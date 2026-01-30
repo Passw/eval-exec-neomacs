@@ -20,6 +20,13 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 
 #ifdef HAVE_NEOMACS
 
+#include <dlfcn.h>
+#include <string.h>
+#include <gtk/gtk.h>
+
+/* Forward declarations for Wayland types (to avoid including wayland headers) */
+struct wl_display;
+
 #include "lisp.h"
 #include "blockinput.h"
 #include "sysselect.h"
@@ -95,6 +102,14 @@ struct neomacs_display_info *
 neomacs_open_display (const char *display_name)
 {
   struct neomacs_display_info *dpyinfo;
+  static bool gtk_initialized = false;
+
+  /* Initialize GTK if not already done */
+  if (!gtk_initialized)
+    {
+      gtk_init ();
+      gtk_initialized = true;
+    }
 
   dpyinfo = xzalloc (sizeof *dpyinfo);
   neomacs_initialize_display_info (dpyinfo);
@@ -129,6 +144,55 @@ neomacs_initialize_display_info (struct neomacs_display_info *dpyinfo)
   dpyinfo->smallest_char_width = 8;
   dpyinfo->smallest_font_height = 16;
   dpyinfo->supports_argb = true;
+  dpyinfo->connection = -1;
+  dpyinfo->gdpy = NULL;
+
+  /* Get the GDK display */
+  GdkDisplay *gdpy = gdk_display_get_default ();
+  if (!gdpy)
+    {
+      /* No display yet, try to open default */
+      gdpy = gdk_display_open (NULL);
+    }
+  dpyinfo->gdpy = gdpy;
+
+  if (gdpy)
+    {
+      /* Get the display connection fd for event handling.
+         This depends on whether we're running on X11 or Wayland.
+         Use dlsym to avoid compile-time dependencies on X11/Wayland headers.  */
+      void *handle = dlopen (NULL, RTLD_LAZY);
+      const char *type_name = G_OBJECT_TYPE_NAME (gdpy);
+
+      if (handle && type_name)
+	{
+	  /* Check for X11 display */
+	  if (strstr (type_name, "X11"))
+	    {
+	      void *(*get_xdisplay) (GdkDisplay *) = dlsym (handle, "gdk_x11_display_get_xdisplay");
+	      int (*conn_number) (void *) = dlsym (handle, "XConnectionNumber");
+	      if (get_xdisplay && conn_number)
+		{
+		  void *xdpy = get_xdisplay (gdpy);
+		  if (xdpy)
+		    dpyinfo->connection = conn_number (xdpy);
+		}
+	    }
+	  /* Check for Wayland display */
+	  else if (strstr (type_name, "Wayland"))
+	    {
+	      struct wl_display *(*get_wl_display) (GdkDisplay *)
+		= dlsym (handle, "gdk_wayland_display_get_wl_display");
+	      int (*get_fd) (struct wl_display *) = dlsym (handle, "wl_display_get_fd");
+	      if (get_wl_display && get_fd)
+		{
+		  struct wl_display *wl_dpy = get_wl_display (gdpy);
+		  if (wl_dpy)
+		    dpyinfo->connection = get_fd (wl_dpy);
+		}
+	    }
+	}
+    }
 }
 
 
@@ -196,6 +260,11 @@ neomacs_create_terminal (struct neomacs_display_info *dpyinfo)
   terminal->defined_color_hook = neomacs_defined_color;
   terminal->get_string_resource_hook = neomacs_get_string_resource;
   terminal->set_new_font_hook = neomacs_new_font;
+  terminal->read_socket_hook = neomacs_read_socket;
+
+  /* Register the display connection fd for event handling */
+  if (dpyinfo->connection >= 0)
+    add_keyboard_wait_descriptor (dpyinfo->connection);
 
   /* More hooks would be set up here... */
 
@@ -576,6 +645,43 @@ neomacs_new_font (struct frame *f, Lisp_Object font_object, int fontset)
     }
 
   return font_object;
+}
+
+
+/* ============================================================================
+ * Input Event Handling
+ * ============================================================================ */
+
+/* Read socket events for the Neomacs terminal.
+   This processes GTK4 events and converts them to Emacs events.  */
+int
+neomacs_read_socket (struct terminal *terminal, struct input_event *hold_quit)
+{
+  GMainContext *context;
+  bool context_acquired = false;
+  int count = 0;
+
+  /* Get the default GLib main context */
+  context = g_main_context_default ();
+  context_acquired = g_main_context_acquire (context);
+
+  block_input ();
+
+  if (context_acquired)
+    {
+      /* Process all pending GTK events */
+      while (g_main_context_pending (context))
+	{
+	  g_main_context_dispatch (context);
+	}
+    }
+
+  unblock_input ();
+
+  if (context_acquired)
+    g_main_context_release (context);
+
+  return count;
 }
 
 
