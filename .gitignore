@@ -391,3 +391,11 @@ exec/config.h.in
 exec/config-mips.m4
 exec/configure
 exec/*.s.s
+
+# Rust build artifacts
+rust/neomacs-display/target/
+rust/neomacs-display/Cargo.lock
+
+# Neomacs exceptions
+!rust/neomacs-display/Makefile
+!rust/neomacs-display/src/core/

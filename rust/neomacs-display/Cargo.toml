@@ -1,0 +1,56 @@
+[package]
+name = "neomacs-display"
+version = "0.1.0"
+edition = "2021"
+authors = ["Neomacs Contributors"]
+license = "GPL-3.0-or-later"
+description = "GPU-accelerated display engine for Neomacs"
+repository = "https://github.com/eval-exec/neomacs-1"
+
+[lib]
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[dependencies]
+# GTK4 bindings
+gtk4 = "0.9"
+gdk4 = "0.9"
+gsk4 = "0.9"
+gio = "0.20"
+glib = "0.20"
+graphene-rs = { version = "0.22.0-alpha.2", package = "graphene-rs" }
+
+# Text rendering
+pango = "0.20"
+pangocairo = "0.20"
+
+# GStreamer for video
+gstreamer = { version = "0.23", optional = true }
+gstreamer-video = { version = "0.23", optional = true }
+gstreamer-app = { version = "0.23", optional = true }
+
+# Utilities
+log = "0.4"
+env_logger = "0.11"
+thiserror = "2.0"
+bitflags = "2.0"
+
+# FFI
+libc = "0.2"
+
+[build-dependencies]
+cbindgen = "0.27"
+which = "7.0"
+
+[features]
+default = ["gtk4-backend", "video"]
+gtk4-backend = []
+tty-backend = []
+video = ["gstreamer", "gstreamer-video", "gstreamer-app"]
+
+[profile.release]
+lto = true
+codegen-units = 1
+panic = "abort"
+
+[profile.dev]
+panic = "abort"
