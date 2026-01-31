@@ -105,6 +105,38 @@ impl WebKitCache {
     pub fn iter(&self) -> impl Iterator<Item = (u32, &WebKitView)> {
         self.views.iter().map(|(&id, view)| (id, view))
     }
+
+    /// Send keyboard event to a view
+    pub fn send_keyboard_event(&self, id: u32, key_code: u32, hardware_key_code: u32, pressed: bool, modifiers: u32) -> DisplayResult<()> {
+        let view = self.views.get(&id)
+            .ok_or_else(|| DisplayError::WebKit(format!("View {} not found", id)))?;
+        view.send_keyboard_event(key_code, hardware_key_code, pressed, modifiers);
+        Ok(())
+    }
+
+    /// Send pointer event to a view
+    pub fn send_pointer_event(&self, id: u32, event_type: u32, x: i32, y: i32, button: u32, state: u32, modifiers: u32) -> DisplayResult<()> {
+        let view = self.views.get(&id)
+            .ok_or_else(|| DisplayError::WebKit(format!("View {} not found", id)))?;
+        view.send_pointer_event(event_type, x, y, button, state, modifiers);
+        Ok(())
+    }
+
+    /// Send scroll event to a view
+    pub fn send_scroll_event(&self, id: u32, x: i32, y: i32, delta_x: i32, delta_y: i32) -> DisplayResult<()> {
+        let view = self.views.get(&id)
+            .ok_or_else(|| DisplayError::WebKit(format!("View {} not found", id)))?;
+        view.scroll(x, y, delta_x, delta_y);
+        Ok(())
+    }
+
+    /// Click in a view
+    pub fn click(&self, id: u32, x: i32, y: i32, button: u32) -> DisplayResult<()> {
+        let view = self.views.get(&id)
+            .ok_or_else(|| DisplayError::WebKit(format!("View {} not found", id)))?;
+        view.click(x, y, button);
+        Ok(())
+    }
 }
 
 #[cfg(test)]

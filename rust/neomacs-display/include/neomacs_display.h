@@ -379,6 +379,47 @@ void neomacs_display_set_floating_webkit(struct NeomacsDisplay *handle,
 void neomacs_display_hide_floating_webkit(struct NeomacsDisplay *handle, uint32_t webkitId);
 
 /**
+ * Send keyboard event to WebKit view
+ */
+void neomacs_display_webkit_send_key(struct NeomacsDisplay *handle,
+                                     uint32_t webkitId,
+                                     uint32_t keyCode,
+                                     uint32_t hardwareKeyCode,
+                                     int pressed,
+                                     uint32_t modifiers);
+
+/**
+ * Send pointer/mouse event to WebKit view
+ */
+void neomacs_display_webkit_send_pointer(struct NeomacsDisplay *handle,
+                                         uint32_t webkitId,
+                                         uint32_t eventType,
+                                         int x,
+                                         int y,
+                                         uint32_t button,
+                                         uint32_t state,
+                                         uint32_t modifiers);
+
+/**
+ * Send scroll event to WebKit view
+ */
+void neomacs_display_webkit_send_scroll(struct NeomacsDisplay *handle,
+                                        uint32_t webkitId,
+                                        int x,
+                                        int y,
+                                        int deltaX,
+                                        int deltaY);
+
+/**
+ * Click in WebKit view (convenience function)
+ */
+void neomacs_display_webkit_click(struct NeomacsDisplay *handle,
+                                  uint32_t webkitId,
+                                  int x,
+                                  int y,
+                                  uint32_t button);
+
+/**
  * Add a WPE glyph to the current row
  */
 void neomacs_display_add_wpe_glyph(struct NeomacsDisplay *handle,

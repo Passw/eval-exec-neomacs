@@ -363,6 +363,50 @@ void neomacs_display_hide_floating_webkit(struct NeomacsDisplay *handle,
                                           uint32_t webkitId);
 
 /**
+ * Send keyboard event to WebKit view
+ * @param key_code XKB keysym
+ * @param hardware_key_code Physical scancode
+ * @param pressed 1 for key down, 0 for key up
+ * @param modifiers Bitmask: ctrl=1, shift=2, alt=4, meta=8
+ */
+void neomacs_display_webkit_send_key(struct NeomacsDisplay *handle,
+                                     uint32_t webkitId,
+                                     uint32_t key_code,
+                                     uint32_t hardware_key_code,
+                                     int pressed,
+                                     uint32_t modifiers);
+
+/**
+ * Send pointer/mouse event to WebKit view
+ * @param event_type 1=motion, 2=button
+ * @param button Mouse button (1=left, 2=middle, 3=right)
+ * @param state Button state (1=pressed, 0=released)
+ */
+void neomacs_display_webkit_send_pointer(struct NeomacsDisplay *handle,
+                                         uint32_t webkitId,
+                                         uint32_t event_type,
+                                         int x, int y,
+                                         uint32_t button,
+                                         uint32_t state,
+                                         uint32_t modifiers);
+
+/**
+ * Send scroll event to WebKit view
+ */
+void neomacs_display_webkit_send_scroll(struct NeomacsDisplay *handle,
+                                        uint32_t webkitId,
+                                        int x, int y,
+                                        int delta_x, int delta_y);
+
+/**
+ * Click in WebKit view
+ */
+void neomacs_display_webkit_click(struct NeomacsDisplay *handle,
+                                  uint32_t webkitId,
+                                  int x, int y,
+                                  uint32_t button);
+
+/**
  * Add a WPE glyph to the current row
  */
 void neomacs_display_add_wpe_glyph(struct NeomacsDisplay *handle,

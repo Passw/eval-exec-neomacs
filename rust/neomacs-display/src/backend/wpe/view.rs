@@ -394,6 +394,115 @@ impl WpeWebView {
             }
         }
     }
+
+    /// Send keyboard event to WebKit
+    /// 
+    /// # Arguments
+    /// * `key_code` - XKB keysym (e.g., XK_a, XK_Return)
+    /// * `hardware_key_code` - Physical scancode
+    /// * `pressed` - true for key down, false for key up
+    /// * `modifiers` - Bitmask of wpe_input_modifier flags
+    pub fn send_keyboard_event(&self, key_code: u32, hardware_key_code: u32, pressed: bool, modifiers: u32) {
+        unsafe {
+            // Get the wpe_view_backend from the exportable
+            let wpe_backend = fdo::wpe_view_backend_exportable_fdo_get_view_backend(self.exportable);
+            if wpe_backend.is_null() {
+                log::warn!("WPE: Cannot send keyboard event - null backend");
+                return;
+            }
+
+            let mut event = sys::wpe_input_keyboard_event {
+                time: 0, // Current time - 0 lets WPE use current time
+                key_code,
+                hardware_key_code,
+                pressed,
+                modifiers,
+            };
+
+            sys::wpe_view_backend_dispatch_keyboard_event(wpe_backend, &mut event);
+            log::trace!("WPE: Keyboard event: key={} pressed={}", key_code, pressed);
+        }
+    }
+
+    /// Send pointer/mouse event to WebKit
+    ///
+    /// # Arguments
+    /// * `event_type` - 1 for motion, 2 for button
+    /// * `x`, `y` - Coordinates relative to view
+    /// * `button` - Mouse button (1=left, 2=middle, 3=right)
+    /// * `state` - Button state (1=pressed, 0=released)
+    /// * `modifiers` - Bitmask of wpe_input_modifier flags
+    pub fn send_pointer_event(&self, event_type: u32, x: i32, y: i32, button: u32, state: u32, modifiers: u32) {
+        unsafe {
+            let wpe_backend = fdo::wpe_view_backend_exportable_fdo_get_view_backend(self.exportable);
+            if wpe_backend.is_null() {
+                log::warn!("WPE: Cannot send pointer event - null backend");
+                return;
+            }
+
+            let mut event = sys::wpe_input_pointer_event {
+                type_: event_type,
+                time: 0,
+                x,
+                y,
+                button,
+                state,
+                modifiers,
+            };
+
+            sys::wpe_view_backend_dispatch_pointer_event(wpe_backend, &mut event);
+            log::trace!("WPE: Pointer event: type={} ({},{}) button={} state={}", event_type, x, y, button, state);
+        }
+    }
+
+    /// Send scroll/axis event to WebKit
+    ///
+    /// # Arguments
+    /// * `x`, `y` - Coordinates relative to view
+    /// * `axis` - 0 for vertical, 1 for horizontal
+    /// * `value` - Scroll amount (positive = down/right)
+    /// * `modifiers` - Bitmask of wpe_input_modifier flags
+    pub fn send_axis_event(&self, x: i32, y: i32, axis: u32, value: i32, modifiers: u32) {
+        unsafe {
+            let wpe_backend = fdo::wpe_view_backend_exportable_fdo_get_view_backend(self.exportable);
+            if wpe_backend.is_null() {
+                log::warn!("WPE: Cannot send axis event - null backend");
+                return;
+            }
+
+            // Axis event type: 0 = null, 1 = motion, 2 = discrete
+            let mut event = sys::wpe_input_axis_event {
+                type_: 2, // discrete scroll
+                time: 0,
+                x,
+                y,
+                axis,
+                value,
+                modifiers,
+            };
+
+            sys::wpe_view_backend_dispatch_axis_event(wpe_backend, &mut event);
+            log::trace!("WPE: Axis event: ({},{}) axis={} value={}", x, y, axis, value);
+        }
+    }
+
+    /// Send mouse click (convenience method)
+    pub fn click(&self, x: i32, y: i32, button: u32) {
+        // Button press
+        self.send_pointer_event(2, x, y, button, 1, 0);
+        // Button release
+        self.send_pointer_event(2, x, y, button, 0, 0);
+    }
+
+    /// Send scroll (convenience method)
+    pub fn scroll(&self, x: i32, y: i32, delta_x: i32, delta_y: i32) {
+        if delta_y != 0 {
+            self.send_axis_event(x, y, 0, delta_y, 0);
+        }
+        if delta_x != 0 {
+            self.send_axis_event(x, y, 1, delta_x, 0);
+        }
+    }
 }
 
 impl Drop for WpeWebView {

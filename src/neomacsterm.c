@@ -1638,6 +1638,116 @@ DEFUN ("neomacs-webkit-floating-clear", Fneomacs_webkit_floating_clear, Sneomacs
   return Qt;
 }
 
+DEFUN ("neomacs-webkit-send-key", Fneomacs_webkit_send_key, Sneomacs_webkit_send_key, 4, 5, 0,
+       doc: /* Send keyboard event to WebKit VIEW-ID.
+KEY-CODE is the XKB keysym.
+HARDWARE-KEY-CODE is the physical scancode.
+PRESSED is non-nil for key down, nil for key up.
+MODIFIERS is a bitmask: ctrl=1, shift=2, alt=4, meta=8.  */)
+  (Lisp_Object view_id, Lisp_Object key_code, Lisp_Object hardware_key_code,
+   Lisp_Object pressed, Lisp_Object modifiers)
+{
+  CHECK_FIXNUM (view_id);
+  CHECK_FIXNUM (key_code);
+  CHECK_FIXNUM (hardware_key_code);
+  
+  struct neomacs_display_info *dpyinfo = neomacs_display_list;
+  if (!dpyinfo || !dpyinfo->display_handle)
+    return Qnil;
+    
+  uint32_t mods = NILP (modifiers) ? 0 : (uint32_t) XFIXNUM (modifiers);
+  
+  neomacs_display_webkit_send_key (dpyinfo->display_handle,
+                                   (uint32_t) XFIXNUM (view_id),
+                                   (uint32_t) XFIXNUM (key_code),
+                                   (uint32_t) XFIXNUM (hardware_key_code),
+                                   !NILP (pressed) ? 1 : 0,
+                                   mods);
+  return Qt;
+}
+
+DEFUN ("neomacs-webkit-send-pointer", Fneomacs_webkit_send_pointer, Sneomacs_webkit_send_pointer, 6, 7, 0,
+       doc: /* Send pointer/mouse event to WebKit VIEW-ID.
+EVENT-TYPE is 1 for motion, 2 for button.
+X and Y are coordinates relative to the view.
+BUTTON is the mouse button (1=left, 2=middle, 3=right).
+STATE is button state (1=pressed, 0=released).
+MODIFIERS is a bitmask.  */)
+  (Lisp_Object view_id, Lisp_Object event_type, Lisp_Object x, Lisp_Object y,
+   Lisp_Object button, Lisp_Object state, Lisp_Object modifiers)
+{
+  CHECK_FIXNUM (view_id);
+  CHECK_FIXNUM (event_type);
+  CHECK_FIXNUM (x);
+  CHECK_FIXNUM (y);
+  CHECK_FIXNUM (button);
+  CHECK_FIXNUM (state);
+  
+  struct neomacs_display_info *dpyinfo = neomacs_display_list;
+  if (!dpyinfo || !dpyinfo->display_handle)
+    return Qnil;
+    
+  uint32_t mods = NILP (modifiers) ? 0 : (uint32_t) XFIXNUM (modifiers);
+  
+  neomacs_display_webkit_send_pointer (dpyinfo->display_handle,
+                                       (uint32_t) XFIXNUM (view_id),
+                                       (uint32_t) XFIXNUM (event_type),
+                                       (int) XFIXNUM (x),
+                                       (int) XFIXNUM (y),
+                                       (uint32_t) XFIXNUM (button),
+                                       (uint32_t) XFIXNUM (state),
+                                       mods);
+  return Qt;
+}
+
+DEFUN ("neomacs-webkit-send-scroll", Fneomacs_webkit_send_scroll, Sneomacs_webkit_send_scroll, 5, 5, 0,
+       doc: /* Send scroll event to WebKit VIEW-ID at position X, Y.
+DELTA-X is horizontal scroll amount (positive = right).
+DELTA-Y is vertical scroll amount (positive = down).  */)
+  (Lisp_Object view_id, Lisp_Object x, Lisp_Object y,
+   Lisp_Object delta_x, Lisp_Object delta_y)
+{
+  CHECK_FIXNUM (view_id);
+  CHECK_FIXNUM (x);
+  CHECK_FIXNUM (y);
+  CHECK_FIXNUM (delta_x);
+  CHECK_FIXNUM (delta_y);
+  
+  struct neomacs_display_info *dpyinfo = neomacs_display_list;
+  if (!dpyinfo || !dpyinfo->display_handle)
+    return Qnil;
+    
+  neomacs_display_webkit_send_scroll (dpyinfo->display_handle,
+                                      (uint32_t) XFIXNUM (view_id),
+                                      (int) XFIXNUM (x),
+                                      (int) XFIXNUM (y),
+                                      (int) XFIXNUM (delta_x),
+                                      (int) XFIXNUM (delta_y));
+  return Qt;
+}
+
+DEFUN ("neomacs-webkit-click", Fneomacs_webkit_click, Sneomacs_webkit_click, 4, 4, 0,
+       doc: /* Click in WebKit VIEW-ID at position X, Y with BUTTON.
+BUTTON is 1 for left, 2 for middle, 3 for right.  */)
+  (Lisp_Object view_id, Lisp_Object x, Lisp_Object y, Lisp_Object button)
+{
+  CHECK_FIXNUM (view_id);
+  CHECK_FIXNUM (x);
+  CHECK_FIXNUM (y);
+  CHECK_FIXNUM (button);
+  
+  struct neomacs_display_info *dpyinfo = neomacs_display_list;
+  if (!dpyinfo || !dpyinfo->display_handle)
+    return Qnil;
+    
+  neomacs_display_webkit_click (dpyinfo->display_handle,
+                                (uint32_t) XFIXNUM (view_id),
+                                (int) XFIXNUM (x),
+                                (int) XFIXNUM (y),
+                                (uint32_t) XFIXNUM (button));
+  return Qt;
+}
+
 
 /* ============================================================================
  * Miscellaneous Functions
@@ -1759,6 +1869,10 @@ syms_of_neomacsterm (void)
   defsubr (&Sneomacs_webkit_execute_js);
   defsubr (&Sneomacs_webkit_floating);
   defsubr (&Sneomacs_webkit_floating_clear);
+  defsubr (&Sneomacs_webkit_send_key);
+  defsubr (&Sneomacs_webkit_send_pointer);
+  defsubr (&Sneomacs_webkit_send_scroll);
+  defsubr (&Sneomacs_webkit_click);
 
   DEFSYM (Qneomacs, "neomacs");
 

@@ -15,6 +15,7 @@ use crate::core::types::Color;
 use crate::text::{TextEngine, GlyphAtlas, GlyphKey};
 use super::video::VideoCache;
 use super::image::ImageCache;
+use crate::backend::webkit::WebKitCache;
 
 /// GPU-accelerated renderer using GSK render nodes.
 pub struct GskRenderer {
@@ -63,7 +64,7 @@ impl GskRenderer {
 
     /// Render scene to a GtkSnapshot (for GPU-accelerated rendering)
     pub fn render_to_snapshot(&mut self, snapshot: &gtk4::Snapshot, scene: &Scene) {
-        if let Some(node) = self.build_render_node(scene, None, None) {
+        if let Some(node) = self.build_render_node(scene, None, None, None) {
             snapshot.append_node(&node);
         }
     }
@@ -71,7 +72,7 @@ impl GskRenderer {
     /// Render scene to Cairo context via GSK nodes
     /// This still uses the GSK scene graph but renders through Cairo
     pub fn render_to_cairo(&mut self, cr: &gtk4::cairo::Context, scene: &Scene) {
-        if let Some(node) = self.build_render_node(scene, None, None) {
+        if let Some(node) = self.build_render_node(scene, None, None, None) {
             // GSK render nodes can be drawn to a Cairo context
             node.draw(cr);
         }
@@ -84,7 +85,7 @@ impl GskRenderer {
         scene: &Scene,
         video_cache: &VideoCache,
     ) {
-        if let Some(node) = self.build_render_node(scene, Some(video_cache), None) {
+        if let Some(node) = self.build_render_node(scene, Some(video_cache), None, None) {
             node.draw(cr);
         }
     }
@@ -97,7 +98,21 @@ impl GskRenderer {
         video_cache: &VideoCache,
         image_cache: &mut ImageCache,
     ) {
-        if let Some(node) = self.build_render_node(scene, Some(video_cache), Some(image_cache)) {
+        if let Some(node) = self.build_render_node(scene, Some(video_cache), Some(image_cache), None) {
+            node.draw(cr);
+        }
+    }
+    
+    /// Render scene to Cairo context with all caches (video, image, webkit)
+    pub fn render_to_cairo_with_all_caches(
+        &mut self, 
+        cr: &gtk4::cairo::Context, 
+        scene: &Scene,
+        video_cache: &VideoCache,
+        image_cache: &mut ImageCache,
+        webkit_cache: &WebKitCache,
+    ) {
+        if let Some(node) = self.build_render_node(scene, Some(video_cache), Some(image_cache), Some(webkit_cache)) {
             node.draw(cr);
         }
     }
@@ -108,6 +123,7 @@ impl GskRenderer {
         scene: &Scene, 
         video_cache: Option<&VideoCache>,
         mut image_cache: Option<&mut ImageCache>,
+        webkit_cache: Option<&WebKitCache>,
     ) -> Option<gsk::RenderNode> {
         let mut nodes: Vec<gsk::RenderNode> = Vec::new();
 
@@ -167,20 +183,45 @@ impl GskRenderer {
 
         // Render floating WebKit views on top (highest z-order)
         #[cfg(feature = "wpe-webkit")]
-        {
-            // WebKit textures are rendered via the scene's floating_webkits
-            // The actual texture is retrieved from the WebKit cache passed to the render function
-            // For now, we just render a placeholder - real integration requires passing the WebKitCache
+        if let Some(cache) = webkit_cache {
             for floating in &scene.floating_webkits {
-                // TODO: Get texture from WebKitCache similar to video/images
-                // For now, render a dark placeholder rectangle
+                if let Some(view) = cache.get(floating.webkit_id) {
+                    if let Some(texture) = view.texture() {
+                        let webkit_rect = graphene::Rect::new(
+                            floating.x,
+                            floating.y,
+                            floating.width,
+                            floating.height,
+                        );
+                        let texture_node = gsk::TextureNode::new(texture, &webkit_rect);
+                        nodes.push(texture_node.upcast());
+                    } else {
+                        // Loading placeholder - dark rectangle with loading indicator
+                        let webkit_rect = graphene::Rect::new(
+                            floating.x,
+                            floating.y,
+                            floating.width,
+                            floating.height,
+                        );
+                        let placeholder_color = gdk::RGBA::new(0.1, 0.1, 0.15, 1.0);
+                        let placeholder_node = gsk::ColorNode::new(&placeholder_color, &webkit_rect);
+                        nodes.push(placeholder_node.upcast());
+                    }
+                }
+            }
+        }
+        
+        // Fallback for floating_webkits when wpe-webkit is not enabled
+        #[cfg(not(feature = "wpe-webkit"))]
+        {
+            for floating in &scene.floating_webkits {
                 let webkit_rect = graphene::Rect::new(
                     floating.x,
                     floating.y,
                     floating.width,
                     floating.height,
                 );
-                let placeholder_color = gdk::RGBA::new(0.1, 0.1, 0.15, 1.0);
+                let placeholder_color = gdk::RGBA::new(0.2, 0.1, 0.1, 1.0);
                 let placeholder_node = gsk::ColorNode::new(&placeholder_color, &webkit_rect);
                 nodes.push(placeholder_node.upcast());
             }

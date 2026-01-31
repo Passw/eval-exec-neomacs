@@ -136,6 +136,31 @@ impl WebKitView {
     pub fn dispatch_frame_complete(&self) {
         self.wpe_view.dispatch_frame_complete();
     }
+
+    /// Send keyboard event
+    pub fn send_keyboard_event(&self, key_code: u32, hardware_key_code: u32, pressed: bool, modifiers: u32) {
+        self.wpe_view.send_keyboard_event(key_code, hardware_key_code, pressed, modifiers);
+    }
+
+    /// Send pointer/mouse event
+    pub fn send_pointer_event(&self, event_type: u32, x: i32, y: i32, button: u32, state: u32, modifiers: u32) {
+        self.wpe_view.send_pointer_event(event_type, x, y, button, state, modifiers);
+    }
+
+    /// Send scroll/axis event
+    pub fn send_axis_event(&self, x: i32, y: i32, axis: u32, value: i32, modifiers: u32) {
+        self.wpe_view.send_axis_event(x, y, axis, value, modifiers);
+    }
+
+    /// Click at position
+    pub fn click(&self, x: i32, y: i32, button: u32) {
+        self.wpe_view.click(x, y, button);
+    }
+
+    /// Scroll at position
+    pub fn scroll(&self, x: i32, y: i32, delta_x: i32, delta_y: i32) {
+        self.wpe_view.scroll(x, y, delta_x, delta_y);
+    }
 }
 
 // Stub implementation when wpe-webkit feature is disabled

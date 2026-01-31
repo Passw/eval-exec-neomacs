@@ -1499,6 +1499,135 @@ pub unsafe extern "C" fn neomacs_display_hide_floating_webkit(
     display.scene.remove_floating_webkit(webkit_id);
 }
 
+/// Send keyboard event to WebKit view
+#[no_mangle]
+pub unsafe extern "C" fn neomacs_display_webkit_send_key(
+    _handle: *mut NeomacsDisplay,
+    webkit_id: u32,
+    key_code: u32,
+    hardware_key_code: u32,
+    pressed: c_int,
+    modifiers: u32,
+) {
+    #[cfg(feature = "wpe-webkit")]
+    {
+        WEBKIT_CACHE.with(|cache| {
+            if let Some(ref c) = *cache.borrow() {
+                if let Err(e) = c.send_keyboard_event(
+                    webkit_id,
+                    key_code,
+                    hardware_key_code,
+                    pressed != 0,
+                    modifiers,
+                ) {
+                    eprintln!("WebKit key event error: {}", e);
+                }
+            }
+        });
+    }
+
+    #[cfg(not(feature = "wpe-webkit"))]
+    {
+        let _ = (webkit_id, key_code, hardware_key_code, pressed, modifiers);
+    }
+}
+
+/// Send pointer/mouse event to WebKit view
+#[no_mangle]
+pub unsafe extern "C" fn neomacs_display_webkit_send_pointer(
+    _handle: *mut NeomacsDisplay,
+    webkit_id: u32,
+    event_type: u32,
+    x: c_int,
+    y: c_int,
+    button: u32,
+    state: u32,
+    modifiers: u32,
+) {
+    #[cfg(feature = "wpe-webkit")]
+    {
+        WEBKIT_CACHE.with(|cache| {
+            if let Some(ref c) = *cache.borrow() {
+                if let Err(e) = c.send_pointer_event(
+                    webkit_id,
+                    event_type,
+                    x,
+                    y,
+                    button,
+                    state,
+                    modifiers,
+                ) {
+                    eprintln!("WebKit pointer event error: {}", e);
+                }
+            }
+        });
+    }
+
+    #[cfg(not(feature = "wpe-webkit"))]
+    {
+        let _ = (webkit_id, event_type, x, y, button, state, modifiers);
+    }
+}
+
+/// Send scroll event to WebKit view
+#[no_mangle]
+pub unsafe extern "C" fn neomacs_display_webkit_send_scroll(
+    _handle: *mut NeomacsDisplay,
+    webkit_id: u32,
+    x: c_int,
+    y: c_int,
+    delta_x: c_int,
+    delta_y: c_int,
+) {
+    #[cfg(feature = "wpe-webkit")]
+    {
+        WEBKIT_CACHE.with(|cache| {
+            if let Some(ref c) = *cache.borrow() {
+                if let Err(e) = c.send_scroll_event(
+                    webkit_id,
+                    x,
+                    y,
+                    delta_x,
+                    delta_y,
+                ) {
+                    eprintln!("WebKit scroll event error: {}", e);
+                }
+            }
+        });
+    }
+
+    #[cfg(not(feature = "wpe-webkit"))]
+    {
+        let _ = (webkit_id, x, y, delta_x, delta_y);
+    }
+}
+
+/// Click in WebKit view (convenience function)
+#[no_mangle]
+pub unsafe extern "C" fn neomacs_display_webkit_click(
+    _handle: *mut NeomacsDisplay,
+    webkit_id: u32,
+    x: c_int,
+    y: c_int,
+    button: u32,
+) {
+    #[cfg(feature = "wpe-webkit")]
+    {
+        WEBKIT_CACHE.with(|cache| {
+            if let Some(ref c) = *cache.borrow() {
+                if let Err(e) = c.click(webkit_id, x, y, button) {
+                    eprintln!("WebKit click error: {}", e);
+                }
+            }
+        });
+    }
+
+    #[cfg(not(feature = "wpe-webkit"))]
+    {
+        let _ = (webkit_id, x, y, button);
+    }
+}
+
 /// Add a WPE glyph to the current row
 #[no_mangle]
 pub unsafe extern "C" fn neomacs_display_add_wpe_glyph(

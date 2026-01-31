@@ -137,6 +137,9 @@ Optional WIDTH and HEIGHT override stored dimensions."
     (define-key map "F" #'neomacs-webkit-mode-forward)
     (define-key map "q" #'neomacs-webkit-mode-quit)
     (define-key map "o" #'neomacs-webkit-mode-open)
+    (define-key map [mouse-1] #'neomacs-webkit-mode-mouse-click)
+    (define-key map [wheel-up] #'neomacs-webkit-mode-scroll-up)
+    (define-key map [wheel-down] #'neomacs-webkit-mode-scroll-down)
     map)
   "Keymap for `neomacs-webkit-mode'.")
 
@@ -178,6 +181,55 @@ Optional WIDTH and HEIGHT override stored dimensions."
   (when neomacs-webkit-buffer-view-id
     (neomacs-webkit-load-uri neomacs-webkit-buffer-view-id url)
     (message "Loading: %s" url)))
+
+(defvar-local neomacs-webkit--floating-position nil
+  "Position and size of floating WebKit view (x y width height).")
+
+(defun neomacs-webkit-mode-mouse-click (event)
+  "Handle mouse click EVENT in WebKit view."
+  (interactive "e")
+  (when (and neomacs-webkit-buffer-view-id neomacs-webkit--floating-position)
+    (let* ((pos (posn-x-y (event-start event)))
+           (click-x (car pos))
+           (click-y (cdr pos))
+           (float-x (nth 0 neomacs-webkit--floating-position))
+           (float-y (nth 1 neomacs-webkit--floating-position))
+           ;; Translate to WebKit view coordinates
+           (view-x (- click-x float-x))
+           (view-y (- click-y float-y)))
+      (neomacs-webkit-click neomacs-webkit-buffer-view-id view-x view-y 1))))
+
+(defun neomacs-webkit-mode-scroll-up (event)
+  "Handle scroll up EVENT in WebKit view."
+  (interactive "e")
+  (when (and neomacs-webkit-buffer-view-id neomacs-webkit--floating-position)
+    (let* ((pos (posn-x-y (event-start event)))
+           (float-x (nth 0 neomacs-webkit--floating-position))
+           (float-y (nth 1 neomacs-webkit--floating-position))
+           (view-x (- (car pos) float-x))
+           (view-y (- (cdr pos) float-y)))
+      (neomacs-webkit-send-scroll neomacs-webkit-buffer-view-id view-x view-y 0 -50))))
+
+(defun neomacs-webkit-mode-scroll-down (event)
+  "Handle scroll down EVENT in WebKit view."
+  (interactive "e")
+  (when (and neomacs-webkit-buffer-view-id neomacs-webkit--floating-position)
+    (let* ((pos (posn-x-y (event-start event)))
+           (float-x (nth 0 neomacs-webkit--floating-position))
+           (float-y (nth 1 neomacs-webkit--floating-position))
+           (view-x (- (car pos) float-x))
+           (view-y (- (cdr pos) float-y)))
+      (neomacs-webkit-send-scroll neomacs-webkit-buffer-view-id view-x view-y 0 50))))
+
+(defun neomacs-webkit-mode-show-fullscreen ()
+  "Show WebKit view as fullscreen floating overlay."
+  (interactive)
+  (when neomacs-webkit-buffer-view-id
+    (let* ((frame (selected-frame))
+           (width (frame-pixel-width frame))
+           (height (frame-pixel-height frame)))
+      (setq neomacs-webkit--floating-position (list 0 0 width height))
+      (neomacs-webkit-floating neomacs-webkit-buffer-view-id 0 0 width height))))
 
 ;;;###autoload
 (defun neomacs-webkit-open-url (url)
