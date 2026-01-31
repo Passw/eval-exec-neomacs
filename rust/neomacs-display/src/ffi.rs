@@ -142,12 +142,10 @@ pub unsafe extern "C" fn neomacs_display_begin_frame(handle: *mut NeomacsDisplay
     }
 
     let display = &mut *handle;
-    // Clear scene at the start of each new frame update cycle
-    // in_frame is false when we start a new cycle (reset by end_frame)
-    if !display.in_frame {
-        display.scene.clear();
-        display.in_frame = true;
-    }
+    // Just mark that we're in a frame update cycle
+    // Don't clear the scene - Emacs does incremental updates and we need to preserve content
+    // between frame updates (e.g. cursor blink doesn't repopulate all glyphs)
+    display.in_frame = true;
 }
 
 /// Add a window to the current frame

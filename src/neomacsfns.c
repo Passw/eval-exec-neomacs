@@ -847,9 +847,6 @@ neomacs_create_frame_widgets (struct frame *f)
   if (gpu_env && strcmp (gpu_env, "1") == 0)
     use_gpu_widget = 1;
 
-  if (0) fprintf (stderr, "DEBUG: Creating frame widgets, pixel size %dx%d, gpu=%d\n",
-	   FRAME_PIXEL_WIDTH (f), FRAME_PIXEL_HEIGHT (f), use_gpu_widget);
-
   /* Create main window */
   window = gtk_window_new ();
 
