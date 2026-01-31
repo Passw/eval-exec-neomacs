@@ -149,7 +149,29 @@ impl GskRenderer {
         if let Some(cache) = video_cache {
             for floating in &scene.floating_videos {
                 if let Some(player) = cache.get(floating.video_id) {
-                    if let Some(texture) = player.get_frame_texture() {
+                    // Prefer using paintable directly (more efficient for gtk4paintablesink)
+                    if let Some(paintable) = player.get_paintable() {
+                        let video_rect = graphene::Rect::new(
+                            floating.x,
+                            floating.y,
+                            floating.width,
+                            floating.height,
+                        );
+                        // Create a snapshot and render the paintable to it
+                        let snapshot = gtk4::Snapshot::new();
+                        snapshot.push_clip(&video_rect);
+                        snapshot.translate(&graphene::Point::new(floating.x, floating.y));
+                        paintable.snapshot(
+                            snapshot.upcast_ref::<gdk::Snapshot>(),
+                            floating.width as f64,
+                            floating.height as f64,
+                        );
+                        snapshot.pop(); // pop clip
+                        if let Some(node) = snapshot.to_node() {
+                            nodes.push(node);
+                        }
+                    } else if let Some(texture) = player.get_frame_texture() {
+                        // Fallback to texture if paintable not available
                         let video_rect = graphene::Rect::new(
                             floating.x,
                             floating.y,
@@ -468,11 +490,28 @@ impl GskRenderer {
                             glyph.ascent as f32,
                         );
                         
-                        // Try to get video frame texture from cache
+                        // Try to get video frame from cache using paintable (more efficient)
                         #[cfg(feature = "video")]
                         let has_frame = if let Some(cache) = video_cache {
                             if let Some(player) = cache.get(video_id) {
-                                if let Some(texture) = player.get_frame_texture() {
+                                // Prefer paintable for better performance with gtk4paintablesink
+                                if let Some(paintable) = player.get_paintable() {
+                                    let snapshot = gtk4::Snapshot::new();
+                                    snapshot.push_clip(&video_rect);
+                                    snapshot.translate(&graphene::Point::new(x, base_y));
+                                    paintable.snapshot(
+                                        snapshot.upcast_ref::<gdk::Snapshot>(),
+                                        glyph.pixel_width as f64,
+                                        glyph.ascent as f64,
+                                    );
+                                    snapshot.pop();
+                                    if let Some(node) = snapshot.to_node() {
+                                        nodes.push(node);
+                                        true
+                                    } else {
+                                        false
+                                    }
+                                } else if let Some(texture) = player.get_frame_texture() {
                                     let texture_node = gsk::TextureNode::new(&texture, &video_rect);
                                     nodes.push(texture_node.upcast());
                                     true
