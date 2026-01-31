@@ -52,6 +52,8 @@ static void neomacs_initialize_display_info (struct neomacs_display_info *);
 static const char *neomacs_get_string_resource (void *, const char *, const char *);
 static void neomacs_make_frame_visible_invisible (struct frame *, bool);
 static void neomacs_after_update_window_line (struct window *, struct glyph_row *);
+static void neomacs_update_window_begin (struct window *);
+static void neomacs_update_window_end (struct window *, bool, bool);
 
 /* The redisplay interface for Neomacs frames - statically initialized.
    All function pointers are declared extern in neomacsterm.h */
@@ -63,8 +65,8 @@ static struct redisplay_interface neomacs_redisplay_interface = {
   .clear_end_of_line = gui_clear_end_of_line,
   .scroll_run_hook = neomacs_scroll_run,
   .after_update_window_line_hook = neomacs_after_update_window_line,
-  .update_window_begin_hook = NULL,
-  .update_window_end_hook = NULL,
+  .update_window_begin_hook = neomacs_update_window_begin,
+  .update_window_end_hook = neomacs_update_window_end,
   .flush_display = neomacs_flush_display,
   .clear_window_mouse_face = gui_clear_window_mouse_face,
   .get_glyph_overhangs = gui_get_glyph_overhangs,
@@ -315,7 +317,52 @@ neomacs_update_end (struct frame *f)
 
   /* Queue a redraw of the drawing area */
   if (output && output->drawing_area)
-    gtk_widget_queue_draw (GTK_WIDGET (output->drawing_area));
+    {
+      /* For GPU widget, also set the scene */
+      if (output->use_gpu_widget && dpyinfo && dpyinfo->display_handle)
+        neomacs_display_render_to_widget (dpyinfo->display_handle, output->drawing_area);
+      
+      gtk_widget_queue_draw (GTK_WIDGET (output->drawing_area));
+    }
+}
+
+/* Called at the beginning of updating a window */
+static void
+neomacs_update_window_begin (struct window *w)
+{
+  struct frame *f = XFRAME (WINDOW_FRAME (w));
+  struct neomacs_display_info *dpyinfo;
+
+  if (!FRAME_NEOMACS_P (f))
+    return;
+
+  dpyinfo = FRAME_NEOMACS_DISPLAY_INFO (f);
+
+  /* Add this window to the Rust scene graph */
+  if (dpyinfo && dpyinfo->display_handle)
+    {
+      int x = WINDOW_LEFT_EDGE_X (w);
+      int y = WINDOW_TOP_EDGE_Y (w);
+      int width = WINDOW_PIXEL_WIDTH (w);
+      int height = WINDOW_PIXEL_HEIGHT (w);
+      unsigned long bg = FRAME_BACKGROUND_PIXEL (f);
+      int selected = (w == XWINDOW (f->selected_window)) ? 1 : 0;
+
+      neomacs_display_add_window (dpyinfo->display_handle,
+                                  (intptr_t) w,  /* window_id */
+                                  (float) x, (float) y,
+                                  (float) width, (float) height,
+                                  (uint32_t) bg,
+                                  selected);
+    }
+}
+
+/* Called at the end of updating a window */
+static void
+neomacs_update_window_end (struct window *w, bool cursor_on_p,
+                           bool mouse_face_overwritten_p)
+{
+  /* Nothing special needed for now */
 }
 
 /* Flush pending output to display */
@@ -376,38 +423,22 @@ bool
 neomacs_defined_color (struct frame *f, const char *color_name,
                        Emacs_Color *color_def, bool alloc, bool makeIndex)
 {
-  /* Simple color name parsing - expand as needed */
+  /* Use GDK to parse color names - supports all CSS color names and formats */
   if (!color_name || !color_def)
     return false;
 
-  /* Try to parse common color names */
-  if (strcmp (color_name, "black") == 0)
+  GdkRGBA rgba;
+  if (gdk_rgba_parse (&rgba, color_name))
     {
-      color_def->red = color_def->green = color_def->blue = 0;
-      color_def->pixel = 0x000000;
+      color_def->red = rgba.red * 65535;
+      color_def->green = rgba.green * 65535;
+      color_def->blue = rgba.blue * 65535;
+      color_def->pixel = ((color_def->red >> 8) << 16
+                          | (color_def->green >> 8) << 8
+                          | (color_def->blue >> 8) << 0);
       return true;
     }
-  if (strcmp (color_name, "white") == 0)
-    {
-      color_def->red = color_def->green = color_def->blue = 65535;
-      color_def->pixel = 0xffffff;
-      return true;
-    }
-
-  /* Try to parse #RRGGBB format */
-  if (color_name[0] == '#' && strlen (color_name) == 7)
-    {
-      unsigned int r, g, b;
-      if (sscanf (color_name + 1, "%2x%2x%2x", &r, &g, &b) == 3)
-        {
-          color_def->red = r * 257;   /* Scale 0-255 to 0-65535 */
-          color_def->green = g * 257;
-          color_def->blue = b * 257;
-          color_def->pixel = RGB_TO_ULONG (r, g, b);
-          return true;
-        }
-    }
-
+  
   return false;
 }
 
@@ -467,15 +498,256 @@ neomacs_draw_glyph_string (struct glyph_string *s)
 {
   struct frame *f = s->f;
   struct neomacs_output *output = FRAME_NEOMACS_OUTPUT (f);
+  struct neomacs_display_info *dpyinfo = FRAME_DISPLAY_INFO (f);
   cairo_t *cr;
 
-  if (!output || !output->cr_context)
+  /* Track current row for Rust scene graph */
+  static int current_row_y = -1;
+
+  if (!output)
+    return;
+
+  /* For GPU widget mode, we don't need Cairo context - just forward to Rust */
+  if (output->use_gpu_widget)
+    {
+      /* Forward glyph data to Rust scene graph */
+      if (dpyinfo && dpyinfo->display_handle && s->first_glyph && s->row)
+        {
+          /* Check if we need to start a new row */
+          int row_y = s->row->y;
+          if (row_y != current_row_y)
+            {
+              /* Start a new row */
+              current_row_y = row_y;
+              neomacs_display_begin_row (dpyinfo->display_handle,
+                                         row_y,
+                                         s->row->height,
+                                         s->row->ascent,
+                                         s->row->mode_line_p ? 1 : 0,
+                                         0);  /* header_line not in glyph_row */
+            }
+
+          /* Add glyphs to Rust scene graph */
+          int face_id = s->face ? s->face->id : 0;
+          
+          /* Register face with colors/attributes if we have face info */
+          if (s->face)
+            {
+              struct face *face = s->face;
+              unsigned long fg = face->foreground;
+              unsigned long bg = face->background;
+              
+              /* If foreground is defaulted, use frame foreground */
+              if (face->foreground_defaulted_p)
+                fg = FRAME_FOREGROUND_PIXEL(s->f);
+              if (face->background_defaulted_p)
+                bg = FRAME_BACKGROUND_PIXEL(s->f);
+              
+              /* Convert Emacs colors to 0xRRGGBB format */
+              uint32_t fg_rgb = ((RED_FROM_ULONG(fg) << 16) |
+                                (GREEN_FROM_ULONG(fg) << 8) |
+                                BLUE_FROM_ULONG(fg));
+              uint32_t bg_rgb = ((RED_FROM_ULONG(bg) << 16) |
+                                (GREEN_FROM_ULONG(bg) << 8) |
+                                BLUE_FROM_ULONG(bg));
+              
+              /* Get font weight and slant from lface attributes */
+              int font_weight = 400;  /* normal */
+              int is_italic = 0;
+              
+              /* Check face's lface for weight (bold) */
+              Lisp_Object weight_attr = face->lface[LFACE_WEIGHT_INDEX];
+              if (!NILP (weight_attr) && SYMBOLP (weight_attr))
+                {
+                  int weight_numeric = FONT_WEIGHT_NAME_NUMERIC (weight_attr);
+                  if (weight_numeric > 0)
+                    font_weight = weight_numeric;
+                }
+              
+              /* Check face's lface for slant (italic) */
+              Lisp_Object slant_attr = face->lface[LFACE_SLANT_INDEX];
+              if (!NILP (slant_attr) && SYMBOLP (slant_attr))
+                {
+                  int slant_numeric = FONT_SLANT_NAME_NUMERIC (slant_attr);
+                  /* Normal slant is 100, italic is 200, oblique is around 110 */
+                  if (slant_numeric != 100)
+                    is_italic = 1;
+                }
+              
+              /* Check for underline */
+              int underline_style = 0;
+              uint32_t underline_color = fg_rgb;
+              if (face->underline != FACE_NO_UNDERLINE)
+                {
+                  underline_style = 1;  /* line */
+                  if (face->underline == FACE_UNDERLINE_WAVE)
+                    underline_style = 2;
+                  /* Use foreground as underline color (there's no separate underline_color field) */
+                }
+              
+              /* Check for box */
+              int box_type = 0;
+              uint32_t box_color = fg_rgb;
+              int box_line_width = 0;
+              if (face->box != FACE_NO_BOX)
+                {
+                  box_type = 1;  /* line */
+                  box_line_width = eabs(face->box_vertical_line_width);
+                  if (box_line_width == 0)
+                    box_line_width = 1;
+                  if (face->box_color_defaulted_p == 0)
+                    box_color = ((RED_FROM_ULONG(face->box_color) << 16) |
+                                 (GREEN_FROM_ULONG(face->box_color) << 8) |
+                                 BLUE_FROM_ULONG(face->box_color));
+                }
+              
+              neomacs_display_set_face (dpyinfo->display_handle,
+                                        face_id,
+                                        fg_rgb,
+                                        bg_rgb,
+                                        font_weight,
+                                        is_italic,
+                                        underline_style,
+                                        underline_color,
+                                        box_type,
+                                        box_color,
+                                        box_line_width);
+            }
+          
+          switch (s->first_glyph->type)
+            {
+            case CHAR_GLYPH:
+              /* Forward character glyphs - get character from glyph->u.ch */
+              {
+                struct glyph *glyph = s->first_glyph;
+                for (int i = 0; i < s->nchars && glyph; i++, glyph++)
+                  {
+                    /* Get the actual Unicode character from the glyph */
+                    unsigned int charcode = glyph->u.ch;
+                    int char_width = glyph->pixel_width;
+                    neomacs_display_add_char_glyph (dpyinfo->display_handle,
+                                                    charcode,
+                                                    (uint32_t) face_id,
+                                                    char_width,
+                                                    FONT_BASE (s->font),
+                                                    FONT_DESCENT (s->font));
+                  }
+              }
+              break;
+            case STRETCH_GLYPH:
+              neomacs_display_add_stretch_glyph (dpyinfo->display_handle,
+                                                  s->first_glyph->pixel_width,
+                                                  s->row->height,
+                                                  (uint32_t) face_id);
+              break;
+            case IMAGE_GLYPH:
+              /* TODO: Handle image glyphs */
+              break;
+            case VIDEO_GLYPH:
+              /* Handle video glyphs */
+              neomacs_display_add_video_glyph (dpyinfo->display_handle,
+                                                s->first_glyph->u.video_id,
+                                                s->first_glyph->pixel_width,
+                                                s->row->height);
+              break;
+            default:
+              break;
+            }
+        }
+      return;  /* Don't do Cairo drawing for GPU widget */
+    }
+
+  /* For Cairo mode, we need the context */
+  if (!output->cr_context)
     return;
 
   cr = output->cr_context;
 
-  /* Set up clipping if needed */
-  /* TODO: Handle clipping properly */
+  /* Forward glyph data to Rust scene graph if available */
+  if (dpyinfo && dpyinfo->display_handle && s->first_glyph && s->row)
+    {
+      /* Check if we need to start a new row */
+      int row_y = s->row->y;
+      if (row_y != current_row_y)
+        {
+          /* Start a new row */
+          current_row_y = row_y;
+          neomacs_display_begin_row (dpyinfo->display_handle,
+                                     row_y,
+                                     s->row->height,
+                                     s->row->ascent,
+                                     s->row->mode_line_p ? 1 : 0,
+                                     0);  /* header_line not in glyph_row */
+        }
+
+      /* Add glyphs to Rust scene graph */
+      int face_id = s->face ? s->face->id : 0;
+      
+      switch (s->first_glyph->type)
+        {
+        case CHAR_GLYPH:
+          /* Forward character glyphs - get character from glyph->u.ch */
+          {
+            struct glyph *glyph = s->first_glyph;
+            for (int i = 0; i < s->nchars && glyph; i++, glyph++)
+              {
+                /* Get the actual Unicode character from the glyph */
+                unsigned int charcode = glyph->u.ch;
+                int char_width = glyph->pixel_width;
+                neomacs_display_add_char_glyph (dpyinfo->display_handle,
+                                                charcode,
+                                                face_id,
+                                                char_width,
+                                                s->font ? FONT_BASE (s->font) : s->height,
+                                                s->font ? FONT_DESCENT (s->font) : 0);
+              }
+          }
+          break;
+          
+        case COMPOSITE_GLYPH:
+        case GLYPHLESS_GLYPH:
+          /* For composite/glyphless, use char2b if available */
+          if (s->char2b)
+            {
+              for (int i = 0; i < s->nchars; i++)
+                {
+                  unsigned int charcode = s->char2b[i];
+                  int char_width = s->width / (s->nchars > 0 ? s->nchars : 1);
+                  neomacs_display_add_char_glyph (dpyinfo->display_handle,
+                                                  charcode,
+                                                  face_id,
+                                                  char_width,
+                                                  s->font ? FONT_BASE (s->font) : s->height,
+                                                  s->font ? FONT_DESCENT (s->font) : 0);
+                }
+            }
+          break;
+          
+        case STRETCH_GLYPH:
+          neomacs_display_add_stretch_glyph (dpyinfo->display_handle,
+                                             s->width,
+                                             s->height,
+                                             face_id);
+          break;
+          
+        case IMAGE_GLYPH:
+          /* TODO: Forward image glyph */
+          break;
+          
+        case VIDEO_GLYPH:
+          /* Handle video glyphs */
+          neomacs_display_add_video_glyph (dpyinfo->display_handle,
+                                           s->first_glyph->u.video_id,
+                                           s->first_glyph->pixel_width,
+                                           s->row->height);
+          break;
+          
+        default:
+          break;
+        }
+    }
+
+  /* Continue with Cairo rendering (keeping existing behavior) */
 
   /* Get face colors */
   unsigned long fg = s->face->foreground;
@@ -559,6 +831,10 @@ neomacs_draw_glyph_string (struct glyph_string *s)
       /* TODO: Implement image glyph drawing */
       break;
 
+    case VIDEO_GLYPH:
+      /* Video glyph rendering is handled by Rust - no Cairo fallback needed */
+      break;
+
     default:
       break;
     }
@@ -638,12 +914,10 @@ neomacs_draw_window_cursor (struct window *w, struct glyph_row *row,
 {
   struct frame *f = XFRAME (w->frame);
   struct neomacs_output *output = FRAME_NEOMACS_OUTPUT (f);
-  cairo_t *cr;
+  struct neomacs_display_info *dpyinfo = FRAME_NEOMACS_DISPLAY_INFO (f);
 
-  if (!output || !output->cr_context || !on_p)
+  if (!output || !on_p)
     return;
-
-  cr = output->cr_context;
 
   /* Get cursor dimensions */
   int char_width = cursor_width > 0 ? cursor_width : FRAME_COLUMN_WIDTH (f);
@@ -652,7 +926,47 @@ neomacs_draw_window_cursor (struct window *w, struct glyph_row *row,
   /* Get cursor color - default to a visible color */
   unsigned long cursor_color = output->cursor_pixel;
   if (cursor_color == 0)
-    cursor_color = 0x000000;  /* Black */
+    cursor_color = 0x00FF00;  /* Green for visibility */
+
+  /* Use GPU path if available */
+  if (dpyinfo && dpyinfo->display_handle)
+    {
+      int style;
+      switch (cursor_type)
+        {
+        case DEFAULT_CURSOR:
+        case FILLED_BOX_CURSOR:
+          style = 0;  /* Box */
+          break;
+        case BAR_CURSOR:
+          style = 1;  /* Bar */
+          break;
+        case HBAR_CURSOR:
+          style = 2;  /* Underline */
+          break;
+        case HOLLOW_BOX_CURSOR:
+          style = 3;  /* Hollow */
+          break;
+        default:
+          style = 0;
+          break;
+        }
+      
+      /* Convert color to RGBA format (0xAARRGGBB) */
+      uint32_t rgba = 0xFF000000 | (cursor_color & 0xFFFFFF);
+      
+      neomacs_display_set_cursor (dpyinfo->display_handle,
+                                  (float) x, (float) y,
+                                  (float) char_width, (float) char_height,
+                                  style, rgba, 1);
+      neomacs_display_reset_cursor_blink (dpyinfo->display_handle);
+      return;
+    }
+
+  /* Fallback to Cairo */
+  cairo_t *cr = output->cr_context;
+  if (!cr)
+    return;
 
   double r = RED_FROM_ULONG (cursor_color) / 255.0;
   double g = GREEN_FROM_ULONG (cursor_color) / 255.0;
@@ -856,7 +1170,8 @@ neomacs_read_socket (struct terminal *terminal, struct input_event *hold_quit)
      - FALSE means don't block if no events */
   while (g_main_context_iteration (context, FALSE))
     {
-      /* Events were processed */
+      /* Events were processed - increment count to tell Emacs we did something */
+      count++;
     }
 
   unblock_input ();
@@ -920,6 +1235,407 @@ DEFUN ("x-display-grayscale-p", Fx_display_grayscale_p, Sx_display_grayscale_p, 
 {
   /* Neomacs displays support both color and grayscale */
   return Qnil;  /* Return nil meaning we support full color, not just grayscale */
+}
+
+
+/* ============================================================================
+ * Video Playback API
+ * ============================================================================ */
+
+DEFUN ("neomacs-video-load", Fneomacs_video_load, Sneomacs_video_load, 1, 1, 0,
+       doc: /* Load a video from URI.
+Returns video ID on success, nil on failure.
+URI can be a file path or a URL.  */)
+  (Lisp_Object uri)
+{
+  CHECK_STRING (uri);
+  
+  struct neomacs_display_info *dpyinfo = neomacs_display_list;
+  if (!dpyinfo || !dpyinfo->display_handle)
+    return Qnil;
+    
+  const char *uri_str = SSDATA (uri);
+  uint32_t video_id = neomacs_display_load_video (dpyinfo->display_handle, uri_str);
+  
+  if (video_id == 0)
+    return Qnil;
+    
+  return make_fixnum (video_id);
+}
+
+DEFUN ("neomacs-video-play", Fneomacs_video_play, Sneomacs_video_play, 1, 1, 0,
+       doc: /* Start playing video with VIDEO-ID.
+Returns t on success, nil on failure.  */)
+  (Lisp_Object video_id)
+{
+  CHECK_FIXNUM (video_id);
+  
+  struct neomacs_display_info *dpyinfo = neomacs_display_list;
+  if (!dpyinfo || !dpyinfo->display_handle)
+    return Qnil;
+    
+  int result = neomacs_display_video_play (dpyinfo->display_handle, 
+                                           (uint32_t) XFIXNUM (video_id));
+  return result == 0 ? Qt : Qnil;
+}
+
+DEFUN ("neomacs-video-pause", Fneomacs_video_pause, Sneomacs_video_pause, 1, 1, 0,
+       doc: /* Pause video with VIDEO-ID.
+Returns t on success, nil on failure.  */)
+  (Lisp_Object video_id)
+{
+  CHECK_FIXNUM (video_id);
+  
+  struct neomacs_display_info *dpyinfo = neomacs_display_list;
+  if (!dpyinfo || !dpyinfo->display_handle)
+    return Qnil;
+    
+  int result = neomacs_display_video_pause (dpyinfo->display_handle,
+                                            (uint32_t) XFIXNUM (video_id));
+  return result == 0 ? Qt : Qnil;
+}
+
+DEFUN ("neomacs-video-stop", Fneomacs_video_stop, Sneomacs_video_stop, 1, 1, 0,
+       doc: /* Stop video with VIDEO-ID.
+Returns t on success, nil on failure.  */)
+  (Lisp_Object video_id)
+{
+  CHECK_FIXNUM (video_id);
+  
+  struct neomacs_display_info *dpyinfo = neomacs_display_list;
+  if (!dpyinfo || !dpyinfo->display_handle)
+    return Qnil;
+    
+  int result = neomacs_display_video_stop (dpyinfo->display_handle,
+                                           (uint32_t) XFIXNUM (video_id));
+  return result == 0 ? Qt : Qnil;
+}
+
+DEFUN ("neomacs-video-floating", Fneomacs_video_floating, Sneomacs_video_floating, 5, 5, 0,
+       doc: /* Display VIDEO-ID as a floating layer at X, Y with WIDTH and HEIGHT.
+The video is rendered on top of the frame content at a fixed screen position.  */)
+  (Lisp_Object video_id, Lisp_Object x, Lisp_Object y,
+   Lisp_Object width, Lisp_Object height)
+{
+  CHECK_FIXNUM (video_id);
+  CHECK_FIXNUM (x);
+  CHECK_FIXNUM (y);
+  CHECK_FIXNUM (width);
+  CHECK_FIXNUM (height);
+  
+  struct neomacs_display_info *dpyinfo = neomacs_display_list;
+  if (!dpyinfo || !dpyinfo->display_handle)
+    return Qnil;
+    
+  neomacs_display_set_floating_video (dpyinfo->display_handle,
+                                      (uint32_t) XFIXNUM (video_id),
+                                      (int) XFIXNUM (x),
+                                      (int) XFIXNUM (y),
+                                      (int) XFIXNUM (width),
+                                      (int) XFIXNUM (height));
+  return Qt;
+}
+
+DEFUN ("neomacs-video-floating-clear", Fneomacs_video_floating_clear, Sneomacs_video_floating_clear, 1, 1, 0,
+       doc: /* Remove floating video layer for VIDEO-ID.  */)
+  (Lisp_Object video_id)
+{
+  CHECK_FIXNUM (video_id);
+  
+  struct neomacs_display_info *dpyinfo = neomacs_display_list;
+  if (!dpyinfo || !dpyinfo->display_handle)
+    return Qnil;
+    
+  neomacs_display_clear_floating_video (dpyinfo->display_handle,
+                                        (uint32_t) XFIXNUM (video_id));
+  return Qt;
+}
+
+
+/* ============================================================================
+ * Image API
+ * ============================================================================ */
+
+DEFUN ("neomacs-image-load", Fneomacs_image_load, Sneomacs_image_load, 1, 1, 0,
+       doc: /* Load an image from PATH.
+Returns image ID on success, nil on failure.  */)
+  (Lisp_Object path)
+{
+  CHECK_STRING (path);
+  
+  struct neomacs_display_info *dpyinfo = neomacs_display_list;
+  if (!dpyinfo || !dpyinfo->display_handle)
+    return Qnil;
+    
+  const char *path_str = SSDATA (path);
+  uint32_t image_id = neomacs_display_load_image (dpyinfo->display_handle, path_str);
+  
+  if (image_id == 0)
+    return Qnil;
+    
+  return make_fixnum (image_id);
+}
+
+DEFUN ("neomacs-image-size", Fneomacs_image_size, Sneomacs_image_size, 1, 1, 0,
+       doc: /* Get size of image with IMAGE-ID.
+Returns (width . height) on success, nil on failure.  */)
+  (Lisp_Object image_id)
+{
+  CHECK_FIXNUM (image_id);
+  
+  struct neomacs_display_info *dpyinfo = neomacs_display_list;
+  if (!dpyinfo || !dpyinfo->display_handle)
+    return Qnil;
+    
+  int width = 0, height = 0;
+  int result = neomacs_display_get_image_size (dpyinfo->display_handle,
+                                                (uint32_t) XFIXNUM (image_id),
+                                                &width, &height);
+  
+  if (result != 0)
+    return Qnil;
+    
+  return Fcons (make_fixnum (width), make_fixnum (height));
+}
+
+DEFUN ("neomacs-image-free", Fneomacs_image_free, Sneomacs_image_free, 1, 1, 0,
+       doc: /* Free image with IMAGE-ID from cache.
+Returns t on success, nil on failure.  */)
+  (Lisp_Object image_id)
+{
+  CHECK_FIXNUM (image_id);
+  
+  struct neomacs_display_info *dpyinfo = neomacs_display_list;
+  if (!dpyinfo || !dpyinfo->display_handle)
+    return Qnil;
+    
+  int result = neomacs_display_free_image (dpyinfo->display_handle,
+                                           (uint32_t) XFIXNUM (image_id));
+  
+  return result == 0 ? Qt : Qnil;
+}
+
+DEFUN ("neomacs-image-floating", Fneomacs_image_floating, Sneomacs_image_floating, 5, 5, 0,
+       doc: /* Show image IMAGE-ID as a floating layer at position (X, Y) with size (WIDTH, HEIGHT).
+The image will be rendered on top of the frame content at a fixed screen position.  */)
+  (Lisp_Object image_id, Lisp_Object x, Lisp_Object y, Lisp_Object width, Lisp_Object height)
+{
+  CHECK_FIXNUM (image_id);
+  CHECK_FIXNUM (x);
+  CHECK_FIXNUM (y);
+  CHECK_FIXNUM (width);
+  CHECK_FIXNUM (height);
+  
+  struct neomacs_display_info *dpyinfo = neomacs_display_list;
+  if (!dpyinfo || !dpyinfo->display_handle)
+    return Qnil;
+    
+  neomacs_display_set_floating_image (dpyinfo->display_handle,
+                                      (uint32_t) XFIXNUM (image_id),
+                                      (int) XFIXNUM (x),
+                                      (int) XFIXNUM (y),
+                                      (int) XFIXNUM (width),
+                                      (int) XFIXNUM (height));
+  return Qt;
+}
+
+DEFUN ("neomacs-image-floating-clear", Fneomacs_image_floating_clear, Sneomacs_image_floating_clear, 1, 1, 0,
+       doc: /* Remove the floating layer for image IMAGE-ID.  */)
+  (Lisp_Object image_id)
+{
+  CHECK_FIXNUM (image_id);
+  
+  struct neomacs_display_info *dpyinfo = neomacs_display_list;
+  if (!dpyinfo || !dpyinfo->display_handle)
+    return Qnil;
+    
+  neomacs_display_clear_floating_image (dpyinfo->display_handle,
+                                        (uint32_t) XFIXNUM (image_id));
+  return Qt;
+}
+
+
+/* ============================================================================
+ * WebKit API
+ * ============================================================================ */
+
+DEFUN ("neomacs-webkit-init", Fneomacs_webkit_init, Sneomacs_webkit_init, 0, 0, 0,
+       doc: /* Initialize WebKit subsystem.
+Must be called before creating WebKit views.
+Returns t on success, nil on failure.  */)
+  (void)
+{
+  struct neomacs_display_info *dpyinfo = neomacs_display_list;
+  if (!dpyinfo || !dpyinfo->display_handle)
+    return Qnil;
+    
+  /* TODO: Get EGL display from GTK4 - for now pass NULL to use default */
+  int result = neomacs_display_webkit_init (dpyinfo->display_handle, NULL);
+  return result == 0 ? Qt : Qnil;
+}
+
+DEFUN ("neomacs-webkit-create", Fneomacs_webkit_create, Sneomacs_webkit_create, 2, 2, 0,
+       doc: /* Create a new WebKit view with WIDTH and HEIGHT.
+Returns view ID on success, nil on failure.  */)
+  (Lisp_Object width, Lisp_Object height)
+{
+  CHECK_FIXNUM (width);
+  CHECK_FIXNUM (height);
+  
+  struct neomacs_display_info *dpyinfo = neomacs_display_list;
+  if (!dpyinfo || !dpyinfo->display_handle)
+    return Qnil;
+    
+  uint32_t view_id = neomacs_display_webkit_create (dpyinfo->display_handle,
+                                                    (int) XFIXNUM (width),
+                                                    (int) XFIXNUM (height));
+  
+  if (view_id == 0)
+    return Qnil;
+    
+  return make_fixnum (view_id);
+}
+
+DEFUN ("neomacs-webkit-destroy", Fneomacs_webkit_destroy, Sneomacs_webkit_destroy, 1, 1, 0,
+       doc: /* Destroy WebKit view with VIEW-ID.
+Returns t on success, nil on failure.  */)
+  (Lisp_Object view_id)
+{
+  CHECK_FIXNUM (view_id);
+  
+  struct neomacs_display_info *dpyinfo = neomacs_display_list;
+  if (!dpyinfo || !dpyinfo->display_handle)
+    return Qnil;
+    
+  int result = neomacs_display_webkit_destroy (dpyinfo->display_handle,
+                                               (uint32_t) XFIXNUM (view_id));
+  return result == 0 ? Qt : Qnil;
+}
+
+DEFUN ("neomacs-webkit-load-uri", Fneomacs_webkit_load_uri, Sneomacs_webkit_load_uri, 2, 2, 0,
+       doc: /* Load URI in WebKit view VIEW-ID.
+Returns t on success, nil on failure.  */)
+  (Lisp_Object view_id, Lisp_Object uri)
+{
+  CHECK_FIXNUM (view_id);
+  CHECK_STRING (uri);
+  
+  struct neomacs_display_info *dpyinfo = neomacs_display_list;
+  if (!dpyinfo || !dpyinfo->display_handle)
+    return Qnil;
+    
+  const char *uri_str = SSDATA (uri);
+  int result = neomacs_display_webkit_load_uri (dpyinfo->display_handle,
+                                                (uint32_t) XFIXNUM (view_id),
+                                                uri_str);
+  return result == 0 ? Qt : Qnil;
+}
+
+DEFUN ("neomacs-webkit-go-back", Fneomacs_webkit_go_back, Sneomacs_webkit_go_back, 1, 1, 0,
+       doc: /* Go back in WebKit view VIEW-ID.
+Returns t on success, nil on failure.  */)
+  (Lisp_Object view_id)
+{
+  CHECK_FIXNUM (view_id);
+  
+  struct neomacs_display_info *dpyinfo = neomacs_display_list;
+  if (!dpyinfo || !dpyinfo->display_handle)
+    return Qnil;
+    
+  int result = neomacs_display_webkit_go_back (dpyinfo->display_handle,
+                                               (uint32_t) XFIXNUM (view_id));
+  return result == 0 ? Qt : Qnil;
+}
+
+DEFUN ("neomacs-webkit-go-forward", Fneomacs_webkit_go_forward, Sneomacs_webkit_go_forward, 1, 1, 0,
+       doc: /* Go forward in WebKit view VIEW-ID.
+Returns t on success, nil on failure.  */)
+  (Lisp_Object view_id)
+{
+  CHECK_FIXNUM (view_id);
+  
+  struct neomacs_display_info *dpyinfo = neomacs_display_list;
+  if (!dpyinfo || !dpyinfo->display_handle)
+    return Qnil;
+    
+  int result = neomacs_display_webkit_go_forward (dpyinfo->display_handle,
+                                                  (uint32_t) XFIXNUM (view_id));
+  return result == 0 ? Qt : Qnil;
+}
+
+DEFUN ("neomacs-webkit-reload", Fneomacs_webkit_reload, Sneomacs_webkit_reload, 1, 1, 0,
+       doc: /* Reload WebKit view VIEW-ID.
+Returns t on success, nil on failure.  */)
+  (Lisp_Object view_id)
+{
+  CHECK_FIXNUM (view_id);
+  
+  struct neomacs_display_info *dpyinfo = neomacs_display_list;
+  if (!dpyinfo || !dpyinfo->display_handle)
+    return Qnil;
+    
+  int result = neomacs_display_webkit_reload (dpyinfo->display_handle,
+                                              (uint32_t) XFIXNUM (view_id));
+  return result == 0 ? Qt : Qnil;
+}
+
+DEFUN ("neomacs-webkit-execute-js", Fneomacs_webkit_execute_js, Sneomacs_webkit_execute_js, 2, 2, 0,
+       doc: /* Execute JavaScript SCRIPT in WebKit view VIEW-ID.
+Returns t on success, nil on failure.  */)
+  (Lisp_Object view_id, Lisp_Object script)
+{
+  CHECK_FIXNUM (view_id);
+  CHECK_STRING (script);
+  
+  struct neomacs_display_info *dpyinfo = neomacs_display_list;
+  if (!dpyinfo || !dpyinfo->display_handle)
+    return Qnil;
+    
+  const char *script_str = SSDATA (script);
+  int result = neomacs_display_webkit_execute_js (dpyinfo->display_handle,
+                                                  (uint32_t) XFIXNUM (view_id),
+                                                  script_str);
+  return result == 0 ? Qt : Qnil;
+}
+
+DEFUN ("neomacs-webkit-floating", Fneomacs_webkit_floating, Sneomacs_webkit_floating, 5, 5, 0,
+       doc: /* Display WebKit view VIEW-ID as a floating layer at X, Y with WIDTH and HEIGHT.
+The browser view is rendered on top of the frame content at a fixed screen position.  */)
+  (Lisp_Object view_id, Lisp_Object x, Lisp_Object y,
+   Lisp_Object width, Lisp_Object height)
+{
+  CHECK_FIXNUM (view_id);
+  CHECK_FIXNUM (x);
+  CHECK_FIXNUM (y);
+  CHECK_FIXNUM (width);
+  CHECK_FIXNUM (height);
+  
+  struct neomacs_display_info *dpyinfo = neomacs_display_list;
+  if (!dpyinfo || !dpyinfo->display_handle)
+    return Qnil;
+    
+  neomacs_display_set_floating_webkit (dpyinfo->display_handle,
+                                       (uint32_t) XFIXNUM (view_id),
+                                       (int) XFIXNUM (x),
+                                       (int) XFIXNUM (y),
+                                       (int) XFIXNUM (width),
+                                       (int) XFIXNUM (height));
+  return Qt;
+}
+
+DEFUN ("neomacs-webkit-floating-clear", Fneomacs_webkit_floating_clear, Sneomacs_webkit_floating_clear, 1, 1, 0,
+       doc: /* Remove floating WebKit layer for VIEW-ID.  */)
+  (Lisp_Object view_id)
+{
+  CHECK_FIXNUM (view_id);
+  
+  struct neomacs_display_info *dpyinfo = neomacs_display_list;
+  if (!dpyinfo || !dpyinfo->display_handle)
+    return Qnil;
+    
+  neomacs_display_hide_floating_webkit (dpyinfo->display_handle,
+                                        (uint32_t) XFIXNUM (view_id));
+  return Qt;
 }
 
 
@@ -1016,6 +1732,33 @@ syms_of_neomacsterm (void)
   defsubr (&Sx_hide_tip);
   defsubr (&Sxw_display_color_p);
   defsubr (&Sx_display_grayscale_p);
+  
+  /* Video playback API */
+  defsubr (&Sneomacs_video_load);
+  defsubr (&Sneomacs_video_play);
+  defsubr (&Sneomacs_video_pause);
+  defsubr (&Sneomacs_video_stop);
+  defsubr (&Sneomacs_video_floating);
+  defsubr (&Sneomacs_video_floating_clear);
+
+  /* Image functions */
+  defsubr (&Sneomacs_image_load);
+  defsubr (&Sneomacs_image_size);
+  defsubr (&Sneomacs_image_free);
+  defsubr (&Sneomacs_image_floating);
+  defsubr (&Sneomacs_image_floating_clear);
+
+  /* WebKit browser functions */
+  defsubr (&Sneomacs_webkit_init);
+  defsubr (&Sneomacs_webkit_create);
+  defsubr (&Sneomacs_webkit_destroy);
+  defsubr (&Sneomacs_webkit_load_uri);
+  defsubr (&Sneomacs_webkit_go_back);
+  defsubr (&Sneomacs_webkit_go_forward);
+  defsubr (&Sneomacs_webkit_reload);
+  defsubr (&Sneomacs_webkit_execute_js);
+  defsubr (&Sneomacs_webkit_floating);
+  defsubr (&Sneomacs_webkit_floating_clear);
 
   DEFSYM (Qneomacs, "neomacs");
 

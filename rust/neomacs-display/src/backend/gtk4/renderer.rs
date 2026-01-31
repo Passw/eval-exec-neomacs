@@ -119,11 +119,6 @@ impl Gtk4Renderer {
             }
         }
 
-        // Draw a sample text to show it works
-        if let Some(context) = &self.pango_context {
-            self.render_sample_text(cr, context, window);
-        }
-
         cr.restore().ok();
     }
 

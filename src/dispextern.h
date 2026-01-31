@@ -443,7 +443,10 @@ enum glyph_type
   STRETCH_GLYPH,
 
   /* Glyph is an external widget drawn by the GUI toolkit.  */
-  XWIDGET_GLYPH
+  XWIDGET_GLYPH,
+
+  /* Glyph is a video frame (Neomacs).  */
+  VIDEO_GLYPH
 };
 
 
@@ -600,6 +603,11 @@ struct glyph
 
     /* Image ID for image glyphs (type == IMAGE_GLYPH).  */
     int img_id;
+
+#ifdef HAVE_NEOMACS
+    /* Video ID for video glyphs (type == VIDEO_GLYPH).  */
+    uint32_t video_id;
+#endif
 
 #ifdef HAVE_XWIDGETS
     /* Xwidget ID.  */

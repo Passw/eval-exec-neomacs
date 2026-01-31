@@ -1,13 +1,15 @@
 //! GTK4/GSK GPU-accelerated display backend.
 
 mod renderer;
+mod gsk_renderer;
+mod widget;
 mod image;
 mod video;
 
 use std::sync::{Arc, Mutex};
 
 use gtk4::prelude::*;
-use gtk4::{cairo, DrawingArea};
+use gtk4::{cairo, gsk, DrawingArea};
 
 use crate::core::error::{DisplayError, DisplayResult};
 use crate::core::scene::Scene;
@@ -15,6 +17,10 @@ use crate::core::face::Face;
 use crate::backend::DisplayBackend;
 
 pub use renderer::Gtk4Renderer;
+pub use gsk_renderer::GskRenderer;
+pub use widget::NeomacsWidget;
+pub use video::VideoCache;
+pub use image::ImageCache;
 
 /// Shared state for the GTK4 backend
 struct Gtk4State {

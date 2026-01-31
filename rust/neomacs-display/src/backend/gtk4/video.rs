@@ -15,6 +15,10 @@ use gstreamer_video as gst_video;
 use gstreamer_app as gst_app;
 #[cfg(feature = "video")]
 use gtk4::cairo;
+#[cfg(feature = "video")]
+use gtk4::gdk;
+#[cfg(feature = "video")]
+use gtk4::glib;
 
 use crate::core::error::{DisplayError, DisplayResult};
 
@@ -220,6 +224,27 @@ impl VideoPlayer {
         let frame = guard.as_ref()?;
         
         create_surface_from_raw(&frame.pixels, frame.width, frame.height).ok()
+    }
+    
+    /// Get current frame as GDK texture for GPU rendering
+    pub fn get_frame_texture(&self) -> Option<gdk::Texture> {
+        let guard = self.frame_data.lock().ok()?;
+        let frame = guard.as_ref()?;
+        
+        // Create GdkTexture from raw BGRA pixel data
+        // GBytes takes ownership of the data
+        let bytes = glib::Bytes::from(&frame.pixels);
+        
+        // Create memory texture (BGRA format = B8G8R8A8_PREMULTIPLIED)
+        let texture = gdk::MemoryTexture::new(
+            frame.width,
+            frame.height,
+            gdk::MemoryFormat::B8g8r8a8Premultiplied,
+            &bytes,
+            (frame.width * 4) as usize, // stride = width * 4 bytes per pixel
+        );
+        
+        Some(texture.upcast())
     }
     
     /// Update video state (call periodically)

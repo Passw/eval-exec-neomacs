@@ -118,10 +118,43 @@ void neomacs_display_add_image_glyph(struct NeomacsDisplay *handle,
 void neomacs_display_end_row(struct NeomacsDisplay *handle);
 
 /**
+ * Register or update a face
+ * Colors are in 0xRRGGBB format
+ */
+void neomacs_display_set_face(struct NeomacsDisplay *handle,
+                              uint32_t faceId,
+                              uint32_t foreground,
+                              uint32_t background,
+                              uint16_t fontWeight,
+                              int isItalic,
+                              int underlineStyle,
+                              uint32_t underlineColor,
+                              int boxType,
+                              uint32_t boxColor,
+                              int boxLineWidth);
+
+/**
  * Load an image from file path
  * Returns image_id on success, 0 on failure
  */
 uint32_t neomacs_display_load_image(struct NeomacsDisplay *handle, const char *path);
+
+/**
+ * Load an image from raw bytes
+ * Returns image_id on success, 0 on failure
+ */
+uint32_t neomacs_display_load_image_data(struct NeomacsDisplay *handle, const uint8_t *data, size_t len);
+
+/**
+ * Get image dimensions
+ * Returns 0 on success, -1 on failure
+ */
+int neomacs_display_get_image_size(struct NeomacsDisplay *handle, uint32_t imageId, int *width, int *height);
+
+/**
+ * Free an image from cache
+ */
+int neomacs_display_free_image(struct NeomacsDisplay *handle, uint32_t imageId);
 
 /**
  * Add a video glyph to the current row
@@ -153,9 +186,57 @@ int neomacs_display_video_pause(struct NeomacsDisplay *handle, uint32_t videoId)
 int neomacs_display_video_stop(struct NeomacsDisplay *handle, uint32_t videoId);
 
 /**
+ * Set a floating video at a specific screen position
+ * The video will be rendered on top of the frame
+ */
+void neomacs_display_set_floating_video(struct NeomacsDisplay *handle,
+                                        uint32_t videoId,
+                                        int x, int y,
+                                        int width, int height);
+
+/**
+ * Remove a floating video
+ */
+void neomacs_display_clear_floating_video(struct NeomacsDisplay *handle,
+                                          uint32_t videoId);
+
+/**
+ * Set a floating image at a specific screen position
+ * The image will be rendered on top of the frame
+ */
+void neomacs_display_set_floating_image(struct NeomacsDisplay *handle,
+                                        uint32_t imageId,
+                                        int x, int y,
+                                        int width, int height);
+
+/**
+ * Remove a floating image
+ */
+void neomacs_display_clear_floating_image(struct NeomacsDisplay *handle,
+                                          uint32_t imageId);
+
+/**
  * End frame and render
  */
 int neomacs_display_end_frame(struct NeomacsDisplay *handle);
+
+/**
+ * Render the scene to an external Cairo context
+ *
+ * # Safety
+ * The cairo_context must be a valid cairo_t pointer from C.
+ */
+int neomacs_display_render_to_cairo(struct NeomacsDisplay *handle, void *cairoContext);
+
+/**
+ * Initialize the renderer with a Pango context (call after widget is realized)
+ */
+void neomacs_display_init_pango(struct NeomacsDisplay *handle, void *pangoContext);
+
+/**
+ * Enable or disable GSK rendering
+ */
+void neomacs_display_set_gsk_enabled(struct NeomacsDisplay *handle, int enabled);
 
 /**
  * Start smooth scroll animation
@@ -184,5 +265,109 @@ const char *neomacs_display_backend_name(struct NeomacsDisplay *handle);
  * Check if backend is initialized
  */
 int neomacs_display_is_initialized(struct NeomacsDisplay *handle);
+
+/**
+ * Create a GPU-accelerated NeomacsWidget
+ *
+ * # Safety
+ * Returns a pointer to a NeomacsWidget that can be added to a GTK container.
+ * The widget is owned by GTK's reference counting system.
+ */
+void *neomacs_display_create_widget(void);
+
+/**
+ * Set the scene on a NeomacsWidget (triggers GPU-accelerated redraw)
+ *
+ * # Safety
+ * handle must be a valid NeomacsDisplay pointer
+ * widget must be a valid NeomacsWidget pointer
+ */
+int neomacs_display_widget_set_scene(struct NeomacsDisplay *handle, void *widget);
+
+/**
+ * Initialize the GSK renderer's Pango context from a NeomacsWidget
+ *
+ * # Safety
+ * handle must be valid, widget must be a realized NeomacsWidget
+ */
+void neomacs_display_widget_init_pango(struct NeomacsDisplay *handle, void *widget);
+
+/**
+ * Render scene to a NeomacsWidget using GSK (GPU-accelerated)
+ *
+ * This renders directly using GSK render nodes for GPU acceleration.
+ *
+ * # Safety
+ * handle must be valid, widget must be a valid NeomacsWidget
+ */
+int neomacs_display_render_to_widget(struct NeomacsDisplay *handle, void *widget);
+
+/**
+ * Create a new WebKit view
+ * Returns view_id on success, 0 on failure
+ */
+uint32_t neomacs_display_webkit_create(struct NeomacsDisplay *handle, int width, int height);
+
+/**
+ * Initialize WebKit subsystem with EGL display
+ * Must be called before creating WebKit views
+ */
+int neomacs_display_webkit_init(struct NeomacsDisplay *handle, void *eglDisplay);
+
+/**
+ * Destroy a WebKit view
+ */
+int neomacs_display_webkit_destroy(struct NeomacsDisplay *handle, uint32_t viewId);
+
+/**
+ * Load a URI in a WebKit view
+ */
+int neomacs_display_webkit_load_uri(struct NeomacsDisplay *handle,
+                                    uint32_t viewId,
+                                    const char *uri);
+
+/**
+ * Go back in a WebKit view
+ */
+int neomacs_display_webkit_go_back(struct NeomacsDisplay *handle, uint32_t viewId);
+
+/**
+ * Go forward in a WebKit view
+ */
+int neomacs_display_webkit_go_forward(struct NeomacsDisplay *handle, uint32_t viewId);
+
+/**
+ * Reload a WebKit view
+ */
+int neomacs_display_webkit_reload(struct NeomacsDisplay *handle, uint32_t viewId);
+
+/**
+ * Execute JavaScript in a WebKit view
+ */
+int neomacs_display_webkit_execute_js(struct NeomacsDisplay *handle,
+                                      uint32_t viewId,
+                                      const char *script);
+
+/**
+ * Set a floating WebKit view at a specific screen position
+ */
+void neomacs_display_set_floating_webkit(struct NeomacsDisplay *handle,
+                                         uint32_t webkitId,
+                                         int x, int y,
+                                         int width, int height);
+
+/**
+ * Hide a floating WebKit view
+ */
+void neomacs_display_hide_floating_webkit(struct NeomacsDisplay *handle,
+                                          uint32_t webkitId);
+
+/**
+ * Add a WPE glyph to the current row
+ */
+void neomacs_display_add_wpe_glyph(struct NeomacsDisplay *handle,
+                                   uint32_t viewId,
+                                   int pixelWidth,
+                                   int pixelHeight);
 
 #endif  /* NEOMACS_DISPLAY_H */

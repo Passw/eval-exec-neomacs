@@ -1,5 +1,18 @@
 { pkgs ? import <nixpkgs> {} }:
 
+let
+  # WPE WebKit from eval-exec's nixpkgs PR #449108
+  # Required because webkitgtk dropped offscreen rendering support
+  wpewebkitPkgs = import (builtins.fetchTarball {
+    url = "https://github.com/eval-exec/nixpkgs/archive/wpewebkit.tar.gz";
+  }) { inherit (pkgs) system; };
+  
+  wpewebkit = wpewebkitPkgs.wpewebkit or null;
+  # libwpe and wpebackend-fdo from standard nixpkgs (they're stable)
+  libwpe = pkgs.libwpe;
+  wpebackendFdo = pkgs.libwpe-fdo;
+in
+
 pkgs.mkShell {
   buildInputs = with pkgs; [
     # Standard Emacs build dependencies
@@ -34,6 +47,9 @@ pkgs.mkShell {
     gst_all_1.gst-plugins-bad
     gst_all_1.gst-plugins-ugly
     
+    # libsoup for HTTP
+    libsoup_3
+    
     # Image libraries
     libjpeg
     libtiff
@@ -53,10 +69,15 @@ pkgs.mkShell {
     
     # For native compilation
     libgccjit
-  ];
+    
+    # EGL for WPE
+    libGL
+    libxkbcommon
+  ] ++ (if wpewebkit != null then [ wpewebkit ] else [])
+    ++ [ libwpe wpebackendFdo ];
 
   # Set up environment for pkg-config
-  PKG_CONFIG_PATH = pkgs.lib.makeSearchPath "lib/pkgconfig" [
+  PKG_CONFIG_PATH = pkgs.lib.makeSearchPath "lib/pkgconfig" ([
     pkgs.gtk4.dev
     pkgs.glib.dev
     pkgs.graphene
@@ -77,15 +98,26 @@ pkgs.mkShell {
     pkgs.libselinux.dev
     pkgs.tree-sitter
     pkgs.gmp.dev
-  ];
+    pkgs.libsoup_3.dev
+    pkgs.libGL.dev
+    pkgs.libxkbcommon.dev
+  ] ++ (if wpewebkit != null then [ wpewebkit.dev or wpewebkit ] else [])
+    ++ [ libwpe wpebackendFdo ]);
 
   shellHook = ''
     echo "Emacs/Neomacs build environment"
     echo "GTK4 version: $(pkg-config --modversion gtk4 2>/dev/null || echo 'not found')"
     echo "GStreamer version: $(pkg-config --modversion gstreamer-1.0 2>/dev/null || echo 'not found')"
+    ${if wpewebkit != null then ''
+    echo "WPE WebKit: $(pkg-config --modversion wpe-webkit-2.0 2>/dev/null || echo 'available')"
+    echo "libwpe: $(pkg-config --modversion wpe-1.0 2>/dev/null || echo 'not in pkg-config')"
+    echo "wpebackend-fdo: $(pkg-config --modversion wpebackend-fdo-1.0 2>/dev/null || echo 'not in pkg-config')"
+    '' else ''
+    echo "WPE WebKit: BUILDING (first run takes ~1 hour, from PR #449108)"
+    ''}
     
     # Set the library path
-    export LD_LIBRARY_PATH="${pkgs.lib.makeLibraryPath [
+    export LD_LIBRARY_PATH="${pkgs.lib.makeLibraryPath ([
       pkgs.gtk4
       pkgs.glib
       pkgs.cairo
@@ -110,11 +142,19 @@ pkgs.mkShell {
       pkgs.sqlite
       pkgs.gmp
       pkgs.libgccjit
-    ]}:$LD_LIBRARY_PATH"
+      pkgs.libsoup_3
+      pkgs.libGL
+      pkgs.mesa
+      pkgs.libxkbcommon
+    ] ++ (if wpewebkit != null then [ wpewebkit ] else [])
+      ++ [ libwpe wpebackendFdo ])}:$LD_LIBRARY_PATH"
     
     echo ""
     echo "To configure with Neomacs:"
     echo "  ./configure --with-neomacs"
     echo ""
+    ${if wpewebkit != null then ''
+    echo "WPE WebKit environment ready"
+    '' else ""}
   '';
 }

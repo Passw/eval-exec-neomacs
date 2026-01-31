@@ -1,7 +1,9 @@
 //! Scene graph for display rendering.
 
+use std::collections::HashMap;
 use crate::core::types::{Color, Rect, Transform, Point};
 use crate::core::glyph::{GlyphRow, GlyphString};
+use crate::core::face::Face;
 
 /// Scene graph node types
 #[derive(Debug, Clone)]
@@ -226,7 +228,7 @@ pub struct CursorState {
 }
 
 /// Complete scene for a frame
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Scene {
     /// Frame dimensions
     pub width: f32,
@@ -243,6 +245,48 @@ pub struct Scene {
 
     /// Dirty region (needs redraw)
     pub dirty: Option<Rect>,
+    
+    /// Faces used in this scene (face_id -> Face)
+    pub faces: HashMap<u32, Face>,
+    
+    /// Floating videos at screen positions
+    pub floating_videos: Vec<FloatingVideo>,
+    
+    /// Floating images at screen positions
+    pub floating_images: Vec<FloatingImage>,
+    
+    /// Floating WebKit views at screen positions
+    pub floating_webkits: Vec<FloatingWebKit>,
+}
+
+/// Floating video layer for rendering video at a specific screen position
+#[derive(Debug, Clone)]
+pub struct FloatingVideo {
+    pub video_id: u32,
+    pub x: f32,
+    pub y: f32,
+    pub width: f32,
+    pub height: f32,
+}
+
+/// Floating image layer for rendering image at a specific screen position
+#[derive(Debug, Clone)]
+pub struct FloatingImage {
+    pub image_id: u32,
+    pub x: f32,
+    pub y: f32,
+    pub width: f32,
+    pub height: f32,
+}
+
+/// Floating WebKit view for rendering web content at a specific screen position
+#[derive(Debug, Clone)]
+pub struct FloatingWebKit {
+    pub webkit_id: u32,
+    pub x: f32,
+    pub y: f32,
+    pub width: f32,
+    pub height: f32,
 }
 
 impl Scene {
@@ -255,6 +299,10 @@ impl Scene {
             windows: Vec::new(),
             root: None,
             dirty: None,
+            faces: HashMap::new(),
+            floating_videos: Vec::new(),
+            floating_images: Vec::new(),
+            floating_webkits: Vec::new(),
         }
     }
 
@@ -281,6 +329,77 @@ impl Scene {
     /// Clear dirty region
     pub fn clear_dirty(&mut self) {
         self.dirty = None;
+    }
+
+    /// Clear all windows and content from the scene (preserves faces)
+    pub fn clear(&mut self) {
+        self.windows.clear();
+        self.root = None;
+        self.mark_dirty();
+    }
+    
+    /// Add or update a face in the scene
+    pub fn set_face(&mut self, face: Face) {
+        self.faces.insert(face.id, face);
+    }
+    
+    /// Get a face by ID
+    pub fn get_face(&self, id: u32) -> Option<&Face> {
+        self.faces.get(&id)
+    }
+    
+    /// Add a floating video at screen position
+    pub fn add_floating_video(&mut self, video_id: u32, x: f32, y: f32, width: f32, height: f32) {
+        self.floating_videos.push(FloatingVideo { video_id, x, y, width, height });
+        self.mark_dirty();
+    }
+    
+    /// Remove floating video by video ID
+    pub fn remove_floating_video(&mut self, video_id: u32) {
+        self.floating_videos.retain(|v| v.video_id != video_id);
+        self.mark_dirty();
+    }
+    
+    /// Clear all floating videos
+    pub fn clear_floating_videos(&mut self) {
+        self.floating_videos.clear();
+        self.mark_dirty();
+    }
+    
+    /// Add a floating image at screen position
+    pub fn add_floating_image(&mut self, image_id: u32, x: f32, y: f32, width: f32, height: f32) {
+        self.floating_images.push(FloatingImage { image_id, x, y, width, height });
+        self.mark_dirty();
+    }
+    
+    /// Remove floating image by image ID
+    pub fn remove_floating_image(&mut self, image_id: u32) {
+        self.floating_images.retain(|i| i.image_id != image_id);
+        self.mark_dirty();
+    }
+    
+    /// Clear all floating images
+    pub fn clear_floating_images(&mut self) {
+        self.floating_images.clear();
+        self.mark_dirty();
+    }
+    
+    /// Add a floating WebKit view at screen position
+    pub fn add_floating_webkit(&mut self, webkit_id: u32, x: f32, y: f32, width: f32, height: f32) {
+        self.floating_webkits.push(FloatingWebKit { webkit_id, x, y, width, height });
+        self.mark_dirty();
+    }
+    
+    /// Remove floating WebKit view by ID
+    pub fn remove_floating_webkit(&mut self, webkit_id: u32) {
+        self.floating_webkits.retain(|w| w.webkit_id != webkit_id);
+        self.mark_dirty();
+    }
+    
+    /// Clear all floating WebKit views
+    pub fn clear_floating_webkits(&mut self) {
+        self.floating_webkits.clear();
+        self.mark_dirty();
     }
 
     /// Build the scene graph from windows

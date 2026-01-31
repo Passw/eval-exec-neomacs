@@ -268,8 +268,8 @@
 - [x] Use videoconvert + videoscale for format conversion
 - [x] Capture frames as BGRA raw bytes
 - [x] Handle pipeline state changes
-- [ ] Handle end-of-stream
-- [ ] Handle errors
+- [x] Handle end-of-stream (via bus messages)
+- [x] Handle errors (via bus messages)
 
 ### 5.2 Video Playback Control ✅
 - [x] Implement play/pause/stop
@@ -282,28 +282,39 @@
 ### 5.3 Video Rendering ✅
 - [x] Create VideoCache for multiple video players
 - [x] Convert raw BGRA to Cairo ImageSurface (on main thread)
-- [x] Integrate VideoCache into Gtk4Renderer
+- [x] Convert raw BGRA to GdkTexture (for GPU rendering)
+- [x] Integrate VideoCache into GskRenderer
 - [x] Implement render_video() method
 - [x] Implement video placeholder rendering
-- [x] Handle video glyphs in render_glyph_row()
+- [x] Handle video glyphs in build_row_nodes()
 - [ ] Implement aspect ratio preservation
 
-### 5.4 Video FFI (Partial)
+### 5.4 Video FFI ✅
 - [x] Implement `neomacs_display_add_video_glyph()` FFI
-- [x] Implement `neomacs_display_load_video()` FFI (stub)
-- [x] Implement `neomacs_display_video_play()` FFI (stub)
-- [x] Implement `neomacs_display_video_pause()` FFI (stub)
-- [x] Implement `neomacs_display_video_stop()` FFI (stub)
+- [x] Implement `neomacs_display_load_video()` FFI
+- [x] Implement `neomacs_display_video_play()` FFI
+- [x] Implement `neomacs_display_video_pause()` FFI
+- [x] Implement `neomacs_display_video_stop()` FFI
 - [ ] Implement `emacs_display_video_seek()` FFI
 - [ ] Implement `emacs_display_video_set_volume()` FFI
 - [ ] Implement `emacs_display_video_get_state()` FFI
 
-### 5.5 Video Lisp API
-- [ ] Define `create-video` Lisp function
-- [ ] Define `insert-video` Lisp function
-- [ ] Define `video-play`, `video-pause`, `video-stop` functions
-- [ ] Define `video-seek`, `video-set-volume` functions
-- [ ] Define `video-playing-p`, `video-duration`, `video-current-time` functions
+### 5.5 Video Lisp API ✅
+- [x] Define `neomacs-video-load` Lisp function
+- [x] Define `neomacs-video-play`, `neomacs-video-pause`, `neomacs-video-stop` functions
+- [x] Define `neomacs-video-overlay`, `neomacs-video-overlay-clear` functions
+- [x] Create `lisp/neomacs-video.el` helper package
+- [ ] Define `neomacs-video-seek`, `neomacs-video-set-volume` functions
+- [ ] Define `neomacs-video-duration`, `neomacs-video-current-time` functions
+
+### 5.6 Video Testing ✅
+- [x] Test 720p (1280x720) H.264 video - PASSED
+- [x] Test 1080p (1920x1080) Theora video - PASSED
+- [x] Verify frame decoding (BGRA pixels captured)
+- [x] Video overlay API implemented and tested
+- [ ] Test 4K video playback
+- [ ] Benchmark video CPU/GPU usage
+- [ ] Visual verification of video overlay rendering
 
 ---
 

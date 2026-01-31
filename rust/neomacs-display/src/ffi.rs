@@ -4,7 +4,7 @@ use std::ffi::{c_char, c_int, c_void, CStr};
 use std::ptr;
 
 use crate::backend::{BackendType, DisplayBackend};
-use crate::backend::gtk4::Gtk4Backend;
+use crate::backend::gtk4::{Gtk4Backend, Gtk4Renderer, GskRenderer, VideoCache, ImageCache};
 use crate::backend::tty::TtyBackend;
 use crate::core::types::{Color, Rect};
 use crate::core::scene::{Scene, WindowScene, CursorState, CursorStyle};
@@ -16,8 +16,16 @@ pub struct NeomacsDisplay {
     backend_type: BackendType,
     gtk4_backend: Option<Gtk4Backend>,
     tty_backend: Option<TtyBackend>,
-    scene: Scene,
+    scene: Scene,           // The scene for rendering
     animations: AnimationManager,
+    renderer: Gtk4Renderer,  // Cairo renderer for external Cairo context
+    gsk_renderer: GskRenderer, // GSK renderer for GPU-accelerated rendering
+    use_gsk: bool,          // Whether to use GSK rendering
+    video_cache: VideoCache, // Video player cache
+    image_cache: ImageCache, // Image cache
+    current_row_y: i32,     // Y position of current row being built
+    current_window_id: i32, // ID of current window being updated
+    in_frame: bool,         // Whether we're currently in a frame update
 }
 
 impl NeomacsDisplay {
@@ -45,6 +53,14 @@ pub unsafe extern "C" fn neomacs_display_init(backend: BackendType) -> *mut Neom
         tty_backend: None,
         scene: Scene::new(800.0, 600.0),
         animations: AnimationManager::new(),
+        renderer: Gtk4Renderer::new(),
+        gsk_renderer: GskRenderer::new(),
+        use_gsk: true,  // Enable GSK rendering by default
+        video_cache: VideoCache::new(),
+        image_cache: ImageCache::new(),
+        current_row_y: -1,
+        current_window_id: -1,
+        in_frame: false,
     });
 
     // Create the backend
@@ -126,8 +142,12 @@ pub unsafe extern "C" fn neomacs_display_begin_frame(handle: *mut NeomacsDisplay
     }
 
     let display = &mut *handle;
-    display.scene.windows.clear();
-    display.scene.mark_dirty();
+    // Clear scene at the start of each new frame update cycle
+    // in_frame is false when we start a new cycle (reset by end_frame)
+    if !display.in_frame {
+        display.scene.clear();
+        display.in_frame = true;
+    }
 }
 
 /// Add a window to the current frame
@@ -148,19 +168,31 @@ pub unsafe extern "C" fn neomacs_display_add_window(
 
     let display = &mut *handle;
     
-    let window = WindowScene {
-        window_id,
-        bounds: Rect::new(x, y, width, height),
-        background: Color::from_pixel(bg_color),
-        rows: Vec::new(),
-        cursor: None,
-        scroll_offset: 0.0,
-        selected: selected != 0,
-        mode_line_height: 0,
-        header_line_height: 0,
-    };
+    // Track current window
+    display.current_window_id = window_id;
     
-    display.scene.windows.push(window);
+    // Find or create window - don't clear rows (Emacs does incremental updates)
+    if let Some(existing) = display.scene.windows.iter_mut().find(|w| w.window_id == window_id) {
+        // Update window properties but keep existing rows
+        existing.bounds = Rect::new(x, y, width, height);
+        existing.background = Color::from_pixel(bg_color);
+        existing.selected = selected != 0;
+        // DON'T clear rows - Emacs will update specific rows
+    } else {
+        // New window
+        let window = WindowScene {
+            window_id,
+            bounds: Rect::new(x, y, width, height),
+            background: Color::from_pixel(bg_color),
+            rows: Vec::new(),
+            cursor: None,
+            scroll_offset: 0.0,
+            selected: selected != 0,
+            mode_line_height: 0,
+            header_line_height: 0,
+        };
+        display.scene.windows.push(window);
+    }
 }
 
 /// Set cursor for the most recently added window
@@ -181,6 +213,7 @@ pub unsafe extern "C" fn neomacs_display_set_cursor(
 
     let display = &mut *handle;
     
+    // Use staging scene
     if let Some(window) = display.scene.windows.last_mut() {
         window.cursor = Some(CursorState {
             x,
@@ -220,19 +253,36 @@ pub unsafe extern "C" fn neomacs_display_begin_row(
 
     let display = &mut *handle;
     
-    if let Some(window) = display.scene.windows.last_mut() {
-        let row = GlyphRow {
-            glyphs: Vec::new(),
-            y,
-            height,
-            visible_height: height,
-            ascent,
-            enabled: true,
-            cursor_in_row: false,
-            mode_line: mode_line != 0,
-            header_line: header_line != 0,
-        };
-        window.rows.push(row);
+    // Track current row Y for glyph additions
+    display.current_row_y = y;
+    
+    // Find window by current_window_id
+    let window_id = display.current_window_id;
+    if let Some(window) = display.scene.windows.iter_mut().find(|w| w.window_id == window_id) {
+        // Look for existing row at this Y position
+        if let Some(existing_row) = window.rows.iter_mut().find(|r| r.y == y) {
+            // Replace existing row content
+            existing_row.glyphs.clear();
+            existing_row.height = height;
+            existing_row.visible_height = height;
+            existing_row.ascent = ascent;
+            existing_row.mode_line = mode_line != 0;
+            existing_row.header_line = header_line != 0;
+        } else {
+            // Add new row
+            let row = GlyphRow {
+                glyphs: Vec::new(),
+                y,
+                height,
+                visible_height: height,
+                ascent,
+                enabled: true,
+                cursor_in_row: false,
+                mode_line: mode_line != 0,
+                header_line: header_line != 0,
+            };
+            window.rows.push(row);
+        }
     }
 }
 
@@ -251,9 +301,13 @@ pub unsafe extern "C" fn neomacs_display_add_char_glyph(
     }
 
     let display = &mut *handle;
+    let current_y = display.current_row_y;
+    let window_id = display.current_window_id;
+    let c = char::from_u32(charcode).unwrap_or('\u{FFFD}');
     
-    if let Some(window) = display.scene.windows.last_mut() {
-        if let Some(row) = window.rows.last_mut() {
+    // Find window by current_window_id, then find row by current_row_y
+    if let Some(window) = display.scene.windows.iter_mut().find(|w| w.window_id == window_id) {
+        if let Some(row) = window.rows.iter_mut().find(|r| r.y == current_y) {
             let glyph = Glyph {
                 glyph_type: GlyphType::Char,
                 charcode,
@@ -266,7 +320,7 @@ pub unsafe extern "C" fn neomacs_display_add_char_glyph(
                 right_box_line: false,
                 padding: false,
                 data: GlyphData::Char {
-                    code: char::from_u32(charcode).unwrap_or('\u{FFFD}'),
+                    code: c,
                 },
             };
             row.glyphs.push(glyph);
@@ -287,9 +341,12 @@ pub unsafe extern "C" fn neomacs_display_add_stretch_glyph(
     }
 
     let display = &mut *handle;
+    let current_y = display.current_row_y;
+    let window_id = display.current_window_id;
     
-    if let Some(window) = display.scene.windows.last_mut() {
-        if let Some(row) = window.rows.last_mut() {
+    // Find window by current_window_id, then find row by current_row_y
+    if let Some(window) = display.scene.windows.iter_mut().find(|w| w.window_id == window_id) {
+        if let Some(row) = window.rows.iter_mut().find(|r| r.y == current_y) {
             let glyph = Glyph {
                 glyph_type: GlyphType::Stretch,
                 charcode: 0,
@@ -321,9 +378,12 @@ pub unsafe extern "C" fn neomacs_display_add_image_glyph(
     }
 
     let display = &mut *handle;
+    let current_y = display.current_row_y;
+    let window_id = display.current_window_id;
     
-    if let Some(window) = display.scene.windows.last_mut() {
-        if let Some(row) = window.rows.last_mut() {
+    // Find window by current_window_id, then find row by current_row_y
+    if let Some(window) = display.scene.windows.iter_mut().find(|w| w.window_id == window_id) {
+        if let Some(row) = window.rows.iter_mut().find(|r| r.y == current_y) {
             let glyph = Glyph {
                 glyph_type: GlyphType::Image,
                 charcode: 0,
@@ -350,34 +410,131 @@ pub unsafe extern "C" fn neomacs_display_end_row(handle: *mut NeomacsDisplay) {
 }
 
 // ============================================================================
-// Image Management
+// Face Management
 // ============================================================================
 
-/// Load an image from file path
-/// Returns image_id on success, 0 on failure
+use crate::core::face::{Face, FaceAttributes, UnderlineStyle, BoxType};
+
+/// Register or update a face
+/// Colors are in 0xRRGGBB format
 #[no_mangle]
-pub unsafe extern "C" fn neomacs_display_load_image(
+pub unsafe extern "C" fn neomacs_display_set_face(
     handle: *mut NeomacsDisplay,
-    path: *const c_char,
-) -> u32 {
-    if handle.is_null() || path.is_null() {
-        return 0;
-    }
-
-    let display = &mut *handle;
-    let path_str = match CStr::from_ptr(path).to_str() {
-        Ok(s) => s,
-        Err(_) => return 0,
-    };
-
-    // Access image cache through backend
-    if let Some(backend) = display.gtk4_backend.as_mut() {
-        // This would need to be implemented on the backend
-        // For now return 0
+    face_id: u32,
+    foreground: u32,  // 0xRRGGBB
+    background: u32,  // 0xRRGGBB
+    font_weight: u16, // 400=normal, 700=bold
+    is_italic: c_int,
+    underline_style: c_int, // 0=none, 1=line, 2=wave, 3=double, 4=dotted, 5=dashed
+    underline_color: u32,
+    box_type: c_int,  // 0=none, 1=line, 2=raised3d, 3=sunken3d
+    box_color: u32,
+    box_line_width: c_int,
+) {
+    if handle.is_null() {
+        return;
     }
     
-    0
+    let display = &mut *handle;
+    
+    // Convert colors from 0xRRGGBB to Color
+    let fg = Color {
+        r: ((foreground >> 16) & 0xFF) as f32 / 255.0,
+        g: ((foreground >> 8) & 0xFF) as f32 / 255.0,
+        b: (foreground & 0xFF) as f32 / 255.0,
+        a: 1.0,
+    };
+    
+    let bg = Color {
+        r: ((background >> 16) & 0xFF) as f32 / 255.0,
+        g: ((background >> 8) & 0xFF) as f32 / 255.0,
+        b: (background & 0xFF) as f32 / 255.0,
+        a: if background == 0 { 0.0 } else { 1.0 },
+    };
+    
+    // Build attributes
+    let mut attrs = FaceAttributes::empty();
+    if font_weight >= 700 {
+        attrs |= FaceAttributes::BOLD;
+    }
+    if is_italic != 0 {
+        attrs |= FaceAttributes::ITALIC;
+    }
+    if underline_style != 0 {
+        attrs |= FaceAttributes::UNDERLINE;
+    }
+    if box_type != 0 {
+        attrs |= FaceAttributes::BOX;
+    }
+    
+    // Underline style
+    let ul_style = match underline_style {
+        1 => UnderlineStyle::Line,
+        2 => UnderlineStyle::Wave,
+        3 => UnderlineStyle::Double,
+        4 => UnderlineStyle::Dotted,
+        5 => UnderlineStyle::Dashed,
+        _ => UnderlineStyle::None,
+    };
+    
+    // Box type
+    let bx_type = match box_type {
+        1 => BoxType::Line,
+        2 => BoxType::Raised3D,
+        3 => BoxType::Sunken3D,
+        _ => BoxType::None,
+    };
+    
+    // Underline color
+    let ul_color = if underline_color != 0 {
+        Some(Color {
+            r: ((underline_color >> 16) & 0xFF) as f32 / 255.0,
+            g: ((underline_color >> 8) & 0xFF) as f32 / 255.0,
+            b: (underline_color & 0xFF) as f32 / 255.0,
+            a: 1.0,
+        })
+    } else {
+        None
+    };
+    
+    // Box color
+    let bx_color = if box_color != 0 {
+        Some(Color {
+            r: ((box_color >> 16) & 0xFF) as f32 / 255.0,
+            g: ((box_color >> 8) & 0xFF) as f32 / 255.0,
+            b: (box_color & 0xFF) as f32 / 255.0,
+            a: 1.0,
+        })
+    } else {
+        None
+    };
+    
+    let face = Face {
+        id: face_id,
+        foreground: fg,
+        background: bg,
+        underline_color: ul_color,
+        overline_color: None,
+        strike_through_color: None,
+        box_color: bx_color,
+        font_family: "monospace".to_string(),
+        font_size: 14.0,
+        font_weight,
+        attributes: attrs,
+        underline_style: ul_style,
+        box_type: bx_type,
+        box_line_width,
+    };
+    
+    // Register face both in the renderer's cache AND in the scene
+    // The scene will be cloned to the widget which has its own renderer
+    display.scene.set_face(face.clone());
+    display.gsk_renderer.face_cache_mut().insert(face);
 }
+
+// ============================================================================
+// Image Management
+// ============================================================================
 
 /// Add a video glyph to the current row
 #[no_mangle]
@@ -392,9 +549,12 @@ pub unsafe extern "C" fn neomacs_display_add_video_glyph(
     }
 
     let display = &mut *handle;
+    let current_y = display.current_row_y;
+    let window_id = display.current_window_id;
     
-    if let Some(window) = display.scene.windows.last_mut() {
-        if let Some(row) = window.rows.last_mut() {
+    // Find window by current_window_id, then find row by current_row_y
+    if let Some(window) = display.scene.windows.iter_mut().find(|w| w.window_id == window_id) {
+        if let Some(row) = window.rows.iter_mut().find(|r| r.y == current_y) {
             let glyph = Glyph {
                 glyph_type: GlyphType::Video,
                 charcode: 0,
@@ -424,15 +584,19 @@ pub unsafe extern "C" fn neomacs_display_load_video(
         return 0;
     }
 
-    let _display = &mut *handle;
-    let _uri_str = match CStr::from_ptr(uri).to_str() {
+    let display = &mut *handle;
+    let uri_str = match CStr::from_ptr(uri).to_str() {
         Ok(s) => s,
         Err(_) => return 0,
     };
 
-    // Video loading would need backend access
-    // For now return 0
-    0
+    match display.video_cache.load(uri_str) {
+        Ok(id) => id,
+        Err(e) => {
+            eprintln!("Failed to load video: {}", e);
+            0
+        }
+    }
 }
 
 /// Play a loaded video
@@ -445,11 +609,17 @@ pub unsafe extern "C" fn neomacs_display_video_play(
         return -1;
     }
 
-    let _display = &mut *handle;
-    let _ = video_id;
+    let display = &mut *handle;
     
-    // Would need backend access
-    0
+    #[cfg(feature = "video")]
+    if let Some(player) = display.video_cache.get_mut(video_id) {
+        return match player.play() {
+            Ok(()) => 0,
+            Err(_) => -1,
+        };
+    }
+    
+    -1
 }
 
 /// Pause a video
@@ -462,10 +632,17 @@ pub unsafe extern "C" fn neomacs_display_video_pause(
         return -1;
     }
 
-    let _display = &mut *handle;
-    let _ = video_id;
+    let display = &mut *handle;
     
-    0
+    #[cfg(feature = "video")]
+    if let Some(player) = display.video_cache.get_mut(video_id) {
+        return match player.pause() {
+            Ok(()) => 0,
+            Err(_) => -1,
+        };
+    }
+    
+    -1
 }
 
 /// Stop a video
@@ -478,10 +655,201 @@ pub unsafe extern "C" fn neomacs_display_video_stop(
         return -1;
     }
 
-    let _display = &mut *handle;
-    let _ = video_id;
+    let display = &mut *handle;
     
-    0
+    #[cfg(feature = "video")]
+    if let Some(player) = display.video_cache.get_mut(video_id) {
+        return match player.stop() {
+            Ok(()) => 0,
+            Err(_) => -1,
+        };
+    }
+    
+    -1
+}
+
+// ============================================================================
+// Image Functions
+// ============================================================================
+
+/// Load an image from a file path
+/// Returns image_id on success, 0 on failure
+#[no_mangle]
+pub unsafe extern "C" fn neomacs_display_load_image(
+    handle: *mut NeomacsDisplay,
+    path: *const c_char,
+) -> u32 {
+    if handle.is_null() || path.is_null() {
+        return 0;
+    }
+
+    let display = &mut *handle;
+    let path_str = match CStr::from_ptr(path).to_str() {
+        Ok(s) => s,
+        Err(_) => return 0,
+    };
+
+    match display.image_cache.load_from_file(std::path::Path::new(path_str)) {
+        Ok(id) => id,
+        Err(e) => {
+            eprintln!("Failed to load image: {}", e);
+            0
+        }
+    }
+}
+
+/// Load an image from raw bytes
+/// Returns image_id on success, 0 on failure
+#[no_mangle]
+pub unsafe extern "C" fn neomacs_display_load_image_data(
+    handle: *mut NeomacsDisplay,
+    data: *const u8,
+    len: usize,
+) -> u32 {
+    if handle.is_null() || data.is_null() || len == 0 {
+        return 0;
+    }
+
+    let display = &mut *handle;
+    let bytes = std::slice::from_raw_parts(data, len);
+
+    match display.image_cache.load_from_bytes(bytes) {
+        Ok(id) => id,
+        Err(e) => {
+            eprintln!("Failed to load image data: {}", e);
+            0
+        }
+    }
+}
+
+/// Get image dimensions
+/// Returns 0 on success, -1 on failure
+#[no_mangle]
+pub unsafe extern "C" fn neomacs_display_get_image_size(
+    handle: *mut NeomacsDisplay,
+    image_id: u32,
+    width: *mut c_int,
+    height: *mut c_int,
+) -> c_int {
+    if handle.is_null() || width.is_null() || height.is_null() {
+        return -1;
+    }
+
+    let display = &mut *handle;
+    
+    if let Some(img) = display.image_cache.get(image_id) {
+        *width = img.width;
+        *height = img.height;
+        return 0;
+    }
+    
+    -1
+}
+
+/// Free an image from cache
+#[no_mangle]
+pub unsafe extern "C" fn neomacs_display_free_image(
+    handle: *mut NeomacsDisplay,
+    image_id: u32,
+) -> c_int {
+    if handle.is_null() {
+        return -1;
+    }
+
+    let display = &mut *handle;
+    if display.image_cache.remove(image_id) {
+        0
+    } else {
+        -1
+    }
+}
+
+/// Set a floating video at a specific screen position
+/// The video will be rendered on top of the frame
+#[no_mangle]
+pub unsafe extern "C" fn neomacs_display_set_floating_video(
+    handle: *mut NeomacsDisplay,
+    video_id: u32,
+    x: c_int,
+    y: c_int,
+    width: c_int,
+    height: c_int,
+) {
+    if handle.is_null() {
+        return;
+    }
+
+    let display = &mut *handle;
+    
+    // Remove existing floating video for this ID
+    display.scene.remove_floating_video(video_id);
+    
+    // Add new floating video
+    display.scene.add_floating_video(
+        video_id,
+        x as f32,
+        y as f32,
+        width as f32,
+        height as f32,
+    );
+}
+
+/// Remove a floating video
+#[no_mangle]
+pub unsafe extern "C" fn neomacs_display_clear_floating_video(
+    handle: *mut NeomacsDisplay,
+    video_id: u32,
+) {
+    if handle.is_null() {
+        return;
+    }
+
+    let display = &mut *handle;
+    display.scene.remove_floating_video(video_id);
+}
+
+/// Set a floating image at a specific screen position
+/// The image will be rendered on top of the frame
+#[no_mangle]
+pub unsafe extern "C" fn neomacs_display_set_floating_image(
+    handle: *mut NeomacsDisplay,
+    image_id: u32,
+    x: c_int,
+    y: c_int,
+    width: c_int,
+    height: c_int,
+) {
+    if handle.is_null() {
+        return;
+    }
+
+    let display = &mut *handle;
+    
+    // Remove existing floating image for this ID
+    display.scene.remove_floating_image(image_id);
+    
+    // Add new floating image
+    display.scene.add_floating_image(
+        image_id,
+        x as f32,
+        y as f32,
+        width as f32,
+        height as f32,
+    );
+}
+
+/// Remove a floating image
+#[no_mangle]
+pub unsafe extern "C" fn neomacs_display_clear_floating_image(
+    handle: *mut NeomacsDisplay,
+    image_id: u32,
+) {
+    if handle.is_null() {
+        return;
+    }
+
+    let display = &mut *handle;
+    display.scene.remove_floating_image(image_id);
 }
 
 /// End frame and render
@@ -493,11 +861,19 @@ pub unsafe extern "C" fn neomacs_display_end_frame(handle: *mut NeomacsDisplay) 
 
     let display = &mut *handle;
     
+    // Reset frame flag
+    display.in_frame = false;
+    
+    // Build scene if it has content
+    let scene_rows: usize = display.scene.windows.iter().map(|w| w.rows.len()).sum();
+    
+    if scene_rows > 0 {
+        // Build the scene graph
+        display.scene.build();
+    }
+    
     // Update animations
     display.animations.tick();
-    
-    // Build scene graph
-    display.scene.build();
     
     // Render - we need to match backend type explicitly to avoid borrow conflict
     let result = match display.backend_type {
@@ -527,6 +903,74 @@ pub unsafe extern "C" fn neomacs_display_end_frame(handle: *mut NeomacsDisplay) 
     display.scene.clear_dirty();
     
     0
+}
+
+/// Render the scene to an external Cairo context
+/// 
+/// # Safety
+/// The cairo_context must be a valid cairo_t pointer from C.
+#[no_mangle]
+pub unsafe extern "C" fn neomacs_display_render_to_cairo(
+    handle: *mut NeomacsDisplay,
+    cairo_context: *mut c_void,
+) -> c_int {
+    if handle.is_null() || cairo_context.is_null() {
+        return -1;
+    }
+
+    let display = &mut *handle;
+    
+    // Convert the C cairo_t pointer to a Rust Cairo context
+    // This is safe because we're wrapping an existing context, not creating one
+    let cr = match gtk4::cairo::Context::from_raw_borrow(cairo_context as *mut _) {
+        cr => cr,
+    };
+    
+    // Build the scene graph from accumulated data
+    display.scene.build();
+    
+    // Render using GSK renderer (GPU-accelerated scene graph) or Cairo renderer
+    if display.use_gsk {
+        display.gsk_renderer.render_to_cairo_with_caches(&cr, &display.scene, &display.video_cache, &mut display.image_cache);
+    } else {
+        display.renderer.render(&cr, &display.scene);
+    }
+    
+    0
+}
+
+/// Initialize the renderer with a Pango context (call after widget is realized)
+#[no_mangle]
+pub unsafe extern "C" fn neomacs_display_init_pango(
+    handle: *mut NeomacsDisplay,
+    pango_context: *mut c_void,
+) {
+    if handle.is_null() || pango_context.is_null() {
+        return;
+    }
+
+    let display = &mut *handle;
+    
+    // Convert C PangoContext to Rust
+    let context: gtk4::pango::Context = gtk4::glib::translate::from_glib_none(pango_context as *mut _);
+    
+    // Initialize both renderers with the Pango context
+    display.renderer.init_with_context(context.clone());
+    display.gsk_renderer.init_with_context(context);
+}
+
+/// Enable or disable GSK rendering
+#[no_mangle]
+pub unsafe extern "C" fn neomacs_display_set_gsk_enabled(
+    handle: *mut NeomacsDisplay,
+    enabled: c_int,
+) {
+    if handle.is_null() {
+        return;
+    }
+
+    let display = &mut *handle;
+    display.use_gsk = enabled != 0;
 }
 
 // ============================================================================
@@ -602,5 +1046,490 @@ pub unsafe extern "C" fn neomacs_display_is_initialized(handle: *mut NeomacsDisp
     match display.get_backend() {
         Some(backend) => backend.is_initialized() as c_int,
         None => 0,
+    }
+}
+
+// ============================================================================
+// GPU-Accelerated Widget (GSK)
+// ============================================================================
+
+use crate::backend::gtk4::NeomacsWidget;
+
+/// Create a GPU-accelerated NeomacsWidget
+/// 
+/// # Safety
+/// Returns a pointer to a NeomacsWidget that can be added to a GTK container.
+/// The widget is owned by GTK's reference counting system.
+#[no_mangle]
+pub unsafe extern "C" fn neomacs_display_create_widget() -> *mut c_void {
+    use gtk4::glib::translate::ToGlibPtr;
+    use gtk4::prelude::{WidgetExt, Cast};
+    
+    let widget = NeomacsWidget::new();
+    
+    // Cast to gtk4::Widget first, then get the pointer
+    let gtk_widget: gtk4::Widget = widget.upcast();
+    let ptr: *mut gtk4::ffi::GtkWidget = gtk_widget.to_glib_full();
+    ptr as *mut c_void
+}
+
+/// Set the scene on a NeomacsWidget (triggers GPU-accelerated redraw)
+/// 
+/// # Safety
+/// handle must be a valid NeomacsDisplay pointer
+/// widget must be a valid NeomacsWidget pointer
+#[no_mangle]
+pub unsafe extern "C" fn neomacs_display_widget_set_scene(
+    handle: *mut NeomacsDisplay,
+    widget: *mut c_void,
+) -> c_int {
+    use gtk4::glib::translate::from_glib_none;
+    
+    if handle.is_null() || widget.is_null() {
+        return -1;
+    }
+
+    let display = &mut *handle;
+    let widget: NeomacsWidget = from_glib_none(widget as *mut _);
+    
+    // Clone the committed scene and set it on the widget
+    widget.set_scene(display.scene.clone());
+    
+    0
+}
+
+/// Initialize the GSK renderer's Pango context from a NeomacsWidget
+/// 
+/// # Safety
+/// handle must be valid, widget must be a realized NeomacsWidget
+#[no_mangle]
+pub unsafe extern "C" fn neomacs_display_widget_init_pango(
+    handle: *mut NeomacsDisplay,
+    widget: *mut c_void,
+) {
+    use gtk4::glib::translate::from_glib_none;
+    use gtk4::prelude::WidgetExt;
+    
+    if handle.is_null() || widget.is_null() {
+        return;
+    }
+
+    let display = &mut *handle;
+    let widget: NeomacsWidget = from_glib_none(widget as *mut _);
+    
+    // Get Pango context from widget and initialize renderer
+    let context = widget.pango_context();
+    display.renderer.init_with_context(context);
+}
+
+/// Render scene to a NeomacsWidget using GSK (GPU-accelerated)
+/// 
+/// This renders directly using GSK render nodes for GPU acceleration.
+/// 
+/// # Safety
+/// handle must be valid, widget must be a valid NeomacsWidget
+#[no_mangle]
+pub unsafe extern "C" fn neomacs_display_render_to_widget(
+    handle: *mut NeomacsDisplay,
+    widget: *mut c_void,
+) -> c_int {
+    use gtk4::glib::translate::from_glib_none;
+    
+    if handle.is_null() || widget.is_null() {
+        return -1;
+    }
+
+    let display = &mut *handle;
+    let widget: NeomacsWidget = from_glib_none(widget as *mut _);
+    
+    // Count glyphs
+    let total_glyphs: usize = display.scene.windows.iter()
+        .map(|w| w.rows.iter().map(|r| r.glyphs.len()).sum::<usize>())
+        .sum();
+    
+    // Show first few chars from the scene
+    let first_chars: String = display.scene.windows.iter()
+        .flat_map(|w| w.rows.iter())
+        .flat_map(|r| r.glyphs.iter())
+        .filter_map(|g| match &g.data {
+            crate::core::glyph::GlyphData::Char { code } => Some(*code),
+            _ => None,
+        })
+        .take(20)
+        .collect();
+    
+    if total_glyphs > 0 {
+        // Build the scene and set it on the widget
+        display.scene.build();
+        let cloned_scene = display.scene.clone();
+        widget.set_scene(cloned_scene);
+    }
+    
+    0
+}
+
+// ============================================================================
+// WebKit Integration
+// ============================================================================
+
+// ============================================================================
+// WebKit Functions
+// ============================================================================
+
+#[cfg(feature = "wpe-webkit")]
+use std::cell::RefCell;
+#[cfg(feature = "wpe-webkit")]
+use crate::backend::webkit::WebKitCache;
+#[cfg(feature = "wpe-webkit")]
+use crate::backend::wpe::WpeBackend;
+
+#[cfg(feature = "wpe-webkit")]
+thread_local! {
+    static WEBKIT_CACHE: RefCell<Option<WebKitCache>> = const { RefCell::new(None) };
+    static WPE_BACKEND: RefCell<Option<WpeBackend>> = const { RefCell::new(None) };
+}
+
+/// Initialize WebKit subsystem with EGL display
+/// Must be called before creating WebKit views
+#[no_mangle]
+pub unsafe extern "C" fn neomacs_display_webkit_init(
+    _handle: *mut NeomacsDisplay,
+    egl_display: *mut libc::c_void,
+) -> c_int {
+    #[cfg(feature = "wpe-webkit")]
+    {
+        // Initialize WPE backend
+        match WpeBackend::new(egl_display) {
+            Ok(backend) => {
+                WPE_BACKEND.with(|wpe| {
+                    *wpe.borrow_mut() = Some(backend);
+                });
+                
+                // Initialize cache
+                WEBKIT_CACHE.with(|cache| {
+                    *cache.borrow_mut() = Some(WebKitCache::new());
+                });
+                
+                log::info!("WebKit subsystem initialized");
+                return 0;
+            }
+            Err(e) => {
+                eprintln!("Failed to initialize WPE backend: {}", e);
+                return -1;
+            }
+        }
+    }
+    
+    #[cfg(not(feature = "wpe-webkit"))]
+    {
+        let _ = egl_display;
+        eprintln!("WebKit support not compiled");
+        -1
+    }
+}
+
+/// Create a new WebKit view
+/// Returns view_id on success, 0 on failure
+#[no_mangle]
+pub unsafe extern "C" fn neomacs_display_webkit_create(
+    _handle: *mut NeomacsDisplay,
+    width: c_int,
+    height: c_int,
+) -> u32 {
+    #[cfg(feature = "wpe-webkit")]
+    {
+        return WPE_BACKEND.with(|wpe_cell| {
+            let wpe_borrow = wpe_cell.borrow();
+            let backend = match wpe_borrow.as_ref() {
+                Some(b) => b,
+                None => {
+                    eprintln!("WebKit not initialized - call neomacs_display_webkit_init first");
+                    return 0;
+                }
+            };
+            
+            WEBKIT_CACHE.with(|cache_cell| {
+                let mut cache_borrow = cache_cell.borrow_mut();
+                if let Some(cache) = cache_borrow.as_mut() {
+                    match cache.create_with_backend(backend, width, height) {
+                        Ok(id) => id,
+                        Err(e) => {
+                            eprintln!("Failed to create WebKit view: {}", e);
+                            0
+                        }
+                    }
+                } else {
+                    0
+                }
+            })
+        });
+    }
+    
+    #[cfg(not(feature = "wpe-webkit"))]
+    {
+        let _ = (width, height);
+        eprintln!("WebKit support not compiled");
+        0
+    }
+}
+
+/// Destroy a WebKit view
+#[no_mangle]
+pub unsafe extern "C" fn neomacs_display_webkit_destroy(
+    _handle: *mut NeomacsDisplay,
+    view_id: u32,
+) -> c_int {
+    #[cfg(feature = "wpe-webkit")]
+    {
+        return WEBKIT_CACHE.with(|cache_cell| {
+            let mut cache_borrow = cache_cell.borrow_mut();
+            if let Some(cache) = cache_borrow.as_mut() {
+                if cache.remove(view_id) {
+                    return 0;
+                }
+            }
+            -1
+        });
+    }
+    
+    #[cfg(not(feature = "wpe-webkit"))]
+    {
+        let _ = view_id;
+        -1
+    }
+}
+
+/// Load a URI in a WebKit view
+#[no_mangle]
+pub unsafe extern "C" fn neomacs_display_webkit_load_uri(
+    _handle: *mut NeomacsDisplay,
+    view_id: u32,
+    uri: *const c_char,
+) -> c_int {
+    if uri.is_null() {
+        return -1;
+    }
+    
+    #[cfg(feature = "wpe-webkit")]
+    {
+        return WEBKIT_CACHE.with(|cache_cell| {
+            let mut cache_borrow = cache_cell.borrow_mut();
+            if let Some(cache) = cache_borrow.as_mut() {
+                let uri_str = match CStr::from_ptr(uri).to_str() {
+                    Ok(s) => s,
+                    Err(_) => return -1,
+                };
+                
+                if let Err(e) = cache.load_uri(view_id, uri_str) {
+                    eprintln!("Failed to load URI: {}", e);
+                    return -1;
+                }
+                return 0;
+            }
+            -1
+        });
+    }
+    
+    #[cfg(not(feature = "wpe-webkit"))]
+    {
+        let _ = view_id;
+        -1
+    }
+}
+
+/// Go back in a WebKit view
+#[no_mangle]
+pub unsafe extern "C" fn neomacs_display_webkit_go_back(
+    _handle: *mut NeomacsDisplay,
+    view_id: u32,
+) -> c_int {
+    #[cfg(feature = "wpe-webkit")]
+    {
+        return WEBKIT_CACHE.with(|cache_cell| {
+            let mut cache_borrow = cache_cell.borrow_mut();
+            if let Some(cache) = cache_borrow.as_mut() {
+                if let Some(view) = cache.get_mut(view_id) {
+                    let _ = view.go_back();
+                    return 0;
+                }
+            }
+            -1
+        });
+    }
+    
+    #[cfg(not(feature = "wpe-webkit"))]
+    {
+        let _ = view_id;
+        -1
+    }
+}
+
+/// Go forward in a WebKit view
+#[no_mangle]
+pub unsafe extern "C" fn neomacs_display_webkit_go_forward(
+    _handle: *mut NeomacsDisplay,
+    view_id: u32,
+) -> c_int {
+    #[cfg(feature = "wpe-webkit")]
+    {
+        return WEBKIT_CACHE.with(|cache_cell| {
+            let mut cache_borrow = cache_cell.borrow_mut();
+            if let Some(cache) = cache_borrow.as_mut() {
+                if let Some(view) = cache.get_mut(view_id) {
+                    let _ = view.go_forward();
+                    return 0;
+                }
+            }
+            -1
+        });
+    }
+    
+    #[cfg(not(feature = "wpe-webkit"))]
+    {
+        let _ = view_id;
+        -1
+    }
+}
+
+/// Reload a WebKit view
+#[no_mangle]
+pub unsafe extern "C" fn neomacs_display_webkit_reload(
+    _handle: *mut NeomacsDisplay,
+    view_id: u32,
+) -> c_int {
+    #[cfg(feature = "wpe-webkit")]
+    {
+        return WEBKIT_CACHE.with(|cache_cell| {
+            let mut cache_borrow = cache_cell.borrow_mut();
+            if let Some(cache) = cache_borrow.as_mut() {
+                if let Some(view) = cache.get_mut(view_id) {
+                    let _ = view.reload();
+                    return 0;
+                }
+            }
+            -1
+        });
+    }
+    
+    #[cfg(not(feature = "wpe-webkit"))]
+    {
+        let _ = view_id;
+        -1
+    }
+}
+
+/// Execute JavaScript in a WebKit view
+#[no_mangle]
+pub unsafe extern "C" fn neomacs_display_webkit_execute_js(
+    _handle: *mut NeomacsDisplay,
+    view_id: u32,
+    script: *const c_char,
+) -> c_int {
+    if script.is_null() {
+        return -1;
+    }
+    
+    #[cfg(feature = "wpe-webkit")]
+    {
+        return WEBKIT_CACHE.with(|cache_cell| {
+            let mut cache_borrow = cache_cell.borrow_mut();
+            if let Some(cache) = cache_borrow.as_mut() {
+                let script_str = match CStr::from_ptr(script).to_str() {
+                    Ok(s) => s,
+                    Err(_) => return -1,
+                };
+                
+                if let Err(e) = cache.execute_javascript(view_id, script_str) {
+                    eprintln!("Failed to execute JavaScript: {}", e);
+                    return -1;
+                }
+                return 0;
+            }
+            -1
+        });
+    }
+    
+    #[cfg(not(feature = "wpe-webkit"))]
+    {
+        let _ = view_id;
+        -1
+    }
+}
+
+/// Set a floating WebKit view position and size
+#[no_mangle]
+pub unsafe extern "C" fn neomacs_display_set_floating_webkit(
+    handle: *mut NeomacsDisplay,
+    webkit_id: u32,
+    x: c_int,
+    y: c_int,
+    width: c_int,
+    height: c_int,
+) {
+    if handle.is_null() {
+        return;
+    }
+    
+    let display = &mut *handle;
+    
+    // Remove existing webkit with same ID
+    display.scene.floating_webkits.retain(|w| w.webkit_id != webkit_id);
+    
+    // Add webkit at position
+    display.scene.add_floating_webkit(
+        webkit_id,
+        x as f32,
+        y as f32,
+        width as f32,
+        height as f32,
+    );
+}
+
+/// Hide a floating WebKit view
+#[no_mangle]
+pub unsafe extern "C" fn neomacs_display_hide_floating_webkit(
+    handle: *mut NeomacsDisplay,
+    webkit_id: u32,
+) {
+    if handle.is_null() {
+        return;
+    }
+    
+    let display = &mut *handle;
+    display.scene.remove_floating_webkit(webkit_id);
+}
+
+/// Add a WPE glyph to the current row
+#[no_mangle]
+pub unsafe extern "C" fn neomacs_display_add_wpe_glyph(
+    handle: *mut NeomacsDisplay,
+    view_id: u32,
+    pixel_width: c_int,
+    pixel_height: c_int,
+) {
+    if handle.is_null() {
+        return;
+    }
+
+    let display = &mut *handle;
+    
+    // Add to the current row
+    if let Some(window) = display.scene.windows.last_mut() {
+        if let Some(row) = window.rows.last_mut() {
+            let glyph = Glyph {
+                glyph_type: GlyphType::Wpe,
+                charcode: 0,
+                face_id: 0,
+                pixel_width,
+                ascent: pixel_height,
+                descent: 0,
+                charpos: 0,
+                left_box_line: false,
+                right_box_line: false,
+                padding: false,
+                data: GlyphData::Wpe { view_id },
+            };
+            row.glyphs.push(glyph);
+        }
     }
 }

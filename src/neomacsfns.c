@@ -409,8 +409,8 @@ neomacs_ensure_cr_surface (struct frame *f, int width, int height)
       output->cr_surface = NULL;
     }
 
-  /* Create new surface */
-  output->cr_surface = cairo_image_surface_create (CAIRO_FORMAT_ARGB32,
+  /* Create new surface - use RGB24 (no alpha) for opaque rendering */
+  output->cr_surface = cairo_image_surface_create (CAIRO_FORMAT_RGB24,
 						   width, height);
   output->cr_context = cairo_create (output->cr_surface);
 
@@ -460,16 +460,28 @@ neomacs_draw_cb (GtkDrawingArea *area, cairo_t *cr,
 {
   struct frame *f = (struct frame *) user_data;
   struct neomacs_output *output;
+  struct neomacs_display_info *dpyinfo;
 
   if (!FRAME_NEOMACS_P (f))
     return;
 
   output = FRAME_NEOMACS_OUTPUT (f);
+  dpyinfo = FRAME_DISPLAY_INFO (f);
 
-  /* Ensure we have a backing surface */
+  /* Use SOURCE operator to replace pixels (ignores destination alpha) */
+  cairo_set_operator (cr, CAIRO_OPERATOR_SOURCE);
+
+  /* Try Rust rendering first */
+  if (dpyinfo && dpyinfo->display_handle)
+    {
+      /* Have Rust render the scene graph directly to the widget's Cairo context */
+      neomacs_display_render_to_cairo (dpyinfo->display_handle, cr);
+      return;
+    }
+
+  /* Fallback: use C Cairo backing surface */
   neomacs_ensure_cr_surface (f, width, height);
-
-  /* If we have a backing surface, blit it to the widget */
+  
   if (output->cr_surface)
     {
       cairo_set_source_surface (cr, output->cr_surface, 0, 0);
@@ -540,6 +552,34 @@ neomacs_key_pressed_cb (GtkEventControllerKey *controller,
   if (0) fprintf (stderr, "DEBUG: Key pressed: keyval=%u (0x%x), keycode=%u, state=%u\n",
 	   keyval, keyval, keycode, state);
 
+  /* Ignore modifier-only key presses - they are only used as modifiers */
+  switch (keyval)
+    {
+    case GDK_KEY_Shift_L:
+    case GDK_KEY_Shift_R:
+    case GDK_KEY_Control_L:
+    case GDK_KEY_Control_R:
+    case GDK_KEY_Caps_Lock:
+    case GDK_KEY_Shift_Lock:
+    case GDK_KEY_Meta_L:
+    case GDK_KEY_Meta_R:
+    case GDK_KEY_Alt_L:
+    case GDK_KEY_Alt_R:
+    case GDK_KEY_Super_L:
+    case GDK_KEY_Super_R:
+    case GDK_KEY_Hyper_L:
+    case GDK_KEY_Hyper_R:
+    case GDK_KEY_ISO_Lock:
+    case GDK_KEY_ISO_Level2_Latch:
+    case GDK_KEY_ISO_Level3_Shift:
+    case GDK_KEY_ISO_Level3_Latch:
+    case GDK_KEY_ISO_Level3_Lock:
+    case GDK_KEY_ISO_Level5_Shift:
+    case GDK_KEY_ISO_Level5_Latch:
+    case GDK_KEY_ISO_Level5_Lock:
+      return FALSE;  /* Let GTK handle modifier keys, don't send as events */
+    }
+
   c = neomacs_translate_key (keyval, state);
   if (c == 0 && keyval > 0x7F)
     {
@@ -574,6 +614,7 @@ neomacs_key_pressed_cb (GtkEventControllerKey *controller,
 	ie.modifiers |= meta_modifier;
       ie.timestamp = 0;
       XSETFRAME (ie.frame_or_window, f);
+      if (0) fprintf (stderr, "DEBUG: Storing ASCII key event: code=%u, modifiers=%d\n", c, ie.modifiers);
       kbd_buffer_store_event (&ie);
       return TRUE;
     }
@@ -636,16 +677,178 @@ neomacs_close_request_cb (GtkWindow *window, gpointer user_data)
   return TRUE;  /* Prevent immediate close, let Emacs handle it */
 }
 
+/* Callback for GTK4 mouse button press */
+static void
+neomacs_click_pressed_cb (GtkGestureClick *gesture, int n_press,
+                          double x, double y, gpointer user_data)
+{
+  struct frame *f = (struct frame *) user_data;
+  struct input_event ie;
+  guint button;
+  GdkModifierType state = 0;
+  GdkEvent *event;
+
+  if (!FRAME_LIVE_P (f))
+    return;
+
+  button = gtk_gesture_single_get_current_button (GTK_GESTURE_SINGLE (gesture));
+  event = gtk_event_controller_get_current_event (GTK_EVENT_CONTROLLER (gesture));
+  if (event)
+    state = gdk_event_get_modifier_state (event);
+
+  EVENT_INIT (ie);
+  ie.kind = MOUSE_CLICK_EVENT;
+  ie.code = button - 1;  /* Emacs uses 0-based button numbers */
+  ie.timestamp = event ? gdk_event_get_time (event) : 0;
+  ie.modifiers = down_modifier;
+
+  /* Add modifier keys */
+  if (state & GDK_SHIFT_MASK)
+    ie.modifiers |= shift_modifier;
+  if (state & GDK_CONTROL_MASK)
+    ie.modifiers |= ctrl_modifier;
+  if (state & GDK_ALT_MASK)
+    ie.modifiers |= meta_modifier;
+
+  XSETINT (ie.x, (int) x);
+  XSETINT (ie.y, (int) y);
+  XSETFRAME (ie.frame_or_window, f);
+  ie.arg = Qnil;
+
+  kbd_buffer_store_event (&ie);
+}
+
+/* Callback for GTK4 mouse button release */
+static void
+neomacs_click_released_cb (GtkGestureClick *gesture, int n_press,
+                           double x, double y, gpointer user_data)
+{
+  struct frame *f = (struct frame *) user_data;
+  struct input_event ie;
+  guint button;
+  GdkModifierType state = 0;
+  GdkEvent *event;
+
+  if (!FRAME_LIVE_P (f))
+    return;
+
+  button = gtk_gesture_single_get_current_button (GTK_GESTURE_SINGLE (gesture));
+  event = gtk_event_controller_get_current_event (GTK_EVENT_CONTROLLER (gesture));
+  if (event)
+    state = gdk_event_get_modifier_state (event);
+
+  EVENT_INIT (ie);
+  ie.kind = MOUSE_CLICK_EVENT;
+  ie.code = button - 1;
+  ie.timestamp = event ? gdk_event_get_time (event) : 0;
+  ie.modifiers = up_modifier;
+
+  if (state & GDK_SHIFT_MASK)
+    ie.modifiers |= shift_modifier;
+  if (state & GDK_CONTROL_MASK)
+    ie.modifiers |= ctrl_modifier;
+  if (state & GDK_ALT_MASK)
+    ie.modifiers |= meta_modifier;
+
+  XSETINT (ie.x, (int) x);
+  XSETINT (ie.y, (int) y);
+  XSETFRAME (ie.frame_or_window, f);
+  ie.arg = Qnil;
+
+  kbd_buffer_store_event (&ie);
+}
+
+/* Callback for GTK4 mouse motion */
+static void
+neomacs_motion_cb (GtkEventControllerMotion *controller,
+                   double x, double y, gpointer user_data)
+{
+  struct frame *f = (struct frame *) user_data;
+  struct neomacs_display_info *dpyinfo;
+
+  if (!FRAME_LIVE_P (f))
+    return;
+
+  dpyinfo = FRAME_DISPLAY_INFO (f);
+  if (!dpyinfo)
+    return;
+
+  /* Update last mouse position - used by Emacs for tracking */
+  f->mouse_moved = true;
+  dpyinfo->last_mouse_frame = f;
+}
+
+/* Callback for GTK4 scroll events (mouse wheel) */
+static gboolean
+neomacs_scroll_cb (GtkEventControllerScroll *controller,
+                   double dx, double dy, gpointer user_data)
+{
+  struct frame *f = (struct frame *) user_data;
+  struct input_event ie;
+  GdkEvent *event;
+
+  if (!FRAME_LIVE_P (f))
+    return FALSE;
+
+  event = gtk_event_controller_get_current_event (GTK_EVENT_CONTROLLER (controller));
+  if (!event)
+    return FALSE;
+
+  EVENT_INIT (ie);
+  ie.timestamp = gdk_event_get_time (event);
+  XSETFRAME (ie.frame_or_window, f);
+  ie.arg = Qnil;
+
+  /* Use 0,0 as position - will be updated by next motion event */
+  XSETINT (ie.x, 0);
+  XSETINT (ie.y, 0);
+
+  if (dy != 0)
+    {
+      /* Vertical scroll - button 4 (up) or 5 (down) */
+      ie.kind = MOUSE_CLICK_EVENT;
+      ie.code = dy < 0 ? 3 : 4;  /* Button 4 or 5, 0-indexed */
+      ie.modifiers = down_modifier;
+      kbd_buffer_store_event (&ie);
+
+      /* Also send release */
+      ie.modifiers = up_modifier;
+      kbd_buffer_store_event (&ie);
+    }
+
+  if (dx != 0)
+    {
+      /* Horizontal scroll - button 6 (left) or 7 (right) */
+      ie.kind = MOUSE_CLICK_EVENT;
+      ie.code = dx < 0 ? 5 : 6;  /* Button 6 or 7, 0-indexed */
+      ie.modifiers = down_modifier;
+      kbd_buffer_store_event (&ie);
+
+      ie.modifiers = up_modifier;
+      kbd_buffer_store_event (&ie);
+    }
+
+  return TRUE;
+}
+
 /* Create GTK4 widgets for a frame */
 static void
 neomacs_create_frame_widgets (struct frame *f)
 {
   struct neomacs_output *output = FRAME_NEOMACS_OUTPUT (f);
+  struct neomacs_display_info *dpyinfo = FRAME_DISPLAY_INFO (f);
   GtkWidget *window, *drawing_area;
-  GtkEventController *key_controller, *focus_controller;
+  GtkEventController *key_controller, *focus_controller, *motion_controller, *scroll_controller;
+  GtkGesture *click_gesture;
+  int use_gpu_widget = 0;
 
-  if (0) fprintf (stderr, "DEBUG: Creating frame widgets, pixel size %dx%d\n",
-	   FRAME_PIXEL_WIDTH (f), FRAME_PIXEL_HEIGHT (f));
+  /* Check if GPU widget is requested via environment variable */
+  const char *gpu_env = getenv ("NEOMACS_GPU_WIDGET");
+  if (gpu_env && strcmp (gpu_env, "1") == 0)
+    use_gpu_widget = 1;
+
+  if (0) fprintf (stderr, "DEBUG: Creating frame widgets, pixel size %dx%d, gpu=%d\n",
+	   FRAME_PIXEL_WIDTH (f), FRAME_PIXEL_HEIGHT (f), use_gpu_widget);
 
   /* Create main window */
   window = gtk_window_new ();
@@ -655,30 +858,74 @@ neomacs_create_frame_widgets (struct frame *f)
                                FRAME_PIXEL_WIDTH (f),
                                FRAME_PIXEL_HEIGHT (f));
 
-  /* Create drawing area */
-  drawing_area = gtk_drawing_area_new ();
-  gtk_drawing_area_set_content_width (GTK_DRAWING_AREA (drawing_area),
-                                      FRAME_PIXEL_WIDTH (f));
-  gtk_drawing_area_set_content_height (GTK_DRAWING_AREA (drawing_area),
-                                       FRAME_PIXEL_HEIGHT (f));
+  /* Create drawing area - either standard DrawingArea or GPU NeomacsWidget */
+  if (use_gpu_widget && dpyinfo && dpyinfo->display_handle)
+    {
+      /* Use GPU-accelerated NeomacsWidget */
+      drawing_area = (GtkWidget *) neomacs_display_create_widget ();
+      if (!drawing_area)
+        {
+          fprintf (stderr, "Failed to create NeomacsWidget, falling back to DrawingArea\n");
+          use_gpu_widget = 0;
+        }
+    }
+  
+  if (!use_gpu_widget)
+    {
+      /* Use standard DrawingArea with Cairo rendering */
+      drawing_area = gtk_drawing_area_new ();
+      gtk_drawing_area_set_content_width (GTK_DRAWING_AREA (drawing_area),
+                                          FRAME_PIXEL_WIDTH (f));
+      gtk_drawing_area_set_content_height (GTK_DRAWING_AREA (drawing_area),
+                                           FRAME_PIXEL_HEIGHT (f));
+      /* Connect draw callback for Cairo rendering */
+      gtk_drawing_area_set_draw_func (GTK_DRAWING_AREA (drawing_area),
+                                      neomacs_draw_cb, f, NULL);
+    }
+  else
+    {
+      /* Set size for GPU widget */
+      gtk_widget_set_size_request (drawing_area,
+                                   FRAME_PIXEL_WIDTH (f),
+                                   FRAME_PIXEL_HEIGHT (f));
+    }
+
+  /* Make widget opaque - disable transparency */
+  gtk_widget_set_opacity (drawing_area, 1.0);
+  gtk_widget_set_opacity (window, 1.0);
+
+  /* Add CSS to set a solid background */
+  {
+    GtkCssProvider *css_provider = gtk_css_provider_new ();
+    gtk_css_provider_load_from_string (css_provider,
+      "window, drawingarea { background-color: white; }");
+    gtk_style_context_add_provider_for_display (
+      gdk_display_get_default (),
+      GTK_STYLE_PROVIDER (css_provider),
+      GTK_STYLE_PROVIDER_PRIORITY_APPLICATION);
+    g_object_unref (css_provider);
+  }
 
   /* Make drawing area focusable to receive keyboard events */
   gtk_widget_set_focusable (drawing_area, TRUE);
   gtk_widget_set_can_focus (drawing_area, TRUE);
 
-  /* Connect callbacks */
-  gtk_drawing_area_set_draw_func (GTK_DRAWING_AREA (drawing_area),
-                                  neomacs_draw_cb, f, NULL);
-  g_signal_connect (drawing_area, "resize",
-                    G_CALLBACK (neomacs_resize_cb), f);
+  /* Connect callbacks - only set resize for DrawingArea (not GPU widget) */
+  if (!use_gpu_widget)
+    {
+      /* Draw func was already set above for DrawingArea */
+      /* Resize signal is DrawingArea-specific */
+      g_signal_connect (drawing_area, "resize",
+                        G_CALLBACK (neomacs_resize_cb), f);
+    }
   g_signal_connect (window, "close-request",
                     G_CALLBACK (neomacs_close_request_cb), f);
 
-  /* Add keyboard event controller */
+  /* Add keyboard event controller - add to WINDOW for reliable key capture */
   key_controller = gtk_event_controller_key_new ();
   g_signal_connect (key_controller, "key-pressed",
 		    G_CALLBACK (neomacs_key_pressed_cb), f);
-  gtk_widget_add_controller (drawing_area, key_controller);
+  gtk_widget_add_controller (window, key_controller);
 
   /* Add focus event controller */
   focus_controller = gtk_event_controller_focus_new ();
@@ -686,7 +933,28 @@ neomacs_create_frame_widgets (struct frame *f)
 		    G_CALLBACK (neomacs_focus_enter_cb), f);
   g_signal_connect (focus_controller, "leave",
 		    G_CALLBACK (neomacs_focus_leave_cb), f);
-  gtk_widget_add_controller (drawing_area, focus_controller);
+  gtk_widget_add_controller (window, focus_controller);
+
+  /* Add mouse click gesture for button events */
+  click_gesture = gtk_gesture_click_new ();
+  gtk_gesture_single_set_button (GTK_GESTURE_SINGLE (click_gesture), 0); /* All buttons */
+  g_signal_connect (click_gesture, "pressed",
+		    G_CALLBACK (neomacs_click_pressed_cb), f);
+  g_signal_connect (click_gesture, "released",
+		    G_CALLBACK (neomacs_click_released_cb), f);
+  gtk_widget_add_controller (drawing_area, GTK_EVENT_CONTROLLER (click_gesture));
+
+  /* Add motion controller for mouse tracking */
+  motion_controller = gtk_event_controller_motion_new ();
+  g_signal_connect (motion_controller, "motion",
+		    G_CALLBACK (neomacs_motion_cb), f);
+  gtk_widget_add_controller (drawing_area, motion_controller);
+
+  /* Add scroll controller for mouse wheel */
+  scroll_controller = gtk_event_controller_scroll_new (GTK_EVENT_CONTROLLER_SCROLL_BOTH_AXES);
+  g_signal_connect (scroll_controller, "scroll",
+		    G_CALLBACK (neomacs_scroll_cb), f);
+  gtk_widget_add_controller (drawing_area, scroll_controller);
 
   /* Set up widget hierarchy */
   gtk_window_set_child (GTK_WINDOW (window), drawing_area);
@@ -695,9 +963,11 @@ neomacs_create_frame_widgets (struct frame *f)
   output->widget = window;
   output->drawing_area = drawing_area;
   output->window_desc = (Window) (intptr_t) window;
+  output->use_gpu_widget = use_gpu_widget;
 
-  /* Create initial Cairo surface */
-  neomacs_ensure_cr_surface (f, FRAME_PIXEL_WIDTH (f), FRAME_PIXEL_HEIGHT (f));
+  /* Create initial Cairo surface (only needed for non-GPU mode) */
+  if (!use_gpu_widget)
+    neomacs_ensure_cr_surface (f, FRAME_PIXEL_WIDTH (f), FRAME_PIXEL_HEIGHT (f));
 
   /* Show the window and grab focus */
   if (0) fprintf (stderr, "DEBUG: Calling gtk_window_present\n");
@@ -706,6 +976,17 @@ neomacs_create_frame_widgets (struct frame *f)
   /* Force window to be realized and shown */
   gtk_widget_set_visible (window, TRUE);
   gtk_widget_realize (window);
+
+  /* Initialize Rust renderer's Pango context now that widget is realized */
+  {
+    struct neomacs_display_info *dpyinfo = FRAME_DISPLAY_INFO (f);
+    if (dpyinfo && dpyinfo->display_handle)
+      {
+	PangoContext *pango_ctx = gtk_widget_get_pango_context (drawing_area);
+	if (pango_ctx)
+	  neomacs_display_init_pango (dpyinfo->display_handle, pango_ctx);
+      }
+  }
 
   /* Process events to ensure window is mapped */
   while (g_main_context_iteration (NULL, FALSE))
@@ -779,6 +1060,13 @@ If the parameters specify a display, that display is used.  */)
   FRAME_NEOMACS_OUTPUT (f)->display_info = dpyinfo;
   dpyinfo->reference_count++;
 
+  /* Initialize frame pixels to white on black BEFORE anything else */
+  /* This is critical because face realization uses FRAME_FOREGROUND_PIXEL */
+  f->foreground_pixel = 0xffffff;  /* white */
+  f->background_pixel = 0x000000;  /* black */
+  FRAME_NEOMACS_OUTPUT (f)->foreground_pixel = 0xffffff;  /* white */
+  FRAME_NEOMACS_OUTPUT (f)->background_pixel = 0x000000;  /* black */
+
   /* Initialize frame dimensions */
   FRAME_FONTSET (f) = -1;
   f->border_width = 0;
@@ -847,9 +1135,10 @@ If the parameters specify a display, that display is used.  */)
   }
 
   /* Set foreground and background colors - REQUIRED for face realization */
-  gui_default_parameter (f, parms, Qforeground_color, build_string ("black"),
+  /* Use white on black (dark theme) for better visibility with GTK4 dark window */
+  gui_default_parameter (f, parms, Qforeground_color, build_string ("white"),
 			 "foreground", "Foreground", RES_TYPE_STRING);
-  gui_default_parameter (f, parms, Qbackground_color, build_string ("white"),
+  gui_default_parameter (f, parms, Qbackground_color, build_string ("black"),
 			 "background", "Background", RES_TYPE_STRING);
 
   /* Initialize faces - MUST be done before adjust_frame_size */

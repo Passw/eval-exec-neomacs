@@ -6,6 +6,13 @@ use crate::core::scene::Scene;
 pub mod gtk4;
 pub mod tty;
 
+#[cfg(feature = "wpe-webkit")]
+pub mod wpe;
+
+// Legacy webkit module - being replaced by wpe
+#[cfg(feature = "wpe-webkit")]
+pub mod webkit;
+
 /// Display backend trait
 /// 
 /// Implementations provide platform-specific rendering.

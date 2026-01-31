@@ -96,10 +96,10 @@ DISPLAY is the name of the display Emacs should connect to."
 		     ;; Exit Emacs with fatal error if this fails.
 		     t)
 
-  ;; Create the default faces
-  (let ((color-map '((foreground-color . "black")
-                     (background-color . "white")
-                     (cursor-color . "black"))))
+  ;; Create the default faces - use white on black (dark theme) for GTK4 dark window
+  (let ((color-map '((foreground-color . "white")
+                     (background-color . "black")
+                     (cursor-color . "white"))))
     (dolist (param color-map)
       (add-to-list 'default-frame-alist param)))
 

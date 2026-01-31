@@ -4,6 +4,7 @@ use std::collections::HashMap;
 use std::path::Path;
 
 use gtk4::cairo;
+use gtk4::gdk;
 use gtk4::gdk_pixbuf::{Pixbuf, PixbufLoader};
 use gtk4::gdk_pixbuf::prelude::*;
 use gtk4::glib;
@@ -14,6 +15,9 @@ use crate::core::error::{DisplayError, DisplayResult};
 pub struct CachedImage {
     /// Cairo surface for rendering
     pub surface: cairo::ImageSurface,
+    
+    /// GDK texture for GSK rendering (lazily created)
+    pub texture: Option<gdk::Texture>,
     
     /// Original width
     pub width: i32,
@@ -29,6 +33,28 @@ pub struct CachedImage {
     
     /// Is this an animated image?
     pub is_animated: bool,
+}
+
+impl CachedImage {
+    /// Get or create GDK texture from the surface
+    pub fn get_texture(&mut self) -> Option<gdk::Texture> {
+        if self.texture.is_some() {
+            return self.texture.clone();
+        }
+        
+        // Create texture from surface
+        if let Some(tex) = surface_to_texture(&self.surface) {
+            self.texture = Some(tex.clone());
+            Some(tex)
+        } else {
+            None
+        }
+    }
+    
+    /// Invalidate texture (call after animation frame change)
+    pub fn invalidate_texture(&mut self) {
+        self.texture = None;
+    }
 }
 
 /// A single animation frame
@@ -69,6 +95,7 @@ impl ImageCache {
             width: pixbuf.width(),
             height: pixbuf.height(),
             surface,
+            texture: None,
             frames: None,
             current_frame: 0,
             is_animated: false,
@@ -97,6 +124,7 @@ impl ImageCache {
             width: pixbuf.width(),
             height: pixbuf.height(),
             surface,
+            texture: None,
             frames: None,
             current_frame: 0,
             is_animated: false,
@@ -172,6 +200,7 @@ impl ImageCache {
             width,
             height,
             surface: main_surface,
+            texture: None,
             frames: Some(frames),
             current_frame: 0,
             is_animated: true,
@@ -198,21 +227,26 @@ impl ImageCache {
             return None;
         }
         
-        let frames = image.frames.as_ref()?;
+        let frames = match &image.frames {
+            Some(f) if !f.is_empty() => f,
+            _ => return None,
+        };
         
-        if frames.is_empty() {
-            return None;
-        }
+        let frame_count = frames.len();
+        let delay_ms = frames[image.current_frame].delay_ms;
         
         // Move to next frame
-        image.current_frame = (image.current_frame + 1) % frames.len();
+        image.current_frame = (image.current_frame + 1) % frame_count;
         
         // Update main surface to current frame
-        if let Ok(new_surface) = clone_surface(&frames[image.current_frame].surface) {
-            image.surface = new_surface;
+        if let Some(frames) = &image.frames {
+            if let Ok(new_surface) = clone_surface(&frames[image.current_frame].surface) {
+                image.surface = new_surface;
+                image.invalidate_texture();  // Re-create texture on next access
+            }
         }
         
-        Some(frames[image.current_frame].delay_ms)
+        Some(delay_ms)
     }
     
     /// Remove an image from cache
@@ -309,6 +343,52 @@ fn clone_surface(source: &cairo::ImageSurface) -> DisplayResult<cairo::ImageSurf
         .map_err(|e| DisplayError::Backend(format!("Failed to paint: {}", e)))?;
     
     Ok(new_surface)
+}
+
+/// Convert Cairo ImageSurface to GdkTexture
+fn surface_to_texture(surface: &cairo::ImageSurface) -> Option<gdk::Texture> {
+    let width = surface.width();
+    let height = surface.height();
+    
+    if width <= 0 || height <= 0 {
+        return None;
+    }
+    
+    // Create a new surface to safely get mutable access to pixel data
+    let mut temp_surface = cairo::ImageSurface::create(surface.format(), width, height).ok()?;
+    let cr = cairo::Context::new(&temp_surface).ok()?;
+    cr.set_source_surface(surface, 0.0, 0.0).ok()?;
+    cr.paint().ok()?;
+    drop(cr);  // Release context before accessing data
+    
+    // Get surface data (BGRA format) from temp surface
+    let stride = temp_surface.stride() as usize;
+    let data = temp_surface.data().ok()?;
+    
+    // Convert BGRA to RGBA for GdkTexture
+    let mut rgba_data = Vec::with_capacity((width * height * 4) as usize);
+    for y in 0..height as usize {
+        for x in 0..width as usize {
+            let offset = y * stride + x * 4;
+            let b = data[offset];
+            let g = data[offset + 1];
+            let r = data[offset + 2];
+            let a = data[offset + 3];
+            rgba_data.push(r);
+            rgba_data.push(g);
+            rgba_data.push(b);
+            rgba_data.push(a);
+        }
+    }
+    
+    let bytes = glib::Bytes::from(&rgba_data);
+    Some(gdk::MemoryTexture::new(
+        width,
+        height,
+        gdk::MemoryFormat::R8g8b8a8,
+        &bytes,
+        (width * 4) as usize,
+    ).upcast())
 }
 
 #[cfg(test)]

@@ -151,6 +151,9 @@ struct neomacs_output
   void *container;
   void *drawing_area;
 
+  /* Whether using GPU-accelerated widget */
+  int use_gpu_widget;
+
   /* Cairo surface for double buffering */
   cairo_surface_t *cr_surface;
   cairo_t *cr_context;
