@@ -298,6 +298,7 @@ pub unsafe extern "C" fn neomacs_display_set_cursor(
         if visible != 0 && display.animations.cursor_visible() {
             // style: 0=box, 1=bar, 2=underline, 3=hollow
             display.frame_glyphs.add_cursor(
+                window_id,
                 x, y, width, height,
                 style as u8,
                 Color::from_pixel(color),

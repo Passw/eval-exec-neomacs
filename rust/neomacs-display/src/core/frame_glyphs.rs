@@ -77,6 +77,7 @@ pub enum FrameGlyph {
 
     /// Cursor
     Cursor {
+        window_id: i32,  // Window ID to track which window this cursor belongs to
         x: f32,
         y: f32,
         width: f32,
@@ -359,11 +360,17 @@ impl FrameGlyphBuffer {
         self.glyphs.push(FrameGlyph::WebKit { webkit_id, x, y, width, height });
     }
 
-    /// Add cursor - removes any existing cursor first (only one cursor should exist)
-    pub fn add_cursor(&mut self, x: f32, y: f32, width: f32, height: f32, style: u8, color: Color) {
-        // Remove any existing cursor glyphs - there should only be one cursor
-        self.glyphs.retain(|g| !matches!(g, FrameGlyph::Cursor { .. }));
-        self.glyphs.push(FrameGlyph::Cursor { x, y, width, height, style, color });
+    /// Add cursor - removes any existing cursor for the same window first
+    pub fn add_cursor(&mut self, window_id: i32, x: f32, y: f32, width: f32, height: f32, style: u8, color: Color) {
+        // Remove any existing cursor for THIS window only (other windows keep their cursors)
+        self.glyphs.retain(|g| {
+            if let FrameGlyph::Cursor { window_id: wid, .. } = g {
+                *wid != window_id
+            } else {
+                true
+            }
+        });
+        self.glyphs.push(FrameGlyph::Cursor { window_id, x, y, width, height, style, color });
     }
 
     /// Add border

@@ -246,6 +246,7 @@ impl HybridRenderer {
                 }
 
                 FrameGlyph::Cursor {
+                    window_id: _,  // Not used in rendering, just for tracking
                     x,
                     y,
                     width,
