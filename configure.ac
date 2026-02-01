@@ -3924,16 +3924,16 @@ NEOMACS_LIBS=
 NEOMACS_CFLAGS=
 if test "$window_system" = "neomacs"; then
   NEOMACS_OBJ="neomacsterm.o neomacsfns.o"
-  dnl Check for the Rust library - use absolute path to static library
+  dnl Check for the Rust library - use dynamic library (.so)
   NEOMACS_RUST_LIB_DIR="`cd ${srcdir} && pwd`/rust/neomacs-display/target/release"
-  if test -f "${NEOMACS_RUST_LIB_DIR}/libneomacs_display.a"; then
-    dnl Use full path to static library to avoid dynamic linking
-    NEOMACS_LIBS="${NEOMACS_RUST_LIB_DIR}/libneomacs_display.a"
+  if test -f "${NEOMACS_RUST_LIB_DIR}/libneomacs_display.so"; then
+    dnl Use dynamic linking - faster iteration during development
+    NEOMACS_LIBS="-L${NEOMACS_RUST_LIB_DIR} -lneomacs_display -Wl,-rpath,${NEOMACS_RUST_LIB_DIR}"
   else
     dnl Try debug build
     NEOMACS_RUST_LIB_DIR="`cd ${srcdir} && pwd`/rust/neomacs-display/target/debug"
-    if test -f "${NEOMACS_RUST_LIB_DIR}/libneomacs_display.a"; then
-      NEOMACS_LIBS="${NEOMACS_RUST_LIB_DIR}/libneomacs_display.a"
+    if test -f "${NEOMACS_RUST_LIB_DIR}/libneomacs_display.so"; then
+      NEOMACS_LIBS="-L${NEOMACS_RUST_LIB_DIR} -lneomacs_display -Wl,-rpath,${NEOMACS_RUST_LIB_DIR}"
     else
       AC_MSG_ERROR([Neomacs display library not found. Build it with: cd rust/neomacs-display && cargo build --release])
     fi
