@@ -6,6 +6,7 @@ use std::ffi::{c_char, c_int, c_uint, c_double, c_void, CStr, CString};
 use std::panic;
 use std::ptr;
 
+use gtk4::prelude::TextureExt;
 use log::{debug, trace, warn, info, error};
 
 use crate::backend::{BackendType, DisplayBackend};
@@ -189,6 +190,9 @@ pub unsafe extern "C" fn neomacs_display_begin_frame(handle: *mut NeomacsDisplay
     display.frame_counter += 1;
     // Mark that we're in a frame update cycle
     display.in_frame = true;
+    
+    // Share the hybrid renderer with the widget for animation state sharing
+    crate::backend::gtk4::set_widget_hybrid_renderer(&mut display.hybrid_renderer);
 
     debug!("begin_frame: frame={}, hybrid={}, glyphs={}", 
            display.frame_counter, display.use_hybrid, display.frame_glyphs.len());
@@ -2747,6 +2751,14 @@ pub unsafe extern "C" fn neomacs_display_set_animation_option(
     let display = &mut *handle;
     display.hybrid_renderer.set_animation_option(key_str, value_str);
     info!("Animation option set: {} = {}", key_str, value_str);
+    
+    // When buffer-transition is enabled, enable frame caching for instant snapshots
+    if key_str == "buffer-transition" {
+        let enabled = value_str == "t" || value_str == "true" || value_str == "1";
+        crate::backend::gtk4::enable_frame_caching(enabled);
+        info!("Frame caching {}", if enabled { "enabled" } else { "disabled" });
+    }
+    
     1
 }
 
@@ -2845,4 +2857,79 @@ pub unsafe extern "C" fn neomacs_display_start_buffer_transition(
     display.hybrid_renderer.start_buffer_transition(effect_str, duration_ms as u32);
     info!("Buffer transition started: {} ({}ms)", effect_str, duration_ms);
     1
+}
+
+/// Prepare for buffer transition (capture snapshot before buffer changes)
+/// Call this BEFORE switching buffers
+/// Returns 1 on success, 0 on failure
+#[no_mangle]
+pub unsafe extern "C" fn neomacs_display_prepare_buffer_transition(
+    handle: *mut NeomacsDisplay,
+) -> c_int {
+    if handle.is_null() {
+        return 0;
+    }
+
+    let display = &mut *handle;
+    display.hybrid_renderer.prepare_buffer_transition();
+    
+    // Use the last cached frame as the snapshot (instant, no async wait)
+    if crate::backend::gtk4::prepare_snapshot_from_last_frame() {
+        info!("FFI: Prepared snapshot from cached frame");
+        1
+    } else {
+        // Fallback: request capture on next frame (legacy async path)
+        crate::backend::gtk4::request_snapshot_capture();
+        info!("FFI: No cached frame, requested async snapshot capture");
+        1
+    }
+}
+
+/// Trigger buffer transition animation (after buffer has changed)
+/// Call this AFTER switching buffers
+/// Returns 1 on success, 0 on failure
+#[no_mangle]
+pub unsafe extern "C" fn neomacs_display_trigger_buffer_transition(
+    handle: *mut NeomacsDisplay,
+) -> c_int {
+    if handle.is_null() {
+        return 0;
+    }
+
+    let display = &mut *handle;
+    
+    // The snapshot should already be in the renderer (set during widget render)
+    // Just check if there's one in the thread-local (fallback) and use it
+    if let Some(texture) = crate::backend::gtk4::take_snapshot_texture() {
+        info!("FFI: Got snapshot texture {}x{} (fallback)", texture.width(), texture.height());
+        display.hybrid_renderer.set_snapshot_texture(texture);
+    }
+    
+    // Check if renderer has a snapshot
+    let has_snapshot = display.hybrid_renderer.has_snapshot();
+    info!("FFI: trigger_buffer_transition called, renderer has snapshot: {}", has_snapshot);
+    
+    if has_snapshot {
+        display.hybrid_renderer.trigger_buffer_transition();
+        let active = display.hybrid_renderer.buffer_transition.is_active();
+        info!("FFI: Transition started, active: {}", active);
+        if active { 1 } else { 0 }
+    } else {
+        info!("FFI: No snapshot available for transition");
+        0
+    }
+}
+
+/// Check if buffer transition is ready (has snapshot)
+/// Returns 1 if ready, 0 if not
+#[no_mangle]
+pub unsafe extern "C" fn neomacs_display_has_transition_snapshot(
+    handle: *mut NeomacsDisplay,
+) -> c_int {
+    if handle.is_null() {
+        return 0;
+    }
+
+    let display = &mut *handle;
+    if display.hybrid_renderer.has_snapshot() { 1 } else { 0 }
 }

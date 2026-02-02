@@ -53,6 +53,16 @@ thread_local! {
     // Mouse scroll callback - called on scroll wheel
     // Args: (x, y, delta_x, delta_y, modifiers, time)
     pub static WIDGET_MOUSE_SCROLL_CALLBACK: RefCell<Option<Box<dyn Fn(f64, f64, f64, f64, u32, u32) + Send + 'static>>> = const { RefCell::new(None) };
+    // Flag to request snapshot capture before next redraw (for buffer transitions)
+    pub static WIDGET_CAPTURE_SNAPSHOT: RefCell<bool> = const { RefCell::new(false) };
+    // Captured snapshot texture for buffer transitions
+    pub static WIDGET_SNAPSHOT_TEXTURE: RefCell<Option<gtk4::gdk::Texture>> = const { RefCell::new(None) };
+    // Last rendered frame texture (always cached for instant snapshot)
+    pub static WIDGET_LAST_FRAME_TEXTURE: RefCell<Option<gtk4::gdk::Texture>> = const { RefCell::new(None) };
+    // Flag to enable continuous frame caching (for buffer transitions)
+    pub static WIDGET_CACHE_FRAMES: RefCell<bool> = const { RefCell::new(false) };
+    // Shared HybridRenderer pointer - set by FFI to share renderer with widget
+    pub static WIDGET_HYBRID_RENDERER: RefCell<Option<*mut super::HybridRenderer>> = const { RefCell::new(None) };
 }
 
 /// Set the video cache for widget rendering (called from FFI before queue_draw)
@@ -162,6 +172,94 @@ where
     });
 }
 
+/// Request snapshot capture on next frame (for buffer transitions)
+pub fn request_snapshot_capture() {
+    WIDGET_CAPTURE_SNAPSHOT.with(|c| {
+        *c.borrow_mut() = true;
+    });
+}
+
+/// Check if snapshot capture was requested
+pub fn is_snapshot_requested() -> bool {
+    WIDGET_CAPTURE_SNAPSHOT.with(|c| *c.borrow())
+}
+
+/// Clear snapshot capture request
+pub fn clear_snapshot_request() {
+    WIDGET_CAPTURE_SNAPSHOT.with(|c| {
+        *c.borrow_mut() = false;
+    });
+}
+
+/// Store captured snapshot texture
+pub fn set_snapshot_texture(texture: gtk4::gdk::Texture) {
+    WIDGET_SNAPSHOT_TEXTURE.with(|c| {
+        *c.borrow_mut() = Some(texture);
+    });
+}
+
+/// Get and take the captured snapshot texture
+pub fn take_snapshot_texture() -> Option<gtk4::gdk::Texture> {
+    WIDGET_SNAPSHOT_TEXTURE.with(|c| c.borrow_mut().take())
+}
+
+/// Check if we have a captured snapshot
+pub fn has_snapshot_texture() -> bool {
+    WIDGET_SNAPSHOT_TEXTURE.with(|c| c.borrow().is_some())
+}
+
+/// Enable frame caching for buffer transitions
+pub fn enable_frame_caching(enable: bool) {
+    WIDGET_CACHE_FRAMES.with(|c| {
+        *c.borrow_mut() = enable;
+    });
+}
+
+/// Check if frame caching is enabled
+pub fn is_frame_caching_enabled() -> bool {
+    WIDGET_CACHE_FRAMES.with(|c| *c.borrow())
+}
+
+/// Store the last rendered frame
+pub fn set_last_frame_texture(texture: gtk4::gdk::Texture) {
+    WIDGET_LAST_FRAME_TEXTURE.with(|c| {
+        *c.borrow_mut() = Some(texture);
+    });
+}
+
+/// Get the last rendered frame as snapshot (for instant buffer transitions)
+/// This copies the texture reference without consuming it
+pub fn get_last_frame_as_snapshot() -> Option<gtk4::gdk::Texture> {
+    WIDGET_LAST_FRAME_TEXTURE.with(|c| c.borrow().clone())
+}
+
+/// Prepare snapshot from last frame (called before buffer switch)
+/// This moves the last frame to the snapshot slot
+pub fn prepare_snapshot_from_last_frame() -> bool {
+    let last_frame = WIDGET_LAST_FRAME_TEXTURE.with(|c| c.borrow().clone());
+    if let Some(texture) = last_frame {
+        WIDGET_SNAPSHOT_TEXTURE.with(|c| {
+            *c.borrow_mut() = Some(texture);
+        });
+        true
+    } else {
+        false
+    }
+}
+
+/// Set the shared HybridRenderer pointer (called from FFI)
+/// This allows the widget to use the same renderer as the FFI layer
+pub fn set_widget_hybrid_renderer(renderer: *mut super::HybridRenderer) {
+    WIDGET_HYBRID_RENDERER.with(|c| {
+        *c.borrow_mut() = if renderer.is_null() { None } else { Some(renderer) };
+    });
+}
+
+/// Get the shared HybridRenderer (unsafe - caller must ensure pointer is valid)
+pub fn get_widget_hybrid_renderer() -> Option<*mut super::HybridRenderer> {
+    WIDGET_HYBRID_RENDERER.with(|c| *c.borrow())
+}
+
 /// Inner state for NeomacsWidget
 #[derive(Default)]
 pub struct NeomacsWidgetInner {
@@ -262,14 +360,69 @@ impl NeomacsWidgetInner {
                 #[cfg(not(feature = "wpe-webkit"))]
                 let webkit_cache: Option<()> = None;
 
-                // Build render node with hybrid renderer
-                let mut renderer = self.hybrid_renderer.borrow_mut();
+                // Try to use shared renderer from FFI layer (for animation state sharing)
+                // Fall back to local renderer if not available
+                let shared_renderer = get_widget_hybrid_renderer();
+                
+                let node = if let Some(renderer_ptr) = shared_renderer {
+                    // Use the shared renderer from FFI
+                    let renderer = unsafe { &mut *renderer_ptr };
+                    
+                    // Set scale factor for HiDPI rendering
+                    let scale_factor = widget.scale_factor() as f32;
+                    renderer.set_scale_factor(scale_factor);
+                    
+                    // Check if we have a snapshot to use for transition
+                    if let Some(snapshot_tex) = take_snapshot_texture() {
+                        info!("Widget: Passing snapshot to shared renderer");
+                        renderer.set_snapshot_texture(snapshot_tex);
+                    }
+                    
+                    renderer.build_render_node(buffer, video_cache, image_cache, &floating_images, &floating_webkits, webkit_cache)
+                } else {
+                    // Use the widget's local renderer (no animation support)
+                    let mut renderer = self.hybrid_renderer.borrow_mut();
+                    
+                    // Set scale factor for HiDPI rendering
+                    let scale_factor = widget.scale_factor() as f32;
+                    renderer.set_scale_factor(scale_factor);
+                    
+                    // Check if we have a snapshot to use for transition
+                    if let Some(snapshot_tex) = take_snapshot_texture() {
+                        renderer.set_snapshot_texture(snapshot_tex);
+                    }
+                    
+                    renderer.build_render_node(buffer, video_cache, image_cache, &floating_images, &floating_webkits, webkit_cache)
+                };
 
-                // Set scale factor for HiDPI rendering
-                let scale_factor = widget.scale_factor() as f32;
-                renderer.set_scale_factor(scale_factor);
-
-                if let Some(node) = renderer.build_render_node(buffer, video_cache, image_cache, &floating_images, &floating_webkits, webkit_cache) {
+                if let Some(node) = node {
+                    // Cache this frame if frame caching is enabled (for instant buffer transitions)
+                    if is_frame_caching_enabled() {
+                        let native = widget.native();
+                        if let Some(native) = native {
+                            if let Some(gsk_renderer) = native.renderer() {
+                                let rect = graphene::Rect::new(0.0, 0.0, width, height);
+                                let texture = gsk_renderer.render_texture(&node, Some(&rect));
+                                trace!("Cached frame for transitions: {}x{}", width, height);
+                                set_last_frame_texture(texture);
+                            }
+                        }
+                    }
+                    
+                    // If snapshot capture is requested (legacy path), capture explicitly
+                    if is_snapshot_requested() {
+                        clear_snapshot_request();
+                        let native = widget.native();
+                        if let Some(native) = native {
+                            if let Some(gsk_renderer) = native.renderer() {
+                                let rect = graphene::Rect::new(0.0, 0.0, width, height);
+                                let texture = gsk_renderer.render_texture(&node, Some(&rect));
+                                debug!("Captured transition snapshot: {}x{}", width, height);
+                                set_snapshot_texture(texture);
+                            }
+                        }
+                    }
+                    
                     snapshot.append_node(&node);
                 } else {
                     let rect = graphene::Rect::new(0.0, 0.0, width, height);

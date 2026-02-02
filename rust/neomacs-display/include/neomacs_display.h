@@ -629,4 +629,24 @@ int neomacs_display_start_buffer_transition(struct NeomacsDisplay *handle,
                                             const char *effect,
                                             int durationMs);
 
+/**
+ * Prepare for buffer transition (capture snapshot before buffer changes)
+ * Call this BEFORE switching buffers
+ * Returns 1 on success, 0 on failure
+ */
+int neomacs_display_prepare_buffer_transition(struct NeomacsDisplay *handle);
+
+/**
+ * Trigger buffer transition animation (after buffer has changed)
+ * Call this AFTER switching buffers
+ * Returns 1 on success, 0 on failure
+ */
+int neomacs_display_trigger_buffer_transition(struct NeomacsDisplay *handle);
+
+/**
+ * Check if buffer transition is ready (has snapshot)
+ * Returns 1 if ready, 0 if not
+ */
+int neomacs_display_has_transition_snapshot(struct NeomacsDisplay *handle);
+
 #endif  /* NEOMACS_DISPLAY_H */

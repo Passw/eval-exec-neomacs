@@ -2779,6 +2779,50 @@ This includes cursor animation and buffer transition animation.  */)
   return active ? Qt : Qnil;
 }
 
+DEFUN ("neomacs-prepare-buffer-transition", Fneomacs_prepare_buffer_transition, Sneomacs_prepare_buffer_transition, 0, 0, 0,
+       doc: /* Prepare for buffer transition by capturing current frame.
+Call this BEFORE switching buffers to capture the "old" frame.
+The captured frame will be used as the starting point for the transition animation.
+Returns t on success, nil on failure.  */)
+  (void)
+{
+  struct neomacs_display_info *dpyinfo = neomacs_display_list;
+  if (!dpyinfo || !dpyinfo->display_handle)
+    return Qnil;
+
+  int result = neomacs_display_prepare_buffer_transition (dpyinfo->display_handle);
+  return result ? Qt : Qnil;
+}
+
+DEFUN ("neomacs-trigger-buffer-transition", Fneomacs_trigger_buffer_transition, Sneomacs_trigger_buffer_transition, 0, 0, 0,
+       doc: /* Trigger buffer transition animation after buffer has changed.
+Call this AFTER switching buffers to start the transition animation.
+The animation will transition from the previously captured frame to the new content.
+Returns t if animation started, nil otherwise.  */)
+  (void)
+{
+  struct neomacs_display_info *dpyinfo = neomacs_display_list;
+  if (!dpyinfo || !dpyinfo->display_handle)
+    return Qnil;
+
+  int result = neomacs_display_trigger_buffer_transition (dpyinfo->display_handle);
+  return result ? Qt : Qnil;
+}
+
+DEFUN ("neomacs-has-transition-snapshot-p", Fneomacs_has_transition_snapshot_p, Sneomacs_has_transition_snapshot_p, 0, 0, 0,
+       doc: /* Return non-nil if a transition snapshot is ready.
+This indicates that `neomacs-prepare-buffer-transition' has been called
+and a frame has been captured.  */)
+  (void)
+{
+  struct neomacs_display_info *dpyinfo = neomacs_display_list;
+  if (!dpyinfo || !dpyinfo->display_handle)
+    return Qnil;
+
+  int has_snapshot = neomacs_display_has_transition_snapshot (dpyinfo->display_handle);
+  return has_snapshot ? Qt : Qnil;
+}
+
 
 /* ============================================================================
  * Miscellaneous Functions
@@ -2963,6 +3007,9 @@ syms_of_neomacsterm (void)
   defsubr (&Sneomacs_get_animation_option);
   defsubr (&Sneomacs_start_buffer_transition);
   defsubr (&Sneomacs_animation_active_p);
+  defsubr (&Sneomacs_prepare_buffer_transition);
+  defsubr (&Sneomacs_trigger_buffer_transition);
+  defsubr (&Sneomacs_has_transition_snapshot_p);
 
   DEFSYM (Qneomacs, "neomacs");
   /* Qvideo and Qwebkit are defined in xdisp.c for use in VIDEOP/WEBKITP */

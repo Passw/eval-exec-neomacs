@@ -20,7 +20,7 @@ use crate::backend::DisplayBackend;
 pub use renderer::Gtk4Renderer;
 pub use gsk_renderer::GskRenderer;
 pub use hybrid_renderer::HybridRenderer;
-pub use widget::{NeomacsWidget, set_widget_video_cache, set_widget_image_cache, set_widget_frame_glyphs, set_widget_use_hybrid, set_widget_resize_callback, set_widget_floating_images, set_widget_floating_webkits, set_widget_mouse_button_callback, set_widget_mouse_motion_callback, set_widget_mouse_scroll_callback};
+pub use widget::{NeomacsWidget, set_widget_video_cache, set_widget_image_cache, set_widget_frame_glyphs, set_widget_use_hybrid, set_widget_resize_callback, set_widget_floating_images, set_widget_floating_webkits, set_widget_mouse_button_callback, set_widget_mouse_motion_callback, set_widget_mouse_scroll_callback, request_snapshot_capture, take_snapshot_texture, has_snapshot_texture, enable_frame_caching, is_frame_caching_enabled, prepare_snapshot_from_last_frame, set_widget_hybrid_renderer};
 #[cfg(feature = "wpe-webkit")]
 pub use widget::set_widget_webkit_cache;
 pub use video::{VideoCache, set_video_widget};

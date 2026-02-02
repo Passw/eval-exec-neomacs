@@ -220,6 +220,62 @@ impl HybridRenderer {
         self.needs_animation_frame()
     }
 
+    /// Capture the last rendered frame as a snapshot texture for transitions.
+    /// This should be called before switching buffers.
+    /// 
+    /// renderer: A GSK renderer to render the snapshot
+    /// node: The render node to capture (from last frame)
+    /// width/height: Dimensions of the capture
+    pub fn capture_frame_snapshot(&mut self, renderer: &gsk::Renderer, node: &gsk::RenderNode, width: f32, height: f32) {
+        // Create a texture from the render node
+        let rect = graphene::Rect::new(0.0, 0.0, width, height);
+        
+        // Use renderer.render_texture to get a GdkTexture from the node
+        // In gsk4 0.9.x, this returns Texture directly, not Option
+        let texture = renderer.render_texture(node, Some(&rect));
+        debug!("Captured frame snapshot: {}x{}", width, height);
+        self.snapshot_texture = Some(texture);
+        self.buffer_transition.has_snapshot = true;
+    }
+
+    /// Store a pre-rendered texture as the snapshot (for widget-driven capture)
+    pub fn set_snapshot_texture(&mut self, texture: gdk::Texture) {
+        debug!("Setting snapshot texture: {}x{}", texture.width(), texture.height());
+        self.snapshot_texture = Some(texture);
+        self.buffer_transition.has_snapshot = true;
+    }
+
+    /// Check if we have a snapshot ready for transition
+    pub fn has_snapshot(&self) -> bool {
+        self.snapshot_texture.is_some()
+    }
+
+    /// Clear the snapshot texture (after transition completes)
+    pub fn clear_snapshot(&mut self) {
+        self.snapshot_texture = None;
+        self.buffer_transition.has_snapshot = false;
+    }
+
+    /// Prepare for buffer switch by capturing snapshot
+    /// Call this BEFORE the buffer content changes
+    pub fn prepare_buffer_transition(&mut self) {
+        // Mark that we want to capture on next frame
+        // The actual capture happens in the widget's snapshot
+        if self.animation_config.buffer_transition_active() {
+            debug!("Preparing for buffer transition");
+            // Snapshot capture will be triggered by widget
+        }
+    }
+
+    /// Start buffer transition after buffer has changed
+    /// Call this AFTER the buffer content changes
+    pub fn trigger_buffer_transition(&mut self) {
+        if self.animation_config.buffer_transition_active() && self.snapshot_texture.is_some() {
+            debug!("Triggering buffer transition");
+            self.buffer_transition.start_transition();
+        }
+    }
+
     /// Get or rasterize a glyph, returning a cached texture
     fn get_or_rasterize_glyph(
         &mut self,
