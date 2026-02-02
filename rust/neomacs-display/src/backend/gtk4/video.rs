@@ -52,13 +52,14 @@ pub fn set_video_widget(widget: Option<gtk4::Widget>) {
         
         // Add timeout source for video frame updates (~60fps)
         // This runs on the GLib main context which Emacs processes
+        // We always redraw when videos are playing to ensure smooth playback
         if widget.is_some() {
             let source_id = glib::timeout_add_local(std::time::Duration::from_millis(16), || {
-                // Check if a new frame is pending
-                if FRAME_PENDING.swap(false, Ordering::Relaxed) {
-                    if let Some(widget) = get_video_widget() {
-                        widget.queue_draw();
-                    }
+                // Always redraw - each video's paintable maintains its current frame
+                // This ensures all videos play at their native frame rate
+                let _ = FRAME_PENDING.swap(false, Ordering::Relaxed);
+                if let Some(widget) = get_video_widget() {
+                    widget.queue_draw();
                 }
                 glib::ControlFlow::Continue
             });
@@ -142,8 +143,11 @@ pub struct GpuVideoPlayer {
     /// Current position in nanoseconds
     pub position_ns: i64,
 
-    /// Loop playback
-    pub looping: bool,
+    /// Loop playback (-1 = infinite, 0 = no loop, n > 0 = loop n times)
+    pub loop_count: i32,
+    
+    /// Remaining loops (decremented on each loop completion)
+    pub loops_remaining: i32,
 
     /// Volume (0.0 - 1.0)
     pub volume: f64,
@@ -153,6 +157,18 @@ pub struct GpuVideoPlayer {
 
     /// Whether DMA-BUF zero-copy is being used
     pub use_dmabuf: bool,
+    
+    /// Frame counter for FPS tracking
+    frame_count: u64,
+    
+    /// Last FPS report time
+    last_fps_time: std::time::Instant,
+    
+    /// Last reported FPS
+    pub fps: f32,
+    
+    /// Video ID for logging
+    pub video_id: u32,
 }
 
 #[cfg(feature = "video")]
@@ -198,10 +214,15 @@ impl GpuVideoPlayer {
             state: VideoState::Stopped,
             duration_ns: None,
             position_ns: 0,
-            looping: false,
+            loop_count: 0,
+            loops_remaining: 0,
             volume: 1.0,
             hw_accel,
             use_dmabuf: true, // gtk4paintablesink handles this automatically
+            frame_count: 0,
+            last_fps_time: std::time::Instant::now(),
+            fps: 0.0,
+            video_id: 0,  // Set later by cache
         };
 
         // Connect paintable's invalidate-contents signal to trigger widget redraw
@@ -225,6 +246,7 @@ impl GpuVideoPlayer {
                 // Set flag - the tick callback will read this and queue_draw
                 FRAME_PENDING.store(true, Ordering::Relaxed);
             });
+        } else {
         }
     }
 
@@ -235,6 +257,18 @@ impl GpuVideoPlayer {
     /// zero-copy is active.
     pub fn get_paintable(&self) -> Option<gdk::Paintable> {
         self.gtk4sink.property::<Option<gdk::Paintable>>("paintable")
+    }
+    
+    /// Count a rendered frame and calculate FPS
+    pub fn count_frame(&mut self) {
+        self.frame_count += 1;
+        let elapsed = self.last_fps_time.elapsed();
+        if elapsed.as_secs_f32() >= 1.0 {
+            self.fps = self.frame_count as f32 / elapsed.as_secs_f32();
+            eprintln!("[Video {}] FPS: {:.1}", self.video_id, self.fps);
+            self.frame_count = 0;
+            self.last_fps_time = std::time::Instant::now();
+        }
     }
 
     /// Get current frame as GDK texture
@@ -289,8 +323,26 @@ impl GpuVideoPlayer {
 
     /// Play the video
     pub fn play(&mut self) -> DisplayResult<()> {
-        self.pipeline.set_state(gst::State::Playing)
+        let ret = self.pipeline.set_state(gst::State::Playing)
             .map_err(|e| DisplayError::Backend(format!("Failed to play: {:?}", e)))?;
+        
+        // If state change is async, wait for it to complete (up to 5 seconds)
+        if ret == gst::StateChangeSuccess::Async {
+            let (_ret2, _current, _pending) = self.pipeline.state(gst::ClockTime::from_seconds(5));
+        }
+        
+        // Re-connect signal after state change in case paintable changed
+        self.connect_invalidate_signal();
+        
+        // Query actual state
+        let (_, _current, _) = self.pipeline.state(gst::ClockTime::NONE);
+        
+        // Check paintable dimensions
+        if let Some(paintable) = self.get_paintable() {
+            let _w = paintable.intrinsic_width();
+            let _h = paintable.intrinsic_height();
+        }
+        
         self.state = VideoState::Playing;
         Ok(())
     }
@@ -320,37 +372,50 @@ impl GpuVideoPlayer {
         Ok(())
     }
 
-    /// Update video state
+    /// Update video state - called once per frame for all videos
     pub fn update(&mut self) {
-        if let Some(position) = self.pipeline.query_position::<gst::ClockTime>() {
-            self.position_ns = position.nseconds() as i64;
-        }
-
-        if self.duration_ns.is_none() {
-            if let Some(duration) = self.pipeline.query_duration::<gst::ClockTime>() {
-                self.duration_ns = Some(duration.nseconds() as i64);
-            }
-        }
-
-        // Check for end of stream
+        // Only query position occasionally to reduce IPC overhead
+        // The paintable handles frame updates automatically
+        
+        // Check for end of stream - limit to a few messages per update
         if let Some(bus) = self.pipeline.bus() {
-            while let Some(msg) = bus.pop() {
-                match msg.view() {
-                    gst::MessageView::Eos(_) => {
-                        if self.looping {
-                            let _ = self.seek(0);
-                        } else {
-                            self.state = VideoState::Stopped;
+            for _ in 0..5 {  // Process at most 5 messages per update
+                if let Some(msg) = bus.pop() {
+                    match msg.view() {
+                        gst::MessageView::Eos(_) => {
+                            // Check if we should loop
+                            let should_loop = self.loop_count < 0 ||  // infinite
+                                self.loops_remaining > 0;  // still have loops
+                            
+                            if should_loop {
+                                if self.loop_count > 0 {
+                                    self.loops_remaining -= 1;
+                                }
+                                let _ = self.seek(0);
+                                // Also need to restart playback after seek
+                                let _ = self.pipeline.set_state(gst::State::Playing);
+                            } else {
+                                self.state = VideoState::Stopped;
+                            }
                         }
+                        gst::MessageView::Error(err) => {
+                            eprintln!("[GpuVideoPlayer] GStreamer error: {:?}", err);
+                            self.state = VideoState::Error;
+                        }
+                        _ => {}
                     }
-                    gst::MessageView::Error(err) => {
-                        eprintln!("[GpuVideoPlayer] GStreamer error: {:?}", err);
-                        self.state = VideoState::Error;
-                    }
-                    _ => {}
+                } else {
+                    break;  // No more messages
                 }
             }
         }
+    }
+    
+    /// Set loop mode
+    /// count: -1 = infinite loop, 0 = no loop, n > 0 = loop n times
+    pub fn set_looping(&mut self, count: i32) {
+        self.loop_count = count;
+        self.loops_remaining = if count > 0 { count } else { 0 };
     }
 }
 
@@ -416,8 +481,9 @@ impl VideoCache {
 
     /// Load a video from URI
     pub fn load(&mut self, uri: &str) -> DisplayResult<u32> {
-        let player = GpuVideoPlayer::new(uri)?;
+        let mut player = GpuVideoPlayer::new(uri)?;
         let id = self.next_id;
+        player.video_id = id;  // Set video ID for FPS logging
         self.next_id += 1;
         self.players.insert(id, player);
         Ok(id)

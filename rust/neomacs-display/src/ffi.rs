@@ -36,6 +36,7 @@ pub struct NeomacsDisplay {
     current_row_x: i32,     // X position for next glyph in current row
     current_row_height: i32, // Height of current row
     current_row_ascent: i32, // Ascent of current row
+    current_row_is_overlay: bool, // True if current row is mode-line/echo area
     current_window_id: i32, // ID of current window being updated
     in_frame: bool,         // Whether we're currently in a frame update
     frame_counter: u64,     // Frame counter for tracking row updates
@@ -92,6 +93,7 @@ pub unsafe extern "C" fn neomacs_display_init(backend: BackendType) -> *mut Neom
         current_row_x: 0,
         current_row_height: 0,
         current_row_ascent: 0,
+        current_row_is_overlay: false,
         current_window_id: -1,
         in_frame: false,
         frame_counter: 0,
@@ -362,7 +364,6 @@ pub unsafe extern "C" fn neomacs_display_draw_border(
     }
 
     // Legacy path
-    eprintln!("DEBUG draw_border: x={}, y={}, w={}, h={}, color={:08x}", x, y, width, height, color);
     display.scene.add_border(
         x as f32,
         y as f32,
@@ -400,9 +401,8 @@ pub unsafe extern "C" fn neomacs_display_begin_row(
     display.current_row_x = x;  // Set starting X for this glyph string
     display.current_row_height = height;  // Store for hybrid path
     display.current_row_ascent = ascent;  // Store for hybrid path
-
-    // Debug: log row Y values
-    log::warn!("begin_row: y={}, x={}, height={}, mode_line={}", y, x, height, mode_line);
+    // Mode-line and header-line are overlays that render on top
+    display.current_row_is_overlay = mode_line != 0 || header_line != 0;
 
     // Hybrid path: we don't need window tracking - just use frame-absolute coords
     if display.use_hybrid {
@@ -507,6 +507,7 @@ pub unsafe extern "C" fn neomacs_display_add_char_glyph(
                 pixel_width as f32,
                 display.current_row_height as f32,
                 display.current_row_ascent as f32,
+                display.current_row_is_overlay,
             );
             display.current_row_x += pixel_width;
             return;
@@ -521,11 +522,6 @@ pub unsafe extern "C" fn neomacs_display_add_char_glyph(
             let relative_y = current_y - window.bounds.y as i32;
             // Convert frame-absolute X to window-relative X
             let relative_x = current_x - window.bounds.x as i32;
-
-            if current_x >= 320 {
-                eprintln!("DEBUG Rust add_char: win_id={}, frame_x={}, rel_x={}, win.x={}, char={}",
-                    current_window_id, current_x, relative_x, window.bounds.x, c);
-            }
 
             if let Some(row) = window.rows.iter_mut().find(|r| r.y == relative_y) {
                 // Remove any existing glyphs that overlap this X range (using window-relative X)
@@ -557,11 +553,7 @@ pub unsafe extern "C" fn neomacs_display_add_char_glyph(
 
                 // Advance X position for next glyph (keep as frame-absolute for C code)
                 display.current_row_x += pixel_width;
-            } else if current_x >= 320 {
-                eprintln!("DEBUG Rust add_char: NO ROW FOUND for rel_y={}", relative_y);
             }
-        } else if current_x >= 320 {
-            eprintln!("DEBUG Rust add_char: NO WINDOW FOUND for win_id={}", current_window_id);
         }
     }));
 
@@ -599,6 +591,7 @@ pub unsafe extern "C" fn neomacs_display_add_stretch_glyph(
                 pixel_width as f32,
                 height as f32,
                 bg_color,
+                display.current_row_is_overlay,
             );
             display.current_row_x += pixel_width;
             return;
@@ -898,6 +891,21 @@ pub unsafe extern "C" fn neomacs_display_add_video_glyph(
     let display = &mut *handle;
     let current_y = display.current_row_y;  // Frame-absolute Y
     let current_x = display.current_row_x;
+
+    // Hybrid path: append directly to frame glyph buffer
+    if display.use_hybrid {
+        display.frame_glyphs.add_video(
+            video_id,
+            current_x as f32,
+            current_y as f32,
+            pixel_width as f32,
+            pixel_height as f32,
+        );
+        display.current_row_x += pixel_width;
+        return;
+    }
+
+    // Legacy scene graph path
     let current_window_id = display.current_window_id;
 
     // Find the correct window by ID
@@ -1028,6 +1036,52 @@ pub unsafe extern "C" fn neomacs_display_video_stop(
             Ok(()) => 0,
             Err(_) => -1,
         };
+    }
+
+    -1
+}
+
+/// Set video loop mode
+/// count: -1 = infinite loop, 0 = no loop, n > 0 = loop n times
+/// Returns 0 on success, -1 on failure
+#[no_mangle]
+pub unsafe extern "C" fn neomacs_display_video_set_loop(
+    handle: *mut NeomacsDisplay,
+    video_id: u32,
+    loop_count: c_int,
+) -> c_int {
+    if handle.is_null() {
+        return -1;
+    }
+
+    let display = &mut *handle;
+
+    #[cfg(feature = "video")]
+    if let Some(player) = display.video_cache.get_mut(video_id) {
+        player.set_looping(loop_count);
+        return 0;
+    }
+
+    -1
+}
+
+/// Update video frame (called from Emacs redisplay)
+/// Returns 0 on success, -1 on failure
+#[no_mangle]
+pub unsafe extern "C" fn neomacs_display_video_update(
+    handle: *mut NeomacsDisplay,
+    video_id: u32,
+) -> c_int {
+    if handle.is_null() {
+        return -1;
+    }
+
+    let display = &mut *handle;
+
+    #[cfg(feature = "video")]
+    if let Some(player) = display.video_cache.get_mut(video_id) {
+        player.update();
+        return 0;
     }
 
     -1
@@ -1215,6 +1269,33 @@ pub unsafe extern "C" fn neomacs_display_clear_floating_image(
 
     let display = &mut *handle;
     display.scene.remove_floating_image(image_id);
+}
+
+/// Clear a rectangular area of the display
+/// Used by gui_clear_end_of_line and related functions
+#[no_mangle]
+pub unsafe extern "C" fn neomacs_display_clear_area(
+    handle: *mut NeomacsDisplay,
+    x: c_int,
+    y: c_int,
+    width: c_int,
+    height: c_int,
+) {
+    if handle.is_null() {
+        return;
+    }
+
+    let display = &mut *handle;
+    
+    // For hybrid path, clear the area in frame_glyphs
+    if display.use_hybrid {
+        display.frame_glyphs.clear_area(
+            x as f32,
+            y as f32,
+            width as f32,
+            height as f32,
+        );
+    }
 }
 
 /// End frame and render

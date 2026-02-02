@@ -96,6 +96,15 @@ void neomacs_display_draw_border(struct NeomacsDisplay *handle,
                                  uint32_t color);
 
 /**
+ * Clear a rectangular area (remove glyphs in the region)
+ */
+void neomacs_display_clear_area(struct NeomacsDisplay *handle,
+                                int x,
+                                int y,
+                                int width,
+                                int height);
+
+/**
  * Begin a new glyph row for the current window
  */
 void neomacs_display_begin_row(struct NeomacsDisplay *handle,
@@ -198,6 +207,17 @@ int neomacs_display_video_pause(struct NeomacsDisplay *handle, uint32_t videoId)
  * Stop a video
  */
 int neomacs_display_video_stop(struct NeomacsDisplay *handle, uint32_t videoId);
+
+/**
+ * Set loop mode for a video
+ * loop_count: 0 = no loop, -1 = infinite loop, >0 = loop that many times
+ */
+int neomacs_display_video_set_loop(struct NeomacsDisplay *handle, uint32_t videoId, int loopCount);
+
+/**
+ * Update video state (check for EOS, handle looping)
+ */
+int neomacs_display_video_update(struct NeomacsDisplay *handle, uint32_t videoId);
 
 /**
  * Load an image from a file path

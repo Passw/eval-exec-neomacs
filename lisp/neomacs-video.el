@@ -78,7 +78,8 @@ Returns the video ID on success, nil on failure."
 
 (defun neomacs-video-insert (file &optional width height)
   "Insert video FILE at point with optional WIDTH and HEIGHT.
-WIDTH and HEIGHT default to 640x360 if not specified."
+WIDTH and HEIGHT default to 640x360 if not specified.
+Returns the video ID on success.  Point is left after the video."
   (interactive "fVideo file: ")
   (let* ((uri (if (string-match-p "^[a-z]+://" file)
                   file
@@ -96,6 +97,7 @@ WIDTH and HEIGHT default to 640x360 if not specified."
         (put-text-property start (point) 'display
                            `(video :id ,video-id :width ,w :height ,h))
         (put-text-property start (point) 'neomacs-video-id video-id))
+      ;; Point is now AFTER the video, so subsequent inserts go after it
       (message "Inserted video %d" video-id)
       video-id)))
 
@@ -151,6 +153,66 @@ Returns the video ID on success."
   (neomacs-video-stop video-id)
   (remhash video-id neomacs-video--players)
   (message "Video %d floating layer hidden" video-id))
+
+;;; Loop Control
+
+(defvar neomacs-video--loop-timers (make-hash-table :test 'eq)
+  "Hash table mapping video IDs to their loop update timers.")
+
+(defun neomacs-video-loop (video-id &optional loop-count)
+  "Enable loop playback for VIDEO-ID.
+LOOP-COUNT can be:
+  nil or t - infinite loop
+  0 - no looping (disable loop)
+  positive integer - loop that many times
+
+Returns t on success."
+  (interactive "nVideo ID: \nP")
+  (let ((count (cond
+                ((null loop-count) -1)  ; Default: infinite
+                ((eq loop-count t) -1)  ; t means infinite
+                ((integerp loop-count) loop-count)
+                (t -1))))               ; Fallback: infinite
+    (when (neomacs-video-set-loop video-id count)
+      ;; Update metadata
+      (let ((info (gethash video-id neomacs-video--players)))
+        (when info
+          (puthash video-id (plist-put info :loop count) neomacs-video--players)))
+      ;; Set up or cancel the update timer for EOS detection
+      (let ((existing-timer (gethash video-id neomacs-video--loop-timers)))
+        (when existing-timer
+          (cancel-timer existing-timer)
+          (remhash video-id neomacs-video--loop-timers)))
+      (if (= count 0)
+          (message "Video %d loop: disabled" video-id)
+        ;; Start timer to call update periodically for EOS detection
+        (let ((timer (run-with-timer 0.2 0.2 
+                       (lambda ()
+                         (when (gethash video-id neomacs-video--players)
+                           (neomacs-video-update video-id))))))
+          (puthash video-id timer neomacs-video--loop-timers))
+        (message "Video %d loop: %s" video-id 
+                 (if (< count 0) "infinite" (format "%d times" count))))
+      t)))
+
+(defun neomacs-video-loop-infinite (video-id)
+  "Enable infinite loop for VIDEO-ID."
+  (interactive "nVideo ID: ")
+  (neomacs-video-loop video-id t))
+
+(defun neomacs-video-loop-disable (video-id)
+  "Disable loop for VIDEO-ID."
+  (interactive "nVideo ID: ")
+  (neomacs-video-loop video-id 0))
+
+(defun neomacs-video-show-floating-loop (file &optional x y width height)
+  "Show video FILE as floating and loop infinitely.
+Like `neomacs-video-show-floating' but with automatic looping."
+  (interactive "fVideo file: ")
+  (let ((video-id (neomacs-video-show-floating file x y width height)))
+    (when video-id
+      (neomacs-video-loop video-id t))
+    video-id))
 
 (provide 'neomacs-video)
 ;;; neomacs-video.el ends here

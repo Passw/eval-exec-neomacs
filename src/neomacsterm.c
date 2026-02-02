@@ -623,17 +623,18 @@ neomacs_draw_glyph_string (struct glyph_string *s)
       /* Forward glyph data to Rust scene graph */
       if (dpyinfo && dpyinfo->display_handle && s->first_glyph && s->row)
         {
-          /* Calculate absolute Y position: window top edge + row Y within window */
+          /* Calculate absolute Y position: use s->y which is the actual Y-origin of this glyph string */
           struct window *w = XWINDOW (s->f->selected_window);
           if (s->w)
             w = s->w;  /* Use the actual window from glyph_string if available */
           int window_top = WINDOW_TOP_EDGE_Y (w);
-          int row_y = window_top + s->row->y;
+          /* Use s->y for the glyph string's actual Y position, not row->y */
+          int glyph_y = window_top + s->y;
           
           neomacs_display_begin_row (dpyinfo->display_handle,
-                                     row_y,
+                                     glyph_y,
                                      s->x,  /* Starting X position for this glyph string */
-                                     s->row->height,
+                                     s->height,  /* Use glyph string height */
                                      s->row->ascent,
                                      s->row->mode_line_p ? 1 : 0,
                                      0);  /* header_line not in glyph_row */
@@ -745,6 +746,24 @@ neomacs_draw_glyph_string (struct glyph_string *s)
                   }
               }
               break;
+            case COMPOSITE_GLYPH:
+            case GLYPHLESS_GLYPH:
+              /* For composite/glyphless, use char2b if available */
+              if (s->char2b)
+                {
+                  for (int i = 0; i < s->nchars; i++)
+                    {
+                      unsigned int charcode = s->char2b[i];
+                      int char_width = s->width / (s->nchars > 0 ? s->nchars : 1);
+                      neomacs_display_add_char_glyph (dpyinfo->display_handle,
+                                                      charcode,
+                                                      (uint32_t) face_id,
+                                                      char_width,
+                                                      s->font ? FONT_BASE (s->font) : s->height,
+                                                      s->font ? FONT_DESCENT (s->font) : 0);
+                    }
+                }
+              break;
             case STRETCH_GLYPH:
               neomacs_display_add_stretch_glyph (dpyinfo->display_handle,
                                                   s->first_glyph->pixel_width,
@@ -755,11 +774,13 @@ neomacs_draw_glyph_string (struct glyph_string *s)
               /* TODO: Handle image glyphs */
               break;
             case VIDEO_GLYPH:
-              /* Handle video glyphs */
-              neomacs_display_add_video_glyph (dpyinfo->display_handle,
-                                                s->first_glyph->u.video_id,
-                                                s->first_glyph->pixel_width,
-                                                s->row->height);
+              {
+                /* Video glyphs render at full size - mode-line overlays on top in Rust */
+                neomacs_display_add_video_glyph (dpyinfo->display_handle,
+                                                  s->first_glyph->u.video_id,
+                                                  s->first_glyph->pixel_width,
+                                                  s->height);
+              }
               break;
             case WEBKIT_GLYPH:
               /* Handle WebKit glyphs */
@@ -769,6 +790,8 @@ neomacs_draw_glyph_string (struct glyph_string *s)
                                               s->row->height);
               break;
             default:
+              fprintf(stderr, "DEBUG: Unhandled glyph type %d (y=%d, mode_line=%d)\n",
+                      s->first_glyph->type, glyph_y, s->row->mode_line_p);
               break;
             }
         }
@@ -1012,6 +1035,16 @@ void
 neomacs_clear_frame_area (struct frame *f, int x, int y, int width, int height)
 {
   struct neomacs_output *output = FRAME_NEOMACS_OUTPUT (f);
+  struct neomacs_display_info *dpyinfo = FRAME_NEOMACS_DISPLAY_INFO (f);
+
+  /* For GPU widget mode, clear the region in the glyph buffer */
+  if (output && output->use_gpu_widget && dpyinfo && dpyinfo->display_handle)
+    {
+      neomacs_display_clear_area (dpyinfo->display_handle, x, y, width, height);
+      return;
+    }
+
+  /* Cairo path for non-GPU widget mode */
   cairo_t *cr;
 
   if (!output || !output->cr_context)
@@ -1569,6 +1602,53 @@ DEFUN ("neomacs-video-floating-clear", Fneomacs_video_floating_clear, Sneomacs_v
   neomacs_display_clear_floating_video (dpyinfo->display_handle,
                                         (uint32_t) XFIXNUM (video_id));
   return Qt;
+}
+
+DEFUN ("neomacs-video-set-loop", Fneomacs_video_set_loop, Sneomacs_video_set_loop, 2, 2, 0,
+       doc: /* Set loop mode for VIDEO-ID.
+LOOP-COUNT can be:
+  nil or 0 - no looping
+  t or -1  - infinite loop
+  positive integer - loop that many times  */)
+  (Lisp_Object video_id, Lisp_Object loop_count)
+{
+  CHECK_FIXNUM (video_id);
+  
+  struct neomacs_display_info *dpyinfo = neomacs_display_list;
+  if (!dpyinfo || !dpyinfo->display_handle)
+    return Qnil;
+    
+  int count = 0;
+  if (NILP (loop_count))
+    count = 0;  /* No loop */
+  else if (EQ (loop_count, Qt))
+    count = -1; /* Infinite loop */
+  else if (FIXNUMP (loop_count))
+    count = XFIXNUM (loop_count);
+  else
+    count = -1; /* Default to infinite for truthy values */
+    
+  int result = neomacs_display_video_set_loop (dpyinfo->display_handle,
+                                               (uint32_t) XFIXNUM (video_id),
+                                               count);
+  return result == 0 ? Qt : Qnil;
+}
+
+DEFUN ("neomacs-video-update", Fneomacs_video_update, Sneomacs_video_update, 1, 1, 0,
+       doc: /* Update video state for VIDEO-ID.
+Checks for end-of-stream and handles looping.
+Should be called periodically for proper loop handling.  */)
+  (Lisp_Object video_id)
+{
+  CHECK_FIXNUM (video_id);
+  
+  struct neomacs_display_info *dpyinfo = neomacs_display_list;
+  if (!dpyinfo || !dpyinfo->display_handle)
+    return Qnil;
+    
+  int result = neomacs_display_video_update (dpyinfo->display_handle,
+                                             (uint32_t) XFIXNUM (video_id));
+  return result == 0 ? Qt : Qnil;
 }
 
 
@@ -2189,6 +2269,8 @@ syms_of_neomacsterm (void)
   defsubr (&Sneomacs_video_play);
   defsubr (&Sneomacs_video_pause);
   defsubr (&Sneomacs_video_stop);
+  defsubr (&Sneomacs_video_set_loop);
+  defsubr (&Sneomacs_video_update);
   defsubr (&Sneomacs_video_floating);
   defsubr (&Sneomacs_video_floating_clear);
 
@@ -2220,8 +2302,7 @@ syms_of_neomacsterm (void)
   defsubr (&Sneomacs_webkit_loading_p);
 
   DEFSYM (Qneomacs, "neomacs");
-  DEFSYM (Qvideo, "video");
-  DEFSYM (Qwebkit, "webkit");
+  /* Qvideo and Qwebkit are defined in xdisp.c for use in VIDEOP/WEBKITP */
   DEFSYM (QCid, ":id");
 
   /* Required variables for cus-start */

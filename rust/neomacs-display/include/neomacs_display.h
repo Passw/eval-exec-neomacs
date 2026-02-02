@@ -189,6 +189,19 @@ int neomacs_display_video_pause(struct NeomacsDisplay *handle, uint32_t videoId)
 int neomacs_display_video_stop(struct NeomacsDisplay *handle, uint32_t videoId);
 
 /**
+ * Set video loop mode
+ * count: -1 = infinite loop, 0 = no loop, n > 0 = loop n times
+ * Returns 0 on success, -1 on failure
+ */
+int neomacs_display_video_set_loop(struct NeomacsDisplay *handle, uint32_t videoId, int loopCount);
+
+/**
+ * Update video frame (called from Emacs redisplay)
+ * Returns 0 on success, -1 on failure
+ */
+int neomacs_display_video_update(struct NeomacsDisplay *handle, uint32_t videoId);
+
+/**
  * Load an image from a file path
  * Returns image_id on success, 0 on failure
  */
@@ -247,6 +260,12 @@ void neomacs_display_set_floating_image(struct NeomacsDisplay *handle,
  * Remove a floating image
  */
 void neomacs_display_clear_floating_image(struct NeomacsDisplay *handle, uint32_t imageId);
+
+/**
+ * Clear a rectangular area of the display
+ * Used by gui_clear_end_of_line and related functions
+ */
+void neomacs_display_clear_area(struct NeomacsDisplay *handle, int x, int y, int width, int height);
 
 /**
  * End frame and render

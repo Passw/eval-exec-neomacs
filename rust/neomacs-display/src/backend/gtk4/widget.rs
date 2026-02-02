@@ -55,17 +55,14 @@ pub fn set_widget_image_cache(cache: *mut ImageCache) {
 pub fn set_widget_frame_glyphs(buffer: *const FrameGlyphBuffer) {
     WIDGET_FRAME_GLYPHS.with(|c| {
         if buffer.is_null() {
-            eprintln!("DEBUG set_widget_frame_glyphs: null buffer, keeping previous");
             return;
         }
         let new_buffer = unsafe { (*buffer).clone() };
         let glyph_count = new_buffer.glyphs.len();
         // Only update if we have content - prevents black flash from empty buffers
         if !new_buffer.glyphs.is_empty() {
-            eprintln!("DEBUG set_widget_frame_glyphs: updating with {} glyphs", glyph_count);
             *c.borrow_mut() = Some(new_buffer);
         } else {
-            eprintln!("DEBUG set_widget_frame_glyphs: EMPTY buffer ({}), keeping previous", glyph_count);
         }
     });
 }
@@ -147,11 +144,10 @@ impl NeomacsWidgetInner {
             });
 
             if let Some(ref buffer) = frame_glyphs {
-                eprintln!("DEBUG snapshot: rendering {} glyphs, size={}x{}", buffer.len(), width, height);
 
-                // Get video cache from thread-local
-                let video_cache = WIDGET_VIDEO_CACHE.with(|c| {
-                    c.borrow().map(|ptr| unsafe { &*ptr })
+                // Get video cache from thread-local (mutable for update())
+                let mut video_cache = WIDGET_VIDEO_CACHE.with(|c| {
+                    c.borrow().map(|ptr| unsafe { &mut *(ptr as *const VideoCache as *mut VideoCache) })
                 });
 
                 // Get image cache from thread-local
@@ -164,13 +160,11 @@ impl NeomacsWidgetInner {
                 if let Some(node) = renderer.build_render_node(buffer, video_cache, image_cache) {
                     snapshot.append_node(&node);
                 } else {
-                    eprintln!("DEBUG snapshot: build_render_node returned None!");
                     let rect = graphene::Rect::new(0.0, 0.0, width, height);
                     let color = gtk4::gdk::RGBA::new(0.5, 0.1, 0.1, 1.0);
                     snapshot.append_color(&color, &rect);
                 }
             } else {
-                eprintln!("DEBUG snapshot: NO frame_glyphs buffer!");
                 // No frame glyphs - draw background
                 let rect = graphene::Rect::new(0.0, 0.0, width, height);
                 let color = gtk4::gdk::RGBA::new(0.1, 0.1, 0.12, 1.0);
@@ -213,6 +207,7 @@ impl WidgetImpl for NeomacsWidgetInner {
         }));
         
         if let Err(e) = result {
+            eprintln!("PANIC in snapshot: {:?}", e);
             warn!("PANIC in snapshot: {:?}", e);
             // Draw error background
             let widget = self.obj();

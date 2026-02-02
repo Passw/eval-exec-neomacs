@@ -38304,6 +38304,11 @@ be let-bound around code that needs to disable messages temporarily. */);
 	  "long-line-optimizations-in-fontification-functions");
   DEFSYM (Qmode_line_elt_no, "mode-line-elt-no");
 
+#ifdef HAVE_NEOMACS
+  DEFSYM (Qvideo, "video");
+  DEFSYM (Qwebkit, "webkit");
+#endif
+
   /* Name of the symbol which disables Lisp evaluation in 'display'
      properties.  This is used by enriched.el.  */
   DEFSYM (Qdisable_eval, "disable-eval");

@@ -37,6 +37,8 @@ pub enum FrameGlyph {
         underline: u8,
         /// Underline color
         underline_color: Option<Color>,
+        /// True if this is mode-line/echo area (renders on top)
+        is_overlay: bool,
     },
 
     /// Stretch (whitespace) glyph
@@ -46,6 +48,8 @@ pub enum FrameGlyph {
         width: f32,
         height: f32,
         bg: Color,
+        /// True if this is mode-line/echo area (renders on top)
+        is_overlay: bool,
     },
 
     /// Image glyph
@@ -101,6 +105,19 @@ pub enum FrameGlyph {
         height: f32,
         color: Color,
     },
+}
+
+impl FrameGlyph {
+    /// Returns true if this glyph is an overlay (mode-line/echo area)
+    /// that should be rendered on top of other content.
+    pub fn is_overlay(&self) -> bool {
+        match self {
+            FrameGlyph::Char { is_overlay, .. } => *is_overlay,
+            FrameGlyph::Stretch { is_overlay, .. } => *is_overlay,
+            // Other glyph types are never overlays
+            _ => false,
+        }
+    }
 }
 
 /// Buffer collecting glyphs for current frame
@@ -315,11 +332,15 @@ impl FrameGlyphBuffer {
     }
 
     /// Remove glyphs that overlap with the given rectangle
+    /// Remove glyphs that overlap with the given rectangle
+    /// FIX: Only remove glyphs with exact Y match (within 1px), not full height range.
+    /// This prevents mode-line (y=561) from being cleared when content rows on a
+    /// shifted grid (y=554) add their chars.
     fn remove_overlapping(&mut self, x: f32, y: f32, width: f32, height: f32) {
         let x_end = x + width;
-        let y_end = y + height;
+        // FIX: Use exact Y match instead of height range to avoid cross-row clearing
         self.glyphs.retain(|g| {
-            let (gx, gy, gw, gh) = match g {
+            let (gx, gy, gw, _gh) = match g {
                 FrameGlyph::Char { x, y, width, height, .. } => (*x, *y, *width, *height),
                 FrameGlyph::Stretch { x, y, width, height, .. } => (*x, *y, *width, *height),
                 FrameGlyph::Image { x, y, width, height, .. } => (*x, *y, *width, *height),
@@ -329,14 +350,38 @@ impl FrameGlyphBuffer {
                 _ => return true,
             };
             let gx_end = gx + gw;
+            // Keep if no X overlap OR Y doesn't match (within 1px tolerance)
+            // This ensures we only remove glyphs on the SAME row, not different rows
+            // that happen to overlap in Y due to video height shifting row positions
+            gx_end <= x || gx >= x_end || (gy - y).abs() > 1.0
+        });
+    }
+
+    /// Clear all glyphs in a rectangular area
+    /// Called by gui_clear_end_of_line and related functions
+    pub fn clear_area(&mut self, x: f32, y: f32, width: f32, height: f32) {
+        let x_end = x + width;
+        let y_end = y + height;
+        
+        self.glyphs.retain(|g| {
+            let (gx, gy, gw, gh) = match g {
+                FrameGlyph::Char { x, y, width, height, .. } => (*x, *y, *width, *height),
+                FrameGlyph::Stretch { x, y, width, height, .. } => (*x, *y, *width, *height),
+                FrameGlyph::Image { x, y, width, height, .. } => (*x, *y, *width, *height),
+                FrameGlyph::Video { x, y, width, height, .. } => (*x, *y, *width, *height),
+                FrameGlyph::WebKit { x, y, width, height, .. } => (*x, *y, *width, *height),
+                // Keep backgrounds, cursors, borders - managed separately
+                _ => return true,
+            };
+            let gx_end = gx + gw;
             let gy_end = gy + gh;
-            // Keep if no overlap
+            // Keep if glyph does NOT overlap with the clear area
             gx_end <= x || gx >= x_end || gy_end <= y || gy >= y_end
         });
     }
 
     /// Add a character glyph (removes overlapping glyphs first)
-    pub fn add_char(&mut self, char: char, x: f32, y: f32, width: f32, height: f32, ascent: f32) {
+    pub fn add_char(&mut self, char: char, x: f32, y: f32, width: f32, height: f32, ascent: f32, is_overlay: bool) {
         // Remove any existing glyphs at this position
         self.remove_overlapping(x, y, width, height);
         self.glyphs.push(FrameGlyph::Char {
@@ -353,13 +398,14 @@ impl FrameGlyphBuffer {
             italic: self.current_italic,
             underline: self.current_underline,
             underline_color: self.current_underline_color,
+            is_overlay,
         });
     }
 
     /// Add a stretch (whitespace) glyph (removes overlapping glyphs first)
-    pub fn add_stretch(&mut self, x: f32, y: f32, width: f32, height: f32, bg: Color) {
+    pub fn add_stretch(&mut self, x: f32, y: f32, width: f32, height: f32, bg: Color, is_overlay: bool) {
         self.remove_overlapping(x, y, width, height);
-        self.glyphs.push(FrameGlyph::Stretch { x, y, width, height, bg });
+        self.glyphs.push(FrameGlyph::Stretch { x, y, width, height, bg, is_overlay });
     }
 
     /// Add an image glyph
