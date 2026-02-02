@@ -14,9 +14,12 @@ use log::{debug, trace, warn};
 use crate::core::frame_glyphs::{FrameGlyph, FrameGlyphBuffer};
 use crate::core::types::Color;
 use crate::core::face::{Face, FaceCache};
+use crate::core::scene::FloatingWebKit;
 use crate::text::{TextEngine, GlyphAtlas, GlyphKey, CachedGlyph};
 use super::video::VideoCache;
 use super::image::ImageCache;
+#[cfg(feature = "wpe-webkit")]
+use crate::backend::webkit::WebKitCache;
 
 /// Hybrid renderer that builds GSK nodes directly from FrameGlyphBuffer.
 /// Uses cosmic-text for text rendering instead of Pango.
@@ -118,12 +121,41 @@ impl HybridRenderer {
     }
 
     /// Build GSK render nodes from FrameGlyphBuffer
+    #[cfg(feature = "wpe-webkit")]
     pub fn build_render_node(
         &mut self,
         buffer: &FrameGlyphBuffer,
         mut video_cache: Option<&mut VideoCache>,
         mut image_cache: Option<&mut ImageCache>,
         floating_images: &[crate::core::scene::FloatingImage],
+        floating_webkits: &[FloatingWebKit],
+        webkit_cache: Option<&WebKitCache>,
+    ) -> Option<gsk::RenderNode> {
+        self.build_render_node_impl(buffer, video_cache, image_cache, floating_images, floating_webkits, webkit_cache)
+    }
+
+    #[cfg(not(feature = "wpe-webkit"))]
+    pub fn build_render_node(
+        &mut self,
+        buffer: &FrameGlyphBuffer,
+        mut video_cache: Option<&mut VideoCache>,
+        mut image_cache: Option<&mut ImageCache>,
+        floating_images: &[crate::core::scene::FloatingImage],
+        floating_webkits: &[FloatingWebKit],
+        _webkit_cache: Option<()>,
+    ) -> Option<gsk::RenderNode> {
+        self.build_render_node_impl(buffer, video_cache, image_cache, floating_images, floating_webkits)
+    }
+
+    #[cfg(feature = "wpe-webkit")]
+    fn build_render_node_impl(
+        &mut self,
+        buffer: &FrameGlyphBuffer,
+        mut video_cache: Option<&mut VideoCache>,
+        mut image_cache: Option<&mut ImageCache>,
+        floating_images: &[crate::core::scene::FloatingImage],
+        floating_webkits: &[FloatingWebKit],
+        webkit_cache: Option<&WebKitCache>,
     ) -> Option<gsk::RenderNode> {
         // Update ALL video players FIRST before any rendering
         // This ensures bus polling doesn't happen during the render loop
@@ -198,6 +230,40 @@ impl HybridRenderer {
             }
         }
 
+        // Render floating webkit views on top (highest z-order)
+        if let Some(cache) = webkit_cache {
+            debug!("Rendering {} floating webkit views", floating_webkits.len());
+            for floating in floating_webkits {
+                if let Some(view) = cache.get(floating.webkit_id) {
+                    if let Some(texture) = view.texture() {
+                        debug!("Got texture for webkit view {}: {}x{}", floating.webkit_id, texture.width(), texture.height());
+                        let webkit_rect = graphene::Rect::new(
+                            floating.x,
+                            floating.y,
+                            floating.width,
+                            floating.height,
+                        );
+                        let texture_node = gsk::TextureNode::new(texture, &webkit_rect);
+                        nodes.push(texture_node.upcast());
+                    } else {
+                        // Loading placeholder - dark rectangle
+                        debug!("No texture for webkit view {}, showing placeholder", floating.webkit_id);
+                        let webkit_rect = graphene::Rect::new(
+                            floating.x,
+                            floating.y,
+                            floating.width,
+                            floating.height,
+                        );
+                        let placeholder_color = gdk::RGBA::new(0.1, 0.1, 0.15, 1.0);
+                        let placeholder_node = gsk::ColorNode::new(&placeholder_color, &webkit_rect);
+                        nodes.push(placeholder_node.upcast());
+                    }
+                } else {
+                    warn!("Webkit view {} not in cache", floating.webkit_id);
+                }
+            }
+        }
+
         debug!("Processed {} chars, {} backgrounds, total {} nodes", char_count, bg_count, nodes.len());
 
         if nodes.is_empty() {
@@ -205,6 +271,88 @@ impl HybridRenderer {
             None
         } else {
             debug!("build_render_node: returning ContainerNode with {} nodes", nodes.len());
+            Some(gsk::ContainerNode::new(&nodes).upcast())
+        }
+    }
+
+    #[cfg(not(feature = "wpe-webkit"))]
+    fn build_render_node_impl(
+        &mut self,
+        buffer: &FrameGlyphBuffer,
+        mut video_cache: Option<&mut VideoCache>,
+        mut image_cache: Option<&mut ImageCache>,
+        floating_images: &[crate::core::scene::FloatingImage],
+        _floating_webkits: &[FloatingWebKit],
+    ) -> Option<gsk::RenderNode> {
+        // Update ALL video players FIRST before any rendering
+        #[cfg(feature = "video")]
+        if let Some(ref mut cache) = video_cache {
+            cache.update_all();
+        }
+        
+        let mut nodes: Vec<gsk::RenderNode> = Vec::with_capacity(buffer.len() + 10);
+
+        // Frame background
+        let bg_rect = graphene::Rect::new(0.0, 0.0, buffer.width, buffer.height);
+        let bg_color = color_to_gdk(&buffer.background);
+        nodes.push(gsk::ColorNode::new(&bg_color, &bg_rect).upcast());
+
+        // Collect glyph data and partition into regular vs overlay
+        let glyphs: Vec<_> = buffer.glyphs.iter().cloned().collect();
+        let (regular_glyphs, overlay_glyphs): (Vec<_>, Vec<_>) = glyphs.into_iter().partition(|g| !g.is_overlay());
+
+        // First pass: process only backgrounds
+        let mut bg_count = 0;
+        for glyph in &regular_glyphs {
+            if let FrameGlyph::Background { x, y, width, height, color } = glyph {
+                let rect = graphene::Rect::new(*x, *y, *width, *height);
+                let gdk_color = color_to_gdk(color);
+                nodes.push(gsk::ColorNode::new(&gdk_color, &rect).upcast());
+                bg_count += 1;
+            }
+        }
+
+        // Second pass: render non-background glyphs
+        let mut char_count = 0;
+        for glyph in &regular_glyphs {
+            if !matches!(glyph, FrameGlyph::Background { .. }) {
+                self.render_glyph(glyph, &mut nodes, &mut video_cache, &mut image_cache, &mut char_count, false);
+            }
+        }
+
+        // Process overlay glyphs last
+        for glyph in &overlay_glyphs {
+            if let FrameGlyph::Background { x, y, width, height, color } = glyph {
+                let rect = graphene::Rect::new(*x, *y, *width, *height);
+                let gdk_color = color_to_gdk(color);
+                nodes.push(gsk::ColorNode::new(&gdk_color, &rect).upcast());
+            }
+        }
+        for glyph in overlay_glyphs {
+            self.render_glyph(&glyph, &mut nodes, &mut video_cache, &mut image_cache, &mut char_count, true);
+        }
+
+        // Render floating images
+        if let Some(ref mut cache) = image_cache {
+            for floating in floating_images {
+                if let Some(img) = cache.get_mut(floating.image_id) {
+                    if let Some(texture) = img.get_texture() {
+                        let img_rect = graphene::Rect::new(
+                            floating.x,
+                            floating.y,
+                            floating.width,
+                            floating.height,
+                        );
+                        let texture_node = gsk::TextureNode::new(&texture, &img_rect);
+                        nodes.push(texture_node.upcast());
+                    }
+                }
+            }
+        }
+
+        if nodes.is_empty() {
+            None
+        } else {
             Some(gsk::ContainerNode::new(&nodes).upcast())
         }
     }

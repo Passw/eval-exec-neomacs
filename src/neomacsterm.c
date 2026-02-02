@@ -2305,7 +2305,7 @@ Returns t on success, nil on failure.  */)
   if (!dpyinfo || !dpyinfo->display_handle)
     return Qnil;
 
-  /* TODO: Get EGL display from GTK4 - for now pass NULL to use default */
+  /* Pass NULL - Rust side will try to get EGL display */
   int result = neomacs_display_webkit_init (dpyinfo->display_handle, NULL);
   return result == 0 ? Qt : Qnil;
 }

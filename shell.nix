@@ -3,11 +3,14 @@
 let
   # WPE WebKit from eval-exec's nixpkgs PR #449108
   # Required because webkitgtk dropped offscreen rendering support
+  # Updated to commit with ENABLE_WPE_PLATFORM enabled for GPU rendering
   wpewebkitPkgs = import (builtins.fetchTarball {
-    url = "https://github.com/eval-exec/nixpkgs/archive/wpewebkit.tar.gz";
+    url = "https://github.com/eval-exec/nixpkgs/archive/b861f05af3a7a2c2c47a5ea3b20b78dadd40b192.tar.gz";
   }) { inherit (pkgs) system; };
   
-  wpewebkit = wpewebkitPkgs.wpewebkit or null;
+  # Base wpewebkit from custom nixpkgs
+  wpewebkit= wpewebkitPkgs.wpewebkit or null;
+  
   # libwpe and wpebackend-fdo from standard nixpkgs (they're stable)
   libwpe = pkgs.libwpe;
   wpebackendFdo = pkgs.libwpe-fdo;
@@ -75,6 +78,13 @@ pkgs.mkShell {
     # EGL for WPE
     libGL
     libxkbcommon
+    
+    # GBM for headless GPU rendering
+    mesa
+    libdrm
+    
+    # Weston - nested Wayland compositor for WPE WebKit
+    weston
   ] ++ (if wpewebkit != null then [ wpewebkit ] else [])
     ++ [ libwpe wpebackendFdo ];
 
@@ -103,6 +113,8 @@ pkgs.mkShell {
     pkgs.libsoup_3.dev
     pkgs.libGL.dev
     pkgs.libxkbcommon.dev
+    pkgs.libdrm.dev
+    pkgs.mesa
   ] ++ (if wpewebkit != null then [ wpewebkit.dev or wpewebkit ] else [])
     ++ [ libwpe wpebackendFdo ]);
 
@@ -147,9 +159,26 @@ pkgs.mkShell {
       pkgs.libsoup_3
       pkgs.libGL
       pkgs.mesa
+      pkgs.libdrm
       pkgs.libxkbcommon
+      pkgs.libgbm
     ] ++ (if wpewebkit != null then [ wpewebkit ] else [])
       ++ [ libwpe wpebackendFdo ])}:$LD_LIBRARY_PATH"
+    
+    # WPE WebKit environment setup for headless rendering
+    # Use wpebackend-fdo as the default backend
+    export WPE_BACKEND_LIBRARY="${wpebackendFdo}/lib/libWPEBackend-fdo-1.0.so"
+    
+    # Disable WebKit sandbox (needed for Nix environment)
+    export WEBKIT_DISABLE_SANDBOX_THIS_IS_DANGEROUS=1
+    
+    # Use single web process (simplifies GPU context sharing)
+    export WEBKIT_USE_SINGLE_WEB_PROCESS=1
+    
+    # Add WPE libexec to PATH for WebProcess helpers
+    ${if wpewebkit != null then ''
+    export PATH="${wpewebkit}/libexec/wpe-webkit-2.0:$PATH"
+    '' else ""}
     
     echo ""
     echo "To configure with Neomacs:"
@@ -157,6 +186,7 @@ pkgs.mkShell {
     echo ""
     ${if wpewebkit != null then ''
     echo "WPE WebKit environment ready"
+    echo "  WPE_BACKEND_LIBRARY=$WPE_BACKEND_LIBRARY"
     '' else ""}
   '';
 }

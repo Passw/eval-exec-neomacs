@@ -18,11 +18,14 @@ use log::{debug, trace, warn, info};
 
 use crate::core::scene::Scene;
 use crate::core::scene::FloatingImage;
+use crate::core::scene::FloatingWebKit;
 use crate::core::frame_glyphs::FrameGlyphBuffer;
 use super::gsk_renderer::GskRenderer;
 use super::hybrid_renderer::HybridRenderer;
 use super::video::VideoCache;
 use super::image::ImageCache;
+#[cfg(feature = "wpe-webkit")]
+use crate::backend::webkit::WebKitCache;
 
 // Thread-local caches for widget rendering
 // These are set by the FFI layer before triggering a widget redraw
@@ -36,6 +39,11 @@ thread_local! {
     pub static WIDGET_RESIZE_CALLBACK: RefCell<Option<Box<dyn Fn(i32, i32) + Send + 'static>>> = const { RefCell::new(None) };
     // Floating images for overlay rendering in hybrid mode
     pub static WIDGET_FLOATING_IMAGES: RefCell<Vec<FloatingImage>> = const { RefCell::new(Vec::new()) };
+    // Floating webkit views for overlay rendering
+    pub static WIDGET_FLOATING_WEBKITS: RefCell<Vec<FloatingWebKit>> = const { RefCell::new(Vec::new()) };
+    // WebKit cache pointer for rendering webkit textures
+    #[cfg(feature = "wpe-webkit")]
+    pub static WIDGET_WEBKIT_CACHE: RefCell<Option<*const WebKitCache>> = const { RefCell::new(None) };
     // Mouse button callback - called on button press/release
     // Args: (x, y, button, pressed, modifiers, time)
     pub static WIDGET_MOUSE_BUTTON_CALLBACK: RefCell<Option<Box<dyn Fn(f64, f64, u32, bool, u32, u32) + Send + 'static>>> = const { RefCell::new(None) };
@@ -100,6 +108,21 @@ where
 pub fn set_widget_floating_images(images: Vec<FloatingImage>) {
     WIDGET_FLOATING_IMAGES.with(|c| {
         *c.borrow_mut() = images;
+    });
+}
+
+/// Set floating webkit views for overlay rendering in hybrid mode
+pub fn set_widget_floating_webkits(webkits: Vec<FloatingWebKit>) {
+    WIDGET_FLOATING_WEBKITS.with(|c| {
+        *c.borrow_mut() = webkits;
+    });
+}
+
+/// Set the webkit cache for widget rendering (called from FFI before queue_draw)
+#[cfg(feature = "wpe-webkit")]
+pub fn set_widget_webkit_cache(cache: *const WebKitCache) {
+    WIDGET_WEBKIT_CACHE.with(|c| {
+        *c.borrow_mut() = if cache.is_null() { None } else { Some(cache) };
     });
 }
 
@@ -215,6 +238,11 @@ impl NeomacsWidgetInner {
                 c.borrow().clone()
             });
 
+            // Get floating webkits from thread-local
+            let floating_webkits: Vec<FloatingWebKit> = WIDGET_FLOATING_WEBKITS.with(|c| {
+                c.borrow().clone()
+            });
+
             if let Some(ref buffer) = frame_glyphs {
 
                 // Get video cache from thread-local (mutable for update())
@@ -226,10 +254,18 @@ impl NeomacsWidgetInner {
                 let mut image_cache_ptr = WIDGET_IMAGE_CACHE.with(|c| *c.borrow());
                 let image_cache = image_cache_ptr.as_mut().map(|ptr| unsafe { &mut **ptr });
 
+                // Get webkit cache from thread-local
+                #[cfg(feature = "wpe-webkit")]
+                let webkit_cache = WIDGET_WEBKIT_CACHE.with(|c| {
+                    c.borrow().map(|ptr| unsafe { &*ptr })
+                });
+                #[cfg(not(feature = "wpe-webkit"))]
+                let webkit_cache: Option<()> = None;
+
                 // Build render node with hybrid renderer
                 let mut renderer = self.hybrid_renderer.borrow_mut();
 
-                if let Some(node) = renderer.build_render_node(buffer, video_cache, image_cache, &floating_images) {
+                if let Some(node) = renderer.build_render_node(buffer, video_cache, image_cache, &floating_images, &floating_webkits, webkit_cache) {
                     snapshot.append_node(&node);
                 } else {
                     let rect = graphene::Rect::new(0.0, 0.0, width, height);

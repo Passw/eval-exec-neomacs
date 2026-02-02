@@ -1737,7 +1737,9 @@ pub unsafe extern "C" fn neomacs_display_is_initialized(handle: *mut NeomacsDisp
 // GPU-Accelerated Widget (GSK)
 // ============================================================================
 
-use crate::backend::gtk4::{NeomacsWidget, set_widget_video_cache, set_widget_image_cache, set_widget_frame_glyphs, set_widget_use_hybrid, set_widget_floating_images};
+use crate::backend::gtk4::{NeomacsWidget, set_widget_video_cache, set_widget_image_cache, set_widget_frame_glyphs, set_widget_use_hybrid, set_widget_floating_images, set_widget_floating_webkits};
+#[cfg(feature = "wpe-webkit")]
+use crate::backend::gtk4::set_widget_webkit_cache;
 
 /// Create a GPU-accelerated NeomacsWidget
 ///
@@ -1845,6 +1847,14 @@ pub unsafe extern "C" fn neomacs_display_render_to_widget(
         // Set hybrid mode flag
         set_widget_use_hybrid(display.use_hybrid);
 
+        // Update all webkit views to process pending frames
+        #[cfg(feature = "wpe-webkit")]
+        WEBKIT_CACHE.with(|cache| {
+            if let Some(ref mut c) = *cache.borrow_mut() {
+                c.update_all();
+            }
+        });
+
         if display.use_hybrid {
             // Hybrid path: pass FrameGlyphBuffer to widget via thread-local
             debug!("render_to_widget: hybrid mode, {} glyphs", display.frame_glyphs.len());
@@ -1852,6 +1862,17 @@ pub unsafe extern "C" fn neomacs_display_render_to_widget(
 
             // Pass floating images to widget for overlay rendering
             set_widget_floating_images(display.scene.floating_images.clone());
+
+            // Pass floating webkits to widget for overlay rendering
+            set_widget_floating_webkits(display.scene.floating_webkits.clone());
+
+            // Set webkit cache for widget rendering
+            #[cfg(feature = "wpe-webkit")]
+            WEBKIT_CACHE.with(|cache| {
+                if let Some(ref c) = *cache.borrow() {
+                    set_widget_webkit_cache(c as *const WebKitCache);
+                }
+            });
 
             // Trigger redraw - widget will read from thread-local frame_glyphs
             widget.queue_draw();
@@ -2035,6 +2056,18 @@ pub unsafe extern "C" fn neomacs_display_webkit_init(
 ) -> c_int {
     #[cfg(feature = "wpe-webkit")]
     {
+        eprintln!("neomacs_display_webkit_init: egl_display={:?}", egl_display);
+        
+        // If no EGL display provided, try to get one from the current context
+        let egl_display = if egl_display.is_null() {
+            eprintln!("neomacs_display_webkit_init: egl_display is NULL, trying eglGetCurrentDisplay");
+            let current = egl_get_current_display();
+            eprintln!("neomacs_display_webkit_init: eglGetCurrentDisplay returned {:?}", current);
+            current
+        } else {
+            egl_display
+        };
+        
         // Initialize WPE backend
         match WpeBackend::new(egl_display) {
             Ok(backend) => {
@@ -2047,11 +2080,11 @@ pub unsafe extern "C" fn neomacs_display_webkit_init(
                     *cache.borrow_mut() = Some(WebKitCache::new());
                 });
 
-                log::info!("WebKit subsystem initialized");
+                eprintln!("neomacs_display_webkit_init: WebKit subsystem initialized successfully");
                 return 0;
             }
             Err(e) => {
-                eprintln!("Failed to initialize WPE backend: {}", e);
+                eprintln!("neomacs_display_webkit_init: Failed to initialize WPE backend: {}", e);
                 return -1;
             }
         }
@@ -2063,6 +2096,16 @@ pub unsafe extern "C" fn neomacs_display_webkit_init(
         eprintln!("WebKit support not compiled");
         -1
     }
+}
+
+/// Try to get current EGL display
+#[cfg(feature = "wpe-webkit")]
+unsafe fn egl_get_current_display() -> *mut libc::c_void {
+    // Link to EGL
+    extern "C" {
+        fn eglGetCurrentDisplay() -> *mut libc::c_void;
+    }
+    eglGetCurrentDisplay()
 }
 
 /// Create a new WebKit view
@@ -2303,7 +2346,9 @@ pub unsafe extern "C" fn neomacs_display_set_floating_webkit(
     width: c_int,
     height: c_int,
 ) {
+    info!("neomacs_display_set_floating_webkit: webkit_id={} x={} y={} {}x{}", webkit_id, x, y, width, height);
     if handle.is_null() {
+        warn!("neomacs_display_set_floating_webkit: handle is null!");
         return;
     }
 
@@ -2320,6 +2365,7 @@ pub unsafe extern "C" fn neomacs_display_set_floating_webkit(
         width as f32,
         height as f32,
     );
+    info!("neomacs_display_set_floating_webkit: now have {} floating webkits", display.scene.floating_webkits.len());
 }
 
 /// Hide a floating WebKit view

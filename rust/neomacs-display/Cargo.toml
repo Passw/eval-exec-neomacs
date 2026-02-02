@@ -50,7 +50,7 @@ bindgen = "0.71"
 pkg-config = "0.3"
 
 [features]
-default = ["gtk4-backend", "video"]
+default = ["gtk4-backend", "video", "wpe-webkit"]
 gtk4-backend = []
 tty-backend = []
 video = ["gstreamer", "gstreamer-video"]

@@ -340,6 +340,10 @@ else
 NEOMACS_RUST_PROFILE = release
 NEOMACS_CARGO_FLAGS = --release
 endif
+# Add WPE WebKit feature if available
+ifdef HAVE_WPE_WEBKIT
+NEOMACS_CARGO_FLAGS += --features wpe-webkit
+endif
 NEOMACS_RUST_TARGET = $(NEOMACS_RUST_DIR)/target/$(NEOMACS_RUST_PROFILE)/$(NEOMACS_RUST_LIB)
 
 ## emacs.res if HAVE_W32
