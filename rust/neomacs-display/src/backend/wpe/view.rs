@@ -191,6 +191,11 @@ impl WpeWebView {
             );
             eprintln!("WpeWebView::new: connected buffer-rendered signal, handler_id={}", handler_id);
 
+            // Map and make the view visible so it starts rendering
+            plat::wpe_view_set_visible(wpe_view as *mut plat::WPEView, 1);
+            plat::wpe_view_map(wpe_view as *mut plat::WPEView);
+            eprintln!("WpeWebView::new: view mapped and set visible");
+
             eprintln!("WpeWebView: WPE Platform WebKitWebView created successfully ({}x{})", width, height);
             log::info!("WPE Platform WebKitWebView created successfully ({}x{})", width, height);
 

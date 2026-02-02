@@ -197,6 +197,27 @@ impl WpePlatformView {
             plat::wpe_view_focus_out(self.wpe_view);
         }
     }
+
+    /// Map the view (make it ready for rendering)
+    pub fn map(&self) {
+        unsafe {
+            plat::wpe_view_map(self.wpe_view);
+        }
+    }
+
+    /// Unmap the view
+    pub fn unmap(&self) {
+        unsafe {
+            plat::wpe_view_unmap(self.wpe_view);
+        }
+    }
+
+    /// Set view visibility
+    pub fn set_visible(&self, visible: bool) {
+        unsafe {
+            plat::wpe_view_set_visible(self.wpe_view, if visible { 1 } else { 0 });
+        }
+    }
 }
 
 /// Import a WPEBuffer to an EGL image
