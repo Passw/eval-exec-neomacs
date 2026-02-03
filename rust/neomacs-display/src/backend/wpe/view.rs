@@ -24,8 +24,16 @@ use super::dmabuf::DmaBufExporter;
 /// Returns: true to handle (ignore webkit's default), false to allow webkit default
 pub type NewWindowCallback = extern "C" fn(view_id: u32, url: *const std::os::raw::c_char, frame_name: *const std::os::raw::c_char) -> bool;
 
+/// Callback type for page load events.
+/// Parameters: (view_id, load_event, uri)
+/// load_event: 0=started, 1=redirected, 2=committed, 3=finished, 4=failed
+pub type LoadCallback = extern "C" fn(view_id: u32, load_event: std::os::raw::c_int, uri: *const std::os::raw::c_char);
+
 /// Global callback for new window requests (set from Emacs)
 static mut NEW_WINDOW_CALLBACK: Option<NewWindowCallback> = None;
+
+/// Global callback for page load events (set from Emacs)
+static mut LOAD_CALLBACK: Option<LoadCallback> = None;
 
 /// Set the global new window callback
 pub fn set_new_window_callback(callback: Option<NewWindowCallback>) {
@@ -37,6 +45,18 @@ pub fn set_new_window_callback(callback: Option<NewWindowCallback>) {
 /// Get the global new window callback
 pub fn get_new_window_callback() -> Option<NewWindowCallback> {
     unsafe { NEW_WINDOW_CALLBACK }
+}
+
+/// Set the global load callback
+pub fn set_load_callback(callback: Option<LoadCallback>) {
+    unsafe {
+        LOAD_CALLBACK = callback;
+    }
+}
+
+/// Get the global load callback
+pub fn get_load_callback() -> Option<LoadCallback> {
+    unsafe { LOAD_CALLBACK }
 }
 
 /// State of a WPE WebKit view
@@ -109,6 +129,9 @@ pub struct WpeWebView {
 
     /// Signal handler ID for decide-policy
     decide_policy_handler_id: u64,
+
+    /// Signal handler ID for load-changed
+    load_changed_handler_id: u64,
 
     /// DMA-BUF exporter for texture conversion
     dmabuf_exporter: DmaBufExporter,
@@ -236,6 +259,21 @@ impl WpeWebView {
             );
             eprintln!("WpeWebView::new: connected decide-policy signal, handler_id={}", decide_policy_handler_id);
 
+            // Connect load-changed signal for page load events
+            let load_changed_signal = CString::new("load-changed").unwrap();
+            let load_changed_handler_id = plat::g_signal_connect_data(
+                web_view as *mut _,
+                load_changed_signal.as_ptr(),
+                Some(std::mem::transmute::<
+                    unsafe extern "C" fn(*mut wk::WebKitWebView, u32, *mut libc::c_void),
+                    unsafe extern "C" fn(),
+                >(load_changed_callback)),
+                callback_data as *mut _,
+                None,
+                0, // G_CONNECT_DEFAULT
+            );
+            eprintln!("WpeWebView::new: connected load-changed signal, handler_id={}", load_changed_handler_id);
+
             // Map and make the view visible so it starts rendering
             plat::wpe_view_set_visible(wpe_view as *mut plat::WPEView, 1);
             plat::wpe_view_map(wpe_view as *mut plat::WPEView);
@@ -258,6 +296,7 @@ impl WpeWebView {
                 callback_data,
                 buffer_rendered_handler_id: handler_id,
                 decide_policy_handler_id,
+                load_changed_handler_id,
                 dmabuf_exporter,
                 gdk_display,
                 needs_redraw: false,
@@ -953,5 +992,56 @@ unsafe extern "C" fn decide_policy_callback(
             // Unknown type - let WebKit handle it
             return 0; // FALSE
         }
+    }
+}
+
+/// Callback for WebKit load-changed signal
+/// load_event: WEBKIT_LOAD_STARTED=0, WEBKIT_LOAD_REDIRECTED=1, WEBKIT_LOAD_COMMITTED=2, WEBKIT_LOAD_FINISHED=3
+unsafe extern "C" fn load_changed_callback(
+    web_view: *mut wk::WebKitWebView,
+    load_event: u32,
+    user_data: *mut libc::c_void,
+) {
+    // WebKit load event constants
+    const WEBKIT_LOAD_STARTED: u32 = 0;
+    const WEBKIT_LOAD_REDIRECTED: u32 = 1;
+    const WEBKIT_LOAD_COMMITTED: u32 = 2;
+    const WEBKIT_LOAD_FINISHED: u32 = 3;
+
+    if user_data.is_null() {
+        return;
+    }
+
+    let callback_data = &*(user_data as *const BufferCallbackData);
+
+    // Map WebKit load events to our callback events:
+    // 0=started, 1=redirected, 2=committed, 3=finished, 4=failed
+    let event_id = match load_event {
+        WEBKIT_LOAD_STARTED => 0,
+        WEBKIT_LOAD_REDIRECTED => 1,
+        WEBKIT_LOAD_COMMITTED => 2,
+        WEBKIT_LOAD_FINISHED => 3,
+        _ => return, // Unknown event
+    };
+
+    // Get the current URI
+    let uri = if !web_view.is_null() {
+        let uri_ptr = wk::webkit_web_view_get_uri(web_view);
+        if !uri_ptr.is_null() {
+            CStr::from_ptr(uri_ptr).to_string_lossy().into_owned()
+        } else {
+            String::new()
+        }
+    } else {
+        String::new()
+    };
+
+    log::debug!("load_changed_callback: view={} event={} uri='{}'",
+               callback_data.view_id, event_id, uri);
+
+    // Call the Emacs callback if set
+    if let Some(callback) = get_load_callback() {
+        let c_uri = CString::new(uri).unwrap_or_default();
+        callback(callback_data.view_id, event_id, c_uri.as_ptr());
     }
 }

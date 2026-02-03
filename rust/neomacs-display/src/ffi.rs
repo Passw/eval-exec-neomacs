@@ -2092,6 +2092,33 @@ pub unsafe extern "C" fn neomacs_display_webkit_set_new_window_callback(
     // No-op when webkit not available
 }
 
+/// Callback type for WebKit page load events
+/// Args: view_id, load_event (0=started, 1=redirected, 2=committed, 3=finished, 4=failed), uri
+pub type WebKitLoadCallback = extern "C" fn(u32, c_int, *const c_char);
+
+/// Set callback for WebKit page load events
+/// Pass null to clear the callback.
+#[no_mangle]
+#[cfg(feature = "wpe-webkit")]
+pub unsafe extern "C" fn neomacs_display_webkit_set_load_callback(
+    callback: Option<WebKitLoadCallback>,
+) {
+    crate::backend::wpe::set_load_callback(callback);
+    if callback.is_some() {
+        log::info!("WebKit load callback set");
+    } else {
+        log::info!("WebKit load callback cleared");
+    }
+}
+
+#[no_mangle]
+#[cfg(not(feature = "wpe-webkit"))]
+pub unsafe extern "C" fn neomacs_display_webkit_set_load_callback(
+    _callback: Option<extern "C" fn(u32, c_int, *const c_char)>,
+) {
+    // No-op when webkit not available
+}
+
 /// Initialize WebKit subsystem with EGL display
 /// Must be called before creating WebKit views
 #[no_mangle]

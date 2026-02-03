@@ -603,6 +603,18 @@ typedef bool (*WebKitNewWindowCallbackFn)(uint32_t view_id,
 void neomacs_display_webkit_set_new_window_callback(WebKitNewWindowCallbackFn callback);
 
 /**
+ * Callback type for WebKit load events
+ * Parameters: view_id, load_event (0=started, 1=redirected, 2=committed, 3=finished, 4=failed), uri
+ */
+typedef void (*WebKitLoadCallbackFn)(uint32_t view_id, int load_event, const char *uri);
+
+/**
+ * Set callback for WebKit page load events
+ * Pass NULL to clear the callback.
+ */
+void neomacs_display_webkit_set_load_callback(WebKitLoadCallbackFn callback);
+
+/**
  * Add a WPE glyph to the current row
  */
 void neomacs_display_add_wpe_glyph(struct NeomacsDisplay *handle,

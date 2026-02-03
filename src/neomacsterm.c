@@ -2713,6 +2713,106 @@ Pass nil to clear the handler.  */)
   return Qt;
 }
 
+/* C callback for page load events */
+static void
+neomacs_webkit_load_callback_impl (uint32_t view_id, int load_event, const char *uri)
+{
+  if (NILP (Vneomacs_webkit_load_callback))
+    return;
+
+  /* load_event: 0=started, 1=redirected, 2=committed, 3=finished, 4=failed */
+  Lisp_Object event_sym;
+  switch (load_event)
+    {
+    case 0: event_sym = intern ("started"); break;
+    case 1: event_sym = intern ("redirected"); break;
+    case 2: event_sym = intern ("committed"); break;
+    case 3: event_sym = intern ("finished"); break;
+    case 4: event_sym = intern ("failed"); break;
+    default: event_sym = intern ("unknown"); break;
+    }
+
+  safe_calln (Vneomacs_webkit_load_callback,
+              make_fixnum (view_id),
+              event_sym,
+              uri ? build_string (uri) : Qnil);
+}
+
+DEFUN ("neomacs-webkit-set-load-callback", Fneomacs_webkit_set_load_callback,
+       Sneomacs_webkit_set_load_callback, 1, 1, 0,
+       doc: /* Set FUNCTION as callback for WebKit page load events.
+FUNCTION is called with three arguments: (VIEW-ID EVENT URI)
+where EVENT is one of: started, redirected, committed, finished, failed.
+Pass nil to clear the callback.  */)
+  (Lisp_Object function)
+{
+  Vneomacs_webkit_load_callback = function;
+
+  /* Register or clear the C callback */
+  if (NILP (function))
+    neomacs_display_webkit_set_load_callback (NULL);
+  else
+    neomacs_display_webkit_set_load_callback (neomacs_webkit_load_callback_impl);
+
+  return Qt;
+}
+
+DEFUN ("neomacs-insert-webkit", Fneomacs_insert_webkit, Sneomacs_insert_webkit, 3, 4, 0,
+       doc: /* Create webkit view and return display spec for inline display.
+URI is the URL to load (or nil for blank).
+WIDTH and HEIGHT are the display dimensions.
+Optional LOAD-P if non-nil means load URI immediately.
+Returns a display spec suitable for use with `insert' and `propertize':
+  (webkit :id ID :width W :height H)
+
+Example usage:
+  (insert (propertize \" \" 'display (neomacs-insert-webkit \"https://example.com\" 400 300)))
+
+To update an existing webkit view, use `neomacs-webkit-load-uri' with the ID.  */)
+  (Lisp_Object uri, Lisp_Object width, Lisp_Object height, Lisp_Object load_p)
+{
+  CHECK_FIXNUM (width);
+  CHECK_FIXNUM (height);
+
+  struct neomacs_display_info *dpyinfo = neomacs_display_list;
+  if (!dpyinfo || !dpyinfo->display_handle)
+    {
+      error ("No neomacs display available");
+      return Qnil;
+    }
+
+  int w = XFIXNUM (width);
+  int h = XFIXNUM (height);
+
+  /* Create webkit view */
+  uint32_t view_id = neomacs_display_webkit_create (dpyinfo->display_handle, w, h);
+  if (view_id == 0)
+    {
+      error ("Failed to create WebKit view");
+      return Qnil;
+    }
+
+  /* Load URI if provided and load_p is non-nil */
+  if (!NILP (uri) && !NILP (load_p))
+    {
+      CHECK_STRING (uri);
+      const char *uri_str = SSDATA (uri);
+      neomacs_display_webkit_load_uri (dpyinfo->display_handle, view_id, uri_str);
+    }
+
+  /* Create display spec: (webkit :id ID :width W :height H) */
+  Lisp_Object plist = Qnil;
+  plist = Fcons (make_fixnum (h), plist);
+  plist = Fcons (QCheight, plist);
+  plist = Fcons (make_fixnum (w), plist);
+  plist = Fcons (QCwidth, plist);
+  plist = Fcons (make_fixnum (view_id), plist);
+  plist = Fcons (QCid, plist);
+
+  Lisp_Object spec = Fcons (Qwebkit, plist);
+  return spec;
+}
+
 
 /* ============================================================================
  * Animation API
@@ -3046,6 +3146,8 @@ syms_of_neomacsterm (void)
   defsubr (&Sneomacs_webkit_get_progress);
   defsubr (&Sneomacs_webkit_loading_p);
   defsubr (&Sneomacs_webkit_set_new_window_function);
+  defsubr (&Sneomacs_webkit_set_load_callback);
+  defsubr (&Sneomacs_insert_webkit);
 
   /* Animation API */
   defsubr (&Sneomacs_set_animation_option);
@@ -3067,6 +3169,13 @@ The function is called with three arguments: VIEW-ID, URL, and FRAME-NAME.
 If it returns non-nil, Emacs handles the request (e.g., opens URL in new buffer).
 If nil, the request is ignored. */);
   Vneomacs_webkit_new_window_function = Qnil;
+
+  /* WebKit page load callback */
+  DEFVAR_LISP ("neomacs-webkit-load-callback", Vneomacs_webkit_load_callback,
+    doc: /* Function called when WebKit page load events occur.
+The function is called with three arguments: VIEW-ID, EVENT, URI.
+EVENT is one of: started, redirected, committed, finished, failed. */);
+  Vneomacs_webkit_load_callback = Qnil;
 
   /* Required variables for cus-start */
   DEFVAR_BOOL ("x-use-underline-position-properties",

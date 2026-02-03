@@ -454,6 +454,14 @@ void neomacs_display_webkit_set_new_window_callback(bool (*callback)(uint32_t,
                                                                      const char*));
 
 /**
+ * Set callback for WebKit page load events
+ * Pass null to clear the callback.
+ */
+void neomacs_display_webkit_set_load_callback(Option<WebKitLoadCallback> callback);
+
+void neomacs_display_webkit_set_load_callback(void (*callback)(uint32_t, int, const char*));
+
+/**
  * Initialize WebKit subsystem with EGL display
  * Must be called before creating WebKit views
  */

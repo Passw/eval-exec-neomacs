@@ -27,7 +27,7 @@ mod dmabuf;
 pub use backend::WpeBackend;
 
 #[cfg(feature = "wpe-webkit")]
-pub use view::{WpeWebView, WpeViewState, set_new_window_callback, NewWindowCallback};
+pub use view::{WpeWebView, WpeViewState, set_new_window_callback, NewWindowCallback, set_load_callback, LoadCallback};
 
 #[cfg(feature = "wpe-webkit")]
 pub use dmabuf::DmaBufExporter;
