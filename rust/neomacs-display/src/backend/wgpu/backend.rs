@@ -14,6 +14,7 @@ use winit::platform::pump_events::EventLoopExtPumpEvents;
 use winit::window::{Window, WindowId};
 
 use super::events::*;
+use super::glyph_atlas::WgpuGlyphAtlas;
 
 use crate::backend::DisplayBackend;
 use crate::core::error::{DisplayError, DisplayResult};
@@ -107,6 +108,8 @@ pub struct WinitBackend {
     pending_windows: Vec<PendingWindowRequest>,
     /// Whether wgpu has been initialized.
     wgpu_initialized: bool,
+    /// Glyph atlas for text rendering.
+    glyph_atlas: Option<WgpuGlyphAtlas>,
 }
 
 impl WinitBackend {
@@ -136,6 +139,7 @@ impl WinitBackend {
             mouse_position: (0, 0),
             pending_windows: Vec::new(),
             wgpu_initialized: false,
+            glyph_atlas: None,
         }
     }
 
@@ -192,12 +196,16 @@ impl WinitBackend {
 
         // Create shared renderer
         let renderer = WgpuRenderer::with_device(
-            device,
+            device.clone(),
             queue,
             self.width,
             self.height,
         );
         self.renderer = Some(renderer);
+
+        // Create glyph atlas for text rendering
+        let glyph_atlas = WgpuGlyphAtlas::new(&device);
+        self.glyph_atlas = Some(glyph_atlas);
 
         log::info!("wgpu initialized in headless mode");
         Ok(())
@@ -361,6 +369,11 @@ impl WinitBackend {
         self.surface = Some(surface);
         self.surface_config = Some(config);
         self.renderer = Some(renderer);
+
+        // Create glyph atlas for text rendering
+        let glyph_atlas = WgpuGlyphAtlas::new(&device);
+        self.glyph_atlas = Some(glyph_atlas);
+
         self.initialized = true;
 
         // Update scene dimensions
