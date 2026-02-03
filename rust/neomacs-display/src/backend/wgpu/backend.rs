@@ -184,11 +184,20 @@ impl WinitBackend {
         };
 
         self.instance = Some(instance);
-        self.device = Some(device);
-        self.queue = Some(queue);
+        self.device = Some(device.clone());
+        self.queue = Some(queue.clone());
         self.surface_format = format;
         self.wgpu_initialized = true;
         self.initialized = true;
+
+        // Create shared renderer
+        let renderer = WgpuRenderer::with_device(
+            device,
+            queue,
+            self.width,
+            self.height,
+        );
+        self.renderer = Some(renderer);
 
         log::info!("wgpu initialized in headless mode");
         Ok(())
