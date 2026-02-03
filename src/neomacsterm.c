@@ -1049,23 +1049,25 @@ neomacs_draw_glyph_string (struct glyph_string *s)
               break;
             case VIDEO_GLYPH:
               {
-                /* Video glyphs render at full size - mode-line overlays on top in Rust */
+                /* Video glyphs use glyph dimensions (ascent + descent) */
+                int glyph_height = s->first_glyph->ascent + s->first_glyph->descent;
                 neomacs_display_add_video_glyph (dpyinfo->display_handle,
                                                   s->first_glyph->u.video_id,
                                                   s->first_glyph->pixel_width,
-                                                  s->height);
+                                                  glyph_height > 0 ? glyph_height : s->height);
               }
               break;
             case WEBKIT_GLYPH:
-              /* Handle WebKit glyphs */
-              neomacs_display_add_wpe_glyph (dpyinfo->display_handle,
-                                              s->first_glyph->u.webkit_id,
-                                              s->first_glyph->pixel_width,
-                                              s->row->height);
+              /* Handle WebKit glyphs - use glyph dimensions */
+              {
+                int glyph_height = s->first_glyph->ascent + s->first_glyph->descent;
+                neomacs_display_add_wpe_glyph (dpyinfo->display_handle,
+                                                s->first_glyph->u.webkit_id,
+                                                s->first_glyph->pixel_width,
+                                                glyph_height > 0 ? glyph_height : s->row->height);
+              }
               break;
             default:
-              fprintf(stderr, "DEBUG: Unhandled glyph type %d (y=%d, mode_line=%d)\n",
-                      s->first_glyph->type, glyph_y, s->row->mode_line_p);
               break;
             }
         }
@@ -1087,12 +1089,6 @@ neomacs_draw_glyph_string (struct glyph_string *s)
         w = s->w;  /* Use the actual window from glyph_string if available */
       int window_top = WINDOW_TOP_EDGE_Y (w);
       int row_y = window_top + s->row->y;
-
-      /* Debug: print what we're calculating */
-      static int debug_count = 0;
-      if (debug_count++ < 30)
-        fprintf(stderr, "DEBUG C begin_row: window_top=%d, s->row->y=%d, row_y=%d, height=%d\n",
-                window_top, s->row->y, row_y, s->row->height);
 
       neomacs_display_begin_row (dpyinfo->display_handle,
                                  row_y,

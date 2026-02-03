@@ -6564,7 +6564,8 @@ handle_single_display_spec (struct it *it, Lisp_Object spec, Lisp_Object object,
           it->xwidget = lookup_xwidget (value);
 	}
 #ifdef HAVE_NEOMACS
-      /* Handle (video :id N :width W :height H) display property.  */
+      /* Handle (video :id N :width W :height H) display property.
+	 Height/width can be integer pixels or (VALUE . em) for font-relative.  */
       else if (VIDEOP (value))
 	{
 	  Lisp_Object id = plist_get (XCDR (value), QCid);
@@ -6572,11 +6573,30 @@ handle_single_display_spec (struct it *it, Lisp_Object spec, Lisp_Object object,
 	    {
 	      Lisp_Object width_prop = plist_get (XCDR (value), QCwidth);
 	      Lisp_Object height_prop = plist_get (XCDR (value), QCheight);
+	      struct face *face = FACE_FROM_ID (it->f, it->face_id);
+	      int font_height = face && face->font ? FONT_HEIGHT (face->font) : 16;
 
 	      it->what = IT_VIDEO;
 	      it->video_id = XFIXNUM (id);
-	      it->video_width = FIXNUMP (width_prop) ? XFIXNUM (width_prop) : 320;
-	      it->video_height = FIXNUMP (height_prop) ? XFIXNUM (height_prop) : 240;
+
+	      /* Parse width: integer or (value . em) */
+	      if (FIXNUMP (width_prop))
+		it->video_width = XFIXNUM (width_prop);
+	      else if (CONSP (width_prop) && NUMBERP (XCAR (width_prop))
+		       && EQ (XCDR (width_prop), Qem))
+		it->video_width = (int) (XFLOATINT (XCAR (width_prop)) * font_height);
+	      else
+		it->video_width = 320;
+
+	      /* Parse height: integer or (value . em) */
+	      if (FIXNUMP (height_prop))
+		it->video_height = XFIXNUM (height_prop);
+	      else if (CONSP (height_prop) && NUMBERP (XCAR (height_prop))
+		       && EQ (XCDR (height_prop), Qem))
+		it->video_height = (int) (XFLOATINT (XCAR (height_prop)) * font_height);
+	      else
+		it->video_height = 240;
+
 	      it->position = start_pos;
 	      it->object = NILP (object) ? it->w->contents : object;
 	      it->method = GET_FROM_VIDEO;
@@ -6584,7 +6604,8 @@ handle_single_display_spec (struct it *it, Lisp_Object spec, Lisp_Object object,
 	      retval = 1 + (it->area == TEXT_AREA);
 	    }
 	}
-      /* Handle (webkit :id N :width W :height H) display property.  */
+      /* Handle (webkit :id N :width W :height H) display property.
+	 Height/width can be integer pixels or (VALUE . em) for font-relative.  */
       else if (WEBKITP (value))
 	{
 	  Lisp_Object id = plist_get (XCDR (value), QCid);
@@ -6592,11 +6613,30 @@ handle_single_display_spec (struct it *it, Lisp_Object spec, Lisp_Object object,
 	    {
 	      Lisp_Object width_prop = plist_get (XCDR (value), QCwidth);
 	      Lisp_Object height_prop = plist_get (XCDR (value), QCheight);
+	      struct face *face = FACE_FROM_ID (it->f, it->face_id);
+	      int font_height = face && face->font ? FONT_HEIGHT (face->font) : 16;
 
 	      it->what = IT_WEBKIT;
 	      it->webkit_id = XFIXNUM (id);
-	      it->video_width = FIXNUMP (width_prop) ? XFIXNUM (width_prop) : 400;
-	      it->video_height = FIXNUMP (height_prop) ? XFIXNUM (height_prop) : 300;
+
+	      /* Parse width: integer or (value . em) */
+	      if (FIXNUMP (width_prop))
+		it->video_width = XFIXNUM (width_prop);
+	      else if (CONSP (width_prop) && NUMBERP (XCAR (width_prop))
+		       && EQ (XCDR (width_prop), Qem))
+		it->video_width = (int) (XFLOATINT (XCAR (width_prop)) * font_height);
+	      else
+		it->video_width = 400;
+
+	      /* Parse height: integer or (value . em) */
+	      if (FIXNUMP (height_prop))
+		it->video_height = XFIXNUM (height_prop);
+	      else if (CONSP (height_prop) && NUMBERP (XCAR (height_prop))
+		       && EQ (XCDR (height_prop), Qem))
+		it->video_height = (int) (XFLOATINT (XCAR (height_prop)) * font_height);
+	      else
+		it->video_height = 300;
+
 	      it->position = start_pos;
 	      it->object = NILP (object) ? it->w->contents : object;
 	      it->method = GET_FROM_WEBKIT;

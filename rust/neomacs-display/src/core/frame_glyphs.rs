@@ -450,11 +450,13 @@ impl FrameGlyphBuffer {
 
     /// Add a video glyph
     pub fn add_video(&mut self, video_id: u32, x: f32, y: f32, width: f32, height: f32) {
+        self.remove_overlapping(x, y, width, height);
         self.glyphs.push(FrameGlyph::Video { video_id, x, y, width, height });
     }
 
     /// Add a webkit glyph
     pub fn add_webkit(&mut self, webkit_id: u32, x: f32, y: f32, width: f32, height: f32) {
+        self.remove_overlapping(x, y, width, height);
         self.glyphs.push(FrameGlyph::WebKit { webkit_id, x, y, width, height });
     }
 

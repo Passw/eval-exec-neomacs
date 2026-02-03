@@ -1479,7 +1479,6 @@ pub unsafe extern "C" fn neomacs_display_clear_all_glyphs(handle: *mut NeomacsDi
     }
 
     let display = &mut *handle;
-    eprintln!("DEBUG: clear_all_glyphs called, clearing {} glyphs", display.frame_glyphs.len());
     display.frame_glyphs.glyphs.clear();
     display.frame_glyphs.window_regions.clear();
     display.frame_glyphs.prev_window_regions.clear();
