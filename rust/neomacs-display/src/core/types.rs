@@ -41,11 +41,6 @@ impl Color {
         Self::from_u8(r, g, b, a)
     }
 
-    #[cfg(feature = "gtk4-backend")]
-    pub fn to_gdk(&self) -> gdk4::RGBA {
-        gdk4::RGBA::new(self.r, self.g, self.b, self.a)
-    }
-
     // Common colors
     pub const BLACK: Self = Self::rgb(0.0, 0.0, 0.0);
     pub const WHITE: Self = Self::rgb(1.0, 1.0, 1.0);
@@ -75,11 +70,6 @@ impl Point {
     }
 
     pub const ZERO: Self = Self::new(0.0, 0.0);
-
-    #[cfg(feature = "gtk4-backend")]
-    pub fn to_graphene(&self) -> gtk4::graphene::Point {
-        gtk4::graphene::Point::new(self.x, self.y)
-    }
 }
 
 impl Add for Point {
@@ -110,11 +100,6 @@ impl Size {
     }
 
     pub const ZERO: Self = Self::new(0.0, 0.0);
-
-    #[cfg(feature = "gtk4-backend")]
-    pub fn to_graphene(&self) -> gtk4::graphene::Size {
-        gtk4::graphene::Size::new(self.width, self.height)
-    }
 }
 
 /// Rectangle with position and size
@@ -166,11 +151,6 @@ impl Rect {
             && self.bottom() > other.y
     }
 
-    #[cfg(feature = "gtk4-backend")]
-    pub fn to_graphene(&self) -> gtk4::graphene::Rect {
-        gtk4::graphene::Rect::new(self.x, self.y, self.width, self.height)
-    }
-
     pub const ZERO: Self = Self::new(0.0, 0.0, 0.0, 0.0);
 }
 
@@ -200,12 +180,6 @@ impl Transform {
         Self {
             matrix: [sx, 0.0, 0.0, sy, 0.0, 0.0],
         }
-    }
-
-    #[cfg(feature = "gtk4-backend")]
-    pub fn to_gsk(&self) -> gsk4::Transform {
-        gsk4::Transform::new()
-            .translate(&gtk4::graphene::Point::new(self.matrix[4], self.matrix[5]))
     }
 }
 

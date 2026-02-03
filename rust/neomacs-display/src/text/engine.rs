@@ -4,12 +4,7 @@ use cosmic_text::{
     Attrs, Buffer, Color as CosmicColor, Family, FontSystem, Metrics,
     ShapeBuffer, SwashCache, Weight, Style,
 };
-#[cfg(feature = "gtk4-backend")]
-use gtk4::gdk;
-#[cfg(feature = "gtk4-backend")]
-use gtk4::prelude::Cast;
 
-use crate::core::types::Color;
 use crate::core::face::{Face, FaceAttributes};
 
 /// Text rendering engine that uses cosmic-text for shaping and rasterization
@@ -200,37 +195,6 @@ impl TextEngine {
         }
 
         attrs
-    }
-
-    /// Create a GdkTexture from RGBA pixel data (premultiplied alpha)
-    #[cfg(feature = "gtk4-backend")]
-    pub fn create_texture(width: u32, height: u32, pixels: &[u8]) -> Option<gdk::Texture> {
-        if width == 0 || height == 0 || pixels.is_empty() {
-            return None;
-        }
-
-        // Premultiply alpha and convert RGBA to BGRA for GSK compatibility
-        let mut premultiplied = pixels.to_vec();
-        for chunk in premultiplied.chunks_mut(4) {
-            let alpha = chunk[3] as f32 / 255.0;
-            let r = (chunk[0] as f32 * alpha) as u8;
-            let g = (chunk[1] as f32 * alpha) as u8;
-            let b = (chunk[2] as f32 * alpha) as u8;
-            // Swap R and B for BGRA format
-            chunk[0] = b;
-            chunk[1] = g;
-            chunk[2] = r;
-            // chunk[3] stays as alpha
-        }
-
-        let bytes = glib::Bytes::from(&premultiplied);
-        Some(gdk::MemoryTexture::new(
-            width as i32,
-            height as i32,
-            gdk::MemoryFormat::B8g8r8a8Premultiplied,
-            &bytes,
-            (width * 4) as usize,
-        ).upcast())
     }
 }
 
