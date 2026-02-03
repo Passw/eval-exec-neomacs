@@ -35,68 +35,31 @@ impl WgpuRenderer {
         pollster::block_on(Self::new_async(surface, width, height))
     }
 
-    async fn new_async(
-        surface: Option<wgpu::Surface<'static>>,
+    /// Create a new WgpuRenderer using an existing device and queue.
+    ///
+    /// This is useful when you need to share the wgpu device with other components,
+    /// such as when surfaces are created with a specific device.
+    pub fn with_device(
+        device: Arc<wgpu::Device>,
+        queue: Arc<wgpu::Queue>,
         width: u32,
         height: u32,
     ) -> Self {
-        // Create wgpu instance
-        let instance = wgpu::Instance::new(wgpu::InstanceDescriptor {
-            backends: wgpu::Backends::all(),
-            ..Default::default()
-        });
+        Self::create_renderer_internal(device, queue, None, None, width, height)
+    }
 
-        // Request adapter
-        let adapter = instance
-            .request_adapter(&wgpu::RequestAdapterOptions {
-                power_preference: wgpu::PowerPreference::HighPerformance,
-                compatible_surface: surface.as_ref(),
-                force_fallback_adapter: false,
-            })
-            .await
-            .expect("Failed to find a suitable GPU adapter");
-
-        // Request device and queue
-        let (device, queue) = adapter
-            .request_device(
-                &wgpu::DeviceDescriptor {
-                    label: Some("Neomacs Device"),
-                    required_features: wgpu::Features::empty(),
-                    required_limits: wgpu::Limits::default(),
-                    memory_hints: Default::default(),
-                },
-                None,
-            )
-            .await
-            .expect("Failed to create device");
-
-        let device = Arc::new(device);
-        let queue = Arc::new(queue);
-
-        // Configure surface if provided
-        let surface_config = surface.as_ref().map(|s| {
-            let caps = s.get_capabilities(&adapter);
-            let format = caps
-                .formats
-                .iter()
-                .copied()
-                .find(|f| f.is_srgb())
-                .unwrap_or(caps.formats[0]);
-
-            let config = wgpu::SurfaceConfiguration {
-                usage: wgpu::TextureUsages::RENDER_ATTACHMENT,
-                format,
-                width,
-                height,
-                present_mode: wgpu::PresentMode::Fifo, // VSync
-                alpha_mode: caps.alpha_modes[0],
-                view_formats: vec![],
-                desired_maximum_frame_latency: 2,
-            };
-            s.configure(&device, &config);
-            config
-        });
-
+    /// Internal helper that creates the renderer with the given device/queue.
+    ///
+    /// This handles pipeline and buffer creation, and is used by both `new_async`
+    /// and `with_device`.
+    fn create_renderer_internal(
+        device: Arc<wgpu::Device>,
+        queue: Arc<wgpu::Queue>,
+        surface: Option<wgpu::Surface<'static>>,
+        surface_config: Option<wgpu::SurfaceConfiguration>,
+        width: u32,
+        height: u32,
+    ) -> Self {
         // Create uniform buffer
         let uniforms = Uniforms {
             screen_size: [width as f32, height as f32],
@@ -203,6 +166,72 @@ impl WgpuRenderer {
             width,
             height,
         }
+    }
+
+    async fn new_async(
+        surface: Option<wgpu::Surface<'static>>,
+        width: u32,
+        height: u32,
+    ) -> Self {
+        // Create wgpu instance
+        let instance = wgpu::Instance::new(wgpu::InstanceDescriptor {
+            backends: wgpu::Backends::all(),
+            ..Default::default()
+        });
+
+        // Request adapter
+        let adapter = instance
+            .request_adapter(&wgpu::RequestAdapterOptions {
+                power_preference: wgpu::PowerPreference::HighPerformance,
+                compatible_surface: surface.as_ref(),
+                force_fallback_adapter: false,
+            })
+            .await
+            .expect("Failed to find a suitable GPU adapter");
+
+        // Request device and queue
+        let (device, queue) = adapter
+            .request_device(
+                &wgpu::DeviceDescriptor {
+                    label: Some("Neomacs Device"),
+                    required_features: wgpu::Features::empty(),
+                    required_limits: wgpu::Limits::default(),
+                    memory_hints: Default::default(),
+                },
+                None,
+            )
+            .await
+            .expect("Failed to create device");
+
+        let device = Arc::new(device);
+        let queue = Arc::new(queue);
+
+        // Configure surface if provided
+        let surface_config = surface.as_ref().map(|s| {
+            let caps = s.get_capabilities(&adapter);
+            let format = caps
+                .formats
+                .iter()
+                .copied()
+                .find(|f| f.is_srgb())
+                .unwrap_or(caps.formats[0]);
+
+            let config = wgpu::SurfaceConfiguration {
+                usage: wgpu::TextureUsages::RENDER_ATTACHMENT,
+                format,
+                width,
+                height,
+                present_mode: wgpu::PresentMode::Fifo, // VSync
+                alpha_mode: caps.alpha_modes[0],
+                view_formats: vec![],
+                desired_maximum_frame_latency: 2,
+            };
+            s.configure(&device, &config);
+            config
+        });
+
+        // Use the internal helper for pipeline/buffer creation
+        Self::create_renderer_internal(device, queue, surface, surface_config, width, height)
     }
 
     /// Resize the renderer's surface.
