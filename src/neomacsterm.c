@@ -142,6 +142,79 @@ neomacs_evq_flush (struct input_event *hold_quit)
   return n;
 }
 
+/* Event callback from Rust/winit */
+static void
+neomacs_event_callback (const NeomacsInputEvent *event)
+{
+  union buffered_input_event inev;
+  struct frame *f = SELECTED_FRAME ();
+  Lisp_Object tail, frame;
+
+  /* Find frame by window_id */
+  FOR_EACH_FRAME (tail, frame)
+    {
+      struct frame *tf = XFRAME (frame);
+      if (FRAME_NEOMACS_P (tf)
+          && FRAME_NEOMACS_OUTPUT (tf)->window_id == event->windowId)
+        {
+          f = tf;
+          break;
+        }
+    }
+
+  EVENT_INIT (inev.ie);
+  inev.ie.timestamp = event->timestamp;
+
+  switch (event->kind)
+    {
+    case NEOMACS_EVENT_KEY_PRESS:
+      if (event->keysym < 0x100)
+        inev.ie.kind = ASCII_KEYSTROKE_EVENT;
+      else
+        inev.ie.kind = NON_ASCII_KEYSTROKE_EVENT;
+      inev.ie.code = event->keysym;
+      inev.ie.modifiers = 0;
+      if (event->modifiers & NEOMACS_SHIFT_MASK) inev.ie.modifiers |= shift_modifier;
+      if (event->modifiers & NEOMACS_CTRL_MASK) inev.ie.modifiers |= ctrl_modifier;
+      if (event->modifiers & NEOMACS_META_MASK) inev.ie.modifiers |= meta_modifier;
+      if (event->modifiers & NEOMACS_SUPER_MASK) inev.ie.modifiers |= super_modifier;
+      XSETFRAME (inev.ie.frame_or_window, f);
+      neomacs_evq_enqueue (&inev);
+      break;
+
+    case NEOMACS_EVENT_MOUSE_PRESS:
+    case NEOMACS_EVENT_MOUSE_RELEASE:
+      inev.ie.kind = MOUSE_CLICK_EVENT;
+      inev.ie.code = event->button - 1;  /* Emacs buttons are 0-indexed */
+      inev.ie.modifiers = (event->kind == NEOMACS_EVENT_MOUSE_PRESS) ? down_modifier : up_modifier;
+      if (event->modifiers & NEOMACS_SHIFT_MASK) inev.ie.modifiers |= shift_modifier;
+      if (event->modifiers & NEOMACS_CTRL_MASK) inev.ie.modifiers |= ctrl_modifier;
+      if (event->modifiers & NEOMACS_META_MASK) inev.ie.modifiers |= meta_modifier;
+      XSETINT (inev.ie.x, event->x);
+      XSETINT (inev.ie.y, event->y);
+      XSETFRAME (inev.ie.frame_or_window, f);
+      neomacs_evq_enqueue (&inev);
+      break;
+
+    case NEOMACS_EVENT_RESIZE:
+      {
+        struct neomacs_display_info *dpyinfo = FRAME_NEOMACS_DISPLAY_INFO (f);
+        if (dpyinfo && dpyinfo->display_handle)
+          neomacs_display_resize (dpyinfo->display_handle, event->width, event->height);
+      }
+      break;
+
+    case NEOMACS_EVENT_CLOSE_REQUEST:
+      inev.ie.kind = DELETE_WINDOW_EVENT;
+      XSETFRAME (inev.ie.frame_or_window, f);
+      neomacs_evq_enqueue (&inev);
+      break;
+
+    default:
+      break;
+    }
+}
+
 /* Forward declarations */
 extern frame_parm_handler neomacs_frame_parm_handlers[];
 
@@ -198,6 +271,9 @@ neomacs_term_init (void)
 {
   /* Initialize the Rust display engine */
   /* This will be called once at Emacs startup */
+
+  /* Register event callback for winit events */
+  neomacs_display_set_event_callback (neomacs_event_callback);
 }
 
 /* Create a new Neomacs display connection */
@@ -1820,59 +1896,19 @@ neomacs_new_font (struct frame *f, Lisp_Object font_object, int fontset)
  * ============================================================================ */
 
 /* Read socket events for the Neomacs terminal.
-   This processes GTK4 events and converts them to Emacs events.  */
+   This processes winit and GTK4 events and converts them to Emacs events.  */
 int
 neomacs_read_socket (struct terminal *terminal, struct input_event *hold_quit)
 {
-  GMainContext *context;
-  bool context_acquired = false;
+  struct neomacs_display_info *dpyinfo = terminal->display_info.neomacs;
   int count;
-  static int read_socket_calls = 0;
 
-  /* First, flush any already-queued events */
+  /* Poll winit events - this calls our callback for each event */
+  if (dpyinfo && dpyinfo->display_handle)
+    neomacs_display_poll_events (dpyinfo->display_handle);
+
+  /* Flush queued events to Emacs */
   count = neomacs_evq_flush (hold_quit);
-  if (count > 0)
-    {
-if (0) fprintf (stderr, "DEBUG: read_socket: flushed %d pre-queued events\n", count);
-      return count;
-    }
-
-  /* Get the default GLib main context */
-  context = g_main_context_default ();
-  context_acquired = g_main_context_acquire (context);
-
-  block_input ();
-
-  /* Process pending GTK events - this will trigger our callbacks
-     which enqueue events via neomacs_evq_enqueue */
-  if (context_acquired)
-    {
-      int pending_count = 0;
-      while (g_main_context_pending (context))
-        {
-          g_main_context_dispatch (context);
-          pending_count++;
-        }
-      if (++read_socket_calls % 500 == 0)
-if (0) fprintf (stderr, "DEBUG: read_socket: dispatched %d events (call #%d)\n",
-                 pending_count, read_socket_calls);
-    }
-  else
-    {
-      if (++read_socket_calls % 500 == 0)
-if (0) fprintf (stderr, "DEBUG: read_socket: could NOT acquire context (call #%d)\n",
-                 read_socket_calls);
-    }
-
-  unblock_input ();
-
-  if (context_acquired)
-    g_main_context_release (context);
-
-  /* Flush events that were queued during dispatch */
-  count = neomacs_evq_flush (hold_quit);
-  if (count > 0)
-if (0) fprintf (stderr, "DEBUG: read_socket: flushed %d events after dispatch\n", count);
   return count;
 }
 
