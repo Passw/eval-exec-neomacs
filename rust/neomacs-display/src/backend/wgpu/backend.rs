@@ -657,7 +657,14 @@ impl WinitBackend {
         // Get mutable reference to glyph atlas
         if let Some(ref mut glyph_atlas) = self.glyph_atlas {
             log::debug!("end_frame_for_window: calling render_frame_glyphs");
-            renderer.render_frame_glyphs(&view, frame_glyphs, glyph_atlas, faces);
+            renderer.render_frame_glyphs(
+                &view,
+                frame_glyphs,
+                glyph_atlas,
+                faces,
+                state.config.width,
+                state.config.height,
+            );
         } else {
             log::debug!("end_frame_for_window: no glyph_atlas");
         }

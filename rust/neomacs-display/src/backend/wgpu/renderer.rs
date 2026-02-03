@@ -645,24 +645,31 @@ impl WgpuRenderer {
     }
 
     /// Render frame glyphs to a texture view
+    ///
+    /// `surface_width` and `surface_height` should be the actual surface dimensions
+    /// for correct coordinate transformation.
     pub fn render_frame_glyphs(
         &self,
         view: &wgpu::TextureView,
         frame_glyphs: &FrameGlyphBuffer,
         glyph_atlas: &mut WgpuGlyphAtlas,
         faces: &HashMap<u32, Face>,
+        surface_width: u32,
+        surface_height: u32,
     ) {
         log::debug!(
-            "render_frame_glyphs: {}x{}, {} glyphs, {} faces",
+            "render_frame_glyphs: frame={}x{} surface={}x{}, {} glyphs, {} faces",
             frame_glyphs.width,
             frame_glyphs.height,
+            surface_width,
+            surface_height,
             frame_glyphs.glyphs.len(),
-            faces.len()
+            faces.len(),
         );
 
-        // Update uniforms for current frame size
+        // Update uniforms with actual surface size for correct coordinate transformation
         let uniforms = Uniforms {
-            screen_size: [frame_glyphs.width, frame_glyphs.height],
+            screen_size: [surface_width as f32, surface_height as f32],
             _padding: [0.0, 0.0],
         };
         self.queue
