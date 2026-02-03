@@ -14,7 +14,7 @@ mod external_buffer;
 #[cfg(feature = "winit-backend")]
 pub use renderer::WgpuRenderer;
 #[cfg(feature = "winit-backend")]
-pub use backend::WinitBackend;
+pub use backend::{WinitBackend, UserEvent, Callbacks, NeomacsApp, run_event_loop};
 #[cfg(feature = "winit-backend")]
 pub use glyph_atlas::{WgpuGlyphAtlas, GlyphKey, CachedGlyph};
 #[cfg(feature = "winit-backend")]
