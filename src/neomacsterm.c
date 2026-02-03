@@ -829,8 +829,29 @@ static void
 neomacs_make_frame_visible_invisible (struct frame *f, bool visible)
 {
   struct neomacs_output *output = FRAME_NEOMACS_OUTPUT (f);
+  struct neomacs_display_info *dpyinfo = FRAME_NEOMACS_DISPLAY_INFO (f);
 
-  if (!output || !output->widget)
+  if (!output)
+    return;
+
+  /* Handle winit windows (no GTK widget) */
+  if (output->window_id > 0 && dpyinfo && dpyinfo->display_handle)
+    {
+      neomacs_display_show_window (dpyinfo->display_handle, output->window_id, visible);
+      if (visible)
+        {
+          SET_FRAME_VISIBLE (f, 1);
+          SET_FRAME_ICONIFIED (f, false);
+        }
+      else
+        {
+          SET_FRAME_VISIBLE (f, 0);
+        }
+      return;
+    }
+
+  /* GTK widget path */
+  if (!output->widget)
     return;
 
   if (visible)

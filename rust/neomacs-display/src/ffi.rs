@@ -245,7 +245,7 @@ pub unsafe extern "C" fn neomacs_display_begin_frame(handle: *mut NeomacsDisplay
     // DON'T clear glyphs - accumulate them for incremental redisplay.
     // Emacs sends only changed content; old content is retained.
     // When add_char is called, it removes overlapping old glyphs.
-    if display.use_hybrid {
+    if display.use_hybrid && display.current_render_window_id == 0 {
         display.frame_glyphs.width = display.scene.width;
         display.frame_glyphs.height = display.scene.height;
         display.frame_glyphs.background = display.scene.background;
@@ -280,7 +280,8 @@ pub unsafe extern "C" fn neomacs_display_add_window(
     display.current_window_id = window_id;
 
     // Hybrid path: just add window background rectangle
-    if display.use_hybrid {
+    // Skip hybrid path if rendering to a winit window (current_render_window_id > 0)
+    if display.use_hybrid && display.current_render_window_id == 0 {
         display.frame_glyphs.add_background(
             x, y, width, height,
             Color::from_pixel(bg_color),
@@ -288,7 +289,7 @@ pub unsafe extern "C" fn neomacs_display_add_window(
         return;
     }
 
-    // Legacy scene graph path...
+    // Scene graph path (used for winit windows and legacy rendering)...
     // Find existing window by ID or create new one
     let window_idx = display.get_target_scene().windows.iter().position(|w| w.window_id == window_id);
 
@@ -352,7 +353,7 @@ pub unsafe extern "C" fn neomacs_display_set_cursor(
     let display = &mut *handle;
 
     // Hybrid path: add cursor directly to glyph buffer
-    if display.use_hybrid {
+    if display.use_hybrid && display.current_render_window_id == 0 {
         if visible != 0 && display.animations.cursor_visible() {
             // style: 0=box, 1=bar, 2=underline, 3=hollow
             display.frame_glyphs.add_cursor(
@@ -406,7 +407,7 @@ pub unsafe extern "C" fn neomacs_display_draw_border(
     let display = &mut *handle;
 
     // Hybrid path: add border directly to glyph buffer
-    if display.use_hybrid {
+    if display.use_hybrid && display.current_render_window_id == 0 {
         display.frame_glyphs.add_border(
             x as f32, y as f32,
             width as f32, height as f32,
@@ -457,7 +458,7 @@ pub unsafe extern "C" fn neomacs_display_begin_row(
     display.current_row_is_overlay = mode_line != 0 || header_line != 0;
 
     // Hybrid path: we don't need window tracking - just use frame-absolute coords
-    if display.use_hybrid {
+    if display.use_hybrid && display.current_render_window_id == 0 {
         // Nothing else needed - glyphs will use current_row_y/x/height/ascent directly
         return;
     }
@@ -552,7 +553,7 @@ pub unsafe extern "C" fn neomacs_display_add_char_glyph(
         let c = char::from_u32(charcode).unwrap_or('\u{FFFD}');
 
         // Hybrid path: append directly to frame glyph buffer
-        if display.use_hybrid {
+        if display.use_hybrid && display.current_render_window_id == 0 {
             display.frame_glyphs.add_char(
                 c,
                 current_x as f32,
@@ -633,7 +634,7 @@ pub unsafe extern "C" fn neomacs_display_add_stretch_glyph(
         let current_x = display.current_row_x;
 
         // Hybrid path: append directly to frame glyph buffer
-        if display.use_hybrid {
+        if display.use_hybrid && display.current_render_window_id == 0 {
             // Get the background color from the current face
             let bg_color = display.frame_glyphs.get_current_bg()
                 .unwrap_or(display.frame_glyphs.background);
@@ -713,7 +714,7 @@ pub unsafe extern "C" fn neomacs_display_add_image_glyph(
     let current_x = display.current_row_x;
 
     // Hybrid path: append directly to frame glyph buffer
-    if display.use_hybrid {
+    if display.use_hybrid && display.current_render_window_id == 0 {
         display.frame_glyphs.add_image(
             image_id,
             current_x as f32,
@@ -905,7 +906,7 @@ pub unsafe extern "C" fn neomacs_display_set_face(
     };
 
     // Hybrid path: set current face attributes for frame glyph buffer
-    if display.use_hybrid {
+    if display.use_hybrid && display.current_render_window_id == 0 {
         let bg_opt = if background == 0 { None } else { Some(bg) };
         let ul_color_opt = if underline_color != 0 { ul_color } else { None };
         display.frame_glyphs.set_face_with_font(
@@ -973,7 +974,7 @@ pub unsafe extern "C" fn neomacs_display_add_video_glyph(
     let current_x = display.current_row_x;
 
     // Hybrid path: append directly to frame glyph buffer
-    if display.use_hybrid {
+    if display.use_hybrid && display.current_render_window_id == 0 {
         display.frame_glyphs.add_video(
             video_id,
             current_x as f32,
@@ -1293,7 +1294,7 @@ pub unsafe extern "C" fn neomacs_display_clear_area(
     let display = &mut *handle;
 
     // For hybrid path, clear the area in frame_glyphs
-    if display.use_hybrid {
+    if display.use_hybrid && display.current_render_window_id == 0 {
         display.frame_glyphs.clear_area(
             x as f32,
             y as f32,
@@ -1357,7 +1358,7 @@ pub unsafe extern "C" fn neomacs_display_end_frame(handle: *mut NeomacsDisplay) 
 
     // End frame - this handles layout change detection and stale glyph removal
     let mut layout_cleared = false;
-    if display.use_hybrid {
+    if display.use_hybrid && display.current_render_window_id == 0 {
         layout_cleared = display.frame_glyphs.end_frame();
         debug!("After end_frame: {} glyphs, cleared={}", display.frame_glyphs.len(), layout_cleared);
     }
@@ -2360,7 +2361,7 @@ pub unsafe extern "C" fn neomacs_display_add_wpe_glyph(
     log::debug!("add_wpe_glyph: at ({}, {}), use_hybrid={}", current_x, current_y, display.use_hybrid);
 
     // Hybrid path: add to frame glyph buffer
-    if display.use_hybrid {
+    if display.use_hybrid && display.current_render_window_id == 0 {
         display.frame_glyphs.add_webkit(
             view_id,
             current_x as f32,
