@@ -58,12 +58,15 @@ bindgen = "0.71"
 pkg-config = "0.3"
 
 [features]
-default = ["winit-backend", "video", "wpe-webkit"]
+# Default: winit-wgpu backend only (no GTK4 dependency)
+# Add gtk4-backend for GTK4 support, wpe-webkit for WebKit views
+default = ["winit-backend"]
 gtk4-backend = ["gtk4", "gdk4", "gsk4", "gio", "glib", "graphene-rs", "pango", "pangocairo"]
 winit-backend = ["winit", "wgpu", "raw-window-handle", "arboard", "bytemuck", "pollster"]
 tty-backend = []
 video = ["gstreamer", "gstreamer-video"]
-wpe-webkit = []
+# wpe-webkit requires gtk4-backend for texture types
+wpe-webkit = ["gtk4-backend"]
 
 [profile.release]
 lto = true

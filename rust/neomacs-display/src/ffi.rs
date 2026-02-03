@@ -1337,7 +1337,6 @@ pub unsafe extern "C" fn neomacs_display_load_image_data_scaled(
 /// Load an image from raw ARGB32 pixel data (Cairo/Emacs format)
 /// Returns image_id on success, 0 on failure
 #[cfg(feature = "gtk4-backend")]
-#[cfg(feature = "gtk4-backend")]
 #[no_mangle]
 pub unsafe extern "C" fn neomacs_display_load_image_argb32(
     handle: *mut NeomacsDisplay,
