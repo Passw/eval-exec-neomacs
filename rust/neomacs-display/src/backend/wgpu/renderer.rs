@@ -711,7 +711,11 @@ impl WgpuRenderer {
                 } => {
                     self.add_rect(&mut rect_vertices, *x, *y, *width, *height, bg);
                 }
-                _ => {} // Chars, cursors, borders handled separately
+                FrameGlyph::Char { x, y, width, height, bg: Some(bg_color), .. } => {
+                    // Render per-character background (modeline, etc.)
+                    self.add_rect(&mut rect_vertices, *x, *y, *width, *height, bg_color);
+                }
+                _ => {} // Chars without bg, cursors, borders handled separately
             }
         }
 
