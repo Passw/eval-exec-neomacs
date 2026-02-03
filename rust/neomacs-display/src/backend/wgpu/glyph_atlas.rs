@@ -3,7 +3,6 @@
 //! Caches rasterized glyphs as individual wgpu textures with bind groups.
 
 use std::collections::HashMap;
-use std::sync::Arc;
 
 use cosmic_text::{
     Attrs, Buffer, Family, FontSystem, Metrics, ShapeBuffer, SwashCache, Style, Weight,

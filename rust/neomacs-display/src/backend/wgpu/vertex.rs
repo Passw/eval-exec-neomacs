@@ -86,7 +86,8 @@ impl GlyphVertex {
                     format: wgpu::VertexFormat::Float32x2,
                 },
                 wgpu::VertexAttribute {
-                    offset: std::mem::size_of::<[f32; 4]>() as wgpu::BufferAddress,
+                    // position (2) + tex_coords (2) = 4 floats offset
+                    offset: (std::mem::size_of::<[f32; 2]>() + std::mem::size_of::<[f32; 2]>()) as wgpu::BufferAddress,
                     shader_location: 2,
                     format: wgpu::VertexFormat::Float32x4,
                 },
