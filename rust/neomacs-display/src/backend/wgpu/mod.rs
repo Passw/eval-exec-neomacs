@@ -10,6 +10,10 @@ mod backend;
 mod glyph_atlas;
 #[cfg(feature = "winit-backend")]
 mod external_buffer;
+#[cfg(feature = "winit-backend")]
+mod animation;
+#[cfg(feature = "winit-backend")]
+mod transition;
 
 #[cfg(feature = "winit-backend")]
 pub use renderer::WgpuRenderer;
@@ -24,3 +28,8 @@ pub use vertex::GlyphVertex;
 pub use external_buffer::{ExternalBuffer, SharedMemoryBuffer, BufferFormat, PlatformBuffer};
 #[cfg(all(feature = "winit-backend", target_os = "linux"))]
 pub use external_buffer::DmaBufBuffer;
+
+#[cfg(feature = "winit-backend")]
+pub use animation::{AnimationTarget, AnimatedProperty, Easing, Animation, AnimationEngine};
+#[cfg(feature = "winit-backend")]
+pub use transition::{TransitionType, BufferTransition, TransitionManager};
