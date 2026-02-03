@@ -30,6 +30,14 @@ pangocairo = "0.20"
 gstreamer = { version = "0.23", optional = true }
 gstreamer-video = { version = "0.23", optional = true }
 
+# Winit + wgpu backend
+winit = { version = "0.30", optional = true }
+wgpu = { version = "23", optional = true }
+raw-window-handle = { version = "0.6", optional = true }
+arboard = { version = "3.4", optional = true }
+bytemuck = { version = "1.18", features = ["derive"], optional = true }
+pollster = { version = "0.4", optional = true }
+
 # WPE WebKit - bindings generated via bindgen in build.rs
 # No crate dependency - we generate sys bindings directly
 
@@ -50,8 +58,9 @@ bindgen = "0.71"
 pkg-config = "0.3"
 
 [features]
-default = ["gtk4-backend", "video", "wpe-webkit"]
+default = ["winit-backend", "video", "wpe-webkit"]
 gtk4-backend = []
+winit-backend = ["winit", "wgpu", "raw-window-handle", "arboard", "bytemuck", "pollster"]
 tty-backend = []
 video = ["gstreamer", "gstreamer-video"]
 wpe-webkit = []
