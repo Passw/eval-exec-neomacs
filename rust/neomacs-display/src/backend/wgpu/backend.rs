@@ -18,6 +18,8 @@ use super::glyph_atlas::WgpuGlyphAtlas;
 
 use crate::backend::DisplayBackend;
 use crate::core::error::{DisplayError, DisplayResult};
+use crate::core::face::Face;
+use crate::core::frame_glyphs::FrameGlyphBuffer;
 use crate::core::scene::Scene;
 
 use super::window_state::WindowState;
@@ -617,8 +619,13 @@ impl WinitBackend {
 
     /// End a frame for a specific window and present it.
     ///
-    /// Renders the window's scene to its surface and presents it.
-    pub fn end_frame_for_window(&mut self, window_id: u32) {
+    /// Renders the frame glyphs to the window's surface and presents it.
+    pub fn end_frame_for_window(
+        &mut self,
+        window_id: u32,
+        frame_glyphs: &FrameGlyphBuffer,
+        faces: &HashMap<u32, Face>,
+    ) {
         let renderer = match &self.renderer {
             Some(r) => r,
             None => return,
@@ -639,7 +646,10 @@ impl WinitBackend {
 
         let view = output.texture.create_view(&wgpu::TextureViewDescriptor::default());
 
-        renderer.render_to_view(&view, &state.scene);
+        // Get mutable reference to glyph atlas
+        if let Some(ref mut glyph_atlas) = self.glyph_atlas {
+            renderer.render_frame_glyphs(&view, frame_glyphs, glyph_atlas, faces);
+        }
 
         output.present();
         state.window.request_redraw();

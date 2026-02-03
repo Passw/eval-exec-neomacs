@@ -2549,8 +2549,12 @@ pub extern "C" fn neomacs_display_end_frame_window(
 
     #[cfg(feature = "winit-backend")]
     if let Some(ref mut backend) = display.winit_backend {
-        // Render and present the window's scene
-        backend.end_frame_for_window(window_id);
+        // Render frame_glyphs to the winit window
+        backend.end_frame_for_window(
+            window_id,
+            &display.frame_glyphs,
+            &display.faces,
+        );
     }
 
     // Reset current window tracking after rendering is complete
