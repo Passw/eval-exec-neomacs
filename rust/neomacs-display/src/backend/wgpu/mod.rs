@@ -8,7 +8,7 @@ mod renderer;
 mod backend;
 #[cfg(feature = "winit-backend")]
 mod glyph_atlas;
-#[cfg(feature = "winit-backend")]
+#[cfg(any(feature = "winit-backend", feature = "wpe-webkit"))]
 mod external_buffer;
 #[cfg(feature = "winit-backend")]
 mod animation;
@@ -33,3 +33,9 @@ pub use external_buffer::DmaBufBuffer;
 pub use animation::{AnimationTarget, AnimatedProperty, Easing, Animation, AnimationEngine};
 #[cfg(feature = "winit-backend")]
 pub use transition::{TransitionType, BufferTransition, TransitionManager};
+
+#[cfg(all(feature = "wpe-webkit", target_os = "linux"))]
+mod webkit_cache;
+
+#[cfg(all(feature = "wpe-webkit", target_os = "linux"))]
+pub use webkit_cache::{WgpuWebKitCache, CachedWebKitView};
