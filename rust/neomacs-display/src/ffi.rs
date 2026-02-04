@@ -1291,15 +1291,34 @@ pub unsafe extern "C" fn neomacs_display_load_image_data(
     0
 }
 
-/// Load an image from raw bytes with optional scaling (stub)
+/// Load an image from raw bytes with optional scaling
 #[no_mangle]
 pub unsafe extern "C" fn neomacs_display_load_image_data_scaled(
-    _handle: *mut NeomacsDisplay,
-    _data: *const u8,
-    _len: usize,
-    _max_width: c_int,
-    _max_height: c_int,
-) -> u32 { 0 }
+    handle: *mut NeomacsDisplay,
+    data: *const u8,
+    len: usize,
+    max_width: c_int,
+    max_height: c_int,
+) -> u32 {
+    if handle.is_null() || data.is_null() || len == 0 {
+        return 0;
+    }
+    let display = &mut *handle;
+
+    let data_slice = std::slice::from_raw_parts(data, len);
+
+    #[cfg(feature = "winit-backend")]
+    if let Some(ref mut backend) = display.winit_backend {
+        if let Some(renderer) = backend.renderer_mut() {
+            return renderer.load_image_data(
+                data_slice,
+                max_width.max(0) as u32,
+                max_height.max(0) as u32,
+            );
+        }
+    }
+    0
+}
 
 /// Load an image from raw ARGB32 pixel data
 #[no_mangle]
