@@ -30,6 +30,8 @@ mod va_dmabuf_export;
 #[cfg(feature = "video")]
 mod video_cache;
 
+pub mod media_budget;
+
 #[cfg(feature = "video")]
 pub use video_cache::{VideoCache, CachedVideo, VideoState, DecodedFrame};
 
