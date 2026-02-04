@@ -285,20 +285,51 @@ impl RenderApp {
                     should_exit = true;
                 }
                 RenderCommand::WebKitCreate { id, width, height } => {
-                    log::debug!("WebKit create: id={}, {}x{}", id, width, height);
-                    // TODO: Create WebKit view
+                    log::info!("Creating WebKit view: id={}, {}x{}", id, width, height);
+                    #[cfg(feature = "wpe-webkit")]
+                    if let Some(ref backend) = self.wpe_backend {
+                        if let Some(platform_display) = backend.platform_display() {
+                            match WpeWebView::new(id, platform_display, width, height) {
+                                Ok(view) => {
+                                    self.webkit_views.insert(id, view);
+                                    log::info!("WebKit view {} created successfully", id);
+                                }
+                                Err(e) => log::error!("Failed to create WebKit view {}: {:?}", id, e),
+                            }
+                        } else {
+                            log::error!("WPE platform display not available");
+                        }
+                    } else {
+                        log::warn!("WPE backend not initialized, cannot create WebKit view");
+                    }
                 }
                 RenderCommand::WebKitLoadUri { id, url } => {
-                    log::debug!("WebKit load: id={}, url={}", id, url);
-                    // TODO: Load URL
+                    log::info!("Loading URL in WebKit view {}: {}", id, url);
+                    #[cfg(feature = "wpe-webkit")]
+                    if let Some(view) = self.webkit_views.get_mut(&id) {
+                        if let Err(e) = view.load_uri(&url) {
+                            log::error!("Failed to load URL in view {}: {:?}", id, e);
+                        }
+                    } else {
+                        log::warn!("WebKit view {} not found", id);
+                    }
                 }
                 RenderCommand::WebKitResize { id, width, height } => {
-                    log::debug!("WebKit resize: id={}, {}x{}", id, width, height);
-                    // TODO: Resize view
+                    log::debug!("Resizing WebKit view {}: {}x{}", id, width, height);
+                    #[cfg(feature = "wpe-webkit")]
+                    if let Some(view) = self.webkit_views.get_mut(&id) {
+                        view.resize(width, height);
+                    }
                 }
                 RenderCommand::WebKitDestroy { id } => {
-                    log::debug!("WebKit destroy: id={}", id);
-                    // TODO: Destroy view
+                    log::info!("Destroying WebKit view {}", id);
+                    #[cfg(feature = "wpe-webkit")]
+                    {
+                        self.webkit_views.remove(&id);
+                        if let Some(ref mut cache) = self.webkit_texture_cache {
+                            cache.remove(id);
+                        }
+                    }
                 }
                 RenderCommand::VideoCreate { id, path } => {
                     log::debug!("Video create: id={}, path={}", id, path);
