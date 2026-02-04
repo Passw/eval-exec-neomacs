@@ -254,6 +254,15 @@ impl RenderApp {
             // Initialize WebKit texture cache
             self.webkit_texture_cache = Some(WgpuWebKitCache::new(&device));
         }
+
+        // Initialize video cache
+        #[cfg(feature = "video")]
+        {
+            let mut video_cache = VideoCache::new();
+            video_cache.init_gpu(&device);
+            self.video_cache = Some(video_cache);
+            log::info!("Video cache initialized");
+        }
     }
 
     /// Handle surface resize
