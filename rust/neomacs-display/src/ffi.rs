@@ -20,7 +20,9 @@ use crate::backend::wgpu::{
     NeomacsInputEvent, WinitBackend,
     NEOMACS_EVENT_KEY_PRESS, NEOMACS_EVENT_KEY_RELEASE,
     NEOMACS_EVENT_BUTTON_PRESS, NEOMACS_EVENT_BUTTON_RELEASE,
-    NEOMACS_EVENT_SCROLL, NEOMACS_EVENT_RESIZE, NEOMACS_EVENT_CLOSE,
+    NEOMACS_EVENT_MOUSE_MOVE, NEOMACS_EVENT_SCROLL,
+    NEOMACS_EVENT_RESIZE, NEOMACS_EVENT_CLOSE,
+    NEOMACS_EVENT_FOCUS_IN, NEOMACS_EVENT_FOCUS_OUT,
 };
 
 /// Event callback function type for C FFI
@@ -3395,4 +3397,253 @@ pub unsafe extern "C" fn neomacs_display_has_transition_snapshot(
     _handle: *mut NeomacsDisplay,
 ) -> c_int {
     0
+}
+
+// ============================================================================
+// Threaded Mode FFI
+// ============================================================================
+
+#[cfg(feature = "winit-backend")]
+use crate::thread_comm::{EmacsComms, InputEvent, RenderCommand, ThreadComms};
+#[cfg(feature = "winit-backend")]
+use crate::render_thread::RenderThread;
+
+/// Global state for threaded mode
+#[cfg(feature = "winit-backend")]
+static mut THREADED_STATE: Option<ThreadedState> = None;
+
+#[cfg(feature = "winit-backend")]
+struct ThreadedState {
+    emacs_comms: EmacsComms,
+    render_thread: Option<RenderThread>,
+}
+
+/// Initialize display in threaded mode
+///
+/// Returns the wakeup pipe fd that Emacs should select() on,
+/// or -1 on error.
+#[cfg(feature = "winit-backend")]
+#[no_mangle]
+pub unsafe extern "C" fn neomacs_display_init_threaded(
+    width: u32,
+    height: u32,
+    title: *const c_char,
+) -> c_int {
+    let _ = env_logger::try_init();
+    log::info!("neomacs_display_init_threaded: {}x{}", width, height);
+
+    let title = if title.is_null() {
+        "Emacs".to_string()
+    } else {
+        CStr::from_ptr(title).to_string_lossy().into_owned()
+    };
+
+    // Create communication channels
+    let comms = match ThreadComms::new() {
+        Ok(c) => c,
+        Err(e) => {
+            log::error!("Failed to create thread comms: {:?}", e);
+            return -1;
+        }
+    };
+
+    let wakeup_fd = comms.wakeup.read_fd();
+    let (emacs_comms, render_comms) = comms.split();
+
+    // Spawn render thread
+    let render_thread = RenderThread::spawn(render_comms, width, height, title);
+
+    THREADED_STATE = Some(ThreadedState {
+        emacs_comms,
+        render_thread: Some(render_thread),
+    });
+
+    wakeup_fd
+}
+
+/// Drain input events from render thread
+///
+/// Returns number of events written to buffer.
+#[cfg(feature = "winit-backend")]
+#[no_mangle]
+pub unsafe extern "C" fn neomacs_display_drain_input(
+    events: *mut NeomacsInputEvent,
+    max_events: c_int,
+) -> c_int {
+    let state = match THREADED_STATE.as_ref() {
+        Some(s) => s,
+        None => return 0,
+    };
+
+    // Clear wakeup pipe
+    state.emacs_comms.wakeup_clear.clear();
+
+    let mut count = 0;
+    while count < max_events {
+        match state.emacs_comms.input_rx.try_recv() {
+            Ok(event) => {
+                let out = &mut *events.add(count as usize);
+                *out = NeomacsInputEvent::default();
+
+                match event {
+                    InputEvent::Key {
+                        keysym,
+                        modifiers,
+                        pressed,
+                    } => {
+                        out.kind = if pressed {
+                            NEOMACS_EVENT_KEY_PRESS
+                        } else {
+                            NEOMACS_EVENT_KEY_RELEASE
+                        };
+                        out.keysym = keysym;
+                        out.modifiers = modifiers;
+                    }
+                    InputEvent::MouseButton {
+                        button,
+                        x,
+                        y,
+                        pressed,
+                        modifiers,
+                    } => {
+                        out.kind = if pressed {
+                            NEOMACS_EVENT_BUTTON_PRESS
+                        } else {
+                            NEOMACS_EVENT_BUTTON_RELEASE
+                        };
+                        out.x = x as i32;
+                        out.y = y as i32;
+                        out.button = button;
+                        out.modifiers = modifiers;
+                    }
+                    InputEvent::MouseMove { x, y, modifiers } => {
+                        out.kind = NEOMACS_EVENT_MOUSE_MOVE;
+                        out.x = x as i32;
+                        out.y = y as i32;
+                        out.modifiers = modifiers;
+                    }
+                    InputEvent::MouseScroll {
+                        delta_x,
+                        delta_y,
+                        x,
+                        y,
+                        modifiers,
+                    } => {
+                        out.kind = NEOMACS_EVENT_SCROLL;
+                        out.x = x as i32;
+                        out.y = y as i32;
+                        out.scroll_delta_x = delta_x;
+                        out.scroll_delta_y = delta_y;
+                        out.modifiers = modifiers;
+                    }
+                    InputEvent::WindowResize { width, height } => {
+                        out.kind = NEOMACS_EVENT_RESIZE;
+                        out.width = width;
+                        out.height = height;
+                    }
+                    InputEvent::WindowClose => {
+                        out.kind = NEOMACS_EVENT_CLOSE;
+                    }
+                    InputEvent::WindowFocus { focused } => {
+                        out.kind = if focused {
+                            NEOMACS_EVENT_FOCUS_IN
+                        } else {
+                            NEOMACS_EVENT_FOCUS_OUT
+                        };
+                    }
+                }
+                count += 1;
+            }
+            Err(_) => break,
+        }
+    }
+
+    count
+}
+
+/// Send frame glyphs to render thread
+#[cfg(feature = "winit-backend")]
+#[no_mangle]
+pub unsafe extern "C" fn neomacs_display_send_frame(handle: *mut NeomacsDisplay) {
+    if handle.is_null() {
+        return;
+    }
+
+    let display = &*handle;
+
+    let state = match THREADED_STATE.as_ref() {
+        Some(s) => s,
+        None => return,
+    };
+
+    // Clone frame glyphs and send to render thread
+    let frame = display.frame_glyphs.clone();
+    let _ = state.emacs_comms.frame_tx.try_send(frame);
+}
+
+/// Send command to render thread
+#[cfg(feature = "winit-backend")]
+#[no_mangle]
+pub unsafe extern "C" fn neomacs_display_send_command(
+    cmd_type: c_int,
+    id: u32,
+    param1: u32,
+    param2: u32,
+    str_param: *const c_char,
+) {
+    let state = match THREADED_STATE.as_ref() {
+        Some(s) => s,
+        None => return,
+    };
+
+    let cmd = match cmd_type {
+        0 => RenderCommand::Shutdown,
+        1 => RenderCommand::WebKitCreate {
+            id,
+            width: param1,
+            height: param2,
+        },
+        2 => {
+            let url = if str_param.is_null() {
+                String::new()
+            } else {
+                CStr::from_ptr(str_param).to_string_lossy().into_owned()
+            };
+            RenderCommand::WebKitLoadUri { id, url }
+        }
+        3 => RenderCommand::WebKitResize {
+            id,
+            width: param1,
+            height: param2,
+        },
+        4 => RenderCommand::WebKitDestroy { id },
+        _ => return,
+    };
+
+    let _ = state.emacs_comms.cmd_tx.try_send(cmd);
+}
+
+/// Shutdown threaded display
+#[cfg(feature = "winit-backend")]
+#[no_mangle]
+pub unsafe extern "C" fn neomacs_display_shutdown_threaded() {
+    if let Some(mut state) = THREADED_STATE.take() {
+        // Send shutdown command
+        let _ = state.emacs_comms.cmd_tx.try_send(RenderCommand::Shutdown);
+
+        // Wait for render thread
+        if let Some(rt) = state.render_thread.take() {
+            rt.join();
+        }
+    }
+}
+
+/// Get wakeup fd for threaded mode (for Emacs to select() on)
+#[cfg(feature = "winit-backend")]
+#[no_mangle]
+pub unsafe extern "C" fn neomacs_display_get_threaded_wakeup_fd() -> c_int {
+    match THREADED_STATE.as_ref() {
+        Some(state) => state.emacs_comms.wakeup_read_fd,
+        None => -1,
+    }
 }

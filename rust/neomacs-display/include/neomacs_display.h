@@ -902,4 +902,43 @@ int neomacs_display_trigger_buffer_transition(struct NeomacsDisplay *handle);
  */
 int neomacs_display_has_transition_snapshot(struct NeomacsDisplay *handle);
 
+/**
+ * Initialize display in threaded mode
+ *
+ * Returns the wakeup pipe fd that Emacs should select() on,
+ * or -1 on error.
+ */
+int neomacs_display_init_threaded(uint32_t width, uint32_t height, const char *title);
+
+/**
+ * Drain input events from render thread
+ *
+ * Returns number of events written to buffer.
+ */
+int neomacs_display_drain_input(struct NeomacsInputEvent *events, int maxEvents);
+
+/**
+ * Send frame glyphs to render thread
+ */
+void neomacs_display_send_frame(struct NeomacsDisplay *handle);
+
+/**
+ * Send command to render thread
+ */
+void neomacs_display_send_command(int cmdType,
+                                  uint32_t id,
+                                  uint32_t param1,
+                                  uint32_t param2,
+                                  const char *strParam);
+
+/**
+ * Shutdown threaded display
+ */
+void neomacs_display_shutdown_threaded(void);
+
+/**
+ * Get wakeup fd for threaded mode (for Emacs to select() on)
+ */
+int neomacs_display_get_threaded_wakeup_fd(void);
+
 #endif  /* NEOMACS_DISPLAY_H */
