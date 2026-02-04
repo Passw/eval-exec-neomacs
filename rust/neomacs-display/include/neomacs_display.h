@@ -359,7 +359,7 @@ uint32_t neomacs_display_load_image_data(struct NeomacsDisplay *handle,
                                          uintptr_t len);
 
 /**
- * Load an image from raw bytes with optional scaling (stub)
+ * Load an image from raw bytes with optional scaling
  */
 uint32_t neomacs_display_load_image_data_scaled(struct NeomacsDisplay *handle,
                                                 const uint8_t *data,
