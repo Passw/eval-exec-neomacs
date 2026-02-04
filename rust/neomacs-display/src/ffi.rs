@@ -1046,6 +1046,14 @@ pub unsafe extern "C" fn neomacs_display_video_play(
     handle: *mut NeomacsDisplay,
     video_id: u32,
 ) -> c_int {
+    // Threaded path
+    #[cfg(all(feature = "winit-backend", feature = "video"))]
+    if let Some(ref state) = THREADED_STATE {
+        let cmd = RenderCommand::VideoPlay { id: video_id };
+        let _ = state.emacs_comms.cmd_tx.try_send(cmd);
+        return 0;
+    }
+
     let display = match handle.as_mut() {
         Some(d) => d,
         None => return -1,
@@ -1068,6 +1076,14 @@ pub unsafe extern "C" fn neomacs_display_video_pause(
     handle: *mut NeomacsDisplay,
     video_id: u32,
 ) -> c_int {
+    // Threaded path
+    #[cfg(all(feature = "winit-backend", feature = "video"))]
+    if let Some(ref state) = THREADED_STATE {
+        let cmd = RenderCommand::VideoPause { id: video_id };
+        let _ = state.emacs_comms.cmd_tx.try_send(cmd);
+        return 0;
+    }
+
     let display = match handle.as_mut() {
         Some(d) => d,
         None => return -1,
@@ -1090,6 +1106,14 @@ pub unsafe extern "C" fn neomacs_display_video_stop(
     handle: *mut NeomacsDisplay,
     video_id: u32,
 ) -> c_int {
+    // Threaded path: stop maps to destroy
+    #[cfg(all(feature = "winit-backend", feature = "video"))]
+    if let Some(ref state) = THREADED_STATE {
+        let cmd = RenderCommand::VideoDestroy { id: video_id };
+        let _ = state.emacs_comms.cmd_tx.try_send(cmd);
+        return 0;
+    }
+
     let display = match handle.as_mut() {
         Some(d) => d,
         None => return -1,
