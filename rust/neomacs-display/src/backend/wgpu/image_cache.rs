@@ -14,6 +14,9 @@ use std::sync::atomic::{AtomicU32, Ordering};
 use std::sync::{mpsc, Arc, Mutex};
 use std::thread;
 
+#[cfg(target_os = "linux")]
+use super::external_buffer::DmaBufBuffer;
+
 /// Maximum texture dimension (width or height)
 const MAX_TEXTURE_SIZE: u32 = 4096;
 
@@ -544,6 +547,57 @@ impl ImageCache {
             max_width,
             max_height,
         });
+
+        id
+    }
+
+    /// Import image from DMA-BUF (zero-copy if supported)
+    #[cfg(target_os = "linux")]
+    pub fn import_dmabuf(
+        &mut self,
+        dmabuf: DmaBufBuffer,
+        device: &wgpu::Device,
+        queue: &wgpu::Queue,
+    ) -> u32 {
+        let id = self.next_id.fetch_add(1, Ordering::SeqCst);
+        let (width, height) = dmabuf.dimensions();
+
+        // Try zero-copy import
+        if let Some(texture) = dmabuf.to_wgpu_texture(device, queue) {
+            let view = texture.create_view(&wgpu::TextureViewDescriptor::default());
+            let bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
+                label: Some("DMA-BUF Image Bind Group"),
+                layout: &self.bind_group_layout,
+                entries: &[
+                    wgpu::BindGroupEntry {
+                        binding: 0,
+                        resource: wgpu::BindingResource::TextureView(&view),
+                    },
+                    wgpu::BindGroupEntry {
+                        binding: 1,
+                        resource: wgpu::BindingResource::Sampler(&self.sampler),
+                    },
+                ],
+            });
+
+            let memory_size = (width * height * 4) as usize;
+            self.total_memory += memory_size;
+
+            self.textures.insert(id, CachedImage {
+                texture,
+                view,
+                bind_group,
+                width,
+                height,
+                memory_size,
+            });
+            self.states.insert(id, ImageState::Ready);
+
+            log::info!("Imported DMA-BUF image {} ({}x{}) zero-copy", id, width, height);
+        } else {
+            self.states.insert(id, ImageState::Failed("DMA-BUF import failed".into()));
+            log::warn!("DMA-BUF import failed for image {}", id);
+        }
 
         id
     }
