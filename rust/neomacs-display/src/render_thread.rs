@@ -23,6 +23,12 @@ use crate::thread_comm::{InputEvent, RenderCommand, RenderComms};
 #[cfg(all(feature = "wpe-webkit", wpe_platform_available))]
 use crate::backend::wpe::sys::platform as plat;
 
+#[cfg(feature = "wpe-webkit")]
+use crate::backend::wpe::{WpeBackend, WpeWebView};
+
+#[cfg(all(feature = "wpe-webkit", target_os = "linux"))]
+use crate::backend::wgpu::WgpuWebKitCache;
+
 /// Render thread state
 pub struct RenderThread {
     handle: Option<JoinHandle<()>>,
@@ -73,6 +79,16 @@ struct RenderApp {
 
     // Last known cursor position
     mouse_pos: (f32, f32),
+
+    // WebKit state
+    #[cfg(feature = "wpe-webkit")]
+    wpe_backend: Option<WpeBackend>,
+
+    #[cfg(feature = "wpe-webkit")]
+    webkit_views: HashMap<u32, WpeWebView>,
+
+    #[cfg(all(feature = "wpe-webkit", target_os = "linux"))]
+    webkit_texture_cache: Option<WgpuWebKitCache>,
 }
 
 impl RenderApp {
@@ -93,6 +109,12 @@ impl RenderApp {
             faces: HashMap::new(),
             modifiers: 0,
             mouse_pos: (0.0, 0.0),
+            #[cfg(feature = "wpe-webkit")]
+            wpe_backend: None,
+            #[cfg(feature = "wpe-webkit")]
+            webkit_views: HashMap::new(),
+            #[cfg(all(feature = "wpe-webkit", target_os = "linux"))]
+            webkit_texture_cache: None,
         }
     }
 
