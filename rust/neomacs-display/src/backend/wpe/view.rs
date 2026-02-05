@@ -225,9 +225,7 @@ impl WpeWebView {
     /// * `width` - Initial width
     /// * `height` - Initial height
     pub fn new(view_id: u32, platform_display: &WpePlatformDisplay, width: u32, height: u32) -> DisplayResult<Self> {
-        use std::io::Write;
-        eprintln!("WpeWebView::new (Platform API) called with id={}, {}x{}", view_id, width, height);
-        let _ = std::io::stderr().flush();
+        log::info!("WpeWebView::new (Platform API) called with id={}, {}x{}", view_id, width, height);
 
         let display = platform_display.raw();
         if display.is_null() {
@@ -235,22 +233,22 @@ impl WpeWebView {
         }
 
         // Create DMA-BUF exporter with the EGL display
-        eprintln!("WpeWebView::new: creating DmaBufExporter...");
+        log::debug!("WpeWebView::new: creating DmaBufExporter...");
         let dmabuf_exporter = DmaBufExporter::new(platform_display.egl_display());
-        eprintln!("WpeWebView::new: DmaBufExporter created");
+        log::debug!("WpeWebView::new: DmaBufExporter created");
 
         unsafe {
             // Create WebKitNetworkSession (required for WPE Platform)
             let network_session = wk::webkit_network_session_get_default();
-            eprintln!("WpeWebView::new: network_session={:?}", network_session);
+            log::debug!("WpeWebView::new: network_session={:?}", network_session);
 
             // Create WebKitWebContext
             let web_context = wk::webkit_web_context_new();
-            eprintln!("WpeWebView::new: web_context={:?}", web_context);
+            log::debug!("WpeWebView::new: web_context={:?}", web_context);
 
             // Create WebKitWebView with display property using g_object_new
             // This is the key difference - we pass the WPE Platform display
-            eprintln!("WpeWebView::new: creating WebKitWebView with WPE Platform display...");
+            log::debug!("WpeWebView::new: creating WebKitWebView with WPE Platform display...");
 
             let type_name = CString::new("WebKitWebView").unwrap();
             let display_prop = CString::new("display").unwrap();
@@ -258,7 +256,7 @@ impl WpeWebView {
             // Use webkit_web_view_new with the display set via web context
             // For WPE Platform, the display should be set as primary and WebKit will use it
             let web_view = wk::webkit_web_view_new(ptr::null_mut());
-            eprintln!("WpeWebView::new: web_view={:?}", web_view);
+            log::debug!("WpeWebView::new: web_view={:?}", web_view);
 
             if web_view.is_null() {
                 return Err(DisplayError::WebKit("Failed to create WebKitWebView".into()));
@@ -266,7 +264,7 @@ impl WpeWebView {
 
             // Get the WPEView from WebKitWebView
             let wpe_view = wk::webkit_web_view_get_wpe_view(web_view);
-            eprintln!("WpeWebView::new: wpe_view={:?}", wpe_view);
+            log::debug!("WpeWebView::new: wpe_view={:?}", wpe_view);
 
             if wpe_view.is_null() {
                 // Clean up
@@ -293,7 +291,7 @@ impl WpeWebView {
                 display,
                 egl_display,
             }));
-            eprintln!("WpeWebView::new: callback_data={:?}", callback_data);
+            log::debug!("WpeWebView::new: callback_data={:?}", callback_data);
 
             // Connect buffer-rendered signal on WPEView
             let signal_name = CString::new("buffer-rendered").unwrap();
@@ -308,7 +306,7 @@ impl WpeWebView {
                 None,
                 0, // G_CONNECT_DEFAULT
             );
-            eprintln!("WpeWebView::new: connected buffer-rendered signal, handler_id={}", handler_id);
+            log::debug!("WpeWebView::new: connected buffer-rendered signal, handler_id={}", handler_id);
 
             // Also add frame-displayed callback on WebKitWebView as a backup notification mechanism
             let frame_callback_id = wk::webkit_web_view_add_frame_displayed_callback(
@@ -317,7 +315,7 @@ impl WpeWebView {
                 callback_data as *mut _,
                 None,
             );
-            eprintln!("WpeWebView::new: added frame-displayed callback, id={}", frame_callback_id);
+            log::debug!("WpeWebView::new: added frame-displayed callback, id={}", frame_callback_id);
 
             // Connect buffer-released signal to debug buffer lifecycle
             let buffer_released_signal = CString::new("buffer-released").unwrap();
@@ -332,7 +330,7 @@ impl WpeWebView {
                 None,
                 0,
             );
-            eprintln!("WpeWebView::new: connected buffer-released signal, handler_id={}", buffer_released_handler_id);
+            log::debug!("WpeWebView::new: connected buffer-released signal, handler_id={}", buffer_released_handler_id);
 
             // Connect decide-policy signal for new window handling
             let decide_policy_signal = CString::new("decide-policy").unwrap();
@@ -347,7 +345,7 @@ impl WpeWebView {
                 None,
                 0, // G_CONNECT_DEFAULT
             );
-            eprintln!("WpeWebView::new: connected decide-policy signal, handler_id={}", decide_policy_handler_id);
+            log::debug!("WpeWebView::new: connected decide-policy signal, handler_id={}", decide_policy_handler_id);
 
             // Connect load-changed signal for page load events
             let load_changed_signal = CString::new("load-changed").unwrap();
@@ -362,34 +360,33 @@ impl WpeWebView {
                 None,
                 0, // G_CONNECT_DEFAULT
             );
-            eprintln!("WpeWebView::new: connected load-changed signal, handler_id={}", load_changed_handler_id);
+            log::debug!("WpeWebView::new: connected load-changed signal, handler_id={}", load_changed_handler_id);
 
             // Create a headless toplevel and attach it to the view
             // This is required for WPEViewHeadless to start rendering and emit buffer-rendered signals
             // IMPORTANT: We must get the display from the view itself to match what WebKit is using
             let view_display = plat::wpe_view_get_display(wpe_view as *mut plat::WPEView);
             if view_display.is_null() {
-                eprintln!("WpeWebView::new: WARNING - view has no display");
+                log::warn!("WpeWebView::new: view has no display");
             } else {
-                eprintln!("WpeWebView::new: view display = {:?}", view_display);
+                log::debug!("WpeWebView::new: view display = {:?}", view_display);
                 let toplevel = plat::wpe_toplevel_headless_new(view_display as *mut _);
                 if !toplevel.is_null() {
-                    eprintln!("WpeWebView::new: created headless toplevel {:?}", toplevel);
+                    log::debug!("WpeWebView::new: created headless toplevel {:?}", toplevel);
                     plat::wpe_view_set_toplevel(wpe_view as *mut plat::WPEView, toplevel);
-                    eprintln!("WpeWebView::new: set toplevel on view");
+                    log::debug!("WpeWebView::new: set toplevel on view");
                     // Resize the toplevel to the view size
                     plat::wpe_toplevel_resize(toplevel, width as i32, height as i32);
                 } else {
-                    eprintln!("WpeWebView::new: WARNING - failed to create headless toplevel");
+                    log::warn!("WpeWebView::new: failed to create headless toplevel");
                 }
             }
 
             // Map and make the view visible so it starts rendering
             plat::wpe_view_set_visible(wpe_view as *mut plat::WPEView, 1);
             plat::wpe_view_map(wpe_view as *mut plat::WPEView);
-            eprintln!("WpeWebView::new: view mapped and set visible");
+            log::debug!("WpeWebView::new: view mapped and set visible");
 
-            eprintln!("WpeWebView: WPE Platform WebKitWebView created successfully ({}x{})", width, height);
             log::info!("WPE Platform WebKitWebView created successfully ({}x{})", width, height);
 
             Ok(Self {
@@ -420,12 +417,10 @@ impl WpeWebView {
 
         let c_uri = CString::new(uri).map_err(|_| DisplayError::WebKit("Invalid URI".into()))?;
 
-        eprintln!("WpeWebView::load_uri: about to call webkit_web_view_load_uri({:?}, {:?})", self.web_view, uri);
+        log::debug!("WpeWebView::load_uri: calling webkit_web_view_load_uri({:?}, {:?})", self.web_view, uri);
         unsafe {
             wk::webkit_web_view_load_uri(self.web_view, c_uri.as_ptr());
         }
-        eprintln!("WpeWebView::load_uri: webkit_web_view_load_uri returned");
-
         log::info!("WPE: Loading URI: {}", uri);
         Ok(())
     }

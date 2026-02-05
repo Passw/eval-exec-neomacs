@@ -853,6 +853,30 @@ impl WgpuRenderer {
         self.video_cache.get(id)
     }
 
+    /// Update a webkit view in the cache from a DMA-BUF buffer.
+    /// Returns true if successful.
+    #[cfg(feature = "wpe-webkit")]
+    pub fn update_webkit_view_dmabuf(
+        &mut self,
+        view_id: u32,
+        buffer: super::external_buffer::DmaBufBuffer,
+    ) -> bool {
+        self.webkit_cache.update_view(view_id, buffer, &self.device, &self.queue)
+    }
+
+    /// Update a webkit view in the cache from pixel data.
+    /// Returns true if successful.
+    #[cfg(feature = "wpe-webkit")]
+    pub fn update_webkit_view_pixels(
+        &mut self,
+        view_id: u32,
+        width: u32,
+        height: u32,
+        pixels: &[u8],
+    ) -> bool {
+        self.webkit_cache.update_view_from_pixels(view_id, width, height, pixels, &self.device, &self.queue)
+    }
+
     /// Process pending webkit frames from WPE views.
     /// This imports DMA-BUF frames into the wgpu texture cache.
     /// Also pumps GLib main context to process WebKit events.

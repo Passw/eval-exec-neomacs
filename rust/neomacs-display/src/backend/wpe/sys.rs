@@ -86,6 +86,13 @@ pub mod platform {
         pub fn g_main_context_default() -> *mut GMainContext;
         pub fn g_main_context_get_thread_default() -> *mut GMainContext;
         pub fn g_main_context_iteration(context: *mut GMainContext, may_block: i32) -> i32;
+        pub fn g_main_context_new() -> *mut GMainContext;
+        pub fn g_main_context_ref(context: *mut GMainContext) -> *mut GMainContext;
+        pub fn g_main_context_unref(context: *mut GMainContext);
+        pub fn g_main_context_push_thread_default(context: *mut GMainContext);
+        pub fn g_main_context_pop_thread_default(context: *mut GMainContext);
+        pub fn g_main_context_acquire(context: *mut GMainContext) -> i32;
+        pub fn g_main_context_release(context: *mut GMainContext);
     }
 }
 

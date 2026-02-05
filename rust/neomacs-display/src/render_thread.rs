@@ -495,16 +495,9 @@ impl RenderApp {
     fn process_webkit_frames(&mut self) {
         use crate::backend::wgpu::external_buffer::DmaBufBuffer;
 
-        let device = match &self.device {
-            Some(d) => d,
-            None => return,
-        };
-        let queue = match &self.queue {
-            Some(q) => q,
-            None => return,
-        };
-        let cache = match &mut self.webkit_texture_cache {
-            Some(c) => c,
+        // Get mutable reference to renderer - we need to update its internal webkit cache
+        let renderer = match &mut self.renderer {
+            Some(r) => r,
             None => return,
         };
 
@@ -533,15 +526,22 @@ impl RenderApp {
                     dmabuf.modifier,
                 );
 
-                if cache.update_view(*view_id, buffer, device, queue) {
+                // Update the RENDERER's webkit cache, not a separate local cache
+                if renderer.update_webkit_view_dmabuf(*view_id, buffer) {
                     log::debug!("Imported DMA-BUF for webkit view {}", view_id);
                 } else {
                     log::warn!("Failed to import DMA-BUF for webkit view {}", view_id);
+                    // DMA-BUF failed, try pixel fallback
+                    if let Some(raw_pixels) = view.take_latest_pixels() {
+                        if renderer.update_webkit_view_pixels(*view_id, raw_pixels.width, raw_pixels.height, &raw_pixels.pixels) {
+                            log::debug!("Uploaded pixels for webkit view {} (DMA-BUF fallback)", view_id);
+                        }
+                    }
                 }
             }
-            // Fallback to pixel upload
+            // Fallback to pixel upload if no DMA-BUF available
             else if let Some(raw_pixels) = view.take_latest_pixels() {
-                if cache.update_view_from_pixels(*view_id, raw_pixels.width, raw_pixels.height, &raw_pixels.pixels, device, queue) {
+                if renderer.update_webkit_view_pixels(*view_id, raw_pixels.width, raw_pixels.height, &raw_pixels.pixels) {
                     log::debug!("Uploaded pixels for webkit view {}", view_id);
                 }
             }
@@ -890,6 +890,25 @@ fn run_render_loop(
     image_dimensions: SharedImageDimensions,
 ) {
     log::info!("Render thread starting");
+
+    // CRITICAL: Set up a dedicated GMainContext for WebKit before any WebKit initialization.
+    // This ensures WebKit attaches its GLib sources (IPC sockets, etc.) to this context,
+    // not the default context. Only the render thread will dispatch events from this context,
+    // preventing the Emacs main thread's xg_select from dispatching WebKit callbacks.
+    #[cfg(all(feature = "wpe-webkit", wpe_platform_available))]
+    let webkit_main_context = unsafe {
+        let ctx = plat::g_main_context_new();
+        if !ctx.is_null() {
+            // Acquire the context so we can dispatch on it
+            plat::g_main_context_acquire(ctx);
+            // Push as thread-default - WebKit will attach sources here
+            plat::g_main_context_push_thread_default(ctx);
+            log::info!("Created dedicated GMainContext for WebKit: {:?}", ctx);
+        } else {
+            log::warn!("Failed to create dedicated GMainContext for WebKit");
+        }
+        ctx
+    };
 
     // Use any_thread() since we're running on a non-main thread
     #[cfg(target_os = "linux")]

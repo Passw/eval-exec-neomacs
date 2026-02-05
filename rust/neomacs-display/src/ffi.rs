@@ -2178,6 +2178,22 @@ pub unsafe extern "C" fn neomacs_display_webkit_init(
                     *cache.borrow_mut() = Some(WebKitViewCache::new());
                 });
 
+                // NOTE: We deliberately do NOT initialize WebKit on the Emacs main thread.
+                // Instead, WebKit should be initialized on the render thread, which will
+                // become WebKit's "main" thread. The render thread has its own GLib main
+                // context iteration loop (pump_glib) that dispatches WebKit callbacks.
+                //
+                // If we initialized WebKit here (on Emacs main thread), then:
+                // - Emacs main thread would become WebKit's "main" thread
+                // - But WebKitWebView is created on render thread
+                // - WebProcessProxy constructor asserts RunLoop::isMain() → crash
+                //
+                // By letting render thread initialize WebKit:
+                // - Render thread becomes WebKit's "main" thread
+                // - WebKitWebView created on render thread → same thread → OK
+                // - pump_glib dispatches callbacks on render thread → same thread → OK
+                log::info!("neomacs_display_webkit_init: WPE backend initialized (WebKit will be initialized on render thread)");
+
                 log::info!("neomacs_display_webkit_init: WebKit subsystem initialized successfully");
                 return 0;
             }
