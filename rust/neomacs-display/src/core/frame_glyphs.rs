@@ -372,34 +372,33 @@ impl FrameGlyphBuffer {
     }
 
     /// Remove glyphs that overlap with the given rectangle
-    /// Remove glyphs that overlap with the given rectangle
-    /// FIX: Only remove glyphs with exact Y match (within 1px), not full height range.
-    /// This prevents mode-line (y=561) from being cleared when content rows on a
-    /// shifted grid (y=554) add their chars.
-    fn remove_overlapping(&mut self, x: f32, y: f32, width: f32, height: f32) {
+    /// Only removes Char/Stretch glyphs with exact Y match (within 1px) to prevent mode-line issues.
+    /// Image/Video glyphs are NOT removed here - they are managed by add_image/add_video.
+    fn remove_overlapping(&mut self, x: f32, y: f32, width: f32, _height: f32) {
         let x_end = x + width;
-        // FIX: Use exact Y match instead of height range to avoid cross-row clearing
         self.glyphs.retain(|g| {
-            let (gx, gy, gw, _gh) = match g {
-                FrameGlyph::Char { x, y, width, height, .. } => (*x, *y, *width, *height),
-                FrameGlyph::Stretch { x, y, width, height, .. } => (*x, *y, *width, *height),
-                FrameGlyph::Image { x, y, width, height, .. } => (*x, *y, *width, *height),
-                FrameGlyph::Video { x, y, width, height, .. } => (*x, *y, *width, *height),
-                // Keep WebKit glyphs - they are persistent embedded views managed explicitly
+            let (gx, gy, gw) = match g {
+                FrameGlyph::Char { x, y, width, .. } => (*x, *y, *width),
+                FrameGlyph::Stretch { x, y, width, .. } => (*x, *y, *width),
+                // Keep Image/Video glyphs - they are managed by add_image/add_video
+                FrameGlyph::Image { .. } => return true,
+                FrameGlyph::Video { .. } => return true,
+                // Keep WebKit glyphs - persistent embedded views
                 FrameGlyph::WebKit { .. } => return true,
-                // Don't remove backgrounds, cursors, borders - they're managed separately
+                // Keep backgrounds, cursors, borders - managed separately
                 _ => return true,
             };
             let gx_end = gx + gw;
             // Keep if no X overlap OR Y doesn't match (within 1px tolerance)
-            // This ensures we only remove glyphs on the SAME row, not different rows
-            // that happen to overlap in Y due to video height shifting row positions
+            // This prevents mode-line (y=561) from being cleared when content rows
+            // on a shifted grid (y=554) add their chars.
             gx_end <= x || gx >= x_end || (gy - y).abs() > 1.0
         });
     }
 
     /// Clear all glyphs in a rectangular area
     /// Called by gui_clear_end_of_line and related functions
+    /// Note: Image and Video glyphs are NOT removed here - they are managed by add_image/add_video
     pub fn clear_area(&mut self, x: f32, y: f32, width: f32, height: f32) {
         let x_end = x + width;
         let y_end = y + height;
@@ -408,8 +407,11 @@ impl FrameGlyphBuffer {
             let (gx, gy, gw, gh) = match g {
                 FrameGlyph::Char { x, y, width, height, .. } => (*x, *y, *width, *height),
                 FrameGlyph::Stretch { x, y, width, height, .. } => (*x, *y, *width, *height),
-                FrameGlyph::Image { x, y, width, height, .. } => (*x, *y, *width, *height),
-                FrameGlyph::Video { x, y, width, height, .. } => (*x, *y, *width, *height),
+                // Keep Image and Video glyphs - they are managed by add_image/add_video
+                // which handles removing same-ID images and overlapping images.
+                // Line-by-line clear_area calls during text redraw should NOT remove images.
+                FrameGlyph::Image { .. } => return true,
+                FrameGlyph::Video { .. } => return true,
                 // WebKit glyphs: remove if the clear area covers the webkit's top edge
                 // This handles scrolling (where webkit moves up and out of view)
                 // while protecting against mode-line clears (which are at the bottom)
@@ -465,8 +467,8 @@ impl FrameGlyphBuffer {
     }
 
     /// Add an image glyph
-    /// Add an image glyph
-    /// Removes any existing image glyph with the same ID first to handle scrolling
+    /// Removes any existing image glyph with the same ID first, then removes
+    /// any other images that overlap with this image's position.
     pub fn add_image(&mut self, image_id: u32, x: f32, y: f32, width: f32, height: f32) {
         // Remove any existing image glyph with the same ID (handles scrolling)
         // This prevents duplicate images when the same image is redrawn at a different position
@@ -477,6 +479,24 @@ impl FrameGlyphBuffer {
                 true
             }
         });
+
+        // Remove any OTHER image that overlaps with this image's position
+        // This handles the case where different images end up at the same screen position
+        // (e.g., after scrolling, Image 4 is at y=51 and Image 1 should replace it)
+        let x_end = x + width;
+        let y_end = y + height;
+        self.glyphs.retain(|g| {
+            if let FrameGlyph::Image { x: gx, y: gy, width: gw, height: gh, .. } = g {
+                let gx_end = *gx + *gw;
+                let gy_end = *gy + *gh;
+                // Keep if no overlap
+                gx_end <= x || *gx >= x_end || gy_end <= y || *gy >= y_end
+            } else {
+                true
+            }
+        });
+
+        // Remove overlapping char/stretch glyphs (but NOT other images - already handled above)
         self.remove_overlapping(x, y, width, height);
         self.glyphs.push(FrameGlyph::Image { image_id, x, y, width, height });
     }
