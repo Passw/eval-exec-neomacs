@@ -537,17 +537,16 @@ if (0) fprintf (stderr, "DEBUG add_window: x=%d y=%d w=%d h=%d bg=%08lx\n",
                                   (uint32_t) bg,
                                   selected);
 
-      /* For GPU widget mode, clear the window's text area to remove stale glyphs.
-         This handles scrolling since scroll_run_hook may not always be called.
-         We clear the text area (excluding mode line) so that when Emacs redraws,
-         old glyphs at different positions are removed. */
-      if (output && output->use_gpu_widget)
-        {
-          int text_x, text_y, text_width, text_height;
-          window_box (w, ANY_AREA, &text_x, &text_y, &text_width, &text_height);
-          neomacs_display_clear_area (dpyinfo->display_handle,
-                                      text_x, text_y, text_width, text_height);
-        }
+      /* Note: We do NOT clear media glyphs here because:
+         1. Multiple windows update per frame (text, mode-line, minibuffer)
+         2. Clearing in each window_begin would clear media from OTHER windows
+         3. add_media_glyph handles overlap detection - removes same-ID images
+            and images at overlapping positions
+         4. For scroll operations, images are repositioned and overlaps handled
+
+         The key insight is that Emacs sends add_image for each visible image
+         with updated positions. The overlap detection in add_media_glyph
+         removes stale images when new ones are added at the same position. */
     }
 }
 

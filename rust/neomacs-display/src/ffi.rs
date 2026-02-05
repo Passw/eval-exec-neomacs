@@ -1696,6 +1696,33 @@ pub unsafe extern "C" fn neomacs_display_clear_area(
     }
 }
 
+/// Clear only media glyphs (Image, Video, WebKit) in a rectangular area.
+/// Called at the start of update_window_begin to clear stale media glyphs
+/// before Emacs sends new positions.
+#[no_mangle]
+pub unsafe extern "C" fn neomacs_display_clear_media_in_area(
+    handle: *mut NeomacsDisplay,
+    x: c_int,
+    y: c_int,
+    width: c_int,
+    height: c_int,
+) {
+    if handle.is_null() {
+        return;
+    }
+
+    let display = &mut *handle;
+
+    if display.use_hybrid {
+        display.frame_glyphs.clear_media_in_area(
+            x as f32,
+            y as f32,
+            width as f32,
+            height as f32,
+        );
+    }
+}
+
 /// Clear all glyphs - used when frame layout changes
 #[no_mangle]
 pub unsafe extern "C" fn neomacs_display_clear_all_glyphs(handle: *mut NeomacsDisplay) {

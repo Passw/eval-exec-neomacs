@@ -484,6 +484,17 @@ void neomacs_display_clear_floating_image(struct NeomacsDisplay *handle, uint32_
 void neomacs_display_clear_area(struct NeomacsDisplay *handle, int x, int y, int width, int height);
 
 /**
+ * Clear only media glyphs (Image, Video, WebKit) in a rectangular area.
+ * Called at the start of update_window_begin to clear stale media glyphs
+ * before Emacs sends new positions.
+ */
+void neomacs_display_clear_media_in_area(struct NeomacsDisplay *handle,
+                                         int x,
+                                         int y,
+                                         int width,
+                                         int height);
+
+/**
  * Clear all glyphs - used when frame layout changes
  */
 void neomacs_display_clear_all_glyphs(struct NeomacsDisplay *handle);

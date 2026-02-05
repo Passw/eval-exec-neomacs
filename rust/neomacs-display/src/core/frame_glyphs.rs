@@ -396,6 +396,37 @@ impl FrameGlyphBuffer {
         });
     }
 
+    /// Clear only media glyphs (Image, Video, WebKit) in a rectangular area.
+    /// Called at the start of update_window_begin to clear stale media glyphs
+    /// before Emacs sends new positions. This is necessary because:
+    /// 1. clear_area doesn't remove media glyphs (to prevent removal during text redraw)
+    /// 2. But when scrolling, media glyphs at old positions need to be cleared
+    /// 3. Emacs only sends media glyphs that ARE visible, not those that WERE visible
+    pub fn clear_media_in_area(&mut self, x: f32, y: f32, width: f32, height: f32) {
+        let x_end = x + width;
+        let y_end = y + height;
+
+        log::info!("clear_media_in_area: ({},{}) {}x{}", x, y, width, height);
+
+        self.glyphs.retain(|g| {
+            let (gx, gy, gw, gh) = match g {
+                FrameGlyph::Image { x, y, width, height, .. } => (*x, *y, *width, *height),
+                FrameGlyph::Video { x, y, width, height, .. } => (*x, *y, *width, *height),
+                FrameGlyph::WebKit { x, y, width, height, .. } => (*x, *y, *width, *height),
+                // Keep all non-media glyphs
+                _ => return true,
+            };
+            let gx_end = gx + gw;
+            let gy_end = gy + gh;
+            // Keep if glyph does NOT overlap with the clear area
+            let keep = gx_end <= x || gx >= x_end || gy_end <= y || gy >= y_end;
+            if !keep {
+                log::info!("  -> clearing media glyph at ({},{}) {}x{}", gx, gy, gw, gh);
+            }
+            keep
+        });
+    }
+
     /// Clear all glyphs in a rectangular area
     /// Called by gui_clear_end_of_line and related functions
     /// Note: Image and Video glyphs are NOT removed here - they are managed by add_image/add_video
@@ -483,6 +514,17 @@ impl FrameGlyphBuffer {
         get_same_type_bounds: impl Fn(&FrameGlyph) -> Option<(f32, f32, f32, f32)>,
         glyph: FrameGlyph,
     ) {
+        // Debug: log existing media glyphs
+        let existing: Vec<_> = self.glyphs.iter().filter_map(|g| get_same_type_bounds(g)).collect();
+        let glyph_info = match &glyph {
+            FrameGlyph::Image { image_id, .. } => format!("Image(id={})", image_id),
+            FrameGlyph::Video { video_id, .. } => format!("Video(id={})", video_id),
+            FrameGlyph::WebKit { webkit_id, .. } => format!("WebKit(id={})", webkit_id),
+            _ => "Unknown".to_string(),
+        };
+        log::info!("add_media_glyph: {} at ({},{}) {}x{}, existing={:?}",
+            glyph_info, x, y, width, height, existing);
+
         // Remove any existing glyph with the same ID (handles repositioning)
         self.glyphs.retain(|g| !is_same_id(g));
 
@@ -491,16 +533,25 @@ impl FrameGlyphBuffer {
         // screen position (e.g., after scrolling)
         let x_end = x + width;
         let y_end = y + height;
+        let before_count = self.glyphs.iter().filter(|g| get_same_type_bounds(g).is_some()).count();
         self.glyphs.retain(|g| {
             if let Some((gx, gy, gw, gh)) = get_same_type_bounds(g) {
                 let gx_end = gx + gw;
                 let gy_end = gy + gh;
                 // Keep if no overlap
-                gx_end <= x || gx >= x_end || gy_end <= y || gy >= y_end
+                let keep = gx_end <= x || gx >= x_end || gy_end <= y || gy >= y_end;
+                if !keep {
+                    log::info!("  -> removing overlapping glyph at ({},{}) {}x{}", gx, gy, gw, gh);
+                }
+                keep
             } else {
                 true
             }
         });
+        let after_count = self.glyphs.iter().filter(|g| get_same_type_bounds(g).is_some()).count();
+        if before_count != after_count {
+            log::info!("  -> overlap removal: {} -> {} glyphs", before_count, after_count);
+        }
 
         // Remove overlapping char/stretch glyphs
         self.remove_overlapping(x, y, width, height);
