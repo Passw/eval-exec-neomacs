@@ -34,8 +34,7 @@ use crate::backend::wpe::{WpeBackend, WpeWebView};
 #[cfg(all(feature = "wpe-webkit", target_os = "linux"))]
 use crate::backend::wgpu::WgpuWebKitCache;
 
-#[cfg(feature = "video")]
-use crate::backend::wgpu::VideoCache;
+// Video cache is managed by WgpuRenderer
 
 /// Shared storage for image dimensions accessible from both threads
 pub type SharedImageDimensions = Arc<Mutex<HashMap<u32, (u32, u32)>>>;
@@ -100,7 +99,7 @@ struct RenderApp {
     // Shared image dimensions (written here, read from main thread)
     image_dimensions: SharedImageDimensions,
 
-    // WebKit state
+    // WebKit state (video cache is managed by renderer)
     #[cfg(feature = "wpe-webkit")]
     wpe_backend: Option<WpeBackend>,
 
@@ -109,10 +108,7 @@ struct RenderApp {
 
     #[cfg(all(feature = "wpe-webkit", target_os = "linux"))]
     webkit_texture_cache: Option<WgpuWebKitCache>,
-
-    // Video state
-    #[cfg(feature = "video")]
-    video_cache: Option<VideoCache>,
+    // Note: video_cache is managed by WgpuRenderer, not RenderApp
 }
 
 impl RenderApp {
@@ -146,8 +142,6 @@ impl RenderApp {
             webkit_views: HashMap::new(),
             #[cfg(all(feature = "wpe-webkit", target_os = "linux"))]
             webkit_texture_cache: None,
-            #[cfg(feature = "video")]
-            video_cache: None,
         }
     }
 
@@ -279,14 +273,9 @@ impl RenderApp {
             self.webkit_texture_cache = Some(WgpuWebKitCache::new(&device));
         }
 
-        // Initialize video cache
+        // Video cache is managed by the renderer
         #[cfg(feature = "video")]
-        {
-            let mut video_cache = VideoCache::new();
-            video_cache.init_gpu(&device);
-            self.video_cache = Some(video_cache);
-            log::info!("Video cache initialized");
-        }
+        log::info!("Video cache initialized");
     }
 
     /// Handle surface resize
@@ -404,30 +393,30 @@ impl RenderApp {
                 RenderCommand::VideoCreate { id, path } => {
                     log::info!("Loading video {}: {}", id, path);
                     #[cfg(feature = "video")]
-                    if let Some(ref mut cache) = self.video_cache {
-                        let video_id = cache.load_file(&path);
+                    if let Some(ref mut renderer) = self.renderer {
+                        let video_id = renderer.load_video_file(&path);
                         log::info!("Video loaded with id {} (requested id was {})", video_id, id);
                     }
                 }
                 RenderCommand::VideoPlay { id } => {
                     log::debug!("Playing video {}", id);
                     #[cfg(feature = "video")]
-                    if let Some(ref mut cache) = self.video_cache {
-                        cache.play(id);
+                    if let Some(ref mut renderer) = self.renderer {
+                        renderer.video_play(id);
                     }
                 }
                 RenderCommand::VideoPause { id } => {
                     log::debug!("Pausing video {}", id);
                     #[cfg(feature = "video")]
-                    if let Some(ref mut cache) = self.video_cache {
-                        cache.pause(id);
+                    if let Some(ref mut renderer) = self.renderer {
+                        renderer.video_pause(id);
                     }
                 }
                 RenderCommand::VideoDestroy { id } => {
                     log::info!("Destroying video {}", id);
                     #[cfg(feature = "video")]
-                    if let Some(ref mut cache) = self.video_cache {
-                        cache.remove(id);
+                    if let Some(ref mut renderer) = self.renderer {
+                        renderer.video_stop(id);
                     }
                 }
             }
@@ -565,17 +554,9 @@ impl RenderApp {
     /// Process pending video frames
     #[cfg(feature = "video")]
     fn process_video_frames(&mut self) {
-        let device = match &self.device {
-            Some(d) => d,
-            None => return,
-        };
-        let queue = match &self.queue {
-            Some(q) => q,
-            None => return,
-        };
-
-        if let Some(ref mut cache) = self.video_cache {
-            cache.process_pending_frames(device, queue);
+        log::trace!("process_video_frames called");
+        if let Some(ref mut renderer) = self.renderer {
+            renderer.process_pending_videos();
         }
     }
 
