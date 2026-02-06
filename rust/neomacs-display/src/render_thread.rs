@@ -483,7 +483,6 @@ impl RenderApp {
     fn poll_frame(&mut self) {
         // Get the newest frame, discarding older ones
         while let Ok(frame) = self.comms.frame_rx.try_recv() {
-            log::debug!("RECEIVED FRAME: {} glyphs", frame.glyphs.len());
             self.current_frame = Some(frame);
             self.frame_dirty = true;
         }

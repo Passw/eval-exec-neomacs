@@ -170,7 +170,9 @@ pub unsafe extern "C" fn neomacs_display_begin_frame(handle: *mut NeomacsDisplay
     display.frame_counter += 1;
     display.in_frame = true;
 
-    debug!("begin_frame: frame={}", display.frame_counter);
+    debug!("begin_frame: frame={} scene_bg=({:.3},{:.3},{:.3})",
+        display.frame_counter,
+        display.scene.background.r, display.scene.background.g, display.scene.background.b);
 
     // Matrix-based full-frame rendering: clear everything and rebuild from scratch.
     // The matrix walker in neomacs_update_end will re-add ALL visible glyphs.
@@ -757,20 +759,22 @@ pub unsafe extern "C" fn neomacs_display_set_face(
 
     trace!("set_face: id={}, fg=0x{:06x}, bg=0x{:06x}, family={}, weight={}", face_id, foreground, background, font_family_str, font_weight);
 
-    // Convert colors from 0xRRGGBB to Color
+    // Convert colors from 0xRRGGBB sRGB to linear for GPU rendering.
+    // The surface uses an sRGB format, so the GPU expects linear values
+    // and automatically applies sRGB encoding on framebuffer write.
     let fg = Color {
         r: ((foreground >> 16) & 0xFF) as f32 / 255.0,
         g: ((foreground >> 8) & 0xFF) as f32 / 255.0,
         b: (foreground & 0xFF) as f32 / 255.0,
         a: 1.0,
-    };
+    }.srgb_to_linear();
 
     let bg = Color {
         r: ((background >> 16) & 0xFF) as f32 / 255.0,
         g: ((background >> 8) & 0xFF) as f32 / 255.0,
         b: (background & 0xFF) as f32 / 255.0,
         a: if background == 0 { 0.0 } else { 1.0 },
-    };
+    }.srgb_to_linear();
 
     // Build attributes
     let mut attrs = FaceAttributes::empty();
@@ -812,7 +816,7 @@ pub unsafe extern "C" fn neomacs_display_set_face(
             g: ((underline_color >> 8) & 0xFF) as f32 / 255.0,
             b: (underline_color & 0xFF) as f32 / 255.0,
             a: 1.0,
-        })
+        }.srgb_to_linear())
     } else {
         None
     };
@@ -824,7 +828,7 @@ pub unsafe extern "C" fn neomacs_display_set_face(
             g: ((box_color >> 8) & 0xFF) as f32 / 255.0,
             b: (box_color & 0xFF) as f32 / 255.0,
             a: 1.0,
-        })
+        }.srgb_to_linear())
     } else {
         None
     };
@@ -892,10 +896,7 @@ pub unsafe extern "C" fn neomacs_display_set_background(
         g: ((color >> 8) & 0xFF) as f32 / 255.0,
         b: (color & 0xFF) as f32 / 255.0,
         a: 1.0,
-    };
-
-    debug!("neomacs_display_set_background: color=0x{:06x} -> ({:.3},{:.3},{:.3})",
-           color, bg.r, bg.g, bg.b);
+    }.srgb_to_linear();
 
     let target_scene = display.get_target_scene();
     target_scene.background = bg;
@@ -2948,13 +2949,14 @@ pub extern "C" fn neomacs_display_begin_frame_window(
 ) {
     let display = unsafe { &mut *handle };
 
-    log::debug!("neomacs_display_begin_frame_window: window_id={}", window_id);
-
     // Track which window we're currently rendering to
     display.current_render_window_id = window_id;
 
-    // Matrix-based full-frame rendering: clear everything.
-    // The matrix walker will re-add ALL visible glyphs from current_matrix.
+    // Matrix-based full-frame rendering: sync frame dimensions and background
+    // from the scene, then clear all glyphs for the new frame.
+    display.frame_glyphs.width = display.scene.width;
+    display.frame_glyphs.height = display.scene.height;
+    display.frame_glyphs.background = display.scene.background;
     display.frame_glyphs.clear_all();
 
     #[cfg(feature = "winit-backend")]
@@ -2973,9 +2975,6 @@ pub extern "C" fn neomacs_display_end_frame_window(
 ) {
     let display = unsafe { &mut *handle };
 
-    log::debug!("neomacs_display_end_frame_window: window_id={}, glyphs={}",
-        window_id, display.frame_glyphs.glyphs.len());
-
     #[cfg(feature = "winit-backend")]
     {
         if let Some(ref state) = unsafe { THREADED_STATE.as_ref() } {
@@ -2983,7 +2982,6 @@ pub extern "C" fn neomacs_display_end_frame_window(
             // The buffer was cleared at begin_frame and rebuilt by the matrix walker,
             // so it always contains the complete visible state.
             let frame = display.frame_glyphs.clone();
-            log::debug!("Sending frame: {} glyphs", frame.glyphs.len());
             let _ = state.emacs_comms.frame_tx.try_send(frame);
         } else if let Some(ref mut backend) = display.winit_backend {
             backend.end_frame_for_window(

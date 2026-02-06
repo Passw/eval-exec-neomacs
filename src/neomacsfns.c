@@ -112,8 +112,12 @@ neomacs_set_foreground_color (struct frame *f, Lisp_Object arg, Lisp_Object oldv
   if (STRINGP (arg))
     {
       fg = x_decode_color (f, arg, BLACK_PIX_DEFAULT (f));
+      FRAME_FOREGROUND_PIXEL (f) = fg;
       FRAME_NEOMACS_OUTPUT (f)->foreground_pixel = fg;
       update_face_from_frame_parameter (f, Qforeground_color, arg);
+
+      if (FRAME_VISIBLE_P (f))
+        redraw_frame (f);
     }
 }
 
@@ -125,8 +129,27 @@ neomacs_set_background_color (struct frame *f, Lisp_Object arg, Lisp_Object oldv
   if (STRINGP (arg))
     {
       bg = x_decode_color (f, arg, WHITE_PIX_DEFAULT (f));
+
+      /* Update both the frame's background pixel and the output struct.
+         FRAME_BACKGROUND_PIXEL(f) is used by face code for defaulted
+         backgrounds (face->background_defaulted_p).  */
+      FRAME_BACKGROUND_PIXEL (f) = bg;
       FRAME_NEOMACS_OUTPUT (f)->background_pixel = bg;
+
+      /* Send new background to the renderer for LoadOp::Clear.  */
+      struct neomacs_display_info *dpyinfo = FRAME_NEOMACS_DISPLAY_INFO (f);
+      if (dpyinfo && dpyinfo->display_handle)
+        {
+          uint32_t bg_rgb = ((RED_FROM_ULONG (bg) << 16) |
+                             (GREEN_FROM_ULONG (bg) << 8) |
+                             BLUE_FROM_ULONG (bg));
+          neomacs_display_set_background (dpyinfo->display_handle, bg_rgb);
+        }
+
       update_face_from_frame_parameter (f, Qbackground_color, arg);
+
+      if (FRAME_VISIBLE_P (f))
+        redraw_frame (f);
     }
 }
 

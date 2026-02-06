@@ -812,6 +812,26 @@ neomacs_extract_full_frame (struct frame *f)
   if (!output || !output->use_gpu_widget)
     return;
 
+  /* Sync the frame background color from the default face.  When themes
+     change (e.g. load-theme wombat), the default face background updates
+     but FRAME_BACKGROUND_PIXEL and the renderer's clear color don't.
+     Update them here so LoadOp::Clear uses the correct color.  */
+  {
+    struct face *default_face = FACE_FROM_ID_OR_NULL (f, DEFAULT_FACE_ID);
+    if (default_face && !default_face->background_defaulted_p)
+      {
+        unsigned long new_bg = default_face->background;
+        if (new_bg != FRAME_BACKGROUND_PIXEL (f))
+          {
+            FRAME_BACKGROUND_PIXEL (f) = new_bg;
+            uint32_t bg_rgb = ((RED_FROM_ULONG (new_bg) << 16) |
+                               (GREEN_FROM_ULONG (new_bg) << 8) |
+                               BLUE_FROM_ULONG (new_bg));
+            neomacs_display_set_background (dpyinfo->display_handle, bg_rgb);
+          }
+      }
+  }
+
   /* Walk all leaf windows and extract their glyphs from current_matrix.
      We can't use foreach_window (it's static in window.c), so traverse
      the window tree ourselves. */

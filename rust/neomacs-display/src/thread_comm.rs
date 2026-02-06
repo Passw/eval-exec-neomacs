@@ -2,7 +2,7 @@
 //!
 //! Provides lock-free channels and wakeup mechanism between Emacs and render threads.
 
-use crossbeam_channel::{bounded, Receiver, Sender};
+use crossbeam_channel::{bounded, unbounded, Receiver, Sender};
 use std::os::unix::io::RawFd;
 
 use crate::core::frame_glyphs::FrameGlyphBuffer;
@@ -183,7 +183,9 @@ impl Drop for WakeupPipe {
 }
 
 /// Channel capacities
-const FRAME_CHANNEL_CAPACITY: usize = 2;  // Double buffer
+// Frame channel: unbounded so try_send never drops frames.
+// The render thread drains all queued frames and keeps only the latest
+// (see poll_frame()), so memory stays bounded in practice.
 const INPUT_CHANNEL_CAPACITY: usize = 256;
 const COMMAND_CHANNEL_CAPACITY: usize = 64;
 
@@ -208,7 +210,7 @@ pub struct ThreadComms {
 impl ThreadComms {
     /// Create new thread communication channels
     pub fn new() -> std::io::Result<Self> {
-        let (frame_tx, frame_rx) = bounded(FRAME_CHANNEL_CAPACITY);
+        let (frame_tx, frame_rx) = unbounded();
         let (cmd_tx, cmd_rx) = bounded(COMMAND_CHANNEL_CAPACITY);
         let (input_tx, input_rx) = bounded(INPUT_CHANNEL_CAPACITY);
         let wakeup = WakeupPipe::new()?;

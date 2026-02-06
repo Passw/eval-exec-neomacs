@@ -30,7 +30,9 @@ impl Color {
         }
     }
 
-    /// Convert from Emacs pixel value (0xAARRGGBB or 0x00RRGGBB)
+    /// Convert from Emacs pixel value (0xAARRGGBB or 0x00RRGGBB).
+    /// Performs sRGB→linear conversion since Emacs colors are sRGB
+    /// and the GPU surface uses an sRGB format (expects linear values).
     pub fn from_pixel(pixel: u32) -> Self {
         let a = ((pixel >> 24) & 0xFF) as u8;
         let r = ((pixel >> 16) & 0xFF) as u8;
@@ -38,7 +40,28 @@ impl Color {
         let b = (pixel & 0xFF) as u8;
         // If alpha is 0, assume fully opaque
         let a = if a == 0 { 255 } else { a };
-        Self::from_u8(r, g, b, a)
+        Self::from_u8(r, g, b, a).srgb_to_linear()
+    }
+
+    /// Convert a single sRGB component (0.0-1.0) to linear space.
+    fn srgb_component_to_linear(c: f32) -> f32 {
+        if c <= 0.04045 {
+            c / 12.92
+        } else {
+            ((c + 0.055) / 1.055).powf(2.4)
+        }
+    }
+
+    /// Convert this color from sRGB to linear space.
+    /// Use when colors come from Emacs (sRGB) and need to be used with
+    /// an sRGB surface format where the GPU expects linear values.
+    pub fn srgb_to_linear(self) -> Self {
+        Self {
+            r: Self::srgb_component_to_linear(self.r),
+            g: Self::srgb_component_to_linear(self.g),
+            b: Self::srgb_component_to_linear(self.b),
+            a: self.a, // alpha is always linear
+        }
     }
 
     // Common colors
@@ -195,10 +218,14 @@ mod tests {
 
     #[test]
     fn test_color_from_pixel() {
+        // from_pixel converts sRGB to linear
         let color = Color::from_pixel(0x00FF8040);
+        // sRGB 1.0 → linear 1.0
         assert!((color.r - 1.0).abs() < 0.01);
-        assert!((color.g - 0.5).abs() < 0.01);
-        assert!((color.b - 0.25).abs() < 0.01);
+        // sRGB 0.502 → linear ~0.214
+        assert!((color.g - 0.214).abs() < 0.02);
+        // sRGB 0.251 → linear ~0.051
+        assert!((color.b - 0.051).abs() < 0.02);
         assert!((color.a - 1.0).abs() < 0.01);
     }
 
