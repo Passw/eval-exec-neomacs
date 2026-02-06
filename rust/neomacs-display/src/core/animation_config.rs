@@ -6,6 +6,7 @@
 use std::time::Duration;
 use crate::core::cursor_animation::CursorAnimationMode;
 use crate::core::buffer_transition::BufferTransitionEffect;
+use crate::core::scroll_animation::{ScrollEffect, ScrollEasing};
 
 /// Master animation configuration
 #[derive(Debug, Clone)]
@@ -145,12 +146,18 @@ impl BufferTransitionConfig {
 pub struct ScrollAnimationConfig {
     /// Enable smooth scrolling
     pub enabled: bool,
-    
+
     /// Scroll animation duration in milliseconds
     pub duration_ms: u32,
-    
+
     /// Lines to scroll before animation kicks in (1 = always animate)
     pub threshold_lines: u32,
+
+    /// Visual effect for scroll transitions
+    pub effect: ScrollEffect,
+
+    /// Easing/physics model for scroll timing
+    pub easing: ScrollEasing,
 }
 
 impl Default for ScrollAnimationConfig {
@@ -159,6 +166,8 @@ impl Default for ScrollAnimationConfig {
             enabled: true,
             duration_ms: 150,
             threshold_lines: 1,
+            effect: ScrollEffect::default(),
+            easing: ScrollEasing::default(),
         }
     }
 }
@@ -234,7 +243,15 @@ impl AnimationConfig {
                 }
                 true
             }
-            
+            "scroll-effect" | "scroll-animation-effect" | "scroll-style" => {
+                self.scroll.effect = ScrollEffect::from_str(value);
+                true
+            }
+            "scroll-easing" | "scroll-animation-easing" => {
+                self.scroll.easing = ScrollEasing::from_str(value);
+                true
+            }
+
             _ => false,
         }
     }
@@ -251,6 +268,8 @@ impl AnimationConfig {
             "buffer-transition-effect" => Some(format!("{:?}", self.buffer_transition.effect).to_lowercase()),
             "buffer-transition-duration" => Some(self.buffer_transition.duration_ms.to_string()),
             "scroll-animation" => Some(bool_str(self.scroll.enabled)),
+            "scroll-effect" => Some(self.scroll.effect.as_str().to_string()),
+            "scroll-easing" => Some(self.scroll.easing.as_str().to_string()),
             _ => None,
         }
     }

@@ -133,7 +133,7 @@ DISPLAY is the name of the display Emacs should connect to."
                   (cursor-enabled cursor-speed cursor-style cursor-duration
                    crossfade-enabled crossfade-duration
                    scroll-enabled scroll-duration
-                   &optional trail-size))
+                   &optional scroll-effect scroll-easing trail-size))
 
 (defun neomacs--sync-cursor-blink ()
   "Sync `blink-cursor-mode' state to the render thread."
@@ -167,9 +167,39 @@ Cursor animation styles:
   `ease-out-cubic'   - stronger deceleration curve
   `ease-out-expo'    - sharp deceleration curve
   `ease-in-out-cubic' - smooth S-curve
-  `linear'           - constant speed"
+  `linear'           - constant speed
+
+Scroll effects (scroll-effect parameter, integer index):
+  0  slide               - content slides in scroll direction (default)
+  1  crossfade           - alpha blend between old and new
+  2  scale-zoom          - destination zooms from 95%% to 100%%
+  3  fade-edges          - lines fade at viewport edges
+  4  cascade             - lines drop in with stagger delay
+  5  parallax            - layers scroll at different speeds
+  6  tilt                - subtle 3D perspective tilt
+  7  page-curl           - page turning effect
+  8  card-flip           - card flips around X-axis
+  9  cylinder-roll       - content wraps around cylinder
+  10 wobbly              - jelly-like deformation
+  11 wave                - sine-wave distortion
+  12 per-line-spring     - each line springs independently
+  13 liquid              - noise-based fluid distortion
+  14 motion-blur         - vertical blur during scroll
+  15 chromatic-aberration - RGB channel separation
+  16 ghost-trails        - semi-transparent afterimages
+  17 color-temperature   - warm/cool tint by direction
+  18 crt-scanlines       - retro scanline overlay
+  19 depth-of-field      - center sharp, edges dim
+  20 typewriter-reveal   - lines appear left-to-right
+
+Scroll easing (scroll-easing parameter, integer index):
+  0  ease-out-quad       - standard deceleration (default)
+  1  ease-out-cubic      - stronger deceleration
+  2  spring              - critically damped spring with overshoot
+  3  linear              - constant speed
+  4  ease-in-out-cubic   - smooth S-curve"
   (when (fboundp 'neomacs-set-animation-config)
-    (neomacs-set-animation-config t 15.0 'spring 150 t 200 t 150 0.7)))
+    (neomacs-set-animation-config t 15.0 'spring 150 t 200 t 150 0 0 0.7)))
 
 ;; Provide the feature
 (provide 'neomacs-win)

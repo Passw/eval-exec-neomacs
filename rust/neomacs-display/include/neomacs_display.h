@@ -46,6 +46,11 @@
 
 
 /**
+ * Number of defined scroll effects.
+ */
+#define ScrollEffect_COUNT 21
+
+/**
  * Modifier flags matching Emacs.
  */
 #define NEOMACS_SHIFT_MASK (1 << 0)
@@ -594,6 +599,8 @@ void neomacs_display_set_animation_config(struct NeomacsDisplay *handle,
                                           uint32_t crossfadeDurationMs,
                                           int scrollEnabled,
                                           uint32_t scrollDurationMs,
+                                          uint32_t scrollEffect,
+                                          uint32_t scrollEasing,
                                           float trailSize);
 
 /**

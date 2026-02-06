@@ -87,6 +87,8 @@ struct ScrollTransition {
     duration: std::time::Duration,
     bounds: Rect,
     direction: i32, // +1 = scroll down (content up), -1 = scroll up
+    effect: crate::core::scroll_animation::ScrollEffect,
+    easing: crate::core::scroll_animation::ScrollEasing,
     old_texture: wgpu::Texture,
     old_view: wgpu::TextureView,
     old_bind_group: wgpu::BindGroup,
@@ -196,6 +198,8 @@ struct RenderApp {
     crossfade_duration: std::time::Duration,
     scroll_enabled: bool,
     scroll_duration: std::time::Duration,
+    scroll_effect: crate::core::scroll_animation::ScrollEffect,
+    scroll_easing: crate::core::scroll_animation::ScrollEasing,
 
     // Double-buffer offscreen textures for transitions
     offscreen_a: Option<(wgpu::Texture, wgpu::TextureView, wgpu::BindGroup)>,
@@ -277,6 +281,8 @@ impl RenderApp {
             crossfade_duration: std::time::Duration::from_millis(200),
             scroll_enabled: true,
             scroll_duration: std::time::Duration::from_millis(150),
+            scroll_effect: crate::core::scroll_animation::ScrollEffect::default(),
+            scroll_easing: crate::core::scroll_animation::ScrollEasing::default(),
             offscreen_a: None,
             offscreen_b: None,
             current_is_a: true,
@@ -656,12 +662,24 @@ impl RenderApp {
                     cursor_style, cursor_duration_ms,
                     crossfade_enabled, crossfade_duration_ms,
                     scroll_enabled, scroll_duration_ms,
+                    scroll_effect, scroll_easing,
                     trail_size,
                 } => {
-                    log::debug!("Animation config: cursor={}/{}/style={:?}/{}ms/trail={}, crossfade={}/{}ms, scroll={}/{}ms",
+                    use crate::core::scroll_animation::{ScrollEffect, ScrollEasing};
+                    let effect = ScrollEffect::ALL.get(scroll_effect as usize)
+                        .copied().unwrap_or(ScrollEffect::Slide);
+                    let easing = match scroll_easing {
+                        0 => ScrollEasing::EaseOutQuad,
+                        1 => ScrollEasing::EaseOutCubic,
+                        2 => ScrollEasing::Spring,
+                        3 => ScrollEasing::Linear,
+                        4 => ScrollEasing::EaseInOutCubic,
+                        _ => ScrollEasing::EaseOutQuad,
+                    };
+                    log::debug!("Animation config: cursor={}/{}/style={:?}/{}ms/trail={}, crossfade={}/{}ms, scroll={}/{}ms/effect={:?}/easing={:?}",
                         cursor_enabled, cursor_speed, cursor_style, cursor_duration_ms, trail_size,
                         crossfade_enabled, crossfade_duration_ms,
-                        scroll_enabled, scroll_duration_ms);
+                        scroll_enabled, scroll_duration_ms, effect, easing);
                     self.cursor_anim_enabled = cursor_enabled;
                     self.cursor_anim_speed = cursor_speed;
                     self.cursor_anim_style = cursor_style;
@@ -671,6 +689,8 @@ impl RenderApp {
                     self.crossfade_duration = std::time::Duration::from_millis(crossfade_duration_ms as u64);
                     self.scroll_enabled = scroll_enabled;
                     self.scroll_duration = std::time::Duration::from_millis(scroll_duration_ms as u64);
+                    self.scroll_effect = effect;
+                    self.scroll_easing = easing;
                     if !cursor_enabled {
                         self.cursor_animating = false;
                     }
@@ -1285,12 +1305,15 @@ impl RenderApp {
                             );
 
                             if let Some((tex, view, bg)) = self.snapshot_prev_texture() {
-                                log::debug!("Starting scroll slide for window {} (dir={}, content_h={})", info.window_id, dir, content_height);
+                                log::debug!("Starting scroll slide for window {} (dir={}, effect={:?}, content_h={})",
+                                    info.window_id, dir, self.scroll_effect, content_height);
                                 self.scroll_slides.insert(info.window_id, ScrollTransition {
                                     started: now,
                                     duration: self.scroll_duration,
                                     bounds: content_bounds,
                                     direction: dir,
+                                    effect: self.scroll_effect,
+                                    easing: self.scroll_easing,
                                     old_texture: tex,
                                     old_view: view,
                                     old_bind_group: bg,
@@ -1352,20 +1375,24 @@ impl RenderApp {
         let mut completed_scrolls = Vec::new();
         for (&wid, transition) in &self.scroll_slides {
             let elapsed = now.duration_since(transition.started);
-            let t = (elapsed.as_secs_f32() / transition.duration.as_secs_f32()).min(1.0);
+            let raw_t = (elapsed.as_secs_f32() / transition.duration.as_secs_f32()).min(1.0);
+            let elapsed_secs = elapsed.as_secs_f32();
 
-            renderer.render_scroll_slide(
+            renderer.render_scroll_effect(
                 surface_view,
                 &transition.old_bind_group,
                 unsafe { &*current_bg },
-                t,
+                raw_t,
+                elapsed_secs,
                 transition.direction,
                 &transition.bounds,
+                transition.effect,
+                transition.easing,
                 self.width,
                 self.height,
             );
 
-            if t >= 1.0 {
+            if raw_t >= 1.0 {
                 completed_scrolls.push(wid);
             }
         }

@@ -143,6 +143,8 @@ pub enum RenderCommand {
         crossfade_duration_ms: u32,
         scroll_enabled: bool,
         scroll_duration_ms: u32,
+        scroll_effect: u32,
+        scroll_easing: u32,
         trail_size: f32,
     },
 }

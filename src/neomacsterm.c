@@ -3684,8 +3684,12 @@ Higher values make the cursor move faster.  */)
   return anim_enabled ? Qt : Qnil;
 }
 
-DEFUN ("neomacs-set-animation-config", Fneomacs_set_animation_config, Sneomacs_set_animation_config, 8, 9, 0,
+DEFUN ("neomacs-set-animation-config", Fneomacs_set_animation_config, Sneomacs_set_animation_config, 8, MANY, 0,
        doc: /* Configure all animation settings in the render thread.
+Arguments: CURSOR-ENABLED CURSOR-SPEED CURSOR-STYLE CURSOR-DURATION
+           CROSSFADE-ENABLED CROSSFADE-DURATION SCROLL-ENABLED SCROLL-DURATION
+           &optional SCROLL-EFFECT SCROLL-EASING TRAIL-SIZE
+
 CURSOR-ENABLED non-nil enables smooth cursor animation.
 CURSOR-SPEED is the exponential interpolation rate (default 15.0).
 CURSOR-STYLE is a symbol naming the animation style:
@@ -3701,19 +3705,59 @@ CROSSFADE-ENABLED non-nil enables buffer-switch crossfade.
 CROSSFADE-DURATION is duration in milliseconds (default 200).
 SCROLL-ENABLED non-nil enables scroll slide animation.
 SCROLL-DURATION is duration in milliseconds (default 150).
+SCROLL-EFFECT is an integer index selecting the scroll animation effect:
+  0  slide               - content slides in scroll direction (default)
+  1  crossfade           - alpha blend between old and new
+  2  scale-zoom          - destination zooms from 95% to 100%
+  3  fade-edges          - lines fade at viewport edges
+  4  cascade             - lines drop in with stagger delay
+  5  parallax            - layers scroll at different speeds
+  6  tilt                - subtle 3D perspective tilt
+  7  page-curl           - page turning effect
+  8  card-flip           - card flips around X-axis
+  9  cylinder-roll       - content wraps around cylinder
+  10 wobbly              - jelly-like deformation
+  11 wave                - sine-wave distortion
+  12 per-line-spring     - each line springs independently
+  13 liquid              - noise-based fluid distortion
+  14 motion-blur         - vertical blur during scroll
+  15 chromatic-aberration - RGB channel separation
+  16 ghost-trails        - semi-transparent afterimages
+  17 color-temperature   - warm/cool tint by direction
+  18 crt-scanlines       - retro scanline overlay
+  19 depth-of-field      - center sharp, edges dim
+  20 typewriter-reveal   - lines appear left-to-right
+SCROLL-EASING is an integer index selecting the scroll easing function:
+  0  ease-out-quad       - standard deceleration (default)
+  1  ease-out-cubic      - stronger deceleration
+  2  spring              - critically damped spring with overshoot
+  3  linear              - constant speed
+  4  ease-in-out-cubic   - smooth S-curve
 Optional TRAIL-SIZE (0.0-1.0) controls the spring cursor trail effect (default 0.7).
   0.0 means no trail (all corners move together like a rigid rectangle).
   0.7 is the default with a visible trailing stretch effect.
-  1.0 is maximum trail where leading corners snap almost immediately.  */)
-  (Lisp_Object cursor_enabled, Lisp_Object cursor_speed,
-   Lisp_Object cursor_style, Lisp_Object cursor_duration,
-   Lisp_Object crossfade_enabled, Lisp_Object crossfade_duration,
-   Lisp_Object scroll_enabled, Lisp_Object scroll_duration,
-   Lisp_Object trail_size)
+  1.0 is maximum trail where leading corners snap almost immediately.
+usage: (neomacs-set-animation-config CURSOR-ENABLED CURSOR-SPEED CURSOR-STYLE CURSOR-DURATION CROSSFADE-ENABLED CROSSFADE-DURATION SCROLL-ENABLED SCROLL-DURATION &optional SCROLL-EFFECT SCROLL-EASING TRAIL-SIZE)  */)
+  (ptrdiff_t nargs, Lisp_Object *args)
 {
   struct neomacs_display_info *dpyinfo = neomacs_display_list;
   if (!dpyinfo || !dpyinfo->display_handle)
     return Qnil;
+
+  /* Required args: 0-7 */
+  Lisp_Object cursor_enabled = args[0];
+  Lisp_Object cursor_speed = args[1];
+  Lisp_Object cursor_style = args[2];
+  Lisp_Object cursor_duration = args[3];
+  Lisp_Object crossfade_enabled = args[4];
+  Lisp_Object crossfade_duration = args[5];
+  Lisp_Object scroll_enabled = args[6];
+  Lisp_Object scroll_duration = args[7];
+
+  /* Optional args: 8-10 */
+  Lisp_Object scroll_effect = nargs > 8 ? args[8] : Qnil;
+  Lisp_Object scroll_easing = nargs > 9 ? args[9] : Qnil;
+  Lisp_Object trail_size = nargs > 10 ? args[10] : Qnil;
 
   int ce = !NILP (cursor_enabled);
   float cs = 15.0f;
@@ -3756,12 +3800,21 @@ Optional TRAIL-SIZE (0.0-1.0) controls the spring cursor trail effect (default 0
   if (NUMBERP (scroll_duration))
     sd = (uint32_t) XFIXNUM (scroll_duration);
 
+  uint32_t seff = 0;
+  if (FIXNUMP (scroll_effect))
+    seff = (uint32_t) XFIXNUM (scroll_effect);
+
+  uint32_t seas = 0;
+  if (FIXNUMP (scroll_easing))
+    seas = (uint32_t) XFIXNUM (scroll_easing);
+
   float ts = 0.7f;
   if (NUMBERP (trail_size))
     ts = (float) XFLOATINT (trail_size);
 
   neomacs_display_set_animation_config (dpyinfo->display_handle,
-                                         ce, cs, cst, cd, cfe, cfd, se, sd, ts);
+                                         ce, cs, cst, cd, cfe, cfd, se, sd,
+                                         seff, seas, ts);
   return Qt;
 }
 

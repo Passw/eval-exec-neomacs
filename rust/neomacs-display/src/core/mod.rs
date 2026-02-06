@@ -10,6 +10,7 @@ pub mod frame_glyphs;
 pub mod cursor_animation;
 pub mod buffer_transition;
 pub mod animation_config;
+pub mod scroll_animation;
 
 pub use types::*;
 pub use scene::*;
@@ -21,3 +22,4 @@ pub use frame_glyphs::*;
 pub use cursor_animation::*;
 pub use buffer_transition::*;
 pub use animation_config::*;
+pub use scroll_animation::*;
