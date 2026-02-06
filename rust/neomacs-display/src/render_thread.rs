@@ -23,6 +23,7 @@ use crate::backend::wgpu::{
 };
 use crate::core::face::Face;
 use crate::core::frame_glyphs::{FrameGlyph, FrameGlyphBuffer};
+use crate::core::types::{Color, Rect};
 use crate::thread_comm::{InputEvent, RenderCommand, RenderComms};
 
 #[cfg(all(feature = "wpe-webkit", wpe_platform_available))]
@@ -67,6 +68,39 @@ impl RenderThread {
     }
 }
 
+/// State for an active crossfade transition
+struct CrossfadeTransition {
+    started: std::time::Instant,
+    duration: std::time::Duration,
+    bounds: Rect,
+    old_texture: wgpu::Texture,
+    old_view: wgpu::TextureView,
+    old_bind_group: wgpu::BindGroup,
+}
+
+/// State for an active scroll slide transition
+struct ScrollTransition {
+    started: std::time::Instant,
+    duration: std::time::Duration,
+    bounds: Rect,
+    direction: i32, // +1 = scroll down (content up), -1 = scroll up
+    old_texture: wgpu::Texture,
+    old_view: wgpu::TextureView,
+    old_bind_group: wgpu::BindGroup,
+}
+
+/// Target position/style for cursor animation
+#[derive(Debug, Clone)]
+struct CursorTarget {
+    window_id: i32,
+    x: f32,
+    y: f32,
+    width: f32,
+    height: f32,
+    style: u8,
+    color: Color,
+}
+
 /// Application state for winit event loop
 struct RenderApp {
     comms: RenderComms,
@@ -104,6 +138,35 @@ struct RenderApp {
     cursor_blink_enabled: bool,
     last_cursor_toggle: std::time::Instant,
     cursor_blink_interval: std::time::Duration,
+
+    // Cursor animation (smooth motion)
+    cursor_anim_enabled: bool,
+    cursor_anim_speed: f32,
+    cursor_target: Option<CursorTarget>,
+    cursor_current_x: f32,
+    cursor_current_y: f32,
+    cursor_current_w: f32,
+    cursor_current_h: f32,
+    cursor_animating: bool,
+    last_anim_time: std::time::Instant,
+
+    // Per-window metadata from previous frame (for transition detection)
+    prev_window_infos: HashMap<i64, crate::core::frame_glyphs::WindowInfo>,
+
+    // Transition state
+    crossfade_enabled: bool,
+    crossfade_duration: std::time::Duration,
+    scroll_enabled: bool,
+    scroll_duration: std::time::Duration,
+
+    // Double-buffer offscreen textures for transitions
+    offscreen_a: Option<(wgpu::Texture, wgpu::TextureView, wgpu::BindGroup)>,
+    offscreen_b: Option<(wgpu::Texture, wgpu::TextureView, wgpu::BindGroup)>,
+    current_is_a: bool,
+
+    // Active transitions
+    crossfades: HashMap<i64, CrossfadeTransition>,
+    scroll_slides: HashMap<i64, ScrollTransition>,
 
     // WebKit state (video cache is managed by renderer)
     #[cfg(feature = "wpe-webkit")]
@@ -143,6 +206,25 @@ impl RenderApp {
             cursor_blink_enabled: true,
             last_cursor_toggle: std::time::Instant::now(),
             cursor_blink_interval: std::time::Duration::from_millis(500),
+            cursor_anim_enabled: true,
+            cursor_anim_speed: 15.0,
+            cursor_target: None,
+            cursor_current_x: 0.0,
+            cursor_current_y: 0.0,
+            cursor_current_w: 0.0,
+            cursor_current_h: 0.0,
+            cursor_animating: false,
+            last_anim_time: std::time::Instant::now(),
+            prev_window_infos: HashMap::new(),
+            crossfade_enabled: true,
+            crossfade_duration: std::time::Duration::from_millis(200),
+            scroll_enabled: true,
+            scroll_duration: std::time::Duration::from_millis(150),
+            offscreen_a: None,
+            offscreen_b: None,
+            current_is_a: true,
+            crossfades: HashMap::new(),
+            scroll_slides: HashMap::new(),
             #[cfg(feature = "wpe-webkit")]
             wpe_backend: None,
             #[cfg(feature = "wpe-webkit")]
@@ -302,6 +384,13 @@ impl RenderApp {
         if let Some(renderer) = &mut self.renderer {
             renderer.resize(width, height);
         }
+
+        // Invalidate offscreen textures (they reference old size)
+        self.offscreen_a = None;
+        self.offscreen_b = None;
+        // Cancel active transitions (they reference old-sized textures)
+        self.crossfades.clear();
+        self.scroll_slides.clear();
 
         log::debug!("Surface resized to {}x{}", width, height);
     }
@@ -492,6 +581,39 @@ impl RenderApp {
                         self.frame_dirty = true;
                     }
                 }
+                RenderCommand::SetCursorAnimation { enabled, speed } => {
+                    log::debug!("Cursor animation: enabled={}, speed={}", enabled, speed);
+                    self.cursor_anim_enabled = enabled;
+                    self.cursor_anim_speed = speed;
+                    if !enabled {
+                        self.cursor_animating = false;
+                    }
+                }
+                RenderCommand::SetAnimationConfig {
+                    cursor_enabled, cursor_speed,
+                    crossfade_enabled, crossfade_duration_ms,
+                    scroll_enabled, scroll_duration_ms,
+                } => {
+                    log::debug!("Animation config: cursor={}/{}, crossfade={}/{}ms, scroll={}/{}ms",
+                        cursor_enabled, cursor_speed,
+                        crossfade_enabled, crossfade_duration_ms,
+                        scroll_enabled, scroll_duration_ms);
+                    self.cursor_anim_enabled = cursor_enabled;
+                    self.cursor_anim_speed = cursor_speed;
+                    self.crossfade_enabled = crossfade_enabled;
+                    self.crossfade_duration = std::time::Duration::from_millis(crossfade_duration_ms as u64);
+                    self.scroll_enabled = scroll_enabled;
+                    self.scroll_duration = std::time::Duration::from_millis(scroll_duration_ms as u64);
+                    if !cursor_enabled {
+                        self.cursor_animating = false;
+                    }
+                    if !crossfade_enabled {
+                        self.crossfades.clear();
+                    }
+                    if !scroll_enabled {
+                        self.scroll_slides.clear();
+                    }
+                }
             }
         }
 
@@ -508,6 +630,89 @@ impl RenderApp {
             self.cursor_blink_on = true;
             self.last_cursor_toggle = std::time::Instant::now();
         }
+
+        // Extract active cursor target for animation
+        if let Some(ref frame) = self.current_frame {
+            let active_cursor = frame.glyphs.iter().find_map(|g| match g {
+                FrameGlyph::Cursor { window_id, x, y, width, height, style, color }
+                    if *style != 3 => Some(CursorTarget {
+                        window_id: *window_id,
+                        x: *x, y: *y,
+                        width: *width, height: *height,
+                        style: *style,
+                        color: *color,
+                    }),
+                _ => None,
+            });
+
+            if let Some(new_target) = active_cursor {
+                let had_target = self.cursor_target.is_some();
+                let target_moved = self.cursor_target.as_ref().map_or(true, |old| {
+                    (old.x - new_target.x).abs() > 0.5
+                    || (old.y - new_target.y).abs() > 0.5
+                    || (old.width - new_target.width).abs() > 0.5
+                    || (old.height - new_target.height).abs() > 0.5
+                });
+
+                if !had_target || !self.cursor_anim_enabled {
+                    // First appearance or animation disabled: snap
+                    self.cursor_current_x = new_target.x;
+                    self.cursor_current_y = new_target.y;
+                    self.cursor_current_w = new_target.width;
+                    self.cursor_current_h = new_target.height;
+                    self.cursor_animating = false;
+                } else if target_moved {
+                    self.cursor_animating = true;
+                    self.last_anim_time = std::time::Instant::now();
+                }
+
+                self.cursor_target = Some(new_target);
+            }
+        }
+    }
+
+    /// Tick cursor animation, returns true if position changed (needs redraw)
+    fn tick_cursor_animation(&mut self) -> bool {
+        if !self.cursor_anim_enabled || !self.cursor_animating {
+            return false;
+        }
+        let target = match self.cursor_target.as_ref() {
+            Some(t) => t,
+            None => return false,
+        };
+
+        let now = std::time::Instant::now();
+        let dt = now.duration_since(self.last_anim_time).as_secs_f32();
+        self.last_anim_time = now;
+
+        // Exponential interpolation
+        let factor = 1.0 - (-self.cursor_anim_speed * dt).exp();
+
+        let dx = target.x - self.cursor_current_x;
+        let dy = target.y - self.cursor_current_y;
+        let dw = target.width - self.cursor_current_w;
+        let dh = target.height - self.cursor_current_h;
+
+        self.cursor_current_x += dx * factor;
+        self.cursor_current_y += dy * factor;
+        self.cursor_current_w += dw * factor;
+        self.cursor_current_h += dh * factor;
+
+        // Snap when close enough
+        if dx.abs() < 0.5 && dy.abs() < 0.5 && dw.abs() < 0.5 && dh.abs() < 0.5 {
+            self.cursor_current_x = target.x;
+            self.cursor_current_y = target.y;
+            self.cursor_current_w = target.width;
+            self.cursor_current_h = target.height;
+            self.cursor_animating = false;
+        }
+
+        true
+    }
+
+    /// Check if any transitions are currently active
+    fn has_active_transitions(&self) -> bool {
+        !self.crossfades.is_empty() || !self.scroll_slides.is_empty()
     }
 
     /// Update cursor blink state, returns true if blink toggled
@@ -695,6 +900,217 @@ impl RenderApp {
         }
     }
 
+    /// Ensure offscreen textures exist (lazily created)
+    fn ensure_offscreen_textures(&mut self) {
+        if self.offscreen_a.is_some() && self.offscreen_b.is_some() {
+            return;
+        }
+        let renderer = match self.renderer.as_ref() {
+            Some(r) => r,
+            None => return,
+        };
+        let w = self.width;
+        let h = self.height;
+
+        if self.offscreen_a.is_none() {
+            let (tex, view) = renderer.create_offscreen_texture(w, h);
+            let bg = renderer.create_texture_bind_group(&view);
+            self.offscreen_a = Some((tex, view, bg));
+        }
+        if self.offscreen_b.is_none() {
+            let (tex, view) = renderer.create_offscreen_texture(w, h);
+            let bg = renderer.create_texture_bind_group(&view);
+            self.offscreen_b = Some((tex, view, bg));
+        }
+    }
+
+    /// Get the "current" offscreen texture view and bind group
+    fn current_offscreen_view_and_bg(&self) -> Option<(&wgpu::TextureView, &wgpu::BindGroup)> {
+        let (_, ref view, ref bg) = if self.current_is_a {
+            self.offscreen_a.as_ref()?
+        } else {
+            self.offscreen_b.as_ref()?
+        };
+        Some((view, bg))
+    }
+
+    /// Get the "previous" offscreen texture, view, and bind group
+    fn previous_offscreen(&self) -> Option<(&wgpu::Texture, &wgpu::TextureView, &wgpu::BindGroup)> {
+        let (ref tex, ref view, ref bg) = if self.current_is_a {
+            self.offscreen_b.as_ref()?
+        } else {
+            self.offscreen_a.as_ref()?
+        };
+        Some((tex, view, bg))
+    }
+
+    /// Snapshot the previous offscreen texture into a new dedicated texture
+    fn snapshot_prev_texture(&self) -> Option<(wgpu::Texture, wgpu::TextureView, wgpu::BindGroup)> {
+        let renderer = self.renderer.as_ref()?;
+        let (prev_tex, _, _) = self.previous_offscreen()?;
+
+        let (snap, snap_view) = renderer.create_offscreen_texture(self.width, self.height);
+
+        // GPU copy
+        let mut encoder = renderer.device().create_command_encoder(&wgpu::CommandEncoderDescriptor {
+            label: Some("Snapshot Copy Encoder"),
+        });
+        encoder.copy_texture_to_texture(
+            wgpu::ImageCopyTexture {
+                texture: prev_tex,
+                mip_level: 0,
+                origin: wgpu::Origin3d::ZERO,
+                aspect: wgpu::TextureAspect::All,
+            },
+            wgpu::ImageCopyTexture {
+                texture: &snap,
+                mip_level: 0,
+                origin: wgpu::Origin3d::ZERO,
+                aspect: wgpu::TextureAspect::All,
+            },
+            wgpu::Extent3d {
+                width: self.width,
+                height: self.height,
+                depth_or_array_layers: 1,
+            },
+        );
+        renderer.queue().submit(std::iter::once(encoder.finish()));
+
+        let snap_bg = renderer.create_texture_bind_group(&snap_view);
+        Some((snap, snap_view, snap_bg))
+    }
+
+    /// Detect transitions by comparing current and previous window infos
+    fn detect_transitions(&mut self) {
+        let frame = match self.current_frame.as_ref() {
+            Some(f) => f,
+            None => return,
+        };
+
+        let now = std::time::Instant::now();
+
+        for info in &frame.window_infos {
+            if let Some(prev) = self.prev_window_infos.get(&info.window_id) {
+                if prev.buffer_id != 0 && info.buffer_id != 0 {
+                    if prev.buffer_id != info.buffer_id {
+                        // Buffer switch → crossfade
+                        // Suppress for minibuffer (small windows change buffers on every keystroke)
+                        if self.crossfade_enabled && info.bounds.height >= 50.0 {
+                            // Cancel existing transition for this window
+                            self.crossfades.remove(&info.window_id);
+                            self.scroll_slides.remove(&info.window_id);
+
+                            if let Some((tex, view, bg)) = self.snapshot_prev_texture() {
+                                log::debug!("Starting crossfade for window {} (buffer changed)", info.window_id);
+                                self.crossfades.insert(info.window_id, CrossfadeTransition {
+                                    started: now,
+                                    duration: self.crossfade_duration,
+                                    bounds: info.bounds,
+                                    old_texture: tex,
+                                    old_view: view,
+                                    old_bind_group: bg,
+                                });
+                            }
+                        }
+                    } else if prev.window_start != info.window_start {
+                        // Scroll → slide
+                        if self.scroll_enabled && info.bounds.height >= 50.0 {
+                            // Cancel existing transition for this window
+                            self.crossfades.remove(&info.window_id);
+                            self.scroll_slides.remove(&info.window_id);
+
+                            let dir = if info.window_start > prev.window_start { 1 } else { -1 };
+
+                            if let Some((tex, view, bg)) = self.snapshot_prev_texture() {
+                                log::debug!("Starting scroll slide for window {} (dir={})", info.window_id, dir);
+                                self.scroll_slides.insert(info.window_id, ScrollTransition {
+                                    started: now,
+                                    duration: self.scroll_duration,
+                                    bounds: info.bounds,
+                                    direction: dir,
+                                    old_texture: tex,
+                                    old_view: view,
+                                    old_bind_group: bg,
+                                });
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        // Update prev_window_infos from current frame
+        self.prev_window_infos.clear();
+        for info in &frame.window_infos {
+            self.prev_window_infos.insert(info.window_id, info.clone());
+        }
+    }
+
+    /// Render active transitions on top of the surface
+    fn render_transitions(&mut self, surface_view: &wgpu::TextureView) {
+        let now = std::time::Instant::now();
+        let renderer = match self.renderer.as_ref() {
+            Some(r) => r,
+            None => return,
+        };
+
+        // Get current offscreen bind group for "new" texture
+        let current_bg = match self.current_offscreen_view_and_bg() {
+            Some((_, bg)) => bg as *const wgpu::BindGroup,
+            None => return,
+        };
+
+        // Render crossfades
+        let mut completed_crossfades = Vec::new();
+        for (&wid, transition) in &self.crossfades {
+            let elapsed = now.duration_since(transition.started);
+            let t = (elapsed.as_secs_f32() / transition.duration.as_secs_f32()).min(1.0);
+
+            // SAFETY: current_bg is valid for the duration of this function
+            renderer.render_crossfade(
+                surface_view,
+                &transition.old_bind_group,
+                unsafe { &*current_bg },
+                t,
+                &transition.bounds,
+                self.width,
+                self.height,
+            );
+
+            if t >= 1.0 {
+                completed_crossfades.push(wid);
+            }
+        }
+        for wid in completed_crossfades {
+            self.crossfades.remove(&wid);
+        }
+
+        // Render scroll slides
+        let mut completed_scrolls = Vec::new();
+        for (&wid, transition) in &self.scroll_slides {
+            let elapsed = now.duration_since(transition.started);
+            let t = (elapsed.as_secs_f32() / transition.duration.as_secs_f32()).min(1.0);
+
+            renderer.render_scroll_slide(
+                surface_view,
+                &transition.old_bind_group,
+                unsafe { &*current_bg },
+                t,
+                transition.direction,
+                &transition.bounds,
+                self.width,
+                self.height,
+            );
+
+            if t >= 1.0 {
+                completed_scrolls.push(wid);
+            }
+        }
+        for wid in completed_scrolls {
+            self.scroll_slides.remove(&wid);
+        }
+    }
+
     /// Render the current frame
     fn render(&mut self) {
         // Early return checks
@@ -761,33 +1177,90 @@ impl RenderApp {
             }
         };
 
-        let view = output
+        let surface_view = output
             .texture
             .create_view(&wgpu::TextureViewDescriptor::default());
 
-        // Now render with immutable borrows
-        let frame = self.current_frame.as_ref().unwrap();
-        let renderer = self.renderer.as_ref().unwrap();
-        let glyph_atlas = self.glyph_atlas.as_mut().unwrap();
+        // Build animated cursor override if applicable
+        let animated_cursor = if self.cursor_anim_enabled && self.cursor_target.is_some() {
+            let target = self.cursor_target.as_ref().unwrap();
+            Some((
+                target.window_id,
+                self.cursor_current_x,
+                self.cursor_current_y,
+                self.cursor_current_w,
+                self.cursor_current_h,
+            ))
+        } else {
+            None
+        };
 
-        // Render frame glyphs
-        log::trace!(
-            "Rendering frame: {}x{}, {} glyphs",
-            frame.width,
-            frame.height,
-            frame.glyphs.len()
-        );
+        // Check if we need offscreen rendering (for transitions)
+        let need_offscreen = self.crossfade_enabled || self.scroll_enabled;
 
-        // Render directly to surface (full-frame rebuild, no pixel buffer needed)
-        renderer.render_frame_glyphs(
-            &view,
-            frame,
-            glyph_atlas,
-            &self.faces,
-            self.width,
-            self.height,
-            self.cursor_blink_on,
-        );
+        if need_offscreen {
+            // Swap: previous ← current
+            self.current_is_a = !self.current_is_a;
+
+            // Ensure offscreen textures exist
+            self.ensure_offscreen_textures();
+
+            // Render frame to current offscreen texture
+            if let Some((current_view, _)) = self.current_offscreen_view_and_bg()
+                .map(|(v, bg)| (v as *const wgpu::TextureView, bg))
+            {
+                let frame = self.current_frame.as_ref().unwrap();
+                let renderer = self.renderer.as_ref().unwrap();
+                let glyph_atlas = self.glyph_atlas.as_mut().unwrap();
+
+                // SAFETY: current_view is valid for the duration of this block
+                renderer.render_frame_glyphs(
+                    unsafe { &*current_view },
+                    frame,
+                    glyph_atlas,
+                    &self.faces,
+                    self.width,
+                    self.height,
+                    self.cursor_blink_on,
+                    animated_cursor,
+                );
+            }
+
+            // Detect transitions (compare window_infos)
+            self.detect_transitions();
+
+            // Blit current offscreen to surface
+            if let Some((_, current_bg)) = self.current_offscreen_view_and_bg()
+                .map(|(v, bg)| (v, bg as *const wgpu::BindGroup))
+            {
+                let renderer = self.renderer.as_ref().unwrap();
+                renderer.blit_texture_to_view(
+                    unsafe { &*current_bg },
+                    &surface_view,
+                    self.width,
+                    self.height,
+                );
+            }
+
+            // Composite active transitions on top
+            self.render_transitions(&surface_view);
+        } else {
+            // Simple path: render directly to surface
+            let frame = self.current_frame.as_ref().unwrap();
+            let renderer = self.renderer.as_ref().unwrap();
+            let glyph_atlas = self.glyph_atlas.as_mut().unwrap();
+
+            renderer.render_frame_glyphs(
+                &surface_view,
+                frame,
+                glyph_atlas,
+                &self.faces,
+                self.width,
+                self.height,
+                self.cursor_blink_on,
+                animated_cursor,
+            );
+        }
 
         // Present the frame
         output.present();
@@ -999,6 +1472,16 @@ impl ApplicationHandler for RenderApp {
 
         // Update cursor blink state
         if self.tick_cursor_blink() {
+            self.frame_dirty = true;
+        }
+
+        // Tick cursor animation
+        if self.tick_cursor_animation() {
+            self.frame_dirty = true;
+        }
+
+        // Keep dirty if transitions are active
+        if self.has_active_transitions() {
             self.frame_dirty = true;
         }
 

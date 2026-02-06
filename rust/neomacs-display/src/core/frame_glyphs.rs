@@ -123,6 +123,21 @@ impl FrameGlyph {
     }
 }
 
+/// Per-window metadata for animation transition detection
+#[derive(Debug, Clone, PartialEq)]
+pub struct WindowInfo {
+    /// Window pointer as i64 (unique window identifier)
+    pub window_id: i64,
+    /// Buffer pointer as u64 (unique buffer identifier)
+    pub buffer_id: u64,
+    /// First visible character position (marker_position(w->start))
+    pub window_start: i64,
+    /// Frame-absolute window bounds
+    pub bounds: Rect,
+    /// Whether this is the selected (active) window
+    pub selected: bool,
+}
+
 /// Buffer collecting glyphs for current frame.
 ///
 /// With matrix-based rendering, this buffer is cleared and rebuilt from scratch
@@ -144,6 +159,9 @@ pub struct FrameGlyphBuffer {
 
     /// Window regions from previous frame (kept for compatibility)
     pub prev_window_regions: Vec<Rect>,
+
+    /// Per-window metadata for animation detection
+    pub window_infos: Vec<WindowInfo>,
 
     /// Flag: layout changed last frame (kept for compatibility)
     pub layout_changed: bool,
@@ -172,6 +190,7 @@ impl FrameGlyphBuffer {
             glyphs: Vec::with_capacity(10000),
             window_regions: Vec::with_capacity(16),
             prev_window_regions: Vec::with_capacity(16),
+            window_infos: Vec::with_capacity(16),
             layout_changed: false,
             current_face_id: 0,
             current_fg: Color::WHITE,
@@ -200,6 +219,7 @@ impl FrameGlyphBuffer {
     pub fn clear_all(&mut self) {
         self.glyphs.clear();
         self.window_regions.clear();
+        self.window_infos.clear();
     }
 
     /// Start new frame - prepare for new content (compatibility shim)
@@ -340,6 +360,18 @@ impl FrameGlyphBuffer {
     /// Add cursor
     pub fn add_cursor(&mut self, window_id: i32, x: f32, y: f32, width: f32, height: f32, style: u8, color: Color) {
         self.glyphs.push(FrameGlyph::Cursor { window_id, x, y, width, height, style, color });
+    }
+
+    /// Add per-window metadata for animation detection
+    pub fn add_window_info(&mut self, window_id: i64, buffer_id: u64, window_start: i64,
+                           x: f32, y: f32, width: f32, height: f32, selected: bool) {
+        self.window_infos.push(WindowInfo {
+            window_id,
+            buffer_id,
+            window_start,
+            bounds: Rect::new(x, y, width, height),
+            selected,
+        });
     }
 
     /// Add border

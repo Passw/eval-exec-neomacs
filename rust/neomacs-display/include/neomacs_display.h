@@ -228,6 +228,19 @@ void neomacs_display_add_window(struct NeomacsDisplay *handle,
                                 int selected);
 
 /**
+ * Add per-window metadata for animation detection
+ */
+void neomacs_display_add_window_info(struct NeomacsDisplay *handle,
+                                     int64_t windowId,
+                                     uint64_t bufferId,
+                                     int64_t windowStart,
+                                     float x,
+                                     float y,
+                                     float width,
+                                     float height,
+                                     int selected);
+
+/**
  * Set cursor for a specific window
  */
 void neomacs_display_set_cursor(struct NeomacsDisplay *handle,
@@ -547,6 +560,22 @@ void neomacs_display_reset_cursor_blink(struct NeomacsDisplay *handle);
  * Configure cursor blinking (enable/disable and interval)
  */
 void neomacs_display_set_cursor_blink(struct NeomacsDisplay *handle, int enabled, int intervalMs);
+
+/**
+ * Configure cursor animation (smooth motion)
+ */
+void neomacs_display_set_cursor_animation(struct NeomacsDisplay *handle, int enabled, float speed);
+
+/**
+ * Configure all animation settings
+ */
+void neomacs_display_set_animation_config(struct NeomacsDisplay *handle,
+                                          int cursorEnabled,
+                                          float cursorSpeed,
+                                          int crossfadeEnabled,
+                                          uint32_t crossfadeDurationMs,
+                                          int scrollEnabled,
+                                          uint32_t scrollDurationMs);
 
 /**
  * Check if animations are active

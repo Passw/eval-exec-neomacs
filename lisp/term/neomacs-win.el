@@ -110,6 +110,9 @@ DISPLAY is the name of the display Emacs should connect to."
   ;; Emacs-side blink timer (which would fight with the render-thread blink).
   (neomacs--setup-cursor-blink)
 
+  ;; Set up animations (smooth cursor, crossfade, scroll slide)
+  (neomacs--setup-animations)
+
   (setq neomacs-initialized t))
 
 ;; Handle args function (required by common-win)
@@ -123,6 +126,12 @@ DISPLAY is the name of the display Emacs should connect to."
 
 ;; Cursor blink integration: delegate to render thread
 (declare-function neomacs-set-cursor-blink "neomacsterm.c" (enabled &optional interval))
+
+;; Animation configuration
+(declare-function neomacs-set-cursor-animation "neomacsterm.c" (enabled &optional speed))
+(declare-function neomacs-set-animation-config "neomacsterm.c"
+                  (cursor-enabled cursor-speed crossfade-enabled crossfade-duration
+                   scroll-enabled scroll-duration))
 
 (defun neomacs--sync-cursor-blink ()
   "Sync `blink-cursor-mode' state to the render thread."
@@ -145,6 +154,12 @@ Also suppresses the Emacs-side blink timer since the render thread handles it."
   (advice-add 'blink-cursor-timer-function :override
               (lambda () nil)
               '((name . neomacs-suppress-blink-timer))))
+
+;; Animation setup
+(defun neomacs--setup-animations ()
+  "Set up render-thread animations (smooth cursor, crossfade, scroll slide)."
+  (when (fboundp 'neomacs-set-animation-config)
+    (neomacs-set-animation-config t 15.0 t 200 t 150)))
 
 ;; Provide the feature
 (provide 'neomacs-win)

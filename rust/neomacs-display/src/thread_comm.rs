@@ -131,6 +131,17 @@ pub enum RenderCommand {
     VideoDestroy { id: u32 },
     /// Configure cursor blinking
     SetCursorBlink { enabled: bool, interval_ms: u32 },
+    /// Configure cursor animation (smooth motion)
+    SetCursorAnimation { enabled: bool, speed: f32 },
+    /// Configure all animations
+    SetAnimationConfig {
+        cursor_enabled: bool,
+        cursor_speed: f32,
+        crossfade_enabled: bool,
+        crossfade_duration_ms: u32,
+        scroll_enabled: bool,
+        scroll_duration_ms: u32,
+    },
 }
 
 /// Wakeup pipe for signaling Emacs from render thread

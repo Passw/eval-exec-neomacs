@@ -992,6 +992,7 @@ impl WgpuRenderer {
         surface_width: u32,
         surface_height: u32,
         cursor_visible: bool,
+        animated_cursor: Option<(i32, f32, f32, f32, f32)>,
     ) {
         log::debug!(
             "render_frame_glyphs: frame={}x{} surface={}x{}, {} glyphs, {} faces",
@@ -1100,14 +1101,25 @@ impl WgpuRenderer {
                     self.add_rect(&mut cursor_vertices, *x, *y, *width, *height, color);
                 }
                 FrameGlyph::Cursor {
+                    window_id,
                     x,
                     y,
                     width,
                     height,
                     style,
                     color,
-                    ..
                 } => {
+                    // Use animated coordinates if available and this is the active cursor
+                    let (cx, cy, cw, ch) = if let Some((anim_wid, ax, ay, aw, ah)) = animated_cursor {
+                        if *window_id == anim_wid && *style != 3 {
+                            (ax, ay, aw, ah)
+                        } else {
+                            (*x, *y, *width, *height)
+                        }
+                    } else {
+                        (*x, *y, *width, *height)
+                    };
+
                     // Hollow cursors (inactive window) never blink;
                     // other styles blink based on cursor_visible flag.
                     let should_draw = *style == 3 || cursor_visible;
@@ -1115,29 +1127,29 @@ impl WgpuRenderer {
                         match style {
                             0 => {
                                 // Filled box
-                                self.add_rect(&mut cursor_vertices, *x, *y, *width, *height, color);
+                                self.add_rect(&mut cursor_vertices, cx, cy, cw, ch, color);
                             }
                             1 => {
                                 // Bar (thin vertical line)
-                                self.add_rect(&mut cursor_vertices, *x, *y, 2.0, *height, color);
+                                self.add_rect(&mut cursor_vertices, cx, cy, 2.0, ch, color);
                             }
                             2 => {
                                 // Underline (hbar at bottom)
-                                self.add_rect(&mut cursor_vertices, *x, *y + *height - 2.0, *width, 2.0, color);
+                                self.add_rect(&mut cursor_vertices, cx, cy + ch - 2.0, cw, 2.0, color);
                             }
                             3 => {
                                 // Hollow box (4 border edges)
                                 // Top
-                                self.add_rect(&mut cursor_vertices, *x, *y, *width, 1.0, color);
+                                self.add_rect(&mut cursor_vertices, cx, cy, cw, 1.0, color);
                                 // Bottom
-                                self.add_rect(&mut cursor_vertices, *x, *y + *height - 1.0, *width, 1.0, color);
+                                self.add_rect(&mut cursor_vertices, cx, cy + ch - 1.0, cw, 1.0, color);
                                 // Left
-                                self.add_rect(&mut cursor_vertices, *x, *y, 1.0, *height, color);
+                                self.add_rect(&mut cursor_vertices, cx, cy, 1.0, ch, color);
                                 // Right
-                                self.add_rect(&mut cursor_vertices, *x + *width - 1.0, *y, 1.0, *height, color);
+                                self.add_rect(&mut cursor_vertices, cx + cw - 1.0, cy, 1.0, ch, color);
                             }
                             _ => {
-                                self.add_rect(&mut cursor_vertices, *x, *y, *width, *height, color);
+                                self.add_rect(&mut cursor_vertices, cx, cy, cw, ch, color);
                             }
                         }
                     }
@@ -1475,6 +1487,341 @@ impl WgpuRenderer {
                 render_pass.set_vertex_buffer(0, cursor_buffer.slice(..));
                 render_pass.draw(0..cursor_vertices.len() as u32, 0..1);
             }
+        }
+
+        self.queue.submit(std::iter::once(encoder.finish()));
+    }
+
+    // ========================================================================
+    // Offscreen texture management (for transitions)
+    // ========================================================================
+
+    /// Get the surface format
+    pub fn surface_format(&self) -> wgpu::TextureFormat {
+        self.surface_format
+    }
+
+    /// Get the image bind group layout (for creating bind groups for offscreen textures)
+    pub fn image_bind_group_layout(&self) -> &wgpu::BindGroupLayout {
+        self.image_cache.bind_group_layout()
+    }
+
+    /// Get the image sampler (for creating bind groups for offscreen textures)
+    pub fn image_sampler(&self) -> &wgpu::Sampler {
+        self.image_cache.sampler()
+    }
+
+    /// Get the uniform bind group (needed for composite rendering)
+    pub fn uniform_bind_group(&self) -> &wgpu::BindGroup {
+        &self.uniform_bind_group
+    }
+
+    /// Get the image pipeline (needed for blit and scroll slide)
+    pub fn image_pipeline(&self) -> &wgpu::RenderPipeline {
+        &self.image_pipeline
+    }
+
+    /// Create an offscreen texture suitable for rendering a full frame
+    pub fn create_offscreen_texture(&self, width: u32, height: u32) -> (wgpu::Texture, wgpu::TextureView) {
+        let tex = self.device.create_texture(&wgpu::TextureDescriptor {
+            label: Some("Offscreen Frame"),
+            size: wgpu::Extent3d {
+                width,
+                height,
+                depth_or_array_layers: 1,
+            },
+            mip_level_count: 1,
+            sample_count: 1,
+            dimension: wgpu::TextureDimension::D2,
+            format: self.surface_format,
+            usage: wgpu::TextureUsages::RENDER_ATTACHMENT
+                | wgpu::TextureUsages::TEXTURE_BINDING
+                | wgpu::TextureUsages::COPY_SRC
+                | wgpu::TextureUsages::COPY_DST,
+            view_formats: &[],
+        });
+        let view = tex.create_view(&wgpu::TextureViewDescriptor::default());
+        (tex, view)
+    }
+
+    /// Create a bind group for a texture view (usable with image_pipeline)
+    pub fn create_texture_bind_group(&self, view: &wgpu::TextureView) -> wgpu::BindGroup {
+        self.device.create_bind_group(&wgpu::BindGroupDescriptor {
+            label: Some("Offscreen Bind Group"),
+            layout: self.image_cache.bind_group_layout(),
+            entries: &[
+                wgpu::BindGroupEntry {
+                    binding: 0,
+                    resource: wgpu::BindingResource::TextureView(view),
+                },
+                wgpu::BindGroupEntry {
+                    binding: 1,
+                    resource: wgpu::BindingResource::Sampler(self.image_cache.sampler()),
+                },
+            ],
+        })
+    }
+
+    /// Blit a texture to a target view (fullscreen quad)
+    pub fn blit_texture_to_view(
+        &self,
+        src_bind_group: &wgpu::BindGroup,
+        dst_view: &wgpu::TextureView,
+        width: u32,
+        height: u32,
+    ) {
+        let w = width as f32;
+        let h = height as f32;
+
+        let vertices = [
+            GlyphVertex { position: [0.0, 0.0], tex_coords: [0.0, 0.0], color: [1.0, 1.0, 1.0, 1.0] },
+            GlyphVertex { position: [w, 0.0], tex_coords: [1.0, 0.0], color: [1.0, 1.0, 1.0, 1.0] },
+            GlyphVertex { position: [w, h], tex_coords: [1.0, 1.0], color: [1.0, 1.0, 1.0, 1.0] },
+            GlyphVertex { position: [0.0, 0.0], tex_coords: [0.0, 0.0], color: [1.0, 1.0, 1.0, 1.0] },
+            GlyphVertex { position: [w, h], tex_coords: [1.0, 1.0], color: [1.0, 1.0, 1.0, 1.0] },
+            GlyphVertex { position: [0.0, h], tex_coords: [0.0, 1.0], color: [1.0, 1.0, 1.0, 1.0] },
+        ];
+
+        let vertex_buffer = self.device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+            label: Some("Blit Vertex Buffer"),
+            contents: bytemuck::cast_slice(&vertices),
+            usage: wgpu::BufferUsages::VERTEX,
+        });
+
+        let mut encoder = self.device.create_command_encoder(&wgpu::CommandEncoderDescriptor {
+            label: Some("Blit Encoder"),
+        });
+
+        {
+            let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
+                label: Some("Blit Pass"),
+                color_attachments: &[Some(wgpu::RenderPassColorAttachment {
+                    view: dst_view,
+                    resolve_target: None,
+                    ops: wgpu::Operations {
+                        load: wgpu::LoadOp::Clear(wgpu::Color::BLACK),
+                        store: wgpu::StoreOp::Store,
+                    },
+                })],
+                depth_stencil_attachment: None,
+                timestamp_writes: None,
+                occlusion_query_set: None,
+            });
+
+            render_pass.set_pipeline(&self.image_pipeline);
+            render_pass.set_bind_group(0, &self.uniform_bind_group, &[]);
+            render_pass.set_bind_group(1, src_bind_group, &[]);
+            render_pass.set_vertex_buffer(0, vertex_buffer.slice(..));
+            render_pass.draw(0..6, 0..1);
+        }
+
+        self.queue.submit(std::iter::once(encoder.finish()));
+    }
+
+    /// Render a crossfade transition within a scissor region
+    /// Uses the image_pipeline to blend old and new textures
+    pub fn render_crossfade(
+        &self,
+        surface_view: &wgpu::TextureView,
+        old_bind_group: &wgpu::BindGroup,
+        new_bind_group: &wgpu::BindGroup,
+        blend_t: f32,
+        bounds: &crate::core::types::Rect,
+        surface_width: u32,
+        surface_height: u32,
+    ) {
+        // We render two passes: old texture with alpha (1-t), new texture with alpha t
+        // Using scissor rect to constrain to the window bounds
+
+        let sx = bounds.x.max(0.0) as u32;
+        let sy = bounds.y.max(0.0) as u32;
+        let sw = (bounds.width as u32).min(surface_width.saturating_sub(sx));
+        let sh = (bounds.height as u32).min(surface_height.saturating_sub(sy));
+
+        if sw == 0 || sh == 0 {
+            return;
+        }
+
+        let w = surface_width as f32;
+        let h = surface_height as f32;
+
+        // Fullscreen quad with UV mapping
+        let vertices = [
+            GlyphVertex { position: [0.0, 0.0], tex_coords: [0.0, 0.0], color: [1.0, 1.0, 1.0, 1.0] },
+            GlyphVertex { position: [w, 0.0], tex_coords: [1.0, 0.0], color: [1.0, 1.0, 1.0, 1.0] },
+            GlyphVertex { position: [w, h], tex_coords: [1.0, 1.0], color: [1.0, 1.0, 1.0, 1.0] },
+            GlyphVertex { position: [0.0, 0.0], tex_coords: [0.0, 0.0], color: [1.0, 1.0, 1.0, 1.0] },
+            GlyphVertex { position: [w, h], tex_coords: [1.0, 1.0], color: [1.0, 1.0, 1.0, 1.0] },
+            GlyphVertex { position: [0.0, h], tex_coords: [0.0, 1.0], color: [1.0, 1.0, 1.0, 1.0] },
+        ];
+
+        let vertex_buffer = self.device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+            label: Some("Crossfade Vertex Buffer"),
+            contents: bytemuck::cast_slice(&vertices),
+            usage: wgpu::BufferUsages::VERTEX,
+        });
+
+        let mut encoder = self.device.create_command_encoder(&wgpu::CommandEncoderDescriptor {
+            label: Some("Crossfade Encoder"),
+        });
+
+        {
+            // Pass 1: Draw old texture with alpha (1 - blend_t)
+            let old_alpha = 1.0 - blend_t;
+            let old_vertices = [
+                GlyphVertex { position: [0.0, 0.0], tex_coords: [0.0, 0.0], color: [1.0, 1.0, 1.0, old_alpha] },
+                GlyphVertex { position: [w, 0.0], tex_coords: [1.0, 0.0], color: [1.0, 1.0, 1.0, old_alpha] },
+                GlyphVertex { position: [w, h], tex_coords: [1.0, 1.0], color: [1.0, 1.0, 1.0, old_alpha] },
+                GlyphVertex { position: [0.0, 0.0], tex_coords: [0.0, 0.0], color: [1.0, 1.0, 1.0, old_alpha] },
+                GlyphVertex { position: [w, h], tex_coords: [1.0, 1.0], color: [1.0, 1.0, 1.0, old_alpha] },
+                GlyphVertex { position: [0.0, h], tex_coords: [0.0, 1.0], color: [1.0, 1.0, 1.0, old_alpha] },
+            ];
+            let old_vb = self.device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+                label: Some("Crossfade Old VB"),
+                contents: bytemuck::cast_slice(&old_vertices),
+                usage: wgpu::BufferUsages::VERTEX,
+            });
+
+            // New texture with alpha blend_t
+            let new_vertices = [
+                GlyphVertex { position: [0.0, 0.0], tex_coords: [0.0, 0.0], color: [1.0, 1.0, 1.0, blend_t] },
+                GlyphVertex { position: [w, 0.0], tex_coords: [1.0, 0.0], color: [1.0, 1.0, 1.0, blend_t] },
+                GlyphVertex { position: [w, h], tex_coords: [1.0, 1.0], color: [1.0, 1.0, 1.0, blend_t] },
+                GlyphVertex { position: [0.0, 0.0], tex_coords: [0.0, 0.0], color: [1.0, 1.0, 1.0, blend_t] },
+                GlyphVertex { position: [w, h], tex_coords: [1.0, 1.0], color: [1.0, 1.0, 1.0, blend_t] },
+                GlyphVertex { position: [0.0, h], tex_coords: [0.0, 1.0], color: [1.0, 1.0, 1.0, blend_t] },
+            ];
+            let new_vb = self.device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+                label: Some("Crossfade New VB"),
+                contents: bytemuck::cast_slice(&new_vertices),
+                usage: wgpu::BufferUsages::VERTEX,
+            });
+
+            let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
+                label: Some("Crossfade Pass"),
+                color_attachments: &[Some(wgpu::RenderPassColorAttachment {
+                    view: surface_view,
+                    resolve_target: None,
+                    ops: wgpu::Operations {
+                        load: wgpu::LoadOp::Load,
+                        store: wgpu::StoreOp::Store,
+                    },
+                })],
+                depth_stencil_attachment: None,
+                timestamp_writes: None,
+                occlusion_query_set: None,
+            });
+
+            render_pass.set_scissor_rect(sx, sy, sw, sh);
+            render_pass.set_pipeline(&self.image_pipeline);
+            render_pass.set_bind_group(0, &self.uniform_bind_group, &[]);
+
+            // Draw old with fading alpha
+            render_pass.set_bind_group(1, old_bind_group, &[]);
+            render_pass.set_vertex_buffer(0, old_vb.slice(..));
+            render_pass.draw(0..6, 0..1);
+
+            // Draw new with increasing alpha
+            render_pass.set_bind_group(1, new_bind_group, &[]);
+            render_pass.set_vertex_buffer(0, new_vb.slice(..));
+            render_pass.draw(0..6, 0..1);
+        }
+
+        self.queue.submit(std::iter::once(encoder.finish()));
+    }
+
+    /// Render a scroll slide transition within a scissor region
+    pub fn render_scroll_slide(
+        &self,
+        surface_view: &wgpu::TextureView,
+        old_bind_group: &wgpu::BindGroup,
+        new_bind_group: &wgpu::BindGroup,
+        t: f32,
+        direction: i32,
+        bounds: &crate::core::types::Rect,
+        surface_width: u32,
+        surface_height: u32,
+    ) {
+        // Ease-out quadratic
+        let eased_t = 1.0 - (1.0 - t).powi(2);
+        let offset = bounds.height * eased_t;
+
+        let sx = bounds.x.max(0.0) as u32;
+        let sy = bounds.y.max(0.0) as u32;
+        let sw = (bounds.width as u32).min(surface_width.saturating_sub(sx));
+        let sh = (bounds.height as u32).min(surface_height.saturating_sub(sy));
+
+        if sw == 0 || sh == 0 {
+            return;
+        }
+
+        let w = surface_width as f32;
+        let h = surface_height as f32;
+        let dir = direction as f32;
+
+        // Old texture slides out by offset in direction
+        let old_y_offset = -dir * offset;
+        // New texture slides in from opposite side
+        let new_y_offset = dir * (bounds.height - offset);
+
+        let make_quad = |y_off: f32| -> [GlyphVertex; 6] {
+            [
+                GlyphVertex { position: [0.0, y_off], tex_coords: [0.0, 0.0], color: [1.0, 1.0, 1.0, 1.0] },
+                GlyphVertex { position: [w, y_off], tex_coords: [1.0, 0.0], color: [1.0, 1.0, 1.0, 1.0] },
+                GlyphVertex { position: [w, h + y_off], tex_coords: [1.0, 1.0], color: [1.0, 1.0, 1.0, 1.0] },
+                GlyphVertex { position: [0.0, y_off], tex_coords: [0.0, 0.0], color: [1.0, 1.0, 1.0, 1.0] },
+                GlyphVertex { position: [w, h + y_off], tex_coords: [1.0, 1.0], color: [1.0, 1.0, 1.0, 1.0] },
+                GlyphVertex { position: [0.0, h + y_off], tex_coords: [0.0, 1.0], color: [1.0, 1.0, 1.0, 1.0] },
+            ]
+        };
+
+        let old_vertices = make_quad(old_y_offset);
+        let new_vertices = make_quad(new_y_offset);
+
+        let old_vb = self.device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+            label: Some("Scroll Old VB"),
+            contents: bytemuck::cast_slice(&old_vertices),
+            usage: wgpu::BufferUsages::VERTEX,
+        });
+        let new_vb = self.device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+            label: Some("Scroll New VB"),
+            contents: bytemuck::cast_slice(&new_vertices),
+            usage: wgpu::BufferUsages::VERTEX,
+        });
+
+        let mut encoder = self.device.create_command_encoder(&wgpu::CommandEncoderDescriptor {
+            label: Some("Scroll Encoder"),
+        });
+
+        {
+            let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
+                label: Some("Scroll Pass"),
+                color_attachments: &[Some(wgpu::RenderPassColorAttachment {
+                    view: surface_view,
+                    resolve_target: None,
+                    ops: wgpu::Operations {
+                        load: wgpu::LoadOp::Load,
+                        store: wgpu::StoreOp::Store,
+                    },
+                })],
+                depth_stencil_attachment: None,
+                timestamp_writes: None,
+                occlusion_query_set: None,
+            });
+
+            render_pass.set_scissor_rect(sx, sy, sw, sh);
+            render_pass.set_pipeline(&self.image_pipeline);
+            render_pass.set_bind_group(0, &self.uniform_bind_group, &[]);
+
+            // Draw old texture sliding out
+            render_pass.set_bind_group(1, old_bind_group, &[]);
+            render_pass.set_vertex_buffer(0, old_vb.slice(..));
+            render_pass.draw(0..6, 0..1);
+
+            // Draw new texture sliding in
+            render_pass.set_bind_group(1, new_bind_group, &[]);
+            render_pass.set_vertex_buffer(0, new_vb.slice(..));
+            render_pass.draw(0..6, 0..1);
         }
 
         self.queue.submit(std::iter::once(encoder.finish()));

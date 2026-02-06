@@ -586,6 +586,26 @@ neomacs_extract_window_glyphs (struct window *w, void *user_data)
                               (float) win_w, (float) win_h,
                               (uint32_t) bg, selected);
 
+  /* Per-window metadata for animation detection */
+  {
+    uintptr_t buf_id = 0;
+    ptrdiff_t win_start = 0;
+    if (BUFFERP (w->contents))
+      {
+        buf_id = (uintptr_t) XBUFFER (w->contents);
+        if (MARKERP (w->start))
+          win_start = marker_position (w->start);
+      }
+    neomacs_display_add_window_info (
+        handle,
+        (int64_t)(intptr_t) w,
+        (uint64_t) buf_id,
+        (int64_t) win_start,
+        (float) win_x, (float) win_y,
+        (float) win_w, (float) win_h,
+        selected);
+  }
+
   /* Walk all rows in current_matrix */
   for (int row_idx = 0; row_idx < matrix->nrows; row_idx++)
     {
@@ -3608,6 +3628,63 @@ Optional INTERVAL is the blink interval in seconds (default 0.5).  */)
   return blink_enabled ? Qt : Qnil;
 }
 
+DEFUN ("neomacs-set-cursor-animation", Fneomacs_set_cursor_animation, Sneomacs_set_cursor_animation, 1, 2, 0,
+       doc: /* Configure cursor animation (smooth motion) in the render thread.
+ENABLED non-nil enables smooth cursor animation, nil disables it.
+Optional SPEED is the exponential interpolation rate (default 15.0).
+Higher values make the cursor move faster.  */)
+  (Lisp_Object enabled, Lisp_Object speed)
+{
+  struct neomacs_display_info *dpyinfo = neomacs_display_list;
+  if (!dpyinfo || !dpyinfo->display_handle)
+    return Qnil;
+
+  int anim_enabled = !NILP (enabled);
+  float anim_speed = 15.0f;
+  if (!NILP (speed) && NUMBERP (speed))
+    anim_speed = (float) XFLOATINT (speed);
+
+  neomacs_display_set_cursor_animation (dpyinfo->display_handle,
+                                         anim_enabled, anim_speed);
+  return anim_enabled ? Qt : Qnil;
+}
+
+DEFUN ("neomacs-set-animation-config", Fneomacs_set_animation_config, Sneomacs_set_animation_config, 6, 6, 0,
+       doc: /* Configure all animation settings in the render thread.
+CURSOR-ENABLED non-nil enables smooth cursor animation.
+CURSOR-SPEED is the exponential interpolation rate (default 15.0).
+CROSSFADE-ENABLED non-nil enables buffer-switch crossfade.
+CROSSFADE-DURATION is duration in milliseconds (default 200).
+SCROLL-ENABLED non-nil enables scroll slide animation.
+SCROLL-DURATION is duration in milliseconds (default 150).  */)
+  (Lisp_Object cursor_enabled, Lisp_Object cursor_speed,
+   Lisp_Object crossfade_enabled, Lisp_Object crossfade_duration,
+   Lisp_Object scroll_enabled, Lisp_Object scroll_duration)
+{
+  struct neomacs_display_info *dpyinfo = neomacs_display_list;
+  if (!dpyinfo || !dpyinfo->display_handle)
+    return Qnil;
+
+  int ce = !NILP (cursor_enabled);
+  float cs = 15.0f;
+  if (NUMBERP (cursor_speed))
+    cs = (float) XFLOATINT (cursor_speed);
+
+  int cfe = !NILP (crossfade_enabled);
+  uint32_t cfd = 200;
+  if (NUMBERP (crossfade_duration))
+    cfd = (uint32_t) XFIXNUM (crossfade_duration);
+
+  int se = !NILP (scroll_enabled);
+  uint32_t sd = 150;
+  if (NUMBERP (scroll_duration))
+    sd = (uint32_t) XFIXNUM (scroll_duration);
+
+  neomacs_display_set_animation_config (dpyinfo->display_handle,
+                                         ce, cs, cfe, cfd, se, sd);
+  return Qt;
+}
+
 
 /* ============================================================================
  * Miscellaneous Functions
@@ -3971,6 +4048,8 @@ syms_of_neomacsterm (void)
 
   /* Cursor blink */
   defsubr (&Sneomacs_set_cursor_blink);
+  defsubr (&Sneomacs_set_cursor_animation);
+  defsubr (&Sneomacs_set_animation_config);
 
   DEFSYM (Qneomacs, "neomacs");
   /* Qvideo and Qwebkit are defined in xdisp.c for use in VIDEOP/WEBKITP */

@@ -265,6 +265,30 @@ pub unsafe extern "C" fn neomacs_display_add_window(
     }
 }
 
+/// Add per-window metadata for animation detection
+#[no_mangle]
+pub unsafe extern "C" fn neomacs_display_add_window_info(
+    handle: *mut NeomacsDisplay,
+    window_id: i64,
+    buffer_id: u64,
+    window_start: i64,
+    x: f32,
+    y: f32,
+    width: f32,
+    height: f32,
+    selected: c_int,
+) {
+    if handle.is_null() {
+        return;
+    }
+    let display = &mut *handle;
+    display.frame_glyphs.add_window_info(
+        window_id, buffer_id, window_start,
+        x, y, width, height,
+        selected != 0,
+    );
+}
+
 /// Set cursor for a specific window
 #[no_mangle]
 pub unsafe extern "C" fn neomacs_display_set_cursor(
@@ -1815,6 +1839,46 @@ pub unsafe extern "C" fn neomacs_display_set_cursor_blink(
     let cmd = RenderCommand::SetCursorBlink {
         enabled: enabled != 0,
         interval_ms: if interval_ms > 0 { interval_ms as u32 } else { 500 },
+    };
+    if let Some(ref state) = THREADED_STATE {
+        let _ = state.emacs_comms.cmd_tx.try_send(cmd);
+    }
+}
+
+/// Configure cursor animation (smooth motion)
+#[no_mangle]
+pub unsafe extern "C" fn neomacs_display_set_cursor_animation(
+    _handle: *mut NeomacsDisplay,
+    enabled: c_int,
+    speed: f32,
+) {
+    let cmd = RenderCommand::SetCursorAnimation {
+        enabled: enabled != 0,
+        speed: if speed > 0.0 { speed } else { 15.0 },
+    };
+    if let Some(ref state) = THREADED_STATE {
+        let _ = state.emacs_comms.cmd_tx.try_send(cmd);
+    }
+}
+
+/// Configure all animation settings
+#[no_mangle]
+pub unsafe extern "C" fn neomacs_display_set_animation_config(
+    _handle: *mut NeomacsDisplay,
+    cursor_enabled: c_int,
+    cursor_speed: f32,
+    crossfade_enabled: c_int,
+    crossfade_duration_ms: u32,
+    scroll_enabled: c_int,
+    scroll_duration_ms: u32,
+) {
+    let cmd = RenderCommand::SetAnimationConfig {
+        cursor_enabled: cursor_enabled != 0,
+        cursor_speed: if cursor_speed > 0.0 { cursor_speed } else { 15.0 },
+        crossfade_enabled: crossfade_enabled != 0,
+        crossfade_duration_ms: if crossfade_duration_ms > 0 { crossfade_duration_ms } else { 200 },
+        scroll_enabled: scroll_enabled != 0,
+        scroll_duration_ms: if scroll_duration_ms > 0 { scroll_duration_ms } else { 150 },
     };
     if let Some(ref state) = THREADED_STATE {
         let _ = state.emacs_comms.cmd_tx.try_send(cmd);
