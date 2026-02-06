@@ -16,7 +16,7 @@
 
 (defun neo-term-test--ffi-available-p ()
   "Check if neo-term FFI functions are available."
-  (fboundp 'neomacs-display-terminal-create))
+  (fboundp 'neomacs-terminal-create))
 
 (defun neo-term-test--insert-section (title)
   "Insert a section header."
@@ -48,25 +48,25 @@
             ;; Test 1: Window mode terminal
             (insert "Test 1: Creating Window mode terminal (80x24)... ")
             (condition-case err
-                (let ((id (neomacs-display-terminal-create 80 24 0 nil)))
+                (let ((id (neomacs-terminal-create 80 24 0 nil)))
                   (if (and id (> id 0))
                       (progn
                         (insert (propertize (format "OK (id=%d)\n" id)
                                             'face '(:foreground "green")))
                         ;; Write some test data
                         (insert "  Writing test data... ")
-                        (neomacs-display-terminal-write
-                         id "echo 'Hello from neo-term!'\r" 28)
+                        (neomacs-terminal-write
+                         id "echo 'Hello from neo-term!'\r")
                         (insert (propertize "OK\n" 'face '(:foreground "green")))
 
                         ;; Resize
                         (insert "  Resizing to 120x40... ")
-                        (neomacs-display-terminal-resize id 120 40)
+                        (neomacs-terminal-resize id 120 40)
                         (insert (propertize "OK\n" 'face '(:foreground "green")))
 
                         ;; Destroy
                         (insert "  Destroying... ")
-                        (neomacs-display-terminal-destroy id)
+                        (neomacs-terminal-destroy id)
                         (insert (propertize "OK\n" 'face '(:foreground "green"))))
                     (insert (propertize "FAIL (id=0)\n"
                                         'face '(:foreground "red")))))
@@ -78,12 +78,12 @@
             ;; Test 2: Inline mode terminal
             (insert "\nTest 2: Creating Inline mode terminal (60x10)... ")
             (condition-case err
-                (let ((id (neomacs-display-terminal-create 60 10 1 nil)))
+                (let ((id (neomacs-terminal-create 60 10 1 nil)))
                   (if (and id (> id 0))
                       (progn
                         (insert (propertize (format "OK (id=%d)\n" id)
                                             'face '(:foreground "green")))
-                        (neomacs-display-terminal-destroy id)
+                        (neomacs-terminal-destroy id)
                         (insert "  Destroyed.\n"))
                     (insert (propertize "FAIL (id=0)\n"
                                         'face '(:foreground "red")))))
@@ -95,16 +95,16 @@
             ;; Test 3: Floating mode terminal
             (insert "\nTest 3: Creating Floating mode terminal (80x24)... ")
             (condition-case err
-                (let ((id (neomacs-display-terminal-create 80 24 2 nil)))
+                (let ((id (neomacs-terminal-create 80 24 2 nil)))
                   (if (and id (> id 0))
                       (progn
                         (insert (propertize (format "OK (id=%d)\n" id)
                                             'face '(:foreground "green")))
                         ;; Set float position
                         (insert "  Setting float position (100, 100, opacity=0.9)... ")
-                        (neomacs-display-terminal-set-float id 100.0 100.0 0.9)
+                        (neomacs-terminal-set-float id 100.0 100.0 0.9)
                         (insert (propertize "OK\n" 'face '(:foreground "green")))
-                        (neomacs-display-terminal-destroy id)
+                        (neomacs-terminal-destroy id)
                         (insert "  Destroyed.\n"))
                     (insert (propertize "FAIL (id=0)\n"
                                         'face '(:foreground "red")))))

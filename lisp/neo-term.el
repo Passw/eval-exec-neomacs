@@ -47,18 +47,18 @@
 (defvar neo-term--next-buffer-num 1
   "Next buffer number for naming.")
 
-;; FFI declarations (provided by neomacs_display library)
-(declare-function neomacs-display-terminal-create "neomacs_display"
-                  (cols rows mode shell))
-(declare-function neomacs-display-terminal-write "neomacs_display"
-                  (terminal-id data len))
-(declare-function neomacs-display-terminal-resize "neomacs_display"
+;; These are C DEFUN primitives defined in neomacsterm.c
+(declare-function neomacs-terminal-create "neomacsterm.c"
+                  (cols rows mode &optional shell))
+(declare-function neomacs-terminal-write "neomacsterm.c"
+                  (terminal-id string))
+(declare-function neomacs-terminal-resize "neomacsterm.c"
                   (terminal-id cols rows))
-(declare-function neomacs-display-terminal-destroy "neomacs_display"
+(declare-function neomacs-terminal-destroy "neomacsterm.c"
                   (terminal-id))
-(declare-function neomacs-display-terminal-set-float "neomacs_display"
+(declare-function neomacs-terminal-set-float "neomacsterm.c"
                   (terminal-id x y opacity))
-(declare-function neomacs-display-terminal-get-text "neomacs_display"
+(declare-function neomacs-terminal-get-text "neomacsterm.c"
                   (terminal-id))
 
 (defun neo-term--shell-path ()
@@ -73,7 +73,7 @@
 Returns terminal ID or nil on failure."
   (let ((shell-path (or shell (neo-term--shell-path))))
     (condition-case err
-        (let ((id (neomacs-display-terminal-create cols rows mode shell-path)))
+        (let ((id (neomacs-terminal-create cols rows mode shell-path)))
           (when (and id (> id 0))
             (puthash id (list :id id :cols cols :rows rows :mode mode
                               :shell shell-path)
@@ -86,18 +86,18 @@ Returns terminal ID or nil on failure."
 (defun neo-term--destroy (terminal-id)
   "Destroy a terminal."
   (when terminal-id
-    (ignore-errors (neomacs-display-terminal-destroy terminal-id))
+    (ignore-errors (neomacs-terminal-destroy terminal-id))
     (remhash terminal-id neo-term--terminals)))
 
 (defun neo-term--write (terminal-id string)
   "Send STRING to the terminal."
   (when (and terminal-id string)
-    (neomacs-display-terminal-write terminal-id string (length string))))
+    (neomacs-terminal-write terminal-id string)))
 
 (defun neo-term--resize (terminal-id cols rows)
   "Resize a terminal."
   (when terminal-id
-    (neomacs-display-terminal-resize terminal-id cols rows)))
+    (neomacs-terminal-resize terminal-id cols rows)))
 
 ;;; Major mode
 
@@ -210,7 +210,7 @@ Optional COLS, ROWS set the terminal size."
     (unless id
       (error "Failed to create floating terminal"))
     (when (or x y)
-      (neomacs-display-terminal-set-float
+      (neomacs-terminal-set-float
        id (or x 100.0) (or y 100.0) 0.95))
     (message "neo-term: floating terminal %d created (%dx%d)" id cols rows)
     id))

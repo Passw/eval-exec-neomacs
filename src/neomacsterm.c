@@ -3875,6 +3875,119 @@ usage: (neomacs-set-animation-config CURSOR-ENABLED CURSOR-SPEED CURSOR-STYLE CU
 
 
 /* ============================================================================
+ * Terminal Emulator (neo-term) Functions
+ * ============================================================================ */
+
+DEFUN ("neomacs-terminal-create", Fneomacs_terminal_create, Sneomacs_terminal_create, 3, 4, 0,
+       doc: /* Create a GPU-accelerated terminal with COLS columns and ROWS rows.
+MODE is 0 for Window, 1 for Inline, 2 for Floating.
+Optional SHELL is the shell program path (nil means default).
+Returns terminal ID on success, nil on failure.  */)
+  (Lisp_Object cols, Lisp_Object rows, Lisp_Object mode, Lisp_Object shell)
+{
+  CHECK_FIXNUM (cols);
+  CHECK_FIXNUM (rows);
+  CHECK_FIXNUM (mode);
+
+  const char *shell_str = NULL;
+  if (!NILP (shell))
+    {
+      CHECK_STRING (shell);
+      shell_str = SSDATA (shell);
+    }
+
+  uint32_t id = neomacs_display_terminal_create (
+    (uint16_t) XFIXNUM (cols),
+    (uint16_t) XFIXNUM (rows),
+    (uint8_t) XFIXNUM (mode),
+    shell_str);
+
+  if (id == 0)
+    return Qnil;
+
+  return make_fixnum (id);
+}
+
+DEFUN ("neomacs-terminal-write", Fneomacs_terminal_write, Sneomacs_terminal_write, 2, 2, 0,
+       doc: /* Write STRING to terminal TERMINAL-ID.
+STRING is sent as keyboard input to the terminal's PTY.  */)
+  (Lisp_Object terminal_id, Lisp_Object string)
+{
+  CHECK_FIXNUM (terminal_id);
+  CHECK_STRING (string);
+
+  neomacs_display_terminal_write (
+    (uint32_t) XFIXNUM (terminal_id),
+    (const uint8_t *) SDATA (string),
+    SBYTES (string));
+
+  return Qt;
+}
+
+DEFUN ("neomacs-terminal-resize", Fneomacs_terminal_resize, Sneomacs_terminal_resize, 3, 3, 0,
+       doc: /* Resize terminal TERMINAL-ID to COLS columns and ROWS rows.  */)
+  (Lisp_Object terminal_id, Lisp_Object cols, Lisp_Object rows)
+{
+  CHECK_FIXNUM (terminal_id);
+  CHECK_FIXNUM (cols);
+  CHECK_FIXNUM (rows);
+
+  neomacs_display_terminal_resize (
+    (uint32_t) XFIXNUM (terminal_id),
+    (uint16_t) XFIXNUM (cols),
+    (uint16_t) XFIXNUM (rows));
+
+  return Qt;
+}
+
+DEFUN ("neomacs-terminal-destroy", Fneomacs_terminal_destroy, Sneomacs_terminal_destroy, 1, 1, 0,
+       doc: /* Destroy terminal TERMINAL-ID.  */)
+  (Lisp_Object terminal_id)
+{
+  CHECK_FIXNUM (terminal_id);
+
+  neomacs_display_terminal_destroy ((uint32_t) XFIXNUM (terminal_id));
+
+  return Qt;
+}
+
+DEFUN ("neomacs-terminal-set-float", Fneomacs_terminal_set_float, Sneomacs_terminal_set_float, 4, 4, 0,
+       doc: /* Set floating position and opacity for terminal TERMINAL-ID.
+X and Y are the screen coordinates, OPACITY is 0.0 to 1.0.  */)
+  (Lisp_Object terminal_id, Lisp_Object x, Lisp_Object y, Lisp_Object opacity)
+{
+  CHECK_FIXNUM (terminal_id);
+  CHECK_NUMBER (x);
+  CHECK_NUMBER (y);
+  CHECK_NUMBER (opacity);
+
+  neomacs_display_terminal_set_float (
+    (uint32_t) XFIXNUM (terminal_id),
+    (float) XFLOATINT (x),
+    (float) XFLOATINT (y),
+    (float) XFLOATINT (opacity));
+
+  return Qt;
+}
+
+DEFUN ("neomacs-terminal-get-text", Fneomacs_terminal_get_text, Sneomacs_terminal_get_text, 1, 1, 0,
+       doc: /* Get visible text from terminal TERMINAL-ID.
+Returns a string, or nil if the terminal is not found.  */)
+  (Lisp_Object terminal_id)
+{
+  CHECK_FIXNUM (terminal_id);
+
+  char *text = neomacs_display_terminal_get_text ((uint32_t) XFIXNUM (terminal_id));
+  if (!text)
+    return Qnil;
+
+  Lisp_Object result = build_string (text);
+  free (text);
+  return result;
+}
+
+
+/* ============================================================================
  * Miscellaneous Functions
  * ============================================================================ */
 
@@ -4378,6 +4491,14 @@ syms_of_neomacsterm (void)
   defsubr (&Sneomacs_set_cursor_blink);
   defsubr (&Sneomacs_set_cursor_animation);
   defsubr (&Sneomacs_set_animation_config);
+
+  /* Terminal emulator (neo-term) */
+  defsubr (&Sneomacs_terminal_create);
+  defsubr (&Sneomacs_terminal_write);
+  defsubr (&Sneomacs_terminal_resize);
+  defsubr (&Sneomacs_terminal_destroy);
+  defsubr (&Sneomacs_terminal_set_float);
+  defsubr (&Sneomacs_terminal_get_text);
 
   DEFSYM (Qneomacs, "neomacs");
   /* Qvideo and Qwebkit are defined in xdisp.c for use in VIDEOP/WEBKITP */
