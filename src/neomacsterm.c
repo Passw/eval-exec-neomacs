@@ -3919,6 +3919,36 @@ neomacs_display_wakeup_handler (int fd, void *data)
           neomacs_evq_enqueue (&inev);
           break;
 
+        case NEOMACS_EVENT_FOCUS_IN:
+          {
+            struct neomacs_display_info *dpyinfo = FRAME_NEOMACS_DISPLAY_INFO (f);
+            if (dpyinfo)
+              {
+                dpyinfo->focus_frame = f;
+                dpyinfo->x_focus_frame = f;
+                dpyinfo->highlight_frame = f;
+                dpyinfo->x_highlight_frame = f;
+              }
+            inev.ie.kind = FOCUS_IN_EVENT;
+            XSETFRAME (inev.ie.frame_or_window, f);
+            neomacs_evq_enqueue (&inev);
+          }
+          break;
+
+        case NEOMACS_EVENT_FOCUS_OUT:
+          {
+            struct neomacs_display_info *dpyinfo = FRAME_NEOMACS_DISPLAY_INFO (f);
+            if (dpyinfo && dpyinfo->highlight_frame == f)
+              {
+                dpyinfo->highlight_frame = NULL;
+                dpyinfo->x_highlight_frame = NULL;
+              }
+            inev.ie.kind = FOCUS_OUT_EVENT;
+            XSETFRAME (inev.ie.frame_or_window, f);
+            neomacs_evq_enqueue (&inev);
+          }
+          break;
+
         case NEOMACS_EVENT_IMAGE_DIMENSIONS_READY:
           /* Image dimensions are now available in the shared map.
              Trigger a redisplay so Emacs can pick them up. */
