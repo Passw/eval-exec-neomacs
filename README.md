@@ -169,24 +169,45 @@ The goal: **Make Emacs the most powerful and beautiful computing environment on 
 - **GStreamer** (for video playback)
 - **VA-API** (optional, for hardware video decode on Linux)
 
-### Linux (Debian/Ubuntu)
+### Linux (Arch Linux)
 
 ```bash
 # Install dependencies
-sudo apt install \
-  build-essential autoconf automake \
-  libgstreamer1.0-dev \
-  libgstreamer-plugins-base1.0-dev \
-  gstreamer1.0-plugins-good \
-  gstreamer1.0-plugins-bad \
-  gstreamer1.0-vaapi \
-  libva-dev
+sudo pacman -S --needed \
+  base-devel autoconf automake texinfo clang git pkg-config \
+  gtk4 glib2 cairo \
+  gstreamer gst-plugins-base gst-plugins-good gst-plugins-bad \
+  wpewebkit wpebackend-fdo \
+  wayland wayland-protocols \
+  mesa libva \
+  libjpeg-turbo libtiff giflib libpng librsvg libwebp \
+  ncurses gnutls libxml2 sqlite jansson tree-sitter \
+  gmp acl libxpm \
+  libgccjit
 
-# Build
+# Install Rust (if not already installed)
+curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
+
+# Build the Rust display engine
+cargo build --release --manifest-path rust/neomacs-display/Cargo.toml
+
+# Build Emacs
 ./autogen.sh
-./configure --with-neomacs-display
+./configure --with-neomacs --with-native-compilation
 make -j$(nproc)
 ```
+
+> **Note:** WPE WebKit (`wpewebkit`) is required for browser embedding. It is available in
+> Arch Linux repos and via NixOS. On distros without WPE WebKit packages, the build will
+> skip webkit support and build the Rust crate with `--no-default-features --features "winit-backend,video"`.
+
+### Docker (Build Test)
+
+```bash
+docker build -t neomacs-build-test .
+```
+
+Uses Arch Linux. See the [Dockerfile](Dockerfile) for the full build environment.
 
 ### Nix
 
@@ -196,7 +217,7 @@ nix-shell
 
 # Build
 ./autogen.sh
-./configure --with-neomacs-display
+./configure --with-neomacs --with-native-compilation
 make -j$(nproc)
 ```
 

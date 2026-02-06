@@ -1,0 +1,10 @@
+rust/neomacs-display/target/
+.git
+*.o
+*.elc
+src/emacs
+src/emacs-30.*
+src/bootstrap-emacs
+lib-src/etags
+lib-src/ctags
+lib-src/ebrowse

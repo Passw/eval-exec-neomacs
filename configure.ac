@@ -3966,13 +3966,18 @@ if test "$window_system" = "neomacs"; then
   fi
   dnl EGL is required for DMA-BUF zero-copy in webkit/video
   PKG_CHECK_MODULES([EGL], [egl], [], [AC_MSG_ERROR([EGL required for Neomacs zero-copy rendering])])
-  dnl WPE WebKit for browser embedding
-  PKG_CHECK_MODULES([WPEWEBKIT], [wpe-webkit-2.0], [], [AC_MSG_ERROR([WPE WebKit required for Neomacs webkit])])
-  PKG_CHECK_MODULES([WPEBACKEND], [wpebackend-fdo-1.0], [], [AC_MSG_ERROR([wpebackend-fdo required for Neomacs webkit])])
+  dnl WPE WebKit for browser embedding (optional)
+  HAVE_NEOMACS_WEBKIT=no
+  PKG_CHECK_MODULES([WPEWEBKIT], [wpe-webkit-2.0], [HAVE_NEOMACS_WEBKIT=yes], [AC_MSG_WARN([WPE WebKit not found, webkit support disabled])])
+  PKG_CHECK_MODULES([WPEBACKEND], [wpebackend-fdo-1.0], [], [AC_MSG_WARN([wpebackend-fdo not found])])
   dnl Wayland-server is needed for wl_shm_buffer functions (SHM fallback mode)
-  PKG_CHECK_MODULES([WAYLAND_SERVER], [wayland-server], [], [AC_MSG_ERROR([wayland-server required for Neomacs webkit SHM mode])])
-  NEOMACS_CFLAGS="$GTK4_CFLAGS $GSTREAMER_CFLAGS $CAIRO_CFLAGS $GLIB_CFLAGS $EGL_CFLAGS $WPEWEBKIT_CFLAGS $WPEBACKEND_CFLAGS $WAYLAND_SERVER_CFLAGS"
-  NEOMACS_LIBS="$NEOMACS_LIBS $GTK4_LIBS $GSTREAMER_LIBS $CAIRO_LIBS $GLIB_LIBS $EGL_LIBS $WPEWEBKIT_LIBS $WPEBACKEND_LIBS $WAYLAND_SERVER_LIBS -lpthread -lm -ldl"
+  PKG_CHECK_MODULES([WAYLAND_SERVER], [wayland-server], [], [AC_MSG_WARN([wayland-server not found])])
+  NEOMACS_CFLAGS="$GTK4_CFLAGS $GSTREAMER_CFLAGS $CAIRO_CFLAGS $GLIB_CFLAGS $EGL_CFLAGS"
+  NEOMACS_LIBS="$NEOMACS_LIBS $GTK4_LIBS $GSTREAMER_LIBS $CAIRO_LIBS $GLIB_LIBS $EGL_LIBS -lpthread -lm -ldl"
+  if test "$HAVE_NEOMACS_WEBKIT" = yes; then
+    NEOMACS_CFLAGS="$NEOMACS_CFLAGS $WPEWEBKIT_CFLAGS $WPEBACKEND_CFLAGS $WAYLAND_SERVER_CFLAGS"
+    NEOMACS_LIBS="$NEOMACS_LIBS $WPEWEBKIT_LIBS $WPEBACKEND_LIBS $WAYLAND_SERVER_LIBS"
+  fi
 fi
 AC_SUBST([NEOMACS_OBJ])
 AC_SUBST([NEOMACS_LIBS])
