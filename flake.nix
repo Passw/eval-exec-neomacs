@@ -16,9 +16,11 @@
     };
 
     # WPE WebKit standalone flake with Cachix binary cache
+    # Do NOT use `inputs.nixpkgs.follows` here — the Cachix binary was built
+    # with nix-wpe-webkit's own pinned nixpkgs, so follows would change the
+    # derivation hash and cause a cache miss (rebuilding from source ~1 hour).
     nix-wpe-webkit = {
       url = "github:eval-exec/nix-wpe-webkit";
-      inputs.nixpkgs.follows = "nixpkgs";
     };
   };
 
