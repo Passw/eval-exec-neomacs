@@ -4,7 +4,7 @@
 
 <p align="center">
   <a href="#features"><img src="https://img.shields.io/badge/status-alpha-blueviolet?style=for-the-badge" alt="Status: Alpha"/></a>
-  <a href="#building"><img src="https://img.shields.io/badge/rust-1.70+-orange?style=for-the-badge&logo=rust" alt="Rust 1.70+"/></a>
+  <a href="#building"><img src="https://img.shields.io/badge/rust-1.92+-orange?style=for-the-badge&logo=rust" alt="Rust 1.92+"/></a>
   <a href="#license"><img src="https://img.shields.io/badge/license-GPL--3.0-blue?style=for-the-badge" alt="License: GPL-3.0"/></a>
 </p>
 
@@ -269,7 +269,7 @@ The goal: **Make Emacs the most powerful and beautiful computing environment on 
 ### Prerequisites
 
 - **Emacs source** (this is a fork)
-- **Rust** (stable, 1.70+)
+- **Rust** (stable, 1.92+)
 - **GStreamer** (for video playback)
 - **VA-API** (optional, for hardware video decode on Linux)
 
