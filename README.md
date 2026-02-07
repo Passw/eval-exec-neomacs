@@ -337,14 +337,30 @@ extra-trusted-public-keys = nix-wpe-webkit.cachix.org-1:ItCjHkz1Y5QcwqI9cTGNWHzc
 
 #### Build with Nix
 
+**Option 1** — Trust the `nixConfig` in `flake.nix` (simplest):
+
 ```bash
-# One-command build (accepts the Cachix cache from flake.nix nixConfig)
 nix build --accept-flake-config
 
-# Or enter development shell for iterative development
+# Or enter development shell
 nix develop --accept-flake-config
+```
 
-# Legacy nix-shell (for non-flake users)
+**Option 2** — Pass Cachix flags directly:
+
+```bash
+nix build \
+  --extra-substituters "https://nix-wpe-webkit.cachix.org" \
+  --extra-trusted-public-keys "nix-wpe-webkit.cachix.org-1:ItCjHkz1Y5QcwqI9cTGNWHzcox4EqcXqKvOygxpwYHE="
+```
+
+> **Note:** Both options require your user to be in `trusted-users` in `/etc/nix/nix.conf`
+> (e.g., `trusted-users = root @wheel your-username`), or configure the cache system-wide
+> as shown above.
+
+**Legacy** (non-flake users):
+
+```bash
 nix-shell
 ```
 
