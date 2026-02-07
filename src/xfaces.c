@@ -3537,6 +3537,11 @@ FRAME 0 means change the face on all frames, and change the default
 		      && !EQ (v, Qflat_button))
 		    break;
 		}
+	      else if (EQ (k, QCcorner_radius))
+		{
+		  if (!FIXNUMP (v) || XFIXNUM (v) < 0)
+		    break;
+		}
 	      else
 		break;
 
@@ -6444,6 +6449,7 @@ realize_gui_face (struct face_cache *cache, Lisp_Object attrs[LFACE_VECTOR_SIZE]
       face->box_color = face->foreground;
       face->box_color_defaulted_p = true;
       face->box_vertical_line_width = face->box_horizontal_line_width = 1;
+      face->box_corner_radius = 0;
 
       while (CONSP (box))
 	{
@@ -6491,6 +6497,11 @@ realize_gui_face (struct face_cache *cache, Lisp_Object attrs[LFACE_VECTOR_SIZE]
 		  if (!set_color)
 		    face->box_color = face->background;
 		}
+	    }
+	  else if (EQ (keyword, QCcorner_radius))
+	    {
+	      if (FIXNUMP (value) && XFIXNUM (value) >= 0)
+		face->box_corner_radius = XFIXNUM (value);
 	    }
 	}
     }
@@ -7499,6 +7510,7 @@ syms_of_xfaces (void)
   DEFSYM (QCcolor, ":color");
   DEFSYM (QCline_width, ":line-width");
   DEFSYM (QCstyle, ":style");
+  DEFSYM (QCcorner_radius, ":corner-radius");
   DEFSYM (QCposition, ":position");
   DEFSYM (Qline, "line");
   DEFSYM (Qwave, "wave");

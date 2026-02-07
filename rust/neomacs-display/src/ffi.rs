@@ -639,6 +639,7 @@ pub unsafe extern "C" fn neomacs_display_add_stretch_glyph(
                 pixel_width as f32,
                 height as f32,
                 bg_color,
+                face_id,
                 display.current_row_is_overlay,
             );
             display.current_row_x += pixel_width;
@@ -793,6 +794,7 @@ pub unsafe extern "C" fn neomacs_display_set_face(
     box_type: c_int,  // 0=none, 1=line, 2=raised3d, 3=sunken3d
     box_color: u32,
     box_line_width: c_int,
+    box_corner_radius: c_int, // 0=sharp corners, >0=rounded
     strike_through: c_int, // 0=none, 1=enabled
     strike_through_color: u32, // 0xRRGGBB
     overline: c_int,  // 0=none, 1=enabled
@@ -941,10 +943,14 @@ pub unsafe extern "C" fn neomacs_display_set_face(
         underline_style: ul_style,
         box_type: bx_type,
         box_line_width,
+        box_corner_radius,
     };
 
     // Store face for later lookup during rendering
     display.faces.insert(face_id, face.clone());
+
+    // Also store in frame glyph buffer so render thread gets full face data
+    display.frame_glyphs.faces.insert(face_id, face.clone());
 
     // Hybrid path: set current face attributes for frame glyph buffer
     if display.use_hybrid {

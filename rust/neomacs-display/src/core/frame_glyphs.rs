@@ -4,6 +4,7 @@
 //! Emacs's current_matrix and rebuilds this buffer from scratch. No
 //! incremental overlap tracking is needed.
 
+use crate::core::face::Face;
 use crate::core::types::{Color, Rect};
 use std::collections::HashMap;
 
@@ -59,6 +60,7 @@ pub enum FrameGlyph {
         width: f32,
         height: f32,
         bg: Color,
+        face_id: u32,
         /// True if this is mode-line/echo area (renders on top)
         is_overlay: bool,
     },
@@ -225,6 +227,9 @@ pub struct FrameGlyphBuffer {
 
     /// Font family cache: face_id -> font_family
     pub face_fonts: HashMap<u32, String>,
+
+    /// Full face data: face_id -> Face (includes box, underline, etc.)
+    pub faces: HashMap<u32, Face>,
 }
 
 impl FrameGlyphBuffer {
@@ -256,6 +261,7 @@ impl FrameGlyphBuffer {
             current_overline: 0,
             current_overline_color: None,
             face_fonts: HashMap::new(),
+            faces: HashMap::new(),
         }
     }
 
@@ -411,8 +417,8 @@ impl FrameGlyphBuffer {
     }
 
     /// Add a stretch (whitespace) glyph. No overlap removal needed.
-    pub fn add_stretch(&mut self, x: f32, y: f32, width: f32, height: f32, bg: Color, is_overlay: bool) {
-        self.glyphs.push(FrameGlyph::Stretch { x, y, width, height, bg, is_overlay });
+    pub fn add_stretch(&mut self, x: f32, y: f32, width: f32, height: f32, bg: Color, face_id: u32, is_overlay: bool) {
+        self.glyphs.push(FrameGlyph::Stretch { x, y, width, height, bg, face_id, is_overlay });
     }
 
     /// Add an image glyph

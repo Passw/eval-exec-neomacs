@@ -1837,6 +1837,9 @@ struct face
   int box_vertical_line_width;
   int box_horizontal_line_width;
 
+  /* Corner radius for the box border.  0 means sharp (rectangular)
+     corners; positive values give rounded corners.  */
+  int box_corner_radius;
 
   /* The amount of pixels above the descent line the underline should
      be displayed.  It does not take effect unless

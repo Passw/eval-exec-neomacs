@@ -86,6 +86,9 @@ pub struct Face {
 
     /// Box line width
     pub box_line_width: i32,
+
+    /// Box corner radius (0 = sharp corners)
+    pub box_corner_radius: i32,
 }
 
 impl Default for Face {
@@ -105,6 +108,7 @@ impl Default for Face {
             underline_style: UnderlineStyle::None,
             box_type: BoxType::None,
             box_line_width: 0,
+            box_corner_radius: 0,
         }
     }
 }

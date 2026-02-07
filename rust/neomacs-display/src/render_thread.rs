@@ -1527,7 +1527,7 @@ impl RenderApp {
                         if let Some(content) = view.content() {
                             extra_glyphs.push(FrameGlyph::Stretch {
                                 x: *x, y: *y, width: *width, height: *height,
-                                bg: content.default_bg, is_overlay: false,
+                                bg: content.default_bg, face_id: 0, is_overlay: false,
                             });
 
                             Self::expand_terminal_cells(
@@ -1562,7 +1562,7 @@ impl RenderApp {
                         // Terminal background
                         win_glyphs.push(FrameGlyph::Stretch {
                             x, y, width, height,
-                            bg: content.default_bg, is_overlay: true,
+                            bg: content.default_bg, face_id: 0, is_overlay: true,
                         });
 
                         Self::expand_terminal_cells(
@@ -1596,7 +1596,7 @@ impl RenderApp {
                         let mut bg = content.default_bg;
                         bg.a = view.float_opacity;
                         float_glyphs.push(FrameGlyph::Stretch {
-                            x, y, width, height, bg, is_overlay: true,
+                            x, y, width, height, bg, face_id: 0, is_overlay: true,
                         });
 
                         Self::expand_terminal_cells(
@@ -1639,7 +1639,7 @@ impl RenderApp {
                 bg.a *= opacity;
                 out.push(FrameGlyph::Stretch {
                     x: cx, y: cy, width: cell_w, height: cell_h,
-                    bg, is_overlay,
+                    bg, face_id: 0, is_overlay,
                 });
             }
 
@@ -1697,32 +1697,17 @@ impl RenderApp {
         // Process pending image uploads (decoded images → GPU textures)
         self.process_pending_images();
 
-        // Build/update faces from frame data first (while we can mutably borrow self)
+        // Update faces from frame data (the frame carries the full face map
+        // set by the FFI side, including box/underline/overline attributes).
         if let Some(ref frame) = self.current_frame {
-            // Build faces from frame glyphs - always update to handle font size changes
-            for glyph in &frame.glyphs {
-                if let FrameGlyph::Char {
-                    face_id,
-                    fg,
-                    bold,
-                    italic,
-                    font_size,
-                    ..
-                } = glyph
-                {
-                    // Always update the face to handle dynamic font size changes
-                    let face = self.faces.entry(*face_id).or_insert_with(|| Face::new(*face_id));
-                    face.foreground = *fg;
-                    face.font_size = *font_size;
-                    face.font_weight = if *bold { 700 } else { 400 };
-                    if *italic {
-                        face.attributes |= crate::core::face::FaceAttributes::ITALIC;
-                    } else {
-                        face.attributes.remove(crate::core::face::FaceAttributes::ITALIC);
-                    }
-                    if let Some(font_family) = frame.face_fonts.get(face_id) {
-                        face.font_family = font_family.clone();
-                    }
+            // Use full face data from frame (set by neomacs_display_set_face FFI)
+            for (face_id, face) in &frame.faces {
+                self.faces.insert(*face_id, face.clone());
+            }
+            // Also update font families from the per-glyph font cache
+            for (face_id, font_family) in &frame.face_fonts {
+                if let Some(face) = self.faces.get_mut(face_id) {
+                    face.font_family = font_family.clone();
                 }
             }
         }

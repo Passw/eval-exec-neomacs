@@ -16,7 +16,7 @@ use super::image_cache::ImageCache;
 use super::video_cache::VideoCache;
 #[cfg(feature = "wpe-webkit")]
 use super::webkit_cache::WgpuWebKitCache;
-use super::vertex::{GlyphVertex, RectVertex, Uniforms};
+use super::vertex::{GlyphVertex, RectVertex, RoundedRectVertex, Uniforms};
 
 /// GPU-accelerated renderer using wgpu.
 pub struct WgpuRenderer {
@@ -26,6 +26,7 @@ pub struct WgpuRenderer {
     surface_config: Option<wgpu::SurfaceConfiguration>,
     surface_format: wgpu::TextureFormat,
     rect_pipeline: wgpu::RenderPipeline,
+    rounded_rect_pipeline: wgpu::RenderPipeline,
     glyph_pipeline: wgpu::RenderPipeline,
     image_pipeline: wgpu::RenderPipeline,
     glyph_bind_group_layout: wgpu::BindGroupLayout,
@@ -157,6 +158,51 @@ impl WgpuRenderer {
             },
             fragment: Some(wgpu::FragmentState {
                 module: &rect_shader,
+                entry_point: Some("fs_main"),
+                targets: &[Some(wgpu::ColorTargetState {
+                    format: target_format,
+                    blend: Some(wgpu::BlendState::ALPHA_BLENDING),
+                    write_mask: wgpu::ColorWrites::ALL,
+                })],
+                compilation_options: Default::default(),
+            }),
+            primitive: wgpu::PrimitiveState {
+                topology: wgpu::PrimitiveTopology::TriangleList,
+                strip_index_format: None,
+                front_face: wgpu::FrontFace::Ccw,
+                cull_mode: None,
+                polygon_mode: wgpu::PolygonMode::Fill,
+                unclipped_depth: false,
+                conservative: false,
+            },
+            depth_stencil: None,
+            multisample: wgpu::MultisampleState {
+                count: 1,
+                mask: !0,
+                alpha_to_coverage_enabled: false,
+            },
+            multiview: None,
+            cache: None,
+        });
+
+        // Load rounded rect shader (SDF-based rounded borders)
+        let rounded_rect_shader_source = include_str!("shaders/rounded_rect.wgsl");
+        let rounded_rect_shader = device.create_shader_module(wgpu::ShaderModuleDescriptor {
+            label: Some("Rounded Rect Shader"),
+            source: wgpu::ShaderSource::Wgsl(rounded_rect_shader_source.into()),
+        });
+
+        let rounded_rect_pipeline = device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
+            label: Some("Rounded Rect Pipeline"),
+            layout: Some(&pipeline_layout),
+            vertex: wgpu::VertexState {
+                module: &rounded_rect_shader,
+                entry_point: Some("vs_main"),
+                buffers: &[RoundedRectVertex::desc()],
+                compilation_options: Default::default(),
+            },
+            fragment: Some(wgpu::FragmentState {
+                module: &rounded_rect_shader,
                 entry_point: Some("fs_main"),
                 targets: &[Some(wgpu::ColorTargetState {
                     format: target_format,
@@ -351,6 +397,7 @@ impl WgpuRenderer {
             surface_config,
             surface_format: target_format,
             rect_pipeline,
+            rounded_rect_pipeline,
             glyph_pipeline,
             image_pipeline,
             glyph_bind_group_layout,
@@ -727,6 +774,50 @@ impl WgpuRenderer {
         });
     }
 
+    /// Emit a single rounded-rectangle border as 6 vertices (one oversized quad).
+    ///
+    /// The quad is padded by 1px on each side so the SDF fragment shader has
+    /// room for anti-aliased edges.  The shader carves out the interior, leaving
+    /// only the border ring with rounded corners.
+    fn add_rounded_rect(
+        &self,
+        vertices: &mut Vec<RoundedRectVertex>,
+        x: f32,
+        y: f32,
+        width: f32,
+        height: f32,
+        border_width: f32,
+        corner_radius: f32,
+        color: &Color,
+    ) {
+        let padding = 1.0; // extra pixels for SDF anti-aliasing fringe
+        let x0 = x - padding;
+        let y0 = y - padding;
+        let x1 = x + width + padding;
+        let y1 = y + height + padding;
+
+        let rect_min = [x, y];
+        let rect_max = [x + width, y + height];
+        let params = [border_width, corner_radius];
+        let color_arr = [color.r, color.g, color.b, color.a];
+
+        let v = |px: f32, py: f32| RoundedRectVertex {
+            position: [px, py],
+            color: color_arr,
+            rect_min,
+            rect_max,
+            params,
+        };
+
+        // Two triangles forming the quad
+        vertices.push(v(x0, y0));
+        vertices.push(v(x1, y0));
+        vertices.push(v(x0, y1));
+        vertices.push(v(x1, y0));
+        vertices.push(v(x1, y1));
+        vertices.push(v(x0, y1));
+    }
+
     /// Add an arbitrary quad (4 corners) to the vertex list (6 vertices = 2 triangles).
     /// Corners order: [TL, TR, BR, BL].
     fn add_quad(
@@ -1075,6 +1166,108 @@ impl WgpuRenderer {
             .reduce(f32::min);
         log::trace!("Frame {}x{}, overlay_y={:?}", frame_glyphs.width, frame_glyphs.height, overlay_y);
 
+        // --- Merge adjacent boxed glyphs into spans ---
+        // All box faces get span-merged for proper border rendering.
+        // Only faces with corner_radius > 0 get the SDF rounded rect treatment
+        // (background suppression + SDF fill + SDF border).
+        // Standard boxes (corner_radius=0) get merged rect borders drawn after text.
+        struct BoxSpan {
+            x: f32,
+            y: f32,
+            width: f32,
+            height: f32,
+            face_id: u32,
+            is_overlay: bool,
+            bg: Option<Color>,
+        }
+        let mut box_spans: Vec<BoxSpan> = Vec::new();
+
+        for glyph in &frame_glyphs.glyphs {
+            // Extract position info from both Char and Stretch glyphs with box faces
+            let (gx, gy, gw, gh, gface_id, g_overlay, g_bg) = match glyph {
+                FrameGlyph::Char { x, y, width, height, face_id, is_overlay, bg, .. } => {
+                    (*x, *y, *width, *height, *face_id, *is_overlay, *bg)
+                }
+                FrameGlyph::Stretch { x, y, width, height, face_id, is_overlay, bg } => {
+                    (*x, *y, *width, *height, *face_id, *is_overlay, Some(*bg))
+                }
+                _ => continue,
+            };
+
+            // Only include glyphs whose face has BOX attribute
+            match faces.get(&gface_id) {
+                Some(f) if f.attributes.contains(FaceAttributes::BOX) && f.box_line_width > 0 => {}
+                _ => continue,
+            };
+
+            // Check if this glyph's face has rounded corners
+            let is_rounded = faces.get(&gface_id)
+                .map(|f| f.box_corner_radius > 0)
+                .unwrap_or(false);
+
+            let merged = if let Some(last) = box_spans.last_mut() {
+                let same_row = (last.y - gy).abs() < 0.5
+                    && (last.height - gh).abs() < 0.5;
+                let same_overlay = last.is_overlay == g_overlay;
+                let adjacent = (gx - (last.x + last.width)).abs() < 1.0;
+                let same_face = last.face_id == gface_id;
+
+                // Merge rules:
+                // - Rounded boxes: only merge same face_id (keep separate boxes)
+                // - Sharp overlay boxes (mode-line): merge across face_ids (continuity)
+                // - Sharp non-overlay boxes (content): only merge same face_id
+                let last_is_rounded = faces.get(&last.face_id)
+                    .map(|f| f.box_corner_radius > 0)
+                    .unwrap_or(false);
+                let face_ok = if is_rounded || last_is_rounded {
+                    same_face  // rounded: strict same-face merge
+                } else if g_overlay {
+                    true  // sharp overlay: merge across faces (mode-line)
+                } else {
+                    same_face  // sharp non-overlay: strict same-face merge
+                };
+
+                if same_row && same_overlay && adjacent && face_ok {
+                    last.width = gx + gw - last.x;
+                    true
+                } else {
+                    false
+                }
+            } else {
+                false
+            };
+
+            if !merged {
+                box_spans.push(BoxSpan {
+                    x: gx, y: gy, width: gw, height: gh,
+                    face_id: gface_id, is_overlay: g_overlay,
+                    bg: g_bg,
+                });
+            }
+        }
+
+        // Helper: test whether a glyph position overlaps any ROUNDED box span.
+        // Only suppresses backgrounds for rounded boxes (corner_radius > 0).
+        // Standard boxes (corner_radius=0) keep normal rect backgrounds.
+        let box_margin: f32 = box_spans.iter()
+            .filter_map(|s| faces.get(&s.face_id)
+                .filter(|f| f.box_corner_radius > 0)
+                .map(|f| f.box_line_width as f32))
+            .fold(0.0_f32, f32::max);
+        let overlaps_rounded_box_span = |gx: f32, gy: f32, g_overlay: bool, spans: &[BoxSpan]| -> bool {
+            if box_margin <= 0.0 { return false; }
+            spans.iter().any(|s| {
+                // Only check rounded box spans with the same overlay status
+                if s.is_overlay != g_overlay { return false; }
+                let is_rounded = faces.get(&s.face_id)
+                    .map(|f| f.box_corner_radius > 0)
+                    .unwrap_or(false);
+                if !is_rounded { return false; }
+                gx >= s.x - box_margin - 0.5 && gx < s.x + s.width + box_margin + 0.5
+                && gy >= s.y - box_margin - 0.5 && gy < s.y + s.height + box_margin + 0.5
+            })
+        };
+
         // --- Collect non-overlay backgrounds ---
         let mut non_overlay_rect_vertices: Vec<RectVertex> = Vec::new();
 
@@ -1087,20 +1280,22 @@ impl WgpuRenderer {
                 );
             }
         }
-        // Non-overlay stretches
+        // Non-overlay stretches (skip those inside a box span)
         for glyph in &frame_glyphs.glyphs {
             if let FrameGlyph::Stretch { x, y, width, height, bg, is_overlay, .. } = glyph {
-                if !*is_overlay {
+                if !*is_overlay && !overlaps_rounded_box_span(*x, *y, false, &box_spans) {
                     self.add_rect(&mut non_overlay_rect_vertices, *x, *y, *width, *height, bg);
                 }
             }
         }
-        // Non-overlay char backgrounds
+        // Non-overlay char backgrounds (skip boxed chars — they get rounded bg instead)
         for glyph in &frame_glyphs.glyphs {
             if let FrameGlyph::Char { x, y, width, height, bg, is_overlay, .. } = glyph {
                 if !*is_overlay {
                     if let Some(bg_color) = bg {
-                        self.add_rect(&mut non_overlay_rect_vertices, *x, *y, *width, *height, bg_color);
+                        if !overlaps_rounded_box_span(*x, *y, false, &box_spans) {
+                            self.add_rect(&mut non_overlay_rect_vertices, *x, *y, *width, *height, bg_color);
+                        }
                     }
                 }
             }
@@ -1109,20 +1304,22 @@ impl WgpuRenderer {
         // --- Collect overlay backgrounds ---
         let mut overlay_rect_vertices: Vec<RectVertex> = Vec::new();
 
-        // Overlay stretches
+        // Overlay stretches (skip those inside a box span)
         for glyph in &frame_glyphs.glyphs {
             if let FrameGlyph::Stretch { x, y, width, height, bg, is_overlay, .. } = glyph {
-                if *is_overlay {
+                if *is_overlay && !overlaps_rounded_box_span(*x, *y, true, &box_spans) {
                     self.add_rect(&mut overlay_rect_vertices, *x, *y, *width, *height, bg);
                 }
             }
         }
-        // Overlay char backgrounds
+        // Overlay char backgrounds (skip those inside a box span)
         for glyph in &frame_glyphs.glyphs {
             if let FrameGlyph::Char { x, y, width, height, bg, is_overlay, .. } = glyph {
                 if *is_overlay {
                     if let Some(bg_color) = bg {
-                        self.add_rect(&mut overlay_rect_vertices, *x, *y, *width, *height, bg_color);
+                        if !overlaps_rounded_box_span(*x, *y, true, &box_spans) {
+                            self.add_rect(&mut overlay_rect_vertices, *x, *y, *width, *height, bg_color);
+                        }
                     }
                 }
             }
@@ -1295,6 +1492,43 @@ impl WgpuRenderer {
                 render_pass.draw(0..non_overlay_rect_vertices.len() as u32, 0..1);
             }
 
+            // === Step 1b: Draw filled rounded rect backgrounds for ROUNDED boxed spans ===
+            // Only for corner_radius > 0. Standard boxes use normal rect backgrounds.
+            {
+                let mut box_fill_vertices: Vec<RoundedRectVertex> = Vec::new();
+                for span in &box_spans {
+                    if span.is_overlay { continue; }
+                    if let Some(ref bg_color) = span.bg {
+                        if let Some(face) = faces.get(&span.face_id) {
+                            if face.box_corner_radius <= 0 { continue; }
+                            let radius = (face.box_corner_radius as f32)
+                                .min(span.height * 0.45)
+                                .min(span.width * 0.45);
+                            // Use a border_width larger than half the rect to fill solid
+                            let fill_bw = span.height.max(span.width);
+                            self.add_rounded_rect(
+                                &mut box_fill_vertices,
+                                span.x, span.y, span.width, span.height,
+                                fill_bw, radius, bg_color,
+                            );
+                        }
+                    }
+                }
+                if !box_fill_vertices.is_empty() {
+                    let fill_buffer = self.device.create_buffer_init(
+                        &wgpu::util::BufferInitDescriptor {
+                            label: Some("Box Fill Buffer"),
+                            contents: bytemuck::cast_slice(&box_fill_vertices),
+                            usage: wgpu::BufferUsages::VERTEX,
+                        },
+                    );
+                    render_pass.set_pipeline(&self.rounded_rect_pipeline);
+                    render_pass.set_bind_group(0, &self.uniform_bind_group, &[]);
+                    render_pass.set_vertex_buffer(0, fill_buffer.slice(..));
+                    render_pass.draw(0..box_fill_vertices.len() as u32, 0..1);
+                }
+            }
+
             // === Step 2: Draw cursor bg rect (inverse video background) ===
             // Drawn after window/char backgrounds but before text, so the cursor
             // background color is visible behind the inverse-video character.
@@ -1355,6 +1589,43 @@ impl WgpuRenderer {
                     render_pass.set_bind_group(0, &self.uniform_bind_group, &[]);
                     render_pass.set_vertex_buffer(0, rect_buffer.slice(..));
                     render_pass.draw(0..overlay_rect_vertices.len() as u32, 0..1);
+                }
+
+                // Draw filled rounded rect backgrounds for overlay ROUNDED boxed spans.
+                if want_overlay {
+                    let mut overlay_box_fill: Vec<RoundedRectVertex> = Vec::new();
+                    for span in &box_spans {
+                        if !span.is_overlay {
+                            continue;
+                        }
+                        if let Some(ref bg_color) = span.bg {
+                            if let Some(face) = faces.get(&span.face_id) {
+                                if face.box_corner_radius <= 0 { continue; }
+                                let radius = (face.box_corner_radius as f32)
+                                    .min(span.height * 0.45)
+                                    .min(span.width * 0.45);
+                                let fill_bw = span.height.max(span.width);
+                                self.add_rounded_rect(
+                                    &mut overlay_box_fill,
+                                    span.x, span.y, span.width, span.height,
+                                    fill_bw, radius, bg_color,
+                                );
+                            }
+                        }
+                    }
+                    if !overlay_box_fill.is_empty() {
+                        let fill_buffer = self.device.create_buffer_init(
+                            &wgpu::util::BufferInitDescriptor {
+                                label: Some("Overlay Box Fill Buffer"),
+                                contents: bytemuck::cast_slice(&overlay_box_fill),
+                                usage: wgpu::BufferUsages::VERTEX,
+                            },
+                        );
+                        render_pass.set_pipeline(&self.rounded_rect_pipeline);
+                        render_pass.set_bind_group(0, &self.uniform_bind_group, &[]);
+                        render_pass.set_vertex_buffer(0, fill_buffer.slice(..));
+                        render_pass.draw(0..overlay_box_fill.len() as u32, 0..1);
+                    }
                 }
 
                 let mut mask_data: Vec<(GlyphKey, [GlyphVertex; 6])> = Vec::new();
@@ -1484,14 +1755,15 @@ impl WgpuRenderer {
                     }
                 }
 
-                // === Draw text decorations (underline, overline, strike-through, box) ===
+                // === Draw text decorations (underline, overline, strike-through) ===
                 // Rendered after text so decorations appear on top of glyphs.
+                // Box borders are handled separately via merged box_spans below.
                 {
                     let mut decoration_vertices: Vec<RectVertex> = Vec::new();
 
                     for glyph in &frame_glyphs.glyphs {
                         if let FrameGlyph::Char {
-                            x, y, width, height, ascent, fg, face_id,
+                            x, y, width, height, ascent, fg,
                             underline, underline_color,
                             strike_through, strike_through_color,
                             overline, overline_color,
@@ -1569,22 +1841,6 @@ impl WgpuRenderer {
                                 let center_y = *y + *height / 2.0;
                                 self.add_rect(&mut decoration_vertices, *x, center_y, *width, 1.0, st_color);
                             }
-
-                            // --- Box ---
-                            if let Some(face) = faces.get(face_id) {
-                                if face.attributes.contains(FaceAttributes::BOX) && face.box_line_width > 0 {
-                                    let bx_color = face.box_color.as_ref().unwrap_or(&face.foreground);
-                                    let bw = face.box_line_width as f32;
-                                    // Top
-                                    self.add_rect(&mut decoration_vertices, *x, *y, *width, bw, bx_color);
-                                    // Bottom
-                                    self.add_rect(&mut decoration_vertices, *x, *y + *height - bw, *width, bw, bx_color);
-                                    // Left
-                                    self.add_rect(&mut decoration_vertices, *x, *y, bw, *height, bx_color);
-                                    // Right
-                                    self.add_rect(&mut decoration_vertices, *x + *width - bw, *y, bw, *height, bx_color);
-                                }
-                            }
                         }
                     }
 
@@ -1599,6 +1855,100 @@ impl WgpuRenderer {
                         render_pass.set_bind_group(0, &self.uniform_bind_group, &[]);
                         render_pass.set_vertex_buffer(0, decoration_buffer.slice(..));
                         render_pass.draw(0..decoration_vertices.len() as u32, 0..1);
+                    }
+                }
+
+                // === Draw box borders (merged spans) ===
+                // Standard boxes (corner_radius=0): merged rect borders (top/bottom/left/right).
+                // Rounded boxes (corner_radius>0): SDF border ring.
+                {
+                    // Sharp box borders as merged rect spans
+                    let mut sharp_border_vertices: Vec<RectVertex> = Vec::new();
+                    // Rounded box borders via SDF
+                    let mut rounded_border_vertices: Vec<RoundedRectVertex> = Vec::new();
+
+                    // Filter spans for this overlay pass
+                    let pass_spans: Vec<usize> = box_spans.iter().enumerate()
+                        .filter(|(_, s)| s.is_overlay == want_overlay)
+                        .map(|(i, _)| i)
+                        .collect();
+
+                    for (idx_in_pass, &span_idx) in pass_spans.iter().enumerate() {
+                        let span = &box_spans[span_idx];
+                        if let Some(face) = faces.get(&span.face_id) {
+                            let bx_color = face.box_color.as_ref().unwrap_or(&face.foreground);
+                            let bw = face.box_line_width as f32;
+
+                            if face.box_corner_radius > 0 {
+                                // Rounded border via SDF
+                                let radius = (face.box_corner_radius as f32)
+                                    .min(span.height * 0.45)
+                                    .min(span.width * 0.45);
+                                self.add_rounded_rect(
+                                    &mut rounded_border_vertices,
+                                    span.x, span.y, span.width, span.height,
+                                    bw, radius, bx_color,
+                                );
+                            } else {
+                                // Sharp border — for overlay spans (mode-line), suppress
+                                // internal left/right borders between adjacent spans for
+                                // continuity. For non-overlay spans, always draw all 4 borders.
+                                let suppress_internal = span.is_overlay;
+                                let has_left_neighbor = suppress_internal && idx_in_pass > 0 && {
+                                    let prev = &box_spans[pass_spans[idx_in_pass - 1]];
+                                    (prev.y - span.y).abs() < 0.5
+                                        && ((prev.x + prev.width) - span.x).abs() < 1.5
+                                };
+                                let has_right_neighbor = suppress_internal && idx_in_pass + 1 < pass_spans.len() && {
+                                    let next = &box_spans[pass_spans[idx_in_pass + 1]];
+                                    (next.y - span.y).abs() < 0.5
+                                        && (next.x - (span.x + span.width)).abs() < 1.5
+                                };
+
+                                // Top
+                                self.add_rect(&mut sharp_border_vertices, span.x, span.y, span.width, bw, bx_color);
+                                // Bottom
+                                self.add_rect(&mut sharp_border_vertices, span.x, span.y + span.height - bw, span.width, bw, bx_color);
+                                // Left (only if no adjacent span to the left on same row)
+                                if !has_left_neighbor {
+                                    self.add_rect(&mut sharp_border_vertices, span.x, span.y, bw, span.height, bx_color);
+                                }
+                                // Right (only if no adjacent span to the right on same row)
+                                if !has_right_neighbor {
+                                    self.add_rect(&mut sharp_border_vertices, span.x + span.width - bw, span.y, bw, span.height, bx_color);
+                                }
+                            }
+                        }
+                    }
+
+                    // Draw sharp box borders
+                    if !sharp_border_vertices.is_empty() {
+                        let sharp_buffer = self.device.create_buffer_init(
+                            &wgpu::util::BufferInitDescriptor {
+                                label: Some("Sharp Box Border Buffer"),
+                                contents: bytemuck::cast_slice(&sharp_border_vertices),
+                                usage: wgpu::BufferUsages::VERTEX,
+                            },
+                        );
+                        render_pass.set_pipeline(&self.rect_pipeline);
+                        render_pass.set_bind_group(0, &self.uniform_bind_group, &[]);
+                        render_pass.set_vertex_buffer(0, sharp_buffer.slice(..));
+                        render_pass.draw(0..sharp_border_vertices.len() as u32, 0..1);
+                    }
+
+                    // Draw rounded box borders
+                    if !rounded_border_vertices.is_empty() {
+                        let rounded_buffer = self.device.create_buffer_init(
+                            &wgpu::util::BufferInitDescriptor {
+                                label: Some("Rounded Box Border Buffer"),
+                                contents: bytemuck::cast_slice(&rounded_border_vertices),
+                                usage: wgpu::BufferUsages::VERTEX,
+                            },
+                        );
+                        render_pass.set_pipeline(&self.rounded_rect_pipeline);
+                        render_pass.set_bind_group(0, &self.uniform_bind_group, &[]);
+                        render_pass.set_vertex_buffer(0, rounded_buffer.slice(..));
+                        render_pass.draw(0..rounded_border_vertices.len() as u32, 0..1);
                     }
                 }
             }

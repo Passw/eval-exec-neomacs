@@ -555,11 +555,18 @@ neomacs_send_face (void *handle, struct frame *f, struct face *face)
       box_type = 1;
       box_line_width = eabs (face->box_vertical_line_width);
       if (box_line_width == 0) box_line_width = 1;
-      if (!face->box_color_defaulted_p)
-        box_color = ((RED_FROM_ULONG (face->box_color) << 16) |
-                     (GREEN_FROM_ULONG (face->box_color) << 8) |
-                     BLUE_FROM_ULONG (face->box_color));
+      /* Always use face->box_color: the face realization code sets it to the
+         correct value (either foreground when defaulted, or the user-specified
+         color from :box (:color ...)).  box_color_defaulted_p may not be
+         cleared even when a custom color is specified (xfaces.c bug). */
+      box_color = ((RED_FROM_ULONG (face->box_color) << 16) |
+                   (GREEN_FROM_ULONG (face->box_color) << 8) |
+                   BLUE_FROM_ULONG (face->box_color));
     }
+
+  int box_corner_radius = 0;
+  if (face->box != FACE_NO_BOX)
+    box_corner_radius = face->box_corner_radius;
 
   int strike_through = face->strike_through_p ? 1 : 0;
   uint32_t strike_through_color = fg_rgb;
@@ -584,6 +591,7 @@ neomacs_send_face (void *handle, struct frame *f, struct face *face)
                             font_weight, is_italic, font_size,
                             underline_style, underline_color,
                             box_type, box_color, box_line_width,
+                            box_corner_radius,
                             strike_through, strike_through_color,
                             overline, overline_color);
 }
@@ -1504,11 +1512,14 @@ neomacs_draw_glyph_string (struct glyph_string *s)
                   box_line_width = eabs(face->box_vertical_line_width);
                   if (box_line_width == 0)
                     box_line_width = 1;
-                  if (face->box_color_defaulted_p == 0)
-                    box_color = ((RED_FROM_ULONG(face->box_color) << 16) |
-                                 (GREEN_FROM_ULONG(face->box_color) << 8) |
-                                 BLUE_FROM_ULONG(face->box_color));
+                  box_color = ((RED_FROM_ULONG(face->box_color) << 16) |
+                               (GREEN_FROM_ULONG(face->box_color) << 8) |
+                               BLUE_FROM_ULONG(face->box_color));
                 }
+
+              int box_corner_radius = 0;
+              if (face->box != FACE_NO_BOX)
+                box_corner_radius = face->box_corner_radius;
 
               /* Check for strike-through */
               int strike_through = face->strike_through_p ? 1 : 0;
@@ -1544,6 +1555,7 @@ neomacs_draw_glyph_string (struct glyph_string *s)
                                         box_type,
                                         box_color,
                                         box_line_width,
+                                        box_corner_radius,
                                         strike_through,
                                         strike_through_color,
                                         overline,

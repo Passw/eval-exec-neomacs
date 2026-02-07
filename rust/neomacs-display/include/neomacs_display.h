@@ -35,8 +35,6 @@
 #define NEOMACS_EVENT_CLOSE_REQUEST 8
 #define NEOMACS_EVENT_FOCUS_IN      9
 #define NEOMACS_EVENT_FOCUS_OUT     10
-#define NEOMACS_EVENT_IMAGE_DIMENSIONS_READY 11
-#define NEOMACS_EVENT_TERMINAL_EXITED 12
 
 #define DRM_FORMAT_ARGB8888 875713089
 
@@ -347,6 +345,7 @@ void neomacs_display_set_face(struct NeomacsDisplay *handle,
                               int boxType,
                               uint32_t boxColor,
                               int boxLineWidth,
+                              int boxCornerRadius,
                               int strikeThrough,
                               uint32_t strikeThroughColor,
                               int overline,
