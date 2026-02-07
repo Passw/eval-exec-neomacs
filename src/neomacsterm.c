@@ -155,6 +155,7 @@ static void neomacs_after_update_window_line (struct window *, struct glyph_row 
 static void neomacs_update_window_begin (struct window *);
 static void neomacs_update_window_end (struct window *, bool, bool);
 static void neomacs_draw_vertical_window_border (struct window *, int, int, int);
+static void neomacs_draw_window_divider (struct window *, int, int, int, int);
 
 /* The redisplay interface for Neomacs frames - statically initialized.
    All function pointers are declared extern in neomacsterm.h */
@@ -182,7 +183,7 @@ static struct redisplay_interface neomacs_redisplay_interface = {
   .clear_under_internal_border = NULL,
   .draw_window_cursor = neomacs_draw_window_cursor,
   .draw_vertical_window_border = neomacs_draw_vertical_window_border,
-  .draw_window_divider = NULL,
+  .draw_window_divider = neomacs_draw_window_divider,
   .shift_glyphs_for_insert = NULL,
   .show_hourglass = NULL,
   .hide_hourglass = NULL,
@@ -2213,6 +2214,80 @@ neomacs_draw_vertical_window_border (struct window *w, int x, int y0, int y1)
       double b = BLUE_FROM_ULONG (fg) / 255.0;
       cairo_set_source_rgb (cr, r, g, b);
       cairo_rectangle (cr, x, y0, 1, y1 - y0);
+      cairo_fill (cr);
+    }
+}
+
+/* Draw window divider - used for window-divider-mode (Doom Emacs etc.) */
+static void
+neomacs_draw_window_divider (struct window *w, int x0, int x1, int y0, int y1)
+{
+  struct frame *f = XFRAME (WINDOW_FRAME (w));
+  struct neomacs_output *output = FRAME_NEOMACS_OUTPUT (f);
+  struct neomacs_display_info *dpyinfo = FRAME_NEOMACS_DISPLAY_INFO (f);
+
+  if (!output)
+    return;
+
+  /* Get divider face colors */
+  struct face *face = FACE_FROM_ID_OR_NULL (f, WINDOW_DIVIDER_FACE_ID);
+  struct face *face_first
+    = FACE_FROM_ID_OR_NULL (f, WINDOW_DIVIDER_FIRST_PIXEL_FACE_ID);
+  struct face *face_last
+    = FACE_FROM_ID_OR_NULL (f, WINDOW_DIVIDER_LAST_PIXEL_FACE_ID);
+  unsigned long color = face ? face->foreground : FRAME_FOREGROUND_PIXEL (f);
+  unsigned long color_first = (face_first
+                               ? face_first->foreground
+                               : FRAME_FOREGROUND_PIXEL (f));
+  unsigned long color_last = (face_last
+                              ? face_last->foreground
+                              : FRAME_FOREGROUND_PIXEL (f));
+
+  if (dpyinfo && dpyinfo->display_handle)
+    {
+      if (y1 - y0 > x1 - x0 && x1 - x0 > 2)
+        {
+          /* Vertical divider: first pixel column, middle, last pixel column */
+          uint32_t c_first = (0xFF << 24) | (color_first & 0xFFFFFF);
+          uint32_t c_mid = (0xFF << 24) | (color & 0xFFFFFF);
+          uint32_t c_last = (0xFF << 24) | (color_last & 0xFFFFFF);
+          neomacs_display_draw_border (dpyinfo->display_handle,
+                                       x0, y0, 1, y1 - y0, c_first);
+          neomacs_display_draw_border (dpyinfo->display_handle,
+                                       x0 + 1, y0, x1 - x0 - 2, y1 - y0, c_mid);
+          neomacs_display_draw_border (dpyinfo->display_handle,
+                                       x1 - 1, y0, 1, y1 - y0, c_last);
+        }
+      else if (x1 - x0 > y1 - y0 && y1 - y0 > 3)
+        {
+          /* Horizontal divider: first pixel row, middle, last pixel row */
+          uint32_t c_first = (0xFF << 24) | (color_first & 0xFFFFFF);
+          uint32_t c_mid = (0xFF << 24) | (color & 0xFFFFFF);
+          uint32_t c_last = (0xFF << 24) | (color_last & 0xFFFFFF);
+          neomacs_display_draw_border (dpyinfo->display_handle,
+                                       x0, y0, x1 - x0, 1, c_first);
+          neomacs_display_draw_border (dpyinfo->display_handle,
+                                       x0, y0 + 1, x1 - x0, y1 - y0 - 2, c_mid);
+          neomacs_display_draw_border (dpyinfo->display_handle,
+                                       x0, y1 - 1, x1 - x0, 1, c_last);
+        }
+      else
+        {
+          /* Small divider: fill with main color */
+          uint32_t c = (0xFF << 24) | (color & 0xFFFFFF);
+          neomacs_display_draw_border (dpyinfo->display_handle,
+                                       x0, y0, x1 - x0, y1 - y0, c);
+        }
+    }
+  else if (output->cr_context)
+    {
+      /* Fallback to Cairo */
+      cairo_t *cr = output->cr_context;
+      double r = RED_FROM_ULONG (color) / 255.0;
+      double g = GREEN_FROM_ULONG (color) / 255.0;
+      double b = BLUE_FROM_ULONG (color) / 255.0;
+      cairo_set_source_rgb (cr, r, g, b);
+      cairo_rectangle (cr, x0, y0, x1 - x0, y1 - y0);
       cairo_fill (cr);
     }
 }
