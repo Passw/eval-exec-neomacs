@@ -8040,8 +8040,7 @@ neomacs_display_wakeup_handler (int fd, void *data)
               {
                 dpyinfo->focus_frame = f;
                 dpyinfo->x_focus_frame = f;
-                dpyinfo->highlight_frame = f;
-                dpyinfo->x_highlight_frame = f;
+                neomacs_frame_rehighlight (dpyinfo);
               }
             inev.ie.kind = FOCUS_IN_EVENT;
             XSETFRAME (inev.ie.frame_or_window, f);
@@ -8052,10 +8051,13 @@ neomacs_display_wakeup_handler (int fd, void *data)
         case NEOMACS_EVENT_FOCUS_OUT:
           {
             struct neomacs_display_info *dpyinfo = FRAME_NEOMACS_DISPLAY_INFO (f);
-            if (dpyinfo && dpyinfo->highlight_frame == f)
+            if (dpyinfo)
               {
-                dpyinfo->highlight_frame = NULL;
-                dpyinfo->x_highlight_frame = NULL;
+                if (dpyinfo->x_focus_frame == f)
+                  dpyinfo->x_focus_frame = NULL;
+                if (dpyinfo->focus_frame == f)
+                  dpyinfo->focus_frame = NULL;
+                neomacs_frame_rehighlight (dpyinfo);
               }
             inev.ie.kind = FOCUS_OUT_EVENT;
             XSETFRAME (inev.ie.frame_or_window, f);
