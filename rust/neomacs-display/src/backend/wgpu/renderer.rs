@@ -264,6 +264,10 @@ pub struct WgpuRenderer {
     window_content_shadow_enabled: bool,
     window_content_shadow_size: f32,
     window_content_shadow_opacity: f32,
+    /// Mini-buffer completion highlight glow
+    minibuffer_highlight_enabled: bool,
+    minibuffer_highlight_color: (f32, f32, f32),
+    minibuffer_highlight_opacity: f32,
     /// Smooth window padding transition on resize
     resize_padding_enabled: bool,
     resize_padding_duration_ms: u32,
@@ -962,6 +966,9 @@ impl WgpuRenderer {
             window_content_shadow_enabled: false,
             window_content_shadow_size: 6.0,
             window_content_shadow_opacity: 0.15,
+            minibuffer_highlight_enabled: false,
+            minibuffer_highlight_color: (0.4, 0.6, 1.0),
+            minibuffer_highlight_opacity: 0.25,
             resize_padding_enabled: false,
             resize_padding_duration_ms: 200,
             resize_padding_max: 12.0,
@@ -1219,6 +1226,13 @@ impl WgpuRenderer {
         self.window_content_shadow_enabled = enabled;
         self.window_content_shadow_size = size;
         self.window_content_shadow_opacity = opacity;
+    }
+
+    /// Update minibuffer highlight config
+    pub fn set_minibuffer_highlight(&mut self, enabled: bool, color: (f32, f32, f32), opacity: f32) {
+        self.minibuffer_highlight_enabled = enabled;
+        self.minibuffer_highlight_color = color;
+        self.minibuffer_highlight_opacity = opacity;
     }
 
     /// Update resize padding config
@@ -5283,6 +5297,76 @@ impl WgpuRenderer {
                 } else if self.resize_padding_started.is_some() {
                     // Animation complete, clean up
                     self.resize_padding_started = None;
+                }
+            }
+
+            // === Mini-buffer completion highlight ===
+            if self.minibuffer_highlight_enabled {
+                let (hr, hg, hb) = self.minibuffer_highlight_color;
+                let h_opacity = self.minibuffer_highlight_opacity.clamp(0.0, 1.0);
+                let mut highlight_vertices: Vec<RectVertex> = Vec::new();
+
+                // Find minibuffer window
+                if let Some(mb_info) = frame_glyphs.window_infos.iter().find(|w| w.is_minibuffer) {
+                    let mb = &mb_info.bounds;
+                    // Collect rows of glyphs with background color in the minibuffer
+                    // Group by Y coordinate to find highlighted rows
+                    let mut highlighted_rows: Vec<(f32, f32, f32, f32)> = Vec::new(); // (x_min, y, x_max, height)
+
+                    for glyph in &frame_glyphs.glyphs {
+                        if let FrameGlyph::Char { x, y, width, height, bg: Some(_), .. } = glyph {
+                            // Check glyph is within minibuffer bounds
+                            if *y >= mb.y && *y < mb.y + mb.height
+                                && *x >= mb.x && *x < mb.x + mb.width
+                            {
+                                // Try to merge with existing row at same Y
+                                let mut merged = false;
+                                for row in &mut highlighted_rows {
+                                    if (row.1 - *y).abs() < 1.0 {
+                                        row.0 = row.0.min(*x);
+                                        row.2 = row.2.max(*x + *width);
+                                        row.3 = row.3.max(*height);
+                                        merged = true;
+                                        break;
+                                    }
+                                }
+                                if !merged {
+                                    highlighted_rows.push((*x, *y, *x + *width, *height));
+                                }
+                            }
+                        }
+                    }
+
+                    // Draw glow overlay around each highlighted row
+                    let glow_pad = 3.0_f32;
+                    for (x_min, y, x_max, height) in &highlighted_rows {
+                        let rx = (x_min - glow_pad).max(mb.x);
+                        let ry = (y - glow_pad).max(mb.y);
+                        let rw = (x_max - x_min + glow_pad * 2.0).min(mb.x + mb.width - rx);
+                        let rh = (height + glow_pad * 2.0).min(mb.y + mb.height - ry);
+
+                        // Soft glow: 3-step gradient outward
+                        for step in 0..3 {
+                            let s = step as f32;
+                            let alpha = h_opacity * (1.0 - s / 3.0) * (1.0 - s / 3.0);
+                            let c = Color::new(hr, hg, hb, alpha);
+                            self.add_rect(&mut highlight_vertices,
+                                rx - s, ry - s,
+                                rw + s * 2.0, rh + s * 2.0, &c);
+                        }
+                    }
+                }
+
+                if !highlight_vertices.is_empty() {
+                    let hl_buffer = self.device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+                        label: Some("Minibuffer Highlight Buffer"),
+                        contents: bytemuck::cast_slice(&highlight_vertices),
+                        usage: wgpu::BufferUsages::VERTEX,
+                    });
+                    render_pass.set_pipeline(&self.rect_pipeline);
+                    render_pass.set_bind_group(0, &self.uniform_bind_group, &[]);
+                    render_pass.set_vertex_buffer(0, hl_buffer.slice(..));
+                    render_pass.draw(0..highlight_vertices.len() as u32, 0..1);
                 }
             }
 

@@ -775,6 +775,10 @@ struct RenderApp {
     window_content_shadow_enabled: bool,
     window_content_shadow_size: f32,
     window_content_shadow_opacity: f32,
+    /// Mini-buffer completion highlight glow
+    minibuffer_highlight_enabled: bool,
+    minibuffer_highlight_color: (f32, f32, f32),
+    minibuffer_highlight_opacity: f32,
     /// Smooth window padding transition on resize
     resize_padding_enabled: bool,
     resize_padding_duration_ms: u32,
@@ -1100,6 +1104,9 @@ impl RenderApp {
             window_content_shadow_enabled: false,
             window_content_shadow_size: 6.0,
             window_content_shadow_opacity: 0.15,
+            minibuffer_highlight_enabled: false,
+            minibuffer_highlight_color: (0.4, 0.6, 1.0),
+            minibuffer_highlight_opacity: 0.25,
             resize_padding_enabled: false,
             resize_padding_duration_ms: 200,
             resize_padding_max: 12.0,
@@ -2184,6 +2191,15 @@ impl RenderApp {
                     self.window_content_shadow_opacity = opacity;
                     if let Some(renderer) = self.renderer.as_mut() {
                         renderer.set_window_content_shadow(enabled, size, opacity);
+                    }
+                    self.frame_dirty = true;
+                }
+                RenderCommand::SetMinibufferHighlight { enabled, r, g, b, opacity } => {
+                    self.minibuffer_highlight_enabled = enabled;
+                    self.minibuffer_highlight_color = (r, g, b);
+                    self.minibuffer_highlight_opacity = opacity;
+                    if let Some(renderer) = self.renderer.as_mut() {
+                        renderer.set_minibuffer_highlight(enabled, (r, g, b), opacity);
                     }
                     self.frame_dirty = true;
                 }

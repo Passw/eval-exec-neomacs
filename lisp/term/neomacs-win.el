@@ -1778,6 +1778,53 @@ are visible, creating a depth/raised pane illusion."
                 neomacs-window-content-shadow-size nil)
             val))))
 
+;; --- Mini-buffer completion highlight ---
+
+(declare-function neomacs-set-minibuffer-highlight "neomacsterm.c"
+  (&optional enabled color opacity))
+
+(defcustom neomacs-minibuffer-highlight nil
+  "Enable mini-buffer completion highlight glow.
+Non-nil draws a soft glow overlay around highlighted completion
+candidates in the mini-buffer area."
+  :type 'boolean
+  :group 'frames
+  :set (lambda (sym val)
+         (set-default sym val)
+         (when (fboundp 'neomacs-set-minibuffer-highlight)
+           (neomacs-set-minibuffer-highlight val
+            (if (boundp 'neomacs-minibuffer-highlight-color)
+                neomacs-minibuffer-highlight-color nil)
+            (if (boundp 'neomacs-minibuffer-highlight-opacity)
+                neomacs-minibuffer-highlight-opacity nil)))))
+
+(defcustom neomacs-minibuffer-highlight-color "#6699FF"
+  "Highlight glow color as hex RGB string."
+  :type '(string :tag "Color (#RRGGBB)")
+  :group 'frames
+  :set (lambda (sym val)
+         (set-default sym val)
+         (when (and (fboundp 'neomacs-set-minibuffer-highlight)
+                    (boundp 'neomacs-minibuffer-highlight)
+                    neomacs-minibuffer-highlight)
+           (neomacs-set-minibuffer-highlight t val
+            (if (boundp 'neomacs-minibuffer-highlight-opacity)
+                neomacs-minibuffer-highlight-opacity nil)))))
+
+(defcustom neomacs-minibuffer-highlight-opacity 25
+  "Highlight glow opacity (0-100)."
+  :type '(integer :tag "Opacity (%)")
+  :group 'frames
+  :set (lambda (sym val)
+         (set-default sym val)
+         (when (and (fboundp 'neomacs-set-minibuffer-highlight)
+                    (boundp 'neomacs-minibuffer-highlight)
+                    neomacs-minibuffer-highlight)
+           (neomacs-set-minibuffer-highlight t
+            (if (boundp 'neomacs-minibuffer-highlight-color)
+                neomacs-minibuffer-highlight-color nil)
+            val))))
+
 ;; --- Resize padding transition ---
 
 (declare-function neomacs-set-resize-padding "neomacsterm.c"

@@ -600,6 +600,16 @@ pub enum RenderCommand {
         /// Shadow opacity 0.0-1.0
         opacity: f32,
     },
+    /// Configure mini-buffer completion highlight glow
+    SetMinibufferHighlight {
+        enabled: bool,
+        /// Highlight color (sRGB floats)
+        r: f32,
+        g: f32,
+        b: f32,
+        /// Glow opacity 0.0-1.0
+        opacity: f32,
+    },
     /// Configure smooth window padding transition on resize
     SetResizePadding {
         enabled: bool,

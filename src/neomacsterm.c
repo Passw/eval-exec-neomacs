@@ -8909,6 +8909,42 @@ OPACITY is 0-100 percentage (default 15).  */)
   return on ? Qt : Qnil;
 }
 
+DEFUN ("neomacs-set-minibuffer-highlight",
+       Fneomacs_set_minibuffer_highlight,
+       Sneomacs_set_minibuffer_highlight, 0, 3, 0,
+       doc: /* Configure mini-buffer completion highlight glow.
+ENABLED non-nil draws a soft glow overlay around highlighted
+completion candidates in the mini-buffer area.
+COLOR is an RGB hex string (default "#6699FF").
+OPACITY is 0-100 percentage (default 25).  */)
+  (Lisp_Object enabled, Lisp_Object color, Lisp_Object opacity)
+{
+  struct neomacs_display_info *dpyinfo = neomacs_display_list;
+  if (!dpyinfo || !dpyinfo->display_handle)
+    return Qnil;
+
+  int on = !NILP (enabled);
+  int r = 102, g = 153, b = 255;
+  int op = 25;
+
+  if (STRINGP (color))
+    {
+      const char *s = SSDATA (color);
+      if (s[0] == '#' && strlen (s) == 7)
+        {
+          unsigned int hex;
+          sscanf (s + 1, "%06x", &hex);
+          r = (hex >> 16) & 0xFF;
+          g = (hex >> 8) & 0xFF;
+          b = hex & 0xFF;
+        }
+    }
+  if (FIXNUMP (opacity)) op = XFIXNUM (opacity);
+
+  neomacs_display_set_minibuffer_highlight (dpyinfo->display_handle, on, r, g, b, op);
+  return on ? Qt : Qnil;
+}
+
 DEFUN ("neomacs-set-resize-padding",
        Fneomacs_set_resize_padding,
        Sneomacs_set_resize_padding, 0, 3, 0,
@@ -10557,6 +10593,7 @@ syms_of_neomacsterm (void)
   defsubr (&Sneomacs_set_cursor_error_pulse);
   defsubr (&Sneomacs_set_window_content_shadow);
   defsubr (&Sneomacs_set_resize_padding);
+  defsubr (&Sneomacs_set_minibuffer_highlight);
   defsubr (&Sneomacs_set_region_glow);
   defsubr (&Sneomacs_set_window_glow);
   defsubr (&Sneomacs_set_scroll_progress);
