@@ -179,6 +179,17 @@ extern "C" {
         out_buf_len: i64,
         face_out: *mut FaceDataFFI,
     ) -> i64;
+
+    /// Get tab-line text for a window as plain UTF-8.
+    /// Returns the number of bytes written, 0 if no tab-line, or -1 on error.
+    /// Also fills face_out with the tab-line face.
+    pub fn neomacs_layout_tab_line_text(
+        window: EmacsWindow,
+        frame: EmacsFrame,
+        out_buf: *mut u8,
+        out_buf_len: i64,
+        face_out: *mut FaceDataFFI,
+    ) -> i64;
 }
 
 /// FFI-safe window parameters struct.

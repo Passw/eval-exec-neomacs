@@ -11,6 +11,13 @@ use crate::core::types::{Color, Rect};
 use super::types::*;
 use super::emacs_ffi::*;
 
+/// Which kind of status line to render.
+enum StatusLineKind {
+    ModeLine,
+    HeaderLine,
+    TabLine,
+}
+
 /// The main Rust layout engine.
 ///
 /// Called on the Emacs thread during redisplay. Reads buffer data via FFI,
@@ -569,18 +576,33 @@ impl LayoutEngine {
             }
         }
 
+        // Render tab-line if this window has one
+        if params.tab_line_height > 0.0 {
+            self.render_status_line(
+                params.bounds.x,
+                params.bounds.y,
+                params.bounds.width,
+                params.tab_line_height,
+                params.char_width,
+                params.font_ascent,
+                wp,
+                frame_glyphs,
+                StatusLineKind::TabLine,
+            );
+        }
+
         // Render header-line if this window has one
         if params.header_line_height > 0.0 {
             self.render_status_line(
                 params.bounds.x,
-                params.text_bounds.y,
+                params.bounds.y + params.tab_line_height,
                 params.bounds.width,
                 params.header_line_height,
                 params.char_width,
                 params.font_ascent,
                 wp,
                 frame_glyphs,
-                true, // is_header
+                StatusLineKind::HeaderLine,
             );
         }
 
@@ -595,7 +617,7 @@ impl LayoutEngine {
                 params.font_ascent,
                 wp,
                 frame_glyphs,
-                false, // is_header
+                StatusLineKind::ModeLine,
             );
         }
 
@@ -607,7 +629,7 @@ impl LayoutEngine {
         );
     }
 
-    /// Render a status line (mode-line or header-line) at a given position.
+    /// Render a status line (mode-line, header-line, or tab-line).
     unsafe fn render_status_line(
         &mut self,
         x: f32,
@@ -618,28 +640,34 @@ impl LayoutEngine {
         ascent: f32,
         wp: &WindowParamsFFI,
         frame_glyphs: &mut FrameGlyphBuffer,
-        is_header: bool,
+        kind: StatusLineKind,
     ) {
         let mut line_face = FaceDataFFI::default();
         let buf_size = 1024usize;
         let mut line_buf = vec![0u8; buf_size];
 
-        let bytes = if is_header {
-            neomacs_layout_header_line_text(
+        let bytes = match kind {
+            StatusLineKind::TabLine => neomacs_layout_tab_line_text(
                 wp.window_ptr,
                 std::ptr::null_mut(),
                 line_buf.as_mut_ptr(),
                 buf_size as i64,
                 &mut line_face,
-            )
-        } else {
-            neomacs_layout_mode_line_text(
+            ),
+            StatusLineKind::HeaderLine => neomacs_layout_header_line_text(
                 wp.window_ptr,
                 std::ptr::null_mut(),
                 line_buf.as_mut_ptr(),
                 buf_size as i64,
                 &mut line_face,
-            )
+            ),
+            StatusLineKind::ModeLine => neomacs_layout_mode_line_text(
+                wp.window_ptr,
+                std::ptr::null_mut(),
+                line_buf.as_mut_ptr(),
+                buf_size as i64,
+                &mut line_face,
+            ),
         };
 
         // Apply face
