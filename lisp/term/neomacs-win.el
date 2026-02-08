@@ -852,6 +852,39 @@ Requires `neomacs-cursor-glow' to be enabled for visible effect."
                     neomacs-cursor-pulse)
            (neomacs-set-cursor-pulse t val))))
 
+;;; Focus mode
+
+(declare-function neomacs-set-focus-mode "neomacsterm.c"
+  (&optional enabled opacity))
+
+(defcustom neomacs-focus-mode nil
+  "Enable focus mode that dims text outside the current paragraph.
+Non-nil draws semi-transparent overlays above and below the paragraph
+containing the cursor, helping focus attention on the current context."
+  :type 'boolean
+  :group 'frames
+  :set (lambda (sym val)
+         (set-default sym val)
+         (when (fboundp 'neomacs-set-focus-mode)
+           (neomacs-set-focus-mode
+            val
+            (if (boundp 'neomacs-focus-mode-opacity)
+                neomacs-focus-mode-opacity
+              nil)))))
+
+(defcustom neomacs-focus-mode-opacity 40
+  "Opacity of the dimming overlay in focus mode (0-100).
+Higher values produce a darker overlay, more strongly dimming
+non-focused paragraphs."
+  :type '(integer :tag "Opacity")
+  :group 'frames
+  :set (lambda (sym val)
+         (set-default sym val)
+         (when (and (fboundp 'neomacs-set-focus-mode)
+                    (boundp 'neomacs-focus-mode)
+                    neomacs-focus-mode)
+           (neomacs-set-focus-mode t val))))
+
 ;; Provide the feature
 (provide 'neomacs-win)
 (provide 'term/neomacs-win)

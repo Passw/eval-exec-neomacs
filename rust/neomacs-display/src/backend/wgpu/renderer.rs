@@ -8,7 +8,7 @@ use wgpu::util::DeviceExt;
 use crate::core::face::{BoxType, Face, FaceAttributes};
 use crate::core::frame_glyphs::{FrameGlyph, FrameGlyphBuffer};
 use crate::core::scene::{CursorStyle, Scene};
-use crate::core::types::{AnimatedCursor, Color};
+use crate::core::types::{AnimatedCursor, Color, Rect};
 
 use super::glyph_atlas::{GlyphKey, WgpuGlyphAtlas};
 use super::image_cache::ImageCache;
@@ -97,6 +97,10 @@ pub struct WgpuRenderer {
     cursor_pulse_min_opacity: f32,
     /// Start time for pulse phase calculation
     cursor_pulse_start: std::time::Instant,
+    /// Focus mode enabled (dim outside current paragraph)
+    focus_mode_enabled: bool,
+    /// Focus mode dimming opacity
+    focus_mode_opacity: f32,
 }
 
 impl WgpuRenderer {
@@ -589,6 +593,8 @@ impl WgpuRenderer {
             cursor_pulse_speed: 1.0,
             cursor_pulse_min_opacity: 0.3,
             cursor_pulse_start: std::time::Instant::now(),
+            focus_mode_enabled: false,
+            focus_mode_opacity: 0.4,
         }
     }
 
@@ -618,6 +624,12 @@ impl WgpuRenderer {
         self.cursor_pulse_enabled = enabled;
         self.cursor_pulse_speed = speed;
         self.cursor_pulse_min_opacity = min_opacity;
+    }
+
+    /// Update focus mode config
+    pub fn set_focus_mode(&mut self, enabled: bool, opacity: f32) {
+        self.focus_mode_enabled = enabled;
+        self.focus_mode_opacity = opacity;
     }
 
     /// Update visible whitespace config
@@ -2832,6 +2844,124 @@ impl WgpuRenderer {
                     render_pass.set_bind_group(0, &self.uniform_bind_group, &[]);
                     render_pass.set_vertex_buffer(0, sep_buffer.slice(..));
                     render_pass.draw(0..sep_vertices.len() as u32, 0..1);
+                }
+            }
+
+            // === Focus mode: dim lines outside current paragraph ===
+            if self.focus_mode_enabled {
+                // Find active cursor Y position (style != 3)
+                let mut cursor_y: Option<f32> = None;
+                let mut cursor_h: f32 = 0.0;
+                if let Some(ref anim) = animated_cursor {
+                    cursor_y = Some(anim.y);
+                    cursor_h = anim.height;
+                } else {
+                    for glyph in &frame_glyphs.glyphs {
+                        if let FrameGlyph::Cursor { y, height, style, .. } = glyph {
+                            if *style != 3 {
+                                cursor_y = Some(*y);
+                                cursor_h = *height;
+                                break;
+                            }
+                        }
+                    }
+                }
+
+                if let Some(cy) = cursor_y {
+                    // Find selected window bounds
+                    let mut sel_bounds: Option<&Rect> = None;
+                    for info in &frame_glyphs.window_infos {
+                        if info.selected && !info.is_minibuffer {
+                            sel_bounds = Some(&info.bounds);
+                            break;
+                        }
+                    }
+
+                    if let Some(bounds) = sel_bounds {
+                        let char_h = frame_glyphs.char_height.max(1.0);
+
+                        // Collect unique row Y positions within the selected window
+                        let mut row_ys: Vec<(f32, f32, bool)> = Vec::new(); // (y, height, has_non_space)
+                        let mut last_y: f32 = -9999.0;
+                        let mut last_h: f32 = 0.0;
+                        let mut has_non_space = false;
+
+                        for glyph in &frame_glyphs.glyphs {
+                            if let FrameGlyph::Char { x, y, height, char: ch, is_overlay, .. } = glyph {
+                                if *is_overlay { continue; }
+                                if *x < bounds.x || *x >= bounds.x + bounds.width { continue; }
+                                if *y < bounds.y || *y >= bounds.y + bounds.height { continue; }
+                                if (*y - last_y).abs() > 0.5 {
+                                    if last_y > 0.0 {
+                                        row_ys.push((last_y, last_h, has_non_space));
+                                    }
+                                    last_y = *y;
+                                    last_h = *height;
+                                    has_non_space = false;
+                                }
+                                if *ch != ' ' && *ch != '\t' && *ch != '\n' {
+                                    has_non_space = true;
+                                }
+                            }
+                        }
+                        if last_y > 0.0 {
+                            row_ys.push((last_y, last_h, has_non_space));
+                        }
+
+                        // Find paragraph boundaries: blank lines around cursor
+                        let cursor_row_idx = row_ys.iter().position(|(y, _, _)| (*y - cy).abs() < cursor_h);
+
+                        if let Some(cursor_idx) = cursor_row_idx {
+                            // Search backward for paragraph start (blank line or window top)
+                            let mut para_start_y = bounds.y;
+                            for i in (0..cursor_idx).rev() {
+                                if !row_ys[i].2 { // blank line
+                                    para_start_y = row_ys[i].0 + row_ys[i].1;
+                                    break;
+                                }
+                            }
+
+                            // Search forward for paragraph end (blank line or window bottom)
+                            let mut para_end_y = bounds.y + bounds.height;
+                            for i in (cursor_idx + 1)..row_ys.len() {
+                                if !row_ys[i].2 { // blank line
+                                    para_end_y = row_ys[i].0;
+                                    break;
+                                }
+                            }
+
+                            // Draw dim overlays above and below the paragraph
+                            let dim_color = Color::new(0.0, 0.0, 0.0, self.focus_mode_opacity);
+                            let mut focus_vertices: Vec<RectVertex> = Vec::new();
+
+                            // Above paragraph
+                            if para_start_y > bounds.y + 1.0 {
+                                self.add_rect(&mut focus_vertices,
+                                    bounds.x, bounds.y, bounds.width,
+                                    para_start_y - bounds.y, &dim_color);
+                            }
+                            // Below paragraph
+                            if para_end_y < bounds.y + bounds.height - 1.0 {
+                                self.add_rect(&mut focus_vertices,
+                                    bounds.x, para_end_y, bounds.width,
+                                    bounds.y + bounds.height - para_end_y, &dim_color);
+                            }
+
+                            if !focus_vertices.is_empty() {
+                                let focus_buffer = self.device.create_buffer_init(
+                                    &wgpu::util::BufferInitDescriptor {
+                                        label: Some("Focus Mode Buffer"),
+                                        contents: bytemuck::cast_slice(&focus_vertices),
+                                        usage: wgpu::BufferUsages::VERTEX,
+                                    },
+                                );
+                                render_pass.set_pipeline(&self.rect_pipeline);
+                                render_pass.set_bind_group(0, &self.uniform_bind_group, &[]);
+                                render_pass.set_vertex_buffer(0, focus_buffer.slice(..));
+                                render_pass.draw(0..focus_vertices.len() as u32, 0..1);
+                            }
+                        }
+                    }
                 }
             }
 

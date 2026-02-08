@@ -667,6 +667,9 @@ struct RenderApp {
     cursor_pulse_enabled: bool,
     cursor_pulse_speed: f32,
     cursor_pulse_min_opacity: f32,
+    /// Focus mode (dim outside current paragraph)
+    focus_mode_enabled: bool,
+    focus_mode_opacity: f32,
 }
 
 /// State for a tooltip displayed as GPU overlay
@@ -850,6 +853,8 @@ impl RenderApp {
             cursor_pulse_enabled: false,
             cursor_pulse_speed: 1.0,
             cursor_pulse_min_opacity: 0.3,
+            focus_mode_enabled: false,
+            focus_mode_opacity: 0.4,
         }
     }
 
@@ -1620,6 +1625,14 @@ impl RenderApp {
                     self.cursor_pulse_min_opacity = min_opacity;
                     if let Some(renderer) = self.renderer.as_mut() {
                         renderer.set_cursor_pulse(enabled, speed, min_opacity);
+                    }
+                    self.frame_dirty = true;
+                }
+                RenderCommand::SetFocusMode { enabled, opacity } => {
+                    self.focus_mode_enabled = enabled;
+                    self.focus_mode_opacity = opacity;
+                    if let Some(renderer) = self.renderer.as_mut() {
+                        renderer.set_focus_mode(enabled, opacity);
                     }
                     self.frame_dirty = true;
                 }

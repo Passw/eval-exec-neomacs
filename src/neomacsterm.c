@@ -8156,6 +8156,29 @@ Requires cursor glow to be enabled for visible effect.  */)
   return on ? Qt : Qnil;
 }
 
+DEFUN ("neomacs-set-focus-mode",
+       Fneomacs_set_focus_mode,
+       Sneomacs_set_focus_mode, 0, 2, 0,
+       doc: /* Configure focus mode (dim text outside current paragraph).
+ENABLED non-nil enables focus mode where only the paragraph around the
+cursor is fully visible.  Surrounding text is dimmed.
+OPACITY is an integer 0-100 for the dimming overlay opacity (default 40).  */)
+  (Lisp_Object enabled, Lisp_Object opacity)
+{
+  struct neomacs_display_info *dpyinfo = neomacs_display_list;
+  if (!dpyinfo || !dpyinfo->display_handle)
+    return Qnil;
+
+  int on = !NILP (enabled);
+  int op = 40;  /* 0.4 default */
+  if (FIXNUMP (opacity))
+    op = XFIXNUM (opacity);
+
+  neomacs_display_set_focus_mode (
+    dpyinfo->display_handle, on, op);
+  return on ? Qt : Qnil;
+}
+
 DEFUN ("neomacs-set-indent-guides",
        Fneomacs_set_indent_guides,
        Sneomacs_set_indent_guides, 0, 2, 0,
@@ -9481,6 +9504,7 @@ syms_of_neomacsterm (void)
   defsubr (&Sneomacs_set_mode_line_separator);
   defsubr (&Sneomacs_set_cursor_glow);
   defsubr (&Sneomacs_set_cursor_pulse);
+  defsubr (&Sneomacs_set_focus_mode);
 
   /* Cursor blink */
   defsubr (&Sneomacs_set_cursor_blink);

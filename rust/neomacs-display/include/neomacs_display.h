@@ -1229,6 +1229,11 @@ void neomacs_display_set_cursor_pulse(struct NeomacsDisplay *handle,
                                       int minOpacity);
 
 /**
+ * Configure focus mode (dim outside current paragraph)
+ */
+void neomacs_display_set_focus_mode(struct NeomacsDisplay *handle, int enabled, int opacity);
+
+/**
  * Configure mode-line separator style (threaded mode)
  */
 void neomacs_display_set_mode_line_separator(struct NeomacsDisplay *handle,

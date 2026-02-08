@@ -339,6 +339,12 @@ pub enum RenderCommand {
         /// Minimum opacity multiplier (0.0-1.0)
         min_opacity: f32,
     },
+    /// Configure focus mode (dim everything outside focused region)
+    SetFocusMode {
+        enabled: bool,
+        /// Dimming opacity for unfocused lines (0.0-1.0)
+        opacity: f32,
+    },
 }
 
 /// Wakeup pipe for signaling Emacs from render thread
