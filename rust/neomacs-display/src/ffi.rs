@@ -26,6 +26,7 @@ use crate::backend::wgpu::{
     NEOMACS_EVENT_FOCUS_IN, NEOMACS_EVENT_FOCUS_OUT,
     NEOMACS_EVENT_IMAGE_DIMENSIONS_READY,
     NEOMACS_EVENT_TERMINAL_EXITED,
+    NEOMACS_EVENT_MENU_SELECTION,
 };
 
 /// Resize callback function type for C FFI
@@ -1991,6 +1992,87 @@ pub unsafe extern "C" fn neomacs_display_warp_mouse(
     }
 }
 
+/// Popup menu item passed from C.
+#[repr(C)]
+pub struct CPopupMenuItem {
+    pub label: *const c_char,
+    pub shortcut: *const c_char,
+    pub enabled: c_int,
+    pub separator: c_int,
+    pub submenu: c_int,
+}
+
+/// Show a popup menu at position (x, y) with the given items.
+/// The render thread will display the menu and send a MenuSelection event.
+#[cfg(feature = "winit-backend")]
+#[no_mangle]
+pub unsafe extern "C" fn neomacs_display_show_popup_menu(
+    _handle: *mut NeomacsDisplay,
+    x: c_int,
+    y: c_int,
+    items: *const CPopupMenuItem,
+    item_count: c_int,
+    title: *const c_char,
+) {
+    let mut menu_items = Vec::new();
+    for i in 0..item_count as usize {
+        let item = &*items.add(i);
+        let label = if item.label.is_null() {
+            String::new()
+        } else {
+            std::ffi::CStr::from_ptr(item.label)
+                .to_string_lossy()
+                .into_owned()
+        };
+        let shortcut = if item.shortcut.is_null() {
+            String::new()
+        } else {
+            std::ffi::CStr::from_ptr(item.shortcut)
+                .to_string_lossy()
+                .into_owned()
+        };
+        menu_items.push(PopupMenuItem {
+            label,
+            shortcut,
+            enabled: item.enabled != 0,
+            separator: item.separator != 0,
+            submenu: item.submenu != 0,
+        });
+    }
+
+    let title_str = if title.is_null() {
+        None
+    } else {
+        Some(
+            std::ffi::CStr::from_ptr(title)
+                .to_string_lossy()
+                .into_owned(),
+        )
+    };
+
+    let cmd = RenderCommand::ShowPopupMenu {
+        x: x as f32,
+        y: y as f32,
+        items: menu_items,
+        title: title_str,
+    };
+    if let Some(ref state) = THREADED_STATE {
+        let _ = state.emacs_comms.cmd_tx.try_send(cmd);
+    }
+}
+
+/// Hide the active popup menu.
+#[cfg(feature = "winit-backend")]
+#[no_mangle]
+pub unsafe extern "C" fn neomacs_display_hide_popup_menu(
+    _handle: *mut NeomacsDisplay,
+) {
+    let cmd = RenderCommand::HidePopupMenu;
+    if let Some(ref state) = THREADED_STATE {
+        let _ = state.emacs_comms.cmd_tx.try_send(cmd);
+    }
+}
+
 /// Set the window title (threaded mode)
 #[no_mangle]
 pub unsafe extern "C" fn neomacs_display_set_title(
@@ -3666,7 +3748,7 @@ pub unsafe extern "C" fn neomacs_display_has_transition_snapshot(
 // ============================================================================
 
 #[cfg(feature = "winit-backend")]
-use crate::thread_comm::{EmacsComms, InputEvent, RenderCommand, ThreadComms};
+use crate::thread_comm::{EmacsComms, InputEvent, PopupMenuItem, RenderCommand, ThreadComms};
 #[cfg(feature = "winit-backend")]
 use crate::render_thread::{RenderThread, SharedImageDimensions};
 
@@ -3879,6 +3961,11 @@ pub unsafe extern "C" fn neomacs_display_drain_input(
                     InputEvent::TerminalTitleChanged { .. } => {
                         // TODO: expose to C via terminal-specific API
                         continue;
+                    }
+                    InputEvent::MenuSelection { index } => {
+                        out.kind = NEOMACS_EVENT_MENU_SELECTION;
+                        out.x = index;
+                        // y field unused, set to 0
                     }
                 }
                 count += 1;

@@ -3864,12 +3864,265 @@ impl WgpuRenderer {
         _bounds: crate::core::types::Rect,
     ) {
         // TODO: Implement texture rendering
-        // Use existing texture pipeline to render webkit content
-        // Steps:
-        // 1. Create a render pass with the output view
-        // 2. Set the texture pipeline (need to add a texture shader)
-        // 3. Set the webkit bind group
-        // 4. Draw a quad at the specified bounds
+    }
+
+    /// Render a popup menu overlay on top of all content.
+    pub fn render_popup_menu(
+        &self,
+        view: &wgpu::TextureView,
+        menu: &crate::render_thread::PopupMenuState,
+        glyph_atlas: &mut WgpuGlyphAtlas,
+        surface_width: u32,
+        surface_height: u32,
+    ) {
+        use wgpu::util::DeviceExt;
+
+        let logical_w = surface_width as f32 / self.scale_factor;
+        let logical_h = surface_height as f32 / self.scale_factor;
+        let uniforms = Uniforms {
+            screen_size: [logical_w, logical_h],
+            _padding: [0.0, 0.0],
+        };
+        self.queue
+            .write_buffer(&self.uniform_buffer, 0, bytemuck::cast_slice(&[uniforms]));
+
+        let (mx, my, mw, mh) = menu.bounds;
+
+        // Colors (dark theme popup) — values are in linear space
+        // since the surface format (Bgra8UnormSrgb) applies sRGB gamma on output
+        let bg_color = Color::new(0.15, 0.15, 0.18, 0.95).srgb_to_linear();
+        let border_color = Color::new(0.35, 0.35, 0.40, 1.0).srgb_to_linear();
+        let hover_color = Color::new(0.25, 0.40, 0.65, 0.9).srgb_to_linear();
+        let text_color = {
+            let c = Color::new(0.9, 0.9, 0.9, 1.0).srgb_to_linear();
+            [c.r, c.g, c.b, c.a]
+        };
+        let disabled_color = {
+            let c = Color::new(0.5, 0.5, 0.5, 1.0).srgb_to_linear();
+            [c.r, c.g, c.b, c.a]
+        };
+        let separator_color = Color::new(0.3, 0.3, 0.35, 0.8).srgb_to_linear();
+        let title_color = {
+            let c = Color::new(0.7, 0.8, 0.9, 1.0).srgb_to_linear();
+            [c.r, c.g, c.b, c.a]
+        };
+        let shortcut_color = {
+            let c = Color::new(0.6, 0.6, 0.65, 1.0).srgb_to_linear();
+            [c.r, c.g, c.b, c.a]
+        };
+
+        // === Pass 1: Background rectangles ===
+        let mut rect_vertices: Vec<RectVertex> = Vec::new();
+
+        // Semi-transparent background
+        self.add_rect(&mut rect_vertices, mx, my, mw, mh, &bg_color);
+
+        // Border (1px on each side)
+        let bw = 1.0_f32;
+        self.add_rect(&mut rect_vertices, mx, my, mw, bw, &border_color); // top
+        self.add_rect(&mut rect_vertices, mx, my + mh - bw, mw, bw, &border_color); // bottom
+        self.add_rect(&mut rect_vertices, mx, my, bw, mh, &border_color); // left
+        self.add_rect(&mut rect_vertices, mx + mw - bw, my, bw, mh, &border_color); // right
+
+        // Hover highlight
+        if menu.hover_index >= 0 && (menu.hover_index as usize) < menu.items.len() {
+            let idx = menu.hover_index as usize;
+            let iy = my + menu.item_offsets[idx];
+            self.add_rect(&mut rect_vertices, mx + bw, iy, mw - 2.0 * bw, menu.item_height, &hover_color);
+        }
+
+        // Separators
+        for (i, item) in menu.items.iter().enumerate() {
+            if item.separator {
+                let iy = my + menu.item_offsets[i] + 3.0;
+                self.add_rect(&mut rect_vertices, mx + 8.0, iy, mw - 16.0, 1.0, &separator_color);
+            }
+        }
+
+        // Title separator
+        if menu.title.is_some() {
+            let sep_y = my + menu.item_height + 2.0;
+            self.add_rect(&mut rect_vertices, mx + 4.0, sep_y, mw - 8.0, 1.0, &separator_color);
+        }
+
+        // Submit background rects
+        if !rect_vertices.is_empty() {
+            let rect_buffer = self.device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+                label: Some("Popup Menu Rect Buffer"),
+                contents: bytemuck::cast_slice(&rect_vertices),
+                usage: wgpu::BufferUsages::VERTEX,
+            });
+
+            let mut encoder = self.device.create_command_encoder(&wgpu::CommandEncoderDescriptor {
+                label: Some("Popup Menu Rect Encoder"),
+            });
+            {
+                let mut pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
+                    label: Some("Popup Menu Rect Pass"),
+                    color_attachments: &[Some(wgpu::RenderPassColorAttachment {
+                        view,
+                        resolve_target: None,
+                        ops: wgpu::Operations {
+                            load: wgpu::LoadOp::Load,
+                            store: wgpu::StoreOp::Store,
+                        },
+                    })],
+                    depth_stencil_attachment: None,
+                    timestamp_writes: None,
+                    occlusion_query_set: None,
+                });
+                pass.set_pipeline(&self.rect_pipeline);
+                pass.set_bind_group(0, &self.uniform_bind_group, &[]);
+                pass.set_vertex_buffer(0, rect_buffer.slice(..));
+                pass.draw(0..rect_vertices.len() as u32, 0..1);
+            }
+            self.queue.submit(Some(encoder.finish()));
+        }
+
+        // === Pass 2: Text glyphs ===
+        let padding = 4.0_f32;
+        let char_width = 8.0_f32;
+        // Use default font size (0.0 means use atlas default)
+        let font_size_bits = 0.0_f32.to_bits();
+
+        // Render title if present
+        if let Some(ref title) = menu.title {
+            let tx = mx + padding * 2.0;
+            for (ci, ch) in title.chars().enumerate() {
+                let key = GlyphKey {
+                    charcode: ch as u32,
+                    face_id: 0,
+                    font_size_bits,
+                };
+                if let Some(cached) = glyph_atlas.get_or_create(&self.device, &self.queue, &key, None) {
+                    let gx = tx + (ci as f32) * char_width;
+                    let gy = my + padding;
+                    self.render_single_glyph(view, cached, gx, gy, &title_color);
+                }
+            }
+        }
+
+        // Render menu items
+        for (i, item) in menu.items.iter().enumerate() {
+            if item.separator {
+                continue;
+            }
+            let iy = my + menu.item_offsets[i];
+            let color = if !item.enabled {
+                &disabled_color
+            } else {
+                &text_color
+            };
+
+            // Render label character by character
+            let label_x = mx + padding * 2.0;
+            for (ci, ch) in item.label.chars().enumerate() {
+                let key = GlyphKey {
+                    charcode: ch as u32,
+                    face_id: 0,
+                    font_size_bits,
+                };
+                if let Some(cached) = glyph_atlas.get_or_create(&self.device, &self.queue, &key, None) {
+                    let gx = label_x + (ci as f32) * char_width;
+                    let gy = iy + 2.0; // Small vertical offset within item
+                    self.render_single_glyph(view, cached, gx, gy, color);
+                }
+            }
+
+            // Render shortcut on the right side
+            if !item.shortcut.is_empty() {
+                let shortcut_x = mx + mw - padding * 2.0 - (item.shortcut.len() as f32 * char_width);
+                for (ci, ch) in item.shortcut.chars().enumerate() {
+                    let key = GlyphKey {
+                        charcode: ch as u32,
+                        face_id: 0,
+                        font_size_bits,
+                    };
+                    if let Some(cached) = glyph_atlas.get_or_create(&self.device, &self.queue, &key, None) {
+                        let gx = shortcut_x + (ci as f32) * char_width;
+                        let gy = iy + 2.0;
+                        self.render_single_glyph(view, cached, gx, gy, &shortcut_color);
+                    }
+                }
+            }
+
+            // Render submenu arrow
+            if item.submenu {
+                let arrow_x = mx + mw - padding * 2.0 - char_width;
+                let key = GlyphKey {
+                    charcode: '▸' as u32,
+                    face_id: 0,
+                    font_size_bits,
+                };
+                if let Some(cached) = glyph_atlas.get_or_create(&self.device, &self.queue, &key, None) {
+                    self.render_single_glyph(view, cached, arrow_x, iy + 2.0, &text_color);
+                }
+            }
+        }
+    }
+
+    /// Render a single glyph texture at the given position.
+    fn render_single_glyph(
+        &self,
+        view: &wgpu::TextureView,
+        cached: &super::glyph_atlas::CachedGlyph,
+        x: f32,
+        y: f32,
+        color: &[f32; 4],
+    ) {
+        use wgpu::util::DeviceExt;
+
+        let gw = cached.width as f32;
+        let gh = cached.height as f32;
+        let gx = x + cached.bearing_x;
+        let gy = y - cached.bearing_y + 14.0; // Approximate baseline offset
+
+        let vertices = [
+            GlyphVertex { position: [gx, gy], tex_coords: [0.0, 0.0], color: *color },
+            GlyphVertex { position: [gx + gw, gy], tex_coords: [1.0, 0.0], color: *color },
+            GlyphVertex { position: [gx + gw, gy + gh], tex_coords: [1.0, 1.0], color: *color },
+            GlyphVertex { position: [gx, gy], tex_coords: [0.0, 0.0], color: *color },
+            GlyphVertex { position: [gx + gw, gy + gh], tex_coords: [1.0, 1.0], color: *color },
+            GlyphVertex { position: [gx, gy + gh], tex_coords: [0.0, 1.0], color: *color },
+        ];
+
+        let buffer = self.device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+            label: Some("Popup Glyph Buffer"),
+            contents: bytemuck::cast_slice(&vertices),
+            usage: wgpu::BufferUsages::VERTEX,
+        });
+
+        let pipeline = if cached.is_color {
+            &self.opaque_image_pipeline
+        } else {
+            &self.image_pipeline
+        };
+
+        let mut encoder = self.device.create_command_encoder(&wgpu::CommandEncoderDescriptor {
+            label: Some("Popup Glyph Encoder"),
+        });
+        {
+            let mut pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
+                label: Some("Popup Glyph Pass"),
+                color_attachments: &[Some(wgpu::RenderPassColorAttachment {
+                    view,
+                    resolve_target: None,
+                    ops: wgpu::Operations {
+                        load: wgpu::LoadOp::Load,
+                        store: wgpu::StoreOp::Store,
+                    },
+                })],
+                depth_stencil_attachment: None,
+                timestamp_writes: None,
+                occlusion_query_set: None,
+            });
+            pass.set_pipeline(pipeline);
+            pass.set_bind_group(0, &self.uniform_bind_group, &[]);
+            pass.set_bind_group(1, &cached.bind_group, &[]);
+            pass.set_vertex_buffer(0, buffer.slice(..));
+            pass.draw(0..6, 0..1);
+        }
+        self.queue.submit(Some(encoder.finish()));
     }
 }
 

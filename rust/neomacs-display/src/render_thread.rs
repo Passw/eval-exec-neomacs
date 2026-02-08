@@ -27,7 +27,7 @@ use crate::core::types::{
     AnimatedCursor, Color, CursorAnimStyle, Rect,
     ease_out_quad, ease_out_cubic, ease_out_expo, ease_in_out_cubic, ease_linear,
 };
-use crate::thread_comm::{InputEvent, RenderCommand, RenderComms};
+use crate::thread_comm::{InputEvent, PopupMenuItem, RenderCommand, RenderComms};
 
 #[cfg(all(feature = "wpe-webkit", wpe_platform_available))]
 use crate::backend::wpe::sys::platform as plat;
@@ -170,6 +170,91 @@ struct CornerSpring {
     omega: f32,
 }
 
+/// State for an active popup menu
+pub(crate) struct PopupMenuState {
+    /// Position (logical pixels)
+    pub(crate) x: f32,
+    pub(crate) y: f32,
+    /// Menu items
+    pub(crate) items: Vec<PopupMenuItem>,
+    /// Optional title
+    pub(crate) title: Option<String>,
+    /// Currently hovered item index (-1 = none)
+    pub(crate) hover_index: i32,
+    /// Computed layout: (x, y, width, height) in logical pixels
+    pub(crate) bounds: (f32, f32, f32, f32),
+    /// Per-item Y offsets (top of each item row, relative to bounds.y)
+    pub(crate) item_offsets: Vec<f32>,
+    /// Item height
+    pub(crate) item_height: f32,
+}
+
+impl PopupMenuState {
+    fn new(x: f32, y: f32, items: Vec<PopupMenuItem>, title: Option<String>) -> Self {
+        // Layout constants
+        let padding = 4.0_f32;
+        let item_height = 20.0_f32;
+        let separator_height = 8.0_f32;
+        let title_height = if title.is_some() { item_height + separator_height } else { 0.0 };
+
+        // Compute total height and per-item offsets
+        let mut total_h = padding + title_height;
+        let mut offsets = Vec::with_capacity(items.len());
+        for item in &items {
+            offsets.push(total_h);
+            if item.separator {
+                total_h += separator_height;
+            } else {
+                total_h += item_height;
+            }
+        }
+        total_h += padding;
+
+        // Compute width based on longest label + shortcut
+        let char_width = 8.0_f32; // Approximate monospace character width
+        let min_width = 150.0_f32;
+        let max_label_len = items.iter()
+            .filter(|i| !i.separator)
+            .map(|i| i.label.len() + if i.shortcut.is_empty() { 0 } else { i.shortcut.len() + 4 })
+            .max()
+            .unwrap_or(10);
+        let title_len = title.as_ref().map(|t| t.len()).unwrap_or(0);
+        let content_width = (max_label_len.max(title_len) as f32) * char_width;
+        let total_w = (content_width + padding * 4.0).max(min_width);
+
+        PopupMenuState {
+            x,
+            y,
+            items,
+            title,
+            hover_index: -1,
+            bounds: (x, y, total_w, total_h),
+            item_offsets: offsets,
+            item_height,
+        }
+    }
+
+    /// Return the item index at the given mouse position, or -1.
+    fn hit_test(&self, mx: f32, my: f32) -> i32 {
+        let (bx, by, bw, _bh) = self.bounds;
+        if mx < bx || mx > bx + bw || my < by {
+            return -1;
+        }
+        for (i, &offset_y) in self.item_offsets.iter().enumerate() {
+            let item = &self.items[i];
+            if item.separator || !item.enabled {
+                continue;
+            }
+            let iy = by + offset_y;
+            let ih = self.item_height;
+            if my >= iy && my < iy + ih && mx >= bx && mx <= bx + bw {
+                return i as i32;
+            }
+        }
+        -1
+    }
+}
+
 /// Application state for winit event loop
 struct RenderApp {
     comms: RenderComms,
@@ -280,6 +365,9 @@ struct RenderApp {
     // Terminal manager (neo-term)
     #[cfg(feature = "neo-term")]
     terminal_manager: crate::terminal::TerminalManager,
+
+    // Active popup menu (shown by x-popup-menu)
+    popup_menu: Option<PopupMenuState>,
 }
 
 impl RenderApp {
@@ -367,6 +455,7 @@ impl RenderApp {
             floating_webkits: Vec::new(),
             #[cfg(feature = "neo-term")]
             terminal_manager: crate::terminal::TerminalManager::new(),
+            popup_menu: None,
         }
     }
 
@@ -927,6 +1016,16 @@ impl RenderApp {
                         view.float_y = y;
                         view.float_opacity = opacity;
                     }
+                }
+                RenderCommand::ShowPopupMenu { x, y, items, title } => {
+                    log::info!("ShowPopupMenu at ({}, {}) with {} items", x, y, items.len());
+                    self.popup_menu = Some(PopupMenuState::new(x, y, items, title));
+                    self.frame_dirty = true;
+                }
+                RenderCommand::HidePopupMenu => {
+                    log::info!("HidePopupMenu");
+                    self.popup_menu = None;
+                    self.frame_dirty = true;
                 }
             }
         }
@@ -2060,6 +2159,15 @@ impl RenderApp {
             }
         }
 
+        // Render popup menu overlay (topmost layer)
+        if let Some(ref menu) = self.popup_menu {
+            if let (Some(ref renderer), Some(ref mut glyph_atlas)) =
+                (&self.renderer, &mut self.glyph_atlas)
+            {
+                renderer.render_popup_menu(&surface_view, menu, glyph_atlas, self.width, self.height);
+            }
+        }
+
         // Present the frame
         output.present();
     }
@@ -2188,32 +2296,58 @@ impl ApplicationHandler for RenderApp {
                     },
                 ..
             } => {
-                let keysym = Self::translate_key(&logical_key);
-                if keysym != 0 {
-                    self.comms.send_input(InputEvent::Key {
-                        keysym,
-                        modifiers: self.modifiers,
-                        pressed: state == ElementState::Pressed,
-                    });
+                // If popup menu is active, Escape cancels it
+                if self.popup_menu.is_some() && state == ElementState::Pressed {
+                    if matches!(logical_key.as_ref(), Key::Named(NamedKey::Escape)) {
+                        self.comms.send_input(InputEvent::MenuSelection { index: -1 });
+                        self.popup_menu = None;
+                        self.frame_dirty = true;
+                    }
+                    // Swallow all keys while popup is active
+                } else {
+                    let keysym = Self::translate_key(&logical_key);
+                    if keysym != 0 {
+                        self.comms.send_input(InputEvent::Key {
+                            keysym,
+                            modifiers: self.modifiers,
+                            pressed: state == ElementState::Pressed,
+                        });
+                    }
                 }
             }
 
             WindowEvent::MouseInput { state, button, .. } => {
-                let btn = match button {
-                    MouseButton::Left => 1,
-                    MouseButton::Middle => 2,
-                    MouseButton::Right => 3,
-                    MouseButton::Back => 4,
-                    MouseButton::Forward => 5,
-                    MouseButton::Other(n) => n as u32,
-                };
-                self.comms.send_input(InputEvent::MouseButton {
-                    button: btn,
-                    x: self.mouse_pos.0,
-                    y: self.mouse_pos.1,
-                    pressed: state == ElementState::Pressed,
-                    modifiers: self.modifiers,
-                });
+                // If popup menu is active, handle clicks for it
+                if let Some(ref menu) = self.popup_menu {
+                    if state == ElementState::Pressed && button == MouseButton::Left {
+                        let idx = menu.hit_test(self.mouse_pos.0, self.mouse_pos.1);
+                        // Send selection (idx >= 0 means item selected, -1 means cancelled)
+                        self.comms.send_input(InputEvent::MenuSelection { index: idx });
+                        self.popup_menu = None;
+                        self.frame_dirty = true;
+                    } else if state == ElementState::Pressed {
+                        // Any other button cancels the menu
+                        self.comms.send_input(InputEvent::MenuSelection { index: -1 });
+                        self.popup_menu = None;
+                        self.frame_dirty = true;
+                    }
+                } else {
+                    let btn = match button {
+                        MouseButton::Left => 1,
+                        MouseButton::Middle => 2,
+                        MouseButton::Right => 3,
+                        MouseButton::Back => 4,
+                        MouseButton::Forward => 5,
+                        MouseButton::Other(n) => n as u32,
+                    };
+                    self.comms.send_input(InputEvent::MouseButton {
+                        button: btn,
+                        x: self.mouse_pos.0,
+                        y: self.mouse_pos.1,
+                        pressed: state == ElementState::Pressed,
+                        modifiers: self.modifiers,
+                    });
+                }
             }
 
             WindowEvent::CursorMoved { position, .. } => {
@@ -2221,11 +2355,21 @@ impl ApplicationHandler for RenderApp {
                 let lx = (position.x / self.scale_factor) as f32;
                 let ly = (position.y / self.scale_factor) as f32;
                 self.mouse_pos = (lx, ly);
-                self.comms.send_input(InputEvent::MouseMove {
-                    x: lx,
-                    y: ly,
-                    modifiers: self.modifiers,
-                });
+
+                // Update popup menu hover state
+                if let Some(ref mut menu) = self.popup_menu {
+                    let new_hover = menu.hit_test(lx, ly);
+                    if new_hover != menu.hover_index {
+                        menu.hover_index = new_hover;
+                        self.frame_dirty = true;
+                    }
+                } else {
+                    self.comms.send_input(InputEvent::MouseMove {
+                        x: lx,
+                        y: ly,
+                        modifiers: self.modifiers,
+                    });
+                }
             }
 
             WindowEvent::MouseWheel { delta, .. } => {

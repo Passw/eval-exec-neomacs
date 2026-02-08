@@ -48,6 +48,7 @@ struct wl_display;
 #include "composite.h"  /* For composition_gstring_from_id, LGSTRING_GLYPH, etc. */
 #include "intervals.h"  /* For TEXT_PROP_MEANS_INVISIBLE */
 #include "process.h"  /* For add_read_fd, delete_read_fd */
+#include "menu.h"  /* For MENU_KEYMAPS, MENU_FOR_CLICK, menu_items macros */
 
 /* List of Neomacs display info structures */
 struct neomacs_display_info *neomacs_display_list = NULL;
@@ -462,14 +463,209 @@ neomacs_delete_terminal (struct terminal *terminal)
   xfree (dpyinfo);
 }
 
-/* Stub for popup menus - not yet implemented for Neomacs */
+/* Popup menu implementation using GPU-rendered overlay in the render thread.
+   Parses Emacs's menu_items array, sends items to Rust render thread,
+   and blocks until the user makes a selection or cancels. */
 static Lisp_Object
 neomacs_menu_show (struct frame *f, int x, int y, int menuflags,
                    Lisp_Object title, const char **error_name)
 {
-  /* For now, just return Qnil to indicate no selection */
-  *error_name = "Popup menus not yet implemented for Neomacs";
-  return Qnil;
+  int i;
+  struct neomacs_display_info *dpyinfo = FRAME_NEOMACS_DISPLAY_INFO (f);
+
+  *error_name = NULL;
+
+  if (menu_items_used <= MENU_ITEMS_PANE_LENGTH)
+    {
+      *error_name = "Empty menu";
+      return Qnil;
+    }
+
+  if (!dpyinfo || !dpyinfo->display_handle)
+    {
+      *error_name = "No display connection";
+      return Qnil;
+    }
+
+  /* Count items (excluding pane headers, submenus markers, etc.) */
+  int item_count = 0;
+  i = 0;
+  while (i < menu_items_used)
+    {
+      if (NILP (AREF (menu_items, i)))
+        { i++; continue; } /* submenu push */
+      else if (EQ (AREF (menu_items, i), Qlambda))
+        { i++; continue; } /* submenu pop */
+      else if (EQ (AREF (menu_items, i), Qquote))
+        { i += 1; continue; } /* nil item (dialog only) */
+      else if (EQ (AREF (menu_items, i), Qt))
+        {
+          /* Pane header — count as separator if not first pane */
+          if (item_count > 0)
+            item_count++; /* separator between panes */
+          i += MENU_ITEMS_PANE_LENGTH;
+        }
+      else
+        {
+          item_count++;
+          i += MENU_ITEMS_ITEM_LENGTH;
+        }
+    }
+
+  if (item_count == 0)
+    {
+      *error_name = "Empty menu";
+      return Qnil;
+    }
+
+  /* Allocate C menu items array */
+  struct CPopupMenuItem *c_items = xmalloc (item_count * sizeof *c_items);
+  memset (c_items, 0, item_count * sizeof *c_items);
+
+  /* Map from c_items index -> menu_items index (for finding the selection) */
+  int *item_indices = xmalloc (item_count * sizeof *item_indices);
+  int ci = 0;
+  bool first_pane = true;
+
+  i = 0;
+  while (i < menu_items_used)
+    {
+      if (NILP (AREF (menu_items, i)))
+        { i++; continue; }
+      else if (EQ (AREF (menu_items, i), Qlambda))
+        { i++; continue; }
+      else if (EQ (AREF (menu_items, i), Qquote))
+        { i += 1; continue; }
+      else if (EQ (AREF (menu_items, i), Qt))
+        {
+          /* Pane header — insert separator between panes */
+          if (!first_pane && ci < item_count)
+            {
+              c_items[ci].label = "";
+              c_items[ci].shortcut = "";
+              c_items[ci].enabled = 0;
+              c_items[ci].separator = 1;
+              c_items[ci].submenu = 0;
+              item_indices[ci] = -1;
+              ci++;
+            }
+          first_pane = false;
+          i += MENU_ITEMS_PANE_LENGTH;
+        }
+      else
+        {
+          /* Regular menu item */
+          Lisp_Object item_name = AREF (menu_items, i + MENU_ITEMS_ITEM_NAME);
+          Lisp_Object enable = AREF (menu_items, i + MENU_ITEMS_ITEM_ENABLE);
+          Lisp_Object descrip = AREF (menu_items, i + MENU_ITEMS_ITEM_EQUIV_KEY);
+          Lisp_Object def = AREF (menu_items, i + MENU_ITEMS_ITEM_DEFINITION);
+
+          if (ci < item_count)
+            {
+              c_items[ci].label = STRINGP (item_name) ? SSDATA (item_name) : "";
+              c_items[ci].shortcut = STRINGP (descrip) ? SSDATA (descrip) : "";
+              c_items[ci].enabled = !NILP (enable) && !NILP (def) ? 1 : 0;
+              c_items[ci].separator = (STRINGP (item_name)
+                                       && !strcmp (SSDATA (item_name), "--")) ? 1 : 0;
+              c_items[ci].submenu = 0;
+              item_indices[ci] = i;
+              ci++;
+            }
+          i += MENU_ITEMS_ITEM_LENGTH;
+        }
+    }
+  item_count = ci; /* Actual count after building */
+
+  /* Send menu to render thread */
+  const char *title_str = NULL;
+  if (!NILP (title) && STRINGP (title))
+    title_str = SSDATA (title);
+
+  neomacs_display_show_popup_menu (dpyinfo->display_handle,
+                                   x, y, c_items, item_count, title_str);
+
+  /* Block waiting for menu selection event from render thread.
+     We poll the input event queue until we get a MenuSelection event. */
+  int selection = -2; /* -2 = still waiting, -1 = cancelled, >= 0 = item index */
+  NeomacsInputEvent events[16];
+
+  while (selection == -2)
+    {
+      /* Wait for events (use a short timeout to stay responsive) */
+      struct timespec timeout = { 0, 50000000 }; /* 50ms */
+      fd_set readfds;
+      FD_ZERO (&readfds);
+      FD_SET (dpyinfo->connection, &readfds);
+      pselect (dpyinfo->connection + 1, &readfds,
+               NULL, NULL, &timeout, NULL);
+
+      int n = neomacs_display_drain_input (events, 16);
+      for (int j = 0; j < n; j++)
+        {
+          if (events[j].kind == NEOMACS_EVENT_MENU_SELECTION)
+            {
+              selection = events[j].x; /* x field contains the selection index */
+            }
+          else if (events[j].kind == NEOMACS_EVENT_RESIZE)
+            {
+              /* Handle resize during menu display */
+              int new_width = events[j].width;
+              int new_height = events[j].height;
+              if (new_width > 0 && new_height > 0)
+                {
+                  change_frame_size (f, new_width, new_height, false, true, false);
+                }
+            }
+          /* Discard other events while menu is active */
+        }
+    }
+
+  /* Clean up */
+  Lisp_Object result = Qnil;
+
+  if (selection >= 0 && selection < item_count
+      && item_indices[selection] >= 0)
+    {
+      int mi = item_indices[selection];
+      Lisp_Object entry = AREF (menu_items, mi + MENU_ITEMS_ITEM_VALUE);
+
+      if (menuflags & MENU_KEYMAPS)
+        {
+          /* Return (prefix . entry) for keymaps */
+          Lisp_Object prefix = Qnil;
+          /* Find the pane prefix for this item */
+          int k = 0;
+          while (k < mi)
+            {
+              if (EQ (AREF (menu_items, k), Qt))
+                {
+                  prefix = AREF (menu_items, k + MENU_ITEMS_PANE_PREFIX);
+                  k += MENU_ITEMS_PANE_LENGTH;
+                }
+              else if (NILP (AREF (menu_items, k))
+                       || EQ (AREF (menu_items, k), Qlambda)
+                       || EQ (AREF (menu_items, k), Qquote))
+                k++;
+              else
+                k += MENU_ITEMS_ITEM_LENGTH;
+            }
+          entry = list1 (entry);
+          if (!NILP (prefix))
+            entry = Fcons (prefix, entry);
+        }
+      result = entry;
+    }
+  else if (selection == -1 && !(menuflags & MENU_FOR_CLICK))
+    {
+      /* User cancelled — equivalent to C-g for non-click menus */
+      xfree (c_items);
+      xfree (item_indices);
+      quit ();
+    }
+
+  xfree (c_items);
+  xfree (item_indices);
+  return result;
 }
 
 /* Create a terminal for a Neomacs display */

@@ -85,6 +85,8 @@
 
 
 
+
+
 /**
  * Maximum number of DMA-BUF planes supported.
  */
@@ -133,6 +135,17 @@
 #define VA_EXPORT_SURFACE_SEPARATE_LAYERS 4
 
 #define VA_SURFACE_ATTRIB_MEM_TYPE_DRM_PRIME_2 1073741824
+
+/**
+ * Popup menu item passed from C.
+ */
+typedef struct CPopupMenuItem {
+  const char *label;
+  const char *shortcut;
+  int enabled;
+  int separator;
+  int submenu;
+} CPopupMenuItem;
 
 /**
  * Type for the resize callback function pointer from C
@@ -1015,6 +1028,22 @@ void neomacs_display_set_mouse_cursor(struct NeomacsDisplay *handle, int cursorT
  * Warp (move) the mouse pointer to the given pixel position.
  */
 void neomacs_display_warp_mouse(struct NeomacsDisplay *handle, int x, int y);
+
+/**
+ * Show a popup menu at position (x, y) with the given items.
+ * The render thread will display the menu and send a MenuSelection event.
+ */
+void neomacs_display_show_popup_menu(struct NeomacsDisplay *handle,
+                                     int x,
+                                     int y,
+                                     const struct CPopupMenuItem *items,
+                                     int itemCount,
+                                     const char *title);
+
+/**
+ * Hide the active popup menu.
+ */
+void neomacs_display_hide_popup_menu(struct NeomacsDisplay *handle);
 
 /**
  * Set the window title (threaded mode)

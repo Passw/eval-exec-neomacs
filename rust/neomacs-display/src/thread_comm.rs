@@ -77,6 +77,23 @@ pub enum InputEvent {
     /// Terminal title changed
     #[cfg(feature = "neo-term")]
     TerminalTitleChanged { id: u32, title: String },
+    /// Popup menu selection made (index into menu items, -1 = cancelled)
+    MenuSelection { index: i32 },
+}
+
+/// A single item in a popup menu
+#[derive(Debug, Clone)]
+pub struct PopupMenuItem {
+    /// Display label for the item
+    pub label: String,
+    /// Keyboard shortcut text (e.g., "C-x C-s"), or empty
+    pub shortcut: String,
+    /// Whether the item is enabled (selectable)
+    pub enabled: bool,
+    /// Whether this is a separator line
+    pub separator: bool,
+    /// Whether this is a submenu header (has children)
+    pub submenu: bool,
 }
 
 /// Command from Emacs to render thread
@@ -196,6 +213,15 @@ pub enum RenderCommand {
     /// Set floating terminal position and opacity
     #[cfg(feature = "neo-term")]
     TerminalSetFloat { id: u32, x: f32, y: f32, opacity: f32 },
+    /// Show a popup menu at position (x, y)
+    ShowPopupMenu {
+        x: f32,
+        y: f32,
+        items: Vec<PopupMenuItem>,
+        title: Option<String>,
+    },
+    /// Hide the active popup menu
+    HidePopupMenu,
 }
 
 /// Wakeup pipe for signaling Emacs from render thread

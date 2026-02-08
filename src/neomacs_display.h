@@ -37,6 +37,7 @@
 #define NEOMACS_EVENT_FOCUS_OUT     10
 #define NEOMACS_EVENT_IMAGE_DIMENSIONS_READY 11
 #define NEOMACS_EVENT_TERMINAL_EXITED 12
+#define NEOMACS_EVENT_MENU_SELECTION 13
 
 #define DRM_FORMAT_ARGB8888 875713089
 
@@ -604,6 +605,33 @@ void neomacs_display_set_mouse_cursor(struct NeomacsDisplay *handle,
  */
 void neomacs_display_warp_mouse(struct NeomacsDisplay *handle,
                                  int x, int y);
+
+/**
+ * Popup menu item structure for FFI.
+ */
+struct CPopupMenuItem
+{
+  const char *label;
+  const char *shortcut;
+  int enabled;
+  int separator;
+  int submenu;
+};
+
+/**
+ * Show a popup menu at position (x, y) with the given items.
+ * The render thread renders the menu and sends a MenuSelection event.
+ */
+void neomacs_display_show_popup_menu(struct NeomacsDisplay *handle,
+                                     int x, int y,
+                                     const struct CPopupMenuItem *items,
+                                     int item_count,
+                                     const char *title);
+
+/**
+ * Hide the active popup menu.
+ */
+void neomacs_display_hide_popup_menu(struct NeomacsDisplay *handle);
 
 /**
  * Set the window title (threaded mode - sends to render thread)
