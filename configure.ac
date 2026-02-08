@@ -3924,7 +3924,7 @@ NEOMACS_LIBS=
 NEOMACS_CFLAGS=
 NEOMACS_PREBUILT=no
 if test "$window_system" = "neomacs"; then
-  NEOMACS_OBJ="neomacsterm.o neomacsfns.o"
+  NEOMACS_OBJ="neomacsterm.o neomacsfns.o neomacs_log.o"
   dnl Check for the Rust library - use dynamic library (.so)
   dnl First check NEOMACS_DISPLAY_LIB environment variable (for nix/external builds)
   if test -n "$NEOMACS_DISPLAY_LIB" && test -f "${NEOMACS_DISPLAY_LIB}/libneomacs_display.so"; then

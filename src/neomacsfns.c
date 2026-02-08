@@ -20,6 +20,9 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 
 #ifdef HAVE_NEOMACS
 
+#define NLOG_MODULE "frame"
+#include "neomacs_log.h"
+
 #include <math.h>
 #include <gtk/gtk.h>
 
@@ -701,7 +704,7 @@ neomacs_translate_key (guint keyval, GdkModifierType state)
 static void
 neomacs_im_commit_cb (GtkIMContext *ctx, const char *str, gpointer user_data)
 {
-  if (0) fprintf (stderr, "DEBUG: IM commit: '%s'\n", str);
+  nlog_debug ("IM commit: '%s'", str);
 }
 
 static gboolean
@@ -716,8 +719,8 @@ neomacs_key_pressed_cb (GtkEventControllerKey *controller,
   if (!FRAME_LIVE_P (f))
     return FALSE;
 
-  if (0) fprintf (stderr, "DEBUG: Key pressed: keyval=%u (0x%x), keycode=%u, state=%u\n",
-	   keyval, keyval, keycode, state);
+  nlog_debug ("Key pressed: keyval=%u (0x%x), keycode=%u, state=%u",
+	     keyval, keyval, keycode, state);
 
   /* Ignore modifier-only key presses - they are only used as modifiers */
   switch (keyval)
@@ -781,7 +784,7 @@ neomacs_key_pressed_cb (GtkEventControllerKey *controller,
 	inev.ie.modifiers |= meta_modifier;
       inev.ie.timestamp = 0;
       XSETFRAME (inev.ie.frame_or_window, f);
-      if (0) fprintf (stderr, "DEBUG: Enqueueing ASCII key event: code=%u, modifiers=%d\n", c, inev.ie.modifiers);
+      nlog_debug ("Enqueueing ASCII key event: code=%u, modifiers=%d", c, inev.ie.modifiers);
       neomacs_evq_enqueue (&inev);
       return TRUE;
     }
@@ -801,10 +804,10 @@ neomacs_focus_enter_cb (GtkEventControllerFocus *controller, gpointer user_data)
   if (!FRAME_LIVE_P (f))
     return;
 
-if (0) fprintf (stderr, "DEBUG: Focus entered frame %p, widget=%p (focusable=%d, has_focus=%d)\n",
-           (void *) f, (void *) widget,
-           gtk_widget_get_focusable (widget),
-           gtk_widget_has_focus (widget));
+  nlog_debug ("Focus entered frame %p, widget=%p (focusable=%d, has_focus=%d)",
+	     (void *) f, (void *) widget,
+	     gtk_widget_get_focusable (widget),
+	     gtk_widget_has_focus (widget));
 
   /* Set this frame as the focus and highlight frame */
   dpyinfo = FRAME_NEOMACS_DISPLAY_INFO (f);
@@ -814,7 +817,7 @@ if (0) fprintf (stderr, "DEBUG: Focus entered frame %p, widget=%p (focusable=%d,
       dpyinfo->x_focus_frame = f;
       dpyinfo->highlight_frame = f;
       dpyinfo->x_highlight_frame = f;
-if (0) fprintf (stderr, "DEBUG: Set highlight_frame to %p\n", (void *) f);
+      nlog_debug ("Set highlight_frame to %p", (void *) f);
     }
 
   /* Send focus-in event to Emacs */
@@ -835,7 +838,7 @@ neomacs_focus_leave_cb (GtkEventControllerFocus *controller, gpointer user_data)
   if (!FRAME_LIVE_P (f))
     return;
 
-if (0) fprintf (stderr, "DEBUG: Focus left frame %p\n", (void *) f);
+  nlog_debug ("Focus left frame %p", (void *) f);
 
   /* Clear highlight frame if it was this frame */
   dpyinfo = FRAME_NEOMACS_DISPLAY_INFO (f);
@@ -1190,18 +1193,18 @@ neomacs_create_frame_widgets (struct frame *f)
           output->drawing_area = NULL;
           output->use_gpu_widget = 1;
 
-          fprintf (stderr, "Created winit window with id %u\n", window_id);
+          nlog_info ("Created winit window with id %u", window_id);
           return;
         }
       else
         {
-          fprintf (stderr, "FATAL: Failed to create winit window\n");
+          nlog_fatal ("Failed to create winit window");
           emacs_abort ();
         }
     }
   else
     {
-      fprintf (stderr, "FATAL: winit backend not initialized\n");
+      nlog_fatal ("winit backend not initialized");
       emacs_abort ();
     }
 
@@ -1232,7 +1235,7 @@ neomacs_create_frame_widgets (struct frame *f)
           drawing_area = (GtkWidget *) neomacs_display_create_widget ();
           if (!drawing_area)
             {
-              fprintf (stderr, "Failed to create NeomacsWidget, falling back to DrawingArea\n");
+              nlog_warn ("Failed to create NeomacsWidget, falling back to DrawingArea");
               use_gpu_widget = 0;
             }
         }
@@ -1397,7 +1400,7 @@ neomacs_create_frame_widgets (struct frame *f)
         neomacs_ensure_cr_surface (f, FRAME_PIXEL_WIDTH (f), FRAME_PIXEL_HEIGHT (f));
 
       /* Show the window and grab focus */
-      if (0) fprintf (stderr, "DEBUG: Calling gtk_window_present\n");
+      nlog_debug ("Calling gtk_window_present");
       gtk_window_present (GTK_WINDOW (window));
 
       /* Force window to be realized and shown */

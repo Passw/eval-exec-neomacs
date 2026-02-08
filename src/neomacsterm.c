@@ -20,6 +20,9 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 
 #ifdef HAVE_NEOMACS
 
+#define NLOG_MODULE "display"
+#include "neomacs_log.h"
+
 #include <dlfcn.h>
 #include <string.h>
 #include <gtk/gtk.h>
@@ -290,7 +293,7 @@ neomacs_initialize_display_info (struct neomacs_display_info *dpyinfo)
       void *handle = dlopen (NULL, RTLD_LAZY);
       const char *type_name = G_OBJECT_TYPE_NAME (gdpy);
 
-      if (0) fprintf (stderr, "DEBUG: GDK display type: %s\n", type_name ? type_name : "NULL");
+      nlog_debug ("GDK display type: %s", type_name ? type_name : "NULL");
 
       if (handle && type_name)
 	{
@@ -299,12 +302,12 @@ neomacs_initialize_display_info (struct neomacs_display_info *dpyinfo)
 	    {
 	      void *(*get_xdisplay) (GdkDisplay *) = dlsym (handle, "gdk_x11_display_get_xdisplay");
 	      int (*conn_number) (void *) = dlsym (handle, "XConnectionNumber");
-	      if (0) fprintf (stderr, "DEBUG: X11: get_xdisplay=%p, conn_number=%p\n",
+	      nlog_debug ("X11: get_xdisplay=%p, conn_number=%p",
 		       (void *) get_xdisplay, (void *) conn_number);
 	      if (get_xdisplay && conn_number)
 		{
 		  void *xdpy = get_xdisplay (gdpy);
-		  if (0) fprintf (stderr, "DEBUG: X11: xdpy=%p\n", xdpy);
+		  nlog_debug ("X11: xdpy=%p", xdpy);
 		  if (xdpy)
 		    dpyinfo->connection = conn_number (xdpy);
 		}
@@ -315,19 +318,19 @@ neomacs_initialize_display_info (struct neomacs_display_info *dpyinfo)
 	      struct wl_display *(*get_wl_display) (GdkDisplay *)
 		= dlsym (handle, "gdk_wayland_display_get_wl_display");
 	      int (*get_fd) (struct wl_display *) = dlsym (handle, "wl_display_get_fd");
-	      if (0) fprintf (stderr, "DEBUG: Wayland: get_wl_display=%p, get_fd=%p\n",
+	      nlog_debug ("Wayland: get_wl_display=%p, get_fd=%p",
 		       (void *) get_wl_display, (void *) get_fd);
 	      if (get_wl_display && get_fd)
 		{
 		  struct wl_display *wl_dpy = get_wl_display (gdpy);
-		  if (0) fprintf (stderr, "DEBUG: Wayland: wl_dpy=%p\n", (void *) wl_dpy);
+		  nlog_debug ("Wayland: wl_dpy=%p", (void *) wl_dpy);
 		  if (wl_dpy)
 		    dpyinfo->connection = get_fd (wl_dpy);
 		}
 	    }
 	}
 
-      if (0) fprintf (stderr, "DEBUG: Display connection fd: %d\n", dpyinfo->connection);
+      nlog_debug ("Display connection fd: %d", dpyinfo->connection);
     }
 }
 
@@ -427,11 +430,11 @@ neomacs_create_terminal (struct neomacs_display_info *dpyinfo)
   if (dpyinfo->connection >= 0)
     {
       add_keyboard_wait_descriptor (dpyinfo->connection);
-if (0) fprintf (stderr, "DEBUG: Registered fd %d with add_keyboard_wait_descriptor\n",
-               dpyinfo->connection);
+      nlog_debug ("Registered fd %d with add_keyboard_wait_descriptor",
+		  dpyinfo->connection);
     }
   else
-if (0) fprintf (stderr, "DEBUG: WARNING: No valid connection fd to register!\n");
+    nlog_warn ("No valid connection fd to register");
 
   /* More hooks would be set up here... */
 
@@ -2161,8 +2164,7 @@ neomacs_get_or_load_image (struct neomacs_display_info *dpyinfo, struct image *i
     {
       /* Only warn if we actually tried to load something */
       if (img->width > 0 && img->height > 0)
-        fprintf (stderr, "neomacs: Failed to load image %dx%d\n",
-                 img->width, img->height);
+        nlog_warn ("Failed to load image %dx%d", img->width, img->height);
       return 0;
     }
 
