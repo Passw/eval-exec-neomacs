@@ -431,6 +431,13 @@ neomacs_delete_terminal (struct terminal *terminal)
   if (!dpyinfo)
     return;
 
+  /* Unregister the connection fd from the event loop.  */
+  if (dpyinfo->connection >= 0)
+    {
+      delete_read_fd (dpyinfo->connection);
+      delete_keyboard_wait_descriptor (dpyinfo->connection);
+    }
+
   /* Shutdown the Rust display engine */
   if (dpyinfo->display_handle)
     {
@@ -6142,13 +6149,20 @@ neomacs_set_frame_offset (struct frame *f, int xoff, int yoff,
 
 /* Delete/destroy a frame.  */
 static void
-neomacs_delete_frame (struct frame *f)
+neomacs_free_frame_resources (struct frame *f)
 {
   struct neomacs_output *output = FRAME_NEOMACS_OUTPUT (f);
   struct neomacs_display_info *dpyinfo = FRAME_NEOMACS_DISPLAY_INFO (f);
+  Mouse_HLInfo *hlinfo;
 
   if (!output || !dpyinfo)
     return;
+
+  hlinfo = MOUSE_HL_INFO (f);
+
+  block_input ();
+
+  free_frame_faces (f);
 
   /* Clean up display info references to this frame.  */
   if (dpyinfo->focus_frame == f)
@@ -6165,6 +6179,21 @@ neomacs_delete_frame (struct frame *f)
     dpyinfo->last_mouse_motion_frame = NULL;
   if (dpyinfo->last_mouse_glyph_frame == f)
     dpyinfo->last_mouse_glyph_frame = NULL;
+
+  if (f == hlinfo->mouse_face_mouse_frame)
+    reset_mouse_highlight (hlinfo);
+
+  unblock_input ();
+}
+
+static void
+neomacs_delete_frame (struct frame *f)
+{
+  neomacs_free_frame_resources (f);
+
+  struct neomacs_display_info *dpyinfo = FRAME_NEOMACS_DISPLAY_INFO (f);
+  if (dpyinfo)
+    dpyinfo->reference_count--;
 }
 
 /* Ring the bell (visual flash).  */
