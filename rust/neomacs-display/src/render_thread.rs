@@ -375,6 +375,10 @@ struct RenderApp {
 
     // Visual bell state (flash overlay)
     visual_bell_start: Option<std::time::Instant>,
+
+    // IME state
+    ime_enabled: bool,
+    ime_preedit_active: bool,
 }
 
 /// State for a tooltip displayed as GPU overlay
@@ -506,6 +510,8 @@ impl RenderApp {
             popup_menu: None,
             tooltip: None,
             visual_bell_start: None,
+            ime_enabled: false,
+            ime_preedit_active: false,
         }
     }
 
@@ -1224,6 +1230,18 @@ impl RenderApp {
                         self.cursor_prev_target_cx = new_cx;
                         self.cursor_prev_target_cy = new_cy;
                     }
+                }
+
+                // Update IME cursor area so candidate window follows text cursor
+                if let Some(ref window) = self.window {
+                    let x = (new_target.x as f64) * self.scale_factor;
+                    let y = (new_target.y as f64 + new_target.height as f64) * self.scale_factor;
+                    let w = new_target.width as f64 * self.scale_factor;
+                    let h = new_target.height as f64 * self.scale_factor;
+                    window.set_ime_cursor_area(
+                        winit::dpi::PhysicalPosition::new(x, y),
+                        winit::dpi::PhysicalSize::new(w, h),
+                    );
                 }
 
                 self.cursor_target = Some(new_target);
@@ -2354,6 +2372,9 @@ impl ApplicationHandler for RenderApp {
                     // Initialize wgpu with the window
                     self.init_wgpu(window.clone());
 
+                    // Enable IME input for CJK and compose support
+                    window.set_ime_allowed(true);
+
                     self.window = Some(window);
                 }
                 Err(e) => {
@@ -2411,6 +2432,10 @@ impl ApplicationHandler for RenderApp {
                         self.frame_dirty = true;
                     }
                     // Swallow all keys while popup is active
+                } else if self.ime_preedit_active {
+                    // When IME preedit is active, suppress character
+                    // keys to avoid double input.  The committed text
+                    // will arrive via Ime::Commit instead.
                 } else {
                     let keysym = Self::translate_key(&logical_key);
                     if keysym != 0 {
@@ -2515,6 +2540,57 @@ impl ApplicationHandler for RenderApp {
                 }
                 if state.super_key() {
                     self.modifiers |= NEOMACS_SUPER_MASK;
+                }
+            }
+
+            WindowEvent::Ime(ime_event) => {
+                match ime_event {
+                    winit::event::Ime::Enabled => {
+                        self.ime_enabled = true;
+                        log::debug!("IME enabled");
+                    }
+                    winit::event::Ime::Disabled => {
+                        self.ime_enabled = false;
+                        log::debug!("IME disabled");
+                    }
+                    winit::event::Ime::Commit(text) => {
+                        // Send each committed character as an individual
+                        // key event to Emacs (no modifiers — IME already
+                        // composed the final characters)
+                        for ch in text.chars() {
+                            let keysym = ch as u32;
+                            if keysym != 0 {
+                                self.comms.send_input(InputEvent::Key {
+                                    keysym,
+                                    modifiers: 0,
+                                    pressed: true,
+                                });
+                            }
+                        }
+                    }
+                    winit::event::Ime::Preedit(text, cursor_range) => {
+                        // Track whether preedit is active to suppress
+                        // raw KeyboardInput during IME composition
+                        self.ime_preedit_active = !text.is_empty();
+
+                        // Update IME cursor area so the OS positions the
+                        // candidate window near the text cursor
+                        if let Some(ref window) = self.window {
+                            if let Some(ref target) = self.cursor_target {
+                                let x = (target.x as f64) * self.scale_factor;
+                                let y = (target.y as f64 + target.height as f64) * self.scale_factor;
+                                let w = target.width as f64 * self.scale_factor;
+                                let h = target.height as f64 * self.scale_factor;
+                                window.set_ime_cursor_area(
+                                    winit::dpi::PhysicalPosition::new(x, y),
+                                    winit::dpi::PhysicalSize::new(w, h),
+                                );
+                            }
+                        }
+                        if !text.is_empty() {
+                            log::trace!("IME preedit: '{}' cursor: {:?}", text, cursor_range);
+                        }
+                    }
                 }
             }
 
