@@ -1411,6 +1411,60 @@ on mode-line areas to simulate a blurred glass appearance."
                 neomacs-frosted-glass-opacity nil)
             val))))
 
+;; --- Idle screen dimming ---
+(declare-function neomacs-set-idle-dim "neomacsterm.c"
+  (&optional enabled delay-secs opacity fade-ms))
+
+(defcustom neomacs-idle-dim nil
+  "Enable idle screen dimming after inactivity.
+Non-nil dims the entire frame after a period of no keyboard or mouse
+activity, then smoothly restores brightness on any input."
+  :type 'boolean
+  :group 'frames
+  :set (lambda (sym val)
+         (set-default sym val)
+         (when (fboundp 'neomacs-set-idle-dim)
+           (neomacs-set-idle-dim val
+            (if (boundp 'neomacs-idle-dim-delay)
+                neomacs-idle-dim-delay nil)
+            (if (boundp 'neomacs-idle-dim-opacity)
+                neomacs-idle-dim-opacity nil)
+            (if (boundp 'neomacs-idle-dim-fade)
+                neomacs-idle-dim-fade nil)))))
+
+(defcustom neomacs-idle-dim-delay 60
+  "Seconds of inactivity before idle dimming starts."
+  :type '(integer :tag "Delay (seconds)")
+  :group 'frames
+  :set (lambda (sym val)
+         (set-default sym val)
+         (when (and (fboundp 'neomacs-set-idle-dim)
+                    (boundp 'neomacs-idle-dim)
+                    neomacs-idle-dim)
+           (neomacs-set-idle-dim t val))))
+
+(defcustom neomacs-idle-dim-opacity 40
+  "Dimming darkness for idle screen dim (0-100)."
+  :type '(integer :tag "Opacity")
+  :group 'frames
+  :set (lambda (sym val)
+         (set-default sym val)
+         (when (and (fboundp 'neomacs-set-idle-dim)
+                    (boundp 'neomacs-idle-dim)
+                    neomacs-idle-dim)
+           (neomacs-set-idle-dim t nil val))))
+
+(defcustom neomacs-idle-dim-fade 500
+  "Fade transition duration in milliseconds for idle dimming."
+  :type '(integer :tag "Fade (ms)")
+  :group 'frames
+  :set (lambda (sym val)
+         (set-default sym val)
+         (when (and (fboundp 'neomacs-set-idle-dim)
+                    (boundp 'neomacs-idle-dim)
+                    neomacs-idle-dim)
+           (neomacs-set-idle-dim t nil nil val))))
+
 ;; --- Noise/film grain overlay ---
 (declare-function neomacs-set-noise-grain "neomacsterm.c"
   (&optional enabled intensity size))

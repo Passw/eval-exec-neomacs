@@ -735,6 +735,14 @@ struct RenderApp {
     /// Buffer-local accent color strip
     accent_strip_enabled: bool,
     accent_strip_width: f32,
+    /// Idle screen dimming
+    idle_dim_enabled: bool,
+    idle_dim_delay: std::time::Duration,
+    idle_dim_opacity: f32,
+    idle_dim_fade_duration: std::time::Duration,
+    last_activity_time: std::time::Instant,
+    idle_dim_current_alpha: f32, // current dimming alpha 0.0 (none) to opacity (full)
+    idle_dim_active: bool,       // true when dimmed or fading
     /// Noise/film grain overlay
     noise_grain_enabled: bool,
     noise_grain_intensity: f32,
@@ -1001,6 +1009,13 @@ impl RenderApp {
             border_transition_duration_ms: 200,
             accent_strip_enabled: false,
             accent_strip_width: 3.0,
+            idle_dim_enabled: false,
+            idle_dim_delay: std::time::Duration::from_secs(60),
+            idle_dim_opacity: 0.4,
+            idle_dim_fade_duration: std::time::Duration::from_millis(500),
+            last_activity_time: std::time::Instant::now(),
+            idle_dim_current_alpha: 0.0,
+            idle_dim_active: false,
             noise_grain_enabled: false,
             noise_grain_intensity: 0.03,
             noise_grain_size: 2.0,
@@ -1959,6 +1974,17 @@ impl RenderApp {
                     self.accent_strip_width = width;
                     if let Some(renderer) = self.renderer.as_mut() {
                         renderer.set_accent_strip(enabled, width);
+                    }
+                    self.frame_dirty = true;
+                }
+                RenderCommand::SetIdleDim { enabled, delay_secs, opacity, fade_ms } => {
+                    self.idle_dim_enabled = enabled;
+                    self.idle_dim_delay = std::time::Duration::from_secs_f32(delay_secs);
+                    self.idle_dim_opacity = opacity;
+                    self.idle_dim_fade_duration = std::time::Duration::from_millis(fade_ms as u64);
+                    if !enabled {
+                        self.idle_dim_current_alpha = 0.0;
+                        self.idle_dim_active = false;
                     }
                     self.frame_dirty = true;
                 }
@@ -3387,6 +3413,7 @@ impl RenderApp {
                 let frame = self.current_frame.as_ref().expect("checked in render");
                 let renderer = self.renderer.as_mut().expect("checked in render");
                 let glyph_atlas = self.glyph_atlas.as_mut().expect("checked in render");
+                renderer.set_idle_dim_alpha(self.idle_dim_current_alpha);
 
                 // SAFETY: current_view is valid for the duration of this block
                 renderer.render_frame_glyphs(
@@ -3426,6 +3453,7 @@ impl RenderApp {
             let frame = self.current_frame.as_ref().expect("checked in render");
             let renderer = self.renderer.as_mut().expect("checked in render");
             let glyph_atlas = self.glyph_atlas.as_mut().expect("checked in render");
+            renderer.set_idle_dim_alpha(self.idle_dim_current_alpha);
 
             renderer.render_frame_glyphs(
                 &surface_view,
@@ -3931,6 +3959,10 @@ impl ApplicationHandler for RenderApp {
                         if self.typing_speed_enabled && state == ElementState::Pressed {
                             self.key_press_times.push(std::time::Instant::now());
                         }
+                        // Track activity for idle dimming
+                        if self.idle_dim_enabled {
+                            self.last_activity_time = std::time::Instant::now();
+                        }
                         self.comms.send_input(InputEvent::Key {
                             keysym,
                             modifiers: self.modifiers,
@@ -4065,6 +4097,10 @@ impl ApplicationHandler for RenderApp {
                 let lx = (position.x / self.scale_factor) as f32;
                 let ly = (position.y / self.scale_factor) as f32;
                 self.mouse_pos = (lx, ly);
+                // Track activity for idle dimming
+                if self.idle_dim_enabled {
+                    self.last_activity_time = std::time::Instant::now();
+                }
 
                 // Restore mouse cursor visibility when mouse moves
                 if self.mouse_hidden_for_typing {
@@ -4300,6 +4336,36 @@ impl ApplicationHandler for RenderApp {
             self.frame_dirty = true;
         }
 
+        // Tick idle dimming
+        if self.idle_dim_enabled {
+            let idle_time = self.last_activity_time.elapsed();
+            let target_alpha = if idle_time >= self.idle_dim_delay {
+                self.idle_dim_opacity
+            } else {
+                0.0
+            };
+            let diff = target_alpha - self.idle_dim_current_alpha;
+            if diff.abs() > 0.001 {
+                let fade_speed = if self.idle_dim_fade_duration.as_secs_f32() > 0.0 {
+                    1.0 / self.idle_dim_fade_duration.as_secs_f32() * 0.016
+                } else {
+                    1.0
+                };
+                if diff > 0.0 {
+                    self.idle_dim_current_alpha = (self.idle_dim_current_alpha + fade_speed * self.idle_dim_opacity).min(target_alpha);
+                } else {
+                    self.idle_dim_current_alpha = (self.idle_dim_current_alpha - fade_speed * self.idle_dim_opacity).max(0.0);
+                }
+                self.idle_dim_active = true;
+                self.frame_dirty = true;
+            } else if self.idle_dim_current_alpha > 0.001 {
+                self.idle_dim_active = true;
+                self.frame_dirty = true;
+            } else {
+                self.idle_dim_active = false;
+            }
+        }
+
         // Keep dirty if cursor pulse is active (needs continuous redraw)
         if self.cursor_pulse_enabled && self.cursor_glow_enabled {
             self.frame_dirty = true;
@@ -4337,7 +4403,8 @@ impl ApplicationHandler for RenderApp {
         // Window events (key, mouse, resize) still wake immediately.
         let now = std::time::Instant::now();
         let next_wake = if self.frame_dirty || has_active_content
-            || self.cursor_animating || self.cursor_size_animating || self.has_active_transitions()
+            || self.cursor_animating || self.cursor_size_animating
+            || self.idle_dim_active || self.has_active_transitions()
         {
             // Active rendering: cap at ~240fps to avoid spinning
             now + std::time::Duration::from_millis(4)

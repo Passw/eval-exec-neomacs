@@ -8624,6 +8624,34 @@ BLUR is the blur spread radius in pixels (default 4).  */)
   return on ? Qt : Qnil;
 }
 
+DEFUN ("neomacs-set-idle-dim",
+       Fneomacs_set_idle_dim,
+       Sneomacs_set_idle_dim, 0, 4, 0,
+       doc: /* Configure idle screen dimming after inactivity.
+ENABLED non-nil dims the entire frame after a period of no keyboard
+or mouse activity, then smoothly restores brightness on input.
+DELAY-SECS is seconds of inactivity before dimming (default 60).
+OPACITY is 0-100 for dimming darkness (default 40).
+FADE-MS is the fade transition duration in milliseconds (default 500).  */)
+  (Lisp_Object enabled, Lisp_Object delay_secs, Lisp_Object opacity,
+   Lisp_Object fade_ms)
+{
+  struct neomacs_display_info *dpyinfo = neomacs_display_list;
+  if (!dpyinfo || !dpyinfo->display_handle)
+    return Qnil;
+
+  int on = !NILP (enabled);
+  int delay = 60;
+  int op = 40;
+  int fade = 500;
+  if (FIXNUMP (delay_secs)) delay = XFIXNUM (delay_secs);
+  if (FIXNUMP (opacity)) op = XFIXNUM (opacity);
+  if (FIXNUMP (fade_ms)) fade = XFIXNUM (fade_ms);
+
+  neomacs_display_set_idle_dim (dpyinfo->display_handle, on, delay, op, fade);
+  return on ? Qt : Qnil;
+}
+
 DEFUN ("neomacs-set-noise-grain",
        Fneomacs_set_noise_grain,
        Sneomacs_set_noise_grain, 0, 3, 0,
@@ -10115,6 +10143,7 @@ syms_of_neomacsterm (void)
   defsubr (&Sneomacs_set_cursor_size_transition);
   defsubr (&Sneomacs_set_padding_gradient);
   defsubr (&Sneomacs_set_noise_grain);
+  defsubr (&Sneomacs_set_idle_dim);
   defsubr (&Sneomacs_set_window_glow);
   defsubr (&Sneomacs_set_scroll_progress);
   defsubr (&Sneomacs_set_inactive_tint);

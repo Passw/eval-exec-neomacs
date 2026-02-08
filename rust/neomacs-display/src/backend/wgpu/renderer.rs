@@ -170,6 +170,8 @@ pub struct WgpuRenderer {
     /// Buffer-local accent color strip
     accent_strip_enabled: bool,
     accent_strip_width: f32,
+    /// Idle screen dimming alpha (0.0 = no dim, >0 = overlay)
+    idle_dim_alpha: f32,
     /// Noise/film grain overlay
     noise_grain_enabled: bool,
     noise_grain_intensity: f32,
@@ -774,6 +776,7 @@ impl WgpuRenderer {
             prev_border_selected: 0,
             accent_strip_enabled: false,
             accent_strip_width: 3.0,
+            idle_dim_alpha: 0.0,
             noise_grain_enabled: false,
             noise_grain_intensity: 0.03,
             noise_grain_size: 2.0,
@@ -971,6 +974,11 @@ impl WgpuRenderer {
     pub fn set_accent_strip(&mut self, enabled: bool, width: f32) {
         self.accent_strip_enabled = enabled;
         self.accent_strip_width = width;
+    }
+
+    /// Update idle dim alpha
+    pub fn set_idle_dim_alpha(&mut self, alpha: f32) {
+        self.idle_dim_alpha = alpha;
     }
 
     /// Update noise grain config
@@ -3682,6 +3690,26 @@ impl WgpuRenderer {
                     render_pass.draw(0..grain_vertices.len() as u32, 0..1);
                 }
                 self.needs_continuous_redraw = true;
+            }
+
+            // === Idle screen dimming ===
+            if self.idle_dim_alpha > 0.001 {
+                let frame_w = surface_width as f32 / self.scale_factor;
+                let frame_h = surface_height as f32 / self.scale_factor;
+                let dim_c = Color::new(0.0, 0.0, 0.0, self.idle_dim_alpha);
+                let mut dim_vertices: Vec<RectVertex> = Vec::new();
+                self.add_rect(&mut dim_vertices, 0.0, 0.0, frame_w, frame_h, &dim_c);
+                let dim_buffer = self.device.create_buffer_init(
+                    &wgpu::util::BufferInitDescriptor {
+                        label: Some("Idle Dim Buffer"),
+                        contents: bytemuck::cast_slice(&dim_vertices),
+                        usage: wgpu::BufferUsages::VERTEX,
+                    },
+                );
+                render_pass.set_pipeline(&self.rect_pipeline);
+                render_pass.set_bind_group(0, &self.uniform_bind_group, &[]);
+                render_pass.set_vertex_buffer(0, dim_buffer.slice(..));
+                render_pass.draw(0..dim_vertices.len() as u32, 0..1);
             }
 
             // === Focus mode: dim lines outside current paragraph ===

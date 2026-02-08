@@ -2781,6 +2781,26 @@ pub unsafe extern "C" fn neomacs_display_set_title_fade(
     }
 }
 
+/// Configure idle screen dimming after inactivity
+#[no_mangle]
+pub unsafe extern "C" fn neomacs_display_set_idle_dim(
+    _handle: *mut NeomacsDisplay,
+    enabled: c_int,
+    delay_secs: c_int,
+    opacity: c_int,
+    fade_ms: c_int,
+) {
+    let cmd = RenderCommand::SetIdleDim {
+        enabled: enabled != 0,
+        delay_secs: delay_secs as f32,
+        opacity: opacity as f32 / 100.0,
+        fade_ms: fade_ms as u32,
+    };
+    if let Some(ref state) = THREADED_STATE {
+        let _ = state.emacs_comms.cmd_tx.try_send(cmd);
+    }
+}
+
 /// Configure noise/film grain texture overlay
 #[no_mangle]
 pub unsafe extern "C" fn neomacs_display_set_noise_grain(

@@ -450,6 +450,16 @@ pub enum RenderCommand {
         /// Blur radius (noise spread in pixels)
         blur: f32,
     },
+    /// Configure idle screen dimming after inactivity
+    SetIdleDim {
+        enabled: bool,
+        /// Seconds of inactivity before dimming starts
+        delay_secs: f32,
+        /// Dim opacity (0.0-1.0, how dark to make it)
+        opacity: f32,
+        /// Fade duration in milliseconds
+        fade_ms: u32,
+    },
     /// Configure noise/film grain texture overlay
     SetNoiseGrain {
         enabled: bool,

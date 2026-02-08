@@ -1423,6 +1423,13 @@ void neomacs_display_set_frosted_glass(
     int opacity,
     int blur);
 
+void neomacs_display_set_idle_dim(
+    struct NeomacsDisplay *handle,
+    int enabled,
+    int delay_secs,
+    int opacity,
+    int fade_ms);
+
 void neomacs_display_set_noise_grain(
     struct NeomacsDisplay *handle,
     int enabled,
