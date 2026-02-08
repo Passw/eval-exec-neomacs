@@ -92,6 +92,11 @@ static void neomacs_judge_scroll_bars (struct frame *f);
 static void neomacs_set_scroll_bar_default_width (struct frame *f);
 static void neomacs_set_scroll_bar_default_height (struct frame *f);
 static void neomacs_clear_frame (struct frame *f);
+static void neomacs_mouse_position (struct frame **fp, int insist,
+                                    Lisp_Object *bar_window,
+                                    enum scroll_bar_part *part,
+                                    Lisp_Object *x, Lisp_Object *y,
+                                    Time *timestamp);
 static uint32_t neomacs_get_or_load_image (struct neomacs_display_info *dpyinfo,
                                            struct image *img);
 
@@ -448,6 +453,7 @@ neomacs_create_terminal (struct neomacs_display_info *dpyinfo)
   terminal->judge_scroll_bars_hook = neomacs_judge_scroll_bars;
   terminal->set_scroll_bar_default_width_hook = neomacs_set_scroll_bar_default_width;
   terminal->set_scroll_bar_default_height_hook = neomacs_set_scroll_bar_default_height;
+  terminal->mouse_position_hook = neomacs_mouse_position;
 
   /* Register the display connection fd for event handling */
   if (dpyinfo->connection >= 0)
@@ -4137,6 +4143,68 @@ neomacs_set_scroll_bar_default_height (struct frame *f)
   int bar_height = 12;  /* 12px thin scroll bar */
   FRAME_CONFIG_SCROLL_BAR_LINES (f) = (bar_height + height - 1) / height;
   FRAME_CONFIG_SCROLL_BAR_HEIGHT (f) = bar_height;
+}
+
+/* Return the current position of the mouse.
+   *FP should be a frame which indicates which display to ask about.
+
+   If the mouse movement started in a scroll bar, set *BAR_WINDOW to
+   the scroll bar's window, *PART to the part the mouse is in, and
+   *X and *Y to the position within the scroll bar.
+
+   Otherwise, set *BAR_WINDOW to Qnil, *PART to scroll_bar_above_handle,
+   and *X and *Y to the character cell the mouse is over.
+
+   Set *TIMESTAMP to the server timestamp of the last mouse event.
+
+   Don't store anything if we don't have a valid set of values to report.
+
+   This clears the mouse_moved flag, so we can wait for the next mouse
+   movement.  */
+
+static void
+neomacs_mouse_position (struct frame **fp, int insist, Lisp_Object *bar_window,
+                        enum scroll_bar_part *part, Lisp_Object *x,
+                        Lisp_Object *y, Time *timestamp)
+{
+  struct frame *f1;
+  struct neomacs_display_info *dpyinfo = FRAME_NEOMACS_DISPLAY_INFO (*fp);
+
+  block_input ();
+
+  Lisp_Object frame, tail;
+
+  /* Clear the mouse-moved flag for every frame on this display.  */
+  FOR_EACH_FRAME (tail, frame)
+    if (FRAME_NEOMACS_P (XFRAME (frame))
+        && FRAME_DISPLAY_INFO (XFRAME (frame)) == dpyinfo)
+      XFRAME (frame)->mouse_moved = false;
+
+  dpyinfo->last_mouse_scroll_bar = NULL;
+
+  if (gui_mouse_grabbed (dpyinfo))
+    f1 = dpyinfo->last_mouse_frame;
+  else
+    f1 = dpyinfo->last_mouse_motion_frame;
+
+  if (f1 != NULL && FRAME_NEOMACS_P (f1))
+    {
+      int win_x = dpyinfo->last_mouse_motion_x;
+      int win_y = dpyinfo->last_mouse_motion_y;
+
+      remember_mouse_glyph (f1, win_x, win_y,
+                            &dpyinfo->last_mouse_glyph);
+      dpyinfo->last_mouse_glyph_frame = f1;
+
+      *bar_window = Qnil;
+      *part = 0;
+      *fp = f1;
+      XSETINT (*x, win_x);
+      XSETINT (*y, win_y);
+      *timestamp = dpyinfo->last_user_time;
+    }
+
+  unblock_input ();
 }
 
 /* Make frame visible or invisible */
