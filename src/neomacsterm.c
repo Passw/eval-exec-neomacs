@@ -62,6 +62,9 @@ struct neomacs_image_cache_entry {
 static struct neomacs_image_cache_entry neomacs_image_cache[IMAGE_CACHE_SIZE];
 static int neomacs_image_cache_count = 0;
 
+/* Track popup/menu activation for tooltip/auto-select suppression */
+static int neomacs_popup_activated_flag;
+
 /* Forward declarations */
 static void neomacs_extract_full_frame (struct frame *f);
 static void neomacs_define_frame_cursor (struct frame *f, Emacs_Cursor cursor);
@@ -580,6 +583,7 @@ neomacs_menu_show (struct frame *f, int x, int y, int menuflags,
   if (!NILP (title) && STRINGP (title))
     title_str = SSDATA (title);
 
+  neomacs_popup_activated_flag = 1;
   neomacs_display_show_popup_menu (dpyinfo->display_handle,
                                    x, y, c_items, item_count, title_str);
 
@@ -618,6 +622,9 @@ neomacs_menu_show (struct frame *f, int x, int y, int menuflags,
           /* Discard other events while menu is active */
         }
     }
+
+  /* Menu selection done — clear popup flag */
+  neomacs_popup_activated_flag = 0;
 
   /* Clean up */
   Lisp_Object result = Qnil;
@@ -8235,6 +8242,20 @@ free_frame_menubar (struct frame *f)
   /* No external menu bar resources to free.  */
 }
 
+int
+popup_activated (void)
+{
+  return neomacs_popup_activated_flag;
+}
+
+DEFUN ("menu-or-popup-active-p", Fmenu_or_popup_active_p,
+       Smenu_or_popup_active_p, 0, 0, 0,
+       doc: /* Return t if a menu or popup dialog is active.  */)
+  (void)
+{
+  return popup_activated () ? Qt : Qnil;
+}
+
 
 /* ============================================================================
  * Threaded Mode Support
@@ -8714,6 +8735,7 @@ syms_of_neomacsterm (void)
   defsubr (&Sneomacs_display_list);
   defsubr (&Sxw_display_color_p);
   defsubr (&Sx_display_grayscale_p);
+  defsubr (&Smenu_or_popup_active_p);
 
   /* Video playback API */
   defsubr (&Sneomacs_video_load);
