@@ -588,11 +588,13 @@ neomacs_menu_show (struct frame *f, int x, int y, int menuflags,
                                    x, y, c_items, item_count, title_str);
 
   /* Block waiting for menu selection event from render thread.
-     We poll the input event queue until we get a MenuSelection event. */
+     We poll the input event queue until we get a MenuSelection event.
+     Give up after 30 seconds to prevent indefinite hang. */
   int selection = -2; /* -2 = still waiting, -1 = cancelled, >= 0 = item index */
   NeomacsInputEvent events[16];
+  int max_iterations = 600; /* 600 * 50ms = 30 seconds */
 
-  while (selection == -2)
+  while (selection == -2 && max_iterations-- > 0)
     {
       /* Wait for events (use a short timeout to stay responsive) */
       struct timespec timeout = { 0, 50000000 }; /* 50ms */
@@ -661,16 +663,15 @@ neomacs_menu_show (struct frame *f, int x, int y, int menuflags,
         }
       result = entry;
     }
-  else if (selection == -1 && !(menuflags & MENU_FOR_CLICK))
+  xfree (c_items);
+  xfree (item_indices);
+
+  if (selection == -1 && !(menuflags & MENU_FOR_CLICK))
     {
       /* User cancelled — equivalent to C-g for non-click menus */
-      xfree (c_items);
-      xfree (item_indices);
       quit ();
     }
 
-  xfree (c_items);
-  xfree (item_indices);
   return result;
 }
 
