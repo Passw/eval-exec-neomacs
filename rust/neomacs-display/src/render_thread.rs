@@ -2263,6 +2263,38 @@ impl RenderApp {
             }
         }
 
+        // Detect window split/delete (window count or IDs changed)
+        if self.crossfade_enabled && !self.prev_window_infos.is_empty() {
+            let curr_ids: std::collections::HashSet<i64> = frame.window_infos.iter()
+                .filter(|i| !i.is_minibuffer)
+                .map(|i| i.window_id)
+                .collect();
+            let prev_non_mini: std::collections::HashSet<i64> = self.prev_window_infos.iter()
+                .filter(|(_, v)| !v.is_minibuffer)
+                .map(|(k, _)| *k)
+                .collect();
+
+            if prev_non_mini != curr_ids && prev_non_mini.len() > 0 && curr_ids.len() > 0 {
+                // Window layout changed — full-frame crossfade
+                // Use a synthetic window_id (0) for the full-frame transition
+                let full_bounds = Rect::new(0.0, 0.0, frame.width, frame.height);
+                if let Some((tex, view, bg)) = self.snapshot_prev_texture() {
+                    log::debug!("Starting window split/delete crossfade ({} → {} windows)",
+                        prev_non_mini.len(), curr_ids.len());
+                    self.crossfades.insert(0, CrossfadeTransition {
+                        started: now,
+                        duration: std::time::Duration::from_millis(200),
+                        bounds: full_bounds,
+                        effect: self.crossfade_effect,
+                        easing: self.crossfade_easing,
+                        old_texture: tex,
+                        old_view: view,
+                        old_bind_group: bg,
+                    });
+                }
+            }
+        }
+
         // Update prev_window_infos from current frame
         self.prev_window_infos.clear();
         for info in &frame.window_infos {
