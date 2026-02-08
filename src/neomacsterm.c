@@ -2302,6 +2302,8 @@ struct DisplayPropFFI {
   int image_width;        /* image width in pixels (type=4) */
   int image_height;       /* image height in pixels (type=4) */
   float raise_factor;     /* raise factor (type=5), fraction of line height */
+  uint32_t display_fg;    /* display string face fg (type=1), 0=use position face */
+  uint32_t display_bg;    /* display string face bg (type=1), 0=use position face */
 };
 
 /* Check for a 'display text property at charpos.
@@ -2328,6 +2330,8 @@ neomacs_layout_check_display_prop (void *buffer_ptr, void *window_ptr,
   out->image_gpu_id = 0;
   out->image_width = 0;
   out->image_height = 0;
+  out->display_fg = 0;
+  out->display_bg = 0;
   out->raise_factor = 0;
 
   if (!buf)
@@ -2366,13 +2370,47 @@ neomacs_layout_check_display_prop (void *buffer_ptr, void *window_ptr,
 
   if (STRINGP (display_prop))
     {
-      /* String replacement: 'display "text" */
+      /* String replacement: 'display "text" or 'display #("text" 0 4 (face foo)) */
       ptrdiff_t len = SBYTES (display_prop);
       ptrdiff_t copy_len = len < str_buf_len - 1 ? len : str_buf_len - 1;
       memcpy (str_buf, SDATA (display_prop), copy_len);
       str_buf[copy_len] = 0;
       out->type = 1;
       out->str_len = (int) copy_len;
+
+      /* Extract face from display string text properties. */
+      if (SCHARS (display_prop) > 0)
+        {
+          Lisp_Object face_prop = Fget_text_property (
+              make_fixnum (0), Qface, display_prop);
+          if (!NILP (face_prop) && SYMBOLP (face_prop))
+            {
+              struct window *sw = window_ptr
+                ? (struct window *) window_ptr : NULL;
+              struct frame *sf = sw ? XFRAME (sw->frame) : NULL;
+              if (sf)
+                {
+                  int face_id = lookup_named_face (sw, sf, face_prop, false);
+                  struct face *face = FACE_FROM_ID_OR_NULL (sf, face_id);
+                  if (face)
+                    {
+                      unsigned long fg = face->foreground;
+                      unsigned long bg = face->background;
+                      if (face->foreground_defaulted_p)
+                        fg = FRAME_FOREGROUND_PIXEL (sf);
+                      if (face->background_defaulted_p)
+                        bg = FRAME_BACKGROUND_PIXEL (sf);
+                      out->display_fg = ((RED_FROM_ULONG (fg) << 16) |
+                                         (GREEN_FROM_ULONG (fg) << 8) |
+                                         BLUE_FROM_ULONG (fg));
+                      out->display_bg = ((RED_FROM_ULONG (bg) << 16) |
+                                         (GREEN_FROM_ULONG (bg) << 8) |
+                                         BLUE_FROM_ULONG (bg));
+                    }
+                }
+            }
+        }
+
       set_buffer_internal_1 (old);
       return 0;
     }

@@ -361,6 +361,10 @@ pub struct DisplayPropFFI {
     pub image_height: c_int,
     /// Raise factor (type=5), fraction of line height
     pub raise_factor: f32,
+    /// Display string face fg (type=1), 0=use position face
+    pub display_fg: u32,
+    /// Display string face bg (type=1), 0=use position face
+    pub display_bg: u32,
 }
 
 /// FFI-safe window parameters struct.

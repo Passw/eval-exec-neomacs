@@ -829,6 +829,18 @@ impl LayoutEngine {
                         next_face_check = if next_check > charpos { next_check } else { charpos + 1 };
                     }
 
+                    // Apply display string face if the replacement string has one
+                    let has_display_face = display_prop.display_fg != 0
+                        || display_prop.display_bg != 0;
+                    if has_display_face {
+                        let dfg = Color::from_pixel(display_prop.display_fg);
+                        let dbg = Color::from_pixel(display_prop.display_bg);
+                        frame_glyphs.set_face(
+                            0, dfg, Some(dbg),
+                            false, false, 0, None, 0, None, 0, None,
+                        );
+                    }
+
                     // Render display string characters
                     let dstr = &display_str_buf[..display_prop.str_len as usize];
                     let mut di = 0usize;
@@ -855,6 +867,11 @@ impl LayoutEngine {
                         let glyph_w = dchar_cols as f32 * char_w;
                         frame_glyphs.add_char(dch, gx, gy, glyph_w, char_h, ascent, false);
                         col += dchar_cols;
+                    }
+
+                    // Restore text face if we overrode it for display string
+                    if has_display_face {
+                        self.apply_face(&self.face_data, frame_glyphs);
                     }
 
                     // Skip original buffer text covered by this display prop
