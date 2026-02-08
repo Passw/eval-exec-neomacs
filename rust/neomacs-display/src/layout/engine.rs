@@ -1117,12 +1117,15 @@ impl LayoutEngine {
                     }
                     trailing_ws_start_col = -1;
 
-                    // Fill rest of line with stretch (use face bg)
+                    // Fill rest of line with stretch.
+                    // Use face bg if :extend is set, default bg otherwise.
                     let remaining = (cols - col) as f32 * char_w;
                     if remaining > 0.0 {
                         let gx = content_x + col as f32 * char_w;
                         let gy = row_y[row as usize];
-                        frame_glyphs.add_stretch(gx, gy, remaining, char_h, face_bg, self.face_data.face_id, false);
+                        let fill_bg = if self.face_data.extend != 0 { face_bg } else { default_bg };
+                        let fill_face = if self.face_data.extend != 0 { self.face_data.face_id } else { 0 };
+                        frame_glyphs.add_stretch(gx, gy, remaining, char_h, fill_bg, fill_face, false);
                     }
 
                     // Close box face at end of line (box continues on next line)

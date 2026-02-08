@@ -511,4 +511,6 @@ pub struct FaceDataFFI {
     pub box_color: u32,
     /// Box line width
     pub box_line_width: c_int,
+    /// Extend: face bg extends to end of visual line (0=no, 1=yes)
+    pub extend: c_int,
 }

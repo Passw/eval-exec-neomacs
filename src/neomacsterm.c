@@ -1680,6 +1680,7 @@ struct FaceDataFFI {
   int box_type;
   uint32_t box_color;
   int box_line_width;
+  int extend;
 };
 
 static void
@@ -1788,6 +1789,9 @@ fill_face_data (struct frame *f, struct face *face, struct FaceDataFFI *out)
                         (GREEN_FROM_ULONG (face->box_color) << 8) |
                         BLUE_FROM_ULONG (face->box_color));
     }
+
+  /* Extend: face background extends to end of visual line */
+  out->extend = FACE_EXTENSIBLE_P (face) ? 1 : 0;
 }
 
 /* Get the resolved face at a buffer position for a window.
