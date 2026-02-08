@@ -9067,6 +9067,42 @@ DURATION-MS is the pulse duration in milliseconds (default 250).  */)
   return on ? Qt : Qnil;
 }
 
+DEFUN ("neomacs-set-edge-snap",
+       Fneomacs_set_edge_snap,
+       Sneomacs_set_edge_snap, 0, 3, 0,
+       doc: /* Configure window edge snap indicator.
+ENABLED non-nil flashes a gradient bar at the top or bottom edge of
+the selected window when the bell rings at buffer boundaries
+(beginning-of-buffer or end-of-buffer).
+COLOR is an RGB hex string (default "#FF6633").
+DURATION-MS is the flash duration in milliseconds (default 200).  */)
+  (Lisp_Object enabled, Lisp_Object color, Lisp_Object duration_ms)
+{
+  struct neomacs_display_info *dpyinfo = neomacs_display_list;
+  if (!dpyinfo || !dpyinfo->display_handle)
+    return Qnil;
+
+  int on = !NILP (enabled);
+  int r = 255, g = 102, b = 51;
+  int dur = 200;
+  if (STRINGP (color))
+    {
+      const char *s = SSDATA (color);
+      if (s[0] == '#' && strlen (s) == 7)
+        {
+          unsigned int hex;
+          sscanf (s + 1, "%06x", &hex);
+          r = (hex >> 16) & 0xFF;
+          g = (hex >> 8) & 0xFF;
+          b = hex & 0xFF;
+        }
+    }
+  if (FIXNUMP (duration_ms)) dur = XFIXNUM (duration_ms);
+
+  neomacs_display_set_edge_snap (dpyinfo->display_handle, on, r, g, b, dur);
+  return on ? Qt : Qnil;
+}
+
 DEFUN ("neomacs-set-wrap-indicator",
        Fneomacs_set_wrap_indicator,
        Sneomacs_set_wrap_indicator, 0, 3, 0,
@@ -10659,6 +10695,7 @@ syms_of_neomacsterm (void)
   defsubr (&Sneomacs_set_minibuffer_highlight);
   defsubr (&Sneomacs_set_scroll_velocity_fade);
   defsubr (&Sneomacs_set_click_halo);
+  defsubr (&Sneomacs_set_edge_snap);
   defsubr (&Sneomacs_set_region_glow);
   defsubr (&Sneomacs_set_window_glow);
   defsubr (&Sneomacs_set_scroll_progress);

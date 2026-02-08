@@ -775,6 +775,10 @@ struct RenderApp {
     window_content_shadow_enabled: bool,
     window_content_shadow_size: f32,
     window_content_shadow_opacity: f32,
+    /// Window edge snap indicator
+    edge_snap_enabled: bool,
+    edge_snap_color: (f32, f32, f32),
+    edge_snap_duration_ms: u32,
     /// Click halo effect
     click_halo_enabled: bool,
     click_halo_color: (f32, f32, f32),
@@ -1113,6 +1117,9 @@ impl RenderApp {
             window_content_shadow_enabled: false,
             window_content_shadow_size: 6.0,
             window_content_shadow_opacity: 0.15,
+            edge_snap_enabled: false,
+            edge_snap_color: (1.0, 0.5, 0.2),
+            edge_snap_duration_ms: 200,
             click_halo_enabled: false,
             click_halo_color: (0.4, 0.6, 1.0),
             click_halo_duration_ms: 300,
@@ -1811,6 +1818,30 @@ impl RenderApp {
                             renderer.trigger_cursor_error_pulse(std::time::Instant::now());
                         }
                     }
+                    // Trigger edge snap indicator if enabled
+                    if self.edge_snap_enabled {
+                        if let Some(ref frame) = self.current_frame {
+                            // Find selected window and check boundary
+                            for info in &frame.window_infos {
+                                if info.selected && !info.is_minibuffer {
+                                    let at_top = info.window_start <= 1;
+                                    let at_bottom = info.window_end >= info.buffer_size;
+                                    if at_top || at_bottom {
+                                        if let Some(renderer) = self.renderer.as_mut() {
+                                            renderer.trigger_edge_snap(
+                                                info.bounds,
+                                                info.mode_line_height,
+                                                at_top,
+                                                at_bottom,
+                                                std::time::Instant::now(),
+                                            );
+                                        }
+                                    }
+                                    break;
+                                }
+                            }
+                        }
+                    }
                     self.frame_dirty = true;
                 }
                 RenderCommand::RequestAttention { urgent } => {
@@ -2207,6 +2238,15 @@ impl RenderApp {
                     self.window_content_shadow_opacity = opacity;
                     if let Some(renderer) = self.renderer.as_mut() {
                         renderer.set_window_content_shadow(enabled, size, opacity);
+                    }
+                    self.frame_dirty = true;
+                }
+                RenderCommand::SetEdgeSnap { enabled, r, g, b, duration_ms } => {
+                    self.edge_snap_enabled = enabled;
+                    self.edge_snap_color = (r, g, b);
+                    self.edge_snap_duration_ms = duration_ms;
+                    if let Some(renderer) = self.renderer.as_mut() {
+                        renderer.set_edge_snap(enabled, (r, g, b), duration_ms);
                     }
                     self.frame_dirty = true;
                 }

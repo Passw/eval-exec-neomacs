@@ -1467,6 +1467,16 @@ void neomacs_display_set_window_content_shadow(struct NeomacsDisplay *handle,
                                                int opacity);
 
 /**
+ * Configure window edge snap indicator
+ */
+void neomacs_display_set_edge_snap(struct NeomacsDisplay *handle,
+                                   int enabled,
+                                   int r,
+                                   int g,
+                                   int b,
+                                   int durationMs);
+
+/**
  * Configure cursor click halo effect
  */
 void neomacs_display_set_click_halo(struct NeomacsDisplay *handle,

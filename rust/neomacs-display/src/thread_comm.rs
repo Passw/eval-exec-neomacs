@@ -600,6 +600,16 @@ pub enum RenderCommand {
         /// Shadow opacity 0.0-1.0
         opacity: f32,
     },
+    /// Configure window edge snap indicator
+    SetEdgeSnap {
+        enabled: bool,
+        /// Flash color (sRGB floats)
+        r: f32,
+        g: f32,
+        b: f32,
+        /// Flash duration in milliseconds
+        duration_ms: u32,
+    },
     /// Configure cursor click halo effect
     SetClickHalo {
         enabled: bool,

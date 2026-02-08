@@ -2126,6 +2126,52 @@ of each window during scrolling."
                 neomacs-scroll-momentum-fade nil)
             val))))
 
+;; --- Window edge snap indicator ---
+(declare-function neomacs-set-edge-snap "neomacsterm.c"
+  (&optional enabled color duration-ms))
+
+(defcustom neomacs-edge-snap nil
+  "Enable window edge snap indicator.
+Non-nil flashes a gradient bar at the top or bottom edge of the
+selected window when Emacs rings the bell at buffer boundaries."
+  :type 'boolean
+  :group 'frames
+  :set (lambda (sym val)
+         (set-default sym val)
+         (when (fboundp 'neomacs-set-edge-snap)
+           (neomacs-set-edge-snap val
+            (if (boundp 'neomacs-edge-snap-color)
+                neomacs-edge-snap-color nil)
+            (if (boundp 'neomacs-edge-snap-duration)
+                neomacs-edge-snap-duration nil)))))
+
+(defcustom neomacs-edge-snap-color "#FF6633"
+  "Edge snap indicator color as hex RGB string."
+  :type '(string :tag "Color (#RRGGBB)")
+  :group 'frames
+  :set (lambda (sym val)
+         (set-default sym val)
+         (when (and (fboundp 'neomacs-set-edge-snap)
+                    (boundp 'neomacs-edge-snap)
+                    neomacs-edge-snap)
+           (neomacs-set-edge-snap t val
+            (if (boundp 'neomacs-edge-snap-duration)
+                neomacs-edge-snap-duration nil)))))
+
+(defcustom neomacs-edge-snap-duration 200
+  "Edge snap indicator flash duration in milliseconds."
+  :type '(integer :tag "Duration (ms)")
+  :group 'frames
+  :set (lambda (sym val)
+         (set-default sym val)
+         (when (and (fboundp 'neomacs-set-edge-snap)
+                    (boundp 'neomacs-edge-snap)
+                    neomacs-edge-snap)
+           (neomacs-set-edge-snap t
+            (if (boundp 'neomacs-edge-snap-color)
+                neomacs-edge-snap-color nil)
+            val))))
+
 ;; --- Mode-line content transition ---
 (declare-function neomacs-set-mode-line-transition "neomacsterm.c"
   (&optional enabled duration-ms))

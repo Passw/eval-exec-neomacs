@@ -1510,6 +1510,14 @@ void neomacs_display_set_cursor_error_pulse(
     int b,
     int duration_ms);
 
+void neomacs_display_set_edge_snap(
+    struct NeomacsDisplay *handle,
+    int enabled,
+    int r,
+    int g,
+    int b,
+    int duration_ms);
+
 void neomacs_display_set_wrap_indicator(
     struct NeomacsDisplay *handle,
     int enabled,

@@ -270,6 +270,11 @@ pub struct WgpuRenderer {
     click_halo_duration_ms: u32,
     click_halo_max_radius: f32,
     click_halos: Vec<ClickHaloEntry>,
+    /// Window edge snap indicator
+    edge_snap_enabled: bool,
+    edge_snap_color: (f32, f32, f32),
+    edge_snap_duration_ms: u32,
+    edge_snaps: Vec<EdgeSnapEntry>,
     /// Scroll velocity fade overlay
     scroll_velocity_fade_enabled: bool,
     scroll_velocity_fade_max_opacity: f32,
@@ -306,6 +311,16 @@ struct ScrollMomentumEntry {
     window_id: i64,
     bounds: Rect,
     direction: i32, // 1 = down, -1 = up
+    started: std::time::Instant,
+    duration: std::time::Duration,
+}
+
+/// Entry for window edge snap indicator
+struct EdgeSnapEntry {
+    bounds: Rect,
+    mode_line_height: f32,
+    at_top: bool,
+    at_bottom: bool,
     started: std::time::Instant,
     duration: std::time::Duration,
 }
@@ -1000,6 +1015,10 @@ impl WgpuRenderer {
             click_halo_duration_ms: 300,
             click_halo_max_radius: 30.0,
             click_halos: Vec::new(),
+            edge_snap_enabled: false,
+            edge_snap_color: (1.0, 0.5, 0.2),
+            edge_snap_duration_ms: 200,
+            edge_snaps: Vec::new(),
             scroll_velocity_fade_enabled: false,
             scroll_velocity_fade_max_opacity: 0.15,
             scroll_velocity_fade_ms: 300,
@@ -1271,6 +1290,25 @@ impl WgpuRenderer {
         self.minibuffer_highlight_enabled = enabled;
         self.minibuffer_highlight_color = color;
         self.minibuffer_highlight_opacity = opacity;
+    }
+
+    /// Update edge snap config
+    pub fn set_edge_snap(&mut self, enabled: bool, color: (f32, f32, f32), duration_ms: u32) {
+        self.edge_snap_enabled = enabled;
+        self.edge_snap_color = color;
+        self.edge_snap_duration_ms = duration_ms;
+    }
+
+    /// Trigger edge snap indicator
+    pub fn trigger_edge_snap(&mut self, bounds: Rect, mode_line_height: f32, at_top: bool, at_bottom: bool, now: std::time::Instant) {
+        self.edge_snaps.push(EdgeSnapEntry {
+            bounds,
+            mode_line_height,
+            at_top,
+            at_bottom,
+            started: now,
+            duration: std::time::Duration::from_millis(self.edge_snap_duration_ms as u64),
+        });
     }
 
     /// Update click halo config
@@ -5531,6 +5569,67 @@ impl WgpuRenderer {
 
                 self.click_halos.retain(|e| e.started.elapsed() < e.duration);
                 if !self.click_halos.is_empty() {
+                    self.needs_continuous_redraw = true;
+                }
+            }
+
+            // === Window edge snap indicator ===
+            if !self.edge_snaps.is_empty() {
+                let (er, eg, eb) = self.edge_snap_color;
+                let mut snap_vertices: Vec<RectVertex> = Vec::new();
+                let bar_h = 4.0_f32;
+                let steps = 3;
+
+                for entry in &self.edge_snaps {
+                    let elapsed = entry.started.elapsed().as_millis() as f32;
+                    let duration = entry.duration.as_millis() as f32;
+                    if elapsed >= duration { continue; }
+
+                    let t = elapsed / duration;
+                    let alpha = 0.5 * (1.0 - t) * (1.0 - t);
+                    if alpha < 0.005 { continue; }
+
+                    let b = &entry.bounds;
+
+                    if entry.at_top {
+                        // Flash gradient at top edge
+                        for i in 0..steps {
+                            let frac = i as f32 / steps as f32;
+                            let a = alpha * (1.0 - frac);
+                            let c = Color::new(er, eg, eb, a);
+                            self.add_rect(&mut snap_vertices,
+                                b.x, b.y + frac * bar_h,
+                                b.width, bar_h / steps as f32, &c);
+                        }
+                    }
+                    if entry.at_bottom {
+                        // Flash gradient at bottom edge (above mode-line)
+                        let content_bottom = b.y + b.height - entry.mode_line_height;
+                        for i in 0..steps {
+                            let frac = i as f32 / steps as f32;
+                            let a = alpha * (1.0 - frac);
+                            let c = Color::new(er, eg, eb, a);
+                            self.add_rect(&mut snap_vertices,
+                                b.x, content_bottom - bar_h + frac * bar_h,
+                                b.width, bar_h / steps as f32, &c);
+                        }
+                    }
+                }
+
+                if !snap_vertices.is_empty() {
+                    let snap_buffer = self.device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+                        label: Some("Edge Snap Buffer"),
+                        contents: bytemuck::cast_slice(&snap_vertices),
+                        usage: wgpu::BufferUsages::VERTEX,
+                    });
+                    render_pass.set_pipeline(&self.rect_pipeline);
+                    render_pass.set_bind_group(0, &self.uniform_bind_group, &[]);
+                    render_pass.set_vertex_buffer(0, snap_buffer.slice(..));
+                    render_pass.draw(0..snap_vertices.len() as u32, 0..1);
+                }
+
+                self.edge_snaps.retain(|e| e.started.elapsed() < e.duration);
+                if !self.edge_snaps.is_empty() {
                     self.needs_continuous_redraw = true;
                 }
             }
