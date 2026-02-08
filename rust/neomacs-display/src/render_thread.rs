@@ -619,6 +619,10 @@ struct RenderApp {
     fps_frame_time_ms: f32,
     /// Last render start time for measuring frame time
     fps_render_start: std::time::Instant,
+    /// Extra line spacing in pixels (added between rows)
+    extra_line_spacing: f32,
+    /// Extra letter spacing in pixels (added between characters)
+    extra_letter_spacing: f32,
 }
 
 /// State for a tooltip displayed as GPU overlay
@@ -773,6 +777,8 @@ impl RenderApp {
             fps_display_value: 0.0,
             fps_frame_time_ms: 0.0,
             fps_render_start: std::time::Instant::now(),
+            extra_line_spacing: 0.0,
+            extra_letter_spacing: 0.0,
         }
     }
 
@@ -1425,6 +1431,11 @@ impl RenderApp {
                 }
                 RenderCommand::SetCornerRadius { radius } => {
                     self.corner_radius = radius;
+                    self.frame_dirty = true;
+                }
+                RenderCommand::SetExtraSpacing { line_spacing, letter_spacing } => {
+                    self.extra_line_spacing = line_spacing;
+                    self.extra_letter_spacing = letter_spacing;
                     self.frame_dirty = true;
                 }
             }
@@ -2411,6 +2422,71 @@ impl RenderApp {
         }
     }
 
+    /// Apply extra line spacing and letter spacing to glyph positions.
+    /// Groups glyphs by Y position (rows) and applies cumulative offsets.
+    fn apply_extra_spacing(
+        glyphs: &mut [FrameGlyph],
+        line_spacing: f32,
+        letter_spacing: f32,
+    ) {
+        use crate::core::frame_glyphs::FrameGlyph;
+
+        let mut last_y: f32 = f32::NEG_INFINITY;
+        let mut row_index: i32 = -1;
+        let mut char_in_row: i32 = 0;
+        let mut last_window_y: f32 = f32::NEG_INFINITY;
+
+        for glyph in glyphs.iter_mut() {
+            match glyph {
+                FrameGlyph::Char { x, y, is_overlay, .. } => {
+                    if *is_overlay { continue; }
+                    // Detect window boundary: Y jumps backwards
+                    if *y < last_window_y - 1.0 {
+                        row_index = -1;
+                        last_y = f32::NEG_INFINITY;
+                    }
+                    last_window_y = *y;
+
+                    if (*y - last_y).abs() > 0.5 {
+                        row_index += 1;
+                        char_in_row = 0;
+                        last_y = *y;
+                    } else {
+                        char_in_row += 1;
+                    }
+                    *y += row_index as f32 * line_spacing;
+                    *x += char_in_row as f32 * letter_spacing;
+                }
+                FrameGlyph::Stretch { x, y, is_overlay, .. } => {
+                    if *is_overlay { continue; }
+                    if *y < last_window_y - 1.0 {
+                        row_index = -1;
+                        last_y = f32::NEG_INFINITY;
+                    }
+                    last_window_y = *y;
+
+                    if (*y - last_y).abs() > 0.5 {
+                        row_index += 1;
+                        char_in_row = 0;
+                        last_y = *y;
+                    } else {
+                        char_in_row += 1;
+                    }
+                    *y += row_index as f32 * line_spacing;
+                    *x += char_in_row as f32 * letter_spacing;
+                }
+                FrameGlyph::Cursor { y, x, .. } => {
+                    // Apply same row-based Y offset to cursor
+                    if (*y - last_y).abs() < 0.5 {
+                        *y += row_index.max(0) as f32 * line_spacing;
+                        *x += char_in_row as f32 * letter_spacing;
+                    }
+                }
+                _ => {}
+            }
+        }
+    }
+
     fn render(&mut self) {
         // Early return checks
         if self.current_frame.is_none()
@@ -2459,6 +2535,17 @@ impl RenderApp {
                 if let Some(face) = self.faces.get_mut(face_id) {
                     face.font_family = font_family.clone();
                 }
+            }
+        }
+
+        // Apply extra spacing adjustments to glyph positions
+        if self.extra_line_spacing != 0.0 || self.extra_letter_spacing != 0.0 {
+            if let Some(ref mut frame) = self.current_frame {
+                Self::apply_extra_spacing(
+                    &mut frame.glyphs,
+                    self.extra_line_spacing,
+                    self.extra_letter_spacing,
+                );
             }
         }
 

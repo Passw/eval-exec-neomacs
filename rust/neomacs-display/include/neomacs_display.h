@@ -1108,6 +1108,13 @@ void neomacs_display_set_show_fps(struct NeomacsDisplay *handle, int enabled);
 void neomacs_display_set_corner_radius(struct NeomacsDisplay *handle, int radius);
 
 /**
+ * Set extra line spacing and letter spacing (in pixels)
+ */
+void neomacs_display_set_extra_spacing(struct NeomacsDisplay *handle,
+                                       int lineSpacing,
+                                       int letterSpacing);
+
+/**
  * Set the window title (threaded mode)
  */
 void neomacs_display_set_title(struct NeomacsDisplay *handle, const char *title);

@@ -7879,6 +7879,26 @@ Only visible when window decorations are disabled.  */)
   return make_fixnum (r);
 }
 
+DEFUN ("neomacs-set-extra-spacing", Fneomacs_set_extra_spacing,
+       Sneomacs_set_extra_spacing, 2, 2, 0,
+       doc: /* Set extra LINE-SPACING and LETTER-SPACING in pixels.
+LINE-SPACING adds vertical space between text rows.
+LETTER-SPACING adds horizontal space between characters.
+Values of 0 mean no extra spacing (default).  */)
+  (Lisp_Object line_spacing, Lisp_Object letter_spacing)
+{
+  struct neomacs_display_info *dpyinfo = neomacs_display_list;
+  if (!dpyinfo || !dpyinfo->display_handle)
+    return Qnil;
+
+  CHECK_FIXNUM (line_spacing);
+  CHECK_FIXNUM (letter_spacing);
+  int ls = XFIXNUM (line_spacing);
+  int cs = XFIXNUM (letter_spacing);
+  neomacs_display_set_extra_spacing (dpyinfo->display_handle, ls, cs);
+  return Qt;
+}
+
 DEFUN ("neomacs-set-cursor-blink", Fneomacs_set_cursor_blink, Sneomacs_set_cursor_blink, 1, 2, 0,
        doc: /* Configure cursor blinking in the render thread.
 ENABLED non-nil enables blinking, nil disables it.
@@ -9053,6 +9073,7 @@ syms_of_neomacsterm (void)
 
   /* Corner radius */
   defsubr (&Sneomacs_set_corner_radius);
+  defsubr (&Sneomacs_set_extra_spacing);
 
   /* Cursor blink */
   defsubr (&Sneomacs_set_cursor_blink);

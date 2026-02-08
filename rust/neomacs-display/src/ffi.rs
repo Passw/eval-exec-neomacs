@@ -2230,6 +2230,22 @@ pub unsafe extern "C" fn neomacs_display_set_corner_radius(
     }
 }
 
+/// Set extra line spacing and letter spacing (in pixels)
+#[no_mangle]
+pub unsafe extern "C" fn neomacs_display_set_extra_spacing(
+    _handle: *mut NeomacsDisplay,
+    line_spacing: c_int,
+    letter_spacing: c_int,
+) {
+    let cmd = RenderCommand::SetExtraSpacing {
+        line_spacing: line_spacing as f32,
+        letter_spacing: letter_spacing as f32,
+    };
+    if let Some(ref state) = THREADED_STATE {
+        let _ = state.emacs_comms.cmd_tx.try_send(cmd);
+    }
+}
+
 /// Set the window title (threaded mode)
 #[no_mangle]
 pub unsafe extern "C" fn neomacs_display_set_title(

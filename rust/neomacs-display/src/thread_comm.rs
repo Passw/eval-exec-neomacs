@@ -257,6 +257,8 @@ pub enum RenderCommand {
     SetShowFps { enabled: bool },
     /// Set window corner radius for borderless mode (0 = no rounding)
     SetCornerRadius { radius: f32 },
+    /// Set extra spacing (line spacing in pixels, letter spacing in pixels)
+    SetExtraSpacing { line_spacing: f32, letter_spacing: f32 },
 }
 
 /// Wakeup pipe for signaling Emacs from render thread

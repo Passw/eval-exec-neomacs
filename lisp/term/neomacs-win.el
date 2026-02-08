@@ -448,6 +448,36 @@ Only takes effect when window decorations are disabled."
          (when (fboundp 'neomacs-set-corner-radius)
            (neomacs-set-corner-radius val))))
 
+;;; Extra spacing (line-height and letter-spacing)
+
+(declare-function neomacs-set-extra-spacing "neomacsterm.c"
+  (line-spacing letter-spacing))
+
+(defcustom neomacs-extra-line-spacing 0
+  "Extra vertical spacing between text rows in pixels.
+Applied at the render level on top of Emacs line-spacing."
+  :type 'integer
+  :group 'frames
+  :set (lambda (sym val)
+         (set-default sym val)
+         (when (fboundp 'neomacs-set-extra-spacing)
+           (neomacs-set-extra-spacing
+            val (if (boundp 'neomacs-extra-letter-spacing)
+                    neomacs-extra-letter-spacing 0)))))
+
+(defcustom neomacs-extra-letter-spacing 0
+  "Extra horizontal spacing between characters in pixels.
+Applied at the render level."
+  :type 'integer
+  :group 'frames
+  :set (lambda (sym val)
+         (set-default sym val)
+         (when (fboundp 'neomacs-set-extra-spacing)
+           (neomacs-set-extra-spacing
+            (if (boundp 'neomacs-extra-line-spacing)
+                neomacs-extra-line-spacing 0)
+            val))))
+
 ;; Provide the feature
 (provide 'neomacs-win)
 (provide 'term/neomacs-win)
