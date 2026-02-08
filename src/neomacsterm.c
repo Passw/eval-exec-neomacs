@@ -8204,9 +8204,8 @@ check_x_display_info (Lisp_Object frame)
 char *
 get_keysym_name (int keysym)
 {
-  /* For GTK4, we could use gdk_keyval_name, but for now return NULL */
-  /* This function is used for debugging and error messages */
-  return NULL;
+  const char *name = gdk_keyval_name (keysym);
+  return name ? (char *) name : NULL;
 }
 
 /* Set mouse pixel position on frame F.  */
