@@ -1142,6 +1142,12 @@ struct neomacs_window_params_ffi {
   int cursor_in_non_selected;
   /* selective-display: 0=off, >0=hide lines indented more than N columns */
   int selective_display;
+  /* escape-glyph face foreground color for control chars */
+  uint32_t escape_glyph_fg;
+  /* nobreak-char-display: 0=off, 1=highlight, 2=escape notation */
+  int nobreak_char_display;
+  /* nobreak-char face foreground color */
+  uint32_t nobreak_char_fg;
   /* wrap-prefix: string rendered at start of continuation lines */
   uint8_t wrap_prefix[128];
   int wrap_prefix_len;
@@ -1395,6 +1401,48 @@ neomacs_layout_get_window_params (void *frame_ptr, int window_index,
   /* Cursor in non-selected windows */
   params->cursor_in_non_selected
       = !NILP (BVAR (&buffer_defaults, cursor_in_non_selected_windows));
+
+  /* escape-glyph face for control characters */
+  params->escape_glyph_fg = params->default_fg; // fallback
+  {
+    int eg_face_id = lookup_named_face (w, f, Qescape_glyph, false);
+    if (eg_face_id >= 0)
+      {
+        struct face *eg_face = FACE_FROM_ID_OR_NULL (f, eg_face_id);
+        if (eg_face)
+          {
+            unsigned long fg = eg_face->foreground;
+            params->escape_glyph_fg
+              = (uint32_t) ((RED_FROM_ULONG (fg) << 16)
+                            | (GREEN_FROM_ULONG (fg) << 8)
+                            | BLUE_FROM_ULONG (fg));
+          }
+      }
+  }
+
+  /* nobreak-char-display */
+  params->nobreak_char_display = 0;
+  params->nobreak_char_fg = params->default_fg;
+  if (FIXNUMP (Vnobreak_char_display) && XFIXNUM (Vnobreak_char_display) > 0)
+    params->nobreak_char_display = (int) XFIXNUM (Vnobreak_char_display);
+  else if (!NILP (Vnobreak_char_display))
+    params->nobreak_char_display = 1;
+  if (params->nobreak_char_display > 0)
+    {
+      int nb_face_id = lookup_named_face (w, f, Qnobreak_space, false);
+      if (nb_face_id >= 0)
+        {
+          struct face *nb_face = FACE_FROM_ID_OR_NULL (f, nb_face_id);
+          if (nb_face)
+            {
+              unsigned long fg = nb_face->foreground;
+              params->nobreak_char_fg
+                = (uint32_t) ((RED_FROM_ULONG (fg) << 16)
+                              | (GREEN_FROM_ULONG (fg) << 8)
+                              | BLUE_FROM_ULONG (fg));
+            }
+        }
+    }
 
   /* selective-display: when a fixnum, hide lines indented deeper */
   params->selective_display = 0;

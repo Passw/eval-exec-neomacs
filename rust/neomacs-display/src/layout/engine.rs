@@ -105,6 +105,9 @@ impl LayoutEngine {
                 extra_line_spacing: wp.extra_line_spacing,
                 cursor_in_non_selected: wp.cursor_in_non_selected != 0,
                 selective_display: wp.selective_display,
+                escape_glyph_fg: wp.escape_glyph_fg,
+                nobreak_char_display: wp.nobreak_char_display,
+                nobreak_char_fg: wp.nobreak_char_fg,
                 wrap_prefix: if wp.wrap_prefix_len > 0 {
                     wp.wrap_prefix[..wp.wrap_prefix_len as usize].to_vec()
                 } else {
@@ -1094,6 +1097,13 @@ impl LayoutEngine {
                 }
                 _ if ch < ' ' => {
                     // Control character: display as ^X (2 columns)
+                    // Use escape-glyph face for control char display
+                    let escape_fg = Color::from_pixel(params.escape_glyph_fg);
+                    frame_glyphs.set_face(
+                        0, escape_fg, Some(face_bg),
+                        false, false, 0, None, 0, None, 0, None,
+                    );
+
                     let gx = content_x + col as f32 * char_w;
                     let gy = text_y + row as f32 * char_h;
 
@@ -1130,8 +1140,34 @@ impl LayoutEngine {
                             wrap_has_break = false;
                         }
                     }
+                    // Restore text face after escape-glyph
+                    if current_face_id >= 0 {
+                        self.apply_face(&self.face_data, frame_glyphs);
+                    }
                 }
                 _ => {
+                    // Non-breaking space and soft hyphen highlighting
+                    if params.nobreak_char_display > 0 && (ch == '\u{00A0}' || ch == '\u{00AD}') {
+                        let nb_fg = Color::from_pixel(params.nobreak_char_fg);
+                        frame_glyphs.set_face(
+                            0, nb_fg, Some(face_bg),
+                            false, false, 0, None, 0, None, 0, None,
+                        );
+                        let gx = content_x + col as f32 * char_w;
+                        let gy = text_y + row as f32 * char_h;
+                        let display_ch = if ch == '\u{00A0}' { ' ' } else { '-' };
+                        if col < cols {
+                            frame_glyphs.add_char(display_ch, gx, gy, char_w, char_h, ascent, false);
+                            col += 1;
+                        }
+                        // Restore text face
+                        if current_face_id >= 0 {
+                            self.apply_face(&self.face_data, frame_glyphs);
+                        }
+                        window_end_charpos = charpos;
+                        continue;
+                    }
+
                     // Combining/non-spacing character: render at previous position, no col advance
                     if is_combining_char(ch) {
                         if col > 0 {

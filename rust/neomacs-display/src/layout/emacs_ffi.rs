@@ -395,6 +395,12 @@ pub struct WindowParamsFFI {
     pub cursor_in_non_selected: c_int,
     /// selective-display: 0=off, >0=hide lines indented more than N columns
     pub selective_display: c_int,
+    /// escape-glyph face foreground color for control chars
+    pub escape_glyph_fg: u32,
+    /// nobreak-char-display: 0=off, 1=highlight, 2=escape notation
+    pub nobreak_char_display: c_int,
+    /// nobreak-char face foreground color
+    pub nobreak_char_fg: u32,
     /// wrap-prefix: string rendered at start of continuation lines
     pub wrap_prefix: [u8; 128],
     pub wrap_prefix_len: c_int,

@@ -207,6 +207,12 @@ pub struct WindowParams {
     pub cursor_in_non_selected: bool,
     /// selective-display: 0=off, >0=hide lines indented more than N columns
     pub selective_display: i32,
+    /// escape-glyph face foreground color
+    pub escape_glyph_fg: u32,
+    /// nobreak-char-display: 0=off, 1=highlight, 2=escape notation
+    pub nobreak_char_display: i32,
+    /// nobreak-char face foreground color
+    pub nobreak_char_fg: u32,
     /// wrap-prefix: bytes rendered at start of continuation lines
     pub wrap_prefix: Vec<u8>,
     /// line-prefix: bytes rendered at start of all visual lines
