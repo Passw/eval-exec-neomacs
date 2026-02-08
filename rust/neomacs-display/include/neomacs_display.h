@@ -1444,6 +1444,14 @@ void neomacs_display_set_noise_grain(struct NeomacsDisplay *handle,
                                      int size);
 
 /**
+ * Configure scroll line spacing animation (accordion effect on scroll)
+ */
+void neomacs_display_set_scroll_line_spacing(struct NeomacsDisplay *handle,
+                                             int enabled,
+                                             int maxSpacing,
+                                             int durationMs);
+
+/**
  * Configure window padding gradient (inner edge shading for depth)
  */
 void neomacs_display_set_padding_gradient(struct NeomacsDisplay *handle,

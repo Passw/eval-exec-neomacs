@@ -757,6 +757,10 @@ struct RenderApp {
     window_watermark_enabled: bool,
     window_watermark_opacity: f32,
     window_watermark_threshold: u32,
+    /// Scroll line spacing animation (accordion effect)
+    scroll_line_spacing_enabled: bool,
+    scroll_line_spacing_max: f32,
+    scroll_line_spacing_duration: std::time::Duration,
     /// Selection region glow
     region_glow_enabled: bool,
     region_glow_face_id: u32,
@@ -1053,6 +1057,9 @@ impl RenderApp {
             window_watermark_enabled: false,
             window_watermark_opacity: 0.08,
             window_watermark_threshold: 10,
+            scroll_line_spacing_enabled: false,
+            scroll_line_spacing_max: 6.0,
+            scroll_line_spacing_duration: std::time::Duration::from_millis(200),
             region_glow_enabled: false,
             region_glow_face_id: 0,
             region_glow_radius: 6.0,
@@ -2072,6 +2079,15 @@ impl RenderApp {
                     }
                     self.frame_dirty = true;
                 }
+                RenderCommand::SetScrollLineSpacing { enabled, max_spacing, duration_ms } => {
+                    self.scroll_line_spacing_enabled = enabled;
+                    self.scroll_line_spacing_max = max_spacing;
+                    self.scroll_line_spacing_duration = std::time::Duration::from_millis(duration_ms as u64);
+                    if let Some(renderer) = self.renderer.as_mut() {
+                        renderer.set_scroll_line_spacing(enabled, max_spacing, duration_ms);
+                    }
+                    self.frame_dirty = true;
+                }
                 RenderCommand::SetRegionGlow { enabled, face_id, radius, opacity } => {
                     self.region_glow_enabled = enabled;
                     self.region_glow_face_id = face_id;
@@ -2864,6 +2880,13 @@ impl RenderApp {
                             }
                         }
                     } else if prev.window_start != info.window_start {
+                        // Scroll line spacing animation (accordion effect)
+                        if self.scroll_line_spacing_enabled {
+                            let dir = if info.window_start > prev.window_start { 1 } else { -1 };
+                            if let Some(renderer) = self.renderer.as_mut() {
+                                renderer.trigger_scroll_line_spacing(info.window_id, info.bounds, dir, now);
+                            }
+                        }
                         // Scroll → slide (content area only, excluding mode-line)
                         let content_height = info.bounds.height - info.mode_line_height;
                         if self.scroll_enabled && content_height >= 50.0 {

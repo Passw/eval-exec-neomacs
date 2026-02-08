@@ -236,6 +236,12 @@ pub struct WgpuRenderer {
     inactive_tint_enabled: bool,
     inactive_tint_color: (f32, f32, f32),
     inactive_tint_opacity: f32,
+    /// Scroll line spacing animation (accordion effect)
+    scroll_line_spacing_enabled: bool,
+    scroll_line_spacing_max: f32,
+    scroll_line_spacing_duration_ms: u32,
+    /// Active scroll line spacing animations: (window_id, bounds, direction, started)
+    active_scroll_spacings: Vec<ScrollSpacingEntry>,
 }
 
 /// Entry for an active window switch highlight fade
@@ -268,6 +274,16 @@ struct LineAnimEntry {
     /// When the animation started
     started: std::time::Instant,
     /// Duration of the animation
+    duration: std::time::Duration,
+}
+
+/// Entry for an active scroll line spacing animation
+struct ScrollSpacingEntry {
+    window_id: i64,
+    bounds: Rect,
+    /// +1 = scroll down (content moves up), -1 = scroll up
+    direction: i32,
+    started: std::time::Instant,
     duration: std::time::Duration,
 }
 
@@ -857,6 +873,10 @@ impl WgpuRenderer {
             inactive_tint_enabled: false,
             inactive_tint_color: (0.2, 0.1, 0.0),
             inactive_tint_opacity: 0.1,
+            scroll_line_spacing_enabled: false,
+            scroll_line_spacing_max: 6.0,
+            scroll_line_spacing_duration_ms: 200,
+            active_scroll_spacings: Vec::new(),
         }
     }
 
@@ -950,6 +970,7 @@ impl WgpuRenderer {
 
     /// Compute Y offset for a glyph due to active line animations
     fn line_y_offset(&self, gx: f32, gy: f32) -> f32 {
+        let mut offset = 0.0;
         for anim in &self.active_line_anims {
             let b = &anim.window_bounds;
             // Check if glyph is in this window and below the edit point
@@ -961,10 +982,33 @@ impl WgpuRenderer {
                 let t = (elapsed.as_secs_f32() / anim.duration.as_secs_f32()).min(1.0);
                 // Ease-out quadratic: t * (2 - t)
                 let eased = t * (2.0 - t);
-                return anim.initial_offset * (1.0 - eased);
+                offset += anim.initial_offset * (1.0 - eased);
             }
         }
-        0.0
+        // Scroll line spacing accordion effect
+        let now = std::time::Instant::now();
+        for entry in &self.active_scroll_spacings {
+            let b = &entry.bounds;
+            if gx >= b.x && gx < b.x + b.width
+                && gy >= b.y && gy < b.y + b.height
+            {
+                let elapsed = now.duration_since(entry.started).as_secs_f32();
+                let total = entry.duration.as_secs_f32();
+                if elapsed < total {
+                    let progress = elapsed / total;
+                    let decay = 1.0 - progress;
+                    let decay = decay * decay;
+                    let norm = ((gy - b.y) / b.height).clamp(0.0, 1.0);
+                    let edge_factor = if entry.direction > 0 {
+                        1.0 - norm
+                    } else {
+                        norm
+                    };
+                    offset += self.scroll_line_spacing_max * decay * edge_factor;
+                }
+            }
+        }
+        offset
     }
 
     /// Update cursor color cycling config
@@ -1036,6 +1080,27 @@ impl WgpuRenderer {
         self.cursor_shadow_offset_x = offset_x;
         self.cursor_shadow_offset_y = offset_y;
         self.cursor_shadow_opacity = opacity;
+    }
+
+    /// Update scroll line spacing config
+    pub fn set_scroll_line_spacing(&mut self, enabled: bool, max_spacing: f32, duration_ms: u32) {
+        self.scroll_line_spacing_enabled = enabled;
+        self.scroll_line_spacing_max = max_spacing;
+        self.scroll_line_spacing_duration_ms = duration_ms;
+    }
+
+    /// Trigger a scroll line spacing animation for a window
+    pub fn trigger_scroll_line_spacing(&mut self, window_id: i64, bounds: Rect, direction: i32, now: std::time::Instant) {
+        // Replace existing animation for this window
+        self.active_scroll_spacings.retain(|e| e.window_id != window_id);
+        self.active_scroll_spacings.push(ScrollSpacingEntry {
+            window_id,
+            bounds,
+            direction,
+            started: now,
+            duration: std::time::Duration::from_millis(self.scroll_line_spacing_duration_ms as u64),
+        });
+        self.needs_continuous_redraw = true;
     }
 
     /// Update focus ring config
@@ -1953,6 +2018,15 @@ impl WgpuRenderer {
             self.needs_continuous_redraw = true;
         }
 
+        // Clean up expired scroll line spacing animations
+        let now_spacing = std::time::Instant::now();
+        self.active_scroll_spacings.retain(|e| {
+            now_spacing.duration_since(e.started) < e.duration
+        });
+        if !self.active_scroll_spacings.is_empty() {
+            self.needs_continuous_redraw = true;
+        }
+
         // Advance glyph atlas generation for LRU tracking
         glyph_atlas.advance_generation();
 
@@ -2128,7 +2202,7 @@ impl WgpuRenderer {
             }
         }
         // Non-overlay stretches (skip those inside a box span)
-        let has_line_anims = !self.active_line_anims.is_empty();
+        let has_line_anims = !self.active_line_anims.is_empty() || !self.active_scroll_spacings.is_empty();
         for glyph in &frame_glyphs.glyphs {
             if let FrameGlyph::Stretch { x, y, width, height, bg, is_overlay, .. } = glyph {
                 if !*is_overlay && !overlaps_rounded_box_span(*x, *y, false, &box_spans) {

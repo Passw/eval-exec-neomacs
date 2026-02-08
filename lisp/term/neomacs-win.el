@@ -1614,6 +1614,48 @@ focused window with continuous animation."
                     neomacs-focus-ring)
            (neomacs-set-focus-ring t nil nil nil nil nil val))))
 
+;; --- Scroll line spacing animation ---
+(declare-function neomacs-set-scroll-line-spacing "neomacsterm.c"
+  (&optional enabled max-spacing duration-ms))
+
+(defcustom neomacs-scroll-line-spacing nil
+  "Enable scroll line spacing animation (accordion effect).
+Non-nil applies a transient accordion-style line spacing animation
+when scrolling, where lines at the leading edge briefly spread
+apart and then settle back."
+  :type 'boolean
+  :group 'frames
+  :set (lambda (sym val)
+         (set-default sym val)
+         (when (fboundp 'neomacs-set-scroll-line-spacing)
+           (neomacs-set-scroll-line-spacing val
+            (if (boundp 'neomacs-scroll-line-spacing-max)
+                neomacs-scroll-line-spacing-max nil)
+            (if (boundp 'neomacs-scroll-line-spacing-duration)
+                neomacs-scroll-line-spacing-duration nil)))))
+
+(defcustom neomacs-scroll-line-spacing-max 6
+  "Maximum extra spacing in pixels at leading edge."
+  :type '(integer :tag "Max Spacing")
+  :group 'frames
+  :set (lambda (sym val)
+         (set-default sym val)
+         (when (and (fboundp 'neomacs-set-scroll-line-spacing)
+                    (boundp 'neomacs-scroll-line-spacing)
+                    neomacs-scroll-line-spacing)
+           (neomacs-set-scroll-line-spacing t val))))
+
+(defcustom neomacs-scroll-line-spacing-duration 200
+  "Animation duration in milliseconds."
+  :type '(integer :tag "Duration (ms)")
+  :group 'frames
+  :set (lambda (sym val)
+         (set-default sym val)
+         (when (and (fboundp 'neomacs-set-scroll-line-spacing)
+                    (boundp 'neomacs-scroll-line-spacing)
+                    neomacs-scroll-line-spacing)
+           (neomacs-set-scroll-line-spacing t nil val))))
+
 ;; --- Window background tint based on file type ---
 (declare-function neomacs-set-window-mode-tint "neomacsterm.c"
   (&optional enabled opacity))

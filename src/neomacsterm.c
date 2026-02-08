@@ -8795,6 +8795,30 @@ THRESHOLD is the maximum buffer size in characters to show watermark (default 10
   return on ? Qt : Qnil;
 }
 
+DEFUN ("neomacs-set-scroll-line-spacing",
+       Fneomacs_set_scroll_line_spacing,
+       Sneomacs_set_scroll_line_spacing, 0, 3, 0,
+       doc: /* Configure scroll line spacing animation (accordion effect).
+ENABLED non-nil applies a transient accordion-style line spacing
+animation when scrolling, where lines at the leading edge briefly
+spread apart and then settle back.
+MAX-SPACING is maximum extra spacing in pixels (default 6).
+DURATION-MS is animation duration in milliseconds (default 200).  */)
+  (Lisp_Object enabled, Lisp_Object max_spacing, Lisp_Object duration_ms)
+{
+  struct neomacs_display_info *dpyinfo = neomacs_display_list;
+  if (!dpyinfo || !dpyinfo->display_handle)
+    return Qnil;
+
+  int on = !NILP (enabled);
+  int ms = 6, dur = 200;
+  if (FIXNUMP (max_spacing)) ms = XFIXNUM (max_spacing);
+  if (FIXNUMP (duration_ms)) dur = XFIXNUM (duration_ms);
+
+  neomacs_display_set_scroll_line_spacing (dpyinfo->display_handle, on, ms, dur);
+  return on ? Qt : Qnil;
+}
+
 DEFUN ("neomacs-set-cursor-trail-fade",
        Fneomacs_set_cursor_trail_fade,
        Sneomacs_set_cursor_trail_fade, 0, 3, 0,
@@ -10316,6 +10340,7 @@ syms_of_neomacsterm (void)
   defsubr (&Sneomacs_set_window_mode_tint);
   defsubr (&Sneomacs_set_window_watermark);
   defsubr (&Sneomacs_set_cursor_trail_fade);
+  defsubr (&Sneomacs_set_scroll_line_spacing);
   defsubr (&Sneomacs_set_region_glow);
   defsubr (&Sneomacs_set_window_glow);
   defsubr (&Sneomacs_set_scroll_progress);

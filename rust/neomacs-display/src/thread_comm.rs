@@ -564,6 +564,14 @@ pub enum RenderCommand {
         /// Opacity of the margin overlay (0.0-1.0)
         margin_opacity: f32,
     },
+    /// Configure line spacing animation on scroll (accordion effect)
+    SetScrollLineSpacing {
+        enabled: bool,
+        /// Extra spacing in pixels applied at leading edge during scroll
+        max_spacing: f32,
+        /// Duration of the spacing animation in milliseconds
+        duration_ms: u32,
+    },
     /// Configure background pattern
     SetBackgroundPattern {
         /// 0=none, 1=dots, 2=grid, 3=crosshatch

@@ -1456,6 +1456,12 @@ void neomacs_display_set_window_watermark(
     int opacity,
     int threshold);
 
+void neomacs_display_set_scroll_line_spacing(
+    struct NeomacsDisplay *handle,
+    int enabled,
+    int max_spacing,
+    int duration_ms);
+
 void neomacs_display_set_cursor_trail_fade(
     struct NeomacsDisplay *handle,
     int enabled,
