@@ -1161,6 +1161,9 @@ struct neomacs_window_params_ffi {
   /* line-prefix: string rendered at start of all visual lines */
   uint8_t line_prefix[128];
   int line_prefix_len;
+  /* Margin widths in pixels */
+  float left_margin_width;
+  float right_margin_width;
 };
 
 /* Get window parameters for the Nth leaf window.
@@ -1257,6 +1260,10 @@ neomacs_layout_get_window_params (void *frame_ptr, int window_index,
   params->text_y = (float) WINDOW_TOP_EDGE_Y (w);
   params->text_width = (float) window_box_width (w, TEXT_AREA);
   params->text_height = (float) WINDOW_PIXEL_HEIGHT (w);
+
+  /* Margin areas */
+  params->left_margin_width = (float) WINDOW_LEFT_MARGIN_WIDTH (w);
+  params->right_margin_width = (float) WINDOW_RIGHT_MARGIN_WIDTH (w);
 
   params->selected = (w == XWINDOW (f->selected_window)) ? 1 : 0;
 
@@ -2564,6 +2571,149 @@ neomacs_layout_check_glyphless (void *frame_ptr, int codepoint,
   else
     *method_out = 2; /* unknown method -> empty-box */
 
+  return 0;
+}
+
+/* Collect margin overlay strings at a position.
+   Checks overlay before/after-strings for display properties with
+   (margin left-margin) or (margin right-margin).
+   left_buf/right_buf receive the display text for each margin.
+   Returns 0 on success. */
+int
+neomacs_layout_margin_strings_at (void *buffer_ptr, void *window_ptr,
+                                  int64_t charpos,
+                                  uint8_t *left_buf, int left_buf_len,
+                                  int *left_len_out,
+                                  uint8_t *right_buf, int right_buf_len,
+                                  int *right_len_out)
+{
+  struct buffer *buf = (struct buffer *) buffer_ptr;
+  struct window *w = window_ptr ? (struct window *) window_ptr : NULL;
+
+  *left_len_out = 0;
+  *right_len_out = 0;
+
+  if (!buf)
+    return -1;
+
+  struct buffer *old = current_buffer;
+  set_buffer_internal_1 (buf);
+
+  ptrdiff_t pos = (ptrdiff_t) charpos;
+  ptrdiff_t len = 16;
+  Lisp_Object *overlay_vec = xmalloc (len * sizeof *overlay_vec);
+  ptrdiff_t noverlays = overlays_at (pos, true, &overlay_vec, &len, NULL);
+
+  int left_offset = 0;
+  int right_offset = 0;
+
+  for (ptrdiff_t i = 0; i < noverlays; i++)
+    {
+      Lisp_Object overlay = overlay_vec[i];
+      if (!OVERLAYP (overlay))
+        continue;
+
+      /* Filter window-specific overlays. */
+      Lisp_Object owin = Foverlay_get (overlay, Qwindow);
+      if (WINDOWP (owin) && w && XWINDOW (owin) != w)
+        continue;
+
+      ptrdiff_t ostart = OVERLAY_START (overlay);
+
+      /* Check before-string and after-string for margin display props. */
+      Lisp_Object strings[2];
+      strings[0] = (ostart == pos)
+        ? Foverlay_get (overlay, Qbefore_string) : Qnil;
+      strings[1] = Foverlay_get (overlay, Qafter_string);
+
+      for (int si = 0; si < 2; si++)
+        {
+          Lisp_Object str = strings[si];
+          if (!STRINGP (str) || SCHARS (str) == 0)
+            continue;
+
+          /* Check the display property on the FIRST character of the string. */
+          Lisp_Object disp
+            = Fget_text_property (make_fixnum (0), Qdisplay, str);
+          if (NILP (disp))
+            continue;
+
+          /* Look for ((margin left-margin) ...) or ((margin right-margin) ...) */
+          if (!CONSP (disp) || !CONSP (XCAR (disp)))
+            continue;
+
+          Lisp_Object margin_spec = XCAR (disp);
+          if (!CONSP (margin_spec))
+            continue;
+
+          Lisp_Object margin_sym = XCAR (margin_spec);
+          if (!EQ (margin_sym, Qmargin))
+            continue;
+
+          Lisp_Object location = Qnil;
+          if (CONSP (XCDR (margin_spec)))
+            location = XCAR (XCDR (margin_spec));
+
+          /* Get the display value (second element of outer cons). */
+          Lisp_Object display_val = XCDR (disp);
+          if (CONSP (display_val))
+            display_val = XCAR (display_val);
+
+          /* Extract text content. */
+          const char *text_data = NULL;
+          ptrdiff_t text_len = 0;
+
+          if (STRINGP (display_val))
+            {
+              text_data = (const char *) SDATA (display_val);
+              text_len = SBYTES (display_val);
+            }
+          else if (STRINGP (str))
+            {
+              /* Fall back to the overlay string itself. */
+              text_data = (const char *) SDATA (str);
+              text_len = SBYTES (str);
+            }
+
+          if (!text_data || text_len <= 0)
+            continue;
+
+          if (EQ (location, Qleft_margin))
+            {
+              ptrdiff_t copy = text_len;
+              if (left_offset + copy > left_buf_len - 1)
+                copy = left_buf_len - 1 - left_offset;
+              if (copy > 0)
+                {
+                  memcpy (left_buf + left_offset, text_data, copy);
+                  left_offset += (int) copy;
+                }
+            }
+          else if (EQ (location, Qright_margin))
+            {
+              ptrdiff_t copy = text_len;
+              if (right_offset + copy > right_buf_len - 1)
+                copy = right_buf_len - 1 - right_offset;
+              if (copy > 0)
+                {
+                  memcpy (right_buf + right_offset, text_data, copy);
+                  right_offset += (int) copy;
+                }
+            }
+        }
+    }
+
+  xfree (overlay_vec);
+
+  if (left_offset > 0)
+    left_buf[left_offset] = 0;
+  if (right_offset > 0)
+    right_buf[right_offset] = 0;
+
+  *left_len_out = left_offset;
+  *right_len_out = right_offset;
+
+  set_buffer_internal_1 (old);
   return 0;
 }
 

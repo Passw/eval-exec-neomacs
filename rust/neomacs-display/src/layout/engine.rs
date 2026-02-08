@@ -120,6 +120,8 @@ impl LayoutEngine {
                 } else {
                     Vec::new()
                 },
+                left_margin_width: wp.left_margin_width,
+                right_margin_width: wp.right_margin_width,
             };
 
             // Add window background
@@ -453,6 +455,10 @@ impl LayoutEngine {
         let mut raise_y_offset: f32 = 0.0;
         let mut raise_end: i64 = 0;
 
+        // Margin rendering: check at start of each visual line
+        let has_margins = params.left_margin_width > 0.0 || params.right_margin_width > 0.0;
+        let mut need_margin_check = has_margins;
+
         while byte_idx < bytes_read as usize && row < max_rows {
             // Render line number at the start of each new row
             if need_line_number && lnum_enabled {
@@ -566,6 +572,58 @@ impl LayoutEngine {
                 need_prefix = 0;
             }
 
+            // Render margin content at the start of each visual line
+            if need_margin_check && (params.left_margin_width > 0.0 || params.right_margin_width > 0.0) {
+                need_margin_check = false;
+                let mut left_margin_buf = [0u8; 256];
+                let mut right_margin_buf = [0u8; 256];
+                let mut left_len: c_int = 0;
+                let mut right_len: c_int = 0;
+                neomacs_layout_margin_strings_at(
+                    buffer, window, charpos,
+                    left_margin_buf.as_mut_ptr(), 256, &mut left_len,
+                    right_margin_buf.as_mut_ptr(), 256, &mut right_len,
+                );
+
+                // Render left margin content
+                if left_len > 0 && params.left_margin_width > 0.0 {
+                    let margin_x = text_x - params.left_margin_width;
+                    let gy = text_y + row as f32 * char_h;
+                    let margin_cols = (params.left_margin_width / char_w).floor() as i32;
+                    let s = std::str::from_utf8_unchecked(
+                        &left_margin_buf[..left_len as usize],
+                    );
+                    let mut mcol = 0i32;
+                    for mch in s.chars() {
+                        if mcol >= margin_cols { break; }
+                        let gx = margin_x + mcol as f32 * char_w;
+                        frame_glyphs.add_char(
+                            mch, gx, gy, char_w, char_h, ascent, false,
+                        );
+                        mcol += 1;
+                    }
+                }
+
+                // Render right margin content
+                if right_len > 0 && params.right_margin_width > 0.0 {
+                    let margin_x = text_x + text_width;
+                    let gy = text_y + row as f32 * char_h;
+                    let margin_cols = (params.right_margin_width / char_w).floor() as i32;
+                    let s = std::str::from_utf8_unchecked(
+                        &right_margin_buf[..right_len as usize],
+                    );
+                    let mut mcol = 0i32;
+                    for mch in s.chars() {
+                        if mcol >= margin_cols { break; }
+                        let gx = margin_x + mcol as f32 * char_w;
+                        frame_glyphs.add_char(
+                            mch, gx, gy, char_w, char_h, ascent, false,
+                        );
+                        mcol += 1;
+                    }
+                }
+            }
+
             // Handle hscroll: show $ indicator and skip columns
             if hscroll_remaining > 0 {
                 // Skip characters consumed by hscroll
@@ -579,6 +637,7 @@ impl LayoutEngine {
                     row += 1;
                     current_line += 1;
                     need_line_number = lnum_enabled;
+                    need_margin_check = has_margins;
                     hscroll_remaining = hscroll; // reset for next line
                     wrap_has_break = false;
                 } else {
@@ -1029,6 +1088,7 @@ impl LayoutEngine {
                     row += 1;
                     current_line += 1;
                     need_line_number = lnum_enabled;
+                    need_margin_check = has_margins;
                     wrap_has_break = false;
                     hscroll_remaining = hscroll;
                     if !params.line_prefix.is_empty() { need_prefix = 1; }
@@ -1115,6 +1175,7 @@ impl LayoutEngine {
                                     row += 1;
                                     current_line += 1;
                                     need_line_number = lnum_enabled;
+                                    need_margin_check = has_margins;
                                     wrap_has_break = false;
                                     break;
                                 }
@@ -1156,6 +1217,7 @@ impl LayoutEngine {
                                 row += 1;
                                 current_line += 1;
                                 need_line_number = lnum_enabled;
+                                need_margin_check = has_margins;
                                 wrap_has_break = false;
                                 hscroll_remaining = hscroll;
                                 break;
@@ -1201,6 +1263,7 @@ impl LayoutEngine {
                                     row += 1;
                                     current_line += 1;
                                     need_line_number = lnum_enabled;
+                                    need_margin_check = has_margins;
                                     wrap_has_break = false;
                                     break;
                                 }
@@ -1376,6 +1439,7 @@ impl LayoutEngine {
                                     row += 1;
                                     current_line += 1;
                                     need_line_number = lnum_enabled;
+                                    need_margin_check = has_margins;
                                     wrap_has_break = false;
                                     hscroll_remaining = hscroll;
                                     break;

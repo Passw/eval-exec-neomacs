@@ -219,6 +219,10 @@ pub struct WindowParams {
     pub wrap_prefix: Vec<u8>,
     /// line-prefix: bytes rendered at start of all visual lines
     pub line_prefix: Vec<u8>,
+    /// Left margin width in pixels (0 = no margin)
+    pub left_margin_width: f32,
+    /// Right margin width in pixels (0 = no margin)
+    pub right_margin_width: f32,
 }
 
 /// Frame-level parameters for layout.

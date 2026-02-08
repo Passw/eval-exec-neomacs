@@ -278,6 +278,25 @@ extern "C" {
         str_buf_len: c_int,
         str_len_out: *mut c_int,
     ) -> c_int;
+
+    // ========================================================================
+    // Margin strings
+    // ========================================================================
+
+    /// Collect margin overlay strings at a buffer position.
+    /// Checks overlay before/after-strings for (margin left-margin) and
+    /// (margin right-margin) display properties.
+    pub fn neomacs_layout_margin_strings_at(
+        buffer: EmacsBuffer,
+        window: EmacsWindow,
+        charpos: i64,
+        left_buf: *mut u8,
+        left_buf_len: c_int,
+        left_len_out: *mut c_int,
+        right_buf: *mut u8,
+        right_buf_len: c_int,
+        right_len_out: *mut c_int,
+    ) -> c_int;
 }
 
 /// FFI-safe line number configuration struct.
@@ -429,6 +448,9 @@ pub struct WindowParamsFFI {
     /// line-prefix: string rendered at start of all visual lines
     pub line_prefix: [u8; 128],
     pub line_prefix_len: c_int,
+    /// Margin widths in pixels
+    pub left_margin_width: f32,
+    pub right_margin_width: f32,
 }
 
 impl Default for WindowParamsFFI {
