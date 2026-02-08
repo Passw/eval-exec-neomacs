@@ -45,15 +45,15 @@ pub struct WgpuRenderer {
 }
 
 impl WgpuRenderer {
-    /// Create a new WgpuRenderer.
+    /// Create a new WgpuRenderer with its own GPU device.
     ///
-    /// If a surface is provided, it will be configured for rendering.
-    /// Otherwise, the renderer can still be used for offscreen rendering.
+    /// Returns an error if GPU initialization fails.
+    /// Prefer `with_device()` when you already have a device/queue.
     pub fn new(
         surface: Option<wgpu::Surface<'static>>,
         width: u32,
         height: u32,
-    ) -> Self {
+    ) -> Result<Self, String> {
         pollster::block_on(Self::new_async(surface, width, height))
     }
 
@@ -460,7 +460,7 @@ impl WgpuRenderer {
         surface: Option<wgpu::Surface<'static>>,
         width: u32,
         height: u32,
-    ) -> Self {
+    ) -> Result<Self, String> {
         // Create wgpu instance
         let instance = wgpu::Instance::new(wgpu::InstanceDescriptor {
             backends: wgpu::Backends::all(),
@@ -475,7 +475,7 @@ impl WgpuRenderer {
                 force_fallback_adapter: false,
             })
             .await
-            .expect("Failed to find a suitable GPU adapter");
+            .ok_or_else(|| "Failed to find a suitable GPU adapter".to_string())?;
 
         // Request device and queue
         let (device, queue) = adapter
@@ -489,7 +489,7 @@ impl WgpuRenderer {
                 None,
             )
             .await
-            .expect("Failed to create device");
+            .map_err(|e| format!("Failed to create device: {}", e))?;
 
         let device = Arc::new(device);
         let queue = Arc::new(queue);
@@ -505,7 +505,7 @@ impl WgpuRenderer {
         });
 
         // Use the internal helper for pipeline/buffer creation (1.0 scale for standalone usage)
-        Self::create_renderer_internal(device, queue, surface, surface_format, width, height, 1.0)
+        Ok(Self::create_renderer_internal(device, queue, surface, surface_format, width, height, 1.0))
     }
 
     /// Resize the renderer's surface.
@@ -4273,11 +4273,5 @@ impl WgpuRenderer {
                 }
             }
         }
-    }
-}
-
-impl Default for WgpuRenderer {
-    fn default() -> Self {
-        Self::new(None, 800, 600)
     }
 }

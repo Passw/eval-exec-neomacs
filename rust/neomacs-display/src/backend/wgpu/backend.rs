@@ -376,8 +376,13 @@ impl WinitBackend {
         };
         surface.configure(&device, &config);
 
-        // Create renderer
-        let renderer = WgpuRenderer::new(None, self.width, self.height);
+        // Create renderer using the already-created device and queue
+        let renderer = WgpuRenderer::with_device(
+            device.clone(), queue.clone(),
+            self.width, self.height,
+            format,
+            1.0, // legacy backend uses 1.0 scale
+        );
 
         // Store the wgpu infrastructure for multi-window support
         self.instance = Some(instance);
