@@ -104,6 +104,7 @@ impl LayoutEngine {
                 fill_column_indicator_fg: wp.fill_column_indicator_fg,
                 extra_line_spacing: wp.extra_line_spacing,
                 cursor_in_non_selected: wp.cursor_in_non_selected != 0,
+                selective_display: wp.selective_display,
             };
 
             // Add window background
@@ -881,6 +882,53 @@ impl LayoutEngine {
                     need_line_number = lnum_enabled;
                     wrap_has_break = false;
                     hscroll_remaining = hscroll;
+
+                    // Selective display: skip lines indented beyond threshold
+                    if params.selective_display > 0 {
+                        let mut shown_ellipsis = false;
+                        while byte_idx < bytes_read as usize && row < max_rows {
+                            // Peek at indentation of next line
+                            let mut indent = 0i32;
+                            let mut peek_idx = byte_idx;
+                            while peek_idx < bytes_read as usize {
+                                let (pch, plen) = decode_utf8(&text[peek_idx..]);
+                                if pch == ' ' {
+                                    indent += 1;
+                                } else if pch == '\t' {
+                                    indent = ((indent / params.tab_width) + 1) * params.tab_width;
+                                } else {
+                                    break;
+                                }
+                                peek_idx += plen;
+                            }
+
+                            if indent > params.selective_display {
+                                // Show ... ellipsis once for the hidden block
+                                if !shown_ellipsis && row > 0 {
+                                    let gy = text_y + (row - 1) as f32 * char_h;
+                                    for dot_i in 0..3i32.min(cols) {
+                                        frame_glyphs.add_char(
+                                            '.', content_x + dot_i as f32 * char_w,
+                                            gy, char_w, char_h, ascent, false,
+                                        );
+                                    }
+                                    shown_ellipsis = true;
+                                }
+                                // Skip this hidden line
+                                while byte_idx < bytes_read as usize {
+                                    let (sch, slen) = decode_utf8(&text[byte_idx..]);
+                                    byte_idx += slen;
+                                    charpos += 1;
+                                    if sch == '\n' {
+                                        current_line += 1;
+                                        break;
+                                    }
+                                }
+                            } else {
+                                break; // Next line is visible
+                            }
+                        }
+                    }
                 }
                 '\t' => {
                     // Tab: advance to next tab stop
@@ -935,7 +983,35 @@ impl LayoutEngine {
                     }
                 }
                 '\r' => {
-                    // Carriage return: skip
+                    if params.selective_display > 0 {
+                        // In selective-display mode, \r hides until next \n
+                        // Show ... ellipsis
+                        let gy = text_y + row as f32 * char_h;
+                        if col + 3 <= cols {
+                            for dot_i in 0..3 {
+                                frame_glyphs.add_char(
+                                    '.', content_x + (col + dot_i) as f32 * char_w,
+                                    gy, char_w, char_h, ascent, false,
+                                );
+                            }
+                        }
+                        // Skip to next \n
+                        while byte_idx < bytes_read as usize {
+                            let (sch, slen) = decode_utf8(&text[byte_idx..]);
+                            byte_idx += slen;
+                            charpos += 1;
+                            if sch == '\n' {
+                                col = 0;
+                                row += 1;
+                                current_line += 1;
+                                need_line_number = lnum_enabled;
+                                wrap_has_break = false;
+                                hscroll_remaining = hscroll;
+                                break;
+                            }
+                        }
+                    }
+                    // Otherwise: carriage return is just skipped
                 }
                 _ if ch < ' ' => {
                     // Control character: display as ^X (2 columns)

@@ -387,6 +387,8 @@ pub struct WindowParamsFFI {
     pub extra_line_spacing: f32,
     /// Whether to show cursor in non-selected windows
     pub cursor_in_non_selected: c_int,
+    /// selective-display: 0=off, >0=hide lines indented more than N columns
+    pub selective_display: c_int,
 }
 
 /// FFI-safe face data struct.

@@ -205,6 +205,8 @@ pub struct WindowParams {
     pub extra_line_spacing: f32,
     /// Whether to show cursor in non-selected windows
     pub cursor_in_non_selected: bool,
+    /// selective-display: 0=off, >0=hide lines indented more than N columns
+    pub selective_display: i32,
 }
 
 /// Frame-level parameters for layout.

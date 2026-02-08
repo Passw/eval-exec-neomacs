@@ -1140,6 +1140,8 @@ struct neomacs_window_params_ffi {
   float extra_line_spacing;
   /* Whether to show cursor in non-selected windows */
   int cursor_in_non_selected;
+  /* selective-display: 0=off, >0=hide lines indented more than N columns */
+  int selective_display;
 };
 
 /* Get window parameters for the Nth leaf window.
@@ -1387,6 +1389,15 @@ neomacs_layout_get_window_params (void *frame_ptr, int window_index,
   /* Cursor in non-selected windows */
   params->cursor_in_non_selected
       = !NILP (BVAR (&buffer_defaults, cursor_in_non_selected_windows));
+
+  /* selective-display: when a fixnum, hide lines indented deeper */
+  params->selective_display = 0;
+  if (BUFFERP (w->contents))
+    {
+      Lisp_Object sd = BVAR (XBUFFER (w->contents), selective_display);
+      if (FIXNUMP (sd) && XFIXNUM (sd) > 0)
+        params->selective_display = (int) XFIXNUM (sd);
+    }
 
   return 0;
 }
