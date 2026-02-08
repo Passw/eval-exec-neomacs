@@ -240,6 +240,26 @@ extern "C" {
         str_buf_len: c_int,
         out: *mut DisplayPropFFI,
     ) -> c_int;
+
+    // ========================================================================
+    // Overlay strings
+    // ========================================================================
+
+    /// Collect overlay before-string and after-string at a position.
+    /// Before-strings come from overlays starting at charpos.
+    /// After-strings come from overlays ending at charpos.
+    /// Returns 0 on success, -1 on error.
+    pub fn neomacs_layout_overlay_strings_at(
+        buffer: EmacsBuffer,
+        window: EmacsWindow,
+        charpos: i64,
+        before_buf: *mut u8,
+        before_buf_len: c_int,
+        before_len_out: *mut c_int,
+        after_buf: *mut u8,
+        after_buf_len: c_int,
+        after_len_out: *mut c_int,
+    ) -> c_int;
 }
 
 /// FFI-safe line number configuration struct.

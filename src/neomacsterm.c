@@ -2052,6 +2052,106 @@ neomacs_layout_check_display_prop (void *buffer_ptr, void *window_ptr,
   return 0;
 }
 
+/* Collect overlay before-string and after-string at a position.
+   Before-strings are from overlays that START at charpos.
+   After-strings are from overlays that END at charpos.
+   Writes concatenated strings into the provided buffers.
+   Returns 0 on success. */
+int
+neomacs_layout_overlay_strings_at (void *buffer_ptr, void *window_ptr,
+                                   int64_t charpos,
+                                   uint8_t *before_buf, int before_buf_len,
+                                   int *before_len_out,
+                                   uint8_t *after_buf, int after_buf_len,
+                                   int *after_len_out)
+{
+  struct buffer *buf = (struct buffer *) buffer_ptr;
+  struct window *w = window_ptr ? (struct window *) window_ptr : NULL;
+
+  *before_len_out = 0;
+  *after_len_out = 0;
+
+  if (!buf)
+    return -1;
+
+  struct buffer *old = current_buffer;
+  set_buffer_internal_1 (buf);
+
+  ptrdiff_t pos = (ptrdiff_t) charpos;
+
+  /* Get all overlays at this position. */
+  ptrdiff_t len = 16;
+  Lisp_Object *overlay_vec = xmalloc (len * sizeof *overlay_vec);
+  ptrdiff_t noverlays = overlays_at (pos, true, &overlay_vec, &len, NULL);
+
+  int before_offset = 0;
+  int after_offset = 0;
+
+  for (ptrdiff_t i = 0; i < noverlays; i++)
+    {
+      Lisp_Object overlay = overlay_vec[i];
+      if (!OVERLAYP (overlay))
+        continue;
+
+      /* Filter window-specific overlays. */
+      Lisp_Object owin = Foverlay_get (overlay, Qwindow);
+      if (WINDOWP (owin) && w && XWINDOW (owin) != w)
+        continue;
+
+      ptrdiff_t ostart = OVERLAY_START (overlay);
+      ptrdiff_t oend = OVERLAY_END (overlay);
+
+      /* Before-string: render at overlay start. */
+      if (ostart == pos)
+        {
+          Lisp_Object bstr = Foverlay_get (overlay, Qbefore_string);
+          if (STRINGP (bstr))
+            {
+              ptrdiff_t slen = SBYTES (bstr);
+              ptrdiff_t copy = slen;
+              if (before_offset + copy > before_buf_len - 1)
+                copy = before_buf_len - 1 - before_offset;
+              if (copy > 0)
+                {
+                  memcpy (before_buf + before_offset, SDATA (bstr), copy);
+                  before_offset += (int) copy;
+                }
+            }
+        }
+
+      /* After-string: render at overlay end. */
+      if (oend == pos)
+        {
+          Lisp_Object astr = Foverlay_get (overlay, Qafter_string);
+          if (STRINGP (astr))
+            {
+              ptrdiff_t slen = SBYTES (astr);
+              ptrdiff_t copy = slen;
+              if (after_offset + copy > after_buf_len - 1)
+                copy = after_buf_len - 1 - after_offset;
+              if (copy > 0)
+                {
+                  memcpy (after_buf + after_offset, SDATA (astr), copy);
+                  after_offset += (int) copy;
+                }
+            }
+        }
+    }
+
+  xfree (overlay_vec);
+
+  if (before_offset > 0)
+    before_buf[before_offset] = 0;
+  if (after_offset > 0)
+    after_buf[after_offset] = 0;
+
+  *before_len_out = before_offset;
+  *after_len_out = after_offset;
+
+  set_buffer_internal_1 (old);
+  return 0;
+}
+
 /* Walk current_matrix for ALL windows in the frame and extract complete
    glyph data.  Called from neomacs_update_end after Emacs has finished
    all window updates.  This replaces the incremental glyph accumulation

@@ -299,6 +299,12 @@ impl LayoutEngine {
         let mut display_prop = DisplayPropFFI::default();
         let mut display_str_buf = [0u8; 1024];
 
+        // Overlay string buffers
+        let mut overlay_before_buf = [0u8; 512];
+        let mut overlay_after_buf = [0u8; 512];
+        let mut overlay_before_len: i32 = 0;
+        let mut overlay_after_len: i32 = 0;
+
         // Line number state
         let mut current_line: i64 = if lnum_enabled {
             neomacs_layout_count_line_number(
@@ -506,6 +512,67 @@ impl LayoutEngine {
                         charpos + 1
                     };
                 }
+            }
+
+            // Check for overlay before-string/after-string at this position.
+            // Before-strings render at overlay start, after-strings at end.
+            {
+                overlay_before_len = 0;
+                overlay_after_len = 0;
+                neomacs_layout_overlay_strings_at(
+                    buffer, window, charpos,
+                    overlay_before_buf.as_mut_ptr(),
+                    overlay_before_buf.len() as i32,
+                    &mut overlay_before_len,
+                    overlay_after_buf.as_mut_ptr(),
+                    overlay_after_buf.len() as i32,
+                    &mut overlay_after_len,
+                );
+
+                // Render before-string (if any) — insert before buffer text
+                if overlay_before_len > 0 {
+                    // Resolve face for this position first
+                    if charpos >= next_face_check || current_face_id < 0 {
+                        let mut next_check: i64 = 0;
+                        let fid = neomacs_layout_face_at_pos(
+                            window, charpos,
+                            &mut self.face_data as *mut FaceDataFFI,
+                            &mut next_check,
+                        );
+                        if fid >= 0 && fid != current_face_id {
+                            current_face_id = fid;
+                            face_fg = Color::from_pixel(self.face_data.fg);
+                            face_bg = Color::from_pixel(self.face_data.bg);
+                            self.apply_face(&self.face_data, frame_glyphs);
+                        }
+                        next_face_check = if next_check > charpos { next_check } else { charpos + 1 };
+                    }
+
+                    let bstr = &overlay_before_buf[..overlay_before_len as usize];
+                    let mut bi = 0usize;
+                    while bi < bstr.len() && row < max_rows {
+                        let (bch, blen) = decode_utf8(&bstr[bi..]);
+                        bi += blen;
+                        if bch == '\n' || bch == '\r' { continue; }
+
+                        let bchar_cols = if is_wide_char(bch) { 2 } else { 1 };
+                        if col + bchar_cols > cols {
+                            if params.truncate_lines { break; }
+                            col = 0;
+                            row += 1;
+                            if row >= max_rows { break; }
+                        }
+                        let gx = content_x + col as f32 * char_w;
+                        let gy = text_y + row as f32 * char_h;
+                        frame_glyphs.add_char(bch, gx, gy, bchar_cols as f32 * char_w, char_h, ascent, false);
+                        col += bchar_cols;
+                    }
+                }
+
+                // After-strings are rendered after the buffer text at the
+                // position, so we defer rendering. We'll render them after
+                // the character at this position has been processed.
+                // (Stored in overlay_after_len for use after char rendering)
             }
 
             // Check for display text property at property boundaries
@@ -897,6 +964,29 @@ impl LayoutEngine {
                         wrap_break_glyph_count = frame_glyphs.glyphs.len();
                         wrap_has_break = true;
                     }
+                }
+            }
+
+            // Render overlay after-string (if any) — collected earlier
+            if overlay_after_len > 0 && row < max_rows {
+                let astr = &overlay_after_buf[..overlay_after_len as usize];
+                let mut ai = 0usize;
+                while ai < astr.len() && row < max_rows {
+                    let (ach, alen) = decode_utf8(&astr[ai..]);
+                    ai += alen;
+                    if ach == '\n' || ach == '\r' { continue; }
+
+                    let achar_cols = if is_wide_char(ach) { 2 } else { 1 };
+                    if col + achar_cols > cols {
+                        if params.truncate_lines { break; }
+                        col = 0;
+                        row += 1;
+                        if row >= max_rows { break; }
+                    }
+                    let gx = content_x + col as f32 * char_w;
+                    let gy = text_y + row as f32 * char_h;
+                    frame_glyphs.add_char(ach, gx, gy, achar_cols as f32 * char_w, char_h, ascent, false);
+                    col += achar_cols;
                 }
             }
 
