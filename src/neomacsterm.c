@@ -8550,6 +8550,31 @@ corner of the active window, calculated from recent keystroke rate.  */)
   return on ? Qt : Qnil;
 }
 
+DEFUN ("neomacs-set-frosted-glass",
+       Fneomacs_set_frosted_glass,
+       Sneomacs_set_frosted_glass, 0, 3, 0,
+       doc: /* Configure frosted glass effect on mode-lines.
+ENABLED non-nil adds a semi-transparent frosted glass overlay with
+noise grain to mode-line areas, creating a blurred glass appearance.
+OPACITY is 0-100 for frost intensity (default 30).
+BLUR is the blur spread radius in pixels (default 4).  */)
+  (Lisp_Object enabled, Lisp_Object opacity, Lisp_Object blur)
+{
+  struct neomacs_display_info *dpyinfo = neomacs_display_list;
+  if (!dpyinfo || !dpyinfo->display_handle)
+    return Qnil;
+
+  int on = !NILP (enabled);
+  int op = 30;
+  int bl = 4;
+  if (FIXNUMP (opacity)) op = XFIXNUM (opacity);
+  if (FIXNUMP (blur)) bl = XFIXNUM (blur);
+
+  neomacs_display_set_frosted_glass (
+    dpyinfo->display_handle, on, op, bl);
+  return on ? Qt : Qnil;
+}
+
 DEFUN ("neomacs-set-window-switch-fade",
        Fneomacs_set_window_switch_fade,
        Sneomacs_set_window_switch_fade, 0, 3, 0,
@@ -9956,6 +9981,7 @@ syms_of_neomacsterm (void)
   defsubr (&Sneomacs_set_breadcrumb);
   defsubr (&Sneomacs_set_title_fade);
   defsubr (&Sneomacs_set_typing_speed);
+  defsubr (&Sneomacs_set_frosted_glass);
   defsubr (&Sneomacs_set_window_glow);
   defsubr (&Sneomacs_set_scroll_progress);
   defsubr (&Sneomacs_set_inactive_tint);

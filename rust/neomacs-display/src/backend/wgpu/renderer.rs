@@ -158,6 +158,10 @@ pub struct WgpuRenderer {
     /// Breadcrumb/path bar overlay
     breadcrumb_enabled: bool,
     breadcrumb_opacity: f32,
+    /// Frosted glass effect on mode-lines
+    frosted_glass_enabled: bool,
+    frosted_glass_opacity: f32,
+    frosted_glass_blur: f32,
     /// Title fade animation
     title_fade_enabled: bool,
     title_fade_duration_ms: u32,
@@ -742,6 +746,9 @@ impl WgpuRenderer {
             active_window_fades: Vec::new(),
             breadcrumb_enabled: false,
             breadcrumb_opacity: 0.7,
+            frosted_glass_enabled: false,
+            frosted_glass_opacity: 0.3,
+            frosted_glass_blur: 4.0,
             title_fade_enabled: false,
             title_fade_duration_ms: 300,
             prev_breadcrumb_text: std::collections::HashMap::new(),
@@ -912,6 +919,13 @@ impl WgpuRenderer {
     pub fn set_breadcrumb(&mut self, enabled: bool, opacity: f32) {
         self.breadcrumb_enabled = enabled;
         self.breadcrumb_opacity = opacity;
+    }
+
+    /// Update frosted glass config
+    pub fn set_frosted_glass(&mut self, enabled: bool, opacity: f32, blur: f32) {
+        self.frosted_glass_enabled = enabled;
+        self.frosted_glass_opacity = opacity;
+        self.frosted_glass_blur = blur;
     }
 
     /// Update title fade config
@@ -3314,6 +3328,81 @@ impl WgpuRenderer {
                     render_pass.set_bind_group(0, &self.uniform_bind_group, &[]);
                     render_pass.set_vertex_buffer(0, sep_buffer.slice(..));
                     render_pass.draw(0..sep_vertices.len() as u32, 0..1);
+                }
+            }
+
+            // === Frosted glass effect on mode-lines ===
+            if self.frosted_glass_enabled {
+                let frost_opacity = self.frosted_glass_opacity.clamp(0.0, 1.0);
+                let blur_r = self.frosted_glass_blur.max(1.0);
+                let mut frost_vertices: Vec<RectVertex> = Vec::new();
+
+                for info in &frame_glyphs.window_infos {
+                    if info.mode_line_height <= 0.0 || info.is_minibuffer {
+                        continue;
+                    }
+                    let b = &info.bounds;
+                    let ml_y = b.y + b.height - info.mode_line_height;
+                    let ml_h = info.mode_line_height;
+
+                    // Layer 1: Base frosted overlay (white, semi-transparent)
+                    let base_color = Color::new(1.0, 1.0, 1.0, frost_opacity * 0.15);
+                    self.add_rect(&mut frost_vertices, b.x, ml_y, b.width, ml_h, &base_color);
+
+                    // Layer 2-5: Offset blur layers (semi-transparent white at offsets)
+                    let offsets = [
+                        (-blur_r, 0.0), (blur_r, 0.0),
+                        (0.0, -blur_r * 0.5), (0.0, blur_r * 0.5),
+                    ];
+                    let layer_alpha = frost_opacity * 0.06;
+                    for (dx, dy) in offsets {
+                        let c = Color::new(1.0, 1.0, 1.0, layer_alpha);
+                        // Clamp to mode-line bounds
+                        let rx = (b.x + dx).max(b.x);
+                        let ry = (ml_y + dy).max(ml_y);
+                        let rw = b.width.min(b.x + b.width - rx);
+                        let rh = ml_h.min(ml_y + ml_h - ry);
+                        if rw > 0.0 && rh > 0.0 {
+                            self.add_rect(&mut frost_vertices, rx, ry, rw, rh, &c);
+                        }
+                    }
+
+                    // Layer 6: Grain/noise pattern (stipple with small rects)
+                    let grain_size = 2.0_f32;
+                    let grain_alpha = frost_opacity * 0.04;
+                    let cols = (b.width / grain_size) as i32;
+                    let rows = (ml_h / grain_size) as i32;
+                    // Use a simple hash-based pseudo-random for grain pattern
+                    for row in 0..rows {
+                        for col in 0..cols {
+                            // Simple hash: (row * 7919 + col * 104729) % 3 == 0
+                            let hash = ((row as u64).wrapping_mul(7919) + (col as u64).wrapping_mul(104729)) % 5;
+                            if hash == 0 {
+                                let gx = b.x + col as f32 * grain_size;
+                                let gy = ml_y + row as f32 * grain_size;
+                                let c = Color::new(1.0, 1.0, 1.0, grain_alpha);
+                                self.add_rect(&mut frost_vertices, gx, gy, grain_size, grain_size, &c);
+                            }
+                        }
+                    }
+
+                    // Top edge: bright line for glass edge highlight
+                    let edge_c = Color::new(1.0, 1.0, 1.0, frost_opacity * 0.3);
+                    self.add_rect(&mut frost_vertices, b.x, ml_y, b.width, 1.0, &edge_c);
+                }
+
+                if !frost_vertices.is_empty() {
+                    let frost_buffer = self.device.create_buffer_init(
+                        &wgpu::util::BufferInitDescriptor {
+                            label: Some("Frosted Glass Buffer"),
+                            contents: bytemuck::cast_slice(&frost_vertices),
+                            usage: wgpu::BufferUsages::VERTEX,
+                        },
+                    );
+                    render_pass.set_pipeline(&self.rect_pipeline);
+                    render_pass.set_bind_group(0, &self.uniform_bind_group, &[]);
+                    render_pass.set_vertex_buffer(0, frost_buffer.slice(..));
+                    render_pass.draw(0..frost_vertices.len() as u32, 0..1);
                 }
             }
 

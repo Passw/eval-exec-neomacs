@@ -428,6 +428,14 @@ pub enum RenderCommand {
     SetTypingSpeed {
         enabled: bool,
     },
+    /// Configure frosted glass effect on mode-lines
+    SetFrostedGlass {
+        enabled: bool,
+        /// Frost opacity (0.0-1.0)
+        opacity: f32,
+        /// Blur radius (noise spread in pixels)
+        blur: f32,
+    },
     /// Configure cursor color cycling (rainbow hue rotation)
     SetCursorColorCycle {
         enabled: bool,

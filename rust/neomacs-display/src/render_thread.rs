@@ -718,6 +718,10 @@ struct RenderApp {
     title_fade_duration_ms: u32,
     /// Typing speed indicator
     typing_speed_enabled: bool,
+    /// Frosted glass effect on mode-lines
+    frosted_glass_enabled: bool,
+    frosted_glass_opacity: f32,
+    frosted_glass_blur: f32,
     /// Key press timestamps for WPM calculation
     key_press_times: Vec<std::time::Instant>,
     /// Smoothed WPM value for display
@@ -958,6 +962,9 @@ impl RenderApp {
             typing_speed_enabled: false,
             key_press_times: Vec::new(),
             displayed_wpm: 0.0,
+            frosted_glass_enabled: false,
+            frosted_glass_opacity: 0.3,
+            frosted_glass_blur: 4.0,
             window_glow_enabled: false,
             window_glow_color: (0.4, 0.6, 1.0),
             window_glow_radius: 8.0,
@@ -1889,6 +1896,15 @@ impl RenderApp {
                     if !enabled {
                         self.key_press_times.clear();
                         self.displayed_wpm = 0.0;
+                    }
+                    self.frame_dirty = true;
+                }
+                RenderCommand::SetFrostedGlass { enabled, opacity, blur } => {
+                    self.frosted_glass_enabled = enabled;
+                    self.frosted_glass_opacity = opacity;
+                    self.frosted_glass_blur = blur;
+                    if let Some(renderer) = self.renderer.as_mut() {
+                        renderer.set_frosted_glass(enabled, opacity, blur);
                     }
                     self.frame_dirty = true;
                 }

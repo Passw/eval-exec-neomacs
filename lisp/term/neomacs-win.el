@@ -1311,6 +1311,52 @@ when switching buffers in a window."
                     neomacs-title-fade)
            (neomacs-set-title-fade t val))))
 
+;; --- Frosted glass effect ---
+(declare-function neomacs-set-frosted-glass "neomacsterm.c"
+  (&optional enabled opacity blur))
+
+(defcustom neomacs-frosted-glass nil
+  "Enable frosted glass effect on mode-lines.
+Non-nil renders a semi-transparent frosted overlay with noise grain
+on mode-line areas to simulate a blurred glass appearance."
+  :type 'boolean
+  :group 'frames
+  :set (lambda (sym val)
+         (set-default sym val)
+         (when (fboundp 'neomacs-set-frosted-glass)
+           (neomacs-set-frosted-glass val
+            (if (boundp 'neomacs-frosted-glass-opacity)
+                neomacs-frosted-glass-opacity nil)
+            (if (boundp 'neomacs-frosted-glass-blur)
+                neomacs-frosted-glass-blur nil)))))
+
+(defcustom neomacs-frosted-glass-opacity 30
+  "Frost intensity for the frosted glass effect (0-100)."
+  :type '(integer :tag "Opacity")
+  :group 'frames
+  :set (lambda (sym val)
+         (set-default sym val)
+         (when (and (fboundp 'neomacs-set-frosted-glass)
+                    (boundp 'neomacs-frosted-glass)
+                    neomacs-frosted-glass)
+           (neomacs-set-frosted-glass t val
+            (if (boundp 'neomacs-frosted-glass-blur)
+                neomacs-frosted-glass-blur nil)))))
+
+(defcustom neomacs-frosted-glass-blur 4
+  "Blur spread radius in pixels for the frosted glass effect."
+  :type '(integer :tag "Blur radius")
+  :group 'frames
+  :set (lambda (sym val)
+         (set-default sym val)
+         (when (and (fboundp 'neomacs-set-frosted-glass)
+                    (boundp 'neomacs-frosted-glass)
+                    neomacs-frosted-glass)
+           (neomacs-set-frosted-glass t
+            (if (boundp 'neomacs-frosted-glass-opacity)
+                neomacs-frosted-glass-opacity nil)
+            val))))
+
 ;; --- Typing speed indicator ---
 (declare-function neomacs-set-typing-speed "neomacsterm.c"
   (&optional enabled))
