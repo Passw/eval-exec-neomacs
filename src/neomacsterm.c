@@ -1109,6 +1109,7 @@ struct neomacs_window_params_ffi {
   int64_t buffer_begv;
   int hscroll;
   int truncate_lines;
+  int word_wrap;
   int tab_width;
   uint32_t default_fg;
   uint32_t default_bg;
@@ -1192,6 +1193,7 @@ neomacs_layout_get_window_params (void *frame_ptr, int window_index,
                           : (FIXNATP (BVAR (buf, tab_width))
                              ? XFIXNAT (BVAR (buf, tab_width)) : 8);
       params->truncate_lines = !NILP (BVAR (buf, truncate_lines));
+      params->word_wrap = !NILP (BVAR (buf, word_wrap));
     }
   else
     {
@@ -1202,6 +1204,7 @@ neomacs_layout_get_window_params (void *frame_ptr, int window_index,
       params->buffer_zv = 1;
       params->tab_width = 8;
       params->truncate_lines = 0;
+      params->word_wrap = 0;
     }
 
   params->x = (float) WINDOW_LEFT_EDGE_X (w);

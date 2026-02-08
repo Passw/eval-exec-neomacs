@@ -157,6 +157,8 @@ pub struct WindowParams {
 
     /// Whether to truncate long lines
     pub truncate_lines: bool,
+    /// Whether to wrap at word boundaries
+    pub word_wrap: bool,
     /// Tab width in columns
     pub tab_width: i32,
 

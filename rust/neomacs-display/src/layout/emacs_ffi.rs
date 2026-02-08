@@ -287,6 +287,8 @@ pub struct WindowParamsFFI {
     pub hscroll: c_int,
     /// Truncate long lines
     pub truncate_lines: c_int,
+    /// Word wrap at word boundaries
+    pub word_wrap: c_int,
     /// Tab width
     pub tab_width: c_int,
 

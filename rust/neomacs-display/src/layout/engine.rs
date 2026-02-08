@@ -81,6 +81,7 @@ impl LayoutEngine {
                 buffer_begv: wp.buffer_begv,
                 hscroll: wp.hscroll,
                 truncate_lines: wp.truncate_lines != 0,
+                word_wrap: wp.word_wrap != 0,
                 tab_width: wp.tab_width,
                 default_fg: wp.default_fg,
                 default_bg: wp.default_bg,
@@ -320,6 +321,13 @@ impl LayoutEngine {
         let mut window_end_charpos = params.window_start;
         let mut byte_idx = 0usize;
 
+        // Word-wrap tracking: position after last breakable whitespace
+        let mut wrap_break_col = 0i32;
+        let mut wrap_break_byte_idx = 0usize;
+        let mut wrap_break_charpos = params.window_start;
+        let mut wrap_break_glyph_count = 0usize;
+        let mut wrap_has_break = false;
+
         while byte_idx < bytes_read as usize && row < max_rows {
             // Render line number at the start of each new row
             if need_line_number && lnum_enabled {
@@ -535,6 +543,7 @@ impl LayoutEngine {
                     row += 1;
                     current_line += 1;
                     need_line_number = lnum_enabled;
+                    wrap_has_break = false;
                 }
                 '\t' => {
                     // Tab: advance to next tab stop
@@ -549,6 +558,14 @@ impl LayoutEngine {
                     frame_glyphs.add_stretch(gx, gy, tab_pixel_w, char_h, face_bg, self.face_data.face_id, false);
 
                     col += spaces;
+                    // Tab is a breakpoint for word-wrap
+                    if params.word_wrap {
+                        wrap_break_col = col;
+                        wrap_break_byte_idx = byte_idx;
+                        wrap_break_charpos = charpos;
+                        wrap_break_glyph_count = frame_glyphs.glyphs.len();
+                        wrap_has_break = true;
+                    }
                     if col >= cols {
                         if params.truncate_lines {
                             while byte_idx < bytes_read as usize {
@@ -558,12 +575,16 @@ impl LayoutEngine {
                                 if c == '\n' {
                                     col = 0;
                                     row += 1;
+                                    current_line += 1;
+                                    need_line_number = lnum_enabled;
+                                    wrap_has_break = false;
                                     break;
                                 }
                             }
                         } else {
                             col = 0;
                             row += 1;
+                            wrap_has_break = false;
                         }
                     }
                 }
@@ -596,16 +617,26 @@ impl LayoutEngine {
                                 if c == '\n' {
                                     col = 0;
                                     row += 1;
+                                    current_line += 1;
+                                    need_line_number = lnum_enabled;
+                                    wrap_has_break = false;
                                     break;
                                 }
                             }
                         } else {
                             col = 0;
                             row += 1;
+                            wrap_has_break = false;
                         }
                     }
                 }
                 _ => {
+                    // Track word-wrap breakpoints: after space/tab
+                    if params.word_wrap && (ch == ' ' || ch == '\t') {
+                        // Record break AFTER this whitespace
+                        // (will be updated after rendering below)
+                    }
+
                     // Normal character
                     let char_cols = if is_wide_char(ch) { 2 } else { 1 };
 
@@ -619,12 +650,41 @@ impl LayoutEngine {
                                 if c == '\n' {
                                     col = 0;
                                     row += 1;
+                                    current_line += 1;
+                                    need_line_number = lnum_enabled;
+                                    wrap_has_break = false;
                                     break;
                                 }
                             }
                             continue;
+                        } else if params.word_wrap && wrap_has_break && wrap_break_col > 0 {
+                            // Word-wrap: rewind to last breakpoint
+                            frame_glyphs.glyphs.truncate(wrap_break_glyph_count);
+                            // Fill from break to end of line with bg
+                            let fill_cols = cols - wrap_break_col;
+                            if fill_cols > 0 {
+                                let gx = content_x + wrap_break_col as f32 * char_w;
+                                let gy = text_y + row as f32 * char_h;
+                                frame_glyphs.add_stretch(
+                                    gx, gy,
+                                    fill_cols as f32 * char_w, char_h,
+                                    face_bg, self.face_data.face_id, false,
+                                );
+                            }
+                            // Rewind position to the break
+                            byte_idx = wrap_break_byte_idx;
+                            charpos = wrap_break_charpos;
+                            // Force face re-check since we rewound
+                            current_face_id = -1;
+                            col = 0;
+                            row += 1;
+                            wrap_has_break = false;
+                            if row >= max_rows {
+                                break;
+                            }
+                            continue;
                         } else {
-                            // Wrap: fill remaining space
+                            // Character wrap: fill remaining space
                             let remaining = (cols - col) as f32 * char_w;
                             if remaining > 0.0 {
                                 let gx = content_x + col as f32 * char_w;
@@ -633,6 +693,7 @@ impl LayoutEngine {
                             }
                             col = 0;
                             row += 1;
+                            wrap_has_break = false;
                             if row >= max_rows {
                                 break;
                             }
@@ -645,6 +706,15 @@ impl LayoutEngine {
 
                     frame_glyphs.add_char(ch, gx, gy, glyph_w, char_h, ascent, false);
                     col += char_cols;
+
+                    // Record break AFTER whitespace characters
+                    if params.word_wrap && (ch == ' ' || ch == '\t') {
+                        wrap_break_col = col;
+                        wrap_break_byte_idx = byte_idx;
+                        wrap_break_charpos = charpos;
+                        wrap_break_glyph_count = frame_glyphs.glyphs.len();
+                        wrap_has_break = true;
+                    }
                 }
             }
 
