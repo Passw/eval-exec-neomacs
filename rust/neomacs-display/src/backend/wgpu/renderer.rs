@@ -4449,6 +4449,104 @@ impl WgpuRenderer {
         self.render_overlay_glyphs(view, &mut overlay_glyphs, glyph_atlas);
     }
 
+    /// Render IME preedit text at the cursor position with underline.
+    pub fn render_ime_preedit(
+        &self,
+        view: &wgpu::TextureView,
+        preedit_text: &str,
+        cursor_x: f32,
+        cursor_y: f32,
+        cursor_height: f32,
+        glyph_atlas: &mut WgpuGlyphAtlas,
+        surface_width: u32,
+        surface_height: u32,
+    ) {
+        use wgpu::util::DeviceExt;
+
+        if preedit_text.is_empty() {
+            return;
+        }
+
+        let logical_w = surface_width as f32 / self.scale_factor;
+        let logical_h = surface_height as f32 / self.scale_factor;
+        let uniforms = Uniforms {
+            screen_size: [logical_w, logical_h],
+            _padding: [0.0, 0.0],
+        };
+        self.queue
+            .write_buffer(&self.uniform_buffer, 0, bytemuck::cast_slice(&[uniforms]));
+
+        let char_width = glyph_atlas.default_font_size() * 0.6;
+        let font_size_bits = 0.0_f32.to_bits();
+        let text_len = preedit_text.chars().count();
+        let preedit_width = text_len as f32 * char_width;
+
+        // Background and underline rects
+        let bg_color = Color::new(0.15, 0.15, 0.2, 0.95).srgb_to_linear();
+        let underline_color = Color::new(0.4, 0.6, 1.0, 1.0).srgb_to_linear();
+
+        let px = cursor_x;
+        let py = cursor_y;
+        let pw = preedit_width + 4.0;
+        let ph = cursor_height;
+
+        let mut rect_vertices: Vec<RectVertex> = Vec::new();
+        // Background
+        self.add_rect(&mut rect_vertices, px, py, pw, ph, &bg_color);
+        // Underline (2px at bottom)
+        self.add_rect(&mut rect_vertices, px, py + ph - 2.0, pw, 2.0, &underline_color);
+
+        if !rect_vertices.is_empty() {
+            let rect_buffer = self.device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+                label: Some("IME Preedit Rect Buffer"),
+                contents: bytemuck::cast_slice(&rect_vertices),
+                usage: wgpu::BufferUsages::VERTEX,
+            });
+
+            let mut encoder = self.device.create_command_encoder(&wgpu::CommandEncoderDescriptor {
+                label: Some("IME Preedit Rect Encoder"),
+            });
+            {
+                let mut pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
+                    label: Some("IME Preedit Rect Pass"),
+                    color_attachments: &[Some(wgpu::RenderPassColorAttachment {
+                        view,
+                        resolve_target: None,
+                        ops: wgpu::Operations {
+                            load: wgpu::LoadOp::Load,
+                            store: wgpu::StoreOp::Store,
+                        },
+                    })],
+                    depth_stencil_attachment: None,
+                    timestamp_writes: None,
+                    occlusion_query_set: None,
+                });
+                pass.set_pipeline(&self.rect_pipeline);
+                pass.set_bind_group(0, &self.uniform_bind_group, &[]);
+                pass.set_vertex_buffer(0, rect_buffer.slice(..));
+                pass.draw(0..rect_vertices.len() as u32, 0..1);
+            }
+            self.queue.submit(Some(encoder.finish()));
+        }
+
+        // Text glyphs
+        let text_color = {
+            let c = Color::new(1.0, 1.0, 1.0, 1.0).srgb_to_linear();
+            [c.r, c.g, c.b, c.a]
+        };
+        let mut overlay_glyphs: Vec<(GlyphKey, f32, f32, [f32; 4])> = Vec::new();
+        for (ci, ch) in preedit_text.chars().enumerate() {
+            let key = GlyphKey {
+                charcode: ch as u32,
+                face_id: 0,
+                font_size_bits,
+            };
+            glyph_atlas.get_or_create(&self.device, &self.queue, &key, None);
+            overlay_glyphs.push((key, px + 2.0 + (ci as f32) * char_width, py, text_color));
+        }
+        self.render_overlay_glyphs(view, &mut overlay_glyphs, glyph_atlas);
+    }
+
     /// Render a visual bell flash overlay (semi-transparent white rectangle fading out).
     pub fn render_visual_bell(
         &self,

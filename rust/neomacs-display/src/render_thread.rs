@@ -419,6 +419,7 @@ struct RenderApp {
     // IME state
     ime_enabled: bool,
     ime_preedit_active: bool,
+    ime_preedit_text: String,
 
     // Borderless window state
     decorations_enabled: bool,
@@ -562,6 +563,7 @@ impl RenderApp {
             visual_bell_start: None,
             ime_enabled: false,
             ime_preedit_active: false,
+            ime_preedit_text: String::new(),
             decorations_enabled: true,
             resize_edge: None,
         }
@@ -2364,6 +2366,24 @@ impl RenderApp {
             }
         }
 
+        // Render IME preedit text overlay at cursor position
+        if self.ime_preedit_active && !self.ime_preedit_text.is_empty() {
+            if let (Some(ref renderer), Some(ref mut glyph_atlas), Some(ref target)) =
+                (&self.renderer, &mut self.glyph_atlas, &self.cursor_target)
+            {
+                renderer.render_ime_preedit(
+                    &surface_view,
+                    &self.ime_preedit_text,
+                    target.x,
+                    target.y,
+                    target.height,
+                    glyph_atlas,
+                    self.width,
+                    self.height,
+                );
+            }
+        }
+
         // Render visual bell flash overlay (above everything)
         if let Some(start) = self.visual_bell_start {
             let elapsed = start.elapsed().as_secs_f32();
@@ -2802,6 +2822,7 @@ impl ApplicationHandler for RenderApp {
                         // Track whether preedit is active to suppress
                         // raw KeyboardInput during IME composition
                         self.ime_preedit_active = !text.is_empty();
+                        self.ime_preedit_text = text.clone();
 
                         // Update IME cursor area so the OS positions the
                         // candidate window near the text cursor
@@ -2820,6 +2841,7 @@ impl ApplicationHandler for RenderApp {
                         if !text.is_empty() {
                             log::trace!("IME preedit: '{}' cursor: {:?}", text, cursor_range);
                         }
+                        self.frame_dirty = true;
                     }
                 }
             }
