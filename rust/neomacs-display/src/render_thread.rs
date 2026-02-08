@@ -411,6 +411,11 @@ struct RenderApp {
     // IME state
     ime_enabled: bool,
     ime_preedit_active: bool,
+
+    // Borderless window state
+    decorations_enabled: bool,
+    /// Resize edge under cursor (None = not on edge)
+    resize_edge: Option<winit::window::ResizeDirection>,
 }
 
 /// State for a tooltip displayed as GPU overlay
@@ -545,6 +550,8 @@ impl RenderApp {
             visual_bell_start: None,
             ime_enabled: false,
             ime_preedit_active: false,
+            decorations_enabled: true,
+            resize_edge: None,
         }
     }
 
@@ -992,6 +999,7 @@ impl RenderApp {
                     }
                 }
                 RenderCommand::SetWindowDecorated { decorated } => {
+                    self.decorations_enabled = decorated;
                     if let Some(ref window) = self.window {
                         window.set_decorations(decorated);
                     }
@@ -2413,6 +2421,37 @@ impl RenderApp {
             _ => 0,
         }
     }
+
+    /// Detect if the mouse is on a resize edge of a borderless window.
+    /// Returns the resize direction if within the border zone, or None.
+    fn detect_resize_edge(
+        &self,
+        x: f32,
+        y: f32,
+    ) -> Option<winit::window::ResizeDirection> {
+        use winit::window::ResizeDirection;
+        if self.decorations_enabled {
+            return None;
+        }
+        let w = self.width as f32;
+        let h = self.height as f32;
+        let border = 5.0_f32;
+        let on_left = x < border;
+        let on_right = x >= w - border;
+        let on_top = y < border;
+        let on_bottom = y >= h - border;
+        match (on_left, on_right, on_top, on_bottom) {
+            (true, _, true, _) => Some(ResizeDirection::NorthWest),
+            (_, true, true, _) => Some(ResizeDirection::NorthEast),
+            (true, _, _, true) => Some(ResizeDirection::SouthWest),
+            (_, true, _, true) => Some(ResizeDirection::SouthEast),
+            (true, _, _, _) => Some(ResizeDirection::West),
+            (_, true, _, _) => Some(ResizeDirection::East),
+            (_, _, true, _) => Some(ResizeDirection::North),
+            (_, _, _, true) => Some(ResizeDirection::South),
+            _ => None,
+        }
+    }
 }
 
 impl ApplicationHandler for RenderApp {
@@ -2582,6 +2621,16 @@ impl ApplicationHandler for RenderApp {
                         self.popup_menu = None;
                         self.frame_dirty = true;
                     }
+                } else if state == ElementState::Pressed
+                    && button == MouseButton::Left
+                    && self.resize_edge.is_some()
+                {
+                    // Borderless: initiate window resize drag
+                    if let Some(ref window) = self.window {
+                        let _ = window.drag_resize_window(
+                            self.resize_edge.unwrap(),
+                        );
+                    }
                 } else {
                     let btn = match button {
                         MouseButton::Left => 1,
@@ -2613,6 +2662,20 @@ impl ApplicationHandler for RenderApp {
                         window.set_cursor_visible(true);
                     }
                     self.mouse_hidden_for_typing = false;
+                }
+
+                // Borderless resize edge detection
+                let edge = self.detect_resize_edge(lx, ly);
+                if edge != self.resize_edge {
+                    self.resize_edge = edge;
+                    if let Some(ref window) = self.window {
+                        use winit::window::CursorIcon;
+                        let icon = match edge {
+                            Some(dir) => CursorIcon::from(dir),
+                            None => CursorIcon::Default,
+                        };
+                        window.set_cursor(icon);
+                    }
                 }
 
                 // Update popup menu hover state
