@@ -309,7 +309,7 @@ pub struct DisplayPropFFI {
 /// FFI-safe window parameters struct.
 /// Matches the C struct in neomacsterm.c.
 #[repr(C)]
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone)]
 pub struct WindowParamsFFI {
     /// Window pointer as i64
     pub window_id: i64,
@@ -395,6 +395,20 @@ pub struct WindowParamsFFI {
     pub cursor_in_non_selected: c_int,
     /// selective-display: 0=off, >0=hide lines indented more than N columns
     pub selective_display: c_int,
+    /// wrap-prefix: string rendered at start of continuation lines
+    pub wrap_prefix: [u8; 128],
+    pub wrap_prefix_len: c_int,
+    /// line-prefix: string rendered at start of all visual lines
+    pub line_prefix: [u8; 128],
+    pub line_prefix_len: c_int,
+}
+
+impl Default for WindowParamsFFI {
+    fn default() -> Self {
+        // Safety: All fields are either numeric types or arrays of u8,
+        // which are all valid when zeroed.
+        unsafe { std::mem::zeroed() }
+    }
 }
 
 /// FFI-safe face data struct.

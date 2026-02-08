@@ -105,6 +105,16 @@ impl LayoutEngine {
                 extra_line_spacing: wp.extra_line_spacing,
                 cursor_in_non_selected: wp.cursor_in_non_selected != 0,
                 selective_display: wp.selective_display,
+                wrap_prefix: if wp.wrap_prefix_len > 0 {
+                    wp.wrap_prefix[..wp.wrap_prefix_len as usize].to_vec()
+                } else {
+                    Vec::new()
+                },
+                line_prefix: if wp.line_prefix_len > 0 {
+                    wp.line_prefix[..wp.line_prefix_len as usize].to_vec()
+                } else {
+                    Vec::new()
+                },
             };
 
             // Add window background
@@ -380,6 +390,9 @@ impl LayoutEngine {
         let mut wrap_break_glyph_count = 0usize;
         let mut wrap_has_break = false;
 
+        // Line/wrap prefix tracking: 0=none, 1=line_prefix, 2=wrap_prefix
+        let mut need_prefix: u8 = if !params.line_prefix.is_empty() { 1 } else { 0 };
+
         while byte_idx < bytes_read as usize && row < max_rows {
             // Render line number at the start of each new row
             if need_line_number && lnum_enabled {
@@ -461,6 +474,36 @@ impl LayoutEngine {
                 }
 
                 need_line_number = false;
+            }
+
+            // Render line-prefix or wrap-prefix at start of visual lines
+            if need_prefix > 0 && row < max_rows {
+                let prefix_bytes = if need_prefix == 2 {
+                    &params.wrap_prefix[..]
+                } else {
+                    &params.line_prefix[..]
+                };
+
+                if !prefix_bytes.is_empty() {
+                    let mut pi = 0usize;
+                    while pi < prefix_bytes.len() {
+                        let (pch, plen) = decode_utf8(&prefix_bytes[pi..]);
+                        pi += plen;
+                        if pch == '\n' || pch == '\r' { continue; }
+
+                        let pchar_cols = if is_wide_char(pch) { 2 } else { 1 };
+                        if col + pchar_cols > cols { break; }
+
+                        let gx = content_x + col as f32 * char_w;
+                        let gy = text_y + row as f32 * char_h;
+                        frame_glyphs.add_char(
+                            pch, gx, gy, pchar_cols as f32 * char_w,
+                            char_h, ascent, false,
+                        );
+                        col += pchar_cols;
+                    }
+                }
+                need_prefix = 0;
             }
 
             // Handle hscroll: show $ indicator and skip columns
@@ -916,6 +959,7 @@ impl LayoutEngine {
                     need_line_number = lnum_enabled;
                     wrap_has_break = false;
                     hscroll_remaining = hscroll;
+                    if !params.line_prefix.is_empty() { need_prefix = 1; }
 
                     // Selective display: skip lines indented beyond threshold
                     if params.selective_display > 0 {
@@ -1013,6 +1057,7 @@ impl LayoutEngine {
                                 row_continuation[row as usize] = true;
                             }
                             wrap_has_break = false;
+                            if !params.wrap_prefix.is_empty() { need_prefix = 2; }
                         }
                     }
                 }
@@ -1162,6 +1207,7 @@ impl LayoutEngine {
                                 row_continuation[row as usize] = true;
                             }
                             wrap_has_break = false;
+                            if !params.wrap_prefix.is_empty() { need_prefix = 2; }
                             if row >= max_rows {
                                 break;
                             }
@@ -1183,6 +1229,7 @@ impl LayoutEngine {
                                 row_continuation[row as usize] = true;
                             }
                             wrap_has_break = false;
+                            if !params.wrap_prefix.is_empty() { need_prefix = 2; }
                             if row >= max_rows {
                                 break;
                             }

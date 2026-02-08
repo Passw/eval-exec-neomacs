@@ -207,6 +207,10 @@ pub struct WindowParams {
     pub cursor_in_non_selected: bool,
     /// selective-display: 0=off, >0=hide lines indented more than N columns
     pub selective_display: i32,
+    /// wrap-prefix: bytes rendered at start of continuation lines
+    pub wrap_prefix: Vec<u8>,
+    /// line-prefix: bytes rendered at start of all visual lines
+    pub line_prefix: Vec<u8>,
 }
 
 /// Frame-level parameters for layout.

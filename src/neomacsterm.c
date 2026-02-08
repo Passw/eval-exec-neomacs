@@ -1142,6 +1142,12 @@ struct neomacs_window_params_ffi {
   int cursor_in_non_selected;
   /* selective-display: 0=off, >0=hide lines indented more than N columns */
   int selective_display;
+  /* wrap-prefix: string rendered at start of continuation lines */
+  uint8_t wrap_prefix[128];
+  int wrap_prefix_len;
+  /* line-prefix: string rendered at start of all visual lines */
+  uint8_t line_prefix[128];
+  int line_prefix_len;
 };
 
 /* Get window parameters for the Nth leaf window.
@@ -1397,6 +1403,26 @@ neomacs_layout_get_window_params (void *frame_ptr, int window_index,
       Lisp_Object sd = BVAR (XBUFFER (w->contents), selective_display);
       if (FIXNUMP (sd) && XFIXNUM (sd) > 0)
         params->selective_display = (int) XFIXNUM (sd);
+    }
+
+  /* wrap-prefix and line-prefix (global variables, may also be per-char props) */
+  params->wrap_prefix_len = 0;
+  params->line_prefix_len = 0;
+  if (!NILP (Vwrap_prefix) && STRINGP (Vwrap_prefix))
+    {
+      ptrdiff_t len = SBYTES (Vwrap_prefix);
+      ptrdiff_t copy_len = len < 127 ? len : 127;
+      memcpy (params->wrap_prefix, SDATA (Vwrap_prefix), copy_len);
+      params->wrap_prefix[copy_len] = 0;
+      params->wrap_prefix_len = (int) copy_len;
+    }
+  if (!NILP (Vline_prefix) && STRINGP (Vline_prefix))
+    {
+      ptrdiff_t len = SBYTES (Vline_prefix);
+      ptrdiff_t copy_len = len < 127 ? len : 127;
+      memcpy (params->line_prefix, SDATA (Vline_prefix), copy_len);
+      params->line_prefix[copy_len] = 0;
+      params->line_prefix_len = (int) copy_len;
     }
 
   return 0;
