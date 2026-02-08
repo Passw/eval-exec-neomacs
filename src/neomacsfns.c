@@ -186,13 +186,48 @@ neomacs_set_mouse_color (struct frame *f, Lisp_Object arg, Lisp_Object oldval)
 static void
 neomacs_set_border_color (struct frame *f, Lisp_Object arg, Lisp_Object oldval)
 {
-  /* Border color - not used in Neomacs currently */
+  unsigned long pixel;
+
+  CHECK_STRING (arg);
+  pixel = x_decode_color (f, arg, BLACK_PIX_DEFAULT (f));
+  f->output_data.neomacs->border_pixel = pixel;
 }
 
 static void
 neomacs_set_menu_bar_lines (struct frame *f, Lisp_Object value, Lisp_Object oldval)
 {
-  /* Menu bar lines - not implemented yet */
+  int nlines;
+
+  if (FRAME_MINIBUF_ONLY_P (f) || FRAME_PARENT_FRAME (f))
+    return;
+
+  if (TYPE_RANGED_FIXNUMP (int, value))
+    nlines = XFIXNUM (value);
+  else
+    nlines = 0;
+
+  fset_redisplay (f);
+
+  /* Neomacs uses GPU rendering without a separate menu bar widget.
+     Set the frame state so Emacs knows the menu bar configuration,
+     but actual rendering goes through the internal menu bar face.  */
+  FRAME_MENU_BAR_LINES (f) = 0;
+  FRAME_MENU_BAR_HEIGHT (f) = 0;
+
+  if (nlines > 0)
+    {
+      FRAME_EXTERNAL_MENU_BAR (f) = 1;
+      if (FRAME_NEOMACS_P (f) && !FRAME_TOOLTIP_P (f))
+	{
+	  XWINDOW (FRAME_SELECTED_WINDOW (f))->update_mode_line = true;
+	}
+    }
+  else
+    {
+      FRAME_EXTERNAL_MENU_BAR (f) = 0;
+    }
+
+  adjust_frame_glyphs (f);
 }
 
 static void
@@ -289,7 +324,39 @@ neomacs_change_tab_bar_height (struct frame *f, int height)
 static void
 neomacs_set_tool_bar_lines (struct frame *f, Lisp_Object value, Lisp_Object oldval)
 {
-  /* Tool bar lines - not implemented yet */
+  int nlines;
+
+  if (FRAME_MINIBUF_ONLY_P (f))
+    {
+      f->tool_bar_resized = true;
+      return;
+    }
+
+  if (RANGED_FIXNUMP (0, value, INT_MAX))
+    nlines = XFIXNAT (value);
+  else
+    nlines = 0;
+
+  fset_redisplay (f);
+
+  /* Neomacs uses GPU rendering without a separate tool bar widget.
+     Set frame state so Emacs knows tool bar configuration.  */
+  FRAME_TOOL_BAR_LINES (f) = 0;
+  FRAME_TOOL_BAR_HEIGHT (f) = 0;
+
+  if (nlines > 0)
+    {
+      FRAME_EXTERNAL_TOOL_BAR (f) = true;
+      if (FRAME_NEOMACS_P (f) && !FRAME_TOOLTIP_P (f))
+	XWINDOW (FRAME_SELECTED_WINDOW (f))->update_mode_line = true;
+    }
+  else
+    {
+      FRAME_EXTERNAL_TOOL_BAR (f) = false;
+      f->tool_bar_resized = true;
+    }
+
+  adjust_frame_glyphs (f);
 }
 
 static void
@@ -344,13 +411,29 @@ neomacs_explicitly_set_name (struct frame *f, Lisp_Object arg, Lisp_Object oldva
 static void
 neomacs_set_icon_name (struct frame *f, Lisp_Object arg, Lisp_Object oldval)
 {
-  /* Icon name - not implemented yet */
+  if (STRINGP (arg))
+    {
+      if (STRINGP (oldval) && EQ (Fstring_equal (oldval, arg), Qt))
+	return;
+    }
+  else if (!STRINGP (oldval) && NILP (oldval) == NILP (arg))
+    return;
+
+  fset_icon_name (f, arg);
 }
 
 static void
 neomacs_set_icon_type (struct frame *f, Lisp_Object arg, Lisp_Object oldval)
 {
-  /* Icon type - not implemented yet */
+  /* Wayland doesn't use bitmap icons (icons come from desktop files),
+     so this is intentionally a no-op.  Just store if provided.  */
+  if (STRINGP (arg))
+    {
+      if (STRINGP (oldval) && EQ (Fstring_equal (oldval, arg), Qt))
+	return;
+    }
+  else if (!STRINGP (oldval) && NILP (oldval) == NILP (arg))
+    return;
 }
 
 /* Change the title of frame F to NAME.
@@ -400,13 +483,16 @@ neomacs_set_scroll_bar_background (struct frame *f, Lisp_Object arg,
 static void
 neomacs_set_sticky (struct frame *f, Lisp_Object arg, Lisp_Object oldval)
 {
-  /* Sticky - not implemented yet */
+  /* Sticky (show on all workspaces) requires compositor protocol support
+     (e.g., wl_surface_set_sticky or _NET_WM_STATE_STICKY on X11).
+     Not available through winit currently.  */
 }
 
 static void
 neomacs_set_tool_bar_position (struct frame *f, Lisp_Object arg, Lisp_Object oldval)
 {
-  /* Tool bar position - not implemented yet */
+  /* Neomacs uses external tool bar (rendered by toolkit), so position
+     is not applicable.  PGTK also does not implement this.  */
 }
 
 static void
@@ -425,13 +511,42 @@ neomacs_set_undecorated (struct frame *f, Lisp_Object arg, Lisp_Object oldval)
 static void
 neomacs_set_parent_frame (struct frame *f, Lisp_Object arg, Lisp_Object oldval)
 {
-  /* Parent frame - not implemented yet */
+  struct frame *p = NULL;
+
+  if (!NILP (arg))
+    {
+      CHECK_FRAME (arg);
+      p = XFRAME (arg);
+
+      if (!FRAME_LIVE_P (p))
+	{
+	  store_frame_param (f, Qparent_frame, oldval);
+	  error ("Parent frame is not live");
+	}
+
+      if (!FRAME_NEOMACS_P (p))
+	{
+	  store_frame_param (f, Qparent_frame, oldval);
+	  error ("Parent frame is not a neomacs frame");
+	}
+    }
+
+  if (p != FRAME_PARENT_FRAME (f))
+    {
+      fset_parent_frame (f, arg);
+      /* Actual window reparenting would require compositor support.
+	 For now, just store the parent relationship for Emacs internals.  */
+    }
 }
 
 static void
 neomacs_set_skip_taskbar (struct frame *f, Lisp_Object arg, Lisp_Object oldval)
 {
-  /* Skip taskbar - not implemented yet */
+  if (!EQ (arg, oldval))
+    {
+      FRAME_SKIP_TASKBAR (f) = !NILP (arg);
+      /* Actual WM hint would require compositor protocol support.  */
+    }
 }
 
 static void

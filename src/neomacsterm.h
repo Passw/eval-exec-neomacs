@@ -217,6 +217,7 @@ struct neomacs_output
   /* The frame's current background color */
   unsigned long background_pixel;
   unsigned long foreground_pixel;
+  unsigned long border_pixel;
 
   /* Cursor colors */
   unsigned long cursor_pixel;
