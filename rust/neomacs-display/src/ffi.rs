@@ -2985,6 +2985,24 @@ pub unsafe extern "C" fn neomacs_display_set_window_content_shadow(
     }
 }
 
+/// Configure smooth window padding transition on resize
+#[no_mangle]
+pub unsafe extern "C" fn neomacs_display_set_resize_padding(
+    _handle: *mut NeomacsDisplay,
+    enabled: c_int,
+    duration_ms: c_int,
+    max_padding: c_int,
+) {
+    let cmd = RenderCommand::SetResizePadding {
+        enabled: enabled != 0,
+        duration_ms: duration_ms as u32,
+        max_padding: max_padding as f32,
+    };
+    if let Some(ref state) = THREADED_STATE {
+        let _ = state.emacs_comms.cmd_tx.try_send(cmd);
+    }
+}
+
 /// Configure cursor error pulse (brief color flash on bell)
 #[no_mangle]
 pub unsafe extern "C" fn neomacs_display_set_cursor_error_pulse(

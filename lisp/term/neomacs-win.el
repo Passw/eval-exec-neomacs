@@ -1778,6 +1778,53 @@ are visible, creating a depth/raised pane illusion."
                 neomacs-window-content-shadow-size nil)
             val))))
 
+;; --- Resize padding transition ---
+
+(declare-function neomacs-set-resize-padding "neomacsterm.c"
+  (&optional enabled duration-ms max-padding))
+
+(defcustom neomacs-resize-padding nil
+  "Enable smooth window padding transition on frame resize.
+Non-nil draws a temporary visual padding overlay at window edges
+during frame resize that eases to zero, creating a smooth transition."
+  :type 'boolean
+  :group 'frames
+  :set (lambda (sym val)
+         (set-default sym val)
+         (when (fboundp 'neomacs-set-resize-padding)
+           (neomacs-set-resize-padding val
+            (if (boundp 'neomacs-resize-padding-duration)
+                neomacs-resize-padding-duration nil)
+            (if (boundp 'neomacs-resize-padding-max)
+                neomacs-resize-padding-max nil)))))
+
+(defcustom neomacs-resize-padding-duration 200
+  "Resize padding transition duration in milliseconds."
+  :type '(integer :tag "Duration (ms)")
+  :group 'frames
+  :set (lambda (sym val)
+         (set-default sym val)
+         (when (and (fboundp 'neomacs-set-resize-padding)
+                    (boundp 'neomacs-resize-padding)
+                    neomacs-resize-padding)
+           (neomacs-set-resize-padding t val
+            (if (boundp 'neomacs-resize-padding-max)
+                neomacs-resize-padding-max nil)))))
+
+(defcustom neomacs-resize-padding-max 12
+  "Maximum extra padding in pixels at start of resize transition."
+  :type '(integer :tag "Max padding (px)")
+  :group 'frames
+  :set (lambda (sym val)
+         (set-default sym val)
+         (when (and (fboundp 'neomacs-set-resize-padding)
+                    (boundp 'neomacs-resize-padding)
+                    neomacs-resize-padding)
+           (neomacs-set-resize-padding t
+            (if (boundp 'neomacs-resize-padding-duration)
+                neomacs-resize-padding-duration nil)
+            val))))
+
 ;; --- Cursor error pulse ---
 (declare-function neomacs-set-cursor-error-pulse "neomacsterm.c"
   (&optional enabled color duration-ms))

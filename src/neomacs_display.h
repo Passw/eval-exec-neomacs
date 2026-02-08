@@ -1473,6 +1473,12 @@ void neomacs_display_set_window_content_shadow(
     int size,
     int opacity);
 
+void neomacs_display_set_resize_padding(
+    struct NeomacsDisplay *handle,
+    int enabled,
+    int duration_ms,
+    int max_padding);
+
 void neomacs_display_set_cursor_error_pulse(
     struct NeomacsDisplay *handle,
     int enabled,

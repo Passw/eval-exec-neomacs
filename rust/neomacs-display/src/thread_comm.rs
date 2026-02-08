@@ -600,6 +600,14 @@ pub enum RenderCommand {
         /// Shadow opacity 0.0-1.0
         opacity: f32,
     },
+    /// Configure smooth window padding transition on resize
+    SetResizePadding {
+        enabled: bool,
+        /// Transition duration in milliseconds
+        duration_ms: u32,
+        /// Maximum extra padding in pixels at start of transition
+        max_padding: f32,
+    },
     /// Configure cursor error pulse (brief color flash on bell)
     SetCursorErrorPulse {
         enabled: bool,

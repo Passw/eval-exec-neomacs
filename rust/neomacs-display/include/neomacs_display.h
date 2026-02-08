@@ -1467,6 +1467,14 @@ void neomacs_display_set_window_content_shadow(struct NeomacsDisplay *handle,
                                                int opacity);
 
 /**
+ * Configure smooth window padding transition on resize
+ */
+void neomacs_display_set_resize_padding(struct NeomacsDisplay *handle,
+                                        int enabled,
+                                        int durationMs,
+                                        int maxPadding);
+
+/**
  * Configure cursor error pulse (brief color flash on bell)
  */
 void neomacs_display_set_cursor_error_pulse(struct NeomacsDisplay *handle,

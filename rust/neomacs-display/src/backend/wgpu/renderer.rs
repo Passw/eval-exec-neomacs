@@ -264,6 +264,11 @@ pub struct WgpuRenderer {
     window_content_shadow_enabled: bool,
     window_content_shadow_size: f32,
     window_content_shadow_opacity: f32,
+    /// Smooth window padding transition on resize
+    resize_padding_enabled: bool,
+    resize_padding_duration_ms: u32,
+    resize_padding_max: f32,
+    resize_padding_started: Option<std::time::Instant>,
     /// Cursor error pulse (brief color flash on bell)
     cursor_error_pulse_enabled: bool,
     cursor_error_pulse_color: (f32, f32, f32),
@@ -957,6 +962,10 @@ impl WgpuRenderer {
             window_content_shadow_enabled: false,
             window_content_shadow_size: 6.0,
             window_content_shadow_opacity: 0.15,
+            resize_padding_enabled: false,
+            resize_padding_duration_ms: 200,
+            resize_padding_max: 12.0,
+            resize_padding_started: None,
             cursor_error_pulse_enabled: false,
             cursor_error_pulse_color: (1.0, 0.2, 0.2),
             cursor_error_pulse_duration_ms: 250,
@@ -1210,6 +1219,34 @@ impl WgpuRenderer {
         self.window_content_shadow_enabled = enabled;
         self.window_content_shadow_size = size;
         self.window_content_shadow_opacity = opacity;
+    }
+
+    /// Update resize padding config
+    pub fn set_resize_padding(&mut self, enabled: bool, duration_ms: u32, max_padding: f32) {
+        self.resize_padding_enabled = enabled;
+        self.resize_padding_duration_ms = duration_ms;
+        self.resize_padding_max = max_padding;
+    }
+
+    /// Trigger resize padding animation
+    pub fn trigger_resize_padding(&mut self, now: std::time::Instant) {
+        self.resize_padding_started = Some(now);
+    }
+
+    /// Get current resize padding amount (eases from max to 0)
+    fn resize_padding_amount(&self) -> f32 {
+        if let Some(started) = self.resize_padding_started {
+            let elapsed = started.elapsed().as_millis() as f32;
+            let duration = self.resize_padding_duration_ms as f32;
+            if elapsed >= duration {
+                return 0.0;
+            }
+            let t = elapsed / duration;
+            let ease = t * (2.0 - t); // quadratic ease-out
+            self.resize_padding_max * (1.0 - ease)
+        } else {
+            0.0
+        }
     }
 
     /// Update cursor error pulse config
@@ -5209,6 +5246,43 @@ impl WgpuRenderer {
                     render_pass.set_bind_group(0, &self.uniform_bind_group, &[]);
                     render_pass.set_vertex_buffer(0, shadow_buffer.slice(..));
                     render_pass.draw(0..shadow_vertices.len() as u32, 0..1);
+                }
+            }
+
+            // === Resize padding transition overlay ===
+            {
+                let pad = self.resize_padding_amount();
+                if pad > 0.5 {
+                    let bg = &frame_glyphs.background;
+                    // Opaque background-colored rectangles at inner edges of each window
+                    let mut pad_vertices: Vec<RectVertex> = Vec::new();
+                    for info in &frame_glyphs.window_infos {
+                        let b = &info.bounds;
+                        // Top edge
+                        self.add_rect(&mut pad_vertices, b.x, b.y, b.width, pad, bg);
+                        // Bottom edge (above mode-line)
+                        let content_bottom = b.y + b.height - info.mode_line_height;
+                        self.add_rect(&mut pad_vertices, b.x, content_bottom - pad, b.width, pad, bg);
+                        // Left edge
+                        self.add_rect(&mut pad_vertices, b.x, b.y, pad, b.height - info.mode_line_height, bg);
+                        // Right edge
+                        self.add_rect(&mut pad_vertices, b.x + b.width - pad, b.y, pad, b.height - info.mode_line_height, bg);
+                    }
+                    if !pad_vertices.is_empty() {
+                        let pad_buffer = self.device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+                            label: Some("Resize Padding Buffer"),
+                            contents: bytemuck::cast_slice(&pad_vertices),
+                            usage: wgpu::BufferUsages::VERTEX,
+                        });
+                        render_pass.set_pipeline(&self.rect_pipeline);
+                        render_pass.set_bind_group(0, &self.uniform_bind_group, &[]);
+                        render_pass.set_vertex_buffer(0, pad_buffer.slice(..));
+                        render_pass.draw(0..pad_vertices.len() as u32, 0..1);
+                    }
+                    self.needs_continuous_redraw = true;
+                } else if self.resize_padding_started.is_some() {
+                    // Animation complete, clean up
+                    self.resize_padding_started = None;
                 }
             }
 

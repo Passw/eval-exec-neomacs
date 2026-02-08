@@ -775,6 +775,10 @@ struct RenderApp {
     window_content_shadow_enabled: bool,
     window_content_shadow_size: f32,
     window_content_shadow_opacity: f32,
+    /// Smooth window padding transition on resize
+    resize_padding_enabled: bool,
+    resize_padding_duration_ms: u32,
+    resize_padding_max: f32,
     /// Cursor error pulse (brief color flash on bell)
     cursor_error_pulse_enabled: bool,
     cursor_error_pulse_color: (f32, f32, f32),
@@ -1096,6 +1100,9 @@ impl RenderApp {
             window_content_shadow_enabled: false,
             window_content_shadow_size: 6.0,
             window_content_shadow_opacity: 0.15,
+            resize_padding_enabled: false,
+            resize_padding_duration_ms: 200,
+            resize_padding_max: 12.0,
             cursor_error_pulse_enabled: false,
             cursor_error_pulse_color: (1.0, 0.2, 0.2),
             cursor_error_pulse_duration_ms: 250,
@@ -1310,6 +1317,13 @@ impl RenderApp {
         // Cancel active transitions (they reference old-sized textures)
         self.crossfades.clear();
         self.scroll_slides.clear();
+
+        // Trigger resize padding transition
+        if self.resize_padding_enabled {
+            if let Some(renderer) = self.renderer.as_mut() {
+                renderer.trigger_resize_padding(std::time::Instant::now());
+            }
+        }
 
         // Force immediate re-render with old frame at new surface size.
         // Ensures the window always shows content during resize
@@ -2170,6 +2184,15 @@ impl RenderApp {
                     self.window_content_shadow_opacity = opacity;
                     if let Some(renderer) = self.renderer.as_mut() {
                         renderer.set_window_content_shadow(enabled, size, opacity);
+                    }
+                    self.frame_dirty = true;
+                }
+                RenderCommand::SetResizePadding { enabled, duration_ms, max_padding } => {
+                    self.resize_padding_enabled = enabled;
+                    self.resize_padding_duration_ms = duration_ms;
+                    self.resize_padding_max = max_padding;
+                    if let Some(renderer) = self.renderer.as_mut() {
+                        renderer.set_resize_padding(enabled, duration_ms, max_padding);
                     }
                     self.frame_dirty = true;
                 }
