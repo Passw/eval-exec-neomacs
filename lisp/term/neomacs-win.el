@@ -1506,6 +1506,34 @@ activity, then smoothly restores brightness on any input."
                     neomacs-idle-dim)
            (neomacs-set-idle-dim t nil nil val))))
 
+;; --- Window background tint based on file type ---
+(declare-function neomacs-set-window-mode-tint "neomacsterm.c"
+  (&optional enabled opacity))
+
+(defcustom neomacs-window-mode-tint nil
+  "Enable window background tint based on file type.
+Non-nil applies a subtle background color tint to each window based
+on the file extension of its buffer."
+  :type 'boolean
+  :group 'frames
+  :set (lambda (sym val)
+         (set-default sym val)
+         (when (fboundp 'neomacs-set-window-mode-tint)
+           (neomacs-set-window-mode-tint val
+            (if (boundp 'neomacs-window-mode-tint-opacity)
+                neomacs-window-mode-tint-opacity nil)))))
+
+(defcustom neomacs-window-mode-tint-opacity 3
+  "Tint intensity for file-type background coloring (0-100)."
+  :type '(integer :tag "Opacity")
+  :group 'frames
+  :set (lambda (sym val)
+         (set-default sym val)
+         (when (and (fboundp 'neomacs-set-window-mode-tint)
+                    (boundp 'neomacs-window-mode-tint)
+                    neomacs-window-mode-tint)
+           (neomacs-set-window-mode-tint t val))))
+
 ;; --- Window watermark for empty buffers ---
 (declare-function neomacs-set-window-watermark "neomacsterm.c"
   (&optional enabled opacity threshold))

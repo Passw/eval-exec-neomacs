@@ -8690,6 +8690,28 @@ FADE-MS is the fade transition duration in milliseconds (default 500).  */)
   return on ? Qt : Qnil;
 }
 
+DEFUN ("neomacs-set-window-mode-tint",
+       Fneomacs_set_window_mode_tint,
+       Sneomacs_set_window_mode_tint, 0, 2, 0,
+       doc: /* Configure window background tint based on file type.
+ENABLED non-nil applies a subtle background color tint to each window
+based on the file extension of its buffer, providing a visual cue for
+the type of file being edited.
+OPACITY is 0-100 for tint intensity (default 3).  */)
+  (Lisp_Object enabled, Lisp_Object opacity)
+{
+  struct neomacs_display_info *dpyinfo = neomacs_display_list;
+  if (!dpyinfo || !dpyinfo->display_handle)
+    return Qnil;
+
+  int on = !NILP (enabled);
+  int op = 3;
+  if (FIXNUMP (opacity)) op = XFIXNUM (opacity);
+
+  neomacs_display_set_window_mode_tint (dpyinfo->display_handle, on, op);
+  return on ? Qt : Qnil;
+}
+
 DEFUN ("neomacs-set-window-watermark",
        Fneomacs_set_window_watermark,
        Sneomacs_set_window_watermark, 0, 3, 0,
@@ -10230,6 +10252,7 @@ syms_of_neomacsterm (void)
   defsubr (&Sneomacs_set_padding_gradient);
   defsubr (&Sneomacs_set_noise_grain);
   defsubr (&Sneomacs_set_idle_dim);
+  defsubr (&Sneomacs_set_window_mode_tint);
   defsubr (&Sneomacs_set_window_watermark);
   defsubr (&Sneomacs_set_cursor_trail_fade);
   defsubr (&Sneomacs_set_region_glow);

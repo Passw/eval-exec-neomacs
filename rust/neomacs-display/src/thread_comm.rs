@@ -496,6 +496,12 @@ pub enum RenderCommand {
         /// Width of gradient in pixels
         width: f32,
     },
+    /// Configure window background tint based on file type
+    SetWindowModeTint {
+        enabled: bool,
+        /// Tint opacity (0.0-1.0)
+        opacity: f32,
+    },
     /// Configure window watermark for empty/small buffers
     SetWindowWatermark {
         enabled: bool,

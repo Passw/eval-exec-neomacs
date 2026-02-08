@@ -1430,6 +1430,11 @@ void neomacs_display_set_region_glow(
     int radius,
     int opacity);
 
+void neomacs_display_set_window_mode_tint(
+    struct NeomacsDisplay *handle,
+    int enabled,
+    int opacity);
+
 void neomacs_display_set_window_watermark(
     struct NeomacsDisplay *handle,
     int enabled,

@@ -176,6 +176,9 @@ pub struct WgpuRenderer {
     cursor_trail_fade_duration: std::time::Duration,
     cursor_trail_positions: Vec<(f32, f32, f32, f32, std::time::Instant)>,
     cursor_trail_last_pos: (f32, f32),
+    /// Window background tint based on file type
+    window_mode_tint_enabled: bool,
+    window_mode_tint_opacity: f32,
     /// Window watermark for empty buffers
     window_watermark_enabled: bool,
     window_watermark_opacity: f32,
@@ -796,6 +799,8 @@ impl WgpuRenderer {
             cursor_trail_fade_duration: std::time::Duration::from_millis(300),
             cursor_trail_positions: Vec::new(),
             cursor_trail_last_pos: (0.0, 0.0),
+            window_mode_tint_enabled: false,
+            window_mode_tint_opacity: 0.03,
             window_watermark_enabled: false,
             window_watermark_opacity: 0.08,
             window_watermark_threshold: 10,
@@ -1001,6 +1006,12 @@ impl WgpuRenderer {
     pub fn set_accent_strip(&mut self, enabled: bool, width: f32) {
         self.accent_strip_enabled = enabled;
         self.accent_strip_width = width;
+    }
+
+    /// Update window mode tint config
+    pub fn set_window_mode_tint(&mut self, enabled: bool, opacity: f32) {
+        self.window_mode_tint_enabled = enabled;
+        self.window_mode_tint_opacity = opacity;
     }
 
     /// Update window watermark config
@@ -3503,6 +3514,39 @@ impl WgpuRenderer {
                     render_pass.set_bind_group(0, &self.uniform_bind_group, &[]);
                     render_pass.set_vertex_buffer(0, strip_buffer.slice(..));
                     render_pass.draw(0..strip_vertices.len() as u32, 0..1);
+                }
+            }
+
+            // === Window background tint based on file type ===
+            if self.window_mode_tint_enabled {
+                let tint_alpha = self.window_mode_tint_opacity.clamp(0.0, 1.0);
+                let mut tint_vertices: Vec<RectVertex> = Vec::new();
+
+                for info in &frame_glyphs.window_infos {
+                    if info.is_minibuffer { continue; }
+                    let b = &info.bounds;
+                    let content_h = b.height - info.mode_line_height;
+                    if content_h <= 0.0 { continue; }
+
+                    let ext = info.buffer_file_name.rsplit('.').next().unwrap_or("");
+                    if ext.is_empty() || ext == info.buffer_file_name { continue; }
+                    let (r, g, b_col) = Self::extension_to_color(ext);
+                    let c = Color::new(r, g, b_col, tint_alpha);
+                    self.add_rect(&mut tint_vertices, b.x, b.y, b.width, content_h, &c);
+                }
+
+                if !tint_vertices.is_empty() {
+                    let tint_buffer = self.device.create_buffer_init(
+                        &wgpu::util::BufferInitDescriptor {
+                            label: Some("Mode Tint Buffer"),
+                            contents: bytemuck::cast_slice(&tint_vertices),
+                            usage: wgpu::BufferUsages::VERTEX,
+                        },
+                    );
+                    render_pass.set_pipeline(&self.rect_pipeline);
+                    render_pass.set_bind_group(0, &self.uniform_bind_group, &[]);
+                    render_pass.set_vertex_buffer(0, tint_buffer.slice(..));
+                    render_pass.draw(0..tint_vertices.len() as u32, 0..1);
                 }
             }
 

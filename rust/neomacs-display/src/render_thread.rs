@@ -739,6 +739,9 @@ struct RenderApp {
     cursor_trail_fade_enabled: bool,
     cursor_trail_fade_length: u32,
     cursor_trail_fade_ms: u32,
+    /// Window background tint based on file type
+    window_mode_tint_enabled: bool,
+    window_mode_tint_opacity: f32,
     /// Window watermark for empty buffers
     window_watermark_enabled: bool,
     window_watermark_opacity: f32,
@@ -1025,6 +1028,8 @@ impl RenderApp {
             cursor_trail_fade_enabled: false,
             cursor_trail_fade_length: 8,
             cursor_trail_fade_ms: 300,
+            window_mode_tint_enabled: false,
+            window_mode_tint_opacity: 0.03,
             window_watermark_enabled: false,
             window_watermark_opacity: 0.08,
             window_watermark_threshold: 10,
@@ -2006,6 +2011,14 @@ impl RenderApp {
                     self.cursor_trail_fade_ms = fade_ms;
                     if let Some(renderer) = self.renderer.as_mut() {
                         renderer.set_cursor_trail_fade(enabled, length as usize, fade_ms);
+                    }
+                    self.frame_dirty = true;
+                }
+                RenderCommand::SetWindowModeTint { enabled, opacity } => {
+                    self.window_mode_tint_enabled = enabled;
+                    self.window_mode_tint_opacity = opacity;
+                    if let Some(renderer) = self.renderer.as_mut() {
+                        renderer.set_window_mode_tint(enabled, opacity);
                     }
                     self.frame_dirty = true;
                 }

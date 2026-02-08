@@ -2801,6 +2801,22 @@ pub unsafe extern "C" fn neomacs_display_set_region_glow(
     }
 }
 
+/// Configure window background tint based on file type
+#[no_mangle]
+pub unsafe extern "C" fn neomacs_display_set_window_mode_tint(
+    _handle: *mut NeomacsDisplay,
+    enabled: c_int,
+    opacity: c_int,
+) {
+    let cmd = RenderCommand::SetWindowModeTint {
+        enabled: enabled != 0,
+        opacity: opacity as f32 / 100.0,
+    };
+    if let Some(ref state) = THREADED_STATE {
+        let _ = state.emacs_comms.cmd_tx.try_send(cmd);
+    }
+}
+
 /// Configure window watermark for empty/small buffers
 #[no_mangle]
 pub unsafe extern "C" fn neomacs_display_set_window_watermark(
