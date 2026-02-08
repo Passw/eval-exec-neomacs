@@ -1295,11 +1295,32 @@ neomacs_layout_get_window_params (void *frame_ptr, int window_index,
       params->default_bg = 0x00000000;
     }
 
-  /* Character cell dimensions */
-  params->char_width = (float) FRAME_COLUMN_WIDTH (f);
-  params->char_height = (float) FRAME_LINE_HEIGHT (f);
-  params->font_pixel_size = FRAME_FONT (f) ? (float) FRAME_FONT (f)->pixel_size : 14.0f;
-  params->font_ascent = FRAME_FONT (f) ? (float) FONT_BASE (FRAME_FONT (f)) : 12.0f;
+  /* Character cell dimensions.
+     Use the window's own default face font if available (respects
+     text-scale-mode via face-remapping-alist), otherwise fall back
+     to the frame font.  */
+  {
+    int def_face_id = lookup_basic_face (w, f, DEFAULT_FACE_ID);
+    struct face *wface = FACE_FROM_ID_OR_NULL (f, def_face_id);
+    if (wface && wface->font)
+      {
+        params->char_width = (float) wface->font->average_width;
+        int asc, desc;
+        get_font_ascent_descent (wface->font, &asc, &desc);
+        params->char_height = (float) (asc + desc);
+        params->font_pixel_size = (float) wface->font->pixel_size;
+        params->font_ascent = (float) asc;
+      }
+    else
+      {
+        params->char_width = (float) FRAME_COLUMN_WIDTH (f);
+        params->char_height = (float) FRAME_LINE_HEIGHT (f);
+        params->font_pixel_size = FRAME_FONT (f)
+          ? (float) FRAME_FONT (f)->pixel_size : 14.0f;
+        params->font_ascent = FRAME_FONT (f)
+          ? (float) FONT_BASE (FRAME_FONT (f)) : 12.0f;
+      }
+  }
 
   /* Special line heights */
   params->mode_line_height = (float) WINDOW_MODE_LINE_HEIGHT (w);
