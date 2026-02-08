@@ -284,6 +284,23 @@ SELECTION is a symbol like `CLIPBOARD' or `PRIMARY'."
       (let ((text (neomacs-primary-selection-get)))
         (and text (not (string-empty-p text))))))))
 
+;; Drag-and-drop file handling
+(require 'dnd)
+
+(defun neomacs-drag-n-drop (event)
+  "Handle a drag-n-drop EVENT by opening dropped files.
+Files are opened via the standard `dnd-protocol-alist' handlers."
+  (interactive "e")
+  (let* ((window (posn-window (event-start event)))
+         (urls (car (cdr (cdr event)))))
+    (when (windowp window)
+      (select-window window))
+    (raise-frame)
+    (when (listp urls)
+      (dnd-handle-multiple-urls window urls 'private))))
+
+(define-key special-event-map [drag-n-drop] #'neomacs-drag-n-drop)
+
 ;; Frame opacity
 (defun neomacs-set-frame-opacity (opacity &optional frame)
   "Set FRAME's background opacity to OPACITY (0.0 fully transparent, 1.0 opaque).
