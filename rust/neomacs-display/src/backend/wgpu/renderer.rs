@@ -83,6 +83,14 @@ pub struct WgpuRenderer {
     cursor_glow_radius: f32,
     /// Cursor glow peak opacity
     cursor_glow_opacity: f32,
+    /// Cursor pulse enabled (sinusoidal glow modulation)
+    cursor_pulse_enabled: bool,
+    /// Cursor pulse speed in Hz
+    cursor_pulse_speed: f32,
+    /// Cursor pulse minimum opacity multiplier (0.0-1.0)
+    cursor_pulse_min_opacity: f32,
+    /// Start time for pulse phase calculation
+    cursor_pulse_start: std::time::Instant,
 }
 
 impl WgpuRenderer {
@@ -568,6 +576,10 @@ impl WgpuRenderer {
             cursor_glow_color: (0.4, 0.6, 1.0),
             cursor_glow_radius: 30.0,
             cursor_glow_opacity: 0.15,
+            cursor_pulse_enabled: false,
+            cursor_pulse_speed: 1.0,
+            cursor_pulse_min_opacity: 0.3,
+            cursor_pulse_start: std::time::Instant::now(),
         }
     }
 
@@ -590,6 +602,13 @@ impl WgpuRenderer {
         self.cursor_glow_color = color;
         self.cursor_glow_radius = radius;
         self.cursor_glow_opacity = opacity;
+    }
+
+    /// Update cursor pulse config
+    pub fn set_cursor_pulse(&mut self, enabled: bool, speed: f32, min_opacity: f32) {
+        self.cursor_pulse_enabled = enabled;
+        self.cursor_pulse_speed = speed;
+        self.cursor_pulse_min_opacity = min_opacity;
     }
 
     /// Update visible whitespace config
@@ -1995,7 +2014,17 @@ impl WgpuRenderer {
                 if let Some((cx, cy, cw, ch)) = glow_pos {
                     let (gr, gg, gb) = self.cursor_glow_color;
                     let radius = self.cursor_glow_radius;
-                    let peak_alpha = self.cursor_glow_opacity;
+                    let mut peak_alpha = self.cursor_glow_opacity;
+
+                    // Apply pulse modulation if enabled
+                    if self.cursor_pulse_enabled {
+                        let elapsed = self.cursor_pulse_start.elapsed().as_secs_f32();
+                        let phase = elapsed * self.cursor_pulse_speed * 2.0 * std::f32::consts::PI;
+                        // Sine wave: maps [min_opacity..1.0] range
+                        let t = (phase.sin() + 1.0) / 2.0; // 0.0 to 1.0
+                        let factor = self.cursor_pulse_min_opacity + t * (1.0 - self.cursor_pulse_min_opacity);
+                        peak_alpha *= factor;
+                    }
                     let layers = (radius / 2.0).ceil() as i32;
                     let mut glow_vertices: Vec<RectVertex> = Vec::new();
 

@@ -821,6 +821,37 @@ A color string, or nil for default light blue."
               nil)
             val))))
 
+;;; Cursor pulse
+
+(declare-function neomacs-set-cursor-pulse "neomacsterm.c"
+  (&optional enabled speed))
+
+(defcustom neomacs-cursor-pulse nil
+  "Enable sinusoidal pulse animation on cursor glow.
+Non-nil modulates the cursor glow opacity with a smooth sine wave.
+Requires `neomacs-cursor-glow' to be enabled for visible effect."
+  :type 'boolean
+  :group 'frames
+  :set (lambda (sym val)
+         (set-default sym val)
+         (when (fboundp 'neomacs-set-cursor-pulse)
+           (neomacs-set-cursor-pulse
+            val
+            (if (boundp 'neomacs-cursor-pulse-speed)
+                neomacs-cursor-pulse-speed
+              nil)))))
+
+(defcustom neomacs-cursor-pulse-speed 100
+  "Cursor pulse speed (100 = 1.0 Hz, 200 = 2.0 Hz, 50 = 0.5 Hz)."
+  :type '(integer :tag "Speed")
+  :group 'frames
+  :set (lambda (sym val)
+         (set-default sym val)
+         (when (and (fboundp 'neomacs-set-cursor-pulse)
+                    (boundp 'neomacs-cursor-pulse)
+                    neomacs-cursor-pulse)
+           (neomacs-set-cursor-pulse t val))))
+
 ;; Provide the feature
 (provide 'neomacs-win)
 (provide 'term/neomacs-win)

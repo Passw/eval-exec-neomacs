@@ -2422,6 +2422,24 @@ pub unsafe extern "C" fn neomacs_display_set_cursor_glow(
     }
 }
 
+/// Configure cursor pulse animation (sinusoidal glow modulation)
+#[no_mangle]
+pub unsafe extern "C" fn neomacs_display_set_cursor_pulse(
+    _handle: *mut NeomacsDisplay,
+    enabled: c_int,
+    speed: c_int,
+    min_opacity: c_int,
+) {
+    let cmd = RenderCommand::SetCursorPulse {
+        enabled: enabled != 0,
+        speed: speed as f32 / 100.0,  // 100 = 1.0 Hz
+        min_opacity: min_opacity as f32 / 100.0,
+    };
+    if let Some(ref state) = THREADED_STATE {
+        let _ = state.emacs_comms.cmd_tx.try_send(cmd);
+    }
+}
+
 /// Configure mode-line separator style (threaded mode)
 #[no_mangle]
 pub unsafe extern "C" fn neomacs_display_set_mode_line_separator(

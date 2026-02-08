@@ -1313,6 +1313,12 @@ void neomacs_display_set_cursor_glow(
     int radius,
     int opacity);
 
+void neomacs_display_set_cursor_pulse(
+    struct NeomacsDisplay *handle,
+    int enabled,
+    int speed,
+    int min_opacity);
+
 void neomacs_display_set_mode_line_separator(
     struct NeomacsDisplay *handle,
     int style,

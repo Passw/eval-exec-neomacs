@@ -8127,6 +8127,35 @@ Optional RADIUS is the glow radius in pixels (default 30).  */)
   return on ? Qt : Qnil;
 }
 
+DEFUN ("neomacs-set-cursor-pulse",
+       Fneomacs_set_cursor_pulse,
+       Sneomacs_set_cursor_pulse, 0, 2, 0,
+       doc: /* Configure cursor pulse animation.
+ENABLED non-nil enables sinusoidal glow modulation on idle cursor.
+Optional SPEED is the pulse frequency as integer (100 = 1.0 Hz, default 100).
+Requires cursor glow to be enabled for visible effect.  */)
+  (Lisp_Object enabled, Lisp_Object speed)
+{
+  struct neomacs_display_info *dpyinfo = neomacs_display_list;
+  if (!dpyinfo || !dpyinfo->display_handle)
+    return Qnil;
+
+  int on = !NILP (enabled);
+  int spd = 100;  /* 1.0 Hz */
+  int min_opacity = 30;  /* 0.3 */
+
+  if (FIXNUMP (speed))
+    {
+      spd = (int) XFIXNUM (speed);
+      if (spd < 10) spd = 10;
+      if (spd > 500) spd = 500;
+    }
+
+  neomacs_display_set_cursor_pulse (
+    dpyinfo->display_handle, on, spd, min_opacity);
+  return on ? Qt : Qnil;
+}
+
 DEFUN ("neomacs-set-indent-guides",
        Fneomacs_set_indent_guides,
        Sneomacs_set_indent_guides, 0, 2, 0,
@@ -9451,6 +9480,7 @@ syms_of_neomacsterm (void)
   defsubr (&Sneomacs_set_inactive_dim);
   defsubr (&Sneomacs_set_mode_line_separator);
   defsubr (&Sneomacs_set_cursor_glow);
+  defsubr (&Sneomacs_set_cursor_pulse);
 
   /* Cursor blink */
   defsubr (&Sneomacs_set_cursor_blink);

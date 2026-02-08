@@ -1221,6 +1221,14 @@ void neomacs_display_set_cursor_glow(struct NeomacsDisplay *handle,
                                      int opacity);
 
 /**
+ * Configure cursor pulse animation (sinusoidal glow modulation)
+ */
+void neomacs_display_set_cursor_pulse(struct NeomacsDisplay *handle,
+                                      int enabled,
+                                      int speed,
+                                      int minOpacity);
+
+/**
  * Configure mode-line separator style (threaded mode)
  */
 void neomacs_display_set_mode_line_separator(struct NeomacsDisplay *handle,

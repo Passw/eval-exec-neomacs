@@ -663,6 +663,10 @@ struct RenderApp {
     cursor_glow_color: (f32, f32, f32),
     cursor_glow_radius: f32,
     cursor_glow_opacity: f32,
+    /// Cursor pulse animation (sinusoidal glow modulation)
+    cursor_pulse_enabled: bool,
+    cursor_pulse_speed: f32,
+    cursor_pulse_min_opacity: f32,
 }
 
 /// State for a tooltip displayed as GPU overlay
@@ -843,6 +847,9 @@ impl RenderApp {
             cursor_glow_color: (0.4, 0.6, 1.0),
             cursor_glow_radius: 30.0,
             cursor_glow_opacity: 0.15,
+            cursor_pulse_enabled: false,
+            cursor_pulse_speed: 1.0,
+            cursor_pulse_min_opacity: 0.3,
         }
     }
 
@@ -1604,6 +1611,15 @@ impl RenderApp {
                     self.cursor_glow_opacity = opacity;
                     if let Some(renderer) = self.renderer.as_mut() {
                         renderer.set_cursor_glow(enabled, (r, g, b), radius, opacity);
+                    }
+                    self.frame_dirty = true;
+                }
+                RenderCommand::SetCursorPulse { enabled, speed, min_opacity } => {
+                    self.cursor_pulse_enabled = enabled;
+                    self.cursor_pulse_speed = speed;
+                    self.cursor_pulse_min_opacity = min_opacity;
+                    if let Some(renderer) = self.renderer.as_mut() {
+                        renderer.set_cursor_pulse(enabled, speed, min_opacity);
                     }
                     self.frame_dirty = true;
                 }
@@ -3757,6 +3773,11 @@ impl ApplicationHandler for RenderApp {
 
         // Tick cursor animation
         if self.tick_cursor_animation() {
+            self.frame_dirty = true;
+        }
+
+        // Keep dirty if cursor pulse is active (needs continuous redraw)
+        if self.cursor_pulse_enabled && self.cursor_glow_enabled {
             self.frame_dirty = true;
         }
 
