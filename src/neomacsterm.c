@@ -9146,6 +9146,27 @@ OPACITY is a percentage 0-100 (default 80).  */)
   return on ? Qt : Qnil;
 }
 
+DEFUN ("neomacs-set-theme-transition",
+       Fneomacs_set_theme_transition,
+       Sneomacs_set_theme_transition, 0, 2, 0,
+       doc: /* Configure smooth theme transition.
+ENABLED non-nil crossfades the entire frame when the background color
+changes (e.g. after load-theme).
+DURATION-MS is the crossfade duration in milliseconds (default 300).  */)
+  (Lisp_Object enabled, Lisp_Object duration_ms)
+{
+  struct neomacs_display_info *dpyinfo = neomacs_display_list;
+  if (!dpyinfo || !dpyinfo->display_handle)
+    return Qnil;
+
+  int on = !NILP (enabled);
+  int dur = 300;
+  if (FIXNUMP (duration_ms)) dur = XFIXNUM (duration_ms);
+
+  neomacs_display_set_theme_transition (dpyinfo->display_handle, on, dur);
+  return on ? Qt : Qnil;
+}
+
 DEFUN ("neomacs-set-edge-snap",
        Fneomacs_set_edge_snap,
        Sneomacs_set_edge_snap, 0, 3, 0,
@@ -10777,6 +10798,7 @@ syms_of_neomacsterm (void)
   defsubr (&Sneomacs_set_edge_snap);
   defsubr (&Sneomacs_set_cursor_crosshair);
   defsubr (&Sneomacs_set_modified_indicator);
+  defsubr (&Sneomacs_set_theme_transition);
   defsubr (&Sneomacs_set_region_glow);
   defsubr (&Sneomacs_set_window_glow);
   defsubr (&Sneomacs_set_scroll_progress);

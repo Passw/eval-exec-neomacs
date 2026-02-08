@@ -1536,6 +1536,11 @@ void neomacs_display_set_modified_indicator(
     int width,
     int opacity);
 
+void neomacs_display_set_theme_transition(
+    struct NeomacsDisplay *handle,
+    int enabled,
+    int duration_ms);
+
 void neomacs_display_set_wrap_indicator(
     struct NeomacsDisplay *handle,
     int enabled,

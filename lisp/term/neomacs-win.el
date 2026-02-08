@@ -2240,6 +2240,34 @@ whose buffers have unsaved modifications."
                 neomacs-modified-indicator-width nil)
             val))))
 
+;; --- Smooth theme transition ---
+(declare-function neomacs-set-theme-transition "neomacsterm.c"
+  (&optional enabled duration-ms))
+
+(defcustom neomacs-theme-transition nil
+  "Enable smooth theme transition.
+Non-nil crossfades the entire frame when the background color changes,
+such as after calling `load-theme'."
+  :type 'boolean
+  :group 'frames
+  :set (lambda (sym val)
+         (set-default sym val)
+         (when (fboundp 'neomacs-set-theme-transition)
+           (neomacs-set-theme-transition val
+            (if (boundp 'neomacs-theme-transition-duration)
+                neomacs-theme-transition-duration nil)))))
+
+(defcustom neomacs-theme-transition-duration 300
+  "Theme transition crossfade duration in milliseconds."
+  :type '(integer :tag "Duration (ms)")
+  :group 'frames
+  :set (lambda (sym val)
+         (set-default sym val)
+         (when (and (fboundp 'neomacs-set-theme-transition)
+                    (boundp 'neomacs-theme-transition)
+                    neomacs-theme-transition)
+           (neomacs-set-theme-transition t val))))
+
 ;; --- Window edge snap indicator ---
 (declare-function neomacs-set-edge-snap "neomacsterm.c"
   (&optional enabled color duration-ms))

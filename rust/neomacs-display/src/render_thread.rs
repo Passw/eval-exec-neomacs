@@ -788,6 +788,10 @@ struct RenderApp {
     modified_indicator_color: (f32, f32, f32),
     modified_indicator_width: f32,
     modified_indicator_opacity: f32,
+    /// Theme transition (crossfade on background color change)
+    theme_transition_enabled: bool,
+    theme_transition_duration: std::time::Duration,
+    prev_background: Option<(f32, f32, f32, f32)>,
     /// Click halo effect
     click_halo_enabled: bool,
     click_halo_color: (f32, f32, f32),
@@ -1136,6 +1140,9 @@ impl RenderApp {
             modified_indicator_color: (1.0, 0.6, 0.2),
             modified_indicator_width: 3.0,
             modified_indicator_opacity: 0.8,
+            theme_transition_enabled: false,
+            theme_transition_duration: std::time::Duration::from_millis(300),
+            prev_background: None,
             click_halo_enabled: false,
             click_halo_color: (0.4, 0.6, 1.0),
             click_halo_duration_ms: 300,
@@ -2285,6 +2292,11 @@ impl RenderApp {
                     }
                     self.frame_dirty = true;
                 }
+                RenderCommand::SetThemeTransition { enabled, duration_ms } => {
+                    self.theme_transition_enabled = enabled;
+                    self.theme_transition_duration = std::time::Duration::from_millis(duration_ms as u64);
+                    self.frame_dirty = true;
+                }
                 RenderCommand::SetClickHalo { enabled, r, g, b, duration_ms, max_radius } => {
                     self.click_halo_enabled = enabled;
                     self.click_halo_color = (r, g, b);
@@ -3348,6 +3360,37 @@ impl RenderApp {
                 }
                 self.prev_selected_window_id = wid;
             }
+        }
+
+        // Detect theme change (background color changed significantly)
+        if self.theme_transition_enabled {
+            let bg = &frame.background;
+            let new_bg = (bg.r, bg.g, bg.b, bg.a);
+            if let Some(old_bg) = self.prev_background {
+                let dr = (new_bg.0 - old_bg.0).abs();
+                let dg = (new_bg.1 - old_bg.1).abs();
+                let db = (new_bg.2 - old_bg.2).abs();
+                // Threshold: any channel changed by more than ~2% means theme switch
+                if dr > 0.02 || dg > 0.02 || db > 0.02 {
+                    let full_bounds = Rect::new(0.0, 0.0, frame.width, frame.height);
+                    if !self.crossfades.contains_key(&-1) {
+                        if let Some((tex, view, bg_group)) = self.snapshot_prev_texture() {
+                            log::debug!("Starting theme transition crossfade (bg changed)");
+                            self.crossfades.insert(-1, CrossfadeTransition {
+                                started: now,
+                                duration: self.theme_transition_duration,
+                                bounds: full_bounds,
+                                effect: self.crossfade_effect,
+                                easing: self.crossfade_easing,
+                                old_texture: tex,
+                                old_view: view,
+                                old_bind_group: bg_group,
+                            });
+                        }
+                    }
+                }
+            }
+            self.prev_background = Some(new_bg);
         }
 
         // Update prev_window_infos from current frame

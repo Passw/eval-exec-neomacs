@@ -3055,6 +3055,22 @@ pub unsafe extern "C" fn neomacs_display_set_modified_indicator(
     }
 }
 
+/// Configure smooth theme transition (crossfade on background color change)
+#[no_mangle]
+pub unsafe extern "C" fn neomacs_display_set_theme_transition(
+    _handle: *mut NeomacsDisplay,
+    enabled: c_int,
+    duration_ms: c_int,
+) {
+    let cmd = RenderCommand::SetThemeTransition {
+        enabled: enabled != 0,
+        duration_ms: duration_ms as u32,
+    };
+    if let Some(ref state) = THREADED_STATE {
+        let _ = state.emacs_comms.cmd_tx.try_send(cmd);
+    }
+}
+
 /// Configure cursor click halo effect
 #[no_mangle]
 pub unsafe extern "C" fn neomacs_display_set_click_halo(

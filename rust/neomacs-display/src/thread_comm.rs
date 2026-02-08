@@ -632,6 +632,12 @@ pub enum RenderCommand {
         /// Opacity (0.0-1.0)
         opacity: f32,
     },
+    /// Configure smooth theme transition (crossfade on background color change)
+    SetThemeTransition {
+        enabled: bool,
+        /// Crossfade duration in milliseconds
+        duration_ms: u32,
+    },
     /// Configure cursor click halo effect
     SetClickHalo {
         enabled: bool,

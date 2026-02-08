@@ -1503,6 +1503,13 @@ void neomacs_display_set_modified_indicator(struct NeomacsDisplay *handle,
                                             int opacity);
 
 /**
+ * Configure smooth theme transition (crossfade on background color change)
+ */
+void neomacs_display_set_theme_transition(struct NeomacsDisplay *handle,
+                                          int enabled,
+                                          int durationMs);
+
+/**
  * Configure cursor click halo effect
  */
 void neomacs_display_set_click_halo(struct NeomacsDisplay *handle,
