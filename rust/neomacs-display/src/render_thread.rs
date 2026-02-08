@@ -680,6 +680,11 @@ struct RenderApp {
     /// Search highlight pulse
     search_pulse_enabled: bool,
     search_pulse_face_id: u32,
+    /// Background pattern (0=none, 1=dots, 2=grid, 3=crosshatch)
+    bg_pattern_style: u32,
+    bg_pattern_spacing: f32,
+    bg_pattern_color: (f32, f32, f32),
+    bg_pattern_opacity: f32,
 }
 
 /// State for a tooltip displayed as GPU overlay
@@ -872,6 +877,10 @@ impl RenderApp {
             typing_ripple_duration_ms: 300,
             search_pulse_enabled: false,
             search_pulse_face_id: 0,
+            bg_pattern_style: 0,
+            bg_pattern_spacing: 20.0,
+            bg_pattern_color: (0.5, 0.5, 0.5),
+            bg_pattern_opacity: 0.05,
         }
     }
 
@@ -1675,6 +1684,16 @@ impl RenderApp {
                     self.search_pulse_face_id = face_id;
                     if let Some(renderer) = self.renderer.as_mut() {
                         renderer.set_search_pulse(enabled, face_id);
+                    }
+                    self.frame_dirty = true;
+                }
+                RenderCommand::SetBackgroundPattern { style, spacing, r, g, b, opacity } => {
+                    self.bg_pattern_style = style;
+                    self.bg_pattern_spacing = spacing;
+                    self.bg_pattern_color = (r, g, b);
+                    self.bg_pattern_opacity = opacity;
+                    if let Some(renderer) = self.renderer.as_mut() {
+                        renderer.set_background_pattern(style, spacing, r, g, b, opacity);
                     }
                     self.frame_dirty = true;
                 }

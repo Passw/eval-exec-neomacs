@@ -8255,6 +8255,47 @@ The isearch face is resolved automatically.  */)
   return on ? Qt : Qnil;
 }
 
+DEFUN ("neomacs-set-background-pattern",
+       Fneomacs_set_background_pattern,
+       Sneomacs_set_background_pattern, 0, 4, 0,
+       doc: /* Configure background pattern rendering.
+STYLE is the pattern type: 0=none, 1=dots, 2=grid, 3=crosshatch.
+SPACING is the pixel distance between pattern elements (default 20).
+COLOR is a color string for the pattern (default \"gray50\").
+OPACITY is 0-100 for pattern opacity (default 5).  */)
+  (Lisp_Object style, Lisp_Object spacing, Lisp_Object color, Lisp_Object opacity)
+{
+  struct neomacs_display_info *dpyinfo = neomacs_display_list;
+  if (!dpyinfo || !dpyinfo->display_handle)
+    return Qnil;
+
+  int s = 0;
+  if (FIXNUMP (style))
+    s = XFIXNUM (style);
+  int sp = 20;
+  if (FIXNUMP (spacing))
+    sp = XFIXNUM (spacing);
+  int op = 5;
+  if (FIXNUMP (opacity))
+    op = XFIXNUM (opacity);
+
+  int cr = 128, cg = 128, cb = 128;
+  if (STRINGP (color))
+    {
+      Emacs_Color ec;
+      if (neomacs_defined_color (NULL, SSDATA (color), &ec, false, false))
+        {
+          cr = ec.red >> 8;
+          cg = ec.green >> 8;
+          cb = ec.blue >> 8;
+        }
+    }
+
+  neomacs_display_set_background_pattern (
+    dpyinfo->display_handle, s, sp, cr, cg, cb, op);
+  return s > 0 ? Qt : Qnil;
+}
+
 DEFUN ("neomacs-set-indent-guides",
        Fneomacs_set_indent_guides,
        Sneomacs_set_indent_guides, 0, 2, 0,
@@ -9584,6 +9625,7 @@ syms_of_neomacsterm (void)
   defsubr (&Sneomacs_set_minimap);
   defsubr (&Sneomacs_set_typing_ripple);
   defsubr (&Sneomacs_set_search_pulse);
+  defsubr (&Sneomacs_set_background_pattern);
 
   /* Cursor blink */
   defsubr (&Sneomacs_set_cursor_blink);

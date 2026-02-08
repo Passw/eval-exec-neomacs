@@ -1001,6 +1001,81 @@ the active match stand out.  Automatically activates during isearch."
   (when (fboundp 'neomacs-set-search-pulse)
     (neomacs-set-search-pulse nil)))
 
+;;; Background pattern
+
+(declare-function neomacs-set-background-pattern "neomacsterm.c"
+  (&optional style spacing color opacity))
+
+(defcustom neomacs-background-pattern 0
+  "Background pattern style for the frame.
+0 = none, 1 = dots, 2 = grid, 3 = crosshatch."
+  :type '(choice (const :tag "None" 0)
+                 (const :tag "Dots" 1)
+                 (const :tag "Grid" 2)
+                 (const :tag "Crosshatch" 3))
+  :group 'frames
+  :set (lambda (sym val)
+         (set-default sym val)
+         (when (fboundp 'neomacs-set-background-pattern)
+           (neomacs-set-background-pattern
+            val
+            (if (boundp 'neomacs-background-pattern-spacing)
+                neomacs-background-pattern-spacing nil)
+            (if (boundp 'neomacs-background-pattern-color)
+                neomacs-background-pattern-color nil)
+            (if (boundp 'neomacs-background-pattern-opacity)
+                neomacs-background-pattern-opacity nil)))))
+
+(defcustom neomacs-background-pattern-spacing 20
+  "Spacing between background pattern elements in pixels."
+  :type '(integer :tag "Spacing")
+  :group 'frames
+  :set (lambda (sym val)
+         (set-default sym val)
+         (when (and (fboundp 'neomacs-set-background-pattern)
+                    (boundp 'neomacs-background-pattern)
+                    (> neomacs-background-pattern 0))
+           (neomacs-set-background-pattern
+            neomacs-background-pattern val
+            (if (boundp 'neomacs-background-pattern-color)
+                neomacs-background-pattern-color nil)
+            (if (boundp 'neomacs-background-pattern-opacity)
+                neomacs-background-pattern-opacity nil)))))
+
+(defcustom neomacs-background-pattern-color "gray50"
+  "Color of the background pattern."
+  :type '(color :tag "Color")
+  :group 'frames
+  :set (lambda (sym val)
+         (set-default sym val)
+         (when (and (fboundp 'neomacs-set-background-pattern)
+                    (boundp 'neomacs-background-pattern)
+                    (> neomacs-background-pattern 0))
+           (neomacs-set-background-pattern
+            neomacs-background-pattern
+            (if (boundp 'neomacs-background-pattern-spacing)
+                neomacs-background-pattern-spacing nil)
+            val
+            (if (boundp 'neomacs-background-pattern-opacity)
+                neomacs-background-pattern-opacity nil)))))
+
+(defcustom neomacs-background-pattern-opacity 5
+  "Opacity of the background pattern (0-100)."
+  :type '(integer :tag "Opacity")
+  :group 'frames
+  :set (lambda (sym val)
+         (set-default sym val)
+         (when (and (fboundp 'neomacs-set-background-pattern)
+                    (boundp 'neomacs-background-pattern)
+                    (> neomacs-background-pattern 0))
+           (neomacs-set-background-pattern
+            neomacs-background-pattern
+            (if (boundp 'neomacs-background-pattern-spacing)
+                neomacs-background-pattern-spacing nil)
+            (if (boundp 'neomacs-background-pattern-color)
+                neomacs-background-pattern-color nil)
+            val))))
+
 ;; Provide the feature
 (provide 'neomacs-win)
 (provide 'term/neomacs-win)

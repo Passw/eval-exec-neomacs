@@ -1340,6 +1340,13 @@ void neomacs_display_set_search_pulse(
     int enabled,
     int face_id);
 
+void neomacs_display_set_background_pattern(
+    struct NeomacsDisplay *handle,
+    int style,
+    int spacing,
+    int r, int g, int b,
+    int opacity);
+
 void neomacs_display_set_mode_line_separator(
     struct NeomacsDisplay *handle,
     int style,

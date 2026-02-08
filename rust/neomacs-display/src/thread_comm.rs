@@ -365,6 +365,17 @@ pub enum RenderCommand {
         /// Face ID of the isearch face (used to identify matching glyphs)
         face_id: u32,
     },
+    /// Configure background pattern
+    SetBackgroundPattern {
+        /// 0=none, 1=dots, 2=grid, 3=crosshatch
+        style: u32,
+        /// Spacing between pattern elements in pixels
+        spacing: f32,
+        /// Pattern color as sRGB 0.0-1.0
+        r: f32, g: f32, b: f32,
+        /// Pattern opacity 0.0-1.0
+        opacity: f32,
+    },
 }
 
 /// Wakeup pipe for signaling Emacs from render thread

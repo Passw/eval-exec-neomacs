@@ -119,6 +119,14 @@ pub struct WgpuRenderer {
     search_pulse_face_id: u32,
     /// Pulse start time
     search_pulse_start: std::time::Instant,
+    /// Background pattern style (0=none, 1=dots, 2=grid, 3=crosshatch)
+    bg_pattern_style: u32,
+    /// Pattern spacing in pixels
+    bg_pattern_spacing: f32,
+    /// Pattern color (sRGB)
+    bg_pattern_color: (f32, f32, f32),
+    /// Pattern opacity
+    bg_pattern_opacity: f32,
 }
 
 impl WgpuRenderer {
@@ -622,6 +630,10 @@ impl WgpuRenderer {
             search_pulse_enabled: false,
             search_pulse_face_id: 0,
             search_pulse_start: std::time::Instant::now(),
+            bg_pattern_style: 0,
+            bg_pattern_spacing: 20.0,
+            bg_pattern_color: (0.5, 0.5, 0.5),
+            bg_pattern_opacity: 0.05,
         }
     }
 
@@ -663,6 +675,14 @@ impl WgpuRenderer {
     pub fn set_minimap(&mut self, enabled: bool, width: f32) {
         self.minimap_enabled = enabled;
         self.minimap_width = width;
+    }
+
+    /// Update background pattern config
+    pub fn set_background_pattern(&mut self, style: u32, spacing: f32, r: f32, g: f32, b: f32, opacity: f32) {
+        self.bg_pattern_style = style;
+        self.bg_pattern_spacing = spacing;
+        self.bg_pattern_color = (r, g, b);
+        self.bg_pattern_opacity = opacity;
     }
 
     /// Update search pulse config
@@ -2038,6 +2058,96 @@ impl WgpuRenderer {
                 render_pass.set_bind_group(0, &self.uniform_bind_group, &[]);
                 render_pass.set_vertex_buffer(0, rect_buffer.slice(..));
                 render_pass.draw(0..non_overlay_rect_vertices.len() as u32, 0..1);
+            }
+
+            // === Step 1a: Background pattern (dots/grid/crosshatch) ===
+            if self.bg_pattern_style > 0 {
+                let spacing = self.bg_pattern_spacing.max(4.0);
+                let (pr, pg, pb) = self.bg_pattern_color;
+                let alpha = self.bg_pattern_opacity;
+                let pat_color = Color::new(pr, pg, pb, alpha);
+                let frame_w = frame_glyphs.width;
+                let frame_h = frame_glyphs.height;
+                let mut pattern_vertices: Vec<RectVertex> = Vec::new();
+
+                match self.bg_pattern_style {
+                    1 => {
+                        // Dots: small squares at grid intersections
+                        let dot_size = 1.0;
+                        let mut y = 0.0_f32;
+                        while y < frame_h {
+                            let mut x = 0.0_f32;
+                            while x < frame_w {
+                                self.add_rect(&mut pattern_vertices, x, y, dot_size, dot_size, &pat_color);
+                                x += spacing;
+                            }
+                            y += spacing;
+                        }
+                    }
+                    2 => {
+                        // Grid: horizontal and vertical lines
+                        let line_w = 1.0;
+                        let mut y = 0.0_f32;
+                        while y < frame_h {
+                            self.add_rect(&mut pattern_vertices, 0.0, y, frame_w, line_w, &pat_color);
+                            y += spacing;
+                        }
+                        let mut x = 0.0_f32;
+                        while x < frame_w {
+                            self.add_rect(&mut pattern_vertices, x, 0.0, line_w, frame_h, &pat_color);
+                            x += spacing;
+                        }
+                    }
+                    3 => {
+                        // Crosshatch: diagonal lines (approximated with small segments)
+                        let line_w = 1.0;
+                        let step = 2.0;
+                        let diag_spacing = spacing * 1.414; // sqrt(2) for diagonal
+                        // Forward diagonals (top-left to bottom-right)
+                        let mut offset = -frame_h;
+                        while offset < frame_w {
+                            let mut t = 0.0_f32;
+                            while t < frame_h.min(frame_w) {
+                                let px = offset + t;
+                                let py = t;
+                                if px >= 0.0 && px < frame_w && py >= 0.0 && py < frame_h {
+                                    self.add_rect(&mut pattern_vertices, px, py, line_w, step, &pat_color);
+                                }
+                                t += step;
+                            }
+                            offset += diag_spacing;
+                        }
+                        // Back diagonals (top-right to bottom-left)
+                        let mut offset = 0.0_f32;
+                        while offset < frame_w + frame_h {
+                            let mut t = 0.0_f32;
+                            while t < frame_h.min(frame_w) {
+                                let px = offset - t;
+                                let py = t;
+                                if px >= 0.0 && px < frame_w && py >= 0.0 && py < frame_h {
+                                    self.add_rect(&mut pattern_vertices, px, py, line_w, step, &pat_color);
+                                }
+                                t += step;
+                            }
+                            offset += diag_spacing;
+                        }
+                    }
+                    _ => {}
+                }
+
+                if !pattern_vertices.is_empty() {
+                    let pattern_buffer = self.device.create_buffer_init(
+                        &wgpu::util::BufferInitDescriptor {
+                            label: Some("Background Pattern Buffer"),
+                            contents: bytemuck::cast_slice(&pattern_vertices),
+                            usage: wgpu::BufferUsages::VERTEX,
+                        },
+                    );
+                    render_pass.set_pipeline(&self.rect_pipeline);
+                    render_pass.set_bind_group(0, &self.uniform_bind_group, &[]);
+                    render_pass.set_vertex_buffer(0, pattern_buffer.slice(..));
+                    render_pass.draw(0..pattern_vertices.len() as u32, 0..1);
+                }
             }
 
             // === Step 1b: Draw filled rounded rect backgrounds for ROUNDED boxed spans ===
