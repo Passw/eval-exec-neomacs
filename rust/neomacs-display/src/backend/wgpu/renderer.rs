@@ -236,6 +236,11 @@ pub struct WgpuRenderer {
     inactive_tint_enabled: bool,
     inactive_tint_color: (f32, f32, f32),
     inactive_tint_opacity: f32,
+    /// Text fade-in animation
+    text_fade_in_enabled: bool,
+    text_fade_in_duration_ms: u32,
+    /// Active text fade-in animations per window
+    active_text_fades: Vec<TextFadeEntry>,
     /// Scroll line spacing animation (accordion effect)
     scroll_line_spacing_enabled: bool,
     scroll_line_spacing_max: f32,
@@ -274,6 +279,14 @@ struct LineAnimEntry {
     /// When the animation started
     started: std::time::Instant,
     /// Duration of the animation
+    duration: std::time::Duration,
+}
+
+/// Entry for an active text fade-in animation
+struct TextFadeEntry {
+    window_id: i64,
+    bounds: Rect,
+    started: std::time::Instant,
     duration: std::time::Duration,
 }
 
@@ -873,6 +886,9 @@ impl WgpuRenderer {
             inactive_tint_enabled: false,
             inactive_tint_color: (0.2, 0.1, 0.0),
             inactive_tint_opacity: 0.1,
+            text_fade_in_enabled: false,
+            text_fade_in_duration_ms: 150,
+            active_text_fades: Vec::new(),
             scroll_line_spacing_enabled: false,
             scroll_line_spacing_max: 6.0,
             scroll_line_spacing_duration_ms: 200,
@@ -1080,6 +1096,49 @@ impl WgpuRenderer {
         self.cursor_shadow_offset_x = offset_x;
         self.cursor_shadow_offset_y = offset_y;
         self.cursor_shadow_opacity = opacity;
+    }
+
+    /// Update text fade-in config
+    pub fn set_text_fade_in(&mut self, enabled: bool, duration_ms: u32) {
+        self.text_fade_in_enabled = enabled;
+        self.text_fade_in_duration_ms = duration_ms;
+    }
+
+    /// Trigger a text fade-in animation for a window
+    pub fn trigger_text_fade_in(&mut self, window_id: i64, bounds: Rect, now: std::time::Instant) {
+        // Replace existing animation for this window
+        self.active_text_fades.retain(|e| e.window_id != window_id);
+        self.active_text_fades.push(TextFadeEntry {
+            window_id,
+            bounds,
+            started: now,
+            duration: std::time::Duration::from_millis(self.text_fade_in_duration_ms as u64),
+        });
+        self.needs_continuous_redraw = true;
+    }
+
+    /// Get the text fade-in alpha multiplier for a glyph at (x, y).
+    /// Returns 1.0 if no fade is active, or 0.0-1.0 during fade-in.
+    fn text_fade_alpha(&self, gx: f32, gy: f32) -> f32 {
+        if !self.text_fade_in_enabled || self.active_text_fades.is_empty() {
+            return 1.0;
+        }
+        let now = std::time::Instant::now();
+        for entry in &self.active_text_fades {
+            let b = &entry.bounds;
+            if gx >= b.x && gx < b.x + b.width
+                && gy >= b.y && gy < b.y + b.height
+            {
+                let elapsed = now.duration_since(entry.started).as_secs_f32();
+                let total = entry.duration.as_secs_f32();
+                if elapsed < total {
+                    // Ease-in: start at 0, end at 1
+                    let t = elapsed / total;
+                    return t * t; // quadratic ease-in for smooth appearance
+                }
+            }
+        }
+        1.0
     }
 
     /// Update scroll line spacing config
@@ -2015,6 +2074,12 @@ impl WgpuRenderer {
         // Clean up expired line animations
         self.active_line_anims.retain(|a| a.started.elapsed() < a.duration);
         if !self.active_line_anims.is_empty() {
+            self.needs_continuous_redraw = true;
+        }
+
+        // Clean up expired text fade-in animations
+        self.active_text_fades.retain(|e| e.started.elapsed() < e.duration);
+        if !self.active_text_fades.is_empty() {
             self.needs_continuous_redraw = true;
         }
 
@@ -3005,10 +3070,11 @@ impl WgpuRenderer {
 
                             // Color glyphs use white vertex color (no tinting),
                             // mask glyphs use foreground color for tinting
+                            let fade_alpha = self.text_fade_alpha(*x, *y);
                             let color = if cached.is_color {
-                                [1.0, 1.0, 1.0, 1.0]
+                                [1.0, 1.0, 1.0, fade_alpha]
                             } else {
-                                [effective_fg.r, effective_fg.g, effective_fg.b, effective_fg.a]
+                                [effective_fg.r, effective_fg.g, effective_fg.b, effective_fg.a * fade_alpha]
                             };
 
                             let vertices = [

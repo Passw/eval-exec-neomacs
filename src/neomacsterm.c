@@ -8795,6 +8795,27 @@ THRESHOLD is the maximum buffer size in characters to show watermark (default 10
   return on ? Qt : Qnil;
 }
 
+DEFUN ("neomacs-set-text-fade-in",
+       Fneomacs_set_text_fade_in,
+       Sneomacs_set_text_fade_in, 0, 2, 0,
+       doc: /* Configure text fade-in animation for new content.
+ENABLED non-nil makes text in a window fade in from transparent when
+the buffer content changes (scroll, buffer switch).
+DURATION-MS is the fade duration in milliseconds (default 150).  */)
+  (Lisp_Object enabled, Lisp_Object duration_ms)
+{
+  struct neomacs_display_info *dpyinfo = neomacs_display_list;
+  if (!dpyinfo || !dpyinfo->display_handle)
+    return Qnil;
+
+  int on = !NILP (enabled);
+  int dur = 150;
+  if (FIXNUMP (duration_ms)) dur = XFIXNUM (duration_ms);
+
+  neomacs_display_set_text_fade_in (dpyinfo->display_handle, on, dur);
+  return on ? Qt : Qnil;
+}
+
 DEFUN ("neomacs-set-scroll-line-spacing",
        Fneomacs_set_scroll_line_spacing,
        Sneomacs_set_scroll_line_spacing, 0, 3, 0,
@@ -10341,6 +10362,7 @@ syms_of_neomacsterm (void)
   defsubr (&Sneomacs_set_window_watermark);
   defsubr (&Sneomacs_set_cursor_trail_fade);
   defsubr (&Sneomacs_set_scroll_line_spacing);
+  defsubr (&Sneomacs_set_text_fade_in);
   defsubr (&Sneomacs_set_region_glow);
   defsubr (&Sneomacs_set_window_glow);
   defsubr (&Sneomacs_set_scroll_progress);

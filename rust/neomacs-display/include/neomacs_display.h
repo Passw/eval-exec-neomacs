@@ -1444,6 +1444,11 @@ void neomacs_display_set_noise_grain(struct NeomacsDisplay *handle,
                                      int size);
 
 /**
+ * Configure text fade-in animation for new content
+ */
+void neomacs_display_set_text_fade_in(struct NeomacsDisplay *handle, int enabled, int durationMs);
+
+/**
  * Configure scroll line spacing animation (accordion effect on scroll)
  */
 void neomacs_display_set_scroll_line_spacing(struct NeomacsDisplay *handle,

@@ -757,6 +757,9 @@ struct RenderApp {
     window_watermark_enabled: bool,
     window_watermark_opacity: f32,
     window_watermark_threshold: u32,
+    /// Text fade-in animation for new content
+    text_fade_in_enabled: bool,
+    text_fade_in_duration_ms: u32,
     /// Scroll line spacing animation (accordion effect)
     scroll_line_spacing_enabled: bool,
     scroll_line_spacing_max: f32,
@@ -1057,6 +1060,8 @@ impl RenderApp {
             window_watermark_enabled: false,
             window_watermark_opacity: 0.08,
             window_watermark_threshold: 10,
+            text_fade_in_enabled: false,
+            text_fade_in_duration_ms: 150,
             scroll_line_spacing_enabled: false,
             scroll_line_spacing_max: 6.0,
             scroll_line_spacing_duration: std::time::Duration::from_millis(200),
@@ -2079,6 +2084,14 @@ impl RenderApp {
                     }
                     self.frame_dirty = true;
                 }
+                RenderCommand::SetTextFadeIn { enabled, duration_ms } => {
+                    self.text_fade_in_enabled = enabled;
+                    self.text_fade_in_duration_ms = duration_ms;
+                    if let Some(renderer) = self.renderer.as_mut() {
+                        renderer.set_text_fade_in(enabled, duration_ms);
+                    }
+                    self.frame_dirty = true;
+                }
                 RenderCommand::SetScrollLineSpacing { enabled, max_spacing, duration_ms } => {
                     self.scroll_line_spacing_enabled = enabled;
                     self.scroll_line_spacing_max = max_spacing;
@@ -2835,6 +2848,12 @@ impl RenderApp {
             if let Some(prev) = self.prev_window_infos.get(&info.window_id) {
                 if prev.buffer_id != 0 && info.buffer_id != 0 {
                     if prev.buffer_id != info.buffer_id {
+                        // Text fade-in on buffer switch
+                        if self.text_fade_in_enabled && !info.is_minibuffer {
+                            if let Some(renderer) = self.renderer.as_mut() {
+                                renderer.trigger_text_fade_in(info.window_id, info.bounds, now);
+                            }
+                        }
                         // Buffer switch → crossfade
                         // Suppress for minibuffer (small windows change buffers on every keystroke)
                         if self.crossfade_enabled && info.bounds.height >= 50.0 {
@@ -2880,6 +2899,12 @@ impl RenderApp {
                             }
                         }
                     } else if prev.window_start != info.window_start {
+                        // Text fade-in on scroll
+                        if self.text_fade_in_enabled && !info.is_minibuffer {
+                            if let Some(renderer) = self.renderer.as_mut() {
+                                renderer.trigger_text_fade_in(info.window_id, info.bounds, now);
+                            }
+                        }
                         // Scroll line spacing animation (accordion effect)
                         if self.scroll_line_spacing_enabled {
                             let dir = if info.window_start > prev.window_start { 1 } else { -1 };

@@ -2933,6 +2933,22 @@ pub unsafe extern "C" fn neomacs_display_set_noise_grain(
     }
 }
 
+/// Configure text fade-in animation for new content
+#[no_mangle]
+pub unsafe extern "C" fn neomacs_display_set_text_fade_in(
+    _handle: *mut NeomacsDisplay,
+    enabled: c_int,
+    duration_ms: c_int,
+) {
+    let cmd = RenderCommand::SetTextFadeIn {
+        enabled: enabled != 0,
+        duration_ms: duration_ms as u32,
+    };
+    if let Some(ref state) = THREADED_STATE {
+        let _ = state.emacs_comms.cmd_tx.try_send(cmd);
+    }
+}
+
 /// Configure scroll line spacing animation (accordion effect on scroll)
 #[no_mangle]
 pub unsafe extern "C" fn neomacs_display_set_scroll_line_spacing(

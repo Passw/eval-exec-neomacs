@@ -1614,6 +1614,34 @@ focused window with continuous animation."
                     neomacs-focus-ring)
            (neomacs-set-focus-ring t nil nil nil nil nil val))))
 
+;; --- Text fade-in animation ---
+(declare-function neomacs-set-text-fade-in "neomacsterm.c"
+  (&optional enabled duration-ms))
+
+(defcustom neomacs-text-fade-in nil
+  "Enable text fade-in animation for new content.
+Non-nil makes text in a window fade in from transparent when the
+buffer content changes (scroll, buffer switch)."
+  :type 'boolean
+  :group 'frames
+  :set (lambda (sym val)
+         (set-default sym val)
+         (when (fboundp 'neomacs-set-text-fade-in)
+           (neomacs-set-text-fade-in val
+            (if (boundp 'neomacs-text-fade-in-duration)
+                neomacs-text-fade-in-duration nil)))))
+
+(defcustom neomacs-text-fade-in-duration 150
+  "Text fade-in duration in milliseconds."
+  :type '(integer :tag "Duration (ms)")
+  :group 'frames
+  :set (lambda (sym val)
+         (set-default sym val)
+         (when (and (fboundp 'neomacs-set-text-fade-in)
+                    (boundp 'neomacs-text-fade-in)
+                    neomacs-text-fade-in)
+           (neomacs-set-text-fade-in t val))))
+
 ;; --- Scroll line spacing animation ---
 (declare-function neomacs-set-scroll-line-spacing "neomacsterm.c"
   (&optional enabled max-spacing duration-ms))
