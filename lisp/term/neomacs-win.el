@@ -297,6 +297,45 @@ background transparent while keeping text fully opaque."
       (setq opacity (/ (float opacity) 100.0)))
     (set-frame-parameter f 'alpha-background opacity)))
 
+;; Window snapping
+(defun neomacs--workarea ()
+  "Return the workarea (x y width height) of the current monitor."
+  (let* ((attrs (car (display-monitor-attributes-list)))
+         (wa (alist-get 'workarea attrs)))
+    (or wa (list 0 0 (display-pixel-width) (display-pixel-height)))))
+
+(defun neomacs-snap-left (&optional frame)
+  "Snap FRAME to the left half of the screen."
+  (interactive)
+  (let* ((f (or frame (selected-frame)))
+         (wa (neomacs--workarea))
+         (x (nth 0 wa)) (y (nth 1 wa))
+         (w (nth 2 wa)) (h (nth 3 wa)))
+    (set-frame-parameter f 'fullscreen nil)
+    (set-frame-position f x y)
+    (set-frame-size f (/ w 2) h t)))
+
+(defun neomacs-snap-right (&optional frame)
+  "Snap FRAME to the right half of the screen."
+  (interactive)
+  (let* ((f (or frame (selected-frame)))
+         (wa (neomacs--workarea))
+         (x (nth 0 wa)) (y (nth 1 wa))
+         (w (nth 2 wa)) (h (nth 3 wa)))
+    (set-frame-parameter f 'fullscreen nil)
+    (set-frame-position f (+ x (/ w 2)) y)
+    (set-frame-size f (/ w 2) h t)))
+
+(defun neomacs-maximize (&optional frame)
+  "Maximize FRAME."
+  (interactive)
+  (set-frame-parameter (or frame (selected-frame)) 'fullscreen 'maximized))
+
+(defun neomacs-restore (&optional frame)
+  "Restore FRAME from maximized/fullscreen state."
+  (interactive)
+  (set-frame-parameter (or frame (selected-frame)) 'fullscreen nil))
+
 ;; Provide the feature
 (provide 'neomacs-win)
 (provide 'term/neomacs-win)
