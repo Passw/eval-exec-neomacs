@@ -285,6 +285,8 @@ pub unsafe extern "C" fn neomacs_display_add_window_info(
     window_id: i64,
     buffer_id: u64,
     window_start: i64,
+    window_end: i64,
+    buffer_size: i64,
     x: f32,
     y: f32,
     width: f32,
@@ -297,7 +299,7 @@ pub unsafe extern "C" fn neomacs_display_add_window_info(
     }
     let display = &mut *handle;
     display.frame_glyphs.add_window_info(
-        window_id, buffer_id, window_start,
+        window_id, buffer_id, window_start, window_end, buffer_size,
         x, y, width, height,
         mode_line_height,
         selected != 0,

@@ -184,6 +184,10 @@ pub struct WindowInfo {
     pub buffer_id: u64,
     /// First visible character position (marker_position(w->start))
     pub window_start: i64,
+    /// Last visible character position
+    pub window_end: i64,
+    /// Total buffer size in characters (BUF_Z)
+    pub buffer_size: i64,
     /// Frame-absolute window bounds (includes mode-line)
     pub bounds: Rect,
     /// Height of the mode-line in pixels (0 if no mode-line)
@@ -471,13 +475,16 @@ impl FrameGlyphBuffer {
     }
 
     /// Add per-window metadata for animation detection
-    pub fn add_window_info(&mut self, window_id: i64, buffer_id: u64, window_start: i64,
+    pub fn add_window_info(&mut self, window_id: i64, buffer_id: u64,
+                           window_start: i64, window_end: i64, buffer_size: i64,
                            x: f32, y: f32, width: f32, height: f32,
                            mode_line_height: f32, selected: bool) {
         self.window_infos.push(WindowInfo {
             window_id,
             buffer_id,
             window_start,
+            window_end,
+            buffer_size,
             bounds: Rect::new(x, y, width, height),
             mode_line_height,
             selected,

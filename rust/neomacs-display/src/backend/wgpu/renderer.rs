@@ -4449,6 +4449,101 @@ impl WgpuRenderer {
         self.render_overlay_glyphs(view, &mut overlay_glyphs, glyph_atlas);
     }
 
+    /// Render thin scroll position indicators on the right edge of each window.
+    pub fn render_scroll_indicators(
+        &self,
+        view: &wgpu::TextureView,
+        window_infos: &[crate::core::frame_glyphs::WindowInfo],
+        surface_width: u32,
+        surface_height: u32,
+    ) {
+        use wgpu::util::DeviceExt;
+
+        let logical_w = surface_width as f32 / self.scale_factor;
+        let logical_h = surface_height as f32 / self.scale_factor;
+        let uniforms = Uniforms {
+            screen_size: [logical_w, logical_h],
+            _padding: [0.0, 0.0],
+        };
+        self.queue
+            .write_buffer(&self.uniform_buffer, 0, bytemuck::cast_slice(&[uniforms]));
+
+        let mut rect_vertices: Vec<RectVertex> = Vec::new();
+        let indicator_width = 3.0_f32;
+
+        for info in window_infos {
+            // Skip windows with no meaningful buffer content
+            if info.buffer_size <= 1 {
+                continue;
+            }
+
+            let b = &info.bounds;
+            // Content area height (exclude mode-line)
+            let content_h = b.height - info.mode_line_height;
+            if content_h < 20.0 {
+                continue;
+            }
+
+            // Scroll ratio: what fraction of the buffer is before window_start
+            let start_ratio = (info.window_start as f32 - 1.0).max(0.0)
+                / (info.buffer_size as f32 - 1.0).max(1.0);
+
+            // Viewport ratio: what fraction of the buffer is visible
+            let visible_chars = if info.window_end > 0 {
+                (info.window_end - info.window_start).max(1) as f32
+            } else {
+                // Estimate: content_h worth of text
+                content_h * 2.0 // rough chars estimate
+            };
+            let viewport_ratio = (visible_chars / info.buffer_size as f32).clamp(0.02, 1.0);
+
+            // Indicator bar position and size
+            let bar_h = (content_h * viewport_ratio).max(8.0).min(content_h);
+            let bar_y = b.y + start_ratio * (content_h - bar_h);
+
+            // Semi-transparent indicator color
+            let color = Color::new(0.5, 0.5, 0.5, 0.25).srgb_to_linear();
+            let x = b.x + b.width - indicator_width;
+
+            self.add_rect(&mut rect_vertices, x, bar_y, indicator_width, bar_h, &color);
+        }
+
+        if rect_vertices.is_empty() {
+            return;
+        }
+
+        let rect_buffer = self.device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+            label: Some("Scroll Indicator Buffer"),
+            contents: bytemuck::cast_slice(&rect_vertices),
+            usage: wgpu::BufferUsages::VERTEX,
+        });
+
+        let mut encoder = self.device.create_command_encoder(&wgpu::CommandEncoderDescriptor {
+            label: Some("Scroll Indicator Encoder"),
+        });
+        {
+            let mut pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
+                label: Some("Scroll Indicator Pass"),
+                color_attachments: &[Some(wgpu::RenderPassColorAttachment {
+                    view,
+                    resolve_target: None,
+                    ops: wgpu::Operations {
+                        load: wgpu::LoadOp::Load,
+                        store: wgpu::StoreOp::Store,
+                    },
+                })],
+                depth_stencil_attachment: None,
+                timestamp_writes: None,
+                occlusion_query_set: None,
+            });
+            pass.set_pipeline(&self.rect_pipeline);
+            pass.set_bind_group(0, &self.uniform_bind_group, &[]);
+            pass.set_vertex_buffer(0, rect_buffer.slice(..));
+            pass.draw(0..rect_vertices.len() as u32, 0..1);
+        }
+        self.queue.submit(Some(encoder.finish()));
+    }
+
     /// Render IME preedit text at the cursor position with underline.
     pub fn render_ime_preedit(
         &self,

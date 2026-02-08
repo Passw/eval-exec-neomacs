@@ -1008,17 +1008,24 @@ neomacs_extract_window_glyphs (struct window *w, void *user_data)
   {
     uintptr_t buf_id = 0;
     ptrdiff_t win_start = 0;
+    ptrdiff_t win_end = 0;
+    ptrdiff_t buf_size = 0;
     if (BUFFERP (w->contents))
       {
-        buf_id = (uintptr_t) XBUFFER (w->contents);
+        struct buffer *buf = XBUFFER (w->contents);
+        buf_id = (uintptr_t) buf;
         if (MARKERP (w->start))
           win_start = marker_position (w->start);
+        win_end = w->window_end_pos;
+        buf_size = BUF_Z (buf);
       }
     neomacs_display_add_window_info (
         handle,
         (int64_t)(intptr_t) w,
         (uint64_t) buf_id,
         (int64_t) win_start,
+        (int64_t) win_end,
+        (int64_t) buf_size,
         (float) win_x, (float) win_y,
         (float) win_w, (float) win_h,
         (float) WINDOW_MODE_LINE_HEIGHT (w),

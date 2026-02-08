@@ -138,6 +138,8 @@ impl LayoutEngine {
                 params.window_id,
                 params.buffer_id,
                 params.window_start,
+                0, // window_end filled after layout
+                params.buffer_size,
                 params.bounds.x,
                 params.bounds.y,
                 params.bounds.width,

@@ -2340,6 +2340,16 @@ impl RenderApp {
             );
         }
 
+        // Render scroll position indicators on right edge of each window
+        if let (Some(ref renderer), Some(ref frame)) =
+            (&self.renderer, &self.current_frame)
+        {
+            renderer.render_scroll_indicators(
+                &surface_view, &frame.window_infos,
+                self.width, self.height,
+            );
+        }
+
         // Render floating WebKit overlays on top of everything
         #[cfg(feature = "wpe-webkit")]
         if !self.floating_webkits.is_empty() {
