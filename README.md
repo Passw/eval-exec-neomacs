@@ -26,7 +26,7 @@ Emacs is a 40-year-old C codebase that hasn't kept up with modern hardware or so
   - **Modern animations** — no smooth cursor movement, buffer transitions, or visual effects
   - **Web content** — limited browser integration
   - **GPU utilization** — everything runs on CPU while your GPU sits idle
-- **Elisp performance** — no JIT compilation, no inline caching, stop-the-world GC, dynamic dispatch overhead. Elisp is orders of magnitude slower than it needs to be
+- **Elisp performance** — no inline caching, stop-the-world GC, dynamic dispatch overhead. Even with native-comp (AOT), Elisp lacks runtime JIT optimization, speculative inlining, and concurrent GC — leaving significant performance on the table
 - **Unsafe C codebase** — ~300,000 lines of unsafe C with manual memory management, monolithic architecture (runtime and editor entangled), single-threaded design that prevents real concurrency
 
 ## The Solution
