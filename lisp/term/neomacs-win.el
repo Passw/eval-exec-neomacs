@@ -360,6 +360,17 @@ _FRAME is ignored; the menu opens on the selected frame."
   (interactive)
   (set-frame-parameter (or frame (selected-frame)) 'fullscreen nil))
 
+;;; Scroll indicators
+
+(declare-function neomacs-set-scroll-indicators "neomacsterm.c" (enabled))
+
+(define-minor-mode neomacs-scroll-indicator-mode
+  "Toggle scroll position indicators and active window focus ring."
+  :global t
+  :group 'frames
+  :init-value t
+  (neomacs-set-scroll-indicators neomacs-scroll-indicator-mode))
+
 ;; Provide the feature
 (provide 'neomacs-win)
 (provide 'term/neomacs-win)

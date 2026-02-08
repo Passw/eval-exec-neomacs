@@ -1086,6 +1086,12 @@ void neomacs_display_visual_bell(struct NeomacsDisplay *handle);
 void neomacs_display_request_attention(struct NeomacsDisplay *handle, int urgent);
 
 /**
+ * Enable or disable scroll indicators and focus ring.
+ * enabled: non-zero = on, zero = off.
+ */
+void neomacs_display_set_scroll_indicators(struct NeomacsDisplay *handle, int enabled);
+
+/**
  * Set the window title (threaded mode)
  */
 void neomacs_display_set_title(struct NeomacsDisplay *handle, const char *title);

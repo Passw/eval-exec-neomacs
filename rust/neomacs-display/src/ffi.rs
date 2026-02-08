@@ -2179,6 +2179,19 @@ pub unsafe extern "C" fn neomacs_display_request_attention(
     }
 }
 
+/// Enable or disable scroll indicators and focus ring.
+/// enabled: non-zero = on, zero = off.
+#[no_mangle]
+pub unsafe extern "C" fn neomacs_display_set_scroll_indicators(
+    _handle: *mut NeomacsDisplay,
+    enabled: c_int,
+) {
+    let cmd = RenderCommand::SetScrollIndicators { enabled: enabled != 0 };
+    if let Some(ref state) = THREADED_STATE {
+        let _ = state.emacs_comms.cmd_tx.try_send(cmd);
+    }
+}
+
 /// Set the window title (threaded mode)
 #[no_mangle]
 pub unsafe extern "C" fn neomacs_display_set_title(

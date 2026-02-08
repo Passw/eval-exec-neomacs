@@ -421,6 +421,9 @@ struct RenderApp {
     ime_preedit_active: bool,
     ime_preedit_text: String,
 
+    // UI overlay state
+    scroll_indicators_enabled: bool,
+
     // Borderless window state
     decorations_enabled: bool,
     /// Resize edge under cursor (None = not on edge)
@@ -564,6 +567,7 @@ impl RenderApp {
             ime_enabled: false,
             ime_preedit_active: false,
             ime_preedit_text: String::new(),
+            scroll_indicators_enabled: true,
             decorations_enabled: true,
             resize_edge: None,
         }
@@ -1194,6 +1198,10 @@ impl RenderApp {
                         };
                         window.request_user_attention(attention);
                     }
+                }
+                RenderCommand::SetScrollIndicators { enabled } => {
+                    self.scroll_indicators_enabled = enabled;
+                    self.frame_dirty = true;
                 }
             }
         }
@@ -2340,14 +2348,16 @@ impl RenderApp {
             );
         }
 
-        // Render scroll position indicators on right edge of each window
-        if let (Some(ref renderer), Some(ref frame)) =
-            (&self.renderer, &self.current_frame)
-        {
-            renderer.render_scroll_indicators(
-                &surface_view, &frame.window_infos,
-                self.width, self.height,
-            );
+        // Render scroll position indicators and focus ring
+        if self.scroll_indicators_enabled {
+            if let (Some(ref renderer), Some(ref frame)) =
+                (&self.renderer, &self.current_frame)
+            {
+                renderer.render_scroll_indicators(
+                    &surface_view, &frame.window_infos,
+                    self.width, self.height,
+                );
+            }
         }
 
         // Render floating WebKit overlays on top of everything

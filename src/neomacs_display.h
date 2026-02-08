@@ -1229,6 +1229,12 @@ void neomacs_display_request_attention(struct NeomacsDisplay *handle,
                                        int urgent);
 
 /**
+ * Enable or disable scroll indicators and focus ring overlay.
+ */
+void neomacs_display_set_scroll_indicators(struct NeomacsDisplay *handle,
+                                            int enabled);
+
+/**
  * Get dropped file paths (call after NEOMACS_EVENT_FILE_DROP).
  * Returns number of paths written to out_paths.
  * Each path must be freed with neomacs_display_free_dropped_path().

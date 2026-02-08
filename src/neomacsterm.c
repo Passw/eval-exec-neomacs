@@ -7804,6 +7804,22 @@ and a frame has been captured.  */)
 }
 
 
+DEFUN ("neomacs-set-scroll-indicators", Fneomacs_set_scroll_indicators,
+       Sneomacs_set_scroll_indicators, 1, 1, 0,
+       doc: /* Enable or disable scroll position indicators and focus ring.
+ENABLED non-nil shows scroll indicators and active window focus ring,
+nil hides them.  */)
+  (Lisp_Object enabled)
+{
+  struct neomacs_display_info *dpyinfo = neomacs_display_list;
+  if (!dpyinfo || !dpyinfo->display_handle)
+    return Qnil;
+
+  neomacs_display_set_scroll_indicators (dpyinfo->display_handle,
+                                          !NILP (enabled));
+  return !NILP (enabled) ? Qt : Qnil;
+}
+
 DEFUN ("neomacs-set-cursor-blink", Fneomacs_set_cursor_blink, Sneomacs_set_cursor_blink, 1, 2, 0,
        doc: /* Configure cursor blinking in the render thread.
 ENABLED non-nil enables blinking, nil disables it.
@@ -8966,6 +8982,9 @@ syms_of_neomacsterm (void)
   defsubr (&Sneomacs_prepare_buffer_transition);
   defsubr (&Sneomacs_trigger_buffer_transition);
   defsubr (&Sneomacs_has_transition_snapshot_p);
+
+  /* Scroll indicators */
+  defsubr (&Sneomacs_set_scroll_indicators);
 
   /* Cursor blink */
   defsubr (&Sneomacs_set_cursor_blink);

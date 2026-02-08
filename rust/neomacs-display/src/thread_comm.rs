@@ -247,6 +247,8 @@ pub enum RenderCommand {
     VisualBell,
     /// Request window attention (urgency hint / taskbar flash)
     RequestAttention { urgent: bool },
+    /// Toggle scroll indicators and focus ring
+    SetScrollIndicators { enabled: bool },
 }
 
 /// Wakeup pipe for signaling Emacs from render thread
