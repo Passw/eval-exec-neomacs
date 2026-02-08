@@ -5126,12 +5126,79 @@ neomacs_draw_window_divider (struct window *w, int x0, int x1, int y0, int y1)
     }
 }
 
-/* Draw fringe bitmap */
+/* Draw fringe bitmap as GPU rectangles.
+   Each row of the bitmap is scanned for runs of set bits, and each run
+   is emitted as a 1-pixel-tall rectangle via neomacs_display_draw_border.
+   Fringe bitmaps are small (8-16px wide, ~8-10px tall) so this is
+   efficient for GPU rendering. */
 void
 neomacs_draw_fringe_bitmap (struct window *w, struct glyph_row *row,
                             struct draw_fringe_bitmap_params *p)
 {
-  /* TODO: Implement fringe bitmap drawing */
+  struct frame *f = XFRAME (WINDOW_FRAME (w));
+  struct neomacs_display_info *dpyinfo = FRAME_NEOMACS_DISPLAY_INFO (f);
+  struct neomacs_output *output = FRAME_NEOMACS_OUTPUT (f);
+
+  if (!dpyinfo || !dpyinfo->display_handle || !output)
+    return;
+
+  struct face *face = p->face;
+  if (!face)
+    return;
+
+  /* Determine colors */
+  unsigned long fg_pixel = p->cursor_p
+    ? (p->overlay_p ? face->background : output->cursor_pixel)
+    : face->foreground;
+  unsigned long bg_pixel = face->background;
+
+  uint32_t fg_rgb = ((RED_FROM_ULONG (fg_pixel) << 16)
+                     | (GREEN_FROM_ULONG (fg_pixel) << 8)
+                     | BLUE_FROM_ULONG (fg_pixel));
+  uint32_t bg_rgb = ((RED_FROM_ULONG (bg_pixel) << 16)
+                     | (GREEN_FROM_ULONG (bg_pixel) << 8)
+                     | BLUE_FROM_ULONG (bg_pixel));
+
+  /* Step 1: Clear background area if needed */
+  if (p->bx >= 0 && !p->overlay_p)
+    neomacs_display_draw_border (dpyinfo->display_handle,
+                                 p->bx, p->by, p->nx, p->ny, bg_rgb);
+
+  /* Step 2: Draw bitmap pixels.
+     p->bits is an array of unsigned short, one per row.
+     p->dh is the vertical offset into the array.
+     p->wd is the bitmap width, p->h is the bitmap height. */
+  if (p->which != 0 && p->bits)
+    {
+      for (int row_i = 0; row_i < p->h; row_i++)
+        {
+          unsigned short bits_row = p->bits[p->dh + row_i];
+          int screen_y = p->y + row_i;
+
+          /* Scan for horizontal runs of set bits to minimize draw calls */
+          int col = 0;
+          while (col < p->wd)
+            {
+              /* Skip unset bits */
+              while (col < p->wd && !(bits_row & (1 << col)))
+                col++;
+              if (col >= p->wd)
+                break;
+
+              /* Found a set bit - scan the run */
+              int run_start = col;
+              while (col < p->wd && (bits_row & (1 << col)))
+                col++;
+
+              /* Emit rectangle for this run */
+              int run_len = col - run_start;
+              int screen_x = p->x + run_start;
+              neomacs_display_draw_border (dpyinfo->display_handle,
+                                           screen_x, screen_y,
+                                           run_len, 1, fg_rgb);
+            }
+        }
+    }
 }
 
 
