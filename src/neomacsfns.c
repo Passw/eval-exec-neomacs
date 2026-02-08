@@ -1700,6 +1700,137 @@ Each value is in the range 0 to 65535 inclusive.  */)
     return Qnil;
 }
 
+DEFUN ("xw-color-defined-p", Fxw_color_defined_p, Sxw_color_defined_p, 1, 2, 0,
+       doc: /* Internal function called by `color-defined-p'.
+Return non-nil if COLOR is supported on FRAME.  */)
+  (Lisp_Object color, Lisp_Object frame)
+{
+  Emacs_Color col;
+  struct frame *f = decode_window_system_frame (frame);
+
+  CHECK_STRING (color);
+
+  if (neomacs_defined_color (f, SSDATA (color), &col, false, false))
+    return Qt;
+  else
+    return Qnil;
+}
+
+DEFUN ("x-display-screens", Fx_display_screens, Sx_display_screens, 0, 1, 0,
+       doc: /* Return the number of screens on the Neomacs display.  */)
+  (Lisp_Object terminal)
+{
+  check_neomacs_display_info (terminal);
+  return make_fixnum (1);
+}
+
+DEFUN ("x-display-mm-height", Fx_display_mm_height,
+       Sx_display_mm_height, 0, 1, 0,
+       doc: /* Return the height of the Neomacs display in millimeters.  */)
+  (Lisp_Object terminal)
+{
+  struct neomacs_display_info *dpyinfo
+    = check_neomacs_display_info (terminal);
+  int height_mm = 0;
+
+  block_input ();
+  GdkDisplay *gdpy = dpyinfo->gdpy;
+  if (gdpy)
+    {
+      GListModel *monitors = gdk_display_get_monitors (gdpy);
+      guint n = g_list_model_get_n_items (monitors);
+      for (guint i = 0; i < n; i++)
+        {
+          GdkMonitor *monitor = GDK_MONITOR (g_list_model_get_item (monitors, i));
+          int mm = gdk_monitor_get_height_mm (monitor);
+          if (mm > height_mm)
+            height_mm = mm;
+          g_object_unref (monitor);
+        }
+    }
+  unblock_input ();
+
+  /* Fallback: estimate from pixel height assuming ~96 DPI */
+  if (height_mm == 0 && dpyinfo->height > 0)
+    height_mm = (int) (dpyinfo->height * 25.4 / 96.0);
+
+  return make_fixnum (height_mm);
+}
+
+DEFUN ("x-display-mm-width", Fx_display_mm_width,
+       Sx_display_mm_width, 0, 1, 0,
+       doc: /* Return the width of the Neomacs display in millimeters.  */)
+  (Lisp_Object terminal)
+{
+  struct neomacs_display_info *dpyinfo
+    = check_neomacs_display_info (terminal);
+  int width_mm = 0;
+
+  block_input ();
+  GdkDisplay *gdpy = dpyinfo->gdpy;
+  if (gdpy)
+    {
+      GListModel *monitors = gdk_display_get_monitors (gdpy);
+      guint n = g_list_model_get_n_items (monitors);
+      for (guint i = 0; i < n; i++)
+        {
+          GdkMonitor *monitor = GDK_MONITOR (g_list_model_get_item (monitors, i));
+          int mm = gdk_monitor_get_width_mm (monitor);
+          if (mm > width_mm)
+            width_mm = mm;
+          g_object_unref (monitor);
+        }
+    }
+  unblock_input ();
+
+  /* Fallback: estimate from pixel width assuming ~96 DPI */
+  if (width_mm == 0 && dpyinfo->width > 0)
+    width_mm = (int) (dpyinfo->width * 25.4 / 96.0);
+
+  return make_fixnum (width_mm);
+}
+
+DEFUN ("x-server-max-request-size", Fx_server_max_request_size,
+       Sx_server_max_request_size, 0, 1, 0,
+       doc: /* Return the maximum request size for the Neomacs display.
+Not applicable to GPU-rendered displays; returns nil.  */)
+  (Lisp_Object terminal)
+{
+  check_neomacs_display_info (terminal);
+  return Qnil;
+}
+
+DEFUN ("x-display-backing-store", Fx_display_backing_store,
+       Sx_display_backing_store, 0, 1, 0,
+       doc: /* Return the backing store capability of the Neomacs display.
+Not applicable to GPU-rendered displays; returns nil.  */)
+  (Lisp_Object terminal)
+{
+  check_neomacs_display_info (terminal);
+  return Qnil;
+}
+
+DEFUN ("x-display-save-under", Fx_display_save_under,
+       Sx_display_save_under, 0, 1, 0,
+       doc: /* Return the save-under capability of the Neomacs display.
+Not applicable to GPU-rendered displays; returns nil.  */)
+  (Lisp_Object terminal)
+{
+  check_neomacs_display_info (terminal);
+  return Qnil;
+}
+
+DEFUN ("x-show-tip", Fx_show_tip, Sx_show_tip, 1, 6, 0,
+       doc: /* Show STRING in a tooltip on FRAME.
+This is a simplified implementation for Neomacs.  */)
+  (Lisp_Object string, Lisp_Object frame, Lisp_Object parms,
+   Lisp_Object timeout, Lisp_Object dx, Lisp_Object dy)
+{
+  /* TODO: Implement proper tooltip rendering via GPU.  */
+  CHECK_STRING (string);
+  return Qnil;
+}
+
 DEFUN ("x-open-connection", Fx_open_connection, Sx_open_connection, 1, 3, 0,
        doc: /* Open a connection to a Neomacs display.
 DISPLAY is the name of the display.  Optional second arg
@@ -1881,6 +2012,20 @@ syms_of_neomacsfns (void)
   defsubr (&Sx_display_visual_class);
   defsubr (&Sxw_color_values);
   defsubr (&Sx_display_list);
+
+  /* Color functions */
+  defsubr (&Sxw_color_defined_p);
+
+  /* Additional display functions */
+  defsubr (&Sx_display_screens);
+  defsubr (&Sx_display_mm_height);
+  defsubr (&Sx_display_mm_width);
+  defsubr (&Sx_server_max_request_size);
+  defsubr (&Sx_display_backing_store);
+  defsubr (&Sx_display_save_under);
+
+  /* Tooltip functions */
+  defsubr (&Sx_show_tip);
 
   /* Connection functions */
   defsubr (&Sx_open_connection);

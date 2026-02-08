@@ -6110,7 +6110,7 @@ DEFUN ("x-display-grayscale-p", Fx_display_grayscale_p, Sx_display_grayscale_p, 
   (Lisp_Object terminal)
 {
   /* Neomacs displays support both color and grayscale */
-  return Qnil;  /* Return nil meaning we support full color, not just grayscale */
+  return Qt;
 }
 
 
