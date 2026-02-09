@@ -752,6 +752,31 @@ struct RenderApp {
     cursor_scope_gap: f32,
     cursor_scope_opacity: f32,
 
+    // Spiral vortex overlay
+    spiral_vortex_enabled: bool,
+    spiral_vortex_color: (f32, f32, f32),
+    spiral_vortex_arms: u32,
+    spiral_vortex_speed: f32,
+    spiral_vortex_opacity: f32,
+    // Cursor shockwave
+    cursor_shockwave_enabled: bool,
+    cursor_shockwave_color: (f32, f32, f32),
+    cursor_shockwave_radius: f32,
+    cursor_shockwave_decay: f32,
+    cursor_shockwave_opacity: f32,
+    // Diamond lattice overlay
+    diamond_lattice_enabled: bool,
+    diamond_lattice_color: (f32, f32, f32),
+    diamond_lattice_cell_size: f32,
+    diamond_lattice_shimmer_speed: f32,
+    diamond_lattice_opacity: f32,
+    // Cursor gravity well
+    cursor_gravity_well_enabled: bool,
+    cursor_gravity_well_color: (f32, f32, f32),
+    cursor_gravity_well_field_radius: f32,
+    cursor_gravity_well_line_count: u32,
+    cursor_gravity_well_opacity: f32,
+
     // Per-window metadata from previous frame (for transition detection)
     prev_window_infos: HashMap<i64, crate::core::frame_glyphs::WindowInfo>,
 
@@ -1438,6 +1463,26 @@ impl RenderApp {
             cursor_scope_thickness: 1.0,
             cursor_scope_gap: 10.0,
             cursor_scope_opacity: 0.3,
+            spiral_vortex_enabled: false,
+            spiral_vortex_color: (0.4, 0.2, 0.8),
+            spiral_vortex_arms: 4,
+            spiral_vortex_speed: 0.5,
+            spiral_vortex_opacity: 0.1,
+            cursor_shockwave_enabled: false,
+            cursor_shockwave_color: (1.0, 0.6, 0.2),
+            cursor_shockwave_radius: 80.0,
+            cursor_shockwave_decay: 2.0,
+            cursor_shockwave_opacity: 0.3,
+            diamond_lattice_enabled: false,
+            diamond_lattice_color: (0.7, 0.5, 0.9),
+            diamond_lattice_cell_size: 30.0,
+            diamond_lattice_shimmer_speed: 0.8,
+            diamond_lattice_opacity: 0.08,
+            cursor_gravity_well_enabled: false,
+            cursor_gravity_well_color: (0.3, 0.6, 1.0),
+            cursor_gravity_well_field_radius: 80.0,
+            cursor_gravity_well_line_count: 8,
+            cursor_gravity_well_opacity: 0.2,
             prev_window_infos: HashMap::new(),
             crossfade_enabled: true,
             crossfade_duration: std::time::Duration::from_millis(200),
@@ -3358,6 +3403,50 @@ impl RenderApp {
                     self.cursor_scope_opacity = opacity;
                     if let Some(renderer) = self.renderer.as_mut() {
                         renderer.set_cursor_scope(enabled, (r, g, b), thickness, gap, opacity);
+                    }
+                    self.frame_dirty = true;
+                }
+                RenderCommand::SetSpiralVortex { enabled, r, g, b, arms, speed, opacity } => {
+                    self.spiral_vortex_enabled = enabled;
+                    self.spiral_vortex_color = (r, g, b);
+                    self.spiral_vortex_arms = arms;
+                    self.spiral_vortex_speed = speed;
+                    self.spiral_vortex_opacity = opacity;
+                    if let Some(renderer) = self.renderer.as_mut() {
+                        renderer.set_spiral_vortex(enabled, (r, g, b), arms, speed, opacity);
+                    }
+                    self.frame_dirty = true;
+                }
+                RenderCommand::SetCursorShockwave { enabled, r, g, b, radius, decay, opacity } => {
+                    self.cursor_shockwave_enabled = enabled;
+                    self.cursor_shockwave_color = (r, g, b);
+                    self.cursor_shockwave_radius = radius;
+                    self.cursor_shockwave_decay = decay;
+                    self.cursor_shockwave_opacity = opacity;
+                    if let Some(renderer) = self.renderer.as_mut() {
+                        renderer.set_cursor_shockwave(enabled, (r, g, b), radius, decay, opacity);
+                    }
+                    self.frame_dirty = true;
+                }
+                RenderCommand::SetDiamondLattice { enabled, r, g, b, cell_size, shimmer_speed, opacity } => {
+                    self.diamond_lattice_enabled = enabled;
+                    self.diamond_lattice_color = (r, g, b);
+                    self.diamond_lattice_cell_size = cell_size;
+                    self.diamond_lattice_shimmer_speed = shimmer_speed;
+                    self.diamond_lattice_opacity = opacity;
+                    if let Some(renderer) = self.renderer.as_mut() {
+                        renderer.set_diamond_lattice(enabled, (r, g, b), cell_size, shimmer_speed, opacity);
+                    }
+                    self.frame_dirty = true;
+                }
+                RenderCommand::SetCursorGravityWell { enabled, r, g, b, field_radius, line_count, opacity } => {
+                    self.cursor_gravity_well_enabled = enabled;
+                    self.cursor_gravity_well_color = (r, g, b);
+                    self.cursor_gravity_well_field_radius = field_radius;
+                    self.cursor_gravity_well_line_count = line_count;
+                    self.cursor_gravity_well_opacity = opacity;
+                    if let Some(renderer) = self.renderer.as_mut() {
+                        renderer.set_cursor_gravity_well(enabled, (r, g, b), field_radius, line_count, opacity);
                     }
                     self.frame_dirty = true;
                 }

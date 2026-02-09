@@ -10819,6 +10819,154 @@ OPACITY is 0-100 (default 30). */)
   return on ? Qt : Qnil;
 }
 
+DEFUN ("neomacs-set-spiral-vortex",
+       Fneomacs_set_spiral_vortex,
+       Sneomacs_set_spiral_vortex, 0, 5, 0,
+       doc: /* Configure spiral vortex overlay effect.
+ENABLED non-nil activates spiraling pattern from window center.
+COLOR is a hex color string like "#RRGGBB" (default "#6633CC").
+ARMS is number of spiral arms (default 4).
+SPEED is rotation speed * 100 (default 50).
+OPACITY is 0-100 (default 10). */)
+  (Lisp_Object enabled, Lisp_Object color, Lisp_Object arms,
+   Lisp_Object speed, Lisp_Object opacity)
+{
+  struct neomacs_display_info *dpyinfo = neomacs_display_list;
+  if (!dpyinfo || !dpyinfo->display_handle)
+    return Qnil;
+  int on = !NILP (enabled);
+  int r = 0x66, g = 0x33, b = 0xCC, ar = 4, spd = 50, op = 10;
+  if (STRINGP (color))
+    {
+      const char *s = SSDATA (color);
+      if (s[0] == '#' && strlen (s) == 7)
+        {
+          unsigned int hex;
+          sscanf (s + 1, "%06x", &hex);
+          r = (hex >> 16) & 0xFF;
+          g = (hex >> 8) & 0xFF;
+          b = hex & 0xFF;
+        }
+    }
+  if (FIXNUMP (arms)) ar = XFIXNUM (arms);
+  if (FIXNUMP (speed)) spd = XFIXNUM (speed);
+  if (FIXNUMP (opacity)) op = XFIXNUM (opacity);
+
+  neomacs_display_set_spiral_vortex (dpyinfo->display_handle, on, r, g, b, ar, spd, op);
+  return on ? Qt : Qnil;
+}
+
+DEFUN ("neomacs-set-cursor-shockwave",
+       Fneomacs_set_cursor_shockwave,
+       Sneomacs_set_cursor_shockwave, 0, 5, 0,
+       doc: /* Configure cursor shockwave effect.
+ENABLED non-nil activates expanding shockwave ring on cursor move.
+COLOR is a hex color string like "#RRGGBB" (default "#FF9933").
+RADIUS is max expansion radius in pixels (default 80).
+DECAY is decay speed * 100 (default 200).
+OPACITY is 0-100 (default 30). */)
+  (Lisp_Object enabled, Lisp_Object color, Lisp_Object radius,
+   Lisp_Object decay, Lisp_Object opacity)
+{
+  struct neomacs_display_info *dpyinfo = neomacs_display_list;
+  if (!dpyinfo || !dpyinfo->display_handle)
+    return Qnil;
+  int on = !NILP (enabled);
+  int r = 0xFF, g = 0x99, b = 0x33, rad = 80, dec = 200, op = 30;
+  if (STRINGP (color))
+    {
+      const char *s = SSDATA (color);
+      if (s[0] == '#' && strlen (s) == 7)
+        {
+          unsigned int hex;
+          sscanf (s + 1, "%06x", &hex);
+          r = (hex >> 16) & 0xFF;
+          g = (hex >> 8) & 0xFF;
+          b = hex & 0xFF;
+        }
+    }
+  if (FIXNUMP (radius)) rad = XFIXNUM (radius);
+  if (FIXNUMP (decay)) dec = XFIXNUM (decay);
+  if (FIXNUMP (opacity)) op = XFIXNUM (opacity);
+
+  neomacs_display_set_cursor_shockwave (dpyinfo->display_handle, on, r, g, b, rad, dec, op);
+  return on ? Qt : Qnil;
+}
+
+DEFUN ("neomacs-set-diamond-lattice",
+       Fneomacs_set_diamond_lattice,
+       Sneomacs_set_diamond_lattice, 0, 5, 0,
+       doc: /* Configure diamond lattice overlay effect.
+ENABLED non-nil activates tessellated diamond pattern.
+COLOR is a hex color string like "#RRGGBB" (default "#B380E5").
+CELL-SIZE is diamond cell size in pixels (default 30).
+SHIMMER-SPEED is shimmer animation speed * 100 (default 80).
+OPACITY is 0-100 (default 8). */)
+  (Lisp_Object enabled, Lisp_Object color, Lisp_Object cell_size,
+   Lisp_Object shimmer_speed, Lisp_Object opacity)
+{
+  struct neomacs_display_info *dpyinfo = neomacs_display_list;
+  if (!dpyinfo || !dpyinfo->display_handle)
+    return Qnil;
+  int on = !NILP (enabled);
+  int r = 0xB3, g = 0x80, b = 0xE5, cs = 30, ss = 80, op = 8;
+  if (STRINGP (color))
+    {
+      const char *s = SSDATA (color);
+      if (s[0] == '#' && strlen (s) == 7)
+        {
+          unsigned int hex;
+          sscanf (s + 1, "%06x", &hex);
+          r = (hex >> 16) & 0xFF;
+          g = (hex >> 8) & 0xFF;
+          b = hex & 0xFF;
+        }
+    }
+  if (FIXNUMP (cell_size)) cs = XFIXNUM (cell_size);
+  if (FIXNUMP (shimmer_speed)) ss = XFIXNUM (shimmer_speed);
+  if (FIXNUMP (opacity)) op = XFIXNUM (opacity);
+
+  neomacs_display_set_diamond_lattice (dpyinfo->display_handle, on, r, g, b, cs, ss, op);
+  return on ? Qt : Qnil;
+}
+
+DEFUN ("neomacs-set-cursor-gravity-well",
+       Fneomacs_set_cursor_gravity_well,
+       Sneomacs_set_cursor_gravity_well, 0, 5, 0,
+       doc: /* Configure cursor gravity well effect.
+ENABLED non-nil activates gravity field lines curving toward cursor.
+COLOR is a hex color string like "#RRGGBB" (default "#4D99FF").
+FIELD-RADIUS is field radius in pixels (default 80).
+LINE-COUNT is number of field lines (default 8).
+OPACITY is 0-100 (default 20). */)
+  (Lisp_Object enabled, Lisp_Object color, Lisp_Object field_radius,
+   Lisp_Object line_count, Lisp_Object opacity)
+{
+  struct neomacs_display_info *dpyinfo = neomacs_display_list;
+  if (!dpyinfo || !dpyinfo->display_handle)
+    return Qnil;
+  int on = !NILP (enabled);
+  int r = 0x4D, g = 0x99, b = 0xFF, fr = 80, lc = 8, op = 20;
+  if (STRINGP (color))
+    {
+      const char *s = SSDATA (color);
+      if (s[0] == '#' && strlen (s) == 7)
+        {
+          unsigned int hex;
+          sscanf (s + 1, "%06x", &hex);
+          r = (hex >> 16) & 0xFF;
+          g = (hex >> 8) & 0xFF;
+          b = hex & 0xFF;
+        }
+    }
+  if (FIXNUMP (field_radius)) fr = XFIXNUM (field_radius);
+  if (FIXNUMP (line_count)) lc = XFIXNUM (line_count);
+  if (FIXNUMP (opacity)) op = XFIXNUM (opacity);
+
+  neomacs_display_set_cursor_gravity_well (dpyinfo->display_handle, on, r, g, b, fr, lc, op);
+  return on ? Qt : Qnil;
+}
+
 DEFUN ("neomacs-set-hex-grid",
        Fneomacs_set_hex_grid,
        Sneomacs_set_hex_grid, 0, 5, 0,
@@ -12648,6 +12796,10 @@ syms_of_neomacsterm (void)
   defsubr (&Sneomacs_set_cursor_ripple_ring);
   defsubr (&Sneomacs_set_noise_field);
   defsubr (&Sneomacs_set_cursor_scope);
+  defsubr (&Sneomacs_set_spiral_vortex);
+  defsubr (&Sneomacs_set_cursor_shockwave);
+  defsubr (&Sneomacs_set_diamond_lattice);
+  defsubr (&Sneomacs_set_cursor_gravity_well);
   defsubr (&Sneomacs_set_hex_grid);
   defsubr (&Sneomacs_set_cursor_sparkle_burst);
   defsubr (&Sneomacs_set_circuit_trace);

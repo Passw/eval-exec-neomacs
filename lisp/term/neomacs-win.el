@@ -5698,6 +5698,290 @@ Non-nil renders animated flowing color bands at the top of the frame."
                 neomacs-cursor-scope-gap nil)
             val))))
 
+;; Spiral vortex overlay effect
+(declare-function neomacs-set-spiral-vortex "neomacsterm.c")
+
+(defcustom neomacs-spiral-vortex nil
+  "Enable spiral vortex overlay effect."
+  :type 'boolean
+  :group 'neomacs
+  :set (lambda (sym val)
+         (set-default sym val)
+         (when (fboundp 'neomacs-set-spiral-vortex)
+           (neomacs-set-spiral-vortex val))))
+
+(defcustom neomacs-spiral-vortex-color "#6633CC"
+  "Spiral vortex color."
+  :type 'color
+  :group 'neomacs
+  :set (lambda (sym val)
+         (set-default sym val)
+         (when (and (fboundp 'neomacs-set-spiral-vortex)
+                    (boundp 'neomacs-spiral-vortex)
+                    neomacs-spiral-vortex)
+           (neomacs-set-spiral-vortex t val))))
+
+(defcustom neomacs-spiral-vortex-arms 4
+  "Number of spiral arms."
+  :type '(integer :tag "Arms")
+  :group 'neomacs
+  :set (lambda (sym val)
+         (set-default sym val)
+         (when (and (fboundp 'neomacs-set-spiral-vortex)
+                    (boundp 'neomacs-spiral-vortex)
+                    neomacs-spiral-vortex)
+           (neomacs-set-spiral-vortex t
+            (if (boundp 'neomacs-spiral-vortex-color)
+                neomacs-spiral-vortex-color nil)
+            val))))
+
+(defcustom neomacs-spiral-vortex-speed 50
+  "Rotation speed * 100."
+  :type '(integer :tag "Speed")
+  :group 'neomacs
+  :set (lambda (sym val)
+         (set-default sym val)
+         (when (and (fboundp 'neomacs-set-spiral-vortex)
+                    (boundp 'neomacs-spiral-vortex)
+                    neomacs-spiral-vortex)
+           (neomacs-set-spiral-vortex t
+            (if (boundp 'neomacs-spiral-vortex-color)
+                neomacs-spiral-vortex-color nil)
+            (if (boundp 'neomacs-spiral-vortex-arms)
+                neomacs-spiral-vortex-arms nil)
+            val))))
+
+(defcustom neomacs-spiral-vortex-opacity 10
+  "Spiral vortex opacity (0-100)."
+  :type '(integer :tag "Opacity (0-100)")
+  :group 'neomacs
+  :set (lambda (sym val)
+         (set-default sym val)
+         (when (and (fboundp 'neomacs-set-spiral-vortex)
+                    (boundp 'neomacs-spiral-vortex)
+                    neomacs-spiral-vortex)
+           (neomacs-set-spiral-vortex t
+            (if (boundp 'neomacs-spiral-vortex-color)
+                neomacs-spiral-vortex-color nil)
+            (if (boundp 'neomacs-spiral-vortex-arms)
+                neomacs-spiral-vortex-arms nil)
+            (if (boundp 'neomacs-spiral-vortex-speed)
+                neomacs-spiral-vortex-speed nil)
+            val))))
+
+;; Cursor shockwave effect
+(declare-function neomacs-set-cursor-shockwave "neomacsterm.c")
+
+(defcustom neomacs-cursor-shockwave nil
+  "Enable cursor shockwave effect."
+  :type 'boolean
+  :group 'neomacs
+  :set (lambda (sym val)
+         (set-default sym val)
+         (when (fboundp 'neomacs-set-cursor-shockwave)
+           (neomacs-set-cursor-shockwave val))))
+
+(defcustom neomacs-cursor-shockwave-color "#FF9933"
+  "Shockwave ring color."
+  :type 'color
+  :group 'neomacs
+  :set (lambda (sym val)
+         (set-default sym val)
+         (when (and (fboundp 'neomacs-set-cursor-shockwave)
+                    (boundp 'neomacs-cursor-shockwave)
+                    neomacs-cursor-shockwave)
+           (neomacs-set-cursor-shockwave t val))))
+
+(defcustom neomacs-cursor-shockwave-radius 80
+  "Max expansion radius in pixels."
+  :type '(integer :tag "Radius (pixels)")
+  :group 'neomacs
+  :set (lambda (sym val)
+         (set-default sym val)
+         (when (and (fboundp 'neomacs-set-cursor-shockwave)
+                    (boundp 'neomacs-cursor-shockwave)
+                    neomacs-cursor-shockwave)
+           (neomacs-set-cursor-shockwave t
+            (if (boundp 'neomacs-cursor-shockwave-color)
+                neomacs-cursor-shockwave-color nil)
+            val))))
+
+(defcustom neomacs-cursor-shockwave-decay 200
+  "Decay speed * 100."
+  :type '(integer :tag "Decay speed")
+  :group 'neomacs
+  :set (lambda (sym val)
+         (set-default sym val)
+         (when (and (fboundp 'neomacs-set-cursor-shockwave)
+                    (boundp 'neomacs-cursor-shockwave)
+                    neomacs-cursor-shockwave)
+           (neomacs-set-cursor-shockwave t
+            (if (boundp 'neomacs-cursor-shockwave-color)
+                neomacs-cursor-shockwave-color nil)
+            (if (boundp 'neomacs-cursor-shockwave-radius)
+                neomacs-cursor-shockwave-radius nil)
+            val))))
+
+(defcustom neomacs-cursor-shockwave-opacity 30
+  "Shockwave opacity (0-100)."
+  :type '(integer :tag "Opacity (0-100)")
+  :group 'neomacs
+  :set (lambda (sym val)
+         (set-default sym val)
+         (when (and (fboundp 'neomacs-set-cursor-shockwave)
+                    (boundp 'neomacs-cursor-shockwave)
+                    neomacs-cursor-shockwave)
+           (neomacs-set-cursor-shockwave t
+            (if (boundp 'neomacs-cursor-shockwave-color)
+                neomacs-cursor-shockwave-color nil)
+            (if (boundp 'neomacs-cursor-shockwave-radius)
+                neomacs-cursor-shockwave-radius nil)
+            (if (boundp 'neomacs-cursor-shockwave-decay)
+                neomacs-cursor-shockwave-decay nil)
+            val))))
+
+;; Diamond lattice overlay effect
+(declare-function neomacs-set-diamond-lattice "neomacsterm.c")
+
+(defcustom neomacs-diamond-lattice nil
+  "Enable diamond lattice overlay effect."
+  :type 'boolean
+  :group 'neomacs
+  :set (lambda (sym val)
+         (set-default sym val)
+         (when (fboundp 'neomacs-set-diamond-lattice)
+           (neomacs-set-diamond-lattice val))))
+
+(defcustom neomacs-diamond-lattice-color "#B380E5"
+  "Diamond lattice color."
+  :type 'color
+  :group 'neomacs
+  :set (lambda (sym val)
+         (set-default sym val)
+         (when (and (fboundp 'neomacs-set-diamond-lattice)
+                    (boundp 'neomacs-diamond-lattice)
+                    neomacs-diamond-lattice)
+           (neomacs-set-diamond-lattice t val))))
+
+(defcustom neomacs-diamond-lattice-cell-size 30
+  "Diamond cell size in pixels."
+  :type '(integer :tag "Cell size (pixels)")
+  :group 'neomacs
+  :set (lambda (sym val)
+         (set-default sym val)
+         (when (and (fboundp 'neomacs-set-diamond-lattice)
+                    (boundp 'neomacs-diamond-lattice)
+                    neomacs-diamond-lattice)
+           (neomacs-set-diamond-lattice t
+            (if (boundp 'neomacs-diamond-lattice-color)
+                neomacs-diamond-lattice-color nil)
+            val))))
+
+(defcustom neomacs-diamond-lattice-shimmer-speed 80
+  "Shimmer animation speed * 100."
+  :type '(integer :tag "Shimmer speed")
+  :group 'neomacs
+  :set (lambda (sym val)
+         (set-default sym val)
+         (when (and (fboundp 'neomacs-set-diamond-lattice)
+                    (boundp 'neomacs-diamond-lattice)
+                    neomacs-diamond-lattice)
+           (neomacs-set-diamond-lattice t
+            (if (boundp 'neomacs-diamond-lattice-color)
+                neomacs-diamond-lattice-color nil)
+            (if (boundp 'neomacs-diamond-lattice-cell-size)
+                neomacs-diamond-lattice-cell-size nil)
+            val))))
+
+(defcustom neomacs-diamond-lattice-opacity 8
+  "Diamond lattice opacity (0-100)."
+  :type '(integer :tag "Opacity (0-100)")
+  :group 'neomacs
+  :set (lambda (sym val)
+         (set-default sym val)
+         (when (and (fboundp 'neomacs-set-diamond-lattice)
+                    (boundp 'neomacs-diamond-lattice)
+                    neomacs-diamond-lattice)
+           (neomacs-set-diamond-lattice t
+            (if (boundp 'neomacs-diamond-lattice-color)
+                neomacs-diamond-lattice-color nil)
+            (if (boundp 'neomacs-diamond-lattice-cell-size)
+                neomacs-diamond-lattice-cell-size nil)
+            (if (boundp 'neomacs-diamond-lattice-shimmer-speed)
+                neomacs-diamond-lattice-shimmer-speed nil)
+            val))))
+
+;; Cursor gravity well effect
+(declare-function neomacs-set-cursor-gravity-well "neomacsterm.c")
+
+(defcustom neomacs-cursor-gravity-well nil
+  "Enable cursor gravity well effect."
+  :type 'boolean
+  :group 'neomacs
+  :set (lambda (sym val)
+         (set-default sym val)
+         (when (fboundp 'neomacs-set-cursor-gravity-well)
+           (neomacs-set-cursor-gravity-well val))))
+
+(defcustom neomacs-cursor-gravity-well-color "#4D99FF"
+  "Gravity field line color."
+  :type 'color
+  :group 'neomacs
+  :set (lambda (sym val)
+         (set-default sym val)
+         (when (and (fboundp 'neomacs-set-cursor-gravity-well)
+                    (boundp 'neomacs-cursor-gravity-well)
+                    neomacs-cursor-gravity-well)
+           (neomacs-set-cursor-gravity-well t val))))
+
+(defcustom neomacs-cursor-gravity-well-field-radius 80
+  "Field radius in pixels."
+  :type '(integer :tag "Radius (pixels)")
+  :group 'neomacs
+  :set (lambda (sym val)
+         (set-default sym val)
+         (when (and (fboundp 'neomacs-set-cursor-gravity-well)
+                    (boundp 'neomacs-cursor-gravity-well)
+                    neomacs-cursor-gravity-well)
+           (neomacs-set-cursor-gravity-well t
+            (if (boundp 'neomacs-cursor-gravity-well-color)
+                neomacs-cursor-gravity-well-color nil)
+            val))))
+
+(defcustom neomacs-cursor-gravity-well-line-count 8
+  "Number of field lines."
+  :type '(integer :tag "Line count")
+  :group 'neomacs
+  :set (lambda (sym val)
+         (set-default sym val)
+         (when (and (fboundp 'neomacs-set-cursor-gravity-well)
+                    (boundp 'neomacs-cursor-gravity-well)
+                    neomacs-cursor-gravity-well)
+           (neomacs-set-cursor-gravity-well t
+            (if (boundp 'neomacs-cursor-gravity-well-color)
+                neomacs-cursor-gravity-well-color nil)
+            (if (boundp 'neomacs-cursor-gravity-well-field-radius)
+                neomacs-cursor-gravity-well-field-radius nil)
+            val))))
+
+(defcustom neomacs-cursor-gravity-well-opacity 20
+  "Gravity well opacity (0-100)."
+  :type '(integer :tag "Opacity (0-100)")
+  :group 'neomacs
+  :set (lambda (sym val)
+         (set-default sym val)
+         (when (and (fboundp 'neomacs-set-cursor-gravity-well)
+                    (boundp 'neomacs-cursor-gravity-well)
+                    neomacs-cursor-gravity-well)
+           (neomacs-set-cursor-gravity-well t
+            (if (boundp 'neomacs-cursor-gravity-well-color)
+                neomacs-cursor-gravity-well-color nil)
+            (if (boundp 'neomacs-cursor-gravity-well-field-radius)
+                neomacs-cursor-gravity-well-field-radius nil)
+            (if (boundp 'neomacs-cursor-gravity-well-line-count)
+                neomacs-cursor-gravity-well-line-count nil)
+            val))))
+
 ;; Hex grid overlay effect
 (declare-function neomacs-set-hex-grid "neomacsterm.c")
 

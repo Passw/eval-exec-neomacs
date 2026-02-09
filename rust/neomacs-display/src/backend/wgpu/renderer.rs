@@ -591,6 +591,33 @@ pub struct WgpuRenderer {
     cursor_scope_thickness: f32,
     cursor_scope_gap: f32,
     cursor_scope_opacity: f32,
+    /// Spiral vortex overlay
+    spiral_vortex_enabled: bool,
+    spiral_vortex_color: (f32, f32, f32),
+    spiral_vortex_arms: u32,
+    spiral_vortex_speed: f32,
+    spiral_vortex_opacity: f32,
+    /// Cursor shockwave
+    cursor_shockwave_enabled: bool,
+    cursor_shockwave_color: (f32, f32, f32),
+    cursor_shockwave_radius: f32,
+    cursor_shockwave_decay: f32,
+    cursor_shockwave_opacity: f32,
+    cursor_shockwave_start: Option<std::time::Instant>,
+    cursor_shockwave_last_x: f32,
+    cursor_shockwave_last_y: f32,
+    /// Diamond lattice overlay
+    diamond_lattice_enabled: bool,
+    diamond_lattice_color: (f32, f32, f32),
+    diamond_lattice_cell_size: f32,
+    diamond_lattice_shimmer_speed: f32,
+    diamond_lattice_opacity: f32,
+    /// Cursor gravity well
+    cursor_gravity_well_enabled: bool,
+    cursor_gravity_well_color: (f32, f32, f32),
+    cursor_gravity_well_field_radius: f32,
+    cursor_gravity_well_line_count: u32,
+    cursor_gravity_well_opacity: f32,
     /// Window edge glow on scroll boundaries
     edge_glow_enabled: bool,
     edge_glow_color: (f32, f32, f32),
@@ -1679,6 +1706,29 @@ impl WgpuRenderer {
             cursor_scope_thickness: 1.0,
             cursor_scope_gap: 10.0,
             cursor_scope_opacity: 0.3,
+            spiral_vortex_enabled: false,
+            spiral_vortex_color: (0.4, 0.2, 0.8),
+            spiral_vortex_arms: 4,
+            spiral_vortex_speed: 0.5,
+            spiral_vortex_opacity: 0.1,
+            cursor_shockwave_enabled: false,
+            cursor_shockwave_color: (1.0, 0.6, 0.2),
+            cursor_shockwave_radius: 80.0,
+            cursor_shockwave_decay: 2.0,
+            cursor_shockwave_opacity: 0.3,
+            cursor_shockwave_start: None,
+            cursor_shockwave_last_x: 0.0,
+            cursor_shockwave_last_y: 0.0,
+            diamond_lattice_enabled: false,
+            diamond_lattice_color: (0.7, 0.5, 0.9),
+            diamond_lattice_cell_size: 30.0,
+            diamond_lattice_shimmer_speed: 0.8,
+            diamond_lattice_opacity: 0.08,
+            cursor_gravity_well_enabled: false,
+            cursor_gravity_well_color: (0.3, 0.6, 1.0),
+            cursor_gravity_well_field_radius: 80.0,
+            cursor_gravity_well_line_count: 8,
+            cursor_gravity_well_opacity: 0.2,
             edge_glow_enabled: false,
             edge_glow_color: (0.4, 0.6, 1.0),
             edge_glow_height: 40.0,
@@ -2546,6 +2596,42 @@ impl WgpuRenderer {
         self.cursor_scope_thickness = thickness;
         self.cursor_scope_gap = gap;
         self.cursor_scope_opacity = opacity;
+    }
+
+    /// Update spiral vortex config
+    pub fn set_spiral_vortex(&mut self, enabled: bool, color: (f32, f32, f32), arms: u32, speed: f32, opacity: f32) {
+        self.spiral_vortex_enabled = enabled;
+        self.spiral_vortex_color = color;
+        self.spiral_vortex_arms = arms;
+        self.spiral_vortex_speed = speed;
+        self.spiral_vortex_opacity = opacity;
+    }
+
+    /// Update cursor shockwave config
+    pub fn set_cursor_shockwave(&mut self, enabled: bool, color: (f32, f32, f32), radius: f32, decay: f32, opacity: f32) {
+        self.cursor_shockwave_enabled = enabled;
+        self.cursor_shockwave_color = color;
+        self.cursor_shockwave_radius = radius;
+        self.cursor_shockwave_decay = decay;
+        self.cursor_shockwave_opacity = opacity;
+    }
+
+    /// Update diamond lattice config
+    pub fn set_diamond_lattice(&mut self, enabled: bool, color: (f32, f32, f32), cell_size: f32, shimmer_speed: f32, opacity: f32) {
+        self.diamond_lattice_enabled = enabled;
+        self.diamond_lattice_color = color;
+        self.diamond_lattice_cell_size = cell_size;
+        self.diamond_lattice_shimmer_speed = shimmer_speed;
+        self.diamond_lattice_opacity = opacity;
+    }
+
+    /// Update cursor gravity well config
+    pub fn set_cursor_gravity_well(&mut self, enabled: bool, color: (f32, f32, f32), field_radius: f32, line_count: u32, opacity: f32) {
+        self.cursor_gravity_well_enabled = enabled;
+        self.cursor_gravity_well_color = color;
+        self.cursor_gravity_well_field_radius = field_radius;
+        self.cursor_gravity_well_line_count = line_count;
+        self.cursor_gravity_well_opacity = opacity;
     }
 
     /// Update hex grid config
@@ -6551,6 +6637,212 @@ impl WgpuRenderer {
                         render_pass.set_bind_group(0, &self.uniform_bind_group, &[]);
                         render_pass.set_vertex_buffer(0, ch_buf.slice(..));
                         render_pass.draw(0..ch_verts.len() as u32, 0..1);
+                    }
+                    self.needs_continuous_redraw = true;
+                }
+            }
+
+            // === Spiral vortex overlay effect ===
+            if self.spiral_vortex_enabled {
+                let now = std::time::Instant::now().duration_since(self.aurora_start).as_secs_f32();
+                let (vr, vg, vb) = self.spiral_vortex_color;
+                let vop = self.spiral_vortex_opacity;
+                let arms = self.spiral_vortex_arms.max(2).min(12);
+                let spd = self.spiral_vortex_speed;
+                let fw = self.width() as f32;
+                let fh = self.height() as f32;
+                let cx = fw / 2.0;
+                let cy = fh / 2.0;
+                let max_r = (fw * fw + fh * fh).sqrt() * 0.5;
+                let mut vortex_verts: Vec<RectVertex> = Vec::new();
+                for arm in 0..arms {
+                    let arm_offset = arm as f32 * std::f32::consts::PI * 2.0 / arms as f32;
+                    let steps = 60;
+                    for step in 0..steps {
+                        let t = step as f32 / steps as f32;
+                        let r = t * max_r;
+                        let angle = arm_offset + t * 6.0 + now * spd;
+                        let px = cx + angle.cos() * r;
+                        let py = cy + angle.sin() * r;
+                        let sz = 2.0 + t * 3.0;
+                        let alpha = vop * (1.0 - t * 0.7);
+                        let c = Color::new(vr, vg, vb, alpha);
+                        self.add_rect(&mut vortex_verts, px - sz / 2.0, py - sz / 2.0, sz, sz, &c);
+                    }
+                }
+                if !vortex_verts.is_empty() {
+                    let vx_buf = self.device.create_buffer_init(
+                        &wgpu::util::BufferInitDescriptor {
+                            label: Some("Spiral Vortex Buffer"),
+                            contents: bytemuck::cast_slice(&vortex_verts),
+                            usage: wgpu::BufferUsages::VERTEX,
+                        },
+                    );
+                    render_pass.set_pipeline(&self.rect_pipeline);
+                    render_pass.set_bind_group(0, &self.uniform_bind_group, &[]);
+                    render_pass.set_vertex_buffer(0, vx_buf.slice(..));
+                    render_pass.draw(0..vortex_verts.len() as u32, 0..1);
+                }
+                self.needs_continuous_redraw = true;
+            }
+
+            // === Cursor shockwave effect ===
+            if self.cursor_shockwave_enabled && cursor_visible {
+                if let Some(ref anim) = animated_cursor {
+                    let cx = anim.x + anim.width / 2.0;
+                    let cy = anim.y + anim.height / 2.0;
+                    // Detect cursor move
+                    if (cx - self.cursor_shockwave_last_x).abs() > 1.0 || (cy - self.cursor_shockwave_last_y).abs() > 1.0 {
+                        self.cursor_shockwave_start = Some(std::time::Instant::now());
+                        self.cursor_shockwave_last_x = cx;
+                        self.cursor_shockwave_last_y = cy;
+                    }
+                    if let Some(start) = self.cursor_shockwave_start {
+                        let elapsed = start.elapsed().as_secs_f32();
+                        let max_r = self.cursor_shockwave_radius;
+                        let duration = 1.0 / self.cursor_shockwave_decay;
+                        if elapsed < duration {
+                            let t = elapsed / duration;
+                            let radius = t * max_r;
+                            let (sr, sg, sb) = self.cursor_shockwave_color;
+                            let sop = self.cursor_shockwave_opacity;
+                            let fade = (1.0 - t) * (1.0 - t);
+                            let mut sw_verts: Vec<RectVertex> = Vec::new();
+                            // Ring at current radius
+                            let ring_thick = 3.0 * (1.0 - t * 0.5);
+                            let ring_segs = 48;
+                            for seg in 0..ring_segs {
+                                let a = seg as f32 / ring_segs as f32 * std::f32::consts::PI * 2.0;
+                                let px = cx + a.cos() * radius;
+                                let py = cy + a.sin() * radius;
+                                let c = Color::new(sr, sg, sb, sop * fade);
+                                self.add_rect(&mut sw_verts, px - ring_thick / 2.0, py - ring_thick / 2.0, ring_thick, ring_thick, &c);
+                            }
+                            // Inner glow
+                            let inner_r = radius * 0.7;
+                            for seg in 0..24 {
+                                let a = seg as f32 / 24.0 * std::f32::consts::PI * 2.0;
+                                let px = cx + a.cos() * inner_r;
+                                let py = cy + a.sin() * inner_r;
+                                let c = Color::new(sr, sg, sb, sop * fade * 0.3);
+                                self.add_rect(&mut sw_verts, px - 1.0, py - 1.0, 2.0, 2.0, &c);
+                            }
+                            if !sw_verts.is_empty() {
+                                let sw_buf = self.device.create_buffer_init(
+                                    &wgpu::util::BufferInitDescriptor {
+                                        label: Some("Shockwave Buffer"),
+                                        contents: bytemuck::cast_slice(&sw_verts),
+                                        usage: wgpu::BufferUsages::VERTEX,
+                                    },
+                                );
+                                render_pass.set_pipeline(&self.rect_pipeline);
+                                render_pass.set_bind_group(0, &self.uniform_bind_group, &[]);
+                                render_pass.set_vertex_buffer(0, sw_buf.slice(..));
+                                render_pass.draw(0..sw_verts.len() as u32, 0..1);
+                            }
+                            self.needs_continuous_redraw = true;
+                        } else {
+                            self.cursor_shockwave_start = None;
+                        }
+                    }
+                }
+            }
+
+            // === Diamond lattice overlay effect ===
+            if self.diamond_lattice_enabled {
+                let now = std::time::Instant::now().duration_since(self.aurora_start).as_secs_f32();
+                let (dr, dg, db) = self.diamond_lattice_color;
+                let dop = self.diamond_lattice_opacity;
+                let cell = self.diamond_lattice_cell_size.max(10.0);
+                let shspd = self.diamond_lattice_shimmer_speed;
+                let fw = self.width() as f32;
+                let fh = self.height() as f32;
+                let mut dl_verts: Vec<RectVertex> = Vec::new();
+                let half = cell / 2.0;
+                let cols = (fw / cell) as i32 + 2;
+                let rows = (fh / half) as i32 + 2;
+                let line_thick = 1.0;
+                for row in 0..rows {
+                    for col in 0..cols {
+                        let cx = col as f32 * cell + if row % 2 == 1 { half } else { 0.0 };
+                        let cy = row as f32 * half;
+                        let shimmer = (0.5 + 0.5 * ((cx * 0.02 + cy * 0.02 + now * shspd).sin())).max(0.0);
+                        let alpha = dop * shimmer;
+                        let c = Color::new(dr, dg, db, alpha);
+                        // Draw diamond edges as small rects
+                        // Top-right edge
+                        let segs = 4;
+                        for s in 0..segs {
+                            let t = s as f32 / segs as f32;
+                            let px = cx + t * half;
+                            let py = cy - half + t * half;
+                            self.add_rect(&mut dl_verts, px, py, line_thick, line_thick, &c);
+                        }
+                        // Bottom-right edge
+                        for s in 0..segs {
+                            let t = s as f32 / segs as f32;
+                            let px = cx + half - t * half;
+                            let py = cy + t * half;
+                            self.add_rect(&mut dl_verts, px, py, line_thick, line_thick, &c);
+                        }
+                    }
+                }
+                if !dl_verts.is_empty() {
+                    let dl_buf = self.device.create_buffer_init(
+                        &wgpu::util::BufferInitDescriptor {
+                            label: Some("Diamond Lattice Buffer"),
+                            contents: bytemuck::cast_slice(&dl_verts),
+                            usage: wgpu::BufferUsages::VERTEX,
+                        },
+                    );
+                    render_pass.set_pipeline(&self.rect_pipeline);
+                    render_pass.set_bind_group(0, &self.uniform_bind_group, &[]);
+                    render_pass.set_vertex_buffer(0, dl_buf.slice(..));
+                    render_pass.draw(0..dl_verts.len() as u32, 0..1);
+                }
+                self.needs_continuous_redraw = true;
+            }
+
+            // === Cursor gravity well effect ===
+            if self.cursor_gravity_well_enabled && cursor_visible {
+                if let Some(ref anim) = animated_cursor {
+                    let cx = anim.x + anim.width / 2.0;
+                    let cy = anim.y + anim.height / 2.0;
+                    let (gr, gg, gb) = self.cursor_gravity_well_color;
+                    let gop = self.cursor_gravity_well_opacity;
+                    let field_r = self.cursor_gravity_well_field_radius;
+                    let lines = self.cursor_gravity_well_line_count.max(4).min(24);
+                    let now = std::time::Instant::now().duration_since(self.aurora_start).as_secs_f32();
+                    let mut gw_verts: Vec<RectVertex> = Vec::new();
+                    for line in 0..lines {
+                        let base_angle = line as f32 * std::f32::consts::PI * 2.0 / lines as f32 + now * 0.2;
+                        let steps = 20;
+                        for step in 0..steps {
+                            let t = step as f32 / steps as f32;
+                            let r = field_r * (1.0 - t);
+                            // Spiral inward with slight curve
+                            let curve = t * t * 1.5;
+                            let angle = base_angle + curve;
+                            let px = cx + angle.cos() * r;
+                            let py = cy + angle.sin() * r;
+                            let sz = 1.5 + t * 2.0;
+                            let alpha = gop * t * t;
+                            let c = Color::new(gr, gg, gb, alpha);
+                            self.add_rect(&mut gw_verts, px - sz / 2.0, py - sz / 2.0, sz, sz, &c);
+                        }
+                    }
+                    if !gw_verts.is_empty() {
+                        let gw_buf = self.device.create_buffer_init(
+                            &wgpu::util::BufferInitDescriptor {
+                                label: Some("Gravity Well Buffer"),
+                                contents: bytemuck::cast_slice(&gw_verts),
+                                usage: wgpu::BufferUsages::VERTEX,
+                            },
+                        );
+                        render_pass.set_pipeline(&self.rect_pipeline);
+                        render_pass.set_bind_group(0, &self.uniform_bind_group, &[]);
+                        render_pass.set_vertex_buffer(0, gw_buf.slice(..));
+                        render_pass.draw(0..gw_verts.len() as u32, 0..1);
                     }
                     self.needs_continuous_redraw = true;
                 }

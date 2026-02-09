@@ -1288,6 +1288,54 @@ pub enum RenderCommand {
         /// Opacity (0.0-1.0)
         opacity: f32,
     },
+    /// Configure spiral vortex overlay effect
+    SetSpiralVortex {
+        enabled: bool,
+        /// Spiral color (sRGB floats)
+        r: f32, g: f32, b: f32,
+        /// Number of spiral arms
+        arms: u32,
+        /// Rotation speed multiplier
+        speed: f32,
+        /// Opacity (0.0-1.0)
+        opacity: f32,
+    },
+    /// Configure cursor shockwave effect
+    SetCursorShockwave {
+        enabled: bool,
+        /// Shockwave color (sRGB floats)
+        r: f32, g: f32, b: f32,
+        /// Max expansion radius in pixels
+        radius: f32,
+        /// Decay speed multiplier
+        decay: f32,
+        /// Opacity (0.0-1.0)
+        opacity: f32,
+    },
+    /// Configure diamond lattice overlay effect
+    SetDiamondLattice {
+        enabled: bool,
+        /// Lattice color (sRGB floats)
+        r: f32, g: f32, b: f32,
+        /// Diamond cell size in pixels
+        cell_size: f32,
+        /// Shimmer animation speed
+        shimmer_speed: f32,
+        /// Opacity (0.0-1.0)
+        opacity: f32,
+    },
+    /// Configure cursor gravity well effect
+    SetCursorGravityWell {
+        enabled: bool,
+        /// Field color (sRGB floats)
+        r: f32, g: f32, b: f32,
+        /// Field radius in pixels
+        field_radius: f32,
+        /// Number of field lines
+        line_count: u32,
+        /// Opacity (0.0-1.0)
+        opacity: f32,
+    },
     /// Configure background pattern
     SetBackgroundPattern {
         /// 0=none, 1=dots, 2=grid, 3=crosshatch

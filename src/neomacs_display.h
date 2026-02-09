@@ -1986,6 +1986,46 @@ void neomacs_display_set_cursor_scope(struct NeomacsDisplay *handle,
     int opacity);
 
 /**
+ * Configure spiral vortex overlay effect.
+ */
+void neomacs_display_set_spiral_vortex(struct NeomacsDisplay *handle,
+    int enabled,
+    int r, int g, int b,
+    int arms,
+    int speed,
+    int opacity);
+
+/**
+ * Configure cursor shockwave effect.
+ */
+void neomacs_display_set_cursor_shockwave(struct NeomacsDisplay *handle,
+    int enabled,
+    int r, int g, int b,
+    int radius,
+    int decay,
+    int opacity);
+
+/**
+ * Configure diamond lattice overlay effect.
+ */
+void neomacs_display_set_diamond_lattice(struct NeomacsDisplay *handle,
+    int enabled,
+    int r, int g, int b,
+    int cell_size,
+    int shimmer_speed,
+    int opacity);
+
+/**
+ * Configure cursor gravity well effect.
+ */
+void neomacs_display_set_cursor_gravity_well(struct NeomacsDisplay *handle,
+    int enabled,
+    int r, int g, int b,
+    int field_radius,
+    int line_count,
+    int opacity);
+
+/**
  * Configure hex grid overlay effect.
  */
 void neomacs_display_set_hex_grid(struct NeomacsDisplay *handle,
