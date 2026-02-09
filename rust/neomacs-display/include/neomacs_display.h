@@ -1503,6 +1503,17 @@ void neomacs_display_set_modified_indicator(struct NeomacsDisplay *handle,
                                             int opacity);
 
 /**
+ * Configure typing heat map overlay
+ */
+void neomacs_display_set_typing_heatmap(struct NeomacsDisplay *handle,
+                                        int enabled,
+                                        int r,
+                                        int g,
+                                        int b,
+                                        int fadeMs,
+                                        int opacity);
+
+/**
  * Configure smooth theme transition (crossfade on background color change)
  */
 void neomacs_display_set_theme_transition(struct NeomacsDisplay *handle,

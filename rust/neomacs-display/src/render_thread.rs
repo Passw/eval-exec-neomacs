@@ -788,6 +788,11 @@ struct RenderApp {
     modified_indicator_color: (f32, f32, f32),
     modified_indicator_width: f32,
     modified_indicator_opacity: f32,
+    /// Typing heat map overlay
+    typing_heatmap_enabled: bool,
+    typing_heatmap_color: (f32, f32, f32),
+    typing_heatmap_fade_ms: u32,
+    typing_heatmap_opacity: f32,
     /// Theme transition (crossfade on background color change)
     theme_transition_enabled: bool,
     theme_transition_duration: std::time::Duration,
@@ -1140,6 +1145,10 @@ impl RenderApp {
             modified_indicator_color: (1.0, 0.6, 0.2),
             modified_indicator_width: 3.0,
             modified_indicator_opacity: 0.8,
+            typing_heatmap_enabled: false,
+            typing_heatmap_color: (1.0, 0.4, 0.1),
+            typing_heatmap_fade_ms: 2000,
+            typing_heatmap_opacity: 0.15,
             theme_transition_enabled: false,
             theme_transition_duration: std::time::Duration::from_millis(300),
             prev_background: None,
@@ -2289,6 +2298,16 @@ impl RenderApp {
                     self.modified_indicator_opacity = opacity;
                     if let Some(renderer) = self.renderer.as_mut() {
                         renderer.set_modified_indicator(enabled, (r, g, b), width, opacity);
+                    }
+                    self.frame_dirty = true;
+                }
+                RenderCommand::SetTypingHeatMap { enabled, hot_r, hot_g, hot_b, fade_ms, opacity } => {
+                    self.typing_heatmap_enabled = enabled;
+                    self.typing_heatmap_color = (hot_r, hot_g, hot_b);
+                    self.typing_heatmap_fade_ms = fade_ms;
+                    self.typing_heatmap_opacity = opacity;
+                    if let Some(renderer) = self.renderer.as_mut() {
+                        renderer.set_typing_heatmap(enabled, (hot_r, hot_g, hot_b), fade_ms, opacity);
                     }
                     self.frame_dirty = true;
                 }

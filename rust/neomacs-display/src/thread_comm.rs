@@ -632,6 +632,18 @@ pub enum RenderCommand {
         /// Opacity (0.0-1.0)
         opacity: f32,
     },
+    /// Configure typing heat map overlay
+    SetTypingHeatMap {
+        enabled: bool,
+        /// Hot color (sRGB floats) for recent edits
+        hot_r: f32,
+        hot_g: f32,
+        hot_b: f32,
+        /// Fade-out duration in milliseconds
+        fade_ms: u32,
+        /// Maximum opacity (0.0-1.0)
+        opacity: f32,
+    },
     /// Configure smooth theme transition (crossfade on background color change)
     SetThemeTransition {
         enabled: bool,

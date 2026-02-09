@@ -9146,6 +9146,44 @@ OPACITY is a percentage 0-100 (default 80).  */)
   return on ? Qt : Qnil;
 }
 
+DEFUN ("neomacs-set-typing-heatmap",
+       Fneomacs_set_typing_heatmap,
+       Sneomacs_set_typing_heatmap, 0, 4, 0,
+       doc: /* Configure typing heat map overlay.
+ENABLED non-nil highlights recently-edited character cells with a
+decaying colored overlay, creating a visual heat map of editing activity.
+COLOR is an RGB hex string (default "#FF6619").
+FADE-MS is the fade-out duration in milliseconds (default 2000).
+OPACITY is a percentage 0-100 (default 15).  */)
+  (Lisp_Object enabled, Lisp_Object color, Lisp_Object fade_ms, Lisp_Object opacity)
+{
+  struct neomacs_display_info *dpyinfo = neomacs_display_list;
+  if (!dpyinfo || !dpyinfo->display_handle)
+    return Qnil;
+
+  int on = !NILP (enabled);
+  int r = 255, g = 102, b = 25;
+  int dur = 2000;
+  int op = 15;
+  if (STRINGP (color))
+    {
+      const char *s = SSDATA (color);
+      if (s[0] == '#' && strlen (s) == 7)
+        {
+          unsigned int hex;
+          sscanf (s + 1, "%06x", &hex);
+          r = (hex >> 16) & 0xFF;
+          g = (hex >> 8) & 0xFF;
+          b = hex & 0xFF;
+        }
+    }
+  if (FIXNUMP (fade_ms)) dur = XFIXNUM (fade_ms);
+  if (FIXNUMP (opacity)) op = XFIXNUM (opacity);
+
+  neomacs_display_set_typing_heatmap (dpyinfo->display_handle, on, r, g, b, dur, op);
+  return on ? Qt : Qnil;
+}
+
 DEFUN ("neomacs-set-theme-transition",
        Fneomacs_set_theme_transition,
        Sneomacs_set_theme_transition, 0, 2, 0,
@@ -10799,6 +10837,7 @@ syms_of_neomacsterm (void)
   defsubr (&Sneomacs_set_cursor_crosshair);
   defsubr (&Sneomacs_set_modified_indicator);
   defsubr (&Sneomacs_set_theme_transition);
+  defsubr (&Sneomacs_set_typing_heatmap);
   defsubr (&Sneomacs_set_region_glow);
   defsubr (&Sneomacs_set_window_glow);
   defsubr (&Sneomacs_set_scroll_progress);

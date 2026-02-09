@@ -1536,6 +1536,15 @@ void neomacs_display_set_modified_indicator(
     int width,
     int opacity);
 
+void neomacs_display_set_typing_heatmap(
+    struct NeomacsDisplay *handle,
+    int enabled,
+    int r,
+    int g,
+    int b,
+    int fade_ms,
+    int opacity);
+
 void neomacs_display_set_theme_transition(
     struct NeomacsDisplay *handle,
     int enabled,

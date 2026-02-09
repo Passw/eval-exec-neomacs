@@ -3055,6 +3055,30 @@ pub unsafe extern "C" fn neomacs_display_set_modified_indicator(
     }
 }
 
+/// Configure typing heat map overlay
+#[no_mangle]
+pub unsafe extern "C" fn neomacs_display_set_typing_heatmap(
+    _handle: *mut NeomacsDisplay,
+    enabled: c_int,
+    r: c_int,
+    g: c_int,
+    b: c_int,
+    fade_ms: c_int,
+    opacity: c_int,
+) {
+    let cmd = RenderCommand::SetTypingHeatMap {
+        enabled: enabled != 0,
+        hot_r: r as f32 / 255.0,
+        hot_g: g as f32 / 255.0,
+        hot_b: b as f32 / 255.0,
+        fade_ms: fade_ms as u32,
+        opacity: opacity as f32 / 100.0,
+    };
+    if let Some(ref state) = THREADED_STATE {
+        let _ = state.emacs_comms.cmd_tx.try_send(cmd);
+    }
+}
+
 /// Configure smooth theme transition (crossfade on background color change)
 #[no_mangle]
 pub unsafe extern "C" fn neomacs_display_set_theme_transition(

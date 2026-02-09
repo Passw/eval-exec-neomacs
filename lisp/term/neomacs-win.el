@@ -2240,6 +2240,74 @@ whose buffers have unsaved modifications."
                 neomacs-modified-indicator-width nil)
             val))))
 
+;; --- Typing heat map overlay ---
+(declare-function neomacs-set-typing-heatmap "neomacsterm.c"
+  (&optional enabled color fade-ms opacity))
+
+(defcustom neomacs-typing-heatmap nil
+  "Enable typing heat map overlay.
+Non-nil highlights recently-edited character cells with a decaying
+colored overlay, creating a visual heat map of editing activity."
+  :type 'boolean
+  :group 'frames
+  :set (lambda (sym val)
+         (set-default sym val)
+         (when (fboundp 'neomacs-set-typing-heatmap)
+           (neomacs-set-typing-heatmap val
+            (if (boundp 'neomacs-typing-heatmap-color)
+                neomacs-typing-heatmap-color nil)
+            (if (boundp 'neomacs-typing-heatmap-fade-ms)
+                neomacs-typing-heatmap-fade-ms nil)
+            (if (boundp 'neomacs-typing-heatmap-opacity)
+                neomacs-typing-heatmap-opacity nil)))))
+
+(defcustom neomacs-typing-heatmap-color "#FF6619"
+  "Typing heat map color as hex RGB string."
+  :type '(string :tag "Color (#RRGGBB)")
+  :group 'frames
+  :set (lambda (sym val)
+         (set-default sym val)
+         (when (and (fboundp 'neomacs-set-typing-heatmap)
+                    (boundp 'neomacs-typing-heatmap)
+                    neomacs-typing-heatmap)
+           (neomacs-set-typing-heatmap t val
+            (if (boundp 'neomacs-typing-heatmap-fade-ms)
+                neomacs-typing-heatmap-fade-ms nil)
+            (if (boundp 'neomacs-typing-heatmap-opacity)
+                neomacs-typing-heatmap-opacity nil)))))
+
+(defcustom neomacs-typing-heatmap-fade-ms 2000
+  "Typing heat map fade-out duration in milliseconds."
+  :type '(integer :tag "Fade (ms)")
+  :group 'frames
+  :set (lambda (sym val)
+         (set-default sym val)
+         (when (and (fboundp 'neomacs-set-typing-heatmap)
+                    (boundp 'neomacs-typing-heatmap)
+                    neomacs-typing-heatmap)
+           (neomacs-set-typing-heatmap t
+            (if (boundp 'neomacs-typing-heatmap-color)
+                neomacs-typing-heatmap-color nil)
+            val
+            (if (boundp 'neomacs-typing-heatmap-opacity)
+                neomacs-typing-heatmap-opacity nil)))))
+
+(defcustom neomacs-typing-heatmap-opacity 15
+  "Typing heat map maximum opacity (0-100)."
+  :type '(integer :tag "Opacity (%)")
+  :group 'frames
+  :set (lambda (sym val)
+         (set-default sym val)
+         (when (and (fboundp 'neomacs-set-typing-heatmap)
+                    (boundp 'neomacs-typing-heatmap)
+                    neomacs-typing-heatmap)
+           (neomacs-set-typing-heatmap t
+            (if (boundp 'neomacs-typing-heatmap-color)
+                neomacs-typing-heatmap-color nil)
+            (if (boundp 'neomacs-typing-heatmap-fade-ms)
+                neomacs-typing-heatmap-fade-ms nil)
+            val))))
+
 ;; --- Smooth theme transition ---
 (declare-function neomacs-set-theme-transition "neomacsterm.c"
   (&optional enabled duration-ms))

@@ -279,6 +279,13 @@ pub struct WgpuRenderer {
     cursor_crosshair_enabled: bool,
     cursor_crosshair_color: (f32, f32, f32),
     cursor_crosshair_opacity: f32,
+    /// Typing heat map overlay
+    typing_heatmap_enabled: bool,
+    typing_heatmap_color: (f32, f32, f32),
+    typing_heatmap_fade_ms: u32,
+    typing_heatmap_opacity: f32,
+    typing_heatmap_entries: Vec<HeatMapEntry>,
+    typing_heatmap_prev_cursor: Option<(f32, f32)>,
     /// Buffer modified border indicator
     modified_indicator_enabled: bool,
     modified_indicator_color: (f32, f32, f32),
@@ -325,6 +332,15 @@ struct ScrollMomentumEntry {
 }
 
 /// Entry for window edge snap indicator
+/// Entry for typing heat map (records where cursor was during edits)
+struct HeatMapEntry {
+    x: f32,
+    y: f32,
+    width: f32,
+    height: f32,
+    started: std::time::Instant,
+}
+
 struct EdgeSnapEntry {
     bounds: Rect,
     mode_line_height: f32,
@@ -1031,6 +1047,12 @@ impl WgpuRenderer {
             cursor_crosshair_enabled: false,
             cursor_crosshair_color: (0.5, 0.5, 0.5),
             cursor_crosshair_opacity: 0.15,
+            typing_heatmap_enabled: false,
+            typing_heatmap_color: (1.0, 0.4, 0.1),
+            typing_heatmap_fade_ms: 2000,
+            typing_heatmap_opacity: 0.15,
+            typing_heatmap_entries: Vec::new(),
+            typing_heatmap_prev_cursor: None,
             modified_indicator_enabled: false,
             modified_indicator_color: (1.0, 0.6, 0.2),
             modified_indicator_width: 3.0,
@@ -1332,6 +1354,18 @@ impl WgpuRenderer {
         self.cursor_crosshair_enabled = enabled;
         self.cursor_crosshair_color = color;
         self.cursor_crosshair_opacity = opacity;
+    }
+
+    /// Update typing heat map config
+    pub fn set_typing_heatmap(&mut self, enabled: bool, color: (f32, f32, f32), fade_ms: u32, opacity: f32) {
+        self.typing_heatmap_enabled = enabled;
+        self.typing_heatmap_color = color;
+        self.typing_heatmap_fade_ms = fade_ms;
+        self.typing_heatmap_opacity = opacity;
+        if !enabled {
+            self.typing_heatmap_entries.clear();
+            self.typing_heatmap_prev_cursor = None;
+        }
     }
 
     /// Update buffer modified border indicator config
@@ -3496,6 +3530,69 @@ impl WgpuRenderer {
                     render_pass.set_bind_group(0, &self.uniform_bind_group, &[]);
                     render_pass.set_vertex_buffer(0, mod_buf.slice(..));
                     render_pass.draw(0..mod_verts.len() as u32, 0..1);
+                }
+            }
+
+            // === Step 1f: Typing heat map overlay ===
+            if self.typing_heatmap_enabled {
+                let now = std::time::Instant::now();
+                let fade_dur = std::time::Duration::from_millis(self.typing_heatmap_fade_ms as u64);
+
+                // Detect cursor movement and record heat entry
+                if let Some(ref anim) = animated_cursor {
+                    let cur_pos = (anim.x, anim.y);
+                    if let Some(prev_pos) = self.typing_heatmap_prev_cursor {
+                        let dx = (cur_pos.0 - prev_pos.0).abs();
+                        let dy = (cur_pos.1 - prev_pos.1).abs();
+                        // Small movements (within ~2 char widths) indicate typing
+                        if (dx > 0.5 || dy > 0.5) && dx < 200.0 && dy < 100.0 {
+                            self.typing_heatmap_entries.push(HeatMapEntry {
+                                x: prev_pos.0,
+                                y: prev_pos.1,
+                                width: anim.width,
+                                height: anim.height,
+                                started: now,
+                            });
+                        }
+                    }
+                    self.typing_heatmap_prev_cursor = Some(cur_pos);
+                }
+
+                // Prune expired entries
+                self.typing_heatmap_entries.retain(|e| now.duration_since(e.started) < fade_dur);
+
+                // Render heat entries
+                if !self.typing_heatmap_entries.is_empty() {
+                    let (hr, hg, hb) = self.typing_heatmap_color;
+                    let max_alpha = self.typing_heatmap_opacity;
+                    let mut heat_verts: Vec<RectVertex> = Vec::new();
+                    for entry in &self.typing_heatmap_entries {
+                        let elapsed = now.duration_since(entry.started);
+                        let t = (elapsed.as_secs_f32() / fade_dur.as_secs_f32()).min(1.0);
+                        let alpha = max_alpha * (1.0 - t);
+                        if alpha > 0.001 {
+                            let c = Color::new(hr, hg, hb, alpha);
+                            self.add_rect(&mut heat_verts, entry.x, entry.y, entry.width, entry.height, &c);
+                        }
+                    }
+                    if !heat_verts.is_empty() {
+                        let heat_buf = self.device.create_buffer_init(
+                            &wgpu::util::BufferInitDescriptor {
+                                label: Some("Heat Map Buffer"),
+                                contents: bytemuck::cast_slice(&heat_verts),
+                                usage: wgpu::BufferUsages::VERTEX,
+                            },
+                        );
+                        render_pass.set_pipeline(&self.rect_pipeline);
+                        render_pass.set_bind_group(0, &self.uniform_bind_group, &[]);
+                        render_pass.set_vertex_buffer(0, heat_buf.slice(..));
+                        render_pass.draw(0..heat_verts.len() as u32, 0..1);
+                    }
+
+                    // Keep redrawing while entries exist for smooth fade
+                    if !self.typing_heatmap_entries.is_empty() {
+                        self.needs_continuous_redraw = true;
+                    }
                 }
             }
 
