@@ -5090,6 +5090,290 @@ Non-nil renders animated flowing color bands at the top of the frame."
                 neomacs-cursor-heartbeat-max-radius nil)
             val))))
 
+;; Hex grid overlay effect
+(declare-function neomacs-set-hex-grid "neomacsterm.c")
+
+(defcustom neomacs-hex-grid nil
+  "Enable hex grid overlay effect."
+  :type 'boolean
+  :group 'neomacs
+  :set (lambda (sym val)
+         (set-default sym val)
+         (when (fboundp 'neomacs-set-hex-grid)
+           (neomacs-set-hex-grid val))))
+
+(defcustom neomacs-hex-grid-color "#4D99E5"
+  "Color of hex grid lines."
+  :type 'color
+  :group 'neomacs
+  :set (lambda (sym val)
+         (set-default sym val)
+         (when (and (fboundp 'neomacs-set-hex-grid)
+                    (boundp 'neomacs-hex-grid)
+                    neomacs-hex-grid)
+           (neomacs-set-hex-grid t val))))
+
+(defcustom neomacs-hex-grid-cell-size 40
+  "Hexagon cell size in pixels."
+  :type '(integer :tag "Cell size (pixels)")
+  :group 'neomacs
+  :set (lambda (sym val)
+         (set-default sym val)
+         (when (and (fboundp 'neomacs-set-hex-grid)
+                    (boundp 'neomacs-hex-grid)
+                    neomacs-hex-grid)
+           (neomacs-set-hex-grid t
+            (if (boundp 'neomacs-hex-grid-color)
+                neomacs-hex-grid-color nil)
+            val))))
+
+(defcustom neomacs-hex-grid-pulse-speed 100
+  "Pulse animation speed * 100."
+  :type '(integer :tag "Speed")
+  :group 'neomacs
+  :set (lambda (sym val)
+         (set-default sym val)
+         (when (and (fboundp 'neomacs-set-hex-grid)
+                    (boundp 'neomacs-hex-grid)
+                    neomacs-hex-grid)
+           (neomacs-set-hex-grid t
+            (if (boundp 'neomacs-hex-grid-color)
+                neomacs-hex-grid-color nil)
+            (if (boundp 'neomacs-hex-grid-cell-size)
+                neomacs-hex-grid-cell-size nil)
+            val))))
+
+(defcustom neomacs-hex-grid-opacity 10
+  "Hex grid opacity (0-100)."
+  :type '(integer :tag "Opacity (0-100)")
+  :group 'neomacs
+  :set (lambda (sym val)
+         (set-default sym val)
+         (when (and (fboundp 'neomacs-set-hex-grid)
+                    (boundp 'neomacs-hex-grid)
+                    neomacs-hex-grid)
+           (neomacs-set-hex-grid t
+            (if (boundp 'neomacs-hex-grid-color)
+                neomacs-hex-grid-color nil)
+            (if (boundp 'neomacs-hex-grid-cell-size)
+                neomacs-hex-grid-cell-size nil)
+            (if (boundp 'neomacs-hex-grid-pulse-speed)
+                neomacs-hex-grid-pulse-speed nil)
+            val))))
+
+;; Cursor sparkle burst effect
+(declare-function neomacs-set-cursor-sparkle-burst "neomacsterm.c")
+
+(defcustom neomacs-cursor-sparkle-burst nil
+  "Enable cursor sparkle burst effect."
+  :type 'boolean
+  :group 'neomacs
+  :set (lambda (sym val)
+         (set-default sym val)
+         (when (fboundp 'neomacs-set-cursor-sparkle-burst)
+           (neomacs-set-cursor-sparkle-burst val))))
+
+(defcustom neomacs-cursor-sparkle-burst-color "#FFD94D"
+  "Sparkle particle color."
+  :type 'color
+  :group 'neomacs
+  :set (lambda (sym val)
+         (set-default sym val)
+         (when (and (fboundp 'neomacs-set-cursor-sparkle-burst)
+                    (boundp 'neomacs-cursor-sparkle-burst)
+                    neomacs-cursor-sparkle-burst)
+           (neomacs-set-cursor-sparkle-burst t val))))
+
+(defcustom neomacs-cursor-sparkle-burst-count 12
+  "Number of sparkle particles per burst."
+  :type '(integer :tag "Particle count")
+  :group 'neomacs
+  :set (lambda (sym val)
+         (set-default sym val)
+         (when (and (fboundp 'neomacs-set-cursor-sparkle-burst)
+                    (boundp 'neomacs-cursor-sparkle-burst)
+                    neomacs-cursor-sparkle-burst)
+           (neomacs-set-cursor-sparkle-burst t
+            (if (boundp 'neomacs-cursor-sparkle-burst-color)
+                neomacs-cursor-sparkle-burst-color nil)
+            val))))
+
+(defcustom neomacs-cursor-sparkle-burst-radius 30
+  "Burst radius in pixels."
+  :type '(integer :tag "Radius (pixels)")
+  :group 'neomacs
+  :set (lambda (sym val)
+         (set-default sym val)
+         (when (and (fboundp 'neomacs-set-cursor-sparkle-burst)
+                    (boundp 'neomacs-cursor-sparkle-burst)
+                    neomacs-cursor-sparkle-burst)
+           (neomacs-set-cursor-sparkle-burst t
+            (if (boundp 'neomacs-cursor-sparkle-burst-color)
+                neomacs-cursor-sparkle-burst-color nil)
+            (if (boundp 'neomacs-cursor-sparkle-burst-count)
+                neomacs-cursor-sparkle-burst-count nil)
+            val))))
+
+(defcustom neomacs-cursor-sparkle-burst-opacity 40
+  "Sparkle burst opacity (0-100)."
+  :type '(integer :tag "Opacity (0-100)")
+  :group 'neomacs
+  :set (lambda (sym val)
+         (set-default sym val)
+         (when (and (fboundp 'neomacs-set-cursor-sparkle-burst)
+                    (boundp 'neomacs-cursor-sparkle-burst)
+                    neomacs-cursor-sparkle-burst)
+           (neomacs-set-cursor-sparkle-burst t
+            (if (boundp 'neomacs-cursor-sparkle-burst-color)
+                neomacs-cursor-sparkle-burst-color nil)
+            (if (boundp 'neomacs-cursor-sparkle-burst-count)
+                neomacs-cursor-sparkle-burst-count nil)
+            (if (boundp 'neomacs-cursor-sparkle-burst-radius)
+                neomacs-cursor-sparkle-burst-radius nil)
+            val))))
+
+;; Circuit board trace effect
+(declare-function neomacs-set-circuit-trace "neomacsterm.c")
+
+(defcustom neomacs-circuit-trace nil
+  "Enable circuit board trace effect."
+  :type 'boolean
+  :group 'neomacs
+  :set (lambda (sym val)
+         (set-default sym val)
+         (when (fboundp 'neomacs-set-circuit-trace)
+           (neomacs-set-circuit-trace val))))
+
+(defcustom neomacs-circuit-trace-color "#33CC66"
+  "Circuit trace color."
+  :type 'color
+  :group 'neomacs
+  :set (lambda (sym val)
+         (set-default sym val)
+         (when (and (fboundp 'neomacs-set-circuit-trace)
+                    (boundp 'neomacs-circuit-trace)
+                    neomacs-circuit-trace)
+           (neomacs-set-circuit-trace t val))))
+
+(defcustom neomacs-circuit-trace-width 2
+  "Trace width in pixels."
+  :type '(integer :tag "Width (pixels)")
+  :group 'neomacs
+  :set (lambda (sym val)
+         (set-default sym val)
+         (when (and (fboundp 'neomacs-set-circuit-trace)
+                    (boundp 'neomacs-circuit-trace)
+                    neomacs-circuit-trace)
+           (neomacs-set-circuit-trace t
+            (if (boundp 'neomacs-circuit-trace-color)
+                neomacs-circuit-trace-color nil)
+            val))))
+
+(defcustom neomacs-circuit-trace-speed 100
+  "Circuit trace animation speed * 100."
+  :type '(integer :tag "Speed")
+  :group 'neomacs
+  :set (lambda (sym val)
+         (set-default sym val)
+         (when (and (fboundp 'neomacs-set-circuit-trace)
+                    (boundp 'neomacs-circuit-trace)
+                    neomacs-circuit-trace)
+           (neomacs-set-circuit-trace t
+            (if (boundp 'neomacs-circuit-trace-color)
+                neomacs-circuit-trace-color nil)
+            (if (boundp 'neomacs-circuit-trace-width)
+                neomacs-circuit-trace-width nil)
+            val))))
+
+(defcustom neomacs-circuit-trace-opacity 20
+  "Circuit trace opacity (0-100)."
+  :type '(integer :tag "Opacity (0-100)")
+  :group 'neomacs
+  :set (lambda (sym val)
+         (set-default sym val)
+         (when (and (fboundp 'neomacs-set-circuit-trace)
+                    (boundp 'neomacs-circuit-trace)
+                    neomacs-circuit-trace)
+           (neomacs-set-circuit-trace t
+            (if (boundp 'neomacs-circuit-trace-color)
+                neomacs-circuit-trace-color nil)
+            (if (boundp 'neomacs-circuit-trace-width)
+                neomacs-circuit-trace-width nil)
+            (if (boundp 'neomacs-circuit-trace-speed)
+                neomacs-circuit-trace-speed nil)
+            val))))
+
+;; Cursor compass rose effect
+(declare-function neomacs-set-cursor-compass "neomacsterm.c")
+
+(defcustom neomacs-cursor-compass nil
+  "Enable cursor compass rose effect."
+  :type 'boolean
+  :group 'neomacs
+  :set (lambda (sym val)
+         (set-default sym val)
+         (when (fboundp 'neomacs-set-cursor-compass)
+           (neomacs-set-cursor-compass val))))
+
+(defcustom neomacs-cursor-compass-color "#E59933"
+  "Compass rose color."
+  :type 'color
+  :group 'neomacs
+  :set (lambda (sym val)
+         (set-default sym val)
+         (when (and (fboundp 'neomacs-set-cursor-compass)
+                    (boundp 'neomacs-cursor-compass)
+                    neomacs-cursor-compass)
+           (neomacs-set-cursor-compass t val))))
+
+(defcustom neomacs-cursor-compass-size 20
+  "Compass size in pixels."
+  :type '(integer :tag "Size (pixels)")
+  :group 'neomacs
+  :set (lambda (sym val)
+         (set-default sym val)
+         (when (and (fboundp 'neomacs-set-cursor-compass)
+                    (boundp 'neomacs-cursor-compass)
+                    neomacs-cursor-compass)
+           (neomacs-set-cursor-compass t
+            (if (boundp 'neomacs-cursor-compass-color)
+                neomacs-cursor-compass-color nil)
+            val))))
+
+(defcustom neomacs-cursor-compass-speed 100
+  "Compass rotation speed * 100."
+  :type '(integer :tag "Speed")
+  :group 'neomacs
+  :set (lambda (sym val)
+         (set-default sym val)
+         (when (and (fboundp 'neomacs-set-cursor-compass)
+                    (boundp 'neomacs-cursor-compass)
+                    neomacs-cursor-compass)
+           (neomacs-set-cursor-compass t
+            (if (boundp 'neomacs-cursor-compass-color)
+                neomacs-cursor-compass-color nil)
+            (if (boundp 'neomacs-cursor-compass-size)
+                neomacs-cursor-compass-size nil)
+            val))))
+
+(defcustom neomacs-cursor-compass-opacity 25
+  "Compass rose opacity (0-100)."
+  :type '(integer :tag "Opacity (0-100)")
+  :group 'neomacs
+  :set (lambda (sym val)
+         (set-default sym val)
+         (when (and (fboundp 'neomacs-set-cursor-compass)
+                    (boundp 'neomacs-cursor-compass)
+                    neomacs-cursor-compass)
+           (neomacs-set-cursor-compass t
+            (if (boundp 'neomacs-cursor-compass-color)
+                neomacs-cursor-compass-color nil)
+            (if (boundp 'neomacs-cursor-compass-size)
+                neomacs-cursor-compass-size nil)
+            (if (boundp 'neomacs-cursor-compass-speed)
+                neomacs-cursor-compass-speed nil)
+            val))))
+
 ;; Warp/distortion grid effect
 (declare-function neomacs-set-warp-grid "neomacsterm.c")
 

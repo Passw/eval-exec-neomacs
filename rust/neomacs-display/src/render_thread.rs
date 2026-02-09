@@ -648,6 +648,31 @@ struct RenderApp {
     cursor_heartbeat_max_radius: f32,
     cursor_heartbeat_opacity: f32,
 
+    // Hex grid overlay
+    hex_grid_enabled: bool,
+    hex_grid_color: (f32, f32, f32),
+    hex_grid_cell_size: f32,
+    hex_grid_pulse_speed: f32,
+    hex_grid_opacity: f32,
+    // Cursor sparkle burst
+    cursor_sparkle_burst_enabled: bool,
+    cursor_sparkle_burst_color: (f32, f32, f32),
+    cursor_sparkle_burst_count: u32,
+    cursor_sparkle_burst_radius: f32,
+    cursor_sparkle_burst_opacity: f32,
+    // Circuit board trace
+    circuit_trace_enabled: bool,
+    circuit_trace_color: (f32, f32, f32),
+    circuit_trace_width: f32,
+    circuit_trace_speed: f32,
+    circuit_trace_opacity: f32,
+    // Cursor compass rose
+    cursor_compass_enabled: bool,
+    cursor_compass_color: (f32, f32, f32),
+    cursor_compass_size: f32,
+    cursor_compass_speed: f32,
+    cursor_compass_opacity: f32,
+
     // Warp grid effect
     warp_grid_enabled: bool,
     warp_grid_color: (f32, f32, f32),
@@ -1277,6 +1302,26 @@ impl RenderApp {
             cursor_heartbeat_bpm: 72.0,
             cursor_heartbeat_max_radius: 50.0,
             cursor_heartbeat_opacity: 0.2,
+            hex_grid_enabled: false,
+            hex_grid_color: (0.3, 0.6, 0.9),
+            hex_grid_cell_size: 40.0,
+            hex_grid_pulse_speed: 1.0,
+            hex_grid_opacity: 0.1,
+            cursor_sparkle_burst_enabled: false,
+            cursor_sparkle_burst_color: (1.0, 0.85, 0.3),
+            cursor_sparkle_burst_count: 12,
+            cursor_sparkle_burst_radius: 30.0,
+            cursor_sparkle_burst_opacity: 0.4,
+            circuit_trace_enabled: false,
+            circuit_trace_color: (0.2, 0.8, 0.4),
+            circuit_trace_width: 2.0,
+            circuit_trace_speed: 1.0,
+            circuit_trace_opacity: 0.2,
+            cursor_compass_enabled: false,
+            cursor_compass_color: (0.9, 0.6, 0.2),
+            cursor_compass_size: 20.0,
+            cursor_compass_speed: 1.0,
+            cursor_compass_opacity: 0.25,
             warp_grid_enabled: false,
             warp_grid_color: (0.3, 0.5, 0.9),
             warp_grid_density: 20,
@@ -3129,6 +3174,50 @@ impl RenderApp {
                     self.cursor_heartbeat_opacity = opacity;
                     if let Some(renderer) = self.renderer.as_mut() {
                         renderer.set_cursor_heartbeat(enabled, (r, g, b), bpm, max_radius, opacity);
+                    }
+                    self.frame_dirty = true;
+                }
+                RenderCommand::SetHexGrid { enabled, r, g, b, cell_size, pulse_speed, opacity } => {
+                    self.hex_grid_enabled = enabled;
+                    self.hex_grid_color = (r, g, b);
+                    self.hex_grid_cell_size = cell_size;
+                    self.hex_grid_pulse_speed = pulse_speed;
+                    self.hex_grid_opacity = opacity;
+                    if let Some(renderer) = self.renderer.as_mut() {
+                        renderer.set_hex_grid(enabled, (r, g, b), cell_size, pulse_speed, opacity);
+                    }
+                    self.frame_dirty = true;
+                }
+                RenderCommand::SetCursorSparkleBurst { enabled, r, g, b, particle_count, burst_radius, opacity } => {
+                    self.cursor_sparkle_burst_enabled = enabled;
+                    self.cursor_sparkle_burst_color = (r, g, b);
+                    self.cursor_sparkle_burst_count = particle_count;
+                    self.cursor_sparkle_burst_radius = burst_radius;
+                    self.cursor_sparkle_burst_opacity = opacity;
+                    if let Some(renderer) = self.renderer.as_mut() {
+                        renderer.set_cursor_sparkle_burst(enabled, (r, g, b), particle_count, burst_radius, opacity);
+                    }
+                    self.frame_dirty = true;
+                }
+                RenderCommand::SetCircuitTrace { enabled, r, g, b, trace_width, speed, opacity } => {
+                    self.circuit_trace_enabled = enabled;
+                    self.circuit_trace_color = (r, g, b);
+                    self.circuit_trace_width = trace_width;
+                    self.circuit_trace_speed = speed;
+                    self.circuit_trace_opacity = opacity;
+                    if let Some(renderer) = self.renderer.as_mut() {
+                        renderer.set_circuit_trace(enabled, (r, g, b), trace_width, speed, opacity);
+                    }
+                    self.frame_dirty = true;
+                }
+                RenderCommand::SetCursorCompass { enabled, r, g, b, size, speed, opacity } => {
+                    self.cursor_compass_enabled = enabled;
+                    self.cursor_compass_color = (r, g, b);
+                    self.cursor_compass_size = size;
+                    self.cursor_compass_speed = speed;
+                    self.cursor_compass_opacity = opacity;
+                    if let Some(renderer) = self.renderer.as_mut() {
+                        renderer.set_cursor_compass(enabled, (r, g, b), size, speed, opacity);
                     }
                     self.frame_dirty = true;
                 }

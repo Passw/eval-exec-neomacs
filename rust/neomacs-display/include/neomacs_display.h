@@ -2531,6 +2531,54 @@ void neomacs_display_set_cursor_heartbeat(struct NeomacsDisplay *handle,
                                           int opacity);
 
 /**
+ * Configure hex grid overlay effect
+ */
+void neomacs_display_set_hex_grid(struct NeomacsDisplay *handle,
+                                  int enabled,
+                                  int r,
+                                  int g,
+                                  int b,
+                                  int cellSize,
+                                  int pulseSpeed,
+                                  int opacity);
+
+/**
+ * Configure cursor sparkle burst effect
+ */
+void neomacs_display_set_cursor_sparkle_burst(struct NeomacsDisplay *handle,
+                                              int enabled,
+                                              int r,
+                                              int g,
+                                              int b,
+                                              int particleCount,
+                                              int burstRadius,
+                                              int opacity);
+
+/**
+ * Configure circuit board trace effect
+ */
+void neomacs_display_set_circuit_trace(struct NeomacsDisplay *handle,
+                                       int enabled,
+                                       int r,
+                                       int g,
+                                       int b,
+                                       int traceWidth,
+                                       int speed,
+                                       int opacity);
+
+/**
+ * Configure cursor compass rose effect
+ */
+void neomacs_display_set_cursor_compass(struct NeomacsDisplay *handle,
+                                        int enabled,
+                                        int r,
+                                        int g,
+                                        int b,
+                                        int size,
+                                        int speed,
+                                        int opacity);
+
+/**
  * Configure warp/distortion grid effect
  */
 void neomacs_display_set_warp_grid(struct NeomacsDisplay *handle,

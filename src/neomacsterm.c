@@ -10519,6 +10519,154 @@ OPACITY is 0-100 for pulse opacity (default 20). */)
   return on ? Qt : Qnil;
 }
 
+DEFUN ("neomacs-set-hex-grid",
+       Fneomacs_set_hex_grid,
+       Sneomacs_set_hex_grid, 0, 5, 0,
+       doc: /* Configure hex grid overlay effect.
+ENABLED non-nil activates honeycomb grid pattern.
+COLOR is a hex color string like "#RRGGBB" (default "#4D99E5").
+CELL-SIZE is hexagon cell size in pixels (default 40).
+PULSE-SPEED is pulse animation speed * 100 (default 100).
+OPACITY is 0-100 (default 10). */)
+  (Lisp_Object enabled, Lisp_Object color, Lisp_Object cell_size,
+   Lisp_Object pulse_speed, Lisp_Object opacity)
+{
+  struct neomacs_display_info *dpyinfo = neomacs_display_list;
+  if (!dpyinfo || !dpyinfo->display_handle)
+    return Qnil;
+  int on = !NILP (enabled);
+  int r = 0x4D, g = 0x99, b = 0xE5, cs = 40, ps = 100, op = 10;
+  if (STRINGP (color))
+    {
+      const char *s = SSDATA (color);
+      if (s[0] == '#' && strlen (s) == 7)
+        {
+          unsigned int hex;
+          sscanf (s + 1, "%06x", &hex);
+          r = (hex >> 16) & 0xFF;
+          g = (hex >> 8) & 0xFF;
+          b = hex & 0xFF;
+        }
+    }
+  if (FIXNUMP (cell_size)) cs = XFIXNUM (cell_size);
+  if (FIXNUMP (pulse_speed)) ps = XFIXNUM (pulse_speed);
+  if (FIXNUMP (opacity)) op = XFIXNUM (opacity);
+
+  neomacs_display_set_hex_grid (dpyinfo->display_handle, on, r, g, b, cs, ps, op);
+  return on ? Qt : Qnil;
+}
+
+DEFUN ("neomacs-set-cursor-sparkle-burst",
+       Fneomacs_set_cursor_sparkle_burst,
+       Sneomacs_set_cursor_sparkle_burst, 0, 5, 0,
+       doc: /* Configure cursor sparkle burst effect.
+ENABLED non-nil activates sparkle particles on keystroke.
+COLOR is a hex color string like "#RRGGBB" (default "#FFD94D").
+PARTICLE-COUNT is particles per burst (default 12).
+BURST-RADIUS is burst radius in pixels (default 30).
+OPACITY is 0-100 (default 40). */)
+  (Lisp_Object enabled, Lisp_Object color, Lisp_Object particle_count,
+   Lisp_Object burst_radius, Lisp_Object opacity)
+{
+  struct neomacs_display_info *dpyinfo = neomacs_display_list;
+  if (!dpyinfo || !dpyinfo->display_handle)
+    return Qnil;
+  int on = !NILP (enabled);
+  int r = 0xFF, g = 0xD9, b = 0x4D, pc = 12, br = 30, op = 40;
+  if (STRINGP (color))
+    {
+      const char *s = SSDATA (color);
+      if (s[0] == '#' && strlen (s) == 7)
+        {
+          unsigned int hex;
+          sscanf (s + 1, "%06x", &hex);
+          r = (hex >> 16) & 0xFF;
+          g = (hex >> 8) & 0xFF;
+          b = hex & 0xFF;
+        }
+    }
+  if (FIXNUMP (particle_count)) pc = XFIXNUM (particle_count);
+  if (FIXNUMP (burst_radius)) br = XFIXNUM (burst_radius);
+  if (FIXNUMP (opacity)) op = XFIXNUM (opacity);
+
+  neomacs_display_set_cursor_sparkle_burst (dpyinfo->display_handle, on, r, g, b, pc, br, op);
+  return on ? Qt : Qnil;
+}
+
+DEFUN ("neomacs-set-circuit-trace",
+       Fneomacs_set_circuit_trace,
+       Sneomacs_set_circuit_trace, 0, 5, 0,
+       doc: /* Configure circuit board trace effect.
+ENABLED non-nil activates pulsing circuit traces along edges.
+COLOR is a hex color string like "#RRGGBB" (default "#33CC66").
+TRACE-WIDTH is trace width in pixels (default 2).
+SPEED is animation speed * 100 (default 100).
+OPACITY is 0-100 (default 20). */)
+  (Lisp_Object enabled, Lisp_Object color, Lisp_Object trace_width,
+   Lisp_Object speed, Lisp_Object opacity)
+{
+  struct neomacs_display_info *dpyinfo = neomacs_display_list;
+  if (!dpyinfo || !dpyinfo->display_handle)
+    return Qnil;
+  int on = !NILP (enabled);
+  int r = 0x33, g = 0xCC, b = 0x66, tw = 2, spd = 100, op = 20;
+  if (STRINGP (color))
+    {
+      const char *s = SSDATA (color);
+      if (s[0] == '#' && strlen (s) == 7)
+        {
+          unsigned int hex;
+          sscanf (s + 1, "%06x", &hex);
+          r = (hex >> 16) & 0xFF;
+          g = (hex >> 8) & 0xFF;
+          b = hex & 0xFF;
+        }
+    }
+  if (FIXNUMP (trace_width)) tw = XFIXNUM (trace_width);
+  if (FIXNUMP (speed)) spd = XFIXNUM (speed);
+  if (FIXNUMP (opacity)) op = XFIXNUM (opacity);
+
+  neomacs_display_set_circuit_trace (dpyinfo->display_handle, on, r, g, b, tw, spd, op);
+  return on ? Qt : Qnil;
+}
+
+DEFUN ("neomacs-set-cursor-compass",
+       Fneomacs_set_cursor_compass,
+       Sneomacs_set_cursor_compass, 0, 5, 0,
+       doc: /* Configure cursor compass rose effect.
+ENABLED non-nil activates spinning compass rose around cursor.
+COLOR is a hex color string like "#RRGGBB" (default "#E59933").
+SIZE is compass size in pixels (default 20).
+SPEED is rotation speed * 100 (default 100).
+OPACITY is 0-100 (default 25). */)
+  (Lisp_Object enabled, Lisp_Object color, Lisp_Object size,
+   Lisp_Object speed, Lisp_Object opacity)
+{
+  struct neomacs_display_info *dpyinfo = neomacs_display_list;
+  if (!dpyinfo || !dpyinfo->display_handle)
+    return Qnil;
+  int on = !NILP (enabled);
+  int r = 0xE5, g = 0x99, b = 0x33, sz = 20, spd = 100, op = 25;
+  if (STRINGP (color))
+    {
+      const char *s = SSDATA (color);
+      if (s[0] == '#' && strlen (s) == 7)
+        {
+          unsigned int hex;
+          sscanf (s + 1, "%06x", &hex);
+          r = (hex >> 16) & 0xFF;
+          g = (hex >> 8) & 0xFF;
+          b = hex & 0xFF;
+        }
+    }
+  if (FIXNUMP (size)) sz = XFIXNUM (size);
+  if (FIXNUMP (speed)) spd = XFIXNUM (speed);
+  if (FIXNUMP (opacity)) op = XFIXNUM (opacity);
+
+  neomacs_display_set_cursor_compass (dpyinfo->display_handle, on, r, g, b, sz, spd, op);
+  return on ? Qt : Qnil;
+}
+
 DEFUN ("neomacs-set-warp-grid",
        Fneomacs_set_warp_grid,
        Sneomacs_set_warp_grid, 0, 6, 0,
@@ -12192,6 +12340,10 @@ syms_of_neomacsterm (void)
   defsubr (&Sneomacs_set_cursor_orbit_particles);
   defsubr (&Sneomacs_set_plasma_border);
   defsubr (&Sneomacs_set_cursor_heartbeat);
+  defsubr (&Sneomacs_set_hex_grid);
+  defsubr (&Sneomacs_set_cursor_sparkle_burst);
+  defsubr (&Sneomacs_set_circuit_trace);
+  defsubr (&Sneomacs_set_cursor_compass);
   defsubr (&Sneomacs_set_warp_grid);
   defsubr (&Sneomacs_set_cursor_dna_helix);
   defsubr (&Sneomacs_set_prism_edge);

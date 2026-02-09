@@ -510,6 +510,31 @@ pub struct WgpuRenderer {
     cursor_pendulum_last_x: f32,
     cursor_pendulum_last_y: f32,
     cursor_pendulum_swing_start: Option<std::time::Instant>,
+    /// Hex grid overlay
+    hex_grid_enabled: bool,
+    hex_grid_color: (f32, f32, f32),
+    hex_grid_cell_size: f32,
+    hex_grid_pulse_speed: f32,
+    hex_grid_opacity: f32,
+    /// Cursor sparkle burst
+    cursor_sparkle_burst_enabled: bool,
+    cursor_sparkle_burst_color: (f32, f32, f32),
+    cursor_sparkle_burst_count: u32,
+    cursor_sparkle_burst_radius: f32,
+    cursor_sparkle_burst_opacity: f32,
+    cursor_sparkle_burst_entries: Vec<SparkleBurstEntry>,
+    /// Circuit board trace
+    circuit_trace_enabled: bool,
+    circuit_trace_color: (f32, f32, f32),
+    circuit_trace_width: f32,
+    circuit_trace_speed: f32,
+    circuit_trace_opacity: f32,
+    /// Cursor compass rose
+    cursor_compass_enabled: bool,
+    cursor_compass_color: (f32, f32, f32),
+    cursor_compass_size: f32,
+    cursor_compass_speed: f32,
+    cursor_compass_opacity: f32,
     /// Window edge glow on scroll boundaries
     edge_glow_enabled: bool,
     edge_glow_color: (f32, f32, f32),
@@ -575,6 +600,14 @@ struct SonarPingEntry {
     cy: f32,
     started: std::time::Instant,
     duration: std::time::Duration,
+}
+
+struct SparkleBurstEntry {
+    cx: f32,
+    cy: f32,
+    started: std::time::Instant,
+    /// Random seed for particle directions
+    seed: u32,
 }
 
 /// Entry for window edge glow (scroll boundary indicator)
@@ -1521,6 +1554,27 @@ impl WgpuRenderer {
             cursor_pendulum_last_x: 0.0,
             cursor_pendulum_last_y: 0.0,
             cursor_pendulum_swing_start: None,
+            hex_grid_enabled: false,
+            hex_grid_color: (0.3, 0.6, 0.9),
+            hex_grid_cell_size: 40.0,
+            hex_grid_pulse_speed: 1.0,
+            hex_grid_opacity: 0.1,
+            cursor_sparkle_burst_enabled: false,
+            cursor_sparkle_burst_color: (1.0, 0.85, 0.3),
+            cursor_sparkle_burst_count: 12,
+            cursor_sparkle_burst_radius: 30.0,
+            cursor_sparkle_burst_opacity: 0.4,
+            cursor_sparkle_burst_entries: Vec::new(),
+            circuit_trace_enabled: false,
+            circuit_trace_color: (0.2, 0.8, 0.4),
+            circuit_trace_width: 2.0,
+            circuit_trace_speed: 1.0,
+            circuit_trace_opacity: 0.2,
+            cursor_compass_enabled: false,
+            cursor_compass_color: (0.9, 0.6, 0.2),
+            cursor_compass_size: 20.0,
+            cursor_compass_speed: 1.0,
+            cursor_compass_opacity: 0.25,
             edge_glow_enabled: false,
             edge_glow_color: (0.4, 0.6, 1.0),
             edge_glow_height: 40.0,
@@ -2314,6 +2368,42 @@ impl WgpuRenderer {
         self.cursor_pendulum_arc_length = arc_length;
         self.cursor_pendulum_damping = damping;
         self.cursor_pendulum_opacity = opacity;
+    }
+
+    /// Update hex grid config
+    pub fn set_hex_grid(&mut self, enabled: bool, color: (f32, f32, f32), cell_size: f32, pulse_speed: f32, opacity: f32) {
+        self.hex_grid_enabled = enabled;
+        self.hex_grid_color = color;
+        self.hex_grid_cell_size = cell_size;
+        self.hex_grid_pulse_speed = pulse_speed;
+        self.hex_grid_opacity = opacity;
+    }
+
+    /// Update cursor sparkle burst config
+    pub fn set_cursor_sparkle_burst(&mut self, enabled: bool, color: (f32, f32, f32), count: u32, radius: f32, opacity: f32) {
+        self.cursor_sparkle_burst_enabled = enabled;
+        self.cursor_sparkle_burst_color = color;
+        self.cursor_sparkle_burst_count = count;
+        self.cursor_sparkle_burst_radius = radius;
+        self.cursor_sparkle_burst_opacity = opacity;
+    }
+
+    /// Update circuit trace config
+    pub fn set_circuit_trace(&mut self, enabled: bool, color: (f32, f32, f32), width: f32, speed: f32, opacity: f32) {
+        self.circuit_trace_enabled = enabled;
+        self.circuit_trace_color = color;
+        self.circuit_trace_width = width;
+        self.circuit_trace_speed = speed;
+        self.circuit_trace_opacity = opacity;
+    }
+
+    /// Update cursor compass config
+    pub fn set_cursor_compass(&mut self, enabled: bool, color: (f32, f32, f32), size: f32, speed: f32, opacity: f32) {
+        self.cursor_compass_enabled = enabled;
+        self.cursor_compass_color = color;
+        self.cursor_compass_size = size;
+        self.cursor_compass_speed = speed;
+        self.cursor_compass_opacity = opacity;
     }
 
     /// Update mode-line transition config
@@ -5869,6 +5959,265 @@ impl WgpuRenderer {
                         render_pass.set_bind_group(0, &self.uniform_bind_group, &[]);
                         render_pass.set_vertex_buffer(0, hb_buf.slice(..));
                         render_pass.draw(0..heartbeat_verts.len() as u32, 0..1);
+                    }
+                    self.needs_continuous_redraw = true;
+                }
+            }
+
+            // === Hex grid overlay effect ===
+            if self.hex_grid_enabled {
+                let now = std::time::Instant::now().duration_since(self.aurora_start).as_secs_f32();
+                let (hr, hg, hb) = self.hex_grid_color;
+                let hop = self.hex_grid_opacity;
+                let cell = self.hex_grid_cell_size.max(10.0);
+                let pspd = self.hex_grid_pulse_speed;
+                let fw = self.width() as f32;
+                let fh = self.height() as f32;
+                let mut hex_verts: Vec<RectVertex> = Vec::new();
+                let hex_h = cell;
+                let hex_w = cell * 0.866;
+                let cols = (fw / hex_w) as i32 + 2;
+                let rows = (fh / (hex_h * 0.75)) as i32 + 2;
+                let line_thick = 1.0;
+                for row in 0..rows {
+                    for col in 0..cols {
+                        let cx = col as f32 * hex_w + if row % 2 == 1 { hex_w * 0.5 } else { 0.0 };
+                        let cy = row as f32 * hex_h * 0.75;
+                        let pulse = (0.6 + 0.4 * ((cx * 0.01 + cy * 0.01 + now * pspd).sin())).max(0.0);
+                        let alpha = hop * pulse;
+                        let c = Color::new(hr, hg, hb, alpha);
+                        // Draw 6 edges of hexagon as small rects
+                        for edge in 0..6 {
+                            let a1 = edge as f32 / 6.0 * std::f32::consts::PI * 2.0 + std::f32::consts::PI / 6.0;
+                            let a2 = (edge + 1) as f32 / 6.0 * std::f32::consts::PI * 2.0 + std::f32::consts::PI / 6.0;
+                            let r = cell * 0.5;
+                            let x1 = cx + a1.cos() * r;
+                            let y1 = cy + a1.sin() * r;
+                            let x2 = cx + a2.cos() * r;
+                            let y2 = cy + a2.sin() * r;
+                            let mx = x1.min(x2);
+                            let my = y1.min(y2);
+                            let ew = (x2 - x1).abs().max(line_thick);
+                            let eh = (y2 - y1).abs().max(line_thick);
+                            self.add_rect(&mut hex_verts, mx, my, ew, eh, &c);
+                        }
+                    }
+                }
+                if !hex_verts.is_empty() {
+                    let hg_buf = self.device.create_buffer_init(
+                        &wgpu::util::BufferInitDescriptor {
+                            label: Some("Hex Grid Buffer"),
+                            contents: bytemuck::cast_slice(&hex_verts),
+                            usage: wgpu::BufferUsages::VERTEX,
+                        },
+                    );
+                    render_pass.set_pipeline(&self.rect_pipeline);
+                    render_pass.set_bind_group(0, &self.uniform_bind_group, &[]);
+                    render_pass.set_vertex_buffer(0, hg_buf.slice(..));
+                    render_pass.draw(0..hex_verts.len() as u32, 0..1);
+                }
+                self.needs_continuous_redraw = true;
+            }
+
+            // === Cursor sparkle burst effect ===
+            if self.cursor_sparkle_burst_enabled && cursor_visible {
+                if let Some(ref anim) = animated_cursor {
+                    let cx = anim.x + anim.width / 2.0;
+                    let cy = anim.y + anim.height / 2.0;
+                    // Detect cursor movement to spawn burst
+                    if !self.cursor_sparkle_burst_entries.is_empty() || true {
+                        // Check if cursor moved (using pendulum tracker as proxy)
+                        let last = self.cursor_sparkle_burst_entries.last();
+                        let should_spawn = match last {
+                            Some(e) => (cx - e.cx).abs() > 2.0 || (cy - e.cy).abs() > 2.0,
+                            None => true,
+                        };
+                        if should_spawn {
+                            let seed = (cx as u32).wrapping_mul(31).wrapping_add(cy as u32).wrapping_mul(17).wrapping_add(
+                                std::time::Instant::now().elapsed().subsec_nanos()
+                            );
+                            self.cursor_sparkle_burst_entries.push(SparkleBurstEntry {
+                                cx, cy,
+                                started: std::time::Instant::now(),
+                                seed,
+                            });
+                            if self.cursor_sparkle_burst_entries.len() > 20 {
+                                self.cursor_sparkle_burst_entries.remove(0);
+                            }
+                        }
+                    }
+                    let (sr, sg, sb) = self.cursor_sparkle_burst_color;
+                    let sop = self.cursor_sparkle_burst_opacity;
+                    let count = self.cursor_sparkle_burst_count;
+                    let radius = self.cursor_sparkle_burst_radius;
+                    let mut sparkle_verts: Vec<RectVertex> = Vec::new();
+                    let duration = 0.4_f32;
+                    self.cursor_sparkle_burst_entries.retain(|e| e.started.elapsed().as_secs_f32() < duration);
+                    for entry in &self.cursor_sparkle_burst_entries {
+                        let t = entry.started.elapsed().as_secs_f32() / duration;
+                        let fade = 1.0 - t;
+                        for i in 0..count {
+                            let mut h = entry.seed.wrapping_add(i * 2654435761);
+                            h ^= h >> 16;
+                            h = h.wrapping_mul(0x45d9f3b);
+                            let angle = (h as f32 / u32::MAX as f32) * std::f32::consts::PI * 2.0;
+                            h = h.wrapping_mul(0x119de1f3);
+                            let speed_var = 0.5 + (h as f32 / u32::MAX as f32) * 0.5;
+                            let r = t * radius * speed_var;
+                            let px = entry.cx + angle.cos() * r;
+                            let py = entry.cy + angle.sin() * r;
+                            let sz = 2.0 * fade;
+                            let c = Color::new(sr, sg, sb, sop * fade * fade);
+                            self.add_rect(&mut sparkle_verts, px - sz / 2.0, py - sz / 2.0, sz, sz, &c);
+                        }
+                    }
+                    if !sparkle_verts.is_empty() {
+                        let sp_buf = self.device.create_buffer_init(
+                            &wgpu::util::BufferInitDescriptor {
+                                label: Some("Sparkle Burst Buffer"),
+                                contents: bytemuck::cast_slice(&sparkle_verts),
+                                usage: wgpu::BufferUsages::VERTEX,
+                            },
+                        );
+                        render_pass.set_pipeline(&self.rect_pipeline);
+                        render_pass.set_bind_group(0, &self.uniform_bind_group, &[]);
+                        render_pass.set_vertex_buffer(0, sp_buf.slice(..));
+                        render_pass.draw(0..sparkle_verts.len() as u32, 0..1);
+                    }
+                    self.needs_continuous_redraw = true;
+                }
+            }
+
+            // === Circuit board trace effect ===
+            if self.circuit_trace_enabled {
+                let now = std::time::Instant::now().duration_since(self.aurora_start).as_secs_f32();
+                let (cr, cg, cb) = self.circuit_trace_color;
+                let cop = self.circuit_trace_opacity;
+                let tw = self.circuit_trace_width;
+                let spd = self.circuit_trace_speed;
+                let fw = self.width() as f32;
+                let fh = self.height() as f32;
+                let mut trace_verts: Vec<RectVertex> = Vec::new();
+                // Generate pseudo-random circuit traces along edges
+                let trace_count = 8;
+                for i in 0..trace_count {
+                    let seed = i * 7919 + 13;
+                    let side = i % 4;
+                    let offset = (seed as f32 * 0.618).fract();
+                    let pulse = (0.5 + 0.5 * (now * spd * 2.0 + i as f32 * 1.5).sin()).max(0.0);
+                    let alpha = cop * pulse;
+                    let c = Color::new(cr, cg, cb, alpha);
+                    match side {
+                        0 => { // top
+                            let x = offset * fw;
+                            let len = 30.0 + (seed as f32 * 0.3).fract() * 60.0;
+                            self.add_rect(&mut trace_verts, x, 0.0, len.min(fw - x), tw, &c);
+                            // Right-angle turn down
+                            let turn_len = 15.0 + (seed as f32 * 0.7).fract() * 25.0;
+                            self.add_rect(&mut trace_verts, x + len.min(fw - x) - tw, 0.0, tw, turn_len, &c);
+                            // Junction dot
+                            let dot = tw * 2.0;
+                            let dc = Color::new(cr, cg, cb, alpha * 1.5);
+                            self.add_rect(&mut trace_verts, x - dot / 2.0, -dot / 4.0, dot, dot, &dc);
+                        }
+                        1 => { // right
+                            let y = offset * fh;
+                            let len = 30.0 + (seed as f32 * 0.5).fract() * 60.0;
+                            self.add_rect(&mut trace_verts, fw - tw, y, tw, len.min(fh - y), &c);
+                            let turn_len = 15.0 + (seed as f32 * 0.9).fract() * 25.0;
+                            self.add_rect(&mut trace_verts, fw - turn_len, y, turn_len, tw, &c);
+                        }
+                        2 => { // bottom
+                            let x = offset * fw;
+                            let len = 30.0 + (seed as f32 * 0.4).fract() * 60.0;
+                            self.add_rect(&mut trace_verts, x, fh - tw, len.min(fw - x), tw, &c);
+                            let turn_len = 15.0 + (seed as f32 * 0.6).fract() * 25.0;
+                            self.add_rect(&mut trace_verts, x, fh - turn_len, tw, turn_len, &c);
+                        }
+                        _ => { // left
+                            let y = offset * fh;
+                            let len = 30.0 + (seed as f32 * 0.8).fract() * 60.0;
+                            self.add_rect(&mut trace_verts, 0.0, y, tw, len.min(fh - y), &c);
+                            let turn_len = 15.0 + (seed as f32 * 0.2).fract() * 25.0;
+                            self.add_rect(&mut trace_verts, 0.0, y + len.min(fh - y) - tw, turn_len, tw, &c);
+                        }
+                    }
+                }
+                if !trace_verts.is_empty() {
+                    let tr_buf = self.device.create_buffer_init(
+                        &wgpu::util::BufferInitDescriptor {
+                            label: Some("Circuit Trace Buffer"),
+                            contents: bytemuck::cast_slice(&trace_verts),
+                            usage: wgpu::BufferUsages::VERTEX,
+                        },
+                    );
+                    render_pass.set_pipeline(&self.rect_pipeline);
+                    render_pass.set_bind_group(0, &self.uniform_bind_group, &[]);
+                    render_pass.set_vertex_buffer(0, tr_buf.slice(..));
+                    render_pass.draw(0..trace_verts.len() as u32, 0..1);
+                }
+                self.needs_continuous_redraw = true;
+            }
+
+            // === Cursor compass rose effect ===
+            if self.cursor_compass_enabled && cursor_visible {
+                if let Some(ref anim) = animated_cursor {
+                    let now = std::time::Instant::now().duration_since(self.aurora_start).as_secs_f32();
+                    let cx = anim.x + anim.width / 2.0;
+                    let cy = anim.y + anim.height / 2.0;
+                    let (cr, cg, cb) = self.cursor_compass_color;
+                    let cop = self.cursor_compass_opacity;
+                    let size = self.cursor_compass_size;
+                    let spd = self.cursor_compass_speed;
+                    let rotation = now * spd;
+                    let mut compass_verts: Vec<RectVertex> = Vec::new();
+                    // 4 cardinal lines + 4 intermediate lines
+                    for i in 0..8 {
+                        let angle = rotation + i as f32 / 8.0 * std::f32::consts::PI * 2.0;
+                        let is_cardinal = i % 2 == 0;
+                        let len = if is_cardinal { size } else { size * 0.6 };
+                        let thick = if is_cardinal { 2.0 } else { 1.0 };
+                        let alpha = if is_cardinal { cop } else { cop * 0.6 };
+                        let seg_count = 8;
+                        for seg in 0..seg_count {
+                            let t = seg as f32 / seg_count as f32;
+                            let r = t * len;
+                            let px = cx + angle.cos() * r;
+                            let py = cy + angle.sin() * r;
+                            let fade = 1.0 - t * 0.3;
+                            let c = Color::new(cr, cg, cb, alpha * fade);
+                            self.add_rect(&mut compass_verts, px - thick / 2.0, py - thick / 2.0, thick, thick, &c);
+                        }
+                        // Arrow tip for cardinal directions
+                        if is_cardinal {
+                            let tip_r = len * 0.9;
+                            let tip_angle1 = angle + 0.15;
+                            let tip_angle2 = angle - 0.15;
+                            let tx1 = cx + tip_angle1.cos() * tip_r;
+                            let ty1 = cy + tip_angle1.sin() * tip_r;
+                            let tx2 = cx + tip_angle2.cos() * tip_r;
+                            let ty2 = cy + tip_angle2.sin() * tip_r;
+                            let tc = Color::new(cr, cg, cb, alpha * 0.8);
+                            self.add_rect(&mut compass_verts, tx1 - 1.5, ty1 - 1.5, 3.0, 3.0, &tc);
+                            self.add_rect(&mut compass_verts, tx2 - 1.5, ty2 - 1.5, 3.0, 3.0, &tc);
+                        }
+                    }
+                    // Center dot
+                    let center_c = Color::new(cr, cg, cb, cop);
+                    self.add_rect(&mut compass_verts, cx - 2.0, cy - 2.0, 4.0, 4.0, &center_c);
+
+                    if !compass_verts.is_empty() {
+                        let comp_buf = self.device.create_buffer_init(
+                            &wgpu::util::BufferInitDescriptor {
+                                label: Some("Compass Rose Buffer"),
+                                contents: bytemuck::cast_slice(&compass_verts),
+                                usage: wgpu::BufferUsages::VERTEX,
+                            },
+                        );
+                        render_pass.set_pipeline(&self.rect_pipeline);
+                        render_pass.set_bind_group(0, &self.uniform_bind_group, &[]);
+                        render_pass.set_vertex_buffer(0, comp_buf.slice(..));
+                        render_pass.draw(0..compass_verts.len() as u32, 0..1);
                     }
                     self.needs_continuous_redraw = true;
                 }

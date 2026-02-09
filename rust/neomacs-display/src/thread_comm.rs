@@ -1140,6 +1140,54 @@ pub enum RenderCommand {
         /// Opacity (0.0-1.0)
         opacity: f32,
     },
+    /// Configure hex grid overlay effect
+    SetHexGrid {
+        enabled: bool,
+        /// Grid line color (sRGB floats)
+        r: f32, g: f32, b: f32,
+        /// Hex cell size in pixels
+        cell_size: f32,
+        /// Pulse animation speed multiplier
+        pulse_speed: f32,
+        /// Opacity (0.0-1.0)
+        opacity: f32,
+    },
+    /// Configure cursor sparkle burst effect
+    SetCursorSparkleBurst {
+        enabled: bool,
+        /// Sparkle color (sRGB floats)
+        r: f32, g: f32, b: f32,
+        /// Number of sparkle particles per burst
+        particle_count: u32,
+        /// Burst radius in pixels
+        burst_radius: f32,
+        /// Opacity (0.0-1.0)
+        opacity: f32,
+    },
+    /// Configure circuit board trace effect
+    SetCircuitTrace {
+        enabled: bool,
+        /// Trace color (sRGB floats)
+        r: f32, g: f32, b: f32,
+        /// Trace width in pixels
+        trace_width: f32,
+        /// Animation speed multiplier
+        speed: f32,
+        /// Opacity (0.0-1.0)
+        opacity: f32,
+    },
+    /// Configure cursor compass rose effect
+    SetCursorCompass {
+        enabled: bool,
+        /// Compass color (sRGB floats)
+        r: f32, g: f32, b: f32,
+        /// Compass size in pixels
+        size: f32,
+        /// Rotation speed multiplier
+        speed: f32,
+        /// Opacity (0.0-1.0)
+        opacity: f32,
+    },
     /// Configure background pattern
     SetBackgroundPattern {
         /// 0=none, 1=dots, 2=grid, 3=crosshatch
