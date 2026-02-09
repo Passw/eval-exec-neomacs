@@ -202,7 +202,7 @@ The spring style also supports a **4-corner trail effect** where leading corners
 
 ### The Ambitious Vision
 
-Neomacs aims to transform Emacs from a text editor into a **modern graphical computing environment**, while rewriting its internals in Rust:
+Neomacs aims to be **the most capable and beautiful Emacs ever built**, rewriting its internals in Rust:
 
 - **Rich media** — 4K video, PDF rendering, image manipulation directly in buffers
 - **GPU-native** — hardware-accelerated rendering, shader effects, 120fps animations
@@ -212,7 +212,7 @@ Neomacs aims to transform Emacs from a text editor into a **modern graphical com
 - **Multi-threaded Elisp** — true concurrency for the Lisp machine, enabling parallel Elisp execution
 - **10x faster Elisp** — Rust-optimized Lisp interpreter/compiler to dramatically speed up Elisp
 
-The goal: **Make Emacs the most powerful and beautiful computing environment on any platform.**
+The goal: **Make Emacs as powerful and beautiful as it deserves to be.**
 
 ---
 
