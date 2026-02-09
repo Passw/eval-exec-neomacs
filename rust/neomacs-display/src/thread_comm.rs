@@ -106,6 +106,15 @@ pub struct PopupMenuItem {
     pub depth: u32,
 }
 
+/// Wrapper for effect update closures that implements Debug.
+pub struct EffectUpdater(pub Box<dyn FnOnce(&mut crate::effect_config::EffectsConfig) + Send>);
+
+impl std::fmt::Debug for EffectUpdater {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "EffectUpdater(...)")
+    }
+}
+
 /// Command from Emacs to render thread
 #[derive(Debug)]
 pub enum RenderCommand {
@@ -249,6 +258,9 @@ pub enum RenderCommand {
     VisualBell,
     /// Request window attention (urgency hint / taskbar flash)
     RequestAttention { urgent: bool },
+    /// Update visual effect configuration.
+    /// The closure modifies the shared EffectsConfig in-place.
+    UpdateEffect(EffectUpdater),
     /// Toggle scroll indicators and focus ring
     SetScrollIndicators { enabled: bool },
     /// Set custom title bar height (0 = hidden, >0 = show with given height)

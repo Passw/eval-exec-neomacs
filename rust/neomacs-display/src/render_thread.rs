@@ -1524,6 +1524,13 @@ impl RenderApp {
                         window.request_user_attention(attention);
                     }
                 }
+                RenderCommand::UpdateEffect(updater) => {
+                    (updater.0)(&mut self.effects);
+                    if let Some(renderer) = self.renderer.as_mut() {
+                        renderer.effects = self.effects.clone();
+                    }
+                    self.frame_dirty = true;
+                }
                 RenderCommand::SetScrollIndicators { enabled } => {
                     self.scroll_indicators_enabled = enabled;
                     self.frame_dirty = true;
