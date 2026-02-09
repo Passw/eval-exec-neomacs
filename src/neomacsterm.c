@@ -4268,17 +4268,34 @@ neomacs_set_window_size (struct frame *f, bool change_gravity,
 
   block_input ();
 
-  /* Update frame's pixel dimensions */
-  output->pixel_width = width;
-  output->pixel_height = height;
+  /* Clamp to display dimensions so the window doesn't extend beyond
+     the screen.  On a real display the WM would do this; without a WM
+     (e.g. Xvfb) the window would grow beyond the screen otherwise.
+     We clamp output dimensions and the renderer/winit request, but
+     leave FRAME_PIXEL_WIDTH/HEIGHT (set by adjust_frame_size) alone
+     so that the Resized event from winit will trigger change_frame_size
+     to recalculate correctly.  */
+  int req_w = width;
+  int req_h = height;
+  if (dpyinfo)
+    {
+      if (req_w > dpyinfo->width)
+        req_w = dpyinfo->width;
+      if (req_h > dpyinfo->height)
+        req_h = dpyinfo->height;
+    }
+
+  /* Update frame's pixel dimensions (clamped) */
+  output->pixel_width = req_w;
+  output->pixel_height = req_h;
 
   /* Update the glyph buffer dimensions (threaded and GPU widget modes) */
   if (dpyinfo && dpyinfo->display_handle)
     {
-      neomacs_display_resize (dpyinfo->display_handle, width, height);
+      neomacs_display_resize (dpyinfo->display_handle, req_w, req_h);
       neomacs_display_clear_all_glyphs (dpyinfo->display_handle);
       /* Request the winit window to resize */
-      neomacs_display_request_size (dpyinfo->display_handle, width, height);
+      neomacs_display_request_size (dpyinfo->display_handle, req_w, req_h);
     }
 
   /* Mark frame for redisplay */

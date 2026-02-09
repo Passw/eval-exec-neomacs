@@ -1075,6 +1075,13 @@ If the parameters specify a display, that display is used.  */)
 			 ? make_fixnum (0) : make_fixnum (1),
 			 NULL, NULL, RES_TYPE_NUMBER);
 
+  /* Re-fit the frame within the display dimensions now that all margins
+     (menu bar, tab bar, tool bar, fringes, borders) are finalized.
+     Without this, the frame can grow beyond the display because each
+     gui_default_parameter that adds bar lines triggers adjust_frame_size
+     which may try to preserve the text area and grow the native frame.  */
+  change_frame_size (f, dpyinfo->width, dpyinfo->height, false, false, false);
+
   gui_default_parameter (f, parms, Qbuffer_predicate, Qnil,
 			 "bufferPredicate", "BufferPredicate",
 			 RES_TYPE_SYMBOL);
