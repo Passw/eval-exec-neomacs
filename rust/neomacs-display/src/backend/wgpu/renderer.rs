@@ -279,6 +279,12 @@ pub struct WgpuRenderer {
     cursor_crosshair_enabled: bool,
     cursor_crosshair_color: (f32, f32, f32),
     cursor_crosshair_opacity: f32,
+    /// Per-window rounded border
+    window_border_radius_enabled: bool,
+    window_border_radius: f32,
+    window_border_width: f32,
+    window_border_color: (f32, f32, f32),
+    window_border_opacity: f32,
     /// Typing heat map overlay
     typing_heatmap_enabled: bool,
     typing_heatmap_color: (f32, f32, f32),
@@ -1047,6 +1053,11 @@ impl WgpuRenderer {
             cursor_crosshair_enabled: false,
             cursor_crosshair_color: (0.5, 0.5, 0.5),
             cursor_crosshair_opacity: 0.15,
+            window_border_radius_enabled: false,
+            window_border_radius: 8.0,
+            window_border_width: 1.0,
+            window_border_color: (0.5, 0.5, 0.5),
+            window_border_opacity: 0.3,
             typing_heatmap_enabled: false,
             typing_heatmap_color: (1.0, 0.4, 0.1),
             typing_heatmap_fade_ms: 2000,
@@ -1354,6 +1365,15 @@ impl WgpuRenderer {
         self.cursor_crosshair_enabled = enabled;
         self.cursor_crosshair_color = color;
         self.cursor_crosshair_opacity = opacity;
+    }
+
+    /// Update per-window rounded border config
+    pub fn set_window_border_radius(&mut self, enabled: bool, radius: f32, border_width: f32, color: (f32, f32, f32), opacity: f32) {
+        self.window_border_radius_enabled = enabled;
+        self.window_border_radius = radius;
+        self.window_border_width = border_width;
+        self.window_border_color = color;
+        self.window_border_opacity = opacity;
     }
 
     /// Update typing heat map config
@@ -3593,6 +3613,44 @@ impl WgpuRenderer {
                     if !self.typing_heatmap_entries.is_empty() {
                         self.needs_continuous_redraw = true;
                     }
+                }
+            }
+
+            // === Step 1g: Per-window rounded border ===
+            if self.window_border_radius_enabled {
+                let (wr, wg, wb) = self.window_border_color;
+                let walpha = self.window_border_opacity;
+                let wc = Color::new(wr, wg, wb, walpha);
+                let radius = self.window_border_radius;
+                let bw = self.window_border_width;
+                let mut border_verts: Vec<RoundedRectVertex> = Vec::new();
+                for win_info in &frame_glyphs.window_infos {
+                    if !win_info.is_minibuffer {
+                        let wb_bounds = &win_info.bounds;
+                        let mode_h = win_info.mode_line_height;
+                        let content_h = wb_bounds.height - mode_h;
+                        if content_h > 0.0 {
+                            self.add_rounded_rect(
+                                &mut border_verts,
+                                wb_bounds.x, wb_bounds.y,
+                                wb_bounds.width, content_h,
+                                bw, radius, &wc,
+                            );
+                        }
+                    }
+                }
+                if !border_verts.is_empty() {
+                    let border_buf = self.device.create_buffer_init(
+                        &wgpu::util::BufferInitDescriptor {
+                            label: Some("Window Border Radius Buffer"),
+                            contents: bytemuck::cast_slice(&border_verts),
+                            usage: wgpu::BufferUsages::VERTEX,
+                        },
+                    );
+                    render_pass.set_pipeline(&self.rounded_rect_pipeline);
+                    render_pass.set_bind_group(0, &self.uniform_bind_group, &[]);
+                    render_pass.set_vertex_buffer(0, border_buf.slice(..));
+                    render_pass.draw(0..border_verts.len() as u32, 0..1);
                 }
             }
 

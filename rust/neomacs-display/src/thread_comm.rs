@@ -632,6 +632,20 @@ pub enum RenderCommand {
         /// Opacity (0.0-1.0)
         opacity: f32,
     },
+    /// Configure per-window rounded border
+    SetWindowBorderRadius {
+        enabled: bool,
+        /// Corner radius in pixels
+        radius: f32,
+        /// Border line width in pixels
+        border_width: f32,
+        /// Border color (sRGB floats)
+        r: f32,
+        g: f32,
+        b: f32,
+        /// Border opacity (0.0-1.0)
+        opacity: f32,
+    },
     /// Configure typing heat map overlay
     SetTypingHeatMap {
         enabled: bool,

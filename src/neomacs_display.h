@@ -1536,6 +1536,16 @@ void neomacs_display_set_modified_indicator(
     int width,
     int opacity);
 
+void neomacs_display_set_window_border_radius(
+    struct NeomacsDisplay *handle,
+    int enabled,
+    int radius,
+    int border_width,
+    int r,
+    int g,
+    int b,
+    int opacity);
+
 void neomacs_display_set_typing_heatmap(
     struct NeomacsDisplay *handle,
     int enabled,

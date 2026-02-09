@@ -788,6 +788,12 @@ struct RenderApp {
     modified_indicator_color: (f32, f32, f32),
     modified_indicator_width: f32,
     modified_indicator_opacity: f32,
+    /// Per-window rounded border
+    window_border_radius_enabled: bool,
+    window_border_radius: f32,
+    window_border_width: f32,
+    window_border_color: (f32, f32, f32),
+    window_border_opacity: f32,
     /// Typing heat map overlay
     typing_heatmap_enabled: bool,
     typing_heatmap_color: (f32, f32, f32),
@@ -1145,6 +1151,11 @@ impl RenderApp {
             modified_indicator_color: (1.0, 0.6, 0.2),
             modified_indicator_width: 3.0,
             modified_indicator_opacity: 0.8,
+            window_border_radius_enabled: false,
+            window_border_radius: 8.0,
+            window_border_width: 1.0,
+            window_border_color: (0.5, 0.5, 0.5),
+            window_border_opacity: 0.3,
             typing_heatmap_enabled: false,
             typing_heatmap_color: (1.0, 0.4, 0.1),
             typing_heatmap_fade_ms: 2000,
@@ -2298,6 +2309,17 @@ impl RenderApp {
                     self.modified_indicator_opacity = opacity;
                     if let Some(renderer) = self.renderer.as_mut() {
                         renderer.set_modified_indicator(enabled, (r, g, b), width, opacity);
+                    }
+                    self.frame_dirty = true;
+                }
+                RenderCommand::SetWindowBorderRadius { enabled, radius, border_width, r, g, b, opacity } => {
+                    self.window_border_radius_enabled = enabled;
+                    self.window_border_radius = radius;
+                    self.window_border_width = border_width;
+                    self.window_border_color = (r, g, b);
+                    self.window_border_opacity = opacity;
+                    if let Some(renderer) = self.renderer.as_mut() {
+                        renderer.set_window_border_radius(enabled, radius, border_width, (r, g, b), opacity);
                     }
                     self.frame_dirty = true;
                 }

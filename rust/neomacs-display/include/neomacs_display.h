@@ -1503,6 +1503,18 @@ void neomacs_display_set_modified_indicator(struct NeomacsDisplay *handle,
                                             int opacity);
 
 /**
+ * Configure per-window rounded border
+ */
+void neomacs_display_set_window_border_radius(struct NeomacsDisplay *handle,
+                                              int enabled,
+                                              int radius,
+                                              int borderWidth,
+                                              int r,
+                                              int g,
+                                              int b,
+                                              int opacity);
+
+/**
  * Configure typing heat map overlay
  */
 void neomacs_display_set_typing_heatmap(struct NeomacsDisplay *handle,

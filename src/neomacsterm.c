@@ -9146,6 +9146,47 @@ OPACITY is a percentage 0-100 (default 80).  */)
   return on ? Qt : Qnil;
 }
 
+DEFUN ("neomacs-set-window-border-radius",
+       Fneomacs_set_window_border_radius,
+       Sneomacs_set_window_border_radius, 0, 5, 0,
+       doc: /* Configure per-window rounded border.
+ENABLED non-nil draws a rounded rectangle border around each
+non-minibuffer window content area.
+RADIUS is the corner radius in pixels (default 8).
+BORDER-WIDTH is the line width in pixels (default 1).
+COLOR is an RGB hex string (default "#808080").
+OPACITY is a percentage 0-100 (default 30).  */)
+  (Lisp_Object enabled, Lisp_Object radius, Lisp_Object border_width,
+   Lisp_Object color, Lisp_Object opacity)
+{
+  struct neomacs_display_info *dpyinfo = neomacs_display_list;
+  if (!dpyinfo || !dpyinfo->display_handle)
+    return Qnil;
+
+  int on = !NILP (enabled);
+  int rad = 8, bw = 1;
+  int r = 128, g = 128, b = 128;
+  int op = 30;
+  if (FIXNUMP (radius)) rad = XFIXNUM (radius);
+  if (FIXNUMP (border_width)) bw = XFIXNUM (border_width);
+  if (STRINGP (color))
+    {
+      const char *s = SSDATA (color);
+      if (s[0] == '#' && strlen (s) == 7)
+        {
+          unsigned int hex;
+          sscanf (s + 1, "%06x", &hex);
+          r = (hex >> 16) & 0xFF;
+          g = (hex >> 8) & 0xFF;
+          b = hex & 0xFF;
+        }
+    }
+  if (FIXNUMP (opacity)) op = XFIXNUM (opacity);
+
+  neomacs_display_set_window_border_radius (dpyinfo->display_handle, on, rad, bw, r, g, b, op);
+  return on ? Qt : Qnil;
+}
+
 DEFUN ("neomacs-set-typing-heatmap",
        Fneomacs_set_typing_heatmap,
        Sneomacs_set_typing_heatmap, 0, 4, 0,
@@ -10838,6 +10879,7 @@ syms_of_neomacsterm (void)
   defsubr (&Sneomacs_set_modified_indicator);
   defsubr (&Sneomacs_set_theme_transition);
   defsubr (&Sneomacs_set_typing_heatmap);
+  defsubr (&Sneomacs_set_window_border_radius);
   defsubr (&Sneomacs_set_region_glow);
   defsubr (&Sneomacs_set_window_glow);
   defsubr (&Sneomacs_set_scroll_progress);

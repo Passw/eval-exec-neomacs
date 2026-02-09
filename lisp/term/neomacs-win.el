@@ -2240,6 +2240,100 @@ whose buffers have unsaved modifications."
                 neomacs-modified-indicator-width nil)
             val))))
 
+;; --- Per-window rounded border ---
+(declare-function neomacs-set-window-border-radius "neomacsterm.c"
+  (&optional enabled radius border-width color opacity))
+
+(defcustom neomacs-window-border-radius nil
+  "Enable per-window rounded border.
+Non-nil draws a rounded rectangle border around each non-minibuffer
+window content area."
+  :type 'boolean
+  :group 'frames
+  :set (lambda (sym val)
+         (set-default sym val)
+         (when (fboundp 'neomacs-set-window-border-radius)
+           (neomacs-set-window-border-radius val
+            (if (boundp 'neomacs-window-border-radius-size)
+                neomacs-window-border-radius-size nil)
+            (if (boundp 'neomacs-window-border-radius-width)
+                neomacs-window-border-radius-width nil)
+            (if (boundp 'neomacs-window-border-radius-color)
+                neomacs-window-border-radius-color nil)
+            (if (boundp 'neomacs-window-border-radius-opacity)
+                neomacs-window-border-radius-opacity nil)))))
+
+(defcustom neomacs-window-border-radius-size 8
+  "Window rounded border corner radius in pixels."
+  :type '(integer :tag "Radius (px)")
+  :group 'frames
+  :set (lambda (sym val)
+         (set-default sym val)
+         (when (and (fboundp 'neomacs-set-window-border-radius)
+                    (boundp 'neomacs-window-border-radius)
+                    neomacs-window-border-radius)
+           (neomacs-set-window-border-radius t val
+            (if (boundp 'neomacs-window-border-radius-width)
+                neomacs-window-border-radius-width nil)
+            (if (boundp 'neomacs-window-border-radius-color)
+                neomacs-window-border-radius-color nil)
+            (if (boundp 'neomacs-window-border-radius-opacity)
+                neomacs-window-border-radius-opacity nil)))))
+
+(defcustom neomacs-window-border-radius-width 1
+  "Window rounded border line width in pixels."
+  :type '(integer :tag "Width (px)")
+  :group 'frames
+  :set (lambda (sym val)
+         (set-default sym val)
+         (when (and (fboundp 'neomacs-set-window-border-radius)
+                    (boundp 'neomacs-window-border-radius)
+                    neomacs-window-border-radius)
+           (neomacs-set-window-border-radius t
+            (if (boundp 'neomacs-window-border-radius-size)
+                neomacs-window-border-radius-size nil)
+            val
+            (if (boundp 'neomacs-window-border-radius-color)
+                neomacs-window-border-radius-color nil)
+            (if (boundp 'neomacs-window-border-radius-opacity)
+                neomacs-window-border-radius-opacity nil)))))
+
+(defcustom neomacs-window-border-radius-color "#808080"
+  "Window rounded border color as hex RGB string."
+  :type '(string :tag "Color (#RRGGBB)")
+  :group 'frames
+  :set (lambda (sym val)
+         (set-default sym val)
+         (when (and (fboundp 'neomacs-set-window-border-radius)
+                    (boundp 'neomacs-window-border-radius)
+                    neomacs-window-border-radius)
+           (neomacs-set-window-border-radius t
+            (if (boundp 'neomacs-window-border-radius-size)
+                neomacs-window-border-radius-size nil)
+            (if (boundp 'neomacs-window-border-radius-width)
+                neomacs-window-border-radius-width nil)
+            val
+            (if (boundp 'neomacs-window-border-radius-opacity)
+                neomacs-window-border-radius-opacity nil)))))
+
+(defcustom neomacs-window-border-radius-opacity 30
+  "Window rounded border opacity (0-100)."
+  :type '(integer :tag "Opacity (%)")
+  :group 'frames
+  :set (lambda (sym val)
+         (set-default sym val)
+         (when (and (fboundp 'neomacs-set-window-border-radius)
+                    (boundp 'neomacs-window-border-radius)
+                    neomacs-window-border-radius)
+           (neomacs-set-window-border-radius t
+            (if (boundp 'neomacs-window-border-radius-size)
+                neomacs-window-border-radius-size nil)
+            (if (boundp 'neomacs-window-border-radius-width)
+                neomacs-window-border-radius-width nil)
+            (if (boundp 'neomacs-window-border-radius-color)
+                neomacs-window-border-radius-color nil)
+            val))))
+
 ;; --- Typing heat map overlay ---
 (declare-function neomacs-set-typing-heatmap "neomacsterm.c"
   (&optional enabled color fade-ms opacity))
