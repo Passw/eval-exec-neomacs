@@ -593,7 +593,7 @@ impl VideoCache {
             let pipeline_str = if has_vapostproc {
                 // VA-API hardware acceleration pipeline with true zero-copy:
                 // - decodebin auto-selects VA-API decoders (higher rank)
-                // - vapostproc does GPU-based color conversion to BGRA on VA surface
+                // - vapostproc does GPU-based color conversion to RGBA on VA surface
                 // - Output stays in VA memory for DMA-BUF export
                 // - Vulkan HAL imports DMA-BUF directly as texture (zero-copy)
                 // NOTE: Audio is handled separately - not included here to avoid
@@ -602,7 +602,7 @@ impl VideoCache {
                 format!(
                     "filesrc location=\"{}\" ! decodebin ! \
                      queue max-size-buffers=3 ! vapostproc ! \
-                     video/x-raw(memory:VAMemory),format=BGRA ! appsink name=sink",
+                     video/x-raw(memory:VAMemory),format=RGBA ! appsink name=sink",
                     path.replace("\"", "\\\"")
                 )
             } else {
