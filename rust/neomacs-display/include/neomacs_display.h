@@ -63,6 +63,16 @@
 
 
 /**
+ * Maximum depth of explicit embedding/override/isolate nesting (UAX#9).
+ */
+#define MAX_DEPTH 125
+
+/**
+ * Maximum size of the BPA stack.
+ */
+#define MAX_BPA_STACK 63
+
+/**
  * Modifier flags matching Emacs.
  */
 #define NEOMACS_SHIFT_MASK (1 << 0)

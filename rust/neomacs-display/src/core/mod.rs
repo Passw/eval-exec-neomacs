@@ -13,6 +13,7 @@ pub mod scroll_animation;
 pub mod itree;
 pub mod regex;
 pub mod gap_buffer;
+pub mod bidi;
 
 pub use types::*;
 pub use scene::*;
