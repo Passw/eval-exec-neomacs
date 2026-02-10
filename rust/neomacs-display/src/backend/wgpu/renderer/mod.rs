@@ -23,6 +23,10 @@ mod effects_state;
 mod glyphs;
 mod transitions;
 mod overlays;
+mod cursor_effects;
+mod effect_common;
+mod window_effects;
+mod pattern_effects;
 
 /// GPU-accelerated renderer using wgpu.
 pub struct WgpuRenderer {
