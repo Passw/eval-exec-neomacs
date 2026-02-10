@@ -3046,6 +3046,24 @@ impl RenderApp {
                     }
                 }
             }
+
+            // Merge box attributes from the Rust layout engine's side-channel.
+            // The layout engine populates face_box_attrs instead of inserting
+            // full Face objects (which causes heap corruption on the Emacs thread).
+            for (face_id, box_attrs) in &frame.face_box_attrs {
+                let face = self.faces.entry(*face_id).or_insert_with(|| {
+                    crate::core::face::Face::new(*face_id)
+                });
+                face.box_type = if box_attrs.box_type == 1 {
+                    crate::core::face::BoxType::Line
+                } else {
+                    crate::core::face::BoxType::None
+                };
+                face.box_color = Some(box_attrs.box_color);
+                face.box_line_width = box_attrs.box_line_width;
+                face.box_corner_radius = box_attrs.box_corner_radius;
+                face.attributes |= crate::core::face::FaceAttributes::BOX;
+            }
         }
 
         // Apply extra spacing adjustments to glyph positions

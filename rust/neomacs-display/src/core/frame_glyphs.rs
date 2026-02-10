@@ -193,6 +193,19 @@ pub struct StipplePattern {
     pub bits: Vec<u8>,
 }
 
+/// Lightweight box attributes for a face (avoids storing full Face on Emacs thread)
+#[derive(Debug, Clone)]
+pub struct FaceBoxAttrs {
+    /// Box type (0=none, 1=line)
+    pub box_type: i32,
+    /// Box color
+    pub box_color: Color,
+    /// Box line width
+    pub box_line_width: i32,
+    /// Box corner radius (0 = sharp)
+    pub box_corner_radius: i32,
+}
+
 /// Per-window metadata for animation transition detection
 #[derive(Debug, Clone, PartialEq)]
 pub struct WindowInfo {
@@ -282,6 +295,11 @@ pub struct FrameGlyphBuffer {
 
     /// Stipple patterns: bitmap_id -> StipplePattern
     pub stipple_patterns: HashMap<i32, StipplePattern>,
+
+    /// Box attributes per face: face_id -> FaceBoxAttrs
+    /// Populated by the Rust layout engine's apply_face() as a lightweight
+    /// side-channel (avoids inserting full Face objects which causes heap corruption).
+    pub face_box_attrs: HashMap<u32, FaceBoxAttrs>,
 }
 
 impl FrameGlyphBuffer {
@@ -315,6 +333,7 @@ impl FrameGlyphBuffer {
             face_fonts: HashMap::new(),
             faces: HashMap::new(),
             stipple_patterns: HashMap::new(),
+            face_box_attrs: HashMap::new(),
         }
     }
 
@@ -335,6 +354,7 @@ impl FrameGlyphBuffer {
         self.window_infos.clear();
         self.cursor_inverse = None;
         self.stipple_patterns.clear();
+        self.face_box_attrs.clear();
     }
 
     /// Start new frame - prepare for new content (compatibility shim)
@@ -363,6 +383,7 @@ impl FrameGlyphBuffer {
         self.glyphs.clear();
         self.cursor_inverse = None;
         self.stipple_patterns.clear();
+        self.face_box_attrs.clear();
     }
 
     /// Set current face attributes for subsequent char glyphs (with font family)

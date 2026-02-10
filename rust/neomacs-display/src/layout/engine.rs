@@ -8,7 +8,7 @@ use std::ffi::CStr;
 use std::ffi::c_int;
 use std::ffi::c_void;
 
-use crate::core::frame_glyphs::{FrameGlyphBuffer, StipplePattern};
+use crate::core::frame_glyphs::{FaceBoxAttrs, FrameGlyphBuffer, StipplePattern};
 use crate::core::types::{Color, Rect};
 use super::types::*;
 use super::emacs_ffi::*;
@@ -437,6 +437,17 @@ impl LayoutEngine {
             overline_color,
         );
 
+        // Store box attributes in side-channel for render thread to pick up.
+        // We don't insert full Face objects here (causes heap corruption on Emacs thread).
+        if face.box_type > 0 {
+            frame_glyphs.face_box_attrs.insert(face.face_id, FaceBoxAttrs {
+                box_type: face.box_type,
+                box_color: Color::from_pixel(face.box_color),
+                box_line_width: face.box_line_width,
+                box_corner_radius: face.box_corner_radius,
+            });
+        }
+
         // Fetch stipple pattern data if present and not yet cached
         if face.stipple > 0 && !frame_glyphs.stipple_patterns.contains_key(&face.stipple) {
             let mut bits_buf = [0u8; 1024]; // max 1024 bytes for stipple bitmap
@@ -734,12 +745,10 @@ impl LayoutEngine {
         let has_margins = params.left_margin_width > 0.0 || params.right_margin_width > 0.0;
         let mut need_margin_check = has_margins;
 
-        // Box face tracking: borders around text regions with box_type > 0
+        // Box face tracking: track active box regions for renderer's span detection
         let mut box_active = false;
         let mut box_start_x: f32 = 0.0;
         let mut box_row: i32 = 0;
-        let mut box_color = Color::from_pixel(0);
-        let mut box_line_width: i32 = 1;
 
         // Pixel Y limit: stop rendering when rows exceed the text area,
         // which can happen with variable-height faces pushing rows down.
@@ -1576,19 +1585,10 @@ impl LayoutEngine {
 
                 if fid >= 0 {
                     if fid != current_face_id {
-                        // Close previous box face region if active
+                        // Close previous box face region if active.
+                        // Box borders are now rendered by the renderer's box span
+                        // detection (supports both sharp and SDF rounded corners).
                         if box_active {
-                            let box_end_x = content_x + x_offset;
-                            let gy = row_y[box_row as usize];
-                            let bw = box_line_width.max(1) as f32;
-                            // Top border
-                            frame_glyphs.add_border(box_start_x, gy, box_end_x - box_start_x, bw, box_color);
-                            // Bottom border
-                            frame_glyphs.add_border(box_start_x, gy + char_h - bw, box_end_x - box_start_x, bw, box_color);
-                            // Left border
-                            frame_glyphs.add_border(box_start_x, gy, bw, char_h, box_color);
-                            // Right border
-                            frame_glyphs.add_border(box_end_x - bw, gy, bw, char_h, box_color);
                             box_active = false;
                         }
 
@@ -1630,8 +1630,6 @@ impl LayoutEngine {
                             box_active = true;
                             box_start_x = content_x + x_offset;
                             box_row = row;
-                            box_color = Color::from_pixel(self.face_data.box_color);
-                            box_line_width = self.face_data.box_line_width;
                         }
                     }
                     // next_check is 0 when face_at_buffer_position returns no limit
@@ -1732,18 +1730,10 @@ impl LayoutEngine {
                         }
                     }
 
-                    // Close box face at end of line (box continues on next line)
+                    // Box face tracking: box stays active across line breaks.
+                    // Borders are rendered by the renderer's box span detection.
                     if box_active {
-                        let box_end_x = content_x + x_offset;
-                        let gy = row_y[box_row as usize];
-                        let bw = box_line_width.max(1) as f32;
-                        frame_glyphs.add_border(box_start_x, gy, box_end_x - box_start_x, bw, box_color);
-                        frame_glyphs.add_border(box_start_x, gy + char_h - bw, box_end_x - box_start_x, bw, box_color);
-                        frame_glyphs.add_border(box_start_x, gy, bw, char_h, box_color);
-                        frame_glyphs.add_border(box_end_x - bw, gy, bw, char_h, box_color);
-                        // Box stays active but restarts on new row
                         box_start_x = content_x;
-                        // box_row will update after row += 1
                     }
 
                     // Record hit-test row (newline ends the row)
@@ -2717,15 +2707,9 @@ impl LayoutEngine {
             }
         }
 
-        // Close any remaining box face region at end of text
+        // Close any remaining box face region at end of text.
+        // Borders are rendered by the renderer's box span detection.
         if box_active {
-            let box_end_x = content_x + x_offset;
-            let gy = row_y[box_row.min(max_rows - 1) as usize];
-            let bw = box_line_width.max(1) as f32;
-            frame_glyphs.add_border(box_start_x, gy, box_end_x - box_start_x, bw, box_color);
-            frame_glyphs.add_border(box_start_x, gy + char_h - bw, box_end_x - box_start_x, bw, box_color);
-            frame_glyphs.add_border(box_start_x, gy, bw, char_h, box_color);
-            frame_glyphs.add_border(box_end_x - bw, gy, bw, char_h, box_color);
             box_active = false;
         }
 
@@ -3156,19 +3140,8 @@ impl LayoutEngine {
             Self::add_stretch_for_face(&line_face, frame_glyphs, gx, y, remaining, height, bg, line_face.face_id, true);
         }
 
-        // Draw box borders if the face has box type
-        if line_face.box_type > 0 {
-            let bw = line_face.box_line_width.max(1) as f32;
-            let box_color = Color::from_pixel(line_face.box_color);
-            // Top border
-            frame_glyphs.add_border(x, y, width, bw, box_color);
-            // Bottom border
-            frame_glyphs.add_border(x, y + height - bw, width, bw, box_color);
-            // Left border
-            frame_glyphs.add_border(x, y, bw, height, box_color);
-            // Right border
-            frame_glyphs.add_border(x + width - bw, y, bw, height, box_color);
-        }
+        // Box borders are rendered by the renderer's box span detection
+        // (supports both sharp and SDF rounded corners).
     }
 }
 

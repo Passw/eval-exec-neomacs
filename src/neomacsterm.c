@@ -2292,6 +2292,7 @@ struct FaceDataFFI {
   int box_type;
   uint32_t box_color;
   int box_line_width;
+  int box_corner_radius;
   int extend;
   float font_char_width;
   float font_ascent;
@@ -2397,6 +2398,7 @@ fill_face_data (struct frame *f, struct face *face, struct FaceDataFFI *out)
   out->box_type = 0;
   out->box_color = out->fg;
   out->box_line_width = 0;
+  out->box_corner_radius = 0;
   if (face->box != FACE_NO_BOX)
     {
       out->box_type = 1;
@@ -2405,6 +2407,7 @@ fill_face_data (struct frame *f, struct face *face, struct FaceDataFFI *out)
       out->box_color = ((RED_FROM_ULONG (face->box_color) << 16) |
                         (GREEN_FROM_ULONG (face->box_color) << 8) |
                         BLUE_FROM_ULONG (face->box_color));
+      out->box_corner_radius = face->box_corner_radius;
     }
 
   /* Extend: face background extends to end of visual line */
