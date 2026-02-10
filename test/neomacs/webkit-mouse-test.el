@@ -2,7 +2,7 @@
 
 ;;; Commentary:
 ;; Test script to verify mouse clicks work on inline WebKit views.
-;; Run with: DISPLAY=:0 ./src/emacs -Q -l test/manual/webkit-mouse-test.el
+;; Run with: DISPLAY=:0 ./src/emacs -Q -l test/neomacs/webkit-mouse-test.el
 
 ;;; Code:
 

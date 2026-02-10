@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Test real mouse clicks on WebKit view using xdotool
-# Usage: ./test/manual/run-xdotool-click-test.sh
+# Usage: ./test/neomacs/run-xdotool-click-test.sh
 
 set -e
 
@@ -10,7 +10,7 @@ echo "=== WebKit XDotool Click Test ==="
 echo "Starting Emacs with WebKit view..."
 
 # Start Emacs and capture stderr to a log file
-RUST_LOG=debug DISPLAY=:0 ./src/emacs -Q -l test/manual/webkit-xdotool-test.el 2>/tmp/webkit-click-test.log &
+RUST_LOG=debug DISPLAY=:0 ./src/emacs -Q -l test/neomacs/webkit-xdotool-test.el 2>/tmp/webkit-click-test.log &
 EMACS_PID=$!
 
 echo "Emacs PID: $EMACS_PID"

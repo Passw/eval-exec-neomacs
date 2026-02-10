@@ -3,7 +3,7 @@
 cd "$(dirname "$0")/../.."
 
 echo "Starting Emacs with WebKit..."
-RUST_LOG=warn DISPLAY=:0 ./src/emacs -Q -l test/manual/webkit-xdotool-test.el &
+RUST_LOG=warn DISPLAY=:0 ./src/emacs -Q -l test/neomacs/webkit-xdotool-test.el &
 EMACS_PID=$!
 
 sleep 8

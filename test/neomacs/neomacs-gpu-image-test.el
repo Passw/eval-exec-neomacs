@@ -4,7 +4,7 @@
 ;; using the GPU path (GdkTexture/GSK TextureNode).
 
 ;;; Commentary:
-;; Run with: ./test/manual/run-gpu-image-test.sh
+;; Run with: ./test/neomacs/run-gpu-image-test.sh
 ;; Or manually: DISPLAY=:0 ./src/emacs -Q -l test/neomacs/neomacs-gpu-image-test.el
 ;;
 ;; Neomacs automatically uses GPU rendering for images when native

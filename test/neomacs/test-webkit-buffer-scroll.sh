@@ -4,7 +4,7 @@ cd "$(dirname "$0")/../.."
 
 echo "=== WebKit Buffer Scroll Test ==="
 
-RUST_LOG=warn DISPLAY=:0 ./src/emacs -Q -l test/manual/webkit-scroll-buffer-test.el 2>/tmp/webkit-buffer-scroll.log &
+RUST_LOG=warn DISPLAY=:0 ./src/emacs -Q -l test/neomacs/webkit-scroll-buffer-test.el 2>/tmp/webkit-buffer-scroll.log &
 EMACS_PID=$!
 echo "Emacs PID: $EMACS_PID"
 

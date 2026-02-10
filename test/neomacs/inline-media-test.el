@@ -6,8 +6,8 @@
 ;; - WebKit (via neomacs-insert-webkit)
 
 ;;; Commentary:
-;; Run with: ./test/manual/run-inline-media-test.sh
-;; Or manually: DISPLAY=:0 ./src/emacs -Q -l test/manual/inline-media-test.el
+;; Run with: ./test/neomacs/run-inline-media-test.sh
+;; Or manually: DISPLAY=:0 ./src/emacs -Q -l test/neomacs/inline-media-test.el
 
 ;;; Code:
 

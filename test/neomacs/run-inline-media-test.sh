@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Test inline image, video, and webkit in one buffer
-# Usage: ./test/manual/run-inline-media-test.sh
+# Usage: ./test/neomacs/run-inline-media-test.sh
 
 set -e
 

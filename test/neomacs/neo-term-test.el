@@ -1,6 +1,6 @@
 ;;; neo-term-test.el --- Manual test for neo-term GPU terminal -*- lexical-binding: t -*-
 
-;; Usage: ./src/emacs -Q -l test/manual/neo-term-test.el
+;; Usage: ./src/emacs -Q -l test/neomacs/neo-term-test.el
 ;;
 ;; This test verifies that the neo-term terminal emulator:
 ;;   1. Creates terminals via the FFI
