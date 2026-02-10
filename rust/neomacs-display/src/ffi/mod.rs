@@ -65,7 +65,6 @@ pub(crate) static TERMINAL_TITLES: std::sync::Mutex<Vec<(u32, String)>> = std::s
 use crate::backend::tty::TtyBackend;
 use crate::core::types::{Color, Rect};
 use crate::core::scene::{Scene, WindowScene, CursorState, CursorStyle};
-use crate::core::glyph::{Glyph, GlyphRow, GlyphType, GlyphData};
 use crate::core::animation::AnimationManager;
 use crate::core::frame_glyphs::{FrameGlyphBuffer, FrameGlyph};
 use crate::core::face::{Face, FaceAttributes, UnderlineStyle, BoxType};

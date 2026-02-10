@@ -961,50 +961,14 @@ pub unsafe extern "C" fn neomacs_display_add_wpe_glyph(
     let current_y = display.current_row_y;
     let current_x = display.current_row_x;
 
-    log::debug!("add_wpe_glyph: at ({}, {}), use_hybrid={}", current_x, current_y, display.use_hybrid);
+    log::debug!("add_wpe_glyph: at ({}, {})", current_x, current_y);
 
-    // Hybrid path: add to frame glyph buffer
-    if display.use_hybrid {
-        display.frame_glyphs.add_webkit(
-            view_id,
-            current_x as f32,
-            current_y as f32,
-            pixel_width as f32,
-            pixel_height as f32,
-        );
-        display.current_row_x += pixel_width;
-        return;
-    }
-
-    // Legacy scene graph path
-    if let Some(window) = display.get_target_scene().windows.first_mut() {
-        if let Some(row) = window.rows.iter_mut().find(|r| r.y == current_y) {
-            // Remove overlapping glyphs
-            let x_start = current_x;
-            let x_end = current_x + pixel_width;
-            row.glyphs.retain(|g| {
-                let g_end = g.x + g.pixel_width;
-                g_end <= x_start || g.x >= x_end
-            });
-
-            let glyph = Glyph {
-                glyph_type: GlyphType::Wpe,
-                charcode: 0,
-                face_id: 0,
-                x: current_x,
-                pixel_width,
-                ascent: pixel_height,
-                descent: 0,
-                charpos: 0,
-                left_box_line: false,
-                right_box_line: false,
-                padding: false,
-                data: GlyphData::Wpe { view_id },
-            };
-            row.glyphs.push(glyph);
-
-            // Advance X position
-            display.current_row_x += pixel_width;
-        }
-    }
+    display.frame_glyphs.add_webkit(
+        view_id,
+        current_x as f32,
+        current_y as f32,
+        pixel_width as f32,
+        pixel_height as f32,
+    );
+    display.current_row_x += pixel_width;
 }

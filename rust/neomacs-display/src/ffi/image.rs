@@ -24,58 +24,14 @@ pub unsafe extern "C" fn neomacs_display_add_video_glyph(
     let current_y = display.current_row_y;  // Frame-absolute Y
     let current_x = display.current_row_x;
 
-    // Hybrid path: append directly to frame glyph buffer
-    if display.use_hybrid {
-        display.frame_glyphs.add_video(
-            video_id,
-            current_x as f32,
-            current_y as f32,
-            pixel_width as f32,
-            pixel_height as f32,
-        );
-        display.current_row_x += pixel_width;
-        return;
-    }
-
-    // Legacy scene graph path
-    let current_window_id = display.current_window_id;
-
-    // Find the correct window by ID
-    if let Some(window) = display.get_target_scene().windows.iter_mut().find(|w| w.window_id == current_window_id) {
-        // Convert frame-absolute Y to window-relative Y
-        let relative_y = current_y - window.bounds.y as i32;
-        // Convert frame-absolute X to window-relative X
-        let relative_x = current_x - window.bounds.x as i32;
-
-        if let Some(row) = window.rows.iter_mut().find(|r| r.y == relative_y) {
-            // Remove overlapping glyphs (using window-relative X)
-            let x_start = relative_x;
-            let x_end = relative_x + pixel_width;
-            row.glyphs.retain(|g| {
-                let g_end = g.x + g.pixel_width;
-                g_end <= x_start || g.x >= x_end
-            });
-
-            let glyph = Glyph {
-                glyph_type: GlyphType::Video,
-                charcode: 0,
-                face_id: 0,
-                x: relative_x,  // Use window-relative X
-                pixel_width,
-                ascent: pixel_height,
-                descent: 0,
-                charpos: 0,
-                left_box_line: false,
-                right_box_line: false,
-                padding: false,
-                data: GlyphData::Video { video_id },
-            };
-            row.glyphs.push(glyph);
-
-            // Advance X position (keep as frame-absolute for C code)
-            display.current_row_x += pixel_width;
-        }
-    }
+    display.frame_glyphs.add_video(
+        video_id,
+        current_x as f32,
+        current_y as f32,
+        pixel_width as f32,
+        pixel_height as f32,
+    );
+    display.current_row_x += pixel_width;
 }
 
 /// Load a video from file path (async - uses GStreamer)
@@ -689,54 +645,30 @@ pub unsafe extern "C" fn neomacs_display_clear_floating_image(
     display.get_target_scene().remove_floating_image(image_id);
 }
 
-/// Clear a rectangular area of the display
+/// Clear a rectangular area of the display.
+/// No-op with full-frame rebuild (buffer is rebuilt from scratch each frame).
 #[no_mangle]
 pub unsafe extern "C" fn neomacs_display_clear_area(
-    handle: *mut NeomacsDisplay,
-    x: c_int,
-    y: c_int,
-    width: c_int,
-    height: c_int,
+    _handle: *mut NeomacsDisplay,
+    _x: c_int,
+    _y: c_int,
+    _width: c_int,
+    _height: c_int,
 ) {
-    if handle.is_null() {
-        return;
-    }
-
-    let display = &mut *handle;
-
-    // With full-frame rebuild, clear_area is a no-op (buffer is rebuilt from scratch)
-    if display.use_hybrid {
-        display.frame_glyphs.clear_area(
-            x as f32, y as f32, width as f32, height as f32,
-        );
-    }
+    // No-op: with full-frame rebuild, the buffer is cleared and rebuilt each frame.
 }
 
 /// Clear only media glyphs (Image, Video, WebKit) in a rectangular area.
-/// Called at the start of update_window_begin to clear stale media glyphs
-/// before Emacs sends new positions.
+/// No-op with full-frame rebuild (buffer is rebuilt from scratch each frame).
 #[no_mangle]
 pub unsafe extern "C" fn neomacs_display_clear_media_in_area(
-    handle: *mut NeomacsDisplay,
-    x: c_int,
-    y: c_int,
-    width: c_int,
-    height: c_int,
+    _handle: *mut NeomacsDisplay,
+    _x: c_int,
+    _y: c_int,
+    _width: c_int,
+    _height: c_int,
 ) {
-    if handle.is_null() {
-        return;
-    }
-
-    let display = &mut *handle;
-
-    if display.use_hybrid {
-        display.frame_glyphs.clear_media_in_area(
-            x as f32,
-            y as f32,
-            width as f32,
-            height as f32,
-        );
-    }
+    // No-op: with full-frame rebuild, the buffer is cleared and rebuilt each frame.
 }
 
 /// Clear all glyphs - used when frame layout changes
@@ -799,11 +731,8 @@ pub unsafe extern "C" fn neomacs_display_end_frame(handle: *mut NeomacsDisplay) 
         debug!("After end_frame: {} glyphs, cleared={}", display.frame_glyphs.len(), layout_cleared);
     }
 
-    // Build scene if it has content
-    let scene_rows: usize = display.scene.windows.iter().map(|w| w.rows.len()).sum();
-
-    if scene_rows > 0 {
-        // Build the scene graph
+    // Build scene if it has content (legacy scene graph path)
+    if !display.scene.windows.is_empty() {
         display.scene.build();
     }
 

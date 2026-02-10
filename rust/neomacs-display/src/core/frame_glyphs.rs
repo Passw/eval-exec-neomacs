@@ -451,22 +451,6 @@ impl FrameGlyphBuffer {
         });
     }
 
-    /// No-op kept for API compatibility. With full-frame rebuild, stale glyphs
-    /// are impossible since the buffer is cleared each frame.
-    #[allow(dead_code)]
-    pub fn remove_stale_glyphs_if_layout_changed(&mut self) {}
-
-    /// No-op kept for API compatibility.
-    #[allow(dead_code)]
-    pub fn remove_stale_glyphs(&mut self) {}
-
-    /// No-op kept for API compatibility. With full-frame rebuild, clear_area
-    /// is not needed since we rebuild from scratch.
-    pub fn clear_area(&mut self, _x: f32, _y: f32, _width: f32, _height: f32) {}
-
-    /// No-op kept for API compatibility.
-    pub fn clear_media_in_area(&mut self, _x: f32, _y: f32, _width: f32, _height: f32) {}
-
     /// Add a character glyph. No overlap removal needed with full-frame rebuild.
     pub fn add_char(&mut self, char: char, x: f32, y: f32, width: f32, height: f32, ascent: f32, is_overlay: bool) {
         self.glyphs.push(FrameGlyph::Char {

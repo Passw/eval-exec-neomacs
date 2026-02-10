@@ -24,8 +24,6 @@ pub unsafe extern "C" fn neomacs_display_begin_row(
     }
 
     let display = &mut *handle;
-    let current_frame = display.frame_counter;
-    let current_window_id = display.current_window_id;
 
     // Track current row Y (frame-absolute) and X for glyph additions
     display.current_row_y = y;
@@ -36,77 +34,6 @@ pub unsafe extern "C" fn neomacs_display_begin_row(
     display.current_row_is_overlay = mode_line != 0 || header_line != 0;
 
     // Hybrid path: we don't need window tracking - just use frame-absolute coords
-    if display.use_hybrid {
-        // Nothing else needed - glyphs will use current_row_y/x/height/ascent directly
-        return;
-    }
-
-    // Legacy scene graph path below...
-    // Find the current window by ID
-    let target_scene = display.get_target_scene();
-    let window = target_scene.windows
-        .iter_mut()
-        .find(|w| w.window_id == current_window_id);
-
-    let window = if let Some(w) = window {
-        w
-    } else {
-        // Create default window if none exists for this ID
-        // Use scene background (dark by default) instead of white
-        target_scene.windows.push(crate::core::scene::WindowScene {
-            window_id: current_window_id,
-            bounds: crate::core::Rect::new(0.0, 0.0,
-                target_scene.width as f32, target_scene.height as f32),
-            background: target_scene.background, // Match scene background
-            rows: Vec::new(),
-            cursor: None,
-            scroll_offset: 0.0,
-            selected: true,
-            mode_line_height: 0,
-            header_line_height: 0,
-            last_frame_touched: current_frame,
-        });
-        target_scene.windows.last_mut().unwrap()
-    };
-
-    // Convert frame-absolute Y to window-relative Y
-    let window_y = window.bounds.y as i32;
-    let relative_y = y - window_y;
-
-    // Look for existing row at this Y position within this window (using window-relative Y)
-    let is_mode_line = mode_line != 0;
-    let is_header_line = header_line != 0;
-
-    if let Some(existing_row) = window.rows.iter_mut().find(|r| r.y == relative_y) {
-        // If row type changed (mode_line <-> content), clear all glyphs
-        // to avoid stale content from previous row type
-        if existing_row.mode_line != is_mode_line || existing_row.header_line != is_header_line {
-            existing_row.glyphs.clear();
-        }
-
-        // Update the properties
-        existing_row.height = height;
-        existing_row.visible_height = height;
-        existing_row.ascent = ascent;
-        existing_row.mode_line = is_mode_line;
-        existing_row.header_line = is_header_line;
-        existing_row.last_frame_touched = current_frame;
-    } else {
-        // Add new row to this window (with window-relative Y)
-        window.rows.push(GlyphRow {
-            glyphs: Vec::new(),
-            y: relative_y,
-            height,
-            visible_height: height,
-            ascent,
-            enabled: true,
-            cursor_in_row: false,
-            mode_line: is_mode_line,
-            header_line: is_header_line,
-            last_frame_cleared: current_frame,
-            last_frame_touched: current_frame,
-        });
-    }
 }
 
 /// Add a character glyph to the current row
@@ -114,10 +41,10 @@ pub unsafe extern "C" fn neomacs_display_begin_row(
 pub unsafe extern "C" fn neomacs_display_add_char_glyph(
     handle: *mut NeomacsDisplay,
     charcode: u32,
-    face_id: u32,
+    _face_id: u32,
     pixel_width: c_int,
-    ascent: c_int,
-    descent: c_int,
+    _ascent: c_int,
+    _descent: c_int,
 ) {
     if handle.is_null() {
         return;
@@ -138,63 +65,16 @@ pub unsafe extern "C" fn neomacs_display_add_char_glyph(
             LAST_DEBUG_Y = current_y;
         }
 
-        // Hybrid path: append directly to frame glyph buffer
-        if display.use_hybrid {
-            display.frame_glyphs.add_char(
-                c,
-                current_x as f32,
-                current_y as f32,
-                pixel_width as f32,
-                display.current_row_height as f32,
-                display.current_row_ascent as f32,
-                display.current_row_is_overlay,
-            );
-            display.current_row_x += pixel_width;
-            return;
-        }
-
-        // Legacy scene graph path...
-        let current_window_id = display.current_window_id;
-
-        // Find the correct window by ID
-        if let Some(window) = display.get_target_scene().windows.iter_mut().find(|w| w.window_id == current_window_id) {
-            // Convert frame-absolute Y to window-relative Y
-            let relative_y = current_y - window.bounds.y as i32;
-            // Convert frame-absolute X to window-relative X
-            let relative_x = current_x - window.bounds.x as i32;
-
-            if let Some(row) = window.rows.iter_mut().find(|r| r.y == relative_y) {
-                // Remove any existing glyphs that overlap this X range (using window-relative X)
-                let x_start = relative_x;
-                let x_end = relative_x + pixel_width;
-                row.glyphs.retain(|g| {
-                    // Keep glyphs that don't overlap with our new glyph's X range
-                    let g_end = g.x + g.pixel_width;
-                    g_end <= x_start || g.x >= x_end
-                });
-
-                let glyph = Glyph {
-                    glyph_type: GlyphType::Char,
-                    charcode,
-                    face_id,
-                    x: relative_x,  // Use window-relative X
-                    pixel_width,
-                    ascent,
-                    descent,
-                    charpos: 0,
-                    left_box_line: false,
-                    right_box_line: false,
-                    padding: false,
-                    data: GlyphData::Char {
-                        code: c,
-                    },
-                };
-                row.glyphs.push(glyph);
-
-                // Advance X position for next glyph (keep as frame-absolute for C code)
-                display.current_row_x += pixel_width;
-            }
-        }
+        display.frame_glyphs.add_char(
+            c,
+            current_x as f32,
+            current_y as f32,
+            pixel_width as f32,
+            display.current_row_height as f32,
+            display.current_row_ascent as f32,
+            display.current_row_is_overlay,
+        );
+        display.current_row_x += pixel_width;
     }));
 
     if let Err(e) = result {
@@ -219,64 +99,20 @@ pub unsafe extern "C" fn neomacs_display_add_stretch_glyph(
         let current_y = display.current_row_y;  // Frame-absolute Y
         let current_x = display.current_row_x;
 
-        // Hybrid path: append directly to frame glyph buffer
-        if display.use_hybrid {
-            // Get the background color from the current face
-            let bg_color = display.frame_glyphs.get_current_bg()
-                .unwrap_or(display.frame_glyphs.background);
+        // Get the background color from the current face
+        let bg_color = display.frame_glyphs.get_current_bg()
+            .unwrap_or(display.frame_glyphs.background);
 
-            display.frame_glyphs.add_stretch(
-                current_x as f32,
-                current_y as f32,
-                pixel_width as f32,
-                height as f32,
-                bg_color,
-                face_id,
-                display.current_row_is_overlay,
-            );
-            display.current_row_x += pixel_width;
-            return;
-        }
-
-        // Legacy scene graph path...
-        let current_window_id = display.current_window_id;
-
-        // Find the correct window by ID
-        if let Some(window) = display.get_target_scene().windows.iter_mut().find(|w| w.window_id == current_window_id) {
-            // Convert frame-absolute Y to window-relative Y
-            let relative_y = current_y - window.bounds.y as i32;
-            // Convert frame-absolute X to window-relative X
-            let relative_x = current_x - window.bounds.x as i32;
-
-            if let Some(row) = window.rows.iter_mut().find(|r| r.y == relative_y) {
-                // Remove any existing glyphs that overlap this X range (using window-relative X)
-                let x_start = relative_x;
-                let x_end = relative_x + pixel_width;
-                row.glyphs.retain(|g| {
-                    let g_end = g.x + g.pixel_width;
-                    g_end <= x_start || g.x >= x_end
-                });
-
-                let glyph = Glyph {
-                    glyph_type: GlyphType::Stretch,
-                    charcode: 0,
-                    face_id,
-                    x: relative_x,  // Use window-relative X
-                    pixel_width,
-                    ascent: height,
-                    descent: 0,
-                    charpos: 0,
-                    left_box_line: false,
-                    right_box_line: false,
-                    padding: false,
-                    data: GlyphData::Stretch { width: pixel_width },
-                };
-                row.glyphs.push(glyph);
-
-                // Advance X position (keep as frame-absolute for C code)
-                display.current_row_x += pixel_width;
-            }
-        }
+        display.frame_glyphs.add_stretch(
+            current_x as f32,
+            current_y as f32,
+            pixel_width as f32,
+            height as f32,
+            bg_color,
+            face_id,
+            display.current_row_is_overlay,
+        );
+        display.current_row_x += pixel_width;
     }));
 
     if let Err(e) = result {
@@ -300,60 +136,16 @@ pub unsafe extern "C" fn neomacs_display_add_image_glyph(
     let current_y = display.current_row_y;  // Frame-absolute Y
     let current_x = display.current_row_x;
 
-    // Hybrid path: append directly to frame glyph buffer
-    if display.use_hybrid {
-        log::info!("add_image_glyph: id={}, pos=({},{}) size={}x{}",
-                   image_id, current_x, current_y, pixel_width, pixel_height);
-        display.frame_glyphs.add_image(
-            image_id,
-            current_x as f32,
-            current_y as f32,
-            pixel_width as f32,
-            pixel_height as f32,
-        );
-        display.current_row_x += pixel_width;
-        return;
-    }
-
-    // Legacy scene graph path
-    let current_window_id = display.current_window_id;
-
-    // Find the correct window by ID
-    if let Some(window) = display.get_target_scene().windows.iter_mut().find(|w| w.window_id == current_window_id) {
-        // Convert frame-absolute Y to window-relative Y
-        let relative_y = current_y - window.bounds.y as i32;
-        // Convert frame-absolute X to window-relative X
-        let relative_x = current_x - window.bounds.x as i32;
-
-        if let Some(row) = window.rows.iter_mut().find(|r| r.y == relative_y) {
-            // Remove overlapping glyphs (using window-relative X)
-            let x_start = relative_x;
-            let x_end = relative_x + pixel_width;
-            row.glyphs.retain(|g| {
-                let g_end = g.x + g.pixel_width;
-                g_end <= x_start || g.x >= x_end
-            });
-
-            let glyph = Glyph {
-                glyph_type: GlyphType::Image,
-                charcode: 0,
-                face_id: 0,
-                x: relative_x,  // Use window-relative X
-                pixel_width,
-                ascent: pixel_height,
-                descent: 0,
-                charpos: 0,
-                left_box_line: false,
-                right_box_line: false,
-                padding: false,
-                data: GlyphData::Image { image_id },
-            };
-            row.glyphs.push(glyph);
-
-            // Advance X position (keep as frame-absolute for C code)
-            display.current_row_x += pixel_width;
-        }
-    }
+    log::info!("add_image_glyph: id={}, pos=({},{}) size={}x{}",
+               image_id, current_x, current_y, pixel_width, pixel_height);
+    display.frame_glyphs.add_image(
+        image_id,
+        current_x as f32,
+        current_y as f32,
+        pixel_width as f32,
+        pixel_height as f32,
+    );
+    display.current_row_x += pixel_width;
 }
 
 /// End the current row

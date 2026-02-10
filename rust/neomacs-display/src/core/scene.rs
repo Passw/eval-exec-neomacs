@@ -1,8 +1,7 @@
 //! Scene graph for display rendering.
 
 use std::collections::HashMap;
-use crate::core::types::{Color, Rect, Transform, Point};
-use crate::core::glyph::{GlyphRow, GlyphString};
+use crate::core::types::{Color, Rect, Transform};
 use crate::core::face::Face;
 
 /// Scene graph node types
@@ -195,9 +194,6 @@ pub struct WindowScene {
 
     /// Background color
     pub background: Color,
-
-    /// Glyph rows
-    pub rows: Vec<GlyphRow>,
 
     /// Cursor position and style
     pub cursor: Option<CursorState>,

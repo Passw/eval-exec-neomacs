@@ -111,32 +111,16 @@ pub unsafe extern "C" fn neomacs_display_add_window(
     if let Some(idx) = window_idx {
         // Update existing window
         let window = &mut display.get_target_scene().windows[idx];
-
-        // Check if bounds changed
-        let old_height = window.bounds.height;
-        let new_height = height;
-
         window.bounds = Rect::new(x, y, width, height);
         window.background = Color::from_pixel(bg_color);
         window.selected = selected != 0;
         window.last_frame_touched = current_frame;
-
-        // If window got smaller, remove rows that are now outside bounds
-        // Row Y is window-relative (0 to height), so rows outside [0, height) should be removed
-        if new_height < old_height {
-            let max_row_y = height as i32;
-            window.rows.retain(|row| {
-                let row_bottom = row.y + row.height;
-                row.y >= 0 && row_bottom <= max_row_y
-            });
-        }
     } else {
         // Create new window
         let window = WindowScene {
             window_id,
             bounds: Rect::new(x, y, width, height),
             background: Color::from_pixel(bg_color),
-            rows: Vec::new(),
             cursor: None,
             scroll_offset: 0.0,
             selected: selected != 0,
