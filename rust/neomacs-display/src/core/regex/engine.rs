@@ -34,7 +34,10 @@ pub fn match_pattern(
     regs: &mut Option<&mut Registers>,
 ) -> Option<usize> {
     let bytes = input.as_bytes();
-    let bytecode = &pattern.bytecode;
+    // Clone bytecode to allow in-place mutation for opcodes like SucceedN
+    // and SetNumberAt that modify counter values during matching (mirroring
+    // how Emacs's C regex engine self-modifies its bytecode buffer).
+    let mut bytecode = pattern.bytecode.clone();
     let num_regs = pattern.num_groups + 1;
 
     // Initialize registers
@@ -385,35 +388,55 @@ pub fn match_pattern(
 
             Opcode::SucceedN => {
                 // succeed_n: [offset:2] [count:2]
-                // If count > 0, decrement and continue. Else jump.
+                // If count > 0, decrement counter in-place and fall through
+                // to execute the loop body. If count == 0, jump past the
+                // loop body (the repetition is satisfied).
                 pc += 1;
                 let offset = bytecode[pc] as i16 | ((bytecode[pc + 1] as i16) << 8);
                 let count = bytecode[pc + 2] as u16 | ((bytecode[pc + 3] as u16) << 8);
                 if count > 0 {
-                    // Note: in the C version, this self-modifies bytecode.
-                    // In our Rust version, we just continue.
+                    // Decrement counter in-place (self-modifying bytecode)
+                    let new_count = count - 1;
+                    bytecode[pc + 2] = new_count as u8;
+                    bytecode[pc + 3] = (new_count >> 8) as u8;
                     pc += 4;
                 } else {
+                    // Counter reached zero — jump past the loop body
                     pc += 4;
                     pc = (pc as i64 + offset as i64) as usize;
                 }
-                let _ = count; // TODO: full implementation with mutable bytecode
             }
 
             Opcode::JumpN => {
+                // jump_n: [offset:2] [count:2]
+                // If count > 0, decrement counter in-place and jump.
+                // If count <= 0, fall through (don't jump).
                 pc += 1;
                 let offset = bytecode[pc] as i16 | ((bytecode[pc + 1] as i16) << 8);
-                let _count = bytecode[pc + 2] as u16 | ((bytecode[pc + 3] as u16) << 8);
-                pc += 4;
-                pc = (pc as i64 + offset as i64) as usize;
+                let count = bytecode[pc + 2] as u16 | ((bytecode[pc + 3] as u16) << 8);
+                if count > 0 {
+                    let new_count = count - 1;
+                    bytecode[pc + 2] = new_count as u8;
+                    bytecode[pc + 3] = (new_count >> 8) as u8;
+                    pc += 4;
+                    pc = (pc as i64 + offset as i64) as usize;
+                } else {
+                    pc += 4;
+                }
             }
 
             Opcode::SetNumberAt => {
+                // set_number_at: [offset:2] [value:2]
+                // Writes the 2-byte value into the bytecode at address
+                // (pc + 4 + offset). Used to reset/set the repetition
+                // counter for SucceedN/JumpN after each loop iteration.
                 pc += 1;
-                let _offset = bytecode[pc] as i16 | ((bytecode[pc + 1] as i16) << 8);
-                let _value = bytecode[pc + 2] as u16 | ((bytecode[pc + 3] as u16) << 8);
+                let offset = bytecode[pc] as i16 | ((bytecode[pc + 1] as i16) << 8);
+                let value = bytecode[pc + 2] as u16 | ((bytecode[pc + 3] as u16) << 8);
                 pc += 4;
-                // TODO: implement bytecode mutation for bounded repetitions
+                let target = (pc as i64 + offset as i64) as usize;
+                bytecode[target] = value as u8;
+                bytecode[target + 1] = (value >> 8) as u8;
             }
 
             Opcode::WordBeg => {
@@ -974,5 +997,105 @@ mod tests {
         assert!(!match_str("[[:digit:]]", "a"));
         assert!(match_str("[[:alpha:]]", "a"));
         assert!(!match_str("[[:alpha:]]", "5"));
+    }
+
+    // ===== Bounded repetition tests =====
+
+    #[test]
+    fn test_exact_repetition() {
+        // a\{3\}b — exactly 3 'a's followed by 'b'
+        assert!(match_str("a\\{3\\}b", "aaab"));
+        assert!(!match_str("a\\{3\\}b", "aab"));
+        assert!(!match_str("a\\{3\\}b", "ab"));
+        // 4 a's: the pattern should still match (search finds "aaab" substring)
+        assert!(match_str("a\\{3\\}b", "aaaab"));
+    }
+
+    #[test]
+    fn test_exact_repetition_anchored() {
+        // ^a\{3\}b$ — exactly 3 'a's, anchored
+        assert!(match_str("^a\\{3\\}b$", "aaab"));
+        assert!(!match_str("^a\\{3\\}b$", "aab"));
+        assert!(!match_str("^a\\{3\\}b$", "aaaab"));
+        assert!(!match_str("^a\\{3\\}b$", "ab"));
+    }
+
+    #[test]
+    fn test_bounded_range_repetition() {
+        // a\{2,4\}b — 2 to 4 'a's followed by 'b'
+        assert!(!match_str("^a\\{2,4\\}b$", "ab"));
+        assert!(match_str("^a\\{2,4\\}b$", "aab"));
+        assert!(match_str("^a\\{2,4\\}b$", "aaab"));
+        assert!(match_str("^a\\{2,4\\}b$", "aaaab"));
+        assert!(!match_str("^a\\{2,4\\}b$", "aaaaab"));
+    }
+
+    #[test]
+    fn test_zero_min_repetition() {
+        // a\{0,3\}b — 0 to 3 'a's followed by 'b'
+        assert!(match_str("^a\\{0,3\\}b$", "b"));
+        assert!(match_str("^a\\{0,3\\}b$", "ab"));
+        assert!(match_str("^a\\{0,3\\}b$", "aab"));
+        assert!(match_str("^a\\{0,3\\}b$", "aaab"));
+        assert!(!match_str("^a\\{0,3\\}b$", "aaaab"));
+    }
+
+    #[test]
+    fn test_unbounded_max_repetition() {
+        // a\{1,\}b — 1 or more 'a's followed by 'b' (like a+b)
+        assert!(!match_str("^a\\{1,\\}b$", "b"));
+        assert!(match_str("^a\\{1,\\}b$", "ab"));
+        assert!(match_str("^a\\{1,\\}b$", "aab"));
+        assert!(match_str("^a\\{1,\\}b$", "aaab"));
+        assert!(match_str("^a\\{1,\\}b$", "aaaaaaaab"));
+    }
+
+    #[test]
+    fn test_zero_min_unbounded_repetition() {
+        // a\{0,\}b — 0 or more 'a's followed by 'b' (like a*b)
+        assert!(match_str("^a\\{0,\\}b$", "b"));
+        assert!(match_str("^a\\{0,\\}b$", "ab"));
+        assert!(match_str("^a\\{0,\\}b$", "aaab"));
+    }
+
+    #[test]
+    fn test_exact_zero_repetition() {
+        // a\{0\}b — exactly 0 'a's, so just matches 'b'
+        assert!(match_str("^a\\{0\\}b$", "b"));
+        assert!(!match_str("^a\\{0\\}b$", "ab"));
+    }
+
+    #[test]
+    fn test_exact_one_repetition() {
+        // a\{1\}b — exactly 1 'a' followed by 'b'
+        assert!(match_str("^a\\{1\\}b$", "ab"));
+        assert!(!match_str("^a\\{1\\}b$", "b"));
+        assert!(!match_str("^a\\{1\\}b$", "aab"));
+    }
+
+    #[test]
+    fn test_bounded_repetition_with_charset() {
+        // [0-9]\{2,4\} — 2 to 4 digits
+        assert!(!match_str("^[0-9]\\{2,4\\}$", "1"));
+        assert!(match_str("^[0-9]\\{2,4\\}$", "12"));
+        assert!(match_str("^[0-9]\\{2,4\\}$", "123"));
+        assert!(match_str("^[0-9]\\{2,4\\}$", "1234"));
+        assert!(!match_str("^[0-9]\\{2,4\\}$", "12345"));
+    }
+
+    #[test]
+    fn test_bounded_repetition_with_dot() {
+        // .\{2,3\}x — 2 to 3 of any char followed by 'x'
+        assert!(!match_str("^.\\{2,3\\}x$", "ax"));
+        assert!(match_str("^.\\{2,3\\}x$", "abx"));
+        assert!(match_str("^.\\{2,3\\}x$", "abcx"));
+        assert!(!match_str("^.\\{2,3\\}x$", "abcdx"));
+    }
+
+    #[test]
+    fn test_bounded_repetition_search() {
+        // Non-anchored search should find the match within the string
+        let pos = search_str("a\\{3\\}", "xxaaaxxx");
+        assert_eq!(pos, Some(2));
     }
 }
