@@ -271,12 +271,29 @@ impl CharacterGrid {
             if x >= self.width {
                 break;
             }
+            let width = if text.chars().next().map_or(false, |c| {
+                // CJK Unified Ideographs and common wide character ranges
+                let cp = c as u32;
+                (0x1100..=0x115F).contains(&cp)   // Hangul Jamo
+                || (0x2E80..=0x303E).contains(&cp) // CJK Radicals, Kangxi, CJK Symbols
+                || (0x3041..=0x33BF).contains(&cp) // Hiragana, Katakana, CJK Compat
+                || (0x3400..=0x4DBF).contains(&cp) // CJK Unified Ext A
+                || (0x4E00..=0x9FFF).contains(&cp) // CJK Unified Ideographs
+                || (0xA000..=0xA4CF).contains(&cp) // Yi
+                || (0xAC00..=0xD7AF).contains(&cp) // Hangul Syllables
+                || (0xF900..=0xFAFF).contains(&cp) // CJK Compat Ideographs
+                || (0xFE30..=0xFE6F).contains(&cp) // CJK Compat Forms
+                || (0xFF01..=0xFF60).contains(&cp) // Fullwidth Forms
+                || (0xFFE0..=0xFFE6).contains(&cp) // Fullwidth Signs
+                || (0x20000..=0x2FA1F).contains(&cp) // CJK Unified Ext B-F + Compat Supp
+                || (0x30000..=0x3134F).contains(&cp) // CJK Unified Ext G-H
+            }) { 2u8 } else { 1u8 };
             if let Some(cell) = self.get_cell_mut(x, y) {
                 cell.text = text.clone();
                 cell.style = style.clone();
-                cell.width = 1; // TODO: handle wide chars
+                cell.width = width;
             }
-            x += 1;
+            x += width as usize;
         }
         self.mark_row_dirty(y);
     }
