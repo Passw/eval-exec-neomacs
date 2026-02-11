@@ -316,15 +316,31 @@ pub unsafe extern "C" fn neomacs_display_load_image_argb32(
     if handle.is_null() || data.is_null() || width <= 0 || height <= 0 || stride <= 0 {
         return 0;
     }
-    let display = &mut *handle;
 
     // Use checked multiplication to prevent overflow
     let data_len = match (stride as usize).checked_mul(height as usize) {
         Some(len) => len,
-        None => return 0, // Overflow would occur
+        None => return 0,
     };
     let data_slice = std::slice::from_raw_parts(data, data_len);
 
+    // Threaded path: send pixel data to render thread
+    #[cfg(feature = "winit-backend")]
+    if let Some(ref state) = THREADED_STATE {
+        let id = IMAGE_ID_COUNTER.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+        let cmd = RenderCommand::ImageLoadArgb32 {
+            id,
+            data: data_slice.to_vec(),
+            width: width as u32,
+            height: height as u32,
+            stride: stride as u32,
+        };
+        let _ = state.emacs_comms.cmd_tx.try_send(cmd);
+        return id;
+    }
+
+    // Non-threaded path: direct renderer access
+    let display = &mut *handle;
     #[cfg(feature = "winit-backend")]
     if let Some(ref mut backend) = display.winit_backend {
         if let Some(renderer) = backend.renderer_mut() {
@@ -351,15 +367,31 @@ pub unsafe extern "C" fn neomacs_display_load_image_rgb24(
     if handle.is_null() || data.is_null() || width <= 0 || height <= 0 || stride <= 0 {
         return 0;
     }
-    let display = &mut *handle;
 
     // Use checked multiplication to prevent overflow
     let data_len = match (stride as usize).checked_mul(height as usize) {
         Some(len) => len,
-        None => return 0, // Overflow would occur
+        None => return 0,
     };
     let data_slice = std::slice::from_raw_parts(data, data_len);
 
+    // Threaded path: send pixel data to render thread
+    #[cfg(feature = "winit-backend")]
+    if let Some(ref state) = THREADED_STATE {
+        let id = IMAGE_ID_COUNTER.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+        let cmd = RenderCommand::ImageLoadRgb24 {
+            id,
+            data: data_slice.to_vec(),
+            width: width as u32,
+            height: height as u32,
+            stride: stride as u32,
+        };
+        let _ = state.emacs_comms.cmd_tx.try_send(cmd);
+        return id;
+    }
+
+    // Non-threaded path: direct renderer access
+    let display = &mut *handle;
     #[cfg(feature = "winit-backend")]
     if let Some(ref mut backend) = display.winit_backend {
         if let Some(renderer) = backend.renderer_mut() {

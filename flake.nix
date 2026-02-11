@@ -247,11 +247,19 @@
               export WEBKIT_USE_SINGLE_WEB_PROCESS=1
               export PATH="${pkgs.wpewebkit}/libexec/wpe-webkit-2.0:$PATH"
 
+              # Set default log levels (can be overridden before entering nix develop)
+              export RUST_LOG="''${RUST_LOG:-info}"
+              export NEOMACS_LOG="''${NEOMACS_LOG:-info}"
+
               echo "Build commands:"
               echo "  1. cd rust/neomacs-display && cargo build --release"
               echo "  2. ./autogen.sh"
               echo "  3. ./configure --with-neomacs"
               echo "  4. make -j$(nproc)"
+              echo ""
+              echo "Logging (set before entering nix develop to override):"
+              echo "  RUST_LOG=$RUST_LOG      (Rust render thread: trace|debug|info|warn|error)"
+              echo "  NEOMACS_LOG=$NEOMACS_LOG  (C display engine: trace|debug|info|warn|error)"
               echo ""
             '';
           };

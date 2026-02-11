@@ -561,6 +561,56 @@ impl ImageCache {
         id
     }
 
+    /// Load image from raw ARGB32 pixel data with a pre-allocated ID (for threaded mode)
+    pub fn load_raw_argb32_with_id(
+        &mut self,
+        id: u32,
+        data: &[u8],
+        width: u32,
+        height: u32,
+        stride: u32,
+    ) {
+        self.pending_dimensions
+            .insert(id, ImageDimensions { width, height });
+        self.states.insert(id, ImageState::Pending);
+        let _ = self.decode_tx.send(DecodeRequest {
+            id,
+            source: ImageSource::RawArgb32 {
+                data: data.to_vec(),
+                width,
+                height,
+                stride,
+            },
+            max_width: 0,
+            max_height: 0,
+        });
+    }
+
+    /// Load image from raw RGB24 pixel data with a pre-allocated ID (for threaded mode)
+    pub fn load_raw_rgb24_with_id(
+        &mut self,
+        id: u32,
+        data: &[u8],
+        width: u32,
+        height: u32,
+        stride: u32,
+    ) {
+        self.pending_dimensions
+            .insert(id, ImageDimensions { width, height });
+        self.states.insert(id, ImageState::Pending);
+        let _ = self.decode_tx.send(DecodeRequest {
+            id,
+            source: ImageSource::RawRgb24 {
+                data: data.to_vec(),
+                width,
+                height,
+                stride,
+            },
+            max_width: 0,
+            max_height: 0,
+        });
+    }
+
     /// Import image from DMA-BUF (zero-copy if supported)
     #[cfg(target_os = "linux")]
     pub fn import_dmabuf(

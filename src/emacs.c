@@ -457,7 +457,7 @@ terminate_due_to_signal (int sig, int backtrace_limit)
           if (sig == SIGTERM || sig == SIGHUP || sig == SIGINT)
 	    {
 	      fprintf (stderr, "DEBUG: Received signal %d (%s), calling kill-emacs\n",
-	               sig, sig == SIGTERM ? "SIGTERM" : 
+	               sig, sig == SIGTERM ? "SIGTERM" :
 	                    sig == SIGHUP ? "SIGHUP" : "SIGINT");
 	      /* Avoid abort in shut_down_emacs if we were interrupted
 		 in noninteractive usage, as in that case we don't

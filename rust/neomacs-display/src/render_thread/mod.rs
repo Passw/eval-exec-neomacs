@@ -633,6 +633,28 @@ impl RenderApp {
                         log::warn!("Renderer not initialized, cannot load image {}", id);
                     }
                 }
+                RenderCommand::ImageLoadArgb32 { id, data, width, height, stride } => {
+                    log::debug!("Loading ARGB32 image {}: {}x{} stride={}", id, width, height, stride);
+                    if let Some(ref mut renderer) = self.renderer {
+                        renderer.load_image_argb32_with_id(id, &data, width, height, stride);
+                        if let Some((w, h)) = renderer.get_image_size(id) {
+                            if let Ok(mut dims) = self.image_dimensions.lock() {
+                                dims.insert(id, (w, h));
+                            }
+                        }
+                    }
+                }
+                RenderCommand::ImageLoadRgb24 { id, data, width, height, stride } => {
+                    log::debug!("Loading RGB24 image {}: {}x{} stride={}", id, width, height, stride);
+                    if let Some(ref mut renderer) = self.renderer {
+                        renderer.load_image_rgb24_with_id(id, &data, width, height, stride);
+                        if let Some((w, h)) = renderer.get_image_size(id) {
+                            if let Ok(mut dims) = self.image_dimensions.lock() {
+                                dims.insert(id, (w, h));
+                            }
+                        }
+                    }
+                }
                 RenderCommand::ImageFree { id } => {
                     log::debug!("Freeing image {}", id);
                     if let Some(ref mut renderer) = self.renderer {

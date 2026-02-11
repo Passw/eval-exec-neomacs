@@ -152,6 +152,22 @@ pub enum RenderCommand {
         max_width: u32,
         max_height: u32,
     },
+    /// Load image from raw ARGB32 pixel data
+    ImageLoadArgb32 {
+        id: u32,
+        data: Vec<u8>,
+        width: u32,
+        height: u32,
+        stride: u32,
+    },
+    /// Load image from raw RGB24 pixel data
+    ImageLoadRgb24 {
+        id: u32,
+        data: Vec<u8>,
+        width: u32,
+        height: u32,
+        stride: u32,
+    },
     /// Free an image from cache
     ImageFree { id: u32 },
     /// Create a WebKit view
