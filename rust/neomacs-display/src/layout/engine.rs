@@ -3242,3 +3242,297 @@ unsafe fn render_fringe_bitmap(
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::core::frame_glyphs::FrameGlyph;
+
+    #[test]
+    fn test_ligature_run_buffer_new() {
+        let buf = LigatureRunBuffer::new();
+
+        // All fields should be zeroed/empty
+        assert_eq!(buf.chars.len(), 0);
+        assert_eq!(buf.advances.len(), 0);
+        assert_eq!(buf.start_x, 0.0);
+        assert_eq!(buf.start_y, 0.0);
+        assert_eq!(buf.face_h, 0.0);
+        assert_eq!(buf.face_ascent, 0.0);
+        assert_eq!(buf.face_id, 0);
+        assert_eq!(buf.total_advance, 0.0);
+        assert_eq!(buf.is_overlay, false);
+        assert_eq!(buf.height_scale, 0.0);
+
+        // Vectors should be pre-allocated
+        assert!(buf.chars.capacity() >= MAX_LIGATURE_RUN_LEN);
+        assert!(buf.advances.capacity() >= MAX_LIGATURE_RUN_LEN);
+    }
+
+    #[test]
+    fn test_ligature_run_buffer_is_empty_len() {
+        let mut buf = LigatureRunBuffer::new();
+
+        assert!(buf.is_empty());
+        assert_eq!(buf.len(), 0);
+
+        buf.push('a', 8.0);
+
+        assert!(!buf.is_empty());
+        assert_eq!(buf.len(), 1);
+
+        buf.push('b', 8.0);
+
+        assert!(!buf.is_empty());
+        assert_eq!(buf.len(), 2);
+    }
+
+    #[test]
+    fn test_ligature_run_buffer_push() {
+        let mut buf = LigatureRunBuffer::new();
+
+        buf.push('h', 8.0);
+        assert_eq!(buf.chars, vec!['h']);
+        assert_eq!(buf.advances, vec![8.0]);
+        assert_eq!(buf.total_advance, 8.0);
+
+        buf.push('e', 8.0);
+        assert_eq!(buf.chars, vec!['h', 'e']);
+        assert_eq!(buf.advances, vec![8.0, 8.0]);
+        assert_eq!(buf.total_advance, 16.0);
+
+        buf.push('l', 7.5);
+        assert_eq!(buf.chars, vec!['h', 'e', 'l']);
+        assert_eq!(buf.advances, vec![8.0, 8.0, 7.5]);
+        assert_eq!(buf.total_advance, 23.5);
+    }
+
+    #[test]
+    fn test_ligature_run_buffer_clear() {
+        let mut buf = LigatureRunBuffer::new();
+
+        buf.push('a', 8.0);
+        buf.push('b', 8.0);
+        buf.start_x = 100.0;
+        buf.start_y = 200.0;
+        buf.face_h = 16.0;
+        buf.face_ascent = 12.0;
+        buf.face_id = 42;
+        buf.is_overlay = true;
+        buf.height_scale = 1.5;
+
+        buf.clear();
+
+        // Vectors and total_advance cleared
+        assert_eq!(buf.chars.len(), 0);
+        assert_eq!(buf.advances.len(), 0);
+        assert_eq!(buf.total_advance, 0.0);
+
+        // Position/face fields NOT cleared
+        assert_eq!(buf.start_x, 100.0);
+        assert_eq!(buf.start_y, 200.0);
+        assert_eq!(buf.face_h, 16.0);
+        assert_eq!(buf.face_ascent, 12.0);
+        assert_eq!(buf.face_id, 42);
+        assert_eq!(buf.is_overlay, true);
+        assert_eq!(buf.height_scale, 1.5);
+    }
+
+    #[test]
+    fn test_ligature_run_buffer_start() {
+        let mut buf = LigatureRunBuffer::new();
+
+        buf.push('x', 10.0);
+        buf.start_x = 999.0;
+
+        buf.start(50.0, 60.0, 20.0, 15.0, 5, true, 1.2);
+
+        // Clears chars/advances/total_advance
+        assert_eq!(buf.chars.len(), 0);
+        assert_eq!(buf.advances.len(), 0);
+        assert_eq!(buf.total_advance, 0.0);
+
+        // Sets all position/face params
+        assert_eq!(buf.start_x, 50.0);
+        assert_eq!(buf.start_y, 60.0);
+        assert_eq!(buf.face_h, 20.0);
+        assert_eq!(buf.face_ascent, 15.0);
+        assert_eq!(buf.face_id, 5);
+        assert_eq!(buf.is_overlay, true);
+        assert_eq!(buf.height_scale, 1.2);
+    }
+
+    #[test]
+    fn test_max_ligature_run_len_constant() {
+        assert_eq!(MAX_LIGATURE_RUN_LEN, 64);
+    }
+
+    #[test]
+    fn test_flush_run_empty() {
+        let run = LigatureRunBuffer::new();
+        let mut frame_glyphs = FrameGlyphBuffer::new();
+
+        flush_run(&run, &mut frame_glyphs, true);
+
+        // No glyphs added
+        assert_eq!(frame_glyphs.glyphs.len(), 0);
+    }
+
+    #[test]
+    fn test_flush_run_single_char_ligatures_true() {
+        let mut run = LigatureRunBuffer::new();
+        run.start(10.0, 20.0, 16.0, 12.0, 1, false, 0.0);
+        run.push('a', 8.0);
+
+        let mut frame_glyphs = FrameGlyphBuffer::new();
+        flush_run(&run, &mut frame_glyphs, true);
+
+        // Single char emits as individual char, not composed
+        assert_eq!(frame_glyphs.glyphs.len(), 1);
+        match &frame_glyphs.glyphs[0] {
+            FrameGlyph::Char { char: ch, composed, x, y, width, height, ascent, is_overlay, .. } => {
+                assert_eq!(*ch, 'a');
+                assert_eq!(*composed, None);
+                assert_eq!(*x, 10.0);
+                assert_eq!(*y, 20.0);
+                assert_eq!(*width, 8.0);
+                assert_eq!(*height, 16.0);
+                assert_eq!(*ascent, 12.0);
+                assert_eq!(*is_overlay, false);
+            }
+            _ => panic!("Expected Char glyph"),
+        }
+    }
+
+    #[test]
+    fn test_flush_run_single_char_ligatures_false() {
+        let mut run = LigatureRunBuffer::new();
+        run.start(100.0, 200.0, 18.0, 14.0, 2, true, 0.0);
+        run.push('x', 9.0);
+
+        let mut frame_glyphs = FrameGlyphBuffer::new();
+        flush_run(&run, &mut frame_glyphs, false);
+
+        // Single char emits as individual char
+        assert_eq!(frame_glyphs.glyphs.len(), 1);
+        match &frame_glyphs.glyphs[0] {
+            FrameGlyph::Char { char: ch, composed, x, y, width, is_overlay, .. } => {
+                assert_eq!(*ch, 'x');
+                assert_eq!(*composed, None);
+                assert_eq!(*x, 100.0);
+                assert_eq!(*y, 200.0);
+                assert_eq!(*width, 9.0);
+                assert_eq!(*is_overlay, true);
+            }
+            _ => panic!("Expected Char glyph"),
+        }
+    }
+
+    #[test]
+    fn test_flush_run_multiple_chars_ligatures_false() {
+        let mut run = LigatureRunBuffer::new();
+        run.start(50.0, 60.0, 16.0, 12.0, 1, false, 0.0);
+        run.push('f', 6.0);
+        run.push('i', 4.0);
+        run.push('j', 4.0);
+
+        let mut frame_glyphs = FrameGlyphBuffer::new();
+        flush_run(&run, &mut frame_glyphs, false);
+
+        // Emits individual chars with correct x positions
+        assert_eq!(frame_glyphs.glyphs.len(), 3);
+
+        match &frame_glyphs.glyphs[0] {
+            FrameGlyph::Char { char: ch, x, width, .. } => {
+                assert_eq!(*ch, 'f');
+                assert_eq!(*x, 50.0);
+                assert_eq!(*width, 6.0);
+            }
+            _ => panic!("Expected Char glyph"),
+        }
+
+        match &frame_glyphs.glyphs[1] {
+            FrameGlyph::Char { char: ch, x, width, .. } => {
+                assert_eq!(*ch, 'i');
+                assert_eq!(*x, 56.0); // 50.0 + 6.0
+                assert_eq!(*width, 4.0);
+            }
+            _ => panic!("Expected Char glyph"),
+        }
+
+        match &frame_glyphs.glyphs[2] {
+            FrameGlyph::Char { char: ch, x, width, .. } => {
+                assert_eq!(*ch, 'j');
+                assert_eq!(*x, 60.0); // 56.0 + 4.0
+                assert_eq!(*width, 4.0);
+            }
+            _ => panic!("Expected Char glyph"),
+        }
+    }
+
+    #[test]
+    fn test_flush_run_multiple_chars_ligatures_true() {
+        let mut run = LigatureRunBuffer::new();
+        run.start(10.0, 20.0, 16.0, 12.0, 1, false, 0.0);
+        run.push('f', 6.0);
+        run.push('i', 4.0);
+
+        let mut frame_glyphs = FrameGlyphBuffer::new();
+        flush_run(&run, &mut frame_glyphs, true);
+
+        // Emits as composed glyph
+        assert_eq!(frame_glyphs.glyphs.len(), 1);
+
+        match &frame_glyphs.glyphs[0] {
+            FrameGlyph::Char { char: ch, composed, x, y, width, height, ascent, is_overlay, .. } => {
+                assert_eq!(*ch, 'f'); // base char
+                assert_eq!(composed.as_ref().map(|s: &Box<str>| s.as_ref()), Some("fi"));
+                assert_eq!(*x, 10.0);
+                assert_eq!(*y, 20.0);
+                assert_eq!(*width, 10.0); // total_advance = 6.0 + 4.0
+                assert_eq!(*height, 16.0);
+                assert_eq!(*ascent, 12.0);
+                assert_eq!(*is_overlay, false);
+            }
+            _ => panic!("Expected Char glyph"),
+        }
+    }
+
+    #[test]
+    fn test_flush_run_height_scale_individual() {
+        let mut run = LigatureRunBuffer::new();
+        run.start(0.0, 0.0, 16.0, 12.0, 1, false, 1.5);
+        run.push('a', 8.0);
+
+        let mut frame_glyphs = FrameGlyphBuffer::new();
+        frame_glyphs.set_font_size(14.0);
+
+        flush_run(&run, &mut frame_glyphs, false);
+
+        // Font size should be restored after flush
+        assert_eq!(frame_glyphs.font_size(), 14.0);
+
+        // Glyph should exist
+        assert_eq!(frame_glyphs.glyphs.len(), 1);
+    }
+
+    #[test]
+    fn test_flush_run_height_scale_composed() {
+        let mut run = LigatureRunBuffer::new();
+        run.start(0.0, 0.0, 16.0, 12.0, 1, false, 2.0);
+        run.push('f', 6.0);
+        run.push('i', 4.0);
+
+        let mut frame_glyphs = FrameGlyphBuffer::new();
+        frame_glyphs.set_font_size(14.0);
+
+        flush_run(&run, &mut frame_glyphs, true);
+
+        // Font size should be restored after flush
+        assert_eq!(frame_glyphs.font_size(), 14.0);
+
+        // Composed glyph should exist
+        assert_eq!(frame_glyphs.glyphs.len(), 1);
+    }
+}
+
