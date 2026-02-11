@@ -1009,4 +1009,609 @@ mod tests {
         let buf = compile("a?", true).unwrap();
         assert!(buf.bytecode.iter().any(|&b| b == Opcode::OnFailureJump as u8));
     }
+
+    // ===== Basic literal pattern compilation =====
+
+    #[test]
+    fn test_compile_single_char_literal() {
+        let buf = compile("x", true).unwrap();
+        assert_eq!(buf.bytecode[0], Opcode::Exactn as u8);
+        assert_eq!(buf.bytecode[1], 1);
+        assert_eq!(buf.bytecode[2], b'x');
+        assert_eq!(buf.bytecode[3], Opcode::Succeed as u8);
+    }
+
+    #[test]
+    fn test_compile_empty_pattern() {
+        let buf = compile("", true).unwrap();
+        // Should produce just Succeed
+        assert_eq!(buf.bytecode.len(), 1);
+        assert_eq!(buf.bytecode[0], Opcode::Succeed as u8);
+    }
+
+    #[test]
+    fn test_compile_literal_splits_before_repetition() {
+        // "ab*" should split: Exactn 1 'a', then Exactn 1 'b' with star wrapping
+        let buf = compile("ab*", true).unwrap();
+        assert_eq!(buf.bytecode[0], Opcode::Exactn as u8);
+        assert_eq!(buf.bytecode[1], 1);
+        assert_eq!(buf.bytecode[2], b'a');
+        // The 'b' should be in its own Exactn since it's followed by *
+    }
+
+    #[test]
+    fn test_compile_long_literal() {
+        // Multiple consecutive literal chars coalesce into one Exactn
+        let buf = compile("abcdef", true).unwrap();
+        assert_eq!(buf.bytecode[0], Opcode::Exactn as u8);
+        assert_eq!(buf.bytecode[1], 6);
+        assert_eq!(buf.bytecode[2], b'a');
+        assert_eq!(buf.bytecode[3], b'b');
+        assert_eq!(buf.bytecode[4], b'c');
+        assert_eq!(buf.bytecode[5], b'd');
+        assert_eq!(buf.bytecode[6], b'e');
+        assert_eq!(buf.bytecode[7], b'f');
+        assert_eq!(buf.bytecode[8], Opcode::Succeed as u8);
+    }
+
+    // ===== Character classes [a-z], [^abc] =====
+
+    #[test]
+    fn test_charset_range_sets_bitmap_bits() {
+        let buf = compile("[a-z]", true).unwrap();
+        assert_eq!(buf.bytecode[0], Opcode::Charset as u8);
+        let bitmap_start = 2; // opcode + size byte
+        // Check that 'a' (97) through 'z' (122) bits are set
+        for c in b'a'..=b'z' {
+            let byte_idx = bitmap_start + (c / 8) as usize;
+            let bit = 1 << (c % 8);
+            assert!(
+                buf.bytecode[byte_idx] & bit != 0,
+                "char '{}' (byte {}) should be in charset",
+                c as char,
+                c
+            );
+        }
+        // Check that 'A' is NOT set
+        let byte_idx_a = bitmap_start + (b'A' / 8) as usize;
+        let bit_a = 1 << (b'A' % 8);
+        assert_eq!(buf.bytecode[byte_idx_a] & bit_a, 0, "'A' should NOT be in [a-z]");
+    }
+
+    #[test]
+    fn test_negated_charset_individual_chars() {
+        let buf = compile("[^xyz]", true).unwrap();
+        assert_eq!(buf.bytecode[0], Opcode::CharsetNot as u8);
+        let bitmap_start = 2;
+        for c in [b'x', b'y', b'z'] {
+            let byte_idx = bitmap_start + (c / 8) as usize;
+            let bit = 1 << (c % 8);
+            assert!(
+                buf.bytecode[byte_idx] & bit != 0,
+                "char '{}' should be in negated charset bitmap",
+                c as char
+            );
+        }
+    }
+
+    #[test]
+    fn test_charset_single_chars() {
+        let buf = compile("[aeiou]", true).unwrap();
+        assert_eq!(buf.bytecode[0], Opcode::Charset as u8);
+        let bitmap_start = 2;
+        for c in [b'a', b'e', b'i', b'o', b'u'] {
+            let byte_idx = bitmap_start + (c / 8) as usize;
+            let bit = 1 << (c % 8);
+            assert!(buf.bytecode[byte_idx] & bit != 0);
+        }
+        // 'b' should NOT be set
+        let byte_idx_b = bitmap_start + (b'b' / 8) as usize;
+        let bit_b = 1 << (b'b' % 8);
+        assert_eq!(buf.bytecode[byte_idx_b] & bit_b, 0);
+    }
+
+    #[test]
+    fn test_charset_named_class_alpha() {
+        let buf = compile("[[:alpha:]]", true).unwrap();
+        assert_eq!(buf.bytecode[0], Opcode::Charset as u8);
+        let bitmap_start = 2;
+        // All ASCII letters should be set
+        for c in b'a'..=b'z' {
+            let byte_idx = bitmap_start + (c / 8) as usize;
+            let bit = 1 << (c % 8);
+            assert!(buf.bytecode[byte_idx] & bit != 0, "'{}' should be in [:alpha:]", c as char);
+        }
+        for c in b'A'..=b'Z' {
+            let byte_idx = bitmap_start + (c / 8) as usize;
+            let bit = 1 << (c % 8);
+            assert!(buf.bytecode[byte_idx] & bit != 0, "'{}' should be in [:alpha:]", c as char);
+        }
+        // digits should NOT be set
+        let byte_idx_0 = bitmap_start + (b'0' / 8) as usize;
+        let bit_0 = 1 << (b'0' % 8);
+        assert_eq!(buf.bytecode[byte_idx_0] & bit_0, 0, "'0' should NOT be in [:alpha:]");
+    }
+
+    #[test]
+    fn test_charset_named_class_digit() {
+        let buf = compile("[[:digit:]]", true).unwrap();
+        assert_eq!(buf.bytecode[0], Opcode::Charset as u8);
+        let bitmap_start = 2;
+        for c in b'0'..=b'9' {
+            let byte_idx = bitmap_start + (c / 8) as usize;
+            let bit = 1 << (c % 8);
+            assert!(buf.bytecode[byte_idx] & bit != 0);
+        }
+    }
+
+    #[test]
+    fn test_charset_invalid_named_class() {
+        let result = compile("[[:foobar:]]", true);
+        match result {
+            Err(RegexError::InvalidCharClass(name)) => assert_eq!(name, "foobar"),
+            Err(other) => panic!("Expected InvalidCharClass, got {:?}", other),
+            Ok(_) => panic!("Expected error, got Ok"),
+        }
+    }
+
+    #[test]
+    fn test_charset_bracket_as_first_char() {
+        // ']' as first character in charset is literal, not closing bracket
+        let buf = compile("[]abc]", true).unwrap();
+        assert_eq!(buf.bytecode[0], Opcode::Charset as u8);
+        let bitmap_start = 2;
+        let byte_idx = bitmap_start + (b']' / 8) as usize;
+        let bit = 1 << (b']' % 8);
+        assert!(buf.bytecode[byte_idx] & bit != 0, "']' should be in charset when first");
+    }
+
+    #[test]
+    fn test_charset_invalid_range() {
+        // [z-a] is an invalid range since z > a
+        match compile("[z-a]", true) {
+            Err(RegexError::InvalidRange) => {} // expected
+            Err(other) => panic!("Expected InvalidRange, got {:?}", other),
+            Ok(_) => panic!("Expected error, got Ok"),
+        }
+    }
+
+    // ===== Emacs-specific operators =====
+
+    #[test]
+    fn test_compile_group_numbered() {
+        let buf = compile("\\(a\\)\\(b\\)", true).unwrap();
+        assert_eq!(buf.num_groups, 2);
+        // First group: StartMemory 1 ... StopMemory 1
+        // Second group: StartMemory 2 ... StopMemory 2
+        let start_mem_positions: Vec<usize> = buf
+            .bytecode
+            .windows(2)
+            .enumerate()
+            .filter(|(_, w)| w[0] == Opcode::StartMemory as u8)
+            .map(|(i, _)| i)
+            .collect();
+        assert_eq!(start_mem_positions.len(), 2);
+        assert_eq!(buf.bytecode[start_mem_positions[0] + 1], 1);
+        assert_eq!(buf.bytecode[start_mem_positions[1] + 1], 2);
+    }
+
+    #[test]
+    fn test_compile_alternation() {
+        let buf = compile("\\(foo\\|bar\\)", true).unwrap();
+        assert_eq!(buf.num_groups, 1);
+        // Should contain Jump (for alternation) and OnFailureJump
+        assert!(buf.bytecode.iter().any(|&b| b == Opcode::Jump as u8));
+        assert!(buf.bytecode.iter().any(|&b| b == Opcode::OnFailureJump as u8));
+    }
+
+    #[test]
+    fn test_compile_bounded_rep_exact() {
+        // \{3\} = exactly 3 repetitions
+        let buf = compile("a\\{3\\}", true).unwrap();
+        // Should contain 3 copies of: Exactn 1 'a'
+        let exactn_count = buf
+            .bytecode
+            .windows(3)
+            .filter(|w| w[0] == Opcode::Exactn as u8 && w[1] == 1 && w[2] == b'a')
+            .count();
+        assert_eq!(exactn_count, 3, "Expected 3 copies of Exactn 1 'a'");
+    }
+
+    #[test]
+    fn test_compile_bounded_rep_range() {
+        // \{2,4\} = 2 to 4 repetitions
+        let buf = compile("a\\{2,4\\}", true).unwrap();
+        // Should succeed without error; contains at least 2 mandatory Exactn 'a's
+        // plus 2 optional ones (wrapped with OnFailureJump)
+        assert!(buf.bytecode.iter().any(|&b| b == Opcode::OnFailureJump as u8));
+    }
+
+    #[test]
+    fn test_compile_bounded_rep_unbounded() {
+        // \{2,\} = 2 or more repetitions
+        let buf = compile("a\\{2,\\}", true).unwrap();
+        // Should contain star wrapping for the unbounded part
+        assert!(buf
+            .bytecode
+            .iter()
+            .any(|&b| b == Opcode::OnFailureJumpLoop as u8));
+    }
+
+    #[test]
+    fn test_compile_word_constituent() {
+        let buf = compile("\\w", true).unwrap();
+        assert_eq!(buf.bytecode[0], Opcode::SyntaxSpec as u8);
+        assert_eq!(buf.bytecode[1], SyntaxClass::Word as u8);
+        assert!(buf.uses_syntax);
+    }
+
+    #[test]
+    fn test_compile_non_word_constituent() {
+        let buf = compile("\\W", true).unwrap();
+        assert_eq!(buf.bytecode[0], Opcode::NotSyntaxSpec as u8);
+        assert_eq!(buf.bytecode[1], SyntaxClass::Word as u8);
+        assert!(buf.uses_syntax);
+    }
+
+    #[test]
+    fn test_compile_syntax_class_whitespace() {
+        let buf = compile("\\s ", true).unwrap();
+        assert_eq!(buf.bytecode[0], Opcode::SyntaxSpec as u8);
+        assert_eq!(buf.bytecode[1], SyntaxClass::Whitespace as u8);
+        assert!(buf.uses_syntax);
+    }
+
+    #[test]
+    fn test_compile_not_syntax_class() {
+        let buf = compile("\\S ", true).unwrap();
+        assert_eq!(buf.bytecode[0], Opcode::NotSyntaxSpec as u8);
+        assert_eq!(buf.bytecode[1], SyntaxClass::Whitespace as u8);
+    }
+
+    #[test]
+    fn test_compile_not_word_boundary() {
+        let buf = compile("\\B", true).unwrap();
+        assert_eq!(buf.bytecode[0], Opcode::NotWordBound as u8);
+        assert!(buf.uses_syntax);
+    }
+
+    #[test]
+    fn test_compile_word_start_end() {
+        let buf = compile("\\<\\w+\\>", true).unwrap();
+        assert_eq!(buf.bytecode[0], Opcode::WordBeg as u8);
+        // WordEnd should be near the end
+        let last_before_succeed = buf.bytecode.len() - 2;
+        assert_eq!(buf.bytecode[last_before_succeed], Opcode::WordEnd as u8);
+    }
+
+    // ===== Special characters: . ^ $ * + ? =====
+
+    #[test]
+    fn test_compile_dot_as_anychar() {
+        let buf = compile(".", true).unwrap();
+        assert_eq!(buf.bytecode[0], Opcode::AnyChar as u8);
+        assert_eq!(buf.bytecode[1], Opcode::Succeed as u8);
+    }
+
+    #[test]
+    fn test_compile_caret_at_start() {
+        let buf = compile("^", true).unwrap();
+        assert_eq!(buf.bytecode[0], Opcode::BegLine as u8);
+    }
+
+    #[test]
+    fn test_compile_dollar_at_end() {
+        let buf = compile("$", true).unwrap();
+        assert_eq!(buf.bytecode[0], Opcode::EndLine as u8);
+    }
+
+    #[test]
+    fn test_compile_star_no_preceding_element() {
+        match compile("*", true) {
+            Err(RegexError::NoPrecedingElement) => {} // expected
+            Err(other) => panic!("Expected NoPrecedingElement, got {:?}", other),
+            Ok(_) => panic!("Expected error, got Ok"),
+        }
+    }
+
+    #[test]
+    fn test_compile_plus_no_preceding_element() {
+        match compile("+", true) {
+            Err(RegexError::NoPrecedingElement) => {} // expected
+            Err(other) => panic!("Expected NoPrecedingElement, got {:?}", other),
+            Ok(_) => panic!("Expected error, got Ok"),
+        }
+    }
+
+    #[test]
+    fn test_compile_question_no_preceding_element() {
+        match compile("?", true) {
+            Err(RegexError::NoPrecedingElement) => {} // expected
+            Err(other) => panic!("Expected NoPrecedingElement, got {:?}", other),
+            Ok(_) => panic!("Expected error, got Ok"),
+        }
+    }
+
+    #[test]
+    fn test_compile_non_greedy_star() {
+        let buf = compile("a*?", true).unwrap();
+        // Non-greedy star uses Jump and OnFailureJumpNastyloop
+        assert!(buf
+            .bytecode
+            .iter()
+            .any(|&b| b == Opcode::OnFailureJumpNastyloop as u8));
+    }
+
+    #[test]
+    fn test_compile_non_greedy_plus() {
+        let buf = compile("a+?", true).unwrap();
+        assert!(buf
+            .bytecode
+            .iter()
+            .any(|&b| b == Opcode::OnFailureJumpNastyloop as u8));
+    }
+
+    #[test]
+    fn test_compile_non_greedy_optional() {
+        let buf = compile("a??", true).unwrap();
+        // Non-greedy optional uses Jump (to skip the atom)
+        assert!(buf.bytecode.iter().any(|&b| b == Opcode::Jump as u8));
+    }
+
+    // ===== Edge cases =====
+
+    #[test]
+    fn test_compile_escaped_special_chars() {
+        // Escaped dot, star, plus, etc. should be literal
+        let buf = compile("\\.\\*\\+\\?\\[\\]\\^\\$", true).unwrap();
+        // Each escaped char becomes Exactn 1 <char>
+        let mut i = 0;
+        let expected = [b'.', b'*', b'+', b'?', b'[', b']', b'^', b'$'];
+        for &exp_ch in &expected {
+            assert_eq!(buf.bytecode[i], Opcode::Exactn as u8, "at offset {}", i);
+            assert_eq!(buf.bytecode[i + 1], 1);
+            assert_eq!(buf.bytecode[i + 2], exp_ch, "expected '{}' at offset {}", exp_ch as char, i);
+            i += 3;
+        }
+        assert_eq!(buf.bytecode[i], Opcode::Succeed as u8);
+    }
+
+    #[test]
+    fn test_compile_escaped_backslash() {
+        let buf = compile("\\\\", true).unwrap();
+        assert_eq!(buf.bytecode[0], Opcode::Exactn as u8);
+        assert_eq!(buf.bytecode[1], 1);
+        assert_eq!(buf.bytecode[2], b'\\');
+    }
+
+    #[test]
+    fn test_compile_nested_groups() {
+        let buf = compile("\\(\\(a\\)\\(b\\)\\)", true).unwrap();
+        assert_eq!(buf.num_groups, 3);
+        // Count StartMemory opcodes
+        let start_count = buf
+            .bytecode
+            .iter()
+            .filter(|&&b| b == Opcode::StartMemory as u8)
+            .count();
+        assert_eq!(start_count, 3);
+        let stop_count = buf
+            .bytecode
+            .iter()
+            .filter(|&&b| b == Opcode::StopMemory as u8)
+            .count();
+        assert_eq!(stop_count, 3);
+    }
+
+    #[test]
+    fn test_compile_escape_sequences() {
+        // \n, \t, \r, \f, \a
+        let buf = compile("\\n\\t\\r\\f\\a", true).unwrap();
+        let mut i = 0;
+        let expected = [b'\n', b'\t', b'\r', 0x0C, 0x07];
+        for &exp_ch in &expected {
+            assert_eq!(buf.bytecode[i], Opcode::Exactn as u8);
+            assert_eq!(buf.bytecode[i + 1], 1);
+            assert_eq!(buf.bytecode[i + 2], exp_ch);
+            i += 3;
+        }
+    }
+
+    #[test]
+    fn test_compile_buffer_boundaries_begin_end() {
+        let buf = compile("\\`\\'", true).unwrap();
+        assert_eq!(buf.bytecode[0], Opcode::BegBuf as u8);
+        assert_eq!(buf.bytecode[1], Opcode::EndBuf as u8);
+        assert_eq!(buf.bytecode[2], Opcode::Succeed as u8);
+    }
+
+    #[test]
+    fn test_compile_symbol_boundaries() {
+        let buf = compile("\\_<foo\\_>", true).unwrap();
+        assert_eq!(buf.bytecode[0], Opcode::SymBeg as u8);
+        assert!(buf.uses_syntax);
+        // SymEnd should be near the end
+        let succeed_pos = buf.bytecode.len() - 1;
+        assert_eq!(buf.bytecode[succeed_pos - 1], Opcode::SymEnd as u8);
+    }
+
+    #[test]
+    fn test_compile_category() {
+        let buf = compile("\\ca", true).unwrap();
+        assert_eq!(buf.bytecode[0], Opcode::CategorySpec as u8);
+        assert_eq!(buf.bytecode[1], b'a');
+    }
+
+    #[test]
+    fn test_compile_not_category() {
+        let buf = compile("\\Ca", true).unwrap();
+        assert_eq!(buf.bytecode[0], Opcode::NotCategorySpec as u8);
+        assert_eq!(buf.bytecode[1], b'a');
+    }
+
+    #[test]
+    fn test_compile_backreference() {
+        let buf = compile("\\(a\\)\\1", true).unwrap();
+        assert_eq!(buf.num_groups, 1);
+        // Should contain Duplicate opcode referencing group 1
+        let dup_pos = buf
+            .bytecode
+            .iter()
+            .position(|&b| b == Opcode::Duplicate as u8)
+            .expect("should have Duplicate opcode");
+        assert_eq!(buf.bytecode[dup_pos + 1], 1);
+    }
+
+    #[test]
+    fn test_compile_multibyte_flag() {
+        let buf_mb = compile("a", true).unwrap();
+        assert!(buf_mb.multibyte);
+        let buf_sb = compile("a", false).unwrap();
+        assert!(!buf_sb.multibyte);
+    }
+
+    // ===== Error cases =====
+
+    #[test]
+    fn test_error_trailing_backslash() {
+        match compile("abc\\", true) {
+            Err(RegexError::TrailingBackslash) => {} // expected
+            Err(other) => panic!("Expected TrailingBackslash, got {:?}", other),
+            Ok(_) => panic!("Expected error, got Ok"),
+        }
+    }
+
+    #[test]
+    fn test_error_unmatched_open_paren() {
+        match compile("\\(abc", true) {
+            Err(RegexError::UnmatchedParen) => {} // expected
+            Err(other) => panic!("Expected UnmatchedParen, got {:?}", other),
+            Ok(_) => panic!("Expected error, got Ok"),
+        }
+    }
+
+    #[test]
+    fn test_error_unmatched_close_paren() {
+        match compile("abc\\)", true) {
+            Err(RegexError::UnmatchedParen) => {} // expected
+            Err(other) => panic!("Expected UnmatchedParen, got {:?}", other),
+            Ok(_) => panic!("Expected error, got Ok"),
+        }
+    }
+
+    #[test]
+    fn test_error_unmatched_brace() {
+        // \{3 without closing \}
+        match compile("a\\{3", true) {
+            Err(RegexError::UnmatchedBrace) => {} // expected
+            Err(other) => panic!("Expected UnmatchedBrace, got {:?}", other),
+            Ok(_) => panic!("Expected error, got Ok"),
+        }
+    }
+
+    #[test]
+    fn test_error_invalid_backreference() {
+        // \2 without having 2 groups
+        match compile("\\2", true) {
+            Err(RegexError::InvalidBackreference(2)) => {} // expected
+            Err(other) => panic!("Expected InvalidBackreference(2), got {:?}", other),
+            Ok(_) => panic!("Expected error, got Ok"),
+        }
+    }
+
+    #[test]
+    fn test_error_syntax_class_without_specifier() {
+        let result = compile("\\s", true);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_error_not_syntax_class_without_specifier() {
+        let result = compile("\\S", true);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_error_category_without_specifier() {
+        let result = compile("\\c", true);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_compile_greedy_plus_structure() {
+        // a+ should produce: Exactn 1 'a', OnFailureKeepStringJump, Jump (back)
+        let buf = compile("a+", true).unwrap();
+        assert!(buf
+            .bytecode
+            .iter()
+            .any(|&b| b == Opcode::OnFailureKeepStringJump as u8));
+        assert!(buf.bytecode.iter().any(|&b| b == Opcode::Jump as u8));
+    }
+
+    #[test]
+    fn test_compile_underscore_not_boundary() {
+        // \_ followed by something other than < or > is a literal underscore
+        let buf = compile("\\_x", true).unwrap();
+        // Should compile as Exactn 1 '_', Exactn 1 'x'
+        assert_eq!(buf.bytecode[0], Opcode::Exactn as u8);
+        assert_eq!(buf.bytecode[1], 1);
+        assert_eq!(buf.bytecode[2], b'_');
+    }
+
+    #[test]
+    fn test_compile_charset_with_escape_in_range() {
+        // [\t-\r] — tab through carriage return
+        let buf = compile("[\\t-\\r]", true).unwrap();
+        assert_eq!(buf.bytecode[0], Opcode::Charset as u8);
+        let bitmap_start = 2;
+        // \t = 9, \n = 10, \r = 13 should all be set
+        for c in [9u8, 10, 13] {
+            let byte_idx = bitmap_start + (c / 8) as usize;
+            let bit = 1 << (c % 8);
+            assert!(buf.bytecode[byte_idx] & bit != 0, "byte {} should be in charset", c);
+        }
+    }
+
+    #[test]
+    fn test_compile_shy_group_no_group_count() {
+        let buf = compile("\\(?:a\\)\\(?:b\\)", true).unwrap();
+        assert_eq!(buf.num_groups, 0);
+        assert!(!buf.bytecode.iter().any(|&b| b == Opcode::StartMemory as u8));
+        assert!(!buf.bytecode.iter().any(|&b| b == Opcode::StopMemory as u8));
+    }
+
+    #[test]
+    fn test_compile_complex_pattern() {
+        // Realistic Emacs regex: match function definition
+        let buf = compile("^\\(defun\\s \\(\\w+\\)\\)", true).unwrap();
+        assert!(buf.bytecode.len() > 0);
+        assert_eq!(buf.num_groups, 2);
+        assert!(buf.uses_syntax);
+        assert_eq!(buf.bytecode[0], Opcode::BegLine as u8);
+        // Should end with Succeed
+        assert_eq!(*buf.bytecode.last().unwrap(), Opcode::Succeed as u8);
+    }
+
+    #[test]
+    fn test_compile_alternation_no_group() {
+        // Bare alternation at top level — \| outside any group
+        // The compiler handles this by checking group_stack.last_mut()
+        // With no group on the stack, the alt_chain bookkeeping is skipped
+        // but it shouldn't crash.
+        let buf = compile("a\\|b", true).unwrap();
+        assert!(buf.bytecode.iter().any(|&b| b == Opcode::Jump as u8));
+    }
+
+    #[test]
+    fn test_compile_bounded_rep_zero_min() {
+        // \{0,2\} = 0 to 2 repetitions (all optional)
+        let buf = compile("a\\{0,2\\}", true).unwrap();
+        // Should contain OnFailureJump for the optional copies
+        let ofj_count = buf
+            .bytecode
+            .iter()
+            .filter(|&&b| b == Opcode::OnFailureJump as u8)
+            .count();
+        assert!(ofj_count >= 2, "Expected at least 2 optional wrappings, got {}", ofj_count);
+    }
 }
