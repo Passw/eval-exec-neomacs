@@ -541,7 +541,7 @@ impl LayoutEngine {
             && !params.is_minibuffer
         {
             // Scroll backward: put point a few lines from the top
-            let lines_above = (max_rows / 4).max(2).min(10);
+            let lines_above = (max_rows / 4).clamp(2, 10);
             let new_start = neomacs_layout_adjust_window_start(
                 wp.window_ptr,
                 wp.buffer_ptr,
@@ -1256,10 +1256,10 @@ impl LayoutEngine {
                     }
 
                     // Restore text face after display string
-                    if has_face_runs || display_prop.display_fg != 0 || display_prop.display_bg != 0 {
-                        if current_face_id >= 0 {
-                            self.apply_face(&self.face_data, frame, frame_glyphs);
-                        }
+                    if (has_face_runs || display_prop.display_fg != 0 || display_prop.display_bg != 0)
+                        && current_face_id >= 0
+                    {
+                        self.apply_face(&self.face_data, frame, frame_glyphs);
                     }
 
                     // Skip original buffer text covered by this display prop

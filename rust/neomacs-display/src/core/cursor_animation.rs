@@ -508,12 +508,12 @@ impl CursorAnimator {
     
     /// Set animation speed (higher = faster cursor movement)
     pub fn set_animation_speed(&mut self, speed: f32) {
-        self.animation_speed = speed.max(1.0).min(100.0);
+        self.animation_speed = speed.clamp(1.0, 100.0);
     }
     
     /// Set particle count for effects
     pub fn set_particle_count(&mut self, count: u32) {
-        self.particle_count = count.max(1).min(100);
+        self.particle_count = count.clamp(1, 100);
     }
 
     /// Update with explicit delta time (for external time management)

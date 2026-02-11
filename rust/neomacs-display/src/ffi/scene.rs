@@ -92,7 +92,7 @@ pub unsafe extern "C" fn neomacs_display_set_frame_identity(
         parent_id,
         parent_x,
         parent_y,
-        z_order as i32,
+        z_order,
         border_width,
         Color::from_pixel(border_color),
         no_accept_focus != 0,

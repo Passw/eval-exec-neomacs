@@ -419,60 +419,60 @@ pub fn match_pattern(
             Opcode::WordBeg => {
                 pc += 1;
                 let at_word_start = is_word_start(input, pos, props);
-                if !at_word_start {
-                    if !backtrack(&mut fail_stack, &mut pc, &mut pos, &mut reg_starts, &mut reg_ends) {
-                        return None;
-                    }
+                if !at_word_start
+                    && !backtrack(&mut fail_stack, &mut pc, &mut pos, &mut reg_starts, &mut reg_ends)
+                {
+                    return None;
                 }
             }
 
             Opcode::WordEnd => {
                 pc += 1;
                 let at_word_end = is_word_end(input, pos, props);
-                if !at_word_end {
-                    if !backtrack(&mut fail_stack, &mut pc, &mut pos, &mut reg_starts, &mut reg_ends) {
-                        return None;
-                    }
+                if !at_word_end
+                    && !backtrack(&mut fail_stack, &mut pc, &mut pos, &mut reg_starts, &mut reg_ends)
+                {
+                    return None;
                 }
             }
 
             Opcode::WordBound => {
                 pc += 1;
                 let at_boundary = is_word_boundary(input, pos, props);
-                if !at_boundary {
-                    if !backtrack(&mut fail_stack, &mut pc, &mut pos, &mut reg_starts, &mut reg_ends) {
-                        return None;
-                    }
+                if !at_boundary
+                    && !backtrack(&mut fail_stack, &mut pc, &mut pos, &mut reg_starts, &mut reg_ends)
+                {
+                    return None;
                 }
             }
 
             Opcode::NotWordBound => {
                 pc += 1;
                 let at_boundary = is_word_boundary(input, pos, props);
-                if at_boundary {
-                    if !backtrack(&mut fail_stack, &mut pc, &mut pos, &mut reg_starts, &mut reg_ends) {
-                        return None;
-                    }
+                if at_boundary
+                    && !backtrack(&mut fail_stack, &mut pc, &mut pos, &mut reg_starts, &mut reg_ends)
+                {
+                    return None;
                 }
             }
 
             Opcode::SymBeg => {
                 pc += 1;
                 let at_sym_start = is_symbol_start(input, pos, props);
-                if !at_sym_start {
-                    if !backtrack(&mut fail_stack, &mut pc, &mut pos, &mut reg_starts, &mut reg_ends) {
-                        return None;
-                    }
+                if !at_sym_start
+                    && !backtrack(&mut fail_stack, &mut pc, &mut pos, &mut reg_starts, &mut reg_ends)
+                {
+                    return None;
                 }
             }
 
             Opcode::SymEnd => {
                 pc += 1;
                 let at_sym_end = is_symbol_end(input, pos, props);
-                if !at_sym_end {
-                    if !backtrack(&mut fail_stack, &mut pc, &mut pos, &mut reg_starts, &mut reg_ends) {
-                        return None;
-                    }
+                if !at_sym_end
+                    && !backtrack(&mut fail_stack, &mut pc, &mut pos, &mut reg_starts, &mut reg_ends)
+                {
+                    return None;
                 }
             }
 
@@ -616,11 +616,9 @@ pub fn search(
         let mut pos = search_start;
         while pos <= search_end {
             // Fastmap check
-            if pattern.fastmap_accurate && pos < len {
-                if !pattern.fastmap[bytes[pos] as usize] {
-                    pos += 1;
-                    continue;
-                }
+            if pattern.fastmap_accurate && pos < len && !pattern.fastmap[bytes[pos] as usize] {
+                pos += 1;
+                continue;
             }
 
             if let Some(end_pos) = match_pattern(pattern, input, pos, props, regs) {
@@ -636,14 +634,12 @@ pub fn search(
     } else {
         let mut pos = search_end;
         loop {
-            if pattern.fastmap_accurate && pos < len {
-                if !pattern.fastmap[bytes[pos] as usize] {
-                    if pos == search_start {
-                        break;
-                    }
-                    pos -= 1;
-                    continue;
+            if pattern.fastmap_accurate && pos < len && !pattern.fastmap[bytes[pos] as usize] {
+                if pos == search_start {
+                    break;
                 }
+                pos -= 1;
+                continue;
             }
 
             if let Some(end_pos) = match_pattern(pattern, input, pos, props, regs) {

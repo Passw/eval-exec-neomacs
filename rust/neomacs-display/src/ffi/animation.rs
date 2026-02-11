@@ -47,7 +47,7 @@ pub unsafe extern "C" fn neomacs_display_set_mouse_cursor(
     cursor_type: c_int,
 ) {
     let cmd = RenderCommand::SetMouseCursor {
-        cursor_type: cursor_type as i32,
+        cursor_type,
     };
     if let Some(ref state) = THREADED_STATE {
         let _ = state.emacs_comms.cmd_tx.try_send(cmd);
@@ -62,8 +62,8 @@ pub unsafe extern "C" fn neomacs_display_warp_mouse(
     y: c_int,
 ) {
     let cmd = RenderCommand::WarpMouse {
-        x: x as i32,
-        y: y as i32,
+        x,
+        y,
     };
     if let Some(ref state) = THREADED_STATE {
         let _ = state.emacs_comms.cmd_tx.try_send(cmd);
@@ -415,7 +415,7 @@ effect_setter!(neomacs_display_set_background_gradient(enabled: c_int, top_r: c_
 
 /// Configure scroll bar appearance
 effect_setter!(neomacs_display_set_scroll_bar_config(width: c_int, thumb_radius: c_int, track_opacity: c_int, hover_brightness: c_int) |effects| {
-        effects.scroll_bar.width = width as i32;
+        effects.scroll_bar.width = width;
                     effects.scroll_bar.thumb_radius = thumb_radius as f32 / 100.0;
                     effects.scroll_bar.track_opacity = track_opacity as f32 / 100.0;
                     effects.scroll_bar.hover_brightness = hover_brightness as f32 / 100.0;
@@ -1024,7 +1024,7 @@ pub unsafe extern "C" fn neomacs_display_set_position(
     x: c_int,
     y: c_int,
 ) {
-    let cmd = RenderCommand::SetWindowPosition { x: x as i32, y: y as i32 };
+    let cmd = RenderCommand::SetWindowPosition { x, y };
     if let Some(ref state) = THREADED_STATE {
         let _ = state.emacs_comms.cmd_tx.try_send(cmd);
     }

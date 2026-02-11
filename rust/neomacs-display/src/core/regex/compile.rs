@@ -695,17 +695,18 @@ impl Compiler {
 
             // If the next char is a repetition operator, we need to split
             // the last char into its own exactn
-            if i < bytes.len() && (bytes[i] == b'*' || bytes[i] == b'+' || bytes[i] == b'?') {
-                if count > 1 {
-                    // Move last byte to a new exactn
-                    let last_byte = self.bytecode.pop().unwrap();
-                    self.bytecode[count_pos] = count - 1;
+            if i < bytes.len()
+                && (bytes[i] == b'*' || bytes[i] == b'+' || bytes[i] == b'?')
+                && count > 1
+            {
+                // Move last byte to a new exactn
+                let last_byte = self.bytecode.pop().unwrap();
+                self.bytecode[count_pos] = count - 1;
 
-                    self.last_atom_start = Some(self.bytecode.len());
-                    self.emit(Opcode::Exactn as u8);
-                    self.emit(1);
-                    self.emit(last_byte);
-                }
+                self.last_atom_start = Some(self.bytecode.len());
+                self.emit(Opcode::Exactn as u8);
+                self.emit(1);
+                self.emit(last_byte);
             }
         }
 

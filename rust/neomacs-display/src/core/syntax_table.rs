@@ -739,7 +739,7 @@ pub fn scan_lists<T: TextSource + ?Sized>(
                         }
                         remaining -= 1;
                     }
-                    if !sexpflag && current_depth == depth - count as i32 + remaining as i32 {
+                    if !sexpflag && current_depth == depth - count + remaining {
                         // Done!
                     }
                 }

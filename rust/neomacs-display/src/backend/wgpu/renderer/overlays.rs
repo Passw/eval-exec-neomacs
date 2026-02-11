@@ -581,11 +581,9 @@ impl WgpuRenderer {
             }
 
             // Title separator (root panel only)
-            if panel_idx == 0 {
-                if menu.title.is_some() {
-                    let sep_y = my + panel.item_height + 2.0;
-                    self.add_rect(&mut rect_vertices, mx + 4.0, sep_y, mw - 8.0, 1.0, &separator_color);
-                }
+            if panel_idx == 0 && menu.title.is_some() {
+                let sep_y = my + panel.item_height + 2.0;
+                self.add_rect(&mut rect_vertices, mx + 4.0, sep_y, mw - 8.0, 1.0, &separator_color);
             }
 
             // Submit rect pass

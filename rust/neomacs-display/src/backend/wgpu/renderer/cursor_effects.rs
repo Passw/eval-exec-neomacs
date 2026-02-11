@@ -920,9 +920,9 @@ pub(super) fn emit_cursor_ripple_ring(
                 let t = elapsed / duration;
                 let (rr, rg, rb) = ctx.effects.cursor_ripple_ring.color;
                 let rop = ctx.effects.cursor_ripple_ring.opacity;
-                let count = ctx.effects.cursor_ripple_ring.count.max(1).min(8);
+                let count = ctx.effects.cursor_ripple_ring.count.clamp(1, 8);
                 for ring in 0..count {
-                    let ring_t = (t - ring as f32 * 0.15).max(0.0).min(1.0);
+                    let ring_t = (t - ring as f32 * 0.15).clamp(0.0, 1.0);
                     if ring_t <= 0.0 { continue; }
                     let radius = ring_t * max_r;
                     let fade = (1.0 - ring_t) * rop;
@@ -1053,7 +1053,7 @@ pub(super) fn emit_cursor_gravity_well(ctx: &EffectCtx) -> Vec<RectVertex> {
         let (gr, gg, gb) = ctx.effects.cursor_gravity_well.color;
         let gop = ctx.effects.cursor_gravity_well.opacity;
         let field_r = ctx.effects.cursor_gravity_well.field_radius;
-        let lines = ctx.effects.cursor_gravity_well.line_count.max(4).min(24);
+        let lines = ctx.effects.cursor_gravity_well.line_count.clamp(4, 24);
         let now = std::time::Instant::now().duration_since(ctx.aurora_start).as_secs_f32();
         for line in 0..lines {
             let base_angle = line as f32 * std::f32::consts::PI * 2.0 / lines as f32 + now * 0.2;
@@ -1147,7 +1147,7 @@ pub(super) fn emit_cursor_bubble(
             if elapsed < duration {
                 let (br, bg, bb) = ctx.effects.cursor_bubble.color;
                 let bop = ctx.effects.cursor_bubble.opacity;
-                let count = ctx.effects.cursor_bubble.count.max(2).min(12);
+                let count = ctx.effects.cursor_bubble.count.clamp(2, 12);
                 let rspd = ctx.effects.cursor_bubble.rise_speed;
                 for i in 0..count {
                     let mut h = i.wrapping_mul(2654435761);

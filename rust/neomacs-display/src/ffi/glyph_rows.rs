@@ -330,10 +330,10 @@ pub unsafe extern "C" fn neomacs_display_set_face(
         box_type: bx_type,
         box_line_width,
         box_corner_radius,
-        font_ascent: font_ascent as i32,
-        font_descent: font_descent as i32,
-        underline_position: if ul_position > 0 { ul_position as i32 } else { 1 },
-        underline_thickness: if ul_thickness > 0 { ul_thickness as i32 } else { 1 },
+        font_ascent,
+        font_descent,
+        underline_position: if ul_position > 0 { ul_position } else { 1 },
+        underline_thickness: if ul_thickness > 0 { ul_thickness } else { 1 },
     };
 
     // Store face for later lookup during rendering

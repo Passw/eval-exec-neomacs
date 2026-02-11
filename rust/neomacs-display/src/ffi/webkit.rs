@@ -715,8 +715,8 @@ pub unsafe extern "C" fn neomacs_display_webkit_send_pointer(
             let cmd = RenderCommand::WebKitPointerEvent {
                 id: webkit_id,
                 event_type,
-                x: x as i32,
-                y: y as i32,
+                x,
+                y,
                 button,
                 state,
                 modifiers,
@@ -748,10 +748,10 @@ pub unsafe extern "C" fn neomacs_display_webkit_send_scroll(
         if let Some(ref state) = THREADED_STATE {
             let cmd = RenderCommand::WebKitScroll {
                 id: webkit_id,
-                x: x as i32,
-                y: y as i32,
-                delta_x: delta_x as i32,
-                delta_y: delta_y as i32,
+                x,
+                y,
+                delta_x,
+                delta_y,
             };
             let _ = state.emacs_comms.cmd_tx.try_send(cmd);
             return;
@@ -779,8 +779,8 @@ pub unsafe extern "C" fn neomacs_display_webkit_click(
         if let Some(ref state) = THREADED_STATE {
             let cmd = RenderCommand::WebKitClick {
                 id: webkit_id,
-                x: x as i32,
-                y: y as i32,
+                x,
+                y,
                 button,
             };
             let _ = state.emacs_comms.cmd_tx.try_send(cmd);
@@ -813,12 +813,12 @@ pub unsafe extern "C" fn neomacs_display_scroll_blit(
     {
         if let Some(ref state) = THREADED_STATE {
             let cmd = RenderCommand::ScrollBlit {
-                x: x as i32,
-                y: y as i32,
-                width: width as i32,
-                height: height as i32,
-                from_y: from_y as i32,
-                to_y: to_y as i32,
+                x,
+                y,
+                width,
+                height,
+                from_y,
+                to_y,
                 bg_r,
                 bg_g,
                 bg_b,

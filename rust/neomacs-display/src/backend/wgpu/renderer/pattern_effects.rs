@@ -321,7 +321,7 @@ pub(super) fn emit_kaleidoscope(ctx: &EffectCtx) -> Vec<RectVertex> {
     let now = std::time::Instant::now().duration_since(ctx.aurora_start).as_secs_f32();
     let (kr, kg, kb) = ctx.effects.kaleidoscope.color;
     let kop = ctx.effects.kaleidoscope.opacity;
-    let segs = ctx.effects.kaleidoscope.segments.max(3).min(12);
+    let segs = ctx.effects.kaleidoscope.segments.clamp(3, 12);
     let spd = ctx.effects.kaleidoscope.speed;
     let fw = ctx.renderer_width;
     let fh = ctx.renderer_height;
@@ -397,7 +397,7 @@ pub(super) fn emit_spiral_vortex(ctx: &EffectCtx) -> Vec<RectVertex> {
     let now = std::time::Instant::now().duration_since(ctx.aurora_start).as_secs_f32();
     let (vr, vg, vb) = ctx.effects.spiral_vortex.color;
     let vop = ctx.effects.spiral_vortex.opacity;
-    let arms = ctx.effects.spiral_vortex.arms.max(2).min(12);
+    let arms = ctx.effects.spiral_vortex.arms.clamp(2, 12);
     let spd = ctx.effects.spiral_vortex.speed;
     let fw = ctx.renderer_width;
     let fh = ctx.renderer_height;
@@ -483,7 +483,7 @@ pub(super) fn emit_wave_interference(ctx: &EffectCtx) -> Vec<RectVertex> {
     let (wr, wg, wb) = ctx.effects.wave_interference.color;
     let wop = ctx.effects.wave_interference.opacity;
     let wl = ctx.effects.wave_interference.wavelength.max(10.0);
-    let sources = ctx.effects.wave_interference.source_count.max(2).min(6);
+    let sources = ctx.effects.wave_interference.source_count.clamp(2, 6);
     let spd = ctx.effects.wave_interference.speed;
     let fw = ctx.renderer_width;
     let fh = ctx.renderer_height;
