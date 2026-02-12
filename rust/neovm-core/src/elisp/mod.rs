@@ -18,6 +18,7 @@ pub mod print;
 pub mod builtins;
 pub mod symbol;
 pub mod load;
+pub mod bytecode;
 
 // Re-export the main public API
 pub use value::{Value, ConsCell, LambdaData, LambdaParams};
@@ -27,6 +28,7 @@ pub use error::{EvalError, format_eval_result};
 pub use eval::Evaluator;
 pub use print::print_value;
 pub use symbol::Obarray;
+pub use bytecode::{ByteCodeFunction, Compiler as ByteCompiler, Vm as ByteVm};
 
 /// Convenience: parse and evaluate source code.
 pub fn eval_source(input: &str) -> Result<Vec<Result<Value, EvalError>>, ParseError> {

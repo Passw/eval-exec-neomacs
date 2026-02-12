@@ -51,6 +51,10 @@ pub fn print_value(value: &Value) -> String {
             format!("(macro {} {})", params, body)
         }
         Value::Subr(name) => format!("#<subr {}>", name),
+        Value::ByteCode(bc) => {
+            let params = format_params(&bc.params);
+            format!("#<bytecode {} ({} ops)>", params, bc.ops.len())
+        }
     }
 }
 

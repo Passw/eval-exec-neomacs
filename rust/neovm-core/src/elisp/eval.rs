@@ -994,6 +994,15 @@ impl Evaluator {
     /// Apply a function value to evaluated arguments.
     pub(crate) fn apply(&mut self, function: Value, args: Vec<Value>) -> EvalResult {
         match function {
+            Value::ByteCode(bc) => {
+                let mut vm = super::bytecode::Vm::new(
+                    &mut self.obarray,
+                    &mut self.dynamic,
+                    &mut self.lexenv,
+                    &mut self.features,
+                );
+                vm.execute(&bc, args)
+            }
             Value::Lambda(lambda) | Value::Macro(lambda) => {
                 self.apply_lambda(&lambda, args)
             }
