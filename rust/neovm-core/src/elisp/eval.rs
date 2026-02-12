@@ -7,6 +7,7 @@ use super::error::*;
 use super::expr::Expr;
 use super::symbol::Obarray;
 use super::value::*;
+use crate::buffer::BufferManager;
 
 /// The Elisp evaluator.
 pub struct Evaluator {
@@ -18,6 +19,8 @@ pub struct Evaluator {
     pub(crate) lexenv: Vec<HashMap<String, Value>>,
     /// Features list (for require/provide).
     pub(crate) features: Vec<String>,
+    /// Buffer manager — owns all live buffers and tracks current buffer.
+    pub(crate) buffers: BufferManager,
     /// Recursion depth counter.
     depth: usize,
     /// Maximum recursion depth.
@@ -61,6 +64,7 @@ impl Evaluator {
             dynamic: Vec::new(),
             lexenv: Vec::new(),
             features: Vec::new(),
+            buffers: BufferManager::new(),
             depth: 0,
             max_depth: 200,
         }
@@ -295,8 +299,8 @@ impl Evaluator {
             "defalias" => self.sf_defalias(tail),
             "provide" => self.sf_provide(tail),
             "require" => self.sf_require(tail),
-            "save-excursion" => self.sf_progn(tail), // Stub
-            "save-restriction" => self.sf_progn(tail), // Stub
+            "save-excursion" => self.sf_save_excursion(tail),
+            "save-restriction" => self.sf_save_restriction(tail),
             "with-current-buffer" => self.sf_with_current_buffer(tail),
             "ignore-errors" => self.sf_ignore_errors(tail),
             "dotimes" => self.sf_dotimes(tail),
@@ -839,9 +843,58 @@ impl Evaluator {
         if tail.is_empty() {
             return Err(signal("wrong-number-of-arguments", vec![]));
         }
-        // Stub: just evaluate args, ignoring buffer switch
-        let _buf = self.eval(&tail[0])?;
-        self.sf_progn(&tail[1..])
+        let buf_val = self.eval(&tail[0])?;
+        let target_id = match &buf_val {
+            Value::Buffer(id) => *id,
+            Value::Str(s) => {
+                self.buffers.find_buffer_by_name(s)
+                    .ok_or_else(|| signal("error", vec![Value::string(format!("No buffer named {s}"))]))?
+            }
+            other => return Err(signal("wrong-type-argument",
+                vec![Value::symbol("bufferp"), other.clone()])),
+        };
+        // Save current buffer, switch, run body, restore
+        let saved = self.buffers.current_buffer().map(|b| b.id);
+        self.buffers.set_current(target_id);
+        let result = self.sf_progn(&tail[1..]);
+        if let Some(saved_id) = saved {
+            self.buffers.set_current(saved_id);
+        }
+        result
+    }
+
+    fn sf_save_excursion(&mut self, tail: &[Expr]) -> EvalResult {
+        // Save current buffer, point, and mark; restore after body
+        let saved_buf = self.buffers.current_buffer().map(|b| b.id);
+        let (saved_pt, saved_mark) = match self.buffers.current_buffer() {
+            Some(b) => (b.pt, b.mark),
+            None => (0, None),
+        };
+        let result = self.sf_progn(tail);
+        // Restore
+        if let Some(buf_id) = saved_buf {
+            self.buffers.set_current(buf_id);
+            if let Some(buf) = self.buffers.get_mut(buf_id) {
+                buf.pt = saved_pt;
+                buf.mark = saved_mark;
+            }
+        }
+        result
+    }
+
+    fn sf_save_restriction(&mut self, tail: &[Expr]) -> EvalResult {
+        // Save narrowing boundaries; restore after body
+        let (saved_begv, saved_zv) = match self.buffers.current_buffer() {
+            Some(b) => (b.begv, b.zv),
+            None => (0, 0),
+        };
+        let result = self.sf_progn(tail);
+        if let Some(buf) = self.buffers.current_buffer_mut() {
+            buf.begv = saved_begv;
+            buf.zv = saved_zv;
+            buf.pt = buf.pt.clamp(buf.begv, buf.zv);
+        }
+        result
     }
 
     fn sf_ignore_errors(&mut self, tail: &[Expr]) -> EvalResult {
@@ -1525,5 +1578,180 @@ mod tests {
         assert_eq!(results[1], "OK t");
         assert_eq!(results[2], "OK 42");
         assert_eq!(results[4], r#"OK "A variable""#);
+    }
+
+    // -- Buffer operations -------------------------------------------------
+
+    #[test]
+    fn buffer_create_and_switch() {
+        let results = eval_all(
+            "(get-buffer-create \"test-buf\")
+             (set-buffer \"test-buf\")
+             (buffer-name)
+             (bufferp (current-buffer))"
+        );
+        assert!(results[0].starts_with("OK #<buffer"));
+        assert!(results[1].starts_with("OK #<buffer"));
+        assert_eq!(results[2], r#"OK "test-buf""#);
+        assert_eq!(results[3], "OK t");
+    }
+
+    #[test]
+    fn buffer_insert_and_point() {
+        let results = eval_all(
+            "(get-buffer-create \"ed\")
+             (set-buffer \"ed\")
+             (insert \"hello\")
+             (point)
+             (goto-char 1)
+             (point)
+             (buffer-string)
+             (point-min)
+             (point-max)"
+        );
+        assert_eq!(results[3], "OK 6"); // after inserting "hello", point is 6 (1-based)
+        assert_eq!(results[5], "OK 1"); // after goto-char 1
+        assert_eq!(results[6], r#"OK "hello""#);
+        assert_eq!(results[7], "OK 1"); // point-min
+        assert_eq!(results[8], "OK 6"); // point-max
+    }
+
+    #[test]
+    fn buffer_delete_region() {
+        let results = eval_all(
+            "(get-buffer-create \"del\")
+             (set-buffer \"del\")
+             (insert \"abcdef\")
+             (delete-region 2 5)
+             (buffer-string)"
+        );
+        assert_eq!(results[4], r#"OK "aef""#);
+    }
+
+    #[test]
+    fn buffer_erase() {
+        let results = eval_all(
+            "(get-buffer-create \"era\")
+             (set-buffer \"era\")
+             (insert \"stuff\")
+             (erase-buffer)
+             (buffer-string)
+             (buffer-size)"
+        );
+        assert_eq!(results[4], r#"OK """#);
+        assert_eq!(results[5], "OK 0");
+    }
+
+    #[test]
+    fn buffer_narrowing() {
+        let results = eval_all(
+            "(get-buffer-create \"nar\")
+             (set-buffer \"nar\")
+             (insert \"hello world\")
+             (narrow-to-region 7 12)
+             (buffer-string)
+             (widen)
+             (buffer-string)"
+        );
+        assert_eq!(results[4], r#"OK "world""#);
+        assert_eq!(results[6], r#"OK "hello world""#);
+    }
+
+    #[test]
+    fn buffer_modified_p() {
+        let results = eval_all(
+            "(get-buffer-create \"mod\")
+             (set-buffer \"mod\")
+             (buffer-modified-p)
+             (insert \"x\")
+             (buffer-modified-p)
+             (set-buffer-modified-p nil)
+             (buffer-modified-p)"
+        );
+        assert_eq!(results[2], "OK nil");
+        assert_eq!(results[4], "OK t");
+        assert_eq!(results[6], "OK nil");
+    }
+
+    #[test]
+    fn buffer_mark() {
+        let results = eval_all(
+            "(get-buffer-create \"mk\")
+             (set-buffer \"mk\")
+             (insert \"hello\")
+             (set-mark 3)
+             (mark)"
+        );
+        assert_eq!(results[4], "OK 3");
+    }
+
+    #[test]
+    fn buffer_with_current_buffer() {
+        let results = eval_all(
+            "(get-buffer-create \"a\")
+             (get-buffer-create \"b\")
+             (set-buffer \"a\")
+             (insert \"in-a\")
+             (with-current-buffer \"b\"
+               (insert \"in-b\")
+               (buffer-string))
+             (buffer-name)
+             (buffer-string)"
+        );
+        // with-current-buffer should switch to b, insert, get string, then restore a
+        assert_eq!(results[4], r#"OK "in-b""#);
+        assert_eq!(results[5], r#"OK "a""#); // current buffer restored
+        assert_eq!(results[6], r#"OK "in-a""#); // a's content unchanged
+    }
+
+    #[test]
+    fn buffer_save_excursion() {
+        let results = eval_all(
+            "(get-buffer-create \"se\")
+             (set-buffer \"se\")
+             (insert \"abcdef\")
+             (goto-char 3)
+             (save-excursion
+               (goto-char 1)
+               (insert \"X\"))
+             (point)"
+        );
+        // save-excursion restores point to 3
+        assert_eq!(results[5], "OK 3");
+    }
+
+    #[test]
+    fn buffer_char_after_before() {
+        let results = eval_all(
+            "(get-buffer-create \"cb\")
+             (set-buffer \"cb\")
+             (insert \"abc\")
+             (goto-char 2)
+             (char-after)
+             (char-before)"
+        );
+        assert_eq!(results[4], "OK 98"); // ?b = 98
+        assert_eq!(results[5], "OK 97"); // ?a = 97
+    }
+
+    #[test]
+    fn buffer_list_and_kill() {
+        let results = eval_all(
+            "(get-buffer-create \"kill-me\")
+             (kill-buffer \"kill-me\")
+             (get-buffer \"kill-me\")"
+        );
+        assert_eq!(results[1], "OK t");
+        assert_eq!(results[2], "OK nil");
+    }
+
+    #[test]
+    fn buffer_generate_new_buffer() {
+        let results = eval_all(
+            "(buffer-name (generate-new-buffer \"test\"))
+             (buffer-name (generate-new-buffer \"test\"))"
+        );
+        assert_eq!(results[0], r#"OK "test""#);
+        assert_eq!(results[1], r#"OK "test<2>""#);
     }
 }

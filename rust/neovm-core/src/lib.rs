@@ -1,3 +1,4 @@
+pub mod buffer;
 pub mod elisp;
 pub mod gc;
 

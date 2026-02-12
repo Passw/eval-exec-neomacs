@@ -2088,6 +2088,500 @@ pub(crate) fn builtin_float_time(args: Vec<Value>) -> EvalResult {
 }
 
 // ===========================================================================
+// Buffer operations (require evaluator for BufferManager access)
+// ===========================================================================
+
+use crate::buffer::BufferId;
+
+fn expect_buffer_id(value: &Value) -> Result<BufferId, Flow> {
+    match value {
+        Value::Buffer(id) => Ok(*id),
+        other => Err(signal(
+            "wrong-type-argument",
+            vec![Value::symbol("bufferp"), other.clone()],
+        )),
+    }
+}
+
+/// (get-buffer-create NAME) → buffer
+pub(crate) fn builtin_get_buffer_create(
+    eval: &mut super::eval::Evaluator,
+    args: Vec<Value>,
+) -> EvalResult {
+    expect_args("get-buffer-create", &args, 1)?;
+    let name = expect_string(&args[0])?;
+    if let Some(id) = eval.buffers.find_buffer_by_name(&name) {
+        Ok(Value::Buffer(id))
+    } else {
+        let id = eval.buffers.create_buffer(&name);
+        Ok(Value::Buffer(id))
+    }
+}
+
+/// (get-buffer NAME-OR-BUFFER) → buffer or nil
+pub(crate) fn builtin_get_buffer(
+    eval: &mut super::eval::Evaluator,
+    args: Vec<Value>,
+) -> EvalResult {
+    expect_args("get-buffer", &args, 1)?;
+    match &args[0] {
+        Value::Buffer(id) => {
+            if eval.buffers.get(*id).is_some() {
+                Ok(args[0].clone())
+            } else {
+                Ok(Value::Nil)
+            }
+        }
+        Value::Str(s) => {
+            if let Some(id) = eval.buffers.find_buffer_by_name(s) {
+                Ok(Value::Buffer(id))
+            } else {
+                Ok(Value::Nil)
+            }
+        }
+        _ => Ok(Value::Nil),
+    }
+}
+
+/// (kill-buffer BUFFER-OR-NAME) → t
+pub(crate) fn builtin_kill_buffer(
+    eval: &mut super::eval::Evaluator,
+    args: Vec<Value>,
+) -> EvalResult {
+    expect_args("kill-buffer", &args, 1)?;
+    let id = match &args[0] {
+        Value::Buffer(id) => *id,
+        Value::Str(s) => {
+            match eval.buffers.find_buffer_by_name(s) {
+                Some(id) => id,
+                None => return Ok(Value::Nil),
+            }
+        }
+        _ => return Ok(Value::Nil),
+    };
+    eval.buffers.kill_buffer(id);
+    Ok(Value::True)
+}
+
+/// (set-buffer BUFFER-OR-NAME) → buffer
+pub(crate) fn builtin_set_buffer(
+    eval: &mut super::eval::Evaluator,
+    args: Vec<Value>,
+) -> EvalResult {
+    expect_args("set-buffer", &args, 1)?;
+    let id = match &args[0] {
+        Value::Buffer(id) => *id,
+        Value::Str(s) => {
+            eval.buffers.find_buffer_by_name(s)
+                .ok_or_else(|| signal("error", vec![Value::string(format!("No buffer named {s}"))]))?
+        }
+        other => return Err(signal("wrong-type-argument", vec![Value::symbol("stringp"), other.clone()])),
+    };
+    eval.buffers.set_current(id);
+    Ok(Value::Buffer(id))
+}
+
+/// (current-buffer) → buffer
+pub(crate) fn builtin_current_buffer(
+    eval: &mut super::eval::Evaluator,
+    args: Vec<Value>,
+) -> EvalResult {
+    let _ = args;
+    match eval.buffers.current_buffer() {
+        Some(buf) => Ok(Value::Buffer(buf.id)),
+        None => Ok(Value::Nil),
+    }
+}
+
+/// (buffer-name &optional BUFFER) → string
+pub(crate) fn builtin_buffer_name(
+    eval: &mut super::eval::Evaluator,
+    args: Vec<Value>,
+) -> EvalResult {
+    let id = if args.is_empty() || matches!(args[0], Value::Nil) {
+        match eval.buffers.current_buffer() {
+            Some(b) => b.id,
+            None => return Ok(Value::Nil),
+        }
+    } else {
+        expect_buffer_id(&args[0])?
+    };
+    match eval.buffers.get(id) {
+        Some(buf) => Ok(Value::string(&buf.name)),
+        None => Ok(Value::Nil),
+    }
+}
+
+/// (buffer-file-name &optional BUFFER) → string or nil
+pub(crate) fn builtin_buffer_file_name(
+    eval: &mut super::eval::Evaluator,
+    args: Vec<Value>,
+) -> EvalResult {
+    let id = if args.is_empty() || matches!(args[0], Value::Nil) {
+        match eval.buffers.current_buffer() {
+            Some(b) => b.id,
+            None => return Ok(Value::Nil),
+        }
+    } else {
+        expect_buffer_id(&args[0])?
+    };
+    match eval.buffers.get(id) {
+        Some(buf) => match &buf.file_name {
+            Some(f) => Ok(Value::string(f)),
+            None => Ok(Value::Nil),
+        },
+        None => Ok(Value::Nil),
+    }
+}
+
+/// (buffer-string) → string
+pub(crate) fn builtin_buffer_string(
+    eval: &mut super::eval::Evaluator,
+    args: Vec<Value>,
+) -> EvalResult {
+    let _ = args;
+    let buf = eval.buffers.current_buffer_mut()
+        .ok_or_else(|| signal("error", vec![Value::string("No current buffer")]))?;
+    Ok(Value::string(buf.buffer_string()))
+}
+
+/// (buffer-substring START END) → string
+pub(crate) fn builtin_buffer_substring(
+    eval: &mut super::eval::Evaluator,
+    args: Vec<Value>,
+) -> EvalResult {
+    expect_args("buffer-substring", &args, 2)?;
+    let start = expect_int(&args[0])? as usize;
+    let end = expect_int(&args[1])? as usize;
+    let buf = eval.buffers.current_buffer_mut()
+        .ok_or_else(|| signal("error", vec![Value::string("No current buffer")]))?;
+    // Emacs uses 1-based positions, convert to 0-based byte positions
+    let s = if start > 0 { start - 1 } else { 0 };
+    let e = if end > 0 { end - 1 } else { 0 };
+    // Convert char positions to byte positions
+    let byte_start = buf.text.char_to_byte(s);
+    let byte_end = buf.text.char_to_byte(e);
+    Ok(Value::string(buf.buffer_substring(byte_start, byte_end)))
+}
+
+/// (point) → integer
+pub(crate) fn builtin_point(
+    eval: &mut super::eval::Evaluator,
+    args: Vec<Value>,
+) -> EvalResult {
+    let _ = args;
+    let buf = eval.buffers.current_buffer()
+        .ok_or_else(|| signal("error", vec![Value::string("No current buffer")]))?;
+    // Return 1-based char position
+    Ok(Value::Int(buf.point_char() as i64 + 1))
+}
+
+/// (point-min) → integer
+pub(crate) fn builtin_point_min(
+    eval: &mut super::eval::Evaluator,
+    args: Vec<Value>,
+) -> EvalResult {
+    let _ = args;
+    let buf = eval.buffers.current_buffer()
+        .ok_or_else(|| signal("error", vec![Value::string("No current buffer")]))?;
+    Ok(Value::Int(buf.text.byte_to_char(buf.point_min()) as i64 + 1))
+}
+
+/// (point-max) → integer
+pub(crate) fn builtin_point_max(
+    eval: &mut super::eval::Evaluator,
+    args: Vec<Value>,
+) -> EvalResult {
+    let _ = args;
+    let buf = eval.buffers.current_buffer()
+        .ok_or_else(|| signal("error", vec![Value::string("No current buffer")]))?;
+    Ok(Value::Int(buf.text.byte_to_char(buf.point_max()) as i64 + 1))
+}
+
+/// (goto-char POS) → POS
+pub(crate) fn builtin_goto_char(
+    eval: &mut super::eval::Evaluator,
+    args: Vec<Value>,
+) -> EvalResult {
+    expect_args("goto-char", &args, 1)?;
+    let pos = expect_int(&args[0])?;
+    let buf = eval.buffers.current_buffer_mut()
+        .ok_or_else(|| signal("error", vec![Value::string("No current buffer")]))?;
+    // Convert 1-based char pos to 0-based byte pos
+    let char_pos = if pos > 0 { pos as usize - 1 } else { 0 };
+    let byte_pos = buf.text.char_to_byte(char_pos.min(buf.text.char_count()));
+    buf.goto_char(byte_pos);
+    Ok(args[0].clone())
+}
+
+/// (insert &rest ARGS) → nil
+pub(crate) fn builtin_insert(
+    eval: &mut super::eval::Evaluator,
+    args: Vec<Value>,
+) -> EvalResult {
+    let buf = eval.buffers.current_buffer_mut()
+        .ok_or_else(|| signal("error", vec![Value::string("No current buffer")]))?;
+    for arg in &args {
+        match arg {
+            Value::Str(s) => buf.insert(s),
+            Value::Char(c) => {
+                let mut tmp = [0u8; 4];
+                buf.insert(c.encode_utf8(&mut tmp));
+            }
+            Value::Int(n) => {
+                if let Some(c) = char::from_u32(*n as u32) {
+                    let mut tmp = [0u8; 4];
+                    buf.insert(c.encode_utf8(&mut tmp));
+                }
+            }
+            other => return Err(signal(
+                "wrong-type-argument",
+                vec![Value::symbol("char-or-string-p"), other.clone()],
+            )),
+        }
+    }
+    Ok(Value::Nil)
+}
+
+/// (delete-region START END) → nil
+pub(crate) fn builtin_delete_region(
+    eval: &mut super::eval::Evaluator,
+    args: Vec<Value>,
+) -> EvalResult {
+    expect_args("delete-region", &args, 2)?;
+    let start = expect_int(&args[0])? as usize;
+    let end = expect_int(&args[1])? as usize;
+    let buf = eval.buffers.current_buffer_mut()
+        .ok_or_else(|| signal("error", vec![Value::string("No current buffer")]))?;
+    // Convert 1-based to 0-based char positions, then to byte positions
+    let s = if start > 0 { start - 1 } else { 0 };
+    let e = if end > 0 { end - 1 } else { 0 };
+    let byte_start = buf.text.char_to_byte(s);
+    let byte_end = buf.text.char_to_byte(e);
+    buf.delete_region(byte_start, byte_end);
+    Ok(Value::Nil)
+}
+
+/// (erase-buffer) → nil
+pub(crate) fn builtin_erase_buffer(
+    eval: &mut super::eval::Evaluator,
+    args: Vec<Value>,
+) -> EvalResult {
+    let _ = args;
+    let buf = eval.buffers.current_buffer_mut()
+        .ok_or_else(|| signal("error", vec![Value::string("No current buffer")]))?;
+    let len = buf.text.len();
+    buf.delete_region(0, len);
+    buf.widen();
+    Ok(Value::Nil)
+}
+
+/// (buffer-size &optional BUFFER) → integer
+pub(crate) fn builtin_buffer_size(
+    eval: &mut super::eval::Evaluator,
+    args: Vec<Value>,
+) -> EvalResult {
+    let buf = if args.is_empty() || matches!(args[0], Value::Nil) {
+        eval.buffers.current_buffer()
+            .ok_or_else(|| signal("error", vec![Value::string("No current buffer")]))?
+    } else {
+        let id = expect_buffer_id(&args[0])?;
+        eval.buffers.get(id)
+            .ok_or_else(|| signal("error", vec![Value::string("No such buffer")]))?
+    };
+    Ok(Value::Int(buf.text.char_count() as i64))
+}
+
+/// (narrow-to-region START END) → nil
+pub(crate) fn builtin_narrow_to_region(
+    eval: &mut super::eval::Evaluator,
+    args: Vec<Value>,
+) -> EvalResult {
+    expect_args("narrow-to-region", &args, 2)?;
+    let start = expect_int(&args[0])? as usize;
+    let end = expect_int(&args[1])? as usize;
+    let buf = eval.buffers.current_buffer_mut()
+        .ok_or_else(|| signal("error", vec![Value::string("No current buffer")]))?;
+    let s = if start > 0 { start - 1 } else { 0 };
+    let e = if end > 0 { end - 1 } else { 0 };
+    let byte_start = buf.text.char_to_byte(s);
+    let byte_end = buf.text.char_to_byte(e);
+    buf.narrow_to_region(byte_start, byte_end);
+    Ok(Value::Nil)
+}
+
+/// (widen) → nil
+pub(crate) fn builtin_widen(
+    eval: &mut super::eval::Evaluator,
+    args: Vec<Value>,
+) -> EvalResult {
+    let _ = args;
+    let buf = eval.buffers.current_buffer_mut()
+        .ok_or_else(|| signal("error", vec![Value::string("No current buffer")]))?;
+    buf.widen();
+    Ok(Value::Nil)
+}
+
+/// (set-mark POS) → POS
+pub(crate) fn builtin_set_mark(
+    eval: &mut super::eval::Evaluator,
+    args: Vec<Value>,
+) -> EvalResult {
+    expect_args("set-mark", &args, 1)?;
+    let pos = expect_int(&args[0])? as usize;
+    let buf = eval.buffers.current_buffer_mut()
+        .ok_or_else(|| signal("error", vec![Value::string("No current buffer")]))?;
+    let char_pos = if pos > 0 { pos - 1 } else { 0 };
+    let byte_pos = buf.text.char_to_byte(char_pos.min(buf.text.char_count()));
+    buf.set_mark(byte_pos);
+    Ok(args[0].clone())
+}
+
+/// (mark) → integer or nil
+pub(crate) fn builtin_mark(
+    eval: &mut super::eval::Evaluator,
+    args: Vec<Value>,
+) -> EvalResult {
+    let _ = args;
+    let buf = eval.buffers.current_buffer()
+        .ok_or_else(|| signal("error", vec![Value::string("No current buffer")]))?;
+    match buf.mark() {
+        Some(byte_pos) => Ok(Value::Int(buf.text.byte_to_char(byte_pos) as i64 + 1)),
+        None => Ok(Value::Nil),
+    }
+}
+
+/// (buffer-modified-p &optional BUFFER) → t or nil
+pub(crate) fn builtin_buffer_modified_p(
+    eval: &mut super::eval::Evaluator,
+    args: Vec<Value>,
+) -> EvalResult {
+    let buf = if args.is_empty() || matches!(args[0], Value::Nil) {
+        eval.buffers.current_buffer()
+            .ok_or_else(|| signal("error", vec![Value::string("No current buffer")]))?
+    } else {
+        let id = expect_buffer_id(&args[0])?;
+        eval.buffers.get(id)
+            .ok_or_else(|| signal("error", vec![Value::string("No such buffer")]))?
+    };
+    Ok(Value::bool(buf.is_modified()))
+}
+
+/// (set-buffer-modified-p FLAG) → FLAG
+pub(crate) fn builtin_set_buffer_modified_p(
+    eval: &mut super::eval::Evaluator,
+    args: Vec<Value>,
+) -> EvalResult {
+    expect_args("set-buffer-modified-p", &args, 1)?;
+    let flag = args[0].is_truthy();
+    let buf = eval.buffers.current_buffer_mut()
+        .ok_or_else(|| signal("error", vec![Value::string("No current buffer")]))?;
+    buf.set_modified(flag);
+    Ok(args[0].clone())
+}
+
+/// (buffer-list) → list of buffers
+pub(crate) fn builtin_buffer_list(
+    eval: &mut super::eval::Evaluator,
+    args: Vec<Value>,
+) -> EvalResult {
+    let _ = args;
+    let ids = eval.buffers.buffer_list();
+    let vals: Vec<Value> = ids.into_iter().map(Value::Buffer).collect();
+    Ok(Value::list(vals))
+}
+
+/// (generate-new-buffer-name BASE) → string
+pub(crate) fn builtin_generate_new_buffer_name(
+    eval: &mut super::eval::Evaluator,
+    args: Vec<Value>,
+) -> EvalResult {
+    expect_args("generate-new-buffer-name", &args, 1)?;
+    let base = expect_string(&args[0])?;
+    Ok(Value::string(eval.buffers.generate_new_buffer_name(&base)))
+}
+
+/// (generate-new-buffer NAME) → buffer
+pub(crate) fn builtin_generate_new_buffer(
+    eval: &mut super::eval::Evaluator,
+    args: Vec<Value>,
+) -> EvalResult {
+    expect_args("generate-new-buffer", &args, 1)?;
+    let base = expect_string(&args[0])?;
+    let name = eval.buffers.generate_new_buffer_name(&base);
+    let id = eval.buffers.create_buffer(&name);
+    Ok(Value::Buffer(id))
+}
+
+/// (bufferp OBJECT) → t or nil
+pub(crate) fn builtin_bufferp(args: Vec<Value>) -> EvalResult {
+    expect_args("bufferp", &args, 1)?;
+    Ok(Value::bool(matches!(args[0], Value::Buffer(_))))
+}
+
+/// (char-after &optional POS) → integer or nil
+pub(crate) fn builtin_char_after(
+    eval: &mut super::eval::Evaluator,
+    args: Vec<Value>,
+) -> EvalResult {
+    let buf = eval.buffers.current_buffer()
+        .ok_or_else(|| signal("error", vec![Value::string("No current buffer")]))?;
+    let byte_pos = if args.is_empty() || matches!(args[0], Value::Nil) {
+        buf.point()
+    } else {
+        let pos = expect_int(&args[0])? as usize;
+        let char_pos = if pos > 0 { pos - 1 } else { 0 };
+        buf.text.char_to_byte(char_pos.min(buf.text.char_count()))
+    };
+    match buf.char_after(byte_pos) {
+        Some(c) => Ok(Value::Int(c as i64)),
+        None => Ok(Value::Nil),
+    }
+}
+
+/// (char-before &optional POS) → integer or nil
+pub(crate) fn builtin_char_before(
+    eval: &mut super::eval::Evaluator,
+    args: Vec<Value>,
+) -> EvalResult {
+    let buf = eval.buffers.current_buffer()
+        .ok_or_else(|| signal("error", vec![Value::string("No current buffer")]))?;
+    let byte_pos = if args.is_empty() || matches!(args[0], Value::Nil) {
+        buf.point()
+    } else {
+        let pos = expect_int(&args[0])? as usize;
+        let char_pos = if pos > 0 { pos - 1 } else { 0 };
+        buf.text.char_to_byte(char_pos.min(buf.text.char_count()))
+    };
+    match buf.char_before(byte_pos) {
+        Some(c) => Ok(Value::Int(c as i64)),
+        None => Ok(Value::Nil),
+    }
+}
+
+/// (buffer-local-value VARIABLE BUFFER) → value
+pub(crate) fn builtin_buffer_local_value(
+    eval: &mut super::eval::Evaluator,
+    args: Vec<Value>,
+) -> EvalResult {
+    expect_args("buffer-local-value", &args, 2)?;
+    let name = match &args[0] {
+        Value::Symbol(s) => s.clone(),
+        other => return Err(signal("wrong-type-argument", vec![Value::symbol("symbolp"), other.clone()])),
+    };
+    let id = expect_buffer_id(&args[1])?;
+    let buf = eval.buffers.get(id)
+        .ok_or_else(|| signal("error", vec![Value::string("No such buffer")]))?;
+    match buf.get_buffer_local(&name) {
+        Some(v) => Ok(v.clone()),
+        None => Ok(Value::Nil),
+    }
+}
+
+/// (with-current-buffer BUFFER-OR-NAME &rest BODY) is a special form handled
+/// in eval.rs, but we provide the utility of switching and restoring here.
+
+// ===========================================================================
 // Dispatch table
 // ===========================================================================
 
@@ -2128,6 +2622,36 @@ pub(crate) fn dispatch_builtin(
         "load" => return Some(builtin_load(eval, args)),
         "load-file" => return Some(builtin_load_file(eval, args)),
         "eval" => return Some(builtin_eval(eval, args)),
+        // Buffer operations
+        "get-buffer-create" => return Some(builtin_get_buffer_create(eval, args)),
+        "get-buffer" => return Some(builtin_get_buffer(eval, args)),
+        "kill-buffer" => return Some(builtin_kill_buffer(eval, args)),
+        "set-buffer" => return Some(builtin_set_buffer(eval, args)),
+        "current-buffer" => return Some(builtin_current_buffer(eval, args)),
+        "buffer-name" => return Some(builtin_buffer_name(eval, args)),
+        "buffer-file-name" => return Some(builtin_buffer_file_name(eval, args)),
+        "buffer-string" => return Some(builtin_buffer_string(eval, args)),
+        "buffer-substring" => return Some(builtin_buffer_substring(eval, args)),
+        "point" => return Some(builtin_point(eval, args)),
+        "point-min" => return Some(builtin_point_min(eval, args)),
+        "point-max" => return Some(builtin_point_max(eval, args)),
+        "goto-char" => return Some(builtin_goto_char(eval, args)),
+        "insert" => return Some(builtin_insert(eval, args)),
+        "delete-region" => return Some(builtin_delete_region(eval, args)),
+        "erase-buffer" => return Some(builtin_erase_buffer(eval, args)),
+        "buffer-size" => return Some(builtin_buffer_size(eval, args)),
+        "narrow-to-region" => return Some(builtin_narrow_to_region(eval, args)),
+        "widen" => return Some(builtin_widen(eval, args)),
+        "set-mark" => return Some(builtin_set_mark(eval, args)),
+        "mark" => return Some(builtin_mark(eval, args)),
+        "buffer-modified-p" => return Some(builtin_buffer_modified_p(eval, args)),
+        "set-buffer-modified-p" => return Some(builtin_set_buffer_modified_p(eval, args)),
+        "buffer-list" => return Some(builtin_buffer_list(eval, args)),
+        "generate-new-buffer-name" => return Some(builtin_generate_new_buffer_name(eval, args)),
+        "generate-new-buffer" => return Some(builtin_generate_new_buffer(eval, args)),
+        "char-after" => return Some(builtin_char_after(eval, args)),
+        "char-before" => return Some(builtin_char_before(eval, args)),
+        "buffer-local-value" => return Some(builtin_buffer_local_value(eval, args)),
         _ => {}
     }
 
@@ -2177,6 +2701,7 @@ pub(crate) fn dispatch_builtin(
         "functionp" => builtin_functionp(args),
         "keywordp" => builtin_keywordp(args),
         "hash-table-p" => builtin_hash_table_p(args),
+        "bufferp" => builtin_bufferp(args),
         "type-of" => builtin_type_of(args),
         "sequencep" => builtin_sequencep(args),
         "arrayp" => builtin_arrayp(args),
@@ -2348,6 +2873,7 @@ pub(crate) fn dispatch_builtin_pure(name: &str, args: Vec<Value>) -> Option<Eval
         "functionp" => builtin_functionp(args),
         "keywordp" => builtin_keywordp(args),
         "hash-table-p" => builtin_hash_table_p(args),
+        "bufferp" => builtin_bufferp(args),
         "type-of" => builtin_type_of(args),
         "sequencep" => builtin_sequencep(args),
         "arrayp" => builtin_arrayp(args),

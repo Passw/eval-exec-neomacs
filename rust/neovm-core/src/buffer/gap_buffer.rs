@@ -1,0 +1,1038 @@
+//! A UTF-8 aware gap buffer for efficient text editing.
+//!
+//! The gap buffer stores text in a contiguous `Vec<u8>` with a movable "gap"
+//! (unused region) that makes insertions and deletions near the gap O(1)
+//! amortized. The gap is relocated to the edit site before each mutation so
+//! that sequential edits in the same neighborhood avoid large copies.
+//!
+//! All public positions are **byte** positions into the logical text (i.e. the
+//! text with the gap removed) unless a parameter is explicitly named
+//! `char_pos`. The caller is responsible for ensuring byte positions fall on
+//! UTF-8 character boundaries.
+
+use std::fmt;
+
+/// Default initial gap size in bytes.
+const DEFAULT_GAP_SIZE: usize = 64;
+
+/// Growth factor when the gap must be expanded — the new gap will be at least
+/// this many bytes, or the requested size, whichever is larger.
+const MIN_GAP_GROW: usize = 64;
+
+/// A gap buffer holding UTF-8 encoded text.
+///
+/// Internally the backing store looks like:
+///
+/// ```text
+///  [ text-before-gap | gap (unused) | text-after-gap ]
+///    0..gap_start      gap_start..gap_end  gap_end..buf.len()
+/// ```
+///
+/// The *logical* text is the concatenation of `buf[..gap_start]` and
+/// `buf[gap_end..]`.
+#[derive(Clone)]
+pub struct GapBuffer {
+    /// Raw backing store.
+    buf: Vec<u8>,
+    /// Byte index where the gap begins (first unused byte).
+    gap_start: usize,
+    /// Byte index one past the last gap byte (first byte of text after gap).
+    gap_end: usize,
+}
+
+// ---------------------------------------------------------------------------
+// Construction
+// ---------------------------------------------------------------------------
+
+impl GapBuffer {
+    /// Create an empty gap buffer with a default-sized gap.
+    pub fn new() -> Self {
+        Self {
+            buf: vec![0u8; DEFAULT_GAP_SIZE],
+            gap_start: 0,
+            gap_end: DEFAULT_GAP_SIZE,
+        }
+    }
+
+    /// Create a gap buffer pre-loaded with the contents of `s`.
+    pub fn from_str(s: &str) -> Self {
+        let text = s.as_bytes();
+        let gap = DEFAULT_GAP_SIZE;
+        let mut buf = Vec::with_capacity(text.len() + gap);
+        buf.extend_from_slice(text);
+        buf.resize(text.len() + gap, 0);
+        // Place gap at the end so that appending is cheap.
+        Self {
+            buf,
+            gap_start: text.len(),
+            gap_end: text.len() + gap,
+        }
+    }
+
+    // -----------------------------------------------------------------------
+    // Queries
+    // -----------------------------------------------------------------------
+
+    /// Total length of the logical text in **bytes** (excluding the gap).
+    #[inline]
+    pub fn len(&self) -> usize {
+        self.buf.len() - self.gap_size()
+    }
+
+    /// Whether the buffer contains no text.
+    #[inline]
+    pub fn is_empty(&self) -> bool {
+        self.len() == 0
+    }
+
+    /// Number of Unicode scalar values (chars) in the buffer.
+    pub fn char_count(&self) -> usize {
+        // Count chars in the two text segments on either side of the gap.
+        let before = std::str::from_utf8(&self.buf[..self.gap_start])
+            .expect("pre-gap text is not valid UTF-8");
+        let after = std::str::from_utf8(&self.buf[self.gap_end..])
+            .expect("post-gap text is not valid UTF-8");
+        before.chars().count() + after.chars().count()
+    }
+
+    /// Size of the gap in bytes.
+    #[inline]
+    pub fn gap_size(&self) -> usize {
+        self.gap_end - self.gap_start
+    }
+
+    // -----------------------------------------------------------------------
+    // Single-element access
+    // -----------------------------------------------------------------------
+
+    /// Return the byte at logical position `pos`.
+    ///
+    /// # Panics
+    ///
+    /// Panics if `pos >= self.len()`.
+    pub fn byte_at(&self, pos: usize) -> u8 {
+        assert!(pos < self.len(), "byte_at: position {pos} out of range (len {})", self.len());
+        if pos < self.gap_start {
+            self.buf[pos]
+        } else {
+            self.buf[pos + self.gap_size()]
+        }
+    }
+
+    /// Return the `char` whose first byte starts at logical byte position `pos`,
+    /// or `None` if `pos >= self.len()`.
+    ///
+    /// # Panics
+    ///
+    /// Panics if `pos` does not lie on a UTF-8 character boundary.
+    pub fn char_at(&self, pos: usize) -> Option<char> {
+        if pos >= self.len() {
+            return None;
+        }
+        // Decode the character spanning up to 4 bytes starting at `pos`.
+        let first = self.byte_at(pos);
+        let char_len = utf8_char_len(first);
+        assert!(
+            pos + char_len <= self.len(),
+            "char_at: incomplete UTF-8 sequence at byte position {pos}"
+        );
+        let mut tmp = [0u8; 4];
+        for i in 0..char_len {
+            tmp[i] = self.byte_at(pos + i);
+        }
+        let s = std::str::from_utf8(&tmp[..char_len])
+            .expect("char_at: invalid UTF-8 sequence");
+        s.chars().next()
+    }
+
+    // -----------------------------------------------------------------------
+    // Range extraction
+    // -----------------------------------------------------------------------
+
+    /// Extract the text in the logical byte range `[start, end)` as a `String`.
+    ///
+    /// # Panics
+    ///
+    /// Panics if `start > end` or `end > self.len()`.
+    pub fn text_range(&self, start: usize, end: usize) -> String {
+        assert!(start <= end, "text_range: start ({start}) > end ({end})");
+        assert!(end <= self.len(), "text_range: end ({end}) > len ({})", self.len());
+        if start == end {
+            return String::new();
+        }
+
+        let mut out = Vec::with_capacity(end - start);
+
+        // The logical text is split into two physical segments:
+        //   segment A: buf[0 .. gap_start]       (logical positions 0 .. gap_start)
+        //   segment B: buf[gap_end .. buf.len()]  (logical positions gap_start .. len)
+        //
+        // We need to copy the intersection of [start, end) with each segment.
+
+        // Intersection with segment A (logical 0..gap_start).
+        if start < self.gap_start {
+            let seg_end = end.min(self.gap_start);
+            out.extend_from_slice(&self.buf[start..seg_end]);
+        }
+
+        // Intersection with segment B (logical gap_start..len).
+        if end > self.gap_start {
+            let seg_start = start.max(self.gap_start);
+            let phys_start = seg_start + self.gap_size();
+            let phys_end = end + self.gap_size();
+            out.extend_from_slice(&self.buf[phys_start..phys_end]);
+        }
+
+        String::from_utf8(out).expect("text_range: extracted bytes are not valid UTF-8")
+    }
+
+    /// Return the full buffer contents as a `String`.
+    pub fn to_string(&self) -> String {
+        self.text_range(0, self.len())
+    }
+
+    // -----------------------------------------------------------------------
+    // Mutation
+    // -----------------------------------------------------------------------
+
+    /// Insert `s` at logical byte position `pos`.
+    ///
+    /// After the call the gap sits immediately after the newly inserted text,
+    /// so consecutive inserts at the same position are fast.
+    ///
+    /// # Panics
+    ///
+    /// Panics if `pos > self.len()` or `pos` is not on a UTF-8 boundary.
+    pub fn insert_str(&mut self, pos: usize, s: &str) {
+        assert!(
+            pos <= self.len(),
+            "insert_str: position {pos} out of range (len {})",
+            self.len()
+        );
+        if s.is_empty() {
+            return;
+        }
+        // Validate that `pos` falls on a char boundary (unless at the very end).
+        debug_assert!(
+            pos == self.len() || self.is_char_boundary(pos),
+            "insert_str: position {pos} is not on a UTF-8 character boundary"
+        );
+
+        let bytes = s.as_bytes();
+        self.move_gap_to(pos);
+        self.ensure_gap(bytes.len());
+
+        // Copy the new text into the gap.
+        self.buf[self.gap_start..self.gap_start + bytes.len()].copy_from_slice(bytes);
+        self.gap_start += bytes.len();
+    }
+
+    /// Delete the logical byte range `[start, end)`.
+    ///
+    /// # Panics
+    ///
+    /// Panics if `start > end`, `end > self.len()`, or either boundary is not
+    /// on a UTF-8 character boundary.
+    pub fn delete_range(&mut self, start: usize, end: usize) {
+        assert!(start <= end, "delete_range: start ({start}) > end ({end})");
+        assert!(
+            end <= self.len(),
+            "delete_range: end ({end}) > len ({})",
+            self.len()
+        );
+        if start == end {
+            return;
+        }
+        debug_assert!(
+            self.is_char_boundary(start),
+            "delete_range: start ({start}) is not on a UTF-8 character boundary"
+        );
+        debug_assert!(
+            end == self.len() || self.is_char_boundary(end),
+            "delete_range: end ({end}) is not on a UTF-8 character boundary"
+        );
+
+        // Move the gap so that it starts at `start`, then extend it to swallow
+        // the bytes up to `end`.
+        self.move_gap_to(start);
+        // After move_gap_to(start), gap_start == start and the bytes that were
+        // logically at [start, end) now sit at buf[gap_end .. gap_end + (end - start)].
+        self.gap_end += end - start;
+    }
+
+    // -----------------------------------------------------------------------
+    // Gap management
+    // -----------------------------------------------------------------------
+
+    /// Move the gap so that `gap_start == pos`.
+    ///
+    /// This copies text bytes across the gap to reposition it.
+    ///
+    /// # Panics
+    ///
+    /// Panics if `pos > self.len()`.
+    pub fn move_gap_to(&mut self, pos: usize) {
+        assert!(
+            pos <= self.len(),
+            "move_gap_to: position {pos} out of range (len {})",
+            self.len()
+        );
+
+        if pos == self.gap_start {
+            return;
+        }
+
+        let gap = self.gap_size();
+
+        if pos < self.gap_start {
+            // Moving gap left: shift buf[pos..gap_start] to the right by `gap`.
+            let count = self.gap_start - pos;
+            // Use copy_within which handles overlapping regions.
+            self.buf.copy_within(pos..pos + count, pos + gap);
+            self.gap_start = pos;
+            self.gap_end = pos + gap;
+        } else {
+            // Moving gap right: shift buf[gap_end..gap_end + (pos - gap_start)]
+            // to the left by `gap`.
+            let count = pos - self.gap_start;
+            let src_start = self.gap_end;
+            let dst_start = self.gap_start;
+            self.buf.copy_within(src_start..src_start + count, dst_start);
+            self.gap_start = pos;
+            self.gap_end = pos + gap;
+        }
+    }
+
+    /// Ensure the gap is at least `min_size` bytes. If it is already large
+    /// enough this is a no-op; otherwise the backing buffer is reallocated.
+    pub fn ensure_gap(&mut self, min_size: usize) {
+        if self.gap_size() >= min_size {
+            return;
+        }
+        let grow = (min_size - self.gap_size()).max(MIN_GAP_GROW);
+        let old_gap_end = self.gap_end;
+        let after_gap_len = self.buf.len() - old_gap_end;
+
+        // Extend the backing buffer.
+        self.buf.resize(self.buf.len() + grow, 0);
+
+        // Shift the post-gap segment to the right by `grow` to widen the gap.
+        if after_gap_len > 0 {
+            self.buf
+                .copy_within(old_gap_end..old_gap_end + after_gap_len, old_gap_end + grow);
+        }
+        self.gap_end += grow;
+    }
+
+    // -----------------------------------------------------------------------
+    // Position conversion
+    // -----------------------------------------------------------------------
+
+    /// Convert a logical byte position to a char (scalar value) position.
+    ///
+    /// Returns the number of complete characters before `byte_pos`.
+    ///
+    /// # Panics
+    ///
+    /// Panics if `byte_pos > self.len()` or is not on a character boundary.
+    pub fn byte_to_char(&self, byte_pos: usize) -> usize {
+        assert!(
+            byte_pos <= self.len(),
+            "byte_to_char: byte_pos ({byte_pos}) > len ({})",
+            self.len()
+        );
+        if byte_pos == 0 {
+            return 0;
+        }
+
+        // Count chars in pre-gap portion that falls within [0, byte_pos).
+        let mut chars = 0usize;
+
+        if byte_pos <= self.gap_start {
+            // Entirely within segment A.
+            let slice = &self.buf[..byte_pos];
+            let s = std::str::from_utf8(slice)
+                .expect("byte_to_char: not a valid UTF-8 boundary (segment A)");
+            chars = s.chars().count();
+        } else {
+            // Spans both segments.
+            let pre = std::str::from_utf8(&self.buf[..self.gap_start])
+                .expect("byte_to_char: pre-gap segment is not valid UTF-8");
+            chars += pre.chars().count();
+
+            let remaining = byte_pos - self.gap_start;
+            let post_slice = &self.buf[self.gap_end..self.gap_end + remaining];
+            let post = std::str::from_utf8(post_slice)
+                .expect("byte_to_char: not a valid UTF-8 boundary (segment B)");
+            chars += post.chars().count();
+        }
+        chars
+    }
+
+    /// Convert a char position to a logical byte position.
+    ///
+    /// `char_pos` is the number of characters from the start of the buffer.
+    ///
+    /// # Panics
+    ///
+    /// Panics if `char_pos > self.char_count()`.
+    pub fn char_to_byte(&self, char_pos: usize) -> usize {
+        if char_pos == 0 {
+            return 0;
+        }
+
+        let mut remaining = char_pos;
+
+        // Walk segment A (pre-gap).
+        let pre = std::str::from_utf8(&self.buf[..self.gap_start])
+            .expect("char_to_byte: pre-gap segment is not valid UTF-8");
+        for (byte_offset, _ch) in pre.char_indices() {
+            if remaining == 0 {
+                return byte_offset;
+            }
+            remaining -= 1;
+        }
+        // If we consumed all of segment A and remaining == 0, the byte position
+        // is at gap_start.
+        if remaining == 0 {
+            return self.gap_start;
+        }
+
+        // Walk segment B (post-gap).
+        let post = std::str::from_utf8(&self.buf[self.gap_end..])
+            .expect("char_to_byte: post-gap segment is not valid UTF-8");
+        for (byte_offset, _ch) in post.char_indices() {
+            if remaining == 0 {
+                // byte_offset is relative to segment B; logical = gap_start + byte_offset.
+                return self.gap_start + byte_offset;
+            }
+            remaining -= 1;
+        }
+        if remaining == 0 {
+            return self.len();
+        }
+
+        panic!(
+            "char_to_byte: char_pos ({char_pos}) exceeds char_count ({})",
+            self.char_count()
+        );
+    }
+
+    // -----------------------------------------------------------------------
+    // Internal helpers
+    // -----------------------------------------------------------------------
+
+    /// Check whether `pos` falls on a UTF-8 character boundary in the logical
+    /// text.
+    fn is_char_boundary(&self, pos: usize) -> bool {
+        if pos == 0 || pos >= self.len() {
+            return true;
+        }
+        let b = self.byte_at(pos);
+        // In UTF-8, a continuation byte has the bit pattern 10xxxxxx.
+        // A character boundary is any byte that is NOT a continuation byte.
+        is_utf8_start_byte(b)
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Trait implementations
+// ---------------------------------------------------------------------------
+
+impl Default for GapBuffer {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl fmt::Display for GapBuffer {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str(&self.to_string())
+    }
+}
+
+impl fmt::Debug for GapBuffer {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("GapBuffer")
+            .field("len", &self.len())
+            .field("gap_start", &self.gap_start)
+            .field("gap_end", &self.gap_end)
+            .field("gap_size", &self.gap_size())
+            .field("text", &self.to_string())
+            .finish()
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Free helper functions
+// ---------------------------------------------------------------------------
+
+/// Return the byte length of a UTF-8 character given its first byte.
+///
+/// Panics on an invalid leading byte (continuation byte or 0xFF/0xFE).
+#[inline]
+fn utf8_char_len(first_byte: u8) -> usize {
+    match first_byte {
+        0x00..=0x7F => 1,
+        0xC0..=0xDF => 2,
+        0xE0..=0xEF => 3,
+        0xF0..=0xF7 => 4,
+        _ => panic!("utf8_char_len: invalid UTF-8 leading byte 0x{first_byte:02X}"),
+    }
+}
+
+/// Returns `true` if `b` is a valid start byte (not a continuation byte).
+#[inline]
+fn is_utf8_start_byte(b: u8) -> bool {
+    // Continuation bytes are 0x80..=0xBF (bit pattern 10xxxxxx).
+    (b & 0xC0) != 0x80
+}
+
+// ===========================================================================
+// Tests
+// ===========================================================================
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    // -----------------------------------------------------------------------
+    // Construction & basic queries
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn new_buffer_is_empty() {
+        let buf = GapBuffer::new();
+        assert_eq!(buf.len(), 0);
+        assert!(buf.is_empty());
+        assert_eq!(buf.char_count(), 0);
+        assert_eq!(buf.to_string(), "");
+    }
+
+    #[test]
+    fn from_str_ascii() {
+        let buf = GapBuffer::from_str("hello");
+        assert_eq!(buf.len(), 5);
+        assert_eq!(buf.char_count(), 5);
+        assert_eq!(buf.to_string(), "hello");
+    }
+
+    #[test]
+    fn from_str_empty() {
+        let buf = GapBuffer::from_str("");
+        assert_eq!(buf.len(), 0);
+        assert!(buf.is_empty());
+        assert_eq!(buf.to_string(), "");
+    }
+
+    // -----------------------------------------------------------------------
+    // insert_str
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn insert_at_beginning() {
+        let mut buf = GapBuffer::from_str("world");
+        buf.insert_str(0, "hello ");
+        assert_eq!(buf.to_string(), "hello world");
+    }
+
+    #[test]
+    fn insert_at_end() {
+        let mut buf = GapBuffer::from_str("hello");
+        buf.insert_str(5, " world");
+        assert_eq!(buf.to_string(), "hello world");
+    }
+
+    #[test]
+    fn insert_in_middle() {
+        let mut buf = GapBuffer::from_str("helo");
+        buf.insert_str(2, "l");
+        assert_eq!(buf.to_string(), "hello");
+    }
+
+    #[test]
+    fn insert_into_empty_buffer() {
+        let mut buf = GapBuffer::new();
+        buf.insert_str(0, "abc");
+        assert_eq!(buf.to_string(), "abc");
+        assert_eq!(buf.len(), 3);
+    }
+
+    #[test]
+    fn insert_empty_string_is_noop() {
+        let mut buf = GapBuffer::from_str("hello");
+        buf.insert_str(3, "");
+        assert_eq!(buf.to_string(), "hello");
+    }
+
+    #[test]
+    fn multiple_sequential_inserts() {
+        let mut buf = GapBuffer::new();
+        buf.insert_str(0, "a");
+        buf.insert_str(1, "b");
+        buf.insert_str(2, "c");
+        buf.insert_str(3, "d");
+        assert_eq!(buf.to_string(), "abcd");
+    }
+
+    #[test]
+    fn insert_larger_than_gap() {
+        let mut buf = GapBuffer::new();
+        let long = "x".repeat(256);
+        buf.insert_str(0, &long);
+        assert_eq!(buf.to_string(), long);
+        assert_eq!(buf.len(), 256);
+    }
+
+    // -----------------------------------------------------------------------
+    // delete_range
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn delete_from_beginning() {
+        let mut buf = GapBuffer::from_str("hello world");
+        buf.delete_range(0, 6);
+        assert_eq!(buf.to_string(), "world");
+    }
+
+    #[test]
+    fn delete_from_end() {
+        let mut buf = GapBuffer::from_str("hello world");
+        buf.delete_range(5, 11);
+        assert_eq!(buf.to_string(), "hello");
+    }
+
+    #[test]
+    fn delete_from_middle() {
+        let mut buf = GapBuffer::from_str("hello world");
+        buf.delete_range(5, 6); // delete the space
+        assert_eq!(buf.to_string(), "helloworld");
+    }
+
+    #[test]
+    fn delete_everything() {
+        let mut buf = GapBuffer::from_str("hello");
+        buf.delete_range(0, 5);
+        assert_eq!(buf.to_string(), "");
+        assert!(buf.is_empty());
+    }
+
+    #[test]
+    fn delete_empty_range_is_noop() {
+        let mut buf = GapBuffer::from_str("hello");
+        buf.delete_range(2, 2);
+        assert_eq!(buf.to_string(), "hello");
+    }
+
+    #[test]
+    fn delete_then_insert() {
+        let mut buf = GapBuffer::from_str("hello world");
+        buf.delete_range(5, 11);
+        buf.insert_str(5, " rust");
+        assert_eq!(buf.to_string(), "hello rust");
+    }
+
+    // -----------------------------------------------------------------------
+    // byte_at / char_at
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn byte_at_ascii() {
+        let buf = GapBuffer::from_str("abcde");
+        assert_eq!(buf.byte_at(0), b'a');
+        assert_eq!(buf.byte_at(4), b'e');
+    }
+
+    #[test]
+    fn byte_at_after_gap_move() {
+        let mut buf = GapBuffer::from_str("abcde");
+        buf.move_gap_to(2);
+        // Logical content unchanged.
+        assert_eq!(buf.byte_at(0), b'a');
+        assert_eq!(buf.byte_at(2), b'c');
+        assert_eq!(buf.byte_at(4), b'e');
+    }
+
+    #[test]
+    fn char_at_ascii() {
+        let buf = GapBuffer::from_str("hello");
+        assert_eq!(buf.char_at(0), Some('h'));
+        assert_eq!(buf.char_at(4), Some('o'));
+        assert_eq!(buf.char_at(5), None);
+    }
+
+    #[test]
+    #[should_panic]
+    fn byte_at_out_of_range_panics() {
+        let buf = GapBuffer::from_str("hi");
+        buf.byte_at(2);
+    }
+
+    // -----------------------------------------------------------------------
+    // text_range
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn text_range_full() {
+        let buf = GapBuffer::from_str("hello world");
+        assert_eq!(buf.text_range(0, 11), "hello world");
+    }
+
+    #[test]
+    fn text_range_prefix() {
+        let buf = GapBuffer::from_str("hello world");
+        assert_eq!(buf.text_range(0, 5), "hello");
+    }
+
+    #[test]
+    fn text_range_suffix() {
+        let buf = GapBuffer::from_str("hello world");
+        assert_eq!(buf.text_range(6, 11), "world");
+    }
+
+    #[test]
+    fn text_range_spanning_gap() {
+        let mut buf = GapBuffer::from_str("hello world");
+        buf.move_gap_to(5);
+        // Range spans the gap.
+        assert_eq!(buf.text_range(3, 8), "lo wo");
+    }
+
+    #[test]
+    fn text_range_empty() {
+        let buf = GapBuffer::from_str("hello");
+        assert_eq!(buf.text_range(2, 2), "");
+    }
+
+    // -----------------------------------------------------------------------
+    // move_gap_to
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn move_gap_to_start() {
+        let mut buf = GapBuffer::from_str("hello");
+        buf.move_gap_to(0);
+        assert_eq!(buf.to_string(), "hello");
+    }
+
+    #[test]
+    fn move_gap_to_end() {
+        let mut buf = GapBuffer::from_str("hello");
+        buf.move_gap_to(5);
+        assert_eq!(buf.to_string(), "hello");
+    }
+
+    #[test]
+    fn move_gap_around() {
+        let mut buf = GapBuffer::from_str("abcdef");
+        buf.move_gap_to(3);
+        assert_eq!(buf.to_string(), "abcdef");
+        buf.move_gap_to(0);
+        assert_eq!(buf.to_string(), "abcdef");
+        buf.move_gap_to(6);
+        assert_eq!(buf.to_string(), "abcdef");
+        buf.move_gap_to(2);
+        assert_eq!(buf.to_string(), "abcdef");
+    }
+
+    // -----------------------------------------------------------------------
+    // ensure_gap
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn ensure_gap_grows() {
+        let mut buf = GapBuffer::from_str("hello");
+        let old_gap = buf.gap_size();
+        buf.ensure_gap(old_gap + 100);
+        assert!(buf.gap_size() >= old_gap + 100);
+        // Content must be preserved.
+        assert_eq!(buf.to_string(), "hello");
+    }
+
+    #[test]
+    fn ensure_gap_noop_when_large_enough() {
+        let mut buf = GapBuffer::from_str("hello");
+        let old_gap = buf.gap_size();
+        buf.ensure_gap(1);
+        assert_eq!(buf.gap_size(), old_gap);
+    }
+
+    // -----------------------------------------------------------------------
+    // Multibyte / UTF-8 (CJK, emoji)
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn multibyte_cjk() {
+        // Each CJK character is 3 bytes in UTF-8.
+        let text = "\u{4F60}\u{597D}\u{4E16}\u{754C}"; // 你好世界
+        let buf = GapBuffer::from_str(text);
+        assert_eq!(buf.len(), 12); // 4 chars * 3 bytes
+        assert_eq!(buf.char_count(), 4);
+        assert_eq!(buf.to_string(), text);
+
+        // char_at at byte boundaries
+        assert_eq!(buf.char_at(0), Some('\u{4F60}')); // 你
+        assert_eq!(buf.char_at(3), Some('\u{597D}')); // 好
+        assert_eq!(buf.char_at(6), Some('\u{4E16}')); // 世
+        assert_eq!(buf.char_at(9), Some('\u{754C}')); // 界
+    }
+
+    #[test]
+    fn multibyte_emoji() {
+        // Emoji are 4 bytes in UTF-8.
+        let text = "\u{1F600}\u{1F60D}"; // two emoji
+        let buf = GapBuffer::from_str(text);
+        assert_eq!(buf.len(), 8);
+        assert_eq!(buf.char_count(), 2);
+        assert_eq!(buf.char_at(0), Some('\u{1F600}'));
+        assert_eq!(buf.char_at(4), Some('\u{1F60D}'));
+    }
+
+    #[test]
+    fn insert_multibyte_in_middle() {
+        let mut buf = GapBuffer::from_str("ab");
+        buf.insert_str(1, "\u{1F600}"); // insert emoji between a and b
+        assert_eq!(buf.to_string(), "a\u{1F600}b");
+        assert_eq!(buf.len(), 6); // 1 + 4 + 1
+        assert_eq!(buf.char_count(), 3);
+    }
+
+    #[test]
+    fn delete_multibyte_char() {
+        let mut buf = GapBuffer::from_str("a\u{4F60}b"); // a你b
+        // Delete the CJK char (bytes 1..4).
+        buf.delete_range(1, 4);
+        assert_eq!(buf.to_string(), "ab");
+    }
+
+    #[test]
+    fn text_range_multibyte_spanning_gap() {
+        let text = "\u{4F60}\u{597D}\u{4E16}\u{754C}"; // 你好世界
+        let mut buf = GapBuffer::from_str(text);
+        buf.move_gap_to(6); // gap between 好 and 世
+        assert_eq!(buf.text_range(0, 6), "\u{4F60}\u{597D}");
+        assert_eq!(buf.text_range(6, 12), "\u{4E16}\u{754C}");
+        assert_eq!(buf.text_range(3, 9), "\u{597D}\u{4E16}");
+    }
+
+    #[test]
+    fn mixed_ascii_and_multibyte() {
+        let mut buf = GapBuffer::from_str("hello\u{4E16}\u{754C}!");
+        // "hello世界!" — 5 + 3 + 3 + 1 = 12 bytes, 8 chars
+        assert_eq!(buf.len(), 12);
+        assert_eq!(buf.char_count(), 8);
+
+        buf.insert_str(5, " ");
+        assert_eq!(buf.to_string(), "hello \u{4E16}\u{754C}!");
+        assert_eq!(buf.len(), 13);
+
+        buf.delete_range(6, 12); // delete "世界"
+        assert_eq!(buf.to_string(), "hello !");
+    }
+
+    // -----------------------------------------------------------------------
+    // byte_to_char / char_to_byte
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn byte_char_roundtrip_ascii() {
+        let buf = GapBuffer::from_str("hello");
+        for i in 0..=5 {
+            assert_eq!(buf.byte_to_char(i), i);
+            assert_eq!(buf.char_to_byte(i), i);
+        }
+    }
+
+    #[test]
+    fn byte_to_char_cjk() {
+        let buf = GapBuffer::from_str("\u{4F60}\u{597D}\u{4E16}"); // 你好世
+        assert_eq!(buf.byte_to_char(0), 0);
+        assert_eq!(buf.byte_to_char(3), 1);
+        assert_eq!(buf.byte_to_char(6), 2);
+        assert_eq!(buf.byte_to_char(9), 3);
+    }
+
+    #[test]
+    fn char_to_byte_cjk() {
+        let buf = GapBuffer::from_str("\u{4F60}\u{597D}\u{4E16}"); // 你好世
+        assert_eq!(buf.char_to_byte(0), 0);
+        assert_eq!(buf.char_to_byte(1), 3);
+        assert_eq!(buf.char_to_byte(2), 6);
+        assert_eq!(buf.char_to_byte(3), 9);
+    }
+
+    #[test]
+    fn byte_char_roundtrip_mixed() {
+        // "a你b" — byte offsets: a=0, 你=1..4, b=4
+        let buf = GapBuffer::from_str("a\u{4F60}b");
+        assert_eq!(buf.byte_to_char(0), 0); // before 'a'
+        assert_eq!(buf.byte_to_char(1), 1); // before '你'
+        assert_eq!(buf.byte_to_char(4), 2); // before 'b'
+        assert_eq!(buf.byte_to_char(5), 3); // end
+
+        assert_eq!(buf.char_to_byte(0), 0);
+        assert_eq!(buf.char_to_byte(1), 1);
+        assert_eq!(buf.char_to_byte(2), 4);
+        assert_eq!(buf.char_to_byte(3), 5);
+    }
+
+    #[test]
+    fn byte_char_conversion_with_gap_in_middle() {
+        let mut buf = GapBuffer::from_str("a\u{4F60}b\u{597D}c");
+        // Move gap to middle of the text.
+        buf.move_gap_to(4); // between 你 and b
+        // Conversions should be unaffected by gap position.
+        assert_eq!(buf.byte_to_char(0), 0);
+        assert_eq!(buf.byte_to_char(1), 1);
+        assert_eq!(buf.byte_to_char(4), 2);
+        assert_eq!(buf.byte_to_char(5), 3);
+        assert_eq!(buf.byte_to_char(8), 4);
+
+        assert_eq!(buf.char_to_byte(0), 0);
+        assert_eq!(buf.char_to_byte(1), 1);
+        assert_eq!(buf.char_to_byte(2), 4);
+        assert_eq!(buf.char_to_byte(3), 5);
+        assert_eq!(buf.char_to_byte(4), 8);
+    }
+
+    #[test]
+    fn byte_char_conversion_empty() {
+        let buf = GapBuffer::new();
+        assert_eq!(buf.byte_to_char(0), 0);
+        assert_eq!(buf.char_to_byte(0), 0);
+    }
+
+    #[test]
+    fn byte_to_char_emoji() {
+        let buf = GapBuffer::from_str("x\u{1F600}y"); // x😀y
+        // byte offsets: x=0, 😀=1..5, y=5
+        assert_eq!(buf.byte_to_char(0), 0);
+        assert_eq!(buf.byte_to_char(1), 1);
+        assert_eq!(buf.byte_to_char(5), 2);
+        assert_eq!(buf.byte_to_char(6), 3);
+    }
+
+    // -----------------------------------------------------------------------
+    // Edge cases
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn repeated_insert_delete_cycle() {
+        let mut buf = GapBuffer::new();
+        for i in 0..100 {
+            let s = format!("{i}");
+            buf.insert_str(buf.len(), &s);
+        }
+        let full = buf.to_string();
+        assert!(!full.is_empty());
+
+        // Delete everything one byte at a time from the front.
+        while !buf.is_empty() {
+            buf.delete_range(0, 1);
+        }
+        assert!(buf.is_empty());
+        assert_eq!(buf.to_string(), "");
+    }
+
+    #[test]
+    fn gap_moves_correctly_after_multiple_operations() {
+        let mut buf = GapBuffer::from_str("the quick brown fox");
+        buf.delete_range(4, 10); // delete "quick "
+        assert_eq!(buf.to_string(), "the brown fox");
+        buf.insert_str(4, "slow ");
+        assert_eq!(buf.to_string(), "the slow brown fox");
+        buf.delete_range(9, 15); // delete "brown "
+        assert_eq!(buf.to_string(), "the slow fox");
+        buf.insert_str(9, "red ");
+        assert_eq!(buf.to_string(), "the slow red fox");
+    }
+
+    #[test]
+    fn insert_at_every_position() {
+        for pos in 0..=5 {
+            let mut buf = GapBuffer::from_str("hello");
+            buf.insert_str(pos, "X");
+            assert_eq!(buf.len(), 6);
+            assert_eq!(buf.byte_at(pos), b'X');
+        }
+    }
+
+    #[test]
+    fn display_trait() {
+        let buf = GapBuffer::from_str("display test");
+        let s = format!("{buf}");
+        assert_eq!(s, "display test");
+    }
+
+    #[test]
+    fn debug_trait_contains_text() {
+        let buf = GapBuffer::from_str("dbg");
+        let dbg = format!("{buf:?}");
+        assert!(dbg.contains("dbg"));
+        assert!(dbg.contains("GapBuffer"));
+    }
+
+    #[test]
+    fn default_is_empty() {
+        let buf = GapBuffer::default();
+        assert!(buf.is_empty());
+    }
+
+    #[test]
+    fn clone_is_independent() {
+        let mut buf = GapBuffer::from_str("original");
+        let clone = buf.clone();
+        buf.insert_str(0, "X");
+        assert_eq!(buf.to_string(), "Xoriginal");
+        assert_eq!(clone.to_string(), "original");
+    }
+
+    #[test]
+    #[should_panic]
+    fn insert_past_end_panics() {
+        let mut buf = GapBuffer::from_str("hi");
+        buf.insert_str(3, "x");
+    }
+
+    #[test]
+    #[should_panic]
+    fn delete_past_end_panics() {
+        let mut buf = GapBuffer::from_str("hi");
+        buf.delete_range(0, 3);
+    }
+
+    #[test]
+    #[should_panic]
+    fn delete_inverted_range_panics() {
+        let mut buf = GapBuffer::from_str("hello");
+        buf.delete_range(3, 1);
+    }
+
+    #[test]
+    #[should_panic]
+    fn text_range_past_end_panics() {
+        let buf = GapBuffer::from_str("hi");
+        buf.text_range(0, 3);
+    }
+
+    #[test]
+    #[should_panic]
+    fn move_gap_past_end_panics() {
+        let mut buf = GapBuffer::from_str("hi");
+        buf.move_gap_to(3);
+    }
+
+    #[test]
+    #[should_panic]
+    fn byte_to_char_past_end_panics() {
+        let buf = GapBuffer::from_str("hi");
+        buf.byte_to_char(3);
+    }
+
+    #[test]
+    #[should_panic]
+    fn char_to_byte_past_end_panics() {
+        let buf = GapBuffer::from_str("hi");
+        buf.char_to_byte(3);
+    }
+}

@@ -31,6 +31,8 @@ pub enum Value {
     Subr(String),
     /// Compiled bytecode function.
     ByteCode(Arc<super::bytecode::ByteCodeFunction>),
+    /// Buffer reference (opaque id into the BufferManager).
+    Buffer(crate::buffer::BufferId),
 }
 
 #[derive(Clone, Debug)]
@@ -243,6 +245,7 @@ impl Value {
             Value::Char(_) => "integer", // Emacs chars are integers
             Value::Subr(_) => "subr",
             Value::ByteCode(_) => "compiled-function",
+            Value::Buffer(_) => "buffer",
         }
     }
 
@@ -314,6 +317,7 @@ impl Value {
             Value::HashTable(h) => HashKey::Ptr(Arc::as_ptr(h) as usize),
             Value::Subr(n) => HashKey::Symbol(n.clone()),
             Value::ByteCode(b) => HashKey::Ptr(Arc::as_ptr(b) as usize),
+            Value::Buffer(id) => HashKey::Int(id.0 as i64),
         }
     }
 
@@ -365,6 +369,7 @@ pub fn eq_value(left: &Value, right: &Value) -> bool {
         (Value::HashTable(a), Value::HashTable(b)) => Arc::ptr_eq(a, b),
         (Value::Subr(a), Value::Subr(b)) => a == b,
         (Value::ByteCode(a), Value::ByteCode(b)) => Arc::ptr_eq(a, b),
+        (Value::Buffer(a), Value::Buffer(b)) => a == b,
         _ => false,
     }
 }
@@ -412,6 +417,7 @@ pub fn equal_value(left: &Value, right: &Value, depth: usize) -> bool {
         (Value::Macro(a), Value::Macro(b)) => Arc::ptr_eq(a, b),
         (Value::Subr(a), Value::Subr(b)) => a == b,
         (Value::ByteCode(a), Value::ByteCode(b)) => Arc::ptr_eq(a, b),
+        (Value::Buffer(a), Value::Buffer(b)) => a == b,
         _ => false,
     }
 }

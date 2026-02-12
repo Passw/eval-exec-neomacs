@@ -55,6 +55,7 @@ pub fn print_value(value: &Value) -> String {
             let params = format_params(&bc.params);
             format!("#<bytecode {} ({} ops)>", params, bc.ops.len())
         }
+        Value::Buffer(id) => format!("#<buffer {}>", id.0),
     }
 }
 
