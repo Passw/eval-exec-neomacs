@@ -33,6 +33,15 @@ make record   # writes cases/core.expected.tsv
 make check    # diffs fresh oracle output against expected
 ```
 
+When NeoVM produces TSV output for the same corpus:
+
+```bash
+cd test/neovm/vm-compat
+make compare NEOVM_OUT=cases/core.neovm.tsv
+```
+
+`compare-results.sh` checks index/form/result equality and reports drift.
+
 ## Next step
 
 Add a NeoVM runner that evaluates the same corpus and diffs against this oracle output.

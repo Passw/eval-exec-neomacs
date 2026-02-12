@@ -1,7 +1,8 @@
 FORMS ?= cases/core.forms
 EXPECTED ?= cases/core.expected.tsv
+NEOVM_OUT ?= cases/core.neovm.tsv
 
-.PHONY: oracle record check
+.PHONY: oracle record check compare
 
 oracle:
 	./run-oracle.sh $(FORMS)
@@ -16,3 +17,6 @@ check:
 	diff -u $(EXPECTED) "$$tmp_file"; \
 	rm -f "$$tmp_file"; \
 	echo "oracle output matches expected baseline"
+
+compare:
+	./compare-results.sh $(EXPECTED) $(NEOVM_OUT)
