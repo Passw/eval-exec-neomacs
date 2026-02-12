@@ -2488,6 +2488,7 @@ fill_face_data (struct frame *f, struct face *face, struct FaceDataFFI *out)
       out->font_is_monospace = (face->font->average_width == face->font->space_width
                                 && face->font->space_width == face->font->max_width)
                                ? 1 : 0;
+
     }
   else
     {
@@ -2588,6 +2589,7 @@ prewarm_font_ascii_widths (struct font *font)
       font->driver->text_extents (font, &code, 1, &metrics);
       font_width_cache[slot].widths[i] = (float) metrics.width;
     }
+
 }
 
 /* Pre-warm ASCII widths for ALL fonts in the frame's face cache.

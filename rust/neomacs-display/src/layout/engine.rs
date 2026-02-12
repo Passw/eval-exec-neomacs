@@ -642,6 +642,11 @@ impl LayoutEngine {
         // Face resolution state: we only call face_at_pos when charpos >= next_face_check
         let mut current_face_id: i32 = -1; // force first lookup
         let mut next_face_check: i64 = 0;
+        // Track whether the window's default face uses a monospace font.
+        // When it does, force monospace spacing for ALL faces — even if
+        // Emacs falls back to a proportional font for bold/italic variants.
+        let mut default_is_monospace = true; // assume monospace until proven otherwise
+        let mut force_monospace = false; // set per-face when non-mono in mono context
         let mut face_fg = default_fg;
         let mut face_bg = default_bg;
 
@@ -1682,6 +1687,21 @@ impl LayoutEngine {
                         }
                         self.apply_face(&self.face_data, frame, frame_glyphs);
 
+                        // On first face resolution (at/before window_start), record
+                        // whether the default face's font is monospace.
+                        let is_mono = self.face_data.font_is_monospace != 0;
+                        if charpos <= window_start {
+                            default_is_monospace = is_mono;
+                        }
+                        // When the window's default font is monospace but the current
+                        // face's font is proportional (e.g., bold/italic fallback to
+                        // a proportional font), force monospace character widths to
+                        // maintain consistent grid alignment.
+                        force_monospace = default_is_monospace && !is_mono;
+                        if force_monospace {
+                            log::debug!("force_monospace: face_id={} is proportional in monospace window", fid);
+                        }
+
                         // Debug: check all face properties
                         if charpos < window_start + 5 {
                             log::debug!("face: id={} fg=0x{:06X} bg=0x{:06X} underline_style={} underline_color=0x{:06X} strike_through={} strike_color=0x{:06X} overline={} overline_color=0x{:06X} box_type={} box_color=0x{:06X} box_lw={}",
@@ -2310,14 +2330,20 @@ impl LayoutEngine {
 
                     // Normal character — compute advance width
                     let char_cols = if is_wide_char(ch) { 2 } else { 1 };
-                    let face_id = self.face_data.face_id;
-                    let font_size = self.face_data.font_size;
-                    let face_char_w = self.face_data.font_char_width;
-                    let advance = char_advance(
-                        &mut self.ascii_width_cache,
-                        ch, char_cols, char_w,
-                        face_id, font_size, face_char_w, window,
-                    );
+                    let advance = if force_monospace {
+                        // Proportional font fallback in monospace context:
+                        // use the window's default monospace width to keep grid alignment.
+                        char_cols as f32 * char_w
+                    } else {
+                        let face_id = self.face_data.face_id;
+                        let font_size = self.face_data.font_size;
+                        let face_char_w = self.face_data.font_char_width;
+                        char_advance(
+                            &mut self.ascii_width_cache,
+                            ch, char_cols, char_w,
+                            face_id, font_size, face_char_w, window,
+                        )
+                    };
 
                     if x_offset + advance > avail_width {
                         // Flush ligature run before line wrap/truncation
