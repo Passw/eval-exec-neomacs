@@ -394,6 +394,7 @@ exec/*.s.s
 
 # Rust build artifacts
 rust/neomacs-display/target/
+rust/neovm-*/target/
 *.rlib
 
 # Neomacs exceptions
