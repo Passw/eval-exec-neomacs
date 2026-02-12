@@ -217,6 +217,7 @@ mod tests {
             strike_through_color: None,
             overline: 0,
             overline_color: None,
+            overstrike: false,
             is_overlay: false,
         }
     }

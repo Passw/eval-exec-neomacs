@@ -161,6 +161,10 @@ pub struct LayoutEngine {
     run_buf: LigatureRunBuffer,
     /// Whether ligatures are enabled
     pub ligatures_enabled: bool,
+    /// Default face font family (set during first face resolution of each window).
+    /// Used for overstrike: when bold variant unavailable, renderer uses this
+    /// family instead of the proportional fallback.
+    default_font_family: String,
 }
 
 impl LayoutEngine {
@@ -173,6 +177,7 @@ impl LayoutEngine {
             hit_data: Vec::new(),
             run_buf: LigatureRunBuffer::new(),
             ligatures_enabled: false,
+            default_font_family: String::new(),
         }
     }
 
@@ -394,12 +399,23 @@ impl LayoutEngine {
         let bg = Color::from_pixel(face.bg);
         let font_weight = face.font_weight as u16;
         let italic = face.italic != 0;
+        let overstrike = face.overstrike != 0;
 
         // Get font family string from C pointer
         let font_family = if !face.font_family.is_null() {
             CStr::from_ptr(face.font_family).to_str().unwrap_or("monospace")
         } else {
             "monospace"
+        };
+
+        // When overstrike is set, Emacs couldn't find a bold variant of the
+        // font, so it kept the regular (non-bold) font. Use the default
+        // face's font family for rendering so the renderer draws with the
+        // monospace font (matching official Emacs behavior).
+        let effective_family = if overstrike && !self.default_font_family.is_empty() {
+            &self.default_font_family
+        } else {
+            font_family
         };
 
         let underline_color = if face.underline_style > 0 {
@@ -424,7 +440,7 @@ impl LayoutEngine {
             face.face_id,
             fg,
             Some(bg),
-            font_family,
+            effective_family,
             font_weight,
             italic,
             face.font_size as f32,
@@ -434,6 +450,7 @@ impl LayoutEngine {
             strike_color,
             face.overline as u8,
             overline_color,
+            overstrike,
         );
 
         // Store box attributes in side-channel for render thread to pick up.
@@ -642,11 +659,9 @@ impl LayoutEngine {
         // Face resolution state: we only call face_at_pos when charpos >= next_face_check
         let mut current_face_id: i32 = -1; // force first lookup
         let mut next_face_check: i64 = 0;
-        // Track whether the window's default face uses a monospace font.
-        // When it does, force monospace spacing for ALL faces — even if
-        // Emacs falls back to a proportional font for bold/italic variants.
-        let mut default_is_monospace = true; // assume monospace until proven otherwise
-        let mut force_monospace = false; // set per-face when non-mono in mono context
+        // Overstrike: when Emacs can't find bold variant, it sets face->overstrike
+        // and keeps the regular font. We use default font metrics for layout.
+        let mut overstrike = false;
         let mut face_fg = default_fg;
         let mut face_bg = default_bg;
 
@@ -1685,22 +1700,23 @@ impl LayoutEngine {
                             face_h = char_h;
                             face_ascent = ascent;
                         }
-                        self.apply_face(&self.face_data, frame, frame_glyphs);
-
-                        // On first face resolution (at/before window_start), record
-                        // whether the default face's font is monospace.
-                        let is_mono = self.face_data.font_is_monospace != 0;
+                        // On first face resolution (at/before window_start),
+                        // capture the default font family for overstrike.
                         if charpos <= window_start {
-                            default_is_monospace = is_mono;
+                            let family = if !self.face_data.font_family.is_null() {
+                                CStr::from_ptr(self.face_data.font_family)
+                                    .to_str().unwrap_or("monospace")
+                            } else {
+                                "monospace"
+                            };
+                            self.default_font_family = family.to_string();
                         }
-                        // When the window's default font is monospace but the current
-                        // face's font is proportional (e.g., bold/italic fallback to
-                        // a proportional font), force monospace character widths to
-                        // maintain consistent grid alignment.
-                        force_monospace = default_is_monospace && !is_mono;
-                        if force_monospace {
-                            log::debug!("force_monospace: face_id={} is proportional in monospace window", fid);
-                        }
+
+                        // Overstrike: Emacs sets this when bold variant is
+                        // unavailable. Use default font metrics for layout.
+                        overstrike = self.face_data.overstrike != 0;
+
+                        self.apply_face(&self.face_data, frame, frame_glyphs);
 
                         // Debug: check all face properties
                         if charpos < window_start + 5 {
@@ -2330,9 +2346,10 @@ impl LayoutEngine {
 
                     // Normal character — compute advance width
                     let char_cols = if is_wide_char(ch) { 2 } else { 1 };
-                    let advance = if force_monospace {
-                        // Proportional font fallback in monospace context:
-                        // use the window's default monospace width to keep grid alignment.
+                    let advance = if overstrike {
+                        // Overstrike: Emacs couldn't find bold variant, kept
+                        // regular font. Use default monospace width for grid
+                        // alignment (matching official Emacs behavior).
                         char_cols as f32 * char_w
                     } else {
                         let face_id = self.face_data.face_id;

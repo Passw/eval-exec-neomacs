@@ -559,6 +559,11 @@ typedef struct FaceDataFFI {
    * Stipple bitmap ID (0 = none, positive = 1-based bitmap index)
    */
   int stipple;
+  /**
+   * Overstrike flag (1 = simulate bold by drawing twice at x and x+1)
+   * Set by Emacs when bold variant is unavailable for the font.
+   */
+  int overstrike;
 } FaceDataFFI;
 
 /**

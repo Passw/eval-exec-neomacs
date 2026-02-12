@@ -1460,7 +1460,7 @@ impl WgpuRenderer {
                 let mut composed_color_data: Vec<(ComposedGlyphKey, [GlyphVertex; 6])> = Vec::new();
 
                 for glyph in &frame_glyphs.glyphs {
-                    if let FrameGlyph::Char { char, composed, x, y, width, ascent, fg, face_id, font_size, is_overlay, .. } = glyph {
+                    if let FrameGlyph::Char { char, composed, x, y, width, ascent, fg, face_id, font_size, is_overlay, overstrike, .. } = glyph {
                         if *is_overlay != want_overlay {
                             continue;
                         }
@@ -1555,6 +1555,24 @@ impl WgpuRenderer {
                                 GlyphVertex { position: [glyph_x, glyph_y + glyph_h], tex_coords: [0.0, 1.0], color },
                             ];
 
+                            // Overstrike: simulate bold by drawing the
+                            // glyph a second time shifted 1px right.
+                            // This matches official Emacs behavior when
+                            // a bold font variant is unavailable.
+                            let overstrike_vertices = if *overstrike {
+                                let ox = 1.0 / self.scale_factor;
+                                Some([
+                                    GlyphVertex { position: [glyph_x + ox, glyph_y], tex_coords: [0.0, 0.0], color },
+                                    GlyphVertex { position: [glyph_x + ox + glyph_w, glyph_y], tex_coords: [1.0, 0.0], color },
+                                    GlyphVertex { position: [glyph_x + ox + glyph_w, glyph_y + glyph_h], tex_coords: [1.0, 1.0], color },
+                                    GlyphVertex { position: [glyph_x + ox, glyph_y], tex_coords: [0.0, 0.0], color },
+                                    GlyphVertex { position: [glyph_x + ox + glyph_w, glyph_y + glyph_h], tex_coords: [1.0, 1.0], color },
+                                    GlyphVertex { position: [glyph_x + ox, glyph_y + glyph_h], tex_coords: [0.0, 1.0], color },
+                                ])
+                            } else {
+                                None
+                            };
+
                             if let Some(ref text) = composed {
                                 let ckey = ComposedGlyphKey {
                                     text: text.clone(),
@@ -1562,9 +1580,15 @@ impl WgpuRenderer {
                                     font_size_bits: font_size.to_bits(),
                                 };
                                 if cached.is_color {
-                                    composed_color_data.push((ckey, vertices));
+                                    composed_color_data.push((ckey.clone(), vertices));
+                                    if let Some(ov) = overstrike_vertices {
+                                        composed_color_data.push((ckey, ov));
+                                    }
                                 } else {
-                                    composed_mask_data.push((ckey, vertices));
+                                    composed_mask_data.push((ckey.clone(), vertices));
+                                    if let Some(ov) = overstrike_vertices {
+                                        composed_mask_data.push((ckey, ov));
+                                    }
                                 }
                             } else {
                                 let key = GlyphKey {
@@ -1573,9 +1597,15 @@ impl WgpuRenderer {
                                     font_size_bits: font_size.to_bits(),
                                 };
                                 if cached.is_color {
-                                    color_data.push((key, vertices));
+                                    color_data.push((key.clone(), vertices));
+                                    if let Some(ov) = overstrike_vertices {
+                                        color_data.push((key, ov));
+                                    }
                                 } else {
-                                    mask_data.push((key, vertices));
+                                    mask_data.push((key.clone(), vertices));
+                                    if let Some(ov) = overstrike_vertices {
+                                        mask_data.push((key, ov));
+                                    }
                                 }
                             }
                         }

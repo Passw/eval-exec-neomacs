@@ -362,6 +362,7 @@ pub unsafe extern "C" fn neomacs_display_set_face(
             st_color_opt,
             overline as u8,
             ol_color_opt,
+            false, // overstrike (legacy path doesn't use it)
         );
     }
 

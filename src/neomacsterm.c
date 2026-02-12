@@ -900,20 +900,41 @@ neomacs_send_face (void *handle, struct frame *f, struct face *face)
         font_family = SSDATA (family_attr);
     }
 
+  /* Font weight — read from ACTUAL loaded font, not requested lface.
+     face->lface has requested attributes; face->font has what was
+     actually loaded.  Using lface causes cosmic-text to pick a
+     different font when the requested weight isn't available.  */
   int font_weight = 400;
-  Lisp_Object weight_attr = face->lface[LFACE_WEIGHT_INDEX];
-  if (!NILP (weight_attr) && SYMBOLP (weight_attr))
+  if (face->font)
     {
-      int w = FONT_WEIGHT_NAME_NUMERIC (weight_attr);
+      int w = FONT_WEIGHT_NUMERIC (face->font);
       if (w >= 0) font_weight = emacs_weight_to_css (w);
     }
-
-  int is_italic = 0;
-  Lisp_Object slant_attr = face->lface[LFACE_SLANT_INDEX];
-  if (!NILP (slant_attr) && SYMBOLP (slant_attr))
+  else
     {
-      int s = FONT_SLANT_NAME_NUMERIC (slant_attr);
-      if (s != 100) is_italic = 1;
+      Lisp_Object weight_attr = face->lface[LFACE_WEIGHT_INDEX];
+      if (!NILP (weight_attr) && SYMBOLP (weight_attr))
+        {
+          int w = FONT_WEIGHT_NAME_NUMERIC (weight_attr);
+          if (w >= 0) font_weight = emacs_weight_to_css (w);
+        }
+    }
+
+  /* Italic — same: read from actual font, not requested lface.  */
+  int is_italic = 0;
+  if (face->font)
+    {
+      int s = FONT_SLANT_NUMERIC (face->font);
+      if (s > 100) is_italic = 1;
+    }
+  else
+    {
+      Lisp_Object slant_attr = face->lface[LFACE_SLANT_INDEX];
+      if (!NILP (slant_attr) && SYMBOLP (slant_attr))
+        {
+          int s = FONT_SLANT_NAME_NUMERIC (slant_attr);
+          if (s != 100) is_italic = 1;
+        }
     }
 
   int underline_style = 0;
@@ -2226,7 +2247,9 @@ neomacs_layout_ensure_fontified (void *buffer_ptr, int64_t from, int64_t to)
   if (!buf)
     return 0;
 
-  if (NILP (Vfontification_functions))
+  if (NILP (Vfontification_functions)
+      || !CONSP (Vfontification_functions)
+      || XLI (Vfontification_functions) == 0)
     return 0;
 
   struct buffer *old = current_buffer;
@@ -2243,7 +2266,12 @@ neomacs_layout_ensure_fontified (void *buffer_ptr, int64_t from, int64_t to)
                                                   Qfontified, Qnil);
       if (NILP (fontified))
         {
-          safe_calln (XCAR (Vfontification_functions), make_fixnum (pos));
+          if (!CONSP (Vfontification_functions)
+              || XLI (Vfontification_functions) == 0)
+            break;
+          Lisp_Object func = XCAR (Vfontification_functions);
+          if (!NILP (func))
+            safe_calln (func, make_fixnum (pos));
           did_fontify = 1;
         }
 
@@ -2362,6 +2390,7 @@ struct FaceDataFFI {
   float font_space_width;
   int font_is_monospace;
   int stipple;  /* Bitmap ID for stipple pattern (0 = none) */
+  int overstrike;  /* 1 if bold variant unavailable, simulate by drawing twice */
 };
 
 static void
@@ -2398,22 +2427,51 @@ fill_face_data (struct frame *f, struct face *face, struct FaceDataFFI *out)
         out->font_family = SSDATA (family_attr);
     }
 
-  /* Font weight (CSS scale) */
+  /* Font weight (CSS scale).
+     Read from the ACTUAL loaded font object, not the requested lface attrs.
+     When Emacs can't find a bold variant (e.g., "Fira Code Bold"), it keeps
+     the regular font and sets face->overstrike.  If we read from lface, we'd
+     send weight=700 to the renderer, which then asks cosmic-text for a bold
+     variant that doesn't exist, causing silent fallback to a proportional font
+     with wrong metrics.  Reading from face->font gives us the truth.
+     Note: FONT_WEIGHT_NUMERIC uses >> 8 to unpack the stored value. */
   out->font_weight = 400;
-  Lisp_Object weight_attr = face->lface[LFACE_WEIGHT_INDEX];
-  if (!NILP (weight_attr) && SYMBOLP (weight_attr))
+  if (face->font)
     {
-      int w = FONT_WEIGHT_NAME_NUMERIC (weight_attr);
+      int w = FONT_WEIGHT_NUMERIC (face->font);
       if (w >= 0) out->font_weight = emacs_weight_to_css (w);
     }
-
-  /* Italic */
-  out->italic = 0;
-  Lisp_Object slant_attr = face->lface[LFACE_SLANT_INDEX];
-  if (!NILP (slant_attr) && SYMBOLP (slant_attr))
+  else
     {
-      int s = FONT_SLANT_NAME_NUMERIC (slant_attr);
-      if (s != 100) out->italic = 1;
+      /* No font object — fall back to lface requested weight */
+      Lisp_Object weight_attr = face->lface[LFACE_WEIGHT_INDEX];
+      if (!NILP (weight_attr) && SYMBOLP (weight_attr))
+        {
+          int w = FONT_WEIGHT_NAME_NUMERIC (weight_attr);
+          if (w >= 0) out->font_weight = emacs_weight_to_css (w);
+        }
+    }
+
+  /* Italic — same principle: read from actual font, not requested attrs.
+     When italic variant isn't available, face->font is the regular (upright)
+     font.  Sending italic=1 to cosmic-text would cause it to fall back to
+     a different font family entirely.
+     Note: FONT_SLANT_NUMERIC uses >> 8 to unpack the stored value.
+     Emacs slant values: 100=normal, 200=italic, 210=oblique. */
+  out->italic = 0;
+  if (face->font)
+    {
+      int s = FONT_SLANT_NUMERIC (face->font);
+      if (s > 100) out->italic = 1;
+    }
+  else
+    {
+      Lisp_Object slant_attr = face->lface[LFACE_SLANT_INDEX];
+      if (!NILP (slant_attr) && SYMBOLP (slant_attr))
+        {
+          int s = FONT_SLANT_NAME_NUMERIC (slant_attr);
+          if (s != 100) out->italic = 1;
+        }
     }
 
   /* Font pixel size */
@@ -2488,7 +2546,6 @@ fill_face_data (struct frame *f, struct face *face, struct FaceDataFFI *out)
       out->font_is_monospace = (face->font->average_width == face->font->space_width
                                 && face->font->space_width == face->font->max_width)
                                ? 1 : 0;
-
     }
   else
     {
@@ -2497,6 +2554,10 @@ fill_face_data (struct frame *f, struct face *face, struct FaceDataFFI *out)
       out->font_space_width = 0.0f;
       out->font_is_monospace = 1;
     }
+
+  /* Overstrike: Emacs sets this when bold variant is unavailable,
+     signaling the renderer to simulate bold by drawing twice. */
+  out->overstrike = face->overstrike ? 1 : 0;
 }
 
 /* Get stipple bitmap data for a given bitmap ID.

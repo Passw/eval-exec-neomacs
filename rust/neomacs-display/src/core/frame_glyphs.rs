@@ -54,6 +54,9 @@ pub enum FrameGlyph {
         overline_color: Option<Color>,
         /// True if this is mode-line/echo area (renders on top)
         is_overlay: bool,
+        /// Overstrike: draw glyph twice (at x and x+1) to simulate bold.
+        /// Set when Emacs can't find a bold variant for the font.
+        overstrike: bool,
     },
 
     /// Stretch (whitespace) glyph
@@ -305,6 +308,7 @@ pub struct FrameGlyphBuffer {
     current_strike_through_color: Option<Color>,
     current_overline: u8,
     current_overline_color: Option<Color>,
+    current_overstrike: bool,
 
     /// Font family cache: face_id -> font_family
     pub face_fonts: HashMap<u32, String>,
@@ -358,6 +362,7 @@ impl FrameGlyphBuffer {
             current_strike_through_color: None,
             current_overline: 0,
             current_overline_color: None,
+            current_overstrike: false,
             face_fonts: HashMap::new(),
             faces: HashMap::new(),
             stipple_patterns: HashMap::new(),
@@ -444,7 +449,8 @@ impl FrameGlyphBuffer {
                     font_family: &str, font_weight: u16, italic: bool, font_size: f32,
                     underline: u8, underline_color: Option<Color>,
                     strike_through: u8, strike_through_color: Option<Color>,
-                    overline: u8, overline_color: Option<Color>) {
+                    overline: u8, overline_color: Option<Color>,
+                    overstrike: bool) {
         self.current_face_id = face_id;
         self.current_fg = fg;
         self.current_bg = bg;
@@ -458,6 +464,7 @@ impl FrameGlyphBuffer {
         self.current_strike_through_color = strike_through_color;
         self.current_overline = overline;
         self.current_overline_color = overline_color;
+        self.current_overstrike = overstrike;
         self.face_fonts.insert(face_id, font_family.to_string());
     }
 
@@ -527,6 +534,7 @@ impl FrameGlyphBuffer {
             overline: self.current_overline,
             overline_color: self.current_overline_color,
             is_overlay,
+            overstrike: self.current_overstrike,
         });
     }
 
@@ -554,6 +562,7 @@ impl FrameGlyphBuffer {
             overline: self.current_overline,
             overline_color: self.current_overline_color,
             is_overlay,
+            overstrike: self.current_overstrike,
         });
     }
 
@@ -1226,6 +1235,7 @@ mod tests {
             7, fg, None,
             "Fira Code", 400, false, 14.0,
             0, None, 0, None, 0, None,
+            false,
         );
 
         // face_fonts map should have the entry
@@ -1240,6 +1250,7 @@ mod tests {
             1, Color::WHITE, None,
             "monospace", 400, false, 24.0,
             0, None, 0, None, 0, None,
+            false,
         );
         buf.add_char('A', 0.0, 0.0, 12.0, 24.0, 18.0, false);
 
@@ -1260,6 +1271,7 @@ mod tests {
             1, Color::WHITE, None,
             "JetBrains Mono", 400, false, 14.0,
             0, None, 0, None, 0, None,
+            false,
         );
         assert_eq!(buf.get_face_font(1), "JetBrains Mono");
 
@@ -1284,6 +1296,7 @@ mod tests {
             2, Some(ul_color),  // wave underline
             1, Some(st_color),  // strike-through
             1, Some(ol_color),  // overline
+            false,
         );
         buf.add_char('D', 0.0, 0.0, 8.0, 16.0, 12.0, false);
 
@@ -1603,6 +1616,7 @@ mod tests {
             0, text_fg, None,
             "Iosevka", 400, false, 14.0,
             0, None, 0, None, 0, None,
+            false,
         );
         for (i, ch) in "Hello, Neomacs!".chars().enumerate() {
             buf.add_char(ch, i as f32 * 8.0, 0.0, 8.0, 16.0, 12.0, false);

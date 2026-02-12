@@ -1877,6 +1877,7 @@ impl RenderApp {
                     strike_through: if cell.flags.contains(CellFlags::STRIKEOUT) { 1 } else { 0 },
                     strike_through_color: None,
                     overline: 0, overline_color: None,
+                    overstrike: false,
                     is_overlay,
                 });
             }

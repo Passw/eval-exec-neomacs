@@ -378,6 +378,7 @@ fn test_frame_glyph_buffer_operations() {
         None,    // strike_through_color
         0,       // overline
         None,    // overline_color
+        false,   // overstrike
     );
 
     buffer.add_char('T', 0.0, 0.0, 10.0, 20.0, 16.0, false);
