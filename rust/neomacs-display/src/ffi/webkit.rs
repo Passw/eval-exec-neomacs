@@ -134,7 +134,6 @@ pub unsafe extern "C" fn neomacs_display_terminal_set_float(
 pub unsafe extern "C" fn neomacs_display_terminal_get_text(
     terminal_id: u32,
 ) -> *mut c_char {
-    #[cfg(feature = "winit-backend")]
     {
         if let Some(ref state) = THREADED_STATE {
             if let Ok(shared) = state.shared_terminals.lock() {
@@ -238,7 +237,7 @@ pub unsafe extern "C" fn neomacs_display_webkit_init(
         log::debug!("neomacs_display_webkit_init: getting DRM device path, handle={:?}", handle);
 
         let device_path: Option<String> = if !handle.is_null() {
-            #[cfg(all(feature = "winit-backend", target_os = "linux"))]
+            #[cfg(target_os = "linux")]
             {
                 use crate::backend::wgpu::get_render_node_from_adapter_info;
 
@@ -266,7 +265,7 @@ pub unsafe extern "C" fn neomacs_display_webkit_init(
                     None
                 }
             }
-            #[cfg(not(all(feature = "winit-backend", target_os = "linux")))]
+            #[cfg(not(target_os = "linux"))]
             {
                 None
             }
@@ -809,32 +808,24 @@ pub unsafe extern "C" fn neomacs_display_scroll_blit(
     bg_g: f32,
     bg_b: f32,
 ) {
-    #[cfg(feature = "winit-backend")]
-    {
-        if let Some(ref state) = THREADED_STATE {
-            let cmd = RenderCommand::ScrollBlit {
-                x,
-                y,
-                width,
-                height,
-                from_y,
-                to_y,
-                bg_r,
-                bg_g,
-                bg_b,
-            };
-            let _ = state.emacs_comms.cmd_tx.try_send(cmd);
-            log::debug!("scroll_blit: sent command x={} y={} w={} h={} from_y={} to_y={}",
-                       x, y, width, height, from_y, to_y);
-            return;
-        }
-        log::error!("scroll_blit: threaded mode not initialized");
+    if let Some(ref state) = THREADED_STATE {
+        let cmd = RenderCommand::ScrollBlit {
+            x,
+            y,
+            width,
+            height,
+            from_y,
+            to_y,
+            bg_r,
+            bg_g,
+            bg_b,
+        };
+        let _ = state.emacs_comms.cmd_tx.try_send(cmd);
+        log::debug!("scroll_blit: sent command x={} y={} w={} h={} from_y={} to_y={}",
+                   x, y, width, height, from_y, to_y);
+        return;
     }
-
-    #[cfg(not(feature = "winit-backend"))]
-    {
-        let _ = (x, y, width, height, from_y, to_y, bg_r, bg_g, bg_b);
-    }
+    log::error!("scroll_blit: threaded mode not initialized");
 }
 
 /// Get WebKit view title

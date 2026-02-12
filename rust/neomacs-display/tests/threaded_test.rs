@@ -465,7 +465,6 @@ fn test_frame_glyph_buffer_cursor_append() {
 // Test that requires windowing system - mark as ignored for CI
 #[test]
 #[ignore = "Requires display server (X11/Wayland)"]
-#[cfg(feature = "winit-backend")]
 fn test_render_thread_lifecycle() {
     use neomacs_display::render_thread::RenderThread;
     use std::sync::{Arc, Mutex};
@@ -499,7 +498,6 @@ fn test_render_thread_lifecycle() {
 // Test render thread with frame data - also requires display
 #[test]
 #[ignore = "Requires display server (X11/Wayland)"]
-#[cfg(feature = "winit-backend")]
 fn test_render_thread_with_frames() {
     use neomacs_display::render_thread::RenderThread;
     use std::sync::{Arc, Mutex};

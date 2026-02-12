@@ -53,7 +53,7 @@ pub unsafe extern "C" fn neomacs_display_load_video(
     log::info!("load_video: path={}", path_str);
 
     // Threaded path: send command to render thread
-    #[cfg(all(feature = "winit-backend", feature = "video"))]
+    #[cfg(feature = "video")]
     if let Some(ref state) = THREADED_STATE {
         let id = VIDEO_ID_COUNTER.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
         let cmd = RenderCommand::VideoCreate {
@@ -65,7 +65,7 @@ pub unsafe extern "C" fn neomacs_display_load_video(
         return id;
     }
 
-    #[cfg(all(feature = "winit-backend", feature = "video"))]
+    #[cfg(feature = "video")]
     if let Some(ref mut backend) = display.winit_backend {
         if let Some(renderer) = backend.renderer_mut() {
             let id = renderer.load_video_file(path_str);
@@ -84,7 +84,7 @@ pub unsafe extern "C" fn neomacs_display_video_play(
     video_id: u32,
 ) -> c_int {
     // Threaded path
-    #[cfg(all(feature = "winit-backend", feature = "video"))]
+    #[cfg(feature = "video")]
     if let Some(ref state) = THREADED_STATE {
         let cmd = RenderCommand::VideoPlay { id: video_id };
         let _ = state.emacs_comms.cmd_tx.try_send(cmd);
@@ -96,7 +96,7 @@ pub unsafe extern "C" fn neomacs_display_video_play(
         None => return -1,
     };
 
-    #[cfg(all(feature = "winit-backend", feature = "video"))]
+    #[cfg(feature = "video")]
     if let Some(ref mut backend) = display.winit_backend {
         if let Some(renderer) = backend.renderer_mut() {
             renderer.video_play(video_id);
@@ -114,7 +114,7 @@ pub unsafe extern "C" fn neomacs_display_video_pause(
     video_id: u32,
 ) -> c_int {
     // Threaded path
-    #[cfg(all(feature = "winit-backend", feature = "video"))]
+    #[cfg(feature = "video")]
     if let Some(ref state) = THREADED_STATE {
         let cmd = RenderCommand::VideoPause { id: video_id };
         let _ = state.emacs_comms.cmd_tx.try_send(cmd);
@@ -126,7 +126,7 @@ pub unsafe extern "C" fn neomacs_display_video_pause(
         None => return -1,
     };
 
-    #[cfg(all(feature = "winit-backend", feature = "video"))]
+    #[cfg(feature = "video")]
     if let Some(ref mut backend) = display.winit_backend {
         if let Some(renderer) = backend.renderer_mut() {
             renderer.video_pause(video_id);
@@ -144,7 +144,7 @@ pub unsafe extern "C" fn neomacs_display_video_stop(
     video_id: u32,
 ) -> c_int {
     // Threaded path: stop maps to destroy
-    #[cfg(all(feature = "winit-backend", feature = "video"))]
+    #[cfg(feature = "video")]
     if let Some(ref state) = THREADED_STATE {
         let cmd = RenderCommand::VideoDestroy { id: video_id };
         let _ = state.emacs_comms.cmd_tx.try_send(cmd);
@@ -156,7 +156,7 @@ pub unsafe extern "C" fn neomacs_display_video_stop(
         None => return -1,
     };
 
-    #[cfg(all(feature = "winit-backend", feature = "video"))]
+    #[cfg(feature = "video")]
     if let Some(ref mut backend) = display.winit_backend {
         if let Some(renderer) = backend.renderer_mut() {
             renderer.video_stop(video_id);
@@ -179,7 +179,7 @@ pub unsafe extern "C" fn neomacs_display_video_set_loop(
         None => return -1,
     };
 
-    #[cfg(all(feature = "winit-backend", feature = "video"))]
+    #[cfg(feature = "video")]
     if let Some(ref mut backend) = display.winit_backend {
         if let Some(renderer) = backend.renderer_mut() {
             renderer.video_set_loop(video_id, loop_count);
@@ -201,7 +201,7 @@ pub unsafe extern "C" fn neomacs_display_video_update(
         None => return -1,
     };
 
-    #[cfg(all(feature = "winit-backend", feature = "video"))]
+    #[cfg(feature = "video")]
     if let Some(ref mut backend) = display.winit_backend {
         if let Some(renderer) = backend.renderer_mut() {
             renderer.process_pending_videos();
@@ -225,7 +225,7 @@ pub unsafe extern "C" fn neomacs_display_get_video_size(
     }
     let display = &mut *handle;
 
-    #[cfg(all(feature = "winit-backend", feature = "video"))]
+    #[cfg(feature = "video")]
     if let Some(ref backend) = display.winit_backend {
         if let Some(renderer) = backend.renderer() {
             if let Some((w, h)) = renderer.get_video_size(video_id) {
@@ -266,7 +266,6 @@ pub unsafe extern "C" fn neomacs_display_load_image_data(
 
     let data_slice = std::slice::from_raw_parts(data, len);
 
-    #[cfg(feature = "winit-backend")]
     if let Some(ref mut backend) = display.winit_backend {
         if let Some(renderer) = backend.renderer_mut() {
             return renderer.load_image_data(data_slice, 0, 0);
@@ -291,7 +290,6 @@ pub unsafe extern "C" fn neomacs_display_load_image_data_scaled(
 
     let data_slice = std::slice::from_raw_parts(data, len);
 
-    #[cfg(feature = "winit-backend")]
     if let Some(ref mut backend) = display.winit_backend {
         if let Some(renderer) = backend.renderer_mut() {
             return renderer.load_image_data(
@@ -325,7 +323,6 @@ pub unsafe extern "C" fn neomacs_display_load_image_argb32(
     let data_slice = std::slice::from_raw_parts(data, data_len);
 
     // Threaded path: send pixel data to render thread
-    #[cfg(feature = "winit-backend")]
     if let Some(ref state) = THREADED_STATE {
         let id = IMAGE_ID_COUNTER.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
         let cmd = RenderCommand::ImageLoadArgb32 {
@@ -341,7 +338,6 @@ pub unsafe extern "C" fn neomacs_display_load_image_argb32(
 
     // Non-threaded path: direct renderer access
     let display = &mut *handle;
-    #[cfg(feature = "winit-backend")]
     if let Some(ref mut backend) = display.winit_backend {
         if let Some(renderer) = backend.renderer_mut() {
             return renderer.load_image_argb32(
@@ -376,7 +372,6 @@ pub unsafe extern "C" fn neomacs_display_load_image_rgb24(
     let data_slice = std::slice::from_raw_parts(data, data_len);
 
     // Threaded path: send pixel data to render thread
-    #[cfg(feature = "winit-backend")]
     if let Some(ref state) = THREADED_STATE {
         let id = IMAGE_ID_COUNTER.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
         let cmd = RenderCommand::ImageLoadRgb24 {
@@ -392,7 +387,6 @@ pub unsafe extern "C" fn neomacs_display_load_image_rgb24(
 
     // Non-threaded path: direct renderer access
     let display = &mut *handle;
-    #[cfg(feature = "winit-backend")]
     if let Some(ref mut backend) = display.winit_backend {
         if let Some(renderer) = backend.renderer_mut() {
             return renderer.load_image_rgb24(
@@ -434,7 +428,6 @@ pub unsafe extern "C" fn neomacs_display_load_image_file_scaled(
     log::info!("load_image_file_scaled: path={}, max={}x{}", path_str, max_width, max_height);
 
     // Threaded path: send command to render thread
-    #[cfg(feature = "winit-backend")]
     if let Some(ref state) = THREADED_STATE {
         let id = IMAGE_ID_COUNTER.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
         let cmd = RenderCommand::ImageLoadFile {
@@ -450,7 +443,6 @@ pub unsafe extern "C" fn neomacs_display_load_image_file_scaled(
 
     // Non-threaded path: direct renderer access
     let display = &mut *handle;
-    #[cfg(feature = "winit-backend")]
     if let Some(ref mut backend) = display.winit_backend {
         if let Some(renderer) = backend.renderer_mut() {
             let id = renderer.load_image_file(
@@ -498,7 +490,6 @@ pub unsafe extern "C" fn neomacs_display_get_image_size(
     }
 
     // Threaded path: check shared map
-    #[cfg(feature = "winit-backend")]
     if let Some(ref state) = THREADED_STATE {
         if let Ok(dims) = state.image_dimensions.lock() {
             if let Some(&(w, h)) = dims.get(&image_id) {
@@ -519,7 +510,6 @@ pub unsafe extern "C" fn neomacs_display_get_image_size(
     }
     let display = &mut *handle;
 
-    #[cfg(feature = "winit-backend")]
     if let Some(ref backend) = display.winit_backend {
         if let Some(renderer) = backend.renderer() {
             if let Some((w, h)) = renderer.get_image_size(image_id) {
@@ -548,7 +538,6 @@ pub unsafe extern "C" fn neomacs_display_query_image_file_size(
         Err(_) => return -1,
     };
 
-    #[cfg(feature = "winit-backend")]
     {
         use crate::backend::wgpu::WgpuRenderer;
         if let Some((w, h)) = WgpuRenderer::query_image_file_size(path_str) {
@@ -567,7 +556,6 @@ pub unsafe extern "C" fn neomacs_display_free_image(
     image_id: u32,
 ) -> c_int {
     // Threaded path: send command to render thread
-    #[cfg(feature = "winit-backend")]
     if let Some(ref state) = THREADED_STATE {
         let cmd = RenderCommand::ImageFree { id: image_id };
         let _ = state.emacs_comms.cmd_tx.try_send(cmd);
@@ -579,7 +567,6 @@ pub unsafe extern "C" fn neomacs_display_free_image(
     }
     let display = &mut *handle;
 
-    #[cfg(feature = "winit-backend")]
     if let Some(ref mut backend) = display.winit_backend {
         if let Some(renderer) = backend.renderer_mut() {
             renderer.free_image(image_id);
@@ -781,7 +768,6 @@ pub unsafe extern "C" fn neomacs_display_end_frame(handle: *mut NeomacsDisplay) 
                 Ok(())
             }
         }
-        #[cfg(feature = "winit-backend")]
         BackendType::Wgpu => {
             if let Some(backend) = display.winit_backend.as_mut() {
                 backend.render(&display.scene)

@@ -69,7 +69,7 @@ exclude = []
 # Disable default features to avoid bindgen-generated WPE types that crash cbindgen.
 crates = ["neomacs-display"]
 default_features = false
-features = ["winit-backend", "wgpu", "wgpu-hal", "winit", "video", "gstreamer", "gstreamer-app", "gstreamer-video", "gstreamer-allocators", "image", "neo-term", "alacritty_terminal", "arboard", "ash", "bytemuck", "parking_lot", "pollster", "raw-window-handle"]
+features = ["video", "gstreamer", "gstreamer-app", "gstreamer-video", "gstreamer-allocators", "neo-term", "alacritty_terminal", "parking_lot"]
 
 [fn]
 # Rename function parameters

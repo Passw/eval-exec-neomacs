@@ -319,7 +319,6 @@ impl DmaBufBuffer {
 
         // Build import params with all planes — the Vulkan driver query
         // determines the correct plane count for the modifier.
-        #[cfg(all(feature = "ash", feature = "wgpu-hal"))]
         {
             use super::vulkan_dmabuf::{import_dmabuf, DmaBufImportParams};
             let params = DmaBufImportParams {
@@ -334,25 +333,6 @@ impl DmaBufBuffer {
             };
             if let Some(texture) = import_dmabuf(device, queue, &params) {
                 log::debug!("DmaBufBuffer: texture import succeeded ({} planes)", n);
-                return Some(texture);
-            }
-        }
-
-        // Fallback for when only ash is available (no wgpu-hal)
-        #[cfg(all(feature = "ash", not(feature = "wgpu-hal")))]
-        {
-            use super::vulkan_dmabuf::{import_dmabuf_via_mmap, DmaBufImportParams};
-            let params = DmaBufImportParams {
-                fds: self.fds[..n].to_vec(),
-                strides: self.strides[..n].to_vec(),
-                offsets: self.offsets[..n].to_vec(),
-                num_planes: self.num_planes,
-                width: self.width,
-                height: self.height,
-                fourcc: self.fourcc,
-                modifier: self.modifier,
-            };
-            if let Some(texture) = import_dmabuf_via_mmap(device, queue, &params) {
                 return Some(texture);
             }
         }

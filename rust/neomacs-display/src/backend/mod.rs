@@ -5,7 +5,6 @@ use crate::core::scene::Scene;
 
 pub mod tty;
 
-#[cfg(feature = "winit-backend")]
 pub mod wgpu;
 
 #[cfg(feature = "wpe-webkit")]
@@ -34,16 +33,11 @@ pub enum BackendType {
     Tty = 0,
 
     /// Winit/wgpu GPU-accelerated backend
-    #[cfg(feature = "winit-backend")]
     Wgpu = 1,
 }
 
 impl Default for BackendType {
     fn default() -> Self {
-        #[cfg(feature = "winit-backend")]
         return Self::Wgpu;
-
-        #[cfg(not(feature = "winit-backend"))]
-        return Self::Tty;
     }
 }

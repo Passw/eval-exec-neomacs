@@ -19,7 +19,6 @@ unsafe fn threaded_state() -> Option<&'static ThreadedState> {
 ///
 /// Returns the wakeup pipe fd that Emacs should select() on,
 /// or -1 on error.
-#[cfg(feature = "winit-backend")]
 #[no_mangle]
 pub unsafe extern "C" fn neomacs_display_init_threaded(
     width: u32,
@@ -128,7 +127,6 @@ pub struct NeomacsMonitorInfo {
 /// Wait for monitor info to be available (with timeout).
 /// Call after neomacs_display_init_threaded().
 /// Returns number of monitors, or 0 on timeout.
-#[cfg(feature = "winit-backend")]
 #[no_mangle]
 pub unsafe extern "C" fn neomacs_display_wait_for_monitors() -> c_int {
     let state = match threaded_state() {
@@ -152,7 +150,6 @@ pub unsafe extern "C" fn neomacs_display_wait_for_monitors() -> c_int {
 
 /// Get the number of monitors available.
 /// Must be called after neomacs_display_init_threaded().
-#[cfg(feature = "winit-backend")]
 #[no_mangle]
 pub unsafe extern "C" fn neomacs_display_get_monitor_count() -> c_int {
     let state = match threaded_state() {
@@ -168,7 +165,6 @@ pub unsafe extern "C" fn neomacs_display_get_monitor_count() -> c_int {
 
 /// Get info about a specific monitor by index.
 /// Returns 1 on success, 0 on failure.
-#[cfg(feature = "winit-backend")]
 #[no_mangle]
 pub unsafe extern "C" fn neomacs_display_get_monitor_info(
     index: c_int,
@@ -203,7 +199,6 @@ pub unsafe extern "C" fn neomacs_display_get_monitor_info(
 
 /// Get the name of a monitor by index.
 /// Returns a pointer to a static string (valid until next call), or NULL.
-#[cfg(feature = "winit-backend")]
 #[no_mangle]
 pub unsafe extern "C" fn neomacs_display_get_monitor_name(
     index: c_int,
@@ -242,7 +237,6 @@ pub unsafe extern "C" fn neomacs_display_get_monitor_name(
 /// Drain input events from render thread
 ///
 /// Returns number of events written to buffer.
-#[cfg(feature = "winit-backend")]
 #[no_mangle]
 pub unsafe extern "C" fn neomacs_display_drain_input(
     events: *mut NeomacsInputEvent,
@@ -400,7 +394,6 @@ pub unsafe extern "C" fn neomacs_display_drain_input(
 /// Returns the number of paths written.  Each path is a null-terminated
 /// C string that must be freed with `neomacs_clipboard_free_text`.
 /// Call repeatedly until it returns 0 to drain all pending drops.
-#[cfg(feature = "winit-backend")]
 #[no_mangle]
 pub unsafe extern "C" fn neomacs_display_get_dropped_files(
     out_paths: *mut *mut c_char,
@@ -431,7 +424,6 @@ pub unsafe extern "C" fn neomacs_display_get_dropped_files(
 }
 
 /// Free a string returned by `neomacs_display_get_dropped_files`.
-#[cfg(feature = "winit-backend")]
 #[no_mangle]
 pub unsafe extern "C" fn neomacs_display_free_dropped_path(path: *mut c_char) {
     if !path.is_null() {
@@ -442,7 +434,6 @@ pub unsafe extern "C" fn neomacs_display_free_dropped_path(path: *mut c_char) {
 /// Get the terminal title from the most recent title change event.
 /// Returns a C string that must be freed with
 /// `neomacs_display_free_dropped_path` (same allocator), or NULL.
-#[cfg(feature = "winit-backend")]
 #[no_mangle]
 pub unsafe extern "C" fn neomacs_display_get_terminal_title(
     terminal_id: u32,
@@ -468,7 +459,6 @@ pub unsafe extern "C" fn neomacs_display_get_terminal_title(
 // ============================================================================
 
 /// Send frame glyphs to render thread
-#[cfg(feature = "winit-backend")]
 #[no_mangle]
 pub unsafe extern "C" fn neomacs_display_send_frame(handle: *mut NeomacsDisplay) {
     if handle.is_null() {
@@ -488,7 +478,6 @@ pub unsafe extern "C" fn neomacs_display_send_frame(handle: *mut NeomacsDisplay)
 }
 
 /// Send command to render thread
-#[cfg(feature = "winit-backend")]
 #[no_mangle]
 pub unsafe extern "C" fn neomacs_display_send_command(
     cmd_type: c_int,
@@ -534,7 +523,6 @@ pub unsafe extern "C" fn neomacs_display_send_command(
 // ============================================================================
 
 /// Shutdown threaded display
-#[cfg(feature = "winit-backend")]
 #[no_mangle]
 pub unsafe extern "C" fn neomacs_display_shutdown_threaded() {
     if let Some(mut state) = (*std::ptr::addr_of_mut!(THREADED_STATE)).take() {
@@ -554,7 +542,6 @@ pub unsafe extern "C" fn neomacs_display_shutdown_threaded() {
 }
 
 /// Get wakeup fd for threaded mode (for Emacs to select() on)
-#[cfg(feature = "winit-backend")]
 #[no_mangle]
 pub unsafe extern "C" fn neomacs_display_get_threaded_wakeup_fd() -> c_int {
     match threaded_state() {
@@ -567,7 +554,6 @@ pub unsafe extern "C" fn neomacs_display_get_threaded_wakeup_fd() -> c_int {
 ///
 /// Returns the NeomacsDisplay handle for use with frame operations.
 /// Returns NULL if threaded mode is not initialized.
-#[cfg(feature = "winit-backend")]
 #[no_mangle]
 pub unsafe extern "C" fn neomacs_display_get_threaded_handle() -> *mut NeomacsDisplay {
     match threaded_state() {

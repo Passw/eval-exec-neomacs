@@ -15,7 +15,7 @@ crate-type = ["staticlib", "cdylib", "rlib"]
 cosmic-text = "0.12"
 
 # Vulkan for DMA-BUF import (WPE WebKit integration)
-ash = { version = "0.38", optional = true }
+ash = "0.38"
 
 # GStreamer for video
 gstreamer = { version = "0.23", optional = true }
@@ -23,18 +23,18 @@ gstreamer-video = { version = "0.23", optional = true }
 gstreamer-app = { version = "0.23", optional = true }
 gstreamer-allocators = { version = "0.23", optional = true }
 
-# Winit + wgpu backend
-winit = { version = "0.30", optional = true }
-wgpu = { version = "23", optional = true }
+# Winit + wgpu backend (always enabled)
+winit = "0.30"
+wgpu = "23"
 # wgpu-hal for low-level Vulkan access (DMA-BUF import)
-wgpu-hal = { version = "23", features = ["vulkan"], optional = true }
-raw-window-handle = { version = "0.6", optional = true }
-arboard = { version = "3.4", optional = true }
-bytemuck = { version = "1.18", features = ["derive"], optional = true }
-pollster = { version = "0.4", optional = true }
+wgpu-hal = { version = "23", features = ["vulkan"] }
+raw-window-handle = "0.6"
+arboard = "3.4"
+bytemuck = { version = "1.18", features = ["derive"] }
+pollster = "0.4"
 
 # Image decoding (async)
-image = { version = "0.24", optional = true }
+image = "0.24"
 
 # WPE WebKit - bindings generated via bindgen in build.rs
 # No crate dependency - we generate sys bindings directly
@@ -64,14 +64,13 @@ bindgen = "0.71"
 pkg-config = "0.3"
 
 [features]
-# Default: winit-wgpu backend with video and webkit support
-default = ["winit-backend", "video", "wpe-webkit", "neo-term"]
-winit-backend = ["winit", "wgpu", "raw-window-handle", "arboard", "bytemuck", "pollster", "image"]
+# Default: all features enabled
+default = ["video", "wpe-webkit", "neo-term"]
 tty-backend = []
-# Video with GStreamer - includes ash and wgpu-hal for DMA-BUF zero-copy
-video = ["gstreamer", "gstreamer-video", "gstreamer-app", "gstreamer-allocators", "winit-backend", "ash", "wgpu-hal"]
-# wpe-webkit requires winit-backend, ash, and wgpu-hal for Vulkan DMA-BUF import
-wpe-webkit = ["winit-backend", "ash", "wgpu-hal"]
+# Video with GStreamer
+video = ["gstreamer", "gstreamer-video", "gstreamer-app", "gstreamer-allocators"]
+# WPE WebKit integration
+wpe-webkit = []
 # GPU-accelerated terminal emulator
 neo-term = ["alacritty_terminal", "parking_lot"]
 

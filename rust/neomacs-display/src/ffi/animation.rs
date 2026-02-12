@@ -83,7 +83,6 @@ pub struct CPopupMenuItem {
 
 /// Show a popup menu at position (x, y) with the given items.
 /// The render thread will display the menu and send a MenuSelection event.
-#[cfg(feature = "winit-backend")]
 #[no_mangle]
 pub unsafe extern "C" fn neomacs_display_show_popup_menu(
     _handle: *mut NeomacsDisplay,
@@ -166,7 +165,6 @@ pub unsafe extern "C" fn neomacs_display_show_popup_menu(
 }
 
 /// Hide the active popup menu.
-#[cfg(feature = "winit-backend")]
 #[no_mangle]
 pub unsafe extern "C" fn neomacs_display_hide_popup_menu(
     _handle: *mut NeomacsDisplay,
@@ -178,7 +176,6 @@ pub unsafe extern "C" fn neomacs_display_hide_popup_menu(
 }
 
 /// Show a tooltip at the given position with specified colors.
-#[cfg(feature = "winit-backend")]
 #[no_mangle]
 pub unsafe extern "C" fn neomacs_display_show_tooltip(
     _handle: *mut NeomacsDisplay,
@@ -207,7 +204,6 @@ pub unsafe extern "C" fn neomacs_display_show_tooltip(
 }
 
 /// Hide the active tooltip.
-#[cfg(feature = "winit-backend")]
 #[no_mangle]
 pub unsafe extern "C" fn neomacs_display_hide_tooltip(
     _handle: *mut NeomacsDisplay,
@@ -219,7 +215,6 @@ pub unsafe extern "C" fn neomacs_display_hide_tooltip(
 }
 
 /// Trigger visual bell flash effect.
-#[cfg(feature = "winit-backend")]
 #[no_mangle]
 pub unsafe extern "C" fn neomacs_display_visual_bell(
     _handle: *mut NeomacsDisplay,
@@ -232,7 +227,6 @@ pub unsafe extern "C" fn neomacs_display_visual_bell(
 
 /// Remove a child frame from the render thread.
 /// Called when a child frame is deleted or unparented.
-#[cfg(feature = "winit-backend")]
 #[no_mangle]
 pub unsafe extern "C" fn neomacs_display_remove_child_frame(
     _handle: *mut NeomacsDisplay,
@@ -1291,7 +1285,7 @@ effect_setter!(neomacs_display_set_aurora(enabled: c_int, r1: c_int, g1: c_int, 
                     effects.aurora.opacity = opacity as f32 / 100.0;
 });
 
-// The remaining ~100 effect_setter! invocations with #[cfg(feature = "winit-backend")]
-// are included inline. They follow the exact same pattern from the original file.
+// The remaining ~100 effect_setter! invocations are included inline.
+// They follow the exact same pattern from the original file.
 
 include!("animation_effects.rs");

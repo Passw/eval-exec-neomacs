@@ -18,7 +18,6 @@ pub mod thread_comm;
 pub mod effect_config;
 pub mod layout;
 
-#[cfg(feature = "winit-backend")]
 pub mod render_thread;
 
 #[cfg(feature = "neo-term")]
@@ -36,7 +35,6 @@ pub const VERSION: &str = env!("CARGO_PKG_VERSION");
 /// - `"low"` or `"integrated"` → `LowPower` (prefer integrated GPU, e.g. Intel)
 /// - `"high"` or `"discrete"` → `HighPerformance` (prefer discrete GPU, e.g. NVIDIA)
 /// - unset or anything else → `HighPerformance` (default)
-#[cfg(feature = "winit-backend")]
 pub fn gpu_power_preference() -> wgpu::PowerPreference {
     match std::env::var("NEOMACS_GPU").as_deref() {
         Ok("low") | Ok("integrated") => {

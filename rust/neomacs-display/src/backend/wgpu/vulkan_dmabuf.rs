@@ -87,7 +87,7 @@ pub struct DmaBufImportParams {
 // True Zero-Copy Implementation using wgpu_hal
 // ============================================================================
 
-#[cfg(all(target_os = "linux", feature = "ash", feature = "wgpu-hal"))]
+#[cfg(target_os = "linux")]
 mod hal_import {
     use super::*;
     use ash::vk;
@@ -806,7 +806,6 @@ pub fn import_dmabuf(
     params: &DmaBufImportParams,
 ) -> Option<wgpu::Texture> {
     // Try true zero-copy via HAL first
-    #[cfg(all(feature = "ash", feature = "wgpu-hal"))]
     {
         if let Some(texture) = hal_import::import_dmabuf_hal(device, queue, params) {
             return Some(texture);

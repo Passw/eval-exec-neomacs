@@ -8,7 +8,6 @@ use super::*;
 
 /// Set clipboard text.  The text is a UTF-8 C string.
 /// Returns 0 on success, -1 on failure.
-#[cfg(feature = "winit-backend")]
 #[no_mangle]
 pub unsafe extern "C" fn neomacs_clipboard_set_text(text: *const c_char) -> c_int {
     if text.is_null() {
@@ -36,7 +35,6 @@ pub unsafe extern "C" fn neomacs_clipboard_set_text(text: *const c_char) -> c_in
 /// Get clipboard text.  Returns a newly allocated UTF-8 C string
 /// that the caller must free with neomacs_clipboard_free_text(),
 /// or NULL if the clipboard is empty or an error occurred.
-#[cfg(feature = "winit-backend")]
 #[no_mangle]
 pub unsafe extern "C" fn neomacs_clipboard_get_text() -> *mut c_char {
     match arboard::Clipboard::new() {
@@ -55,7 +53,6 @@ pub unsafe extern "C" fn neomacs_clipboard_get_text() -> *mut c_char {
 }
 
 /// Free a string returned by neomacs_clipboard_get_text().
-#[cfg(feature = "winit-backend")]
 #[no_mangle]
 pub unsafe extern "C" fn neomacs_clipboard_free_text(text: *mut c_char) {
     if !text.is_null() {
@@ -69,7 +66,6 @@ pub unsafe extern "C" fn neomacs_clipboard_free_text(text: *mut c_char) {
 
 /// Set primary selection text.  The text is a UTF-8 C string.
 /// Returns 0 on success, -1 on failure.
-#[cfg(feature = "winit-backend")]
 #[no_mangle]
 pub unsafe extern "C" fn neomacs_primary_selection_set_text(text: *const c_char) -> c_int {
     use arboard::{LinuxClipboardKind, SetExtLinux};
@@ -104,7 +100,6 @@ pub unsafe extern "C" fn neomacs_primary_selection_set_text(text: *const c_char)
 /// Get primary selection text.  Returns a newly allocated UTF-8 C string
 /// that the caller must free with neomacs_clipboard_free_text(),
 /// or NULL if the selection is empty or an error occurred.
-#[cfg(feature = "winit-backend")]
 #[no_mangle]
 pub unsafe extern "C" fn neomacs_primary_selection_get_text() -> *mut c_char {
     use arboard::{GetExtLinux, LinuxClipboardKind};

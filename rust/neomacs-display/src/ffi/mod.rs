@@ -27,7 +27,6 @@ use crate::backend::{BackendType, DisplayBackend};
 // Event Callback for FFI
 // ============================================================================
 
-#[cfg(feature = "winit-backend")]
 use crate::backend::wgpu::{
     NeomacsInputEvent, WinitBackend,
     NEOMACS_EVENT_KEY_PRESS, NEOMACS_EVENT_KEY_RELEASE,
@@ -43,24 +42,19 @@ use crate::backend::wgpu::{
 };
 
 /// Resize callback function type for C FFI
-#[cfg(feature = "winit-backend")]
 pub(crate) type ResizeCallback = extern "C" fn(user_data: *mut std::ffi::c_void, width: std::ffi::c_int, height: std::ffi::c_int);
 
 /// Global resize callback - set by C code to receive resize events
-#[cfg(feature = "winit-backend")]
 pub(crate) static mut RESIZE_CALLBACK: Option<ResizeCallback> = None;
 
 /// User data pointer for resize callback
-#[cfg(feature = "winit-backend")]
 pub(crate) static mut RESIZE_CALLBACK_USER_DATA: *mut std::ffi::c_void = std::ptr::null_mut();
 
 /// Pending dropped file paths (populated by drain_input, consumed by C)
-#[cfg(feature = "winit-backend")]
 pub(crate) static DROPPED_FILES: std::sync::Mutex<Vec<Vec<String>>> = std::sync::Mutex::new(Vec::new());
 
 /// Pending terminal title changes (populated by drain_input, consumed by C)
 /// Each entry is (terminal_id, new_title).
-#[cfg(feature = "winit-backend")]
 pub(crate) static TERMINAL_TITLES: std::sync::Mutex<Vec<(u32, String)>> = std::sync::Mutex::new(Vec::new());
 
 use crate::backend::tty::TtyBackend;
@@ -74,9 +68,7 @@ use crate::core::face::{Face, FaceAttributes, UnderlineStyle, BoxType};
 pub struct NeomacsDisplay {
     pub(crate) backend_type: BackendType,
     pub(crate) tty_backend: Option<TtyBackend>,
-    #[cfg(feature = "winit-backend")]
     pub(crate) winit_backend: Option<WinitBackend>,
-    #[cfg(feature = "winit-backend")]
     pub(crate) event_loop: Option<winit::event_loop::EventLoop<crate::backend::wgpu::UserEvent>>,
     pub(crate) scene: Scene,           // The scene for rendering (legacy)
     pub(crate) frame_glyphs: FrameGlyphBuffer,  // Hybrid approach: direct glyph buffer
@@ -100,7 +92,6 @@ impl NeomacsDisplay {
     pub(crate) fn get_backend(&mut self) -> Option<&mut dyn DisplayBackend> {
         match self.backend_type {
             BackendType::Tty => self.tty_backend.as_mut().map(|b| b as &mut dyn DisplayBackend),
-            #[cfg(feature = "winit-backend")]
             BackendType::Wgpu => self.winit_backend.as_mut().map(|b| b as &mut dyn DisplayBackend),
         }
     }
@@ -110,7 +101,6 @@ impl NeomacsDisplay {
     /// otherwise returns the legacy scene.
     pub(crate) fn get_target_scene(&mut self) -> &mut Scene {
         if self.current_render_window_id > 0 {
-            #[cfg(feature = "winit-backend")]
             if let Some(ref mut backend) = self.winit_backend {
                 if let Some(scene) = backend.get_scene_mut(self.current_render_window_id) {
                     return scene;
@@ -191,17 +181,9 @@ pub unsafe extern "C" fn neomacs_display_set_resize_callback(
     callback: ResizeCallbackFn,
     user_data: *mut c_void,
 ) {
-    #[cfg(feature = "winit-backend")]
-    {
-        RESIZE_CALLBACK = Some(callback);
-        RESIZE_CALLBACK_USER_DATA = user_data;
-        log::debug!("Resize callback set");
-    }
-    #[cfg(not(feature = "winit-backend"))]
-    {
-        let _ = callback;
-        let _ = user_data;
-    }
+    RESIZE_CALLBACK = Some(callback);
+    RESIZE_CALLBACK_USER_DATA = user_data;
+    log::debug!("Resize callback set");
 }
 
 // ============================================================================
@@ -209,7 +191,6 @@ pub unsafe extern "C" fn neomacs_display_set_resize_callback(
 // ============================================================================
 
 /// Atomic counter for generating image IDs in threaded mode
-#[cfg(feature = "winit-backend")]
 pub(crate) static IMAGE_ID_COUNTER: std::sync::atomic::AtomicU32 = std::sync::atomic::AtomicU32::new(1);
 
 /// Atomic counter for generating WebKit view IDs in threaded mode
@@ -228,16 +209,12 @@ pub(crate) static TERMINAL_ID_COUNTER: std::sync::atomic::AtomicU32 = std::sync:
 // Threaded State
 // ============================================================================
 
-#[cfg(feature = "winit-backend")]
 use crate::thread_comm::{EmacsComms, EffectUpdater, InputEvent, PopupMenuItem, RenderCommand, ThreadComms};
-#[cfg(feature = "winit-backend")]
 use crate::render_thread::{RenderThread, SharedImageDimensions, SharedMonitorInfo};
 
 /// Global state for threaded mode
-#[cfg(feature = "winit-backend")]
 pub(crate) static mut THREADED_STATE: Option<ThreadedState> = None;
 
-#[cfg(feature = "winit-backend")]
 pub(crate) struct ThreadedState {
     pub(crate) emacs_comms: EmacsComms,
     pub(crate) render_thread: Option<RenderThread>,
