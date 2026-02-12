@@ -66,7 +66,7 @@ static int neomacs_image_cache_count = 0;
 static int neomacs_popup_activated_flag;
 
 /* Forward declarations */
-static void neomacs_extract_full_frame (struct frame *f);
+/* neomacs_extract_full_frame removed — Rust layout is the only path. */
 static void neomacs_define_frame_cursor (struct frame *f, Emacs_Cursor cursor);
 static void neomacs_show_hourglass (struct frame *f);
 static void neomacs_hide_hourglass (struct frame *f);
@@ -1510,8 +1510,7 @@ neomacs_extract_window_glyphs (struct window *w, void *user_data)
  * structures during layout computation.  They run on the Emacs thread.
  */
 
-/* Global flag: whether to use the Rust display engine */
-bool use_rust_display_engine = true;
+/* The Rust display engine is always active — no legacy fallback. */
 
 /* Get a character at a character position in a buffer.
    Returns the Unicode codepoint, or -1 if out of range. */
@@ -4814,12 +4813,14 @@ neomacs_layout_check_line_prefix (void *buffer_ptr, void *window_ptr,
   return 0;
 }
 
-/* Walk current_matrix for ALL windows in the frame and extract complete
-   glyph data.  Called from neomacs_update_end after Emacs has finished
-   all window updates.  This replaces the incremental glyph accumulation
-   model with a full-frame snapshot. */
+/* neomacs_extract_full_frame — REMOVED.
+   The Rust layout engine is the only rendering path.  Legacy matrix
+   extraction is no longer needed.  Menu/tool bars are still extracted
+   from current_matrix in neomacs_update_end().  */
+
+#if 0  /* Legacy full-frame matrix extraction — removed in favor of Rust layout. */
 static void
-neomacs_extract_full_frame (struct frame *f)
+neomacs_extract_full_frame_REMOVED (struct frame *f)
 {
   struct neomacs_display_info *dpyinfo = FRAME_NEOMACS_DISPLAY_INFO (f);
   struct neomacs_output *output = FRAME_NEOMACS_OUTPUT (f);
@@ -4993,6 +4994,7 @@ neomacs_extract_full_frame (struct frame *f)
       }
   }
 }
+#endif  /* Legacy neomacs_extract_full_frame */
 
 /* Called at the end of updating a frame */
 void
@@ -5003,103 +5005,95 @@ neomacs_update_end (struct frame *f)
 
   if (dpyinfo && dpyinfo->display_handle)
     {
-      if (use_rust_display_engine)
+      /* Rust layout engine reads buffer data directly via FFI
+         and produces FrameGlyphBuffer internally. */
+      struct face *default_face = FACE_FROM_ID_OR_NULL (f, DEFAULT_FACE_ID);
+      unsigned long bg_pixel = default_face && !default_face->background_defaulted_p
+        ? default_face->background : FRAME_BACKGROUND_PIXEL (f);
+      uint32_t bg_rgb = ((RED_FROM_ULONG (bg_pixel) << 16)
+                         | (GREEN_FROM_ULONG (bg_pixel) << 8)
+                         | BLUE_FROM_ULONG (bg_pixel));
+
+      /* Get vertical border face color */
+      struct face *vborder_face = FACE_FROM_ID_OR_NULL (f, VERTICAL_BORDER_FACE_ID);
+      unsigned long vb_fg = vborder_face ? vborder_face->foreground : 0;
+      uint32_t vb_rgb = ((RED_FROM_ULONG (vb_fg) << 16)
+                         | (GREEN_FROM_ULONG (vb_fg) << 8)
+                         | BLUE_FROM_ULONG (vb_fg));
+
+      /* Window divider face colors */
+      int rdw = FRAME_RIGHT_DIVIDER_WIDTH (f);
+      int bdw = FRAME_BOTTOM_DIVIDER_WIDTH (f);
+      uint32_t div_fg = vb_rgb, div_first_fg = vb_rgb, div_last_fg = vb_rgb;
+      if (rdw > 0 || bdw > 0)
         {
-          /* NEW PATH: Rust layout engine reads buffer data directly via FFI
-             and produces FrameGlyphBuffer internally. */
-          struct face *default_face = FACE_FROM_ID_OR_NULL (f, DEFAULT_FACE_ID);
-          unsigned long bg_pixel = default_face && !default_face->background_defaulted_p
-            ? default_face->background : FRAME_BACKGROUND_PIXEL (f);
-          uint32_t bg_rgb = ((RED_FROM_ULONG (bg_pixel) << 16)
-                             | (GREEN_FROM_ULONG (bg_pixel) << 8)
-                             | BLUE_FROM_ULONG (bg_pixel));
-
-          /* Get vertical border face color */
-          struct face *vborder_face = FACE_FROM_ID_OR_NULL (f, VERTICAL_BORDER_FACE_ID);
-          unsigned long vb_fg = vborder_face ? vborder_face->foreground : 0;
-          uint32_t vb_rgb = ((RED_FROM_ULONG (vb_fg) << 16)
-                             | (GREEN_FROM_ULONG (vb_fg) << 8)
-                             | BLUE_FROM_ULONG (vb_fg));
-
-          /* Window divider face colors */
-          int rdw = FRAME_RIGHT_DIVIDER_WIDTH (f);
-          int bdw = FRAME_BOTTOM_DIVIDER_WIDTH (f);
-          uint32_t div_fg = vb_rgb, div_first_fg = vb_rgb, div_last_fg = vb_rgb;
-          if (rdw > 0 || bdw > 0)
+          struct face *div_face
+            = FACE_FROM_ID_OR_NULL (f, WINDOW_DIVIDER_FACE_ID);
+          struct face *div_first
+            = FACE_FROM_ID_OR_NULL (f, WINDOW_DIVIDER_FIRST_PIXEL_FACE_ID);
+          struct face *div_last
+            = FACE_FROM_ID_OR_NULL (f, WINDOW_DIVIDER_LAST_PIXEL_FACE_ID);
+          if (div_face)
             {
-              struct face *div_face
-                = FACE_FROM_ID_OR_NULL (f, WINDOW_DIVIDER_FACE_ID);
-              struct face *div_first
-                = FACE_FROM_ID_OR_NULL (f, WINDOW_DIVIDER_FIRST_PIXEL_FACE_ID);
-              struct face *div_last
-                = FACE_FROM_ID_OR_NULL (f, WINDOW_DIVIDER_LAST_PIXEL_FACE_ID);
-              if (div_face)
-                {
-                  unsigned long c = div_face->foreground;
-                  div_fg = ((RED_FROM_ULONG (c) << 16)
-                            | (GREEN_FROM_ULONG (c) << 8)
-                            | BLUE_FROM_ULONG (c));
-                }
-              if (div_first)
-                {
-                  unsigned long c = div_first->foreground;
-                  div_first_fg = ((RED_FROM_ULONG (c) << 16)
-                                  | (GREEN_FROM_ULONG (c) << 8)
-                                  | BLUE_FROM_ULONG (c));
-                }
-              else
-                div_first_fg = div_fg;
-              if (div_last)
-                {
-                  unsigned long c = div_last->foreground;
-                  div_last_fg = ((RED_FROM_ULONG (c) << 16)
-                                 | (GREEN_FROM_ULONG (c) << 8)
-                                 | BLUE_FROM_ULONG (c));
-                }
-              else
-                div_last_fg = div_fg;
+              unsigned long c = div_face->foreground;
+              div_fg = ((RED_FROM_ULONG (c) << 16)
+                        | (GREEN_FROM_ULONG (c) << 8)
+                        | BLUE_FROM_ULONG (c));
             }
-
-          /* Pre-warm font metrics cache for all faces before entering
-             Rust layout.  This ensures ftcrfont_glyph_extents() won't
-             need to xrealloc/xmalloc during FFI callbacks. */
-          prewarm_all_face_fonts (f);
-
-          neomacs_rust_layout_frame (
-              dpyinfo->display_handle,
-              (void *) f,
-              (float) FRAME_PIXEL_WIDTH (f),
-              (float) FRAME_PIXEL_HEIGHT (f),
-              (float) FRAME_COLUMN_WIDTH (f),
-              (float) FRAME_LINE_HEIGHT (f),
-              FRAME_FONT (f) ? (float) FRAME_FONT (f)->pixel_size : 14.0f,
-              bg_rgb,
-              vb_rgb,
-              rdw, bdw,
-              div_fg, div_first_fg, div_last_fg);
-
-          /* Extract menu bar and tool bar from current_matrix.
-             Their desired_matrix was populated by
-             neomacs_display_menu_and_tool_bar() in redisplay_internal,
-             then copied desired→current by update_menu_bar/update_tool_bar
-             in update_frame (dispnew.c).  */
-          if (WINDOWP (f->menu_bar_window))
+          if (div_first)
             {
-              struct window *mbw = XWINDOW (f->menu_bar_window);
-              if (mbw->current_matrix)
-                neomacs_extract_window_glyphs (mbw, NULL);
+              unsigned long c = div_first->foreground;
+              div_first_fg = ((RED_FROM_ULONG (c) << 16)
+                              | (GREEN_FROM_ULONG (c) << 8)
+                              | BLUE_FROM_ULONG (c));
             }
-          if (WINDOWP (f->tool_bar_window))
+          else
+            div_first_fg = div_fg;
+          if (div_last)
             {
-              struct window *tbw = XWINDOW (f->tool_bar_window);
-              if (tbw->current_matrix)
-                neomacs_extract_window_glyphs (tbw, NULL);
+              unsigned long c = div_last->foreground;
+              div_last_fg = ((RED_FROM_ULONG (c) << 16)
+                             | (GREEN_FROM_ULONG (c) << 8)
+                             | BLUE_FROM_ULONG (c));
             }
+          else
+            div_last_fg = div_fg;
         }
-      else
+
+      /* Pre-warm font metrics cache for all faces before entering
+         Rust layout.  This ensures ftcrfont_glyph_extents() won't
+         need to xrealloc/xmalloc during FFI callbacks. */
+      prewarm_all_face_fonts (f);
+
+      neomacs_rust_layout_frame (
+          dpyinfo->display_handle,
+          (void *) f,
+          (float) FRAME_PIXEL_WIDTH (f),
+          (float) FRAME_PIXEL_HEIGHT (f),
+          (float) FRAME_COLUMN_WIDTH (f),
+          (float) FRAME_LINE_HEIGHT (f),
+          FRAME_FONT (f) ? (float) FRAME_FONT (f)->pixel_size : 14.0f,
+          bg_rgb,
+          vb_rgb,
+          rdw, bdw,
+          div_fg, div_first_fg, div_last_fg);
+
+      /* Extract menu bar and tool bar from current_matrix.
+         Their desired_matrix was populated by
+         neomacs_display_menu_and_tool_bar() in redisplay_internal,
+         then copied desired→current by update_menu_bar/update_tool_bar
+         in update_frame (dispnew.c).  */
+      if (WINDOWP (f->menu_bar_window))
         {
-          /* LEGACY PATH: Extract from current_matrix (C display engine). */
-          neomacs_extract_full_frame (f);
+          struct window *mbw = XWINDOW (f->menu_bar_window);
+          if (mbw->current_matrix)
+            neomacs_extract_window_glyphs (mbw, NULL);
+        }
+      if (WINDOWP (f->tool_bar_window))
+        {
+          struct window *tbw = XWINDOW (f->tool_bar_window);
+          if (tbw->current_matrix)
+            neomacs_extract_window_glyphs (tbw, NULL);
         }
 
       /* Signal end of frame to Rust (sends frame to render thread) */
@@ -8209,51 +8203,14 @@ neomacs_new_font (struct frame *f, Lisp_Object font_object, int fontset)
  * ============================================================================ */
 
 /* Re-send the current frame to the render thread.
-   Used after mouse highlight changes to immediately update the display
-   without waiting for a full redisplay cycle.  Does NOT clear cursors.
-   Only works with the C display engine (legacy path), since the Rust
-   layout engine doesn't use current_matrix.  Mouse-face highlighting
-   for the Rust engine requires a hit-test infrastructure (TODO).  */
+   The Rust layout engine produces frames independently — mouse-face
+   highlighting needs a Rust-side hit-test infrastructure (TODO).  */
 static void
 neomacs_resend_frame (struct frame *f)
 {
-  struct neomacs_display_info *dpyinfo = FRAME_NEOMACS_DISPLAY_INFO (f);
-  struct neomacs_output *output = FRAME_NEOMACS_OUTPUT (f);
-
-  if (!dpyinfo || !dpyinfo->display_handle || !output
-      || !output->use_gpu_widget)
-    return;
-
-  /* The Rust layout engine produces frames independently — resending
-     via neomacs_extract_full_frame would produce an empty frame
-     (current_matrix is not populated by the Rust path), causing a
-     white flash.  Mouse-face highlighting needs a Rust-side hit-test
-     infrastructure to determine buffer positions from pixel coordinates.
-     Skip the resend until that is implemented.  */
-  if (use_rust_display_engine)
-    return;
-
-  void *handle = dpyinfo->display_handle;
-
-  /* Begin frame (clears glyph data but not cursors) */
-  if (output->window_id > 0)
-    neomacs_display_begin_frame_window (
-        handle, output->window_id,
-        (float) FRAME_COLUMN_WIDTH (f),
-        (float) FRAME_LINE_HEIGHT (f),
-        FRAME_FONT (f)
-          ? (float) FRAME_FONT (f)->pixel_size : 14.0f);
-  else
-    neomacs_display_begin_frame (handle);
-
-  /* Re-extract with current mouse highlight state */
-  neomacs_extract_full_frame (f);
-
-  /* Send to render thread */
-  if (output->window_id > 0)
-    neomacs_display_end_frame_window (handle, output->window_id);
-  else
-    neomacs_display_end_frame (handle);
+  /* No-op: the Rust layout engine handles all rendering.
+     Mouse-face highlighting will be implemented via Rust-side hit-test.  */
+  (void) f;
 }
 
 /* Read socket events for the Neomacs terminal.
@@ -9302,19 +9259,12 @@ To update an existing webkit view, use `neomacs-webkit-load-uri' with the ID.  *
  * ============================================================================ */
 
 DEFUN ("neomacs-set-rust-display", Fneomacs_set_rust_display, Sneomacs_set_rust_display, 1, 1, 0,
-       doc: /* Enable or disable the Rust layout engine.
-When ENABLE is non-nil, use the Rust layout engine instead of the C display engine.
-The Rust engine reads buffer data directly via FFI and produces the glyph buffer,
-bypassing xdisp.c's matrix extraction.  Default is t (Rust engine).
-Set to nil to fall back to the legacy C matrix extraction engine.  */)
+       doc: /* No-op: the Rust layout engine is always active.
+Kept for backward compatibility with existing Lisp code.  */)
   (Lisp_Object enable)
 {
-  use_rust_display_engine = !NILP (enable);
-  nlog_info ("Rust display engine %s", use_rust_display_engine ? "ENABLED" : "disabled");
-
-  /* Force full redisplay */
-  SET_FRAME_GARBAGED (SELECTED_FRAME ());
-  return enable;
+  (void) enable;
+  return Qt;
 }
 
 /* ============================================================================
