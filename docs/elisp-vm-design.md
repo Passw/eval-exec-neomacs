@@ -97,6 +97,7 @@ Implemented now:
   - cancellation-aware task lifecycle (`Queued/Running/Completed/Cancelled`)
   - worker-pool execution loop
   - pluggable task executor closure and result/error propagation through `task_await`
+  - `with_elisp_executor` path to execute Elisp source payloads on worker tasks
   - bounded channels and timeout-aware `select`
   - condition-variable wakeups for `task_await` and channel readiness (no default busy-spin waits)
   - finished-task reaping API to prevent task registry growth

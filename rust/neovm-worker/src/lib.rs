@@ -1,3 +1,4 @@
+use neovm_core::elisp::{self, EvalError, Evaluator};
 use neovm_core::{TaskHandle, TaskScheduler, TaskStatus};
 use neovm_host_abi::{
     Affinity, ChannelId, LispValue, SelectOp, SelectResult, Signal, TaskError, TaskOptions,
@@ -434,6 +435,40 @@ pub struct WorkerRuntime {
 impl WorkerRuntime {
     pub fn new(config: WorkerConfig) -> Self {
         Self::with_executor(config, |form, _opts, _ctx| Ok(form.clone()))
+    }
+
+    pub fn with_elisp_executor(config: WorkerConfig) -> Self {
+        let evaluator = Arc::new(Mutex::new(Evaluator::new()));
+        Self::with_executor(config, move |form, _opts, _ctx| {
+            let source = std::str::from_utf8(&form.bytes).map_err(|err| {
+                TaskError::Failed(Signal {
+                    symbol: "invalid-read-syntax".to_string(),
+                    data: Some(err.to_string()),
+                })
+            })?;
+
+            let forms = elisp::parse_forms(source).map_err(|err| {
+                TaskError::Failed(Signal {
+                    symbol: "invalid-read-syntax".to_string(),
+                    data: Some(err.to_string()),
+                })
+            })?;
+
+            let mut eval = evaluator.lock().expect("elisp evaluator mutex poisoned");
+            let mut last = LispValue::default();
+            for form in &forms {
+                match eval.eval_expr(form) {
+                    Ok(value) => {
+                        last = LispValue {
+                            bytes: elisp::print_value(&value).into_bytes(),
+                        };
+                    }
+                    Err(err) => return Err(eval_error_to_task_error(err)),
+                }
+            }
+
+            Ok(last)
+        })
     }
 
     pub fn with_executor<F>(config: WorkerConfig, executor: F) -> Self
@@ -920,6 +955,35 @@ fn channel_error_to_signal(err: ChannelError) -> Signal {
     }
 }
 
+fn eval_error_to_task_error(err: EvalError) -> TaskError {
+    match err {
+        EvalError::Signal { symbol, data } => {
+            let payload = if data.is_empty() {
+                "nil".to_string()
+            } else {
+                let rendered = data
+                    .iter()
+                    .map(elisp::print_value)
+                    .collect::<Vec<_>>()
+                    .join(" ");
+                format!("({rendered})")
+            };
+            TaskError::Failed(Signal {
+                symbol,
+                data: Some(payload),
+            })
+        }
+        EvalError::UncaughtThrow { tag, value } => TaskError::Failed(Signal {
+            symbol: "no-catch".to_string(),
+            data: Some(format!(
+                "({} {})",
+                elisp::print_value(&tag),
+                elisp::print_value(&value)
+            )),
+        }),
+    }
+}
+
 impl TaskScheduler for WorkerRuntime {
     fn spawn_task(&self, form: LispValue, opts: TaskOptions) -> Result<TaskHandle, Signal> {
         self.spawn(form, opts).map_err(enqueue_error_to_signal)
@@ -1276,5 +1340,107 @@ mod tests {
         let reaped = rt.reap_finished(8);
         assert_eq!(reaped, 1);
         assert_eq!(rt.task_status(task), None);
+    }
+
+    #[test]
+    fn elisp_executor_evaluates_source_task() {
+        let rt = WorkerRuntime::with_elisp_executor(WorkerConfig {
+            threads: 1,
+            queue_capacity: 16,
+        });
+        let workers = rt.start_dummy_workers();
+
+        let task = rt
+            .spawn(
+                LispValue {
+                    bytes: b"(+ 20 22)".to_vec(),
+                },
+                TaskOptions::default(),
+            )
+            .expect("task should enqueue");
+        let result = TaskScheduler::task_await(&rt, task, Some(Duration::from_millis(50)))
+            .expect("task should evaluate");
+
+        rt.close();
+        for worker in workers {
+            worker.join().expect("worker thread should join");
+        }
+
+        assert_eq!(String::from_utf8(result.bytes).expect("utf8 output"), "42");
+    }
+
+    #[test]
+    fn elisp_executor_maps_signal_errors() {
+        let rt = WorkerRuntime::with_elisp_executor(WorkerConfig {
+            threads: 1,
+            queue_capacity: 16,
+        });
+        let workers = rt.start_dummy_workers();
+
+        let task = rt
+            .spawn(
+                LispValue {
+                    bytes: b"(/ 1 0)".to_vec(),
+                },
+                TaskOptions::default(),
+            )
+            .expect("task should enqueue");
+        let result = TaskScheduler::task_await(&rt, task, Some(Duration::from_millis(50)))
+            .expect_err("arith-error should propagate");
+
+        rt.close();
+        for worker in workers {
+            worker.join().expect("worker thread should join");
+        }
+
+        match result {
+            TaskError::Failed(signal) => assert_eq!(signal.symbol, "arith-error"),
+            _ => panic!("expected failed signal"),
+        }
+    }
+
+    #[test]
+    fn elisp_executor_persists_defun_state() {
+        let rt = WorkerRuntime::with_elisp_executor(WorkerConfig {
+            threads: 1,
+            queue_capacity: 16,
+        });
+        let workers = rt.start_dummy_workers();
+
+        let define = rt
+            .spawn(
+                LispValue {
+                    bytes: b"(defun plus1 (x) (+ x 1))".to_vec(),
+                },
+                TaskOptions::default(),
+            )
+            .expect("defun task should enqueue");
+        let call = rt
+            .spawn(
+                LispValue {
+                    bytes: b"(plus1 41)".to_vec(),
+                },
+                TaskOptions::default(),
+            )
+            .expect("call task should enqueue");
+
+        let define_out = TaskScheduler::task_await(&rt, define, Some(Duration::from_millis(50)))
+            .expect("defun should succeed");
+        let call_out = TaskScheduler::task_await(&rt, call, Some(Duration::from_millis(50)))
+            .expect("function call should succeed");
+
+        rt.close();
+        for worker in workers {
+            worker.join().expect("worker thread should join");
+        }
+
+        assert_eq!(
+            String::from_utf8(define_out.bytes).expect("utf8 output"),
+            "plus1"
+        );
+        assert_eq!(
+            String::from_utf8(call_out.bytes).expect("utf8 output"),
+            "42"
+        );
     }
 }

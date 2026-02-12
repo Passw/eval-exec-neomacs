@@ -65,6 +65,7 @@ The initial scaffolding is now implemented in Rust:
   - bounded priority queues
   - cancellation state and task status tracking
   - pluggable task executor and awaitable result/error propagation
+  - Elisp executor wiring (`with_elisp_executor`) for source payload evaluation
   - bounded channels and timeout-aware `select`
   - condvar-based wait/wakeup for task completion and channel readiness
   - finished-task reaping hook for long-running process memory hygiene

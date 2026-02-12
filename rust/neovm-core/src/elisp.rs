@@ -1,8 +1,7 @@
-use std::cell::RefCell;
 use std::collections::HashMap;
 use std::error::Error;
 use std::fmt::{Display, Formatter};
-use std::rc::Rc;
+use std::sync::{Arc, Mutex};
 
 #[derive(Clone, Debug, PartialEq)]
 pub enum Expr {
@@ -16,8 +15,8 @@ pub enum Value {
     Nil,
     Int(i64),
     Symbol(String),
-    Cons(Rc<RefCell<ConsCell>>),
-    Lambda(Rc<Lambda>),
+    Cons(Arc<Mutex<ConsCell>>),
+    Lambda(Arc<Lambda>),
 }
 
 #[derive(Clone, Debug)]
@@ -358,7 +357,7 @@ impl Evaluator {
             _ => return Err(signal("wrong-type-argument", vec![])),
         }
 
-        Ok(Value::Lambda(Rc::new(Lambda {
+        Ok(Value::Lambda(Arc::new(Lambda {
             params,
             body: tail[1..].to_vec(),
         })))
@@ -429,7 +428,8 @@ impl Evaluator {
 
         match list {
             Value::Cons(cell) => {
-                cell.borrow_mut().car = value.clone();
+                let mut pair = cell.lock().expect("cons cell mutex poisoned");
+                pair.car = value.clone();
                 Ok(value)
             }
             _ => Err(signal("wrong-type-argument", vec![])),
@@ -443,7 +443,7 @@ impl Evaluator {
         let list = self.eval(&tail[0])?;
         match list {
             Value::Nil => Ok(Value::Nil),
-            Value::Cons(cell) => Ok(cell.borrow().car.clone()),
+            Value::Cons(cell) => Ok(cell.lock().expect("cons cell mutex poisoned").car.clone()),
             _ => Err(signal("wrong-type-argument", vec![])),
         }
     }
@@ -455,7 +455,7 @@ impl Evaluator {
         let list = self.eval(&tail[0])?;
         match list {
             Value::Nil => Ok(Value::Nil),
-            Value::Cons(cell) => Ok(cell.borrow().cdr.clone()),
+            Value::Cons(cell) => Ok(cell.lock().expect("cons cell mutex poisoned").cdr.clone()),
             _ => Err(signal("wrong-type-argument", vec![])),
         }
     }
@@ -466,7 +466,7 @@ impl Evaluator {
         }
         let car = self.eval(&tail[0])?;
         let cdr = self.eval(&tail[1])?;
-        Ok(Value::Cons(Rc::new(RefCell::new(ConsCell { car, cdr }))))
+        Ok(Value::Cons(Arc::new(Mutex::new(ConsCell { car, cdr }))))
     }
 
     fn eval_list_builtin(&mut self, tail: &[Expr]) -> EvalResult {
@@ -665,7 +665,7 @@ fn print_cons(value: &Value, out: &mut String) {
                 if !first {
                     out.push(' ');
                 }
-                let pair = cell.borrow();
+                let pair = cell.lock().expect("cons cell mutex poisoned");
                 out.push_str(&print_value(&pair.car));
                 cursor = pair.cdr.clone();
                 first = false;
@@ -684,7 +684,7 @@ fn print_cons(value: &Value, out: &mut String) {
 
 fn list_from_vec(values: Vec<Value>) -> Value {
     values.into_iter().rev().fold(Value::Nil, |acc, item| {
-        Value::Cons(Rc::new(RefCell::new(ConsCell {
+        Value::Cons(Arc::new(Mutex::new(ConsCell {
             car: item,
             cdr: acc,
         })))
@@ -708,8 +708,8 @@ fn eq_value(left: &Value, right: &Value) -> bool {
         (Value::Nil, Value::Nil) => true,
         (Value::Int(a), Value::Int(b)) => a == b,
         (Value::Symbol(a), Value::Symbol(b)) => a == b,
-        (Value::Cons(a), Value::Cons(b)) => Rc::ptr_eq(a, b),
-        (Value::Lambda(a), Value::Lambda(b)) => Rc::ptr_eq(a, b),
+        (Value::Cons(a), Value::Cons(b)) => Arc::ptr_eq(a, b),
+        (Value::Lambda(a), Value::Lambda(b)) => Arc::ptr_eq(a, b),
         _ => false,
     }
 }
