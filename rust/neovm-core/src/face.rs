@@ -300,7 +300,10 @@ impl Face {
             underline: overlay.underline.clone().or_else(|| self.underline.clone()),
             overline: overlay.overline.or(self.overline),
             strike_through: overlay.strike_through.or(self.strike_through),
-            box_border: overlay.box_border.clone().or_else(|| self.box_border.clone()),
+            box_border: overlay
+                .box_border
+                .clone()
+                .or_else(|| self.box_border.clone()),
             inverse_video: overlay.inverse_video.or(self.inverse_video),
             stipple: overlay.stipple.clone().or_else(|| self.stipple.clone()),
             extend: overlay.extend.or(self.extend),
@@ -378,7 +381,10 @@ impl Face {
             let key = match &plist[i] {
                 Value::Keyword(k) => k.as_str(),
                 Value::Symbol(s) => s.as_str(),
-                _ => { i += 2; continue; }
+                _ => {
+                    i += 2;
+                    continue;
+                }
             };
             let val = &plist[i + 1];
 
@@ -405,39 +411,35 @@ impl Face {
                         face.slant = FontSlant::from_symbol(s);
                     }
                 }
-                "height" => {
-                    match val {
-                        Value::Int(n) => face.height = Some(FaceHeight::Absolute(*n as i32)),
-                        Value::Float(f) => face.height = Some(FaceHeight::Relative(*f)),
-                        _ => {}
-                    }
-                }
+                "height" => match val {
+                    Value::Int(n) => face.height = Some(FaceHeight::Absolute(*n as i32)),
+                    Value::Float(f) => face.height = Some(FaceHeight::Relative(*f)),
+                    _ => {}
+                },
                 "family" => {
                     if let Some(s) = val.as_str() {
                         face.family = Some(s.to_string());
                     }
                 }
-                "underline" => {
-                    match val {
-                        Value::True => {
+                "underline" => match val {
+                    Value::True => {
+                        face.underline = Some(Underline {
+                            style: UnderlineStyle::Line,
+                            color: None,
+                            position: None,
+                        });
+                    }
+                    Value::Nil => face.underline = None,
+                    _ => {
+                        if let Some(s) = val.as_str() {
                             face.underline = Some(Underline {
                                 style: UnderlineStyle::Line,
-                                color: None,
+                                color: Color::parse(s),
                                 position: None,
                             });
                         }
-                        Value::Nil => face.underline = None,
-                        _ => {
-                            if let Some(s) = val.as_str() {
-                                face.underline = Some(Underline {
-                                    style: UnderlineStyle::Line,
-                                    color: Color::parse(s),
-                                    position: None,
-                                });
-                            }
-                        }
                     }
-                }
+                },
                 "overline" => {
                     face.overline = Some(val.is_truthy());
                 }
@@ -611,18 +613,30 @@ impl FaceTable {
         self.define(success);
 
         // font-lock faces
-        self.define_font_lock("font-lock-comment-face", Color::rgb(128, 128, 128), Some(FontSlant::Italic));
+        self.define_font_lock(
+            "font-lock-comment-face",
+            Color::rgb(128, 128, 128),
+            Some(FontSlant::Italic),
+        );
         self.define_font_lock("font-lock-string-face", Color::rgb(0, 128, 0), None);
         self.define_font_lock("font-lock-keyword-face", Color::rgb(128, 0, 128), None);
         self.define_font_lock("font-lock-function-name-face", Color::rgb(0, 0, 255), None);
-        self.define_font_lock("font-lock-variable-name-face", Color::rgb(139, 69, 19), None);
+        self.define_font_lock(
+            "font-lock-variable-name-face",
+            Color::rgb(139, 69, 19),
+            None,
+        );
         self.define_font_lock("font-lock-type-face", Color::rgb(0, 128, 0), None);
         self.define_font_lock("font-lock-constant-face", Color::rgb(0, 128, 128), None);
         self.define_font_lock("font-lock-builtin-face", Color::rgb(128, 0, 128), None);
         self.define_font_lock("font-lock-preprocessor-face", Color::rgb(128, 128, 0), None);
         self.define_font_lock("font-lock-negation-char-face", Color::rgb(255, 0, 0), None);
         self.define_font_lock("font-lock-warning-face", Color::rgb(255, 165, 0), None);
-        self.define_font_lock("font-lock-doc-face", Color::rgb(128, 128, 0), Some(FontSlant::Italic));
+        self.define_font_lock(
+            "font-lock-doc-face",
+            Color::rgb(128, 128, 0),
+            Some(FontSlant::Italic),
+        );
 
         // isearch
         let mut isearch = Face::new("isearch");

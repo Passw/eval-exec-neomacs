@@ -38,7 +38,12 @@ pub struct Rect {
 
 impl Rect {
     pub fn new(x: f32, y: f32, width: f32, height: f32) -> Self {
-        Self { x, y, width, height }
+        Self {
+            x,
+            y,
+            width,
+            height,
+        }
     }
 
     pub fn right(&self) -> f32 {
@@ -163,7 +168,13 @@ impl Window {
 
     /// Set the buffer displayed in this window (leaf only).
     pub fn set_buffer(&mut self, new_id: BufferId) {
-        if let Window::Leaf { buffer_id, window_start, point, .. } = self {
+        if let Window::Leaf {
+            buffer_id,
+            window_start,
+            point,
+            ..
+        } = self
+        {
             *buffer_id = new_id;
             *window_start = 0;
             *point = 0;
@@ -228,7 +239,9 @@ impl Window {
                     None
                 }
             }
-            Window::Internal { children, bounds, .. } => {
+            Window::Internal {
+                children, bounds, ..
+            } => {
                 if !bounds.contains(px, py) {
                     return None;
                 }
@@ -246,9 +259,7 @@ impl Window {
     pub fn leaf_count(&self) -> usize {
         match self {
             Window::Leaf { .. } => 1,
-            Window::Internal { children, .. } => {
-                children.iter().map(|c| c.leaf_count()).sum()
-            }
+            Window::Internal { children, .. } => children.iter().map(|c| c.leaf_count()).sum(),
         }
     }
 }
@@ -291,14 +302,11 @@ pub struct Frame {
 }
 
 impl Frame {
-    pub fn new(
-        id: FrameId,
-        name: String,
-        width: u32,
-        height: u32,
-        root_window: Window,
-    ) -> Self {
-        let selected = root_window.leaf_ids().first().copied()
+    pub fn new(id: FrameId, name: String, width: u32, height: u32, root_window: Window) -> Self {
+        let selected = root_window
+            .leaf_ids()
+            .first()
+            .copied()
             .unwrap_or(WindowId(0));
         Self {
             id,
@@ -501,11 +509,7 @@ impl FrameManager {
     }
 
     /// Delete a window from a frame. Cannot delete the last window.
-    pub fn delete_window(
-        &mut self,
-        frame_id: FrameId,
-        window_id: WindowId,
-    ) -> bool {
+    pub fn delete_window(&mut self, frame_id: FrameId, window_id: WindowId) -> bool {
         let Some(frame) = self.frames.get_mut(&frame_id) else {
             return false;
         };
@@ -612,7 +616,10 @@ fn split_window_in_tree(
 
 /// Delete a window from the tree. Returns true if found and removed.
 fn delete_window_in_tree(tree: &mut Window, target: WindowId) -> bool {
-    if let Window::Internal { children, bounds, .. } = tree {
+    if let Window::Internal {
+        children, bounds, ..
+    } = tree
+    {
         // Check if any direct child is the target.
         if let Some(idx) = children.iter().position(|c| c.id() == target) {
             children.remove(idx);
@@ -734,7 +741,8 @@ mod tests {
         let wid = mgr.get(fid).unwrap().window_list()[0];
 
         // Split first.
-        let new_wid = mgr.split_window(fid, wid, SplitDirection::Horizontal, BufferId(2))
+        let new_wid = mgr
+            .split_window(fid, wid, SplitDirection::Horizontal, BufferId(2))
             .unwrap();
 
         // Delete the new window.
@@ -757,14 +765,12 @@ mod tests {
         let fid = mgr.create_frame("F1", 800, 600, BufferId(1));
         let wid = mgr.get(fid).unwrap().window_list()[0];
 
-        let new_wid = mgr.split_window(fid, wid, SplitDirection::Horizontal, BufferId(2))
+        let new_wid = mgr
+            .split_window(fid, wid, SplitDirection::Horizontal, BufferId(2))
             .unwrap();
 
         assert!(mgr.get_mut(fid).unwrap().select_window(new_wid));
-        assert_eq!(
-            mgr.get(fid).unwrap().selected_window.0,
-            new_wid.0,
-        );
+        assert_eq!(mgr.get(fid).unwrap().selected_window.0, new_wid.0,);
     }
 
     #[test]

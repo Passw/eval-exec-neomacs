@@ -412,10 +412,7 @@ impl BufferManager {
 
     /// Find a buffer by name, returning its id if it exists.
     pub fn find_buffer_by_name(&self, name: &str) -> Option<BufferId> {
-        self.buffers
-            .values()
-            .find(|b| b.name == name)
-            .map(|b| b.id)
+        self.buffers.values().find(|b| b.name == name).map(|b| b.id)
     }
 
     /// Remove a buffer.  Returns `true` if the buffer existed.
@@ -905,10 +902,7 @@ mod tests {
         let mgr = BufferManager::new();
         // "*scratch*" is taken, "foo" is not.
         assert_eq!(mgr.generate_new_buffer_name("foo"), "foo");
-        assert_eq!(
-            mgr.generate_new_buffer_name("*scratch*"),
-            "*scratch*<2>"
-        );
+        assert_eq!(mgr.generate_new_buffer_name("*scratch*"), "*scratch*<2>");
     }
 
     #[test]

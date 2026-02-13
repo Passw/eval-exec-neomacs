@@ -103,10 +103,7 @@ impl OverlayList {
 
     /// Get the end position of an overlay.
     pub fn overlay_end(&self, id: u64) -> Option<usize> {
-        self.overlays
-            .iter()
-            .find(|ov| ov.id == id)
-            .map(|ov| ov.end)
+        self.overlays.iter().find(|ov| ov.id == id).map(|ov| ov.end)
     }
 
     /// Move an overlay to cover a new range `[start, end)`.

@@ -40,12 +40,10 @@ impl Hook {
     /// If `append` is false, adds at the beginning.
     pub fn add(&mut self, func: Value, append: bool) {
         // Don't add duplicates (compared by eq for symbols).
-        let already = self.functions.iter().any(|f| {
-            match (f, &func) {
-                (Value::Symbol(a), Value::Symbol(b)) => a == b,
-                (Value::Subr(a), Value::Subr(b)) => a == b,
-                _ => false,
-            }
+        let already = self.functions.iter().any(|f| match (f, &func) {
+            (Value::Symbol(a), Value::Symbol(b)) => a == b,
+            (Value::Subr(a), Value::Subr(b)) => a == b,
+            _ => false,
         });
 
         if !already {
@@ -59,12 +57,10 @@ impl Hook {
 
     /// Remove a function from the hook.
     pub fn remove(&mut self, func: &Value) {
-        self.functions.retain(|f| {
-            !match (f, func) {
-                (Value::Symbol(a), Value::Symbol(b)) => a == b,
-                (Value::Subr(a), Value::Subr(b)) => a == b,
-                _ => false,
-            }
+        self.functions.retain(|f| !match (f, func) {
+            (Value::Symbol(a), Value::Symbol(b)) => a == b,
+            (Value::Subr(a), Value::Subr(b)) => a == b,
+            _ => false,
         });
     }
 
@@ -158,7 +154,9 @@ impl HookManager {
 
     /// Get or create a hook.
     pub fn get_or_create(&mut self, name: &str) -> &mut Hook {
-        self.hooks.entry(name.to_string()).or_insert_with(|| Hook::new(name))
+        self.hooks
+            .entry(name.to_string())
+            .or_insert_with(|| Hook::new(name))
     }
 
     /// Get a hook by name.
@@ -185,7 +183,8 @@ impl HookManager {
 
     /// Get the list of functions for a hook (empty vec if not found).
     pub fn hook_functions(&self, name: &str) -> Vec<Value> {
-        self.hooks.get(name)
+        self.hooks
+            .get(name)
             .map(|h| h.functions.clone())
             .unwrap_or_default()
     }
@@ -285,10 +284,7 @@ mod tests {
 
         hook.remove(&Value::symbol("func-a"));
         assert_eq!(hook.len(), 1);
-        assert_eq!(
-            hook.functions()[0].as_symbol_name(),
-            Some("func-b"),
-        );
+        assert_eq!(hook.functions()[0].as_symbol_name(), Some("func-b"),);
     }
 
     #[test]

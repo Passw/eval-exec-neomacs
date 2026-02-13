@@ -10,8 +10,8 @@
 //! - Pre/post-command hooks
 //! - Prefix argument handling
 
-use crate::elisp::value::Value;
 use crate::elisp::keymap::Keymap;
+use crate::elisp::value::Value;
 use std::collections::VecDeque;
 
 // ---------------------------------------------------------------------------
@@ -22,7 +22,7 @@ use std::collections::VecDeque;
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash)]
 pub struct Modifiers {
     pub ctrl: bool,
-    pub meta: bool,  // Alt
+    pub meta: bool, // Alt
     pub shift: bool,
     pub super_: bool,
     pub hyper: bool,
@@ -34,25 +34,45 @@ impl Modifiers {
     }
 
     pub fn ctrl() -> Self {
-        Self { ctrl: true, ..Self::default() }
+        Self {
+            ctrl: true,
+            ..Self::default()
+        }
     }
 
     pub fn meta() -> Self {
-        Self { meta: true, ..Self::default() }
+        Self {
+            meta: true,
+            ..Self::default()
+        }
     }
 
     pub fn ctrl_meta() -> Self {
-        Self { ctrl: true, meta: true, ..Self::default() }
+        Self {
+            ctrl: true,
+            meta: true,
+            ..Self::default()
+        }
     }
 
     /// Convert to Emacs modifier bitmask.
     pub fn to_bits(&self) -> u32 {
         let mut bits = 0u32;
-        if self.ctrl { bits |= 1 << 26; }
-        if self.meta { bits |= 1 << 27; }
-        if self.shift { bits |= 1 << 25; }
-        if self.super_ { bits |= 1 << 23; }
-        if self.hyper { bits |= 1 << 24; }
+        if self.ctrl {
+            bits |= 1 << 26;
+        }
+        if self.meta {
+            bits |= 1 << 27;
+        }
+        if self.shift {
+            bits |= 1 << 25;
+        }
+        if self.super_ {
+            bits |= 1 << 23;
+        }
+        if self.hyper {
+            bits |= 1 << 24;
+        }
         bits
     }
 
@@ -70,11 +90,21 @@ impl Modifiers {
     /// Format as Emacs modifier prefix (e.g., "C-M-").
     pub fn prefix_string(&self) -> String {
         let mut s = String::new();
-        if self.hyper { s.push_str("H-"); }
-        if self.super_ { s.push_str("s-"); }
-        if self.ctrl { s.push_str("C-"); }
-        if self.meta { s.push_str("M-"); }
-        if self.shift { s.push_str("S-"); }
+        if self.hyper {
+            s.push_str("H-");
+        }
+        if self.super_ {
+            s.push_str("s-");
+        }
+        if self.ctrl {
+            s.push_str("C-");
+        }
+        if self.meta {
+            s.push_str("M-");
+        }
+        if self.shift {
+            s.push_str("S-");
+        }
         s
     }
 
@@ -220,14 +250,17 @@ impl KeyEvent {
             "<up>" => Key::Named(NamedKey::Up),
             "<down>" => Key::Named(NamedKey::Down),
             s if s.starts_with("<f") && s.ends_with('>') => {
-                let n: u8 = s[2..s.len()-1].parse().ok()?;
+                let n: u8 = s[2..s.len() - 1].parse().ok()?;
                 Key::Named(NamedKey::F(n))
             }
             s if s.len() == 1 => Key::Char(s.chars().next()?),
             _ => return None,
         };
 
-        Some(KeyEvent { key, modifiers: mods })
+        Some(KeyEvent {
+            key,
+            modifiers: mods,
+        })
     }
 
     /// Convert to Emacs integer event representation.
@@ -262,7 +295,9 @@ impl KeySequence {
     }
 
     pub fn single(event: KeyEvent) -> Self {
-        Self { events: vec![event] }
+        Self {
+            events: vec![event],
+        }
     }
 
     pub fn push(&mut self, event: KeyEvent) {
@@ -279,7 +314,8 @@ impl KeySequence {
 
     /// Format as Emacs key sequence description.
     pub fn to_description(&self) -> String {
-        self.events.iter()
+        self.events
+            .iter()
             .map(|e| e.to_description())
             .collect::<Vec<_>>()
             .join(" ")
@@ -288,7 +324,8 @@ impl KeySequence {
     /// Parse an Emacs key sequence description (e.g., "C-x C-f").
     pub fn from_description(desc: &str) -> Option<Self> {
         let parts: Vec<&str> = desc.split_whitespace().collect();
-        let events: Option<Vec<KeyEvent>> = parts.iter()
+        let events: Option<Vec<KeyEvent>> = parts
+            .iter()
             .map(|p| KeyEvent::from_description(p))
             .collect();
         events.map(|e| Self { events: e })
@@ -318,11 +355,7 @@ pub enum InputEvent {
         modifiers: Modifiers,
     },
     /// Mouse button release.
-    MouseRelease {
-        button: MouseButton,
-        x: f32,
-        y: f32,
-    },
+    MouseRelease { button: MouseButton, x: f32, y: f32 },
     /// Mouse movement.
     MouseMove {
         x: f32,
@@ -805,7 +838,13 @@ mod tests {
 
     #[test]
     fn modifier_bits_round_trip() {
-        let m = Modifiers { ctrl: true, meta: true, shift: false, super_: false, hyper: false };
+        let m = Modifiers {
+            ctrl: true,
+            meta: true,
+            shift: false,
+            super_: false,
+            hyper: false,
+        };
         let bits = m.to_bits();
         let m2 = Modifiers::from_bits(bits);
         assert_eq!(m, m2);

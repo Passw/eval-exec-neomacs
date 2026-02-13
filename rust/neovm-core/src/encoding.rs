@@ -121,27 +121,15 @@ pub fn is_multibyte_string(s: &str) -> bool {
 /// Currently only UTF-8 is supported.
 pub fn encode_string(s: &str, coding_system: &str) -> Vec<u8> {
     match coding_system {
-        "utf-8" | "utf-8-unix" | "utf-8-dos" | "utf-8-mac" => {
-            s.as_bytes().to_vec()
-        }
-        "latin-1" | "iso-8859-1" | "iso-latin-1" => {
-            s.chars().map(|c| {
-                if (c as u32) <= 0xff {
-                    c as u8
-                } else {
-                    b'?'
-                }
-            }).collect()
-        }
-        "ascii" | "us-ascii" => {
-            s.chars().map(|c| {
-                if c.is_ascii() {
-                    c as u8
-                } else {
-                    b'?'
-                }
-            }).collect()
-        }
+        "utf-8" | "utf-8-unix" | "utf-8-dos" | "utf-8-mac" => s.as_bytes().to_vec(),
+        "latin-1" | "iso-8859-1" | "iso-latin-1" => s
+            .chars()
+            .map(|c| if (c as u32) <= 0xff { c as u8 } else { b'?' })
+            .collect(),
+        "ascii" | "us-ascii" => s
+            .chars()
+            .map(|c| if c.is_ascii() { c as u8 } else { b'?' })
+            .collect(),
         _ => s.as_bytes().to_vec(), // default to UTF-8
     }
 }
@@ -153,14 +141,11 @@ pub fn decode_bytes(bytes: &[u8], coding_system: &str) -> String {
         "utf-8" | "utf-8-unix" | "utf-8-dos" | "utf-8-mac" => {
             String::from_utf8_lossy(bytes).into_owned()
         }
-        "latin-1" | "iso-8859-1" | "iso-latin-1" => {
-            bytes.iter().map(|&b| b as char).collect()
-        }
-        "ascii" | "us-ascii" => {
-            bytes.iter().map(|&b| {
-                if b < 128 { b as char } else { '?' }
-            }).collect()
-        }
+        "latin-1" | "iso-8859-1" | "iso-latin-1" => bytes.iter().map(|&b| b as char).collect(),
+        "ascii" | "us-ascii" => bytes
+            .iter()
+            .map(|&b| if b < 128 { b as char } else { '?' })
+            .collect(),
         _ => String::from_utf8_lossy(bytes).into_owned(),
     }
 }
@@ -219,7 +204,11 @@ fn expect_args(name: &str, args: &[Value], n: usize) -> Result<(), crate::elisp:
     }
 }
 
-fn expect_min_args(name: &str, args: &[Value], min: usize) -> Result<(), crate::elisp::error::Flow> {
+fn expect_min_args(
+    name: &str,
+    args: &[Value],
+    min: usize,
+) -> Result<(), crate::elisp::error::Flow> {
     if args.len() < min {
         Err(signal(
             "wrong-number-of-arguments",
@@ -246,10 +235,12 @@ pub fn builtin_char_width(args: Vec<Value>) -> EvalResult {
     let c = match &args[0] {
         Value::Char(c) => *c,
         Value::Int(n) => char::from_u32(*n as u32).unwrap_or('?'),
-        other => return Err(signal(
-            "wrong-type-argument",
-            vec![Value::symbol("characterp"), other.clone()],
-        )),
+        other => {
+            return Err(signal(
+                "wrong-type-argument",
+                vec![Value::symbol("characterp"), other.clone()],
+            ))
+        }
     };
     Ok(Value::Int(char_width(c) as i64))
 }
@@ -282,10 +273,12 @@ pub fn builtin_encode_coding_string(args: Vec<Value>) -> EvalResult {
     let coding = match &args[1] {
         Value::Symbol(s) => s.clone(),
         Value::Str(s) => (**s).clone(),
-        other => return Err(signal(
-            "wrong-type-argument",
-            vec![Value::symbol("symbolp"), other.clone()],
-        )),
+        other => {
+            return Err(signal(
+                "wrong-type-argument",
+                vec![Value::symbol("symbolp"), other.clone()],
+            ))
+        }
     };
     let bytes = encode_string(&s, &coding);
     // Return as unibyte string (for now, just convert back)
@@ -300,10 +293,12 @@ pub fn builtin_decode_coding_string(args: Vec<Value>) -> EvalResult {
     let coding = match &args[1] {
         Value::Symbol(s) => s.clone(),
         Value::Str(s) => (**s).clone(),
-        other => return Err(signal(
-            "wrong-type-argument",
-            vec![Value::symbol("symbolp"), other.clone()],
-        )),
+        other => {
+            return Err(signal(
+                "wrong-type-argument",
+                vec![Value::symbol("symbolp"), other.clone()],
+            ))
+        }
     };
     let bytes: Vec<u8> = s.chars().map(|c| c as u8).collect();
     let result = decode_bytes(&bytes, &coding);
@@ -313,7 +308,10 @@ pub fn builtin_decode_coding_string(args: Vec<Value>) -> EvalResult {
 /// `(char-or-string-p OBJ)` -> t or nil
 pub fn builtin_char_or_string_p(args: Vec<Value>) -> EvalResult {
     expect_args("char-or-string-p", &args, 1)?;
-    Ok(Value::bool(matches!(&args[0], Value::Char(_) | Value::Str(_) | Value::Int(_))))
+    Ok(Value::bool(matches!(
+        &args[0],
+        Value::Char(_) | Value::Str(_) | Value::Int(_)
+    )))
 }
 
 /// `(max-char)` -> integer

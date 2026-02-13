@@ -128,7 +128,13 @@ mod tests {
 
     #[test]
     fn tag_round_trip() {
-        for tag in [GcTag::Cons, GcTag::String, GcTag::Vector, GcTag::Lambda, GcTag::Symbol] {
+        for tag in [
+            GcTag::Cons,
+            GcTag::String,
+            GcTag::Vector,
+            GcTag::Lambda,
+            GcTag::Symbol,
+        ] {
             assert_eq!(GcTag::from_u8(tag as u8), Some(tag));
         }
     }

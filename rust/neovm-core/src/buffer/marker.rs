@@ -435,15 +435,15 @@ mod tests {
     #[test]
     fn delete_multiple_markers_mixed_positions() {
         let mut set = MarkerSet::new();
-        set.add(1, 3, InsertionType::Before);  // before region
-        set.add(2, 7, InsertionType::After);    // inside region
-        set.add(3, 15, InsertionType::Before);  // after region
+        set.add(1, 3, InsertionType::Before); // before region
+        set.add(2, 7, InsertionType::After); // inside region
+        set.add(3, 15, InsertionType::Before); // after region
 
         // Delete bytes [5, 10).
         set.adjust_for_delete(5, 10);
 
-        assert_eq!(set.position(1), Some(3));  // unchanged
-        assert_eq!(set.position(2), Some(5));  // clamped to start
+        assert_eq!(set.position(1), Some(3)); // unchanged
+        assert_eq!(set.position(2), Some(5)); // clamped to start
         assert_eq!(set.position(3), Some(10)); // shifted back by 5
     }
 
@@ -580,7 +580,7 @@ mod tests {
         // Insert 3 bytes at position 10.
         set.adjust_for_insert(10, 3);
 
-        assert_eq!(set.position(1), Some(5));  // before: unchanged
+        assert_eq!(set.position(1), Some(5)); // before: unchanged
         assert_eq!(set.position(2), Some(13)); // at insert, After: moved
         assert_eq!(set.position(3), Some(18)); // after: shifted
     }

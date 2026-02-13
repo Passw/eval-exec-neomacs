@@ -140,7 +140,9 @@ impl GcHeap {
 
     /// Read the car of a cons cell.
     pub fn cons_car(&self, handle: GcRef) -> GcRef {
-        if handle.is_nil() { return GcRef::NIL; }
+        if handle.is_nil() {
+            return GcRef::NIL;
+        }
         let offset = match self.handles.get(&handle.0) {
             Some(&off) => off,
             None => return GcRef::NIL,
@@ -151,7 +153,9 @@ impl GcHeap {
 
     /// Read the cdr of a cons cell.
     pub fn cons_cdr(&self, handle: GcRef) -> GcRef {
-        if handle.is_nil() { return GcRef::NIL; }
+        if handle.is_nil() {
+            return GcRef::NIL;
+        }
         let offset = match self.handles.get(&handle.0) {
             Some(&off) => off,
             None => return GcRef::NIL,
@@ -162,7 +166,9 @@ impl GcHeap {
 
     /// Set the car of a cons cell.
     pub fn set_cons_car(&mut self, handle: GcRef, car: GcRef) {
-        if handle.is_nil() { return; }
+        if handle.is_nil() {
+            return;
+        }
         if let Some(&offset) = self.handles.get(&handle.0) {
             let payload_offset = offset + ObjHeader::SIZE;
             self.write_u64(payload_offset, car.0);
@@ -171,7 +177,9 @@ impl GcHeap {
 
     /// Set the cdr of a cons cell.
     pub fn set_cons_cdr(&mut self, handle: GcRef, cdr: GcRef) {
-        if handle.is_nil() { return; }
+        if handle.is_nil() {
+            return;
+        }
         if let Some(&offset) = self.handles.get(&handle.0) {
             let payload_offset = offset + ObjHeader::SIZE;
             self.write_u64(payload_offset + 8, cdr.0);
@@ -194,10 +202,14 @@ impl GcHeap {
 
     /// Read a string from a handle.
     pub fn get_string(&self, handle: GcRef) -> Option<String> {
-        if handle.is_nil() { return None; }
+        if handle.is_nil() {
+            return None;
+        }
         let offset = *self.handles.get(&handle.0)?;
         let header = self.read_header(offset);
-        if header.gc_tag() != Some(GcTag::String) { return None; }
+        if header.gc_tag() != Some(GcTag::String) {
+            return None;
+        }
         let payload_offset = offset + ObjHeader::SIZE;
         let len = self.read_u64(payload_offset) as usize;
         let bytes = &self.from_space[payload_offset + 8..payload_offset + 8 + len];
@@ -220,31 +232,41 @@ impl GcHeap {
 
     /// Read a vector element.
     pub fn vector_ref(&self, handle: GcRef, index: usize) -> Option<GcRef> {
-        if handle.is_nil() { return None; }
+        if handle.is_nil() {
+            return None;
+        }
         let offset = *self.handles.get(&handle.0)?;
         let payload_offset = offset + ObjHeader::SIZE;
         let len = self.read_u64(payload_offset) as usize;
-        if index >= len { return None; }
+        if index >= len {
+            return None;
+        }
         Some(GcRef(self.read_u64(payload_offset + 8 + index * 8)))
     }
 
     /// Set a vector element.
     pub fn vector_set(&mut self, handle: GcRef, index: usize, value: GcRef) -> bool {
-        if handle.is_nil() { return false; }
+        if handle.is_nil() {
+            return false;
+        }
         let offset = match self.handles.get(&handle.0) {
             Some(&off) => off,
             None => return false,
         };
         let payload_offset = offset + ObjHeader::SIZE;
         let len = self.read_u64(payload_offset) as usize;
-        if index >= len { return false; }
+        if index >= len {
+            return false;
+        }
         self.write_u64(payload_offset + 8 + index * 8, value.0);
         true
     }
 
     /// Vector length.
     pub fn vector_len(&self, handle: GcRef) -> usize {
-        if handle.is_nil() { return 0; }
+        if handle.is_nil() {
+            return 0;
+        }
         let offset = match self.handles.get(&handle.0) {
             Some(&off) => off,
             None => return 0,
@@ -255,7 +277,9 @@ impl GcHeap {
 
     /// Get the tag of an object.
     pub fn tag(&self, handle: GcRef) -> Option<GcTag> {
-        if handle.is_nil() { return None; }
+        if handle.is_nil() {
+            return None;
+        }
         let offset = *self.handles.get(&handle.0)?;
         let header = self.read_header(offset);
         header.gc_tag()
@@ -375,7 +399,9 @@ impl GcHeap {
         to_ptr: &mut usize,
         new_offsets: &mut HashMap<u64, usize>,
     ) -> u64 {
-        if handle_id == 0 { return 0; }
+        if handle_id == 0 {
+            return 0;
+        }
 
         // Already copied?
         if new_offsets.contains_key(&handle_id) {

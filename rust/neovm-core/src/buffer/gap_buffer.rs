@@ -111,7 +111,11 @@ impl GapBuffer {
     ///
     /// Panics if `pos >= self.len()`.
     pub fn byte_at(&self, pos: usize) -> u8 {
-        assert!(pos < self.len(), "byte_at: position {pos} out of range (len {})", self.len());
+        assert!(
+            pos < self.len(),
+            "byte_at: position {pos} out of range (len {})",
+            self.len()
+        );
         if pos < self.gap_start {
             self.buf[pos]
         } else {
@@ -140,8 +144,7 @@ impl GapBuffer {
         for i in 0..char_len {
             tmp[i] = self.byte_at(pos + i);
         }
-        let s = std::str::from_utf8(&tmp[..char_len])
-            .expect("char_at: invalid UTF-8 sequence");
+        let s = std::str::from_utf8(&tmp[..char_len]).expect("char_at: invalid UTF-8 sequence");
         s.chars().next()
     }
 
@@ -156,7 +159,11 @@ impl GapBuffer {
     /// Panics if `start > end` or `end > self.len()`.
     pub fn text_range(&self, start: usize, end: usize) -> String {
         assert!(start <= end, "text_range: start ({start}) > end ({end})");
-        assert!(end <= self.len(), "text_range: end ({end}) > len ({})", self.len());
+        assert!(
+            end <= self.len(),
+            "text_range: end ({end}) > len ({})",
+            self.len()
+        );
         if start == end {
             return String::new();
         }
@@ -297,7 +304,8 @@ impl GapBuffer {
             let count = pos - self.gap_start;
             let src_start = self.gap_end;
             let dst_start = self.gap_start;
-            self.buf.copy_within(src_start..src_start + count, dst_start);
+            self.buf
+                .copy_within(src_start..src_start + count, dst_start);
             self.gap_start = pos;
             self.gap_end = pos + gap;
         }
@@ -800,7 +808,7 @@ mod tests {
     #[test]
     fn delete_multibyte_char() {
         let mut buf = GapBuffer::from_str("a\u{4F60}b"); // a你b
-        // Delete the CJK char (bytes 1..4).
+                                                         // Delete the CJK char (bytes 1..4).
         buf.delete_range(1, 4);
         assert_eq!(buf.to_string(), "ab");
     }
@@ -881,7 +889,7 @@ mod tests {
         let mut buf = GapBuffer::from_str("a\u{4F60}b\u{597D}c");
         // Move gap to middle of the text.
         buf.move_gap_to(4); // between 你 and b
-        // Conversions should be unaffected by gap position.
+                            // Conversions should be unaffected by gap position.
         assert_eq!(buf.byte_to_char(0), 0);
         assert_eq!(buf.byte_to_char(1), 1);
         assert_eq!(buf.byte_to_char(4), 2);
@@ -905,7 +913,7 @@ mod tests {
     #[test]
     fn byte_to_char_emoji() {
         let buf = GapBuffer::from_str("x\u{1F600}y"); // x😀y
-        // byte offsets: x=0, 😀=1..5, y=5
+                                                      // byte offsets: x=0, 😀=1..5, y=5
         assert_eq!(buf.byte_to_char(0), 0);
         assert_eq!(buf.byte_to_char(1), 1);
         assert_eq!(buf.byte_to_char(5), 2);
