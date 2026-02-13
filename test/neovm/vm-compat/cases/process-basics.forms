@@ -60,6 +60,17 @@
   (list
    (call-process "cat" "/etc/passwd" t nil)
    (> (length (buffer-string)) 0)))
+(with-temp-buffer
+  (insert "abc")
+  (list (call-process-region nil nil "cat" nil t nil)
+        (buffer-string)))
+(with-temp-buffer
+  (insert "abc")
+  (list (call-process-region "xyz" nil "cat" nil t nil)
+        (buffer-string)))
+(condition-case err
+    (call-process-region "xyz" nil "cat" t t nil)
+  (error (car err)))
 (condition-case err
     (call-process "cat" "/nonexistent/neovm-vm-compat-process-infile")
   (error (car err)))

@@ -200,13 +200,13 @@ fn expect_string(value: &Value) -> Result<String, Flow> {
     }
 }
 
-fn expect_int(value: &Value) -> Result<i64, Flow> {
+fn expect_int_or_marker(value: &Value) -> Result<i64, Flow> {
     match value {
         Value::Int(n) => Ok(*n),
         Value::Char(c) => Ok(*c as i64),
         other => Err(signal(
             "wrong-type-argument",
-            vec![Value::symbol("integerp"), other.clone()],
+            vec![Value::symbol("integer-or-marker-p"), other.clone()],
         )),
     }
 }
@@ -604,8 +604,6 @@ pub(crate) fn builtin_call_process_region(
     args: Vec<Value>,
 ) -> EvalResult {
     expect_min_args("call-process-region", &args, 3)?;
-    let start = expect_int(&args[0])? as usize;
-    let end = expect_int(&args[1])? as usize;
     let program = expect_string(&args[2])?;
 
     let delete = args.len() > 3 && args[3].is_truthy();
@@ -626,28 +624,63 @@ pub(crate) fn builtin_call_process_region(
         Vec::new()
     };
 
-    // Extract the region text from current buffer.
-    let region_text = {
-        let buf = eval
-            .buffers
-            .current_buffer()
-            .ok_or_else(|| signal("error", vec![Value::string("No current buffer")]))?;
-        // Convert 1-based Emacs positions to 0-based byte positions.
-        let beg = (start.saturating_sub(1)).min(buf.text.len());
-        let e = (end.saturating_sub(1)).min(buf.text.len());
-        buf.text.text_range(beg, e)
-    };
+    // START semantics:
+    // - nil => use whole buffer contents, ignore END
+    // - string => use that string as stdin, ignore END
+    // - integer/marker => use region START..END
+    let region_text = match &args[0] {
+        Value::Nil => {
+            let (text, maybe_delete_range) = {
+                let buf = eval
+                    .buffers
+                    .current_buffer()
+                    .ok_or_else(|| signal("error", vec![Value::string("No current buffer")]))?;
+                let len = buf.text.len();
+                (buf.text.text_range(0, len), (0usize, len))
+            };
+            if delete {
+                let buf = eval
+                    .buffers
+                    .current_buffer_mut()
+                    .ok_or_else(|| signal("error", vec![Value::string("No current buffer")]))?;
+                buf.delete_region(maybe_delete_range.0, maybe_delete_range.1);
+            }
+            text
+        }
+        Value::Str(s) => {
+            if delete {
+                return Err(signal(
+                    "wrong-type-argument",
+                    vec![Value::symbol("integer-or-marker-p"), args[0].clone()],
+                ));
+            }
+            (**s).clone()
+        }
+        _ => {
+            let start = expect_int_or_marker(&args[0])? as usize;
+            let end = expect_int_or_marker(&args[1])? as usize;
+            let (text, beg, e) = {
+                let buf = eval
+                    .buffers
+                    .current_buffer()
+                    .ok_or_else(|| signal("error", vec![Value::string("No current buffer")]))?;
+                // Convert 1-based Emacs positions to 0-based byte positions.
+                let beg = (start.saturating_sub(1)).min(buf.text.len());
+                let e = (end.saturating_sub(1)).min(buf.text.len());
+                (buf.text.text_range(beg, e), beg, e)
+            };
 
-    // Optionally delete the region from the buffer.
-    if delete {
-        let buf = eval
-            .buffers
-            .current_buffer_mut()
-            .ok_or_else(|| signal("error", vec![Value::string("No current buffer")]))?;
-        let beg = (start.saturating_sub(1)).min(buf.text.len());
-        let e = (end.saturating_sub(1)).min(buf.text.len());
-        buf.delete_region(beg, e);
-    }
+            if delete {
+                let buf = eval
+                    .buffers
+                    .current_buffer_mut()
+                    .ok_or_else(|| signal("error", vec![Value::string("No current buffer")]))?;
+                buf.delete_region(beg, e);
+            }
+
+            text
+        }
+    };
 
     use std::io::Write;
     if destination_spec.no_wait {
@@ -1226,6 +1259,41 @@ mod tests {
         assert_eq!(results[0], "OK 0");
         assert_eq!(results[1], r#"OK "abc""#);
         let _ = std::fs::remove_file(&out);
+    }
+
+    #[test]
+    fn call_process_region_start_nil_uses_whole_buffer() {
+        let cat = find_bin("cat");
+        let results = eval_all(&format!(
+            r#"(with-temp-buffer
+                 (insert "abc")
+                 (list (call-process-region nil nil "{cat}" nil t nil)
+                       (buffer-string)))"#
+        ));
+        assert_eq!(results[0], r#"OK (0 "abcabc")"#);
+    }
+
+    #[test]
+    fn call_process_region_start_string_uses_string_input() {
+        let cat = find_bin("cat");
+        let results = eval_all(&format!(
+            r#"(with-temp-buffer
+                 (insert "abc")
+                 (list (call-process-region "xyz" nil "{cat}" nil t nil)
+                       (buffer-string)))"#
+        ));
+        assert_eq!(results[0], r#"OK (0 "abcxyz")"#);
+    }
+
+    #[test]
+    fn call_process_region_start_string_with_delete_signals_wrong_type() {
+        let cat = find_bin("cat");
+        let result = eval_one(&format!(
+            r#"(condition-case err
+                   (call-process-region "xyz" nil "{cat}" t t nil)
+                 (error (car err)))"#
+        ));
+        assert_eq!(result, "OK wrong-type-argument");
     }
 
     #[test]
