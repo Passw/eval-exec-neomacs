@@ -539,9 +539,14 @@ fn expect_string_strict(value: &Value) -> Result<String, Flow> {
 /// (expand-file-name NAME &optional DEFAULT-DIRECTORY) -> string
 pub(crate) fn builtin_expand_file_name(args: Vec<Value>) -> EvalResult {
     expect_min_args("expand-file-name", &args, 1)?;
-    let name = expect_string(&args[0])?;
-    let default_dir = if args.len() > 1 && args[1].is_truthy() {
-        Some(expect_string(&args[1])?)
+    let name = expect_string_strict(&args[0])?;
+    let default_dir = if let Some(arg) = args.get(1) {
+        match arg {
+            Value::Nil => None,
+            Value::Str(s) => Some((**s).clone()),
+            // Emacs treats non-string DEFAULT-DIRECTORY as root.
+            _ => Some("/".to_string()),
+        }
     } else {
         None
     };
@@ -554,7 +559,7 @@ pub(crate) fn builtin_expand_file_name(args: Vec<Value>) -> EvalResult {
 /// (file-name-directory FILENAME) -> string or nil
 pub(crate) fn builtin_file_name_directory(args: Vec<Value>) -> EvalResult {
     expect_args("file-name-directory", &args, 1)?;
-    let filename = expect_string(&args[0])?;
+    let filename = expect_string_strict(&args[0])?;
     match file_name_directory(&filename) {
         Some(dir) => Ok(Value::string(dir)),
         None => Ok(Value::Nil),
@@ -564,14 +569,14 @@ pub(crate) fn builtin_file_name_directory(args: Vec<Value>) -> EvalResult {
 /// (file-name-nondirectory FILENAME) -> string
 pub(crate) fn builtin_file_name_nondirectory(args: Vec<Value>) -> EvalResult {
     expect_args("file-name-nondirectory", &args, 1)?;
-    let filename = expect_string(&args[0])?;
+    let filename = expect_string_strict(&args[0])?;
     Ok(Value::string(file_name_nondirectory(&filename)))
 }
 
 /// (file-name-extension FILENAME) -> string or nil
 pub(crate) fn builtin_file_name_extension(args: Vec<Value>) -> EvalResult {
     expect_args("file-name-extension", &args, 1)?;
-    let filename = expect_string(&args[0])?;
+    let filename = expect_string_strict(&args[0])?;
     match file_name_extension(&filename) {
         Some(ext) => Ok(Value::string(ext)),
         None => Ok(Value::Nil),
@@ -581,21 +586,21 @@ pub(crate) fn builtin_file_name_extension(args: Vec<Value>) -> EvalResult {
 /// (file-name-sans-extension FILENAME) -> string
 pub(crate) fn builtin_file_name_sans_extension(args: Vec<Value>) -> EvalResult {
     expect_args("file-name-sans-extension", &args, 1)?;
-    let filename = expect_string(&args[0])?;
+    let filename = expect_string_strict(&args[0])?;
     Ok(Value::string(file_name_sans_extension(&filename)))
 }
 
 /// (file-name-as-directory FILENAME) -> string
 pub(crate) fn builtin_file_name_as_directory(args: Vec<Value>) -> EvalResult {
     expect_args("file-name-as-directory", &args, 1)?;
-    let filename = expect_string(&args[0])?;
+    let filename = expect_string_strict(&args[0])?;
     Ok(Value::string(file_name_as_directory(&filename)))
 }
 
 /// (directory-file-name FILENAME) -> string
 pub(crate) fn builtin_directory_file_name(args: Vec<Value>) -> EvalResult {
     expect_args("directory-file-name", &args, 1)?;
-    let filename = expect_string(&args[0])?;
+    let filename = expect_string_strict(&args[0])?;
     Ok(Value::string(directory_file_name(&filename)))
 }
 
@@ -649,49 +654,49 @@ pub(crate) fn builtin_substitute_in_file_name(args: Vec<Value>) -> EvalResult {
 /// (file-exists-p FILENAME) -> t or nil
 pub(crate) fn builtin_file_exists_p(args: Vec<Value>) -> EvalResult {
     expect_args("file-exists-p", &args, 1)?;
-    let filename = expect_string(&args[0])?;
+    let filename = expect_string_strict(&args[0])?;
     Ok(Value::bool(file_exists_p(&filename)))
 }
 
 /// (file-readable-p FILENAME) -> t or nil
 pub(crate) fn builtin_file_readable_p(args: Vec<Value>) -> EvalResult {
     expect_args("file-readable-p", &args, 1)?;
-    let filename = expect_string(&args[0])?;
+    let filename = expect_string_strict(&args[0])?;
     Ok(Value::bool(file_readable_p(&filename)))
 }
 
 /// (file-writable-p FILENAME) -> t or nil
 pub(crate) fn builtin_file_writable_p(args: Vec<Value>) -> EvalResult {
     expect_args("file-writable-p", &args, 1)?;
-    let filename = expect_string(&args[0])?;
+    let filename = expect_string_strict(&args[0])?;
     Ok(Value::bool(file_writable_p(&filename)))
 }
 
 /// (file-directory-p FILENAME) -> t or nil
 pub(crate) fn builtin_file_directory_p(args: Vec<Value>) -> EvalResult {
     expect_args("file-directory-p", &args, 1)?;
-    let filename = expect_string(&args[0])?;
+    let filename = expect_string_strict(&args[0])?;
     Ok(Value::bool(file_directory_p(&filename)))
 }
 
 /// (file-regular-p FILENAME) -> t or nil
 pub(crate) fn builtin_file_regular_p(args: Vec<Value>) -> EvalResult {
     expect_args("file-regular-p", &args, 1)?;
-    let filename = expect_string(&args[0])?;
+    let filename = expect_string_strict(&args[0])?;
     Ok(Value::bool(file_regular_p(&filename)))
 }
 
 /// (file-symlink-p FILENAME) -> t or nil
 pub(crate) fn builtin_file_symlink_p(args: Vec<Value>) -> EvalResult {
     expect_args("file-symlink-p", &args, 1)?;
-    let filename = expect_string(&args[0])?;
+    let filename = expect_string_strict(&args[0])?;
     Ok(Value::bool(file_symlink_p(&filename)))
 }
 
 /// (delete-file FILENAME) -> nil
 pub(crate) fn builtin_delete_file(args: Vec<Value>) -> EvalResult {
     expect_args("delete-file", &args, 1)?;
-    let filename = expect_string(&args[0])?;
+    let filename = expect_string_strict(&args[0])?;
     delete_file(&filename).map_err(|e| signal("file-error", vec![Value::string(e)]))?;
     Ok(Value::Nil)
 }
@@ -699,8 +704,8 @@ pub(crate) fn builtin_delete_file(args: Vec<Value>) -> EvalResult {
 /// (rename-file FROM TO) -> nil
 pub(crate) fn builtin_rename_file(args: Vec<Value>) -> EvalResult {
     expect_args("rename-file", &args, 2)?;
-    let from = expect_string(&args[0])?;
-    let to = expect_string(&args[1])?;
+    let from = expect_string_strict(&args[0])?;
+    let to = expect_string_strict(&args[1])?;
     rename_file(&from, &to).map_err(|e| signal("file-error", vec![Value::string(e)]))?;
     Ok(Value::Nil)
 }
@@ -708,8 +713,8 @@ pub(crate) fn builtin_rename_file(args: Vec<Value>) -> EvalResult {
 /// (copy-file FROM TO) -> nil
 pub(crate) fn builtin_copy_file(args: Vec<Value>) -> EvalResult {
     expect_min_args("copy-file", &args, 2)?;
-    let from = expect_string(&args[0])?;
-    let to = expect_string(&args[1])?;
+    let from = expect_string_strict(&args[0])?;
+    let to = expect_string_strict(&args[1])?;
     copy_file(&from, &to).map_err(|e| signal("file-error", vec![Value::string(e)]))?;
     Ok(Value::Nil)
 }
@@ -717,7 +722,7 @@ pub(crate) fn builtin_copy_file(args: Vec<Value>) -> EvalResult {
 /// (make-directory DIR &optional PARENTS) -> nil
 pub(crate) fn builtin_make_directory(args: Vec<Value>) -> EvalResult {
     expect_min_args("make-directory", &args, 1)?;
-    let dir = expect_string(&args[0])?;
+    let dir = expect_string_strict(&args[0])?;
     let parents = args.get(1).is_some_and(|v| v.is_truthy());
     make_directory(&dir, parents).map_err(|e| signal("file-error", vec![Value::string(e)]))?;
     Ok(Value::Nil)
@@ -726,11 +731,11 @@ pub(crate) fn builtin_make_directory(args: Vec<Value>) -> EvalResult {
 /// (directory-files DIR &optional FULL MATCH) -> list of strings
 pub(crate) fn builtin_directory_files(args: Vec<Value>) -> EvalResult {
     expect_min_args("directory-files", &args, 1)?;
-    let dir = expect_string(&args[0])?;
+    let dir = expect_string_strict(&args[0])?;
     let full = args.get(1).is_some_and(|v| v.is_truthy());
     let match_pattern = if let Some(val) = args.get(2) {
         if val.is_truthy() {
-            Some(expect_string(val)?)
+            Some(expect_string_strict(val)?)
         } else {
             None
         }
@@ -1303,6 +1308,10 @@ mod tests {
         let result = builtin_expand_file_name(vec![Value::string("/usr/local/bin/emacs")]);
         assert!(result.is_ok());
         assert_eq!(result.unwrap().as_str(), Some("/usr/local/bin/emacs"));
+
+        // Emacs treats non-string DEFAULT-DIRECTORY as root.
+        let result = builtin_expand_file_name(vec![Value::string("a"), Value::symbol("x")]);
+        assert_eq!(result.unwrap().as_str(), Some("/a"));
     }
 
     #[test]
@@ -1350,6 +1359,16 @@ mod tests {
     }
 
     #[test]
+    fn test_builtin_file_name_ops_strict_types() {
+        assert!(builtin_file_name_directory(vec![Value::symbol("x")]).is_err());
+        assert!(builtin_file_name_nondirectory(vec![Value::symbol("x")]).is_err());
+        assert!(builtin_file_name_extension(vec![Value::symbol("x")]).is_err());
+        assert!(builtin_file_name_sans_extension(vec![Value::symbol("x")]).is_err());
+        assert!(builtin_file_name_as_directory(vec![Value::symbol("x")]).is_err());
+        assert!(builtin_directory_file_name(vec![Value::symbol("x")]).is_err());
+    }
+
+    #[test]
     fn test_builtin_file_name_concat_strict_types() {
         let result = builtin_file_name_concat(vec![Value::Nil, Value::string("bar")]);
         assert_eq!(result.unwrap().as_str(), Some("bar"));
@@ -1380,6 +1399,16 @@ mod tests {
 
         let result = builtin_directory_name_p(vec![Value::Nil]);
         assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_builtin_file_predicates_strict_types() {
+        assert!(builtin_file_exists_p(vec![Value::Nil]).is_err());
+        assert!(builtin_file_readable_p(vec![Value::Nil]).is_err());
+        assert!(builtin_file_writable_p(vec![Value::Nil]).is_err());
+        assert!(builtin_file_directory_p(vec![Value::Nil]).is_err());
+        assert!(builtin_file_regular_p(vec![Value::Nil]).is_err());
+        assert!(builtin_file_symlink_p(vec![Value::Nil]).is_err());
     }
 
     #[test]
