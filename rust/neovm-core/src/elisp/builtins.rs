@@ -1791,6 +1791,25 @@ pub(crate) fn builtin_symbol_function(
     Ok(Value::Nil)
 }
 
+pub(crate) fn builtin_func_arity_eval(
+    eval: &mut super::eval::Evaluator,
+    args: Vec<Value>,
+) -> EvalResult {
+    expect_args("func-arity", &args, 1)?;
+
+    match &args[0] {
+        Value::Symbol(name) => {
+            if let Some(function) = resolve_indirect_symbol(eval, name) {
+                super::subr_info::builtin_func_arity(vec![function])
+            } else {
+                Err(signal("void-function", vec![Value::symbol(name)]))
+            }
+        }
+        Value::Nil => Err(signal("void-function", vec![Value::symbol("nil")])),
+        other => super::subr_info::builtin_func_arity(vec![other.clone()]),
+    }
+}
+
 pub(crate) fn builtin_set(eval: &mut super::eval::Evaluator, args: Vec<Value>) -> EvalResult {
     expect_args("set", &args, 2)?;
     let name = args[0].as_symbol_name().ok_or_else(|| {
@@ -5145,7 +5164,7 @@ pub(crate) fn dispatch_builtin(
         "special-form-p" => super::subr_info::builtin_special_form_p(args),
         "macrop" => super::subr_info::builtin_macrop(args),
         "commandp" => super::subr_info::builtin_commandp(args),
-        "func-arity" => super::subr_info::builtin_func_arity(args),
+        "func-arity" => builtin_func_arity_eval(eval, args),
 
         // Format/string utilities (pure)
         "format-spec" => super::format::builtin_format_spec(args),
@@ -6624,6 +6643,56 @@ mod tests {
         let t_symbol = builtin_symbol_function(&mut eval, vec![Value::symbol("t")])
             .expect("symbol-function should return nil for symbol t");
         assert!(t_symbol.is_nil());
+    }
+
+    #[test]
+    fn func_arity_eval_resolves_symbol_inputs_and_void_edges() {
+        let mut eval = crate::elisp::eval::Evaluator::new();
+
+        let car_arity = builtin_func_arity_eval(&mut eval, vec![Value::symbol("car")])
+            .expect("func-arity should resolve builtin symbols");
+        match &car_arity {
+            Value::Cons(cell) => {
+                let pair = cell.lock().expect("poisoned");
+                assert_eq!(pair.car, Value::Int(1));
+                assert_eq!(pair.cdr, Value::Int(1));
+            }
+            other => panic!("expected cons arity pair, got {other:?}"),
+        }
+
+        let when_arity = builtin_func_arity_eval(&mut eval, vec![Value::symbol("when")])
+            .expect("func-arity should resolve fallback macro symbols");
+        match &when_arity {
+            Value::Cons(cell) => {
+                let pair = cell.lock().expect("poisoned");
+                assert_eq!(pair.car, Value::Int(1));
+                assert_eq!(pair.cdr, Value::symbol("many"));
+            }
+            other => panic!("expected cons arity pair, got {other:?}"),
+        }
+
+        let missing_err = builtin_func_arity_eval(
+            &mut eval,
+            vec![Value::symbol("definitely-not-a-function")],
+        )
+        .expect_err("func-arity should signal void-function for unresolved symbols");
+        match missing_err {
+            Flow::Signal(sig) => {
+                assert_eq!(sig.symbol, "void-function");
+                assert_eq!(sig.data, vec![Value::symbol("definitely-not-a-function")]);
+            }
+            other => panic!("unexpected flow: {other:?}"),
+        }
+
+        let nil_err = builtin_func_arity_eval(&mut eval, vec![Value::Nil])
+            .expect_err("func-arity should signal void-function for nil");
+        match nil_err {
+            Flow::Signal(sig) => {
+                assert_eq!(sig.symbol, "void-function");
+                assert_eq!(sig.data, vec![Value::symbol("nil")]);
+            }
+            other => panic!("unexpected flow: {other:?}"),
+        }
     }
 
     #[test]

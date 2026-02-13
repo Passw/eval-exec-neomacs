@@ -1436,6 +1436,7 @@ impl Evaluator {
                     Err(signal("void-function", vec![Value::symbol(name)]))
                 }
             }
+            Value::Nil => Err(signal("void-function", vec![Value::symbol("nil")])),
             _ => Err(signal("invalid-function", vec![function])),
         }
     }
@@ -1825,6 +1826,23 @@ mod tests {
     fn apply_works() {
         assert_eq!(eval_one("(apply #'+ '(1 2 3))"), "OK 6");
         assert_eq!(eval_one("(apply #'+ 1 2 '(3))"), "OK 6");
+    }
+
+    #[test]
+    fn funcall_and_apply_nil_signal_void_function() {
+        let funcall_result = eval_one(
+            "(condition-case err
+                 (funcall nil)
+               (void-function (car err)))",
+        );
+        assert_eq!(funcall_result, "OK void-function");
+
+        let apply_result = eval_one(
+            "(condition-case err
+                 (apply nil nil)
+               (void-function (car err)))",
+        );
+        assert_eq!(apply_result, "OK void-function");
     }
 
     #[test]
