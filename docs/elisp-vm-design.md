@@ -147,6 +147,8 @@ Implemented now:
   - `file-name-sans-extension` now preserves directory-path inputs ending with `/` exactly
   - filename and file predicate builtins enforce GNU-style strict string type checks (`wrong-type-argument` on non-strings)
   - `expand-file-name` now enforces GNU argument arity (max 2 args) while keeping non-string default-dir root fallback
+  - `file-name-completion` now applies predicate callables with evaluator path semantics (`default-directory` binding behavior aligned with GNU Emacs for tested forms)
+  - `file-name-all-completions` arity is locked to GNU Emacs 30.2 behavior (3rd arg signals `wrong-number-of-arguments`)
   - path predicates `file-name-absolute-p` and `directory-name-p` are implemented with GNU behavior for Unix-style path forms
   - `substitute-in-file-name` supports `$VAR` / `${VAR}` replacement, `$$` escaping, and embedded absolute-path trimming (`//`, `/~`)
   - compatibility corpus includes oracle-checked `cases/directory-file-name`, `cases/file-name-concat`, `cases/file-name-types`, `cases/path-predicates`, and `cases/substitute-in-file-name`
