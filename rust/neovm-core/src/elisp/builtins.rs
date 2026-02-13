@@ -1697,10 +1697,18 @@ pub(crate) fn builtin_symbol_function(
             vec![Value::symbol("symbolp"), args[0].clone()],
         )
     })?;
-    eval.obarray()
-        .symbol_function(name)
-        .cloned()
-        .ok_or_else(|| signal("void-function", vec![Value::symbol(name)]))
+    if let Some(function) = eval.obarray().symbol_function(name) {
+        return Ok(function.clone());
+    }
+
+    if super::subr_info::is_special_form(name)
+        || super::builtin_registry::is_dispatch_builtin_name(name)
+        || name.parse::<PureBuiltinId>().is_ok()
+    {
+        return Ok(Value::Subr(name.to_string()));
+    }
+
+    Err(signal("void-function", vec![Value::symbol(name)]))
 }
 
 pub(crate) fn builtin_set(eval: &mut super::eval::Evaluator, args: Vec<Value>) -> EvalResult {
@@ -6305,6 +6313,27 @@ mod tests {
         let random = builtin_fboundp(&mut eval, vec![Value::symbol("random")])
             .expect("fboundp should succeed for random");
         assert!(random.is_truthy());
+    }
+
+    #[test]
+    fn symbol_function_resolves_builtin_and_special_names() {
+        let mut eval = crate::elisp::eval::Evaluator::new();
+
+        let message = builtin_symbol_function(&mut eval, vec![Value::symbol("message")])
+            .expect("symbol-function should resolve message");
+        assert_eq!(message, Value::Subr("message".to_string()));
+
+        let load = builtin_symbol_function(&mut eval, vec![Value::symbol("load")])
+            .expect("symbol-function should resolve load");
+        assert_eq!(load, Value::Subr("load".to_string()));
+
+        let if_sf = builtin_symbol_function(&mut eval, vec![Value::symbol("if")])
+            .expect("symbol-function should resolve if");
+        assert_eq!(if_sf, Value::Subr("if".to_string()));
+
+        let typed = builtin_symbol_function(&mut eval, vec![Value::symbol("car")])
+            .expect("symbol-function should resolve car");
+        assert_eq!(typed, Value::Subr("car".to_string()));
     }
 
     #[test]
