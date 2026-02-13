@@ -3006,6 +3006,18 @@ enum PureBuiltinId {
     CharToString,
     #[strum(serialize = "string-to-char")]
     StringToChar,
+    #[strum(serialize = "make-hash-table")]
+    MakeHashTable,
+    #[strum(serialize = "gethash")]
+    Gethash,
+    #[strum(serialize = "puthash")]
+    Puthash,
+    #[strum(serialize = "remhash")]
+    Remhash,
+    #[strum(serialize = "clrhash")]
+    Clrhash,
+    #[strum(serialize = "hash-table-count")]
+    HashTableCount,
 }
 
 fn dispatch_builtin_id_pure(id: PureBuiltinId, args: Vec<Value>) -> EvalResult {
@@ -3094,6 +3106,12 @@ fn dispatch_builtin_id_pure(id: PureBuiltinId, args: Vec<Value>) -> EvalResult {
         PureBuiltinId::Round => builtin_round(args),
         PureBuiltinId::CharToString => builtin_char_to_string(args),
         PureBuiltinId::StringToChar => builtin_string_to_char(args),
+        PureBuiltinId::MakeHashTable => builtin_make_hash_table(args),
+        PureBuiltinId::Gethash => builtin_gethash(args),
+        PureBuiltinId::Puthash => builtin_puthash(args),
+        PureBuiltinId::Remhash => builtin_remhash(args),
+        PureBuiltinId::Clrhash => builtin_clrhash(args),
+        PureBuiltinId::HashTableCount => builtin_hash_table_count(args),
     }
 }
 
@@ -3637,13 +3655,7 @@ pub(crate) fn dispatch_builtin(
 
         // Vector (typed subset is dispatched above)
 
-        // Hash table
-        "make-hash-table" => builtin_make_hash_table(args),
-        "gethash" => builtin_gethash(args),
-        "puthash" => builtin_puthash(args),
-        "remhash" => builtin_remhash(args),
-        "clrhash" => builtin_clrhash(args),
-        "hash-table-count" => builtin_hash_table_count(args),
+        // Hash table (typed subset is dispatched above)
 
         // Conversion (typed subset is dispatched above)
 
@@ -4671,5 +4683,32 @@ mod tests {
             .expect("builtin char-to-string should resolve")
             .expect("builtin char-to-string should evaluate");
         assert_eq!(as_string, Value::string("A"));
+    }
+
+    #[test]
+    fn pure_dispatch_typed_hash_table_round_trip() {
+        let table = dispatch_builtin_pure(
+            "make-hash-table",
+            vec![Value::keyword(":test"), Value::symbol("equal")],
+        )
+        .expect("builtin make-hash-table should resolve")
+        .expect("builtin make-hash-table should evaluate");
+
+        dispatch_builtin_pure(
+            "puthash",
+            vec![Value::string("answer"), Value::Int(42), table.clone()],
+        )
+        .expect("builtin puthash should resolve")
+        .expect("builtin puthash should evaluate");
+
+        let value = dispatch_builtin_pure("gethash", vec![Value::string("answer"), table.clone()])
+            .expect("builtin gethash should resolve")
+            .expect("builtin gethash should evaluate");
+        assert_eq!(value, Value::Int(42));
+
+        let count = dispatch_builtin_pure("hash-table-count", vec![table])
+            .expect("builtin hash-table-count should resolve")
+            .expect("builtin hash-table-count should evaluate");
+        assert_eq!(count, Value::Int(1));
     }
 }
