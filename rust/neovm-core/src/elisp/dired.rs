@@ -13,6 +13,7 @@ use std::collections::{HashMap, VecDeque};
 #[cfg(unix)]
 use std::ffi::{CStr, CString};
 use std::fs;
+use std::io::ErrorKind;
 
 // ---------------------------------------------------------------------------
 // Argument helpers
@@ -48,6 +49,26 @@ fn ensure_trailing_slash(dir: &str) -> String {
     }
 }
 
+fn file_error_symbol(kind: ErrorKind) -> &'static str {
+    match kind {
+        ErrorKind::NotFound => "file-missing",
+        ErrorKind::AlreadyExists => "file-already-exists",
+        ErrorKind::PermissionDenied => "permission-denied",
+        _ => "file-error",
+    }
+}
+
+fn signal_file_io(action: &str, path: &str, err: std::io::Error) -> Flow {
+    signal(
+        file_error_symbol(err.kind()),
+        vec![
+            Value::string(action),
+            Value::string(err.to_string()),
+            Value::string(path),
+        ],
+    )
+}
+
 #[cfg(unix)]
 fn read_directory_names(dir: &str) -> Result<Vec<String>, Flow> {
     let dir_cstr = CString::new(dir).map_err(|_| {
@@ -62,13 +83,10 @@ fn read_directory_names(dir: &str) -> Result<Vec<String>, Flow> {
     })?;
     let dirp = unsafe { libc::opendir(dir_cstr.as_ptr()) };
     if dirp.is_null() {
-        return Err(signal(
-            "file-error",
-            vec![
-                Value::string("Opening directory"),
-                Value::string(std::io::Error::last_os_error().to_string()),
-                Value::string(dir),
-            ],
+        return Err(signal_file_io(
+            "Opening directory",
+            dir,
+            std::io::Error::last_os_error(),
         ));
     }
 
@@ -88,24 +106,10 @@ fn read_directory_names(dir: &str) -> Result<Vec<String>, Flow> {
 
 #[cfg(not(unix))]
 fn read_directory_names(dir: &str) -> Result<Vec<String>, Flow> {
-    let entries = fs::read_dir(dir).map_err(|e| {
-        signal(
-            "file-error",
-            vec![
-                Value::string("Opening directory"),
-                Value::string(e.to_string()),
-                Value::string(dir),
-            ],
-        )
-    })?;
+    let entries = fs::read_dir(dir).map_err(|e| signal_file_io("Opening directory", dir, e))?;
     let mut names = vec![".".to_string(), "..".to_string()];
     for entry in entries {
-        let entry = entry.map_err(|e| {
-            signal(
-                "file-error",
-                vec![Value::string(format!("Reading directory entry: {}", e))],
-            )
-        })?;
+        let entry = entry.map_err(|e| signal_file_io("Reading directory entry", dir, e))?;
         names.push(entry.file_name().to_string_lossy().into_owned());
     }
     Ok(names)
@@ -1157,6 +1161,15 @@ mod tests {
     fn test_directory_files_nonexistent() {
         let result = builtin_directory_files(vec![Value::string("/nonexistent_dir_xyz_12345")]);
         assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_directory_files_nonexistent_signals_file_missing() {
+        let result = builtin_directory_files(vec![Value::string("/nonexistent_dir_xyz_12345")]);
+        match result {
+            Err(Flow::Signal(sig)) => assert_eq!(sig.symbol, "file-missing"),
+            other => panic!("expected file-missing signal, got {:?}", other),
+        }
     }
 
     #[test]
