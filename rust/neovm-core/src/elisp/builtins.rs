@@ -2411,35 +2411,6 @@ pub(crate) fn builtin_widen(
     Ok(Value::Nil)
 }
 
-/// (set-mark POS) → POS
-pub(crate) fn builtin_set_mark(
-    eval: &mut super::eval::Evaluator,
-    args: Vec<Value>,
-) -> EvalResult {
-    expect_args("set-mark", &args, 1)?;
-    let pos = expect_int(&args[0])? as usize;
-    let buf = eval.buffers.current_buffer_mut()
-        .ok_or_else(|| signal("error", vec![Value::string("No current buffer")]))?;
-    let char_pos = if pos > 0 { pos - 1 } else { 0 };
-    let byte_pos = buf.text.char_to_byte(char_pos.min(buf.text.char_count()));
-    buf.set_mark(byte_pos);
-    Ok(args[0].clone())
-}
-
-/// (mark) → integer or nil
-pub(crate) fn builtin_mark(
-    eval: &mut super::eval::Evaluator,
-    args: Vec<Value>,
-) -> EvalResult {
-    let _ = args;
-    let buf = eval.buffers.current_buffer()
-        .ok_or_else(|| signal("error", vec![Value::string("No current buffer")]))?;
-    match buf.mark() {
-        Some(byte_pos) => Ok(Value::Int(buf.text.byte_to_char(byte_pos) as i64 + 1)),
-        None => Ok(Value::Nil),
-    }
-}
-
 /// (buffer-modified-p &optional BUFFER) → t or nil
 pub(crate) fn builtin_buffer_modified_p(
     eval: &mut super::eval::Evaluator,
