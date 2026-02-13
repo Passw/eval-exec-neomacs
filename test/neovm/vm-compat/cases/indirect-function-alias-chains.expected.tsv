@@ -1,0 +1,8 @@
+1	(fset 'vm-if-short-target 'car)	OK car
+2	(fset 'vm-if-short-a1 'vm-if-short-target)	OK vm-if-short-target
+3	(fset 'vm-if-short-a2 'vm-if-short-a1)	OK vm-if-short-a1
+4	(indirect-function 'vm-if-short-a2)	OK #<subr car>
+5	(indirect-function 'vm-if-short-missing)	OK nil
+6	(indirect-function 'vm-if-short-missing t)	OK nil
+7	(let ((i 0)) (while (< i 120) (fset (intern (format "vm-if-deep-%d" i)) (if (= i 119) 'car (intern (format "vm-if-deep-%d" (1+ i))))) (setq i (1+ i))) (indirect-function 'vm-if-deep-0))	OK #<subr car>
+8	(let ((i 0)) (while (< i 120) (fset (intern (format "vm-if-deep-noerror-%d" i)) (if (= i 119) 'car (intern (format "vm-if-deep-noerror-%d" (1+ i))))) (setq i (1+ i))) (indirect-function 'vm-if-deep-noerror-0 t))	OK #<subr car>
