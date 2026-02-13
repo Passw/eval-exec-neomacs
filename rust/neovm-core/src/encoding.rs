@@ -240,17 +240,6 @@ fn expect_string(val: &Value) -> Result<String, crate::elisp::error::Flow> {
     }
 }
 
-fn expect_int(val: &Value) -> Result<i64, crate::elisp::error::Flow> {
-    match val {
-        Value::Int(n) => Ok(*n),
-        Value::Char(c) => Ok(*c as i64),
-        other => Err(signal(
-            "wrong-type-argument",
-            vec![Value::symbol("integerp"), other.clone()],
-        )),
-    }
-}
-
 /// `(char-width CHAR)` -> integer
 pub fn builtin_char_width(args: Vec<Value>) -> EvalResult {
     expect_args("char-width", &args, 1)?;
