@@ -13,7 +13,8 @@ pub fn print_value(value: &Value) -> String {
         Value::Symbol(s) => s.clone(),
         Value::Keyword(s) => s.clone(),
         Value::Str(s) => format!("{:?}", **s),
-        Value::Char(c) => format!("?{}", format_char(*c)),
+        // Emacs chars are integer values, so print as codepoint.
+        Value::Char(c) => (*c as u32).to_string(),
         Value::Cons(_) => {
             let mut out = String::from("(");
             print_cons(value, &mut out);
@@ -80,17 +81,6 @@ fn format_float(f: f64) -> String {
         format!("{:.1}", f)
     } else {
         format!("{}", f)
-    }
-}
-
-fn format_char(c: char) -> String {
-    match c {
-        '\n' => "\\n".to_string(),
-        '\r' => "\\r".to_string(),
-        '\t' => "\\t".to_string(),
-        '\\' => "\\\\".to_string(),
-        ' ' => "\\s".to_string(),
-        _ => c.to_string(),
     }
 }
 

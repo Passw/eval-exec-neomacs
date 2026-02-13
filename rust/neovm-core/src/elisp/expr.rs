@@ -42,7 +42,8 @@ pub fn print_expr(expr: &Expr) -> String {
         Expr::Symbol(s) => s.clone(),
         Expr::Keyword(s) => s.clone(),
         Expr::Str(s) => format!("{:?}", s),
-        Expr::Char(c) => format!("?{}", format_char_literal(*c)),
+        // Emacs chars are integer values, so print as codepoint.
+        Expr::Char(c) => (*c as u32).to_string(),
         Expr::Bool(true) => "t".to_string(),
         Expr::Bool(false) => "nil".to_string(),
         Expr::List(items) => {
@@ -88,17 +89,6 @@ fn format_float(f: f64) -> String {
         format!("{:.1}", f)
     } else {
         format!("{}", f)
-    }
-}
-
-fn format_char_literal(c: char) -> String {
-    match c {
-        '\n' => "\\n".to_string(),
-        '\r' => "\\r".to_string(),
-        '\t' => "\\t".to_string(),
-        '\\' => "\\\\".to_string(),
-        ' ' => "\\s".to_string(), // Emacs-style space literal
-        _ => c.to_string(),
     }
 }
 

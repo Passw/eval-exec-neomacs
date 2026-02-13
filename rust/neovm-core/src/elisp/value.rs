@@ -321,7 +321,8 @@ impl Value {
             Value::Float(f) => HashKey::Float(f.to_bits()),
             Value::Symbol(s) => HashKey::Symbol(s.clone()),
             Value::Keyword(s) => HashKey::Keyword(s.clone()),
-            Value::Char(c) => HashKey::Char(*c),
+            // Emacs chars are integers for equality/hash semantics.
+            Value::Char(c) => HashKey::Int(*c as i64),
             // For eq, use pointer identity
             Value::Cons(c) => HashKey::Ptr(Arc::as_ptr(c) as usize),
             Value::Vector(v) => HashKey::Ptr(Arc::as_ptr(v) as usize),
@@ -341,7 +342,7 @@ impl Value {
             // eql is like eq but also does value-equality for numbers
             Value::Int(n) => HashKey::Int(*n),
             Value::Float(f) => HashKey::Float(f.to_bits()),
-            Value::Char(c) => HashKey::Char(*c),
+            Value::Char(c) => HashKey::Int(*c as i64),
             other => other.to_eq_key(),
         }
     }
@@ -355,7 +356,7 @@ impl Value {
             Value::Symbol(s) => HashKey::Symbol(s.clone()),
             Value::Keyword(s) => HashKey::Keyword(s.clone()),
             Value::Str(s) => HashKey::Str((**s).clone()),
-            Value::Char(c) => HashKey::Char(*c),
+            Value::Char(c) => HashKey::Int(*c as i64),
             // For compound types, fall back to eq identity
             other => other.to_eq_key(),
         }
@@ -372,6 +373,8 @@ pub fn eq_value(left: &Value, right: &Value) -> bool {
         (Value::Nil, Value::Nil) => true,
         (Value::True, Value::True) => true,
         (Value::Int(a), Value::Int(b)) => a == b,
+        (Value::Int(a), Value::Char(b)) => *a == *b as i64,
+        (Value::Char(a), Value::Int(b)) => *a as i64 == *b,
         (Value::Float(a), Value::Float(b)) => a.to_bits() == b.to_bits(),
         (Value::Char(a), Value::Char(b)) => a == b,
         (Value::Symbol(a), Value::Symbol(b)) => a == b,
@@ -404,6 +407,8 @@ pub fn equal_value(left: &Value, right: &Value, depth: usize) -> bool {
         (Value::Nil, Value::Nil) => true,
         (Value::True, Value::True) => true,
         (Value::Int(a), Value::Int(b)) => a == b,
+        (Value::Int(a), Value::Char(b)) => *a == *b as i64,
+        (Value::Char(a), Value::Int(b)) => *a as i64 == *b,
         (Value::Float(a), Value::Float(b)) => a.to_bits() == b.to_bits(),
         (Value::Char(a), Value::Char(b)) => a == b,
         (Value::Symbol(a), Value::Symbol(b)) => a == b,
@@ -518,6 +523,8 @@ mod tests {
         assert!(eq_value(&Value::Nil, &Value::Nil));
         assert!(eq_value(&Value::Int(42), &Value::Int(42)));
         assert!(!eq_value(&Value::Int(1), &Value::Int(2)));
+        assert!(eq_value(&Value::Char('a'), &Value::Int(97)));
+        assert!(eq_value(&Value::Int(97), &Value::Char('a')));
         assert!(eq_value(&Value::symbol("foo"), &Value::symbol("foo")));
     }
 
@@ -536,6 +543,15 @@ mod tests {
         assert!(equal_value(&a, &b, 0));
         // eq compares Arc pointers — different Arcs
         assert!(!eq_value(&a, &b));
+    }
+
+    #[test]
+    fn hash_key_char_int_equivalence() {
+        for test in [HashTableTest::Eq, HashTableTest::Eql, HashTableTest::Equal] {
+            let char_key = Value::Char('a').to_hash_key(&test);
+            let int_key = Value::Int(97).to_hash_key(&test);
+            assert_eq!(char_key, int_key);
+        }
     }
 
     #[test]
