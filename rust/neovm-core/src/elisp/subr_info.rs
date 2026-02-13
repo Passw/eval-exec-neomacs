@@ -216,6 +216,7 @@ fn fallback_macro_spec(name: &str) -> Option<FallbackMacroSpec> {
         | "with-temp-buffer"
         | "with-output-to-string"
         | "track-mouse"
+        | "declare"
         | "eval-when-compile"
         | "eval-and-compile" => Some(FallbackMacroSpec { min: 0, max: None }),
         "defvar-local" => Some(FallbackMacroSpec {

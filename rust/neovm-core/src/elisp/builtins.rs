@@ -1787,7 +1787,7 @@ pub(crate) fn builtin_symbol_function(
         return Ok(Value::Subr(name.to_string()));
     }
 
-    Err(signal("void-function", vec![Value::symbol(name)]))
+    Ok(Value::Nil)
 }
 
 pub(crate) fn builtin_set(eval: &mut super::eval::Evaluator, args: Vec<Value>) -> EvalResult {
@@ -6580,6 +6580,25 @@ mod tests {
         let when_macro = builtin_symbol_function(&mut eval, vec![Value::symbol("when")])
             .expect("symbol-function should resolve when as a macro");
         assert!(matches!(when_macro, Value::Macro(_)));
+
+        let declare_macro = builtin_symbol_function(&mut eval, vec![Value::symbol("declare")])
+            .expect("symbol-function should resolve declare as a macro");
+        assert!(matches!(declare_macro, Value::Macro(_)));
+
+        let unresolved = builtin_symbol_function(
+            &mut eval,
+            vec![Value::symbol("definitely-not-a-function")],
+        )
+        .expect("symbol-function should return nil for unresolved symbols");
+        assert!(unresolved.is_nil());
+
+        let nil_symbol = builtin_symbol_function(&mut eval, vec![Value::symbol("nil")])
+            .expect("symbol-function should return nil for symbol nil");
+        assert!(nil_symbol.is_nil());
+
+        let t_symbol = builtin_symbol_function(&mut eval, vec![Value::symbol("t")])
+            .expect("symbol-function should return nil for symbol t");
+        assert!(t_symbol.is_nil());
     }
 
     #[test]
