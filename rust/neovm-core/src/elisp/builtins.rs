@@ -3112,7 +3112,19 @@ pub(crate) fn builtin_buffer_enable_undo(
             .ok_or_else(|| signal("error", vec![Value::string("No current buffer")]))?
             .id
     } else {
-        expect_buffer_id(&args[0])?
+        match &args[0] {
+            Value::Buffer(id) => *id,
+            Value::Str(name) => eval
+                .buffers
+                .find_buffer_by_name(name)
+                .ok_or_else(|| signal("error", vec![Value::string(format!("No buffer named {name}"))]))?,
+            other => {
+                return Err(signal(
+                    "wrong-type-argument",
+                    vec![Value::symbol("stringp"), other.clone()],
+                ))
+            }
+        }
     };
     let buf = eval
         .buffers
@@ -3144,7 +3156,19 @@ pub(crate) fn builtin_buffer_disable_undo(
             .ok_or_else(|| signal("error", vec![Value::string("No current buffer")]))?
             .id
     } else {
-        expect_buffer_id(&args[0])?
+        match &args[0] {
+            Value::Buffer(id) => *id,
+            Value::Str(name) => eval
+                .buffers
+                .find_buffer_by_name(name)
+                .ok_or_else(|| signal("error", vec![Value::string(format!("No buffer named {name}"))]))?,
+            other => {
+                return Err(signal(
+                    "wrong-type-argument",
+                    vec![Value::symbol("stringp"), other.clone()],
+                ))
+            }
+        }
     };
     let buf = eval
         .buffers
