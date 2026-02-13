@@ -706,19 +706,13 @@ pub(crate) fn builtin_format_spec(args: Vec<Value>) -> EvalResult {
 
 /// `(read-from-minibuffer PROMPT ...)`
 ///
-/// Stub: returns empty string (no interactive input available).
+/// Batch-mode behavior: signal `end-of-file` (no interactive input available).
 pub(crate) fn builtin_read_from_minibuffer(
     _eval: &mut super::eval::Evaluator,
     args: Vec<Value>,
 ) -> EvalResult {
     expect_min_args("read-from-minibuffer", &args, 1)?;
-    // Return initial-contents if provided (2nd arg), otherwise empty string
-    if args.len() > 1 {
-        match &args[1] {
-            Value::Str(_) => return Ok(args[1].clone()),
-            _ => {}
-        }
-    }
+    let _prompt = expect_string(&args[0])?;
     Err(signal("end-of-file", vec![]))
 }
 
@@ -728,19 +722,13 @@ pub(crate) fn builtin_read_from_minibuffer(
 
 /// `(read-string PROMPT ...)`
 ///
-/// Stub: returns empty string.
+/// Batch-mode behavior: signal `end-of-file`.
 pub(crate) fn builtin_read_string(
     _eval: &mut super::eval::Evaluator,
     args: Vec<Value>,
 ) -> EvalResult {
     expect_min_args("read-string", &args, 1)?;
-    // Return initial-input if provided (2nd arg), otherwise empty string
-    if args.len() > 1 {
-        match &args[1] {
-            Value::Str(_) => return Ok(args[1].clone()),
-            _ => {}
-        }
-    }
+    let _prompt = expect_string(&args[0])?;
     Err(signal("end-of-file", vec![]))
 }
 
@@ -765,19 +753,13 @@ pub(crate) fn builtin_read_number(
 
 /// `(completing-read PROMPT COLLECTION ...)`
 ///
-/// Stub: returns empty string.
+/// Batch-mode behavior: signal `end-of-file`.
 pub(crate) fn builtin_completing_read(
     _eval: &mut super::eval::Evaluator,
     args: Vec<Value>,
 ) -> EvalResult {
     expect_min_args("completing-read", &args, 2)?;
-    // If DEF (5th arg, index 4) is provided, return it
-    if args.len() > 4 && args[4].is_truthy() {
-        match &args[4] {
-            Value::Str(_) => return Ok(args[4].clone()),
-            _ => {}
-        }
-    }
+    let _prompt = expect_string(&args[0])?;
     Err(signal("end-of-file", vec![]))
 }
 
@@ -1280,52 +1262,74 @@ mod tests {
     // ===================================================================
 
     #[test]
-    fn read_from_minibuffer_returns_empty() {
+    fn read_from_minibuffer_signals_end_of_file() {
         let mut ev = Evaluator::new();
-        let result =
-            builtin_read_from_minibuffer(&mut ev, vec![Value::string("Prompt: ")]).unwrap();
-        assert_eq!(result.as_str(), Some(""));
+        let result = builtin_read_from_minibuffer(&mut ev, vec![Value::string("Prompt: ")]);
+        assert!(result.is_err());
     }
 
     #[test]
-    fn read_from_minibuffer_returns_initial() {
+    fn read_from_minibuffer_ignores_initial_and_signals_end_of_file() {
         let mut ev = Evaluator::new();
         let result = builtin_read_from_minibuffer(
             &mut ev,
             vec![Value::string("Prompt: "), Value::string("initial")],
-        )
-        .unwrap();
-        assert_eq!(result.as_str(), Some("initial"));
+        );
+        assert!(result.is_err());
     }
 
     #[test]
-    fn read_string_returns_empty() {
+    fn read_string_signals_end_of_file() {
         let mut ev = Evaluator::new();
-        let result = builtin_read_string(&mut ev, vec![Value::string("Prompt: ")]).unwrap();
-        assert_eq!(result.as_str(), Some(""));
+        let result = builtin_read_string(&mut ev, vec![Value::string("Prompt: ")]);
+        assert!(result.is_err());
     }
 
     #[test]
-    fn read_number_returns_default() {
+    fn read_string_ignores_initial_and_signals_end_of_file() {
         let mut ev = Evaluator::new();
-        let result =
-            builtin_read_number(&mut ev, vec![Value::string("Number: "), Value::Int(42)]).unwrap();
-        assert!(matches!(result, Value::Int(42)));
+        let result = builtin_read_string(
+            &mut ev,
+            vec![Value::string("Prompt: "), Value::string("initial")],
+        );
+        assert!(result.is_err());
     }
 
     #[test]
-    fn read_number_returns_zero_no_default() {
+    fn read_number_signals_end_of_file_even_with_default() {
         let mut ev = Evaluator::new();
-        let result = builtin_read_number(&mut ev, vec![Value::string("Number: ")]).unwrap();
-        assert!(matches!(result, Value::Int(0)));
+        let result = builtin_read_number(&mut ev, vec![Value::string("Number: "), Value::Int(42)]);
+        assert!(result.is_err());
     }
 
     #[test]
-    fn completing_read_returns_empty() {
+    fn read_number_signals_end_of_file_without_default() {
         let mut ev = Evaluator::new();
-        let result =
-            builtin_completing_read(&mut ev, vec![Value::string("Choose: "), Value::Nil]).unwrap();
-        assert_eq!(result.as_str(), Some(""));
+        let result = builtin_read_number(&mut ev, vec![Value::string("Number: ")]);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn completing_read_signals_end_of_file() {
+        let mut ev = Evaluator::new();
+        let result = builtin_completing_read(&mut ev, vec![Value::string("Choose: "), Value::Nil]);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn completing_read_ignores_default_and_signals_end_of_file() {
+        let mut ev = Evaluator::new();
+        let result = builtin_completing_read(
+            &mut ev,
+            vec![
+                Value::string("Choose: "),
+                Value::Nil,
+                Value::Nil,
+                Value::Nil,
+                Value::string("fallback"),
+            ],
+        );
+        assert!(result.is_err());
     }
 
     #[test]
