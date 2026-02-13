@@ -1215,6 +1215,40 @@ mod tests {
     }
 
     // -----------------------------------------------------------------------
+    // gv-define-setter
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn gv_define_setter_basic() {
+        let mut ev = make_ev();
+        let setup = parse_forms(
+            "(defun my-get2 (obj) (car obj))
+             (setq pair2 (cons 1 2))",
+        )
+        .unwrap();
+        for f in &setup {
+            ev.eval_expr(f).unwrap();
+        }
+
+        let forms = parse_forms(
+            "(gv-define-setter my-get2
+                (val obj)
+              (setcar obj val))",
+        )
+        .unwrap();
+        let Expr::List(items) = &forms[0] else { panic!() };
+        sf_gv_define_setter(&mut ev, &items[1..]).unwrap();
+
+        let forms = parse_forms("(setf (my-get2 pair2) 77)").unwrap();
+        let Expr::List(items) = &forms[0] else { panic!() };
+        sf_setf(&mut ev, &items[1..]).unwrap();
+
+        let check = parse_forms("(car pair2)").unwrap();
+        let result = ev.eval_expr(&check[0]).unwrap();
+        assert_eq!(format!("{}", result), "77");
+    }
+
+    // -----------------------------------------------------------------------
     // gv-define-simple-setter
     // -----------------------------------------------------------------------
 
