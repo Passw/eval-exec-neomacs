@@ -118,6 +118,7 @@ Implemented now:
 - `rust/neovm-worker/examples/scheduler_bench.rs`: quick throughput benchmark for task scheduling and channel round-trips
 - `rust/neovm-worker/examples/elisp_bench.rs`: throughput benchmark for threaded Elisp task execution path
 - `rust/neovm-core/examples/compat_runner.rs`: NeoVM compatibility runner producing oracle-style TSV
+- `rust/neovm-core/examples/load_cache_bench.rs`: cold/warm `.neoc` load benchmark helper
 - `rust/neovm-worker/examples/elisp_compat_runner.rs`: compatibility runner through threaded worker runtime path
 - configure-time core backend selection: `--with-neovm-core-backend=emacs-c|rust`
   - `emacs-c` keeps the current legacy core path
