@@ -1,44 +1,25 @@
 //! File loading and module system (require/provide/load).
 
 use super::error::EvalError;
+use super::expr::print_expr;
 use super::expr::Expr;
 use super::value::Value;
+use std::hash::{Hash, Hasher};
 use std::fs;
 use std::path::{Path, PathBuf};
 
 fn has_load_suffix(name: &str) -> bool {
-    name.ends_with(".el") || name.ends_with(".elc")
+    name.ends_with(".el")
 }
 
-fn suffixed_paths(base: &Path) -> (PathBuf, PathBuf) {
+fn source_suffixed_path(base: &Path) -> PathBuf {
     let base_str = base.to_string_lossy();
-    (
-        PathBuf::from(format!("{base_str}.elc")),
-        PathBuf::from(format!("{base_str}.el")),
-    )
+    PathBuf::from(format!("{base_str}.el"))
 }
 
-fn source_is_newer(source: &Path, compiled: &Path) -> bool {
-    let source_mtime = fs::metadata(source).and_then(|m| m.modified());
-    let compiled_mtime = fs::metadata(compiled).and_then(|m| m.modified());
-    match (source_mtime, compiled_mtime) {
-        (Ok(s), Ok(c)) => s > c,
-        _ => false,
-    }
-}
-
-fn pick_suffixed(base: &Path, prefer_newer: bool) -> Option<PathBuf> {
-    let (elc, el) = suffixed_paths(base);
-    let has_elc = elc.exists();
-    let has_el = el.exists();
-
-    if prefer_newer && has_el && has_elc && source_is_newer(&el, &elc) {
-        return Some(el);
-    }
-    if has_elc {
-        return Some(elc);
-    }
-    if has_el {
+fn pick_suffixed(base: &Path, _prefer_newer: bool) -> Option<PathBuf> {
+    let el = source_suffixed_path(base);
+    if el.exists() {
         return Some(el);
     }
     None
@@ -79,7 +60,7 @@ pub fn find_file_in_load_path(name: &str, load_path: &[String]) -> Option<PathBu
 /// Behavior follows Emacs:
 /// - `no_suffix`: load only the exact filename.
 /// - `must_suffix`: require a suffixed file when FILE has no suffix.
-/// - `prefer_newer`: choose source `.el` over `.elc` when source is newer.
+/// - `prefer_newer`: kept for API compatibility; no effect in source-only mode.
 /// - default: search each load-path directory in order, preferring suffixed
 ///   files within each directory before bare names.
 pub fn find_file_in_load_path_with_flags(
@@ -127,8 +108,108 @@ pub fn get_load_path(obarray: &super::symbol::Obarray) -> Vec<String> {
         .collect()
 }
 
+const ELISP_CACHE_MAGIC: &str = "NEOVM-ELISP-CACHE-V1";
+const ELISP_CACHE_SCHEMA: &str = "schema=1";
+const ELISP_CACHE_VM_VERSION: &str = env!("CARGO_PKG_VERSION");
+
+fn cache_key(lexical_binding: bool) -> String {
+    let lexical = if lexical_binding { "1" } else { "0" };
+    format!(
+        "{ELISP_CACHE_SCHEMA};vm={ELISP_CACHE_VM_VERSION};lexical={lexical}"
+    )
+}
+
+fn source_hash(content: &str) -> u64 {
+    let mut hasher = std::collections::hash_map::DefaultHasher::new();
+    content.hash(&mut hasher);
+    hasher.finish()
+}
+
+fn cache_sidecar_path(source_path: &Path) -> PathBuf {
+    source_path.with_extension("neoc")
+}
+
+fn maybe_load_cached_forms(
+    source_path: &Path,
+    source: &str,
+    lexical_binding: bool,
+) -> Option<Vec<Expr>> {
+    let cache_path = cache_sidecar_path(source_path);
+    let raw = fs::read_to_string(cache_path).ok()?;
+    let mut parts = raw.splitn(5, '\n');
+    let magic = parts.next()?;
+    let key = parts.next()?;
+    let hash = parts.next()?;
+    let blank = parts.next()?;
+    let payload = parts.next().unwrap_or("");
+
+    if magic != ELISP_CACHE_MAGIC {
+        return None;
+    }
+    if blank != "" {
+        return None;
+    }
+
+    let expected_key = format!("key={}", cache_key(lexical_binding));
+    if key != expected_key {
+        return None;
+    }
+    let expected_hash = format!("source-hash={:016x}", source_hash(source));
+    if hash != expected_hash {
+        return None;
+    }
+
+    super::parser::parse_forms(payload).ok()
+}
+
+fn write_forms_cache(source_path: &Path, source: &str, lexical_binding: bool, forms: &[Expr]) {
+    let cache_path = cache_sidecar_path(source_path);
+    let payload = forms.iter().map(print_expr).collect::<Vec<_>>().join("\n");
+    let raw = format!(
+        "{ELISP_CACHE_MAGIC}\nkey={}\nsource-hash={:016x}\n\n{}\n",
+        cache_key(lexical_binding),
+        source_hash(source),
+        payload
+    );
+
+    let tmp_path = cache_path.with_extension("neoc.tmp");
+    let _ = fs::write(&tmp_path, raw);
+    let _ = fs::rename(&tmp_path, &cache_path);
+}
+
+fn parse_source_with_cache(
+    source_path: &Path,
+    source: &str,
+    lexical_binding: bool,
+) -> Result<Vec<Expr>, EvalError> {
+    if let Some(forms) = maybe_load_cached_forms(source_path, source, lexical_binding) {
+        return Ok(forms);
+    }
+
+    let forms = super::parser::parse_forms(source).map_err(|e| EvalError::Signal {
+        symbol: "invalid-read-syntax".to_string(),
+        data: vec![Value::string(format!(
+            "Parse error in {}: {:?}",
+            source_path.display(),
+            e
+        ))],
+    })?;
+    write_forms_cache(source_path, source, lexical_binding, &forms);
+    Ok(forms)
+}
+
 /// Load and evaluate a file. Returns the last result.
 pub fn load_file(eval: &mut super::eval::Evaluator, path: &Path) -> Result<Value, EvalError> {
+    if path.extension().and_then(|s| s.to_str()) == Some("elc") {
+        return Err(EvalError::Signal {
+            symbol: "file-error".to_string(),
+            data: vec![Value::string(format!(
+                "Loading .elc is unsupported in neomacs. Rebuild from source and load the .el file: {}",
+                path.display()
+            ))],
+        });
+    }
+
     let content = std::fs::read_to_string(path).map_err(|e| EvalError::Signal {
         symbol: "file-error".to_string(),
         data: vec![Value::string(format!(
@@ -154,46 +235,10 @@ pub fn load_file(eval: &mut super::eval::Evaluator, path: &Path) -> Result<Value
     );
 
     let result = (|| -> Result<Value, EvalError> {
-        let mut forms = match super::parser::parse_forms(&content) {
-            Ok(forms) => forms,
-            Err(e) => {
-                // Temporary compatibility path: when we cannot read an .elc file,
-                // transparently try sibling source until native .elc execution lands.
-                if let Some(source_path) = source_sibling_for_elc(path) {
-                    return load_file(eval, &source_path);
-                }
-                return Err(EvalError::Signal {
-                    symbol: "invalid-read-syntax".to_string(),
-                    data: vec![Value::string(format!(
-                        "Parse error in {}: {:?}",
-                        path.display(),
-                        e
-                    ))],
-                });
-            }
-        };
-
-        // Until native `.elc` execution is implemented, prefer source if this
-        // file contains compiled-function literals and a sibling `.el` exists.
-        if forms_contain_compiled_literals(&forms) {
-            if let Some(source_path) = source_sibling_for_elc(path) {
-                return load_file(eval, &source_path);
-            }
-        }
-        if path.extension().and_then(|s| s.to_str()) == Some("elc") {
-            rewrite_compiled_literal_source_markers(
-                &mut forms,
-                path.to_string_lossy().as_ref(),
-            );
-        }
+        let forms = parse_source_with_cache(path, &content, eval.lexical_binding())?;
 
         for form in forms.iter() {
-            if let Err(err) = eval.eval_expr(form) {
-                if let Some(source_path) = source_sibling_for_elc(path) {
-                    return load_file(eval, &source_path);
-                }
-                return Err(err);
-            }
+            eval.eval_expr(form)?;
         }
 
         record_load_history(eval, path);
@@ -212,18 +257,6 @@ pub fn load_file(eval: &mut super::eval::Evaluator, path: &Path) -> Result<Value
     result
 }
 
-fn source_sibling_for_elc(path: &Path) -> Option<PathBuf> {
-    if path.extension().and_then(|s| s.to_str()) != Some("elc") {
-        return None;
-    }
-    let source = path.with_extension("el");
-    if source.exists() {
-        Some(source)
-    } else {
-        None
-    }
-}
-
 fn record_load_history(eval: &mut super::eval::Evaluator, path: &Path) {
     let path_str = path.to_string_lossy().to_string();
     let entry = Value::cons(Value::string(path_str), Value::Nil);
@@ -233,113 +266,6 @@ fn record_load_history(eval: &mut super::eval::Evaluator, path: &Path) {
         .cloned()
         .unwrap_or(Value::Nil);
     eval.set_variable("load-history", Value::cons(entry, history));
-}
-
-fn forms_contain_compiled_literals(forms: &[Expr]) -> bool {
-    forms.iter().any(expr_contains_compiled_literal)
-}
-
-fn expr_contains_compiled_literal(expr: &Expr) -> bool {
-    match expr {
-        Expr::List(items) => {
-            if is_compiled_literal_quote(items) {
-                return true;
-            }
-            items.iter().any(expr_contains_compiled_literal)
-        }
-        Expr::Vector(items) => items.iter().any(expr_contains_compiled_literal),
-        Expr::DottedList(items, last) => {
-            items.iter().any(expr_contains_compiled_literal) || expr_contains_compiled_literal(last)
-        }
-        _ => false,
-    }
-}
-
-fn is_compiled_literal_quote(items: &[Expr]) -> bool {
-    if items.len() != 2 {
-        return false;
-    }
-    if !matches!(&items[0], Expr::Symbol(s) if s == "quote") {
-        return false;
-    }
-    let Expr::Vector(vector_items) = &items[1] else {
-        return false;
-    };
-    matches!(
-        (
-            vector_items.first(),
-            vector_items.get(1),
-            vector_items.get(2),
-            vector_items.get(3),
-        ),
-        (
-            Some(Expr::List(_)),
-            Some(Expr::Str(_)),
-            Some(Expr::Vector(_)),
-            Some(Expr::Int(_)),
-        )
-    )
-}
-
-fn rewrite_compiled_literal_source_markers(forms: &mut [Expr], load_file_name: &str) {
-    for form in forms.iter_mut() {
-        rewrite_compiled_literal_source_markers_in_expr(form, load_file_name);
-    }
-}
-
-fn rewrite_compiled_literal_source_markers_in_expr(expr: &mut Expr, load_file_name: &str) {
-    match expr {
-        Expr::List(items) => {
-            if is_compiled_literal_quote(items) {
-                if let Expr::Vector(vector_items) = &mut items[1] {
-                    for item in vector_items.iter_mut() {
-                        replace_load_file_name_symbol(item, load_file_name);
-                    }
-                }
-                return;
-            }
-            for item in items.iter_mut() {
-                rewrite_compiled_literal_source_markers_in_expr(item, load_file_name);
-            }
-        }
-        Expr::Vector(items) => {
-            for item in items.iter_mut() {
-                rewrite_compiled_literal_source_markers_in_expr(item, load_file_name);
-            }
-        }
-        Expr::DottedList(items, last) => {
-            for item in items.iter_mut() {
-                rewrite_compiled_literal_source_markers_in_expr(item, load_file_name);
-            }
-            rewrite_compiled_literal_source_markers_in_expr(last, load_file_name);
-        }
-        _ => {}
-    }
-}
-
-fn replace_load_file_name_symbol(expr: &mut Expr, load_file_name: &str) {
-    match expr {
-        Expr::Symbol(name) if name == "load-file-name" => {
-            *expr = Expr::Str(load_file_name.to_string());
-        }
-        Expr::List(items) => {
-            for item in items.iter_mut() {
-                replace_load_file_name_symbol(item, load_file_name);
-            }
-        }
-        Expr::Vector(items) => {
-            for item in items.iter_mut() {
-                replace_load_file_name_symbol(item, load_file_name);
-            }
-        }
-        Expr::DottedList(items, last) => {
-            for item in items.iter_mut() {
-                replace_load_file_name_symbol(item, load_file_name);
-            }
-            replace_load_file_name_symbol(last, load_file_name);
-        }
-        _ => {}
-    }
 }
 
 #[cfg(test)]
@@ -463,7 +389,7 @@ mod tests {
         let load_path = vec![dir.to_string_lossy().to_string()];
         assert_eq!(
             find_file_in_load_path_with_flags("choice", &load_path, false, false, false),
-            Some(elc)
+            Some(el.clone())
         );
         assert_eq!(
             find_file_in_load_path_with_flags("choice", &load_path, false, false, true),
@@ -507,45 +433,82 @@ mod tests {
     }
 
     #[test]
-    fn load_elc_falls_back_to_source_sibling() {
+    fn load_file_writes_and_invalidates_neoc_cache() {
         let unique = SystemTime::now()
             .duration_since(UNIX_EPOCH)
             .expect("clock before epoch")
             .as_nanos();
-        let dir = std::env::temp_dir().join(format!("neovm-load-elc-fallback-{unique}"));
+        let dir = std::env::temp_dir().join(format!("neovm-load-neoc-cache-{unique}"));
         fs::create_dir_all(&dir).expect("create temp fixture dir");
-        let source = dir.join("probe.el");
-        let compiled = dir.join("probe.elc");
-        fs::write(&source, "(setq vm-load-elc-fallback 'source)\n").expect("write source fixture");
-        // Intentionally unreadable as Elisp for current parser.
-        fs::write(&compiled, "#[broken\n").expect("write compiled fixture");
+        let file = dir.join("probe.el");
+        let source_v1 = "(setq vm-load-cache-probe 'v1)\n";
+        fs::write(&file, source_v1).expect("write source fixture");
 
         let mut eval = super::super::eval::Evaluator::new();
-        let loaded = load_file(&mut eval, &compiled).expect("load file with source fallback");
+        let loaded = load_file(&mut eval, &file).expect("load source file");
         assert_eq!(loaded, Value::True);
         assert_eq!(
-            eval.obarray().symbol_value("vm-load-elc-fallback").cloned(),
-            Some(Value::symbol("source"))
+            eval.obarray().symbol_value("vm-load-cache-probe").cloned(),
+            Some(Value::symbol("v1"))
+        );
+
+        let cache = cache_sidecar_path(&file);
+        assert!(cache.exists(), "source load should create .neoc sidecar cache");
+        let cache_v1 = fs::read_to_string(&cache).expect("read cache v1");
+        assert!(
+            cache_v1.contains(&format!("key={}", cache_key(false))),
+            "cache key should include lexical-binding dimension",
+        );
+        assert!(
+            cache_v1.contains(&format!("source-hash={:016x}", source_hash(source_v1))),
+            "cache should carry source hash invalidation key",
+        );
+
+        let source_v2 = ";;; -*- lexical-binding: t; -*-\n(setq vm-load-cache-probe 'v2)\n";
+        fs::write(&file, source_v2).expect("write source fixture v2");
+
+        let loaded = load_file(&mut eval, &file).expect("reload source file");
+        assert_eq!(loaded, Value::True);
+        assert_eq!(
+            eval.obarray().symbol_value("vm-load-cache-probe").cloned(),
+            Some(Value::symbol("v2"))
+        );
+        let cache_v2 = fs::read_to_string(&cache).expect("read cache v2");
+        assert_ne!(cache_v1, cache_v2, "cache must refresh when source changes");
+        assert!(
+            cache_v2.contains(&format!("key={}", cache_key(true))),
+            "cache key should update when lexical-binding dimension changes",
+        );
+        assert!(
+            cache_v2.contains(&format!("source-hash={:016x}", source_hash(source_v2))),
+            "cache hash should update when source text changes",
         );
 
         let _ = fs::remove_dir_all(&dir);
     }
 
     #[test]
-    fn load_elc_without_source_still_errors() {
+    fn load_elc_is_explicitly_unsupported() {
         let unique = SystemTime::now()
             .duration_since(UNIX_EPOCH)
             .expect("clock before epoch")
             .as_nanos();
-        let dir = std::env::temp_dir().join(format!("neovm-load-elc-no-source-{unique}"));
+        let dir = std::env::temp_dir().join(format!("neovm-load-elc-unsupported-{unique}"));
         fs::create_dir_all(&dir).expect("create temp fixture dir");
         let compiled = dir.join("probe.elc");
-        fs::write(&compiled, "#[broken\n").expect("write compiled fixture");
+        fs::write(&compiled, "compiled-data").expect("write compiled fixture");
 
         let mut eval = super::super::eval::Evaluator::new();
-        let err = load_file(&mut eval, &compiled).expect_err("load should error");
+        let err = load_file(&mut eval, &compiled).expect_err("load should reject .elc");
         match err {
-            EvalError::Signal { symbol, .. } => assert_eq!(symbol, "invalid-read-syntax"),
+            EvalError::Signal { symbol, data } => {
+                assert_eq!(symbol, "file-error");
+                assert!(
+                    data.iter()
+                        .any(|v| v.as_str().is_some_and(|s| s.contains("unsupported in neomacs"))),
+                    "error should explain .elc policy",
+                );
+            }
             other => panic!("unexpected error: {other:?}"),
         }
 
@@ -553,200 +516,28 @@ mod tests {
     }
 
     #[test]
-    fn load_elc_falls_back_when_first_eval_form_errors() {
+    fn load_elc_is_rejected_even_if_sibling_el_exists() {
         let unique = SystemTime::now()
             .duration_since(UNIX_EPOCH)
             .expect("clock before epoch")
             .as_nanos();
-        let dir = std::env::temp_dir().join(format!("neovm-load-elc-eval-fallback-{unique}"));
+        let dir = std::env::temp_dir().join(format!("neovm-load-elc-with-sibling-{unique}"));
         fs::create_dir_all(&dir).expect("create temp fixture dir");
         let source = dir.join("probe.el");
         let compiled = dir.join("probe.elc");
-        fs::write(&source, "(setq vm-load-elc-eval-fallback 'source)\n")
-            .expect("write source fixture");
-        // Reader can parse this, but evaluation fails because `byte-code`
-        // isn't implemented yet in NeoVM.
-        fs::write(&compiled, "(byte-code \"\\301\\207\" [x] 1)\n").expect("write compiled fixture");
+        fs::write(&source, "(setq vm-load-elc-sibling 'source)\n").expect("write source fixture");
+        fs::write(&compiled, "compiled-data").expect("write compiled fixture");
 
         let mut eval = super::super::eval::Evaluator::new();
-        let loaded = load_file(&mut eval, &compiled).expect("load file with eval fallback");
-        assert_eq!(loaded, Value::True);
-        assert_eq!(
-            eval.obarray()
-                .symbol_value("vm-load-elc-eval-fallback")
-                .cloned(),
-            Some(Value::symbol("source"))
-        );
-
-        let _ = fs::remove_dir_all(&dir);
-    }
-
-    #[test]
-    fn load_elc_falls_back_when_later_eval_form_errors() {
-        let unique = SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .expect("clock before epoch")
-            .as_nanos();
-        let dir = std::env::temp_dir().join(format!("neovm-load-elc-late-eval-fallback-{unique}"));
-        fs::create_dir_all(&dir).expect("create temp fixture dir");
-        let source = dir.join("probe.el");
-        let compiled = dir.join("probe.elc");
-        fs::write(&source, "(setq vm-load-elc-late-eval-fallback 'source)\n")
-            .expect("write source fixture");
-        fs::write(
-            &compiled,
-            "(setq vm-load-elc-late-eval-fallback 'compiled-prefix)\n(byte-code \"\\301\\207\" [x] 1)\n",
-        )
-        .expect("write compiled fixture");
-
-        let mut eval = super::super::eval::Evaluator::new();
-        let loaded = load_file(&mut eval, &compiled).expect("load file with late eval fallback");
-        assert_eq!(loaded, Value::True);
-        assert_eq!(
-            eval.obarray()
-                .symbol_value("vm-load-elc-late-eval-fallback")
-                .cloned(),
-            Some(Value::symbol("source"))
-        );
-
-        let _ = fs::remove_dir_all(&dir);
-    }
-
-    #[test]
-    fn load_elc_bytecode_literal_without_source_succeeds() {
-        let unique = SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .expect("clock before epoch")
-            .as_nanos();
-        let dir = std::env::temp_dir().join(format!("neovm-load-elc-bytecode-literal-{unique}"));
-        fs::create_dir_all(&dir).expect("create temp fixture dir");
-        let compiled = dir.join("probe.elc");
-        fs::write(
-            &compiled,
-            ";ELC\x1e\0\0\0\n#@4data\n(defalias 'vm-bytecode-probe #[(x) \"\\bT\\207\" [x] 1 (#$ . 83)])\n(provide 'vm-bytecode-probe)\n",
-        )
-        .expect("write compiled fixture");
-
-        let mut eval = super::super::eval::Evaluator::new();
-        let loaded = load_file(&mut eval, &compiled).expect("load bytecode-literal elc");
-        assert_eq!(loaded, Value::True);
-        let func = eval
-            .obarray()
-            .symbol_function("vm-bytecode-probe")
-            .cloned()
-            .expect("function cell should be set");
-        assert!(
-            matches!(func, Value::ByteCode(_)),
-            "defalias should install a compiled function cell",
-        );
-
-        let features = eval
-            .obarray()
-            .symbol_value("features")
-            .cloned()
-            .unwrap_or(Value::Nil);
-        let feature_values = super::super::value::list_to_vec(&features).expect("features list");
-        assert!(
-            feature_values
-                .iter()
-                .any(|v| matches!(v, Value::Symbol(s) if s == "vm-bytecode-probe")),
-            "feature should be present after provide",
-        );
-
-        let _ = fs::remove_dir_all(&dir);
-    }
-
-    #[test]
-    fn load_elc_bytecode_literal_without_source_signals_explicit_error_on_call() {
-        let unique = SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .expect("clock before epoch")
-            .as_nanos();
-        let dir = std::env::temp_dir().join(format!("neovm-load-elc-bytecode-call-{unique}"));
-        fs::create_dir_all(&dir).expect("create temp fixture dir");
-        let compiled = dir.join("probe.elc");
-        fs::write(
-            &compiled,
-            ";ELC\x1e\0\0\0\n#@4data\n(defalias 'vm-bytecode-call-probe #[(x) \"\\bT\\207\" [x] 1 (#$ . 83)])\n",
-        )
-        .expect("write compiled fixture");
-
-        let mut eval = super::super::eval::Evaluator::new();
-        let loaded = load_file(&mut eval, &compiled).expect("load bytecode-literal elc");
-        assert_eq!(loaded, Value::True);
-
-        let forms = super::super::parser::parse_forms(
-            "(condition-case err (vm-bytecode-call-probe 1) (error (car err)))",
-        )
-        .expect("parse probe form");
-        let mut result = Value::Nil;
-        for form in &forms {
-            result = eval.eval(form).expect("evaluate probe form");
+        let err = load_file(&mut eval, &compiled).expect_err("load should reject .elc");
+        match err {
+            EvalError::Signal { symbol, .. } => assert_eq!(symbol, "file-error"),
+            other => panic!("unexpected error: {other:?}"),
         }
-        assert_eq!(result, Value::symbol("error"));
-
-        let _ = fs::remove_dir_all(&dir);
-    }
-
-    #[test]
-    fn load_elc_with_source_prefers_source_for_compiled_literals() {
-        let unique = SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .expect("clock before epoch")
-            .as_nanos();
-        let dir =
-            std::env::temp_dir().join(format!("neovm-load-elc-source-fallback-compiled-{unique}"));
-        fs::create_dir_all(&dir).expect("create temp fixture dir");
-        let source = dir.join("probe.el");
-        let compiled = dir.join("probe.elc");
-        fs::write(
-            &source,
-            "(setq vm-load-elc-compiled-literal-fallback 'source)\n",
-        )
-        .expect("write source fixture");
-        fs::write(
-            &compiled,
-            "(defalias 'vm-load-elc-compiled-literal-fallback-fn #[(x) \"\\bT\\207\" [x] 1 (#$ . 83)])\n",
-        )
-        .expect("write compiled fixture");
-
-        let mut eval = super::super::eval::Evaluator::new();
-        let loaded = load_file(&mut eval, &compiled).expect("load file with source fallback");
-        assert_eq!(loaded, Value::True);
         assert_eq!(
-            eval.obarray()
-                .symbol_value("vm-load-elc-compiled-literal-fallback")
-                .cloned(),
-            Some(Value::symbol("source"))
-        );
-
-        let _ = fs::remove_dir_all(&dir);
-    }
-
-    #[test]
-    fn load_elc_paren_bytecode_literal_without_source_succeeds() {
-        let unique = SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .expect("clock before epoch")
-            .as_nanos();
-        let dir = std::env::temp_dir().join(format!("neovm-load-elc-paren-bytecode-{unique}"));
-        fs::create_dir_all(&dir).expect("create temp fixture dir");
-        let compiled = dir.join("probe.elc");
-        fs::write(
-            &compiled,
-            "(defalias 'vm-paren-bytecode-probe #((x) \"\\bT\\207\" [x] 1 (#$ . 83)))\n(provide 'vm-paren-bytecode-probe)\n",
-        )
-        .expect("write compiled fixture");
-
-        let mut eval = super::super::eval::Evaluator::new();
-        let loaded = load_file(&mut eval, &compiled).expect("load paren-bytecode elc");
-        assert_eq!(loaded, Value::True);
-        assert!(
-            matches!(
-                eval.obarray().symbol_function("vm-paren-bytecode-probe"),
-                Some(Value::ByteCode(_))
-            ),
-            "defalias should install a compiled function cell",
+            eval.obarray().symbol_value("vm-load-elc-sibling").cloned(),
+            None,
+            "rejecting .elc should not implicitly load source sibling",
         );
 
         let _ = fs::remove_dir_all(&dir);
