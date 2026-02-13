@@ -1720,10 +1720,11 @@ pub(crate) fn builtin_fboundp(eval: &mut super::eval::Evaluator, args: Vec<Value
             vec![Value::symbol("symbolp"), args[0].clone()],
         )
     })?;
+    let macro_bound = super::subr_info::is_evaluator_macro_name(name);
     Ok(Value::bool(
         eval.obarray().fboundp(name)
             || super::subr_info::is_special_form(name)
-            || super::subr_info::is_evaluator_macro_name(name)
+            || macro_bound
             || super::subr_info::is_evaluator_callable_name(name)
             || super::builtin_registry::is_dispatch_builtin_name(name)
             || name.parse::<PureBuiltinId>().is_ok(),

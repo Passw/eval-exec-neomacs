@@ -188,26 +188,7 @@ pub(crate) fn is_special_form(name: &str) -> bool {
 }
 
 pub(crate) fn is_evaluator_macro_name(name: &str) -> bool {
-    let is_macro = matches!(
-        name,
-        "when"
-            | "unless"
-            | "dotimes"
-            | "dolist"
-            | "with-temp-buffer"
-            | "with-current-buffer"
-            | "ignore-errors"
-            | "setq-local"
-            | "defvar-local"
-            | "with-output-to-string"
-            | "prog2"
-            | "track-mouse"
-            | "with-syntax-table"
-            | "eval-when-compile"
-            | "eval-and-compile"
-            | "declare"
-            | "with-eval-after-load"
-    );
+    let is_macro = has_fallback_macro(name) || name == "declare";
     debug_assert!(!is_macro || is_evaluator_special_form_name(name));
     is_macro
 }
@@ -244,6 +225,10 @@ fn fallback_macro_spec(name: &str) -> Option<FallbackMacroSpec> {
         "prog2" => Some(FallbackMacroSpec { min: 2, max: None }),
         _ => None,
     }
+}
+
+pub(crate) fn has_fallback_macro(name: &str) -> bool {
+    fallback_macro_spec(name).is_some()
 }
 
 fn fallback_macro_params(spec: FallbackMacroSpec) -> LambdaParams {
