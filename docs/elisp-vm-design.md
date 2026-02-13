@@ -109,20 +109,20 @@ Implemented now:
 - configure-time core backend selection: `--with-neovm-core-backend=emacs-c|rust`
   - `emacs-c` keeps the current legacy core path
   - `rust` enables the future Rust-core build mode surface for migration
-- `.elc` compatibility hardening in `neovm-core` loader/reader:
-  - load-path resolution now follows Emacs directory-first semantics
-  - reader support for `.elc` forms `#[...]`, `#(...)`, `#@N...`, and `#$`
-  - temporary source fallback policy:
-    - parse/eval failure on `.elc` falls back to sibling `.el` when present
-    - `.elc` with compiled-function literals also prefers sibling `.el` when present
-  - no-source `.elc` path can still load/provide in limited mode:
-    - compiled literals are coerced to typed `Value::ByteCode` placeholders
-    - invoking those placeholders signals an explicit `error` until real `.elc` bytecode decode/exec lands
+- Source-only loading policy in `neovm-core` loader:
+  - load-path suffix resolution uses source-first policy (`.el`, not `.elc`)
+  - explicit `.elc` rejection with `file-error` and actionable message
+  - no implicit `.elc` parse/eval fallback behavior
+- Source parse cache (`.neoc` sidecar):
+  - cache file: `<module>.neoc` beside `<module>.el`
+  - key includes schema version, VM version, and lexical-binding mode
+  - source-content hash invalidates stale cache entries
+  - cache stores parsed forms and bypasses parse work on valid hits
 
 Not implemented yet:
 
 - Full Elisp reader/compiler/bytecode pipeline
-- Native execution of GNU Emacs `.elc` compiled-function objects (current `.elc` path is compatibility fallback/placeholder-bytecode mode)
+- Native execution of GNU Emacs `.elc` compiled-function objects (explicitly out of scope for current compatibility contract)
 - Per-isolate Lisp heaps and snapshot/patch transfer semantics
 - Tiered JIT pipeline and deoptimization metadata
 - Incremental/concurrent GC engine
