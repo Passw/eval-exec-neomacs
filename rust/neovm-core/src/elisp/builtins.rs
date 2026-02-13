@@ -2864,6 +2864,22 @@ enum PureBuiltinId {
     NumGe,
     #[strum(serialize = "/=")]
     NumNe,
+    #[strum(serialize = "max")]
+    Max,
+    #[strum(serialize = "min")]
+    Min,
+    #[strum(serialize = "abs")]
+    Abs,
+    #[strum(serialize = "logand")]
+    LogAnd,
+    #[strum(serialize = "logior")]
+    LogIor,
+    #[strum(serialize = "logxor")]
+    LogXor,
+    #[strum(serialize = "lognot")]
+    LogNot,
+    #[strum(serialize = "ash")]
+    Ash,
 }
 
 fn dispatch_builtin_id_pure(id: PureBuiltinId, args: Vec<Value>) -> EvalResult {
@@ -2881,6 +2897,14 @@ fn dispatch_builtin_id_pure(id: PureBuiltinId, args: Vec<Value>) -> EvalResult {
         PureBuiltinId::NumGt => builtin_num_gt(args),
         PureBuiltinId::NumGe => builtin_num_ge(args),
         PureBuiltinId::NumNe => builtin_num_ne(args),
+        PureBuiltinId::Max => builtin_max(args),
+        PureBuiltinId::Min => builtin_min(args),
+        PureBuiltinId::Abs => builtin_abs(args),
+        PureBuiltinId::LogAnd => builtin_logand(args),
+        PureBuiltinId::LogIor => builtin_logior(args),
+        PureBuiltinId::LogXor => builtin_logxor(args),
+        PureBuiltinId::LogNot => builtin_lognot(args),
+        PureBuiltinId::Ash => builtin_ash(args),
     }
 }
 
@@ -4033,14 +4057,6 @@ pub(crate) fn dispatch_builtin_pure(name: &str, args: Vec<Value>) -> Option<Eval
 
     Some(match name {
         // Arithmetic (typed subset is dispatched above)
-        "max" => builtin_max(args),
-        "min" => builtin_min(args),
-        "abs" => builtin_abs(args),
-        "logand" => builtin_logand(args),
-        "logior" => builtin_logior(args),
-        "logxor" => builtin_logxor(args),
-        "lognot" => builtin_lognot(args),
-        "ash" => builtin_ash(args),
         // Type predicates
         "null" => builtin_null(args),
         "not" => builtin_not(args),
