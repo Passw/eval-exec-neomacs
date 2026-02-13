@@ -298,6 +298,12 @@ pub(crate) fn builtin_read_char(
     eval: &mut super::eval::Evaluator,
     args: Vec<Value>,
 ) -> EvalResult {
+    if args.len() > 3 {
+        return Err(signal(
+            "wrong-number-of-arguments",
+            vec![Value::symbol("read-char"), Value::Int(args.len() as i64)],
+        ));
+    }
     expect_optional_prompt_string(&args)?;
     if let Some(event) = pop_unread_command_event(eval) {
         if let Some(n) = event_to_int(&event) {
@@ -315,6 +321,12 @@ pub(crate) fn builtin_read_event(
     eval: &mut super::eval::Evaluator,
     args: Vec<Value>,
 ) -> EvalResult {
+    if args.len() > 3 {
+        return Err(signal(
+            "wrong-number-of-arguments",
+            vec![Value::symbol("read-event"), Value::Int(args.len() as i64)],
+        ));
+    }
     expect_optional_prompt_string(&args)?;
     if let Some(event) = pop_unread_command_event(eval) {
         if let Some(n) = event_to_int(&event) {
@@ -332,6 +344,15 @@ pub(crate) fn builtin_read_char_exclusive(
     eval: &mut super::eval::Evaluator,
     args: Vec<Value>,
 ) -> EvalResult {
+    if args.len() > 3 {
+        return Err(signal(
+            "wrong-number-of-arguments",
+            vec![
+                Value::symbol("read-char-exclusive"),
+                Value::Int(args.len() as i64),
+            ],
+        ));
+    }
     expect_optional_prompt_string(&args)?;
     while let Some(event) = pop_unread_command_event(eval) {
         if let Some(n) = event_to_int(&event) {
@@ -1057,6 +1078,24 @@ mod tests {
     }
 
     #[test]
+    fn read_event_rejects_more_than_three_args() {
+        let mut ev = Evaluator::new();
+        let result = builtin_read_event(
+            &mut ev,
+            vec![
+                Value::string("key: "),
+                Value::Nil,
+                Value::Int(0),
+                Value::Nil,
+            ],
+        );
+        assert!(matches!(
+            result,
+            Err(Flow::Signal(sig)) if sig.symbol == "wrong-number-of-arguments"
+        ));
+    }
+
+    #[test]
     fn read_char_exclusive_returns_nil() {
         let mut ev = Evaluator::new();
         let result = builtin_read_char_exclusive(&mut ev, vec![]).unwrap();
@@ -1080,6 +1119,24 @@ mod tests {
             .set_symbol_value("unread-command-events", Value::list(vec![Value::Int(97)]));
         let result = builtin_read_char_exclusive(&mut ev, vec![]).unwrap();
         assert_eq!(result.as_int(), Some(97));
+    }
+
+    #[test]
+    fn read_char_exclusive_rejects_more_than_three_args() {
+        let mut ev = Evaluator::new();
+        let result = builtin_read_char_exclusive(
+            &mut ev,
+            vec![
+                Value::string("key: "),
+                Value::Nil,
+                Value::Int(0),
+                Value::Nil,
+            ],
+        );
+        assert!(matches!(
+            result,
+            Err(Flow::Signal(sig)) if sig.symbol == "wrong-number-of-arguments"
+        ));
     }
 
     #[test]

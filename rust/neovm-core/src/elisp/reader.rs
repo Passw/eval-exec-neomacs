@@ -857,6 +857,12 @@ pub(crate) fn builtin_read_char(
     eval: &mut super::eval::Evaluator,
     args: Vec<Value>,
 ) -> EvalResult {
+    if args.len() > 3 {
+        return Err(signal(
+            "wrong-number-of-arguments",
+            vec![Value::symbol("read-char"), Value::Int(args.len() as i64)],
+        ));
+    }
     expect_optional_prompt_string(&args)?;
     if let Some(event) = pop_unread_command_event(eval) {
         if let Some(n) = event_to_int(&event) {
@@ -1507,6 +1513,24 @@ mod tests {
             Err(Flow::Signal(sig))
                 if sig.symbol == "error"
                     && sig.data == vec![Value::string("Non-character input-event")]
+        ));
+    }
+
+    #[test]
+    fn read_char_rejects_more_than_three_args() {
+        let mut ev = Evaluator::new();
+        let result = builtin_read_char(
+            &mut ev,
+            vec![
+                Value::string("key: "),
+                Value::Nil,
+                Value::Int(0),
+                Value::Nil,
+            ],
+        );
+        assert!(matches!(
+            result,
+            Err(Flow::Signal(sig)) if sig.symbol == "wrong-number-of-arguments"
         ));
     }
 
