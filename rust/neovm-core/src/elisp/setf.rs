@@ -56,11 +56,7 @@ fn read_place(eval: &mut super::eval::Evaluator, place: &Expr) -> EvalResult {
 // ---------------------------------------------------------------------------
 
 /// Set a single generalized PLACE to VALUE.  Returns the value stored.
-fn setf_place(
-    eval: &mut super::eval::Evaluator,
-    place: &Expr,
-    value: Value,
-) -> EvalResult {
+fn setf_place(eval: &mut super::eval::Evaluator, place: &Expr, value: Value) -> EvalResult {
     match place {
         // Simple variable
         Expr::Symbol(name) => {
@@ -168,10 +164,7 @@ fn setf_place(
                             c.lock().expect("poisoned").car = value.clone();
                             Ok(value)
                         }
-                        _ => Err(signal(
-                            "args-out-of-range",
-                            vec![Value::Int(n as i64)],
-                        )),
+                        _ => Err(signal("args-out-of-range", vec![Value::Int(n as i64)])),
                     }
                 }
 
@@ -200,8 +193,7 @@ fn setf_place(
                             for _ in 0..idx {
                                 match cursor {
                                     Value::Cons(c) => {
-                                        cursor =
-                                            c.lock().expect("poisoned").cdr.clone();
+                                        cursor = c.lock().expect("poisoned").cdr.clone();
                                     }
                                     _ => {
                                         return Err(signal(
@@ -216,10 +208,7 @@ fn setf_place(
                                     c.lock().expect("poisoned").car = value.clone();
                                     Ok(value)
                                 }
-                                _ => Err(signal(
-                                    "args-out-of-range",
-                                    vec![Value::Int(idx as i64)],
-                                )),
+                                _ => Err(signal("args-out-of-range", vec![Value::Int(idx as i64)])),
                             }
                         }
                         other => Err(signal(
@@ -294,9 +283,10 @@ fn setf_place(
                             ))
                         }
                     };
-                    let buf = eval.buffers.current_buffer_mut().ok_or_else(|| {
-                        signal("error", vec![Value::string("No current buffer")])
-                    })?;
+                    let buf = eval
+                        .buffers
+                        .current_buffer_mut()
+                        .ok_or_else(|| signal("error", vec![Value::string("No current buffer")]))?;
                     buf.name = new_name;
                     Ok(value)
                 }
@@ -304,18 +294,12 @@ fn setf_place(
                 // (point) -> (goto-char VALUE)
                 "point" => {
                     let pos = expect_int(&value)?;
-                    let buf =
-                        eval.buffers.current_buffer_mut().ok_or_else(|| {
-                            signal(
-                                "error",
-                                vec![Value::string("No current buffer")],
-                            )
-                        })?;
-                    let char_pos =
-                        if pos > 0 { pos as usize - 1 } else { 0 };
-                    let byte_pos = buf
-                        .text
-                        .char_to_byte(char_pos.min(buf.text.char_count()));
+                    let buf = eval
+                        .buffers
+                        .current_buffer_mut()
+                        .ok_or_else(|| signal("error", vec![Value::string("No current buffer")]))?;
+                    let char_pos = if pos > 0 { pos as usize - 1 } else { 0 };
+                    let byte_pos = buf.text.char_to_byte(char_pos.min(buf.text.char_count()));
                     buf.goto_char(byte_pos);
                     Ok(value)
                 }
@@ -323,17 +307,12 @@ fn setf_place(
                 // (mark) -> (set-mark VALUE)
                 "mark" => {
                     let pos = expect_int(&value)? as usize;
-                    let buf =
-                        eval.buffers.current_buffer_mut().ok_or_else(|| {
-                            signal(
-                                "error",
-                                vec![Value::string("No current buffer")],
-                            )
-                        })?;
+                    let buf = eval
+                        .buffers
+                        .current_buffer_mut()
+                        .ok_or_else(|| signal("error", vec![Value::string("No current buffer")]))?;
                     let char_pos = if pos > 0 { pos - 1 } else { 0 };
-                    let byte_pos = buf
-                        .text
-                        .char_to_byte(char_pos.min(buf.text.char_count()));
+                    let byte_pos = buf.text.char_to_byte(char_pos.min(buf.text.char_count()));
                     buf.set_mark(byte_pos);
                     Ok(value)
                 }
@@ -350,8 +329,7 @@ fn setf_place(
                             vec![Value::symbol("symbolp"), sym.clone()],
                         )
                     })?;
-                    eval.obarray_mut()
-                        .set_symbol_value(name, value.clone());
+                    eval.obarray_mut().set_symbol_value(name, value.clone());
                     Ok(value)
                 }
 
@@ -373,10 +351,8 @@ fn setf_place(
                 // Unknown accessor — check for a user-defined gv-setter in the obarray
                 other => {
                     // Look for a gv-setter property on the symbol
-                    if let Some(setter_name) = eval
-                        .obarray()
-                        .get_property(other, "gv-setter")
-                        .cloned()
+                    if let Some(setter_name) =
+                        eval.obarray().get_property(other, "gv-setter").cloned()
                     {
                         match &setter_name {
                             // Simple setter: property value is a symbol name string
@@ -387,10 +363,7 @@ fn setf_place(
                                     setter_args.push(eval.eval(sub_expr)?);
                                 }
                                 setter_args.push(value.clone());
-                                eval.apply(
-                                    Value::Symbol(setter.clone()),
-                                    setter_args,
-                                )?;
+                                eval.apply(Value::Symbol(setter.clone()), setter_args)?;
                                 Ok(value)
                             }
                             // Lambda setter: call the lambda with (VALUE args...)
@@ -429,10 +402,7 @@ fn setf_place(
 // ===========================================================================
 
 /// `(setf PLACE VALUE [PLACE VALUE] ...)` -- set generalized places.
-pub(crate) fn sf_setf(
-    eval: &mut super::eval::Evaluator,
-    tail: &[Expr],
-) -> EvalResult {
+pub(crate) fn sf_setf(eval: &mut super::eval::Evaluator, tail: &[Expr]) -> EvalResult {
     if tail.is_empty() {
         return Ok(Value::Nil);
     }
@@ -457,10 +427,7 @@ pub(crate) fn sf_setf(
 
 /// `(push ELEMENT PLACE)` -- push ELEMENT onto the list stored in PLACE.
 /// Returns the new list.
-pub(crate) fn sf_push(
-    eval: &mut super::eval::Evaluator,
-    tail: &[Expr],
-) -> EvalResult {
+pub(crate) fn sf_push(eval: &mut super::eval::Evaluator, tail: &[Expr]) -> EvalResult {
     if tail.len() != 2 {
         return Err(signal("wrong-number-of-arguments", vec![]));
     }
@@ -472,10 +439,7 @@ pub(crate) fn sf_push(
 }
 
 /// `(pop PLACE)` -- remove and return the first element of the list in PLACE.
-pub(crate) fn sf_pop(
-    eval: &mut super::eval::Evaluator,
-    tail: &[Expr],
-) -> EvalResult {
+pub(crate) fn sf_pop(eval: &mut super::eval::Evaluator, tail: &[Expr]) -> EvalResult {
     if tail.len() != 1 {
         return Err(signal("wrong-number-of-arguments", vec![]));
     }
@@ -505,10 +469,7 @@ pub(crate) fn sf_pop(
 // ===========================================================================
 
 /// `(cl-incf PLACE &optional DELTA)` -- increment PLACE by DELTA (default 1).
-pub(crate) fn sf_cl_incf(
-    eval: &mut super::eval::Evaluator,
-    tail: &[Expr],
-) -> EvalResult {
+pub(crate) fn sf_cl_incf(eval: &mut super::eval::Evaluator, tail: &[Expr]) -> EvalResult {
     if tail.is_empty() || tail.len() > 2 {
         return Err(signal("wrong-number-of-arguments", vec![]));
     }
@@ -528,10 +489,7 @@ pub(crate) fn sf_cl_incf(
 }
 
 /// `(cl-decf PLACE &optional DELTA)` -- decrement PLACE by DELTA (default 1).
-pub(crate) fn sf_cl_decf(
-    eval: &mut super::eval::Evaluator,
-    tail: &[Expr],
-) -> EvalResult {
+pub(crate) fn sf_cl_decf(eval: &mut super::eval::Evaluator, tail: &[Expr]) -> EvalResult {
     if tail.is_empty() || tail.len() > 2 {
         return Err(signal("wrong-number-of-arguments", vec![]));
     }
@@ -593,10 +551,7 @@ pub(crate) fn sf_gv_define_simple_setter(
 /// setf-expander for GETTER.  The lambda is called as (LAMBDA VALUE args...).
 ///
 /// Stores the lambda as the `gv-setter` property on the getter's symbol.
-pub(crate) fn sf_gv_define_setter(
-    eval: &mut super::eval::Evaluator,
-    tail: &[Expr],
-) -> EvalResult {
+pub(crate) fn sf_gv_define_setter(eval: &mut super::eval::Evaluator, tail: &[Expr]) -> EvalResult {
     // (gv-define-setter NAME (VALUE-VAR ARGS...) BODY...)
     // We compile the arglist + body into a lambda and store it.
     if tail.len() < 3 {
@@ -624,9 +579,9 @@ pub(crate) fn sf_gv_define_setter(
 
 #[cfg(test)]
 mod tests {
+    use super::super::eval::Evaluator;
     use super::*;
     use crate::elisp::parse_forms;
-    use super::super::eval::Evaluator;
 
     // -- helper to register setf/push/pop/cl-incf/cl-decf as special forms --
     // Since we are not wired into eval.rs yet, we test through a mini evaluator
@@ -652,7 +607,9 @@ mod tests {
 
         // (setf x 20)
         let forms = parse_forms("(setf x 20)").unwrap();
-        let Expr::List(items) = &forms[0] else { panic!() };
+        let Expr::List(items) = &forms[0] else {
+            panic!()
+        };
         let result = sf_setf(&mut ev, &items[1..]).unwrap();
         assert_eq!(format!("{}", result), "20");
         // Verify x is now 20
@@ -670,7 +627,9 @@ mod tests {
         }
 
         let forms = parse_forms("(setf a 10 b 20)").unwrap();
-        let Expr::List(items) = &forms[0] else { panic!() };
+        let Expr::List(items) = &forms[0] else {
+            panic!()
+        };
         let result = sf_setf(&mut ev, &items[1..]).unwrap();
         assert_eq!(format!("{}", result), "20"); // last value
 
@@ -691,7 +650,9 @@ mod tests {
         ev.eval_expr(&setup[0]).unwrap();
 
         let forms = parse_forms("(setf (car lst) 99)").unwrap();
-        let Expr::List(items) = &forms[0] else { panic!() };
+        let Expr::List(items) = &forms[0] else {
+            panic!()
+        };
         sf_setf(&mut ev, &items[1..]).unwrap();
 
         let check = parse_forms("lst").unwrap();
@@ -706,7 +667,9 @@ mod tests {
         ev.eval_expr(&setup[0]).unwrap();
 
         let forms = parse_forms("(setf (cdr lst) '(20 30))").unwrap();
-        let Expr::List(items) = &forms[0] else { panic!() };
+        let Expr::List(items) = &forms[0] else {
+            panic!()
+        };
         sf_setf(&mut ev, &items[1..]).unwrap();
 
         let check = parse_forms("lst").unwrap();
@@ -725,7 +688,9 @@ mod tests {
         ev.eval_expr(&setup[0]).unwrap();
 
         let forms = parse_forms("(setf (aref v 1) 99)").unwrap();
-        let Expr::List(items) = &forms[0] else { panic!() };
+        let Expr::List(items) = &forms[0] else {
+            panic!()
+        };
         sf_setf(&mut ev, &items[1..]).unwrap();
 
         let check = parse_forms("(aref v 1)").unwrap();
@@ -740,7 +705,9 @@ mod tests {
         ev.eval_expr(&setup[0]).unwrap();
 
         let forms = parse_forms("(setf (aref v 5) 99)").unwrap();
-        let Expr::List(items) = &forms[0] else { panic!() };
+        let Expr::List(items) = &forms[0] else {
+            panic!()
+        };
         let result = sf_setf(&mut ev, &items[1..]);
         assert!(result.is_err());
     }
@@ -756,7 +723,9 @@ mod tests {
         ev.eval_expr(&setup[0]).unwrap();
 
         let forms = parse_forms("(setf (nth 2 lst) 99)").unwrap();
-        let Expr::List(items) = &forms[0] else { panic!() };
+        let Expr::List(items) = &forms[0] else {
+            panic!()
+        };
         sf_setf(&mut ev, &items[1..]).unwrap();
 
         let check = parse_forms("lst").unwrap();
@@ -775,7 +744,9 @@ mod tests {
         ev.eval_expr(&setup[0]).unwrap();
 
         let forms = parse_forms("(setf (elt lst 1) 'z)").unwrap();
-        let Expr::List(items) = &forms[0] else { panic!() };
+        let Expr::List(items) = &forms[0] else {
+            panic!()
+        };
         sf_setf(&mut ev, &items[1..]).unwrap();
 
         let check = parse_forms("lst").unwrap();
@@ -790,7 +761,9 @@ mod tests {
         ev.eval_expr(&setup[0]).unwrap();
 
         let forms = parse_forms("(setf (elt v 2) 'z)").unwrap();
-        let Expr::List(items) = &forms[0] else { panic!() };
+        let Expr::List(items) = &forms[0] else {
+            panic!()
+        };
         sf_setf(&mut ev, &items[1..]).unwrap();
 
         let check = parse_forms("(aref v 2)").unwrap();
@@ -805,12 +778,13 @@ mod tests {
     #[test]
     fn setf_gethash() {
         let mut ev = make_ev();
-        let setup =
-            parse_forms("(setq ht (make-hash-table :test 'equal))").unwrap();
+        let setup = parse_forms("(setq ht (make-hash-table :test 'equal))").unwrap();
         ev.eval_expr(&setup[0]).unwrap();
 
         let forms = parse_forms(r#"(setf (gethash "key" ht) 42)"#).unwrap();
-        let Expr::List(items) = &forms[0] else { panic!() };
+        let Expr::List(items) = &forms[0] else {
+            panic!()
+        };
         sf_setf(&mut ev, &items[1..]).unwrap();
 
         let check = parse_forms(r#"(gethash "key" ht)"#).unwrap();
@@ -828,9 +802,10 @@ mod tests {
         let setup = parse_forms("(setq myvar 10)").unwrap();
         ev.eval_expr(&setup[0]).unwrap();
 
-        let forms =
-            parse_forms("(setf (symbol-value 'myvar) 42)").unwrap();
-        let Expr::List(items) = &forms[0] else { panic!() };
+        let forms = parse_forms("(setf (symbol-value 'myvar) 42)").unwrap();
+        let Expr::List(items) = &forms[0] else {
+            panic!()
+        };
         sf_setf(&mut ev, &items[1..]).unwrap();
 
         let check = parse_forms("myvar").unwrap();
@@ -848,11 +823,10 @@ mod tests {
         let setup = parse_forms("(defun dummy () 1)").unwrap();
         ev.eval_expr(&setup[0]).unwrap();
 
-        let forms = parse_forms(
-            "(setf (symbol-function 'dummy) (lambda () 99))",
-        )
-        .unwrap();
-        let Expr::List(items) = &forms[0] else { panic!() };
+        let forms = parse_forms("(setf (symbol-function 'dummy) (lambda () 99))").unwrap();
+        let Expr::List(items) = &forms[0] else {
+            panic!()
+        };
         sf_setf(&mut ev, &items[1..]).unwrap();
 
         let check = parse_forms("(dummy)").unwrap();
@@ -867,17 +841,16 @@ mod tests {
     #[test]
     fn setf_buffer_name() {
         let mut ev = make_ev();
-        let setup = parse_forms(
-            r#"(get-buffer-create "old-name") (set-buffer "old-name")"#,
-        )
-        .unwrap();
+        let setup =
+            parse_forms(r#"(get-buffer-create "old-name") (set-buffer "old-name")"#).unwrap();
         for f in &setup {
             ev.eval_expr(f).unwrap();
         }
 
-        let forms =
-            parse_forms(r#"(setf (buffer-name) "new-name")"#).unwrap();
-        let Expr::List(items) = &forms[0] else { panic!() };
+        let forms = parse_forms(r#"(setf (buffer-name) "new-name")"#).unwrap();
+        let Expr::List(items) = &forms[0] else {
+            panic!()
+        };
         sf_setf(&mut ev, &items[1..]).unwrap();
 
         let check = parse_forms("(buffer-name)").unwrap();
@@ -892,16 +865,16 @@ mod tests {
     #[test]
     fn setf_point() {
         let mut ev = make_ev();
-        let setup = parse_forms(
-            r#"(get-buffer-create "pt") (set-buffer "pt") (insert "hello")"#,
-        )
-        .unwrap();
+        let setup =
+            parse_forms(r#"(get-buffer-create "pt") (set-buffer "pt") (insert "hello")"#).unwrap();
         for f in &setup {
             ev.eval_expr(f).unwrap();
         }
 
         let forms = parse_forms("(setf (point) 3)").unwrap();
-        let Expr::List(items) = &forms[0] else { panic!() };
+        let Expr::List(items) = &forms[0] else {
+            panic!()
+        };
         sf_setf(&mut ev, &items[1..]).unwrap();
 
         let check = parse_forms("(point)").unwrap();
@@ -925,7 +898,9 @@ mod tests {
         }
 
         let forms = parse_forms("(setf (mark) 4)").unwrap();
-        let Expr::List(items) = &forms[0] else { panic!() };
+        let Expr::List(items) = &forms[0] else {
+            panic!()
+        };
         sf_setf(&mut ev, &items[1..]).unwrap();
 
         let check = parse_forms("(mark)").unwrap();
@@ -943,9 +918,10 @@ mod tests {
         let setup = parse_forms("(defvar myglob 10)").unwrap();
         ev.eval_expr(&setup[0]).unwrap();
 
-        let forms =
-            parse_forms("(setf (default-value 'myglob) 99)").unwrap();
-        let Expr::List(items) = &forms[0] else { panic!() };
+        let forms = parse_forms("(setf (default-value 'myglob) 99)").unwrap();
+        let Expr::List(items) = &forms[0] else {
+            panic!()
+        };
         sf_setf(&mut ev, &items[1..]).unwrap();
 
         let check = parse_forms("myglob").unwrap();
@@ -961,7 +937,9 @@ mod tests {
     fn setf_odd_args_error() {
         let mut ev = make_ev();
         let forms = parse_forms("(setf x)").unwrap();
-        let Expr::List(items) = &forms[0] else { panic!() };
+        let Expr::List(items) = &forms[0] else {
+            panic!()
+        };
         let result = sf_setf(&mut ev, &items[1..]);
         assert!(result.is_err());
     }
@@ -974,7 +952,9 @@ mod tests {
     fn setf_invalid_place() {
         let mut ev = make_ev();
         let forms = parse_forms("(setf 42 10)").unwrap();
-        let Expr::List(items) = &forms[0] else { panic!() };
+        let Expr::List(items) = &forms[0] else {
+            panic!()
+        };
         let result = sf_setf(&mut ev, &items[1..]);
         assert!(result.is_err());
     }
@@ -990,7 +970,9 @@ mod tests {
         ev.eval_expr(&setup[0]).unwrap();
 
         let forms = parse_forms("(push 1 lst)").unwrap();
-        let Expr::List(items) = &forms[0] else { panic!() };
+        let Expr::List(items) = &forms[0] else {
+            panic!()
+        };
         let result = sf_push(&mut ev, &items[1..]).unwrap();
         assert_eq!(format!("{}", result), "(1 2 3)");
 
@@ -1006,7 +988,9 @@ mod tests {
         ev.eval_expr(&setup[0]).unwrap();
 
         let forms = parse_forms("(push 'a lst)").unwrap();
-        let Expr::List(items) = &forms[0] else { panic!() };
+        let Expr::List(items) = &forms[0] else {
+            panic!()
+        };
         sf_push(&mut ev, &items[1..]).unwrap();
 
         let check = parse_forms("lst").unwrap();
@@ -1021,7 +1005,9 @@ mod tests {
         ev.eval_expr(&setup[0]).unwrap();
 
         let forms = parse_forms("(pop lst)").unwrap();
-        let Expr::List(items) = &forms[0] else { panic!() };
+        let Expr::List(items) = &forms[0] else {
+            panic!()
+        };
         let result = sf_pop(&mut ev, &items[1..]).unwrap();
         assert_eq!(format!("{}", result), "1");
 
@@ -1037,7 +1023,9 @@ mod tests {
         ev.eval_expr(&setup[0]).unwrap();
 
         let forms = parse_forms("(pop lst)").unwrap();
-        let Expr::List(items) = &forms[0] else { panic!() };
+        let Expr::List(items) = &forms[0] else {
+            panic!()
+        };
         let result = sf_pop(&mut ev, &items[1..]).unwrap();
         assert_eq!(format!("{}", result), "nil");
     }
@@ -1052,7 +1040,9 @@ mod tests {
         for val in &["'a", "'b", "'c"] {
             let src = format!("(push {} stk)", val);
             let forms = parse_forms(&src).unwrap();
-            let Expr::List(items) = &forms[0] else { panic!() };
+            let Expr::List(items) = &forms[0] else {
+                panic!()
+            };
             sf_push(&mut ev, &items[1..]).unwrap();
         }
 
@@ -1065,7 +1055,9 @@ mod tests {
         let mut popped = Vec::new();
         for _ in 0..3 {
             let forms = parse_forms("(pop stk)").unwrap();
-            let Expr::List(items) = &forms[0] else { panic!() };
+            let Expr::List(items) = &forms[0] else {
+                panic!()
+            };
             let v = sf_pop(&mut ev, &items[1..]).unwrap();
             popped.push(format!("{}", v));
         }
@@ -1088,7 +1080,9 @@ mod tests {
         ev.eval_expr(&setup[0]).unwrap();
 
         let forms = parse_forms("(cl-incf x)").unwrap();
-        let Expr::List(items) = &forms[0] else { panic!() };
+        let Expr::List(items) = &forms[0] else {
+            panic!()
+        };
         let result = sf_cl_incf(&mut ev, &items[1..]).unwrap();
         assert_eq!(format!("{}", result), "11");
 
@@ -1104,7 +1098,9 @@ mod tests {
         ev.eval_expr(&setup[0]).unwrap();
 
         let forms = parse_forms("(cl-incf x 5)").unwrap();
-        let Expr::List(items) = &forms[0] else { panic!() };
+        let Expr::List(items) = &forms[0] else {
+            panic!()
+        };
         let result = sf_cl_incf(&mut ev, &items[1..]).unwrap();
         assert_eq!(format!("{}", result), "15");
     }
@@ -1116,7 +1112,9 @@ mod tests {
         ev.eval_expr(&setup[0]).unwrap();
 
         let forms = parse_forms("(cl-incf x 0.5)").unwrap();
-        let Expr::List(items) = &forms[0] else { panic!() };
+        let Expr::List(items) = &forms[0] else {
+            panic!()
+        };
         let result = sf_cl_incf(&mut ev, &items[1..]).unwrap();
         assert_eq!(format!("{}", result), "2.0");
     }
@@ -1128,7 +1126,9 @@ mod tests {
         ev.eval_expr(&setup[0]).unwrap();
 
         let forms = parse_forms("(cl-decf x)").unwrap();
-        let Expr::List(items) = &forms[0] else { panic!() };
+        let Expr::List(items) = &forms[0] else {
+            panic!()
+        };
         let result = sf_cl_decf(&mut ev, &items[1..]).unwrap();
         assert_eq!(format!("{}", result), "9");
     }
@@ -1140,7 +1140,9 @@ mod tests {
         ev.eval_expr(&setup[0]).unwrap();
 
         let forms = parse_forms("(cl-decf x 3)").unwrap();
-        let Expr::List(items) = &forms[0] else { panic!() };
+        let Expr::List(items) = &forms[0] else {
+            panic!()
+        };
         let result = sf_cl_decf(&mut ev, &items[1..]).unwrap();
         assert_eq!(format!("{}", result), "7");
     }
@@ -1153,7 +1155,9 @@ mod tests {
 
         // (cl-incf (nth 1 lst) 5) should set element 1 to 25
         let forms = parse_forms("(cl-incf (nth 1 lst) 5)").unwrap();
-        let Expr::List(items) = &forms[0] else { panic!() };
+        let Expr::List(items) = &forms[0] else {
+            panic!()
+        };
         let result = sf_cl_incf(&mut ev, &items[1..]).unwrap();
         assert_eq!(format!("{}", result), "25");
 
@@ -1169,7 +1173,9 @@ mod tests {
         ev.eval_expr(&setup[0]).unwrap();
 
         let forms = parse_forms("(cl-decf (aref v 0) 50)").unwrap();
-        let Expr::List(items) = &forms[0] else { panic!() };
+        let Expr::List(items) = &forms[0] else {
+            panic!()
+        };
         let result = sf_cl_decf(&mut ev, &items[1..]).unwrap();
         assert_eq!(format!("{}", result), "50");
 
@@ -1200,11 +1206,15 @@ mod tests {
               (setcar obj val))",
         )
         .unwrap();
-        let Expr::List(items) = &forms[0] else { panic!() };
+        let Expr::List(items) = &forms[0] else {
+            panic!()
+        };
         sf_gv_define_setter(&mut ev, &items[1..]).unwrap();
 
         let forms = parse_forms("(setf (my-get2 pair2) 77)").unwrap();
-        let Expr::List(items) = &forms[0] else { panic!() };
+        let Expr::List(items) = &forms[0] else {
+            panic!()
+        };
         sf_setf(&mut ev, &items[1..]).unwrap();
 
         let check = parse_forms("(car pair2)").unwrap();
@@ -1231,14 +1241,17 @@ mod tests {
         }
 
         // Register the setter
-        let forms =
-            parse_forms("(gv-define-simple-setter my-get my-set)").unwrap();
-        let Expr::List(items) = &forms[0] else { panic!() };
+        let forms = parse_forms("(gv-define-simple-setter my-get my-set)").unwrap();
+        let Expr::List(items) = &forms[0] else {
+            panic!()
+        };
         sf_gv_define_simple_setter(&mut ev, &items[1..]).unwrap();
 
         // Now use setf with the custom getter
         let forms = parse_forms("(setf (my-get pair) 99)").unwrap();
-        let Expr::List(items) = &forms[0] else { panic!() };
+        let Expr::List(items) = &forms[0] else {
+            panic!()
+        };
         sf_setf(&mut ev, &items[1..]).unwrap();
 
         // my-set is called as (my-set pair 99), setting car to 99
@@ -1255,7 +1268,9 @@ mod tests {
     fn setf_empty_returns_nil() {
         let mut ev = make_ev();
         let forms = parse_forms("(setf)").unwrap();
-        let Expr::List(items) = &forms[0] else { panic!() };
+        let Expr::List(items) = &forms[0] else {
+            panic!()
+        };
         let result = sf_setf(&mut ev, &items[1..]).unwrap();
         assert_eq!(format!("{}", result), "nil");
     }
@@ -1271,7 +1286,9 @@ mod tests {
         ev.eval_expr(&setup[0]).unwrap();
 
         let forms = parse_forms("(setf (totally-unknown x) 42)").unwrap();
-        let Expr::List(items) = &forms[0] else { panic!() };
+        let Expr::List(items) = &forms[0] else {
+            panic!()
+        };
         let result = sf_setf(&mut ev, &items[1..]);
         assert!(result.is_err());
     }
@@ -1288,7 +1305,9 @@ mod tests {
         ev.eval_expr(&setup[0]).unwrap();
 
         let forms = parse_forms("(push 1 (car cell))").unwrap();
-        let Expr::List(items) = &forms[0] else { panic!() };
+        let Expr::List(items) = &forms[0] else {
+            panic!()
+        };
         sf_push(&mut ev, &items[1..]).unwrap();
 
         let check = parse_forms("(car cell)").unwrap();
@@ -1307,7 +1326,9 @@ mod tests {
         ev.eval_expr(&setup[0]).unwrap();
 
         let forms = parse_forms("(cl-incf x)").unwrap();
-        let Expr::List(items) = &forms[0] else { panic!() };
+        let Expr::List(items) = &forms[0] else {
+            panic!()
+        };
         let result = sf_cl_incf(&mut ev, &items[1..]);
         assert!(result.is_err());
     }
@@ -1320,7 +1341,9 @@ mod tests {
     fn push_wrong_arity() {
         let mut ev = make_ev();
         let forms = parse_forms("(push 1)").unwrap();
-        let Expr::List(items) = &forms[0] else { panic!() };
+        let Expr::List(items) = &forms[0] else {
+            panic!()
+        };
         let result = sf_push(&mut ev, &items[1..]);
         assert!(result.is_err());
     }
@@ -1329,7 +1352,9 @@ mod tests {
     fn pop_wrong_arity() {
         let mut ev = make_ev();
         let forms = parse_forms("(pop)").unwrap();
-        let Expr::List(items) = &forms[0] else { panic!() };
+        let Expr::List(items) = &forms[0] else {
+            panic!()
+        };
         let result = sf_pop(&mut ev, &items[1..]);
         assert!(result.is_err());
     }
@@ -1338,7 +1363,9 @@ mod tests {
     fn cl_incf_wrong_arity() {
         let mut ev = make_ev();
         let forms = parse_forms("(cl-incf)").unwrap();
-        let Expr::List(items) = &forms[0] else { panic!() };
+        let Expr::List(items) = &forms[0] else {
+            panic!()
+        };
         let result = sf_cl_incf(&mut ev, &items[1..]);
         assert!(result.is_err());
     }
@@ -1347,7 +1374,9 @@ mod tests {
     fn cl_decf_wrong_arity() {
         let mut ev = make_ev();
         let forms = parse_forms("(cl-decf x 1 2)").unwrap();
-        let Expr::List(items) = &forms[0] else { panic!() };
+        let Expr::List(items) = &forms[0] else {
+            panic!()
+        };
         let result = sf_cl_decf(&mut ev, &items[1..]);
         assert!(result.is_err());
     }
@@ -1359,14 +1388,14 @@ mod tests {
     #[test]
     fn setf_gethash_with_default() {
         let mut ev = make_ev();
-        let setup =
-            parse_forms("(setq ht (make-hash-table :test 'equal))").unwrap();
+        let setup = parse_forms("(setq ht (make-hash-table :test 'equal))").unwrap();
         ev.eval_expr(&setup[0]).unwrap();
 
         // (setf (gethash "key" ht 'default) 42)
-        let forms =
-            parse_forms(r#"(setf (gethash "key" ht 'default) 42)"#).unwrap();
-        let Expr::List(items) = &forms[0] else { panic!() };
+        let forms = parse_forms(r#"(setf (gethash "key" ht 'default) 42)"#).unwrap();
+        let Expr::List(items) = &forms[0] else {
+            panic!()
+        };
         sf_setf(&mut ev, &items[1..]).unwrap();
 
         let check = parse_forms(r#"(gethash "key" ht)"#).unwrap();
@@ -1385,7 +1414,9 @@ mod tests {
         ev.eval_expr(&setup[0]).unwrap();
 
         let forms = parse_forms("(cl-incf x 0.5)").unwrap();
-        let Expr::List(items) = &forms[0] else { panic!() };
+        let Expr::List(items) = &forms[0] else {
+            panic!()
+        };
         let result = sf_cl_incf(&mut ev, &items[1..]).unwrap();
         assert_eq!(format!("{}", result), "10.5");
     }
@@ -1397,7 +1428,9 @@ mod tests {
         ev.eval_expr(&setup[0]).unwrap();
 
         let forms = parse_forms("(cl-decf x 2)").unwrap();
-        let Expr::List(items) = &forms[0] else { panic!() };
+        let Expr::List(items) = &forms[0] else {
+            panic!()
+        };
         let result = sf_cl_decf(&mut ev, &items[1..]).unwrap();
         assert_eq!(format!("{}", result), "3.0");
     }

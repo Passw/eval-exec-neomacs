@@ -191,9 +191,9 @@ pub fn builtin_seq_uniq(args: Vec<Value>) -> EvalResult {
             Value::Nil => break,
             Value::Cons(cell) => {
                 let pair = cell.lock().expect("poisoned");
-                let already = result.iter().any(|v| {
-                    super::value::equal_value(v, &pair.car, 0)
-                });
+                let already = result
+                    .iter()
+                    .any(|v| super::value::equal_value(v, &pair.car, 0));
                 if !already {
                     result.push(pair.car.clone());
                 }
@@ -257,13 +257,14 @@ pub fn builtin_seq_into(args: Vec<Value>) -> EvalResult {
     match target_type {
         "vector" => Ok(Value::vector(elements)),
         "string" => {
-            let s: String = elements.iter().filter_map(|v| {
-                match v {
+            let s: String = elements
+                .iter()
+                .filter_map(|v| match v {
                     Value::Char(c) => Some(*c),
                     Value::Int(n) => char::from_u32(*n as u32),
                     _ => None,
-                }
-            }).collect();
+                })
+                .collect();
             Ok(Value::string(s))
         }
         _ => Ok(Value::list(elements)),
@@ -273,9 +274,7 @@ pub fn builtin_seq_into(args: Vec<Value>) -> EvalResult {
 fn collect_sequence(val: &Value) -> Vec<Value> {
     match val {
         Value::Nil => Vec::new(),
-        Value::Cons(_) => {
-            super::value::list_to_vec(val).unwrap_or_default()
-        }
+        Value::Cons(_) => super::value::list_to_vec(val).unwrap_or_default(),
         Value::Vector(v) => v.lock().expect("poisoned").clone(),
         Value::Str(s) => s.chars().map(Value::Char).collect(),
         _ => vec![val.clone()],
@@ -471,7 +470,8 @@ pub fn builtin_string_to_number_ext(args: Vec<Value>) -> EvalResult {
             return Ok(Value::Float(f));
         }
     } else {
-        let stripped = trimmed.strip_prefix("0x")
+        let stripped = trimmed
+            .strip_prefix("0x")
             .or_else(|| trimmed.strip_prefix("0X"))
             .or_else(|| trimmed.strip_prefix("#x"))
             .unwrap_or(trimmed);
@@ -660,9 +660,8 @@ pub fn builtin_user_real_login_name(args: Vec<Value>) -> EvalResult {
 /// `(user-full-name)` -> string.
 pub fn builtin_user_full_name(args: Vec<Value>) -> EvalResult {
     let _ = args;
-    let name = std::env::var("NAME").unwrap_or_else(|_| {
-        std::env::var("USER").unwrap_or_else(|_| "Unknown".to_string())
-    });
+    let name = std::env::var("NAME")
+        .unwrap_or_else(|_| std::env::var("USER").unwrap_or_else(|_| "Unknown".to_string()));
     Ok(Value::string(name))
 }
 
@@ -744,7 +743,12 @@ mod tests {
 
     #[test]
     fn remove_from_list() {
-        let list = Value::list(vec![Value::Int(1), Value::Int(2), Value::Int(3), Value::Int(2)]);
+        let list = Value::list(vec![
+            Value::Int(1),
+            Value::Int(2),
+            Value::Int(3),
+            Value::Int(2),
+        ]);
         let result = builtin_remove(vec![Value::Int(2), list]).unwrap();
         let items = super::super::value::list_to_vec(&result).unwrap();
         assert_eq!(items.len(), 2);
@@ -776,9 +780,9 @@ mod tests {
             builtin_string_empty_p(vec![Value::string("")]).unwrap(),
             Value::True,
         ));
-        assert!(
-            builtin_string_empty_p(vec![Value::string("a")]).unwrap().is_nil(),
-        );
+        assert!(builtin_string_empty_p(vec![Value::string("a")])
+            .unwrap()
+            .is_nil(),);
         assert!(matches!(
             builtin_string_blank_p(vec![Value::string("  ")]).unwrap(),
             Value::True,
@@ -791,31 +795,26 @@ mod tests {
             Value::string("world"),
             Value::string("rust"),
             Value::string("hello world"),
-        ]).unwrap();
+        ])
+        .unwrap();
         assert_eq!(result.as_str(), Some("hello rust"));
     }
 
     #[test]
     fn string_search() {
-        let result = builtin_string_search(vec![
-            Value::string("world"),
-            Value::string("hello world"),
-        ]).unwrap();
+        let result =
+            builtin_string_search(vec![Value::string("world"), Value::string("hello world")])
+                .unwrap();
         assert_eq!(result.as_int(), Some(6));
 
-        let result = builtin_string_search(vec![
-            Value::string("xyz"),
-            Value::string("hello"),
-        ]).unwrap();
+        let result =
+            builtin_string_search(vec![Value::string("xyz"), Value::string("hello")]).unwrap();
         assert!(result.is_nil());
     }
 
     #[test]
     fn string_repeat() {
-        let result = builtin_string_repeat(vec![
-            Value::string("ab"),
-            Value::Int(3),
-        ]).unwrap();
+        let result = builtin_string_repeat(vec![Value::string("ab"), Value::Int(3)]).unwrap();
         assert_eq!(result.as_str(), Some("ababab"));
     }
 
@@ -826,24 +825,39 @@ mod tests {
             builtin_proper_list_p(vec![list]).unwrap(),
             Value::True,
         ));
-        assert!(
-            builtin_proper_list_p(vec![Value::Int(5)]).unwrap().is_nil(),
-        );
+        assert!(builtin_proper_list_p(vec![Value::Int(5)]).unwrap().is_nil(),);
     }
 
     #[test]
     fn number_predicates() {
-        assert!(matches!(builtin_zerop(vec![Value::Int(0)]).unwrap(), Value::True));
+        assert!(matches!(
+            builtin_zerop(vec![Value::Int(0)]).unwrap(),
+            Value::True
+        ));
         assert!(builtin_zerop(vec![Value::Int(1)]).unwrap().is_nil());
-        assert!(matches!(builtin_natnump(vec![Value::Int(5)]).unwrap(), Value::True));
+        assert!(matches!(
+            builtin_natnump(vec![Value::Int(5)]).unwrap(),
+            Value::True
+        ));
         assert!(builtin_natnump(vec![Value::Int(-1)]).unwrap().is_nil());
-        assert!(matches!(builtin_cl_oddp(vec![Value::Int(3)]).unwrap(), Value::True));
-        assert!(matches!(builtin_cl_evenp(vec![Value::Int(4)]).unwrap(), Value::True));
+        assert!(matches!(
+            builtin_cl_oddp(vec![Value::Int(3)]).unwrap(),
+            Value::True
+        ));
+        assert!(matches!(
+            builtin_cl_evenp(vec![Value::Int(4)]).unwrap(),
+            Value::True
+        ));
     }
 
     #[test]
     fn seq_uniq() {
-        let list = Value::list(vec![Value::Int(1), Value::Int(2), Value::Int(1), Value::Int(3)]);
+        let list = Value::list(vec![
+            Value::Int(1),
+            Value::Int(2),
+            Value::Int(1),
+            Value::Int(3),
+        ]);
         let result = builtin_seq_uniq(vec![list]).unwrap();
         let items = super::super::value::list_to_vec(&result).unwrap();
         assert_eq!(items.len(), 3);

@@ -296,10 +296,7 @@ pub(crate) fn builtin_func_arity(args: Vec<Value>) -> EvalResult {
             let max = m.params.max_arity();
             Ok(arity_cons(min, max))
         }
-        other => Err(signal(
-            "invalid-function",
-            vec![other.clone()],
-        )),
+        other => Err(signal("invalid-function", vec![other.clone()])),
     }
 }
 
@@ -331,10 +328,7 @@ pub(crate) fn builtin_indirect_function(
             } else if noerror {
                 Ok(Value::Nil)
             } else {
-                Err(signal(
-                    "void-function",
-                    vec![Value::symbol(name.clone())],
-                ))
+                Err(signal("void-function", vec![Value::symbol(name.clone())]))
             }
         }
         // nil as a symbol
@@ -376,9 +370,7 @@ mod tests {
     fn make_closure(required: Vec<&str>) -> Value {
         use std::collections::HashMap;
         Value::Lambda(Arc::new(LambdaData {
-            params: LambdaParams::simple(
-                required.into_iter().map(String::from).collect(),
-            ),
+            params: LambdaParams::simple(required.into_iter().map(String::from).collect()),
             body: vec![],
             env: Some(vec![HashMap::new()]),
             docstring: None,
@@ -387,9 +379,7 @@ mod tests {
 
     fn make_macro(required: Vec<&str>) -> Value {
         Value::Macro(Arc::new(LambdaData {
-            params: LambdaParams::simple(
-                required.into_iter().map(String::from).collect(),
-            ),
+            params: LambdaParams::simple(required.into_iter().map(String::from).collect()),
             body: vec![],
             env: None,
             docstring: None,
@@ -738,8 +728,7 @@ mod tests {
     fn indirect_function_resolves_symbol() {
         let mut eval = crate::elisp::eval::Evaluator::new();
         eval.set_function("my-fn", Value::Subr("+".into()));
-        let result =
-            builtin_indirect_function(&mut eval, vec![Value::symbol("my-fn")]).unwrap();
+        let result = builtin_indirect_function(&mut eval, vec![Value::symbol("my-fn")]).unwrap();
         assert!(matches!(result, Value::Subr(ref n) if n == "+"));
     }
 
@@ -748,29 +737,23 @@ mod tests {
         let mut eval = crate::elisp::eval::Evaluator::new();
         eval.set_function("real-fn", Value::Subr("+".into()));
         eval.set_function("alias", Value::Symbol("real-fn".into()));
-        let result =
-            builtin_indirect_function(&mut eval, vec![Value::symbol("alias")]).unwrap();
+        let result = builtin_indirect_function(&mut eval, vec![Value::symbol("alias")]).unwrap();
         assert!(matches!(result, Value::Subr(ref n) if n == "+"));
     }
 
     #[test]
     fn indirect_function_void_with_noerror() {
         let mut eval = crate::elisp::eval::Evaluator::new();
-        let result = builtin_indirect_function(
-            &mut eval,
-            vec![Value::symbol("nonexistent"), Value::True],
-        )
-        .unwrap();
+        let result =
+            builtin_indirect_function(&mut eval, vec![Value::symbol("nonexistent"), Value::True])
+                .unwrap();
         assert!(result.is_nil());
     }
 
     #[test]
     fn indirect_function_void_signals_error() {
         let mut eval = crate::elisp::eval::Evaluator::new();
-        let result = builtin_indirect_function(
-            &mut eval,
-            vec![Value::symbol("nonexistent")],
-        );
+        let result = builtin_indirect_function(&mut eval, vec![Value::symbol("nonexistent")]);
         assert!(result.is_err());
     }
 
