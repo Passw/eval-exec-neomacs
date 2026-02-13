@@ -4,6 +4,7 @@
 (indirect-function 'if)
 (indirect-function 'car)
 (indirect-function 'read-key)
+(indirect-function 'read-key-sequence-vector)
 (indirect-function 'read-event)
 (indirect-function 'read-char-exclusive)
 (indirect-function 'definitely-not-a-function t)
