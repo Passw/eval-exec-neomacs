@@ -90,3 +90,62 @@ fn parse_compiled_literal_params(value: &Value) -> Option<LambdaParams> {
         rest,
     })
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn non_vector_passthrough() {
+        let v = Value::Int(42);
+        assert_eq!(maybe_coerce_compiled_literal_function(v.clone()), v);
+    }
+
+    #[test]
+    fn invalid_vector_passthrough() {
+        let v = Value::vector(vec![Value::Int(1), Value::Int(2)]);
+        assert!(matches!(
+            maybe_coerce_compiled_literal_function(v),
+            Value::Vector(_)
+        ));
+    }
+
+    #[test]
+    fn coerces_compiled_literal_vector_to_placeholder_bytecode() {
+        let literal = Value::vector(vec![
+            Value::list(vec![
+                Value::symbol("x"),
+                Value::symbol("&optional"),
+                Value::symbol("y"),
+                Value::symbol("&rest"),
+                Value::symbol("rest"),
+            ]),
+            Value::string("\u{8}T\u{87}"),
+            Value::vector(vec![Value::symbol("x"), Value::Int(7)]),
+            Value::Int(3),
+            Value::string("doc"),
+        ]);
+
+        let coerced = maybe_coerce_compiled_literal_function(literal);
+        let Value::ByteCode(bc) = coerced else {
+            panic!("expected Value::ByteCode");
+        };
+
+        assert_eq!(bc.params.required, vec!["x"]);
+        assert_eq!(bc.params.optional, vec!["y"]);
+        assert_eq!(bc.params.rest.as_deref(), Some("rest"));
+        assert_eq!(bc.max_stack, 3);
+        assert_eq!(bc.constants[0], Value::symbol("x"));
+        assert_eq!(bc.constants[1], Value::Int(7));
+        assert_eq!(bc.docstring.as_deref(), Some("doc"));
+        match bc.ops.as_slice() {
+            [Op::CallBuiltin(idx, 0), Op::Return] => {
+                assert_eq!(
+                    bc.constants[*idx as usize],
+                    Value::symbol("%%unimplemented-elc-bytecode")
+                );
+            }
+            other => panic!("unexpected placeholder ops: {other:?}"),
+        }
+    }
+}
