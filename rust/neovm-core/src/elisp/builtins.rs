@@ -1960,7 +1960,7 @@ pub(crate) fn builtin_featurep(eval: &mut super::eval::Evaluator, args: Vec<Valu
             vec![Value::symbol("symbolp"), args[0].clone()],
         )
     })?;
-    Ok(Value::bool(eval.features.contains(&name.to_string())))
+    Ok(Value::bool(eval.feature_present(name)))
 }
 
 // ===========================================================================

@@ -209,17 +209,40 @@ impl Evaluator {
         self.obarray.set_symbol_value("features", Value::list(values));
     }
 
-    fn has_feature(&self, name: &str) -> bool {
+    fn refresh_features_from_variable(&mut self) {
+        let current = self
+            .obarray
+            .symbol_value("features")
+            .cloned()
+            .unwrap_or(Value::Nil);
+        let mut parsed = Vec::new();
+        if let Some(items) = list_to_vec(&current) {
+            for item in items {
+                if let Some(name) = item.as_symbol_name() {
+                    parsed.push(name.to_string());
+                }
+            }
+        }
+        self.features = parsed;
+    }
+
+    fn has_feature(&mut self, name: &str) -> bool {
+        self.refresh_features_from_variable();
         self.features.iter().any(|f| f == name)
     }
 
     fn add_feature(&mut self, name: &str) {
-        if self.has_feature(name) {
+        self.refresh_features_from_variable();
+        if self.features.iter().any(|f| f == name) {
             return;
         }
         // Emacs pushes newly-provided features at the front.
         self.features.insert(0, name.to_string());
         self.sync_features_variable();
+    }
+
+    pub(crate) fn feature_present(&mut self, name: &str) -> bool {
+        self.has_feature(name)
     }
 
     /// Access the obarray (for builtins that need it).
@@ -1321,13 +1344,16 @@ impl Evaluator {
     pub(crate) fn apply(&mut self, function: Value, args: Vec<Value>) -> EvalResult {
         match function {
             Value::ByteCode(bc) => {
+                self.refresh_features_from_variable();
                 let mut vm = super::bytecode::Vm::new(
                     &mut self.obarray,
                     &mut self.dynamic,
                     &mut self.lexenv,
                     &mut self.features,
                 );
-                vm.execute(&bc, args)
+                let result = vm.execute(&bc, args);
+                self.sync_features_variable();
+                result
             }
             Value::Lambda(lambda) | Value::Macro(lambda) => self.apply_lambda(&lambda, args),
             Value::Subr(name) => {
@@ -1871,6 +1897,30 @@ mod tests {
             .collect();
         assert_eq!(results[0], "OK my-feature");
         assert_eq!(results[1], "OK t");
+    }
+
+    #[test]
+    fn features_variable_controls_featurep_and_require() {
+        let results = eval_all(
+            "(setq features '(vm-existing))
+             (featurep 'vm-existing)
+             (require 'vm-existing)",
+        );
+        assert_eq!(results[0], "OK (vm-existing)");
+        assert_eq!(results[1], "OK t");
+        assert_eq!(results[2], "OK vm-existing");
+    }
+
+    #[test]
+    fn provide_preserves_features_variable_entries() {
+        let results = eval_all(
+            "(setq features '(vm-existing))
+             (provide 'vm-new)
+             features",
+        );
+        assert_eq!(results[0], "OK (vm-existing)");
+        assert_eq!(results[1], "OK vm-new");
+        assert_eq!(results[2], "OK (vm-new vm-existing)");
     }
 
     #[test]
