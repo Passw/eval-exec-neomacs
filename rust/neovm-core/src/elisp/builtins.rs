@@ -43,6 +43,21 @@ fn expect_int(value: &Value) -> Result<i64, Flow> {
     }
 }
 
+/// Extract an integer/marker-ish position value.
+///
+/// NeoVM does not expose marker values yet, so this currently accepts
+/// integers (including char values) and signals with `integer-or-marker-p`.
+fn expect_integer_or_marker(value: &Value) -> Result<i64, Flow> {
+    match value {
+        Value::Int(n) => Ok(*n),
+        Value::Char(c) => Ok(*c as i64),
+        other => Err(signal(
+            "wrong-type-argument",
+            vec![Value::symbol("integer-or-marker-p"), other.clone()],
+        )),
+    }
+}
+
 /// Extract a number as f64.
 fn expect_number(value: &Value) -> Result<f64, Flow> {
     match value {
@@ -68,6 +83,39 @@ fn numeric_result(f: f64, was_float: bool) -> Value {
     } else {
         Value::Int(f as i64)
     }
+}
+
+fn normalize_string_start_arg(string: &str, start: Option<&Value>) -> Result<usize, Flow> {
+    let Some(start_val) = start else {
+        return Ok(0);
+    };
+    if start_val.is_nil() {
+        return Ok(0);
+    }
+
+    let raw_start = expect_int(start_val)?;
+    let len = string.len() as i64;
+    let normalized = if raw_start < 0 {
+        len.checked_add(raw_start)
+    } else {
+        Some(raw_start)
+    };
+
+    let Some(start_idx) = normalized else {
+        return Err(signal(
+            "args-out-of-range",
+            vec![Value::string(string), Value::Int(raw_start)],
+        ));
+    };
+
+    if !(0..=len).contains(&start_idx) {
+        return Err(signal(
+            "args-out-of-range",
+            vec![Value::string(string), Value::Int(raw_start)],
+        ));
+    }
+
+    Ok(start_idx as usize)
 }
 
 // ===========================================================================
@@ -3660,6 +3708,8 @@ pub(crate) fn dispatch_builtin(
         "match-string" => return Some(builtin_match_string(eval, args)),
         "match-beginning" => return Some(builtin_match_beginning(eval, args)),
         "match-end" => return Some(builtin_match_end(eval, args)),
+        "match-data" => return Some(builtin_match_data_eval(eval, args)),
+        "set-match-data" => return Some(builtin_set_match_data_eval(eval, args)),
         "replace-match" => return Some(builtin_replace_match(eval, args)),
         // File I/O (evaluator-dependent)
         "insert-file-contents" => {
@@ -5216,11 +5266,7 @@ pub(crate) fn builtin_string_match_eval(
     expect_min_args("string-match", &args, 2)?;
     let pattern = expect_string(&args[0])?;
     let s = expect_string(&args[1])?;
-    let start = if args.len() > 2 {
-        expect_int(&args[2])? as usize
-    } else {
-        0
-    };
+    let start = normalize_string_start_arg(&s, args.get(2))?;
 
     match super::regex::string_match_full(&pattern, &s, start, &mut eval.match_data) {
         Ok(Some(pos)) => Ok(Value::Int(pos as i64)),
@@ -5285,19 +5331,13 @@ pub(crate) fn builtin_match_beginning(
 
     let md = match &eval.match_data {
         Some(md) => md,
-        None => return Err(signal("error", vec![Value::string("No match data")])),
+        None => return Ok(Value::Nil),
     };
 
     match md.groups.get(group) {
         Some(Some((start, _end))) => Ok(Value::Int(*start as i64)),
-        Some(None) => Ok(Value::Nil), // group exists but didn't participate
-        None => Err(signal(
-            "error",
-            vec![Value::string(format!(
-                "match-beginning: invalid group {}",
-                group
-            ))],
-        )),
+        Some(None) => Ok(Value::Nil),
+        None => Ok(Value::Nil),
     }
 }
 
@@ -5307,17 +5347,112 @@ pub(crate) fn builtin_match_end(eval: &mut super::eval::Evaluator, args: Vec<Val
 
     let md = match &eval.match_data {
         Some(md) => md,
-        None => return Err(signal("error", vec![Value::string("No match data")])),
+        None => return Ok(Value::Nil),
     };
 
     match md.groups.get(group) {
         Some(Some((_start, end))) => Ok(Value::Int(*end as i64)),
         Some(None) => Ok(Value::Nil),
-        None => Err(signal(
-            "error",
-            vec![Value::string(format!("match-end: invalid group {}", group))],
-        )),
+        None => Ok(Value::Nil),
     }
+}
+
+pub(crate) fn builtin_match_data_eval(
+    eval: &mut super::eval::Evaluator,
+    args: Vec<Value>,
+) -> EvalResult {
+    if args.len() > 3 {
+        return Err(signal(
+            "wrong-number-of-arguments",
+            vec![Value::symbol("match-data"), Value::Int(args.len() as i64)],
+        ));
+    }
+
+    let Some(md) = &eval.match_data else {
+        return Ok(Value::Nil);
+    };
+
+    // Emacs trims trailing unmatched groups from match-data output.
+    let mut trailing = md.groups.len();
+    while trailing > 0 && md.groups[trailing - 1].is_none() {
+        trailing -= 1;
+    }
+
+    let mut flat: Vec<Value> = Vec::with_capacity(trailing * 2);
+    for grp in md.groups.iter().take(trailing) {
+        match grp {
+            Some((start, end)) => {
+                flat.push(Value::Int(*start as i64));
+                flat.push(Value::Int(*end as i64));
+            }
+            None => {
+                flat.push(Value::Nil);
+                flat.push(Value::Nil);
+            }
+        }
+    }
+    Ok(Value::list(flat))
+}
+
+pub(crate) fn builtin_set_match_data_eval(
+    eval: &mut super::eval::Evaluator,
+    args: Vec<Value>,
+) -> EvalResult {
+    expect_min_args("set-match-data", &args, 1)?;
+    if args.len() > 2 {
+        return Err(signal(
+            "wrong-number-of-arguments",
+            vec![Value::symbol("set-match-data"), Value::Int(args.len() as i64)],
+        ));
+    }
+
+    if args[0].is_nil() {
+        eval.match_data = None;
+        return Ok(Value::Nil);
+    }
+
+    let items = list_to_vec(&args[0]).ok_or_else(|| {
+        signal(
+            "wrong-type-argument",
+            vec![Value::symbol("listp"), args[0].clone()],
+        )
+    })?;
+
+    let mut groups: Vec<Option<(usize, usize)>> = Vec::with_capacity(items.len() / 2);
+    let mut i = 0usize;
+    while i + 1 < items.len() {
+        let start_v = &items[i];
+        let end_v = &items[i + 1];
+
+        if start_v.is_nil() && end_v.is_nil() {
+            groups.push(None);
+            i += 2;
+            continue;
+        }
+
+        let start = expect_integer_or_marker(start_v)?;
+        let end = expect_integer_or_marker(end_v)?;
+
+        // Emacs treats negative marker positions as an end sentinel and
+        // truncates remaining groups.
+        if start < 0 || end < 0 {
+            break;
+        }
+
+        groups.push(Some((start as usize, end as usize)));
+        i += 2;
+    }
+
+    if groups.is_empty() {
+        eval.match_data = None;
+    } else {
+        eval.match_data = Some(super::regex::MatchData {
+            groups,
+            searched_string: None,
+        });
+    }
+
+    Ok(Value::Nil)
 }
 
 pub(crate) fn builtin_replace_match(
@@ -5541,6 +5676,81 @@ mod tests {
             .expect("builtin last should resolve")
             .expect("builtin last should evaluate");
         assert_eq!(last, Value::list(vec![Value::Int(4)]));
+    }
+
+    #[test]
+    fn match_data_round_trip_with_nil_groups() {
+        let mut eval = crate::elisp::eval::Evaluator::new();
+
+        builtin_set_match_data_eval(
+            &mut eval,
+            vec![Value::list(vec![
+                Value::Int(0),
+                Value::Int(2),
+                Value::Nil,
+                Value::Nil,
+                Value::Int(5),
+                Value::Int(7),
+            ])],
+        )
+        .expect("set-match-data should succeed");
+
+        let md = builtin_match_data_eval(&mut eval, vec![]).expect("match-data should succeed");
+        assert_eq!(
+            md,
+            Value::list(vec![
+                Value::Int(0),
+                Value::Int(2),
+                Value::Nil,
+                Value::Nil,
+                Value::Int(5),
+                Value::Int(7)
+            ])
+        );
+    }
+
+    #[test]
+    fn match_beginning_end_return_nil_without_match_data() {
+        let mut eval = crate::elisp::eval::Evaluator::new();
+        builtin_set_match_data_eval(&mut eval, vec![Value::Nil]).expect("set-match-data nil");
+
+        let beg = builtin_match_beginning(&mut eval, vec![Value::Int(0)])
+            .expect("match-beginning should not error");
+        let end =
+            builtin_match_end(&mut eval, vec![Value::Int(0)]).expect("match-end should not error");
+        assert!(beg.is_nil());
+        assert!(end.is_nil());
+    }
+
+    #[test]
+    fn string_match_start_handles_nil_and_negative_offsets() {
+        let mut eval = crate::elisp::eval::Evaluator::new();
+        let with_nil = builtin_string_match_eval(
+            &mut eval,
+            vec![Value::string("a"), Value::string("ba"), Value::Nil],
+        )
+        .expect("string-match with nil start");
+        assert_eq!(with_nil, Value::Int(1));
+
+        let with_negative = builtin_string_match_eval(
+            &mut eval,
+            vec![Value::string("a"), Value::string("ba"), Value::Int(-1)],
+        )
+        .expect("string-match with negative start");
+        assert_eq!(with_negative, Value::Int(1));
+
+        let out_of_range = builtin_string_match_eval(
+            &mut eval,
+            vec![Value::string("a"), Value::string("ba"), Value::Int(3)],
+        );
+        assert!(out_of_range.is_err());
+    }
+
+    #[test]
+    fn set_match_data_rejects_non_list() {
+        let mut eval = crate::elisp::eval::Evaluator::new();
+        let result = builtin_set_match_data_eval(&mut eval, vec![Value::Int(1)]);
+        assert!(result.is_err());
     }
 
     #[test]
