@@ -120,6 +120,8 @@ pub fn load_file(eval: &mut super::eval::Evaluator, path: &Path) -> Result<Value
             let _ = eval.eval_expr(form)?;
         }
 
+        record_load_history(eval, path);
+
         // Emacs `load` returns non-nil on success (typically `t`).
         Ok(Value::True)
     })();
@@ -132,6 +134,17 @@ pub fn load_file(eval: &mut super::eval::Evaluator, path: &Path) -> Result<Value
     }
 
     result
+}
+
+fn record_load_history(eval: &mut super::eval::Evaluator, path: &Path) {
+    let path_str = path.to_string_lossy().to_string();
+    let entry = Value::cons(Value::string(path_str), Value::Nil);
+    let history = eval
+        .obarray()
+        .symbol_value("load-history")
+        .cloned()
+        .unwrap_or(Value::Nil);
+    eval.set_variable("load-history", Value::cons(entry, history));
 }
 
 #[cfg(test)]
@@ -203,6 +216,39 @@ mod tests {
         assert_eq!(
             find_file_in_load_path_with_flags("choice", &load_path, true, true),
             Some(plain)
+        );
+
+        let _ = fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn load_file_records_load_history() {
+        let unique = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .expect("clock before epoch")
+            .as_nanos();
+        let dir = std::env::temp_dir().join(format!("neovm-load-history-{unique}"));
+        fs::create_dir_all(&dir).expect("create temp fixture dir");
+        let file = dir.join("probe.el");
+        fs::write(&file, "(setq vm-load-history-probe t)\n").expect("write fixture");
+
+        let mut eval = super::super::eval::Evaluator::new();
+        let loaded = load_file(&mut eval, &file).expect("load file");
+        assert_eq!(loaded, Value::True);
+
+        let history = eval
+            .obarray()
+            .symbol_value("load-history")
+            .cloned()
+            .unwrap_or(Value::Nil);
+        let entries = super::super::value::list_to_vec(&history).expect("load-history is a list");
+        assert!(!entries.is_empty(), "load-history should have at least one entry");
+        let first = super::super::value::list_to_vec(&entries[0]).expect("entry is a list");
+        let path_str = file.to_string_lossy().to_string();
+        assert_eq!(first.first().and_then(Value::as_str), Some(path_str.as_str()));
+        assert_eq!(
+            eval.obarray().symbol_value("load-file-name").cloned(),
+            Some(Value::Nil)
         );
 
         let _ = fs::remove_dir_all(&dir);

@@ -107,6 +107,7 @@ impl Evaluator {
         obarray.set_symbol_value("emacs-version", Value::string("29.1"));
         obarray.set_symbol_value("system-type", Value::symbol("gnu/linux"));
         obarray.set_symbol_value("load-path", Value::Nil);
+        obarray.set_symbol_value("load-history", Value::Nil);
         obarray.set_symbol_value("features", Value::Nil);
         obarray.set_symbol_value("debug-on-error", Value::Nil);
         obarray.set_symbol_value("lexical-binding", Value::Nil);
@@ -121,6 +122,7 @@ impl Evaluator {
             "debug-on-error",
             "lexical-binding",
             "load-path",
+            "load-history",
             "features",
             "load-file-name",
             "noninteractive",
