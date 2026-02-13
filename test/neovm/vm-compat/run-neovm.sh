@@ -12,9 +12,12 @@ if [[ ! -f "$forms_file" ]]; then
   exit 2
 fi
 
+forms_dir="$(cd "$(dirname "$forms_file")" && pwd)"
+forms_file_abs="$forms_dir/$(basename "$forms_file")"
+
 repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)"
 
-cargo run \
+NEOVM_FORMS_FILE="$forms_file_abs" cargo run \
   --manifest-path "$repo_root/rust/neovm-worker/Cargo.toml" \
   --example elisp_compat_runner \
-  -- "$forms_file"
+  -- "$forms_file_abs"

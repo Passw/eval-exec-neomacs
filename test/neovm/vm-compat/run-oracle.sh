@@ -12,6 +12,9 @@ if [[ ! -f "$forms_file" ]]; then
   exit 2
 fi
 
+forms_dir="$(cd "$(dirname "$forms_file")" && pwd)"
+forms_file_abs="$forms_dir/$(basename "$forms_file")"
+
 script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 oracle_el="$script_dir/oracle_eval.el"
 emacs_bin="${NEOVM_ORACLE_EMACS:-}"
@@ -29,4 +32,4 @@ if [[ ! -x "$emacs_bin" ]]; then
   exit 127
 fi
 
-NEOVM_FORMS_FILE="$forms_file" "$emacs_bin" --batch -Q -l "$oracle_el" 2>/dev/null
+NEOVM_FORMS_FILE="$forms_file_abs" "$emacs_bin" --batch -Q -l "$oracle_el" 2>/dev/null
