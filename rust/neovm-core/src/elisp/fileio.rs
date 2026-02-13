@@ -128,6 +128,18 @@ pub fn file_name_sans_extension(filename: &str) -> String {
     }
 }
 
+/// Return FILENAME as a directory name (must end in `/`).
+/// Like Emacs `file-name-as-directory`.
+pub fn file_name_as_directory(filename: &str) -> String {
+    if filename.is_empty() {
+        "./".to_string()
+    } else if filename.ends_with('/') {
+        filename.to_string()
+    } else {
+        format!("{filename}/")
+    }
+}
+
 // ===========================================================================
 // File predicates (pure)
 // ===========================================================================
@@ -418,6 +430,13 @@ pub(crate) fn builtin_file_name_sans_extension(args: Vec<Value>) -> EvalResult {
     expect_args("file-name-sans-extension", &args, 1)?;
     let filename = expect_string(&args[0])?;
     Ok(Value::string(file_name_sans_extension(&filename)))
+}
+
+/// (file-name-as-directory FILENAME) -> string
+pub(crate) fn builtin_file_name_as_directory(args: Vec<Value>) -> EvalResult {
+    expect_args("file-name-as-directory", &args, 1)?;
+    let filename = expect_string(&args[0])?;
+    Ok(Value::string(file_name_as_directory(&filename)))
 }
 
 /// (file-exists-p FILENAME) -> t or nil
@@ -795,6 +814,17 @@ mod tests {
         assert_eq!(file_name_sans_extension("archive.tar.gz"), "archive.tar");
     }
 
+    #[test]
+    fn test_file_name_as_directory() {
+        assert_eq!(file_name_as_directory("/tmp"), "/tmp/");
+        assert_eq!(file_name_as_directory("/tmp/"), "/tmp/");
+        assert_eq!(file_name_as_directory(""), "./");
+        assert_eq!(file_name_as_directory("foo"), "foo/");
+        assert_eq!(file_name_as_directory("foo/"), "foo/");
+        assert_eq!(file_name_as_directory("~"), "~/");
+        assert_eq!(file_name_as_directory("~/"), "~/");
+    }
+
     // -----------------------------------------------------------------------
     // File predicates
     // -----------------------------------------------------------------------
@@ -1021,6 +1051,9 @@ mod tests {
 
         let result = builtin_file_name_sans_extension(vec![Value::string("/home/user/test.el")]);
         assert_eq!(result.unwrap().as_str(), Some("/home/user/test"));
+
+        let result = builtin_file_name_as_directory(vec![Value::string("/home/user")]);
+        assert_eq!(result.unwrap().as_str(), Some("/home/user/"));
     }
 
     #[test]
