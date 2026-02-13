@@ -108,6 +108,9 @@ impl Evaluator {
             obarray.make_special(name);
         }
 
+        // Initialize the standard error hierarchy (error, user-error, etc.)
+        super::errors::init_standard_errors(&mut obarray);
+
         Self {
             obarray,
             dynamic: Vec::new(),
@@ -386,6 +389,8 @@ impl Evaluator {
             "make-obsolete" => super::autoload::sf_make_obsolete(self, tail),
             "make-obsolete-variable" => super::autoload::sf_make_obsolete_variable(self, tail),
             "with-eval-after-load" => super::autoload::sf_with_eval_after_load(self, tail),
+            // Error hierarchy
+            "define-error" => super::errors::sf_define_error(self, tail),
             // Interactive / mode definition special forms
             "define-minor-mode" => super::interactive::sf_define_minor_mode(self, tail),
             "define-derived-mode" => super::interactive::sf_define_derived_mode(self, tail),

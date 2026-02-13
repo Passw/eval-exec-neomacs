@@ -44,6 +44,7 @@ pub mod window_cmds;
 pub mod textprop;
 pub mod navigation;
 pub mod chartable;
+pub mod errors;
 
 // Re-export the main public API
 pub use value::{Value, ConsCell, LambdaData, LambdaParams};

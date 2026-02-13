@@ -3182,6 +3182,9 @@ pub(crate) fn dispatch_builtin(
         "word-at-point" => return Some(super::interactive::builtin_word_at_point(eval, args)),
         "symbol-at-point" => return Some(super::interactive::builtin_symbol_at_point(eval, args)),
 
+        // Error hierarchy (evaluator-dependent — reads obarray)
+        "error-message-string" => return Some(super::errors::builtin_error_message_string(eval, args)),
+
         // Char-table (evaluator-dependent — applies function)
         "map-char-table" => return Some(super::chartable::builtin_map_char_table(eval, args)),
 
@@ -3473,6 +3476,9 @@ pub(crate) fn dispatch_builtin(
 
         // Custom system (pure)
         "custom-set-faces" => super::custom::builtin_custom_set_faces(args),
+
+        // Error hierarchy (pure)
+        "signal" => super::errors::builtin_signal(args),
 
         // Char-table / bool-vector (pure)
         "make-char-table" => super::chartable::builtin_make_char_table(args),
