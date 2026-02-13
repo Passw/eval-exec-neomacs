@@ -131,6 +131,41 @@ fn seq_default_match(left: &Value, right: &Value) -> bool {
     }
 }
 
+fn seq_collect_concat_arg(arg: &Value) -> Result<Vec<Value>, Flow> {
+    match arg {
+        Value::Nil => Ok(Vec::new()),
+        Value::Cons(_) => {
+            let mut out = Vec::new();
+            let mut cursor = arg.clone();
+            loop {
+                match cursor {
+                    Value::Nil => return Ok(out),
+                    Value::Cons(cell) => {
+                        let pair = cell.lock().expect("poisoned");
+                        out.push(pair.car.clone());
+                        cursor = pair.cdr.clone();
+                    }
+                    tail => {
+                        return Err(signal(
+                            "wrong-type-argument",
+                            vec![Value::symbol("listp"), tail],
+                        ));
+                    }
+                }
+            }
+        }
+        Value::Vector(v) => Ok(v.lock().expect("poisoned").clone()),
+        Value::Str(s) => Ok(s.chars().map(|ch| Value::Int(ch as i64)).collect()),
+        other => Err(signal(
+            "error",
+            vec![Value::string(format!(
+                "Cannot convert {} into a sequence",
+                super::print::print_value(other)
+            ))],
+        )),
+    }
+}
+
 // ===========================================================================
 // CL-lib pure list operations
 // ===========================================================================
@@ -871,25 +906,55 @@ pub(crate) fn builtin_seq_subseq(args: Vec<Value>) -> EvalResult {
 /// `(seq-concatenate TYPE &rest SEQS)` — concatenate sequences into target type.
 pub(crate) fn builtin_seq_concatenate(args: Vec<Value>) -> EvalResult {
     expect_min_args("seq-concatenate", &args, 1)?;
-    let target = type_name_str(&args[0]);
+    let target = match &args[0] {
+        Value::Symbol(s) => s.as_str(),
+        other => {
+            return Err(signal(
+                "error",
+                vec![Value::string(format!(
+                    "Not a sequence type name: {}",
+                    super::print::print_value(other)
+                ))],
+            ));
+        }
+    };
+    if target != "list" && target != "vector" && target != "string" {
+        return Err(signal(
+            "error",
+            vec![Value::string(format!("Not a sequence type name: {}", target))],
+        ));
+    }
+
     let mut combined = Vec::new();
     for arg in &args[1..] {
-        combined.extend(collect_sequence(arg));
+        combined.extend(seq_collect_concat_arg(arg)?);
     }
     match target {
+        "list" => Ok(Value::list(combined)),
         "vector" => Ok(Value::vector(combined)),
         "string" => {
-            let s: String = combined
-                .iter()
-                .filter_map(|v| match v {
-                    Value::Char(c) => Some(*c),
-                    Value::Int(n) => char::from_u32(*n as u32),
-                    _ => None,
-                })
-                .collect();
+            let mut s = String::new();
+            for value in &combined {
+                let ch = match value {
+                    Value::Char(c) => *c,
+                    Value::Int(n) => char::from_u32(*n as u32).ok_or_else(|| {
+                        signal(
+                            "wrong-type-argument",
+                            vec![Value::symbol("characterp"), value.clone()],
+                        )
+                    })?,
+                    other => {
+                        return Err(signal(
+                            "wrong-type-argument",
+                            vec![Value::symbol("characterp"), other.clone()],
+                        ));
+                    }
+                };
+                s.push(ch);
+            }
             Ok(Value::string(s))
         }
-        _ => Ok(Value::list(combined)),
+        _ => unreachable!(),
     }
 }
 
