@@ -2,13 +2,17 @@
 
 use std::collections::HashMap;
 
+use super::abbrev::AbbrevManager;
 use super::advice::{AdviceManager, VariableWatcherList};
+use super::bookmark::BookmarkManager;
 use super::builtins;
 use super::error::*;
 use super::expr::Expr;
 use super::keymap::KeymapManager;
+use super::network::NetworkManager;
 use super::process::ProcessManager;
 use super::regex::MatchData;
+use super::register::RegisterManager;
 use super::symbol::Obarray;
 use super::timer::TimerManager;
 use super::value::*;
@@ -32,6 +36,8 @@ pub struct Evaluator {
     pub(crate) keymaps: KeymapManager,
     /// Process manager — owns all tracked processes.
     pub(crate) processes: ProcessManager,
+    /// Network manager — owns network connections, filters, and sentinels.
+    pub(crate) network: NetworkManager,
     /// Timer manager — owns all timers.
     pub(crate) timers: TimerManager,
     /// Advice manager — function advice (before/after/around/etc.).
@@ -40,6 +46,12 @@ pub struct Evaluator {
     pub(crate) watchers: VariableWatcherList,
     /// Current buffer-local keymap id (set by `use-local-map`).
     pub(crate) current_local_map: Option<u64>,
+    /// Register manager — quick storage and retrieval of text, positions, etc.
+    pub(crate) registers: RegisterManager,
+    /// Bookmark manager — persistent named positions.
+    pub(crate) bookmarks: BookmarkManager,
+    /// Abbreviation manager — text abbreviation expansion.
+    pub(crate) abbrevs: AbbrevManager,
     /// Recursion depth counter.
     depth: usize,
     /// Maximum recursion depth.
@@ -87,10 +99,14 @@ impl Evaluator {
             match_data: None,
             keymaps: KeymapManager::new(),
             processes: ProcessManager::new(),
+            network: NetworkManager::new(),
             timers: TimerManager::new(),
             advice: AdviceManager::new(),
             watchers: VariableWatcherList::new(),
             current_local_map: None,
+            registers: RegisterManager::new(),
+            bookmarks: BookmarkManager::new(),
+            abbrevs: AbbrevManager::new(),
             depth: 0,
             max_depth: 200,
         }

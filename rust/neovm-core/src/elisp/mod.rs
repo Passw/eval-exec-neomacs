@@ -25,8 +25,16 @@ pub mod fileio;
 pub mod syntax;
 pub mod advice;
 pub mod process;
+pub mod network;
 pub mod timer;
 pub mod builtins_extra;
+pub mod isearch;
+pub mod debug;
+pub mod minibuffer;
+pub mod mode;
+pub mod register;
+pub mod bookmark;
+pub mod abbrev;
 
 // Re-export the main public API
 pub use value::{Value, ConsCell, LambdaData, LambdaParams};

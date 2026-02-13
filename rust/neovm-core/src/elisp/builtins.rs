@@ -2993,6 +2993,36 @@ pub(crate) fn dispatch_builtin(
         "backward-sexp" => return Some(super::syntax::builtin_backward_sexp(eval, args)),
         "skip-syntax-forward" => return Some(super::syntax::builtin_skip_syntax_forward(eval, args)),
         "skip-syntax-backward" => return Some(super::syntax::builtin_skip_syntax_backward(eval, args)),
+        // Register operations (evaluator-dependent)
+        "copy-to-register" => return Some(super::register::builtin_copy_to_register(eval, args)),
+        "insert-register" => return Some(super::register::builtin_insert_register(eval, args)),
+        "point-to-register" => return Some(super::register::builtin_point_to_register(eval, args)),
+        "number-to-register" => return Some(super::register::builtin_number_to_register(eval, args)),
+        "increment-register" => return Some(super::register::builtin_increment_register(eval, args)),
+        "view-register" => return Some(super::register::builtin_view_register(eval, args)),
+        "get-register" => return Some(super::register::builtin_get_register(eval, args)),
+        "set-register" => return Some(super::register::builtin_set_register(eval, args)),
+        // Bookmark operations (evaluator-dependent)
+        "bookmark-set" => return Some(super::bookmark::builtin_bookmark_set(eval, args)),
+        "bookmark-jump" => return Some(super::bookmark::builtin_bookmark_jump(eval, args)),
+        "bookmark-delete" => return Some(super::bookmark::builtin_bookmark_delete(eval, args)),
+        "bookmark-rename" => return Some(super::bookmark::builtin_bookmark_rename(eval, args)),
+        "bookmark-all-names" => return Some(super::bookmark::builtin_bookmark_all_names(eval, args)),
+        "bookmark-get-filename" => return Some(super::bookmark::builtin_bookmark_get_filename(eval, args)),
+        "bookmark-get-position" => return Some(super::bookmark::builtin_bookmark_get_position(eval, args)),
+        "bookmark-get-annotation" => return Some(super::bookmark::builtin_bookmark_get_annotation(eval, args)),
+        "bookmark-set-annotation" => return Some(super::bookmark::builtin_bookmark_set_annotation(eval, args)),
+        "bookmark-save" => return Some(super::bookmark::builtin_bookmark_save(eval, args)),
+        "bookmark-load" => return Some(super::bookmark::builtin_bookmark_load(eval, args)),
+        // Abbreviation operations (evaluator-dependent)
+        "define-abbrev" => return Some(super::abbrev::builtin_define_abbrev(eval, args)),
+        "expand-abbrev" => return Some(super::abbrev::builtin_expand_abbrev(eval, args)),
+        "abbrev-mode" => return Some(super::abbrev::builtin_abbrev_mode(eval, args)),
+        "define-abbrev-table" => return Some(super::abbrev::builtin_define_abbrev_table(eval, args)),
+        "clear-abbrev-table" => return Some(super::abbrev::builtin_clear_abbrev_table(eval, args)),
+        "abbrev-expansion" => return Some(super::abbrev::builtin_abbrev_expansion(eval, args)),
+        "insert-abbrev-table-description" => return Some(super::abbrev::builtin_insert_abbrev_table_description(eval, args)),
+        "abbrev-table-p" => return Some(super::abbrev::builtin_abbrev_table_p(eval, args)),
         _ => {}
     }
 
@@ -3197,6 +3227,9 @@ pub(crate) fn dispatch_builtin(
         // Timer (pure — no evaluator needed)
         "timerp" => super::timer::builtin_timerp(args),
         "sit-for" => super::timer::builtin_sit_for(args),
+
+        // Register (pure — no evaluator needed)
+        "register-to-string" => super::register::builtin_register_to_string(args),
 
         // Character encoding
         "char-width" => crate::encoding::builtin_char_width(args),
@@ -3440,6 +3473,8 @@ pub(crate) fn dispatch_builtin_pure(name: &str, args: Vec<Value>) -> Option<Eval
         // Timer (pure)
         "timerp" => super::timer::builtin_timerp(args),
         "sit-for" => super::timer::builtin_sit_for(args),
+        // Register (pure)
+        "register-to-string" => super::register::builtin_register_to_string(args),
         // Character encoding (pure)
         "char-width" => crate::encoding::builtin_char_width(args),
         "multibyte-string-p" => crate::encoding::builtin_multibyte_string_p(args),
