@@ -460,4 +460,46 @@ mod tests {
 
         let _ = fs::remove_dir_all(&dir);
     }
+
+    #[test]
+    fn load_elc_bytecode_literal_without_source_succeeds() {
+        let unique = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .expect("clock before epoch")
+            .as_nanos();
+        let dir = std::env::temp_dir().join(format!("neovm-load-elc-bytecode-literal-{unique}"));
+        fs::create_dir_all(&dir).expect("create temp fixture dir");
+        let compiled = dir.join("probe.elc");
+        fs::write(
+            &compiled,
+            ";ELC\x1e\0\0\0\n#@4data\n(defalias 'vm-bytecode-probe #[(x) \"\\bT\\207\" [x] 1 (#$ . 83)])\n(provide 'vm-bytecode-probe)\n",
+        )
+        .expect("write compiled fixture");
+
+        let mut eval = super::super::eval::Evaluator::new();
+        let loaded = load_file(&mut eval, &compiled).expect("load bytecode-literal elc");
+        assert_eq!(loaded, Value::True);
+        assert!(
+            matches!(
+                eval.obarray().symbol_function("vm-bytecode-probe"),
+                Some(Value::Vector(_))
+            ),
+            "defalias should install a vector-backed function cell",
+        );
+
+        let features = eval
+            .obarray()
+            .symbol_value("features")
+            .cloned()
+            .unwrap_or(Value::Nil);
+        let feature_values = super::super::value::list_to_vec(&features).expect("features list");
+        assert!(
+            feature_values
+                .iter()
+                .any(|v| matches!(v, Value::Symbol(s) if s == "vm-bytecode-probe")),
+            "feature should be present after provide",
+        );
+
+        let _ = fs::remove_dir_all(&dir);
+    }
 }
