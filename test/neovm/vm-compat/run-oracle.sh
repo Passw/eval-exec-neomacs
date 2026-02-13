@@ -17,11 +17,11 @@ forms_file_abs="$forms_dir/$(basename "$forms_file")"
 
 script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 oracle_el="$script_dir/oracle_eval.el"
-emacs_bin="${NEOVM_ORACLE_EMACS:-}"
+emacs_bin="${NEOVM_ORACLE_EMACS:-${ORACLE_EMACS:-}}"
 
 if [[ -z "$emacs_bin" ]]; then
   if ! command -v emacs >/dev/null 2>&1; then
-    echo "emacs binary not found in PATH (or set NEOVM_ORACLE_EMACS)" >&2
+    echo "emacs binary not found in PATH (or set NEOVM_ORACLE_EMACS/ORACLE_EMACS)" >&2
     exit 127
   fi
   emacs_bin="emacs"

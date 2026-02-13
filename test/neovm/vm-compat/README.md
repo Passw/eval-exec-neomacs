@@ -22,7 +22,7 @@ test/neovm/vm-compat/run-oracle.sh test/neovm/vm-compat/cases/core.forms
 test/neovm/vm-compat/run-neovm.sh test/neovm/vm-compat/cases/core.forms
 ```
 
-Use official Emacs explicitly by setting `NEOVM_ORACLE_EMACS`, for example:
+Use official Emacs explicitly by setting `NEOVM_ORACLE_EMACS` (or `ORACLE_EMACS`), for example:
 
 ```bash
 NEOVM_ORACLE_EMACS=/nix/store/hql3zwz5b4ywd2qwx8jssp4dyb7nx4cb-emacs-30.2/bin/emacs \
