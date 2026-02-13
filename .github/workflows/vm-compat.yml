@@ -37,6 +37,26 @@ jobs:
         run: |
           RUSTFLAGS='-Awarnings' make check-introspection-neovm
 
+  vm-compat-ert-allowlist:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    continue-on-error: true
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install Emacs for oracle checks
+        run: |
+          sudo apt-get update
+          sudo DEBIAN_FRONTEND=noninteractive apt-get install -y emacs-nox
+
+      - name: Run ERT allowlist oracle check
+        working-directory: test/neovm/vm-compat
+        env:
+          NEOVM_ORACLE_EMACS: /usr/bin/emacs
+        run: |
+          make check-ert-allowlist
+
   neovm-vm-compat:
     runs-on: ubuntu-latest
     timeout-minutes: 30
