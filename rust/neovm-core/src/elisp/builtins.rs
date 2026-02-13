@@ -3083,7 +3083,7 @@ pub(crate) fn dispatch_builtin(
         "pop-mark" => return Some(super::navigation::builtin_pop_mark(eval, args)),
         "set-mark" => return Some(super::navigation::builtin_set_mark_nav(eval, args)),
         "mark" => return Some(super::navigation::builtin_mark_nav(eval, args)),
-        "mark-marker" => return Some(super::navigation::builtin_mark_marker(eval, args)),
+        "mark-marker" => return Some(super::marker::builtin_mark_marker(eval, args)),
         "region-beginning" => return Some(super::navigation::builtin_region_beginning(eval, args)),
         "region-end" => return Some(super::navigation::builtin_region_end(eval, args)),
         "use-region-p" => return Some(super::navigation::builtin_use_region_p(eval, args)),
@@ -3248,6 +3248,12 @@ pub(crate) fn dispatch_builtin(
         "maphash" => return Some(super::hashtab::builtin_maphash(eval, args)),
         "mapatoms" => return Some(super::hashtab::builtin_mapatoms(eval, args)),
         "unintern" => return Some(super::hashtab::builtin_unintern(eval, args)),
+
+        // Marker (evaluator-dependent)
+        "set-marker" => return Some(super::marker::builtin_set_marker(eval, args)),
+        "point-marker" => return Some(super::marker::builtin_point_marker(eval, args)),
+        "point-min-marker" => return Some(super::marker::builtin_point_min_marker(eval, args)),
+        "point-max-marker" => return Some(super::marker::builtin_point_max_marker(eval, args)),
 
         // Category (evaluator-dependent)
         "modify-category-entry" => return Some(super::category::builtin_modify_category_entry(eval, args)),
@@ -3705,6 +3711,24 @@ pub(crate) fn dispatch_builtin(
         "string-glyph-split" => super::format::builtin_string_glyph_split(args),
         "string-equal-ignore-case" => super::format::builtin_string_equal_ignore_case(args),
 
+        // Marker (pure)
+        "markerp" => super::marker::builtin_markerp(args),
+        "marker-position" => super::marker::builtin_marker_position(args),
+        "marker-buffer" => super::marker::builtin_marker_buffer(args),
+        "marker-insertion-type" => super::marker::builtin_marker_insertion_type(args),
+        "set-marker-insertion-type" => super::marker::builtin_set_marker_insertion_type(args),
+        "copy-marker" => super::marker::builtin_copy_marker(args),
+        "make-marker" => super::marker::builtin_make_marker(args),
+
+        // Composite (pure)
+        "compose-region-internal" => super::composite::builtin_compose_region_internal(args),
+        "compose-string-internal" => super::composite::builtin_compose_string_internal(args),
+        "find-composition-internal" => super::composite::builtin_find_composition_internal(args),
+        "composition-get-gstring" => super::composite::builtin_composition_get_gstring(args),
+        "clear-composition-cache" => super::composite::builtin_clear_composition_cache(args),
+        "composition-sort-rules" => super::composite::builtin_composition_sort_rules(args),
+        "auto-composition-mode" => super::composite::builtin_auto_composition_mode(args),
+
         // Indentation (pure)
         "current-indentation" => super::indent::builtin_current_indentation(args),
         "indent-to" => super::indent::builtin_indent_to(args),
@@ -3713,6 +3737,15 @@ pub(crate) fn dispatch_builtin(
 
         // Error hierarchy (pure)
         "signal" => super::errors::builtin_signal(args),
+
+        // Marker (pure)
+        "markerp" => super::marker::builtin_markerp(args),
+        "marker-position" => super::marker::builtin_marker_position(args),
+        "marker-buffer" => super::marker::builtin_marker_buffer(args),
+        "marker-insertion-type" => super::marker::builtin_marker_insertion_type(args),
+        "set-marker-insertion-type" => super::marker::builtin_set_marker_insertion_type(args),
+        "copy-marker" => super::marker::builtin_copy_marker(args),
+        "make-marker" => super::marker::builtin_make_marker(args),
 
         // Hash-table extended (pure)
         "hash-table-keys" => super::hashtab::builtin_hash_table_keys(args),

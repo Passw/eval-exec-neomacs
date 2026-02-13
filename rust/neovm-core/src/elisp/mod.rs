@@ -43,6 +43,7 @@ pub mod interactive;
 pub mod window_cmds;
 pub mod textprop;
 pub mod navigation;
+pub mod casefiddle;
 pub mod casetab;
 pub mod chartable;
 pub mod errors;
@@ -54,6 +55,8 @@ pub mod misc;
 pub mod threads;
 pub mod coding;
 pub mod hashtab;
+pub mod charset;
+pub mod marker;
 pub mod json;
 pub mod category;
 pub mod kmacro;
@@ -64,6 +67,10 @@ pub mod indent;
 pub mod subr_info;
 pub mod rect;
 pub mod format;
+pub mod composite;
+pub mod floatfns;
+pub mod timefns;
+pub mod font;
 
 // Re-export the main public API
 pub use value::{Value, ConsCell, LambdaData, LambdaParams};
