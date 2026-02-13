@@ -1,0 +1,14 @@
+; call-process and call-process-region baseline behavior.
+(call-process "true")
+(let ((code (call-process "false"))) (/= code 0))
+(with-temp-buffer
+  (insert "abc")
+  (call-process-region (point-min) (point-max) "true"))
+(condition-case err
+    (call-process "/nonexistent/neovm-vm-compat-missing-prog")
+  (error (car err)))
+(with-temp-buffer
+  (insert "x")
+  (condition-case err
+      (call-process-region (point-min) (point-max) "/nonexistent/neovm-vm-compat-missing-prog")
+    (error (car err))))

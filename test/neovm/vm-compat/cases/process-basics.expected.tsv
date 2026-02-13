@@ -1,0 +1,5 @@
+1	(call-process "true")	OK 0
+2	(let ((code (call-process "false"))) (/= code 0))	OK t
+3	(with-temp-buffer (insert "abc") (call-process-region (point-min) (point-max) "true"))	OK 0
+4	(condition-case err (call-process "/nonexistent/neovm-vm-compat-missing-prog") (error (car err)))	OK file-missing
+5	(with-temp-buffer (insert "x") (condition-case err (call-process-region (point-min) (point-max) "/nonexistent/neovm-vm-compat-missing-prog") (error (car err))))	OK file-missing
