@@ -40,6 +40,7 @@ Initial scaffold:
 - Oracle runner: `test/neovm/vm-compat/run-oracle.sh`
 - NeoVM runner: `test/neovm/vm-compat/run-neovm.sh`
 - Comparator: `test/neovm/vm-compat/compare-results.sh`
+- NeoVM-only extension/policy cases: `load-suffixes`, `load-policy`, `precompile`
 
 Current command:
 
@@ -138,6 +139,7 @@ Implemented now:
   - deterministic cache output for identical source/input mode
   - explicit `.elc`/`.elc.gz` input rejection with `file-error`
   - `rust/neovm-core/examples/precompile_neoc.rs` batch precompile example CLI
+  - `neovm-precompile-file` Elisp builtin for in-process cache warming
 
 Package/runtime policy:
 

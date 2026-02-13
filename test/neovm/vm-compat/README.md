@@ -70,8 +70,9 @@ cd test/neovm/vm-compat
 make check-all-neovm-only
 ```
 
-Current NeoVM-only policy cases include source-only loading behavior such as
-`.elc` rejection and `.neoc` fallback safety.
+Current NeoVM-only policy cases include source-only loading behavior (`.elc`
+rejection and `.neoc` fallback safety) plus NeoVM extension behavior
+(`neovm-precompile-file` cache warming).
 
 You can also precompile source files into NeoVM cache sidecars ahead of load:
 
