@@ -249,13 +249,17 @@ impl MinibufferManager {
         if new_depth > self.max_depth {
             return Err(signal(
                 "error",
-                vec![Value::string("Command attempted to use minibuffer while in minibuffer")],
+                vec![Value::string(
+                    "Command attempted to use minibuffer while in minibuffer",
+                )],
             ));
         }
         if !self.enable_recursive && !self.state_stack.is_empty() {
             return Err(signal(
                 "error",
-                vec![Value::string("Command attempted to use minibuffer while in minibuffer")],
+                vec![Value::string(
+                    "Command attempted to use minibuffer while in minibuffer",
+                )],
             ));
         }
 
@@ -307,11 +311,7 @@ impl MinibufferManager {
 
     /// Try to complete `prefix` to the longest common prefix of all matches.
     /// Returns `None` if there are no matches.
-    pub fn try_completion_string(
-        &self,
-        prefix: &str,
-        table: &CompletionTable,
-    ) -> Option<String> {
+    pub fn try_completion_string(&self, prefix: &str, table: &CompletionTable) -> Option<String> {
         let matches = self.all_completions(prefix, table);
         compute_common_prefix(&matches)
     }
@@ -872,10 +872,7 @@ pub fn builtin_exit_minibuffer(args: Vec<Value>) -> EvalResult {
     expect_args("exit-minibuffer", &args, 0)?;
     // In a real interactive session this would exit the minibuffer.
     // Stub: signal an error since we're non-interactive.
-    Err(signal(
-        "error",
-        vec![Value::string("Not in a minibuffer")],
-    ))
+    Err(signal("error", vec![Value::string("Not in a minibuffer")]))
 }
 
 /// `(abort-recursive-edit)` — abort the innermost recursive edit.
@@ -1200,9 +1197,7 @@ mod tests {
     fn exit_with_default() {
         let mut mgr = MinibufferManager::new();
         {
-            let state = mgr
-                .read_from_minibuffer("Enter: ", None, None)
-                .unwrap();
+            let state = mgr.read_from_minibuffer("Enter: ", None, None).unwrap();
             state.default_value = Some("fallback".to_string());
             // Content is empty, so default should be used.
         }
@@ -1252,11 +1247,7 @@ mod tests {
     #[test]
     fn test_completion_exact_match() {
         let mgr = MinibufferManager::new();
-        let table = CompletionTable::List(vec![
-            "apple".into(),
-            "banana".into(),
-            "cherry".into(),
-        ]);
+        let table = CompletionTable::List(vec!["apple".into(), "banana".into(), "cherry".into()]);
         assert!(mgr.test_completion("apple", &table));
         assert!(mgr.test_completion("banana", &table));
         assert!(!mgr.test_completion("app", &table));
@@ -1266,11 +1257,8 @@ mod tests {
     #[test]
     fn try_completion_string_result() {
         let mgr = MinibufferManager::new();
-        let table = CompletionTable::List(vec![
-            "application".into(),
-            "apple".into(),
-            "apply".into(),
-        ]);
+        let table =
+            CompletionTable::List(vec!["application".into(), "apple".into(), "apply".into()]);
         let result = mgr.try_completion_string("app", &table);
         assert_eq!(result, Some("appl".to_string()));
     }
@@ -1319,11 +1307,8 @@ mod tests {
     fn completion_style_basic_case_sensitive() {
         let mut mgr = MinibufferManager::new();
         mgr.set_completion_style(CompletionStyle::Basic);
-        let table = CompletionTable::List(vec![
-            "Apple".into(),
-            "apple".into(),
-            "application".into(),
-        ]);
+        let table =
+            CompletionTable::List(vec!["Apple".into(), "apple".into(), "application".into()]);
         let result = mgr.all_completions("app", &table);
         assert_eq!(result.len(), 2);
         assert!(result.contains(&"apple".to_string()));
@@ -1348,18 +1333,15 @@ mod tests {
 
     #[test]
     fn builtin_read_from_minibuffer_returns_initial() {
-        let result = builtin_read_from_minibuffer(vec![
-            Value::string("prompt: "),
-            Value::string("init"),
-        ])
-        .unwrap();
+        let result =
+            builtin_read_from_minibuffer(vec![Value::string("prompt: "), Value::string("init")])
+                .unwrap();
         assert!(matches!(result, Value::Str(ref s) if &**s == "init"));
     }
 
     #[test]
     fn builtin_read_from_minibuffer_returns_empty() {
-        let result =
-            builtin_read_from_minibuffer(vec![Value::string("prompt: ")]).unwrap();
+        let result = builtin_read_from_minibuffer(vec![Value::string("prompt: ")]).unwrap();
         assert!(matches!(result, Value::Str(ref s) if s.is_empty()));
     }
 
@@ -1377,8 +1359,7 @@ mod tests {
 
     #[test]
     fn builtin_read_number_default() {
-        let result =
-            builtin_read_number(vec![Value::string("N: "), Value::Int(42)]).unwrap();
+        let result = builtin_read_number(vec![Value::string("N: "), Value::Int(42)]).unwrap();
         assert!(matches!(result, Value::Int(42)));
     }
 
@@ -1409,30 +1390,22 @@ mod tests {
     #[test]
     fn builtin_try_completion_unique_exact() {
         // Exact unique match should return t.
-        let coll = Value::list(vec![
-            Value::string("unique"),
-            Value::string("other"),
-        ]);
+        let coll = Value::list(vec![Value::string("unique"), Value::string("other")]);
         let result = builtin_try_completion(vec![Value::string("unique"), coll]).unwrap();
         assert!(matches!(result, Value::True));
     }
 
     #[test]
     fn builtin_try_completion_common_prefix() {
-        let coll = Value::list(vec![
-            Value::string("application"),
-            Value::string("apple"),
-        ]);
-        let result =
-            builtin_try_completion(vec![Value::string("app"), coll]).unwrap();
+        let coll = Value::list(vec![Value::string("application"), Value::string("apple")]);
+        let result = builtin_try_completion(vec![Value::string("app"), coll]).unwrap();
         assert!(matches!(result, Value::Str(ref s) if &**s == "appl"));
     }
 
     #[test]
     fn builtin_try_completion_no_match() {
         let coll = Value::list(vec![Value::string("foo"), Value::string("bar")]);
-        let result =
-            builtin_try_completion(vec![Value::string("zzz"), coll]).unwrap();
+        let result = builtin_try_completion(vec![Value::string("zzz"), coll]).unwrap();
         assert!(matches!(result, Value::Nil));
     }
 
@@ -1443,31 +1416,22 @@ mod tests {
             Value::string("application"),
             Value::string("banana"),
         ]);
-        let result =
-            builtin_all_completions(vec![Value::string("app"), coll]).unwrap();
+        let result = builtin_all_completions(vec![Value::string("app"), coll]).unwrap();
         let items = super::super::value::list_to_vec(&result).unwrap();
         assert_eq!(items.len(), 2);
     }
 
     #[test]
     fn builtin_test_completion_match() {
-        let coll = Value::list(vec![
-            Value::string("alpha"),
-            Value::string("beta"),
-        ]);
-        let result =
-            builtin_test_completion(vec![Value::string("alpha"), coll]).unwrap();
+        let coll = Value::list(vec![Value::string("alpha"), Value::string("beta")]);
+        let result = builtin_test_completion(vec![Value::string("alpha"), coll]).unwrap();
         assert!(matches!(result, Value::True));
     }
 
     #[test]
     fn builtin_test_completion_no_match() {
-        let coll = Value::list(vec![
-            Value::string("alpha"),
-            Value::string("beta"),
-        ]);
-        let result =
-            builtin_test_completion(vec![Value::string("alp"), coll]).unwrap();
+        let coll = Value::list(vec![Value::string("alpha"), Value::string("beta")]);
+        let result = builtin_test_completion(vec![Value::string("alp"), coll]).unwrap();
         assert!(matches!(result, Value::Nil));
     }
 
@@ -1520,11 +1484,9 @@ mod tests {
 
     #[test]
     fn builtin_read_buffer_returns_default() {
-        let result = builtin_read_buffer(vec![
-            Value::string("Buffer: "),
-            Value::string("*scratch*"),
-        ])
-        .unwrap();
+        let result =
+            builtin_read_buffer(vec![Value::string("Buffer: "), Value::string("*scratch*")])
+                .unwrap();
         assert!(matches!(result, Value::Str(ref s) if &**s == "*scratch*"));
     }
 
@@ -1536,8 +1498,7 @@ mod tests {
 
     #[test]
     fn builtin_read_key_sequence_returns_empty_string() {
-        let result =
-            builtin_read_key_sequence(vec![Value::string("Key: ")]).unwrap();
+        let result = builtin_read_key_sequence(vec![Value::string("Key: ")]).unwrap();
         assert!(matches!(result, Value::Str(ref s) if s.is_empty()));
     }
 
@@ -1572,10 +1533,7 @@ mod tests {
 
     #[test]
     fn value_to_string_list_from_vector() {
-        let vec = Value::vector(vec![
-            Value::string("a"),
-            Value::string("b"),
-        ]);
+        let vec = Value::vector(vec![Value::string("a"), Value::string("b")]);
         let result = value_to_string_list(&vec);
         assert_eq!(result, vec!["a", "b"]);
     }

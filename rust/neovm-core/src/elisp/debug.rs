@@ -142,11 +142,7 @@ impl Backtrace {
         let mut out = String::new();
         // Print newest frame first (like Emacs *Backtrace* buffer)
         for (i, frame) in self.frames.iter().rev().enumerate() {
-            let kind = if frame.is_special_form {
-                "  "
-            } else {
-                "  "
-            };
+            let kind = if frame.is_special_form { "  " } else { "  " };
             let args_str = frame
                 .args
                 .iter()
@@ -625,7 +621,9 @@ pub(crate) fn builtin_backtrace(args: Vec<Value>) -> EvalResult {
     }
     // Without evaluator access, return a stub message.
     // In practice, the evaluator calls this with its own debug state.
-    Ok(Value::string("Backtrace not available outside debugger context."))
+    Ok(Value::string(
+        "Backtrace not available outside debugger context.",
+    ))
 }
 
 /// `(debug &rest ARGS)` -- enter the debugger.
@@ -977,7 +975,10 @@ mod tests {
         assert!(store.get_function_doc("car").is_none());
 
         store.set_function_doc("car", "Return the car of LIST.");
-        assert_eq!(store.get_function_doc("car"), Some("Return the car of LIST."));
+        assert_eq!(
+            store.get_function_doc("car"),
+            Some("Return the car of LIST.")
+        );
 
         // Overwrite
         store.set_function_doc("car", "Updated doc.");
@@ -1105,8 +1106,7 @@ mod tests {
             docstring: Some("Inline doc.".to_string()),
         }));
         // Docstore doc overrides inline
-        let output =
-            HelpFormatter::describe_function("my-fn", &lam, Some("Docstore doc."));
+        let output = HelpFormatter::describe_function("my-fn", &lam, Some("Docstore doc."));
         assert!(output.contains("Docstore doc."));
         assert!(!output.contains("Inline doc."));
     }
@@ -1141,8 +1141,11 @@ mod tests {
 
     #[test]
     fn help_describe_variable() {
-        let output =
-            HelpFormatter::describe_variable("fill-column", &Value::Int(70), Some("Column beyond which automatic line-filling takes place."));
+        let output = HelpFormatter::describe_variable(
+            "fill-column",
+            &Value::Int(70),
+            Some("Column beyond which automatic line-filling takes place."),
+        );
         assert!(output.contains("fill-column's value is 70"));
         assert!(output.contains("Column beyond which"));
     }
@@ -1156,8 +1159,7 @@ mod tests {
 
     #[test]
     fn help_describe_key() {
-        let output =
-            HelpFormatter::describe_key("C-x C-f", "find-file", Some("Visit a file."));
+        let output = HelpFormatter::describe_key("C-x C-f", "find-file", Some("Visit a file."));
         assert!(output.contains("C-x C-f runs the command find-file"));
         assert!(output.contains("Visit a file."));
     }
@@ -1428,15 +1430,27 @@ mod tests {
         let mut store = DocStore::new();
 
         // Populate
-        store.set_function_doc("car", "Return the car of LIST.\nThe car is the first element.");
+        store.set_function_doc(
+            "car",
+            "Return the car of LIST.\nThe car is the first element.",
+        );
         store.set_function_doc("cdr", "Return the cdr of LIST.");
         store.set_function_doc("cons", "Create a new cons cell from CAR and CDR.");
-        store.set_variable_doc("load-path", "List of directories to search for files to load.");
+        store.set_variable_doc(
+            "load-path",
+            "List of directories to search for files to load.",
+        );
         store.set_variable_doc("debug-on-error", "Non-nil means enter debugger on error.");
 
         // Lookup
-        assert!(store.get_function_doc("car").unwrap().contains("first element"));
-        assert!(store.get_variable_doc("load-path").unwrap().contains("directories"));
+        assert!(store
+            .get_function_doc("car")
+            .unwrap()
+            .contains("first element"));
+        assert!(store
+            .get_variable_doc("load-path")
+            .unwrap()
+            .contains("directories"));
 
         // Apropos
         let results = store.apropos("c");

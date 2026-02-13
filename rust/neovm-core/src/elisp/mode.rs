@@ -392,10 +392,7 @@ impl ModeRegistry {
             if name == ancestor {
                 return true;
             }
-            current = self
-                .major_modes
-                .get(&name)
-                .and_then(|m| m.parent.clone());
+            current = self.major_modes.get(&name).and_then(|m| m.parent.clone());
         }
         false
     }
@@ -410,11 +407,7 @@ impl ModeRegistry {
     }
 
     /// Enable a minor mode in a specific buffer.
-    pub fn enable_minor_mode(
-        &mut self,
-        buffer_id: u64,
-        mode_name: &str,
-    ) -> Result<(), String> {
+    pub fn enable_minor_mode(&mut self, buffer_id: u64, mode_name: &str) -> Result<(), String> {
         if !self.minor_modes.contains_key(mode_name) {
             return Err(format!("Unknown minor mode: {}", mode_name));
         }
@@ -437,11 +430,7 @@ impl ModeRegistry {
 
     /// Toggle a minor mode in a specific buffer. Returns `Ok(true)` if the
     /// mode is now active, `Ok(false)` if it was disabled.
-    pub fn toggle_minor_mode(
-        &mut self,
-        buffer_id: u64,
-        mode_name: &str,
-    ) -> Result<bool, String> {
+    pub fn toggle_minor_mode(&mut self, buffer_id: u64, mode_name: &str) -> Result<bool, String> {
         if !self.minor_modes.contains_key(mode_name) {
             return Err(format!("Unknown minor mode: {}", mode_name));
         }
@@ -989,10 +978,7 @@ mod tests {
 
         // Should only appear once.
         let active = reg.active_minor_modes(1);
-        assert_eq!(
-            active.iter().filter(|&&m| m == "shared-mode").count(),
-            1
-        );
+        assert_eq!(active.iter().filter(|&&m| m == "shared-mode").count(), 1);
     }
 
     // -------------------------------------------------------------------
@@ -1120,15 +1106,13 @@ mod tests {
             syntax_table_name: None,
             abbrev_table_name: None,
             font_lock: Some(FontLockDefaults {
-                keywords: vec![
-                    FontLockKeyword {
-                        pattern: r"\b(defun|defvar)\b".to_string(),
-                        face: "font-lock-keyword-face".to_string(),
-                        group: 1,
-                        override_: false,
-                        laxmatch: false,
-                    },
-                ],
+                keywords: vec![FontLockKeyword {
+                    pattern: r"\b(defun|defvar)\b".to_string(),
+                    face: "font-lock-keyword-face".to_string(),
+                    group: 1,
+                    override_: false,
+                    laxmatch: false,
+                }],
                 case_fold: false,
                 syntax_table: None,
             }),
@@ -1356,10 +1340,13 @@ mod tests {
 
         // Falls back to fundamental-mode (no entry).
         assert_eq!(reg.get_major_mode(1), "fundamental-mode");
-        assert!(reg.active_minor_modes(1).is_empty()
-                || reg.active_minor_modes(1).iter().all(|m| {
-                    reg.global_minor_modes.contains(&m.to_string())
-                }));
+        assert!(
+            reg.active_minor_modes(1).is_empty()
+                || reg
+                    .active_minor_modes(1)
+                    .iter()
+                    .all(|m| { reg.global_minor_modes.contains(&m.to_string()) })
+        );
     }
 
     // -------------------------------------------------------------------
@@ -1408,10 +1395,8 @@ mod tests {
 
     #[test]
     fn builtin_derived_mode_p_no_match() {
-        let result = builtin_derived_mode_p(vec![
-            Value::symbol("text-mode"),
-            Value::symbol("prog-mode"),
-        ]);
+        let result =
+            builtin_derived_mode_p(vec![Value::symbol("text-mode"), Value::symbol("prog-mode")]);
         assert!(result.is_ok());
         assert!(result.unwrap().is_nil());
     }

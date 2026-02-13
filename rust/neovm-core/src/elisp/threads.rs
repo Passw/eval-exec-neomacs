@@ -302,20 +302,18 @@ impl ThreadManager {
     // -- Condition variable operations --------------------------------------
 
     /// Create a condition variable associated with the given mutex.
-    pub fn create_condition_variable(&mut self, mutex_id: u64, name: Option<String>) -> Option<u64> {
+    pub fn create_condition_variable(
+        &mut self,
+        mutex_id: u64,
+        name: Option<String>,
+    ) -> Option<u64> {
         if !self.mutexes.contains_key(&mutex_id) {
             return None;
         }
         let id = self.next_cv_id;
         self.next_cv_id += 1;
-        self.condition_vars.insert(
-            id,
-            ConditionVarState {
-                id,
-                name,
-                mutex_id,
-            },
-        );
+        self.condition_vars
+            .insert(id, ConditionVarState { id, name, mutex_id });
         Some(id)
     }
 
@@ -326,7 +324,9 @@ impl ThreadManager {
 
     /// Get condition variable name.
     pub fn condition_variable_name(&self, id: u64) -> Option<&str> {
-        self.condition_vars.get(&id).and_then(|cv| cv.name.as_deref())
+        self.condition_vars
+            .get(&id)
+            .and_then(|cv| cv.name.as_deref())
     }
 
     /// Get the mutex associated with a condition variable.
@@ -460,11 +460,8 @@ pub(crate) fn builtin_make_thread(
             eval.threads.signal_thread(thread_id, error_val);
         }
         Err(Flow::Throw { ref tag, ref value }) => {
-            let error_val = Value::list(vec![
-                Value::symbol("no-catch"),
-                tag.clone(),
-                value.clone(),
-            ]);
+            let error_val =
+                Value::list(vec![Value::symbol("no-catch"), tag.clone(), value.clone()]);
             eval.threads.signal_thread(thread_id, error_val);
         }
     }
@@ -607,7 +604,10 @@ pub(crate) fn builtin_thread_last_error(
     if args.len() > 1 {
         return Err(signal(
             "wrong-number-of-arguments",
-            vec![Value::symbol("thread-last-error"), Value::Int(args.len() as i64)],
+            vec![
+                Value::symbol("thread-last-error"),
+                Value::Int(args.len() as i64),
+            ],
         ));
     }
     let cleanup = args.first().is_some_and(|v| v.is_truthy());
@@ -724,7 +724,10 @@ pub(crate) fn builtin_make_condition_variable(
     if args.len() > 2 {
         return Err(signal(
             "wrong-number-of-arguments",
-            vec![Value::symbol("make-condition-variable"), Value::Int(args.len() as i64)],
+            vec![
+                Value::symbol("make-condition-variable"),
+                Value::Int(args.len() as i64),
+            ],
         ));
     }
     let mutex_id = expect_mutex_id(&args[0])?;
@@ -797,7 +800,10 @@ pub(crate) fn builtin_condition_notify(
     if args.len() > 2 {
         return Err(signal(
             "wrong-number-of-arguments",
-            vec![Value::symbol("condition-notify"), Value::Int(args.len() as i64)],
+            vec![
+                Value::symbol("condition-notify"),
+                Value::Int(args.len() as i64),
+            ],
         ));
     }
     let id = expect_cv_id(&args[0])?;
@@ -851,8 +857,8 @@ pub(crate) fn sf_with_mutex(
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use super::super::eval::Evaluator;
+    use super::*;
 
     // -- ThreadManager unit tests -------------------------------------------
 
@@ -1077,12 +1083,14 @@ mod tests {
         // Create and run a thread
         let tid_val = builtin_make_thread(
             &mut eval,
-            vec![Value::Lambda(std::sync::Arc::new(super::super::value::LambdaData {
-                params: super::super::value::LambdaParams::simple(vec![]),
-                body: vec![],
-                env: None,
-                docstring: None,
-            }))],
+            vec![Value::Lambda(std::sync::Arc::new(
+                super::super::value::LambdaData {
+                    params: super::super::value::LambdaParams::simple(vec![]),
+                    body: vec![],
+                    env: None,
+                    docstring: None,
+                },
+            ))],
         )
         .unwrap();
 
@@ -1096,12 +1104,14 @@ mod tests {
         let mut eval = Evaluator::new();
         let tid_val = builtin_make_thread(
             &mut eval,
-            vec![Value::Lambda(std::sync::Arc::new(super::super::value::LambdaData {
-                params: super::super::value::LambdaParams::simple(vec![]),
-                body: vec![],
-                env: None,
-                docstring: None,
-            }))],
+            vec![Value::Lambda(std::sync::Arc::new(
+                super::super::value::LambdaData {
+                    params: super::super::value::LambdaParams::simple(vec![]),
+                    body: vec![],
+                    env: None,
+                    docstring: None,
+                },
+            ))],
         )
         .unwrap();
 
@@ -1186,10 +1196,7 @@ mod tests {
     fn test_builtin_make_condition_variable() {
         let mut eval = Evaluator::new();
         let mx = builtin_make_mutex(&mut eval, vec![]).unwrap();
-        let result = builtin_make_condition_variable(
-            &mut eval,
-            vec![mx, Value::string("my-cv")],
-        );
+        let result = builtin_make_condition_variable(&mut eval, vec![mx, Value::string("my-cv")]);
         assert!(result.is_ok());
     }
 
@@ -1237,10 +1244,7 @@ mod tests {
         eval.set_variable("test-mx", mx);
 
         // (with-mutex test-mx 42)
-        let tail = vec![
-            Expr::Symbol("test-mx".into()),
-            Expr::Int(42),
-        ];
+        let tail = vec![Expr::Symbol("test-mx".into()), Expr::Int(42)];
         let result = sf_with_mutex(&mut eval, &tail);
         assert!(result.is_ok());
         assert_eq!(result.unwrap().as_int(), Some(42));
@@ -1262,11 +1266,7 @@ mod tests {
         // (with-mutex test-mx2 (/ 1 0))  -- will signal arith-error
         let tail = vec![
             Expr::Symbol("test-mx2".into()),
-            Expr::List(vec![
-                Expr::Symbol("/".into()),
-                Expr::Int(1),
-                Expr::Int(0),
-            ]),
+            Expr::List(vec![Expr::Symbol("/".into()), Expr::Int(1), Expr::Int(0)]),
         ];
         let result = sf_with_mutex(&mut eval, &tail);
         // Should propagate the error

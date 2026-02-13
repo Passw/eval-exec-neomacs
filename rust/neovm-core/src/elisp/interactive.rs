@@ -164,10 +164,7 @@ fn expect_min_args(name: &str, args: &[Value], min: usize) -> Result<(), Flow> {
 /// `(call-interactively FUNCTION &optional RECORD-FLAG KEYS)`
 /// Call FUNCTION interactively, reading arguments according to its
 /// interactive spec.
-pub(crate) fn builtin_call_interactively(
-    eval: &mut Evaluator,
-    args: Vec<Value>,
-) -> EvalResult {
+pub(crate) fn builtin_call_interactively(eval: &mut Evaluator, args: Vec<Value>) -> EvalResult {
     expect_min_args("call-interactively", &args, 1)?;
 
     let func_val = &args[0];
@@ -188,10 +185,7 @@ pub(crate) fn builtin_call_interactively(
 }
 
 /// `(interactive-p)` -> t if the calling function was called interactively.
-pub(crate) fn builtin_interactive_p(
-    eval: &mut Evaluator,
-    args: Vec<Value>,
-) -> EvalResult {
+pub(crate) fn builtin_interactive_p(eval: &mut Evaluator, args: Vec<Value>) -> EvalResult {
     expect_args("interactive-p", &args, 0)?;
     Ok(Value::bool(eval.interactive.is_called_interactively()))
 }
@@ -199,15 +193,15 @@ pub(crate) fn builtin_interactive_p(
 /// `(called-interactively-p &optional KIND)`
 /// Return t if the calling function was called interactively.
 /// KIND can be 'interactive or 'any.
-pub(crate) fn builtin_called_interactively_p(
-    eval: &mut Evaluator,
-    args: Vec<Value>,
-) -> EvalResult {
+pub(crate) fn builtin_called_interactively_p(eval: &mut Evaluator, args: Vec<Value>) -> EvalResult {
     // Accept 0 or 1 args
     if args.len() > 1 {
         return Err(signal(
             "wrong-number-of-arguments",
-            vec![Value::symbol("called-interactively-p"), Value::Int(args.len() as i64)],
+            vec![
+                Value::symbol("called-interactively-p"),
+                Value::Int(args.len() as i64),
+            ],
         ));
     }
     Ok(Value::bool(eval.interactive.is_called_interactively()))
@@ -215,10 +209,7 @@ pub(crate) fn builtin_called_interactively_p(
 
 /// `(commandp FUNCTION &optional FOR-CALL-INTERACTIVELY)`
 /// Return non-nil if FUNCTION is a command (i.e., can be called interactively).
-pub(crate) fn builtin_commandp_interactive(
-    eval: &mut Evaluator,
-    args: Vec<Value>,
-) -> EvalResult {
+pub(crate) fn builtin_commandp_interactive(eval: &mut Evaluator, args: Vec<Value>) -> EvalResult {
     expect_min_args("commandp", &args, 1)?;
 
     let func = &args[0];
@@ -246,10 +237,7 @@ pub(crate) fn builtin_commandp_interactive(
 
 /// `(command-execute CMD &optional RECORD-FLAG KEYS SPECIAL)`
 /// Execute CMD as an editor command.
-pub(crate) fn builtin_command_execute(
-    eval: &mut Evaluator,
-    args: Vec<Value>,
-) -> EvalResult {
+pub(crate) fn builtin_command_execute(eval: &mut Evaluator, args: Vec<Value>) -> EvalResult {
     expect_min_args("command-execute", &args, 1)?;
 
     let cmd = &args[0];
@@ -294,16 +282,15 @@ pub(crate) fn builtin_execute_extended_command(
     // Without interactive input, signal an error
     Err(signal(
         "error",
-        vec![Value::string("execute-extended-command requires a command name")],
+        vec![Value::string(
+            "execute-extended-command requires a command name",
+        )],
     ))
 }
 
 /// `(key-binding KEY &optional ACCEPT-DEFAULTS NO-REMAP POSITION)`
 /// Return the binding for KEY in the current keymaps.
-pub(crate) fn builtin_key_binding(
-    eval: &mut Evaluator,
-    args: Vec<Value>,
-) -> EvalResult {
+pub(crate) fn builtin_key_binding(eval: &mut Evaluator, args: Vec<Value>) -> EvalResult {
     expect_min_args("key-binding", &args, 1)?;
 
     let key_desc = match args[0].as_str() {
@@ -347,10 +334,7 @@ pub(crate) fn builtin_key_binding(
 }
 
 /// `(local-key-binding KEY &optional ACCEPT-DEFAULTS)`
-pub(crate) fn builtin_local_key_binding(
-    eval: &mut Evaluator,
-    args: Vec<Value>,
-) -> EvalResult {
+pub(crate) fn builtin_local_key_binding(eval: &mut Evaluator, args: Vec<Value>) -> EvalResult {
     expect_min_args("local-key-binding", &args, 1)?;
 
     let key_desc = match args[0].as_str() {
@@ -376,10 +360,7 @@ pub(crate) fn builtin_local_key_binding(
 }
 
 /// `(global-key-binding KEY &optional ACCEPT-DEFAULTS)`
-pub(crate) fn builtin_global_key_binding(
-    eval: &mut Evaluator,
-    args: Vec<Value>,
-) -> EvalResult {
+pub(crate) fn builtin_global_key_binding(eval: &mut Evaluator, args: Vec<Value>) -> EvalResult {
     expect_min_args("global-key-binding", &args, 1)?;
 
     let key_desc = match args[0].as_str() {
@@ -418,10 +399,7 @@ pub(crate) fn builtin_minor_mode_key_binding(
 /// `(where-is-internal DEFINITION &optional KEYMAP FIRSTONLY NOINDIRECT NO-REMAP)`
 /// Return list of key sequences that invoke DEFINITION.
 /// Stub: returns nil.
-pub(crate) fn builtin_where_is_internal(
-    _eval: &mut Evaluator,
-    args: Vec<Value>,
-) -> EvalResult {
+pub(crate) fn builtin_where_is_internal(_eval: &mut Evaluator, args: Vec<Value>) -> EvalResult {
     expect_min_args("where-is-internal", &args, 1)?;
     Ok(Value::Nil)
 }
@@ -477,10 +455,7 @@ pub(crate) fn builtin_substitute_command_keys(
 
 /// `(describe-key-briefly KEY &optional INSERT UNTRANSLATED)`
 /// Print the command bound to KEY.
-pub(crate) fn builtin_describe_key_briefly(
-    eval: &mut Evaluator,
-    args: Vec<Value>,
-) -> EvalResult {
+pub(crate) fn builtin_describe_key_briefly(eval: &mut Evaluator, args: Vec<Value>) -> EvalResult {
     expect_min_args("describe-key-briefly", &args, 1)?;
 
     let key_desc = match args[0].as_str() {
@@ -502,10 +477,7 @@ pub(crate) fn builtin_describe_key_briefly(
 }
 
 /// `(this-command-keys)` -> string of keys that invoked current command.
-pub(crate) fn builtin_this_command_keys(
-    eval: &mut Evaluator,
-    args: Vec<Value>,
-) -> EvalResult {
+pub(crate) fn builtin_this_command_keys(eval: &mut Evaluator, args: Vec<Value>) -> EvalResult {
     expect_args("this-command-keys", &args, 0)?;
     let keys = eval.interactive.this_command_keys();
     Ok(Value::string(keys.join(" ")))
@@ -527,10 +499,7 @@ pub(crate) fn builtin_this_command_keys_vector(
 // ---------------------------------------------------------------------------
 
 /// `(thing-at-point THING &optional NO-PROPERTIES)` -> the THING at point.
-pub(crate) fn builtin_thing_at_point(
-    eval: &mut Evaluator,
-    args: Vec<Value>,
-) -> EvalResult {
+pub(crate) fn builtin_thing_at_point(eval: &mut Evaluator, args: Vec<Value>) -> EvalResult {
     expect_min_args("thing-at-point", &args, 1)?;
 
     let thing = match args[0].as_symbol_name() {
@@ -561,7 +530,7 @@ pub(crate) fn builtin_thing_at_point(
         "sexp" => Ok(extract_thing_symbol(&text, idx)),   // simplified
         "whitespace" => Ok(extract_thing_whitespace(&text, idx)),
         "number" => Ok(extract_thing_number(&text, idx)),
-        "url" => Ok(Value::Nil), // stub
+        "url" => Ok(Value::Nil),   // stub
         "email" => Ok(Value::Nil), // stub
         "filename" => Ok(extract_thing_filename(&text, idx)),
         _ => Ok(Value::Nil),
@@ -617,18 +586,12 @@ pub(crate) fn builtin_bounds_of_thing_at_point(
 }
 
 /// `(word-at-point &optional NO-PROPERTIES)` -> word at point or nil.
-pub(crate) fn builtin_word_at_point(
-    eval: &mut Evaluator,
-    _args: Vec<Value>,
-) -> EvalResult {
+pub(crate) fn builtin_word_at_point(eval: &mut Evaluator, _args: Vec<Value>) -> EvalResult {
     builtin_thing_at_point(eval, vec![Value::symbol("word")])
 }
 
 /// `(symbol-at-point)` -> symbol at point or nil.
-pub(crate) fn builtin_symbol_at_point(
-    eval: &mut Evaluator,
-    _args: Vec<Value>,
-) -> EvalResult {
+pub(crate) fn builtin_symbol_at_point(eval: &mut Evaluator, _args: Vec<Value>) -> EvalResult {
     let thing = builtin_thing_at_point(eval, vec![Value::symbol("symbol")])?;
     match thing {
         Value::Str(s) => Ok(Value::symbol((*s).clone())),
@@ -956,16 +919,14 @@ pub(crate) fn sf_define_generic_mode(eval: &mut Evaluator, tail: &[Expr]) -> Eva
     // Create a simple mode function
     let lambda = Value::Lambda(std::sync::Arc::new(LambdaData {
         params: LambdaParams::simple(vec![]),
-        body: vec![
+        body: vec![Expr::List(vec![
+            Expr::Symbol("setq".to_string()),
+            Expr::Symbol("major-mode".to_string()),
             Expr::List(vec![
-                Expr::Symbol("setq".to_string()),
-                Expr::Symbol("major-mode".to_string()),
-                Expr::List(vec![
-                    Expr::Symbol("quote".to_string()),
-                    Expr::Symbol(mode_name.clone()),
-                ]),
+                Expr::Symbol("quote".to_string()),
+                Expr::Symbol(mode_name.clone()),
             ]),
-        ],
+        ])],
         env: None,
         docstring: None,
     }));
@@ -1029,7 +990,11 @@ fn is_word_char(c: char) -> bool {
 }
 
 fn is_symbol_char(c: char) -> bool {
-    c.is_alphanumeric() || matches!(c, '_' | '-' | '.' | '+' | '*' | '/' | '?' | '!' | '<' | '>' | '=' | ':')
+    c.is_alphanumeric()
+        || matches!(
+            c,
+            '_' | '-' | '.' | '+' | '*' | '/' | '?' | '!' | '<' | '>' | '=' | ':'
+        )
 }
 
 fn is_filename_char(c: char) -> bool {
@@ -1448,10 +1413,7 @@ mod tests {
     #[test]
     fn define_derived_mode_registers_interactive() {
         let mut ev = Evaluator::new();
-        eval_all_with(
-            &mut ev,
-            r#"(define-derived-mode ireg-mode nil "IReg")"#,
-        );
+        eval_all_with(&mut ev, r#"(define-derived-mode ireg-mode nil "IReg")"#);
         assert!(ev.interactive.is_interactive("ireg-mode"));
     }
 
@@ -1461,9 +1423,7 @@ mod tests {
 
     #[test]
     fn define_generic_mode_creates_mode() {
-        let results = eval_all(
-            r#"(define-generic-mode my-generic-mode nil nil nil nil nil)"#,
-        );
+        let results = eval_all(r#"(define-generic-mode my-generic-mode nil nil nil nil nil)"#);
         assert_eq!(results[0], "OK my-generic-mode");
     }
 
@@ -1474,15 +1434,9 @@ mod tests {
     #[test]
     fn commandp_with_interactive_registration() {
         let mut ev = Evaluator::new();
-        eval_all_with(
-            &mut ev,
-            r#"(define-minor-mode cmd-test-mode "Test")"#,
-        );
+        eval_all_with(&mut ev, r#"(define-minor-mode cmd-test-mode "Test")"#);
         // cmd-test-mode should now be a command
-        let result = builtin_commandp_interactive(
-            &mut ev,
-            vec![Value::symbol("cmd-test-mode")],
-        );
+        let result = builtin_commandp_interactive(&mut ev, vec![Value::symbol("cmd-test-mode")]);
         assert!(result.unwrap().is_truthy());
     }
 
@@ -1490,10 +1444,7 @@ mod tests {
     fn commandp_non_interactive() {
         let mut ev = Evaluator::new();
         eval_all_with(&mut ev, r#"(defun my-plain-fn () 42)"#);
-        let result = builtin_commandp_interactive(
-            &mut ev,
-            vec![Value::symbol("my-plain-fn")],
-        );
+        let result = builtin_commandp_interactive(&mut ev, vec![Value::symbol("my-plain-fn")]);
         assert!(result.unwrap().is_nil());
     }
 
@@ -1518,8 +1469,7 @@ mod tests {
     #[test]
     fn called_interactively_p_with_kind() {
         let mut ev = Evaluator::new();
-        let result =
-            builtin_called_interactively_p(&mut ev, vec![Value::symbol("any")]);
+        let result = builtin_called_interactively_p(&mut ev, vec![Value::symbol("any")]);
         assert!(result.unwrap().is_nil());
     }
 
@@ -1583,8 +1533,7 @@ mod tests {
         let mut ev = Evaluator::new();
         let map_id = ev.keymaps.make_keymap();
         ev.keymaps.set_global_map(map_id);
-        let events =
-            KeymapManager::parse_key_description("C-f").unwrap();
+        let events = KeymapManager::parse_key_description("C-f").unwrap();
         ev.keymaps.define_key(
             map_id,
             events[0].clone(),
@@ -1614,27 +1563,21 @@ mod tests {
             KeyBinding::Command("execute-extended-command".to_string()),
         );
 
-        let result =
-            builtin_global_key_binding(&mut ev, vec![Value::string("M-x")]).unwrap();
+        let result = builtin_global_key_binding(&mut ev, vec![Value::string("M-x")]).unwrap();
         assert_eq!(result.as_symbol_name(), Some("execute-extended-command"));
     }
 
     #[test]
     fn local_key_binding_nil_when_no_local_map() {
         let mut ev = Evaluator::new();
-        let result =
-            builtin_local_key_binding(&mut ev, vec![Value::string("C-c")]).unwrap();
+        let result = builtin_local_key_binding(&mut ev, vec![Value::string("C-c")]).unwrap();
         assert!(result.is_nil());
     }
 
     #[test]
     fn minor_mode_key_binding_returns_nil() {
         let mut ev = Evaluator::new();
-        let result = builtin_minor_mode_key_binding(
-            &mut ev,
-            vec![Value::string("C-c")],
-        )
-        .unwrap();
+        let result = builtin_minor_mode_key_binding(&mut ev, vec![Value::string("C-c")]).unwrap();
         assert!(result.is_nil());
     }
 
@@ -1645,11 +1588,9 @@ mod tests {
     #[test]
     fn substitute_command_keys_plain() {
         let mut ev = Evaluator::new();
-        let result = builtin_substitute_command_keys(
-            &mut ev,
-            vec![Value::string("Press C-x to save")],
-        )
-        .unwrap();
+        let result =
+            builtin_substitute_command_keys(&mut ev, vec![Value::string("Press C-x to save")])
+                .unwrap();
         assert_eq!(result.as_str(), Some("Press C-x to save"));
     }
 
@@ -1690,8 +1631,7 @@ mod tests {
     #[test]
     fn substitute_command_keys_not_string() {
         let mut ev = Evaluator::new();
-        let result =
-            builtin_substitute_command_keys(&mut ev, vec![Value::Int(42)]);
+        let result = builtin_substitute_command_keys(&mut ev, vec![Value::Int(42)]);
         assert!(result.is_err());
     }
 
@@ -1702,9 +1642,7 @@ mod tests {
     #[test]
     fn describe_key_briefly_unbound() {
         let mut ev = Evaluator::new();
-        let result =
-            builtin_describe_key_briefly(&mut ev, vec![Value::string("C-z")])
-                .unwrap();
+        let result = builtin_describe_key_briefly(&mut ev, vec![Value::string("C-z")]).unwrap();
         let s = result.as_str().unwrap();
         assert!(s.contains("undefined"));
     }
@@ -1721,9 +1659,7 @@ mod tests {
             KeyBinding::Command("forward-char".to_string()),
         );
 
-        let result =
-            builtin_describe_key_briefly(&mut ev, vec![Value::string("C-f")])
-                .unwrap();
+        let result = builtin_describe_key_briefly(&mut ev, vec![Value::string("C-f")]).unwrap();
         let s = result.as_str().unwrap();
         assert!(s.contains("forward-char"));
     }
@@ -1742,8 +1678,7 @@ mod tests {
                (insert "hello world")
                (goto-char 2)"#,
         );
-        let result =
-            builtin_thing_at_point(&mut ev, vec![Value::symbol("word")]).unwrap();
+        let result = builtin_thing_at_point(&mut ev, vec![Value::symbol("word")]).unwrap();
         assert_eq!(result.as_str(), Some("hello"));
     }
 
@@ -1757,8 +1692,7 @@ mod tests {
                (insert "foo-bar baz")
                (goto-char 3)"#,
         );
-        let result =
-            builtin_thing_at_point(&mut ev, vec![Value::symbol("symbol")]).unwrap();
+        let result = builtin_thing_at_point(&mut ev, vec![Value::symbol("symbol")]).unwrap();
         assert_eq!(result.as_str(), Some("foo-bar"));
     }
 
@@ -1772,8 +1706,7 @@ mod tests {
                (insert "line1\nline2\n")
                (goto-char 1)"#,
         );
-        let result =
-            builtin_thing_at_point(&mut ev, vec![Value::symbol("line")]).unwrap();
+        let result = builtin_thing_at_point(&mut ev, vec![Value::symbol("line")]).unwrap();
         let s = result.as_str().unwrap();
         assert!(s.starts_with("line1"));
     }
@@ -1782,8 +1715,7 @@ mod tests {
     fn thing_at_point_no_buffer() {
         let mut ev = Evaluator::new();
         // No buffer set
-        let result =
-            builtin_thing_at_point(&mut ev, vec![Value::symbol("word")]).unwrap();
+        let result = builtin_thing_at_point(&mut ev, vec![Value::symbol("word")]).unwrap();
         assert!(result.is_nil());
     }
 
@@ -1808,11 +1740,8 @@ mod tests {
                (insert "hello world")
                (goto-char 3)"#,
         );
-        let result = builtin_bounds_of_thing_at_point(
-            &mut ev,
-            vec![Value::symbol("word")],
-        )
-        .unwrap();
+        let result =
+            builtin_bounds_of_thing_at_point(&mut ev, vec![Value::symbol("word")]).unwrap();
         // Should be (1 . 6) for "hello"
         if let Value::Cons(cell) = &result {
             let cell = cell.lock().unwrap();
@@ -1833,11 +1762,8 @@ mod tests {
                (insert "   ")
                (goto-char 2)"#,
         );
-        let result = builtin_bounds_of_thing_at_point(
-            &mut ev,
-            vec![Value::symbol("word")],
-        )
-        .unwrap();
+        let result =
+            builtin_bounds_of_thing_at_point(&mut ev, vec![Value::symbol("word")]).unwrap();
         assert!(result.is_nil());
     }
 
@@ -1888,9 +1814,7 @@ mod tests {
         ev.interactive
             .register_interactive("test-cmd", InteractiveSpec::no_args());
 
-        let result =
-            builtin_command_execute(&mut ev, vec![Value::symbol("test-cmd")])
-                .unwrap();
+        let result = builtin_command_execute(&mut ev, vec![Value::symbol("test-cmd")]).unwrap();
         assert!(result.is_truthy());
 
         let ran = ev.obarray.symbol_value("exec-ran").unwrap().clone();
@@ -1900,8 +1824,7 @@ mod tests {
     #[test]
     fn command_execute_void_function() {
         let mut ev = Evaluator::new();
-        let result =
-            builtin_command_execute(&mut ev, vec![Value::symbol("nonexistent")]);
+        let result = builtin_command_execute(&mut ev, vec![Value::symbol("nonexistent")]);
         assert!(result.is_err());
     }
 
@@ -1918,11 +1841,9 @@ mod tests {
                (defun ext-cmd () (setq ext-ran t))"#,
         );
 
-        let _result = builtin_execute_extended_command(
-            &mut ev,
-            vec![Value::Nil, Value::string("ext-cmd")],
-        )
-        .unwrap();
+        let _result =
+            builtin_execute_extended_command(&mut ev, vec![Value::Nil, Value::string("ext-cmd")])
+                .unwrap();
 
         let ran = ev.obarray.symbol_value("ext-ran").unwrap().clone();
         assert!(ran.is_truthy());
@@ -1931,8 +1852,7 @@ mod tests {
     #[test]
     fn execute_extended_command_no_name() {
         let mut ev = Evaluator::new();
-        let result =
-            builtin_execute_extended_command(&mut ev, vec![Value::Nil]);
+        let result = builtin_execute_extended_command(&mut ev, vec![Value::Nil]);
         assert!(result.is_err());
     }
 
@@ -1943,11 +1863,8 @@ mod tests {
     #[test]
     fn where_is_internal_returns_nil() {
         let mut ev = Evaluator::new();
-        let result = builtin_where_is_internal(
-            &mut ev,
-            vec![Value::symbol("forward-char")],
-        )
-        .unwrap();
+        let result =
+            builtin_where_is_internal(&mut ev, vec![Value::symbol("forward-char")]).unwrap();
         assert!(result.is_nil());
     }
 
@@ -2015,17 +1932,15 @@ mod tests {
 
     #[test]
     fn eval_define_minor_mode() {
-        let results = eval_all(
-            r#"(define-minor-mode my-test-mode "A test minor mode" :lighter " T")"#,
-        );
+        let results =
+            eval_all(r#"(define-minor-mode my-test-mode "A test minor mode" :lighter " T")"#);
         assert_eq!(results[0], "OK my-test-mode");
     }
 
     #[test]
     fn eval_define_derived_mode() {
-        let results = eval_all(
-            r#"(define-derived-mode my-custom-mode nil "MyCustom" "Custom mode.")"#,
-        );
+        let results =
+            eval_all(r#"(define-derived-mode my-custom-mode nil "MyCustom" "Custom mode.")"#);
         assert_eq!(results[0], "OK my-custom-mode");
     }
 
@@ -2049,8 +1964,8 @@ mod tests {
                (cycle-mode)
                cycle-mode"#,
         );
-        assert_eq!(results[1], "OK nil");  // initially off
-        assert_eq!(results[3], "OK t");    // toggled on
-        assert_eq!(results[5], "OK nil");  // toggled off
+        assert_eq!(results[1], "OK nil"); // initially off
+        assert_eq!(results[3], "OK t"); // toggled on
+        assert_eq!(results[5], "OK nil"); // toggled off
     }
 }

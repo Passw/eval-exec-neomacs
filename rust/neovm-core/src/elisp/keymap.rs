@@ -189,11 +189,7 @@ impl KeymapManager {
 
     /// Look up a sequence of key events, following prefix keymaps.
     /// Returns the final binding, or None if the sequence is unbound.
-    pub fn lookup_key_sequence(
-        &self,
-        keymap_id: u64,
-        keys: &[KeyEvent],
-    ) -> Option<&KeyBinding> {
+    pub fn lookup_key_sequence(&self, keymap_id: u64, keys: &[KeyEvent]) -> Option<&KeyBinding> {
         if keys.is_empty() {
             return None;
         }
@@ -312,63 +308,108 @@ impl KeymapManager {
         match remainder {
             "RET" | "return" => Ok(KeyEvent::Function {
                 name: "return".to_string(),
-                ctrl, meta, shift, super_,
+                ctrl,
+                meta,
+                shift,
+                super_,
             }),
             "TAB" | "tab" => Ok(KeyEvent::Function {
                 name: "tab".to_string(),
-                ctrl, meta, shift, super_,
+                ctrl,
+                meta,
+                shift,
+                super_,
             }),
             "SPC" | "space" => Ok(KeyEvent::Char {
                 code: ' ',
-                ctrl, meta, shift, super_,
+                ctrl,
+                meta,
+                shift,
+                super_,
             }),
             "ESC" | "escape" => Ok(KeyEvent::Function {
                 name: "escape".to_string(),
-                ctrl, meta, shift, super_,
+                ctrl,
+                meta,
+                shift,
+                super_,
             }),
             "DEL" | "delete" => Ok(KeyEvent::Function {
                 name: "delete".to_string(),
-                ctrl, meta, shift, super_,
+                ctrl,
+                meta,
+                shift,
+                super_,
             }),
             "BS" | "backspace" => Ok(KeyEvent::Function {
                 name: "backspace".to_string(),
-                ctrl, meta, shift, super_,
+                ctrl,
+                meta,
+                shift,
+                super_,
             }),
             "up" => Ok(KeyEvent::Function {
                 name: "up".to_string(),
-                ctrl, meta, shift, super_,
+                ctrl,
+                meta,
+                shift,
+                super_,
             }),
             "down" => Ok(KeyEvent::Function {
                 name: "down".to_string(),
-                ctrl, meta, shift, super_,
+                ctrl,
+                meta,
+                shift,
+                super_,
             }),
             "left" => Ok(KeyEvent::Function {
                 name: "left".to_string(),
-                ctrl, meta, shift, super_,
+                ctrl,
+                meta,
+                shift,
+                super_,
             }),
             "right" => Ok(KeyEvent::Function {
                 name: "right".to_string(),
-                ctrl, meta, shift, super_,
+                ctrl,
+                meta,
+                shift,
+                super_,
             }),
             "home" => Ok(KeyEvent::Function {
                 name: "home".to_string(),
-                ctrl, meta, shift, super_,
+                ctrl,
+                meta,
+                shift,
+                super_,
             }),
             "end" => Ok(KeyEvent::Function {
                 name: "end".to_string(),
-                ctrl, meta, shift, super_,
+                ctrl,
+                meta,
+                shift,
+                super_,
             }),
             "prior" | "page-up" => Ok(KeyEvent::Function {
                 name: "prior".to_string(),
-                ctrl, meta, shift, super_,
+                ctrl,
+                meta,
+                shift,
+                super_,
             }),
             "next" | "page-down" => Ok(KeyEvent::Function {
                 name: "next".to_string(),
-                ctrl, meta, shift, super_,
+                ctrl,
+                meta,
+                shift,
+                super_,
             }),
             "insert" => Ok(KeyEvent::Function {
                 name: "insert".to_string(),
-                ctrl, meta, shift, super_,
+                ctrl,
+                meta,
+                shift,
+                super_,
             }),
             other => {
                 // Check for function keys: f1 .. f20
@@ -377,7 +418,10 @@ impl KeymapManager {
                         if (1..=20).contains(&n) {
                             return Ok(KeyEvent::Function {
                                 name: format!("f{}", n),
-                                ctrl, meta, shift, super_,
+                                ctrl,
+                                meta,
+                                shift,
+                                super_,
                             });
                         }
                     }
@@ -385,15 +429,18 @@ impl KeymapManager {
 
                 // Single character
                 let mut chars = other.chars();
-                let ch = chars.next().ok_or_else(|| {
-                    format!("empty key after modifiers: {}", token)
-                })?;
+                let ch = chars
+                    .next()
+                    .ok_or_else(|| format!("empty key after modifiers: {}", token))?;
                 if chars.next().is_some() {
                     return Err(format!("unknown key name: {}", other));
                 }
                 Ok(KeyEvent::Char {
                     code: ch,
-                    ctrl, meta, shift, super_,
+                    ctrl,
+                    meta,
+                    shift,
+                    super_,
                 })
             }
         }
@@ -403,8 +450,20 @@ impl KeymapManager {
     pub fn format_key_event(event: &KeyEvent) -> String {
         let mut parts = String::new();
         let (ctrl, meta, shift, super_) = match event {
-            KeyEvent::Char { ctrl, meta, shift, super_, .. } => (*ctrl, *meta, *shift, *super_),
-            KeyEvent::Function { ctrl, meta, shift, super_, .. } => (*ctrl, *meta, *shift, *super_),
+            KeyEvent::Char {
+                ctrl,
+                meta,
+                shift,
+                super_,
+                ..
+            } => (*ctrl, *meta, *shift, *super_),
+            KeyEvent::Function {
+                ctrl,
+                meta,
+                shift,
+                super_,
+                ..
+            } => (*ctrl, *meta, *shift, *super_),
         };
         if ctrl {
             parts.push_str("C-");
@@ -677,7 +736,11 @@ mod tests {
             shift: false,
             super_: false,
         };
-        mgr.define_key(map, key.clone(), KeyBinding::Command("self-insert-command".to_string()));
+        mgr.define_key(
+            map,
+            key.clone(),
+            KeyBinding::Command("self-insert-command".to_string()),
+        );
         match mgr.lookup_key(map, &key) {
             Some(KeyBinding::Command(name)) => assert_eq!(name, "self-insert-command"),
             other => panic!("expected Command, got {:?}", other),
@@ -707,8 +770,16 @@ mod tests {
         };
 
         // Bind 'a' in parent, 'b' in child
-        mgr.define_key(parent, key_a.clone(), KeyBinding::Command("cmd-a".to_string()));
-        mgr.define_key(child, key_b.clone(), KeyBinding::Command("cmd-b".to_string()));
+        mgr.define_key(
+            parent,
+            key_a.clone(),
+            KeyBinding::Command("cmd-a".to_string()),
+        );
+        mgr.define_key(
+            child,
+            key_b.clone(),
+            KeyBinding::Command("cmd-b".to_string()),
+        );
 
         // Child should find 'b' directly
         match mgr.lookup_key(child, &key_b) {
@@ -748,8 +819,16 @@ mod tests {
             super_: false,
         };
 
-        mgr.define_key(parent, key.clone(), KeyBinding::Command("parent-cmd".to_string()));
-        mgr.define_key(child, key.clone(), KeyBinding::Command("child-cmd".to_string()));
+        mgr.define_key(
+            parent,
+            key.clone(),
+            KeyBinding::Command("parent-cmd".to_string()),
+        );
+        mgr.define_key(
+            child,
+            key.clone(),
+            KeyBinding::Command("child-cmd".to_string()),
+        );
 
         // Child's binding should shadow parent's
         match mgr.lookup_key(child, &key) {
@@ -782,7 +861,11 @@ mod tests {
         // C-x is a prefix leading to prefix_map
         mgr.define_key(root, cx.clone(), KeyBinding::Prefix(prefix_map));
         // C-f in the prefix map leads to find-file
-        mgr.define_key(prefix_map, cf.clone(), KeyBinding::Command("find-file".to_string()));
+        mgr.define_key(
+            prefix_map,
+            cf.clone(),
+            KeyBinding::Command("find-file".to_string()),
+        );
 
         // Lookup "C-x C-f"
         let binding = mgr.lookup_key_sequence(root, &[cx, cf]);
@@ -882,11 +965,7 @@ mod tests {
             shift: false,
             super_: false,
         };
-        mgr.define_key(
-            map,
-            key.clone(),
-            KeyBinding::LispValue(Value::Int(42)),
-        );
+        mgr.define_key(map, key.clone(), KeyBinding::LispValue(Value::Int(42)));
         match mgr.lookup_key(map, &key) {
             Some(KeyBinding::LispValue(Value::Int(42))) => {}
             other => panic!("expected LispValue(42), got {:?}", other),
