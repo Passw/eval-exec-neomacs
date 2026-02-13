@@ -64,3 +64,8 @@
 (condition-case err (yes-or-no-p "Confirm? " nil) (error (car err)))
 (condition-case err (progn (setq unread-command-events (list 97)) (read-key-sequence "" nil nil nil nil nil nil)) (error (car err)))
 (condition-case err (progn (setq unread-command-events (list 97)) (read-key-sequence-vector "" nil nil nil nil nil nil)) (error (car err)))
+(condition-case err (read-file-name "" nil nil nil nil nil nil) (error (car err)))
+(condition-case err (read-directory-name "" nil nil nil nil nil) (error (car err)))
+(condition-case err (read-buffer "" nil nil nil nil) (error (car err)))
+(condition-case err (read-command "" nil nil) (error (car err)))
+(condition-case err (read-variable "" nil nil) (error (car err)))

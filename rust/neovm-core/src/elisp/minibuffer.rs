@@ -37,6 +37,17 @@ fn expect_min_args(name: &str, args: &[Value], min: usize) -> Result<(), Flow> {
     }
 }
 
+fn expect_max_args(name: &str, args: &[Value], max: usize) -> Result<(), Flow> {
+    if args.len() > max {
+        Err(signal(
+            "wrong-number-of-arguments",
+            vec![Value::symbol(name), Value::Int(args.len() as i64)],
+        ))
+    } else {
+        Ok(())
+    }
+}
+
 fn expect_string(val: &Value) -> Result<String, Flow> {
     match val {
         Value::Str(s) => Ok((**s).clone()),
@@ -622,6 +633,7 @@ pub(crate) fn builtin_completing_read(args: Vec<Value>) -> EvalResult {
 /// Stub: returns INITIAL or DEFAULT or "".
 pub(crate) fn builtin_read_file_name(args: Vec<Value>) -> EvalResult {
     expect_min_args("read-file-name", &args, 1)?;
+    expect_max_args("read-file-name", &args, 6)?;
     let _prompt = expect_string(&args[0])?;
     Err(signal("end-of-file", vec![]))
 }
@@ -631,6 +643,7 @@ pub(crate) fn builtin_read_file_name(args: Vec<Value>) -> EvalResult {
 /// Stub: returns INITIAL or DEFAULT or "".
 pub(crate) fn builtin_read_directory_name(args: Vec<Value>) -> EvalResult {
     expect_min_args("read-directory-name", &args, 1)?;
+    expect_max_args("read-directory-name", &args, 5)?;
     let _prompt = expect_string(&args[0])?;
     Err(signal("end-of-file", vec![]))
 }
@@ -640,6 +653,7 @@ pub(crate) fn builtin_read_directory_name(args: Vec<Value>) -> EvalResult {
 /// Stub: returns DEFAULT or "".
 pub(crate) fn builtin_read_buffer(args: Vec<Value>) -> EvalResult {
     expect_min_args("read-buffer", &args, 1)?;
+    expect_max_args("read-buffer", &args, 4)?;
     let _prompt = expect_string(&args[0])?;
     Err(signal("end-of-file", vec![]))
 }
@@ -649,6 +663,7 @@ pub(crate) fn builtin_read_buffer(args: Vec<Value>) -> EvalResult {
 /// Stub: returns DEFAULT or "".
 pub(crate) fn builtin_read_command(args: Vec<Value>) -> EvalResult {
     expect_min_args("read-command", &args, 1)?;
+    expect_max_args("read-command", &args, 2)?;
     let _prompt = expect_string(&args[0])?;
     Err(signal("end-of-file", vec![]))
 }
@@ -658,6 +673,7 @@ pub(crate) fn builtin_read_command(args: Vec<Value>) -> EvalResult {
 /// Stub: returns DEFAULT or "".
 pub(crate) fn builtin_read_variable(args: Vec<Value>) -> EvalResult {
     expect_min_args("read-variable", &args, 1)?;
+    expect_max_args("read-variable", &args, 2)?;
     let _prompt = expect_string(&args[0])?;
     Err(signal("end-of-file", vec![]))
 }
@@ -1362,12 +1378,78 @@ mod tests {
     }
 
     #[test]
+    fn builtin_read_file_name_rejects_more_than_six_args() {
+        let result = builtin_read_file_name(vec![
+            Value::string("File: "),
+            Value::Nil,
+            Value::Nil,
+            Value::Nil,
+            Value::Nil,
+            Value::Nil,
+            Value::Nil,
+        ]);
+        assert!(matches!(
+            result,
+            Err(Flow::Signal(sig)) if sig.symbol == "wrong-number-of-arguments"
+        ));
+    }
+
+    #[test]
     fn builtin_read_buffer_signals_end_of_file() {
         let result =
             builtin_read_buffer(vec![Value::string("Buffer: "), Value::string("*scratch*")]);
         assert!(matches!(
             result,
             Err(Flow::Signal(sig)) if sig.symbol == "end-of-file"
+        ));
+    }
+
+    #[test]
+    fn builtin_read_directory_name_rejects_more_than_five_args() {
+        let result = builtin_read_directory_name(vec![
+            Value::string("Directory: "),
+            Value::Nil,
+            Value::Nil,
+            Value::Nil,
+            Value::Nil,
+            Value::Nil,
+        ]);
+        assert!(matches!(
+            result,
+            Err(Flow::Signal(sig)) if sig.symbol == "wrong-number-of-arguments"
+        ));
+    }
+
+    #[test]
+    fn builtin_read_buffer_rejects_more_than_four_args() {
+        let result = builtin_read_buffer(vec![
+            Value::string("Buffer: "),
+            Value::Nil,
+            Value::Nil,
+            Value::Nil,
+            Value::Nil,
+        ]);
+        assert!(matches!(
+            result,
+            Err(Flow::Signal(sig)) if sig.symbol == "wrong-number-of-arguments"
+        ));
+    }
+
+    #[test]
+    fn builtin_read_command_rejects_more_than_two_args() {
+        let result = builtin_read_command(vec![Value::string("Command: "), Value::Nil, Value::Nil]);
+        assert!(matches!(
+            result,
+            Err(Flow::Signal(sig)) if sig.symbol == "wrong-number-of-arguments"
+        ));
+    }
+
+    #[test]
+    fn builtin_read_variable_rejects_more_than_two_args() {
+        let result = builtin_read_variable(vec![Value::string("Variable: "), Value::Nil, Value::Nil]);
+        assert!(matches!(
+            result,
+            Err(Flow::Signal(sig)) if sig.symbol == "wrong-number-of-arguments"
         ));
     }
 
