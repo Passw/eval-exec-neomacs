@@ -35,6 +35,14 @@ pub mod mode;
 pub mod register;
 pub mod bookmark;
 pub mod abbrev;
+pub mod cl_lib;
+pub mod autoload;
+pub mod custom;
+pub mod kill_ring;
+pub mod interactive;
+pub mod window_cmds;
+pub mod textprop;
+pub mod navigation;
 
 // Re-export the main public API
 pub use value::{Value, ConsCell, LambdaData, LambdaParams};

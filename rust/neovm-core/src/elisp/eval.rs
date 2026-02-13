@@ -4,11 +4,16 @@ use std::collections::HashMap;
 
 use super::abbrev::AbbrevManager;
 use super::advice::{AdviceManager, VariableWatcherList};
+use super::autoload::AutoloadManager;
 use super::bookmark::BookmarkManager;
 use super::builtins;
+use super::custom::CustomManager;
 use super::error::*;
 use super::expr::Expr;
+use super::interactive::InteractiveRegistry;
+use super::mode::ModeRegistry;
 use super::keymap::KeymapManager;
+use super::kill_ring::KillRing;
 use super::network::NetworkManager;
 use super::process::ProcessManager;
 use super::regex::MatchData;
@@ -17,6 +22,7 @@ use super::symbol::Obarray;
 use super::timer::TimerManager;
 use super::value::*;
 use crate::buffer::BufferManager;
+use crate::window::FrameManager;
 
 /// The Elisp evaluator.
 pub struct Evaluator {
@@ -52,6 +58,18 @@ pub struct Evaluator {
     pub(crate) bookmarks: BookmarkManager,
     /// Abbreviation manager — text abbreviation expansion.
     pub(crate) abbrevs: AbbrevManager,
+    /// Autoload manager — deferred function loading.
+    pub(crate) autoloads: AutoloadManager,
+    /// Custom variable manager — defcustom/defgroup system.
+    pub(crate) custom: CustomManager,
+    /// Kill ring — clipboard/kill ring for text editing.
+    pub(crate) kill_ring: KillRing,
+    /// Interactive command registry — tracks interactive commands.
+    pub(crate) interactive: InteractiveRegistry,
+    /// Frame manager — owns all frames and windows.
+    pub(crate) frames: FrameManager,
+    /// Mode registry — major/minor modes.
+    pub(crate) modes: ModeRegistry,
     /// Recursion depth counter.
     depth: usize,
     /// Maximum recursion depth.
@@ -107,6 +125,12 @@ impl Evaluator {
             registers: RegisterManager::new(),
             bookmarks: BookmarkManager::new(),
             abbrevs: AbbrevManager::new(),
+            autoloads: AutoloadManager::new(),
+            custom: CustomManager::new(),
+            kill_ring: KillRing::new(),
+            interactive: InteractiveRegistry::new(),
+            frames: FrameManager::new(),
+            modes: ModeRegistry::new(),
             depth: 0,
             max_depth: 200,
         }
@@ -124,7 +148,7 @@ impl Evaluator {
     }
 
     /// Load a file, converting EvalError back to Flow for use in special forms.
-    fn load_file_internal(&mut self, path: &std::path::Path) -> EvalResult {
+    pub(crate) fn load_file_internal(&mut self, path: &std::path::Path) -> EvalResult {
         super::load::load_file(self, path).map_err(|e| match e {
             EvalError::Signal { symbol, data } => {
                 signal(&symbol, data)
@@ -347,6 +371,25 @@ impl Evaluator {
             "ignore-errors" => self.sf_ignore_errors(tail),
             "dotimes" => self.sf_dotimes(tail),
             "dolist" => self.sf_dolist(tail),
+            // Custom system special forms
+            "defcustom" => super::custom::sf_defcustom(self, tail),
+            "defgroup" => super::custom::sf_defgroup(self, tail),
+            "setq-default" => super::custom::sf_setq_default(self, tail),
+            "defvar-local" => super::custom::sf_defvar_local(self, tail),
+            // Autoload special forms
+            "autoload" => super::autoload::sf_autoload(self, tail),
+            "eval-when-compile" => super::autoload::sf_eval_when_compile(self, tail),
+            "eval-and-compile" => super::autoload::sf_eval_and_compile(self, tail),
+            "declare-function" => super::autoload::sf_declare_function(self, tail),
+            "define-obsolete-function-alias" => super::autoload::sf_define_obsolete_function_alias(self, tail),
+            "define-obsolete-variable-alias" => super::autoload::sf_define_obsolete_variable_alias(self, tail),
+            "make-obsolete" => super::autoload::sf_make_obsolete(self, tail),
+            "make-obsolete-variable" => super::autoload::sf_make_obsolete_variable(self, tail),
+            "with-eval-after-load" => super::autoload::sf_with_eval_after_load(self, tail),
+            // Interactive / mode definition special forms
+            "define-minor-mode" => super::interactive::sf_define_minor_mode(self, tail),
+            "define-derived-mode" => super::interactive::sf_define_derived_mode(self, tail),
+            "define-generic-mode" => super::interactive::sf_define_generic_mode(self, tail),
             _ => return None,
         })
     }
