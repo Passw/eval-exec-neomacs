@@ -396,6 +396,14 @@ impl Evaluator {
             "pcase-let" => super::pcase::sf_pcase_let(self, tail),
             "pcase-let*" => super::pcase::sf_pcase_let_star(self, tail),
             "pcase-dolist" => super::pcase::sf_pcase_dolist(self, tail),
+            // Generalized variables (setf)
+            "setf" => super::setf::sf_setf(self, tail),
+            "push" => super::setf::sf_push(self, tail),
+            "pop" => super::setf::sf_pop(self, tail),
+            "cl-incf" => super::setf::sf_cl_incf(self, tail),
+            "cl-decf" => super::setf::sf_cl_decf(self, tail),
+            "gv-define-simple-setter" => super::setf::sf_gv_define_simple_setter(self, tail),
+            "gv-define-setter" => super::setf::sf_gv_define_setter(self, tail),
             // Interactive / mode definition special forms
             "define-minor-mode" => super::interactive::sf_define_minor_mode(self, tail),
             "define-derived-mode" => super::interactive::sf_define_derived_mode(self, tail),
