@@ -138,7 +138,11 @@ Implemented now:
 - loader context compatibility:
   - `default-directory` is initialized to the process current directory with directory-path form
   - nested `load` restores parent `load-file-name` correctly across child loads
-  - compatibility corpus includes oracle-checked `cases/default-directory` and `cases/load-file-name`
+  - `nil` in `load-path` resolves against `default-directory` during `load` lookup
+  - compatibility corpus includes oracle-checked `cases/default-directory`, `cases/load-file-name`, and `cases/load-path-nil`
+- pathname normalization builtins:
+  - `file-name-as-directory` and `directory-file-name` mirror GNU Emacs semantics for trailing separator normalization
+  - compatibility corpus includes oracle-checked `cases/directory-file-name`
 - Source parse cache (`.neoc` sidecar):
   - cache file: `<module>.neoc` beside `<module>.el`
   - key includes schema version, VM version, and lexical-binding mode
