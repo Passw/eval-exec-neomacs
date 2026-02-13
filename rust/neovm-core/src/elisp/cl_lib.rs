@@ -74,6 +74,51 @@ fn type_name_str(val: &Value) -> &str {
     }
 }
 
+fn seq_position_list_elements(seq: &Value) -> Result<Vec<Value>, Flow> {
+    let mut elements = Vec::new();
+    let mut cursor = seq.clone();
+    loop {
+        match cursor {
+            Value::Nil => return Ok(elements),
+            Value::Cons(cell) => {
+                let pair = cell.lock().expect("poisoned");
+                elements.push(pair.car.clone());
+                cursor = pair.cdr.clone();
+            }
+            tail => {
+                return Err(signal(
+                    "wrong-type-argument",
+                    vec![Value::symbol("listp"), tail],
+                ));
+            }
+        }
+    }
+}
+
+fn seq_position_elements(seq: &Value) -> Result<Vec<Value>, Flow> {
+    match seq {
+        Value::Nil => Ok(Vec::new()),
+        Value::Cons(_) => seq_position_list_elements(seq),
+        Value::Vector(v) => Ok(v.lock().expect("poisoned").clone()),
+        Value::Str(s) => Ok(s.chars().map(|ch| Value::Int(ch as i64)).collect()),
+        other => Err(signal(
+            "wrong-type-argument",
+            vec![Value::symbol("sequencep"), other.clone()],
+        )),
+    }
+}
+
+fn seq_default_match(left: &Value, right: &Value) -> bool {
+    if equal_value(left, right, 0) {
+        return true;
+    }
+    match (left, right) {
+        (Value::Char(a), Value::Int(b)) => (*a as i64) == *b,
+        (Value::Int(a), Value::Char(b)) => *a == (*b as i64),
+        _ => false,
+    }
+}
+
 // ===========================================================================
 // CL-lib pure list operations
 // ===========================================================================
@@ -794,6 +839,32 @@ pub fn builtin_seq_into(args: Vec<Value>) -> EvalResult {
 // ===========================================================================
 // Seq.el eval-dependent operations
 // ===========================================================================
+
+/// `(seq-position SEQ ELT &optional TESTFN)` — return first matching index.
+pub fn builtin_seq_position(eval: &mut super::eval::Evaluator, args: Vec<Value>) -> EvalResult {
+    expect_min_args("seq-position", &args, 2)?;
+    let seq = &args[0];
+    let target = args[1].clone();
+    let test_fn = if args.len() > 2 && !args[2].is_nil() {
+        Some(args[2].clone())
+    } else {
+        None
+    };
+    let elements = seq_position_elements(seq)?;
+
+    for (idx, element) in elements.into_iter().enumerate() {
+        let matches = if let Some(test) = &test_fn {
+            eval.apply(test.clone(), vec![element.clone(), target.clone()])?
+                .is_truthy()
+        } else {
+            seq_default_match(&element, &target)
+        };
+        if matches {
+            return Ok(Value::Int(idx as i64));
+        }
+    }
+    Ok(Value::Nil)
+}
 
 /// `(seq-mapn FN &rest SEQS)` — map over multiple sequences.
 pub fn builtin_seq_mapn(eval: &mut super::eval::Evaluator, args: Vec<Value>) -> EvalResult {

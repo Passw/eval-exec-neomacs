@@ -155,30 +155,6 @@ pub fn builtin_take(args: Vec<Value>) -> EvalResult {
     Ok(Value::list(result))
 }
 
-/// `(cl-position ITEM SEQ)` — find position of item in list.
-pub fn builtin_seq_position(args: Vec<Value>) -> EvalResult {
-    expect_min_args("seq-position", &args, 2)?;
-    let target = &args[0];
-    let list = &args[1];
-
-    let mut cursor = list.clone();
-    let mut idx = 0;
-    loop {
-        match cursor {
-            Value::Nil => return Ok(Value::Nil),
-            Value::Cons(cell) => {
-                let pair = cell.lock().expect("poisoned");
-                if super::value::equal_value(&pair.car, target, 0) {
-                    return Ok(Value::Int(idx));
-                }
-                cursor = pair.cdr.clone();
-                idx += 1;
-            }
-            _ => return Ok(Value::Nil),
-        }
-    }
-}
-
 /// `(seq-uniq SEQ)` — remove duplicates (equal).
 pub fn builtin_seq_uniq(args: Vec<Value>) -> EvalResult {
     expect_args("seq-uniq", &args, 1)?;
