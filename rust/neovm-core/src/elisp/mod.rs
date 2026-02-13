@@ -74,6 +74,8 @@ pub mod font;
 pub mod dired;
 pub mod undo;
 pub mod xdisp;
+pub mod ccl;
+pub mod xml;
 
 // Re-export the main public API
 pub use value::{Value, ConsCell, LambdaData, LambdaParams};

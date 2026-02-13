@@ -3816,6 +3816,20 @@ pub(crate) fn dispatch_builtin(
         "charset-after" => super::charset::builtin_charset_after(args),
         "unibyte-charset" => super::charset::builtin_unibyte_charset(args),
 
+        // CCL (pure)
+        "ccl-program-p" => super::ccl::builtin_ccl_program_p(args),
+        "ccl-execute" => super::ccl::builtin_ccl_execute(args),
+        "ccl-execute-on-string" => super::ccl::builtin_ccl_execute_on_string(args),
+        "register-ccl-program" => super::ccl::builtin_register_ccl_program(args),
+        "register-code-conversion-map" => super::ccl::builtin_register_code_conversion_map(args),
+
+        // XML/decompress (pure)
+        "libxml-parse-html-region" => super::xml::builtin_libxml_parse_html_region(args),
+        "libxml-parse-xml-region" => super::xml::builtin_libxml_parse_xml_region(args),
+        "libxml-available-p" => super::xml::builtin_libxml_available_p(args),
+        "zlib-available-p" => super::xml::builtin_zlib_available_p(args),
+        "zlib-decompress-region" => super::xml::builtin_zlib_decompress_region(args),
+
         // Custom system (pure)
         "custom-set-faces" => super::custom::builtin_custom_set_faces(args),
 
