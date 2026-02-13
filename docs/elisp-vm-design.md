@@ -52,7 +52,7 @@ cd test/neovm/vm-compat && make check-neovm
 
 Next phase:
 
-- Expand oracle corpus coverage for currently stubbed domains (undo, search, minibuffer, hashing, input)
+- Continue expanding oracle corpus coverage for remaining stub-heavy domains (search and input; undo/hash/minibuffer coverage has started)
 - Expand upstream ERT allowlist coverage and add NeoVM-vs-oracle differential comparison over that allowlist
 
 Focused introspection gate:
