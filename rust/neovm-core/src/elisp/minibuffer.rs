@@ -662,50 +662,6 @@ pub(crate) fn builtin_read_variable(args: Vec<Value>) -> EvalResult {
     Err(signal("end-of-file", vec![]))
 }
 
-/// `(read-char &optional PROMPT INHERIT SECONDS)`
-///
-/// Stub: returns ?a (character 97).
-pub(crate) fn builtin_read_char(args: Vec<Value>) -> EvalResult {
-    // All args optional.
-    let _ = &args;
-    Ok(Value::Char('a'))
-}
-
-/// `(read-key &optional PROMPT)`
-///
-/// Stub: returns ?a (character 97).
-pub(crate) fn builtin_read_key(args: Vec<Value>) -> EvalResult {
-    let _ = &args;
-    Ok(Value::Char('a'))
-}
-
-/// `(read-key-sequence PROMPT &optional CONTINUE-ECHO DONT-DOWNCASE-LAST CAN-RETURN-SWITCH-FRAME CMD-LOOP)`
-///
-/// Stub: returns the empty string.
-pub(crate) fn builtin_read_key_sequence(args: Vec<Value>) -> EvalResult {
-    expect_min_args("read-key-sequence", &args, 1)?;
-    let _prompt = expect_string(&args[0])?;
-    Ok(Value::string(""))
-}
-
-/// `(y-or-n-p PROMPT)`
-///
-/// Non-interactive stub: always returns t.
-pub(crate) fn builtin_y_or_n_p(args: Vec<Value>) -> EvalResult {
-    expect_args("y-or-n-p", &args, 1)?;
-    let _prompt = expect_string(&args[0])?;
-    Ok(Value::True)
-}
-
-/// `(yes-or-no-p PROMPT)`
-///
-/// Non-interactive stub: always returns t.
-pub(crate) fn builtin_yes_or_no_p(args: Vec<Value>) -> EvalResult {
-    expect_args("yes-or-no-p", &args, 1)?;
-    let _prompt = expect_string(&args[0])?;
-    Ok(Value::True)
-}
-
 /// `(try-completion STRING COLLECTION &optional PREDICATE)`
 ///
 /// Returns:
@@ -1309,24 +1265,6 @@ mod tests {
     }
 
     #[test]
-    fn builtin_y_or_n_p_returns_t() {
-        let result = builtin_y_or_n_p(vec![Value::string("Continue? ")]).unwrap();
-        assert!(matches!(result, Value::True));
-    }
-
-    #[test]
-    fn builtin_yes_or_no_p_returns_t() {
-        let result = builtin_yes_or_no_p(vec![Value::string("Confirm? ")]).unwrap();
-        assert!(matches!(result, Value::True));
-    }
-
-    #[test]
-    fn builtin_y_or_n_p_wrong_args() {
-        let result = builtin_y_or_n_p(vec![]);
-        assert!(result.is_err());
-    }
-
-    #[test]
     fn builtin_try_completion_unique_exact() {
         // Exact unique match should return t.
         let coll = Value::list(vec![Value::string("unique"), Value::string("other")]);
@@ -1409,36 +1347,22 @@ mod tests {
     }
 
     #[test]
-    fn builtin_read_file_name_returns_initial() {
+    fn builtin_read_file_name_signals_end_of_file() {
         let result = builtin_read_file_name(vec![
             Value::string("File: "),
             Value::Nil,
             Value::Nil,
             Value::Nil,
             Value::string("/tmp/test.txt"),
-        ])
-        .unwrap();
-        assert!(matches!(result, Value::Str(ref s) if &**s == "/tmp/test.txt"));
+        ]);
+        assert!(result.is_err());
     }
 
     #[test]
-    fn builtin_read_buffer_returns_default() {
+    fn builtin_read_buffer_signals_end_of_file() {
         let result =
-            builtin_read_buffer(vec![Value::string("Buffer: "), Value::string("*scratch*")])
-                .unwrap();
-        assert!(matches!(result, Value::Str(ref s) if &**s == "*scratch*"));
-    }
-
-    #[test]
-    fn builtin_read_char_returns_char() {
-        let result = builtin_read_char(vec![]).unwrap();
-        assert!(matches!(result, Value::Char('a')));
-    }
-
-    #[test]
-    fn builtin_read_key_sequence_returns_empty_string() {
-        let result = builtin_read_key_sequence(vec![Value::string("Key: ")]).unwrap();
-        assert!(matches!(result, Value::Str(ref s) if s.is_empty()));
+            builtin_read_buffer(vec![Value::string("Buffer: "), Value::string("*scratch*")]);
+        assert!(result.is_err());
     }
 
     // -- value_to_string_list -------------------------------------------------
