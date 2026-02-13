@@ -154,7 +154,7 @@ pub fn load_file(eval: &mut super::eval::Evaluator, path: &Path) -> Result<Value
     );
 
     let result = (|| -> Result<Value, EvalError> {
-        let forms = match super::parser::parse_forms(&content) {
+        let mut forms = match super::parser::parse_forms(&content) {
             Ok(forms) => forms,
             Err(e) => {
                 // Temporary compatibility path: when we cannot read an .elc file,
@@ -179,6 +179,12 @@ pub fn load_file(eval: &mut super::eval::Evaluator, path: &Path) -> Result<Value
             if let Some(source_path) = source_sibling_for_elc(path) {
                 return load_file(eval, &source_path);
             }
+        }
+        if path.extension().and_then(|s| s.to_str()) == Some("elc") {
+            rewrite_compiled_literal_source_markers(
+                &mut forms,
+                path.to_string_lossy().as_ref(),
+            );
         }
 
         for (i, form) in forms.iter().enumerate() {
@@ -275,6 +281,67 @@ fn is_compiled_literal_quote(items: &[Expr]) -> bool {
             Some(Expr::Int(_)),
         )
     )
+}
+
+fn rewrite_compiled_literal_source_markers(forms: &mut [Expr], load_file_name: &str) {
+    for form in forms.iter_mut() {
+        rewrite_compiled_literal_source_markers_in_expr(form, load_file_name);
+    }
+}
+
+fn rewrite_compiled_literal_source_markers_in_expr(expr: &mut Expr, load_file_name: &str) {
+    match expr {
+        Expr::List(items) => {
+            if is_compiled_literal_quote(items) {
+                if let Expr::Vector(vector_items) = &mut items[1] {
+                    for item in vector_items.iter_mut() {
+                        replace_load_file_name_symbol(item, load_file_name);
+                    }
+                }
+                return;
+            }
+            for item in items.iter_mut() {
+                rewrite_compiled_literal_source_markers_in_expr(item, load_file_name);
+            }
+        }
+        Expr::Vector(items) => {
+            for item in items.iter_mut() {
+                rewrite_compiled_literal_source_markers_in_expr(item, load_file_name);
+            }
+        }
+        Expr::DottedList(items, last) => {
+            for item in items.iter_mut() {
+                rewrite_compiled_literal_source_markers_in_expr(item, load_file_name);
+            }
+            rewrite_compiled_literal_source_markers_in_expr(last, load_file_name);
+        }
+        _ => {}
+    }
+}
+
+fn replace_load_file_name_symbol(expr: &mut Expr, load_file_name: &str) {
+    match expr {
+        Expr::Symbol(name) if name == "load-file-name" => {
+            *expr = Expr::Str(load_file_name.to_string());
+        }
+        Expr::List(items) => {
+            for item in items.iter_mut() {
+                replace_load_file_name_symbol(item, load_file_name);
+            }
+        }
+        Expr::Vector(items) => {
+            for item in items.iter_mut() {
+                replace_load_file_name_symbol(item, load_file_name);
+            }
+        }
+        Expr::DottedList(items, last) => {
+            for item in items.iter_mut() {
+                replace_load_file_name_symbol(item, load_file_name);
+            }
+            replace_load_file_name_symbol(last, load_file_name);
+        }
+        _ => {}
+    }
 }
 
 #[cfg(test)]
@@ -534,13 +601,23 @@ mod tests {
         let mut eval = super::super::eval::Evaluator::new();
         let loaded = load_file(&mut eval, &compiled).expect("load bytecode-literal elc");
         assert_eq!(loaded, Value::True);
-        assert!(
-            matches!(
-                eval.obarray().symbol_function("vm-bytecode-probe"),
-                Some(Value::Vector(_))
-            ),
-            "defalias should install a vector-backed function cell",
-        );
+        let func = eval
+            .obarray()
+            .symbol_function("vm-bytecode-probe")
+            .cloned()
+            .expect("function cell should be set");
+        let Value::Vector(vec_ref) = func else {
+            panic!("defalias should install a vector-backed function cell");
+        };
+        let values = vec_ref.lock().expect("lock vector");
+        let source_loc = values.get(4).expect("source location payload");
+        let Value::Cons(cell) = source_loc else {
+            panic!("source location should be cons");
+        };
+        let pair = cell.lock().expect("lock source location pair");
+        let path_str = compiled.to_string_lossy().to_string();
+        assert_eq!(pair.car.as_str(), Some(path_str.as_str()));
+        assert_eq!(pair.cdr, Value::Int(83));
 
         let features = eval
             .obarray()
