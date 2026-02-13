@@ -3752,6 +3752,9 @@ pub(crate) fn dispatch_builtin(
         "write-region" => return Some(super::fileio::builtin_write_region(eval, args)),
         "find-file-noselect" => return Some(super::fileio::builtin_find_file_noselect(eval, args)),
         "directory-files" => return Some(super::fileio::builtin_directory_files_eval(eval, args)),
+        "directory-files-and-attributes" => {
+            return Some(super::dired::builtin_directory_files_and_attributes_eval(eval, args))
+        }
         "file-name-completion" => {
             return Some(super::dired::builtin_file_name_completion_eval(eval, args))
         }

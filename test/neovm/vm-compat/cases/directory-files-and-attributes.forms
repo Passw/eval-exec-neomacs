@@ -19,3 +19,6 @@
   (list (car err) (nth 1 err)))
 (condition-case err (directory-files-and-attributes vm-dfa-dir nil nil nil nil 0 nil)
   (car err))
+(let* ((default-directory (file-name-directory vm-dfa-dir)))
+  (equal (sort (copy-sequence (mapcar #'car (directory-files-and-attributes "directory-files-fixtures" nil "^[^.]"))) #'string<)
+         (sort (copy-sequence (mapcar #'car (directory-files-and-attributes vm-dfa-dir nil "^[^.]"))) #'string<)))

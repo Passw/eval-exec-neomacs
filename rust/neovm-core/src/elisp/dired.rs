@@ -535,8 +535,25 @@ pub(crate) fn builtin_directory_files(args: Vec<Value>) -> EvalResult {
 /// ATTRIBUTES is the result of `file-attributes`.
 pub(crate) fn builtin_directory_files_and_attributes(args: Vec<Value>) -> EvalResult {
     expect_range_args("directory-files-and-attributes", &args, 1, 6)?;
-
     let dir = expect_string("directory-files-and-attributes", &args[0])?;
+    directory_files_and_attributes_with_dir(&args, dir)
+}
+
+/// Evaluator-backed variant of `directory-files-and-attributes`.
+/// Resolves relative DIRECTORY against dynamic/default `default-directory`.
+pub(crate) fn builtin_directory_files_and_attributes_eval(
+    eval: &Evaluator,
+    args: Vec<Value>,
+) -> EvalResult {
+    expect_range_args("directory-files-and-attributes", &args, 1, 6)?;
+    let dir = super::fileio::resolve_filename_for_eval(
+        eval,
+        &expect_string("directory-files-and-attributes", &args[0])?,
+    );
+    directory_files_and_attributes_with_dir(&args, dir)
+}
+
+fn directory_files_and_attributes_with_dir(args: &[Value], dir: String) -> EvalResult {
     let full_name = args.get(1).is_some_and(|v| v.is_truthy());
     let match_regexp = match args.get(2) {
         Some(v) if v.is_truthy() => Some(expect_string("directory-files-and-attributes", v)?),
@@ -1293,6 +1310,46 @@ mod tests {
         assert!(attrs_items[3].is_string());
 
         let _ = fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn test_directory_files_and_attributes_eval_respects_default_directory() {
+        let base = std::env::temp_dir().join("neovm_dfa_eval_builtin");
+        let fixture = base.join("fixtures");
+        let _ = fs::remove_dir_all(&base);
+        fs::create_dir_all(&fixture).unwrap();
+        fs::write(fixture.join("alpha.txt"), "").unwrap();
+        fs::write(fixture.join("beta.el"), "").unwrap();
+
+        let mut eval = Evaluator::new();
+        let base_str = format!("{}/", base.to_string_lossy());
+        eval.obarray
+            .set_symbol_value("default-directory", Value::string(&base_str));
+
+        let result = builtin_directory_files_and_attributes_eval(
+            &eval,
+            vec![
+                Value::string("fixtures"),
+                Value::Nil,
+                Value::string("\\.el$"),
+            ],
+        )
+        .unwrap();
+
+        let names: Vec<String> = list_to_vec(&result)
+            .unwrap()
+            .iter()
+            .map(|pair| {
+                if let Value::Cons(cell) = pair {
+                    cell.lock().unwrap().car.as_str().unwrap().to_string()
+                } else {
+                    panic!("expected cons pair");
+                }
+            })
+            .collect();
+        assert_eq!(names, vec!["beta.el"]);
+
+        let _ = fs::remove_dir_all(&base);
     }
 
     // -----------------------------------------------------------------------
