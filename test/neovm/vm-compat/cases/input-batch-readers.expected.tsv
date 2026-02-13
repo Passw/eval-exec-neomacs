@@ -15,3 +15,5 @@
 15	(condition-case err (read-char nil nil 0) (error (car err)))	OK nil
 16	(condition-case err (read-event nil nil 0) (error (car err)))	OK nil
 17	(condition-case err (read-char-exclusive nil nil 0) (error (car err)))	OK nil
+18	(condition-case err (y-or-n-p 123) (error (car err)))	OK wrong-type-argument
+19	(condition-case err (yes-or-no-p 123) (error (car err)))	OK wrong-type-argument
