@@ -717,18 +717,30 @@ pub(crate) fn builtin_cl_stable_sort(eval: &mut super::eval::Evaluator, args: Ve
 /// `(seq-reverse SEQ)` — reverse a sequence.
 pub(crate) fn builtin_seq_reverse(args: Vec<Value>) -> EvalResult {
     expect_args("seq-reverse", &args, 1)?;
-    let mut elems = collect_sequence(&args[0]);
+    let mut elems = seq_position_elements(&args[0])?;
     elems.reverse();
     match &args[0] {
         Value::Vector(_) => Ok(Value::vector(elems)),
         Value::Str(_) => {
-            let s: String = elems
-                .iter()
-                .filter_map(|v| match v {
-                    Value::Char(c) => Some(*c),
-                    _ => None,
-                })
-                .collect();
+            let mut s = String::new();
+            for value in &elems {
+                let ch = match value {
+                    Value::Char(c) => *c,
+                    Value::Int(n) => char::from_u32(*n as u32).ok_or_else(|| {
+                        signal(
+                            "wrong-type-argument",
+                            vec![Value::symbol("characterp"), value.clone()],
+                        )
+                    })?,
+                    other => {
+                        return Err(signal(
+                            "wrong-type-argument",
+                            vec![Value::symbol("characterp"), other.clone()],
+                        ));
+                    }
+                };
+                s.push(ch);
+            }
             Ok(Value::string(s))
         }
         _ => Ok(Value::list(elems)),
