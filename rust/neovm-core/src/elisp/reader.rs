@@ -798,6 +798,16 @@ fn event_to_char(event: &Value) -> Option<char> {
     }
 }
 
+fn expect_optional_prompt_string(args: &[Value]) -> Result<(), Flow> {
+    if args.is_empty() || args[0].is_nil() || matches!(args[0], Value::Str(_)) {
+        return Ok(());
+    }
+    Err(signal(
+        "wrong-type-argument",
+        vec![Value::symbol("stringp"), args[0].clone()],
+    ))
+}
+
 // ---------------------------------------------------------------------------
 // 9. y-or-n-p (stub)
 // ---------------------------------------------------------------------------
@@ -843,7 +853,7 @@ pub(crate) fn builtin_read_char(
     eval: &mut super::eval::Evaluator,
     args: Vec<Value>,
 ) -> EvalResult {
-    let _ = args;
+    expect_optional_prompt_string(&args)?;
     if let Some(event) = pop_unread_command_event(eval) {
         if let Some(n) = event_to_int(&event) {
             return Ok(Value::Int(n));
@@ -860,7 +870,7 @@ pub(crate) fn builtin_read_key(
     eval: &mut super::eval::Evaluator,
     args: Vec<Value>,
 ) -> EvalResult {
-    let _ = args;
+    expect_optional_prompt_string(&args)?;
     if let Some(event) = pop_unread_command_event(eval) {
         if let Some(n) = event_to_int(&event) {
             return Ok(Value::Int(n));
@@ -1458,6 +1468,16 @@ mod tests {
     }
 
     #[test]
+    fn read_char_rejects_non_string_prompt() {
+        let mut ev = Evaluator::new();
+        let result = builtin_read_char(&mut ev, vec![Value::Int(123)]);
+        assert!(matches!(
+            result,
+            Err(Flow::Signal(sig)) if sig.symbol == "wrong-type-argument"
+        ));
+    }
+
+    #[test]
     fn read_char_consumes_unread_command_event() {
         let mut ev = Evaluator::new();
         ev.obarray
@@ -1473,6 +1493,16 @@ mod tests {
             .set_symbol_value("unread-command-events", Value::list(vec![Value::Int(97)]));
         let result = builtin_read_key(&mut ev, vec![]).unwrap();
         assert_eq!(result.as_int(), Some(97));
+    }
+
+    #[test]
+    fn read_key_rejects_non_string_prompt() {
+        let mut ev = Evaluator::new();
+        let result = builtin_read_key(&mut ev, vec![Value::Int(123)]);
+        assert!(matches!(
+            result,
+            Err(Flow::Signal(sig)) if sig.symbol == "wrong-type-argument"
+        ));
     }
 
     #[test]

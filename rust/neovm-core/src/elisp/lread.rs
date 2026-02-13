@@ -277,13 +277,24 @@ fn event_to_int(event: &Value) -> Option<i64> {
     }
 }
 
+fn expect_optional_prompt_string(args: &[Value]) -> Result<(), Flow> {
+    if args.is_empty() || args[0].is_nil() || matches!(args[0], Value::Str(_)) {
+        return Ok(());
+    }
+    Err(signal(
+        "wrong-type-argument",
+        vec![Value::symbol("stringp"), args[0].clone()],
+    ))
+}
+
 /// `(read-char &optional PROMPT INHERIT-INPUT-METHOD SECONDS)`
 ///
 /// Batch stub: returns nil (no terminal input available).
 pub(crate) fn builtin_read_char(
     eval: &mut super::eval::Evaluator,
-    _args: Vec<Value>,
+    args: Vec<Value>,
 ) -> EvalResult {
+    expect_optional_prompt_string(&args)?;
     if let Some(event) = pop_unread_command_event(eval) {
         if let Some(n) = event_to_int(&event) {
             return Ok(Value::Int(n));
@@ -298,8 +309,9 @@ pub(crate) fn builtin_read_char(
 /// Stub: returns nil (no event input available in batch mode).
 pub(crate) fn builtin_read_event(
     eval: &mut super::eval::Evaluator,
-    _args: Vec<Value>,
+    args: Vec<Value>,
 ) -> EvalResult {
+    expect_optional_prompt_string(&args)?;
     if let Some(event) = pop_unread_command_event(eval) {
         if let Some(n) = event_to_int(&event) {
             return Ok(Value::Int(n));
@@ -314,8 +326,9 @@ pub(crate) fn builtin_read_event(
 /// Batch stub: returns nil (no terminal input available).
 pub(crate) fn builtin_read_char_exclusive(
     eval: &mut super::eval::Evaluator,
-    _args: Vec<Value>,
+    args: Vec<Value>,
 ) -> EvalResult {
+    expect_optional_prompt_string(&args)?;
     if let Some(event) = pop_unread_command_event(eval) {
         if let Some(n) = event_to_int(&event) {
             return Ok(Value::Int(n));
@@ -981,6 +994,16 @@ mod tests {
     }
 
     #[test]
+    fn read_char_rejects_non_string_prompt() {
+        let mut ev = Evaluator::new();
+        let result = builtin_read_char(&mut ev, vec![Value::Int(123)]);
+        assert!(matches!(
+            result,
+            Err(Flow::Signal(sig)) if sig.symbol == "wrong-type-argument"
+        ));
+    }
+
+    #[test]
     fn read_char_consumes_unread_command_event() {
         let mut ev = Evaluator::new();
         ev.obarray
@@ -997,6 +1020,16 @@ mod tests {
     }
 
     #[test]
+    fn read_event_rejects_non_string_prompt() {
+        let mut ev = Evaluator::new();
+        let result = builtin_read_event(&mut ev, vec![Value::Int(123)]);
+        assert!(matches!(
+            result,
+            Err(Flow::Signal(sig)) if sig.symbol == "wrong-type-argument"
+        ));
+    }
+
+    #[test]
     fn read_event_consumes_unread_command_event() {
         let mut ev = Evaluator::new();
         ev.obarray
@@ -1010,6 +1043,16 @@ mod tests {
         let mut ev = Evaluator::new();
         let result = builtin_read_char_exclusive(&mut ev, vec![]).unwrap();
         assert!(result.is_nil());
+    }
+
+    #[test]
+    fn read_char_exclusive_rejects_non_string_prompt() {
+        let mut ev = Evaluator::new();
+        let result = builtin_read_char_exclusive(&mut ev, vec![Value::Int(123)]);
+        assert!(matches!(
+            result,
+            Err(Flow::Signal(sig)) if sig.symbol == "wrong-type-argument"
+        ));
     }
 
     #[test]
