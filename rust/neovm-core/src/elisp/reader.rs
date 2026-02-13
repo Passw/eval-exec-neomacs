@@ -924,6 +924,7 @@ pub(crate) fn builtin_read_key_sequence(
     args: Vec<Value>,
 ) -> EvalResult {
     expect_min_args("read-key-sequence", &args, 1)?;
+    expect_max_args("read-key-sequence", &args, 6)?;
     expect_optional_prompt_string(&args)?;
     if let Some(event) = pop_unread_command_event(eval) {
         if let Some(c) = event_to_char(&event) {
@@ -943,6 +944,7 @@ pub(crate) fn builtin_read_key_sequence_vector(
     args: Vec<Value>,
 ) -> EvalResult {
     expect_min_args("read-key-sequence-vector", &args, 1)?;
+    expect_max_args("read-key-sequence-vector", &args, 6)?;
     expect_optional_prompt_string(&args)?;
     if let Some(event) = pop_unread_command_event(eval) {
         if let Some(n) = event_to_int(&event) {
@@ -1749,6 +1751,29 @@ mod tests {
     }
 
     #[test]
+    fn read_key_sequence_rejects_more_than_six_args() {
+        let mut ev = Evaluator::new();
+        ev.obarray
+            .set_symbol_value("unread-command-events", Value::list(vec![Value::Int(97)]));
+        let result = builtin_read_key_sequence(
+            &mut ev,
+            vec![
+                Value::string("key: "),
+                Value::Nil,
+                Value::Nil,
+                Value::Nil,
+                Value::Nil,
+                Value::Nil,
+                Value::Nil,
+            ],
+        );
+        assert!(matches!(
+            result,
+            Err(Flow::Signal(sig)) if sig.symbol == "wrong-number-of-arguments"
+        ));
+    }
+
+    #[test]
     fn read_key_sequence_vector_returns_empty_vector() {
         let mut ev = Evaluator::new();
         let result =
@@ -1790,6 +1815,29 @@ mod tests {
             }
             other => panic!("expected vector, got {other:?}"),
         }
+    }
+
+    #[test]
+    fn read_key_sequence_vector_rejects_more_than_six_args() {
+        let mut ev = Evaluator::new();
+        ev.obarray
+            .set_symbol_value("unread-command-events", Value::list(vec![Value::Int(97)]));
+        let result = builtin_read_key_sequence_vector(
+            &mut ev,
+            vec![
+                Value::string("key: "),
+                Value::Nil,
+                Value::Nil,
+                Value::Nil,
+                Value::Nil,
+                Value::Nil,
+                Value::Nil,
+            ],
+        );
+        assert!(matches!(
+            result,
+            Err(Flow::Signal(sig)) if sig.symbol == "wrong-number-of-arguments"
+        ));
     }
 
     // ===================================================================
