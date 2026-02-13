@@ -87,15 +87,12 @@ fn compile_pattern(expr: &Expr) -> Result<Pattern, Flow> {
 
         // Vector pattern — [PAT1 PAT2 ...]
         Expr::Vector(items) => {
-            let pats: Result<Vec<Pattern>, Flow> =
-                items.iter().map(compile_pattern).collect();
+            let pats: Result<Vec<Pattern>, Flow> = items.iter().map(compile_pattern).collect();
             Ok(Pattern::Vector(pats?))
         }
 
         // List forms: quote, pred, guard, let, and, or, app, backquote
-        Expr::List(items) if !items.is_empty() => {
-            compile_list_pattern(items)
-        }
+        Expr::List(items) if !items.is_empty() => compile_list_pattern(items),
 
         // Empty list = nil literal
         Expr::List(_) => Ok(Pattern::Literal(Value::Nil)),
@@ -161,15 +158,13 @@ fn compile_list_pattern(items: &[Expr]) -> Result<Pattern, Flow> {
 
         // (and PAT...)
         Expr::Symbol(s) if s == "and" => {
-            let pats: Result<Vec<Pattern>, Flow> =
-                items[1..].iter().map(compile_pattern).collect();
+            let pats: Result<Vec<Pattern>, Flow> = items[1..].iter().map(compile_pattern).collect();
             Ok(Pattern::And(pats?))
         }
 
         // (or PAT...)
         Expr::Symbol(s) if s == "or" => {
-            let pats: Result<Vec<Pattern>, Flow> =
-                items[1..].iter().map(compile_pattern).collect();
+            let pats: Result<Vec<Pattern>, Flow> = items[1..].iter().map(compile_pattern).collect();
             Ok(Pattern::Or(pats?))
         }
 
@@ -190,7 +185,9 @@ fn compile_list_pattern(items: &[Expr]) -> Result<Pattern, Flow> {
             if items.len() != 2 {
                 return Err(signal(
                     "error",
-                    vec![Value::string("backquote pattern requires exactly one argument")],
+                    vec![Value::string(
+                        "backquote pattern requires exactly one argument",
+                    )],
                 ));
             }
             compile_backquote(&items[1])
@@ -215,8 +212,7 @@ fn compile_backquote(expr: &Expr) -> Result<Pattern, Flow> {
     match expr {
         // (\, PAT) — unquote: compile the inner thing as a pattern
         Expr::List(items)
-            if items.len() == 2
-                && matches!(&items[0], Expr::Symbol(s) if s == "\\,") =>
+            if items.len() == 2 && matches!(&items[0], Expr::Symbol(s) if s == "\\,") =>
         {
             compile_pattern(&items[1])
         }
@@ -238,8 +234,10 @@ fn compile_backquote(expr: &Expr) -> Result<Pattern, Flow> {
 
         // Vector inside backquote
         Expr::Vector(items) => {
-            let pats: Result<Vec<Pattern>, Flow> =
-                items.iter().map(|e| compile_bq_element_to_pattern(e)).collect();
+            let pats: Result<Vec<Pattern>, Flow> = items
+                .iter()
+                .map(|e| compile_bq_element_to_pattern(e))
+                .collect();
             Ok(Pattern::Vector(pats?))
         }
 
@@ -253,8 +251,7 @@ fn compile_bq_element(expr: &Expr) -> Result<BqElement, Flow> {
     match expr {
         // (\, PAT) — unquote
         Expr::List(items)
-            if items.len() == 2
-                && matches!(&items[0], Expr::Symbol(s) if s == "\\,") =>
+            if items.len() == 2 && matches!(&items[0], Expr::Symbol(s) if s == "\\,") =>
         {
             let pat = compile_pattern(&items[1])?;
             Ok(BqElement::Unquote(pat))
@@ -276,8 +273,7 @@ fn compile_bq_element(expr: &Expr) -> Result<BqElement, Flow> {
 fn compile_bq_element_to_pattern(expr: &Expr) -> Result<Pattern, Flow> {
     match expr {
         Expr::List(items)
-            if items.len() == 2
-                && matches!(&items[0], Expr::Symbol(s) if s == "\\,") =>
+            if items.len() == 2 && matches!(&items[0], Expr::Symbol(s) if s == "\\,") =>
         {
             compile_pattern(&items[1])
         }
@@ -289,8 +285,7 @@ fn compile_bq_element_to_pattern(expr: &Expr) -> Result<Pattern, Flow> {
 fn compile_bq_tail(expr: &Expr) -> Result<Pattern, Flow> {
     match expr {
         Expr::List(items)
-            if items.len() == 2
-                && matches!(&items[0], Expr::Symbol(s) if s == "\\,") =>
+            if items.len() == 2 && matches!(&items[0], Expr::Symbol(s) if s == "\\,") =>
         {
             compile_pattern(&items[1])
         }
@@ -493,12 +488,10 @@ fn match_backquote_dotted(
                 drop(pair);
 
                 match elem {
-                    BqElement::Unquote(pat) => {
-                        match match_pattern(eval, pat, &car)? {
-                            Some(bindings) => combined.extend(bindings),
-                            None => return Ok(None),
-                        }
-                    }
+                    BqElement::Unquote(pat) => match match_pattern(eval, pat, &car)? {
+                        Some(bindings) => combined.extend(bindings),
+                        None => return Ok(None),
+                    },
                     BqElement::Exact(expected) => {
                         if !equal_value(expected, &car, 0) {
                             return Ok(None);
@@ -603,10 +596,7 @@ fn with_bindings(
 /// whose PATTERN matches gets its BODY forms evaluated with any pattern
 /// bindings in scope.  Returns the result of the matching clause body, or
 /// nil if no clause matches.
-pub(crate) fn sf_pcase(
-    eval: &mut Evaluator,
-    tail: &[Expr],
-) -> EvalResult {
+pub(crate) fn sf_pcase(eval: &mut Evaluator, tail: &[Expr]) -> EvalResult {
     if tail.is_empty() {
         return Err(signal(
             "wrong-number-of-arguments",
@@ -644,10 +634,7 @@ pub(crate) fn sf_pcase(
 /// Like `let` but each binding uses pattern destructuring.  All VAL
 /// expressions are evaluated first (parallel binding), then all patterns
 /// are matched and bindings installed.
-pub(crate) fn sf_pcase_let(
-    eval: &mut Evaluator,
-    tail: &[Expr],
-) -> EvalResult {
+pub(crate) fn sf_pcase_let(eval: &mut Evaluator, tail: &[Expr]) -> EvalResult {
     if tail.is_empty() {
         return Err(signal(
             "wrong-number-of-arguments",
@@ -672,13 +659,17 @@ pub(crate) fn sf_pcase_let(
         let Expr::List(pair) = entry else {
             return Err(signal(
                 "error",
-                vec![Value::string("pcase-let binding must be a list (PATTERN VAL)")],
+                vec![Value::string(
+                    "pcase-let binding must be a list (PATTERN VAL)",
+                )],
             ));
         };
         if pair.len() < 2 {
             return Err(signal(
                 "error",
-                vec![Value::string("pcase-let binding must have at least PATTERN and VAL")],
+                vec![Value::string(
+                    "pcase-let binding must have at least PATTERN and VAL",
+                )],
             ));
         }
         let pat = compile_pattern(&pair[0])?;
@@ -709,10 +700,7 @@ pub(crate) fn sf_pcase_let(
 /// Like `let*` but with pattern destructuring.  Each (PATTERN VAL) is
 /// evaluated and matched sequentially, so later bindings can refer to
 /// earlier ones.
-pub(crate) fn sf_pcase_let_star(
-    eval: &mut Evaluator,
-    tail: &[Expr],
-) -> EvalResult {
+pub(crate) fn sf_pcase_let_star(eval: &mut Evaluator, tail: &[Expr]) -> EvalResult {
     if tail.is_empty() {
         return Err(signal(
             "wrong-number-of-arguments",
@@ -747,7 +735,9 @@ pub(crate) fn sf_pcase_let_star(
             }
             return Err(signal(
                 "error",
-                vec![Value::string("pcase-let* binding must be a list (PATTERN VAL)")],
+                vec![Value::string(
+                    "pcase-let* binding must be a list (PATTERN VAL)",
+                )],
             ));
         };
         if pair.len() < 2 {
@@ -760,7 +750,9 @@ pub(crate) fn sf_pcase_let_star(
             }
             return Err(signal(
                 "error",
-                vec![Value::string("pcase-let* binding must have PATTERN and VAL")],
+                vec![Value::string(
+                    "pcase-let* binding must have PATTERN and VAL",
+                )],
             ));
         }
 
@@ -845,10 +837,7 @@ pub(crate) fn sf_pcase_let_star(
 ///
 /// Iterate over LIST.  For each element, match it against PATTERN and
 /// evaluate BODY with the resulting bindings.
-pub(crate) fn sf_pcase_dolist(
-    eval: &mut Evaluator,
-    tail: &[Expr],
-) -> EvalResult {
+pub(crate) fn sf_pcase_dolist(eval: &mut Evaluator, tail: &[Expr]) -> EvalResult {
     if tail.is_empty() {
         return Err(signal(
             "wrong-number-of-arguments",
@@ -859,7 +848,9 @@ pub(crate) fn sf_pcase_dolist(
     let Expr::List(spec) = &tail[0] else {
         return Err(signal(
             "wrong-type-argument",
-            vec![Value::string("pcase-dolist spec must be a list (PATTERN LIST)")],
+            vec![Value::string(
+                "pcase-dolist spec must be a list (PATTERN LIST)",
+            )],
         ));
     };
     if spec.len() < 2 {
@@ -947,18 +938,12 @@ mod tests {
 
     #[test]
     fn pcase_quoted_symbol() {
-        assert_eq!(
-            eval_last("(pcase 'foo ('foo 1) ('bar 2))"),
-            "OK 1"
-        );
+        assert_eq!(eval_last("(pcase 'foo ('foo 1) ('bar 2))"), "OK 1");
     }
 
     #[test]
     fn pcase_quoted_symbol_no_match() {
-        assert_eq!(
-            eval_last("(pcase 'baz ('foo 1) ('bar 2))"),
-            "OK nil"
-        );
+        assert_eq!(eval_last("(pcase 'baz ('foo 1) ('bar 2))"), "OK nil");
     }
 
     #[test]
@@ -1015,10 +1000,7 @@ mod tests {
 
     #[test]
     fn pcase_char_match() {
-        assert_eq!(
-            eval_last("(pcase ?a (?a 'yes) (_ 'no))"),
-            "OK yes"
-        );
+        assert_eq!(eval_last("(pcase ?a (?a 'yes) (_ 'no))"), "OK yes");
     }
 
     // =======================================================================
@@ -1035,10 +1017,7 @@ mod tests {
 
     #[test]
     fn pcase_t_literal() {
-        assert_eq!(
-            eval_last("(pcase t (t 'is-t) (_ 'other))"),
-            "OK is-t"
-        );
+        assert_eq!(eval_last("(pcase t (t 'is-t) (_ 'other))"), "OK is-t");
     }
 
     // =======================================================================
@@ -1096,10 +1075,7 @@ mod tests {
     #[test]
     fn pcase_let_pattern() {
         // (let PATTERN EXPR) — match EXPR against PATTERN
-        assert_eq!(
-            eval_last("(pcase 42 ((let x (+ 1 2)) x))"),
-            "OK 3"
-        );
+        assert_eq!(eval_last("(pcase 42 ((let x (+ 1 2)) x))"), "OK 3");
     }
 
     // =======================================================================
@@ -1108,10 +1084,7 @@ mod tests {
 
     #[test]
     fn pcase_and_all_match() {
-        assert_eq!(
-            eval_last("(pcase 42 ((and (pred integerp) x) x))"),
-            "OK 42"
-        );
+        assert_eq!(eval_last("(pcase 42 ((and (pred integerp) x) x))"), "OK 42");
     }
 
     #[test]
@@ -1164,10 +1137,7 @@ mod tests {
 
     #[test]
     fn pcase_app_with_binding() {
-        assert_eq!(
-            eval_last("(pcase '(1 2 3) ((app car x) x))"),
-            "OK 1"
-        );
+        assert_eq!(eval_last("(pcase '(1 2 3) ((app car x) x))"), "OK 1");
     }
 
     #[test]
@@ -1184,18 +1154,12 @@ mod tests {
 
     #[test]
     fn pcase_backquote_simple_list() {
-        assert_eq!(
-            eval_last("(pcase '(1 2 3) (`(1 ,x 3) x) (_ 'no))"),
-            "OK 2"
-        );
+        assert_eq!(eval_last("(pcase '(1 2 3) (`(1 ,x 3) x) (_ 'no))"), "OK 2");
     }
 
     #[test]
     fn pcase_backquote_all_unquoted() {
-        assert_eq!(
-            eval_last("(pcase '(10 20) (`(,a ,b) (+ a b)))"),
-            "OK 30"
-        );
+        assert_eq!(eval_last("(pcase '(10 20) (`(,a ,b) (+ a b)))"), "OK 30");
     }
 
     #[test]
@@ -1208,10 +1172,7 @@ mod tests {
 
     #[test]
     fn pcase_backquote_nested() {
-        assert_eq!(
-            eval_last("(pcase '(1 (2 3)) (`(1 (2 ,x)) x))"),
-            "OK 3"
-        );
+        assert_eq!(eval_last("(pcase '(1 (2 3)) (`(1 (2 ,x)) x))"), "OK 3");
     }
 
     // =======================================================================
@@ -1220,10 +1181,7 @@ mod tests {
 
     #[test]
     fn pcase_vector_match() {
-        assert_eq!(
-            eval_last("(pcase [1 2 3] ([a b c] (+ a b c)))"),
-            "OK 6"
-        );
+        assert_eq!(eval_last("(pcase [1 2 3] ([a b c] (+ a b c)))"), "OK 6");
     }
 
     #[test]
@@ -1240,10 +1198,7 @@ mod tests {
 
     #[test]
     fn pcase_clause_with_multiple_body_forms() {
-        assert_eq!(
-            eval_last("(pcase 42 (x (+ x 1) (+ x 2)))"),
-            "OK 44"
-        );
+        assert_eq!(eval_last("(pcase 42 (x (+ x 1) (+ x 2)))"), "OK 44");
     }
 
     // =======================================================================
@@ -1261,26 +1216,17 @@ mod tests {
 
     #[test]
     fn pcase_let_basic_binding() {
-        assert_eq!(
-            eval_last("(pcase-let ((x 42)) x)"),
-            "OK 42"
-        );
+        assert_eq!(eval_last("(pcase-let ((x 42)) x)"), "OK 42");
     }
 
     #[test]
     fn pcase_let_destructure() {
-        assert_eq!(
-            eval_last("(pcase-let ((`(,a ,b) '(1 2))) (+ a b))"),
-            "OK 3"
-        );
+        assert_eq!(eval_last("(pcase-let ((`(,a ,b) '(1 2))) (+ a b))"), "OK 3");
     }
 
     #[test]
     fn pcase_let_multiple_bindings() {
-        assert_eq!(
-            eval_last("(pcase-let ((x 10) (y 20)) (+ x y))"),
-            "OK 30"
-        );
+        assert_eq!(eval_last("(pcase-let ((x 10) (y 20)) (+ x y))"), "OK 30");
     }
 
     // =======================================================================
@@ -1289,10 +1235,7 @@ mod tests {
 
     #[test]
     fn pcase_let_star_sequential() {
-        assert_eq!(
-            eval_last("(pcase-let* ((x 10) (y (+ x 5))) y)"),
-            "OK 15"
-        );
+        assert_eq!(eval_last("(pcase-let* ((x 10) (y (+ x 5))) y)"), "OK 15");
     }
 
     #[test]
@@ -1405,10 +1348,7 @@ mod tests {
 
     #[test]
     fn pcase_keyword_literal() {
-        assert_eq!(
-            eval_last("(pcase :foo (:foo 'yes) (_ 'no))"),
-            "OK yes"
-        );
+        assert_eq!(eval_last("(pcase :foo (:foo 'yes) (_ 'no))"), "OK yes");
     }
 
     // =======================================================================
@@ -1417,10 +1357,7 @@ mod tests {
 
     #[test]
     fn pcase_float_literal() {
-        assert_eq!(
-            eval_last("(pcase 3.14 (3.14 'pi) (_ 'other))"),
-            "OK pi"
-        );
+        assert_eq!(eval_last("(pcase 3.14 (3.14 'pi) (_ 'other))"), "OK pi");
     }
 
     // =======================================================================
@@ -1453,10 +1390,7 @@ mod tests {
 
     #[test]
     fn pcase_let_empty_bindings() {
-        assert_eq!(
-            eval_last("(pcase-let () 42)"),
-            "OK 42"
-        );
+        assert_eq!(eval_last("(pcase-let () 42)"), "OK 42");
     }
 
     // =======================================================================
@@ -1465,10 +1399,7 @@ mod tests {
 
     #[test]
     fn pcase_let_star_empty_bindings() {
-        assert_eq!(
-            eval_last("(pcase-let* () 42)"),
-            "OK 42"
-        );
+        assert_eq!(eval_last("(pcase-let* () 42)"), "OK 42");
     }
 
     // =======================================================================
@@ -1477,10 +1408,7 @@ mod tests {
 
     #[test]
     fn pcase_dolist_returns_nil() {
-        assert_eq!(
-            eval_last("(pcase-dolist (x '(1 2 3)) x)"),
-            "OK nil"
-        );
+        assert_eq!(eval_last("(pcase-dolist (x '(1 2 3)) x)"), "OK nil");
     }
 
     // =======================================================================

@@ -19,19 +19,29 @@ use super::value::*;
 fn expect_symbol(expr: &Expr) -> Result<&str, Flow> {
     match expr {
         Expr::Symbol(s) => Ok(s.as_str()),
-        _ => Err(signal("wrong-type-argument", vec![Value::symbol("symbolp")])),
+        _ => Err(signal(
+            "wrong-type-argument",
+            vec![Value::symbol("symbolp")],
+        )),
     }
 }
 
 fn value_as_symbol(val: &Value) -> Result<&str, Flow> {
-    val.as_symbol_name()
-        .ok_or_else(|| signal("wrong-type-argument", vec![Value::symbol("symbolp"), val.clone()]))
+    val.as_symbol_name().ok_or_else(|| {
+        signal(
+            "wrong-type-argument",
+            vec![Value::symbol("symbolp"), val.clone()],
+        )
+    })
 }
 
 fn expr_to_symbol_string(expr: &Expr) -> Result<String, Flow> {
     match expr {
         Expr::Symbol(s) => Ok(s.clone()),
-        _ => Err(signal("wrong-type-argument", vec![Value::symbol("symbolp")])),
+        _ => Err(signal(
+            "wrong-type-argument",
+            vec![Value::symbol("symbolp")],
+        )),
     }
 }
 
@@ -117,7 +127,12 @@ pub(crate) fn sf_cl_defstruct(eval: &mut Evaluator, tail: &[Expr]) -> EvalResult
     let num_slots = slots.len();
 
     // Store struct metadata on the symbol's plist
-    let slot_name_list = Value::list(slot_names.iter().map(|n| Value::symbol(n.clone())).collect());
+    let slot_name_list = Value::list(
+        slot_names
+            .iter()
+            .map(|n| Value::symbol(n.clone()))
+            .collect(),
+    );
     eval.obarray
         .put_property(&struct_name, "cl-struct-slots", slot_name_list);
     eval.obarray
@@ -312,10 +327,7 @@ pub(crate) fn sf_cl_defstruct(eval: &mut Evaluator, tail: &[Expr]) -> EvalResult
                     Expr::Symbol("obj".into()),
                     Expr::Int(0),
                 ]),
-                Expr::List(vec![
-                    Expr::Symbol("quote".into()),
-                    Expr::Symbol(tag_sym),
-                ]),
+                Expr::List(vec![Expr::Symbol("quote".into()), Expr::Symbol(tag_sym)]),
             ]),
         ]);
         let lambda = LambdaData {
@@ -453,15 +465,9 @@ enum LoopClause {
         inclusive: bool,
     },
     /// `for VAR in LIST`
-    ForIn {
-        var: String,
-        list_expr: Expr,
-    },
+    ForIn { var: String, list_expr: Expr },
     /// `for VAR across VECTOR`
-    ForAcross {
-        var: String,
-        vec_expr: Expr,
-    },
+    ForAcross { var: String, vec_expr: Expr },
     /// `for VAR = EXPR [then EXPR]`
     ForEquals {
         var: String,
@@ -469,63 +475,33 @@ enum LoopClause {
         then_expr: Option<Expr>,
     },
     /// `repeat N`
-    Repeat {
-        count: Expr,
-    },
+    Repeat { count: Expr },
     /// `while CONDITION`
-    While {
-        condition: Expr,
-    },
+    While { condition: Expr },
     /// `until CONDITION`
-    Until {
-        condition: Expr,
-    },
+    Until { condition: Expr },
     /// `collect EXPR [into VAR]`
-    Collect {
-        expr: Expr,
-        into: Option<String>,
-    },
+    Collect { expr: Expr, into: Option<String> },
     /// `append EXPR`
-    Append {
-        expr: Expr,
-    },
+    Append { expr: Expr },
     /// `sum EXPR`
-    Sum {
-        expr: Expr,
-    },
+    Sum { expr: Expr },
     /// `count EXPR`
-    Count {
-        expr: Expr,
-    },
+    Count { expr: Expr },
     /// `maximize EXPR`
-    Maximize {
-        expr: Expr,
-    },
+    Maximize { expr: Expr },
     /// `minimize EXPR`
-    Minimize {
-        expr: Expr,
-    },
+    Minimize { expr: Expr },
     /// `do BODY...` (one or more exprs)
-    Do {
-        body: Vec<Expr>,
-    },
+    Do { body: Vec<Expr> },
     /// `initially BODY...`
-    Initially {
-        body: Vec<Expr>,
-    },
+    Initially { body: Vec<Expr> },
     /// `finally BODY...`
-    Finally {
-        body: Vec<Expr>,
-    },
+    Finally { body: Vec<Expr> },
     /// `return EXPR`
-    Return {
-        expr: Expr,
-    },
+    Return { expr: Expr },
     /// `with VAR = EXPR`
-    With {
-        var: String,
-        expr: Expr,
-    },
+    With { var: String, expr: Expr },
 }
 
 /// Parse cl-loop clauses from the tail expressions.
@@ -552,19 +528,27 @@ fn parse_loop_clauses(tail: &[Expr]) -> Result<Vec<LoopClause>, Flow> {
             "for" | "as" => {
                 i += 1;
                 if i >= tail.len() {
-                    return Err(signal("cl-loop-error", vec![Value::string("Missing variable after 'for'")]));
+                    return Err(signal(
+                        "cl-loop-error",
+                        vec![Value::string("Missing variable after 'for'")],
+                    ));
                 }
                 let var = expr_to_symbol_string(&tail[i])?;
                 i += 1;
                 if i >= tail.len() {
-                    return Err(signal("cl-loop-error", vec![Value::string("Missing clause after 'for VAR'")]));
+                    return Err(signal(
+                        "cl-loop-error",
+                        vec![Value::string("Missing clause after 'for VAR'")],
+                    ));
                 }
                 let clause_kw = match &tail[i] {
                     Expr::Symbol(s) => s.clone(),
                     _ => {
                         return Err(signal(
                             "cl-loop-error",
-                            vec![Value::string("Expected 'from', 'in', 'across', or '=' after 'for VAR'")],
+                            vec![Value::string(
+                                "Expected 'from', 'in', 'across', or '=' after 'for VAR'",
+                            )],
                         ));
                     }
                 };
@@ -572,7 +556,10 @@ fn parse_loop_clauses(tail: &[Expr]) -> Result<Vec<LoopClause>, Flow> {
                     "from" => {
                         i += 1;
                         if i >= tail.len() {
-                            return Err(signal("cl-loop-error", vec![Value::string("Missing start expr")]));
+                            return Err(signal(
+                                "cl-loop-error",
+                                vec![Value::string("Missing start expr")],
+                            ));
                         }
                         let start = tail[i].clone();
                         i += 1;
@@ -587,26 +574,38 @@ fn parse_loop_clauses(tail: &[Expr]) -> Result<Vec<LoopClause>, Flow> {
                                     "to" | "upto" => {
                                         inclusive = true;
                                         i += 1;
-                                        end = tail.get(i).cloned().unwrap_or(Expr::Symbol("nil".into()));
+                                        end = tail
+                                            .get(i)
+                                            .cloned()
+                                            .unwrap_or(Expr::Symbol("nil".into()));
                                         i += 1;
                                     }
                                     "below" => {
                                         inclusive = false;
                                         i += 1;
-                                        end = tail.get(i).cloned().unwrap_or(Expr::Symbol("nil".into()));
+                                        end = tail
+                                            .get(i)
+                                            .cloned()
+                                            .unwrap_or(Expr::Symbol("nil".into()));
                                         i += 1;
                                     }
                                     "downto" => {
                                         inclusive = true;
                                         i += 1;
-                                        end = tail.get(i).cloned().unwrap_or(Expr::Symbol("nil".into()));
+                                        end = tail
+                                            .get(i)
+                                            .cloned()
+                                            .unwrap_or(Expr::Symbol("nil".into()));
                                         i += 1;
                                         // Check for by
                                         if i < tail.len() {
                                             if let Expr::Symbol(s) = &tail[i] {
                                                 if s == "by" {
                                                     i += 1;
-                                                    step = tail.get(i).cloned().unwrap_or(Expr::Int(1));
+                                                    step = tail
+                                                        .get(i)
+                                                        .cloned()
+                                                        .unwrap_or(Expr::Int(1));
                                                     i += 1;
                                                 }
                                             }
@@ -647,7 +646,10 @@ fn parse_loop_clauses(tail: &[Expr]) -> Result<Vec<LoopClause>, Flow> {
                     "downfrom" => {
                         i += 1;
                         if i >= tail.len() {
-                            return Err(signal("cl-loop-error", vec![Value::string("Missing start expr")]));
+                            return Err(signal(
+                                "cl-loop-error",
+                                vec![Value::string("Missing start expr")],
+                            ));
                         }
                         let start = tail[i].clone();
                         i += 1;
@@ -693,7 +695,10 @@ fn parse_loop_clauses(tail: &[Expr]) -> Result<Vec<LoopClause>, Flow> {
                     "in" => {
                         i += 1;
                         if i >= tail.len() {
-                            return Err(signal("cl-loop-error", vec![Value::string("Missing list expr")]));
+                            return Err(signal(
+                                "cl-loop-error",
+                                vec![Value::string("Missing list expr")],
+                            ));
                         }
                         let list_expr = tail[i].clone();
                         i += 1;
@@ -702,7 +707,10 @@ fn parse_loop_clauses(tail: &[Expr]) -> Result<Vec<LoopClause>, Flow> {
                     "across" => {
                         i += 1;
                         if i >= tail.len() {
-                            return Err(signal("cl-loop-error", vec![Value::string("Missing vector expr")]));
+                            return Err(signal(
+                                "cl-loop-error",
+                                vec![Value::string("Missing vector expr")],
+                            ));
                         }
                         let vec_expr = tail[i].clone();
                         i += 1;
@@ -711,7 +719,10 @@ fn parse_loop_clauses(tail: &[Expr]) -> Result<Vec<LoopClause>, Flow> {
                     "=" => {
                         i += 1;
                         if i >= tail.len() {
-                            return Err(signal("cl-loop-error", vec![Value::string("Missing init expr")]));
+                            return Err(signal(
+                                "cl-loop-error",
+                                vec![Value::string("Missing init expr")],
+                            ));
                         }
                         let init_expr = tail[i].clone();
                         i += 1;
@@ -757,7 +768,10 @@ fn parse_loop_clauses(tail: &[Expr]) -> Result<Vec<LoopClause>, Flow> {
             "repeat" => {
                 i += 1;
                 if i >= tail.len() {
-                    return Err(signal("cl-loop-error", vec![Value::string("Missing count after 'repeat'")]));
+                    return Err(signal(
+                        "cl-loop-error",
+                        vec![Value::string("Missing count after 'repeat'")],
+                    ));
                 }
                 clauses.push(LoopClause::Repeat {
                     count: tail[i].clone(),
@@ -767,7 +781,10 @@ fn parse_loop_clauses(tail: &[Expr]) -> Result<Vec<LoopClause>, Flow> {
             "while" => {
                 i += 1;
                 if i >= tail.len() {
-                    return Err(signal("cl-loop-error", vec![Value::string("Missing condition after 'while'")]));
+                    return Err(signal(
+                        "cl-loop-error",
+                        vec![Value::string("Missing condition after 'while'")],
+                    ));
                 }
                 clauses.push(LoopClause::While {
                     condition: tail[i].clone(),
@@ -777,7 +794,10 @@ fn parse_loop_clauses(tail: &[Expr]) -> Result<Vec<LoopClause>, Flow> {
             "until" => {
                 i += 1;
                 if i >= tail.len() {
-                    return Err(signal("cl-loop-error", vec![Value::string("Missing condition after 'until'")]));
+                    return Err(signal(
+                        "cl-loop-error",
+                        vec![Value::string("Missing condition after 'until'")],
+                    ));
                 }
                 clauses.push(LoopClause::Until {
                     condition: tail[i].clone(),
@@ -787,7 +807,10 @@ fn parse_loop_clauses(tail: &[Expr]) -> Result<Vec<LoopClause>, Flow> {
             "collect" | "collecting" => {
                 i += 1;
                 if i >= tail.len() {
-                    return Err(signal("cl-loop-error", vec![Value::string("Missing expr after 'collect'")]));
+                    return Err(signal(
+                        "cl-loop-error",
+                        vec![Value::string("Missing expr after 'collect'")],
+                    ));
                 }
                 let expr = tail[i].clone();
                 i += 1;
@@ -818,7 +841,10 @@ fn parse_loop_clauses(tail: &[Expr]) -> Result<Vec<LoopClause>, Flow> {
             "append" | "appending" => {
                 i += 1;
                 if i >= tail.len() {
-                    return Err(signal("cl-loop-error", vec![Value::string("Missing expr after 'append'")]));
+                    return Err(signal(
+                        "cl-loop-error",
+                        vec![Value::string("Missing expr after 'append'")],
+                    ));
                 }
                 clauses.push(LoopClause::Append {
                     expr: tail[i].clone(),
@@ -828,7 +854,10 @@ fn parse_loop_clauses(tail: &[Expr]) -> Result<Vec<LoopClause>, Flow> {
             "sum" | "summing" => {
                 i += 1;
                 if i >= tail.len() {
-                    return Err(signal("cl-loop-error", vec![Value::string("Missing expr after 'sum'")]));
+                    return Err(signal(
+                        "cl-loop-error",
+                        vec![Value::string("Missing expr after 'sum'")],
+                    ));
                 }
                 clauses.push(LoopClause::Sum {
                     expr: tail[i].clone(),
@@ -838,7 +867,10 @@ fn parse_loop_clauses(tail: &[Expr]) -> Result<Vec<LoopClause>, Flow> {
             "count" | "counting" => {
                 i += 1;
                 if i >= tail.len() {
-                    return Err(signal("cl-loop-error", vec![Value::string("Missing expr after 'count'")]));
+                    return Err(signal(
+                        "cl-loop-error",
+                        vec![Value::string("Missing expr after 'count'")],
+                    ));
                 }
                 clauses.push(LoopClause::Count {
                     expr: tail[i].clone(),
@@ -848,7 +880,10 @@ fn parse_loop_clauses(tail: &[Expr]) -> Result<Vec<LoopClause>, Flow> {
             "maximize" | "maximizing" => {
                 i += 1;
                 if i >= tail.len() {
-                    return Err(signal("cl-loop-error", vec![Value::string("Missing expr after 'maximize'")]));
+                    return Err(signal(
+                        "cl-loop-error",
+                        vec![Value::string("Missing expr after 'maximize'")],
+                    ));
                 }
                 clauses.push(LoopClause::Maximize {
                     expr: tail[i].clone(),
@@ -858,7 +893,10 @@ fn parse_loop_clauses(tail: &[Expr]) -> Result<Vec<LoopClause>, Flow> {
             "minimize" | "minimizing" => {
                 i += 1;
                 if i >= tail.len() {
-                    return Err(signal("cl-loop-error", vec![Value::string("Missing expr after 'minimize'")]));
+                    return Err(signal(
+                        "cl-loop-error",
+                        vec![Value::string("Missing expr after 'minimize'")],
+                    ));
                 }
                 clauses.push(LoopClause::Minimize {
                     expr: tail[i].clone(),
@@ -877,7 +915,10 @@ fn parse_loop_clauses(tail: &[Expr]) -> Result<Vec<LoopClause>, Flow> {
                     i += 1;
                 }
                 if body.is_empty() {
-                    return Err(signal("cl-loop-error", vec![Value::string("Missing body after 'do'")]));
+                    return Err(signal(
+                        "cl-loop-error",
+                        vec![Value::string("Missing body after 'do'")],
+                    ));
                 }
                 clauses.push(LoopClause::Do { body });
             }
@@ -908,7 +949,10 @@ fn parse_loop_clauses(tail: &[Expr]) -> Result<Vec<LoopClause>, Flow> {
             "return" => {
                 i += 1;
                 if i >= tail.len() {
-                    return Err(signal("cl-loop-error", vec![Value::string("Missing expr after 'return'")]));
+                    return Err(signal(
+                        "cl-loop-error",
+                        vec![Value::string("Missing expr after 'return'")],
+                    ));
                 }
                 clauses.push(LoopClause::Return {
                     expr: tail[i].clone(),
@@ -918,7 +962,10 @@ fn parse_loop_clauses(tail: &[Expr]) -> Result<Vec<LoopClause>, Flow> {
             "with" => {
                 i += 1;
                 if i >= tail.len() {
-                    return Err(signal("cl-loop-error", vec![Value::string("Missing var after 'with'")]));
+                    return Err(signal(
+                        "cl-loop-error",
+                        vec![Value::string("Missing var after 'with'")],
+                    ));
                 }
                 let var = expr_to_symbol_string(&tail[i])?;
                 i += 1;
@@ -931,7 +978,10 @@ fn parse_loop_clauses(tail: &[Expr]) -> Result<Vec<LoopClause>, Flow> {
                     }
                 }
                 if i >= tail.len() {
-                    return Err(signal("cl-loop-error", vec![Value::string("Missing expr after 'with VAR ='")]));
+                    return Err(signal(
+                        "cl-loop-error",
+                        vec![Value::string("Missing expr after 'with VAR ='")],
+                    ));
                 }
                 let expr = tail[i].clone();
                 i += 1;
@@ -953,10 +1003,29 @@ fn is_loop_keyword(expr: &Expr) -> bool {
     if let Expr::Symbol(s) = expr {
         matches!(
             s.as_str(),
-            "for" | "as" | "repeat" | "while" | "until" | "collect" | "collecting"
-                | "append" | "appending" | "sum" | "summing" | "count" | "counting"
-                | "maximize" | "maximizing" | "minimize" | "minimizing"
-                | "do" | "doing" | "initially" | "finally" | "return" | "with"
+            "for"
+                | "as"
+                | "repeat"
+                | "while"
+                | "until"
+                | "collect"
+                | "collecting"
+                | "append"
+                | "appending"
+                | "sum"
+                | "summing"
+                | "count"
+                | "counting"
+                | "maximize"
+                | "maximizing"
+                | "minimize"
+                | "minimizing"
+                | "do"
+                | "doing"
+                | "initially"
+                | "finally"
+                | "return"
+                | "with"
         )
     } else {
         false
@@ -1007,7 +1076,10 @@ pub(crate) fn sf_cl_loop(eval: &mut Evaluator, tail: &[Expr]) -> EvalResult {
     // Collect named into-vars
     let mut named_collects: HashMap<String, Vec<Value>> = HashMap::new();
     for clause in &clauses {
-        if let LoopClause::Collect { into: Some(name), .. } = clause {
+        if let LoopClause::Collect {
+            into: Some(name), ..
+        } = clause
+        {
             named_collects.entry(name.clone()).or_default();
         }
     }
@@ -1148,21 +1220,27 @@ pub(crate) fn sf_cl_loop(eval: &mut Evaluator, tail: &[Expr]) -> EvalResult {
         if !first_iteration {
             for clause in &clauses {
                 match clause {
-                    LoopClause::ForFromTo {
-                        var, step, ..
-                    } => {
+                    LoopClause::ForFromTo { var, step, .. } => {
                         let step_val = eval.eval(step)?;
-                        let current = eval.dynamic.last().and_then(|f| f.get(var)).cloned().unwrap_or(Value::Int(0));
+                        let current = eval
+                            .dynamic
+                            .last()
+                            .and_then(|f| f.get(var))
+                            .cloned()
+                            .unwrap_or(Value::Int(0));
                         let new_val = add_values(&current, &step_val)?;
                         if let Some(frame) = eval.dynamic.last_mut() {
                             frame.insert(var.clone(), new_val);
                         }
                     }
-                    LoopClause::ForDownFromTo {
-                        var, step, ..
-                    } => {
+                    LoopClause::ForDownFromTo { var, step, .. } => {
                         let step_val = eval.eval(step)?;
-                        let current = eval.dynamic.last().and_then(|f| f.get(var)).cloned().unwrap_or(Value::Int(0));
+                        let current = eval
+                            .dynamic
+                            .last()
+                            .and_then(|f| f.get(var))
+                            .cloned()
+                            .unwrap_or(Value::Int(0));
                         let new_val = sub_values(&current, &step_val)?;
                         if let Some(frame) = eval.dynamic.last_mut() {
                             frame.insert(var.clone(), new_val);
@@ -1188,12 +1266,20 @@ pub(crate) fn sf_cl_loop(eval: &mut Evaluator, tail: &[Expr]) -> EvalResult {
         for clause in &clauses {
             match clause {
                 LoopClause::ForFromTo {
-                    var, end, inclusive, ..
+                    var,
+                    end,
+                    inclusive,
+                    ..
                 } => {
                     let end_val = eval.eval(end)?;
                     // nil end means no upper bound
                     if !end_val.is_nil() {
-                        let current = eval.dynamic.last().and_then(|f| f.get(var)).cloned().unwrap_or(Value::Int(0));
+                        let current = eval
+                            .dynamic
+                            .last()
+                            .and_then(|f| f.get(var))
+                            .cloned()
+                            .unwrap_or(Value::Int(0));
                         if *inclusive {
                             if compare_values(&current, &end_val)? > 0 {
                                 break 'outer;
@@ -1204,11 +1290,19 @@ pub(crate) fn sf_cl_loop(eval: &mut Evaluator, tail: &[Expr]) -> EvalResult {
                     }
                 }
                 LoopClause::ForDownFromTo {
-                    var, end, inclusive, ..
+                    var,
+                    end,
+                    inclusive,
+                    ..
                 } => {
                     let end_val = eval.eval(end)?;
                     if !end_val.is_nil() {
-                        let current = eval.dynamic.last().and_then(|f| f.get(var)).cloned().unwrap_or(Value::Int(0));
+                        let current = eval
+                            .dynamic
+                            .last()
+                            .and_then(|f| f.get(var))
+                            .cloned()
+                            .unwrap_or(Value::Int(0));
                         if *inclusive {
                             if compare_values(&current, &end_val)? < 0 {
                                 break 'outer;
@@ -1360,12 +1454,18 @@ fn add_values(a: &Value, b: &Value) -> Result<Value, Flow> {
     match (a, b) {
         (Value::Int(a), Value::Int(b)) => Ok(Value::Int(a + b)),
         _ => {
-            let fa = a
-                .as_number_f64()
-                .ok_or_else(|| signal("wrong-type-argument", vec![Value::symbol("numberp"), a.clone()]))?;
-            let fb = b
-                .as_number_f64()
-                .ok_or_else(|| signal("wrong-type-argument", vec![Value::symbol("numberp"), b.clone()]))?;
+            let fa = a.as_number_f64().ok_or_else(|| {
+                signal(
+                    "wrong-type-argument",
+                    vec![Value::symbol("numberp"), a.clone()],
+                )
+            })?;
+            let fb = b.as_number_f64().ok_or_else(|| {
+                signal(
+                    "wrong-type-argument",
+                    vec![Value::symbol("numberp"), b.clone()],
+                )
+            })?;
             if a.is_integer() && b.is_integer() {
                 Ok(Value::Int((fa + fb) as i64))
             } else {
@@ -1380,12 +1480,18 @@ fn sub_values(a: &Value, b: &Value) -> Result<Value, Flow> {
     match (a, b) {
         (Value::Int(a), Value::Int(b)) => Ok(Value::Int(a - b)),
         _ => {
-            let fa = a
-                .as_number_f64()
-                .ok_or_else(|| signal("wrong-type-argument", vec![Value::symbol("numberp"), a.clone()]))?;
-            let fb = b
-                .as_number_f64()
-                .ok_or_else(|| signal("wrong-type-argument", vec![Value::symbol("numberp"), b.clone()]))?;
+            let fa = a.as_number_f64().ok_or_else(|| {
+                signal(
+                    "wrong-type-argument",
+                    vec![Value::symbol("numberp"), a.clone()],
+                )
+            })?;
+            let fb = b.as_number_f64().ok_or_else(|| {
+                signal(
+                    "wrong-type-argument",
+                    vec![Value::symbol("numberp"), b.clone()],
+                )
+            })?;
             if a.is_integer() && b.is_integer() {
                 Ok(Value::Int((fa - fb) as i64))
             } else {
@@ -1397,12 +1503,18 @@ fn sub_values(a: &Value, b: &Value) -> Result<Value, Flow> {
 
 /// Compare two numeric values. Returns -1, 0, or 1.
 fn compare_values(a: &Value, b: &Value) -> Result<i32, Flow> {
-    let fa = a
-        .as_number_f64()
-        .ok_or_else(|| signal("wrong-type-argument", vec![Value::symbol("numberp"), a.clone()]))?;
-    let fb = b
-        .as_number_f64()
-        .ok_or_else(|| signal("wrong-type-argument", vec![Value::symbol("numberp"), b.clone()]))?;
+    let fa = a.as_number_f64().ok_or_else(|| {
+        signal(
+            "wrong-type-argument",
+            vec![Value::symbol("numberp"), a.clone()],
+        )
+    })?;
+    let fb = b.as_number_f64().ok_or_else(|| {
+        signal(
+            "wrong-type-argument",
+            vec![Value::symbol("numberp"), b.clone()],
+        )
+    })?;
     if fa < fb {
         Ok(-1)
     } else if fa > fb {
@@ -1497,9 +1609,7 @@ fn destructure_pattern(
                         } else {
                             return Err(signal(
                                 "wrong-number-of-arguments",
-                                vec![Value::string(
-                                    "Not enough values for destructuring pattern",
-                                )],
+                                vec![Value::string("Not enough values for destructuring pattern")],
                             ));
                         };
                         destructure_pattern(pat, &val, bindings)?;
@@ -1545,7 +1655,10 @@ fn destructure_pattern(
 /// `(cl-incf PLACE &optional DELTA)`
 pub(crate) fn sf_cl_incf(eval: &mut Evaluator, tail: &[Expr]) -> EvalResult {
     if tail.is_empty() {
-        return Err(signal("wrong-number-of-arguments", vec![Value::symbol("cl-incf")]));
+        return Err(signal(
+            "wrong-number-of-arguments",
+            vec![Value::symbol("cl-incf")],
+        ));
     }
     let var_name = expect_symbol(&tail[0])?;
     let delta = if tail.len() > 1 {
@@ -1562,7 +1675,10 @@ pub(crate) fn sf_cl_incf(eval: &mut Evaluator, tail: &[Expr]) -> EvalResult {
 /// `(cl-decf PLACE &optional DELTA)`
 pub(crate) fn sf_cl_decf(eval: &mut Evaluator, tail: &[Expr]) -> EvalResult {
     if tail.is_empty() {
-        return Err(signal("wrong-number-of-arguments", vec![Value::symbol("cl-decf")]));
+        return Err(signal(
+            "wrong-number-of-arguments",
+            vec![Value::symbol("cl-decf")],
+        ));
     }
     let var_name = expect_symbol(&tail[0])?;
     let delta = if tail.len() > 1 {
@@ -1581,7 +1697,10 @@ pub(crate) fn sf_cl_decf(eval: &mut Evaluator, tail: &[Expr]) -> EvalResult {
 /// `(cl-push ITEM PLACE)` — push an item onto the front of a list variable.
 pub(crate) fn sf_cl_push(eval: &mut Evaluator, tail: &[Expr]) -> EvalResult {
     if tail.len() != 2 {
-        return Err(signal("wrong-number-of-arguments", vec![Value::symbol("cl-push")]));
+        return Err(signal(
+            "wrong-number-of-arguments",
+            vec![Value::symbol("cl-push")],
+        ));
     }
     let item = eval.eval(&tail[0])?;
     let var_name = expect_symbol(&tail[1])?;
@@ -1594,7 +1713,10 @@ pub(crate) fn sf_cl_push(eval: &mut Evaluator, tail: &[Expr]) -> EvalResult {
 /// `(cl-pop PLACE)` — pop the first item from a list variable.
 pub(crate) fn sf_cl_pop(eval: &mut Evaluator, tail: &[Expr]) -> EvalResult {
     if tail.len() != 1 {
-        return Err(signal("wrong-number-of-arguments", vec![Value::symbol("cl-pop")]));
+        return Err(signal(
+            "wrong-number-of-arguments",
+            vec![Value::symbol("cl-pop")],
+        ));
     }
     let var_name = expect_symbol(&tail[0])?;
     let current = eval.eval(&tail[0])?;
@@ -1618,7 +1740,10 @@ pub(crate) fn sf_cl_pop(eval: &mut Evaluator, tail: &[Expr]) -> EvalResult {
 /// `(cl-pushnew ITEM PLACE)` — push item onto list only if not already present (using `equal`).
 pub(crate) fn sf_cl_pushnew(eval: &mut Evaluator, tail: &[Expr]) -> EvalResult {
     if tail.len() < 2 {
-        return Err(signal("wrong-number-of-arguments", vec![Value::symbol("cl-pushnew")]));
+        return Err(signal(
+            "wrong-number-of-arguments",
+            vec![Value::symbol("cl-pushnew")],
+        ));
     }
     let item = eval.eval(&tail[0])?;
     let var_name = expect_symbol(&tail[1])?;
@@ -1642,7 +1767,10 @@ pub(crate) fn sf_cl_pushnew(eval: &mut Evaluator, tail: &[Expr]) -> EvalResult {
 /// `(cl-assert EXPR &optional STRING)` — signal error if expr is nil.
 pub(crate) fn sf_cl_assert(eval: &mut Evaluator, tail: &[Expr]) -> EvalResult {
     if tail.is_empty() {
-        return Err(signal("wrong-number-of-arguments", vec![Value::symbol("cl-assert")]));
+        return Err(signal(
+            "wrong-number-of-arguments",
+            vec![Value::symbol("cl-assert")],
+        ));
     }
     let val = eval.eval(&tail[0])?;
     if val.is_nil() {
@@ -1698,9 +1826,16 @@ pub(crate) fn sf_cl_check_type(eval: &mut Evaluator, tail: &[Expr]) -> EvalResul
                 _ => format!("Type check failed: expected {}", type_sym),
             }
         } else {
-            format!("Type check failed: expected {}, got {}", type_sym, val.type_name())
+            format!(
+                "Type check failed: expected {}, got {}",
+                type_sym,
+                val.type_name()
+            )
         };
-        Err(signal("wrong-type-argument", vec![Value::symbol(type_sym), val, Value::string(msg)]))
+        Err(signal(
+            "wrong-type-argument",
+            vec![Value::symbol(type_sym), val, Value::string(msg)],
+        ))
     }
 }
 
@@ -1709,13 +1844,19 @@ pub(crate) fn sf_cl_check_type(eval: &mut Evaluator, tail: &[Expr]) -> EvalResul
 /// `(cl-case EXPR (KEY BODY...)...)`
 pub(crate) fn sf_cl_case(eval: &mut Evaluator, tail: &[Expr]) -> EvalResult {
     if tail.is_empty() {
-        return Err(signal("wrong-number-of-arguments", vec![Value::symbol("cl-case")]));
+        return Err(signal(
+            "wrong-number-of-arguments",
+            vec![Value::symbol("cl-case")],
+        ));
     }
     let key = eval.eval(&tail[0])?;
 
     for clause in &tail[1..] {
         let Expr::List(items) = clause else {
-            return Err(signal("wrong-type-argument", vec![Value::string("cl-case clause must be a list")]));
+            return Err(signal(
+                "wrong-type-argument",
+                vec![Value::string("cl-case clause must be a list")],
+            ));
         };
         if items.is_empty() {
             continue;
@@ -1745,13 +1886,19 @@ pub(crate) fn sf_cl_case(eval: &mut Evaluator, tail: &[Expr]) -> EvalResult {
 /// `(cl-ecase EXPR (KEY BODY...)...)` — like cl-case but signals error if no clause matches.
 pub(crate) fn sf_cl_ecase(eval: &mut Evaluator, tail: &[Expr]) -> EvalResult {
     if tail.is_empty() {
-        return Err(signal("wrong-number-of-arguments", vec![Value::symbol("cl-ecase")]));
+        return Err(signal(
+            "wrong-number-of-arguments",
+            vec![Value::symbol("cl-ecase")],
+        ));
     }
     let key = eval.eval(&tail[0])?;
 
     for clause in &tail[1..] {
         let Expr::List(items) = clause else {
-            return Err(signal("wrong-type-argument", vec![Value::string("cl-ecase clause must be a list")]));
+            return Err(signal(
+                "wrong-type-argument",
+                vec![Value::string("cl-ecase clause must be a list")],
+            ));
         };
         if items.is_empty() {
             continue;
@@ -1771,17 +1918,17 @@ pub(crate) fn sf_cl_ecase(eval: &mut Evaluator, tail: &[Expr]) -> EvalResult {
 
     Err(signal(
         "cl-ecase-error",
-        vec![
-            Value::string("cl-ecase: no matching clause"),
-            key,
-        ],
+        vec![Value::string("cl-ecase: no matching clause"), key],
     ))
 }
 
 /// `(cl-typecase EXPR (TYPE BODY...)...)`
 pub(crate) fn sf_cl_typecase(eval: &mut Evaluator, tail: &[Expr]) -> EvalResult {
     if tail.is_empty() {
-        return Err(signal("wrong-number-of-arguments", vec![Value::symbol("cl-typecase")]));
+        return Err(signal(
+            "wrong-number-of-arguments",
+            vec![Value::symbol("cl-typecase")],
+        ));
     }
     let val = eval.eval(&tail[0])?;
 
@@ -1838,10 +1985,7 @@ pub(crate) fn sf_cl_etypecase(eval: &mut Evaluator, tail: &[Expr]) -> EvalResult
 
     Err(signal(
         "cl-etypecase-error",
-        vec![
-            Value::string("cl-etypecase: no matching clause"),
-            val,
-        ],
+        vec![Value::string("cl-etypecase: no matching clause"), val],
     ))
 }
 
@@ -1885,7 +2029,10 @@ fn type_matches(val: &Value, type_name: &str) -> bool {
 /// Uses catch/throw with a generated tag.
 pub(crate) fn sf_cl_block(eval: &mut Evaluator, tail: &[Expr]) -> EvalResult {
     if tail.is_empty() {
-        return Err(signal("wrong-number-of-arguments", vec![Value::symbol("cl-block")]));
+        return Err(signal(
+            "wrong-number-of-arguments",
+            vec![Value::symbol("cl-block")],
+        ));
     }
     let block_name = expect_symbol(&tail[0])?;
     let tag = Value::symbol(format!("--cl-block-{}", block_name));
@@ -1923,7 +2070,10 @@ pub(crate) fn sf_cl_return_from(eval: &mut Evaluator, tail: &[Expr]) -> EvalResu
 /// `(cl-dotimes (VAR COUNT [RESULT]) BODY...)`
 pub(crate) fn sf_cl_dotimes(eval: &mut Evaluator, tail: &[Expr]) -> EvalResult {
     if tail.is_empty() {
-        return Err(signal("wrong-number-of-arguments", vec![Value::symbol("cl-dotimes")]));
+        return Err(signal(
+            "wrong-number-of-arguments",
+            vec![Value::symbol("cl-dotimes")],
+        ));
     }
     let Expr::List(spec) = &tail[0] else {
         return Err(signal("wrong-type-argument", vec![]));
@@ -1965,7 +2115,10 @@ pub(crate) fn sf_cl_dotimes(eval: &mut Evaluator, tail: &[Expr]) -> EvalResult {
 /// `(cl-dolist (VAR LIST [RESULT]) BODY...)`
 pub(crate) fn sf_cl_dolist(eval: &mut Evaluator, tail: &[Expr]) -> EvalResult {
     if tail.is_empty() {
-        return Err(signal("wrong-number-of-arguments", vec![Value::symbol("cl-dolist")]));
+        return Err(signal(
+            "wrong-number-of-arguments",
+            vec![Value::symbol("cl-dolist")],
+        ));
     }
     let Expr::List(spec) = &tail[0] else {
         return Err(signal("wrong-type-argument", vec![]));
@@ -2002,7 +2155,10 @@ pub(crate) fn sf_cl_dolist(eval: &mut Evaluator, tail: &[Expr]) -> EvalResult {
 /// Bind local functions (non-recursive — they don't see each other).
 pub(crate) fn sf_cl_flet(eval: &mut Evaluator, tail: &[Expr]) -> EvalResult {
     if tail.is_empty() {
-        return Err(signal("wrong-number-of-arguments", vec![Value::symbol("cl-flet")]));
+        return Err(signal(
+            "wrong-number-of-arguments",
+            vec![Value::symbol("cl-flet")],
+        ));
     }
     let Expr::List(bindings) = &tail[0] else {
         return Err(signal("wrong-type-argument", vec![]));
@@ -2042,7 +2198,10 @@ pub(crate) fn sf_cl_flet(eval: &mut Evaluator, tail: &[Expr]) -> EvalResult {
 /// Bind local functions that can call each other (and themselves recursively).
 pub(crate) fn sf_cl_labels(eval: &mut Evaluator, tail: &[Expr]) -> EvalResult {
     if tail.is_empty() {
-        return Err(signal("wrong-number-of-arguments", vec![Value::symbol("cl-labels")]));
+        return Err(signal(
+            "wrong-number-of-arguments",
+            vec![Value::symbol("cl-labels")],
+        ));
     }
     let Expr::List(bindings) = &tail[0] else {
         return Err(signal("wrong-type-argument", vec![]));
@@ -2139,7 +2298,8 @@ mod tests {
     fn eval_all_cl(src: &str) -> Vec<String> {
         let forms = parse_forms(src).expect("parse");
         let mut ev = Evaluator::new();
-        forms.iter()
+        forms
+            .iter()
             .map(|form| {
                 let result = eval_cl_form(&mut ev, form);
                 format_eval_result(&result.map_err(super::super::error::map_flow))
@@ -2266,105 +2426,79 @@ mod tests {
 
     #[test]
     fn loop_for_from_to_collect() {
-        let result = eval_with_cl(
-            "(cl-loop for i from 1 to 5 collect i)",
-        );
+        let result = eval_with_cl("(cl-loop for i from 1 to 5 collect i)");
         assert_eq!(result, "OK (1 2 3 4 5)");
     }
 
     #[test]
     fn loop_for_from_below() {
-        let result = eval_with_cl(
-            "(cl-loop for i from 0 below 3 collect i)",
-        );
+        let result = eval_with_cl("(cl-loop for i from 0 below 3 collect i)");
         assert_eq!(result, "OK (0 1 2)");
     }
 
     #[test]
     fn loop_for_from_to_by() {
-        let result = eval_with_cl(
-            "(cl-loop for i from 0 to 10 by 3 collect i)",
-        );
+        let result = eval_with_cl("(cl-loop for i from 0 to 10 by 3 collect i)");
         assert_eq!(result, "OK (0 3 6 9)");
     }
 
     #[test]
     fn loop_for_in_list() {
-        let result = eval_with_cl(
-            "(cl-loop for x in '(a b c) collect x)",
-        );
+        let result = eval_with_cl("(cl-loop for x in '(a b c) collect x)");
         assert_eq!(result, "OK (a b c)");
     }
 
     #[test]
     fn loop_for_across_vector() {
-        let result = eval_with_cl(
-            "(cl-loop for x across [10 20 30] collect x)",
-        );
+        let result = eval_with_cl("(cl-loop for x across [10 20 30] collect x)");
         assert_eq!(result, "OK (10 20 30)");
     }
 
     #[test]
     fn loop_for_equals_then() {
-        let result = eval_with_cl(
-            "(cl-loop for x = 1 then (* x 2) repeat 5 collect x)",
-        );
+        let result = eval_with_cl("(cl-loop for x = 1 then (* x 2) repeat 5 collect x)");
         assert_eq!(result, "OK (1 2 4 8 16)");
     }
 
     #[test]
     fn loop_sum() {
-        let result = eval_with_cl(
-            "(cl-loop for i from 1 to 5 sum i)",
-        );
+        let result = eval_with_cl("(cl-loop for i from 1 to 5 sum i)");
         assert_eq!(result, "OK 15");
     }
 
     #[test]
     fn loop_count() {
-        let result = eval_with_cl(
-            "(cl-loop for i from 1 to 10 count (= 0 (% i 2)))",
-        );
+        let result = eval_with_cl("(cl-loop for i from 1 to 10 count (= 0 (% i 2)))");
         assert_eq!(result, "OK 5");
     }
 
     #[test]
     fn loop_maximize() {
-        let result = eval_with_cl(
-            "(cl-loop for x in '(3 1 4 1 5 9) maximize x)",
-        );
+        let result = eval_with_cl("(cl-loop for x in '(3 1 4 1 5 9) maximize x)");
         assert_eq!(result, "OK 9");
     }
 
     #[test]
     fn loop_minimize() {
-        let result = eval_with_cl(
-            "(cl-loop for x in '(3 1 4 1 5 9) minimize x)",
-        );
+        let result = eval_with_cl("(cl-loop for x in '(3 1 4 1 5 9) minimize x)");
         assert_eq!(result, "OK 1");
     }
 
     #[test]
     fn loop_while_condition() {
-        let result = eval_with_cl(
-            "(cl-loop for i from 0 while (< i 3) collect i)",
-        );
+        let result = eval_with_cl("(cl-loop for i from 0 while (< i 3) collect i)");
         assert_eq!(result, "OK (0 1 2)");
     }
 
     #[test]
     fn loop_until_condition() {
-        let result = eval_with_cl(
-            "(cl-loop for i from 0 until (= i 3) collect i)",
-        );
+        let result = eval_with_cl("(cl-loop for i from 0 until (= i 3) collect i)");
         assert_eq!(result, "OK (0 1 2)");
     }
 
     #[test]
     fn loop_repeat() {
-        let result = eval_with_cl(
-            "(cl-loop repeat 4 collect 42)",
-        );
+        let result = eval_with_cl("(cl-loop repeat 4 collect 42)");
         assert_eq!(result, "OK (42 42 42 42)");
     }
 
@@ -2401,9 +2535,7 @@ mod tests {
 
     #[test]
     fn loop_append() {
-        let result = eval_with_cl(
-            "(cl-loop for x in '(1 2 3) append (list x (* x 10)))",
-        );
+        let result = eval_with_cl("(cl-loop for x in '(1 2 3) append (list x (* x 10)))");
         assert_eq!(result, "OK (1 10 2 20 3 30)");
     }
 
@@ -2661,9 +2793,7 @@ mod tests {
 
     #[test]
     fn cl_block_normal() {
-        let result = eval_with_cl(
-            "(cl-block myblock 1 2 3)",
-        );
+        let result = eval_with_cl("(cl-block myblock 1 2 3)");
         assert_eq!(result, "OK 3");
     }
 
@@ -2672,7 +2802,8 @@ mod tests {
         // Since cl-return-from is a special form that must be dispatched by our handler,
         // and it's nested inside cl-block's body where the standard evaluator runs,
         // we test it by directly calling the Rust functions.
-        let forms = parse_forms("(cl-block myblock (throw '--cl-block-myblock 42) 99)").expect("parse");
+        let forms =
+            parse_forms("(cl-block myblock (throw '--cl-block-myblock 42) 99)").expect("parse");
         let mut ev = Evaluator::new();
         let result = eval_cl_form(&mut ev, &forms[0]);
         let formatted = format_eval_result(&result.map_err(super::super::error::map_flow));
@@ -2774,17 +2905,13 @@ mod tests {
 
     #[test]
     fn loop_downfrom() {
-        let result = eval_with_cl(
-            "(cl-loop for i downfrom 5 to 1 collect i)",
-        );
+        let result = eval_with_cl("(cl-loop for i downfrom 5 to 1 collect i)");
         assert_eq!(result, "OK (5 4 3 2 1)");
     }
 
     #[test]
     fn destructure_discard_with_underscore() {
-        let result = eval_with_cl(
-            "(cl-destructuring-bind (_ b _) '(1 2 3) b)",
-        );
+        let result = eval_with_cl("(cl-destructuring-bind (_ b _) '(1 2 3) b)");
         assert_eq!(result, "OK 2");
     }
 }

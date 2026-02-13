@@ -266,16 +266,36 @@ fn nth_helper(name: &str, args: &[Value], n: usize) -> EvalResult {
     }
 }
 
-pub fn builtin_cl_first(args: Vec<Value>) -> EvalResult { nth_helper("cl-first", &args, 0) }
-pub fn builtin_cl_second(args: Vec<Value>) -> EvalResult { nth_helper("cl-second", &args, 1) }
-pub fn builtin_cl_third(args: Vec<Value>) -> EvalResult { nth_helper("cl-third", &args, 2) }
-pub fn builtin_cl_fourth(args: Vec<Value>) -> EvalResult { nth_helper("cl-fourth", &args, 3) }
-pub fn builtin_cl_fifth(args: Vec<Value>) -> EvalResult { nth_helper("cl-fifth", &args, 4) }
-pub fn builtin_cl_sixth(args: Vec<Value>) -> EvalResult { nth_helper("cl-sixth", &args, 5) }
-pub fn builtin_cl_seventh(args: Vec<Value>) -> EvalResult { nth_helper("cl-seventh", &args, 6) }
-pub fn builtin_cl_eighth(args: Vec<Value>) -> EvalResult { nth_helper("cl-eighth", &args, 7) }
-pub fn builtin_cl_ninth(args: Vec<Value>) -> EvalResult { nth_helper("cl-ninth", &args, 8) }
-pub fn builtin_cl_tenth(args: Vec<Value>) -> EvalResult { nth_helper("cl-tenth", &args, 9) }
+pub fn builtin_cl_first(args: Vec<Value>) -> EvalResult {
+    nth_helper("cl-first", &args, 0)
+}
+pub fn builtin_cl_second(args: Vec<Value>) -> EvalResult {
+    nth_helper("cl-second", &args, 1)
+}
+pub fn builtin_cl_third(args: Vec<Value>) -> EvalResult {
+    nth_helper("cl-third", &args, 2)
+}
+pub fn builtin_cl_fourth(args: Vec<Value>) -> EvalResult {
+    nth_helper("cl-fourth", &args, 3)
+}
+pub fn builtin_cl_fifth(args: Vec<Value>) -> EvalResult {
+    nth_helper("cl-fifth", &args, 4)
+}
+pub fn builtin_cl_sixth(args: Vec<Value>) -> EvalResult {
+    nth_helper("cl-sixth", &args, 5)
+}
+pub fn builtin_cl_seventh(args: Vec<Value>) -> EvalResult {
+    nth_helper("cl-seventh", &args, 6)
+}
+pub fn builtin_cl_eighth(args: Vec<Value>) -> EvalResult {
+    nth_helper("cl-eighth", &args, 7)
+}
+pub fn builtin_cl_ninth(args: Vec<Value>) -> EvalResult {
+    nth_helper("cl-ninth", &args, 8)
+}
+pub fn builtin_cl_tenth(args: Vec<Value>) -> EvalResult {
+    nth_helper("cl-tenth", &args, 9)
+}
 
 /// `(cl-rest LIST)` — alias for cdr.
 pub fn builtin_cl_rest(args: Vec<Value>) -> EvalResult {
@@ -303,7 +323,11 @@ pub fn builtin_cl_subseq(args: Vec<Value>) -> EvalResult {
     if start > elems.len() || end > elems.len() || start > end {
         return Err(signal(
             "args-out-of-range",
-            vec![args[0].clone(), Value::Int(start as i64), Value::Int(end as i64)],
+            vec![
+                args[0].clone(),
+                Value::Int(start as i64),
+                Value::Int(end as i64),
+            ],
         ));
     }
     let result: Vec<Value> = elems[start..end].to_vec();
@@ -401,10 +425,7 @@ pub fn builtin_cl_coerce(args: Vec<Value>) -> EvalResult {
 // ===========================================================================
 
 /// `(cl-map TYPE FN &rest SEQS)` — map over sequences, return target type.
-pub fn builtin_cl_map(
-    eval: &mut super::eval::Evaluator,
-    args: Vec<Value>,
-) -> EvalResult {
+pub fn builtin_cl_map(eval: &mut super::eval::Evaluator, args: Vec<Value>) -> EvalResult {
     expect_min_args("cl-map", &args, 3)?;
     let target = type_name_str(&args[0]);
     let func = args[1].clone();
@@ -436,10 +457,7 @@ pub fn builtin_cl_map(
 }
 
 /// `(cl-every PRED &rest SEQS)` — all elements satisfy predicate.
-pub fn builtin_cl_every(
-    eval: &mut super::eval::Evaluator,
-    args: Vec<Value>,
-) -> EvalResult {
+pub fn builtin_cl_every(eval: &mut super::eval::Evaluator, args: Vec<Value>) -> EvalResult {
     expect_min_args("cl-every", &args, 2)?;
     let pred = args[0].clone();
     let seqs: Vec<Vec<Value>> = args[1..].iter().map(|s| collect_sequence(s)).collect();
@@ -458,10 +476,7 @@ pub fn builtin_cl_every(
 }
 
 /// `(cl-some PRED &rest SEQS)` — some element satisfies predicate.
-pub fn builtin_cl_some(
-    eval: &mut super::eval::Evaluator,
-    args: Vec<Value>,
-) -> EvalResult {
+pub fn builtin_cl_some(eval: &mut super::eval::Evaluator, args: Vec<Value>) -> EvalResult {
     expect_min_args("cl-some", &args, 2)?;
     let pred = args[0].clone();
     let seqs: Vec<Vec<Value>> = args[1..].iter().map(|s| collect_sequence(s)).collect();
@@ -480,28 +495,19 @@ pub fn builtin_cl_some(
 }
 
 /// `(cl-notevery PRED &rest SEQS)` — not all satisfy.
-pub fn builtin_cl_notevery(
-    eval: &mut super::eval::Evaluator,
-    args: Vec<Value>,
-) -> EvalResult {
+pub fn builtin_cl_notevery(eval: &mut super::eval::Evaluator, args: Vec<Value>) -> EvalResult {
     let result = builtin_cl_every(eval, args)?;
     Ok(Value::bool(result.is_nil()))
 }
 
 /// `(cl-notany PRED &rest SEQS)` — none satisfy.
-pub fn builtin_cl_notany(
-    eval: &mut super::eval::Evaluator,
-    args: Vec<Value>,
-) -> EvalResult {
+pub fn builtin_cl_notany(eval: &mut super::eval::Evaluator, args: Vec<Value>) -> EvalResult {
     let result = builtin_cl_some(eval, args)?;
     Ok(Value::bool(result.is_nil()))
 }
 
 /// `(cl-reduce FN SEQ &optional INITIAL-VALUE)` — reduce/fold.
-pub fn builtin_cl_reduce(
-    eval: &mut super::eval::Evaluator,
-    args: Vec<Value>,
-) -> EvalResult {
+pub fn builtin_cl_reduce(eval: &mut super::eval::Evaluator, args: Vec<Value>) -> EvalResult {
     expect_min_args("cl-reduce", &args, 2)?;
     let func = args[0].clone();
     let elems = collect_sequence(&args[1]);
@@ -526,10 +532,7 @@ pub fn builtin_cl_reduce(
 }
 
 /// `(cl-remove-if PRED SEQ)` — remove elements matching predicate.
-pub fn builtin_cl_remove_if(
-    eval: &mut super::eval::Evaluator,
-    args: Vec<Value>,
-) -> EvalResult {
+pub fn builtin_cl_remove_if(eval: &mut super::eval::Evaluator, args: Vec<Value>) -> EvalResult {
     expect_args("cl-remove-if", &args, 2)?;
     let pred = args[0].clone();
     let elems = collect_sequence(&args[1]);
@@ -544,10 +547,7 @@ pub fn builtin_cl_remove_if(
 }
 
 /// `(cl-remove-if-not PRED SEQ)` — keep only elements matching predicate.
-pub fn builtin_cl_remove_if_not(
-    eval: &mut super::eval::Evaluator,
-    args: Vec<Value>,
-) -> EvalResult {
+pub fn builtin_cl_remove_if_not(eval: &mut super::eval::Evaluator, args: Vec<Value>) -> EvalResult {
     expect_args("cl-remove-if-not", &args, 2)?;
     let pred = args[0].clone();
     let elems = collect_sequence(&args[1]);
@@ -562,10 +562,7 @@ pub fn builtin_cl_remove_if_not(
 }
 
 /// `(cl-find-if PRED SEQ)` — find first element matching predicate.
-pub fn builtin_cl_find_if(
-    eval: &mut super::eval::Evaluator,
-    args: Vec<Value>,
-) -> EvalResult {
+pub fn builtin_cl_find_if(eval: &mut super::eval::Evaluator, args: Vec<Value>) -> EvalResult {
     expect_args("cl-find-if", &args, 2)?;
     let pred = args[0].clone();
     let elems = collect_sequence(&args[1]);
@@ -579,10 +576,7 @@ pub fn builtin_cl_find_if(
 }
 
 /// `(cl-count-if PRED SEQ)` — count elements matching predicate.
-pub fn builtin_cl_count_if(
-    eval: &mut super::eval::Evaluator,
-    args: Vec<Value>,
-) -> EvalResult {
+pub fn builtin_cl_count_if(eval: &mut super::eval::Evaluator, args: Vec<Value>) -> EvalResult {
     expect_args("cl-count-if", &args, 2)?;
     let pred = args[0].clone();
     let elems = collect_sequence(&args[1]);
@@ -597,10 +591,7 @@ pub fn builtin_cl_count_if(
 }
 
 /// `(cl-sort SEQ PRED)` — sort with predicate (not guaranteed stable).
-pub fn builtin_cl_sort(
-    eval: &mut super::eval::Evaluator,
-    args: Vec<Value>,
-) -> EvalResult {
+pub fn builtin_cl_sort(eval: &mut super::eval::Evaluator, args: Vec<Value>) -> EvalResult {
     expect_args("cl-sort", &args, 2)?;
     let pred = args[1].clone();
     let mut items = collect_sequence(&args[0]);
@@ -609,8 +600,7 @@ pub fn builtin_cl_sort(
     for i in 1..items.len() {
         let mut j = i;
         while j > 0 {
-            let result =
-                eval.apply(pred.clone(), vec![items[j].clone(), items[j - 1].clone()])?;
+            let result = eval.apply(pred.clone(), vec![items[j].clone(), items[j - 1].clone()])?;
             if result.is_truthy() {
                 items.swap(j, j - 1);
                 j -= 1;
@@ -623,10 +613,7 @@ pub fn builtin_cl_sort(
 }
 
 /// `(cl-stable-sort SEQ PRED)` — stable sort with predicate.
-pub fn builtin_cl_stable_sort(
-    eval: &mut super::eval::Evaluator,
-    args: Vec<Value>,
-) -> EvalResult {
+pub fn builtin_cl_stable_sort(eval: &mut super::eval::Evaluator, args: Vec<Value>) -> EvalResult {
     // Same as cl-sort since our insertion sort is already stable
     builtin_cl_sort(eval, args)
 }
@@ -809,10 +796,7 @@ pub fn builtin_seq_into(args: Vec<Value>) -> EvalResult {
 // ===========================================================================
 
 /// `(seq-mapn FN &rest SEQS)` — map over multiple sequences.
-pub fn builtin_seq_mapn(
-    eval: &mut super::eval::Evaluator,
-    args: Vec<Value>,
-) -> EvalResult {
+pub fn builtin_seq_mapn(eval: &mut super::eval::Evaluator, args: Vec<Value>) -> EvalResult {
     expect_min_args("seq-mapn", &args, 2)?;
     let func = args[0].clone();
     let seqs: Vec<Vec<Value>> = args[1..].iter().map(|s| collect_sequence(s)).collect();
@@ -829,10 +813,7 @@ pub fn builtin_seq_mapn(
 }
 
 /// `(seq-do FN SEQ)` — apply fn for side effects, return nil.
-pub fn builtin_seq_do(
-    eval: &mut super::eval::Evaluator,
-    args: Vec<Value>,
-) -> EvalResult {
+pub fn builtin_seq_do(eval: &mut super::eval::Evaluator, args: Vec<Value>) -> EvalResult {
     expect_args("seq-do", &args, 2)?;
     let func = args[0].clone();
     let elems = collect_sequence(&args[1]);
@@ -843,10 +824,7 @@ pub fn builtin_seq_do(
 }
 
 /// `(seq-count PRED SEQ)` — count elements matching predicate.
-pub fn builtin_seq_count(
-    eval: &mut super::eval::Evaluator,
-    args: Vec<Value>,
-) -> EvalResult {
+pub fn builtin_seq_count(eval: &mut super::eval::Evaluator, args: Vec<Value>) -> EvalResult {
     expect_args("seq-count", &args, 2)?;
     let pred = args[0].clone();
     let elems = collect_sequence(&args[1]);
@@ -861,10 +839,7 @@ pub fn builtin_seq_count(
 }
 
 /// `(seq-reduce FN SEQ INITIAL)` — reduce with initial value.
-pub fn builtin_seq_reduce(
-    eval: &mut super::eval::Evaluator,
-    args: Vec<Value>,
-) -> EvalResult {
+pub fn builtin_seq_reduce(eval: &mut super::eval::Evaluator, args: Vec<Value>) -> EvalResult {
     expect_args("seq-reduce", &args, 3)?;
     let func = args[0].clone();
     let elems = collect_sequence(&args[1]);
@@ -876,10 +851,7 @@ pub fn builtin_seq_reduce(
 }
 
 /// `(seq-some PRED SEQ)` — some element matches predicate.
-pub fn builtin_seq_some(
-    eval: &mut super::eval::Evaluator,
-    args: Vec<Value>,
-) -> EvalResult {
+pub fn builtin_seq_some(eval: &mut super::eval::Evaluator, args: Vec<Value>) -> EvalResult {
     expect_args("seq-some", &args, 2)?;
     let pred = args[0].clone();
     let elems = collect_sequence(&args[1]);
@@ -893,10 +865,7 @@ pub fn builtin_seq_some(
 }
 
 /// `(seq-every-p PRED SEQ)` — all elements match predicate.
-pub fn builtin_seq_every_p(
-    eval: &mut super::eval::Evaluator,
-    args: Vec<Value>,
-) -> EvalResult {
+pub fn builtin_seq_every_p(eval: &mut super::eval::Evaluator, args: Vec<Value>) -> EvalResult {
     expect_args("seq-every-p", &args, 2)?;
     let pred = args[0].clone();
     let elems = collect_sequence(&args[1]);
@@ -910,10 +879,7 @@ pub fn builtin_seq_every_p(
 }
 
 /// `(seq-sort PRED SEQ)` — sort with predicate.
-pub fn builtin_seq_sort(
-    eval: &mut super::eval::Evaluator,
-    args: Vec<Value>,
-) -> EvalResult {
+pub fn builtin_seq_sort(eval: &mut super::eval::Evaluator, args: Vec<Value>) -> EvalResult {
     expect_args("seq-sort", &args, 2)?;
     let pred = args[0].clone();
     let mut items = collect_sequence(&args[1]);
@@ -922,8 +888,7 @@ pub fn builtin_seq_sort(
     for i in 1..items.len() {
         let mut j = i;
         while j > 0 {
-            let result =
-                eval.apply(pred.clone(), vec![items[j].clone(), items[j - 1].clone()])?;
+            let result = eval.apply(pred.clone(), vec![items[j].clone(), items[j - 1].clone()])?;
             if result.is_truthy() {
                 items.swap(j, j - 1);
                 j -= 1;
@@ -944,7 +909,10 @@ fn json_to_lisp(json: &str) -> EvalResult {
     // Minimal JSON parser without external dependency
     let trimmed = json.trim();
     if trimmed.is_empty() {
-        return Err(signal("json-parse-error", vec![Value::string("Empty JSON input")]));
+        return Err(signal(
+            "json-parse-error",
+            vec![Value::string("Empty JSON input")],
+        ));
     }
     let (val, _rest) = parse_json_value(trimmed)?;
     Ok(val)
@@ -953,7 +921,10 @@ fn json_to_lisp(json: &str) -> EvalResult {
 fn parse_json_value(s: &str) -> Result<(Value, &str), Flow> {
     let s = s.trim_start();
     if s.is_empty() {
-        return Err(signal("json-parse-error", vec![Value::string("Unexpected end of JSON")]));
+        return Err(signal(
+            "json-parse-error",
+            vec![Value::string("Unexpected end of JSON")],
+        ));
     }
     match s.as_bytes()[0] {
         b'"' => parse_json_string(s),
@@ -963,27 +934,39 @@ fn parse_json_value(s: &str) -> Result<(Value, &str), Flow> {
             if s.starts_with("true") {
                 Ok((Value::True, &s[4..]))
             } else {
-                Err(signal("json-parse-error", vec![Value::string("Invalid JSON token")]))
+                Err(signal(
+                    "json-parse-error",
+                    vec![Value::string("Invalid JSON token")],
+                ))
             }
         }
         b'f' => {
             if s.starts_with("false") {
                 Ok((Value::Nil, &s[5..]))
             } else {
-                Err(signal("json-parse-error", vec![Value::string("Invalid JSON token")]))
+                Err(signal(
+                    "json-parse-error",
+                    vec![Value::string("Invalid JSON token")],
+                ))
             }
         }
         b'n' => {
             if s.starts_with("null") {
                 Ok((Value::Keyword("null".to_string()), &s[4..]))
             } else {
-                Err(signal("json-parse-error", vec![Value::string("Invalid JSON token")]))
+                Err(signal(
+                    "json-parse-error",
+                    vec![Value::string("Invalid JSON token")],
+                ))
             }
         }
         b'-' | b'0'..=b'9' => parse_json_number(s),
         _ => Err(signal(
             "json-parse-error",
-            vec![Value::string(format!("Unexpected character: {}", s.chars().next().unwrap_or('?')))],
+            vec![Value::string(format!(
+                "Unexpected character: {}",
+                s.chars().next().unwrap_or('?')
+            ))],
         )),
     }
 }
@@ -996,52 +979,56 @@ fn parse_json_string(s: &str) -> Result<(Value, &str), Flow> {
     loop {
         match chars.next() {
             None => {
-                return Err(signal("json-parse-error", vec![Value::string("Unterminated string")]));
+                return Err(signal(
+                    "json-parse-error",
+                    vec![Value::string("Unterminated string")],
+                ));
             }
             Some((_, '"')) => {
                 let rest_offset = chars.as_str();
                 return Ok((Value::string(result), rest_offset));
             }
-            Some((_, '\\')) => {
-                match chars.next() {
-                    Some((_, '"')) => result.push('"'),
-                    Some((_, '\\')) => result.push('\\'),
-                    Some((_, '/')) => result.push('/'),
-                    Some((_, 'b')) => result.push('\u{0008}'),
-                    Some((_, 'f')) => result.push('\u{000C}'),
-                    Some((_, 'n')) => result.push('\n'),
-                    Some((_, 'r')) => result.push('\r'),
-                    Some((_, 't')) => result.push('\t'),
-                    Some((_, 'u')) => {
-                        let mut hex = String::new();
-                        for _ in 0..4 {
-                            match chars.next() {
-                                Some((_, c)) => hex.push(c),
-                                None => {
-                                    return Err(signal(
-                                        "json-parse-error",
-                                        vec![Value::string("Unterminated unicode escape")],
-                                    ));
-                                }
+            Some((_, '\\')) => match chars.next() {
+                Some((_, '"')) => result.push('"'),
+                Some((_, '\\')) => result.push('\\'),
+                Some((_, '/')) => result.push('/'),
+                Some((_, 'b')) => result.push('\u{0008}'),
+                Some((_, 'f')) => result.push('\u{000C}'),
+                Some((_, 'n')) => result.push('\n'),
+                Some((_, 'r')) => result.push('\r'),
+                Some((_, 't')) => result.push('\t'),
+                Some((_, 'u')) => {
+                    let mut hex = String::new();
+                    for _ in 0..4 {
+                        match chars.next() {
+                            Some((_, c)) => hex.push(c),
+                            None => {
+                                return Err(signal(
+                                    "json-parse-error",
+                                    vec![Value::string("Unterminated unicode escape")],
+                                ));
                             }
                         }
-                        let code = u32::from_str_radix(&hex, 16).map_err(|_| {
-                            signal("json-parse-error", vec![Value::string("Invalid unicode escape")])
-                        })?;
-                        if let Some(c) = char::from_u32(code) {
-                            result.push(c);
-                        } else {
-                            result.push('\u{FFFD}');
-                        }
                     }
-                    _ => {
-                        return Err(signal(
+                    let code = u32::from_str_radix(&hex, 16).map_err(|_| {
+                        signal(
                             "json-parse-error",
-                            vec![Value::string("Invalid escape sequence")],
-                        ));
+                            vec![Value::string("Invalid unicode escape")],
+                        )
+                    })?;
+                    if let Some(c) = char::from_u32(code) {
+                        result.push(c);
+                    } else {
+                        result.push('\u{FFFD}');
                     }
                 }
-            }
+                _ => {
+                    return Err(signal(
+                        "json-parse-error",
+                        vec![Value::string("Invalid escape sequence")],
+                    ));
+                }
+            },
             Some((_, c)) => result.push(c),
         }
     }
@@ -1080,9 +1067,9 @@ fn parse_json_number(s: &str) -> Result<(Value, &str), Flow> {
     let rest = &s[end..];
 
     if is_float {
-        let f: f64 = num_str.parse().map_err(|_| {
-            signal("json-parse-error", vec![Value::string("Invalid number")])
-        })?;
+        let f: f64 = num_str
+            .parse()
+            .map_err(|_| signal("json-parse-error", vec![Value::string("Invalid number")]))?;
         Ok((Value::Float(f), rest))
     } else {
         match num_str.parse::<i64>() {
@@ -1200,7 +1187,9 @@ fn lisp_to_json_str(val: &Value) -> Result<String, Flow> {
             if f.is_nan() || f.is_infinite() {
                 return Err(signal(
                     "json-serialize-error",
-                    vec![Value::string("NaN and Infinity cannot be serialized to JSON")],
+                    vec![Value::string(
+                        "NaN and Infinity cannot be serialized to JSON",
+                    )],
                 ));
             }
             Ok(format!("{}", f))
@@ -1335,10 +1324,7 @@ pub fn builtin_json_parse_buffer(
 }
 
 /// `(json-insert OBJECT &rest ARGS)` — insert JSON into current buffer.
-pub fn builtin_json_insert(
-    eval: &mut super::eval::Evaluator,
-    args: Vec<Value>,
-) -> EvalResult {
+pub fn builtin_json_insert(eval: &mut super::eval::Evaluator, args: Vec<Value>) -> EvalResult {
     expect_min_args("json-insert", &args, 1)?;
     let json_str = lisp_to_json(&args[0])?;
     let s = match &json_str {
@@ -1421,8 +1407,7 @@ mod tests {
     #[test]
     fn cl_substitute_items() {
         let list = Value::list(vec![Value::Int(1), Value::Int(2), Value::Int(3)]);
-        let result =
-            builtin_cl_substitute(vec![Value::Int(99), Value::Int(2), list]).unwrap();
+        let result = builtin_cl_substitute(vec![Value::Int(99), Value::Int(2), list]).unwrap();
         let items = list_to_vec(&result).unwrap();
         assert_eq!(items[1].as_int(), Some(99));
     }
@@ -1500,9 +1485,18 @@ mod tests {
     #[test]
     fn cl_first_through_third() {
         let list = Value::list(vec![Value::Int(10), Value::Int(20), Value::Int(30)]);
-        assert_eq!(builtin_cl_first(vec![list.clone()]).unwrap().as_int(), Some(10));
-        assert_eq!(builtin_cl_second(vec![list.clone()]).unwrap().as_int(), Some(20));
-        assert_eq!(builtin_cl_third(vec![list.clone()]).unwrap().as_int(), Some(30));
+        assert_eq!(
+            builtin_cl_first(vec![list.clone()]).unwrap().as_int(),
+            Some(10)
+        );
+        assert_eq!(
+            builtin_cl_second(vec![list.clone()]).unwrap().as_int(),
+            Some(20)
+        );
+        assert_eq!(
+            builtin_cl_third(vec![list.clone()]).unwrap().as_int(),
+            Some(30)
+        );
         assert!(builtin_cl_fourth(vec![list]).unwrap().is_nil());
     }
 
@@ -1534,8 +1528,7 @@ mod tests {
     fn cl_concatenate_lists() {
         let l1 = Value::list(vec![Value::Int(1), Value::Int(2)]);
         let l2 = Value::list(vec![Value::Int(3), Value::Int(4)]);
-        let result =
-            builtin_cl_concatenate(vec![Value::symbol("list"), l1, l2]).unwrap();
+        let result = builtin_cl_concatenate(vec![Value::symbol("list"), l1, l2]).unwrap();
         let items = list_to_vec(&result).unwrap();
         assert_eq!(items.len(), 4);
     }
@@ -1607,7 +1600,12 @@ mod tests {
 
     #[test]
     fn seq_subseq_test() {
-        let vec = Value::vector(vec![Value::Int(10), Value::Int(20), Value::Int(30), Value::Int(40)]);
+        let vec = Value::vector(vec![
+            Value::Int(10),
+            Value::Int(20),
+            Value::Int(30),
+            Value::Int(40),
+        ]);
         let result = builtin_seq_subseq(vec![vec, Value::Int(1), Value::Int(3)]).unwrap();
         if let Value::Vector(v) = result {
             let v = v.lock().unwrap();
@@ -1623,8 +1621,7 @@ mod tests {
     fn seq_concatenate_test() {
         let l1 = Value::list(vec![Value::Int(1)]);
         let l2 = Value::list(vec![Value::Int(2)]);
-        let result =
-            builtin_seq_concatenate(vec![Value::symbol("list"), l1, l2]).unwrap();
+        let result = builtin_seq_concatenate(vec![Value::symbol("list"), l1, l2]).unwrap();
         let items = list_to_vec(&result).unwrap();
         assert_eq!(items.len(), 2);
     }
@@ -1639,11 +1636,9 @@ mod tests {
             builtin_seq_empty_p(vec![Value::string("")]).unwrap(),
             Value::True
         ));
-        assert!(
-            builtin_seq_empty_p(vec![Value::list(vec![Value::Int(1)])])
-                .unwrap()
-                .is_nil()
-        );
+        assert!(builtin_seq_empty_p(vec![Value::list(vec![Value::Int(1)])])
+            .unwrap()
+            .is_nil());
     }
 
     #[test]
@@ -1653,10 +1648,7 @@ mod tests {
             builtin_seq_min(vec![list.clone()]).unwrap().as_int(),
             Some(1)
         );
-        assert_eq!(
-            builtin_seq_max(vec![list]).unwrap().as_int(),
-            Some(3)
-        );
+        assert_eq!(builtin_seq_max(vec![list]).unwrap().as_int(), Some(3));
     }
 
     #[test]
@@ -1670,50 +1662,43 @@ mod tests {
 
     #[test]
     fn json_parse_number() {
-        let result =
-            builtin_json_parse_string(vec![Value::string("42")]).unwrap();
+        let result = builtin_json_parse_string(vec![Value::string("42")]).unwrap();
         assert_eq!(result.as_int(), Some(42));
     }
 
     #[test]
     fn json_parse_float() {
-        let result =
-            builtin_json_parse_string(vec![Value::string("3.14")]).unwrap();
+        let result = builtin_json_parse_string(vec![Value::string("3.14")]).unwrap();
         assert!(result.is_float());
     }
 
     #[test]
     fn json_parse_string() {
-        let result =
-            builtin_json_parse_string(vec![Value::string("\"hello\"")]).unwrap();
+        let result = builtin_json_parse_string(vec![Value::string("\"hello\"")]).unwrap();
         assert_eq!(result.as_str(), Some("hello"));
     }
 
     #[test]
     fn json_parse_bool_true() {
-        let result =
-            builtin_json_parse_string(vec![Value::string("true")]).unwrap();
+        let result = builtin_json_parse_string(vec![Value::string("true")]).unwrap();
         assert!(matches!(result, Value::True));
     }
 
     #[test]
     fn json_parse_bool_false() {
-        let result =
-            builtin_json_parse_string(vec![Value::string("false")]).unwrap();
+        let result = builtin_json_parse_string(vec![Value::string("false")]).unwrap();
         assert!(result.is_nil());
     }
 
     #[test]
     fn json_parse_null() {
-        let result =
-            builtin_json_parse_string(vec![Value::string("null")]).unwrap();
+        let result = builtin_json_parse_string(vec![Value::string("null")]).unwrap();
         assert!(matches!(result, Value::Keyword(ref k) if k == "null"));
     }
 
     #[test]
     fn json_parse_array() {
-        let result =
-            builtin_json_parse_string(vec![Value::string("[1,2,3]")]).unwrap();
+        let result = builtin_json_parse_string(vec![Value::string("[1,2,3]")]).unwrap();
         if let Value::Vector(v) = result {
             let v = v.lock().unwrap();
             assert_eq!(v.len(), 3);
@@ -1725,10 +1710,9 @@ mod tests {
 
     #[test]
     fn json_parse_object() {
-        let result = builtin_json_parse_string(vec![Value::string(
-            "{\"name\":\"test\",\"value\":42}",
-        )])
-        .unwrap();
+        let result =
+            builtin_json_parse_string(vec![Value::string("{\"name\":\"test\",\"value\":42}")])
+                .unwrap();
         assert!(result.is_hash_table());
         if let Value::HashTable(ht_arc) = &result {
             let ht = ht_arc.lock().unwrap();
@@ -1741,10 +1725,9 @@ mod tests {
 
     #[test]
     fn json_parse_nested() {
-        let result = builtin_json_parse_string(vec![Value::string(
-            "{\"arr\":[1,{\"nested\":true}]}",
-        )])
-        .unwrap();
+        let result =
+            builtin_json_parse_string(vec![Value::string("{\"arr\":[1,{\"nested\":true}]}")])
+                .unwrap();
         assert!(result.is_hash_table());
     }
 
@@ -1756,8 +1739,7 @@ mod tests {
 
     #[test]
     fn json_serialize_string() {
-        let result =
-            builtin_json_serialize(vec![Value::string("hello")]).unwrap();
+        let result = builtin_json_serialize(vec![Value::string("hello")]).unwrap();
         assert_eq!(result.as_str(), Some("\"hello\""));
     }
 
@@ -1796,17 +1778,14 @@ mod tests {
 
     #[test]
     fn json_parse_string_with_escapes() {
-        let result = builtin_json_parse_string(vec![Value::string(
-            "\"hello\\nworld\\t!\"",
-        )])
-        .unwrap();
+        let result =
+            builtin_json_parse_string(vec![Value::string("\"hello\\nworld\\t!\"")]).unwrap();
         assert_eq!(result.as_str(), Some("hello\nworld\t!"));
     }
 
     #[test]
     fn json_parse_empty_array() {
-        let result =
-            builtin_json_parse_string(vec![Value::string("[]")]).unwrap();
+        let result = builtin_json_parse_string(vec![Value::string("[]")]).unwrap();
         if let Value::Vector(v) = result {
             assert!(v.lock().unwrap().is_empty());
         } else {
@@ -1816,8 +1795,7 @@ mod tests {
 
     #[test]
     fn json_parse_empty_object() {
-        let result =
-            builtin_json_parse_string(vec![Value::string("{}")]).unwrap();
+        let result = builtin_json_parse_string(vec![Value::string("{}")]).unwrap();
         assert!(result.is_hash_table());
         if let Value::HashTable(ht_arc) = &result {
             assert!(ht_arc.lock().unwrap().data.is_empty());
@@ -1848,15 +1826,13 @@ mod tests {
 
     #[test]
     fn json_parse_negative_number() {
-        let result =
-            builtin_json_parse_string(vec![Value::string("-42")]).unwrap();
+        let result = builtin_json_parse_string(vec![Value::string("-42")]).unwrap();
         assert_eq!(result.as_int(), Some(-42));
     }
 
     #[test]
     fn json_parse_scientific_notation() {
-        let result =
-            builtin_json_parse_string(vec![Value::string("1.5e2")]).unwrap();
+        let result = builtin_json_parse_string(vec![Value::string("1.5e2")]).unwrap();
         if let Value::Float(f) = result {
             assert!((f - 150.0).abs() < 0.001);
         } else {
@@ -1866,8 +1842,7 @@ mod tests {
 
     #[test]
     fn json_serialize_escape_chars() {
-        let result =
-            builtin_json_serialize(vec![Value::string("line1\nline2\ttab")]).unwrap();
+        let result = builtin_json_serialize(vec![Value::string("line1\nline2\ttab")]).unwrap();
         let s = result.as_str().unwrap();
         assert!(s.contains("\\n"));
         assert!(s.contains("\\t"));
@@ -1880,10 +1855,7 @@ mod tests {
         let mut evaluator = super::super::eval::Evaluator::new();
         // Test cl-every with numberp
         evaluator
-            .eval_forms(
-                &super::super::parser::parse_forms("(defun my-pos (x) (> x 0))")
-                    .unwrap(),
-            );
+            .eval_forms(&super::super::parser::parse_forms("(defun my-pos (x) (> x 0))").unwrap());
         let func = Value::Subr("numberp".to_string());
         let seq = Value::list(vec![Value::Int(1), Value::Int(2), Value::Int(3)]);
         let result = builtin_cl_every(&mut evaluator, vec![func, seq]).unwrap();
@@ -1904,8 +1876,7 @@ mod tests {
         let mut evaluator = super::super::eval::Evaluator::new();
         let func = Value::Subr("+".to_string());
         let seq = Value::list(vec![Value::Int(1), Value::Int(2), Value::Int(3)]);
-        let result =
-            builtin_cl_reduce(&mut evaluator, vec![func, seq, Value::Int(0)]).unwrap();
+        let result = builtin_cl_reduce(&mut evaluator, vec![func, seq, Value::Int(0)]).unwrap();
         assert_eq!(result.as_int(), Some(6));
     }
 
@@ -1914,8 +1885,7 @@ mod tests {
         let mut evaluator = super::super::eval::Evaluator::new();
         let func = Value::Subr("+".to_string());
         let seq = Value::list(vec![Value::Int(10), Value::Int(20)]);
-        let result =
-            builtin_seq_reduce(&mut evaluator, vec![func, seq, Value::Int(0)]).unwrap();
+        let result = builtin_seq_reduce(&mut evaluator, vec![func, seq, Value::Int(0)]).unwrap();
         assert_eq!(result.as_int(), Some(30));
     }
 
@@ -1923,13 +1893,8 @@ mod tests {
     fn seq_count_with_eval() {
         let mut evaluator = super::super::eval::Evaluator::new();
         let func = Value::Subr("numberp".to_string());
-        let seq = Value::list(vec![
-            Value::Int(1),
-            Value::string("a"),
-            Value::Int(2),
-        ]);
-        let result =
-            builtin_seq_count(&mut evaluator, vec![func, seq]).unwrap();
+        let seq = Value::list(vec![Value::Int(1), Value::string("a"), Value::Int(2)]);
+        let result = builtin_seq_count(&mut evaluator, vec![func, seq]).unwrap();
         assert_eq!(result.as_int(), Some(2));
     }
 }
