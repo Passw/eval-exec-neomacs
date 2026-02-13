@@ -99,6 +99,7 @@ pub unsafe extern "C" fn neomacs_primary_selection_set_text(text: *const c_char)
 }
 
 #[cfg(not(target_os = "linux"))]
+#[no_mangle]
 pub unsafe extern "C" fn neomacs_primary_selection_set_text(_text: *const c_char) -> c_int {
     -1
 }
