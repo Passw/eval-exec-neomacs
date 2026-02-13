@@ -500,6 +500,15 @@ fn is_runtime_function_object(value: &Value) -> bool {
     }
 }
 
+fn autoload_type_of(value: &Value) -> Option<super::autoload::AutoloadType> {
+    if !super::autoload::is_autoload_value(value) {
+        return None;
+    }
+    let items = list_to_vec(value)?;
+    let type_value = items.get(4).cloned().unwrap_or(Value::Nil);
+    Some(super::autoload::AutoloadType::from_value(&type_value))
+}
+
 pub(crate) fn builtin_functionp_eval(
     eval: &mut super::eval::Evaluator,
     args: Vec<Value>,
@@ -509,7 +518,11 @@ pub(crate) fn builtin_functionp_eval(
         Value::Lambda(_) | Value::Subr(_) | Value::ByteCode(_) => is_runtime_function_object(&args[0]),
         Value::Symbol(name) => {
             if let Some(function) = eval.obarray().symbol_function(name) {
-                is_runtime_function_object(function)
+                if let Some(autoload_type) = autoload_type_of(function) {
+                    matches!(autoload_type, super::autoload::AutoloadType::Function)
+                } else {
+                    is_runtime_function_object(function)
+                }
             } else if super::subr_info::is_evaluator_macro_name(name) {
                 false
             } else {
@@ -6457,6 +6470,41 @@ mod tests {
         let special_subr = builtin_functionp_eval(&mut eval, vec![Value::Subr("if".to_string())])
             .expect("functionp should reject special-form subr objects");
         assert!(special_subr.is_nil());
+
+        let autoload_function_forms =
+            crate::elisp::parser::parse_forms(r#"(autoload 'vm-test-auto-fn "vm-test-file" nil t)"#)
+                .expect("autoload function form should parse");
+        for form in &autoload_function_forms {
+            eval.eval(form)
+                .expect("autoload function should register");
+        }
+        let autoload_function_symbol =
+            builtin_functionp_eval(&mut eval, vec![Value::symbol("vm-test-auto-fn")])
+                .expect("functionp should recognize autoload function symbol");
+        assert!(autoload_function_symbol.is_truthy());
+        let autoload_function_cell = eval
+            .obarray()
+            .symbol_function("vm-test-auto-fn")
+            .expect("autoload function cell exists")
+            .clone();
+        let autoload_function_cell = builtin_functionp_eval(
+            &mut eval,
+            vec![autoload_function_cell],
+        )
+        .expect("functionp should reject raw autoload function cell object");
+        assert!(autoload_function_cell.is_nil());
+
+        let autoload_macro_forms = crate::elisp::parser::parse_forms(
+            r#"(autoload 'vm-test-auto-macro "vm-test-file" nil nil 'macro)"#,
+        )
+        .expect("autoload macro form should parse");
+        for form in &autoload_macro_forms {
+            eval.eval(form).expect("autoload macro should register");
+        }
+        let autoload_macro_symbol =
+            builtin_functionp_eval(&mut eval, vec![Value::symbol("vm-test-auto-macro")])
+                .expect("functionp should reject autoload macro symbol");
+        assert!(autoload_macro_symbol.is_nil());
     }
 
     #[test]

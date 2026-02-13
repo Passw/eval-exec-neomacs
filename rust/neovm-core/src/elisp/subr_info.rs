@@ -286,6 +286,20 @@ fn is_macro_object(value: &Value) -> bool {
     }
 }
 
+fn autoload_macro_marker(value: &Value) -> Option<Value> {
+    if !super::autoload::is_autoload_value(value) {
+        return None;
+    }
+
+    let items = list_to_vec(value)?;
+    let autoload_type = items.get(4)?;
+    if autoload_type.as_symbol_name() == Some("macro") {
+        Some(Value::list(vec![Value::symbol("macro"), Value::True]))
+    } else {
+        None
+    }
+}
+
 // ---------------------------------------------------------------------------
 // Pure builtins (no evaluator access)
 // ---------------------------------------------------------------------------
@@ -395,6 +409,9 @@ pub(crate) fn builtin_special_form_p(args: Vec<Value>) -> EvalResult {
 /// `(macrop OBJECT)` -- return t if OBJECT is a macro.
 pub(crate) fn builtin_macrop(args: Vec<Value>) -> EvalResult {
     expect_args("macrop", &args, 1)?;
+    if let Some(marker) = autoload_macro_marker(&args[0]) {
+        return Ok(marker);
+    }
     Ok(Value::bool(is_macro_object(&args[0])))
 }
 
@@ -784,6 +801,35 @@ mod tests {
         let marker = Value::cons(Value::symbol("macro"), Value::Int(1));
         let result = builtin_macrop(vec![marker]).unwrap();
         assert!(result.is_truthy());
+    }
+
+    #[test]
+    fn macrop_autoload_macro_returns_macro_marker_list() {
+        let autoload_macro = Value::list(vec![
+            Value::symbol("autoload"),
+            Value::string("dummy-file"),
+            Value::Nil,
+            Value::Nil,
+            Value::symbol("macro"),
+        ]);
+        let result = builtin_macrop(vec![autoload_macro]).unwrap();
+        assert_eq!(
+            result,
+            Value::list(vec![Value::symbol("macro"), Value::True])
+        );
+    }
+
+    #[test]
+    fn macrop_autoload_function_is_nil() {
+        let autoload_function = Value::list(vec![
+            Value::symbol("autoload"),
+            Value::string("dummy-file"),
+            Value::Nil,
+            Value::True,
+            Value::Nil,
+        ]);
+        let result = builtin_macrop(vec![autoload_function]).unwrap();
+        assert!(result.is_nil());
     }
 
     // -- commandp --
