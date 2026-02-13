@@ -10,6 +10,11 @@
 
 #![allow(unused)] // TODO: Remove once implementation is complete
 
+#[cfg(all(feature = "core-backend-emacs-c", feature = "core-backend-rust"))]
+compile_error!(
+    "features `core-backend-emacs-c` and `core-backend-rust` are mutually exclusive"
+);
+
 pub mod core;
 pub mod backend;
 pub mod text;
@@ -29,6 +34,14 @@ pub use crate::text::TextEngine;
 
 /// Library version
 pub const VERSION: &str = env!("CARGO_PKG_VERSION");
+
+/// NeoVM core backend selected at compile time.
+#[cfg(feature = "core-backend-rust")]
+pub const CORE_BACKEND: &str = "rust";
+
+/// NeoVM core backend selected at compile time.
+#[cfg(not(feature = "core-backend-rust"))]
+pub const CORE_BACKEND: &str = "emacs-c";
 
 /// Read GPU power preference from `NEOMACS_GPU` environment variable.
 ///

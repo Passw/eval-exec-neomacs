@@ -1898,6 +1898,23 @@ Returns a string, or nil if the selection is empty or an error occurred.  */)
 }
 
 /* ============================================================================
+ * Core backend query
+ * ============================================================================ */
+
+#ifndef NEOVM_CORE_BACKEND_NAME
+#define NEOVM_CORE_BACKEND_NAME "emacs-c"
+#endif
+
+DEFUN ("neomacs-core-backend", Fneomacs_core_backend,
+       Sneomacs_core_backend, 0, 0, 0,
+       doc: /* Return the compile-time NeoVM core backend.
+The return value is a string: either \"emacs-c\" or \"rust\".  */)
+  (void)
+{
+  return build_string (NEOVM_CORE_BACKEND_NAME);
+}
+
+/* ============================================================================
  * Initialization
  * ============================================================================ */
 
@@ -1953,6 +1970,9 @@ syms_of_neomacsfns (void)
   /* Primary selection functions */
   defsubr (&Sneomacs_primary_selection_set);
   defsubr (&Sneomacs_primary_selection_get);
+
+  /* Core backend query */
+  defsubr (&Sneomacs_core_backend);
 
   /* Tooltip state GC roots */
   staticpro (&tip_timer);

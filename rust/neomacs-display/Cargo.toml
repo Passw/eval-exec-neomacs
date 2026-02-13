@@ -66,6 +66,9 @@ pkg-config = "0.3"
 [features]
 # Default: all features enabled
 default = ["video", "wpe-webkit", "neo-term"]
+# Core backend selection (chosen by configure/Makefile feature flag)
+core-backend-emacs-c = []
+core-backend-rust = []
 tty-backend = []
 # Video with GStreamer
 video = ["gstreamer", "gstreamer-video", "gstreamer-app", "gstreamer-allocators"]

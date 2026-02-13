@@ -333,6 +333,8 @@ NEOMACS_CFLAGS=@NEOMACS_CFLAGS@
 ## Set NEOMACS_DEBUG=1 to build debug version (default is release)
 ## If NEOMACS_PREBUILT=yes, the library is pre-built externally (e.g., nix)
 NEOMACS_PREBUILT = @NEOMACS_PREBUILT@
+NEOVM_CORE_BACKEND = @NEOVM_CORE_BACKEND@
+NEOVM_CORE_BACKEND_CARGO_FEATURE = @NEOVM_CORE_BACKEND_CARGO_FEATURE@
 NEOMACS_RUST_DIR = $(top_srcdir)/rust/neomacs-display
 NEOMACS_RUST_LIB = libneomacs_display.so
 ifdef NEOMACS_DEBUG
@@ -342,6 +344,7 @@ else
 NEOMACS_RUST_PROFILE = release
 NEOMACS_CARGO_FLAGS = --release
 endif
+NEOMACS_CARGO_BACKEND_FLAGS = --features $(NEOVM_CORE_BACKEND_CARGO_FEATURE)
 # WPE WebKit is now a default feature - always enable the cargo feature
 # Note: wpe-webkit is included in the default features in Cargo.toml
 HAVE_WPE_WEBKIT = 1
@@ -733,7 +736,7 @@ $(NEOMACS_RUST_LIB): $(NEOMACS_RUST_TARGET)
 	$(AM_V_GEN)cp -f $< $@
 
 $(NEOMACS_RUST_TARGET): FORCE
-	$(AM_V_at)cd $(NEOMACS_RUST_DIR) && cargo build $(NEOMACS_CARGO_FLAGS)
+	$(AM_V_at)cd $(NEOMACS_RUST_DIR) && cargo build $(NEOMACS_CARGO_FLAGS) $(NEOMACS_CARGO_BACKEND_FLAGS)
 else
 # Pre-built library - no local build needed
 $(NEOMACS_RUST_LIB):
