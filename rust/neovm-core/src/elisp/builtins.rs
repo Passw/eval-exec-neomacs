@@ -3315,6 +3315,22 @@ pub(crate) fn dispatch_builtin(
         "back-to-indentation" => return Some(super::indent::builtin_back_to_indentation(eval, args)),
         "delete-indentation" => return Some(super::indent::builtin_delete_indentation(eval, args)),
 
+        // Rectangle operations (evaluator-dependent)
+        "extract-rectangle-line" => return Some(super::rect::builtin_extract_rectangle_line(eval, args)),
+        "extract-rectangle" => return Some(super::rect::builtin_extract_rectangle(eval, args)),
+        "delete-rectangle" => return Some(super::rect::builtin_delete_rectangle(eval, args)),
+        "kill-rectangle" => return Some(super::rect::builtin_kill_rectangle(eval, args)),
+        "yank-rectangle" => return Some(super::rect::builtin_yank_rectangle(eval, args)),
+        "insert-rectangle" => return Some(super::rect::builtin_insert_rectangle(eval, args)),
+        "open-rectangle" => return Some(super::rect::builtin_open_rectangle(eval, args)),
+        "clear-rectangle" => return Some(super::rect::builtin_clear_rectangle(eval, args)),
+        "string-rectangle" => return Some(super::rect::builtin_string_rectangle(eval, args)),
+        "delete-extract-rectangle" => return Some(super::rect::builtin_delete_extract_rectangle(eval, args)),
+        "replace-rectangle" => return Some(super::rect::builtin_replace_rectangle(eval, args)),
+
+        // Subr introspection (evaluator-dependent)
+        "indirect-function" => return Some(super::subr_info::builtin_indirect_function(eval, args)),
+
         _ => {}
     }
 
@@ -3657,6 +3673,37 @@ pub(crate) fn dispatch_builtin(
         "Snarf-documentation" => super::doc::builtin_snarf_documentation(args),
         "substitute-command-keys" => super::doc::builtin_substitute_command_keys(args),
         "help-function-arglist" => super::doc::builtin_help_function_arglist(args),
+
+        // JSON (pure)
+        "json-serialize" => super::json::builtin_json_serialize(args),
+        "json-parse-string" => super::json::builtin_json_parse_string(args),
+
+        // Subr introspection (pure)
+        "subrp" => super::subr_info::builtin_subrp(args),
+        "subr-name" => super::subr_info::builtin_subr_name(args),
+        "subr-arity" => super::subr_info::builtin_subr_arity(args),
+        "functionp" => super::subr_info::builtin_functionp(args),
+        "byte-code-function-p" => super::subr_info::builtin_byte_code_function_p(args),
+        "closurep" => super::subr_info::builtin_closurep(args),
+        "interpreted-function-p" => super::subr_info::builtin_interpreted_function_p(args),
+        "special-form-p" => super::subr_info::builtin_special_form_p(args),
+        "macrop" => super::subr_info::builtin_macrop(args),
+        "commandp" => super::subr_info::builtin_commandp(args),
+        "func-arity" => super::subr_info::builtin_func_arity(args),
+
+        // Format/string utilities (pure)
+        "format-spec" => super::format::builtin_format_spec(args),
+        "format-time-string" => super::format::builtin_format_time_string(args),
+        "format-seconds" => super::format::builtin_format_seconds(args),
+        "string-pad" => super::format::builtin_string_pad(args),
+        "string-chop-newline" => super::format::builtin_string_chop_newline(args),
+        "string-lines" => super::format::builtin_string_lines(args),
+        "string-clean-whitespace" => super::format::builtin_string_clean_whitespace(args),
+        "string-fill" => super::format::builtin_string_fill(args),
+        "string-limit" => super::format::builtin_string_limit(args),
+        "string-pixel-width" => super::format::builtin_string_pixel_width(args),
+        "string-glyph-split" => super::format::builtin_string_glyph_split(args),
+        "string-equal-ignore-case" => super::format::builtin_string_equal_ignore_case(args),
 
         // Indentation (pure)
         "current-indentation" => super::indent::builtin_current_indentation(args),
