@@ -140,6 +140,25 @@ pub fn file_name_as_directory(filename: &str) -> String {
     }
 }
 
+/// Return directory FILENAME in file-name form (without trailing slash).
+/// Like Emacs `directory-file-name`.
+pub fn directory_file_name(filename: &str) -> String {
+    if filename.is_empty() {
+        return String::new();
+    }
+
+    // Emacs keeps exactly two leading slashes as a distinct root marker.
+    if filename.bytes().all(|b| b == b'/') {
+        return if filename.len() == 2 {
+            "//".to_string()
+        } else {
+            "/".to_string()
+        };
+    }
+
+    filename.trim_end_matches('/').to_string()
+}
+
 // ===========================================================================
 // File predicates (pure)
 // ===========================================================================
@@ -437,6 +456,13 @@ pub(crate) fn builtin_file_name_as_directory(args: Vec<Value>) -> EvalResult {
     expect_args("file-name-as-directory", &args, 1)?;
     let filename = expect_string(&args[0])?;
     Ok(Value::string(file_name_as_directory(&filename)))
+}
+
+/// (directory-file-name FILENAME) -> string
+pub(crate) fn builtin_directory_file_name(args: Vec<Value>) -> EvalResult {
+    expect_args("directory-file-name", &args, 1)?;
+    let filename = expect_string(&args[0])?;
+    Ok(Value::string(directory_file_name(&filename)))
 }
 
 /// (file-exists-p FILENAME) -> t or nil
@@ -825,6 +851,21 @@ mod tests {
         assert_eq!(file_name_as_directory("~/"), "~/");
     }
 
+    #[test]
+    fn test_directory_file_name() {
+        assert_eq!(directory_file_name("/tmp/"), "/tmp");
+        assert_eq!(directory_file_name("/tmp"), "/tmp");
+        assert_eq!(directory_file_name("/"), "/");
+        assert_eq!(directory_file_name("//"), "//");
+        assert_eq!(directory_file_name("///"), "/");
+        assert_eq!(directory_file_name("foo/"), "foo");
+        assert_eq!(directory_file_name("foo"), "foo");
+        assert_eq!(directory_file_name("a//"), "a");
+        assert_eq!(directory_file_name("~/"), "~");
+        assert_eq!(directory_file_name("~"), "~");
+        assert_eq!(directory_file_name(""), "");
+    }
+
     // -----------------------------------------------------------------------
     // File predicates
     // -----------------------------------------------------------------------
@@ -1054,6 +1095,9 @@ mod tests {
 
         let result = builtin_file_name_as_directory(vec![Value::string("/home/user")]);
         assert_eq!(result.unwrap().as_str(), Some("/home/user/"));
+
+        let result = builtin_directory_file_name(vec![Value::string("/home/user/")]);
+        assert_eq!(result.unwrap().as_str(), Some("/home/user"));
     }
 
     #[test]
