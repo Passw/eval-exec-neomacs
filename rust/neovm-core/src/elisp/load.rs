@@ -17,6 +17,14 @@ fn source_suffixed_path(base: &Path) -> PathBuf {
     PathBuf::from(format!("{base_str}.el"))
 }
 
+fn unsupported_compiled_suffixed_paths(base: &Path) -> [PathBuf; 2] {
+    let base_str = base.to_string_lossy();
+    [
+        PathBuf::from(format!("{base_str}.elc")),
+        PathBuf::from(format!("{base_str}.elc.gz")),
+    ]
+}
+
 fn pick_suffixed(base: &Path, _prefer_newer: bool) -> Option<PathBuf> {
     let el = source_suffixed_path(base);
     if el.exists() {
@@ -45,6 +53,14 @@ fn find_for_base(
 
     if !must_suffix && base.exists() {
         return Some(base.to_path_buf());
+    }
+
+    // Surface unsupported compiled artifacts explicitly instead of reporting
+    // generic file-missing when only `.elc` payloads are present.
+    for compiled in unsupported_compiled_suffixed_paths(base) {
+        if compiled.exists() {
+            return Some(compiled);
+        }
     }
 
     None
@@ -198,13 +214,20 @@ fn parse_source_with_cache(
     Ok(forms)
 }
 
+fn is_unsupported_compiled_path(path: &Path) -> bool {
+    let Some(name) = path.file_name().and_then(|s| s.to_str()) else {
+        return false;
+    };
+    name.ends_with(".elc") || name.ends_with(".elc.gz")
+}
+
 /// Load and evaluate a file. Returns the last result.
 pub fn load_file(eval: &mut super::eval::Evaluator, path: &Path) -> Result<Value, EvalError> {
-    if path.extension().and_then(|s| s.to_str()) == Some("elc") {
+    if is_unsupported_compiled_path(path) {
         return Err(EvalError::Signal {
             symbol: "file-error".to_string(),
             data: vec![Value::string(format!(
-                "Loading .elc is unsupported in neomacs. Rebuild from source and load the .el file: {}",
+                "Loading compiled Elisp artifacts (.elc/.elc.gz) is unsupported in neomacs. Rebuild from source and load the .el file: {}",
                 path.display()
             ))],
         });
@@ -488,6 +511,35 @@ mod tests {
     }
 
     #[test]
+    fn load_file_ignores_corrupt_neoc_cache_and_loads_source() {
+        let unique = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .expect("clock before epoch")
+            .as_nanos();
+        let dir = std::env::temp_dir().join(format!("neovm-load-neoc-corrupt-{unique}"));
+        fs::create_dir_all(&dir).expect("create temp fixture dir");
+        let file = dir.join("probe.el");
+        fs::write(&file, "(setq vm-load-corrupt-neoc 'ok)\n").expect("write source fixture");
+        let cache = cache_sidecar_path(&file);
+        fs::write(&cache, "corrupt-neoc-cache").expect("write corrupt cache");
+
+        let mut eval = super::super::eval::Evaluator::new();
+        let loaded = load_file(&mut eval, &file).expect("load should ignore corrupt cache");
+        assert_eq!(loaded, Value::True);
+        assert_eq!(
+            eval.obarray().symbol_value("vm-load-corrupt-neoc").cloned(),
+            Some(Value::symbol("ok"))
+        );
+        let rewritten = fs::read_to_string(&cache).expect("cache should be rewritten");
+        assert!(
+            rewritten.starts_with(ELISP_CACHE_MAGIC),
+            "rewritten cache should have expected header",
+        );
+
+        let _ = fs::remove_dir_all(&dir);
+    }
+
+    #[test]
     fn load_elc_is_explicitly_unsupported() {
         let unique = SystemTime::now()
             .duration_since(UNIX_EPOCH)
@@ -504,8 +556,9 @@ mod tests {
             EvalError::Signal { symbol, data } => {
                 assert_eq!(symbol, "file-error");
                 assert!(
-                    data.iter()
-                        .any(|v| v.as_str().is_some_and(|s| s.contains("unsupported in neomacs"))),
+                    data.iter().any(|v| v
+                        .as_str()
+                        .is_some_and(|s| s.contains("unsupported in neomacs"))),
                     "error should explain .elc policy",
                 );
             }
@@ -539,6 +592,46 @@ mod tests {
             None,
             "rejecting .elc should not implicitly load source sibling",
         );
+
+        let _ = fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn find_file_surfaces_elc_only_artifact_as_explicit_unsupported_load_target() {
+        let unique = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .expect("clock before epoch")
+            .as_nanos();
+        let dir = std::env::temp_dir().join(format!("neovm-load-elc-only-{unique}"));
+        fs::create_dir_all(&dir).expect("create temp fixture dir");
+
+        let compiled = dir.join("module.elc");
+        fs::write(&compiled, "compiled").expect("write compiled fixture");
+
+        let load_path = vec![dir.to_string_lossy().to_string()];
+        let found = find_file_in_load_path_with_flags("module", &load_path, false, false, false);
+        assert_eq!(found, Some(compiled));
+
+        let _ = fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn load_elc_gz_is_explicitly_unsupported() {
+        let unique = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .expect("clock before epoch")
+            .as_nanos();
+        let dir = std::env::temp_dir().join(format!("neovm-load-elc-gz-unsupported-{unique}"));
+        fs::create_dir_all(&dir).expect("create temp fixture dir");
+        let compiled = dir.join("probe.elc.gz");
+        fs::write(&compiled, "compiled-data").expect("write compiled fixture");
+
+        let mut eval = super::super::eval::Evaluator::new();
+        let err = load_file(&mut eval, &compiled).expect_err("load should reject .elc.gz");
+        match err {
+            EvalError::Signal { symbol, .. } => assert_eq!(symbol, "file-error"),
+            other => panic!("unexpected error: {other:?}"),
+        }
 
         let _ = fs::remove_dir_all(&dir);
     }
