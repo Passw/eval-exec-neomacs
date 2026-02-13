@@ -1713,7 +1713,7 @@ pub(crate) fn builtin_fset(eval: &mut super::eval::Evaluator, args: Vec<Value>) 
             vec![Value::symbol("symbolp"), args[0].clone()],
         )
     })?;
-    let def = super::eval::maybe_coerce_compiled_literal_function(args[1].clone());
+    let def = super::compiled_literal::maybe_coerce_compiled_literal_function(args[1].clone());
     eval.obarray_mut().set_symbol_function(name, def.clone());
     Ok(def)
 }

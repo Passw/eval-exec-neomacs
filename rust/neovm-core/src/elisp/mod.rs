@@ -25,6 +25,7 @@ pub mod chartable;
 pub mod cl_extra;
 pub mod cl_lib;
 pub mod coding;
+pub mod compiled_literal;
 pub mod composite;
 pub mod custom;
 pub mod debug;
