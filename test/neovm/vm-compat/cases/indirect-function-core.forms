@@ -1,0 +1,8 @@
+; indirect-function should resolve builtins/special forms and honor noerror semantics.
+(indirect-function 'message)
+(indirect-function 'load)
+(indirect-function 'if)
+(indirect-function 'car)
+(indirect-function 'definitely-not-a-function t)
+(indirect-function 'definitely-not-a-function)
+(indirect-function 42)

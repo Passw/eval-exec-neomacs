@@ -1,0 +1,7 @@
+1	(indirect-function 'message)	OK #<subr message>
+2	(indirect-function 'load)	OK #<subr load>
+3	(indirect-function 'if)	OK #<subr if>
+4	(indirect-function 'car)	OK #<subr car>
+5	(indirect-function 'definitely-not-a-function t)	OK nil
+6	(indirect-function 'definitely-not-a-function)	OK nil
+7	(indirect-function 42)	OK 42

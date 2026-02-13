@@ -1826,13 +1826,26 @@ pub(crate) fn builtin_indirect_function(
     args: Vec<Value>,
 ) -> EvalResult {
     expect_min_args("indirect-function", &args, 1)?;
-    let name = args[0].as_symbol_name().ok_or_else(|| {
-        signal(
-            "wrong-type-argument",
-            vec![Value::symbol("symbolp"), args[0].clone()],
-        )
-    })?;
-    Ok(eval.obarray().indirect_function(name).unwrap_or(Value::Nil))
+    let _noerror = args.get(1).is_some_and(|value| value.is_truthy());
+
+    match &args[0] {
+        Value::Symbol(name) => {
+            if let Some(function) = eval.obarray().indirect_function(name) {
+                return Ok(function);
+            }
+
+            if super::subr_info::is_special_form(name)
+                || super::builtin_registry::is_dispatch_builtin_name(name)
+                || name.parse::<PureBuiltinId>().is_ok()
+            {
+                return Ok(Value::Subr(name.clone()));
+            }
+
+            Ok(Value::Nil)
+        }
+        Value::Nil => Ok(Value::Nil),
+        other => Ok(other.clone()),
+    }
 }
 
 pub(crate) fn builtin_intern_fn(eval: &mut super::eval::Evaluator, args: Vec<Value>) -> EvalResult {
@@ -6334,6 +6347,54 @@ mod tests {
         let typed = builtin_symbol_function(&mut eval, vec![Value::symbol("car")])
             .expect("symbol-function should resolve car");
         assert_eq!(typed, Value::Subr("car".to_string()));
+    }
+
+    #[test]
+    fn indirect_function_resolves_builtin_and_special_names() {
+        let mut eval = crate::elisp::eval::Evaluator::new();
+
+        let message = builtin_indirect_function(&mut eval, vec![Value::symbol("message")])
+            .expect("indirect-function should resolve message");
+        assert_eq!(message, Value::Subr("message".to_string()));
+
+        let load = builtin_indirect_function(&mut eval, vec![Value::symbol("load")])
+            .expect("indirect-function should resolve load");
+        assert_eq!(load, Value::Subr("load".to_string()));
+
+        let if_sf = builtin_indirect_function(&mut eval, vec![Value::symbol("if")])
+            .expect("indirect-function should resolve if");
+        assert_eq!(if_sf, Value::Subr("if".to_string()));
+
+        let typed = builtin_indirect_function(&mut eval, vec![Value::symbol("car")])
+            .expect("indirect-function should resolve car");
+        assert_eq!(typed, Value::Subr("car".to_string()));
+    }
+
+    #[test]
+    fn indirect_function_nil_and_non_symbol_behavior() {
+        let mut eval = crate::elisp::eval::Evaluator::new();
+
+        let noerror = builtin_indirect_function(
+            &mut eval,
+            vec![Value::symbol("definitely-not-a-function"), Value::True],
+        )
+        .expect("indirect-function should return nil when noerror is non-nil");
+        assert!(noerror.is_nil());
+
+        let unresolved = builtin_indirect_function(
+            &mut eval,
+            vec![Value::symbol("definitely-not-a-function")],
+        )
+        .expect("indirect-function should return nil for unresolved function");
+        assert!(unresolved.is_nil());
+
+        let nil_input = builtin_indirect_function(&mut eval, vec![Value::Nil])
+            .expect("indirect-function should return nil for nil input");
+        assert!(nil_input.is_nil());
+
+        let passthrough = builtin_indirect_function(&mut eval, vec![Value::Int(42)])
+            .expect("non-symbol should be returned as-is");
+        assert_eq!(passthrough, Value::Int(42));
     }
 
     #[test]
