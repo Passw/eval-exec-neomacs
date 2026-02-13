@@ -2018,6 +2018,20 @@ pub(crate) fn builtin_load_file(eval: &mut super::eval::Evaluator, args: Vec<Val
     super::load::load_file(eval, path).map_err(eval_error_to_flow)
 }
 
+/// `(neovm-precompile-file FILE)` -> cache path string
+///
+/// NeoVM extension: parse source `.el` and emit internal `.neoc` cache sidecar.
+pub(crate) fn builtin_neovm_precompile_file(
+    _eval: &mut super::eval::Evaluator,
+    args: Vec<Value>,
+) -> EvalResult {
+    expect_args("neovm-precompile-file", &args, 1)?;
+    let file = expect_string(&args[0])?;
+    let path = std::path::Path::new(&file);
+    let cache = super::load::precompile_source_file(path).map_err(eval_error_to_flow)?;
+    Ok(Value::string(cache.to_string_lossy()))
+}
+
 pub(crate) fn builtin_eval(eval: &mut super::eval::Evaluator, args: Vec<Value>) -> EvalResult {
     expect_min_args("eval", &args, 1)?;
     // Convert value back to expr and evaluate
@@ -3687,6 +3701,7 @@ pub(crate) fn dispatch_builtin(
         // Loading
         "load" => return Some(builtin_load(eval, args)),
         "load-file" => return Some(builtin_load_file(eval, args)),
+        "neovm-precompile-file" => return Some(builtin_neovm_precompile_file(eval, args)),
         "eval" => return Some(builtin_eval(eval, args)),
         // Buffer operations
         "get-buffer-create" => return Some(builtin_get_buffer_create(eval, args)),
@@ -6128,5 +6143,67 @@ mod tests {
         .expect("dispatch_builtin should resolve string-equal")
         .expect("dispatch_builtin should evaluate string-equal");
         assert!(result.is_truthy());
+    }
+
+    #[test]
+    fn neovm_precompile_file_builtin_writes_cache_and_returns_path() {
+        use std::fs;
+        use std::time::{SystemTime, UNIX_EPOCH};
+
+        let mut eval = crate::elisp::eval::Evaluator::new();
+        let unique = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .expect("clock before epoch")
+            .as_nanos();
+        let dir = std::env::temp_dir().join(format!("neovm-builtin-precompile-ok-{unique}"));
+        fs::create_dir_all(&dir).expect("create temp dir");
+        let source = dir.join("probe.el");
+        fs::write(
+            &source,
+            ";;; -*- lexical-binding: t; -*-\n(setq vm-builtins-precompile 1)\n",
+        )
+        .expect("write source");
+
+        let result = builtin_neovm_precompile_file(
+            &mut eval,
+            vec![Value::string(source.to_string_lossy())],
+        )
+        .expect("precompile builtin should succeed");
+        let cache_path = result
+            .as_str()
+            .expect("result should be a string path")
+            .to_string();
+        assert!(cache_path.ends_with(".neoc"), "cache path should end with .neoc");
+        assert!(std::path::Path::new(&cache_path).exists(), "cache file should exist");
+
+        let _ = fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn neovm_precompile_file_builtin_rejects_compiled_inputs() {
+        use std::fs;
+        use std::time::{SystemTime, UNIX_EPOCH};
+
+        let mut eval = crate::elisp::eval::Evaluator::new();
+        let unique = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .expect("clock before epoch")
+            .as_nanos();
+        let dir = std::env::temp_dir().join(format!("neovm-builtin-precompile-reject-{unique}"));
+        fs::create_dir_all(&dir).expect("create temp dir");
+        let compiled = dir.join("probe.elc");
+        fs::write(&compiled, "compiled").expect("write compiled artifact");
+
+        let err = builtin_neovm_precompile_file(
+            &mut eval,
+            vec![Value::string(compiled.to_string_lossy())],
+        )
+        .expect_err("precompile builtin should reject .elc");
+        match err {
+            Flow::Signal(sig) => assert_eq!(sig.symbol, "file-error"),
+            other => panic!("unexpected flow: {other:?}"),
+        }
+
+        let _ = fs::remove_dir_all(&dir);
     }
 }
