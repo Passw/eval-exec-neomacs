@@ -98,7 +98,7 @@ fn collect_sequence_strict(val: &Value) -> Result<Vec<Value>, Flow> {
 /// `(cl-remove-if PREDICATE LIST)` — remove elements matching predicate.
 /// Since we can't call a predicate here (no eval), this is a stub that
 /// works with known predicates like 'null.
-pub fn builtin_remove(args: Vec<Value>) -> EvalResult {
+pub(crate) fn builtin_remove(args: Vec<Value>) -> EvalResult {
     expect_args("remove", &args, 2)?;
     let target = &args[0];
     let list_val = &args[1];
@@ -122,7 +122,7 @@ pub fn builtin_remove(args: Vec<Value>) -> EvalResult {
 }
 
 /// `(remq ITEM LIST)` — remove by eq.
-pub fn builtin_remq(args: Vec<Value>) -> EvalResult {
+pub(crate) fn builtin_remq(args: Vec<Value>) -> EvalResult {
     expect_args("remq", &args, 2)?;
     let target = &args[0];
     let list_val = &args[1];
@@ -146,7 +146,7 @@ pub fn builtin_remq(args: Vec<Value>) -> EvalResult {
 }
 
 /// `(flatten-tree TREE)` — flatten nested lists.
-pub fn builtin_flatten_tree(args: Vec<Value>) -> EvalResult {
+pub(crate) fn builtin_flatten_tree(args: Vec<Value>) -> EvalResult {
     expect_args("flatten-tree", &args, 1)?;
     let mut result = Vec::new();
     flatten_value(&args[0], &mut result);
@@ -166,7 +166,7 @@ fn flatten_value(val: &Value, out: &mut Vec<Value>) {
 }
 
 /// `(take N LIST)` — first N elements.
-pub fn builtin_take(args: Vec<Value>) -> EvalResult {
+pub(crate) fn builtin_take(args: Vec<Value>) -> EvalResult {
     expect_args("take", &args, 2)?;
     let n = expect_int(&args[0])? as usize;
     let list = &args[1];
@@ -188,7 +188,7 @@ pub fn builtin_take(args: Vec<Value>) -> EvalResult {
 }
 
 /// `(seq-uniq SEQ)` — remove duplicates (equal).
-pub fn builtin_seq_uniq(args: Vec<Value>) -> EvalResult {
+pub(crate) fn builtin_seq_uniq(args: Vec<Value>) -> EvalResult {
     expect_args("seq-uniq", &args, 1)?;
     let elements = collect_sequence_strict(&args[0])?;
     let mut result = Vec::new();
@@ -204,7 +204,7 @@ pub fn builtin_seq_uniq(args: Vec<Value>) -> EvalResult {
 }
 
 /// `(seq-contains-p SEQ ELT)` — check if sequence contains element.
-pub fn builtin_seq_contains_p(args: Vec<Value>) -> EvalResult {
+pub(crate) fn builtin_seq_contains_p(args: Vec<Value>) -> EvalResult {
     expect_args("seq-contains-p", &args, 2)?;
     let list = &args[0];
     let target = &args[1];
@@ -226,14 +226,14 @@ pub fn builtin_seq_contains_p(args: Vec<Value>) -> EvalResult {
 }
 
 /// `(seq-count PRED SEQ)` — stub: count non-nil elements.
-pub fn builtin_seq_length(args: Vec<Value>) -> EvalResult {
+pub(crate) fn builtin_seq_length(args: Vec<Value>) -> EvalResult {
     expect_args("seq-length", &args, 1)?;
     let elements = collect_sequence_strict(&args[0])?;
     Ok(Value::Int(elements.len() as i64))
 }
 
 /// `(seq-into SEQ TYPE)` — convert sequence to another type.
-pub fn builtin_seq_into(args: Vec<Value>) -> EvalResult {
+pub(crate) fn builtin_seq_into(args: Vec<Value>) -> EvalResult {
     expect_args("seq-into", &args, 2)?;
     let target_type = match &args[1] {
         Value::Symbol(s) => s.as_str(),
@@ -289,21 +289,21 @@ pub fn builtin_seq_into(args: Vec<Value>) -> EvalResult {
 // ---------------------------------------------------------------------------
 
 /// `(string-empty-p STRING)` -> t or nil.
-pub fn builtin_string_empty_p(args: Vec<Value>) -> EvalResult {
+pub(crate) fn builtin_string_empty_p(args: Vec<Value>) -> EvalResult {
     expect_args("string-empty-p", &args, 1)?;
     let s = expect_string(&args[0])?;
     Ok(Value::bool(s.is_empty()))
 }
 
 /// `(string-blank-p STRING)` -> t or nil.
-pub fn builtin_string_blank_p(args: Vec<Value>) -> EvalResult {
+pub(crate) fn builtin_string_blank_p(args: Vec<Value>) -> EvalResult {
     expect_args("string-blank-p", &args, 1)?;
     let s = expect_string(&args[0])?;
     Ok(Value::bool(s.trim().is_empty()))
 }
 
 /// `(string-chop-newline STRING)` -> string without trailing newline.
-pub fn builtin_string_chop_newline(args: Vec<Value>) -> EvalResult {
+pub(crate) fn builtin_string_chop_newline(args: Vec<Value>) -> EvalResult {
     expect_args("string-chop-newline", &args, 1)?;
     let s = expect_string(&args[0])?;
     let trimmed = s.strip_suffix('\n').unwrap_or(&s);
@@ -312,7 +312,7 @@ pub fn builtin_string_chop_newline(args: Vec<Value>) -> EvalResult {
 }
 
 /// `(string-pad STRING LENGTH &optional PADDING FROM-END)`.
-pub fn builtin_string_pad(args: Vec<Value>) -> EvalResult {
+pub(crate) fn builtin_string_pad(args: Vec<Value>) -> EvalResult {
     expect_min_args("string-pad", &args, 2)?;
     let s = expect_string(&args[0])?;
     let length = expect_int(&args[1])? as usize;
@@ -341,7 +341,7 @@ pub fn builtin_string_pad(args: Vec<Value>) -> EvalResult {
 }
 
 /// `(string-repeat STRING COUNT)`.
-pub fn builtin_string_repeat(args: Vec<Value>) -> EvalResult {
+pub(crate) fn builtin_string_repeat(args: Vec<Value>) -> EvalResult {
     expect_args("string-repeat", &args, 2)?;
     let s = expect_string(&args[0])?;
     let count = expect_int(&args[1])? as usize;
@@ -349,7 +349,7 @@ pub fn builtin_string_repeat(args: Vec<Value>) -> EvalResult {
 }
 
 /// `(string-replace FROM TO IN)` — replace all occurrences.
-pub fn builtin_string_replace(args: Vec<Value>) -> EvalResult {
+pub(crate) fn builtin_string_replace(args: Vec<Value>) -> EvalResult {
     expect_args("string-replace", &args, 3)?;
     let from = expect_string(&args[0])?;
     let to = expect_string(&args[1])?;
@@ -358,7 +358,7 @@ pub fn builtin_string_replace(args: Vec<Value>) -> EvalResult {
 }
 
 /// `(string-search NEEDLE HAYSTACK &optional START)`.
-pub fn builtin_string_search(args: Vec<Value>) -> EvalResult {
+pub(crate) fn builtin_string_search(args: Vec<Value>) -> EvalResult {
     expect_min_args("string-search", &args, 2)?;
     let needle = expect_string(&args[0])?;
     let haystack = expect_string(&args[1])?;
@@ -376,7 +376,7 @@ pub fn builtin_string_search(args: Vec<Value>) -> EvalResult {
 }
 
 /// `(string-to-vector STRING)` — convert string to vector of chars.
-pub fn builtin_string_to_vector(args: Vec<Value>) -> EvalResult {
+pub(crate) fn builtin_string_to_vector(args: Vec<Value>) -> EvalResult {
     expect_args("string-to-vector", &args, 1)?;
     let s = expect_string(&args[0])?;
     let chars: Vec<Value> = s.chars().map(Value::Char).collect();
@@ -384,7 +384,7 @@ pub fn builtin_string_to_vector(args: Vec<Value>) -> EvalResult {
 }
 
 /// `(vconcat &rest SEQUENCES)` — concatenate into a vector.
-pub fn builtin_vconcat(args: Vec<Value>) -> EvalResult {
+pub(crate) fn builtin_vconcat(args: Vec<Value>) -> EvalResult {
     let mut result = Vec::new();
     for arg in &args {
         match arg {
@@ -411,7 +411,7 @@ pub fn builtin_vconcat(args: Vec<Value>) -> EvalResult {
 
 /// `(default-value SYMBOL)` — get the default value of a variable.
 /// Stub: same as symbol-value for now.
-pub fn builtin_default_value(args: Vec<Value>) -> EvalResult {
+pub(crate) fn builtin_default_value(args: Vec<Value>) -> EvalResult {
     expect_args("default-value", &args, 1)?;
     // In a full implementation, this returns the non-buffer-local default.
     // For now, just return nil.
@@ -421,28 +421,28 @@ pub fn builtin_default_value(args: Vec<Value>) -> EvalResult {
 
 /// `(set-default SYMBOL VALUE)` — set the default value.
 /// Stub.
-pub fn builtin_set_default(args: Vec<Value>) -> EvalResult {
+pub(crate) fn builtin_set_default(args: Vec<Value>) -> EvalResult {
     expect_args("set-default", &args, 2)?;
     Ok(args[1].clone())
 }
 
 /// `(local-variable-p VARIABLE &optional BUFFER)` -> t or nil.
 /// Stub: always nil for now.
-pub fn builtin_local_variable_p(args: Vec<Value>) -> EvalResult {
+pub(crate) fn builtin_local_variable_p(args: Vec<Value>) -> EvalResult {
     expect_min_args("local-variable-p", &args, 1)?;
     Ok(Value::Nil)
 }
 
 /// `(make-local-variable VARIABLE)` — make variable buffer-local.
 /// Stub.
-pub fn builtin_make_local_variable(args: Vec<Value>) -> EvalResult {
+pub(crate) fn builtin_make_local_variable(args: Vec<Value>) -> EvalResult {
     expect_args("make-local-variable", &args, 1)?;
     Ok(args[0].clone())
 }
 
 /// `(kill-local-variable VARIABLE)` — remove buffer-local binding.
 /// Stub.
-pub fn builtin_kill_local_variable(args: Vec<Value>) -> EvalResult {
+pub(crate) fn builtin_kill_local_variable(args: Vec<Value>) -> EvalResult {
     expect_args("kill-local-variable", &args, 1)?;
     Ok(args[0].clone())
 }
@@ -455,7 +455,7 @@ pub fn builtin_kill_local_variable(args: Vec<Value>) -> EvalResult {
 /// `(format "%x" N)` etc.
 
 /// `(string-to-number STRING &optional BASE)` — with base support.
-pub fn builtin_string_to_number_ext(args: Vec<Value>) -> EvalResult {
+pub(crate) fn builtin_string_to_number_ext(args: Vec<Value>) -> EvalResult {
     expect_min_args("string-to-number", &args, 1)?;
     let s = expect_string(&args[0])?;
     let base = if args.len() > 1 {
@@ -487,7 +487,7 @@ pub fn builtin_string_to_number_ext(args: Vec<Value>) -> EvalResult {
 }
 
 /// `(random &optional LIMIT)` — random number.
-pub fn builtin_random_ext(args: Vec<Value>) -> EvalResult {
+pub(crate) fn builtin_random_ext(args: Vec<Value>) -> EvalResult {
     let limit = if args.is_empty() {
         i64::MAX
     } else {
@@ -519,37 +519,37 @@ pub fn builtin_random_ext(args: Vec<Value>) -> EvalResult {
 // ---------------------------------------------------------------------------
 
 /// `(proper-list-p OBJ)` -> t if OBJ is a proper list.
-pub fn builtin_proper_list_p(args: Vec<Value>) -> EvalResult {
+pub(crate) fn builtin_proper_list_p(args: Vec<Value>) -> EvalResult {
     expect_args("proper-list-p", &args, 1)?;
     Ok(Value::bool(super::value::list_to_vec(&args[0]).is_some()))
 }
 
 /// `(bool-vector-p OBJ)` -> nil (not implemented).
-pub fn builtin_bool_vector_p(args: Vec<Value>) -> EvalResult {
+pub(crate) fn builtin_bool_vector_p(args: Vec<Value>) -> EvalResult {
     expect_args("bool-vector-p", &args, 1)?;
     Ok(Value::Nil)
 }
 
 /// `(subrp OBJ)` -> t if OBJ is a built-in function.
-pub fn builtin_subrp(args: Vec<Value>) -> EvalResult {
+pub(crate) fn builtin_subrp(args: Vec<Value>) -> EvalResult {
     expect_args("subrp", &args, 1)?;
     Ok(Value::bool(matches!(&args[0], Value::Subr(_))))
 }
 
 /// `(byte-code-function-p OBJ)` -> t if compiled.
-pub fn builtin_byte_code_function_p(args: Vec<Value>) -> EvalResult {
+pub(crate) fn builtin_byte_code_function_p(args: Vec<Value>) -> EvalResult {
     expect_args("byte-code-function-p", &args, 1)?;
     Ok(Value::bool(matches!(&args[0], Value::ByteCode(_))))
 }
 
 /// `(compiled-function-p OBJ)` -> t if compiled function.
-pub fn builtin_compiled_function_p(args: Vec<Value>) -> EvalResult {
+pub(crate) fn builtin_compiled_function_p(args: Vec<Value>) -> EvalResult {
     expect_args("compiled-function-p", &args, 1)?;
     Ok(Value::bool(matches!(&args[0], Value::ByteCode(_))))
 }
 
 /// `(closurep OBJ)` -> t if closure.
-pub fn builtin_closurep(args: Vec<Value>) -> EvalResult {
+pub(crate) fn builtin_closurep(args: Vec<Value>) -> EvalResult {
     expect_args("closurep", &args, 1)?;
     let is_closure = match &args[0] {
         Value::Lambda(l) => l.env.is_some(),
@@ -560,19 +560,19 @@ pub fn builtin_closurep(args: Vec<Value>) -> EvalResult {
 
 /// `(commandp OBJ)` -> t if OBJ can be used as a command.
 /// Stub: anything callable is a command.
-pub fn builtin_commandp(args: Vec<Value>) -> EvalResult {
+pub(crate) fn builtin_commandp(args: Vec<Value>) -> EvalResult {
     expect_args("commandp", &args, 1)?;
     Ok(Value::bool(args[0].is_function()))
 }
 
 /// `(nlistp OBJ)` -> t if not a list.
-pub fn builtin_nlistp(args: Vec<Value>) -> EvalResult {
+pub(crate) fn builtin_nlistp(args: Vec<Value>) -> EvalResult {
     expect_args("nlistp", &args, 1)?;
     Ok(Value::bool(!args[0].is_list()))
 }
 
 /// `(natnump OBJ)` -> t if natural number (>= 0).
-pub fn builtin_natnump(args: Vec<Value>) -> EvalResult {
+pub(crate) fn builtin_natnump(args: Vec<Value>) -> EvalResult {
     expect_args("natnump", &args, 1)?;
     let is_nat = match &args[0] {
         Value::Int(n) => *n >= 0,
@@ -582,19 +582,19 @@ pub fn builtin_natnump(args: Vec<Value>) -> EvalResult {
 }
 
 /// `(fixnump OBJ)` -> t if fixnum.
-pub fn builtin_fixnump(args: Vec<Value>) -> EvalResult {
+pub(crate) fn builtin_fixnump(args: Vec<Value>) -> EvalResult {
     expect_args("fixnump", &args, 1)?;
     Ok(Value::bool(matches!(&args[0], Value::Int(_))))
 }
 
 /// `(bignump OBJ)` -> nil (we don't have bignums).
-pub fn builtin_bignump(args: Vec<Value>) -> EvalResult {
+pub(crate) fn builtin_bignump(args: Vec<Value>) -> EvalResult {
     expect_args("bignump", &args, 1)?;
     Ok(Value::Nil)
 }
 
 /// `(wholenump OBJ)` -> t if whole number.
-pub fn builtin_wholenump(args: Vec<Value>) -> EvalResult {
+pub(crate) fn builtin_wholenump(args: Vec<Value>) -> EvalResult {
     expect_args("wholenump", &args, 1)?;
     let is_whole = match &args[0] {
         Value::Int(n) => *n >= 0,
@@ -604,7 +604,7 @@ pub fn builtin_wholenump(args: Vec<Value>) -> EvalResult {
 }
 
 /// `(zerop OBJ)` -> t if zero.
-pub fn builtin_zerop(args: Vec<Value>) -> EvalResult {
+pub(crate) fn builtin_zerop(args: Vec<Value>) -> EvalResult {
     expect_args("zerop", &args, 1)?;
     let is_zero = match &args[0] {
         Value::Int(0) => true,
@@ -615,28 +615,28 @@ pub fn builtin_zerop(args: Vec<Value>) -> EvalResult {
 }
 
 /// `(cl-oddp N)` -> t if odd.
-pub fn builtin_cl_oddp(args: Vec<Value>) -> EvalResult {
+pub(crate) fn builtin_cl_oddp(args: Vec<Value>) -> EvalResult {
     expect_args("cl-oddp", &args, 1)?;
     let n = expect_int(&args[0])?;
     Ok(Value::bool(n % 2 != 0))
 }
 
 /// `(cl-evenp N)` -> t if even.
-pub fn builtin_cl_evenp(args: Vec<Value>) -> EvalResult {
+pub(crate) fn builtin_cl_evenp(args: Vec<Value>) -> EvalResult {
     expect_args("cl-evenp", &args, 1)?;
     let n = expect_int(&args[0])?;
     Ok(Value::bool(n % 2 == 0))
 }
 
 /// `(cl-plusp N)` -> t if positive.
-pub fn builtin_cl_plusp(args: Vec<Value>) -> EvalResult {
+pub(crate) fn builtin_cl_plusp(args: Vec<Value>) -> EvalResult {
     expect_args("cl-plusp", &args, 1)?;
     let n = expect_int(&args[0])?;
     Ok(Value::bool(n > 0))
 }
 
 /// `(cl-minusp N)` -> t if negative.
-pub fn builtin_cl_minusp(args: Vec<Value>) -> EvalResult {
+pub(crate) fn builtin_cl_minusp(args: Vec<Value>) -> EvalResult {
     expect_args("cl-minusp", &args, 1)?;
     let n = expect_int(&args[0])?;
     Ok(Value::bool(n < 0))
@@ -647,7 +647,7 @@ pub fn builtin_cl_minusp(args: Vec<Value>) -> EvalResult {
 // ---------------------------------------------------------------------------
 
 /// `(user-login-name)` -> string.
-pub fn builtin_user_login_name(args: Vec<Value>) -> EvalResult {
+pub(crate) fn builtin_user_login_name(args: Vec<Value>) -> EvalResult {
     let _ = args;
     let name = std::env::var("USER")
         .or_else(|_| std::env::var("LOGNAME"))
@@ -656,12 +656,12 @@ pub fn builtin_user_login_name(args: Vec<Value>) -> EvalResult {
 }
 
 /// `(user-real-login-name)` -> string.
-pub fn builtin_user_real_login_name(args: Vec<Value>) -> EvalResult {
+pub(crate) fn builtin_user_real_login_name(args: Vec<Value>) -> EvalResult {
     builtin_user_login_name(args)
 }
 
 /// `(user-full-name)` -> string.
-pub fn builtin_user_full_name(args: Vec<Value>) -> EvalResult {
+pub(crate) fn builtin_user_full_name(args: Vec<Value>) -> EvalResult {
     let _ = args;
     let name = std::env::var("NAME")
         .unwrap_or_else(|_| std::env::var("USER").unwrap_or_else(|_| "Unknown".to_string()));
@@ -669,38 +669,38 @@ pub fn builtin_user_full_name(args: Vec<Value>) -> EvalResult {
 }
 
 /// `(system-name)` -> string.
-pub fn builtin_system_name(args: Vec<Value>) -> EvalResult {
+pub(crate) fn builtin_system_name(args: Vec<Value>) -> EvalResult {
     let _ = args;
     let name = std::env::var("HOSTNAME").unwrap_or_else(|_| "localhost".to_string());
     Ok(Value::string(name))
 }
 
 /// `(emacs-version)` -> string.
-pub fn builtin_emacs_version(args: Vec<Value>) -> EvalResult {
+pub(crate) fn builtin_emacs_version(args: Vec<Value>) -> EvalResult {
     let _ = args;
     Ok(Value::string("NeoVM 0.1.0 (Neomacs)"))
 }
 
 /// `(emacs-pid)` -> integer.
-pub fn builtin_emacs_pid(args: Vec<Value>) -> EvalResult {
+pub(crate) fn builtin_emacs_pid(args: Vec<Value>) -> EvalResult {
     let _ = args;
     Ok(Value::Int(std::process::id() as i64))
 }
 
 /// `(garbage-collect)` -> nil (stub).
-pub fn builtin_garbage_collect(args: Vec<Value>) -> EvalResult {
+pub(crate) fn builtin_garbage_collect(args: Vec<Value>) -> EvalResult {
     let _ = args;
     Ok(Value::Nil)
 }
 
 /// `(memory-use-counts)` -> list of integers (stub).
-pub fn builtin_memory_use_counts(args: Vec<Value>) -> EvalResult {
+pub(crate) fn builtin_memory_use_counts(args: Vec<Value>) -> EvalResult {
     let _ = args;
     Ok(Value::list(vec![Value::Int(0); 7]))
 }
 
 /// `(cl-gensym &optional PREFIX)` — generate unique symbol.
-pub fn builtin_cl_gensym(args: Vec<Value>) -> EvalResult {
+pub(crate) fn builtin_cl_gensym(args: Vec<Value>) -> EvalResult {
     let prefix = if args.is_empty() {
         "G"
     } else {
@@ -715,14 +715,14 @@ pub fn builtin_cl_gensym(args: Vec<Value>) -> EvalResult {
 }
 
 /// `(make-symbol NAME)` — create uninterned symbol.
-pub fn builtin_make_symbol_extra(args: Vec<Value>) -> EvalResult {
+pub(crate) fn builtin_make_symbol_extra(args: Vec<Value>) -> EvalResult {
     expect_args("make-symbol", &args, 1)?;
     let name = expect_string(&args[0])?;
     Ok(Value::symbol(name))
 }
 
 /// `(symbol-name SYM)` — already exists but let's provide compat.
-pub fn builtin_symbol_name(args: Vec<Value>) -> EvalResult {
+pub(crate) fn builtin_symbol_name(args: Vec<Value>) -> EvalResult {
     expect_args("symbol-name", &args, 1)?;
     match &args[0] {
         Value::Symbol(s) => Ok(Value::string(s.clone())),
