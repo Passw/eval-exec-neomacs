@@ -189,6 +189,100 @@ pub fn directory_name_p(name: &str) -> bool {
     name.ends_with('/')
 }
 
+fn env_name_char(b: u8) -> bool {
+    b.is_ascii_alphanumeric() || b == b'_'
+}
+
+fn trim_embedded_absfilename(path: String) -> String {
+    let mut current = path;
+    loop {
+        let bytes = current.as_bytes();
+        let mut cut_at = None;
+        let mut i = 1usize;
+        while i < bytes.len() {
+            if bytes[i - 1] == b'/' && (bytes[i] == b'/' || bytes[i] == b'~') {
+                cut_at = Some(i);
+                break;
+            }
+            i += 1;
+        }
+        if let Some(idx) = cut_at {
+            current = current[idx..].to_string();
+        } else {
+            return current;
+        }
+    }
+}
+
+/// Substitute environment variables in FILENAME.
+/// Mirrors Emacs `substitute-in-file-name` behavior for local path forms.
+pub fn substitute_in_file_name(filename: &str) -> String {
+    let bytes = filename.as_bytes();
+    let mut out = String::with_capacity(filename.len());
+    let mut i = 0usize;
+
+    while i < bytes.len() {
+        if bytes[i] != b'$' {
+            // Safe because i is always at a valid UTF-8 boundary.
+            let ch = filename[i..]
+                .chars()
+                .next()
+                .expect("index points at valid char boundary");
+            out.push(ch);
+            i += ch.len_utf8();
+            continue;
+        }
+
+        if i + 1 >= bytes.len() {
+            out.push('$');
+            i += 1;
+            continue;
+        }
+
+        match bytes[i + 1] {
+            b'$' => {
+                out.push('$');
+                i += 2;
+            }
+            b'{' => {
+                if let Some(rel_end) = bytes[i + 2..].iter().position(|&b| b == b'}') {
+                    let end = i + 2 + rel_end;
+                    let var = &filename[i + 2..end];
+                    if let Ok(value) = std::env::var(var) {
+                        out.push_str(&value);
+                    } else {
+                        out.push_str(&filename[i..=end]);
+                    }
+                    i = end + 1;
+                } else {
+                    // Unclosed ${... keeps '$' literal; rest passes through.
+                    out.push('$');
+                    i += 1;
+                }
+            }
+            next if env_name_char(next) => {
+                let mut end = i + 1;
+                while end < bytes.len() && env_name_char(bytes[end]) {
+                    end += 1;
+                }
+                let var = &filename[i + 1..end];
+                if let Ok(value) = std::env::var(var) {
+                    out.push_str(&value);
+                } else {
+                    out.push_str(&filename[i..end]);
+                }
+                i = end;
+            }
+            _ => {
+                out.push('$');
+                i += 1;
+            }
+        }
+    }
+
+    trim_embedded_absfilename(out)
+}
+
 // ===========================================================================
 // File predicates (pure)
 // ===========================================================================
@@ -543,6 +637,13 @@ pub(crate) fn builtin_directory_name_p(args: Vec<Value>) -> EvalResult {
     expect_args("directory-name-p", &args, 1)?;
     let name = expect_string_strict(&args[0])?;
     Ok(Value::bool(directory_name_p(&name)))
+}
+
+/// (substitute-in-file-name FILENAME) -> string
+pub(crate) fn builtin_substitute_in_file_name(args: Vec<Value>) -> EvalResult {
+    expect_args("substitute-in-file-name", &args, 1)?;
+    let filename = expect_string_strict(&args[0])?;
+    Ok(Value::string(substitute_in_file_name(&filename)))
 }
 
 /// (file-exists-p FILENAME) -> t or nil
@@ -980,6 +1081,32 @@ mod tests {
         assert!(!directory_name_p(""));
     }
 
+    #[test]
+    fn test_substitute_in_file_name() {
+        let home = std::env::var("HOME").unwrap_or_default();
+
+        assert_eq!(
+            substitute_in_file_name("$HOME/foo"),
+            format!("{home}/foo")
+        );
+        assert_eq!(
+            substitute_in_file_name("${HOME}/foo"),
+            format!("{home}/foo")
+        );
+        assert_eq!(substitute_in_file_name("$UNDEF/foo"), "$UNDEF/foo");
+        assert_eq!(substitute_in_file_name("$$HOME"), "$HOME");
+        assert_eq!(substitute_in_file_name("${}"), "${}");
+        assert_eq!(substitute_in_file_name("$"), "$");
+        assert_eq!(substitute_in_file_name("${HOME"), "${HOME");
+        assert_eq!(substitute_in_file_name("bar/~/foo"), "~/foo");
+        assert_eq!(
+            substitute_in_file_name("/usr/local/$HOME/foo"),
+            format!("{home}/foo")
+        );
+        assert_eq!(substitute_in_file_name("a//b"), "/b");
+        assert_eq!(substitute_in_file_name("a///b"), "/b");
+    }
+
     // -----------------------------------------------------------------------
     // File predicates
     // -----------------------------------------------------------------------
@@ -1252,6 +1379,19 @@ mod tests {
         assert!(result.is_err());
 
         let result = builtin_directory_name_p(vec![Value::Nil]);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_builtin_substitute_in_file_name() {
+        let home = std::env::var("HOME").unwrap_or_default();
+        let result = builtin_substitute_in_file_name(vec![Value::string("$HOME/foo")]).unwrap();
+        assert_eq!(result.as_str(), Some(format!("{home}/foo").as_str()));
+    }
+
+    #[test]
+    fn test_builtin_substitute_in_file_name_strict_type() {
+        let result = builtin_substitute_in_file_name(vec![Value::symbol("foo")]);
         assert!(result.is_err());
     }
 
