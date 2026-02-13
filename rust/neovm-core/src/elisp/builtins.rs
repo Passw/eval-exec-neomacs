@@ -4538,3 +4538,37 @@ pub(crate) fn builtin_replace_match(
         Err(msg) => Err(signal("error", vec![Value::string(msg)])),
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn pure_dispatch_typed_add_still_works() {
+        let result = dispatch_builtin_pure("+", vec![Value::Int(2), Value::Int(3)])
+            .expect("builtin + should resolve")
+            .expect("builtin + should evaluate");
+        assert_eq!(result, Value::Int(5));
+    }
+
+    #[test]
+    fn pure_dispatch_typed_mod_aliases_match() {
+        let percent = dispatch_builtin_pure("%", vec![Value::Int(11), Value::Int(4)])
+            .expect("builtin % should resolve")
+            .expect("builtin % should evaluate");
+        let mod_name = dispatch_builtin_pure("mod", vec![Value::Int(11), Value::Int(4)])
+            .expect("builtin mod should resolve")
+            .expect("builtin mod should evaluate");
+        assert_eq!(percent, Value::Int(3));
+        assert_eq!(mod_name, Value::Int(3));
+    }
+
+    #[test]
+    fn pure_dispatch_typed_eq_returns_truthy_for_same_symbol() {
+        let sym = Value::symbol("typed-dispatch-test");
+        let result = dispatch_builtin_pure("eq", vec![sym.clone(), sym])
+            .expect("builtin eq should resolve")
+            .expect("builtin eq should evaluate");
+        assert!(result.is_truthy());
+    }
+}
