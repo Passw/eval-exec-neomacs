@@ -75,3 +75,7 @@
 (funcall (car (read-from-string "#[(x) \"\\301\\10\\41\\207\" [x reverse] 2]")) '(1 2 3))
 (funcall (car (read-from-string "#[(x y) \"\\302\\10\\11\\42\\207\" [x y append] 3]")) '(1) '(2))
 (funcall (car (read-from-string "#[(x y z) \"\\303\\10\\11\\12\\43\\207\" [x y z append] 4]")) '(1) '(2) '(3))
+(funcall (car (read-from-string "#[(x y) \"\\302\\10\\11\\42\\207\" [x y logand] 3]")) 6 3)
+(funcall (car (read-from-string "#[(x) \"\\301\\10\\41\\207\" [x floor] 2]")) 3.7)
+(funcall (car (read-from-string "#[(x y) \"\\302\\10\\11\\42\\207\" [x y vector] 3]")) 1 2)
+(funcall (car (read-from-string "#[(x y) \"\\302\\10\\11\\42\\207\" [x y assoc] 3]")) 'b '((a . 1) (b . 2)))
