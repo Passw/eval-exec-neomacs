@@ -5702,9 +5702,6 @@ pub(crate) fn dispatch_builtin(
         "indent-rigidly" => return Some(super::kill_ring::builtin_indent_rigidly(eval, args)),
 
         // Rectangle operations (evaluator-dependent — buffer access)
-        "extract-rectangle-line" => {
-            return Some(super::rect::builtin_extract_rectangle_line(eval, args))
-        }
         "extract-rectangle" => return Some(super::rect::builtin_extract_rectangle(eval, args)),
         "delete-rectangle" => return Some(super::rect::builtin_delete_rectangle(eval, args)),
         "kill-rectangle" => return Some(super::rect::builtin_kill_rectangle(eval, args)),
@@ -5849,7 +5846,6 @@ pub(crate) fn dispatch_builtin(
                 eval, args,
             ))
         }
-        "word-at-point" => return Some(super::interactive::builtin_word_at_point(eval, args)),
         "symbol-at-point" => return Some(super::interactive::builtin_symbol_at_point(eval, args)),
 
         // Error hierarchy (evaluator-dependent — reads obarray)
@@ -6002,12 +5998,6 @@ pub(crate) fn dispatch_builtin(
         }
         "coding-system-change-text-conversion" => {
             return Some(super::coding::builtin_coding_system_change_text_conversion(
-                &eval.coding_systems,
-                args,
-            ))
-        }
-        "find-coding-system" => {
-            return Some(super::coding::builtin_find_coding_system(
                 &eval.coding_systems,
                 args,
             ))
@@ -6268,9 +6258,6 @@ pub(crate) fn dispatch_builtin(
         "timerp" => super::timer::builtin_timerp(args),
         "sit-for" => super::timer::builtin_sit_for(args),
 
-        // Register (pure — no evaluator needed)
-        "register-to-string" => super::register::builtin_register_to_string(args),
-
         // Undo system (pure — no evaluator needed)
         "undo-boundary" => super::undo::builtin_undo_boundary(args),
         "primitive-undo" => super::undo::builtin_primitive_undo(args),
@@ -6284,7 +6271,6 @@ pub(crate) fn dispatch_builtin(
         "set-case-table" => super::casetab::builtin_set_case_table(args),
         "set-standard-case-table" => super::casetab::builtin_set_standard_case_table(args),
         "upcase-char" => super::casetab::builtin_upcase_char(args),
-        "downcase-char" => super::casetab::builtin_downcase_char(args),
 
         // Category (pure)
         "define-category" => super::category::builtin_define_category(args),
@@ -6318,7 +6304,6 @@ pub(crate) fn dispatch_builtin(
         "terminal-name" => super::display::builtin_terminal_name(args),
         "terminal-list" => super::display::builtin_terminal_list(args),
         "frame-terminal" => super::display::builtin_frame_terminal(args),
-        "selected-terminal" => super::display::builtin_selected_terminal(args),
         "terminal-live-p" => super::display::builtin_terminal_live_p(args),
         "terminal-parameter" => super::display::builtin_terminal_parameter(args),
         "set-terminal-parameter" => super::display::builtin_set_terminal_parameter(args),
@@ -6350,7 +6335,6 @@ pub(crate) fn dispatch_builtin(
         "char-width" => crate::encoding::builtin_char_width(args),
         "string-bytes" => crate::encoding::builtin_string_bytes(args),
         "multibyte-string-p" => crate::encoding::builtin_multibyte_string_p(args),
-        "unibyte-string-p" => crate::encoding::builtin_unibyte_string_p(args),
         "encode-coding-string" => crate::encoding::builtin_encode_coding_string(args),
         "decode-coding-string" => crate::encoding::builtin_decode_coding_string(args),
         "char-or-string-p" => crate::encoding::builtin_char_or_string_p(args),
@@ -6368,7 +6352,6 @@ pub(crate) fn dispatch_builtin(
         "string-blank-p" => super::builtins_extra::builtin_string_blank_p(args),
         "string-chop-newline" => super::builtins_extra::builtin_string_chop_newline(args),
         "string-pad" => super::builtins_extra::builtin_string_pad(args),
-        "string-repeat" => super::builtins_extra::builtin_string_repeat(args),
         "string-replace" => super::builtins_extra::builtin_string_replace(args),
         "string-search" => super::builtins_extra::builtin_string_search(args),
         "string-to-vector" => super::builtins_extra::builtin_string_to_vector(args),
@@ -6486,9 +6469,6 @@ pub(crate) fn dispatch_builtin(
         "move-to-window-line" => super::xdisp::builtin_move_to_window_line(args),
         "tool-bar-height" => super::xdisp::builtin_tool_bar_height(args),
         "tab-bar-height" => super::xdisp::builtin_tab_bar_height(args),
-        "display-line-numbers-update-width" => {
-            super::xdisp::builtin_display_line_numbers_update_width(args)
-        }
         "line-number-display-width" => super::xdisp::builtin_line_number_display_width(args),
         "long-line-optimizations-p" => super::xdisp::builtin_long_line_optimizations_p(args),
 
@@ -6585,8 +6565,6 @@ pub(crate) fn dispatch_builtin(
         "signal" => super::errors::builtin_signal(args),
 
         // Hash-table extended (pure)
-        "hash-table-keys" => super::hashtab::builtin_hash_table_keys(args),
-        "hash-table-values" => super::hashtab::builtin_hash_table_values(args),
         "hash-table-test" => super::hashtab::builtin_hash_table_test(args),
         "hash-table-size" => super::hashtab::builtin_hash_table_size(args),
         "hash-table-rehash-size" => super::hashtab::builtin_hash_table_rehash_size(args),
@@ -6643,7 +6621,6 @@ pub(crate) fn dispatch_builtin(
         "bool-vector-intersection" => super::chartable::builtin_bool_vector_intersection(args),
         "bool-vector-union" => super::chartable::builtin_bool_vector_union(args),
         "bool-vector-exclusive-or" => super::chartable::builtin_bool_vector_exclusive_or(args),
-        "bool-vector-complement" => super::chartable::builtin_bool_vector_complement(args),
         "bool-vector-subsetp" => super::chartable::builtin_bool_vector_subsetp(args),
 
         // Note: windowp and framep are in the eval-dependent section above
@@ -6684,7 +6661,6 @@ pub(crate) fn dispatch_builtin(
         "base64-encode-string" => super::fns::builtin_base64_encode_string(args),
         "base64-decode-string" => super::fns::builtin_base64_decode_string(args),
         "base64url-encode-string" => super::fns::builtin_base64url_encode_string(args),
-        "base64url-decode-string" => super::fns::builtin_base64url_decode_string(args),
         "md5" => super::fns::builtin_md5(args),
         "secure-hash" => super::fns::builtin_secure_hash(args),
         "buffer-hash" => super::fns::builtin_buffer_hash(args),
@@ -6797,8 +6773,6 @@ pub(crate) fn dispatch_builtin_pure(name: &str, args: Vec<Value>) -> Option<Eval
         // Timer (pure)
         "timerp" => super::timer::builtin_timerp(args),
         "sit-for" => super::timer::builtin_sit_for(args),
-        // Register (pure)
-        "register-to-string" => super::register::builtin_register_to_string(args),
         // Undo system (pure)
         "undo-boundary" => super::undo::builtin_undo_boundary(args),
         "primitive-undo" => super::undo::builtin_primitive_undo(args),
@@ -6807,7 +6781,6 @@ pub(crate) fn dispatch_builtin_pure(name: &str, args: Vec<Value>) -> Option<Eval
         "char-width" => crate::encoding::builtin_char_width(args),
         "string-bytes" => crate::encoding::builtin_string_bytes(args),
         "multibyte-string-p" => crate::encoding::builtin_multibyte_string_p(args),
-        "unibyte-string-p" => crate::encoding::builtin_unibyte_string_p(args),
         "encode-coding-string" => crate::encoding::builtin_encode_coding_string(args),
         "decode-coding-string" => crate::encoding::builtin_decode_coding_string(args),
         "char-or-string-p" => crate::encoding::builtin_char_or_string_p(args),
