@@ -842,8 +842,58 @@ pub(crate) fn builtin_reverse(args: Vec<Value>) -> EvalResult {
 }
 
 pub(crate) fn builtin_nreverse(args: Vec<Value>) -> EvalResult {
-    // For simplicity, same as reverse (we'd need to destructively modify cons cells)
-    builtin_reverse(args)
+    expect_args("nreverse", &args, 1)?;
+    match &args[0] {
+        Value::Nil => Ok(Value::Nil),
+        Value::Cons(_) => {
+            // Match Emacs list semantics: reject dotted lists, then reverse destructively.
+            if list_length(&args[0]).is_none() {
+                let mut cursor = args[0].clone();
+                loop {
+                    match cursor {
+                        Value::Cons(cell) => {
+                            cursor = cell.lock().expect("poisoned").cdr.clone();
+                        }
+                        Value::Nil => break,
+                        tail => {
+                            return Err(signal(
+                                "wrong-type-argument",
+                                vec![Value::symbol("listp"), tail],
+                            ))
+                        }
+                    }
+                }
+            }
+
+            let mut prev = Value::Nil;
+            let mut current = args[0].clone();
+            loop {
+                match current {
+                    Value::Nil => return Ok(prev),
+                    Value::Cons(cell) => {
+                        let next = {
+                            let mut pair = cell.lock().expect("poisoned");
+                            let next = pair.cdr.clone();
+                            pair.cdr = prev;
+                            next
+                        };
+                        prev = Value::Cons(cell);
+                        current = next;
+                    }
+                    _ => unreachable!("proper-list check should reject dotted tails"),
+                }
+            }
+        }
+        Value::Vector(v) => {
+            v.lock().expect("poisoned").reverse();
+            Ok(args[0].clone())
+        }
+        Value::Str(_) => builtin_reverse(args),
+        _ => Err(signal(
+            "wrong-type-argument",
+            vec![Value::symbol("sequencep"), args[0].clone()],
+        )),
+    }
 }
 
 pub(crate) fn builtin_member(args: Vec<Value>) -> EvalResult {
