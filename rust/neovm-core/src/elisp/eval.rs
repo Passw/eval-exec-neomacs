@@ -2630,7 +2630,10 @@ mod tests {
              (funcall (car (read-from-string \"#[(x) \\\"\\\\301\\\\10\\\\41\\\\207\\\" [x lognot] 2]\")) 0)
              (funcall (car (read-from-string \"#[(x y) \\\"\\\\302\\\\10\\\\11\\\\42\\\\207\\\" [x y ash] 3]\")) 3 2)
              (funcall (car (read-from-string \"#[(a b c d e f g h) \\\"\\\\10\\\\11\\\\12\\\\13\\\\14\\\\15\\\\16\\\\6\\\\16\\\\7\\\\257\\\\10\\\\207\\\" [a b c d e f g h] 8]\")) 1 2 3 4 5 6 7 8)
-             (funcall (car (read-from-string \"#[(a b c d e f g h) \\\"\\\\11\\\\20\\\\10\\\\16\\\\7\\\\26\\\\6\\\\16\\\\6\\\\104\\\\207\\\" [a b c d e f g h] 2]\")) 1 2 3 4 5 6 7 8)",
+             (funcall (car (read-from-string \"#[(a b c d e f g h) \\\"\\\\11\\\\20\\\\10\\\\16\\\\7\\\\26\\\\6\\\\16\\\\6\\\\104\\\\207\\\" [a b c d e f g h] 2]\")) 1 2 3 4 5 6 7 8)
+             (funcall (car (read-from-string \"#[nil \\\"\\\\300\\\\301\\\\1\\\\207\\\" [1 2] 3]\")))
+             (funcall (car (read-from-string \"#[nil \\\"\\\\300\\\\211\\\\134\\\\207\\\" [7] 2]\")))
+             (funcall (car (read-from-string \"#[nil \\\"\\\\300\\\\301\\\\210\\\\207\\\" [1 2] 2]\")))",
         );
         assert_eq!(results[0], "OK t");
         assert_eq!(results[1], "OK t");
@@ -2673,6 +2676,9 @@ mod tests {
         assert_eq!(results[38], "OK 12");
         assert_eq!(results[39], "OK (1 2 3 4 5 6 7 8)");
         assert_eq!(results[40], "OK (2 8)");
+        assert_eq!(results[41], "OK 1");
+        assert_eq!(results[42], "OK 14");
+        assert_eq!(results[43], "OK 1");
     }
 
     #[test]

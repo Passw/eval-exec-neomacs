@@ -94,3 +94,6 @@
 (funcall (car (read-from-string "#[(x y) \"\\302\\10\\11\\42\\207\" [x y ash] 3]")) 3 2)
 (funcall (car (read-from-string "#[(a b c d e f g h) \"\\10\\11\\12\\13\\14\\15\\16\\6\\16\\7\\257\\10\\207\" [a b c d e f g h] 8]")) 1 2 3 4 5 6 7 8)
 (funcall (car (read-from-string "#[(a b c d e f g h) \"\\11\\20\\10\\16\\7\\26\\6\\16\\6\\104\\207\" [a b c d e f g h] 2]")) 1 2 3 4 5 6 7 8)
+(funcall (car (read-from-string "#[nil \"\\300\\301\\1\\207\" [1 2] 3]")))
+(funcall (car (read-from-string "#[nil \"\\300\\211\\134\\207\" [7] 2]")))
+(funcall (car (read-from-string "#[nil \"\\300\\301\\210\\207\" [1 2] 2]")))
