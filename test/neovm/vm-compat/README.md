@@ -229,6 +229,8 @@ Post-freeze updates:
   - `cases/fset-special-form-override-boundary`
 - Added evaluator-callable function-cell override/restoration compatibility case:
   - `cases/fset-evaluator-callable-override-boundary`
+- Added explicit `fset`-to-`nil` function-cell compatibility case:
+  - `cases/fset-nil-function-cell-semantics`
 - Added bytecode literal reader compatibility case (legacy opt-in):
   - `cases/bytecode-literal-reader-semantics`
 - Added bytecode literal execution compatibility case (legacy opt-in):
