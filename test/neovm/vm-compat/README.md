@@ -77,6 +77,13 @@ cd test/neovm/vm-compat
 make check-legacy-elc-neovm
 ```
 
+Validate runner feature-stamp flip behavior (`default -> legacy -> default`):
+
+```bash
+cd test/neovm/vm-compat
+make check-runner-feature-stamp
+```
+
 Run the focused callable-introspection suite (faster loop for `fboundp`/`symbol-function`/`indirect-function`/`functionp`/`macrop`/`func-arity`):
 
 ```bash
