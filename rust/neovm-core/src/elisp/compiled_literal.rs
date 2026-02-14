@@ -303,6 +303,14 @@ fn decode_opcode_subset(byte_stream: &str, const_len: usize) -> Option<Vec<Op>> 
                 pending.push(Pending::PushConditionCase(target));
                 pc += 3;
             }
+            // pushcatch (16-bit bytecode stream offset)
+            // In the current compatibility subset this shares the same handler
+            // representation as condition-case.
+            0o062 => {
+                let target = read_u16_operand(&bytes, pc + 1)? as usize;
+                pending.push(Pending::PushConditionCase(target));
+                pc += 3;
+            }
             // goto (16-bit bytecode stream offset)
             0o202 => {
                 let target = read_u16_operand(&bytes, pc + 1)? as usize;
@@ -933,6 +941,30 @@ mod tests {
             Value::Nil,
             Value::string("\u{C0}\u{31}\u{6}\u{0}\u{C1}\u{30}\u{87}"),
             Value::vector(vec![Value::Int(10), Value::Int(20)]),
+            Value::Int(2),
+        ]);
+        let coerced = maybe_coerce_compiled_literal_function(literal);
+        let Value::ByteCode(bc) = coerced else {
+            panic!("expected Value::ByteCode");
+        };
+        assert_eq!(
+            bc.ops,
+            vec![
+                Op::Constant(0),
+                Op::PushConditionCase(4),
+                Op::Constant(1),
+                Op::PopHandler,
+                Op::Return,
+            ]
+        );
+    }
+
+    #[test]
+    fn decodes_pushcatch_and_pophandler_opcode_subset() {
+        let literal = Value::vector(vec![
+            Value::Nil,
+            Value::string("\u{C0}\u{32}\u{6}\u{0}\u{C1}\u{30}\u{87}"),
+            Value::vector(vec![Value::Int(1), Value::Int(2)]),
             Value::Int(2),
         ]);
         let coerced = maybe_coerce_compiled_literal_function(literal);
