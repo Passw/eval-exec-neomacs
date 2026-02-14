@@ -569,28 +569,24 @@ pub(crate) fn builtin_functionp_eval(
     args: Vec<Value>,
 ) -> EvalResult {
     expect_args("functionp", &args, 1)?;
-    let is_function = match &args[0] {
-        Value::Lambda(_) | Value::Subr(_) | Value::ByteCode(_) => is_runtime_function_object(&args[0]),
-        Value::Symbol(name) => {
-            if let Some(function) = eval.obarray().symbol_function(name) {
-                if let Some(autoload_type) = autoload_type_of(function) {
-                    matches!(autoload_type, super::autoload::AutoloadType::Function)
-                } else {
-                    is_runtime_function_object(function)
-                }
-            } else if eval.obarray().is_function_unbound(name) {
-                false
-            } else if super::subr_info::is_evaluator_macro_name(name) {
-                false
-            } else if super::subr_info::is_evaluator_callable_name(name) {
-                true
+    let is_function = if let Some(name) = args[0].as_symbol_name() {
+        if let Some(function) = resolve_indirect_symbol(eval, name) {
+            if let Some(autoload_type) = autoload_type_of(&function) {
+                matches!(autoload_type, super::autoload::AutoloadType::Function)
             } else {
-                super::builtin_registry::is_dispatch_builtin_name(name)
-                    || name.parse::<PureBuiltinId>().is_ok()
+                is_runtime_function_object(&function)
             }
+        } else {
+            false
         }
-        Value::Cons(_) => !is_macro_marker_list(&args[0]) && is_lambda_form_list(&args[0]),
-        _ => false,
+    } else {
+        match &args[0] {
+            Value::Lambda(_) | Value::Subr(_) | Value::ByteCode(_) => {
+                is_runtime_function_object(&args[0])
+            }
+            Value::Cons(_) => !is_macro_marker_list(&args[0]) && is_lambda_form_list(&args[0]),
+            _ => false,
+        }
     };
     Ok(Value::bool(is_function))
 }
@@ -2507,17 +2503,17 @@ pub(crate) fn builtin_func_arity_eval(
 ) -> EvalResult {
     expect_args("func-arity", &args, 1)?;
 
-    match &args[0] {
-        Value::Symbol(name) => {
-            if let Some(function) = resolve_indirect_symbol(eval, name) {
-                super::subr_info::builtin_func_arity(vec![function])
-            } else {
-                Err(signal("void-function", vec![Value::symbol(name)]))
+    if let Some(name) = args[0].as_symbol_name() {
+        if let Some(function) = resolve_indirect_symbol(eval, name) {
+            if function.is_nil() {
+                return Err(signal("void-function", vec![Value::symbol(name)]));
             }
+            return super::subr_info::builtin_func_arity(vec![function]);
         }
-        Value::Nil => Err(signal("void-function", vec![Value::symbol("nil")])),
-        other => super::subr_info::builtin_func_arity(vec![other.clone()]),
+        return Err(signal("void-function", vec![Value::symbol(name)]));
     }
+
+    super::subr_info::builtin_func_arity(vec![args[0].clone()])
 }
 
 pub(crate) fn builtin_set(eval: &mut super::eval::Evaluator, args: Vec<Value>) -> EvalResult {
@@ -2703,13 +2699,14 @@ fn resolve_indirect_symbol(eval: &super::eval::Evaluator, name: &str) -> Option<
         }
 
         if let Some(function) = eval.obarray().symbol_function(&current) {
-            match function {
-                Value::Symbol(next) => {
-                    current = next.clone();
-                    continue;
+            if let Some(next) = function.as_symbol_name() {
+                if next == "nil" {
+                    return Some(Value::Nil);
                 }
-                other => return Some(other.clone()),
+                current = next.to_string();
+                continue;
             }
+            return Some(function.clone());
         }
 
         if let Some(function) = super::subr_info::fallback_macro_value(&current) {
@@ -2733,21 +2730,14 @@ pub(crate) fn builtin_macrop_eval(
     args: Vec<Value>,
 ) -> EvalResult {
     expect_args("macrop", &args, 1)?;
-    match &args[0] {
-        Value::Symbol(name) => {
-            if let Some(function) = eval.obarray().symbol_function(name) {
-                return super::subr_info::builtin_macrop(vec![function.clone()]);
-            }
-            if eval.obarray().is_function_unbound(name) {
-                return Ok(Value::Nil);
-            }
-            if let Some(function) = super::subr_info::fallback_macro_value(name) {
-                return super::subr_info::builtin_macrop(vec![function]);
-            }
-            Ok(Value::Nil)
+    if let Some(name) = args[0].as_symbol_name() {
+        if let Some(function) = resolve_indirect_symbol(eval, name) {
+            return super::subr_info::builtin_macrop(vec![function]);
         }
-        _ => super::subr_info::builtin_macrop(args),
+        return Ok(Value::Nil);
     }
+
+    super::subr_info::builtin_macrop(args)
 }
 
 pub(crate) fn builtin_intern_fn(eval: &mut super::eval::Evaluator, args: Vec<Value>) -> EvalResult {
@@ -8073,6 +8063,33 @@ mod tests {
     }
 
     #[test]
+    fn functionp_eval_resolves_t_and_keyword_symbol_designators() {
+        let mut eval = crate::elisp::eval::Evaluator::new();
+
+        let keyword = Value::keyword(":vm-functionp-keyword");
+        let orig_t = builtin_symbol_function(&mut eval, vec![Value::True])
+            .expect("symbol-function should read t cell");
+        let orig_keyword = builtin_symbol_function(&mut eval, vec![keyword.clone()])
+            .expect("symbol-function should read keyword cell");
+
+        builtin_fset(&mut eval, vec![Value::True, Value::symbol("car")])
+            .expect("fset should bind t function cell");
+        builtin_fset(&mut eval, vec![keyword.clone(), Value::symbol("car")])
+            .expect("fset should bind keyword function cell");
+
+        let t_result =
+            builtin_functionp_eval(&mut eval, vec![Value::True]).expect("functionp should accept t");
+        assert!(t_result.is_truthy());
+        let keyword_result = builtin_functionp_eval(&mut eval, vec![keyword.clone()])
+            .expect("functionp should accept keyword designator");
+        assert!(keyword_result.is_truthy());
+
+        builtin_fset(&mut eval, vec![Value::True, orig_t]).expect("restore t function cell");
+        builtin_fset(&mut eval, vec![keyword, orig_keyword])
+            .expect("restore keyword function cell");
+    }
+
+    #[test]
     fn symbol_function_resolves_builtin_and_special_names() {
         let mut eval = crate::elisp::eval::Evaluator::new();
 
@@ -8239,6 +8256,64 @@ mod tests {
     }
 
     #[test]
+    fn func_arity_eval_resolves_symbol_designators_and_nil_cells() {
+        let mut eval = crate::elisp::eval::Evaluator::new();
+
+        let keyword = Value::keyword(":vm-func-arity-keyword");
+        let vm_nil = Value::symbol("vm-func-arity-nil-cell");
+        let orig_t = builtin_symbol_function(&mut eval, vec![Value::True])
+            .expect("symbol-function should read t function cell");
+        let orig_keyword = builtin_symbol_function(&mut eval, vec![keyword.clone()])
+            .expect("symbol-function should read keyword function cell");
+        let orig_vm_nil = builtin_symbol_function(&mut eval, vec![vm_nil.clone()])
+            .expect("symbol-function should read symbol function cell");
+
+        builtin_fset(&mut eval, vec![Value::True, Value::symbol("car")])
+            .expect("fset should bind t function cell");
+        builtin_fset(&mut eval, vec![keyword.clone(), Value::symbol("car")])
+            .expect("fset should bind keyword function cell");
+        builtin_fset(&mut eval, vec![vm_nil.clone(), Value::Nil])
+            .expect("fset should bind explicit nil function cell");
+
+        let t_arity = builtin_func_arity_eval(&mut eval, vec![Value::True])
+            .expect("func-arity should resolve t designator");
+        match &t_arity {
+            Value::Cons(cell) => {
+                let pair = cell.lock().expect("poisoned");
+                assert_eq!(pair.car, Value::Int(1));
+                assert_eq!(pair.cdr, Value::Int(1));
+            }
+            other => panic!("expected cons arity pair, got {other:?}"),
+        }
+
+        let keyword_arity = builtin_func_arity_eval(&mut eval, vec![keyword.clone()])
+            .expect("func-arity should resolve keyword designator");
+        match &keyword_arity {
+            Value::Cons(cell) => {
+                let pair = cell.lock().expect("poisoned");
+                assert_eq!(pair.car, Value::Int(1));
+                assert_eq!(pair.cdr, Value::Int(1));
+            }
+            other => panic!("expected cons arity pair, got {other:?}"),
+        }
+
+        let nil_cell_err = builtin_func_arity_eval(&mut eval, vec![vm_nil.clone()])
+            .expect_err("func-arity should signal void-function for nil function cell");
+        match nil_cell_err {
+            Flow::Signal(sig) => {
+                assert_eq!(sig.symbol, "void-function");
+                assert_eq!(sig.data, vec![vm_nil.clone()]);
+            }
+            other => panic!("unexpected flow: {other:?}"),
+        }
+
+        builtin_fset(&mut eval, vec![Value::True, orig_t]).expect("restore t function cell");
+        builtin_fset(&mut eval, vec![keyword, orig_keyword])
+            .expect("restore keyword function cell");
+        builtin_fset(&mut eval, vec![vm_nil, orig_vm_nil]).expect("restore symbol function cell");
+    }
+
+    #[test]
     fn indirect_function_resolves_builtin_and_special_names() {
         let mut eval = crate::elisp::eval::Evaluator::new();
 
@@ -8280,6 +8355,47 @@ mod tests {
     }
 
     #[test]
+    fn indirect_function_follows_t_and_keyword_alias_values() {
+        let mut eval = crate::elisp::eval::Evaluator::new();
+
+        let keyword = Value::keyword(":vm-indirect-keyword-alias");
+        let t_alias = Value::symbol("vm-indirect-through-t");
+        let keyword_alias = Value::symbol("vm-indirect-through-keyword");
+        let orig_t = builtin_symbol_function(&mut eval, vec![Value::True])
+            .expect("symbol-function should read t function cell");
+        let orig_keyword = builtin_symbol_function(&mut eval, vec![keyword.clone()])
+            .expect("symbol-function should read keyword function cell");
+        let orig_t_alias = builtin_symbol_function(&mut eval, vec![t_alias.clone()])
+            .expect("symbol-function should read alias function cell");
+        let orig_keyword_alias = builtin_symbol_function(&mut eval, vec![keyword_alias.clone()])
+            .expect("symbol-function should read alias function cell");
+
+        builtin_fset(&mut eval, vec![Value::True, Value::symbol("car")])
+            .expect("fset should bind t function cell");
+        builtin_fset(&mut eval, vec![keyword.clone(), Value::symbol("car")])
+            .expect("fset should bind keyword function cell");
+        builtin_fset(&mut eval, vec![t_alias.clone(), Value::True])
+            .expect("fset should bind alias to t symbol designator");
+        builtin_fset(&mut eval, vec![keyword_alias.clone(), keyword.clone()])
+            .expect("fset should bind alias to keyword designator");
+
+        let resolved_t_alias = builtin_indirect_function(&mut eval, vec![t_alias.clone()])
+            .expect("indirect-function should resolve alias through t");
+        assert_eq!(resolved_t_alias, Value::Subr("car".to_string()));
+        let resolved_keyword_alias =
+            builtin_indirect_function(&mut eval, vec![keyword_alias.clone()])
+                .expect("indirect-function should resolve alias through keyword");
+        assert_eq!(resolved_keyword_alias, Value::Subr("car".to_string()));
+
+        builtin_fset(&mut eval, vec![Value::True, orig_t]).expect("restore t function cell");
+        builtin_fset(&mut eval, vec![keyword, orig_keyword])
+            .expect("restore keyword function cell");
+        builtin_fset(&mut eval, vec![t_alias, orig_t_alias]).expect("restore alias function cell");
+        builtin_fset(&mut eval, vec![keyword_alias, orig_keyword_alias])
+            .expect("restore alias function cell");
+    }
+
+    #[test]
     fn macrop_eval_recognizes_symbol_function_and_marker_forms() {
         let mut eval = crate::elisp::eval::Evaluator::new();
 
@@ -8295,6 +8411,26 @@ mod tests {
         let marker_result =
             builtin_macrop_eval(&mut eval, vec![marker]).expect("macrop should accept markers");
         assert!(marker_result.is_truthy());
+    }
+
+    #[test]
+    fn macrop_eval_resolves_keyword_designators() {
+        let mut eval = crate::elisp::eval::Evaluator::new();
+
+        let keyword = Value::keyword(":vm-macrop-keyword");
+        let orig_keyword = builtin_symbol_function(&mut eval, vec![keyword.clone()])
+            .expect("symbol-function should read keyword function cell");
+        let when_macro = builtin_symbol_function(&mut eval, vec![Value::symbol("when")])
+            .expect("symbol-function should read when macro");
+
+        builtin_fset(&mut eval, vec![keyword.clone(), when_macro])
+            .expect("fset should bind keyword function cell");
+        let keyword_result = builtin_macrop_eval(&mut eval, vec![keyword.clone()])
+            .expect("macrop should resolve keyword designator");
+        assert!(keyword_result.is_truthy());
+
+        builtin_fset(&mut eval, vec![keyword, orig_keyword])
+            .expect("restore keyword function cell");
     }
 
     #[test]
