@@ -30,6 +30,7 @@
 (fboundp 'upcase-region)
 (fboundp 'downcase-region)
 (fboundp 'capitalize-region)
+(fboundp 'upcase-initials-region)
 (fboundp 'kill-word)
 (fboundp 'backward-kill-word)
 (fboundp 'kill-region)
