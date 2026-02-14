@@ -200,6 +200,8 @@ Post-freeze updates:
   - `cases/hash-make-table-options-semantics`
 - Added hash-table rehash/copy compatibility case:
   - `cases/hash-rehash-copy-semantics`
+- Added dynamic-binding/unwind restoration compatibility case:
+  - `cases/specpdl-dynamic-unwind-semantics`
 - Added higher-order map primitive compatibility case:
   - `cases/map-family-semantics`
 - Added `ignore` callable compatibility case:
