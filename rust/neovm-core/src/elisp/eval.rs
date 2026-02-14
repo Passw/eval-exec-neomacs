@@ -1629,6 +1629,9 @@ impl Evaluator {
                 if let Some(func) = self.obarray.symbol_function(&name).cloned() {
                     return self.apply(func, args);
                 }
+                if super::subr_info::is_evaluator_callable_name(&name) {
+                    return self.apply_evaluator_callable(&name, args);
+                }
                 if let Some(result) = builtins::dispatch_builtin(self, &name, args) {
                     result.map_err(|flow| rewrite_wrong_arity_function_object(flow, &name))
                 } else if super::subr_info::is_special_form(&name) {
@@ -1641,6 +1644,8 @@ impl Evaluator {
                 // Symbol used as function — look up in obarray function cell
                 if let Some(func) = self.obarray.symbol_function(&name).cloned() {
                     self.apply(func, args)
+                } else if super::subr_info::is_evaluator_callable_name(&name) {
+                    self.apply_evaluator_callable(&name, args)
                 } else if let Some(result) = builtins::dispatch_builtin(self, &name, args) {
                     result.map_err(|flow| rewrite_wrong_arity_function_object(flow, &name))
                 } else if super::subr_info::is_special_form(&name) {
@@ -1653,6 +1658,24 @@ impl Evaluator {
             Value::Keyword(name) => Err(signal("void-function", vec![Value::symbol(name)])),
             Value::Nil => Err(signal("void-function", vec![Value::symbol("nil")])),
             _ => Err(signal("invalid-function", vec![function])),
+        }
+    }
+
+    fn apply_evaluator_callable(&mut self, name: &str, args: Vec<Value>) -> EvalResult {
+        match name {
+            "throw" => {
+                if args.len() != 2 {
+                    return Err(signal(
+                        "wrong-number-of-arguments",
+                        vec![Value::symbol("throw"), Value::Int(args.len() as i64)],
+                    ));
+                }
+                Err(Flow::Throw {
+                    tag: args[0].clone(),
+                    value: args[1].clone(),
+                })
+            }
+            _ => Err(signal("void-function", vec![Value::symbol(name)])),
         }
     }
 
@@ -2277,6 +2300,19 @@ mod tests {
         assert_eq!(
             eval_one("(condition-case err (apply 'if '(t 1 2)) (error (car err)))"),
             "OK invalid-function"
+        );
+    }
+
+    #[test]
+    fn funcall_throw_is_callable_and_preserves_throw_semantics() {
+        assert_eq!(eval_one("(catch 'tag (funcall 'throw 'tag 42))"), "OK 42");
+        assert_eq!(
+            eval_one("(condition-case err (funcall 'throw 'tag 42) (error err))"),
+            "OK (no-catch tag 42)"
+        );
+        assert_eq!(
+            eval_one("(condition-case err (funcall 'throw) (error err))"),
+            "OK (wrong-number-of-arguments throw 0)"
         );
     }
 

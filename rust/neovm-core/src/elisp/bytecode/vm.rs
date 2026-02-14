@@ -209,15 +209,35 @@ impl<'a> Vm<'a> {
                     let args_start = stack.len().saturating_sub(n);
                     let args: Vec<Value> = stack.drain(args_start..).collect();
                     let func_val = stack.pop().unwrap_or(Value::Nil);
-                    let result = self.call_function(func_val, args)?;
-                    stack.push(result);
+                    match self.call_function(func_val, args) {
+                        Ok(result) => stack.push(result),
+                        Err(Flow::Throw { tag, value }) => {
+                            if let Some(target) = resolve_throw_target(handlers, &tag) {
+                                stack.push(value);
+                                *pc = target as usize;
+                                continue;
+                            }
+                            return Err(Flow::Throw { tag, value });
+                        }
+                        Err(flow) => return Err(flow),
+                    }
                 }
                 Op::Apply(n) => {
                     let n = *n as usize;
                     if n == 0 {
                         let func_val = stack.pop().unwrap_or(Value::Nil);
-                        let result = self.call_function(func_val, vec![])?;
-                        stack.push(result);
+                        match self.call_function(func_val, vec![]) {
+                            Ok(result) => stack.push(result),
+                            Err(Flow::Throw { tag, value }) => {
+                                if let Some(target) = resolve_throw_target(handlers, &tag) {
+                                    stack.push(value);
+                                    *pc = target as usize;
+                                    continue;
+                                }
+                                return Err(Flow::Throw { tag, value });
+                            }
+                            Err(flow) => return Err(flow),
+                        }
                     } else {
                         let args_start = stack.len().saturating_sub(n);
                         let mut args: Vec<Value> = stack.drain(args_start..).collect();
@@ -227,8 +247,18 @@ impl<'a> Vm<'a> {
                             let spread = list_to_vec(&last).unwrap_or_default();
                             args.extend(spread);
                         }
-                        let result = self.call_function(func_val, args)?;
-                        stack.push(result);
+                        match self.call_function(func_val, args) {
+                            Ok(result) => stack.push(result),
+                            Err(Flow::Throw { tag, value }) => {
+                                if let Some(target) = resolve_throw_target(handlers, &tag) {
+                                    stack.push(value);
+                                    *pc = target as usize;
+                                    continue;
+                                }
+                                return Err(Flow::Throw { tag, value });
+                            }
+                            Err(flow) => return Err(flow),
+                        }
                     }
                 }
 
@@ -665,20 +695,7 @@ impl<'a> Vm<'a> {
                 Op::Throw => {
                     let val = stack.pop().unwrap_or(Value::Nil);
                     let tag = stack.pop().unwrap_or(Value::Nil);
-                    let mut catch_target = None;
-                    while let Some(handler) = handlers.pop() {
-                        if let Handler::Catch {
-                            tag: catch_tag,
-                            target,
-                        } = handler
-                        {
-                            if eq_value(&catch_tag, &tag) {
-                                catch_target = Some(target);
-                                break;
-                            }
-                        }
-                    }
-                    if let Some(target) = catch_target {
+                    if let Some(target) = resolve_throw_target(handlers, &tag) {
                         stack.push(val);
                         *pc = target as usize;
                         continue;
@@ -894,6 +911,18 @@ impl<'a> Vm<'a> {
                     )],
                 ));
             }
+            "throw" => {
+                if args.len() != 2 {
+                    return Err(signal(
+                        "wrong-number-of-arguments",
+                        vec![Value::symbol("throw"), Value::Int(args.len() as i64)],
+                    ));
+                }
+                return Err(Flow::Throw {
+                    tag: args[0].clone(),
+                    value: args[1].clone(),
+                });
+            }
             _ => {}
         }
 
@@ -909,6 +938,21 @@ impl<'a> Vm<'a> {
 }
 
 // -- Arithmetic helpers --
+
+fn resolve_throw_target(handlers: &mut Vec<Handler>, tag: &Value) -> Option<u32> {
+    while let Some(handler) = handlers.pop() {
+        if let Handler::Catch {
+            tag: catch_tag,
+            target,
+        } = handler
+        {
+            if eq_value(&catch_tag, tag) {
+                return Some(target);
+            }
+        }
+    }
+    None
+}
 
 fn arith_add(a: &Value, b: &Value) -> EvalResult {
     match (a, b) {
