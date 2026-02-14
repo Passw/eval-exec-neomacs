@@ -13,13 +13,14 @@ INTROSPECTION_CASES_LIST ?= cases/introspection.list
 INTROSPECTION_CASES ?= $(call read_case_list,$(INTROSPECTION_CASES_LIST))
 THREAD_CASES_LIST ?= cases/thread.list
 THREAD_CASES ?= $(call read_case_list,$(THREAD_CASES_LIST))
+CASE_LIST_FILES ?= $(CASES_LIST) $(NEOVM_ONLY_CASES_LIST) $(INTROSPECTION_CASES_LIST) $(THREAD_CASES_LIST)
 BENCH_SOURCE ?= cases/load-policy-fixtures/vm-policy-cache-probe.el
 BENCH_ITERS ?= 100
 ERT_ALLOWLIST ?= cases/ert-allowlist-smoke.txt
 ERT_EXPECTED ?= cases/ert-allowlist-smoke.expected.tsv
 ERT_LOAD_FILES ?= cases/ert-allowlist-fixtures/smoke-tests.el
 
-.PHONY: oracle neovm record check compare check-neovm record-all check-all check-all-neovm check-all-neovm-only check-introspection-neovm check-thread-neovm ert-oracle record-ert-allowlist check-ert-allowlist bench-load-cache
+.PHONY: oracle neovm record check compare check-neovm record-all check-all check-all-neovm check-all-neovm-only check-introspection-neovm check-thread-neovm validate-case-lists ert-oracle record-ert-allowlist check-ert-allowlist bench-load-cache
 
 oracle:
 	./run-oracle.sh $(FORMS)
@@ -91,6 +92,31 @@ check-thread-neovm:
 		echo "== $$case =="; \
 		$(MAKE) --no-print-directory check-neovm FORMS="$$case.forms" EXPECTED="$$case.expected.tsv"; \
 	done
+
+validate-case-lists:
+	@set -e; \
+	for list in $(CASE_LIST_FILES); do \
+		echo "== $$list =="; \
+		if [ ! -f "$$list" ]; then \
+			echo "missing list file: $$list"; \
+			exit 1; \
+		fi; \
+		tmp="$$(mktemp)"; \
+		awk 'NF && $$1 !~ /^#/' "$$list" > "$$tmp"; \
+		dups="$$(sort "$$tmp" | uniq -d)"; \
+		if [ -n "$$dups" ]; then \
+			echo "duplicate entries in $$list:"; \
+			echo "$$dups"; \
+			rm -f "$$tmp"; \
+			exit 1; \
+		fi; \
+		while IFS= read -r case; do \
+			[ -f "$$case.forms" ] || { echo "missing forms file: $$case.forms"; rm -f "$$tmp"; exit 1; }; \
+			[ -f "$$case.expected.tsv" ] || { echo "missing expected file: $$case.expected.tsv"; rm -f "$$tmp"; exit 1; }; \
+		done < "$$tmp"; \
+		rm -f "$$tmp"; \
+	done; \
+	echo "case lists validated"
 
 ert-oracle:
 	./run-ert-allowlist.sh $(ERT_ALLOWLIST) $(ERT_LOAD_FILES)
