@@ -177,6 +177,8 @@ Post-freeze updates:
 - Added list tail/suffix compatibility case:
   - `cases/last-butlast-semantics`
   - includes arg normalization edges (`N=nil`, `number-or-marker-p`, float payload signaling)
+- Added list indexing/tail-walk compatibility case:
+  - `cases/nth-nthcdr-semantics`
 - Added higher-order map primitive compatibility case:
   - `cases/map-family-semantics`
 - Added `ignore` callable compatibility case:
