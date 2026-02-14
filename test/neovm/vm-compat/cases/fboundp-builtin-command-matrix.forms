@@ -1,4 +1,9 @@
 ; fboundp should agree with commandp for common builtin command names.
+(fboundp 'ignore)
+(fboundp 'eval-expression)
+(fboundp 'self-insert-command)
+(fboundp 'newline)
+(fboundp 'execute-extended-command)
 (fboundp 'forward-char)
 (fboundp 'next-line)
 (fboundp 'previous-line)
