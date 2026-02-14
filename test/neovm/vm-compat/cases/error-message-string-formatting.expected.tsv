@@ -12,3 +12,6 @@
 12	(error-message-string '(void-function x))	OK "Symbol’s function definition is void: x"
 13	(let ((msg (condition-case e (progn (error "%S" (current-thread)) "") (error (error-message-string e))))) (string-prefix-p "#<thread" msg))	OK t
 14	(error-message-string '(end-of-file "EOF while reading"))	OK "End of file during parsing: EOF while reading"
+15	(error-message-string '(error 1 2 3))	OK "peculiar error: 2, 3"
+16	(error-message-string '(file-error 1 2 3))	OK "peculiar error: 2, 3"
+17	(error-message-string '(file-missing 1 2 3))	OK "peculiar error: 2, 3"

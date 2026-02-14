@@ -555,17 +555,14 @@ pub(crate) fn builtin_error_message_string(
             return Ok(Value::string(format!("{first_str}: {}", rest_strs.join(", "))));
         }
 
-        // Exact `error`/`file-error` without a leading string keep Emacs'
-        // "peculiar error" behavior.
-        if sym_name == "error" || sym_name == "file-error" {
-            if let Some(detail) = data.get(1) {
-                return Ok(Value::string(format!(
-                    "peculiar error: {}",
-                    format_error_arg(detail, true)
-                )));
-            }
-            return Ok(Value::string("peculiar error"));
+        // `error` and most file-error-family members render peculiar payload
+        // data from the second element onward when no leading message string
+        // is present.
+        if data.len() > 1 {
+            let detail: Vec<String> = data[1..].iter().map(|v| format_error_arg(v, true)).collect();
+            return Ok(Value::string(format!("peculiar error: {}", detail.join(", "))));
         }
+        return Ok(Value::string("peculiar error"));
     }
 
     let quote_strings = sym_name != "end-of-file";
@@ -1372,6 +1369,15 @@ mod tests {
         assert!(error_double_result.is_ok());
         assert_eq!(error_double_result.unwrap().as_str(), Some("peculiar error: 2"));
 
+        let error_triple =
+            Value::list(vec![Value::symbol("error"), Value::Int(1), Value::Int(2), Value::Int(3)]);
+        let error_triple_result = builtin_error_message_string(&evaluator, vec![error_triple]);
+        assert!(error_triple_result.is_ok());
+        assert_eq!(
+            error_triple_result.unwrap().as_str(),
+            Some("peculiar error: 2, 3")
+        );
+
         let file_single = Value::list(vec![Value::symbol("file-error"), Value::Int(1)]);
         let file_single_result = builtin_error_message_string(&evaluator, vec![file_single]);
         assert!(file_single_result.is_ok());
@@ -1381,6 +1387,33 @@ mod tests {
         let file_double_result = builtin_error_message_string(&evaluator, vec![file_double]);
         assert!(file_double_result.is_ok());
         assert_eq!(file_double_result.unwrap().as_str(), Some("peculiar error: 2"));
+
+        let file_triple = Value::list(vec![
+            Value::symbol("file-error"),
+            Value::Int(1),
+            Value::Int(2),
+            Value::Int(3),
+        ]);
+        let file_triple_result = builtin_error_message_string(&evaluator, vec![file_triple]);
+        assert!(file_triple_result.is_ok());
+        assert_eq!(
+            file_triple_result.unwrap().as_str(),
+            Some("peculiar error: 2, 3")
+        );
+
+        let file_missing_triple = Value::list(vec![
+            Value::symbol("file-missing"),
+            Value::Int(1),
+            Value::Int(2),
+            Value::Int(3),
+        ]);
+        let file_missing_triple_result =
+            builtin_error_message_string(&evaluator, vec![file_missing_triple]);
+        assert!(file_missing_triple_result.is_ok());
+        assert_eq!(
+            file_missing_triple_result.unwrap().as_str(),
+            Some("peculiar error: 2, 3")
+        );
 
     }
 

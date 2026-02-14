@@ -12,3 +12,6 @@
 (error-message-string '(void-function x))
 (let ((msg (condition-case e (progn (error "%S" (current-thread)) "") (error (error-message-string e))))) (string-prefix-p "#<thread" msg))
 (error-message-string '(end-of-file "EOF while reading"))
+(error-message-string '(error 1 2 3))
+(error-message-string '(file-error 1 2 3))
+(error-message-string '(file-missing 1 2 3))
