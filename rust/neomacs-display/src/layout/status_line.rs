@@ -170,6 +170,25 @@ impl LayoutEngine {
         let bg = Color::from_pixel(line_face.bg);
         let default_fg = Color::from_pixel(line_face.fg);
 
+        // Use the mode-line face's own font metrics instead of the window's
+        // text-scaled values.  text-scale-adjust changes the window's default
+        // face size but the mode-line face renders at its own (unscaled) size.
+        let char_w = if line_face.font_char_width > 0.0 { line_face.font_char_width } else { char_w };
+        let ascent = if line_face.font_ascent > 0.0 { line_face.font_ascent } else { ascent };
+
+        // Vertical text inset within the mode line area.
+        // When box_h_line_width > 0, estimate_mode_line_height() added
+        // 2 * box_h_line_width to the area height for top/bottom borders.
+        // Text starts after the top border line.
+        // When box_h_line_width <= 0 (drawn within, or no box), the mode
+        // line area is exactly font height — no inset, text fills the area.
+        let inset = if line_face.box_h_line_width > 0 {
+            line_face.box_h_line_width as f32
+        } else {
+            0.0
+        };
+        let text_y = y + inset;
+
         // Draw background
         Self::add_stretch_for_face(&line_face, frame_glyphs, x, y, width, height, bg, line_face.face_id, true);
 
@@ -303,9 +322,9 @@ impl LayoutEngine {
                                 // Percentage
                                 img_h * (dp.ascent as f32 / 100.0)
                             };
-                            y + ascent - img_ascent_px
+                            text_y + ascent - img_ascent_px
                         } else {
-                            y
+                            text_y
                         };
 
                         frame_glyphs.add_image(dp.gpu_id, gx, gy, img_w, img_h);
@@ -379,7 +398,7 @@ impl LayoutEngine {
             };
 
             let gx = x + sl_x_offset;
-            frame_glyphs.add_char(ch, gx, y, advance, height, ascent, true);
+            frame_glyphs.add_char(ch, gx, text_y, advance, height, ascent, true);
             sl_x_offset += advance;
         }
 

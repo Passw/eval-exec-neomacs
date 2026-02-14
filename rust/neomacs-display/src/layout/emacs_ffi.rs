@@ -583,6 +583,11 @@ pub struct FaceDataFFI {
     pub box_line_width: c_int,
     /// Box corner radius (0 = sharp corners)
     pub box_corner_radius: c_int,
+    /// Signed box horizontal (top/bottom) line width.
+    /// >0: box adds height (borders drawn outside text area).
+    /// <0: box drawn within text area (no extra height).
+    /// Used for mode-line text vertical inset.
+    pub box_h_line_width: c_int,
     /// Extend: face bg extends to end of visual line (0=no, 1=yes)
     pub extend: c_int,
     /// Per-face font character width (0.0 = use window default)

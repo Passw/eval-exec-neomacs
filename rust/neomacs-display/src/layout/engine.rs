@@ -627,7 +627,7 @@ impl LayoutEngine {
             && !params.is_minibuffer
         {
             // Forward scroll: put point near bottom (3/4 down)
-            let lines_above = (max_rows * 3 / 4).clamp(2, max_rows - 1);
+            let lines_above = if max_rows <= 2 { 1 } else { (max_rows * 3 / 4).clamp(2, max_rows - 1) };
             let new_start = neomacs_layout_adjust_window_start(
                 wp.window_ptr,
                 wp.buffer_ptr,

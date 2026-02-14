@@ -592,6 +592,13 @@ typedef struct FaceDataFFI {
    */
   int boxCornerRadius;
   /**
+   * Signed box horizontal (top/bottom) line width.
+   * >0: box adds height (borders drawn outside text area).
+   * <0: box drawn within text area (no extra height).
+   * Used for mode-line text vertical inset.
+   */
+  int boxHLineWidth;
+  /**
    * Extend: face bg extends to end of visual line (0=no, 1=yes)
    */
   int extend;

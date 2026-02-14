@@ -1898,7 +1898,17 @@ neomacs_layout_get_window_params (void *frame_ptr, int window_index,
       }
   }
 
-  /* Special line heights */
+  /* Special line heights.
+     Invalidate cached heights so estimate_mode_line_height() uses
+     the CURRENT realized face (which may have changed after theme
+     loading or set-face-attribute).  In official Emacs, display_mode_line()
+     writes back the actual rendered height, but we skip that entirely
+     (Rust layout renders status lines directly).  Without invalidation,
+     stale cached heights from a previous redisplay cycle persist and
+     may not match the font we actually render with. */
+  w->mode_line_height = -1;
+  w->header_line_height = -1;
+  w->tab_line_height = -1;
   params->mode_line_height = (float) WINDOW_MODE_LINE_HEIGHT (w);
   params->header_line_height = (float) WINDOW_HEADER_LINE_HEIGHT (w);
   params->tab_line_height = (float) WINDOW_TAB_LINE_HEIGHT (w);
@@ -2325,6 +2335,7 @@ struct FaceDataFFI {
   uint32_t box_color;
   int box_line_width;
   int box_corner_radius;
+  int box_h_line_width;  /* Signed box_horizontal_line_width: >0 adds height, <0 drawn within */
   int extend;
   float font_char_width;
   float font_ascent;
@@ -2465,6 +2476,7 @@ fill_face_data (struct frame *f, struct face *face, struct FaceDataFFI *out)
   out->box_color = out->fg;
   out->box_line_width = 0;
   out->box_corner_radius = 0;
+  out->box_h_line_width = 0;
   if (face->box != FACE_NO_BOX)
     {
       out->box_type = 1;
@@ -2474,6 +2486,10 @@ fill_face_data (struct frame *f, struct face *face, struct FaceDataFFI *out)
                         (GREEN_FROM_ULONG (face->box_color) << 8) |
                         BLUE_FROM_ULONG (face->box_color));
       out->box_corner_radius = face->box_corner_radius;
+      /* Signed horizontal line width: >0 means box adds height (top/bottom
+         borders drawn outside text area), <0 means drawn within text area.
+         Used by the Rust layout engine for mode-line text vertical inset. */
+      out->box_h_line_width = face->box_horizontal_line_width;
     }
 
   /* Extend: face background extends to end of visual line */
