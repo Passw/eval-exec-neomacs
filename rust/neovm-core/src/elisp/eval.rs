@@ -2640,7 +2640,8 @@ mod tests {
                (funcall (car (read-from-string \"#[nil \\\"\\\\300\\\\112\\\\207\\\" [x] 1]\"))))
              (progn
                (put 'x 'p 42)
-               (funcall (car (read-from-string \"#[nil \\\"\\\\300\\\\301\\\\116\\\\207\\\" [x p] 2]\"))))",
+               (funcall (car (read-from-string \"#[nil \\\"\\\\300\\\\301\\\\116\\\\207\\\" [x p] 2]\"))))
+             (funcall (car (read-from-string \"#[nil \\\"\\\\201\\\\100\\\\0\\\\207\\\" [0 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20 21 22 23 24 25 26 27 28 29 30 31 32 33 34 35 36 37 38 39 40 41 42 43 44 45 46 47 48 49 50 51 52 53 54 55 56 57 58 59 60 61 62 63 64] 1]\")))",
         );
         assert_eq!(results[0], "OK t");
         assert_eq!(results[1], "OK t");
@@ -2689,6 +2690,7 @@ mod tests {
         assert_eq!(results[44], "OK -7");
         assert_eq!(results[45], "OK 99");
         assert_eq!(results[46], "OK 42");
+        assert_eq!(results[47], "OK 64");
     }
 
     #[test]
