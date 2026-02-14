@@ -100,6 +100,7 @@ cases/md5-coding-semantics
 cases/coding-system-runtime-semantics
 cases/charset-priority-semantics
 cases/charset-id-internal-semantics
+cases/charset-encode-decode-semantics
 cases/find-charset-string-semantics
 cases/unibyte-string-semantics
 cases/string-make-unibyte-semantics
