@@ -15,6 +15,9 @@ results against that baseline once evaluator execution is wired in.
 - `compare-results.sh`: diffs oracle TSV vs NeoVM TSV
 - `bench-load-cache.sh`: runs cold/warm `.neoc` load benchmark via `load_cache_bench`
 - `cases/default.list`: default `check-all-neovm` corpus order (one case per line)
+- `cases/neovm-only.list`: NeoVM-only policy corpus order
+- `cases/introspection.list`: focused callable/special-form introspection corpus order
+- `cases/thread.list`: focused thread primitive corpus order
 - `cases/core.forms`: starter corpus for expression and error behavior
 - `cases/input-batch-readers.forms`: batch-mode input reader compatibility corpus
 
