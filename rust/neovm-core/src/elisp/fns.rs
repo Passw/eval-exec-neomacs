@@ -1111,6 +1111,7 @@ pub(crate) fn builtin_string_collate_equalp(args: Vec<Value>) -> EvalResult {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::elisp::{print, string_escape};
 
     // ---- Base64 standard ----
 
@@ -1418,6 +1419,28 @@ mod tests {
     fn secure_hash_md5_known() {
         let r = builtin_secure_hash(vec![Value::symbol("md5"), Value::string("abc")]).unwrap();
         assert_eq!(r.as_str(), Some("900150983cd24fb0d6963f7d28e17f72"));
+    }
+
+    #[test]
+    fn secure_hash_binary_string_uses_unibyte_storage() {
+        let r = builtin_secure_hash(vec![
+            Value::symbol("sha1"),
+            Value::string("abc"),
+            Value::Nil,
+            Value::Nil,
+            Value::True,
+        ])
+        .unwrap();
+
+        let s = r.as_str().expect("binary secure-hash should return a string");
+        assert_eq!(string_escape::storage_byte_len(s), 20);
+        assert_eq!(
+            string_escape::decode_storage_char_codes(s).first(),
+            Some(&169)
+        );
+
+        let printed = print::print_value_bytes(&r);
+        assert_eq!(&printed[..3], b"\"\xC0\xA9");
     }
 
     #[test]
