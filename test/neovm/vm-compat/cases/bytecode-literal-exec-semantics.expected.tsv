@@ -83,3 +83,6 @@
 83	(funcall (car (read-from-string "#[nil \"\\300\\301\\1\\207\" [1 2] 3]")))	OK 1
 84	(funcall (car (read-from-string "#[nil \"\\300\\211\\134\\207\" [7] 2]")))	OK 14
 85	(funcall (car (read-from-string "#[nil \"\\300\\301\\210\\207\" [1 2] 2]")))	OK 1
+86	(funcall (car (read-from-string "#[(x) \"\\10\\133\\207\" [x] 1]")) 7)	OK -7
+87	(progn (set 'x 99) (funcall (car (read-from-string "#[nil \"\\300\\112\\207\" [x] 1]"))))	OK 99
+88	(progn (put 'x 'p 42) (funcall (car (read-from-string "#[nil \"\\300\\301\\116\\207\" [x p] 2]"))))	OK 42
