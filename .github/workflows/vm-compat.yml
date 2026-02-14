@@ -149,6 +149,13 @@ jobs:
         run: |
           RUSTFLAGS='-Awarnings' make check-all-neovm
 
+      - name: Check builtin registry fboundp parity
+        working-directory: test/neovm/vm-compat
+        env:
+          NEOVM_ORACLE_EMACS: /usr/bin/emacs
+        run: |
+          make check-builtin-registry-fboundp
+
   neovm-vm-compat-legacy-elc:
     runs-on: ubuntu-latest
     timeout-minutes: 20
