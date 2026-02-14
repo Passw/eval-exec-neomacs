@@ -163,6 +163,31 @@
     (with-temp-buffer
       (insert "abc")
       (goto-char 1)
+      (set-mark 3)
+      (call-interactively 'upcase-initials-region)
+      (buffer-string))
+  (error err))
+
+(condition-case err
+    (with-temp-buffer
+      (insert "abc")
+      (goto-char 1)
+      (set-mark 3)
+      (command-execute 'upcase-initials-region)
+      (buffer-string))
+  (error err))
+
+(condition-case err
+    (with-temp-buffer
+      (insert "abc")
+      (goto-char 1)
+      (command-execute 'upcase-initials-region))
+  (error err))
+
+(condition-case err
+    (with-temp-buffer
+      (insert "abc")
+      (goto-char 1)
       (command-execute 'kill-region))
   (error err))
 
