@@ -64,6 +64,7 @@ Run all checked-in corpora in one shot:
 
 ```bash
 cd test/neovm/vm-compat
+make validate-case-lists
 make check-all
 make check-all-neovm
 ```
