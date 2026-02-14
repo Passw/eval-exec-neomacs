@@ -21,3 +21,8 @@
             (intern (format "vm-if-deep-noerror-%d" (1+ i)))))
     (setq i (1+ i)))
   (indirect-function 'vm-if-deep-noerror-0 t))
+(fset 'vm-if-cycle-self 'vm-if-cycle-self)
+(let ((a 'vm-if-cycle-a)
+      (b 'vm-if-cycle-b))
+  (fset a b)
+  (fset b a))
