@@ -444,22 +444,6 @@ impl<'a> Parser<'a> {
         }
     }
 
-    fn parse_vector_paren(&mut self) -> Result<Expr, ParseError> {
-        self.expect('(')?;
-        let mut items = Vec::new();
-        loop {
-            self.skip_ws_and_comments();
-            match self.current() {
-                Some(')') => {
-                    self.bump();
-                    return Ok(Expr::Vector(items));
-                }
-                Some(_) => items.push(self.parse_expr()?),
-                None => return Err(self.error("unterminated vector")),
-            }
-        }
-    }
-
     fn parse_hash_skip_bytes(&mut self) -> Result<Expr, ParseError> {
         self.expect('@')?;
         let len = self.parse_decimal_usize()?;
