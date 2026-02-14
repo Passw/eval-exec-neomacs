@@ -1,15 +1,18 @@
 FORMS ?= cases/core.forms
 EXPECTED ?= cases/core.expected.tsv
 NEOVM_OUT ?= cases/core.neovm.tsv
+
+read_case_list = $(strip $(shell awk 'NF && $$1 !~ /^#/' $(1) | tr '\n' ' '))
+
 CASES_LIST ?= cases/default.list
-CASES ?= $(shell awk 'NF && $$1 !~ /^#/' $(CASES_LIST) | tr '\n' ' ')
+CASES ?= $(call read_case_list,$(CASES_LIST))
 NEOVM_ONLY_CASES_LIST ?= cases/neovm-only.list
-NEOVM_ONLY_CASES ?= $(shell awk 'NF && $$1 !~ /^#/' $(NEOVM_ONLY_CASES_LIST) | tr '\n' ' ')
+NEOVM_ONLY_CASES ?= $(call read_case_list,$(NEOVM_ONLY_CASES_LIST))
 ALL_NEOVM_CASES ?= $(CASES) $(NEOVM_ONLY_CASES)
 INTROSPECTION_CASES_LIST ?= cases/introspection.list
-INTROSPECTION_CASES ?= $(shell awk 'NF && $$1 !~ /^#/' $(INTROSPECTION_CASES_LIST) | tr '\n' ' ')
+INTROSPECTION_CASES ?= $(call read_case_list,$(INTROSPECTION_CASES_LIST))
 THREAD_CASES_LIST ?= cases/thread.list
-THREAD_CASES ?= $(shell awk 'NF && $$1 !~ /^#/' $(THREAD_CASES_LIST) | tr '\n' ' ')
+THREAD_CASES ?= $(call read_case_list,$(THREAD_CASES_LIST))
 BENCH_SOURCE ?= cases/load-policy-fixtures/vm-policy-cache-probe.el
 BENCH_ITERS ?= 100
 ERT_ALLOWLIST ?= cases/ert-allowlist-smoke.txt
