@@ -8080,13 +8080,21 @@ neomacs_ring_bell (struct frame *f)
 {
   struct neomacs_display_info *dpyinfo = FRAME_NEOMACS_DISPLAY_INFO (f);
 
-  /* GPU visual bell flash (brief white overlay that fades out) */
-  if (dpyinfo && dpyinfo->display_handle)
-    neomacs_display_visual_bell (dpyinfo->display_handle);
+  if (!(dpyinfo && dpyinfo->display_handle))
+    return;
 
-  /* Terminal bell as fallback when visible-bell is not set */
-  if (!visible_bell)
-    write (STDOUT_FILENO, "\a", 1);
+  if (visible_bell)
+    {
+      /* GPU visual bell flash (brief white overlay that fades out).  */
+      neomacs_display_visual_bell (dpyinfo->display_handle);
+    }
+  else
+    {
+      /* Keep GUI bell behavior inside the window system backend.
+         Writing '\a' to stdout couples bell behavior to the launching
+         terminal and changes behavior when stdout/stderr are redirected.  */
+      neomacs_display_request_attention (dpyinfo->display_handle, 0);
+    }
 }
 
 /* Toggle invisible mouse pointer.  */
