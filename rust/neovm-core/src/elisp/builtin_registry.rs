@@ -846,6 +846,7 @@ const DISPATCH_BUILTIN_NAMES: &[&str] = &[
     "universal-argument",
     "unibyte-char-to-multibyte",
     "unibyte-charset",
+    "unibyte-string",
     "unibyte-string-p",
     "unintern",
     "upcase-char",

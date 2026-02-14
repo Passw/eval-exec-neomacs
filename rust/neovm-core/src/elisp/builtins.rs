@@ -5,8 +5,9 @@
 
 use super::error::{signal, EvalResult, Flow};
 use super::string_escape::{
-    bytes_to_storage_string, decode_storage_char_codes, encode_nonunicode_char_for_storage,
-    storage_char_len, storage_string_display_width, storage_substring,
+    bytes_to_storage_string, bytes_to_unibyte_storage_string, decode_storage_char_codes,
+    encode_nonunicode_char_for_storage, storage_char_len, storage_string_display_width,
+    storage_substring,
 };
 use super::value::*;
 use std::collections::HashSet;
@@ -3379,6 +3380,31 @@ pub(crate) fn builtin_string(args: Vec<Value>) -> EvalResult {
     Ok(Value::string(result))
 }
 
+/// `(unibyte-string &rest BYTES)` -> unibyte storage string.
+pub(crate) fn builtin_unibyte_string(args: Vec<Value>) -> EvalResult {
+    let mut bytes = Vec::with_capacity(args.len());
+    for arg in args {
+        let n = match arg {
+            Value::Int(v) => v,
+            Value::Char(c) => c as i64,
+            other => {
+                return Err(signal(
+                    "wrong-type-argument",
+                    vec![Value::symbol("integerp"), other],
+                ))
+            }
+        };
+        if !(0..=255).contains(&n) {
+            return Err(signal(
+                "args-out-of-range",
+                vec![Value::Int(n), Value::Int(0), Value::Int(255)],
+            ));
+        }
+        bytes.push(n as u8);
+    }
+    Ok(Value::string(bytes_to_unibyte_storage_string(&bytes)))
+}
+
 pub(crate) fn builtin_string_to_list(args: Vec<Value>) -> EvalResult {
     expect_args("string-to-list", &args, 1)?;
     let s = expect_string(&args[0])?;
@@ -5016,6 +5042,8 @@ enum PureBuiltinId {
     Concat,
     #[strum(serialize = "string")]
     String,
+    #[strum(serialize = "unibyte-string")]
+    UnibyteString,
     #[strum(serialize = "string-to-number")]
     StringToNumber,
     #[strum(serialize = "number-to-string")]
@@ -5203,6 +5231,7 @@ fn dispatch_builtin_id_pure(id: PureBuiltinId, args: Vec<Value>) -> EvalResult {
         PureBuiltinId::Substring => builtin_substring(args),
         PureBuiltinId::Concat => builtin_concat(args),
         PureBuiltinId::String => builtin_string(args),
+        PureBuiltinId::UnibyteString => builtin_unibyte_string(args),
         PureBuiltinId::StringToNumber => builtin_string_to_number(args),
         PureBuiltinId::NumberToString => builtin_number_to_string(args),
         PureBuiltinId::Upcase => builtin_upcase(args),
@@ -7646,6 +7675,61 @@ mod tests {
         .expect("builtin string should resolve")
         .expect("builtin string should evaluate");
         assert_eq!(result, Value::string("ABC"));
+    }
+
+    #[test]
+    fn pure_dispatch_typed_unibyte_string_round_trips_bytes() {
+        let s = dispatch_builtin_pure(
+            "unibyte-string",
+            vec![Value::Int(65), Value::Int(255), Value::Int(66)],
+        )
+        .expect("builtin unibyte-string should resolve")
+        .expect("builtin unibyte-string should evaluate");
+
+        let len = dispatch_builtin_pure("string-bytes", vec![s.clone()])
+            .expect("builtin string-bytes should resolve")
+            .expect("builtin string-bytes should evaluate");
+        assert_eq!(len, Value::Int(3));
+
+        let a = dispatch_builtin_pure("aref", vec![s.clone(), Value::Int(0)])
+            .expect("builtin aref should resolve")
+            .expect("builtin aref should evaluate");
+        assert_eq!(a, Value::Int(65));
+
+        let ff = dispatch_builtin_pure("aref", vec![s.clone(), Value::Int(1)])
+            .expect("builtin aref should resolve")
+            .expect("builtin aref should evaluate");
+        assert_eq!(ff, Value::Int(255));
+
+        let b = dispatch_builtin_pure("aref", vec![s, Value::Int(2)])
+            .expect("builtin aref should resolve")
+            .expect("builtin aref should evaluate");
+        assert_eq!(b, Value::Int(66));
+    }
+
+    #[test]
+    fn pure_dispatch_typed_unibyte_string_validates_range_and_type() {
+        let out_of_range = dispatch_builtin_pure("unibyte-string", vec![Value::Int(256)])
+            .expect("builtin unibyte-string should resolve")
+            .expect_err("expected args-out-of-range");
+        match out_of_range {
+            Flow::Signal(sig) => {
+                assert_eq!(sig.symbol, "args-out-of-range");
+                assert_eq!(sig.data, vec![Value::Int(256), Value::Int(0), Value::Int(255)]);
+            }
+            other => panic!("expected signal flow, got {other:?}"),
+        }
+
+        let wrong_type = dispatch_builtin_pure("unibyte-string", vec![Value::string("x")])
+            .expect("builtin unibyte-string should resolve")
+            .expect_err("expected wrong-type-argument");
+        match wrong_type {
+            Flow::Signal(sig) => {
+                assert_eq!(sig.symbol, "wrong-type-argument");
+                assert_eq!(sig.data, vec![Value::symbol("integerp"), Value::string("x")]);
+            }
+            other => panic!("expected signal flow, got {other:?}"),
+        }
     }
 
     #[test]
