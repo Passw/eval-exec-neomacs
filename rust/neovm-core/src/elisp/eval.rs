@@ -2605,7 +2605,9 @@ mod tests {
                v)
              (funcall (car (read-from-string \"#[(x y) \\\"\\\\10\\\\11\\\\245\\\\207\\\" [x y] 2]\")) 7 2)
              (funcall (car (read-from-string \"#[(x y) \\\"\\\\10\\\\11\\\\246\\\\207\\\" [x y] 2]\")) 7 2)
-             (funcall (car (read-from-string \"#[(x y z) \\\"\\\\10\\\\11\\\\12\\\\303\\\\304\\\\305\\\\257\\\\6\\\\207\\\" [x y z 1 2 3] 6]\")) 'a 'b 'c)",
+             (funcall (car (read-from-string \"#[(x y z) \\\"\\\\10\\\\11\\\\12\\\\303\\\\304\\\\305\\\\257\\\\6\\\\207\\\" [x y z 1 2 3] 6]\")) 'a 'b 'c)
+             (funcall (car (read-from-string \"#[(x y) \\\"\\\\10\\\\11\\\\235\\\\207\\\" [x y] 2]\")) 'b '(a b c))
+             (funcall (car (read-from-string \"#[(x) \\\"\\\\10\\\\237\\\\207\\\" [x] 1]\")) '(1 2 3))",
         );
         assert_eq!(results[0], "OK t");
         assert_eq!(results[1], "OK t");
@@ -2623,6 +2625,8 @@ mod tests {
         assert_eq!(results[13], "OK 3");
         assert_eq!(results[14], "OK 1");
         assert_eq!(results[15], "OK (a b c 1 2 3)");
+        assert_eq!(results[16], "OK (b c)");
+        assert_eq!(results[17], "OK (3 2 1)");
     }
 
     #[test]
