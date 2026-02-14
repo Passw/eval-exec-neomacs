@@ -1950,6 +1950,9 @@ pub(crate) fn builtin_fset(eval: &mut super::eval::Evaluator, args: Vec<Value>) 
             vec![Value::symbol("symbolp"), args[0].clone()],
         )
     })?;
+    if name == "nil" {
+        return Err(signal("setting-constant", vec![Value::symbol("nil")]));
+    }
     let def = super::compiled_literal::maybe_coerce_compiled_literal_function(args[1].clone());
     if would_create_function_alias_cycle(eval, name, &def) {
         return Err(signal(
@@ -7321,6 +7324,34 @@ mod tests {
             }
             other => panic!("unexpected flow: {other:?}"),
         }
+    }
+
+    #[test]
+    fn fset_nil_signals_setting_constant() {
+        let mut eval = crate::elisp::eval::Evaluator::new();
+
+        let err = builtin_fset(&mut eval, vec![Value::Nil, Value::symbol("car")])
+            .expect_err("fset should reject writing nil's function cell");
+        match err {
+            Flow::Signal(sig) => {
+                assert_eq!(sig.symbol, "setting-constant");
+                assert_eq!(sig.data, vec![Value::symbol("nil")]);
+            }
+            other => panic!("unexpected flow: {other:?}"),
+        }
+    }
+
+    #[test]
+    fn fset_t_accepts_symbol_cell_updates() {
+        let mut eval = crate::elisp::eval::Evaluator::new();
+
+        let result = builtin_fset(&mut eval, vec![Value::True, Value::symbol("car")])
+            .expect("fset should allow writing t's function cell");
+        assert_eq!(result, Value::symbol("car"));
+
+        let resolved = builtin_indirect_function(&mut eval, vec![Value::True])
+            .expect("indirect-function should resolve t after fset");
+        assert_eq!(resolved, Value::Subr("car".to_string()));
     }
 
     #[test]

@@ -1077,15 +1077,18 @@ impl Evaluator {
         let def = super::compiled_literal::maybe_coerce_compiled_literal_function(
             self.eval(&tail[1])?,
         );
-        let name = match &sym {
-            Value::Symbol(s) => s.clone(),
-            _ => {
-                return Err(signal(
+        let name = sym
+            .as_symbol_name()
+            .map(str::to_string)
+            .ok_or_else(|| {
+                signal(
                     "wrong-type-argument",
-                    vec![Value::symbol("symbolp"), sym],
-                ))
-            }
-        };
+                    vec![Value::symbol("symbolp"), sym.clone()],
+                )
+            })?;
+        if name == "nil" {
+            return Err(signal("setting-constant", vec![Value::symbol("nil")]));
+        }
         if builtins::would_create_function_alias_cycle(self, &name, &def) {
             return Err(signal(
                 "cyclic-function-indirection",
@@ -2088,6 +2091,26 @@ mod tests {
         );
         assert_eq!(results[0], "OK vm-da-a");
         assert_eq!(results[1], "OK (cyclic-function-indirection vm-da-b)");
+    }
+
+    #[test]
+    fn defalias_nil_signals_setting_constant() {
+        let result = eval_one(
+            "(condition-case err
+                 (defalias nil 'car)
+               (error err))",
+        );
+        assert_eq!(result, "OK (setting-constant nil)");
+    }
+
+    #[test]
+    fn defalias_t_accepts_symbol_cell_updates() {
+        let results = eval_all(
+            "(defalias t 'car)
+             (symbol-function t)",
+        );
+        assert_eq!(results[0], "OK t");
+        assert_eq!(results[1], "OK car");
     }
 
     #[test]
