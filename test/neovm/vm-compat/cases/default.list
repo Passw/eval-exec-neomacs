@@ -24,6 +24,7 @@ cases/fset-noncallable-function-cell-semantics
 cases/fset-t-function-cell-semantics
 cases/fset-keyword-function-cell-semantics
 cases/fset-alias-cycle-symbol-designator-semantics
+cases/symbol-designator-introspection-semantics
 cases/special-form-edges
 cases/special-form-arity-errors
 cases/special-form-type-errors
