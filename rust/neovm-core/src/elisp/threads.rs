@@ -557,6 +557,12 @@ pub(crate) fn builtin_thread_join(
             vec![Value::symbol("threadp"), args[0].clone()],
         ));
     }
+    if id == eval.threads.current_thread_id() {
+        return Err(signal(
+            "error",
+            vec![Value::string("Cannot join current thread")],
+        ));
+    }
     Ok(eval.threads.thread_result(id))
 }
 
@@ -1249,6 +1255,21 @@ mod tests {
     }
 
     #[test]
+    fn test_builtin_thread_join_current_thread_errors() {
+        let mut eval = Evaluator::new();
+        let current = builtin_current_thread(&mut eval, vec![]).unwrap();
+        let result = builtin_thread_join(&mut eval, vec![current]);
+        match result {
+            Err(Flow::Signal(sig)) => {
+                assert_eq!(sig.symbol, "error");
+                assert_eq!(sig.data.len(), 1);
+                assert_eq!(sig.data[0].as_str(), Some("Cannot join current thread"));
+            }
+            other => panic!("expected error signal for self-join, got {other:?}"),
+        }
+    }
+
+    #[test]
     fn test_builtin_thread_signal_non_current_is_noop() {
         let mut eval = Evaluator::new();
         let tid_val = builtin_make_thread(
@@ -1296,13 +1317,8 @@ mod tests {
     #[test]
     fn test_builtin_thread_last_error_cleanup() {
         let mut eval = Evaluator::new();
-        let current = builtin_current_thread(&mut eval, vec![]).unwrap();
-        // Signal on main thread to set last_error
-        builtin_thread_signal(
-            &mut eval,
-            vec![current, Value::symbol("err"), Value::Nil],
-        )
-        .unwrap();
+        eval.threads
+            .signal_thread(0, Value::list(vec![Value::symbol("err"), Value::Int(1)]));
 
         let e1 = builtin_thread_last_error(&mut eval, vec![Value::Nil]).unwrap();
         assert!(e1.is_truthy());
