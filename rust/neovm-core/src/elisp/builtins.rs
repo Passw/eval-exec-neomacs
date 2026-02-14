@@ -3531,30 +3531,40 @@ pub(crate) fn builtin_nconc(args: Vec<Value>) -> EvalResult {
 pub(crate) fn builtin_alist_get(args: Vec<Value>) -> EvalResult {
     expect_min_args("alist-get", &args, 2)?;
     let key = &args[0];
-    let alist = list_to_vec(&args[1]).ok_or_else(|| {
-        signal(
-            "wrong-type-argument",
-            vec![Value::symbol("listp"), args[1].clone()],
-        )
-    })?;
     let default = args.get(2).cloned().unwrap_or(Value::Nil);
     let _remove = args.get(3); // not used
     let use_equal = args.get(4).is_some_and(|v| v.is_truthy());
 
-    for entry in &alist {
-        if let Value::Cons(cell) = entry {
-            let pair = cell.lock().expect("poisoned");
-            let matches = if use_equal {
-                equal_value(key, &pair.car, 0)
-            } else {
-                eq_value(key, &pair.car)
-            };
-            if matches {
-                return Ok(pair.cdr.clone());
+    let mut cursor = args[1].clone();
+    loop {
+        match cursor {
+            Value::Nil => return Ok(default),
+            Value::Cons(cell) => {
+                let pair = cell.lock().expect("poisoned");
+                let entry = pair.car.clone();
+                cursor = pair.cdr.clone();
+                drop(pair);
+
+                if let Value::Cons(entry_cell) = entry {
+                    let entry_pair = entry_cell.lock().expect("poisoned");
+                    let matches = if use_equal {
+                        equal_value(key, &entry_pair.car, 0)
+                    } else {
+                        eq_value(key, &entry_pair.car)
+                    };
+                    if matches {
+                        return Ok(entry_pair.cdr.clone());
+                    }
+                }
+            }
+            _ => {
+                return Err(signal(
+                    "wrong-type-argument",
+                    vec![Value::symbol("listp"), args[1].clone()],
+                ))
             }
         }
     }
-    Ok(default)
 }
 
 pub(crate) fn builtin_number_sequence(args: Vec<Value>) -> EvalResult {
