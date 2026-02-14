@@ -172,5 +172,7 @@ Post-freeze updates:
   - `cases/nconc-destructive-semantics`
 - Added destructive element-removal compatibility case:
   - `cases/delete-delq-semantics`
+- Added destructive ordering compatibility case:
+  - `cases/sort-semantics`
 - Full NeoVM gate is green with these additions:
   - `make check-all-neovm`
