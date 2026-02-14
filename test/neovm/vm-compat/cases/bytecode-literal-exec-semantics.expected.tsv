@@ -67,3 +67,14 @@
 67	(funcall (car (read-from-string "#[(x y) \"\\302\\10\\11\\42\\207\" [x y assoc] 3]")) 'b '((a . 1) (b . 2)))	OK (b . 2)
 68	(funcall (car (read-from-string "#[(x y) \"\\10\\11\\244\\207\" [x y] 2]")) '(1) '(2))	OK (1 2)
 69	(funcall (car (read-from-string "#[(x y z) \"\\10\\11\\244\\12\\244\\207\" [x y z] 3]")) '(1) '(2) '(3))	OK (1 2 3)
+70	(funcall (car (read-from-string "#[(x) \"\\301\\10\\41\\207\" [x string-to-number] 2]")) "42.5")	OK 42.5
+71	(funcall (car (read-from-string "#[(x) \"\\301\\10\\41\\207\" [x number-to-string] 2]")) 42)	OK "42"
+72	(funcall (car (read-from-string "#[(x) \"\\301\\10\\41\\207\" [x char-to-string] 2]")) 65)	OK "A"
+73	(funcall (car (read-from-string "#[(x) \"\\301\\10\\41\\207\" [x string-to-char] 2]")) "Az")	OK 65
+74	(funcall (car (read-from-string "#[(x) \"\\301\\10\\41\\207\" [x float] 2]")) 7)	OK 7.0
+75	(funcall (car (read-from-string "#[(x) \"\\301\\10\\41\\207\" [x truncate] 2]")) -3.7)	OK -3
+76	(funcall (car (read-from-string "#[(x) \"\\301\\10\\41\\207\" [x ceiling] 2]")) 3.2)	OK 4
+77	(funcall (car (read-from-string "#[(x y) \"\\302\\10\\11\\42\\207\" [x y logior] 3]")) 6 3)	OK 7
+78	(funcall (car (read-from-string "#[(x y) \"\\302\\10\\11\\42\\207\" [x y logxor] 3]")) 6 3)	OK 5
+79	(funcall (car (read-from-string "#[(x) \"\\301\\10\\41\\207\" [x lognot] 2]")) 0)	OK -1
+80	(funcall (car (read-from-string "#[(x y) \"\\302\\10\\11\\42\\207\" [x y ash] 3]")) 3 2)	OK 12

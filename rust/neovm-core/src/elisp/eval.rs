@@ -2617,7 +2617,18 @@ mod tests {
              (funcall (car (read-from-string \"#[(x y) \\\"\\\\302\\\\10\\\\11\\\\42\\\\207\\\" [x y vector] 3]\")) 1 2)
              (funcall (car (read-from-string \"#[(x y) \\\"\\\\302\\\\10\\\\11\\\\42\\\\207\\\" [x y assoc] 3]\")) 'b '((a . 1) (b . 2)))
              (funcall (car (read-from-string \"#[(x y) \\\"\\\\10\\\\11\\\\244\\\\207\\\" [x y] 2]\")) '(1) '(2))
-             (funcall (car (read-from-string \"#[(x y z) \\\"\\\\10\\\\11\\\\244\\\\12\\\\244\\\\207\\\" [x y z] 3]\")) '(1) '(2) '(3))",
+             (funcall (car (read-from-string \"#[(x y z) \\\"\\\\10\\\\11\\\\244\\\\12\\\\244\\\\207\\\" [x y z] 3]\")) '(1) '(2) '(3))
+             (funcall (car (read-from-string \"#[(x) \\\"\\\\301\\\\10\\\\41\\\\207\\\" [x string-to-number] 2]\")) \"42.5\")
+             (funcall (car (read-from-string \"#[(x) \\\"\\\\301\\\\10\\\\41\\\\207\\\" [x number-to-string] 2]\")) 42)
+             (funcall (car (read-from-string \"#[(x) \\\"\\\\301\\\\10\\\\41\\\\207\\\" [x char-to-string] 2]\")) 65)
+             (funcall (car (read-from-string \"#[(x) \\\"\\\\301\\\\10\\\\41\\\\207\\\" [x string-to-char] 2]\")) \"Az\")
+             (funcall (car (read-from-string \"#[(x) \\\"\\\\301\\\\10\\\\41\\\\207\\\" [x float] 2]\")) 7)
+             (funcall (car (read-from-string \"#[(x) \\\"\\\\301\\\\10\\\\41\\\\207\\\" [x truncate] 2]\")) -3.7)
+             (funcall (car (read-from-string \"#[(x) \\\"\\\\301\\\\10\\\\41\\\\207\\\" [x ceiling] 2]\")) 3.2)
+             (funcall (car (read-from-string \"#[(x y) \\\"\\\\302\\\\10\\\\11\\\\42\\\\207\\\" [x y logior] 3]\")) 6 3)
+             (funcall (car (read-from-string \"#[(x y) \\\"\\\\302\\\\10\\\\11\\\\42\\\\207\\\" [x y logxor] 3]\")) 6 3)
+             (funcall (car (read-from-string \"#[(x) \\\"\\\\301\\\\10\\\\41\\\\207\\\" [x lognot] 2]\")) 0)
+             (funcall (car (read-from-string \"#[(x y) \\\"\\\\302\\\\10\\\\11\\\\42\\\\207\\\" [x y ash] 3]\")) 3 2)",
         );
         assert_eq!(results[0], "OK t");
         assert_eq!(results[1], "OK t");
@@ -2647,6 +2658,17 @@ mod tests {
         assert_eq!(results[25], "OK (b . 2)");
         assert_eq!(results[26], "OK (1 2)");
         assert_eq!(results[27], "OK (1 2 3)");
+        assert_eq!(results[28], "OK 42.5");
+        assert_eq!(results[29], "OK \"42\"");
+        assert_eq!(results[30], "OK \"A\"");
+        assert_eq!(results[31], "OK 65");
+        assert_eq!(results[32], "OK 7.0");
+        assert_eq!(results[33], "OK -3");
+        assert_eq!(results[34], "OK 4");
+        assert_eq!(results[35], "OK 7");
+        assert_eq!(results[36], "OK 5");
+        assert_eq!(results[37], "OK -1");
+        assert_eq!(results[38], "OK 12");
     }
 
     #[test]
