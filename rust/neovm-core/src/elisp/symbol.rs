@@ -48,6 +48,7 @@ impl SymbolData {
 #[derive(Clone, Debug)]
 pub struct Obarray {
     symbols: HashMap<String, SymbolData>,
+    function_epoch: u64,
 }
 
 impl Default for Obarray {
@@ -60,6 +61,7 @@ impl Obarray {
     pub fn new() -> Self {
         let mut ob = Self {
             symbols: HashMap::new(),
+            function_epoch: 0,
         };
 
         // Pre-intern fundamental symbols
@@ -132,12 +134,14 @@ impl Obarray {
     pub fn set_symbol_function(&mut self, name: &str, function: Value) {
         let sym = self.get_or_intern(name);
         sym.function = Some(function);
+        self.function_epoch = self.function_epoch.wrapping_add(1);
     }
 
     /// Remove the function cell (fmakunbound).
     pub fn fmakunbound(&mut self, name: &str) {
         if let Some(sym) = self.symbols.get_mut(name) {
             sym.function = None;
+            self.function_epoch = self.function_epoch.wrapping_add(1);
         }
     }
 
@@ -237,7 +241,16 @@ impl Obarray {
 
     /// Remove a symbol from the obarray.  Returns `true` if it was present.
     pub fn unintern(&mut self, name: &str) -> bool {
-        self.symbols.remove(name).is_some()
+        let removed = self.symbols.remove(name).is_some();
+        if removed {
+            self.function_epoch = self.function_epoch.wrapping_add(1);
+        }
+        removed
+    }
+
+    /// Monotonic epoch for function-cell mutations.
+    pub fn function_epoch(&self) -> u64 {
+        self.function_epoch
     }
 }
 
@@ -266,10 +279,14 @@ mod tests {
     fn symbol_function_cell() {
         let mut ob = Obarray::new();
         assert!(!ob.fboundp("f"));
+        let start_epoch = ob.function_epoch();
         ob.set_symbol_function("f", Value::Subr("+".to_string()));
         assert!(ob.fboundp("f"));
+        assert!(ob.function_epoch() > start_epoch);
+        let after_set_epoch = ob.function_epoch();
         ob.fmakunbound("f");
         assert!(!ob.fboundp("f"));
+        assert!(ob.function_epoch() > after_set_epoch);
     }
 
     #[test]
