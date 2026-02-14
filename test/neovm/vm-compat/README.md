@@ -154,6 +154,7 @@ Post-freeze updates:
   - `cases/string-print-unicode-semantics`
   - `cases/string-nonunicode-char-semantics`
   - `cases/string-nonunicode-indexing-semantics`
+  - `cases/string-nonunicode-concat-semantics`
   - `cases/string-trim-semantics`
   - `cases/string-prefix-suffix-semantics`
   - `cases/string-join-semantics`
