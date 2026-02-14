@@ -747,6 +747,26 @@ pub(crate) fn builtin_nthcdr(args: Vec<Value>) -> EvalResult {
 }
 
 pub(crate) fn builtin_append(args: Vec<Value>) -> EvalResult {
+    fn extend_from_proper_list(out: &mut Vec<Value>, list: &Value) -> Result<(), Flow> {
+        let mut cursor = list.clone();
+        loop {
+            match cursor {
+                Value::Nil => return Ok(()),
+                Value::Cons(cell) => {
+                    let pair = cell.lock().expect("poisoned");
+                    out.push(pair.car.clone());
+                    cursor = pair.cdr.clone();
+                }
+                tail => {
+                    return Err(signal(
+                        "wrong-type-argument",
+                        vec![Value::symbol("listp"), tail],
+                    ))
+                }
+            }
+        }
+    }
+
     if args.is_empty() {
         return Ok(Value::Nil);
     }
@@ -757,8 +777,23 @@ pub(crate) fn builtin_append(args: Vec<Value>) -> EvalResult {
     // Collect all elements from all lists except the last, then use last as tail
     let mut elements: Vec<Value> = Vec::new();
     for arg in &args[..args.len() - 1] {
-        if let Some(items) = list_to_vec(arg) {
-            elements.extend(items);
+        match arg {
+            Value::Nil => {}
+            Value::Cons(_) => extend_from_proper_list(&mut elements, arg)?,
+            Value::Vector(v) => elements.extend(v.lock().expect("poisoned").iter().cloned()),
+            Value::Str(s) => {
+                elements.extend(
+                    decode_storage_char_codes(s)
+                        .into_iter()
+                        .map(|cp| Value::Int(cp as i64)),
+                );
+            }
+            _ => {
+                return Err(signal(
+                    "wrong-type-argument",
+                    vec![Value::symbol("sequencep"), arg.clone()],
+                ))
+            }
         }
     }
 
@@ -1399,16 +1434,39 @@ pub(crate) fn builtin_aset(args: Vec<Value>) -> EvalResult {
 }
 
 pub(crate) fn builtin_vconcat(args: Vec<Value>) -> EvalResult {
+    fn extend_from_proper_list(out: &mut Vec<Value>, list: &Value) -> Result<(), Flow> {
+        let mut cursor = list.clone();
+        loop {
+            match cursor {
+                Value::Nil => return Ok(()),
+                Value::Cons(cell) => {
+                    let pair = cell.lock().expect("poisoned");
+                    out.push(pair.car.clone());
+                    cursor = pair.cdr.clone();
+                }
+                tail => {
+                    return Err(signal(
+                        "wrong-type-argument",
+                        vec![Value::symbol("listp"), tail],
+                    ))
+                }
+            }
+        }
+    }
+
     let mut result = Vec::new();
     for arg in &args {
         match arg {
             Value::Vector(v) => result.extend(v.lock().expect("poisoned").iter().cloned()),
-            Value::Nil => {}
-            Value::Cons(_) => {
-                if let Some(items) = list_to_vec(arg) {
-                    result.extend(items);
-                }
+            Value::Str(s) => {
+                result.extend(
+                    decode_storage_char_codes(s)
+                        .into_iter()
+                        .map(|cp| Value::Int(cp as i64)),
+                );
             }
+            Value::Nil => {}
+            Value::Cons(_) => extend_from_proper_list(&mut result, arg)?,
             _ => {
                 return Err(signal(
                     "wrong-type-argument",
