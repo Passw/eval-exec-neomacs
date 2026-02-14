@@ -167,11 +167,92 @@ fn decode_opcode_subset(byte_stream: &str, const_len: usize) -> Option<Vec<Op>> 
                 pending.push(Pending::Op(Op::VarRef(idx as u16)));
                 pc += 2;
             }
+            // varref (wide 16-bit index)
+            0o017 => {
+                let idx = read_u16_operand(&bytes, pc + 1)? as usize;
+                if idx >= const_len {
+                    return None;
+                }
+                pending.push(Pending::Op(Op::VarRef(idx as u16)));
+                pc += 3;
+            }
+            // varset 0..5
+            0o020..=0o025 => {
+                let idx = (b - 0o020) as usize;
+                if idx >= const_len {
+                    return None;
+                }
+                pending.push(Pending::Op(Op::VarSet(idx as u16)));
+                pc += 1;
+            }
+            // varset (wide 8-bit index)
+            0o026 => {
+                let idx = *bytes.get(pc + 1)? as usize;
+                if idx >= const_len {
+                    return None;
+                }
+                pending.push(Pending::Op(Op::VarSet(idx as u16)));
+                pc += 2;
+            }
+            // varset (wide 16-bit index)
+            0o027 => {
+                let idx = read_u16_operand(&bytes, pc + 1)? as usize;
+                if idx >= const_len {
+                    return None;
+                }
+                pending.push(Pending::Op(Op::VarSet(idx as u16)));
+                pc += 3;
+            }
+            // varbind 0..5
+            0o030..=0o035 => {
+                let idx = (b - 0o030) as usize;
+                if idx >= const_len {
+                    return None;
+                }
+                pending.push(Pending::Op(Op::VarBind(idx as u16)));
+                pc += 1;
+            }
+            // varbind (wide 8-bit index)
+            0o036 => {
+                let idx = *bytes.get(pc + 1)? as usize;
+                if idx >= const_len {
+                    return None;
+                }
+                pending.push(Pending::Op(Op::VarBind(idx as u16)));
+                pc += 2;
+            }
+            // varbind (wide 16-bit index)
+            0o037 => {
+                let idx = read_u16_operand(&bytes, pc + 1)? as usize;
+                if idx >= const_len {
+                    return None;
+                }
+                pending.push(Pending::Op(Op::VarBind(idx as u16)));
+                pc += 3;
+            }
             // call 0..7 (function object already pushed on stack)
             0o040..=0o047 => {
                 let argc = (b - 0o040) as u8;
                 pending.push(Pending::Op(Op::Call(argc)));
                 pc += 1;
+            }
+            // unbind 0..5
+            0o050..=0o055 => {
+                let n = (b - 0o050) as u16;
+                pending.push(Pending::Op(Op::Unbind(n)));
+                pc += 1;
+            }
+            // unbind (wide 8-bit immediate)
+            0o056 => {
+                let n = *bytes.get(pc + 1)? as u16;
+                pending.push(Pending::Op(Op::Unbind(n)));
+                pc += 2;
+            }
+            // unbind (wide 16-bit immediate)
+            0o057 => {
+                let n = read_u16_operand(&bytes, pc + 1)?;
+                pending.push(Pending::Op(Op::Unbind(n)));
+                pc += 3;
             }
             // goto-if-nil (16-bit bytecode stream offset)
             0o203 => {
@@ -1115,6 +1196,114 @@ mod tests {
                 Op::VarRef(6),
                 Op::VarRef(7),
                 Op::List(8),
+                Op::Return,
+            ]
+        );
+    }
+
+    #[test]
+    fn decodes_wide16_varref_opcode_subset() {
+        let mut consts = Vec::new();
+        for i in 0..=300 {
+            consts.push(Value::Int(i));
+        }
+        let literal = Value::vector(vec![
+            Value::Nil,
+            Value::string("\u{F},\u{1}\u{87}"),
+            Value::vector(consts),
+            Value::Int(1),
+        ]);
+        let coerced = maybe_coerce_compiled_literal_function(literal);
+        let Value::ByteCode(bc) = coerced else {
+            panic!("expected Value::ByteCode");
+        };
+        assert_eq!(bc.ops, vec![Op::VarRef(300), Op::Return]);
+    }
+
+    #[test]
+    fn decodes_varset_opcode_subset() {
+        let literal = Value::vector(vec![
+            Value::list(vec![
+                Value::symbol("a"),
+                Value::symbol("b"),
+                Value::symbol("c"),
+                Value::symbol("d"),
+                Value::symbol("e"),
+                Value::symbol("f"),
+                Value::symbol("g"),
+                Value::symbol("h"),
+            ]),
+            Value::string("\u{9}\u{10}\u{8}\u{E}\u{7}\u{16}\u{6}\u{E}\u{6}\u{87}"),
+            Value::vector(vec![
+                Value::symbol("a"),
+                Value::symbol("b"),
+                Value::symbol("c"),
+                Value::symbol("d"),
+                Value::symbol("e"),
+                Value::symbol("f"),
+                Value::symbol("g"),
+                Value::symbol("h"),
+            ]),
+            Value::Int(2),
+        ]);
+        let coerced = maybe_coerce_compiled_literal_function(literal);
+        let Value::ByteCode(bc) = coerced else {
+            panic!("expected Value::ByteCode");
+        };
+        assert_eq!(
+            bc.ops,
+            vec![
+                Op::VarRef(1),
+                Op::VarSet(0),
+                Op::VarRef(0),
+                Op::VarRef(7),
+                Op::VarSet(6),
+                Op::VarRef(6),
+                Op::Return,
+            ]
+        );
+    }
+
+    #[test]
+    fn decodes_varbind_unbind_opcode_subset() {
+        let literal = Value::vector(vec![
+            Value::list(vec![
+                Value::symbol("a"),
+                Value::symbol("b"),
+                Value::symbol("c"),
+                Value::symbol("d"),
+                Value::symbol("e"),
+                Value::symbol("f"),
+                Value::symbol("g"),
+                Value::symbol("h"),
+            ]),
+            Value::string("\u{8}\u{18})\u{E}\u{7}\u{1E}\u{6}.\u{1}/,\u{1}\u{87}"),
+            Value::vector(vec![
+                Value::symbol("a"),
+                Value::symbol("b"),
+                Value::symbol("c"),
+                Value::symbol("d"),
+                Value::symbol("e"),
+                Value::symbol("f"),
+                Value::symbol("g"),
+                Value::symbol("h"),
+            ]),
+            Value::Int(2),
+        ]);
+        let coerced = maybe_coerce_compiled_literal_function(literal);
+        let Value::ByteCode(bc) = coerced else {
+            panic!("expected Value::ByteCode");
+        };
+        assert_eq!(
+            bc.ops,
+            vec![
+                Op::VarRef(0),
+                Op::VarBind(0),
+                Op::Unbind(1),
+                Op::VarRef(7),
+                Op::VarBind(6),
+                Op::Unbind(1),
+                Op::Unbind(300),
                 Op::Return,
             ]
         );
