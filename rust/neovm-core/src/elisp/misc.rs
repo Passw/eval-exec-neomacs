@@ -95,6 +95,27 @@ fn expect_character_code(val: &Value) -> Result<i64, Flow> {
     }
 }
 
+fn convert_unibyte_storage_to_multibyte(s: &str) -> String {
+    let mut out = String::with_capacity(s.len());
+    for ch in s.chars() {
+        let cp = ch as u32;
+        if (UNIBYTE_BYTE_SENTINEL_MIN..=UNIBYTE_BYTE_SENTINEL_MAX).contains(&cp) {
+            let byte = cp - UNIBYTE_BYTE_SENTINEL_BASE;
+            if byte <= 0x7F {
+                out.push(char::from_u32(byte).expect("ascii scalar"));
+            } else {
+                let raw_code = 0x3FFF00 + byte;
+                let encoded = encode_nonunicode_char_for_storage(raw_code)
+                    .expect("raw-byte code should be encodable");
+                out.push_str(&encoded);
+            }
+            continue;
+        }
+        out.push(ch);
+    }
+    out
+}
+
 // ===========================================================================
 // Special forms
 // ===========================================================================
@@ -473,26 +494,7 @@ pub(crate) fn builtin_string_match_p(args: Vec<Value>) -> EvalResult {
 pub(crate) fn builtin_string_to_multibyte(args: Vec<Value>) -> EvalResult {
     expect_args("string-to-multibyte", &args, 1)?;
     let s = expect_string(&args[0])?;
-
-    let mut out = String::with_capacity(s.len());
-    for ch in s.chars() {
-        let cp = ch as u32;
-        if (UNIBYTE_BYTE_SENTINEL_MIN..=UNIBYTE_BYTE_SENTINEL_MAX).contains(&cp) {
-            let byte = cp - UNIBYTE_BYTE_SENTINEL_BASE;
-            if byte <= 0x7F {
-                out.push(char::from_u32(byte).expect("ascii scalar"));
-            } else {
-                let raw_code = 0x3FFF00 + byte;
-                let encoded = encode_nonunicode_char_for_storage(raw_code)
-                    .expect("raw-byte code should be encodable");
-                out.push_str(&encoded);
-            }
-            continue;
-        }
-        out.push(ch);
-    }
-
-    Ok(Value::string(out))
+    Ok(Value::string(convert_unibyte_storage_to_multibyte(&s)))
 }
 
 /// `(string-to-unibyte STRING)` -- convert to unibyte storage.
@@ -556,16 +558,11 @@ pub(crate) fn builtin_string_as_unibyte(args: Vec<Value>) -> EvalResult {
     Ok(Value::string(bytes_to_unibyte_storage_string(&bytes)))
 }
 
-/// `(string-as-multibyte STRING)` -- identity.
+/// `(string-as-multibyte STRING)` -- reinterpret unibyte storage as multibyte.
 pub(crate) fn builtin_string_as_multibyte(args: Vec<Value>) -> EvalResult {
     expect_args("string-as-multibyte", &args, 1)?;
-    match &args[0] {
-        Value::Str(_) => Ok(args[0].clone()),
-        other => Err(signal(
-            "wrong-type-argument",
-            vec![Value::symbol("stringp"), other.clone()],
-        )),
-    }
+    let s = expect_string(&args[0])?;
+    Ok(Value::string(convert_unibyte_storage_to_multibyte(&s)))
 }
 
 /// `(unibyte-char-to-multibyte CHAR)` -- map 0..255 to multibyte/raw-byte char code.
@@ -1035,10 +1032,20 @@ mod tests {
     }
 
     #[test]
-    fn string_as_multibyte_identity() {
+    fn string_as_multibyte_identity_for_multibyte_input() {
         let s = Value::string("test");
         let result = builtin_string_as_multibyte(vec![s.clone()]).unwrap();
         assert!(equal_value(&s, &result, 0));
+    }
+
+    #[test]
+    fn string_as_multibyte_converts_unibyte_high_bytes_to_raw_byte_chars() {
+        let mut s = String::new();
+        s.push(char::from_u32(0xE3FF).expect("valid unibyte sentinel"));
+        let result = builtin_string_as_multibyte(vec![Value::string(s)]).unwrap();
+        let out = result.as_str().unwrap();
+        assert_eq!(string_escape::storage_byte_len(out), 2);
+        assert_eq!(string_escape::decode_storage_char_codes(out), vec![0x3FFFFF]);
     }
 
     // ----- char encoding conversions -----
