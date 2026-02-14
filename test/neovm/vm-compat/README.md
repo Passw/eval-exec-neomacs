@@ -148,6 +148,8 @@ Post-freeze updates:
 - Added obarray argument compatibility cases: `cases/intern-obarray-semantics` and `cases/obarray-arg-semantics`.
 - Added string primitive compatibility cases:
   - `cases/split-string-semantics`
+  - `cases/make-string-semantics`
+  - `cases/string-print-unicode-semantics`
   - `cases/string-trim-semantics`
   - `cases/string-prefix-suffix-semantics`
   - `cases/string-join-semantics`
