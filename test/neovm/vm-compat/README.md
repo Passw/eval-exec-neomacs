@@ -178,5 +178,7 @@ Post-freeze updates:
   - `cases/last-butlast-semantics`
 - Added higher-order map primitive compatibility case:
   - `cases/map-family-semantics`
+- Added `ignore` callable compatibility case:
+  - `cases/ignore-semantics`
 - Full NeoVM gate is green with these additions:
   - `make check-all-neovm`
