@@ -498,6 +498,47 @@ pub(crate) fn builtin_buffer_hash(args: Vec<Value>) -> EvalResult {
     Ok(Value::string("0"))
 }
 
+/// (buffer-hash &optional BUFFER-OR-NAME)
+/// Evaluator-aware implementation used at runtime.
+pub(crate) fn builtin_buffer_hash_eval(
+    eval: &mut super::eval::Evaluator,
+    args: Vec<Value>,
+) -> EvalResult {
+    expect_range_args("buffer-hash", &args, 0, 1)?;
+
+    let buffer_id = if args.is_empty() || args[0].is_nil() {
+        eval.buffers
+            .current_buffer()
+            .ok_or_else(|| signal("error", vec![Value::string("No current buffer")]))?
+            .id
+    } else {
+        match &args[0] {
+            Value::Buffer(id) => *id,
+            Value::Str(name) => eval
+                .buffers
+                .find_buffer_by_name(name)
+                .ok_or_else(|| signal("error", vec![Value::string(format!("No buffer named {name}"))]))?,
+            other => {
+                return Err(signal(
+                    "wrong-type-argument",
+                    vec![Value::symbol("stringp"), other.clone()],
+                ))
+            }
+        }
+    };
+
+    // GNU Emacs accepts killed buffer objects and hashes as empty content.
+    let text = eval
+        .buffers
+        .get(buffer_id)
+        .map(|buf| buf.buffer_string())
+        .unwrap_or_default();
+
+    let mut hasher = Sha1::new();
+    hasher.update(text.as_bytes());
+    Ok(Value::string(bytes_to_hex(&hasher.finalize())))
+}
+
 /// (locale-info ITEM)
 /// Stub: always returns nil.
 pub(crate) fn builtin_locale_info(args: Vec<Value>) -> EvalResult {
@@ -1072,6 +1113,47 @@ mod tests {
     fn buffer_hash_stub() {
         let r = builtin_buffer_hash(vec![]).unwrap();
         assert_eq!(r.as_str(), Some("0"));
+    }
+
+    #[test]
+    fn buffer_hash_eval_current_buffer_sha1() {
+        let mut eval = crate::elisp::eval::Evaluator::new();
+        let buf = eval.buffers.current_buffer_mut().expect("current buffer");
+        buf.delete_region(buf.point_min(), buf.point_max());
+        buf.insert("abc");
+        let r = builtin_buffer_hash_eval(&mut eval, vec![]).unwrap();
+        assert_eq!(r.as_str(), Some("a9993e364706816aba3e25717850c26c9cd0d89d"));
+    }
+
+    #[test]
+    fn buffer_hash_eval_by_name_sha1() {
+        let mut eval = crate::elisp::eval::Evaluator::new();
+        let buf = eval.buffers.current_buffer_mut().expect("current buffer");
+        buf.delete_region(buf.point_min(), buf.point_max());
+        buf.insert("abc");
+        let name = eval
+            .buffers
+            .current_buffer()
+            .expect("current buffer")
+            .name
+            .clone();
+        let r = builtin_buffer_hash_eval(&mut eval, vec![Value::string(name)]).unwrap();
+        assert_eq!(r.as_str(), Some("a9993e364706816aba3e25717850c26c9cd0d89d"));
+    }
+
+    #[test]
+    fn buffer_hash_eval_missing_name_errors() {
+        let mut eval = crate::elisp::eval::Evaluator::new();
+        match builtin_buffer_hash_eval(&mut eval, vec![Value::string("*missing*")]) {
+            Err(Flow::Signal(sig)) => {
+                assert_eq!(sig.symbol, "error");
+                assert_eq!(
+                    sig.data.first().and_then(|v| v.as_str()),
+                    Some("No buffer named *missing*")
+                );
+            }
+            other => panic!("expected error signal, got {other:?}"),
+        }
     }
 
     // ---- locale-info stub ----
