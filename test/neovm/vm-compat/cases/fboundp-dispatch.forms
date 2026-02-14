@@ -7,4 +7,7 @@
 (fboundp 'read-key-sequence-vector)
 (fboundp 'read-event)
 (fboundp 'read-char-exclusive)
+(fboundp 'recursive-edit)
+(fboundp 'top-level)
+(fboundp 'exit-recursive-edit)
 (fboundp 'definitely-not-a-builtin)
