@@ -2507,7 +2507,15 @@ mod tests {
              (funcall (car (read-from-string \"#[(x y) \\\"\\\\10\\\\11\\\\125\\\\207\\\" [x y] 2]\")) 7 7)
              (funcall (car (read-from-string \"#[(x y) \\\"\\\\10\\\\11\\\\125\\\\207\\\" [x y] 2]\")) 7 8)
              (funcall (car (read-from-string \"#[(x) \\\"\\\\10\\\\100\\\\207\\\" [x] 1]\")) '(1 2))
-             (funcall (car (read-from-string \"#[(x) \\\"\\\\10\\\\101\\\\207\\\" [x] 1]\")) '(1 2))",
+             (funcall (car (read-from-string \"#[(x) \\\"\\\\10\\\\101\\\\207\\\" [x] 1]\")) '(1 2))
+             (funcall (car (read-from-string \"#[(x) \\\"\\\\10\\\\203\\\\6\\\\0\\\\301\\\\207\\\\302\\\\207\\\" [x 1 2] 1]\")) t)
+             (funcall (car (read-from-string \"#[(x) \\\"\\\\10\\\\203\\\\6\\\\0\\\\301\\\\207\\\\302\\\\207\\\" [x 1 2] 1]\")) nil)
+             (funcall (car (read-from-string \"#[(x) \\\"\\\\10\\\\205\\\\5\\\\0\\\\301\\\\207\\\" [x 2] 1]\")) t)
+             (funcall (car (read-from-string \"#[(x) \\\"\\\\10\\\\205\\\\5\\\\0\\\\301\\\\207\\\" [x 2] 1]\")) nil)
+             (funcall (car (read-from-string \"#[(x) \\\"\\\\10\\\\206\\\\5\\\\0\\\\301\\\\207\\\" [x 2] 1]\")) t)
+             (funcall (car (read-from-string \"#[(x) \\\"\\\\10\\\\206\\\\5\\\\0\\\\301\\\\207\\\" [x 2] 1]\")) nil)
+             (funcall (car (read-from-string \"#[(x) \\\"\\\\10\\\\204\\\\6\\\\0\\\\301\\\\207\\\\302\\\\207\\\" [x 1 2] 1]\")) nil)
+             (funcall (car (read-from-string \"#[(x) \\\"\\\\10\\\\204\\\\6\\\\0\\\\301\\\\207\\\\302\\\\207\\\" [x 1 2] 1]\")) t)",
         );
         assert_eq!(results[0], "OK 42");
         assert_eq!(results[1], "OK vm-x");
@@ -2521,6 +2529,14 @@ mod tests {
         assert_eq!(results[9], "OK nil");
         assert_eq!(results[10], "OK 1");
         assert_eq!(results[11], "OK (2)");
+        assert_eq!(results[12], "OK 1");
+        assert_eq!(results[13], "OK 2");
+        assert_eq!(results[14], "OK 2");
+        assert_eq!(results[15], "OK nil");
+        assert_eq!(results[16], "OK t");
+        assert_eq!(results[17], "OK 2");
+        assert_eq!(results[18], "OK 1");
+        assert_eq!(results[19], "OK 2");
     }
 
     #[test]

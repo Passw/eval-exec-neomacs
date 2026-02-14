@@ -1,5 +1,7 @@
 //! Compatibility helpers for Emacs compiled-function reader literals (`#[...]`, `#(...)`).
 
+use std::collections::HashMap;
+
 use super::bytecode::{ByteCodeFunction, Op};
 use super::error::{signal, Flow};
 use super::value::{list_to_vec, LambdaParams, Value};
@@ -122,9 +124,21 @@ fn compiled_literal_vector_to_bytecode(
 }
 
 fn decode_opcode_subset(byte_stream: &str, const_len: usize) -> Option<Vec<Op>> {
+    enum Pending {
+        Op(Op),
+        GotoIfNil(usize),
+        GotoIfNotNil(usize),
+        GotoIfNilElsePop(usize),
+        GotoIfNotNilElsePop(usize),
+    }
+
     let bytes = decode_unibyte_stream(byte_stream)?;
-    let mut ops = Vec::with_capacity(bytes.len());
-    for b in bytes {
+    let mut pending = Vec::with_capacity(bytes.len());
+    let mut byte_to_op_index = HashMap::new();
+    let mut pc = 0usize;
+    while pc < bytes.len() {
+        let b = bytes[pc];
+        byte_to_op_index.insert(pc, pending.len());
         match b {
             // byte-constant 0..63
             0o300..=0o377 => {
@@ -132,7 +146,8 @@ fn decode_opcode_subset(byte_stream: &str, const_len: usize) -> Option<Vec<Op>> 
                 if idx >= const_len {
                     return None;
                 }
-                ops.push(Op::Constant(idx as u16));
+                pending.push(Pending::Op(Op::Constant(idx as u16)));
+                pc += 1;
             }
             // varref 0..7
             0o010..=0o017 => {
@@ -140,34 +155,121 @@ fn decode_opcode_subset(byte_stream: &str, const_len: usize) -> Option<Vec<Op>> 
                 if idx >= const_len {
                     return None;
                 }
-                ops.push(Op::VarRef(idx as u16));
+                pending.push(Pending::Op(Op::VarRef(idx as u16)));
+                pc += 1;
+            }
+            // goto-if-nil (16-bit bytecode stream offset)
+            0o203 => {
+                let target = read_u16_operand(&bytes, pc + 1)? as usize;
+                pending.push(Pending::GotoIfNil(target));
+                pc += 3;
+            }
+            // goto-if-not-nil (16-bit bytecode stream offset)
+            0o204 => {
+                let target = read_u16_operand(&bytes, pc + 1)? as usize;
+                pending.push(Pending::GotoIfNotNil(target));
+                pc += 3;
+            }
+            // goto-if-nil-else-pop (16-bit bytecode stream offset)
+            0o205 => {
+                let target = read_u16_operand(&bytes, pc + 1)? as usize;
+                pending.push(Pending::GotoIfNilElsePop(target));
+                pc += 3;
+            }
+            // goto-if-not-nil-else-pop (16-bit bytecode stream offset)
+            0o206 => {
+                let target = read_u16_operand(&bytes, pc + 1)? as usize;
+                pending.push(Pending::GotoIfNotNilElsePop(target));
+                pc += 3;
+            }
+            // not
+            0o077 => {
+                pending.push(Pending::Op(Op::Not));
+                pc += 1;
             }
             // car
-            0o100 => ops.push(Op::Car),
+            0o100 => {
+                pending.push(Pending::Op(Op::Car));
+                pc += 1;
+            }
             // cdr
-            0o101 => ops.push(Op::Cdr),
+            0o101 => {
+                pending.push(Pending::Op(Op::Cdr));
+                pc += 1;
+            }
             // 1- (sub1)
-            0o123 => ops.push(Op::Sub1),
+            0o123 => {
+                pending.push(Pending::Op(Op::Sub1));
+                pc += 1;
+            }
             // 1+ (add1)
-            0o124 => ops.push(Op::Add1),
+            0o124 => {
+                pending.push(Pending::Op(Op::Add1));
+                pc += 1;
+            }
             // numeric =
-            0o125 => ops.push(Op::Eqlsign),
+            0o125 => {
+                pending.push(Pending::Op(Op::Eqlsign));
+                pc += 1;
+            }
             // -
-            0o132 => ops.push(Op::Sub),
+            0o132 => {
+                pending.push(Pending::Op(Op::Sub));
+                pc += 1;
+            }
             // +
-            0o134 => ops.push(Op::Add),
+            0o134 => {
+                pending.push(Pending::Op(Op::Add));
+                pc += 1;
+            }
             // *
-            0o137 => ops.push(Op::Mul),
+            0o137 => {
+                pending.push(Pending::Op(Op::Mul));
+                pc += 1;
+            }
             // return
-            0o207 => ops.push(Op::Return),
+            0o207 => {
+                pending.push(Pending::Op(Op::Return));
+                pc += 1;
+            }
             _ => return None,
         }
     }
 
-    if ops.is_empty() {
+    if pending.is_empty() {
         return None;
     }
+
+    let mut ops = Vec::with_capacity(pending.len());
+    for item in pending {
+        let op = match item {
+            Pending::Op(op) => op,
+            Pending::GotoIfNil(target) => {
+                Op::GotoIfNil(*byte_to_op_index.get(&target)? as u32)
+            }
+            Pending::GotoIfNotNil(target) => {
+                Op::GotoIfNotNil(*byte_to_op_index.get(&target)? as u32)
+            }
+            Pending::GotoIfNilElsePop(target) => {
+                Op::GotoIfNilElsePop(*byte_to_op_index.get(&target)? as u32)
+            }
+            Pending::GotoIfNotNilElsePop(target) => {
+                Op::GotoIfNotNilElsePop(*byte_to_op_index.get(&target)? as u32)
+            }
+        };
+        ops.push(op);
+    }
+
     Some(ops)
+}
+
+fn read_u16_operand(bytes: &[u8], operand_start: usize) -> Option<u16> {
+    if operand_start + 1 >= bytes.len() {
+        return None;
+    }
+    let lo = bytes[operand_start] as u16;
+    let hi = bytes[operand_start + 1] as u16;
+    Some(lo | (hi << 8))
 }
 
 fn decode_unibyte_stream(byte_stream: &str) -> Option<Vec<u8>> {
@@ -358,6 +460,31 @@ mod tests {
             panic!("expected Value::ByteCode");
         };
         assert_eq!(bc.ops, vec![Op::VarRef(0), Op::Car, Op::Return]);
+    }
+
+    #[test]
+    fn decodes_if_branch_opcode_subset() {
+        let literal = Value::vector(vec![
+            Value::list(vec![Value::symbol("x")]),
+            Value::string("\u{8}\u{83}\u{6}\u{0}\u{C1}\u{87}\u{C2}\u{87}"),
+            Value::vector(vec![Value::symbol("x"), Value::Int(1), Value::Int(2)]),
+            Value::Int(1),
+        ]);
+        let coerced = maybe_coerce_compiled_literal_function(literal);
+        let Value::ByteCode(bc) = coerced else {
+            panic!("expected Value::ByteCode");
+        };
+        assert_eq!(
+            bc.ops,
+            vec![
+                Op::VarRef(0),
+                Op::GotoIfNil(4),
+                Op::Constant(1),
+                Op::Return,
+                Op::Constant(2),
+                Op::Return,
+            ]
+        );
     }
 
     #[test]
