@@ -443,8 +443,16 @@ impl<'a> Vm<'a> {
                     stack.push(Value::string(result));
                 }
                 Op::Substring => {
-                    // Handled via CallBuiltin in practice
-                    stack.push(Value::Nil);
+                    let to = stack.pop().unwrap_or(Value::Nil);
+                    let from = stack.pop().unwrap_or(Value::Int(0));
+                    let string = stack.pop().unwrap_or(Value::Nil);
+                    let args = if to.is_nil() {
+                        vec![string, from]
+                    } else {
+                        vec![string, from, to]
+                    };
+                    let result = self.dispatch_vm_builtin("substring", args)?;
+                    stack.push(result);
                 }
                 Op::StringEqual => {
                     let b = stack.pop().unwrap_or(Value::Nil);
