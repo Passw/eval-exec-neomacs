@@ -452,19 +452,6 @@ pub(crate) fn builtin_set_register(
 }
 
 // ===========================================================================
-// Pure builtins (no evaluator needed)
-// ===========================================================================
-
-/// (register-to-string REGISTER-DESCRIPTION) -> string
-///
-/// Not a real Emacs builtin, but useful: format a register char as string.
-pub(crate) fn builtin_register_to_string(args: Vec<Value>) -> EvalResult {
-    expect_args("register-to-string", &args, 1)?;
-    let reg = expect_register(&args[0])?;
-    Ok(Value::string(reg.to_string()))
-}
-
-// ===========================================================================
 // Tests
 // ===========================================================================
 
@@ -736,17 +723,6 @@ mod tests {
         assert!(result.is_ok());
         let desc = result.unwrap();
         assert!(desc.as_str().unwrap().contains("99"));
-    }
-
-    #[test]
-    fn test_builtin_register_to_string() {
-        let result = builtin_register_to_string(vec![Value::Char('a')]);
-        assert!(result.is_ok());
-        assert_eq!(result.unwrap().as_str(), Some("a"));
-
-        // Wrong arg count
-        let result = builtin_register_to_string(vec![]);
-        assert!(result.is_err());
     }
 
     #[test]
