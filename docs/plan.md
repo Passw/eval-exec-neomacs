@@ -6,6 +6,8 @@ Last updated: 2026-02-14
 
 - Full suite baseline verified after latest cleanup:
   - `cd test/neovm/vm-compat && make check-all-neovm` (pass)
+- Full suite re-verified after terminal parameter semantics slice:
+  - `cd test/neovm/vm-compat && NEOVM_ORACLE_EMACS=/nix/store/hql3zwz5b4ywd2qwx8jssp4dyb7nx4cb-emacs-30.2/bin/emacs make check-all-neovm` (pass)
 - Added a builtin-registry-wide `fboundp` parity checker against GNU Emacs `-Q`:
   - `test/neovm/vm-compat/check-builtin-registry-fboundp.sh`
   - allowlist: `test/neovm/vm-compat/cases/builtin-registry-fboundp-allowlist.txt`
@@ -31,6 +33,14 @@ Last updated: 2026-02-14
   - removed unexposed `downcase-char` helper
   - removed unexposed `find-coding-system` helper
   - removed unexposed `word-at-point` helper
+- Implemented `terminal-parameter` / `set-terminal-parameter` compatibility semantics:
+  - persisted terminal parameter values for symbol keys
+  - `terminal-parameter` enforces `symbolp` for PARAMETER
+  - `set-terminal-parameter` returns `nil` (and ignores non-symbol keys)
+- Added and enabled new oracle corpus:
+  - `test/neovm/vm-compat/cases/terminal-parameter-semantics.forms`
+  - `test/neovm/vm-compat/cases/terminal-parameter-semantics.expected.tsv`
+  - wired into `test/neovm/vm-compat/cases/default.list`
 - Kept branch green with targeted Rust tests and vm-compat checks after each slice.
 
 ## Doing
