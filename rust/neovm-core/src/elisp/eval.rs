@@ -1070,8 +1070,11 @@ impl Evaluator {
     }
 
     fn sf_defalias(&mut self, tail: &[Expr]) -> EvalResult {
-        if tail.len() < 2 {
-            return Err(signal("wrong-number-of-arguments", vec![]));
+        if !(2..=3).contains(&tail.len()) {
+            return Err(signal(
+                "wrong-number-of-arguments",
+                vec![Value::symbol("defalias"), Value::Int(tail.len() as i64)],
+            ));
         }
         let sym = self.eval(&tail[0])?;
         let def = super::compiled_literal::maybe_coerce_compiled_literal_function(
@@ -2111,6 +2114,18 @@ mod tests {
         );
         assert_eq!(results[0], "OK t");
         assert_eq!(results[1], "OK car");
+    }
+
+    #[test]
+    fn defalias_enforces_argument_count() {
+        let results = eval_all(
+            "(condition-case err (defalias) (error err))
+             (condition-case err (defalias 'vm-da-too-few) (error err))
+             (condition-case err (defalias 'vm-da-too-many 'car \"doc\" t) (error err))",
+        );
+        assert_eq!(results[0], "OK (wrong-number-of-arguments defalias 0)");
+        assert_eq!(results[1], "OK (wrong-number-of-arguments defalias 1)");
+        assert_eq!(results[2], "OK (wrong-number-of-arguments defalias 4)");
     }
 
     #[test]
