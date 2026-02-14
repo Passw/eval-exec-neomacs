@@ -929,40 +929,48 @@ pub(crate) fn builtin_string_lessp(args: Vec<Value>) -> EvalResult {
 
 pub(crate) fn builtin_substring(args: Vec<Value>) -> EvalResult {
     expect_min_args("substring", &args, 1)?;
+    expect_max_args("substring", &args, 3)?;
     let s = expect_string(&args[0])?;
     let chars: Vec<char> = s.chars().collect();
     let len = chars.len() as i64;
 
-    let from = if args.len() > 1 {
-        let n = expect_int(&args[1])?;
-        if n < 0 {
-            (len + n).max(0) as usize
+    let normalize_index = |value: &Value, default: i64| -> Result<i64, Flow> {
+        let raw = if value.is_nil() {
+            default
         } else {
-            n as usize
+            expect_int(value)?
+        };
+        let idx = if raw < 0 { len + raw } else { raw };
+        if idx < 0 || idx > len {
+            return Err(signal(
+                "args-out-of-range",
+                vec![args[0].clone(), args[1].clone(), args.get(2).cloned().unwrap_or(Value::Nil)],
+            ));
         }
+        Ok(idx)
+    };
+
+    let from = if args.len() > 1 {
+        normalize_index(&args[1], 0)?
     } else {
         0
-    };
+    } as usize;
 
     let to = if args.len() > 2 {
-        if args[2].is_nil() {
-            chars.len()
-        } else {
-            let n = expect_int(&args[2])?;
-            if n < 0 {
-                (len + n).max(0) as usize
-            } else {
-                n as usize
-            }
-        }
+        normalize_index(&args[2], len)?
     } else {
-        chars.len()
-    };
+        len
+    } as usize;
 
-    let from = from.min(chars.len());
-    let to = to.min(chars.len());
     if from > to {
-        return Ok(Value::string(""));
+        return Err(signal(
+            "args-out-of-range",
+            vec![
+                args[0].clone(),
+                args.get(1).cloned().unwrap_or(Value::Int(0)),
+                args.get(2).cloned().unwrap_or(Value::Nil),
+            ],
+        ));
     }
     let result: String = chars[from..to].iter().collect();
     Ok(Value::string(result))
