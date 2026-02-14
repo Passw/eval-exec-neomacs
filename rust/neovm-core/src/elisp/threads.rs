@@ -367,13 +367,31 @@ fn expect_min_args(name: &str, args: &[Value], min: usize) -> Result<(), Flow> {
     }
 }
 
-/// Extract a thread id from an `Int` value.
+fn tagged_object_value(tag: &str, id: u64) -> Value {
+    Value::cons(Value::symbol(tag), Value::Int(id as i64))
+}
+
+fn tagged_object_id(value: &Value, expected_tag: &str) -> Option<u64> {
+    let Value::Cons(cell) = value else {
+        return None;
+    };
+    let pair = cell.lock().expect("poisoned");
+    if pair.car.as_symbol_name() != Some(expected_tag) {
+        return None;
+    }
+    match pair.cdr {
+        Value::Int(n) if n >= 0 => Some(n as u64),
+        _ => None,
+    }
+}
+
+/// Extract a thread id from a `(thread . ID)` object.
 fn expect_thread_id(value: &Value) -> Result<u64, Flow> {
-    match value {
-        Value::Int(n) if *n >= 0 => Ok(*n as u64),
-        other => Err(signal(
+    match tagged_object_id(value, "thread") {
+        Some(id) => Ok(id),
+        None => Err(signal(
             "wrong-type-argument",
-            vec![Value::symbol("threadp"), other.clone()],
+            vec![Value::symbol("threadp"), value.clone()],
         )),
     }
 }
@@ -407,7 +425,7 @@ fn expect_cv_id(value: &Value) -> Result<u64, Flow> {
 /// `(make-thread FUNCTION &optional NAME)` -- create a thread.
 ///
 /// In our single-threaded simulation the function is executed immediately.
-/// Returns the thread id as `Value::Int`.
+/// Returns a `(thread . ID)` object.
 pub(crate) fn builtin_make_thread(
     eval: &mut super::eval::Evaluator,
     args: Vec<Value>,
@@ -466,7 +484,7 @@ pub(crate) fn builtin_make_thread(
         }
     }
 
-    Ok(Value::Int(thread_id as i64))
+    Ok(tagged_object_value("thread", thread_id))
 }
 
 /// `(thread-join THREAD)` -- wait for thread completion.
@@ -536,15 +554,15 @@ pub(crate) fn builtin_thread_live_p(
 
 /// `(threadp OBJ)` -- type predicate.
 ///
-/// Returns t if OBJ is an integer that refers to a known thread.
-pub(crate) fn builtin_threadp(args: Vec<Value>) -> EvalResult {
+/// Returns t if OBJ is a known thread object.
+pub(crate) fn builtin_threadp(
+    eval: &mut super::eval::Evaluator,
+    args: Vec<Value>,
+) -> EvalResult {
     expect_args("threadp", &args, 1)?;
-    // We represent threads as Int values, so check the range and note that
-    // the caller is responsible for verifying the id is valid if needed.
-    // For the predicate, we accept any non-negative integer as "possibly a thread".
-    match &args[0] {
-        Value::Int(n) if *n >= 0 => Ok(Value::True),
-        _ => Ok(Value::Nil),
+    match tagged_object_id(&args[0], "thread") {
+        Some(id) => Ok(Value::bool(eval.threads.is_thread(id))),
+        None => Ok(Value::Nil),
     }
 }
 
@@ -570,28 +588,28 @@ pub(crate) fn builtin_thread_signal(
     Ok(Value::Nil)
 }
 
-/// `(current-thread)` -- return the current thread's id.
+/// `(current-thread)` -- return the current thread object.
 pub(crate) fn builtin_current_thread(
     eval: &mut super::eval::Evaluator,
     args: Vec<Value>,
 ) -> EvalResult {
     expect_args("current-thread", &args, 0)?;
-    Ok(Value::Int(eval.threads.current_thread_id() as i64))
+    Ok(tagged_object_value("thread", eval.threads.current_thread_id()))
 }
 
-/// `(all-threads)` -- return a list of all thread ids.
+/// `(all-threads)` -- return a list of all thread objects.
 pub(crate) fn builtin_all_threads(
     eval: &mut super::eval::Evaluator,
     args: Vec<Value>,
 ) -> EvalResult {
     expect_args("all-threads", &args, 0)?;
-    let ids: Vec<Value> = eval
-        .threads
-        .all_thread_ids()
+    let mut ids = eval.threads.all_thread_ids();
+    ids.sort_unstable();
+    let objects: Vec<Value> = ids
         .into_iter()
-        .map(|id| Value::Int(id as i64))
+        .map(|id| tagged_object_value("thread", id))
         .collect();
-    Ok(Value::list(ids))
+    Ok(Value::list(objects))
 }
 
 /// `(thread-last-error &optional CLEANUP)` -- return the last error.
@@ -1016,20 +1034,28 @@ mod tests {
         );
         assert!(result.is_ok());
         let tid = result.unwrap();
-        assert!(matches!(tid, Value::Int(_)));
+        assert_eq!(tagged_object_id(&tid, "thread"), Some(1));
     }
 
     #[test]
     fn test_builtin_threadp() {
-        let r = builtin_threadp(vec![Value::Int(0)]);
+        let mut eval = Evaluator::new();
+        let current = builtin_current_thread(&mut eval, vec![]).unwrap();
+
+        let r = builtin_threadp(&mut eval, vec![current]);
         assert!(r.is_ok());
         assert!(r.unwrap().is_truthy());
 
-        let r = builtin_threadp(vec![Value::string("nope")]);
+        let r = builtin_threadp(&mut eval, vec![Value::Int(0)]);
         assert!(r.is_ok());
         assert!(r.unwrap().is_nil());
 
-        let r = builtin_threadp(vec![Value::Int(-1)]);
+        let r = builtin_threadp(&mut eval, vec![Value::string("nope")]);
+        assert!(r.is_ok());
+        assert!(r.unwrap().is_nil());
+
+        let fake = Value::cons(Value::symbol("thread"), Value::Int(999));
+        let r = builtin_threadp(&mut eval, vec![fake]);
         assert!(r.is_ok());
         assert!(r.unwrap().is_nil());
     }
@@ -1039,7 +1065,7 @@ mod tests {
         let mut eval = Evaluator::new();
         let result = builtin_current_thread(&mut eval, vec![]);
         assert!(result.is_ok());
-        assert_eq!(result.unwrap().as_int(), Some(0));
+        assert_eq!(tagged_object_id(&result.unwrap(), "thread"), Some(0));
     }
 
     #[test]
@@ -1053,7 +1079,8 @@ mod tests {
     #[test]
     fn test_builtin_thread_name_main() {
         let mut eval = Evaluator::new();
-        let result = builtin_thread_name(&mut eval, vec![Value::Int(0)]);
+        let current = builtin_current_thread(&mut eval, vec![]).unwrap();
+        let result = builtin_thread_name(&mut eval, vec![current]);
         assert!(result.is_ok());
         assert_eq!(result.unwrap().as_str(), Some("main"));
     }
@@ -1061,7 +1088,8 @@ mod tests {
     #[test]
     fn test_builtin_thread_live_p_main() {
         let mut eval = Evaluator::new();
-        let result = builtin_thread_live_p(&mut eval, vec![Value::Int(0)]);
+        let current = builtin_current_thread(&mut eval, vec![]).unwrap();
+        let result = builtin_thread_live_p(&mut eval, vec![current]);
         assert!(result.is_ok());
         assert!(result.unwrap().is_truthy());
     }
@@ -1073,8 +1101,10 @@ mod tests {
         assert!(result.is_ok());
         let list = super::super::value::list_to_vec(&result.unwrap()).unwrap();
         assert!(!list.is_empty());
-        // Main thread (id=0) should be present
-        assert!(list.iter().any(|v| v.as_int() == Some(0)));
+        assert!(
+            list.iter()
+                .any(|v| tagged_object_id(v, "thread") == Some(0))
+        );
     }
 
     #[test]
@@ -1130,10 +1160,11 @@ mod tests {
     #[test]
     fn test_builtin_thread_last_error_cleanup() {
         let mut eval = Evaluator::new();
+        let current = builtin_current_thread(&mut eval, vec![]).unwrap();
         // Signal on main thread to set last_error
         builtin_thread_signal(
             &mut eval,
-            vec![Value::Int(0), Value::symbol("err"), Value::Nil],
+            vec![current, Value::symbol("err"), Value::Nil],
         )
         .unwrap();
 

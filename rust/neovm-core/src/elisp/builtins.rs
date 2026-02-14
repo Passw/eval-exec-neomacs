@@ -4639,6 +4639,7 @@ pub(crate) fn dispatch_builtin(
         "thread-yield" => return Some(super::threads::builtin_thread_yield(eval, args)),
         "thread-name" => return Some(super::threads::builtin_thread_name(eval, args)),
         "thread-live-p" => return Some(super::threads::builtin_thread_live_p(eval, args)),
+        "threadp" => return Some(super::threads::builtin_threadp(eval, args)),
         "thread-signal" => return Some(super::threads::builtin_thread_signal(eval, args)),
         "current-thread" => return Some(super::threads::builtin_current_thread(eval, args)),
         "all-threads" => return Some(super::threads::builtin_all_threads(eval, args)),
@@ -5341,7 +5342,6 @@ pub(crate) fn dispatch_builtin(
         "copy-hash-table" => super::hashtab::builtin_copy_hash_table(args),
 
         // Threading (pure)
-        "threadp" => super::threads::builtin_threadp(args),
         "mutexp" => super::threads::builtin_mutexp(args),
         "condition-variable-p" => super::threads::builtin_condition_variable_p(args),
 
