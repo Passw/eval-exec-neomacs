@@ -595,28 +595,14 @@ pub(crate) fn builtin_multibyte_char_to_unibyte(args: Vec<Value>) -> EvalResult 
     Ok(Value::Int(-1))
 }
 
-/// `(decode-char CHARSET CODE)` -- stub: returns CODE as a character.
-/// Real Emacs looks up the charset; we just pass through.
+/// `(decode-char CHARSET CODE)` -- delegate to charset semantics.
 pub(crate) fn builtin_decode_char(args: Vec<Value>) -> EvalResult {
-    expect_args("decode-char", &args, 2)?;
-    let code = expect_int(&args[1])?;
-    match char::from_u32(code as u32) {
-        Some(c) => Ok(Value::Char(c)),
-        None => Ok(Value::Nil),
-    }
+    super::charset::builtin_decode_char(args)
 }
 
-/// `(encode-char CHAR CHARSET)` -- stub: returns the char's code point as int.
+/// `(encode-char CHAR CHARSET)` -- delegate to charset semantics.
 pub(crate) fn builtin_encode_char(args: Vec<Value>) -> EvalResult {
-    expect_args("encode-char", &args, 2)?;
-    match &args[0] {
-        Value::Char(c) => Ok(Value::Int(*c as i64)),
-        Value::Int(n) => Ok(Value::Int(*n)),
-        other => Err(signal(
-            "wrong-type-argument",
-            vec![Value::symbol("characterp"), other.clone()],
-        )),
-    }
+    super::charset::builtin_encode_char(args)
 }
 
 /// Improved `nconc` that properly handles nil arguments and non-list tails.
@@ -1100,7 +1086,7 @@ mod tests {
     #[test]
     fn decode_char_basic() {
         let result = builtin_decode_char(vec![Value::symbol("unicode"), Value::Int(65)]).unwrap();
-        assert!(eq_value(&result, &Value::Char('A')));
+        assert!(eq_value(&result, &Value::Int(65)));
     }
 
     #[test]
