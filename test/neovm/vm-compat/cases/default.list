@@ -16,6 +16,7 @@ cases/autoload-macro-introspection
 cases/functionp-callable-matrix
 cases/commandp-semantics
 cases/command-dispatch-semantics
+cases/execute-extended-command-name-validation
 cases/funcall-apply-non-callable-matrix
 cases/funcall-arity-function-object-payloads
 cases/fmakunbound-fallback-boundary

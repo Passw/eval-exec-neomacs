@@ -449,24 +449,53 @@ pub(crate) fn builtin_execute_extended_command(
 ) -> EvalResult {
     expect_min_args("execute-extended-command", &args, 1)?;
 
-    // If command-name is given (2nd arg), execute it
-    if args.len() >= 2 {
-        if let Some(name) = args[1].as_str() {
-            let cmd = Value::symbol(name);
-            return builtin_command_execute(eval, vec![cmd]);
-        } else if let Some(name) = args[1].as_symbol_name() {
-            let cmd = Value::symbol(name);
-            return builtin_command_execute(eval, vec![cmd]);
-        }
+    // Batch mode prompt path: M-x reads from stdin and hits EOF.
+    if args.len() < 2 {
+        return Err(signal(
+            "end-of-file",
+            vec![Value::string("Error reading from stdin")],
+        ));
     }
 
-    // Without interactive input, signal an error
-    Err(signal(
-        "error",
-        vec![Value::string(
-            "execute-extended-command requires a command name",
-        )],
-    ))
+    let command_name = if let Some(name) = args[1].as_str() {
+        name.to_string()
+    } else {
+        let name = command_name_display(&args[1]);
+        return Err(signal(
+            "error",
+            vec![Value::string(format!(
+                "\u{2018}{name}\u{2019} is not a valid command name"
+            ))],
+        ));
+    };
+
+    let command_designator = Value::symbol(command_name.clone());
+    if !command_designator_p(eval, &command_designator) {
+        return Err(signal(
+            "error",
+            vec![Value::string(format!(
+                "\u{2018}{command_name}\u{2019} is not a valid command name"
+            ))],
+        ));
+    }
+
+    builtin_command_execute(eval, vec![command_designator])
+}
+
+fn command_name_display(value: &Value) -> String {
+    if let Some(name) = value.as_symbol_name() {
+        return name.to_string();
+    }
+    if let Some(text) = value.as_str() {
+        return text.to_string();
+    }
+    if let Value::Int(n) = value {
+        return n.to_string();
+    }
+    if let Value::Float(n) = value {
+        return n.to_string();
+    }
+    value.type_name().to_string()
 }
 
 /// `(key-binding KEY &optional ACCEPT-DEFAULTS NO-REMAP POSITION)`
@@ -2175,27 +2204,83 @@ mod tests {
     // -------------------------------------------------------------------
 
     #[test]
-    fn execute_extended_command_with_name() {
+    fn execute_extended_command_with_command_name() {
         let mut ev = Evaluator::new();
-        eval_all_with(
+        let result = builtin_execute_extended_command(
             &mut ev,
-            r#"(defvar ext-ran nil)
-               (defun ext-cmd () (setq ext-ran t))"#,
-        );
-
-        let _result =
-            builtin_execute_extended_command(&mut ev, vec![Value::Nil, Value::string("ext-cmd")])
-                .unwrap();
-
-        let ran = ev.obarray.symbol_value("ext-ran").unwrap().clone();
-        assert!(ran.is_truthy());
+            vec![Value::Nil, Value::string("ignore")],
+        )
+        .expect("execute-extended-command should run command names");
+        assert!(result.is_nil());
     }
 
     #[test]
-    fn execute_extended_command_no_name() {
+    fn execute_extended_command_no_name_signals_end_of_file() {
         let mut ev = Evaluator::new();
-        let result = builtin_execute_extended_command(&mut ev, vec![Value::Nil]);
-        assert!(result.is_err());
+        let result = builtin_execute_extended_command(&mut ev, vec![Value::Nil])
+            .expect_err("execute-extended-command should signal end-of-file in batch");
+        match result {
+            Flow::Signal(sig) => {
+                assert_eq!(sig.symbol, "end-of-file");
+                assert_eq!(sig.data, vec![Value::string("Error reading from stdin")]);
+            }
+            other => panic!("unexpected flow: {other:?}"),
+        }
+    }
+
+    #[test]
+    fn execute_extended_command_rejects_symbol_name_payload() {
+        let mut ev = Evaluator::new();
+        let result = builtin_execute_extended_command(
+            &mut ev,
+            vec![Value::Nil, Value::symbol("ignore")],
+        )
+        .expect_err("symbol payload should not be accepted as a command name");
+        match result {
+            Flow::Signal(sig) => {
+                assert_eq!(sig.symbol, "error");
+                assert_eq!(
+                    sig.data,
+                    vec![Value::string("\u{2018}ignore\u{2019} is not a valid command name")]
+                );
+            }
+            other => panic!("unexpected flow: {other:?}"),
+        }
+    }
+
+    #[test]
+    fn execute_extended_command_rejects_non_command_name() {
+        let mut ev = Evaluator::new();
+        let result =
+            builtin_execute_extended_command(&mut ev, vec![Value::Nil, Value::string("car")])
+                .expect_err("non-command names should be rejected");
+        match result {
+            Flow::Signal(sig) => {
+                assert_eq!(sig.symbol, "error");
+                assert_eq!(
+                    sig.data,
+                    vec![Value::string("\u{2018}car\u{2019} is not a valid command name")]
+                );
+            }
+            other => panic!("unexpected flow: {other:?}"),
+        }
+    }
+
+    #[test]
+    fn execute_extended_command_rejects_non_string_name_payload() {
+        let mut ev = Evaluator::new();
+        let result = builtin_execute_extended_command(&mut ev, vec![Value::Nil, Value::Int(1)])
+            .expect_err("non-string command names should be rejected");
+        match result {
+            Flow::Signal(sig) => {
+                assert_eq!(sig.symbol, "error");
+                assert_eq!(
+                    sig.data,
+                    vec![Value::string("\u{2018}1\u{2019} is not a valid command name")]
+                );
+            }
+            other => panic!("unexpected flow: {other:?}"),
+        }
     }
 
     // -------------------------------------------------------------------
