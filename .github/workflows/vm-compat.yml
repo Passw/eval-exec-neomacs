@@ -148,3 +148,27 @@ jobs:
         working-directory: test/neovm/vm-compat
         run: |
           RUSTFLAGS='-Awarnings' make check-all-neovm
+
+  neovm-vm-compat-legacy-elc:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install Rust nightly
+        uses: dtolnay/rust-toolchain@nightly
+
+      - name: Cache cargo artifacts
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: |
+            rust/neovm-core
+            rust/neovm-worker
+
+      - name: Run NeoVM legacy .elc literal compatibility corpus
+        working-directory: test/neovm/vm-compat
+        env:
+          NEOVM_WORKER_CARGO_FEATURES: legacy-elc-literal
+        run: |
+          RUSTFLAGS='-Awarnings' make check-legacy-elc-neovm
