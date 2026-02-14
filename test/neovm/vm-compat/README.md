@@ -162,5 +162,9 @@ Post-freeze updates:
   - `cases/string-join-semantics`
   - `cases/string-to-number-semantics`
   - `cases/substring-edge-semantics`
+- Added append/vconcat sequence compatibility cases:
+  - `cases/append-vconcat-error-paths`
+  - `cases/append-tail-object-semantics`
+  - `cases/vconcat-mixed-sequence-semantics`
 - Full NeoVM gate is green with these additions:
   - `make check-all-neovm`
