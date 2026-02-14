@@ -16,8 +16,7 @@ RUN pacman -S --noconfirm --needed \
     mesa libva \
     libjpeg-turbo libtiff giflib libpng librsvg libwebp \
     ncurses gnutls libxml2 sqlite jansson tree-sitter \
-    gmp acl libxpm \
-    libgccjit
+    gmp acl libxpm
 
 # Install Rust via rustup
 RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
@@ -31,7 +30,7 @@ RUN cargo build --release --manifest-path rust/neomacs-display/Cargo.toml
 
 # Build Emacs with neomacs display engine
 RUN ./autogen.sh
-RUN ./configure --with-neomacs --with-native-compilation
+RUN ./configure --with-neomacs
 RUN make -j$(nproc)
 
 # Verify the binary works
