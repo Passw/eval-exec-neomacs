@@ -13,7 +13,7 @@
 //! - Special forms: `define-minor-mode`, `define-derived-mode`,
 //!   `define-generic-mode`.
 
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 use super::error::{signal, EvalResult, Flow};
 use super::eval::Evaluator;
@@ -211,28 +211,140 @@ pub(crate) fn builtin_called_interactively_p(eval: &mut Evaluator, args: Vec<Val
 /// Return non-nil if FUNCTION is a command (i.e., can be called interactively).
 pub(crate) fn builtin_commandp_interactive(eval: &mut Evaluator, args: Vec<Value>) -> EvalResult {
     expect_min_args("commandp", &args, 1)?;
+    let is_command = command_designator_p(eval, &args[0]);
+    Ok(Value::bool(is_command))
+}
 
-    let func = &args[0];
-    match func {
-        Value::Symbol(name) | Value::Subr(name) => {
-            if eval.interactive.is_interactive(name) {
-                return Ok(Value::True);
-            }
-            // Fall back: check if there is a function binding and it is callable
-            if let Some(f) = eval.obarray.symbol_function(name) {
-                if f.is_function() {
-                    // Check if function has an interactive spec registered
-                    return Ok(Value::bool(eval.interactive.is_interactive(name)));
-                }
-            }
-            Ok(Value::Nil)
-        }
-        Value::Lambda(_) | Value::ByteCode(_) => {
-            // Anonymous functions are not commands unless explicitly registered
-            Ok(Value::Nil)
-        }
-        _ => Ok(Value::Nil),
+fn builtin_command_name(name: &str) -> bool {
+    matches!(name, "ignore" | "eval-expression" | "self-insert-command" | "newline")
+}
+
+fn expr_is_interactive_form(expr: &Expr) -> bool {
+    match expr {
+        Expr::List(items) => items
+            .first()
+            .is_some_and(|head| matches!(head, Expr::Symbol(sym) if sym == "interactive")),
+        _ => false,
     }
+}
+
+fn lambda_body_has_interactive_form(body: &[Expr]) -> bool {
+    let mut body_index = 0;
+    if matches!(body.first(), Some(Expr::Str(_))) {
+        body_index = 1;
+    }
+    body.get(body_index).is_some_and(expr_is_interactive_form)
+}
+
+fn value_list_to_vec(list: &Value) -> Option<Vec<Value>> {
+    let mut values = Vec::new();
+    let mut cursor = list.clone();
+    loop {
+        match cursor {
+            Value::Nil => return Some(values),
+            Value::Cons(cell) => {
+                let pair = cell.lock().expect("poisoned");
+                values.push(pair.car.clone());
+                cursor = pair.cdr.clone();
+            }
+            _ => return None,
+        }
+    }
+}
+
+fn value_is_interactive_form(value: &Value) -> bool {
+    match value {
+        Value::Cons(cell) => {
+            let pair = cell.lock().expect("poisoned");
+            pair.car.as_symbol_name() == Some("interactive")
+        }
+        _ => false,
+    }
+}
+
+fn quoted_lambda_has_interactive_form(value: &Value) -> bool {
+    let Some(items) = value_list_to_vec(value) else {
+        return false;
+    };
+    if items.first().and_then(Value::as_symbol_name) != Some("lambda") {
+        return false;
+    }
+
+    let mut body_index = 2;
+    if matches!(items.get(body_index), Some(Value::Str(_))) {
+        body_index += 1;
+    }
+
+    items
+        .get(body_index)
+        .is_some_and(value_is_interactive_form)
+}
+
+fn resolve_function_designator_symbol(eval: &Evaluator, name: &str) -> Option<(String, Value)> {
+    let mut current = name.to_string();
+    let mut seen = HashSet::new();
+
+    loop {
+        if !seen.insert(current.clone()) {
+            return None;
+        }
+
+        if eval.obarray.is_function_unbound(&current) {
+            return None;
+        }
+
+        if let Some(function) = eval.obarray.symbol_function(&current) {
+            if let Some(next) = function.as_symbol_name() {
+                if next == "nil" {
+                    return Some((current, Value::Nil));
+                }
+                current = next.to_string();
+                continue;
+            }
+            return Some((current, function.clone()));
+        }
+
+        if let Some(function) = super::subr_info::fallback_macro_value(&current) {
+            return Some((current, function));
+        }
+
+        if super::subr_info::is_special_form(&current)
+            || super::subr_info::is_evaluator_callable_name(&current)
+            || super::builtin_registry::is_dispatch_builtin_name(&current)
+        {
+            return Some((current.clone(), Value::Subr(current)));
+        }
+
+        return None;
+    }
+}
+
+fn command_object_p(eval: &Evaluator, resolved_name: Option<&str>, value: &Value) -> bool {
+    if let Some(name) = resolved_name {
+        if eval.interactive.is_interactive(name) || builtin_command_name(name) {
+            return true;
+        }
+    }
+
+    match value {
+        Value::Lambda(lambda) => lambda_body_has_interactive_form(&lambda.body),
+        Value::Cons(_) => quoted_lambda_has_interactive_form(value),
+        Value::Subr(name) => eval.interactive.is_interactive(name) || builtin_command_name(name),
+        _ => false,
+    }
+}
+
+fn command_designator_p(eval: &Evaluator, designator: &Value) -> bool {
+    if let Some(name) = designator.as_symbol_name() {
+        if eval.obarray.is_function_unbound(name) {
+            return false;
+        }
+        if let Some((resolved_name, resolved_value)) = resolve_function_designator_symbol(eval, name) {
+            return command_object_p(eval, Some(&resolved_name), &resolved_value);
+        }
+        return eval.interactive.is_interactive(name) || builtin_command_name(name);
+    }
+    command_object_p(eval, None, designator)
 }
 
 /// `(command-execute CMD &optional RECORD-FLAG KEYS SPECIAL)`
@@ -1446,6 +1558,68 @@ mod tests {
         eval_all_with(&mut ev, r#"(defun my-plain-fn () 42)"#);
         let result = builtin_commandp_interactive(&mut ev, vec![Value::symbol("my-plain-fn")]);
         assert!(result.unwrap().is_nil());
+    }
+
+    #[test]
+    fn commandp_true_for_builtin_ignore() {
+        let mut ev = Evaluator::new();
+        let result = builtin_commandp_interactive(&mut ev, vec![Value::symbol("ignore")]);
+        assert!(result.unwrap().is_truthy());
+    }
+
+    #[test]
+    fn commandp_false_for_noninteractive_builtin() {
+        let mut ev = Evaluator::new();
+        let result = builtin_commandp_interactive(&mut ev, vec![Value::symbol("car")]);
+        assert!(result.unwrap().is_nil());
+    }
+
+    #[test]
+    fn commandp_resolves_aliases_and_symbol_designators() {
+        let mut ev = Evaluator::new();
+        ev.obarray
+            .set_symbol_function("t", Value::symbol("ignore"));
+        ev.obarray
+            .set_symbol_function(":vm-command-alias-keyword", Value::symbol("ignore"));
+        ev.obarray
+            .set_symbol_function("vm-command-alias", Value::True);
+        ev.obarray.set_symbol_function(
+            "vm-command-alias-keyword",
+            Value::keyword(":vm-command-alias-keyword"),
+        );
+
+        let t_result = builtin_commandp_interactive(&mut ev, vec![Value::True]);
+        assert!(t_result.unwrap().is_truthy());
+        let keyword_result =
+            builtin_commandp_interactive(&mut ev, vec![Value::keyword(":vm-command-alias-keyword")]);
+        assert!(keyword_result.unwrap().is_truthy());
+        let alias_result = builtin_commandp_interactive(&mut ev, vec![Value::symbol("vm-command-alias")]);
+        assert!(alias_result.unwrap().is_truthy());
+        let keyword_alias_result =
+            builtin_commandp_interactive(&mut ev, vec![Value::symbol("vm-command-alias-keyword")]);
+        assert!(keyword_alias_result.unwrap().is_truthy());
+    }
+
+    #[test]
+    fn commandp_true_for_lambda_with_interactive_form() {
+        let mut ev = Evaluator::new();
+        let lambda = eval_all_with(&mut ev, "(lambda () (interactive) 1)");
+        let parsed = super::super::parser::parse_forms("(lambda () (interactive) 1)")
+            .expect("lambda form should parse");
+        let value = ev.eval(&parsed[0]).expect("lambda form should evaluate");
+        assert_eq!(lambda[0], "OK (lambda nil (interactive) 1)");
+        let result = builtin_commandp_interactive(&mut ev, vec![value]);
+        assert!(result.unwrap().is_truthy());
+    }
+
+    #[test]
+    fn commandp_true_for_quoted_lambda_with_interactive_form() {
+        let mut ev = Evaluator::new();
+        let forms = super::super::parser::parse_forms("'(lambda () \"doc\" (interactive) 1)")
+            .expect("quoted lambda form should parse");
+        let quoted_lambda = ev.eval(&forms[0]).expect("quoted lambda should evaluate");
+        let result = builtin_commandp_interactive(&mut ev, vec![quoted_lambda]);
+        assert!(result.unwrap().is_truthy());
     }
 
     // -------------------------------------------------------------------

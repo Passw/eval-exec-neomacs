@@ -11,6 +11,7 @@ cases/macro-special-introspection-core
 cases/function-special-form-edges
 cases/autoload-macro-introspection
 cases/functionp-callable-matrix
+cases/commandp-semantics
 cases/funcall-apply-non-callable-matrix
 cases/fmakunbound-fallback-boundary
 cases/fset-special-form-override-boundary
