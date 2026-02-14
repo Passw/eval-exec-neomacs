@@ -22,7 +22,7 @@ ERT_ALLOWLIST ?= cases/ert-allowlist-smoke.txt
 ERT_EXPECTED ?= cases/ert-allowlist-smoke.expected.tsv
 ERT_LOAD_FILES ?= cases/ert-allowlist-fixtures/smoke-tests.el
 
-.PHONY: oracle neovm record check compare check-neovm record-all check-all check-all-neovm check-all-neovm-only check-legacy-elc-neovm check-introspection-neovm check-thread-neovm check-runner-feature-stamp validate-case-lists ert-oracle record-ert-allowlist check-ert-allowlist bench-load-cache
+.PHONY: oracle neovm record check compare check-neovm record-all check-all check-all-neovm check-all-neovm-only check-legacy-elc-neovm check-introspection-neovm check-thread-neovm check-runner-feature-stamp check-builtin-registry-fboundp validate-case-lists ert-oracle record-ert-allowlist check-ert-allowlist bench-load-cache
 
 oracle:
 	./run-oracle.sh $(FORMS)
@@ -105,6 +105,9 @@ check-thread-neovm:
 
 check-runner-feature-stamp:
 	./check-run-neovm-feature-stamp.sh
+
+check-builtin-registry-fboundp:
+	./check-builtin-registry-fboundp.sh
 
 validate-case-lists:
 	@set -e; \
