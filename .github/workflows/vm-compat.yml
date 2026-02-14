@@ -15,6 +15,65 @@ on:
       - ".github/workflows/vm-compat.yml"
 
 jobs:
+  neovm-backend-feature-matrix:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        backend:
+          - core-backend-emacs-c
+          - core-backend-rust
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install Rust nightly
+        uses: dtolnay/rust-toolchain@nightly
+
+      - name: Cache cargo artifacts
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: |
+            rust/neovm-core
+            rust/neovm-worker
+
+      - name: Check neovm-core for backend feature
+        run: |
+          RUSTFLAGS='-Awarnings' cargo check \
+            --manifest-path rust/neovm-core/Cargo.toml \
+            --no-default-features \
+            --features ${{ matrix.backend }}
+
+      - name: Check neovm-worker for backend feature
+        run: |
+          RUSTFLAGS='-Awarnings' cargo check \
+            --manifest-path rust/neovm-worker/Cargo.toml \
+            --no-default-features \
+            --features ${{ matrix.backend }}
+
+  neovm-vm-compat-thread:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install Rust nightly
+        uses: dtolnay/rust-toolchain@nightly
+
+      - name: Cache cargo artifacts
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: |
+            rust/neovm-core
+            rust/neovm-worker
+
+      - name: Run NeoVM thread compatibility suite
+        working-directory: test/neovm/vm-compat
+        run: |
+          RUSTFLAGS='-Awarnings' make check-thread-neovm
+
   neovm-vm-compat-introspection:
     runs-on: ubuntu-latest
     timeout-minutes: 20
