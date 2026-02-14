@@ -398,9 +398,11 @@ impl<'a> Parser<'a> {
             }
             '[' => {
                 // #[...] — compiled-function literal in .elc.
-                // Preserve it as data so forms like (defalias 'f #[...]) load.
                 let vector = self.parse_vector()?;
-                Ok(Expr::List(vec![Expr::Symbol("quote".into()), vector]))
+                Ok(Expr::List(vec![
+                    Expr::Symbol("byte-code-literal".into()),
+                    vector,
+                ]))
             }
             '@' => {
                 // #@N<bytes> — reader skip used by .elc for inline data blocks.
@@ -799,14 +801,14 @@ mod tests {
     }
 
     #[test]
-    fn parse_bytecode_literal_vector_is_quoted() {
+    fn parse_bytecode_literal_vector_uses_byte_code_literal_form() {
         let forms = parse_forms("#[(x) \"\\bT\\207\" [x] 1 (#$ . 83)]").unwrap();
         assert_eq!(forms.len(), 1);
         let Expr::List(items) = &forms[0] else {
-            panic!("expected quoted literal");
+            panic!("expected byte-code-literal form");
         };
         assert_eq!(items.len(), 2);
-        assert_eq!(items[0], Expr::Symbol("quote".into()));
+        assert_eq!(items[0], Expr::Symbol("byte-code-literal".into()));
 
         let Expr::Vector(values) = &items[1] else {
             panic!("expected vector body");

@@ -165,6 +165,8 @@ pub(crate) fn builtin_read_from_string(
             .symbol_value("load-file-name")
             .cloned()
             .unwrap_or(Value::Nil)
+    } else if let Some(bytecode) = first_form_byte_code_literal_value(&forms[0]) {
+        bytecode
     } else {
         super::eval::quote_to_value(&forms[0])
     };
@@ -176,6 +178,26 @@ pub(crate) fn builtin_read_from_string(
 fn first_form_is_reader_hash_dollar(expr: &Expr, consumed: &str) -> bool {
     matches!(expr, Expr::Symbol(s) if s == "load-file-name")
         && consumed_represents_hash_dollar(consumed)
+}
+
+fn first_form_byte_code_literal_value(expr: &Expr) -> Option<Value> {
+    let Expr::List(items) = expr else {
+        return None;
+    };
+    if items.len() != 2 {
+        return None;
+    }
+    let Expr::Symbol(name) = &items[0] else {
+        return None;
+    };
+    if name != "byte-code-literal" {
+        return None;
+    }
+    let Expr::Vector(values) = &items[1] else {
+        return None;
+    };
+    let values = values.iter().map(super::eval::quote_to_value).collect();
+    Some(super::compiled_literal::maybe_coerce_compiled_literal_function(Value::vector(values)))
 }
 
 fn consumed_represents_hash_dollar(input: &str) -> bool {
@@ -2104,6 +2126,20 @@ mod tests {
                 assert_eq!(pair.cdr, Value::Int(expected_end));
             }
             _ => panic!("Expected cons"),
+        }
+    }
+
+    #[test]
+    fn read_from_string_hash_bracket_coerces_compiled_literal() {
+        let mut ev = Evaluator::new();
+        let input = "#[nil \"\\300\\207\" [0] 1]";
+        let result = builtin_read_from_string(&mut ev, vec![Value::string(input)]).unwrap();
+        match result {
+            Value::Cons(cell) => {
+                let pair = cell.lock().expect("poisoned");
+                assert!(matches!(pair.car, Value::ByteCode(_)));
+            }
+            other => panic!("Expected cons from read-from-string, got {other:?}"),
         }
     }
 

@@ -469,6 +469,7 @@ impl Evaluator {
             "throw" => self.sf_throw(tail),
             "unwind-protect" => self.sf_unwind_protect(tail),
             "condition-case" => self.sf_condition_case(tail),
+            "byte-code-literal" => self.sf_byte_code_literal(tail),
             "interactive" => Ok(Value::Nil), // Stub: ignored for now
             "declare" => Ok(Value::Nil),     // Stub: ignored for now
             "when" => self.sf_when(tail),
@@ -1223,6 +1224,28 @@ impl Evaluator {
                 Err(Flow::Throw { tag, value })
             }
         }
+    }
+
+    fn sf_byte_code_literal(&mut self, tail: &[Expr]) -> EvalResult {
+        if tail.len() != 1 {
+            return Err(signal(
+                "wrong-number-of-arguments",
+                vec![
+                    Value::symbol("byte-code-literal"),
+                    Value::Int(tail.len() as i64),
+                ],
+            ));
+        }
+
+        let Expr::Vector(items) = &tail[0] else {
+            return Err(signal(
+                "wrong-type-argument",
+                vec![Value::symbol("vectorp"), quote_to_value(&tail[0])],
+            ));
+        };
+
+        let values = items.iter().map(quote_to_value).collect::<Vec<_>>();
+        Ok(super::compiled_literal::maybe_coerce_compiled_literal_function(Value::vector(values)))
     }
 
     fn sf_defalias(&mut self, tail: &[Expr]) -> EvalResult {
