@@ -326,6 +326,28 @@
 
 (condition-case err
     (with-temp-buffer
+      (insert "x")
+      (goto-char 1)
+      (command-execute 'indent-for-tab-command)
+      (let ((s (buffer-string)))
+        (and (= (length s) 2)
+             (= (aref s 0) 9)
+             (= (aref s 1) ?x))))
+  (error err))
+
+(condition-case err
+    (with-temp-buffer
+      (insert "x")
+      (goto-char 1)
+      (call-interactively 'indent-for-tab-command)
+      (let ((s (buffer-string)))
+        (and (= (length s) 2)
+             (= (aref s 0) 9)
+             (= (aref s 1) ?x))))
+  (error err))
+
+(condition-case err
+    (with-temp-buffer
       (insert "abc")
       (goto-char 1)
       (call-interactively 'transpose-lines)
