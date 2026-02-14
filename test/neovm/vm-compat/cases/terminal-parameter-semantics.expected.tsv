@@ -1,0 +1,9 @@
+1	(fboundp 'terminal-parameter)	OK t
+2	(fboundp 'set-terminal-parameter)	OK t
+3	(let* ((term (frame-terminal nil)) (_ (set-terminal-parameter term 'neovm-vmcompat-terminal-param 42))) (terminal-parameter term 'neovm-vmcompat-terminal-param))	OK 42
+4	(let* ((term (frame-terminal nil)) (_ (set-terminal-parameter term 'neovm-vmcompat-terminal-param nil))) (terminal-parameter term 'neovm-vmcompat-terminal-param))	OK nil
+5	(let* ((term (frame-terminal nil)) (_ (set-terminal-parameter term 'neovm-vmcompat-a 1)) (_ (set-terminal-parameter term 'neovm-vmcompat-b 2))) (list (terminal-parameter term 'neovm-vmcompat-a) (terminal-parameter term 'neovm-vmcompat-b)))	OK (1 2)
+6	(let* ((term (frame-terminal nil)) (_ (set-terminal-parameter term 'neovm-vmcompat-a 1))) (condition-case err (terminal-parameter term "neovm-vmcompat-string-key") (wrong-type-argument (car err))))	OK wrong-type-argument
+7	(let ((term (frame-terminal nil))) (set-terminal-parameter term "neovm-vmcompat-string-key" 1))	OK nil
+8	(condition-case err (terminal-parameter nil) (wrong-number-of-arguments (car err)))	OK wrong-number-of-arguments
+9	(condition-case err (set-terminal-parameter nil 'x) (wrong-number-of-arguments (car err)))	OK wrong-number-of-arguments

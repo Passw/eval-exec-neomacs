@@ -6,6 +6,12 @@
 
 use super::error::{signal, EvalResult, Flow};
 use super::value::*;
+use std::cell::RefCell;
+use std::collections::HashMap;
+
+thread_local! {
+    static TERMINAL_PARAMS: RefCell<HashMap<HashKey, Value>> = RefCell::new(HashMap::new());
+}
 
 // ---------------------------------------------------------------------------
 // Argument helpers
@@ -41,6 +47,18 @@ fn expect_range_args(name: &str, args: &[Value], min: usize, max: usize) -> Resu
         ))
     } else {
         Ok(())
+    }
+}
+
+fn expect_symbol_name(value: &Value) -> Result<String, Flow> {
+    match value {
+        Value::Nil => Ok("nil".to_string()),
+        Value::True => Ok("t".to_string()),
+        Value::Symbol(name) => Ok(name.clone()),
+        other => Err(signal(
+            "wrong-type-argument",
+            vec![Value::symbol("symbolp"), other.clone()],
+        )),
     }
 }
 
@@ -197,13 +215,26 @@ pub(crate) fn builtin_terminal_live_p(args: Vec<Value>) -> EvalResult {
 /// (terminal-parameter TERMINAL PARAMETER) -> nil (stub)
 pub(crate) fn builtin_terminal_parameter(args: Vec<Value>) -> EvalResult {
     expect_args("terminal-parameter", &args, 2)?;
-    Ok(Value::Nil)
+    let key = HashKey::Symbol(expect_symbol_name(&args[1])?);
+    TERMINAL_PARAMS.with(|slot| {
+        Ok(slot
+            .borrow()
+            .get(&key)
+            .cloned()
+            .unwrap_or(Value::Nil))
+    })
 }
 
-/// (set-terminal-parameter TERMINAL PARAMETER VALUE) -> VALUE (stub)
+/// (set-terminal-parameter TERMINAL PARAMETER VALUE) -> nil
 pub(crate) fn builtin_set_terminal_parameter(args: Vec<Value>) -> EvalResult {
     expect_args("set-terminal-parameter", &args, 3)?;
-    Ok(args[2].clone())
+    if let Ok(name) = expect_symbol_name(&args[1]) {
+        let key = HashKey::Symbol(name);
+        TERMINAL_PARAMS.with(|slot| {
+            slot.borrow_mut().insert(key, args[2].clone());
+        });
+    }
+    Ok(Value::Nil)
 }
 
 // ---------------------------------------------------------------------------
@@ -292,4 +323,69 @@ fn make_monitor_alist() -> Value {
         (Value::symbol("name"), Value::string("default")),
         (Value::symbol("source"), Value::string("neomacs")),
     ])
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn clear_terminal_parameters() {
+        TERMINAL_PARAMS.with(|slot| slot.borrow_mut().clear());
+    }
+
+    #[test]
+    fn terminal_parameter_defaults_to_nil() {
+        clear_terminal_parameters();
+        let result = builtin_terminal_parameter(vec![Value::Nil, Value::symbol("neovm-param")]);
+        assert!(result.unwrap().is_nil());
+    }
+
+    #[test]
+    fn terminal_parameter_round_trips() {
+        clear_terminal_parameters();
+        let set_result = builtin_set_terminal_parameter(vec![
+            Value::Nil,
+            Value::symbol("neovm-param"),
+            Value::Int(42),
+        ])
+        .unwrap();
+        assert!(set_result.is_nil());
+
+        let get_result =
+            builtin_terminal_parameter(vec![Value::Nil, Value::symbol("neovm-param")]).unwrap();
+        assert_eq!(get_result, Value::Int(42));
+    }
+
+    #[test]
+    fn terminal_parameter_distinct_keys_do_not_alias() {
+        clear_terminal_parameters();
+        builtin_set_terminal_parameter(vec![Value::Nil, Value::symbol("k1"), Value::Int(1)])
+            .unwrap();
+        builtin_set_terminal_parameter(vec![Value::Nil, Value::symbol("k2"), Value::Int(2)])
+            .unwrap();
+
+        let first = builtin_terminal_parameter(vec![Value::Nil, Value::symbol("k1")]).unwrap();
+        let second = builtin_terminal_parameter(vec![Value::Nil, Value::symbol("k2")]).unwrap();
+        assert_eq!(first, Value::Int(1));
+        assert_eq!(second, Value::Int(2));
+    }
+
+    #[test]
+    fn terminal_parameter_rejects_non_symbol_key() {
+        clear_terminal_parameters();
+        let result = builtin_terminal_parameter(vec![Value::Nil, Value::string("k")]);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn set_terminal_parameter_ignores_non_symbol_key() {
+        clear_terminal_parameters();
+        let set_result =
+            builtin_set_terminal_parameter(vec![Value::Nil, Value::string("k"), Value::Int(9)])
+                .unwrap();
+        assert!(set_result.is_nil());
+
+        let get_result = builtin_terminal_parameter(vec![Value::Nil, Value::symbol("k")]).unwrap();
+        assert!(get_result.is_nil());
+    }
 }
