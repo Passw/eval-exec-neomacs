@@ -76,6 +76,7 @@ cases/pcase
 cases/seq-position
 cases/split-string-semantics
 cases/make-string-semantics
+cases/string-constructor-semantics
 cases/make-string-raw-byte-semantics
 cases/make-string-nonunicode-semantics
 cases/string-print-unicode-semantics
