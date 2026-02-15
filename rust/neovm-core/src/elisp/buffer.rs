@@ -25,17 +25,6 @@
 //! - `buffer-size` -- return content length
 //! - `make-indirect-buffer` -- create indirect buffer (stub)
 //! - `buffer-base-buffer` -- return base buffer of indirect (stub)
-//! - `overlay-lists` -- return overlay lists (stub)
-//! - `overlayp` -- check if overlay (stub)
-//! - `make-overlay` -- create overlay (stub)
-//! - `delete-overlay` -- delete overlay (stub)
-//! - `overlay-start` -- overlay start position (stub)
-//! - `overlay-end` -- overlay end position (stub)
-//! - `overlay-buffer` -- overlay's buffer (stub)
-//! - `overlay-get` -- get overlay property (stub)
-//! - `overlay-put` -- set overlay property (stub)
-//! - `overlays-at` -- overlays at position (stub)
-//! - `overlays-in` -- overlays in range (stub)
 
 use super::error::{signal, EvalResult, Flow};
 use super::value::*;
