@@ -9,6 +9,7 @@ Last updated: 2026-02-15
   - `run-with-timer` compatibility is now lock-in covered for numeric, `nil`, and `"0 sec"` immediate forms
   - `run-with-idle-timer` now accepts `nil` delay and keeps non-numeric delay specs as `error`
   - `timer-activate` now matches error-class behavior on invalid/active timer activation paths
+  - `sit-for` now enforces GNU-compatible arity bounds (1..=2 args; extra args signal `wrong-number-of-arguments`)
   - added oracle corpus:
     - `test/neovm/vm-compat/cases/timer-semantics.forms`
     - `test/neovm/vm-compat/cases/timer-semantics.expected.tsv`
