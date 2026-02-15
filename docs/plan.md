@@ -2,6 +2,19 @@
 
 Last updated: 2026-02-15
 
+## Doing
+
+- Finishing the `buffer-read-only` variable-compat sweep in `rust/neovm-core/src/elisp/kill_ring.rs`.
+- Locking the latest runtime slice with oracle corpus for `indent-rigidly` read-only variable semantics.
+- Keeping each slice small: runtime patch -> oracle corpus -> docs note -> push.
+
+## Next
+
+- Add `test/neovm/vm-compat/cases/indent-rigidly-read-only-variable-semantics.{forms,expected.tsv}` and wire to `test/neovm/vm-compat/cases/default.list`.
+- Investigate and lock `yank-pop` behavior deltas (currently hitting oracle `end-of-file` paths in some probes).
+- Continue the remaining raw `buf.read_only` kill-ring mutators (`transpose-*`, case-word mutators) with mutation-aware read-only checks and corpus lock-in.
+- Run targeted regression checks after each slice (`command-dispatch-default-arg-semantics` plus touched command corpus).
+
 ## Done
 
 - Aligned `delete-indentation` read-only behavior with oracle variable semantics:
