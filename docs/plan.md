@@ -63,8 +63,9 @@ Last updated: 2026-02-15
     - `test/neovm/vm-compat/cases/kill-ring-pointer-normalize-mutation-semantics.forms`
     - `test/neovm/vm-compat/cases/kill-ring-pointer-normalize-mutation-semantics.expected.tsv`
     - wired into `test/neovm/vm-compat/cases/default.list`
+    - extended with improper cons pointer seeds for `kill-new` and `kill-append` normalization paths
   - verified:
-    - `make -C test/neovm/vm-compat check-one-neovm CASE=cases/kill-ring-pointer-normalize-mutation-semantics` (pass, 19/19)
+    - `make -C test/neovm/vm-compat check-one-neovm CASE=cases/kill-ring-pointer-normalize-mutation-semantics` (pass, 27/27)
     - `make -C test/neovm/vm-compat validate-case-lists` (pass)
 - Added `yank-pop` mixed pointer-seed oracle corpus and list wiring:
   - added and enabled:
