@@ -4,6 +4,21 @@ Last updated: 2026-02-15
 
 ## Done
 
+- Implemented `transient-mark-mode` compatibility slice:
+  - aligned evaluator behavior with oracle semantics for:
+    - optional-argument handling (`nil`/missing, numeric, non-numeric non-nil)
+    - state publication to `transient-mark-mode`
+    - over-arity signaling (`wrong-number-of-arguments`)
+  - expanded unit coverage in `rust/neovm-core/src/elisp/navigation.rs`
+  - added and enabled oracle corpus:
+    - `test/neovm/vm-compat/cases/transient-mark-mode-semantics.forms`
+    - `test/neovm/vm-compat/cases/transient-mark-mode-semantics.expected.tsv`
+    - wired into `test/neovm/vm-compat/cases/default.list`
+  - verified:
+    - `cargo test --manifest-path rust/neovm-core/Cargo.toml navigation::tests -- --nocapture` (pass)
+    - `make -C test/neovm/vm-compat check-neovm FORMS=cases/transient-mark-mode-semantics.forms EXPECTED=cases/transient-mark-mode-semantics.expected.tsv` (pass)
+    - `make -C test/neovm/vm-compat validate-case-lists` (pass)
+    - `make -C test/neovm/vm-compat check-all-neovm` (pass)
 - Implemented display query selected-frame designator compatibility slice:
   - added and enabled oracle corpus:
     - `test/neovm/vm-compat/cases/display-frame-designator-semantics.forms`
