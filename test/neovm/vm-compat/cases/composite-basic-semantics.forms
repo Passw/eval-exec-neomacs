@@ -1,6 +1,7 @@
 (fboundp 'compose-region-internal)
 (fboundp 'compose-string-internal)
 (fboundp 'find-composition-internal)
+(fboundp 'composition-get-gstring)
 (fboundp 'clear-composition-cache)
 (fboundp 'composition-sort-rules)
 (fboundp 'auto-composition-mode)
@@ -21,7 +22,15 @@
 (condition-case err (compose-region-internal 1) (error (car err)))
 
 (condition-case err (find-composition-internal 1 nil nil nil) (error (car err)))
+(condition-case err (find-composition-internal 'x nil nil nil) (error err))
+(condition-case err (find-composition-internal 1 'y nil nil) (error err))
+(condition-case err (find-composition-internal 1 nil 1 nil) (error err))
 (condition-case err (find-composition-internal 1) (error (car err)))
+
+(condition-case err (composition-get-gstring 'x 1 nil "ab") (error err))
+(condition-case err (composition-get-gstring 0 'y nil "ab") (error err))
+(condition-case err (composition-get-gstring 0 1 nil 1) (error err))
+(condition-case err (composition-get-gstring 0 1 nil "ab" nil) (error (car err)))
 
 (condition-case err (clear-composition-cache) (error (car err)))
 (condition-case err (clear-composition-cache nil) (error (car err)))
