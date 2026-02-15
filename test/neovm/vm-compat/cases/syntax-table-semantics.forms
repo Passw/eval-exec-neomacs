@@ -3,6 +3,11 @@
 (fboundp 'make-syntax-table)
 (fboundp 'standard-syntax-table)
 (fboundp 'syntax-table)
+(fboundp 'syntax-table-p)
+
+(syntax-table-p (make-syntax-table))
+(syntax-table-p (make-char-table 'foo))
+(syntax-table-p 1)
 
 (char-table-p (make-syntax-table))
 (eq (char-table-subtype (make-syntax-table)) 'syntax-table)
@@ -25,5 +30,6 @@
   (eq (char-table-subtype (syntax-table)) 'syntax-table))
 
 (condition-case err (make-syntax-table 1) (error (car err)))
+(condition-case err (syntax-table-p) (wrong-number-of-arguments (car err)))
 (condition-case err (standard-syntax-table 1) (wrong-number-of-arguments (car err)))
 (condition-case err (syntax-table 1) (wrong-number-of-arguments (car err)))

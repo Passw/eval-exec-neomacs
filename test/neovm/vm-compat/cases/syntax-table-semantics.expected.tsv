@@ -1,14 +1,19 @@
 1	(fboundp 'make-syntax-table)	OK t
 2	(fboundp 'standard-syntax-table)	OK t
 3	(fboundp 'syntax-table)	OK t
-4	(char-table-p (make-syntax-table))	OK t
-5	(eq (char-table-subtype (make-syntax-table)) 'syntax-table)	OK t
-6	(let* ((parent (make-syntax-table)) (child (make-syntax-table parent))) (char-table-p (char-table-parent child)))	OK t
-7	(let* ((parent (make-syntax-table)) (child (make-syntax-table parent))) (eq (char-table-subtype child) 'syntax-table))	OK t
-8	(char-table-p (standard-syntax-table))	OK t
-9	(eq (char-table-subtype (standard-syntax-table)) 'syntax-table)	OK t
-10	(with-temp-buffer (char-table-p (syntax-table)))	OK t
-11	(with-temp-buffer (eq (char-table-subtype (syntax-table)) 'syntax-table))	OK t
-12	(condition-case err (make-syntax-table 1) (error (car err)))	OK wrong-type-argument
-13	(condition-case err (standard-syntax-table 1) (wrong-number-of-arguments (car err)))	OK wrong-number-of-arguments
-14	(condition-case err (syntax-table 1) (wrong-number-of-arguments (car err)))	OK wrong-number-of-arguments
+4	(fboundp 'syntax-table-p)	OK t
+5	(syntax-table-p (make-syntax-table))	OK t
+6	(syntax-table-p (make-char-table 'foo))	OK nil
+7	(syntax-table-p 1)	OK nil
+8	(char-table-p (make-syntax-table))	OK t
+9	(eq (char-table-subtype (make-syntax-table)) 'syntax-table)	OK t
+10	(let* ((parent (make-syntax-table)) (child (make-syntax-table parent))) (char-table-p (char-table-parent child)))	OK t
+11	(let* ((parent (make-syntax-table)) (child (make-syntax-table parent))) (eq (char-table-subtype child) 'syntax-table))	OK t
+12	(char-table-p (standard-syntax-table))	OK t
+13	(eq (char-table-subtype (standard-syntax-table)) 'syntax-table)	OK t
+14	(with-temp-buffer (char-table-p (syntax-table)))	OK t
+15	(with-temp-buffer (eq (char-table-subtype (syntax-table)) 'syntax-table))	OK t
+16	(condition-case err (make-syntax-table 1) (error (car err)))	OK wrong-type-argument
+17	(condition-case err (syntax-table-p) (wrong-number-of-arguments (car err)))	OK wrong-number-of-arguments
+18	(condition-case err (standard-syntax-table 1) (wrong-number-of-arguments (car err)))	OK wrong-number-of-arguments
+19	(condition-case err (syntax-table 1) (wrong-number-of-arguments (car err)))	OK wrong-number-of-arguments
