@@ -19,6 +19,18 @@ Last updated: 2026-02-15
 
 ## Done
 
+- Ran recurring full vm-compat gate after xdisp/window/keymap compatibility slices:
+  - verified:
+    - `make -C test/neovm/vm-compat check-all-neovm` (pass, full default + neovm-only corpus)
+
+- Hardened `xdisp-navigation` stale window probe semantics:
+  - updated:
+    - `test/neovm/vm-compat/cases/xdisp-navigation-semantics.{forms,expected.tsv}`
+      - replaced invalid window probe `1` -> `999999` for `pos-visible-in-window-p` optional WINDOW arg.
+      - refreshed oracle baseline.
+  - verified:
+    - `make -C test/neovm/vm-compat check-one-neovm CASE=cases/xdisp-navigation-semantics` (pass, 10/10)
+
 - Routed `window-text-pixel-size` through evaluator-aware window designator validation:
   - updated:
     - `rust/neovm-core/src/elisp/xdisp.rs`
