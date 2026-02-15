@@ -5,3 +5,4 @@ cases/bytecode-literal-default-policy
 cases/image-insert-put-semantics
 cases/image-area-semantics
 cases/image-flush-semantics
+cases/image-remove-semantics

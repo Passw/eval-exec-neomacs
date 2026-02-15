@@ -352,17 +352,25 @@ pub(crate) fn builtin_remove_images(args: Vec<Value>) -> EvalResult {
     expect_min_args("remove-images", &args, 2)?;
     expect_max_args("remove-images", &args, 3)?;
 
-    // Validate START and END are integers.
-    if args[0].as_int().is_none() {
+    // Validate START and END are integer-or-marker in batch.
+    if !matches!(&args[0], Value::Int(_) | Value::Char(_)) {
         return Err(signal(
             "wrong-type-argument",
-            vec![Value::symbol("integerp"), args[0].clone()],
+            vec![Value::symbol("integer-or-marker-p"), args[0].clone()],
         ));
     }
-    if args[1].as_int().is_none() {
+    if !matches!(&args[1], Value::Int(_) | Value::Char(_)) {
         return Err(signal(
             "wrong-type-argument",
-            vec![Value::symbol("integerp"), args[1].clone()],
+            vec![Value::symbol("integer-or-marker-p"), args[1].clone()],
+        ));
+    }
+
+    // Optional BUFFER must be nil or a buffer object.
+    if args.len() > 2 && !args[2].is_nil() && !matches!(&args[2], Value::Buffer(_)) {
+        return Err(signal(
+            "wrong-type-argument",
+            vec![Value::symbol("bufferp"), args[2].clone()],
         ));
     }
 
@@ -787,15 +795,43 @@ mod tests {
     }
 
     #[test]
+    fn remove_images_accepts_char_positions() {
+        let result = builtin_remove_images(vec![Value::Char('a'), Value::Char('z')]);
+        assert!(result.is_ok());
+        assert!(result.unwrap().is_nil());
+    }
+
+    #[test]
     fn remove_images_bad_start() {
         let result = builtin_remove_images(vec![Value::string("x"), Value::Int(100)]);
-        assert!(result.is_err());
+        assert!(matches!(
+            result,
+            Err(Flow::Signal(sig))
+                if sig.symbol == "wrong-type-argument"
+                && sig.data.first() == Some(&Value::symbol("integer-or-marker-p"))
+        ));
     }
 
     #[test]
     fn remove_images_bad_end() {
         let result = builtin_remove_images(vec![Value::Int(1), Value::string("x")]);
-        assert!(result.is_err());
+        assert!(matches!(
+            result,
+            Err(Flow::Signal(sig))
+                if sig.symbol == "wrong-type-argument"
+                && sig.data.first() == Some(&Value::symbol("integer-or-marker-p"))
+        ));
+    }
+
+    #[test]
+    fn remove_images_bad_buffer() {
+        let result = builtin_remove_images(vec![Value::Int(1), Value::Int(10), Value::Int(1)]);
+        assert!(matches!(
+            result,
+            Err(Flow::Signal(sig))
+                if sig.symbol == "wrong-type-argument"
+                && sig.data.first() == Some(&Value::symbol("bufferp"))
+        ));
     }
 
     #[test]
