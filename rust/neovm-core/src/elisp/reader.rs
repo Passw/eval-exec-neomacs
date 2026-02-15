@@ -1023,38 +1023,6 @@ pub(crate) fn builtin_read_key_sequence_vector(
 }
 
 // ---------------------------------------------------------------------------
-// 13. with-temp-buffer (special form)
-// ---------------------------------------------------------------------------
-
-/// Special form: `(with-temp-buffer BODY...)`
-///
-/// Create a temporary buffer, make it current, evaluate BODY forms,
-/// kill the buffer, and return the last value from BODY.
-pub(crate) fn builtin_with_temp_buffer(
-    eval: &mut super::eval::Evaluator,
-    tail: &[Expr],
-) -> EvalResult {
-    // Generate a unique temp buffer name
-    let name = eval.buffers.generate_new_buffer_name(" *temp*");
-    let buf_id = eval.buffers.create_buffer(&name);
-
-    // Save current buffer, switch to temp
-    let saved = eval.buffers.current_buffer().map(|b| b.id);
-    eval.buffers.set_current(buf_id);
-
-    // Evaluate body
-    let result = eval.sf_progn(tail);
-
-    // Restore and kill temp buffer
-    if let Some(saved_id) = saved {
-        eval.buffers.set_current(saved_id);
-    }
-    eval.buffers.kill_buffer(buf_id);
-
-    result
-}
-
-// ---------------------------------------------------------------------------
 // 14. with-output-to-string (special form)
 // ---------------------------------------------------------------------------
 
@@ -1922,28 +1890,6 @@ mod tests {
             result,
             Err(Flow::Signal(sig)) if sig.symbol == "wrong-number-of-arguments"
         ));
-    }
-
-    // ===================================================================
-    // with-temp-buffer tests
-    // ===================================================================
-
-    #[test]
-    fn with_temp_buffer_returns_last_value() {
-        let mut ev = Evaluator::new();
-        let body = parse_forms("1 2 3").unwrap();
-        let result = builtin_with_temp_buffer(&mut ev, &body).unwrap();
-        assert!(matches!(result, Value::Int(3)));
-    }
-
-    #[test]
-    fn with_temp_buffer_cleans_up() {
-        let mut ev = Evaluator::new();
-        let initial_count = ev.buffers.buffer_list().len();
-        let body = parse_forms("(insert \"test\") (buffer-string)").unwrap();
-        let _result = builtin_with_temp_buffer(&mut ev, &body);
-        // Temp buffer should be killed
-        assert_eq!(ev.buffers.buffer_list().len(), initial_count);
     }
 
     // ===================================================================
