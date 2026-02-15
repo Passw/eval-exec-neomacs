@@ -94,6 +94,9 @@ impl Buffer {
 
     /// Create a new, empty buffer.
     pub fn new(id: BufferId, name: String) -> Self {
+        let mut properties = HashMap::new();
+        properties.insert("buffer-read-only".to_string(), Value::Nil);
+
         Self {
             id,
             name,
@@ -107,7 +110,7 @@ impl Buffer {
             multibyte: true,
             file_name: None,
             markers: Vec::new(),
-            properties: HashMap::new(),
+            properties,
             text_props: TextPropertyTable::new(),
             overlays: OverlayList::new(),
             syntax_table: SyntaxTable::new_standard(),
