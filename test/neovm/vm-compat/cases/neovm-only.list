@@ -2,3 +2,4 @@ cases/load-suffixes
 cases/load-policy
 cases/precompile
 cases/bytecode-literal-default-policy
+cases/image-insert-put-semantics

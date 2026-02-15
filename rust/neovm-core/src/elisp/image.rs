@@ -276,17 +276,18 @@ pub(crate) fn builtin_put_image(args: Vec<Value>) -> EvalResult {
 
     // Validate that first arg looks like an image spec.
     if !is_image_spec(&args[0]) {
+        let rendered = super::print::print_value(&args[0]);
         return Err(signal(
-            "wrong-type-argument",
-            vec![Value::symbol("imagep"), args[0].clone()],
+            "error",
+            vec![Value::string(format!("Not an image: {rendered}"))],
         ));
     }
 
-    // Validate POINT is an integer.
-    if args[1].as_int().is_none() {
+    // Validate POINT is integer-or-marker in batch.
+    if !matches!(&args[1], Value::Int(_) | Value::Char(_)) {
         return Err(signal(
             "wrong-type-argument",
-            vec![Value::symbol("integerp"), args[1].clone()],
+            vec![Value::symbol("integer-or-marker-p"), args[1].clone()],
         ));
     }
 
@@ -297,20 +298,20 @@ pub(crate) fn builtin_put_image(args: Vec<Value>) -> EvalResult {
 /// (insert-image IMAGE &optional STRING AREA SLICE) -> nil
 ///
 /// Insert IMAGE into the current buffer at point.
-/// Stub: does nothing, returns nil.
+/// Batch stub: validates IMAGE and returns t.
 pub(crate) fn builtin_insert_image(args: Vec<Value>) -> EvalResult {
     expect_min_args("insert-image", &args, 1)?;
-    expect_max_args("insert-image", &args, 4)?;
+    expect_max_args("insert-image", &args, 5)?;
 
     if !is_image_spec(&args[0]) {
+        let rendered = super::print::print_value(&args[0]);
         return Err(signal(
-            "wrong-type-argument",
-            vec![Value::symbol("imagep"), args[0].clone()],
+            "error",
+            vec![Value::string(format!("Not an image: {rendered}"))],
         ));
     }
 
-    // Stub: no-op.
-    Ok(Value::Nil)
+    Ok(Value::True)
 }
 
 /// (remove-images START END &optional BUFFER) -> nil
@@ -630,18 +631,38 @@ mod tests {
     }
 
     #[test]
+    fn put_image_accepts_char_point() {
+        let spec =
+            builtin_create_image(vec![Value::string("test.png"), Value::symbol("png")]).unwrap();
+
+        let result = builtin_put_image(vec![spec, Value::Char('a')]);
+        assert!(result.is_ok());
+        assert!(result.unwrap().is_nil());
+    }
+
+    #[test]
     fn put_image_bad_point() {
         let spec =
             builtin_create_image(vec![Value::string("test.png"), Value::symbol("png")]).unwrap();
 
         let result = builtin_put_image(vec![spec, Value::string("not a point")]);
-        assert!(result.is_err());
+        assert!(matches!(
+            result,
+            Err(Flow::Signal(sig))
+                if sig.symbol == "wrong-type-argument"
+                && sig.data.first() == Some(&Value::symbol("integer-or-marker-p"))
+        ));
     }
 
     #[test]
     fn put_image_not_image() {
         let result = builtin_put_image(vec![Value::Int(1), Value::Int(1)]);
-        assert!(result.is_err());
+        assert!(matches!(
+            result,
+            Err(Flow::Signal(sig))
+                if sig.symbol == "error"
+                && sig.data.first() == Some(&Value::string("Not an image: 1"))
+        ));
     }
 
     // -----------------------------------------------------------------------
@@ -655,12 +676,32 @@ mod tests {
 
         let result = builtin_insert_image(vec![spec]);
         assert!(result.is_ok());
-        assert!(result.unwrap().is_nil());
+        assert_eq!(result.unwrap(), Value::True);
     }
 
     #[test]
     fn insert_image_not_image() {
         let result = builtin_insert_image(vec![Value::Int(42)]);
+        assert!(matches!(
+            result,
+            Err(Flow::Signal(sig))
+                if sig.symbol == "error"
+                && sig.data.first() == Some(&Value::string("Not an image: 42"))
+        ));
+    }
+
+    #[test]
+    fn insert_image_too_many_args() {
+        let spec =
+            builtin_create_image(vec![Value::string("test.png"), Value::symbol("png")]).unwrap();
+        let result = builtin_insert_image(vec![
+            spec,
+            Value::Nil,
+            Value::Nil,
+            Value::Nil,
+            Value::Nil,
+            Value::Nil,
+        ]);
         assert!(result.is_err());
     }
 
