@@ -4,6 +4,21 @@ Last updated: 2026-02-15
 
 ## Done
 
+- Aligned whitespace/indent mutator read-only behavior with oracle semantics:
+  - updated `rust/neovm-core/src/elisp/kill_ring.rs`:
+    - `delete-horizontal-space` now checks read-only only when an actual deletion is needed, and honors dynamic/buffer-local/global `buffer-read-only`
+    - `just-one-space` now checks read-only only when replacement would change text, and honors dynamic/buffer-local/global `buffer-read-only`
+    - `indent-line-to` now checks read-only only when indentation would change, and honors dynamic/buffer-local/global `buffer-read-only`
+    - `indent-to` now checks read-only only when space insertion is required, and honors dynamic/buffer-local/global `buffer-read-only`
+    - `tab-to-tab-stop` now honors dynamic/buffer-local/global `buffer-read-only`
+  - added and enabled oracle corpus:
+    - `test/neovm/vm-compat/cases/whitespace-read-only-variable-semantics.forms`
+    - `test/neovm/vm-compat/cases/whitespace-read-only-variable-semantics.expected.tsv`
+    - wired into `test/neovm/vm-compat/cases/default.list`
+  - verified:
+    - `make -C test/neovm/vm-compat check-one-neovm CASE=cases/whitespace-read-only-variable-semantics` (pass, 10/10)
+    - `make -C test/neovm/vm-compat check-one-neovm CASE=cases/tab-to-tab-stop-semantics` (pass, 4/4)
+    - `make -C test/neovm/vm-compat check-one-neovm CASE=cases/indent-line-to-semantics` (pass, 6/6)
 - Aligned newline insertion paths with `buffer-read-only` variable semantics and locked with oracle corpus:
   - updated `rust/neovm-core/src/elisp/kill_ring.rs`:
     - `newline` now honors dynamic/buffer-local/global `buffer-read-only` (not just raw `buf.read_only`)
