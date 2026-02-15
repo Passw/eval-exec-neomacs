@@ -295,52 +295,6 @@ fn set_buffer_modified_p_wrong_args() {
     assert!(result.is_err());
 }
 
-// ----- buffer-local-value -----
-
-#[test]
-fn buffer_local_value_found() {
-    let mut eval = new_eval();
-    let id = eval.buffers.create_buffer("test");
-    eval.buffers
-        .get_mut(id)
-        .unwrap()
-        .set_buffer_local("tab-width", Value::Int(4));
-    let result = builtin_buffer_local_value(
-        &mut eval,
-        vec![Value::symbol("tab-width"), Value::Buffer(id)],
-    )
-    .unwrap();
-    assert!(matches!(result, Value::Int(4)));
-}
-
-#[test]
-fn buffer_local_value_not_found() {
-    let mut eval = new_eval();
-    let id = eval.buffers.create_buffer("test");
-    let result = builtin_buffer_local_value(
-        &mut eval,
-        vec![Value::symbol("nonexistent"), Value::Buffer(id)],
-    )
-    .unwrap();
-    assert!(result.is_nil());
-}
-
-#[test]
-fn buffer_local_value_wrong_args() {
-    let mut eval = new_eval();
-    let result = builtin_buffer_local_value(&mut eval, vec![Value::Int(1)]);
-    assert!(result.is_err());
-}
-
-// ----- buffer-local-variables -----
-
-#[test]
-fn buffer_local_variables_stub() {
-    let mut eval = new_eval();
-    let result = builtin_buffer_local_variables(&mut eval, vec![]).unwrap();
-    assert!(result.is_nil());
-}
-
 // ----- buffer-live-p -----
 
 #[test]

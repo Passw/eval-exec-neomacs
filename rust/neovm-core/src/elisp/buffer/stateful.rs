@@ -1,7 +1,7 @@
 use super::super::eval::Evaluator;
 use super::args::{
-    expect_args, expect_buffer_id, expect_max_args, expect_min_args, expect_string,
-    resolve_buffer_arg, resolve_buffer_or_name_opt,
+    expect_args, expect_max_args, expect_min_args, expect_string, resolve_buffer_arg,
+    resolve_buffer_or_name_opt,
 };
 use super::{signal, EvalResult, Value};
 
@@ -179,44 +179,6 @@ pub(crate) fn builtin_set_buffer_modified_p(eval: &mut Evaluator, args: Vec<Valu
         .ok_or_else(|| signal("error", vec![Value::string("No current buffer")]))?;
     buf.set_modified(flag);
     Ok(args[0].clone())
-}
-
-/// (buffer-local-value VARIABLE BUFFER) -> value
-///
-/// Return the value of VARIABLE in BUFFER.
-/// Stub: returns nil.
-pub(crate) fn builtin_buffer_local_value(eval: &mut Evaluator, args: Vec<Value>) -> EvalResult {
-    expect_args("buffer-local-value", &args, 2)?;
-    let name = match &args[0] {
-        Value::Symbol(s) => s.clone(),
-        Value::Nil => "nil".to_string(),
-        Value::True => "t".to_string(),
-        other => {
-            return Err(signal(
-                "wrong-type-argument",
-                vec![Value::symbol("symbolp"), other.clone()],
-            ))
-        }
-    };
-    let id = expect_buffer_id(&args[1])?;
-    let buf = eval
-        .buffers
-        .get(id)
-        .ok_or_else(|| signal("error", vec![Value::string("No such buffer")]))?;
-    match buf.get_buffer_local(&name) {
-        Some(v) => Ok(v.clone()),
-        None => Ok(Value::Nil),
-    }
-}
-
-/// (buffer-local-variables &optional BUFFER) -> list
-///
-/// Return an alist of buffer-local variables in BUFFER.
-/// Stub: returns nil (empty list).
-pub(crate) fn builtin_buffer_local_variables(eval: &mut Evaluator, args: Vec<Value>) -> EvalResult {
-    expect_max_args("buffer-local-variables", &args, 1)?;
-    let _ = resolve_buffer_arg(&eval, args.first())?;
-    Ok(Value::Nil)
 }
 
 /// (buffer-live-p OBJECT) -> t or nil

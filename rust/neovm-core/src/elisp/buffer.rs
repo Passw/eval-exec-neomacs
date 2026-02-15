@@ -11,8 +11,6 @@
 //! - `buffer-file-name` -- return associated file name or nil
 //! - `buffer-modified-p` -- check modified flag
 //! - `set-buffer-modified-p` -- set modified flag
-//! - `buffer-local-value` -- read buffer-local variable (stub)
-//! - `buffer-local-variables` -- list buffer-local variables (stub)
 //! - `buffer-live-p` -- check if buffer is live
 //! - `rename-buffer` -- rename a buffer
 //! - `other-buffer` -- return another buffer
