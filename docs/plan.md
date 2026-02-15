@@ -1865,6 +1865,17 @@ Last updated: 2026-02-15
     - `cargo test --manifest-path rust/neovm-core/Cargo.toml kill_ring::tests::capitalize_ -- --nocapture` (pass)
     - `make -C test/neovm/vm-compat check-neovm FORMS=cases/case-word-semantics.forms EXPECTED=cases/case-word-semantics.expected.tsv` (pass, 10/10)
     - `make -C test/neovm/vm-compat CASES='cases/case-region-optional-arg-semantics cases/command-dispatch-default-arg-semantics cases/case-word-semantics' check-neovm` (pass, 15/15)
+- Aligned region case command read-only semantics with `buffer-read-only` variable state:
+  - `downcase-region`, `upcase-region`, `capitalize-region`, and `upcase-initials-region` now signal `buffer-read-only` when dynamic/buffer-local/global `buffer-read-only` is non-nil
+  - kept `upcase-word`/`downcase-word`/`capitalize-word` behavior unchanged for this axis (oracle parity)
+  - added and enabled oracle corpus:
+    - `test/neovm/vm-compat/cases/case-region-read-only-semantics.forms`
+    - `test/neovm/vm-compat/cases/case-region-read-only-semantics.expected.tsv`
+    - `test/neovm/vm-compat/cases/default.list`
+  - verified:
+    - `make -C test/neovm/vm-compat check-neovm FORMS=cases/case-region-read-only-semantics.forms EXPECTED=cases/case-region-read-only-semantics.expected.tsv` (pass, 5/5)
+    - `make -C test/neovm/vm-compat CASES='cases/case-region-optional-arg-semantics cases/case-region-read-only-semantics cases/case-word-semantics cases/command-dispatch-default-arg-semantics' check-neovm` (pass, 15/15)
+    - `make -C test/neovm/vm-compat check-all-neovm` (pass)
 - Kept branch green with targeted Rust tests and vm-compat checks after each slice.
 
 ## Doing
