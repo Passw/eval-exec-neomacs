@@ -234,7 +234,8 @@ pub(crate) fn builtin_string_match_p(args: Vec<Value>) -> EvalResult {
     let s = expect_string(&args[1])?;
     let start = normalize_string_start_arg(&s, args.get(2))?;
 
-    let rust_pattern = super::regex::translate_emacs_regex(&pattern);
+    // Emacs defaults `case-fold-search` to non-nil for string matching.
+    let rust_pattern = format!("(?i:{})", super::regex::translate_emacs_regex(&pattern));
     let re = regex::Regex::new(&rust_pattern)
         .map_err(|e| signal("invalid-regexp", vec![Value::string(e.to_string())]))?;
 
@@ -482,6 +483,12 @@ mod tests {
     }
 
     #[test]
+    fn string_match_defaults_to_case_fold() {
+        let result = builtin_string_match(vec![Value::string("a"), Value::string("A")]);
+        assert_int(result.unwrap(), 0);
+    }
+
+    #[test]
     fn string_match_p_basic() {
         let result =
             builtin_string_match_p(vec![Value::string("[0-9]+"), Value::string("abc 123 def")]);
@@ -495,6 +502,12 @@ mod tests {
             Value::string("no digits here"),
         ]);
         assert_nil(result.unwrap());
+    }
+
+    #[test]
+    fn string_match_p_defaults_to_case_fold() {
+        let result = builtin_string_match_p(vec![Value::string("a"), Value::string("A")]);
+        assert_int(result.unwrap(), 0);
     }
 
     #[test]

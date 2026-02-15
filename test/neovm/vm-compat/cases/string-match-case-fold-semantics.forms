@@ -1,0 +1,6 @@
+(fboundp 'string-match)
+(fboundp 'string-match-p)
+(string-match "a" "A")
+(string-match-p "a" "A")
+(string-match "A" "a")
+(string-match-p "A" "a")

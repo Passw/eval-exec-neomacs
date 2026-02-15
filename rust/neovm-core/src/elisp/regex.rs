@@ -231,6 +231,16 @@ fn compile_emacs_regex(pattern: &str) -> Result<Regex, String> {
     Regex::new(&rust_pattern).map_err(|e| format!("Invalid regexp: {}", e))
 }
 
+fn compile_emacs_regex_case_fold(pattern: &str, case_fold: bool) -> Result<Regex, String> {
+    let rust_pattern = translate_emacs_regex(pattern);
+    let wrapped = if case_fold {
+        format!("(?i:{})", rust_pattern)
+    } else {
+        rust_pattern
+    };
+    Regex::new(&wrapped).map_err(|e| format!("Invalid regexp: {}", e))
+}
+
 fn match_data_from_captures(caps: &regex::Captures<'_>, offset: usize) -> MatchData {
     let mut groups = Vec::with_capacity(caps.len());
     for i in 0..caps.len() {
@@ -466,7 +476,8 @@ pub fn string_match_full(
     start: usize,
     match_data: &mut Option<MatchData>,
 ) -> Result<Option<usize>, String> {
-    let re = compile_emacs_regex(pattern)?;
+    // Emacs defaults `case-fold-search` to non-nil for string matching.
+    let re = compile_emacs_regex_case_fold(pattern, true)?;
 
     if start > string.len() {
         return Ok(None);
