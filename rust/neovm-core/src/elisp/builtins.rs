@@ -6489,6 +6489,15 @@ pub(crate) fn dispatch_builtin(
         "set-terminal-parameter" => {
             return Some(super::display::builtin_set_terminal_parameter_eval(eval, args))
         }
+        "tty-type" => return Some(super::display::builtin_tty_type_eval(eval, args)),
+        "tty-top-frame" => return Some(super::display::builtin_tty_top_frame_eval(eval, args)),
+        "controlling-tty-p" => {
+            return Some(super::display::builtin_controlling_tty_p_eval(
+                eval, args,
+            ))
+        }
+        "suspend-tty" => return Some(super::display::builtin_suspend_tty_eval(eval, args)),
+        "resume-tty" => return Some(super::display::builtin_resume_tty_eval(eval, args)),
         "frame-terminal" => return Some(super::display::builtin_frame_terminal_eval(eval, args)),
         "display-monitor-attributes-list" => {
             return Some(super::display::builtin_display_monitor_attributes_list_eval(eval, args))

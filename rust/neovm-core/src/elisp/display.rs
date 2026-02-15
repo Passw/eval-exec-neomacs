@@ -855,6 +855,20 @@ pub(crate) fn builtin_tty_type(args: Vec<Value>) -> EvalResult {
     Ok(Value::Nil)
 }
 
+/// Evaluator-aware variant of `tty-type`.
+///
+/// Accepts live frame designators in addition to terminal designators.
+pub(crate) fn builtin_tty_type_eval(
+    eval: &mut super::eval::Evaluator,
+    args: Vec<Value>,
+) -> EvalResult {
+    expect_max_args("tty-type", &args, 1)?;
+    if let Some(terminal) = args.first() {
+        expect_terminal_designator_eval(eval, terminal)?;
+    }
+    Ok(Value::Nil)
+}
+
 /// (tty-top-frame &optional TERMINAL) -> nil
 pub(crate) fn builtin_tty_top_frame(args: Vec<Value>) -> EvalResult {
     expect_max_args("tty-top-frame", &args, 1)?;
@@ -864,11 +878,39 @@ pub(crate) fn builtin_tty_top_frame(args: Vec<Value>) -> EvalResult {
     Ok(Value::Nil)
 }
 
+/// Evaluator-aware variant of `tty-top-frame`.
+///
+/// Accepts live frame designators in addition to terminal designators.
+pub(crate) fn builtin_tty_top_frame_eval(
+    eval: &mut super::eval::Evaluator,
+    args: Vec<Value>,
+) -> EvalResult {
+    expect_max_args("tty-top-frame", &args, 1)?;
+    if let Some(terminal) = args.first() {
+        expect_terminal_designator_eval(eval, terminal)?;
+    }
+    Ok(Value::Nil)
+}
+
 /// (controlling-tty-p &optional TERMINAL) -> nil
 pub(crate) fn builtin_controlling_tty_p(args: Vec<Value>) -> EvalResult {
     expect_max_args("controlling-tty-p", &args, 1)?;
     if let Some(terminal) = args.first() {
         expect_terminal_designator(terminal)?;
+    }
+    Ok(Value::Nil)
+}
+
+/// Evaluator-aware variant of `controlling-tty-p`.
+///
+/// Accepts live frame designators in addition to terminal designators.
+pub(crate) fn builtin_controlling_tty_p_eval(
+    eval: &mut super::eval::Evaluator,
+    args: Vec<Value>,
+) -> EvalResult {
+    expect_max_args("controlling-tty-p", &args, 1)?;
+    if let Some(terminal) = args.first() {
+        expect_terminal_designator_eval(eval, terminal)?;
     }
     Ok(Value::Nil)
 }
@@ -885,11 +927,45 @@ pub(crate) fn builtin_suspend_tty(args: Vec<Value>) -> EvalResult {
     ))
 }
 
+/// Evaluator-aware variant of `suspend-tty`.
+///
+/// Accepts live frame designators in addition to terminal designators.
+pub(crate) fn builtin_suspend_tty_eval(
+    eval: &mut super::eval::Evaluator,
+    args: Vec<Value>,
+) -> EvalResult {
+    expect_max_args("suspend-tty", &args, 1)?;
+    if let Some(terminal) = args.first() {
+        expect_terminal_designator_eval(eval, terminal)?;
+    }
+    Err(signal(
+        "error",
+        vec![Value::string("Attempt to suspend a non-text terminal device")],
+    ))
+}
+
 /// (resume-tty &optional TTY) -> error in GUI/non-text terminal context.
 pub(crate) fn builtin_resume_tty(args: Vec<Value>) -> EvalResult {
     expect_max_args("resume-tty", &args, 1)?;
     if let Some(terminal) = args.first() {
         expect_terminal_designator(terminal)?;
+    }
+    Err(signal(
+        "error",
+        vec![Value::string("Attempt to resume a non-text terminal device")],
+    ))
+}
+
+/// Evaluator-aware variant of `resume-tty`.
+///
+/// Accepts live frame designators in addition to terminal designators.
+pub(crate) fn builtin_resume_tty_eval(
+    eval: &mut super::eval::Evaluator,
+    args: Vec<Value>,
+) -> EvalResult {
+    expect_max_args("resume-tty", &args, 1)?;
+    if let Some(terminal) = args.first() {
+        expect_terminal_designator_eval(eval, terminal)?;
     }
     Err(signal(
         "error",
@@ -1239,6 +1315,27 @@ mod tests {
     }
 
     #[test]
+    fn eval_tty_queries_accept_live_frame_designator() {
+        let mut eval = crate::elisp::Evaluator::new();
+        let frame_id = crate::elisp::window_cmds::ensure_selected_frame_id(&mut eval).0 as i64;
+        assert!(
+            builtin_tty_type_eval(&mut eval, vec![Value::Int(frame_id)])
+                .unwrap()
+                .is_nil()
+        );
+        assert!(
+            builtin_tty_top_frame_eval(&mut eval, vec![Value::Int(frame_id)])
+                .unwrap()
+                .is_nil()
+        );
+        assert!(
+            builtin_controlling_tty_p_eval(&mut eval, vec![Value::Int(frame_id)])
+                .unwrap()
+                .is_nil()
+        );
+    }
+
+    #[test]
     fn suspend_tty_signals_non_text_terminal_error() {
         for args in [vec![], vec![Value::Nil], vec![terminal_handle_value()]] {
             let result = builtin_suspend_tty(args);
@@ -1253,6 +1350,16 @@ mod tests {
                 other => panic!("expected error signal, got {other:?}"),
             }
         }
+    }
+
+    #[test]
+    fn eval_suspend_resume_accept_live_frame_and_signal_non_text_terminal_error() {
+        let mut eval = crate::elisp::Evaluator::new();
+        let frame_id = crate::elisp::window_cmds::ensure_selected_frame_id(&mut eval).0 as i64;
+        let suspend = builtin_suspend_tty_eval(&mut eval, vec![Value::Int(frame_id)]);
+        let resume = builtin_resume_tty_eval(&mut eval, vec![Value::Int(frame_id)]);
+        assert!(suspend.is_err());
+        assert!(resume.is_err());
     }
 
     #[test]

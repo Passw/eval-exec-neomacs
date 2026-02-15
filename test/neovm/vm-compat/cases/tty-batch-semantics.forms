@@ -6,7 +6,10 @@
     (tty-type (car (terminal-list)))
   (error (car err)))
 (condition-case err
-    (tty-type 1)
+    (tty-type (selected-frame))
+  (error (car err)))
+(condition-case err
+    (tty-type 999999)
   (error (car err)))
 
 (fboundp 'tty-top-frame)
@@ -17,7 +20,10 @@
     (tty-top-frame (car (terminal-list)))
   (error (car err)))
 (condition-case err
-    (tty-top-frame 1)
+    (tty-top-frame (selected-frame))
+  (error (car err)))
+(condition-case err
+    (tty-top-frame 999999)
   (error (car err)))
 
 (fboundp 'controlling-tty-p)
@@ -28,7 +34,10 @@
     (controlling-tty-p (car (terminal-list)))
   (error (car err)))
 (condition-case err
-    (controlling-tty-p 1)
+    (controlling-tty-p (selected-frame))
+  (error (car err)))
+(condition-case err
+    (controlling-tty-p 999999)
   (error (car err)))
 
 (fboundp 'suspend-tty)
@@ -42,7 +51,10 @@
     (suspend-tty (car (terminal-list)))
   (error (car err)))
 (condition-case err
-    (suspend-tty 1)
+    (suspend-tty (selected-frame))
+  (error (car err)))
+(condition-case err
+    (suspend-tty 999999)
   (error (car err)))
 (condition-case err
     (suspend-tty)
@@ -59,7 +71,10 @@
     (resume-tty (car (terminal-list)))
   (error (car err)))
 (condition-case err
-    (resume-tty 1)
+    (resume-tty (selected-frame))
+  (error (car err)))
+(condition-case err
+    (resume-tty 999999)
   (error (car err)))
 (condition-case err
     (resume-tty)
