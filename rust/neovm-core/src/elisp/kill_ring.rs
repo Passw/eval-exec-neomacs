@@ -1046,7 +1046,7 @@ pub(crate) fn builtin_yank(eval: &mut super::eval::Evaluator, args: Vec<Value>) 
 pub(crate) fn builtin_yank_pop(eval: &mut super::eval::Evaluator, args: Vec<Value>) -> EvalResult {
     let yank_command_in_progress = matches!(
         dynamic_or_global_symbol_value(eval, "last-command"),
-        Some(Value::Symbol(ref name)) if name == "yank" || name == "yank-pop"
+        Some(Value::Symbol(ref name)) if name == "yank"
     );
     if !yank_command_in_progress {
         if eval.kill_ring.is_empty() {
@@ -3057,6 +3057,12 @@ mod tests {
     fn yank_pop_without_yank_errors() {
         let results = eval_all(r#"(kill-new "hello") (yank-pop)"#);
         assert!(results[1].contains("end-of-file"));
+    }
+
+    #[test]
+    fn yank_pop_with_last_command_yank_pop_errors() {
+        let results = eval_all(r#"(kill-new "hello") (setq last-command 'yank-pop) (yank-pop)"#);
+        assert!(results[2].contains("end-of-file"));
     }
 
     #[test]
