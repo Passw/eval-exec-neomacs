@@ -217,28 +217,6 @@ pub(crate) fn builtin_seq_uniq(args: Vec<Value>) -> EvalResult {
     Ok(Value::list(result))
 }
 
-/// `(seq-contains-p SEQ ELT)` — check if sequence contains element.
-pub(crate) fn builtin_seq_contains_p(args: Vec<Value>) -> EvalResult {
-    expect_args("seq-contains-p", &args, 2)?;
-    let list = &args[0];
-    let target = &args[1];
-
-    let mut cursor = list.clone();
-    loop {
-        match cursor {
-            Value::Nil => return Ok(Value::Nil),
-            Value::Cons(cell) => {
-                let pair = cell.lock().expect("poisoned");
-                if super::value::equal_value(&pair.car, target, 0) {
-                    return Ok(Value::True);
-                }
-                cursor = pair.cdr.clone();
-            }
-            _ => return Ok(Value::Nil),
-        }
-    }
-}
-
 /// `(seq-count PRED SEQ)` — stub: count non-nil elements.
 pub(crate) fn builtin_seq_length(args: Vec<Value>) -> EvalResult {
     expect_args("seq-length", &args, 1)?;
