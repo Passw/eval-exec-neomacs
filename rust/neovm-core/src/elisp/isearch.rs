@@ -1536,6 +1536,50 @@ pub(crate) fn builtin_flush_lines_eval(
     Ok(Value::Nil)
 }
 
+/// `(how-many REGEXP &optional RSTART REND INTERACTIVE)` —
+/// evaluator-backed regexp match counting subset.
+pub(crate) fn builtin_how_many_eval(
+    eval: &mut super::eval::Evaluator,
+    args: Vec<Value>,
+) -> EvalResult {
+    expect_min_max_args("how-many", &args, 1, 4)?;
+    let regexp = expect_sequence_string(&args[0])?;
+
+    let source = {
+        let buf = eval
+            .buffers
+            .current_buffer()
+            .ok_or_else(|| signal("error", vec![Value::string("No current buffer")]))?;
+        let (start, end) = line_operation_region_bounds(buf, args.get(1), args.get(2))?;
+        buf.buffer_substring(start, end)
+    };
+
+    if regexp.is_empty() {
+        return Ok(Value::Int(source.chars().count() as i64));
+    }
+
+    let case_fold = resolve_case_fold(None, &regexp);
+    let pattern = build_regex_pattern(&regexp, case_fold);
+    let re = Regex::new(&pattern).map_err(|e| {
+        signal(
+            "invalid-regexp",
+            vec![Value::string(format!("Invalid regexp: {e}"))],
+        )
+    })?;
+
+    let mut count: i64 = 0;
+    for m in re.find_iter(&source) {
+        if m.start() == m.end() {
+            if m.start() >= source.len() {
+                continue;
+            }
+        }
+        count += 1;
+    }
+
+    Ok(Value::Int(count))
+}
+
 /// `(isearch-forward)` — stub: initiates forward incremental search.
 pub(crate) fn builtin_isearch_forward(args: Vec<Value>) -> EvalResult {
     // Interactive search requires a running event loop; return nil as a stub.

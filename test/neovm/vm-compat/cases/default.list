@@ -236,6 +236,7 @@ cases/propertize-semantics
 cases/widget-apply-semantics
 cases/remove-overlays-arity-semantics
 cases/search-buffer
+cases/how-many-semantics
 cases/flush-lines-semantics
 cases/keep-lines-semantics
 cases/replace-regexp-semantics

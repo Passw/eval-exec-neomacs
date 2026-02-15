@@ -359,6 +359,7 @@ const DISPATCH_BUILTIN_NAMES: &[&str] = &[
     "hash-table-test",
     "hash-table-weakness",
     "help-function-arglist",
+    "how-many",
     "identity",
     "ignore",
     "image-flush",
