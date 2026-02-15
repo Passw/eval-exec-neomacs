@@ -1,0 +1,18 @@
+1	(fboundp 'list-fonts)	OK t
+2	(condition-case err (list-fonts nil) (error (car err)))	OK wrong-type-argument
+3	(condition-case err (list-fonts 1) (error (car err)))	OK wrong-type-argument
+4	(condition-case err (list-fonts (font-spec :family "x")) (error (car err)))	OK nil
+5	(condition-case err (list-fonts) (error (car err)))	OK wrong-number-of-arguments
+6	(fboundp 'find-font)	OK t
+7	(condition-case err (find-font nil) (error (car err)))	OK wrong-type-argument
+8	(condition-case err (find-font 1) (error (car err)))	OK wrong-type-argument
+9	(condition-case err (find-font (font-spec :family "x")) (error (car err)))	OK nil
+10	(condition-case err (find-font) (error (car err)))	OK wrong-number-of-arguments
+11	(fboundp 'clear-font-cache)	OK t
+12	(condition-case err (clear-font-cache) (error (car err)))	OK nil
+13	(condition-case err (clear-font-cache nil) (error (car err)))	OK wrong-number-of-arguments
+14	(fboundp 'font-family-list)	OK t
+15	(condition-case err (font-family-list) (error (car err)))	OK nil
+16	(condition-case err (font-family-list nil) (error (car err)))	OK nil
+17	(condition-case err (font-family-list 1) (error (car err)))	OK wrong-type-argument
+18	(condition-case err (font-family-list nil nil) (error (car err)))	OK wrong-number-of-arguments
