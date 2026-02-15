@@ -1583,7 +1583,12 @@ pub(crate) fn builtin_query_replace_regexp_eval(
     args: Vec<Value>,
 ) -> EvalResult {
     expect_min_max_args("query-replace-regexp", &args, 2, 7)?;
-    builtin_replace_regexp_eval(eval, args)
+    match builtin_replace_regexp_eval(eval, args) {
+        // Batch `query-replace-regexp` does not signal invalid regexp payloads;
+        // it reports and returns nil in non-interactive compatibility mode.
+        Err(Flow::Signal(sig)) if sig.symbol == "invalid-regexp" => Ok(Value::Nil),
+        other => other,
+    }
 }
 
 /// `(keep-lines REGEXP &optional RSTART REND INTERACTIVE)` —

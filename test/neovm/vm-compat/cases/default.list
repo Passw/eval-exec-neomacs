@@ -251,6 +251,7 @@ cases/replace-backward-semantics
 cases/replace-backward-edge-semantics
 cases/replace-region-noncontiguous-semantics
 cases/query-replace-batch-semantics
+cases/query-replace-edge-semantics
 cases/looking-at-p-semantics
 cases/search-count
 cases/search-posix-word-semantics
