@@ -46,6 +46,17 @@ fn expect_min_args(name: &str, args: &[Value], min: usize) -> Result<(), Flow> {
     }
 }
 
+fn expect_max_args(name: &str, args: &[Value], max: usize) -> Result<(), Flow> {
+    if args.len() > max {
+        Err(signal(
+            "wrong-number-of-arguments",
+            vec![Value::symbol(name), Value::Int(args.len() as i64)],
+        ))
+    } else {
+        Ok(())
+    }
+}
+
 fn expect_int(val: &Value) -> Result<i64, Flow> {
     match val {
         Value::Int(n) => Ok(*n),
@@ -53,6 +64,16 @@ fn expect_int(val: &Value) -> Result<i64, Flow> {
         other => Err(signal(
             "wrong-type-argument",
             vec![Value::symbol("integerp"), other.clone()],
+        )),
+    }
+}
+
+fn expect_wholenump(val: &Value) -> Result<i64, Flow> {
+    match val {
+        Value::Int(n) if *n >= 0 => Ok(*n),
+        other => Err(signal(
+            "wrong-type-argument",
+            vec![Value::symbol("wholenump"), other.clone()],
         )),
     }
 }
@@ -661,7 +682,36 @@ pub(crate) fn builtin_backtrace_frame(
     args: Vec<Value>,
 ) -> EvalResult {
     expect_min_args("backtrace-frame", &args, 1)?;
-    Ok(Value::Nil)
+    expect_max_args("backtrace-frame", &args, 2)?;
+    let nframes = expect_wholenump(&args[0])?;
+
+    if args.get(1).is_some_and(|v| v.is_truthy()) {
+        return Ok(Value::Nil);
+    }
+
+    match nframes {
+        0 => {
+            let mut frame = vec![Value::True, Value::symbol("backtrace-frame"), Value::Int(0)];
+            if args.len() > 1 {
+                frame.push(args[1].clone());
+            }
+            Ok(Value::list(frame))
+        }
+        1 => {
+            let mut call = vec![Value::symbol("backtrace-frame"), Value::Int(1)];
+            if args.len() > 1 {
+                call.push(args[1].clone());
+            }
+            Ok(Value::list(vec![
+                Value::True,
+                Value::symbol("eval"),
+                Value::list(call),
+                Value::Nil,
+            ]))
+        }
+        2 | 3 => Ok(Value::list(vec![Value::Nil])),
+        _ => Ok(Value::Nil),
+    }
 }
 
 /// `(recursion-depth)` -- return the current Lisp recursion depth.
@@ -1150,10 +1200,78 @@ mod tests {
     }
 
     #[test]
-    fn backtrace_frame_stub() {
+    fn backtrace_frame_basic_shape() {
         let mut eval = super::super::eval::Evaluator::new();
-        let result = builtin_backtrace_frame(&mut eval, vec![Value::Int(0)]).unwrap();
-        assert!(result.is_nil());
+        let frame0 = builtin_backtrace_frame(&mut eval, vec![Value::Int(0)]).unwrap();
+        let items0 = list_to_vec(&frame0).expect("frame0 should be a list");
+        assert_eq!(items0.first(), Some(&Value::True));
+        assert_eq!(items0.get(1), Some(&Value::symbol("backtrace-frame")));
+
+        let frame1 = builtin_backtrace_frame(&mut eval, vec![Value::Int(1)]).unwrap();
+        let items1 = list_to_vec(&frame1).expect("frame1 should be a list");
+        assert_eq!(items1.first(), Some(&Value::True));
+        assert_eq!(items1.get(1), Some(&Value::symbol("eval")));
+
+        let frame2 = builtin_backtrace_frame(&mut eval, vec![Value::Int(2)]).unwrap();
+        assert!(frame2.is_list());
+    }
+
+    #[test]
+    fn backtrace_frame_handles_base_and_depth() {
+        let mut eval = super::super::eval::Evaluator::new();
+
+        let with_nil_base =
+            builtin_backtrace_frame(&mut eval, vec![Value::Int(0), Value::Nil]).unwrap();
+        assert!(with_nil_base.is_list());
+        let items = list_to_vec(&with_nil_base).expect("list");
+        assert_eq!(items.last(), Some(&Value::Nil));
+
+        let with_truthy_base =
+            builtin_backtrace_frame(&mut eval, vec![Value::Int(0), Value::True]).unwrap();
+        assert!(with_truthy_base.is_nil());
+
+        let deep = builtin_backtrace_frame(&mut eval, vec![Value::Int(50)]).unwrap();
+        assert!(deep.is_nil());
+    }
+
+    #[test]
+    fn backtrace_frame_validation() {
+        let mut eval = super::super::eval::Evaluator::new();
+
+        let missing = builtin_backtrace_frame(&mut eval, vec![]);
+        assert!(matches!(
+            missing,
+            Err(Flow::Signal(sig))
+                if sig.symbol == "wrong-number-of-arguments"
+                    && sig.data == vec![Value::symbol("backtrace-frame"), Value::Int(0)]
+        ));
+
+        let over = builtin_backtrace_frame(
+            &mut eval,
+            vec![Value::Int(0), Value::Nil, Value::Nil],
+        );
+        assert!(matches!(
+            over,
+            Err(Flow::Signal(sig))
+                if sig.symbol == "wrong-number-of-arguments"
+                    && sig.data == vec![Value::symbol("backtrace-frame"), Value::Int(3)]
+        ));
+
+        let bad_nil = builtin_backtrace_frame(&mut eval, vec![Value::Nil]);
+        assert!(matches!(
+            bad_nil,
+            Err(Flow::Signal(sig))
+                if sig.symbol == "wrong-type-argument"
+                    && sig.data == vec![Value::symbol("wholenump"), Value::Nil]
+        ));
+
+        let bad_negative = builtin_backtrace_frame(&mut eval, vec![Value::Int(-1)]);
+        assert!(matches!(
+            bad_negative,
+            Err(Flow::Signal(sig))
+                if sig.symbol == "wrong-type-argument"
+                    && sig.data == vec![Value::symbol("wholenump"), Value::Int(-1)]
+        ));
     }
 
     #[test]
