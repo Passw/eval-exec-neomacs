@@ -197,16 +197,22 @@ pub(crate) fn sf_track_mouse(eval: &mut super::eval::Evaluator, tail: &[Expr]) -
     eval.sf_progn(tail)
 }
 
-/// `(with-syntax-table TABLE BODY...)` -- stub: evaluates TABLE (discards),
-/// then evaluates BODY. Syntax table switching not yet implemented.
+/// `(with-syntax-table TABLE BODY...)` -- evaluate BODY with TABLE installed
+/// as the current buffer syntax-table object, then restore the previous table.
 pub(crate) fn sf_with_syntax_table(eval: &mut super::eval::Evaluator, tail: &[Expr]) -> EvalResult {
     if tail.is_empty() {
-        return Err(signal("wrong-number-of-arguments", vec![]));
+        return Err(signal(
+            "wrong-number-of-arguments",
+            vec![Value::symbol("with-syntax-table"), Value::Int(0)],
+        ));
     }
-    // Evaluate TABLE expression (discard result)
-    eval.eval(&tail[0])?;
-    // Evaluate body
-    eval.sf_progn(&tail[1..])
+    let saved = super::syntax::builtin_syntax_table(eval, vec![])?;
+    let table = eval.eval(&tail[0])?;
+    super::syntax::builtin_set_syntax_table(eval, vec![table])?;
+
+    let result = eval.sf_progn(&tail[1..]);
+    let _ = super::syntax::builtin_set_syntax_table(eval, vec![saved]);
+    result
 }
 
 // ===========================================================================
@@ -1082,15 +1088,16 @@ mod tests {
         assert!(eq_value(&result, &Value::Int(99)));
     }
 
-    // ----- special form: with-syntax-table (stub) -----
+    // ----- special form: with-syntax-table -----
 
     #[test]
     fn sf_with_syntax_table_evaluates_body() {
         use super::super::expr::Expr;
         let mut ev = super::super::eval::Evaluator::new();
-        // TABLE=nil, BODY=(+ 10 20)  -- but since we're calling sf directly,
-        // BODY must be Expr nodes. We use a literal for simplicity.
-        let tail = [Expr::Symbol("nil".to_string()), Expr::Int(30)];
+        let tail = [
+            Expr::List(vec![Expr::Symbol("make-syntax-table".to_string())]),
+            Expr::Int(30),
+        ];
         let result = sf_with_syntax_table(&mut ev, &tail).unwrap();
         assert!(eq_value(&result, &Value::Int(30)));
     }
@@ -1102,6 +1109,34 @@ mod tests {
         let tail: [Expr; 0] = [];
         let result = sf_with_syntax_table(&mut ev, &tail);
         assert!(result.is_err());
+    }
+
+    #[test]
+    fn sf_with_syntax_table_restores_original_table_on_success() {
+        use super::super::expr::Expr;
+        let mut ev = super::super::eval::Evaluator::new();
+        let original = crate::elisp::syntax::builtin_syntax_table(&mut ev, vec![]).unwrap();
+        let tail = [
+            Expr::List(vec![Expr::Symbol("make-syntax-table".to_string())]),
+            Expr::Int(1),
+        ];
+        sf_with_syntax_table(&mut ev, &tail).unwrap();
+        let restored = crate::elisp::syntax::builtin_syntax_table(&mut ev, vec![]).unwrap();
+        assert!(eq_value(&restored, &original));
+    }
+
+    #[test]
+    fn sf_with_syntax_table_restores_original_table_on_error() {
+        use super::super::expr::Expr;
+        let mut ev = super::super::eval::Evaluator::new();
+        let original = crate::elisp::syntax::builtin_syntax_table(&mut ev, vec![]).unwrap();
+        let tail = [
+            Expr::List(vec![Expr::Symbol("make-syntax-table".to_string())]),
+            Expr::Symbol("__missing_with_syntax_table_symbol__".to_string()),
+        ];
+        let _ = sf_with_syntax_table(&mut ev, &tail);
+        let restored = crate::elisp::syntax::builtin_syntax_table(&mut ev, vec![]).unwrap();
+        assert!(eq_value(&restored, &original));
     }
 
     // ----- special form: with-temp-buffer -----
