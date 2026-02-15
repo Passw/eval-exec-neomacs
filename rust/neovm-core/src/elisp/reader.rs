@@ -52,20 +52,6 @@ fn expect_string(value: &Value) -> Result<String, Flow> {
     }
 }
 
-/// Print a value without quoting strings or escaping special characters.
-/// Used when NOESCAPE is non-nil in `prin1-to-string`.
-fn print_value_no_escape(value: &Value) -> String {
-    match value {
-        Value::Str(s) => (**s).clone(),
-        Value::Symbol(s) => s.clone(),
-        Value::Nil => "nil".to_string(),
-        Value::True => "t".to_string(),
-        // NOESCAPE should behave like `princ` and emit the glyph directly.
-        Value::Char(c) => c.to_string(),
-        other => super::print::print_value(other),
-    }
-}
-
 // ---------------------------------------------------------------------------
 // 1. read-from-string
 // ---------------------------------------------------------------------------
@@ -661,26 +647,6 @@ pub(crate) fn builtin_read(eval: &mut super::eval::Evaluator, args: Vec<Value>) 
 }
 
 // ---------------------------------------------------------------------------
-// 3. prin1-to-string (enhanced)
-// ---------------------------------------------------------------------------
-
-/// `(prin1-to-string OBJECT &optional NOESCAPE)`
-///
-/// Return the printed representation of OBJECT as a string.
-/// If NOESCAPE is non-nil, don't escape special characters (like `princ`).
-pub(crate) fn builtin_prin1_to_string_full(args: Vec<Value>) -> EvalResult {
-    expect_min_args("prin1-to-string", &args, 1)?;
-
-    let noescape = args.get(1).is_some_and(|v| v.is_truthy());
-
-    if noescape {
-        Ok(Value::string(print_value_no_escape(&args[0])))
-    } else {
-        Ok(Value::string(super::print::print_value(&args[0])))
-    }
-}
-
-// ---------------------------------------------------------------------------
 // 5. read-from-minibuffer (stub)
 // ---------------------------------------------------------------------------
 
@@ -1267,50 +1233,6 @@ mod tests {
     }
 
     // ===================================================================
-    // prin1-to-string (enhanced) tests
-    // ===================================================================
-
-    #[test]
-    fn prin1_to_string_normal() {
-        let result = builtin_prin1_to_string_full(vec![Value::string("hello")]).unwrap();
-        // With escaping: should have quotes
-        assert_eq!(result.as_str(), Some("\"hello\""));
-    }
-
-    #[test]
-    fn prin1_to_string_noescape() {
-        let result =
-            builtin_prin1_to_string_full(vec![Value::string("hello"), Value::True]).unwrap();
-        // Without escaping: no quotes
-        assert_eq!(result.as_str(), Some("hello"));
-    }
-
-    #[test]
-    fn prin1_to_string_int() {
-        let result = builtin_prin1_to_string_full(vec![Value::Int(42)]).unwrap();
-        assert_eq!(result.as_str(), Some("42"));
-    }
-
-    #[test]
-    fn prin1_to_string_symbol() {
-        let result = builtin_prin1_to_string_full(vec![Value::symbol("foo")]).unwrap();
-        assert_eq!(result.as_str(), Some("foo"));
-    }
-
-    #[test]
-    fn prin1_to_string_nil() {
-        let result = builtin_prin1_to_string_full(vec![Value::Nil]).unwrap();
-        assert_eq!(result.as_str(), Some("nil"));
-    }
-
-    #[test]
-    fn prin1_to_string_list() {
-        let lst = Value::list(vec![Value::Int(1), Value::Int(2)]);
-        let result = builtin_prin1_to_string_full(vec![lst]).unwrap();
-        assert_eq!(result.as_str(), Some("(1 2)"));
-    }
-
-    // ===================================================================
     // Stub function tests
     // ===================================================================
 
@@ -1846,12 +1768,6 @@ mod tests {
     }
 
     #[test]
-    fn prin1_to_string_no_args() {
-        let result = builtin_prin1_to_string_full(vec![]);
-        assert!(result.is_err());
-    }
-
-    #[test]
     fn read_from_string_hash_syntax() {
         let mut ev = Evaluator::new();
         let result = builtin_read_from_string(&mut ev, vec![Value::string("#xff")]).unwrap();
@@ -1964,13 +1880,6 @@ mod tests {
             }
             other => panic!("Expected cons from read-from-string, got {other:?}"),
         }
-    }
-
-    #[test]
-    fn prin1_to_string_noescape_char() {
-        // With NOESCAPE, a char should print as the character itself
-        let result = builtin_prin1_to_string_full(vec![Value::Char('x'), Value::True]).unwrap();
-        assert_eq!(result.as_str(), Some("x"));
     }
 
 }
