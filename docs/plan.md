@@ -1876,6 +1876,19 @@ Last updated: 2026-02-15
     - `make -C test/neovm/vm-compat check-neovm FORMS=cases/case-region-read-only-semantics.forms EXPECTED=cases/case-region-read-only-semantics.expected.tsv` (pass, 5/5)
     - `make -C test/neovm/vm-compat CASES='cases/case-region-optional-arg-semantics cases/case-region-read-only-semantics cases/case-word-semantics cases/command-dispatch-default-arg-semantics' check-neovm` (pass, 15/15)
     - `make -C test/neovm/vm-compat check-all-neovm` (pass)
+- Aligned `buffer-read-only` default/local variable semantics with oracle:
+  - evaluator now predeclares `buffer-read-only` with default global value `nil`, marks it special, and marks it as auto-buffer-local
+  - new buffers now seed an explicit local `buffer-read-only=nil` binding (matching oracle behavior for `local-variable-p` and `setq-default` interactions)
+  - added and enabled oracle corpus:
+    - `test/neovm/vm-compat/cases/buffer-read-only-default-semantics.forms`
+    - `test/neovm/vm-compat/cases/buffer-read-only-default-semantics.expected.tsv`
+    - `test/neovm/vm-compat/cases/default.list`
+  - verified:
+    - `make -C test/neovm/vm-compat check-one-neovm CASE=cases/buffer-read-only-default-semantics` (pass, 5/5)
+    - `make -C test/neovm/vm-compat check-one-neovm CASE=cases/buffer-local-variables-semantics` (pass, 7/7)
+    - `make -C test/neovm/vm-compat check-one-neovm CASE=cases/buffer-locals` (pass, 9/9)
+    - `make -C test/neovm/vm-compat check-one-neovm CASE=cases/defvar-local` (pass, 7/7)
+    - `make -C test/neovm/vm-compat check-one-neovm CASE=cases/setq-local` (pass, 4/4)
 - Kept branch green with targeted Rust tests and vm-compat checks after each slice.
 
 ## Doing
