@@ -429,30 +429,6 @@ pub(crate) fn builtin_re_search_backward(
     Ok(Value::Nil)
 }
 
-/// `(posix-search-forward REGEXP &optional BOUND NOERROR COUNT)` -- like
-/// `re-search-forward` but uses POSIX matching semantics.  Stub: returns nil.
-pub(crate) fn builtin_posix_search_forward(
-    _eval: &mut super::eval::Evaluator,
-    args: Vec<Value>,
-) -> EvalResult {
-    expect_min_args("posix-search-forward", &args, 1)?;
-    let _pattern = expect_string(&args[0])?;
-    // Stub: proper implementation requires buffer context and POSIX regex engine.
-    Ok(Value::Nil)
-}
-
-/// `(posix-search-backward REGEXP &optional BOUND NOERROR COUNT)` -- like
-/// `re-search-backward` but uses POSIX matching semantics.  Stub: returns nil.
-pub(crate) fn builtin_posix_search_backward(
-    _eval: &mut super::eval::Evaluator,
-    args: Vec<Value>,
-) -> EvalResult {
-    expect_min_args("posix-search-backward", &args, 1)?;
-    let _pattern = expect_string(&args[0])?;
-    // Stub: proper implementation requires buffer context and POSIX regex engine.
-    Ok(Value::Nil)
-}
-
 /// `(replace-match NEWTEXT &optional FIXEDCASE LITERAL STRING SUBEXP)` --
 /// replace the text matched by the last search.  Stub: returns nil.
 pub(crate) fn builtin_replace_match(
@@ -462,30 +438,6 @@ pub(crate) fn builtin_replace_match(
     expect_min_args("replace-match", &args, 1)?;
     let _newtext = expect_string(&args[0])?;
     // Stub: proper implementation requires buffer context and match data.
-    Ok(Value::Nil)
-}
-
-/// `(word-search-forward STRING &optional BOUND NOERROR COUNT)` -- search
-/// forward for STRING treating it as a sequence of words.  Stub: returns nil.
-pub(crate) fn builtin_word_search_forward(
-    _eval: &mut super::eval::Evaluator,
-    args: Vec<Value>,
-) -> EvalResult {
-    expect_min_args("word-search-forward", &args, 1)?;
-    let _pattern = expect_string(&args[0])?;
-    // Stub: proper implementation requires buffer context.
-    Ok(Value::Nil)
-}
-
-/// `(word-search-backward STRING &optional BOUND NOERROR COUNT)` -- search
-/// backward for STRING treating it as a sequence of words.  Stub: returns nil.
-pub(crate) fn builtin_word_search_backward(
-    _eval: &mut super::eval::Evaluator,
-    args: Vec<Value>,
-) -> EvalResult {
-    expect_min_args("word-search-backward", &args, 1)?;
-    let _pattern = expect_string(&args[0])?;
-    // Stub: proper implementation requires buffer context.
     Ok(Value::Nil)
 }
 
