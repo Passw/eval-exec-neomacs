@@ -303,6 +303,7 @@ cases/remove-overlays-arity-semantics
 cases/isearch-batch-semantics
 cases/search-buffer
 cases/scan-lists-semantics
+cases/scan-sexps-semantics
 cases/count-matches-semantics
 cases/count-how-many-case-fold-variable-semantics
 cases/how-many-semantics
