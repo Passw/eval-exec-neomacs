@@ -18,6 +18,39 @@ Last updated: 2026-02-15
 
 ## Done
 
+- Removed additional dead duplicate wrapper surface across `dired`, `mode`, `network`, `reader`, and `subr_info`:
+  - updated:
+    - `rust/neovm-core/src/elisp/dired.rs`
+      - removed dead duplicate `directory-files` wrapper path/tests shadowed by active `fileio` dispatch.
+      - cfg-gated non-Unix-only helper `system_time_to_secs_nanos`.
+    - `rust/neovm-core/src/elisp/mode.rs`
+      - removed unregistered dead builtin wrapper surface (`fundamental-mode`, `major-mode`, `minor-mode-list`, `derived-mode-p`) and wrapper-only tests.
+    - `rust/neovm-core/src/elisp/network.rs`
+      - test-gated local arg-helper surface used only by `network` unit tests.
+    - `rust/neovm-core/src/elisp/reader.rs`
+      - removed dead duplicate `with-temp-buffer` wrapper surface (active special form remains in evaluator/misc paths).
+      - removed dead duplicate `format-spec` wrapper surface (active implementation remains in `elisp/format.rs`).
+      - removed dead duplicate `prin1-to-string` wrapper surface and wrapper-only tests.
+    - `rust/neovm-core/src/elisp/subr_info.rs`
+      - removed unreferenced duplicate wrappers for `subrp` / `functionp` / `byte-code-function-p` / `closurep` / `indirect-function`, and stale local tests tied only to those dead wrappers.
+  - verified:
+    - `make -C test/neovm/vm-compat check-one-neovm CASE=cases/directory-files` (pass, 15/15)
+    - `make -C test/neovm/vm-compat check-one-neovm CASE=cases/directory-files-and-attributes` (pass, 14/14)
+    - `make -C test/neovm/vm-compat check-one-neovm CASE=cases/file-attributes` (pass, 7/7)
+    - `cargo test 'elisp::mode::tests::' -- --nocapture` (pass, 34 tests)
+    - `make -C test/neovm/vm-compat check-one-neovm CASE=cases/core` (pass, 15/15)
+    - `cargo test 'elisp::network::tests::' -- --nocapture` (pass, 45 tests)
+    - `make -C test/neovm/vm-compat check-one-neovm CASE=cases/process-basics` (pass, 29/29)
+    - `cargo test 'elisp::reader::tests::with_output_to_string' -- --nocapture` (pass, 2 tests)
+    - `make -C test/neovm/vm-compat check-one-neovm CASE=cases/input-batch-readers` (pass, 70/70)
+    - `cargo test 'elisp::format::tests::' -- --nocapture` (pass, 63 tests)
+    - `make -C test/neovm/vm-compat check-one-neovm CASE=cases/printing` (pass, 6/6)
+    - `make -C test/neovm/vm-compat check-one-neovm CASE=cases/prin1-to-string-noescape` (pass, 5/5)
+    - `cargo test 'elisp::subr_info::tests::' -- --nocapture` (pass, 45 tests)
+    - `make -C test/neovm/vm-compat check-one-neovm CASE=cases/subr-introspection-core` (pass, 10/10)
+    - `make -C test/neovm/vm-compat check-one-neovm CASE=cases/indirect-function-core` (pass, 13/13)
+    - `make -C test/neovm/vm-compat check-one-neovm CASE=cases/functionp-callable-matrix` (pass, 21/21)
+
 - Removed dead duplicate wrapper surface from `editfns`:
   - updated:
     - `rust/neovm-core/src/elisp/editfns.rs`
