@@ -19,6 +19,25 @@ Last updated: 2026-02-15
 
 ## Done
 
+- Routed `window-text-pixel-size` through evaluator-aware window designator validation:
+  - updated:
+    - `rust/neovm-core/src/elisp/xdisp.rs`
+      - added `builtin_window_text_pixel_size_eval` to accept live window designators and validate optional FROM/TO indices.
+      - added xdisp unit coverage for live-window and stale-window paths.
+    - `rust/neovm-core/src/elisp/builtins.rs`
+      - routed `window-text-pixel-size` through evaluator dispatch.
+    - `rust/neovm-core/src/elisp/window_cmds.rs`
+      - `selected-window` now bootstraps the initial frame (matching `selected-frame`) so batch evaluator paths can always resolve a live window id.
+      - added unit test for selected-window bootstrap behavior.
+    - `test/neovm/vm-compat/cases/xdisp-pixel-metrics-semantics.{forms,expected.tsv}`
+      - added selected-window lock-in for `window-text-pixel-size`.
+      - switched stale window probe `1` -> `999999`.
+      - refreshed oracle baseline.
+  - verified:
+    - `cargo test xdisp::tests --manifest-path rust/neovm-core/Cargo.toml -- --nocapture` (pass)
+    - `cargo test window_cmds::tests --manifest-path rust/neovm-core/Cargo.toml -- --nocapture` (pass)
+    - `make -C test/neovm/vm-compat check-one-neovm CASE=cases/xdisp-pixel-metrics-semantics` (pass, 14/14)
+
 - Hardened display query corpus against live frame-id collisions:
   - updated:
     - `test/neovm/vm-compat/cases/display-query-designator-semantics.{forms,expected.tsv}`
