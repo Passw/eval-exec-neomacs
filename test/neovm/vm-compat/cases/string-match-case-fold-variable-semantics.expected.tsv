@@ -4,3 +4,5 @@
 4	(let ((case-fold-search nil)) (string-match-p "A" "a"))	OK nil
 5	(let ((case-fold-search t)) (string-match "a" "A"))	OK 0
 6	(let ((case-fold-search t)) (string-match-p "a" "A"))	OK 0
+7	(let ((case-fold-search t)) (string-match "A" "a"))	OK 0
+8	(let ((case-fold-search t)) (string-match-p "A" "a"))	OK 0
