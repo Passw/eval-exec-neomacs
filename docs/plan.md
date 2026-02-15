@@ -1723,6 +1723,39 @@ Last updated: 2026-02-15
     - `cargo test --manifest-path rust/neovm-core/Cargo.toml regex::tests::search_forward_case_fold_true -- --nocapture` (pass)
     - `cargo test --manifest-path rust/neovm-core/Cargo.toml regex::tests::looking_at_respects_case_fold_false -- --nocapture` (pass)
     - `make -C test/neovm/vm-compat validate-case-lists` (pass)
+- Aligned `count-matches` / `how-many` and line-filter regex builtins with `case-fold-search` variable semantics:
+  - evaluator paths now read dynamic/global `case-fold-search`, while preserving smart-case behavior when `case-fold-search` is non-`nil`
+  - `case-fold-search=nil` now forces exact match semantics for:
+    - `count-matches`
+    - `how-many`
+    - `keep-lines`
+    - `flush-lines`
+  - added and enabled oracle corpus:
+    - `test/neovm/vm-compat/cases/count-how-many-case-fold-variable-semantics.forms`
+    - `test/neovm/vm-compat/cases/count-how-many-case-fold-variable-semantics.expected.tsv`
+    - `test/neovm/vm-compat/cases/default.list`
+  - verified:
+    - `make -C test/neovm/vm-compat check-neovm FORMS=cases/count-how-many-case-fold-variable-semantics.forms EXPECTED=cases/count-how-many-case-fold-variable-semantics.expected.tsv` (pass, 6/6)
+    - `make -C test/neovm/vm-compat --no-print-directory check-neovm FORMS=cases/count-matches-semantics.forms EXPECTED=cases/count-matches-semantics.expected.tsv` (pass)
+    - `make -C test/neovm/vm-compat --no-print-directory check-neovm FORMS=cases/how-many-semantics.forms EXPECTED=cases/how-many-semantics.expected.tsv` (pass)
+    - `make -C test/neovm/vm-compat --no-print-directory check-neovm FORMS=cases/keep-lines-semantics.forms EXPECTED=cases/keep-lines-semantics.expected.tsv` (pass)
+    - `make -C test/neovm/vm-compat --no-print-directory check-neovm FORMS=cases/flush-lines-semantics.forms EXPECTED=cases/flush-lines-semantics.expected.tsv` (pass)
+    - `make -C test/neovm/vm-compat --no-print-directory check-neovm FORMS=cases/line-filter-edge-semantics.forms EXPECTED=cases/line-filter-edge-semantics.expected.tsv` (pass)
+    - `make -C test/neovm/vm-compat validate-case-lists` (pass)
+- Aligned replace/query-replace stack with `case-fold-search` variable semantics:
+  - `replace-string` and `replace-regexp` evaluator paths now honor dynamic/global `case-fold-search` (`nil` forces exact, non-`nil` keeps smart-case)
+  - `query-replace` and `query-replace-regexp` inherit behavior through shared evaluator replacement internals
+  - added and enabled oracle corpus:
+    - `test/neovm/vm-compat/cases/replace-query-case-fold-variable-semantics.forms`
+    - `test/neovm/vm-compat/cases/replace-query-case-fold-variable-semantics.expected.tsv`
+    - `test/neovm/vm-compat/cases/default.list`
+  - verified:
+    - `make -C test/neovm/vm-compat check-neovm FORMS=cases/replace-query-case-fold-variable-semantics.forms EXPECTED=cases/replace-query-case-fold-variable-semantics.expected.tsv` (pass, 10/10)
+    - `make -C test/neovm/vm-compat --no-print-directory check-neovm FORMS=cases/replace-string-semantics.forms EXPECTED=cases/replace-string-semantics.expected.tsv` (pass)
+    - `make -C test/neovm/vm-compat --no-print-directory check-neovm FORMS=cases/replace-regexp-semantics.forms EXPECTED=cases/replace-regexp-semantics.expected.tsv` (pass)
+    - `make -C test/neovm/vm-compat --no-print-directory check-neovm FORMS=cases/query-replace-batch-semantics.forms EXPECTED=cases/query-replace-batch-semantics.expected.tsv` (pass)
+    - `make -C test/neovm/vm-compat --no-print-directory check-neovm FORMS=cases/query-replace-edge-semantics.forms EXPECTED=cases/query-replace-edge-semantics.expected.tsv` (pass)
+    - `make -C test/neovm/vm-compat validate-case-lists` (pass)
 - Kept branch green with targeted Rust tests and vm-compat checks after each slice.
 
 ## Doing
@@ -1732,7 +1765,7 @@ Last updated: 2026-02-15
   - run oracle/parity checks after each behavior-affecting change
   - remove dead helper code that is not part of exposed compatibility surface
 - Identify the next high-impact builtin still stubbed in NeoVM core and land it as a small implementation + oracle-corpus lock-in slice.
-  - current focus: `query-replace` / `query-replace-regexp` batch-safe subset work
+  - current focus: next evaluator-backed builtin with stubbed behavior in batch compatibility surface
 - Reduce vm-compat operator friction for large case sets (small Makefile UX improvements).
   - added list-driven targets: `record-list`, `check-list`, `check-neovm-list` with `LIST=cases/<name>.list`
 
