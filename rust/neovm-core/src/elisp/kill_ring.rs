@@ -2634,13 +2634,6 @@ pub(crate) fn builtin_indent_rigidly(
         .current_buffer()
         .ok_or_else(|| signal("error", vec![Value::string("No current buffer")]))?;
 
-    if buf.read_only {
-        return Err(signal(
-            "buffer-read-only",
-            vec![Value::string(buf.name.clone())],
-        ));
-    }
-
     let (start, end) = resolve_region(buf, start_val, end_val);
 
     // Extract the region text.
@@ -2668,6 +2661,17 @@ pub(crate) fn builtin_indent_rigidly(
         } else {
             result.push_str(line);
         }
+    }
+
+    if region_text == result {
+        return Ok(Value::Nil);
+    }
+
+    if region_case_read_only(eval, buf) {
+        return Err(signal(
+            "buffer-read-only",
+            vec![Value::string(buf.name.clone())],
+        ));
     }
 
     let buf = eval
