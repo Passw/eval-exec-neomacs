@@ -17,6 +17,12 @@ Last updated: 2026-02-15
 
 ## Done
 
+- Clarified legacy `.elc` compatibility suite boundary in case-list metadata:
+  - updated `test/neovm/vm-compat/cases/legacy-elc-literal.list` with guidance that
+    these corpora are intentionally non-default and should be run via
+    `make -C test/neovm/vm-compat check-legacy-elc-neovm`
+  - verified:
+    - `make -C test/neovm/vm-compat validate-case-lists` (pass)
 - Added length-cycle fallback oracle corpus for proper-list pointer seeds:
   - added and enabled:
     - `test/neovm/vm-compat/cases/kill-ring-pointer-length-cycle-semantics.forms`
