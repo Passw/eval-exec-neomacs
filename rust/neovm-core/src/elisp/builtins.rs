@@ -813,6 +813,41 @@ pub(crate) fn builtin_caddar(args: Vec<Value>) -> EvalResult {
     apply_cxr(args[0].clone(), b"adda")
 }
 
+pub(crate) fn builtin_cdaaar(args: Vec<Value>) -> EvalResult {
+    expect_args("cdaaar", &args, 1)?;
+    apply_cxr(args[0].clone(), b"aaad")
+}
+
+pub(crate) fn builtin_cdaadr(args: Vec<Value>) -> EvalResult {
+    expect_args("cdaadr", &args, 1)?;
+    apply_cxr(args[0].clone(), b"daad")
+}
+
+pub(crate) fn builtin_cdadar(args: Vec<Value>) -> EvalResult {
+    expect_args("cdadar", &args, 1)?;
+    apply_cxr(args[0].clone(), b"adad")
+}
+
+pub(crate) fn builtin_cdaddr(args: Vec<Value>) -> EvalResult {
+    expect_args("cdaddr", &args, 1)?;
+    apply_cxr(args[0].clone(), b"ddad")
+}
+
+pub(crate) fn builtin_cddaar(args: Vec<Value>) -> EvalResult {
+    expect_args("cddaar", &args, 1)?;
+    apply_cxr(args[0].clone(), b"aadd")
+}
+
+pub(crate) fn builtin_cddadr(args: Vec<Value>) -> EvalResult {
+    expect_args("cddadr", &args, 1)?;
+    apply_cxr(args[0].clone(), b"dadd")
+}
+
+pub(crate) fn builtin_cdddar(args: Vec<Value>) -> EvalResult {
+    expect_args("cdddar", &args, 1)?;
+    apply_cxr(args[0].clone(), b"addd")
+}
+
 pub(crate) fn builtin_car_safe(args: Vec<Value>) -> EvalResult {
     expect_args("car-safe", &args, 1)?;
     match &args[0] {
@@ -5414,6 +5449,20 @@ enum PureBuiltinId {
     Cadadr,
     #[strum(serialize = "caddar")]
     Caddar,
+    #[strum(serialize = "cdaaar")]
+    Cdaaar,
+    #[strum(serialize = "cdaadr")]
+    Cdaadr,
+    #[strum(serialize = "cdadar")]
+    Cdadar,
+    #[strum(serialize = "cdaddr")]
+    Cdaddr,
+    #[strum(serialize = "cddaar")]
+    Cddaar,
+    #[strum(serialize = "cddadr")]
+    Cddadr,
+    #[strum(serialize = "cdddar")]
+    Cdddar,
     #[strum(serialize = "car-safe")]
     CarSafe,
     #[strum(serialize = "cdr-safe")]
@@ -5645,6 +5694,13 @@ fn dispatch_builtin_id_pure(id: PureBuiltinId, args: Vec<Value>) -> EvalResult {
         PureBuiltinId::Cadaar => builtin_cadaar(args),
         PureBuiltinId::Cadadr => builtin_cadadr(args),
         PureBuiltinId::Caddar => builtin_caddar(args),
+        PureBuiltinId::Cdaaar => builtin_cdaaar(args),
+        PureBuiltinId::Cdaadr => builtin_cdaadr(args),
+        PureBuiltinId::Cdadar => builtin_cdadar(args),
+        PureBuiltinId::Cdaddr => builtin_cdaddr(args),
+        PureBuiltinId::Cddaar => builtin_cddaar(args),
+        PureBuiltinId::Cddadr => builtin_cddadr(args),
+        PureBuiltinId::Cdddar => builtin_cdddar(args),
         PureBuiltinId::CarSafe => builtin_car_safe(args),
         PureBuiltinId::CdrSafe => builtin_cdr_safe(args),
         PureBuiltinId::Setcar => builtin_setcar(args),
@@ -6758,6 +6814,13 @@ pub(crate) fn dispatch_builtin(
         "cadaar" => builtin_cadaar(args),
         "cadadr" => builtin_cadadr(args),
         "caddar" => builtin_caddar(args),
+        "cdaaar" => builtin_cdaaar(args),
+        "cdaadr" => builtin_cdaadr(args),
+        "cdadar" => builtin_cdadar(args),
+        "cdaddr" => builtin_cdaddr(args),
+        "cddaar" => builtin_cddaar(args),
+        "cddadr" => builtin_cddadr(args),
+        "cdddar" => builtin_cdddar(args),
         "car-safe" => builtin_car_safe(args),
         "cdr-safe" => builtin_cdr_safe(args),
         "setcar" => builtin_setcar(args),
