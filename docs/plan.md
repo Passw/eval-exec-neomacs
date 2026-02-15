@@ -1827,6 +1827,20 @@ Last updated: 2026-02-15
     - `make -C test/neovm/vm-compat check-neovm FORMS=cases/replace-query-case-fold-variable-semantics.forms EXPECTED=cases/replace-query-case-fold-variable-semantics.expected.tsv` (pass, 10/10)
     - `make -C test/neovm/vm-compat check-neovm FORMS=cases/query-replace-edge-semantics.forms EXPECTED=cases/query-replace-edge-semantics.expected.tsv` (pass, 12/12)
     - `make -C test/neovm/vm-compat check-all-neovm` (pass)
+- Implemented `replace-lax-whitespace` compatibility for literal replace paths:
+  - `replace-string` now honors dynamic/global `replace-lax-whitespace` by matching runs of spaces in pattern against whitespace runs in source (`[ \\t\\n\\r]+`)
+  - `query-replace` inherits the same behavior through shared replace-string evaluator internals
+  - added and enabled oracle corpus:
+    - `test/neovm/vm-compat/cases/replace-lax-whitespace-semantics.forms`
+    - `test/neovm/vm-compat/cases/replace-lax-whitespace-semantics.expected.tsv`
+    - `test/neovm/vm-compat/cases/default.list`
+  - verified:
+    - `make -C test/neovm/vm-compat check-neovm FORMS=cases/replace-lax-whitespace-semantics.forms EXPECTED=cases/replace-lax-whitespace-semantics.expected.tsv` (pass, 4/4)
+    - `make -C test/neovm/vm-compat check-neovm FORMS=cases/replace-string-semantics.forms EXPECTED=cases/replace-string-semantics.expected.tsv` (pass, 6/6)
+    - `make -C test/neovm/vm-compat check-neovm FORMS=cases/query-replace-batch-semantics.forms EXPECTED=cases/query-replace-batch-semantics.expected.tsv` (pass, 10/10)
+    - `make -C test/neovm/vm-compat check-neovm FORMS=cases/replace-query-case-fold-variable-semantics.forms EXPECTED=cases/replace-query-case-fold-variable-semantics.expected.tsv` (pass, 10/10)
+    - `make -C test/neovm/vm-compat check-neovm FORMS=cases/case-replace-semantics.forms EXPECTED=cases/case-replace-semantics.expected.tsv` (pass, 14/14)
+    - `make -C test/neovm/vm-compat check-all-neovm` (pass)
 - Kept branch green with targeted Rust tests and vm-compat checks after each slice.
 
 ## Doing
