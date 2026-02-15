@@ -88,6 +88,7 @@ cases/kmacro-helper-availability
 cases/kbd-macro-query-semantics
 cases/cl-helper-availability
 cases/residual-helper-availability
+cases/subr-x-string-helper-availability
 cases/bindings
 cases/mark-semantics
 cases/region-beginning-end-semantics
