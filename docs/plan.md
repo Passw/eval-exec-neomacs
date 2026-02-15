@@ -19,6 +19,29 @@ Last updated: 2026-02-15
 
 ## Done
 
+- Expanded display monitor evaluator designator compatibility:
+  - updated:
+    - `rust/neovm-core/src/elisp/display.rs`
+      - evaluator `display-monitor-attributes-list` / `frame-monitor-attributes` now accept live frame designators via shared display-designator validation.
+      - added unit coverage for selected-frame designator success paths.
+    - `test/neovm/vm-compat/cases/display-monitor-semantics.{forms,expected.tsv}`
+      - added selected-frame monitor queries.
+      - switched invalid-designator probes from `1` to `999999` to avoid selected-frame-id collisions.
+  - verified:
+    - `cargo test display::tests --manifest-path rust/neovm-core/Cargo.toml -- --nocapture` (pass)
+    - `make -C test/neovm/vm-compat check-one-neovm CASE=cases/display-monitor-semantics` (pass, 11/11)
+    - `make -C test/neovm/vm-compat check-one-neovm CASE=cases/display-monitor-frames-semantics` (pass, 3/3)
+
+- Expanded `looking-at`/`looking-at-p` oracle corpus edge coverage:
+  - updated:
+    - `test/neovm/vm-compat/cases/looking-at-semantics.{forms,expected.tsv}`
+      - added explicit `fboundp` coverage for `looking-at-p`.
+      - added `looking-at-p` invalid-regexp/arity/type error lock-ins.
+      - added explicit check that `looking-at-p` does not clobber prior match data.
+      - refreshed oracle baseline with reference Emacs.
+  - verified:
+    - `make -C test/neovm/vm-compat check-one-neovm CASE=cases/looking-at-semantics` (pass, 20/20)
+
 - Fixed evaluator-side `case-table` identity drift across vm-compat runs:
   - updated:
     - `rust/neovm-core/src/elisp/casetab.rs`
