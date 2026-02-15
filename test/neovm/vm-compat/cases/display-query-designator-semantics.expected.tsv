@@ -9,3 +9,4 @@
 9	(let ((term (car (terminal-list)))) (list (display-planes nil) (display-planes term) (condition-case err (display-planes 1) (error (car err)))))	OK (3 3 error)
 10	(let ((term (car (terminal-list)))) (list (display-visual-class nil) (display-visual-class term) (condition-case err (display-visual-class 1) (error (car err)))))	OK (static-gray static-gray error)
 11	(let ((term (car (terminal-list)))) (list (display-backing-store nil) (display-backing-store term) (condition-case err (display-backing-store 1) (error (car err)))))	OK (not-useful not-useful error)
+12	(condition-case err (display-graphic-p 999999) (error (not (null (string-match-p "999999" (cadr err))))))	OK t

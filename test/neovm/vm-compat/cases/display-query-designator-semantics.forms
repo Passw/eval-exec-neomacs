@@ -53,3 +53,7 @@
   (list (display-backing-store nil)
         (display-backing-store term)
         (condition-case err (display-backing-store 1) (error (car err)))))
+
+(condition-case err
+    (display-graphic-p 999999)
+  (error (not (null (string-match-p "999999" (cadr err))))))
