@@ -76,6 +76,7 @@ cases/read-batch-error-payloads
 cases/timer-semantics
 cases/display-stub-semantics
 cases/display-batch-semantics
+cases/display-query-designator-semantics
 cases/x-display-batch-semantics
 cases/display-monitor-semantics
 cases/display-monitor-frames-semantics
