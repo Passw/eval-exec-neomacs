@@ -4,6 +4,21 @@ Last updated: 2026-02-15
 
 ## Done
 
+- Aligned `documentation` builtin semantics with oracle behavior:
+  - `function-documentation` property now takes precedence for symbol arguments
+  - symbol lookup now distinguishes `void-function` and `invalid-function` paths
+  - non-callable non-symbol function arguments now signal `invalid-function`
+  - lambda/defmacro evaluation now captures docstring metadata in `LambdaData`
+- Added and enabled new oracle corpus:
+  - `test/neovm/vm-compat/cases/documentation-semantics.forms`
+  - `test/neovm/vm-compat/cases/documentation-semantics.expected.tsv`
+  - wired into `test/neovm/vm-compat/cases/default.list` and `test/neovm/vm-compat/cases/introspection.list`
+- Verified the documentation slice end-to-end:
+  - `cargo test documentation_ -- --nocapture` (pass)
+  - `cargo test captures_docstring_metadata -- --nocapture` (pass)
+  - `cd test/neovm/vm-compat && make check-neovm FORMS=cases/documentation-semantics.forms EXPECTED=cases/documentation-semantics.expected.tsv` (pass)
+  - `cd test/neovm/vm-compat && make check-neovm FORMS=cases/documentation-property-semantics.forms EXPECTED=cases/documentation-property-semantics.expected.tsv` (pass)
+  - `cd test/neovm/vm-compat && make validate-case-lists` (pass)
 - Implemented evaluator-aware `documentation-property` semantics:
   - reads symbol plist entries through evaluator obarray state
   - returns string-valued properties, maps non-string property values to `nil`
