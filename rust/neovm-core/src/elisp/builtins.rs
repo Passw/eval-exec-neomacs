@@ -697,6 +697,30 @@ pub(crate) fn builtin_cdr(args: Vec<Value>) -> EvalResult {
     }
 }
 
+pub(crate) fn builtin_caar(args: Vec<Value>) -> EvalResult {
+    expect_args("caar", &args, 1)?;
+    let car = builtin_car(vec![args[0].clone()])?;
+    builtin_car(vec![car])
+}
+
+pub(crate) fn builtin_cadr(args: Vec<Value>) -> EvalResult {
+    expect_args("cadr", &args, 1)?;
+    let cdr = builtin_cdr(vec![args[0].clone()])?;
+    builtin_car(vec![cdr])
+}
+
+pub(crate) fn builtin_cdar(args: Vec<Value>) -> EvalResult {
+    expect_args("cdar", &args, 1)?;
+    let car = builtin_car(vec![args[0].clone()])?;
+    builtin_cdr(vec![car])
+}
+
+pub(crate) fn builtin_cddr(args: Vec<Value>) -> EvalResult {
+    expect_args("cddr", &args, 1)?;
+    let cdr = builtin_cdr(vec![args[0].clone()])?;
+    builtin_cdr(vec![cdr])
+}
+
 pub(crate) fn builtin_car_safe(args: Vec<Value>) -> EvalResult {
     expect_args("car-safe", &args, 1)?;
     match &args[0] {
@@ -5256,6 +5280,14 @@ enum PureBuiltinId {
     Car,
     #[strum(serialize = "cdr")]
     Cdr,
+    #[strum(serialize = "caar")]
+    Caar,
+    #[strum(serialize = "cadr")]
+    Cadr,
+    #[strum(serialize = "cdar")]
+    Cdar,
+    #[strum(serialize = "cddr")]
+    Cddr,
     #[strum(serialize = "car-safe")]
     CarSafe,
     #[strum(serialize = "cdr-safe")]
@@ -5466,6 +5498,10 @@ fn dispatch_builtin_id_pure(id: PureBuiltinId, args: Vec<Value>) -> EvalResult {
         PureBuiltinId::Cons => builtin_cons(args),
         PureBuiltinId::Car => builtin_car(args),
         PureBuiltinId::Cdr => builtin_cdr(args),
+        PureBuiltinId::Caar => builtin_caar(args),
+        PureBuiltinId::Cadr => builtin_cadr(args),
+        PureBuiltinId::Cdar => builtin_cdar(args),
+        PureBuiltinId::Cddr => builtin_cddr(args),
         PureBuiltinId::CarSafe => builtin_car_safe(args),
         PureBuiltinId::CdrSafe => builtin_cdr_safe(args),
         PureBuiltinId::Setcar => builtin_setcar(args),
@@ -6558,6 +6594,10 @@ pub(crate) fn dispatch_builtin(
         "cons" => builtin_cons(args),
         "car" => builtin_car(args),
         "cdr" => builtin_cdr(args),
+        "caar" => builtin_caar(args),
+        "cadr" => builtin_cadr(args),
+        "cdar" => builtin_cdar(args),
+        "cddr" => builtin_cddr(args),
         "car-safe" => builtin_car_safe(args),
         "cdr-safe" => builtin_cdr_safe(args),
         "setcar" => builtin_setcar(args),
