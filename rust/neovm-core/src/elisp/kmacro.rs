@@ -489,62 +489,6 @@ pub(crate) fn builtin_executing_kbd_macro_p(args: Vec<Value>) -> EvalResult {
     Ok(Value::Nil)
 }
 
-/// (defining-kbd-macro-p) -> t or nil
-///
-/// Return non-nil if a keyboard macro is currently being defined (recorded).
-/// This is a pure builtin that peeks at the evaluator state indirectly:
-/// since pure builtins can't access the evaluator, this checks a global
-/// static.  As a simplified stub, it always returns nil.  The eval-dependent
-/// version below is used when dispatch has evaluator access.
-pub(crate) fn builtin_defining_kbd_macro_p(args: Vec<Value>) -> EvalResult {
-    let _ = args;
-    // Without evaluator access, we cannot check the recording flag.
-    // This pure stub exists for bytecode VM dispatch compatibility.
-    Ok(Value::Nil)
-}
-
-/// (kmacro-p OBJECT) -> t or nil
-///
-/// Return non-nil if OBJECT looks like a keyboard macro.
-/// A keyboard macro is a vector, a string, or a symbol with a vector
-/// function definition.
-pub(crate) fn builtin_kmacro_p(args: Vec<Value>) -> EvalResult {
-    expect_args("kmacro-p", &args, 1)?;
-    let is_macro = match &args[0] {
-        Value::Vector(_) => true,
-        Value::Str(_) => true,
-        _ => false,
-    };
-    Ok(Value::bool(is_macro))
-}
-
-// ===========================================================================
-// Eval-dependent versions of predicates (richer than pure stubs)
-// ===========================================================================
-
-/// (defining-kbd-macro-p) -> t or nil  [eval-dependent version]
-///
-/// Returns non-nil when the evaluator is currently recording a macro.
-pub(crate) fn builtin_defining_kbd_macro_p_eval(
-    eval: &mut super::eval::Evaluator,
-    _args: Vec<Value>,
-) -> EvalResult {
-    Ok(Value::bool(eval.kmacro.recording))
-}
-
-/// (last-kbd-macro) -> vector or nil  [eval-dependent version]
-///
-/// Return the last keyboard macro as a vector of events, or nil.
-pub(crate) fn builtin_last_kbd_macro_eval(
-    eval: &mut super::eval::Evaluator,
-    _args: Vec<Value>,
-) -> EvalResult {
-    match &eval.kmacro.last_macro {
-        Some(keys) => Ok(Value::vector(keys.clone())),
-        None => Ok(Value::Nil),
-    }
-}
-
 // ===========================================================================
 // Internal helpers
 // ===========================================================================
@@ -868,59 +812,6 @@ mod tests {
     }
 
     #[test]
-    fn test_defining_kbd_macro_p_eval() {
-        use super::super::eval::Evaluator;
-
-        let mut eval = Evaluator::new();
-
-        // Not recording
-        let result = builtin_defining_kbd_macro_p_eval(&mut eval, vec![]);
-        assert!(result.is_ok());
-        assert!(result.unwrap().is_nil());
-
-        // Start recording
-        eval.kmacro.start_recording(false);
-        let result = builtin_defining_kbd_macro_p_eval(&mut eval, vec![]);
-        assert!(result.is_ok());
-        assert!(result.unwrap().is_truthy());
-
-        // Stop recording
-        eval.kmacro.store_event(Value::Char('x'));
-        eval.kmacro.stop_recording();
-        let result = builtin_defining_kbd_macro_p_eval(&mut eval, vec![]);
-        assert!(result.is_ok());
-        assert!(result.unwrap().is_nil());
-    }
-
-    #[test]
-    fn test_last_kbd_macro_eval() {
-        use super::super::eval::Evaluator;
-
-        let mut eval = Evaluator::new();
-
-        // No macro yet
-        let result = builtin_last_kbd_macro_eval(&mut eval, vec![]);
-        assert!(result.is_ok());
-        assert!(result.unwrap().is_nil());
-
-        // Record a macro
-        eval.kmacro.start_recording(false);
-        eval.kmacro.store_event(Value::Char('a'));
-        eval.kmacro.store_event(Value::Char('b'));
-        eval.kmacro.stop_recording();
-
-        let result = builtin_last_kbd_macro_eval(&mut eval, vec![]);
-        assert!(result.is_ok());
-        match result.unwrap() {
-            Value::Vector(v) => {
-                let items = v.lock().unwrap();
-                assert_eq!(items.len(), 2);
-            }
-            other => panic!("Expected Vector, got {:?}", other),
-        }
-    }
-
-    #[test]
     fn test_name_last_kbd_macro() {
         use super::super::eval::Evaluator;
 
@@ -963,44 +854,9 @@ mod tests {
     }
 
     #[test]
-    fn test_kmacro_p() {
-        // Vector is a macro
-        let result = builtin_kmacro_p(vec![Value::vector(vec![Value::Char('a')])]);
-        assert!(result.is_ok());
-        assert!(result.unwrap().is_truthy());
-
-        // String is a macro
-        let result = builtin_kmacro_p(vec![Value::string("abc")]);
-        assert!(result.is_ok());
-        assert!(result.unwrap().is_truthy());
-
-        // Integer is not a macro
-        let result = builtin_kmacro_p(vec![Value::Int(42)]);
-        assert!(result.is_ok());
-        assert!(result.unwrap().is_nil());
-
-        // Nil is not a macro
-        let result = builtin_kmacro_p(vec![Value::Nil]);
-        assert!(result.is_ok());
-        assert!(result.unwrap().is_nil());
-
-        // Wrong arg count
-        let result = builtin_kmacro_p(vec![]);
-        assert!(result.is_err());
-    }
-
-    #[test]
     fn test_executing_kbd_macro_p() {
         // Stub: always nil
         let result = builtin_executing_kbd_macro_p(vec![]);
-        assert!(result.is_ok());
-        assert!(result.unwrap().is_nil());
-    }
-
-    #[test]
-    fn test_defining_kbd_macro_p_pure() {
-        // Pure stub: always nil
-        let result = builtin_defining_kbd_macro_p(vec![]);
         assert!(result.is_ok());
         assert!(result.unwrap().is_nil());
     }
