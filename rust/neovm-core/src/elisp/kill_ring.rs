@@ -2510,13 +2510,6 @@ pub(crate) fn builtin_delete_indentation(
         .current_buffer()
         .ok_or_else(|| signal("error", vec![Value::string("No current buffer")]))?;
 
-    if buf.read_only {
-        return Err(signal(
-            "buffer-read-only",
-            vec![Value::string(buf.name.clone())],
-        ));
-    }
-
     let pt = buf.point();
     let pmin = buf.point_min();
     let pmax = buf.point_max();
@@ -2537,6 +2530,13 @@ pub(crate) fn builtin_delete_indentation(
                     .take_while(|&c| c == ' ' || c == '\t')
                     .map(|c| c.len_utf8())
                     .sum();
+
+                if region_case_read_only(eval, buf) {
+                    return Err(signal(
+                        "buffer-read-only",
+                        vec![Value::string(buf.name.clone())],
+                    ));
+                }
 
                 let buf = eval
                     .buffers
@@ -2569,6 +2569,13 @@ pub(crate) fn builtin_delete_indentation(
             .take_while(|&c| c == ' ' || c == '\t')
             .map(|c| c.len_utf8())
             .sum();
+
+        if region_case_read_only(eval, buf) {
+            return Err(signal(
+                "buffer-read-only",
+                vec![Value::string(buf.name.clone())],
+            ));
+        }
 
         let buf = eval
             .buffers
