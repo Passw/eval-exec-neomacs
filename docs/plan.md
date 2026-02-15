@@ -4,6 +4,17 @@ Last updated: 2026-02-15
 
 ## Done
 
+- Implemented `remove-overlays` arity compatibility slice:
+  - added oracle corpus:
+    - `test/neovm/vm-compat/cases/remove-overlays-arity-semantics.forms`
+    - `test/neovm/vm-compat/cases/remove-overlays-arity-semantics.expected.tsv`
+    - enabled in `test/neovm/vm-compat/cases/default.list`
+  - aligned `remove-overlays` to reject >4 args with `wrong-number-of-arguments`
+  - added unit test for the over-arity path in `textprop.rs`
+  - verified:
+    - `cargo test remove_overlays_ -- --nocapture` (pass)
+    - `make -C test/neovm/vm-compat check-neovm FORMS=cases/remove-overlays-arity-semantics.forms EXPECTED=cases/remove-overlays-arity-semantics.expected.tsv` (pass)
+    - `make -C test/neovm/vm-compat validate-case-lists` (pass)
 - Implemented text-property arity compatibility slice:
   - added oracle corpus:
     - `test/neovm/vm-compat/cases/textprop-arity-semantics.forms`
