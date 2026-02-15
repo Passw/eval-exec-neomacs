@@ -18,6 +18,17 @@ Last updated: 2026-02-15
 
 ## Done
 
+- Removed dead buffer-live/rename/other wrapper surface from legacy buffer module:
+  - updated:
+    - `rust/neovm-core/src/elisp/buffer/stateful.rs`
+      - deleted unreferenced `buffer-live-p` / `rename-buffer` / `other-buffer` wrappers (not wired in active builtin dispatch/registry)
+    - `rust/neovm-core/src/elisp/buffer/tests.rs`
+      - removed stale local tests/integration checks bound only to deleted dead wrappers
+    - `rust/neovm-core/src/elisp/buffer.rs`
+      - removed stale module comment entries for deleted wrappers
+  - verified:
+    - `cargo test current_buffer_returns_scratch -- --nocapture` (pass)
+    - `make -C test/neovm/vm-compat check-one-neovm CASE=cases/core` (pass, 15/15)
 - Removed dead duplicate buffer-local wrappers from legacy buffer stateful surface:
   - updated:
     - `rust/neovm-core/src/elisp/buffer/stateful.rs`
