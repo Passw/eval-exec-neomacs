@@ -5645,6 +5645,7 @@ pub(crate) fn dispatch_builtin(
         "file-newer-than-file-p" => {
             return Some(super::fileio::builtin_file_newer_than_file_p_eval(eval, args))
         }
+        "file-equal-p" => return Some(super::fileio::builtin_file_equal_p_eval(eval, args)),
         "file-in-directory-p" => {
             return Some(super::fileio::builtin_file_in_directory_p_eval(eval, args))
         }
@@ -6554,6 +6555,7 @@ pub(crate) fn dispatch_builtin(
         "file-symlink-p" => super::fileio::builtin_file_symlink_p(args),
         "file-name-case-insensitive-p" => super::fileio::builtin_file_name_case_insensitive_p(args),
         "file-newer-than-file-p" => super::fileio::builtin_file_newer_than_file_p(args),
+        "file-equal-p" => super::fileio::builtin_file_equal_p(args),
         "file-in-directory-p" => super::fileio::builtin_file_in_directory_p(args),
         "file-modes" => super::fileio::builtin_file_modes(args),
         "set-file-modes" => super::fileio::builtin_set_file_modes(args),
@@ -7097,6 +7099,7 @@ pub(crate) fn dispatch_builtin_pure(name: &str, args: Vec<Value>) -> Option<Eval
         "file-symlink-p" => super::fileio::builtin_file_symlink_p(args),
         "file-name-case-insensitive-p" => super::fileio::builtin_file_name_case_insensitive_p(args),
         "file-newer-than-file-p" => super::fileio::builtin_file_newer_than_file_p(args),
+        "file-equal-p" => super::fileio::builtin_file_equal_p(args),
         "file-in-directory-p" => super::fileio::builtin_file_in_directory_p(args),
         "file-modes" => super::fileio::builtin_file_modes(args),
         "set-file-modes" => super::fileio::builtin_set_file_modes(args),

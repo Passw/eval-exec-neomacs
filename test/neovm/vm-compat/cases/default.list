@@ -120,6 +120,7 @@ cases/directory-files-and-attributes
 cases/file-attributes
 cases/file-name-case-insensitive-p-semantics
 cases/file-newer-than-file-p-semantics
+cases/file-equal-p-semantics
 cases/file-in-directory-p-semantics
 cases/file-modes-semantics
 cases/default-file-modes-semantics

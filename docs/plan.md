@@ -4,6 +4,28 @@ Last updated: 2026-02-15
 
 ## Done
 
+- Implemented `file-equal-p` compatibility slice:
+  - added pure + evaluator-aware builtins in `rust/neovm-core/src/elisp/fileio.rs`:
+    - `builtin_file_equal_p`
+    - `builtin_file_equal_p_eval`
+  - semantics aligned with oracle subset:
+    - arity `2`
+    - strict `stringp` validation for both path args
+    - existing-file identity checks return `t` when both names refer to the same file
+    - symlink identity follows target semantics
+    - missing paths return `nil`
+    - evaluator path resolves relative names against dynamic/default `default-directory`
+  - registered and dispatched `file-equal-p` in:
+    - `rust/neovm-core/src/elisp/builtins.rs`
+    - `rust/neovm-core/src/elisp/builtin_registry.rs`
+  - added and enabled oracle corpus:
+    - `test/neovm/vm-compat/cases/file-equal-p-semantics.forms`
+    - `test/neovm/vm-compat/cases/file-equal-p-semantics.expected.tsv`
+    - wired into `test/neovm/vm-compat/cases/default.list`
+  - verified:
+    - `cargo test --manifest-path rust/neovm-core/Cargo.toml file_equal_p -- --nocapture` (pass)
+    - `make -C test/neovm/vm-compat check-neovm FORMS=cases/file-equal-p-semantics.forms EXPECTED=cases/file-equal-p-semantics.expected.tsv` (pass)
+    - `make -C test/neovm/vm-compat validate-case-lists` (pass)
 - Implemented `file-in-directory-p` compatibility slice:
   - added pure + evaluator-aware builtins in `rust/neovm-core/src/elisp/fileio.rs`:
     - `builtin_file_in_directory_p`

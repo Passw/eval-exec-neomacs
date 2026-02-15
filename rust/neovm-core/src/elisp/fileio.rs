@@ -476,6 +476,53 @@ pub fn file_newer_than_file_p(file1: &str, file2: &str) -> bool {
     mtime1 > mtime2
 }
 
+/// Return true if FILE1 and FILE2 name the same existing file.
+///
+/// Missing paths return false. Symlinks are followed (matching Emacs behavior).
+pub fn file_equal_p(file1: &str, file2: &str) -> bool {
+    let meta1 = match fs::metadata(file1) {
+        Ok(meta) => meta,
+        Err(_) => return false,
+    };
+    let meta2 = match fs::metadata(file2) {
+        Ok(meta) => meta,
+        Err(_) => return false,
+    };
+
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::MetadataExt;
+        return meta1.dev() == meta2.dev() && meta1.ino() == meta2.ino();
+    }
+
+    #[cfg(windows)]
+    {
+        let path1 = match fs::canonicalize(file1) {
+            Ok(path) => path,
+            Err(_) => return false,
+        };
+        let path2 = match fs::canonicalize(file2) {
+            Ok(path) => path,
+            Err(_) => return false,
+        };
+        return path1.to_string_lossy().to_lowercase() == path2.to_string_lossy().to_lowercase();
+    }
+
+    #[cfg(not(any(unix, windows)))]
+    {
+        let _ = (meta1, meta2);
+        let path1 = match fs::canonicalize(file1) {
+            Ok(path) => path,
+            Err(_) => return false,
+        };
+        let path2 = match fs::canonicalize(file2) {
+            Ok(path) => path,
+            Err(_) => return false,
+        };
+        return path1 == path2;
+    }
+}
+
 /// Return true if FILE is in DIR, using true-name semantics.
 pub fn file_in_directory_p(file: &str, dir: &str, default_dir: Option<&str>) -> bool {
     let file_true = file_truename(file, default_dir);
@@ -1591,6 +1638,28 @@ pub(crate) fn builtin_file_newer_than_file_p_eval(
     let file1 = expand_file_name(&file1, default_dir.as_deref());
     let file2 = expand_file_name(&file2, default_dir.as_deref());
     Ok(Value::bool(file_newer_than_file_p(&file1, &file2)))
+}
+
+/// (file-equal-p FILE1 FILE2) -> t or nil
+pub(crate) fn builtin_file_equal_p(args: Vec<Value>) -> EvalResult {
+    expect_args("file-equal-p", &args, 2)?;
+    let file1 = expect_string_strict(&args[0])?;
+    let file2 = expect_string_strict(&args[1])?;
+    let file1 = expand_file_name(&file1, None);
+    let file2 = expand_file_name(&file2, None);
+    Ok(Value::bool(file_equal_p(&file1, &file2)))
+}
+
+/// Evaluator-aware variant of `file-equal-p` that resolves relative
+/// paths against dynamic/default `default-directory`.
+pub(crate) fn builtin_file_equal_p_eval(eval: &Evaluator, args: Vec<Value>) -> EvalResult {
+    expect_args("file-equal-p", &args, 2)?;
+    let file1 = expect_string_strict(&args[0])?;
+    let file2 = expect_string_strict(&args[1])?;
+    let default_dir = default_directory_for_eval(eval);
+    let file1 = expand_file_name(&file1, default_dir.as_deref());
+    let file2 = expand_file_name(&file2, default_dir.as_deref());
+    Ok(Value::bool(file_equal_p(&file1, &file2)))
 }
 
 /// (file-in-directory-p FILE DIR) -> t or nil
@@ -3472,6 +3541,8 @@ mod tests {
         assert!(builtin_file_name_case_insensitive_p(vec![Value::Nil]).is_err());
         assert!(builtin_file_newer_than_file_p(vec![Value::Nil, Value::string("/tmp")]).is_err());
         assert!(builtin_file_newer_than_file_p(vec![Value::string("/tmp"), Value::Nil]).is_err());
+        assert!(builtin_file_equal_p(vec![Value::Nil, Value::string("/tmp")]).is_err());
+        assert!(builtin_file_equal_p(vec![Value::string("/tmp"), Value::Nil]).is_err());
         assert!(builtin_file_in_directory_p(vec![Value::Nil, Value::string("/tmp")]).is_err());
         assert!(builtin_file_in_directory_p(vec![Value::string("/tmp"), Value::Nil]).is_err());
     }
@@ -3607,6 +3678,91 @@ mod tests {
         assert_eq!(result, Value::True);
 
         let _ = fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn test_builtin_file_equal_p_semantics() {
+        let base = std::env::temp_dir().join("neovm-file-equal-p");
+        let dir = base.join("dir");
+        let a = dir.join("a.txt");
+        let b = dir.join("b.txt");
+        let missing = dir.join("missing.txt");
+        let _ = fs::remove_dir_all(&base);
+        fs::create_dir_all(&dir).expect("create dir");
+        fs::write(&a, b"a").expect("write a");
+        fs::write(&b, b"b").expect("write b");
+
+        assert_eq!(
+            builtin_file_equal_p(vec![
+                Value::string(a.to_string_lossy()),
+                Value::string(a.to_string_lossy()),
+            ])
+            .expect("same path"),
+            Value::True
+        );
+        assert_eq!(
+            builtin_file_equal_p(vec![
+                Value::string(a.to_string_lossy()),
+                Value::string(b.to_string_lossy()),
+            ])
+            .expect("different files"),
+            Value::Nil
+        );
+        assert_eq!(
+            builtin_file_equal_p(vec![
+                Value::string(a.to_string_lossy()),
+                Value::string(missing.to_string_lossy()),
+            ])
+            .expect("missing file"),
+            Value::Nil
+        );
+
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::symlink;
+            let link = dir.join("link.txt");
+            symlink(&a, &link).expect("symlink");
+            assert_eq!(
+                builtin_file_equal_p(vec![
+                    Value::string(a.to_string_lossy()),
+                    Value::string(link.to_string_lossy()),
+                ])
+                .expect("symlink equals target"),
+                Value::True
+            );
+            let _ = fs::remove_file(&link);
+        }
+
+        let _ = fs::remove_dir_all(&base);
+    }
+
+    #[test]
+    fn test_file_equal_p_eval_respects_default_directory() {
+        use super::super::eval::Evaluator;
+
+        let base = std::env::temp_dir().join("neovm-file-equal-p-eval");
+        let dir = base.join("dir");
+        let a = dir.join("a.txt");
+        let _ = fs::remove_dir_all(&base);
+        fs::create_dir_all(&dir).expect("create dir");
+        fs::write(&a, b"a").expect("write a");
+
+        let mut eval = Evaluator::new();
+        eval.obarray.set_symbol_value(
+            "default-directory",
+            Value::string(format!("{}/", base.to_string_lossy())),
+        );
+
+        assert_eq!(
+            builtin_file_equal_p_eval(
+                &eval,
+                vec![Value::string("dir/a.txt"), Value::string("dir/./a.txt")],
+            )
+            .expect("relative equality in default-directory"),
+            Value::True
+        );
+
+        let _ = fs::remove_dir_all(&base);
     }
 
     #[test]
