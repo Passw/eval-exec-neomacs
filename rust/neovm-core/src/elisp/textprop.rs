@@ -783,6 +783,7 @@ pub(crate) fn builtin_remove_overlays(
     eval: &mut super::eval::Evaluator,
     args: Vec<Value>,
 ) -> EvalResult {
+    expect_max_args("remove-overlays", &args, 4)?;
     let buf_id = eval
         .buffers
         .current_buffer()
@@ -1544,6 +1545,16 @@ mod tests {
                 Value::Nil,
                 Value::Nil,
             ],
+        );
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn remove_overlays_rejects_too_many_args() {
+        let mut eval = eval_with_text("hello");
+        let result = builtin_remove_overlays(
+            &mut eval,
+            vec![Value::Nil, Value::Nil, Value::Nil, Value::Nil, Value::Nil],
         );
         assert!(result.is_err());
     }
