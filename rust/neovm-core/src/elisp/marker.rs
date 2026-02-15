@@ -162,6 +162,49 @@ fn marker_insertion_type_value(v: &Value) -> Value {
     }
 }
 
+fn lisp_pos_to_byte(buf: &crate::buffer::Buffer, lisp_pos: i64) -> usize {
+    let char_count = buf.text.byte_to_char(buf.text.len());
+    let clamped = (lisp_pos.max(1) as usize).min(char_count + 1);
+    let char0 = clamped - 1;
+    let byte = buf.text.char_to_byte(char0);
+    byte.clamp(buf.begv, buf.zv)
+}
+
+fn marker_targets_current_mark(eval: &super::eval::Evaluator, marker: &Value) -> bool {
+    let buf = match eval.buffers.current_buffer() {
+        Some(buf) => buf,
+        None => return false,
+    };
+
+    let (m_buf, m_pos) = match marker {
+        Value::Vector(vec) => {
+            let elems = vec.lock().expect("poisoned");
+            if elems.len() != 4 {
+                return false;
+            }
+            let name = match &elems[1] {
+                Value::Str(s) => Some((**s).clone()),
+                Value::Nil => None,
+                _ => return false,
+            };
+            let pos = match elems[2] {
+                Value::Int(n) => Some(n),
+                Value::Nil => None,
+                _ => return false,
+            };
+            (name, pos)
+        }
+        _ => return false,
+    };
+
+    if m_buf.as_deref() != Some(buf.name.as_str()) {
+        return false;
+    }
+
+    let current_mark_char = buf.mark.map(|byte| buf.text.byte_to_char(byte) as i64 + 1);
+    m_pos == current_mark_char
+}
+
 // ---------------------------------------------------------------------------
 // Pure builtins
 // ---------------------------------------------------------------------------
@@ -269,6 +312,8 @@ pub(crate) fn builtin_set_marker(
     expect_range_args("set-marker", &args, 2, 3)?;
     expect_marker("set-marker", &args[0])?;
 
+    let targets_current_mark = marker_targets_current_mark(eval, &args[0]);
+
     // Resolve buffer name
     let buffer_name: Option<String> = if args.len() > 2 && args[2].is_truthy() {
         match &args[2] {
@@ -316,6 +361,17 @@ pub(crate) fn builtin_set_marker(
             };
         }
         _ => unreachable!(), // guarded by expect_marker
+    }
+
+    if targets_current_mark {
+        if let Some(buf) = eval.buffers.current_buffer_mut() {
+            match position {
+                Some(pos) => buf.set_mark(lisp_pos_to_byte(buf, pos)),
+                None => {
+                    buf.mark = None;
+                }
+            }
+        }
     }
 
     Ok(args[0].clone())

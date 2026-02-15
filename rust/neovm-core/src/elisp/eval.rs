@@ -151,6 +151,9 @@ impl Evaluator {
         obarray.set_symbol_value("print-level", Value::Nil);
         obarray.set_symbol_value("standard-output", Value::True);
         obarray.set_symbol_value("buffer-read-only", Value::Nil);
+        obarray.set_symbol_value("kill-ring", Value::Nil);
+        obarray.set_symbol_value("kill-ring-yank-pointer", Value::Nil);
+        obarray.set_symbol_value("last-command", Value::Nil);
 
         // Mark standard variables as special (dynamically bound)
         for name in &[
