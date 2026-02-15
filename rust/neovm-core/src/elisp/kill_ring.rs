@@ -2136,13 +2136,6 @@ pub(crate) fn builtin_indent_line_to(
         .current_buffer()
         .ok_or_else(|| signal("error", vec![Value::string("No current buffer")]))?;
 
-    if buf.read_only {
-        return Err(signal(
-            "buffer-read-only",
-            vec![Value::string(buf.name.clone())],
-        ));
-    }
-
     let pt = buf.point();
     let pmin = buf.point_min();
 
@@ -2165,6 +2158,17 @@ pub(crate) fn builtin_indent_line_to(
     let indent_end = line_start + indent_end_offset;
 
     let new_indent: String = " ".repeat(column);
+    let old_indent = buf.buffer_substring(line_start, indent_end);
+    if old_indent == new_indent {
+        return Ok(Value::Nil);
+    }
+
+    if region_case_read_only(eval, buf) {
+        return Err(signal(
+            "buffer-read-only",
+            vec![Value::string(buf.name.clone())],
+        ));
+    }
 
     let buf = eval
         .buffers
@@ -2193,13 +2197,6 @@ pub(crate) fn builtin_indent_to(eval: &mut super::eval::Evaluator, args: Vec<Val
         .current_buffer()
         .ok_or_else(|| signal("error", vec![Value::string("No current buffer")]))?;
 
-    if buf.read_only {
-        return Err(signal(
-            "buffer-read-only",
-            vec![Value::string(buf.name.clone())],
-        ));
-    }
-
     let pt = buf.point();
     let pmin = buf.point_min();
 
@@ -2216,6 +2213,13 @@ pub(crate) fn builtin_indent_to(eval: &mut super::eval::Evaluator, args: Vec<Val
     } else {
         minimum
     };
+
+    if spaces_needed > 0 && region_case_read_only(eval, buf) {
+        return Err(signal(
+            "buffer-read-only",
+            vec![Value::string(buf.name.clone())],
+        ));
+    }
 
     if spaces_needed > 0 {
         let spaces: String = " ".repeat(spaces_needed);
@@ -2364,13 +2368,6 @@ pub(crate) fn builtin_delete_horizontal_space(
         .current_buffer()
         .ok_or_else(|| signal("error", vec![Value::string("No current buffer")]))?;
 
-    if buf.read_only {
-        return Err(signal(
-            "buffer-read-only",
-            vec![Value::string(buf.name.clone())],
-        ));
-    }
-
     let pmin = buf.point_min();
     let pmax = buf.point_max();
     let pt = buf.point();
@@ -2397,6 +2394,17 @@ pub(crate) fn builtin_delete_horizontal_space(
             }
             right += ch.len_utf8();
         }
+    }
+
+    if left == right {
+        return Ok(Value::Nil);
+    }
+
+    if region_case_read_only(eval, buf) {
+        return Err(signal(
+            "buffer-read-only",
+            vec![Value::string(buf.name.clone())],
+        ));
     }
 
     let buf = eval
@@ -2430,13 +2438,6 @@ pub(crate) fn builtin_just_one_space(
         .current_buffer()
         .ok_or_else(|| signal("error", vec![Value::string("No current buffer")]))?;
 
-    if buf.read_only {
-        return Err(signal(
-            "buffer-read-only",
-            vec![Value::string(buf.name.clone())],
-        ));
-    }
-
     let pmin = buf.point_min();
     let pmax = buf.point_max();
     let pt = buf.point();
@@ -2461,6 +2462,19 @@ pub(crate) fn builtin_just_one_space(
             break;
         }
         right += ch.len_utf8();
+    }
+
+    let existing = buf.buffer_substring(left, right);
+    let needs_mutation = existing.len() != count || existing.chars().any(|ch| ch != ' ');
+    if !needs_mutation {
+        return Ok(Value::Nil);
+    }
+
+    if region_case_read_only(eval, buf) {
+        return Err(signal(
+            "buffer-read-only",
+            vec![Value::string(buf.name.clone())],
+        ));
     }
 
     let buf = eval
@@ -2572,7 +2586,7 @@ pub(crate) fn builtin_tab_to_tab_stop(
         .current_buffer()
         .ok_or_else(|| signal("error", vec![Value::string("No current buffer")]))?;
 
-    if buf.read_only {
+    if region_case_read_only(eval, buf) {
         return Err(signal(
             "buffer-read-only",
             vec![Value::string(buf.name.clone())],
