@@ -8,5 +8,5 @@
 (pos-visible-in-window-p 1)
 (pos-visible-in-window-p nil nil t)
 (condition-case err (pos-visible-in-window-p nil "x") (error err))
-(condition-case err (pos-visible-in-window-p nil 1) (error err))
+(condition-case err (pos-visible-in-window-p nil 999999) (error err))
 (condition-case err (pos-visible-in-window-p nil nil t nil) (error (car err)))
