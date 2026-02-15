@@ -329,28 +329,6 @@ pub(crate) fn builtin_string_to_vector(args: Vec<Value>) -> EvalResult {
     Ok(Value::vector(chars))
 }
 
-/// `(vconcat &rest SEQUENCES)` — concatenate into a vector.
-pub(crate) fn builtin_vconcat(args: Vec<Value>) -> EvalResult {
-    let mut result = Vec::new();
-    for arg in &args {
-        match arg {
-            Value::Vector(v) => {
-                result.extend(v.lock().expect("poisoned").iter().cloned());
-            }
-            Value::Str(s) => {
-                result.extend(s.chars().map(Value::Char));
-            }
-            list if list.is_list() => {
-                if let Some(items) = super::value::list_to_vec(list) {
-                    result.extend(items);
-                }
-            }
-            _ => result.push(arg.clone()),
-        }
-    }
-    Ok(Value::vector(result))
-}
-
 // ---------------------------------------------------------------------------
 // Predicate additions
 // ---------------------------------------------------------------------------
@@ -697,15 +675,4 @@ mod tests {
         }
     }
 
-    #[test]
-    fn vconcat_test() {
-        let v1 = Value::vector(vec![Value::Int(1)]);
-        let v2 = Value::vector(vec![Value::Int(2)]);
-        let result = builtin_vconcat(vec![v1, v2]).unwrap();
-        if let Value::Vector(v) = result {
-            assert_eq!(v.lock().unwrap().len(), 2);
-        } else {
-            panic!("expected vector");
-        }
-    }
 }
