@@ -394,18 +394,6 @@ pub(crate) fn builtin_region_end(
     }
 }
 
-/// `(mark &optional FORCE)` — return mark position, or nil if not set.
-pub(crate) fn builtin_mark(eval: &mut super::eval::Evaluator, args: Vec<Value>) -> EvalResult {
-    expect_max_args("mark", &args, 1)?;
-    match eval.buffers.current_buffer() {
-        Some(buf) => match buf.mark {
-            Some(m) => Ok(Value::Int(byte_to_lisp_pos(buf, m))),
-            None => Ok(Value::Nil),
-        },
-        None => Ok(Value::Nil),
-    }
-}
-
 /// `(set-mark POS)` — set the mark to POS, return POS.
 pub(crate) fn builtin_set_mark(eval: &mut super::eval::Evaluator, args: Vec<Value>) -> EvalResult {
     expect_args("set-mark", &args, 1)?;
