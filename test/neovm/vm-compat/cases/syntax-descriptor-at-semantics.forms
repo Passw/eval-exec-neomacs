@@ -1,0 +1,7 @@
+(string-to-syntax "@")
+(with-temp-buffer
+  (modify-syntax-entry ?x "@")
+  (char-syntax ?x))
+(with-temp-buffer
+  (modify-syntax-entry ?\( "@")
+  (char-syntax ?\())
