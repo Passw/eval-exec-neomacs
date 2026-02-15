@@ -19,6 +19,20 @@ Last updated: 2026-02-15
 
 ## Done
 
+- Tightened composite compose builtin argument validation and expanded oracle corpus:
+  - updated:
+    - `rust/neovm-core/src/elisp/composite.rs`
+      - `compose-region-internal` now enforces `integer-or-marker-p` on START/END.
+      - `compose-string-internal` now enforces `stringp` for STRING and `integerp` for START/END.
+      - expanded unit tests for new type-check paths.
+    - `test/neovm/vm-compat/cases/composite-basic-semantics.{forms,expected.tsv}`
+      - added `compose-string-internal` availability and type/error coverage.
+      - added `compose-region-internal` type-error coverage.
+      - refreshed oracle baseline.
+  - verified:
+    - `cargo test composite::tests --manifest-path rust/neovm-core/Cargo.toml -- --nocapture` (pass)
+    - `make -C test/neovm/vm-compat check-one-neovm CASE=cases/composite-basic-semantics` (pass, 24/24)
+
 - Aligned `pos-visible-in-window-p` optional WINDOW validation with oracle batch semantics:
   - updated:
     - `rust/neovm-core/src/elisp/xdisp.rs`
