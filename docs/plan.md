@@ -4,6 +4,26 @@ Last updated: 2026-02-15
 
 ## Done
 
+- Implemented `file-name-case-insensitive-p` compatibility slice:
+  - added pure + evaluator-aware builtins in `rust/neovm-core/src/elisp/fileio.rs`:
+    - `builtin_file_name_case_insensitive_p`
+    - `builtin_file_name_case_insensitive_p_eval`
+  - semantics aligned with oracle subset:
+    - arity `1`
+    - strict `stringp` validation for `FILENAME`
+    - evaluator path resolves relative names against dynamic/default `default-directory`
+    - current backend reports case-insensitive filesystem truthiness per-platform with existing-path ancestry probing
+  - registered and dispatched `file-name-case-insensitive-p` in:
+    - `rust/neovm-core/src/elisp/builtins.rs`
+    - `rust/neovm-core/src/elisp/builtin_registry.rs`
+  - added and enabled oracle corpus:
+    - `test/neovm/vm-compat/cases/file-name-case-insensitive-p-semantics.forms`
+    - `test/neovm/vm-compat/cases/file-name-case-insensitive-p-semantics.expected.tsv`
+    - wired into `test/neovm/vm-compat/cases/default.list`
+  - verified:
+    - `cargo test --manifest-path rust/neovm-core/Cargo.toml file_name_case_insensitive -- --nocapture` (pass)
+    - `make -C test/neovm/vm-compat check-neovm FORMS=cases/file-name-case-insensitive-p-semantics.forms EXPECTED=cases/file-name-case-insensitive-p-semantics.expected.tsv` (pass)
+    - `make -C test/neovm/vm-compat validate-case-lists` (pass)
 - Implemented `set-file-modes` compatibility slice:
   - added pure + evaluator-aware builtins in `rust/neovm-core/src/elisp/fileio.rs`:
     - `builtin_set_file_modes`

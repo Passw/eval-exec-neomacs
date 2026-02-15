@@ -279,6 +279,7 @@ const DISPATCH_BUILTIN_NAMES: &[&str] = &[
     "file-name-concat",
     "file-name-directory",
     "file-name-extension",
+    "file-name-case-insensitive-p",
     "file-modes",
     "file-name-nondirectory",
     "file-name-sans-extension",

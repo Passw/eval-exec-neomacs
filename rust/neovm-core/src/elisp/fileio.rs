@@ -422,6 +422,24 @@ pub fn file_symlink_p(filename: &str) -> bool {
     }
 }
 
+/// Return true if FILENAME is on a case-insensitive filesystem.
+pub fn file_name_case_insensitive_p(filename: &str) -> bool {
+    let mut probe = PathBuf::from(filename);
+    while !probe.exists() {
+        if !probe.pop() || probe.as_os_str().is_empty() {
+            return false;
+        }
+    }
+    #[cfg(windows)]
+    {
+        true
+    }
+    #[cfg(not(windows))]
+    {
+        false
+    }
+}
+
 // ===========================================================================
 // File I/O operations
 // ===========================================================================
@@ -1350,6 +1368,27 @@ pub(crate) fn builtin_file_symlink_p_eval(eval: &Evaluator, args: Vec<Value>) ->
     let filename = expect_string_strict(&args[0])?;
     let filename = resolve_filename_for_eval(eval, &filename);
     Ok(Value::bool(file_symlink_p(&filename)))
+}
+
+/// (file-name-case-insensitive-p FILENAME) -> t or nil
+pub(crate) fn builtin_file_name_case_insensitive_p(args: Vec<Value>) -> EvalResult {
+    expect_args("file-name-case-insensitive-p", &args, 1)?;
+    let filename = expect_string_strict(&args[0])?;
+    let filename = expand_file_name(&filename, None);
+    Ok(Value::bool(file_name_case_insensitive_p(&filename)))
+}
+
+/// Evaluator-aware variant of `file-name-case-insensitive-p` that resolves
+/// relative paths against dynamic/default `default-directory`.
+pub(crate) fn builtin_file_name_case_insensitive_p_eval(
+    eval: &Evaluator,
+    args: Vec<Value>,
+) -> EvalResult {
+    expect_args("file-name-case-insensitive-p", &args, 1)?;
+    let filename = expect_string_strict(&args[0])?;
+    let default_dir = default_directory_for_eval(eval);
+    let filename = expand_file_name(&filename, default_dir.as_deref());
+    Ok(Value::bool(file_name_case_insensitive_p(&filename)))
 }
 
 /// (file-modes FILENAME &optional FLAG) -> integer or nil
@@ -3138,6 +3177,7 @@ mod tests {
         assert!(builtin_file_directory_p(vec![Value::Nil]).is_err());
         assert!(builtin_file_regular_p(vec![Value::Nil]).is_err());
         assert!(builtin_file_symlink_p(vec![Value::Nil]).is_err());
+        assert!(builtin_file_name_case_insensitive_p(vec![Value::Nil]).is_err());
     }
 
     #[test]
@@ -3160,6 +3200,35 @@ mod tests {
         let exists = builtin_file_exists_p_eval(&eval, vec![Value::string("subdir")])
             .expect("file-exists-p eval");
         assert!(exists.is_truthy());
+
+        let _ = fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn test_file_name_case_insensitive_eval_respects_default_directory() {
+        use super::super::eval::Evaluator;
+
+        let dir = std::env::temp_dir().join("neovm_fileio_case_insensitive_eval");
+        let _ = fs::remove_dir_all(&dir);
+        fs::create_dir_all(&dir).expect("create test dir");
+        let file = dir.join("alpha.txt");
+        fs::write(&file, b"x").expect("create test file");
+
+        let absolute =
+            builtin_file_name_case_insensitive_p(vec![Value::string(file.to_string_lossy())])
+                .expect("absolute case-insensitive query");
+
+        let mut eval = Evaluator::new();
+        eval.obarray.set_symbol_value(
+            "default-directory",
+            Value::string(format!("{}/", dir.to_string_lossy())),
+        );
+        let relative = builtin_file_name_case_insensitive_p_eval(
+            &eval,
+            vec![Value::string("alpha.txt")],
+        )
+        .expect("relative case-insensitive query");
+        assert_eq!(relative, absolute);
 
         let _ = fs::remove_dir_all(&dir);
     }

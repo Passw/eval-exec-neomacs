@@ -5637,6 +5637,11 @@ pub(crate) fn dispatch_builtin(
         }
         "file-regular-p" => return Some(super::fileio::builtin_file_regular_p_eval(eval, args)),
         "file-symlink-p" => return Some(super::fileio::builtin_file_symlink_p_eval(eval, args)),
+        "file-name-case-insensitive-p" => {
+            return Some(super::fileio::builtin_file_name_case_insensitive_p_eval(
+                eval, args,
+            ))
+        }
         "file-modes" => return Some(super::fileio::builtin_file_modes_eval(eval, args)),
         "set-file-modes" => return Some(super::fileio::builtin_set_file_modes_eval(eval, args)),
         // Keymap operations
@@ -6536,6 +6541,7 @@ pub(crate) fn dispatch_builtin(
         "file-directory-p" => super::fileio::builtin_file_directory_p(args),
         "file-regular-p" => super::fileio::builtin_file_regular_p(args),
         "file-symlink-p" => super::fileio::builtin_file_symlink_p(args),
+        "file-name-case-insensitive-p" => super::fileio::builtin_file_name_case_insensitive_p(args),
         "file-modes" => super::fileio::builtin_file_modes(args),
         "set-file-modes" => super::fileio::builtin_set_file_modes(args),
         "delete-file" => super::fileio::builtin_delete_file(args),
@@ -7073,6 +7079,7 @@ pub(crate) fn dispatch_builtin_pure(name: &str, args: Vec<Value>) -> Option<Eval
         "file-directory-p" => super::fileio::builtin_file_directory_p(args),
         "file-regular-p" => super::fileio::builtin_file_regular_p(args),
         "file-symlink-p" => super::fileio::builtin_file_symlink_p(args),
+        "file-name-case-insensitive-p" => super::fileio::builtin_file_name_case_insensitive_p(args),
         "file-modes" => super::fileio::builtin_file_modes(args),
         "set-file-modes" => super::fileio::builtin_set_file_modes(args),
         "delete-file" => super::fileio::builtin_delete_file(args),
