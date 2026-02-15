@@ -1,0 +1,16 @@
+1	(fboundp 'posix-search-forward)	OK t
+2	(fboundp 'posix-search-backward)	OK t
+3	(fboundp 'word-search-forward)	OK t
+4	(fboundp 'word-search-backward)	OK t
+5	(with-temp-buffer (insert "foo baaar baz") (goto-char (point-min)) (posix-search-forward "ba+r"))	OK 10
+6	(with-temp-buffer (insert "foo baaar baz") (goto-char (point-min)) (posix-search-forward "zz+" nil t))	OK nil
+7	(with-temp-buffer (insert "foo baaar baz") (goto-char (point-min)) (condition-case err (posix-search-forward "zz+") (error (car err))))	OK search-failed
+8	(with-temp-buffer (insert "foo baaar baz") (goto-char (point-max)) (posix-search-backward "ba+r"))	OK 5
+9	(with-temp-buffer (insert "foo baaar baz") (goto-char (point-max)) (posix-search-backward "zz+" nil t))	OK nil
+10	(with-temp-buffer (insert "foo baaar baz") (goto-char (point-max)) (condition-case err (posix-search-backward "zz+") (error (car err))))	OK search-failed
+11	(with-temp-buffer (insert "alpha beta alpha") (goto-char (point-min)) (word-search-forward "beta"))	OK 11
+12	(with-temp-buffer (insert "alpha beta alpha") (goto-char (point-min)) (word-search-forward "gamma" nil t))	OK nil
+13	(with-temp-buffer (insert "alpha beta alpha") (goto-char (point-min)) (condition-case err (word-search-forward "gamma") (error (car err))))	OK search-failed
+14	(with-temp-buffer (insert "alpha beta alpha") (goto-char (point-max)) (word-search-backward "beta"))	OK 7
+15	(with-temp-buffer (insert "alpha beta alpha") (goto-char (point-max)) (word-search-backward "gamma" nil t))	OK nil
+16	(with-temp-buffer (insert "alpha beta alpha") (goto-char (point-max)) (condition-case err (word-search-backward "gamma") (error (car err))))	OK search-failed

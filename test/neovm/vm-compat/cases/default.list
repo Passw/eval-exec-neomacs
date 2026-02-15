@@ -179,6 +179,7 @@ cases/match-data
 cases/search-buffer
 cases/looking-at-p-semantics
 cases/search-count
+cases/search-posix-word-semantics
 cases/replace-match
 cases/load-require
 cases/require-recursive
