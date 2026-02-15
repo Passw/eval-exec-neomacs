@@ -16,7 +16,7 @@ use regex::Regex;
 
 use super::error::{signal, EvalResult, Flow};
 use super::eval::Evaluator;
-use super::value::Value;
+use super::value::{list_to_vec, Value};
 
 // ===========================================================================
 // Path operations (pure, no evaluator needed)
@@ -772,6 +772,67 @@ fn expect_fixnum(value: &Value) -> Result<i64, Flow> {
     }
 }
 
+fn normalize_secs_nanos(mut secs: i64, mut nanos: i64) -> (i64, i64) {
+    if nanos >= 1_000_000_000 {
+        secs += nanos / 1_000_000_000;
+        nanos %= 1_000_000_000;
+    } else if nanos < 0 {
+        let borrow = ((-nanos) + 999_999_999) / 1_000_000_000;
+        secs -= borrow;
+        nanos += borrow * 1_000_000_000;
+    }
+    (secs, nanos)
+}
+
+fn parse_timestamp_arg(value: &Value) -> Result<(i64, i64), Flow> {
+    match value {
+        Value::Int(n) => Ok((*n, 0)),
+        Value::Float(f) => {
+            let secs = f.floor() as i64;
+            let nanos = ((f - f.floor()) * 1_000_000_000.0).round() as i64;
+            Ok(normalize_secs_nanos(secs, nanos))
+        }
+        Value::Cons(_) => {
+            let items = list_to_vec(value).ok_or_else(|| {
+                signal(
+                    "wrong-type-argument",
+                    vec![Value::symbol("listp"), value.clone()],
+                )
+            })?;
+            if items.len() < 2 {
+                return Err(signal(
+                    "wrong-type-argument",
+                    vec![Value::symbol("listp"), value.clone()],
+                ));
+            }
+            let high = items[0].as_int().ok_or_else(|| {
+                signal(
+                    "wrong-type-argument",
+                    vec![Value::symbol("integerp"), items[0].clone()],
+                )
+            })?;
+            let low = items[1].as_int().ok_or_else(|| {
+                signal(
+                    "wrong-type-argument",
+                    vec![Value::symbol("integerp"), items[1].clone()],
+                )
+            })?;
+            let usec = if items.len() > 2 {
+                items[2].as_int().unwrap_or(0)
+            } else {
+                0
+            };
+            let secs = high * 65_536 + low;
+            let nanos = usec * 1_000;
+            Ok(normalize_secs_nanos(secs, nanos))
+        }
+        other => Err(signal(
+            "wrong-type-argument",
+            vec![Value::symbol("numberp"), other.clone()],
+        )),
+    }
+}
+
 fn validate_file_truename_counter(counter: &Value) -> Result<(), Flow> {
     if counter.is_nil() {
         return Ok(());
@@ -1288,6 +1349,68 @@ fn signal_file_action_error(err: std::io::Error, action: &str, path: &str) -> Fl
     )
 }
 
+fn set_file_times_compat(
+    filename: &str,
+    timestamp: Option<(i64, i64)>,
+    nofollow: bool,
+) -> Result<(), Flow> {
+    #[cfg(unix)]
+    {
+        let c_path = CString::new(filename.as_bytes()).map_err(|_| {
+            signal(
+                "file-error",
+                vec![
+                    Value::string("Setting file times"),
+                    Value::string("embedded NUL in file name"),
+                    Value::string(filename),
+                ],
+            )
+        })?;
+
+        let mut ts = [
+            libc::timespec {
+                tv_sec: 0,
+                tv_nsec: 0,
+            },
+            libc::timespec {
+                tv_sec: 0,
+                tv_nsec: 0,
+            },
+        ];
+        if let Some((secs, nanos)) = timestamp {
+            ts[0].tv_sec = secs as libc::time_t;
+            ts[1].tv_sec = secs as libc::time_t;
+            ts[0].tv_nsec = nanos as libc::c_long;
+            ts[1].tv_nsec = nanos as libc::c_long;
+        } else {
+            ts[0].tv_nsec = libc::UTIME_NOW as libc::c_long;
+            ts[1].tv_nsec = libc::UTIME_NOW as libc::c_long;
+        }
+        let flags = if nofollow { libc::AT_SYMLINK_NOFOLLOW } else { 0 };
+        let result = unsafe { libc::utimensat(libc::AT_FDCWD, c_path.as_ptr(), ts.as_ptr(), flags) };
+        if result != 0 {
+            return Err(signal_file_action_error(
+                std::io::Error::last_os_error(),
+                "Setting file times",
+                filename,
+            ));
+        }
+        Ok(())
+    }
+    #[cfg(not(unix))]
+    {
+        let _ = (timestamp, nofollow);
+        Err(signal(
+            "file-error",
+            vec![
+                Value::string("Setting file times"),
+                Value::string("set-file-times is unsupported on this platform"),
+                Value::string(filename),
+            ],
+        ))
+    }
+}
+
 fn delete_file_compat(filename: &str) -> Result<(), Flow> {
     match delete_file(filename) {
         Ok(()) => Ok(()),
@@ -1534,6 +1657,52 @@ pub(crate) fn builtin_set_file_modes_eval(eval: &Evaluator, args: Vec<Value>) ->
             .map_err(|err| signal_file_action_error(err, "Doing chmod", &filename))?;
     }
     Ok(Value::Nil)
+}
+
+/// (set-file-times FILENAME &optional TIMESTAMP FLAG) -> t
+pub(crate) fn builtin_set_file_times(args: Vec<Value>) -> EvalResult {
+    expect_min_args("set-file-times", &args, 1)?;
+    if args.len() > 3 {
+        return Err(signal(
+            "wrong-number-of-arguments",
+            vec![Value::symbol("set-file-times"), Value::Int(args.len() as i64)],
+        ));
+    }
+    let filename = expect_string_strict(&args[0])?;
+    let filename = expand_file_name(&filename, None);
+    let timestamp = if args.len() > 1 && !args[1].is_nil() {
+        Some(parse_timestamp_arg(&args[1])?)
+    } else {
+        None
+    };
+    // Emacs currently treats all non-nil values like `nofollow`.
+    let nofollow = args.get(2).is_some_and(|flag| !flag.is_nil());
+    set_file_times_compat(&filename, timestamp, nofollow)?;
+    Ok(Value::True)
+}
+
+/// Evaluator-aware variant of `set-file-times` that resolves relative paths
+/// against dynamic/default `default-directory`.
+pub(crate) fn builtin_set_file_times_eval(eval: &Evaluator, args: Vec<Value>) -> EvalResult {
+    expect_min_args("set-file-times", &args, 1)?;
+    if args.len() > 3 {
+        return Err(signal(
+            "wrong-number-of-arguments",
+            vec![Value::symbol("set-file-times"), Value::Int(args.len() as i64)],
+        ));
+    }
+    let filename = expect_string_strict(&args[0])?;
+    let default_dir = default_directory_for_eval(eval);
+    let filename = expand_file_name(&filename, default_dir.as_deref());
+    let timestamp = if args.len() > 1 && !args[1].is_nil() {
+        Some(parse_timestamp_arg(&args[1])?)
+    } else {
+        None
+    };
+    // Emacs currently treats all non-nil values like `nofollow`.
+    let nofollow = args.get(2).is_some_and(|flag| !flag.is_nil());
+    set_file_times_compat(&filename, timestamp, nofollow)?;
+    Ok(Value::True)
 }
 
 /// (delete-file FILENAME &optional TRASH) -> nil
@@ -3358,6 +3527,82 @@ mod tests {
         )
         .expect("relative newer check");
         assert_eq!(result, Value::True);
+
+        let _ = fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn test_builtin_set_file_times_semantics() {
+        let dir = std::env::temp_dir().join("neovm-set-file-times");
+        let _ = fs::remove_dir_all(&dir);
+        fs::create_dir_all(&dir).expect("create test dir");
+
+        let older = dir.join("older.txt");
+        let newer = dir.join("newer.txt");
+        fs::write(&older, b"older").expect("write older");
+        fs::write(&newer, b"newer").expect("write newer");
+
+        assert_eq!(
+            builtin_set_file_times(vec![
+                Value::string(older.to_string_lossy()),
+                Value::Int(0),
+            ])
+            .expect("set-file-times"),
+            Value::True
+        );
+        assert_eq!(
+            builtin_set_file_times(vec![
+                Value::string(newer.to_string_lossy()),
+                Value::Nil,
+                Value::True,
+            ])
+            .expect("set-file-times with flag"),
+            Value::True
+        );
+        assert_eq!(
+            builtin_file_newer_than_file_p(vec![
+                Value::string(newer.to_string_lossy()),
+                Value::string(older.to_string_lossy()),
+            ])
+            .expect("newer-than"),
+            Value::True
+        );
+
+        let _ = fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn test_set_file_times_eval_respects_default_directory() {
+        use super::super::eval::Evaluator;
+
+        let dir = std::env::temp_dir().join("neovm-set-file-times-eval");
+        let _ = fs::remove_dir_all(&dir);
+        fs::create_dir_all(&dir).expect("create test dir");
+        let file = dir.join("alpha.txt");
+        fs::write(&file, b"alpha").expect("write file");
+
+        let mut eval = Evaluator::new();
+        eval.obarray.set_symbol_value(
+            "default-directory",
+            Value::string(format!("{}/", dir.to_string_lossy())),
+        );
+
+        assert_eq!(
+            builtin_set_file_times_eval(
+                &eval,
+                vec![Value::string("alpha.txt"), Value::Int(0)],
+            )
+            .expect("eval set-file-times"),
+            Value::True
+        );
+        let mtime = fs::metadata(&file)
+            .expect("metadata")
+            .modified()
+            .expect("modified")
+            .duration_since(UNIX_EPOCH)
+            .expect("epoch")
+            .as_secs();
+        assert_eq!(mtime, 0);
 
         let _ = fs::remove_dir_all(&dir);
     }

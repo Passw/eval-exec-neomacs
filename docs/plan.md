@@ -4,6 +4,29 @@ Last updated: 2026-02-15
 
 ## Done
 
+- Implemented `set-file-times` compatibility slice:
+  - added pure + evaluator-aware builtins in `rust/neovm-core/src/elisp/fileio.rs`:
+    - `builtin_set_file_times`
+    - `builtin_set_file_times_eval`
+  - semantics aligned with oracle subset:
+    - arity `1..3`
+    - strict `stringp` validation for `FILENAME`
+    - `TIMESTAMP=nil` uses current time
+    - numeric and list timestamp forms accepted for deterministic epoch writes
+    - non-`nil` `FLAG` treated like `nofollow` (matching current Emacs behavior)
+    - return shape `t` on success
+    - evaluator path resolves relative names against dynamic/default `default-directory`
+  - registered and dispatched `set-file-times` in:
+    - `rust/neovm-core/src/elisp/builtins.rs`
+    - `rust/neovm-core/src/elisp/builtin_registry.rs`
+  - added and enabled oracle corpus:
+    - `test/neovm/vm-compat/cases/set-file-times-semantics.forms`
+    - `test/neovm/vm-compat/cases/set-file-times-semantics.expected.tsv`
+    - wired into `test/neovm/vm-compat/cases/default.list`
+  - verified:
+    - `cargo test --manifest-path rust/neovm-core/Cargo.toml set_file_times -- --nocapture` (pass)
+    - `make -C test/neovm/vm-compat check-neovm FORMS=cases/set-file-times-semantics.forms EXPECTED=cases/set-file-times-semantics.expected.tsv` (pass)
+    - `make -C test/neovm/vm-compat validate-case-lists` (pass)
 - Implemented `file-newer-than-file-p` compatibility slice:
   - added pure + evaluator-aware builtins in `rust/neovm-core/src/elisp/fileio.rs`:
     - `builtin_file_newer_than_file_p`

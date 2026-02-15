@@ -122,6 +122,7 @@ cases/file-name-case-insensitive-p-semantics
 cases/file-newer-than-file-p-semantics
 cases/file-modes-semantics
 cases/set-file-modes-semantics
+cases/set-file-times-semantics
 cases/system-users-groups-semantics
 cases/file-ops-relative
 cases/fileio-relative

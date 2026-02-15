@@ -5647,6 +5647,7 @@ pub(crate) fn dispatch_builtin(
         }
         "file-modes" => return Some(super::fileio::builtin_file_modes_eval(eval, args)),
         "set-file-modes" => return Some(super::fileio::builtin_set_file_modes_eval(eval, args)),
+        "set-file-times" => return Some(super::fileio::builtin_set_file_times_eval(eval, args)),
         // Keymap operations
         "make-keymap" => return Some(builtin_make_keymap(eval, args)),
         "make-sparse-keymap" => return Some(builtin_make_sparse_keymap(eval, args)),
@@ -6548,6 +6549,7 @@ pub(crate) fn dispatch_builtin(
         "file-newer-than-file-p" => super::fileio::builtin_file_newer_than_file_p(args),
         "file-modes" => super::fileio::builtin_file_modes(args),
         "set-file-modes" => super::fileio::builtin_set_file_modes(args),
+        "set-file-times" => super::fileio::builtin_set_file_times(args),
         "delete-file" => super::fileio::builtin_delete_file(args),
         "delete-directory" => super::fileio::builtin_delete_directory(args),
         "rename-file" => super::fileio::builtin_rename_file(args),
@@ -7087,6 +7089,7 @@ pub(crate) fn dispatch_builtin_pure(name: &str, args: Vec<Value>) -> Option<Eval
         "file-newer-than-file-p" => super::fileio::builtin_file_newer_than_file_p(args),
         "file-modes" => super::fileio::builtin_file_modes(args),
         "set-file-modes" => super::fileio::builtin_set_file_modes(args),
+        "set-file-times" => super::fileio::builtin_set_file_times(args),
         "delete-file" => super::fileio::builtin_delete_file(args),
         "delete-directory" => super::fileio::builtin_delete_directory(args),
         "rename-file" => super::fileio::builtin_rename_file(args),
