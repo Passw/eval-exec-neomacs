@@ -1,12 +1,23 @@
 (fboundp 'compose-region-internal)
+(fboundp 'compose-string-internal)
 (fboundp 'find-composition-internal)
 (fboundp 'clear-composition-cache)
 (fboundp 'composition-sort-rules)
 (fboundp 'auto-composition-mode)
 
+(stringp (compose-string-internal "abc" 0 3))
+(condition-case err (compose-string-internal 1 0 1) (error err))
+(condition-case err (compose-string-internal "abc" 'x 1) (error err))
+(condition-case err (compose-string-internal "abc" 0 'y) (error err))
 (condition-case err
     (with-temp-buffer (insert "abc") (compose-region-internal 1 3))
   (error (car err)))
+(condition-case err
+    (with-temp-buffer (insert "abc") (compose-region-internal 'x 2))
+  (error err))
+(condition-case err
+    (with-temp-buffer (insert "abc") (compose-region-internal 1 'y))
+  (error err))
 (condition-case err (compose-region-internal 1) (error (car err)))
 
 (condition-case err (find-composition-internal 1 nil nil nil) (error (car err)))
