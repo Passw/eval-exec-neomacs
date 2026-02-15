@@ -14,7 +14,7 @@
 
 use super::error::{signal, EvalResult, Flow};
 use super::syntax::{backward_word, forward_word, scan_sexps, SyntaxClass, SyntaxTable};
-use super::value::{equal_value, eq_value, Value};
+use super::value::Value;
 use crate::buffer::Buffer;
 
 // ===========================================================================
@@ -615,9 +615,8 @@ fn kill_ring_entries_from_value(value: &Value) -> Option<Vec<String>> {
 }
 
 fn kill_ring_pointer_index(
-    kill_ring_value: &Value,
+    kill_ring_entries: &[String],
     pointer_value: &Value,
-    ring_len: usize,
     strict_non_list: bool,
 ) -> Result<usize, Flow> {
     if pointer_value.is_nil() {
@@ -631,24 +630,18 @@ fn kill_ring_pointer_index(
         };
     }
 
-    let mut cursor = kill_ring_value.clone();
-    let mut idx = 0usize;
-    loop {
-        if eq_value(&cursor, pointer_value) || equal_value(&cursor, pointer_value, 0) {
+    let pointer_entries = if let Some(v) = kill_ring_entries_from_value(pointer_value) {
+        v
+    } else {
+        return Ok(kill_ring_entries.len().saturating_sub(1));
+    };
+
+    for idx in 0..kill_ring_entries.len() {
+        if kill_ring_entries[idx..] == pointer_entries[..] {
             return Ok(idx);
         }
-        match cursor {
-            Value::Cons(cell) => {
-                let pair = match cell.lock() {
-                    Ok(p) => p,
-                    Err(_) => return Ok(0),
-                };
-                cursor = pair.cdr.clone();
-                idx += 1;
-            }
-            _ => return Ok(ring_len.saturating_sub(1)),
-        }
     }
+    Ok(kill_ring_entries.len().saturating_sub(1))
 }
 
 fn list_tail_at(list: &Value, index: usize) -> Value {
@@ -677,7 +670,7 @@ fn sync_kill_ring_from_binding_internal(
             let pointer_index = if let Some(ptr) =
                 dynamic_or_global_symbol_value(eval, "kill-ring-yank-pointer")
             {
-                kill_ring_pointer_index(&value, &ptr, entries.len(), strict_non_list_pointer)?
+                kill_ring_pointer_index(&entries, &ptr, strict_non_list_pointer)?
             } else {
                 0
             };
