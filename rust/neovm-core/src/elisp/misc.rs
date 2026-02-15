@@ -5,7 +5,7 @@
 //! - Pure builtins: copy-alist, rassoc, rassq, assoc-default, make-list, safe-length,
 //!   subst-char-in-string, replace-regexp-in-string, string-match-p, string/char encoding
 //!   stubs, nconc (improved), locale-info
-//! - Eval-dependent builtins: backtrace-frame, recursion-depth, abort-recursive-edit
+//! - Eval-dependent builtins: backtrace-frame, recursion-depth
 
 use super::error::{signal, EvalResult, Flow};
 use super::expr::Expr;
@@ -725,15 +725,6 @@ pub(crate) fn builtin_recursion_depth(
     Ok(Value::Int(eval.dynamic.len() as i64))
 }
 
-/// `(abort-recursive-edit)` -- stub: signals a quit.
-pub(crate) fn builtin_abort_recursive_edit(
-    _eval: &mut super::eval::Evaluator,
-    args: Vec<Value>,
-) -> EvalResult {
-    let _ = args;
-    Err(signal("quit", vec![]))
-}
-
 // ===========================================================================
 // Tests
 // ===========================================================================
@@ -1272,13 +1263,6 @@ mod tests {
                 if sig.symbol == "wrong-type-argument"
                     && sig.data == vec![Value::symbol("wholenump"), Value::Int(-1)]
         ));
-    }
-
-    #[test]
-    fn abort_recursive_edit_signals_quit() {
-        let mut eval = super::super::eval::Evaluator::new();
-        let result = builtin_abort_recursive_edit(&mut eval, vec![]);
-        assert!(result.is_err());
     }
 
     // ----- special form: prog2 -----
