@@ -1300,9 +1300,16 @@ pub(crate) fn builtin_replace_string_eval(
             ));
         }
         let mut out = String::with_capacity(source.len() + to.len() * source.chars().count());
-        for ch in source.chars() {
-            out.push_str(&to);
-            out.push(ch);
+        if backward {
+            for ch in source.chars() {
+                out.push(ch);
+                out.push_str(&to);
+            }
+        } else {
+            for ch in source.chars() {
+                out.push_str(&to);
+                out.push(ch);
+            }
         }
         if out == source {
             return Ok(Value::Nil);
@@ -1315,7 +1322,11 @@ pub(crate) fn builtin_replace_string_eval(
         buf.goto_char(start);
         buf.insert(&out);
         if backward {
-            buf.goto_char(start);
+            if let Some(first) = source.chars().next() {
+                buf.goto_char(start + first.len_utf8());
+            } else {
+                buf.goto_char(start);
+            }
         } else {
             buf.goto_char(start + out.len());
         }
@@ -1326,6 +1337,7 @@ pub(crate) fn builtin_replace_string_eval(
     let mut out = String::with_capacity(source.len());
     let mut cursor = 0usize;
     let mut replaced = 0usize;
+    let mut backward_point = None;
     while let Some((m_start, m_end)) = find_match(&source, &from, cursor, true, false, case_fold) {
         if delimited && !is_delimited_match(&source, m_start, m_end) {
             out.push_str(&source[cursor..m_end]);
@@ -1335,6 +1347,9 @@ pub(crate) fn builtin_replace_string_eval(
         out.push_str(&source[cursor..m_start]);
         let matched = &source[m_start..m_end];
         out.push_str(&preserve_case(&to, matched));
+        if backward && backward_point.is_none() {
+            backward_point = Some(m_start);
+        }
         replaced += 1;
         cursor = m_end;
     }
@@ -1358,7 +1373,11 @@ pub(crate) fn builtin_replace_string_eval(
     buf.goto_char(start);
     buf.insert(&out);
     if backward {
-        buf.goto_char(start);
+        if let Some(pos) = backward_point {
+            buf.goto_char(start + pos);
+        } else {
+            buf.goto_char(start);
+        }
     } else {
         buf.goto_char(start + out.len());
     }
@@ -1401,6 +1420,7 @@ pub(crate) fn builtin_replace_regexp_eval(
     let mut out = String::with_capacity(source.len());
     let mut last = 0usize;
     let mut replaced = 0usize;
+    let mut backward_point = None;
     for caps in re.captures_iter(&source) {
         let Some(m) = caps.get(0) else {
             continue;
@@ -1409,14 +1429,24 @@ pub(crate) fn builtin_replace_regexp_eval(
             continue;
         }
         if m.start() == m.end() {
-            // Emacs inserts on empty regexp matches before each character, not at end.
-            if m.start() >= source.len() {
-                continue;
+            if backward {
+                // Backward path inserts after each character and at region end, not at start.
+                if m.start() == 0 {
+                    continue;
+                }
+            } else {
+                // Forward path inserts before each character, not at end.
+                if m.start() >= source.len() {
+                    continue;
+                }
             }
             out.push_str(&source[last..m.start()]);
             let expanded = expand_emacs_replacement(&to, &caps);
             out.push_str(&preserve_case(&expanded, m.as_str()));
             last = m.start();
+            if backward && backward_point.is_none() {
+                backward_point = Some(m.start());
+            }
             replaced += 1;
             continue;
         }
@@ -1425,6 +1455,9 @@ pub(crate) fn builtin_replace_regexp_eval(
         let expanded = expand_emacs_replacement(&to, &caps);
         out.push_str(&preserve_case(&expanded, m.as_str()));
         last = m.end();
+        if backward && backward_point.is_none() {
+            backward_point = Some(m.start());
+        }
         replaced += 1;
     }
     out.push_str(&source[last..]);
@@ -1447,7 +1480,11 @@ pub(crate) fn builtin_replace_regexp_eval(
     buf.goto_char(start);
     buf.insert(&out);
     if backward {
-        buf.goto_char(start);
+        if let Some(pos) = backward_point {
+            buf.goto_char(start + pos);
+        } else {
+            buf.goto_char(start);
+        }
     } else {
         buf.goto_char(start + out.len());
     }
