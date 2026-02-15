@@ -1624,6 +1624,30 @@ pub(crate) fn builtin_syntax_ppss(
     Ok(parse_state_from_range(buf, &table, 1, pos))
 }
 
+/// `(syntax-ppss-flush-cache POS &rest _IGNORED)` — flush parser-state cache.
+///
+/// NeoVM currently computes parser state directly, so this is a no-op that
+/// enforces Emacs-compatible arity/type behavior.
+pub(crate) fn builtin_syntax_ppss_flush_cache(
+    _eval: &mut super::eval::Evaluator,
+    args: Vec<Value>,
+) -> EvalResult {
+    if args.is_empty() {
+        return Err(signal(
+            "wrong-number-of-arguments",
+            vec![Value::symbol("syntax-ppss-flush-cache"), Value::Int(0)],
+        ));
+    }
+
+    match &args[0] {
+        Value::Int(_) | Value::Char(_) => Ok(Value::Nil),
+        other => Err(signal(
+            "wrong-type-argument",
+            vec![Value::symbol("number-or-marker-p"), other.clone()],
+        )),
+    }
+}
+
 /// `(skip-syntax-forward SYNTAX &optional LIMIT)` — skip forward over chars
 /// matching the given syntax classes.
 pub(crate) fn builtin_skip_syntax_forward(
@@ -2400,6 +2424,40 @@ mod tests {
                 assert_eq!(sig.data.first(), Some(&Value::symbol("backward-prefix-chars")));
             }
             other => panic!("expected wrong-number-of-arguments signal, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn syntax_ppss_flush_cache_contract() {
+        let mut eval = crate::elisp::eval::Evaluator::new();
+
+        assert_eq!(
+            builtin_syntax_ppss_flush_cache(&mut eval, vec![Value::Int(1)]).unwrap(),
+            Value::Nil
+        );
+        assert_eq!(
+            builtin_syntax_ppss_flush_cache(
+                &mut eval,
+                vec![Value::Int(1), Value::symbol("ignored"), Value::Int(3)],
+            )
+            .unwrap(),
+            Value::Nil
+        );
+
+        match builtin_syntax_ppss_flush_cache(&mut eval, vec![]) {
+            Err(crate::elisp::error::Flow::Signal(sig)) => {
+                assert_eq!(sig.symbol, "wrong-number-of-arguments");
+                assert_eq!(sig.data.first(), Some(&Value::symbol("syntax-ppss-flush-cache")));
+            }
+            other => panic!("expected wrong-number-of-arguments signal, got {other:?}"),
+        }
+
+        match builtin_syntax_ppss_flush_cache(&mut eval, vec![Value::Nil]) {
+            Err(crate::elisp::error::Flow::Signal(sig)) => {
+                assert_eq!(sig.symbol, "wrong-type-argument");
+                assert_eq!(sig.data.first(), Some(&Value::symbol("number-or-marker-p")));
+            }
+            other => panic!("expected wrong-type-argument signal, got {other:?}"),
         }
     }
 

@@ -804,6 +804,7 @@ const DISPATCH_BUILTIN_NAMES: &[&str] = &[
     "switch-to-buffer",
     "syntax-after",
     "syntax-ppss",
+    "syntax-ppss-flush-cache",
     "syntax-table",
     "syntax-table-p",
     "symbol-at-point",

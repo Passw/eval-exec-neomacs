@@ -6111,6 +6111,9 @@ pub(crate) fn dispatch_builtin(
         "scan-sexps" => return Some(super::syntax::builtin_scan_sexps(eval, args)),
         "parse-partial-sexp" => return Some(super::syntax::builtin_parse_partial_sexp(eval, args)),
         "syntax-ppss" => return Some(super::syntax::builtin_syntax_ppss(eval, args)),
+        "syntax-ppss-flush-cache" => {
+            return Some(super::syntax::builtin_syntax_ppss_flush_cache(eval, args))
+        }
         "skip-syntax-forward" => {
             return Some(super::syntax::builtin_skip_syntax_forward(eval, args))
         }
