@@ -7,6 +7,7 @@ Last updated: 2026-02-15
 - Continue compatibility-first maintenance with small commit slices.
 - Keep builtin dispatch surface and registry in lock-step for `fboundp`/introspection parity.
 - Run targeted vm-compat checks after each behavior-affecting slice.
+- Keep recurring full-corpus `check-all-neovm` gates after each compatibility batch.
 - Keep `.elc` reader/exec compatibility corpora explicitly non-default while `.elc` binary compatibility remains disabled.
 
 ## Next
@@ -17,6 +18,10 @@ Last updated: 2026-02-15
 4. Keep Rust backend behind compile-time switch and preserve Emacs C core as default backend.
 
 ## Done
+
+- Re-ran full NeoVM compatibility gate after syntax parser batch:
+  - verified:
+    - `make -C test/neovm/vm-compat check-all-neovm` (pass, full default + neovm-only corpus)
 
 - Implemented baseline `parse-partial-sexp`/`syntax-ppss` and locked corpus:
   - updated:
