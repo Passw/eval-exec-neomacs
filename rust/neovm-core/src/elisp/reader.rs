@@ -52,6 +52,16 @@ fn expect_string(value: &Value) -> Result<String, Flow> {
     }
 }
 
+fn expect_number(value: &Value) -> Result<(), Flow> {
+    match value {
+        Value::Int(_) | Value::Float(_) | Value::Char(_) => Ok(()),
+        other => Err(signal(
+            "wrong-type-argument",
+            vec![Value::symbol("numberp"), other.clone()],
+        )),
+    }
+}
+
 // ---------------------------------------------------------------------------
 // 1. read-from-string
 // ---------------------------------------------------------------------------
@@ -700,6 +710,11 @@ pub(crate) fn builtin_read_number(
     expect_min_args("read-number", &args, 1)?;
     expect_max_args("read-number", &args, 3)?;
     let _prompt = expect_string(&args[0])?;
+    if let Some(default) = args.get(1) {
+        if !default.is_nil() {
+            let _ = expect_number(default)?;
+        }
+    }
     Err(signal(
         "end-of-file",
         vec![Value::string("Error reading from stdin")],
@@ -1324,6 +1339,32 @@ mod tests {
         let mut ev = Evaluator::new();
         let result = builtin_read_number(&mut ev, vec![Value::string("Number: ")]);
         assert!(result.is_err());
+    }
+
+    #[test]
+    fn read_number_rejects_non_numeric_default() {
+        let mut ev = Evaluator::new();
+        let result = builtin_read_number(
+            &mut ev,
+            vec![Value::string("Number: "), Value::string("x")],
+        );
+        assert!(matches!(
+            result,
+            Err(Flow::Signal(sig)) if sig.symbol == "wrong-type-argument"
+        ));
+    }
+
+    #[test]
+    fn read_number_accepts_numeric_default_and_signals_end_of_file() {
+        let mut ev = Evaluator::new();
+        let result = builtin_read_number(
+            &mut ev,
+            vec![Value::string("Number: "), Value::Float(1.5)],
+        );
+        assert!(matches!(
+            result,
+            Err(Flow::Signal(sig)) if sig.symbol == "end-of-file"
+        ));
     }
 
     #[test]
