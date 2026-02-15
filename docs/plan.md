@@ -47,6 +47,14 @@ Last updated: 2026-02-14
   - `test/neovm/vm-compat/cases/terminal-parameter-semantics.forms`
   - `test/neovm/vm-compat/cases/terminal-parameter-semantics.expected.tsv`
   - wired into `test/neovm/vm-compat/cases/default.list`
+- Implemented `safe-date-to-time` compatibility subset:
+  - parse and convert explicit-offset date formats (ISO/slash and RFC-style)
+  - return `(HIGH LOW)` for valid dates, integer `0` for non-parseable/non-string inputs
+  - preserve wrong-arity signaling
+- Added and enabled new oracle corpus:
+  - `test/neovm/vm-compat/cases/safe-date-to-time-semantics.forms`
+  - `test/neovm/vm-compat/cases/safe-date-to-time-semantics.expected.tsv`
+  - wired into `test/neovm/vm-compat/cases/default.list`
 - Kept branch green with targeted Rust tests and vm-compat checks after each slice.
 
 ## Doing
