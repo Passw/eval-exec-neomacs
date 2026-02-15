@@ -19,6 +19,18 @@ Last updated: 2026-02-15
 
 ## Done
 
+- Aligned `find-composition-internal` position lower-bound error semantics:
+  - updated:
+    - `rust/neovm-core/src/elisp/composite.rs`
+      - now signals `args-out-of-range` when POS is zero or negative.
+      - expanded composite unit tests for POS lower-bound error paths.
+    - `test/neovm/vm-compat/cases/composite-basic-semantics.{forms,expected.tsv}`
+      - added oracle-locked checks for `find-composition-internal` with `POS=0` and `POS=-1`.
+      - refreshed oracle baseline.
+  - verified:
+    - `cargo test composite::tests --manifest-path rust/neovm-core/Cargo.toml -- --nocapture` (pass)
+    - `make -C test/neovm/vm-compat check-one-neovm CASE=cases/composite-basic-semantics` (pass, 49/49)
+
 - Aligned `compose-string-internal` range/error behavior with oracle subset:
   - updated:
     - `rust/neovm-core/src/elisp/composite.rs`
