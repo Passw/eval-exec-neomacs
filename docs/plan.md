@@ -9,6 +9,7 @@ Last updated: 2026-02-15
   - `run-with-timer` compatibility is now lock-in covered for numeric, `nil`, and `"0 sec"` immediate forms
   - `run-with-idle-timer` now accepts `nil` delay and keeps non-numeric delay specs as `error`
   - `timer-activate` now matches error-class behavior on invalid/active timer activation paths
+  - `sleep-for` is now exposed in builtin registry/dispatch and matches core GNU argument/error semantics in batch mode
   - `sit-for` now enforces GNU-compatible arity bounds (1..=2 args; extra args signal `wrong-number-of-arguments`)
   - timer corpus now locks additional timer arity/error paths (`timerp`, `cancel-timer`, `timer-activate`) under `condition-case`
   - added oracle corpus:
