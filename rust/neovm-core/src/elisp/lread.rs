@@ -1,5 +1,5 @@
-//! Reader-internals builtins: intern, intern-soft, read, read-from-string,
-//! eval-buffer, eval-region, read-char, read-event, read-char-exclusive, load,
+//! Reader-internals builtins: read, read-from-string,
+//! eval-buffer, eval-region, read-char, read-event, read-char-exclusive,
 //! get-load-suffixes, locate-file, locate-file-internal, read-coding-system,
 //! read-non-nil-coding-system.
 
@@ -60,35 +60,6 @@ fn expect_string(value: &Value) -> Result<String, Flow> {
 // ---------------------------------------------------------------------------
 // Eval-dependent builtins
 // ---------------------------------------------------------------------------
-
-/// `(intern STRING &optional OBARRAY)`
-///
-/// Intern a symbol with the given name in the obarray.  If the symbol already
-/// exists, return the existing one; otherwise create it.  The optional OBARRAY
-/// argument is accepted but ignored (we use the single global obarray).
-pub(crate) fn builtin_intern(eval: &mut super::eval::Evaluator, args: Vec<Value>) -> EvalResult {
-    expect_min_args("intern", &args, 1)?;
-    let name = expect_string(&args[0])?;
-    eval.obarray.intern(&name);
-    Ok(Value::symbol(name))
-}
-
-/// `(intern-soft STRING &optional OBARRAY)`
-///
-/// Look up STRING in the obarray without creating a new symbol.
-/// Return the symbol if found, nil otherwise.
-pub(crate) fn builtin_intern_soft(
-    eval: &mut super::eval::Evaluator,
-    args: Vec<Value>,
-) -> EvalResult {
-    expect_min_args("intern-soft", &args, 1)?;
-    let name = expect_string(&args[0])?;
-    if eval.obarray.intern_soft(&name).is_some() {
-        Ok(Value::symbol(name))
-    } else {
-        Ok(Value::Nil)
-    }
-}
 
 /// `(read &optional STREAM)`
 ///
@@ -961,30 +932,6 @@ fn skip_string(input: &str, mut pos: usize) -> usize {
 mod tests {
     use super::*;
     use crate::elisp::eval::Evaluator;
-
-    #[test]
-    fn intern_creates_symbol() {
-        let mut ev = Evaluator::new();
-        let result = builtin_intern(&mut ev, vec![Value::string("my-sym")]).unwrap();
-        assert!(matches!(result, Value::Symbol(ref s) if s == "my-sym"));
-    }
-
-    #[test]
-    fn intern_soft_found() {
-        let mut ev = Evaluator::new();
-        // First intern it
-        builtin_intern(&mut ev, vec![Value::string("existing")]).unwrap();
-        // Then intern-soft should find it
-        let result = builtin_intern_soft(&mut ev, vec![Value::string("existing")]).unwrap();
-        assert!(matches!(result, Value::Symbol(ref s) if s == "existing"));
-    }
-
-    #[test]
-    fn intern_soft_not_found() {
-        let mut ev = Evaluator::new();
-        let result = builtin_intern_soft(&mut ev, vec![Value::string("nonexistent")]).unwrap();
-        assert!(result.is_nil());
-    }
 
     #[test]
     fn read_from_string_integer() {
