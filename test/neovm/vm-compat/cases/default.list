@@ -57,6 +57,7 @@ cases/char-byte-conversion-semantics
 cases/get-byte-semantics
 cases/string-pixel-width-semantics
 cases/indent-column-semantics
+cases/move-to-column-force-semantics
 cases/custom-group-p-availability
 cases/custom-set-semantics
 cases/bookmark-helper-availability

@@ -161,6 +161,22 @@ fn column_for_prefix(prefix: &str, tab_width: usize) -> usize {
     column
 }
 
+fn padding_to_column(mut column: usize, target: usize, tab_width: usize) -> String {
+    let mut out = String::new();
+    let tab = tab_width.max(1);
+    while column < target {
+        let next_tab = column + (tab - (column % tab));
+        if next_tab <= target && next_tab > column + 1 {
+            out.push('\t');
+            column = next_tab;
+        } else {
+            out.push(' ');
+            column += 1;
+        }
+    }
+    out
+}
+
 // ---------------------------------------------------------------------------
 // Eval-dependent builtins
 // ---------------------------------------------------------------------------
@@ -236,25 +252,52 @@ pub(crate) fn builtin_move_to_column_eval(
     let (bol, eol) = line_bounds(&text, buf.begv, buf.zv, pt);
     let line = &text[bol..eol];
 
+    if target == 0 {
+        buf.goto_char(bol);
+        return Ok(Value::Int(0));
+    }
+
     let mut column = 0usize;
     let mut dest_byte = bol;
     let mut reached = 0usize;
     let mut found = false;
+    let mut tab_split: Option<(usize, usize)> = None;
 
     for (rel, ch) in line.char_indices() {
+        let char_start = bol + rel;
+        let char_end = char_start + ch.len_utf8();
         let next = next_column(column, ch, tabw);
-        dest_byte = bol + rel + ch.len_utf8();
-        reached = next;
         if next >= target {
+            if force && ch == '\t' && next > target {
+                tab_split = Some((char_start, column));
+            } else {
+                dest_byte = char_end;
+                reached = next;
+            }
             found = true;
             break;
         }
+        dest_byte = char_end;
+        reached = next;
         column = next;
     }
 
     if !found {
         dest_byte = eol;
         reached = column_for_prefix(line, tabw);
+    }
+
+    if let Some((tab_byte, col_before_tab)) = tab_split {
+        if buf.read_only {
+            return Err(signal(
+                "buffer-read-only",
+                vec![Value::string(buf.name.clone())],
+            ));
+        }
+        buf.goto_char(tab_byte);
+        let pad = padding_to_column(col_before_tab, target, tabw);
+        buf.insert(&pad);
+        return Ok(Value::Int(target as i64));
     }
 
     buf.goto_char(dest_byte);
@@ -266,7 +309,7 @@ pub(crate) fn builtin_move_to_column_eval(
                 vec![Value::string(buf.name.clone())],
             ));
         }
-        let pad = " ".repeat(target - reached);
+        let pad = padding_to_column(reached, target, tabw);
         buf.insert(&pad);
         reached = target;
     }
@@ -533,6 +576,57 @@ mod tests {
             }
             other => panic!("unexpected flow: {other:?}"),
         }
+    }
+
+    #[test]
+    fn eval_move_to_column_force_subset() {
+        let mut ev = super::super::eval::Evaluator::new();
+        let forms = super::super::parser::parse_forms(
+            r#"
+            (with-temp-buffer
+              (insert "abc")
+              (goto-char (point-min))
+              (list (move-to-column 10 t) (point) (string-to-list (buffer-string))))
+            (with-temp-buffer
+              (insert "a\tb")
+              (goto-char (point-min))
+              (list (move-to-column 5 t) (point) (string-to-list (buffer-string))))
+            "#,
+        )
+        .expect("parse forms");
+
+        let first = ev.eval(&forms[0]).expect("eval first force case");
+        let first_items = list_to_vec(&first).expect("first list");
+        assert_eq!(first_items[0], Value::Int(10));
+        assert_eq!(first_items[1], Value::Int(7));
+        assert_eq!(
+            list_to_vec(&first_items[2]).expect("first buffer bytes"),
+            vec![
+                Value::Int(97),
+                Value::Int(98),
+                Value::Int(99),
+                Value::Int(9),
+                Value::Int(32),
+                Value::Int(32),
+            ]
+        );
+
+        let second = ev.eval(&forms[1]).expect("eval second force case");
+        let second_items = list_to_vec(&second).expect("second list");
+        assert_eq!(second_items[0], Value::Int(5));
+        assert_eq!(second_items[1], Value::Int(6));
+        assert_eq!(
+            list_to_vec(&second_items[2]).expect("second buffer bytes"),
+            vec![
+                Value::Int(97),
+                Value::Int(32),
+                Value::Int(32),
+                Value::Int(32),
+                Value::Int(32),
+                Value::Int(9),
+                Value::Int(98),
+            ]
+        );
     }
 
     #[test]

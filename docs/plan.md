@@ -4,6 +4,21 @@ Last updated: 2026-02-15
 
 ## Done
 
+- Implemented `move-to-column` FORCE padding compatibility and oracle lock-in:
+  - updated `rust/neovm-core/src/elisp/indent.rs`:
+    - added force-path tab split behavior (insert spaces before tab when target lands inside tab width)
+    - added force-path end-of-line padding using tab+space expansion toward target columns
+    - aligned zero-column movement behavior to keep point at line start
+  - added and enabled oracle corpus:
+    - `test/neovm/vm-compat/cases/move-to-column-force-semantics.forms`
+    - `test/neovm/vm-compat/cases/move-to-column-force-semantics.expected.tsv`
+    - wired into `test/neovm/vm-compat/cases/default.list`
+  - verified:
+    - `cargo test --manifest-path rust/neovm-core/Cargo.toml indent::tests::eval_move_to_column_force_subset -- --nocapture` (pass)
+    - `make -C test/neovm/vm-compat check-neovm FORMS=cases/move-to-column-force-semantics.forms EXPECTED=cases/move-to-column-force-semantics.expected.tsv` (pass)
+    - `make -C test/neovm/vm-compat check-neovm FORMS=cases/indent-column-semantics.forms EXPECTED=cases/indent-column-semantics.expected.tsv` (pass)
+    - `make -C test/neovm/vm-compat validate-case-lists` (pass)
+    - `make -C test/neovm/vm-compat check-all-neovm` (pass)
 - Implemented evaluator-backed indentation column subset and oracle lock-in:
   - updated `rust/neovm-core/src/elisp/indent.rs`:
     - added evaluator-aware `current-column`, `current-indentation`, and `move-to-column`
