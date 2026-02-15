@@ -4,6 +4,17 @@ Last updated: 2026-02-15
 
 ## Done
 
+- Implemented `posix-search-*` / `word-search-*` evaluator fallback slice:
+  - replaced nil-stub dispatch paths by routing:
+    - `posix-search-forward` / `posix-search-backward` -> evaluator regex search paths
+    - `word-search-forward` / `word-search-backward` -> evaluator literal search paths
+  - added and enabled oracle corpus:
+    - `test/neovm/vm-compat/cases/search-posix-word-semantics.forms`
+    - `test/neovm/vm-compat/cases/search-posix-word-semantics.expected.tsv`
+    - wired into `test/neovm/vm-compat/cases/default.list`
+  - verified:
+    - `make -C test/neovm/vm-compat check-neovm FORMS=cases/search-posix-word-semantics.forms EXPECTED=cases/search-posix-word-semantics.expected.tsv` (pass)
+    - `make -C test/neovm/vm-compat validate-case-lists` (pass)
 - Re-ran full vm-compat verification and fixed a real regression:
   - `make -C test/neovm/vm-compat check-all-neovm` initially exposed a mismatch in `cases/internal-lisp-face-comparators` for string face designators (`"default"`)
   - patched `internal-lisp-face-empty-p` / `internal-lisp-face-equal-p` face resolution to accept valid string face names with GNU-compatible invalid-face payloads
