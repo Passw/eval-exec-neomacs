@@ -1,4 +1,5 @@
 (fboundp 'looking-at)
+(fboundp 'looking-at-p)
 
 (with-temp-buffer
   (insert "hello")
@@ -66,6 +67,17 @@
         (search-upper-case nil))
     (looking-at "A")))
 
+(with-temp-buffer
+  (insert "abc")
+  (goto-char (point-min))
+  (looking-at "a")
+  (let ((before (match-beginning 0)))
+    (looking-at-p "b")
+    (list before (match-beginning 0))))
+
 (condition-case err (looking-at "[") (invalid-regexp (car err)))
+(condition-case err (looking-at-p "[") (invalid-regexp (car err)))
 (condition-case err (looking-at) (wrong-number-of-arguments (car err)))
+(condition-case err (looking-at-p "a" nil) (wrong-number-of-arguments (car err)))
 (condition-case err (looking-at 1) (error err))
+(condition-case err (looking-at-p 1) (error err))
