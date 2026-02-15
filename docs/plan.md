@@ -2493,6 +2493,17 @@ Last updated: 2026-02-15
     - `make -C test/neovm/vm-compat check-one-neovm CASE=cases/replace-string-semantics` (pass, 6/6)
     - `make -C test/neovm/vm-compat check-one-neovm CASE=cases/replace-regexp-semantics` (pass, 8/8)
 - Kept branch green with targeted Rust tests and vm-compat checks after each slice.
+- Aligned `transpose-lines` negative-arg behavior with oracle for unterminated EOB buffers:
+  - negative path now transposes only newline-terminated line units; trailing unterminated last line is excluded
+  - fixed regression where `(transpose-lines -1)` at `point-max` in `\"a\\nb\"` incorrectly succeeded instead of signaling `error`
+  - added and enabled oracle corpus:
+    - `test/neovm/vm-compat/cases/transpose-lines-prefix-arg-semantics.forms`
+    - `test/neovm/vm-compat/cases/transpose-lines-prefix-arg-semantics.expected.tsv`
+    - `test/neovm/vm-compat/cases/default.list`
+  - verified:
+    - `make -C test/neovm/vm-compat check-one-neovm CASE=cases/transpose-lines-command-context-semantics` (pass, 8/8)
+    - `make -C test/neovm/vm-compat check-one-neovm CASE=cases/transpose-lines-prefix-arg-semantics` (pass, 3/3)
+    - `make -C test/neovm/vm-compat check-neovm-list LIST=cases/default.list` (pass)
 
 ## Doing
 
