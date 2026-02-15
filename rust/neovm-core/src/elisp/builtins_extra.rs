@@ -543,20 +543,6 @@ pub(crate) fn builtin_zerop(args: Vec<Value>) -> EvalResult {
     Ok(Value::bool(is_zero))
 }
 
-/// `(cl-oddp N)` -> t if odd.
-pub(crate) fn builtin_cl_oddp(args: Vec<Value>) -> EvalResult {
-    expect_args("cl-oddp", &args, 1)?;
-    let n = expect_int(&args[0])?;
-    Ok(Value::bool(n % 2 != 0))
-}
-
-/// `(cl-evenp N)` -> t if even.
-pub(crate) fn builtin_cl_evenp(args: Vec<Value>) -> EvalResult {
-    expect_args("cl-evenp", &args, 1)?;
-    let n = expect_int(&args[0])?;
-    Ok(Value::bool(n % 2 == 0))
-}
-
 // ---------------------------------------------------------------------------
 // Misc operations
 // ---------------------------------------------------------------------------
@@ -761,14 +747,6 @@ mod tests {
             Value::True
         ));
         assert!(builtin_natnump(vec![Value::Int(-1)]).unwrap().is_nil());
-        assert!(matches!(
-            builtin_cl_oddp(vec![Value::Int(3)]).unwrap(),
-            Value::True
-        ));
-        assert!(matches!(
-            builtin_cl_evenp(vec![Value::Int(4)]).unwrap(),
-            Value::True
-        ));
     }
 
     #[test]
