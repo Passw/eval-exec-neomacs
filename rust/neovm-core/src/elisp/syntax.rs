@@ -4,11 +4,18 @@
 //! motion functions (forward/backward word, sexp scanning), and the
 //! `string-to-syntax` descriptor parser.
 
+use std::cell::RefCell;
 use std::collections::HashMap;
 
-use super::error::{signal, EvalResult};
+use super::error::{signal, EvalResult, Flow};
 use super::value::Value;
 use crate::buffer::Buffer;
+
+thread_local! {
+    static STANDARD_SYNTAX_TABLE_OBJECT: RefCell<Option<Value>> = const { RefCell::new(None) };
+}
+
+const SYNTAX_TABLE_OBJECT_PROPERTY: &str = "syntax-table-object";
 
 // ===========================================================================
 // Syntax classes
@@ -915,6 +922,48 @@ pub(crate) fn builtin_copy_syntax_table(args: Vec<Value>) -> EvalResult {
     }
 }
 
+fn ensure_standard_syntax_table_object() -> EvalResult {
+    STANDARD_SYNTAX_TABLE_OBJECT.with(|slot| {
+        if let Some(table) = slot.borrow().as_ref() {
+            return Ok(table.clone());
+        }
+        let table = super::chartable::builtin_make_char_table(vec![Value::symbol("syntax-table")])?;
+        *slot.borrow_mut() = Some(table.clone());
+        Ok(table)
+    })
+}
+
+fn current_buffer_syntax_table_object(eval: &mut super::eval::Evaluator) -> Result<Value, Flow> {
+    let fallback = ensure_standard_syntax_table_object()?;
+    let buf = eval
+        .buffers
+        .current_buffer_mut()
+        .ok_or_else(|| signal("error", vec![Value::string("No current buffer")]))?;
+
+    if let Some(value) = buf.properties.get(SYNTAX_TABLE_OBJECT_PROPERTY) {
+        if builtin_syntax_table_p(vec![value.clone()])?.is_truthy() {
+            return Ok(value.clone());
+        }
+    }
+
+    buf.properties
+        .insert(SYNTAX_TABLE_OBJECT_PROPERTY.to_string(), fallback.clone());
+    Ok(fallback)
+}
+
+fn set_current_buffer_syntax_table_object(
+    eval: &mut super::eval::Evaluator,
+    table: Value,
+) -> Result<(), Flow> {
+    let buf = eval
+        .buffers
+        .current_buffer_mut()
+        .ok_or_else(|| signal("error", vec![Value::string("No current buffer")]))?;
+    buf.properties
+        .insert(SYNTAX_TABLE_OBJECT_PROPERTY.to_string(), table);
+    Ok(())
+}
+
 /// `(syntax-class-to-char CLASS)` — map syntax class code to descriptor char.
 pub(crate) fn builtin_syntax_class_to_char(args: Vec<Value>) -> EvalResult {
     if args.len() != 1 {
@@ -1014,7 +1063,7 @@ pub(crate) fn builtin_standard_syntax_table(args: Vec<Value>) -> EvalResult {
             ],
         ));
     }
-    builtin_make_syntax_table(vec![])
+    ensure_standard_syntax_table_object()
 }
 
 /// `(syntax-table-p OBJECT)` — return t if OBJECT is a syntax table.
@@ -1040,10 +1089,10 @@ pub(crate) fn builtin_syntax_table_p(args: Vec<Value>) -> EvalResult {
 
 /// `(syntax-table)` — return the current buffer syntax table.
 ///
-/// Current VM representation stores syntax behavior on the buffer internals,
-/// so this returns a compatible syntax-table char-table object.
+/// Returns the buffer-local syntax-table object, defaulting to the standard
+/// syntax-table object.
 pub(crate) fn builtin_syntax_table(
-    _eval: &mut super::eval::Evaluator,
+    eval: &mut super::eval::Evaluator,
     args: Vec<Value>,
 ) -> EvalResult {
     if !args.is_empty() {
@@ -1052,16 +1101,15 @@ pub(crate) fn builtin_syntax_table(
             vec![Value::symbol("syntax-table"), Value::Int(args.len() as i64)],
         ));
     }
-    builtin_make_syntax_table(vec![])
+    current_buffer_syntax_table_object(eval)
 }
 
 /// `(set-syntax-table TABLE)` — install TABLE for current buffer and return it.
 ///
-/// NeoVM currently stores syntax behavior on `Buffer.syntax_table` internals.
-/// We accept and validate TABLE as a syntax-table object for compatibility,
-/// then return it; full char-table-to-internal projection can be layered later.
+/// NeoVM currently stores syntax behavior on `Buffer.syntax_table` internals;
+/// this installs the exposed syntax-table object for compatibility and returns it.
 pub(crate) fn builtin_set_syntax_table(
-    _eval: &mut super::eval::Evaluator,
+    eval: &mut super::eval::Evaluator,
     args: Vec<Value>,
 ) -> EvalResult {
     if args.len() != 1 {
@@ -1076,7 +1124,9 @@ pub(crate) fn builtin_set_syntax_table(
             vec![Value::symbol("syntax-table-p"), args[0].clone()],
         ));
     }
-    Ok(args[0].clone())
+    let table = args[0].clone();
+    set_current_buffer_syntax_table_object(eval, table.clone())?;
+    Ok(table)
 }
 
 // ===========================================================================
@@ -2514,6 +2564,41 @@ mod tests {
             }
             other => panic!("expected wrong-type-argument signal, got {other:?}"),
         }
+    }
+
+    #[test]
+    fn syntax_table_and_standard_default_to_same_object() {
+        let mut eval = crate::elisp::eval::Evaluator::new();
+        let current = builtin_syntax_table(&mut eval, vec![]).unwrap();
+        let standard = builtin_standard_syntax_table(vec![]).unwrap();
+        match (current, standard) {
+            (Value::Vector(a), Value::Vector(b)) => assert!(std::sync::Arc::ptr_eq(&a, &b)),
+            other => panic!("expected syntax-table vectors, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn set_syntax_table_updates_current_buffer_only() {
+        let mut eval = crate::elisp::eval::Evaluator::new();
+        let custom = builtin_make_syntax_table(vec![]).unwrap();
+        let current_id = eval.buffers.current_buffer().expect("current buffer").id;
+        let other_id = eval.buffers.create_buffer("*syntax-other*");
+
+        let out = builtin_set_syntax_table(&mut eval, vec![custom.clone()]).unwrap();
+        assert_eq!(out, custom);
+        let current = builtin_syntax_table(&mut eval, vec![]).unwrap();
+        assert_eq!(current, custom);
+
+        eval.buffers.set_current(other_id);
+        let other = builtin_syntax_table(&mut eval, vec![]).unwrap();
+        match (&other, &custom) {
+            (Value::Vector(a), Value::Vector(b)) => assert!(!std::sync::Arc::ptr_eq(a, b)),
+            pair => panic!("expected syntax-table vectors, got {pair:?}"),
+        }
+
+        eval.buffers.set_current(current_id);
+        let restored = builtin_syntax_table(&mut eval, vec![]).unwrap();
+        assert_eq!(restored, custom);
     }
 
     #[test]
