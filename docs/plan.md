@@ -40,6 +40,7 @@ Last updated: 2026-02-15
   - removed unexposed `find-coding-system` helper
   - removed unexposed `word-at-point` helper
   - removed stale, unreferenced `elisp/terminal` shim module files
+  - removed stale, unreferenced pure-JSON buffer stub helpers from `elisp/json.rs` (`json-insert`/`json-parse-buffer`; active dispatch already uses evaluator-backed `cl_lib` versions)
 - Implemented `terminal-parameter` / `set-terminal-parameter` compatibility semantics:
   - persisted terminal parameter values for symbol keys
   - `terminal-parameter` enforces `symbolp` for PARAMETER
