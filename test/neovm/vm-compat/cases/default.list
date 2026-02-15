@@ -74,6 +74,7 @@ cases/copy-syntax-table-semantics
 cases/forward-comment-semantics
 cases/backward-prefix-chars-semantics
 cases/syntax-ppss-flush-cache-semantics
+cases/string-to-syntax-class-codes-semantics
 cases/syntax-after-semantics
 cases/parse-partial-sexp-syntax-ppss-semantics
 cases/category-semantics

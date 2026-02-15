@@ -1,0 +1,5 @@
+(fboundp 'string-to-syntax)
+(string-to-syntax "'")
+(string-to-syntax "$")
+(string-to-syntax "/")
+(mapcar (lambda (s) (car (string-to-syntax s))) '("'" "$" "/"))

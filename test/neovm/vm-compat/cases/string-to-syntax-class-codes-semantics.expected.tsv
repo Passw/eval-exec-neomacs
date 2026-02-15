@@ -1,0 +1,5 @@
+1	(fboundp 'string-to-syntax)	OK t
+2	(string-to-syntax "'")	OK (6)
+3	(string-to-syntax "$")	OK (8)
+4	(string-to-syntax "/")	OK (10)
+5	(mapcar (lambda (s) (car (string-to-syntax s))) '("'" "$" "/"))	OK (6 8 10)
