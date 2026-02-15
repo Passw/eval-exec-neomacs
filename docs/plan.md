@@ -4,6 +4,16 @@ Last updated: 2026-02-15
 
 ## Done
 
+- Implemented `face-font` compatibility slice:
+  - aligned face argument semantics with oracle behavior (known symbol/string faces return `nil`, invalid faces keep oracle-compatible `Invalid face` payloads)
+  - preserved optional-argument behavior (`FRAME`/`CHARACTER` accepted and ignored for valid faces in batch compatibility path)
+  - added and enabled oracle corpus:
+    - `test/neovm/vm-compat/cases/face-font-semantics.forms`
+    - `test/neovm/vm-compat/cases/face-font-semantics.expected.tsv`
+    - wired into `test/neovm/vm-compat/cases/default.list`
+  - verified:
+    - `cargo test font::tests -- --nocapture` (pass)
+    - `make -C test/neovm/vm-compat check-neovm FORMS=cases/face-font-semantics.forms EXPECTED=cases/face-font-semantics.expected.tsv` (pass)
 - Implemented `face-id` compatibility slice:
   - replaced fixed-id stub with oracle-compatible ids for core faces and dynamic-id allocation for faces created via `internal-make-lisp-face`
   - aligned argument semantics: accepts optional second argument (ignored), keeps string first-arg `symbolp` type checks, and preserves oracle-style `Not a face: ...` error payloads
