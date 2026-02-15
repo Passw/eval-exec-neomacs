@@ -133,8 +133,9 @@
               # For native compilation
               libgccjit
 
-              # EGL/GPU for WPE
+              # EGL/GPU/Vulkan for WPE and wgpu
               libGL
+              vulkan-loader
               libxkbcommon
               mesa
               libdrm
@@ -225,6 +226,7 @@
                 libgccjit
                 libsoup_3
                 libGL
+                vulkan-loader
                 mesa
                 libdrm
                 libxkbcommon
@@ -239,6 +241,11 @@
                 libwpe
                 libwpe-fdo
               ])}''${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
+
+              # Vulkan ICD discovery — tell the Vulkan loader where Mesa's
+              # driver JSON files are (e.g. intel_icd.x86_64.json for anv).
+              # Without this, wgpu can't find Vulkan drivers and falls back to OpenGL.
+              export VK_DRIVER_FILES="$(echo ${pkgs.mesa}/share/vulkan/icd.d/*.json | tr ' ' ':')"
 
               # WPE WebKit environment
               export WPE_BACKEND_LIBRARY="${pkgs.libwpe-fdo}/lib/libWPEBackend-fdo-1.0.so"
