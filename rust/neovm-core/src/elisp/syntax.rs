@@ -1051,6 +1051,50 @@ pub(crate) fn builtin_char_syntax(
     Ok(Value::Char(class.to_char()))
 }
 
+/// `(syntax-after POS)` — return syntax descriptor for char at POS.
+pub(crate) fn builtin_syntax_after(
+    eval: &mut super::eval::Evaluator,
+    args: Vec<Value>,
+) -> EvalResult {
+    if args.len() != 1 {
+        return Err(signal(
+            "wrong-number-of-arguments",
+            vec![Value::symbol("syntax-after"), Value::Int(args.len() as i64)],
+        ));
+    }
+
+    let pos = match &args[0] {
+        Value::Int(n) => *n,
+        other => {
+            return Err(signal(
+                "wrong-type-argument",
+                vec![Value::symbol("number-or-marker-p"), other.clone()],
+            ));
+        }
+    };
+    if pos <= 0 {
+        return Ok(Value::Nil);
+    }
+
+    let buf = eval
+        .buffers
+        .current_buffer()
+        .ok_or_else(|| signal("error", vec![Value::string("No current buffer")]))?;
+
+    let char_index = pos as usize - 1;
+    let byte_index = buf.text.char_to_byte(char_index.min(buf.text.char_count()));
+    let Some(ch) = buf.char_after(byte_index) else {
+        return Ok(Value::Nil);
+    };
+
+    let entry = buf
+        .syntax_table
+        .get_entry(ch)
+        .cloned()
+        .unwrap_or_else(|| SyntaxEntry::simple(buf.syntax_table.char_syntax(ch)));
+    Ok(syntax_entry_to_value(&entry))
+}
+
 /// `(forward-word &optional COUNT)` — move point forward COUNT words.
 pub(crate) fn builtin_forward_word(
     eval: &mut super::eval::Evaluator,
@@ -1921,5 +1965,30 @@ mod tests {
         )
         .unwrap();
         assert_eq!(backward, Value::Nil);
+    }
+
+    #[test]
+    fn syntax_after_returns_descriptor_and_nil_out_of_range() {
+        let mut eval = crate::elisp::eval::Evaluator::new();
+        {
+            let buf = eval.buffers.current_buffer_mut().expect("current buffer");
+            buf.delete_region(buf.point_min(), buf.point_max());
+            buf.insert("a(");
+        }
+
+        let word = builtin_syntax_after(&mut eval, vec![Value::Int(1)]).unwrap();
+        assert_eq!(
+            word,
+            syntax_entry_to_value(&SyntaxEntry::simple(SyntaxClass::Word))
+        );
+
+        let open = builtin_syntax_after(&mut eval, vec![Value::Int(2)]).unwrap();
+        assert_eq!(
+            open,
+            syntax_entry_to_value(&SyntaxEntry::with_match(SyntaxClass::Open, ')'))
+        );
+
+        let oob = builtin_syntax_after(&mut eval, vec![Value::Int(3)]).unwrap();
+        assert_eq!(oob, Value::Nil);
     }
 }
