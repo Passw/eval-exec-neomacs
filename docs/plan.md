@@ -57,6 +57,15 @@ Last updated: 2026-02-15
   - `test/neovm/vm-compat/cases/safe-date-to-time-semantics.forms`
   - `test/neovm/vm-compat/cases/safe-date-to-time-semantics.expected.tsv`
   - wired into `test/neovm/vm-compat/cases/default.list`
+- Implemented `set-time-zone-rule` / `current-time-zone` compatibility subset:
+  - process-level time zone rule state (`nil`/`wall`, `t`, integer offsets, TZ strings)
+  - deterministic offset-name rendering for fixed offset rules
+  - invalid specification signaling (`error "Invalid time zone specification"`)
+  - `current-time-zone` now honors explicit `ZONE` argument overrides
+- Added and enabled new oracle corpus:
+  - `test/neovm/vm-compat/cases/time-zone-rule-semantics.forms`
+  - `test/neovm/vm-compat/cases/time-zone-rule-semantics.expected.tsv`
+  - wired into `test/neovm/vm-compat/cases/default.list`
 - Kept branch green with targeted Rust tests and vm-compat checks after each slice.
 
 ## Doing
