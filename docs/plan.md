@@ -40,6 +40,7 @@ Last updated: 2026-02-15
   - updated `rust/neovm-core/src/elisp/kill_ring.rs`:
     - strict pointer sync now treats improper cons pointers as `wrong-type-argument`
     - proper-list pointers now use length-based cyclic fallback when no string-tail match exists (matching oracle behavior)
+    - extracted/documented the length-cycle fallback rule in a dedicated helper for maintainability
   - added and enabled oracle corpus:
     - `test/neovm/vm-compat/cases/kill-ring-pointer-improper-semantics.forms`
     - `test/neovm/vm-compat/cases/kill-ring-pointer-improper-semantics.expected.tsv`
