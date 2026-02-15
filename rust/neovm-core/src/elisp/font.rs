@@ -288,14 +288,123 @@ const KNOWN_FACES: &[&str] = &[
     "cursor",
 ];
 
-/// `(internal-lisp-face-p FACE &optional FRAME)` -- return t if FACE is a
-/// symbol naming a known face.  For maximum compatibility we accept any
-/// symbol as a valid face.
+const LISP_FACE_VECTOR_LEN: usize = 20;
+const VALID_FACE_ATTRIBUTES: &[&str] = &[
+    ":family",
+    ":foundry",
+    ":height",
+    ":weight",
+    ":slant",
+    ":underline",
+    ":overline",
+    ":strike-through",
+    ":box",
+    ":inverse-video",
+    ":foreground",
+    ":distant-foreground",
+    ":background",
+    ":stipple",
+    ":width",
+    ":inherit",
+    ":extend",
+    ":font",
+    ":fontset",
+];
+
+fn known_face_name(face: &Value) -> Option<&str> {
+    match face {
+        Value::Symbol(name) => KNOWN_FACES.contains(&name.as_str()).then_some(name.as_str()),
+        Value::Str(name) => KNOWN_FACES.contains(&name.as_str()).then_some(name.as_str()),
+        _ => None,
+    }
+}
+
+fn make_lisp_face_vector() -> Value {
+    let mut values = Vec::with_capacity(LISP_FACE_VECTOR_LEN);
+    values.push(Value::symbol("face"));
+    values.extend((1..LISP_FACE_VECTOR_LEN).map(|_| Value::symbol("unspecified")));
+    Value::vector(values)
+}
+
+fn normalize_face_attribute_name(attr: &Value) -> Result<String, Flow> {
+    let name = match attr {
+        Value::Symbol(name) => name.clone(),
+        Value::Keyword(name) => {
+            if name.starts_with(':') {
+                name.clone()
+            } else {
+                format!(":{name}")
+            }
+        }
+        Value::Nil | Value::True => attr.as_symbol_name().unwrap_or_default().to_string(),
+        _ => {
+            return Err(signal(
+                "wrong-type-argument",
+                vec![Value::symbol("symbolp"), attr.clone()],
+            ));
+        }
+    };
+
+    if VALID_FACE_ATTRIBUTES.contains(&name.as_str()) {
+        Ok(name)
+    } else if attr.is_nil() {
+        Err(signal(
+            "error",
+            vec![Value::string("Invalid face attribute name")],
+        ))
+    } else {
+        Err(signal(
+            "error",
+            vec![Value::string("Invalid face attribute name"), attr.clone()],
+        ))
+    }
+}
+
+fn default_face_attribute_value(attr: &str) -> Value {
+    match attr {
+        ":family" | ":foundry" => Value::string("default"),
+        ":height" => Value::Int(1),
+        ":weight" | ":slant" | ":width" => Value::symbol("normal"),
+        ":underline" | ":overline" | ":strike-through" | ":box" | ":inverse-video"
+        | ":stipple" | ":inherit" | ":extend" | ":fontset" => Value::Nil,
+        ":foreground" => Value::string("unspecified-fg"),
+        ":background" => Value::string("unspecified-bg"),
+        ":distant-foreground" | ":font" => Value::symbol("unspecified"),
+        _ => Value::symbol("unspecified"),
+    }
+}
+
+fn lisp_face_attribute_value(face: &str, attr: &str) -> Value {
+    if face == "default" {
+        return default_face_attribute_value(attr);
+    }
+
+    match (face, attr) {
+        ("bold", ":weight") => Value::symbol("bold"),
+        ("italic", ":slant") => Value::symbol("italic"),
+        ("underline", ":underline") => Value::True,
+        _ => Value::symbol("unspecified"),
+    }
+}
+
+/// `(internal-lisp-face-p FACE &optional FRAME)` -- return a face descriptor
+/// vector for known faces, nil otherwise.
 pub(crate) fn builtin_internal_lisp_face_p(args: Vec<Value>) -> EvalResult {
     expect_min_args("internal-lisp-face-p", &args, 1)?;
     expect_max_args("internal-lisp-face-p", &args, 2)?;
-    // Accept any symbol as a face name (Emacs packages define many faces).
-    Ok(Value::bool(args[0].is_symbol()))
+    if let Some(frame) = args.get(1) {
+        if !frame.is_nil() {
+            return Err(signal(
+                "wrong-type-argument",
+                vec![Value::symbol("frame-live-p"), frame.clone()],
+            ));
+        }
+    }
+    if known_face_name(&args[0]).is_some() {
+        Ok(make_lisp_face_vector())
+    } else {
+        Ok(Value::Nil)
+    }
 }
 
 /// `(internal-copy-lisp-face FROM TO FRAME NEW-FRAME)` -- stub, return TO.
@@ -312,12 +421,65 @@ pub(crate) fn builtin_internal_set_lisp_face_attribute(args: Vec<Value>) -> Eval
     Ok(args[2].clone())
 }
 
-/// `(internal-get-lisp-face-attribute FACE ATTR &optional FRAME)` -- stub,
-/// return nil.
+/// `(internal-get-lisp-face-attribute FACE ATTR &optional FRAME)` -- batch
+/// semantics-compatible face attribute query for core predefined faces.
 pub(crate) fn builtin_internal_get_lisp_face_attribute(args: Vec<Value>) -> EvalResult {
     expect_min_args("internal-get-lisp-face-attribute", &args, 2)?;
     expect_max_args("internal-get-lisp-face-attribute", &args, 3)?;
-    Ok(Value::Nil)
+    let defaults_frame = if let Some(frame) = args.get(2) {
+        if frame.is_nil() {
+            false
+        } else if matches!(frame, Value::True) {
+            true
+        } else {
+            return Err(signal(
+                "wrong-type-argument",
+                vec![Value::symbol("frame-live-p"), frame.clone()],
+            ));
+        }
+    } else {
+        false
+    };
+
+    let face_name = match &args[0] {
+        Value::Nil => {
+            return Err(signal("error", vec![Value::string("Invalid face")]));
+        }
+        Value::Symbol(name) => {
+            if KNOWN_FACES.contains(&name.as_str()) {
+                name.as_str()
+            } else {
+                return Err(signal(
+                    "error",
+                    vec![Value::string("Invalid face"), args[0].clone()],
+                ));
+            }
+        }
+        Value::Str(name) => {
+            if KNOWN_FACES.contains(&name.as_str()) {
+                return Err(signal(
+                    "wrong-type-argument",
+                    vec![Value::symbol("symbolp"), args[0].clone()],
+                ));
+            }
+            return Err(signal(
+                "error",
+                vec![Value::string("Invalid face"), Value::symbol(name.as_str())],
+            ));
+        }
+        _ => {
+            return Err(signal(
+                "error",
+                vec![Value::string("Invalid face"), args[0].clone()],
+            ));
+        }
+    };
+
+    let attr_name = normalize_face_attribute_name(&args[1])?;
+    if defaults_frame {
+        return Ok(Value::symbol("unspecified"));
+    }
+    Ok(lisp_face_attribute_value(face_name, &attr_name))
 }
 
 /// `(internal-merge-in-global-face FACE FRAME)` -- stub, return nil.
@@ -702,9 +864,14 @@ mod tests {
     // -----------------------------------------------------------------------
 
     #[test]
-    fn internal_lisp_face_p_symbol() {
+    fn internal_lisp_face_p_symbol_returns_face_vector() {
         let result = builtin_internal_lisp_face_p(vec![Value::symbol("default")]).unwrap();
-        assert!(result.is_truthy());
+        let values = match result {
+            Value::Vector(v) => v.lock().expect("poisoned").clone(),
+            _ => panic!("expected vector"),
+        };
+        assert_eq!(values.len(), LISP_FACE_VECTOR_LEN);
+        assert_eq!(values[0].as_symbol_name(), Some("face"));
     }
 
     #[test]
@@ -714,10 +881,15 @@ mod tests {
     }
 
     #[test]
-    fn internal_lisp_face_p_nil_is_symbol() {
-        // nil is a symbol in Emacs.
+    fn internal_lisp_face_p_nil_returns_nil() {
         let result = builtin_internal_lisp_face_p(vec![Value::Nil]).unwrap();
-        assert!(result.is_truthy());
+        assert!(result.is_nil());
+    }
+
+    #[test]
+    fn internal_lisp_face_p_rejects_non_nil_frame_designator() {
+        let result = builtin_internal_lisp_face_p(vec![Value::symbol("default"), Value::Int(1)]);
+        assert!(result.is_err());
     }
 
     #[test]
@@ -744,13 +916,56 @@ mod tests {
     }
 
     #[test]
-    fn internal_get_lisp_face_attribute_returns_nil() {
+    fn internal_get_lisp_face_attribute_default_foreground() {
         let result = builtin_internal_get_lisp_face_attribute(vec![
             Value::symbol("default"),
-            Value::Keyword("foreground".to_string()),
+            Value::Keyword(":foreground".to_string()),
         ])
         .unwrap();
-        assert!(result.is_nil());
+        assert_eq!(result.as_str(), Some("unspecified-fg"));
+    }
+
+    #[test]
+    fn internal_get_lisp_face_attribute_mode_line_returns_unspecified() {
+        let result = builtin_internal_get_lisp_face_attribute(vec![
+            Value::symbol("mode-line"),
+            Value::Keyword(":foreground".to_string()),
+        ])
+        .unwrap();
+        assert_eq!(result.as_symbol_name(), Some("unspecified"));
+    }
+
+    #[test]
+    fn internal_get_lisp_face_attribute_defaults_frame_returns_unspecified() {
+        let result = builtin_internal_get_lisp_face_attribute(vec![
+            Value::symbol("default"),
+            Value::Keyword(":foreground".to_string()),
+            Value::True,
+        ])
+        .unwrap();
+        assert_eq!(result.as_symbol_name(), Some("unspecified"));
+    }
+
+    #[test]
+    fn internal_get_lisp_face_attribute_invalid_face_errors() {
+        let result = builtin_internal_get_lisp_face_attribute(vec![
+            Value::symbol("unknown-face"),
+            Value::Keyword(":foreground".to_string()),
+        ]);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn internal_get_lisp_face_attribute_invalid_attr_errors() {
+        let wrong_type =
+            builtin_internal_get_lisp_face_attribute(vec![Value::symbol("default"), Value::Int(1)]);
+        assert!(wrong_type.is_err());
+
+        let invalid_name = builtin_internal_get_lisp_face_attribute(vec![
+            Value::symbol("default"),
+            Value::symbol("bogus"),
+        ]);
+        assert!(invalid_name.is_err());
     }
 
     #[test]
