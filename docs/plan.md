@@ -4,6 +4,18 @@ Last updated: 2026-02-15
 
 ## Done
 
+- Added display/terminal stub compatibility slice:
+  - exposed and wired display-side builtins: `redraw-frame`, `redraw-display`, `open-termscript`, `ding`, `send-string-to-terminal`, `internal-show-cursor`, `internal-show-cursor-p`
+  - exposed `last-nonminibuffer-frame` and locked current batch behavior to oracle
+  - added oracle corpus:
+    - `test/neovm/vm-compat/cases/display-stub-semantics.forms`
+    - `test/neovm/vm-compat/cases/display-stub-semantics.expected.tsv`
+    - enabled in `test/neovm/vm-compat/cases/default.list`
+  - verified:
+    - `make -C test/neovm/vm-compat record FORMS=cases/display-stub-semantics.forms EXPECTED=cases/display-stub-semantics.expected.tsv` (pass)
+    - `make -C test/neovm/vm-compat check-neovm FORMS=cases/display-stub-semantics.forms EXPECTED=cases/display-stub-semantics.expected.tsv` (pass)
+    - `make -C test/neovm/vm-compat validate-case-lists` (pass)
+    - `make -C test/neovm/vm-compat check-all-neovm` (pass)
 - Added timer compatibility slice (`run-at-time` / `run-with-idle-timer` / `timer-activate`):
   - `run-at-time` now accepts GNU-compatible immediate specs for `nil` and numeric-prefixed strings like `"0 sec"` (while invalid specs signal `error`)
   - `run-with-timer` compatibility is now lock-in covered for numeric, `nil`, and `"0 sec"` immediate forms
