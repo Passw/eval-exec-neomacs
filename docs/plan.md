@@ -4,6 +4,27 @@ Last updated: 2026-02-15
 
 ## Done
 
+- Implemented `make-nearby-temp-file` compatibility slice:
+  - added pure + evaluator-aware builtins in `rust/neovm-core/src/elisp/fileio.rs`:
+    - `builtin_make_nearby_temp_file`
+    - `builtin_make_nearby_temp_file_eval`
+  - semantics aligned with oracle subset:
+    - arity `1..3`
+    - `PREFIX`/`SUFFIX` type validation payloads (`sequencep` vs `stringp`) aligned with `make-temp-file`
+    - plain prefixes allocate under `temporary-file-directory` fallback
+    - directory-containing prefixes allocate nearby using basename-only temp prefixing
+    - evaluator path resolves relative directory-containing prefixes against dynamic/default `default-directory`
+  - registered and dispatched `make-nearby-temp-file` in:
+    - `rust/neovm-core/src/elisp/builtins.rs`
+    - `rust/neovm-core/src/elisp/builtin_registry.rs`
+  - added and enabled oracle corpus:
+    - `test/neovm/vm-compat/cases/make-nearby-temp-file-semantics.forms`
+    - `test/neovm/vm-compat/cases/make-nearby-temp-file-semantics.expected.tsv`
+    - wired into `test/neovm/vm-compat/cases/default.list`
+  - verified:
+    - `cargo test --manifest-path rust/neovm-core/Cargo.toml make_nearby_temp_file -- --nocapture` (pass)
+    - `make -C test/neovm/vm-compat check-neovm FORMS=cases/make-nearby-temp-file-semantics.forms EXPECTED=cases/make-nearby-temp-file-semantics.expected.tsv` (pass)
+    - `make -C test/neovm/vm-compat validate-case-lists` (pass)
 - Implemented `delete-file` optional `TRASH` compatibility slice:
   - extended `delete-file` arity in `rust/neovm-core/src/elisp/fileio.rs` from exact 1 to `1..2` for both pure and evaluator-aware paths
   - preserved strict `stringp` validation for `FILENAME`

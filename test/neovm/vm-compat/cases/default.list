@@ -66,6 +66,7 @@ cases/specpdl-dynamic-unwind-semantics
 cases/get-file-buffer-semantics
 cases/file-truename-semantics
 cases/make-temp-file-semantics
+cases/make-nearby-temp-file-semantics
 cases/delete-directory-semantics
 cases/delete-file-trash-semantics
 cases/make-symbolic-link-semantics

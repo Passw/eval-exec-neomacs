@@ -461,6 +461,7 @@ const DISPATCH_BUILTIN_NAMES: &[&str] = &[
     "make-local-variable",
     "make-marker",
     "make-mutex",
+    "make-nearby-temp-file",
     "make-overlay",
     "make-sparse-keymap",
     "make-symbol",
@@ -869,7 +870,9 @@ mod tests {
         assert!(is_dispatch_builtin_name("read-char-exclusive"));
         assert!(is_dispatch_builtin_name("minibuffer-prompt"));
         assert!(is_dispatch_builtin_name("minibuffer-contents"));
-        assert!(is_dispatch_builtin_name("minibuffer-contents-no-properties"));
+        assert!(is_dispatch_builtin_name(
+            "minibuffer-contents-no-properties"
+        ));
         assert!(is_dispatch_builtin_name("sleep-for"));
         assert!(is_dispatch_builtin_name("redraw-frame"));
         assert!(is_dispatch_builtin_name("last-nonminibuffer-frame"));

@@ -765,14 +765,23 @@ fn make_temp_file_impl(
                         let mut file = fs::OpenOptions::new()
                             .write(true)
                             .open(&candidate)
-                            .map_err(|err| signal_file_io_path(err, "Writing to", &candidate_str))?;
-                        file.write_all(contents.as_bytes())
-                            .map_err(|err| signal_file_io_path(err, "Writing to", &candidate_str))?;
+                            .map_err(|err| {
+                                signal_file_io_path(err, "Writing to", &candidate_str)
+                            })?;
+                        file.write_all(contents.as_bytes()).map_err(|err| {
+                            signal_file_io_path(err, "Writing to", &candidate_str)
+                        })?;
                     }
                     return Ok(candidate_str);
                 }
                 Err(err) if err.kind() == ErrorKind::AlreadyExists => continue,
-                Err(err) => return Err(signal_file_io_path(err, "Creating directory", &candidate_str)),
+                Err(err) => {
+                    return Err(signal_file_io_path(
+                        err,
+                        "Creating directory",
+                        &candidate_str,
+                    ))
+                }
             }
         } else {
             match fs::OpenOptions::new()
@@ -782,8 +791,9 @@ fn make_temp_file_impl(
             {
                 Ok(mut file) => {
                     if let Some(contents) = text {
-                        file.write_all(contents.as_bytes())
-                            .map_err(|err| signal_file_io_path(err, "Writing to", &candidate_str))?;
+                        file.write_all(contents.as_bytes()).map_err(|err| {
+                            signal_file_io_path(err, "Writing to", &candidate_str)
+                        })?;
                     }
                     return Ok(candidate_str);
                 }
@@ -797,6 +807,22 @@ fn make_temp_file_impl(
         "file-error",
         vec![Value::string("Cannot create temporary file")],
     ))
+}
+
+fn split_nearby_temp_prefix(prefix: &str) -> Option<(String, String)> {
+    let path = Path::new(prefix);
+    if !path.is_absolute() {
+        return None;
+    }
+    let file_name = path.file_name()?.to_string_lossy().into_owned();
+    if file_name.is_empty() {
+        return None;
+    }
+    let parent = path.parent()?;
+    if parent.as_os_str().is_empty() || parent == Path::new(".") {
+        return None;
+    }
+    Some((parent.to_string_lossy().into_owned(), file_name))
 }
 
 /// (expand-file-name NAME &optional DEFAULT-DIRECTORY) -> string
@@ -865,7 +891,10 @@ pub(crate) fn builtin_make_temp_file(args: Vec<Value>) -> EvalResult {
     if args.len() > 4 {
         return Err(signal(
             "wrong-number-of-arguments",
-            vec![Value::symbol("make-temp-file"), Value::Int(args.len() as i64)],
+            vec![
+                Value::symbol("make-temp-file"),
+                Value::Int(args.len() as i64),
+            ],
         ));
     }
 
@@ -893,7 +922,10 @@ pub(crate) fn builtin_make_temp_file_eval(eval: &Evaluator, args: Vec<Value>) ->
     if args.len() > 4 {
         return Err(signal(
             "wrong-number-of-arguments",
-            vec![Value::symbol("make-temp-file"), Value::Int(args.len() as i64)],
+            vec![
+                Value::symbol("make-temp-file"),
+                Value::Int(args.len() as i64),
+            ],
         ));
     }
 
@@ -915,13 +947,73 @@ pub(crate) fn builtin_make_temp_file_eval(eval: &Evaluator, args: Vec<Value>) ->
     Ok(Value::string(path))
 }
 
+/// (make-nearby-temp-file PREFIX &optional DIR-FLAG SUFFIX) -> string
+pub(crate) fn builtin_make_nearby_temp_file(args: Vec<Value>) -> EvalResult {
+    expect_min_args("make-nearby-temp-file", &args, 1)?;
+    if args.len() > 3 {
+        return Err(signal(
+            "wrong-number-of-arguments",
+            vec![
+                Value::symbol("make-nearby-temp-file"),
+                Value::Int(args.len() as i64),
+            ],
+        ));
+    }
+
+    let prefix = expect_temp_prefix(&args[0])?;
+    let dir_flag = args.get(1).is_some_and(|value| value.is_truthy());
+    let suffix = match args.get(2) {
+        None | Some(Value::Nil) => String::new(),
+        Some(value) => expect_string_strict(value)?,
+    };
+    let fallback_temp_dir = std::env::temp_dir().to_string_lossy().into_owned();
+    let (temp_dir, file_prefix) =
+        split_nearby_temp_prefix(&prefix).unwrap_or_else(|| (fallback_temp_dir, prefix.clone()));
+
+    let path = make_temp_file_impl(&temp_dir, &file_prefix, dir_flag, &suffix, None)?;
+    Ok(Value::string(path))
+}
+
+/// Evaluator-aware variant of `make-nearby-temp-file` that resolves relative
+/// directory-containing prefixes against dynamic/default `default-directory`
+/// and honors dynamic `temporary-file-directory` fallback.
+pub(crate) fn builtin_make_nearby_temp_file_eval(eval: &Evaluator, args: Vec<Value>) -> EvalResult {
+    expect_min_args("make-nearby-temp-file", &args, 1)?;
+    if args.len() > 3 {
+        return Err(signal(
+            "wrong-number-of-arguments",
+            vec![
+                Value::symbol("make-nearby-temp-file"),
+                Value::Int(args.len() as i64),
+            ],
+        ));
+    }
+
+    let prefix = expect_temp_prefix(&args[0])?;
+    let dir_flag = args.get(1).is_some_and(|value| value.is_truthy());
+    let suffix = match args.get(2) {
+        None | Some(Value::Nil) => String::new(),
+        Some(value) => expect_string_strict(value)?,
+    };
+    let fallback_temp_dir = temporary_file_directory_for_eval(eval)
+        .unwrap_or_else(|| std::env::temp_dir().to_string_lossy().into_owned());
+    let (temp_dir, file_prefix) =
+        split_nearby_temp_prefix(&prefix).unwrap_or_else(|| (fallback_temp_dir, prefix.clone()));
+
+    let path = make_temp_file_impl(&temp_dir, &file_prefix, dir_flag, &suffix, None)?;
+    Ok(Value::string(path))
+}
+
 /// (file-truename FILENAME &optional COUNTER PREV-DIRS) -> string
 pub(crate) fn builtin_file_truename(args: Vec<Value>) -> EvalResult {
     expect_min_args("file-truename", &args, 1)?;
     if args.len() > 3 {
         return Err(signal(
             "wrong-number-of-arguments",
-            vec![Value::symbol("file-truename"), Value::Int(args.len() as i64)],
+            vec![
+                Value::symbol("file-truename"),
+                Value::Int(args.len() as i64),
+            ],
         ));
     }
 
@@ -940,7 +1032,10 @@ pub(crate) fn builtin_file_truename_eval(eval: &Evaluator, args: Vec<Value>) -> 
     if args.len() > 3 {
         return Err(signal(
             "wrong-number-of-arguments",
-            vec![Value::symbol("file-truename"), Value::Int(args.len() as i64)],
+            vec![
+                Value::symbol("file-truename"),
+                Value::Int(args.len() as i64),
+            ],
         ));
     }
 
@@ -1254,7 +1349,10 @@ pub(crate) fn builtin_delete_directory(args: Vec<Value>) -> EvalResult {
     if args.len() > 3 {
         return Err(signal(
             "wrong-number-of-arguments",
-            vec![Value::symbol("delete-directory"), Value::Int(args.len() as i64)],
+            vec![
+                Value::symbol("delete-directory"),
+                Value::Int(args.len() as i64),
+            ],
         ));
     }
     let directory = expect_string_strict(&args[0])?;
@@ -1275,7 +1373,10 @@ pub(crate) fn builtin_delete_directory_eval(eval: &Evaluator, args: Vec<Value>) 
     if args.len() > 3 {
         return Err(signal(
             "wrong-number-of-arguments",
-            vec![Value::symbol("delete-directory"), Value::Int(args.len() as i64)],
+            vec![
+                Value::symbol("delete-directory"),
+                Value::Int(args.len() as i64),
+            ],
         ));
     }
     let directory = expect_string_strict(&args[0])?;
@@ -1324,7 +1425,9 @@ pub(crate) fn builtin_make_symbolic_link(args: Vec<Value>) -> EvalResult {
         let _ = (target, linkname, ok_if_exists);
         Err(signal(
             "file-error",
-            vec![Value::string("Symbolic links are unsupported on this platform")],
+            vec![Value::string(
+                "Symbolic links are unsupported on this platform",
+            )],
         ))
     }
 }
@@ -1364,7 +1467,9 @@ pub(crate) fn builtin_make_symbolic_link_eval(eval: &Evaluator, args: Vec<Value>
         let _ = (target, linkname, ok_if_exists);
         Err(signal(
             "file-error",
-            vec![Value::string("Symbolic links are unsupported on this platform")],
+            vec![Value::string(
+                "Symbolic links are unsupported on this platform",
+            )],
         ))
     }
 }
@@ -2009,7 +2114,10 @@ mod tests {
     #[test]
     fn test_file_error_symbol_mapping() {
         assert_eq!(file_error_symbol(ErrorKind::NotFound), "file-missing");
-        assert_eq!(file_error_symbol(ErrorKind::AlreadyExists), "file-already-exists");
+        assert_eq!(
+            file_error_symbol(ErrorKind::AlreadyExists),
+            "file-already-exists"
+        );
         assert_eq!(
             file_error_symbol(ErrorKind::PermissionDenied),
             "permission-denied"
@@ -2055,12 +2163,8 @@ mod tests {
         assert_eq!(result, Value::Nil);
         assert!(!path.exists());
 
-        let err = builtin_delete_file(vec![
-            Value::string(&path_str),
-            Value::Nil,
-            Value::Nil,
-        ])
-        .unwrap_err();
+        let err = builtin_delete_file(vec![Value::string(&path_str), Value::Nil, Value::Nil])
+            .unwrap_err();
         match err {
             Flow::Signal(sig) => {
                 assert_eq!(sig.symbol, "wrong-number-of-arguments");
@@ -2349,7 +2453,8 @@ mod tests {
 
     #[test]
     fn test_builtin_file_truename_counter_validation() {
-        let value = builtin_file_truename(vec![Value::string("/tmp"), Value::list(vec![])]).unwrap();
+        let value =
+            builtin_file_truename(vec![Value::string("/tmp"), Value::list(vec![])]).unwrap();
         assert_eq!(value.as_str(), Some("/tmp"));
 
         let err = builtin_file_truename(vec![Value::string("/tmp"), Value::Int(1)]).unwrap_err();
@@ -2371,7 +2476,10 @@ mod tests {
                 assert_eq!(sig.symbol, "wrong-type-argument");
                 assert_eq!(
                     sig.data,
-                    vec![Value::symbol("number-or-marker-p"), Value::symbol("visited")]
+                    vec![
+                        Value::symbol("number-or-marker-p"),
+                        Value::symbol("visited")
+                    ]
                 );
             }
             other => panic!("expected signal, got {:?}", other),
@@ -2381,8 +2489,10 @@ mod tests {
     #[test]
     fn test_builtin_file_truename_eval_uses_default_directory() {
         let mut eval = Evaluator::new();
-        eval.obarray
-            .set_symbol_value("default-directory", Value::string("/tmp/neovm-file-truename/"));
+        eval.obarray.set_symbol_value(
+            "default-directory",
+            Value::string("/tmp/neovm-file-truename/"),
+        );
 
         let value = builtin_file_truename_eval(&eval, vec![Value::string("alpha.txt")]).unwrap();
         assert_eq!(value.as_str(), Some("/tmp/neovm-file-truename/alpha.txt"));
@@ -2395,7 +2505,8 @@ mod tests {
         assert!(file_exists_p(&file_path));
         delete_file(&file_path).unwrap();
 
-        let dir = builtin_make_temp_file(vec![Value::string("neovm-mtf-dir-"), Value::True]).unwrap();
+        let dir =
+            builtin_make_temp_file(vec![Value::string("neovm-mtf-dir-"), Value::True]).unwrap();
         let dir_path = dir.as_str().unwrap().to_string();
         assert!(file_directory_p(&dir_path));
         fs::remove_dir(&dir_path).unwrap();
@@ -2423,7 +2534,8 @@ mod tests {
             other => panic!("expected signal, got {:?}", other),
         }
 
-        let err = builtin_make_temp_file(vec![Value::string("neo"), Value::Nil, Value::Int(1)]).unwrap_err();
+        let err = builtin_make_temp_file(vec![Value::string("neo"), Value::Nil, Value::Int(1)])
+            .unwrap_err();
         match err {
             Flow::Signal(sig) => {
                 assert_eq!(sig.symbol, "wrong-type-argument");
@@ -2449,6 +2561,56 @@ mod tests {
         assert!(file_exists_p(&path));
         delete_file(&path).unwrap();
         let _ = fs::remove_dir(&dir);
+    }
+
+    #[test]
+    fn test_builtin_make_nearby_temp_file_core_semantics() {
+        let path = builtin_make_nearby_temp_file(vec![Value::string("neovm-nearby-")]).unwrap();
+        let path_str = path.as_str().unwrap().to_string();
+        assert!(file_exists_p(&path_str));
+        delete_file(&path_str).unwrap();
+
+        let dir =
+            builtin_make_nearby_temp_file(vec![Value::string("neovm-nearby-dir-"), Value::True])
+                .unwrap();
+        let dir_str = dir.as_str().unwrap().to_string();
+        assert!(file_directory_p(&dir_str));
+        fs::remove_dir(&dir_str).unwrap();
+
+        let base = std::env::temp_dir().join("neovm-nearby-parent");
+        let _ = fs::remove_dir_all(&base);
+        fs::create_dir_all(&base).unwrap();
+        let prefix = base.join("child-").to_string_lossy().to_string();
+        let nearby = builtin_make_nearby_temp_file(vec![Value::string(&prefix)]).unwrap();
+        let nearby_str = nearby.as_str().unwrap().to_string();
+        assert_eq!(
+            file_name_directory(&nearby_str),
+            file_name_directory(&prefix),
+        );
+        assert!(file_exists_p(&nearby_str));
+        delete_file(&nearby_str).unwrap();
+        fs::remove_dir_all(&base).unwrap();
+    }
+
+    #[test]
+    fn test_builtin_make_nearby_temp_file_eval_relative_prefix_uses_temp_dir() {
+        let base = std::env::temp_dir().join("neovm-nearby-eval");
+        let sub = base.join("sub");
+        let _ = fs::remove_dir_all(&base);
+        fs::create_dir_all(&sub).unwrap();
+        let mut eval = Evaluator::new();
+        eval.obarray.set_symbol_value(
+            "default-directory",
+            Value::string(format!("{}/", base.to_string_lossy())),
+        );
+
+        let err = builtin_make_nearby_temp_file_eval(&eval, vec![Value::string("sub/child-")])
+            .unwrap_err();
+        match err {
+            Flow::Signal(sig) => assert_eq!(sig.symbol, "file-missing"),
+            other => panic!("expected signal, got {:?}", other),
+        }
+        let _ = fs::remove_dir_all(base);
     }
 
     #[test]

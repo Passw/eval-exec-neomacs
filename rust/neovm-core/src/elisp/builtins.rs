@@ -1139,7 +1139,11 @@ pub(crate) fn builtin_substring(args: Vec<Value>) -> EvalResult {
         if idx < 0 || idx > len {
             return Err(signal(
                 "args-out-of-range",
-                vec![args[0].clone(), args[1].clone(), args.get(2).cloned().unwrap_or(Value::Nil)],
+                vec![
+                    args[0].clone(),
+                    args[1].clone(),
+                    args.get(2).cloned().unwrap_or(Value::Nil),
+                ],
             ));
         }
         Ok(idx)
@@ -1289,10 +1293,9 @@ pub(crate) fn builtin_string_to_number(args: Vec<Value>) -> EvalResult {
 
     let s = s.trim_start();
     if base == 10 {
-        let number_prefix = regex::Regex::new(
-            r"^[+-]?(?:[0-9]+(?:\.[0-9]*)?|\.[0-9]+)(?:[eE][+-]?[0-9]+)?",
-        )
-        .expect("number prefix regexp should compile");
+        let number_prefix =
+            regex::Regex::new(r"^[+-]?(?:[0-9]+(?:\.[0-9]*)?|\.[0-9]+)(?:[eE][+-]?[0-9]+)?")
+                .expect("number prefix regexp should compile");
         if let Some(m) = number_prefix.find(s) {
             let token = m.as_str();
             let is_float = token.contains('.') || token.contains('e') || token.contains('E');
@@ -1640,10 +1643,7 @@ pub(crate) fn builtin_vconcat(args: Vec<Value>) -> EvalResult {
 // ===========================================================================
 
 fn invalid_hash_table_argument_list(arg: Value) -> Flow {
-    signal(
-        "error",
-        vec![Value::string("Invalid argument list"), arg],
-    )
+    signal("error", vec![Value::string("Invalid argument list"), arg])
 }
 
 pub(crate) fn builtin_make_hash_table(args: Vec<Value>) -> EvalResult {
@@ -1697,10 +1697,7 @@ pub(crate) fn builtin_make_hash_table(args: Vec<Value>) -> EvalResult {
                             _ => {
                                 return Err(signal(
                                     "error",
-                                    vec![
-                                        Value::string("Invalid hash table test"),
-                                        value.clone(),
-                                    ],
+                                    vec![Value::string("Invalid hash table test"), value.clone()],
                                 ));
                             }
                         };
@@ -1771,7 +1768,8 @@ pub(crate) fn builtin_make_hash_table(args: Vec<Value>) -> EvalResult {
                 // treat this option as value-less and continue parsing.
                 if i + 1 >= args.len() {
                     i += 1;
-                } else if matches!(&args[i + 1], Value::Keyword(next) if is_known_hash_table_option(next)) {
+                } else if matches!(&args[i + 1], Value::Keyword(next) if is_known_hash_table_option(next))
+                {
                     i += 1;
                 } else {
                     i += 2;
@@ -1957,7 +1955,10 @@ pub(crate) fn builtin_char_to_string(args: Vec<Value>) -> EvalResult {
 pub(crate) fn builtin_string_to_char(args: Vec<Value>) -> EvalResult {
     expect_args("string-to-char", &args, 1)?;
     let s = expect_string(&args[0])?;
-    let first = decode_storage_char_codes(&s).into_iter().next().unwrap_or(0);
+    let first = decode_storage_char_codes(&s)
+        .into_iter()
+        .next()
+        .unwrap_or(0);
     Ok(Value::Int(first as i64))
 }
 
@@ -3187,7 +3188,10 @@ pub(crate) fn builtin_split_string(args: Vec<Value>) -> EvalResult {
             let compiled = regex::Regex::new(&pattern).map_err(|e| {
                 signal(
                     "invalid-regexp",
-                    vec![Value::string(format!("Invalid regexp \"{}\": {}", pattern, e))],
+                    vec![Value::string(format!(
+                        "Invalid regexp \"{}\": {}",
+                        pattern, e
+                    ))],
                 )
             })?;
             (compiled, false)
@@ -3202,7 +3206,10 @@ pub(crate) fn builtin_split_string(args: Vec<Value>) -> EvalResult {
         Some(pattern) => Some(regex::Regex::new(&pattern).map_err(|e| {
             signal(
                 "invalid-regexp",
-                vec![Value::string(format!("Invalid regexp \"{}\": {}", pattern, e))],
+                vec![Value::string(format!(
+                    "Invalid regexp \"{}\": {}",
+                    pattern, e
+                ))],
             )
         })?),
         None => None,
@@ -3214,7 +3221,9 @@ pub(crate) fn builtin_split_string(args: Vec<Value>) -> EvalResult {
         let mut segment = part.to_string();
         if let Some(trim_re) = trimmer.as_ref() {
             loop {
-                let Some(m) = trim_re.find(&segment) else { break };
+                let Some(m) = trim_re.find(&segment) else {
+                    break;
+                };
                 if m.start() == 0 && m.end() > 0 {
                     segment = segment[m.end()..].to_string();
                 } else {
@@ -3350,7 +3359,9 @@ pub(crate) fn builtin_make_string(args: Vec<Value>) -> EvalResult {
                     // Emacs accepts broader internal character codes. When these
                     // cannot be represented as Unicode scalar values in Rust, emit
                     // replacement characters to keep observable oracle parity.
-                    return Ok(Value::string("\u{FFFD}\u{FFFD}\u{FFFD}\u{FFFD}".repeat(count)));
+                    return Ok(Value::string(
+                        "\u{FFFD}\u{FFFD}\u{FFFD}\u{FFFD}".repeat(count),
+                    ));
                 }
             }
         }
@@ -3476,9 +3487,7 @@ pub(crate) fn builtin_last(args: Vec<Value>) -> EvalResult {
                     Value::Cons(cell) => {
                         lead = cell.lock().expect("poisoned").cdr.clone();
                         lag = match lag {
-                            Value::Cons(lag_cell) => {
-                                lag_cell.lock().expect("poisoned").cdr.clone()
-                            }
+                            Value::Cons(lag_cell) => lag_cell.lock().expect("poisoned").cdr.clone(),
                             _ => unreachable!("lag should be a cons while lead is a cons"),
                         };
                     }
@@ -3563,7 +3572,10 @@ pub(crate) fn builtin_butlast(args: Vec<Value>) -> EvalResult {
         }
         NumberOrMarker::Float(v) => Err(signal(
             "wrong-type-argument",
-            vec![Value::symbol("integerp"), Value::Float(items.len() as f64 - v)],
+            vec![
+                Value::symbol("integerp"),
+                Value::Float(items.len() as f64 - v),
+            ],
         )),
     }
 }
@@ -3878,7 +3890,10 @@ fn write_print_output(
         }
         Value::Str(name) => {
             let Some(id) = eval.buffers.find_buffer_by_name(&name) else {
-                return Err(signal("error", vec![Value::string(format!("No buffer named {name}"))]));
+                return Err(signal(
+                    "error",
+                    vec![Value::string(format!("No buffer named {name}"))],
+                ));
             };
             let Some(buf) = eval.buffers.get_mut(id) else {
                 return Err(signal(
@@ -3932,7 +3947,11 @@ fn prin1_to_string_value(value: &Value, noescape: bool) -> String {
     }
 }
 
-fn prin1_to_string_value_eval(eval: &super::eval::Evaluator, value: &Value, noescape: bool) -> String {
+fn prin1_to_string_value_eval(
+    eval: &super::eval::Evaluator,
+    value: &Value,
+    noescape: bool,
+) -> String {
     if noescape {
         match value {
             Value::Str(s) => (**s).clone(),
@@ -4438,10 +4457,12 @@ pub(crate) fn builtin_buffer_enable_undo(
     } else {
         match &args[0] {
             Value::Buffer(id) => *id,
-            Value::Str(name) => eval
-                .buffers
-                .find_buffer_by_name(name)
-                .ok_or_else(|| signal("error", vec![Value::string(format!("No buffer named {name}"))]))?,
+            Value::Str(name) => eval.buffers.find_buffer_by_name(name).ok_or_else(|| {
+                signal(
+                    "error",
+                    vec![Value::string(format!("No buffer named {name}"))],
+                )
+            })?,
             other => {
                 return Err(signal(
                     "wrong-type-argument",
@@ -4482,10 +4503,12 @@ pub(crate) fn builtin_buffer_disable_undo(
     } else {
         match &args[0] {
             Value::Buffer(id) => *id,
-            Value::Str(name) => eval
-                .buffers
-                .find_buffer_by_name(name)
-                .ok_or_else(|| signal("error", vec![Value::string(format!("No buffer named {name}"))]))?,
+            Value::Str(name) => eval.buffers.find_buffer_by_name(name).ok_or_else(|| {
+                signal(
+                    "error",
+                    vec![Value::string(format!("No buffer named {name}"))],
+                )
+            })?,
             other => {
                 return Err(signal(
                     "wrong-type-argument",
@@ -4669,9 +4692,7 @@ pub(crate) fn builtin_char_before(
 }
 
 fn is_unibyte_storage_string(s: &str) -> bool {
-    !s.is_empty()
-        && s.chars()
-            .all(|ch| (0xE300..=0xE3FF).contains(&(ch as u32)))
+    !s.is_empty() && s.chars().all(|ch| (0xE300..=0xE3FF).contains(&(ch as u32)))
 }
 
 fn get_byte_from_multibyte_char_code(code: u32) -> EvalResult {
@@ -4738,7 +4759,11 @@ pub(crate) fn builtin_get_byte(eval: &mut super::eval::Evaluator, args: Vec<Valu
         if pos < point_min || pos >= point_max {
             return Err(signal(
                 "args-out-of-range",
-                vec![args[0].clone(), Value::Int(point_min), Value::Int(point_max)],
+                vec![
+                    args[0].clone(),
+                    Value::Int(point_min),
+                    Value::Int(point_max),
+                ],
             ));
         }
         buf.text.char_to_byte((pos - 1) as usize)
@@ -5564,14 +5589,18 @@ pub(crate) fn dispatch_builtin(
         "set-match-data" => return Some(builtin_set_match_data_eval(eval, args)),
         "replace-match" => return Some(builtin_replace_match(eval, args)),
         // File I/O (evaluator-dependent)
-        "expand-file-name" => return Some(super::fileio::builtin_expand_file_name_eval(eval, args)),
+        "expand-file-name" => {
+            return Some(super::fileio::builtin_expand_file_name_eval(eval, args))
+        }
         "file-truename" => return Some(super::fileio::builtin_file_truename_eval(eval, args)),
         "insert-file-contents" => {
             return Some(super::fileio::builtin_insert_file_contents(eval, args))
         }
         "write-region" => return Some(super::fileio::builtin_write_region(eval, args)),
         "delete-file" => return Some(super::fileio::builtin_delete_file_eval(eval, args)),
-        "delete-directory" => return Some(super::fileio::builtin_delete_directory_eval(eval, args)),
+        "delete-directory" => {
+            return Some(super::fileio::builtin_delete_directory_eval(eval, args))
+        }
         "rename-file" => return Some(super::fileio::builtin_rename_file_eval(eval, args)),
         "copy-file" => return Some(super::fileio::builtin_copy_file_eval(eval, args)),
         "make-symbolic-link" => {
@@ -5579,22 +5608,33 @@ pub(crate) fn dispatch_builtin(
         }
         "make-directory" => return Some(super::fileio::builtin_make_directory_eval(eval, args)),
         "make-temp-file" => return Some(super::fileio::builtin_make_temp_file_eval(eval, args)),
+        "make-nearby-temp-file" => {
+            return Some(super::fileio::builtin_make_nearby_temp_file_eval(
+                eval, args,
+            ))
+        }
         "find-file-noselect" => return Some(super::fileio::builtin_find_file_noselect(eval, args)),
         "directory-files" => return Some(super::fileio::builtin_directory_files_eval(eval, args)),
         "directory-files-and-attributes" => {
-            return Some(super::dired::builtin_directory_files_and_attributes_eval(eval, args))
+            return Some(super::dired::builtin_directory_files_and_attributes_eval(
+                eval, args,
+            ))
         }
         "file-name-completion" => {
             return Some(super::dired::builtin_file_name_completion_eval(eval, args))
         }
         "file-name-all-completions" => {
-            return Some(super::dired::builtin_file_name_all_completions_eval(eval, args))
+            return Some(super::dired::builtin_file_name_all_completions_eval(
+                eval, args,
+            ))
         }
         "file-attributes" => return Some(super::dired::builtin_file_attributes_eval(eval, args)),
         "file-exists-p" => return Some(super::fileio::builtin_file_exists_p_eval(eval, args)),
         "file-readable-p" => return Some(super::fileio::builtin_file_readable_p_eval(eval, args)),
         "file-writable-p" => return Some(super::fileio::builtin_file_writable_p_eval(eval, args)),
-        "file-directory-p" => return Some(super::fileio::builtin_file_directory_p_eval(eval, args)),
+        "file-directory-p" => {
+            return Some(super::fileio::builtin_file_directory_p_eval(eval, args))
+        }
         "file-regular-p" => return Some(super::fileio::builtin_file_regular_p_eval(eval, args)),
         "file-symlink-p" => return Some(super::fileio::builtin_file_symlink_p_eval(eval, args)),
         // Keymap operations
@@ -5881,7 +5921,9 @@ pub(crate) fn dispatch_builtin(
         }
         "open-line" => return Some(super::kill_ring::builtin_open_line(eval, args)),
         "delete-horizontal-space" => {
-            return Some(super::kill_ring::builtin_delete_horizontal_space(eval, args))
+            return Some(super::kill_ring::builtin_delete_horizontal_space(
+                eval, args,
+            ))
         }
         "just-one-space" => return Some(super::kill_ring::builtin_just_one_space(eval, args)),
         "delete-indentation" => {
@@ -5971,32 +6013,46 @@ pub(crate) fn dispatch_builtin(
         "frame-live-p" => return Some(super::window_cmds::builtin_frame_live_p(eval, args)),
         "windowp" => return Some(super::window_cmds::builtin_windowp(eval, args)),
         "framep" => return Some(super::window_cmds::builtin_framep(eval, args)),
-        "display-graphic-p" => return Some(super::display::builtin_display_graphic_p_eval(eval, args)),
-        "display-color-p" => return Some(super::display::builtin_display_color_p_eval(eval, args)),
-        "display-pixel-width" => return Some(super::display::builtin_display_pixel_width_eval(eval, args)),
-        "display-pixel-height" => {
-            return Some(super::display::builtin_display_pixel_height_eval(eval, args))
+        "display-graphic-p" => {
+            return Some(super::display::builtin_display_graphic_p_eval(eval, args))
         }
-        "display-mm-width" => return Some(super::display::builtin_display_mm_width_eval(eval, args)),
-        "display-mm-height" => return Some(super::display::builtin_display_mm_height_eval(eval, args)),
+        "display-color-p" => return Some(super::display::builtin_display_color_p_eval(eval, args)),
+        "display-pixel-width" => {
+            return Some(super::display::builtin_display_pixel_width_eval(eval, args))
+        }
+        "display-pixel-height" => {
+            return Some(super::display::builtin_display_pixel_height_eval(
+                eval, args,
+            ))
+        }
+        "display-mm-width" => {
+            return Some(super::display::builtin_display_mm_width_eval(eval, args))
+        }
+        "display-mm-height" => {
+            return Some(super::display::builtin_display_mm_height_eval(eval, args))
+        }
         "display-screens" => return Some(super::display::builtin_display_screens_eval(eval, args)),
         "display-color-cells" => {
             return Some(super::display::builtin_display_color_cells_eval(eval, args))
         }
         "display-planes" => return Some(super::display::builtin_display_planes_eval(eval, args)),
         "display-visual-class" => {
-            return Some(super::display::builtin_display_visual_class_eval(eval, args))
-        }
-        "display-backing-store" => {
-            return Some(super::display::builtin_display_backing_store_eval(eval, args))
-        }
-        "display-monitor-attributes-list" => {
-            return Some(super::display::builtin_display_monitor_attributes_list_eval(
+            return Some(super::display::builtin_display_visual_class_eval(
                 eval, args,
             ))
         }
+        "display-backing-store" => {
+            return Some(super::display::builtin_display_backing_store_eval(
+                eval, args,
+            ))
+        }
+        "display-monitor-attributes-list" => {
+            return Some(super::display::builtin_display_monitor_attributes_list_eval(eval, args))
+        }
         "frame-monitor-attributes" => {
-            return Some(super::display::builtin_frame_monitor_attributes_eval(eval, args))
+            return Some(super::display::builtin_frame_monitor_attributes_eval(
+                eval, args,
+            ))
         }
 
         // Interactive / command system (evaluator-dependent)
@@ -6013,15 +6069,23 @@ pub(crate) fn dispatch_builtin(
         "command-execute" => return Some(super::interactive::builtin_command_execute(eval, args)),
         "find-file" => return Some(super::interactive::builtin_find_file_command(eval, args)),
         "save-buffer" => return Some(super::interactive::builtin_save_buffer_command(eval, args)),
-        "set-mark-command" => return Some(super::interactive::builtin_set_mark_command(eval, args)),
+        "set-mark-command" => {
+            return Some(super::interactive::builtin_set_mark_command(eval, args))
+        }
         "eval-expression" => return Some(super::interactive::builtin_eval_expression(eval, args)),
         "self-insert-command" => {
             return Some(super::interactive::builtin_self_insert_command(eval, args))
         }
         "keyboard-quit" => return Some(super::interactive::builtin_keyboard_quit(eval, args)),
-        "quoted-insert" => return Some(super::interactive::builtin_quoted_insert_command(eval, args)),
+        "quoted-insert" => {
+            return Some(super::interactive::builtin_quoted_insert_command(
+                eval, args,
+            ))
+        }
         "universal-argument" => {
-            return Some(super::interactive::builtin_universal_argument_command(eval, args))
+            return Some(super::interactive::builtin_universal_argument_command(
+                eval, args,
+            ))
         }
         "execute-extended-command" => {
             return Some(super::interactive::builtin_execute_extended_command(
@@ -6119,7 +6183,9 @@ pub(crate) fn dispatch_builtin(
         "top-level" => return Some(super::minibuffer::builtin_top_level(args)),
         "recursive-edit" => return Some(super::minibuffer::builtin_recursive_edit(args)),
         "exit-recursive-edit" => return Some(super::minibuffer::builtin_exit_recursive_edit(args)),
-        "abort-recursive-edit" => return Some(super::minibuffer::builtin_abort_recursive_edit(args)),
+        "abort-recursive-edit" => {
+            return Some(super::minibuffer::builtin_abort_recursive_edit(args))
+        }
 
         // Threading (evaluator-dependent)
         "make-thread" => return Some(super::threads::builtin_make_thread(eval, args)),
@@ -6307,27 +6373,25 @@ pub(crate) fn dispatch_builtin(
 
         // Case/char (evaluator-dependent)
         "upcase-initials-region" => {
-            return Some(super::kill_ring::builtin_upcase_initials_region(
-                eval, args,
-            ))
+            return Some(super::kill_ring::builtin_upcase_initials_region(eval, args))
         }
 
         // Search (evaluator-dependent)
         "posix-search-forward" => {
             // Reuse regex search engine for now; this replaces nil-stub behavior.
-            return Some(builtin_re_search_forward(eval, args))
+            return Some(builtin_re_search_forward(eval, args));
         }
         "posix-search-backward" => {
             // Reuse regex search engine for now; this replaces nil-stub behavior.
-            return Some(builtin_re_search_backward(eval, args))
+            return Some(builtin_re_search_backward(eval, args));
         }
         "word-search-forward" => {
             // Literal fallback keeps search state/point semantics instead of stub nil.
-            return Some(builtin_search_forward(eval, args))
+            return Some(builtin_search_forward(eval, args));
         }
         "word-search-backward" => {
             // Literal fallback keeps search state/point semantics instead of stub nil.
-            return Some(builtin_search_backward(eval, args))
+            return Some(builtin_search_backward(eval, args));
         }
 
         // Lread (evaluator-dependent)
@@ -6477,6 +6541,7 @@ pub(crate) fn dispatch_builtin(
         "make-symbolic-link" => super::fileio::builtin_make_symbolic_link(args),
         "make-directory" => super::fileio::builtin_make_directory(args),
         "make-temp-file" => super::fileio::builtin_make_temp_file(args),
+        "make-nearby-temp-file" => super::fileio::builtin_make_nearby_temp_file(args),
         "directory-files" => super::fileio::builtin_directory_files(args),
         "file-attributes" => super::dired::builtin_file_attributes(args),
 
@@ -6870,7 +6935,6 @@ pub(crate) fn dispatch_builtin(
         "bool-vector-subsetp" => super::chartable::builtin_bool_vector_subsetp(args),
 
         // Note: windowp and framep are in the eval-dependent section above
-
         "seq-reverse" => super::cl_lib::builtin_seq_reverse(args),
         "seq-drop" => super::cl_lib::builtin_seq_drop(args),
         "seq-take" => super::cl_lib::builtin_seq_take(args),
@@ -7012,6 +7076,7 @@ pub(crate) fn dispatch_builtin_pure(name: &str, args: Vec<Value>) -> Option<Eval
         "make-symbolic-link" => super::fileio::builtin_make_symbolic_link(args),
         "make-directory" => super::fileio::builtin_make_directory(args),
         "make-temp-file" => super::fileio::builtin_make_temp_file(args),
+        "make-nearby-temp-file" => super::fileio::builtin_make_nearby_temp_file(args),
         "directory-files" => super::fileio::builtin_directory_files(args),
         "file-attributes" => super::dired::builtin_file_attributes(args),
         // Keymap (pure)
@@ -7632,7 +7697,10 @@ pub(crate) fn builtin_set_match_data_eval(
     if args.len() > 2 {
         return Err(signal(
             "wrong-number-of-arguments",
-            vec![Value::symbol("set-match-data"), Value::Int(args.len() as i64)],
+            vec![
+                Value::symbol("set-match-data"),
+                Value::Int(args.len() as i64),
+            ],
         ));
     }
 
@@ -7693,7 +7761,10 @@ pub(crate) fn builtin_replace_match(
     if args.len() > 6 {
         return Err(signal(
             "wrong-number-of-arguments",
-            vec![Value::symbol("replace-match"), Value::Int(args.len() as i64)],
+            vec![
+                Value::symbol("replace-match"),
+                Value::Int(args.len() as i64),
+            ],
         ));
     }
 
@@ -7928,10 +7999,7 @@ mod tests {
         match result {
             Flow::Signal(sig) => {
                 assert_eq!(sig.symbol, "wrong-number-of-arguments");
-                assert_eq!(
-                    sig.data,
-                    vec![Value::symbol("propertize"), Value::Int(2)]
-                );
+                assert_eq!(sig.data, vec![Value::symbol("propertize"), Value::Int(2)]);
             }
             other => panic!("unexpected flow: {other:?}"),
         }
@@ -7986,7 +8054,10 @@ mod tests {
         match out_of_range {
             Flow::Signal(sig) => {
                 assert_eq!(sig.symbol, "args-out-of-range");
-                assert_eq!(sig.data, vec![Value::Int(256), Value::Int(0), Value::Int(255)]);
+                assert_eq!(
+                    sig.data,
+                    vec![Value::Int(256), Value::Int(0), Value::Int(255)]
+                );
             }
             other => panic!("expected signal flow, got {other:?}"),
         }
@@ -7997,7 +8068,10 @@ mod tests {
         match wrong_type {
             Flow::Signal(sig) => {
                 assert_eq!(sig.symbol, "wrong-type-argument");
-                assert_eq!(sig.data, vec![Value::symbol("integerp"), Value::string("x")]);
+                assert_eq!(
+                    sig.data,
+                    vec![Value::symbol("integerp"), Value::string("x")]
+                );
             }
             other => panic!("expected signal flow, got {other:?}"),
         }
@@ -8331,9 +8405,13 @@ mod tests {
             .expect("current-thread should resolve")
             .expect("current-thread should evaluate");
 
-        let upper = dispatch_builtin(&mut eval, "format", vec![Value::string("%S"), thread.clone()])
-            .expect("format should resolve for %S")
-            .expect("format should evaluate for %S");
+        let upper = dispatch_builtin(
+            &mut eval,
+            "format",
+            vec![Value::string("%S"), thread.clone()],
+        )
+        .expect("format should resolve for %S")
+        .expect("format should evaluate for %S");
         assert!(upper.as_str().is_some_and(|s| s.starts_with("#<thread")));
 
         let lower = dispatch_builtin(&mut eval, "format", vec![Value::string("%s"), thread])
@@ -8461,9 +8539,11 @@ mod tests {
         let throw_symbol = builtin_functionp_eval(&mut eval, vec![Value::symbol("throw")])
             .expect("functionp should accept throw symbol");
         assert!(throw_symbol.is_truthy());
-        let macro_marker_cons =
-            builtin_functionp_eval(&mut eval, vec![Value::cons(Value::symbol("macro"), Value::True)])
-                .expect("functionp should reject dotted macro marker cons");
+        let macro_marker_cons = builtin_functionp_eval(
+            &mut eval,
+            vec![Value::cons(Value::symbol("macro"), Value::True)],
+        )
+        .expect("functionp should reject dotted macro marker cons");
         assert!(macro_marker_cons.is_nil());
         let macro_marker_list = builtin_functionp_eval(
             &mut eval,
@@ -8476,12 +8556,12 @@ mod tests {
             .expect("functionp should reject special-form subr objects");
         assert!(special_subr.is_nil());
 
-        let autoload_function_forms =
-            crate::elisp::parser::parse_forms(r#"(autoload 'vm-test-auto-fn "vm-test-file" nil t)"#)
-                .expect("autoload function form should parse");
+        let autoload_function_forms = crate::elisp::parser::parse_forms(
+            r#"(autoload 'vm-test-auto-fn "vm-test-file" nil t)"#,
+        )
+        .expect("autoload function form should parse");
         for form in &autoload_function_forms {
-            eval.eval(form)
-                .expect("autoload function should register");
+            eval.eval(form).expect("autoload function should register");
         }
         let autoload_function_symbol =
             builtin_functionp_eval(&mut eval, vec![Value::symbol("vm-test-auto-fn")])
@@ -8492,11 +8572,9 @@ mod tests {
             .symbol_function("vm-test-auto-fn")
             .expect("autoload function cell exists")
             .clone();
-        let autoload_function_cell = builtin_functionp_eval(
-            &mut eval,
-            vec![autoload_function_cell],
-        )
-        .expect("functionp should reject raw autoload function cell object");
+        let autoload_function_cell =
+            builtin_functionp_eval(&mut eval, vec![autoload_function_cell])
+                .expect("functionp should reject raw autoload function cell object");
         assert!(autoload_function_cell.is_nil());
 
         let autoload_macro_forms = crate::elisp::parser::parse_forms(
@@ -8527,8 +8605,8 @@ mod tests {
         builtin_fset(&mut eval, vec![keyword.clone(), Value::symbol("car")])
             .expect("fset should bind keyword function cell");
 
-        let t_result =
-            builtin_functionp_eval(&mut eval, vec![Value::True]).expect("functionp should accept t");
+        let t_result = builtin_functionp_eval(&mut eval, vec![Value::True])
+            .expect("functionp should accept t");
         assert!(t_result.is_truthy());
         let keyword_result = builtin_functionp_eval(&mut eval, vec![keyword.clone()])
             .expect("functionp should accept keyword designator");
@@ -8579,11 +8657,9 @@ mod tests {
             .expect("symbol-function should resolve declare as a macro");
         assert!(matches!(declare_macro, Value::Macro(_)));
 
-        let unresolved = builtin_symbol_function(
-            &mut eval,
-            vec![Value::symbol("definitely-not-a-function")],
-        )
-        .expect("symbol-function should return nil for unresolved symbols");
+        let unresolved =
+            builtin_symbol_function(&mut eval, vec![Value::symbol("definitely-not-a-function")])
+                .expect("symbol-function should return nil for unresolved symbols");
         assert!(unresolved.is_nil());
 
         let nil_symbol = builtin_symbol_function(&mut eval, vec![Value::symbol("nil")])
@@ -8681,11 +8757,9 @@ mod tests {
             other => panic!("expected cons arity pair, got {other:?}"),
         }
 
-        let missing_err = builtin_func_arity_eval(
-            &mut eval,
-            vec![Value::symbol("definitely-not-a-function")],
-        )
-        .expect_err("func-arity should signal void-function for unresolved symbols");
+        let missing_err =
+            builtin_func_arity_eval(&mut eval, vec![Value::symbol("definitely-not-a-function")])
+                .expect_err("func-arity should signal void-function for unresolved symbols");
         match missing_err {
             Flow::Signal(sig) => {
                 assert_eq!(sig.symbol, "void-function");
@@ -8783,11 +8857,9 @@ mod tests {
             .expect("indirect-function should resolve car");
         assert_eq!(typed, Value::Subr("car".to_string()));
 
-        let read_key_sequence_vector = builtin_indirect_function(
-            &mut eval,
-            vec![Value::symbol("read-key-sequence-vector")],
-        )
-        .expect("indirect-function should resolve read-key-sequence-vector");
+        let read_key_sequence_vector =
+            builtin_indirect_function(&mut eval, vec![Value::symbol("read-key-sequence-vector")])
+                .expect("indirect-function should resolve read-key-sequence-vector");
         assert_eq!(
             read_key_sequence_vector,
             Value::Subr("read-key-sequence-vector".to_string())
@@ -8894,11 +8966,9 @@ mod tests {
         .expect("indirect-function should return nil when noerror is non-nil");
         assert!(noerror.is_nil());
 
-        let unresolved = builtin_indirect_function(
-            &mut eval,
-            vec![Value::symbol("definitely-not-a-function")],
-        )
-        .expect("indirect-function should return nil for unresolved function");
+        let unresolved =
+            builtin_indirect_function(&mut eval, vec![Value::symbol("definitely-not-a-function")])
+                .expect("indirect-function should return nil for unresolved function");
         assert!(unresolved.is_nil());
 
         let nil_input = builtin_indirect_function(&mut eval, vec![Value::Nil])
@@ -9003,8 +9073,11 @@ mod tests {
     fn fset_rejects_keyword_and_t_alias_cycles() {
         let mut eval = crate::elisp::eval::Evaluator::new();
 
-        let first = builtin_fset(&mut eval, vec![Value::keyword(":vmk2"), Value::keyword(":vmk3")])
-            .expect("first keyword alias should be accepted");
+        let first = builtin_fset(
+            &mut eval,
+            vec![Value::keyword(":vmk2"), Value::keyword(":vmk3")],
+        )
+        .expect("first keyword alias should be accepted");
         assert_eq!(first, Value::keyword(":vmk3"));
 
         let keyword_cycle = builtin_fset(
@@ -9081,17 +9154,21 @@ mod tests {
         )
         .expect("write source");
 
-        let result = builtin_neovm_precompile_file(
-            &mut eval,
-            vec![Value::string(source.to_string_lossy())],
-        )
-        .expect("precompile builtin should succeed");
+        let result =
+            builtin_neovm_precompile_file(&mut eval, vec![Value::string(source.to_string_lossy())])
+                .expect("precompile builtin should succeed");
         let cache_path = result
             .as_str()
             .expect("result should be a string path")
             .to_string();
-        assert!(cache_path.ends_with(".neoc"), "cache path should end with .neoc");
-        assert!(std::path::Path::new(&cache_path).exists(), "cache file should exist");
+        assert!(
+            cache_path.ends_with(".neoc"),
+            "cache path should end with .neoc"
+        );
+        assert!(
+            std::path::Path::new(&cache_path).exists(),
+            "cache file should exist"
+        );
 
         let _ = fs::remove_dir_all(&dir);
     }
@@ -9196,7 +9273,10 @@ mod tests {
         );
 
         builtin_goto_char(&mut eval, vec![Value::Int(2)]).unwrap();
-        assert_eq!(builtin_get_byte(&mut eval, vec![Value::Nil]).unwrap(), Value::Int(98));
+        assert_eq!(
+            builtin_get_byte(&mut eval, vec![Value::Nil]).unwrap(),
+            Value::Int(98)
+        );
 
         let zero = builtin_get_byte(&mut eval, vec![Value::Int(0)]).unwrap_err();
         match zero {
