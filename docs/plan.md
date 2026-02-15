@@ -4,6 +4,21 @@ Last updated: 2026-02-15
 
 ## Done
 
+- Added timer compatibility slice (`run-at-time` / `run-with-idle-timer` / `timer-activate`):
+  - `run-at-time` now accepts GNU-compatible immediate specs for `nil` and numeric-prefixed strings like `"0 sec"` (while invalid specs signal `error`)
+  - `run-with-idle-timer` now accepts `nil` delay and keeps non-numeric delay specs as `error`
+  - `timer-activate` now matches error-class behavior on invalid/active timer activation paths
+  - added oracle corpus:
+    - `test/neovm/vm-compat/cases/timer-semantics.forms`
+    - `test/neovm/vm-compat/cases/timer-semantics.expected.tsv`
+    - enabled in `test/neovm/vm-compat/cases/default.list`
+  - verified:
+    - `cargo test test_eval_run_at_time -- --nocapture` (pass)
+    - `cargo test test_eval_run_with_idle_timer_nil_ok_string_error -- --nocapture` (pass)
+    - `cargo test test_eval_timer_activate -- --nocapture` (pass)
+    - `make -C test/neovm/vm-compat validate-case-lists` (pass)
+    - `make -C test/neovm/vm-compat check-neovm FORMS=cases/timer-semantics.forms EXPECTED=cases/timer-semantics.expected.tsv` (pass)
+    - `make -C test/neovm/vm-compat check-all-neovm` (pass)
 - Added `minibuffer-contents-no-properties` builtin compatibility slice:
   - implemented evaluator-aware builtin in `neovm-core` with batch behavior matching `minibuffer-contents`
   - wired builtin dispatch and registry exposure (`fboundp`/dispatch parity)
