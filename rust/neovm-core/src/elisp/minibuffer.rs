@@ -793,14 +793,25 @@ pub(crate) fn builtin_minibuffer_depth(args: Vec<Value>) -> EvalResult {
 
 /// `(minibufferp &optional BUFFER)` — returns t if BUFFER is a minibuffer.
 ///
-/// Stub: always returns nil.
+/// Batch-compatible behavior: accepts 0..=2 args, validates BUFFER-like first
+/// arg shape, and returns nil (no active minibuffer).
 pub(crate) fn builtin_minibufferp(args: Vec<Value>) -> EvalResult {
-    // 0 or 1 arg
-    if args.len() > 1 {
+    if args.len() > 2 {
         return Err(signal(
             "wrong-number-of-arguments",
             vec![Value::symbol("minibufferp"), Value::Int(args.len() as i64)],
         ));
+    }
+    if let Some(bufferish) = args.first() {
+        match bufferish {
+            Value::Nil | Value::Str(_) | Value::Buffer(_) => {}
+            _ => {
+                return Err(signal(
+                    "wrong-type-argument",
+                    vec![Value::symbol("bufferp"), bufferish.clone()],
+                ));
+            }
+        }
     }
     Ok(Value::Nil)
 }
@@ -1438,6 +1449,30 @@ mod tests {
     fn builtin_minibufferp_returns_nil() {
         let result = builtin_minibufferp(vec![]).unwrap();
         assert!(matches!(result, Value::Nil));
+    }
+
+    #[test]
+    fn builtin_minibufferp_accepts_string_and_second_arg() {
+        let result = builtin_minibufferp(vec![Value::string("x"), Value::Nil]).unwrap();
+        assert!(matches!(result, Value::Nil));
+    }
+
+    #[test]
+    fn builtin_minibufferp_rejects_non_buffer_like_values() {
+        let result = builtin_minibufferp(vec![Value::Int(1)]);
+        assert!(matches!(
+            result,
+            Err(Flow::Signal(sig)) if sig.symbol == "wrong-type-argument"
+        ));
+    }
+
+    #[test]
+    fn builtin_minibufferp_rejects_more_than_two_args() {
+        let result = builtin_minibufferp(vec![Value::Nil, Value::Nil, Value::Nil]);
+        assert!(matches!(
+            result,
+            Err(Flow::Signal(sig)) if sig.symbol == "wrong-number-of-arguments"
+        ));
     }
 
     #[test]
