@@ -1,0 +1,75 @@
+(fboundp 'x-open-connection)
+(condition-case err
+    (x-open-connection nil)
+  (error (car err)))
+(condition-case err
+    (x-open-connection "")
+  (error (car err)))
+(condition-case err
+    (x-open-connection "" nil nil nil)
+  (error (car err)))
+
+(fboundp 'x-close-connection)
+(condition-case err
+    (x-close-connection)
+  (error (car err)))
+(condition-case err
+    (x-close-connection nil)
+  (error (car err)))
+(condition-case err
+    (x-close-connection 1)
+  (error (car err)))
+(condition-case err
+    (x-close-connection "")
+  (error (car err)))
+
+(fboundp 'x-display-pixel-width)
+(condition-case err
+    (x-display-pixel-width)
+  (error (car err)))
+(condition-case err
+    (x-display-pixel-width nil)
+  (error (car err)))
+(condition-case err
+    (x-display-pixel-width 1)
+  (error (car err)))
+(condition-case err
+    (x-display-pixel-width "")
+  (error (car err)))
+(condition-case err
+    (x-display-pixel-width 1 2)
+  (error (car err)))
+
+(fboundp 'x-display-pixel-height)
+(condition-case err
+    (x-display-pixel-height)
+  (error (car err)))
+(condition-case err
+    (x-display-pixel-height nil)
+  (error (car err)))
+(condition-case err
+    (x-display-pixel-height 1)
+  (error (car err)))
+(condition-case err
+    (x-display-pixel-height "")
+  (error (car err)))
+(condition-case err
+    (x-display-pixel-height 1 2)
+  (error (car err)))
+
+(fboundp 'x-display-color-p)
+(condition-case err
+    (x-display-color-p)
+  (error (car err)))
+(condition-case err
+    (x-display-color-p nil)
+  (error (car err)))
+(condition-case err
+    (x-display-color-p 1)
+  (error (car err)))
+(condition-case err
+    (x-display-color-p "")
+  (error (car err)))
+(condition-case err
+    (x-display-color-p 1 2)
+  (error (car err)))

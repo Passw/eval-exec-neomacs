@@ -70,6 +70,7 @@ cases/input-batch-readers
 cases/timer-semantics
 cases/display-stub-semantics
 cases/display-batch-semantics
+cases/x-display-batch-semantics
 cases/display-monitor-semantics
 cases/display-monitor-frames-semantics
 cases/tty-batch-semantics
