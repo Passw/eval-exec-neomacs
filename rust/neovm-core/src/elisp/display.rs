@@ -278,6 +278,28 @@ pub(crate) fn builtin_send_string_to_terminal(args: Vec<Value>) -> EvalResult {
     }
 }
 
+/// Evaluator-aware variant of `send-string-to-terminal`.
+///
+/// Accepts live frame designators for the optional TERMINAL argument.
+pub(crate) fn builtin_send_string_to_terminal_eval(
+    eval: &mut super::eval::Evaluator,
+    args: Vec<Value>,
+) -> EvalResult {
+    expect_range_args("send-string-to-terminal", &args, 1, 2)?;
+    match &args[0] {
+        Value::Str(_) => {
+            if let Some(terminal) = args.get(1) {
+                expect_terminal_designator_eval(eval, terminal)?;
+            }
+            Ok(Value::Nil)
+        }
+        other => Err(signal(
+            "wrong-type-argument",
+            vec![Value::symbol("stringp"), other.clone()],
+        )),
+    }
+}
+
 /// (internal-show-cursor WINDOW SHOW) -> nil
 pub(crate) fn builtin_internal_show_cursor(args: Vec<Value>) -> EvalResult {
     expect_args("internal-show-cursor", &args, 2)?;
@@ -1172,6 +1194,16 @@ mod tests {
     fn send_string_to_terminal_accepts_live_terminal_handle() {
         let handle = terminal_handle_value();
         let result = builtin_send_string_to_terminal(vec![Value::string(""), handle]).unwrap();
+        assert!(result.is_nil());
+    }
+
+    #[test]
+    fn eval_send_string_to_terminal_accepts_live_frame_designator() {
+        let mut eval = crate::elisp::Evaluator::new();
+        let frame_id = crate::elisp::window_cmds::ensure_selected_frame_id(&mut eval).0 as i64;
+        let result =
+            builtin_send_string_to_terminal_eval(&mut eval, vec![Value::string(""), Value::Int(frame_id)])
+                .unwrap();
         assert!(result.is_nil());
     }
 

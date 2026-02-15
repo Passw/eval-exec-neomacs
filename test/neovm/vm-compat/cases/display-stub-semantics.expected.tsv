@@ -14,18 +14,19 @@
 14	(condition-case err (open-termscript) (error (car err)))	OK wrong-number-of-arguments
 15	(fboundp 'send-string-to-terminal)	OK t
 16	(condition-case err (send-string-to-terminal "") (error (car err)))	OK nil
-17	(condition-case err (send-string-to-terminal "" 1) (error (car err)))	OK wrong-type-argument
-18	(condition-case err (send-string-to-terminal "" (car (terminal-list))) (error (car err)))	OK nil
-19	(condition-case err (send-string-to-terminal) (error (car err)))	OK wrong-number-of-arguments
-20	(fboundp 'internal-show-cursor)	OK t
-21	(condition-case err (internal-show-cursor nil t) (error (car err)))	OK nil
-22	(condition-case err (internal-show-cursor 1 nil) (error (car err)))	OK wrong-type-argument
-23	(condition-case err (internal-show-cursor nil nil) (error (car err)))	OK nil
-24	(condition-case err (internal-show-cursor nil) (error (car err)))	OK wrong-number-of-arguments
-25	(fboundp 'internal-show-cursor-p)	OK t
-26	(condition-case err (internal-show-cursor-p) (error (car err)))	OK nil
-27	(condition-case err (internal-show-cursor-p 1) (error (car err)))	OK wrong-type-argument
-28	(condition-case err (internal-show-cursor-p nil nil) (error (car err)))	OK wrong-number-of-arguments
-29	(fboundp 'last-nonminibuffer-frame)	OK t
-30	(condition-case err (framep (last-nonminibuffer-frame)) (error (car err)))	OK t
-31	(condition-case err (last-nonminibuffer-frame nil) (error (car err)))	OK wrong-number-of-arguments
+17	(condition-case err (send-string-to-terminal "" (selected-frame)) (error (car err)))	OK nil
+18	(condition-case err (send-string-to-terminal "" 999999) (error (car err)))	OK wrong-type-argument
+19	(condition-case err (send-string-to-terminal "" (car (terminal-list))) (error (car err)))	OK nil
+20	(condition-case err (send-string-to-terminal) (error (car err)))	OK wrong-number-of-arguments
+21	(fboundp 'internal-show-cursor)	OK t
+22	(condition-case err (internal-show-cursor nil t) (error (car err)))	OK nil
+23	(condition-case err (internal-show-cursor 1 nil) (error (car err)))	OK wrong-type-argument
+24	(condition-case err (internal-show-cursor nil nil) (error (car err)))	OK nil
+25	(condition-case err (internal-show-cursor nil) (error (car err)))	OK wrong-number-of-arguments
+26	(fboundp 'internal-show-cursor-p)	OK t
+27	(condition-case err (internal-show-cursor-p) (error (car err)))	OK nil
+28	(condition-case err (internal-show-cursor-p 1) (error (car err)))	OK wrong-type-argument
+29	(condition-case err (internal-show-cursor-p nil nil) (error (car err)))	OK wrong-number-of-arguments
+30	(fboundp 'last-nonminibuffer-frame)	OK t
+31	(condition-case err (framep (last-nonminibuffer-frame)) (error (car err)))	OK t
+32	(condition-case err (last-nonminibuffer-frame nil) (error (car err)))	OK wrong-number-of-arguments

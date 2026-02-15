@@ -6445,6 +6445,11 @@ pub(crate) fn dispatch_builtin(
         "display-graphic-p" => {
             return Some(super::display::builtin_display_graphic_p_eval(eval, args))
         }
+        "send-string-to-terminal" => {
+            return Some(super::display::builtin_send_string_to_terminal_eval(
+                eval, args,
+            ))
+        }
         "redraw-frame" => return Some(super::display::builtin_redraw_frame_eval(eval, args)),
         "display-color-p" => return Some(super::display::builtin_display_color_p_eval(eval, args)),
         "display-pixel-width" => {

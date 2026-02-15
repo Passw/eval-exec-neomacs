@@ -41,7 +41,10 @@
     (send-string-to-terminal "")
   (error (car err)))
 (condition-case err
-    (send-string-to-terminal "" 1)
+    (send-string-to-terminal "" (selected-frame))
+  (error (car err)))
+(condition-case err
+    (send-string-to-terminal "" 999999)
   (error (car err)))
 (condition-case err
     (send-string-to-terminal "" (car (terminal-list)))
