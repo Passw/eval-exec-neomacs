@@ -4,6 +4,8 @@ Last updated: 2026-02-15
 
 ## Done
 
+- Full vm-compat verification rerun after recent textprop/overlay slices:
+  - `make -C test/neovm/vm-compat check-all-neovm` (pass)
 - Implemented `remove-overlays` arity compatibility slice:
   - added oracle corpus:
     - `test/neovm/vm-compat/cases/remove-overlays-arity-semantics.forms`
