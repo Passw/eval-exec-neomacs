@@ -30,6 +30,17 @@ fn expect_min_args(name: &str, args: &[Value], min: usize) -> Result<(), Flow> {
     }
 }
 
+fn expect_min_max_args(name: &str, args: &[Value], min: usize, max: usize) -> Result<(), Flow> {
+    if args.len() < min || args.len() > max {
+        Err(signal(
+            "wrong-number-of-arguments",
+            vec![Value::symbol(name), Value::Int(args.len() as i64)],
+        ))
+    } else {
+        Ok(())
+    }
+}
+
 fn expect_string(val: &Value) -> Result<String, Flow> {
     match val {
         Value::Str(s) => Ok((**s).clone()),
@@ -37,6 +48,53 @@ fn expect_string(val: &Value) -> Result<String, Flow> {
             "wrong-type-argument",
             vec![Value::symbol("stringp"), other.clone()],
         )),
+    }
+}
+
+fn expect_integer_or_marker(val: &Value) -> Result<i64, Flow> {
+    match val {
+        Value::Int(n) => Ok(*n),
+        Value::Char(c) => Ok(*c as i64),
+        other => Err(signal(
+            "wrong-type-argument",
+            vec![Value::symbol("integer-or-marker-p"), other.clone()],
+        )),
+    }
+}
+
+fn expect_sequence_string(val: &Value) -> Result<String, Flow> {
+    match val {
+        Value::Str(s) => Ok((**s).clone()),
+        other => Err(signal(
+            "wrong-type-argument",
+            vec![Value::symbol("sequencep"), other.clone()],
+        )),
+    }
+}
+
+fn lisp_pos_to_byte(buf: &crate::buffer::Buffer, raw: i64) -> usize {
+    let char_pos = if raw > 0 { raw as usize - 1 } else { 0 };
+    let byte = buf.text.char_to_byte(char_pos.min(buf.text.char_count()));
+    byte.clamp(buf.begv, buf.zv)
+}
+
+fn replacement_region_bounds(
+    buf: &crate::buffer::Buffer,
+    start_arg: Option<&Value>,
+    end_arg: Option<&Value>,
+) -> Result<(usize, usize), Flow> {
+    let start = match start_arg {
+        Some(v) if !v.is_nil() => lisp_pos_to_byte(buf, expect_integer_or_marker(v)?),
+        _ => buf.point(),
+    };
+    let end = match end_arg {
+        Some(v) if !v.is_nil() => lisp_pos_to_byte(buf, expect_integer_or_marker(v)?),
+        _ => buf.point_max(),
+    };
+    if start <= end {
+        Ok((start, end))
+    } else {
+        Ok((end, start))
     }
 }
 
@@ -1120,6 +1178,94 @@ fn preserve_case(replacement: &str, matched: &str) -> String {
 // ---------------------------------------------------------------------------
 // Builtin functions (stubs for evaluator dispatch)
 // ---------------------------------------------------------------------------
+
+/// `(replace-string FROM-STRING TO-STRING &optional DELIMITED START END BACKWARD REGION-NONCONTIGUOUS-P)` —
+/// evaluator-backed non-interactive replace subset.
+pub(crate) fn builtin_replace_string_eval(
+    eval: &mut super::eval::Evaluator,
+    args: Vec<Value>,
+) -> EvalResult {
+    expect_min_max_args("replace-string", &args, 2, 7)?;
+    let from = expect_sequence_string(&args[0])?;
+    let to = expect_string(&args[1])?;
+    let (start, end, source, read_only, buffer_name) = {
+        let buf = eval
+            .buffers
+            .current_buffer()
+            .ok_or_else(|| signal("error", vec![Value::string("No current buffer")]))?;
+        let (start, end) = replacement_region_bounds(buf, args.get(3), args.get(4))?;
+        (
+            start,
+            end,
+            buf.buffer_substring(start, end),
+            buf.read_only,
+            buf.name.clone(),
+        )
+    };
+
+    if from.is_empty() {
+        if source.is_empty() {
+            return Ok(Value::Nil);
+        }
+        if read_only {
+            return Err(signal(
+                "buffer-read-only",
+                vec![Value::string(buffer_name)],
+            ));
+        }
+        let mut out = String::with_capacity(source.len() + to.len() * source.chars().count());
+        for ch in source.chars() {
+            out.push_str(&to);
+            out.push(ch);
+        }
+        if out == source {
+            return Ok(Value::Nil);
+        }
+        let buf = eval
+            .buffers
+            .current_buffer_mut()
+            .ok_or_else(|| signal("error", vec![Value::string("No current buffer")]))?;
+        buf.delete_region(start, end);
+        buf.goto_char(start);
+        buf.insert(&out);
+        buf.goto_char(start + out.len());
+        return Ok(Value::Nil);
+    }
+
+    let case_fold = resolve_case_fold(None, &from);
+    let mut out = String::with_capacity(source.len());
+    let mut cursor = 0usize;
+    let mut replaced = 0usize;
+    while let Some((m_start, m_end)) = find_match(&source, &from, cursor, true, false, case_fold) {
+        out.push_str(&source[cursor..m_start]);
+        let matched = &source[m_start..m_end];
+        out.push_str(&preserve_case(&to, matched));
+        replaced += 1;
+        cursor = m_end;
+    }
+    out.push_str(&source[cursor..]);
+
+    if replaced == 0 {
+        return Ok(Value::Nil);
+    }
+    if read_only {
+        return Err(signal(
+            "buffer-read-only",
+            vec![Value::string(buffer_name)],
+        ));
+    }
+
+    let buf = eval
+        .buffers
+        .current_buffer_mut()
+        .ok_or_else(|| signal("error", vec![Value::string("No current buffer")]))?;
+    buf.delete_region(start, end);
+    buf.goto_char(start);
+    buf.insert(&out);
+    buf.goto_char(start + out.len());
+
+    Ok(Value::Nil)
+}
 
 /// `(isearch-forward)` — stub: initiates forward incremental search.
 pub(crate) fn builtin_isearch_forward(args: Vec<Value>) -> EvalResult {
