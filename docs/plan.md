@@ -4,6 +4,24 @@ Last updated: 2026-02-15
 
 ## Done
 
+- Implemented evaluator-backed `indent-according-to-mode` / `reindent-then-newline-and-indent` compatibility subset and oracle lock-in:
+  - updated `rust/neovm-core/src/elisp/indent.rs`:
+    - replaced `indent-according-to-mode` stub with evaluator behavior (batch subset: remove leading spaces/tabs on current line)
+    - aligned `indent-according-to-mode` arity to `0..1` with ignored optional arg
+    - preserved point shift behavior when indentation is removed before point
+    - replaced `reindent-then-newline-and-indent` stub with `indent-according-to-mode` + newline sequence (oracle-compatible batch subset)
+    - kept `reindent-then-newline-and-indent` strict arity (`0`)
+    - added evaluator unit coverage for both builtins
+  - added and enabled oracle corpus:
+    - `test/neovm/vm-compat/cases/indent-mode-semantics.forms`
+    - `test/neovm/vm-compat/cases/indent-mode-semantics.expected.tsv`
+    - wired into `test/neovm/vm-compat/cases/default.list`
+  - verified:
+    - `cargo test --manifest-path rust/neovm-core/Cargo.toml indent::tests::eval_indent_mode_subset -- --nocapture` (pass)
+    - `NEOVM_ORACLE_EMACS=/nix/store/hql3zwz5b4ywd2qwx8jssp4dyb7nx4cb-emacs-30.2/bin/emacs make -C test/neovm/vm-compat record FORMS=cases/indent-mode-semantics.forms EXPECTED=cases/indent-mode-semantics.expected.tsv` (pass)
+    - `make -C test/neovm/vm-compat check-neovm FORMS=cases/indent-mode-semantics.forms EXPECTED=cases/indent-mode-semantics.expected.tsv` (pass, 7/7)
+    - `make -C test/neovm/vm-compat validate-case-lists` (pass)
+    - `make -C test/neovm/vm-compat check-all-neovm` (pass)
 - Implemented evaluator-backed `indent-region` compatibility subset and oracle lock-in:
   - updated `rust/neovm-core/src/elisp/indent.rs`:
     - replaced stub with evaluator behavior for region indentation
