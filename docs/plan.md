@@ -1789,6 +1789,21 @@ Last updated: 2026-02-15
     - `make -C test/neovm/vm-compat check-neovm FORMS=cases/looking-at-semantics.forms EXPECTED=cases/looking-at-semantics.expected.tsv` (pass, 13/13)
     - `make -C test/neovm/vm-compat check-neovm FORMS=cases/line-filter-case-fold-variable-semantics.forms EXPECTED=cases/line-filter-case-fold-variable-semantics.expected.tsv` (pass, 6/6)
     - `make -C test/neovm/vm-compat check-all-neovm` (pass)
+- Aligned `replace-regexp-in-string` with dynamic `case-fold-search` variable semantics:
+  - evaluator dispatch now routes `replace-regexp-in-string` through an evaluator-aware path
+  - pure helper is reused with explicit case-fold mode; evaluator path reads dynamic/global `case-fold-search`
+  - `case-fold-search=nil` now forces exact-match behavior for regexp replacement-in-string paths (oracle parity)
+  - added and enabled oracle corpus:
+    - `test/neovm/vm-compat/cases/replace-regexp-in-string-variable-semantics.forms`
+    - `test/neovm/vm-compat/cases/replace-regexp-in-string-variable-semantics.expected.tsv`
+    - `test/neovm/vm-compat/cases/default.list`
+  - verified:
+    - `make -C test/neovm/vm-compat check-neovm FORMS=cases/replace-regexp-in-string-variable-semantics.forms EXPECTED=cases/replace-regexp-in-string-variable-semantics.expected.tsv` (pass, 3/3)
+    - `make -C test/neovm/vm-compat check-neovm FORMS=cases/replace-regexp-in-string-semantics.forms EXPECTED=cases/replace-regexp-in-string-semantics.expected.tsv` (pass, 9/9)
+    - `make -C test/neovm/vm-compat check-neovm FORMS=cases/replace-query-case-fold-variable-semantics.forms EXPECTED=cases/replace-query-case-fold-variable-semantics.expected.tsv` (pass, 10/10)
+    - `make -C test/neovm/vm-compat check-neovm FORMS=cases/search-upper-case-variable-semantics.forms EXPECTED=cases/search-upper-case-variable-semantics.expected.tsv` (pass, 8/8)
+    - `make -C test/neovm/vm-compat validate-case-lists` (pass)
+    - `make -C test/neovm/vm-compat check-all-neovm` (pass)
 - Kept branch green with targeted Rust tests and vm-compat checks after each slice.
 
 ## Doing
