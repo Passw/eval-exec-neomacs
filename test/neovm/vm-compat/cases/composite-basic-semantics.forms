@@ -7,6 +7,10 @@
 (fboundp 'auto-composition-mode)
 
 (stringp (compose-string-internal "abc" 0 3))
+(equal (compose-string-internal "abc" 0 0) "abc")
+(condition-case err (compose-string-internal "abc" 2 1) (error err))
+(condition-case err (compose-string-internal "abc" 0 4) (error err))
+(condition-case err (compose-string-internal "abc" -1 1) (error err))
 (condition-case err (compose-string-internal 1 0 1) (error err))
 (condition-case err (compose-string-internal "abc" 'x 1) (error err))
 (condition-case err (compose-string-internal "abc" 0 'y) (error err))
