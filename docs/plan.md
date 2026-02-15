@@ -4,6 +4,16 @@ Last updated: 2026-02-15
 
 ## Done
 
+- Implemented `face-id` compatibility slice:
+  - replaced fixed-id stub with oracle-compatible ids for core faces and dynamic-id allocation for faces created via `internal-make-lisp-face`
+  - aligned argument semantics: accepts optional second argument (ignored), keeps string first-arg `symbolp` type checks, and preserves oracle-style `Not a face: ...` error payloads
+  - added and enabled oracle corpus:
+    - `test/neovm/vm-compat/cases/face-id-semantics.forms`
+    - `test/neovm/vm-compat/cases/face-id-semantics.expected.tsv`
+    - wired into `test/neovm/vm-compat/cases/default.list`
+  - verified:
+    - `cargo test font::tests -- --nocapture` (pass)
+    - `make -C test/neovm/vm-compat check-neovm FORMS=cases/face-id-semantics.forms EXPECTED=cases/face-id-semantics.expected.tsv` (pass)
 - Implemented `internal-merge-in-global-face` compatibility slice:
   - replaced stub behavior with frame/face validation and merge semantics that copy concrete defaults-face overrides into selected-frame face state
   - merged values now align with oracle behavior for defaults-to-selected propagation and ignore relative defaults (for example `unspecified`)
