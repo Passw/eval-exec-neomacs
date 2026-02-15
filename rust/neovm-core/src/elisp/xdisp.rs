@@ -17,6 +17,7 @@
 
 use super::error::{signal, EvalResult, Flow};
 use super::value::*;
+use crate::window::FrameId;
 
 // ---------------------------------------------------------------------------
 // Argument helpers
@@ -186,12 +187,36 @@ pub(crate) fn builtin_tool_bar_height(args: Vec<Value>) -> EvalResult {
     Ok(Value::Int(0))
 }
 
+/// `(tool-bar-height &optional FRAME PIXELWISE)` evaluator-backed variant.
+///
+/// Accepts nil or a live frame designator for FRAME.
+pub(crate) fn builtin_tool_bar_height_eval(
+    eval: &mut super::eval::Evaluator,
+    args: Vec<Value>,
+) -> EvalResult {
+    expect_args_range("tool-bar-height", &args, 0, 2)?;
+    validate_optional_frame_designator(eval, args.first())?;
+    Ok(Value::Int(0))
+}
+
 /// (tab-bar-height &optional FRAME PIXELWISE) -> integer
 ///
 /// Get the height of the tab bar. Returns 0 (no tab bar).
 pub(crate) fn builtin_tab_bar_height(args: Vec<Value>) -> EvalResult {
     expect_args_range("tab-bar-height", &args, 0, 2)?;
     // Return 0 (no tab bar)
+    Ok(Value::Int(0))
+}
+
+/// `(tab-bar-height &optional FRAME PIXELWISE)` evaluator-backed variant.
+///
+/// Accepts nil or a live frame designator for FRAME.
+pub(crate) fn builtin_tab_bar_height_eval(
+    eval: &mut super::eval::Evaluator,
+    args: Vec<Value>,
+) -> EvalResult {
+    expect_args_range("tab-bar-height", &args, 0, 2)?;
+    validate_optional_frame_designator(eval, args.first())?;
     Ok(Value::Int(0))
 }
 
@@ -211,6 +236,27 @@ pub(crate) fn builtin_long_line_optimizations_p(args: Vec<Value>) -> EvalResult 
     expect_args("long-line-optimizations-p", &args, 0)?;
     // Return nil (optimizations not enabled)
     Ok(Value::Nil)
+}
+
+fn validate_optional_frame_designator(
+    eval: &super::eval::Evaluator,
+    value: Option<&Value>,
+) -> Result<(), Flow> {
+    let Some(frameish) = value else {
+        return Ok(());
+    };
+    if frameish.is_nil() {
+        return Ok(());
+    }
+    if let Value::Int(id) = frameish {
+        if *id >= 0 && eval.frames.get(FrameId(*id as u64)).is_some() {
+            return Ok(());
+        }
+    }
+    Err(signal(
+        "wrong-type-argument",
+        vec![Value::symbol("framep"), frameish.clone()],
+    ))
 }
 
 // ---------------------------------------------------------------------------
@@ -371,12 +417,46 @@ mod tests {
     }
 
     #[test]
+    fn test_tool_bar_height_eval_frame_validation() {
+        let mut eval = super::super::eval::Evaluator::new();
+        let buf_id = eval.buffers.current_buffer().expect("current buffer").id;
+        let frame_id = eval.frames.create_frame("xdisp-test", 80, 24, buf_id);
+
+        let result =
+            builtin_tool_bar_height_eval(&mut eval, vec![Value::Int(frame_id.0 as i64)]).unwrap();
+        assert_eq!(result, Value::Int(0));
+
+        let err = builtin_tool_bar_height_eval(&mut eval, vec![Value::string("x")]).unwrap_err();
+        match err {
+            Flow::Signal(sig) => assert_eq!(sig.symbol, "wrong-type-argument"),
+            other => panic!("expected wrong-type-argument, got {:?}", other),
+        }
+    }
+
+    #[test]
     fn test_tab_bar_height() {
         let result = builtin_tab_bar_height(vec![]).unwrap();
         assert_eq!(result, Value::Int(0));
 
         let result = builtin_tab_bar_height(vec![Value::symbol("frame")]).unwrap();
         assert_eq!(result, Value::Int(0));
+    }
+
+    #[test]
+    fn test_tab_bar_height_eval_frame_validation() {
+        let mut eval = super::super::eval::Evaluator::new();
+        let buf_id = eval.buffers.current_buffer().expect("current buffer").id;
+        let frame_id = eval.frames.create_frame("xdisp-test", 80, 24, buf_id);
+
+        let result =
+            builtin_tab_bar_height_eval(&mut eval, vec![Value::Int(frame_id.0 as i64)]).unwrap();
+        assert_eq!(result, Value::Int(0));
+
+        let err = builtin_tab_bar_height_eval(&mut eval, vec![Value::string("x")]).unwrap_err();
+        match err {
+            Flow::Signal(sig) => assert_eq!(sig.symbol, "wrong-type-argument"),
+            other => panic!("expected wrong-type-argument, got {:?}", other),
+        }
     }
 
     #[test]

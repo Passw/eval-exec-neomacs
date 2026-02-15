@@ -5969,6 +5969,9 @@ pub(crate) fn dispatch_builtin(
         "count-matches" => return Some(super::isearch::builtin_count_matches_eval(eval, args)),
         "keep-lines" => return Some(super::isearch::builtin_keep_lines_eval(eval, args)),
         "flush-lines" => return Some(super::isearch::builtin_flush_lines_eval(eval, args)),
+        // xdisp (evaluator-dependent)
+        "tool-bar-height" => return Some(super::xdisp::builtin_tool_bar_height_eval(eval, args)),
+        "tab-bar-height" => return Some(super::xdisp::builtin_tab_bar_height_eval(eval, args)),
         // File I/O (evaluator-dependent)
         "expand-file-name" => {
             return Some(super::fileio::builtin_expand_file_name_eval(eval, args))
