@@ -18,6 +18,25 @@ Last updated: 2026-02-15
 
 ## Done
 
+- Removed dead pure `buffer-hash` stub path and kept runtime on evaluator-backed implementation:
+  - updated:
+    - `rust/neovm-core/src/elisp/fns.rs`
+      - removed unreferenced pure `builtin_buffer_hash` (`"0"` stub) and stub-only unit test.
+    - `rust/neovm-core/src/elisp/builtins.rs`
+      - removed dead pure dispatch fallback entry for `"buffer-hash"` in the eval dispatch table.
+  - verified:
+    - `cargo test 'elisp::fns::tests::buffer_hash' -- --nocapture` (pass)
+    - `make -C test/neovm/vm-compat check-one-neovm CASE=cases/buffer-hash-semantics` (pass)
+
+- Expanded oracle-locked `buffer-hash` corpus coverage for non-current buffer objects:
+  - updated:
+    - `test/neovm/vm-compat/cases/buffer-hash-semantics.forms`
+      - added non-current live buffer object scenario (`generate-new-buffer` + `buffer-hash` + `kill-buffer`).
+    - `test/neovm/vm-compat/cases/buffer-hash-semantics.expected.tsv`
+      - re-recorded with `NEOVM_ORACLE_EMACS=/nix/store/2lzapcylxkad2r63h144mp9nnin4vb5n-user-environment/bin/emacs`.
+  - verified:
+    - `make -C test/neovm/vm-compat check-one-neovm CASE=cases/buffer-hash-semantics` (pass, 7/7)
+
 - Added oracle-locked `category` compatibility corpus and aligned behavior:
   - updated:
     - `test/neovm/vm-compat/cases/category-semantics.forms`
