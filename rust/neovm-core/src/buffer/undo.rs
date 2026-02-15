@@ -185,6 +185,18 @@ impl UndoList {
         self.records.is_empty()
     }
 
+    /// True when the most recent undo entry is a boundary marker.
+    pub fn has_trailing_boundary(&self) -> bool {
+        matches!(self.records.last(), Some(UndoRecord::Boundary))
+    }
+
+    /// True when the undo list contains at least one boundary marker.
+    pub fn contains_boundary(&self) -> bool {
+        self.records
+            .iter()
+            .any(|record| matches!(record, UndoRecord::Boundary))
+    }
+
     /// Clear all undo history.
     pub fn clear(&mut self) {
         self.records.clear();

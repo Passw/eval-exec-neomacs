@@ -5944,6 +5944,7 @@ pub(crate) fn dispatch_builtin(
         "condition-notify" => return Some(super::threads::builtin_condition_notify(eval, args)),
 
         // Undo system (evaluator-dependent)
+        "undo-boundary" => return Some(super::undo::builtin_undo_boundary_eval(eval, args)),
         "undo" => return Some(super::undo::builtin_undo(eval, args)),
 
         // Hash-table / obarray (evaluator-dependent)

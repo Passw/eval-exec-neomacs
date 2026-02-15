@@ -81,6 +81,22 @@ pub(crate) fn builtin_undo_boundary(args: Vec<Value>) -> EvalResult {
     Ok(Value::Nil)
 }
 
+/// (undo-boundary) -> nil
+///
+/// Evaluator-dependent variant used during normal execution: inserts an
+/// undo boundary into the current buffer's undo list.
+pub(crate) fn builtin_undo_boundary_eval(
+    eval: &mut super::eval::Evaluator,
+    args: Vec<Value>,
+) -> EvalResult {
+    expect_args("undo-boundary", &args, 0)?;
+    let Some(buffer) = eval.buffers.current_buffer_mut() else {
+        return Err(signal("error", vec![Value::string("No current buffer")]));
+    };
+    buffer.undo_list.boundary();
+    Ok(Value::Nil)
+}
+
 /// (primitive-undo COUNT LIST) -> remainder of LIST
 ///
 /// Undo COUNT entries from the undo list LIST.
@@ -124,22 +140,41 @@ pub(crate) fn builtin_undo(eval: &mut super::eval::Evaluator, args: Vec<Value>) 
     if let Some(arg) = args.first() {
         count = expect_int(arg)?;
     }
-    if count <= 0 {
-        return Ok(Value::Nil);
-    }
 
     let Some(buffer) = eval.buffers.current_buffer_mut() else {
         return Err(signal("error", vec![Value::string("No current buffer")]));
     };
 
+    let had_any_records = !buffer.undo_list.is_empty();
+    let had_boundary = buffer.undo_list.contains_boundary();
+    let had_trailing_boundary = buffer.undo_list.has_trailing_boundary();
+
+    // Emacs returns "Undo" for non-positive ARG when there are grouped
+    // (boundary-separated) undo entries, without applying a change.
+    if count <= 0 && had_boundary {
+        return Ok(Value::string("Undo"));
+    }
+    // For non-positive ARG without boundary markers, Emacs still consumes one
+    // undo group and reports "No further undo information".
+    if count <= 0 {
+        count = 1;
+    }
+
     let previous_undoing = buffer.undo_list.undoing;
     buffer.undo_list.undoing = true;
+    let mut applied_any = false;
+    let groups_to_undo = if had_trailing_boundary {
+        count as usize
+    } else {
+        (count as usize).saturating_add(1)
+    };
 
-    for _ in 0..(count as usize) {
+    for _ in 0..groups_to_undo {
         let group = buffer.undo_list.pop_undo_group();
         if group.is_empty() {
             break;
         }
+        applied_any = true;
 
         for record in group {
             match record {
@@ -163,7 +198,23 @@ pub(crate) fn builtin_undo(eval: &mut super::eval::Evaluator, args: Vec<Value>) 
     }
 
     buffer.undo_list.undoing = previous_undoing;
-    Ok(Value::Nil)
+    if !applied_any {
+        let msg = if had_any_records {
+            "No further undo information"
+        } else {
+            "No undo information in this buffer"
+        };
+        return Err(signal("user-error", vec![Value::string(msg)]));
+    }
+
+    if had_boundary {
+        Ok(Value::string("Undo"))
+    } else {
+        Err(signal(
+            "user-error",
+            vec![Value::string("No further undo information")],
+        ))
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -179,6 +230,21 @@ mod tests {
         let result = builtin_undo_boundary(vec![]);
         assert!(result.is_ok());
         assert!(result.unwrap().is_nil());
+    }
+
+    #[test]
+    fn test_undo_boundary_eval_inserts_boundary_marker() {
+        use super::super::eval::Evaluator;
+
+        let mut eval = Evaluator::new();
+        {
+            let buffer = eval.buffers.current_buffer_mut().expect("scratch buffer");
+            buffer.insert("x");
+        }
+        let result = builtin_undo_boundary_eval(&mut eval, vec![]);
+        assert!(result.is_ok());
+        let buffer = eval.buffers.current_buffer().expect("scratch buffer");
+        assert!(buffer.undo_list.has_trailing_boundary());
     }
 
     #[test]
@@ -244,8 +310,7 @@ mod tests {
 
         let mut eval = Evaluator::new();
         let result = builtin_undo(&mut eval, vec![]);
-        assert!(result.is_ok());
-        assert!(result.unwrap().is_nil());
+        assert!(result.is_err());
     }
 
     #[test]
@@ -254,8 +319,7 @@ mod tests {
 
         let mut eval = Evaluator::new();
         let result = builtin_undo(&mut eval, vec![Value::Int(5)]);
-        assert!(result.is_ok());
-        assert!(result.unwrap().is_nil());
+        assert!(result.is_err());
     }
 
     #[test]
@@ -294,5 +358,44 @@ mod tests {
             .expect("scratch buffer")
             .buffer_string();
         assert_eq!(contents, "");
+    }
+
+    #[test]
+    fn test_undo_without_boundary_signals_user_error_after_apply() {
+        use super::super::eval::Evaluator;
+
+        let mut eval = Evaluator::new();
+        {
+            let buffer = eval.buffers.current_buffer_mut().expect("scratch buffer");
+            buffer.insert("x");
+        }
+        let result = builtin_undo(&mut eval, vec![Value::Int(1)]);
+        assert!(result.is_err());
+        let contents = eval
+            .buffers
+            .current_buffer()
+            .expect("scratch buffer")
+            .buffer_string();
+        assert_eq!(contents, "");
+    }
+
+    #[test]
+    fn test_undo_with_non_positive_arg_and_boundary_returns_undo() {
+        use super::super::eval::Evaluator;
+
+        let mut eval = Evaluator::new();
+        {
+            let buffer = eval.buffers.current_buffer_mut().expect("scratch buffer");
+            buffer.insert("x");
+            buffer.undo_list.boundary();
+        }
+        let result = builtin_undo(&mut eval, vec![Value::Int(0)]).unwrap();
+        assert_eq!(result, Value::string("Undo"));
+        let contents = eval
+            .buffers
+            .current_buffer()
+            .expect("scratch buffer")
+            .buffer_string();
+        assert_eq!(contents, "x");
     }
 }

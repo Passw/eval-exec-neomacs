@@ -157,7 +157,6 @@ impl Buffer {
         }
 
         // Record undo before modifying.
-        self.undo_list.record_cursor(insert_pos);
         self.undo_list.record_insert(insert_pos, len);
 
         self.text.insert_str(insert_pos, text);
@@ -206,7 +205,6 @@ impl Buffer {
 
         // Record undo: save the deleted text for restoration.
         let deleted_text = self.text.text_range(start, end);
-        self.undo_list.record_cursor(self.pt);
         self.undo_list.record_delete(start, &deleted_text);
 
         self.text.delete_range(start, end);
