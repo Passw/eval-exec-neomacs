@@ -1,7 +1,7 @@
 //! Directory and file attribute builtins for the Elisp interpreter.
 //!
 //! Provides dired-related primitives:
-//! - `directory-files`, `directory-files-and-attributes`
+//! - `directory-files-and-attributes`
 //! - `file-name-completion`, `file-name-all-completions`
 //! - `file-attributes`, `file-attributes-lessp`
 //! - `system-users`, `system-groups`
@@ -457,81 +457,6 @@ fn format_mode_string(mode: u32, meta: &fs::Metadata) -> String {
 // ---------------------------------------------------------------------------
 // Pure builtins
 // ---------------------------------------------------------------------------
-
-/// (directory-files DIRECTORY &optional FULL-NAME MATCH-REGEXP NOSORT COUNT)
-///
-/// Return a list of names of files in DIRECTORY.
-/// If FULL-NAME is non-nil, return absolute file names.
-/// If MATCH-REGEXP is non-nil, only return names matching the regexp.
-/// If NOSORT is nil, sort the result alphabetically.
-/// COUNT limits the number of results returned.
-pub(crate) fn builtin_directory_files(args: Vec<Value>) -> EvalResult {
-    expect_range_args("directory-files", &args, 1, 5)?;
-
-    let dir = expect_string("directory-files", &args[0])?;
-    let full_name = args.get(1).is_some_and(|v| v.is_truthy());
-    let match_regexp = match args.get(2) {
-        Some(v) if v.is_truthy() => Some(expect_string("directory-files", v)?),
-        _ => None,
-    };
-    let nosort = args.get(3).is_some_and(|v| v.is_truthy());
-    let count = parse_wholenump_count(args.get(4))?;
-    if count == Some(0) {
-        return Ok(Value::Nil);
-    }
-
-    // Compile regex if provided.
-    let re = match &match_regexp {
-        Some(pattern) => {
-            let compiled = regex::Regex::new(pattern).map_err(|e| {
-                signal(
-                    "invalid-regexp",
-                    vec![Value::string(format!(
-                        "Invalid regexp \"{}\": {}",
-                        pattern, e
-                    ))],
-                )
-            })?;
-            Some(compiled)
-        }
-        None => None,
-    };
-
-    let names = read_directory_names(&dir)?;
-
-    let dir_with_slash = ensure_trailing_slash(&dir);
-    let mut result: VecDeque<String> = VecDeque::new();
-    let mut remaining = count.unwrap_or(usize::MAX);
-    for name in names {
-        // Apply regex filter.
-        if let Some(ref re) = re {
-            if !re.is_match(&name) {
-                continue;
-            }
-        }
-
-        if full_name {
-            result.push_front(format!("{}{}", dir_with_slash, name));
-        } else {
-            result.push_front(name);
-        }
-
-        if remaining != usize::MAX {
-            remaining -= 1;
-            if remaining == 0 {
-                break;
-            }
-        }
-    }
-
-    let mut result: Vec<String> = result.into_iter().collect();
-    // Sort unless NOSORT is non-nil.
-    if !nosort {
-        result.sort();
-    }
-
-    Ok(Value::list(result.into_iter().map(Value::string).collect()))
-}
 
 /// (directory-files-and-attributes DIRECTORY &optional FULL-NAME MATCH-REGEXP NOSORT ID-FORMAT COUNT)
 ///
@@ -1088,139 +1013,6 @@ mod tests {
         let path = dir.join(name);
         let mut f = fs::File::create(&path).unwrap();
         f.write_all(content.as_bytes()).unwrap();
-    }
-
-    // -----------------------------------------------------------------------
-    // directory-files
-    // -----------------------------------------------------------------------
-
-    #[test]
-    fn test_directory_files_basic() {
-        let (dir, dir_str) = make_test_dir("df_basic");
-        create_file(&dir, "alpha.txt", "a");
-        create_file(&dir, "beta.txt", "b");
-        create_file(&dir, "gamma.el", "g");
-
-        let result = builtin_directory_files(vec![Value::string(&dir_str)]).unwrap();
-        let items = list_to_vec(&result).unwrap();
-        let names: Vec<String> = items
-            .iter()
-            .map(|v| v.as_str().unwrap().to_string())
-            .collect();
-
-        assert!(names.contains(&"alpha.txt".to_string()));
-        assert!(names.contains(&"beta.txt".to_string()));
-        assert!(names.contains(&"gamma.el".to_string()));
-        // Should be sorted.
-        assert!(names.windows(2).all(|w| w[0] <= w[1]));
-
-        let _ = fs::remove_dir_all(&dir);
-    }
-
-    #[test]
-    fn test_directory_files_full_name() {
-        let (dir, dir_str) = make_test_dir("df_full");
-        create_file(&dir, "file.txt", "data");
-
-        let result = builtin_directory_files(vec![Value::string(&dir_str), Value::True]).unwrap();
-        let items = list_to_vec(&result).unwrap();
-        for item in &items {
-            let s = item.as_str().unwrap();
-            assert!(s.starts_with(&dir_str), "Expected full path, got: {}", s);
-        }
-
-        let _ = fs::remove_dir_all(&dir);
-    }
-
-    #[test]
-    fn test_directory_files_match_regexp() {
-        let (dir, dir_str) = make_test_dir("df_re");
-        create_file(&dir, "foo.el", "");
-        create_file(&dir, "bar.el", "");
-        create_file(&dir, "baz.txt", "");
-
-        let result = builtin_directory_files(vec![
-            Value::string(&dir_str),
-            Value::Nil,
-            Value::string("\\.el$"),
-        ])
-        .unwrap();
-        let items = list_to_vec(&result).unwrap();
-        assert_eq!(items.len(), 2);
-        for item in &items {
-            assert!(item.as_str().unwrap().ends_with(".el"));
-        }
-
-        let _ = fs::remove_dir_all(&dir);
-    }
-
-    #[test]
-    fn test_directory_files_nosort() {
-        let (dir, dir_str) = make_test_dir("df_nosort");
-        create_file(&dir, "zzz.txt", "");
-        create_file(&dir, "aaa.txt", "");
-
-        // NOSORT = t: we just check it does not error.
-        let result = builtin_directory_files(vec![
-            Value::string(&dir_str),
-            Value::Nil,
-            Value::Nil,
-            Value::True,
-        ]);
-        assert!(result.is_ok());
-
-        let _ = fs::remove_dir_all(&dir);
-    }
-
-    #[test]
-    fn test_directory_files_count() {
-        let (dir, dir_str) = make_test_dir("df_count");
-        create_file(&dir, "a.txt", "");
-        create_file(&dir, "b.txt", "");
-        create_file(&dir, "c.txt", "");
-
-        let result = builtin_directory_files(vec![
-            Value::string(&dir_str),
-            Value::Nil,
-            Value::Nil,
-            Value::Nil,
-            Value::Int(2),
-        ])
-        .unwrap();
-        let items = list_to_vec(&result).unwrap();
-        assert_eq!(items.len(), 2);
-
-        let _ = fs::remove_dir_all(&dir);
-    }
-
-    #[test]
-    fn test_directory_files_nonexistent() {
-        let result = builtin_directory_files(vec![Value::string("/nonexistent_dir_xyz_12345")]);
-        assert!(result.is_err());
-    }
-
-    #[test]
-    fn test_directory_files_nonexistent_signals_file_missing() {
-        let result = builtin_directory_files(vec![Value::string("/nonexistent_dir_xyz_12345")]);
-        match result {
-            Err(Flow::Signal(sig)) => assert_eq!(sig.symbol, "file-missing"),
-            other => panic!("expected file-missing signal, got {:?}", other),
-        }
-    }
-
-    #[test]
-    fn test_directory_files_invalid_regexp() {
-        let (dir, dir_str) = make_test_dir("df_badre");
-        create_file(&dir, "a.txt", "");
-
-        let result = builtin_directory_files(vec![
-            Value::string(&dir_str),
-            Value::Nil,
-            Value::string("[invalid"),
-        ]);
-        assert!(result.is_err());
-
-        let _ = fs::remove_dir_all(&dir);
     }
 
     // -----------------------------------------------------------------------
@@ -1826,17 +1618,18 @@ mod tests {
     // -----------------------------------------------------------------------
 
     #[test]
-    fn test_directory_files_wrong_args() {
+    fn test_directory_files_and_attributes_wrong_args() {
         // No args.
-        assert!(builtin_directory_files(vec![]).is_err());
+        assert!(builtin_directory_files_and_attributes(vec![]).is_err());
         // Too many args.
-        assert!(builtin_directory_files(vec![
+        assert!(builtin_directory_files_and_attributes(vec![
             Value::string("/tmp"),
             Value::Nil,
             Value::Nil,
             Value::Nil,
             Value::Nil,
-            Value::Nil, // 6th arg
+            Value::Nil,
+            Value::Nil, // 7th arg
         ])
         .is_err());
     }
