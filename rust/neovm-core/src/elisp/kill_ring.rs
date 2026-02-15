@@ -14,7 +14,7 @@
 
 use super::error::{signal, EvalResult, Flow};
 use super::syntax::{backward_word, forward_word, scan_sexps, SyntaxClass, SyntaxTable};
-use super::value::Value;
+use super::value::{eq_value, Value};
 use crate::buffer::Buffer;
 
 // ===========================================================================
@@ -614,18 +614,71 @@ fn kill_ring_entries_from_value(value: &Value) -> Option<Vec<String>> {
     }
 }
 
+fn kill_ring_pointer_index(kill_ring_value: &Value, pointer_value: &Value) -> usize {
+    if pointer_value.is_nil() {
+        return 0;
+    }
+    let mut cursor = kill_ring_value.clone();
+    let mut idx = 0usize;
+    loop {
+        if eq_value(&cursor, pointer_value) {
+            return idx;
+        }
+        match cursor {
+            Value::Cons(cell) => {
+                let pair = match cell.lock() {
+                    Ok(p) => p,
+                    Err(_) => return 0,
+                };
+                cursor = pair.cdr.clone();
+                idx += 1;
+            }
+            _ => return 0,
+        }
+    }
+}
+
+fn list_tail_at(list: &Value, index: usize) -> Value {
+    let mut cursor = list.clone();
+    for _ in 0..index {
+        match cursor {
+            Value::Cons(cell) => {
+                let pair = match cell.lock() {
+                    Ok(p) => p,
+                    Err(_) => return Value::Nil,
+                };
+                cursor = pair.cdr.clone();
+            }
+            _ => return Value::Nil,
+        }
+    }
+    cursor
+}
+
 fn sync_kill_ring_from_binding(eval: &mut super::eval::Evaluator) {
     if let Some(value) = dynamic_or_global_symbol_value(eval, "kill-ring") {
         if let Some(entries) = kill_ring_entries_from_value(&value) {
+            let pointer_index = dynamic_or_global_symbol_value(eval, "kill-ring-yank-pointer")
+                .map(|ptr| kill_ring_pointer_index(&value, &ptr))
+                .unwrap_or(0);
             if eval.kill_ring.entries != entries {
                 eval.kill_ring.set_entries(entries);
+            }
+            if eval.kill_ring.entries.is_empty() {
+                eval.kill_ring.yank_pointer = 0;
+            } else {
+                eval.kill_ring.yank_pointer =
+                    pointer_index.min(eval.kill_ring.entries.len().saturating_sub(1));
             }
         }
     }
 }
 
 fn sync_kill_ring_binding(eval: &mut super::eval::Evaluator) {
-    eval.assign("kill-ring", eval.kill_ring.to_lisp_list());
+    let kill_ring_list = eval.kill_ring.to_lisp_list();
+    let pointer_tail = list_tail_at(&kill_ring_list, eval.kill_ring.yank_pointer);
+    eval.assign("kill-ring", kill_ring_list);
+    eval.assign("kill-ring-yank-pointer", pointer_tail);
 }
 
 // ===========================================================================
@@ -684,6 +737,7 @@ pub(crate) fn builtin_current_kill(
         Ok(Value::string(eval.kill_ring.peek(n).unwrap_or("")))
     } else {
         let text = eval.kill_ring.rotate(n).unwrap_or("").to_string();
+        sync_kill_ring_binding(eval);
         Ok(Value::string(text))
     }
 }
@@ -1089,6 +1143,7 @@ pub(crate) fn builtin_yank(eval: &mut super::eval::Evaluator, args: Vec<Value>) 
         let n = expect_int(&args[0])?;
         if n != 0 {
             eval.kill_ring.rotate(n - 1);
+            sync_kill_ring_binding(eval);
         }
     }
 
@@ -1182,6 +1237,7 @@ pub(crate) fn builtin_yank_pop(eval: &mut super::eval::Evaluator, args: Vec<Valu
         .rotate(n)
         .ok_or_else(|| signal("error", vec![Value::string("Kill ring is empty")]))?
         .to_string();
+    sync_kill_ring_binding(eval);
 
     let buf = eval
         .buffers
