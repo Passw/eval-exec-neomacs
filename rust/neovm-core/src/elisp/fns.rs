@@ -751,29 +751,6 @@ pub(crate) fn builtin_buffer_hash_eval(
     Ok(Value::string(bytes_to_hex(&hasher.finalize())))
 }
 
-/// (locale-info ITEM)
-/// Stub: always returns nil.
-pub(crate) fn builtin_locale_info(args: Vec<Value>) -> EvalResult {
-    expect_args("locale-info", &args, 1)?;
-    Ok(Value::Nil)
-}
-
-// ---------------------------------------------------------------------------
-// Equality
-// ---------------------------------------------------------------------------
-
-/// (eql OBJ1 OBJ2) -- like eq but also equal for same-value floats.
-pub(crate) fn builtin_eql(args: Vec<Value>) -> EvalResult {
-    expect_args("eql", &args, 2)?;
-    let result = match (&args[0], &args[1]) {
-        // Float comparison by value (same bit pattern)
-        (Value::Float(a), Value::Float(b)) => a.to_bits() == b.to_bits(),
-        // For everything else, delegate to eq semantics
-        _ => eq_value(&args[0], &args[1]),
-    };
-    Ok(Value::bool(result))
-}
-
 /// (equal-including-properties O1 O2)
 /// Like `equal` but also checks text properties. Since our implementation
 /// does not yet track text properties on strings, this behaves the same
@@ -910,26 +887,6 @@ pub(crate) fn builtin_widget_apply(args: Vec<Value>) -> EvalResult {
         }
         other => Err(signal("invalid-function", vec![other])),
     }
-}
-
-// ---------------------------------------------------------------------------
-// Identity and string type coercions
-// ---------------------------------------------------------------------------
-
-/// (identity ARG) -- return ARG unchanged.
-pub(crate) fn builtin_identity(args: Vec<Value>) -> EvalResult {
-    expect_args("identity", &args, 1)?;
-    Ok(args[0].clone())
-}
-
-/// (string-to-multibyte STRING) -- convert unibyte storage bytes to multibyte chars.
-pub(crate) fn builtin_string_to_multibyte(args: Vec<Value>) -> EvalResult {
-    super::misc::builtin_string_to_multibyte(args)
-}
-
-/// (string-to-unibyte STRING) -- convert to unibyte storage.
-pub(crate) fn builtin_string_to_unibyte(args: Vec<Value>) -> EvalResult {
-    super::misc::builtin_string_to_unibyte(args)
 }
 
 /// (string-make-multibyte STRING) -- convert unibyte storage bytes to multibyte chars.
@@ -1682,40 +1639,6 @@ mod tests {
         }
     }
 
-    // ---- locale-info stub ----
-
-    #[test]
-    fn locale_info_nil() {
-        let r = builtin_locale_info(vec![Value::symbol("decimal-point")]).unwrap();
-        assert!(r.is_nil());
-    }
-
-    // ---- eql ----
-
-    #[test]
-    fn eql_same_float() {
-        let r = builtin_eql(vec![Value::Float(1.5), Value::Float(1.5)]).unwrap();
-        assert!(r.is_truthy());
-    }
-
-    #[test]
-    fn eql_different_float() {
-        let r = builtin_eql(vec![Value::Float(1.5), Value::Float(2.5)]).unwrap();
-        assert!(r.is_nil());
-    }
-
-    #[test]
-    fn eql_int() {
-        let r = builtin_eql(vec![Value::Int(42), Value::Int(42)]).unwrap();
-        assert!(r.is_truthy());
-    }
-
-    #[test]
-    fn eql_different_types() {
-        let r = builtin_eql(vec![Value::Int(1), Value::Float(1.0)]).unwrap();
-        assert!(r.is_nil());
-    }
-
     // ---- equal-including-properties ----
 
     #[test]
@@ -1726,49 +1649,6 @@ mod tests {
         ])
         .unwrap();
         assert!(r.is_truthy());
-    }
-
-    // ---- identity ----
-
-    #[test]
-    fn identity_returns_arg() {
-        let r = builtin_identity(vec![Value::Int(42)]).unwrap();
-        assert!(matches!(r, Value::Int(42)));
-    }
-
-    // ---- string-to-multibyte / unibyte ----
-
-    #[test]
-    fn string_to_multibyte_passthrough_ascii() {
-        let r = builtin_string_to_multibyte(vec![Value::string("abc")]).unwrap();
-        assert_eq!(r.as_str(), Some("abc"));
-    }
-
-    #[test]
-    fn string_to_multibyte_wrong_type() {
-        let r = builtin_string_to_multibyte(vec![Value::Int(42)]);
-        assert!(r.is_err());
-    }
-
-    #[test]
-    fn string_to_unibyte_ascii_passthrough() {
-        let r = builtin_string_to_unibyte(vec![Value::string("abc")]).unwrap();
-        assert_eq!(string_escape::decode_storage_char_codes(r.as_str().unwrap()), vec![97, 98, 99]);
-    }
-
-    #[test]
-    fn string_to_multibyte_promotes_unibyte_byte() {
-        let r = builtin_string_to_multibyte(vec![Value::string(
-            bytes_to_unibyte_storage_string(&[0xFF]),
-        )])
-        .unwrap();
-        assert_eq!(string_escape::decode_storage_char_codes(r.as_str().unwrap()), vec![0x3FFFFF]);
-    }
-
-    #[test]
-    fn string_to_unibyte_rejects_unicode_scalar() {
-        let r = builtin_string_to_unibyte(vec![Value::string("é")]);
-        assert!(r.is_err());
     }
 
     #[test]
