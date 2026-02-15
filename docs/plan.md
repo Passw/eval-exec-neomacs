@@ -18,6 +18,15 @@ Last updated: 2026-02-15
 
 ## Done
 
+- Removed dead `casefiddle` byte-conversion wrapper surface:
+  - updated:
+    - `rust/neovm-core/src/elisp/casefiddle.rs`
+      - deleted unreferenced wrapper implementations for `unibyte-char-to-multibyte` / `multibyte-char-to-unibyte` / `get-byte`
+      - removed helper code and stale local tests tied only to those deleted wrappers
+      - kept active modifier-resolution and live dispatch-backed behavior paths intact
+  - verified:
+    - `cargo test 'elisp::casefiddle::tests::' -- --nocapture` (pass, 30 tests)
+    - `make -C test/neovm/vm-compat check-one-neovm CASE=cases/chars` (pass, 11/11)
 - Removed dead `casefiddle` width/predicate wrapper surface:
   - updated:
     - `rust/neovm-core/src/elisp/casefiddle.rs`
