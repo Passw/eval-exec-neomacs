@@ -192,6 +192,7 @@ const DISPATCH_BUILTIN_NAMES: &[&str] = &[
     "copy-marker",
     "copy-region-as-kill",
     "copy-sequence",
+    "copy-syntax-table",
     "copy-to-register",
     "copysign",
     "count-matches",

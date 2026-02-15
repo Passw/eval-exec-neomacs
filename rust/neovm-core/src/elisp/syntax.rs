@@ -887,6 +887,40 @@ pub(crate) fn builtin_make_syntax_table(args: Vec<Value>) -> EvalResult {
     Ok(table)
 }
 
+/// `(copy-syntax-table &optional TABLE)` — return a fresh copy of TABLE.
+pub(crate) fn builtin_copy_syntax_table(args: Vec<Value>) -> EvalResult {
+    if args.len() > 1 {
+        return Err(signal(
+            "wrong-number-of-arguments",
+            vec![
+                Value::symbol("copy-syntax-table"),
+                Value::Int(args.len() as i64),
+            ],
+        ));
+    }
+
+    let source = if args.is_empty() || args[0].is_nil() {
+        builtin_standard_syntax_table(vec![])?
+    } else {
+        let table = args[0].clone();
+        if builtin_syntax_table_p(vec![table.clone()])?.is_nil() {
+            return Err(signal(
+                "wrong-type-argument",
+                vec![Value::symbol("syntax-table-p"), table],
+            ));
+        }
+        table
+    };
+
+    match source {
+        Value::Vector(v) => Ok(Value::vector(v.lock().expect("vector lock poisoned").clone())),
+        other => Err(signal(
+            "wrong-type-argument",
+            vec![Value::symbol("syntax-table-p"), other],
+        )),
+    }
+}
+
 /// `(standard-syntax-table)` — return the standard syntax table.
 pub(crate) fn builtin_standard_syntax_table(args: Vec<Value>) -> EvalResult {
     if !args.is_empty() {
@@ -1621,6 +1655,7 @@ mod tests {
     use super::*;
     use crate::buffer::buffer::{Buffer, BufferId};
     use crate::buffer::gap_buffer::GapBuffer;
+    use std::sync::Arc;
 
     /// Helper: create a buffer with given text, point at start, full accessible range.
     fn buf_with_text(text: &str) -> Buffer {
@@ -2088,6 +2123,41 @@ mod tests {
         assert_eq!(is_ct, Value::True);
         let subtype = crate::elisp::chartable::builtin_char_table_subtype(vec![table]).unwrap();
         assert_eq!(subtype, Value::symbol("syntax-table"));
+    }
+
+    #[test]
+    fn copy_syntax_table_returns_fresh_syntax_table() {
+        let source = builtin_make_syntax_table(vec![]).unwrap();
+        let copied = builtin_copy_syntax_table(vec![source.clone()]).unwrap();
+
+        let is_ct = crate::elisp::chartable::builtin_char_table_p(vec![copied.clone()]).unwrap();
+        assert_eq!(is_ct, Value::True);
+        let subtype = crate::elisp::chartable::builtin_char_table_subtype(vec![copied.clone()]).unwrap();
+        assert_eq!(subtype, Value::symbol("syntax-table"));
+
+        match (source, copied) {
+            (Value::Vector(a), Value::Vector(b)) => assert!(!Arc::ptr_eq(&a, &b)),
+            other => panic!("expected vector-backed char tables, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn copy_syntax_table_validates_arity_and_type() {
+        match builtin_copy_syntax_table(vec![Value::Int(1)]) {
+            Err(crate::elisp::error::Flow::Signal(sig)) => {
+                assert_eq!(sig.symbol, "wrong-type-argument");
+                assert_eq!(sig.data.first(), Some(&Value::symbol("syntax-table-p")));
+            }
+            other => panic!("expected wrong-type-argument signal, got {other:?}"),
+        }
+
+        match builtin_copy_syntax_table(vec![Value::Nil, Value::Nil]) {
+            Err(crate::elisp::error::Flow::Signal(sig)) => {
+                assert_eq!(sig.symbol, "wrong-number-of-arguments");
+                assert_eq!(sig.data.first(), Some(&Value::symbol("copy-syntax-table")));
+            }
+            other => panic!("expected wrong-number-of-arguments signal, got {other:?}"),
+        }
     }
 
     #[test]
