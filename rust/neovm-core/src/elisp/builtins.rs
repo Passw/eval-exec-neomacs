@@ -5969,6 +5969,10 @@ pub(crate) fn dispatch_builtin(
         "count-matches" => return Some(super::isearch::builtin_count_matches_eval(eval, args)),
         "keep-lines" => return Some(super::isearch::builtin_keep_lines_eval(eval, args)),
         "flush-lines" => return Some(super::isearch::builtin_flush_lines_eval(eval, args)),
+        // composite (evaluator-dependent)
+        "compose-region-internal" => {
+            return Some(super::composite::builtin_compose_region_internal_eval(eval, args))
+        }
         // xdisp (evaluator-dependent)
         "format-mode-line" => return Some(super::xdisp::builtin_format_mode_line_eval(eval, args)),
         "pos-visible-in-window-p" => {

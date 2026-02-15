@@ -66,6 +66,14 @@ fn expect_integer_or_marker_p(arg: &Value) -> Result<(), Flow> {
     }
 }
 
+fn integer_value(arg: &Value) -> i64 {
+    match arg {
+        Value::Int(n) => *n,
+        Value::Char(c) => *c as i64,
+        _ => 0,
+    }
+}
+
 // ---------------------------------------------------------------------------
 // Pure builtins
 // ---------------------------------------------------------------------------
@@ -81,6 +89,40 @@ pub(crate) fn builtin_compose_region_internal(args: Vec<Value>) -> EvalResult {
     expect_range_args("compose-region-internal", &args, 2, 4)?;
     expect_integer_or_marker_p(&args[0])?;
     expect_integer_or_marker_p(&args[1])?;
+    Ok(Value::Nil)
+}
+
+/// Evaluator-backed `(compose-region-internal START END &optional COMPONENTS MODIFICATION-FUNC)`.
+///
+/// Batch-compatible subset:
+/// - validates START/END type (`integer-or-marker-p`)
+/// - validates range against the current buffer's accessible positions
+/// - returns nil on success
+pub(crate) fn builtin_compose_region_internal_eval(
+    eval: &mut super::eval::Evaluator,
+    args: Vec<Value>,
+) -> EvalResult {
+    expect_range_args("compose-region-internal", &args, 2, 4)?;
+    expect_integer_or_marker_p(&args[0])?;
+    expect_integer_or_marker_p(&args[1])?;
+
+    let start = integer_value(&args[0]);
+    let end = integer_value(&args[1]);
+    let (buffer_handle, point_max) = if let Some(buf) = eval.buffers.current_buffer() {
+        (
+            Value::Buffer(buf.id),
+            buf.buffer_string().chars().count() as i64 + 1,
+        )
+    } else {
+        (Value::Nil, 1)
+    };
+
+    if start < 1 || end < 1 || start > end || start > point_max || end > point_max {
+        return Err(signal(
+            "args-out-of-range",
+            vec![buffer_handle, Value::Int(start), Value::Int(end)],
+        ));
+    }
     Ok(Value::Nil)
 }
 
@@ -310,6 +352,22 @@ mod tests {
         assert!(result.is_err());
         let result = builtin_compose_region_internal(vec![Value::Int(1), Value::symbol("y")]);
         assert!(result.is_err());
+    }
+
+    #[test]
+    fn compose_region_internal_eval_range_checks() {
+        let mut eval = super::super::eval::Evaluator::new();
+        {
+            let buffer = eval.buffers.current_buffer_mut().expect("current buffer");
+            buffer.insert("abc");
+        }
+        let ok =
+            builtin_compose_region_internal_eval(&mut eval, vec![Value::Int(1), Value::Int(3)]);
+        assert!(ok.is_ok());
+
+        let out_of_range =
+            builtin_compose_region_internal_eval(&mut eval, vec![Value::Int(0), Value::Int(0)]);
+        assert!(out_of_range.is_err());
     }
 
     #[test]
