@@ -19,6 +19,23 @@ Last updated: 2026-02-15
 
 ## Done
 
+- Implemented evaluator-backed case-table object semantics and locked oracle corpus:
+  - updated:
+    - `rust/neovm-core/src/elisp/casetab.rs`
+      - added stable standard case-table object storage.
+      - added evaluator-backed `current-case-table` / `standard-case-table` object reads.
+      - added evaluator-backed `set-case-table` / `set-standard-case-table` validation + state updates.
+      - added buffer-local case-table object storage and isolation tests.
+    - `rust/neovm-core/src/elisp/builtins.rs`
+      - routed case-table builtins through evaluator dispatch.
+    - `test/neovm/vm-compat/cases/case-table-object-semantics.{forms,expected.tsv}`
+    - `test/neovm/vm-compat/cases/default.list`
+      - included `cases/case-table-object-semantics` in default compatibility runs.
+  - verified:
+    - `cargo test casetab::tests --manifest-path rust/neovm-core/Cargo.toml -- --nocapture` (pass)
+    - `make -C test/neovm/vm-compat check-neovm CASES=cases/case-table-object-semantics` (pass, 15/15)
+    - `make -C test/neovm/vm-compat validate-case-lists` (pass)
+
 - Aligned a composite builtin subset and locked oracle corpus:
   - updated:
     - `rust/neovm-core/src/elisp/composite.rs`
