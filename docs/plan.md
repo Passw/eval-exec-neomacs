@@ -96,6 +96,9 @@ Last updated: 2026-02-15
 - Aligned display query builtins with Emacs batch-context defaults:
   - display queries now report terminal-style values in vm-compat context (`display-graphic-p`, `display-color-p`, pixel/mm size, color cells/planes/class/backing store, `x-display-list`)
   - preserved terminal-handle parameter semantics separately (`terminal-parameter` corpus remains green)
+- Aligned terminal handle and terminal-name presentation semantics:
+  - `terminal-name` now returns `\"initial_terminal\"` for the current terminal
+  - `prin1-to-string` / `format` / error-message rendering now print terminal handles as `#<terminal ...>` (parity with GNU Emacs handle style)
 - Added and enabled new oracle corpus:
   - `test/neovm/vm-compat/cases/json-buffer-semantics.forms`
   - `test/neovm/vm-compat/cases/json-buffer-semantics.expected.tsv`
@@ -107,6 +110,10 @@ Last updated: 2026-02-15
 - Added and enabled new oracle corpus:
   - `test/neovm/vm-compat/cases/display-batch-semantics.forms`
   - `test/neovm/vm-compat/cases/display-batch-semantics.expected.tsv`
+  - wired into `test/neovm/vm-compat/cases/default.list`
+- Added and enabled new oracle corpus:
+  - `test/neovm/vm-compat/cases/terminal-handle-printing.forms`
+  - `test/neovm/vm-compat/cases/terminal-handle-printing.expected.tsv`
   - wired into `test/neovm/vm-compat/cases/default.list`
 - Kept branch green with targeted Rust tests and vm-compat checks after each slice.
 
