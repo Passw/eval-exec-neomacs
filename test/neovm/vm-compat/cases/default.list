@@ -312,6 +312,7 @@ cases/load-path-order
 cases/load-policy
 cases/load-suffixes
 cases/precompile
+cases/bytecode-literal-default-policy
 cases/reader-hash
 cases/read-from-string-edges
 cases/read-stream-semantics
