@@ -71,11 +71,6 @@ fn lisp_pos_to_byte(buf: &crate::buffer::Buffer, lisp_pos: i64) -> usize {
     byte.clamp(buf.begv, buf.zv)
 }
 
-/// Convert a 0-based byte position to a Lisp 1-based character position.
-fn byte_to_lisp_pos(buf: &crate::buffer::Buffer, byte: usize) -> i64 {
-    (buf.text.byte_to_char(byte) + 1) as i64
-}
-
 fn buffer_read_only_active(eval: &super::eval::Evaluator, buf: &crate::buffer::Buffer) -> bool {
     if buf.read_only {
         return true;
@@ -231,114 +226,6 @@ pub(crate) fn builtin_buffer_substring_no_properties(
     args: Vec<Value>,
 ) -> EvalResult {
     builtin_buffer_substring(eval, args)
-}
-
-/// `(region-beginning)` — return start of region.
-/// Stub: returns point-min when no region is active.
-pub(crate) fn builtin_region_beginning(
-    eval: &mut super::eval::Evaluator,
-    args: Vec<Value>,
-) -> EvalResult {
-    expect_args("region-beginning", &args, 0)?;
-    match eval.buffers.current_buffer() {
-        Some(buf) => {
-            let pt_lisp = byte_to_lisp_pos(buf, buf.pt);
-            let mark_lisp = buf
-                .mark
-                .map(|m| byte_to_lisp_pos(buf, m))
-                .unwrap_or_else(|| byte_to_lisp_pos(buf, buf.begv));
-            Ok(Value::Int(pt_lisp.min(mark_lisp)))
-        }
-        None => Ok(Value::Int(1)),
-    }
-}
-
-/// `(region-end)` — return end of region.
-/// Stub: returns point-max when no region is active.
-pub(crate) fn builtin_region_end(
-    eval: &mut super::eval::Evaluator,
-    args: Vec<Value>,
-) -> EvalResult {
-    expect_args("region-end", &args, 0)?;
-    match eval.buffers.current_buffer() {
-        Some(buf) => {
-            let pt_lisp = byte_to_lisp_pos(buf, buf.pt);
-            let mark_lisp = buf
-                .mark
-                .map(|m| byte_to_lisp_pos(buf, m))
-                .unwrap_or_else(|| byte_to_lisp_pos(buf, buf.zv));
-            Ok(Value::Int(pt_lisp.max(mark_lisp)))
-        }
-        None => Ok(Value::Int(1)),
-    }
-}
-
-/// `(set-mark POS)` — set the mark to POS, return POS.
-pub(crate) fn builtin_set_mark(eval: &mut super::eval::Evaluator, args: Vec<Value>) -> EvalResult {
-    expect_args("set-mark", &args, 1)?;
-    let pos = expect_integer("set-mark", &args[0])?;
-    let ret = args[0].clone();
-    if let Some(buf) = eval.buffers.current_buffer_mut() {
-        let byte = lisp_pos_to_byte(buf, pos);
-        buf.set_mark(byte);
-    }
-    Ok(ret)
-}
-
-/// `(bobp)` — return t if point is at beginning of accessible region.
-pub(crate) fn builtin_bobp(eval: &mut super::eval::Evaluator, args: Vec<Value>) -> EvalResult {
-    expect_args("bobp", &args, 0)?;
-    match eval.buffers.current_buffer() {
-        Some(buf) => Ok(Value::bool(buf.pt <= buf.begv)),
-        None => Ok(Value::True),
-    }
-}
-
-/// `(eobp)` — return t if point is at end of accessible region.
-pub(crate) fn builtin_eobp(eval: &mut super::eval::Evaluator, args: Vec<Value>) -> EvalResult {
-    expect_args("eobp", &args, 0)?;
-    match eval.buffers.current_buffer() {
-        Some(buf) => Ok(Value::bool(buf.pt >= buf.zv)),
-        None => Ok(Value::True),
-    }
-}
-
-/// `(bolp)` — return t if point is at beginning of a line.
-/// True at buffer beginning or if the character before point is a newline.
-pub(crate) fn builtin_bolp(eval: &mut super::eval::Evaluator, args: Vec<Value>) -> EvalResult {
-    expect_args("bolp", &args, 0)?;
-    match eval.buffers.current_buffer() {
-        Some(buf) => {
-            if buf.pt <= buf.begv {
-                Ok(Value::True)
-            } else {
-                match buf.char_before(buf.pt) {
-                    Some('\n') => Ok(Value::True),
-                    _ => Ok(Value::Nil),
-                }
-            }
-        }
-        None => Ok(Value::True),
-    }
-}
-
-/// `(eolp)` — return t if point is at end of a line.
-/// True at buffer end or if the character after point is a newline.
-pub(crate) fn builtin_eolp(eval: &mut super::eval::Evaluator, args: Vec<Value>) -> EvalResult {
-    expect_args("eolp", &args, 0)?;
-    match eval.buffers.current_buffer() {
-        Some(buf) => {
-            if buf.pt >= buf.zv {
-                Ok(Value::True)
-            } else {
-                match buf.char_after(buf.pt) {
-                    Some('\n') => Ok(Value::True),
-                    _ => Ok(Value::Nil),
-                }
-            }
-        }
-        None => Ok(Value::True),
-    }
 }
 
 /// `(following-char)` — return character after point (0 if at end).
