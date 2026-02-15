@@ -4,6 +4,8 @@ Last updated: 2026-02-15
 
 ## Done
 
+- Full vm-compat verification rerun after latest minibuffer/search slices:
+  - `make -C test/neovm/vm-compat check-all-neovm` (pass)
 - Implemented `minibufferp` compatibility slice:
   - aligned arity to GNU behavior (accepts 0..=2 args; >2 is `wrong-number-of-arguments`)
   - added buffer-like validation for the first arg (`nil` / string / buffer accepted; otherwise `wrong-type-argument bufferp ...`)
