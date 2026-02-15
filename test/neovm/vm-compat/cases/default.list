@@ -61,6 +61,7 @@ cases/move-to-column-force-semantics
 cases/back-to-indentation-semantics
 cases/indent-region-semantics
 cases/indent-mode-semantics
+cases/tab-to-tab-stop-semantics
 cases/custom-group-p-availability
 cases/custom-set-semantics
 cases/bookmark-helper-availability

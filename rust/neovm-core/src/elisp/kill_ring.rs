@@ -2529,13 +2529,12 @@ pub(crate) fn builtin_delete_indentation(
     Ok(Value::Nil)
 }
 
-/// `(tab-to-tab-stop)` — insert spaces or tabs to the next tab stop.
-/// Tab stops are every 8 columns by default.
+/// `(tab-to-tab-stop)` — insert a tab character (batch-compatible subset).
 pub(crate) fn builtin_tab_to_tab_stop(
     eval: &mut super::eval::Evaluator,
     args: Vec<Value>,
 ) -> EvalResult {
-    let _ = args; // No arguments.
+    expect_args("tab-to-tab-stop", &args, 0)?;
 
     let buf = eval
         .buffers
@@ -2549,27 +2548,11 @@ pub(crate) fn builtin_tab_to_tab_stop(
         ));
     }
 
-    let pt = buf.point();
-    let pmin = buf.point_min();
-
-    // Compute current column.
-    let text_before = buf.buffer_substring(pmin, pt);
-    let cur_col = if let Some(nl_pos) = text_before.rfind('\n') {
-        text_before.len() - nl_pos - 1
-    } else {
-        text_before.len()
-    };
-
-    let tab_width = 8usize;
-    let next_stop = ((cur_col / tab_width) + 1) * tab_width;
-    let spaces_needed = next_stop - cur_col;
-
-    let spaces: String = " ".repeat(spaces_needed);
     let buf = eval
         .buffers
         .current_buffer_mut()
         .ok_or_else(|| signal("error", vec![Value::string("No current buffer")]))?;
-    buf.insert(&spaces);
+    buf.insert("\t");
 
     Ok(Value::Nil)
 }
@@ -3391,8 +3374,7 @@ mod tests {
                (tab-to-tab-stop)
                (buffer-string)"#,
         );
-        // "hi" is 2 chars, next tab stop at 8, so 6 spaces.
-        assert_eq!(results[2], r#"OK "hi      ""#);
+        assert_eq!(results[2], r#"OK "hi\t""#);
     }
 
     // -- indent-rigidly tests --
