@@ -4,6 +4,27 @@ Last updated: 2026-02-15
 
 ## Done
 
+- Implemented `file-newer-than-file-p` compatibility slice:
+  - added pure + evaluator-aware builtins in `rust/neovm-core/src/elisp/fileio.rs`:
+    - `builtin_file_newer_than_file_p`
+    - `builtin_file_newer_than_file_p_eval`
+  - semantics aligned with oracle subset:
+    - arity `2`
+    - strict `stringp` validation for `FILE1` and `FILE2`
+    - missing `FILE1` returns `nil`
+    - missing `FILE2` returns `t`
+    - evaluator path resolves relative names against dynamic/default `default-directory`
+  - registered and dispatched `file-newer-than-file-p` in:
+    - `rust/neovm-core/src/elisp/builtins.rs`
+    - `rust/neovm-core/src/elisp/builtin_registry.rs`
+  - added and enabled oracle corpus:
+    - `test/neovm/vm-compat/cases/file-newer-than-file-p-semantics.forms`
+    - `test/neovm/vm-compat/cases/file-newer-than-file-p-semantics.expected.tsv`
+    - wired into `test/neovm/vm-compat/cases/default.list`
+  - verified:
+    - `cargo test --manifest-path rust/neovm-core/Cargo.toml file_newer_than_file_p -- --nocapture` (pass)
+    - `make -C test/neovm/vm-compat check-neovm FORMS=cases/file-newer-than-file-p-semantics.forms EXPECTED=cases/file-newer-than-file-p-semantics.expected.tsv` (pass)
+    - `make -C test/neovm/vm-compat validate-case-lists` (pass)
 - Implemented `file-name-case-insensitive-p` compatibility slice:
   - added pure + evaluator-aware builtins in `rust/neovm-core/src/elisp/fileio.rs`:
     - `builtin_file_name_case_insensitive_p`

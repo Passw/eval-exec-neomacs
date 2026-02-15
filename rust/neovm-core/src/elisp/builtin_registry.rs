@@ -283,6 +283,7 @@ const DISPATCH_BUILTIN_NAMES: &[&str] = &[
     "file-modes",
     "file-name-nondirectory",
     "file-name-sans-extension",
+    "file-newer-than-file-p",
     "file-readable-p",
     "file-regular-p",
     "file-symlink-p",

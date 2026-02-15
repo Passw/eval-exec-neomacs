@@ -440,6 +440,28 @@ pub fn file_name_case_insensitive_p(filename: &str) -> bool {
     }
 }
 
+/// Return true if FILE1 has a newer modification time than FILE2.
+pub fn file_newer_than_file_p(file1: &str, file2: &str) -> bool {
+    let meta1 = match fs::metadata(file1) {
+        Ok(meta) => meta,
+        Err(_) => return false,
+    };
+    let meta2 = match fs::metadata(file2) {
+        Ok(meta) => meta,
+        Err(_) => return true,
+    };
+
+    let mtime1 = match meta1.modified() {
+        Ok(time) => time,
+        Err(_) => return false,
+    };
+    let mtime2 = match meta2.modified() {
+        Ok(time) => time,
+        Err(_) => return true,
+    };
+    mtime1 > mtime2
+}
+
 // ===========================================================================
 // File I/O operations
 // ===========================================================================
@@ -1389,6 +1411,31 @@ pub(crate) fn builtin_file_name_case_insensitive_p_eval(
     let default_dir = default_directory_for_eval(eval);
     let filename = expand_file_name(&filename, default_dir.as_deref());
     Ok(Value::bool(file_name_case_insensitive_p(&filename)))
+}
+
+/// (file-newer-than-file-p FILE1 FILE2) -> t or nil
+pub(crate) fn builtin_file_newer_than_file_p(args: Vec<Value>) -> EvalResult {
+    expect_args("file-newer-than-file-p", &args, 2)?;
+    let file1 = expect_string_strict(&args[0])?;
+    let file2 = expect_string_strict(&args[1])?;
+    let file1 = expand_file_name(&file1, None);
+    let file2 = expand_file_name(&file2, None);
+    Ok(Value::bool(file_newer_than_file_p(&file1, &file2)))
+}
+
+/// Evaluator-aware variant of `file-newer-than-file-p` that resolves
+/// relative paths against dynamic/default `default-directory`.
+pub(crate) fn builtin_file_newer_than_file_p_eval(
+    eval: &Evaluator,
+    args: Vec<Value>,
+) -> EvalResult {
+    expect_args("file-newer-than-file-p", &args, 2)?;
+    let file1 = expect_string_strict(&args[0])?;
+    let file2 = expect_string_strict(&args[1])?;
+    let default_dir = default_directory_for_eval(eval);
+    let file1 = expand_file_name(&file1, default_dir.as_deref());
+    let file2 = expand_file_name(&file2, default_dir.as_deref());
+    Ok(Value::bool(file_newer_than_file_p(&file1, &file2)))
 }
 
 /// (file-modes FILENAME &optional FLAG) -> integer or nil
@@ -3178,6 +3225,8 @@ mod tests {
         assert!(builtin_file_regular_p(vec![Value::Nil]).is_err());
         assert!(builtin_file_symlink_p(vec![Value::Nil]).is_err());
         assert!(builtin_file_name_case_insensitive_p(vec![Value::Nil]).is_err());
+        assert!(builtin_file_newer_than_file_p(vec![Value::Nil, Value::string("/tmp")]).is_err());
+        assert!(builtin_file_newer_than_file_p(vec![Value::string("/tmp"), Value::Nil]).is_err());
     }
 
     #[test]
@@ -3229,6 +3278,86 @@ mod tests {
         )
         .expect("relative case-insensitive query");
         assert_eq!(relative, absolute);
+
+        let _ = fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn test_builtin_file_newer_than_file_p_semantics() {
+        let dir = std::env::temp_dir().join("neovm-file-newer-than-file-p");
+        let _ = fs::remove_dir_all(&dir);
+        fs::create_dir_all(&dir).expect("create test dir");
+
+        let old = dir.join("old.txt");
+        let new = dir.join("new.txt");
+        let missing = dir.join("missing.txt");
+
+        fs::write(&old, b"old").expect("write old file");
+        std::thread::sleep(std::time::Duration::from_millis(1200));
+        fs::write(&new, b"new").expect("write new file");
+
+        assert_eq!(
+            builtin_file_newer_than_file_p(vec![
+                Value::string(new.to_string_lossy()),
+                Value::string(old.to_string_lossy()),
+            ])
+            .expect("newer"),
+            Value::True
+        );
+        assert_eq!(
+            builtin_file_newer_than_file_p(vec![
+                Value::string(old.to_string_lossy()),
+                Value::string(new.to_string_lossy()),
+            ])
+            .expect("older"),
+            Value::Nil
+        );
+        assert_eq!(
+            builtin_file_newer_than_file_p(vec![
+                Value::string(missing.to_string_lossy()),
+                Value::string(old.to_string_lossy()),
+            ])
+            .expect("missing first"),
+            Value::Nil
+        );
+        assert_eq!(
+            builtin_file_newer_than_file_p(vec![
+                Value::string(old.to_string_lossy()),
+                Value::string(missing.to_string_lossy()),
+            ])
+            .expect("missing second"),
+            Value::True
+        );
+
+        let _ = fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn test_file_newer_than_file_p_eval_respects_default_directory() {
+        use super::super::eval::Evaluator;
+
+        let dir = std::env::temp_dir().join("neovm-file-newer-than-file-p-eval");
+        let _ = fs::remove_dir_all(&dir);
+        fs::create_dir_all(&dir).expect("create test dir");
+
+        let old = dir.join("old.txt");
+        let new = dir.join("new.txt");
+        fs::write(&old, b"old").expect("write old file");
+        std::thread::sleep(std::time::Duration::from_millis(1200));
+        fs::write(&new, b"new").expect("write new file");
+
+        let mut eval = Evaluator::new();
+        eval.obarray.set_symbol_value(
+            "default-directory",
+            Value::string(format!("{}/", dir.to_string_lossy())),
+        );
+
+        let result = builtin_file_newer_than_file_p_eval(
+            &eval,
+            vec![Value::string("new.txt"), Value::string("old.txt")],
+        )
+        .expect("relative newer check");
+        assert_eq!(result, Value::True);
 
         let _ = fs::remove_dir_all(&dir);
     }

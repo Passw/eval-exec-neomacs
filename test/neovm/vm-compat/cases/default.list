@@ -119,6 +119,7 @@ cases/directory-files
 cases/directory-files-and-attributes
 cases/file-attributes
 cases/file-name-case-insensitive-p-semantics
+cases/file-newer-than-file-p-semantics
 cases/file-modes-semantics
 cases/set-file-modes-semantics
 cases/system-users-groups-semantics
