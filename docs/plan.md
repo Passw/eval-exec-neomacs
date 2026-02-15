@@ -4,6 +4,21 @@ Last updated: 2026-02-15
 
 ## Done
 
+- Implemented `system-users` / `system-groups` compatibility slice:
+  - replaced dired stubs with real account/group discovery from `/etc/passwd` and `/etc/group`
+  - aligned output ordering with oracle behavior (reverse file order)
+  - preserved fallback behavior when account files are unavailable
+  - added and enabled oracle corpus:
+    - `test/neovm/vm-compat/cases/system-users-groups-semantics.forms`
+    - `test/neovm/vm-compat/cases/system-users-groups-semantics.expected.tsv`
+    - wired into `test/neovm/vm-compat/cases/default.list`
+  - expanded `rust/neovm-core/src/elisp/dired.rs` tests for parsed ordering and list shape
+  - verified:
+    - `cargo test --manifest-path rust/neovm-core/Cargo.toml dired::tests::test_system_ -- --nocapture` (pass)
+    - `cargo test --manifest-path rust/neovm-core/Cargo.toml parse_colon_file_names_reverses_order -- --nocapture` (pass)
+    - `make -C test/neovm/vm-compat check-neovm FORMS=cases/system-users-groups-semantics.forms EXPECTED=cases/system-users-groups-semantics.expected.tsv` (pass)
+    - `make -C test/neovm/vm-compat validate-case-lists` (pass)
+    - `make -C test/neovm/vm-compat check-all-neovm` (pass)
 - Implemented `read-coding-system` compatibility slice:
   - replaced `read-coding-system` / `read-non-nil-coding-system` UTF-8 stubs with batch-compatible prompt behavior:
     - prompt argument now validates as `stringp`
