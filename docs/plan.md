@@ -4,6 +4,18 @@ Last updated: 2026-02-15
 
 ## Done
 
+- Fixed vm-compat raw-byte string rendering in worker execution path:
+  - added byte-preserving evaluator-aware helpers in `neovm-core` (`print_value_bytes_with_eval`, `format_eval_result_bytes_with_eval`)
+  - switched `neovm-core` compat runner output to buffered byte writes
+  - switched `neovm-worker` elisp executor result rendering to `print_value_bytes_with_eval`
+- Re-verified non-Unicode oracle slices and full suite:
+  - `make -C test/neovm/vm-compat check-neovm FORMS=cases/make-string-raw-byte-semantics.forms EXPECTED=cases/make-string-raw-byte-semantics.expected.tsv` (pass)
+  - `make -C test/neovm/vm-compat check-neovm FORMS=cases/make-string-nonunicode-semantics.forms EXPECTED=cases/make-string-nonunicode-semantics.expected.tsv` (pass)
+  - `make -C test/neovm/vm-compat check-neovm FORMS=cases/string-nonunicode-char-semantics.forms EXPECTED=cases/string-nonunicode-char-semantics.expected.tsv` (pass)
+  - `make -C test/neovm/vm-compat check-neovm FORMS=cases/string-nonunicode-indexing-semantics.forms EXPECTED=cases/string-nonunicode-indexing-semantics.expected.tsv` (pass)
+  - `make -C test/neovm/vm-compat check-neovm FORMS=cases/string-nonunicode-concat-semantics.forms EXPECTED=cases/string-nonunicode-concat-semantics.expected.tsv` (pass)
+  - `make -C test/neovm/vm-compat check-neovm FORMS=cases/string-nonunicode-sequence-semantics.forms EXPECTED=cases/string-nonunicode-sequence-semantics.expected.tsv` (pass)
+  - `make -C test/neovm/vm-compat check-all-neovm` (pass)
 - Aligned `documentation` builtin semantics with oracle behavior:
   - `function-documentation` property now takes precedence for symbol arguments
   - symbol lookup now distinguishes `void-function` and `invalid-function` paths
