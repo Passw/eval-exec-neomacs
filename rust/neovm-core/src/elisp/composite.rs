@@ -141,7 +141,67 @@ pub(crate) fn builtin_composition_get_gstring(args: Vec<Value>) -> EvalResult {
             vec![Value::symbol("stringp"), args[3].clone()],
         ));
     }
-    Ok(Value::Nil)
+    let from = match &args[0] {
+        Value::Int(n) => *n,
+        Value::Char(c) => *c as i64,
+        _ => unreachable!("validated by expect_integerp"),
+    };
+    let to = match &args[1] {
+        Value::Int(n) => *n,
+        Value::Char(c) => *c as i64,
+        _ => unreachable!("validated by expect_integerp"),
+    };
+    let text = args[3].as_str().expect("validated string");
+    let chars: Vec<char> = text.chars().collect();
+    let len = chars.len() as i64;
+
+    if from > to || from > len || to > len {
+        return Err(signal(
+            "args-out-of-range",
+            vec![Value::string(text), Value::Int(from), Value::Int(to)],
+        ));
+    }
+    if from < 0 || from == to {
+        return Err(signal(
+            "error",
+            vec![Value::string("Attempt to shape zero-length text")],
+        ));
+    }
+
+    let from_usize = from as usize;
+    let to_usize = to as usize;
+    if from_usize >= chars.len() || to_usize > chars.len() || from_usize >= to_usize {
+        return Err(signal(
+            "args-out-of-range",
+            vec![Value::string(text), Value::Int(from), Value::Int(to)],
+        ));
+    }
+
+    let segment = &chars[from_usize..to_usize];
+    let mut encoded = vec![Value::symbol("utf-8-unix")];
+    encoded.extend(segment.iter().map(|c| Value::Int(*c as i64)));
+
+    let mut gstring = vec![Value::vector(encoded), Value::Nil];
+    for ch in segment {
+        let code = *ch as i64;
+        gstring.push(Value::vector(vec![
+            Value::Int(0),
+            Value::Int(0),
+            Value::Int(code),
+            Value::Int(code),
+            Value::Int(1),
+            Value::Int(0),
+            Value::Int(1),
+            Value::Int(1),
+            Value::Int(0),
+            Value::Nil,
+        ]));
+    }
+    while gstring.len() < 10 {
+        gstring.push(Value::Nil);
+    }
+
+    Ok(Value::vector(gstring))
 }
 
 /// `(clear-composition-cache)`
@@ -338,15 +398,20 @@ mod tests {
     }
 
     #[test]
-    fn composition_get_gstring_returns_nil() {
+    fn composition_get_gstring_returns_vector_shape() {
         let result = builtin_composition_get_gstring(vec![
             Value::Int(0),
-            Value::Int(5),
+            Value::Int(1),
             Value::Nil,
-            Value::string("hello"),
+            Value::string("ab"),
         ]);
         assert!(result.is_ok());
-        assert!(result.unwrap().is_nil());
+        let Value::Vector(gs) = result.unwrap() else {
+            panic!("expected vector gstring");
+        };
+        let gs = gs.lock().expect("poisoned");
+        assert!(!gs.is_empty());
+        assert!(matches!(gs[0], Value::Vector(_)));
     }
 
     #[test]
@@ -376,6 +441,17 @@ mod tests {
         let bad_string =
             builtin_composition_get_gstring(vec![Value::Int(0), Value::Int(5), Value::Nil, Value::Int(1)]);
         assert!(bad_string.is_err());
+    }
+
+    #[test]
+    fn composition_get_gstring_range_errors() {
+        let from_gt_to =
+            builtin_composition_get_gstring(vec![Value::Int(2), Value::Int(1), Value::Nil, Value::string("ab")]);
+        assert!(from_gt_to.is_err());
+
+        let zero_length =
+            builtin_composition_get_gstring(vec![Value::Int(0), Value::Int(0), Value::Nil, Value::string("ab")]);
+        assert!(zero_length.is_err());
     }
 
     #[test]
