@@ -404,15 +404,6 @@ pub(crate) fn builtin_image_type(args: Vec<Value>) -> EvalResult {
     }
 }
 
-/// (display-images-p &optional DISPLAY) -> t
-///
-/// Return non-nil if DISPLAY can display images.
-/// Always returns t since Neomacs supports image display.
-pub(crate) fn builtin_display_images_p(args: Vec<Value>) -> EvalResult {
-    expect_max_args("display-images-p", &args, 1)?;
-    Ok(Value::True)
-}
-
 /// (image-transforms-p &optional FRAME) -> t
 ///
 /// Return non-nil if FRAME supports image transforms (scaling, rotation).
@@ -803,30 +794,6 @@ mod tests {
     #[test]
     fn image_type_wrong_arity() {
         let result = builtin_image_type(vec![]);
-        assert!(result.is_err());
-    }
-
-    // -----------------------------------------------------------------------
-    // display-images-p
-    // -----------------------------------------------------------------------
-
-    #[test]
-    fn display_images_p_returns_t() {
-        let result = builtin_display_images_p(vec![]);
-        assert!(result.is_ok());
-        assert!(result.unwrap().is_truthy());
-    }
-
-    #[test]
-    fn display_images_p_with_display() {
-        let result = builtin_display_images_p(vec![Value::Nil]);
-        assert!(result.is_ok());
-        assert!(result.unwrap().is_truthy());
-    }
-
-    #[test]
-    fn display_images_p_too_many_args() {
-        let result = builtin_display_images_p(vec![Value::Nil, Value::Nil]);
         assert!(result.is_err());
     }
 

@@ -18,6 +18,16 @@ Last updated: 2026-02-15
 
 ## Done
 
+- Removed dead duplicate image wrapper surface:
+  - updated:
+    - `rust/neovm-core/src/elisp/image.rs`
+      - deleted unreferenced `builtin_display_images_p` wrapper and wrapper-only tests.
+      - active `display-images-p` dispatch remains in `rust/neovm-core/src/elisp/builtins.rs`.
+  - verified:
+    - `cargo test 'elisp::image::tests::' -- --nocapture` (pass, 51 tests)
+    - `make -C test/neovm/vm-compat check-one-neovm CASE=cases/display-batch-semantics` (pass, 12/12)
+    - `make -C test/neovm/vm-compat check-one-neovm CASE=cases/display-stub-semantics` (pass, 30/30)
+
 - Implemented evaluator-backed category docstring path (replacing pure-stub behavior in active dispatch):
   - updated:
     - `rust/neovm-core/src/elisp/category.rs`
