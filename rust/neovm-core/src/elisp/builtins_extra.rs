@@ -454,73 +454,6 @@ pub(crate) fn builtin_kill_local_variable(args: Vec<Value>) -> EvalResult {
 }
 
 // ---------------------------------------------------------------------------
-// Math operations
-// ---------------------------------------------------------------------------
-
-/// `(number-to-string NUMBER)` — already exists, but add base conversion.
-/// `(format "%x" N)` etc.
-
-/// `(string-to-number STRING &optional BASE)` — with base support.
-pub(crate) fn builtin_string_to_number_ext(args: Vec<Value>) -> EvalResult {
-    expect_min_args("string-to-number", &args, 1)?;
-    let s = expect_string(&args[0])?;
-    let base = if args.len() > 1 {
-        expect_int(&args[1])? as u32
-    } else {
-        10
-    };
-
-    let trimmed = s.trim();
-    if base == 10 {
-        if let Ok(n) = trimmed.parse::<i64>() {
-            return Ok(Value::Int(n));
-        }
-        if let Ok(f) = trimmed.parse::<f64>() {
-            return Ok(Value::Float(f));
-        }
-    } else {
-        let stripped = trimmed
-            .strip_prefix("0x")
-            .or_else(|| trimmed.strip_prefix("0X"))
-            .or_else(|| trimmed.strip_prefix("#x"))
-            .unwrap_or(trimmed);
-        if let Ok(n) = i64::from_str_radix(stripped, base) {
-            return Ok(Value::Int(n));
-        }
-    }
-
-    Ok(Value::Int(0))
-}
-
-/// `(random &optional LIMIT)` — random number.
-pub(crate) fn builtin_random_ext(args: Vec<Value>) -> EvalResult {
-    let limit = if args.is_empty() {
-        i64::MAX
-    } else {
-        match &args[0] {
-            Value::Int(n) if *n > 0 => *n,
-            Value::True => {
-                // Seed from time
-                let seed = std::time::SystemTime::now()
-                    .duration_since(std::time::UNIX_EPOCH)
-                    .unwrap_or_default()
-                    .as_nanos() as i64;
-                return Ok(Value::Int(seed.abs()));
-            }
-            _ => i64::MAX,
-        }
-    };
-
-    // Simple LCG random (for determinism in tests).
-    // In production, use a proper RNG.
-    let seed = std::time::SystemTime::now()
-        .duration_since(std::time::UNIX_EPOCH)
-        .unwrap_or_default()
-        .as_nanos() as i64;
-    Ok(Value::Int(seed.abs() % limit))
-}
-
-// ---------------------------------------------------------------------------
 // Predicate additions
 // ---------------------------------------------------------------------------
 
@@ -624,20 +557,6 @@ pub(crate) fn builtin_cl_evenp(args: Vec<Value>) -> EvalResult {
     Ok(Value::bool(n % 2 == 0))
 }
 
-/// `(cl-plusp N)` -> t if positive.
-pub(crate) fn builtin_cl_plusp(args: Vec<Value>) -> EvalResult {
-    expect_args("cl-plusp", &args, 1)?;
-    let n = expect_int(&args[0])?;
-    Ok(Value::bool(n > 0))
-}
-
-/// `(cl-minusp N)` -> t if negative.
-pub(crate) fn builtin_cl_minusp(args: Vec<Value>) -> EvalResult {
-    expect_args("cl-minusp", &args, 1)?;
-    let n = expect_int(&args[0])?;
-    Ok(Value::bool(n < 0))
-}
-
 // ---------------------------------------------------------------------------
 // Misc operations
 // ---------------------------------------------------------------------------
@@ -710,28 +629,6 @@ pub(crate) fn builtin_garbage_collect(args: Vec<Value>) -> EvalResult {
 pub(crate) fn builtin_memory_use_counts(args: Vec<Value>) -> EvalResult {
     expect_args("memory-use-counts", &args, 0)?;
     Ok(Value::list(vec![Value::Int(0); 7]))
-}
-
-/// `(cl-gensym &optional PREFIX)` — generate unique symbol.
-pub(crate) fn builtin_cl_gensym(args: Vec<Value>) -> EvalResult {
-    let prefix = if args.is_empty() {
-        "G"
-    } else {
-        match &args[0] {
-            Value::Str(s) => s.as_str(),
-            _ => "G",
-        }
-    };
-    static COUNTER: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
-    let n = COUNTER.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
-    Ok(Value::symbol(format!("{}{}", prefix, n)))
-}
-
-/// `(make-symbol NAME)` — create uninterned symbol.
-pub(crate) fn builtin_make_symbol_extra(args: Vec<Value>) -> EvalResult {
-    expect_args("make-symbol", &args, 1)?;
-    let name = expect_string(&args[0])?;
-    Ok(Value::symbol(name))
 }
 
 /// `(symbol-name SYM)` — already exists but let's provide compat.
