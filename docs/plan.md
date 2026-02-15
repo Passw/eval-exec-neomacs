@@ -19,6 +19,20 @@ Last updated: 2026-02-15
 
 ## Done
 
+- Fixed `read-number` default-argument type validation in batch read stubs:
+  - updated:
+    - `rust/neovm-core/src/elisp/reader.rs`
+      - `read-number` now validates optional DEFAULT as `numberp` when non-nil before signaling batch `end-of-file`.
+      - added reader unit coverage for numeric/non-numeric DEFAULT behavior.
+    - `test/neovm/vm-compat/cases/minibuffer-batch.{forms,expected.tsv}`
+      - added oracle lock-ins for `read-number`:
+        - numeric default still yields `end-of-file` in batch
+        - non-numeric defaults (`t`, `"x"`) signal `wrong-type-argument`
+      - refreshed oracle baseline.
+  - verified:
+    - `cargo test reader::tests --manifest-path rust/neovm-core/Cargo.toml -- --nocapture` (pass)
+    - `make -C test/neovm/vm-compat check-one-neovm CASE=cases/minibuffer-batch` (pass, 30/30)
+
 - Locked monitor-query designator message-detail parity:
   - updated:
     - `test/neovm/vm-compat/cases/display-monitor-semantics.{forms,expected.tsv}`
