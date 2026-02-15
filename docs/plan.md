@@ -19,6 +19,16 @@ Last updated: 2026-02-15
 
 ## Done
 
+- Added oracle-locked `composition-get-gstring` range/error edge coverage:
+  - updated:
+    - `test/neovm/vm-compat/cases/composite-basic-semantics.{forms,expected.tsv}`
+      - added explicit range/error assertions for:
+        - `args-out-of-range` (`FROM > TO`, out-of-bounds `TO`, out-of-bounds `FROM==TO`)
+        - zero-length shaping error (`FROM == TO` in-range and negative FROM edge)
+      - refreshed oracle baseline.
+  - verified:
+    - `make -C test/neovm/vm-compat check-one-neovm CASE=cases/composite-basic-semantics` (pass, 39/39)
+
 - Implemented a non-nil `composition-get-gstring` placeholder shape for valid batch inputs:
   - updated:
     - `rust/neovm-core/src/elisp/composite.rs`
