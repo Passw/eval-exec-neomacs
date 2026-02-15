@@ -34,6 +34,18 @@ Last updated: 2026-02-15
     - `make -C test/neovm/vm-compat check-neovm FORMS=cases/query-replace-batch-semantics.forms EXPECTED=cases/query-replace-batch-semantics.expected.tsv` (pass)
     - `make -C test/neovm/vm-compat validate-case-lists` (pass)
     - `NEOVM_ORACLE_EMACS=/nix/store/hql3zwz5b4ywd2qwx8jssp4dyb7nx4cb-emacs-30.2/bin/emacs make -C test/neovm/vm-compat check-builtin-registry-fboundp` (pass; expected allowlisted drift only)
+- Implemented regexp replacement back-reference expansion parity and oracle lock-in:
+  - updated `rust/neovm-core/src/elisp/isearch.rs`:
+    - added replacement expansion for Emacs escapes (`\\&`, `\\1`..`\\9`) in regexp replacement paths
+    - `replace-regexp` now uses capture-aware iteration and applies expanded replacement text
+    - `query-replace-regexp` inherits the same expansion behavior via evaluator subset routing
+  - added and enabled oracle corpus:
+    - `test/neovm/vm-compat/cases/replace-regexp-backref-semantics.forms`
+    - `test/neovm/vm-compat/cases/replace-regexp-backref-semantics.expected.tsv`
+    - wired into `test/neovm/vm-compat/cases/default.list`
+  - verified:
+    - `make -C test/neovm/vm-compat check-neovm FORMS=cases/replace-regexp-backref-semantics.forms EXPECTED=cases/replace-regexp-backref-semantics.expected.tsv` (pass)
+    - `make -C test/neovm/vm-compat validate-case-lists` (pass)
 
 - Implemented and locked search-stack evaluator subsets with oracle corpus:
   - `replace-regexp`:
