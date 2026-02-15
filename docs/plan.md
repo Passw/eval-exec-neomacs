@@ -19,6 +19,19 @@ Last updated: 2026-02-15
 
 ## Done
 
+- Added argument-value detail to `get-device-terminal` display error payloads:
+  - updated:
+    - `rust/neovm-core/src/elisp/display.rs`
+      - centralized invalid display-designator error construction using printed argument values.
+      - `x-display-color-p` and related display-designator checks now include the offending value in error message text.
+      - expanded unit assertion coverage for `x-display-color-p` integer-designator payload.
+    - `test/neovm/vm-compat/cases/x-display-batch-semantics.{forms,expected.tsv}`
+      - added explicit check that `(x-display-color-p 999999)` error message mentions `999999`.
+      - refreshed oracle baseline.
+  - verified:
+    - `cargo test display::tests --manifest-path rust/neovm-core/Cargo.toml -- --nocapture` (pass)
+    - `make -C test/neovm/vm-compat check-one-neovm CASE=cases/x-display-batch-semantics` (pass, 35/35)
+
 - Expanded posix/word search oracle corpus for type and COUNT edge paths:
   - updated:
     - `test/neovm/vm-compat/cases/search-posix-word-semantics.{forms,expected.tsv}`
