@@ -25,6 +25,7 @@ const DISPATCH_BUILTIN_NAMES: &[&str] = &[
     "abort-recursive-edit",
     "abs",
     "add-hook",
+    "add-name-to-file",
     "add-text-properties",
     "add-variable-watcher",
     "advice-add",

@@ -4,6 +4,28 @@ Last updated: 2026-02-15
 
 ## Done
 
+- Implemented `add-name-to-file` compatibility slice:
+  - added pure + evaluator-aware builtins in `rust/neovm-core/src/elisp/fileio.rs`:
+    - `builtin_add_name_to_file`
+    - `builtin_add_name_to_file_eval`
+  - semantics aligned with oracle subset:
+    - arity `2..3`
+    - strict `stringp` validation for `OLDNAME` and `NEWNAME`
+    - creates hard-link aliases (`NEWNAME` points to `OLDNAME`)
+    - existing destination signals `file-already-exists` unless `OK-IF-ALREADY-EXISTS` is non-`nil`
+    - missing source signals `file-missing`
+    - evaluator path resolves relative names against dynamic/default `default-directory`
+  - registered and dispatched `add-name-to-file` in:
+    - `rust/neovm-core/src/elisp/builtins.rs`
+    - `rust/neovm-core/src/elisp/builtin_registry.rs`
+  - added and enabled oracle corpus:
+    - `test/neovm/vm-compat/cases/add-name-to-file-semantics.forms`
+    - `test/neovm/vm-compat/cases/add-name-to-file-semantics.expected.tsv`
+    - wired into `test/neovm/vm-compat/cases/default.list`
+  - verified:
+    - `cargo test --manifest-path rust/neovm-core/Cargo.toml add_name_to_file -- --nocapture` (pass)
+    - `make -C test/neovm/vm-compat check-neovm FORMS=cases/add-name-to-file-semantics.forms EXPECTED=cases/add-name-to-file-semantics.expected.tsv` (pass)
+    - `make -C test/neovm/vm-compat validate-case-lists` (pass)
 - Implemented `file-equal-p` compatibility slice:
   - added pure + evaluator-aware builtins in `rust/neovm-core/src/elisp/fileio.rs`:
     - `builtin_file_equal_p`

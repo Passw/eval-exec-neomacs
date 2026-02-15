@@ -118,6 +118,7 @@ cases/directory-file-name
 cases/directory-files
 cases/directory-files-and-attributes
 cases/file-attributes
+cases/add-name-to-file-semantics
 cases/file-name-case-insensitive-p-semantics
 cases/file-newer-than-file-p-semantics
 cases/file-equal-p-semantics

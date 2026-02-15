@@ -714,6 +714,11 @@ pub fn copy_file(from: &str, to: &str) -> std::io::Result<()> {
     fs::copy(from, to).map(|_| ())
 }
 
+/// Create an additional name (hard link) from OLDNAME to NEWNAME.
+pub fn add_name_to_file(oldname: &str, newname: &str) -> std::io::Result<()> {
+    fs::hard_link(oldname, newname)
+}
+
 // ===========================================================================
 // File attributes
 // ===========================================================================
@@ -2049,6 +2054,53 @@ pub(crate) fn builtin_copy_file_eval(eval: &Evaluator, args: Vec<Value>) -> Eval
     Ok(Value::Nil)
 }
 
+/// (add-name-to-file OLDNAME NEWNAME &optional OK-IF-ALREADY-EXISTS) -> nil
+pub(crate) fn builtin_add_name_to_file(args: Vec<Value>) -> EvalResult {
+    expect_min_args("add-name-to-file", &args, 2)?;
+    if args.len() > 3 {
+        return Err(signal(
+            "wrong-number-of-arguments",
+            vec![
+                Value::symbol("add-name-to-file"),
+                Value::Int(args.len() as i64),
+            ],
+        ));
+    }
+    let oldname = expect_string_strict(&args[0])?;
+    let newname = expect_string_strict(&args[1])?;
+    let ok_if_exists = args.get(2).is_some_and(|value| value.is_truthy());
+    if ok_if_exists && fs::symlink_metadata(&newname).is_ok() {
+        fs::remove_file(&newname).map_err(|err| signal_file_io_path(err, "Removing old name", &newname))?;
+    }
+    add_name_to_file(&oldname, &newname)
+        .map_err(|err| signal_file_io_paths(err, "Adding new name", &oldname, &newname))?;
+    Ok(Value::Nil)
+}
+
+/// Evaluator-aware variant of `add-name-to-file` that resolves relative paths
+/// against dynamic/default `default-directory`.
+pub(crate) fn builtin_add_name_to_file_eval(eval: &Evaluator, args: Vec<Value>) -> EvalResult {
+    expect_min_args("add-name-to-file", &args, 2)?;
+    if args.len() > 3 {
+        return Err(signal(
+            "wrong-number-of-arguments",
+            vec![
+                Value::symbol("add-name-to-file"),
+                Value::Int(args.len() as i64),
+            ],
+        ));
+    }
+    let oldname = resolve_filename_for_eval(eval, &expect_string_strict(&args[0])?);
+    let newname = resolve_filename_for_eval(eval, &expect_string_strict(&args[1])?);
+    let ok_if_exists = args.get(2).is_some_and(|value| value.is_truthy());
+    if ok_if_exists && fs::symlink_metadata(&newname).is_ok() {
+        fs::remove_file(&newname).map_err(|err| signal_file_io_path(err, "Removing old name", &newname))?;
+    }
+    add_name_to_file(&oldname, &newname)
+        .map_err(|err| signal_file_io_paths(err, "Adding new name", &oldname, &newname))?;
+    Ok(Value::Nil)
+}
+
 /// (make-directory DIR &optional PARENTS) -> nil
 pub(crate) fn builtin_make_directory(args: Vec<Value>) -> EvalResult {
     expect_min_args("make-directory", &args, 1)?;
@@ -2919,6 +2971,56 @@ mod tests {
         let _ = fs::remove_dir_all(&dir);
     }
 
+    #[test]
+    fn test_builtin_add_name_to_file_semantics() {
+        let dir = std::env::temp_dir().join("neovm_add_name_to_file_test");
+        let _ = fs::remove_dir_all(&dir);
+        fs::create_dir_all(&dir).unwrap();
+
+        let src = dir.join("source.txt");
+        let dst = dir.join("alias.txt");
+        fs::write(&src, b"x").unwrap();
+
+        let src_str = src.to_string_lossy().to_string();
+        let dst_str = dst.to_string_lossy().to_string();
+
+        assert_eq!(
+            builtin_add_name_to_file(vec![Value::string(&src_str), Value::string(&dst_str)]).unwrap(),
+            Value::Nil
+        );
+        assert!(file_exists_p(&dst_str));
+        assert!(file_equal_p(&src_str, &dst_str));
+
+        let err = builtin_add_name_to_file(vec![Value::string(&src_str), Value::string(&dst_str)])
+            .unwrap_err();
+        match err {
+            Flow::Signal(sig) => assert_eq!(sig.symbol, "file-already-exists"),
+            other => panic!("expected signal, got {:?}", other),
+        }
+
+        assert_eq!(
+            builtin_add_name_to_file(vec![
+                Value::string(&src_str),
+                Value::string(&dst_str),
+                Value::True,
+            ])
+            .unwrap(),
+            Value::Nil
+        );
+        assert!(file_equal_p(&src_str, &dst_str));
+
+        let missing = dir.join("missing.txt").to_string_lossy().to_string();
+        let dst2 = dir.join("alias2.txt").to_string_lossy().to_string();
+        let err = builtin_add_name_to_file(vec![Value::string(&missing), Value::string(&dst2)])
+            .unwrap_err();
+        match err {
+            Flow::Signal(sig) => assert_eq!(sig.symbol, "file-missing"),
+            other => panic!("expected signal, got {:?}", other),
+        }
+
+        let _ = fs::remove_dir_all(&dir);
+    }
+
     // -----------------------------------------------------------------------
     // File attributes
     // -----------------------------------------------------------------------
@@ -3427,6 +3529,18 @@ mod tests {
 
         builtin_delete_file_eval(&eval, vec![Value::string("gamma.txt")]).unwrap();
         assert!(!base.join("gamma.txt").exists());
+
+        builtin_add_name_to_file_eval(
+            &eval,
+            vec![Value::string("alpha.txt"), Value::string("delta.txt")],
+        )
+        .unwrap();
+        assert!(base.join("delta.txt").exists());
+        assert!(file_equal_p(
+            &base.join("alpha.txt").to_string_lossy(),
+            &base.join("delta.txt").to_string_lossy(),
+        ));
+        builtin_delete_file_eval(&eval, vec![Value::string("delta.txt")]).unwrap();
 
         let _ = fs::remove_dir_all(&base);
     }

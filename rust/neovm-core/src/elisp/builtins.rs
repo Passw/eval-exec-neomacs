@@ -5603,6 +5603,9 @@ pub(crate) fn dispatch_builtin(
         }
         "rename-file" => return Some(super::fileio::builtin_rename_file_eval(eval, args)),
         "copy-file" => return Some(super::fileio::builtin_copy_file_eval(eval, args)),
+        "add-name-to-file" => {
+            return Some(super::fileio::builtin_add_name_to_file_eval(eval, args))
+        }
         "make-symbolic-link" => {
             return Some(super::fileio::builtin_make_symbolic_link_eval(eval, args))
         }
@@ -6566,6 +6569,7 @@ pub(crate) fn dispatch_builtin(
         "delete-directory" => super::fileio::builtin_delete_directory(args),
         "rename-file" => super::fileio::builtin_rename_file(args),
         "copy-file" => super::fileio::builtin_copy_file(args),
+        "add-name-to-file" => super::fileio::builtin_add_name_to_file(args),
         "make-symbolic-link" => super::fileio::builtin_make_symbolic_link(args),
         "make-directory" => super::fileio::builtin_make_directory(args),
         "make-temp-file" => super::fileio::builtin_make_temp_file(args),
@@ -7110,6 +7114,7 @@ pub(crate) fn dispatch_builtin_pure(name: &str, args: Vec<Value>) -> Option<Eval
         "delete-directory" => super::fileio::builtin_delete_directory(args),
         "rename-file" => super::fileio::builtin_rename_file(args),
         "copy-file" => super::fileio::builtin_copy_file(args),
+        "add-name-to-file" => super::fileio::builtin_add_name_to_file(args),
         "make-symbolic-link" => super::fileio::builtin_make_symbolic_link(args),
         "make-directory" => super::fileio::builtin_make_directory(args),
         "make-temp-file" => super::fileio::builtin_make_temp_file(args),
