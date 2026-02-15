@@ -50,6 +50,7 @@ cases/printing
 cases/prin1-to-string-noescape
 cases/chars
 cases/char-byte-conversion-semantics
+cases/get-byte-semantics
 cases/custom-group-p-availability
 cases/custom-set-semantics
 cases/bookmark-helper-availability
