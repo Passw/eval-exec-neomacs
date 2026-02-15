@@ -68,6 +68,15 @@ Last updated: 2026-02-15
   - `test/neovm/vm-compat/cases/time-zone-rule-semantics.forms`
   - `test/neovm/vm-compat/cases/time-zone-rule-semantics.expected.tsv`
   - wired into `test/neovm/vm-compat/cases/default.list`
+- Implemented JSON compatibility adjustments:
+  - `json-serialize` alist key typing now follows Emacs `symbolp` expectations
+  - `json-parse-string` `:object-type 'alist` now emits symbol keys
+  - parser now signals `json-end-of-file` for empty/whitespace-only input
+  - trailing-content signal now uses `json-trailing-content`
+- Added and enabled new oracle corpus:
+  - `test/neovm/vm-compat/cases/json-semantics.forms`
+  - `test/neovm/vm-compat/cases/json-semantics.expected.tsv`
+  - wired into `test/neovm/vm-compat/cases/default.list`
 - Kept branch green with targeted Rust tests and vm-compat checks after each slice.
 
 ## Doing
