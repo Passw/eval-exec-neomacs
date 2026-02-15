@@ -1652,6 +1652,23 @@ Last updated: 2026-02-15
     - `NEOVM_ORACLE_EMACS=/nix/store/hql3zwz5b4ywd2qwx8jssp4dyb7nx4cb-emacs-30.2/bin/emacs make -C test/neovm/vm-compat record FORMS=cases/query-replace-edge-semantics.forms EXPECTED=cases/query-replace-edge-semantics.expected.tsv` (pass)
     - `make -C test/neovm/vm-compat check-neovm FORMS=cases/query-replace-edge-semantics.forms EXPECTED=cases/query-replace-edge-semantics.expected.tsv` (pass, 9/9)
     - `make -C test/neovm/vm-compat validate-case-lists` (pass)
+- Aligned forward point placement for `query-replace*` batch subset:
+  - root cause: shared replace path left point at region end, while Oracle leaves point at end of last replaced match for forward query-replace flows
+  - refactored evaluator replacement internals to keep replace/query-replace text semantics shared while allowing query-specific point placement
+  - expanded `query-replace` edge corpus with point-sensitive cases:
+    - forward empty-regexp query replacement point behavior
+    - ranged empty-string query replacement point behavior
+    - reversed start/end query-regexp point behavior
+  - verified:
+    - `NEOVM_ORACLE_EMACS=/nix/store/hql3zwz5b4ywd2qwx8jssp4dyb7nx4cb-emacs-30.2/bin/emacs make -C test/neovm/vm-compat record FORMS=cases/query-replace-edge-semantics.forms EXPECTED=cases/query-replace-edge-semantics.expected.tsv` (pass)
+    - `make -C test/neovm/vm-compat check-neovm FORMS=cases/query-replace-edge-semantics.forms EXPECTED=cases/query-replace-edge-semantics.expected.tsv` (pass, 12/12)
+    - `make -C test/neovm/vm-compat --no-print-directory check-neovm FORMS=cases/query-replace-batch-semantics.forms EXPECTED=cases/query-replace-batch-semantics.expected.tsv` (pass)
+    - `make -C test/neovm/vm-compat --no-print-directory check-neovm FORMS=cases/replace-string-semantics.forms EXPECTED=cases/replace-string-semantics.expected.tsv` (pass)
+    - `make -C test/neovm/vm-compat --no-print-directory check-neovm FORMS=cases/replace-regexp-semantics.forms EXPECTED=cases/replace-regexp-semantics.expected.tsv` (pass)
+    - `make -C test/neovm/vm-compat --no-print-directory check-neovm FORMS=cases/replace-backward-semantics.forms EXPECTED=cases/replace-backward-semantics.expected.tsv` (pass)
+    - `make -C test/neovm/vm-compat --no-print-directory check-neovm FORMS=cases/replace-backward-edge-semantics.forms EXPECTED=cases/replace-backward-edge-semantics.expected.tsv` (pass)
+    - `make -C test/neovm/vm-compat --no-print-directory check-neovm FORMS=cases/replace-region-noncontiguous-semantics.forms EXPECTED=cases/replace-region-noncontiguous-semantics.expected.tsv` (pass)
+    - `make -C test/neovm/vm-compat validate-case-lists` (pass)
 - Kept branch green with targeted Rust tests and vm-compat checks after each slice.
 
 ## Doing
