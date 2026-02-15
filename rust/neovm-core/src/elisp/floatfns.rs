@@ -4,7 +4,6 @@
 //! - Trigonometric: `acos`, `asin`, `atan`, `cos`, `sin`, `tan`
 //! - Classification: `isnan`, `copysign`, `frexp`, `ldexp`, `logb`
 //! - Exponential: `exp`, `expt`, `log`, `sqrt`
-//! - Rounding (integer result): `ceiling`, `floor`, `round`, `truncate`
 //! - Rounding (float result): `fceiling`, `ffloor`, `fround`, `ftruncate`
 
 use super::error::{signal, EvalResult, Flow};
@@ -360,97 +359,6 @@ pub(crate) fn builtin_logb(args: Vec<Value>) -> EvalResult {
     Ok(Value::Int(result))
 }
 
-// ---------------------------------------------------------------------------
-// Rounding to integer
-// ---------------------------------------------------------------------------
-
-/// Helper for ceiling/floor/round/truncate with optional DIVISOR.
-/// Returns the quotient as f64 after dividing by DIVISOR (if present).
-fn divide_for_rounding(name: &str, args: &[Value]) -> Result<(f64, bool), Flow> {
-    let x = extract_float(name, &args[0])?;
-    let is_int_division = matches!(args[0], Value::Int(_));
-
-    if args.len() == 2 {
-        let divisor = extract_float(name, &args[1])?;
-        if divisor == 0.0 {
-            return Err(signal("arith-error", vec![Value::symbol(name)]));
-        }
-        let both_int = is_int_division && matches!(args[1], Value::Int(_));
-        Ok((x / divisor, both_int))
-    } else {
-        Ok((x, is_int_division))
-    }
-}
-
-/// (ceiling X &optional DIVISOR) -- round X upward to integer
-pub(crate) fn builtin_ceiling(args: Vec<Value>) -> EvalResult {
-    expect_args_range("ceiling", &args, 1, 2)?;
-    let (quotient, _both_int) = divide_for_rounding("ceiling", &args)?;
-
-    if quotient.is_nan() || quotient.is_infinite() {
-        return Err(signal(
-            "range-error",
-            vec![Value::symbol("ceiling"), Value::Float(quotient)],
-        ));
-    }
-
-    // When there is no DIVISOR and the arg is already Int, return it directly
-    if args.len() == 1 {
-        if let Value::Int(n) = &args[0] {
-            return Ok(Value::Int(*n));
-        }
-    }
-
-    let result = quotient.ceil();
-    Ok(Value::Int(result as i64))
-}
-
-/// (floor X &optional DIVISOR) -- round X downward to integer
-pub(crate) fn builtin_floor(args: Vec<Value>) -> EvalResult {
-    expect_args_range("floor", &args, 1, 2)?;
-    let (quotient, _both_int) = divide_for_rounding("floor", &args)?;
-
-    if quotient.is_nan() || quotient.is_infinite() {
-        return Err(signal(
-            "range-error",
-            vec![Value::symbol("floor"), Value::Float(quotient)],
-        ));
-    }
-
-    if args.len() == 1 {
-        if let Value::Int(n) = &args[0] {
-            return Ok(Value::Int(*n));
-        }
-    }
-
-    let result = quotient.floor();
-    Ok(Value::Int(result as i64))
-}
-
-/// (round X &optional DIVISOR) -- round X to nearest integer (banker's rounding)
-///
-/// Uses "round half to even" (banker's rounding) to match Emacs behavior.
-pub(crate) fn builtin_round(args: Vec<Value>) -> EvalResult {
-    expect_args_range("round", &args, 1, 2)?;
-    let (quotient, _both_int) = divide_for_rounding("round", &args)?;
-
-    if quotient.is_nan() || quotient.is_infinite() {
-        return Err(signal(
-            "range-error",
-            vec![Value::symbol("round"), Value::Float(quotient)],
-        ));
-    }
-
-    if args.len() == 1 {
-        if let Value::Int(n) = &args[0] {
-            return Ok(Value::Int(*n));
-        }
-    }
-
-    let result = bankers_round(quotient);
-    Ok(Value::Int(result as i64))
-}
-
 /// Banker's rounding: round half to even.
 fn bankers_round(x: f64) -> f64 {
     let rounded = x.round();
@@ -474,28 +382,6 @@ fn bankers_round(x: f64) -> f64 {
     } else {
         rounded
     }
-}
-
-/// (truncate X &optional DIVISOR) -- round X toward zero to integer
-pub(crate) fn builtin_truncate(args: Vec<Value>) -> EvalResult {
-    expect_args_range("truncate", &args, 1, 2)?;
-    let (quotient, _both_int) = divide_for_rounding("truncate", &args)?;
-
-    if quotient.is_nan() || quotient.is_infinite() {
-        return Err(signal(
-            "range-error",
-            vec![Value::symbol("truncate"), Value::Float(quotient)],
-        ));
-    }
-
-    if args.len() == 1 {
-        if let Value::Int(n) = &args[0] {
-            return Ok(Value::Int(*n));
-        }
-    }
-
-    let result = quotient.trunc();
-    Ok(Value::Int(result as i64))
 }
 
 // ---------------------------------------------------------------------------
@@ -806,112 +692,6 @@ mod tests {
         // logb(0.5) = -1
         let result = builtin_logb(vec![Value::Float(0.5)]).unwrap();
         assert_int_eq(&result, -1);
-    }
-
-    // ===== Rounding to integer =====
-
-    #[test]
-    fn test_ceiling() {
-        let result = builtin_ceiling(vec![Value::Float(1.1)]).unwrap();
-        assert_int_eq(&result, 2);
-
-        let result = builtin_ceiling(vec![Value::Float(-1.1)]).unwrap();
-        assert_int_eq(&result, -1);
-
-        let result = builtin_ceiling(vec![Value::Float(2.0)]).unwrap();
-        assert_int_eq(&result, 2);
-
-        // Integer passthrough
-        let result = builtin_ceiling(vec![Value::Int(5)]).unwrap();
-        assert_int_eq(&result, 5);
-    }
-
-    #[test]
-    fn test_ceiling_with_divisor() {
-        // ceiling(7, 2) = 4
-        let result = builtin_ceiling(vec![Value::Float(7.0), Value::Float(2.0)]).unwrap();
-        assert_int_eq(&result, 4);
-    }
-
-    #[test]
-    fn test_floor() {
-        let result = builtin_floor(vec![Value::Float(1.9)]).unwrap();
-        assert_int_eq(&result, 1);
-
-        let result = builtin_floor(vec![Value::Float(-1.1)]).unwrap();
-        assert_int_eq(&result, -2);
-
-        let result = builtin_floor(vec![Value::Int(5)]).unwrap();
-        assert_int_eq(&result, 5);
-    }
-
-    #[test]
-    fn test_floor_with_divisor() {
-        // floor(7, 2) = 3
-        let result = builtin_floor(vec![Value::Float(7.0), Value::Float(2.0)]).unwrap();
-        assert_int_eq(&result, 3);
-    }
-
-    #[test]
-    fn test_round_basic() {
-        let result = builtin_round(vec![Value::Float(1.4)]).unwrap();
-        assert_int_eq(&result, 1);
-
-        let result = builtin_round(vec![Value::Float(1.6)]).unwrap();
-        assert_int_eq(&result, 2);
-
-        let result = builtin_round(vec![Value::Float(-1.4)]).unwrap();
-        assert_int_eq(&result, -1);
-
-        let result = builtin_round(vec![Value::Float(-1.6)]).unwrap();
-        assert_int_eq(&result, -2);
-    }
-
-    #[test]
-    fn test_round_bankers() {
-        // Banker's rounding: 0.5 rounds to even
-        let result = builtin_round(vec![Value::Float(0.5)]).unwrap();
-        assert_int_eq(&result, 0);
-
-        let result = builtin_round(vec![Value::Float(1.5)]).unwrap();
-        assert_int_eq(&result, 2);
-
-        let result = builtin_round(vec![Value::Float(2.5)]).unwrap();
-        assert_int_eq(&result, 2);
-
-        let result = builtin_round(vec![Value::Float(3.5)]).unwrap();
-        assert_int_eq(&result, 4);
-    }
-
-    #[test]
-    fn test_truncate() {
-        let result = builtin_truncate(vec![Value::Float(1.9)]).unwrap();
-        assert_int_eq(&result, 1);
-
-        let result = builtin_truncate(vec![Value::Float(-1.9)]).unwrap();
-        assert_int_eq(&result, -1);
-
-        let result = builtin_truncate(vec![Value::Int(5)]).unwrap();
-        assert_int_eq(&result, 5);
-    }
-
-    #[test]
-    fn test_truncate_with_divisor() {
-        // truncate(7, 2) = 3
-        let result = builtin_truncate(vec![Value::Float(7.0), Value::Float(2.0)]).unwrap();
-        assert_int_eq(&result, 3);
-
-        // truncate(-7, 2) = -3
-        let result = builtin_truncate(vec![Value::Float(-7.0), Value::Float(2.0)]).unwrap();
-        assert_int_eq(&result, -3);
-    }
-
-    #[test]
-    fn test_division_by_zero() {
-        assert!(builtin_ceiling(vec![Value::Float(1.0), Value::Float(0.0)]).is_err());
-        assert!(builtin_floor(vec![Value::Float(1.0), Value::Float(0.0)]).is_err());
-        assert!(builtin_round(vec![Value::Float(1.0), Value::Float(0.0)]).is_err());
-        assert!(builtin_truncate(vec![Value::Float(1.0), Value::Float(0.0)]).is_err());
     }
 
     // ===== Rounding to float =====

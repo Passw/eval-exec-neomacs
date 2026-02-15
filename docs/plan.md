@@ -18,6 +18,16 @@ Last updated: 2026-02-15
 
 ## Done
 
+- Pruned dead duplicate integer-rounding wrappers from `floatfns`:
+  - updated:
+    - `rust/neovm-core/src/elisp/floatfns.rs`
+      - removed unreferenced local `ceiling`/`floor`/`round`/`truncate` wrapper implementations and local helper used only by that dead path.
+      - removed local wrapper-only tests tied to those wrappers.
+      - kept float-rounding wrappers (`fceiling`/`ffloor`/`fround`/`ftruncate`) intact.
+  - verified:
+    - `cargo test 'elisp::floatfns::tests::' -- --nocapture` (pass, 28 tests)
+    - `make -C test/neovm/vm-compat check-one-neovm CASE=cases/core` (pass, 15/15)
+
 - Pruned dead duplicate `float` wrapper from `floatfns`:
   - updated:
     - `rust/neovm-core/src/elisp/floatfns.rs`
