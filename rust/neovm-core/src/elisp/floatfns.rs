@@ -4,7 +4,7 @@
 //! - Trigonometric: `acos`, `asin`, `atan`, `cos`, `sin`, `tan`
 //! - Classification: `isnan`, `copysign`, `frexp`, `ldexp`, `logb`
 //! - Exponential: `exp`, `expt`, `log`, `sqrt`
-//! - Absolute value and conversion: `abs`, `float`
+//! - Conversion: `float`
 //! - Rounding (integer result): `ceiling`, `floor`, `round`, `truncate`
 //! - Rounding (float result): `fceiling`, `ffloor`, `fround`, `ftruncate`
 
@@ -333,29 +333,6 @@ pub(crate) fn builtin_sqrt(args: Vec<Value>) -> EvalResult {
         ));
     }
     Ok(Value::Float(x.sqrt()))
-}
-
-// ---------------------------------------------------------------------------
-// Absolute value and conversion
-// ---------------------------------------------------------------------------
-
-/// (abs X) -- absolute value of X (works for int and float)
-pub(crate) fn builtin_abs(args: Vec<Value>) -> EvalResult {
-    expect_args("abs", &args, 1)?;
-    match &args[0] {
-        Value::Int(n) => {
-            // Handle i64::MIN overflow
-            match n.checked_abs() {
-                Some(v) => Ok(Value::Int(v)),
-                None => Ok(Value::Float((*n as f64).abs())),
-            }
-        }
-        Value::Float(f) => Ok(Value::Float(f.abs())),
-        other => Err(signal(
-            "wrong-type-argument",
-            vec![Value::symbol("number-or-marker-p"), other.clone()],
-        )),
-    }
 }
 
 /// (float X) -- convert X to a floating-point number
@@ -828,33 +805,7 @@ mod tests {
         assert!(builtin_sqrt(vec![Value::Float(-1.0)]).is_err());
     }
 
-    // ===== abs / float / logb =====
-
-    #[test]
-    fn test_abs_int() {
-        let result = builtin_abs(vec![Value::Int(-42)]).unwrap();
-        assert_int_eq(&result, 42);
-
-        let result = builtin_abs(vec![Value::Int(42)]).unwrap();
-        assert_int_eq(&result, 42);
-
-        let result = builtin_abs(vec![Value::Int(0)]).unwrap();
-        assert_int_eq(&result, 0);
-    }
-
-    #[test]
-    fn test_abs_float() {
-        let result = builtin_abs(vec![Value::Float(-3.14)]).unwrap();
-        assert_float_eq(&result, 3.14, 1e-10);
-
-        let result = builtin_abs(vec![Value::Float(3.14)]).unwrap();
-        assert_float_eq(&result, 3.14, 1e-10);
-    }
-
-    #[test]
-    fn test_abs_wrong_type() {
-        assert!(builtin_abs(vec![Value::string("nope")]).is_err());
-    }
+    // ===== float / logb =====
 
     #[test]
     fn test_float_conversion() {

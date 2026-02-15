@@ -18,6 +18,15 @@ Last updated: 2026-02-15
 
 ## Done
 
+- Pruned dead duplicate `abs` wrapper from `floatfns`:
+  - updated:
+    - `rust/neovm-core/src/elisp/floatfns.rs`
+      - removed unreferenced local `builtin_abs` implementation (active `abs` dispatch remains in `builtins.rs`).
+      - removed local wrapper-only `abs` tests.
+  - verified:
+    - `cargo test 'elisp::floatfns::tests::' -- --nocapture` (pass, 38 tests)
+    - `make -C test/neovm/vm-compat check-one-neovm CASE=cases/core` (pass, 15/15)
+
 - Re-ran full NeoVM compatibility gate after cleanup batch:
   - verified:
     - `make -C test/neovm/vm-compat check-all-neovm` (pass, full default + neovm-only corpus)
