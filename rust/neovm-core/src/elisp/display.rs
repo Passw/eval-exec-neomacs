@@ -770,10 +770,47 @@ pub(crate) fn builtin_terminal_parameter(args: Vec<Value>) -> EvalResult {
     })
 }
 
+/// Evaluator-aware variant of `terminal-parameter`.
+///
+/// Accepts live frame designators in addition to terminal designators.
+pub(crate) fn builtin_terminal_parameter_eval(
+    eval: &mut super::eval::Evaluator,
+    args: Vec<Value>,
+) -> EvalResult {
+    expect_args("terminal-parameter", &args, 2)?;
+    expect_terminal_designator_eval(eval, &args[0])?;
+    let key = HashKey::Symbol(expect_symbol_name(&args[1])?);
+    TERMINAL_PARAMS.with(|slot| {
+        Ok(slot
+            .borrow()
+            .get(&key)
+            .cloned()
+            .unwrap_or(Value::Nil))
+    })
+}
+
 /// (set-terminal-parameter TERMINAL PARAMETER VALUE) -> nil
 pub(crate) fn builtin_set_terminal_parameter(args: Vec<Value>) -> EvalResult {
     expect_args("set-terminal-parameter", &args, 3)?;
     expect_terminal_designator(&args[0])?;
+    if let Ok(name) = expect_symbol_name(&args[1]) {
+        let key = HashKey::Symbol(name);
+        TERMINAL_PARAMS.with(|slot| {
+            slot.borrow_mut().insert(key, args[2].clone());
+        });
+    }
+    Ok(Value::Nil)
+}
+
+/// Evaluator-aware variant of `set-terminal-parameter`.
+///
+/// Accepts live frame designators in addition to terminal designators.
+pub(crate) fn builtin_set_terminal_parameter_eval(
+    eval: &mut super::eval::Evaluator,
+    args: Vec<Value>,
+) -> EvalResult {
+    expect_args("set-terminal-parameter", &args, 3)?;
+    expect_terminal_designator_eval(eval, &args[0])?;
     if let Ok(name) = expect_symbol_name(&args[1]) {
         let key = HashKey::Symbol(name);
         TERMINAL_PARAMS.with(|slot| {
@@ -1016,6 +1053,28 @@ mod tests {
         let result =
             builtin_set_terminal_parameter(vec![Value::Int(1), Value::symbol("k"), Value::Int(1)]);
         assert!(result.is_err());
+    }
+
+    #[test]
+    fn eval_terminal_parameter_accepts_live_frame_designator() {
+        clear_terminal_parameters();
+        let mut eval = crate::elisp::Evaluator::new();
+        let frame_id = crate::elisp::window_cmds::ensure_selected_frame_id(&mut eval).0 as i64;
+        builtin_set_terminal_parameter_eval(
+            &mut eval,
+            vec![
+                Value::Int(frame_id),
+                Value::symbol("neovm-frame-param"),
+                Value::Int(7),
+            ],
+        )
+        .unwrap();
+        let value = builtin_terminal_parameter_eval(
+            &mut eval,
+            vec![Value::Int(frame_id), Value::symbol("neovm-frame-param")],
+        )
+        .unwrap();
+        assert_eq!(value, Value::Int(7));
     }
 
     #[test]
