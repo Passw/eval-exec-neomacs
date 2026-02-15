@@ -70,6 +70,7 @@ cases/printing
 cases/prin1-to-string-noescape
 cases/chars
 cases/syntax-table-semantics
+cases/copy-syntax-table-semantics
 cases/syntax-after-semantics
 cases/parse-partial-sexp-syntax-ppss-semantics
 cases/category-semantics
