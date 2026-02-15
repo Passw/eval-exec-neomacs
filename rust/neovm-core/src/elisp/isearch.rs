@@ -157,6 +157,14 @@ fn case_fold_for_pattern(eval: &super::eval::Evaluator, pattern: &str) -> bool {
     if !case_fold_search_enabled {
         return false;
     }
+    // Emacs honors `search-upper-case`: nil disables smart-case and keeps
+    // folding even when PATTERN contains uppercase characters.
+    let smart_case_enabled = dynamic_or_global_symbol_value(eval, "search-upper-case")
+        .map(|value| !value.is_nil())
+        .unwrap_or(true);
+    if !smart_case_enabled {
+        return true;
+    }
     resolve_case_fold(None, pattern)
 }
 

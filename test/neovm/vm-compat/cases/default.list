@@ -261,6 +261,7 @@ cases/looking-at-semantics
 cases/looking-at-p-semantics
 cases/search-count
 cases/search-case-fold-variable-semantics
+cases/search-upper-case-variable-semantics
 cases/search-posix-word-semantics
 cases/replace-match
 cases/load-require
