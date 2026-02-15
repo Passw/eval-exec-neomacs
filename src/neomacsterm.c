@@ -2898,54 +2898,46 @@ neomacs_layout_default_face (void *frame_ptr, void *face_out)
 static int extract_string_align_entries (Lisp_Object, struct window *,
                                           uint8_t *, int, int);
 
-/* Get mode-line text for a window as plain UTF-8.
-   Returns the number of bytes written, or -1 on error.
-   Also fills face_out with the mode-line face (active or inactive). */
-int64_t
-neomacs_layout_mode_line_text (void *window_ptr, void *frame_ptr,
-                               uint8_t *out_buf, int64_t out_buf_len,
-                               void *face_out)
+/* Common core for status line text extraction (mode-line, header-line, tab-line).
+   Mirrors official Emacs's display_mode_line(w, face_id, format) pattern:
+   all three status lines share the same rendering logic.
+
+   Extracts text, sub-face runs, display properties (images), and align-to
+   entries from a format-mode-line result.  Returns packed int64:
+     bits 0-31:  text byte length
+     bits 32-47: number of face runs
+     bits 48-55: number of display property records
+     bits 56-63: number of align-to entries  */
+static int64_t
+neomacs_layout_status_line_text_1 (struct window *w, struct frame *f,
+                                   uint8_t *out_buf, int64_t out_buf_len,
+                                   void *face_out, int face_id,
+                                   Lisp_Object format)
 {
-  struct window *w = (struct window *) window_ptr;
   if (!w || !out_buf || out_buf_len <= 0)
     return -1;
 
-  /* Get frame from window if not provided */
-  struct frame *f = frame_ptr ? (struct frame *) frame_ptr : XFRAME (w->frame);
+  /* Fill base face data. */
+  struct face *base_face = FACE_FROM_ID_OR_NULL (f, face_id);
+  if (!base_face)
+    base_face = FACE_FROM_ID_OR_NULL (f, DEFAULT_FACE_ID);
+  if (face_out && base_face)
+    fill_face_data (f, base_face, (struct FaceDataFFI *) face_out);
 
-  /* Determine which face to use */
-  int selected = (w == XWINDOW (f->selected_window));
-  int face_id = selected ? MODE_LINE_ACTIVE_FACE_ID : MODE_LINE_INACTIVE_FACE_ID;
+  if (NILP (format))
+    return 0;
 
-  /* Fill face data */
-  if (face_out)
-    {
-      struct face *face = FACE_FROM_ID_OR_NULL (f, face_id);
-      if (!face)
-        face = FACE_FROM_ID_OR_NULL (f, DEFAULT_FACE_ID);
-      if (face)
-        {
-          fill_face_data (f, face, (struct FaceDataFFI *) face_out);
-        }
-    }
-
-  /* Get mode-line-format from the window's buffer */
   if (!BUFFERP (w->contents))
     return -1;
 
   struct buffer *buf = XBUFFER (w->contents);
-  Lisp_Object format = BVAR (buf, mode_line_format);
-  if (NILP (format))
-    return 0; /* No mode line */
-
-  /* Set buffer context for format-mode-line */
   struct buffer *old = current_buffer;
   set_buffer_internal_1 (buf);
 
-  /* Call (format-mode-line FORMAT nil WINDOW BUFFER)
+  /* Call (format-mode-line FORMAT nil WINDOW BUFFER).
      Pass nil as FACE so that per-segment face properties from
      :propertize specs are preserved in the output string.
-     The base mode-line face is applied later via
+     The base status-line face is applied later via
      face_at_string_position with face_id as base.  */
   Lisp_Object window_obj;
   XSETWINDOW (window_obj, w);
@@ -2963,14 +2955,23 @@ neomacs_layout_mode_line_text (void *window_ptr, void *frame_ptr,
 
   memcpy (out_buf, SDATA (result), len);
 
+  /* Resolve the base face's actual fg/bg for defaulted_p substitution.
+     When a sub-face has background_defaulted_p, we substitute the base
+     status-line face's background (not the frame background).  */
+  unsigned long base_fg = base_face ? base_face->foreground : 0;
+  unsigned long base_bg = base_face ? base_face->background : 0;
+  if (base_face && base_face->foreground_defaulted_p)
+    base_fg = FRAME_FOREGROUND_PIXEL (f);
+  if (base_face && base_face->background_defaulted_p)
+    base_bg = FRAME_BACKGROUND_PIXEL (f);
+
   /* Extract face runs from the propertized string.
      Walk character positions and detect face changes.
-     Store face runs in the face_runs area (if provided via out_buf after text).
+     Store face runs in the face_runs area (after text in out_buf).
      Format: each run = { uint16_t byte_offset, uint32_t fg, uint32_t bg }
-     Total = 10 bytes per run.  Stored after text data if space permits. */
+     Total = 10 bytes per run. */
   if (string_intervals (result) && len + 10 <= out_buf_len)
     {
-      /* Extract per-character face properties from the string. */
       ptrdiff_t charpos = 0;
       ptrdiff_t nchars = SCHARS (result);
       ptrdiff_t run_offset = len;
@@ -2998,7 +2999,7 @@ neomacs_layout_mode_line_text (void *window_ptr, void *frame_ptr,
             next_pos = XFIXNUM (flf_next);
 
           /* Resolve face: start with face_at_string_position which
-             merges the 'face' text property with the base mode-line
+             merges the 'face' text property with the base status-line
              face.  */
           uint32_t fg = 0, bg = 0;
           {
@@ -3021,17 +3022,21 @@ neomacs_layout_mode_line_text (void *window_ptr, void *frame_ptr,
             if (rf)
               {
                 unsigned long c = rf->foreground;
+                if (rf->foreground_defaulted_p)
+                  c = base_fg;
                 fg = ((RED_FROM_ULONG (c) << 16)
                       | (GREEN_FROM_ULONG (c) << 8)
                       | BLUE_FROM_ULONG (c));
                 c = rf->background;
+                if (rf->background_defaulted_p)
+                  c = base_bg;
                 bg = ((RED_FROM_ULONG (c) << 16)
                       | (GREEN_FROM_ULONG (c) << 8)
                       | BLUE_FROM_ULONG (c));
               }
           }
 
-          /* Only emit a run if colors changed */
+          /* Only emit a run if colors changed. */
           if (fg != prev_fg || bg != prev_bg)
             {
               ptrdiff_t byte_off = string_char_to_byte (result, charpos);
@@ -3129,8 +3134,8 @@ neomacs_layout_mode_line_text (void *window_ptr, void *frame_ptr,
 
       /* Extract align-to entries from (space :align-to ...) display
          text properties.  Entries are 6-byte records appended after the
-         display property area.  This enables mode-line right-alignment
-         (e.g. Doom Emacs places parts of its mode-line via
+         display property area.  This enables right-alignment in status
+         lines (e.g. Doom Emacs places parts of its mode-line via
          (space :align-to (- right N))). */
       int naligns = 0;
       if (run_offset + 6 <= out_buf_len)
@@ -3151,117 +3156,72 @@ neomacs_layout_mode_line_text (void *window_ptr, void *frame_ptr,
   return (int64_t) len;
 }
 
-/* Get header-line text for a window as plain UTF-8.
-   Returns the number of bytes written, 0 if no header-line, or -1 on error.
-   Also fills face_out with the header-line face (active or inactive). */
+/* Get mode-line text for a window.  Thin wrapper around common core. */
+int64_t
+neomacs_layout_mode_line_text (void *window_ptr, void *frame_ptr,
+                               uint8_t *out_buf, int64_t out_buf_len,
+                               void *face_out)
+{
+  struct window *w = (struct window *) window_ptr;
+  if (!w)
+    return -1;
+  struct frame *f = frame_ptr ? (struct frame *) frame_ptr : XFRAME (w->frame);
+  int selected = (w == XWINDOW (f->selected_window));
+  int face_id = selected ? MODE_LINE_ACTIVE_FACE_ID : MODE_LINE_INACTIVE_FACE_ID;
+
+  if (!BUFFERP (w->contents))
+    return -1;
+  Lisp_Object format = BVAR (XBUFFER (w->contents), mode_line_format);
+
+  return neomacs_layout_status_line_text_1 (w, f, out_buf, out_buf_len,
+                                             face_out, face_id, format);
+}
+
+/* Get header-line text for a window.  Thin wrapper around common core. */
 int64_t
 neomacs_layout_header_line_text (void *window_ptr, void *frame_ptr,
                                   uint8_t *out_buf, int64_t out_buf_len,
                                   void *face_out)
 {
   struct window *w = (struct window *) window_ptr;
-  if (!w || !out_buf || out_buf_len <= 0)
+  if (!w)
     return -1;
-
   struct frame *f = frame_ptr ? (struct frame *) frame_ptr : XFRAME (w->frame);
-
   int selected = (w == XWINDOW (f->selected_window));
   int face_id = selected ? HEADER_LINE_ACTIVE_FACE_ID : HEADER_LINE_INACTIVE_FACE_ID;
 
-  if (face_out)
-    {
-      struct face *face = FACE_FROM_ID_OR_NULL (f, face_id);
-      if (!face)
-        face = FACE_FROM_ID_OR_NULL (f, DEFAULT_FACE_ID);
-      if (face)
-        fill_face_data (f, face, (struct FaceDataFFI *) face_out);
-    }
-
   if (!BUFFERP (w->contents))
     return -1;
+  Lisp_Object format = BVAR (XBUFFER (w->contents), header_line_format);
 
-  struct buffer *buf = XBUFFER (w->contents);
-  Lisp_Object format = BVAR (buf, header_line_format);
-  if (NILP (format))
-    return 0;
-
-  struct buffer *old = current_buffer;
-  set_buffer_internal_1 (buf);
-
-  Lisp_Object window_obj;
-  XSETWINDOW (window_obj, w);
-  Lisp_Object result = Fformat_mode_line (format, make_fixnum (0),
-                                           window_obj, w->contents);
-
-  set_buffer_internal_1 (old);
-
-  if (!STRINGP (result))
-    return -1;
-
-  ptrdiff_t len = SBYTES (result);
-  if (len > out_buf_len)
-    len = out_buf_len;
-
-  memcpy (out_buf, SDATA (result), len);
-  return (int64_t) len;
+  return neomacs_layout_status_line_text_1 (w, f, out_buf, out_buf_len,
+                                             face_out, face_id, format);
 }
 
-/* Get tab-line text for a window as plain UTF-8.
-   Returns number of bytes, 0 if no tab-line, or -1 on error.  */
+/* Get tab-line text for a window.  Thin wrapper around common core. */
 int64_t
 neomacs_layout_tab_line_text (void *window_ptr, void *frame_ptr,
                                uint8_t *out_buf, int64_t out_buf_len,
                                void *face_out)
 {
   struct window *w = (struct window *) window_ptr;
-  if (!w || !out_buf || out_buf_len <= 0)
+  if (!w)
     return -1;
-
-  struct frame *f = frame_ptr
-    ? (struct frame *) frame_ptr : XFRAME (w->frame);
-
-  if (face_out)
-    {
-      struct face *face
-        = FACE_FROM_ID_OR_NULL (f, TAB_LINE_FACE_ID);
-      if (!face)
-        face = FACE_FROM_ID_OR_NULL (f, DEFAULT_FACE_ID);
-      if (face)
-        fill_face_data (f, face, (struct FaceDataFFI *) face_out);
-    }
+  struct frame *f = frame_ptr ? (struct frame *) frame_ptr : XFRAME (w->frame);
 
   if (!BUFFERP (w->contents))
     return -1;
-
   struct buffer *buf = XBUFFER (w->contents);
 
-  /* Check both buffer-local and window-parameter formats.  */
+  /* Check both buffer-local and window-parameter formats. */
   Lisp_Object format = BVAR (buf, tab_line_format);
   Lisp_Object wfmt = window_parameter (w, Qtab_line_format);
   if (!NILP (wfmt) && !EQ (wfmt, Qnone))
     format = wfmt;
-  if (NILP (format))
-    return 0;
 
-  struct buffer *old = current_buffer;
-  set_buffer_internal_1 (buf);
-
-  Lisp_Object window_obj;
-  XSETWINDOW (window_obj, w);
-  Lisp_Object result = Fformat_mode_line (
-      format, make_fixnum (0), window_obj, w->contents);
-
-  set_buffer_internal_1 (old);
-
-  if (!STRINGP (result))
-    return -1;
-
-  ptrdiff_t len = SBYTES (result);
-  if (len > out_buf_len)
-    len = out_buf_len;
-
-  memcpy (out_buf, SDATA (result), len);
-  return (int64_t) len;
+  return neomacs_layout_status_line_text_1 (w, f, out_buf, out_buf_len,
+                                             face_out, TAB_LINE_FACE_ID,
+                                             format);
 }
 
 /* FFI struct for line number configuration.
