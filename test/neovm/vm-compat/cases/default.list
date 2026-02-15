@@ -261,6 +261,7 @@ cases/aref-aset-index-semantics
 cases/copy-sequence-semantics
 cases/cxr-semantics
 cases/cxr-3level-semantics
+cases/cxr-4level-first-batch-semantics
 cases/cxr-4level-common-semantics
 cases/member-assoc-semantics
 cases/alist-get-semantics
