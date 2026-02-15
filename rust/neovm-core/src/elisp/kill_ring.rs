@@ -70,6 +70,21 @@ fn expect_int(value: &Value) -> Result<i64, Flow> {
     }
 }
 
+fn expect_indent_column(value: &Value) -> Result<i64, Flow> {
+    match value {
+        Value::Int(n) => Ok(*n),
+        Value::Char(c) => Ok(*c as i64),
+        Value::Float(_) => Err(signal(
+            "wrong-type-argument",
+            vec![Value::symbol("fixnump"), value.clone()],
+        )),
+        other => Err(signal(
+            "wrong-type-argument",
+            vec![Value::symbol("number-or-marker-p"), other.clone()],
+        )),
+    }
+}
+
 fn expect_string(value: &Value) -> Result<String, Flow> {
     match value {
         Value::Str(s) => Ok((**s).clone()),
@@ -2106,7 +2121,7 @@ pub(crate) fn builtin_indent_line_to(
     args: Vec<Value>,
 ) -> EvalResult {
     expect_args("indent-line-to", &args, 1)?;
-    let column = expect_int(&args[0])?.max(0) as usize;
+    let column = expect_indent_column(&args[0])?.max(0) as usize;
 
     let buf = eval
         .buffers

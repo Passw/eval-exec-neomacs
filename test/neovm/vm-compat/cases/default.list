@@ -62,6 +62,7 @@ cases/back-to-indentation-semantics
 cases/indent-region-semantics
 cases/indent-mode-semantics
 cases/tab-to-tab-stop-semantics
+cases/indent-line-to-semantics
 cases/custom-group-p-availability
 cases/custom-set-semantics
 cases/bookmark-helper-availability
