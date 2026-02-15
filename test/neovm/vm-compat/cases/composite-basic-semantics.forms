@@ -30,6 +30,8 @@
 (condition-case err (composition-get-gstring 'x 1 nil "ab") (error err))
 (condition-case err (composition-get-gstring 0 'y nil "ab") (error err))
 (condition-case err (composition-get-gstring 0 1 nil 1) (error err))
+(vectorp (composition-get-gstring 0 1 nil "ab"))
+(let ((v (composition-get-gstring 0 1 nil "ab"))) (vectorp (aref v 0)))
 (condition-case err (composition-get-gstring 0 1 nil "ab" nil) (error (car err)))
 
 (condition-case err (clear-composition-cache) (error (car err)))

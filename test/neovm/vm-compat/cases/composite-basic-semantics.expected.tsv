@@ -21,12 +21,14 @@
 21	(condition-case err (composition-get-gstring 'x 1 nil "ab") (error err))	OK (wrong-type-argument integerp x)
 22	(condition-case err (composition-get-gstring 0 'y nil "ab") (error err))	OK (wrong-type-argument integerp y)
 23	(condition-case err (composition-get-gstring 0 1 nil 1) (error err))	OK (wrong-type-argument stringp 1)
-24	(condition-case err (composition-get-gstring 0 1 nil "ab" nil) (error (car err)))	OK wrong-number-of-arguments
-25	(condition-case err (clear-composition-cache) (error (car err)))	OK nil
-26	(condition-case err (clear-composition-cache nil) (error (car err)))	OK wrong-number-of-arguments
-27	(condition-case err (composition-sort-rules nil) (error err))	OK nil
-28	(condition-case err (composition-sort-rules [1 2]) (error err))	OK (wrong-type-argument listp [1 2])
-29	(condition-case err (composition-sort-rules '(3 2 1)) (error err))	OK (error "Invalid composition rule in RULES argument")
-30	(condition-case err (auto-composition-mode) (error (car err)))	OK t
-31	(condition-case err (auto-composition-mode t) (error (car err)))	OK t
-32	(condition-case err (auto-composition-mode nil nil) (error (car err)))	OK wrong-number-of-arguments
+24	(vectorp (composition-get-gstring 0 1 nil "ab"))	OK t
+25	(let ((v (composition-get-gstring 0 1 nil "ab"))) (vectorp (aref v 0)))	OK t
+26	(condition-case err (composition-get-gstring 0 1 nil "ab" nil) (error (car err)))	OK wrong-number-of-arguments
+27	(condition-case err (clear-composition-cache) (error (car err)))	OK nil
+28	(condition-case err (clear-composition-cache nil) (error (car err)))	OK wrong-number-of-arguments
+29	(condition-case err (composition-sort-rules nil) (error err))	OK nil
+30	(condition-case err (composition-sort-rules [1 2]) (error err))	OK (wrong-type-argument listp [1 2])
+31	(condition-case err (composition-sort-rules '(3 2 1)) (error err))	OK (error "Invalid composition rule in RULES argument")
+32	(condition-case err (auto-composition-mode) (error (car err)))	OK t
+33	(condition-case err (auto-composition-mode t) (error (car err)))	OK t
+34	(condition-case err (auto-composition-mode nil nil) (error (car err)))	OK wrong-number-of-arguments
