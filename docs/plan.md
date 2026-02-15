@@ -19,6 +19,21 @@ Last updated: 2026-02-15
 
 ## Done
 
+- Aligned a composite builtin subset and locked oracle corpus:
+  - updated:
+    - `rust/neovm-core/src/elisp/composite.rs`
+      - `composition-sort-rules` now matches batch subset behavior for nil/non-list/invalid-rule inputs with oracle-compatible error payloads.
+      - `auto-composition-mode` now returns `t` in batch subset and preserves arity contract.
+      - expanded module unit tests for the updated subset.
+    - `test/neovm/vm-compat/cases/composite-basic-semantics.{forms,expected.tsv}`
+    - `test/neovm/vm-compat/cases/default.list`
+      - included `cases/composite-basic-semantics` in default compatibility runs.
+  - verified:
+    - `cargo test composite::tests --manifest-path rust/neovm-core/Cargo.toml -- --nocapture` (pass)
+    - `make -C test/neovm/vm-compat check-neovm FORMS=cases/composite-basic-semantics.forms EXPECTED=cases/composite-basic-semantics.expected.tsv` (pass, 17/17)
+    - `make -C test/neovm/vm-compat check-one-neovm CASE=cases/composite-basic-semantics` (pass)
+    - `make -C test/neovm/vm-compat validate-case-lists` (pass)
+
 - Aligned additional xdisp stub edges with oracle semantics and locked corpus:
   - updated:
     - `rust/neovm-core/src/elisp/xdisp.rs`
