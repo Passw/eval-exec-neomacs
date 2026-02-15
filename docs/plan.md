@@ -18,6 +18,10 @@ Last updated: 2026-02-15
 
 ## Done
 
+- Re-ran full NeoVM compatibility gate after cleanup batch:
+  - verified:
+    - `make -C test/neovm/vm-compat check-all-neovm` (pass, full default + neovm-only corpus)
+
 - Silenced intentional placeholder dead-code noise in compiled-literal path:
   - updated:
     - `rust/neovm-core/src/elisp/compiled_literal.rs`
