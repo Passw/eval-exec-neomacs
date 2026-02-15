@@ -4,6 +4,15 @@ Last updated: 2026-02-15
 
 ## Done
 
+- Aligned `yank` read-only behavior with oracle variable semantics:
+  - updated `rust/neovm-core/src/elisp/kill_ring.rs`:
+    - `yank` now honors dynamic/buffer-local/global `buffer-read-only` before insertion
+  - added and enabled oracle corpus:
+    - `test/neovm/vm-compat/cases/yank-read-only-variable-semantics.forms`
+    - `test/neovm/vm-compat/cases/yank-read-only-variable-semantics.expected.tsv`
+    - wired into `test/neovm/vm-compat/cases/default.list`
+  - verified:
+    - `make -C test/neovm/vm-compat check-one-neovm CASE=cases/yank-read-only-variable-semantics` (pass, 4/4)
 - Aligned kill-word read-only behavior with oracle variable semantics:
   - updated `rust/neovm-core/src/elisp/kill_ring.rs`:
     - `kill-word` now honors dynamic/buffer-local/global `buffer-read-only` for real deletions
