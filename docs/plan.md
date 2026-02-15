@@ -19,6 +19,19 @@ Last updated: 2026-02-15
 
 ## Done
 
+- Aligned `pos-visible-in-window-p` optional WINDOW validation with oracle batch semantics:
+  - updated:
+    - `rust/neovm-core/src/elisp/xdisp.rs`
+      - added evaluator-backed `pos-visible-in-window-p` path that validates optional WINDOW as a live window designator and signals `wrong-type-argument (window-live-p ...)` for invalid values.
+      - expanded xdisp unit tests for evaluator window validation.
+    - `rust/neovm-core/src/elisp/builtins.rs`
+      - routed `pos-visible-in-window-p` through evaluator dispatch.
+    - `test/neovm/vm-compat/cases/xdisp-navigation-semantics.{forms,expected.tsv}`
+      - added invalid WINDOW argument coverage and refreshed oracle baseline.
+  - verified:
+    - `cargo test xdisp::tests --manifest-path rust/neovm-core/Cargo.toml -- --nocapture` (pass)
+    - `make -C test/neovm/vm-compat check-one-neovm CASE=cases/xdisp-navigation-semantics` (pass, 10/10)
+
 - Added evaluator-backed `format-mode-line` optional designator checks and locked corpus:
   - updated:
     - `rust/neovm-core/src/elisp/xdisp.rs`
