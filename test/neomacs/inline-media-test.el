@@ -65,6 +65,8 @@
 
   (let ((media-width 320)
         (media-height 180)  ; 16:9 aspect, smaller to fit all 3
+        (webkit-width 800)
+        (webkit-height 500)
         (success-count 0)
         (total-count 3))
 
@@ -74,14 +76,14 @@
         (progn
           (neomacs-webkit-init)
           (let ((spec (neomacs-insert-webkit inline-media-test-url
-                                              media-width media-height t)))
+                                              webkit-width webkit-height t)))
             (if spec
                 (let ((view-id (plist-get (cdr spec) :id)))
                   (insert (propertize " " 'display spec))
                   (insert "\n")
                   (insert (format "WebKit ID: %d, URL: %s (%dx%d)\n"
                                   view-id inline-media-test-url
-                                  media-width media-height))
+                                  webkit-width webkit-height))
                   (setq success-count (1+ success-count))
                   (inline-media-test-log "WebKit: OK (id=%d)" view-id))
               (insert "[WebKit creation failed]\n")
