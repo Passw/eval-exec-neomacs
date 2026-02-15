@@ -4,8 +4,15 @@ use super::expr::{self, Expr};
 use super::string_escape::{format_lisp_string, format_lisp_string_bytes};
 use super::value::{list_to_vec, Value};
 
+fn print_special_handle(value: &Value) -> Option<String> {
+    super::display::print_terminal_handle(value)
+}
+
 /// Print a `Value` as a Lisp string.
 pub fn print_value(value: &Value) -> String {
+    if let Some(handle) = print_special_handle(value) {
+        return handle;
+    }
     match value {
         Value::Nil => "nil".to_string(),
         Value::True => "t".to_string(),
@@ -75,6 +82,10 @@ pub fn print_value_bytes(value: &Value) -> Vec<u8> {
 }
 
 fn append_print_value_bytes(value: &Value, out: &mut Vec<u8>) {
+    if let Some(handle) = print_special_handle(value) {
+        out.extend_from_slice(handle.as_bytes());
+        return;
+    }
     match value {
         Value::Nil => out.extend_from_slice(b"nil"),
         Value::True => out.extend_from_slice(b"t"),
@@ -368,5 +379,16 @@ mod tests {
             docstring: None,
         }));
         assert_eq!(print_value(&lam), "(lambda (x y) (+ x y))");
+    }
+
+    #[test]
+    fn print_terminal_handle_special_form() {
+        let list = super::super::display::builtin_terminal_list(vec![]).unwrap();
+        let items = list_to_vec(&list).expect("terminal-list should return a list");
+        let handle = items.first().expect("terminal-list should contain one handle");
+
+        let printed = print_value(handle);
+        assert!(printed.starts_with("#<terminal "));
+        assert!(printed.contains("on initial_terminal>"));
     }
 }
