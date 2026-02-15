@@ -1,0 +1,23 @@
+; mutating kill-ring ops should normalize malformed pointer bindings.
+(setq kill-ring (list "a" "b" "c"))
+(setq kill-ring-yank-pointer 42)
+(kill-new "x")
+(car kill-ring-yank-pointer)
+(car kill-ring)
+
+(setq kill-ring (list "a" "b" "c"))
+(setq kill-ring-yank-pointer 42)
+(kill-append "z" nil)
+(car kill-ring-yank-pointer)
+(car kill-ring)
+
+(setq kill-ring (list "a" "b" "c"))
+(setq kill-ring-yank-pointer 42)
+(kill-append "p" t)
+(car kill-ring-yank-pointer)
+(car kill-ring)
+
+(setq kill-ring (list "a" "b" "c"))
+(setq kill-ring-yank-pointer (list "b" "c"))
+(kill-new "n")
+(car kill-ring-yank-pointer)
