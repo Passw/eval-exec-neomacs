@@ -19,6 +19,22 @@ Last updated: 2026-02-15
 
 ## Done
 
+- Added evaluator-backed `compose-region-internal` range validation and oracle corpus coverage:
+  - updated:
+    - `rust/neovm-core/src/elisp/composite.rs`
+      - added evaluator-backed `compose-region-internal` handler with buffer-aware position range validation.
+      - invalid ranges now signal `args-out-of-range` in batch-compatible paths.
+      - added unit test coverage for evaluator range checks.
+    - `rust/neovm-core/src/elisp/builtins.rs`
+      - routed `compose-region-internal` through evaluator dispatch.
+    - `test/neovm/vm-compat/cases/composite-basic-semantics.{forms,expected.tsv}`
+      - added range/error lock-ins for `compose-region-internal`:
+        - `5 1`, `0 0`, `0 4`, `-1 1` in a temp buffer.
+      - refreshed oracle baseline.
+  - verified:
+    - `cargo test composite::tests --manifest-path rust/neovm-core/Cargo.toml -- --nocapture` (pass)
+    - `make -C test/neovm/vm-compat check-one-neovm CASE=cases/composite-basic-semantics` (pass, 43/43)
+
 - Added oracle-locked `composition-get-gstring` range/error edge coverage:
   - updated:
     - `test/neovm/vm-compat/cases/composite-basic-semantics.{forms,expected.tsv}`
