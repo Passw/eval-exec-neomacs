@@ -4,6 +4,21 @@ Last updated: 2026-02-15
 
 ## Done
 
+- Implemented `read-coding-system` compatibility slice:
+  - replaced `read-coding-system` / `read-non-nil-coding-system` UTF-8 stubs with batch-compatible prompt behavior:
+    - prompt argument now validates as `stringp`
+    - arity now matches oracle payloads
+    - batch path now signals `(end-of-file "Error reading from stdin")`
+  - added and enabled oracle corpus:
+    - `test/neovm/vm-compat/cases/read-coding-system-semantics.forms`
+    - `test/neovm/vm-compat/cases/read-coding-system-semantics.expected.tsv`
+    - wired into `test/neovm/vm-compat/cases/default.list`
+  - expanded `rust/neovm-core/src/elisp/lread.rs` unit coverage for EOF/type/arity paths
+  - verified:
+    - `cargo test --manifest-path rust/neovm-core/Cargo.toml lread::tests -- --nocapture` (pass)
+    - `make -C test/neovm/vm-compat check-neovm FORMS=cases/read-coding-system-semantics.forms EXPECTED=cases/read-coding-system-semantics.expected.tsv` (pass)
+    - `make -C test/neovm/vm-compat validate-case-lists` (pass)
+    - `make -C test/neovm/vm-compat check-all-neovm` (pass)
 - Implemented `eval-buffer` / `eval-region` compatibility slice:
   - replaced `lread` stubs with real evaluator-backed behavior:
     - `eval-buffer` now resolves source buffer (`nil`/current, buffer object, buffer name), evaluates all parsed forms, and preserves Emacs-compatible return shape (`nil`)
