@@ -108,6 +108,7 @@ cases/delete-directory-semantics
 cases/delete-file-trash-semantics
 cases/make-symbolic-link-semantics
 cases/buffer-locals
+cases/buffer-live-p-semantics
 cases/buffer-read-only-default-semantics
 cases/delete-indentation-read-only-variable-semantics
 cases/edit-read-only-variable-semantics
