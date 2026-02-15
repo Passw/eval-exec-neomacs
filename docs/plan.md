@@ -18,6 +18,17 @@ Last updated: 2026-02-15
 
 ## Done
 
+- Removed dead legacy buffer `bury-buffer` / `buffer-swap-text` stub surface:
+  - updated:
+    - `rust/neovm-core/src/elisp/buffer/stateful.rs`
+      - deleted unreferenced `bury-buffer` and `buffer-swap-text` stubs
+    - `rust/neovm-core/src/elisp/buffer/tests.rs`
+      - removed stale local tests bound only to deleted dead stubs
+    - `rust/neovm-core/src/elisp/buffer.rs`
+      - removed stale module comment entries for deleted stubs
+  - verified:
+    - `cargo test kill_buffer_kills_current -- --nocapture` (pass)
+    - `make -C test/neovm/vm-compat check-one-neovm CASE=cases/core` (pass, 15/15)
 - Removed dead legacy buffer pure-module slice after prior dead-surface trims:
   - updated:
     - deleted: `rust/neovm-core/src/elisp/buffer/pure.rs`
