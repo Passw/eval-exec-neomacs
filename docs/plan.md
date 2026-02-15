@@ -19,6 +19,19 @@ Last updated: 2026-02-15
 
 ## Done
 
+- Tightened `isearch` stub arity parity with oracle behavior:
+  - updated:
+    - `rust/neovm-core/src/elisp/isearch.rs`
+      - `isearch-forward` / `isearch-backward` now enforce argument range `0..=2`.
+      - calls with 3+ args now signal `wrong-number-of-arguments` before stub runtime error.
+      - added unit coverage for over-arity paths.
+    - `test/neovm/vm-compat/cases/isearch-batch-semantics.{forms,expected.tsv}`
+      - added lock-ins for 2-arg acceptance and 3-arg rejection.
+      - refreshed oracle baseline.
+  - verified:
+    - `cargo test isearch::tests --manifest-path rust/neovm-core/Cargo.toml -- --nocapture` (pass)
+    - `make -C test/neovm/vm-compat check-one-neovm CASE=cases/isearch-batch-semantics` (pass, 10/10)
+
 - Added evaluator-backed live-window designator support for cursor visibility display APIs:
   - updated:
     - `rust/neovm-core/src/elisp/display.rs`
