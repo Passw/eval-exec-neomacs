@@ -18,6 +18,15 @@ Last updated: 2026-02-15
 
 ## Done
 
+- Removed dead duplicate buffer undo stubs from legacy buffer module surface:
+  - updated:
+    - `rust/neovm-core/src/elisp/buffer/stateful.rs`
+      - deleted unused `buffer-enable-undo` and `buffer-disable-undo` stub wrappers shadowed by active `builtins.rs` implementations
+    - `rust/neovm-core/src/elisp/buffer/tests.rs`
+      - removed stale local tests for deleted dead wrappers
+  - verified:
+    - `make -C test/neovm/vm-compat check-one-neovm CASE=cases/undo-basics` (pass, 8/8)
+    - `make -C test/neovm/vm-compat check-one-neovm CASE=cases/buffer-local-variables-semantics` (pass, 7/7)
 - Removed unreachable legacy replace/search stub entrypoints from `isearch` surface:
   - updated:
     - `rust/neovm-core/src/elisp/isearch.rs`
