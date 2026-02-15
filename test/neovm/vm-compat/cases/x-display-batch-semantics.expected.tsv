@@ -5,26 +5,30 @@
 5	(fboundp 'x-close-connection)	OK t
 6	(condition-case err (x-close-connection) (error (car err)))	OK wrong-number-of-arguments
 7	(condition-case err (x-close-connection nil) (error (car err)))	OK error
-8	(condition-case err (x-close-connection 1) (error (car err)))	OK wrong-type-argument
-9	(condition-case err (x-close-connection "") (error (car err)))	OK error
-10	(fboundp 'x-display-pixel-width)	OK t
-11	(condition-case err (x-display-pixel-width) (error (car err)))	OK error
-12	(condition-case err (x-display-pixel-width nil) (error (car err)))	OK error
-13	(condition-case err (x-display-pixel-width (selected-frame)) (error (car err)))	OK error
-14	(condition-case err (x-display-pixel-width 999999) (error (car err)))	OK wrong-type-argument
-15	(condition-case err (x-display-pixel-width "") (error (car err)))	OK error
-16	(condition-case err (x-display-pixel-width 1 2) (error (car err)))	OK wrong-number-of-arguments
-17	(fboundp 'x-display-pixel-height)	OK t
-18	(condition-case err (x-display-pixel-height) (error (car err)))	OK error
-19	(condition-case err (x-display-pixel-height nil) (error (car err)))	OK error
-20	(condition-case err (x-display-pixel-height (selected-frame)) (error (car err)))	OK error
-21	(condition-case err (x-display-pixel-height 999999) (error (car err)))	OK wrong-type-argument
-22	(condition-case err (x-display-pixel-height "") (error (car err)))	OK error
-23	(condition-case err (x-display-pixel-height 1 2) (error (car err)))	OK wrong-number-of-arguments
-24	(fboundp 'x-display-color-p)	OK t
-25	(condition-case err (x-display-color-p) (error (car err)))	OK nil
-26	(condition-case err (x-display-color-p nil) (error (car err)))	OK nil
-27	(condition-case err (x-display-color-p (selected-frame)) (error (car err)))	OK nil
-28	(condition-case err (x-display-color-p 999999) (error (car err)))	OK error
-29	(condition-case err (x-display-color-p "") (error (car err)))	OK error
-30	(condition-case err (x-display-color-p 1 2) (error (car err)))	OK wrong-number-of-arguments
+8	(condition-case err (x-close-connection (selected-frame)) (error (car err)))	OK error
+9	(condition-case err (x-close-connection (selected-frame)) (error (cadr err)))	OK "Window system frame should be used"
+10	(condition-case err (x-close-connection 999999) (error (car err)))	OK wrong-type-argument
+11	(condition-case err (x-close-connection "") (error (car err)))	OK error
+12	(fboundp 'x-display-pixel-width)	OK t
+13	(condition-case err (x-display-pixel-width) (error (car err)))	OK error
+14	(condition-case err (x-display-pixel-width nil) (error (car err)))	OK error
+15	(condition-case err (x-display-pixel-width (selected-frame)) (error (car err)))	OK error
+16	(condition-case err (x-display-pixel-width (selected-frame)) (error (cadr err)))	OK "Window system frame should be used"
+17	(condition-case err (x-display-pixel-width 999999) (error (car err)))	OK wrong-type-argument
+18	(condition-case err (x-display-pixel-width "") (error (car err)))	OK error
+19	(condition-case err (x-display-pixel-width 1 2) (error (car err)))	OK wrong-number-of-arguments
+20	(fboundp 'x-display-pixel-height)	OK t
+21	(condition-case err (x-display-pixel-height) (error (car err)))	OK error
+22	(condition-case err (x-display-pixel-height nil) (error (car err)))	OK error
+23	(condition-case err (x-display-pixel-height (selected-frame)) (error (car err)))	OK error
+24	(condition-case err (x-display-pixel-height (selected-frame)) (error (cadr err)))	OK "Window system frame should be used"
+25	(condition-case err (x-display-pixel-height 999999) (error (car err)))	OK wrong-type-argument
+26	(condition-case err (x-display-pixel-height "") (error (car err)))	OK error
+27	(condition-case err (x-display-pixel-height 1 2) (error (car err)))	OK wrong-number-of-arguments
+28	(fboundp 'x-display-color-p)	OK t
+29	(condition-case err (x-display-color-p) (error (car err)))	OK nil
+30	(condition-case err (x-display-color-p nil) (error (car err)))	OK nil
+31	(condition-case err (x-display-color-p (selected-frame)) (error (car err)))	OK nil
+32	(condition-case err (x-display-color-p 999999) (error (car err)))	OK error
+33	(condition-case err (x-display-color-p "") (error (car err)))	OK error
+34	(condition-case err (x-display-color-p 1 2) (error (car err)))	OK wrong-number-of-arguments

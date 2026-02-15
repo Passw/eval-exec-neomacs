@@ -17,7 +17,13 @@
     (x-close-connection nil)
   (error (car err)))
 (condition-case err
-    (x-close-connection 1)
+    (x-close-connection (selected-frame))
+  (error (car err)))
+(condition-case err
+    (x-close-connection (selected-frame))
+  (error (cadr err)))
+(condition-case err
+    (x-close-connection 999999)
   (error (car err)))
 (condition-case err
     (x-close-connection "")
@@ -33,6 +39,9 @@
 (condition-case err
     (x-display-pixel-width (selected-frame))
   (error (car err)))
+(condition-case err
+    (x-display-pixel-width (selected-frame))
+  (error (cadr err)))
 (condition-case err
     (x-display-pixel-width 999999)
   (error (car err)))
@@ -53,6 +62,9 @@
 (condition-case err
     (x-display-pixel-height (selected-frame))
   (error (car err)))
+(condition-case err
+    (x-display-pixel-height (selected-frame))
+  (error (cadr err)))
 (condition-case err
     (x-display-pixel-height 999999)
   (error (car err)))

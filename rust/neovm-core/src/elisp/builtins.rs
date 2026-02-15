@@ -6496,6 +6496,11 @@ pub(crate) fn dispatch_builtin(
         "x-display-color-p" => {
             return Some(super::display::builtin_x_display_color_p_eval(eval, args))
         }
+        "x-close-connection" => {
+            return Some(super::display::builtin_x_close_connection_eval(
+                eval, args,
+            ))
+        }
 
         // Interactive / command system (evaluator-dependent)
         "call-interactively" => {

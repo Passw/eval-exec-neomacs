@@ -498,6 +498,25 @@ pub(crate) fn builtin_x_close_connection(args: Vec<Value>) -> EvalResult {
     }
 }
 
+/// Evaluator-aware variant of `x-close-connection`.
+///
+/// Live frame designators map to batch-compatible frame-class errors.
+pub(crate) fn builtin_x_close_connection_eval(
+    eval: &mut super::eval::Evaluator,
+    args: Vec<Value>,
+) -> EvalResult {
+    expect_args("x-close-connection", &args, 1)?;
+    if let Some(display) = args.first() {
+        if live_frame_designator_p(eval, display) {
+            return Err(signal(
+                "error",
+                vec![Value::string("Window system frame should be used")],
+            ));
+        }
+    }
+    builtin_x_close_connection(args)
+}
+
 /// (x-display-pixel-width &optional TERMINAL)
 ///
 /// Batch/no-X semantics: signal X-not-in-use, invalid frame designator, or
@@ -533,7 +552,7 @@ pub(crate) fn builtin_x_display_pixel_width_eval(
         if live_frame_designator_p(eval, display) {
             return Err(signal(
                 "error",
-                vec![Value::string("X windows are not in use or not initialized")],
+                vec![Value::string("Window system frame should be used")],
             ));
         }
     }
@@ -575,7 +594,7 @@ pub(crate) fn builtin_x_display_pixel_height_eval(
         if live_frame_designator_p(eval, display) {
             return Err(signal(
                 "error",
-                vec![Value::string("X windows are not in use or not initialized")],
+                vec![Value::string("Window system frame should be used")],
             ));
         }
     }
@@ -1062,6 +1081,21 @@ mod tests {
         assert!(x_nil.is_err());
         assert!(x_int.is_err());
         assert!(x_str.is_err());
+    }
+
+    #[test]
+    fn eval_x_close_connection_live_frame_uses_window_system_error() {
+        let mut eval = crate::elisp::Evaluator::new();
+        let frame_id = crate::elisp::window_cmds::ensure_selected_frame_id(&mut eval).0 as i64;
+
+        let result = builtin_x_close_connection_eval(&mut eval, vec![Value::Int(frame_id)]);
+        match result {
+            Err(Flow::Signal(sig)) => {
+                assert_eq!(sig.symbol, "error");
+                assert_eq!(sig.data, vec![Value::string("Window system frame should be used")]);
+            }
+            other => panic!("expected error signal, got {other:?}"),
+        }
     }
 
     #[test]
