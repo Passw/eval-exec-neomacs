@@ -109,6 +109,7 @@ cases/yank-read-only-variable-semantics
 cases/yank-pop-read-only-variable-semantics
 cases/yank-pop-semantics
 cases/yank-pop-wrap-empty-entry-semantics
+cases/yank-pop-pointer-seed-semantics
 cases/buffer-local-value
 cases/buffer-local-variables-semantics
 cases/defvar-local
