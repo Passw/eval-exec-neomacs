@@ -159,37 +159,6 @@ fn seq_collect_concat_arg(arg: &Value) -> Result<Vec<Value>, Flow> {
 // CL-lib pure list operations
 // ===========================================================================
 
-/// `(cl-remove ITEM SEQ)` — remove all occurrences of item using `equal`.
-pub(crate) fn builtin_cl_remove(args: Vec<Value>) -> EvalResult {
-    expect_args("cl-remove", &args, 2)?;
-    let item = &args[0];
-    let elems = collect_sequence(&args[1]);
-    let result: Vec<Value> = elems
-        .into_iter()
-        .filter(|e| !equal_value(item, e, 0))
-        .collect();
-    Ok(Value::list(result))
-}
-
-/// `(cl-substitute NEW OLD SEQ)` — replace old with new in sequence using `equal`.
-pub(crate) fn builtin_cl_substitute(args: Vec<Value>) -> EvalResult {
-    expect_args("cl-substitute", &args, 3)?;
-    let new = &args[0];
-    let old = &args[1];
-    let elems = collect_sequence(&args[2]);
-    let result: Vec<Value> = elems
-        .into_iter()
-        .map(|e| {
-            if equal_value(old, &e, 0) {
-                new.clone()
-            } else {
-                e
-            }
-        })
-        .collect();
-    Ok(Value::list(result))
-}
-
 /// `(cl-intersection LIST1 LIST2)` — set intersection using `equal`.
 pub(crate) fn builtin_cl_intersection(args: Vec<Value>) -> EvalResult {
     expect_args("cl-intersection", &args, 2)?;
@@ -1031,29 +1000,6 @@ mod tests {
     use super::*;
 
     // --- CL-lib pure operations ---
-
-    #[test]
-    fn cl_remove_items() {
-        let list = Value::list(vec![
-            Value::Int(1),
-            Value::Int(2),
-            Value::Int(3),
-            Value::Int(2),
-        ]);
-        let result = builtin_cl_remove(vec![Value::Int(2), list]).unwrap();
-        let items = list_to_vec(&result).unwrap();
-        assert_eq!(items.len(), 2);
-        assert_eq!(items[0].as_int(), Some(1));
-        assert_eq!(items[1].as_int(), Some(3));
-    }
-
-    #[test]
-    fn cl_substitute_items() {
-        let list = Value::list(vec![Value::Int(1), Value::Int(2), Value::Int(3)]);
-        let result = builtin_cl_substitute(vec![Value::Int(99), Value::Int(2), list]).unwrap();
-        let items = list_to_vec(&result).unwrap();
-        assert_eq!(items[1].as_int(), Some(99));
-    }
 
     #[test]
     fn cl_intersection_test() {
