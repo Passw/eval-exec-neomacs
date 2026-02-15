@@ -320,11 +320,53 @@ const DISCRETE_BOOLEAN_FACE_ATTRIBUTES: &[&str] = &[
     ":inverse-video",
     ":extend",
 ];
+const SET_ONLY_FACE_ATTRIBUTES: &[&str] = &[":bold", ":italic"];
+const VALID_FACE_WEIGHTS: &[&str] = &[
+    "ultra-light",
+    "extra-light",
+    "light",
+    "semi-light",
+    "normal",
+    "semi-bold",
+    "bold",
+    "extra-bold",
+    "ultra-bold",
+];
+const VALID_FACE_SLANTS: &[&str] = &[
+    "normal",
+    "italic",
+    "oblique",
+    "reverse-italic",
+    "reverse-oblique",
+];
+const VALID_FACE_WIDTHS: &[&str] = &[
+    "ultra-condensed",
+    "extra-condensed",
+    "condensed",
+    "semi-condensed",
+    "normal",
+    "semi-expanded",
+    "expanded",
+    "extra-expanded",
+    "ultra-expanded",
+];
 
 static CREATED_LISP_FACES: OnceLock<Mutex<HashSet<String>>> = OnceLock::new();
+#[derive(Default)]
+struct FaceAttrState {
+    selected_created: HashSet<String>,
+    selected_overrides: std::collections::HashMap<String, std::collections::HashMap<String, Value>>,
+    defaults_overrides: std::collections::HashMap<String, std::collections::HashMap<String, Value>>,
+}
+
+static FACE_ATTR_STATE: OnceLock<Mutex<FaceAttrState>> = OnceLock::new();
 
 fn created_lisp_faces() -> &'static Mutex<HashSet<String>> {
     CREATED_LISP_FACES.get_or_init(|| Mutex::new(HashSet::new()))
+}
+
+fn face_attr_state() -> &'static Mutex<FaceAttrState> {
+    FACE_ATTR_STATE.get_or_init(|| Mutex::new(FaceAttrState::default()))
 }
 
 fn is_created_lisp_face(name: &str) -> bool {
@@ -339,6 +381,74 @@ fn mark_created_lisp_face(name: &str) {
         .lock()
         .expect("poisoned")
         .insert(name.to_string());
+}
+
+fn is_selected_created_lisp_face(name: &str) -> bool {
+    face_attr_state()
+        .lock()
+        .expect("poisoned")
+        .selected_created
+        .contains(name)
+}
+
+fn mark_selected_created_lisp_face(name: &str) {
+    face_attr_state()
+        .lock()
+        .expect("poisoned")
+        .selected_created
+        .insert(name.to_string());
+}
+
+fn face_exists_for_domain(name: &str, defaults_frame: bool) -> bool {
+    if KNOWN_FACES.contains(&name) {
+        return true;
+    }
+    if defaults_frame {
+        is_created_lisp_face(name)
+    } else {
+        is_selected_created_lisp_face(name)
+    }
+}
+
+fn get_face_override(face_name: &str, attr: &str, defaults_frame: bool) -> Option<Value> {
+    let state = face_attr_state().lock().expect("poisoned");
+    let map = if defaults_frame {
+        &state.defaults_overrides
+    } else {
+        &state.selected_overrides
+    };
+    map.get(face_name).and_then(|attrs| attrs.get(attr)).cloned()
+}
+
+fn set_face_override(face_name: &str, attr: &str, value: Value, defaults_frame: bool) {
+    let mut state = face_attr_state().lock().expect("poisoned");
+    let map = if defaults_frame {
+        &mut state.defaults_overrides
+    } else {
+        &mut state.selected_overrides
+    };
+    map.entry(face_name.to_string())
+        .or_default()
+        .insert(attr.to_string(), value);
+}
+
+fn clear_face_overrides(face_name: &str, defaults_frame: bool) {
+    let mut state = face_attr_state().lock().expect("poisoned");
+    if defaults_frame {
+        state.defaults_overrides.remove(face_name);
+    } else {
+        state.selected_overrides.remove(face_name);
+    }
+}
+
+fn copy_defaults_overrides(src: &str, dst: &str) {
+    let mut state = face_attr_state().lock().expect("poisoned");
+    let copied = state.defaults_overrides.get(src).cloned();
+    if let Some(attrs) = copied {
+        state.defaults_overrides.insert(dst.to_string(), attrs);
+    } else {
+        state.defaults_overrides.remove(dst);
+    }
 }
 
 fn symbol_name_for_face_value(face: &Value) -> Option<String> {
@@ -385,6 +495,41 @@ fn resolve_copy_source_face_symbol(face: &Value) -> Result<String, Flow> {
     ))
 }
 
+fn resolve_face_name_for_domain(face: &Value, defaults_frame: bool) -> Result<String, Flow> {
+    match face {
+        Value::Str(name) => {
+            if face_exists_for_domain(name, defaults_frame) {
+                Err(signal(
+                    "wrong-type-argument",
+                    vec![Value::symbol("symbolp"), face.clone()],
+                ))
+            } else {
+                Err(signal(
+                    "error",
+                    vec![Value::string("Invalid face"), Value::symbol(name.as_str())],
+                ))
+            }
+        }
+        Value::Nil | Value::True | Value::Symbol(_) => {
+            let name = symbol_name_for_face_value(face).expect("symbol-like");
+            if face_exists_for_domain(&name, defaults_frame) {
+                Ok(name)
+            } else if face.is_nil() {
+                Err(signal("error", vec![Value::string("Invalid face")]))
+            } else {
+                Err(signal(
+                    "error",
+                    vec![Value::string("Invalid face"), face.clone()],
+                ))
+            }
+        }
+        _ => Err(signal(
+            "error",
+            vec![Value::string("Invalid face"), face.clone()],
+        )),
+    }
+}
+
 fn make_lisp_face_vector() -> Value {
     let mut values = Vec::with_capacity(LISP_FACE_VECTOR_LEN);
     values.push(Value::symbol("face"));
@@ -426,6 +571,40 @@ fn normalize_face_attribute_name(attr: &Value) -> Result<String, Flow> {
     }
 }
 
+fn normalize_set_face_attribute_name(attr: &Value) -> Result<String, Flow> {
+    let name = match attr {
+        Value::Symbol(name) => name.clone(),
+        Value::Keyword(name) => {
+            if name.starts_with(':') {
+                name.clone()
+            } else {
+                format!(":{name}")
+            }
+        }
+        Value::Nil | Value::True => attr.as_symbol_name().unwrap_or_default().to_string(),
+        _ => {
+            return Err(signal(
+                "wrong-type-argument",
+                vec![Value::symbol("symbolp"), attr.clone()],
+            ));
+        }
+    };
+
+    if VALID_FACE_ATTRIBUTES.contains(&name.as_str()) || SET_ONLY_FACE_ATTRIBUTES.contains(&name.as_str()) {
+        Ok(name)
+    } else if attr.is_nil() {
+        Err(signal(
+            "error",
+            vec![Value::string("Invalid face attribute name")],
+        ))
+    } else {
+        Err(signal(
+            "error",
+            vec![Value::string("Invalid face attribute name"), attr.clone()],
+        ))
+    }
+}
+
 fn default_face_attribute_value(attr: &str) -> Value {
     match attr {
         ":family" | ":foundry" => Value::string("default"),
@@ -440,11 +619,13 @@ fn default_face_attribute_value(attr: &str) -> Value {
     }
 }
 
-fn lisp_face_attribute_value(face: &str, attr: &str) -> Value {
+fn lisp_face_attribute_base_value(face: &str, attr: &str, defaults_frame: bool) -> Value {
+    if defaults_frame {
+        return Value::symbol("unspecified");
+    }
     if face == "default" {
         return default_face_attribute_value(attr);
     }
-
     match (face, attr) {
         ("bold", ":weight") => Value::symbol("bold"),
         ("italic", ":slant") => Value::symbol("italic"),
@@ -459,34 +640,15 @@ fn lisp_face_attribute_value(face: &str, attr: &str) -> Value {
     }
 }
 
-fn resolve_known_face_name_for_compare(face: &Value) -> Result<String, Flow> {
-    match face {
-        Value::Nil => Err(signal("error", vec![Value::string("Invalid face")])),
-        Value::Symbol(name) => {
-            if KNOWN_FACES.contains(&name.as_str()) {
-                Ok(name.clone())
-            } else {
-                Err(signal(
-                    "error",
-                    vec![Value::string("Invalid face"), face.clone()],
-                ))
-            }
-        }
-        Value::Str(name) => {
-            if KNOWN_FACES.contains(&name.as_str()) {
-                Ok(name.as_str().to_string())
-            } else {
-                Err(signal(
-                    "error",
-                    vec![Value::string("Invalid face"), Value::symbol(name.as_str())],
-                ))
-            }
-        }
-        _ => Err(signal(
-            "error",
-            vec![Value::string("Invalid face"), face.clone()],
-        )),
+fn lisp_face_attribute_value(face: &str, attr: &str, defaults_frame: bool) -> Value {
+    if let Some(value) = get_face_override(face, attr, defaults_frame) {
+        return value;
     }
+    lisp_face_attribute_base_value(face, attr, defaults_frame)
+}
+
+fn resolve_known_face_name_for_compare(face: &Value, defaults_frame: bool) -> Result<String, Flow> {
+    resolve_face_name_for_domain(face, defaults_frame)
 }
 
 fn face_attr_value_name(attr: &Value) -> Result<String, Flow> {
@@ -518,6 +680,205 @@ fn frame_defaults_flag(frame: Option<&Value>) -> Result<bool, Flow> {
             vec![Value::symbol("frame-live-p"), v.clone()],
         )),
     }
+}
+
+fn check_non_empty_string(value: &Value, empty_message: &str) -> Result<(), Flow> {
+    match value {
+        Value::Str(s) => {
+            if s.is_empty() {
+                Err(signal(
+                    "error",
+                    vec![Value::string(empty_message), value.clone()],
+                ))
+            } else {
+                Ok(())
+            }
+        }
+        _ => Err(signal(
+            "wrong-type-argument",
+            vec![Value::symbol("stringp"), value.clone()],
+        )),
+    }
+}
+
+fn symbol_name_or_type_error(value: &Value) -> Result<String, Flow> {
+    match value {
+        Value::Nil => Ok("nil".to_string()),
+        Value::True => Ok("t".to_string()),
+        Value::Symbol(s) => Ok(s.clone()),
+        _ => Err(signal(
+            "wrong-type-argument",
+            vec![Value::symbol("symbolp"), value.clone()],
+        )),
+    }
+}
+
+fn normalize_face_attr_for_set(face_name: &str, attr: &str, value: Value) -> Result<(String, Value), Flow> {
+    let normalized = match attr {
+        ":foreground" | ":background" | ":distant-foreground" if value.is_nil() => {
+            Value::symbol("unspecified")
+        }
+        _ => value,
+    };
+    let is_reset_like =
+        matches!(&normalized, Value::Symbol(s) if s == "unspecified" || s == ":ignore-defface" || s == "reset");
+
+    match attr {
+        ":family" | ":foundry" => {
+            if !is_reset_like {
+                match &normalized {
+                    Value::Str(s) if !s.is_empty() => {}
+                    Value::Str(_) => {
+                        let msg = if attr == ":family" {
+                            "Invalid face family"
+                        } else {
+                            "Invalid face foundry"
+                        };
+                        return Err(signal("error", vec![Value::string(msg), normalized]));
+                    }
+                    _ => {
+                        return Err(signal(
+                            "wrong-type-argument",
+                            vec![Value::symbol("stringp"), normalized],
+                        ));
+                    }
+                }
+            }
+        }
+        ":height" => {
+            if !is_reset_like {
+                if face_name == "default" {
+                    match &normalized {
+                        Value::Int(n) if *n > 0 => {}
+                        _ => {
+                            return Err(signal(
+                                "error",
+                                vec![
+                                    Value::string("Default face height not absolute and positive"),
+                                    normalized,
+                                ],
+                            ));
+                        }
+                    }
+                } else {
+                    match &normalized {
+                        Value::Int(n) if *n > 0 => {}
+                        Value::Float(f) if *f > 0.0 => {}
+                        _ => {
+                            return Err(signal(
+                                "error",
+                                vec![
+                                    Value::string("Face height does not produce a positive integer"),
+                                    normalized,
+                                ],
+                            ));
+                        }
+                    }
+                }
+            }
+        }
+        ":weight" => {
+            if !is_reset_like {
+                let sym = symbol_name_or_type_error(&normalized)?;
+                if !VALID_FACE_WEIGHTS.contains(&sym.as_str()) {
+                    return Err(signal("error", vec![Value::string("Invalid face weight"), normalized]));
+                }
+            }
+        }
+        ":slant" => {
+            if !is_reset_like {
+                let sym = symbol_name_or_type_error(&normalized)?;
+                if !VALID_FACE_SLANTS.contains(&sym.as_str()) {
+                    return Err(signal("error", vec![Value::string("Invalid face slant"), normalized]));
+                }
+            }
+        }
+        ":width" => {
+            if !is_reset_like {
+                let sym = symbol_name_or_type_error(&normalized)?;
+                if !VALID_FACE_WIDTHS.contains(&sym.as_str()) {
+                    return Err(signal("error", vec![Value::string("Invalid face width"), normalized]));
+                }
+            }
+        }
+        ":foreground" => {
+            if !is_reset_like {
+                check_non_empty_string(&normalized, "Empty foreground color value")?;
+            }
+        }
+        ":background" => {
+            if !is_reset_like {
+                check_non_empty_string(&normalized, "Empty background color value")?;
+            }
+        }
+        ":distant-foreground" => {
+            if !is_reset_like {
+                check_non_empty_string(&normalized, "Empty distant-foreground color value")?;
+            }
+        }
+        ":inverse-video" => {
+            if !is_reset_like {
+                let sym = symbol_name_or_type_error(&normalized)?;
+                if sym != "t" && sym != "nil" {
+                    return Err(signal(
+                        "error",
+                        vec![
+                            Value::string("Invalid inverse-video face attribute value"),
+                            normalized,
+                        ],
+                    ));
+                }
+            }
+        }
+        ":extend" => {
+            if !is_reset_like {
+                let sym = symbol_name_or_type_error(&normalized)?;
+                if sym != "t" && sym != "nil" {
+                    return Err(signal(
+                        "error",
+                        vec![Value::string("Invalid extend face attribute value"), normalized],
+                    ));
+                }
+            }
+        }
+        ":inherit" => {
+            let valid = match &normalized {
+                Value::Nil | Value::True | Value::Symbol(_) => true,
+                Value::Cons(_) => list_to_vec(&normalized)
+                    .map(|vals| vals.iter().all(Value::is_symbol))
+                    .unwrap_or(false),
+                _ => false,
+            };
+            if !valid {
+                let mut payload = vec![Value::string("Invalid face inheritance")];
+                if let Some(vals) = list_to_vec(&normalized) {
+                    payload.extend(vals);
+                } else {
+                    payload.push(normalized);
+                }
+                return Err(signal("error", payload));
+            }
+        }
+        ":bold" => {
+            let mapped = if normalized.is_nil() {
+                Value::symbol("normal")
+            } else {
+                Value::symbol("bold")
+            };
+            return Ok((":weight".to_string(), mapped));
+        }
+        ":italic" => {
+            let mapped = if normalized.is_nil() {
+                Value::symbol("normal")
+            } else {
+                Value::symbol("italic")
+            };
+            return Ok((":slant".to_string(), mapped));
+        }
+        _ => {}
+    }
+
+    Ok((attr.to_string(), normalized))
 }
 
 /// `(internal-lisp-face-p FACE &optional FRAME)` -- return a face descriptor
@@ -555,6 +916,7 @@ pub(crate) fn builtin_internal_make_lisp_face(args: Vec<Value>) -> EvalResult {
         }
     }
     mark_created_lisp_face(&face_name);
+    clear_face_overrides(&face_name, true);
     Ok(make_lisp_face_vector())
 }
 
@@ -569,17 +931,60 @@ pub(crate) fn builtin_internal_copy_lisp_face(args: Vec<Value>) -> EvalResult {
             vec![Value::symbol("frame-live-p"), args[2].clone()],
         ));
     }
-    let _ = resolve_copy_source_face_symbol(&args[0])?;
+    let from_name = resolve_copy_source_face_symbol(&args[0])?;
     mark_created_lisp_face(&to_name);
+    copy_defaults_overrides(&from_name, &to_name);
     Ok(args[1].clone())
 }
 
 /// `(internal-set-lisp-face-attribute FACE ATTR VALUE &optional FRAME)` --
-/// stub, return VALUE.
+/// set FACE attribute in selected-frame/default face domains.
 pub(crate) fn builtin_internal_set_lisp_face_attribute(args: Vec<Value>) -> EvalResult {
     expect_min_args("internal-set-lisp-face-attribute", &args, 3)?;
     expect_max_args("internal-set-lisp-face-attribute", &args, 4)?;
-    Ok(args[2].clone())
+    let face = &args[0];
+    let face_name = require_symbol_face_name(face)?;
+    let attr_name = normalize_set_face_attribute_name(&args[1])?;
+    let value = args[2].clone();
+
+    let apply_set = |defaults_frame: bool| -> Result<(), Flow> {
+        if defaults_frame {
+            if !face_exists_for_domain(&face_name, true) {
+                if face.is_nil() {
+                    return Err(signal("error", vec![Value::string("Invalid face")]));
+                }
+                return Err(signal(
+                    "error",
+                    vec![Value::string("Invalid face"), face.clone()],
+                ));
+            }
+        } else if !face_exists_for_domain(&face_name, false) {
+            mark_selected_created_lisp_face(&face_name);
+            mark_created_lisp_face(&face_name);
+        }
+
+        let (canonical_attr, canonical_value) =
+            normalize_face_attr_for_set(&face_name, &attr_name, value.clone())?;
+        set_face_override(&face_name, &canonical_attr, canonical_value, defaults_frame);
+        Ok(())
+    };
+
+    match args.get(3) {
+        None | Some(Value::Nil) => apply_set(false)?,
+        Some(Value::True) => apply_set(true)?,
+        Some(Value::Int(0)) => {
+            apply_set(true)?;
+            apply_set(false)?;
+        }
+        Some(other) => {
+            return Err(signal(
+                "wrong-type-argument",
+                vec![Value::symbol("frame-live-p"), other.clone()],
+            ));
+        }
+    }
+
+    Ok(face.clone())
 }
 
 /// `(internal-get-lisp-face-attribute FACE ATTR &optional FRAME)` -- batch
@@ -602,45 +1007,10 @@ pub(crate) fn builtin_internal_get_lisp_face_attribute(args: Vec<Value>) -> Eval
         false
     };
 
-    let face_name = match &args[0] {
-        Value::Nil => {
-            return Err(signal("error", vec![Value::string("Invalid face")]));
-        }
-        Value::Symbol(name) => {
-            if KNOWN_FACES.contains(&name.as_str()) {
-                name.as_str()
-            } else {
-                return Err(signal(
-                    "error",
-                    vec![Value::string("Invalid face"), args[0].clone()],
-                ));
-            }
-        }
-        Value::Str(name) => {
-            if KNOWN_FACES.contains(&name.as_str()) {
-                return Err(signal(
-                    "wrong-type-argument",
-                    vec![Value::symbol("symbolp"), args[0].clone()],
-                ));
-            }
-            return Err(signal(
-                "error",
-                vec![Value::string("Invalid face"), Value::symbol(name.as_str())],
-            ));
-        }
-        _ => {
-            return Err(signal(
-                "error",
-                vec![Value::string("Invalid face"), args[0].clone()],
-            ));
-        }
-    };
+    let face_name = resolve_face_name_for_domain(&args[0], defaults_frame)?;
 
     let attr_name = normalize_face_attribute_name(&args[1])?;
-    if defaults_frame {
-        return Ok(Value::symbol("unspecified"));
-    }
-    Ok(lisp_face_attribute_value(face_name, &attr_name))
+    Ok(lisp_face_attribute_value(&face_name, &attr_name, defaults_frame))
 }
 
 /// `(internal-lisp-face-attribute-values ATTR)` -- return valid discrete values
@@ -662,14 +1032,11 @@ pub(crate) fn builtin_internal_lisp_face_equal_p(args: Vec<Value>) -> EvalResult
     expect_min_args("internal-lisp-face-equal-p", &args, 2)?;
     expect_max_args("internal-lisp-face-equal-p", &args, 3)?;
     let defaults_frame = frame_defaults_flag(args.get(2))?;
-    let face1 = resolve_known_face_name_for_compare(&args[0])?;
-    let face2 = resolve_known_face_name_for_compare(&args[1])?;
-    if defaults_frame {
-        return Ok(Value::True);
-    }
+    let face1 = resolve_known_face_name_for_compare(&args[0], defaults_frame)?;
+    let face2 = resolve_known_face_name_for_compare(&args[1], defaults_frame)?;
     for attr in VALID_FACE_ATTRIBUTES {
-        let v1 = lisp_face_attribute_value(&face1, attr);
-        let v2 = lisp_face_attribute_value(&face2, attr);
+        let v1 = lisp_face_attribute_value(&face1, attr, defaults_frame);
+        let v2 = lisp_face_attribute_value(&face2, attr, defaults_frame);
         if v1 != v2 {
             return Ok(Value::Nil);
         }
@@ -683,12 +1050,9 @@ pub(crate) fn builtin_internal_lisp_face_empty_p(args: Vec<Value>) -> EvalResult
     expect_min_args("internal-lisp-face-empty-p", &args, 1)?;
     expect_max_args("internal-lisp-face-empty-p", &args, 2)?;
     let defaults_frame = frame_defaults_flag(args.get(1))?;
-    let face = resolve_known_face_name_for_compare(&args[0])?;
-    if defaults_frame {
-        return Ok(Value::True);
-    }
+    let face = resolve_known_face_name_for_compare(&args[0], defaults_frame)?;
     for attr in VALID_FACE_ATTRIBUTES {
-        let v = lisp_face_attribute_value(&face, attr);
+        let v = lisp_face_attribute_value(&face, attr, defaults_frame);
         if !matches!(v, Value::Symbol(ref name) if name == "unspecified") {
             return Ok(Value::Nil);
         }
@@ -1157,13 +1521,14 @@ mod tests {
 
     #[test]
     fn internal_set_lisp_face_attribute_returns_value() {
+        let face = Value::symbol("__neovm_set_attr_unit_test");
         let result = builtin_internal_set_lisp_face_attribute(vec![
-            Value::symbol("default"),
+            face.clone(),
             Value::Keyword("foreground".to_string()),
             Value::string("white"),
         ])
         .unwrap();
-        assert_eq!(result.as_str(), Some("white"));
+        assert_eq!(result, face);
     }
 
     #[test]
