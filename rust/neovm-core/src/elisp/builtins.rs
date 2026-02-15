@@ -6055,8 +6055,8 @@ pub(crate) fn dispatch_builtin(
         "seq-some" => return Some(super::cl_lib::builtin_seq_some(eval, args)),
         "seq-every-p" => return Some(super::cl_lib::builtin_seq_every_p(eval, args)),
         "seq-sort" => return Some(super::cl_lib::builtin_seq_sort(eval, args)),
-        "json-parse-buffer" => return Some(super::cl_lib::builtin_json_parse_buffer(eval, args)),
-        "json-insert" => return Some(super::cl_lib::builtin_json_insert(eval, args)),
+        "json-parse-buffer" => return Some(super::json::builtin_json_parse_buffer(eval, args)),
+        "json-insert" => return Some(super::json::builtin_json_insert(eval, args)),
 
         // Documentation/help (evaluator-dependent)
         "documentation" => return Some(super::doc::builtin_documentation(eval, args)),

@@ -1079,6 +1079,57 @@ pub(crate) fn builtin_json_parse_string(args: Vec<Value>) -> EvalResult {
     Ok(result)
 }
 
+/// `(json-parse-buffer &rest ARGS)` — parse one JSON value from point.
+///
+/// Unlike `json-parse-string`, this parses a single JSON value starting at the
+/// current point (after leading whitespace), leaves trailing buffer content
+/// untouched, and advances point to just after the parsed value.
+pub(crate) fn builtin_json_parse_buffer(
+    eval: &mut super::eval::Evaluator,
+    args: Vec<Value>,
+) -> EvalResult {
+    let opts = parse_parse_kwargs(&args, 0)?;
+    let (input, point_base) = {
+        let buf = eval
+            .buffers
+            .current_buffer()
+            .ok_or_else(|| signal("error", vec![Value::string("No current buffer")]))?;
+        (buf.buffer_substring(buf.point(), buf.point_max()), buf.point())
+    };
+
+    let mut parser = JsonParser::new(&input, opts);
+    parser.skip_ws();
+    if parser.pos >= parser.input.len() {
+        let p = parser.pos as i64;
+        return Err(signal(
+            "json-end-of-file",
+            vec![Value::Int(1), Value::Int(p), Value::Int(p)],
+        ));
+    }
+
+    let result = parser.parse_value()?;
+    let new_point = point_base + parser.pos;
+    if let Some(buf) = eval.buffers.current_buffer_mut() {
+        buf.goto_char(new_point);
+    }
+    Ok(result)
+}
+
+/// `(json-insert VALUE &rest ARGS)` — insert JSON text at point.
+///
+/// Keyword arguments mirror `json-serialize` (`:null-object`, `:false-object`).
+pub(crate) fn builtin_json_insert(eval: &mut super::eval::Evaluator, args: Vec<Value>) -> EvalResult {
+    expect_min_args("json-insert", &args, 1)?;
+    let opts = parse_serialize_kwargs(&args, 1)?;
+    let json = serialize_to_json(&args[0], &opts, 0)?;
+    let buf = eval
+        .buffers
+        .current_buffer_mut()
+        .ok_or_else(|| signal("error", vec![Value::string("No current buffer")]))?;
+    buf.insert(&json);
+    Ok(Value::Nil)
+}
+
 // ===========================================================================
 // Tests
 // ===========================================================================
