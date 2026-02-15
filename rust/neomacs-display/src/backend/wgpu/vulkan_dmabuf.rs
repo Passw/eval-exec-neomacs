@@ -700,18 +700,22 @@ mod hal_import {
         };
 
         // Step 7: Transition image layout from UNDEFINED to SHADER_READ_ONLY_OPTIMAL.
-        // DMA-BUF imported images start in UNDEFINED layout. We must perform an
-        // explicit Vulkan barrier to make the external content readable. Without this,
-        // the GPU may return black/garbage when sampling (observed on AMD RADV with DCC).
-        if let Err(e) = transition_image_layout(
-            vk_device, vk_queue, queue_family, image,
-        ) {
-            log::warn!("Failed to transition DMA-BUF image layout: {:?}", e);
-            for &mem in &memories {
-                vk_device.free_memory(mem, None);
+        //
+        // AMD (RADV) may require an explicit transition to avoid sampling
+        // compressed/tiled data before decompression. This transition currently
+        // uses queue_wait_idle(), so skip it on non-AMD adapters to avoid
+        // per-frame queue stalls on Intel/NVIDIA.
+        if needs_explicit_dmabuf_transition(instance, physical_device) {
+            if let Err(e) = transition_image_layout(
+                vk_device, vk_queue, queue_family, image,
+            ) {
+                log::warn!("Failed to transition DMA-BUF image layout: {:?}", e);
+                for &mem in &memories {
+                    vk_device.free_memory(mem, None);
+                }
+                vk_device.destroy_image(image, None);
+                return None;
             }
-            vk_device.destroy_image(image, None);
-            return None;
         }
 
         log::info!(
@@ -793,6 +797,21 @@ mod hal_import {
 
         log::debug!("DMA-BUF image layout transition: UNDEFINED → SHADER_READ_ONLY_OPTIMAL");
         Ok(())
+    }
+
+    #[inline]
+    fn needs_explicit_dmabuf_transition(
+        instance: &ash::Instance,
+        physical_device: vk::PhysicalDevice,
+    ) -> bool {
+        // PCI vendor ID for AMD GPUs.
+        const AMD_VENDOR_ID: u32 = 0x1002;
+        unsafe {
+            instance
+                .get_physical_device_properties(physical_device)
+                .vendor_id
+                == AMD_VENDOR_ID
+        }
     }
 }
 

@@ -33,6 +33,17 @@ pub enum VideoState {
     Error,
 }
 
+impl VideoState {
+    /// Whether this state should keep the render loop actively redrawing.
+    ///
+    /// `Loading` must be considered active so initial decoded frames get
+    /// uploaded promptly, even before state transitions to `Playing`.
+    #[inline]
+    fn keeps_render_loop_active(self) -> bool {
+        matches!(self, VideoState::Loading | VideoState::Playing)
+    }
+}
+
 /// DMA-BUF information for zero-copy path.
 ///
 /// Owns the file descriptor — Drop closes it automatically.
@@ -273,7 +284,9 @@ impl VideoCache {
 
     /// Check if any video is currently in Playing state
     pub fn has_playing_videos(&self) -> bool {
-        self.videos.values().any(|v| v.state == VideoState::Playing)
+        self.videos
+            .values()
+            .any(|v| v.state.keeps_render_loop_active())
     }
 
     /// Process pending decoded frames using stored GPU resources (call each frame)
@@ -313,49 +326,141 @@ impl VideoCache {
         bind_group_layout: &wgpu::BindGroupLayout,
         sampler: &wgpu::Sampler,
     ) {
-        // Process all available frames
-        let mut frame_count = 0;
+        // Drain queue quickly, then keep only the latest frame per video ID.
+        // This bounds upload work per tick and avoids long stalls when decode
+        // threads outpace rendering (e.g., two concurrent 4K videos).
+        let mut drained_frames = Vec::new();
         while let Ok(frame) = self.frame_rx.try_recv() {
-            frame_count += 1;
-            let total = self.videos.get(&frame.video_id).map(|v| v.frame_count).unwrap_or(0) + 1;
+            drained_frames.push(frame);
+        }
+        if drained_frames.is_empty() {
+            return;
+        }
 
-            log::info!("VideoCache::process_pending received frame #{} for video {}, pts={}ms, size={}x{}",
-                total, frame.video_id, frame.pts / 1_000_000, frame.width, frame.height);
-            if let Some(video) = self.videos.get_mut(&frame.video_id) {
-                // Check if we need to create new texture (first frame or size changed)
-                let need_new_texture = video.texture.is_none()
-                    || video.width != frame.width
-                    || video.height != frame.height;
+        let drained_count = drained_frames.len();
+        let latest_frames = Self::coalesce_latest_frames(drained_frames);
+        if drained_count > latest_frames.len() {
+            log::debug!(
+                "VideoCache::process_pending coalesced {} queued frames into {} uploads",
+                drained_count,
+                latest_frames.len()
+            );
+        }
 
-                if need_new_texture {
-                    // Update dimensions
-                    video.width = frame.width;
-                    video.height = frame.height;
-                    if video.state == VideoState::Loading {
-                        video.state = VideoState::Playing;
-                    }
+        for frame in latest_frames.into_values() {
+            self.process_single_frame(device, queue, bind_group_layout, sampler, frame);
+        }
+    }
 
-                    // Create new texture (only when dimensions change)
-                    let texture = device.create_texture(&wgpu::TextureDescriptor {
-                        label: Some("Video Frame Texture"),
-                        size: wgpu::Extent3d {
-                            width: frame.width,
-                            height: frame.height,
-                            depth_or_array_layers: 1,
+    fn coalesce_latest_frames<I>(frames: I) -> HashMap<u32, DecodedFrame>
+    where
+        I: IntoIterator<Item = DecodedFrame>,
+    {
+        let mut latest = HashMap::new();
+        for frame in frames {
+            latest.insert(frame.video_id, frame);
+        }
+        latest
+    }
+
+    fn process_single_frame(
+        &mut self,
+        device: &wgpu::Device,
+        queue: &wgpu::Queue,
+        bind_group_layout: &wgpu::BindGroupLayout,
+        sampler: &wgpu::Sampler,
+        frame: DecodedFrame,
+    ) {
+        let total = self.videos.get(&frame.video_id).map(|v| v.frame_count).unwrap_or(0) + 1;
+        log::info!(
+            "VideoCache::process_pending received frame #{} for video {}, pts={}ms, size={}x{}",
+            total,
+            frame.video_id,
+            frame.pts / 1_000_000,
+            frame.width,
+            frame.height
+        );
+
+        if let Some(video) = self.videos.get_mut(&frame.video_id) {
+            // Check if we need to create new texture (first frame or size changed)
+            let need_new_texture = video.texture.is_none()
+                || video.width != frame.width
+                || video.height != frame.height;
+
+            if need_new_texture {
+                // Update dimensions
+                video.width = frame.width;
+                video.height = frame.height;
+                if video.state == VideoState::Loading {
+                    video.state = VideoState::Playing;
+                }
+
+                // Create new texture (only when dimensions change)
+                let texture = device.create_texture(&wgpu::TextureDescriptor {
+                    label: Some("Video Frame Texture"),
+                    size: wgpu::Extent3d {
+                        width: frame.width,
+                        height: frame.height,
+                        depth_or_array_layers: 1,
+                    },
+                    mip_level_count: 1,
+                    sample_count: 1,
+                    dimension: wgpu::TextureDimension::D2,
+                    format: wgpu::TextureFormat::Rgba8UnormSrgb,
+                    usage: wgpu::TextureUsages::TEXTURE_BINDING | wgpu::TextureUsages::COPY_DST,
+                    view_formats: &[],
+                });
+
+                let texture_view = texture.create_view(&wgpu::TextureViewDescriptor::default());
+
+                // Create bind group
+                let bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
+                    label: Some("Video Bind Group"),
+                    layout: bind_group_layout,
+                    entries: &[
+                        wgpu::BindGroupEntry {
+                            binding: 0,
+                            resource: wgpu::BindingResource::TextureView(&texture_view),
                         },
-                        mip_level_count: 1,
-                        sample_count: 1,
-                        dimension: wgpu::TextureDimension::D2,
-                        format: wgpu::TextureFormat::Rgba8UnormSrgb,
-                        usage: wgpu::TextureUsages::TEXTURE_BINDING | wgpu::TextureUsages::COPY_DST,
-                        view_formats: &[],
-                    });
+                        wgpu::BindGroupEntry {
+                            binding: 1,
+                            resource: wgpu::BindingResource::Sampler(sampler),
+                        },
+                    ],
+                });
 
-                    let texture_view = texture.create_view(&wgpu::TextureViewDescriptor::default());
+                video.texture = Some(texture);
+                video.texture_view = Some(texture_view);
+                video.bind_group = Some(bind_group);
+            }
 
-                    // Create bind group
+            // Update texture data
+            // Try DMA-BUF zero-copy path first, fall back to CPU copy
+            #[cfg(target_os = "linux")]
+            let dmabuf_imported = if let Some(ref dmabuf) = frame.dmabuf {
+                // Try to import DMA-BUF directly into wgpu texture
+                use super::external_buffer::DmaBufBuffer;
+
+                let dmabuf_buffer = DmaBufBuffer::single_plane(
+                    dmabuf.fd,
+                    frame.width,
+                    frame.height,
+                    dmabuf.stride,
+                    dmabuf.fourcc,
+                    dmabuf.modifier,
+                );
+
+                if let Some(imported_texture) = dmabuf_buffer.to_wgpu_texture(device, queue) {
+                    log::debug!(
+                        "DMA-BUF zero-copy import successful for video {}",
+                        frame.video_id
+                    );
+
+                    // Replace texture with imported one
+                    let texture_view =
+                        imported_texture.create_view(&wgpu::TextureViewDescriptor::default());
                     let bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
-                        label: Some("Video Bind Group"),
+                        label: Some("Video DMA-BUF Bind Group"),
                         layout: bind_group_layout,
                         entries: &[
                             wgpu::BindGroupEntry {
@@ -369,90 +474,52 @@ impl VideoCache {
                         ],
                     });
 
-                    video.texture = Some(texture);
+                    video.texture = Some(imported_texture);
                     video.texture_view = Some(texture_view);
                     video.bind_group = Some(bind_group);
-                }
-
-                // Update texture data
-                // Try DMA-BUF zero-copy path first, fall back to CPU copy
-                #[cfg(target_os = "linux")]
-                let dmabuf_imported = if let Some(ref dmabuf) = frame.dmabuf {
-                    // Try to import DMA-BUF directly into wgpu texture
-                    use super::external_buffer::DmaBufBuffer;
-
-                    let dmabuf_buffer = DmaBufBuffer::single_plane(
-                        dmabuf.fd,
-                        frame.width,
-                        frame.height,
-                        dmabuf.stride,
-                        dmabuf.fourcc,
-                        dmabuf.modifier,
-                    );
-
-                    if let Some(imported_texture) = dmabuf_buffer.to_wgpu_texture(device, queue) {
-                        log::debug!("DMA-BUF zero-copy import successful for video {}", frame.video_id);
-
-                        // Replace texture with imported one
-                        let texture_view = imported_texture.create_view(&wgpu::TextureViewDescriptor::default());
-                        let bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
-                            label: Some("Video DMA-BUF Bind Group"),
-                            layout: bind_group_layout,
-                            entries: &[
-                                wgpu::BindGroupEntry {
-                                    binding: 0,
-                                    resource: wgpu::BindingResource::TextureView(&texture_view),
-                                },
-                                wgpu::BindGroupEntry {
-                                    binding: 1,
-                                    resource: wgpu::BindingResource::Sampler(sampler),
-                                },
-                            ],
-                        });
-
-                        video.texture = Some(imported_texture);
-                        video.texture_view = Some(texture_view);
-                        video.bind_group = Some(bind_group);
-                        true
-                    } else {
-                        log::debug!("DMA-BUF import failed, falling back to CPU copy");
-                        false
-                    }
+                    true
                 } else {
+                    log::debug!("DMA-BUF import failed, falling back to CPU copy");
                     false
-                };
-
-                #[cfg(not(target_os = "linux"))]
-                let dmabuf_imported = false;
-
-                // Fall back to CPU copy if DMA-BUF import failed or not available
-                if !dmabuf_imported && !frame.data.is_empty() {
-                    if let Some(ref texture) = video.texture {
-                        queue.write_texture(
-                            wgpu::ImageCopyTexture {
-                                texture,
-                                mip_level: 0,
-                                origin: wgpu::Origin3d::ZERO,
-                                aspect: wgpu::TextureAspect::All,
-                            },
-                            &frame.data,
-                            wgpu::ImageDataLayout {
-                                offset: 0,
-                                bytes_per_row: Some(frame.width * 4),
-                                rows_per_image: Some(frame.height),
-                            },
-                            wgpu::Extent3d {
-                                width: frame.width,
-                                height: frame.height,
-                                depth_or_array_layers: 1,
-                            },
-                        );
-                    }
                 }
+            } else {
+                false
+            };
 
-                video.frame_count += 1;
-                log::trace!("VideoCache: updated video {} frame {}", frame.video_id, video.frame_count);
+            #[cfg(not(target_os = "linux"))]
+            let dmabuf_imported = false;
+
+            // Fall back to CPU copy if DMA-BUF import failed or not available
+            if !dmabuf_imported && !frame.data.is_empty() {
+                if let Some(ref texture) = video.texture {
+                    queue.write_texture(
+                        wgpu::ImageCopyTexture {
+                            texture,
+                            mip_level: 0,
+                            origin: wgpu::Origin3d::ZERO,
+                            aspect: wgpu::TextureAspect::All,
+                        },
+                        &frame.data,
+                        wgpu::ImageDataLayout {
+                            offset: 0,
+                            bytes_per_row: Some(frame.width * 4),
+                            rows_per_image: Some(frame.height),
+                        },
+                        wgpu::Extent3d {
+                            width: frame.width,
+                            height: frame.height,
+                            depth_or_array_layers: 1,
+                        },
+                    );
+                }
             }
+
+            video.frame_count += 1;
+            log::trace!(
+                "VideoCache: updated video {} frame {}",
+                frame.video_id,
+                video.frame_count
+            );
         }
     }
 
@@ -828,5 +895,51 @@ impl VideoCache {
 impl Default for VideoCache {
     fn default() -> Self {
         Self::new()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{DecodedFrame, VideoCache, VideoState};
+
+    fn frame(video_id: u32, id: u32, pts: u64) -> DecodedFrame {
+        DecodedFrame {
+            id,
+            video_id,
+            width: 320,
+            height: 180,
+            data: Vec::new(),
+            #[cfg(target_os = "linux")]
+            dmabuf: None,
+            pts,
+            duration: 16_666_667,
+        }
+    }
+
+    #[test]
+    fn loading_and_playing_states_keep_render_loop_active() {
+        assert!(VideoState::Loading.keeps_render_loop_active());
+        assert!(VideoState::Playing.keeps_render_loop_active());
+        assert!(!VideoState::Paused.keeps_render_loop_active());
+        assert!(!VideoState::Stopped.keeps_render_loop_active());
+        assert!(!VideoState::EndOfStream.keeps_render_loop_active());
+        assert!(!VideoState::Error.keeps_render_loop_active());
+    }
+
+    #[test]
+    fn coalesce_latest_frames_keeps_only_most_recent_per_video() {
+        let latest = VideoCache::coalesce_latest_frames(vec![
+            frame(1, 1, 100),
+            frame(2, 1, 120),
+            frame(1, 2, 140),
+            frame(2, 2, 160),
+            frame(1, 3, 180),
+        ]);
+
+        assert_eq!(latest.len(), 2);
+        assert_eq!(latest.get(&1).map(|f| f.id), Some(3));
+        assert_eq!(latest.get(&2).map(|f| f.id), Some(2));
+        assert_eq!(latest.get(&1).map(|f| f.pts), Some(180));
+        assert_eq!(latest.get(&2).map(|f| f.pts), Some(160));
     }
 }
