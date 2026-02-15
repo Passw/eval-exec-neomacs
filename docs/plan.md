@@ -19,6 +19,22 @@ Last updated: 2026-02-15
 
 ## Done
 
+- Aligned evaluator-backed X-display query behavior for live frame designators:
+  - updated:
+    - `rust/neovm-core/src/elisp/display.rs`
+      - added evaluator-backed variants for `x-display-pixel-width`, `x-display-pixel-height`, and `x-display-color-p`.
+      - live frame designators now map to Emacs-compatible batch semantics (`error` for pixel width/height, `nil` for color query).
+      - added unit test coverage for selected-frame designator paths.
+    - `rust/neovm-core/src/elisp/builtins.rs`
+      - routed the three `x-display-*` builtins through evaluator dispatch.
+    - `test/neovm/vm-compat/cases/x-display-batch-semantics.{forms,expected.tsv}`
+      - added explicit selected-frame checks.
+      - switched invalid numeric probes to `999999` to avoid live frame-id overlap.
+      - refreshed oracle baseline.
+  - verified:
+    - `cargo test display::tests --manifest-path rust/neovm-core/Cargo.toml -- --nocapture` (pass)
+    - `make -C test/neovm/vm-compat check-one-neovm CASE=cases/x-display-batch-semantics` (pass, 30/30)
+
 - Expanded display monitor evaluator designator compatibility:
   - updated:
     - `rust/neovm-core/src/elisp/display.rs`
