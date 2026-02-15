@@ -18,6 +18,23 @@ Last updated: 2026-02-15
 
 ## Done
 
+- Implemented `syntax-table-p` and expanded syntax-table corpus coverage:
+  - updated:
+    - `rust/neovm-core/src/elisp/syntax.rs`
+      - added pure `syntax-table-p` predicate over char-table subtype `syntax-table`.
+      - added unit test covering syntax-table/non-syntax-table/atom behavior.
+    - `rust/neovm-core/src/elisp/builtins.rs`
+      - wired `syntax-table-p` in pure dispatch maps.
+    - `rust/neovm-core/src/elisp/builtin_registry.rs`
+      - registered `syntax-table-p` for `fboundp`/introspection parity.
+    - `test/neovm/vm-compat/cases/syntax-table-semantics.forms`
+      - expanded with `syntax-table-p` availability/value/arity checks.
+    - `test/neovm/vm-compat/cases/syntax-table-semantics.expected.tsv`
+      - re-recorded with `NEOVM_ORACLE_EMACS=/nix/store/2lzapcylxkad2r63h144mp9nnin4vb5n-user-environment/bin/emacs`.
+  - verified:
+    - `cargo test 'elisp::syntax::tests::syntax_table_p_recognizes_syntax_tables' -- --nocapture` (pass)
+    - `make -C test/neovm/vm-compat check-one-neovm CASE=cases/syntax-table-semantics` (pass, 19/19)
+
 - Implemented evaluator-backed `buffer-live-p` and locked behavior with corpus:
   - updated:
     - `rust/neovm-core/src/elisp/builtins.rs`
