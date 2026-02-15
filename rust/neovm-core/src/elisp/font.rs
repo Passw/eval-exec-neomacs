@@ -14,7 +14,7 @@
 //!   `internal-set-alternative-font-family-alist`,
 //!   `internal-set-alternative-font-registry-alist`
 
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 use std::sync::{Mutex, OnceLock};
 
 use super::error::{signal, EvalResult, Flow};
@@ -290,6 +290,23 @@ const KNOWN_FACES: &[&str] = &[
     "fringe",
     "cursor",
 ];
+const FIRST_DYNAMIC_FACE_ID: i64 = 133;
+
+fn known_face_id(name: &str) -> Option<i64> {
+    match name {
+        "default" => Some(0),
+        "bold" => Some(1),
+        "italic" => Some(2),
+        "underline" => Some(4),
+        "highlight" => Some(12),
+        "region" => Some(13),
+        "mode-line" => Some(25),
+        "mode-line-inactive" => Some(27),
+        "fringe" => Some(40),
+        "cursor" => Some(43),
+        _ => None,
+    }
+}
 
 const LISP_FACE_VECTOR_LEN: usize = 20;
 const VALID_FACE_ATTRIBUTES: &[&str] = &[
@@ -352,6 +369,8 @@ const VALID_FACE_WIDTHS: &[&str] = &[
 ];
 
 static CREATED_LISP_FACES: OnceLock<Mutex<HashSet<String>>> = OnceLock::new();
+static CREATED_FACE_IDS: OnceLock<Mutex<HashMap<String, i64>>> = OnceLock::new();
+static NEXT_CREATED_FACE_ID: OnceLock<Mutex<i64>> = OnceLock::new();
 #[derive(Default)]
 struct FaceAttrState {
     selected_created: HashSet<String>,
@@ -363,6 +382,14 @@ static FACE_ATTR_STATE: OnceLock<Mutex<FaceAttrState>> = OnceLock::new();
 
 fn created_lisp_faces() -> &'static Mutex<HashSet<String>> {
     CREATED_LISP_FACES.get_or_init(|| Mutex::new(HashSet::new()))
+}
+
+fn created_face_ids() -> &'static Mutex<HashMap<String, i64>> {
+    CREATED_FACE_IDS.get_or_init(|| Mutex::new(HashMap::new()))
+}
+
+fn next_created_face_id() -> &'static Mutex<i64> {
+    NEXT_CREATED_FACE_ID.get_or_init(|| Mutex::new(FIRST_DYNAMIC_FACE_ID))
 }
 
 fn face_attr_state() -> &'static Mutex<FaceAttrState> {
@@ -377,10 +404,38 @@ fn is_created_lisp_face(name: &str) -> bool {
 }
 
 fn mark_created_lisp_face(name: &str) {
-    created_lisp_faces()
+    let inserted = created_lisp_faces()
         .lock()
         .expect("poisoned")
         .insert(name.to_string());
+    if inserted {
+        ensure_dynamic_face_id(name);
+    }
+}
+
+fn ensure_dynamic_face_id(name: &str) {
+    if known_face_id(name).is_some() {
+        return;
+    }
+    let mut ids = created_face_ids().lock().expect("poisoned");
+    if ids.contains_key(name) {
+        return;
+    }
+    let mut next = next_created_face_id().lock().expect("poisoned");
+    ids.insert(name.to_string(), *next);
+    *next += 1;
+}
+
+fn dynamic_face_id(name: &str) -> Option<i64> {
+    created_face_ids()
+        .lock()
+        .expect("poisoned")
+        .get(name)
+        .copied()
+}
+
+fn face_id_for_name(name: &str) -> Option<i64> {
+    known_face_id(name).or_else(|| dynamic_face_id(name))
 }
 
 fn is_selected_created_lisp_face(name: &str) -> bool {
@@ -1284,12 +1339,27 @@ pub(crate) fn builtin_defined_colors(args: Vec<Value>) -> EvalResult {
     Ok(Value::list(colors.into_iter().map(Value::string).collect()))
 }
 
-/// `(face-id FACE)` -- stub, return 0.
+/// `(face-id FACE &optional FRAME)` -- return numeric face id for known and
+/// dynamically created faces.
 pub(crate) fn builtin_face_id(args: Vec<Value>) -> EvalResult {
-    expect_args("face-id", &args, 1)?;
-    if let Value::Symbol(name) = &args[0] {
-        if KNOWN_FACES.contains(&name.as_str()) {
-            return Ok(Value::Int(0));
+    expect_min_args("face-id", &args, 1)?;
+    expect_max_args("face-id", &args, 2)?;
+    if matches!(&args[0], Value::Str(_)) {
+        return Err(signal(
+            "wrong-type-argument",
+            vec![Value::symbol("symbolp"), args[0].clone()],
+        ));
+    }
+
+    if let Some(name) = symbol_name_for_face_value(&args[0]) {
+        if let Some(id) = face_id_for_name(&name) {
+            return Ok(Value::Int(id));
+        }
+        if is_created_lisp_face(&name) {
+            ensure_dynamic_face_id(&name);
+            if let Some(id) = face_id_for_name(&name) {
+                return Ok(Value::Int(id));
+            }
         }
     }
     let rendered = super::print::print_value(&args[0]);
@@ -1867,6 +1937,29 @@ mod tests {
     fn face_id_stub() {
         let result = builtin_face_id(vec![Value::symbol("default")]).unwrap();
         assert_eq!(result.as_int(), Some(0));
+    }
+
+    #[test]
+    fn face_id_known_faces_use_oracle_ids() {
+        let bold = builtin_face_id(vec![Value::symbol("bold")]).unwrap();
+        assert_eq!(bold.as_int(), Some(1));
+        let mode_line = builtin_face_id(vec![Value::symbol("mode-line")]).unwrap();
+        assert_eq!(mode_line.as_int(), Some(25));
+    }
+
+    #[test]
+    fn face_id_accepts_optional_frame_argument() {
+        let result = builtin_face_id(vec![Value::symbol("default"), Value::Nil]).unwrap();
+        assert_eq!(result.as_int(), Some(0));
+    }
+
+    #[test]
+    fn face_id_assigns_dynamic_id_for_created_faces() {
+        let face = Value::symbol("__neovm_face_id_dynamic_unit_test");
+        let _ = builtin_internal_make_lisp_face(vec![face.clone()]).unwrap();
+        let first = builtin_face_id(vec![face.clone()]).unwrap();
+        let second = builtin_face_id(vec![face]).unwrap();
+        assert_eq!(first, second);
     }
 
     #[test]
