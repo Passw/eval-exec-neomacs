@@ -4,7 +4,7 @@
 //! - `documentation` — retrieve docstring from a function
 //! - `describe-function` — return description string for a function
 //! - `describe-variable` — return description string for a variable
-//! - `documentation-property` — retrieve documentation property (stub)
+//! - `documentation-property` — retrieve documentation property
 //! - `Snarf-documentation` — internal DOC file loader (stub)
 //! - `substitute-command-keys` — process special sequences in docstrings
 //! - `help-function-arglist` — return argument list of a function
@@ -171,6 +171,37 @@ pub(crate) fn builtin_describe_variable(
         Ok(Value::string(format!("{} is a variable.", name)))
     } else {
         Ok(Value::Nil)
+    }
+}
+
+/// `(documentation-property SYMBOL PROP &optional RAW)` -- return the
+/// documentation property PROP of SYMBOL.
+///
+/// Evaluator-aware implementation:
+/// - validates SYMBOL as a symbol designator (`symbolp`)
+/// - returns nil when PROP is not a symbol (matching Emacs `get`-like behavior)
+/// - returns string-valued properties only; non-string properties map to nil
+/// - accepts RAW but currently ignores it
+pub(crate) fn builtin_documentation_property_eval(
+    eval: &mut super::eval::Evaluator,
+    args: Vec<Value>,
+) -> EvalResult {
+    expect_min_max_args("documentation-property", &args, 2, 3)?;
+
+    let sym = args[0].as_symbol_name().ok_or_else(|| {
+        signal(
+            "wrong-type-argument",
+            vec![Value::symbol("symbolp"), args[0].clone()],
+        )
+    })?;
+
+    let Some(prop) = args[1].as_symbol_name() else {
+        return Ok(Value::Nil);
+    };
+
+    match eval.obarray.get_property(sym, prop) {
+        Some(value) if value.is_string() => Ok(value.clone()),
+        _ => Ok(Value::Nil),
     }
 }
 
@@ -950,6 +981,61 @@ mod tests {
     fn describe_variable_non_symbol() {
         let mut evaluator = super::super::eval::Evaluator::new();
         let result = builtin_describe_variable(&mut evaluator, vec![Value::Int(42)]);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn documentation_property_eval_returns_string_property() {
+        let mut evaluator = super::super::eval::Evaluator::new();
+        evaluator
+            .obarray
+            .put_property("doc-sym", "variable-documentation", Value::string("doc"));
+
+        let result = builtin_documentation_property_eval(
+            &mut evaluator,
+            vec![Value::symbol("doc-sym"), Value::symbol("variable-documentation")],
+        )
+        .unwrap();
+        assert_eq!(result.as_str(), Some("doc"));
+    }
+
+    #[test]
+    fn documentation_property_eval_non_string_property_returns_nil() {
+        let mut evaluator = super::super::eval::Evaluator::new();
+        evaluator
+            .obarray
+            .put_property("doc-sym", "variable-documentation", Value::Int(7));
+
+        let result = builtin_documentation_property_eval(
+            &mut evaluator,
+            vec![Value::symbol("doc-sym"), Value::symbol("variable-documentation")],
+        )
+        .unwrap();
+        assert!(result.is_nil());
+    }
+
+    #[test]
+    fn documentation_property_eval_non_symbol_prop_returns_nil() {
+        let mut evaluator = super::super::eval::Evaluator::new();
+        evaluator
+            .obarray
+            .put_property("doc-sym", "x", Value::string("v"));
+
+        let result = builtin_documentation_property_eval(
+            &mut evaluator,
+            vec![Value::symbol("doc-sym"), Value::Int(1)],
+        )
+        .unwrap();
+        assert!(result.is_nil());
+    }
+
+    #[test]
+    fn documentation_property_eval_non_symbol_target_errors() {
+        let mut evaluator = super::super::eval::Evaluator::new();
+        let result = builtin_documentation_property_eval(
+            &mut evaluator,
+            vec![Value::Int(1), Value::symbol("variable-documentation")],
+        );
         assert!(result.is_err());
     }
 }

@@ -6073,6 +6073,9 @@ pub(crate) fn dispatch_builtin(
         "documentation" => return Some(super::doc::builtin_documentation(eval, args)),
         "describe-function" => return Some(super::doc::builtin_describe_function(eval, args)),
         "describe-variable" => return Some(super::doc::builtin_describe_variable(eval, args)),
+        "documentation-property" => {
+            return Some(super::doc::builtin_documentation_property_eval(eval, args))
+        }
 
         // Indentation (evaluator-dependent)
         "indent-region" => return Some(super::indent::builtin_indent_region(eval, args)),
