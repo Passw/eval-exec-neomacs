@@ -365,33 +365,6 @@ fn expect_optional_prompt_string(args: &[Value]) -> Result<(), Flow> {
     ))
 }
 
-fn non_character_input_event_error() -> Flow {
-    signal("error", vec![Value::string("Non-character input-event")])
-}
-
-/// `(read-char &optional PROMPT INHERIT-INPUT-METHOD SECONDS)`
-///
-/// Batch stub: returns nil (no terminal input available).
-pub(crate) fn builtin_read_char(
-    eval: &mut super::eval::Evaluator,
-    args: Vec<Value>,
-) -> EvalResult {
-    if args.len() > 3 {
-        return Err(signal(
-            "wrong-number-of-arguments",
-            vec![Value::symbol("read-char"), Value::Int(args.len() as i64)],
-        ));
-    }
-    expect_optional_prompt_string(&args)?;
-    if let Some(event) = pop_unread_command_event(eval) {
-        if let Some(n) = event_to_int(&event) {
-            return Ok(Value::Int(n));
-        }
-        return Err(non_character_input_event_error());
-    }
-    Ok(Value::Nil)
-}
-
 /// `(read-event &optional PROMPT INHERIT-INPUT-METHOD SECONDS)`
 ///
 /// Stub: returns nil (no event input available in batch mode).
@@ -1229,46 +1202,6 @@ mod tests {
         assert!(result.is_nil());
         let point = ev.buffers.current_buffer().expect("current buffer").point_char() as i64 + 1;
         assert_eq!(point, 1);
-    }
-
-    #[test]
-    fn read_char_returns_nil() {
-        let mut ev = Evaluator::new();
-        let result = builtin_read_char(&mut ev, vec![]).unwrap();
-        assert!(result.is_nil());
-    }
-
-    #[test]
-    fn read_char_rejects_non_string_prompt() {
-        let mut ev = Evaluator::new();
-        let result = builtin_read_char(&mut ev, vec![Value::Int(123)]);
-        assert!(matches!(
-            result,
-            Err(Flow::Signal(sig)) if sig.symbol == "wrong-type-argument"
-        ));
-    }
-
-    #[test]
-    fn read_char_consumes_unread_command_event() {
-        let mut ev = Evaluator::new();
-        ev.obarray
-            .set_symbol_value("unread-command-events", Value::list(vec![Value::Int(97)]));
-        let result = builtin_read_char(&mut ev, vec![]).unwrap();
-        assert_eq!(result.as_int(), Some(97));
-    }
-
-    #[test]
-    fn read_char_signals_error_on_non_character_event() {
-        let mut ev = Evaluator::new();
-        ev.obarray
-            .set_symbol_value("unread-command-events", Value::list(vec![Value::symbol("foo")]));
-        let result = builtin_read_char(&mut ev, vec![]);
-        assert!(matches!(
-            result,
-            Err(Flow::Signal(sig))
-                if sig.symbol == "error"
-                    && sig.data == vec![Value::string("Non-character input-event")]
-        ));
     }
 
     #[test]
