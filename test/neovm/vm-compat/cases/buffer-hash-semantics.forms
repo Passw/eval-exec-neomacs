@@ -22,3 +22,10 @@
 (condition-case err
     (buffer-hash "*missing*")
   (error err))
+
+(let ((buf (generate-new-buffer " *buffer-hash-non-current*")))
+  (with-current-buffer buf
+    (insert "abc"))
+  (prog1
+      (buffer-hash buf)
+    (kill-buffer buf)))
