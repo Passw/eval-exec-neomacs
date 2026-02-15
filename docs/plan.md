@@ -18,6 +18,15 @@ Last updated: 2026-02-15
 
 ## Done
 
+- Removed dead `casefiddle` width/predicate wrapper surface:
+  - updated:
+    - `rust/neovm-core/src/elisp/casefiddle.rs`
+      - deleted unreferenced wrapper implementations for `char-or-string-p` / `max-char` / `char-width` / `string-width`
+      - removed local helper code used only by those dead wrappers and stale local tests
+      - retained active `capitalize` / `upcase-initials` / modifier-resolution paths
+  - verified:
+    - `cargo test 'elisp::casefiddle::tests::' -- --nocapture` (pass, 38 tests)
+    - `make -C test/neovm/vm-compat check-one-neovm CASE=cases/chars` (pass, 11/11)
 - Removed dead `misc` regex wrapper surface:
   - updated:
     - `rust/neovm-core/src/elisp/misc.rs`
