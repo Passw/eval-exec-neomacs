@@ -684,30 +684,11 @@ pub(crate) fn builtin_set_mark_nav(
 
 /// (mark &optional FORCE) -> integer or signal
 pub(crate) fn builtin_mark_nav(eval: &mut super::eval::Evaluator, args: Vec<Value>) -> EvalResult {
-    let force = args.first().is_some_and(|v| v.is_truthy());
+    let _force = args.first().is_some_and(|v| v.is_truthy());
     let buf = eval.buffers.current_buffer().ok_or_else(no_buffer)?;
-    let mark_active = buf
-        .properties
-        .get("mark-active")
-        .is_some_and(|v| v.is_truthy());
-    if !force && !mark_active {
-        // If transient-mark-mode is on and mark is not active, signal.
-        // For simplicity, we just return the mark if set or signal.
-    }
     match buf.mark() {
         Some(byte_pos) => Ok(Value::Int(byte_to_char_pos(buf, byte_pos))),
-        None => {
-            if force {
-                Ok(Value::Nil)
-            } else {
-                Err(signal(
-                    "mark-not-set",
-                    vec![Value::string(
-                        "The mark is not set now, so there is no region",
-                    )],
-                ))
-            }
-        }
+        None => Ok(Value::Nil),
     }
 }
 
