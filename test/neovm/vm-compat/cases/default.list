@@ -204,6 +204,7 @@ cases/load-path-order
 cases/reader-hash
 cases/read-from-string-edges
 cases/read-stream-semantics
+cases/eval-buffer-region-semantics
 cases/hash-basics
 cases/hash-make-table-options-semantics
 cases/hash-rehash-copy-semantics
