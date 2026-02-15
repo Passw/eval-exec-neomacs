@@ -733,6 +733,7 @@ const DISPATCH_BUILTIN_NAMES: &[&str] = &[
     "set-match-data",
     "set-register",
     "set-standard-case-table",
+    "set-syntax-table",
     "set-terminal-coding-system",
     "set-terminal-parameter",
     "set-time-zone-rule",

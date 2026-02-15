@@ -939,6 +939,30 @@ pub(crate) fn builtin_syntax_table(
     builtin_make_syntax_table(vec![])
 }
 
+/// `(set-syntax-table TABLE)` — install TABLE for current buffer and return it.
+///
+/// NeoVM currently stores syntax behavior on `Buffer.syntax_table` internals.
+/// We accept and validate TABLE as a syntax-table object for compatibility,
+/// then return it; full char-table-to-internal projection can be layered later.
+pub(crate) fn builtin_set_syntax_table(
+    _eval: &mut super::eval::Evaluator,
+    args: Vec<Value>,
+) -> EvalResult {
+    if args.len() != 1 {
+        return Err(signal(
+            "wrong-number-of-arguments",
+            vec![Value::symbol("set-syntax-table"), Value::Int(args.len() as i64)],
+        ));
+    }
+    if builtin_syntax_table_p(vec![args[0].clone()])?.is_nil() {
+        return Err(signal(
+            "wrong-type-argument",
+            vec![Value::symbol("syntax-table-p"), args[0].clone()],
+        ));
+    }
+    Ok(args[0].clone())
+}
+
 // ===========================================================================
 // Builtin functions (evaluator-dependent — operate on current buffer)
 // ===========================================================================
@@ -1799,5 +1823,21 @@ mod tests {
 
         let atom = builtin_syntax_table_p(vec![Value::Int(1)]).unwrap();
         assert_eq!(atom, Value::Nil);
+    }
+
+    #[test]
+    fn set_syntax_table_validates_and_returns_table() {
+        let mut eval = crate::elisp::eval::Evaluator::new();
+        let table = builtin_make_syntax_table(vec![]).unwrap();
+        let out = builtin_set_syntax_table(&mut eval, vec![table.clone()]).unwrap();
+        assert_eq!(out, table);
+
+        match builtin_set_syntax_table(&mut eval, vec![Value::Int(1)]) {
+            Err(crate::elisp::error::Flow::Signal(sig)) => {
+                assert_eq!(sig.symbol, "wrong-type-argument");
+                assert_eq!(sig.data.first(), Some(&Value::symbol("syntax-table-p")));
+            }
+            other => panic!("expected wrong-type-argument signal, got {other:?}"),
+        }
     }
 }
