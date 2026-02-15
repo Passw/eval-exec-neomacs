@@ -3,17 +3,21 @@
 3	(fboundp 'cancel-timer)	OK t
 4	(fboundp 'timer-activate)	OK t
 5	(timerp nil)	OK nil
-6	(let ((tm (run-at-time 0 nil #'ignore))) (prog1 (timerp tm) (cancel-timer tm)))	OK t
-7	(let ((tm (run-at-time "0 sec" nil #'ignore))) (prog1 (timerp tm) (cancel-timer tm)))	OK t
-8	(let ((tm (run-at-time nil nil #'ignore))) (prog1 (timerp tm) (cancel-timer tm)))	OK t
-9	(condition-case err (run-at-time "abc" nil #'ignore) (error (car err)))	OK error
-10	(condition-case err (run-at-time t nil #'ignore) (error (car err)))	OK error
-11	(let ((tm (run-with-idle-timer nil nil #'ignore))) (prog1 (timerp tm) (cancel-timer tm)))	OK t
-12	(let ((tm (run-with-timer 0 nil #'ignore))) (prog1 (timerp tm) (cancel-timer tm)))	OK t
-13	(let ((tm (run-with-timer "0 sec" nil #'ignore))) (prog1 (timerp tm) (cancel-timer tm)))	OK t
-14	(let ((tm (run-with-timer nil nil #'ignore))) (prog1 (timerp tm) (cancel-timer tm)))	OK t
-15	(condition-case err (run-with-idle-timer "0 sec" nil #'ignore) (error (car err)))	OK error
-16	(condition-case err (run-with-timer t nil #'ignore) (error (car err)))	OK error
-17	(condition-case err (timer-activate nil) (error (car err)))	OK error
-18	(let ((tm (run-at-time 60 nil #'ignore))) (cancel-timer tm) (condition-case err (progn (timer-activate tm) 'ok) (error (car err))))	OK ok
-19	(let ((tm (run-at-time 60 nil #'ignore))) (condition-case err (progn (cancel-timer tm) (timer-activate tm) (timer-activate tm) 'ok) (error (car err))))	OK error
+6	(sit-for 0)	OK t
+7	(sit-for 0 t)	OK t
+8	(condition-case err (sit-for "0") (error (car err)))	OK wrong-type-argument
+9	(condition-case err (sit-for 0 nil nil) (error (car err)))	OK wrong-number-of-arguments
+10	(let ((tm (run-at-time 0 nil #'ignore))) (prog1 (timerp tm) (cancel-timer tm)))	OK t
+11	(let ((tm (run-at-time "0 sec" nil #'ignore))) (prog1 (timerp tm) (cancel-timer tm)))	OK t
+12	(let ((tm (run-at-time nil nil #'ignore))) (prog1 (timerp tm) (cancel-timer tm)))	OK t
+13	(condition-case err (run-at-time "abc" nil #'ignore) (error (car err)))	OK error
+14	(condition-case err (run-at-time t nil #'ignore) (error (car err)))	OK error
+15	(let ((tm (run-with-idle-timer nil nil #'ignore))) (prog1 (timerp tm) (cancel-timer tm)))	OK t
+16	(let ((tm (run-with-timer 0 nil #'ignore))) (prog1 (timerp tm) (cancel-timer tm)))	OK t
+17	(let ((tm (run-with-timer "0 sec" nil #'ignore))) (prog1 (timerp tm) (cancel-timer tm)))	OK t
+18	(let ((tm (run-with-timer nil nil #'ignore))) (prog1 (timerp tm) (cancel-timer tm)))	OK t
+19	(condition-case err (run-with-idle-timer "0 sec" nil #'ignore) (error (car err)))	OK error
+20	(condition-case err (run-with-timer t nil #'ignore) (error (car err)))	OK error
+21	(condition-case err (timer-activate nil) (error (car err)))	OK error
+22	(let ((tm (run-at-time 60 nil #'ignore))) (cancel-timer tm) (condition-case err (progn (timer-activate tm) 'ok) (error (car err))))	OK ok
+23	(let ((tm (run-at-time 60 nil #'ignore))) (condition-case err (progn (cancel-timer tm) (timer-activate tm) (timer-activate tm) 'ok) (error (car err))))	OK error

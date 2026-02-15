@@ -3,6 +3,16 @@
 (fboundp 'cancel-timer)
 (fboundp 'timer-activate)
 (timerp nil)
+(sit-for 0)
+(sit-for 0 t)
+
+(condition-case err
+    (sit-for "0")
+  (error (car err)))
+
+(condition-case err
+    (sit-for 0 nil nil)
+  (error (car err)))
 
 (let ((tm (run-at-time 0 nil #'ignore)))
   (prog1 (timerp tm)
