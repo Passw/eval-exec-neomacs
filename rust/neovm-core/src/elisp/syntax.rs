@@ -1345,6 +1345,147 @@ pub(crate) fn builtin_scan_sexps(
     }
 }
 
+fn parse_state_from_range(buf: &Buffer, table: &SyntaxTable, from: i64, to: i64) -> Value {
+    let chars: Vec<char> = buf.buffer_string().chars().collect();
+    let from_idx = if from > 0 { from as usize - 1 } else { 0 };
+    let to_idx = if to > 0 { to as usize - 1 } else { 0 }.min(chars.len());
+
+    let mut depth = 0i64;
+    let mut stack: Vec<i64> = Vec::new();
+    let mut last_sexp_start: Option<i64> = None;
+    let mut completed_toplevel_list_start: Option<i64> = None;
+
+    if to_idx > from_idx {
+        for (idx, ch) in chars[from_idx..to_idx].iter().enumerate() {
+            let pos1 = (from_idx + idx + 1) as i64;
+            match table.char_syntax(*ch) {
+                SyntaxClass::Open => {
+                    depth += 1;
+                    stack.push(pos1);
+                }
+                SyntaxClass::Close => {
+                    if depth > 0 {
+                        depth -= 1;
+                    }
+                    if let Some(open_pos) = stack.pop() {
+                        if depth == 0 {
+                            completed_toplevel_list_start = Some(open_pos);
+                        }
+                    }
+                }
+                SyntaxClass::Whitespace | SyntaxClass::Comment | SyntaxClass::EndComment => {}
+                _ => {
+                    if last_sexp_start.is_none() {
+                        last_sexp_start = Some(pos1);
+                    }
+                }
+            }
+        }
+    }
+
+    if let Some(open_pos) = completed_toplevel_list_start {
+        last_sexp_start = Some(open_pos);
+    }
+
+    let stack_value = if depth > 0 {
+        Value::list(stack.iter().map(|p| Value::Int(*p)).collect())
+    } else {
+        Value::Nil
+    };
+
+    Value::list(vec![
+        Value::Int(depth),
+        stack.last().map_or(Value::Nil, |p| Value::Int(*p)),
+        last_sexp_start.map_or(Value::Nil, Value::Int),
+        Value::Nil,
+        Value::Nil,
+        Value::Nil,
+        Value::Int(0),
+        Value::Nil,
+        Value::Nil,
+        stack_value,
+        Value::Nil,
+    ])
+}
+
+/// `(parse-partial-sexp FROM TO &optional TARGETDEPTH STOPBEFORE STATE COMMENTSTOP)`
+/// Baseline parser-state implementation for structural Lisp motion/state queries.
+pub(crate) fn builtin_parse_partial_sexp(
+    eval: &mut super::eval::Evaluator,
+    args: Vec<Value>,
+) -> EvalResult {
+    if args.len() < 2 || args.len() > 6 {
+        return Err(signal(
+            "wrong-number-of-arguments",
+            vec![
+                Value::symbol("parse-partial-sexp"),
+                Value::Int(args.len() as i64),
+            ],
+        ));
+    }
+
+    let from = match &args[0] {
+        Value::Int(n) => *n,
+        other => {
+            return Err(signal(
+                "wrong-type-argument",
+                vec![Value::symbol("number-or-marker-p"), other.clone()],
+            ));
+        }
+    };
+    let to = match &args[1] {
+        Value::Int(n) => *n,
+        other => {
+            return Err(signal(
+                "wrong-type-argument",
+                vec![Value::symbol("number-or-marker-p"), other.clone()],
+            ));
+        }
+    };
+
+    let buf = eval
+        .buffers
+        .current_buffer()
+        .ok_or_else(|| signal("error", vec![Value::string("No current buffer")]))?;
+    let table = buf.syntax_table.clone();
+    Ok(parse_state_from_range(buf, &table, from, to))
+}
+
+/// `(syntax-ppss &optional POS)` — parser state at POS.
+pub(crate) fn builtin_syntax_ppss(
+    eval: &mut super::eval::Evaluator,
+    args: Vec<Value>,
+) -> EvalResult {
+    if args.len() > 1 {
+        return Err(signal(
+            "wrong-number-of-arguments",
+            vec![Value::symbol("syntax-ppss"), Value::Int(args.len() as i64)],
+        ));
+    }
+
+    let buf = eval
+        .buffers
+        .current_buffer()
+        .ok_or_else(|| signal("error", vec![Value::string("No current buffer")]))?;
+    let table = buf.syntax_table.clone();
+
+    let pos = if args.is_empty() || args[0].is_nil() {
+        buf.point_char() as i64 + 1
+    } else {
+        match &args[0] {
+            Value::Int(n) => *n,
+            other => {
+                return Err(signal(
+                    "wrong-type-argument",
+                    vec![Value::symbol("number-or-marker-p"), other.clone()],
+                ));
+            }
+        }
+    };
+
+    Ok(parse_state_from_range(buf, &table, 1, pos))
+}
+
 /// `(skip-syntax-forward SYNTAX &optional LIMIT)` — skip forward over chars
 /// matching the given syntax classes.
 pub(crate) fn builtin_skip_syntax_forward(
@@ -2053,5 +2194,85 @@ mod tests {
 
         let backward = builtin_scan_sexps(&mut eval, vec![Value::Int(1), Value::Int(-1)]).unwrap();
         assert_eq!(backward, Value::Nil);
+    }
+
+    #[test]
+    fn parse_partial_sexp_baseline_shapes() {
+        let mut eval = crate::elisp::eval::Evaluator::new();
+        {
+            let buf = eval.buffers.current_buffer_mut().expect("current buffer");
+            buf.delete_region(buf.point_min(), buf.point_max());
+            buf.insert("abc");
+        }
+        let state = builtin_parse_partial_sexp(&mut eval, vec![Value::Int(1), Value::Int(4)])
+            .unwrap();
+        assert_eq!(
+            state,
+            Value::list(vec![
+                Value::Int(0),
+                Value::Nil,
+                Value::Int(1),
+                Value::Nil,
+                Value::Nil,
+                Value::Nil,
+                Value::Int(0),
+                Value::Nil,
+                Value::Nil,
+                Value::Nil,
+                Value::Nil,
+            ])
+        );
+
+        {
+            let buf = eval.buffers.current_buffer_mut().expect("current buffer");
+            buf.delete_region(buf.point_min(), buf.point_max());
+            buf.insert("(a)");
+        }
+        let nested = builtin_parse_partial_sexp(&mut eval, vec![Value::Int(1), Value::Int(3)])
+            .unwrap();
+        assert_eq!(
+            nested,
+            Value::list(vec![
+                Value::Int(1),
+                Value::Int(1),
+                Value::Int(2),
+                Value::Nil,
+                Value::Nil,
+                Value::Nil,
+                Value::Int(0),
+                Value::Nil,
+                Value::Nil,
+                Value::list(vec![Value::Int(1)]),
+                Value::Nil,
+            ])
+        );
+    }
+
+    #[test]
+    fn syntax_ppss_baseline_shape() {
+        let mut eval = crate::elisp::eval::Evaluator::new();
+        {
+            let buf = eval.buffers.current_buffer_mut().expect("current buffer");
+            buf.delete_region(buf.point_min(), buf.point_max());
+            buf.insert("(a)");
+        }
+
+        let state = builtin_syntax_ppss(&mut eval, vec![Value::Int(3)]).unwrap();
+        assert_eq!(
+            state,
+            Value::list(vec![
+                Value::Int(1),
+                Value::Int(1),
+                Value::Int(2),
+                Value::Nil,
+                Value::Nil,
+                Value::Nil,
+                Value::Int(0),
+                Value::Nil,
+                Value::Nil,
+                Value::list(vec![Value::Int(1)]),
+                Value::Nil,
+            ])
+        );
     }
 }
