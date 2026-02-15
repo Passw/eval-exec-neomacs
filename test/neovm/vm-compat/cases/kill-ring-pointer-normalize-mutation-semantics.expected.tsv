@@ -17,3 +17,11 @@
 17	(setq kill-ring-yank-pointer (list "b" "c"))	OK ("b" "c")
 18	(kill-new "n")	OK nil
 19	(car kill-ring-yank-pointer)	OK "n"
+20	(setq kill-ring (list "a" "b" "c"))	OK ("a" "b" "c")
+21	(setq kill-ring-yank-pointer '("b" . "c"))	OK ("b" . "c")
+22	(kill-new "q")	OK nil
+23	(car kill-ring-yank-pointer)	OK "q"
+24	(setq kill-ring (list "a" "b" "c"))	OK ("a" "b" "c")
+25	(setq kill-ring-yank-pointer '(1 . 2))	OK (1 . 2)
+26	(kill-append "r" nil)	OK nil
+27	(car kill-ring-yank-pointer)	OK "ar"
