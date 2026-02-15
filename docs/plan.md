@@ -4,6 +4,25 @@ Last updated: 2026-02-15
 
 ## Done
 
+- Exposed `memory-use-counts` in NeoVM dispatch/registry and locked compatibility semantics:
+  - updated `rust/neovm-core/src/elisp/builtins_extra.rs`:
+    - enforced strict arity `0` for `memory-use-counts`
+    - retained stable seven-integer return shape
+    - added unit coverage for shape and arity error path
+  - updated `rust/neovm-core/src/elisp/builtins.rs`:
+    - wired `memory-use-counts` into runtime builtin dispatch
+  - updated `rust/neovm-core/src/elisp/builtin_registry.rs`:
+    - added `memory-use-counts` to the builtin symbol registry
+  - added and enabled oracle corpus:
+    - `test/neovm/vm-compat/cases/memory-use-counts-semantics.forms`
+    - `test/neovm/vm-compat/cases/memory-use-counts-semantics.expected.tsv`
+    - wired into `test/neovm/vm-compat/cases/default.list`
+  - verified:
+    - `cargo test --manifest-path rust/neovm-core/Cargo.toml builtins_extra::tests::memory_use_counts_shape_and_arity -- --nocapture` (pass)
+    - `NEOVM_ORACLE_EMACS=/nix/store/hql3zwz5b4ywd2qwx8jssp4dyb7nx4cb-emacs-30.2/bin/emacs make -C test/neovm/vm-compat record FORMS=cases/memory-use-counts-semantics.forms EXPECTED=cases/memory-use-counts-semantics.expected.tsv` (pass)
+    - `make -C test/neovm/vm-compat check-neovm FORMS=cases/memory-use-counts-semantics.forms EXPECTED=cases/memory-use-counts-semantics.expected.tsv` (pass, 4/4)
+    - `make -C test/neovm/vm-compat validate-case-lists` (pass)
+    - `make -C test/neovm/vm-compat check-all-neovm` (pass)
 - Implemented `garbage-collect` compatibility shape and oracle lock-in:
   - updated `rust/neovm-core/src/elisp/builtins_extra.rs`:
     - replaced `nil` stub with structured GC bucket list (`conses`, `symbols`, `strings`, `string-bytes`, `vectors`, `vector-slots`, `floats`, `intervals`, `buffers`)
