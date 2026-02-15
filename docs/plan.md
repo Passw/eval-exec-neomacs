@@ -19,6 +19,23 @@ Last updated: 2026-02-15
 
 ## Done
 
+- Aligned image query stub semantics for batch/no-window behavior:
+  - updated:
+    - `rust/neovm-core/src/elisp/image.rs`
+      - `image-size` now matches oracle error classes:
+        - invalid spec -> `(error "Invalid image specification")`
+        - valid spec in batch -> `(error "Window system frame should be used")`
+      - `image-mask-p` now mirrors the same invalid-spec vs no-window split.
+      - refreshed image unit tests that previously expected concrete size/mask return values.
+    - `test/neovm/vm-compat/cases/default.list`
+      - added `cases/image-batch-query-semantics`.
+    - added oracle corpus:
+      - `test/neovm/vm-compat/cases/image-batch-query-semantics.{forms,expected.tsv}`
+  - verified:
+    - `cargo test image::tests --manifest-path rust/neovm-core/Cargo.toml -- --nocapture` (pass)
+    - `make -C test/neovm/vm-compat check-one-neovm CASE=cases/image-batch-query-semantics` (pass, 11/11)
+    - `make -C test/neovm/vm-compat check-all-neovm` (pass, full default + neovm-only corpus)
+
 - Aligned `clear-image-cache` batch semantics with oracle behavior:
   - updated:
     - `rust/neovm-core/src/elisp/image.rs`
