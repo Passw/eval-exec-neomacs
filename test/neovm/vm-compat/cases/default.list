@@ -75,6 +75,7 @@ cases/display-monitor-semantics
 cases/display-monitor-frames-semantics
 cases/tty-batch-semantics
 cases/font-batch-semantics
+cases/face-batch-semantics
 cases/terminal-parameter-semantics
 cases/terminal-handle-printing
 cases/frame-batch-semantics
