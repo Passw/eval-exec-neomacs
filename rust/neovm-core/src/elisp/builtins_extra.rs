@@ -412,48 +412,6 @@ pub(crate) fn builtin_vconcat(args: Vec<Value>) -> EvalResult {
 }
 
 // ---------------------------------------------------------------------------
-// Variable / symbol operations
-// ---------------------------------------------------------------------------
-
-/// `(default-value SYMBOL)` — get the default value of a variable.
-/// Stub: same as symbol-value for now.
-pub(crate) fn builtin_default_value(args: Vec<Value>) -> EvalResult {
-    expect_args("default-value", &args, 1)?;
-    // In a full implementation, this returns the non-buffer-local default.
-    // For now, just return nil.
-    let _ = args;
-    Ok(Value::Nil)
-}
-
-/// `(set-default SYMBOL VALUE)` — set the default value.
-/// Stub.
-pub(crate) fn builtin_set_default(args: Vec<Value>) -> EvalResult {
-    expect_args("set-default", &args, 2)?;
-    Ok(args[1].clone())
-}
-
-/// `(local-variable-p VARIABLE &optional BUFFER)` -> t or nil.
-/// Stub: always nil for now.
-pub(crate) fn builtin_local_variable_p(args: Vec<Value>) -> EvalResult {
-    expect_min_args("local-variable-p", &args, 1)?;
-    Ok(Value::Nil)
-}
-
-/// `(make-local-variable VARIABLE)` — make variable buffer-local.
-/// Stub.
-pub(crate) fn builtin_make_local_variable(args: Vec<Value>) -> EvalResult {
-    expect_args("make-local-variable", &args, 1)?;
-    Ok(args[0].clone())
-}
-
-/// `(kill-local-variable VARIABLE)` — remove buffer-local binding.
-/// Stub.
-pub(crate) fn builtin_kill_local_variable(args: Vec<Value>) -> EvalResult {
-    expect_args("kill-local-variable", &args, 1)?;
-    Ok(args[0].clone())
-}
-
-// ---------------------------------------------------------------------------
 // Predicate additions
 // ---------------------------------------------------------------------------
 
