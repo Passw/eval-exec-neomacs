@@ -1881,36 +1881,40 @@ pub(crate) fn builtin_transpose_words(
             };
 
             if backward {
-                let pivot = if pt > pmin && buf.char_before(pt).is_some_and(|ch| is_word_char(ch)) {
-                    retreat_to_word_start(pt)
-                } else if pt < pmax && buf.char_after(pt).is_some_and(|ch| is_word_char(ch)) {
-                    retreat_to_word_start(pt)
-                } else {
-                    word_start_before(pt)
-                }
-                .ok_or_else(&two_word_error)?;
-                let prev = word_start_before(pivot).ok_or_else(&two_word_error)?;
-                let prev_end = word_end_from_start(prev);
-                let pivot_end = word_end_from_start(pivot);
-                (prev, prev_end, pivot, pivot_end)
+                // Negative transpose uses the two words strictly before point.
+                let right = word_start_before(pt).ok_or_else(&two_word_error)?;
+                let left = word_start_before(right).ok_or_else(&two_word_error)?;
+                let left_end = word_end_from_start(left);
+                let right_end = word_end_from_start(right);
+                (left, left_end, right, right_end)
             } else {
-                let pivot = if pt > pmin && buf.char_before(pt).is_some_and(|ch| is_word_char(ch)) {
-                    retreat_to_word_start(pt)
-                } else if pt < pmax && buf.char_after(pt).is_some_and(|ch| is_word_char(ch)) {
-                    retreat_to_word_start(pt)
-                } else {
-                    word_start_at_or_after(pt)
-                }
-                .ok_or_else(&two_word_error)?;
-
-                let pivot_end = word_end_from_start(pivot);
-                if let Some(prev) = word_start_before(pivot) {
-                    let prev_end = word_end_from_start(prev);
-                    (prev, prev_end, pivot, pivot_end)
-                } else {
+                let inside_word = pt > pmin && buf.char_before(pt).is_some_and(|ch| is_word_char(ch));
+                if inside_word {
+                    // Inside/after a word: transpose this word with the following one.
+                    let pivot = retreat_to_word_start(pt).ok_or_else(&two_word_error)?;
+                    let pivot_end = word_end_from_start(pivot);
                     let next = word_start_at_or_after(pivot_end).ok_or_else(&two_word_error)?;
                     let next_end = word_end_from_start(next);
                     (pivot, pivot_end, next, next_end)
+                } else {
+                    // At a boundary/non-word: transpose previous word with the one at/after point.
+                    let pivot = if pt < pmax && buf.char_after(pt).is_some_and(|ch| is_word_char(ch))
+                    {
+                        retreat_to_word_start(pt)
+                    } else {
+                        word_start_at_or_after(pt)
+                    }
+                    .ok_or_else(&two_word_error)?;
+
+                    let pivot_end = word_end_from_start(pivot);
+                    if let Some(prev) = word_start_before(pivot) {
+                        let prev_end = word_end_from_start(prev);
+                        (prev, prev_end, pivot, pivot_end)
+                    } else {
+                        let next = word_start_at_or_after(pivot_end).ok_or_else(&two_word_error)?;
+                        let next_end = word_end_from_start(next);
+                        (pivot, pivot_end, next, next_end)
+                    }
                 }
             }
         };
@@ -1939,8 +1943,15 @@ pub(crate) fn builtin_transpose_words(
         buf_m.insert(&between);
         buf_m.insert(&w1_text);
 
-        // Keep point at end of the first transposed word.
-        buf_m.goto_char(w1s + w2_text.len() + between.len());
+        // Emacs keeps point differently for forward/backward transpose.
+        let new_point = if backward {
+            // For negative transpose, point ends at the moved-left word.
+            w1s + w2_text.len()
+        } else {
+            // For positive transpose, point ends at the moved-right word.
+            w1s + w2_text.len() + between.len() + w1_text.len()
+        };
+        buf_m.goto_char(new_point);
     }
 
     Ok(Value::Nil)
