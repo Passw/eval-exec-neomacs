@@ -608,16 +608,6 @@ pub(crate) fn builtin_multibyte_char_to_unibyte(args: Vec<Value>) -> EvalResult 
     Ok(Value::Int(-1))
 }
 
-/// `(decode-char CHARSET CODE)` -- delegate to charset semantics.
-pub(crate) fn builtin_decode_char(args: Vec<Value>) -> EvalResult {
-    super::charset::builtin_decode_char(args)
-}
-
-/// `(encode-char CHAR CHARSET)` -- delegate to charset semantics.
-pub(crate) fn builtin_encode_char(args: Vec<Value>) -> EvalResult {
-    super::charset::builtin_encode_char(args)
-}
-
 /// `(locale-info ITEM)` -- minimal locale info.
 /// Returns "UTF-8" for symbol ITEM `codeset`; nil otherwise.
 pub(crate) fn builtin_locale_info(args: Vec<Value>) -> EvalResult {
@@ -1059,20 +1049,6 @@ mod tests {
     fn multibyte_char_to_unibyte_returns_minus_one_for_non_unibyte_unicode() {
         let result = builtin_multibyte_char_to_unibyte(vec![Value::Int(256)]).unwrap();
         assert!(eq_value(&result, &Value::Int(-1)));
-    }
-
-    // ----- decode-char / encode-char -----
-
-    #[test]
-    fn decode_char_basic() {
-        let result = builtin_decode_char(vec![Value::symbol("unicode"), Value::Int(65)]).unwrap();
-        assert!(eq_value(&result, &Value::Int(65)));
-    }
-
-    #[test]
-    fn encode_char_basic() {
-        let result = builtin_encode_char(vec![Value::Char('A'), Value::symbol("unicode")]).unwrap();
-        assert!(eq_value(&result, &Value::Int(65)));
     }
 
     // ----- locale-info -----
