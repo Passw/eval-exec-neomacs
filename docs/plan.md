@@ -2537,6 +2537,16 @@ Last updated: 2026-02-15
     - `make -C test/neovm/vm-compat check-neovm FORMS=cases/subr-x-string-helper-availability.forms EXPECTED=cases/subr-x-string-helper-availability.expected.tsv` (pass, 8/8)
     - `NEOVM_ORACLE_EMACS=/nix/store/ha7zx1gahhj7lrx223m9rpwh89vbqq9z-emacs-git-with-packages-20240702.0/bin/emacs make -C test/neovm/vm-compat check-builtin-registry-fboundp` (pass; only allowlisted drift remains)
     - `make -C test/neovm/vm-compat validate-case-lists` (pass)
+- Added common 4-level `cxr` accessors and locked semantics with oracle corpus:
+  - implemented pure builtins: `cadddr`, `cddddr`
+  - added and enabled oracle corpus:
+    - `test/neovm/vm-compat/cases/cxr-4level-common-semantics.forms`
+    - `test/neovm/vm-compat/cases/cxr-4level-common-semantics.expected.tsv`
+    - `test/neovm/vm-compat/cases/default.list`
+  - verified:
+    - `make -C test/neovm/vm-compat check-neovm FORMS=cases/cxr-4level-common-semantics.forms EXPECTED=cases/cxr-4level-common-semantics.expected.tsv` (pass, 7/7)
+    - `make -C test/neovm/vm-compat check-one-neovm CASE=cases/cxr-3level-semantics` (pass, 11/11)
+    - `make -C test/neovm/vm-compat validate-case-lists` (pass)
 
 ## Doing
 
