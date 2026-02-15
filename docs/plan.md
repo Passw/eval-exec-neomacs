@@ -11,12 +11,25 @@ Last updated: 2026-02-15
 ## Next
 
 - Keep bytecode-literal reader/exec corpora out of `default.list` while `.elc` compatibility remains disabled; retain default-policy corpus in default.
-- Expand oracle corpus for additional malformed pointer permutations across mutators and command-context commands.
+- Expand oracle corpus for remaining malformed pointer permutations across mutators and command-context commands.
 - Audit `yank`/`yank-pop` behavior with empty kill-ring entries and pointer wrap rules.
 - Run targeted regression checks after each slice (`command-dispatch-default-arg-semantics`, touched command corpus, and focused `yank`/`yank-pop` suites).
 
 ## Done
 
+- Aligned proper vs improper pointer fallback semantics and locked with corpus:
+  - updated `rust/neovm-core/src/elisp/kill_ring.rs`:
+    - strict pointer sync now treats improper cons pointers as `wrong-type-argument`
+    - proper-list pointers now use length-based cyclic fallback when no string-tail match exists (matching oracle behavior)
+  - added and enabled oracle corpus:
+    - `test/neovm/vm-compat/cases/kill-ring-pointer-improper-semantics.forms`
+    - `test/neovm/vm-compat/cases/kill-ring-pointer-improper-semantics.expected.tsv`
+    - wired into `test/neovm/vm-compat/cases/default.list`
+  - verified:
+    - `make -C test/neovm/vm-compat check-one-neovm CASE=cases/kill-ring-pointer-improper-semantics` (pass, 14/14)
+    - `make -C test/neovm/vm-compat check-one-neovm CASE=cases/kill-ring-yank-pointer-invalid-semantics` (pass, 20/20)
+    - `cargo test current_kill -- --nocapture` in `rust/neovm-core` (pass)
+    - `make -C test/neovm/vm-compat validate-case-lists` (pass)
 - Promoted additional passing corpora into the default vm-compat suite:
   - added to `test/neovm/vm-compat/cases/default.list`:
     - `cases/load-policy`
