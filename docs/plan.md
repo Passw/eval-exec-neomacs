@@ -19,6 +19,29 @@ Last updated: 2026-02-15
 
 ## Done
 
+- Re-ran full NeoVM compatibility gate after syntax-descriptor parity slices:
+  - verified:
+    - `make -C test/neovm/vm-compat check-all-neovm` (pass, full default + neovm-only corpus)
+
+- Aligned `string-to-syntax` descriptor semantics with oracle and expanded corpora:
+  - updated:
+    - `rust/neovm-core/src/elisp/syntax.rs`
+      - added prefix class descriptor support (`"'"`) and aligned class code mapping (`$` => code `8`).
+      - aligned `string-to-syntax "@"` to return `nil`.
+      - aligned baseline `modify-syntax-entry` handling for `@` descriptors to whitespace-class behavior.
+      - added focused unit tests for prefix class and `@` descriptor paths.
+    - `test/neovm/vm-compat/cases/string-to-syntax-class-codes-semantics.{forms,expected.tsv}`
+    - `test/neovm/vm-compat/cases/syntax-descriptor-at-semantics.{forms,expected.tsv}`
+    - `test/neovm/vm-compat/cases/default.list`
+      - included both new corpora in default compatibility runs.
+  - verified:
+    - targeted `cargo test` slices:
+      - `syntax_class_roundtrip`, `string_to_syntax_prefix_class`, `builtin_string_to_syntax_at_returns_nil`, `modify_syntax_entry_at_descriptor_yields_whitespace` (pass)
+    - targeted vm-compat checks:
+      - `make -C test/neovm/vm-compat check-one-neovm CASE=cases/string-to-syntax-class-codes-semantics` (pass)
+      - `make -C test/neovm/vm-compat check-one-neovm CASE=cases/syntax-descriptor-at-semantics` (pass)
+      - `make -C test/neovm/vm-compat validate-case-lists` (pass)
+
 - Closed syntax/buffer introspection callable gaps and locked new corpora:
   - updated:
     - `rust/neovm-core/src/elisp/syntax.rs`
