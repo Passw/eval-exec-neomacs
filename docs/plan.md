@@ -4,18 +4,32 @@ Last updated: 2026-02-15
 
 ## Doing
 
-- Finishing the `buffer-read-only` variable-compat sweep in `rust/neovm-core/src/elisp/kill_ring.rs`.
-- Locking remaining raw `buf.read_only` mutators (`yank-pop`, `transpose-*`) with mutation-aware checks.
+- Continue the `buffer-read-only` variable-compat sweep in `rust/neovm-core/src/elisp/kill_ring.rs`.
+- Lock remaining raw `buf.read_only` mutators (`transpose-*`) with mutation-aware checks.
+- Expand command-context compatibility corpus around interactive editing commands.
 - Keeping each slice small: runtime patch -> oracle corpus -> docs note -> push.
 
 ## Next
 
-- Investigate and lock `yank-pop` behavior deltas (currently hitting oracle `end-of-file` paths in some probes).
-- Continue the remaining raw `buf.read_only` kill-ring mutators (`transpose-*`, case-word mutators) with mutation-aware read-only checks and corpus lock-in.
-- Run targeted regression checks after each slice (`command-dispatch-default-arg-semantics` plus touched command corpus).
+- Finish `transpose-*` read-only variable checks and add dedicated oracle corpus.
+- Audit adjacent kill-ring command-context paths (`kill-new`, rotation, point updates) for batch-oracle deltas.
+- Run targeted regression checks after each slice (`command-dispatch-default-arg-semantics`, touched command corpus, and focused `yank`/`yank-pop` suites).
 
 ## Done
 
+- Aligned `yank-pop` command-context/error semantics with oracle and locked a dedicated corpus:
+  - updated `rust/neovm-core/src/elisp/kill_ring.rs`:
+    - `yank-pop` now gates on `last-command == 'yank` in batch-compatible paths
+    - non-yank context now returns oracle-shaped `end-of-file` when ring is non-empty
+    - missing/stale yank region now signals oracle-shaped `wrong-type-argument`
+    - added current-buffer bounds validation to avoid stale-region panics
+  - added and enabled oracle corpus:
+    - `test/neovm/vm-compat/cases/yank-pop-semantics.forms`
+    - `test/neovm/vm-compat/cases/yank-pop-semantics.expected.tsv`
+    - wired into `test/neovm/vm-compat/cases/default.list`
+  - verified:
+    - `cargo test yank_pop -- --nocapture` in `rust/neovm-core` (pass)
+    - `make -C test/neovm/vm-compat check-one-neovm CASE=cases/yank-pop-semantics` (pass, 5/5)
 - Aligned case-word mutator read-only behavior with oracle variable semantics:
   - updated `rust/neovm-core/src/elisp/kill_ring.rs`:
     - `downcase-word`, `upcase-word`, and `capitalize-word` now honor dynamic/buffer-local/global `buffer-read-only` only when text would change
