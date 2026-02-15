@@ -6,17 +6,31 @@ Last updated: 2026-02-15
 
 - Expand kill-ring/yank pointer corpus around normalization and command-context edges.
 - Keep default-suite case lists authoritative and append passing corpora in small slices.
-- Continue `yank-pop` parity lock-in for malformed pointer seeds and early-error publication behavior.
+- Continue `yank-pop` parity lock-in for region-tracking and pointer-publication behavior under intervening edits.
 - Keep `.elc` reader/exec compatibility corpora explicitly non-default while `.elc` binary compatibility remains disabled.
 
 ## Next
 
-- Add one focused corpus for `yank-pop` improper-pointer behavior under explicit command context (`last-command='yank`).
+- Add one focused corpus for `yank-pop` behavior when mark is unset/overridden after yank (error precedence + pointer publication).
 - Continue promoting already-green non-default corpora to `default.list` one-by-one with targeted checks.
 - Run `check-all-neovm` after the next 2-4 corpus/list promotions to catch integration regressions early.
 
 ## Done
 
+- Aligned `yank-pop` replacement-region tracking with oracle behavior under intervening edits:
+  - updated `rust/neovm-core/src/elisp/kill_ring.rs`:
+    - `yank-pop` now derives replacement bounds from current `mark`/`point` (while retaining yank-context gate), instead of stale stored byte ranges
+  - added corpus:
+    - `test/neovm/vm-compat/cases/yank-pop-region-tracking-semantics.forms`
+    - `test/neovm/vm-compat/cases/yank-pop-region-tracking-semantics.expected.tsv`
+  - wired into:
+    - `test/neovm/vm-compat/cases/default.list`
+  - verified:
+    - `make -C test/neovm/vm-compat check-neovm FORMS=cases/yank-pop-region-tracking-semantics.forms EXPECTED=cases/yank-pop-region-tracking-semantics.expected.tsv` (pass, 3/3)
+    - `make -C test/neovm/vm-compat check-one-neovm CASE=cases/yank-pop-region-tracking-semantics` (pass, 3/3)
+    - `make -C test/neovm/vm-compat check-one-neovm CASE=cases/yank-pop-semantics` (pass, 5/5)
+    - `make -C test/neovm/vm-compat check-one-neovm CASE=cases/yank-pop-pointer-normalize-error-semantics` (pass, 5/5)
+    - `make -C test/neovm/vm-compat validate-case-lists` (pass)
 - Reduced vm-compat sweep redundancy by deduplicating merged case sets:
   - updated `test/neovm/vm-compat/Makefile`:
     - added `dedupe_case_list` helper
