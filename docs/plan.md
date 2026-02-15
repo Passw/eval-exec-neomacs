@@ -18,6 +18,14 @@ Last updated: 2026-02-15
 
 ## Done
 
+- Removed dead duplicate `abort-recursive-edit` helper from misc surface:
+  - updated:
+    - `rust/neovm-core/src/elisp/misc.rs`
+      - deleted unused eval-dependent `builtin_abort_recursive_edit` and stale test
+  - verified:
+    - `cargo test 'elisp::misc::tests::' -- --nocapture` (pass, 58 tests)
+    - `make -C test/neovm/vm-compat check-one-neovm CASE=cases/minibuffer-batch` (pass, 27/27)
+    - `make -C test/neovm/vm-compat check-one-neovm CASE=cases/exit-recursive-edit-semantics` (pass, 3/3)
 - Removed duplicate recursive-edit behavior drift in keyboard pure wrappers:
   - updated:
     - `rust/neovm-core/src/elisp/keyboard/pure.rs`
