@@ -255,8 +255,10 @@ fn test_top_level_wrong_args() {
 #[test]
 fn test_exit_recursive_edit() {
     let result = builtin_exit_recursive_edit(vec![]);
-    assert!(result.is_ok());
-    assert!(result.unwrap().is_nil());
+    assert!(matches!(
+        result,
+        Err(Flow::Signal(sig)) if sig.symbol == "user-error"
+    ));
 }
 
 #[test]
@@ -270,8 +272,10 @@ fn test_exit_recursive_edit_wrong_args() {
 #[test]
 fn test_abort_recursive_edit() {
     let result = builtin_abort_recursive_edit(vec![]);
-    assert!(result.is_ok());
-    assert!(result.unwrap().is_nil());
+    assert!(matches!(
+        result,
+        Err(Flow::Signal(sig)) if sig.symbol == "user-error"
+    ));
 }
 
 #[test]

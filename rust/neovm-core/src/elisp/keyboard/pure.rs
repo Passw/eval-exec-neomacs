@@ -116,29 +116,20 @@ pub(crate) fn builtin_clear_this_command_keys(args: Vec<Value>) -> EvalResult {
 /// `(top-level)` -> nil
 ///
 /// Exit all recursive editing levels.
-///
-/// Stub implementation: returns nil.
 pub(crate) fn builtin_top_level(args: Vec<Value>) -> EvalResult {
-    expect_args("top-level", &args, 0)?;
-    Ok(Value::Nil)
+    super::super::minibuffer::builtin_top_level(args)
 }
 
-/// `(exit-recursive-edit)` -> nil
+/// `(exit-recursive-edit)` -> non-local exit when active, otherwise user-error
 ///
 /// Exit from the innermost recursive edit or minibuffer.
-///
-/// Stub implementation: returns nil.
 pub(crate) fn builtin_exit_recursive_edit(args: Vec<Value>) -> EvalResult {
-    expect_args("exit-recursive-edit", &args, 0)?;
-    Ok(Value::Nil)
+    super::super::minibuffer::builtin_exit_recursive_edit(args)
 }
 
-/// `(abort-recursive-edit)` -> nil
+/// `(abort-recursive-edit)` -> non-local abort when active, otherwise user-error
 ///
 /// Abort the command that requested this recursive edit or minibuffer input.
-///
-/// Stub implementation: returns nil.
 pub(crate) fn builtin_abort_recursive_edit(args: Vec<Value>) -> EvalResult {
-    expect_args("abort-recursive-edit", &args, 0)?;
-    Ok(Value::Nil)
+    super::super::minibuffer::builtin_abort_recursive_edit(args)
 }
