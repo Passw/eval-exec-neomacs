@@ -18,6 +18,10 @@ Last updated: 2026-02-15
 
 ## Done
 
+- Re-ran full NeoVM compatibility gate after warning-cleanup slices:
+  - verified:
+    - `make -C test/neovm/vm-compat check-all-neovm` (pass, full default + neovm-only corpus)
+
 - Removed dead `Evaluator` network manager field:
   - updated:
     - `rust/neovm-core/src/elisp/eval.rs`
