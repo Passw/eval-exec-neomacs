@@ -303,35 +303,6 @@ pub(crate) fn builtin_string_chop_newline(args: Vec<Value>) -> EvalResult {
     Ok(Value::string(trimmed))
 }
 
-/// `(string-pad STRING LENGTH &optional PADDING FROM-END)`.
-pub(crate) fn builtin_string_pad(args: Vec<Value>) -> EvalResult {
-    expect_min_args("string-pad", &args, 2)?;
-    let s = expect_string(&args[0])?;
-    let length = expect_int(&args[1])? as usize;
-    let pad_char = if args.len() > 2 {
-        match &args[2] {
-            Value::Char(c) => *c,
-            Value::Int(n) => char::from_u32(*n as u32).unwrap_or(' '),
-            _ => ' ',
-        }
-    } else {
-        ' '
-    };
-    let from_end = args.len() > 3 && args[3].is_truthy();
-
-    if s.len() >= length {
-        return Ok(Value::string(&s[..length]));
-    }
-
-    let padding: String = std::iter::repeat(pad_char).take(length - s.len()).collect();
-
-    if from_end {
-        Ok(Value::string(format!("{}{}", padding, s)))
-    } else {
-        Ok(Value::string(format!("{}{}", s, padding)))
-    }
-}
-
 /// `(string-replace FROM TO IN)` — replace all occurrences.
 pub(crate) fn builtin_string_replace(args: Vec<Value>) -> EvalResult {
     expect_args("string-replace", &args, 3)?;
