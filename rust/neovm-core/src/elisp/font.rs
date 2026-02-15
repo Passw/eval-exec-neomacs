@@ -102,14 +102,15 @@ fn is_font_spec(val: &Value) -> bool {
     }
 }
 
-/// Extract a property from a font-spec vector.  The vector layout is:
-/// `[:font-spec :family "Mono" :weight normal :slant italic :size 12 ...]`
-/// Property keys are keywords; values follow immediately after each key.
+/// Extract a property from a font-spec vector.
+///
+/// Property lookup is strict: keys only match if they are exactly equal to
+/// `prop` (keyword vs symbol distinction is preserved).
 fn font_spec_get(vec_elems: &[Value], prop: &Value) -> Value {
     // Skip the tag at index 0; scan remaining pairs.
     let mut i = 1;
     while i + 1 < vec_elems.len() {
-        if keyword_eq(&vec_elems[i], prop) {
+        if vec_elems[i] == *prop {
             return vec_elems[i + 1].clone();
         }
         i += 2;
@@ -117,47 +118,18 @@ fn font_spec_get(vec_elems: &[Value], prop: &Value) -> Value {
     Value::Nil
 }
 
-/// Set (or add) a property in a font-spec, returning a new vector.
-fn font_spec_put(vec_elems: &[Value], prop: &Value, val: &Value) -> Vec<Value> {
-    let mut result: Vec<Value> = Vec::with_capacity(vec_elems.len() + 2);
-    // Copy the tag.
-    if !vec_elems.is_empty() {
-        result.push(vec_elems[0].clone());
-    }
-    let mut found = false;
+/// Set (or add) a property in a font-spec in place.
+fn font_spec_put(vec_elems: &mut Vec<Value>, prop: &Value, val: &Value) {
     let mut i = 1;
     while i + 1 < vec_elems.len() {
-        if keyword_eq(&vec_elems[i], prop) {
-            result.push(vec_elems[i].clone());
-            result.push(val.clone());
-            found = true;
-        } else {
-            result.push(vec_elems[i].clone());
-            result.push(vec_elems[i + 1].clone());
+        if vec_elems[i] == *prop {
+            vec_elems[i + 1] = val.clone();
+            return;
         }
         i += 2;
     }
-    // Handle a trailing key without a value (shouldn't happen, but be safe).
-    if i < vec_elems.len() {
-        result.push(vec_elems[i].clone());
-    }
-    if !found {
-        result.push(prop.clone());
-        result.push(val.clone());
-    }
-    result
-}
-
-/// Compare two Values as keyword keys.  Accepts both `:family` (Keyword) and
-/// `family` (Symbol) to be flexible.
-fn keyword_eq(a: &Value, b: &Value) -> bool {
-    match (a, b) {
-        (Value::Keyword(ka), Value::Keyword(kb)) => ka == kb,
-        (Value::Keyword(ka), Value::Symbol(sb)) => ka == sb,
-        (Value::Symbol(sa), Value::Keyword(kb)) => sa == kb,
-        (Value::Symbol(sa), Value::Symbol(sb)) => sa == sb,
-        _ => false,
-    }
+    vec_elems.push(prop.clone());
+    vec_elems.push(val.clone());
 }
 
 /// Normalize a property name to a Keyword value.  If the user passes a symbol
@@ -210,35 +182,44 @@ pub(crate) fn builtin_font_spec(args: Vec<Value>) -> EvalResult {
 /// `(font-get FONT PROP)` -- get a property value from a font-spec.
 pub(crate) fn builtin_font_get(args: Vec<Value>) -> EvalResult {
     expect_args("font-get", &args, 2)?;
-    let prop = normalize_prop_key(&args[1]);
+    if !is_font_spec(&args[0]) {
+        return Err(signal(
+            "wrong-type-argument",
+            vec![Value::symbol("font"), args[0].clone()],
+        ));
+    }
+    if !matches!(&args[1], Value::Keyword(_) | Value::Symbol(_)) {
+        return Err(signal(
+            "wrong-type-argument",
+            vec![Value::symbol("symbolp"), args[1].clone()],
+        ));
+    }
+
     match &args[0] {
         Value::Vector(v) => {
             let elems = v.lock().expect("poisoned");
-            Ok(font_spec_get(&elems, &prop))
+            Ok(font_spec_get(&elems, &args[1]))
         }
-        // If not a vector, return nil (Emacs tolerates this for non-font objects).
-        _ => Ok(Value::Nil),
+        _ => unreachable!("font-spec check above guarantees vector"),
     }
 }
 
-/// `(font-put FONT PROP VAL)` -- set a property in a font-spec, returning a
-/// modified copy.
-///
-/// NOTE: Real Emacs mutates in-place; we return a new vector for safety in
-/// our GC-free representation.  Callers should use the returned value.
+/// `(font-put FONT PROP VAL)` -- set a property in a font-spec and return VAL.
 pub(crate) fn builtin_font_put(args: Vec<Value>) -> EvalResult {
     expect_args("font-put", &args, 3)?;
-    let prop = normalize_prop_key(&args[1]);
+    if !is_font_spec(&args[0]) {
+        return Err(signal(
+            "wrong-type-argument",
+            vec![Value::symbol("font-spec"), args[0].clone()],
+        ));
+    }
     match &args[0] {
         Value::Vector(v) => {
-            let elems = v.lock().expect("poisoned");
-            let new_elems = font_spec_put(&elems, &prop, &args[2]);
-            Ok(Value::vector(new_elems))
+            let mut elems = v.lock().expect("poisoned");
+            font_spec_put(&mut elems, &args[1], &args[2]);
+            Ok(args[2].clone())
         }
-        other => Err(signal(
-            "wrong-type-argument",
-            vec![Value::symbol("fontp"), other.clone()],
-        )),
+        _ => unreachable!("font-spec check above guarantees vector"),
     }
 }
 
@@ -341,8 +322,43 @@ pub(crate) fn builtin_font_family_list_eval(
 /// `(font-xlfd-name FONT &optional FOLD-WILDCARDS)` -- stub, return "*".
 pub(crate) fn builtin_font_xlfd_name(args: Vec<Value>) -> EvalResult {
     expect_min_args("font-xlfd-name", &args, 1)?;
-    expect_max_args("font-xlfd-name", &args, 2)?;
-    Ok(Value::string("*"))
+    if !is_font_spec(&args[0]) {
+        return Err(signal(
+            "wrong-type-argument",
+            vec![Value::symbol("font"), args[0].clone()],
+        ));
+    }
+
+    let mut family: Option<String> = None;
+    if let Value::Vector(v) = &args[0] {
+        let elems = v.lock().expect("poisoned");
+        let mut i = 1;
+        while i + 1 < elems.len() {
+            let family_key = match &elems[i] {
+                Value::Keyword(k) | Value::Symbol(k) => k == "family" || k == ":family",
+                _ => false,
+            };
+            if family_key {
+                family = match &elems[i + 1] {
+                    Value::Str(s) => Some((**s).clone()),
+                    Value::Symbol(s) => Some(s.clone()),
+                    Value::Keyword(s) => Some(s.clone()),
+                    _ => None,
+                };
+                break;
+            }
+            i += 2;
+        }
+    }
+
+    let fold_wildcards = args.get(1).is_some_and(Value::is_truthy);
+    let rendered = match (family, fold_wildcards) {
+        (Some(name), true) => format!("-*-{name}-*"),
+        (None, true) => "-*".to_string(),
+        (Some(name), false) => format!("-*-{name}-*-*-*-*-*-*-*-*-*-*-*-*"),
+        (None, false) => "-*-*-*-*-*-*-*-*-*-*-*-*-*-*".to_string(),
+    };
+    Ok(Value::string(rendered))
 }
 
 // ===========================================================================
@@ -1667,46 +1683,59 @@ mod tests {
             builtin_font_get(vec![spec.clone(), Value::Keyword("size".to_string())]).unwrap();
         assert!(missing.is_nil());
 
-        // Put new property.
-        let spec2 = builtin_font_put(vec![
+        // Put returns VAL and mutates the original spec.
+        let put_size = builtin_font_put(vec![
             spec.clone(),
             Value::Keyword("size".to_string()),
             Value::Int(14),
         ])
         .unwrap();
+        assert_eq!(put_size.as_int(), Some(14));
         let size =
-            builtin_font_get(vec![spec2.clone(), Value::Keyword("size".to_string())]).unwrap();
+            builtin_font_get(vec![spec.clone(), Value::Keyword("size".to_string())]).unwrap();
         assert_eq!(size.as_int(), Some(14));
 
-        // Put overwriting existing property.
-        let spec3 = builtin_font_put(vec![
-            spec2,
+        // Overwrite existing property.
+        let put_family = builtin_font_put(vec![
+            spec.clone(),
             Value::Keyword("family".to_string()),
             Value::string("Serif"),
         ])
         .unwrap();
-        let family2 = builtin_font_get(vec![spec3, Value::Keyword("family".to_string())]).unwrap();
+        assert_eq!(put_family.as_str(), Some("Serif"));
+        let family2 =
+            builtin_font_get(vec![spec.clone(), Value::Keyword("family".to_string())]).unwrap();
         assert_eq!(family2.as_str(), Some("Serif"));
     }
 
     #[test]
     fn font_get_symbol_key() {
-        // font-get should accept a symbol key and match against keyword storage.
+        // Symbol key does not match keyword storage.
         let spec = builtin_font_spec(vec![
             Value::Keyword("weight".to_string()),
             Value::symbol("bold"),
         ])
         .unwrap();
         let weight = builtin_font_get(vec![spec, Value::symbol("weight")]).unwrap();
-        assert_eq!(weight.as_symbol_name(), Some("bold"));
+        assert!(weight.is_nil());
+    }
+
+    #[test]
+    fn font_get_non_symbol_property_errors() {
+        let spec = builtin_font_spec(vec![
+            Value::Keyword("weight".to_string()),
+            Value::symbol("bold"),
+        ])
+        .unwrap();
+        let result = builtin_font_get(vec![spec, Value::Int(1)]);
+        assert!(result.is_err());
     }
 
     #[test]
     fn font_get_non_vector() {
-        // font-get on a non-vector should return nil, not error.
+        // font-get on a non-font value signals wrong-type-argument.
         let result = builtin_font_get(vec![Value::Int(42), Value::Keyword("family".to_string())]);
-        assert!(result.is_ok());
-        assert!(result.unwrap().is_nil());
+        assert!(result.is_err());
     }
 
     #[test]
@@ -1800,7 +1829,7 @@ mod tests {
             FONT_SPEC_TAG.to_string(),
         )])])
         .unwrap();
-        assert_eq!(result.as_str(), Some("*"));
+        assert_eq!(result.as_str(), Some("-*-*-*-*-*-*-*-*-*-*-*-*-*-*"));
     }
 
     // -----------------------------------------------------------------------

@@ -1,0 +1,35 @@
+(fboundp 'fontp)
+(fboundp 'font-get)
+(fboundp 'font-put)
+(fboundp 'font-xlfd-name)
+
+(fontp (font-spec :size 12))
+(fontp nil)
+
+(condition-case err
+    (font-get nil :size)
+  (error (car err)))
+(condition-case err
+    (font-get (font-spec :size 12) 1)
+  (error (car err)))
+(font-get (font-spec :size 12) :size)
+(font-get (font-spec :size 12) 'size)
+
+(let ((s (font-spec :size 12)))
+  (list (font-put s :weight 'bold)
+        (font-get s :weight)))
+(let ((s (font-spec :size 12)))
+  (font-put s 'weight 'bold)
+  (font-get s :weight))
+(let ((s (font-spec :size 12)))
+  (font-put s 1 'bold))
+(condition-case err
+    (font-put nil :weight 'bold)
+  (error (car err)))
+
+(font-xlfd-name (font-spec))
+(font-xlfd-name (font-spec :family "x") t)
+(condition-case err
+    (font-xlfd-name nil)
+  (error (car err)))
+(font-xlfd-name (font-spec :family "x") nil nil)
