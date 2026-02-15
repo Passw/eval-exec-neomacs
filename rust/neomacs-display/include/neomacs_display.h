@@ -3034,6 +3034,18 @@ int64_t neomacs_layout_charpos_at_pixel(float px, float py);
 int64_t neomacs_layout_window_charpos(int64_t windowId, float wx, float wy);
 
 /**
+ * Set the font metrics backend for the layout engine.
+ * backend: 0 = Emacs C (default), 1 = cosmic-text
+ *
+ * When set to cosmic-text, the layout engine uses the same font resolution
+ * as the render thread, eliminating width mismatches between layout and rendering.
+ *
+ * # Safety
+ * Must be called on the Emacs thread.
+ */
+void neomacs_display_set_font_backend(struct NeomacsDisplay *handle, int backend);
+
+/**
  * Initialize display in threaded mode
  *
  * Returns the wakeup pipe fd that Emacs should select() on,

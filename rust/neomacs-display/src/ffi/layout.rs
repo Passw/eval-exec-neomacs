@@ -16,6 +16,10 @@ pub(crate) static mut LAYOUT_ENGINE: Option<crate::layout::LayoutEngine> = None;
 /// Applied on first engine creation so init.el settings are not lost.
 pub(crate) static mut PENDING_LIGATURES_ENABLED: Option<bool> = None;
 
+/// Pending cosmic-metrics-enabled flag, set before layout engine is initialized.
+/// Applied on first engine creation so init.el settings are not lost.
+pub(crate) static mut PENDING_COSMIC_METRICS: Option<bool> = None;
+
 /// Called from C when `neomacs-use-rust-display` is enabled.
 /// The Rust layout engine reads buffer data via FFI helpers and produces
 /// a FrameGlyphBuffer, bypassing the C matrix extraction.
@@ -58,6 +62,11 @@ pub unsafe extern "C" fn neomacs_rust_layout_frame(
             if let Some(enabled) = *std::ptr::addr_of!(PENDING_LIGATURES_ENABLED) {
                 engine.ligatures_enabled = enabled;
                 log::info!("Applied pending ligatures_enabled={}", enabled);
+            }
+            // Apply pending cosmic metrics setting from init.el
+            if let Some(enabled) = *std::ptr::addr_of!(PENDING_COSMIC_METRICS) {
+                engine.use_cosmic_metrics = enabled;
+                log::info!("Applied pending use_cosmic_metrics={}", enabled);
             }
             *std::ptr::addr_of_mut!(LAYOUT_ENGINE) = Some(engine);
             log::info!("Rust layout engine initialized");
@@ -136,3 +145,27 @@ pub unsafe extern "C" fn neomacs_layout_window_charpos(
 // Note: Event Polling FFI Functions have been removed
 // Events are now delivered via the threaded mode wakeup mechanism
 // Use neomacs_display_drain_input() instead
+
+/// Set the font metrics backend for the layout engine.
+/// backend: 0 = Emacs C (default), 1 = cosmic-text
+///
+/// When set to cosmic-text, the layout engine uses the same font resolution
+/// as the render thread, eliminating width mismatches between layout and rendering.
+///
+/// # Safety
+/// Must be called on the Emacs thread.
+#[no_mangle]
+pub unsafe extern "C" fn neomacs_display_set_font_backend(
+    _handle: *mut NeomacsDisplay,
+    backend: c_int,
+) {
+    let use_cosmic = backend != 0;
+
+    // Set on the layout engine if already initialized
+    if let Some(ref mut engine) = *std::ptr::addr_of_mut!(LAYOUT_ENGINE) {
+        engine.use_cosmic_metrics = use_cosmic;
+        log::info!("Font metrics backend set to {}", if use_cosmic { "cosmic-text" } else { "emacs-c" });
+    }
+    // Always store pending so engine init picks it up even if set before creation
+    *std::ptr::addr_of_mut!(PENDING_COSMIC_METRICS) = Some(use_cosmic);
+}

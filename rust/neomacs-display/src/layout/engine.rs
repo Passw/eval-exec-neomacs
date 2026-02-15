@@ -17,6 +17,7 @@ use super::unicode::*;
 use super::hit_test::*;
 use super::status_line::*;
 use super::bidi_layout::reorder_row_bidi;
+use super::font_metrics::FontMetricsService;
 
 /// Maximum number of characters in a ligature run before forced flush.
 const MAX_LIGATURE_RUN_LEN: usize = 64;
@@ -166,6 +167,10 @@ pub struct LayoutEngine {
     /// Used for overstrike: when bold variant unavailable, renderer uses this
     /// family instead of the proportional fallback.
     default_font_family: String,
+    /// Cosmic-text font metrics service (lazily initialized on first use)
+    font_metrics: Option<FontMetricsService>,
+    /// Whether to use cosmic-text for font metrics instead of C FFI
+    pub use_cosmic_metrics: bool,
 }
 
 impl LayoutEngine {
@@ -179,6 +184,8 @@ impl LayoutEngine {
             run_buf: LigatureRunBuffer::new(),
             ligatures_enabled: false,
             default_font_family: String::new(),
+            font_metrics: None,
+            use_cosmic_metrics: false,
         }
     }
 
@@ -208,6 +215,14 @@ impl LayoutEngine {
 
         // Clear hit-test data for new frame
         self.hit_data.clear();
+
+        // Lazy-initialize FontMetricsService when cosmic metrics are enabled
+        if self.use_cosmic_metrics && self.font_metrics.is_none() {
+            self.font_metrics = Some(FontMetricsService::new());
+        } else if !self.use_cosmic_metrics && self.font_metrics.is_some() {
+            // Drop the service when switching back to C metrics
+            self.font_metrics = None;
+        }
 
         // Always populate face_id=0 (DEFAULT_FACE_ID) in the faces map.
         // Many code paths use face_id=0 as a fallback: initial set_face(),
@@ -2483,10 +2498,19 @@ impl LayoutEngine {
                         let face_id = self.face_data.face_id;
                         let font_size = self.face_data.font_size;
                         let face_char_w = self.face_data.font_char_width;
+                        let font_family = if !self.face_data.font_family.is_null() {
+                            CStr::from_ptr(self.face_data.font_family).to_str().unwrap_or("")
+                        } else {
+                            ""
+                        };
+                        let font_weight = self.face_data.font_weight as u16;
+                        let font_italic = self.face_data.italic != 0;
                         char_advance(
                             &mut self.ascii_width_cache,
+                            &mut self.font_metrics,
                             ch, char_cols, char_w,
                             face_id, font_size, face_char_w, window,
+                            font_family, font_weight, font_italic,
                         )
                     };
 
@@ -3509,20 +3533,19 @@ impl LayoutEngine {
 }
 
 /// Get the advance width for a character in a specific face.
-/// For regular monospace fonts, uses the face's `average_width` (fast path).
-/// For bold monospace fonts (weight >= 700) and all non-monospace fonts,
-/// queries real glyph metrics via text_extents() so that wider bold glyphs
-/// get correct advance widths instead of overlapping.
 ///
 /// Standalone function to avoid borrow conflicts with `LayoutEngine::text_buf`.
-/// Compute the advance width for a character in the current face's font.
 ///
-/// Uses a Rust-side cache keyed by (face_id, font_size).  On cache miss,
-/// calls neomacs_layout_fill_ascii_widths() which reads from a pre-warmed
-/// C-side font metrics cache — no allocating text_extents() calls happen
-/// during Rust layout, avoiding the heap corruption in ftcrfont_glyph_extents.
+/// Supports two measurement backends:
+/// - **C FFI** (default): Uses `neomacs_layout_fill_ascii_widths()` / `neomacs_layout_char_width()`
+///   which read from Emacs C font metrics (fontconfig/freetype).
+/// - **Cosmic-text**: Uses `FontMetricsService` for measurement, matching the render thread's
+///   font resolution exactly. Eliminates width mismatches between layout and rendering.
+///
+/// The backend is selected by `font_metrics_svc` being Some (cosmic) or None (C FFI).
 unsafe fn char_advance(
     ascii_width_cache: &mut std::collections::HashMap<(u32, i32), [f32; 128]>,
+    font_metrics_svc: &mut Option<FontMetricsService>,
     ch: char,
     char_cols: i32,
     char_w: f32,
@@ -3530,11 +3553,21 @@ unsafe fn char_advance(
     font_size: i32,
     face_char_w: f32,
     window: EmacsWindow,
+    font_family: &str,
+    font_weight: u16,
+    font_italic: bool,
 ) -> f32 {
     // Use the face-specific character width when available (handles
     // faces with :height attribute that use a differently-sized font).
     let face_w = if face_char_w > 0.0 { face_char_w } else { char_w };
 
+    // Cosmic-text path: use FontMetricsService for measurement
+    if let Some(ref mut svc) = font_metrics_svc {
+        let font_size_f = font_size as f32;
+        return svc.char_width(ch, font_family, font_weight, font_italic, font_size_f);
+    }
+
+    // C FFI path (default): use pre-warmed Emacs font metrics
     let cp = ch as u32;
     if cp < 128 {
         // ASCII: use cached widths from pre-warmed font metrics

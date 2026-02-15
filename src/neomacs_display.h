@@ -1273,6 +1273,15 @@ void neomacs_display_set_extra_spacing(struct NeomacsDisplay *handle,
 void neomacs_display_set_ligatures_enabled(struct NeomacsDisplay *handle,
                                             int enabled);
 
+/**
+ * Set the font metrics backend for the layout engine.
+ * backend: 0 = Emacs C (default), 1 = cosmic-text.
+ * When set to cosmic-text, the layout engine uses the same font resolution
+ * as the render thread, eliminating width mismatches between layout and rendering.
+ */
+void neomacs_display_set_font_backend(struct NeomacsDisplay *handle,
+                                       int backend);
+
 void neomacs_display_set_background_gradient(
     struct NeomacsDisplay *handle,
     int enabled,

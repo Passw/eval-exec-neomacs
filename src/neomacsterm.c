@@ -9657,6 +9657,24 @@ glyph in fonts like JetBrains Mono or Fira Code).  */)
   return !NILP (enabled) ? Qt : Qnil;
 }
 
+DEFUN ("neomacs-set-font-backend", Fneomacs_set_font_backend,
+       Sneomacs_set_font_backend, 1, 1, 0,
+       doc: /* Set the font metrics backend for the layout engine.
+BACKEND is a symbol: `emacs' (default) for C/fontconfig metrics,
+or `cosmic' for cosmic-text metrics that match the render thread.
+Using `cosmic' eliminates width mismatches between layout and rendering
+when C fontconfig and cosmic-text resolve different font files.  */)
+  (Lisp_Object backend)
+{
+  struct neomacs_display_info *dpyinfo = neomacs_display_list;
+  if (!dpyinfo || !dpyinfo->display_handle)
+    return Qnil;
+
+  int use_cosmic = EQ (backend, intern ("cosmic"));
+  neomacs_display_set_font_backend (dpyinfo->display_handle, use_cosmic);
+  return use_cosmic ? intern ("cosmic") : intern ("emacs");
+}
+
 DEFUN ("neomacs-set-background-gradient",
        Fneomacs_set_background_gradient,
        Sneomacs_set_background_gradient, 2, 2, 0,
@@ -16135,6 +16153,7 @@ syms_of_neomacsterm (void)
   defsubr (&Sneomacs_set_corner_radius);
   defsubr (&Sneomacs_set_extra_spacing);
   defsubr (&Sneomacs_set_ligatures_enabled);
+  defsubr (&Sneomacs_set_font_backend);
   defsubr (&Sneomacs_set_background_gradient);
   defsubr (&Sneomacs_set_scroll_bar_config);
   defsubr (&Sneomacs_set_indent_guides);

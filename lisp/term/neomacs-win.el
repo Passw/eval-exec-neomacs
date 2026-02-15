@@ -513,6 +513,24 @@ for sequences like ->, =>, !=, == etc."
          (when (fboundp 'neomacs-set-ligatures-enabled)
            (neomacs-set-ligatures-enabled val))))
 
+;;; Font metrics backend
+
+(declare-function neomacs-set-font-backend "neomacsterm.c" (backend))
+
+(defcustom neomacs-font-backend 'emacs
+  "Font metrics backend for the layout engine.
+`emacs' (default) uses C/fontconfig font metrics.
+`cosmic' uses cosmic-text font metrics, matching the render thread's
+font resolution.  This eliminates width mismatches between layout and
+rendering when C fontconfig and cosmic-text resolve different font files."
+  :type '(choice (const :tag "Emacs C (fontconfig)" emacs)
+                 (const :tag "Cosmic-text" cosmic))
+  :group 'frames
+  :set (lambda (sym val)
+         (set-default sym val)
+         (when (fboundp 'neomacs-set-font-backend)
+           (neomacs-set-font-backend val))))
+
 ;;; Background gradient
 
 (declare-function neomacs-set-background-gradient "neomacsterm.c"
