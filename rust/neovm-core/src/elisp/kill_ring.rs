@@ -1189,9 +1189,11 @@ pub(crate) fn builtin_yank(eval: &mut super::eval::Evaluator, args: Vec<Value>) 
         let n = expect_int(&args[0])?;
         if n != 0 {
             eval.kill_ring.rotate(n - 1);
-            sync_kill_ring_binding(eval);
         }
     }
+    // Emacs normalizes/updates `kill-ring-yank-pointer` during yank command
+    // setup, even when insertion later errors (e.g. read-only buffers).
+    sync_kill_ring_binding(eval);
 
     let text = eval
         .kill_ring
