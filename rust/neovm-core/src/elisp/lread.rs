@@ -22,6 +22,28 @@ fn expect_min_args(name: &str, args: &[Value], min: usize) -> Result<(), Flow> {
     }
 }
 
+fn expect_max_args(name: &str, args: &[Value], max: usize) -> Result<(), Flow> {
+    if args.len() > max {
+        Err(signal(
+            "wrong-number-of-arguments",
+            vec![Value::symbol(name), Value::Int(args.len() as i64)],
+        ))
+    } else {
+        Ok(())
+    }
+}
+
+fn expect_integer_or_marker(value: &Value) -> Result<i64, Flow> {
+    match value {
+        Value::Int(n) => Ok(*n),
+        Value::Char(c) => Ok(*c as i64),
+        other => Err(signal(
+            "wrong-type-argument",
+            vec![Value::symbol("integer-or-marker-p"), other.clone()],
+        )),
+    }
+}
+
 fn expect_string(value: &Value) -> Result<String, Flow> {
     match value {
         Value::Str(s) => Ok((**s).clone()),
@@ -230,24 +252,109 @@ pub(crate) fn builtin_read_from_string(
     Ok(Value::cons(value, Value::Int(absolute_end as i64)))
 }
 
+fn eval_forms_from_source(eval: &mut super::eval::Evaluator, source: &str) -> EvalResult {
+    if source.is_empty() {
+        return Ok(Value::Nil);
+    }
+    let forms = super::parser::parse_forms(source).map_err(|e| {
+        signal(
+            "invalid-read-syntax",
+            vec![Value::string(e.message.clone())],
+        )
+    })?;
+    for form in forms {
+        eval.eval(&form)?;
+    }
+    Ok(Value::Nil)
+}
+
+fn eval_buffer_source_text(eval: &super::eval::Evaluator, arg: Option<&Value>) -> Result<String, Flow> {
+    let buffer_id = match arg {
+        None | Some(Value::Nil) => eval
+            .buffers
+            .current_buffer()
+            .map(|b| b.id)
+            .ok_or_else(|| signal("error", vec![Value::string("No current buffer")]))?,
+        Some(Value::Buffer(id)) => *id,
+        Some(Value::Str(name)) => eval
+            .buffers
+            .find_buffer_by_name(name)
+            .ok_or_else(|| signal("error", vec![Value::string("No such buffer")]))?,
+        Some(other) => {
+            return Err(signal(
+                "wrong-type-argument",
+                vec![Value::symbol("stringp"), other.clone()],
+            ))
+        }
+    };
+    eval.buffers
+        .get(buffer_id)
+        .map(|buffer| buffer.buffer_string())
+        .ok_or_else(|| signal("error", vec![Value::string("No such buffer")]))
+}
+
 /// `(eval-buffer &optional BUFFER PRINTFLAG FILENAME UNIBYTE DO-ALLOW-PRINT)`
 ///
-/// Stub: returns nil.
+/// Evaluate all forms from BUFFER (or current buffer) and return nil.
 pub(crate) fn builtin_eval_buffer(
-    _eval: &mut super::eval::Evaluator,
-    _args: Vec<Value>,
+    eval: &mut super::eval::Evaluator,
+    args: Vec<Value>,
 ) -> EvalResult {
-    Ok(Value::Nil)
+    expect_max_args("eval-buffer", &args, 5)?;
+    let source = eval_buffer_source_text(eval, args.first())?;
+    eval_forms_from_source(eval, &source)
 }
 
 /// `(eval-region START END &optional PRINTFLAG READ-FUNCTION)`
 ///
-/// Stub: returns nil.
+/// Evaluate forms in the [START, END) region of the current buffer.
 pub(crate) fn builtin_eval_region(
-    _eval: &mut super::eval::Evaluator,
-    _args: Vec<Value>,
+    eval: &mut super::eval::Evaluator,
+    args: Vec<Value>,
 ) -> EvalResult {
-    Ok(Value::Nil)
+    expect_min_args("eval-region", &args, 2)?;
+    expect_max_args("eval-region", &args, 4)?;
+
+    let (source, start_char_pos, end_char_pos) = {
+        let buffer = eval
+            .buffers
+            .current_buffer()
+            .ok_or_else(|| signal("error", vec![Value::string("No current buffer")]))?;
+
+        let point_char_pos = buffer.text.byte_to_char(buffer.point()) as i64 + 1;
+        let max_char_pos = buffer.text.byte_to_char(buffer.point_max()) as i64 + 1;
+
+        let raw_start = if args[0].is_nil() {
+            point_char_pos
+        } else {
+            expect_integer_or_marker(&args[0])?
+        };
+        let raw_end = if args[1].is_nil() {
+            point_char_pos
+        } else {
+            expect_integer_or_marker(&args[1])?
+        };
+
+        if raw_start < 1 || raw_start > max_char_pos || raw_end < 1 || raw_end > max_char_pos {
+            return Err(signal(
+                "args-out-of-range",
+                vec![args[0].clone(), args[1].clone()],
+            ));
+        }
+
+        if raw_start >= raw_end {
+            return Ok(Value::Nil);
+        }
+
+        let start_byte = buffer.text.char_to_byte((raw_start - 1) as usize);
+        let end_byte = buffer.text.char_to_byte((raw_end - 1) as usize);
+        (buffer.buffer_substring(start_byte, end_byte), raw_start, raw_end)
+    };
+
+    if start_char_pos >= end_char_pos {
+        return Ok(Value::Nil);
+    }
+    eval_forms_from_source(eval, &source)
 }
 
 fn pop_unread_command_event(eval: &mut super::eval::Evaluator) -> Option<Value> {
@@ -1002,17 +1109,215 @@ mod tests {
     }
 
     #[test]
-    fn eval_buffer_returns_nil() {
+    fn eval_buffer_evaluates_current_buffer_forms() {
         let mut ev = Evaluator::new();
+        {
+            let buf = ev.buffers.current_buffer_mut().expect("current buffer");
+            buf.insert("(setq lread-eb-a 11)\n(setq lread-eb-b (+ lread-eb-a 1))");
+        }
         let result = builtin_eval_buffer(&mut ev, vec![]).unwrap();
         assert!(result.is_nil());
+        assert_eq!(
+            ev.obarray.symbol_value("lread-eb-a").cloned(),
+            Some(Value::Int(11))
+        );
+        assert_eq!(
+            ev.obarray.symbol_value("lread-eb-b").cloned(),
+            Some(Value::Int(12))
+        );
     }
 
     #[test]
-    fn eval_region_returns_nil() {
+    fn eval_buffer_uses_source_text_without_switching_current() {
         let mut ev = Evaluator::new();
-        let result = builtin_eval_region(&mut ev, vec![Value::Int(1), Value::Int(10)]).unwrap();
+        let target = ev.buffers.create_buffer("*lread-eval-buffer-target*");
+        {
+            let target_buf = ev.buffers.get_mut(target).expect("target buffer");
+            target_buf.insert("(setq lread-eb-current-name (buffer-name))");
+        }
+        let caller = ev.buffers.create_buffer("*lread-eval-buffer-caller*");
+        ev.buffers.set_current(caller);
+
+        let result = builtin_eval_buffer(&mut ev, vec![Value::Buffer(target)]).unwrap();
         assert!(result.is_nil());
+        assert_eq!(
+            ev.obarray.symbol_value("lread-eb-current-name").cloned(),
+            Some(Value::string("*lread-eval-buffer-caller*"))
+        );
+    }
+
+    #[test]
+    fn eval_buffer_reports_designator_and_arity_errors() {
+        let mut ev = Evaluator::new();
+
+        let missing = builtin_eval_buffer(&mut ev, vec![Value::string("*no-such-buffer*")]);
+        assert!(matches!(
+            missing,
+            Err(Flow::Signal(sig))
+                if sig.symbol == "error" && sig.data == vec![Value::string("No such buffer")]
+        ));
+
+        let bad_type = builtin_eval_buffer(&mut ev, vec![Value::Int(1)]);
+        assert!(matches!(
+            bad_type,
+            Err(Flow::Signal(sig))
+                if sig.symbol == "wrong-type-argument"
+                    && sig.data == vec![Value::symbol("stringp"), Value::Int(1)]
+        ));
+
+        let arity = builtin_eval_buffer(
+            &mut ev,
+            vec![
+                Value::Nil,
+                Value::Nil,
+                Value::Nil,
+                Value::Nil,
+                Value::Nil,
+                Value::Nil,
+            ],
+        );
+        assert!(matches!(
+            arity,
+            Err(Flow::Signal(sig))
+                if sig.symbol == "wrong-number-of-arguments"
+                    && sig.data == vec![Value::symbol("eval-buffer"), Value::Int(6)]
+        ));
+    }
+
+    #[test]
+    fn eval_region_evaluates_forms_in_range() {
+        let mut ev = Evaluator::new();
+        {
+            let buf = ev.buffers.current_buffer_mut().expect("current buffer");
+            buf.insert("(setq lread-er-a 1)\n(setq lread-er-b (+ lread-er-a 2))");
+        }
+        let end = {
+            let buf = ev.buffers.current_buffer().expect("current buffer");
+            Value::Int(buf.text.char_count() as i64 + 1)
+        };
+
+        let result = builtin_eval_region(&mut ev, vec![Value::Int(1), end]).unwrap();
+        assert!(result.is_nil());
+        assert_eq!(
+            ev.obarray.symbol_value("lread-er-a").cloned(),
+            Some(Value::Int(1))
+        );
+        assert_eq!(
+            ev.obarray.symbol_value("lread-er-b").cloned(),
+            Some(Value::Int(3))
+        );
+    }
+
+    #[test]
+    fn eval_region_nil_or_reversed_bounds_are_noop() {
+        let mut ev = Evaluator::new();
+        {
+            let buf = ev.buffers.current_buffer_mut().expect("current buffer");
+            buf.insert("(setq lread-er-noop 9)");
+        }
+        ev.obarray.set_symbol_value("lread-er-noop", Value::Int(0));
+
+        let nil_bounds = builtin_eval_region(&mut ev, vec![Value::Nil, Value::Nil]).unwrap();
+        assert!(nil_bounds.is_nil());
+        assert_eq!(
+            ev.obarray.symbol_value("lread-er-noop").cloned(),
+            Some(Value::Int(0))
+        );
+
+        let point_max = {
+            let buf = ev.buffers.current_buffer().expect("current buffer");
+            buf.text.char_count() as i64 + 1
+        };
+        let reversed = builtin_eval_region(&mut ev, vec![Value::Int(point_max), Value::Int(1)])
+            .unwrap();
+        assert!(reversed.is_nil());
+        assert_eq!(
+            ev.obarray.symbol_value("lread-er-noop").cloned(),
+            Some(Value::Int(0))
+        );
+    }
+
+    #[test]
+    fn eval_region_reports_type_range_and_arity_errors() {
+        let mut ev = Evaluator::new();
+        {
+            let buf = ev.buffers.current_buffer_mut().expect("current buffer");
+            buf.insert("(+ 1 2)");
+        }
+        let point_max = {
+            let buf = ev.buffers.current_buffer().expect("current buffer");
+            buf.text.char_count() as i64 + 1
+        };
+
+        let bad_start =
+            builtin_eval_region(&mut ev, vec![Value::string("1"), Value::Int(point_max)]);
+        assert!(matches!(
+            bad_start,
+            Err(Flow::Signal(sig))
+                if sig.symbol == "wrong-type-argument"
+                    && sig.data
+                        == vec![Value::symbol("integer-or-marker-p"), Value::string("1")]
+        ));
+
+        let bad_end = builtin_eval_region(&mut ev, vec![Value::Int(1), Value::string("2")]);
+        assert!(matches!(
+            bad_end,
+            Err(Flow::Signal(sig))
+                if sig.symbol == "wrong-type-argument"
+                    && sig.data
+                        == vec![Value::symbol("integer-or-marker-p"), Value::string("2")]
+        ));
+
+        let range = builtin_eval_region(&mut ev, vec![Value::Int(1), Value::Int(999)]);
+        assert!(matches!(
+            range,
+            Err(Flow::Signal(sig))
+                if sig.symbol == "args-out-of-range"
+                    && sig.data == vec![Value::Int(1), Value::Int(999)]
+        ));
+
+        let arity_low = builtin_eval_region(&mut ev, vec![]);
+        assert!(matches!(
+            arity_low,
+            Err(Flow::Signal(sig))
+                if sig.symbol == "wrong-number-of-arguments"
+                    && sig.data == vec![Value::symbol("eval-region"), Value::Int(0)]
+        ));
+
+        let arity_high = builtin_eval_region(
+            &mut ev,
+            vec![
+                Value::Int(1),
+                Value::Int(point_max),
+                Value::Nil,
+                Value::Nil,
+                Value::Nil,
+            ],
+        );
+        assert!(matches!(
+            arity_high,
+            Err(Flow::Signal(sig))
+                if sig.symbol == "wrong-number-of-arguments"
+                    && sig.data == vec![Value::symbol("eval-region"), Value::Int(5)]
+        ));
+    }
+
+    #[test]
+    fn eval_region_keeps_point_stable_without_side_effects() {
+        let mut ev = Evaluator::new();
+        {
+            let buf = ev.buffers.current_buffer_mut().expect("current buffer");
+            buf.insert("(setq lread-er-point 1)");
+            buf.goto_char(0);
+        }
+        let end = {
+            let buf = ev.buffers.current_buffer().expect("current buffer");
+            Value::Int(buf.text.char_count() as i64 + 1)
+        };
+        let result = builtin_eval_region(&mut ev, vec![Value::Int(1), end]).unwrap();
+        assert!(result.is_nil());
+        let point = ev.buffers.current_buffer().expect("current buffer").point_char() as i64 + 1;
+        assert_eq!(point, 1);
     }
 
     #[test]
