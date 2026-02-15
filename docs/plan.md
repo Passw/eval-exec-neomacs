@@ -13,11 +13,42 @@ Last updated: 2026-02-15
 ## Next
 
 1. Keep `check-all-neovm` as a recurring post-slice gate to catch regressions early.
-2. Continue landing evaluator-backed display builtins that still use pure stub dispatch (`internal-show-cursor*` live-window designator paths).
-3. Expand focused oracle corpora for remaining high-risk stub areas (search/input/minibuffer/display edges).
+2. Continue expanding oracle corpora for remaining high-risk stub areas (search/input/minibuffer/display/font edge paths).
+3. Keep shrinking semantic drift in partially stubbed font/face and display helpers using small parity slices.
 4. Keep Rust backend behind compile-time switch and preserve Emacs C core as default backend.
 
 ## Done
+
+- Expanded vm-compat coverage for font/face helper stubs and aligned runtime semantics:
+  - updated:
+    - `rust/neovm-core/src/elisp/font.rs`
+      - aligned `color-defined-p` / `color-values` behavior with oracle (`unknown/non-string -> nil`).
+      - aligned `font-get` / `font-put` semantics:
+        - strict font-spec validation and error predicates.
+        - strict property-key matching for `font-get`.
+        - in-place `font-put` update with return value equal to VAL.
+      - aligned `font-xlfd-name` behavior:
+        - font object validation.
+        - family extraction from keyword/symbol keys.
+        - fold-wildcards output shape parity.
+      - aligned `face-attribute-relative-p` height-specific relative checks.
+      - aligned `internal-face-x-get-resource` arity and string-argument validation.
+      - expanded unit coverage for the above behavior.
+    - `test/neovm/vm-compat/cases/default.list`
+      - added:
+        - `cases/font-color-semantics`
+        - `cases/font-object-semantics`
+        - `cases/font-face-helper-semantics`
+    - added oracle corpora:
+      - `test/neovm/vm-compat/cases/font-color-semantics.{forms,expected.tsv}`
+      - `test/neovm/vm-compat/cases/font-object-semantics.{forms,expected.tsv}`
+      - `test/neovm/vm-compat/cases/font-face-helper-semantics.{forms,expected.tsv}`
+  - verified:
+    - `cargo test font::tests --manifest-path rust/neovm-core/Cargo.toml -- --nocapture` (pass)
+    - `make -C test/neovm/vm-compat check-one-neovm CASE=cases/font-color-semantics` (pass, 15/15)
+    - `make -C test/neovm/vm-compat check-one-neovm CASE=cases/font-object-semantics` (pass, 18/18)
+    - `make -C test/neovm/vm-compat check-one-neovm CASE=cases/font-face-helper-semantics` (pass, 15/15)
+    - `make -C test/neovm/vm-compat check-all-neovm` (pass, full default + neovm-only corpus)
 
 - Expanded evaluator-backed frame-designator support across font batch stubs:
   - updated:
