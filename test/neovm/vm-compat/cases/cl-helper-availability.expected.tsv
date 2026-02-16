@@ -4,8 +4,8 @@
 4	(condition-case err (cl-coerce '(a b) 'vector) (error err))	OK [a b]
 5	(fboundp 'cl-concatenate)	OK t
 6	(condition-case err (cl-concatenate 'list '(a b) '(c)) (error err))	OK (a b c)
-7	(fboundp 'cl-count)	OK nil
-8	(condition-case err (cl-count) (error err))	OK (void-function cl-count)
+7	(fboundp 'cl-count)	OK t
+8	(condition-case err (cl-count #'numberp '(1 "x" 2)) (error err))	OK 2
 9	(fboundp 'cl-count-if)	OK nil
 10	(condition-case err (cl-count-if) (error err))	OK (void-function cl-count-if)
 11	(fboundp 'cl-eighth)	OK t

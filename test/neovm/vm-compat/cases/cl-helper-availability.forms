@@ -5,7 +5,7 @@
 (fboundp 'cl-concatenate)
 (condition-case err (cl-concatenate 'list '(a b) '(c)) (error err))
 (fboundp 'cl-count)
-(condition-case err (cl-count) (error err))
+(condition-case err (cl-count #'numberp '(1 "x" 2)) (error err))
 (fboundp 'cl-count-if)
 (condition-case err (cl-count-if) (error err))
 (fboundp 'cl-eighth)

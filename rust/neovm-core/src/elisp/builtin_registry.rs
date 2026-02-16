@@ -170,6 +170,7 @@ const DISPATCH_BUILTIN_NAMES: &[&str] = &[
     "cl-adjoin",
     "cl-coerce",
     "cl-concatenate",
+    "cl-count",
     "cl-eighth",
     "cl-evenp",
     "cl-fifth",
