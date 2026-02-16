@@ -19,6 +19,24 @@ Last updated: 2026-02-16
 
 ## Done
 
+- Exposed `cl-member` as a callable CL helper:
+  - updated:
+    - `rust/neovm-core/src/elisp/cl_lib.rs`
+      - added `cl-member` builtin as a CL alias over `member`.
+      - added focused unit coverage for found-tail, not-found, and wrong-arity paths.
+    - `rust/neovm-core/src/elisp/builtins.rs`
+      - pure CL/seq dispatch now routes `cl-member`.
+    - `rust/neovm-core/src/elisp/builtin_registry.rs`
+      - added `cl-member` to builtin registry.
+    - `test/neovm/vm-compat/cases/cl-helper-availability.forms`
+      - switched helper probe to callable form `(cl-member 'b '(a b c))`.
+    - `test/neovm/vm-compat/cases/cl-helper-availability.expected.tsv`
+      - updated expectations from missing helper to callable behavior (`(b c)`).
+  - verified:
+    - `cargo test cl_member --manifest-path rust/neovm-core/Cargo.toml` (pass)
+    - `make -C test/neovm/vm-compat check-one-neovm CASE=cases/cl-helper-availability` (pass, 86/86)
+    - `make -C test/neovm/vm-compat validate-case-lists` (pass)
+
 - Exposed `cl-concatenate` as a callable CL helper:
   - updated:
     - `rust/neovm-core/src/elisp/cl_lib.rs`
