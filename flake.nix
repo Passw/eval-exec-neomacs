@@ -121,6 +121,9 @@
               librsvg
               libwebp
 
+              # PDF rendering (for pdf-tools epdfinfo server)
+              poppler
+
               # Other useful libraries
               dbus
               sqlite
@@ -186,6 +189,7 @@
               wpewebkit
               libwpe
               libwpe-fdo
+              poppler.dev
             ]);
 
             # For bindgen to find libclang
