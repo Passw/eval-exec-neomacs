@@ -49,7 +49,7 @@ Last updated: 2026-02-16
 ## Next
 
 1. Keep `check-all-neovm` as a recurring post-slice gate to catch regressions early.
-2. Land the next evaluator-backed stub replacement after `input-pending-p` (prefer display/minibuffer path with high package impact).
+2. Land the next evaluator-backed stub replacement after startup wrapper parity (prefer display/minibuffer path with high package impact).
 3. Continue expanding oracle corpora for remaining high-risk stub areas (search/input/minibuffer/display/font edge paths) and keep list/alist primitive semantics locked in.
 4. Keep Rust backend behind compile-time switch and preserve Emacs C core as default backend.
 5. Expand `kbd` edge corpus around uncommon modifier composition and align non-`kbd` key-description consumers with the new parser semantics where needed.
@@ -57,6 +57,23 @@ Last updated: 2026-02-16
 7. Continue subr-arity registry drift reduction from `59` remaining mismatches using batched oracle lock-ins.
 
 ## Done
+
+- Aligned startup bookmark command wrapper shape with GNU Emacs:
+  - seeded startup function cells as autoload values:
+    - `bookmark-delete`, `bookmark-jump`, `bookmark-load`, `bookmark-rename`, `bookmark-save`, `bookmark-set`
+    - each now resolves through `(autoload "bookmark" "...doc..." t nil)`
+  - added unit assertion in:
+    - `symbol_function_resolves_builtin_and_special_names`
+  - added oracle corpus lock-in case:
+    - `test/neovm/vm-compat/cases/bookmark-autoload-wrapper-semantics.{forms,expected.tsv}`
+    - wired into default and introspection suites:
+      - `test/neovm/vm-compat/cases/default.list`
+      - `test/neovm/vm-compat/cases/introspection.list`
+  - verified:
+    - `cargo test --manifest-path rust/neovm-core/Cargo.toml symbol_function_resolves_builtin_and_special_names -- --nocapture` (pass)
+    - `make -C test/neovm/vm-compat check-one-neovm CASE=cases/bookmark-autoload-wrapper-semantics` (pass)
+    - `make -C test/neovm/vm-compat validate-case-lists` (pass)
+    - `make -C test/neovm/vm-compat check-all-neovm-strict` (pass)
 
 - Aligned `subr-primitive-p` startup introspection shape toward GNU Emacs:
   - seeded startup function cell as a Lisp lambda wrapper:
