@@ -889,6 +889,7 @@ const DISPATCH_BUILTIN_NAMES: &[&str] = &[
     "widget-apply",
     "widget-get",
     "widget-put",
+    "word-at-point",
     "window-body-height",
     "window-body-width",
     "window-buffer",

@@ -6678,6 +6678,7 @@ pub(crate) fn dispatch_builtin(
             ))
         }
         "symbol-at-point" => return Some(super::interactive::builtin_symbol_at_point(eval, args)),
+        "word-at-point" => return Some(super::interactive::builtin_word_at_point(eval, args)),
 
         // Error hierarchy (evaluator-dependent — reads obarray)
         "error-message-string" => {

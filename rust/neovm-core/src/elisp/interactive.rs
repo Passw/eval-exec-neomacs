@@ -1133,6 +1133,16 @@ pub(crate) fn builtin_symbol_at_point(eval: &mut Evaluator, _args: Vec<Value>) -
     }
 }
 
+/// `(word-at-point &optional NO-PROPERTIES)` -> word at point or nil.
+pub(crate) fn builtin_word_at_point(eval: &mut Evaluator, args: Vec<Value>) -> EvalResult {
+    expect_max_args("word-at-point", &args, 1)?;
+    let mut thing_args = vec![Value::symbol("word")];
+    if let Some(no_properties) = args.first() {
+        thing_args.push(no_properties.clone());
+    }
+    builtin_thing_at_point(eval, thing_args)
+}
+
 // ---------------------------------------------------------------------------
 // Special forms for mode definition (called from eval.rs)
 // ---------------------------------------------------------------------------
@@ -2609,6 +2619,29 @@ mod tests {
         );
         let result = builtin_symbol_at_point(&mut ev, vec![]).unwrap();
         assert_eq!(result.as_symbol_name(), Some("my-symbol"));
+    }
+
+    #[test]
+    fn word_at_point_basic() {
+        let mut ev = Evaluator::new();
+        eval_all_with(
+            &mut ev,
+            r#"(get-buffer-create "wap")
+               (set-buffer "wap")
+               (insert "alpha beta")
+               (goto-char 3)"#,
+        );
+        let result = builtin_word_at_point(&mut ev, vec![]).unwrap();
+        match result {
+            Value::Str(s) => assert_eq!(&*s, "alpha"),
+            other => panic!("expected string, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn word_at_point_arity() {
+        let mut ev = Evaluator::new();
+        assert!(builtin_word_at_point(&mut ev, vec![Value::Nil, Value::Nil]).is_err());
     }
 
     // -------------------------------------------------------------------

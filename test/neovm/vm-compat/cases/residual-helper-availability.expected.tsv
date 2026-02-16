@@ -22,5 +22,5 @@
 22	(condition-case err (string-repeat) (error err))	OK (void-function string-repeat)
 23	(fboundp 'unibyte-string-p)	OK nil
 24	(condition-case err (unibyte-string-p) (error err))	OK (void-function unibyte-string-p)
-25	(fboundp 'word-at-point)	OK nil
-26	(condition-case err (word-at-point) (error err))	OK (void-function word-at-point)
+25	(fboundp 'word-at-point)	OK t
+26	(condition-case err (word-at-point) (error err))	OK nil
