@@ -46,11 +46,12 @@ Last updated: 2026-02-16
 - Keep newly landed autoload object error-kind parity stable while expanding remaining non-symbol callable error-path drifts.
 - Keep newly landed filesystem-create helper primitive `subr-arity` parity stable while expanding remaining filesystem helper drifts.
 - Keep newly landed `minor-mode-key-binding` runtime parity slice stable while expanding remaining interactive/keymap stub areas.
+- Keep newly landed `other-buffer` runtime+`subr-arity` parity stable while expanding remaining buffer/window helper drifts.
 
 ## Next
 
 1. Keep `check-all-neovm` as a recurring post-slice gate to catch regressions early.
-2. Land the next evaluator-backed stub replacement after startup wrapper parity (prefer display/minibuffer path with high package impact).
+2. Land the next evaluator-backed stub replacement after `other-buffer` (prefer a high-impact buffer/window helper path).
 3. Continue expanding oracle corpora for remaining high-risk stub areas (search/input/minibuffer/display/font edge paths) and keep list/alist primitive semantics locked in.
 4. Keep Rust backend behind compile-time switch and preserve Emacs C core as default backend.
 5. Expand `kbd` edge corpus around uncommon modifier composition and align non-`kbd` key-description consumers with the new parser semantics where needed.
@@ -59,6 +60,25 @@ Last updated: 2026-02-16
 8. Resolve the last startup wrapper-shape drift (`neovm-precompile-file`) with an explicit extension-vs-oracle policy and lock-in corpus note.
 
 ## Done
+
+- Added evaluator-backed `other-buffer` baseline semantics with oracle lock-in:
+  - implemented builtin:
+    - `rust/neovm-core/src/elisp/builtins.rs` (`other-buffer`)
+    - dispatch wiring:
+      - `rust/neovm-core/src/elisp/builtins.rs`
+      - `rust/neovm-core/src/elisp/builtin_registry.rs`
+  - added `subr-arity` metadata lock-in:
+    - `rust/neovm-core/src/elisp/subr_info.rs` (`0..3`)
+  - added evaluator regression:
+    - `other_buffer_prefers_live_alternative_and_enforces_arity`
+  - added oracle corpus case:
+    - `test/neovm/vm-compat/cases/other-buffer-semantics.{forms,expected.tsv}`
+    - wired into:
+      - `test/neovm/vm-compat/cases/default.list`
+  - verified:
+    - `cargo test --manifest-path rust/neovm-core/Cargo.toml other_buffer_prefers_live_alternative_and_enforces_arity -- --nocapture` (pass)
+    - `make -C test/neovm/vm-compat check-one-neovm CASE=cases/other-buffer-semantics` (pass)
+    - `make -C test/neovm/vm-compat check-all-neovm-strict` (pass)
 
 - Aligned window command buffer-designator type errors with GNU Emacs:
   - changed buffer designator resolution used by:
