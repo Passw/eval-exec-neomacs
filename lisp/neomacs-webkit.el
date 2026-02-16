@@ -617,14 +617,56 @@ When enabled, most keys are forwarded to the WebKit view."
       (message "WebKit browser opened: %s" url))
     buffer))
 
-;;; Inline WebKit interaction mode
+;;; Cursor-aware inline WebKit input mode
 ;;
-;; Auto-enters keyboard forwarding when clicking on an inline WebKit view.
-;; The C code sets `neomacs-webkit-clicked-view-id' when a click lands on
-;; a WebKit view.  This hook detects that and activates input forwarding.
+;; Keyboard input only reaches an inline WebKit view when:
+;; 1. The cursor is on the WebKit character (has `neomacs-webkit-id' text prop)
+;; 2. Input mode is explicitly toggled ON for that view
+;;
+;; Moving the cursor off the WebKit character auto-deactivates input mode.
+;; Clicking on a WebKit view (C sets `neomacs-webkit-clicked-view-id') also
+;; enters input mode automatically.
 
-(defvar-local neomacs-webkit--inline-focused-id nil
-  "View ID of the currently focused inline WebKit view, or nil.")
+(defvar neomacs-webkit-debug nil
+  "When non-nil, log WebKit input routing events to *Messages*.")
+
+(defun neomacs-webkit--log (fmt &rest args)
+  "Log FMT with ARGS if `neomacs-webkit-debug' is non-nil."
+  (when neomacs-webkit-debug
+    (apply #'message (concat "[webkit-input] " fmt) args)))
+
+(defvar-local neomacs-webkit--input-view-id nil
+  "View ID of the inline WebKit view currently accepting keyboard input, or nil.")
+
+;;; Hover keymap — active when cursor is on a WebKit character but input is OFF
+
+(defvar neomacs-webkit-hover-keymap
+  (let ((map (make-sparse-keymap)))
+    (define-key map "i" #'neomacs-webkit-enter-input-mode)
+    (define-key map (kbd "RET") #'neomacs-webkit-enter-input-mode)
+    map)
+  "Keymap active when cursor is on a WebKit character but input mode is off.
+Press `i' or RET to enter input mode for this view.")
+
+;;; neomacs-webkit-insert — Lisp wrapper that adds text properties
+
+(defun neomacs-webkit-insert (url width height &optional load-p)
+  "Insert inline WebKit view at point.  Returns view-id or nil.
+Calls the C function `neomacs-insert-webkit' to create the view,
+then inserts a propertized character with `neomacs-webkit-id' and
+`keymap' text properties for cursor-aware input routing.
+
+URL, WIDTH, HEIGHT, and LOAD-P are passed to `neomacs-insert-webkit'."
+  (let ((spec (neomacs-insert-webkit url width height load-p)))
+    (when spec
+      (let ((view-id (plist-get (cdr spec) :id)))
+        (insert (propertize " "
+                  'display spec
+                  'neomacs-webkit-id view-id
+                  'keymap neomacs-webkit-hover-keymap))
+        view-id))))
+
+;;; Interaction mode keymap — active when input mode is ON
 
 (defvar neomacs-webkit-interaction-mode-map
   (let ((map (make-sparse-keymap)))
@@ -648,31 +690,59 @@ When enabled, most keys are forwarded to the WebKit view."
     map)
   "Keymap active when typing into an inline WebKit view.")
 
+;;; Minor mode
+
 (define-minor-mode neomacs-webkit-interaction-mode
   "Minor mode for keyboard input to inline WebKit views.
-Activated automatically when clicking on a WebKit view.
+Activated when entering input mode on a WebKit character.
 Press ESC, C-g, or C-c C-c to exit."
   :lighter " WebKit-Input"
   (if neomacs-webkit-interaction-mode
-      (message "WebKit input active (view %s) — ESC to exit"
-               neomacs-webkit--inline-focused-id)
-    (setq neomacs-webkit--inline-focused-id nil)
+      (progn
+        (neomacs-webkit--log "input ON for view %s" neomacs-webkit--input-view-id)
+        (message "WebKit input active (view %s) — ESC to exit"
+                 neomacs-webkit--input-view-id))
+    (neomacs-webkit--log "input OFF (was view %s)" neomacs-webkit--input-view-id)
+    (setq neomacs-webkit--input-view-id nil)
     (message "WebKit input off")))
+
+;;; Input activation / deactivation
+
+(defun neomacs-webkit--activate-input (view-id)
+  "Activate input mode for VIEW-ID."
+  (setq neomacs-webkit--input-view-id view-id)
+  (neomacs-webkit-interaction-mode 1))
+
+(defun neomacs-webkit--deactivate-input ()
+  "Deactivate input mode."
+  (neomacs-webkit-interaction-mode -1))
+
+(defun neomacs-webkit-enter-input-mode ()
+  "Enter input mode for the WebKit view at point.
+Reads the `neomacs-webkit-id' text property to determine which view."
+  (interactive)
+  (let ((view-id (get-text-property (point) 'neomacs-webkit-id)))
+    (if view-id
+        (neomacs-webkit--activate-input view-id)
+      (neomacs-webkit--log "enter-input-mode: no webkit-id at point")
+      (message "No WebKit view at point"))))
+
+;;; Key forwarding commands
 
 (defun neomacs-webkit-interaction-self-insert ()
   "Forward character to the focused inline WebKit view."
   (interactive)
-  (when neomacs-webkit--inline-focused-id
+  (when neomacs-webkit--input-view-id
     (let* ((char last-command-event)
            (keysym (neomacs-webkit--char-to-keysym char)))
-      (neomacs-webkit-send-key neomacs-webkit--inline-focused-id keysym 0 t 0)
-      (neomacs-webkit-send-key neomacs-webkit--inline-focused-id keysym 0 nil 0))))
+      (neomacs-webkit-send-key neomacs-webkit--input-view-id keysym 0 t 0)
+      (neomacs-webkit-send-key neomacs-webkit--input-view-id keysym 0 nil 0))))
 
 (defun neomacs-webkit-interaction--send (keysym keycode)
   "Send KEYSYM with KEYCODE to focused webkit view."
-  (when neomacs-webkit--inline-focused-id
-    (neomacs-webkit-send-key neomacs-webkit--inline-focused-id keysym keycode t 0)
-    (neomacs-webkit-send-key neomacs-webkit--inline-focused-id keysym keycode nil 0)))
+  (when neomacs-webkit--input-view-id
+    (neomacs-webkit-send-key neomacs-webkit--input-view-id keysym keycode t 0)
+    (neomacs-webkit-send-key neomacs-webkit--input-view-id keysym keycode nil 0)))
 
 (defun neomacs-webkit-interaction-return ()
   "Send Return to WebKit." (interactive)
@@ -705,21 +775,37 @@ Press ESC, C-g, or C-c C-c to exit."
 (defun neomacs-webkit-interaction-quit ()
   "Exit WebKit interaction mode."
   (interactive)
-  (neomacs-webkit-interaction-mode -1))
+  (neomacs-webkit--deactivate-input))
 
-(defun neomacs-webkit--check-clicked ()
-  "Check if a WebKit view was clicked and enter interaction mode.
-Called from `post-command-hook'."
+;;; Post-command hook — click-to-activate and auto-deactivate
+
+(defun neomacs-webkit--post-command-check ()
+  "Post-command hook for WebKit input routing.
+Handles two concerns:
+1. Click-to-activate: when C sets `neomacs-webkit-clicked-view-id',
+   auto-enter input mode if point is on that view.
+2. Auto-deactivate: if input mode is active but cursor has moved
+   off the view, deactivate."
+  ;; 1. Click-to-activate
   (when (and (boundp 'neomacs-webkit-clicked-view-id)
              neomacs-webkit-clicked-view-id
              (integerp neomacs-webkit-clicked-view-id)
              (> neomacs-webkit-clicked-view-id 0))
-    (let ((view-id neomacs-webkit-clicked-view-id))
+    (let ((clicked-id neomacs-webkit-clicked-view-id))
       (setq neomacs-webkit-clicked-view-id nil)
-      (setq neomacs-webkit--inline-focused-id view-id)
-      (neomacs-webkit-interaction-mode 1))))
+      (neomacs-webkit--log "click detected: view %d" clicked-id)
+      ;; Only activate if point is on that view's character
+      (when (eq (get-text-property (point) 'neomacs-webkit-id) clicked-id)
+        (neomacs-webkit--activate-input clicked-id))))
+  ;; 2. Auto-deactivate: cursor left the input-mode view
+  (when neomacs-webkit--input-view-id
+    (unless (eq (get-text-property (point) 'neomacs-webkit-id)
+                neomacs-webkit--input-view-id)
+      (neomacs-webkit--log "cursor left view %d, deactivating"
+                           neomacs-webkit--input-view-id)
+      (neomacs-webkit--deactivate-input))))
 
-(add-hook 'post-command-hook #'neomacs-webkit--check-clicked)
+(add-hook 'post-command-hook #'neomacs-webkit--post-command-check)
 
 (provide 'neomacs-webkit)
 

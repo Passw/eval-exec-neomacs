@@ -3,7 +3,7 @@
 ;; This test creates a buffer containing all three inline media types:
 ;; - Image (via standard Emacs create-image/insert-image)
 ;; - Video (via neomacs-video-insert)
-;; - WebKit (via neomacs-insert-webkit)
+;; - WebKit (via neomacs-webkit-insert)
 
 ;;; Commentary:
 ;; Run with: ./test/neomacs/run-inline-media-test.sh
@@ -75,11 +75,10 @@
     (condition-case err
         (progn
           (neomacs-webkit-init)
-          (let ((spec (neomacs-insert-webkit inline-media-test-url
-                                              webkit-width webkit-height t)))
-            (if spec
-                (let ((view-id (plist-get (cdr spec) :id)))
-                  (insert (propertize " " 'display spec))
+          (let ((view-id (neomacs-webkit-insert inline-media-test-url
+                                                webkit-width webkit-height t)))
+            (if view-id
+                (progn
                   (insert "\n")
                   (insert (format "WebKit ID: %d, URL: %s (%dx%d)\n"
                                   view-id inline-media-test-url
@@ -87,7 +86,7 @@
                   (setq success-count (1+ success-count))
                   (inline-media-test-log "WebKit: OK (id=%d)" view-id))
               (insert "[WebKit creation failed]\n")
-              (inline-media-test-log "WebKit: FAILED (neomacs-insert-webkit returned nil)"))))
+              (inline-media-test-log "WebKit: FAILED (neomacs-webkit-insert returned nil)"))))
       (error
        (insert (format "[WebKit error: %S]\n" err))
        (inline-media-test-log "WebKit: ERROR %S" err)))
