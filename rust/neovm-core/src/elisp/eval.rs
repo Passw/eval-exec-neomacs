@@ -258,6 +258,44 @@ impl Evaluator {
             "misc",
             "Uppercasify ARG chars starting from point.  Point doesn't move.",
         );
+        // Some startup helpers are Lisp functions that delegate to primitives.
+        // Seed lightweight wrappers so `symbol-function` shape matches GNU Emacs.
+        let mut seed_function_wrapper = |name: &str| {
+            let wrapper = format!("neovm--startup-subr-wrapper-{name}");
+            obarray.set_symbol_function(&wrapper, Value::Subr(name.to_string()));
+            obarray.set_symbol_function(
+                name,
+                Value::Lambda(std::sync::Arc::new(LambdaData {
+                    params: LambdaParams {
+                        required: vec![],
+                        optional: vec![],
+                        rest: Some("args".to_string()),
+                    },
+                    body: vec![Expr::List(vec![
+                        Expr::Symbol("apply".to_string()),
+                        Expr::Symbol(wrapper),
+                        Expr::Symbol("args".to_string()),
+                    ])],
+                    env: None,
+                    docstring: None,
+                })),
+            );
+        };
+        for name in [
+            "seq-count",
+            "seq-do",
+            "seq-every-p",
+            "seq-mapn",
+            "seq-reduce",
+            "seq-some",
+            "seq-sort",
+            "string-blank-p",
+            "string-empty-p",
+            "string-equal-ignore-case",
+            "string-to-vector",
+        ] {
+            seed_function_wrapper(name);
+        }
 
         // Mark standard variables as special (dynamically bound)
         for name in &[

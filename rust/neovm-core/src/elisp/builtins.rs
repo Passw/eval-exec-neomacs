@@ -10731,6 +10731,23 @@ mod tests {
                 .unwrap_or_else(|_| panic!("symbol-function should resolve {name} autoload"));
             assert!(crate::elisp::autoload::is_autoload_value(&value));
         }
+        for name in [
+            "seq-count",
+            "seq-do",
+            "seq-every-p",
+            "seq-mapn",
+            "seq-reduce",
+            "seq-some",
+            "seq-sort",
+            "string-blank-p",
+            "string-empty-p",
+            "string-equal-ignore-case",
+            "string-to-vector",
+        ] {
+            let value = builtin_symbol_function(&mut eval, vec![Value::symbol(name)])
+                .unwrap_or_else(|_| panic!("symbol-function should resolve {name} wrapper"));
+            assert!(matches!(value, Value::Lambda(_)));
+        }
 
         let throw_fn = builtin_symbol_function(&mut eval, vec![Value::symbol("throw")])
             .expect("symbol-function should resolve throw as callable subr");
