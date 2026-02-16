@@ -219,7 +219,9 @@ pub(crate) fn builtin_add(args: Vec<Value>) -> EvalResult {
 }
 
 pub(crate) fn builtin_sub(args: Vec<Value>) -> EvalResult {
-    expect_min_args("-", &args, 1)?;
+    if args.is_empty() {
+        return Ok(Value::Int(0));
+    }
     if args.len() == 1 {
         // Unary negation
         if has_float(&args) {

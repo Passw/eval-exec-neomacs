@@ -426,6 +426,18 @@ fn help_arglist_from_quoted_lambda(function: &Value) -> Option<Value> {
 }
 
 fn help_arglist_from_subr_name(name: &str, preserve_names: bool) -> Option<Value> {
+    if name == "-" {
+        return Some(if preserve_names {
+            help_arglist(
+                &[],
+                &["number-or-marker"],
+                Some("more-numbers-or-markers"),
+            )
+        } else {
+            help_arglist(&[], &[], Some("rest"))
+        });
+    }
+
     let (required, optional) = match name {
         "thread-join" => (
             if preserve_names {
@@ -791,6 +803,29 @@ mod tests {
         let result =
             builtin_help_function_arglist(vec![Value::symbol("thread-join"), Value::True]).unwrap();
         assert_eq!(arglist_names(&result), vec!["thread".to_string()]);
+    }
+
+    #[test]
+    fn help_function_arglist_sub_non_preserve_names_matches_oracle_shape() {
+        let result = builtin_help_function_arglist(vec![Value::symbol("-")]).unwrap();
+        assert_eq!(
+            arglist_names(&result),
+            vec!["&rest".to_string(), "rest".to_string()]
+        );
+    }
+
+    #[test]
+    fn help_function_arglist_sub_preserve_names_matches_oracle_shape() {
+        let result = builtin_help_function_arglist(vec![Value::symbol("-"), Value::True]).unwrap();
+        assert_eq!(
+            arglist_names(&result),
+            vec![
+                "&optional".to_string(),
+                "number-or-marker".to_string(),
+                "&rest".to_string(),
+                "more-numbers-or-markers".to_string()
+            ]
+        );
     }
 
     #[test]

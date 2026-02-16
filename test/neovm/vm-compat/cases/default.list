@@ -35,6 +35,7 @@ cases/keymap-kbd-designator-semantics
 cases/kbd-modifier-composition-semantics
 cases/key-description-semantics
 cases/vector-literal-self-eval-semantics
+cases/sub-zero-arity-semantics
 cases/help-key-recent-keys-semantics
 cases/event-builtins-semantics
 cases/event-key-helpers-semantics
