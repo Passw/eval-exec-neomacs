@@ -32,6 +32,7 @@ cases/keymap-parent-semantics
 cases/keymap-kbd-designator-semantics
 cases/lookup-key-partial-semantics
 cases/key-binding-partial-semantics
+cases/key-binding-empty-designator-semantics
 cases/command-dispatch-default-arg-semantics
 cases/call-interactively-prefix-numeric-arg-semantics
 cases/call-interactively-word-prefix-arg-semantics
