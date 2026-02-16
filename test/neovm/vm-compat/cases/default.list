@@ -123,6 +123,7 @@ cases/custom-set-semantics
 cases/bookmark-helper-availability
 cases/kmacro-helper-availability
 cases/kmacro-arity-semantics
+cases/defining-kbd-macro-semantics
 cases/kbd-macro-query-semantics
 cases/kbd-string-encoding-semantics
 cases/cl-helper-availability

@@ -226,6 +226,7 @@ const DISPATCH_BUILTIN_NAMES: &[&str] = &[
     "define-charset-internal",
     "define-coding-system-alias",
     "define-key",
+    "defining-kbd-macro",
     "defined-colors",
     "delete-char",
     "delete-directory",

@@ -292,6 +292,7 @@ fn subr_arity_value(name: &str) -> Value {
         "car" | "cdr" => arity_cons(1, Some(1)),
         "message" => arity_cons(1, None),
         "if" => Value::cons(Value::Int(2), Value::symbol("unevalled")),
+        "defining-kbd-macro" => arity_cons(1, Some(2)),
         "help-key-description" => arity_cons(2, Some(2)),
         "recent-keys" => arity_cons(0, Some(1)),
         // Threading primitives

@@ -167,6 +167,39 @@ impl KmacroManager {
 // Builtins (evaluator-dependent)
 // ===========================================================================
 
+/// (defining-kbd-macro APPEND &optional NO-EXEC) -> nil
+///
+/// Compatibility subset:
+/// - starts keyboard macro recording (like `start-kbd-macro`)
+/// - when APPEND is non-nil with no prior macro, signal
+///   `(wrong-type-argument arrayp nil)`
+/// - when already recording, signal `(error "Already defining kbd macro")`
+/// - NO-EXEC is accepted for arity compatibility and currently ignored
+pub(crate) fn builtin_defining_kbd_macro(
+    eval: &mut super::eval::Evaluator,
+    args: Vec<Value>,
+) -> EvalResult {
+    expect_min_args("defining-kbd-macro", &args, 1)?;
+    expect_max_args("defining-kbd-macro", &args, 2)?;
+    if eval.kmacro.recording {
+        return Err(signal(
+            "error",
+            vec![Value::string("Already defining kbd macro")],
+        ));
+    }
+
+    let append = args[0].is_truthy();
+    if append && eval.kmacro.last_macro.is_none() {
+        return Err(signal(
+            "wrong-type-argument",
+            vec![Value::symbol("arrayp"), Value::Nil],
+        ));
+    }
+
+    eval.kmacro.start_recording(append);
+    Ok(Value::Nil)
+}
+
 /// (start-kbd-macro &optional APPEND) -> nil
 ///
 /// Start recording a keyboard macro.  With non-nil APPEND, append to
@@ -765,6 +798,42 @@ mod tests {
         // Double-end should error
         let result = builtin_end_kbd_macro(&mut eval, vec![]);
         assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_defining_kbd_macro_builtin_contract() {
+        use super::super::eval::Evaluator;
+
+        let mut eval = Evaluator::new();
+
+        // Arity contract.
+        assert!(builtin_defining_kbd_macro(&mut eval, vec![]).is_err());
+        assert!(builtin_defining_kbd_macro(&mut eval, vec![Value::Nil, Value::Nil, Value::Nil]).is_err());
+
+        // APPEND with no prior macro should signal wrong-type-argument.
+        let append_without_last = builtin_defining_kbd_macro(&mut eval, vec![Value::True]);
+        assert!(append_without_last.is_err());
+
+        // Fresh recording with APPEND=nil should succeed.
+        assert_eq!(
+            builtin_defining_kbd_macro(&mut eval, vec![Value::Nil]).unwrap(),
+            Value::Nil
+        );
+        assert!(eval.kmacro.recording);
+
+        // Re-entry while recording should signal `error`.
+        let already = builtin_defining_kbd_macro(&mut eval, vec![Value::Nil, Value::True]);
+        assert!(already.is_err());
+
+        // Finish recording and ensure append path works once a last macro exists.
+        let _ = builtin_store_kbd_macro_event(&mut eval, vec![Value::Char('a')]);
+        let _ = builtin_end_kbd_macro(&mut eval, vec![]);
+        assert!(eval.kmacro.last_macro.is_some());
+        assert_eq!(
+            builtin_defining_kbd_macro(&mut eval, vec![Value::True, Value::True]).unwrap(),
+            Value::Nil
+        );
+        let _ = builtin_end_kbd_macro(&mut eval, vec![]);
     }
 
     #[test]

@@ -436,6 +436,18 @@ fn help_arglist_from_subr_name(name: &str, preserve_names: bool) -> Option<Value
             vec![],
         ),
         "thread-yield" => (vec![], vec![]),
+        "defining-kbd-macro" => (
+            if preserve_names {
+                vec!["append"]
+            } else {
+                vec!["arg1"]
+            },
+            if preserve_names {
+                vec!["no-exec"]
+            } else {
+                vec!["arg2"]
+            },
+        ),
         "help-key-description" => (
             if preserve_names {
                 vec!["key", "untranslated"]
