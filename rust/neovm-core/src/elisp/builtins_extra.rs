@@ -606,20 +606,20 @@ pub(crate) fn builtin_user_full_name(args: Vec<Value>) -> EvalResult {
 
 /// `(system-name)` -> string.
 pub(crate) fn builtin_system_name(args: Vec<Value>) -> EvalResult {
-    let _ = args;
+    expect_args("system-name", &args, 0)?;
     let name = std::env::var("HOSTNAME").unwrap_or_else(|_| "localhost".to_string());
     Ok(Value::string(name))
 }
 
 /// `(emacs-version)` -> string.
 pub(crate) fn builtin_emacs_version(args: Vec<Value>) -> EvalResult {
-    let _ = args;
+    expect_args("emacs-version", &args, 0)?;
     Ok(Value::string("NeoVM 0.1.0 (Neomacs)"))
 }
 
 /// `(emacs-pid)` -> integer.
 pub(crate) fn builtin_emacs_pid(args: Vec<Value>) -> EvalResult {
-    let _ = args;
+    expect_args("emacs-pid", &args, 0)?;
     Ok(Value::Int(std::process::id() as i64))
 }
 
@@ -864,6 +864,27 @@ mod tests {
     fn emacs_pid() {
         let pid = builtin_emacs_pid(vec![]).unwrap();
         assert!(matches!(pid, Value::Int(n) if n > 0));
+    }
+
+    #[test]
+    fn runtime_identity_arity_contracts() {
+        let system_name_err = builtin_system_name(vec![Value::Nil]).unwrap_err();
+        match system_name_err {
+            Flow::Signal(sig) => assert_eq!(sig.symbol, "wrong-number-of-arguments"),
+            other => panic!("expected signal, got {other:?}"),
+        }
+
+        let version_err = builtin_emacs_version(vec![Value::Nil]).unwrap_err();
+        match version_err {
+            Flow::Signal(sig) => assert_eq!(sig.symbol, "wrong-number-of-arguments"),
+            other => panic!("expected signal, got {other:?}"),
+        }
+
+        let pid_err = builtin_emacs_pid(vec![Value::Nil]).unwrap_err();
+        match pid_err {
+            Flow::Signal(sig) => assert_eq!(sig.symbol, "wrong-number-of-arguments"),
+            other => panic!("expected signal, got {other:?}"),
+        }
     }
 
     #[test]
