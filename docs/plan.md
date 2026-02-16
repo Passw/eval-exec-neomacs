@@ -23,6 +23,30 @@ Last updated: 2026-02-16
 
 ## Done
 
+- Implemented missing event helper builtins and locked oracle parity:
+  - updated:
+    - `rust/neovm-core/src/elisp/builtins.rs`
+      - added pure builtins:
+        - `event-convert-list`
+        - `event-basic-type`
+        - `text-char-description`
+      - implemented modifier-bit conversion and basic-type normalization aligned to oracle.
+    - `rust/neovm-core/src/elisp/builtin_registry.rs`
+      - added startup builtin registry entries for:
+        - `event-convert-list`
+        - `event-basic-type`
+        - `text-char-description`
+    - `test/neovm/vm-compat/cases/event-builtins-semantics.forms`
+      - new corpus covering conversion, basic-type, text-char rendering, and arity/type edges.
+    - `test/neovm/vm-compat/cases/event-builtins-semantics.expected.tsv`
+      - recorded oracle baseline for the event builtin matrix.
+    - `test/neovm/vm-compat/cases/default.list`
+      - added `cases/event-builtins-semantics` to recurring default compatibility execution.
+  - verified:
+    - `make -C test/neovm/vm-compat check-one-neovm CASE=cases/event-builtins-semantics` (pass, 50/50)
+    - `make -C test/neovm/vm-compat validate-case-lists` (pass)
+    - `make -C test/neovm/vm-compat check-builtin-registry-fboundp` (pass; only allowlisted `neovm-precompile-file` drift)
+
 - Implemented `single-key-description` / `key-description` builtins and locked oracle parity with a dedicated corpus:
   - updated:
     - `rust/neovm-core/src/elisp/builtins.rs`
