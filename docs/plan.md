@@ -33,6 +33,7 @@ Last updated: 2026-02-16
 - Keep newly landed hash-table introspection primitive `subr-arity` parity stable while expanding remaining hash/runtime introspection drifts.
 - Keep newly landed hash-table core primitive `subr-arity` parity stable while expanding remaining hash/runtime behavior drifts.
 - Keep newly landed buffer lookup primitive runtime+`subr-arity` parity stable while expanding remaining buffer helper drifts.
+- Keep newly landed numeric/state helper primitive `subr-arity` parity stable while expanding remaining math/runtime introspection drifts.
 
 ## Next
 
@@ -44,6 +45,26 @@ Last updated: 2026-02-16
 6. Expand `recent-keys` capture beyond `read*` consumers to eventual command-loop event publication.
 
 ## Done
+
+- Aligned numeric/state helper primitive `subr-arity` metadata with GNU Emacs:
+  - updated:
+    - `rust/neovm-core/src/elisp/subr_info.rs`
+      - added explicit arity overrides:
+        - `(1 . 1)`: `fceiling`, `ffloor`, `frexp`, `fround`, `framep`, `ftruncate`, `fixnump`
+        - `(0 . 0)`: `following-char`, `garbage-collect`, `get-load-suffixes`
+        - `(0 . 2)`: `get-byte`
+      - added unit matrix `subr_arity_numeric_state_helper_primitives_match_oracle`.
+    - `test/neovm/vm-compat/cases/numeric-state-helper-subr-arity-semantics.forms`
+    - `test/neovm/vm-compat/cases/numeric-state-helper-subr-arity-semantics.expected.tsv`
+    - `test/neovm/vm-compat/cases/default.list`
+      - added oracle lock-in case for numeric/state helper arity payloads.
+  - recorded with official GNU Emacs:
+    - `NEOVM_ORACLE_EMACS=/nix/store/hql3zwz5b4ywd2qwx8jssp4dyb7nx4cb-emacs-30.2/bin/emacs make -C test/neovm/vm-compat record FORMS=cases/numeric-state-helper-subr-arity-semantics.forms EXPECTED=cases/numeric-state-helper-subr-arity-semantics.expected.tsv` (pass)
+  - verified:
+    - `cargo test --manifest-path rust/neovm-core/Cargo.toml subr_arity_numeric_state_helper_primitives_match_oracle -- --nocapture` (pass)
+    - `make -C test/neovm/vm-compat check-one-neovm CASE=cases/numeric-state-helper-subr-arity-semantics` (pass, 11/11)
+    - `make -C test/neovm/vm-compat validate-case-lists` (pass)
+    - `make -C test/neovm/vm-compat check-builtin-registry-fboundp` (pass; allowlisted drift only: `neovm-precompile-file`)
 
 - Aligned buffer lookup primitive runtime behavior and `subr-arity` metadata with GNU Emacs:
   - updated:
