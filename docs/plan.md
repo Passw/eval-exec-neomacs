@@ -19,6 +19,23 @@ Last updated: 2026-02-16
 
 ## Done
 
+- Exposed `display-line-numbers-update-width` as a callable misc helper:
+  - updated:
+    - `rust/neovm-core/src/elisp/misc.rs`
+      - added `display-line-numbers-update-width` builtin as batch compatibility no-op.
+      - enforces arity `0` and returns `nil`.
+      - added focused unit coverage for no-op and arity validation.
+    - `rust/neovm-core/src/elisp/builtins.rs`
+      - pure dispatch now routes `display-line-numbers-update-width`.
+    - `rust/neovm-core/src/elisp/builtin_registry.rs`
+      - added helper name to builtin registry.
+    - `test/neovm/vm-compat/cases/residual-helper-availability.expected.tsv`
+      - updated expectations from `void-function` to callable no-op behavior.
+  - verified:
+    - `cargo test display_line_numbers_update_width --manifest-path rust/neovm-core/Cargo.toml` (pass)
+    - `make -C test/neovm/vm-compat check-one-neovm CASE=cases/residual-helper-availability` (pass, 26/26)
+    - `make -C test/neovm/vm-compat validate-case-lists` (pass)
+
 - Exposed `string-repeat` as a real misc helper builtin:
   - updated:
     - `rust/neovm-core/src/elisp/misc.rs`
