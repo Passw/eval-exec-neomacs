@@ -55,6 +55,28 @@ Last updated: 2026-02-16
 
 ## Done
 
+- Aligned string/syntax helper primitive `subr-arity` metadata with GNU Emacs:
+  - added explicit arity lock-ins for:
+    - `(1 . 1)`: `string-as-multibyte`, `string-as-unibyte`, `string-make-multibyte`, `string-make-unibyte`, `string-to-multibyte`, `string-to-syntax`, `string-to-unibyte`, `substitute-in-file-name`, `syntax-after`, `syntax-class-to-char`, `syntax-table-p`
+    - `(2 . 4)`: `string-collate-equalp`, `string-collate-lessp`
+    - `(1 . 3)`: `string-lines`
+    - `(3 . 3)`: `string-replace`
+    - `(2 . 3)`: `string-search`
+    - `(2 . 2)`: `string-version-lessp`
+    - `(3 . 4)`: `subst-char-in-string`
+    - `(0 . 1)`: `syntax-ppss`
+    - `(1 . many)`: `syntax-ppss-flush-cache`
+    - `(0 . 0)`: `syntax-table`, `standard-case-table`, `standard-category-table`, `standard-syntax-table`
+  - added oracle corpus lock-in case:
+    - `test/neovm/vm-compat/cases/string-syntax-helper-subr-arity-semantics.{forms,expected.tsv}`
+    - wired into default suite: `test/neovm/vm-compat/cases/default.list`
+  - unit coverage:
+    - `subr_arity_string_syntax_helpers_match_oracle`
+  - verified:
+    - `cargo test --manifest-path rust/neovm-core/Cargo.toml subr_arity_string_syntax_helpers_match_oracle -- --nocapture` (pass)
+    - `make -C test/neovm/vm-compat check-one-neovm CASE=cases/string-syntax-helper-subr-arity-semantics` (pass)
+    - `make -C test/neovm/vm-compat check-all-neovm-strict` (pass)
+
 - Aligned `set*`/`scan-*` helper primitive `subr-arity` metadata with GNU Emacs:
   - added explicit arity lock-ins for:
     - `(1 . 1)`: `set-buffer`, `set-buffer-modified-p`, `set-case-table`, `set-category-table`, `set-default-file-modes`, `set-standard-case-table`, `set-syntax-table`, `set-time-zone-rule`
