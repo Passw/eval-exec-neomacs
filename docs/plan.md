@@ -14,10 +14,28 @@ Last updated: 2026-02-16
 
 1. Keep `check-all-neovm` as a recurring post-slice gate to catch regressions early.
 2. Continue expanding oracle corpora for remaining high-risk stub areas (search/input/minibuffer/display/font edge paths).
-3. Keep shrinking semantic drift in partially stubbed font/face and display helpers using small parity slices.
+3. Keep shrinking semantic drift in partially stubbed rectangle/font/face/display helpers using small parity slices.
 4. Keep Rust backend behind compile-time switch and preserve Emacs C core as default backend.
 
 ## Done
+
+- Implemented `extract-rectangle-line` optional `LINE` semantics and locked in neovm-only corpus coverage:
+  - updated:
+    - `rust/neovm-core/src/elisp/rect.rs`
+      - implemented optional-line extraction behavior with column normalization.
+      - kept 2-arg legacy path returning `""` for compatibility.
+      - added negative-column `args-out-of-range` signaling.
+      - added focused unit coverage for line-arg behavior, swapped columns, and negative-column errors.
+    - `test/neovm/vm-compat/cases/rect-extract-line-semantics.forms`
+      - added focused probes for line slicing, column swap, clamp behavior, empty slice, error signaling, and legacy 2-arg path.
+    - `test/neovm/vm-compat/cases/rect-extract-line-semantics.expected.tsv`
+      - recorded neovm baseline outputs for this neovm-only case.
+    - `test/neovm/vm-compat/cases/neovm-only.list`
+      - added `cases/rect-extract-line-semantics` to recurring neovm-only execution.
+  - verified:
+    - `cargo test extract_rectangle_line --manifest-path rust/neovm-core/Cargo.toml` (pass)
+    - `make -C test/neovm/vm-compat check-one-neovm CASE=cases/rect-extract-line-semantics` (pass, 6/6)
+    - `make -C test/neovm/vm-compat check-all-neovm` (pass)
 
 - Extended `cl-map` compatibility with `'string` result-type support:
   - updated:
