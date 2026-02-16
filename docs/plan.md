@@ -20,6 +20,23 @@ Last updated: 2026-02-16
 
 ## Done
 
+- Aligned marker accessor builtin arity with oracle and added dedicated marker accessor corpus lock-in:
+  - updated:
+    - `rust/neovm-core/src/elisp/marker.rs`
+      - added explicit zero-argument arity checks for `point-marker`, `point-min-marker`, `point-max-marker`, and `mark-marker`.
+      - added focused unit coverage for marker accessor wrong-number-of-arguments behavior.
+    - `test/neovm/vm-compat/cases/marker-accessor-arity-semantics.forms`
+      - added oracle probes for marker accessor availability, callable marker return shape, and arity error behavior.
+    - `test/neovm/vm-compat/cases/marker-accessor-arity-semantics.expected.tsv`
+      - recorded oracle baseline outputs for marker accessor arity semantics.
+    - `test/neovm/vm-compat/cases/default.list`
+      - added `cases/marker-accessor-arity-semantics` to recurring default compatibility execution.
+  - verified:
+    - `cargo test marker_accessors_require_zero_arguments --manifest-path rust/neovm-core/Cargo.toml` (pass)
+    - `make -C test/neovm/vm-compat check-one-neovm CASE=cases/marker-accessor-arity-semantics` (pass, 12/12)
+    - `make -C test/neovm/vm-compat validate-case-lists` (pass)
+    - `make -C test/neovm/vm-compat check-all-neovm` (pass)
+
 - Extended `define-charset-internal` stub compatibility with oracle-aligned short-vector `args-out-of-range` behavior:
   - updated:
     - `rust/neovm-core/src/elisp/charset.rs`
