@@ -455,6 +455,7 @@ const DISPATCH_BUILTIN_NAMES: &[&str] = &[
     "keyboard-quit",
     "keymap-parent",
     "keymapp",
+    "kmacro-add-counter",
     "kmacro-p",
     "kmacro-set-counter",
     "kill-append",

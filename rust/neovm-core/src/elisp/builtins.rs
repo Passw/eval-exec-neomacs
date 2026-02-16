@@ -6213,6 +6213,7 @@ pub(crate) fn dispatch_builtin(
         "insert-kbd-macro" => return Some(super::kmacro::builtin_insert_kbd_macro(eval, args)),
         "last-kbd-macro" => return Some(super::kmacro::builtin_last_kbd_macro(eval, args)),
         "kmacro-p" => return Some(super::kmacro::builtin_kmacro_p(args)),
+        "kmacro-add-counter" => return Some(super::kmacro::builtin_kmacro_add_counter(eval, args)),
         "kmacro-set-counter" => return Some(super::kmacro::builtin_kmacro_set_counter(eval, args)),
         "kbd-macro-query" => return Some(super::kmacro::builtin_kbd_macro_query(eval, args)),
         "store-kbd-macro-event" => {

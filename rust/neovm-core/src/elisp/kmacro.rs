@@ -491,6 +491,16 @@ pub(crate) fn builtin_kmacro_set_counter(
     Ok(Value::Nil)
 }
 
+/// (kmacro-add-counter DELTA) -> nil
+pub(crate) fn builtin_kmacro_add_counter(
+    eval: &mut super::eval::Evaluator,
+    args: Vec<Value>,
+) -> EvalResult {
+    expect_args("kmacro-add-counter", &args, 1)?;
+    eval.kmacro.counter += expect_int(&args[0])?;
+    Ok(Value::Nil)
+}
+
 /// (store-kbd-macro-event EVENT) -> nil
 ///
 /// Add EVENT to the keyboard macro currently being recorded.
@@ -862,6 +872,29 @@ mod tests {
         assert!(builtin_kmacro_set_counter(&mut eval, vec![]).is_err());
         assert!(builtin_kmacro_set_counter(&mut eval, vec![Value::Nil]).is_err());
         assert!(builtin_kmacro_set_counter(&mut eval, vec![Value::Int(1), Value::Nil, Value::Nil]).is_err());
+    }
+
+    #[test]
+    fn test_kmacro_add_counter_builtin() {
+        use super::super::eval::Evaluator;
+
+        let mut eval = Evaluator::new();
+        eval.kmacro.counter = 10;
+        assert_eq!(
+            builtin_kmacro_add_counter(&mut eval, vec![Value::Int(5)]).unwrap(),
+            Value::Nil
+        );
+        assert_eq!(eval.kmacro.counter, 15);
+
+        assert_eq!(
+            builtin_kmacro_add_counter(&mut eval, vec![Value::Int(-2)]).unwrap(),
+            Value::Nil
+        );
+        assert_eq!(eval.kmacro.counter, 13);
+
+        assert!(builtin_kmacro_add_counter(&mut eval, vec![]).is_err());
+        assert!(builtin_kmacro_add_counter(&mut eval, vec![Value::Nil]).is_err());
+        assert!(builtin_kmacro_add_counter(&mut eval, vec![Value::Int(1), Value::Nil]).is_err());
     }
 
     #[test]
