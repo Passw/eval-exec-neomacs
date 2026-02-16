@@ -47,6 +47,27 @@ Last updated: 2026-02-16
 
 ## Done
 
+- Aligned image/font primitive `subr-arity` metadata with GNU Emacs:
+  - added explicit arity lock-ins for:
+    - `clear-font-cache`: `(0 . 0)`
+    - `clear-image-cache`: `(0 . 2)`
+    - `create-image`: `(1 . many)`
+    - `find-font`: `(1 . 2)`
+    - `font-family-list`: `(0 . 1)`
+    - `image-flush`, `image-mask-p`: `(1 . 2)`
+    - `image-size`, `image-type`: `(1 . 3)`
+    - `image-transforms-p`: `(0 . 1)`
+    - `image-type-available-p`: `(1 . 1)`
+    - `list-fonts`: `(1 . 4)`
+  - added oracle corpus lock-in case:
+    - `test/neovm/vm-compat/cases/image-font-subr-arity-semantics`
+  - wired into default vm-compat suite:
+    - `test/neovm/vm-compat/cases/default.list`
+  - verified:
+    - `cargo test --manifest-path rust/neovm-core/Cargo.toml subr_arity_image_font_primitives_match_oracle -- --nocapture` (pass)
+    - `make -C test/neovm/vm-compat check-one-neovm CASE=cases/image-font-subr-arity-semantics` (pass)
+    - `make -C test/neovm/vm-compat check-all-neovm-strict` (pass)
+
 - Aligned timer runtime + `subr-arity` compatibility with GNU Emacs:
   - `timer-activate` now accepts `(1 . 3)` args and mirrors optional-arg
     behavior:
