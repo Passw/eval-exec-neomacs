@@ -668,6 +668,14 @@ pub(crate) fn builtin_delete_window(
             vec![Value::string("Cannot delete sole window")],
         ));
     }
+    let selected_buffer = eval
+        .frames
+        .get(fid)
+        .and_then(|frame| frame.find_window(frame.selected_window))
+        .and_then(|w| w.buffer_id());
+    if let Some(buffer_id) = selected_buffer {
+        eval.buffers.set_current(buffer_id);
+    }
     Ok(Value::Nil)
 }
 
@@ -691,8 +699,14 @@ pub(crate) fn builtin_delete_other_windows(
         let _ = eval.frames.delete_window(fid, wid);
     }
     // Select the kept window.
-    if let Some(f) = eval.frames.get_mut(fid) {
+    let selected_buffer = if let Some(f) = eval.frames.get_mut(fid) {
         f.select_window(keep_wid);
+        f.find_window(keep_wid).and_then(|w| w.buffer_id())
+    } else {
+        None
+    };
+    if let Some(buffer_id) = selected_buffer {
+        eval.buffers.set_current(buffer_id);
     }
     Ok(Value::Nil)
 }
@@ -1612,6 +1626,22 @@ mod tests {
     }
 
     #[test]
+    fn delete_window_updates_current_buffer_to_selected_window_buffer() {
+        let result = eval_one_with_frame(
+            "(save-current-buffer
+               (let* ((b1 (get-buffer-create \"dw-curbuf-a\"))
+                      (b2 (get-buffer-create \"dw-curbuf-b\")))
+                 (set-window-buffer nil b1)
+                 (let ((w2 (split-window)))
+                   (set-window-buffer w2 b2)
+                   (select-window w2)
+                   (delete-window w2)
+                   (buffer-name (current-buffer)))))",
+        );
+        assert_eq!(result, "OK \"dw-curbuf-a\"");
+    }
+
+    #[test]
     fn delete_sole_window_errors() {
         let r = eval_one_with_frame("(delete-window)");
         assert!(r.contains("ERR"), "deleting sole window should error: {r}");
@@ -1626,6 +1656,23 @@ mod tests {
              (length (window-list))",
         );
         assert_eq!(results[3], "OK 1");
+    }
+
+    #[test]
+    fn delete_other_windows_updates_current_buffer_when_kept_window_differs() {
+        let result = eval_one_with_frame(
+            "(save-current-buffer
+               (let* ((b1 (get-buffer-create \"dow-curbuf-a\"))
+                      (b2 (get-buffer-create \"dow-curbuf-b\")))
+                 (set-window-buffer nil b1)
+                 (let ((w2 (split-window))
+                       (w1 (selected-window)))
+                   (set-window-buffer w2 b2)
+                   (select-window w2)
+                   (delete-other-windows w1)
+                   (buffer-name (current-buffer)))))",
+        );
+        assert_eq!(result, "OK \"dow-curbuf-a\"");
     }
 
     #[test]
