@@ -100,6 +100,30 @@
 (let ((tm (run-at-time 60 nil #'ignore)))
   (cancel-timer tm)
   (condition-case err
+      (timer-activate tm nil)
+    (error (car err))))
+
+(let ((tm (run-at-time 60 nil #'ignore)))
+  (cancel-timer tm)
+  (condition-case err
+      (timer-activate tm nil nil)
+    (error (car err))))
+
+(let ((tm (run-at-time 60 nil #'ignore)))
+  (cancel-timer tm)
+  (condition-case err
+      (timer-activate tm nil nil nil)
+    (error (car err))))
+
+(let ((tm (run-at-time 60 nil #'ignore)))
+  (cancel-timer tm)
+  (condition-case err
+      (timer-activate tm nil 2)
+    (error (car err))))
+
+(let ((tm (run-at-time 60 nil #'ignore)))
+  (cancel-timer tm)
+  (condition-case err
       (progn
         (timer-activate tm)
         'ok)

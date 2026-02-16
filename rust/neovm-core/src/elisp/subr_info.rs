@@ -428,7 +428,9 @@ fn subr_arity_value(name: &str) -> Value {
         "featurep" => arity_cons(1, Some(2)),
         "commandp" => arity_cons(1, Some(2)),
         "cancel-timer" | "timerp" => arity_cons(1, Some(1)),
-        "run-at-time" => arity_cons(3, None),
+        "run-at-time" | "run-with-timer" | "run-with-idle-timer" => arity_cons(3, None),
+        "timer-activate" => arity_cons(1, Some(3)),
+        "sleep-for" | "sit-for" => arity_cons(1, Some(2)),
         "current-time" => arity_cons(0, Some(0)),
         "category-table" | "clear-charset-maps" => arity_cons(0, Some(0)),
         "case-table-p" | "category-table-p" | "ccl-program-p" | "check-coding-system"
@@ -1111,6 +1113,11 @@ mod tests {
         assert_subr_arity("cancel-timer", 1, Some(1));
         assert_subr_arity("timerp", 1, Some(1));
         assert_subr_arity("run-at-time", 3, None);
+        assert_subr_arity("run-with-timer", 3, None);
+        assert_subr_arity("run-with-idle-timer", 3, None);
+        assert_subr_arity("timer-activate", 1, Some(3));
+        assert_subr_arity("sleep-for", 1, Some(2));
+        assert_subr_arity("sit-for", 1, Some(2));
         assert_subr_arity("current-time", 0, Some(0));
         assert_subr_arity("float-time", 0, Some(1));
     }

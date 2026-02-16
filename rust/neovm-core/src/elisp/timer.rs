@@ -382,7 +382,23 @@ pub(crate) fn builtin_timer_activate(
     eval: &mut super::eval::Evaluator,
     args: Vec<Value>,
 ) -> EvalResult {
-    expect_args("timer-activate", &args, 1)?;
+    expect_min_args("timer-activate", &args, 1)?;
+    if args.len() > 3 {
+        return Err(signal(
+            "wrong-number-of-arguments",
+            vec![Value::symbol("timer-activate"), Value::Int(args.len() as i64)],
+        ));
+    }
+
+    if let Some(delay) = args.get(2) {
+        if !delay.is_nil() && !delay.is_cons() {
+            return Err(signal(
+                "wrong-type-argument",
+                vec![Value::symbol("consp"), delay.clone()],
+            ));
+        }
+    }
+
     let id = match &args[0] {
         Value::Timer(id) => *id,
         _ => return Err(signal("error", vec![Value::string("Invalid timer")])),
@@ -875,6 +891,22 @@ mod tests {
         // Active timers cannot be activated again.
         let second = builtin_timer_activate(&mut eval, vec![timer_val.clone()]);
         assert!(matches!(second, Err(Flow::Signal(sig)) if sig.symbol == "error"));
+
+        // Cancel again and verify optional args are accepted.
+        builtin_cancel_timer(&mut eval, vec![timer_val.clone()]).unwrap();
+        let with_restart = builtin_timer_activate(&mut eval, vec![timer_val.clone(), Value::True]);
+        assert!(with_restart.is_ok());
+
+        builtin_cancel_timer(&mut eval, vec![timer_val.clone()]).unwrap();
+        let with_restart_and_delta = builtin_timer_activate(
+            &mut eval,
+            vec![
+                timer_val.clone(),
+                Value::Nil,
+                Value::cons(Value::Int(1), Value::Int(2)),
+            ],
+        );
+        assert!(with_restart_and_delta.is_ok());
     }
 
     #[test]
@@ -884,5 +916,27 @@ mod tests {
         let mut eval = Evaluator::new();
         let result = builtin_timer_activate(&mut eval, vec![Value::Nil]);
         assert!(matches!(result, Err(Flow::Signal(sig)) if sig.symbol == "error"));
+    }
+
+    #[test]
+    fn test_eval_timer_activate_optional_delta_must_be_cons_or_nil() {
+        use super::super::eval::Evaluator;
+
+        let mut eval = Evaluator::new();
+        let timer_val = builtin_run_at_time(
+            &mut eval,
+            vec![Value::Float(1.0), Value::Nil, Value::symbol("cb")],
+        )
+        .unwrap();
+        builtin_cancel_timer(&mut eval, vec![timer_val.clone()]).unwrap();
+
+        let result =
+            builtin_timer_activate(&mut eval, vec![timer_val.clone(), Value::Nil, Value::Int(2)]);
+        assert!(matches!(
+            result,
+            Err(Flow::Signal(sig))
+                if sig.symbol == "wrong-type-argument"
+                    && sig.data == vec![Value::symbol("consp"), Value::Int(2)]
+        ));
     }
 }

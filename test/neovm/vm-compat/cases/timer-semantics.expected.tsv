@@ -29,5 +29,9 @@
 29	(condition-case err (run-with-idle-timer "0 sec" nil #'ignore) (error (car err)))	OK error
 30	(condition-case err (run-with-timer t nil #'ignore) (error (car err)))	OK error
 31	(condition-case err (timer-activate nil) (error (car err)))	OK error
-32	(let ((tm (run-at-time 60 nil #'ignore))) (cancel-timer tm) (condition-case err (progn (timer-activate tm) 'ok) (error (car err))))	OK ok
-33	(let ((tm (run-at-time 60 nil #'ignore))) (condition-case err (progn (cancel-timer tm) (timer-activate tm) (timer-activate tm) 'ok) (error (car err))))	OK error
+32	(let ((tm (run-at-time 60 nil #'ignore))) (cancel-timer tm) (condition-case err (timer-activate tm nil) (error (car err))))	OK nil
+33	(let ((tm (run-at-time 60 nil #'ignore))) (cancel-timer tm) (condition-case err (timer-activate tm nil nil) (error (car err))))	OK nil
+34	(let ((tm (run-at-time 60 nil #'ignore))) (cancel-timer tm) (condition-case err (timer-activate tm nil nil nil) (error (car err))))	OK wrong-number-of-arguments
+35	(let ((tm (run-at-time 60 nil #'ignore))) (cancel-timer tm) (condition-case err (timer-activate tm nil 2) (error (car err))))	OK wrong-type-argument
+36	(let ((tm (run-at-time 60 nil #'ignore))) (cancel-timer tm) (condition-case err (progn (timer-activate tm) 'ok) (error (car err))))	OK ok
+37	(let ((tm (run-at-time 60 nil #'ignore))) (condition-case err (progn (cancel-timer tm) (timer-activate tm) (timer-activate tm) 'ok) (error (car err))))	OK error
