@@ -3018,6 +3018,20 @@ mod tests {
     }
 
     #[test]
+    fn minor_mode_key_binding_invalid_emulation_keymap_id_errors() {
+        assert_eq!(
+            eval_one(
+                r#"(let ((emulation-mode-map-alists (list (list (cons 'emu-mode 999999))))
+                         (emu-mode t))
+                     (condition-case err
+                         (minor-mode-key-binding (kbd "C-a"))
+                       (error err)))"#
+            ),
+            "OK (wrong-type-argument keymapp 999999)"
+        );
+    }
+
+    #[test]
     fn minor_mode_key_binding_too_many_args_errors() {
         let mut ev = Evaluator::new();
         let result = builtin_minor_mode_key_binding(

@@ -40,6 +40,11 @@
         (emulation-mode-map-alists '(emu-alist))
         (emu-mode t))
     (minor-mode-key-binding (kbd "C-a"))))
+(let ((emulation-mode-map-alists (list (list (cons 'emu-mode 999999))))
+      (emu-mode t))
+  (condition-case err
+      (minor-mode-key-binding (kbd "C-a"))
+    (error err)))
 (let ((minor-mode-map-alist '((demo-mode . 999999)))
       (demo-mode t))
   (condition-case err
