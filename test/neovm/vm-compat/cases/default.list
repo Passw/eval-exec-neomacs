@@ -71,6 +71,7 @@ cases/current-state-subr-arity-semantics
 cases/misc-helper-subr-arity-semantics
 cases/mark-marker-subr-arity-semantics
 cases/register-helper-subr-arity-semantics
+cases/list-sequence-subr-arity-semantics
 cases/composition-subr-arity-semantics
 cases/predicate-core-subr-arity-semantics
 cases/abbrev-subr-arity-semantics

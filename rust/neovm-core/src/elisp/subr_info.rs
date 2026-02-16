@@ -399,9 +399,15 @@ fn subr_arity_value(name: &str) -> Value {
         "remhash" | "maphash" => arity_cons(2, Some(2)),
         "hash-table-test" | "hash-table-size" | "hash-table-rehash-size"
         | "hash-table-rehash-threshold" | "hash-table-weakness" => arity_cons(1, Some(1)),
+        "max" | "min" => arity_cons(1, None),
         "assq" | "member" | "memq" | "rassoc" | "rassq" => arity_cons(2, Some(2)),
+        "mod" | "make-list" | "mapc" | "mapcan" | "mapcar" | "nth" | "nthcdr" | "remq" => {
+            arity_cons(2, Some(2))
+        }
+        "mapconcat" => arity_cons(2, Some(3)),
         "assoc" => arity_cons(2, Some(3)),
         "assoc-default" => arity_cons(2, Some(4)),
+        "nreverse" | "proper-list-p" | "reverse" | "safe-length" => arity_cons(1, Some(1)),
         "back-to-indentation" | "backward-prefix-chars" => arity_cons(0, Some(0)),
         "backward-sexp" => arity_cons(0, Some(2)),
         "backward-kill-word" | "move-beginning-of-line" | "move-end-of-line" | "capitalize"
@@ -1131,6 +1137,25 @@ mod tests {
         assert_subr_arity("set-register", 2, Some(2));
         assert_subr_arity("register-ccl-program", 2, Some(2));
         assert_subr_arity("register-code-conversion-map", 2, Some(2));
+    }
+
+    #[test]
+    fn subr_arity_list_sequence_primitives_match_oracle() {
+        assert_subr_arity("max", 1, None);
+        assert_subr_arity("min", 1, None);
+        assert_subr_arity("mod", 2, Some(2));
+        assert_subr_arity("nreverse", 1, Some(1));
+        assert_subr_arity("nth", 2, Some(2));
+        assert_subr_arity("nthcdr", 2, Some(2));
+        assert_subr_arity("remq", 2, Some(2));
+        assert_subr_arity("reverse", 1, Some(1));
+        assert_subr_arity("safe-length", 1, Some(1));
+        assert_subr_arity("proper-list-p", 1, Some(1));
+        assert_subr_arity("make-list", 2, Some(2));
+        assert_subr_arity("mapcar", 2, Some(2));
+        assert_subr_arity("mapc", 2, Some(2));
+        assert_subr_arity("mapcan", 2, Some(2));
+        assert_subr_arity("mapconcat", 2, Some(3));
     }
 
     #[test]
