@@ -704,6 +704,7 @@ const DISPATCH_BUILTIN_NAMES: &[&str] = &[
     "send-string-to-terminal",
     "select-window",
     "selected-frame",
+    "selected-terminal",
     "selected-window",
     "seq-concatenate",
     "seq-contains-p",

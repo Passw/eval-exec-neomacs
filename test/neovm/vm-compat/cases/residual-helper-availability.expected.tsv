@@ -16,8 +16,8 @@
 16	(condition-case err (hash-table-values (make-hash-table)) (error err))	OK nil
 17	(fboundp 'register-to-string)	OK nil
 18	(condition-case err (register-to-string) (error err))	OK (void-function register-to-string)
-19	(fboundp 'selected-terminal)	OK nil
-20	(condition-case err (selected-terminal) (error err))	OK (void-function selected-terminal)
+19	(fboundp 'selected-terminal)	OK t
+20	(condition-case err (selected-terminal) (error err))	OK #<terminal 0 on initial_terminal>
 21	(fboundp 'string-repeat)	OK nil
 22	(condition-case err (string-repeat) (error err))	OK (void-function string-repeat)
 23	(fboundp 'unibyte-string-p)	OK nil

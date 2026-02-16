@@ -785,6 +785,12 @@ pub(crate) fn builtin_terminal_list(args: Vec<Value>) -> EvalResult {
     Ok(Value::list(vec![terminal_handle_value()]))
 }
 
+/// (selected-terminal) -> currently selected terminal handle.
+pub(crate) fn builtin_selected_terminal(args: Vec<Value>) -> EvalResult {
+    expect_args("selected-terminal", &args, 0)?;
+    Ok(terminal_handle_value())
+}
+
 /// (frame-terminal &optional FRAME) -> opaque terminal handle.
 pub(crate) fn builtin_frame_terminal(args: Vec<Value>) -> EvalResult {
     expect_max_args("frame-terminal", &args, 1)?;
@@ -1275,6 +1281,18 @@ mod tests {
         let handle = builtin_frame_terminal(vec![Value::Nil]).unwrap();
         let live = builtin_terminal_live_p(vec![handle]).unwrap();
         assert_eq!(live, Value::True);
+    }
+
+    #[test]
+    fn selected_terminal_returns_live_terminal_handle() {
+        let handle = builtin_selected_terminal(vec![]).unwrap();
+        let live = builtin_terminal_live_p(vec![handle]).unwrap();
+        assert_eq!(live, Value::True);
+    }
+
+    #[test]
+    fn selected_terminal_arity() {
+        assert!(builtin_selected_terminal(vec![Value::Nil]).is_err());
     }
 
     #[test]

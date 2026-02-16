@@ -6558,6 +6558,7 @@ pub(crate) fn dispatch_builtin(
                 eval, args,
             ))
         }
+        "selected-terminal" => return Some(super::display::builtin_selected_terminal(args)),
         "terminal-name" => return Some(super::display::builtin_terminal_name_eval(eval, args)),
         "terminal-live-p" => return Some(super::display::builtin_terminal_live_p_eval(eval, args)),
         "terminal-parameter" => {
@@ -7229,6 +7230,7 @@ pub(crate) fn dispatch_builtin(
         "x-display-pixel-width" => super::display::builtin_x_display_pixel_width(args),
         "x-display-pixel-height" => super::display::builtin_x_display_pixel_height(args),
         "x-display-color-p" => super::display::builtin_x_display_color_p(args),
+        "selected-terminal" => super::display::builtin_selected_terminal(args),
         "terminal-name" => super::display::builtin_terminal_name(args),
         "terminal-list" => super::display::builtin_terminal_list(args),
         "frame-terminal" => super::display::builtin_frame_terminal(args),
@@ -7740,6 +7742,7 @@ pub(crate) fn dispatch_builtin_pure(name: &str, args: Vec<Value>) -> Option<Eval
         "display-color-p" => super::display::builtin_display_color_p(args),
         "display-pixel-width" => super::display::builtin_display_pixel_width(args),
         "display-pixel-height" => super::display::builtin_display_pixel_height(args),
+        "selected-terminal" => super::display::builtin_selected_terminal(args),
         "terminal-name" => super::display::builtin_terminal_name(args),
         "terminal-live-p" => super::display::builtin_terminal_live_p(args),
         _ => return None,
