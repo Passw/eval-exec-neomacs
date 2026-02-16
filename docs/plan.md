@@ -55,6 +55,25 @@ Last updated: 2026-02-16
 
 ## Done
 
+- Aligned print/replace/edit-command primitive `subr-arity` metadata with GNU Emacs:
+  - added explicit arity lock-ins for:
+    - `(2 . 2)`: `primitive-undo`
+    - `(1 . 3)`: `prin1`, `prin1-to-string`
+    - `(1 . 2)`: `princ`, `print`
+    - `(1 . many)`: `propertize`
+    - `(2 . 4)`: `put-image`
+    - `(2 . 7)`: `query-replace`, `query-replace-regexp`
+    - `(1 . 1)`: `quoted-insert`
+  - added oracle corpus lock-in case:
+    - `test/neovm/vm-compat/cases/print-replace-edit-subr-arity-semantics.{forms,expected.tsv}`
+    - wired into default suite: `test/neovm/vm-compat/cases/default.list`
+  - unit coverage:
+    - `subr_arity_print_replace_edit_primitives_match_oracle`
+  - verified:
+    - `cargo test --manifest-path rust/neovm-core/Cargo.toml subr_arity_print_replace_edit_primitives_match_oracle -- --nocapture` (pass)
+    - `make -C test/neovm/vm-compat check-one-neovm CASE=cases/print-replace-edit-subr-arity-semantics` (pass)
+    - `make -C test/neovm/vm-compat check-all-neovm-strict` (pass)
+
 - Aligned read/region helper primitive `subr-arity` metadata with GNU Emacs:
   - added explicit arity lock-ins for:
     - `(1 . 4)`: `read-buffer`
