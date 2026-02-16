@@ -219,6 +219,7 @@ cases/internal-make-copy-lisp-face-semantics
 cases/terminal-parameter-semantics
 cases/terminal-handle-printing
 cases/frame-batch-semantics
+cases/window-buffer-switch-semantics
 cases/default-directory
 cases/expand-file-name-default-directory
 cases/directory-file-name
