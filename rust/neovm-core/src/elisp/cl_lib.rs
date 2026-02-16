@@ -838,6 +838,22 @@ pub(crate) fn builtin_cl_set_difference(args: Vec<Value>) -> EvalResult {
     Ok(Value::list(out))
 }
 
+/// `(cl-union LIST1 LIST2)` -- set-style union preserving left-to-right discovery order.
+pub(crate) fn builtin_cl_union(args: Vec<Value>) -> EvalResult {
+    expect_args("cl-union", &args, 2)?;
+    let left = seq_position_elements(&args[0])?;
+    let right = seq_position_elements(&args[1])?;
+
+    let mut out = Vec::new();
+    for item in left.into_iter().chain(right.into_iter()) {
+        let already_in_out = out.iter().any(|seen| equal_value(&item, seen, 0));
+        if !already_in_out {
+            out.push(item);
+        }
+    }
+    Ok(Value::list(out))
+}
+
 /// `(seq-contains-p SEQ ELT &optional TESTFN)` — membership test for sequence.
 pub(crate) fn builtin_seq_contains_p(eval: &mut super::eval::Evaluator, args: Vec<Value>) -> EvalResult {
     if !(2..=3).contains(&args.len()) {
@@ -1785,5 +1801,29 @@ mod tests {
     #[test]
     fn cl_set_difference_wrong_arity() {
         assert!(builtin_cl_set_difference(vec![Value::Nil]).is_err());
+    }
+
+    #[test]
+    fn cl_union_basic() {
+        let result = builtin_cl_union(vec![
+            Value::list(vec![Value::symbol("a"), Value::symbol("b")]),
+            Value::list(vec![Value::symbol("b"), Value::symbol("c")]),
+        ])
+        .unwrap();
+        assert_eq!(
+            result,
+            Value::list(vec![Value::symbol("a"), Value::symbol("b"), Value::symbol("c")])
+        );
+    }
+
+    #[test]
+    fn cl_union_empty_left() {
+        let result = builtin_cl_union(vec![Value::Nil, Value::list(vec![Value::symbol("c")])]).unwrap();
+        assert_eq!(result, Value::list(vec![Value::symbol("c")]));
+    }
+
+    #[test]
+    fn cl_union_wrong_arity() {
+        assert!(builtin_cl_union(vec![Value::Nil]).is_err());
     }
 }

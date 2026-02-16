@@ -82,5 +82,5 @@
 82	(condition-case err (cl-tenth '(a b c d e f g h i j)) (error err))	OK j
 83	(fboundp 'cl-third)	OK t
 84	(condition-case err (cl-third '(a b c)) (error err))	OK c
-85	(fboundp 'cl-union)	OK nil
-86	(condition-case err (cl-union) (error err))	OK (void-function cl-union)
+85	(fboundp 'cl-union)	OK t
+86	(condition-case err (cl-union '(a b) '(b c)) (error err))	OK (a b c)

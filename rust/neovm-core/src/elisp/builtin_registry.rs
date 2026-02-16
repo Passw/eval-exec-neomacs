@@ -203,6 +203,7 @@ const DISPATCH_BUILTIN_NAMES: &[&str] = &[
     "cl-subsetp",
     "cl-tenth",
     "cl-third",
+    "cl-union",
     "closurep",
     "coding-system-aliases",
     "coding-system-base",
