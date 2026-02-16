@@ -137,7 +137,14 @@ cd test/neovm/vm-compat
 make check-ert-allowlist
 ```
 
-If `emacs` is not on `PATH`, set `NEOVM_ORACLE_EMACS` explicitly:
+The oracle runner defaults to this hardcoded GNU Emacs binary:
+
+```bash
+/nix/store/hql3zwz5b4ywd2qwx8jssp4dyb7nx4cb-emacs-30.2/bin/emacs
+```
+
+Override with `NEOVM_ORACLE_EMACS` only when you intentionally need a
+different oracle binary:
 
 ```bash
 cd test/neovm/vm-compat
