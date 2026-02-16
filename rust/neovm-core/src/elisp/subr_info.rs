@@ -316,6 +316,12 @@ fn subr_arity_value(name: &str) -> Value {
         "file-name-extension" => arity_cons(1, Some(2)),
         "file-name-concat" => arity_cons(1, None),
         "file-truename" => arity_cons(1, Some(3)),
+        "find-file" => arity_cons(1, Some(2)),
+        "find-file-noselect" => arity_cons(1, Some(4)),
+        "insert-file-contents" => arity_cons(1, Some(5)),
+        "load" => arity_cons(1, Some(5)),
+        "load-file" => arity_cons(1, Some(1)),
+        "locate-file" | "locate-file-internal" => arity_cons(2, Some(4)),
         "file-attributes" | "file-modes" => arity_cons(1, Some(2)),
         "file-directory-p" | "file-exists-p" | "file-readable-p" | "file-regular-p"
         | "file-symlink-p" | "file-writable-p" => arity_cons(1, Some(1)),
@@ -1297,6 +1303,17 @@ mod tests {
         assert_subr_arity("directory-files-and-attributes", 1, Some(6));
         assert_subr_arity("directory-name-p", 1, Some(1));
         assert_subr_arity("expand-file-name", 1, Some(2));
+    }
+
+    #[test]
+    fn subr_arity_file_load_primitives_match_oracle() {
+        assert_subr_arity("find-file", 1, Some(2));
+        assert_subr_arity("find-file-noselect", 1, Some(4));
+        assert_subr_arity("insert-file-contents", 1, Some(5));
+        assert_subr_arity("load", 1, Some(5));
+        assert_subr_arity("load-file", 1, Some(1));
+        assert_subr_arity("locate-file", 2, Some(4));
+        assert_subr_arity("locate-file-internal", 2, Some(4));
     }
 
     #[test]

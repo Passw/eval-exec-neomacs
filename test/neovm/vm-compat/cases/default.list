@@ -59,6 +59,7 @@ cases/kill-edit-subr-arity-semantics
 cases/kmacro-command-subr-arity-semantics
 cases/delete-subr-arity-semantics
 cases/filesystem-path-subr-arity-semantics
+cases/file-load-subr-arity-semantics
 cases/event-error-misc-subr-arity-semantics
 cases/eval-subr-arity-semantics
 cases/define-default-subr-arity-semantics
