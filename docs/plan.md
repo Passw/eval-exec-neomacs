@@ -19,6 +19,24 @@ Last updated: 2026-02-16
 
 ## Done
 
+- Exposed `cl-tenth` as a callable CL helper:
+  - updated:
+    - `rust/neovm-core/src/elisp/cl_lib.rs`
+      - added `cl-tenth` builtin (arity `1`) backed by shared CL list-index extraction.
+      - added focused unit coverage for list, nil, and wrong-type paths.
+    - `rust/neovm-core/src/elisp/builtins.rs`
+      - pure CL/seq dispatch now routes `cl-tenth`.
+    - `rust/neovm-core/src/elisp/builtin_registry.rs`
+      - added `cl-tenth` to builtin registry.
+    - `test/neovm/vm-compat/cases/cl-helper-availability.forms`
+      - switched helper probe to callable form `(cl-tenth '(a b c d e f g h i j))`.
+    - `test/neovm/vm-compat/cases/cl-helper-availability.expected.tsv`
+      - updated expectations from missing helper to callable behavior (`j`).
+  - verified:
+    - `cargo test cl_tenth --manifest-path rust/neovm-core/Cargo.toml` (pass)
+    - `make -C test/neovm/vm-compat check-one-neovm CASE=cases/cl-helper-availability` (pass, 86/86)
+    - `make -C test/neovm/vm-compat validate-case-lists` (pass)
+
 - Exposed `cl-ninth` as a callable CL helper:
   - updated:
     - `rust/neovm-core/src/elisp/cl_lib.rs`
