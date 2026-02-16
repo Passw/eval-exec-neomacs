@@ -418,6 +418,19 @@ fn subr_arity_value(name: &str) -> Value {
         | "capitalize-word" | "downcase-word" | "kill-local-variable" | "kill-word" => {
             arity_cons(1, Some(1))
         }
+        "newline" | "next-line" => arity_cons(0, Some(2)),
+        "newline-and-indent" => arity_cons(0, Some(1)),
+        "open-line" => arity_cons(1, Some(1)),
+        "other-window" | "goto-line" => arity_cons(1, Some(3)),
+        "flush-lines" | "keep-lines" | "how-many" => arity_cons(1, Some(4)),
+        "local-variable-p" => arity_cons(1, Some(2)),
+        "locale-info" => arity_cons(1, Some(1)),
+        "max-char" => arity_cons(0, Some(1)),
+        "memory-use-counts" | "make-marker" => arity_cons(0, Some(0)),
+        "make-local-variable" | "make-variable-buffer-local" => arity_cons(1, Some(1)),
+        "make-syntax-table" => arity_cons(0, Some(1)),
+        "mapatoms" => arity_cons(1, Some(2)),
+        "map-char-table" => arity_cons(2, Some(2)),
         "capitalize-region" => arity_cons(2, Some(3)),
         "downcase-region" | "kill-region" | "kill-ring-save" => arity_cons(2, Some(3)),
         "kill-append" => arity_cons(2, Some(2)),
@@ -1696,6 +1709,29 @@ mod tests {
         assert_subr_arity("posix-search-backward", 1, Some(4));
         assert_subr_arity("word-search-forward", 1, Some(4));
         assert_subr_arity("word-search-backward", 1, Some(4));
+    }
+
+    #[test]
+    fn subr_arity_edit_state_helper_primitives_match_oracle() {
+        assert_subr_arity("newline", 0, Some(2));
+        assert_subr_arity("next-line", 0, Some(2));
+        assert_subr_arity("newline-and-indent", 0, Some(1));
+        assert_subr_arity("open-line", 1, Some(1));
+        assert_subr_arity("other-window", 1, Some(3));
+        assert_subr_arity("goto-line", 1, Some(3));
+        assert_subr_arity("flush-lines", 1, Some(4));
+        assert_subr_arity("keep-lines", 1, Some(4));
+        assert_subr_arity("how-many", 1, Some(4));
+        assert_subr_arity("local-variable-p", 1, Some(2));
+        assert_subr_arity("locale-info", 1, Some(1));
+        assert_subr_arity("max-char", 0, Some(1));
+        assert_subr_arity("memory-use-counts", 0, Some(0));
+        assert_subr_arity("make-marker", 0, Some(0));
+        assert_subr_arity("make-local-variable", 1, Some(1));
+        assert_subr_arity("make-variable-buffer-local", 1, Some(1));
+        assert_subr_arity("make-syntax-table", 0, Some(1));
+        assert_subr_arity("mapatoms", 1, Some(2));
+        assert_subr_arity("map-char-table", 2, Some(2));
     }
 
     #[test]

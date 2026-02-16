@@ -72,6 +72,7 @@ cases/color-subr-arity-semantics
 cases/copy-cons-subr-arity-semantics
 cases/current-state-subr-arity-semantics
 cases/misc-helper-subr-arity-semantics
+cases/edit-state-helper-subr-arity-semantics
 cases/mark-marker-subr-arity-semantics
 cases/register-helper-subr-arity-semantics
 cases/list-sequence-subr-arity-semantics
