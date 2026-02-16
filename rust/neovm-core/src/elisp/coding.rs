@@ -981,6 +981,8 @@ fn allows_derived_eol_variant(base: &str) -> bool {
             | "us-ascii"
             | "raw-text"
             | "undecided"
+            | "utf-8-auto"
+            | "prefer-utf-8"
     )
 }
 
@@ -1637,6 +1639,14 @@ mod tests {
             builtin_check_coding_system(&m, vec![Value::symbol("undecided-unix")]).unwrap(),
             Value::symbol("undecided-unix")
         );
+        assert_eq!(
+            builtin_check_coding_system(&m, vec![Value::symbol("utf-8-auto-unix")]).unwrap(),
+            Value::symbol("utf-8-auto-unix")
+        );
+        assert_eq!(
+            builtin_check_coding_system(&m, vec![Value::symbol("prefer-utf-8-unix")]).unwrap(),
+            Value::symbol("prefer-utf-8-unix")
+        );
     }
 
     #[test]
@@ -1651,14 +1661,23 @@ mod tests {
     fn set_keyboard_coding_system_rejects_unsuitable_variants() {
         let mut m = mgr();
         let auto = builtin_set_keyboard_coding_system(&mut m, vec![Value::symbol("utf-8-auto")]);
+        let auto_derived =
+            builtin_set_keyboard_coding_system(&mut m, vec![Value::symbol("utf-8-auto-unix")]);
         let prefer =
             builtin_set_keyboard_coding_system(&mut m, vec![Value::symbol("prefer-utf-8")]);
+        let prefer_derived =
+            builtin_set_keyboard_coding_system(&mut m, vec![Value::symbol("prefer-utf-8-unix")]);
         let undecided =
             builtin_set_keyboard_coding_system(&mut m, vec![Value::symbol("undecided")]);
+        let undecided_derived =
+            builtin_set_keyboard_coding_system(&mut m, vec![Value::symbol("undecided-unix")]);
 
         assert!(auto.is_err());
+        assert!(auto_derived.is_err());
         assert!(prefer.is_err());
+        assert!(prefer_derived.is_err());
         assert!(undecided.is_err());
+        assert!(undecided_derived.is_err());
     }
 
     #[test]
