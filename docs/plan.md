@@ -23,6 +23,14 @@ Last updated: 2026-02-16
 
 ## Done
 
+- Refreshed existing arity baseline impacted by `substitute-command-keys` optional-arg compatibility:
+  - updated:
+    - `test/neovm/vm-compat/cases/doc-helper-arity-semantics.expected.tsv`
+      - updated the `substitute-command-keys "" nil` oracle line to `OK ""` (was prior wrong-number expectation).
+  - verified:
+    - `make -C test/neovm/vm-compat check-one-neovm CASE=cases/doc-helper-arity-semantics` (pass, 18/18)
+    - `make -C test/neovm/vm-compat check-all-neovm` (pass)
+
 - Aligned default plain-char key lookup fallback for `key-binding` / `global-key-binding` with oracle and added dedicated corpus lock-in:
   - updated:
     - `rust/neovm-core/src/elisp/interactive.rs`
