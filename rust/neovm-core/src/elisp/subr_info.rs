@@ -343,9 +343,14 @@ fn subr_arity_value(name: &str) -> Value {
         }
         "capitalize-region" => arity_cons(2, Some(3)),
         "add-hook" => arity_cons(2, Some(4)),
+        "add-name-to-file" => arity_cons(2, Some(3)),
+        "add-text-properties" => arity_cons(3, Some(4)),
+        "add-variable-watcher" => arity_cons(2, Some(2)),
         "remove-hook" => arity_cons(2, Some(3)),
         "advice-add" => arity_cons(3, Some(4)),
         "advice-remove" | "advice-member-p" => arity_cons(2, Some(2)),
+        "autoload-do-load" => arity_cons(1, Some(3)),
+        "backtrace-frame" => arity_cons(1, Some(2)),
         "run-hook-with-args" => arity_cons(1, None),
         "base64-decode-string" => arity_cons(1, Some(3)),
         "base64-encode-string" | "base64url-encode-string" => arity_cons(1, Some(2)),
@@ -965,10 +970,15 @@ mod tests {
     #[test]
     fn subr_arity_hook_advice_primitives_match_oracle() {
         assert_subr_arity("add-hook", 2, Some(4));
+        assert_subr_arity("add-name-to-file", 2, Some(3));
+        assert_subr_arity("add-text-properties", 3, Some(4));
+        assert_subr_arity("add-variable-watcher", 2, Some(2));
         assert_subr_arity("remove-hook", 2, Some(3));
         assert_subr_arity("advice-add", 3, Some(4));
         assert_subr_arity("advice-remove", 2, Some(2));
         assert_subr_arity("advice-member-p", 2, Some(2));
+        assert_subr_arity("autoload-do-load", 1, Some(3));
+        assert_subr_arity("backtrace-frame", 1, Some(2));
         assert_subr_arity("run-hook-with-args", 1, None);
     }
 
