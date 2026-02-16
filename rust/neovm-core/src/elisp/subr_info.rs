@@ -306,6 +306,10 @@ fn subr_arity_value(name: &str) -> Value {
         "waiting-for-user-input-p" => arity_cons(0, Some(0)),
         "read-passwd" => arity_cons(1, Some(3)),
         "event-apply-modifier" => arity_cons(4, Some(4)),
+        "open-termscript" | "x-close-connection" => arity_cons(1, Some(1)),
+        "send-string-to-terminal" | "display-supports-face-attributes-p" => arity_cons(1, Some(2)),
+        "x-open-connection" => arity_cons(1, Some(3)),
+        "internal-show-cursor" => arity_cons(2, Some(2)),
         // Process primitives
         "call-process" => arity_cons(1, None),
         "call-process-region" => arity_cons(3, None),
@@ -325,10 +329,11 @@ fn subr_arity_value(name: &str) -> Value {
         | "tty-top-frame" | "tty-display-color-p" | "tty-display-color-cells"
         | "tty-no-underline" | "window-system" | "x-display-pixel-width"
         | "x-display-pixel-height" | "x-server-version" | "x-server-max-request-size"
-        | "x-display-grayscale-p" => {
+        | "x-display-grayscale-p" | "redraw-frame" | "ding" | "internal-show-cursor-p"
+        | "controlling-tty-p" | "suspend-tty" | "resume-tty" | "terminal-coding-system" => {
             arity_cons(0, Some(1))
         }
-        "terminal-list" | "x-display-list" => arity_cons(0, Some(0)),
+        "terminal-list" | "x-display-list" | "redraw-display" => arity_cons(0, Some(0)),
         "frame-edges" => arity_cons(0, Some(2)),
         "terminal-live-p" => arity_cons(1, Some(1)),
         "terminal-parameter" => arity_cons(2, Some(2)),
@@ -637,6 +642,14 @@ mod tests {
         assert_subr_arity("display-planes", 0, Some(1));
         assert_subr_arity("display-visual-class", 0, Some(1));
         assert_subr_arity("display-backing-store", 0, Some(1));
+        assert_subr_arity("display-supports-face-attributes-p", 1, Some(2));
+        assert_subr_arity("ding", 0, Some(1));
+        assert_subr_arity("redraw-display", 0, Some(0));
+        assert_subr_arity("redraw-frame", 0, Some(1));
+        assert_subr_arity("open-termscript", 1, Some(1));
+        assert_subr_arity("send-string-to-terminal", 1, Some(2));
+        assert_subr_arity("internal-show-cursor", 2, Some(2));
+        assert_subr_arity("internal-show-cursor-p", 0, Some(1));
         assert_subr_arity("display-monitor-attributes-list", 0, Some(1));
         assert_subr_arity("frame-monitor-attributes", 0, Some(1));
         assert_subr_arity("window-system", 0, Some(1));
@@ -652,7 +665,13 @@ mod tests {
         assert_subr_arity("tty-display-color-cells", 0, Some(1));
         assert_subr_arity("tty-no-underline", 0, Some(1));
         assert_subr_arity("tty-top-frame", 0, Some(1));
+        assert_subr_arity("controlling-tty-p", 0, Some(1));
+        assert_subr_arity("suspend-tty", 0, Some(1));
+        assert_subr_arity("resume-tty", 0, Some(1));
+        assert_subr_arity("terminal-coding-system", 0, Some(1));
         assert_subr_arity("x-display-list", 0, Some(0));
+        assert_subr_arity("x-open-connection", 1, Some(3));
+        assert_subr_arity("x-close-connection", 1, Some(1));
         assert_subr_arity("x-server-version", 0, Some(1));
         assert_subr_arity("x-server-max-request-size", 0, Some(1));
         assert_subr_arity("x-display-grayscale-p", 0, Some(1));
