@@ -47,6 +47,19 @@ Last updated: 2026-02-16
 
 ## Done
 
+- Hardcoded vm-compat oracle default to official GNU Emacs path:
+  - default oracle binary now set to:
+    - `/nix/store/hql3zwz5b4ywd2qwx8jssp4dyb7nx4cb-emacs-30.2/bin/emacs`
+  - updated runners:
+    - `test/neovm/vm-compat/run-oracle.sh`
+    - `test/neovm/vm-compat/run-ert-allowlist.sh`
+  - updated harness docs:
+    - `test/neovm/vm-compat/README.md`
+  - verified:
+    - `make -C test/neovm/vm-compat check-ert-allowlist` (pass)
+    - `make -C test/neovm/vm-compat check-one-neovm CASE=cases/core` (pass)
+    - `make -C test/neovm/vm-compat check-builtin-registry-fboundp` (pass)
+
 - Hardened vm-compat harness output filtering and builtin registry parity accounting:
   - enforced `LC_ALL=C` around case-line AWK filters in:
     - `test/neovm/vm-compat/run-oracle.sh`
