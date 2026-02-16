@@ -60,6 +60,24 @@ Last updated: 2026-02-16
 
 ## Done
 
+- Added builtin registry function-cell parity guard to strict vm-compat:
+  - added strict checker:
+    - `test/neovm/vm-compat/check-builtin-registry-function-cell.sh`
+    - compares GNU Emacs vs NeoVM over core dispatch registry names for:
+      - `fboundp` state
+      - subr vs non-subr shape
+      - `subr-arity` when subr
+  - added allowlist file for intentional core drifts:
+    - `test/neovm/vm-compat/cases/builtin-registry-function-cell-allowlist.txt`
+  - wired into strict gate:
+    - `test/neovm/vm-compat/Makefile` (`check-all-neovm-strict`)
+  - verified:
+    - `make -C test/neovm/vm-compat check-builtin-registry-function-cell` (pass)
+    - `make -C test/neovm/vm-compat check-all-neovm-strict` (pass)
+    - current status from guard:
+      - core drifts: `0`
+      - extension-only intentional delta: `neovm-precompile-file` (`fboundp=nil` in GNU Emacs, `subr` in NeoVM)
+
 - Aligned evaluator error semantics for autoload object function designators:
   - changed direct `funcall`/`apply` on autoload objects from:
     - `(invalid-function <autoload-object>)`
