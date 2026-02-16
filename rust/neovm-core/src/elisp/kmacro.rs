@@ -42,6 +42,17 @@ fn expect_min_args(name: &str, args: &[Value], min: usize) -> Result<(), Flow> {
     }
 }
 
+fn expect_max_args(name: &str, args: &[Value], max: usize) -> Result<(), Flow> {
+    if args.len() > max {
+        Err(signal(
+            "wrong-number-of-arguments",
+            vec![Value::symbol(name), Value::Int(args.len() as i64)],
+        ))
+    } else {
+        Ok(())
+    }
+}
+
 fn expect_int(value: &Value) -> Result<i64, Flow> {
     match value {
         Value::Int(n) => Ok(*n),
@@ -162,6 +173,7 @@ pub(crate) fn builtin_start_kbd_macro(
     eval: &mut super::eval::Evaluator,
     args: Vec<Value>,
 ) -> EvalResult {
+    expect_max_args("start-kbd-macro", &args, 1)?;
     if eval.kmacro.recording {
         return Err(signal(
             "error",
@@ -182,7 +194,7 @@ pub(crate) fn builtin_end_kbd_macro(
     eval: &mut super::eval::Evaluator,
     args: Vec<Value>,
 ) -> EvalResult {
-    let _ = args; // REPEAT and LOOPFUNC accepted but unused
+    expect_max_args("end-kbd-macro", &args, 2)?;
     if !eval.kmacro.recording {
         return Err(signal(
             "error",
@@ -202,6 +214,7 @@ pub(crate) fn builtin_call_last_kbd_macro(
     eval: &mut super::eval::Evaluator,
     args: Vec<Value>,
 ) -> EvalResult {
+    expect_max_args("call-last-kbd-macro", &args, 2)?;
     let repeat = if args.is_empty() {
         1i64
     } else {
@@ -250,6 +263,7 @@ pub(crate) fn builtin_execute_kbd_macro(
     args: Vec<Value>,
 ) -> EvalResult {
     expect_min_args("execute-kbd-macro", &args, 1)?;
+    expect_max_args("execute-kbd-macro", &args, 3)?;
 
     let count = if args.len() >= 2 {
         expect_int(&args[1]).unwrap_or(1)
@@ -324,6 +338,7 @@ pub(crate) fn builtin_insert_kbd_macro(
     args: Vec<Value>,
 ) -> EvalResult {
     expect_min_args("insert-kbd-macro", &args, 1)?;
+    expect_max_args("insert-kbd-macro", &args, 2)?;
 
     let name = match &args[0] {
         Value::Symbol(s) => s.clone(),
@@ -693,6 +708,32 @@ mod tests {
         // Wrong arg count
         let result = builtin_store_kbd_macro_event(&mut eval, vec![]);
         assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_kmacro_builtin_arity_contracts() {
+        use super::super::eval::Evaluator;
+
+        let mut eval = Evaluator::new();
+
+        assert!(builtin_start_kbd_macro(&mut eval, vec![Value::Nil, Value::Nil]).is_err());
+        assert!(builtin_end_kbd_macro(&mut eval, vec![Value::Nil, Value::Nil, Value::Nil]).is_err());
+        assert!(
+            builtin_call_last_kbd_macro(&mut eval, vec![Value::Nil, Value::Nil, Value::Nil])
+                .is_err()
+        );
+        assert!(builtin_execute_kbd_macro(&mut eval, vec![]).is_err());
+        assert!(
+            builtin_execute_kbd_macro(
+                &mut eval,
+                vec![Value::Nil, Value::Nil, Value::Nil, Value::Nil]
+            )
+            .is_err()
+        );
+        assert!(builtin_insert_kbd_macro(&mut eval, vec![]).is_err());
+        assert!(
+            builtin_insert_kbd_macro(&mut eval, vec![Value::Nil, Value::Nil, Value::Nil]).is_err()
+        );
     }
 
     #[test]
