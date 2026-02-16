@@ -23,6 +23,23 @@ Last updated: 2026-02-16
 
 ## Done
 
+- Aligned `minor-mode-key-binding` arity semantics with oracle and added dedicated corpus lock-in:
+  - updated:
+    - `rust/neovm-core/src/elisp/interactive.rs`
+      - enforced max arity (`1..2`) for `minor-mode-key-binding` while keeping current stub nil lookup behavior.
+      - added focused unit coverage for the too-many-args error path.
+    - `test/neovm/vm-compat/cases/minor-mode-key-binding-semantics.forms`
+      - added oracle probes for basic nil paths, non-array argument path, and arity errors.
+    - `test/neovm/vm-compat/cases/minor-mode-key-binding-semantics.expected.tsv`
+      - recorded oracle baseline outputs for minor-mode-key-binding semantics.
+    - `test/neovm/vm-compat/cases/default.list`
+      - added `cases/minor-mode-key-binding-semantics` to recurring default compatibility execution.
+  - verified:
+    - `cargo test --manifest-path rust/neovm-core/Cargo.toml minor_mode_key_binding` (pass)
+    - `make -C test/neovm/vm-compat check-neovm FORMS=cases/minor-mode-key-binding-semantics.forms EXPECTED=cases/minor-mode-key-binding-semantics.expected.tsv` (pass, 5/5)
+    - `make -C test/neovm/vm-compat check-one-neovm CASE=cases/minor-mode-key-binding-semantics` (pass, 5/5)
+    - `make -C test/neovm/vm-compat validate-case-lists` (pass)
+
 - Aligned empty key-designator semantics for interactive key-binding APIs and added dedicated corpus lock-in:
   - updated:
     - `rust/neovm-core/src/elisp/interactive.rs`
