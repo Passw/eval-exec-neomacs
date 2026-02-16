@@ -94,6 +94,22 @@ Last updated: 2026-02-16
     - `make -C test/neovm/vm-compat check-builtin-registry-all` (pass)
     - `make -C test/neovm/vm-compat check-all-neovm-strict` (pass)
 
+- Refactored builtin-registry strict check scripts to share name parsing logic:
+  - added shared helper:
+    - `test/neovm/vm-compat/lib/builtin-registry.sh`
+    - centralizes:
+      - dispatch builtin name extraction
+      - core-name filtering (exclude `neovm-*`)
+      - extension-name extraction
+  - updated scripts to source shared helper:
+    - `check-builtin-registry-fboundp.sh`
+    - `check-builtin-registry-function-cell.sh`
+    - `check-builtin-registry-function-kind.sh`
+    - `check-builtin-registry-commandp.sh`
+    - `check-builtin-registry-extension-policy.sh`
+  - verified:
+    - `make -C test/neovm/vm-compat check-builtin-registry-all` (pass)
+
 - Added oracle corpus lock-in for batch prompt-reader error semantics:
   - added case:
     - `test/neovm/vm-compat/cases/reader-prompt-batch-error-semantics.{forms,expected.tsv}`
