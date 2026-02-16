@@ -586,6 +586,7 @@ const DISPATCH_BUILTIN_NAMES: &[&str] = &[
     "name-last-kbd-macro",
     "narrow-to-region",
     "natnump",
+    "native-comp-function-p",
     "neovm-precompile-file",
     "newline",
     "newline-and-indent",

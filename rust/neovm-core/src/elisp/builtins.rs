@@ -8431,6 +8431,7 @@ pub(crate) fn dispatch_builtin(
         "subr-name" => super::subr_info::builtin_subr_name(args),
         "subr-arity" => super::subr_info::builtin_subr_arity(args),
         "subr-native-elisp-p" => super::subr_info::builtin_subr_native_elisp_p(args),
+        "native-comp-function-p" => super::subr_info::builtin_native_comp_function_p(args),
         "subr-primitive-p" => super::subr_info::builtin_subr_primitive_p(args),
         "interpreted-function-p" => super::subr_info::builtin_interpreted_function_p(args),
         "special-form-p" => super::subr_info::builtin_special_form_p(args),
@@ -10702,6 +10703,10 @@ mod tests {
         let wholenump = builtin_symbol_function(&mut eval, vec![Value::symbol("wholenump")])
             .expect("symbol-function should resolve wholenump alias");
         assert_eq!(wholenump, Value::symbol("natnump"));
+
+        let subr_native = builtin_symbol_function(&mut eval, vec![Value::symbol("subr-native-elisp-p")])
+            .expect("symbol-function should resolve subr-native-elisp-p alias");
+        assert_eq!(subr_native, Value::symbol("native-comp-function-p"));
 
         let throw_fn = builtin_symbol_function(&mut eval, vec![Value::symbol("throw")])
             .expect("symbol-function should resolve throw as callable subr");

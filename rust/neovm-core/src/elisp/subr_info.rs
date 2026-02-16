@@ -368,8 +368,10 @@ fn subr_arity_value(name: &str) -> Value {
         | "charset-priority-list" => arity_cons(0, Some(1)),
         "char-category-set" | "char-or-string-p" | "char-resolve-modifiers" | "char-syntax"
         | "char-width" | "char-table-p" | "char-table-parent" | "char-table-subtype"
-        | "charset-plist" | "charsetp" | "closurep" | "compiled-function-p" | "custom-variable-p"
-        | "default-value" => arity_cons(1, Some(1)),
+        | "charset-plist" | "charsetp" | "closurep" | "compiled-function-p"
+        | "custom-variable-p" | "default-value" | "native-comp-function-p" => {
+            arity_cons(1, Some(1))
+        }
         "char-charset" => arity_cons(1, Some(2)),
         "char-table-extra-slot" | "char-table-range" => arity_cons(2, Some(2)),
         "decode-char" => arity_cons(2, Some(2)),
@@ -882,6 +884,16 @@ pub(crate) fn builtin_subr_arity(args: Vec<Value>) -> EvalResult {
 /// returns nil.
 pub(crate) fn builtin_subr_native_elisp_p(args: Vec<Value>) -> EvalResult {
     expect_args("subr-native-elisp-p", &args, 1)?;
+    Ok(Value::Nil)
+}
+
+/// `(native-comp-function-p OBJECT)` -- return t if OBJECT is a native-compiled
+/// function object.
+///
+/// NeoVM does not currently model native-compiled function objects, so this
+/// always returns nil.
+pub(crate) fn builtin_native_comp_function_p(args: Vec<Value>) -> EvalResult {
+    expect_args("native-comp-function-p", &args, 1)?;
     Ok(Value::Nil)
 }
 
@@ -1798,6 +1810,7 @@ mod tests {
     fn subr_arity_symbol_state_primitives_match_oracle() {
         assert_subr_arity("fboundp", 1, Some(1));
         assert_subr_arity("func-arity", 1, Some(1));
+        assert_subr_arity("native-comp-function-p", 1, Some(1));
         assert_subr_arity("fset", 2, Some(2));
         assert_subr_arity("fmakunbound", 1, Some(1));
         assert_subr_arity("makunbound", 1, Some(1));

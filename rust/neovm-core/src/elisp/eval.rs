@@ -169,6 +169,7 @@ impl Evaluator {
         obarray.set_symbol_function("count-matches", Value::symbol("how-many"));
         obarray.set_symbol_function("replace-rectangle", Value::symbol("string-rectangle"));
         obarray.set_symbol_function("wholenump", Value::symbol("natnump"));
+        obarray.set_symbol_function("subr-native-elisp-p", Value::symbol("native-comp-function-p"));
 
         // Mark standard variables as special (dynamically bound)
         for name in &[
