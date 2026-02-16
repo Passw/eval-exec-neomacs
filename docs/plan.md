@@ -25,6 +25,26 @@ Last updated: 2026-02-16
 
 ## Done
 
+- Aligned core numeric/comparator primitive `subr-arity` metadata with GNU Emacs:
+  - updated:
+    - `rust/neovm-core/src/elisp/subr_info.rs`
+      - added explicit arity overrides:
+        - `(2 . 2)`: `%`, `/=`, `ash`
+        - `(1 . many)`: `/`, `<`, `<=`, `=`, `>`, `>=`, `apply`
+        - `(1 . 1)`: `1+`, `1-`, `abs`
+      - added unit matrix `subr_arity_core_math_primitives_match_oracle`.
+    - `test/neovm/vm-compat/cases/core-math-subr-arity-semantics.forms`
+    - `test/neovm/vm-compat/cases/core-math-subr-arity-semantics.expected.tsv`
+    - `test/neovm/vm-compat/cases/default.list`
+      - added oracle lock-in case for core numeric/comparator subr-arity payloads.
+  - recorded with official GNU Emacs:
+    - `NEOVM_ORACLE_EMACS=/nix/store/hql3zwz5b4ywd2qwx8jssp4dyb7nx4cb-emacs-30.2/bin/emacs make -C test/neovm/vm-compat record FORMS=cases/core-math-subr-arity-semantics.forms EXPECTED=cases/core-math-subr-arity-semantics.expected.tsv` (pass)
+  - verified:
+    - `cargo test --manifest-path rust/neovm-core/Cargo.toml subr_arity_core_math_primitives_match_oracle -- --nocapture` (pass)
+    - `make -C test/neovm/vm-compat check-one-neovm CASE=cases/core-math-subr-arity-semantics` (pass, 13/13)
+    - `make -C test/neovm/vm-compat validate-case-lists` (pass)
+    - `make -C test/neovm/vm-compat check-builtin-registry-fboundp` (pass)
+
 - Aligned window startup alias shape and batch window-size query semantics with GNU Emacs:
   - updated:
     - `rust/neovm-core/src/elisp/eval.rs`
