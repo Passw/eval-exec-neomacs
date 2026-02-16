@@ -897,6 +897,7 @@ pub(crate) fn builtin_minor_mode_key_binding(
     args: Vec<Value>,
 ) -> EvalResult {
     expect_min_args("minor-mode-key-binding", &args, 1)?;
+    expect_max_args("minor-mode-key-binding", &args, 2)?;
     Ok(Value::Nil)
 }
 
@@ -2626,6 +2627,16 @@ mod tests {
         let mut ev = Evaluator::new();
         let result = builtin_minor_mode_key_binding(&mut ev, vec![Value::string("C-c")]).unwrap();
         assert!(result.is_nil());
+    }
+
+    #[test]
+    fn minor_mode_key_binding_too_many_args_errors() {
+        let mut ev = Evaluator::new();
+        let result = builtin_minor_mode_key_binding(
+            &mut ev,
+            vec![Value::string("C-c"), Value::True, Value::symbol("extra")],
+        );
+        assert!(result.is_err());
     }
 
     // -------------------------------------------------------------------
