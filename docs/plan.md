@@ -25,6 +25,26 @@ Last updated: 2026-02-16
 
 ## Done
 
+- Separated frame/window integer ID domains to remove designator aliasing and lock boundary parity:
+  - updated:
+    - `rust/neovm-core/src/window.rs`
+      - introduced disjoint frame ID base (`2^32`) so frame and window integer wrappers no longer collide in normal operation.
+      - keeps existing integer-backed architecture while restoring key `framep`/`windowp` and display-designator distinctions.
+    - `test/neovm/vm-compat/cases/frame-window-designator-boundary-semantics.forms`
+    - `test/neovm/vm-compat/cases/frame-window-designator-boundary-semantics.expected.tsv`
+      - added oracle lock-in for:
+        - `(eq (selected-frame) (selected-window)) -> nil`
+        - `framep/windowp` cross-predicate boundaries
+        - selected-window rejection by display designator APIs (`get-device-terminal` error path).
+    - `test/neovm/vm-compat/cases/default.list`
+      - included new boundary case in default vm-compat gate.
+  - verified:
+    - `make -C test/neovm/vm-compat check-one-neovm CASE=cases/frame-window-designator-boundary-semantics` (pass, 10/10)
+    - `make -C test/neovm/vm-compat check-one-neovm CASE=cases/display-query-designator-semantics` (pass, 12/12)
+    - `make -C test/neovm/vm-compat check-one-neovm CASE=cases/frame-batch-semantics` (pass, 7/7)
+    - `cargo test --manifest-path rust/neovm-core/Cargo.toml window_cmds::tests:: -- --nocapture` (pass)
+    - `make -C test/neovm/vm-compat validate-case-lists` (pass)
+
 - Aligned X-display terminal-designator semantics with oracle and locked coverage:
   - updated:
     - `rust/neovm-core/src/elisp/display.rs`
