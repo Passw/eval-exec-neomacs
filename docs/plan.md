@@ -47,6 +47,7 @@ Last updated: 2026-02-16
 - Keep newly landed filesystem-create helper primitive `subr-arity` parity stable while expanding remaining filesystem helper drifts.
 - Keep newly landed `minor-mode-key-binding` runtime parity slice stable while expanding remaining interactive/keymap stub areas.
 - Keep newly landed `other-buffer` runtime+`subr-arity` parity stable while expanding remaining buffer/window helper drifts.
+- Keep newly landed `kill-buffer` runtime parity stable while expanding remaining buffer lifecycle/helper drifts.
 
 ## Next
 
@@ -60,6 +61,26 @@ Last updated: 2026-02-16
 8. Resolve the last startup wrapper-shape drift (`neovm-precompile-file`) with an explicit extension-vs-oracle policy and lock-in corpus note.
 
 ## Done
+
+- Aligned `kill-buffer` runtime semantics with GNU Emacs and added oracle lock-in:
+  - updated builtin behavior:
+    - `rust/neovm-core/src/elisp/builtins.rs`
+    - `kill-buffer` now matches runtime contracts:
+      - accepts optional argument (`0..1`) with omitted/`nil` meaning current buffer
+      - missing name signals `(error "No buffer named ...")`
+      - dead buffer object returns `nil`
+      - non-buffer/non-string designators signal `(wrong-type-argument stringp VALUE)`
+      - killing current buffer reseats current buffer to a live alternative
+  - added evaluator regression:
+    - `kill_buffer_optional_arg_and_error_semantics`
+  - added oracle corpus case:
+    - `test/neovm/vm-compat/cases/kill-buffer-runtime-semantics.{forms,expected.tsv}`
+    - wired into:
+      - `test/neovm/vm-compat/cases/default.list`
+  - verified:
+    - `cargo test --manifest-path rust/neovm-core/Cargo.toml kill_buffer_optional_arg_and_error_semantics -- --nocapture` (pass)
+    - `make -C test/neovm/vm-compat check-one-neovm CASE=cases/kill-buffer-runtime-semantics` (pass)
+    - `make -C test/neovm/vm-compat check-all-neovm-strict` (pass)
 
 - Added evaluator-backed `other-buffer` baseline semantics with oracle lock-in:
   - implemented builtin:
