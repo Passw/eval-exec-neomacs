@@ -70,6 +70,44 @@ Last updated: 2026-02-16
     - `make -C test/neovm/vm-compat check-one-neovm CASE=cases/display-terminal-subr-arity-semantics` (pass, 28/28)
     - `make -C test/neovm/vm-compat check-builtin-registry-fboundp` (pass)
 
+- Added missing display/TTY/X helper startup surface and batch parity:
+  - updated:
+    - `rust/neovm-core/src/elisp/display.rs`
+      - implemented and wired pure+evaluator variants:
+        - `window-system` (0..1) -> `nil`, frame-designator validation (`wrong-type-argument framep` on invalid)
+        - `frame-edges` (0..2) -> `(0 0 80 25)` batch shape, invalid frame -> `error` (`\"<arg> is not a live frame\"`)
+        - `x-server-version`, `x-server-max-request-size`, `x-display-grayscale-p` (0..1) with batch/no-X error matrix aligned to oracle
+        - `tty-display-color-p` (0..1) -> `nil`
+        - `tty-display-color-cells` (0..1) -> `0`
+        - `tty-no-underline` (0..1) -> `nil`
+      - added shared error helpers for frame-live/X-not-initialized/window-system-frame payload classes.
+    - `rust/neovm-core/src/elisp/builtins.rs`
+      - added evaluator and pure dispatch wiring for all above names.
+    - `rust/neovm-core/src/elisp/builtin_registry.rs`
+      - added startup exposure names:
+        - `window-system`, `frame-edges`
+        - `x-server-version`, `x-server-max-request-size`, `x-display-grayscale-p`
+        - `tty-display-color-p`, `tty-display-color-cells`, `tty-no-underline`
+    - `rust/neovm-core/src/elisp/subr_info.rs`
+      - added/extended `subr-arity` overrides:
+        - `(0 . 1)` for `window-system`, `x-server-version`, `x-server-max-request-size`, `x-display-grayscale-p`, `tty-display-color-p`, `tty-display-color-cells`, `tty-no-underline`
+        - `(0 . 2)` for `frame-edges`
+      - extended display/terminal arity unit matrix coverage.
+    - `test/neovm/vm-compat/cases/display-tty-x-helper-semantics.forms`
+    - `test/neovm/vm-compat/cases/display-tty-x-helper-semantics.expected.tsv`
+    - `test/neovm/vm-compat/cases/default.list`
+      - added oracle lock-in case for startup `fboundp`, return values, error classes, and arity payloads.
+  - recorded with official GNU Emacs:
+    - `NEOVM_ORACLE_EMACS=/nix/store/hql3zwz5b4ywd2qwx8jssp4dyb7nx4cb-emacs-30.2/bin/emacs make -C test/neovm/vm-compat record FORMS=cases/display-tty-x-helper-semantics.forms EXPECTED=cases/display-tty-x-helper-semantics.expected.tsv` (pass)
+  - verified:
+    - `cargo test --manifest-path rust/neovm-core/Cargo.toml subr_arity_display_terminal_primitives_match_oracle -- --nocapture` (pass)
+    - `make -C test/neovm/vm-compat check-one-neovm CASE=cases/display-tty-x-helper-semantics` (pass, 56/56)
+    - `make -C test/neovm/vm-compat check-one-neovm CASE=cases/x-display-batch-semantics` (pass, 35/35)
+    - `make -C test/neovm/vm-compat check-one-neovm CASE=cases/tty-batch-semantics` (pass, 29/29)
+    - `make -C test/neovm/vm-compat check-one-neovm CASE=cases/display-terminal-subr-arity-semantics` (pass, 28/28)
+    - `make -C test/neovm/vm-compat validate-case-lists` (pass)
+    - `make -C test/neovm/vm-compat check-builtin-registry-fboundp` (pass)
+
 - Hardened vm-compat runner parsing for stdout-noisy forms (for example `read-passwd` prompts):
   - updated:
     - `test/neovm/vm-compat/oracle_eval.el`
