@@ -25,6 +25,36 @@ Last updated: 2026-02-16
 
 ## Done
 
+- Implemented `defining-kbd-macro` builtin parity and locked behavior with oracle corpus:
+  - updated:
+    - `rust/neovm-core/src/elisp/kmacro.rs`
+      - added evaluator-backed `defining-kbd-macro` builtin (`1..2` args).
+      - matched core oracle contracts for:
+        - append-without-last-macro error shape (`wrong-type-argument arrayp nil`)
+        - already-recording guard (`error "Already defining kbd macro"`)
+        - accepted optional `NO-EXEC` argument.
+      - added focused unit coverage for arity/error/append paths.
+    - `rust/neovm-core/src/elisp/builtins.rs`
+      - wired evaluator dispatch for `defining-kbd-macro`.
+    - `rust/neovm-core/src/elisp/builtin_registry.rs`
+      - added startup builtin registry entry for `defining-kbd-macro`.
+    - `rust/neovm-core/src/elisp/subr_info.rs`
+      - added arity override: `defining-kbd-macro` => `(1 . 2)`.
+    - `rust/neovm-core/src/elisp/doc.rs`
+      - added `help-function-arglist` mapping:
+        - default: `(arg1 &optional arg2)`
+        - preserve-names: `(append &optional no-exec)`.
+    - `test/neovm/vm-compat/cases/defining-kbd-macro-semantics.forms`
+      - new corpus covering availability, introspection, arity edges, and recording flow.
+    - `test/neovm/vm-compat/cases/defining-kbd-macro-semantics.expected.tsv`
+      - recorded oracle baseline for the new case.
+    - `test/neovm/vm-compat/cases/default.list`
+      - added `cases/defining-kbd-macro-semantics` to recurring default compatibility execution.
+  - verified:
+    - `make -C test/neovm/vm-compat check-one-neovm CASE=cases/defining-kbd-macro-semantics` (pass, 16/16)
+    - `make -C test/neovm/vm-compat validate-case-lists` (pass)
+    - `make -C test/neovm/vm-compat check-builtin-registry-fboundp` (pass; only allowlisted `neovm-precompile-file` drift)
+
 - Aligned introspection metadata for newly-added key/help builtins:
   - updated:
     - `rust/neovm-core/src/elisp/subr_info.rs`
