@@ -49,6 +49,17 @@ fn expect_max_args(name: &str, args: &[Value], max: usize) -> Result<(), Flow> {
     }
 }
 
+fn expect_range_args(name: &str, args: &[Value], min: usize, max: usize) -> Result<(), Flow> {
+    if args.len() < min || args.len() > max {
+        Err(signal(
+            "wrong-number-of-arguments",
+            vec![Value::symbol(name), Value::Int(args.len() as i64)],
+        ))
+    } else {
+        Ok(())
+    }
+}
+
 /// Extract an integer, signaling wrong-type-argument if not.
 fn expect_int(value: &Value) -> Result<i64, Flow> {
     match value {
@@ -5461,6 +5472,184 @@ fn builtin_kbd(args: Vec<Value>) -> EvalResult {
     super::kbd::parse_kbd_string(desc).map_err(|msg| signal("error", vec![Value::string(msg)]))
 }
 
+const KEY_CHAR_META: i64 = 0x8000000;
+const KEY_CHAR_CTRL: i64 = 0x4000000;
+const KEY_CHAR_SHIFT: i64 = 0x2000000;
+const KEY_CHAR_SUPER: i64 = 0x0800000;
+const KEY_CHAR_MOD_MASK: i64 = KEY_CHAR_META | KEY_CHAR_CTRL | KEY_CHAR_SHIFT | KEY_CHAR_SUPER;
+
+fn invalid_single_key_error() -> Flow {
+    signal(
+        "error",
+        vec![Value::string(
+            "KEY must be an integer, cons, symbol, or string",
+        )],
+    )
+}
+
+fn control_char_suffix(code: i64) -> Option<char> {
+    match code {
+        0 => Some('@'),
+        1..=26 => char::from_u32((code as u32) + 96),
+        28 => Some('\\'),
+        29 => Some(']'),
+        30 => Some('^'),
+        31 => Some('_'),
+        _ => None,
+    }
+}
+
+fn named_char_name(code: i64) -> Option<&'static str> {
+    match code {
+        9 => Some("TAB"),
+        13 => Some("RET"),
+        27 => Some("ESC"),
+        32 => Some("SPC"),
+        127 => Some("DEL"),
+        _ => None,
+    }
+}
+
+fn split_symbol_modifiers(mut name: &str) -> (String, &str) {
+    let mut prefix = String::new();
+    loop {
+        if let Some(rest) = name.strip_prefix("C-") {
+            prefix.push_str("C-");
+            name = rest;
+            continue;
+        }
+        if let Some(rest) = name.strip_prefix("M-") {
+            prefix.push_str("M-");
+            name = rest;
+            continue;
+        }
+        if let Some(rest) = name.strip_prefix("S-") {
+            prefix.push_str("S-");
+            name = rest;
+            continue;
+        }
+        break;
+    }
+    (prefix, name)
+}
+
+fn describe_symbol_key(name: &str, no_angles: bool) -> String {
+    let (prefix, base) = split_symbol_modifiers(name);
+    if no_angles {
+        return format!("{prefix}{base}");
+    }
+    format!("{prefix}<{base}>")
+}
+
+fn describe_int_key(code: i64) -> Result<String, Flow> {
+    let mods = code & KEY_CHAR_MOD_MASK;
+    let base = code & !KEY_CHAR_MOD_MASK;
+    if !(0..=0x10FFFF).contains(&base) {
+        return Err(invalid_single_key_error());
+    }
+
+    let ctrl = (mods & KEY_CHAR_CTRL) != 0;
+    let meta = (mods & KEY_CHAR_META) != 0;
+    let shift = (mods & KEY_CHAR_SHIFT) != 0;
+    let super_ = (mods & KEY_CHAR_SUPER) != 0;
+
+    let push_prefixes = |out: &mut String, with_ctrl: bool| {
+        if with_ctrl {
+            out.push_str("C-");
+        }
+        if meta {
+            out.push_str("M-");
+        }
+        if shift {
+            out.push_str("S-");
+        }
+        if super_ {
+            out.push_str("s-");
+        }
+    };
+
+    let mut out = String::new();
+
+    if let Some(name) = named_char_name(base) {
+        push_prefixes(&mut out, ctrl);
+        out.push_str(name);
+        return Ok(out);
+    }
+
+    if let Some(sfx) = control_char_suffix(base) {
+        push_prefixes(&mut out, true);
+        out.push(sfx.to_ascii_lowercase());
+        return Ok(out);
+    }
+
+    let Some(ch) = char::from_u32(base as u32) else {
+        return Err(invalid_single_key_error());
+    };
+    push_prefixes(&mut out, ctrl);
+    out.push(ch);
+    Ok(out)
+}
+
+fn describe_single_key_value(value: &Value, no_angles: bool) -> Result<String, Flow> {
+    match value {
+        Value::Int(n) => describe_int_key(*n),
+        Value::Char(c) => describe_int_key(*c as i64),
+        Value::Symbol(name) => Ok(describe_symbol_key(name, no_angles)),
+        Value::True => Ok(describe_symbol_key("t", no_angles)),
+        Value::Nil => Ok(describe_symbol_key("nil", no_angles)),
+        Value::Str(s) => Ok((**s).clone()),
+        Value::Cons(_) => {
+            let items = list_to_vec(value).ok_or_else(invalid_single_key_error)?;
+            if items.len() != 1 {
+                return Err(invalid_single_key_error());
+            }
+            describe_single_key_value(&items[0], no_angles)
+        }
+        _ => Err(invalid_single_key_error()),
+    }
+}
+
+fn key_sequence_values(value: &Value) -> Result<Vec<Value>, Flow> {
+    match value {
+        Value::Nil => Ok(vec![]),
+        Value::Str(s) => Ok(s.chars().map(|ch| Value::Int(ch as i64)).collect()),
+        Value::Vector(v) => Ok(v.lock().expect("vector lock poisoned").clone()),
+        Value::Cons(_) => list_to_vec(value).ok_or_else(|| {
+            signal(
+                "wrong-type-argument",
+                vec![Value::symbol("sequencep"), value.clone()],
+            )
+        }),
+        _ => Err(signal(
+            "wrong-type-argument",
+            vec![Value::symbol("sequencep"), value.clone()],
+        )),
+    }
+}
+
+/// `(single-key-description KEY &optional NO-ANGLES)` -> string
+fn builtin_single_key_description(args: Vec<Value>) -> EvalResult {
+    expect_range_args("single-key-description", &args, 1, 2)?;
+    let no_angles = args.get(1).is_some_and(Value::is_truthy);
+    Ok(Value::string(describe_single_key_value(&args[0], no_angles)?))
+}
+
+/// `(key-description KEYS &optional PREFIX)` -> string
+fn builtin_key_description(args: Vec<Value>) -> EvalResult {
+    expect_range_args("key-description", &args, 1, 2)?;
+    let mut events = if let Some(prefix) = args.get(1) {
+        key_sequence_values(prefix)?
+    } else {
+        vec![]
+    };
+    events.extend(key_sequence_values(&args[0])?);
+    let rendered: Result<Vec<String>, Flow> = events
+        .iter()
+        .map(|event| describe_single_key_value(event, false))
+        .collect();
+    Ok(Value::string(rendered?.join(" ")))
+}
+
 // ===========================================================================
 // Dispatch table
 // ===========================================================================
@@ -7201,6 +7390,8 @@ pub(crate) fn dispatch_builtin(
 
         // Keymap (pure — no evaluator needed)
         "kbd" => builtin_kbd(args),
+        "single-key-description" => builtin_single_key_description(args),
+        "key-description" => builtin_key_description(args),
 
         // Process (pure — no evaluator needed)
         "shell-command-to-string" => super::process::builtin_shell_command_to_string(args),
@@ -7748,6 +7939,8 @@ pub(crate) fn dispatch_builtin_pure(name: &str, args: Vec<Value>) -> Option<Eval
         "file-attributes" => super::dired::builtin_file_attributes(args),
         // Keymap (pure)
         "kbd" => builtin_kbd(args),
+        "single-key-description" => builtin_single_key_description(args),
+        "key-description" => builtin_key_description(args),
         // Process (pure)
         "shell-command-to-string" => super::process::builtin_shell_command_to_string(args),
         "getenv" => super::process::builtin_getenv(args),
