@@ -280,6 +280,7 @@ cases/charset-priority-semantics
 cases/charset-id-internal-semantics
 cases/charset-encode-decode-semantics
 cases/find-charset-string-semantics
+cases/charset-region-after-semantics
 cases/unibyte-string-semantics
 cases/string-make-unibyte-semantics
 cases/string-make-multibyte-semantics
