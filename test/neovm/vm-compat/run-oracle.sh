@@ -45,10 +45,12 @@ find_nix_oracle_emacs() {
 }
 
 if [[ -z "$emacs_bin" ]]; then
+  emacs_bin="$(find_nix_oracle_emacs || true)"
+fi
+
+if [[ -z "$emacs_bin" ]]; then
   if command -v emacs >/dev/null 2>&1; then
     emacs_bin="$(command -v emacs)"
-  else
-    emacs_bin="$(find_nix_oracle_emacs || true)"
   fi
 fi
 
