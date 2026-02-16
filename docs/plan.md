@@ -57,6 +57,18 @@ Last updated: 2026-02-16
     - `make -C test/neovm/vm-compat check-one-neovm CASE=cases/core` (pass, 15/15)
     - `make -C test/neovm/vm-compat check-one-neovm CASE=cases/read-passwd-batch-semantics` (pass, 8/8)
 
+- Added vm-compat self-check target for case-line filter protocol:
+  - added:
+    - `test/neovm/vm-compat/check-case-line-filter.sh`
+    - `make -C test/neovm/vm-compat check-case-line-filter`
+  - behavior:
+    - validates prefixed-case extraction from noisy mixed output.
+    - validates fail-fast behavior when no prefixed case lines are emitted.
+    - validates `NEOVM_ALLOW_EMPTY_CASE_OUTPUT=1` override.
+  - verified:
+    - `make -C test/neovm/vm-compat check-case-line-filter` (pass)
+    - `make -C test/neovm/vm-compat check-one-neovm CASE=cases/read-passwd-batch-semantics` (pass, 8/8)
+
 - Added oracle lock-in corpus for `read-passwd` batch semantics:
   - added and enabled:
     - `test/neovm/vm-compat/cases/read-passwd-batch-semantics.forms`
