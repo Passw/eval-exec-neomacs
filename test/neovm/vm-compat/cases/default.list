@@ -43,6 +43,7 @@ cases/buffer-lookup-subr-arity-semantics
 cases/numeric-state-helper-subr-arity-semantics
 cases/char-charset-subr-arity-semantics
 cases/assoc-predicate-subr-arity-semantics
+cases/text-property-overlay-subr-arity-semantics
 cases/navigation-case-subr-arity-semantics
 cases/count-lines-subr-arity-semantics
 cases/hook-advice-subr-arity-semantics
