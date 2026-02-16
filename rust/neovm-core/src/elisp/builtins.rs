@@ -10306,6 +10306,11 @@ mod tests {
             Value::Subr("read-key-sequence-vector".to_string())
         );
 
+        let x_display_color =
+            builtin_symbol_function(&mut eval, vec![Value::symbol("x-display-color-p")])
+                .expect("symbol-function should resolve x-display-color-p alias");
+        assert_eq!(x_display_color, Value::symbol("display-color-p"));
+
         let throw_fn = builtin_symbol_function(&mut eval, vec![Value::symbol("throw")])
             .expect("symbol-function should resolve throw as callable subr");
         assert_eq!(throw_fn, Value::Subr("throw".to_string()));

@@ -227,6 +227,7 @@ cases/display-batch-semantics
 cases/display-query-designator-semantics
 cases/display-images-face-support-semantics
 cases/display-frame-designator-semantics
+cases/display-terminal-subr-arity-semantics
 cases/frame-window-designator-boundary-semantics
 cases/x-display-batch-semantics
 cases/x-display-terminal-designator-semantics

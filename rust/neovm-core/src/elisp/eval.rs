@@ -159,6 +159,10 @@ impl Evaluator {
         obarray.set_symbol_value("kill-ring-yank-pointer", Value::Nil);
         obarray.set_symbol_value("last-command", Value::Nil);
 
+        // GNU Emacs exposes `x-display-color-p` as an alias to
+        // `display-color-p` in startup state.
+        obarray.set_symbol_function("x-display-color-p", Value::symbol("display-color-p"));
+
         // Mark standard variables as special (dynamically bound)
         for name in &[
             "debug-on-error",

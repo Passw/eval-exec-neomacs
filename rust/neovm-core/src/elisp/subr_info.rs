@@ -306,6 +306,16 @@ fn subr_arity_value(name: &str) -> Value {
         "waiting-for-user-input-p" => arity_cons(0, Some(0)),
         "read-passwd" => arity_cons(1, Some(3)),
         "event-apply-modifier" => arity_cons(4, Some(4)),
+        // Display/terminal query primitives
+        "display-images-p" | "display-graphic-p" | "display-color-p" | "display-pixel-width"
+        | "display-pixel-height" | "display-color-cells" | "terminal-name" | "frame-terminal"
+        | "tty-type" | "tty-top-frame" | "x-display-pixel-width" | "x-display-pixel-height" => {
+            arity_cons(0, Some(1))
+        }
+        "terminal-list" => arity_cons(0, Some(0)),
+        "terminal-live-p" => arity_cons(1, Some(1)),
+        "terminal-parameter" => arity_cons(2, Some(2)),
+        "set-terminal-parameter" => arity_cons(3, Some(3)),
         // Threading primitives
         "thread-join" | "thread-name" | "thread-live-p" | "mutexp" | "mutex-name"
         | "mutex-lock" | "mutex-unlock" | "condition-variable-p" | "condition-wait" => {
@@ -594,6 +604,26 @@ mod tests {
     #[test]
     fn subr_arity_event_apply_modifier_is_four() {
         assert_subr_arity("event-apply-modifier", 4, Some(4));
+    }
+
+    #[test]
+    fn subr_arity_display_terminal_primitives_match_oracle() {
+        assert_subr_arity("display-images-p", 0, Some(1));
+        assert_subr_arity("display-graphic-p", 0, Some(1));
+        assert_subr_arity("display-color-p", 0, Some(1));
+        assert_subr_arity("display-pixel-width", 0, Some(1));
+        assert_subr_arity("display-pixel-height", 0, Some(1));
+        assert_subr_arity("display-color-cells", 0, Some(1));
+        assert_subr_arity("terminal-name", 0, Some(1));
+        assert_subr_arity("terminal-list", 0, Some(0));
+        assert_subr_arity("terminal-live-p", 1, Some(1));
+        assert_subr_arity("frame-terminal", 0, Some(1));
+        assert_subr_arity("terminal-parameter", 2, Some(2));
+        assert_subr_arity("set-terminal-parameter", 3, Some(3));
+        assert_subr_arity("tty-type", 0, Some(1));
+        assert_subr_arity("tty-top-frame", 0, Some(1));
+        assert_subr_arity("x-display-pixel-width", 0, Some(1));
+        assert_subr_arity("x-display-pixel-height", 0, Some(1));
     }
 
     #[test]
