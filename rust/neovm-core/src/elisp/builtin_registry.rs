@@ -51,6 +51,7 @@ const DISPATCH_BUILTIN_NAMES: &[&str] = &[
     "backward-word",
     "base64-decode-string",
     "base64-encode-string",
+    "base64url-decode-string",
     "base64url-encode-string",
     "beginning-of-line",
     "move-beginning-of-line",

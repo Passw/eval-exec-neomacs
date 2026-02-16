@@ -1,5 +1,5 @@
 (fboundp 'base64url-decode-string)
-(condition-case err (base64url-decode-string) (error err))
+(condition-case err (base64url-decode-string "YQ") (error err))
 (fboundp 'bool-vector-complement)
 (condition-case err (bool-vector-complement) (error err))
 (fboundp 'display-line-numbers-update-width)

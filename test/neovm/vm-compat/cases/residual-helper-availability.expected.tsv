@@ -1,5 +1,5 @@
-1	(fboundp 'base64url-decode-string)	OK nil
-2	(condition-case err (base64url-decode-string) (error err))	OK (void-function base64url-decode-string)
+1	(fboundp 'base64url-decode-string)	OK t
+2	(condition-case err (base64url-decode-string "YQ") (error err))	OK "a"
 3	(fboundp 'bool-vector-complement)	OK nil
 4	(condition-case err (bool-vector-complement) (error err))	OK (void-function bool-vector-complement)
 5	(fboundp 'display-line-numbers-update-width)	OK nil
