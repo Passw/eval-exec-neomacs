@@ -7978,6 +7978,20 @@ Last updated: 2026-02-16
     - `make -C test/neovm/vm-compat check-one-neovm CASE=cases/coding-system-subr-arity-semantics` (pass, 11/11)
     - `make -C test/neovm/vm-compat validate-case-lists` (pass)
     - `make -C test/neovm/vm-compat check-builtin-registry-fboundp` (pass, 1 allowlisted drift)
+- Aligned color primitive `subr-arity` metadata with GNU Emacs and locked parity in corpus:
+  - added arity overrides:
+    - `(0 . 1)`: `defined-colors`
+    - `(1 . 2)`: `color-defined-p`, `color-values`
+  - added and enabled oracle corpus:
+    - `test/neovm/vm-compat/cases/color-subr-arity-semantics.forms`
+    - `test/neovm/vm-compat/cases/color-subr-arity-semantics.expected.tsv`
+    - `test/neovm/vm-compat/cases/default.list`
+  - verified:
+    - `NEOVM_ORACLE_EMACS=/nix/store/hql3zwz5b4ywd2qwx8jssp4dyb7nx4cb-emacs-30.2/bin/emacs make -C test/neovm/vm-compat record FORMS=cases/color-subr-arity-semantics.forms EXPECTED=cases/color-subr-arity-semantics.expected.tsv` (pass)
+    - `cargo test subr_arity_color_primitives_match_oracle -- --nocapture` in `rust/neovm-core` (pass)
+    - `make -C test/neovm/vm-compat check-one-neovm CASE=cases/color-subr-arity-semantics` (pass, 3/3)
+    - `make -C test/neovm/vm-compat validate-case-lists` (pass)
+    - `make -C test/neovm/vm-compat check-builtin-registry-fboundp` (pass, 1 allowlisted drift)
 
 ## Doing
 
