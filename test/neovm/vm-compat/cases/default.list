@@ -46,6 +46,7 @@ cases/hook-advice-subr-arity-semantics
 cases/encoding-bool-vector-subr-arity-semantics
 cases/command-timer-subr-arity-semantics
 cases/command-read-subr-arity-semantics
+cases/kmacro-command-subr-arity-semantics
 cases/category-ccl-subr-arity-semantics
 cases/coding-system-subr-arity-semantics
 cases/color-subr-arity-semantics

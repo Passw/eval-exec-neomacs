@@ -396,6 +396,10 @@ fn subr_arity_value(name: &str) -> Value {
         "expand-abbrev" => arity_cons(0, Some(0)),
         "if" => Value::cons(Value::Int(2), Value::symbol("unevalled")),
         "defining-kbd-macro" => arity_cons(1, Some(2)),
+        "start-kbd-macro" => arity_cons(1, Some(2)),
+        "end-kbd-macro" | "call-last-kbd-macro" => arity_cons(0, Some(2)),
+        "execute-kbd-macro" | "execute-extended-command" => arity_cons(1, Some(3)),
+        "describe-key-briefly" => arity_cons(0, Some(3)),
         "help-key-description" => arity_cons(2, Some(2)),
         "recent-keys" => arity_cons(0, Some(1)),
         "input-pending-p" => arity_cons(0, Some(1)),
@@ -978,6 +982,16 @@ mod tests {
         assert_subr_arity("command-execute", 1, Some(4));
         assert_subr_arity("compare-strings", 6, Some(7));
         assert_subr_arity("completing-read", 2, Some(8));
+    }
+
+    #[test]
+    fn subr_arity_kmacro_command_primitives_match_oracle() {
+        assert_subr_arity("start-kbd-macro", 1, Some(2));
+        assert_subr_arity("end-kbd-macro", 0, Some(2));
+        assert_subr_arity("call-last-kbd-macro", 0, Some(2));
+        assert_subr_arity("execute-kbd-macro", 1, Some(3));
+        assert_subr_arity("execute-extended-command", 1, Some(3));
+        assert_subr_arity("describe-key-briefly", 0, Some(3));
     }
 
     #[test]
