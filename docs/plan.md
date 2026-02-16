@@ -23,6 +23,32 @@ Last updated: 2026-02-16
 
 ## Done
 
+- Implemented `single-key-description` / `key-description` builtins and locked oracle parity with a dedicated corpus:
+  - updated:
+    - `rust/neovm-core/src/elisp/builtins.rs`
+      - added pure builtins:
+        - `single-key-description`
+        - `key-description`
+      - implemented Emacs-compatible key rendering for:
+        - integer events (including modifier-bit composition)
+        - symbol and single-item list key events
+        - sequence inputs from string/vector/list for `key-description`
+      - aligned canonical modifier ordering and symbol-angle formatting to oracle (`C-M-*`, `M-<s-a>`, etc.).
+    - `rust/neovm-core/src/elisp/builtin_registry.rs`
+      - added startup builtin registry entries for:
+        - `single-key-description`
+        - `key-description`
+    - `test/neovm/vm-compat/cases/key-description-semantics.forms`
+      - new oracle corpus covering arity/type errors, modifier composition, sequence shapes, and prefix argument behavior.
+    - `test/neovm/vm-compat/cases/key-description-semantics.expected.tsv`
+      - recorded oracle baseline outputs for the new key-description corpus.
+    - `test/neovm/vm-compat/cases/default.list`
+      - added `cases/key-description-semantics` to recurring default compatibility execution.
+  - verified:
+    - `make -C test/neovm/vm-compat check-one-neovm CASE=cases/key-description-semantics` (pass, 42/42)
+    - `make -C test/neovm/vm-compat validate-case-lists` (pass)
+    - `make -C test/neovm/vm-compat check-builtin-registry-fboundp` (pass; only allowlisted `neovm-precompile-file` drift)
+
 - Expanded `kbd` uncommon modifier-composition corpus and locked oracle parity for edge combinations:
   - updated:
     - `test/neovm/vm-compat/cases/kbd-modifier-composition-semantics.forms`
