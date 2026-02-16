@@ -47,6 +47,24 @@ Last updated: 2026-02-16
 
 ## Done
 
+- Aligned coding/time helper primitive `subr-arity` metadata with GNU Emacs:
+  - added explicit arity lock-ins for:
+    - `decode-coding-string`, `encode-coding-string`: `(2 . 4)`
+    - `decode-time`: `(0 . 3)`
+    - `detect-coding-region`: `(2 . 3)`
+    - `detect-coding-string`: `(1 . 2)`
+    - `encode-char`: `(2 . 2)`
+    - `encode-time`: `(1 . many)`
+    - `format-time-string`: `(1 . 3)`
+  - added oracle corpus lock-in case:
+    - `test/neovm/vm-compat/cases/coding-time-subr-arity-semantics`
+  - wired into default vm-compat suite:
+    - `test/neovm/vm-compat/cases/default.list`
+  - verified:
+    - `cargo test --manifest-path rust/neovm-core/Cargo.toml subr_arity_coding_time_primitives_match_oracle -- --nocapture` (pass)
+    - `make -C test/neovm/vm-compat check-one-neovm CASE=cases/coding-time-subr-arity-semantics` (pass)
+    - `make -C test/neovm/vm-compat check-all-neovm-strict` (pass)
+
 - Aligned doc helper primitive `subr-arity` metadata with GNU Emacs:
   - added explicit arity lock-ins for:
     - `Snarf-documentation`: `(1 . 1)`
