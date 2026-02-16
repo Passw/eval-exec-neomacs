@@ -19,6 +19,23 @@ Last updated: 2026-02-16
 
 ## Done
 
+- Exposed `bookmark-get-position` as a callable bookmark helper:
+  - updated:
+    - `rust/neovm-core/src/elisp/bookmark.rs`
+      - added `bookmark-get-position` builtin (arity `1`) accepting bookmark names or bookmark-record alists.
+      - returns integer position when present, `nil` for missing bookmarks/fields.
+      - added focused unit coverage for hit/miss lookup behavior.
+    - `rust/neovm-core/src/elisp/builtins.rs`
+      - bookmark evaluator dispatch now routes `bookmark-get-position`.
+    - `rust/neovm-core/src/elisp/builtin_registry.rs`
+      - added `bookmark-get-position` to builtin registry.
+    - `test/neovm/vm-compat/cases/bookmark-helper-availability.expected.tsv`
+      - updated expectations from missing helper to callable behavior (`nil` on missing bookmark).
+  - verified:
+    - `cargo test bookmark_get_position --manifest-path rust/neovm-core/Cargo.toml` (pass)
+    - `make -C test/neovm/vm-compat check-one-neovm CASE=cases/bookmark-helper-availability` (pass, 10/10)
+    - `make -C test/neovm/vm-compat validate-case-lists` (pass)
+
 - Exposed `bookmark-get-filename` as a callable bookmark helper:
   - updated:
     - `rust/neovm-core/src/elisp/bookmark.rs`
