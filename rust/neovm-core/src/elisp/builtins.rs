@@ -5975,13 +5975,71 @@ fn builtin_event_modifiers(args: Vec<Value>) -> EvalResult {
     }
 }
 
-/// `(event-apply-modifier EVENT MODIFIER CLICK-COUNT ...)` -- arity-compatible placeholder.
+/// `(event-apply-modifier EVENT MODIFIER LSHIFTBY PREFIX)` -- apply one key
+/// modifier operation to EVENT.
 fn builtin_event_apply_modifier(args: Vec<Value>) -> EvalResult {
-    expect_args("event-apply-modifier", &args, 9)?;
-    Err(signal(
-        "error",
-        vec![Value::string("event-apply-modifier not yet implemented")],
-    ))
+    expect_args("event-apply-modifier", &args, 4)?;
+
+    let event = match &args[0] {
+        Value::Int(n) => *n,
+        Value::Char(c) => *c as i64,
+        Value::Nil | Value::True | Value::Symbol(_) | Value::Cons(_) => return Ok(args[0].clone()),
+        Value::Str(_) => {
+            return Err(signal(
+                "wrong-type-argument",
+                vec![Value::symbol("listp"), args[0].clone()],
+            ))
+        }
+        _ => {
+            return Err(signal(
+                "wrong-type-argument",
+                vec![Value::symbol("integer-or-marker-p"), args[0].clone()],
+            ))
+        }
+    };
+
+    let modifier = args[1].as_symbol_name();
+    if modifier == Some("control") {
+        let code = event & KEY_CHAR_CODE_MASK;
+        if let Some(resolved) = resolve_control_code(code) {
+            let mut mod_bits = event & !KEY_CHAR_CODE_MASK;
+            if (65..=90).contains(&code) || (mod_bits & KEY_CHAR_SHIFT) != 0 {
+                mod_bits |= KEY_CHAR_SHIFT;
+            }
+            return Ok(Value::Int(mod_bits | resolved));
+        }
+        return Ok(Value::Int(event));
+    }
+
+    if modifier == Some("shift") {
+        let code = event & KEY_CHAR_CODE_MASK;
+        let mod_bits = event & !KEY_CHAR_CODE_MASK;
+        let shifted = match code {
+            1..=26 => code + 64,
+            32 => 33,
+            64 => 65,
+            96 => 97,
+            97..=122 => code - 32,
+            _ => code,
+        };
+        return Ok(Value::Int(mod_bits | shifted));
+    }
+
+    let lshiftby = match &args[2] {
+        Value::Int(n) => *n,
+        _ => {
+            return Err(signal(
+                "wrong-type-argument",
+                vec![Value::symbol("integerp"), args[2].clone()],
+            ))
+        }
+    };
+
+    if !(0..63).contains(&lshiftby) {
+        return Ok(Value::Int(event));
+    }
+
+    Ok(Value::Int(event | (1i64 << lshiftby)))
 }
 
 /// `(listify-key-sequence SEQUENCE)` -> list representation of key sequence.

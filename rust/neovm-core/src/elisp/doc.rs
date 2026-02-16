@@ -476,6 +476,14 @@ fn help_arglist_from_subr_name(name: &str, preserve_names: bool) -> Option<Value
                 vec!["arg1"]
             },
         ),
+        "event-apply-modifier" => (
+            if preserve_names {
+                vec!["event", "symbol", "lshiftby", "prefix"]
+            } else {
+                vec!["arg1", "arg2", "arg3", "arg4"]
+            },
+            vec![],
+        ),
         "thread-name" => (
             if preserve_names {
                 vec!["thread"]
@@ -824,6 +832,39 @@ mod tests {
                 "number-or-marker".to_string(),
                 "&rest".to_string(),
                 "more-numbers-or-markers".to_string()
+            ]
+        );
+    }
+
+    #[test]
+    fn help_function_arglist_event_apply_modifier_matches_oracle_shape() {
+        let result =
+            builtin_help_function_arglist(vec![Value::symbol("event-apply-modifier")]).unwrap();
+        assert_eq!(
+            arglist_names(&result),
+            vec![
+                "arg1".to_string(),
+                "arg2".to_string(),
+                "arg3".to_string(),
+                "arg4".to_string()
+            ]
+        );
+    }
+
+    #[test]
+    fn help_function_arglist_event_apply_modifier_preserve_names() {
+        let result = builtin_help_function_arglist(vec![
+            Value::symbol("event-apply-modifier"),
+            Value::True,
+        ])
+        .unwrap();
+        assert_eq!(
+            arglist_names(&result),
+            vec![
+                "event".to_string(),
+                "symbol".to_string(),
+                "lshiftby".to_string(),
+                "prefix".to_string()
             ]
         );
     }

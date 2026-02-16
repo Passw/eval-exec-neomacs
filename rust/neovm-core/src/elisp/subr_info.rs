@@ -295,6 +295,7 @@ fn subr_arity_value(name: &str) -> Value {
         "defining-kbd-macro" => arity_cons(1, Some(2)),
         "help-key-description" => arity_cons(2, Some(2)),
         "recent-keys" => arity_cons(0, Some(1)),
+        "event-apply-modifier" => arity_cons(4, Some(4)),
         // Threading primitives
         "thread-join" | "thread-name" | "thread-live-p" | "mutexp" | "mutex-name"
         | "mutex-lock" | "mutex-unlock" | "condition-variable-p" | "condition-wait" => {
@@ -578,6 +579,11 @@ mod tests {
     #[test]
     fn subr_arity_condition_notify_optional_all() {
         assert_subr_arity("condition-notify", 1, Some(2));
+    }
+
+    #[test]
+    fn subr_arity_event_apply_modifier_is_four() {
+        assert_subr_arity("event-apply-modifier", 4, Some(4));
     }
 
     #[test]
