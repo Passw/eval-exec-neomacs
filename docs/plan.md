@@ -10136,6 +10136,20 @@ Last updated: 2026-02-16
     - `make -C test/neovm/vm-compat check-one-neovm CASE=cases/predicate-core-subr-arity-semantics` (pass, 6/6)
     - `make -C test/neovm/vm-compat validate-case-lists` (pass)
     - `make -C test/neovm/vm-compat check-builtin-registry-fboundp` (pass, 1 allowlisted drift)
+- Aligned `frame-visible-p` runtime behavior with GNU Emacs and locked explicit designator semantics:
+  - runtime changes:
+    - require exactly 1 arg (`wrong-number-of-arguments` on 0/2+)
+    - reject non-frame-live designators with `(wrong-type-argument frame-live-p VALUE)`
+    - no implicit default to selected frame
+  - added and enabled oracle corpus:
+    - `test/neovm/vm-compat/cases/frame-visible-p-semantics.forms`
+    - `test/neovm/vm-compat/cases/frame-visible-p-semantics.expected.tsv`
+    - `test/neovm/vm-compat/cases/default.list`
+  - verified:
+    - `NEOVM_ORACLE_EMACS=/nix/store/hql3zwz5b4ywd2qwx8jssp4dyb7nx4cb-emacs-30.2/bin/emacs make -C test/neovm/vm-compat record FORMS=cases/frame-visible-p-semantics.forms EXPECTED=cases/frame-visible-p-semantics.expected.tsv` (pass)
+    - `cargo test --manifest-path rust/neovm-core/Cargo.toml frame_visible_p_enforces_arity_and_designators` (pass)
+    - `make -C test/neovm/vm-compat check-one-neovm CASE=cases/frame-visible-p-semantics` (pass, 4/4)
+    - `make -C test/neovm/vm-compat check-all-neovm-strict` (pass)
 
 ## Doing
 
@@ -10144,13 +10158,13 @@ Last updated: 2026-02-16
   - run oracle/parity checks after each behavior-affecting change
   - remove dead helper code that is not part of exposed compatibility surface
 - Identify the next high-impact builtin still stubbed in NeoVM core and land it as a small implementation + oracle-corpus lock-in slice.
-  - current focus: continue subr-arity parity reduction with compact 10-20 primitive clusters, then pivot to next evaluator-backed stub replacement
+  - current focus: continue targeted frame/window semantic parity lock-ins after recent arity slices, then pivot to next evaluator-backed stub replacement
 - Reduce vm-compat operator friction for large case sets (small Makefile UX improvements).
   - added list-driven targets: `record-list`, `check-list`, `check-neovm-list` with `LIST=cases/<name>.list`
 
 ## Next
 
 1. Keep `check-all-neovm` as a recurring post-slice gate (detect regressions before they batch up).
-2. Continue `subr-arity` oracle cluster slices until next `check-builtin-registry-fboundp` drift report meaningfully drops.
-3. Land a minimal non-interactive subset for `query-replace` and `query-replace-regexp`, with explicit oracle lock-in.
+2. Continue frame/window semantic lock-ins for non-arity behavior drifts (designator/type payload precision).
+3. Continue `subr-arity` oracle cluster slices until next `check-builtin-registry-fboundp` drift report meaningfully drops.
 4. Keep Rust backend behind compile-time switch and preserve Emacs C core as default backend.
