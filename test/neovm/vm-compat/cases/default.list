@@ -172,6 +172,7 @@ cases/minibuffer-contents-no-properties-semantics
 cases/transient-mark-mode-semantics
 cases/input-batch-readers
 cases/thing-at-point-url-email-semantics
+cases/thing-at-point-filename-semantics
 cases/read-batch-input-semantics
 cases/read-batch-error-payloads
 cases/zlib-decompress-region-semantics

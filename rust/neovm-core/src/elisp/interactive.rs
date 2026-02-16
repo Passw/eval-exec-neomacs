@@ -1111,6 +1111,7 @@ pub(crate) fn builtin_bounds_of_thing_at_point(
         "number" => bounds_number(&text, idx),
         "url" => bounds_url(&text, idx),
         "email" => bounds_email(&text, idx),
+        "filename" => bounds_filename(&text, idx),
         _ => None,
     };
 
@@ -1845,6 +1846,26 @@ fn bounds_number(text: &str, idx: usize) -> Option<(usize, usize)> {
     }
     let mut end = idx;
     while end < chars.len() && (chars[end].is_ascii_digit() || chars[end] == '.') {
+        end += 1;
+    }
+
+    let byte_start: usize = chars[..start].iter().map(|c| c.len_utf8()).sum();
+    let byte_end: usize = chars[..end].iter().map(|c| c.len_utf8()).sum();
+    Some((byte_start, byte_end))
+}
+
+fn bounds_filename(text: &str, idx: usize) -> Option<(usize, usize)> {
+    let chars: Vec<char> = text.chars().collect();
+    if idx >= chars.len() || !is_filename_char(chars[idx]) {
+        return None;
+    }
+
+    let mut start = idx;
+    while start > 0 && is_filename_char(chars[start - 1]) {
+        start -= 1;
+    }
+    let mut end = idx;
+    while end < chars.len() && is_filename_char(chars[end]) {
         end += 1;
     }
 
@@ -2641,6 +2662,20 @@ mod tests {
     }
 
     #[test]
+    fn thing_at_point_filename() {
+        let mut ev = Evaluator::new();
+        eval_all_with(
+            &mut ev,
+            r#"(get-buffer-create "tap5")
+               (set-buffer "tap5")
+               (insert "open ./dir/file.txt now")
+               (goto-char 10)"#,
+        );
+        let result = builtin_thing_at_point(&mut ev, vec![Value::symbol("filename")]).unwrap();
+        assert_eq!(result.as_str(), Some("./dir/file.txt"));
+    }
+
+    #[test]
     fn thing_at_point_no_buffer() {
         let mut ev = Evaluator::new();
         // No buffer set
@@ -2725,6 +2760,27 @@ mod tests {
             assert_eq!(cell.cdr.as_int(), Some(61));
         } else {
             panic!("expected email bounds cons, got {email:?}");
+        }
+    }
+
+    #[test]
+    fn bounds_of_thing_at_point_filename() {
+        let mut ev = Evaluator::new();
+        eval_all_with(
+            &mut ev,
+            r#"(get-buffer-create "bnd4")
+               (set-buffer "bnd4")
+               (insert "open ./dir/file.txt now")
+               (goto-char 10)"#,
+        );
+        let result =
+            builtin_bounds_of_thing_at_point(&mut ev, vec![Value::symbol("filename")]).unwrap();
+        if let Value::Cons(cell) = &result {
+            let cell = cell.lock().expect("cons lock");
+            assert_eq!(cell.car.as_int(), Some(6));
+            assert_eq!(cell.cdr.as_int(), Some(20));
+        } else {
+            panic!("expected filename bounds cons, got {result:?}");
         }
     }
 
