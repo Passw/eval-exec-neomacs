@@ -784,6 +784,28 @@ mod tests {
     }
 
     #[test]
+    fn subr_arity_thread_primitives_match_oracle() {
+        assert_subr_arity("thread-join", 1, Some(1));
+        assert_subr_arity("thread-yield", 0, Some(0));
+        assert_subr_arity("thread-name", 1, Some(1));
+        assert_subr_arity("thread-live-p", 1, Some(1));
+        assert_subr_arity("thread-signal", 3, Some(3));
+        assert_subr_arity("thread-last-error", 0, Some(1));
+        assert_subr_arity("make-thread", 1, Some(2));
+        assert_subr_arity("make-mutex", 0, Some(1));
+        assert_subr_arity("mutexp", 1, Some(1));
+        assert_subr_arity("mutex-name", 1, Some(1));
+        assert_subr_arity("mutex-lock", 1, Some(1));
+        assert_subr_arity("mutex-unlock", 1, Some(1));
+        assert_subr_arity("make-condition-variable", 1, Some(2));
+        assert_subr_arity("condition-variable-p", 1, Some(1));
+        assert_subr_arity("condition-wait", 1, Some(1));
+        assert_subr_arity("condition-notify", 1, Some(2));
+        assert_subr_arity("current-thread", 0, Some(0));
+        assert_subr_arity("all-threads", 0, Some(0));
+    }
+
+    #[test]
     fn subr_arity_display_terminal_primitives_match_oracle() {
         assert_subr_arity("display-images-p", 0, Some(1));
         assert_subr_arity("display-graphic-p", 0, Some(1));
