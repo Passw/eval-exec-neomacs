@@ -1854,27 +1854,6 @@ neomacs_layout_get_window_params (void *frame_ptr, int window_index,
   params->hscroll = w->hscroll;
   params->vscroll = w->vscroll;
 
-  /* Face colors */
-  struct face *default_face = FACE_FROM_ID_OR_NULL (f, DEFAULT_FACE_ID);
-  if (default_face)
-    {
-      unsigned long fg = default_face->foreground_defaulted_p
-        ? FRAME_FOREGROUND_PIXEL (f) : default_face->foreground;
-      unsigned long bg = default_face->background_defaulted_p
-        ? FRAME_BACKGROUND_PIXEL (f) : default_face->background;
-      params->default_fg = (uint32_t) ((RED_FROM_ULONG (fg) << 16)
-                                       | (GREEN_FROM_ULONG (fg) << 8)
-                                       | BLUE_FROM_ULONG (fg));
-      params->default_bg = (uint32_t) ((RED_FROM_ULONG (bg) << 16)
-                                       | (GREEN_FROM_ULONG (bg) << 8)
-                                       | BLUE_FROM_ULONG (bg));
-    }
-  else
-    {
-      params->default_fg = 0x00FFFFFF;
-      params->default_bg = 0x00000000;
-    }
-
   /* Many variables below are buffer-local (face-remapping-alist,
      show-trailing-whitespace, wrap-prefix, line-prefix, fill-column
      indicator settings, etc.).  Their C globals (Vfoo) resolve through
@@ -1884,13 +1863,31 @@ neomacs_layout_get_window_params (void *frame_ptr, int window_index,
   if (BUFFERP (w->contents))
     set_buffer_internal_1 (XBUFFER (w->contents));
 
-  /* Character cell dimensions.
-     Use the window's own default face font if available (respects
-     text-scale-mode / buffer-face-mode via face-remapping-alist),
-     otherwise fall back to the frame font.  */
+  /* Default face colors and character cell dimensions.
+     Must be AFTER buffer switch so face-remapping-alist (used by
+     solaire-mode, buffer-face-mode, text-scale-mode, etc.) is
+     respected.  lookup_basic_face resolves the remapping.  */
   {
     int def_face_id = lookup_basic_face (w, f, DEFAULT_FACE_ID);
     struct face *wface = FACE_FROM_ID_OR_NULL (f, def_face_id);
+    if (wface)
+      {
+        unsigned long fg = wface->foreground_defaulted_p
+          ? FRAME_FOREGROUND_PIXEL (f) : wface->foreground;
+        unsigned long bg = wface->background_defaulted_p
+          ? FRAME_BACKGROUND_PIXEL (f) : wface->background;
+        params->default_fg = (uint32_t) ((RED_FROM_ULONG (fg) << 16)
+                                         | (GREEN_FROM_ULONG (fg) << 8)
+                                         | BLUE_FROM_ULONG (fg));
+        params->default_bg = (uint32_t) ((RED_FROM_ULONG (bg) << 16)
+                                         | (GREEN_FROM_ULONG (bg) << 8)
+                                         | BLUE_FROM_ULONG (bg));
+      }
+    else
+      {
+        params->default_fg = 0x00FFFFFF;
+        params->default_bg = 0x00000000;
+      }
     if (wface && wface->font)
       {
         params->char_width = (float) wface->font->average_width;
