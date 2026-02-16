@@ -6941,6 +6941,7 @@ pub(crate) fn dispatch_builtin(
         "seq-do" => return Some(super::cl_lib::builtin_seq_do(eval, args)),
         "seq-count" => return Some(super::cl_lib::builtin_seq_count(eval, args)),
         "cl-count" => return Some(super::cl_lib::builtin_cl_count(eval, args)),
+        "cl-count-if" => return Some(super::cl_lib::builtin_cl_count_if(eval, args)),
         "seq-reduce" => return Some(super::cl_lib::builtin_seq_reduce(eval, args)),
         "cl-reduce" => return Some(super::cl_lib::builtin_cl_reduce(eval, args)),
         "seq-some" => return Some(super::cl_lib::builtin_seq_some(eval, args)),

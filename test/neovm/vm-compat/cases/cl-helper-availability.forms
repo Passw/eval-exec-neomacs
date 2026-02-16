@@ -7,7 +7,7 @@
 (fboundp 'cl-count)
 (condition-case err (cl-count #'numberp '(1 "x" 2)) (error err))
 (fboundp 'cl-count-if)
-(condition-case err (cl-count-if) (error err))
+(condition-case err (cl-count-if #'numberp '(1 "x" 2)) (error err))
 (fboundp 'cl-eighth)
 (condition-case err (cl-eighth '(a b c d e f g h)) (error err))
 (fboundp 'cl-evenp)

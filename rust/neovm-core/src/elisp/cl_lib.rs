@@ -706,6 +706,14 @@ pub(crate) fn builtin_cl_count(eval: &mut super::eval::Evaluator, args: Vec<Valu
     builtin_seq_count(eval, args)
 }
 
+/// `(cl-count-if PREDICATE SEQ)` -- CL alias for `seq-count`.
+pub(crate) fn builtin_cl_count_if(
+    eval: &mut super::eval::Evaluator,
+    args: Vec<Value>,
+) -> EvalResult {
+    builtin_seq_count(eval, args)
+}
+
 /// `(seq-contains-p SEQ ELT &optional TESTFN)` — membership test for sequence.
 pub(crate) fn builtin_seq_contains_p(eval: &mut super::eval::Evaluator, args: Vec<Value>) -> EvalResult {
     if !(2..=3).contains(&args.len()) {
@@ -1459,6 +1467,15 @@ mod tests {
         let func = Value::Subr("numberp".to_string());
         let seq = Value::list(vec![Value::Int(1), Value::string("x"), Value::Int(2)]);
         let result = builtin_cl_count(&mut evaluator, vec![func, seq]).unwrap();
+        assert_eq!(result.as_int(), Some(2));
+    }
+
+    #[test]
+    fn cl_count_if_with_eval() {
+        let mut evaluator = super::super::eval::Evaluator::new();
+        let func = Value::Subr("numberp".to_string());
+        let seq = Value::list(vec![Value::Int(1), Value::string("x"), Value::Int(2)]);
+        let result = builtin_cl_count_if(&mut evaluator, vec![func, seq]).unwrap();
         assert_eq!(result.as_int(), Some(2));
     }
 }
