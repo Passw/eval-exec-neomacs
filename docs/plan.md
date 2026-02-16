@@ -20,6 +20,23 @@ Last updated: 2026-02-16
 
 ## Done
 
+- Aligned `thing-at-point 'number` return type with oracle and added core thing-at-point corpus lock-in:
+  - updated:
+    - `rust/neovm-core/src/elisp/interactive.rs`
+      - changed number extraction to return numeric `Value::Int` / `Value::Float` instead of string payloads when parsing succeeds.
+      - added focused unit coverage for float and integer number extraction.
+    - `test/neovm/vm-compat/cases/thing-at-point-core-semantics.forms`
+      - added oracle probes for word/symbol/whitespace/number extraction and bounds behavior.
+    - `test/neovm/vm-compat/cases/thing-at-point-core-semantics.expected.tsv`
+      - recorded oracle baseline outputs for the new core thing-at-point corpus.
+    - `test/neovm/vm-compat/cases/default.list`
+      - added `cases/thing-at-point-core-semantics` to recurring compatibility execution.
+  - verified:
+    - `cargo test thing_at_point_number_returns_numeric_value --manifest-path rust/neovm-core/Cargo.toml` (pass)
+    - `cargo test interactive::tests::thing_at_point --manifest-path rust/neovm-core/Cargo.toml` (pass)
+    - `make -C test/neovm/vm-compat check-one-neovm CASE=cases/thing-at-point-core-semantics` (pass, 8/8)
+    - `make -C test/neovm/vm-compat validate-case-lists` (pass)
+
 - Re-ran full `vm-compat` gate after thing-at-point compatibility slices:
   - `make -C test/neovm/vm-compat check-all-neovm` (pass)
 
