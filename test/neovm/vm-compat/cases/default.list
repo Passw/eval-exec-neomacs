@@ -334,6 +334,7 @@ cases/frame-batch-semantics
 cases/window-buffer-switch-semantics
 cases/window-buffer-designator-errors-semantics
 cases/window-buffer-missing-designator-semantics
+cases/set-window-buffer-arity-semantics
 cases/set-window-buffer-bootstrap-semantics
 cases/set-window-dedicated-p-designator-semantics
 cases/select-window-designator-semantics

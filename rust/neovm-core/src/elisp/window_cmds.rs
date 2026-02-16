@@ -843,6 +843,7 @@ pub(crate) fn builtin_set_window_buffer(
     args: Vec<Value>,
 ) -> EvalResult {
     expect_min_args("set-window-buffer", &args, 2)?;
+    expect_max_args("set-window-buffer", &args, 3)?;
     let (fid, wid) = resolve_window_id(eval, args.first())?;
     let buf_id = match &args[1] {
         Value::Buffer(id) => {
@@ -2172,11 +2173,13 @@ mod tests {
         let results = eval_with_frame(
             "(condition-case err (switch-to-buffer \"*scratch*\" nil nil nil) (error (car err)))
              (condition-case err (display-buffer \"*scratch*\" nil nil nil) (error (car err)))
-             (condition-case err (pop-to-buffer \"*scratch*\" nil nil nil) (error (car err)))",
+             (condition-case err (pop-to-buffer \"*scratch*\" nil nil nil) (error (car err)))
+             (condition-case err (set-window-buffer (selected-window) \"*scratch*\" nil nil) (error (car err)))",
         );
         assert_eq!(results[0], "OK wrong-number-of-arguments");
         assert_eq!(results[1], "OK wrong-number-of-arguments");
         assert_eq!(results[2], "OK wrong-number-of-arguments");
+        assert_eq!(results[3], "OK wrong-number-of-arguments");
     }
 
     #[test]
