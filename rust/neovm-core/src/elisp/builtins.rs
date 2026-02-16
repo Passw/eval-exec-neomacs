@@ -10708,6 +10708,10 @@ mod tests {
             .expect("symbol-function should resolve subr-native-elisp-p alias");
         assert_eq!(subr_native, Value::symbol("native-comp-function-p"));
 
+        let name_last = builtin_symbol_function(&mut eval, vec![Value::symbol("name-last-kbd-macro")])
+            .expect("symbol-function should resolve name-last-kbd-macro alias");
+        assert_eq!(name_last, Value::symbol("kmacro-name-last-macro"));
+
         let throw_fn = builtin_symbol_function(&mut eval, vec![Value::symbol("throw")])
             .expect("symbol-function should resolve throw as callable subr");
         assert_eq!(throw_fn, Value::Subr("throw".to_string()));

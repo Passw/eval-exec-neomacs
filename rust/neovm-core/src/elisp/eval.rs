@@ -170,6 +170,11 @@ impl Evaluator {
         obarray.set_symbol_function("replace-rectangle", Value::symbol("string-rectangle"));
         obarray.set_symbol_function("wholenump", Value::symbol("natnump"));
         obarray.set_symbol_function("subr-native-elisp-p", Value::symbol("native-comp-function-p"));
+        obarray.set_symbol_function(
+            "kmacro-name-last-macro",
+            Value::Subr("name-last-kbd-macro".to_string()),
+        );
+        obarray.set_symbol_function("name-last-kbd-macro", Value::symbol("kmacro-name-last-macro"));
 
         // Mark standard variables as special (dynamically bound)
         for name in &[
