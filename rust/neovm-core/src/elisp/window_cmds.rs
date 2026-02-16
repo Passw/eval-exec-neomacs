@@ -346,6 +346,30 @@ pub(crate) fn builtin_window_body_width(
     }
 }
 
+/// `(window-total-height &optional WINDOW ROUND)` -> integer.
+///
+/// Compatibility wrapper over `window-body-height`: we currently have no
+/// separate total-vs-body geometry model in batch mode.
+pub(crate) fn builtin_window_total_height(
+    eval: &mut super::eval::Evaluator,
+    args: Vec<Value>,
+) -> EvalResult {
+    expect_max_args("window-total-height", &args, 2)?;
+    builtin_window_body_height(eval, args)
+}
+
+/// `(window-total-width &optional WINDOW ROUND)` -> integer.
+///
+/// Compatibility wrapper over `window-body-width`: we currently have no
+/// separate total-vs-body geometry model in batch mode.
+pub(crate) fn builtin_window_total_width(
+    eval: &mut super::eval::Evaluator,
+    args: Vec<Value>,
+) -> EvalResult {
+    expect_max_args("window-total-width", &args, 2)?;
+    builtin_window_body_width(eval, args)
+}
+
 /// `(window-list &optional FRAME MINIBUF ALL-FRAMES)` -> list of window ids.
 pub(crate) fn builtin_window_list(
     eval: &mut super::eval::Evaluator,
@@ -362,6 +386,79 @@ pub(crate) fn builtin_window_list(
         .map(|wid| Value::Int(wid.0 as i64))
         .collect();
     Ok(Value::list(ids))
+}
+
+/// `(get-buffer-window &optional BUFFER-OR-NAME ALL-FRAMES)` -> window or nil.
+///
+/// Batch-compatible behavior: search the selected frame for a window showing
+/// the requested buffer.
+pub(crate) fn builtin_get_buffer_window(
+    eval: &mut super::eval::Evaluator,
+    args: Vec<Value>,
+) -> EvalResult {
+    expect_max_args("get-buffer-window", &args, 2)?;
+    let target = resolve_optional_buffer_id(eval, args.first())?;
+    let fid = ensure_selected_frame_id(eval);
+    let frame = eval
+        .frames
+        .get(fid)
+        .ok_or_else(|| signal("error", vec![Value::string("Frame not found")]))?;
+
+    for wid in frame.window_list() {
+        let matches = frame
+            .find_window(wid)
+            .and_then(|w| w.buffer_id())
+            .is_some_and(|bid| bid == target);
+        if matches {
+            return Ok(Value::Int(wid.0 as i64));
+        }
+    }
+
+    Ok(Value::Nil)
+}
+
+/// `(get-buffer-window-list &optional BUFFER-OR-NAME MINIBUF ALL-FRAMES)`
+/// -> list of windows displaying BUFFER-OR-NAME.
+///
+/// Batch-compatible behavior: collects matching windows from the selected
+/// frame and ignores MINIBUF/ALL-FRAMES.
+pub(crate) fn builtin_get_buffer_window_list(
+    eval: &mut super::eval::Evaluator,
+    args: Vec<Value>,
+) -> EvalResult {
+    expect_max_args("get-buffer-window-list", &args, 3)?;
+    let target = resolve_optional_buffer_id(eval, args.first())?;
+    let fid = ensure_selected_frame_id(eval);
+    let frame = eval
+        .frames
+        .get(fid)
+        .ok_or_else(|| signal("error", vec![Value::string("Frame not found")]))?;
+
+    let mut windows = Vec::new();
+    for wid in frame.window_list() {
+        let matches = frame
+            .find_window(wid)
+            .and_then(|w| w.buffer_id())
+            .is_some_and(|bid| bid == target);
+        if matches {
+            windows.push(Value::Int(wid.0 as i64));
+        }
+    }
+
+    Ok(Value::list(windows))
+}
+
+/// `(fit-window-to-buffer &optional WINDOW MAX-HEIGHT MIN-HEIGHT MAX-WIDTH PRESERVE-SIZE)`
+/// -> WINDOW.
+///
+/// Batch-compatible no-op: validates WINDOW when provided and returns it.
+pub(crate) fn builtin_fit_window_to_buffer(
+    eval: &mut super::eval::Evaluator,
+    args: Vec<Value>,
+) -> EvalResult {
+    expect_max_args("fit-window-to-buffer", &args, 6)?;
+    let (_fid, wid) = resolve_window_id(&eval.frames, args.first())?;
+    Ok(Value::Int(wid.0 as i64))
 }
 
 /// `(window-dedicated-p &optional WINDOW)` -> t or nil.
@@ -999,6 +1096,20 @@ fn resolve_buffer_id(eval: &super::eval::Evaluator, val: &Value) -> Result<Buffe
     }
 }
 
+fn resolve_optional_buffer_id(
+    eval: &super::eval::Evaluator,
+    maybe: Option<&Value>,
+) -> Result<BufferId, Flow> {
+    match maybe {
+        None | Some(Value::Nil) => eval
+            .buffers
+            .current_buffer()
+            .map(|buf| buf.id)
+            .ok_or_else(|| signal("error", vec![Value::string("No current buffer")])),
+        Some(value) => resolve_buffer_id(eval, value),
+    }
+}
+
 // ===========================================================================
 // Tests
 // ===========================================================================
@@ -1140,6 +1251,38 @@ mod tests {
         assert!(r.starts_with("OK "));
         let val: i64 = r.strip_prefix("OK ").unwrap().trim().parse().unwrap();
         assert_eq!(val, 800);
+    }
+
+    #[test]
+    fn window_total_size_queries_work() {
+        let results = eval_with_frame(
+            "(list (integerp (window-total-height))
+                   (integerp (window-total-width))
+                   (integerp (window-total-height nil t))
+                   (integerp (window-total-width nil t)))",
+        );
+        assert_eq!(results[0], "OK (t t t t)");
+    }
+
+    #[test]
+    fn get_buffer_window_finds_selected_window_for_current_buffer() {
+        let result = eval_one_with_frame(
+            "(let ((w (selected-window)))
+               (eq w (get-buffer-window (window-buffer w))))",
+        );
+        assert_eq!(result, "OK t");
+    }
+
+    #[test]
+    fn get_buffer_window_list_returns_matching_windows() {
+        let result = eval_one_with_frame("(length (get-buffer-window-list (window-buffer)))");
+        assert_eq!(result, "OK 1");
+    }
+
+    #[test]
+    fn fit_window_to_buffer_returns_window_id() {
+        let result = eval_one_with_frame("(windowp (fit-window-to-buffer))");
+        assert_eq!(result, "OK t");
     }
 
     #[test]

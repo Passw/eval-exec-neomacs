@@ -231,6 +231,7 @@ cases/display-terminal-subr-arity-semantics
 cases/display-control-subr-arity-semantics
 cases/display-tty-x-helper-semantics
 cases/frame-window-designator-boundary-semantics
+cases/window-frame-subr-arity-semantics
 cases/x-display-batch-semantics
 cases/x-display-terminal-designator-semantics
 cases/display-monitor-semantics

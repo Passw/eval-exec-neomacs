@@ -7320,7 +7320,22 @@ pub(crate) fn dispatch_builtin(
         "window-body-width" => {
             return Some(super::window_cmds::builtin_window_body_width(eval, args))
         }
+        "window-total-height" => {
+            return Some(super::window_cmds::builtin_window_total_height(eval, args))
+        }
+        "window-total-width" => {
+            return Some(super::window_cmds::builtin_window_total_width(eval, args))
+        }
         "window-list" => return Some(super::window_cmds::builtin_window_list(eval, args)),
+        "get-buffer-window" => {
+            return Some(super::window_cmds::builtin_get_buffer_window(eval, args))
+        }
+        "get-buffer-window-list" => {
+            return Some(super::window_cmds::builtin_get_buffer_window_list(eval, args))
+        }
+        "fit-window-to-buffer" => {
+            return Some(super::window_cmds::builtin_fit_window_to_buffer(eval, args))
+        }
         "window-dedicated-p" => {
             return Some(super::window_cmds::builtin_window_dedicated_p(eval, args))
         }

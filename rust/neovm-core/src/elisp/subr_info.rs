@@ -310,6 +310,11 @@ fn subr_arity_value(name: &str) -> Value {
         "send-string-to-terminal" | "display-supports-face-attributes-p" => arity_cons(1, Some(2)),
         "x-open-connection" => arity_cons(1, Some(3)),
         "internal-show-cursor" => arity_cons(2, Some(2)),
+        "display-buffer" => arity_cons(1, Some(3)),
+        "frame-parameter" | "set-window-point" => arity_cons(2, Some(2)),
+        "set-window-buffer" | "set-window-start" => arity_cons(2, Some(3)),
+        "fit-window-to-buffer" => arity_cons(0, Some(6)),
+        "window-text-pixel-size" => arity_cons(0, Some(7)),
         // Process primitives
         "call-process" => arity_cons(1, None),
         "call-process-region" => arity_cons(3, None),
@@ -330,12 +335,21 @@ fn subr_arity_value(name: &str) -> Value {
         | "tty-no-underline" | "window-system" | "x-display-pixel-width"
         | "x-display-pixel-height" | "x-server-version" | "x-server-max-request-size"
         | "x-display-grayscale-p" | "redraw-frame" | "ding" | "internal-show-cursor-p"
-        | "controlling-tty-p" | "suspend-tty" | "resume-tty" | "terminal-coding-system" => {
+        | "controlling-tty-p" | "suspend-tty" | "resume-tty" | "terminal-coding-system"
+        | "frame-parameters" | "window-buffer" | "window-dedicated-p" | "window-point"
+        | "window-start" => {
             arity_cons(0, Some(1))
         }
-        "terminal-list" | "x-display-list" | "redraw-display" => arity_cons(0, Some(0)),
-        "frame-edges" => arity_cons(0, Some(2)),
-        "terminal-live-p" => arity_cons(1, Some(1)),
+        "terminal-list" | "x-display-list" | "redraw-display" | "frame-list"
+        | "selected-window" => arity_cons(0, Some(0)),
+        "frame-edges" | "window-body-height" | "window-body-width" | "window-end"
+        | "window-total-height" | "window-total-width" | "get-buffer-window" => {
+            arity_cons(0, Some(2))
+        }
+        "window-list" | "get-buffer-window-list" => arity_cons(0, Some(3)),
+        "terminal-live-p" | "frame-live-p" | "frame-visible-p" | "window-live-p" | "windowp" => {
+            arity_cons(1, Some(1))
+        }
         "terminal-parameter" => arity_cons(2, Some(2)),
         "set-terminal-parameter" => arity_cons(3, Some(3)),
         // Threading primitives
@@ -691,6 +705,36 @@ mod tests {
         assert_subr_arity("process-send-string", 2, Some(2));
         assert_subr_arity("process-status", 1, Some(1));
         assert_subr_arity("start-process", 3, None);
+    }
+
+    #[test]
+    fn subr_arity_window_frame_primitives_match_oracle() {
+        assert_subr_arity("display-buffer", 1, Some(3));
+        assert_subr_arity("frame-list", 0, Some(0));
+        assert_subr_arity("frame-live-p", 1, Some(1));
+        assert_subr_arity("frame-parameter", 2, Some(2));
+        assert_subr_arity("frame-parameters", 0, Some(1));
+        assert_subr_arity("frame-visible-p", 1, Some(1));
+        assert_subr_arity("selected-window", 0, Some(0));
+        assert_subr_arity("set-window-buffer", 2, Some(3));
+        assert_subr_arity("set-window-point", 2, Some(2));
+        assert_subr_arity("set-window-start", 2, Some(3));
+        assert_subr_arity("window-body-height", 0, Some(2));
+        assert_subr_arity("window-body-width", 0, Some(2));
+        assert_subr_arity("window-buffer", 0, Some(1));
+        assert_subr_arity("window-dedicated-p", 0, Some(1));
+        assert_subr_arity("window-end", 0, Some(2));
+        assert_subr_arity("window-list", 0, Some(3));
+        assert_subr_arity("window-live-p", 1, Some(1));
+        assert_subr_arity("window-point", 0, Some(1));
+        assert_subr_arity("window-start", 0, Some(1));
+        assert_subr_arity("window-text-pixel-size", 0, Some(7));
+        assert_subr_arity("windowp", 1, Some(1));
+        assert_subr_arity("get-buffer-window", 0, Some(2));
+        assert_subr_arity("get-buffer-window-list", 0, Some(3));
+        assert_subr_arity("fit-window-to-buffer", 0, Some(6));
+        assert_subr_arity("window-total-height", 0, Some(2));
+        assert_subr_arity("window-total-width", 0, Some(2));
     }
 
     #[test]
