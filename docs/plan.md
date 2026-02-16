@@ -23,6 +23,21 @@ Last updated: 2026-02-16
 
 ## Done
 
+- Aligned `describe-variable` optional-argument arity with oracle and stabilized existing helper-arity corpus:
+  - updated:
+    - `rust/neovm-core/src/elisp/doc.rs`
+      - `describe-variable` now accepts 1..2 args (optional second arg accepted/ignored for now).
+      - added focused unit coverage for optional-second-arg acceptance.
+    - `test/neovm/vm-compat/cases/doc-helper-arity-semantics.forms`
+      - replaced a brittle `fill-column` probe with a self-seeded variable probe:
+        - `(setq neovm-doc-helper-probe 1)` then `(stringp (describe-variable 'neovm-doc-helper-probe nil))`
+      - keeps the case asserting optional-arg acceptance without depending on startup variable tables.
+    - `test/neovm/vm-compat/cases/doc-helper-arity-semantics.expected.tsv`
+      - refreshed oracle baseline output for the updated form set.
+  - verified:
+    - `cargo test --manifest-path rust/neovm-core/Cargo.toml describe_variable_` (pass)
+    - `make -C test/neovm/vm-compat check-one-neovm CASE=cases/doc-helper-arity-semantics` (pass, 18/18)
+
 - Refreshed existing arity baseline impacted by `substitute-command-keys` optional-arg compatibility:
   - updated:
     - `test/neovm/vm-compat/cases/doc-helper-arity-semantics.expected.tsv`
