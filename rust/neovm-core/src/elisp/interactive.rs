@@ -948,6 +948,37 @@ fn resolve_minor_mode_keymap_id(eval: &Evaluator, map_value: &Value) -> Result<O
     }
 }
 
+fn lookup_minor_mode_binding_in_alist(
+    eval: &Evaluator,
+    events: &[KeyEvent],
+    alist_value: &Value,
+) -> Result<Option<(String, Value)>, Flow> {
+    let Some(entries) = list_to_vec(alist_value) else {
+        return Ok(None);
+    };
+
+    for entry in entries {
+        let Some((mode_name, map_value)) = minor_mode_map_entry(&entry) else {
+            continue;
+        };
+        if !dynamic_or_global_symbol_value(eval, &mode_name).is_some_and(|v| v.is_truthy()) {
+            continue;
+        }
+
+        let Some(map_id) = resolve_minor_mode_keymap_id(eval, &map_value)? else {
+            continue;
+        };
+        let binding = lookup_keymap_with_partial(eval, map_id, events);
+        if binding.is_nil() {
+            continue;
+        }
+
+        return Ok(Some((mode_name, binding)));
+    }
+
+    Ok(None)
+}
+
 /// `(minor-mode-key-binding KEY &optional ACCEPT-DEFAULTS)`
 /// Look up KEY in active minor mode keymaps.
 pub(crate) fn builtin_minor_mode_key_binding(
@@ -963,30 +994,32 @@ pub(crate) fn builtin_minor_mode_key_binding(
         Err(_) => return Ok(Value::Nil),
     };
 
+    if let Some(emulation_raw) = dynamic_or_global_symbol_value(eval, "emulation-mode-map-alists") {
+        if let Some(emulation_entries) = list_to_vec(&emulation_raw) {
+            for emulation_entry in emulation_entries {
+                let alist_value = match emulation_entry.as_symbol_name() {
+                    Some(name) => dynamic_or_global_symbol_value(eval, name).unwrap_or(Value::Nil),
+                    None => emulation_entry,
+                };
+                if let Some((mode_name, binding)) =
+                    lookup_minor_mode_binding_in_alist(eval, &events, &alist_value)?
+                {
+                    return Ok(Value::list(vec![Value::cons(
+                        Value::symbol(mode_name),
+                        binding,
+                    )]));
+                }
+            }
+        }
+    }
+
     for alist_name in ["minor-mode-overriding-map-alist", "minor-mode-map-alist"] {
         let Some(alist_value) = dynamic_or_global_symbol_value(eval, alist_name) else {
             continue;
         };
-        let Some(entries) = list_to_vec(&alist_value) else {
-            continue;
-        };
-
-        for entry in entries {
-            let Some((mode_name, map_value)) = minor_mode_map_entry(&entry) else {
-                continue;
-            };
-            if !dynamic_or_global_symbol_value(eval, &mode_name).is_some_and(|v| v.is_truthy()) {
-                continue;
-            }
-
-            let Some(map_id) = resolve_minor_mode_keymap_id(eval, &map_value)? else {
-                continue;
-            };
-            let binding = lookup_keymap_with_partial(eval, map_id, &events);
-            if binding.is_nil() {
-                continue;
-            }
-
+        if let Some((mode_name, binding)) =
+            lookup_minor_mode_binding_in_alist(eval, &events, &alist_value)?
+        {
             return Ok(Value::list(vec![Value::cons(
                 Value::symbol(mode_name),
                 binding,
@@ -2931,6 +2964,39 @@ mod tests {
                        (error err)))"#
             ),
             "OK (wrong-type-argument keymapp 999999)"
+        );
+    }
+
+    #[test]
+    fn minor_mode_key_binding_prefers_emulation_mode_maps() {
+        assert_eq!(
+            eval_one(
+                r#"(let* ((m-minor (make-sparse-keymap))
+                          (m-emu (make-sparse-keymap)))
+                     (define-key m-minor (kbd "C-a") 'ignore)
+                     (define-key m-emu (kbd "C-a") 'forward-char)
+                     (let ((emulation-mode-map-alists (list (list (cons 'emu-mode m-emu))))
+                           (minor-mode-map-alist (list (cons 'minor-mode m-minor)))
+                           (emu-mode t)
+                           (minor-mode t))
+                       (minor-mode-key-binding (kbd "C-a"))))"#
+            ),
+            "OK ((emu-mode . forward-char))"
+        );
+    }
+
+    #[test]
+    fn minor_mode_key_binding_resolves_symbol_emulation_alists() {
+        assert_eq!(
+            eval_one(
+                r#"(let* ((m (make-sparse-keymap)))
+                     (define-key m (kbd "C-a") 'ignore)
+                     (let ((emu-alist (list (cons 'emu-mode m)))
+                           (emulation-mode-map-alists '(emu-alist))
+                           (emu-mode t))
+                       (minor-mode-key-binding (kbd "C-a"))))"#
+            ),
+            "OK ((emu-mode . ignore))"
         );
     }
 
