@@ -19,6 +19,29 @@ Last updated: 2026-02-16
 
 ## Done
 
+- Implemented oracle-aligned `string-rectangle` / `replace-rectangle` semantics and locked compatibility corpus coverage:
+  - updated:
+    - `rust/neovm-core/src/elisp/rect.rs`
+      - replaced `string-rectangle` no-op stub with rectangle slice replacement logic (including short-line padding and START-below-END line-order asymmetry).
+      - aligned replacement argument handling with oracle char-or-string semantics (`"..."`, character objects, and character integer codes).
+      - updated `replace-rectangle` to delegate to `string-rectangle` semantics after `replace-rectangle` arity validation.
+      - added focused unit coverage for mutation, point/return behavior, type checks, and alias behavior.
+    - `test/neovm/vm-compat/cases/rect-string-semantics.forms`
+      - added oracle-backed probes for multi-line replacements, asymmetry, out-of-range positions, char-code replacement args, and type errors.
+    - `test/neovm/vm-compat/cases/rect-string-semantics.expected.tsv`
+      - recorded oracle baseline outputs for string-rectangle behavior.
+    - `test/neovm/vm-compat/cases/rect-replace-semantics.forms`
+      - added oracle-backed probes for alias behavior parity, char-code replacement args, out-of-range positions, and error paths.
+    - `test/neovm/vm-compat/cases/rect-replace-semantics.expected.tsv`
+      - recorded oracle baseline outputs for replace-rectangle behavior.
+    - `test/neovm/vm-compat/cases/default.list`
+      - added `cases/rect-string-semantics` and `cases/rect-replace-semantics` to recurring default compatibility execution.
+  - verified:
+    - `cargo test string_rectangle --manifest-path rust/neovm-core/Cargo.toml` (pass)
+    - `make -C test/neovm/vm-compat check-one-neovm CASE=cases/rect-string-semantics` (pass, 9/9)
+    - `make -C test/neovm/vm-compat check-one-neovm CASE=cases/rect-replace-semantics` (pass, 6/6)
+    - `make -C test/neovm/vm-compat validate-case-lists` (pass)
+
 - Implemented oracle-aligned `open-rectangle` semantics and locked compatibility corpus coverage:
   - updated:
     - `rust/neovm-core/src/elisp/rect.rs`
