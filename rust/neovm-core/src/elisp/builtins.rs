@@ -4518,21 +4518,67 @@ pub(crate) fn builtin_get_file_buffer(
     Ok(Value::Nil)
 }
 
-/// (kill-buffer BUFFER-OR-NAME) → t
+/// (kill-buffer &optional BUFFER-OR-NAME) → t or nil
 pub(crate) fn builtin_kill_buffer(
     eval: &mut super::eval::Evaluator,
     args: Vec<Value>,
 ) -> EvalResult {
-    expect_args("kill-buffer", &args, 1)?;
-    let id = match &args[0] {
-        Value::Buffer(id) => *id,
-        Value::Str(s) => match eval.buffers.find_buffer_by_name(s) {
-            Some(id) => id,
+    expect_max_args("kill-buffer", &args, 1)?;
+    let id = match args.first() {
+        None | Some(Value::Nil) => match eval.buffers.current_buffer() {
+            Some(buf) => buf.id,
             None => return Ok(Value::Nil),
         },
-        _ => return Ok(Value::Nil),
+        Some(Value::Buffer(id)) => {
+            if eval.buffers.get(*id).is_none() {
+                return Ok(Value::Nil);
+            }
+            *id
+        }
+        Some(Value::Str(name)) => match eval.buffers.find_buffer_by_name(name) {
+            Some(id) => id,
+            None => {
+                return Err(signal(
+                    "error",
+                    vec![Value::string(format!("No buffer named {name}"))],
+                ))
+            }
+        },
+        Some(other) => {
+            return Err(signal(
+                "wrong-type-argument",
+                vec![Value::symbol("stringp"), other.clone()],
+            ))
+        }
     };
-    eval.buffers.kill_buffer(id);
+
+    let was_current = eval.buffers.current_buffer().map(|buf| buf.id) == Some(id);
+    let replacement = if was_current {
+        match builtin_other_buffer(eval, vec![Value::Buffer(id)])? {
+            Value::Buffer(next) if next != id => Some(next),
+            _ => None,
+        }
+    } else {
+        None
+    };
+
+    if !eval.buffers.kill_buffer(id) {
+        return Ok(Value::Nil);
+    }
+
+    if was_current {
+        if let Some(next) = replacement {
+            if eval.buffers.get(next).is_some() {
+                eval.buffers.set_current(next);
+            }
+        }
+        if eval.buffers.current_buffer().is_none() {
+            if let Some(next) = eval.buffers.buffer_list().into_iter().next() {
+                eval.buffers.set_current(next);
+            }
+        }
+    }
+
     Ok(Value::True)
 }
 
@@ -9718,6 +9764,62 @@ mod tests {
         let _ = builtin_kill_buffer(&mut eval, vec![buf.clone()]).unwrap();
         let dead = builtin_buffer_live_p(&mut eval, vec![buf]).unwrap();
         assert_eq!(dead, Value::Nil);
+    }
+
+    #[test]
+    fn kill_buffer_optional_arg_and_error_semantics() {
+        let mut eval = super::super::eval::Evaluator::new();
+        let a = builtin_get_buffer_create(&mut eval, vec![Value::string("*kb-opt-a*")]).unwrap();
+        let b = builtin_get_buffer_create(&mut eval, vec![Value::string("*kb-opt-b*")]).unwrap();
+        let _ = builtin_set_buffer(&mut eval, vec![a.clone()]).unwrap();
+
+        // Optional argument omitted kills current buffer and selects another.
+        let killed_current = builtin_kill_buffer(&mut eval, vec![]).unwrap();
+        assert_eq!(killed_current, Value::True);
+        assert_eq!(
+            builtin_buffer_live_p(&mut eval, vec![a.clone()]).unwrap(),
+            Value::Nil
+        );
+        assert!(matches!(
+            builtin_current_buffer(&mut eval, vec![]).unwrap(),
+            Value::Buffer(_)
+        ));
+
+        // Missing buffer name signals `(error "No buffer named ...")`.
+        let missing = builtin_kill_buffer(&mut eval, vec![Value::string("*kb-opt-missing*")])
+            .expect_err("kill-buffer should signal on missing name");
+        match missing {
+            Flow::Signal(sig) => {
+                assert_eq!(sig.symbol, "error");
+                assert_eq!(sig.data, vec![Value::string("No buffer named *kb-opt-missing*")]);
+            }
+            other => panic!("unexpected flow: {other:?}"),
+        }
+
+        // Dead buffer object returns nil.
+        let dead =
+            builtin_generate_new_buffer(&mut eval, vec![Value::string("*kb-opt-dead*")]).unwrap();
+        assert_eq!(
+            builtin_kill_buffer(&mut eval, vec![dead.clone()]).unwrap(),
+            Value::True
+        );
+        assert_eq!(
+            builtin_kill_buffer(&mut eval, vec![dead]).unwrap(),
+            Value::Nil
+        );
+
+        // Non-buffer/non-string designators signal `wrong-type-argument`.
+        let type_err = builtin_kill_buffer(&mut eval, vec![Value::Int(1)])
+            .expect_err("kill-buffer should reject non-string designator");
+        match type_err {
+            Flow::Signal(sig) => {
+                assert_eq!(sig.symbol, "wrong-type-argument");
+                assert_eq!(sig.data, vec![Value::symbol("stringp"), Value::Int(1)]);
+            }
+            other => panic!("unexpected flow: {other:?}"),
+        }
+
+        let _ = builtin_kill_buffer(&mut eval, vec![b]).unwrap();
     }
 
     #[test]
