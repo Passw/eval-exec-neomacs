@@ -25,6 +25,23 @@ Last updated: 2026-02-16
 
 ## Done
 
+- Aligned `color-values` / `color-defined-p` batch TTY semantics with oracle and expanded font-color corpus:
+  - updated:
+    - `rust/neovm-core/src/elisp/font.rs`
+      - replaced permissive/Euclidean color approximation with batch-compatible 8-color quantization behavior:
+        - strict hex parsing for `#RGB`, `#RRGGBB`, `#RRRRGGGGBBBB` (invalid hex now returns `nil`)
+        - gray-band handling + min/max midpoint channel quantization to match oracle on mixed hex colors (`#abc`, `#f80`, etc.)
+      - expanded named-color support for compatibility probes (`orange red`/`orangered`).
+      - updated and extended font unit tests for the new quantization rules.
+    - `test/neovm/vm-compat/cases/font-color-semantics.forms`
+    - `test/neovm/vm-compat/cases/font-color-semantics.expected.tsv`
+      - added oracle lock-in for hex and mixed named-color edge paths (`#abc`, `#aabbcc`, `#aaaabbbbcccc`, `#ggg`, `DarkGray`, `light gray`, `orange red`).
+  - verified:
+    - `make -C test/neovm/vm-compat check-one-neovm CASE=cases/font-color-semantics` (pass, 25/25)
+    - `make -C test/neovm/vm-compat check-one-neovm CASE=cases/font-batch-semantics` (pass, 21/21)
+    - `cargo test --manifest-path rust/neovm-core/Cargo.toml color_values_ -- --nocapture` (pass)
+    - `make -C test/neovm/vm-compat validate-case-lists` (pass)
+
 - Separated frame/window integer ID domains to remove designator aliasing and lock boundary parity:
   - updated:
     - `rust/neovm-core/src/window.rs`
