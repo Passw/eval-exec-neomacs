@@ -382,7 +382,7 @@ pub(crate) fn builtin_point_marker(
     eval: &mut super::eval::Evaluator,
     args: Vec<Value>,
 ) -> EvalResult {
-    let _ = args;
+    expect_args("point-marker", &args, 0)?;
     let buf = eval
         .buffers
         .current_buffer()
@@ -397,7 +397,7 @@ pub(crate) fn builtin_point_min_marker(
     eval: &mut super::eval::Evaluator,
     args: Vec<Value>,
 ) -> EvalResult {
-    let _ = args;
+    expect_args("point-min-marker", &args, 0)?;
     let buf = eval
         .buffers
         .current_buffer()
@@ -412,7 +412,7 @@ pub(crate) fn builtin_point_max_marker(
     eval: &mut super::eval::Evaluator,
     args: Vec<Value>,
 ) -> EvalResult {
-    let _ = args;
+    expect_args("point-max-marker", &args, 0)?;
     let buf = eval
         .buffers
         .current_buffer()
@@ -427,7 +427,7 @@ pub(crate) fn builtin_mark_marker(
     eval: &mut super::eval::Evaluator,
     args: Vec<Value>,
 ) -> EvalResult {
-    let _ = args;
+    expect_args("mark-marker", &args, 0)?;
     let buf = eval
         .buffers
         .current_buffer()
@@ -549,5 +549,15 @@ mod tests {
     fn wrong_type_signals_error() {
         let result = builtin_marker_position(vec![Value::Int(5)]);
         assert!(result.is_err());
+    }
+
+    #[test]
+    fn marker_accessors_require_zero_arguments() {
+        let mut eval = super::super::eval::Evaluator::new();
+
+        assert!(builtin_point_marker(&mut eval, vec![Value::Nil]).is_err());
+        assert!(builtin_point_min_marker(&mut eval, vec![Value::Nil]).is_err());
+        assert!(builtin_point_max_marker(&mut eval, vec![Value::Nil]).is_err());
+        assert!(builtin_mark_marker(&mut eval, vec![Value::Nil]).is_err());
     }
 }
