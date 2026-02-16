@@ -20,6 +20,17 @@ Last updated: 2026-02-16
 
 ## Done
 
+- Removed pure category placeholder behavior and aligned pure builtins with real stateful semantics:
+  - updated:
+    - `rust/neovm-core/src/elisp/category.rs`
+      - added pure-mode category manager state backing for `define-category`, `category-docstring`, and `get-unused-category`.
+      - replaced pure placeholder returns (`nil`/fixed `?a`) with real lookup/allocation semantics matching evaluator-backed behavior shape.
+      - added deterministic pure-state reset helper in unit tests and updated pure builtin tests to assert stateful behavior.
+  - verified:
+    - `cargo test category::tests::builtin_ --manifest-path rust/neovm-core/Cargo.toml` (pass)
+    - `make -C test/neovm/vm-compat check-one-neovm CASE=cases/category-semantics` (pass, 12/12)
+    - `make -C test/neovm/vm-compat check-one-neovm CASE=cases/category-table-object-semantics` (pass, 12/12)
+
 - Re-ran full `vm-compat` post-slice gate after rectangle compatibility expansion:
   - `make -C test/neovm/vm-compat check-all-neovm` (pass)
 
