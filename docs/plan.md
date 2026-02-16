@@ -19,6 +19,23 @@ Last updated: 2026-02-16
 
 ## Done
 
+- Implemented oracle-aligned `yank-rectangle` semantics and locked compatibility corpus coverage:
+  - updated:
+    - `rust/neovm-core/src/elisp/rect.rs`
+      - replaced no-op stub behavior with insertion via `insert-rectangle` semantics using `RectangleState.killed`.
+      - aligned empty-state behavior with oracle (`yank-rectangle` returns `nil` when no rectangle is available).
+      - added focused unit coverage for empty-state return, insertion mutation, and point placement.
+    - `test/neovm/vm-compat/cases/rect-yank-semantics.forms`
+      - added oracle-backed probes for empty-state no-op behavior, kill+reinsert round-trips at different columns, and arity errors.
+    - `test/neovm/vm-compat/cases/rect-yank-semantics.expected.tsv`
+      - recorded oracle baseline outputs for yank-rectangle behavior.
+    - `test/neovm/vm-compat/cases/default.list`
+      - added `cases/rect-yank-semantics` to recurring default compatibility execution.
+  - verified:
+    - `cargo test yank_rectangle --manifest-path rust/neovm-core/Cargo.toml` (pass)
+    - `make -C test/neovm/vm-compat check-one-neovm CASE=cases/rect-yank-semantics` (pass, 4/4)
+    - `make -C test/neovm/vm-compat validate-case-lists` (pass)
+
 - Implemented oracle-aligned `insert-rectangle` mutation/point semantics and locked compatibility corpus coverage:
   - updated:
     - `rust/neovm-core/src/elisp/rect.rs`
