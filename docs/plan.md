@@ -20,6 +20,20 @@ Last updated: 2026-02-16
 
 ## Done
 
+- Extended `define-charset-internal` stub compatibility with oracle-aligned short-vector `args-out-of-range` behavior:
+  - updated:
+    - `rust/neovm-core/src/elisp/charset.rs`
+      - for exact-arity calls, added short third-vector guard that signals `args-out-of-range` for dimension vectors of length 0 or 1.
+      - expanded focused unit coverage for short-vector `args-out-of-range` payload shape.
+    - `test/neovm/vm-compat/cases/charset-internal-arity-semantics.forms`
+      - added oracle probe for `(define-charset-internal 'x [0] [0] ...)` edge behavior.
+    - `test/neovm/vm-compat/cases/charset-internal-arity-semantics.expected.tsv`
+      - refreshed oracle baseline outputs for the new short-vector edge probe.
+  - verified:
+    - `cargo test define_charset_internal --manifest-path rust/neovm-core/Cargo.toml` (pass)
+    - `make -C test/neovm/vm-compat check-one-neovm CASE=cases/charset-internal-arity-semantics` (pass, 9/9)
+    - `make -C test/neovm/vm-compat check-all-neovm` (pass)
+
 - Tightened `define-charset-internal` exact-arity stub with oracle-aligned early array type validation:
   - updated:
     - `rust/neovm-core/src/elisp/charset.rs`
