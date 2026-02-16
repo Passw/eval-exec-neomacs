@@ -19,6 +19,27 @@ Last updated: 2026-02-16
 
 ## Done
 
+- Exposed `hash-table-keys` and `hash-table-values` helper builtins:
+  - updated:
+    - `rust/neovm-core/src/elisp/hashtab.rs`
+      - added pure builtins:
+        - `hash-table-keys` (returns list of table keys)
+        - `hash-table-values` (returns list of table values)
+      - both enforce arity `1` and signal `(wrong-type-argument hash-table-p ...)` on non-table inputs.
+      - added focused unit coverage for happy path and error path semantics.
+    - `rust/neovm-core/src/elisp/builtins.rs`
+      - pure builtin dispatch now routes both helpers.
+    - `rust/neovm-core/src/elisp/builtin_registry.rs`
+      - added both helper names to builtin registry.
+    - `test/neovm/vm-compat/cases/residual-helper-availability.forms`
+      - switched helper calls to `(make-hash-table)` payload for stable callable checks.
+    - `test/neovm/vm-compat/cases/residual-helper-availability.expected.tsv`
+      - updated expectations from `void-function` to callable helper behavior.
+  - verified:
+    - `cargo test hashtab::tests:: --manifest-path rust/neovm-core/Cargo.toml` (pass)
+    - `make -C test/neovm/vm-compat check-one-neovm CASE=cases/residual-helper-availability` (pass, 26/26)
+    - `make -C test/neovm/vm-compat validate-case-lists` (pass)
+
 - Exposed `word-at-point` as an evaluator helper builtin:
   - updated:
     - `rust/neovm-core/src/elisp/interactive.rs`
