@@ -37,6 +37,18 @@ fn expect_min_args(name: &str, args: &[Value], min: usize) -> Result<(), Flow> {
     }
 }
 
+/// Expect at most N arguments.
+fn expect_max_args(name: &str, args: &[Value], max: usize) -> Result<(), Flow> {
+    if args.len() > max {
+        Err(signal(
+            "wrong-number-of-arguments",
+            vec![Value::symbol(name), Value::Int(args.len() as i64)],
+        ))
+    } else {
+        Ok(())
+    }
+}
+
 /// Extract an integer from a Value.
 fn expect_int(value: &Value) -> Result<i64, Flow> {
     match value {
@@ -627,14 +639,11 @@ pub(crate) fn builtin_switch_to_buffer(
     args: Vec<Value>,
 ) -> EvalResult {
     expect_min_args("switch-to-buffer", &args, 1)?;
+    expect_max_args("switch-to-buffer", &args, 3)?;
     let buf_id = resolve_buffer_id(eval, &args[0])?;
 
     // Set the selected window's buffer.
-    let fid = eval
-        .frames
-        .selected_frame()
-        .map(|f| f.id)
-        .ok_or_else(|| signal("error", vec![Value::string("No selected frame")]))?;
+    let fid = ensure_selected_frame_id(eval);
     let sel_wid = eval
         .frames
         .get(fid)
@@ -660,13 +669,10 @@ pub(crate) fn builtin_display_buffer(
     args: Vec<Value>,
 ) -> EvalResult {
     expect_min_args("display-buffer", &args, 1)?;
+    expect_max_args("display-buffer", &args, 3)?;
     let buf_id = resolve_buffer_id(eval, &args[0])?;
 
-    let fid = eval
-        .frames
-        .selected_frame()
-        .map(|f| f.id)
-        .ok_or_else(|| signal("error", vec![Value::string("No selected frame")]))?;
+    let fid = ensure_selected_frame_id(eval);
     let sel_wid = eval
         .frames
         .get(fid)
@@ -682,21 +688,19 @@ pub(crate) fn builtin_display_buffer(
     Ok(Value::Int(sel_wid.0 as i64))
 }
 
-/// `(pop-to-buffer BUFFER-OR-NAME &optional ACTION NORECORD)` -> window id.
+/// `(pop-to-buffer BUFFER-OR-NAME &optional ACTION NORECORD)` -> buffer.
 ///
-/// Simplified: same as display-buffer + select that window.
+/// Batch compatibility follows Emacs' noninteractive behavior: switch current
+/// buffer and return the buffer object.
 pub(crate) fn builtin_pop_to_buffer(
     eval: &mut super::eval::Evaluator,
     args: Vec<Value>,
 ) -> EvalResult {
     expect_min_args("pop-to-buffer", &args, 1)?;
+    expect_max_args("pop-to-buffer", &args, 3)?;
     let buf_id = resolve_buffer_id(eval, &args[0])?;
 
-    let fid = eval
-        .frames
-        .selected_frame()
-        .map(|f| f.id)
-        .ok_or_else(|| signal("error", vec![Value::string("No selected frame")]))?;
+    let fid = ensure_selected_frame_id(eval);
     let sel_wid = eval
         .frames
         .get(fid)
@@ -710,7 +714,7 @@ pub(crate) fn builtin_pop_to_buffer(
         w.set_buffer(buf_id);
     }
     eval.buffers.set_current(buf_id);
-    Ok(Value::Int(sel_wid.0 as i64))
+    Ok(Value::Buffer(buf_id))
 }
 
 // ===========================================================================
@@ -1405,11 +1409,42 @@ mod tests {
     }
 
     #[test]
-    fn pop_to_buffer_returns_window() {
+    fn pop_to_buffer_returns_buffer() {
         let results = eval_with_frame(
             "(get-buffer-create \"pop-buf\")
-             (windowp (pop-to-buffer \"pop-buf\"))",
+             (bufferp (pop-to-buffer \"pop-buf\"))",
         );
         assert_eq!(results[1], "OK t");
+    }
+
+    #[test]
+    fn switch_display_pop_bootstrap_initial_frame() {
+        let forms = parse_forms(
+            "(save-current-buffer (bufferp (switch-to-buffer \"*scratch*\")))
+             (save-current-buffer (windowp (display-buffer \"*scratch*\")))
+             (save-current-buffer (bufferp (pop-to-buffer \"*scratch*\")))",
+        )
+        .expect("parse");
+        let mut ev = Evaluator::new();
+        let out = ev
+            .eval_forms(&forms)
+            .iter()
+            .map(format_eval_result)
+            .collect::<Vec<_>>();
+        assert_eq!(out[0], "OK t");
+        assert_eq!(out[1], "OK t");
+        assert_eq!(out[2], "OK t");
+    }
+
+    #[test]
+    fn switch_display_pop_enforce_max_arity() {
+        let results = eval_with_frame(
+            "(condition-case err (switch-to-buffer \"*scratch*\" nil nil nil) (error (car err)))
+             (condition-case err (display-buffer \"*scratch*\" nil nil nil) (error (car err)))
+             (condition-case err (pop-to-buffer \"*scratch*\" nil nil nil) (error (car err)))",
+        );
+        assert_eq!(results[0], "OK wrong-number-of-arguments");
+        assert_eq!(results[1], "OK wrong-number-of-arguments");
+        assert_eq!(results[2], "OK wrong-number-of-arguments");
     }
 }
