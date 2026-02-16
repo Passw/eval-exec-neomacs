@@ -515,6 +515,13 @@ fn subr_arity_value(name: &str) -> Value {
         "read-string" => arity_cons(1, Some(5)),
         "read-variable" | "read-command" => arity_cons(1, Some(2)),
         "read-from-string" => arity_cons(1, Some(3)),
+        "read-buffer" => arity_cons(1, Some(4)),
+        "read-coding-system" => arity_cons(1, Some(2)),
+        "read-directory-name" => arity_cons(1, Some(5)),
+        "read-file-name" => arity_cons(1, Some(6)),
+        "read-from-minibuffer" => arity_cons(1, Some(7)),
+        "read-key-sequence" | "read-key-sequence-vector" => arity_cons(1, Some(6)),
+        "read-non-nil-coding-system" => arity_cons(1, Some(1)),
         "kbd" | "key-valid-p" | "keymap-parent" | "keymapp" | "listify-key-sequence" => {
             arity_cons(1, Some(1))
         }
@@ -537,6 +544,8 @@ fn subr_arity_value(name: &str) -> Value {
         }
         "line-number-at-pos" => arity_cons(0, Some(2)),
         "line-pixel-height" => arity_cons(0, Some(0)),
+        "recenter-top-bottom" => arity_cons(0, Some(1)),
+        "recursion-depth" | "region-beginning" | "region-end" => arity_cons(0, Some(0)),
         "called-interactively-p" | "float-time" => arity_cons(0, Some(1)),
         "featurep" => arity_cons(1, Some(2)),
         "commandp" => arity_cons(1, Some(2)),
@@ -612,6 +621,7 @@ fn subr_arity_value(name: &str) -> Value {
         | "minibuffer-contents-no-properties" => arity_cons(0, Some(0)),
         "read-passwd" => arity_cons(1, Some(3)),
         "event-apply-modifier" => arity_cons(4, Some(4)),
+        "regexp-quote" => arity_cons(1, Some(1)),
         "open-termscript" | "x-close-connection" => arity_cons(1, Some(1)),
         "send-string-to-terminal" | "display-supports-face-attributes-p" => arity_cons(1, Some(2)),
         "x-open-connection" => arity_cons(1, Some(3)),
@@ -1732,6 +1742,23 @@ mod tests {
         assert_subr_arity("make-syntax-table", 0, Some(1));
         assert_subr_arity("mapatoms", 1, Some(2));
         assert_subr_arity("map-char-table", 2, Some(2));
+    }
+
+    #[test]
+    fn subr_arity_read_region_helper_primitives_match_oracle() {
+        assert_subr_arity("read-buffer", 1, Some(4));
+        assert_subr_arity("read-coding-system", 1, Some(2));
+        assert_subr_arity("read-directory-name", 1, Some(5));
+        assert_subr_arity("read-file-name", 1, Some(6));
+        assert_subr_arity("read-from-minibuffer", 1, Some(7));
+        assert_subr_arity("read-key-sequence", 1, Some(6));
+        assert_subr_arity("read-key-sequence-vector", 1, Some(6));
+        assert_subr_arity("read-non-nil-coding-system", 1, Some(1));
+        assert_subr_arity("recenter-top-bottom", 0, Some(1));
+        assert_subr_arity("recursion-depth", 0, Some(0));
+        assert_subr_arity("region-beginning", 0, Some(0));
+        assert_subr_arity("region-end", 0, Some(0));
+        assert_subr_arity("regexp-quote", 1, Some(1));
     }
 
     #[test]
