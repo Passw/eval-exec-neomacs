@@ -496,12 +496,29 @@ fn subr_arity_value(name: &str) -> Value {
         "string-replace" => arity_cons(3, Some(3)),
         "string-search" => arity_cons(2, Some(3)),
         "string-version-lessp" => arity_cons(2, Some(2)),
+        "sort" | "syntax-ppss-flush-cache" => arity_cons(1, None),
         "subst-char-in-string" => arity_cons(3, Some(4)),
+        "self-insert-command" | "single-key-description" | "skip-chars-backward"
+        | "skip-chars-forward" | "skip-syntax-backward" | "skip-syntax-forward"
+        | "transpose-sexps" => arity_cons(1, Some(2)),
+        "shell-command-to-string" | "special-form-p" | "store-kbd-macro-event"
+        | "unibyte-char-to-multibyte" | "upcase-initials" | "upcase-word"
+        | "use-global-map" | "use-local-map" | "view-register" => arity_cons(1, Some(1)),
+        "signal" | "take" => arity_cons(2, Some(2)),
+        "split-window" => arity_cons(0, Some(4)),
+        "switch-to-buffer" => arity_cons(1, Some(3)),
+        "this-command-keys" | "this-command-keys-vector" | "undo-boundary"
+        | "universal-argument" | "use-region-p" => arity_cons(0, Some(0)),
+        "transient-mark-mode" | "undo" | "yank" | "yank-pop" => arity_cons(0, Some(1)),
+        "transpose-chars" | "transpose-lines" | "transpose-paragraphs"
+        | "transpose-sentences" | "transpose-words" => arity_cons(1, Some(1)),
+        "upcase-initials-region" | "upcase-region" => arity_cons(2, Some(3)),
+        "widget-apply" => arity_cons(2, None),
+        "where-is-internal" => arity_cons(1, Some(5)),
         "text-char-description" | "threadp" | "y-or-n-p" | "yes-or-no-p" | "zerop" => {
             arity_cons(1, Some(1))
         }
         "syntax-ppss" => arity_cons(0, Some(1)),
-        "syntax-ppss-flush-cache" => arity_cons(1, None),
         "syntax-table" | "standard-case-table" | "standard-category-table"
         | "standard-syntax-table" => arity_cons(0, Some(0)),
         "zlib-available-p" => arity_cons(0, Some(0)),
@@ -1994,6 +2011,49 @@ mod tests {
         assert_subr_arity("zerop", 1, Some(1));
         assert_subr_arity("zlib-available-p", 0, Some(0));
         assert_subr_arity("zlib-decompress-region", 2, Some(3));
+    }
+
+    #[test]
+    fn subr_arity_command_edit_runtime_helpers_match_oracle() {
+        assert_subr_arity("self-insert-command", 1, Some(2));
+        assert_subr_arity("shell-command-to-string", 1, Some(1));
+        assert_subr_arity("signal", 2, Some(2));
+        assert_subr_arity("single-key-description", 1, Some(2));
+        assert_subr_arity("skip-chars-backward", 1, Some(2));
+        assert_subr_arity("skip-chars-forward", 1, Some(2));
+        assert_subr_arity("skip-syntax-backward", 1, Some(2));
+        assert_subr_arity("skip-syntax-forward", 1, Some(2));
+        assert_subr_arity("sort", 1, None);
+        assert_subr_arity("special-form-p", 1, Some(1));
+        assert_subr_arity("split-window", 0, Some(4));
+        assert_subr_arity("store-kbd-macro-event", 1, Some(1));
+        assert_subr_arity("switch-to-buffer", 1, Some(3));
+        assert_subr_arity("take", 2, Some(2));
+        assert_subr_arity("this-command-keys", 0, Some(0));
+        assert_subr_arity("this-command-keys-vector", 0, Some(0));
+        assert_subr_arity("transient-mark-mode", 0, Some(1));
+        assert_subr_arity("transpose-chars", 1, Some(1));
+        assert_subr_arity("transpose-lines", 1, Some(1));
+        assert_subr_arity("transpose-paragraphs", 1, Some(1));
+        assert_subr_arity("transpose-sentences", 1, Some(1));
+        assert_subr_arity("transpose-sexps", 1, Some(2));
+        assert_subr_arity("transpose-words", 1, Some(1));
+        assert_subr_arity("undo", 0, Some(1));
+        assert_subr_arity("undo-boundary", 0, Some(0));
+        assert_subr_arity("universal-argument", 0, Some(0));
+        assert_subr_arity("unibyte-char-to-multibyte", 1, Some(1));
+        assert_subr_arity("upcase-initials", 1, Some(1));
+        assert_subr_arity("upcase-initials-region", 2, Some(3));
+        assert_subr_arity("upcase-region", 2, Some(3));
+        assert_subr_arity("upcase-word", 1, Some(1));
+        assert_subr_arity("use-global-map", 1, Some(1));
+        assert_subr_arity("use-local-map", 1, Some(1));
+        assert_subr_arity("use-region-p", 0, Some(0));
+        assert_subr_arity("view-register", 1, Some(1));
+        assert_subr_arity("where-is-internal", 1, Some(5));
+        assert_subr_arity("widget-apply", 2, None);
+        assert_subr_arity("yank", 0, Some(1));
+        assert_subr_arity("yank-pop", 0, Some(1));
     }
 
     #[test]
