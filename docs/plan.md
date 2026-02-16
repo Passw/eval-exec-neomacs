@@ -36,9 +36,9 @@ Last updated: 2026-02-16
     - `test/neovm/vm-compat/cases/this-command-keys-readers-semantics.forms`
     - `test/neovm/vm-compat/cases/this-command-keys-readers-semantics.expected.tsv`
     - `test/neovm/vm-compat/cases/default.list`
-      - added new oracle lock-in case covering read-key/read-key-sequence/read-event/read-char-exclusive interactions with `this-command-keys*`.
+      - added oracle lock-in case covering read-key/read-key-sequence state publication plus read-event/read-char/read-char-exclusive non-mutation interactions with `this-command-keys*`.
   - verified:
-    - `make -C test/neovm/vm-compat check-one-neovm CASE=cases/this-command-keys-readers-semantics` (pass, 8/8)
+    - `make -C test/neovm/vm-compat check-one-neovm CASE=cases/this-command-keys-readers-semantics` (pass, 11/11)
     - `make -C test/neovm/vm-compat check-one-neovm CASE=cases/help-key-recent-keys-semantics` (pass, 45/45)
     - `make -C test/neovm/vm-compat validate-case-lists` (pass)
     - `cargo test --manifest-path rust/neovm-core/Cargo.toml this_command_keys_prefers_read_command_key_chars -- --nocapture` (pass)
