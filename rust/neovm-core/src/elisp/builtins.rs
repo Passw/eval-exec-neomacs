@@ -5291,9 +5291,10 @@ fn builtin_make_sparse_keymap(eval: &mut super::eval::Evaluator, args: Vec<Value
     Ok(Value::Int(id as i64))
 }
 
-/// (define-key KEYMAP KEY DEF) -> DEF
+/// (define-key KEYMAP KEY DEF &optional REMOVE) -> DEF
 fn builtin_define_key(eval: &mut super::eval::Evaluator, args: Vec<Value>) -> EvalResult {
-    expect_args("define-key", &args, 3)?;
+    expect_min_args("define-key", &args, 3)?;
+    expect_max_args("define-key", &args, 4)?;
     let keymap_id = expect_keymap_id(eval, &args[0])?;
     let keys = expect_key_description(&args[1])?;
     let binding = value_to_key_binding(eval, &args[2]);

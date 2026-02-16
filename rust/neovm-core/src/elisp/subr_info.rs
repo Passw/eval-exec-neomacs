@@ -413,9 +413,13 @@ fn subr_arity_value(name: &str) -> Value {
         "delete-window" => arity_cons(0, Some(1)),
         "delete-directory" => arity_cons(1, Some(3)),
         "delete-file" => arity_cons(1, Some(2)),
+        "default-file-modes" => arity_cons(0, Some(0)),
         "directory-file-name" | "directory-name-p" => arity_cons(1, Some(1)),
         "directory-files" => arity_cons(1, Some(5)),
         "directory-files-and-attributes" => arity_cons(1, Some(6)),
+        "define-category" => arity_cons(2, Some(3)),
+        "define-coding-system-alias" => arity_cons(2, Some(2)),
+        "define-key" => arity_cons(3, Some(4)),
         "expand-file-name" => arity_cons(1, Some(2)),
         "event-basic-type" | "event-convert-list" | "event-modifiers" | "eventp"
         | "error-message-string" => arity_cons(1, Some(1)),
@@ -1063,6 +1067,14 @@ mod tests {
         assert_subr_arity("eval-buffer", 0, Some(5));
         assert_subr_arity("eval-expression", 1, Some(4));
         assert_subr_arity("eval-region", 2, Some(4));
+    }
+
+    #[test]
+    fn subr_arity_define_defaults_primitives_match_oracle() {
+        assert_subr_arity("default-file-modes", 0, Some(0));
+        assert_subr_arity("define-category", 2, Some(3));
+        assert_subr_arity("define-coding-system-alias", 2, Some(2));
+        assert_subr_arity("define-key", 3, Some(4));
     }
 
     #[test]

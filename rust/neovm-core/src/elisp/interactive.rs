@@ -4113,6 +4113,15 @@ mod tests {
         }
     }
 
+    #[test]
+    fn define_key_accepts_optional_remove_arg() {
+        let result = eval_one(
+            r#"(let ((m (make-sparse-keymap)))
+                 (eq (define-key m "a" 'ignore t) 'ignore))"#,
+        );
+        assert_eq!(result, "OK t");
+    }
+
     // -------------------------------------------------------------------
     // where-is-internal
     // -------------------------------------------------------------------
