@@ -7940,6 +7940,21 @@ Last updated: 2026-02-16
     - `make -C test/neovm/vm-compat check-neovm CASE=cases/category-ccl-subr-arity-semantics` (pass, 15/15)
     - `make -C test/neovm/vm-compat validate-case-lists` (pass)
     - `make -C test/neovm/vm-compat check-builtin-registry-fboundp` (pass, 1 allowlisted drift)
+- Aligned abbrev primitive `subr-arity` metadata with GNU Emacs and locked parity in corpus:
+  - added arity overrides:
+    - `(0 . 1)`: `abbrev-mode`
+    - `(1 . 2)`: `abbrev-expansion`
+    - `(1 . 1)`: `abbrev-table-p`
+  - added and enabled oracle corpus:
+    - `test/neovm/vm-compat/cases/abbrev-subr-arity-semantics.forms`
+    - `test/neovm/vm-compat/cases/abbrev-subr-arity-semantics.expected.tsv`
+    - `test/neovm/vm-compat/cases/default.list`
+  - verified:
+    - `NEOVM_ORACLE_EMACS=/nix/store/hql3zwz5b4ywd2qwx8jssp4dyb7nx4cb-emacs-30.2/bin/emacs make -C test/neovm/vm-compat record FORMS=cases/abbrev-subr-arity-semantics.forms EXPECTED=cases/abbrev-subr-arity-semantics.expected.tsv` (pass)
+    - `cargo test subr_arity_abbrev_primitives_match_oracle -- --nocapture` in `rust/neovm-core` (pass)
+    - `make -C test/neovm/vm-compat check-neovm CASE=cases/abbrev-subr-arity-semantics` (pass, 15/15)
+    - `make -C test/neovm/vm-compat validate-case-lists` (pass)
+    - `make -C test/neovm/vm-compat check-builtin-registry-fboundp` (pass, 1 allowlisted drift)
 
 ## Doing
 
@@ -7948,13 +7963,13 @@ Last updated: 2026-02-16
   - run oracle/parity checks after each behavior-affecting change
   - remove dead helper code that is not part of exposed compatibility surface
 - Identify the next high-impact builtin still stubbed in NeoVM core and land it as a small implementation + oracle-corpus lock-in slice.
-  - current focus: next evaluator-backed builtin with stubbed behavior in batch compatibility surface
+  - current focus: continue subr-arity parity reduction with compact 10-20 primitive clusters, then pivot to next evaluator-backed stub replacement
 - Reduce vm-compat operator friction for large case sets (small Makefile UX improvements).
   - added list-driven targets: `record-list`, `check-list`, `check-neovm-list` with `LIST=cases/<name>.list`
 
 ## Next
 
 1. Keep `check-all-neovm` as a recurring post-slice gate (detect regressions before they batch up).
-2. Land a minimal non-interactive subset for `query-replace` and `query-replace-regexp`, with explicit oracle lock-in.
-3. Expand focused oracle corpora for remaining high-risk areas still carrying stubs (search/input/minibuffer/display edges).
+2. Continue `subr-arity` oracle cluster slices until next `check-builtin-registry-fboundp` drift report meaningfully drops.
+3. Land a minimal non-interactive subset for `query-replace` and `query-replace-regexp`, with explicit oracle lock-in.
 4. Keep Rust backend behind compile-time switch and preserve Emacs C core as default backend.
