@@ -6119,6 +6119,73 @@ fn builtin_key_description(args: Vec<Value>) -> EvalResult {
     Ok(Value::string(rendered?.join(" ")))
 }
 
+/// `(help-key-description TRANSLATED UNTRANSLATED)` -> key description for help output.
+fn builtin_help_key_description(args: Vec<Value>) -> EvalResult {
+    expect_args("help-key-description", &args, 2)?;
+
+    let translated = &args[0];
+    let untranslated = &args[1];
+
+    if untranslated.is_nil() {
+        if translated.is_nil() {
+            return Ok(Value::Nil);
+        }
+        let rendered: Result<Vec<String>, Flow> = key_sequence_values(translated)?
+            .iter()
+            .map(|event| describe_single_key_value(event, false))
+            .collect();
+        return Ok(Value::string(rendered?.join(" ")));
+    }
+
+    let untranslated_events = match untranslated {
+        Value::Str(_) | Value::Vector(_) => key_sequence_values(untranslated)?,
+        other => {
+            return Err(signal(
+                "wrong-type-argument",
+                vec![Value::symbol("arrayp"), other.clone()],
+            ))
+        }
+    };
+    if untranslated_events.is_empty() {
+        return Err(signal(
+            "args-out-of-range",
+            vec![untranslated.clone(), Value::Int(0)],
+        ));
+    }
+
+    let translated_desc = if translated.is_nil() {
+        "nil".to_string()
+    } else {
+        let rendered: Result<Vec<String>, Flow> = key_sequence_values(translated)?
+            .iter()
+            .map(|event| describe_single_key_value(event, false))
+            .collect();
+        rendered?.join(" ")
+    };
+
+    let untranslated_desc = {
+        let rendered: Result<Vec<String>, Flow> = untranslated_events
+            .iter()
+            .map(|event| describe_single_key_value(event, false))
+            .collect();
+        rendered?.join(" ")
+    };
+
+    if translated_desc == untranslated_desc {
+        Ok(Value::string(translated_desc))
+    } else {
+        Ok(Value::string(format!(
+            "{translated_desc} (translated from {untranslated_desc})"
+        )))
+    }
+}
+
+/// `(recent-keys &optional INCLUDE-CMDS)` -> vector of recent input events.
+fn builtin_recent_keys(args: Vec<Value>) -> EvalResult {
+    expect_max_args("recent-keys", &args, 1)?;
+    Ok(Value::vector(vec![]))
+}
+
 // ===========================================================================
 // Dispatch table
 // ===========================================================================
@@ -7861,6 +7928,7 @@ pub(crate) fn dispatch_builtin(
         "kbd" => builtin_kbd(args),
         "single-key-description" => builtin_single_key_description(args),
         "key-description" => builtin_key_description(args),
+        "help-key-description" => builtin_help_key_description(args),
         "event-convert-list" => builtin_event_convert_list(args),
         "event-basic-type" => builtin_event_basic_type(args),
         "event-apply-modifier" => builtin_event_apply_modifier(args),
@@ -7869,6 +7937,7 @@ pub(crate) fn dispatch_builtin(
         "listify-key-sequence" => builtin_listify_key_sequence(args),
         "key-valid-p" => builtin_key_valid_p(args),
         "text-char-description" => builtin_text_char_description(args),
+        "recent-keys" => builtin_recent_keys(args),
 
         // Process (pure — no evaluator needed)
         "shell-command-to-string" => super::process::builtin_shell_command_to_string(args),
@@ -8418,6 +8487,7 @@ pub(crate) fn dispatch_builtin_pure(name: &str, args: Vec<Value>) -> Option<Eval
         "kbd" => builtin_kbd(args),
         "single-key-description" => builtin_single_key_description(args),
         "key-description" => builtin_key_description(args),
+        "help-key-description" => builtin_help_key_description(args),
         "event-convert-list" => builtin_event_convert_list(args),
         "event-basic-type" => builtin_event_basic_type(args),
         "event-apply-modifier" => builtin_event_apply_modifier(args),
@@ -8426,6 +8496,7 @@ pub(crate) fn dispatch_builtin_pure(name: &str, args: Vec<Value>) -> Option<Eval
         "listify-key-sequence" => builtin_listify_key_sequence(args),
         "key-valid-p" => builtin_key_valid_p(args),
         "text-char-description" => builtin_text_char_description(args),
+        "recent-keys" => builtin_recent_keys(args),
         // Process (pure)
         "shell-command-to-string" => super::process::builtin_shell_command_to_string(args),
         "getenv" => super::process::builtin_getenv(args),

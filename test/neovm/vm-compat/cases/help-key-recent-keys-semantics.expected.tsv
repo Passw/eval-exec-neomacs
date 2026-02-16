@@ -1,0 +1,31 @@
+1	(fboundp 'help-key-description)	OK t
+2	(condition-case err (help-key-description) (error (car err)))	OK wrong-number-of-arguments
+3	(condition-case err (help-key-description "a") (error (car err)))	OK wrong-number-of-arguments
+4	(condition-case err (help-key-description "a" nil nil) (error (car err)))	OK wrong-number-of-arguments
+5	(condition-case err (help-key-description 1 "a") (error (car err)))	OK wrong-type-argument
+6	(condition-case err (help-key-description "a" 1) (error (car err)))	OK wrong-type-argument
+7	(condition-case err (help-key-description "a" '(a)) (error (car err)))	OK wrong-type-argument
+8	(condition-case err (help-key-description "a" "") (error (car err)))	OK args-out-of-range
+9	(condition-case err (help-key-description [] []) (error (car err)))	OK args-out-of-range
+10	(help-key-description nil nil)	OK nil
+11	(string= (help-key-description "ab" nil) "a b")	OK t
+12	(string= (help-key-description "ab" "ab") "a b")	OK t
+13	(string= (help-key-description "ab" "ac") "a b (translated from a c)")	OK t
+14	(string= (help-key-description [24 6] [24 6]) "C-x C-f")	OK t
+15	(string= (help-key-description [24 6] [24]) "C-x C-f (translated from C-x)")	OK t
+16	(string= (help-key-description nil "a") "nil (translated from a)")	OK t
+17	(string= (help-key-description '(a) nil) "<a>")	OK t
+18	(string= (help-key-description '(a) "a") "<a> (translated from a)")	OK t
+19	(string= (help-key-description "" nil) "")	OK t
+20	(string= (help-key-description "" "a") " (translated from a)")	OK t
+21	(fboundp 'recent-keys)	OK t
+22	(type-of (recent-keys))	OK vector
+23	(length (recent-keys))	OK 0
+24	(append (recent-keys) nil)	OK nil
+25	(type-of (recent-keys nil))	OK vector
+26	(length (recent-keys nil))	OK 0
+27	(type-of (recent-keys t))	OK vector
+28	(length (recent-keys t))	OK 0
+29	(type-of (recent-keys 'foo))	OK vector
+30	(length (recent-keys "x"))	OK 0
+31	(condition-case err (recent-keys nil nil) (error (car err)))	OK wrong-number-of-arguments
