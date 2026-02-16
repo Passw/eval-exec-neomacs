@@ -23,6 +23,25 @@ Last updated: 2026-02-16
 
 ## Done
 
+- Aligned `lookup-key` partial-sequence return semantics and added dedicated corpus lock-in:
+  - updated:
+    - `rust/neovm-core/src/elisp/builtins.rs`
+      - updated `lookup-key` runtime to align partial/overlong sequence behavior:
+        - returns integer prefix lengths for over-specified sequences past a complete binding,
+        - returns `1` on first-event misses for multi-event key sequences,
+        - returns nil for deeper misses after entering a prefix map,
+        - returns the keymap object (NeoVM keymap id representation) for empty key sequences.
+    - `test/neovm/vm-compat/cases/lookup-key-partial-semantics.forms`
+      - added probes for string/vector partial lookup return values and empty-key/keymap-object behavior via `keymapp`.
+    - `test/neovm/vm-compat/cases/lookup-key-partial-semantics.expected.tsv`
+      - recorded oracle baseline outputs for partial lookup semantics.
+    - `test/neovm/vm-compat/cases/default.list`
+      - added `cases/lookup-key-partial-semantics` to recurring default compatibility execution.
+  - verified:
+    - `make -C test/neovm/vm-compat check-neovm FORMS=cases/lookup-key-partial-semantics.forms EXPECTED=cases/lookup-key-partial-semantics.expected.tsv` (pass, 12/12)
+    - `make -C test/neovm/vm-compat check-one-neovm CASE=cases/lookup-key-partial-semantics` (pass, 12/12)
+    - `make -C test/neovm/vm-compat validate-case-lists` (pass)
+
 - Aligned keymap/key-binding designator handling with `kbd` vector outputs and added dedicated corpus lock-in:
   - updated:
     - `rust/neovm-core/src/elisp/kbd.rs`
