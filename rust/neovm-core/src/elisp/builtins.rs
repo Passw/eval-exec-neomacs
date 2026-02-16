@@ -5292,15 +5292,48 @@ fn builtin_lookup_key(eval: &mut super::eval::Evaluator, args: Vec<Value>) -> Ev
     expect_args("lookup-key", &args, 2)?;
     let keymap_id = expect_keymap_id(eval, &args[0])?;
     let keys = expect_key_description(&args[1])?;
-    let result = if keys.len() == 1 {
-        eval.keymaps.lookup_key(keymap_id, &keys[0])
-    } else {
-        eval.keymaps.lookup_key_sequence(keymap_id, &keys)
-    };
-    match result {
-        Some(binding) => Ok(key_binding_to_value(binding)),
-        None => Ok(Value::Nil),
+
+    if keys.is_empty() {
+        // Oracle returns the original keymap object for empty key sequences.
+        return Ok(Value::Int(keymap_id as i64));
     }
+
+    if keys.len() == 1 {
+        return match eval.keymaps.lookup_key(keymap_id, &keys[0]) {
+            Some(binding) => Ok(key_binding_to_value(binding)),
+            None => Ok(Value::Nil),
+        };
+    }
+
+    let mut current_map = keymap_id;
+    for (i, key) in keys.iter().enumerate() {
+        let Some(binding) = eval.keymaps.lookup_key(current_map, key) else {
+            // Oracle lookup-key returns 1 when the first key in a multi-key
+            // sequence has no binding; deeper misses return nil.
+            return if i == 0 {
+                Ok(Value::Int(1))
+            } else {
+                Ok(Value::Nil)
+            };
+        };
+
+        if i == keys.len() - 1 {
+            return Ok(key_binding_to_value(binding));
+        }
+
+        match binding {
+            KeyBinding::Prefix(next_map) => {
+                current_map = *next_map;
+            }
+            _ => {
+                // Over-specified sequence past a complete binding: return the
+                // matched prefix length.
+                return Ok(Value::Int((i + 1) as i64));
+            }
+        }
+    }
+
+    Ok(Value::Nil)
 }
 
 /// (global-set-key KEY COMMAND)
