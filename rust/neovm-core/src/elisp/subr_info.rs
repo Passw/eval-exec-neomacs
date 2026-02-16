@@ -321,6 +321,12 @@ fn subr_arity_value(name: &str) -> Value {
         | "charset-plist" => arity_cons(1, Some(1)),
         "char-charset" => arity_cons(1, Some(2)),
         "char-table-extra-slot" | "char-table-range" => arity_cons(2, Some(2)),
+        "bignump" | "boundp" | "byte-code-function-p" | "car-safe" | "cdr-safe" => {
+            arity_cons(1, Some(1))
+        }
+        "assq" | "member" | "memq" | "rassoc" | "rassq" => arity_cons(2, Some(2)),
+        "assoc" => arity_cons(2, Some(3)),
+        "assoc-default" => arity_cons(2, Some(4)),
         "if" => Value::cons(Value::Int(2), Value::symbol("unevalled")),
         "defining-kbd-macro" => arity_cons(1, Some(2)),
         "help-key-description" => arity_cons(2, Some(2)),
@@ -835,6 +841,22 @@ mod tests {
         assert_subr_arity("charset-id-internal", 0, Some(1));
         assert_subr_arity("charset-plist", 1, Some(1));
         assert_subr_arity("charset-priority-list", 0, Some(1));
+    }
+
+    #[test]
+    fn subr_arity_assoc_predicate_primitives_match_oracle() {
+        assert_subr_arity("assoc", 2, Some(3));
+        assert_subr_arity("assoc-default", 2, Some(4));
+        assert_subr_arity("assq", 2, Some(2));
+        assert_subr_arity("member", 2, Some(2));
+        assert_subr_arity("memq", 2, Some(2));
+        assert_subr_arity("rassoc", 2, Some(2));
+        assert_subr_arity("rassq", 2, Some(2));
+        assert_subr_arity("bignump", 1, Some(1));
+        assert_subr_arity("boundp", 1, Some(1));
+        assert_subr_arity("byte-code-function-p", 1, Some(1));
+        assert_subr_arity("car-safe", 1, Some(1));
+        assert_subr_arity("cdr-safe", 1, Some(1));
     }
 
     #[test]
