@@ -19,6 +19,23 @@ Last updated: 2026-02-16
 
 ## Done
 
+- Implemented oracle-aligned `delete-extract-rectangle` semantics and locked compatibility corpus coverage:
+  - updated:
+    - `rust/neovm-core/src/elisp/rect.rs`
+      - replaced empty-list stub behavior with real rectangle extraction+deletion over current buffer text.
+      - mirrored Emacs START-line traversal asymmetry and column clamping/padding rules shared with `extract-rectangle`.
+      - added focused unit coverage for basic deletion, START/END line-order behavior, and clamped endpoints.
+    - `test/neovm/vm-compat/cases/rect-delete-extract-semantics.forms`
+      - added oracle-backed probes for extraction payload + post-delete buffer state (encoded as char lists), asymmetry, clamping, and type errors.
+    - `test/neovm/vm-compat/cases/rect-delete-extract-semantics.expected.tsv`
+      - recorded oracle baseline outputs for rectangle deletion/extraction.
+    - `test/neovm/vm-compat/cases/default.list`
+      - added `cases/rect-delete-extract-semantics` to recurring default compatibility execution.
+  - verified:
+    - `cargo test delete_extract_rectangle --manifest-path rust/neovm-core/Cargo.toml` (pass)
+    - `make -C test/neovm/vm-compat check-one-neovm CASE=cases/rect-delete-extract-semantics` (pass, 7/7)
+    - `make -C test/neovm/vm-compat check-all-neovm` (pass)
+
 - Implemented oracle-aligned `extract-rectangle` semantics and locked compatibility corpus coverage:
   - updated:
     - `rust/neovm-core/src/elisp/rect.rs`
