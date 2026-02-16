@@ -54,6 +54,7 @@ cases/startup-helper-subr-arity-semantics
 cases/encoding-bool-vector-subr-arity-semantics
 cases/command-timer-subr-arity-semantics
 cases/command-read-subr-arity-semantics
+cases/keymap-keyboard-subr-arity-semantics
 cases/kmacro-command-subr-arity-semantics
 cases/delete-subr-arity-semantics
 cases/filesystem-path-subr-arity-semantics

@@ -438,6 +438,16 @@ fn subr_arity_value(name: &str) -> Value {
         "command-execute" => arity_cons(1, Some(4)),
         "compare-strings" => arity_cons(6, Some(7)),
         "completing-read" => arity_cons(2, Some(8)),
+        "kbd" | "key-valid-p" | "keymap-parent" | "keymapp" | "listify-key-sequence" => {
+            arity_cons(1, Some(1))
+        }
+        "global-key-binding" | "local-key-binding" | "key-description" => arity_cons(1, Some(2)),
+        "lookup-key" => arity_cons(2, Some(3)),
+        "global-set-key" | "local-set-key" => arity_cons(2, Some(2)),
+        "key-binding" => arity_cons(1, Some(4)),
+        "keyboard-coding-system" => arity_cons(0, Some(1)),
+        "keyboard-quit" => arity_cons(0, Some(0)),
+        "make-keymap" | "make-sparse-keymap" => arity_cons(0, Some(1)),
         "current-bidi-paragraph-direction" => arity_cons(0, Some(1)),
         "current-case-table" | "current-column" | "current-global-map"
         | "current-indentation" | "current-local-map" => arity_cons(0, Some(0)),
@@ -1222,6 +1232,26 @@ mod tests {
         assert_subr_arity("execute-kbd-macro", 1, Some(3));
         assert_subr_arity("execute-extended-command", 1, Some(3));
         assert_subr_arity("describe-key-briefly", 0, Some(3));
+    }
+
+    #[test]
+    fn subr_arity_keymap_keyboard_primitives_match_oracle() {
+        assert_subr_arity("kbd", 1, Some(1));
+        assert_subr_arity("key-binding", 1, Some(4));
+        assert_subr_arity("global-key-binding", 1, Some(2));
+        assert_subr_arity("local-key-binding", 1, Some(2));
+        assert_subr_arity("lookup-key", 2, Some(3));
+        assert_subr_arity("key-description", 1, Some(2));
+        assert_subr_arity("key-valid-p", 1, Some(1));
+        assert_subr_arity("global-set-key", 2, Some(2));
+        assert_subr_arity("local-set-key", 2, Some(2));
+        assert_subr_arity("keymap-parent", 1, Some(1));
+        assert_subr_arity("keymapp", 1, Some(1));
+        assert_subr_arity("keyboard-coding-system", 0, Some(1));
+        assert_subr_arity("keyboard-quit", 0, Some(0));
+        assert_subr_arity("listify-key-sequence", 1, Some(1));
+        assert_subr_arity("make-keymap", 0, Some(1));
+        assert_subr_arity("make-sparse-keymap", 0, Some(1));
     }
 
     #[test]
