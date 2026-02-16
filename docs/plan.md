@@ -6711,6 +6711,13 @@ Last updated: 2026-02-16
   - verified:
     - `make -C test/neovm/vm-compat check-one-neovm CASE=cases/subr-x-string-helper-availability` (pass, 8/8)
     - `make -C test/neovm/vm-compat check-builtin-registry-fboundp` drift count reduced from 52 to 48
+- Aligned charset helper startup availability with GNU Emacs `-Q`:
+  - removed default dispatch/registry exposure of `charset-list` and `unibyte-charset`
+  - refreshed oracle baseline:
+    - `test/neovm/vm-compat/cases/charset-api-availability.expected.tsv`
+  - verified:
+    - `make -C test/neovm/vm-compat check-one-neovm CASE=cases/charset-api-availability` (pass, 4/4)
+    - `make -C test/neovm/vm-compat check-builtin-registry-fboundp` drift count reduced from 48 to 46
 
 ## Doing
 
