@@ -33,7 +33,7 @@
 (fboundp 'cl-member)
 (condition-case err (cl-member) (error err))
 (fboundp 'cl-minusp)
-(condition-case err (cl-minusp) (error err))
+(condition-case err (cl-minusp -1) (error err))
 (fboundp 'cl-ninth)
 (condition-case err (cl-ninth '(a b c d e f g h i)) (error err))
 (fboundp 'cl-notany)

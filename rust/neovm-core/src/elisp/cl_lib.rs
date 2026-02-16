@@ -188,6 +188,13 @@ pub(crate) fn builtin_cl_plusp(args: Vec<Value>) -> EvalResult {
     Ok(Value::bool(n > 0.0))
 }
 
+/// `(cl-minusp N)` -- return t if N is strictly negative.
+pub(crate) fn builtin_cl_minusp(args: Vec<Value>) -> EvalResult {
+    expect_args("cl-minusp", &args, 1)?;
+    let n = expect_number_or_marker(&args[0])?;
+    Ok(Value::bool(n < 0.0))
+}
+
 fn seq_position_list_elements(seq: &Value) -> Result<Vec<Value>, Flow> {
     let mut elements = Vec::new();
     let mut cursor = seq.clone();
@@ -1088,6 +1095,23 @@ mod tests {
     #[test]
     fn cl_plusp_wrong_type() {
         assert!(builtin_cl_plusp(vec![Value::string("x")]).is_err());
+    }
+
+    #[test]
+    fn cl_minusp_true() {
+        let result = builtin_cl_minusp(vec![Value::Int(-1)]).unwrap();
+        assert!(result.is_truthy());
+    }
+
+    #[test]
+    fn cl_minusp_false() {
+        let result = builtin_cl_minusp(vec![Value::Int(0)]).unwrap();
+        assert!(result.is_nil());
+    }
+
+    #[test]
+    fn cl_minusp_wrong_type() {
+        assert!(builtin_cl_minusp(vec![Value::string("x")]).is_err());
     }
 
     #[test]

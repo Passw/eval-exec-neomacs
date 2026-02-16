@@ -32,8 +32,8 @@
 32	(condition-case err (cl-map) (error err))	OK (void-function cl-map)
 33	(fboundp 'cl-member)	OK nil
 34	(condition-case err (cl-member) (error err))	OK (void-function cl-member)
-35	(fboundp 'cl-minusp)	OK nil
-36	(condition-case err (cl-minusp) (error err))	OK (void-function cl-minusp)
+35	(fboundp 'cl-minusp)	OK t
+36	(condition-case err (cl-minusp -1) (error err))	OK t
 37	(fboundp 'cl-ninth)	OK t
 38	(condition-case err (cl-ninth '(a b c d e f g h i)) (error err))	OK i
 39	(fboundp 'cl-notany)	OK nil
