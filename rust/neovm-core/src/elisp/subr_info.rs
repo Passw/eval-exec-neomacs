@@ -361,6 +361,9 @@ fn subr_arity_value(name: &str) -> Value {
         "compose-string-internal" => arity_cons(3, Some(5)),
         "composition-get-gstring" => arity_cons(4, Some(4)),
         "call-interactively" => arity_cons(1, Some(3)),
+        "command-execute" => arity_cons(1, Some(4)),
+        "compare-strings" => arity_cons(6, Some(7)),
+        "completing-read" => arity_cons(2, Some(8)),
         "current-bidi-paragraph-direction" => arity_cons(0, Some(1)),
         "current-case-table" | "current-column" | "current-global-map"
         | "current-indentation" | "current-local-map" => arity_cons(0, Some(0)),
@@ -968,6 +971,13 @@ mod tests {
         assert_subr_arity("run-at-time", 3, None);
         assert_subr_arity("current-time", 0, Some(0));
         assert_subr_arity("float-time", 0, Some(1));
+    }
+
+    #[test]
+    fn subr_arity_command_read_primitives_match_oracle() {
+        assert_subr_arity("command-execute", 1, Some(4));
+        assert_subr_arity("compare-strings", 6, Some(7));
+        assert_subr_arity("completing-read", 2, Some(8));
     }
 
     #[test]
