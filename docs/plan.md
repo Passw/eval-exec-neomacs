@@ -36,6 +36,7 @@ Last updated: 2026-02-16
 - Keep newly landed numeric/state helper primitive `subr-arity` parity stable while expanding remaining math/runtime introspection drifts.
 - Keep newly landed text-property/overlay primitive `subr-arity` parity stable while expanding remaining text/UI metadata drifts.
 - Keep newly landed misc-helper primitive `subr-arity` parity stable while expanding remaining low-level helper drifts.
+- Keep newly landed mark/marker helper primitive `subr-arity` parity stable while expanding remaining editor-state helper drifts.
 
 ## Next
 
@@ -47,6 +48,23 @@ Last updated: 2026-02-16
 6. Expand `recent-keys` capture beyond `read*` consumers to eventual command-loop event publication.
 
 ## Done
+
+- Aligned mark/marker helper primitive `subr-arity` metadata with GNU Emacs:
+  - added explicit arity lock-ins for:
+    - `(0 . 1)`: `exchange-point-and-mark`, `mark`
+    - `(0 . 0)`: `mark-marker`, `point-marker`, `point-min-marker`, `point-max-marker`, `pop-mark`
+    - `(1 . 1)`: `marker-buffer`, `marker-insertion-type`, `marker-position`, `markerp`, `set-mark`, `set-mark-command`
+    - `(0 . 3)`: `push-mark`
+    - `(2 . 3)`: `set-marker`
+    - `(2 . 2)`: `set-marker-insertion-type`
+  - added oracle corpus lock-in case:
+    - `test/neovm/vm-compat/cases/mark-marker-subr-arity-semantics`
+  - wired into default vm-compat suite:
+    - `test/neovm/vm-compat/cases/default.list`
+  - verified:
+    - `cargo test --manifest-path rust/neovm-core/Cargo.toml subr_arity_mark_marker_primitives_match_oracle -- --nocapture` (pass)
+    - `make -C test/neovm/vm-compat check-one-neovm CASE=cases/mark-marker-subr-arity-semantics` (pass)
+    - `make -C test/neovm/vm-compat check-all-neovm-strict` (pass)
 
 - Aligned misc-helper primitive `subr-arity` metadata with GNU Emacs:
   - added explicit arity lock-ins for:
