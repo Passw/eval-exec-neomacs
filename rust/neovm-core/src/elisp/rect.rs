@@ -619,30 +619,79 @@ pub(crate) fn builtin_open_rectangle(
 /// `(clear-rectangle START END &optional FILL)` -- replace the rectangle
 /// contents with spaces (or FILL character if given).
 ///
-/// Stub: returns nil.
+/// Compatibility behavior:
+/// - fills rectangle width with spaces, then trims trailing spaces in affected
+///   lines
+/// - optional FILL is accepted but ignored
+/// - preserves caller point position by restoring original point after rewrite
+///   (clamped if buffer shrinks)
+/// - returns rectangle end position after rewrite (1-based char)
 pub(crate) fn builtin_clear_rectangle(
-    _eval: &mut super::eval::Evaluator,
+    eval: &mut super::eval::Evaluator,
     args: Vec<Value>,
 ) -> EvalResult {
     expect_min_args("clear-rectangle", &args, 2)?;
     expect_max_args("clear-rectangle", &args, 3)?;
-    let _start = expect_int(&args[0])?;
-    let _end = expect_int(&args[1])?;
-    // Optional FILL argument (character or string) — validated but unused in stub.
-    if args.len() == 3 {
-        match &args[2] {
-            Value::Nil => {}                     // nil means use spaces (default)
-            Value::Char(_) | Value::Str(_) => {} // valid fill
-            other => {
-                return Err(signal(
-                    "wrong-type-argument",
-                    vec![Value::symbol("char-or-string-p"), other.clone()],
-                ));
-            }
+    let start = expect_int(&args[0])?;
+    let end = expect_int(&args[1])?;
+    let old_point_char = eval
+        .buffers
+        .current_buffer()
+        .map(|buf| buf.point_char() as i64 + 1)
+        .unwrap_or(1);
+
+    let Some((text, pmin, pmax, start_line, _start_col, end_line, _end_col, left_col, right_col)) =
+        clamped_rect_inputs(eval, start, end)
+    else {
+        return Ok(Value::Int(1));
+    };
+
+    let width = right_col.saturating_sub(left_col);
+    let spaces = " ".repeat(width);
+    let mut lines: Vec<String> = text.split('\n').map(ToString::to_string).collect();
+    let line_indices = rectangle_lines_for_extract(start_line, end_line);
+    for line_index in &line_indices {
+        while lines.len() <= *line_index {
+            lines.push(String::new());
+        }
+        let line = &mut lines[*line_index];
+        let line_len = line.chars().count();
+        if line_len < left_col {
+            line.push_str(&" ".repeat(left_col - line_len));
+        }
+        let line_len = line.chars().count();
+        let del_end_char = line_len.min(right_col);
+        let del_start_byte = char_index_to_byte(line, left_col);
+        let del_end_byte = char_index_to_byte(line, del_end_char);
+        if del_start_byte < del_end_byte {
+            line.replace_range(del_start_byte..del_end_byte, "");
+        }
+        let insert_at = char_index_to_byte(line, left_col);
+        line.insert_str(insert_at, &spaces);
+        while line.ends_with(' ') {
+            line.pop();
         }
     }
-    // Stub: no-op.
-    Ok(Value::Nil)
+
+    let rewritten = lines.join("\n");
+    let last_line = line_indices.last().copied().unwrap_or(start_line);
+    let return_rel_char = line_col_to_char_index(&rewritten, last_line, left_col + width);
+    let return_char = return_rel_char as i64 + 1;
+
+    if let Some(buf) = eval.buffers.current_buffer_mut() {
+        buf.delete_region(pmin, pmax);
+        buf.goto_char(pmin);
+        buf.insert(&rewritten);
+        let restore_char = if old_point_char > 0 {
+            old_point_char as usize - 1
+        } else {
+            0
+        };
+        let restore_byte = buf.text.char_to_byte(restore_char.min(buf.text.char_count()));
+        buf.goto_char(restore_byte);
+    }
+
+    Ok(Value::Int(return_char))
 }
 
 /// `(string-rectangle START END STRING)` -- replace each line of the
@@ -1073,11 +1122,11 @@ mod tests {
     }
 
     #[test]
-    fn clear_rectangle_returns_nil() {
+    fn clear_rectangle_returns_point() {
         let mut eval = super::super::eval::Evaluator::new();
         let result = builtin_clear_rectangle(&mut eval, vec![Value::Int(1), Value::Int(10)]);
         assert!(result.is_ok());
-        assert!(result.unwrap().is_nil());
+        assert!(matches!(result.unwrap(), Value::Int(_)));
     }
 
     #[test]
@@ -1088,17 +1137,38 @@ mod tests {
             vec![Value::Int(1), Value::Int(10), Value::Char('x')],
         );
         assert!(result.is_ok());
-        assert!(result.unwrap().is_nil());
+        assert!(matches!(result.unwrap(), Value::Int(_)));
     }
 
     #[test]
-    fn clear_rectangle_bad_fill() {
+    fn clear_rectangle_accepts_non_char_fill() {
         let mut eval = super::super::eval::Evaluator::new();
         let result = builtin_clear_rectangle(
             &mut eval,
-            vec![Value::Int(1), Value::Int(10), Value::Int(42)],
+            vec![Value::Int(1), Value::Int(10), Value::Float(1.5)],
         );
-        assert!(result.is_err());
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn clear_rectangle_eval_mutates_and_restores_point() {
+        let mut eval = super::super::eval::Evaluator::new();
+        {
+            let buf = eval
+                .buffers
+                .current_buffer_mut()
+                .expect("current buffer must exist");
+            buf.insert("abcdef\n123456\n");
+        }
+        let result = builtin_clear_rectangle(&mut eval, vec![Value::Int(1), Value::Int(9)])
+            .expect("clear-rectangle");
+        assert_eq!(result, Value::Int(9));
+        let buf = eval
+            .buffers
+            .current_buffer()
+            .expect("current buffer must exist");
+        assert_eq!(buf.buffer_string(), " bcdef\n 23456\n");
+        assert_eq!(buf.text.byte_to_char(buf.point()) as i64 + 1, 15);
     }
 
     #[test]
