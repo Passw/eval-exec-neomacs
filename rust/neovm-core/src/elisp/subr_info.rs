@@ -353,6 +353,11 @@ fn subr_arity_value(name: &str) -> Value {
             arity_cons(2, Some(3))
         }
         "call-interactively" => arity_cons(1, Some(3)),
+        "current-bidi-paragraph-direction" => arity_cons(0, Some(1)),
+        "current-case-table" | "current-column" | "current-global-map"
+        | "current-indentation" | "current-local-map" => arity_cons(0, Some(0)),
+        "current-kill" => arity_cons(1, Some(2)),
+        "current-time-string" | "current-time-zone" => arity_cons(0, Some(2)),
         "called-interactively-p" | "float-time" => arity_cons(0, Some(1)),
         "commandp" => arity_cons(1, Some(2)),
         "cancel-timer" | "timerp" => arity_cons(1, Some(1)),
@@ -1004,6 +1009,19 @@ mod tests {
         assert_subr_arity("copy-sequence", 1, Some(1));
         assert_subr_arity("copy-syntax-table", 0, Some(1));
         assert_subr_arity("copy-to-register", 3, Some(5));
+    }
+
+    #[test]
+    fn subr_arity_current_state_primitives_match_oracle() {
+        assert_subr_arity("current-bidi-paragraph-direction", 0, Some(1));
+        assert_subr_arity("current-case-table", 0, Some(0));
+        assert_subr_arity("current-column", 0, Some(0));
+        assert_subr_arity("current-global-map", 0, Some(0));
+        assert_subr_arity("current-indentation", 0, Some(0));
+        assert_subr_arity("current-kill", 1, Some(2));
+        assert_subr_arity("current-local-map", 0, Some(0));
+        assert_subr_arity("current-time-string", 0, Some(2));
+        assert_subr_arity("current-time-zone", 0, Some(2));
     }
 
     #[test]
