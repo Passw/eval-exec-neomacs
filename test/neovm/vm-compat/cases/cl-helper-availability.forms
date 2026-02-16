@@ -81,6 +81,6 @@
 (fboundp 'cl-tenth)
 (condition-case err (cl-tenth) (error err))
 (fboundp 'cl-third)
-(condition-case err (cl-third) (error err))
+(condition-case err (cl-third '(a b c)) (error err))
 (fboundp 'cl-union)
 (condition-case err (cl-union) (error err))
