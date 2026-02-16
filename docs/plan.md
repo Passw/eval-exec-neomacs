@@ -25,6 +25,27 @@ Last updated: 2026-02-16
 
 ## Done
 
+- Implemented `waiting-for-user-input-p` batch compatibility and locked oracle coverage:
+  - updated:
+    - `rust/neovm-core/src/elisp/reader.rs`
+      - added `waiting-for-user-input-p` builtin with batch semantics (`nil`) and arity `(0 . 0)`.
+      - added unit coverage for return shape and arity error path.
+    - `rust/neovm-core/src/elisp/builtins.rs`
+      - wired `waiting-for-user-input-p` into evaluator dispatch.
+    - `rust/neovm-core/src/elisp/builtin_registry.rs`
+      - added `waiting-for-user-input-p` to dispatch builtin registry.
+    - `rust/neovm-core/src/elisp/subr_info.rs`
+      - added `subr-arity` metadata `(0 . 0)` for `waiting-for-user-input-p`.
+    - `test/neovm/vm-compat/cases/waiting-for-user-input-semantics.forms`
+    - `test/neovm/vm-compat/cases/waiting-for-user-input-semantics.expected.tsv`
+    - `test/neovm/vm-compat/cases/default.list`
+      - added oracle lock-in for baseline nil, unread-queue non-consumption, and arity error payload.
+  - verified:
+    - `cargo test --manifest-path rust/neovm-core/Cargo.toml waiting_for_user_input_p -- --nocapture` (pass)
+    - `make -C test/neovm/vm-compat check-builtin-registry-fboundp` (pass)
+    - `make -C test/neovm/vm-compat check-one-neovm CASE=cases/waiting-for-user-input-semantics` (pass, 4/4)
+    - `make -C test/neovm/vm-compat validate-case-lists` (pass)
+
 - Implemented `current-input-mode` / `set-input-mode` batch parity and locked oracle coverage:
   - updated:
     - `rust/neovm-core/src/elisp/eval.rs`
