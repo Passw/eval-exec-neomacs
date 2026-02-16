@@ -7923,6 +7923,23 @@ Last updated: 2026-02-16
     - `make -C test/neovm/vm-compat check-neovm CASE=cases/command-timer-subr-arity-semantics` (pass, 15/15)
     - `make -C test/neovm/vm-compat validate-case-lists` (pass)
     - `make -C test/neovm/vm-compat check-builtin-registry-fboundp` (pass, 1 allowlisted drift)
+- Aligned category/case-table/ccl/coding helper `subr-arity` metadata with GNU Emacs and locked parity in corpus:
+  - added arity overrides:
+    - `(0 . 0)`: `category-table`, `clear-charset-maps`
+    - `(1 . 1)`: `case-table-p`, `category-table-p`, `ccl-program-p`, `check-coding-system`, `clear-abbrev-table`
+    - `(1 . 2)`: `category-docstring`
+    - `(2 . 2)`: `ccl-execute`
+    - `(3 . 5)`: `ccl-execute-on-string`
+  - added and enabled oracle corpus:
+    - `test/neovm/vm-compat/cases/category-ccl-subr-arity-semantics.forms`
+    - `test/neovm/vm-compat/cases/category-ccl-subr-arity-semantics.expected.tsv`
+    - `test/neovm/vm-compat/cases/default.list`
+  - verified:
+    - `NEOVM_ORACLE_EMACS=/nix/store/hql3zwz5b4ywd2qwx8jssp4dyb7nx4cb-emacs-30.2/bin/emacs make -C test/neovm/vm-compat record FORMS=cases/category-ccl-subr-arity-semantics.forms EXPECTED=cases/category-ccl-subr-arity-semantics.expected.tsv` (pass)
+    - `cargo test subr_arity_category_ccl_primitives_match_oracle -- --nocapture` in `rust/neovm-core` (pass)
+    - `make -C test/neovm/vm-compat check-neovm CASE=cases/category-ccl-subr-arity-semantics` (pass, 15/15)
+    - `make -C test/neovm/vm-compat validate-case-lists` (pass)
+    - `make -C test/neovm/vm-compat check-builtin-registry-fboundp` (pass, 1 allowlisted drift)
 
 ## Doing
 
