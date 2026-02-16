@@ -19,6 +19,19 @@ Last updated: 2026-02-15
 
 ## Done
 
+- Added CCL arity compatibility corpus:
+  - updated:
+    - `test/neovm/vm-compat/cases/ccl-arity-semantics.{forms,expected.tsv}`
+      - added lock-ins for arity signaling of `ccl-program-p`, `ccl-execute`,
+        `ccl-execute-on-string`, `register-ccl-program`, and
+        `register-code-conversion-map`.
+    - `test/neovm/vm-compat/cases/default.list`
+      - added `cases/ccl-arity-semantics`.
+  - verified:
+    - `make -C test/neovm/vm-compat check-one-neovm CASE=cases/ccl-arity-semantics` (pass, 15/15)
+    - `make -C test/neovm/vm-compat validate-case-lists` (pass)
+    - `make -C test/neovm/vm-compat check-all-neovm` (pass, full default + neovm-only corpus)
+
 - Added documentation helper arity compatibility corpus:
   - updated:
     - `test/neovm/vm-compat/cases/doc-helper-arity-semantics.{forms,expected.tsv}`
