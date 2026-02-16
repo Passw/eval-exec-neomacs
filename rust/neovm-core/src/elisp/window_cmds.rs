@@ -1269,17 +1269,28 @@ pub(crate) fn builtin_modify_frame_parameters(
     Ok(Value::Nil)
 }
 
-/// `(frame-visible-p &optional FRAME)` -> t or nil.
+/// `(frame-visible-p FRAME)` -> t or nil.
 pub(crate) fn builtin_frame_visible_p(
     eval: &mut super::eval::Evaluator,
     args: Vec<Value>,
 ) -> EvalResult {
-    expect_max_args("frame-visible-p", &args, 1)?;
-    let fid = resolve_frame_id(&eval.frames, args.first())?;
-    let frame = eval
-        .frames
-        .get(fid)
-        .ok_or_else(|| signal("error", vec![Value::string("Frame not found")]))?;
+    expect_args("frame-visible-p", &args, 1)?;
+    let fid = match args.first() {
+        Some(Value::Int(n)) => FrameId(*n as u64),
+        Some(other) => {
+            return Err(signal(
+                "wrong-type-argument",
+                vec![Value::symbol("frame-live-p"), other.clone()],
+            ))
+        }
+        None => unreachable!("expect_args enforced"),
+    };
+    let frame = eval.frames.get(fid).ok_or_else(|| {
+        signal(
+            "wrong-type-argument",
+            vec![Value::symbol("frame-live-p"), args[0].clone()],
+        )
+    })?;
     Ok(Value::bool(frame.visible))
 }
 
@@ -2007,6 +2018,27 @@ mod tests {
     }
 
     #[test]
+    fn frame_visible_p_enforces_arity_and_designators() {
+        let forms = parse_forms(
+            "(condition-case err (frame-visible-p) (error (car err)))
+             (condition-case err (frame-visible-p nil) (error err))
+             (condition-case err (frame-visible-p 999999) (error err))
+             (frame-visible-p (selected-frame))",
+        )
+        .expect("parse");
+        let mut ev = Evaluator::new();
+        let out = ev
+            .eval_forms(&forms)
+            .iter()
+            .map(format_eval_result)
+            .collect::<Vec<_>>();
+        assert_eq!(out[0], "OK wrong-number-of-arguments");
+        assert_eq!(out[1], "OK (wrong-type-argument frame-live-p nil)");
+        assert_eq!(out[2], "OK (wrong-type-argument frame-live-p 999999)");
+        assert_eq!(out[3], "OK t");
+    }
+
+    #[test]
     fn selected_frame_returns_int() {
         let r = eval_one_with_frame("(selected-frame)");
         assert!(r.starts_with("OK "));
@@ -2065,9 +2097,9 @@ mod tests {
     }
 
     #[test]
-    fn frame_visible_p_default() {
+    fn frame_visible_p_requires_one_arg() {
         let r = eval_one_with_frame("(frame-visible-p)");
-        assert_eq!(r, "OK t");
+        assert_eq!(r, "OK wrong-number-of-arguments");
     }
 
     #[test]
