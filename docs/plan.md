@@ -6684,6 +6684,13 @@ Last updated: 2026-02-16
   - verified:
     - `make -C test/neovm/vm-compat check-one-neovm CASE=cases/bookmark-helper-availability` (pass, 10/10)
     - `make -C test/neovm/vm-compat check-builtin-registry-fboundp` drift count reduced from 70 to 65
+- Aligned startup `fboundp` surface for `custom-group-p` with GNU Emacs `-Q`:
+  - removed default dispatch/registry exposure of `custom-group-p`
+  - refreshed oracle baseline:
+    - `test/neovm/vm-compat/cases/custom-group-p-availability.expected.tsv`
+  - verified:
+    - `make -C test/neovm/vm-compat check-one-neovm CASE=cases/custom-group-p-availability` (pass, 2/2)
+    - `make -C test/neovm/vm-compat check-builtin-registry-fboundp` drift count reduced from 65 to 64
 
 ## Doing
 
