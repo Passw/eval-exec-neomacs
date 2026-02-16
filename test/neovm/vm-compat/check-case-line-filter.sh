@@ -25,7 +25,7 @@ cat >"$mixed_expected" <<'EOF'
 2	(condition-case err (read-passwd "pw: ") (error err))	OK (end-of-file "Error reading from stdin")
 EOF
 
-awk -f "$filter_script" "$mixed_in" >"$mixed_out"
+LC_ALL=C awk -f "$filter_script" "$mixed_in" >"$mixed_out"
 diff -u "$mixed_expected" "$mixed_out"
 
 empty_in="$tmp_dir/empty.in"
@@ -34,11 +34,11 @@ only noise
 without prefixed cases
 EOF
 
-if awk -f "$filter_script" "$empty_in" >/dev/null 2>&1; then
+if LC_ALL=C awk -f "$filter_script" "$empty_in" >/dev/null 2>&1; then
   echo "expected filter-case-lines.awk to fail for empty case output" >&2
   exit 1
 fi
 
-NEOVM_ALLOW_EMPTY_CASE_OUTPUT=1 awk -f "$filter_script" "$empty_in" >/dev/null
+NEOVM_ALLOW_EMPTY_CASE_OUTPUT=1 LC_ALL=C awk -f "$filter_script" "$empty_in" >/dev/null
 
 echo "case-line filter checks passed"

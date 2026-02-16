@@ -78,4 +78,4 @@ if [[ "$version_banner" =~ [Nn][Ee][Oo][Mm][Aa][Cc][Ss] ]] || [[ "$emacs_bin" =~
 fi
 
 NEOVM_FORMS_FILE="$forms_file_abs" "$emacs_bin" --batch -Q -l "$oracle_el" 2>/dev/null \
-  | awk -f "$script_dir/filter-case-lines.awk"
+  | LC_ALL=C awk -f "$script_dir/filter-case-lines.awk"
