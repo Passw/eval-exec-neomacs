@@ -345,6 +345,12 @@ fn subr_arity_value(name: &str) -> Value {
         "bool-vector-exclusive-or" | "bool-vector-intersection" | "bool-vector-union" => {
             arity_cons(2, Some(3))
         }
+        "call-interactively" => arity_cons(1, Some(3)),
+        "called-interactively-p" | "float-time" => arity_cons(0, Some(1)),
+        "commandp" => arity_cons(1, Some(2)),
+        "cancel-timer" | "timerp" => arity_cons(1, Some(1)),
+        "run-at-time" => arity_cons(3, None),
+        "current-time" => arity_cons(0, Some(0)),
         "if" => Value::cons(Value::Int(2), Value::symbol("unevalled")),
         "defining-kbd-macro" => arity_cons(1, Some(2)),
         "help-key-description" => arity_cons(2, Some(2)),
@@ -910,6 +916,18 @@ mod tests {
         assert_subr_arity("bool-vector-exclusive-or", 2, Some(3));
         assert_subr_arity("bool-vector-intersection", 2, Some(3));
         assert_subr_arity("bool-vector-union", 2, Some(3));
+    }
+
+    #[test]
+    fn subr_arity_command_timer_primitives_match_oracle() {
+        assert_subr_arity("call-interactively", 1, Some(3));
+        assert_subr_arity("called-interactively-p", 0, Some(1));
+        assert_subr_arity("commandp", 1, Some(2));
+        assert_subr_arity("cancel-timer", 1, Some(1));
+        assert_subr_arity("timerp", 1, Some(1));
+        assert_subr_arity("run-at-time", 3, None);
+        assert_subr_arity("current-time", 0, Some(0));
+        assert_subr_arity("float-time", 0, Some(1));
     }
 
     #[test]

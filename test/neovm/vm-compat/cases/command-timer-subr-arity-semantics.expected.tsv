@@ -1,0 +1,8 @@
+1	(subr-arity (symbol-function 'call-interactively))	OK (1 . 3)
+2	(subr-arity (symbol-function 'called-interactively-p))	OK (0 . 1)
+3	(subr-arity (symbol-function 'commandp))	OK (1 . 2)
+4	(subr-arity (symbol-function 'cancel-timer))	OK (1 . 1)
+5	(subr-arity (symbol-function 'timerp))	OK (1 . 1)
+6	(subr-arity (symbol-function 'run-at-time))	OK (3 . many)
+7	(subr-arity (symbol-function 'current-time))	OK (0 . 0)
+8	(subr-arity (symbol-function 'float-time))	OK (0 . 1)
