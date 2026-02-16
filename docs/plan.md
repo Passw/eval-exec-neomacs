@@ -55,9 +55,35 @@ Last updated: 2026-02-16
 5. Expand `kbd` edge corpus around uncommon modifier composition and align non-`kbd` key-description consumers with the new parser semantics where needed.
 6. Expand `recent-keys` capture beyond `read*` consumers to eventual command-loop event publication.
 7. Continue subr-arity registry drift reduction from `59` remaining mismatches using batched oracle lock-ins.
-8. Continue startup `symbol-function` wrapper-shape parity for remaining drifts (prefer low-risk wrappers not exercised by runtime behavior suites).
+8. Continue startup `symbol-function` wrapper-shape parity from `15` remaining drifts (prefer low-risk wrappers not exercised by runtime behavior suites).
 
 ## Done
+
+- Added callable startup-autoload dispatch and landed `thingatpt/time/auth-source` wrapper parity batch:
+  - evaluator now routes named calls through autoload-aware dispatch when function cells hold autoload forms.
+  - added builtin-backed fast path for autoload-wrapped names so startup wrapper shape can remain autoload without breaking runtime callability.
+  - added evaluator regression coverage:
+    - `named_autoload_function_cell_for_builtin_name_remains_callable`
+  - seeded startup autoload wrapper function cells for:
+    - `bounds-of-thing-at-point`, `thing-at-point`, `symbol-at-point`
+    - `safe-date-to-time`
+    - `read-passwd`
+  - extended unit assertion coverage:
+    - `symbol_function_resolves_builtin_and_special_names`
+  - added oracle corpus lock-in case:
+    - `test/neovm/vm-compat/cases/thingatpt-time-auth-autoload-wrapper-semantics.{forms,expected.tsv}`
+    - wired into default + introspection suites:
+      - `test/neovm/vm-compat/cases/default.list`
+      - `test/neovm/vm-compat/cases/introspection.list`
+  - verified:
+    - `cargo test --manifest-path rust/neovm-core/Cargo.toml named_autoload_function_cell_for_builtin_name_remains_callable -- --nocapture` (pass)
+    - `cargo test --manifest-path rust/neovm-core/Cargo.toml symbol_function_resolves_builtin_and_special_names -- --nocapture` (pass)
+    - `make -C test/neovm/vm-compat check-one-neovm CASE=cases/thingatpt-time-auth-autoload-wrapper-semantics` (pass)
+    - `make -C test/neovm/vm-compat check-one-neovm CASE=cases/safe-date-to-time-semantics` (pass)
+    - `make -C test/neovm/vm-compat check-one-neovm CASE=cases/read-passwd-batch-semantics` (pass)
+    - `make -C test/neovm/vm-compat validate-case-lists` (pass)
+    - `make -C test/neovm/vm-compat check-all-neovm-strict` (pass)
+    - collapsed wrapper-shape drift scan status: `15` remaining (down from `20`)
 
 - Fixed startup wrapper recursion in evaluator `Subr` dispatch and expanded wrapper-shape parity corpus:
   - fixed `Value::Subr` application to dispatch directly to builtin/evaluator/special-form paths instead of re-entering symbol-function lookup through obarray.
