@@ -53,9 +53,23 @@ Last updated: 2026-02-16
 4. Keep Rust backend behind compile-time switch and preserve Emacs C core as default backend.
 5. Expand `kbd` edge corpus around uncommon modifier composition and align non-`kbd` key-description consumers with the new parser semantics where needed.
 6. Expand `recent-keys` capture beyond `read*` consumers to eventual command-loop event publication.
-7. Continue subr-arity registry drift reduction from `65` remaining mismatches using batched oracle lock-ins.
+7. Continue subr-arity registry drift reduction from `64` remaining mismatches using batched oracle lock-ins.
 
 ## Done
+
+- Aligned `reindent-then-newline-and-indent` `subr-arity` with GNU Emacs:
+  - added explicit arity lock-in:
+    - `(0 . 0)`: `reindent-then-newline-and-indent`
+  - added oracle corpus lock-in case:
+    - `test/neovm/vm-compat/cases/reindent-newline-subr-arity-semantics.{forms,expected.tsv}`
+    - wired into default suite: `test/neovm/vm-compat/cases/default.list`
+  - unit coverage:
+    - asserted in `subr_arity_command_edit_runtime_helpers_match_oracle`
+  - verified:
+    - `cargo test --manifest-path rust/neovm-core/Cargo.toml subr_arity_command_edit_runtime_helpers_match_oracle -- --nocapture` (pass)
+    - `make -C test/neovm/vm-compat check-one-neovm CASE=cases/reindent-newline-subr-arity-semantics` (pass)
+    - `make -C test/neovm/vm-compat check-all-neovm-strict` (pass)
+    - registry scan status: `CURRENT_SUBR_ARITY_MISMATCHES=64`
 
 - Aligned charset/json/libxml/display helper primitive `subr-arity` metadata with GNU Emacs:
   - added explicit arity lock-ins for:
