@@ -802,6 +802,7 @@ pub(crate) fn builtin_next_window(
     eval: &mut super::eval::Evaluator,
     args: Vec<Value>,
 ) -> EvalResult {
+    expect_max_args("next-window", &args, 3)?;
     let (fid, wid) = resolve_window_id(eval, args.first())?;
     let frame = eval
         .frames
@@ -821,6 +822,7 @@ pub(crate) fn builtin_previous_window(
     eval: &mut super::eval::Evaluator,
     args: Vec<Value>,
 ) -> EvalResult {
+    expect_max_args("previous-window", &args, 3)?;
     let (fid, wid) = resolve_window_id(eval, args.first())?;
     let frame = eval
         .frames
@@ -1933,6 +1935,31 @@ mod tests {
                  (/= w1 w2)))",
         );
         assert_eq!(results[0], "OK t");
+    }
+
+    #[test]
+    fn next_previous_window_enforce_max_arity() {
+        let forms = parse_forms(
+            "(condition-case err (next-window nil nil nil nil) (error (car err)))
+             (condition-case err (previous-window nil nil nil nil) (error (car err)))
+             (let ((w1 (selected-window)))
+               (split-window)
+               (windowp (next-window w1 nil nil)))
+             (let ((w1 (selected-window)))
+               (split-window)
+               (windowp (previous-window w1 nil nil)))",
+        )
+        .expect("parse");
+        let mut ev = Evaluator::new();
+        let out = ev
+            .eval_forms(&forms)
+            .iter()
+            .map(format_eval_result)
+            .collect::<Vec<_>>();
+        assert_eq!(out[0], "OK wrong-number-of-arguments");
+        assert_eq!(out[1], "OK wrong-number-of-arguments");
+        assert_eq!(out[2], "OK t");
+        assert_eq!(out[3], "OK t");
     }
 
     #[test]
