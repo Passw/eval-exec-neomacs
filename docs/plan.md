@@ -20,6 +20,21 @@ Last updated: 2026-02-16
 
 ## Done
 
+- Fixed token-boundary extraction compatibility for `thing-at-point` wrappers:
+  - updated:
+    - `rust/neovm-core/src/elisp/interactive.rs`
+      - updated `bounds_word` and `bounds_symbol` to accept point at token end boundaries (point right after token).
+      - added focused unit coverage for boundary extraction and boundary bounds.
+    - `test/neovm/vm-compat/cases/symbol-word-at-point-semantics.forms`
+      - updated probes to include boundary-position behavior and symbol bounds coverage.
+    - `test/neovm/vm-compat/cases/symbol-word-at-point-semantics.expected.tsv`
+      - refreshed oracle baseline outputs for boundary behavior.
+  - verified:
+    - `cargo test thing_at_point_word_and_symbol_boundary --manifest-path rust/neovm-core/Cargo.toml` (pass)
+    - `cargo test bounds_of_thing_at_point_symbol_boundary --manifest-path rust/neovm-core/Cargo.toml` (pass)
+    - `make -C test/neovm/vm-compat check-one-neovm CASE=cases/symbol-word-at-point-semantics` (pass, 6/6)
+    - `make -C test/neovm/vm-compat validate-case-lists` (pass)
+
 - Added oracle lock-in corpus for `symbol-at-point` / `word-at-point` wrappers:
   - updated:
     - `test/neovm/vm-compat/cases/symbol-word-at-point-semantics.forms`
