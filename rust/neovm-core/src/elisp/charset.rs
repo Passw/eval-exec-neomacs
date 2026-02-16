@@ -394,9 +394,12 @@ pub(crate) fn builtin_charset_id_internal(args: Vec<Value>) -> EvalResult {
     }
 }
 
-/// `(define-charset-internal &rest ARGS)` -- stub, return nil.
+/// `(define-charset-internal ARG1 ... ARG17)` -- internal charset initializer.
+///
+/// NeoVM keeps a compatibility stub body but mirrors Emacs arity behavior:
+/// this builtin accepts exactly 17 arguments.
 pub(crate) fn builtin_define_charset_internal(args: Vec<Value>) -> EvalResult {
-    let _ = args;
+    expect_args("define-charset-internal", &args, 17)?;
     Ok(Value::Nil)
 }
 
@@ -924,13 +927,15 @@ mod tests {
     // -----------------------------------------------------------------------
 
     #[test]
-    fn define_charset_internal_stub() {
-        let r = builtin_define_charset_internal(vec![
-            Value::symbol("test"),
-            Value::Int(1),
-            Value::Int(2),
-        ])
-        .unwrap();
+    fn define_charset_internal_requires_exact_arity() {
+        assert!(builtin_define_charset_internal(vec![]).is_err());
+        assert!(builtin_define_charset_internal(vec![Value::Nil; 16]).is_err());
+        assert!(builtin_define_charset_internal(vec![Value::Nil; 18]).is_err());
+    }
+
+    #[test]
+    fn define_charset_internal_exact_arity_returns_nil_stub() {
+        let r = builtin_define_charset_internal(vec![Value::Nil; 17]).unwrap();
         assert!(r.is_nil());
     }
 
