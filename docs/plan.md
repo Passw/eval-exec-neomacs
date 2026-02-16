@@ -20,6 +20,23 @@ Last updated: 2026-02-16
 
 ## Done
 
+- Aligned `define-charset-internal` arity with oracle and added charset internal arity corpus lock-in:
+  - updated:
+    - `rust/neovm-core/src/elisp/charset.rs`
+      - changed `define-charset-internal` from permissive stub arity to exact 17-argument arity (`wrong-number-of-arguments` on mismatch), preserving nil stub body for exact-arity calls.
+      - updated focused unit coverage for exact arity acceptance and mismatch errors.
+    - `test/neovm/vm-compat/cases/charset-internal-arity-semantics.forms`
+      - added oracle probes for `define-charset-internal` arity edges (0, 16, 18 args), plus `clear-charset-maps` arity lock-in.
+    - `test/neovm/vm-compat/cases/charset-internal-arity-semantics.expected.tsv`
+      - recorded oracle baseline outputs for charset internal arity behavior.
+    - `test/neovm/vm-compat/cases/default.list`
+      - added `cases/charset-internal-arity-semantics` to recurring default compatibility execution.
+  - verified:
+    - `cargo test define_charset_internal --manifest-path rust/neovm-core/Cargo.toml` (pass)
+    - `make -C test/neovm/vm-compat check-one-neovm CASE=cases/charset-internal-arity-semantics` (pass, 7/7)
+    - `make -C test/neovm/vm-compat validate-case-lists` (pass)
+    - `make -C test/neovm/vm-compat check-all-neovm` (pass)
+
 - Added sentence/sexp bounds support for `bounds-of-thing-at-point` and locked oracle coverage:
   - updated:
     - `rust/neovm-core/src/elisp/interactive.rs`
