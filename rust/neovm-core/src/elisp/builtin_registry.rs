@@ -178,6 +178,7 @@ const DISPATCH_BUILTIN_NAMES: &[&str] = &[
     "cl-fifth",
     "cl-first",
     "cl-fourth",
+    "cl-gensym",
     "cl-member",
     "cl-minusp",
     "cl-notany",

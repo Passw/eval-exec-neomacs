@@ -5,6 +5,7 @@
 
 use super::error::{signal, EvalResult, Flow};
 use super::value::*;
+use std::sync::atomic::{AtomicU64, Ordering};
 
 // ---------------------------------------------------------------------------
 // Argument helpers (local copies for this module)
@@ -42,6 +43,8 @@ fn expect_max_args(name: &str, args: &[Value], max: usize) -> Result<(), Flow> {
         Ok(())
     }
 }
+
+static CL_GENSYM_COUNTER: AtomicU64 = AtomicU64::new(0);
 
 fn expect_int(val: &Value) -> Result<i64, Flow> {
     match val {
@@ -737,6 +740,24 @@ pub(crate) fn builtin_cl_notevery(
 ) -> EvalResult {
     let every = builtin_seq_every_p(eval, args)?;
     Ok(Value::bool(!every.is_truthy()))
+}
+
+/// `(cl-gensym &optional PREFIX)` -- generate an uninterned-style symbol name.
+pub(crate) fn builtin_cl_gensym(args: Vec<Value>) -> EvalResult {
+    expect_max_args("cl-gensym", &args, 1)?;
+    let prefix = match args.first() {
+        None => "G".to_string(),
+        Some(Value::Nil) => "G".to_string(),
+        Some(Value::Str(s)) => s.to_string(),
+        Some(other) => {
+            return Err(signal(
+                "wrong-type-argument",
+                vec![Value::symbol("stringp"), other.clone()],
+            ))
+        }
+    };
+    let n = CL_GENSYM_COUNTER.fetch_add(1, Ordering::Relaxed);
+    Ok(Value::symbol(format!("{prefix}{n}")))
 }
 
 /// `(seq-contains-p SEQ ELT &optional TESTFN)` — membership test for sequence.
@@ -1538,5 +1559,28 @@ mod tests {
         let seq = Value::list(vec![Value::Int(1), Value::string("x")]);
         let result = builtin_cl_notevery(&mut evaluator, vec![func, seq]).unwrap();
         assert!(result.is_truthy());
+    }
+
+    #[test]
+    fn cl_gensym_default_prefix() {
+        let result = builtin_cl_gensym(vec![]).unwrap();
+        match result {
+            Value::Symbol(sym) => assert!(sym.starts_with('G')),
+            other => panic!("expected symbol, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn cl_gensym_custom_prefix() {
+        let result = builtin_cl_gensym(vec![Value::string("P")]).unwrap();
+        match result {
+            Value::Symbol(sym) => assert!(sym.starts_with('P')),
+            other => panic!("expected symbol, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn cl_gensym_wrong_type() {
+        assert!(builtin_cl_gensym(vec![Value::Int(1)]).is_err());
     }
 }

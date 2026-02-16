@@ -25,7 +25,7 @@
 (fboundp 'cl-fourth)
 (condition-case err (cl-fourth '(a b c d)) (error err))
 (fboundp 'cl-gensym)
-(condition-case err (cl-gensym) (error err))
+(condition-case err (symbolp (cl-gensym)) (error err))
 (fboundp 'cl-intersection)
 (condition-case err (cl-intersection) (error err))
 (fboundp 'cl-map)
