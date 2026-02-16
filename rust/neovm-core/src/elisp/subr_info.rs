@@ -352,6 +352,12 @@ fn subr_arity_value(name: &str) -> Value {
         "bool-vector-exclusive-or" | "bool-vector-intersection" | "bool-vector-union" => {
             arity_cons(2, Some(3))
         }
+        "activate-mark" | "auto-composition-mode" | "deactivate-mark" => arity_cons(0, Some(1)),
+        "clear-composition-cache" => arity_cons(0, Some(0)),
+        "composition-sort-rules" => arity_cons(1, Some(1)),
+        "compose-region-internal" => arity_cons(2, Some(4)),
+        "compose-string-internal" => arity_cons(3, Some(5)),
+        "composition-get-gstring" => arity_cons(4, Some(4)),
         "call-interactively" => arity_cons(1, Some(3)),
         "current-bidi-paragraph-direction" => arity_cons(0, Some(1)),
         "current-case-table" | "current-column" | "current-global-map"
@@ -1022,6 +1028,18 @@ mod tests {
         assert_subr_arity("current-local-map", 0, Some(0));
         assert_subr_arity("current-time-string", 0, Some(2));
         assert_subr_arity("current-time-zone", 0, Some(2));
+    }
+
+    #[test]
+    fn subr_arity_composition_primitives_match_oracle() {
+        assert_subr_arity("activate-mark", 0, Some(1));
+        assert_subr_arity("auto-composition-mode", 0, Some(1));
+        assert_subr_arity("clear-composition-cache", 0, Some(0));
+        assert_subr_arity("compose-region-internal", 2, Some(4));
+        assert_subr_arity("compose-string-internal", 3, Some(5));
+        assert_subr_arity("composition-get-gstring", 4, Some(4));
+        assert_subr_arity("composition-sort-rules", 1, Some(1));
+        assert_subr_arity("deactivate-mark", 0, Some(1));
     }
 
     #[test]

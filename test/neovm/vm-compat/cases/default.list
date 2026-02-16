@@ -50,6 +50,7 @@ cases/coding-system-subr-arity-semantics
 cases/color-subr-arity-semantics
 cases/copy-cons-subr-arity-semantics
 cases/current-state-subr-arity-semantics
+cases/composition-subr-arity-semantics
 cases/abbrev-subr-arity-semantics
 cases/help-key-recent-keys-semantics
 cases/this-command-keys-readers-semantics
