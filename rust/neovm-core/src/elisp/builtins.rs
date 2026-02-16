@@ -4309,7 +4309,7 @@ pub(crate) fn builtin_string_to_syntax(args: Vec<Value>) -> EvalResult {
 }
 
 pub(crate) fn builtin_current_time(args: Vec<Value>) -> EvalResult {
-    let _ = args;
+    expect_args("current-time", &args, 0)?;
     use std::time::{SystemTime, UNIX_EPOCH};
     let dur = SystemTime::now()
         .duration_since(UNIX_EPOCH)
@@ -4694,7 +4694,7 @@ pub(crate) fn builtin_erase_buffer(
     eval: &mut super::eval::Evaluator,
     args: Vec<Value>,
 ) -> EvalResult {
-    let _ = args;
+    expect_args("erase-buffer", &args, 0)?;
     let read_only_buffer_name = eval.buffers.current_buffer().and_then(|buf| {
         if buffer_read_only_active(eval, buf) {
             Some(buf.name.clone())
@@ -4848,7 +4848,7 @@ pub(crate) fn builtin_narrow_to_region(
 
 /// (widen) → nil
 pub(crate) fn builtin_widen(eval: &mut super::eval::Evaluator, args: Vec<Value>) -> EvalResult {
-    let _ = args;
+    expect_args("widen", &args, 0)?;
     let buf = eval
         .buffers
         .current_buffer_mut()
