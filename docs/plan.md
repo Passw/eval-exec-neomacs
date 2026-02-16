@@ -20,6 +20,22 @@ Last updated: 2026-02-16
 
 ## Done
 
+- Added sentence/sexp bounds support for `bounds-of-thing-at-point` and locked oracle coverage:
+  - updated:
+    - `rust/neovm-core/src/elisp/interactive.rs`
+      - added `sentence` and `sexp` branches in `bounds-of-thing-at-point` (aligned with current sentence/sexp extraction model).
+      - added focused unit coverage for sentence and sexp bounds behavior.
+    - `test/neovm/vm-compat/cases/thing-at-point-sentence-sexp-semantics.forms`
+      - added probes for sentence extraction+bounds and sexp extraction+bounds.
+    - `test/neovm/vm-compat/cases/thing-at-point-sentence-sexp-semantics.expected.tsv`
+      - recorded oracle baseline outputs for sentence/sexp behavior.
+    - `test/neovm/vm-compat/cases/default.list`
+      - added `cases/thing-at-point-sentence-sexp-semantics` to recurring compatibility execution.
+  - verified:
+    - `cargo test bounds_of_thing_at_point_sentence_and_sexp --manifest-path rust/neovm-core/Cargo.toml` (pass)
+    - `make -C test/neovm/vm-compat check-one-neovm CASE=cases/thing-at-point-sentence-sexp-semantics` (pass, 5/5)
+    - `make -C test/neovm/vm-compat validate-case-lists` (pass)
+
 - Re-ran full `vm-compat` gate after token-boundary extraction fix:
   - `make -C test/neovm/vm-compat check-all-neovm` (pass)
 
