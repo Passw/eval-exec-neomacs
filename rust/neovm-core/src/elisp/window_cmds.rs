@@ -1084,6 +1084,48 @@ pub(crate) fn builtin_select_frame(
     Ok(Value::Int(fid.0 as i64))
 }
 
+/// `(select-frame-set-input-focus FRAME &optional NORECORD)` -> nil.
+pub(crate) fn builtin_select_frame_set_input_focus(
+    eval: &mut super::eval::Evaluator,
+    args: Vec<Value>,
+) -> EvalResult {
+    expect_min_args("select-frame-set-input-focus", &args, 1)?;
+    expect_max_args("select-frame-set-input-focus", &args, 2)?;
+    let fid = match &args[0] {
+        Value::Int(n) => {
+            let fid = FrameId(*n as u64);
+            if eval.frames.get(fid).is_none() {
+                return Err(signal(
+                    "wrong-type-argument",
+                    vec![Value::symbol("frame-live-p"), Value::Int(*n)],
+                ));
+            }
+            fid
+        }
+        other => {
+            return Err(signal(
+                "wrong-type-argument",
+                vec![Value::symbol("frame-live-p"), other.clone()],
+            ))
+        }
+    };
+    if !eval.frames.select_frame(fid) {
+        return Err(signal(
+            "wrong-type-argument",
+            vec![Value::symbol("frame-live-p"), args[0].clone()],
+        ));
+    }
+    if let Some(buf_id) = eval
+        .frames
+        .get(fid)
+        .and_then(|f| f.find_window(f.selected_window))
+        .and_then(|w| w.buffer_id())
+    {
+        eval.buffers.set_current(buf_id);
+    }
+    Ok(Value::Nil)
+}
+
 /// `(frame-list)` -> list of frame ids.
 pub(crate) fn builtin_frame_list(
     eval: &mut super::eval::Evaluator,
@@ -2148,6 +2190,31 @@ mod tests {
         assert_eq!(out[2], "OK (wrong-type-argument frame-live-p \"x\")");
         assert_eq!(out[3], "OK (wrong-type-argument frame-live-p 999999)");
         assert_eq!(out[4], "OK (t t)");
+    }
+
+    #[test]
+    fn select_frame_set_input_focus_arity_designators_and_result() {
+        let forms = parse_forms(
+            "(condition-case err (select-frame-set-input-focus) (error (car err)))
+             (condition-case err (select-frame-set-input-focus nil) (error err))
+             (condition-case err (select-frame-set-input-focus \"x\") (error err))
+             (condition-case err (select-frame-set-input-focus 999999) (error err))
+             (let ((f (selected-frame)))
+               (list (select-frame-set-input-focus f)
+                     (eq (selected-frame) f)))",
+        )
+        .expect("parse");
+        let mut ev = Evaluator::new();
+        let out = ev
+            .eval_forms(&forms)
+            .iter()
+            .map(format_eval_result)
+            .collect::<Vec<_>>();
+        assert_eq!(out[0], "OK wrong-number-of-arguments");
+        assert_eq!(out[1], "OK (wrong-type-argument frame-live-p nil)");
+        assert_eq!(out[2], "OK (wrong-type-argument frame-live-p \"x\")");
+        assert_eq!(out[3], "OK (wrong-type-argument frame-live-p 999999)");
+        assert_eq!(out[4], "OK (nil t)");
     }
 
     #[test]

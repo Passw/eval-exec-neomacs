@@ -7531,6 +7531,11 @@ pub(crate) fn dispatch_builtin(
         "pop-to-buffer" => return Some(super::window_cmds::builtin_pop_to_buffer(eval, args)),
         "selected-frame" => return Some(super::window_cmds::builtin_selected_frame(eval, args)),
         "select-frame" => return Some(super::window_cmds::builtin_select_frame(eval, args)),
+        "select-frame-set-input-focus" => {
+            return Some(super::window_cmds::builtin_select_frame_set_input_focus(
+                eval, args,
+            ))
+        }
         "last-nonminibuffer-frame" => {
             return Some(super::window_cmds::builtin_selected_frame(eval, args))
         }

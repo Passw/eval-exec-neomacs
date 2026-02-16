@@ -716,6 +716,7 @@ const DISPATCH_BUILTIN_NAMES: &[&str] = &[
     "secure-hash",
     "send-string-to-terminal",
     "select-frame",
+    "select-frame-set-input-focus",
     "select-window",
     "selected-frame",
     "selected-window",

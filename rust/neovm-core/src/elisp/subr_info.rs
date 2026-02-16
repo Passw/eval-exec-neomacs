@@ -547,6 +547,7 @@ fn subr_arity_value(name: &str) -> Value {
         "save-buffer" | "scroll-down-command" | "scroll-up-command" => arity_cons(0, Some(1)),
         "select-window" | "minor-mode-key-binding" => arity_cons(1, Some(2)),
         "select-frame" => arity_cons(1, Some(2)),
+        "select-frame-set-input-focus" => arity_cons(1, Some(2)),
         "selected-frame" => arity_cons(0, Some(0)),
         "set-charset-priority" => arity_cons(1, None),
         "write-region" => arity_cons(3, Some(7)),
@@ -2117,6 +2118,7 @@ mod tests {
         assert_subr_arity("scroll-down-command", 0, Some(1));
         assert_subr_arity("scroll-up-command", 0, Some(1));
         assert_subr_arity("select-frame", 1, Some(2));
+        assert_subr_arity("select-frame-set-input-focus", 1, Some(2));
         assert_subr_arity("select-window", 1, Some(2));
         assert_subr_arity("selected-frame", 0, Some(0));
         assert_subr_arity("set-charset-priority", 1, None);
