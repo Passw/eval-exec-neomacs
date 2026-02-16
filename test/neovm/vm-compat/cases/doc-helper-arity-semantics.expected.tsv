@@ -1,6 +1,6 @@
 1	(fboundp 'substitute-command-keys)	OK t
 2	(condition-case err (substitute-command-keys) (error (car err)))	OK wrong-number-of-arguments
-3	(condition-case err (substitute-command-keys "" nil) (error (car err)))	OK wrong-number-of-arguments
+3	(condition-case err (substitute-command-keys "" nil) (error (car err)))	OK ""
 4	(fboundp 'Snarf-documentation)	OK t
 5	(condition-case err (Snarf-documentation) (error (car err)))	OK wrong-number-of-arguments
 6	(condition-case err (Snarf-documentation "" nil) (error (car err)))	OK wrong-number-of-arguments
