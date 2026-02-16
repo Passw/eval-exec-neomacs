@@ -19,6 +19,25 @@ Last updated: 2026-02-16
 
 ## Done
 
+- Exposed `bool-vector-complement` as a real char-table/bool-vector helper:
+  - updated:
+    - `rust/neovm-core/src/elisp/chartable.rs`
+      - added `bool-vector-complement` builtin (`1..=2` args) with optional destination mutation.
+      - validates bool-vector payloads and reuses existing bool-vector storage/update helpers.
+      - added focused unit coverage for allocating result, destination mutation, and arity checks.
+    - `rust/neovm-core/src/elisp/builtins.rs`
+      - pure dispatch now routes `bool-vector-complement`.
+    - `rust/neovm-core/src/elisp/builtin_registry.rs`
+      - added `bool-vector-complement` to builtin registry.
+    - `test/neovm/vm-compat/cases/residual-helper-availability.forms`
+      - switched helper probe to a callable bool-vector complement + predicate path.
+    - `test/neovm/vm-compat/cases/residual-helper-availability.expected.tsv`
+      - updated expectations from `void-function` to callable helper behavior (`t`).
+  - verified:
+    - `cargo test bool_vector_complement --manifest-path rust/neovm-core/Cargo.toml` (pass)
+    - `make -C test/neovm/vm-compat check-one-neovm CASE=cases/residual-helper-availability` (pass, 26/26)
+    - `make -C test/neovm/vm-compat validate-case-lists` (pass)
+
 - Exposed `base64url-decode-string` as a real fns helper builtin:
   - updated:
     - `rust/neovm-core/src/elisp/fns.rs`
