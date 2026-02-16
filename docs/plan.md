@@ -25,6 +25,20 @@ Last updated: 2026-02-16
 
 ## Done
 
+- Aligned `event-apply-modifier` shift-edge tilde behavior with oracle:
+  - updated:
+    - `rust/neovm-core/src/elisp/builtins.rs`
+      - added shift-edge mapping for code `126` -> `127` in the integer shift normalization path.
+    - `test/neovm/vm-compat/cases/event-key-helpers-semantics.forms`
+      - added explicit probe:
+        - `(event-apply-modifier 126 'shift 0 nil)`
+    - `test/neovm/vm-compat/cases/event-key-helpers-semantics.expected.tsv`
+      - refreshed oracle baseline with the new shift-edge line.
+  - verified:
+    - `make -C test/neovm/vm-compat check-one-neovm CASE=cases/event-key-helpers-semantics` (pass, 81/81)
+    - `make -C test/neovm/vm-compat validate-case-lists` (pass)
+    - `make -C test/neovm/vm-compat check-builtin-registry-fboundp` (pass; only allowlisted `neovm-precompile-file` drift)
+
 - Aligned `event-apply-modifier` control-edge character semantics with oracle:
   - updated:
     - `rust/neovm-core/src/elisp/builtins.rs`
