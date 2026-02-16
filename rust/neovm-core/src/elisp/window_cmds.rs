@@ -218,6 +218,7 @@ pub(crate) fn builtin_window_buffer(
     eval: &mut super::eval::Evaluator,
     args: Vec<Value>,
 ) -> EvalResult {
+    expect_max_args("window-buffer", &args, 1)?;
     let (fid, wid) = resolve_window_id_with_pred(eval, args.first(), "windowp")?;
     let w = get_leaf(&eval.frames, fid, wid)?;
     match w.buffer_id() {
@@ -231,6 +232,7 @@ pub(crate) fn builtin_window_start(
     eval: &mut super::eval::Evaluator,
     args: Vec<Value>,
 ) -> EvalResult {
+    expect_max_args("window-start", &args, 1)?;
     let (fid, wid) = resolve_window_id(eval, args.first())?;
     let w = get_leaf(&eval.frames, fid, wid)?;
     match w {
@@ -247,6 +249,7 @@ pub(crate) fn builtin_window_end(
     eval: &mut super::eval::Evaluator,
     args: Vec<Value>,
 ) -> EvalResult {
+    expect_max_args("window-end", &args, 2)?;
     let (fid, wid) = resolve_window_id(eval, args.first())?;
     let w = get_leaf(&eval.frames, fid, wid)?;
     match w {
@@ -279,6 +282,7 @@ pub(crate) fn builtin_window_point(
     eval: &mut super::eval::Evaluator,
     args: Vec<Value>,
 ) -> EvalResult {
+    expect_max_args("window-point", &args, 1)?;
     let (fid, wid) = resolve_window_id(eval, args.first())?;
     let w = get_leaf(&eval.frames, fid, wid)?;
     match w {
@@ -293,6 +297,7 @@ pub(crate) fn builtin_set_window_start(
     args: Vec<Value>,
 ) -> EvalResult {
     expect_min_args("set-window-start", &args, 2)?;
+    expect_max_args("set-window-start", &args, 3)?;
     let (fid, wid) = resolve_window_id(eval, args.first())?;
     let pos = expect_int(&args[1])? as usize;
     if let Some(w) = eval
@@ -563,6 +568,7 @@ pub(crate) fn builtin_window_dedicated_p(
     eval: &mut super::eval::Evaluator,
     args: Vec<Value>,
 ) -> EvalResult {
+    expect_max_args("window-dedicated-p", &args, 1)?;
     let (fid, wid) = resolve_window_id(eval, args.first())?;
     let w = get_leaf(&eval.frames, fid, wid)?;
     match w {
@@ -1570,6 +1576,31 @@ mod tests {
     fn window_dedicated_p_default() {
         let r = eval_one_with_frame("(window-dedicated-p)");
         assert_eq!(r, "OK nil");
+    }
+
+    #[test]
+    fn window_accessors_enforce_max_arity() {
+        let forms = parse_forms(
+            "(condition-case err (window-buffer nil nil) (error (car err)))
+             (condition-case err (window-start nil nil) (error (car err)))
+             (condition-case err (window-end nil nil nil) (error (car err)))
+             (condition-case err (window-point nil nil) (error (car err)))
+             (condition-case err (window-dedicated-p nil nil) (error (car err)))
+             (condition-case err (set-window-start nil 1 nil nil) (error (car err)))",
+        )
+        .expect("parse");
+        let mut ev = Evaluator::new();
+        let out = ev
+            .eval_forms(&forms)
+            .iter()
+            .map(format_eval_result)
+            .collect::<Vec<_>>();
+        assert_eq!(out[0], "OK wrong-number-of-arguments");
+        assert_eq!(out[1], "OK wrong-number-of-arguments");
+        assert_eq!(out[2], "OK wrong-number-of-arguments");
+        assert_eq!(out[3], "OK wrong-number-of-arguments");
+        assert_eq!(out[4], "OK wrong-number-of-arguments");
+        assert_eq!(out[5], "OK wrong-number-of-arguments");
     }
 
     #[test]
