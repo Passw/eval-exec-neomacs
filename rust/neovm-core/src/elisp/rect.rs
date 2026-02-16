@@ -73,6 +73,24 @@ fn expect_string(value: &Value) -> Result<String, Flow> {
     }
 }
 
+fn expect_char_or_string(value: &Value) -> Result<String, Flow> {
+    match value {
+        Value::Str(s) => Ok((**s).clone()),
+        Value::Char(c) => Ok(c.to_string()),
+        Value::Int(n) if *n >= 0 => match char::from_u32(*n as u32) {
+            Some(ch) => Ok(ch.to_string()),
+            None => Err(signal(
+                "wrong-type-argument",
+                vec![Value::symbol("char-or-string-p"), value.clone()],
+            )),
+        },
+        _ => Err(signal(
+            "wrong-type-argument",
+            vec![Value::symbol("char-or-string-p"), value.clone()],
+        )),
+    }
+}
+
 // ---------------------------------------------------------------------------
 // RectangleState — stores the last killed rectangle
 // ---------------------------------------------------------------------------
@@ -241,6 +259,44 @@ fn delete_extract_rectangle_from_text(
     }
 
     (extracted, lines.join("\n"))
+}
+
+fn string_rectangle_into_text(
+    text: &str,
+    start_line: usize,
+    end_line: usize,
+    left_col: usize,
+    right_col: usize,
+    replacement: &str,
+) -> (String, usize) {
+    let mut lines: Vec<String> = text.split('\n').map(ToString::to_string).collect();
+    let line_indices = rectangle_lines_for_extract(start_line, end_line);
+
+    for line_index in &line_indices {
+        while lines.len() <= *line_index {
+            lines.push(String::new());
+        }
+        let line = &mut lines[*line_index];
+        let line_len = line.chars().count();
+        if line_len < left_col {
+            line.push_str(&" ".repeat(left_col - line_len));
+        }
+        let line_len = line.chars().count();
+        let del_end_char = line_len.min(right_col);
+        let del_start_byte = char_index_to_byte(line, left_col);
+        let del_end_byte = char_index_to_byte(line, del_end_char);
+        if del_start_byte < del_end_byte {
+            line.replace_range(del_start_byte..del_end_byte, "");
+        }
+        let insert_at = char_index_to_byte(line, left_col);
+        line.insert_str(insert_at, replacement);
+    }
+
+    let rewritten = lines.join("\n");
+    let last_line = line_indices.last().copied().unwrap_or(start_line);
+    let final_col = left_col + replacement.chars().count();
+    let final_rel_char = line_col_to_char_index(&rewritten, last_line, final_col);
+    (rewritten, final_rel_char)
 }
 
 fn clamped_rect_inputs(
@@ -592,17 +648,43 @@ pub(crate) fn builtin_clear_rectangle(
 /// `(string-rectangle START END STRING)` -- replace each line of the
 /// rectangle with STRING.
 ///
-/// Stub: returns nil.
+/// Compatibility behavior:
+/// - replaces each target rectangle slice with STRING
+/// - pads short lines before replacement when rectangle starts past EOL
+/// - updates point to end of replacement on the final processed line
+/// - returns new point as 1-based char position
 pub(crate) fn builtin_string_rectangle(
-    _eval: &mut super::eval::Evaluator,
+    eval: &mut super::eval::Evaluator,
     args: Vec<Value>,
 ) -> EvalResult {
     expect_args("string-rectangle", &args, 3)?;
-    let _start = expect_int(&args[0])?;
-    let _end = expect_int(&args[1])?;
-    let _string = expect_string(&args[2])?;
-    // Stub: no-op.
-    Ok(Value::Nil)
+    let start = expect_int(&args[0])?;
+    let end = expect_int(&args[1])?;
+    let replacement = expect_char_or_string(&args[2])?;
+    let Some((text, pmin, pmax, start_line, _start_col, end_line, _end_col, left_col, right_col)) =
+        clamped_rect_inputs(eval, start, end)
+    else {
+        return Ok(Value::Int(1));
+    };
+
+    let (rewritten, final_rel_char) = string_rectangle_into_text(
+        &text,
+        start_line,
+        end_line,
+        left_col,
+        right_col,
+        &replacement,
+    );
+
+    let Some(buf) = eval.buffers.current_buffer_mut() else {
+        return Ok(Value::Int(1));
+    };
+    buf.delete_region(pmin, pmax);
+    buf.goto_char(pmin);
+    buf.insert(&rewritten);
+    let final_byte = pmin + char_index_to_byte(&rewritten, final_rel_char);
+    buf.goto_char(final_byte);
+    Ok(Value::Int(buf.text.byte_to_char(final_byte) as i64 + 1))
 }
 
 /// `(delete-extract-rectangle START END)` -- delete the rectangle and
@@ -644,17 +726,14 @@ pub(crate) fn builtin_delete_extract_rectangle(
 
 /// `(replace-rectangle START END REPLACEMENT)` -- alias for `string-rectangle`.
 ///
-/// Stub: returns nil.
+/// Compatibility behavior:
+/// - delegates to `string-rectangle` after `replace-rectangle` arity check
 pub(crate) fn builtin_replace_rectangle(
-    _eval: &mut super::eval::Evaluator,
+    eval: &mut super::eval::Evaluator,
     args: Vec<Value>,
 ) -> EvalResult {
     expect_args("replace-rectangle", &args, 3)?;
-    let _start = expect_int(&args[0])?;
-    let _end = expect_int(&args[1])?;
-    let _string = expect_string(&args[2])?;
-    // Stub: no-op (alias for string-rectangle).
-    Ok(Value::Nil)
+    builtin_string_rectangle(eval, args)
 }
 
 // ---------------------------------------------------------------------------
@@ -1023,14 +1102,14 @@ mod tests {
     }
 
     #[test]
-    fn string_rectangle_returns_nil() {
+    fn string_rectangle_returns_point() {
         let mut eval = super::super::eval::Evaluator::new();
         let result = builtin_string_rectangle(
             &mut eval,
             vec![Value::Int(1), Value::Int(10), Value::string("hi")],
         );
         assert!(result.is_ok());
-        assert!(result.unwrap().is_nil());
+        assert!(matches!(result.unwrap(), Value::Int(_)));
     }
 
     #[test]
@@ -1038,9 +1117,33 @@ mod tests {
         let mut eval = super::super::eval::Evaluator::new();
         let result = builtin_string_rectangle(
             &mut eval,
-            vec![Value::Int(1), Value::Int(10), Value::Int(42)],
+            vec![Value::Int(1), Value::Int(10), Value::Float(1.5)],
         );
         assert!(result.is_err());
+    }
+
+    #[test]
+    fn string_rectangle_eval_mutates_buffer_and_point() {
+        let mut eval = super::super::eval::Evaluator::new();
+        {
+            let buf = eval
+                .buffers
+                .current_buffer_mut()
+                .expect("current buffer must exist");
+            buf.insert("abcdef\n123456\n");
+        }
+        let result = builtin_string_rectangle(
+            &mut eval,
+            vec![Value::Int(2), Value::Int(10), Value::string("XX")],
+        )
+        .expect("string-rectangle");
+        assert_eq!(result, Value::Int(12));
+        let buf = eval
+            .buffers
+            .current_buffer()
+            .expect("current buffer must exist");
+        assert_eq!(buf.buffer_string(), "aXXcdef\n1XX3456\n");
+        assert_eq!(buf.text.byte_to_char(buf.point()) as i64 + 1, 12);
     }
 
     #[test]
@@ -1122,14 +1225,27 @@ mod tests {
     }
 
     #[test]
-    fn replace_rectangle_returns_nil() {
+    fn replace_rectangle_aliases_string_rectangle() {
         let mut eval = super::super::eval::Evaluator::new();
+        {
+            let buf = eval
+                .buffers
+                .current_buffer_mut()
+                .expect("current buffer must exist");
+            buf.insert("abcdef\n123456\n");
+        }
         let result = builtin_replace_rectangle(
             &mut eval,
             vec![Value::Int(1), Value::Int(10), Value::string("hi")],
         );
         assert!(result.is_ok());
-        assert!(result.unwrap().is_nil());
+        assert_eq!(result.unwrap(), Value::Int(10));
+        let buf = eval
+            .buffers
+            .current_buffer()
+            .expect("current buffer must exist");
+        assert_eq!(buf.buffer_string(), "hicdef\nhi3456\n");
+        assert_eq!(buf.text.byte_to_char(buf.point()) as i64 + 1, 10);
     }
 
     #[test]
