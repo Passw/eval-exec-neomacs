@@ -1987,7 +1987,16 @@ impl Evaluator {
                 self.apply_named_callable(&name, args, Value::Subr(name.clone()), true)
             }
             Value::Nil => Err(signal("void-function", vec![Value::symbol("nil")])),
-            _ => Err(signal("invalid-function", vec![function])),
+            other => {
+                if super::autoload::is_autoload_value(&other) {
+                    Err(signal(
+                        "wrong-type-argument",
+                        vec![Value::symbol("symbolp"), other],
+                    ))
+                } else {
+                    Err(signal("invalid-function", vec![other]))
+                }
+            }
         }
     }
 
@@ -2938,6 +2947,18 @@ mod tests {
                      (fset 'safe-date-to-time orig)))"
             ),
             "OK t"
+        );
+    }
+
+    #[test]
+    fn funcall_autoload_object_signals_wrong_type_argument_symbolp() {
+        assert_eq!(
+            eval_one(
+                "(condition-case err
+                     (funcall '(autoload \"x\" nil nil nil) 3)
+                   (wrong-type-argument (list (car err) (nth 1 err) (autoloadp (nth 2 err)))))"
+            ),
+            "OK (wrong-type-argument symbolp t)"
         );
     }
 

@@ -14,6 +14,7 @@ cases/rect-help-macros-subrx-autoload-wrapper-semantics
 cases/function-wrapper-shape-semantics
 cases/subr-primitive-wrapper-semantics
 cases/subr-native-elisp-alias-semantics
+cases/autoload-funcall-error-semantics
 cases/symbol-function-error-paths
 cases/indirect-function-core
 cases/indirect-function-alias-chains
