@@ -351,6 +351,10 @@ fn subr_arity_value(name: &str) -> Value {
         | "makunbound" => arity_cons(1, Some(1)),
         "fset" | "set" | "get" => arity_cons(2, Some(2)),
         "put" => arity_cons(3, Some(3)),
+        "hash-table-p" | "clrhash" | "hash-table-count" => arity_cons(1, Some(1)),
+        "gethash" => arity_cons(2, Some(3)),
+        "puthash" => arity_cons(3, Some(3)),
+        "remhash" | "maphash" => arity_cons(2, Some(2)),
         "hash-table-test" | "hash-table-size" | "hash-table-rehash-size"
         | "hash-table-rehash-threshold" | "hash-table-weakness" => arity_cons(1, Some(1)),
         "assq" | "member" | "memq" | "rassoc" | "rassq" => arity_cons(2, Some(2)),
@@ -1310,6 +1314,18 @@ mod tests {
         assert_subr_arity("hash-table-rehash-size", 1, Some(1));
         assert_subr_arity("hash-table-rehash-threshold", 1, Some(1));
         assert_subr_arity("hash-table-weakness", 1, Some(1));
+    }
+
+    #[test]
+    fn subr_arity_hash_table_core_primitives_match_oracle() {
+        assert_subr_arity("hash-table-p", 1, Some(1));
+        assert_subr_arity("make-hash-table", 0, None);
+        assert_subr_arity("gethash", 2, Some(3));
+        assert_subr_arity("puthash", 3, Some(3));
+        assert_subr_arity("remhash", 2, Some(2));
+        assert_subr_arity("clrhash", 1, Some(1));
+        assert_subr_arity("hash-table-count", 1, Some(1));
+        assert_subr_arity("maphash", 2, Some(2));
     }
 
     #[test]

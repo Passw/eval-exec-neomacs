@@ -488,6 +488,7 @@ cases/hash-basics
 cases/hash-make-table-options-semantics
 cases/hash-rehash-copy-semantics
 cases/hash-table-subr-arity-semantics
+cases/hash-table-core-subr-arity-semantics
 cases/locate-file
 cases/thread-introspection
 cases/thread-name-semantics
