@@ -1,5 +1,7 @@
 (key-binding "a")
 (global-key-binding "a")
+(global-key-binding "ab")
+(global-key-binding "C-z")
 (key-binding [97])
 (global-key-binding [97])
 (key-binding "C-z")
