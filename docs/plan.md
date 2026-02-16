@@ -25,6 +25,20 @@ Last updated: 2026-02-16
 
 ## Done
 
+- Expanded display-query oracle corpus around selected-window designator boundaries:
+  - updated:
+    - `test/neovm/vm-compat/cases/display-query-designator-semantics.forms`
+    - `test/neovm/vm-compat/cases/display-query-designator-semantics.expected.tsv`
+      - added selected-window matrix for display query builtins:
+        - `display-graphic-p`, `display-color-p`, `display-pixel-width/height`
+        - `display-mm-width/height`, `display-screens`, `display-color-cells`
+        - `display-planes`, `display-visual-class`, `display-backing-store`
+      - locked expected `error`-class behavior for non-display designators.
+  - verified:
+    - `make -C test/neovm/vm-compat check-one-neovm CASE=cases/display-query-designator-semantics` (pass, 13/13)
+    - `make -C test/neovm/vm-compat check-one-neovm CASE=cases/display-images-face-support-semantics` (pass, 14/14)
+    - `make -C test/neovm/vm-compat validate-case-lists` (pass)
+
 - Aligned font color API device-argument validation and `defined-colors` shape with oracle:
   - updated:
     - `rust/neovm-core/src/elisp/font.rs`
