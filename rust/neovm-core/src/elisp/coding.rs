@@ -62,7 +62,10 @@ fn is_known_or_derived_coding_system(mgr: &CodingSystemManager, name: &str) -> b
         return true;
     }
     let base = strip_eol_suffix(name);
-    base != name && mgr.is_known(base)
+    if base == name || !allows_derived_eol_variant(base) {
+        return false;
+    }
+    mgr.is_known(base)
 }
 
 fn normalize_keyboard_coding_system(name: &str) -> String {
@@ -75,6 +78,7 @@ fn normalize_keyboard_coding_system(name: &str) -> String {
     }
     match name {
         "binary" | "no-conversion" => name.to_string(),
+        "emacs-internal" => "emacs-internal".to_string(),
         "ascii" | "us-ascii" => "us-ascii-unix".to_string(),
         "latin-1" | "iso-8859-1" | "iso-latin-1" => "iso-latin-1-unix".to_string(),
         _ => format!("{name}-unix"),
@@ -671,7 +675,7 @@ pub(crate) fn builtin_check_coding_system(
     match &args[0] {
         Value::Nil => Ok(Value::Nil),
         Value::Symbol(name) => {
-            if mgr.is_known(name) {
+            if is_known_or_derived_coding_system(mgr, name) {
                 Ok(args[0].clone())
             } else {
                 Err(signal("coding-system-error", vec![args[0].clone()]))
@@ -877,6 +881,23 @@ pub(crate) fn builtin_set_keyboard_coding_system(
             if !is_known_or_derived_coding_system(mgr, name) {
                 return Err(signal("coding-system-error", vec![Value::symbol(name.clone())]));
             }
+            let base = strip_eol_suffix(name);
+            if matches!(base, "utf-8-auto" | "prefer-utf-8") {
+                return Err(signal(
+                    "error",
+                    vec![Value::string(format!(
+                        "Unsuitable coding system for keyboard: {name}"
+                    ))],
+                ));
+            }
+            if base == "undecided" {
+                return Err(signal(
+                    "error",
+                    vec![Value::string(format!(
+                        "Unsupported coding system for keyboard: {name}"
+                    ))],
+                ));
+            }
             let normalized = normalize_keyboard_coding_system(name);
             mgr.keyboard_coding = normalized.clone();
             Ok(Value::symbol(normalized))
@@ -947,6 +968,20 @@ fn strip_eol_suffix(name: &str) -> &str {
         }
     }
     name
+}
+
+fn allows_derived_eol_variant(base: &str) -> bool {
+    matches!(
+        base,
+        "utf-8"
+            | "latin-1"
+            | "iso-8859-1"
+            | "iso-latin-1"
+            | "ascii"
+            | "us-ascii"
+            | "raw-text"
+            | "undecided"
+    )
 }
 
 // ===========================================================================
@@ -1585,6 +1620,57 @@ mod tests {
             }
             other => panic!("expected coding-system-error signal, got {other:?}"),
         }
+    }
+
+    #[test]
+    fn check_coding_system_accepts_supported_derived_variants() {
+        let m = mgr();
+        assert_eq!(
+            builtin_check_coding_system(&m, vec![Value::symbol("latin-1-unix")]).unwrap(),
+            Value::symbol("latin-1-unix")
+        );
+        assert_eq!(
+            builtin_check_coding_system(&m, vec![Value::symbol("ascii-unix")]).unwrap(),
+            Value::symbol("ascii-unix")
+        );
+        assert_eq!(
+            builtin_check_coding_system(&m, vec![Value::symbol("undecided-unix")]).unwrap(),
+            Value::symbol("undecided-unix")
+        );
+    }
+
+    #[test]
+    fn check_coding_system_rejects_unsupported_derived_variants() {
+        let m = mgr();
+        assert!(builtin_check_coding_system(&m, vec![Value::symbol("no-conversion-unix")]).is_err());
+        assert!(builtin_check_coding_system(&m, vec![Value::symbol("binary-unix")]).is_err());
+        assert!(builtin_check_coding_system(&m, vec![Value::symbol("emacs-internal-unix")]).is_err());
+    }
+
+    #[test]
+    fn set_keyboard_coding_system_rejects_unsuitable_variants() {
+        let mut m = mgr();
+        let auto = builtin_set_keyboard_coding_system(&mut m, vec![Value::symbol("utf-8-auto")]);
+        let prefer =
+            builtin_set_keyboard_coding_system(&mut m, vec![Value::symbol("prefer-utf-8")]);
+        let undecided =
+            builtin_set_keyboard_coding_system(&mut m, vec![Value::symbol("undecided")]);
+
+        assert!(auto.is_err());
+        assert!(prefer.is_err());
+        assert!(undecided.is_err());
+    }
+
+    #[test]
+    fn set_keyboard_coding_system_preserves_emacs_internal() {
+        let mut m = mgr();
+        let set =
+            builtin_set_keyboard_coding_system(&mut m, vec![Value::symbol("emacs-internal")])
+                .unwrap();
+        assert_eq!(set, Value::symbol("emacs-internal"));
+
+        let get = builtin_keyboard_coding_system(&m, vec![]).unwrap();
+        assert_eq!(get, Value::symbol("emacs-internal"));
     }
 
     #[test]
