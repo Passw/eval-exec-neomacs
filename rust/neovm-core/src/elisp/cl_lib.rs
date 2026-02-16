@@ -854,6 +854,26 @@ pub(crate) fn builtin_cl_union(args: Vec<Value>) -> EvalResult {
     Ok(Value::list(out))
 }
 
+/// `(cl-substitute NEW OLD SEQ)` -- replace OLD with NEW across SEQ.
+pub(crate) fn builtin_cl_substitute(args: Vec<Value>) -> EvalResult {
+    expect_args("cl-substitute", &args, 3)?;
+    let new_value = args[0].clone();
+    let old_value = &args[1];
+    let elements = seq_position_elements(&args[2])?;
+
+    let replaced = elements
+        .into_iter()
+        .map(|item| {
+            if equal_value(&item, old_value, 0) {
+                new_value.clone()
+            } else {
+                item
+            }
+        })
+        .collect::<Vec<_>>();
+    Ok(Value::list(replaced))
+}
+
 /// `(seq-contains-p SEQ ELT &optional TESTFN)` — membership test for sequence.
 pub(crate) fn builtin_seq_contains_p(eval: &mut super::eval::Evaluator, args: Vec<Value>) -> EvalResult {
     if !(2..=3).contains(&args.len()) {
@@ -1825,5 +1845,34 @@ mod tests {
     #[test]
     fn cl_union_wrong_arity() {
         assert!(builtin_cl_union(vec![Value::Nil]).is_err());
+    }
+
+    #[test]
+    fn cl_substitute_basic() {
+        let result = builtin_cl_substitute(vec![
+            Value::symbol("x"),
+            Value::symbol("b"),
+            Value::list(vec![
+                Value::symbol("a"),
+                Value::symbol("b"),
+                Value::symbol("c"),
+                Value::symbol("b"),
+            ]),
+        ])
+        .unwrap();
+        assert_eq!(
+            result,
+            Value::list(vec![
+                Value::symbol("a"),
+                Value::symbol("x"),
+                Value::symbol("c"),
+                Value::symbol("x"),
+            ])
+        );
+    }
+
+    #[test]
+    fn cl_substitute_wrong_arity() {
+        assert!(builtin_cl_substitute(vec![Value::Nil]).is_err());
     }
 }

@@ -201,6 +201,7 @@ const DISPATCH_BUILTIN_NAMES: &[&str] = &[
     "cl-some",
     "cl-subseq",
     "cl-subsetp",
+    "cl-substitute",
     "cl-tenth",
     "cl-third",
     "cl-union",

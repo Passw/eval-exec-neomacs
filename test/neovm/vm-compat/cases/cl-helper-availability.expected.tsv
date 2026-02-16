@@ -76,8 +76,8 @@
 76	(condition-case err (cl-subseq '(a b c d) 1 3) (error err))	OK (b c)
 77	(fboundp 'cl-subsetp)	OK t
 78	(condition-case err (cl-subsetp '(a b) '(b a c)) (error err))	OK t
-79	(fboundp 'cl-substitute)	OK nil
-80	(condition-case err (cl-substitute) (error err))	OK (void-function cl-substitute)
+79	(fboundp 'cl-substitute)	OK t
+80	(condition-case err (cl-substitute 'x 'b '(a b c b)) (error err))	OK (a x c x)
 81	(fboundp 'cl-tenth)	OK t
 82	(condition-case err (cl-tenth '(a b c d e f g h i j)) (error err))	OK j
 83	(fboundp 'cl-third)	OK t

@@ -7631,6 +7631,7 @@ pub(crate) fn dispatch_builtin(
         "cl-tenth" => super::cl_lib::builtin_cl_tenth(args),
         "cl-rest" => super::cl_lib::builtin_cl_rest(args),
         "cl-set-difference" => super::cl_lib::builtin_cl_set_difference(args),
+        "cl-substitute" => super::cl_lib::builtin_cl_substitute(args),
         "cl-subsetp" => super::cl_lib::builtin_cl_subsetp(args),
         "cl-union" => super::cl_lib::builtin_cl_union(args),
         "seq-reverse" => super::cl_lib::builtin_seq_reverse(args),

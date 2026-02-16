@@ -77,7 +77,7 @@
 (fboundp 'cl-subsetp)
 (condition-case err (cl-subsetp '(a b) '(b a c)) (error err))
 (fboundp 'cl-substitute)
-(condition-case err (cl-substitute) (error err))
+(condition-case err (cl-substitute 'x 'b '(a b c b)) (error err))
 (fboundp 'cl-tenth)
 (condition-case err (cl-tenth '(a b c d e f g h i j)) (error err))
 (fboundp 'cl-third)
