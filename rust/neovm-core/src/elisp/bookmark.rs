@@ -452,6 +452,38 @@ pub(crate) fn builtin_bookmark_get_filename(
     Ok(filename)
 }
 
+/// (bookmark-get-position BOOKMARK) -> integer position or nil
+///
+/// BOOKMARK may be a bookmark name or a bookmark record alist.
+pub(crate) fn builtin_bookmark_get_position(
+    eval: &mut super::eval::Evaluator,
+    args: Vec<Value>,
+) -> EvalResult {
+    expect_args("bookmark-get-position", &args, 1)?;
+
+    if let Some(items) = super::value::list_to_vec(&args[0]) {
+        for item in &items {
+            if let Value::Cons(cell) = item {
+                let pair = cell.lock().expect("poisoned");
+                if let Value::Symbol(sym) = &pair.car {
+                    if sym == "position" {
+                        return Ok(pair.cdr.clone());
+                    }
+                }
+            }
+        }
+        return Ok(Value::Nil);
+    }
+
+    let name = expect_string(&args[0])?;
+    let position = eval
+        .bookmarks
+        .get(&name)
+        .map(|bm| Value::Int(bm.position as i64))
+        .unwrap_or(Value::Nil);
+    Ok(position)
+}
+
 /// (bookmark-save) -> string
 ///
 /// Serialize all bookmarks and return the string.  In a real Emacs this
@@ -829,6 +861,21 @@ mod tests {
 
         let missing =
             builtin_bookmark_get_filename(&mut eval, vec![Value::string("missing")]).unwrap();
+        assert!(missing.is_nil());
+    }
+
+    #[test]
+    fn test_builtin_bookmark_get_position() {
+        use super::super::eval::Evaluator;
+
+        let mut eval = Evaluator::new();
+        builtin_bookmark_set(&mut eval, vec![Value::string("at-point")]).unwrap();
+
+        let found = builtin_bookmark_get_position(&mut eval, vec![Value::string("at-point")]).unwrap();
+        assert_eq!(found.as_int(), Some(0));
+
+        let missing =
+            builtin_bookmark_get_position(&mut eval, vec![Value::string("missing")]).unwrap();
         assert!(missing.is_nil());
     }
 

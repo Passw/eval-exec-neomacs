@@ -61,6 +61,7 @@ const DISPATCH_BUILTIN_NAMES: &[&str] = &[
     "bookmark-all-names",
     "bookmark-delete",
     "bookmark-get-filename",
+    "bookmark-get-position",
     "bookmark-jump",
     "bookmark-load",
     "bookmark-rename",
