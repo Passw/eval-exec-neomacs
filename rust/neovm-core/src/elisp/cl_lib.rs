@@ -66,6 +66,19 @@ fn collect_sequence(val: &Value) -> Vec<Value> {
     }
 }
 
+/// `(cl-first LIST)` -- return the first element of LIST.
+pub(crate) fn builtin_cl_first(args: Vec<Value>) -> EvalResult {
+    expect_args("cl-first", &args, 1)?;
+    match &args[0] {
+        Value::Nil => Ok(Value::Nil),
+        Value::Cons(cell) => Ok(cell.lock().expect("poisoned").car.clone()),
+        other => Err(signal(
+            "wrong-type-argument",
+            vec![Value::symbol("listp"), other.clone()],
+        )),
+    }
+}
+
 fn seq_position_list_elements(seq: &Value) -> Result<Vec<Value>, Flow> {
     let mut elements = Vec::new();
     let mut cursor = seq.clone();
@@ -655,6 +668,24 @@ mod tests {
         let s = Value::string("abc");
         let result = builtin_seq_reverse(vec![s]).unwrap();
         assert_eq!(result.as_str(), Some("cba"));
+    }
+
+    #[test]
+    fn cl_first_list() {
+        let list = Value::list(vec![Value::symbol("a"), Value::symbol("b")]);
+        let result = builtin_cl_first(vec![list]).unwrap();
+        assert!(matches!(result, Value::Symbol(s) if s == "a"));
+    }
+
+    #[test]
+    fn cl_first_nil() {
+        let result = builtin_cl_first(vec![Value::Nil]).unwrap();
+        assert!(result.is_nil());
+    }
+
+    #[test]
+    fn cl_first_wrong_type() {
+        assert!(builtin_cl_first(vec![Value::Int(1)]).is_err());
     }
 
     #[test]

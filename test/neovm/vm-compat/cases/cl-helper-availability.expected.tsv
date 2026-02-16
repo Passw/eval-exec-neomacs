@@ -20,8 +20,8 @@
 20	(condition-case err (cl-find) (error err))	OK (void-function cl-find)
 21	(fboundp 'cl-find-if)	OK nil
 22	(condition-case err (cl-find-if) (error err))	OK (void-function cl-find-if)
-23	(fboundp 'cl-first)	OK nil
-24	(condition-case err (cl-first) (error err))	OK (void-function cl-first)
+23	(fboundp 'cl-first)	OK t
+24	(condition-case err (cl-first '(a b)) (error err))	OK a
 25	(fboundp 'cl-fourth)	OK nil
 26	(condition-case err (cl-fourth) (error err))	OK (void-function cl-fourth)
 27	(fboundp 'cl-gensym)	OK nil

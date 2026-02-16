@@ -7597,6 +7597,7 @@ pub(crate) fn dispatch_builtin(
         "bool-vector-subsetp" => super::chartable::builtin_bool_vector_subsetp(args),
 
         // Note: windowp and framep are in the eval-dependent section above
+        "cl-first" => super::cl_lib::builtin_cl_first(args),
         "seq-reverse" => super::cl_lib::builtin_seq_reverse(args),
         "seq-drop" => super::cl_lib::builtin_seq_drop(args),
         "seq-take" => super::cl_lib::builtin_seq_take(args),

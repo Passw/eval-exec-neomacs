@@ -21,7 +21,7 @@
 (fboundp 'cl-find-if)
 (condition-case err (cl-find-if) (error err))
 (fboundp 'cl-first)
-(condition-case err (cl-first) (error err))
+(condition-case err (cl-first '(a b)) (error err))
 (fboundp 'cl-fourth)
 (condition-case err (cl-fourth) (error err))
 (fboundp 'cl-gensym)
