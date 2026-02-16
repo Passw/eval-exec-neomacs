@@ -6583,6 +6583,12 @@ pub(crate) fn dispatch_builtin(
                 eval, args,
             ))
         }
+        "display-images-p" => return Some(super::display::builtin_display_images_p_eval(eval, args)),
+        "display-supports-face-attributes-p" => {
+            return Some(super::display::builtin_display_supports_face_attributes_p_eval(
+                eval, args,
+            ))
+        }
         "selected-terminal" => return Some(super::display::builtin_selected_terminal(args)),
         "terminal-name" => return Some(super::display::builtin_terminal_name_eval(eval, args)),
         "terminal-live-p" => return Some(super::display::builtin_terminal_live_p_eval(eval, args)),
@@ -7292,7 +7298,10 @@ pub(crate) fn dispatch_builtin(
             super::display::builtin_display_monitor_attributes_list(args)
         }
         "frame-monitor-attributes" => super::display::builtin_frame_monitor_attributes(args),
-        "display-images-p" | "display-supports-face-attributes-p" => Ok(Value::True),
+        "display-images-p" => super::display::builtin_display_images_p(args),
+        "display-supports-face-attributes-p" => {
+            super::display::builtin_display_supports_face_attributes_p(args)
+        }
 
         // Image (pure)
         "image-type-available-p" => super::image::builtin_image_type_available_p(args),

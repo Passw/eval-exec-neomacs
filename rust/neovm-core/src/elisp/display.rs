@@ -468,6 +468,22 @@ pub(crate) fn builtin_display_backing_store(args: Vec<Value>) -> EvalResult {
     Ok(Value::symbol("not-useful"))
 }
 
+/// (display-images-p &optional DISPLAY) -> nil in batch-style vm context.
+pub(crate) fn builtin_display_images_p(args: Vec<Value>) -> EvalResult {
+    expect_max_args("display-images-p", &args, 1)?;
+    if let Some(display) = args.first() {
+        expect_display_designator(display)?;
+    }
+    Ok(Value::Nil)
+}
+
+/// (display-supports-face-attributes-p ATTRIBUTES &optional DISPLAY) -> nil
+/// in batch-style vm context.
+pub(crate) fn builtin_display_supports_face_attributes_p(args: Vec<Value>) -> EvalResult {
+    expect_range_args("display-supports-face-attributes-p", &args, 1, 2)?;
+    Ok(Value::Nil)
+}
+
 /// Evaluator-aware variant of `display-graphic-p`.
 pub(crate) fn builtin_display_graphic_p_eval(
     eval: &mut super::eval::Evaluator,
@@ -565,6 +581,27 @@ pub(crate) fn builtin_display_backing_store_eval(
 ) -> EvalResult {
     expect_optional_display_designator_eval(eval, "display-backing-store", &args)?;
     Ok(Value::symbol("not-useful"))
+}
+
+/// Evaluator-aware variant of `display-images-p`.
+pub(crate) fn builtin_display_images_p_eval(
+    eval: &mut super::eval::Evaluator,
+    args: Vec<Value>,
+) -> EvalResult {
+    expect_optional_display_designator_eval(eval, "display-images-p", &args)?;
+    Ok(Value::Nil)
+}
+
+/// Evaluator-aware variant of `display-supports-face-attributes-p`.
+///
+/// Emacs accepts broad argument shapes here in batch mode and still returns
+/// nil as long as arity is valid.
+pub(crate) fn builtin_display_supports_face_attributes_p_eval(
+    _eval: &mut super::eval::Evaluator,
+    args: Vec<Value>,
+) -> EvalResult {
+    expect_range_args("display-supports-face-attributes-p", &args, 1, 2)?;
+    Ok(Value::Nil)
 }
 
 // ---------------------------------------------------------------------------
@@ -1652,6 +1689,19 @@ mod tests {
             builtin_display_backing_store_eval(&mut eval, vec![Value::Int(frame_id)]).unwrap(),
             Value::symbol("not-useful")
         );
+        assert!(
+            builtin_display_images_p_eval(&mut eval, vec![Value::Int(frame_id)])
+                .unwrap()
+                .is_nil()
+        );
+        assert!(
+            builtin_display_supports_face_attributes_p_eval(
+                &mut eval,
+                vec![Value::list(vec![Value::symbol(":weight"), Value::symbol("bold")])]
+            )
+            .unwrap()
+            .is_nil()
+        );
     }
 
     #[test]
@@ -1660,5 +1710,56 @@ mod tests {
         let _ = crate::elisp::window_cmds::ensure_selected_frame_id(&mut eval);
         let result = builtin_display_pixel_width_eval(&mut eval, vec![Value::Int(999_999)]);
         assert!(result.is_err());
+    }
+
+    #[test]
+    fn display_images_p_shapes_and_errors() {
+        assert!(builtin_display_images_p(vec![]).unwrap().is_nil());
+        assert!(builtin_display_images_p(vec![Value::Nil]).unwrap().is_nil());
+
+        match builtin_display_images_p(vec![Value::Int(1)]) {
+            Err(Flow::Signal(sig)) => {
+                assert_eq!(sig.symbol, "error");
+                assert_eq!(
+                    sig.data,
+                    vec![Value::string("Invalid argument 1 in 'get-device-terminal'")]
+                );
+            }
+            other => panic!("expected error signal, got {other:?}"),
+        }
+
+        match builtin_display_images_p(vec![Value::Nil, Value::Nil]) {
+            Err(Flow::Signal(sig)) => assert_eq!(sig.symbol, "wrong-number-of-arguments"),
+            other => panic!("expected wrong-number-of-arguments, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn display_supports_face_attributes_p_arity_and_nil_result() {
+        let attrs = Value::list(vec![Value::symbol(":weight"), Value::symbol("bold")]);
+        assert!(
+            builtin_display_supports_face_attributes_p(vec![attrs.clone()])
+                .unwrap()
+                .is_nil()
+        );
+        assert!(
+            builtin_display_supports_face_attributes_p(vec![attrs.clone(), Value::Int(999_999)])
+                .unwrap()
+                .is_nil()
+        );
+        assert!(
+            builtin_display_supports_face_attributes_p(vec![Value::Int(1)])
+                .unwrap()
+                .is_nil()
+        );
+
+        match builtin_display_supports_face_attributes_p(vec![]) {
+            Err(Flow::Signal(sig)) => assert_eq!(sig.symbol, "wrong-number-of-arguments"),
+            other => panic!("expected wrong-number-of-arguments, got {other:?}"),
+        }
+        match builtin_display_supports_face_attributes_p(vec![attrs, Value::Nil, Value::Nil]) {
+            Err(Flow::Signal(sig)) => assert_eq!(sig.symbol, "wrong-number-of-arguments"),
+            other => panic!("expected wrong-number-of-arguments, got {other:?}"),
+        }
     }
 }
