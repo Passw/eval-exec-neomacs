@@ -55,6 +55,24 @@ Last updated: 2026-02-16
 
 ## Done
 
+- Aligned window/navigation helper primitive `subr-arity` metadata with GNU Emacs:
+  - added explicit arity lock-ins for:
+    - `(0 . 2)`: `delete-frame`, `delete-other-windows`
+    - `(0 . 3)`: `next-window`, `previous-window`, `pos-visible-in-window-p`
+    - `(1 . 3)`: `pop-to-buffer`
+    - `(1 . 1)`: `move-to-window-line`, `move-point-visually`
+    - `(2 . 2)`: `modify-frame-parameters`
+    - `(0 . 1)`: `make-frame`
+  - added oracle corpus lock-in case:
+    - `test/neovm/vm-compat/cases/window-nav-helper-subr-arity-semantics.{forms,expected.tsv}`
+    - wired into default suite: `test/neovm/vm-compat/cases/default.list`
+  - unit coverage:
+    - `subr_arity_window_navigation_helpers_match_oracle`
+  - verified:
+    - `cargo test --manifest-path rust/neovm-core/Cargo.toml subr_arity_window_navigation_helpers_match_oracle -- --nocapture` (pass)
+    - `make -C test/neovm/vm-compat check-one-neovm CASE=cases/window-nav-helper-subr-arity-semantics` (pass)
+    - `make -C test/neovm/vm-compat check-all-neovm-strict` (pass)
+
 - Aligned print/replace/edit-command primitive `subr-arity` metadata with GNU Emacs:
   - added explicit arity lock-ins for:
     - `(2 . 2)`: `primitive-undo`
