@@ -213,6 +213,11 @@ pub(crate) fn builtin_cl_subseq(args: Vec<Value>) -> EvalResult {
     builtin_seq_subseq(args)
 }
 
+/// `(cl-concatenate TYPE &rest SEQS)` -- CL alias for `seq-concatenate`.
+pub(crate) fn builtin_cl_concatenate(args: Vec<Value>) -> EvalResult {
+    builtin_seq_concatenate(args)
+}
+
 fn seq_position_list_elements(seq: &Value) -> Result<Vec<Value>, Flow> {
     let mut elements = Vec::new();
     let mut cursor = seq.clone();
@@ -1154,6 +1159,25 @@ mod tests {
     #[test]
     fn cl_subseq_wrong_type() {
         assert!(builtin_cl_subseq(vec![Value::Int(0), Value::Int(0)]).is_err());
+    }
+
+    #[test]
+    fn cl_concatenate_list() {
+        let result = builtin_cl_concatenate(vec![
+            Value::symbol("list"),
+            Value::list(vec![Value::symbol("a"), Value::symbol("b")]),
+            Value::list(vec![Value::symbol("c")]),
+        ])
+        .unwrap();
+        assert_eq!(
+            result,
+            Value::list(vec![Value::symbol("a"), Value::symbol("b"), Value::symbol("c")])
+        );
+    }
+
+    #[test]
+    fn cl_concatenate_wrong_type_symbol() {
+        assert!(builtin_cl_concatenate(vec![Value::Int(0), Value::Nil]).is_err());
     }
 
     #[test]

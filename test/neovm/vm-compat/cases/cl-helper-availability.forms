@@ -3,7 +3,7 @@
 (fboundp 'cl-coerce)
 (condition-case err (cl-coerce) (error err))
 (fboundp 'cl-concatenate)
-(condition-case err (cl-concatenate) (error err))
+(condition-case err (cl-concatenate 'list '(a b) '(c)) (error err))
 (fboundp 'cl-count)
 (condition-case err (cl-count) (error err))
 (fboundp 'cl-count-if)

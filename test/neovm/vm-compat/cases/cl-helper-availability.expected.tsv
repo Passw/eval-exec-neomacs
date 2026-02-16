@@ -2,8 +2,8 @@
 2	(condition-case err (cl-adjoin) (error err))	OK (void-function cl-adjoin)
 3	(fboundp 'cl-coerce)	OK nil
 4	(condition-case err (cl-coerce) (error err))	OK (void-function cl-coerce)
-5	(fboundp 'cl-concatenate)	OK nil
-6	(condition-case err (cl-concatenate) (error err))	OK (void-function cl-concatenate)
+5	(fboundp 'cl-concatenate)	OK t
+6	(condition-case err (cl-concatenate 'list '(a b) '(c)) (error err))	OK (a b c)
 7	(fboundp 'cl-count)	OK nil
 8	(condition-case err (cl-count) (error err))	OK (void-function cl-count)
 9	(fboundp 'cl-count-if)	OK nil
