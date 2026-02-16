@@ -39,6 +39,7 @@ Last updated: 2026-02-16
 - Keep newly landed mark/marker helper primitive `subr-arity` parity stable while expanding remaining editor-state helper drifts.
 - Keep newly landed register helper primitive `subr-arity` parity stable while expanding remaining register/jump helper drifts.
 - Keep newly landed list/sequence helper primitive `subr-arity` parity stable while expanding remaining sequence/search helper drifts.
+- Keep newly landed read-core helper primitive `subr-arity` parity stable while expanding remaining minibuffer/input drifts.
 
 ## Next
 
@@ -50,6 +51,23 @@ Last updated: 2026-02-16
 6. Expand `recent-keys` capture beyond `read*` consumers to eventual command-loop event publication.
 
 ## Done
+
+- Aligned read-core helper primitive `subr-arity` metadata with GNU Emacs:
+  - added explicit arity lock-ins for:
+    - `(0 . 1)`: `read`
+    - `(0 . 3)`: `read-char`, `read-char-exclusive`, `read-event`
+    - `(0 . 2)`: `read-key`
+    - `(1 . 3)`: `read-number`, `read-from-string`
+    - `(1 . 5)`: `read-string`
+    - `(1 . 2)`: `read-variable`, `read-command`
+  - added oracle corpus lock-in case:
+    - `test/neovm/vm-compat/cases/read-core-subr-arity-semantics`
+  - wired into default vm-compat suite:
+    - `test/neovm/vm-compat/cases/default.list`
+  - verified:
+    - `cargo test --manifest-path rust/neovm-core/Cargo.toml subr_arity_read_core_primitives_match_oracle -- --nocapture` (pass)
+    - `make -C test/neovm/vm-compat check-one-neovm CASE=cases/read-core-subr-arity-semantics` (pass)
+    - `make -C test/neovm/vm-compat check-all-neovm-strict` (pass)
 
 - Aligned list/sequence helper primitive `subr-arity` metadata with GNU Emacs:
   - added explicit arity lock-ins for:
