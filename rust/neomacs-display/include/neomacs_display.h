@@ -3564,19 +3564,31 @@ extern int neomacs_layout_check_glyphless(EmacsFrame frame,
                                           int *strLenOut);
 
 /**
- * Collect margin overlay strings at a buffer position.
- * Checks overlay before/after-strings for (margin left-margin) and
- * (margin right-margin) display properties.
+ * Collect margin display content at a buffer position.
+ * Checks text properties, overlay display properties, and overlay
+ * before/after-strings for margin display specs.
  */
 extern int neomacs_layout_margin_strings_at(EmacsBuffer buffer,
                                             EmacsWindow window,
+                                            EmacsFrame frame,
                                             int64_t charpos,
                                             uint8_t *leftBuf,
                                             int leftBufLen,
                                             int *leftLenOut,
                                             uint8_t *rightBuf,
                                             int rightBufLen,
-                                            int *rightLenOut);
+                                            int *rightLenOut,
+                                            uint32_t *leftFgOut,
+                                            uint32_t *leftBgOut,
+                                            uint32_t *rightFgOut,
+                                            uint32_t *rightBgOut,
+                                            int *leftImageGpuIdOut,
+                                            int *leftImageWOut,
+                                            int *leftImageHOut,
+                                            int *rightImageGpuIdOut,
+                                            int *rightImageWOut,
+                                            int *rightImageHOut,
+                                            int64_t *coversToOut);
 
 /**
  * Check line-height and line-spacing text properties at a position.

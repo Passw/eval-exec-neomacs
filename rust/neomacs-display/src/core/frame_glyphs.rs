@@ -512,9 +512,20 @@ impl FrameGlyphBuffer {
         &self.current_font_family
     }
 
+    /// Get current foreground color
+    pub fn get_current_fg(&self) -> Color {
+        self.current_fg
+    }
+
     /// Get current face background color (for stretch glyphs)
     pub fn get_current_bg(&self) -> Option<Color> {
         self.current_bg
+    }
+
+    /// Temporarily set fg/bg colors for margin rendering.
+    pub fn set_colors(&mut self, fg: Color, bg: Option<Color>) {
+        self.current_fg = fg;
+        self.current_bg = bg;
     }
 
     /// Add a window background rectangle and record the window region.

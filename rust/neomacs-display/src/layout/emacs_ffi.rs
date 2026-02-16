@@ -295,12 +295,13 @@ extern "C" {
     // Margin strings
     // ========================================================================
 
-    /// Collect margin overlay strings at a buffer position.
-    /// Checks overlay before/after-strings for (margin left-margin) and
-    /// (margin right-margin) display properties.
+    /// Collect margin display content at a buffer position.
+    /// Checks text properties, overlay display properties, and overlay
+    /// before/after-strings for margin display specs.
     pub fn neomacs_layout_margin_strings_at(
         buffer: EmacsBuffer,
         window: EmacsWindow,
+        frame: EmacsFrame,
         charpos: i64,
         left_buf: *mut u8,
         left_buf_len: c_int,
@@ -308,6 +309,17 @@ extern "C" {
         right_buf: *mut u8,
         right_buf_len: c_int,
         right_len_out: *mut c_int,
+        left_fg_out: *mut u32,
+        left_bg_out: *mut u32,
+        right_fg_out: *mut u32,
+        right_bg_out: *mut u32,
+        left_image_gpu_id_out: *mut c_int,
+        left_image_w_out: *mut c_int,
+        left_image_h_out: *mut c_int,
+        right_image_gpu_id_out: *mut c_int,
+        right_image_w_out: *mut c_int,
+        right_image_h_out: *mut c_int,
+        covers_to_out: *mut i64,
     ) -> c_int;
 
     // ========================================================================

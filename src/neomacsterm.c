@@ -4812,24 +4812,217 @@ neomacs_layout_check_glyphless (void *frame_ptr, int codepoint,
   return 0;
 }
 
-/* Collect margin overlay strings at a position.
-   Checks overlay before/after-strings for display properties with
-   (margin left-margin) or (margin right-margin).
+/* Try to extract a margin spec from a display property value DISP.
+   If DISP is ((margin left-margin|right-margin) VALUE), write the
+   text/image content into the appropriate output buffers and return true.
+   Handles both string and image VALUE forms.  Also resolves face
+   colors when the display string has a face text property. */
+static bool
+extract_margin_spec (struct frame *f, struct window *w,
+                     Lisp_Object disp,
+                     uint8_t *left_buf, int left_buf_len, int *left_offset,
+                     uint8_t *right_buf, int right_buf_len, int *right_offset,
+                     uint32_t *left_fg, uint32_t *left_bg,
+                     uint32_t *right_fg, uint32_t *right_bg,
+                     int *left_image_gpu_id, int *left_image_w,
+                     int *left_image_h,
+                     int *right_image_gpu_id, int *right_image_w,
+                     int *right_image_h)
+{
+  if (!CONSP (disp) || !CONSP (XCAR (disp)))
+    return false;
+
+  Lisp_Object margin_spec = XCAR (disp);
+  if (!EQ (XCAR (margin_spec), Qmargin))
+    return false;
+
+  Lisp_Object location = Qnil;
+  if (CONSP (XCDR (margin_spec)))
+    location = XCAR (XCDR (margin_spec));
+
+  if (!EQ (location, Qleft_margin) && !EQ (location, Qright_margin))
+    return false;
+
+  /* Get the display value (second element of outer cons). */
+  Lisp_Object display_val = XCDR (disp);
+  if (CONSP (display_val))
+    display_val = XCAR (display_val);
+
+  bool is_left = EQ (location, Qleft_margin);
+
+  /* Handle image spec in margin. */
+  if (CONSP (display_val) && EQ (XCAR (display_val), Qimage))
+    {
+      if (f && valid_image_p (display_val))
+        {
+          struct neomacs_display_info *dpyinfo
+            = FRAME_NEOMACS_DISPLAY_INFO (f);
+          if (dpyinfo && dpyinfo->display_handle)
+            {
+              int face_id = DEFAULT_FACE_ID;
+              if (w)
+                {
+                  face_id = lookup_named_face (w, f, Qdefault, false);
+                  if (face_id < 0)
+                    face_id = DEFAULT_FACE_ID;
+                }
+              ptrdiff_t img_id = lookup_image (f, display_val, face_id);
+              if (img_id >= 0)
+                {
+                  struct image *img = IMAGE_FROM_ID (f, img_id);
+                  if (img)
+                    {
+                      prepare_image_for_display (f, img);
+                      uint32_t gpu_id
+                        = neomacs_get_or_load_image (dpyinfo, img);
+                      if (gpu_id != 0)
+                        {
+                          if (is_left)
+                            {
+                              *left_image_gpu_id = (int) gpu_id;
+                              *left_image_w
+                                = img->width > 0 ? img->width : 16;
+                              *left_image_h
+                                = img->height > 0 ? img->height : 16;
+                            }
+                          else
+                            {
+                              *right_image_gpu_id = (int) gpu_id;
+                              *right_image_w
+                                = img->width > 0 ? img->width : 16;
+                              *right_image_h
+                                = img->height > 0 ? img->height : 16;
+                            }
+                          return true;
+                        }
+                    }
+                }
+            }
+        }
+      return false;
+    }
+
+  /* Handle string content in margin. */
+  if (!STRINGP (display_val))
+    return false;
+
+  const char *text_data = (const char *) SDATA (display_val);
+  ptrdiff_t text_len = SBYTES (display_val);
+  if (text_len <= 0)
+    return false;
+
+  /* Extract face colors from the display string's face property. */
+  if (f)
+    {
+      Lisp_Object face_prop
+        = Fget_text_property (make_fixnum (0), Qface, display_val);
+      if (!NILP (face_prop))
+        {
+          int face_id = lookup_named_face (w, f, face_prop, false);
+          if (face_id >= 0)
+            {
+              struct face *face = FACE_FROM_ID (f, face_id);
+              if (face)
+                {
+                  unsigned long fg_pixel = face->foreground;
+                  unsigned long bg_pixel = face->background;
+                  if (face->foreground_defaulted_p)
+                    fg_pixel = FRAME_FOREGROUND_PIXEL (f);
+                  if (face->background_defaulted_p)
+                    bg_pixel = FRAME_BACKGROUND_PIXEL (f);
+                  uint32_t fg_packed
+                    = ((RED_FROM_ULONG (fg_pixel) << 16)
+                       | (GREEN_FROM_ULONG (fg_pixel) << 8)
+                       | BLUE_FROM_ULONG (fg_pixel));
+                  uint32_t bg_packed
+                    = ((RED_FROM_ULONG (bg_pixel) << 16)
+                       | (GREEN_FROM_ULONG (bg_pixel) << 8)
+                       | BLUE_FROM_ULONG (bg_pixel));
+                  if (is_left)
+                    {
+                      *left_fg = fg_packed;
+                      *left_bg = bg_packed;
+                    }
+                  else
+                    {
+                      *right_fg = fg_packed;
+                      *right_bg = bg_packed;
+                    }
+                }
+            }
+        }
+    }
+
+  if (is_left)
+    {
+      ptrdiff_t copy = text_len;
+      if (*left_offset + copy > left_buf_len - 1)
+        copy = left_buf_len - 1 - *left_offset;
+      if (copy > 0)
+        {
+          memcpy (left_buf + *left_offset, text_data, copy);
+          *left_offset += (int) copy;
+        }
+    }
+  else
+    {
+      ptrdiff_t copy = text_len;
+      if (*right_offset + copy > right_buf_len - 1)
+        copy = right_buf_len - 1 - *right_offset;
+      if (copy > 0)
+        {
+          memcpy (right_buf + *right_offset, text_data, copy);
+          *right_offset += (int) copy;
+        }
+    }
+
+  return true;
+}
+
+/* Collect margin display content at a position.
+   Checks text properties, overlay display properties, and overlay
+   before/after-strings for (margin left-margin) or (margin right-margin)
+   display specs.
    left_buf/right_buf receive the display text for each margin.
+   Face colors, image info, and property extent (covers_to) are also
+   returned when available.
    Returns 0 on success. */
 int
 neomacs_layout_margin_strings_at (void *buffer_ptr, void *window_ptr,
+                                  void *frame_ptr,
                                   int64_t charpos,
                                   uint8_t *left_buf, int left_buf_len,
                                   int *left_len_out,
                                   uint8_t *right_buf, int right_buf_len,
-                                  int *right_len_out)
+                                  int *right_len_out,
+                                  uint32_t *left_fg_out, uint32_t *left_bg_out,
+                                  uint32_t *right_fg_out,
+                                  uint32_t *right_bg_out,
+                                  int *left_image_gpu_id_out,
+                                  int *left_image_w_out,
+                                  int *left_image_h_out,
+                                  int *right_image_gpu_id_out,
+                                  int *right_image_w_out,
+                                  int *right_image_h_out,
+                                  int64_t *covers_to_out)
 {
   struct buffer *buf = (struct buffer *) buffer_ptr;
   struct window *w = window_ptr ? (struct window *) window_ptr : NULL;
+  struct frame *f = frame_ptr ? (struct frame *) frame_ptr : NULL;
 
   *left_len_out = 0;
   *right_len_out = 0;
+  *left_fg_out = 0;
+  *left_bg_out = 0;
+  *right_fg_out = 0;
+  *right_bg_out = 0;
+  *left_image_gpu_id_out = 0;
+  *left_image_w_out = 0;
+  *left_image_h_out = 0;
+  *right_image_gpu_id_out = 0;
+  *right_image_w_out = 0;
+  *right_image_h_out = 0;
+  *covers_to_out = 0;
 
   if (!buf)
     return -1;
@@ -4838,12 +5031,67 @@ neomacs_layout_margin_strings_at (void *buffer_ptr, void *window_ptr,
   set_buffer_internal_1 (buf);
 
   ptrdiff_t pos = (ptrdiff_t) charpos;
+  int left_offset = 0;
+  int right_offset = 0;
+
+  /* 1. Check text/overlay 'display property via Fget_char_property.
+     This catches both text properties AND overlay display properties
+     (Fget_char_property checks overlays first by priority). */
+  Lisp_Object display_prop
+    = Fget_char_property (make_fixnum (pos), Qdisplay, Qnil);
+  if (!NILP (display_prop))
+    {
+      bool found = false;
+
+      /* Try as a single margin spec: ((margin ...) VALUE) */
+      found = extract_margin_spec (f, w, display_prop,
+                                   left_buf, left_buf_len, &left_offset,
+                                   right_buf, right_buf_len, &right_offset,
+                                   left_fg_out, left_bg_out,
+                                   right_fg_out, right_bg_out,
+                                   left_image_gpu_id_out, left_image_w_out,
+                                   left_image_h_out,
+                                   right_image_gpu_id_out, right_image_w_out,
+                                   right_image_h_out);
+
+      /* Try as list of specs: (((margin ...) VALUE) ...) */
+      if (!found && CONSP (display_prop) && CONSP (XCAR (display_prop))
+          && CONSP (XCAR (XCAR (display_prop))))
+        {
+          for (Lisp_Object tail = display_prop;
+               CONSP (tail); tail = XCDR (tail))
+            {
+              if (extract_margin_spec (f, w, XCAR (tail),
+                                       left_buf, left_buf_len, &left_offset,
+                                       right_buf, right_buf_len, &right_offset,
+                                       left_fg_out, left_bg_out,
+                                       right_fg_out, right_bg_out,
+                                       left_image_gpu_id_out,
+                                       left_image_w_out, left_image_h_out,
+                                       right_image_gpu_id_out,
+                                       right_image_w_out, right_image_h_out))
+                {
+                  found = true;
+                  break;
+                }
+            }
+        }
+
+      /* Compute covers_to for the display property extent. */
+      if (found)
+        {
+          Lisp_Object next_change
+            = Fnext_single_char_property_change (make_fixnum (pos), Qdisplay,
+                                                 Qnil, Qnil);
+          if (FIXNUMP (next_change))
+            *covers_to_out = (int64_t) XFIXNUM (next_change);
+        }
+    }
+
+  /* 2. Check overlay before/after-strings for margin display props. */
   ptrdiff_t len = 16;
   Lisp_Object *overlay_vec = xmalloc (len * sizeof *overlay_vec);
   ptrdiff_t noverlays = overlays_at (pos, true, &overlay_vec, &len, NULL);
-
-  int left_offset = 0;
-  int right_offset = 0;
 
   for (ptrdiff_t i = 0; i < noverlays; i++)
     {
@@ -4870,74 +5118,22 @@ neomacs_layout_margin_strings_at (void *buffer_ptr, void *window_ptr,
           if (!STRINGP (str) || SCHARS (str) == 0)
             continue;
 
-          /* Check the display property on the FIRST character of the string. */
+          /* Check the display property on the FIRST character of
+             the string. */
           Lisp_Object disp
             = Fget_text_property (make_fixnum (0), Qdisplay, str);
           if (NILP (disp))
             continue;
 
-          /* Look for ((margin left-margin) ...) or ((margin right-margin) ...) */
-          if (!CONSP (disp) || !CONSP (XCAR (disp)))
-            continue;
-
-          Lisp_Object margin_spec = XCAR (disp);
-          if (!CONSP (margin_spec))
-            continue;
-
-          Lisp_Object margin_sym = XCAR (margin_spec);
-          if (!EQ (margin_sym, Qmargin))
-            continue;
-
-          Lisp_Object location = Qnil;
-          if (CONSP (XCDR (margin_spec)))
-            location = XCAR (XCDR (margin_spec));
-
-          /* Get the display value (second element of outer cons). */
-          Lisp_Object display_val = XCDR (disp);
-          if (CONSP (display_val))
-            display_val = XCAR (display_val);
-
-          /* Extract text content. */
-          const char *text_data = NULL;
-          ptrdiff_t text_len = 0;
-
-          if (STRINGP (display_val))
-            {
-              text_data = (const char *) SDATA (display_val);
-              text_len = SBYTES (display_val);
-            }
-          else if (STRINGP (str))
-            {
-              /* Fall back to the overlay string itself. */
-              text_data = (const char *) SDATA (str);
-              text_len = SBYTES (str);
-            }
-
-          if (!text_data || text_len <= 0)
-            continue;
-
-          if (EQ (location, Qleft_margin))
-            {
-              ptrdiff_t copy = text_len;
-              if (left_offset + copy > left_buf_len - 1)
-                copy = left_buf_len - 1 - left_offset;
-              if (copy > 0)
-                {
-                  memcpy (left_buf + left_offset, text_data, copy);
-                  left_offset += (int) copy;
-                }
-            }
-          else if (EQ (location, Qright_margin))
-            {
-              ptrdiff_t copy = text_len;
-              if (right_offset + copy > right_buf_len - 1)
-                copy = right_buf_len - 1 - right_offset;
-              if (copy > 0)
-                {
-                  memcpy (right_buf + right_offset, text_data, copy);
-                  right_offset += (int) copy;
-                }
-            }
+          extract_margin_spec (f, w, disp,
+                               left_buf, left_buf_len, &left_offset,
+                               right_buf, right_buf_len, &right_offset,
+                               left_fg_out, left_bg_out,
+                               right_fg_out, right_bg_out,
+                               left_image_gpu_id_out, left_image_w_out,
+                               left_image_h_out,
+                               right_image_gpu_id_out, right_image_w_out,
+                               right_image_h_out);
         }
     }
 

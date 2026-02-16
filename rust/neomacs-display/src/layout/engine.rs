@@ -894,6 +894,7 @@ impl LayoutEngine {
         // Margin rendering: check at start of each visual line
         let has_margins = params.left_margin_width > 0.0 || params.right_margin_width > 0.0;
         let mut need_margin_check = has_margins;
+        let mut margin_covers_to: i64 = 0;
 
         // Box face tracking: track active box regions for renderer's span detection
         let mut box_active = false;
@@ -1058,52 +1059,126 @@ impl LayoutEngine {
 
             // Render margin content at the start of each visual line
             if need_margin_check && (params.left_margin_width > 0.0 || params.right_margin_width > 0.0) {
-                need_margin_check = false;
-                let mut left_margin_buf = [0u8; 256];
-                let mut right_margin_buf = [0u8; 256];
-                let mut left_len: c_int = 0;
-                let mut right_len: c_int = 0;
-                neomacs_layout_margin_strings_at(
-                    buffer, window, charpos,
-                    left_margin_buf.as_mut_ptr(), 256, &mut left_len,
-                    right_margin_buf.as_mut_ptr(), 256, &mut right_len,
-                );
-
-                // Render left margin content
-                if left_len > 0 && params.left_margin_width > 0.0 {
-                    let margin_x = text_x - params.left_margin_width;
-                    let gy = row_y[row as usize];
-                    let margin_cols = (params.left_margin_width / char_w).floor() as i32;
-                    let s = std::str::from_utf8_unchecked(
-                        &left_margin_buf[..left_len as usize],
+                // Skip margin check if covers_to tells us this position
+                // is still within the same margin display property.
+                if margin_covers_to > 0 && charpos < margin_covers_to {
+                    need_margin_check = false;
+                } else {
+                    need_margin_check = false;
+                    let mut left_margin_buf = [0u8; 256];
+                    let mut right_margin_buf = [0u8; 256];
+                    let mut left_len: c_int = 0;
+                    let mut right_len: c_int = 0;
+                    let mut left_fg: u32 = 0;
+                    let mut left_bg: u32 = 0;
+                    let mut right_fg: u32 = 0;
+                    let mut right_bg: u32 = 0;
+                    let mut left_image_gpu_id: c_int = 0;
+                    let mut left_image_w: c_int = 0;
+                    let mut left_image_h: c_int = 0;
+                    let mut right_image_gpu_id: c_int = 0;
+                    let mut right_image_w: c_int = 0;
+                    let mut right_image_h: c_int = 0;
+                    let mut covers_to: i64 = 0;
+                    neomacs_layout_margin_strings_at(
+                        buffer, window, frame, charpos,
+                        left_margin_buf.as_mut_ptr(), 256, &mut left_len,
+                        right_margin_buf.as_mut_ptr(), 256, &mut right_len,
+                        &mut left_fg, &mut left_bg,
+                        &mut right_fg, &mut right_bg,
+                        &mut left_image_gpu_id, &mut left_image_w,
+                        &mut left_image_h,
+                        &mut right_image_gpu_id, &mut right_image_w,
+                        &mut right_image_h,
+                        &mut covers_to,
                     );
-                    let mut mcol = 0i32;
-                    for mch in s.chars() {
-                        if mcol >= margin_cols { break; }
-                        let gx = margin_x + mcol as f32 * char_w;
-                        frame_glyphs.add_char(
-                            mch, gx, gy, char_w, char_h, ascent, false,
-                        );
-                        mcol += 1;
+
+                    if covers_to > 0 {
+                        margin_covers_to = covers_to;
                     }
-                }
 
-                // Render right margin content
-                if right_len > 0 && params.right_margin_width > 0.0 {
-                    let margin_x = text_x + text_width;
-                    let gy = row_y[row as usize];
-                    let margin_cols = (params.right_margin_width / char_w).floor() as i32;
-                    let s = std::str::from_utf8_unchecked(
-                        &right_margin_buf[..right_len as usize],
-                    );
-                    let mut mcol = 0i32;
-                    for mch in s.chars() {
-                        if mcol >= margin_cols { break; }
-                        let gx = margin_x + mcol as f32 * char_w;
-                        frame_glyphs.add_char(
-                            mch, gx, gy, char_w, char_h, ascent, false,
+                    // Render left margin: image or text
+                    if left_image_gpu_id != 0 && params.left_margin_width > 0.0 {
+                        let margin_x = text_x - params.left_margin_width;
+                        let gy = row_y[row as usize];
+                        frame_glyphs.add_image(
+                            left_image_gpu_id as u32,
+                            margin_x, gy,
+                            left_image_w as f32, left_image_h as f32,
                         );
-                        mcol += 1;
+                    } else if left_len > 0 && params.left_margin_width > 0.0 {
+                        let margin_x = text_x - params.left_margin_width;
+                        let gy = row_y[row as usize];
+                        let margin_cols = (params.left_margin_width / char_w).floor() as i32;
+
+                        // Save and apply face colors if provided
+                        let saved_fg = frame_glyphs.get_current_fg();
+                        let saved_bg = frame_glyphs.get_current_bg();
+                        if left_fg != 0 || left_bg != 0 {
+                            let fg = if left_fg != 0 { Color::from_pixel(left_fg) } else { saved_fg };
+                            let bg = if left_bg != 0 { Some(Color::from_pixel(left_bg)) } else { saved_bg };
+                            frame_glyphs.set_colors(fg, bg);
+                        }
+
+                        let s = std::str::from_utf8_unchecked(
+                            &left_margin_buf[..left_len as usize],
+                        );
+                        let mut mcol = 0i32;
+                        for mch in s.chars() {
+                            if mcol >= margin_cols { break; }
+                            let gx = margin_x + mcol as f32 * char_w;
+                            frame_glyphs.add_char(
+                                mch, gx, gy, char_w, char_h, ascent, false,
+                            );
+                            mcol += 1;
+                        }
+
+                        // Restore face colors
+                        if left_fg != 0 || left_bg != 0 {
+                            frame_glyphs.set_colors(saved_fg, saved_bg);
+                        }
+                    }
+
+                    // Render right margin: image or text
+                    if right_image_gpu_id != 0 && params.right_margin_width > 0.0 {
+                        let margin_x = text_x + text_width;
+                        let gy = row_y[row as usize];
+                        frame_glyphs.add_image(
+                            right_image_gpu_id as u32,
+                            margin_x, gy,
+                            right_image_w as f32, right_image_h as f32,
+                        );
+                    } else if right_len > 0 && params.right_margin_width > 0.0 {
+                        let margin_x = text_x + text_width;
+                        let gy = row_y[row as usize];
+                        let margin_cols = (params.right_margin_width / char_w).floor() as i32;
+
+                        // Save and apply face colors if provided
+                        let saved_fg = frame_glyphs.get_current_fg();
+                        let saved_bg = frame_glyphs.get_current_bg();
+                        if right_fg != 0 || right_bg != 0 {
+                            let fg = if right_fg != 0 { Color::from_pixel(right_fg) } else { saved_fg };
+                            let bg = if right_bg != 0 { Some(Color::from_pixel(right_bg)) } else { saved_bg };
+                            frame_glyphs.set_colors(fg, bg);
+                        }
+
+                        let s = std::str::from_utf8_unchecked(
+                            &right_margin_buf[..right_len as usize],
+                        );
+                        let mut mcol = 0i32;
+                        for mch in s.chars() {
+                            if mcol >= margin_cols { break; }
+                            let gx = margin_x + mcol as f32 * char_w;
+                            frame_glyphs.add_char(
+                                mch, gx, gy, char_w, char_h, ascent, false,
+                            );
+                            mcol += 1;
+                        }
+
+                        // Restore face colors
+                        if right_fg != 0 || right_bg != 0 {
+                            frame_glyphs.set_colors(saved_fg, saved_bg);
+                        }
                     }
                 }
             }
