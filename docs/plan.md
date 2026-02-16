@@ -20,6 +20,15 @@ Last updated: 2026-02-16
 
 ## Done
 
+- Hardened vm-compat oracle runner to prevent accidental Neomacs-as-oracle baselines:
+  - updated:
+    - `test/neovm/vm-compat/run-oracle.sh`
+      - added guard to reject oracle binaries that identify as Neomacs via binary path or version banner.
+      - added actionable error guidance to set `NEOVM_ORACLE_EMACS` / `ORACLE_EMACS` to an official GNU Emacs binary.
+  - verified:
+    - `NEOVM_ORACLE_EMACS=/nix/store/qn885snj89prad9jbndjbg80d4rxbc3z-emacs-git-20240702.0/bin/emacs test/neovm/vm-compat/run-oracle.sh test/neovm/vm-compat/cases/core.forms` (pass)
+    - `NEOVM_ORACLE_EMACS=/nix/store/v3r0n1yqmf52j6b6gp2xgq4j2s844gyx-neomacs-30.0.50-neomacs/bin/emacs test/neovm/vm-compat/run-oracle.sh test/neovm/vm-compat/cases/core.forms` (fails with explicit oracle-binary rejection)
+
 - Aligned `define-charset-internal` arity with oracle and added charset internal arity corpus lock-in:
   - updated:
     - `rust/neovm-core/src/elisp/charset.rs`
