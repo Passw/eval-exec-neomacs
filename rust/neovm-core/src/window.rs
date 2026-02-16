@@ -25,7 +25,7 @@ pub struct FrameId(pub u64);
 
 /// Keep frame and window numeric domains disjoint while both are represented
 /// as Lisp integers.
-const FRAME_ID_BASE: u64 = 1 << 32;
+pub(crate) const FRAME_ID_BASE: u64 = 1 << 32;
 
 // ---------------------------------------------------------------------------
 // Window geometry

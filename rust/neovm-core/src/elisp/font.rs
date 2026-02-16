@@ -1346,6 +1346,7 @@ pub(crate) fn builtin_face_list(args: Vec<Value>) -> EvalResult {
 pub(crate) fn builtin_color_defined_p(args: Vec<Value>) -> EvalResult {
     expect_min_args("color-defined-p", &args, 1)?;
     expect_max_args("color-defined-p", &args, 2)?;
+    expect_optional_color_device_arg(&args, 1)?;
     match &args[0] {
         Value::Str(_) => Ok(Value::bool(
             !builtin_color_values(vec![args[0].clone()])?.is_nil(),
@@ -1362,6 +1363,7 @@ pub(crate) fn builtin_color_defined_p(args: Vec<Value>) -> EvalResult {
 pub(crate) fn builtin_color_values(args: Vec<Value>) -> EvalResult {
     expect_min_args("color-values", &args, 1)?;
     expect_max_args("color-values", &args, 2)?;
+    expect_optional_color_device_arg(&args, 1)?;
     let color_name = match &args[0] {
         Value::Str(s) => (**s).clone(),
         _ => return Ok(Value::Nil),
@@ -1455,26 +1457,46 @@ fn approximate_tty_color((r, g, b): (i64, i64, i64)) -> (i64, i64, i64) {
     )
 }
 
+fn invalid_get_device_terminal_error(value: &Value) -> Flow {
+    signal(
+        "error",
+        vec![Value::string(format!(
+            "Invalid argument {} in 'get-device-terminal'",
+            super::print::print_value(value)
+        ))],
+    )
+}
+
+fn color_device_designator_p(value: &Value) -> bool {
+    match value {
+        Value::Nil => true,
+        Value::Int(id) => *id >= crate::window::FRAME_ID_BASE as i64,
+        _ => false,
+    }
+}
+
+fn expect_optional_color_device_arg(args: &[Value], idx: usize) -> Result<(), Flow> {
+    if let Some(value) = args.get(idx) {
+        if !color_device_designator_p(value) {
+            return Err(invalid_get_device_terminal_error(value));
+        }
+    }
+    Ok(())
+}
+
 /// `(defined-colors &optional FRAME)` -- return a list of defined color names.
 pub(crate) fn builtin_defined_colors(args: Vec<Value>) -> EvalResult {
     expect_max_args("defined-colors", &args, 1)?;
+    expect_optional_color_device_arg(&args, 0)?;
     let colors = vec![
         "black",
-        "white",
         "red",
         "green",
-        "blue",
         "yellow",
-        "cyan",
+        "blue",
         "magenta",
-        "gray",
-        "grey",
-        "dark gray",
-        "light gray",
-        "orange",
-        "pink",
-        "brown",
-        "purple",
+        "cyan",
+        "white",
     ];
     Ok(Value::list(colors.into_iter().map(Value::string).collect()))
 }
@@ -2208,6 +2230,13 @@ mod tests {
     }
 
     #[test]
+    fn color_queries_validate_optional_device_arg() {
+        assert!(builtin_color_defined_p(vec![Value::string("red"), Value::Int(1)]).is_err());
+        assert!(builtin_color_values(vec![Value::string("red"), Value::Int(1)]).is_err());
+        assert!(builtin_defined_colors(vec![Value::Int(1)]).is_err());
+    }
+
+    #[test]
     fn color_values_named_black() {
         let result = builtin_color_values(vec![Value::string("black")]).unwrap();
         let rgb = list_to_vec(&result).unwrap();
@@ -2273,6 +2302,10 @@ mod tests {
         let result = builtin_defined_colors(vec![]).unwrap();
         assert!(result.is_list());
         assert!(!result.is_nil());
+        let colors = list_to_vec(&result).expect("defined-colors list");
+        assert_eq!(colors.len(), 8);
+        assert_eq!(colors[0].as_str(), Some("black"));
+        assert_eq!(colors[7].as_str(), Some("white"));
     }
 
     #[test]

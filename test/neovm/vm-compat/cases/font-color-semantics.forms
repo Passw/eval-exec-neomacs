@@ -3,6 +3,15 @@
 (color-defined-p "NO-SUCH-COLOR")
 (color-defined-p nil)
 (condition-case err
+    (color-defined-p "red" 1)
+  (error (car err)))
+(condition-case err
+    (color-defined-p "red" (selected-frame))
+  (error (car err)))
+(condition-case err
+    (color-defined-p "red" (selected-window))
+  (error (car err)))
+(condition-case err
     (color-defined-p "red" nil nil)
   (error (car err)))
 
@@ -19,6 +28,15 @@
 (color-values "light gray")
 (color-values "orange red")
 (condition-case err
+    (color-values "red" 1)
+  (error (car err)))
+(condition-case err
+    (color-values "red" (selected-frame))
+  (error (car err)))
+(condition-case err
+    (color-values "red" (selected-window))
+  (error (car err)))
+(condition-case err
     (color-values "red" nil nil)
   (error (car err)))
 
@@ -29,6 +47,16 @@
 (let ((cs (defined-colors nil)))
   (and (listp cs)
        (not (null (member "red" cs)))))
+(length (defined-colors))
+(condition-case err
+    (defined-colors 1)
+  (error (car err)))
+(condition-case err
+    (defined-colors (selected-frame))
+  (error (car err)))
+(condition-case err
+    (defined-colors (selected-window))
+  (error (car err)))
 (condition-case err
     (defined-colors nil nil)
   (error (car err)))
