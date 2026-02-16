@@ -7945,6 +7945,12 @@ Last updated: 2026-02-16
     - `(0 . 1)`: `abbrev-mode`
     - `(1 . 2)`: `abbrev-expansion`
     - `(1 . 1)`: `abbrev-table-p`
+    - `(3 . many)`: `define-abbrev`
+    - `(2 . many)`: `define-abbrev-table`
+    - `(0 . 0)`: `expand-abbrev`
+  - aligned callable arity behavior to avoid introspection/runtime drift:
+    - `expand-abbrev` now accepts exactly zero args in batch mode and returns `nil` (placeholder until full interactive expansion path is implemented)
+    - `define-abbrev-table` now enforces GNU Emacs-compatible minimum arity (2 args) while still accepting legacy NeoVM parent shorthand when arg 2 is string/symbol
   - added and enabled oracle corpus:
     - `test/neovm/vm-compat/cases/abbrev-subr-arity-semantics.forms`
     - `test/neovm/vm-compat/cases/abbrev-subr-arity-semantics.expected.tsv`
@@ -7952,7 +7958,8 @@ Last updated: 2026-02-16
   - verified:
     - `NEOVM_ORACLE_EMACS=/nix/store/hql3zwz5b4ywd2qwx8jssp4dyb7nx4cb-emacs-30.2/bin/emacs make -C test/neovm/vm-compat record FORMS=cases/abbrev-subr-arity-semantics.forms EXPECTED=cases/abbrev-subr-arity-semantics.expected.tsv` (pass)
     - `cargo test subr_arity_abbrev_primitives_match_oracle -- --nocapture` in `rust/neovm-core` (pass)
-    - `make -C test/neovm/vm-compat check-neovm CASE=cases/abbrev-subr-arity-semantics` (pass, 15/15)
+    - `cargo test abbrev::tests:: -- --nocapture` in `rust/neovm-core` (pass)
+    - `make -C test/neovm/vm-compat check-one-neovm CASE=cases/abbrev-subr-arity-semantics` (pass, 6/6)
     - `make -C test/neovm/vm-compat validate-case-lists` (pass)
     - `make -C test/neovm/vm-compat check-builtin-registry-fboundp` (pass, 1 allowlisted drift)
 
