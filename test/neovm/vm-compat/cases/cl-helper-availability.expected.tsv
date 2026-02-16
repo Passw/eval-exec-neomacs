@@ -64,8 +64,8 @@
 64	(condition-case err (cl-set-difference) (error err))	OK (void-function cl-set-difference)
 65	(fboundp 'cl-seventh)	OK nil
 66	(condition-case err (cl-seventh) (error err))	OK (void-function cl-seventh)
-67	(fboundp 'cl-sixth)	OK nil
-68	(condition-case err (cl-sixth) (error err))	OK (void-function cl-sixth)
+67	(fboundp 'cl-sixth)	OK t
+68	(condition-case err (cl-sixth '(a b c d e f)) (error err))	OK f
 69	(fboundp 'cl-some)	OK nil
 70	(condition-case err (cl-some) (error err))	OK (void-function cl-some)
 71	(fboundp 'cl-sort)	OK nil
