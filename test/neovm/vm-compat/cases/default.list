@@ -335,6 +335,7 @@ cases/window-buffer-switch-semantics
 cases/window-buffer-designator-errors-semantics
 cases/window-buffer-missing-designator-semantics
 cases/set-window-buffer-bootstrap-semantics
+cases/set-window-dedicated-p-designator-semantics
 cases/window-designator-bootstrap-semantics
 cases/window-size-query-semantics
 cases/window-list-frame-designator-semantics

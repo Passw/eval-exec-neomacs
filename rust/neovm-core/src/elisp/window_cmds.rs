@@ -577,18 +577,12 @@ pub(crate) fn builtin_set_window_dedicated_p(
     args: Vec<Value>,
 ) -> EvalResult {
     expect_args("set-window-dedicated-p", &args, 2)?;
-    let wid_val = expect_int(&args[0])? as u64;
     let flag = args[1].is_truthy();
-
-    let fid = eval
-        .frames
-        .selected_frame()
-        .map(|f| f.id)
-        .ok_or_else(|| signal("error", vec![Value::string("No selected frame")]))?;
+    let (fid, wid) = resolve_window_id(eval, args.first())?;
     if let Some(w) = eval
         .frames
         .get_mut(fid)
-        .and_then(|f| f.find_window_mut(WindowId(wid_val)))
+        .and_then(|f| f.find_window_mut(wid))
     {
         if let Window::Leaf { dedicated, .. } = w {
             *dedicated = flag;
@@ -1554,6 +1548,31 @@ mod tests {
         );
         assert_eq!(results[0], "OK t");
         assert_eq!(results[1], "OK t");
+    }
+
+    #[test]
+    fn set_window_dedicated_p_bootstraps_nil_and_validates_designators() {
+        let forms = parse_forms(
+            "(condition-case err (set-window-dedicated-p nil t) (error err))
+             (window-dedicated-p nil)
+             (condition-case err (set-window-dedicated-p 'foo t) (error err))
+             (condition-case err (set-window-dedicated-p 999999 t) (error err))
+             (condition-case err (set-window-dedicated-p nil nil) (error err))
+             (window-dedicated-p nil)",
+        )
+        .expect("parse");
+        let mut ev = Evaluator::new();
+        let out = ev
+            .eval_forms(&forms)
+            .iter()
+            .map(format_eval_result)
+            .collect::<Vec<_>>();
+        assert_eq!(out[0], "OK t");
+        assert_eq!(out[1], "OK t");
+        assert_eq!(out[2], "OK (wrong-type-argument window-live-p foo)");
+        assert_eq!(out[3], "OK (wrong-type-argument window-live-p 999999)");
+        assert_eq!(out[4], "OK nil");
+        assert_eq!(out[5], "OK nil");
     }
 
     // -- Window manipulation --
