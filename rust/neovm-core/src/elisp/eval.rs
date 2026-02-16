@@ -273,7 +273,10 @@ impl Evaluator {
                     },
                     body: vec![Expr::List(vec![
                         Expr::Symbol("apply".to_string()),
-                        Expr::Symbol(wrapper),
+                        Expr::List(vec![
+                            Expr::Symbol("quote".to_string()),
+                            Expr::Symbol(wrapper),
+                        ]),
                         Expr::Symbol("args".to_string()),
                     ])],
                     env: None,
@@ -282,13 +285,29 @@ impl Evaluator {
             );
         };
         for name in [
+            "autoloadp",
             "seq-count",
+            "seq-concatenate",
+            "seq-contains-p",
+            "seq-drop",
             "seq-do",
+            "seq-empty-p",
             "seq-every-p",
+            "seq-into",
+            "seq-length",
             "seq-mapn",
+            "seq-max",
+            "seq-min",
+            "seq-position",
             "seq-reduce",
+            "seq-reverse",
             "seq-some",
             "seq-sort",
+            "seq-subseq",
+            "seq-take",
+            "seq-uniq",
+            "looking-at-p",
+            "string-match-p",
             "string-blank-p",
             "string-empty-p",
             "string-equal-ignore-case",
@@ -1867,9 +1886,7 @@ impl Evaluator {
                 result
             }
             Value::Lambda(lambda) | Value::Macro(lambda) => self.apply_lambda(&lambda, args),
-            Value::Subr(name) => {
-                self.apply_named_callable(&name, args, Value::Subr(name.clone()), true)
-            }
+            Value::Subr(name) => self.apply_subr_object(&name, args, true),
             Value::Symbol(name) => {
                 self.apply_named_callable(&name, args, Value::Subr(name.clone()), true)
             }
@@ -1881,6 +1898,30 @@ impl Evaluator {
             }
             Value::Nil => Err(signal("void-function", vec![Value::symbol("nil")])),
             _ => Err(signal("invalid-function", vec![function])),
+        }
+    }
+
+    #[inline]
+    fn apply_subr_object(
+        &mut self,
+        name: &str,
+        args: Vec<Value>,
+        rewrite_builtin_wrong_arity: bool,
+    ) -> EvalResult {
+        if super::subr_info::is_special_form(name) {
+            return Err(signal("invalid-function", vec![Value::Subr(name.to_string())]));
+        }
+        if super::subr_info::is_evaluator_callable_name(name) {
+            return self.apply_evaluator_callable(name, args);
+        }
+        if let Some(result) = builtins::dispatch_builtin(self, name, args) {
+            if rewrite_builtin_wrong_arity {
+                result.map_err(|flow| rewrite_wrong_arity_function_object(flow, name))
+            } else {
+                result
+            }
+        } else {
+            Err(signal("void-function", vec![Value::symbol(name)]))
         }
     }
 
@@ -2735,6 +2776,22 @@ mod tests {
                    (if t 1 2))"
             ),
             "OK 1"
+        );
+    }
+
+    #[test]
+    fn funcall_subr_object_ignores_symbol_function_rebinding() {
+        assert_eq!(
+            eval_one(
+                "(let ((orig (symbol-function 'car))
+                       (snap (symbol-function 'car)))
+                   (unwind-protect
+                       (progn
+                         (fset 'car (lambda (&rest _) 'shadow))
+                         (list (funcall snap '(1 2)) (car '(1 2))))
+                     (fset 'car orig)))"
+            ),
+            "OK (1 shadow)"
         );
     }
 
