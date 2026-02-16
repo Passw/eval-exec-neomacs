@@ -446,7 +446,25 @@ pub(crate) fn builtin_get_buffer_window(
     args: Vec<Value>,
 ) -> EvalResult {
     expect_max_args("get-buffer-window", &args, 2)?;
-    let target = resolve_optional_buffer_id(eval, args.first())?;
+    let target = match args.first() {
+        None | Some(Value::Nil) => return Ok(Value::Nil),
+        Some(Value::Str(name)) => match eval.buffers.find_buffer_by_name(name) {
+            Some(id) => id,
+            None => return Ok(Value::Nil),
+        },
+        Some(Value::Buffer(id)) => {
+            if eval.buffers.get(*id).is_none() {
+                return Ok(Value::Nil);
+            }
+            *id
+        }
+        Some(other) => {
+            return Err(signal(
+                "wrong-type-argument",
+                vec![Value::symbol("stringp"), other.clone()],
+            ))
+        }
+    };
     let fid = ensure_selected_frame_id(eval);
     let frame = eval
         .frames
@@ -476,7 +494,33 @@ pub(crate) fn builtin_get_buffer_window_list(
     args: Vec<Value>,
 ) -> EvalResult {
     expect_max_args("get-buffer-window-list", &args, 3)?;
-    let target = resolve_optional_buffer_id(eval, args.first())?;
+    let target = match args.first() {
+        None | Some(Value::Nil) => return Ok(Value::Nil),
+        Some(Value::Str(name)) => match eval.buffers.find_buffer_by_name(name) {
+            Some(id) => id,
+            None => {
+                return Err(signal(
+                    "error",
+                    vec![Value::string(format!("No such live buffer {name}"))],
+                ))
+            }
+        },
+        Some(Value::Buffer(id)) => {
+            if eval.buffers.get(*id).is_none() {
+                return Err(signal(
+                    "error",
+                    vec![Value::string("No such live buffer #<killed buffer>")],
+                ));
+            }
+            *id
+        }
+        Some(other) => {
+            return Err(signal(
+                "error",
+                vec![Value::string(format!("No such buffer {}", other))],
+            ))
+        }
+    };
     let fid = ensure_selected_frame_id(eval);
     let frame = eval
         .frames
@@ -494,7 +538,11 @@ pub(crate) fn builtin_get_buffer_window_list(
         }
     }
 
-    Ok(Value::list(windows))
+    if windows.is_empty() {
+        Ok(Value::Nil)
+    } else {
+        Ok(Value::list(windows))
+    }
 }
 
 /// `(fit-window-to-buffer &optional WINDOW MAX-HEIGHT MIN-HEIGHT MAX-WIDTH PRESERVE-SIZE)`
@@ -1253,40 +1301,6 @@ pub(crate) fn builtin_frame_live_p(
 }
 
 // ===========================================================================
-// Internal helper — resolve buffer from int id, Buffer value, or string name
-// ===========================================================================
-
-fn resolve_buffer_id(eval: &super::eval::Evaluator, val: &Value) -> Result<BufferId, Flow> {
-    match val {
-        Value::Buffer(id) => Ok(*id),
-        Value::Str(name) => eval.buffers.find_buffer_by_name(name).ok_or_else(|| {
-            signal(
-                "error",
-                vec![Value::string(format!("No buffer named {name}"))],
-            )
-        }),
-        _ => Err(signal(
-            "wrong-type-argument",
-            vec![Value::symbol("stringp"), val.clone()],
-        )),
-    }
-}
-
-fn resolve_optional_buffer_id(
-    eval: &super::eval::Evaluator,
-    maybe: Option<&Value>,
-) -> Result<BufferId, Flow> {
-    match maybe {
-        None | Some(Value::Nil) => eval
-            .buffers
-            .current_buffer()
-            .map(|buf| buf.id)
-            .ok_or_else(|| signal("error", vec![Value::string("No current buffer")])),
-        Some(value) => resolve_buffer_id(eval, value),
-    }
-}
-
-// ===========================================================================
 // Tests
 // ===========================================================================
 
@@ -1481,6 +1495,45 @@ mod tests {
     fn get_buffer_window_list_returns_matching_windows() {
         let result = eval_one_with_frame("(length (get-buffer-window-list (window-buffer)))");
         assert_eq!(result, "OK 1");
+    }
+
+    #[test]
+    fn get_buffer_window_and_list_match_optional_and_missing_buffer_semantics() {
+        let forms = parse_forms(
+            "(condition-case err (get-buffer-window) (error err))
+             (condition-case err (get-buffer-window nil) (error err))
+             (condition-case err (get-buffer-window \"missing\") (error err))
+             (windowp (get-buffer-window \"*scratch*\"))
+             (condition-case err (get-buffer-window-list) (error err))
+             (condition-case err (get-buffer-window-list nil) (error err))
+             (length (get-buffer-window-list \"*scratch*\"))
+             (condition-case err (get-buffer-window-list \"missing\") (error err))
+             (condition-case err (get-buffer-window-list 1) (error err))
+             (let ((b (generate-new-buffer \"gbwl-live\")))
+               (prog1 (condition-case err (get-buffer-window-list b) (error err))
+                 (kill-buffer b)))
+             (let ((b (generate-new-buffer \"gbwl-dead\")))
+               (kill-buffer b)
+               (condition-case err (get-buffer-window-list b) (error err)))",
+        )
+        .expect("parse");
+        let mut ev = Evaluator::new();
+        let results = ev
+            .eval_forms(&forms)
+            .iter()
+            .map(format_eval_result)
+            .collect::<Vec<_>>();
+        assert_eq!(results[0], "OK nil");
+        assert_eq!(results[1], "OK nil");
+        assert_eq!(results[2], "OK nil");
+        assert_eq!(results[3], "OK t");
+        assert_eq!(results[4], "OK nil");
+        assert_eq!(results[5], "OK nil");
+        assert_eq!(results[6], "OK 1");
+        assert_eq!(results[7], "OK (error \"No such live buffer missing\")");
+        assert_eq!(results[8], "OK (error \"No such buffer 1\")");
+        assert_eq!(results[9], "OK nil");
+        assert_eq!(results[10], "OK (error \"No such live buffer #<killed buffer>\")");
     }
 
     #[test]

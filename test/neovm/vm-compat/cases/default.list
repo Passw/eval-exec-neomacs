@@ -337,6 +337,7 @@ cases/window-buffer-missing-designator-semantics
 cases/window-designator-bootstrap-semantics
 cases/window-size-query-semantics
 cases/window-list-frame-designator-semantics
+cases/get-buffer-window-optional-buffer-semantics
 cases/other-buffer-semantics
 cases/kill-buffer-runtime-semantics
 cases/set-buffer-dead-buffer-semantics
