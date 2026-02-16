@@ -12992,6 +12992,7 @@ NEOMACS_TYPE_VALIDATOR(gif, Qgif)
 NEOMACS_TYPE_VALIDATOR(tiff, Qtiff)
 NEOMACS_TYPE_VALIDATOR(webp, Qwebp)
 NEOMACS_TYPE_VALIDATOR(svg, Qsvg)
+NEOMACS_TYPE_VALIDATOR(xpm, Qxpm)
 
 /* Load a neomacs image.
    Query dimensions from GPU backend for proper scaling.  */
@@ -13183,6 +13184,7 @@ static struct image_type const image_types[] =
  { SYMBOL_INDEX (Qtiff), neomacs_tiff_image_p, neomacs_load, neomacs_clear_image },
  { SYMBOL_INDEX (Qwebp), neomacs_webp_image_p, neomacs_load, neomacs_clear_image },
  { SYMBOL_INDEX (Qsvg),  neomacs_svg_image_p,  neomacs_load, neomacs_clear_image },
+ { SYMBOL_INDEX (Qxpm),  neomacs_xpm_image_p,  neomacs_load, neomacs_clear_image },
 #ifdef HAVE_GHOSTSCRIPT
  { SYMBOL_INDEX (Qpostscript), gs_image_p, gs_load, image_clear_image },
 #endif

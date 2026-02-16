@@ -269,6 +269,10 @@ impl ImageCache {
         if let Ok(img) = image::open(path) {
             return Self::process_image(img, max_width, max_height);
         }
+        // Fallback: try XPM
+        if let Some(result) = super::xpm::decode_xpm_file(Path::new(path), max_width, max_height) {
+            return Some(result);
+        }
         // Fallback: try SVG via resvg
         let data = std::fs::read(path).ok()?;
         Self::decode_svg_data(&data, max_width, max_height)
@@ -278,6 +282,10 @@ impl ImageCache {
     fn decode_data(data: &[u8], max_width: u32, max_height: u32) -> Option<(u32, u32, Vec<u8>)> {
         if let Ok(img) = image::load_from_memory(data) {
             return Self::process_image(img, max_width, max_height);
+        }
+        // Fallback: try XPM
+        if let Some(result) = super::xpm::decode_xpm_data(data, max_width, max_height) {
+            return Some(result);
         }
         // Fallback: try SVG via resvg
         Self::decode_svg_data(data, max_width, max_height)
@@ -516,6 +524,11 @@ impl ImageCache {
             .into_dimensions()
         {
             return Some(ImageDimensions { width: dims.0, height: dims.1 });
+        }
+
+        // Fallback: try XPM header
+        if let Some((w, h)) = super::xpm::query_xpm_dimensions(data) {
+            return Some(ImageDimensions { width: w, height: h });
         }
 
         // Fallback: try SVG via resvg

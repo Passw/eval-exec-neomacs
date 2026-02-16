@@ -10,6 +10,7 @@ mod transition;
 mod window_state;
 mod events;
 mod image_cache;
+mod xpm;
 
 #[cfg(all(feature = "video", target_os = "linux"))]
 mod vulkan_dmabuf;
