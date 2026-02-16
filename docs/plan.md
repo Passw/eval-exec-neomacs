@@ -19,6 +19,19 @@ Last updated: 2026-02-16
 
 ## Done
 
+- Exposed `thread-alive-p` compatibility alias:
+  - updated:
+    - `rust/neovm-core/src/elisp/builtins.rs`
+      - evaluator-dependent dispatch now routes `thread-alive-p` to thread liveness predicate implementation.
+    - `rust/neovm-core/src/elisp/builtin_registry.rs`
+      - added `thread-alive-p` for `fboundp`/introspection parity.
+    - `test/neovm/vm-compat/cases/thread-introspection.expected.tsv`
+      - updated expectations for callable alias and subr introspection.
+  - verified:
+    - `make -C test/neovm/vm-compat check-one-neovm CASE=cases/thread-introspection` (pass, 44/44)
+    - `make -C test/neovm/vm-compat check-thread-neovm` (pass)
+    - `make -C test/neovm/vm-compat validate-case-lists` (pass)
+
 - Added a dedicated neovm-only corpus for CL set/list helper semantics:
   - updated:
     - `test/neovm/vm-compat/cases/cl-setops-semantics.forms`
