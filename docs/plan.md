@@ -47,6 +47,24 @@ Last updated: 2026-02-16
 
 ## Done
 
+- Aligned keymap/keyboard helper primitive `subr-arity` metadata with GNU Emacs:
+  - added explicit arity lock-ins for:
+    - `(1 . 1)`: `kbd`, `key-valid-p`, `keymap-parent`, `keymapp`, `listify-key-sequence`
+    - `(1 . 2)`: `global-key-binding`, `local-key-binding`, `key-description`
+    - `(2 . 3)`: `lookup-key`
+    - `(2 . 2)`: `global-set-key`, `local-set-key`
+    - `(1 . 4)`: `key-binding`
+    - `(0 . 1)`: `keyboard-coding-system`, `make-keymap`, `make-sparse-keymap`
+    - `(0 . 0)`: `keyboard-quit`
+  - added oracle corpus lock-in case:
+    - `test/neovm/vm-compat/cases/keymap-keyboard-subr-arity-semantics`
+  - wired into default vm-compat suite:
+    - `test/neovm/vm-compat/cases/default.list`
+  - verified:
+    - `cargo test --manifest-path rust/neovm-core/Cargo.toml subr_arity_keymap_keyboard_primitives_match_oracle -- --nocapture` (pass)
+    - `make -C test/neovm/vm-compat check-one-neovm CASE=cases/keymap-keyboard-subr-arity-semantics` (pass)
+    - `make -C test/neovm/vm-compat check-all-neovm-strict` (pass)
+
 - Aligned line-position helper primitive `subr-arity` metadata with GNU Emacs:
   - added explicit arity lock-ins for:
     - `line-beginning-position`, `line-end-position`, `line-number-display-width`: `(0 . 1)`
