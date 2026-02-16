@@ -60,6 +60,23 @@ Last updated: 2026-02-16
 
 ## Done
 
+- Expanded core builtin `commandp` parity set and added oracle corpus lock-in:
+  - aligned NeoVM `commandp` truthiness for an additional `124` core command builtins (previously drifting `t` in GNU Emacs vs `nil` in NeoVM).
+  - extended builtin command-name table in:
+    - `rust/neovm-core/src/elisp/interactive.rs`
+  - added evaluator regression coverage:
+    - `commandp_true_for_additional_builtin_commands`
+  - added oracle corpus case:
+    - `test/neovm/vm-compat/cases/commandp-core-command-matrix-extra.{forms,expected.tsv}`
+    - wired into:
+      - `test/neovm/vm-compat/cases/default.list`
+      - `test/neovm/vm-compat/cases/introspection.list`
+  - verified:
+    - `cargo test --manifest-path rust/neovm-core/Cargo.toml commandp_true_for_additional_builtin_commands -- --nocapture` (pass)
+    - `make -C test/neovm/vm-compat validate-case-lists` (pass)
+    - `make -C test/neovm/vm-compat check-one-neovm CASE=cases/commandp-core-command-matrix-extra` (pass)
+    - `make -C test/neovm/vm-compat check-all-neovm-strict` (pass)
+
 - Added builtin registry function-cell parity guard to strict vm-compat:
   - added strict checker:
     - `test/neovm/vm-compat/check-builtin-registry-function-cell.sh`
