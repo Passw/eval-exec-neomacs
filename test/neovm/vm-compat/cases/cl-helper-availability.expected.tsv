@@ -58,8 +58,8 @@
 58	(condition-case err (cl-remove-if-not) (error err))	OK (void-function cl-remove-if-not)
 59	(fboundp 'cl-rest)	OK nil
 60	(condition-case err (cl-rest) (error err))	OK (void-function cl-rest)
-61	(fboundp 'cl-second)	OK nil
-62	(condition-case err (cl-second) (error err))	OK (void-function cl-second)
+61	(fboundp 'cl-second)	OK t
+62	(condition-case err (cl-second '(a b)) (error err))	OK b
 63	(fboundp 'cl-set-difference)	OK nil
 64	(condition-case err (cl-set-difference) (error err))	OK (void-function cl-set-difference)
 65	(fboundp 'cl-seventh)	OK nil

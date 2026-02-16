@@ -59,7 +59,7 @@
 (fboundp 'cl-rest)
 (condition-case err (cl-rest) (error err))
 (fboundp 'cl-second)
-(condition-case err (cl-second) (error err))
+(condition-case err (cl-second '(a b)) (error err))
 (fboundp 'cl-set-difference)
 (condition-case err (cl-set-difference) (error err))
 (fboundp 'cl-seventh)

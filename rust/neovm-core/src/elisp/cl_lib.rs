@@ -66,17 +66,44 @@ fn collect_sequence(val: &Value) -> Vec<Value> {
     }
 }
 
+fn cl_list_nth(list: &Value, index: usize) -> EvalResult {
+    let mut cursor = list.clone();
+    for _ in 0..index {
+        match cursor {
+            Value::Nil => return Ok(Value::Nil),
+            Value::Cons(cell) => {
+                let pair = cell.lock().expect("poisoned");
+                cursor = pair.cdr.clone();
+            }
+            tail => {
+                return Err(signal(
+                    "wrong-type-argument",
+                    vec![Value::symbol("listp"), tail],
+                ))
+            }
+        }
+    }
+
+    match cursor {
+        Value::Nil => Ok(Value::Nil),
+        Value::Cons(cell) => Ok(cell.lock().expect("poisoned").car.clone()),
+        tail => Err(signal(
+            "wrong-type-argument",
+            vec![Value::symbol("listp"), tail],
+        )),
+    }
+}
+
 /// `(cl-first LIST)` -- return the first element of LIST.
 pub(crate) fn builtin_cl_first(args: Vec<Value>) -> EvalResult {
     expect_args("cl-first", &args, 1)?;
-    match &args[0] {
-        Value::Nil => Ok(Value::Nil),
-        Value::Cons(cell) => Ok(cell.lock().expect("poisoned").car.clone()),
-        other => Err(signal(
-            "wrong-type-argument",
-            vec![Value::symbol("listp"), other.clone()],
-        )),
-    }
+    cl_list_nth(&args[0], 0)
+}
+
+/// `(cl-second LIST)` -- return the second element of LIST.
+pub(crate) fn builtin_cl_second(args: Vec<Value>) -> EvalResult {
+    expect_args("cl-second", &args, 1)?;
+    cl_list_nth(&args[0], 1)
 }
 
 fn seq_position_list_elements(seq: &Value) -> Result<Vec<Value>, Flow> {
@@ -686,6 +713,24 @@ mod tests {
     #[test]
     fn cl_first_wrong_type() {
         assert!(builtin_cl_first(vec![Value::Int(1)]).is_err());
+    }
+
+    #[test]
+    fn cl_second_list() {
+        let list = Value::list(vec![Value::symbol("a"), Value::symbol("b")]);
+        let result = builtin_cl_second(vec![list]).unwrap();
+        assert!(matches!(result, Value::Symbol(s) if s == "b"));
+    }
+
+    #[test]
+    fn cl_second_nil() {
+        let result = builtin_cl_second(vec![Value::Nil]).unwrap();
+        assert!(result.is_nil());
+    }
+
+    #[test]
+    fn cl_second_wrong_type() {
+        assert!(builtin_cl_second(vec![Value::Int(1)]).is_err());
     }
 
     #[test]

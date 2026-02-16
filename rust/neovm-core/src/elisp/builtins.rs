@@ -7598,6 +7598,7 @@ pub(crate) fn dispatch_builtin(
 
         // Note: windowp and framep are in the eval-dependent section above
         "cl-first" => super::cl_lib::builtin_cl_first(args),
+        "cl-second" => super::cl_lib::builtin_cl_second(args),
         "seq-reverse" => super::cl_lib::builtin_seq_reverse(args),
         "seq-drop" => super::cl_lib::builtin_seq_drop(args),
         "seq-take" => super::cl_lib::builtin_seq_take(args),

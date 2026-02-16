@@ -168,6 +168,7 @@ const DISPATCH_BUILTIN_NAMES: &[&str] = &[
     "clear-image-cache",
     "clear-rectangle",
     "cl-first",
+    "cl-second",
     "closurep",
     "coding-system-aliases",
     "coding-system-base",
