@@ -25,6 +25,44 @@ Last updated: 2026-02-16
 
 ## Done
 
+- Added missing window helper builtins and aligned window/frame `subr-arity` metadata with GNU Emacs:
+  - updated:
+    - `rust/neovm-core/src/elisp/window_cmds.rs`
+      - added evaluator-backed builtins:
+        - `window-total-height` `(0 . 2)` (batch wrapper over existing window geometry path)
+        - `window-total-width` `(0 . 2)` (batch wrapper over existing window geometry path)
+        - `get-buffer-window` `(0 . 2)` (selected-frame search for window showing buffer)
+        - `get-buffer-window-list` `(0 . 3)` (selected-frame list of matching windows)
+        - `fit-window-to-buffer` `(0 . 6)` (batch no-op returning validated window)
+      - added unit coverage for total-size wrappers and new window-buffer helper paths.
+    - `rust/neovm-core/src/elisp/builtins.rs`
+      - wired evaluator dispatch for new window helpers.
+    - `rust/neovm-core/src/elisp/builtin_registry.rs`
+      - exposed startup names: `fit-window-to-buffer`, `get-buffer-window`, `get-buffer-window-list`, `window-total-height`, `window-total-width`.
+    - `rust/neovm-core/src/elisp/subr_info.rs`
+      - added/extended window/frame arity overrides to match oracle:
+        - `display-buffer` `(1 . 3)`, `frame-list` `(0 . 0)`, `frame-live-p` `(1 . 1)`, `frame-parameter` `(2 . 2)`, `frame-parameters` `(0 . 1)`, `frame-visible-p` `(1 . 1)`
+        - `selected-window` `(0 . 0)`, `set-window-buffer` `(2 . 3)`, `set-window-point` `(2 . 2)`, `set-window-start` `(2 . 3)`
+        - `window-body-height` `(0 . 2)`, `window-body-width` `(0 . 2)`, `window-buffer` `(0 . 1)`, `window-dedicated-p` `(0 . 1)`, `window-end` `(0 . 2)`, `window-list` `(0 . 3)`, `window-live-p` `(1 . 1)`, `window-point` `(0 . 1)`, `window-start` `(0 . 1)`, `window-text-pixel-size` `(0 . 7)`, `windowp` `(1 . 1)`
+        - `get-buffer-window` `(0 . 2)`, `get-buffer-window-list` `(0 . 3)`, `fit-window-to-buffer` `(0 . 6)`, `window-total-height` `(0 . 2)`, `window-total-width` `(0 . 2)`
+      - added unit matrix `subr_arity_window_frame_primitives_match_oracle`.
+    - `test/neovm/vm-compat/cases/window-frame-subr-arity-semantics.forms`
+    - `test/neovm/vm-compat/cases/window-frame-subr-arity-semantics.expected.tsv`
+    - `test/neovm/vm-compat/cases/default.list`
+      - added oracle lock-in case for window/frame subr-arity matrix.
+  - recorded with official GNU Emacs:
+    - `NEOVM_ORACLE_EMACS=/nix/store/hql3zwz5b4ywd2qwx8jssp4dyb7nx4cb-emacs-30.2/bin/emacs make -C test/neovm/vm-compat record FORMS=cases/window-frame-subr-arity-semantics.forms EXPECTED=cases/window-frame-subr-arity-semantics.expected.tsv` (pass)
+  - verified:
+    - `cargo test --manifest-path rust/neovm-core/Cargo.toml window_total_size_queries_work -- --nocapture` (pass)
+    - `cargo test --manifest-path rust/neovm-core/Cargo.toml get_buffer_window -- --nocapture` (pass)
+    - `cargo test --manifest-path rust/neovm-core/Cargo.toml fit_window_to_buffer_returns_window_id -- --nocapture` (pass)
+    - `cargo test --manifest-path rust/neovm-core/Cargo.toml subr_arity_window_frame_primitives_match_oracle -- --nocapture` (pass)
+    - `make -C test/neovm/vm-compat check-one-neovm CASE=cases/window-frame-subr-arity-semantics` (pass, 26/26)
+    - `make -C test/neovm/vm-compat check-one-neovm CASE=cases/frame-window-designator-boundary-semantics` (pass, 10/10)
+    - `make -C test/neovm/vm-compat check-one-neovm CASE=cases/window-buffer-switch-semantics` (pass, 12/12)
+    - `make -C test/neovm/vm-compat validate-case-lists` (pass)
+    - `make -C test/neovm/vm-compat check-builtin-registry-fboundp` (pass)
+
 - Aligned display control/TTY/X helper `subr-arity` metadata with GNU Emacs:
   - updated:
     - `rust/neovm-core/src/elisp/subr_info.rs`
