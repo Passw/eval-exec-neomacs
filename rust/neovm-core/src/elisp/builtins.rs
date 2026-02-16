@@ -6290,9 +6290,9 @@ fn builtin_help_key_description(args: Vec<Value>) -> EvalResult {
 }
 
 /// `(recent-keys &optional INCLUDE-CMDS)` -> vector of recent input events.
-fn builtin_recent_keys(args: Vec<Value>) -> EvalResult {
+fn builtin_recent_keys(eval: &mut super::eval::Evaluator, args: Vec<Value>) -> EvalResult {
     expect_max_args("recent-keys", &args, 1)?;
-    Ok(Value::vector(vec![]))
+    Ok(Value::vector(eval.recent_input_events().to_vec()))
 }
 
 // ===========================================================================
@@ -7580,6 +7580,7 @@ pub(crate) fn dispatch_builtin(
         "read-key-sequence-vector" => {
             return Some(super::reader::builtin_read_key_sequence_vector(eval, args))
         }
+        "recent-keys" => return Some(builtin_recent_keys(eval, args)),
         "minibufferp" => return Some(super::minibuffer::builtin_minibufferp(args)),
         "minibuffer-prompt" => return Some(super::minibuffer::builtin_minibuffer_prompt(args)),
         "minibuffer-contents" => {
@@ -8047,7 +8048,6 @@ pub(crate) fn dispatch_builtin(
         "listify-key-sequence" => builtin_listify_key_sequence(args),
         "key-valid-p" => builtin_key_valid_p(args),
         "text-char-description" => builtin_text_char_description(args),
-        "recent-keys" => builtin_recent_keys(args),
 
         // Process (pure — no evaluator needed)
         "shell-command-to-string" => super::process::builtin_shell_command_to_string(args),
@@ -8606,7 +8606,6 @@ pub(crate) fn dispatch_builtin_pure(name: &str, args: Vec<Value>) -> Option<Eval
         "listify-key-sequence" => builtin_listify_key_sequence(args),
         "key-valid-p" => builtin_key_valid_p(args),
         "text-char-description" => builtin_text_char_description(args),
-        "recent-keys" => builtin_recent_keys(args),
         // Process (pure)
         "shell-command-to-string" => super::process::builtin_shell_command_to_string(args),
         "getenv" => super::process::builtin_getenv(args),
