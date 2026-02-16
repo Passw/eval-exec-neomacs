@@ -7620,6 +7620,7 @@ pub(crate) fn dispatch_builtin(
         "cl-gensym" => super::cl_lib::builtin_cl_gensym(args),
         "cl-evenp" => super::cl_lib::builtin_cl_evenp(args),
         "cl-find" => super::cl_lib::builtin_cl_find(args),
+        "cl-intersection" => super::cl_lib::builtin_cl_intersection(args),
         "cl-member" => super::cl_lib::builtin_cl_member(args),
         "cl-minusp" => super::cl_lib::builtin_cl_minusp(args),
         "cl-ninth" => super::cl_lib::builtin_cl_ninth(args),

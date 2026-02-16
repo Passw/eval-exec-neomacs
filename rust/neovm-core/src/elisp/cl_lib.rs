@@ -804,6 +804,23 @@ pub(crate) fn builtin_cl_subsetp(args: Vec<Value>) -> EvalResult {
     Ok(Value::True)
 }
 
+/// `(cl-intersection LIST1 LIST2)` -- set-style intersection preserving LIST1 order.
+pub(crate) fn builtin_cl_intersection(args: Vec<Value>) -> EvalResult {
+    expect_args("cl-intersection", &args, 2)?;
+    let left = seq_position_elements(&args[0])?;
+    let right = seq_position_elements(&args[1])?;
+
+    let mut out = Vec::new();
+    for item in left {
+        let in_right = right.iter().any(|candidate| equal_value(&item, candidate, 0));
+        let already_in_out = out.iter().any(|seen| equal_value(&item, seen, 0));
+        if in_right && !already_in_out {
+            out.push(item);
+        }
+    }
+    Ok(Value::list(out))
+}
+
 /// `(seq-contains-p SEQ ELT &optional TESTFN)` — membership test for sequence.
 pub(crate) fn builtin_seq_contains_p(eval: &mut super::eval::Evaluator, args: Vec<Value>) -> EvalResult {
     if !(2..=3).contains(&args.len()) {
@@ -1696,5 +1713,30 @@ mod tests {
     #[test]
     fn cl_subsetp_wrong_arity() {
         assert!(builtin_cl_subsetp(vec![Value::Nil]).is_err());
+    }
+
+    #[test]
+    fn cl_intersection_basic() {
+        let result = builtin_cl_intersection(vec![
+            Value::list(vec![Value::symbol("a"), Value::symbol("b"), Value::symbol("c")]),
+            Value::list(vec![Value::symbol("b"), Value::symbol("d"), Value::symbol("c")]),
+        ])
+        .unwrap();
+        assert_eq!(result, Value::list(vec![Value::symbol("b"), Value::symbol("c")]));
+    }
+
+    #[test]
+    fn cl_intersection_no_overlap() {
+        let result = builtin_cl_intersection(vec![
+            Value::list(vec![Value::symbol("a")]),
+            Value::list(vec![Value::symbol("z")]),
+        ])
+        .unwrap();
+        assert!(result.is_nil());
+    }
+
+    #[test]
+    fn cl_intersection_wrong_arity() {
+        assert!(builtin_cl_intersection(vec![Value::Nil]).is_err());
     }
 }

@@ -26,8 +26,8 @@
 26	(condition-case err (cl-fourth '(a b c d)) (error err))	OK d
 27	(fboundp 'cl-gensym)	OK t
 28	(condition-case err (symbolp (cl-gensym)) (error err))	OK t
-29	(fboundp 'cl-intersection)	OK nil
-30	(condition-case err (cl-intersection) (error err))	OK (void-function cl-intersection)
+29	(fboundp 'cl-intersection)	OK t
+30	(condition-case err (cl-intersection '(a b c) '(b d c)) (error err))	OK (b c)
 31	(fboundp 'cl-map)	OK nil
 32	(condition-case err (cl-map) (error err))	OK (void-function cl-map)
 33	(fboundp 'cl-member)	OK t

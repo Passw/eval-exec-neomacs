@@ -27,7 +27,7 @@
 (fboundp 'cl-gensym)
 (condition-case err (symbolp (cl-gensym)) (error err))
 (fboundp 'cl-intersection)
-(condition-case err (cl-intersection) (error err))
+(condition-case err (cl-intersection '(a b c) '(b d c)) (error err))
 (fboundp 'cl-map)
 (condition-case err (cl-map) (error err))
 (fboundp 'cl-member)
