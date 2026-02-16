@@ -6215,6 +6215,12 @@ pub(crate) fn dispatch_builtin(
         "store-kbd-macro-event" => {
             return Some(super::kmacro::builtin_store_kbd_macro_event(eval, args))
         }
+        "defining-kbd-macro-p" => {
+            return Some(super::kmacro::builtin_defining_kbd_macro_p(eval, args))
+        }
+        "executing-kbd-macro-p" => {
+            return Some(super::kmacro::builtin_executing_kbd_macro_p(eval, args))
+        }
         // Bookmark operations (evaluator-dependent)
         "bookmark-set" => return Some(super::bookmark::builtin_bookmark_set(eval, args)),
         "bookmark-jump" => return Some(super::bookmark::builtin_bookmark_jump(eval, args)),

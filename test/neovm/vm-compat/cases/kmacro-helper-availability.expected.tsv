@@ -8,7 +8,7 @@
 8	(condition-case err (kmacro-set-format "%d") (error err))	OK (void-function kmacro-set-format)
 9	(fboundp 'last-kbd-macro)	OK nil
 10	(condition-case err (last-kbd-macro) (error err))	OK (void-function last-kbd-macro)
-11	(fboundp 'defining-kbd-macro-p)	OK nil
-12	(condition-case err (defining-kbd-macro-p) (error err))	OK (void-function defining-kbd-macro-p)
-13	(fboundp 'executing-kbd-macro-p)	OK nil
-14	(condition-case err (executing-kbd-macro-p) (error err))	OK (void-function executing-kbd-macro-p)
+11	(fboundp 'defining-kbd-macro-p)	OK t
+12	(condition-case err (defining-kbd-macro-p) (error err))	OK nil
+13	(fboundp 'executing-kbd-macro-p)	OK t
+14	(condition-case err (executing-kbd-macro-p) (error err))	OK nil
