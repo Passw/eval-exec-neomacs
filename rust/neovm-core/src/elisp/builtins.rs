@@ -4323,8 +4323,52 @@ pub(crate) fn builtin_current_time(args: Vec<Value>) -> EvalResult {
     ]))
 }
 
+fn number_or_marker_to_f64(value: NumberOrMarker) -> f64 {
+    match value {
+        NumberOrMarker::Int(n) => n as f64,
+        NumberOrMarker::Float(f) => f,
+    }
+}
+
+fn decode_float_time_arg(value: &Value) -> Result<f64, Flow> {
+    match value {
+        Value::Cons(_) => {
+            let items = list_to_vec(value).ok_or_else(|| {
+                signal(
+                    "wrong-type-argument",
+                    vec![Value::symbol("listp"), value.clone()],
+                )
+            })?;
+            if items.len() < 2 {
+                return Err(signal(
+                    "wrong-type-argument",
+                    vec![Value::symbol("listp"), value.clone()],
+                ));
+            }
+
+            let high = number_or_marker_to_f64(expect_number_or_marker(&items[0])?);
+            let low = number_or_marker_to_f64(expect_number_or_marker(&items[1])?);
+            let mut seconds = high * 65536.0 + low;
+            if let Some(usec) = items.get(2) {
+                seconds += number_or_marker_to_f64(expect_number_or_marker(usec)?) / 1_000_000.0;
+            }
+            if let Some(psec) = items.get(3) {
+                seconds +=
+                    number_or_marker_to_f64(expect_number_or_marker(psec)?) / 1_000_000_000_000.0;
+            }
+            Ok(seconds)
+        }
+        _ => Ok(number_or_marker_to_f64(expect_number_or_marker(value)?)),
+    }
+}
+
 pub(crate) fn builtin_float_time(args: Vec<Value>) -> EvalResult {
-    let _ = args;
+    expect_max_args("float-time", &args, 1)?;
+    if let Some(specified_time) = args.first() {
+        if !specified_time.is_nil() {
+            return Ok(Value::Float(decode_float_time_arg(specified_time)?));
+        }
+    }
     use std::time::{SystemTime, UNIX_EPOCH};
     let dur = SystemTime::now()
         .duration_since(UNIX_EPOCH)
