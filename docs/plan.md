@@ -25,6 +25,21 @@ Last updated: 2026-02-16
 
 ## Done
 
+- Fixed uppercase control conversion parity in `event-convert-list` and locked coverage in oracle corpus:
+  - updated:
+    - `rust/neovm-core/src/elisp/builtins.rs`
+      - preserved uppercase-origin shift bit when resolving `control` modifier over integer uppercase letters in `event-convert-list`.
+      - aligned conversion output for `'(control ?A)` with oracle (`33554433`).
+    - `test/neovm/vm-compat/cases/event-builtins-semantics.forms`
+      - added explicit uppercase control probe:
+        - `(event-convert-list '(control ?A))`
+    - `test/neovm/vm-compat/cases/event-builtins-semantics.expected.tsv`
+      - refreshed oracle baseline with the new uppercase control conversion line.
+  - verified:
+    - `make -C test/neovm/vm-compat check-one-neovm CASE=cases/event-builtins-semantics` (pass, 51/51)
+    - `make -C test/neovm/vm-compat validate-case-lists` (pass)
+    - `make -C test/neovm/vm-compat check-builtin-registry-fboundp` (pass; only allowlisted `neovm-precompile-file` drift)
+
 - Replaced `event-apply-modifier` placeholder behavior with oracle-locked runtime and introspection parity:
   - updated:
     - `rust/neovm-core/src/elisp/builtins.rs`
