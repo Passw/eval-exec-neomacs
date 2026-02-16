@@ -142,6 +142,12 @@ pub(crate) fn builtin_cl_eighth(args: Vec<Value>) -> EvalResult {
     cl_list_nth(&args[0], 7)
 }
 
+/// `(cl-ninth LIST)` -- return the ninth element of LIST.
+pub(crate) fn builtin_cl_ninth(args: Vec<Value>) -> EvalResult {
+    expect_args("cl-ninth", &args, 1)?;
+    cl_list_nth(&args[0], 8)
+}
+
 fn seq_position_list_elements(seq: &Value) -> Result<Vec<Value>, Flow> {
     let mut elements = Vec::new();
     let mut cursor = seq.clone();
@@ -914,6 +920,34 @@ mod tests {
     #[test]
     fn cl_eighth_wrong_type() {
         assert!(builtin_cl_eighth(vec![Value::Int(1)]).is_err());
+    }
+
+    #[test]
+    fn cl_ninth_list() {
+        let list = Value::list(vec![
+            Value::symbol("a"),
+            Value::symbol("b"),
+            Value::symbol("c"),
+            Value::symbol("d"),
+            Value::symbol("e"),
+            Value::symbol("f"),
+            Value::symbol("g"),
+            Value::symbol("h"),
+            Value::symbol("i"),
+        ]);
+        let result = builtin_cl_ninth(vec![list]).unwrap();
+        assert!(matches!(result, Value::Symbol(s) if s == "i"));
+    }
+
+    #[test]
+    fn cl_ninth_nil() {
+        let result = builtin_cl_ninth(vec![Value::Nil]).unwrap();
+        assert!(result.is_nil());
+    }
+
+    #[test]
+    fn cl_ninth_wrong_type() {
+        assert!(builtin_cl_ninth(vec![Value::Int(1)]).is_err());
     }
 
     #[test]

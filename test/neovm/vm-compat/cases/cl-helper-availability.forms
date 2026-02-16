@@ -35,7 +35,7 @@
 (fboundp 'cl-minusp)
 (condition-case err (cl-minusp) (error err))
 (fboundp 'cl-ninth)
-(condition-case err (cl-ninth) (error err))
+(condition-case err (cl-ninth '(a b c d e f g h i)) (error err))
 (fboundp 'cl-notany)
 (condition-case err (cl-notany) (error err))
 (fboundp 'cl-notevery)
