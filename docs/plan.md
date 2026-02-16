@@ -6725,6 +6725,19 @@ Last updated: 2026-02-16
   - verified:
     - `make -C test/neovm/vm-compat check-one-neovm CASE=cases/thread-introspection` (pass, 44/44)
     - `make -C test/neovm/vm-compat check-builtin-registry-fboundp` drift count reduced from 46 to 45
+- Aligned CL helper startup availability with GNU Emacs `-Q`:
+  - removed default dispatch/registry exposure for the `cl-*` helper surface previously present in NeoVM startup (`cl-adjoin`, `cl-coerce`, `cl-concatenate`, `cl-count`, `cl-count-if`, `cl-every`, `cl-eighth`, `cl-evenp`, `cl-fifth`, `cl-find`, `cl-find-if`, `cl-first`, `cl-fourth`, `cl-gensym`, `cl-intersection`, `cl-map`, `cl-member`, `cl-minusp`, `cl-notany`, `cl-notevery`, `cl-ninth`, `cl-oddp`, `cl-plusp`, `cl-position`, `cl-reduce`, `cl-remove`, `cl-remove-duplicates`, `cl-remove-if`, `cl-remove-if-not`, `cl-rest`, `cl-second`, `cl-set-difference`, `cl-seventh`, `cl-sixth`, `cl-some`, `cl-sort`, `cl-stable-sort`, `cl-subseq`, `cl-subsetp`, `cl-substitute`, `cl-tenth`, `cl-third`, `cl-union`)
+  - refreshed oracle baselines:
+    - `test/neovm/vm-compat/cases/cl-helper-availability.expected.tsv`
+    - `test/neovm/vm-compat/cases/cl-setops-semantics.expected.tsv`
+  - verified:
+    - `make -C test/neovm/vm-compat check-one-neovm CASE=cases/cl-helper-availability` (pass, 86/86)
+    - `make -C test/neovm/vm-compat check-one-neovm CASE=cases/cl-setops-semantics` (pass, 13/13)
+    - `make -C test/neovm/vm-compat check-builtin-registry-fboundp` drift count reduced from 45 to 2
+- Tightened builtin-registry drift policy for intentional startup differences:
+  - updated `test/neovm/vm-compat/cases/builtin-registry-fboundp-allowlist.txt` to include `word-at-point` (kept intentionally exposed for current symbol/word-at-point compatibility flow)
+  - verified:
+    - `make -C test/neovm/vm-compat check-builtin-registry-fboundp` now passes (2 drifts, both allowlisted: `neovm-precompile-file`, `word-at-point`)
 
 ## Doing
 
