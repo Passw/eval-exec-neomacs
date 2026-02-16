@@ -6252,20 +6252,9 @@ pub(crate) fn dispatch_builtin(
             return Some(super::kmacro::builtin_name_last_kbd_macro(eval, args))
         }
         "insert-kbd-macro" => return Some(super::kmacro::builtin_insert_kbd_macro(eval, args)),
-        "last-kbd-macro" => return Some(super::kmacro::builtin_last_kbd_macro(eval, args)),
-        "kmacro-p" => return Some(super::kmacro::builtin_kmacro_p(args)),
-        "kmacro-add-counter" => return Some(super::kmacro::builtin_kmacro_add_counter(eval, args)),
-        "kmacro-set-counter" => return Some(super::kmacro::builtin_kmacro_set_counter(eval, args)),
-        "kmacro-set-format" => return Some(super::kmacro::builtin_kmacro_set_format(eval, args)),
         "kbd-macro-query" => return Some(super::kmacro::builtin_kbd_macro_query(eval, args)),
         "store-kbd-macro-event" => {
             return Some(super::kmacro::builtin_store_kbd_macro_event(eval, args))
-        }
-        "defining-kbd-macro-p" => {
-            return Some(super::kmacro::builtin_defining_kbd_macro_p(eval, args))
-        }
-        "executing-kbd-macro-p" => {
-            return Some(super::kmacro::builtin_executing_kbd_macro_p(eval, args))
         }
         // Bookmark operations (evaluator-dependent)
         "bookmark-set" => return Some(super::bookmark::builtin_bookmark_set(eval, args)),
