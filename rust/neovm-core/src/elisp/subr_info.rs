@@ -308,6 +308,10 @@ fn subr_arity_value(name: &str) -> Value {
         "copy-file" => arity_cons(2, Some(6)),
         "copy-region-as-kill" => arity_cons(2, Some(3)),
         "copy-to-register" => arity_cons(3, Some(5)),
+        "make-directory" => arity_cons(1, Some(2)),
+        "make-temp-file" => arity_cons(1, Some(4)),
+        "make-nearby-temp-file" => arity_cons(1, Some(3)),
+        "make-symbolic-link" | "rename-file" => arity_cons(2, Some(3)),
         "file-name-absolute-p" | "file-name-as-directory" | "file-name-directory"
         | "file-name-nondirectory" | "file-name-sans-extension"
         | "file-name-case-insensitive-p" => arity_cons(1, Some(1)),
@@ -1417,6 +1421,16 @@ mod tests {
         assert_subr_arity("directory-files-and-attributes", 1, Some(6));
         assert_subr_arity("directory-name-p", 1, Some(1));
         assert_subr_arity("expand-file-name", 1, Some(2));
+    }
+
+    #[test]
+    fn subr_arity_filesystem_create_primitives_match_oracle() {
+        assert_subr_arity("make-directory", 1, Some(2));
+        assert_subr_arity("make-temp-file", 1, Some(4));
+        assert_subr_arity("make-nearby-temp-file", 1, Some(3));
+        assert_subr_arity("make-symbolic-link", 2, Some(3));
+        assert_subr_arity("rename-file", 2, Some(3));
+        assert_subr_arity("add-name-to-file", 2, Some(3));
     }
 
     #[test]
