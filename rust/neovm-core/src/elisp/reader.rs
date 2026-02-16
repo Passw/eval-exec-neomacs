@@ -859,7 +859,39 @@ pub(crate) fn builtin_discard_input(
 }
 
 // ---------------------------------------------------------------------------
-// 11. y-or-n-p (stub)
+// 11. current-input-mode / set-input-mode
+// ---------------------------------------------------------------------------
+
+/// `(current-input-mode)` -> `(INTERRUPT FLOW META QUIT)`
+pub(crate) fn builtin_current_input_mode(
+    eval: &mut super::eval::Evaluator,
+    args: Vec<Value>,
+) -> EvalResult {
+    expect_args("current-input-mode", &args, 0)?;
+    let (interrupt, flow, meta, quit) = eval.current_input_mode_tuple();
+    Ok(Value::list(vec![
+        Value::bool(interrupt),
+        Value::bool(flow),
+        Value::bool(meta),
+        Value::Int(quit),
+    ]))
+}
+
+/// `(set-input-mode INTERRUPT FLOW META QUIT)`
+///
+/// Batch-compatible behavior currently tracks only INTERRUPT and ignores
+/// FLOW/META/QUIT while preserving arity/return-value semantics.
+pub(crate) fn builtin_set_input_mode(
+    eval: &mut super::eval::Evaluator,
+    args: Vec<Value>,
+) -> EvalResult {
+    expect_args("set-input-mode", &args, 4)?;
+    eval.set_input_mode_interrupt(args[0].is_truthy());
+    Ok(Value::Nil)
+}
+
+// ---------------------------------------------------------------------------
+// 12. y-or-n-p (stub)
 // ---------------------------------------------------------------------------
 
 /// `(y-or-n-p PROMPT)`
@@ -883,7 +915,7 @@ pub(crate) fn builtin_y_or_n_p(args: Vec<Value>) -> EvalResult {
 }
 
 // ---------------------------------------------------------------------------
-// 12. yes-or-no-p (stub)
+// 13. yes-or-no-p (stub)
 // ---------------------------------------------------------------------------
 
 /// `(yes-or-no-p PROMPT)`
@@ -899,7 +931,7 @@ pub(crate) fn builtin_yes_or_no_p(args: Vec<Value>) -> EvalResult {
 }
 
 // ---------------------------------------------------------------------------
-// 13. read-char (stub)
+// 14. read-char (stub)
 // ---------------------------------------------------------------------------
 
 /// `(read-char &optional PROMPT ...)`
@@ -954,7 +986,7 @@ pub(crate) fn builtin_read_key(
 }
 
 // ---------------------------------------------------------------------------
-// 14. read-key-sequence (stub)
+// 15. read-key-sequence (stub)
 // ---------------------------------------------------------------------------
 
 /// `(read-key-sequence PROMPT)`
@@ -1801,6 +1833,69 @@ mod tests {
         let result = builtin_discard_input(&mut ev, vec![Value::Nil]);
         assert!(matches!(
             result,
+            Err(Flow::Signal(sig)) if sig.symbol == "wrong-number-of-arguments"
+        ));
+    }
+
+    #[test]
+    fn current_input_mode_returns_batch_tuple() {
+        let mut ev = Evaluator::new();
+        let result = builtin_current_input_mode(&mut ev, vec![]).unwrap();
+        assert_eq!(
+            result,
+            Value::list(vec![Value::True, Value::Nil, Value::True, Value::Int(7)])
+        );
+    }
+
+    #[test]
+    fn current_input_mode_rejects_args() {
+        let mut ev = Evaluator::new();
+        let result = builtin_current_input_mode(&mut ev, vec![Value::Nil]);
+        assert!(matches!(
+            result,
+            Err(Flow::Signal(sig)) if sig.symbol == "wrong-number-of-arguments"
+        ));
+    }
+
+    #[test]
+    fn set_input_mode_toggles_interrupt_only() {
+        let mut ev = Evaluator::new();
+        let _ = builtin_set_input_mode(
+            &mut ev,
+            vec![Value::Nil, Value::True, Value::Nil, Value::Int(65)],
+        )
+        .unwrap();
+        assert_eq!(
+            builtin_current_input_mode(&mut ev, vec![]).unwrap(),
+            Value::list(vec![Value::Nil, Value::Nil, Value::True, Value::Int(7)])
+        );
+
+        let _ = builtin_set_input_mode(
+            &mut ev,
+            vec![Value::symbol("x"), Value::Nil, Value::Nil, Value::Nil],
+        )
+        .unwrap();
+        assert_eq!(
+            builtin_current_input_mode(&mut ev, vec![]).unwrap(),
+            Value::list(vec![Value::True, Value::Nil, Value::True, Value::Int(7)])
+        );
+    }
+
+    #[test]
+    fn set_input_mode_rejects_wrong_arity() {
+        let mut ev = Evaluator::new();
+        let too_few = builtin_set_input_mode(&mut ev, vec![Value::Nil, Value::Nil, Value::Nil]);
+        assert!(matches!(
+            too_few,
+            Err(Flow::Signal(sig)) if sig.symbol == "wrong-number-of-arguments"
+        ));
+
+        let too_many = builtin_set_input_mode(
+            &mut ev,
+            vec![Value::Nil, Value::Nil, Value::Nil, Value::Nil, Value::Nil],
+        );
+        assert!(matches!(
+            too_many,
             Err(Flow::Signal(sig)) if sig.symbol == "wrong-number-of-arguments"
         ));
     }

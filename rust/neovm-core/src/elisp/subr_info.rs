@@ -297,6 +297,8 @@ fn subr_arity_value(name: &str) -> Value {
         "recent-keys" => arity_cons(0, Some(1)),
         "input-pending-p" => arity_cons(0, Some(1)),
         "discard-input" => arity_cons(0, Some(0)),
+        "current-input-mode" => arity_cons(0, Some(0)),
+        "set-input-mode" => arity_cons(4, Some(4)),
         "event-apply-modifier" => arity_cons(4, Some(4)),
         // Threading primitives
         "thread-join" | "thread-name" | "thread-live-p" | "mutexp" | "mutex-name"

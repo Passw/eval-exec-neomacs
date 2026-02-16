@@ -94,6 +94,8 @@ pub struct Evaluator {
     recent_input_events: Vec<Value>,
     /// Last key sequence captured by read-key/read-key-sequence/read-event paths.
     read_command_keys: Vec<Value>,
+    /// Batch-compatible input-mode interrupt flag for `current-input-mode`.
+    input_mode_interrupt: bool,
     /// Frame manager — owns all frames and windows.
     pub(crate) frames: FrameManager,
     /// Mode registry — major/minor modes.
@@ -210,6 +212,7 @@ impl Evaluator {
             interactive: InteractiveRegistry::new(),
             recent_input_events: Vec::new(),
             read_command_keys: Vec::new(),
+            input_mode_interrupt: true,
             frames: FrameManager::new(),
             modes: ModeRegistry::new(),
             threads: ThreadManager::new(),
@@ -247,6 +250,16 @@ impl Evaluator {
 
     pub(crate) fn read_command_keys(&self) -> &[Value] {
         &self.read_command_keys
+    }
+
+    pub(crate) fn current_input_mode_tuple(&self) -> (bool, bool, bool, i64) {
+        // Batch oracle compatibility: flow-control and meta are fixed to
+        // nil/t respectively, and quit char is fixed to C-g (7).
+        (self.input_mode_interrupt, false, true, 7)
+    }
+
+    pub(crate) fn set_input_mode_interrupt(&mut self, interrupt: bool) {
+        self.input_mode_interrupt = interrupt;
     }
 
     pub(crate) fn pop_unread_command_event(&mut self) -> Option<Value> {

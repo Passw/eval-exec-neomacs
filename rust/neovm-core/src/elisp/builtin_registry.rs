@@ -206,6 +206,7 @@ const DISPATCH_BUILTIN_NAMES: &[&str] = &[
     "current-global-map",
     "current-indentation",
     "current-kill",
+    "current-input-mode",
     "current-local-map",
     "current-thread",
     "current-time",
@@ -742,6 +743,7 @@ const DISPATCH_BUILTIN_NAMES: &[&str] = &[
     "set-default-file-modes",
     "set-file-modes",
     "set-file-times",
+    "set-input-mode",
     "set-keyboard-coding-system",
     "set-keymap-parent",
     "set-mark",
@@ -947,6 +949,8 @@ mod tests {
         assert!(is_dispatch_builtin_name("read-char-exclusive"));
         assert!(is_dispatch_builtin_name("input-pending-p"));
         assert!(is_dispatch_builtin_name("discard-input"));
+        assert!(is_dispatch_builtin_name("current-input-mode"));
+        assert!(is_dispatch_builtin_name("set-input-mode"));
         assert!(is_dispatch_builtin_name("minibuffer-prompt"));
         assert!(is_dispatch_builtin_name("minibuffer-contents"));
         assert!(is_dispatch_builtin_name(

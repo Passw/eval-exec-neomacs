@@ -7576,6 +7576,8 @@ pub(crate) fn dispatch_builtin(
         "test-completion" => return Some(super::minibuffer::builtin_test_completion(args)),
         "input-pending-p" => return Some(super::reader::builtin_input_pending_p(eval, args)),
         "discard-input" => return Some(super::reader::builtin_discard_input(eval, args)),
+        "current-input-mode" => return Some(super::reader::builtin_current_input_mode(eval, args)),
+        "set-input-mode" => return Some(super::reader::builtin_set_input_mode(eval, args)),
         "read-char" => return Some(super::reader::builtin_read_char(eval, args)),
         "read-key" => return Some(super::reader::builtin_read_key(eval, args)),
         "read-key-sequence" => return Some(super::reader::builtin_read_key_sequence(eval, args)),
