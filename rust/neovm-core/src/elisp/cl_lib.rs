@@ -118,6 +118,12 @@ pub(crate) fn builtin_cl_fourth(args: Vec<Value>) -> EvalResult {
     cl_list_nth(&args[0], 3)
 }
 
+/// `(cl-fifth LIST)` -- return the fifth element of LIST.
+pub(crate) fn builtin_cl_fifth(args: Vec<Value>) -> EvalResult {
+    expect_args("cl-fifth", &args, 1)?;
+    cl_list_nth(&args[0], 4)
+}
+
 fn seq_position_list_elements(seq: &Value) -> Result<Vec<Value>, Flow> {
     let mut elements = Vec::new();
     let mut cursor = seq.clone();
@@ -788,6 +794,30 @@ mod tests {
     #[test]
     fn cl_fourth_wrong_type() {
         assert!(builtin_cl_fourth(vec![Value::Int(1)]).is_err());
+    }
+
+    #[test]
+    fn cl_fifth_list() {
+        let list = Value::list(vec![
+            Value::symbol("a"),
+            Value::symbol("b"),
+            Value::symbol("c"),
+            Value::symbol("d"),
+            Value::symbol("e"),
+        ]);
+        let result = builtin_cl_fifth(vec![list]).unwrap();
+        assert!(matches!(result, Value::Symbol(s) if s == "e"));
+    }
+
+    #[test]
+    fn cl_fifth_nil() {
+        let result = builtin_cl_fifth(vec![Value::Nil]).unwrap();
+        assert!(result.is_nil());
+    }
+
+    #[test]
+    fn cl_fifth_wrong_type() {
+        assert!(builtin_cl_fifth(vec![Value::Int(1)]).is_err());
     }
 
     #[test]

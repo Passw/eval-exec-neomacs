@@ -15,7 +15,7 @@
 (fboundp 'cl-every)
 (condition-case err (cl-every) (error err))
 (fboundp 'cl-fifth)
-(condition-case err (cl-fifth) (error err))
+(condition-case err (cl-fifth '(a b c d e)) (error err))
 (fboundp 'cl-find)
 (condition-case err (cl-find) (error err))
 (fboundp 'cl-find-if)

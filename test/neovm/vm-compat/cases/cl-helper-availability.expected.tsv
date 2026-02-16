@@ -14,8 +14,8 @@
 14	(condition-case err (cl-evenp) (error err))	OK (void-function cl-evenp)
 15	(fboundp 'cl-every)	OK nil
 16	(condition-case err (cl-every) (error err))	OK (void-function cl-every)
-17	(fboundp 'cl-fifth)	OK nil
-18	(condition-case err (cl-fifth) (error err))	OK (void-function cl-fifth)
+17	(fboundp 'cl-fifth)	OK t
+18	(condition-case err (cl-fifth '(a b c d e)) (error err))	OK e
 19	(fboundp 'cl-find)	OK nil
 20	(condition-case err (cl-find) (error err))	OK (void-function cl-find)
 21	(fboundp 'cl-find-if)	OK nil
