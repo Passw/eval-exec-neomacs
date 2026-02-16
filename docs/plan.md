@@ -47,6 +47,22 @@ Last updated: 2026-02-16
 
 ## Done
 
+- Aligned kill/edit helper primitive `subr-arity` metadata with GNU Emacs:
+  - added explicit arity lock-ins for:
+    - `(2 . 3)`: `downcase-region`, `kill-region`, `kill-ring-save`
+    - `(1 . 1)`: `downcase-word`, `move-end-of-line`, `kill-local-variable`, `kill-word`
+    - `(0 . 1)`: `just-one-space`, `kill-buffer`, `kill-line`, `kill-whole-line`
+    - `(2 . 2)`: `kill-append`
+    - `(1 . 2)`: `kill-new`
+  - added oracle corpus lock-in case:
+    - `test/neovm/vm-compat/cases/kill-edit-subr-arity-semantics`
+  - wired into default vm-compat suite:
+    - `test/neovm/vm-compat/cases/default.list`
+  - verified:
+    - `cargo test --manifest-path rust/neovm-core/Cargo.toml subr_arity_kill_edit_primitives_match_oracle -- --nocapture` (pass)
+    - `make -C test/neovm/vm-compat check-one-neovm CASE=cases/kill-edit-subr-arity-semantics` (pass)
+    - `make -C test/neovm/vm-compat check-all-neovm-strict` (pass)
+
 - Aligned keymap/keyboard helper primitive `subr-arity` metadata with GNU Emacs:
   - added explicit arity lock-ins for:
     - `(1 . 1)`: `kbd`, `key-valid-p`, `keymap-parent`, `keymapp`, `listify-key-sequence`
