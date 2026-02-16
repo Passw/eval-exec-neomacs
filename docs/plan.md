@@ -17,13 +17,42 @@ Last updated: 2026-02-16
 ## Next
 
 1. Keep `check-all-neovm` as a recurring post-slice gate to catch regressions early.
-2. Land the next evaluator-backed stub replacement outside `rect`/`recent-keys` (prefer display/input path with high package impact).
+2. Land the next evaluator-backed stub replacement after `input-pending-p` (prefer display/minibuffer path with high package impact).
 3. Continue expanding oracle corpora for remaining high-risk stub areas (search/input/minibuffer/display/font edge paths) and keep list/alist primitive semantics locked in.
 4. Keep Rust backend behind compile-time switch and preserve Emacs C core as default backend.
 5. Expand `kbd` edge corpus around uncommon modifier composition and align non-`kbd` key-description consumers with the new parser semantics where needed.
 6. Expand `recent-keys` capture beyond `read*` consumers to eventual command-loop event publication.
 
 ## Done
+
+- Implemented `input-pending-p` with dynamic `unread-command-events` parity and locked oracle coverage:
+  - updated:
+    - `rust/neovm-core/src/elisp/reader.rs`
+      - added evaluator-backed `input-pending-p` implementation:
+        - accepts optional `CHECK-TIMERS` arg for arity parity.
+        - uses evaluator scope resolution for `unread-command-events` (dynamic/lexical-aware).
+        - returns non-nil iff the resolved value is a cons cell (pending event present), without consuming events.
+      - added unit coverage for:
+        - empty/non-list unread queue behavior,
+        - dynamic let-binding precedence over global value,
+        - optional arg acceptance and arity error path.
+    - `rust/neovm-core/src/elisp/builtins.rs`
+      - wired `input-pending-p` into evaluator-dependent builtin dispatch.
+    - `rust/neovm-core/src/elisp/builtin_registry.rs`
+      - added `input-pending-p` to dispatch builtin registry.
+    - `rust/neovm-core/src/elisp/subr_info.rs`
+      - added `subr-arity` override `(0 . 1)` for `input-pending-p`.
+    - `test/neovm/vm-compat/cases/input-pending-semantics.forms`
+    - `test/neovm/vm-compat/cases/input-pending-semantics.expected.tsv`
+    - `test/neovm/vm-compat/cases/default.list`
+      - added oracle lock-in for baseline nil, cons/non-cons unread queue detection, non-consuming behavior, optional-arg acceptance, and arity error payload.
+  - verified:
+    - `cargo test --manifest-path rust/neovm-core/Cargo.toml input_pending_p -- --nocapture` (pass)
+    - `cargo test --manifest-path rust/neovm-core/Cargo.toml registry_contains_common_builtins -- --nocapture` (pass)
+    - `make -C test/neovm/vm-compat check-builtin-registry-fboundp` (pass)
+    - `make -C test/neovm/vm-compat check-one-neovm CASE=cases/input-pending-semantics` (pass, 10/10)
+    - `make -C test/neovm/vm-compat check-one-neovm CASE=cases/input-batch-readers` (pass, 70/70)
+    - `make -C test/neovm/vm-compat validate-case-lists` (pass)
 
 - Fixed dynamic `unread-command-events` consumption semantics for input readers and locked oracle coverage:
   - updated:
