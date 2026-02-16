@@ -60,6 +60,26 @@ Last updated: 2026-02-16
 
 ## Done
 
+- Aligned window command buffer-designator type errors with GNU Emacs:
+  - changed buffer designator resolution used by:
+    - `switch-to-buffer`
+    - `display-buffer`
+    - `pop-to-buffer`
+    - `set-window-buffer`
+  - dropped integer buffer-id acceptance from Lisp-facing designators.
+  - non-buffer/non-string values now signal:
+    - `(wrong-type-argument stringp VALUE)`
+  - added unit regression:
+    - `switch_display_pop_reject_non_buffer_designators`
+  - added oracle corpus case:
+    - `test/neovm/vm-compat/cases/window-buffer-designator-errors-semantics.{forms,expected.tsv}`
+  - wired into:
+    - `test/neovm/vm-compat/cases/default.list`
+  - verified:
+    - `cargo test --manifest-path rust/neovm-core/Cargo.toml switch_display_pop_reject_non_buffer_designators -- --nocapture` (pass)
+    - `make -C test/neovm/vm-compat check-one-neovm CASE=cases/window-buffer-designator-errors-semantics` (pass)
+    - `make -C test/neovm/vm-compat check-all-neovm-strict` (pass)
+
 - Added builtin registry function-kind parity guard to strict vm-compat:
   - added strict checker:
     - `test/neovm/vm-compat/check-builtin-registry-function-kind.sh`
