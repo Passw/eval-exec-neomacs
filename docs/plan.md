@@ -10180,6 +10180,21 @@ Last updated: 2026-02-16
     - `cargo test --manifest-path rust/neovm-core/Cargo.toml subr_arity_replace_window_io_helpers_match_oracle` (pass)
     - `make -C test/neovm/vm-compat check-one-neovm CASE=cases/select-frame-semantics` (pass, 7/7)
     - `make -C test/neovm/vm-compat check-all-neovm-strict` (pass)
+- Implemented `select-frame-set-input-focus` with oracle-locked parity:
+  - runtime changes:
+    - added evaluator dispatch with Emacs arity `(1 . 2)`
+    - aligned error payloads to `(wrong-type-argument frame-live-p VALUE)` for nil/non-frame/stale designators
+    - selecting target frame updates current buffer via selected window and returns `nil` (matching oracle)
+    - registered builtin for `fboundp`/`symbol-function`/`subr-arity` parity without marking it interactive
+  - added and enabled oracle corpus:
+    - `test/neovm/vm-compat/cases/select-frame-set-input-focus-semantics.forms`
+    - `test/neovm/vm-compat/cases/select-frame-set-input-focus-semantics.expected.tsv`
+    - `test/neovm/vm-compat/cases/default.list`
+  - verified:
+    - `NEOVM_ORACLE_EMACS=/nix/store/hql3zwz5b4ywd2qwx8jssp4dyb7nx4cb-emacs-30.2/bin/emacs make -C test/neovm/vm-compat record FORMS=cases/select-frame-set-input-focus-semantics.forms EXPECTED=cases/select-frame-set-input-focus-semantics.expected.tsv` (pass)
+    - `cargo test --manifest-path rust/neovm-core/Cargo.toml select_frame_set_input_focus_arity_designators_and_result` (pass)
+    - `make -C test/neovm/vm-compat check-one-neovm CASE=cases/select-frame-set-input-focus-semantics` (pass, 8/8)
+    - `make -C test/neovm/vm-compat check-all-neovm-strict` (pass)
 
 ## Doing
 
@@ -10188,13 +10203,13 @@ Last updated: 2026-02-16
   - run oracle/parity checks after each behavior-affecting change
   - remove dead helper code that is not part of exposed compatibility surface
 - Identify the next high-impact builtin still stubbed in NeoVM core and land it as a small implementation + oracle-corpus lock-in slice.
-  - current focus: continue targeted frame/window semantic parity lock-ins (designator + error payload precision), then pivot to next evaluator-backed stub replacement (next likely `select-frame-set-input-focus`)
+  - current focus: continue targeted frame/window semantic parity lock-ins (designator + error payload precision), then pivot to next evaluator-backed stub replacement
 - Reduce vm-compat operator friction for large case sets (small Makefile UX improvements).
   - added list-driven targets: `record-list`, `check-list`, `check-neovm-list` with `LIST=cases/<name>.list`
 
 ## Next
 
 1. Keep `check-all-neovm` as a recurring post-slice gate (detect regressions before they batch up).
-2. Continue frame/window semantic lock-ins for non-arity behavior drifts (designator/type payload precision), starting with `select-frame-set-input-focus`.
+2. Continue frame/window semantic lock-ins for non-arity behavior drifts (designator/type payload precision), next around `frame-terminal`/display frame-designator surfaces.
 3. Continue `subr-arity` oracle cluster slices until next `check-builtin-registry-fboundp` drift report meaningfully drops.
 4. Keep Rust backend behind compile-time switch and preserve Emacs C core as default backend.
