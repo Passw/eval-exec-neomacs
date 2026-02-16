@@ -505,6 +505,16 @@ fn subr_arity_value(name: &str) -> Value {
         "x-open-connection" => arity_cons(1, Some(3)),
         "internal-show-cursor" => arity_cons(2, Some(2)),
         "display-buffer" => arity_cons(1, Some(3)),
+        "clear-font-cache" => arity_cons(0, Some(0)),
+        "clear-image-cache" => arity_cons(0, Some(2)),
+        "create-image" => arity_cons(1, None),
+        "find-font" => arity_cons(1, Some(2)),
+        "font-family-list" => arity_cons(0, Some(1)),
+        "image-flush" | "image-mask-p" => arity_cons(1, Some(2)),
+        "image-size" | "image-type" => arity_cons(1, Some(3)),
+        "image-transforms-p" => arity_cons(0, Some(1)),
+        "image-type-available-p" => arity_cons(1, Some(1)),
+        "list-fonts" => arity_cons(1, Some(4)),
         "frame-parameter" | "set-window-point" => arity_cons(2, Some(2)),
         "set-window-buffer" | "set-window-start" => arity_cons(2, Some(3)),
         "fit-window-to-buffer" => arity_cons(0, Some(6)),
@@ -909,6 +919,22 @@ mod tests {
         assert_subr_arity("x-display-grayscale-p", 0, Some(1));
         assert_subr_arity("x-display-pixel-width", 0, Some(1));
         assert_subr_arity("x-display-pixel-height", 0, Some(1));
+    }
+
+    #[test]
+    fn subr_arity_image_font_primitives_match_oracle() {
+        assert_subr_arity("clear-font-cache", 0, Some(0));
+        assert_subr_arity("clear-image-cache", 0, Some(2));
+        assert_subr_arity("create-image", 1, None);
+        assert_subr_arity("find-font", 1, Some(2));
+        assert_subr_arity("font-family-list", 0, Some(1));
+        assert_subr_arity("image-flush", 1, Some(2));
+        assert_subr_arity("image-mask-p", 1, Some(2));
+        assert_subr_arity("image-size", 1, Some(3));
+        assert_subr_arity("image-transforms-p", 0, Some(1));
+        assert_subr_arity("image-type", 1, Some(3));
+        assert_subr_arity("image-type-available-p", 1, Some(1));
+        assert_subr_arity("list-fonts", 1, Some(4));
     }
 
     #[test]
