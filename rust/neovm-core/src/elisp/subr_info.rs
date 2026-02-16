@@ -553,6 +553,12 @@ fn subr_arity_value(name: &str) -> Value {
         "line-pixel-height" => arity_cons(0, Some(0)),
         "recenter-top-bottom" => arity_cons(0, Some(1)),
         "recursion-depth" | "region-beginning" | "region-end" => arity_cons(0, Some(0)),
+        "delete-frame" | "delete-other-windows" => arity_cons(0, Some(2)),
+        "next-window" | "previous-window" | "pos-visible-in-window-p" => arity_cons(0, Some(3)),
+        "pop-to-buffer" => arity_cons(1, Some(3)),
+        "move-to-window-line" | "move-point-visually" => arity_cons(1, Some(1)),
+        "modify-frame-parameters" => arity_cons(2, Some(2)),
+        "make-frame" => arity_cons(0, Some(1)),
         "called-interactively-p" | "float-time" => arity_cons(0, Some(1)),
         "featurep" => arity_cons(1, Some(2)),
         "commandp" => arity_cons(1, Some(2)),
@@ -1780,6 +1786,20 @@ mod tests {
         assert_subr_arity("query-replace", 2, Some(7));
         assert_subr_arity("query-replace-regexp", 2, Some(7));
         assert_subr_arity("quoted-insert", 1, Some(1));
+    }
+
+    #[test]
+    fn subr_arity_window_navigation_helpers_match_oracle() {
+        assert_subr_arity("delete-frame", 0, Some(2));
+        assert_subr_arity("delete-other-windows", 0, Some(2));
+        assert_subr_arity("next-window", 0, Some(3));
+        assert_subr_arity("previous-window", 0, Some(3));
+        assert_subr_arity("pop-to-buffer", 1, Some(3));
+        assert_subr_arity("pos-visible-in-window-p", 0, Some(3));
+        assert_subr_arity("move-to-window-line", 1, Some(1));
+        assert_subr_arity("move-point-visually", 1, Some(1));
+        assert_subr_arity("modify-frame-parameters", 2, Some(2));
+        assert_subr_arity("make-frame", 0, Some(1));
     }
 
     #[test]

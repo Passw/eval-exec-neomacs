@@ -279,6 +279,7 @@ cases/display-images-face-support-semantics
 cases/display-frame-designator-semantics
 cases/display-terminal-subr-arity-semantics
 cases/display-control-subr-arity-semantics
+cases/window-nav-helper-subr-arity-semantics
 cases/display-tty-x-helper-semantics
 cases/frame-window-designator-boundary-semantics
 cases/window-frame-subr-arity-semantics
