@@ -19,6 +19,21 @@ Last updated: 2026-02-16
 
 ## Done
 
+- Enforced buffer metadata helper arity contracts:
+  - updated:
+    - `rust/neovm-core/src/elisp/builtins.rs`
+      - `buffer-size` and `buffer-modified-p` now enforce max arity `1`.
+      - `buffer-list` now enforces max arity `1`.
+    - added corpus:
+      - `test/neovm/vm-compat/cases/buffer-metadata-arity-semantics.{forms,expected.tsv}`
+        - locks over-arity signaling and core return-shape behavior for the updated builtins.
+    - `test/neovm/vm-compat/cases/default.list`
+      - added `cases/buffer-metadata-arity-semantics`.
+  - verified:
+    - `make -C test/neovm/vm-compat check-one-neovm CASE=cases/buffer-metadata-arity-semantics` (pass, 11/11)
+    - `make -C test/neovm/vm-compat validate-case-lists` (pass)
+    - `make -C test/neovm/vm-compat check-all-neovm` (pass, full default + neovm-only corpus)
+
 - Enforced zero-arity buffer state helper semantics:
   - updated:
     - `rust/neovm-core/src/elisp/builtins.rs`
