@@ -4948,17 +4948,20 @@ pub(crate) fn builtin_buffer_size(
     args: Vec<Value>,
 ) -> EvalResult {
     expect_max_args("buffer-size", &args, 1)?;
-    let buf = if args.is_empty() || matches!(args[0], Value::Nil) {
-        eval.buffers
+    if args.is_empty() || matches!(args[0], Value::Nil) {
+        let buf = eval
+            .buffers
             .current_buffer()
-            .ok_or_else(|| signal("error", vec![Value::string("No current buffer")]))?
+            .ok_or_else(|| signal("error", vec![Value::string("No current buffer")]))?;
+        return Ok(Value::Int(buf.text.char_count() as i64));
+    }
+
+    let id = expect_buffer_id(&args[0])?;
+    if let Some(buf) = eval.buffers.get(id) {
+        Ok(Value::Int(buf.text.char_count() as i64))
     } else {
-        let id = expect_buffer_id(&args[0])?;
-        eval.buffers
-            .get(id)
-            .ok_or_else(|| signal("error", vec![Value::string("No such buffer")]))?
-    };
-    Ok(Value::Int(buf.text.char_count() as i64))
+        Ok(Value::Int(0))
+    }
 }
 
 /// (narrow-to-region START END) → nil
@@ -4998,17 +5001,20 @@ pub(crate) fn builtin_buffer_modified_p(
     args: Vec<Value>,
 ) -> EvalResult {
     expect_max_args("buffer-modified-p", &args, 1)?;
-    let buf = if args.is_empty() || matches!(args[0], Value::Nil) {
-        eval.buffers
+    if args.is_empty() || matches!(args[0], Value::Nil) {
+        let buf = eval
+            .buffers
             .current_buffer()
-            .ok_or_else(|| signal("error", vec![Value::string("No current buffer")]))?
+            .ok_or_else(|| signal("error", vec![Value::string("No current buffer")]))?;
+        return Ok(Value::bool(buf.is_modified()));
+    }
+
+    let id = expect_buffer_id(&args[0])?;
+    if let Some(buf) = eval.buffers.get(id) {
+        Ok(Value::bool(buf.is_modified()))
     } else {
-        let id = expect_buffer_id(&args[0])?;
-        eval.buffers
-            .get(id)
-            .ok_or_else(|| signal("error", vec![Value::string("No such buffer")]))?
-    };
-    Ok(Value::bool(buf.is_modified()))
+        Ok(Value::Nil)
+    }
 }
 
 /// (set-buffer-modified-p FLAG) → FLAG
@@ -10024,6 +10030,23 @@ mod tests {
             }
             other => panic!("unexpected flow: {other:?}"),
         }
+    }
+
+    #[test]
+    fn buffer_size_and_modified_p_return_defaults_for_deleted_buffer_objects() {
+        let mut eval = super::super::eval::Evaluator::new();
+
+        let dead_for_size =
+            builtin_generate_new_buffer(&mut eval, vec![Value::string("*bs-dead*")]).unwrap();
+        let _ = builtin_kill_buffer(&mut eval, vec![dead_for_size.clone()]).unwrap();
+        let size = builtin_buffer_size(&mut eval, vec![dead_for_size]).unwrap();
+        assert_eq!(size, Value::Int(0));
+
+        let dead_for_modified =
+            builtin_generate_new_buffer(&mut eval, vec![Value::string("*bm-dead*")]).unwrap();
+        let _ = builtin_kill_buffer(&mut eval, vec![dead_for_modified.clone()]).unwrap();
+        let modified = builtin_buffer_modified_p(&mut eval, vec![dead_for_modified]).unwrap();
+        assert_eq!(modified, Value::Nil);
     }
 
     #[test]
