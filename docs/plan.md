@@ -19,6 +19,24 @@ Last updated: 2026-02-16
 
 ## Done
 
+- Implemented oracle-aligned `extract-rectangle` semantics and locked compatibility corpus coverage:
+  - updated:
+    - `rust/neovm-core/src/elisp/rect.rs`
+      - implemented START/END column extraction using current buffer text instead of empty-string stubs.
+      - mirrored Emacs `apply-on-rectangle` line traversal shape: iterate downward from START line to END line, with START-below-END collapsing to a single-line extraction.
+      - added clamped position handling and space-padding when rectangle columns extend past line ends.
+      - added focused unit coverage for basic extraction, START/END line-order asymmetry, and out-of-range clamping behavior.
+    - `test/neovm/vm-compat/cases/rect-extract-semantics.forms`
+      - added oracle-backed probes for same-line extraction, clamped positions, START/END asymmetry across lines, and type-error classification.
+    - `test/neovm/vm-compat/cases/rect-extract-semantics.expected.tsv`
+      - recorded oracle baseline outputs for the new extraction corpus.
+    - `test/neovm/vm-compat/cases/default.list`
+      - added `cases/rect-extract-semantics` to recurring default compatibility execution.
+  - verified:
+    - `cargo test extract_rectangle --manifest-path rust/neovm-core/Cargo.toml` (pass)
+    - `make -C test/neovm/vm-compat check-one-neovm CASE=cases/rect-extract-semantics` (pass, 9/9)
+    - `make -C test/neovm/vm-compat check-all-neovm` (pass)
+
 - Implemented evaluator-aware charset region/point semantics and locked oracle corpus coverage:
   - updated:
     - `rust/neovm-core/src/elisp/charset.rs`
