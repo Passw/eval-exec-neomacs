@@ -517,6 +517,34 @@ pub(crate) fn builtin_bookmark_get_annotation(
     Ok(annotation)
 }
 
+/// (bookmark-set-annotation BOOKMARK ANNOTATION) -> annotation string or nil
+///
+/// BOOKMARK is a bookmark name.  If missing, returns nil.
+pub(crate) fn builtin_bookmark_set_annotation(
+    eval: &mut super::eval::Evaluator,
+    args: Vec<Value>,
+) -> EvalResult {
+    expect_args("bookmark-set-annotation", &args, 2)?;
+    let name = expect_string(&args[0])?;
+    let annotation = if args[1].is_nil() {
+        None
+    } else {
+        Some(expect_string(&args[1])?)
+    };
+
+    if let Some(mut bm) = eval.bookmarks.get(&name).cloned() {
+        bm.annotation = annotation.clone();
+        eval.bookmarks.set(&name, bm);
+        if let Some(value) = annotation {
+            Ok(Value::string(value))
+        } else {
+            Ok(Value::Nil)
+        }
+    } else {
+        Ok(Value::Nil)
+    }
+}
+
 /// (bookmark-save) -> string
 ///
 /// Serialize all bookmarks and return the string.  In a real Emacs this
@@ -933,6 +961,31 @@ mod tests {
 
         let missing =
             builtin_bookmark_get_annotation(&mut eval, vec![Value::string("missing")]).unwrap();
+        assert!(missing.is_nil());
+    }
+
+    #[test]
+    fn test_builtin_bookmark_set_annotation() {
+        use super::super::eval::Evaluator;
+
+        let mut eval = Evaluator::new();
+        builtin_bookmark_set(&mut eval, vec![Value::string("entry")]).unwrap();
+
+        let set_result = builtin_bookmark_set_annotation(
+            &mut eval,
+            vec![Value::string("entry"), Value::string("note")],
+        )
+        .unwrap();
+        assert_eq!(set_result.as_str(), Some("note"));
+
+        let got = builtin_bookmark_get_annotation(&mut eval, vec![Value::string("entry")]).unwrap();
+        assert_eq!(got.as_str(), Some("note"));
+
+        let missing = builtin_bookmark_set_annotation(
+            &mut eval,
+            vec![Value::string("missing"), Value::string("note")],
+        )
+        .unwrap();
         assert!(missing.is_nil());
     }
 

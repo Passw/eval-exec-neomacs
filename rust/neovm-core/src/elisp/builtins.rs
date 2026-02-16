@@ -6244,6 +6244,9 @@ pub(crate) fn dispatch_builtin(
         "bookmark-get-annotation" => {
             return Some(super::bookmark::builtin_bookmark_get_annotation(eval, args))
         }
+        "bookmark-set-annotation" => {
+            return Some(super::bookmark::builtin_bookmark_set_annotation(eval, args))
+        }
         "bookmark-save" => return Some(super::bookmark::builtin_bookmark_save(eval, args)),
         "bookmark-load" => return Some(super::bookmark::builtin_bookmark_load(eval, args)),
         // Abbreviation operations (evaluator-dependent)

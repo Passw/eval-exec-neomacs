@@ -6,5 +6,5 @@
 6	(condition-case err (bookmark-get-position "x") (error err))	OK nil
 7	(fboundp 'bookmark-get-annotation)	OK t
 8	(condition-case err (bookmark-get-annotation "x") (error err))	OK nil
-9	(fboundp 'bookmark-set-annotation)	OK nil
-10	(condition-case err (bookmark-set-annotation "x" "a") (error err))	OK (void-function bookmark-set-annotation)
+9	(fboundp 'bookmark-set-annotation)	OK t
+10	(condition-case err (bookmark-set-annotation "x" "a") (error err))	OK nil
