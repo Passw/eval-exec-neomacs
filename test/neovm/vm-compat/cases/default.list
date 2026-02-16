@@ -318,6 +318,7 @@ cases/process-error-conditions
 cases/process-basics
 cases/process-subr-arity-semantics
 cases/getenv-optional-frame-semantics
+cases/setenv-sequence-semantics
 cases/file-name-concat
 cases/path-predicates
 cases/file-stat-predicate-subr-arity-semantics

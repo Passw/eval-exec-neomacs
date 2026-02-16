@@ -200,6 +200,70 @@ fn expect_string(value: &Value) -> Result<String, Flow> {
     }
 }
 
+fn signal_wrong_type_sequence(value: Value) -> Flow {
+    signal(
+        "wrong-type-argument",
+        vec![Value::symbol("sequencep"), value],
+    )
+}
+
+fn signal_wrong_type_character(value: Value) -> Flow {
+    signal(
+        "wrong-type-argument",
+        vec![Value::symbol("characterp"), value],
+    )
+}
+
+fn char_from_codepoint_value(value: &Value) -> Result<char, Flow> {
+    match value {
+        Value::Char(c) => Ok(*c),
+        Value::Int(n) if *n >= 0 => char::from_u32(*n as u32)
+            .ok_or_else(|| signal_wrong_type_character(value.clone())),
+        _ => Err(signal_wrong_type_character(value.clone())),
+    }
+}
+
+fn sequence_value_to_env_string(value: &Value) -> Result<String, Flow> {
+    match value {
+        Value::Str(s) => Ok((**s).clone()),
+        Value::Vector(items) => {
+            let chars = items
+                .lock()
+                .expect("poisoned")
+                .iter()
+                .cloned()
+                .map(|item| char_from_codepoint_value(&item))
+                .collect::<Result<Vec<_>, _>>()?;
+            Ok(chars.into_iter().collect())
+        }
+        Value::Cons(_) | Value::Nil => {
+            let mut out = String::new();
+            let mut cursor = value.clone();
+            loop {
+                match cursor {
+                    Value::Nil => break,
+                    Value::Cons(cell) => {
+                        let (car, cdr) = {
+                            let pair = cell.lock().expect("poisoned");
+                            (pair.car.clone(), pair.cdr.clone())
+                        };
+                        out.push(char_from_codepoint_value(&car)?);
+                        cursor = cdr;
+                    }
+                    tail => {
+                        return Err(signal(
+                            "wrong-type-argument",
+                            vec![Value::symbol("listp"), tail],
+                        ))
+                    }
+                }
+            }
+            Ok(out)
+        }
+        other => Err(signal_wrong_type_sequence(other.clone())),
+    }
+}
+
 fn expect_int_or_marker(value: &Value) -> Result<i64, Flow> {
     match value {
         Value::Int(n) => Ok(*n),
@@ -903,7 +967,7 @@ pub(crate) fn builtin_getenv(args: Vec<Value>) -> EvalResult {
             ));
         }
     }
-    let name = expect_string(&args[0])?;
+    let name = expect_string_strict(&args[0])?;
     match std::env::var(&name) {
         Ok(val) => Ok(Value::string(val)),
         Err(_) => Ok(Value::Nil),
@@ -916,16 +980,28 @@ pub(crate) fn builtin_getenv(args: Vec<Value>) -> EvalResult {
 /// or omitted, removes the variable.
 pub(crate) fn builtin_setenv(args: Vec<Value>) -> EvalResult {
     expect_min_args("setenv", &args, 1)?;
-    let name = expect_string(&args[0])?;
+    if args.len() > 3 {
+        return Err(signal(
+            "wrong-number-of-arguments",
+            vec![Value::symbol("setenv"), Value::Int(args.len() as i64)],
+        ));
+    }
+    let name = expect_string_strict(&args[0])?;
 
     if args.len() > 1 && !args[1].is_nil() {
-        let value = expect_string(&args[1])?;
+        let env_value = if args.len() > 2 && args[2].is_truthy() {
+            let substituted =
+                super::fileio::builtin_substitute_in_file_name(vec![args[1].clone()])?;
+            expect_string_strict(&substituted)?
+        } else {
+            sequence_value_to_env_string(&args[1])?
+        };
         // Safety: this is single-threaded for the Elisp VM, so setting env
         // vars is acceptable.
         unsafe {
-            std::env::set_var(&name, &value);
+            std::env::set_var(&name, &env_value);
         }
-        Ok(Value::string(value))
+        Ok(args[1].clone())
     } else {
         unsafe {
             std::env::remove_var(&name);
@@ -1441,6 +1517,12 @@ mod tests {
     }
 
     #[test]
+    fn getenv_name_must_be_string() {
+        let result = eval_one(r#"(condition-case err (getenv nil) (error err))"#);
+        assert_eq!(result, "OK (wrong-type-argument stringp nil)");
+    }
+
+    #[test]
     fn getenv_accepts_optional_nil_frame_arg() {
         let result = eval_one(
             r#"(condition-case err
@@ -1482,6 +1564,79 @@ mod tests {
                (getenv "NEOVM_TEST_UNSET")"#,
         );
         assert_eq!(results[2], "OK nil");
+    }
+
+    #[test]
+    fn setenv_name_must_be_string() {
+        let result = eval_one(r#"(condition-case err (setenv nil "v") (error err))"#);
+        assert_eq!(result, "OK (wrong-type-argument stringp nil)");
+    }
+
+    #[test]
+    fn setenv_accepts_sequence_value_and_sets_environment() {
+        let vector_result = eval_one(
+            r#"(let ((old (getenv "NEOVM_TEST_SETENV_SEQ")))
+                 (unwind-protect
+                     (progn
+                       (setenv "NEOVM_TEST_SETENV_SEQ" [118 97 108])
+                       (getenv "NEOVM_TEST_SETENV_SEQ"))
+                   (setenv "NEOVM_TEST_SETENV_SEQ" old)))"#,
+        );
+        assert_eq!(vector_result, r#"OK "val""#);
+
+        let list_result = eval_one(
+            r#"(let ((old (getenv "NEOVM_TEST_SETENV_SEQ")))
+                 (unwind-protect
+                     (progn
+                       (setenv "NEOVM_TEST_SETENV_SEQ" '(118 97 108))
+                       (getenv "NEOVM_TEST_SETENV_SEQ"))
+                   (setenv "NEOVM_TEST_SETENV_SEQ" old)))"#,
+        );
+        assert_eq!(list_result, r#"OK "val""#);
+    }
+
+    #[test]
+    fn setenv_substitute_flag_controls_expansion_and_requires_string() {
+        let unsubstituted = eval_one(
+            r#"(let ((old (getenv "NEOVM_TEST_SETENV_SEQ")))
+                 (unwind-protect
+                     (progn
+                       (setenv "NEOVM_TEST_SETENV_SEQ" "$HOME")
+                       (getenv "NEOVM_TEST_SETENV_SEQ"))
+                   (setenv "NEOVM_TEST_SETENV_SEQ" old)))"#,
+        );
+        assert_eq!(unsubstituted, r#"OK "$HOME""#);
+
+        let substituted = eval_one(
+            r#"(let ((old (getenv "NEOVM_TEST_SETENV_SEQ")))
+                 (unwind-protect
+                     (progn
+                       (setenv "NEOVM_TEST_SETENV_SEQ" "$HOME" t)
+                       (getenv "NEOVM_TEST_SETENV_SEQ"))
+                   (setenv "NEOVM_TEST_SETENV_SEQ" old)))"#,
+        );
+        assert!(substituted.starts_with("OK \""));
+        assert_ne!(substituted, r#"OK "$HOME""#);
+
+        let type_err = eval_one(
+            r#"(condition-case err (setenv "NEOVM_TEST_SETENV_SEQ" [118 97 108] t) (error err))"#,
+        );
+        assert_eq!(type_err, "OK (wrong-type-argument stringp [118 97 108])");
+    }
+
+    #[test]
+    fn setenv_rejects_non_sequence_value() {
+        let result =
+            eval_one(r#"(condition-case err (setenv "NEOVM_TEST_SETENV_SEQ" 1) (error err))"#);
+        assert_eq!(result, "OK (wrong-type-argument sequencep 1)");
+    }
+
+    #[test]
+    fn setenv_rejects_too_many_args() {
+        let result = eval_one(
+            r#"(condition-case err (setenv "NEOVM_TEST_SETENV_SEQ" "v" nil nil) (error (car err)))"#,
+        );
+        assert_eq!(result, "OK wrong-number-of-arguments");
     }
 
     #[test]

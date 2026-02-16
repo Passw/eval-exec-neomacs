@@ -486,6 +486,7 @@ fn subr_arity_value(name: &str) -> Value {
         }
         "process-list" => arity_cons(0, Some(0)),
         "process-send-string" => arity_cons(2, Some(2)),
+        "setenv" => arity_cons(1, Some(3)),
         "start-process" => arity_cons(3, None),
         "getenv" => arity_cons(1, Some(2)),
         // Display/terminal query primitives
@@ -890,6 +891,7 @@ mod tests {
         assert_subr_arity("process-name", 1, Some(1));
         assert_subr_arity("process-send-string", 2, Some(2));
         assert_subr_arity("process-status", 1, Some(1));
+        assert_subr_arity("setenv", 1, Some(3));
         assert_subr_arity("start-process", 3, None);
     }
 
