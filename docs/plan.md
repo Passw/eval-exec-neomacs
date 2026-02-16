@@ -21,6 +21,18 @@ Last updated: 2026-02-16
 
 ## Done
 
+- Added oracle lock-in corpus for keymap parent relationships:
+  - updated:
+    - `test/neovm/vm-compat/cases/keymap-parent-semantics.forms`
+      - added probes for `keymap-parent` / `set-keymap-parent` parent-link behavior, reset-to-nil behavior, and arity/type error paths.
+    - `test/neovm/vm-compat/cases/keymap-parent-semantics.expected.tsv`
+      - recorded oracle baseline outputs for keymap parent semantics.
+    - `test/neovm/vm-compat/cases/default.list`
+      - added `cases/keymap-parent-semantics` to recurring default compatibility execution.
+  - verified:
+    - `make -C test/neovm/vm-compat check-one-neovm CASE=cases/keymap-parent-semantics` (pass, 8/8)
+    - `make -C test/neovm/vm-compat validate-case-lists` (pass)
+
 - Aligned `current-global-map` bootstrap behavior with oracle and added keymap map-selection corpus lock-in:
   - updated:
     - `rust/neovm-core/src/elisp/builtins.rs`
