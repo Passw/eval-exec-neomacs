@@ -1,8 +1,8 @@
-1	(fboundp 'string-chop-newline)	OK t
-2	(condition-case err (string-chop-newline "x\n") (error err))	OK "x"
-3	(fboundp 'string-pad)	OK t
-4	(condition-case err (string-pad "x" 2) (error err))	OK "x "
-5	(fboundp 'string-fill)	OK t
-6	(condition-case err (string-fill "x" 2) (error err))	OK "x"
-7	(fboundp 'string-limit)	OK t
-8	(condition-case err (string-limit "x" 2) (error err))	OK "x"
+1	(fboundp 'string-chop-newline)	OK nil
+2	(condition-case err (string-chop-newline "x\n") (error err))	OK (void-function string-chop-newline)
+3	(fboundp 'string-pad)	OK nil
+4	(condition-case err (string-pad "x" 2) (error err))	OK (void-function string-pad)
+5	(fboundp 'string-fill)	OK nil
+6	(condition-case err (string-fill "x" 2) (error err))	OK (void-function string-fill)
+7	(fboundp 'string-limit)	OK nil
+8	(condition-case err (string-limit "x" 2) (error err))	OK (void-function string-limit)
