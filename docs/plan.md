@@ -19,6 +19,7 @@ Last updated: 2026-02-16
 - Keep newly landed filesystem/path primitive `subr-arity` parity stable while expanding command/display slices.
 - Keep newly landed event/error/misc primitive `subr-arity` parity stable while expanding remaining command-loop slices.
 - Keep newly landed `eval*` primitive runtime+`subr-arity` parity stable while expanding remaining startup drifts.
+- Keep newly landed startup-helper primitive `subr-arity` parity stable while expanding remaining high-volume drifts.
 
 ## Next
 
@@ -30,6 +31,28 @@ Last updated: 2026-02-16
 6. Expand `recent-keys` capture beyond `read*` consumers to eventual command-loop event publication.
 
 ## Done
+
+- Aligned startup-helper primitive `subr-arity` metadata with GNU Emacs:
+  - updated:
+    - `rust/neovm-core/src/elisp/subr_info.rs`
+      - added explicit arity overrides:
+        - `(2 . 3)`: `add-name-to-file`
+        - `(3 . 4)`: `add-text-properties`
+        - `(2 . 2)`: `add-variable-watcher`
+        - `(1 . 3)`: `autoload-do-load`
+        - `(1 . 2)`: `backtrace-frame`
+      - extended unit matrix `subr_arity_hook_advice_primitives_match_oracle`.
+    - `test/neovm/vm-compat/cases/startup-helper-subr-arity-semantics.forms`
+    - `test/neovm/vm-compat/cases/startup-helper-subr-arity-semantics.expected.tsv`
+    - `test/neovm/vm-compat/cases/default.list`
+      - added oracle lock-in case for startup-helper arity payloads.
+  - recorded with official GNU Emacs:
+    - `NEOVM_ORACLE_EMACS=/nix/store/hql3zwz5b4ywd2qwx8jssp4dyb7nx4cb-emacs-30.2/bin/emacs make -C test/neovm/vm-compat record FORMS=cases/startup-helper-subr-arity-semantics.forms EXPECTED=cases/startup-helper-subr-arity-semantics.expected.tsv` (pass)
+  - verified:
+    - `cargo test --manifest-path rust/neovm-core/Cargo.toml subr_arity_hook_advice_primitives_match_oracle -- --nocapture` (pass)
+    - `make -C test/neovm/vm-compat check-one-neovm CASE=cases/startup-helper-subr-arity-semantics` (pass, 5/5)
+    - `make -C test/neovm/vm-compat validate-case-lists` (pass)
+    - `make -C test/neovm/vm-compat check-builtin-registry-fboundp` (pass; allowlisted drift only: `neovm-precompile-file`)
 
 - Aligned `eval*` primitive runtime arity behavior and `subr-arity` metadata with GNU Emacs:
   - updated:
