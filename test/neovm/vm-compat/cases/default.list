@@ -55,6 +55,7 @@ cases/encoding-bool-vector-subr-arity-semantics
 cases/command-timer-subr-arity-semantics
 cases/command-read-subr-arity-semantics
 cases/read-core-subr-arity-semantics
+cases/input-mode-subr-arity-semantics
 cases/keymap-keyboard-subr-arity-semantics
 cases/kill-edit-subr-arity-semantics
 cases/kmacro-command-subr-arity-semantics

@@ -575,9 +575,8 @@ fn subr_arity_value(name: &str) -> Value {
         "discard-input" => arity_cons(0, Some(0)),
         "current-input-mode" => arity_cons(0, Some(0)),
         "set-input-mode" => arity_cons(3, Some(4)),
-        "set-input-interrupt-mode" | "set-input-meta-mode" | "set-quit-char" => {
-            arity_cons(1, Some(1))
-        }
+        "set-input-meta-mode" => arity_cons(1, Some(2)),
+        "set-input-interrupt-mode" | "set-quit-char" => arity_cons(1, Some(1)),
         "set-output-flow-control" => arity_cons(1, Some(2)),
         "waiting-for-user-input-p" => arity_cons(0, Some(0)),
         "minibufferp" => arity_cons(0, Some(2)),
@@ -1354,6 +1353,19 @@ mod tests {
         assert_subr_arity("read-variable", 1, Some(2));
         assert_subr_arity("read-from-string", 1, Some(3));
         assert_subr_arity("read-command", 1, Some(2));
+    }
+
+    #[test]
+    fn subr_arity_input_mode_primitives_match_oracle() {
+        assert_subr_arity("current-input-mode", 0, Some(0));
+        assert_subr_arity("set-input-mode", 3, Some(4));
+        assert_subr_arity("set-input-interrupt-mode", 1, Some(1));
+        assert_subr_arity("set-input-meta-mode", 1, Some(2));
+        assert_subr_arity("set-output-flow-control", 1, Some(2));
+        assert_subr_arity("set-quit-char", 1, Some(1));
+        assert_subr_arity("input-pending-p", 0, Some(1));
+        assert_subr_arity("discard-input", 0, Some(0));
+        assert_subr_arity("waiting-for-user-input-p", 0, Some(0));
     }
 
     #[test]
