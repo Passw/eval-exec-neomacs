@@ -547,11 +547,37 @@ pub(crate) fn builtin_multibyte_char_to_unibyte(args: Vec<Value>) -> EvalResult 
 }
 
 /// `(locale-info ITEM)` -- minimal locale info.
-/// Returns "UTF-8" for symbol ITEM `codeset`; nil otherwise.
+/// Returns a small oracle-aligned subset in batch mode.
 pub(crate) fn builtin_locale_info(args: Vec<Value>) -> EvalResult {
     expect_args("locale-info", &args, 1)?;
     match &args[0] {
         Value::Symbol(item) if item == "codeset" => Ok(Value::string("UTF-8")),
+        Value::Symbol(item) if item == "days" => Ok(Value::vector(vec![
+            Value::string("Sunday"),
+            Value::string("Monday"),
+            Value::string("Tuesday"),
+            Value::string("Wednesday"),
+            Value::string("Thursday"),
+            Value::string("Friday"),
+            Value::string("Saturday"),
+        ])),
+        Value::Symbol(item) if item == "months" => Ok(Value::vector(vec![
+            Value::string("January"),
+            Value::string("February"),
+            Value::string("March"),
+            Value::string("April"),
+            Value::string("May"),
+            Value::string("June"),
+            Value::string("July"),
+            Value::string("August"),
+            Value::string("September"),
+            Value::string("October"),
+            Value::string("November"),
+            Value::string("December"),
+        ])),
+        Value::Symbol(item) if item == "paper" => {
+            Ok(Value::list(vec![Value::Int(210), Value::Int(297)]))
+        }
         _ => Ok(Value::Nil),
     }
 }
@@ -968,9 +994,31 @@ mod tests {
     }
 
     #[test]
-    fn locale_info_other_items_return_nil() {
-        let result = builtin_locale_info(vec![Value::symbol("codeset")]).unwrap();
-        assert!(result.is_truthy());
+    fn locale_info_days_months_and_paper_return_oracle_shapes() {
+        let days = builtin_locale_info(vec![Value::symbol("days")]).unwrap();
+        let days_vec = match days {
+            Value::Vector(v) => v.lock().expect("days vector lock").clone(),
+            other => panic!("days should be a vector, got {other:?}"),
+        };
+        assert_eq!(days_vec.len(), 7);
+        assert_eq!(days_vec[0], Value::string("Sunday"));
+        assert_eq!(days_vec[6], Value::string("Saturday"));
+
+        let months = builtin_locale_info(vec![Value::symbol("months")]).unwrap();
+        let months_vec = match months {
+            Value::Vector(v) => v.lock().expect("months vector lock").clone(),
+            other => panic!("months should be a vector, got {other:?}"),
+        };
+        assert_eq!(months_vec.len(), 12);
+        assert_eq!(months_vec[0], Value::string("January"));
+        assert_eq!(months_vec[11], Value::string("December"));
+
+        let paper = builtin_locale_info(vec![Value::symbol("paper")]).unwrap();
+        assert_eq!(paper, Value::list(vec![Value::Int(210), Value::Int(297)]));
+    }
+
+    #[test]
+    fn locale_info_unknown_or_non_symbol_items_return_nil() {
         let result = builtin_locale_info(vec![Value::symbol("time")]).unwrap();
         assert!(result.is_nil());
         let result = builtin_locale_info(vec![Value::string("codeset")]).unwrap();
