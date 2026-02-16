@@ -504,6 +504,7 @@ fn subr_arity_value(name: &str) -> Value {
         "shell-command-to-string" | "special-form-p" | "store-kbd-macro-event"
         | "unibyte-char-to-multibyte" | "upcase-initials" | "upcase-word"
         | "use-global-map" | "use-local-map" | "view-register" => arity_cons(1, Some(1)),
+        "subr-arity" | "subr-name" | "subrp" => arity_cons(1, Some(1)),
         "signal" | "take" => arity_cons(2, Some(2)),
         "split-window" => arity_cons(0, Some(4)),
         "switch-to-buffer" => arity_cons(1, Some(3)),
@@ -513,6 +514,8 @@ fn subr_arity_value(name: &str) -> Value {
         "transpose-chars" | "transpose-lines" | "transpose-paragraphs"
         | "transpose-sentences" | "transpose-words" => arity_cons(1, Some(1)),
         "upcase-initials-region" | "upcase-region" => arity_cons(2, Some(3)),
+        "widget-get" => arity_cons(2, Some(2)),
+        "widget-put" => arity_cons(3, Some(3)),
         "widget-apply" => arity_cons(2, None),
         "where-is-internal" => arity_cons(1, Some(5)),
         "text-char-description" | "threadp" | "y-or-n-p" | "yes-or-no-p" | "zerop" => {
@@ -528,6 +531,15 @@ fn subr_arity_value(name: &str) -> Value {
         | "word-search-backward" => arity_cons(1, Some(4)),
         "add-variable-watcher" => arity_cons(2, Some(2)),
         "remove-hook" => arity_cons(2, Some(3)),
+        "remove" | "remove-variable-watcher" | "narrow-to-region" => arity_cons(2, Some(2)),
+        "remove-images" => arity_cons(2, Some(3)),
+        "replace-regexp" | "replace-string" => arity_cons(2, Some(7)),
+        "save-buffer" | "scroll-down-command" | "scroll-up-command" => arity_cons(0, Some(1)),
+        "select-window" | "minor-mode-key-binding" => arity_cons(1, Some(2)),
+        "selected-frame" => arity_cons(0, Some(0)),
+        "set-charset-priority" => arity_cons(1, None),
+        "write-region" => arity_cons(3, Some(7)),
+        "isearch-backward" | "isearch-forward" => arity_cons(0, Some(2)),
         "advice-add" => arity_cons(3, Some(4)),
         "advice-remove" | "advice-member-p" => arity_cons(2, Some(2)),
         "autoload-do-load" => arity_cons(1, Some(3)),
@@ -2054,6 +2066,31 @@ mod tests {
         assert_subr_arity("widget-apply", 2, None);
         assert_subr_arity("yank", 0, Some(1));
         assert_subr_arity("yank-pop", 0, Some(1));
+    }
+
+    #[test]
+    fn subr_arity_replace_window_io_helpers_match_oracle() {
+        assert_subr_arity("isearch-backward", 0, Some(2));
+        assert_subr_arity("isearch-forward", 0, Some(2));
+        assert_subr_arity("minor-mode-key-binding", 1, Some(2));
+        assert_subr_arity("narrow-to-region", 2, Some(2));
+        assert_subr_arity("remove", 2, Some(2));
+        assert_subr_arity("remove-images", 2, Some(3));
+        assert_subr_arity("remove-variable-watcher", 2, Some(2));
+        assert_subr_arity("replace-regexp", 2, Some(7));
+        assert_subr_arity("replace-string", 2, Some(7));
+        assert_subr_arity("save-buffer", 0, Some(1));
+        assert_subr_arity("scroll-down-command", 0, Some(1));
+        assert_subr_arity("scroll-up-command", 0, Some(1));
+        assert_subr_arity("select-window", 1, Some(2));
+        assert_subr_arity("selected-frame", 0, Some(0));
+        assert_subr_arity("set-charset-priority", 1, None);
+        assert_subr_arity("subr-arity", 1, Some(1));
+        assert_subr_arity("subr-name", 1, Some(1));
+        assert_subr_arity("subrp", 1, Some(1));
+        assert_subr_arity("widget-get", 2, Some(2));
+        assert_subr_arity("widget-put", 3, Some(3));
+        assert_subr_arity("write-region", 3, Some(7));
     }
 
     #[test]

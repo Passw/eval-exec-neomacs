@@ -73,6 +73,7 @@ cases/set-scan-subr-arity-semantics
 cases/string-syntax-helper-subr-arity-semantics
 cases/time-user-runtime-subr-arity-semantics
 cases/command-edit-runtime-subr-arity-semantics
+cases/replace-window-io-subr-arity-semantics
 cases/coding-system-subr-arity-semantics
 cases/color-subr-arity-semantics
 cases/copy-cons-subr-arity-semantics
