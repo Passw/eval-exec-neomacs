@@ -333,6 +333,10 @@ fn subr_arity_value(name: &str) -> Value {
         "bignump" | "boundp" | "byte-code-function-p" | "car-safe" | "cdr-safe" => {
             arity_cons(1, Some(1))
         }
+        "fboundp" | "func-arity" | "symbol-function" | "symbol-value" | "fmakunbound"
+        | "makunbound" => arity_cons(1, Some(1)),
+        "fset" | "set" | "get" => arity_cons(2, Some(2)),
+        "put" => arity_cons(3, Some(3)),
         "assq" | "member" | "memq" | "rassoc" | "rassq" => arity_cons(2, Some(2)),
         "assoc" => arity_cons(2, Some(3)),
         "assoc-default" => arity_cons(2, Some(4)),
@@ -1231,6 +1235,20 @@ mod tests {
         assert_subr_arity("cddadr", 1, Some(1));
         assert_subr_arity("cdddar", 1, Some(1));
         assert_subr_arity("cddddr", 1, Some(1));
+    }
+
+    #[test]
+    fn subr_arity_symbol_state_primitives_match_oracle() {
+        assert_subr_arity("fboundp", 1, Some(1));
+        assert_subr_arity("func-arity", 1, Some(1));
+        assert_subr_arity("fset", 2, Some(2));
+        assert_subr_arity("fmakunbound", 1, Some(1));
+        assert_subr_arity("makunbound", 1, Some(1));
+        assert_subr_arity("set", 2, Some(2));
+        assert_subr_arity("get", 2, Some(2));
+        assert_subr_arity("put", 3, Some(3));
+        assert_subr_arity("symbol-function", 1, Some(1));
+        assert_subr_arity("symbol-value", 1, Some(1));
     }
 
     #[test]
