@@ -19,6 +19,24 @@ Last updated: 2026-02-16
 
 ## Done
 
+- Exposed `cl-fourth` as a callable CL helper:
+  - updated:
+    - `rust/neovm-core/src/elisp/cl_lib.rs`
+      - added `cl-fourth` builtin (arity `1`) backed by shared CL list-index extraction.
+      - added focused unit coverage for list, nil, and wrong-type paths.
+    - `rust/neovm-core/src/elisp/builtins.rs`
+      - pure CL/seq dispatch now routes `cl-fourth`.
+    - `rust/neovm-core/src/elisp/builtin_registry.rs`
+      - added `cl-fourth` to builtin registry.
+    - `test/neovm/vm-compat/cases/cl-helper-availability.forms`
+      - switched helper probe to callable form `(cl-fourth '(a b c d))`.
+    - `test/neovm/vm-compat/cases/cl-helper-availability.expected.tsv`
+      - updated expectations from missing helper to callable behavior (`d`).
+  - verified:
+    - `cargo test cl_fourth --manifest-path rust/neovm-core/Cargo.toml` (pass)
+    - `make -C test/neovm/vm-compat check-one-neovm CASE=cases/cl-helper-availability` (pass, 86/86)
+    - `make -C test/neovm/vm-compat validate-case-lists` (pass)
+
 - Exposed `cl-third` as a callable CL helper:
   - updated:
     - `rust/neovm-core/src/elisp/cl_lib.rs`
