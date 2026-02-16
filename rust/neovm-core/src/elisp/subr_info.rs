@@ -360,6 +360,8 @@ fn subr_arity_value(name: &str) -> Value {
         | "coding-system-get" => arity_cons(2, Some(2)),
         "coding-system-put" => arity_cons(3, Some(3)),
         "coding-system-list" | "coding-system-priority-list" => arity_cons(0, Some(1)),
+        "defined-colors" => arity_cons(0, Some(1)),
+        "color-defined-p" | "color-values" => arity_cons(1, Some(2)),
         "category-docstring" => arity_cons(1, Some(2)),
         "ccl-execute" => arity_cons(2, Some(2)),
         "ccl-execute-on-string" => arity_cons(3, Some(5)),
@@ -975,6 +977,13 @@ mod tests {
         assert_subr_arity("coding-system-priority-list", 0, Some(1));
         assert_subr_arity("coding-system-put", 3, Some(3));
         assert_subr_arity("coding-system-type", 1, Some(1));
+    }
+
+    #[test]
+    fn subr_arity_color_primitives_match_oracle() {
+        assert_subr_arity("defined-colors", 0, Some(1));
+        assert_subr_arity("color-defined-p", 1, Some(2));
+        assert_subr_arity("color-values", 1, Some(2));
     }
 
     #[test]
