@@ -23,6 +23,25 @@ Last updated: 2026-02-16
 
 ## Done
 
+- Aligned empty key-designator semantics for interactive key-binding APIs and added dedicated corpus lock-in:
+  - updated:
+    - `rust/neovm-core/src/elisp/interactive.rs`
+      - `key-binding ""` now lazily bootstraps/returns active keymaps (local first, then global) in a list.
+      - `key-binding []` now returns nil (string/vector empty-designator split aligned to oracle).
+      - `global-key-binding` now lazily bootstraps/returns global keymap for empty designators.
+      - added focused unit coverage for empty string/vector behavior.
+    - `test/neovm/vm-compat/cases/key-binding-empty-designator-semantics.forms`
+      - added oracle probes for `""` vs `[]` behavior across `key-binding` and `global-key-binding`.
+    - `test/neovm/vm-compat/cases/key-binding-empty-designator-semantics.expected.tsv`
+      - recorded oracle baseline outputs for empty key-designator semantics.
+    - `test/neovm/vm-compat/cases/default.list`
+      - added `cases/key-binding-empty-designator-semantics` to recurring default compatibility execution.
+  - verified:
+    - `cargo test --manifest-path rust/neovm-core/Cargo.toml key_binding_empty_` (pass)
+    - `make -C test/neovm/vm-compat check-neovm FORMS=cases/key-binding-empty-designator-semantics.forms EXPECTED=cases/key-binding-empty-designator-semantics.expected.tsv` (pass, 6/6)
+    - `make -C test/neovm/vm-compat check-one-neovm CASE=cases/key-binding-empty-designator-semantics` (pass, 6/6)
+    - `make -C test/neovm/vm-compat validate-case-lists` (pass)
+
 - Aligned `global-key-binding` / `local-key-binding` partial-sequence behavior and added dedicated corpus lock-in:
   - updated:
     - `rust/neovm-core/src/elisp/interactive.rs`
