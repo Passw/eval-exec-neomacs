@@ -38,6 +38,7 @@ cases/vector-literal-self-eval-semantics
 cases/sub-zero-arity-semantics
 cases/help-key-recent-keys-semantics
 cases/event-builtins-semantics
+cases/event-convert-low-ascii-matrix-semantics
 cases/event-key-helpers-semantics
 cases/event-apply-low-ascii-matrix-semantics
 cases/lookup-key-partial-semantics
