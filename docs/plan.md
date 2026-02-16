@@ -23,6 +23,27 @@ Last updated: 2026-02-16
 
 ## Done
 
+- Aligned default plain-char key lookup fallback for `key-binding` / `global-key-binding` with oracle and added dedicated corpus lock-in:
+  - updated:
+    - `rust/neovm-core/src/elisp/interactive.rs`
+      - when no explicit global map is installed, single printable plain-char key lookups now return `self-insert-command` for:
+        - `key-binding`
+        - `global-key-binding`
+      - preserved existing sparse-map behavior (`use-global-map` with sparse map still yields nil for unbound keys).
+      - factored shared plain-printable-char event predicate used by key lookup and describe-key fallback paths.
+      - added focused unit coverage for default plain-char self-insert behavior.
+    - `test/neovm/vm-compat/cases/key-binding-default-self-insert-semantics.forms`
+      - added oracle probes for default plain-char self-insert behavior across string/vector designators, control-key nil path, and sparse-map opt-out behavior.
+    - `test/neovm/vm-compat/cases/key-binding-default-self-insert-semantics.expected.tsv`
+      - recorded oracle baseline outputs for default self-insert lookup behavior.
+    - `test/neovm/vm-compat/cases/default.list`
+      - added `cases/key-binding-default-self-insert-semantics` to recurring default compatibility execution.
+  - verified:
+    - `cargo test --manifest-path rust/neovm-core/Cargo.toml plain_char_self_insert` (pass)
+    - `make -C test/neovm/vm-compat check-neovm FORMS=cases/key-binding-default-self-insert-semantics.forms EXPECTED=cases/key-binding-default-self-insert-semantics.expected.tsv` (pass, 8/8)
+    - `make -C test/neovm/vm-compat check-one-neovm CASE=cases/key-binding-default-self-insert-semantics` (pass, 8/8)
+    - `make -C test/neovm/vm-compat validate-case-lists` (pass)
+
 - Aligned `describe-key-briefly` sequence/type edge behavior with oracle and added dedicated corpus lock-in:
   - updated:
     - `rust/neovm-core/src/elisp/interactive.rs`
