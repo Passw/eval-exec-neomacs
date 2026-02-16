@@ -25,6 +25,17 @@ Last updated: 2026-02-16
 
 ## Done
 
+- Refined terminal parameter key semantics for string-key edge parity:
+  - updated:
+    - `rust/neovm-core/src/elisp/display.rs`
+      - `set-terminal-parameter` now ignores string keys (returns `nil`) instead of participating in previous-value storage, matching oracle behavior.
+      - retained previous-value behavior for non-string keys where applicable.
+      - extended display unit coverage for repeated string-key set behavior.
+  - verified:
+    - `make -C test/neovm/vm-compat check-one-neovm CASE=cases/terminal-parameter-semantics` (pass, 24/24)
+    - `make -C test/neovm/vm-compat check-one-neovm CASE=cases/terminal-parameter-state-semantics` (pass, 11/11)
+    - `cargo test --manifest-path rust/neovm-core/Cargo.toml set_terminal_parameter_ -- --nocapture` (pass)
+
 - Aligned terminal parameter state semantics with oracle and locked cross-form behavior:
   - updated:
     - `rust/neovm-core/src/elisp/display.rs`
