@@ -334,6 +334,9 @@ fn subr_arity_value(name: &str) -> Value {
         | "forward-line" => arity_cons(0, Some(1)),
         "current-buffer" | "buffer-string" | "point" | "point-max" | "point-min" | "bobp"
         | "eobp" | "bolp" | "eolp" | "erase-buffer" | "widen" => arity_cons(0, Some(0)),
+        "group-gid" | "group-real-gid" | "interactive-p" | "last-nonminibuffer-frame" => {
+            arity_cons(0, Some(0))
+        }
         "following-char" | "garbage-collect" | "get-load-suffixes" => arity_cons(0, Some(0)),
         "buffer-file-name" | "buffer-name" | "buffer-size" | "buffer-modified-p"
         | "buffer-list" | "buffer-disable-undo" | "buffer-enable-undo" | "buffer-hash"
@@ -359,9 +362,15 @@ fn subr_arity_value(name: &str) -> Value {
         "fceiling" | "ffloor" | "frexp" | "fround" | "framep" | "ftruncate" | "fixnump" => {
             arity_cons(1, Some(1))
         }
+        "ldexp" => arity_cons(2, Some(2)),
+        "logb" | "lognot" => arity_cons(1, Some(1)),
         "bignump" | "boundp" | "byte-code-function-p" | "car-safe" | "cdr-safe" => {
             arity_cons(1, Some(1))
         }
+        "identity" | "length" | "interpreted-function-p" | "invisible-p" | "macrop" => {
+            arity_cons(1, Some(1))
+        }
+        "gensym" => arity_cons(0, Some(1)),
         "fboundp" | "func-arity" | "symbol-function" | "symbol-value" | "fmakunbound"
         | "makunbound" => arity_cons(1, Some(1)),
         "make-symbol" | "symbol-name" | "symbol-plist" => arity_cons(1, Some(1)),
@@ -1583,6 +1592,23 @@ mod tests {
         assert_subr_arity("garbage-collect", 0, Some(0));
         assert_subr_arity("get-load-suffixes", 0, Some(0));
         assert_subr_arity("get-byte", 0, Some(2));
+    }
+
+    #[test]
+    fn subr_arity_misc_helper_primitives_match_oracle() {
+        assert_subr_arity("identity", 1, Some(1));
+        assert_subr_arity("length", 1, Some(1));
+        assert_subr_arity("ldexp", 2, Some(2));
+        assert_subr_arity("logb", 1, Some(1));
+        assert_subr_arity("lognot", 1, Some(1));
+        assert_subr_arity("group-gid", 0, Some(0));
+        assert_subr_arity("group-real-gid", 0, Some(0));
+        assert_subr_arity("last-nonminibuffer-frame", 0, Some(0));
+        assert_subr_arity("interactive-p", 0, Some(0));
+        assert_subr_arity("interpreted-function-p", 1, Some(1));
+        assert_subr_arity("invisible-p", 1, Some(1));
+        assert_subr_arity("macrop", 1, Some(1));
+        assert_subr_arity("gensym", 0, Some(1));
     }
 
     #[test]
