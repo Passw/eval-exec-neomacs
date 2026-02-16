@@ -39,3 +39,4 @@
 (condition-case err (exit-minibuffer) (no-catch err))
 (condition-case err (abort-recursive-edit) (error (car err)))
 (condition-case err (abort-recursive-edit nil) (error (car err)))
+(condition-case err (minibuffer-depth nil) (error (car err)))

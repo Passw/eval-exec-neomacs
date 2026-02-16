@@ -38,3 +38,4 @@
 38	(condition-case err (exit-minibuffer) (no-catch err))	OK (no-catch exit nil)
 39	(condition-case err (abort-recursive-edit) (error (car err)))	OK user-error
 40	(condition-case err (abort-recursive-edit nil) (error (car err)))	OK wrong-number-of-arguments
+41	(condition-case err (minibuffer-depth nil) (error (car err)))	OK wrong-number-of-arguments
