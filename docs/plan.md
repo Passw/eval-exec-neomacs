@@ -6758,6 +6758,14 @@ Last updated: 2026-02-16
   - verified:
     - `make -C test/neovm/vm-compat validate-case-lists` (pass)
     - `make -C test/neovm/vm-compat check-one-neovm CASE=cases/word-at-point-lazy-bootstrap-semantics` (pass, 3/3)
+- Added a strict aggregate vm-compat gate target:
+  - new target: `make -C test/neovm/vm-compat check-all-neovm-strict`
+  - behavior:
+    - runs `check-all-neovm`
+    - then runs `check-builtin-registry-fboundp`
+    - prints a single success sentinel on full pass
+  - verified:
+    - `make -C test/neovm/vm-compat check-all-neovm-strict ALL_NEOVM_CASES='cases/core'` (pass)
 
 ## Doing
 
