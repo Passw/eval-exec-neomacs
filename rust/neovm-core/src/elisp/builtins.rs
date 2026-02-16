@@ -10712,6 +10712,10 @@ mod tests {
             .expect("symbol-function should resolve name-last-kbd-macro alias");
         assert_eq!(name_last, Value::symbol("kmacro-name-last-macro"));
 
+        let subr_primitive = builtin_symbol_function(&mut eval, vec![Value::symbol("subr-primitive-p")])
+            .expect("symbol-function should resolve subr-primitive-p wrapper");
+        assert!(matches!(subr_primitive, Value::Lambda(_)));
+
         let throw_fn = builtin_symbol_function(&mut eval, vec![Value::symbol("throw")])
             .expect("symbol-function should resolve throw as callable subr");
         assert_eq!(throw_fn, Value::Subr("throw".to_string()));

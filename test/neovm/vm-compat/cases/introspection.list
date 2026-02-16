@@ -3,6 +3,7 @@ cases/fboundp-builtin-command-matrix
 cases/fboundp-dispatch
 cases/fboundp-macro-boundary
 cases/symbol-function-core
+cases/subr-primitive-wrapper-semantics
 cases/symbol-function-error-paths
 cases/indirect-function-core
 cases/indirect-function-alias-chains

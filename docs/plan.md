@@ -54,9 +54,26 @@ Last updated: 2026-02-16
 4. Keep Rust backend behind compile-time switch and preserve Emacs C core as default backend.
 5. Expand `kbd` edge corpus around uncommon modifier composition and align non-`kbd` key-description consumers with the new parser semantics where needed.
 6. Expand `recent-keys` capture beyond `read*` consumers to eventual command-loop event publication.
-7. Continue subr-arity registry drift reduction from `60` remaining mismatches using batched oracle lock-ins.
+7. Continue subr-arity registry drift reduction from `59` remaining mismatches using batched oracle lock-ins.
 
 ## Done
+
+- Aligned `subr-primitive-p` startup introspection shape toward GNU Emacs:
+  - seeded startup function cell as a Lisp lambda wrapper:
+    - `subr-primitive-p -> (lambda (object) (subrp object))`
+  - added unit assertion in:
+    - `symbol_function_resolves_builtin_and_special_names`
+  - added oracle corpus lock-in case:
+    - `test/neovm/vm-compat/cases/subr-primitive-wrapper-semantics.{forms,expected.tsv}`
+    - wired into default and introspection suites:
+      - `test/neovm/vm-compat/cases/default.list`
+      - `test/neovm/vm-compat/cases/introspection.list`
+  - verified:
+    - `cargo test --manifest-path rust/neovm-core/Cargo.toml symbol_function_resolves_builtin_and_special_names -- --nocapture` (pass)
+    - `make -C test/neovm/vm-compat check-one-neovm CASE=cases/subr-primitive-wrapper-semantics` (pass)
+    - `make -C test/neovm/vm-compat validate-case-lists` (pass)
+    - `make -C test/neovm/vm-compat check-all-neovm-strict` (pass)
+    - registry scan status: `CURRENT_SUBR_ARITY_MISMATCHES=59` (count unchanged; wrapper now matches non-subr error *kind* while payload still differs from oracle bytecode object text)
 
 - Aligned `subr-native-elisp-p` startup alias behavior with GNU Emacs:
   - seeded startup function alias:
