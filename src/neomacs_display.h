@@ -453,6 +453,15 @@ int neomacs_display_query_image_file_size(struct NeomacsDisplay *handle,
                                           int *height);
 
 /**
+ * Query image data dimensions without loading (fast - reads header only)
+ */
+int neomacs_display_query_image_data_size(struct NeomacsDisplay *handle,
+                                          const unsigned char *data,
+                                          size_t len,
+                                          int *width,
+                                          int *height);
+
+/**
  * Free an image from cache
  */
 int neomacs_display_free_image(struct NeomacsDisplay *handle, uint32_t imageId);

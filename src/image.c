@@ -13061,21 +13061,39 @@ neomacs_load (struct frame *f, struct image *img)
     }
   else if (STRINGP (data))
     {
-      /* Inline image data - load to get dimensions */
+      /* Inline image data - query dimensions synchronously first,
+         then trigger async GPU loading.  */
       const unsigned char *bytes = (const unsigned char *) SDATA (data);
       ptrdiff_t len = SBYTES (data);
-      uint32_t gpu_id;
 
+      /* Get dimensions synchronously (reads header only, no GPU) */
+      neomacs_display_query_image_data_size (dpyinfo->display_handle,
+                                              bytes, len,
+                                              &actual_w, &actual_h);
+
+      /* Apply max constraints if specified */
+      if (actual_w > 0 && actual_h > 0 && (mw > 0 || mh > 0))
+        {
+          double ratio = (double)actual_w / actual_h;
+          if (mw > 0 && actual_w > mw)
+            {
+              actual_w = mw;
+              actual_h = (int)(mw / ratio);
+            }
+          if (mh > 0 && actual_h > mh)
+            {
+              actual_h = mh;
+              actual_w = (int)(mh * ratio);
+            }
+        }
+
+      /* Trigger async GPU loading (dimensions already known) */
       if (mw > 0 || mh > 0)
-        gpu_id = neomacs_display_load_image_data_scaled (dpyinfo->display_handle,
-                                                          bytes, len, mw, mh);
+        neomacs_display_load_image_data_scaled (dpyinfo->display_handle,
+                                                 bytes, len, mw, mh);
       else
-        gpu_id = neomacs_display_load_image_data (dpyinfo->display_handle,
-                                                   bytes, len);
-
-      if (gpu_id != 0)
-        neomacs_display_get_image_size (dpyinfo->display_handle, gpu_id,
-                                         &actual_w, &actual_h);
+        neomacs_display_load_image_data (dpyinfo->display_handle,
+                                          bytes, len);
     }
 
   if (actual_w > 0 && actual_h > 0)

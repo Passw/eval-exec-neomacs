@@ -586,6 +586,32 @@ pub unsafe extern "C" fn neomacs_display_query_image_file_size(
     -1
 }
 
+/// Query image data dimensions synchronously (reads header only, no GPU loading).
+/// Returns 0 on success, -1 on failure.
+#[no_mangle]
+pub unsafe extern "C" fn neomacs_display_query_image_data_size(
+    _handle: *mut NeomacsDisplay,
+    data: *const u8,
+    len: usize,
+    width: *mut c_int,
+    height: *mut c_int,
+) -> c_int {
+    if data.is_null() || width.is_null() || height.is_null() || len == 0 {
+        return -1;
+    }
+    let bytes = std::slice::from_raw_parts(data, len);
+
+    {
+        use crate::backend::wgpu::WgpuRenderer;
+        if let Some((w, h)) = WgpuRenderer::query_image_data_size(bytes) {
+            *width = w as c_int;
+            *height = h as c_int;
+            return 0;
+        }
+    }
+    -1
+}
+
 /// Free an image from cache
 #[no_mangle]
 pub unsafe extern "C" fn neomacs_display_free_image(
