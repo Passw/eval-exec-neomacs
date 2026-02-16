@@ -19,6 +19,26 @@ Last updated: 2026-02-16
 
 ## Done
 
+- Enforced keyboard macro builtin arity contracts:
+  - updated:
+    - `rust/neovm-core/src/elisp/kmacro.rs`
+      - `start-kbd-macro` now enforces max arity `1`.
+      - `end-kbd-macro` now enforces max arity `2`.
+      - `call-last-kbd-macro` now enforces max arity `2`.
+      - `execute-kbd-macro` now enforces arity range `1..=3`.
+      - `insert-kbd-macro` now enforces arity range `1..=2`.
+      - added focused unit coverage for the above arity contracts.
+    - added corpus:
+      - `test/neovm/vm-compat/cases/kmacro-arity-semantics.{forms,expected.tsv}`
+        - locks over/under-arity signaling for the updated kmacro builtins.
+    - `test/neovm/vm-compat/cases/default.list`
+      - added `cases/kmacro-arity-semantics`.
+  - verified:
+    - `cargo test kmacro::tests::test_kmacro_builtin_arity_contracts --manifest-path rust/neovm-core/Cargo.toml -- --nocapture` (pass)
+    - `make -C test/neovm/vm-compat check-one-neovm CASE=cases/kmacro-arity-semantics` (pass, 12/12)
+    - `make -C test/neovm/vm-compat validate-case-lists` (pass)
+    - `make -C test/neovm/vm-compat check-all-neovm` (pass, full default + neovm-only corpus)
+
 - Enforced `gensym` arity + semantic lock-in:
   - updated:
     - `rust/neovm-core/src/elisp/builtins.rs`
