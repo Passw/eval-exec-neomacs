@@ -55,6 +55,22 @@ Last updated: 2026-02-16
 
 ## Done
 
+- Extended `minor-mode-key-binding` runtime parity with emulation map precedence:
+  - runtime behavior:
+    - added `emulation-mode-map-alists` lookup ahead of `minor-mode-overriding-map-alist` and `minor-mode-map-alist`.
+    - added support for symbol-indirect emulation alist entries (e.g. `'(emu-alist)`).
+    - preserved first-match behavior and GNU precedence ordering for the covered matrix.
+  - unit coverage:
+    - `minor_mode_key_binding_prefers_emulation_mode_maps`
+    - `minor_mode_key_binding_resolves_symbol_emulation_alists`
+  - oracle corpus expanded and re-recorded:
+    - `test/neovm/vm-compat/cases/minor-mode-key-binding-semantics.forms`
+    - `test/neovm/vm-compat/cases/minor-mode-key-binding-semantics.expected.tsv`
+  - verified:
+    - `cargo test --manifest-path rust/neovm-core/Cargo.toml minor_mode_key_binding -- --nocapture` (pass)
+    - `make -C test/neovm/vm-compat check-one-neovm CASE=cases/minor-mode-key-binding-semantics` (pass)
+    - `make -C test/neovm/vm-compat check-all-neovm-strict` (pass)
+
 - Implemented evaluator-backed `minor-mode-key-binding` compatibility slice (stub -> active mode map lookup):
   - runtime behavior:
     - replaced unconditional `nil` stub with active lookup over `minor-mode-overriding-map-alist` then `minor-mode-map-alist`.
