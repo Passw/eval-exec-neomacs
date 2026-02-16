@@ -19,6 +19,22 @@ Last updated: 2026-02-16
 
 ## Done
 
+- Exposed `charset-list` as a callable charset helper:
+  - updated:
+    - `rust/neovm-core/src/elisp/charset.rs`
+      - added `charset-list` builtin (arity `0`) returning charset symbols in current priority order.
+      - added focused unit coverage for return-shape/ordering behavior.
+    - `rust/neovm-core/src/elisp/builtins.rs`
+      - charset pure dispatch now routes `charset-list`.
+    - `rust/neovm-core/src/elisp/builtin_registry.rs`
+      - added `charset-list` to builtin registry.
+    - `test/neovm/vm-compat/cases/charset-api-availability.expected.tsv`
+      - updated expectations from missing helper to callable charset list payload.
+  - verified:
+    - `cargo test charset_list --manifest-path rust/neovm-core/Cargo.toml` (pass)
+    - `make -C test/neovm/vm-compat check-one-neovm CASE=cases/charset-api-availability` (pass, 4/4)
+    - `make -C test/neovm/vm-compat validate-case-lists` (pass)
+
 - Exposed `custom-group-p` as a callable custom helper:
   - updated:
     - `rust/neovm-core/src/elisp/custom.rs`
