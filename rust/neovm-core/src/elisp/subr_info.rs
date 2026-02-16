@@ -338,6 +338,13 @@ fn subr_arity_value(name: &str) -> Value {
         "advice-add" => arity_cons(3, Some(4)),
         "advice-remove" | "advice-member-p" => arity_cons(2, Some(2)),
         "run-hook-with-args" => arity_cons(1, None),
+        "base64-decode-string" => arity_cons(1, Some(3)),
+        "base64-encode-string" | "base64url-encode-string" => arity_cons(1, Some(2)),
+        "bool-vector-p" | "bool-vector-count-population" => arity_cons(1, Some(1)),
+        "bool-vector-subsetp" => arity_cons(2, Some(2)),
+        "bool-vector-exclusive-or" | "bool-vector-intersection" | "bool-vector-union" => {
+            arity_cons(2, Some(3))
+        }
         "if" => Value::cons(Value::Int(2), Value::symbol("unevalled")),
         "defining-kbd-macro" => arity_cons(1, Some(2)),
         "help-key-description" => arity_cons(2, Some(2)),
@@ -890,6 +897,19 @@ mod tests {
         assert_subr_arity("advice-remove", 2, Some(2));
         assert_subr_arity("advice-member-p", 2, Some(2));
         assert_subr_arity("run-hook-with-args", 1, None);
+    }
+
+    #[test]
+    fn subr_arity_encoding_bool_vector_primitives_match_oracle() {
+        assert_subr_arity("base64-decode-string", 1, Some(3));
+        assert_subr_arity("base64-encode-string", 1, Some(2));
+        assert_subr_arity("base64url-encode-string", 1, Some(2));
+        assert_subr_arity("bool-vector-p", 1, Some(1));
+        assert_subr_arity("bool-vector-count-population", 1, Some(1));
+        assert_subr_arity("bool-vector-subsetp", 2, Some(2));
+        assert_subr_arity("bool-vector-exclusive-or", 2, Some(3));
+        assert_subr_arity("bool-vector-intersection", 2, Some(3));
+        assert_subr_arity("bool-vector-union", 2, Some(3));
     }
 
     #[test]
