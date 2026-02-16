@@ -257,6 +257,7 @@ cases/undo-buffer-arg
 cases/undo-arity-semantics
 cases/undo-result-semantics
 cases/minibuffer-batch
+cases/reader-prompt-batch-error-semantics
 cases/minibufferp-semantics
 cases/exit-recursive-edit-semantics
 cases/recursive-top-level-arity-semantics
