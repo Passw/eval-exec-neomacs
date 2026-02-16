@@ -47,6 +47,21 @@ Last updated: 2026-02-16
 
 ## Done
 
+- Hardened vm-compat harness output filtering and builtin registry parity accounting:
+  - enforced `LC_ALL=C` around case-line AWK filters in:
+    - `test/neovm/vm-compat/run-oracle.sh`
+    - `test/neovm/vm-compat/run-neovm.sh`
+    - `test/neovm/vm-compat/check-case-line-filter.sh`
+  - updated `check-builtin-registry-fboundp.sh` to:
+    - compare only core builtin names against GNU Emacs (`neovm-*` excluded)
+    - print explicit `total/core/skipped-extension` counters
+    - keep core-only drift enforcement via `cases/builtin-registry-fboundp-allowlist.txt`
+  - simplified `cases/builtin-registry-fboundp-allowlist.txt` to empty-by-default commentary.
+  - verified:
+    - `make -C test/neovm/vm-compat check-case-line-filter` (pass)
+    - `make -C test/neovm/vm-compat check-builtin-registry-fboundp` (pass)
+    - `make -C test/neovm/vm-compat check-all-neovm-strict` (pass)
+
 - Closed the latest vm-compat blocker batch and re-established full-gate green:
   - landed evaluator/runtime parity fixes:
     - `beginning-of-buffer` / `end-of-buffer` dispatch + registry integration.
