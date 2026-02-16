@@ -21,6 +21,28 @@ Last updated: 2026-02-16
 
 ## Done
 
+- Aligned `display-images-p` / `display-supports-face-attributes-p` runtime semantics with oracle and added dedicated corpus lock-in:
+  - updated:
+    - `rust/neovm-core/src/elisp/display.rs`
+      - implemented `display-images-p` as batch-style nil return with display designator validation and correct arity.
+      - implemented `display-supports-face-attributes-p` as oracle-aligned nil return with 1..2 arity contract.
+      - added evaluator-aware variants for both builtins and expanded focused unit coverage.
+    - `rust/neovm-core/src/elisp/builtins.rs`
+      - routed both builtins through display module runtime/evaluator dispatch instead of unconditional `t` fallback.
+    - `test/neovm/vm-compat/cases/display-images-face-support-semantics.forms`
+      - added oracle probes for value/arity/error paths of both display helpers.
+    - `test/neovm/vm-compat/cases/display-images-face-support-semantics.expected.tsv`
+      - recorded oracle baseline outputs for the new display helper semantics case.
+    - `test/neovm/vm-compat/cases/default.list`
+      - added `cases/display-images-face-support-semantics` to recurring default compatibility execution.
+  - verified:
+    - `cargo test display_images_p --manifest-path rust/neovm-core/Cargo.toml` (pass)
+    - `cargo test display_supports_face_attributes_p --manifest-path rust/neovm-core/Cargo.toml` (pass)
+    - `cargo test eval_display_queries_accept_live_frame_designator --manifest-path rust/neovm-core/Cargo.toml` (pass)
+    - `make -C test/neovm/vm-compat check-one-neovm CASE=cases/display-images-face-support-semantics` (pass, 14/14)
+    - `make -C test/neovm/vm-compat validate-case-lists` (pass)
+    - `make -C test/neovm/vm-compat check-all-neovm` (pass)
+
 - Aligned `assoc-default` / `make-list` runtime semantics with oracle and added dedicated corpus lock-in:
   - updated:
     - `rust/neovm-core/src/elisp/misc.rs`
