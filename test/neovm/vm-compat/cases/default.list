@@ -45,6 +45,7 @@ cases/navigation-case-subr-arity-semantics
 cases/hook-advice-subr-arity-semantics
 cases/encoding-bool-vector-subr-arity-semantics
 cases/command-timer-subr-arity-semantics
+cases/category-ccl-subr-arity-semantics
 cases/help-key-recent-keys-semantics
 cases/this-command-keys-readers-semantics
 cases/event-builtins-semantics

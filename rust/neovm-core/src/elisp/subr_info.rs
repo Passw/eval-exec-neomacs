@@ -351,6 +351,12 @@ fn subr_arity_value(name: &str) -> Value {
         "cancel-timer" | "timerp" => arity_cons(1, Some(1)),
         "run-at-time" => arity_cons(3, None),
         "current-time" => arity_cons(0, Some(0)),
+        "category-table" | "clear-charset-maps" => arity_cons(0, Some(0)),
+        "case-table-p" | "category-table-p" | "ccl-program-p" | "check-coding-system"
+        | "clear-abbrev-table" => arity_cons(1, Some(1)),
+        "category-docstring" => arity_cons(1, Some(2)),
+        "ccl-execute" => arity_cons(2, Some(2)),
+        "ccl-execute-on-string" => arity_cons(3, Some(5)),
         "if" => Value::cons(Value::Int(2), Value::symbol("unevalled")),
         "defining-kbd-macro" => arity_cons(1, Some(2)),
         "help-key-description" => arity_cons(2, Some(2)),
@@ -928,6 +934,20 @@ mod tests {
         assert_subr_arity("run-at-time", 3, None);
         assert_subr_arity("current-time", 0, Some(0));
         assert_subr_arity("float-time", 0, Some(1));
+    }
+
+    #[test]
+    fn subr_arity_category_ccl_primitives_match_oracle() {
+        assert_subr_arity("category-table", 0, Some(0));
+        assert_subr_arity("clear-charset-maps", 0, Some(0));
+        assert_subr_arity("case-table-p", 1, Some(1));
+        assert_subr_arity("category-table-p", 1, Some(1));
+        assert_subr_arity("ccl-program-p", 1, Some(1));
+        assert_subr_arity("check-coding-system", 1, Some(1));
+        assert_subr_arity("clear-abbrev-table", 1, Some(1));
+        assert_subr_arity("category-docstring", 1, Some(2));
+        assert_subr_arity("ccl-execute", 2, Some(2));
+        assert_subr_arity("ccl-execute-on-string", 3, Some(5));
     }
 
     #[test]
