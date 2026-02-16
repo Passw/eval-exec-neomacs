@@ -21,6 +21,18 @@ Last updated: 2026-02-16
 
 ## Done
 
+- Added oracle lock-in corpus for keymap binding basics (`global-set-key` / `local-set-key` / `lookup-key` / `key-binding`):
+  - updated:
+    - `test/neovm/vm-compat/cases/keymap-binding-basics-semantics.forms`
+      - added probes for keymap binding installation, lookup behavior, command resolution, and wrong-arity errors.
+    - `test/neovm/vm-compat/cases/keymap-binding-basics-semantics.expected.tsv`
+      - recorded oracle baseline outputs for keymap binding basics behavior.
+    - `test/neovm/vm-compat/cases/default.list`
+      - added `cases/keymap-binding-basics-semantics` to recurring default compatibility execution.
+  - verified:
+    - `make -C test/neovm/vm-compat check-one-neovm CASE=cases/keymap-binding-basics-semantics` (pass, 12/12)
+    - `make -C test/neovm/vm-compat validate-case-lists` (pass)
+
 - Aligned `switch-to-buffer` / `display-buffer` / `pop-to-buffer` runtime semantics with oracle batch behavior and added dedicated corpus lock-in:
   - updated:
     - `rust/neovm-core/src/elisp/window_cmds.rs`
