@@ -9,3 +9,15 @@
 9	(condition-case err (terminal-parameter (frame-terminal) 1) (error (car err)))	OK wrong-type-argument
 10	(set-terminal-parameter (frame-terminal) 1 1)	OK 9
 11	(terminal-parameter (frame-terminal) 'neo-test)	OK 7
+12	(set-terminal-parameter (frame-terminal) :neo-key 3)	OK nil
+13	(set-terminal-parameter (frame-terminal) :neo-key 4)	OK 3
+14	(terminal-parameter (frame-terminal) :neo-key)	OK 4
+15	(set-terminal-parameter (frame-terminal) nil 5)	OK nil
+16	(set-terminal-parameter (frame-terminal) nil 6)	OK 5
+17	(terminal-parameter (frame-terminal) nil)	OK 6
+18	(set-terminal-parameter (frame-terminal) t 7)	OK nil
+19	(set-terminal-parameter (frame-terminal) t 8)	OK 7
+20	(terminal-parameter (frame-terminal) t)	OK 8
+21	(set-terminal-parameter (frame-terminal) "neo-str" 1)	OK nil
+22	(set-terminal-parameter (frame-terminal) "neo-str" 2)	OK nil
+23	(condition-case err (terminal-parameter (frame-terminal) "neo-str") (error (car err)))	OK wrong-type-argument

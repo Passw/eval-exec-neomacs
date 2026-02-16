@@ -59,11 +59,11 @@ fn expect_range_args(name: &str, args: &[Value], min: usize, max: usize) -> Resu
     }
 }
 
-fn expect_symbol_name(value: &Value) -> Result<String, Flow> {
+fn expect_symbol_key(value: &Value) -> Result<HashKey, Flow> {
     match value {
-        Value::Nil => Ok("nil".to_string()),
-        Value::True => Ok("t".to_string()),
-        Value::Symbol(name) => Ok(name.clone()),
+        Value::Nil | Value::True | Value::Symbol(_) | Value::Keyword(_) => {
+            Ok(value.to_hash_key(&HashTableTest::Eq))
+        }
         other => Err(signal(
             "wrong-type-argument",
             vec![Value::symbol("symbolp"), other.clone()],
@@ -877,7 +877,7 @@ pub(crate) fn builtin_terminal_live_p_eval(
 pub(crate) fn builtin_terminal_parameter(args: Vec<Value>) -> EvalResult {
     expect_args("terminal-parameter", &args, 2)?;
     expect_terminal_designator(&args[0])?;
-    let key = HashKey::Symbol(expect_symbol_name(&args[1])?);
+    let key = expect_symbol_key(&args[1])?;
     TERMINAL_PARAMS.with(|slot| {
         Ok(slot
             .borrow()
@@ -896,7 +896,7 @@ pub(crate) fn builtin_terminal_parameter_eval(
 ) -> EvalResult {
     expect_args("terminal-parameter", &args, 2)?;
     expect_terminal_designator_eval(eval, &args[0])?;
-    let key = HashKey::Symbol(expect_symbol_name(&args[1])?);
+    let key = expect_symbol_key(&args[1])?;
     TERMINAL_PARAMS.with(|slot| {
         Ok(slot
             .borrow()
