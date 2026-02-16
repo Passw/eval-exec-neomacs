@@ -25,6 +25,25 @@ Last updated: 2026-02-16
 
 ## Done
 
+- Aligned introspection metadata for newly-added key/help builtins:
+  - updated:
+    - `rust/neovm-core/src/elisp/subr_info.rs`
+      - added subr arity overrides:
+        - `help-key-description` => `(2 . 2)`
+        - `recent-keys` => `(0 . 1)`
+    - `rust/neovm-core/src/elisp/doc.rs`
+      - extended `help-function-arglist` mapping for:
+        - `help-key-description`
+        - `recent-keys`
+      - preserve-names mode now reports oracle-compatible parameter names (`key`, `untranslated`, `include-cmds`).
+    - `test/neovm/vm-compat/cases/help-key-recent-keys-semantics.forms`
+      - added `subr-arity` and `help-function-arglist` probes for both builtins.
+    - `test/neovm/vm-compat/cases/help-key-recent-keys-semantics.expected.tsv`
+      - refreshed oracle baseline including the new introspection lines.
+  - verified:
+    - `make -C test/neovm/vm-compat check-one-neovm CASE=cases/help-key-recent-keys-semantics` (pass, 37/37)
+    - `make -C test/neovm/vm-compat check-builtin-registry-fboundp` (pass; only allowlisted `neovm-precompile-file` drift)
+
 - Implemented `help-key-description` / `recent-keys` builtins and locked oracle parity with a dedicated corpus:
   - updated:
     - `rust/neovm-core/src/elisp/builtins.rs`
