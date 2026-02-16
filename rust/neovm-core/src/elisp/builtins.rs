@@ -4482,7 +4482,7 @@ pub(crate) fn builtin_current_buffer(
     eval: &mut super::eval::Evaluator,
     args: Vec<Value>,
 ) -> EvalResult {
-    let _ = args;
+    expect_args("current-buffer", &args, 0)?;
     match eval.buffers.current_buffer() {
         Some(buf) => Ok(Value::Buffer(buf.id)),
         None => Ok(Value::Nil),
@@ -4494,6 +4494,7 @@ pub(crate) fn builtin_buffer_name(
     eval: &mut super::eval::Evaluator,
     args: Vec<Value>,
 ) -> EvalResult {
+    expect_max_args("buffer-name", &args, 1)?;
     let id = if args.is_empty() || matches!(args[0], Value::Nil) {
         match eval.buffers.current_buffer() {
             Some(b) => b.id,
@@ -4513,6 +4514,7 @@ pub(crate) fn builtin_buffer_file_name(
     eval: &mut super::eval::Evaluator,
     args: Vec<Value>,
 ) -> EvalResult {
+    expect_max_args("buffer-file-name", &args, 1)?;
     let id = if args.is_empty() || matches!(args[0], Value::Nil) {
         match eval.buffers.current_buffer() {
             Some(b) => b.id,
@@ -4535,7 +4537,7 @@ pub(crate) fn builtin_buffer_string(
     eval: &mut super::eval::Evaluator,
     args: Vec<Value>,
 ) -> EvalResult {
-    let _ = args;
+    expect_args("buffer-string", &args, 0)?;
     let buf = eval
         .buffers
         .current_buffer_mut()
@@ -4566,7 +4568,7 @@ pub(crate) fn builtin_buffer_substring(
 
 /// (point) → integer
 pub(crate) fn builtin_point(eval: &mut super::eval::Evaluator, args: Vec<Value>) -> EvalResult {
-    let _ = args;
+    expect_args("point", &args, 0)?;
     let buf = eval
         .buffers
         .current_buffer()
@@ -4577,7 +4579,7 @@ pub(crate) fn builtin_point(eval: &mut super::eval::Evaluator, args: Vec<Value>)
 
 /// (point-min) → integer
 pub(crate) fn builtin_point_min(eval: &mut super::eval::Evaluator, args: Vec<Value>) -> EvalResult {
-    let _ = args;
+    expect_args("point-min", &args, 0)?;
     let buf = eval
         .buffers
         .current_buffer()
@@ -4589,7 +4591,7 @@ pub(crate) fn builtin_point_min(eval: &mut super::eval::Evaluator, args: Vec<Val
 
 /// (point-max) → integer
 pub(crate) fn builtin_point_max(eval: &mut super::eval::Evaluator, args: Vec<Value>) -> EvalResult {
-    let _ = args;
+    expect_args("point-max", &args, 0)?;
     let buf = eval
         .buffers
         .current_buffer()
