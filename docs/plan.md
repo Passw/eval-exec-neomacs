@@ -18,6 +18,7 @@ Last updated: 2026-02-16
 - Keep newly landed delete-family command `subr-arity` parity stable while expanding remaining edit/display command arity matrix.
 - Keep newly landed filesystem/path primitive `subr-arity` parity stable while expanding command/display slices.
 - Keep newly landed event/error/misc primitive `subr-arity` parity stable while expanding remaining command-loop slices.
+- Keep newly landed `eval*` primitive runtime+`subr-arity` parity stable while expanding remaining startup drifts.
 
 ## Next
 
@@ -29,6 +30,35 @@ Last updated: 2026-02-16
 6. Expand `recent-keys` capture beyond `read*` consumers to eventual command-loop event publication.
 
 ## Done
+
+- Aligned `eval*` primitive runtime arity behavior and `subr-arity` metadata with GNU Emacs:
+  - updated:
+    - `rust/neovm-core/src/elisp/builtins.rs`
+      - `eval`: enforced max arity `(1 . 2)` via `expect_max_args`.
+      - added regression test `eval_builtin_rejects_too_many_args`.
+    - `rust/neovm-core/src/elisp/interactive.rs`
+      - `eval-expression`: enforced max arity `(1 . 4)` (retains existing interactive EOF path on missing arg).
+      - added regression test `eval_expression_rejects_too_many_args`.
+    - `rust/neovm-core/src/elisp/subr_info.rs`
+      - added explicit arity overrides:
+        - `(1 . 2)`: `eval`
+        - `(0 . 5)`: `eval-buffer`
+        - `(1 . 4)`: `eval-expression`
+        - `(2 . 4)`: `eval-region`
+      - added unit matrix `subr_arity_eval_primitives_match_oracle`.
+    - `test/neovm/vm-compat/cases/eval-subr-arity-semantics.forms`
+    - `test/neovm/vm-compat/cases/eval-subr-arity-semantics.expected.tsv`
+    - `test/neovm/vm-compat/cases/default.list`
+      - added oracle lock-in case for `eval*` arity payloads.
+  - recorded with official GNU Emacs:
+    - `NEOVM_ORACLE_EMACS=/nix/store/hql3zwz5b4ywd2qwx8jssp4dyb7nx4cb-emacs-30.2/bin/emacs make -C test/neovm/vm-compat record FORMS=cases/eval-subr-arity-semantics.forms EXPECTED=cases/eval-subr-arity-semantics.expected.tsv` (pass)
+  - verified:
+    - `cargo test --manifest-path rust/neovm-core/Cargo.toml eval_builtin_rejects_too_many_args -- --nocapture` (pass)
+    - `cargo test --manifest-path rust/neovm-core/Cargo.toml eval_expression_rejects_too_many_args -- --nocapture` (pass)
+    - `cargo test --manifest-path rust/neovm-core/Cargo.toml subr_arity_eval_primitives_match_oracle -- --nocapture` (pass)
+    - `make -C test/neovm/vm-compat check-one-neovm CASE=cases/eval-subr-arity-semantics` (pass, 4/4)
+    - `make -C test/neovm/vm-compat validate-case-lists` (pass)
+    - `make -C test/neovm/vm-compat check-builtin-registry-fboundp` (pass; allowlisted drift only: `neovm-precompile-file`)
 
 - Aligned event/error/misc primitive `subr-arity` metadata with GNU Emacs:
   - updated:
