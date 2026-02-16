@@ -7608,6 +7608,7 @@ pub(crate) fn dispatch_builtin(
         "cl-evenp" => super::cl_lib::builtin_cl_evenp(args),
         "cl-ninth" => super::cl_lib::builtin_cl_ninth(args),
         "cl-oddp" => super::cl_lib::builtin_cl_oddp(args),
+        "cl-plusp" => super::cl_lib::builtin_cl_plusp(args),
         "cl-tenth" => super::cl_lib::builtin_cl_tenth(args),
         "cl-rest" => super::cl_lib::builtin_cl_rest(args),
         "seq-reverse" => super::cl_lib::builtin_seq_reverse(args),

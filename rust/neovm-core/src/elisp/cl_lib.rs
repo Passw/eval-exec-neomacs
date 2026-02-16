@@ -181,6 +181,13 @@ pub(crate) fn builtin_cl_oddp(args: Vec<Value>) -> EvalResult {
     Ok(Value::bool(n % 2 != 0))
 }
 
+/// `(cl-plusp N)` -- return t if N is strictly positive.
+pub(crate) fn builtin_cl_plusp(args: Vec<Value>) -> EvalResult {
+    expect_args("cl-plusp", &args, 1)?;
+    let n = expect_number_or_marker(&args[0])?;
+    Ok(Value::bool(n > 0.0))
+}
+
 fn seq_position_list_elements(seq: &Value) -> Result<Vec<Value>, Flow> {
     let mut elements = Vec::new();
     let mut cursor = seq.clone();
@@ -1064,6 +1071,23 @@ mod tests {
     #[test]
     fn cl_oddp_wrong_type() {
         assert!(builtin_cl_oddp(vec![Value::string("x")]).is_err());
+    }
+
+    #[test]
+    fn cl_plusp_true() {
+        let result = builtin_cl_plusp(vec![Value::Int(1)]).unwrap();
+        assert!(result.is_truthy());
+    }
+
+    #[test]
+    fn cl_plusp_false() {
+        let result = builtin_cl_plusp(vec![Value::Int(0)]).unwrap();
+        assert!(result.is_nil());
+    }
+
+    #[test]
+    fn cl_plusp_wrong_type() {
+        assert!(builtin_cl_plusp(vec![Value::string("x")]).is_err());
     }
 
     #[test]

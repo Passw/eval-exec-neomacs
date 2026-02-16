@@ -43,7 +43,7 @@
 (fboundp 'cl-oddp)
 (condition-case err (cl-oddp 3) (error err))
 (fboundp 'cl-plusp)
-(condition-case err (cl-plusp) (error err))
+(condition-case err (cl-plusp 1) (error err))
 (fboundp 'cl-position)
 (condition-case err (cl-position) (error err))
 (fboundp 'cl-reduce)
