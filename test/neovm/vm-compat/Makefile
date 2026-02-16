@@ -24,7 +24,7 @@ ERT_ALLOWLIST ?= cases/ert-allowlist-smoke.txt
 ERT_EXPECTED ?= cases/ert-allowlist-smoke.expected.tsv
 ERT_LOAD_FILES ?= cases/ert-allowlist-fixtures/smoke-tests.el
 
-.PHONY: oracle neovm record check compare check-neovm record-all check-all check-all-neovm check-all-neovm-only check-all-neovm-strict check-legacy-elc-neovm check-introspection-neovm check-thread-neovm check-runner-feature-stamp check-builtin-registry-fboundp check-builtin-registry-function-cell check-builtin-registry-commandp check-builtin-registry-extension-policy check-oracle-default-path check-case-line-filter list-cases record-list check-list check-neovm-list check-one-neovm validate-case-lists ert-oracle record-ert-allowlist check-ert-allowlist bench-load-cache
+.PHONY: oracle neovm record check compare check-neovm record-all check-all check-all-neovm check-all-neovm-only check-all-neovm-strict check-legacy-elc-neovm check-introspection-neovm check-thread-neovm check-runner-feature-stamp check-builtin-registry-fboundp check-builtin-registry-function-cell check-builtin-registry-function-kind check-builtin-registry-commandp check-builtin-registry-extension-policy check-oracle-default-path check-case-line-filter list-cases record-list check-list check-neovm-list check-one-neovm validate-case-lists ert-oracle record-ert-allowlist check-ert-allowlist bench-load-cache
 
 oracle:
 	./run-oracle.sh $(FORMS)
@@ -81,6 +81,7 @@ check-all-neovm-strict:
 	$(MAKE) --no-print-directory check-all-neovm; \
 	$(MAKE) --no-print-directory check-builtin-registry-fboundp; \
 	$(MAKE) --no-print-directory check-builtin-registry-function-cell; \
+	$(MAKE) --no-print-directory check-builtin-registry-function-kind; \
 	$(MAKE) --no-print-directory check-builtin-registry-commandp; \
 	$(MAKE) --no-print-directory check-builtin-registry-extension-policy; \
 	$(MAKE) --no-print-directory check-oracle-default-path; \
@@ -123,6 +124,9 @@ check-builtin-registry-fboundp:
 
 check-builtin-registry-function-cell:
 	./check-builtin-registry-function-cell.sh
+
+check-builtin-registry-function-kind:
+	./check-builtin-registry-function-kind.sh
 
 check-builtin-registry-commandp:
 	./check-builtin-registry-commandp.sh

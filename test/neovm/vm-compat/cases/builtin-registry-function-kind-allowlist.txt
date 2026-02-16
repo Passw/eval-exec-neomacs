@@ -1,0 +1,32 @@
+# One builtin name per line.
+# Intentional source-only policy drifts:
+# GNU Emacs ships these as `byte-code-function` wrappers, while NeoVM uses
+# source `function` wrappers and does not pursue .elc binary compatibility.
+autoloadp
+looking-at-p
+seq-concatenate
+seq-contains-p
+seq-count
+seq-do
+seq-drop
+seq-empty-p
+seq-every-p
+seq-into
+seq-length
+seq-mapn
+seq-max
+seq-min
+seq-position
+seq-reduce
+seq-reverse
+seq-some
+seq-sort
+seq-subseq
+seq-take
+seq-uniq
+string-blank-p
+string-empty-p
+string-equal-ignore-case
+string-match-p
+string-to-vector
+subr-primitive-p
