@@ -42,6 +42,7 @@ Last updated: 2026-02-16
 - Keep newly landed read-core helper primitive `subr-arity` parity stable while expanding remaining minibuffer/input drifts.
 - Keep newly landed input-mode helper primitive `subr-arity` parity stable while expanding remaining input/runtime drifts.
 - Keep newly landed charset/json/libxml/display helper primitive `subr-arity` parity stable while expanding remaining arity drifts.
+- Keep newly landed symbol-function alias-wrapper startup parity stable while expanding remaining non-subr introspection drifts.
 - Keep newly landed filesystem-create helper primitive `subr-arity` parity stable while expanding remaining filesystem helper drifts.
 - Keep newly landed `minor-mode-key-binding` runtime parity slice stable while expanding remaining interactive/keymap stub areas.
 
@@ -53,9 +54,25 @@ Last updated: 2026-02-16
 4. Keep Rust backend behind compile-time switch and preserve Emacs C core as default backend.
 5. Expand `kbd` edge corpus around uncommon modifier composition and align non-`kbd` key-description consumers with the new parser semantics where needed.
 6. Expand `recent-keys` capture beyond `read*` consumers to eventual command-loop event publication.
-7. Continue subr-arity registry drift reduction from `64` remaining mismatches using batched oracle lock-ins.
+7. Continue subr-arity registry drift reduction from `61` remaining mismatches using batched oracle lock-ins.
 
 ## Done
+
+- Aligned startup `symbol-function` alias wrappers with GNU Emacs for wrapper names:
+  - seeded startup function aliases:
+    - `count-matches -> how-many`
+    - `replace-rectangle -> string-rectangle`
+    - `wholenump -> natnump`
+  - added unit assertions in:
+    - `symbol_function_resolves_builtin_and_special_names`
+  - added oracle corpus lock-in case:
+    - `test/neovm/vm-compat/cases/symbol-function-alias-wrapper-semantics.{forms,expected.tsv}`
+    - wired into default suite: `test/neovm/vm-compat/cases/default.list`
+  - verified:
+    - `cargo test --manifest-path rust/neovm-core/Cargo.toml symbol_function_resolves_builtin_and_special_names -- --nocapture` (pass)
+    - `make -C test/neovm/vm-compat check-one-neovm CASE=cases/symbol-function-alias-wrapper-semantics` (pass)
+    - `make -C test/neovm/vm-compat check-all-neovm-strict` (pass)
+    - registry scan status: `CURRENT_SUBR_ARITY_MISMATCHES=61`
 
 - Aligned `reindent-then-newline-and-indent` `subr-arity` with GNU Emacs:
   - added explicit arity lock-in:
