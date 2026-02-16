@@ -23,6 +23,26 @@ Last updated: 2026-02-16
 
 ## Done
 
+- Aligned `global-key-binding` / `local-key-binding` partial-sequence behavior and added dedicated corpus lock-in:
+  - updated:
+    - `rust/neovm-core/src/elisp/interactive.rs`
+      - added shared partial lookup helper for keymap-facing interactive bindings:
+        - returns integer prefix lengths for overlong sequences (`1`, `2`, ...),
+        - returns keymap object representation for empty key designators,
+        - preserves nil behavior for deeper misses and for missing local map context.
+      - wired `global-key-binding` and `local-key-binding` through the partial lookup helper while keeping `key-binding` behavior unchanged.
+    - `test/neovm/vm-compat/cases/key-binding-partial-semantics.forms`
+      - added oracle probes for partial global/local key binding behavior, overlong sequences, nil miss paths, and empty-key/keymap return shape checks via `keymapp`.
+    - `test/neovm/vm-compat/cases/key-binding-partial-semantics.expected.tsv`
+      - recorded oracle baseline outputs for key-binding partial semantics.
+    - `test/neovm/vm-compat/cases/default.list`
+      - added `cases/key-binding-partial-semantics` to recurring default compatibility execution.
+  - verified:
+    - `cargo test key_binding --manifest-path rust/neovm-core/Cargo.toml` (pass)
+    - `make -C test/neovm/vm-compat check-neovm FORMS=cases/key-binding-partial-semantics.forms EXPECTED=cases/key-binding-partial-semantics.expected.tsv` (pass, 14/14)
+    - `make -C test/neovm/vm-compat check-one-neovm CASE=cases/key-binding-partial-semantics` (pass, 14/14)
+    - `make -C test/neovm/vm-compat validate-case-lists` (pass)
+
 - Aligned `lookup-key` partial-sequence return semantics and added dedicated corpus lock-in:
   - updated:
     - `rust/neovm-core/src/elisp/builtins.rs`
