@@ -55,6 +55,30 @@ Last updated: 2026-02-16
 
 ## Done
 
+- Aligned replace/window/io helper primitive `subr-arity` metadata with GNU Emacs:
+  - added explicit arity lock-ins for:
+    - `(0 . 2)`: `isearch-backward`, `isearch-forward`
+    - `(1 . 2)`: `minor-mode-key-binding`, `select-window`
+    - `(2 . 2)`: `narrow-to-region`, `remove`, `remove-variable-watcher`
+    - `(2 . 3)`: `remove-images`
+    - `(2 . 7)`: `replace-regexp`, `replace-string`
+    - `(0 . 1)`: `save-buffer`, `scroll-down-command`, `scroll-up-command`
+    - `(0 . 0)`: `selected-frame`
+    - `(1 . many)`: `set-charset-priority`
+    - `(1 . 1)`: `subr-arity`, `subr-name`, `subrp`
+    - `(2 . 2)`: `widget-get`
+    - `(3 . 3)`: `widget-put`
+    - `(3 . 7)`: `write-region`
+  - added oracle corpus lock-in case:
+    - `test/neovm/vm-compat/cases/replace-window-io-subr-arity-semantics.{forms,expected.tsv}`
+    - wired into default suite: `test/neovm/vm-compat/cases/default.list`
+  - unit coverage:
+    - `subr_arity_replace_window_io_helpers_match_oracle`
+  - verified:
+    - `cargo test --manifest-path rust/neovm-core/Cargo.toml subr_arity_replace_window_io_helpers_match_oracle -- --nocapture` (pass)
+    - `make -C test/neovm/vm-compat check-one-neovm CASE=cases/replace-window-io-subr-arity-semantics` (pass)
+    - `make -C test/neovm/vm-compat check-all-neovm-strict` (pass)
+
 - Aligned command/edit runtime helper primitive `subr-arity` metadata with GNU Emacs:
   - added explicit arity lock-ins for:
     - `(1 . 2)`: `self-insert-command`, `single-key-description`, `skip-chars-backward`, `skip-chars-forward`, `skip-syntax-backward`, `skip-syntax-forward`, `transpose-sexps`
