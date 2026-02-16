@@ -5,4 +5,4 @@
 5	(with-temp-buffer (insert "abc") (goto-char 2) (insert-rectangle 'nil) (list (point) (string-to-list (buffer-string))))	OK (2 (97 98 99))
 6	(with-temp-buffer (insert "abc") (goto-char 2) (insert-rectangle '("" "")) (list (point) (string-to-list (buffer-string))))	OK (6 (97 98 99 10 32))
 7	(condition-case err (insert-rectangle 1) (error (car err)))	OK wrong-type-argument
-8	(condition-case err (insert-rectangle '("a" 1)) (error (car err)))	OK wrong-type-argument
+8	(condition-case err (insert-rectangle '("a" 1)) (error (list (car err) (cadr err))))	OK (wrong-type-argument buffer-or-string-p)

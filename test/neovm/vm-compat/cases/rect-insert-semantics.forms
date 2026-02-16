@@ -35,4 +35,4 @@
   (insert-rectangle '("" ""))
   (list (point) (string-to-list (buffer-string))))
 (condition-case err (insert-rectangle 1) (error (car err)))
-(condition-case err (insert-rectangle '("a" 1)) (error (car err)))
+(condition-case err (insert-rectangle '("a" 1)) (error (list (car err) (cadr err))))
