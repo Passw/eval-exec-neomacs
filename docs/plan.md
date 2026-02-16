@@ -19,6 +19,19 @@ Last updated: 2026-02-15
 
 ## Done
 
+- Added documentation helper arity compatibility corpus:
+  - updated:
+    - `test/neovm/vm-compat/cases/doc-helper-arity-semantics.{forms,expected.tsv}`
+      - added lock-ins for `substitute-command-keys`, `Snarf-documentation`, `documentation`,
+        `documentation-property`, `help-function-arglist`, `describe-function`, and
+        `describe-variable` over-arity signaling.
+    - `test/neovm/vm-compat/cases/default.list`
+      - added `cases/doc-helper-arity-semantics`.
+  - verified:
+    - `make -C test/neovm/vm-compat check-one-neovm CASE=cases/doc-helper-arity-semantics` (pass, 18/18)
+    - `make -C test/neovm/vm-compat validate-case-lists` (pass)
+    - `make -C test/neovm/vm-compat check-all-neovm` (pass, full default + neovm-only corpus)
+
 - Enforced `get-load-suffixes` zero-arity semantics:
   - updated:
     - `rust/neovm-core/src/elisp/lread.rs`
