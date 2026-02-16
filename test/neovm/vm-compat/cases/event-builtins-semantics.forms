@@ -1,6 +1,8 @@
 (fboundp 'event-convert-list)
 (event-convert-list '(control ?a))
 (event-convert-list '(control ?A))
+(event-convert-list '(control ?\ ))
+(event-convert-list '(control ?\?))
 (event-convert-list '(meta ?a))
 (event-convert-list '(control meta ?a))
 (event-convert-list '(shift ?a))

@@ -5758,7 +5758,7 @@ fn builtin_event_convert_list(args: Vec<Value>) -> EvalResult {
                 code -= 32;
                 mod_bits &= !KEY_CHAR_SHIFT;
             }
-            if ctrl {
+            if ctrl && code != 32 && code != 63 {
                 if let Some(resolved) = resolve_control_code(code) {
                     if (65..=90).contains(&code) {
                         mod_bits |= KEY_CHAR_SHIFT;
