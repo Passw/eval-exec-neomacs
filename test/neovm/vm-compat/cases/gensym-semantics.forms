@@ -1,0 +1,14 @@
+; Lock in gensym uniqueness, prefix, and arity/type signaling.
+(fboundp 'gensym)
+
+(let ((a (gensym))
+      (b (gensym)))
+  (and (symbolp a)
+       (symbolp b)
+       (not (eq a b))))
+
+(let ((s (gensym "tmp-")))
+  (string-prefix-p "tmp-" (symbol-name s)))
+
+(condition-case err (gensym nil nil) (error (car err)))
+(condition-case err (gensym 1) (error (car err)))

@@ -4295,6 +4295,7 @@ pub(crate) fn builtin_propertize(args: Vec<Value>) -> EvalResult {
 pub(crate) fn builtin_gensym(args: Vec<Value>) -> EvalResult {
     use std::sync::atomic::{AtomicU64, Ordering};
     static COUNTER: AtomicU64 = AtomicU64::new(0);
+    expect_max_args("gensym", &args, 1)?;
     let prefix = if !args.is_empty() {
         expect_string(&args[0])?
     } else {
