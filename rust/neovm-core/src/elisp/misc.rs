@@ -556,6 +556,12 @@ pub(crate) fn builtin_locale_info(args: Vec<Value>) -> EvalResult {
     }
 }
 
+/// `(display-line-numbers-update-width)` -- compatibility no-op in batch mode.
+pub(crate) fn builtin_display_line_numbers_update_width(args: Vec<Value>) -> EvalResult {
+    expect_args("display-line-numbers-update-width", &args, 0)?;
+    Ok(Value::Nil)
+}
+
 // ===========================================================================
 // Eval-dependent builtins
 // ===========================================================================
@@ -971,6 +977,17 @@ mod tests {
         assert!(result.is_nil());
         let result = builtin_locale_info(vec![Value::Int(1)]).unwrap();
         assert!(result.is_nil());
+    }
+
+    #[test]
+    fn display_line_numbers_update_width_is_noop() {
+        let result = builtin_display_line_numbers_update_width(vec![]).unwrap();
+        assert_eq!(result, Value::Nil);
+    }
+
+    #[test]
+    fn display_line_numbers_update_width_arity() {
+        assert!(builtin_display_line_numbers_update_width(vec![Value::Nil]).is_err());
     }
 
     // ----- eval-dependent builtins (need Evaluator) -----

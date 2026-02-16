@@ -259,6 +259,7 @@ const DISPATCH_BUILTIN_NAMES: &[&str] = &[
     "display-color-p",
     "display-graphic-p",
     "display-images-p",
+    "display-line-numbers-update-width",
     "display-mm-height",
     "display-mm-width",
     "display-monitor-attributes-list",

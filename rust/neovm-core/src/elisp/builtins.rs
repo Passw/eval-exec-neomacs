@@ -7541,6 +7541,9 @@ pub(crate) fn dispatch_builtin(
             super::coding::builtin_set_coding_system_priority(&mut eval.coding_systems, args)
         }
         "locale-info" => super::misc::builtin_locale_info(args),
+        "display-line-numbers-update-width" => {
+            super::misc::builtin_display_line_numbers_update_width(args)
+        }
 
         // Reader/printer (pure)
         "y-or-n-p" => super::reader::builtin_y_or_n_p(args),

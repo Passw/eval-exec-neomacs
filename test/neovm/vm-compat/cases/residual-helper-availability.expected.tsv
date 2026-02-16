@@ -2,8 +2,8 @@
 2	(condition-case err (base64url-decode-string "YQ") (error err))	OK "a"
 3	(fboundp 'bool-vector-complement)	OK t
 4	(condition-case err (bool-vector-p (bool-vector-complement (make-bool-vector 2 nil))) (error err))	OK t
-5	(fboundp 'display-line-numbers-update-width)	OK nil
-6	(condition-case err (display-line-numbers-update-width) (error err))	OK (void-function display-line-numbers-update-width)
+5	(fboundp 'display-line-numbers-update-width)	OK t
+6	(condition-case err (display-line-numbers-update-width) (error err))	OK nil
 7	(fboundp 'downcase-char)	OK t
 8	(condition-case err (downcase-char 65) (error err))	OK 97
 9	(fboundp 'extract-rectangle-line)	OK nil
