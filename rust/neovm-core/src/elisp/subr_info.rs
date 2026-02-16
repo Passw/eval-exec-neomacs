@@ -423,7 +423,7 @@ fn subr_arity_value(name: &str) -> Value {
         "current-kill" => arity_cons(1, Some(2)),
         "current-time-string" | "current-time-zone" => arity_cons(0, Some(2)),
         "system-name" => arity_cons(0, Some(0)),
-        "emacs-version" => arity_cons(0, Some(1)),
+        "emacs-version" => arity_cons(0, Some(0)),
         "called-interactively-p" | "float-time" => arity_cons(0, Some(1)),
         "featurep" => arity_cons(1, Some(2)),
         "commandp" => arity_cons(1, Some(2)),
@@ -1272,7 +1272,7 @@ mod tests {
         assert_subr_arity("current-time-string", 0, Some(2));
         assert_subr_arity("current-time-zone", 0, Some(2));
         assert_subr_arity("system-name", 0, Some(0));
-        assert_subr_arity("emacs-version", 0, Some(1));
+        assert_subr_arity("emacs-version", 0, Some(0));
     }
 
     #[test]

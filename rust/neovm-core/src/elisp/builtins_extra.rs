@@ -613,10 +613,7 @@ pub(crate) fn builtin_system_name(args: Vec<Value>) -> EvalResult {
 
 /// `(emacs-version)` -> string.
 pub(crate) fn builtin_emacs_version(args: Vec<Value>) -> EvalResult {
-    expect_max_args("emacs-version", &args, 1)?;
-    if args.first().is_some_and(|arg| !arg.is_nil()) {
-        return Ok(Value::Nil);
-    }
+    expect_args("emacs-version", &args, 0)?;
     Ok(Value::string("NeoVM 0.1.0 (Neomacs)"))
 }
 
@@ -877,11 +874,17 @@ mod tests {
             other => panic!("expected signal, got {other:?}"),
         }
 
-        let version_with_nil = builtin_emacs_version(vec![Value::Nil]).unwrap();
-        assert!(version_with_nil.is_string());
+        let version_with_nil = builtin_emacs_version(vec![Value::Nil]).unwrap_err();
+        match version_with_nil {
+            Flow::Signal(sig) => assert_eq!(sig.symbol, "wrong-number-of-arguments"),
+            other => panic!("expected signal, got {other:?}"),
+        }
 
-        let version_with_non_nil = builtin_emacs_version(vec![Value::True]).unwrap();
-        assert!(version_with_non_nil.is_nil());
+        let version_with_non_nil = builtin_emacs_version(vec![Value::True]).unwrap_err();
+        match version_with_non_nil {
+            Flow::Signal(sig) => assert_eq!(sig.symbol, "wrong-number-of-arguments"),
+            other => panic!("expected signal, got {other:?}"),
+        }
 
         let version_err = builtin_emacs_version(vec![Value::Nil, Value::Nil]).unwrap_err();
         match version_err {
