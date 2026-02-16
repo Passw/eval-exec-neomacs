@@ -1121,10 +1121,9 @@ fn resolve_buffer_id(eval: &super::eval::Evaluator, val: &Value) -> Result<Buffe
                 vec![Value::string(format!("No buffer named {name}"))],
             )
         }),
-        Value::Int(n) => Ok(BufferId(*n as u64)),
         _ => Err(signal(
             "wrong-type-argument",
-            vec![Value::symbol("bufferp"), val.clone()],
+            vec![Value::symbol("stringp"), val.clone()],
         )),
     }
 }
@@ -1643,5 +1642,19 @@ mod tests {
         assert_eq!(results[0], "OK wrong-number-of-arguments");
         assert_eq!(results[1], "OK wrong-number-of-arguments");
         assert_eq!(results[2], "OK wrong-number-of-arguments");
+    }
+
+    #[test]
+    fn switch_display_pop_reject_non_buffer_designators() {
+        let results = eval_with_frame(
+            "(condition-case err (switch-to-buffer 1) (error (list (car err) (cadr err) (caddr err))))
+             (condition-case err (display-buffer 1) (error (list (car err) (cadr err) (caddr err))))
+             (condition-case err (pop-to-buffer 1) (error (list (car err) (cadr err) (caddr err))))
+             (condition-case err (set-window-buffer (selected-window) 1) (error (list (car err) (cadr err) (caddr err))))",
+        );
+        assert_eq!(results[0], "OK (wrong-type-argument stringp 1)");
+        assert_eq!(results[1], "OK (wrong-type-argument stringp 1)");
+        assert_eq!(results[2], "OK (wrong-type-argument stringp 1)");
+        assert_eq!(results[3], "OK (wrong-type-argument stringp 1)");
     }
 }
