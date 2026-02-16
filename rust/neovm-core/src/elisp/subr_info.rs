@@ -410,6 +410,12 @@ fn subr_arity_value(name: &str) -> Value {
         "encode-char" => arity_cons(2, Some(2)),
         "encode-time" => arity_cons(1, None),
         "format-time-string" => arity_cons(1, Some(3)),
+        "indent-according-to-mode" | "indent-for-tab-command" => arity_cons(0, Some(1)),
+        "indent-line-to" => arity_cons(1, Some(1)),
+        "indent-region" => arity_cons(2, Some(3)),
+        "indent-rigidly" => arity_cons(3, Some(4)),
+        "indent-to" | "move-to-column" => arity_cons(1, Some(2)),
+        "tab-to-tab-stop" => arity_cons(0, Some(0)),
         "backtrace-frame" => arity_cons(1, Some(2)),
         "run-hook-with-args" => arity_cons(1, None),
         "base64-decode-string" => arity_cons(1, Some(3)),
@@ -1124,6 +1130,18 @@ mod tests {
         assert_subr_arity("encode-coding-string", 2, Some(4));
         assert_subr_arity("encode-time", 1, None);
         assert_subr_arity("format-time-string", 1, Some(3));
+    }
+
+    #[test]
+    fn subr_arity_indent_primitives_match_oracle() {
+        assert_subr_arity("indent-according-to-mode", 0, Some(1));
+        assert_subr_arity("indent-for-tab-command", 0, Some(1));
+        assert_subr_arity("indent-line-to", 1, Some(1));
+        assert_subr_arity("indent-region", 2, Some(3));
+        assert_subr_arity("indent-rigidly", 3, Some(4));
+        assert_subr_arity("indent-to", 1, Some(2));
+        assert_subr_arity("tab-to-tab-stop", 0, Some(0));
+        assert_subr_arity("move-to-column", 1, Some(2));
     }
 
     #[test]
