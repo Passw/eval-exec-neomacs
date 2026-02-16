@@ -1,3 +1,2 @@
 # Names intentionally exposed by NeoVM but absent in GNU Emacs -Q.
 neovm-precompile-file
-word-at-point

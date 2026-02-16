@@ -895,7 +895,6 @@ const DISPATCH_BUILTIN_NAMES: &[&str] = &[
     "window-text-pixel-size",
     "window-width",
     "windowp",
-    "word-at-point",
     "word-search-backward",
     "word-search-forward",
     "write-region",
