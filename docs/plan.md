@@ -56,12 +56,13 @@ Last updated: 2026-02-16
 - Keep newly landed window designator bootstrap/type-error parity stable while expanding remaining window geometry/runtime drifts.
 - Keep newly landed window size-query default/predicate parity stable while expanding remaining window/frame-list drifts.
 - Keep newly landed `window-list` bootstrap/frame-arg parity stable while expanding remaining window object-representation drifts.
+- Keep newly landed `get-buffer-window` optional-buffer parity stable while expanding remaining window/buffer helper drifts.
 - Keep newly landed window missing-buffer/designator parity slice stable while expanding remaining window lifecycle/helper drifts.
 
 ## Next
 
 1. Keep `check-all-neovm` as a recurring post-slice gate to catch regressions early.
-2. Land the next evaluator-backed stub replacement after the window designator slice (prefer a high-impact buffer/window lifecycle helper path).
+2. Land the next evaluator-backed stub replacement after the `get-buffer-window` optional-buffer slice (prefer high-impact buffer/window lifecycle helper paths).
 3. Continue expanding oracle corpora for remaining high-risk stub areas (search/input/minibuffer/display/font edge paths) and keep list/alist primitive semantics locked in.
 4. Keep Rust backend behind compile-time switch and preserve Emacs C core as default backend.
 5. Expand `kbd` edge corpus around uncommon modifier composition and align non-`kbd` key-description consumers with the new parser semantics where needed.
@@ -70,6 +71,30 @@ Last updated: 2026-02-16
 8. Resolve the last startup wrapper-shape drift (`neovm-precompile-file`) with an explicit extension-vs-oracle policy and lock-in corpus note.
 
 ## Done
+
+- Aligned `get-buffer-window` / `get-buffer-window-list` optional-buffer semantics with GNU Emacs and added oracle lock-in:
+  - updated runtime behavior:
+    - `rust/neovm-core/src/elisp/window_cmds.rs`
+    - `get-buffer-window` now:
+      - returns `nil` for omitted/`nil` buffer argument in batch context.
+      - returns `nil` for missing string buffers and deleted buffer objects.
+      - signals `(wrong-type-argument stringp VALUE)` for non-string/non-buffer designators.
+    - `get-buffer-window-list` now:
+      - returns `nil` for omitted/`nil` buffer argument in batch context.
+      - returns `nil` when no window displays a live target buffer.
+      - signals `(error "No such live buffer <name>")` for missing string designators.
+      - signals `(error "No such live buffer #<killed buffer>")` for deleted buffer objects.
+      - signals `(error "No such buffer <printed-value>")` for non-string/non-buffer designators.
+    - removed now-unused internal helper paths (`resolve_buffer_id`, `resolve_optional_buffer_id`) after call-site parity rewrite.
+  - added evaluator regression:
+    - `get_buffer_window_and_list_match_optional_and_missing_buffer_semantics`
+  - added oracle corpus case:
+    - `test/neovm/vm-compat/cases/get-buffer-window-optional-buffer-semantics.{forms,expected.tsv}`
+    - wired into:
+      - `test/neovm/vm-compat/cases/default.list`
+  - verified:
+    - `cargo test --manifest-path rust/neovm-core/Cargo.toml get_buffer_window_and_list_match_optional_and_missing_buffer_semantics -- --nocapture` (pass)
+    - `make -C test/neovm/vm-compat check-one-neovm CASE=cases/get-buffer-window-optional-buffer-semantics` (pass)
 
 - Aligned `window-list` bootstrap and non-nil frame-argument error semantics with GNU Emacs:
   - updated runtime behavior:
