@@ -20,6 +20,20 @@ Last updated: 2026-02-16
 
 ## Done
 
+- Aligned decimal-dot number point semantics for `thing-at-point` with oracle:
+  - updated:
+    - `rust/neovm-core/src/elisp/interactive.rs`
+      - enhanced number bounds detection to accept point on decimal dot and number end-boundaries.
+      - kept numeric return values (`int`/`float`) for parsed number payloads.
+    - `test/neovm/vm-compat/cases/thing-at-point-core-semantics.forms`
+      - simplified number probes to use direct point placement after `search-forward "12"` (no manual rewinding).
+    - `test/neovm/vm-compat/cases/thing-at-point-core-semantics.expected.tsv`
+      - refreshed oracle baseline after number-point alignment.
+  - verified:
+    - `cargo test thing_at_point_number_returns_numeric_value --manifest-path rust/neovm-core/Cargo.toml` (pass)
+    - `make -C test/neovm/vm-compat check-one-neovm CASE=cases/thing-at-point-core-semantics` (pass, 8/8)
+    - `make -C test/neovm/vm-compat validate-case-lists` (pass)
+
 - Re-ran full `vm-compat` gate after core thing-at-point corpus and numeric-return alignment:
   - `make -C test/neovm/vm-compat check-all-neovm` (pass)
 
