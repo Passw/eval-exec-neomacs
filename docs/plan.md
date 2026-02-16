@@ -19,6 +19,23 @@ Last updated: 2026-02-16
 
 ## Done
 
+- Exposed `bookmark-set-annotation` as a callable bookmark helper:
+  - updated:
+    - `rust/neovm-core/src/elisp/bookmark.rs`
+      - added `bookmark-set-annotation` builtin (arity `2`) for name-based annotation updates.
+      - returns annotation string on success, `nil` when bookmark is missing.
+      - added focused unit coverage for update and missing-bookmark paths.
+    - `rust/neovm-core/src/elisp/builtins.rs`
+      - bookmark evaluator dispatch now routes `bookmark-set-annotation`.
+    - `rust/neovm-core/src/elisp/builtin_registry.rs`
+      - added `bookmark-set-annotation` to builtin registry.
+    - `test/neovm/vm-compat/cases/bookmark-helper-availability.expected.tsv`
+      - updated expectations from missing helper to callable behavior (`nil` on missing bookmark).
+  - verified:
+    - `cargo test bookmark_set_annotation --manifest-path rust/neovm-core/Cargo.toml` (pass)
+    - `make -C test/neovm/vm-compat check-one-neovm CASE=cases/bookmark-helper-availability` (pass, 10/10)
+    - `make -C test/neovm/vm-compat validate-case-lists` (pass)
+
 - Exposed `bookmark-get-annotation` as a callable bookmark helper:
   - updated:
     - `rust/neovm-core/src/elisp/bookmark.rs`
