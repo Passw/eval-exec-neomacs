@@ -25,6 +25,18 @@ Last updated: 2026-02-16
 
 ## Done
 
+- Expanded vm-compat oracle lock-in for `event-apply-modifier` low-ASCII behavior:
+  - added new case:
+    - `test/neovm/vm-compat/cases/event-apply-low-ascii-matrix-semantics.forms`
+    - `test/neovm/vm-compat/cases/event-apply-low-ascii-matrix-semantics.expected.tsv`
+    - matrix coverage:
+      - `event-apply-modifier` with `control` and `shift` over integer codes `0..127`.
+  - updated case list:
+    - `test/neovm/vm-compat/cases/default.list`
+  - verified:
+    - `make -C test/neovm/vm-compat check-one-neovm CASE=cases/event-apply-low-ascii-matrix-semantics` (pass, 257/257)
+    - `make -C test/neovm/vm-compat validate-case-lists` (pass)
+
 - Aligned `event-apply-modifier` low-ASCII control/shift edge semantics with oracle and locked coverage:
   - updated:
     - `rust/neovm-core/src/elisp/builtins.rs`
