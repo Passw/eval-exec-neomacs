@@ -4589,7 +4589,15 @@ pub(crate) fn builtin_set_buffer(
 ) -> EvalResult {
     expect_args("set-buffer", &args, 1)?;
     let id = match &args[0] {
-        Value::Buffer(id) => *id,
+        Value::Buffer(id) => {
+            if eval.buffers.get(*id).is_none() {
+                return Err(signal(
+                    "error",
+                    vec![Value::string("Selecting deleted buffer")],
+                ));
+            }
+            *id
+        }
         Value::Str(s) => eval
             .buffers
             .find_buffer_by_name(s)
@@ -9820,6 +9828,23 @@ mod tests {
         }
 
         let _ = builtin_kill_buffer(&mut eval, vec![b]).unwrap();
+    }
+
+    #[test]
+    fn set_buffer_rejects_deleted_buffer_object() {
+        let mut eval = super::super::eval::Evaluator::new();
+        let dead = builtin_generate_new_buffer(&mut eval, vec![Value::string("*sb-dead*")]).unwrap();
+        let _ = builtin_kill_buffer(&mut eval, vec![dead.clone()]).unwrap();
+
+        let err = builtin_set_buffer(&mut eval, vec![dead])
+            .expect_err("set-buffer should reject deleted buffer objects");
+        match err {
+            Flow::Signal(sig) => {
+                assert_eq!(sig.symbol, "error");
+                assert_eq!(sig.data, vec![Value::string("Selecting deleted buffer")]);
+            }
+            other => panic!("unexpected flow: {other:?}"),
+        }
     }
 
     #[test]

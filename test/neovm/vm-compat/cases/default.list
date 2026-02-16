@@ -335,6 +335,7 @@ cases/window-buffer-switch-semantics
 cases/window-buffer-designator-errors-semantics
 cases/other-buffer-semantics
 cases/kill-buffer-runtime-semantics
+cases/set-buffer-dead-buffer-semantics
 cases/default-directory
 cases/expand-file-name-default-directory
 cases/directory-file-name
