@@ -696,6 +696,11 @@ pub(crate) fn builtin_cl_position(eval: &mut super::eval::Evaluator, args: Vec<V
     builtin_seq_position(eval, forwarded)
 }
 
+/// `(cl-reduce FUNCTION SEQ &optional INITIAL-VALUE)` -- CL alias for `seq-reduce`.
+pub(crate) fn builtin_cl_reduce(eval: &mut super::eval::Evaluator, args: Vec<Value>) -> EvalResult {
+    builtin_seq_reduce(eval, args)
+}
+
 /// `(seq-contains-p SEQ ELT &optional TESTFN)` — membership test for sequence.
 pub(crate) fn builtin_seq_contains_p(eval: &mut super::eval::Evaluator, args: Vec<Value>) -> EvalResult {
     if !(2..=3).contains(&args.len()) {
@@ -1432,5 +1437,14 @@ mod tests {
     fn cl_position_wrong_arity() {
         let mut evaluator = super::super::eval::Evaluator::new();
         assert!(builtin_cl_position(&mut evaluator, vec![Value::symbol("a")]).is_err());
+    }
+
+    #[test]
+    fn cl_reduce_with_eval() {
+        let mut evaluator = super::super::eval::Evaluator::new();
+        let func = Value::Subr("+".to_string());
+        let seq = Value::list(vec![Value::Int(1), Value::Int(2), Value::Int(3)]);
+        let result = builtin_cl_reduce(&mut evaluator, vec![func, seq, Value::Int(0)]).unwrap();
+        assert_eq!(result.as_int(), Some(6));
     }
 }

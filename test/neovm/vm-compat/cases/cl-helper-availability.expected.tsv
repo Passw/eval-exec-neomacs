@@ -46,8 +46,8 @@
 46	(condition-case err (cl-plusp 1) (error err))	OK t
 47	(fboundp 'cl-position)	OK t
 48	(condition-case err (cl-position 'b '(a b c)) (error err))	OK 1
-49	(fboundp 'cl-reduce)	OK nil
-50	(condition-case err (cl-reduce) (error err))	OK (void-function cl-reduce)
+49	(fboundp 'cl-reduce)	OK t
+50	(condition-case err (cl-reduce '+ '(1 2 3) 0) (error err))	OK 6
 51	(fboundp 'cl-remove)	OK t
 52	(condition-case err (cl-remove 'a '(a b a)) (error err))	OK (b)
 53	(fboundp 'cl-remove-duplicates)	OK t

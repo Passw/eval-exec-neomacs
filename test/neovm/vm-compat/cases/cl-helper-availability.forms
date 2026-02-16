@@ -47,7 +47,7 @@
 (fboundp 'cl-position)
 (condition-case err (cl-position 'b '(a b c)) (error err))
 (fboundp 'cl-reduce)
-(condition-case err (cl-reduce) (error err))
+(condition-case err (cl-reduce '+ '(1 2 3) 0) (error err))
 (fboundp 'cl-remove)
 (condition-case err (cl-remove 'a '(a b a)) (error err))
 (fboundp 'cl-remove-duplicates)
