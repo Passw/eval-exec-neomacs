@@ -328,9 +328,11 @@ fn subr_arity_value(name: &str) -> Value {
         | "forward-line" => arity_cons(0, Some(1)),
         "current-buffer" | "buffer-string" | "point" | "point-max" | "point-min" | "bobp"
         | "eobp" | "bolp" | "eolp" | "erase-buffer" | "widen" => arity_cons(0, Some(0)),
+        "following-char" | "garbage-collect" | "get-load-suffixes" => arity_cons(0, Some(0)),
         "buffer-file-name" | "buffer-name" | "buffer-size" | "buffer-modified-p"
         | "buffer-list" | "buffer-disable-undo" | "buffer-enable-undo" | "buffer-hash"
         | "buffer-local-variables" => arity_cons(0, Some(1)),
+        "get-byte" => arity_cons(0, Some(2)),
         "get-buffer" | "get-file-buffer" => arity_cons(1, Some(1)),
         "get-buffer-create" | "generate-new-buffer-name" | "generate-new-buffer" => {
             arity_cons(1, Some(2))
@@ -348,6 +350,9 @@ fn subr_arity_value(name: &str) -> Value {
         "char-charset" => arity_cons(1, Some(2)),
         "char-table-extra-slot" | "char-table-range" => arity_cons(2, Some(2)),
         "decode-char" => arity_cons(2, Some(2)),
+        "fceiling" | "ffloor" | "frexp" | "fround" | "framep" | "ftruncate" | "fixnump" => {
+            arity_cons(1, Some(1))
+        }
         "bignump" | "boundp" | "byte-code-function-p" | "car-safe" | "cdr-safe" => {
             arity_cons(1, Some(1))
         }
@@ -1339,6 +1344,21 @@ mod tests {
         assert_subr_arity("get-file-buffer", 1, Some(1));
         assert_subr_arity("generate-new-buffer-name", 1, Some(2));
         assert_subr_arity("generate-new-buffer", 1, Some(2));
+    }
+
+    #[test]
+    fn subr_arity_numeric_state_helper_primitives_match_oracle() {
+        assert_subr_arity("fceiling", 1, Some(1));
+        assert_subr_arity("ffloor", 1, Some(1));
+        assert_subr_arity("frexp", 1, Some(1));
+        assert_subr_arity("fround", 1, Some(1));
+        assert_subr_arity("framep", 1, Some(1));
+        assert_subr_arity("ftruncate", 1, Some(1));
+        assert_subr_arity("fixnump", 1, Some(1));
+        assert_subr_arity("following-char", 0, Some(0));
+        assert_subr_arity("garbage-collect", 0, Some(0));
+        assert_subr_arity("get-load-suffixes", 0, Some(0));
+        assert_subr_arity("get-byte", 0, Some(2));
     }
 
     #[test]
