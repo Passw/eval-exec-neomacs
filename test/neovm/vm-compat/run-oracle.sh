@@ -32,4 +32,11 @@ if [[ ! -x "$emacs_bin" ]]; then
   exit 127
 fi
 
+version_banner="$("$emacs_bin" --version 2>/dev/null | head -n 1 || true)"
+if [[ "$version_banner" =~ [Nn][Ee][Oo][Mm][Aa][Cc][Ss] ]] || [[ "$emacs_bin" =~ [Nn][Ee][Oo][Mm][Aa][Cc][Ss] ]]; then
+  echo "oracle emacs binary appears to be Neomacs, not GNU Emacs: $emacs_bin" >&2
+  echo "set NEOVM_ORACLE_EMACS/ORACLE_EMACS to an official GNU Emacs binary" >&2
+  exit 2
+fi
+
 NEOVM_FORMS_FILE="$forms_file_abs" "$emacs_bin" --batch -Q -l "$oracle_el" 2>/dev/null
