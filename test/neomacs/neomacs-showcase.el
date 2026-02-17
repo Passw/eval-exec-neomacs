@@ -1100,7 +1100,7 @@ The future of text editing is here.  It's called Neomacs.
         (unwind-protect
             (progn
               (select-frame f 'norecord)
-              (insert (propertize "Floating Image\n" 'face '(:foreground "gold" :weight bold)))
+              (insert (propertize "Floating Image\n" 'face '(:foreground "gold")))
               (condition-case nil
                   (let ((img (create-image showcase--image-path nil nil
                                            :max-width 280 :max-height 180)))
@@ -1120,7 +1120,7 @@ The future of text editing is here.  It's called Neomacs.
         (unwind-protect
             (progn
               (select-frame f 'norecord)
-              (insert (propertize "Floating Video\n" 'face '(:foreground "gold" :weight bold)))
+              (insert (propertize "Floating Video\n" 'face '(:foreground "gold")))
               (condition-case nil
                   (let* ((uri (concat "file://" (expand-file-name showcase--video-path)))
                          (video-id (neomacs-video-load uri)))
@@ -1150,9 +1150,9 @@ The future of text editing is here.  It's called Neomacs.
           (unwind-protect
               (progn
                 (select-frame f 'norecord)
-                (insert (propertize "Documentation\n" 'face '(:foreground "cyan" :weight bold :height 1.3)))
+                (insert (propertize "Documentation\n" 'face '(:foreground "cyan" :height 1.3)))
                 (insert "\n")
-                (insert (propertize "neomacs-set-child-frame-style" 'face '(:foreground "#FF6633" :weight bold)))
+                (insert (propertize "neomacs-set-child-frame-style" 'face '(:foreground "#FF6633")))
                 (insert "\n\n")
                 (insert "  :corner-radius  16\n")
                 (insert "  :shadow         t\n")
