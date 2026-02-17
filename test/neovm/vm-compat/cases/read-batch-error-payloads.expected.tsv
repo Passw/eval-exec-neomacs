@@ -31,3 +31,7 @@
 31	(condition-case err (progn (setq unread-command-events '((1 2))) (read-coding-system "Coding: ")) (error (list (car err) unread-command-events)))	OK (end-of-file ((1 2)))
 32	(condition-case err (progn (setq unread-command-events '([1 2])) (read-non-nil-coding-system "Coding: ")) (error (list (car err) unread-command-events)))	OK (end-of-file ([1 2]))
 33	(condition-case err (progn (setq unread-command-events '(foo)) (read-non-nil-coding-system "Coding: ")) (error (list (car err) unread-command-events)))	OK (end-of-file (foo))
+34	(condition-case err (progn (setq unread-command-events '(97)) (read-file-name "f")) (error (list (car err) unread-command-events)))	OK (end-of-file (97))
+35	(condition-case err (progn (setq unread-command-events '((1 2))) (read-file-name "f")) (error (list (car err) unread-command-events)))	OK (end-of-file ((1 2)))
+36	(condition-case err (progn (setq unread-command-events '(97)) (read-directory-name "d")) (error (list (car err) unread-command-events)))	OK (end-of-file (97))
+37	(condition-case err (progn (setq unread-command-events '(foo)) (read-buffer "")) (error (list (car err) unread-command-events)))	OK (end-of-file (foo))
