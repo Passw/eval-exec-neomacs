@@ -79,6 +79,13 @@ cd test/neovm/vm-compat
 make list-cases
 ```
 
+Get a compact status snapshot (case counts + builtin registry counts + allowlist size):
+
+```bash
+cd test/neovm/vm-compat
+make compat-progress
+```
+
 Run any case list file directly (avoids passing very long `CASES=...` values):
 
 ```bash
