@@ -34,3 +34,13 @@
 34	(let ((tm (run-at-time ".5e2sec" nil #'ignore))) (prog1 (timerp tm) (cancel-timer tm)))	OK t
 35	(let ((tm (run-at-time "1e+1 sec" nil #'ignore))) (prog1 (timerp tm) (cancel-timer tm)))	OK t
 36	(let ((tm (run-at-time "1e+ 1 sec" nil #'ignore))) (prog1 (timerp tm) (cancel-timer tm)))	OK t
+37	(let ((tm (run-at-time "1 +2 sec" nil #'ignore))) (prog1 (timerp tm) (cancel-timer tm)))	OK t
+38	(let ((tm (run-at-time "1 +2e3 sec" nil #'ignore))) (prog1 (timerp tm) (cancel-timer tm)))	OK t
+39	(let ((tm (run-at-time "1 -2 sec" nil #'ignore))) (prog1 (timerp tm) (cancel-timer tm)))	OK t
+40	(let ((tm (run-at-time "1 -2e2 sec" nil #'ignore))) (prog1 (timerp tm) (cancel-timer tm)))	OK t
+41	(let ((tm (run-at-time "1 e2 sec" nil #'ignore))) (prog1 (timerp tm) (cancel-timer tm)))	OK t
+42	(let ((tm (run-at-time "1 2e3 sec" nil #'ignore))) (prog1 (timerp tm) (cancel-timer tm)))	OK t
+43	(let ((tm (run-at-time "1 - +2 sec" nil #'ignore))) (prog1 (timerp tm) (cancel-timer tm)))	OK t
+44	(let ((tm (run-at-time "1 + 2 sec" nil #'ignore))) (prog1 (timerp tm) (cancel-timer tm)))	OK t
+45	(let ((tm (run-at-time "1 - 2 sec" nil #'ignore))) (prog1 (timerp tm) (cancel-timer tm)))	OK t
+46	(let ((tm (run-at-time "1 + 2e 3 sec" nil #'ignore))) (prog1 (timerp tm) (cancel-timer tm)))	OK t

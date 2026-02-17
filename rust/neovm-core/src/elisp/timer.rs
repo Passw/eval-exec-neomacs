@@ -292,6 +292,27 @@ fn parse_concatenated_time_delay_spec(spec: &str) -> Option<f64> {
     None
 }
 
+fn parse_spaced_run_at_time_delay(tokens: &[&str]) -> Option<f64> {
+    let (unit_index, multiplier) = tokens
+        .iter()
+        .enumerate()
+        .rev()
+        .find_map(|(index, token)| parse_time_unit_factor(token).map(|factor| (index, factor)))?;
+
+    let number_tokens = &tokens[..unit_index];
+    if number_tokens.is_empty() {
+        return None;
+    }
+
+    for token in number_tokens.iter().rev() {
+        if let Ok(delay) = token.parse::<f64>() {
+            return Some(delay * multiplier);
+        }
+    }
+
+    None
+}
+
 fn parse_run_at_time_delay(value: &Value) -> Result<f64, Flow> {
     match value {
         Value::Nil => Ok(0.0),
@@ -321,40 +342,8 @@ fn parse_run_at_time_delay(value: &Value) -> Result<f64, Flow> {
                 }
             }
 
-            if tokens.len() == 2 {
-                if tokens[0] == "+" || tokens[0] == "-" {
-                    let token = format!("{}{}", tokens[0], tokens[1]);
-                    if let Some(delay) = parse_concatenated_time_delay_spec(&token) {
-                        return Ok(delay);
-                    }
-                }
-
-                if let Ok(delay) = tokens[0].parse::<f64>() {
-                    let factor = parse_time_unit_factor(tokens[1]);
-                    if let Some(multiplier) = factor {
-                        return Ok(delay * multiplier);
-                    }
-
-                    return Err(signal(
-                        "error",
-                        vec![Value::string("Invalid time specification")],
-                    ));
-                }
-            } else if tokens.len() == 3 {
-                if tokens[0] == "+" || tokens[0] == "-" {
-                    if let Ok(delay) = tokens[1].parse::<f64>() {
-                        let factor = parse_time_unit_factor(tokens[2]);
-                        if let Some(multiplier) = factor {
-                            let sign = if tokens[0] == "+" { 1.0 } else { -1.0 };
-                            return Ok(delay * sign * multiplier);
-                        }
-
-                        return Err(signal(
-                            "error",
-                            vec![Value::string("Invalid time specification")],
-                        ));
-                    }
-                }
+            if let Some(delay) = parse_spaced_run_at_time_delay(&tokens) {
+                return Ok(delay);
             }
 
             Err(signal(
@@ -1000,6 +989,41 @@ mod tests {
             parse_run_at_time_delay(&Value::string("+ 1 5 sec"))
                 .expect("+ 1 5 sec should parse"),
             15.0
+        );
+        assert_eq!(
+            parse_run_at_time_delay(&Value::string("1 +2 sec")).expect("1 +2 sec should parse"),
+            2.0
+        );
+        assert_eq!(
+            parse_run_at_time_delay(&Value::string("1 +2e3 sec"))
+                .expect("1 +2e3 sec should parse"),
+            2_000.0
+        );
+        assert_eq!(
+            parse_run_at_time_delay(&Value::string("1 -2 sec")).expect("1 -2 sec should parse"),
+            -2.0
+        );
+        assert_eq!(
+            parse_run_at_time_delay(&Value::string("1 -2e2 sec"))
+                .expect("1 -2e2 sec should parse"),
+            -200.0
+        );
+        assert_eq!(
+            parse_run_at_time_delay(&Value::string("1 - +2 sec")).expect("1 - +2 sec should parse"),
+            2.0
+        );
+        assert_eq!(
+            parse_run_at_time_delay(&Value::string("1 + 2 sec")).expect("1 + 2 sec should parse"),
+            2.0
+        );
+        assert_eq!(
+            parse_run_at_time_delay(&Value::string("1 - 2 sec")).expect("1 - 2 sec should parse"),
+            2.0
+        );
+        assert_eq!(
+            parse_run_at_time_delay(&Value::string("1 + 2e 3 sec"))
+                .expect("1 + 2e 3 sec should parse"),
+            3.0
         );
         assert_eq!(
             parse_run_at_time_delay(&Value::string("1 2 3 min"))
