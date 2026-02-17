@@ -428,11 +428,7 @@ fn help_arglist_from_quoted_lambda(function: &Value) -> Option<Value> {
 fn help_arglist_from_subr_name(name: &str, preserve_names: bool) -> Option<Value> {
     if name == "-" {
         return Some(if preserve_names {
-            help_arglist(
-                &[],
-                &["number-or-marker"],
-                Some("more-numbers-or-markers"),
-            )
+            help_arglist(&[], &["number-or-marker"], Some("more-numbers-or-markers"))
         } else {
             help_arglist(&[], &[], Some("rest"))
         });
@@ -853,11 +849,9 @@ mod tests {
 
     #[test]
     fn help_function_arglist_event_apply_modifier_preserve_names() {
-        let result = builtin_help_function_arglist(vec![
-            Value::symbol("event-apply-modifier"),
-            Value::True,
-        ])
-        .unwrap();
+        let result =
+            builtin_help_function_arglist(vec![Value::symbol("event-apply-modifier"), Value::True])
+                .unwrap();
         assert_eq!(
             arglist_names(&result),
             vec![
@@ -871,7 +865,8 @@ mod tests {
 
     #[test]
     fn help_function_arglist_condition_notify_optional_arg() {
-        let result = builtin_help_function_arglist(vec![Value::symbol("condition-notify")]).unwrap();
+        let result =
+            builtin_help_function_arglist(vec![Value::symbol("condition-notify")]).unwrap();
         assert_eq!(
             arglist_names(&result),
             vec![
@@ -884,8 +879,8 @@ mod tests {
 
     #[test]
     fn help_function_arglist_lambda_params() {
-        let result = builtin_help_function_arglist(vec![Value::Lambda(std::sync::Arc::new(
-            LambdaData {
+        let result =
+            builtin_help_function_arglist(vec![Value::Lambda(std::sync::Arc::new(LambdaData {
                 params: LambdaParams {
                     required: vec!["x".to_string()],
                     optional: vec!["y".to_string()],
@@ -894,9 +889,8 @@ mod tests {
                 body: vec![],
                 env: None,
                 docstring: None,
-            },
-        ))])
-        .unwrap();
+            }))])
+            .unwrap();
         assert_eq!(
             arglist_names(&result),
             vec![
@@ -990,10 +984,14 @@ mod tests {
     #[test]
     fn documentation_prefers_function_documentation_property() {
         let mut evaluator = super::super::eval::Evaluator::new();
-        evaluator.obarray.set_symbol_function("doc-prop", Value::Int(7));
         evaluator
             .obarray
-            .put_property("doc-prop", "function-documentation", Value::string("propdoc"));
+            .set_symbol_function("doc-prop", Value::Int(7));
+        evaluator.obarray.put_property(
+            "doc-prop",
+            "function-documentation",
+            Value::string("propdoc"),
+        );
 
         let result = builtin_documentation(&mut evaluator, vec![Value::symbol("doc-prop")]);
         assert_eq!(result.unwrap().as_str(), Some("propdoc"));
@@ -1002,7 +1000,9 @@ mod tests {
     #[test]
     fn documentation_non_string_function_documentation_property_returns_nil() {
         let mut evaluator = super::super::eval::Evaluator::new();
-        evaluator.obarray.set_symbol_function("doc-prop", Value::Int(7));
+        evaluator
+            .obarray
+            .set_symbol_function("doc-prop", Value::Int(7));
         evaluator
             .obarray
             .put_property("doc-prop", "function-documentation", Value::Int(9));
@@ -1125,10 +1125,8 @@ mod tests {
         let mut evaluator = super::super::eval::Evaluator::new();
         evaluator.obarray.set_symbol_value("x", Value::Int(10));
 
-        let result = builtin_describe_variable(
-            &mut evaluator,
-            vec![Value::symbol("x"), Value::Nil],
-        );
+        let result =
+            builtin_describe_variable(&mut evaluator, vec![Value::symbol("x"), Value::Nil]);
         assert!(result.is_ok());
         assert!(result.unwrap().as_str().is_some());
     }
@@ -1142,7 +1140,10 @@ mod tests {
 
         let result = builtin_documentation_property_eval(
             &mut evaluator,
-            vec![Value::symbol("doc-sym"), Value::symbol("variable-documentation")],
+            vec![
+                Value::symbol("doc-sym"),
+                Value::symbol("variable-documentation"),
+            ],
         )
         .unwrap();
         assert_eq!(result.as_str(), Some("doc"));
@@ -1157,7 +1158,10 @@ mod tests {
 
         let result = builtin_documentation_property_eval(
             &mut evaluator,
-            vec![Value::symbol("doc-sym"), Value::symbol("variable-documentation")],
+            vec![
+                Value::symbol("doc-sym"),
+                Value::symbol("variable-documentation"),
+            ],
         )
         .unwrap();
         assert!(result.is_nil());

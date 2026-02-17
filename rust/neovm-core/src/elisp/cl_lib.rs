@@ -558,7 +558,10 @@ pub(crate) fn builtin_seq_concatenate(args: Vec<Value>) -> EvalResult {
     if target != "list" && target != "vector" && target != "string" {
         return Err(signal(
             "error",
-            vec![Value::string(format!("Not a sequence type name: {}", target))],
+            vec![Value::string(format!(
+                "Not a sequence type name: {}",
+                target
+            ))],
         ));
     }
 
@@ -659,7 +662,10 @@ pub(crate) fn builtin_seq_max(args: Vec<Value>) -> EvalResult {
 // ===========================================================================
 
 /// `(seq-position SEQ ELT &optional TESTFN)` — return first matching index.
-pub(crate) fn builtin_seq_position(eval: &mut super::eval::Evaluator, args: Vec<Value>) -> EvalResult {
+pub(crate) fn builtin_seq_position(
+    eval: &mut super::eval::Evaluator,
+    args: Vec<Value>,
+) -> EvalResult {
     expect_min_args("seq-position", &args, 2)?;
     let seq = &args[0];
     let target = args[1].clone();
@@ -685,7 +691,10 @@ pub(crate) fn builtin_seq_position(eval: &mut super::eval::Evaluator, args: Vec<
 }
 
 /// `(cl-position ITEM SEQ &optional TESTFN)` -- CL argument order wrapper.
-pub(crate) fn builtin_cl_position(eval: &mut super::eval::Evaluator, args: Vec<Value>) -> EvalResult {
+pub(crate) fn builtin_cl_position(
+    eval: &mut super::eval::Evaluator,
+    args: Vec<Value>,
+) -> EvalResult {
     expect_min_args("cl-position", &args, 2)?;
     expect_max_args("cl-position", &args, 3)?;
 
@@ -797,7 +806,10 @@ pub(crate) fn builtin_cl_subsetp(args: Vec<Value>) -> EvalResult {
     let right = seq_position_elements(&args[1])?;
 
     for item in left {
-        if !right.iter().any(|candidate| equal_value(&item, candidate, 0)) {
+        if !right
+            .iter()
+            .any(|candidate| equal_value(&item, candidate, 0))
+        {
             return Ok(Value::Nil);
         }
     }
@@ -812,7 +824,9 @@ pub(crate) fn builtin_cl_intersection(args: Vec<Value>) -> EvalResult {
 
     let mut out = Vec::new();
     for item in left {
-        let in_right = right.iter().any(|candidate| equal_value(&item, candidate, 0));
+        let in_right = right
+            .iter()
+            .any(|candidate| equal_value(&item, candidate, 0));
         let already_in_out = out.iter().any(|seen| equal_value(&item, seen, 0));
         if in_right && !already_in_out {
             out.push(item);
@@ -829,7 +843,9 @@ pub(crate) fn builtin_cl_set_difference(args: Vec<Value>) -> EvalResult {
 
     let mut out = Vec::new();
     for item in left {
-        let in_right = right.iter().any(|candidate| equal_value(&item, candidate, 0));
+        let in_right = right
+            .iter()
+            .any(|candidate| equal_value(&item, candidate, 0));
         let already_in_out = out.iter().any(|seen| equal_value(&item, seen, 0));
         if !in_right && !already_in_out {
             out.push(item);
@@ -941,34 +957,41 @@ pub(crate) fn builtin_cl_map(eval: &mut super::eval::Evaluator, args: Vec<Value>
         Value::Symbol(s) if s == "list" => Ok(mapped),
         Value::Symbol(s) if s == "vector" => {
             let items = list_to_vec(&mapped).ok_or_else(|| {
-                signal("wrong-type-argument", vec![Value::symbol("listp"), mapped.clone()])
+                signal(
+                    "wrong-type-argument",
+                    vec![Value::symbol("listp"), mapped.clone()],
+                )
             })?;
             Ok(Value::vector(items))
         }
         Value::Symbol(s) if s == "string" => {
             let items = list_to_vec(&mapped).ok_or_else(|| {
-                signal("wrong-type-argument", vec![Value::symbol("listp"), mapped.clone()])
+                signal(
+                    "wrong-type-argument",
+                    vec![Value::symbol("listp"), mapped.clone()],
+                )
             })?;
             let mut out = String::new();
             for item in items {
-                let ch = match item {
-                    Value::Char(c) => c,
-                    Value::Int(n) => u32::try_from(n)
-                        .ok()
-                        .and_then(char::from_u32)
-                        .ok_or_else(|| {
-                            signal(
+                let ch =
+                    match item {
+                        Value::Char(c) => c,
+                        Value::Int(n) => u32::try_from(n)
+                            .ok()
+                            .and_then(char::from_u32)
+                            .ok_or_else(|| {
+                                signal(
+                                    "wrong-type-argument",
+                                    vec![Value::symbol("characterp"), Value::Int(n)],
+                                )
+                            })?,
+                        other => {
+                            return Err(signal(
                                 "wrong-type-argument",
-                                vec![Value::symbol("characterp"), Value::Int(n)],
-                            )
-                        })?,
-                    other => {
-                        return Err(signal(
-                            "wrong-type-argument",
-                            vec![Value::symbol("characterp"), other],
-                        ))
-                    }
-                };
+                                vec![Value::symbol("characterp"), other],
+                            ))
+                        }
+                    };
                 out.push(ch);
             }
             Ok(Value::string(out))
@@ -984,11 +1007,17 @@ pub(crate) fn builtin_cl_map(eval: &mut super::eval::Evaluator, args: Vec<Value>
 }
 
 /// `(seq-contains-p SEQ ELT &optional TESTFN)` — membership test for sequence.
-pub(crate) fn builtin_seq_contains_p(eval: &mut super::eval::Evaluator, args: Vec<Value>) -> EvalResult {
+pub(crate) fn builtin_seq_contains_p(
+    eval: &mut super::eval::Evaluator,
+    args: Vec<Value>,
+) -> EvalResult {
     if !(2..=3).contains(&args.len()) {
         return Err(signal(
             "wrong-number-of-arguments",
-            vec![Value::symbol("seq-contains-p"), Value::Int(args.len() as i64)],
+            vec![
+                Value::symbol("seq-contains-p"),
+                Value::Int(args.len() as i64),
+            ],
         ));
     }
     let seq = &args[0];
@@ -1058,7 +1087,10 @@ pub(crate) fn builtin_seq_count(eval: &mut super::eval::Evaluator, args: Vec<Val
 }
 
 /// `(seq-reduce FN SEQ INITIAL)` — reduce with initial value.
-pub(crate) fn builtin_seq_reduce(eval: &mut super::eval::Evaluator, args: Vec<Value>) -> EvalResult {
+pub(crate) fn builtin_seq_reduce(
+    eval: &mut super::eval::Evaluator,
+    args: Vec<Value>,
+) -> EvalResult {
     expect_args("seq-reduce", &args, 3)?;
     let func = args[0].clone();
     let elems = collect_sequence(&args[1]);
@@ -1084,7 +1116,10 @@ pub(crate) fn builtin_seq_some(eval: &mut super::eval::Evaluator, args: Vec<Valu
 }
 
 /// `(seq-every-p PRED SEQ)` — all elements match predicate.
-pub(crate) fn builtin_seq_every_p(eval: &mut super::eval::Evaluator, args: Vec<Value>) -> EvalResult {
+pub(crate) fn builtin_seq_every_p(
+    eval: &mut super::eval::Evaluator,
+    args: Vec<Value>,
+) -> EvalResult {
     expect_args("seq-every-p", &args, 2)?;
     let pred = args[0].clone();
     let elems = collect_sequence(&args[1]);
@@ -1387,7 +1422,11 @@ mod tests {
 
     #[test]
     fn cl_rest_list() {
-        let list = Value::list(vec![Value::symbol("a"), Value::symbol("b"), Value::symbol("c")]);
+        let list = Value::list(vec![
+            Value::symbol("a"),
+            Value::symbol("b"),
+            Value::symbol("c"),
+        ]);
         let result = builtin_cl_rest(vec![list]).unwrap();
         let items = list_to_vec(&result).unwrap();
         assert_eq!(items.len(), 2);
@@ -1476,7 +1515,11 @@ mod tests {
     #[test]
     fn cl_subseq_list() {
         let result = builtin_cl_subseq(vec![
-            Value::list(vec![Value::symbol("a"), Value::symbol("b"), Value::symbol("c")]),
+            Value::list(vec![
+                Value::symbol("a"),
+                Value::symbol("b"),
+                Value::symbol("c"),
+            ]),
             Value::Int(1),
             Value::Int(3),
         ])
@@ -1507,7 +1550,11 @@ mod tests {
         .unwrap();
         assert_eq!(
             result,
-            Value::list(vec![Value::symbol("a"), Value::symbol("b"), Value::symbol("c")])
+            Value::list(vec![
+                Value::symbol("a"),
+                Value::symbol("b"),
+                Value::symbol("c")
+            ])
         );
     }
 
@@ -1520,10 +1567,17 @@ mod tests {
     fn cl_member_found_tail() {
         let result = builtin_cl_member(vec![
             Value::symbol("b"),
-            Value::list(vec![Value::symbol("a"), Value::symbol("b"), Value::symbol("c")]),
+            Value::list(vec![
+                Value::symbol("a"),
+                Value::symbol("b"),
+                Value::symbol("c"),
+            ]),
         ])
         .unwrap();
-        assert_eq!(result, Value::list(vec![Value::symbol("b"), Value::symbol("c")]));
+        assert_eq!(
+            result,
+            Value::list(vec![Value::symbol("b"), Value::symbol("c")])
+        );
     }
 
     #[test]
@@ -1548,7 +1602,10 @@ mod tests {
             Value::symbol("vector"),
         ])
         .unwrap();
-        assert_eq!(result, Value::vector(vec![Value::symbol("a"), Value::symbol("b")]));
+        assert_eq!(
+            result,
+            Value::vector(vec![Value::symbol("a"), Value::symbol("b")])
+        );
     }
 
     #[test]
@@ -1565,7 +1622,11 @@ mod tests {
         .unwrap();
         assert_eq!(
             result,
-            Value::list(vec![Value::symbol("a"), Value::symbol("b"), Value::symbol("c")])
+            Value::list(vec![
+                Value::symbol("a"),
+                Value::symbol("b"),
+                Value::symbol("c")
+            ])
         );
     }
 
@@ -1585,7 +1646,11 @@ mod tests {
     fn cl_remove_filters_equal_items() {
         let result = builtin_cl_remove(vec![
             Value::symbol("a"),
-            Value::list(vec![Value::symbol("a"), Value::symbol("b"), Value::symbol("a")]),
+            Value::list(vec![
+                Value::symbol("a"),
+                Value::symbol("b"),
+                Value::symbol("a"),
+            ]),
         ])
         .unwrap();
         assert_eq!(result, Value::list(vec![Value::symbol("b")]));
@@ -1608,7 +1673,11 @@ mod tests {
         .unwrap();
         assert_eq!(
             result,
-            Value::list(vec![Value::symbol("a"), Value::symbol("b"), Value::symbol("c")])
+            Value::list(vec![
+                Value::symbol("a"),
+                Value::symbol("b"),
+                Value::symbol("c")
+            ])
         );
     }
 
@@ -1710,7 +1779,11 @@ mod tests {
     #[test]
     fn cl_position_with_eval() {
         let mut evaluator = super::super::eval::Evaluator::new();
-        let seq = Value::list(vec![Value::symbol("a"), Value::symbol("b"), Value::symbol("c")]);
+        let seq = Value::list(vec![
+            Value::symbol("a"),
+            Value::symbol("b"),
+            Value::symbol("c"),
+        ]);
         let result = builtin_cl_position(&mut evaluator, vec![Value::symbol("b"), seq]).unwrap();
         assert_eq!(result.as_int(), Some(1));
     }
@@ -1811,7 +1884,11 @@ mod tests {
     fn cl_find_found() {
         let result = builtin_cl_find(vec![
             Value::symbol("b"),
-            Value::list(vec![Value::symbol("a"), Value::symbol("b"), Value::symbol("c")]),
+            Value::list(vec![
+                Value::symbol("a"),
+                Value::symbol("b"),
+                Value::symbol("c"),
+            ]),
         ])
         .unwrap();
         assert_eq!(result, Value::symbol("b"));
@@ -1821,7 +1898,11 @@ mod tests {
     fn cl_find_not_found() {
         let result = builtin_cl_find(vec![
             Value::symbol("z"),
-            Value::list(vec![Value::symbol("a"), Value::symbol("b"), Value::symbol("c")]),
+            Value::list(vec![
+                Value::symbol("a"),
+                Value::symbol("b"),
+                Value::symbol("c"),
+            ]),
         ])
         .unwrap();
         assert!(result.is_nil());
@@ -1849,14 +1930,20 @@ mod tests {
     #[test]
     fn cl_find_if_wrong_arity() {
         let mut evaluator = super::super::eval::Evaluator::new();
-        assert!(builtin_cl_find_if(&mut evaluator, vec![Value::Subr("numberp".to_string())]).is_err());
+        assert!(
+            builtin_cl_find_if(&mut evaluator, vec![Value::Subr("numberp".to_string())]).is_err()
+        );
     }
 
     #[test]
     fn cl_subsetp_true() {
         let result = builtin_cl_subsetp(vec![
             Value::list(vec![Value::symbol("a"), Value::symbol("b")]),
-            Value::list(vec![Value::symbol("b"), Value::symbol("a"), Value::symbol("c")]),
+            Value::list(vec![
+                Value::symbol("b"),
+                Value::symbol("a"),
+                Value::symbol("c"),
+            ]),
         ])
         .unwrap();
         assert!(result.is_truthy());
@@ -1880,11 +1967,22 @@ mod tests {
     #[test]
     fn cl_intersection_basic() {
         let result = builtin_cl_intersection(vec![
-            Value::list(vec![Value::symbol("a"), Value::symbol("b"), Value::symbol("c")]),
-            Value::list(vec![Value::symbol("b"), Value::symbol("d"), Value::symbol("c")]),
+            Value::list(vec![
+                Value::symbol("a"),
+                Value::symbol("b"),
+                Value::symbol("c"),
+            ]),
+            Value::list(vec![
+                Value::symbol("b"),
+                Value::symbol("d"),
+                Value::symbol("c"),
+            ]),
         ])
         .unwrap();
-        assert_eq!(result, Value::list(vec![Value::symbol("b"), Value::symbol("c")]));
+        assert_eq!(
+            result,
+            Value::list(vec![Value::symbol("b"), Value::symbol("c")])
+        );
     }
 
     #[test]
@@ -1914,7 +2012,10 @@ mod tests {
             Value::list(vec![Value::symbol("b"), Value::symbol("d")]),
         ])
         .unwrap();
-        assert_eq!(result, Value::list(vec![Value::symbol("a"), Value::symbol("c")]));
+        assert_eq!(
+            result,
+            Value::list(vec![Value::symbol("a"), Value::symbol("c")])
+        );
     }
 
     #[test]
@@ -1941,13 +2042,18 @@ mod tests {
         .unwrap();
         assert_eq!(
             result,
-            Value::list(vec![Value::symbol("a"), Value::symbol("b"), Value::symbol("c")])
+            Value::list(vec![
+                Value::symbol("a"),
+                Value::symbol("b"),
+                Value::symbol("c")
+            ])
         );
     }
 
     #[test]
     fn cl_union_empty_left() {
-        let result = builtin_cl_union(vec![Value::Nil, Value::list(vec![Value::symbol("c")])]).unwrap();
+        let result =
+            builtin_cl_union(vec![Value::Nil, Value::list(vec![Value::symbol("c")])]).unwrap();
         assert_eq!(result, Value::list(vec![Value::symbol("c")]));
     }
 
@@ -1989,8 +2095,12 @@ mod tests {
     fn cl_sort_with_eval() {
         let mut evaluator = super::super::eval::Evaluator::new();
         let seq = Value::list(vec![Value::Int(3), Value::Int(1), Value::Int(2)]);
-        let result = builtin_cl_sort(&mut evaluator, vec![seq, Value::Subr("<".to_string())]).unwrap();
-        assert_eq!(result, Value::list(vec![Value::Int(1), Value::Int(2), Value::Int(3)]));
+        let result =
+            builtin_cl_sort(&mut evaluator, vec![seq, Value::Subr("<".to_string())]).unwrap();
+        assert_eq!(
+            result,
+            Value::list(vec![Value::Int(1), Value::Int(2), Value::Int(3)])
+        );
     }
 
     #[test]
@@ -2000,7 +2110,10 @@ mod tests {
         let result =
             builtin_cl_stable_sort(&mut evaluator, vec![seq, Value::Subr("<".to_string())])
                 .unwrap();
-        assert_eq!(result, Value::list(vec![Value::Int(1), Value::Int(2), Value::Int(3)]));
+        assert_eq!(
+            result,
+            Value::list(vec![Value::Int(1), Value::Int(2), Value::Int(3)])
+        );
     }
 
     #[test]
@@ -2043,7 +2156,10 @@ mod tests {
             ],
         )
         .unwrap();
-        assert_eq!(result, Value::list(vec![Value::Int(2), Value::Int(3), Value::Int(4)]));
+        assert_eq!(
+            result,
+            Value::list(vec![Value::Int(2), Value::Int(3), Value::Int(4)])
+        );
     }
 
     #[test]

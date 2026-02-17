@@ -277,7 +277,8 @@ impl ThreadManager {
                 lock_count: 0,
             },
         );
-        self.mutex_handles.insert(id, tagged_object_value("mutex", id));
+        self.mutex_handles
+            .insert(id, tagged_object_value("mutex", id));
         id
     }
 
@@ -640,10 +641,7 @@ pub(crate) fn builtin_thread_live_p(
 /// `(threadp OBJ)` -- type predicate.
 ///
 /// Returns t if OBJ is a known thread object.
-pub(crate) fn builtin_threadp(
-    eval: &mut super::eval::Evaluator,
-    args: Vec<Value>,
-) -> EvalResult {
+pub(crate) fn builtin_threadp(eval: &mut super::eval::Evaluator, args: Vec<Value>) -> EvalResult {
     expect_args("threadp", &args, 1)?;
     Ok(Value::bool(
         eval.threads.thread_id_from_handle(&args[0]).is_some(),
@@ -768,12 +766,11 @@ pub(crate) fn builtin_make_mutex(
 }
 
 /// `(mutexp OBJ)` -- type predicate for mutexes.
-pub(crate) fn builtin_mutexp(
-    eval: &mut super::eval::Evaluator,
-    args: Vec<Value>,
-) -> EvalResult {
+pub(crate) fn builtin_mutexp(eval: &mut super::eval::Evaluator, args: Vec<Value>) -> EvalResult {
     expect_args("mutexp", &args, 1)?;
-    Ok(Value::bool(eval.threads.mutex_id_from_handle(&args[0]).is_some()))
+    Ok(Value::bool(
+        eval.threads.mutex_id_from_handle(&args[0]).is_some(),
+    ))
 }
 
 /// `(mutex-name MUTEX)` -- return the mutex's name or nil.
@@ -1264,10 +1261,9 @@ mod tests {
         assert!(result.is_ok());
         let list = super::super::value::list_to_vec(&result.unwrap()).unwrap();
         assert!(!list.is_empty());
-        assert!(
-            list.iter()
-                .any(|v| tagged_object_id(v, "thread") == Some(0))
-        );
+        assert!(list
+            .iter()
+            .any(|v| tagged_object_id(v, "thread") == Some(0)));
     }
 
     #[test]
@@ -1583,7 +1579,10 @@ mod tests {
         let thread = builtin_make_thread(&mut eval, vec![Value::Int(1)]).unwrap();
         let _ = builtin_thread_join(&mut eval, vec![thread]).unwrap();
         let err = builtin_thread_last_error(&mut eval, vec![]).unwrap();
-        assert_eq!(super::super::print::print_value(&err), "(invalid-function 1)");
+        assert_eq!(
+            super::super::print::print_value(&err),
+            "(invalid-function 1)"
+        );
     }
 
     #[test]

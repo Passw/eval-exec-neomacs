@@ -486,9 +486,7 @@ fn quoted_lambda_has_interactive_form(value: &Value) -> bool {
         body_index += 1;
     }
 
-    items
-        .get(body_index)
-        .is_some_and(value_is_interactive_form)
+    items.get(body_index).is_some_and(value_is_interactive_form)
 }
 
 fn resolve_function_designator_symbol(eval: &Evaluator, name: &str) -> Option<(String, Value)> {
@@ -550,7 +548,9 @@ fn command_designator_p(eval: &Evaluator, designator: &Value) -> bool {
         if eval.obarray.is_function_unbound(name) {
             return false;
         }
-        if let Some((resolved_name, resolved_value)) = resolve_function_designator_symbol(eval, name) {
+        if let Some((resolved_name, resolved_value)) =
+            resolve_function_designator_symbol(eval, name)
+        {
             return command_object_p(eval, Some(&resolved_name), &resolved_value);
         }
         return eval.interactive.is_interactive(name) || builtin_command_name(name);
@@ -595,7 +595,10 @@ fn interactive_prefix_numeric_arg(eval: &Evaluator) -> Value {
     Value::Int(prefix_numeric_value(&raw))
 }
 
-fn interactive_region_args(eval: &Evaluator, missing_mark_signal: &str) -> Result<Vec<Value>, Flow> {
+fn interactive_region_args(
+    eval: &Evaluator,
+    missing_mark_signal: &str,
+) -> Result<Vec<Value>, Flow> {
     let buf = eval
         .buffers
         .current_buffer()
@@ -603,7 +606,9 @@ fn interactive_region_args(eval: &Evaluator, missing_mark_signal: &str) -> Resul
     let mark = buf.mark().ok_or_else(|| {
         signal(
             missing_mark_signal,
-            vec![Value::string("The mark is not set now, so there is no region")],
+            vec![Value::string(
+                "The mark is not set now, so there is no region",
+            )],
         )
     })?;
     let pt = buf.point();
@@ -635,9 +640,10 @@ fn default_command_execute_args(eval: &Evaluator, name: &str) -> Result<Vec<Valu
         "set-mark-command" => Ok(vec![Value::Nil]),
         "capitalize-region" => interactive_region_args(eval, "error"),
         "upcase-initials-region" => interactive_region_args(eval, "error"),
-        "upcase-region" | "downcase-region" => {
-            Err(signal("args-out-of-range", vec![Value::string(""), Value::Int(0)]))
-        }
+        "upcase-region" | "downcase-region" => Err(signal(
+            "args-out-of-range",
+            vec![Value::string(""), Value::Int(0)],
+        )),
         _ => Ok(Vec::new()),
     }
 }
@@ -664,9 +670,11 @@ fn default_call_interactively_args(eval: &Evaluator, name: &str) -> Result<Vec<V
         | "end-of-line"
         | "move-beginning-of-line"
         | "move-end-of-line" => Ok(vec![interactive_prefix_numeric_arg(eval)]),
-        "set-mark-command" => Ok(vec![
-            dynamic_or_global_symbol_value(eval, "current-prefix-arg").unwrap_or(Value::Nil),
-        ]),
+        "set-mark-command" => Ok(vec![dynamic_or_global_symbol_value(
+            eval,
+            "current-prefix-arg",
+        )
+        .unwrap_or(Value::Nil)]),
         "upcase-region" | "downcase-region" | "capitalize-region" => {
             interactive_region_args(eval, "error")
         }
@@ -826,10 +834,7 @@ pub(crate) fn builtin_set_mark_command(eval: &mut Evaluator, args: Vec<Value>) -
 /// `(quoted-insert &optional ARG)` -- read a character and insert it.
 ///
 /// In batch mode interactive invocation hits EOF while reading input.
-pub(crate) fn builtin_quoted_insert_command(
-    _eval: &mut Evaluator,
-    args: Vec<Value>,
-) -> EvalResult {
+pub(crate) fn builtin_quoted_insert_command(_eval: &mut Evaluator, args: Vec<Value>) -> EvalResult {
     if args.is_empty() || args[0].is_nil() {
         return Err(signal(
             "end-of-file",
@@ -1106,10 +1111,7 @@ fn lookup_minor_mode_binding_in_alist(
 
 /// `(minor-mode-key-binding KEY &optional ACCEPT-DEFAULTS)`
 /// Look up KEY in active minor mode keymaps.
-pub(crate) fn builtin_minor_mode_key_binding(
-    eval: &mut Evaluator,
-    args: Vec<Value>,
-) -> EvalResult {
+pub(crate) fn builtin_minor_mode_key_binding(eval: &mut Evaluator, args: Vec<Value>) -> EvalResult {
     expect_min_args("minor-mode-key-binding", &args, 1)?;
     expect_max_args("minor-mode-key-binding", &args, 2)?;
 
@@ -1967,13 +1969,7 @@ fn collect_where_is_sequences(
         match binding {
             KeyBinding::Prefix(next_map) => {
                 if collect_where_is_sequences(
-                    eval,
-                    next_map,
-                    definition,
-                    prefix,
-                    visiting,
-                    out,
-                    first_only,
+                    eval, next_map, definition, prefix, visiting, out, first_only,
                 ) {
                     visiting.pop();
                     prefix.pop();
@@ -1996,13 +1992,7 @@ fn collect_where_is_sequences(
 
     if let Some(parent_id) = parent {
         if collect_where_is_sequences(
-            eval,
-            parent_id,
-            definition,
-            prefix,
-            visiting,
-            out,
-            first_only,
+            eval, parent_id, definition, prefix, visiting, out, first_only,
         ) {
             visiting.pop();
             return true;
@@ -2757,8 +2747,7 @@ mod tests {
     #[test]
     fn commandp_resolves_aliases_and_symbol_designators() {
         let mut ev = Evaluator::new();
-        ev.obarray
-            .set_symbol_function("t", Value::symbol("ignore"));
+        ev.obarray.set_symbol_function("t", Value::symbol("ignore"));
         ev.obarray
             .set_symbol_function(":vm-command-alias-keyword", Value::symbol("ignore"));
         ev.obarray
@@ -2770,10 +2759,13 @@ mod tests {
 
         let t_result = builtin_commandp_interactive(&mut ev, vec![Value::True]);
         assert!(t_result.unwrap().is_truthy());
-        let keyword_result =
-            builtin_commandp_interactive(&mut ev, vec![Value::keyword(":vm-command-alias-keyword")]);
+        let keyword_result = builtin_commandp_interactive(
+            &mut ev,
+            vec![Value::keyword(":vm-command-alias-keyword")],
+        );
         assert!(keyword_result.unwrap().is_truthy());
-        let alias_result = builtin_commandp_interactive(&mut ev, vec![Value::symbol("vm-command-alias")]);
+        let alias_result =
+            builtin_commandp_interactive(&mut ev, vec![Value::symbol("vm-command-alias")]);
         assert!(alias_result.unwrap().is_truthy());
         let keyword_alias_result =
             builtin_commandp_interactive(&mut ev, vec![Value::symbol("vm-command-alias-keyword")]);
@@ -3059,10 +3051,8 @@ mod tests {
     #[test]
     fn global_key_binding_too_many_args_errors() {
         let mut ev = Evaluator::new();
-        let result = builtin_global_key_binding(
-            &mut ev,
-            vec![Value::string("C-c"), Value::Nil, Value::Nil],
-        );
+        let result =
+            builtin_global_key_binding(&mut ev, vec![Value::string("C-c"), Value::Nil, Value::Nil]);
         assert!(result.is_err());
     }
 
@@ -3253,7 +3243,11 @@ mod tests {
         let mut ev = Evaluator::new();
         let result = builtin_substitute_command_keys(
             &mut ev,
-            vec![Value::string("x"), Value::symbol("extra"), Value::symbol("more")],
+            vec![
+                Value::string("x"),
+                Value::symbol("extra"),
+                Value::symbol("more"),
+            ],
         )
         .unwrap();
         assert_eq!(result.as_str(), Some("x"));
@@ -3533,8 +3527,7 @@ mod tests {
                (goto-char (point-min))
                (search-forward "foo")"#,
         );
-        let sexp =
-            builtin_bounds_of_thing_at_point(&mut ev, vec![Value::symbol("sexp")]).unwrap();
+        let sexp = builtin_bounds_of_thing_at_point(&mut ev, vec![Value::symbol("sexp")]).unwrap();
         if let Value::Cons(cell) = &sexp {
             let cell = cell.lock().expect("cons lock");
             assert_eq!(cell.car.as_int(), Some(2));
@@ -4237,7 +4230,8 @@ mod tests {
         let result = builtin_command_execute(&mut ev, vec![Value::symbol("universal-argument")])
             .expect("universal-argument should execute");
         assert!(matches!(result, Value::Lambda(_)));
-        let as_command = builtin_commandp_interactive(&mut ev, vec![result]).expect("commandp call");
+        let as_command =
+            builtin_commandp_interactive(&mut ev, vec![result]).expect("commandp call");
         assert!(as_command.is_nil());
     }
 
@@ -4267,7 +4261,10 @@ mod tests {
         match result {
             Flow::Signal(sig) => {
                 assert_eq!(sig.symbol, "wrong-type-argument");
-                assert_eq!(sig.data, vec![Value::symbol("commandp"), Value::symbol("car")]);
+                assert_eq!(
+                    sig.data,
+                    vec![Value::symbol("commandp"), Value::symbol("car")]
+                );
             }
             other => panic!("unexpected flow: {other:?}"),
         }
@@ -4288,7 +4285,10 @@ mod tests {
         match result {
             Flow::Signal(sig) => {
                 assert_eq!(sig.symbol, "wrong-type-argument");
-                assert_eq!(sig.data, vec![Value::symbol("commandp"), Value::symbol("car")]);
+                assert_eq!(
+                    sig.data,
+                    vec![Value::symbol("commandp"), Value::symbol("car")]
+                );
             }
             other => panic!("unexpected flow: {other:?}"),
         }
@@ -4383,11 +4383,9 @@ mod tests {
     #[test]
     fn execute_extended_command_with_command_name() {
         let mut ev = Evaluator::new();
-        let result = builtin_execute_extended_command(
-            &mut ev,
-            vec![Value::Nil, Value::string("ignore")],
-        )
-        .expect("execute-extended-command should run command names");
+        let result =
+            builtin_execute_extended_command(&mut ev, vec![Value::Nil, Value::string("ignore")])
+                .expect("execute-extended-command should run command names");
         assert!(result.is_nil());
     }
 
@@ -4408,17 +4406,17 @@ mod tests {
     #[test]
     fn execute_extended_command_rejects_symbol_name_payload() {
         let mut ev = Evaluator::new();
-        let result = builtin_execute_extended_command(
-            &mut ev,
-            vec![Value::Nil, Value::symbol("ignore")],
-        )
-        .expect_err("symbol payload should not be accepted as a command name");
+        let result =
+            builtin_execute_extended_command(&mut ev, vec![Value::Nil, Value::symbol("ignore")])
+                .expect_err("symbol payload should not be accepted as a command name");
         match result {
             Flow::Signal(sig) => {
                 assert_eq!(sig.symbol, "error");
                 assert_eq!(
                     sig.data,
-                    vec![Value::string("\u{2018}ignore\u{2019} is not a valid command name")]
+                    vec![Value::string(
+                        "\u{2018}ignore\u{2019} is not a valid command name"
+                    )]
                 );
             }
             other => panic!("unexpected flow: {other:?}"),
@@ -4436,7 +4434,9 @@ mod tests {
                 assert_eq!(sig.symbol, "error");
                 assert_eq!(
                     sig.data,
-                    vec![Value::string("\u{2018}car\u{2019} is not a valid command name")]
+                    vec![Value::string(
+                        "\u{2018}car\u{2019} is not a valid command name"
+                    )]
                 );
             }
             other => panic!("unexpected flow: {other:?}"),
@@ -4453,7 +4453,9 @@ mod tests {
                 assert_eq!(sig.symbol, "error");
                 assert_eq!(
                     sig.data,
-                    vec![Value::string("\u{2018}1\u{2019} is not a valid command name")]
+                    vec![Value::string(
+                        "\u{2018}1\u{2019} is not a valid command name"
+                    )]
                 );
             }
             other => panic!("unexpected flow: {other:?}"),

@@ -1,6 +1,4 @@
-use neovm_core::elisp::{
-    format_eval_result_bytes_with_eval, parse_forms, print_expr, Evaluator,
-};
+use neovm_core::elisp::{format_eval_result_bytes_with_eval, parse_forms, print_expr, Evaluator};
 use std::fs;
 use std::io::{self, Write};
 
@@ -34,7 +32,8 @@ fn main() {
         out.write_all((index + 1).to_string().as_bytes())
             .expect("write index");
         out.write_all(b"\t").expect("write tab");
-        out.write_all(print_expr(form).as_bytes()).expect("write form");
+        out.write_all(print_expr(form).as_bytes())
+            .expect("write form");
         out.write_all(b"\t").expect("write tab");
         out.write_all(&format_eval_result_bytes_with_eval(&evaluator, &result))
             .expect("write result");

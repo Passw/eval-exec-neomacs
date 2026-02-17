@@ -566,8 +566,7 @@ fn bv_from_bits(bits: &[bool]) -> Value {
 pub(crate) fn builtin_bool_vector_intersection(args: Vec<Value>) -> EvalResult {
     expect_min_args("bool-vector-intersection", &args, 2)?;
     expect_max_args("bool-vector-intersection", &args, 3)?;
-    let (bits_a, bits_b, _len) =
-        extract_bv_pair("bool-vector-intersection", &args[0], &args[1])?;
+    let (bits_a, bits_b, _len) = extract_bv_pair("bool-vector-intersection", &args[0], &args[1])?;
     let result_bits: Vec<bool> = bits_a
         .iter()
         .zip(bits_b.iter())

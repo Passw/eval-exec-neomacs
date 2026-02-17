@@ -79,8 +79,12 @@ fn invalid_get_device_terminal_error(value: &Value) -> Flow {
 }
 
 fn terminal_not_x_display_error(value: &Value) -> Option<Flow> {
-    terminal_handle_id(value)
-        .map(|id| signal("error", vec![Value::string(format!("Terminal {id} is not an X display"))]))
+    terminal_handle_id(value).map(|id| {
+        signal(
+            "error",
+            vec![Value::string(format!("Terminal {id} is not an X display"))],
+        )
+    })
 }
 
 fn terminal_designator_p(value: &Value) -> bool {
@@ -1339,7 +1343,9 @@ pub(crate) fn builtin_suspend_tty(args: Vec<Value>) -> EvalResult {
     }
     Err(signal(
         "error",
-        vec![Value::string("Attempt to suspend a non-text terminal device")],
+        vec![Value::string(
+            "Attempt to suspend a non-text terminal device",
+        )],
     ))
 }
 
@@ -1356,7 +1362,9 @@ pub(crate) fn builtin_suspend_tty_eval(
     }
     Err(signal(
         "error",
-        vec![Value::string("Attempt to suspend a non-text terminal device")],
+        vec![Value::string(
+            "Attempt to suspend a non-text terminal device",
+        )],
     ))
 }
 
@@ -1368,7 +1376,9 @@ pub(crate) fn builtin_resume_tty(args: Vec<Value>) -> EvalResult {
     }
     Err(signal(
         "error",
-        vec![Value::string("Attempt to resume a non-text terminal device")],
+        vec![Value::string(
+            "Attempt to resume a non-text terminal device",
+        )],
     ))
 }
 
@@ -1385,7 +1395,9 @@ pub(crate) fn builtin_resume_tty_eval(
     }
     Err(signal(
         "error",
-        vec![Value::string("Attempt to resume a non-text terminal device")],
+        vec![Value::string(
+            "Attempt to resume a non-text terminal device",
+        )],
     ))
 }
 
@@ -1699,7 +1711,10 @@ mod tests {
         match result {
             Err(Flow::Signal(sig)) => {
                 assert_eq!(sig.symbol, "error");
-                assert_eq!(sig.data, vec![Value::string("Current frame is not on a tty device")]);
+                assert_eq!(
+                    sig.data,
+                    vec![Value::string("Current frame is not on a tty device")]
+                );
             }
             other => panic!("expected error signal, got {other:?}"),
         }
@@ -1722,9 +1737,11 @@ mod tests {
     fn eval_send_string_to_terminal_accepts_live_frame_designator() {
         let mut eval = crate::elisp::Evaluator::new();
         let frame_id = crate::elisp::window_cmds::ensure_selected_frame_id(&mut eval).0 as i64;
-        let result =
-            builtin_send_string_to_terminal_eval(&mut eval, vec![Value::string(""), Value::Int(frame_id)])
-                .unwrap();
+        let result = builtin_send_string_to_terminal_eval(
+            &mut eval,
+            vec![Value::string(""), Value::Int(frame_id)],
+        )
+        .unwrap();
         assert!(result.is_nil());
     }
 
@@ -1757,11 +1774,9 @@ mod tests {
             .unwrap()
             .as_int()
             .expect("selected-window should return id");
-        let result = builtin_internal_show_cursor_eval(
-            &mut eval,
-            vec![Value::Int(window_id), Value::True],
-        )
-        .unwrap();
+        let result =
+            builtin_internal_show_cursor_eval(&mut eval, vec![Value::Int(window_id), Value::True])
+                .unwrap();
         assert!(result.is_nil());
     }
 
@@ -1773,8 +1788,8 @@ mod tests {
             .unwrap()
             .as_int()
             .expect("selected-window should return id");
-        let result = builtin_internal_show_cursor_p_eval(&mut eval, vec![Value::Int(window_id)])
-            .unwrap();
+        let result =
+            builtin_internal_show_cursor_p_eval(&mut eval, vec![Value::Int(window_id)]).unwrap();
         assert!(matches!(result, Value::True | Value::Nil));
     }
 
@@ -1792,11 +1807,9 @@ mod tests {
     fn eval_tty_queries_accept_live_frame_designator() {
         let mut eval = crate::elisp::Evaluator::new();
         let frame_id = crate::elisp::window_cmds::ensure_selected_frame_id(&mut eval).0 as i64;
-        assert!(
-            builtin_tty_type_eval(&mut eval, vec![Value::Int(frame_id)])
-                .unwrap()
-                .is_nil()
-        );
+        assert!(builtin_tty_type_eval(&mut eval, vec![Value::Int(frame_id)])
+            .unwrap()
+            .is_nil());
         assert!(
             builtin_tty_top_frame_eval(&mut eval, vec![Value::Int(frame_id)])
                 .unwrap()
@@ -1818,7 +1831,9 @@ mod tests {
                     assert_eq!(sig.symbol, "error");
                     assert_eq!(
                         sig.data,
-                        vec![Value::string("Attempt to suspend a non-text terminal device")]
+                        vec![Value::string(
+                            "Attempt to suspend a non-text terminal device"
+                        )]
                     );
                 }
                 other => panic!("expected error signal, got {other:?}"),
@@ -1845,7 +1860,9 @@ mod tests {
                     assert_eq!(sig.symbol, "error");
                     assert_eq!(
                         sig.data,
-                        vec![Value::string("Attempt to resume a non-text terminal device")]
+                        vec![Value::string(
+                            "Attempt to resume a non-text terminal device"
+                        )]
                     );
                 }
                 other => panic!("expected error signal, got {other:?}"),
@@ -1871,7 +1888,10 @@ mod tests {
         match x_term {
             Err(Flow::Signal(sig)) => {
                 assert_eq!(sig.symbol, "error");
-                assert_eq!(sig.data, vec![Value::string("Terminal 0 is not an X display")]);
+                assert_eq!(
+                    sig.data,
+                    vec![Value::string("Terminal 0 is not an X display")]
+                );
             }
             other => panic!("expected error signal, got {other:?}"),
         }
@@ -1886,7 +1906,10 @@ mod tests {
         match result {
             Err(Flow::Signal(sig)) => {
                 assert_eq!(sig.symbol, "error");
-                assert_eq!(sig.data, vec![Value::string("Window system frame should be used")]);
+                assert_eq!(
+                    sig.data,
+                    vec![Value::string("Window system frame should be used")]
+                );
             }
             other => panic!("expected error signal, got {other:?}"),
         }
@@ -1911,14 +1934,20 @@ mod tests {
         match width_term {
             Err(Flow::Signal(sig)) => {
                 assert_eq!(sig.symbol, "error");
-                assert_eq!(sig.data, vec![Value::string("Terminal 0 is not an X display")]);
+                assert_eq!(
+                    sig.data,
+                    vec![Value::string("Terminal 0 is not an X display")]
+                );
             }
             other => panic!("expected error signal, got {other:?}"),
         }
         match height_term {
             Err(Flow::Signal(sig)) => {
                 assert_eq!(sig.symbol, "error");
-                assert_eq!(sig.data, vec![Value::string("Terminal 0 is not an X display")]);
+                assert_eq!(
+                    sig.data,
+                    vec![Value::string("Terminal 0 is not an X display")]
+                );
             }
             other => panic!("expected error signal, got {other:?}"),
         }
@@ -2058,14 +2087,15 @@ mod tests {
                 .unwrap()
                 .is_nil()
         );
-        assert!(
-            builtin_display_supports_face_attributes_p_eval(
-                &mut eval,
-                vec![Value::list(vec![Value::symbol(":weight"), Value::symbol("bold")])]
-            )
-            .unwrap()
-            .is_nil()
-        );
+        assert!(builtin_display_supports_face_attributes_p_eval(
+            &mut eval,
+            vec![Value::list(vec![
+                Value::symbol(":weight"),
+                Value::symbol("bold")
+            ])]
+        )
+        .unwrap()
+        .is_nil());
     }
 
     #[test]
@@ -2106,11 +2136,12 @@ mod tests {
                 .unwrap()
                 .is_nil()
         );
-        assert!(
-            builtin_display_supports_face_attributes_p(vec![attrs.clone(), Value::Int(999_999)])
-                .unwrap()
-                .is_nil()
-        );
+        assert!(builtin_display_supports_face_attributes_p(vec![
+            attrs.clone(),
+            Value::Int(999_999)
+        ])
+        .unwrap()
+        .is_nil());
         assert!(
             builtin_display_supports_face_attributes_p(vec![Value::Int(1)])
                 .unwrap()

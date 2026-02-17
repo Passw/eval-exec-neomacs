@@ -488,14 +488,8 @@ fn face_attr_state() -> &'static Mutex<FaceAttrState> {
 }
 
 fn clear_font_cache_state() {
-    created_lisp_faces()
-        .lock()
-        .expect("poisoned")
-        .clear();
-    created_face_ids()
-        .lock()
-        .expect("poisoned")
-        .clear();
+    created_lisp_faces().lock().expect("poisoned").clear();
+    created_face_ids().lock().expect("poisoned").clear();
     *next_created_face_id().lock().expect("poisoned") = FIRST_DYNAMIC_FACE_ID;
     *face_attr_state().lock().expect("poisoned") = FaceAttrState::default();
 }
@@ -1925,15 +1919,10 @@ mod tests {
         let result = builtin_clear_font_cache(vec![]).unwrap();
         assert!(result.is_nil());
 
-        assert!(created_lisp_faces()
-            .lock()
-            .expect("poisoned")
-            .is_empty());
+        assert!(created_lisp_faces().lock().expect("poisoned").is_empty());
         assert!(created_face_ids().lock().expect("poisoned").is_empty());
         assert_eq!(
-            *next_created_face_id()
-                .lock()
-                .expect("poisoned"),
+            *next_created_face_id().lock().expect("poisoned"),
             FIRST_DYNAMIC_FACE_ID
         );
         let state = face_attr_state().lock().expect("poisoned");

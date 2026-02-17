@@ -879,7 +879,10 @@ pub(crate) fn builtin_set_keyboard_coding_system(
         }
         Value::Symbol(name) => {
             if !is_known_or_derived_coding_system(mgr, name) {
-                return Err(signal("coding-system-error", vec![Value::symbol(name.clone())]));
+                return Err(signal(
+                    "coding-system-error",
+                    vec![Value::symbol(name.clone())],
+                ));
             }
             let base = strip_eol_suffix(name);
             if matches!(base, "utf-8-auto" | "prefer-utf-8") {
@@ -924,7 +927,10 @@ pub(crate) fn builtin_set_terminal_coding_system(
         }
         Value::Symbol(name) => {
             if !is_known_or_derived_coding_system(mgr, name) {
-                return Err(signal("coding-system-error", vec![Value::symbol(name.clone())]));
+                return Err(signal(
+                    "coding-system-error",
+                    vec![Value::symbol(name.clone())],
+                ));
             }
             mgr.terminal_coding = name.clone();
             Ok(Value::Nil)
@@ -1477,12 +1483,8 @@ mod tests {
     #[test]
     fn coding_system_setters_validate_symbol_and_known_names() {
         let mut m = mgr();
-        assert!(
-            builtin_set_keyboard_coding_system(&mut m, vec![Value::string("utf-8")]).is_err()
-        );
-        assert!(
-            builtin_set_terminal_coding_system(&mut m, vec![Value::string("utf-8")]).is_err()
-        );
+        assert!(builtin_set_keyboard_coding_system(&mut m, vec![Value::string("utf-8")]).is_err());
+        assert!(builtin_set_terminal_coding_system(&mut m, vec![Value::string("utf-8")]).is_err());
         assert!(
             builtin_set_keyboard_coding_system(&mut m, vec![Value::symbol("no-such-coding")])
                 .is_err()
@@ -1496,31 +1498,24 @@ mod tests {
     #[test]
     fn coding_system_setters_validate_arity_edges() {
         let mut m = mgr();
-        assert!(
-            builtin_set_keyboard_coding_system(&mut m, vec![Value::Nil, Value::Nil]).is_ok()
-        );
-        assert!(
-            builtin_set_keyboard_coding_system(&mut m, vec![Value::Nil, Value::Nil, Value::Nil])
-                .is_err()
-        );
+        assert!(builtin_set_keyboard_coding_system(&mut m, vec![Value::Nil, Value::Nil]).is_ok());
+        assert!(builtin_set_keyboard_coding_system(
+            &mut m,
+            vec![Value::Nil, Value::Nil, Value::Nil]
+        )
+        .is_err());
 
-        assert!(
-            builtin_set_terminal_coding_system(&mut m, vec![Value::Nil, Value::Nil]).is_ok()
-        );
-        assert!(
-            builtin_set_terminal_coding_system(
-                &mut m,
-                vec![Value::Nil, Value::Nil, Value::Nil]
-            )
-            .is_ok()
-        );
-        assert!(
-            builtin_set_terminal_coding_system(
-                &mut m,
-                vec![Value::Nil, Value::Nil, Value::Nil, Value::Nil]
-            )
-            .is_err()
-        );
+        assert!(builtin_set_terminal_coding_system(&mut m, vec![Value::Nil, Value::Nil]).is_ok());
+        assert!(builtin_set_terminal_coding_system(
+            &mut m,
+            vec![Value::Nil, Value::Nil, Value::Nil]
+        )
+        .is_ok());
+        assert!(builtin_set_terminal_coding_system(
+            &mut m,
+            vec![Value::Nil, Value::Nil, Value::Nil, Value::Nil]
+        )
+        .is_err());
     }
 
     // ----- coding-system-priority-list -----
@@ -1652,9 +1647,13 @@ mod tests {
     #[test]
     fn check_coding_system_rejects_unsupported_derived_variants() {
         let m = mgr();
-        assert!(builtin_check_coding_system(&m, vec![Value::symbol("no-conversion-unix")]).is_err());
+        assert!(
+            builtin_check_coding_system(&m, vec![Value::symbol("no-conversion-unix")]).is_err()
+        );
         assert!(builtin_check_coding_system(&m, vec![Value::symbol("binary-unix")]).is_err());
-        assert!(builtin_check_coding_system(&m, vec![Value::symbol("emacs-internal-unix")]).is_err());
+        assert!(
+            builtin_check_coding_system(&m, vec![Value::symbol("emacs-internal-unix")]).is_err()
+        );
     }
 
     #[test]
@@ -1683,9 +1682,8 @@ mod tests {
     #[test]
     fn set_keyboard_coding_system_preserves_emacs_internal() {
         let mut m = mgr();
-        let set =
-            builtin_set_keyboard_coding_system(&mut m, vec![Value::symbol("emacs-internal")])
-                .unwrap();
+        let set = builtin_set_keyboard_coding_system(&mut m, vec![Value::symbol("emacs-internal")])
+            .unwrap();
         assert_eq!(set, Value::symbol("emacs-internal"));
 
         let get = builtin_keyboard_coding_system(&m, vec![]).unwrap();
@@ -1698,7 +1696,8 @@ mod tests {
         let known = builtin_find_coding_system(&m, vec![Value::symbol("utf-8")]).unwrap();
         assert_eq!(known, Value::symbol("utf-8"));
 
-        let unknown = builtin_find_coding_system(&m, vec![Value::symbol("vm-no-such-coding")]).unwrap();
+        let unknown =
+            builtin_find_coding_system(&m, vec![Value::symbol("vm-no-such-coding")]).unwrap();
         assert_eq!(unknown, Value::Nil);
     }
 

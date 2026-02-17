@@ -338,9 +338,7 @@ impl SyntaxTable {
         // Punctuation: everything else in printable ASCII that we haven't
         // covered.  In Emacs the standard table marks most punctuation as
         // punctuation; we enumerate the important ones.
-        for ch in [
-            '!', '#', ',', '.', ':', ';', '?', '@', '^', '~',
-        ] {
+        for ch in ['!', '#', ',', '.', ':', ';', '?', '@', '^', '~'] {
             entries.insert(ch, SyntaxEntry::simple(SyntaxClass::Punctuation));
         }
 
@@ -914,7 +912,9 @@ pub(crate) fn builtin_copy_syntax_table(args: Vec<Value>) -> EvalResult {
     };
 
     match source {
-        Value::Vector(v) => Ok(Value::vector(v.lock().expect("vector lock poisoned").clone())),
+        Value::Vector(v) => Ok(Value::vector(
+            v.lock().expect("vector lock poisoned").clone(),
+        )),
         other => Err(signal(
             "wrong-type-argument",
             vec![Value::symbol("syntax-table-p"), other],
@@ -1020,7 +1020,10 @@ pub(crate) fn builtin_matching_paren(args: Vec<Value>) -> EvalResult {
     if args.len() != 1 {
         return Err(signal(
             "wrong-number-of-arguments",
-            vec![Value::symbol("matching-paren"), Value::Int(args.len() as i64)],
+            vec![
+                Value::symbol("matching-paren"),
+                Value::Int(args.len() as i64),
+            ],
         ));
     }
 
@@ -1071,7 +1074,10 @@ pub(crate) fn builtin_syntax_table_p(args: Vec<Value>) -> EvalResult {
     if args.len() != 1 {
         return Err(signal(
             "wrong-number-of-arguments",
-            vec![Value::symbol("syntax-table-p"), Value::Int(args.len() as i64)],
+            vec![
+                Value::symbol("syntax-table-p"),
+                Value::Int(args.len() as i64),
+            ],
         ));
     }
 
@@ -1115,7 +1121,10 @@ pub(crate) fn builtin_set_syntax_table(
     if args.len() != 1 {
         return Err(signal(
             "wrong-number-of-arguments",
-            vec![Value::symbol("set-syntax-table"), Value::Int(args.len() as i64)],
+            vec![
+                Value::symbol("set-syntax-table"),
+                Value::Int(args.len() as i64),
+            ],
         ));
     }
     if builtin_syntax_table_p(vec![args[0].clone()])?.is_nil() {
@@ -1277,7 +1286,10 @@ pub(crate) fn builtin_forward_comment(
     if args.len() != 1 {
         return Err(signal(
             "wrong-number-of-arguments",
-            vec![Value::symbol("forward-comment"), Value::Int(args.len() as i64)],
+            vec![
+                Value::symbol("forward-comment"),
+                Value::Int(args.len() as i64),
+            ],
         ));
     }
 
@@ -2437,7 +2449,8 @@ mod tests {
 
         let is_ct = crate::elisp::chartable::builtin_char_table_p(vec![copied.clone()]).unwrap();
         assert_eq!(is_ct, Value::True);
-        let subtype = crate::elisp::chartable::builtin_char_table_subtype(vec![copied.clone()]).unwrap();
+        let subtype =
+            crate::elisp::chartable::builtin_char_table_subtype(vec![copied.clone()]).unwrap();
         assert_eq!(subtype, Value::symbol("syntax-table"));
 
         match (source, copied) {
@@ -2541,8 +2554,8 @@ mod tests {
         let is_syntax = builtin_syntax_table_p(vec![syntax_table]).unwrap();
         assert_eq!(is_syntax, Value::True);
 
-        let char_table = crate::elisp::chartable::builtin_make_char_table(vec![Value::symbol("foo")])
-            .unwrap();
+        let char_table =
+            crate::elisp::chartable::builtin_make_char_table(vec![Value::symbol("foo")]).unwrap();
         let not_syntax = builtin_syntax_table_p(vec![char_table]).unwrap();
         assert_eq!(not_syntax, Value::Nil);
 
@@ -2693,7 +2706,10 @@ mod tests {
         match builtin_backward_prefix_chars(&mut eval, vec![Value::Int(1)]) {
             Err(crate::elisp::error::Flow::Signal(sig)) => {
                 assert_eq!(sig.symbol, "wrong-number-of-arguments");
-                assert_eq!(sig.data.first(), Some(&Value::symbol("backward-prefix-chars")));
+                assert_eq!(
+                    sig.data.first(),
+                    Some(&Value::symbol("backward-prefix-chars"))
+                );
             }
             other => panic!("expected wrong-number-of-arguments signal, got {other:?}"),
         }
@@ -2702,11 +2718,8 @@ mod tests {
     #[test]
     fn modify_syntax_entry_at_descriptor_yields_whitespace() {
         let mut eval = crate::elisp::eval::Evaluator::new();
-        builtin_modify_syntax_entry(
-            &mut eval,
-            vec![Value::Int('x' as i64), Value::string("@")],
-        )
-        .unwrap();
+        builtin_modify_syntax_entry(&mut eval, vec![Value::Int('x' as i64), Value::string("@")])
+            .unwrap();
 
         let out = builtin_char_syntax(&mut eval, vec![Value::Int('x' as i64)]).unwrap();
         assert_eq!(out, Value::Char(' '));
@@ -2732,7 +2745,10 @@ mod tests {
         match builtin_syntax_ppss_flush_cache(&mut eval, vec![]) {
             Err(crate::elisp::error::Flow::Signal(sig)) => {
                 assert_eq!(sig.symbol, "wrong-number-of-arguments");
-                assert_eq!(sig.data.first(), Some(&Value::symbol("syntax-ppss-flush-cache")));
+                assert_eq!(
+                    sig.data.first(),
+                    Some(&Value::symbol("syntax-ppss-flush-cache"))
+                );
             }
             other => panic!("expected wrong-number-of-arguments signal, got {other:?}"),
         }
@@ -2755,11 +2771,9 @@ mod tests {
             buf.insert("(a b)");
         }
 
-        let forward = builtin_scan_lists(
-            &mut eval,
-            vec![Value::Int(1), Value::Int(1), Value::Int(0)],
-        )
-        .unwrap();
+        let forward =
+            builtin_scan_lists(&mut eval, vec![Value::Int(1), Value::Int(1), Value::Int(0)])
+                .unwrap();
         assert_eq!(forward, Value::Int(6));
 
         let backward = builtin_scan_lists(
@@ -2819,8 +2833,8 @@ mod tests {
             buf.delete_region(buf.point_min(), buf.point_max());
             buf.insert("abc");
         }
-        let state = builtin_parse_partial_sexp(&mut eval, vec![Value::Int(1), Value::Int(4)])
-            .unwrap();
+        let state =
+            builtin_parse_partial_sexp(&mut eval, vec![Value::Int(1), Value::Int(4)]).unwrap();
         assert_eq!(
             state,
             Value::list(vec![
@@ -2843,8 +2857,8 @@ mod tests {
             buf.delete_region(buf.point_min(), buf.point_max());
             buf.insert("(a)");
         }
-        let nested = builtin_parse_partial_sexp(&mut eval, vec![Value::Int(1), Value::Int(3)])
-            .unwrap();
+        let nested =
+            builtin_parse_partial_sexp(&mut eval, vec![Value::Int(1), Value::Int(3)]).unwrap();
         assert_eq!(
             nested,
             Value::list(vec![

@@ -213,7 +213,8 @@ pub(crate) fn builtin_custom_set_variables(
         }
 
         // Emacs ignores entries for unknown/unbound variables.
-        let should_set = eval.obarray.symbol_value(&name).is_some() || eval.custom.is_custom_variable(&name);
+        let should_set =
+            eval.obarray.symbol_value(&name).is_some() || eval.custom.is_custom_variable(&name);
         if !should_set {
             continue;
         }
@@ -313,7 +314,10 @@ pub(crate) fn builtin_make_local_variable(
 }
 
 /// `(local-variable-p VARIABLE &optional BUFFER)` -- test if variable is local.
-pub(crate) fn builtin_local_variable_p(eval: &mut super::eval::Evaluator, args: Vec<Value>) -> EvalResult {
+pub(crate) fn builtin_local_variable_p(
+    eval: &mut super::eval::Evaluator,
+    args: Vec<Value>,
+) -> EvalResult {
     expect_min_args("local-variable-p", &args, 1)?;
     let name = match &args[0] {
         Value::Symbol(s) => s.clone(),
@@ -402,7 +406,10 @@ pub(crate) fn builtin_kill_local_variable(
 }
 
 /// `(default-value SYMBOL)` -- get the default (global) value of a variable.
-pub(crate) fn builtin_default_value(eval: &mut super::eval::Evaluator, args: Vec<Value>) -> EvalResult {
+pub(crate) fn builtin_default_value(
+    eval: &mut super::eval::Evaluator,
+    args: Vec<Value>,
+) -> EvalResult {
     expect_args("default-value", &args, 1)?;
     let name = match &args[0] {
         Value::Symbol(s) => s.clone(),
@@ -422,7 +429,10 @@ pub(crate) fn builtin_default_value(eval: &mut super::eval::Evaluator, args: Vec
 }
 
 /// `(set-default SYMBOL VALUE)` -- set the default (global) value.
-pub(crate) fn builtin_set_default(eval: &mut super::eval::Evaluator, args: Vec<Value>) -> EvalResult {
+pub(crate) fn builtin_set_default(
+    eval: &mut super::eval::Evaluator,
+    args: Vec<Value>,
+) -> EvalResult {
     expect_args("set-default", &args, 2)?;
     let name = match &args[0] {
         Value::Symbol(s) => s.clone(),

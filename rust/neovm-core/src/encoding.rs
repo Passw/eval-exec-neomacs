@@ -4,8 +4,8 @@
 //! character classification, width calculation, and encoding conversion
 //! APIs.
 
-use crate::elisp::value::Value;
 use crate::elisp::string_escape::storage_byte_len;
+use crate::elisp::value::Value;
 
 // ---------------------------------------------------------------------------
 // Character classification

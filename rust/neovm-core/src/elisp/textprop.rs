@@ -1456,7 +1456,8 @@ mod tests {
     #[test]
     fn text_properties_at_rejects_too_many_args() {
         let mut eval = eval_with_text("hello");
-        let result = builtin_text_properties_at(&mut eval, vec![Value::Int(1), Value::Nil, Value::Nil]);
+        let result =
+            builtin_text_properties_at(&mut eval, vec![Value::Int(1), Value::Nil, Value::Nil]);
         assert!(result.is_err());
     }
 

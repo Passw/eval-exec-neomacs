@@ -165,14 +165,14 @@ pub(crate) fn ensure_selected_frame_id(eval: &mut super::eval::Evaluator) -> Fra
     // With our default 8x16 char metrics the text area corresponds to 640x384.
     let fid = eval.frames.create_frame("F1", 640, 384, buf_id);
     if let Some(frame) = eval.frames.get_mut(fid) {
-        frame
-            .parameters
-            .insert("width".to_string(), Value::Int(80));
+        frame.parameters.insert("width".to_string(), Value::Int(80));
         frame
             .parameters
             .insert("height".to_string(), Value::Int(25));
         if let Some(Window::Leaf {
-            window_start, point, ..
+            window_start,
+            point,
+            ..
         }) = frame.find_window_mut(frame.selected_window)
         {
             // Batch-mode startup in GNU Emacs reports point/window-start as 1.
@@ -1551,7 +1551,11 @@ mod tests {
             .collect::<Vec<_>>();
         assert_eq!(out[0], "OK 1");
         assert_eq!(out[1], "OK 1");
-        assert!(out[2].starts_with("OK #<buffer "), "unexpected value: {}", out[2]);
+        assert!(
+            out[2].starts_with("OK #<buffer "),
+            "unexpected value: {}",
+            out[2]
+        );
         assert_eq!(out[3], "OK (wrong-type-argument window-live-p 999999)");
         assert_eq!(out[4], "OK (wrong-type-argument windowp 999999)");
         assert_eq!(out[5], "OK 1");
@@ -1716,7 +1720,10 @@ mod tests {
         assert_eq!(results[7], "OK (error \"No such live buffer missing\")");
         assert_eq!(results[8], "OK (error \"No such buffer 1\")");
         assert_eq!(results[9], "OK nil");
-        assert_eq!(results[10], "OK (error \"No such live buffer #<killed buffer>\")");
+        assert_eq!(
+            results[10],
+            "OK (error \"No such live buffer #<killed buffer>\")"
+        );
     }
 
     #[test]
@@ -1889,7 +1896,7 @@ mod tests {
     #[test]
     fn delete_window_and_delete_other_windows_enforce_max_arity() {
         let forms = parse_forms(
-             "(condition-case err (delete-window nil nil) (error (car err)))
+            "(condition-case err (delete-window nil nil) (error (car err)))
              (condition-case err (delete-other-windows nil nil nil) (error (car err)))
              (condition-case err
                  (let ((w2 (split-window)))
@@ -2053,7 +2060,8 @@ mod tests {
 
     #[test]
     fn selected_frame_bootstraps_initial_frame() {
-        let forms = parse_forms("(list (framep (selected-frame)) (length (frame-list)))").expect("parse");
+        let forms =
+            parse_forms("(list (framep (selected-frame)) (length (frame-list)))").expect("parse");
         let mut ev = Evaluator::new();
         let results = ev.eval_forms(&forms);
         assert_eq!(format_eval_result(&results[0]), "OK (t 1)");
@@ -2524,7 +2532,10 @@ mod tests {
         );
         assert_eq!(results[0], "OK nil");
         assert_eq!(results[1], "OK (wrong-type-argument bufferp nil)");
-        assert_eq!(results[2], "OK (error \"Attempt to display deleted buffer\")");
+        assert_eq!(
+            results[2],
+            "OK (error \"Attempt to display deleted buffer\")"
+        );
         assert_eq!(results[3], "OK (wrong-type-argument window-live-p 999999)");
         assert_eq!(results[4], "OK (wrong-type-argument window-live-p foo)");
     }

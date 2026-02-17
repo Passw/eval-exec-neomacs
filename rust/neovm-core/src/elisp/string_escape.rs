@@ -88,14 +88,8 @@ fn decode_emacs_extended_utf8(bytes: &[u8]) -> Option<u32> {
         [b0, b1] if (0xC2..=0xDF).contains(b0) && (b1 & 0xC0) == 0x80 => {
             Some((((b0 & 0x1F) as u32) << 6) | ((b1 & 0x3F) as u32))
         }
-        [b0, b1, b2]
-            if (b0 & 0xF0) == 0xE0 && (b1 & 0xC0) == 0x80 && (b2 & 0xC0) == 0x80 =>
-        {
-            Some(
-                (((b0 & 0x0F) as u32) << 12)
-                    | (((b1 & 0x3F) as u32) << 6)
-                    | ((b2 & 0x3F) as u32),
-            )
+        [b0, b1, b2] if (b0 & 0xF0) == 0xE0 && (b1 & 0xC0) == 0x80 && (b2 & 0xC0) == 0x80 => {
+            Some((((b0 & 0x0F) as u32) << 12) | (((b1 & 0x3F) as u32) << 6) | ((b2 & 0x3F) as u32))
         }
         [b0, b1, b2, b3]
             if (b0 & 0xF8) == 0xF0
@@ -154,8 +148,7 @@ fn encode_extended_sequence_for_storage(bytes: &[u8]) -> String {
     out.push(len_char);
     for b in bytes {
         out.push(
-            char::from_u32(EXT_SEQ_BYTE_BASE + (*b as u32))
-                .expect("valid extended byte sentinel"),
+            char::from_u32(EXT_SEQ_BYTE_BASE + (*b as u32)).expect("valid extended byte sentinel"),
         );
     }
     out
@@ -289,12 +282,18 @@ fn decode_storage_units(s: &str) -> Vec<(u32, usize)> {
 
 /// Decode NeoVM string storage into Emacs character codes.
 pub(crate) fn decode_storage_char_codes(s: &str) -> Vec<u32> {
-    decode_storage_units(s).into_iter().map(|(cp, _)| cp).collect()
+    decode_storage_units(s)
+        .into_iter()
+        .map(|(cp, _)| cp)
+        .collect()
 }
 
 /// Compute Emacs-like display width for NeoVM string storage.
 pub(crate) fn storage_string_display_width(s: &str) -> usize {
-    decode_storage_units(s).into_iter().map(|(_, width)| width).sum()
+    decode_storage_units(s)
+        .into_iter()
+        .map(|(_, width)| width)
+        .sum()
 }
 
 /// Count logical Emacs characters in NeoVM string storage.
@@ -326,7 +325,11 @@ pub(crate) fn storage_substring(s: &str, from: usize, to: usize) -> Option<Strin
     } else {
         units[from].0
     };
-    let end_byte = if to == units.len() { s.len() } else { units[to].0 };
+    let end_byte = if to == units.len() {
+        s.len()
+    } else {
+        units[to].0
+    };
     Some(s[start_byte..end_byte].to_string())
 }
 
@@ -451,10 +454,7 @@ mod tests {
     #[test]
     fn escapes_raw_byte_sentinel_as_octal() {
         let raw_377 = char::from_u32(0xE0FF).expect("valid sentinel scalar");
-        assert_eq!(
-            format_lisp_string(&raw_377.to_string()),
-            "\"\\377\""
-        );
+        assert_eq!(format_lisp_string(&raw_377.to_string()), "\"\\377\"");
     }
 
     #[test]
@@ -494,7 +494,10 @@ mod tests {
             encode_nonunicode_char_for_storage(0x110000).expect("should encode"),
             encode_nonunicode_char_for_storage(0x3FFFFF).expect("raw byte should encode")
         );
-        assert_eq!(decode_storage_char_codes(&encoded), vec![0x110000, 0x3FFFFF]);
+        assert_eq!(
+            decode_storage_char_codes(&encoded),
+            vec![0x110000, 0x3FFFFF]
+        );
         assert_eq!(storage_string_display_width(&encoded), 5);
     }
 
@@ -518,12 +521,13 @@ mod tests {
 
     #[test]
     fn unibyte_storage_string_round_trips_emacs_mule_bytes() {
-        let encoded = bytes_to_unibyte_storage_string(&[0x06, b'"', b'\\', b'\n', 0x7F, 0x80, 0xA9, 0xFF]);
+        let encoded =
+            bytes_to_unibyte_storage_string(&[0x06, b'"', b'\\', b'\n', 0x7F, 0x80, 0xA9, 0xFF]);
         assert_eq!(
             format_lisp_string_bytes(&encoded),
             vec![
-                b'"', 0x06, b'\\', b'"', b'\\', b'\\', b'\n', 0x7F, 0xC0, 0x80, 0xC0, 0xA9,
-                0xC1, 0xBF, b'"'
+                b'"', 0x06, b'\\', b'"', b'\\', b'\\', b'\n', 0x7F, 0xC0, 0x80, 0xC0, 0xA9, 0xC1,
+                0xBF, b'"'
             ]
         );
         assert_eq!(

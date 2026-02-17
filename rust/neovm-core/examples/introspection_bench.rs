@@ -115,7 +115,12 @@ fn main() {
             let per_form_elapsed = per_form_start.elapsed();
             let per_form_ns =
                 (per_form_elapsed.as_secs_f64() * 1_000_000_000.0) / options.iterations as f64;
-            println!("{}\t{:.1}\t{}", idx + 1, per_form_ns, INTROSPECTION_FORMS[idx]);
+            println!(
+                "{}\t{:.1}\t{}",
+                idx + 1,
+                per_form_ns,
+                INTROSPECTION_FORMS[idx]
+            );
         }
     }
 }

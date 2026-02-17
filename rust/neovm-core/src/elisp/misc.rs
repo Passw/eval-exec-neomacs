@@ -805,7 +805,10 @@ mod tests {
         match float {
             Flow::Signal(sig) => {
                 assert_eq!(sig.symbol, "wrong-type-argument");
-                assert_eq!(sig.data, vec![Value::symbol("wholenump"), Value::Float(3.2)]);
+                assert_eq!(
+                    sig.data,
+                    vec![Value::symbol("wholenump"), Value::Float(3.2)]
+                );
             }
             other => panic!("expected wrong-type-argument signal, got {other:?}"),
         }
@@ -892,7 +895,10 @@ mod tests {
         let result = builtin_string_to_multibyte(vec![Value::string(s)]).unwrap();
         let out = result.as_str().unwrap();
         assert_eq!(string_escape::storage_byte_len(out), 2);
-        assert_eq!(string_escape::decode_storage_char_codes(out), vec![0x3FFFFF]);
+        assert_eq!(
+            string_escape::decode_storage_char_codes(out),
+            vec![0x3FFFFF]
+        );
     }
 
     #[test]
@@ -900,7 +906,10 @@ mod tests {
         let result = builtin_string_to_unibyte(vec![Value::string("world")]).unwrap();
         let s = result.as_str().unwrap();
         assert_eq!(string_escape::storage_byte_len(s), 5);
-        assert_eq!(string_escape::decode_storage_char_codes(s), vec![119, 111, 114, 108, 100]);
+        assert_eq!(
+            string_escape::decode_storage_char_codes(s),
+            vec![119, 111, 114, 108, 100]
+        );
     }
 
     #[test]
@@ -911,7 +920,9 @@ mod tests {
                 assert_eq!(sig.symbol, "error");
                 assert_eq!(
                     sig.data,
-                    vec![Value::string("Cannot convert character at index 0 to unibyte")]
+                    vec![Value::string(
+                        "Cannot convert character at index 0 to unibyte"
+                    )]
                 );
             }
             other => panic!("expected conversion error, got {other:?}"),
@@ -941,7 +952,10 @@ mod tests {
         let result = builtin_string_as_unibyte(vec![Value::string("test")]).unwrap();
         let s = result.as_str().unwrap();
         assert_eq!(string_escape::storage_byte_len(s), 4);
-        assert_eq!(string_escape::decode_storage_char_codes(s), vec![116, 101, 115, 116]);
+        assert_eq!(
+            string_escape::decode_storage_char_codes(s),
+            vec![116, 101, 115, 116]
+        );
     }
 
     #[test]
@@ -968,7 +982,10 @@ mod tests {
         let result = builtin_string_as_multibyte(vec![Value::string(s)]).unwrap();
         let out = result.as_str().unwrap();
         assert_eq!(string_escape::storage_byte_len(out), 2);
-        assert_eq!(string_escape::decode_storage_char_codes(out), vec![0x3FFFFF]);
+        assert_eq!(
+            string_escape::decode_storage_char_codes(out),
+            vec![0x3FFFFF]
+        );
     }
 
     // ----- char encoding conversions -----
@@ -1128,10 +1145,7 @@ mod tests {
                     && sig.data == vec![Value::symbol("backtrace-frame"), Value::Int(0)]
         ));
 
-        let over = builtin_backtrace_frame(
-            &mut eval,
-            vec![Value::Int(0), Value::Nil, Value::Nil],
-        );
+        let over = builtin_backtrace_frame(&mut eval, vec![Value::Int(0), Value::Nil, Value::Nil]);
         assert!(matches!(
             over,
             Err(Flow::Signal(sig))

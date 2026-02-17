@@ -1,9 +1,9 @@
 //! Compatibility helpers for Emacs compiled-function reader literals (`#[...]`, `#(...)`).
 
-use super::error::{signal, Flow};
-use super::value::Value;
 #[cfg(feature = "legacy-elc-literal")]
 use super::bytecode::{ByteCodeFunction, Op};
+use super::error::{signal, Flow};
+use super::value::Value;
 #[cfg(feature = "legacy-elc-literal")]
 use super::value::{list_to_vec, LambdaParams};
 #[cfg(feature = "legacy-elc-literal")]
@@ -682,12 +682,8 @@ fn decode_opcode_subset(byte_stream: &str, const_len: usize) -> Option<Vec<Op>> 
             Pending::PushConditionCaseRaw(target) => {
                 Op::PushConditionCaseRaw(*byte_to_op_index.get(&target)? as u32)
             }
-            Pending::PushCatch(target) => {
-                Op::PushCatch(*byte_to_op_index.get(&target)? as u32)
-            }
-            Pending::GotoIfNil(target) => {
-                Op::GotoIfNil(*byte_to_op_index.get(&target)? as u32)
-            }
+            Pending::PushCatch(target) => Op::PushCatch(*byte_to_op_index.get(&target)? as u32),
+            Pending::GotoIfNil(target) => Op::GotoIfNil(*byte_to_op_index.get(&target)? as u32),
             Pending::GotoIfNotNil(target) => {
                 Op::GotoIfNotNil(*byte_to_op_index.get(&target)? as u32)
             }
@@ -1181,7 +1177,10 @@ mod tests {
         let Value::ByteCode(bc) = coerced else {
             panic!("expected Value::ByteCode");
         };
-        assert_eq!(bc.ops, vec![Op::VarRef(0), Op::VarRef(1), Op::Elt, Op::Return]);
+        assert_eq!(
+            bc.ops,
+            vec![Op::VarRef(0), Op::VarRef(1), Op::Elt, Op::Return]
+        );
     }
 
     #[test]
@@ -1229,7 +1228,10 @@ mod tests {
         let Value::ByteCode(bc) = coerced else {
             panic!("expected Value::ByteCode");
         };
-        assert_eq!(bc.ops, vec![Op::VarRef(0), Op::VarRef(1), Op::Aref, Op::Return]);
+        assert_eq!(
+            bc.ops,
+            vec![Op::VarRef(0), Op::VarRef(1), Op::Aref, Op::Return]
+        );
 
         let aset = Value::vector(vec![
             Value::list(vec![
@@ -1273,7 +1275,10 @@ mod tests {
         let Value::ByteCode(bc) = coerced else {
             panic!("expected Value::ByteCode");
         };
-        assert_eq!(bc.ops, vec![Op::VarRef(0), Op::VarRef(1), Op::Div, Op::Return]);
+        assert_eq!(
+            bc.ops,
+            vec![Op::VarRef(0), Op::VarRef(1), Op::Div, Op::Return]
+        );
 
         let rem = Value::vector(vec![
             Value::list(vec![Value::symbol("x"), Value::symbol("y")]),
@@ -1285,7 +1290,10 @@ mod tests {
         let Value::ByteCode(bc) = coerced else {
             panic!("expected Value::ByteCode");
         };
-        assert_eq!(bc.ops, vec![Op::VarRef(0), Op::VarRef(1), Op::Rem, Op::Return]);
+        assert_eq!(
+            bc.ops,
+            vec![Op::VarRef(0), Op::VarRef(1), Op::Rem, Op::Return]
+        );
     }
 
     #[test]
@@ -1454,7 +1462,10 @@ mod tests {
         let Value::ByteCode(bc) = coerced else {
             panic!("expected Value::ByteCode");
         };
-        assert_eq!(bc.ops, vec![Op::VarRef(0), Op::VarRef(1), Op::Nconc, Op::Return]);
+        assert_eq!(
+            bc.ops,
+            vec![Op::VarRef(0), Op::VarRef(1), Op::Nconc, Op::Return]
+        );
 
         let nconc3 = Value::vector(vec![
             Value::list(vec![
@@ -1656,7 +1667,12 @@ mod tests {
         };
         assert_eq!(
             bc.ops,
-            vec![Op::StackRef(1), Op::StackRef(6), Op::StackRef(300), Op::Return]
+            vec![
+                Op::StackRef(1),
+                Op::StackRef(6),
+                Op::StackRef(300),
+                Op::Return
+            ]
         );
     }
 
@@ -1702,7 +1718,12 @@ mod tests {
         let literal_wide = Value::vector(vec![
             Value::Nil,
             Value::string("\u{C0}\u{C1}\u{C2}\u{C3}\u{B3}\u{2}\u{0}E\u{87}"),
-            Value::vector(vec![Value::Int(1), Value::Int(2), Value::Int(3), Value::Int(4)]),
+            Value::vector(vec![
+                Value::Int(1),
+                Value::Int(2),
+                Value::Int(3),
+                Value::Int(4),
+            ]),
             Value::Int(4),
         ]);
         let coerced = maybe_coerce_compiled_literal_function(literal_wide);

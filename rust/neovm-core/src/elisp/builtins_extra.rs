@@ -856,7 +856,8 @@ mod tests {
             other => panic!("expected signal, got {other:?}"),
         }
 
-        let full_name_err = builtin_user_full_name(vec![Value::list(vec![Value::Int(1)])]).unwrap_err();
+        let full_name_err =
+            builtin_user_full_name(vec![Value::list(vec![Value::Int(1)])]).unwrap_err();
         match full_name_err {
             Flow::Signal(sig) => assert_eq!(sig.symbol, "wrong-type-argument"),
             other => panic!("expected signal, got {other:?}"),
@@ -946,5 +947,4 @@ mod tests {
             other => panic!("expected signal, got {other:?}"),
         }
     }
-
 }

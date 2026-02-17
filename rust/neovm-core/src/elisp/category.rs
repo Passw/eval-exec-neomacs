@@ -253,7 +253,9 @@ fn is_category_table_value(value: &Value) -> Result<bool, Flow> {
 
 fn clone_char_table_object(value: &Value) -> EvalResult {
     match value {
-        Value::Vector(v) => Ok(Value::vector(v.lock().expect("vector lock poisoned").clone())),
+        Value::Vector(v) => Ok(Value::vector(
+            v.lock().expect("vector lock poisoned").clone(),
+        )),
         other => Err(signal(
             "wrong-type-argument",
             vec![Value::symbol("category-table-p"), other.clone()],
@@ -1100,11 +1102,8 @@ mod tests {
         let first = builtin_get_unused_category_eval(&mut eval, vec![]).unwrap();
         assert!(matches!(first, Value::Char('a')));
 
-        builtin_define_category_eval(
-            &mut eval,
-            vec![Value::Char('a'), Value::string("used")],
-        )
-        .unwrap();
+        builtin_define_category_eval(&mut eval, vec![Value::Char('a'), Value::string("used")])
+            .unwrap();
         let second = builtin_get_unused_category_eval(&mut eval, vec![]).unwrap();
         assert!(matches!(second, Value::Char('b')));
     }
@@ -1138,7 +1137,9 @@ mod tests {
         builtin_set_category_table_eval(&mut eval, vec![custom]).unwrap();
         let restored = builtin_set_category_table_eval(&mut eval, vec![Value::Nil]).unwrap();
 
-        assert!(builtin_category_table_p(vec![restored.clone()]).unwrap().is_truthy());
+        assert!(builtin_category_table_p(vec![restored.clone()])
+            .unwrap()
+            .is_truthy());
         assert!(!category_table_pointer_eq(&restored, &standard));
     }
 

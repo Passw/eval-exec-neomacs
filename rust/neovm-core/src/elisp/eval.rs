@@ -169,12 +169,18 @@ impl Evaluator {
         obarray.set_symbol_function("count-matches", Value::symbol("how-many"));
         obarray.set_symbol_function("replace-rectangle", Value::symbol("string-rectangle"));
         obarray.set_symbol_function("wholenump", Value::symbol("natnump"));
-        obarray.set_symbol_function("subr-native-elisp-p", Value::symbol("native-comp-function-p"));
+        obarray.set_symbol_function(
+            "subr-native-elisp-p",
+            Value::symbol("native-comp-function-p"),
+        );
         obarray.set_symbol_function(
             "kmacro-name-last-macro",
             Value::Subr("name-last-kbd-macro".to_string()),
         );
-        obarray.set_symbol_function("name-last-kbd-macro", Value::symbol("kmacro-name-last-macro"));
+        obarray.set_symbol_function(
+            "name-last-kbd-macro",
+            Value::symbol("kmacro-name-last-macro"),
+        );
         // GNU Emacs exposes this helper as a Lisp wrapper, not a primitive.
         obarray.set_symbol_function(
             "subr-primitive-p",
@@ -185,9 +191,7 @@ impl Evaluator {
                     Expr::Symbol("object".to_string()),
                 ])],
                 env: None,
-                docstring: Some(
-                    "Return non-nil if OBJECT is a primitive callable.".to_string(),
-                ),
+                docstring: Some("Return non-nil if OBJECT is a primitive callable.".to_string()),
             })),
         );
         // Bookmark command wrappers are startup autoloads in GNU Emacs.
@@ -279,7 +283,11 @@ impl Evaluator {
             "auth-source",
             "Read a password, prompting with PROMPT, and return password as a string.",
         );
-        seed_autoload("clear-rectangle", "rect", "Blank out the region-rectangle with spaces.");
+        seed_autoload(
+            "clear-rectangle",
+            "rect",
+            "Blank out the region-rectangle with spaces.",
+        );
         seed_autoload(
             "delete-extract-rectangle",
             "rect",
@@ -561,7 +569,8 @@ impl Evaluator {
             .iter()
             .map(|name| Value::symbol(name.clone()))
             .collect();
-        self.obarray.set_symbol_value("features", Value::list(values));
+        self.obarray
+            .set_symbol_value("features", Value::list(values));
     }
 
     fn refresh_features_from_variable(&mut self) {
@@ -1150,10 +1159,7 @@ impl Evaluator {
         if tail.len() % 2 != 0 {
             return Err(signal(
                 "wrong-number-of-arguments",
-                vec![
-                    Value::symbol("setq-local"),
-                    Value::Int(tail.len() as i64),
-                ],
+                vec![Value::symbol("setq-local"), Value::Int(tail.len() as i64)],
             ));
         }
 
@@ -1341,10 +1347,7 @@ impl Evaluator {
             ));
         }
         if tail.len() > 3 {
-            return Err(signal(
-                "error",
-                vec![Value::string("Too many arguments")],
-            ));
+            return Err(signal("error", vec![Value::string("Too many arguments")]));
         }
         let Expr::Symbol(name) = &tail[0] else {
             return Err(signal(
@@ -1373,10 +1376,7 @@ impl Evaluator {
             ));
         }
         if tail.len() > 3 {
-            return Err(signal(
-                "error",
-                vec![Value::string("Too many arguments")],
-            ));
+            return Err(signal("error", vec![Value::string("Too many arguments")]));
         }
         let Expr::Symbol(name) = &tail[0] else {
             return Err(signal(
@@ -1470,7 +1470,10 @@ impl Evaluator {
         if tail.is_empty() {
             return Err(signal(
                 "wrong-number-of-arguments",
-                vec![Value::symbol("unwind-protect"), Value::Int(tail.len() as i64)],
+                vec![
+                    Value::symbol("unwind-protect"),
+                    Value::Int(tail.len() as i64),
+                ],
             ));
         }
         let primary = self.eval(&tail[0]);
@@ -1613,18 +1616,14 @@ impl Evaluator {
             ));
         }
         let sym = self.eval(&tail[0])?;
-        let def = super::compiled_literal::maybe_coerce_compiled_literal_function(
-            self.eval(&tail[1])?,
-        );
-        let name = sym
-            .as_symbol_name()
-            .map(str::to_string)
-            .ok_or_else(|| {
-                signal(
-                    "wrong-type-argument",
-                    vec![Value::symbol("symbolp"), sym.clone()],
-                )
-            })?;
+        let def =
+            super::compiled_literal::maybe_coerce_compiled_literal_function(self.eval(&tail[1])?);
+        let name = sym.as_symbol_name().map(str::to_string).ok_or_else(|| {
+            signal(
+                "wrong-type-argument",
+                vec![Value::symbol("symbolp"), sym.clone()],
+            )
+        })?;
         if name == "nil" {
             return Err(signal("setting-constant", vec![Value::symbol("nil")]));
         }
@@ -1980,9 +1979,7 @@ impl Evaluator {
             Value::Symbol(name) => {
                 self.apply_named_callable(&name, args, Value::Subr(name.clone()), true)
             }
-            Value::True => {
-                self.apply_named_callable("t", args, Value::Subr("t".to_string()), true)
-            }
+            Value::True => self.apply_named_callable("t", args, Value::Subr("t".to_string()), true),
             Value::Keyword(name) => {
                 self.apply_named_callable(&name, args, Value::Subr(name.clone()), true)
             }
@@ -2008,7 +2005,10 @@ impl Evaluator {
         rewrite_builtin_wrong_arity: bool,
     ) -> EvalResult {
         if super::subr_info::is_special_form(name) {
-            return Err(signal("invalid-function", vec![Value::Subr(name.to_string())]));
+            return Err(signal(
+                "invalid-function",
+                vec![Value::Subr(name.to_string())],
+            ));
         }
         if super::subr_info::is_evaluator_callable_name(name) {
             return self.apply_evaluator_callable(name, args);
@@ -2174,7 +2174,10 @@ impl Evaluator {
                 if args.len() != 2 {
                     return Err(signal(
                         "wrong-number-of-arguments",
-                        vec![Value::Subr("throw".to_string()), Value::Int(args.len() as i64)],
+                        vec![
+                            Value::Subr("throw".to_string()),
+                            Value::Int(args.len() as i64),
+                        ],
                     ));
                 }
                 Err(Flow::Throw {
@@ -2650,10 +2653,7 @@ mod tests {
             eval_one("(condition-case err #'1 (error (car err)))"),
             "OK 1"
         );
-        assert_eq!(
-            eval_one("(equal #''(lambda) ''(lambda))"),
-            "OK t"
-        );
+        assert_eq!(eval_one("(equal #''(lambda) ''(lambda))"), "OK t");
     }
 
     #[test]
@@ -2828,7 +2828,9 @@ mod tests {
             "OK invalid-function"
         );
         assert_eq!(
-            eval_one("(condition-case err (funcall (symbol-function 'if) t 1 2) (error (car err)))"),
+            eval_one(
+                "(condition-case err (funcall (symbol-function 'if) t 1 2) (error (car err)))"
+            ),
             "OK invalid-function"
         );
         assert_eq!(
@@ -3341,7 +3343,10 @@ mod tests {
         assert_eq!(results[0], "OK 42");
         assert_eq!(results[1], "OK vm-x");
         assert_eq!(results[2], "OK 78");
-        assert_eq!(results[3], "OK (wrong-type-argument number-or-marker-p vm-x)");
+        assert_eq!(
+            results[3],
+            "OK (wrong-type-argument number-or-marker-p vm-x)"
+        );
         assert_eq!(results[4], "OK 76");
         assert_eq!(results[5], "OK 42");
         assert_eq!(results[6], "OK 5");
@@ -3633,7 +3638,10 @@ mod tests {
         )
         .expect("write vm-rec-b");
 
-        let escaped = dir.to_string_lossy().replace('\\', "\\\\").replace('"', "\\\"");
+        let escaped = dir
+            .to_string_lossy()
+            .replace('\\', "\\\\")
+            .replace('"', "\\\"");
         let script = format!(
             "(progn (setq load-path (cons \"{}\" load-path)) 'ok)\n\
              (condition-case err (require 'vm-rec-a) (error (car err)))\n\

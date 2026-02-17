@@ -77,7 +77,10 @@ fn eval_forms_from_source(eval: &mut super::eval::Evaluator, source: &str) -> Ev
     Ok(Value::Nil)
 }
 
-fn eval_buffer_source_text(eval: &super::eval::Evaluator, arg: Option<&Value>) -> Result<String, Flow> {
+fn eval_buffer_source_text(
+    eval: &super::eval::Evaluator,
+    arg: Option<&Value>,
+) -> Result<String, Flow> {
     let buffer_id = match arg {
         None | Some(Value::Nil) => eval
             .buffers
@@ -157,7 +160,11 @@ pub(crate) fn builtin_eval_region(
 
         let start_byte = buffer.text.char_to_byte((raw_start - 1) as usize);
         let end_byte = buffer.text.char_to_byte((raw_end - 1) as usize);
-        (buffer.buffer_substring(start_byte, end_byte), raw_start, raw_end)
+        (
+            buffer.buffer_substring(start_byte, end_byte),
+            raw_start,
+            raw_end,
+        )
     };
 
     if start_char_pos >= end_char_pos {
@@ -261,10 +268,12 @@ pub(crate) fn builtin_locate_file(args: Vec<Value>) -> EvalResult {
     let filename = expect_string(&args[0])?;
     let path = parse_path_argument(&args[1])?;
     let suffixes = parse_suffixes_argument(&args[2])?;
-    Ok(match locate_file_with_path_and_suffixes(&filename, &path, &suffixes, args.get(3))? {
-        Some(found) => Value::string(found),
-        None => Value::Nil,
-    })
+    Ok(
+        match locate_file_with_path_and_suffixes(&filename, &path, &suffixes, args.get(3))? {
+            Some(found) => Value::string(found),
+            None => Value::Nil,
+        },
+    )
 }
 
 /// `(locate-file-internal FILENAME PATH SUFFIXES &optional PREDICATE)`
@@ -276,10 +285,12 @@ pub(crate) fn builtin_locate_file_internal(args: Vec<Value>) -> EvalResult {
     let filename = expect_string(&args[0])?;
     let path = parse_path_argument(&args[1])?;
     let suffixes = parse_suffixes_argument(&args[2])?;
-    Ok(match locate_file_with_path_and_suffixes(&filename, &path, &suffixes, args.get(3))? {
-        Some(found) => Value::string(found),
-        None => Value::Nil,
-    })
+    Ok(
+        match locate_file_with_path_and_suffixes(&filename, &path, &suffixes, args.get(3))? {
+            Some(found) => Value::string(found),
+            None => Value::Nil,
+        },
+    )
 }
 
 /// `(read-coding-system PROMPT &optional DEFAULT-CODING-SYSTEM)`
@@ -388,8 +399,7 @@ fn locate_file_with_path_and_suffixes(
     if absolute || path.is_empty() {
         for suffix in &effective_suffixes {
             let candidate = format!("{filename}{suffix}");
-            if Path::new(&candidate).exists()
-                && predicate_matches_candidate(predicate, &candidate)?
+            if Path::new(&candidate).exists() && predicate_matches_candidate(predicate, &candidate)?
             {
                 return Ok(Some(candidate));
             }
@@ -402,8 +412,7 @@ fn locate_file_with_path_and_suffixes(
         let base = base.to_string_lossy();
         for suffix in &effective_suffixes {
             let candidate = format!("{base}{suffix}");
-            if Path::new(&candidate).exists()
-                && predicate_matches_candidate(predicate, &candidate)?
+            if Path::new(&candidate).exists() && predicate_matches_candidate(predicate, &candidate)?
             {
                 return Ok(Some(candidate));
             }
@@ -426,7 +435,8 @@ fn predicate_matches_candidate(predicate: Option<&Value>, candidate: &str) -> Re
         // unknown predicate object shapes default to accepting candidate.
         return Ok(true);
     };
-    let Some(result) = super::builtins::dispatch_builtin_pure(symbol, vec![Value::string(candidate)])
+    let Some(result) =
+        super::builtins::dispatch_builtin_pure(symbol, vec![Value::string(candidate)])
     else {
         // Emacs locate-file tolerates non-callable predicate values in practice.
         // Keep search behavior instead of surfacing an execution error here.
@@ -564,8 +574,8 @@ mod tests {
             let buf = ev.buffers.current_buffer().expect("current buffer");
             buf.text.char_count() as i64 + 1
         };
-        let reversed = builtin_eval_region(&mut ev, vec![Value::Int(point_max), Value::Int(1)])
-            .unwrap();
+        let reversed =
+            builtin_eval_region(&mut ev, vec![Value::Int(point_max), Value::Int(1)]).unwrap();
         assert!(reversed.is_nil());
         assert_eq!(
             ev.obarray.symbol_value("lread-er-noop").cloned(),
@@ -652,7 +662,12 @@ mod tests {
         };
         let result = builtin_eval_region(&mut ev, vec![Value::Int(1), end]).unwrap();
         assert!(result.is_nil());
-        let point = ev.buffers.current_buffer().expect("current buffer").point_char() as i64 + 1;
+        let point = ev
+            .buffers
+            .current_buffer()
+            .expect("current buffer")
+            .point_char() as i64
+            + 1;
         assert_eq!(point, 1);
     }
 
@@ -705,7 +720,10 @@ mod tests {
             .set_symbol_value("unread-command-events", Value::list(vec![Value::Char('a')]));
         let result = builtin_read_event(&mut ev, vec![]).unwrap();
         assert_eq!(result.as_int(), Some(97));
-        assert_eq!(ev.obarray.symbol_value("unread-command-events"), Some(&Value::Nil));
+        assert_eq!(
+            ev.obarray.symbol_value("unread-command-events"),
+            Some(&Value::Nil)
+        );
     }
 
     #[test]
@@ -794,15 +812,22 @@ mod tests {
         );
         let result = builtin_read_char_exclusive(&mut ev, vec![]).unwrap();
         assert_eq!(result.as_int(), Some(97));
-        assert_eq!(ev.recent_input_events(), &[Value::symbol("foo"), Value::Int(97)]);
+        assert_eq!(
+            ev.recent_input_events(),
+            &[Value::symbol("foo"), Value::Int(97)]
+        );
     }
 
     #[test]
     fn read_char_exclusive_skips_non_character_and_empty_tail() {
         let mut ev = Evaluator::new();
-        ev.obarray
-            .set_symbol_value("unread-command-events", Value::list(vec![Value::symbol("foo"), Value::Int(97)]));
-        let result = builtin_read_char_exclusive(&mut ev, vec![Value::Nil, Value::Nil, Value::Int(0)]).unwrap();
+        ev.obarray.set_symbol_value(
+            "unread-command-events",
+            Value::list(vec![Value::symbol("foo"), Value::Int(97)]),
+        );
+        let result =
+            builtin_read_char_exclusive(&mut ev, vec![Value::Nil, Value::Nil, Value::Int(0)])
+                .unwrap();
         assert_eq!(result.as_int(), Some(97));
         assert_eq!(
             ev.obarray.symbol_value("unread-command-events"),
@@ -813,9 +838,13 @@ mod tests {
     #[test]
     fn read_char_exclusive_skips_non_character_and_leaves_tail() {
         let mut ev = Evaluator::new();
-        ev.obarray
-            .set_symbol_value("unread-command-events", Value::list(vec![Value::symbol("foo"), Value::Int(97), Value::Int(98)]));
-        let result = builtin_read_char_exclusive(&mut ev, vec![Value::Nil, Value::Nil, Value::Int(0)]).unwrap();
+        ev.obarray.set_symbol_value(
+            "unread-command-events",
+            Value::list(vec![Value::symbol("foo"), Value::Int(97), Value::Int(98)]),
+        );
+        let result =
+            builtin_read_char_exclusive(&mut ev, vec![Value::Nil, Value::Nil, Value::Int(0)])
+                .unwrap();
         assert_eq!(result.as_int(), Some(97));
         assert_eq!(
             ev.obarray.symbol_value("unread-command-events"),
@@ -967,7 +996,9 @@ mod tests {
             Value::list(vec![Value::string(".elc")]),
         ])
         .expect("locate-file-internal should succeed");
-        let found = result.as_str().expect("locate-file-internal should return path");
+        let found = result
+            .as_str()
+            .expect("locate-file-internal should return path");
         assert!(
             found.ends_with("probe.elc"),
             "expected .elc resolution, got {found}",

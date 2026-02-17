@@ -87,7 +87,10 @@ pub(crate) fn builtin_format_mode_line_eval(
 /// numeric positions are not invisible by default.
 pub(crate) fn builtin_invisible_p(args: Vec<Value>) -> EvalResult {
     expect_args("invisible-p", &args, 1)?;
-    Ok(Value::bool(matches!(&args[0], Value::Symbol(_) | Value::True)))
+    Ok(Value::bool(matches!(
+        &args[0],
+        Value::Symbol(_) | Value::True
+    )))
 }
 
 /// (line-pixel-height) -> integer
@@ -223,7 +226,9 @@ pub(crate) fn builtin_move_to_window_line(args: Vec<Value>) -> EvalResult {
     expect_args("move-to-window-line", &args, 1)?;
     Err(signal(
         "error",
-        vec![Value::string("move-to-window-line called from unrelated buffer")],
+        vec![Value::string(
+            "move-to-window-line called from unrelated buffer",
+        )],
     ))
 }
 
@@ -381,12 +386,7 @@ mod tests {
         let mut eval = super::super::eval::Evaluator::new();
         let buffer_id = eval.buffers.current_buffer().expect("current buffer").id;
         let frame_id = eval.frames.create_frame("xdisp-format", 80, 24, buffer_id);
-        let window_id = eval
-            .frames
-            .get(frame_id)
-            .expect("frame")
-            .selected_window
-            .0 as i64;
+        let window_id = eval.frames.get(frame_id).expect("frame").selected_window.0 as i64;
 
         let ok = builtin_format_mode_line_eval(
             &mut eval,
@@ -467,9 +467,8 @@ mod tests {
             other => panic!("expected wrong-type-argument, got {:?}", other),
         }
 
-        let err =
-            builtin_window_text_pixel_size(vec![Value::Nil, Value::Nil, Value::symbol("x")])
-                .unwrap_err();
+        let err = builtin_window_text_pixel_size(vec![Value::Nil, Value::Nil, Value::symbol("x")])
+            .unwrap_err();
         match err {
             Flow::Signal(sig) => assert_eq!(sig.symbol, "wrong-type-argument"),
             other => panic!("expected wrong-type-argument, got {:?}", other),
@@ -493,16 +492,10 @@ mod tests {
         let mut eval = super::super::eval::Evaluator::new();
         let buf_id = eval.buffers.current_buffer().expect("current buffer").id;
         let frame_id = eval.frames.create_frame("xdisp-test", 80, 24, buf_id);
-        let selected_window = eval
-            .frames
-            .get(frame_id)
-            .expect("frame")
-            .selected_window
-            .0 as i64;
+        let selected_window = eval.frames.get(frame_id).expect("frame").selected_window.0 as i64;
 
-        let ok =
-            builtin_window_text_pixel_size_eval(&mut eval, vec![Value::Int(selected_window)])
-                .unwrap();
+        let ok = builtin_window_text_pixel_size_eval(&mut eval, vec![Value::Int(selected_window)])
+            .unwrap();
         match ok {
             Value::Cons(_) => {}
             other => panic!("expected cons return, got {other:?}"),

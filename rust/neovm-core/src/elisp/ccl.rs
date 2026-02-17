@@ -28,11 +28,7 @@ fn is_valid_ccl_program(program: &Value) -> bool {
         return false;
     }
 
-    let [first, second, third] = [
-        &program[0],
-        &program[1],
-        &program[2],
-    ];
+    let [first, second, third] = [&program[0], &program[1], &program[2]];
 
     let first = first.as_int();
     if first.is_none() || first.is_some_and(|n| n < 0) {
@@ -95,7 +91,10 @@ pub(crate) fn builtin_ccl_program_p(args: Vec<Value>) -> EvalResult {
 pub(crate) fn builtin_ccl_execute(args: Vec<Value>) -> EvalResult {
     expect_args("ccl-execute", &args, 2)?;
     if !args[1].is_vector() {
-        return Err(signal("wrong-type-argument", vec![Value::symbol("vectorp"), args[1].clone()]));
+        return Err(signal(
+            "wrong-type-argument",
+            vec![Value::symbol("vectorp"), args[1].clone()],
+        ));
     }
 
     Ok(Value::Nil)
@@ -107,7 +106,10 @@ pub(crate) fn builtin_ccl_execute_on_string(args: Vec<Value>) -> EvalResult {
     expect_min_args("ccl-execute-on-string", &args, 3)?;
     expect_max_args("ccl-execute-on-string", &args, 5)?;
     if !args[1].is_vector() {
-        return Err(signal("wrong-type-argument", vec![Value::symbol("vectorp"), args[1].clone()]));
+        return Err(signal(
+            "wrong-type-argument",
+            vec![Value::symbol("vectorp"), args[1].clone()],
+        ));
     }
 
     // Arguments:
@@ -161,16 +163,30 @@ mod tests {
         let program = Value::vector(vec![Value::Int(10), Value::Int(0), Value::Int(0)]);
         let invalid_program = Value::vector(vec![Value::Int(0), Value::Int(0)]);
         let invalid_negative = Value::vector(vec![Value::Int(-1), Value::Int(0), Value::Int(0)]);
-        assert_eq!(builtin_ccl_program_p(vec![program]).expect("valid program"), Value::True);
-        assert_eq!(builtin_ccl_program_p(vec![invalid_program]).expect("invalid program"), Value::Nil);
-        assert_eq!(builtin_ccl_program_p(vec![invalid_negative]).expect("invalid program"), Value::Nil);
+        assert_eq!(
+            builtin_ccl_program_p(vec![program]).expect("valid program"),
+            Value::True
+        );
+        assert_eq!(
+            builtin_ccl_program_p(vec![invalid_program]).expect("invalid program"),
+            Value::Nil
+        );
+        assert_eq!(
+            builtin_ccl_program_p(vec![invalid_negative]).expect("invalid program"),
+            Value::Nil
+        );
     }
 
     #[test]
     fn ccl_execute_on_string_returns_string_payload() {
         let out = builtin_ccl_execute_on_string(vec![
             Value::vector(vec![Value::Int(10), Value::Int(0), Value::Int(0)]),
-            Value::vector(vec![Value::Int(0), Value::Int(0), Value::Int(0), Value::Int(0)]),
+            Value::vector(vec![
+                Value::Int(0),
+                Value::Int(0),
+                Value::Int(0),
+                Value::Int(0),
+            ]),
             Value::string("abc"),
         ])
         .expect("string payload should be returned");
@@ -195,10 +211,15 @@ mod tests {
     fn ccl_execute_on_string_rejects_non_string_payload() {
         let err = builtin_ccl_execute_on_string(vec![
             Value::vector(vec![Value::Int(10), Value::Int(0), Value::Int(0)]),
-            Value::vector(vec![Value::Int(0), Value::Int(0), Value::Int(0), Value::Int(0)]),
+            Value::vector(vec![
+                Value::Int(0),
+                Value::Int(0),
+                Value::Int(0),
+                Value::Int(0),
+            ]),
             Value::Int(1),
         ])
-            .expect_err("non-string payload must be rejected");
+        .expect_err("non-string payload must be rejected");
         match err {
             Flow::Signal(sig) => assert_eq!(sig.symbol, "wrong-type-argument"),
             other => panic!("expected wrong-type-argument signal, got {other:?}"),
@@ -209,7 +230,12 @@ mod tests {
     fn ccl_execute_on_string_rejects_over_arity() {
         let err = builtin_ccl_execute_on_string(vec![
             Value::vector(vec![Value::Int(10), Value::Int(0), Value::Int(0)]),
-            Value::vector(vec![Value::Int(0), Value::Int(0), Value::Int(0), Value::Int(0)]),
+            Value::vector(vec![
+                Value::Int(0),
+                Value::Int(0),
+                Value::Int(0),
+                Value::Int(0),
+            ]),
             Value::string("abc"),
             Value::Nil,
             Value::Nil,

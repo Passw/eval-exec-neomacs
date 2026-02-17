@@ -100,12 +100,7 @@ fn dynamic_or_global_symbol_value(eval: &super::eval::Evaluator, name: &str) -> 
 }
 
 fn rectangle_strings_to_value(rectangle: &[String]) -> Value {
-    Value::list(
-        rectangle
-            .iter()
-            .map(|s| Value::string(s.clone()))
-            .collect(),
-    )
+    Value::list(rectangle.iter().map(|s| Value::string(s.clone())).collect())
 }
 
 fn rectangle_strings_from_value(value: &Value) -> Result<Vec<String>, Flow> {
@@ -240,7 +235,10 @@ fn insert_rectangle_into_text(
     rectangle: &[String],
 ) -> (String, usize) {
     if rectangle.is_empty() {
-        return (text.to_string(), line_col_to_char_index(text, start_line, start_col));
+        return (
+            text.to_string(),
+            line_col_to_char_index(text, start_line, start_col),
+        );
     }
 
     let mut lines: Vec<String> = text.split('\n').map(ToString::to_string).collect();
@@ -437,12 +435,11 @@ pub(crate) fn builtin_extract_rectangle(
         return Ok(Value::list(Vec::new()));
     };
 
-    let strings: Vec<Value> = extract_rectangle_from_text(
-        &text, start_line, end_line, left_col, right_col,
-    )
-    .into_iter()
-    .map(Value::string)
-    .collect();
+    let strings: Vec<Value> =
+        extract_rectangle_from_text(&text, start_line, end_line, left_col, right_col)
+            .into_iter()
+            .map(Value::string)
+            .collect();
     Ok(Value::list(strings))
 }
 
@@ -473,7 +470,12 @@ pub(crate) fn builtin_delete_rectangle(
     let rewritten_lines: Vec<&str> = rewritten.split('\n').collect();
     let mut final_rel_char = 0usize;
     for idx in 0..last_line_index {
-        final_rel_char += rewritten_lines.get(idx).copied().unwrap_or("").chars().count();
+        final_rel_char += rewritten_lines
+            .get(idx)
+            .copied()
+            .unwrap_or("")
+            .chars()
+            .count();
         final_rel_char += 1; // newline
     }
     let last_line_len = rewritten_lines
@@ -509,7 +511,8 @@ pub(crate) fn builtin_kill_rectangle(
     expect_args("kill-rectangle", &args, 2)?;
     let start = expect_int(&args[0])?;
     let end = expect_int(&args[1])?;
-    let extracted = builtin_delete_extract_rectangle(eval, vec![Value::Int(start), Value::Int(end)])?;
+    let extracted =
+        builtin_delete_extract_rectangle(eval, vec![Value::Int(start), Value::Int(end)])?;
     let killed = list_to_vec(&extracted)
         .unwrap_or_default()
         .into_iter()
@@ -547,10 +550,8 @@ pub(crate) fn builtin_yank_rectangle(
         return Ok(Value::Nil);
     }
     eval.rectangle.killed = rectangle.clone();
-    eval.obarray.set_symbol_value(
-        "killed-rectangle",
-        rectangle_strings_to_value(&rectangle),
-    );
+    eval.obarray
+        .set_symbol_value("killed-rectangle", rectangle_strings_to_value(&rectangle));
     builtin_insert_rectangle(eval, vec![rectangle_strings_to_value(&rectangle)])
 }
 
@@ -665,7 +666,9 @@ pub(crate) fn builtin_open_rectangle(
 
     if let Some(buf) = eval.buffers.current_buffer_mut() {
         let target_char = if start > 0 { start as usize - 1 } else { 0 };
-        let target_byte = buf.text.char_to_byte(target_char.min(buf.text.char_count()));
+        let target_byte = buf
+            .text
+            .char_to_byte(target_char.min(buf.text.char_count()));
         buf.goto_char(target_byte);
     }
 
@@ -743,7 +746,9 @@ pub(crate) fn builtin_clear_rectangle(
         } else {
             0
         };
-        let restore_byte = buf.text.char_to_byte(restore_char.min(buf.text.char_count()));
+        let restore_byte = buf
+            .text
+            .char_to_byte(restore_char.min(buf.text.char_count()));
         buf.goto_char(restore_byte);
     }
 
@@ -1025,7 +1030,10 @@ mod tests {
             result,
             Value::list(vec![Value::string("a"), Value::string("1")])
         );
-        assert_eq!(eval.rectangle.killed, vec!["a".to_string(), "1".to_string()]);
+        assert_eq!(
+            eval.rectangle.killed,
+            vec!["a".to_string(), "1".to_string()]
+        );
         assert_eq!(
             eval.obarray
                 .symbol_value("killed-rectangle")
@@ -1101,7 +1109,8 @@ mod tests {
     #[test]
     fn yank_rectangle_non_list_symbol_errors() {
         let mut eval = super::super::eval::Evaluator::new();
-        eval.obarray.set_symbol_value("killed-rectangle", Value::Int(1));
+        eval.obarray
+            .set_symbol_value("killed-rectangle", Value::Int(1));
         let result = builtin_yank_rectangle(&mut eval, vec![]);
         assert!(result.is_err());
     }
@@ -1155,7 +1164,11 @@ mod tests {
             buf.insert("abc");
             buf.goto_char(1);
         }
-        let rect = Value::list(vec![Value::string("X"), Value::string("Y"), Value::string("Z")]);
+        let rect = Value::list(vec![
+            Value::string("X"),
+            Value::string("Y"),
+            Value::string("Z"),
+        ]);
         let result = builtin_insert_rectangle(&mut eval, vec![rect]);
         assert!(result.is_ok());
         assert!(result.unwrap().is_nil());

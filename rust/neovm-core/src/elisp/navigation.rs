@@ -306,10 +306,7 @@ pub(crate) fn builtin_forward_line(
 }
 
 /// (next-line &optional N)
-pub(crate) fn builtin_next_line(
-    eval: &mut super::eval::Evaluator,
-    args: Vec<Value>,
-) -> EvalResult {
+pub(crate) fn builtin_next_line(eval: &mut super::eval::Evaluator, args: Vec<Value>) -> EvalResult {
     let n = if args.is_empty() || args[0].is_nil() {
         1
     } else {
@@ -796,8 +793,8 @@ pub(crate) fn builtin_use_region_p(
             .get("mark-active")
             .is_some_and(|v| v.is_truthy()),
     };
-    let transient_mark_mode = dynamic_or_global_symbol_value(eval, "transient-mark-mode")
-        .is_some_and(|v| v.is_truthy());
+    let transient_mark_mode =
+        dynamic_or_global_symbol_value(eval, "transient-mark-mode").is_some_and(|v| v.is_truthy());
     let non_empty_region = buf.mark().is_some_and(|m| m != buf.point());
     Ok(Value::bool(
         mark_active && transient_mark_mode && non_empty_region,
@@ -822,7 +819,10 @@ pub(crate) fn builtin_activate_mark(
     if args.len() > 1 {
         return Err(signal(
             "wrong-number-of-arguments",
-            vec![Value::symbol("activate-mark"), Value::Int(args.len() as i64)],
+            vec![
+                Value::symbol("activate-mark"),
+                Value::Int(args.len() as i64),
+            ],
         ));
     }
     let buf = eval.buffers.current_buffer_mut().ok_or_else(no_buffer)?;
@@ -1110,7 +1110,10 @@ mod tests {
     #[test]
     fn test_next_line_signals_end_of_buffer() {
         let mut ev = eval_with_text("abc");
-        let val = eval_str(&mut ev, "(condition-case err (next-line) (error (car err)))");
+        let val = eval_str(
+            &mut ev,
+            "(condition-case err (next-line) (error (car err)))",
+        );
         assert_eq!(val.as_symbol_name(), Some("end-of-buffer"));
     }
 
@@ -1193,7 +1196,10 @@ mod tests {
             &mut ev,
             "(condition-case err (beginning-of-buffer nil nil) (error (car err)))",
         );
-        assert_eq!(beginning_err.as_symbol_name(), Some("wrong-number-of-arguments"));
+        assert_eq!(
+            beginning_err.as_symbol_name(),
+            Some("wrong-number-of-arguments")
+        );
 
         let end_err = eval_str(
             &mut ev,

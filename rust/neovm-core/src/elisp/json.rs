@@ -1064,7 +1064,10 @@ pub(crate) fn builtin_json_parse_buffer(
             .buffers
             .current_buffer()
             .ok_or_else(|| signal("error", vec![Value::string("No current buffer")]))?;
-        (buf.buffer_substring(buf.point(), buf.point_max()), buf.point())
+        (
+            buf.buffer_substring(buf.point(), buf.point_max()),
+            buf.point(),
+        )
     };
 
     let mut parser = JsonParser::new(&input, opts);
@@ -1088,7 +1091,10 @@ pub(crate) fn builtin_json_parse_buffer(
 /// `(json-insert VALUE &rest ARGS)` — insert JSON text at point.
 ///
 /// Keyword arguments mirror `json-serialize` (`:null-object`, `:false-object`).
-pub(crate) fn builtin_json_insert(eval: &mut super::eval::Evaluator, args: Vec<Value>) -> EvalResult {
+pub(crate) fn builtin_json_insert(
+    eval: &mut super::eval::Evaluator,
+    args: Vec<Value>,
+) -> EvalResult {
     expect_min_args("json-insert", &args, 1)?;
     let opts = parse_serialize_kwargs(&args, 1)?;
     let json = serialize_to_json(&args[0], &opts, 0)?;

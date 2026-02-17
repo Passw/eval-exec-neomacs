@@ -217,8 +217,9 @@ fn signal_wrong_type_character(value: Value) -> Flow {
 fn char_from_codepoint_value(value: &Value) -> Result<char, Flow> {
     match value {
         Value::Char(c) => Ok(*c),
-        Value::Int(n) if *n >= 0 => char::from_u32(*n as u32)
-            .ok_or_else(|| signal_wrong_type_character(value.clone())),
+        Value::Int(n) if *n >= 0 => {
+            char::from_u32(*n as u32).ok_or_else(|| signal_wrong_type_character(value.clone()))
+        }
         _ => Err(signal_wrong_type_character(value.clone())),
     }
 }
@@ -339,10 +340,7 @@ struct DestinationSpec {
 }
 
 fn signal_wrong_type_string(value: Value) -> Flow {
-    signal(
-        "wrong-type-argument",
-        vec![Value::symbol("stringp"), value],
-    )
+    signal("wrong-type-argument", vec![Value::symbol("stringp"), value])
 }
 
 fn expect_string_strict(value: &Value) -> Result<String, Flow> {
@@ -372,13 +370,17 @@ fn parse_real_buffer_destination(
         Value::True | Value::Str(_) => Ok((OutputTarget::Buffer(value.clone()), false)),
         Value::Buffer(id) => {
             if eval.buffers.get(*id).is_none() {
-                Err(signal("error", vec![Value::string("Selecting deleted buffer")]))
+                Err(signal(
+                    "error",
+                    vec![Value::string("Selecting deleted buffer")],
+                ))
             } else {
                 Ok((OutputTarget::Buffer(value.clone()), false))
             }
         }
         Value::Cons(_) => {
-            let items = list_to_vec(value).ok_or_else(|| signal_wrong_type_string(value.clone()))?;
+            let items =
+                list_to_vec(value).ok_or_else(|| signal_wrong_type_string(value.clone()))?;
             let first = items.first().cloned().unwrap_or(Value::Nil);
             if is_file_keyword(&first) {
                 Ok((parse_file_target(&items)?, false))
@@ -404,8 +406,8 @@ fn parse_call_process_destination(
     destination: &Value,
 ) -> Result<DestinationSpec, Flow> {
     if let Value::Cons(_) = destination {
-        let items =
-            list_to_vec(destination).ok_or_else(|| signal_wrong_type_string(destination.clone()))?;
+        let items = list_to_vec(destination)
+            .ok_or_else(|| signal_wrong_type_string(destination.clone()))?;
         let first = items.first().cloned().unwrap_or(Value::Nil);
         if is_file_keyword(&first) {
             let stdout = parse_file_target(&items)?;
@@ -452,15 +454,19 @@ fn insert_process_output(
                 .find_buffer_by_name(name)
                 .unwrap_or_else(|| eval.buffers.create_buffer(name));
             let buf = eval.buffers.get_mut(id).ok_or_else(|| {
-                signal("error", vec![Value::string("No such live buffer for process output")])
+                signal(
+                    "error",
+                    vec![Value::string("No such live buffer for process output")],
+                )
             })?;
             buf.insert(output);
             Ok(())
         }
         Value::Buffer(id) => {
-            let buf = eval.buffers.get_mut(*id).ok_or_else(|| {
-                signal("error", vec![Value::string("Selecting deleted buffer")])
-            })?;
+            let buf = eval
+                .buffers
+                .get_mut(*id)
+                .ok_or_else(|| signal("error", vec![Value::string("Selecting deleted buffer")]))?;
             buf.insert(output);
             Ok(())
         }
@@ -646,10 +652,9 @@ pub(crate) fn builtin_call_process(
                 command.stderr(Stdio::null());
             }
             StderrTarget::File => {
-                let path = destination_spec
-                    .stderr_file
-                    .as_ref()
-                    .ok_or_else(|| signal("error", vec![Value::string("Missing stderr file target")]))?;
+                let path = destination_spec.stderr_file.as_ref().ok_or_else(|| {
+                    signal("error", vec![Value::string("Missing stderr file target")])
+                })?;
                 let file = OpenOptions::new()
                     .create(true)
                     .truncate(true)
@@ -775,16 +780,18 @@ pub(crate) fn builtin_call_process_region(
     use std::io::Write;
     if destination_spec.no_wait {
         let mut command = Command::new(&program);
-        command.args(&cmd_args).stdin(Stdio::piped()).stdout(Stdio::null());
+        command
+            .args(&cmd_args)
+            .stdin(Stdio::piped())
+            .stdout(Stdio::null());
         match destination_spec.stderr {
             StderrTarget::Discard | StderrTarget::ToStdoutTarget => {
                 command.stderr(Stdio::null());
             }
             StderrTarget::File => {
-                let path = destination_spec
-                    .stderr_file
-                    .as_ref()
-                    .ok_or_else(|| signal("error", vec![Value::string("Missing stderr file target")]))?;
+                let path = destination_spec.stderr_file.as_ref().ok_or_else(|| {
+                    signal("error", vec![Value::string("Missing stderr file target")])
+                })?;
                 let file = OpenOptions::new()
                     .create(true)
                     .truncate(true)
@@ -1541,8 +1548,7 @@ mod tests {
 
     #[test]
     fn getenv_rejects_more_than_two_args() {
-        let result =
-            eval_one(r#"(condition-case err (getenv "HOME" nil nil) (error (car err)))"#);
+        let result = eval_one(r#"(condition-case err (getenv "HOME" nil nil) (error (car err)))"#);
         assert_eq!(result, "OK wrong-number-of-arguments");
     }
 

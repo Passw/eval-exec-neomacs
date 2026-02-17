@@ -262,15 +262,15 @@ mod tests {
 
     #[test]
     fn char_resolve_modifiers_resolves_shift_lowercase() {
-        let result = builtin_char_resolve_modifiers(vec![Value::Int(0x2000000 | ('a' as i64))])
-            .unwrap();
+        let result =
+            builtin_char_resolve_modifiers(vec![Value::Int(0x2000000 | ('a' as i64))]).unwrap();
         assert_eq!(result.as_int(), Some('A' as i64));
     }
 
     #[test]
     fn char_resolve_modifiers_clears_shift_on_uppercase() {
-        let result = builtin_char_resolve_modifiers(vec![Value::Int(0x2000000 | ('A' as i64))])
-            .unwrap();
+        let result =
+            builtin_char_resolve_modifiers(vec![Value::Int(0x2000000 | ('A' as i64))]).unwrap();
         assert_eq!(result.as_int(), Some('A' as i64));
     }
 
@@ -295,5 +295,4 @@ mod tests {
         let result = builtin_capitalize(vec![Value::string("it's a test")]).unwrap();
         assert_eq!(result.as_str(), Some("It'S A Test"));
     }
-
 }

@@ -1470,8 +1470,13 @@ fn set_file_times_compat(
             ts[0].tv_nsec = libc::UTIME_NOW as libc::c_long;
             ts[1].tv_nsec = libc::UTIME_NOW as libc::c_long;
         }
-        let flags = if nofollow { libc::AT_SYMLINK_NOFOLLOW } else { 0 };
-        let result = unsafe { libc::utimensat(libc::AT_FDCWD, c_path.as_ptr(), ts.as_ptr(), flags) };
+        let flags = if nofollow {
+            libc::AT_SYMLINK_NOFOLLOW
+        } else {
+            0
+        };
+        let result =
+            unsafe { libc::utimensat(libc::AT_FDCWD, c_path.as_ptr(), ts.as_ptr(), flags) };
         if result != 0 {
             return Err(signal_file_action_error(
                 std::io::Error::last_os_error(),
@@ -1729,7 +1734,10 @@ pub(crate) fn builtin_set_file_modes(args: Vec<Value>) -> EvalResult {
     if args.len() > 3 {
         return Err(signal(
             "wrong-number-of-arguments",
-            vec![Value::symbol("set-file-modes"), Value::Int(args.len() as i64)],
+            vec![
+                Value::symbol("set-file-modes"),
+                Value::Int(args.len() as i64),
+            ],
         ));
     }
     let filename = expect_string_strict(&args[0])?;
@@ -1761,7 +1769,10 @@ pub(crate) fn builtin_set_file_modes_eval(eval: &Evaluator, args: Vec<Value>) ->
     if args.len() > 3 {
         return Err(signal(
             "wrong-number-of-arguments",
-            vec![Value::symbol("set-file-modes"), Value::Int(args.len() as i64)],
+            vec![
+                Value::symbol("set-file-modes"),
+                Value::Int(args.len() as i64),
+            ],
         ));
     }
     let filename = expect_string_strict(&args[0])?;
@@ -1793,7 +1804,10 @@ pub(crate) fn builtin_set_file_times(args: Vec<Value>) -> EvalResult {
     if args.len() > 3 {
         return Err(signal(
             "wrong-number-of-arguments",
-            vec![Value::symbol("set-file-times"), Value::Int(args.len() as i64)],
+            vec![
+                Value::symbol("set-file-times"),
+                Value::Int(args.len() as i64),
+            ],
         ));
     }
     let filename = expect_string_strict(&args[0])?;
@@ -1816,7 +1830,10 @@ pub(crate) fn builtin_set_file_times_eval(eval: &Evaluator, args: Vec<Value>) ->
     if args.len() > 3 {
         return Err(signal(
             "wrong-number-of-arguments",
-            vec![Value::symbol("set-file-times"), Value::Int(args.len() as i64)],
+            vec![
+                Value::symbol("set-file-times"),
+                Value::Int(args.len() as i64),
+            ],
         ));
     }
     let filename = expect_string_strict(&args[0])?;
@@ -2150,7 +2167,8 @@ pub(crate) fn builtin_add_name_to_file(args: Vec<Value>) -> EvalResult {
     let newname = expect_string_strict(&args[1])?;
     let ok_if_exists = args.get(2).is_some_and(|value| value.is_truthy());
     if ok_if_exists && fs::symlink_metadata(&newname).is_ok() {
-        fs::remove_file(&newname).map_err(|err| signal_file_io_path(err, "Removing old name", &newname))?;
+        fs::remove_file(&newname)
+            .map_err(|err| signal_file_io_path(err, "Removing old name", &newname))?;
     }
     add_name_to_file(&oldname, &newname)
         .map_err(|err| signal_file_io_paths(err, "Adding new name", &oldname, &newname))?;
@@ -2174,7 +2192,8 @@ pub(crate) fn builtin_add_name_to_file_eval(eval: &Evaluator, args: Vec<Value>) 
     let newname = resolve_filename_for_eval(eval, &expect_string_strict(&args[1])?);
     let ok_if_exists = args.get(2).is_some_and(|value| value.is_truthy());
     if ok_if_exists && fs::symlink_metadata(&newname).is_ok() {
-        fs::remove_file(&newname).map_err(|err| signal_file_io_path(err, "Removing old name", &newname))?;
+        fs::remove_file(&newname)
+            .map_err(|err| signal_file_io_path(err, "Removing old name", &newname))?;
     }
     add_name_to_file(&oldname, &newname)
         .map_err(|err| signal_file_io_paths(err, "Adding new name", &oldname, &newname))?;
@@ -2187,7 +2206,10 @@ pub(crate) fn builtin_make_directory(args: Vec<Value>) -> EvalResult {
     if args.len() > 2 {
         return Err(signal(
             "wrong-number-of-arguments",
-            vec![Value::symbol("make-directory"), Value::Int(args.len() as i64)],
+            vec![
+                Value::symbol("make-directory"),
+                Value::Int(args.len() as i64),
+            ],
         ));
     }
     let dir = expect_string_strict(&args[0])?;
@@ -2204,7 +2226,10 @@ pub(crate) fn builtin_make_directory_eval(eval: &Evaluator, args: Vec<Value>) ->
     if args.len() > 2 {
         return Err(signal(
             "wrong-number-of-arguments",
-            vec![Value::symbol("make-directory"), Value::Int(args.len() as i64)],
+            vec![
+                Value::symbol("make-directory"),
+                Value::Int(args.len() as i64),
+            ],
         ));
     }
     let dir = resolve_filename_for_eval(eval, &expect_string_strict(&args[0])?);
@@ -3018,12 +3043,8 @@ mod tests {
         );
         assert!(nested.is_dir());
 
-        let err = builtin_make_directory(vec![
-            Value::string(&nested_s),
-            Value::Nil,
-            Value::Nil,
-        ])
-        .unwrap_err();
+        let err = builtin_make_directory(vec![Value::string(&nested_s), Value::Nil, Value::Nil])
+            .unwrap_err();
         match err {
             Flow::Signal(sig) => assert_eq!(sig.symbol, "wrong-number-of-arguments"),
             other => panic!("expected wrong-number-of-arguments, got {:?}", other),
@@ -3087,15 +3108,20 @@ mod tests {
         let src_s = src.to_string_lossy().to_string();
         let dst_s = dst.to_string_lossy().to_string();
 
-        let err = builtin_rename_file(vec![Value::string(&src_s), Value::string(&dst_s)]).unwrap_err();
+        let err =
+            builtin_rename_file(vec![Value::string(&src_s), Value::string(&dst_s)]).unwrap_err();
         match err {
             Flow::Signal(sig) => assert_eq!(sig.symbol, "file-already-exists"),
             other => panic!("expected signal, got {:?}", other),
         }
 
         assert_eq!(
-            builtin_rename_file(vec![Value::string(&src_s), Value::string(&dst_s), Value::True])
-                .unwrap(),
+            builtin_rename_file(vec![
+                Value::string(&src_s),
+                Value::string(&dst_s),
+                Value::True
+            ])
+            .unwrap(),
             Value::Nil
         );
         assert!(!src.exists());
@@ -3129,15 +3155,20 @@ mod tests {
         let src_s = src.to_string_lossy().to_string();
         let dst_s = dst.to_string_lossy().to_string();
 
-        let err = builtin_copy_file(vec![Value::string(&src_s), Value::string(&dst_s)]).unwrap_err();
+        let err =
+            builtin_copy_file(vec![Value::string(&src_s), Value::string(&dst_s)]).unwrap_err();
         match err {
             Flow::Signal(sig) => assert_eq!(sig.symbol, "file-already-exists"),
             other => panic!("expected signal, got {:?}", other),
         }
 
         assert_eq!(
-            builtin_copy_file(vec![Value::string(&src_s), Value::string(&dst_s), Value::True])
-                .unwrap(),
+            builtin_copy_file(vec![
+                Value::string(&src_s),
+                Value::string(&dst_s),
+                Value::True
+            ])
+            .unwrap(),
             Value::Nil
         );
 
@@ -3186,7 +3217,8 @@ mod tests {
         let dst_str = dst.to_string_lossy().to_string();
 
         assert_eq!(
-            builtin_add_name_to_file(vec![Value::string(&src_str), Value::string(&dst_str)]).unwrap(),
+            builtin_add_name_to_file(vec![Value::string(&src_str), Value::string(&dst_str)])
+                .unwrap(),
             Value::Nil
         );
         assert!(file_exists_p(&dst_str));
@@ -3470,7 +3502,10 @@ mod tests {
 
     #[test]
     fn test_builtin_file_modes_semantics() {
-        assert_eq!(builtin_file_modes(vec![Value::string("/tmp/neovm-file-modes-missing")]).unwrap(), Value::Nil);
+        assert_eq!(
+            builtin_file_modes(vec![Value::string("/tmp/neovm-file-modes-missing")]).unwrap(),
+            Value::Nil
+        );
 
         let path = builtin_make_temp_file(vec![Value::string("neovm-file-modes-")]).unwrap();
         let path_str = path.as_str().unwrap().to_string();
@@ -3510,12 +3545,18 @@ mod tests {
             Value::Nil
         );
         assert_eq!(
-            builtin_set_file_modes(vec![Value::string(&path_str), Value::Int(0o640), Value::True])
-                .unwrap(),
+            builtin_set_file_modes(vec![
+                Value::string(&path_str),
+                Value::Int(0o640),
+                Value::True
+            ])
+            .unwrap(),
             Value::Nil
         );
         assert_eq!(
-            builtin_file_modes(vec![Value::string(&path_str)]).unwrap().as_int(),
+            builtin_file_modes(vec![Value::string(&path_str)])
+                .unwrap()
+                .as_int(),
             Some(0o640)
         );
 
@@ -3535,11 +3576,8 @@ mod tests {
             "default-directory",
             Value::string(format!("{}/", base.to_string_lossy())),
         );
-        builtin_set_file_modes_eval(
-            &eval,
-            vec![Value::string("alpha.txt"), Value::Int(0o600)],
-        )
-        .unwrap();
+        builtin_set_file_modes_eval(&eval, vec![Value::string("alpha.txt"), Value::Int(0o600)])
+            .unwrap();
         assert_eq!(
             builtin_file_modes(vec![Value::string(file.to_string_lossy().to_string())])
                 .unwrap()
@@ -3772,7 +3810,11 @@ mod tests {
         assert_eq!(
             builtin_rename_file_eval(
                 &eval,
-                vec![Value::string("src.txt"), Value::string("dst.txt"), Value::True],
+                vec![
+                    Value::string("src.txt"),
+                    Value::string("dst.txt"),
+                    Value::True
+                ],
             )
             .unwrap(),
             Value::Nil
@@ -3809,7 +3851,11 @@ mod tests {
         assert_eq!(
             builtin_copy_file_eval(
                 &eval,
-                vec![Value::string("src.txt"), Value::string("dst.txt"), Value::True],
+                vec![
+                    Value::string("src.txt"),
+                    Value::string("dst.txt"),
+                    Value::True
+                ],
             )
             .unwrap(),
             Value::Nil
@@ -3977,11 +4023,9 @@ mod tests {
             "default-directory",
             Value::string(format!("{}/", dir.to_string_lossy())),
         );
-        let relative = builtin_file_name_case_insensitive_p_eval(
-            &eval,
-            vec![Value::string("alpha.txt")],
-        )
-        .expect("relative case-insensitive query");
+        let relative =
+            builtin_file_name_case_insensitive_p_eval(&eval, vec![Value::string("alpha.txt")])
+                .expect("relative case-insensitive query");
         assert_eq!(relative, absolute);
 
         let _ = fs::remove_dir_all(&dir);
@@ -4250,11 +4294,8 @@ mod tests {
         fs::write(&newer, b"newer").expect("write newer");
 
         assert_eq!(
-            builtin_set_file_times(vec![
-                Value::string(older.to_string_lossy()),
-                Value::Int(0),
-            ])
-            .expect("set-file-times"),
+            builtin_set_file_times(vec![Value::string(older.to_string_lossy()), Value::Int(0),])
+                .expect("set-file-times"),
             Value::True
         );
         assert_eq!(
@@ -4295,11 +4336,8 @@ mod tests {
         );
 
         assert_eq!(
-            builtin_set_file_times_eval(
-                &eval,
-                vec![Value::string("alpha.txt"), Value::Int(0)],
-            )
-            .expect("eval set-file-times"),
+            builtin_set_file_times_eval(&eval, vec![Value::string("alpha.txt"), Value::Int(0)],)
+                .expect("eval set-file-times"),
             Value::True
         );
         let mtime = fs::metadata(&file)
@@ -4321,7 +4359,8 @@ mod tests {
             .as_int()
             .expect("default-file-modes int");
         assert_eq!(
-            builtin_set_default_file_modes(vec![Value::Int(0o700)]).expect("set-default-file-modes"),
+            builtin_set_default_file_modes(vec![Value::Int(0o700)])
+                .expect("set-default-file-modes"),
             Value::Nil
         );
         assert_eq!(

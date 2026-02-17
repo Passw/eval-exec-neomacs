@@ -125,7 +125,10 @@ pub(crate) fn builtin_read_from_string(
     if args.len() > 3 {
         return Err(signal(
             "wrong-number-of-arguments",
-            vec![Value::symbol("read-from-string"), Value::Int(args.len() as i64)],
+            vec![
+                Value::symbol("read-from-string"),
+                Value::Int(args.len() as i64),
+            ],
         ));
     }
 
@@ -191,7 +194,10 @@ pub(crate) fn builtin_read_from_string(
                 vec![Value::string("End of file during parsing")],
             )
         } else {
-            signal("invalid-read-syntax", vec![Value::string(e.message.clone())])
+            signal(
+                "invalid-read-syntax",
+                vec![Value::string(e.message.clone())],
+            )
         }
     })?;
 
@@ -1023,10 +1029,7 @@ pub(crate) fn builtin_waiting_for_user_input_p(args: Vec<Value>) -> EvalResult {
 // ---------------------------------------------------------------------------
 
 /// `(y-or-n-p PROMPT)` currently returns EOF in batch mode.
-pub(crate) fn builtin_y_or_n_p(
-    _eval: &mut super::eval::Evaluator,
-    args: Vec<Value>,
-) -> EvalResult {
+pub(crate) fn builtin_y_or_n_p(_eval: &mut super::eval::Evaluator, args: Vec<Value>) -> EvalResult {
     expect_args("y-or-n-p", &args, 1)?;
     match &args[0] {
         Value::Str(_) | Value::Vector(_) | Value::Nil => {}
@@ -1072,10 +1075,7 @@ pub(crate) fn builtin_yes_or_no_p(
 /// `(read-char &optional PROMPT ...)`
 ///
 /// Batch-mode: returns next unread character codepoint when available, otherwise nil.
-pub(crate) fn builtin_read_char(
-    eval: &mut super::eval::Evaluator,
-    args: Vec<Value>,
-) -> EvalResult {
+pub(crate) fn builtin_read_char(eval: &mut super::eval::Evaluator, args: Vec<Value>) -> EvalResult {
     if args.len() > 3 {
         return Err(signal(
             "wrong-number-of-arguments",
@@ -1098,10 +1098,7 @@ pub(crate) fn builtin_read_char(
 /// `(read-key &optional PROMPT)`
 ///
 /// Batch-mode: return next `unread-command-events` event when present, else nil.
-pub(crate) fn builtin_read_key(
-    eval: &mut super::eval::Evaluator,
-    args: Vec<Value>,
-) -> EvalResult {
+pub(crate) fn builtin_read_key(eval: &mut super::eval::Evaluator, args: Vec<Value>) -> EvalResult {
     if args.len() > 2 {
         return Err(signal(
             "wrong-number-of-arguments",
@@ -1632,10 +1629,8 @@ mod tests {
     #[test]
     fn read_number_rejects_non_numeric_default() {
         let mut ev = Evaluator::new();
-        let result = builtin_read_number(
-            &mut ev,
-            vec![Value::string("Number: "), Value::string("x")],
-        );
+        let result =
+            builtin_read_number(&mut ev, vec![Value::string("Number: "), Value::string("x")]);
         assert!(matches!(
             result,
             Err(Flow::Signal(sig)) if sig.symbol == "wrong-type-argument"
@@ -1645,10 +1640,8 @@ mod tests {
     #[test]
     fn read_number_accepts_numeric_default_and_signals_end_of_file() {
         let mut ev = Evaluator::new();
-        let result = builtin_read_number(
-            &mut ev,
-            vec![Value::string("Number: "), Value::Float(1.5)],
-        );
+        let result =
+            builtin_read_number(&mut ev, vec![Value::string("Number: "), Value::Float(1.5)]);
         assert!(matches!(
             result,
             Err(Flow::Signal(sig)) if sig.symbol == "end-of-file"
@@ -1660,7 +1653,12 @@ mod tests {
         let mut ev = Evaluator::new();
         let result = builtin_read_number(
             &mut ev,
-            vec![Value::string("Number: "), Value::Int(42), Value::Nil, Value::Nil],
+            vec![
+                Value::string("Number: "),
+                Value::Int(42),
+                Value::Nil,
+                Value::Nil,
+            ],
         );
         assert!(matches!(
             result,
@@ -1886,22 +1884,28 @@ mod tests {
         assert!(nil_prompt.is_err());
 
         let mut ev_vec = Evaluator::new();
-        let vector_prompt = builtin_y_or_n_p(&mut ev_vec, vec![Value::vector(vec![
-            Value::Int(121),
-            Value::Int(47),
-            Value::Int(110),
-        ])]);
+        let vector_prompt = builtin_y_or_n_p(
+            &mut ev_vec,
+            vec![Value::vector(vec![
+                Value::Int(121),
+                Value::Int(47),
+                Value::Int(110),
+            ])],
+        );
         assert!(vector_prompt.is_err());
     }
 
     #[test]
     fn y_or_n_p_rejects_list_prompt() {
         let mut ev = Evaluator::new();
-        let result = builtin_y_or_n_p(&mut ev, vec![Value::list(vec![
-            Value::Int(121),
-            Value::Int(47),
-            Value::Int(110),
-        ])]);
+        let result = builtin_y_or_n_p(
+            &mut ev,
+            vec![Value::list(vec![
+                Value::Int(121),
+                Value::Int(47),
+                Value::Int(110),
+            ])],
+        );
         assert!(matches!(
             result,
             Err(Flow::Signal(sig)) if sig.symbol == "wrong-type-argument"
@@ -2074,8 +2078,10 @@ mod tests {
     #[test]
     fn input_pending_p_accepts_optional_check_timers_arg() {
         let mut ev = Evaluator::new();
-        ev.obarray
-            .set_symbol_value("unread-command-events", Value::list(vec![Value::symbol("foo")]));
+        ev.obarray.set_symbol_value(
+            "unread-command-events",
+            Value::list(vec![Value::symbol("foo")]),
+        );
         let result = builtin_input_pending_p(&mut ev, vec![Value::symbol("timers")]).unwrap();
         assert_eq!(result, Value::True);
     }
@@ -2104,7 +2110,10 @@ mod tests {
             .set_symbol_value("unread-command-events", Value::list(vec![Value::Int(97)]));
         let result = builtin_discard_input(&mut ev, vec![]).unwrap();
         assert!(result.is_nil());
-        assert_eq!(ev.obarray.symbol_value("unread-command-events"), Some(&Value::Nil));
+        assert_eq!(
+            ev.obarray.symbol_value("unread-command-events"),
+            Some(&Value::Nil)
+        );
     }
 
     #[test]
@@ -2112,9 +2121,10 @@ mod tests {
         let mut ev = Evaluator::new();
         ev.obarray
             .set_symbol_value("unread-command-events", Value::list(vec![Value::Int(97)]));
-        let forms =
-            parse_forms("(let ((unread-command-events (list 98))) (discard-input) unread-command-events)")
-                .unwrap();
+        let forms = parse_forms(
+            "(let ((unread-command-events (list 98))) (discard-input) unread-command-events)",
+        )
+        .unwrap();
         let result = ev.eval_expr(&forms[0]).unwrap();
         assert!(result.is_nil());
         assert_eq!(
@@ -2329,8 +2339,10 @@ mod tests {
     #[test]
     fn read_char_signals_error_on_non_character_event() {
         let mut ev = Evaluator::new();
-        ev.obarray
-            .set_symbol_value("unread-command-events", Value::list(vec![Value::symbol("foo")]));
+        ev.obarray.set_symbol_value(
+            "unread-command-events",
+            Value::list(vec![Value::symbol("foo")]),
+        );
         let result = builtin_read_char(&mut ev, vec![]);
         assert!(matches!(
             result,
@@ -2424,7 +2436,8 @@ mod tests {
         let mut ev = Evaluator::new();
         ev.obarray
             .set_symbol_value("unread-command-events", Value::list(vec![Value::Int(97)]));
-        let result = builtin_read_key(&mut ev, vec![Value::string("key: "), Value::Int(1)]).unwrap();
+        let result =
+            builtin_read_key(&mut ev, vec![Value::string("key: "), Value::Int(1)]).unwrap();
         assert_eq!(result.as_int(), Some(97));
     }
 
@@ -2456,24 +2469,34 @@ mod tests {
     fn read_key_consumes_unread_character_and_keeps_tail() {
         let mut ev = Evaluator::new();
         let event = Value::symbol("foo");
-        ev.obarray
-            .set_symbol_value("unread-command-events", Value::list(vec![event.clone(), Value::Int(97)]));
+        ev.obarray.set_symbol_value(
+            "unread-command-events",
+            Value::list(vec![event.clone(), Value::Int(97)]),
+        );
         let result = builtin_read_key(&mut ev, vec![Value::string("key: ")]).unwrap();
         assert_eq!(result, event);
         assert_eq!(ev.read_command_keys(), std::slice::from_ref(&event));
-        assert_eq!(ev.obarray.symbol_value("unread-command-events"), Some(&Value::list(vec![Value::Int(97)])));
+        assert_eq!(
+            ev.obarray.symbol_value("unread-command-events"),
+            Some(&Value::list(vec![Value::Int(97)]))
+        );
     }
 
     #[test]
     fn read_key_consumes_character_event_and_preserves_tail() {
         let mut ev = Evaluator::new();
         let event = Value::symbol("foo");
-        ev.obarray
-            .set_symbol_value("unread-command-events", Value::list(vec![Value::Int(97), event.clone()]));
+        ev.obarray.set_symbol_value(
+            "unread-command-events",
+            Value::list(vec![Value::Int(97), event.clone()]),
+        );
         let result = builtin_read_key(&mut ev, vec![Value::string("key: ")]).unwrap();
         assert_eq!(result.as_int(), Some(97));
         assert_eq!(ev.read_command_keys(), &[Value::Int(97)]);
-        assert_eq!(ev.obarray.symbol_value("unread-command-events"), Some(&Value::list(vec![event])));
+        assert_eq!(
+            ev.obarray.symbol_value("unread-command-events"),
+            Some(&Value::list(vec![event]))
+        );
     }
 
     #[test]
@@ -2515,8 +2538,10 @@ mod tests {
     fn read_key_sequence_consumes_non_character_event_and_preserves_tail() {
         let mut ev = Evaluator::new();
         let event = Value::symbol("foo");
-        ev.obarray
-            .set_symbol_value("unread-command-events", Value::list(vec![event.clone(), Value::Int(97)]));
+        ev.obarray.set_symbol_value(
+            "unread-command-events",
+            Value::list(vec![event.clone(), Value::Int(97)]),
+        );
         let result = builtin_read_key_sequence(&mut ev, vec![Value::string("key: ")]).unwrap();
         match result {
             Value::Vector(v) => {
@@ -2527,19 +2552,27 @@ mod tests {
             other => panic!("expected vector event payload, got {other:?}"),
         }
         assert_eq!(ev.read_command_keys(), std::slice::from_ref(&event));
-        assert_eq!(ev.obarray.symbol_value("unread-command-events"), Some(&Value::list(vec![Value::Int(97)])));
+        assert_eq!(
+            ev.obarray.symbol_value("unread-command-events"),
+            Some(&Value::list(vec![Value::Int(97)]))
+        );
     }
 
     #[test]
     fn read_key_sequence_consumes_character_and_preserves_tail() {
         let mut ev = Evaluator::new();
         let event = Value::symbol("foo");
-        ev.obarray
-            .set_symbol_value("unread-command-events", Value::list(vec![Value::Int(97), event.clone()]));
+        ev.obarray.set_symbol_value(
+            "unread-command-events",
+            Value::list(vec![Value::Int(97), event.clone()]),
+        );
         let result = builtin_read_key_sequence(&mut ev, vec![Value::string("key: ")]).unwrap();
         assert!(matches!(result, Value::Str(s) if s.as_str() == "a"));
         assert_eq!(ev.read_command_keys(), &[Value::Int(97)]);
-        assert_eq!(ev.obarray.symbol_value("unread-command-events"), Some(&Value::list(vec![event])));
+        assert_eq!(
+            ev.obarray.symbol_value("unread-command-events"),
+            Some(&Value::list(vec![event]))
+        );
     }
 
     #[test]
@@ -2626,9 +2659,12 @@ mod tests {
     fn read_key_sequence_vector_consumes_non_character_event_and_preserves_tail() {
         let mut ev = Evaluator::new();
         let event = Value::symbol("bar");
-        ev.obarray
-            .set_symbol_value("unread-command-events", Value::list(vec![event.clone(), Value::Int(97)]));
-        let result = builtin_read_key_sequence_vector(&mut ev, vec![Value::string("key: ")]).unwrap();
+        ev.obarray.set_symbol_value(
+            "unread-command-events",
+            Value::list(vec![event.clone(), Value::Int(97)]),
+        );
+        let result =
+            builtin_read_key_sequence_vector(&mut ev, vec![Value::string("key: ")]).unwrap();
         match result {
             Value::Vector(v) => {
                 let items = v.lock().expect("poisoned");
@@ -2638,17 +2674,22 @@ mod tests {
             other => panic!("expected vector, got {other:?}"),
         }
         assert_eq!(ev.read_command_keys(), std::slice::from_ref(&event));
-        assert_eq!(ev.obarray.symbol_value("unread-command-events"), Some(&Value::list(vec![Value::Int(97)])));
+        assert_eq!(
+            ev.obarray.symbol_value("unread-command-events"),
+            Some(&Value::list(vec![Value::Int(97)]))
+        );
     }
 
     #[test]
     fn read_key_sequence_vector_consumes_character_and_preserves_tail() {
         let mut ev = Evaluator::new();
         let event = Value::symbol("bar");
-        ev.obarray
-            .set_symbol_value("unread-command-events", Value::list(vec![Value::Int(97), event.clone()]));
-        let result = builtin_read_key_sequence_vector(&mut ev, vec![Value::string("key: ")])
-            .unwrap();
+        ev.obarray.set_symbol_value(
+            "unread-command-events",
+            Value::list(vec![Value::Int(97), event.clone()]),
+        );
+        let result =
+            builtin_read_key_sequence_vector(&mut ev, vec![Value::string("key: ")]).unwrap();
         match result {
             Value::Vector(v) => {
                 let items = v.lock().expect("poisoned");
@@ -2658,7 +2699,10 @@ mod tests {
             other => panic!("expected vector, got {other:?}"),
         }
         assert_eq!(ev.read_command_keys(), &[Value::Int(97)]);
-        assert_eq!(ev.obarray.symbol_value("unread-command-events"), Some(&Value::list(vec![event])));
+        assert_eq!(
+            ev.obarray.symbol_value("unread-command-events"),
+            Some(&Value::list(vec![event]))
+        );
     }
 
     #[test]
@@ -2707,8 +2751,9 @@ mod tests {
     #[test]
     fn with_output_to_string_captures_print_output() {
         let mut ev = Evaluator::new();
-        let forms = parse_forms(r#"(with-output-to-string (princ "a") (prin1 '(1 2)) (print "x"))"#)
-            .unwrap();
+        let forms =
+            parse_forms(r#"(with-output-to-string (princ "a") (prin1 '(1 2)) (print "x"))"#)
+                .unwrap();
         let result = ev.eval_expr(&forms[0]).unwrap();
         assert_eq!(result.as_str(), Some("a(1 2)\n\"x\"\n"));
     }
@@ -2904,5 +2949,4 @@ mod tests {
             other => panic!("Expected cons from read-from-string, got {other:?}"),
         }
     }
-
 }

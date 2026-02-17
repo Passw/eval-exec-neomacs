@@ -416,31 +416,51 @@ mod tests {
 
     #[test]
     fn compose_string_internal_type_checks() {
-        let non_string = builtin_compose_string_internal(vec![Value::Int(1), Value::Int(0), Value::Int(1)]);
+        let non_string =
+            builtin_compose_string_internal(vec![Value::Int(1), Value::Int(0), Value::Int(1)]);
         assert!(non_string.is_err());
-        let bad_start =
-            builtin_compose_string_internal(vec![Value::string("abc"), Value::symbol("x"), Value::Int(1)]);
+        let bad_start = builtin_compose_string_internal(vec![
+            Value::string("abc"),
+            Value::symbol("x"),
+            Value::Int(1),
+        ]);
         assert!(bad_start.is_err());
-        let bad_end =
-            builtin_compose_string_internal(vec![Value::string("abc"), Value::Int(0), Value::symbol("y")]);
+        let bad_end = builtin_compose_string_internal(vec![
+            Value::string("abc"),
+            Value::Int(0),
+            Value::symbol("y"),
+        ]);
         assert!(bad_end.is_err());
     }
 
     #[test]
     fn compose_string_internal_range_checks() {
-        let ok = builtin_compose_string_internal(vec![Value::string("abc"), Value::Int(0), Value::Int(0)]);
+        let ok = builtin_compose_string_internal(vec![
+            Value::string("abc"),
+            Value::Int(0),
+            Value::Int(0),
+        ]);
         assert!(ok.is_ok());
 
-        let start_gt_end =
-            builtin_compose_string_internal(vec![Value::string("abc"), Value::Int(2), Value::Int(1)]);
+        let start_gt_end = builtin_compose_string_internal(vec![
+            Value::string("abc"),
+            Value::Int(2),
+            Value::Int(1),
+        ]);
         assert!(start_gt_end.is_err());
 
-        let end_oob =
-            builtin_compose_string_internal(vec![Value::string("abc"), Value::Int(0), Value::Int(4)]);
+        let end_oob = builtin_compose_string_internal(vec![
+            Value::string("abc"),
+            Value::Int(0),
+            Value::Int(4),
+        ]);
         assert!(end_oob.is_err());
 
-        let start_neg =
-            builtin_compose_string_internal(vec![Value::string("abc"), Value::Int(-1), Value::Int(1)]);
+        let start_neg = builtin_compose_string_internal(vec![
+            Value::string("abc"),
+            Value::Int(-1),
+            Value::Int(1),
+        ]);
         assert!(start_neg.is_err());
     }
 
@@ -549,19 +569,31 @@ mod tests {
         ]);
         assert!(bad_to.is_err());
 
-        let bad_string =
-            builtin_composition_get_gstring(vec![Value::Int(0), Value::Int(5), Value::Nil, Value::Int(1)]);
+        let bad_string = builtin_composition_get_gstring(vec![
+            Value::Int(0),
+            Value::Int(5),
+            Value::Nil,
+            Value::Int(1),
+        ]);
         assert!(bad_string.is_err());
     }
 
     #[test]
     fn composition_get_gstring_range_errors() {
-        let from_gt_to =
-            builtin_composition_get_gstring(vec![Value::Int(2), Value::Int(1), Value::Nil, Value::string("ab")]);
+        let from_gt_to = builtin_composition_get_gstring(vec![
+            Value::Int(2),
+            Value::Int(1),
+            Value::Nil,
+            Value::string("ab"),
+        ]);
         assert!(from_gt_to.is_err());
 
-        let zero_length =
-            builtin_composition_get_gstring(vec![Value::Int(0), Value::Int(0), Value::Nil, Value::string("ab")]);
+        let zero_length = builtin_composition_get_gstring(vec![
+            Value::Int(0),
+            Value::Int(0),
+            Value::Nil,
+            Value::string("ab"),
+        ]);
         assert!(zero_length.is_err());
     }
 

@@ -301,10 +301,7 @@ pub(crate) fn builtin_md5(args: Vec<Value>) -> EvalResult {
 /// (md5 OBJECT &optional START END CODING-SYSTEM NOERROR)
 ///
 /// Evaluator-aware implementation that also supports buffer objects.
-pub(crate) fn builtin_md5_eval(
-    eval: &mut super::eval::Evaluator,
-    args: Vec<Value>,
-) -> EvalResult {
+pub(crate) fn builtin_md5_eval(eval: &mut super::eval::Evaluator, args: Vec<Value>) -> EvalResult {
     expect_range_args("md5", &args, 1, 5)?;
     validate_md5_coding_system_arg(&args)?;
     let object = &args[0];
@@ -447,7 +444,8 @@ fn md5_hex_for_string(
     let end_arg = end_raw.cloned().unwrap_or(Value::Nil);
     let start =
         normalize_secure_hash_index(start_raw, 0, len, object, &start_arg, &end_arg)? as usize;
-    let end = normalize_secure_hash_index(end_raw, len, len, object, &start_arg, &end_arg)? as usize;
+    let end =
+        normalize_secure_hash_index(end_raw, len, len, object, &start_arg, &end_arg)? as usize;
 
     if start > end {
         return Err(signal(
@@ -507,8 +505,9 @@ fn hash_slice_for_buffer(
     let start = normalize_md5_buffer_position(
         start_raw, point_min, point_min, point_max, &start_arg, &end_arg,
     )?;
-    let end =
-        normalize_md5_buffer_position(end_raw, point_max, point_min, point_max, &start_arg, &end_arg)?;
+    let end = normalize_md5_buffer_position(
+        end_raw, point_max, point_min, point_max, &start_arg, &end_arg,
+    )?;
 
     let (lo, hi) = if start <= end {
         (start, end)
@@ -733,10 +732,12 @@ pub(crate) fn builtin_buffer_hash_eval(
     } else {
         match &args[0] {
             Value::Buffer(id) => *id,
-            Value::Str(name) => eval
-                .buffers
-                .find_buffer_by_name(name)
-                .ok_or_else(|| signal("error", vec![Value::string(format!("No buffer named {name}"))]))?,
+            Value::Str(name) => eval.buffers.find_buffer_by_name(name).ok_or_else(|| {
+                signal(
+                    "error",
+                    vec![Value::string(format!("No buffer named {name}"))],
+                )
+            })?,
             other => {
                 return Err(signal(
                     "wrong-type-argument",
@@ -1328,7 +1329,12 @@ mod tests {
 
     #[test]
     fn md5_non_symbol_coding_system_errors() {
-        match builtin_md5(vec![Value::string("abc"), Value::Nil, Value::Nil, Value::Int(1)]) {
+        match builtin_md5(vec![
+            Value::string("abc"),
+            Value::Nil,
+            Value::Nil,
+            Value::Int(1),
+        ]) {
             Err(Flow::Signal(sig)) => {
                 assert_eq!(sig.symbol, "coding-system-error");
                 assert_eq!(sig.data, vec![Value::Int(1)]);
@@ -1350,8 +1356,11 @@ mod tests {
         let full = builtin_md5_eval(&mut eval, vec![Value::Buffer(id)]).unwrap();
         assert_eq!(full.as_str(), Some("900150983cd24fb0d6963f7d28e17f72"));
 
-        let swapped = builtin_md5_eval(&mut eval, vec![Value::Buffer(id), Value::Int(4), Value::Int(3)])
-            .unwrap();
+        let swapped = builtin_md5_eval(
+            &mut eval,
+            vec![Value::Buffer(id), Value::Int(4), Value::Int(3)],
+        )
+        .unwrap();
         assert_eq!(swapped.as_str(), Some("4a8a08f09d37b73795649038408b5f33"));
     }
 
@@ -1379,10 +1388,16 @@ mod tests {
         let mut eval = crate::elisp::eval::Evaluator::new();
         let id = eval.buffers.current_buffer().expect("current buffer").id;
 
-        match builtin_md5_eval(&mut eval, vec![Value::Buffer(id), Value::True, Value::Int(3)]) {
+        match builtin_md5_eval(
+            &mut eval,
+            vec![Value::Buffer(id), Value::True, Value::Int(3)],
+        ) {
             Err(Flow::Signal(sig)) => {
                 assert_eq!(sig.symbol, "wrong-type-argument");
-                assert_eq!(sig.data.first(), Some(&Value::symbol("integer-or-marker-p")));
+                assert_eq!(
+                    sig.data.first(),
+                    Some(&Value::symbol("integer-or-marker-p"))
+                );
             }
             other => panic!("expected wrong-type-argument signal, got {other:?}"),
         }
@@ -1440,7 +1455,9 @@ mod tests {
         ])
         .unwrap();
 
-        let s = r.as_str().expect("binary secure-hash should return a string");
+        let s = r
+            .as_str()
+            .expect("binary secure-hash should return a string");
         assert_eq!(string_escape::storage_byte_len(s), 20);
         assert_eq!(
             string_escape::decode_storage_char_codes(s).first(),
@@ -1515,9 +1532,8 @@ mod tests {
             buf.insert("abc");
         }
         let id = eval.buffers.current_buffer().expect("current buffer").id;
-        let r =
-            builtin_secure_hash_eval(&mut eval, vec![Value::symbol("sha1"), Value::Buffer(id)])
-                .unwrap();
+        let r = builtin_secure_hash_eval(&mut eval, vec![Value::symbol("sha1"), Value::Buffer(id)])
+            .unwrap();
         assert_eq!(r.as_str(), Some("a9993e364706816aba3e25717850c26c9cd0d89d"));
     }
 
@@ -1559,7 +1575,10 @@ mod tests {
         ) {
             Err(Flow::Signal(sig)) => {
                 assert_eq!(sig.symbol, "wrong-type-argument");
-                assert_eq!(sig.data.first(), Some(&Value::symbol("integer-or-marker-p")));
+                assert_eq!(
+                    sig.data.first(),
+                    Some(&Value::symbol("integer-or-marker-p"))
+                );
             }
             other => panic!("expected wrong-type-argument signal, got {other:?}"),
         }
@@ -1594,10 +1613,7 @@ mod tests {
         let id = eval.buffers.create_buffer("*secure-doomed*");
         assert!(eval.buffers.kill_buffer(id));
 
-        match builtin_secure_hash_eval(
-            &mut eval,
-            vec![Value::symbol("sha1"), Value::Buffer(id)],
-        ) {
+        match builtin_secure_hash_eval(&mut eval, vec![Value::symbol("sha1"), Value::Buffer(id)]) {
             Err(Flow::Signal(sig)) => {
                 assert_eq!(sig.symbol, "error");
                 assert_eq!(
@@ -1670,23 +1686,33 @@ mod tests {
 
     #[test]
     fn string_make_multibyte_promotes_unibyte_byte() {
-        let r = builtin_string_make_multibyte(vec![Value::string(
-            bytes_to_unibyte_storage_string(&[0xFF]),
-        )])
-        .unwrap();
-        assert_eq!(string_escape::decode_storage_char_codes(r.as_str().unwrap()), vec![0x3FFFFF]);
+        let r =
+            builtin_string_make_multibyte(vec![Value::string(bytes_to_unibyte_storage_string(&[
+                0xFF,
+            ]))])
+            .unwrap();
+        assert_eq!(
+            string_escape::decode_storage_char_codes(r.as_str().unwrap()),
+            vec![0x3FFFFF]
+        );
     }
 
     #[test]
     fn string_make_unibyte_passthrough_ascii() {
         let r = builtin_string_make_unibyte(vec![Value::string("abc")]).unwrap();
-        assert_eq!(string_escape::decode_storage_char_codes(r.as_str().unwrap()), vec![97, 98, 99]);
+        assert_eq!(
+            string_escape::decode_storage_char_codes(r.as_str().unwrap()),
+            vec![97, 98, 99]
+        );
     }
 
     #[test]
     fn string_make_unibyte_truncates_unicode_char_code() {
         let r = builtin_string_make_unibyte(vec![Value::string("😀")]).unwrap();
-        assert_eq!(string_escape::decode_storage_char_codes(r.as_str().unwrap()), vec![0]);
+        assert_eq!(
+            string_escape::decode_storage_char_codes(r.as_str().unwrap()),
+            vec![0]
+        );
     }
 
     // ---- compare-strings ----
@@ -1972,10 +1998,8 @@ mod tests {
             Value::Keyword("action".into()),
             Value::Int(7),
         ]);
-        let err =
-            builtin_widget_apply(vec![widget, Value::Keyword("action".into())]).expect_err(
-                "widget-apply should reject non-callable property values",
-            );
+        let err = builtin_widget_apply(vec![widget, Value::Keyword("action".into())])
+            .expect_err("widget-apply should reject non-callable property values");
         match err {
             Flow::Signal(sig) => {
                 assert_eq!(sig.symbol, "invalid-function");

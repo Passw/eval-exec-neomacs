@@ -144,7 +144,9 @@ fn append_print_value_bytes(value: &Value, out: &mut Vec<u8>) {
         Value::Subr(name) => out.extend_from_slice(format!("#<subr {}>", name).as_bytes()),
         Value::ByteCode(bc) => {
             let params = format_params(&bc.params);
-            out.extend_from_slice(format!("#<bytecode {} ({} ops)>", params, bc.ops.len()).as_bytes());
+            out.extend_from_slice(
+                format!("#<bytecode {} ({} ops)>", params, bc.ops.len()).as_bytes(),
+            );
         }
         Value::Buffer(id) => out.extend_from_slice(format!("#<buffer {}>", id.0).as_bytes()),
         Value::Timer(id) => out.extend_from_slice(format!("#<timer {}>", id).as_bytes()),
@@ -327,7 +329,10 @@ mod tests {
     #[test]
     fn print_string_bytes_preserve_non_utf8_payloads() {
         let raw = char::from_u32(0xE0FF).expect("raw-byte sentinel");
-        assert_eq!(print_value_bytes(&Value::string(raw.to_string())), b"\"\\377\"");
+        assert_eq!(
+            print_value_bytes(&Value::string(raw.to_string())),
+            b"\"\\377\""
+        );
     }
 
     #[test]
@@ -385,7 +390,9 @@ mod tests {
     fn print_terminal_handle_special_form() {
         let list = super::super::display::builtin_terminal_list(vec![]).unwrap();
         let items = list_to_vec(&list).expect("terminal-list should return a list");
-        let handle = items.first().expect("terminal-list should contain one handle");
+        let handle = items
+            .first()
+            .expect("terminal-list should contain one handle");
 
         let printed = print_value(handle);
         assert!(printed.starts_with("#<terminal "));

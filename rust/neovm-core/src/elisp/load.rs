@@ -133,9 +133,7 @@ const ELISP_CACHE_TEMP_EXTENSION: &str = "neoc.tmp";
 
 fn cache_key(lexical_binding: bool) -> String {
     let lexical = if lexical_binding { "1" } else { "0" };
-    format!(
-        "{ELISP_CACHE_SCHEMA};vm={ELISP_CACHE_VM_VERSION};lexical={lexical}"
-    )
+    format!("{ELISP_CACHE_SCHEMA};vm={ELISP_CACHE_VM_VERSION};lexical={lexical}")
 }
 
 fn source_hash(content: &str) -> u64 {
@@ -597,10 +595,16 @@ mod tests {
             .cloned()
             .unwrap_or(Value::Nil);
         let entries = super::super::value::list_to_vec(&history).expect("load-history is a list");
-        assert!(!entries.is_empty(), "load-history should have at least one entry");
+        assert!(
+            !entries.is_empty(),
+            "load-history should have at least one entry"
+        );
         let first = super::super::value::list_to_vec(&entries[0]).expect("entry is a list");
         let path_str = file.to_string_lossy().to_string();
-        assert_eq!(first.first().and_then(Value::as_str), Some(path_str.as_str()));
+        assert_eq!(
+            first.first().and_then(Value::as_str),
+            Some(path_str.as_str())
+        );
         assert_eq!(
             eval.obarray().symbol_value("load-file-name").cloned(),
             Some(Value::Nil)
@@ -636,11 +640,15 @@ mod tests {
         let parent_str = parent.to_string_lossy().to_string();
         let child_str = child.to_string_lossy().to_string();
         assert_eq!(
-            eval.obarray().symbol_value("vm-parent-seen").and_then(Value::as_str),
+            eval.obarray()
+                .symbol_value("vm-parent-seen")
+                .and_then(Value::as_str),
             Some(parent_str.as_str())
         );
         assert_eq!(
-            eval.obarray().symbol_value("vm-child-seen").and_then(Value::as_str),
+            eval.obarray()
+                .symbol_value("vm-child-seen")
+                .and_then(Value::as_str),
             Some(child_str.as_str())
         );
         assert_eq!(
@@ -679,7 +687,10 @@ mod tests {
         );
 
         let cache = cache_sidecar_path(&file);
-        assert!(cache.exists(), "source load should create .neoc sidecar cache");
+        assert!(
+            cache.exists(),
+            "source load should create .neoc sidecar cache"
+        );
         let cache_v1 = fs::read_to_string(&cache).expect("read cache v1");
         assert!(
             cache_v1.contains(&format!("key={}", cache_key(false))),
@@ -755,7 +766,8 @@ mod tests {
 
         let _guard = CacheWriteFailGuard::set(CACHE_WRITE_PHASE_BEFORE_WRITE);
         let mut eval = super::super::eval::Evaluator::new();
-        let loaded = load_file(&mut eval, &file).expect("load should succeed despite cache write failure");
+        let loaded =
+            load_file(&mut eval, &file).expect("load should succeed despite cache write failure");
         assert_eq!(loaded, Value::True);
         assert_eq!(
             eval.obarray()
@@ -780,11 +792,13 @@ mod tests {
         let dir = std::env::temp_dir().join(format!("neovm-load-neoc-write-fail-post-{unique}"));
         fs::create_dir_all(&dir).expect("create temp fixture dir");
         let file = dir.join("probe.el");
-        fs::write(&file, "(setq vm-load-neoc-write-fail-post 'ok)\n").expect("write source fixture");
+        fs::write(&file, "(setq vm-load-neoc-write-fail-post 'ok)\n")
+            .expect("write source fixture");
 
         let _guard = CacheWriteFailGuard::set(CACHE_WRITE_PHASE_AFTER_WRITE);
         let mut eval = super::super::eval::Evaluator::new();
-        let loaded = load_file(&mut eval, &file).expect("load should succeed despite cache rename failure");
+        let loaded =
+            load_file(&mut eval, &file).expect("load should succeed despite cache rename failure");
         assert_eq!(loaded, Value::True);
         assert_eq!(
             eval.obarray()
@@ -916,14 +930,18 @@ mod tests {
         )
         .expect("write source fixture");
 
-        let cache_path_1 = precompile_source_file(&source).expect("first precompile should succeed");
+        let cache_path_1 =
+            precompile_source_file(&source).expect("first precompile should succeed");
         let cache_v1 = fs::read_to_string(&cache_path_1).expect("read cache v1");
         let cache_path_2 =
             precompile_source_file(&source).expect("second precompile should succeed");
         let cache_v2 = fs::read_to_string(&cache_path_2).expect("read cache v2");
 
         assert_eq!(cache_path_1, cache_path_2, "cache path should be stable");
-        assert_eq!(cache_v1, cache_v2, "precompile output should be deterministic");
+        assert_eq!(
+            cache_v1, cache_v2,
+            "precompile output should be deterministic"
+        );
         assert!(
             cache_v1.contains("lexical=1"),
             "lexical-binding should be reflected in cache key",

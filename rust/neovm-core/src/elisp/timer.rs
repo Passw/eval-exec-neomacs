@@ -397,7 +397,10 @@ pub(crate) fn builtin_timer_activate(
     if args.len() > 3 {
         return Err(signal(
             "wrong-number-of-arguments",
-            vec![Value::symbol("timer-activate"), Value::Int(args.len() as i64)],
+            vec![
+                Value::symbol("timer-activate"),
+                Value::Int(args.len() as i64),
+            ],
         ));
     }
 
@@ -418,7 +421,10 @@ pub(crate) fn builtin_timer_activate(
         return Err(signal("error", vec![Value::string("Invalid timer")]));
     }
     if eval.timers.timer_active_p(id) {
-        return Err(signal("error", vec![Value::string("Timer is already active")]));
+        return Err(signal(
+            "error",
+            vec![Value::string("Timer is already active")],
+        ));
     }
     eval.timers.timer_activate(id);
     Ok(Value::Nil)
@@ -828,7 +834,11 @@ mod tests {
 
         let from_string = builtin_run_at_time(
             &mut eval,
-            vec![Value::string("0 sec"), Value::Nil, Value::symbol("cb-from-string")],
+            vec![
+                Value::string("0 sec"),
+                Value::Nil,
+                Value::symbol("cb-from-string"),
+            ],
         )
         .expect("string time spec should be accepted");
         assert!(matches!(from_string, Value::Timer(_)));
@@ -849,8 +859,10 @@ mod tests {
             Err(Flow::Signal(sig)) if sig.symbol == "error"
         ));
 
-        let invalid_type =
-            builtin_run_at_time(&mut eval, vec![Value::True, Value::Nil, Value::symbol("cb")]);
+        let invalid_type = builtin_run_at_time(
+            &mut eval,
+            vec![Value::True, Value::Nil, Value::symbol("cb")],
+        );
         assert!(matches!(
             invalid_type,
             Err(Flow::Signal(sig)) if sig.symbol == "error"
@@ -863,9 +875,11 @@ mod tests {
 
         let mut eval = Evaluator::new();
 
-        let from_nil =
-            builtin_run_with_idle_timer(&mut eval, vec![Value::Nil, Value::Nil, Value::symbol("cb")])
-                .expect("nil idle delay should be accepted");
+        let from_nil = builtin_run_with_idle_timer(
+            &mut eval,
+            vec![Value::Nil, Value::Nil, Value::symbol("cb")],
+        )
+        .expect("nil idle delay should be accepted");
         assert!(matches!(from_nil, Value::Timer(_)));
 
         let from_string = builtin_run_with_idle_timer(
@@ -946,8 +960,10 @@ mod tests {
         .unwrap();
         builtin_cancel_timer(&mut eval, vec![timer_val.clone()]).unwrap();
 
-        let result =
-            builtin_timer_activate(&mut eval, vec![timer_val.clone(), Value::Nil, Value::Int(2)]);
+        let result = builtin_timer_activate(
+            &mut eval,
+            vec![timer_val.clone(), Value::Nil, Value::Int(2)],
+        );
         assert!(matches!(
             result,
             Err(Flow::Signal(sig))

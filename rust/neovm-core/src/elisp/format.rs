@@ -1275,7 +1275,8 @@ mod tests {
 
     #[test]
     fn string_fill_preserves_blank_lines() {
-        let result = builtin_string_fill(vec![Value::string("a b\n\nc d"), Value::Int(10)]).unwrap();
+        let result =
+            builtin_string_fill(vec![Value::string("a b\n\nc d"), Value::Int(10)]).unwrap();
         assert_eq!(result.as_str().unwrap(), "a b\n\nc d");
     }
 
@@ -1317,10 +1318,13 @@ mod tests {
     fn string_limit_type_errors() {
         assert!(builtin_string_limit(vec![Value::Int(1), Value::Int(2)]).is_err());
         assert!(builtin_string_limit(vec![Value::string("x"), Value::Int(-1)]).is_err());
-        assert!(
-            builtin_string_limit(vec![Value::string("x"), Value::Int(1), Value::Nil, Value::Int(1)])
-                .is_err()
-        );
+        assert!(builtin_string_limit(vec![
+            Value::string("x"),
+            Value::Int(1),
+            Value::Nil,
+            Value::Int(1)
+        ])
+        .is_err());
     }
 
     // ===================================================================

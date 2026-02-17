@@ -655,7 +655,10 @@ mod tests {
         match err {
             Flow::Signal(sig) => {
                 assert_eq!(sig.symbol, "wrong-type-argument");
-                assert_eq!(sig.data, vec![Value::symbol("wholenump"), Value::string("x")]);
+                assert_eq!(
+                    sig.data,
+                    vec![Value::symbol("wholenump"), Value::string("x")]
+                );
             }
             other => panic!("unexpected flow: {other:?}"),
         }
@@ -803,13 +806,17 @@ mod tests {
             vec![Value::Int(97), Value::Int(10), Value::Int(98),]
         );
 
-        let third = ev.eval(&forms[2]).expect("eval indent-region swapped bounds");
+        let third = ev
+            .eval(&forms[2])
+            .expect("eval indent-region swapped bounds");
         assert_eq!(
             list_to_vec(&third).expect("third byte list"),
             vec![Value::Int(97), Value::Int(10), Value::Int(98),]
         );
 
-        let fourth = ev.eval(&forms[3]).expect("eval indent-region non-numeric column");
+        let fourth = ev
+            .eval(&forms[3])
+            .expect("eval indent-region non-numeric column");
         assert_eq!(fourth, Value::True);
     }
 
@@ -848,7 +855,9 @@ mod tests {
             vec![Value::Int(97)]
         );
 
-        let second = ev.eval(&forms[1]).expect("eval indent-according-to-mode point");
+        let second = ev
+            .eval(&forms[1])
+            .expect("eval indent-according-to-mode point");
         assert_eq!(second, Value::Int(2));
 
         let third = ev

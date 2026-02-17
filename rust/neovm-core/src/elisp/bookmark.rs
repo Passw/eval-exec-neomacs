@@ -917,7 +917,8 @@ mod tests {
         )
         .unwrap();
 
-        let found = builtin_bookmark_get_filename(&mut eval, vec![Value::string("with-file")]).unwrap();
+        let found =
+            builtin_bookmark_get_filename(&mut eval, vec![Value::string("with-file")]).unwrap();
         assert_eq!(found.as_str(), Some("/tmp/file.el"));
 
         let missing =
@@ -932,7 +933,8 @@ mod tests {
         let mut eval = Evaluator::new();
         builtin_bookmark_set(&mut eval, vec![Value::string("at-point")]).unwrap();
 
-        let found = builtin_bookmark_get_position(&mut eval, vec![Value::string("at-point")]).unwrap();
+        let found =
+            builtin_bookmark_get_position(&mut eval, vec![Value::string("at-point")]).unwrap();
         assert_eq!(found.as_int(), Some(0));
 
         let missing =

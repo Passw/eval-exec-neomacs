@@ -1610,7 +1610,9 @@ mod tests {
 
     #[test]
     fn test_parse_colon_file_names_reverses_order() {
-        let parsed = parse_colon_file_names("root:x:0:0:root:/root:/bin/sh\nexec:x:1000:1000::/home/exec:/bin/sh\n");
+        let parsed = parse_colon_file_names(
+            "root:x:0:0:root:/root:/bin/sh\nexec:x:1000:1000::/home/exec:/bin/sh\n",
+        );
         assert_eq!(parsed, vec!["exec".to_string(), "root".to_string()]);
     }
 

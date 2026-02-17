@@ -74,13 +74,17 @@ pub(crate) fn parse_kbd_string(desc: &str) -> Result<Value, String> {
     Ok(Value::vector(values))
 }
 
-pub(crate) fn key_events_from_designator(designator: &Value) -> Result<Vec<KeyEvent>, KeyDesignatorError> {
+pub(crate) fn key_events_from_designator(
+    designator: &Value,
+) -> Result<Vec<KeyEvent>, KeyDesignatorError> {
     match designator {
         Value::Str(s) => {
             let encoded = parse_kbd_string(s).map_err(KeyDesignatorError::Parse)?;
             decode_encoded_key_events(&encoded).map_err(KeyDesignatorError::Parse)
         }
-        Value::Vector(_) => decode_encoded_key_events(designator).map_err(KeyDesignatorError::Parse),
+        Value::Vector(_) => {
+            decode_encoded_key_events(designator).map_err(KeyDesignatorError::Parse)
+        }
         other => Err(KeyDesignatorError::WrongType(other.clone())),
     }
 }
@@ -134,7 +138,8 @@ fn decode_int_event(code: i64) -> Result<KeyEvent, String> {
     if !(0..=0x10FFFF).contains(&base) {
         return Err(format!("invalid key event code: {code}"));
     }
-    let ch = char::from_u32(base as u32).ok_or_else(|| format!("invalid key event code: {code}"))?;
+    let ch =
+        char::from_u32(base as u32).ok_or_else(|| format!("invalid key event code: {code}"))?;
     Ok(KeyEvent::Char {
         code: ch,
         ctrl: (mods & CHAR_CTL) != 0,

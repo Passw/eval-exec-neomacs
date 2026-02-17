@@ -355,8 +355,12 @@ fn transpose_subr_ranges(
     mut pos1: (usize, usize),
     mut pos2: (usize, usize),
 ) -> EvalResult {
-    let two_thing_error =
-        || signal("error", vec![Value::string("Don\u{2019}t have two things to transpose")]);
+    let two_thing_error = || {
+        signal(
+            "error",
+            vec![Value::string("Don\u{2019}t have two things to transpose")],
+        )
+    };
 
     if pos1.0 > pos1.1 {
         pos1 = (pos1.1, pos1.0);
@@ -586,7 +590,9 @@ fn resolve_case_region(
         let mark = buf.mark().ok_or_else(|| {
             signal(
                 "error",
-                vec![Value::string("The mark is not set now, so there is no region")],
+                vec![Value::string(
+                    "The mark is not set now, so there is no region",
+                )],
             )
         })?;
         let pt = buf.point();
@@ -691,13 +697,12 @@ fn sync_kill_ring_from_binding_internal(
 ) -> Result<(), Flow> {
     if let Some(value) = dynamic_or_global_symbol_value(eval, "kill-ring") {
         if let Some(entries) = kill_ring_entries_from_value(&value) {
-            let pointer_index = if let Some(ptr) =
-                dynamic_or_global_symbol_value(eval, "kill-ring-yank-pointer")
-            {
-                kill_ring_pointer_index(&entries, &ptr, strict_non_list_pointer)?
-            } else {
-                0
-            };
+            let pointer_index =
+                if let Some(ptr) = dynamic_or_global_symbol_value(eval, "kill-ring-yank-pointer") {
+                    kill_ring_pointer_index(&entries, &ptr, strict_non_list_pointer)?
+                } else {
+                    0
+                };
             if eval.kill_ring.entries != entries {
                 eval.kill_ring.set_entries(entries);
             }
@@ -1808,8 +1813,12 @@ pub(crate) fn builtin_transpose_words(
 
     let steps = n.unsigned_abs() as usize;
     let backward = n < 0;
-    let two_word_error =
-        || signal("error", vec![Value::string("Don\u{2019}t have two things to transpose")]);
+    let two_word_error = || {
+        signal(
+            "error",
+            vec![Value::string("Don\u{2019}t have two things to transpose")],
+        )
+    };
 
     for _ in 0..steps {
         let (w1s, w1e, w2s, w2e) = {
@@ -1888,7 +1897,8 @@ pub(crate) fn builtin_transpose_words(
                 let right_end = word_end_from_start(right);
                 (left, left_end, right, right_end)
             } else {
-                let inside_word = pt > pmin && buf.char_before(pt).is_some_and(|ch| is_word_char(ch));
+                let inside_word =
+                    pt > pmin && buf.char_before(pt).is_some_and(|ch| is_word_char(ch));
                 if inside_word {
                     // Inside/after a word: transpose this word with the following one.
                     let pivot = retreat_to_word_start(pt).ok_or_else(&two_word_error)?;
@@ -1898,13 +1908,13 @@ pub(crate) fn builtin_transpose_words(
                     (pivot, pivot_end, next, next_end)
                 } else {
                     // At a boundary/non-word: transpose previous word with the one at/after point.
-                    let pivot = if pt < pmax && buf.char_after(pt).is_some_and(|ch| is_word_char(ch))
-                    {
-                        retreat_to_word_start(pt)
-                    } else {
-                        word_start_at_or_after(pt)
-                    }
-                    .ok_or_else(&two_word_error)?;
+                    let pivot =
+                        if pt < pmax && buf.char_after(pt).is_some_and(|ch| is_word_char(ch)) {
+                            retreat_to_word_start(pt)
+                        } else {
+                            word_start_at_or_after(pt)
+                        }
+                        .ok_or_else(&two_word_error)?;
 
                     let pivot_end = word_end_from_start(pivot);
                     if let Some(prev) = word_start_before(pivot) {
@@ -1979,8 +1989,12 @@ pub(crate) fn builtin_transpose_sexps(
         ));
     }
 
-    let two_sexp_error =
-        || signal("error", vec![Value::string("Don\u{2019}t have two things to transpose")]);
+    let two_sexp_error = || {
+        signal(
+            "error",
+            vec![Value::string("Don\u{2019}t have two things to transpose")],
+        )
+    };
 
     let (point, table, spans, scan_error_pos) = {
         let buf = eval
@@ -2118,8 +2132,12 @@ pub(crate) fn builtin_transpose_sentences(
 
     let steps = n.unsigned_abs() as usize;
     let backward = n < 0;
-    let two_sentence_error =
-        || signal("error", vec![Value::string("Don\u{2019}t have two things to transpose")]);
+    let two_sentence_error = || {
+        signal(
+            "error",
+            vec![Value::string("Don\u{2019}t have two things to transpose")],
+        )
+    };
 
     for _ in 0..steps {
         let (s1, e1, s2, e2) = {
@@ -2279,8 +2297,12 @@ pub(crate) fn builtin_transpose_lines(
     expect_args("transpose-lines", &args, 1)?;
     let n = expect_int(&args[0])?;
 
-    let two_line_error =
-        || signal("error", vec![Value::string("Don\u{2019}t have two things to transpose")]);
+    let two_line_error = || {
+        signal(
+            "error",
+            vec![Value::string("Don\u{2019}t have two things to transpose")],
+        )
+    };
 
     if n < 0 {
         let steps = (-n) as usize;
