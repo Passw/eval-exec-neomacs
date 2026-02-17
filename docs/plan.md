@@ -94,7 +94,7 @@ Last updated: 2026-02-16
 5. Keep Rust backend behind compile-time switch and preserve Emacs C core as default backend.
 6. Expand `kbd` edge corpus around uncommon modifier composition and align non-`kbd` key-description consumers with the new parser semantics where needed.
 7. Expand `recent-keys` capture beyond `read*` consumers to eventual command-loop event publication.
-8. Continue subr-arity registry drift reduction from `59` remaining mismatches using batched oracle lock-ins.
+8. Current registry status is `fboundp`/function-cell: 0 drifts, `function-kind`: 28 allowlisted drifts.
 9. Resolve the last startup wrapper-shape drift (`neovm-precompile-file`) with an explicit extension-vs-oracle policy and lock-in corpus note.
 
 ## Done
