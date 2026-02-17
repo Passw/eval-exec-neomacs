@@ -287,6 +287,7 @@ fn parse_run_at_time_delay(value: &Value) -> Result<f64, Flow> {
                     if let Some(multiplier) = factor {
                         return Ok(delay * multiplier);
                     }
+                    return Ok(delay);
                 }
             }
 
@@ -876,8 +877,9 @@ mod tests {
             604_800.0
         );
         assert!(matches!(
-            parse_run_at_time_delay(&Value::string("4 fortnights")),
-            Err(Flow::Signal(sig)) if sig.symbol == "error"
+            parse_run_at_time_delay(&Value::string("4 fortnights"))
+                .expect("unknown units should fallback to numeric spec"),
+            4.0
         ));
     }
 

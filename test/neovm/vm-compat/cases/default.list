@@ -326,6 +326,7 @@ cases/libxml-parse-html-region-semantics
 cases/xml-zlib-availability-semantics
 cases/read-coding-system-semantics
 cases/timer-semantics
+cases/timer-unit-delay-semantics
 cases/display-stub-semantics
 cases/xdisp-pixel-metrics-semantics
 cases/xdisp-navigation-semantics
