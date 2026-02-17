@@ -1,0 +1,4 @@
+(let ((unread-command-events (list 'foo [bar])))
+  (progn
+    (read-key "")
+    unread-command-events))
