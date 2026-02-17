@@ -822,6 +822,15 @@ mod tests {
     }
 
     #[test]
+    fn looking_at_wrong_number_of_arguments() {
+        let result = builtin_looking_at(vec![]);
+        assert!(matches!(
+            result,
+            Err(Flow::Signal(sig)) if sig.symbol == "wrong-number-of-arguments"
+        ));
+    }
+
+    #[test]
     fn looking_at_with_limit_any_value() {
         let result = builtin_looking_at(vec![Value::string("foo"), Value::True]);
         assert_nil(result.unwrap());
@@ -862,6 +871,15 @@ mod tests {
     fn looking_at_p_invalid_regexp_signals() {
         let result = builtin_looking_at_p(vec![Value::string("[")]);
         assert!(result.is_err());
+    }
+
+    #[test]
+    fn looking_at_p_wrong_number_of_arguments() {
+        let result = builtin_looking_at_p(vec![]);
+        assert!(matches!(
+            result,
+            Err(Flow::Signal(sig)) if sig.symbol == "wrong-number-of-arguments"
+        ));
     }
 
     #[test]
