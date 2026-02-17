@@ -287,9 +287,10 @@ pub(crate) fn builtin_find_font_eval(
     Ok(Value::Nil)
 }
 
-/// `(clear-font-cache)` -- stub, return nil.
+/// `(clear-font-cache)` -- reset internal font/face caches and return nil.
 pub(crate) fn builtin_clear_font_cache(args: Vec<Value>) -> EvalResult {
     expect_max_args("clear-font-cache", &args, 0)?;
+    clear_font_cache_state();
     Ok(Value::Nil)
 }
 
@@ -486,6 +487,19 @@ fn face_attr_state() -> &'static Mutex<FaceAttrState> {
     FACE_ATTR_STATE.get_or_init(|| Mutex::new(FaceAttrState::default()))
 }
 
+fn clear_font_cache_state() {
+    created_lisp_faces()
+        .lock()
+        .expect("poisoned")
+        .clear();
+    created_face_ids()
+        .lock()
+        .expect("poisoned")
+        .clear();
+    *next_created_face_id().lock().expect("poisoned") = FIRST_DYNAMIC_FACE_ID;
+    *face_attr_state().lock().expect("poisoned") = FaceAttrState::default();
+}
+
 fn is_created_lisp_face(name: &str) -> bool {
     created_lisp_faces()
         .lock()
@@ -562,7 +576,9 @@ fn get_face_override(face_name: &str, attr: &str, defaults_frame: bool) -> Optio
     } else {
         &state.selected_overrides
     };
-    map.get(face_name).and_then(|attrs| attrs.get(attr)).cloned()
+    map.get(face_name)
+        .and_then(|attrs| attrs.get(attr))
+        .cloned()
 }
 
 fn set_face_override(face_name: &str, attr: &str, value: Value, defaults_frame: bool) {
@@ -600,7 +616,10 @@ fn merge_defaults_overrides_into_selected(face_name: &str) {
     let mut state = face_attr_state().lock().expect("poisoned");
     let defaults = state.defaults_overrides.get(face_name).cloned();
     if let Some(attrs) = defaults {
-        let selected = state.selected_overrides.entry(face_name.to_string()).or_default();
+        let selected = state
+            .selected_overrides
+            .entry(face_name.to_string())
+            .or_default();
         for (attr, value) in attrs {
             if matches!(&value, Value::Symbol(s) if s == "unspecified" || s == "relative") {
                 continue;
@@ -781,7 +800,9 @@ fn normalize_set_face_attribute_name(attr: &Value) -> Result<String, Flow> {
         }
     };
 
-    if VALID_FACE_ATTRIBUTES.contains(&name.as_str()) || SET_ONLY_FACE_ATTRIBUTES.contains(&name.as_str()) {
+    if VALID_FACE_ATTRIBUTES.contains(&name.as_str())
+        || SET_ONLY_FACE_ATTRIBUTES.contains(&name.as_str())
+    {
         Ok(name)
     } else if attr.is_nil() {
         Err(signal(
@@ -801,8 +822,8 @@ fn default_face_attribute_value(attr: &str) -> Value {
         ":family" | ":foundry" => Value::string("default"),
         ":height" => Value::Int(1),
         ":weight" | ":slant" | ":width" => Value::symbol("normal"),
-        ":underline" | ":overline" | ":strike-through" | ":box" | ":inverse-video"
-        | ":stipple" | ":inherit" | ":extend" | ":fontset" => Value::Nil,
+        ":underline" | ":overline" | ":strike-through" | ":box" | ":inverse-video" | ":stipple"
+        | ":inherit" | ":extend" | ":fontset" => Value::Nil,
         ":foreground" => Value::string("unspecified-fg"),
         ":background" => Value::string("unspecified-bg"),
         ":distant-foreground" | ":font" => Value::symbol("unspecified"),
@@ -937,15 +958,18 @@ fn symbol_name_or_type_error(value: &Value) -> Result<String, Flow> {
     }
 }
 
-fn normalize_face_attr_for_set(face_name: &str, attr: &str, value: Value) -> Result<(String, Value), Flow> {
+fn normalize_face_attr_for_set(
+    face_name: &str,
+    attr: &str,
+    value: Value,
+) -> Result<(String, Value), Flow> {
     let normalized = match attr {
         ":foreground" | ":background" | ":distant-foreground" if value.is_nil() => {
             Value::symbol("unspecified")
         }
         _ => value,
     };
-    let is_reset_like =
-        matches!(&normalized, Value::Symbol(s) if s == "unspecified" || s == ":ignore-defface" || s == "reset");
+    let is_reset_like = matches!(&normalized, Value::Symbol(s) if s == "unspecified" || s == ":ignore-defface" || s == "reset");
 
     match attr {
         ":family" | ":foundry" => {
@@ -992,7 +1016,9 @@ fn normalize_face_attr_for_set(face_name: &str, attr: &str, value: Value) -> Res
                             return Err(signal(
                                 "error",
                                 vec![
-                                    Value::string("Face height does not produce a positive integer"),
+                                    Value::string(
+                                        "Face height does not produce a positive integer",
+                                    ),
                                     normalized,
                                 ],
                             ));
@@ -1005,7 +1031,10 @@ fn normalize_face_attr_for_set(face_name: &str, attr: &str, value: Value) -> Res
             if !is_reset_like {
                 let sym = symbol_name_or_type_error(&normalized)?;
                 if !VALID_FACE_WEIGHTS.contains(&sym.as_str()) {
-                    return Err(signal("error", vec![Value::string("Invalid face weight"), normalized]));
+                    return Err(signal(
+                        "error",
+                        vec![Value::string("Invalid face weight"), normalized],
+                    ));
                 }
             }
         }
@@ -1013,7 +1042,10 @@ fn normalize_face_attr_for_set(face_name: &str, attr: &str, value: Value) -> Res
             if !is_reset_like {
                 let sym = symbol_name_or_type_error(&normalized)?;
                 if !VALID_FACE_SLANTS.contains(&sym.as_str()) {
-                    return Err(signal("error", vec![Value::string("Invalid face slant"), normalized]));
+                    return Err(signal(
+                        "error",
+                        vec![Value::string("Invalid face slant"), normalized],
+                    ));
                 }
             }
         }
@@ -1021,7 +1053,10 @@ fn normalize_face_attr_for_set(face_name: &str, attr: &str, value: Value) -> Res
             if !is_reset_like {
                 let sym = symbol_name_or_type_error(&normalized)?;
                 if !VALID_FACE_WIDTHS.contains(&sym.as_str()) {
-                    return Err(signal("error", vec![Value::string("Invalid face width"), normalized]));
+                    return Err(signal(
+                        "error",
+                        vec![Value::string("Invalid face width"), normalized],
+                    ));
                 }
             }
         }
@@ -1060,7 +1095,10 @@ fn normalize_face_attr_for_set(face_name: &str, attr: &str, value: Value) -> Res
                 if sym != "t" && sym != "nil" {
                     return Err(signal(
                         "error",
-                        vec![Value::string("Invalid extend face attribute value"), normalized],
+                        vec![
+                            Value::string("Invalid extend face attribute value"),
+                            normalized,
+                        ],
                     ));
                 }
             }
@@ -1234,7 +1272,11 @@ pub(crate) fn builtin_internal_get_lisp_face_attribute(args: Vec<Value>) -> Eval
     let face_name = resolve_face_name_for_domain(&args[0], defaults_frame)?;
 
     let attr_name = normalize_face_attribute_name(&args[1])?;
-    Ok(lisp_face_attribute_value(&face_name, &attr_name, defaults_frame))
+    Ok(lisp_face_attribute_value(
+        &face_name,
+        &attr_name,
+        defaults_frame,
+    ))
 }
 
 /// `(internal-lisp-face-attribute-values ATTR)` -- return valid discrete values
@@ -1315,7 +1357,10 @@ pub(crate) fn builtin_face_attribute_relative_p(args: Vec<Value>) -> EvalResult 
         return Ok(Value::Nil);
     }
 
-    Ok(Value::bool(!matches!(&args[1], Value::Int(_) | Value::Char(_))))
+    Ok(Value::bool(!matches!(
+        &args[1],
+        Value::Int(_) | Value::Char(_)
+    )))
 }
 
 /// `(merge-face-attribute ATTRIBUTE VALUE1 VALUE2)` -- return VALUE1 unless it
@@ -1489,14 +1534,7 @@ pub(crate) fn builtin_defined_colors(args: Vec<Value>) -> EvalResult {
     expect_max_args("defined-colors", &args, 1)?;
     expect_optional_color_device_arg(&args, 0)?;
     let colors = vec![
-        "black",
-        "red",
-        "green",
-        "yellow",
-        "blue",
-        "magenta",
-        "cyan",
-        "white",
+        "black", "red", "green", "yellow", "blue", "magenta", "cyan", "white",
     ];
     Ok(Value::list(colors.into_iter().map(Value::string).collect()))
 }
@@ -1625,7 +1663,10 @@ pub(crate) fn builtin_internal_set_font_selection_order(args: Vec<Value>) -> Eva
 
     if let Some(values) = list_to_vec(order) {
         if values.is_empty() {
-            return Err(signal("error", vec![Value::string("Invalid font sort order")]));
+            return Err(signal(
+                "error",
+                vec![Value::string("Invalid font sort order")],
+            ));
         }
         let mut payload = vec![Value::string("Invalid font sort order")];
         payload.extend(values);
@@ -1853,6 +1894,46 @@ mod tests {
     }
 
     #[test]
+    fn clear_font_cache_resets_face_caches() {
+        let face = Value::symbol("__neovm_clear_font_cache_unit_test");
+        let _ = builtin_internal_make_lisp_face(vec![face.clone()]).unwrap();
+        let _ = builtin_internal_set_lisp_face_attribute(vec![
+            face.clone(),
+            Value::Keyword(":foreground".to_string()),
+            Value::string("white"),
+        ])
+        .unwrap();
+
+        {
+            let created = created_lisp_faces().lock().expect("poisoned");
+            assert!(created.contains("__neovm_clear_font_cache_unit_test"));
+        }
+        {
+            let state = face_attr_state().lock().expect("poisoned");
+            assert!(!state.selected_overrides.is_empty());
+        }
+
+        let result = builtin_clear_font_cache(vec![]).unwrap();
+        assert!(result.is_nil());
+
+        assert!(created_lisp_faces()
+            .lock()
+            .expect("poisoned")
+            .is_empty());
+        assert!(created_face_ids().lock().expect("poisoned").is_empty());
+        assert_eq!(
+            *next_created_face_id()
+                .lock()
+                .expect("poisoned"),
+            FIRST_DYNAMIC_FACE_ID
+        );
+        let state = face_attr_state().lock().expect("poisoned");
+        assert!(state.selected_overrides.is_empty());
+        assert!(state.defaults_overrides.is_empty());
+        assert!(state.selected_created.is_empty());
+    }
+
+    #[test]
     fn font_family_list_batch_returns_nil() {
         let result = builtin_font_family_list(vec![]).unwrap();
         assert!(result.is_nil());
@@ -1940,7 +2021,9 @@ mod tests {
     #[test]
     fn internal_make_lisp_face_rejects_non_symbol_and_non_nil_frame() {
         assert!(builtin_internal_make_lisp_face(vec![Value::string("foo")]).is_err());
-        assert!(builtin_internal_make_lisp_face(vec![Value::symbol("foo"), Value::Int(1)]).is_err());
+        assert!(
+            builtin_internal_make_lisp_face(vec![Value::symbol("foo"), Value::Int(1)]).is_err()
+        );
     }
 
     #[test]
@@ -2082,13 +2165,15 @@ mod tests {
     #[test]
     fn internal_lisp_face_empty_p_defaults_frame_is_empty() {
         let result =
-            builtin_internal_lisp_face_empty_p(vec![Value::symbol("default"), Value::True]).unwrap();
+            builtin_internal_lisp_face_empty_p(vec![Value::symbol("default"), Value::True])
+                .unwrap();
         assert!(result.is_truthy());
     }
 
     #[test]
     fn internal_lisp_face_empty_p_rejects_non_nil_non_t_frame_designator() {
-        let result = builtin_internal_lisp_face_empty_p(vec![Value::symbol("default"), Value::Int(1)]);
+        let result =
+            builtin_internal_lisp_face_empty_p(vec![Value::symbol("default"), Value::Int(1)]);
         assert!(result.is_err());
     }
 
@@ -2125,7 +2210,8 @@ mod tests {
 
     #[test]
     fn internal_merge_in_global_face_rejects_non_frame_designator() {
-        let result = builtin_internal_merge_in_global_face(vec![Value::symbol("default"), Value::Nil]);
+        let result =
+            builtin_internal_merge_in_global_face(vec![Value::symbol("default"), Value::Nil]);
         assert!(result.is_err());
     }
 
@@ -2357,12 +2443,8 @@ mod tests {
 
     #[test]
     fn face_font_ignores_optional_arguments_for_known_face() {
-        let result = builtin_face_font(vec![
-            Value::symbol("default"),
-            Value::Nil,
-            Value::True,
-        ])
-        .unwrap();
+        let result =
+            builtin_face_font(vec![Value::symbol("default"), Value::Nil, Value::True]).unwrap();
         assert!(result.is_nil());
     }
 
@@ -2422,7 +2504,10 @@ mod tests {
 
     #[test]
     fn internal_set_alternative_font_family_alist_converts_strings_to_symbols() {
-        let input = Value::list(vec![Value::list(vec![Value::string("Foo"), Value::string("Bar")])]);
+        let input = Value::list(vec![Value::list(vec![
+            Value::string("Foo"),
+            Value::string("Bar"),
+        ])]);
         let result = builtin_internal_set_alternative_font_family_alist(vec![input]).unwrap();
         let outer = list_to_vec(&result).expect("outer list");
         let inner = list_to_vec(&outer[0]).expect("inner list");
@@ -2440,7 +2525,8 @@ mod tests {
     #[test]
     fn internal_set_alternative_font_registry_alist_preserves_values() {
         let input = Value::list(vec![Value::list(vec![Value::Int(1), Value::Int(2)])]);
-        let result = builtin_internal_set_alternative_font_registry_alist(vec![input.clone()]).unwrap();
+        let result =
+            builtin_internal_set_alternative_font_registry_alist(vec![input.clone()]).unwrap();
         assert_eq!(result, input);
     }
 
