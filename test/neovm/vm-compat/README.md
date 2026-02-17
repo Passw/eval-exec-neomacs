@@ -161,6 +161,14 @@ cd test/neovm/vm-compat
 make check-builtin-registry-fboundp
 ```
 
+Show all currently allowlisted `function-kind` drift entries in detail (useful when
+triaging `function-kind` allowlist scope):
+
+```bash
+cd test/neovm/vm-compat
+make show-function-kind-drifts
+```
+
 Run the oracle default-path guard (ensures runner scripts stay pinned to the
 hardcoded GNU Emacs oracle binary):
 
