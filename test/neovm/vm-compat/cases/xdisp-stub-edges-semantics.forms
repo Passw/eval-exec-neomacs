@@ -4,6 +4,11 @@
 (condition-case err (invisible-p) (error (car err)))
 (condition-case err (invisible-p 1 2) (error (car err)))
 
+(fboundp 'format-mode-line)
+(format-mode-line "fmt")
+(condition-case err (format-mode-line "fmt" nil 'xwin) (error (car err)))
+(condition-case err (format-mode-line "fmt" nil nil 'xbuf) (error (car err)))
+
 (fboundp 'move-point-visually)
 (move-point-visually 1)
 (move-point-visually 0)

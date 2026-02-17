@@ -74,6 +74,22 @@ fn expect_fixnum_arg(name: &str, arg: &Value) -> Result<(), Flow> {
 /// Batch-compatible behavior: accepts 1..4 args and returns an empty string.
 pub(crate) fn builtin_format_mode_line(args: Vec<Value>) -> EvalResult {
     expect_args_range("format-mode-line", &args, 1, 4)?;
+    if let Some(window) = args.get(2) {
+        if !window.is_nil() {
+            return Err(signal(
+                "wrong-type-argument",
+                vec![Value::symbol("windowp"), window.clone()],
+            ));
+        }
+    }
+    if let Some(buffer) = args.get(3) {
+        if !buffer.is_nil() && !matches!(buffer, Value::Buffer(_)) {
+            return Err(signal(
+                "wrong-type-argument",
+                vec![Value::symbol("bufferp"), buffer.clone()],
+            ));
+        }
+    }
     Ok(Value::string(""))
 }
 
@@ -394,6 +410,37 @@ mod tests {
             builtin_format_mode_line(vec![Value::string("test"), Value::symbol("default")])
                 .unwrap();
         assert_eq!(result, Value::string(""));
+
+        let result = builtin_format_mode_line(vec![
+            Value::string("test"),
+            Value::symbol("default"),
+            Value::Nil,
+        ])
+        .unwrap();
+        assert_eq!(result, Value::string(""));
+
+        let err = builtin_format_mode_line(vec![
+            Value::string("test"),
+            Value::symbol("default"),
+            Value::symbol("window"),
+        ])
+        .unwrap_err();
+        match err {
+            Flow::Signal(sig) => assert_eq!(sig.symbol, "wrong-type-argument"),
+            other => panic!("expected wrong-type-argument, got {:?}", other),
+        }
+
+        let err = builtin_format_mode_line(vec![
+            Value::string("test"),
+            Value::symbol("default"),
+            Value::Nil,
+            Value::symbol("buffer"),
+        ])
+        .unwrap_err();
+        match err {
+            Flow::Signal(sig) => assert_eq!(sig.symbol, "wrong-type-argument"),
+            other => panic!("expected wrong-type-argument, got {:?}", other),
+        }
 
         assert!(builtin_format_mode_line(vec![]).is_err());
     }
