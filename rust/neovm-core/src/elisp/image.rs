@@ -470,12 +470,20 @@ pub(crate) fn builtin_image_flush(args: Vec<Value>) -> EvalResult {
 /// or t (clear all frames).
 /// Stub: does nothing, returns nil.
 pub(crate) fn builtin_clear_image_cache(args: Vec<Value>) -> EvalResult {
-    if args.len() != 1 || args[0].is_nil() {
+    if args.len() > 2 {
+        return Err(signal(
+            "wrong-number-of-arguments",
+            vec![Value::symbol("clear-image-cache"), Value::Int(args.len() as i64)],
+        ));
+    }
+
+    if args.is_empty() || args[0].is_nil() {
         return Err(signal(
             "error",
             vec![Value::string("Window system frame should be used")],
         ));
     }
+
     Ok(Value::Nil)
 }
 
@@ -1060,7 +1068,14 @@ mod tests {
     #[test]
     fn clear_image_cache_too_many_args() {
         let result = builtin_clear_image_cache(vec![Value::True, Value::True]);
-        assert!(result.is_err());
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn clear_image_cache_nil_second_arg_but_valid_filter() {
+        let result = builtin_clear_image_cache(vec![Value::True, Value::Nil]);
+        assert!(result.is_ok());
+        assert!(result.unwrap().is_nil());
     }
 
     // -----------------------------------------------------------------------

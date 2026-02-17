@@ -4,4 +4,5 @@
 4	(condition-case err (clear-image-cache t) (error (car err)))	OK nil
 5	(condition-case err (clear-image-cache 1) (error (car err)))	OK nil
 6	(condition-case err (clear-image-cache 'foo) (error (car err)))	OK nil
-7	(condition-case err (clear-image-cache nil nil) (error (car err)))	OK error
+7	(condition-case err (clear-image-cache 'foo t) (error (car err)))	OK nil
+8	(condition-case err (clear-image-cache nil nil) (error (car err)))	OK error

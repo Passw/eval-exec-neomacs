@@ -15,5 +15,8 @@
     (clear-image-cache 'foo)
   (error (car err)))
 (condition-case err
+    (clear-image-cache 'foo t)
+  (error (car err)))
+(condition-case err
     (clear-image-cache nil nil)
   (error (car err)))
