@@ -1,5 +1,8 @@
 (fboundp 'x-open-connection)
 (condition-case err
+    (x-open-connection)
+  (error (car err)))
+(condition-case err
     (x-open-connection nil)
   (error (car err)))
 (condition-case err
