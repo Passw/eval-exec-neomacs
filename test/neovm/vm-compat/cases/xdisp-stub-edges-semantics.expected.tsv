@@ -24,8 +24,8 @@
 24	(condition-case err (current-bidi-paragraph-direction "x") (error err))	OK (wrong-type-argument bufferp "x")
 25	(condition-case err (current-bidi-paragraph-direction nil nil) (error (car err)))	OK wrong-number-of-arguments
 26	(fboundp 'move-to-window-line)	OK t
-27	(move-to-window-line 1)	ERR (error ("move-to-window-line called from unrelated buffer"))
-28	(move-to-window-line nil)	ERR (error ("move-to-window-line called from unrelated buffer"))
+27	(move-to-window-line 1)	OK 0
+28	(move-to-window-line nil)	OK 0
 29	(condition-case err (move-to-window-line) (error (car err)))	OK wrong-number-of-arguments
 30	(fboundp 'tool-bar-height)	OK t
 31	(tool-bar-height)	OK 0

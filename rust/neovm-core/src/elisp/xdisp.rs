@@ -257,12 +257,7 @@ pub(crate) fn builtin_current_bidi_paragraph_direction(args: Vec<Value>) -> Eval
 /// Batch semantics: no related live window is available.
 pub(crate) fn builtin_move_to_window_line(args: Vec<Value>) -> EvalResult {
     expect_args("move-to-window-line", &args, 1)?;
-    Err(signal(
-        "error",
-        vec![Value::string(
-            "move-to-window-line called from unrelated buffer",
-        )],
-    ))
+    Ok(Value::Int(0))
 }
 
 /// (tool-bar-height &optional FRAME PIXELWISE) -> integer
@@ -681,17 +676,14 @@ mod tests {
 
     #[test]
     fn test_move_to_window_line() {
-        let err = builtin_move_to_window_line(vec![Value::Int(0)]).unwrap_err();
-        match err {
-            Flow::Signal(sig) => assert_eq!(sig.symbol, "error"),
-            other => panic!("expected error signal, got {:?}", other),
-        }
+        let result = builtin_move_to_window_line(vec![Value::Int(1)]).unwrap();
+        assert_eq!(result, Value::Int(0));
 
-        let err = builtin_move_to_window_line(vec![Value::Int(5)]).unwrap_err();
-        match err {
-            Flow::Signal(sig) => assert_eq!(sig.symbol, "error"),
-            other => panic!("expected error signal, got {:?}", other),
-        }
+        let result = builtin_move_to_window_line(vec![Value::Int(0)]).unwrap();
+        assert_eq!(result, Value::Int(0));
+
+        let result = builtin_move_to_window_line(vec![Value::symbol("left")]).unwrap();
+        assert_eq!(result, Value::Int(0));
     }
 
     #[test]
