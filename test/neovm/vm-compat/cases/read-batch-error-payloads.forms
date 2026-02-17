@@ -28,3 +28,7 @@
 (condition-case err (progn (setq unread-command-events '([1 2])) (read-from-minibuffer "")) (error (list (car err) unread-command-events)))
 (condition-case err (progn (setq unread-command-events '([1 2])) (read-passwd "")) (error (list (car err) unread-command-events)))
 (condition-case err (progn (setq unread-command-events '([1 2])) (completing-read "" '(("a") ("b")))) (error (list (car err) unread-command-events)))
+(condition-case err (progn (setq unread-command-events '(97)) (read-coding-system "Coding: ")) (error (list (car err) unread-command-events)))
+(condition-case err (progn (setq unread-command-events '((1 2))) (read-coding-system "Coding: ")) (error (list (car err) unread-command-events)))
+(condition-case err (progn (setq unread-command-events '([1 2])) (read-non-nil-coding-system "Coding: ")) (error (list (car err) unread-command-events)))
+(condition-case err (progn (setq unread-command-events '(foo)) (read-non-nil-coding-system "Coding: ")) (error (list (car err) unread-command-events)))
