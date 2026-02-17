@@ -4,6 +4,8 @@
 4	(car (libxml-parse-html-region))	OK html
 5	(car (libxml-parse-html-region 1))	OK html
 6	(car (libxml-parse-html-region 1 2 "x"))	OK html
-7	(condition-case err (libxml-parse-html-region 1 2 2) (error err))	OK (wrong-type-argument stringp 2)
-8	(condition-case err (libxml-parse-html-region 1 2 'bad-base) (error err))	OK (wrong-type-argument stringp bad-base)
-9	(car (libxml-parse-html-region 1 1))	OK nil
+7	(car (libxml-parse-html-region nil))	OK html
+8	(car (libxml-parse-html-region nil 1))	OK nil
+9	(condition-case err (libxml-parse-html-region 1 2 2) (error err))	OK (wrong-type-argument stringp 2)
+10	(condition-case err (libxml-parse-html-region 1 2 'bad-base) (error err))	OK (wrong-type-argument stringp bad-base)
+11	(car (libxml-parse-html-region 1 1))	OK nil

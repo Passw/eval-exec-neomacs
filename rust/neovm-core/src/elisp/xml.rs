@@ -274,6 +274,10 @@ mod tests {
             html_parse_fallback("libxml-parse-html-region", &[])
         );
         assert_eq!(
+            builtin_libxml_parse_html_region(vec![Value::Nil]).unwrap(),
+            html_parse_fallback("libxml-parse-html-region", &[Value::Nil])
+        );
+        assert_eq!(
             builtin_libxml_parse_html_region(vec![Value::Int(1)]).unwrap(),
             html_parse_fallback("libxml-parse-html-region", &[Value::Int(1)])
         );

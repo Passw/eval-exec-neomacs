@@ -4,6 +4,8 @@
 (car (libxml-parse-html-region))
 (car (libxml-parse-html-region 1))
 (car (libxml-parse-html-region 1 2 "x"))
+(car (libxml-parse-html-region nil))
+(car (libxml-parse-html-region nil 1))
 (condition-case err (libxml-parse-html-region 1 2 2) (error err))
 (condition-case err (libxml-parse-html-region 1 2 'bad-base) (error err))
 (car (libxml-parse-html-region 1 1))
