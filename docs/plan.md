@@ -4,6 +4,10 @@ Last updated: 2026-02-16
 
 ## Doing
 
+- Add evaluator-backed behavior and vm-compat lock-ins for minibuffer/read prompt decisions:
+  - `y-or-n-p` and `yes-or-no-p` now consume `unread-command-events` and signal meaningful prompt-type/signaling behavior in batch mode.
+  - Added unit coverage for `y-or-n-p`/`yes-or-no-p` event consumption and invalid reply signaling.
+  - Cleaned `reader.rs` interactive-input section comments to reflect implemented behavior.
 - Continue compatibility-first maintenance with small commit slices.
 - Keep builtin dispatch surface and registry in lock-step for `fboundp`/introspection parity.
 - Run targeted vm-compat checks after each behavior-affecting slice.
@@ -73,14 +77,15 @@ Last updated: 2026-02-16
 
 ## Next
 
-1. Keep `check-all-neovm` as a recurring post-slice gate to catch regressions early.
-2. Land the next evaluator-backed stub replacement after the `set-window-buffer` max-arity parity slice (prefer high-impact buffer/window lifecycle helper paths).
-3. Continue expanding oracle corpora for remaining high-risk stub areas (search/input/minibuffer/display/font edge paths) and keep list/alist primitive semantics locked in.
-4. Keep Rust backend behind compile-time switch and preserve Emacs C core as default backend.
-5. Expand `kbd` edge corpus around uncommon modifier composition and align non-`kbd` key-description consumers with the new parser semantics where needed.
-6. Expand `recent-keys` capture beyond `read*` consumers to eventual command-loop event publication.
-7. Continue subr-arity registry drift reduction from `59` remaining mismatches using batched oracle lock-ins.
-8. Resolve the last startup wrapper-shape drift (`neovm-precompile-file`) with an explicit extension-vs-oracle policy and lock-in corpus note.
+1. Expand `read-char`/`read-key`/`read-key-sequence` event semantics beyond single-event returns and lock in oracle coverage for queue consumption edge-cases.
+2. Keep `check-all-neovm` as a recurring post-slice gate to catch regressions early.
+3. Land the next evaluator-backed stub replacement after the `set-window-buffer` max-arity parity slice (prefer high-impact buffer/window lifecycle helper paths).
+4. Continue expanding oracle corpora for remaining high-risk stub areas (search/input/minibuffer/display/font edge paths) and keep list/alist primitive semantics locked in.
+5. Keep Rust backend behind compile-time switch and preserve Emacs C core as default backend.
+6. Expand `kbd` edge corpus around uncommon modifier composition and align non-`kbd` key-description consumers with the new parser semantics where needed.
+7. Expand `recent-keys` capture beyond `read*` consumers to eventual command-loop event publication.
+8. Continue subr-arity registry drift reduction from `59` remaining mismatches using batched oracle lock-ins.
+9. Resolve the last startup wrapper-shape drift (`neovm-precompile-file`) with an explicit extension-vs-oracle policy and lock-in corpus note.
 
 ## Done
 
