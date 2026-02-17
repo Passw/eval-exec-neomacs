@@ -199,6 +199,7 @@ Implemented now:
 - `rust/neovm-worker/examples/elisp_bench.rs`: throughput benchmark for threaded Elisp task execution path
 - `rust/neovm-core/examples/compat_runner.rs`: NeoVM compatibility runner producing oracle-style TSV
 - `rust/neovm-core/examples/load_cache_bench.rs`: cold/warm `.neoc` load benchmark helper
+- `rust/neovm-core/src/elisp/interactive.rs`: improved command-loop `KEYS` handling so vectors supplied to `command-execute` or `call-interactively` are forwarded into `recent-keys`, guaranteeing the recorded input history matches GNU Emacs command publishing semantics.
 - `rust/neovm-worker/examples/elisp_compat_runner.rs`: compatibility runner through threaded worker runtime path
 - thread primitive compatibility hardening:
   - `thread-join` matches GNU Emacs self-join behavior (`error` with "Cannot join current thread")
