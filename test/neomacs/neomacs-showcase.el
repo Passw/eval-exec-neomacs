@@ -81,7 +81,7 @@ Each line is prefixed with a relative timestamp from showcase start."
     ("Rounded Box Faces"         7  showcase--section-box-faces)
     ("Window Transitions"        7  showcase--section-window-trans)
     ("Inline Media"             13  showcase--section-media)
-    ("Child Frames"              8  showcase--section-child-frames)
+    ("Child Frames"             12  showcase--section-child-frames)
     ("Retro / Visual Madness"    4  showcase--section-retro)
     ("Grand Finale"              4  showcase--section-finale))
   "Alist of (NAME DURATION-SECS FUNCTION).")
@@ -1141,8 +1141,8 @@ The future of text editing is here.  It's called Neomacs.
           (when (buffer-live-p (get-buffer "*showcase-cf-vid*"))
             (set-buffer "*showcase-cf-vid*"))))))
 
-  ;; Child frame 3: Documentation popup (after 2s)
-  (showcase--schedule 2.0
+  ;; Child frame 3: Documentation popup (after 6s)
+  (showcase--schedule 6.0
     (lambda ()
       (showcase--log "  child-frames: showing doc popup")
       (let ((f (showcase--make-child "cf-doc" 200 320 50 10
@@ -1163,10 +1163,11 @@ The future of text editing is here.  It's called Neomacs.
             (when (frame-live-p f)
               (select-frame f 'norecord))
             (when (buffer-live-p (get-buffer "*showcase-cf-doc*"))
-              (set-buffer "*showcase-cf-doc*")))))))
+              (set-buffer "*showcase-cf-doc*"))))
+        (raise-frame f))))
 
-  ;; Child frame 4: WebKit browser (after 4s)
-  (showcase--schedule 4.0
+  ;; Child frame 4: WebKit browser (after 8s)
+  (showcase--schedule 8.0
     (lambda ()
       (showcase--log "  child-frames: showing WebKit child frame")
       (let ((f (showcase--make-child "cf-web" 150 100 82 30
@@ -1185,7 +1186,8 @@ The future of text editing is here.  It's called Neomacs.
             (when (frame-live-p f)
               (select-frame f 'norecord))
             (when (buffer-live-p (get-buffer "*showcase-cf-web*"))
-              (set-buffer "*showcase-cf-web*"))))))))
+              (set-buffer "*showcase-cf-web*"))))
+        (raise-frame f)))))
 
 (defun showcase--section-retro ()
   "Stack retro effects: CRT + dot matrix + background pattern + cursor."
