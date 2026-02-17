@@ -14,9 +14,9 @@ I started Neomacs because I love Emacs, I respect Emacs, and I want to make it b
 
 > **Note:** Neomacs is in active alpha development. Expect rough edges, breaking changes, and missing features. Contributions and bug reports are very welcome!
 
-> **Fork notice:** Neomacs is a hard fork of GNU Emacs, forked from commit [`705c0e3729`](https://git.savannah.gnu.org/cgit/emacs.git/commit/?id=705c0e3729bf53db9e84ae7c8b932ebc3b2da934). The changes are too invasive to ever be accepted upstream, so we did not preserve the original git history to keep the repository lightweight. If you need the full Emacs git history for reference, open an issue and we can re-add it.
+> **Fork notice:** Neomacs is a hard fork of GNU Emacs, forked from commit [`705c0e3729`](https://git.savannah.gnu.org/cgit/emacs.git/commit/?id=705c0e3729bf53db9e84ae7c8b932ebc3b2da934). The changes are too invasive to ever be accepted upstream, so we did not preserve the original git history to keep the repository lightweight. If you need the full Emacs git history for reference, open an issue, and we can re-add it.
 
-> **Why a fork, not from scratch?** Neomacs aims for 100% compatibility with official GNU Emacs — every config, package, and workflow should just work. By forking, we keep the original Emacs C code as a reference and test oracle: we can verify that each Rust rewrite produces identical behavior, ensuring nothing breaks as subsystems are replaced one by one.
+> **Why a fork, not from scratch?** Neomacs aims for 100% compatibility with official GNU Emacs — every config, package, and workflow should just work. By forking, we keep the original Emacs C code as a reference and test oracle: we can verifying that each Rust rewrite produces identical behavior, ensuring nothing breaks as subsystems are replaced one by one.
 
 ---
 
@@ -46,8 +46,7 @@ Throw it all away and start fresh.
 - **Zero-copy DMA-BUF** *(done)* — efficient GPU texture sharing (Linux)
 - **Rewrite entire Emacs core in Rust** *(in progress)* — replacing all ~300,000 lines of C with safe, modern Rust: Elisp runtime, evaluator, bytecode VM, GC, buffer/window/frame subsystems, and all editor internals
 - **True multi-threaded Elisp** *(planned)* — real concurrency for the Lisp machine, not just cooperative threading
-- **10x Elisp performance** *(planned)* — Rust-optimized Lisp machine with JIT compilation and inline caching
-- **Full Emacs compatibility** — your config and packages still work
+- **10x performance, and 100% Emacs compatibility.** *(planned)* — Rust-optimized Lisp machine with JIT compilation and inline caching
 
 ---
 
@@ -104,7 +103,7 @@ https://github.com/user-attachments/assets/275c6d9a-fced-44f6-8f43-3bbd2984d672
 
 ### Animations
 
-All animations run on the GPU render thread at display refresh rate, independent of Emacs redisplay. Configure everything from Elisp.
+All animations run on the GPU render thread at display refresh rate, independent of the Emacs redisplay. Configure everything from Elisp.
 
 #### Cursor
 
