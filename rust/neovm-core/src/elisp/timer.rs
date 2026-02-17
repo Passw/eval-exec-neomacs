@@ -258,13 +258,12 @@ fn expect_fixnum_like(value: &Value) -> Result<i64, Flow> {
 fn parse_time_unit_factor(unit: &str) -> Option<f64> {
     let unit = unit.to_ascii_lowercase();
     match unit.as_str() {
-        // Short and canonical singular/plural forms.
-        "sec" | "secs" | "second" | "seconds" | "s" => Some(1.0),
-        "min" | "mins" | "minute" | "minutes" | "m" => Some(60.0),
-        "hour" | "hours" | "h" | "hr" | "hrs" => Some(3600.0),
-        "day" | "days" | "d" => Some(86_400.0),
-        "week" | "weeks" | "w" => Some(604_800.0),
-        // Full-word forms accepted by Emacs for no-space variants.
+        // Full-word and widely-used shorthand forms.
+        "sec" | "secs" | "second" | "seconds" => Some(1.0),
+        "min" | "mins" | "minute" | "minutes" => Some(60.0),
+        "hour" | "hours" => Some(3600.0),
+        "day" | "days" => Some(86_400.0),
+        "week" | "weeks" => Some(604_800.0),
         "month" | "months" => Some(2_592_000.0),
         "year" | "years" => Some(31_104_000.0),
         "fortnight" | "fortnights" => Some(1_209_600.0),
@@ -931,6 +930,18 @@ mod tests {
         );
         assert!(matches!(
             parse_run_at_time_delay(&Value::string("4 foo")),
+            Err(_)
+        ));
+        assert!(matches!(
+            parse_run_at_time_delay(&Value::string("2 s")),
+            Err(_)
+        ));
+        assert!(matches!(
+            parse_run_at_time_delay(&Value::string("2h")),
+            Err(_)
+        ));
+        assert!(matches!(
+            parse_run_at_time_delay(&Value::string("2 hr")),
             Err(_)
         ));
     }
