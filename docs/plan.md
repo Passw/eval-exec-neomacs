@@ -7,7 +7,7 @@ Last updated: 2026-02-17
 1. [x] Add `thread-yield` behavior lock-in (`cases/thread-yield-semantics`) and baseline.
 2. [x] Add `thread-join` nil-handle argument error-path lock-in (`cases/thread-join-error-paths`).
 3. [x] Re-gate `check-all-neovm` and keep `stub-budget` in `compat-progress` output.
-4. [ ] Continue `xdisp`/display no-op surface audit with one behavior lock-in per commit.
+4. [x] Continue `xdisp`/display no-op surface audit with one behavior lock-in per commit (`move-point-visually`, `invisible-p` edge cases).
 5. [ ] Expand thread concurrency matrix coverage for argument errors and join edge-cases.
 6. [ ] Land next `font`/`font-lock` behavior lock-in slice with oracle-backed `font-spec` checks.
 7. [ ] Expand input queue edge cases for `read-key`/`read-event` mixed payload tails.
@@ -51,6 +51,10 @@ Last updated: 2026-02-17
   - Non-character head event now returns immediately with numeric tail preserved.
   - Character head consumes its own event and empties queue as expected.
 - Continue compatibility-first maintenance with small commit slices.
+- Completed latest xdisp parity slice:
+  - Added `move-point-visually` and `invisible-p` edge-case behavior.
+  - Added lock-ins in `cases/xdisp-stub-edges-semantics`.
+  - Verified with `make -C test/neovm/vm-compat check-one-neovm CASE=cases/xdisp-stub-edges-semantics` and full `check-all-neovm`.
 - Keep builtin dispatch surface and registry in lock-step for `fboundp`/introspection parity.
 - Run targeted vm-compat checks after each behavior-affecting slice.
 - Keep recurring full-corpus `check-all-neovm` gates after each compatibility batch.
