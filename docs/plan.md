@@ -4,6 +4,9 @@ Last updated: 2026-02-17
 
 ## Doing
 
+- Completed local search builtin hardening:
+  - `looking-at-p` now has explicit arity and match-data-preservation tests in `rust/neovm-core/src/elisp/search.rs`.
+  - Pure `looking-at`/`looking-at-p` docs updated and compatibility checks kept passing (`cases/looking-at-semantics`).
 - Add evaluator-backed behavior and vm-compat lock-ins for minibuffer/read prompt decisions:
   - `y-or-n-p` and `yes-or-no-p` now consume `unread-command-events` and signal meaningful prompt-type/signaling behavior in batch mode.
   - Added unit coverage for `y-or-n-p`/`yes-or-no-p` event consumption and invalid reply signaling.
