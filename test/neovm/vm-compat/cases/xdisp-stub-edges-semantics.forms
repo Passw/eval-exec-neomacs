@@ -6,6 +6,8 @@
 
 (fboundp 'move-point-visually)
 (move-point-visually 1)
+(move-point-visually 0)
+(move-point-visually -1)
 (move-point-visually 'left)
 (condition-case err (move-point-visually) (error (car err)))
 

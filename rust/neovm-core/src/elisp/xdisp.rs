@@ -186,15 +186,19 @@ pub(crate) fn builtin_pos_visible_in_window_p_eval(
 
 /// (move-point-visually DIRECTION) -> boolean
 ///
-/// Batch semantics: direction is validated as a fixnum and currently always
-/// reports out-of-range movement from the unrelated batch window.
+/// Batch semantics: direction is validated as a fixnum and reports whether
+/// movement would reach the buffer edge in the stub-only VM context.
 pub(crate) fn builtin_move_point_visually(args: Vec<Value>) -> EvalResult {
     expect_args("move-point-visually", &args, 1)?;
     match &args[0] {
-        Value::Int(_) | Value::Char(_) => Err(signal(
-            "args-out-of-range",
-            vec![Value::Int(224), Value::Int(224)],
-        )),
+        Value::Int(v) => {
+            if *v > 0 {
+                Ok(Value::symbol("end-of-buffer"))
+            } else {
+                Ok(Value::symbol("beginning-of-buffer"))
+            }
+        }
+        Value::Char(_) => Ok(Value::symbol("end-of-buffer")),
         other => Err(signal(
             "wrong-type-argument",
             vec![Value::symbol("fixnump"), other.clone()],
@@ -550,11 +554,17 @@ mod tests {
 
     #[test]
     fn test_move_point_visually() {
-        let err = builtin_move_point_visually(vec![Value::Int(1)]).unwrap_err();
-        match err {
-            Flow::Signal(sig) => assert_eq!(sig.symbol, "args-out-of-range"),
-            other => panic!("expected args-out-of-range, got {:?}", other),
-        }
+        let result = builtin_move_point_visually(vec![Value::Int(1)]).unwrap();
+        assert_eq!(result, Value::symbol("end-of-buffer"));
+
+        let result = builtin_move_point_visually(vec![Value::Int(0)]).unwrap();
+        assert_eq!(result, Value::symbol("beginning-of-buffer"));
+
+        let result = builtin_move_point_visually(vec![Value::Int(-1)]).unwrap();
+        assert_eq!(result, Value::symbol("beginning-of-buffer"));
+
+        let result = builtin_move_point_visually(vec![Value::Char('a')]).unwrap();
+        assert_eq!(result, Value::symbol("end-of-buffer"));
 
         let err = builtin_move_point_visually(vec![Value::symbol("left")]).unwrap_err();
         match err {
