@@ -3750,6 +3750,25 @@ mod tests {
     }
 
     #[test]
+    fn command_execute_records_keys_in_recent_history() {
+        let mut ev = Evaluator::new();
+        let result = builtin_command_execute(
+            &mut ev,
+            vec![
+                Value::symbol("ignore"),
+                Value::Nil,
+                Value::vector(vec![Value::Int(97), Value::symbol("mouse-1")]),
+            ],
+        )
+        .expect("command-execute should accept vector keys argument");
+        assert!(result.is_nil());
+        assert_eq!(
+            ev.recent_input_events(),
+            &[Value::Int(97), Value::symbol("mouse-1")]
+        );
+    }
+
+    #[test]
     fn command_execute_rejects_too_many_arguments() {
         let mut ev = Evaluator::new();
         let result = builtin_command_execute(
@@ -3849,6 +3868,22 @@ mod tests {
         )
         .expect("call-interactively should accept vector keys argument");
         assert!(result.is_nil());
+    }
+
+    #[test]
+    fn call_interactively_records_keys_in_recent_history() {
+        let mut ev = Evaluator::new();
+        let result = builtin_call_interactively(
+            &mut ev,
+            vec![
+                Value::symbol("ignore"),
+                Value::Nil,
+                Value::vector(vec![Value::Int(98)]),
+            ],
+        )
+        .expect("call-interactively should accept vector keys argument");
+        assert!(result.is_nil());
+        assert_eq!(ev.recent_input_events(), &[Value::Int(98)]);
     }
 
     #[test]
