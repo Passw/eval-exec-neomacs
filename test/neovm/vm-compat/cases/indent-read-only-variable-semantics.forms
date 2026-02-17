@@ -26,3 +26,12 @@
         (with-temp-buffer
           (condition-case err (indent-for-tab-command) (error (car err)))))
     (setq-default buffer-read-only orig)))
+
+; No-op path: `indent-according-to-mode` on an already-unindented
+; read-only line should not raise `buffer-read-only`.
+(with-temp-buffer
+  (insert "abc")
+  (setq buffer-read-only t)
+  (condition-case err
+      (indent-according-to-mode)
+    (error (car err))))

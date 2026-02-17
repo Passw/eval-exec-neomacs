@@ -12,7 +12,7 @@ Last updated: 2026-02-17
 6. [x] Land next `font`/`font-lock` behavior lock-in slice with oracle-backed `font-spec` checks.
 7. [x] Expand input queue edge cases for `read-key`/`read-event` mixed payload tails.
 8. [x] Add negative path cases for `terminal-parameter` argument validation and storage behavior.
-9. [ ] Tighten `indent` semantics around arity and read-only mutation boundaries in interactive buffer-mode.
+9. [x] Tighten `indent` semantics around arity and read-only mutation boundaries in interactive buffer-mode.
 10. [ ] Sweep remaining display compatibility notes and convert stub wording to explicit behavior.
 11. [ ] Add focused `make` target for `check-stub-budget` in CI dry-run dashboards.
 12. [ ] Expand `window` and `frame` lifecycle cases around stale buffer references.
@@ -50,6 +50,9 @@ Last updated: 2026-02-17
 - Added explicit `read-event` batch lock-ins for character and mixed event queues:
   - Non-character head event now returns immediately with numeric tail preserved.
   - Character head consumes its own event and empties queue as expected.
+- Completed `indent` read-only boundary tightening:
+  - `indent-according-to-mode` now only signals `buffer-read-only` when indentation is mutated, not when already at zero indentation.
+  - Added oracle lock-in case in `cases/indent-read-only-variable-semantics` for this no-op path.
 - Continue compatibility-first maintenance with small commit slices.
 - Completed latest xdisp parity slice:
   - Added `move-point-visually` and `invisible-p` edge-case behavior.

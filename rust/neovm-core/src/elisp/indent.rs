@@ -474,13 +474,6 @@ pub(crate) fn builtin_indent_according_to_mode(
     let Some(buf) = eval.buffers.current_buffer() else {
         return Ok(Value::Nil);
     };
-    if buffer_read_only_active(eval, buf) {
-        return Err(signal(
-            "buffer-read-only",
-            vec![Value::string(buf.name.clone())],
-        ));
-    }
-
     let text = buf.text.to_string();
     let pt = buf.pt.clamp(buf.begv, buf.zv);
     let (bol, eol) = line_bounds(&text, buf.begv, buf.zv, pt);
@@ -492,6 +485,13 @@ pub(crate) fn builtin_indent_according_to_mode(
         .sum::<usize>();
     if indent_len == 0 {
         return Ok(Value::Nil);
+    }
+
+    if buffer_read_only_active(eval, buf) {
+        return Err(signal(
+            "buffer-read-only",
+            vec![Value::string(buf.name.clone())],
+        ));
     }
 
     let indent_end = bol + indent_len;
