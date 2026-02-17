@@ -47,6 +47,9 @@ struct NamedCallCache {
     target: NamedCallTarget,
 }
 
+/// Limit for stored recent input events to match GNU Emacs: 300 entries.
+pub(crate) const RECENT_INPUT_EVENT_LIMIT: usize = 300;
+
 /// The Elisp evaluator.
 pub struct Evaluator {
     /// The obarray — unified symbol table with value cells, function cells, plists.
@@ -482,6 +485,9 @@ impl Evaluator {
 
     pub(crate) fn record_input_event(&mut self, event: Value) {
         self.recent_input_events.push(event);
+        if self.recent_input_events.len() > RECENT_INPUT_EVENT_LIMIT {
+            self.recent_input_events.remove(0);
+        }
     }
 
     pub(crate) fn recent_input_events(&self) -> &[Value] {
