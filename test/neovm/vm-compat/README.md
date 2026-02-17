@@ -101,6 +101,15 @@ cd test/neovm/vm-compat
 make compat-stub-index-json
 ```
 
+Enforce a zero-stub budget for explicit compatibility markers
+(set `NEOVM_STUB_BUDGET` to a non-zero value if you intentionally keep
+some markers):
+
+```bash
+cd test/neovm/vm-compat
+NEOVM_STUB_BUDGET=0 make check-stub-budget
+```
+
 Run any case list file directly (avoids passing very long `CASES=...` values):
 
 ```bash

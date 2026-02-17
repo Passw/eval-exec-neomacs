@@ -149,6 +149,11 @@ jobs:
         run: |
           RUSTFLAGS='-Awarnings' make check-all-neovm
 
+      - name: Enforce explicit stub budget
+        working-directory: test/neovm/vm-compat
+        run: |
+          make check-stub-budget
+
       - name: Check builtin registry fboundp parity
         working-directory: test/neovm/vm-compat
         env:
