@@ -357,6 +357,7 @@ cases/create-image-type-resolution
 cases/image-type-semantics
 cases/image-area-semantics
 cases/image-flush-semantics
+cases/image-transforms-semantics
 cases/image-remove-semantics
 cases/image-insert-put-semantics
 cases/tty-batch-semantics

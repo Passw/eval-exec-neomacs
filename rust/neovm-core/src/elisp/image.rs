@@ -14,6 +14,7 @@
 
 use super::error::{signal, EvalResult, Flow};
 use super::value::*;
+use crate::window::FRAME_ID_BASE;
 
 // ---------------------------------------------------------------------------
 // Argument helpers
@@ -49,6 +50,17 @@ fn expect_max_args(name: &str, args: &[Value], max: usize) -> Result<(), Flow> {
         ))
     } else {
         Ok(())
+    }
+}
+
+fn expect_frame_designator(_name: &str, value: &Value) -> Result<(), Flow> {
+    match value {
+        Value::Nil => Ok(()),
+        Value::Int(id) if *id >= 0 && (*id as u64) >= FRAME_ID_BASE => Ok(()),
+        _ => Err(signal(
+            "wrong-type-argument",
+            vec![Value::symbol("frame-live-p"), value.clone()],
+        )),
     }
 }
 
@@ -577,13 +589,17 @@ pub(crate) fn builtin_image_type(args: Vec<Value>) -> EvalResult {
     Ok(Value::symbol(resolved))
 }
 
-/// (image-transforms-p &optional FRAME) -> t
+/// (image-transforms-p &optional FRAME) -> bool
 ///
-/// Return non-nil if FRAME supports image transforms (scaling, rotation).
-/// Always returns t since Neomacs supports GPU-based transforms.
+/// Return nil if FRAME does not match an active frame designator in Neovm.
+/// (Compatibility layer keeps this conservative and follows official Emacs semantics
+/// observed for common callers.)
 pub(crate) fn builtin_image_transforms_p(args: Vec<Value>) -> EvalResult {
     expect_max_args("image-transforms-p", &args, 1)?;
-    Ok(Value::True)
+    if let Some(frame_or_display) = args.first() {
+        expect_frame_designator("image-transforms-p", frame_or_display)?;
+    }
+    Ok(Value::Nil)
 }
 
 // ---------------------------------------------------------------------------
@@ -1181,14 +1197,26 @@ mod tests {
     fn image_transforms_p_returns_t() {
         let result = builtin_image_transforms_p(vec![]);
         assert!(result.is_ok());
-        assert!(result.unwrap().is_truthy());
+        assert!(result.unwrap().is_nil());
     }
 
     #[test]
     fn image_transforms_p_with_frame() {
         let result = builtin_image_transforms_p(vec![Value::Nil]);
         assert!(result.is_ok());
-        assert!(result.unwrap().is_truthy());
+        assert!(result.unwrap().is_nil());
+    }
+
+    #[test]
+    fn image_transforms_p_with_non_integer_or_small_frame() {
+        let result = builtin_image_transforms_p(vec![Value::Int(1)]);
+        assert!(matches!(
+            result,
+            Err(Flow::Signal(sig))
+                if sig.symbol == "wrong-type-argument"
+                    && sig.data
+                        == vec![Value::symbol("frame-live-p"), Value::Int(1)]
+        ));
     }
 
     #[test]
