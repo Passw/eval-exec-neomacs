@@ -1093,12 +1093,12 @@ pub(crate) fn builtin_yes_or_no_p(
 }
 
 // ---------------------------------------------------------------------------
-// 17. read-char (stub)
+// 17. read-char
 // ---------------------------------------------------------------------------
 
 /// `(read-char &optional PROMPT ...)`
 ///
-/// Batch stub: returns nil (no input available).
+/// Batch-mode: returns next unread character codepoint when available, otherwise nil.
 pub(crate) fn builtin_read_char(
     eval: &mut super::eval::Evaluator,
     args: Vec<Value>,
@@ -1148,12 +1148,12 @@ pub(crate) fn builtin_read_key(
 }
 
 // ---------------------------------------------------------------------------
-// 18. read-key-sequence (stub)
+// 18. read-key-sequence
 // ---------------------------------------------------------------------------
 
 /// `(read-key-sequence PROMPT)`
 ///
-/// Stub: returns empty vector.
+/// Batch-mode: consume one queued event and return it, or return empty string.
 pub(crate) fn builtin_read_key_sequence(
     eval: &mut super::eval::Evaluator,
     args: Vec<Value>,
@@ -1174,7 +1174,7 @@ pub(crate) fn builtin_read_key_sequence(
 
 /// `(read-key-sequence-vector PROMPT)`
 ///
-/// Batch stub: returns next `unread-command-events` event as a single-element
+/// Batch mode: returns next `unread-command-events` event as a single-element
 /// vector when present, otherwise an empty vector.
 pub(crate) fn builtin_read_key_sequence_vector(
     eval: &mut super::eval::Evaluator,
