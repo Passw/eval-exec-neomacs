@@ -255,6 +255,50 @@ fn expect_fixnum_like(value: &Value) -> Result<i64, Flow> {
     }
 }
 
+fn parse_time_unit_factor(unit: &str) -> Option<f64> {
+    let unit = unit.to_ascii_lowercase();
+    match unit.as_str() {
+        // Short and canonical singular/plural forms.
+        "sec" | "secs" | "second" | "seconds" | "s" => Some(1.0),
+        "min" | "mins" | "minute" | "minutes" | "m" => Some(60.0),
+        "hour" | "hours" | "h" | "hr" | "hrs" => Some(3600.0),
+        "day" | "days" | "d" => Some(86_400.0),
+        "week" | "weeks" | "w" => Some(604_800.0),
+        // Full-word forms accepted by Emacs for no-space variants.
+        "month" | "months" => Some(2_592_000.0),
+        "year" | "years" => Some(31_104_000.0),
+        "fortnight" | "fortnights" => Some(1_209_600.0),
+        _ => None,
+    }
+}
+
+fn parse_concatenated_time_delay_spec(spec: &str) -> Option<f64> {
+    let mut split = 0;
+    for (idx, ch) in spec.char_indices() {
+        if ch.is_ascii_digit() || ch == '.' {
+            split = idx + ch.len_utf8();
+            continue;
+        }
+        split = idx;
+        break;
+    }
+
+    if split == 0 || split >= spec.len() {
+        return None;
+    }
+
+    let (number_part, unit_part) = spec.split_at(split);
+    if unit_part.is_empty() {
+        return None;
+    }
+
+    if let Ok(delay) = number_part.parse::<f64>() {
+        return parse_time_unit_factor(unit_part).map(|multiplier| delay * multiplier);
+    }
+
+    None
+}
+
 fn parse_run_at_time_delay(value: &Value) -> Result<f64, Flow> {
     match value {
         Value::Nil => Ok(0.0),
@@ -272,22 +316,22 @@ fn parse_run_at_time_delay(value: &Value) -> Result<f64, Flow> {
                 return Ok(delay);
             }
 
+            if let Some(delay) = parse_concatenated_time_delay_spec(spec) {
+                return Ok(delay);
+            }
+
             let tokens: Vec<&str> = spec.split_whitespace().collect();
-            if tokens.len() >= 2 {
+            if tokens.len() == 2 {
                 if let Ok(delay) = tokens[0].parse::<f64>() {
-                    let unit = tokens[1].to_ascii_lowercase();
-                    let factor = match unit.as_str() {
-                        "sec" | "secs" | "second" | "seconds" | "s" => Some(1.0),
-                        "min" | "mins" | "minute" | "minutes" | "m" => Some(60.0),
-                        "hr" | "hrs" | "hour" | "hours" | "h" => Some(3600.0),
-                        "day" | "days" | "d" => Some(86_400.0),
-                        "week" | "weeks" | "w" => Some(604_800.0),
-                        _ => None,
-                    };
+                    let factor = parse_time_unit_factor(tokens[1]);
                     if let Some(multiplier) = factor {
                         return Ok(delay * multiplier);
                     }
-                    return Ok(delay);
+
+                    return Err(signal(
+                        "error",
+                        vec![Value::string("Invalid time specification")],
+                    ));
                 }
             }
 
@@ -876,10 +920,18 @@ mod tests {
             parse_run_at_time_delay(&Value::string("1 week")).expect("1 week should parse"),
             604_800.0
         );
-        assert!(matches!(
+        assert_eq!(
             parse_run_at_time_delay(&Value::string("4 fortnights"))
-                .expect("unknown units should fallback to numeric spec"),
-            4.0
+                .expect("4 fortnights should parse"),
+            4_838_400.0
+        );
+        assert_eq!(
+            parse_run_at_time_delay(&Value::string("4fortnight")).expect("4fortnight should parse"),
+            4_838_400.0
+        );
+        assert!(matches!(
+            parse_run_at_time_delay(&Value::string("4 foo")),
+            Err(_)
         ));
     }
 
