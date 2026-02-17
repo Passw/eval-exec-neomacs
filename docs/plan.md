@@ -156,6 +156,7 @@ Last updated: 2026-02-17
 - Keep newly landed `set-window-buffer` max-arity parity stable while expanding remaining window/buffer lifecycle drifts.
 - Keep newly landed window missing-buffer/designator parity slice stable while expanding remaining window lifecycle/helper drifts.
 - Keep window stale-reference behavior lock-in stable after `kill-buffer` now rewires dead windows and evaluator printing for buffer ids is now name-aware in nested forms.
+- Keep `display-tty-x-helper` edge-lock-ins aligned with oracle for `x-open-connection`/`x-close-connection` type errors and nil/`1` paths.
 
 ## Next
 1. Completed: added `read-char` non-character numeric-edge lock-in (`1.0`) for queue-tail truncation parity.
