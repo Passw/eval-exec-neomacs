@@ -78,6 +78,10 @@ Last updated: 2026-02-17
   - Added `move-point-visually` and `invisible-p` edge-case behavior.
   - Added lock-ins in `cases/xdisp-stub-edges-semantics`.
   - Verified with `make -C test/neovm/vm-compat check-one-neovm CASE=cases/xdisp-stub-edges-semantics` and full `check-all-neovm`.
+- Completed display-tty helper edge slice:
+  - Added oracle lock-ins for additional `x-open-connection` and `x-close-connection` arity edges.
+  - Updated `cases/display-tty-x-helper-semantics.{forms,expected.tsv}` with extra queue/arity guards.
+  - Re-recorded expected output from the pinned Oracle at `/nix/store/hql3zwz5b4ywd2qwx8jssp4dyb7nx4cb-emacs-30.2/bin/emacs` and validated with `check-one-neovm`.
 - Completed thread concurrency slice:
   - Extended `cases/thread-join-error-paths` with current-thread and non-canonical thread-handle errors.
   - Verified with `make -C test/neovm/vm-compat check-one-neovm CASE=cases/thread-join-error-paths`.
