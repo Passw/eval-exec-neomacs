@@ -1613,8 +1613,8 @@ pub(crate) fn builtin_face_list(args: Vec<Value>) -> EvalResult {
     ))
 }
 
-/// `(color-defined-p COLOR &optional FRAME)` -- stub, return t (assume all
-/// color names are supported).
+/// `(color-defined-p COLOR &optional FRAME)` -- nil if unknown; otherwise truthy
+/// for known RGB/hex and supported terminal color names.
 pub(crate) fn builtin_color_defined_p(args: Vec<Value>) -> EvalResult {
     expect_min_args("color-defined-p", &args, 1)?;
     expect_max_args("color-defined-p", &args, 2)?;
