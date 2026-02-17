@@ -3,7 +3,7 @@
 //! Pure builtins:
 //! - `string-match`, `string-match-p`, `regexp-quote`
 //! - `match-beginning`, `match-end`, `match-data`, `set-match-data`
-//! - `looking-at` (stub), `replace-regexp-in-string`
+//! - `looking-at`, `looking-at-p`, `replace-regexp-in-string`
 //!
 //! Eval-dependent builtins:
 //! - `search-forward`, `search-backward`
