@@ -199,6 +199,7 @@ Last updated: 2026-02-17
 - Keep newly landed `next-window` / `previous-window` max-arity parity stable while expanding remaining window lifecycle/helper drifts.
 - Keep newly landed frame-op max-arity parity stable while expanding remaining window/frame lifecycle/helper drifts.
 - Keep newly landed `set-window-buffer` max-arity parity stable while expanding remaining window/buffer lifecycle drifts.
+- Added documentation on editor/VM decoupling and the isolate-first concurrency model in `docs/elisp-vm-design.md` to clarify the Rust-side architecture and message-passing patterns.
 - Keep newly landed window missing-buffer/designator parity slice stable while expanding remaining window lifecycle/helper drifts.
 - Keep window stale-reference behavior lock-in stable after `kill-buffer` now rewires dead windows and evaluator printing for buffer ids is now name-aware in nested forms.
 - Completed stale-window object parity slice:
