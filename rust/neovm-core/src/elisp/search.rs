@@ -769,6 +769,20 @@ mod tests {
     }
 
     #[test]
+    fn looking_at_with_text_case_fold_default() {
+        let result =
+            builtin_looking_at(vec![Value::string("foo"), Value::string("FOO BAR")]);
+        assert_true(result.unwrap());
+    }
+
+    #[test]
+    fn looking_at_with_text_requires_start_position() {
+        let result =
+            builtin_looking_at(vec![Value::string("foo"), Value::string("bar foo")]);
+        assert_nil(result.unwrap());
+    }
+
+    #[test]
     fn looking_at_with_text_no_match() {
         let result =
             builtin_looking_at(vec![Value::string("foo"), Value::string("bar")]);
