@@ -688,6 +688,18 @@ mod tests {
     }
 
     #[test]
+    fn looking_at_with_limit_limit_nil() {
+        let result = builtin_looking_at(vec![Value::string("foo"), Value::Nil]);
+        assert_nil(result.unwrap());
+    }
+
+    #[test]
+    fn looking_at_with_limit_marker_like_char() {
+        let result = builtin_looking_at(vec![Value::string("foo"), Value::Char('a')]);
+        assert_nil(result.unwrap());
+    }
+
+    #[test]
     fn replace_regexp_basic() {
         let result = builtin_replace_regexp_in_string(vec![
             Value::string("[0-9]+"),
