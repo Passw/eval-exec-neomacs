@@ -366,6 +366,7 @@ cases/font-object-semantics
 cases/font-face-helper-semantics
 cases/image-font-subr-arity-semantics
 cases/face-batch-semantics
+cases/font-face-batch-semantics
 cases/face-id-semantics
 cases/face-font-semantics
 cases/internal-set-font-selection-order-semantics
