@@ -549,13 +549,14 @@ pub(crate) fn builtin_encode_char(args: Vec<Value>) -> EvalResult {
     Ok(encoded.map_or(Value::Nil, Value::Int))
 }
 
-/// `(clear-charset-maps)` -- stub, return nil.
+/// `(clear-charset-maps)` -- clear charset-related caches (currently no cache
+/// state is stored) and return nil.
 pub(crate) fn builtin_clear_charset_maps(args: Vec<Value>) -> EvalResult {
     expect_max_args("clear-charset-maps", &args, 0)?;
     Ok(Value::Nil)
 }
 
-/// `(charset-after &optional POS)` -- stub, return 'unicode.
+/// `(charset-after &optional POS)` -- currently returns 'unicode for compatibility.
 pub(crate) fn builtin_charset_after(args: Vec<Value>) -> EvalResult {
     expect_max_args("charset-after", &args, 1)?;
     Ok(Value::symbol("unicode"))
@@ -601,7 +602,11 @@ pub(crate) fn builtin_charset_after_eval(
         "eight-bit"
     } else if (UNIBYTE_BYTE_SENTINEL_MIN..=UNIBYTE_BYTE_SENTINEL_MAX).contains(&cp) {
         let byte = cp - UNIBYTE_BYTE_SENTINEL_MIN;
-        if byte <= 0x7F { "ascii" } else { "eight-bit" }
+        if byte <= 0x7F {
+            "ascii"
+        } else {
+            "eight-bit"
+        }
     } else if cp <= 0x7F {
         "ascii"
     } else if cp <= 0xFFFF {
@@ -825,7 +830,10 @@ mod tests {
                 assert_eq!(sig.symbol, "wrong-type-argument");
                 assert_eq!(
                     sig.data,
-                    vec![Value::symbol("charsetp"), Value::symbol("vm-no-such-charset")]
+                    vec![
+                        Value::symbol("charsetp"),
+                        Value::symbol("vm-no-such-charset")
+                    ]
                 );
             }
             other => panic!("expected wrong-type-argument signal, got {other:?}"),
@@ -1052,9 +1060,8 @@ mod tests {
             .expect("find-charset-region bmp");
         assert_eq!(bmp, Value::list(vec![Value::symbol("unicode-bmp")]));
 
-        let empty =
-            builtin_find_charset_region_eval(&mut eval, vec![Value::Int(4), Value::Int(4)])
-                .expect("find-charset-region empty");
+        let empty = builtin_find_charset_region_eval(&mut eval, vec![Value::Int(4), Value::Int(4)])
+            .expect("find-charset-region empty");
         assert_eq!(empty, Value::list(vec![Value::symbol("ascii")]));
     }
 
@@ -1068,10 +1075,14 @@ mod tests {
                 .expect("current buffer must exist");
             buf.insert("abc");
         }
-        assert!(builtin_find_charset_region_eval(&mut eval, vec![Value::Int(0), Value::Int(2)])
-            .is_err());
-        assert!(builtin_find_charset_region_eval(&mut eval, vec![Value::Int(1), Value::Int(5)])
-            .is_err());
+        assert!(
+            builtin_find_charset_region_eval(&mut eval, vec![Value::Int(0), Value::Int(2)])
+                .is_err()
+        );
+        assert!(
+            builtin_find_charset_region_eval(&mut eval, vec![Value::Int(1), Value::Int(5)])
+                .is_err()
+        );
     }
 
     // -----------------------------------------------------------------------
@@ -1269,7 +1280,8 @@ mod tests {
 
     #[test]
     fn encode_char_eight_bit_raw_byte_maps_back_to_byte() {
-        let r = builtin_encode_char(vec![Value::Int(0x3FFFFF), Value::symbol("eight-bit")]).unwrap();
+        let r =
+            builtin_encode_char(vec![Value::Int(0x3FFFFF), Value::symbol("eight-bit")]).unwrap();
         assert!(matches!(r, Value::Int(255)));
     }
 
@@ -1311,7 +1323,7 @@ mod tests {
     // -----------------------------------------------------------------------
 
     #[test]
-    fn clear_charset_maps_stub() {
+    fn clear_charset_maps_returns_nil() {
         let r = builtin_clear_charset_maps(vec![]).unwrap();
         assert!(r.is_nil());
     }
@@ -1326,7 +1338,7 @@ mod tests {
     // -----------------------------------------------------------------------
 
     #[test]
-    fn charset_after_no_arg() {
+    fn charset_after_default_returns_unicode() {
         let r = builtin_charset_after(vec![]).unwrap();
         assert!(matches!(r, Value::Symbol(s) if s == "unicode"));
     }

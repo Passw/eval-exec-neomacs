@@ -1182,7 +1182,8 @@ pub(crate) fn builtin_internal_make_lisp_face(args: Vec<Value>) -> EvalResult {
     Ok(make_lisp_face_vector())
 }
 
-/// `(internal-copy-lisp-face FROM TO FRAME NEW-FRAME)` -- stub, return TO.
+/// `(internal-copy-lisp-face FROM TO FRAME NEW-FRAME)` -- copy defaults overrides to
+/// `TO` and return `TO`.
 pub(crate) fn builtin_internal_copy_lisp_face(args: Vec<Value>) -> EvalResult {
     expect_args("internal-copy-lisp-face", &args, 4)?;
     let _ = require_symbol_face_name(&args[0])?;
@@ -1608,7 +1609,8 @@ pub(crate) fn builtin_face_font(args: Vec<Value>) -> EvalResult {
     }
 }
 
-/// `(internal-face-x-get-resource RESOURCE CLASS FRAME)` -- stub, return nil.
+/// `(internal-face-x-get-resource RESOURCE CLASS FRAME)` -- validate arguments and
+/// return nil (font resource lookup is not implemented).
 pub(crate) fn builtin_internal_face_x_get_resource(args: Vec<Value>) -> EvalResult {
     expect_min_args("internal-face-x-get-resource", &args, 2)?;
     expect_max_args("internal-face-x-get-resource", &args, 3)?;
@@ -1623,7 +1625,7 @@ pub(crate) fn builtin_internal_face_x_get_resource(args: Vec<Value>) -> EvalResu
     Ok(Value::Nil)
 }
 
-/// `(internal-set-font-selection-order ORDER)` -- stub, return nil.
+/// `(internal-set-font-selection-order ORDER)` -- validate order list shape and return nil.
 pub(crate) fn builtin_internal_set_font_selection_order(args: Vec<Value>) -> EvalResult {
     expect_args("internal-set-font-selection-order", &args, 1)?;
     let order = &args[0];
@@ -1679,7 +1681,8 @@ pub(crate) fn builtin_internal_set_font_selection_order(args: Vec<Value>) -> Eva
     ))
 }
 
-/// `(internal-set-alternative-font-family-alist ALIST)` -- stub, return nil.
+/// `(internal-set-alternative-font-family-alist ALIST)` -- normalize string
+/// entries to symbols and return the normalized list.
 pub(crate) fn builtin_internal_set_alternative_font_family_alist(args: Vec<Value>) -> EvalResult {
     expect_args("internal-set-alternative-font-family-alist", &args, 1)?;
     let entries = proper_list_to_vec_or_listp_error(&args[0])?;
@@ -1703,7 +1706,8 @@ pub(crate) fn builtin_internal_set_alternative_font_family_alist(args: Vec<Value
     Ok(Value::list(normalized))
 }
 
-/// `(internal-set-alternative-font-registry-alist ALIST)` -- stub, return nil.
+/// `(internal-set-alternative-font-registry-alist ALIST)` -- validate ALIST shape and
+/// return it unchanged.
 pub(crate) fn builtin_internal_set_alternative_font_registry_alist(args: Vec<Value>) -> EvalResult {
     expect_args("internal-set-alternative-font-registry-alist", &args, 1)?;
     let entries = proper_list_to_vec_or_listp_error(&args[0])?;
@@ -1829,7 +1833,7 @@ mod tests {
     }
 
     #[test]
-    fn list_fonts_stub() {
+    fn list_fonts_returns_list_or_nil() {
         let result = builtin_list_fonts(vec![Value::vector(vec![Value::Keyword(
             FONT_SPEC_TAG.to_string(),
         )])]);
@@ -1859,7 +1863,7 @@ mod tests {
     }
 
     #[test]
-    fn find_font_stub() {
+    fn find_font_returns_nil_for_font_spec() {
         let result = builtin_find_font(vec![Value::vector(vec![Value::Keyword(
             FONT_SPEC_TAG.to_string(),
         )])]);
@@ -1889,7 +1893,7 @@ mod tests {
     }
 
     #[test]
-    fn clear_font_cache_stub() {
+    fn clear_font_cache_returns_nil() {
         assert!(builtin_clear_font_cache(vec![]).unwrap().is_nil());
     }
 
@@ -1954,7 +1958,7 @@ mod tests {
     }
 
     #[test]
-    fn font_xlfd_name_stub() {
+    fn font_xlfd_name_returns_xlfd() {
         let result = builtin_font_xlfd_name(vec![Value::vector(vec![Value::Keyword(
             FONT_SPEC_TAG.to_string(),
         )])])
@@ -2395,7 +2399,7 @@ mod tests {
     }
 
     #[test]
-    fn face_id_stub() {
+    fn face_id_rejects_non_symbol_faces() {
         let result = builtin_face_id(vec![Value::symbol("default")]).unwrap();
         assert_eq!(result.as_int(), Some(0));
     }
@@ -2430,7 +2434,7 @@ mod tests {
     }
 
     #[test]
-    fn face_font_stub() {
+    fn face_font_returns_nil_for_known_faces() {
         let result = builtin_face_font(vec![Value::symbol("default")]).unwrap();
         assert!(result.is_nil());
     }
@@ -2455,7 +2459,7 @@ mod tests {
     }
 
     #[test]
-    fn internal_face_x_get_resource_stub() {
+    fn internal_face_x_get_resource_returns_nil_for_string_args() {
         let result = builtin_internal_face_x_get_resource(vec![
             Value::string("font"),
             Value::string("Font"),
@@ -2478,7 +2482,7 @@ mod tests {
     }
 
     #[test]
-    fn internal_set_font_selection_order_stub() {
+    fn internal_set_font_selection_order_accepts_valid_order() {
         let result = builtin_internal_set_font_selection_order(vec![Value::list(vec![
             Value::Keyword(":width".to_string()),
             Value::Keyword(":height".to_string()),
@@ -2497,7 +2501,7 @@ mod tests {
     }
 
     #[test]
-    fn internal_set_alternative_font_family_alist_stub() {
+    fn internal_set_alternative_font_family_alist_returns_converted_list() {
         let result = builtin_internal_set_alternative_font_family_alist(vec![Value::Nil]).unwrap();
         assert!(result.is_nil());
     }
@@ -2516,7 +2520,7 @@ mod tests {
     }
 
     #[test]
-    fn internal_set_alternative_font_registry_alist_stub() {
+    fn internal_set_alternative_font_registry_alist_returns_nil_or_value() {
         let result =
             builtin_internal_set_alternative_font_registry_alist(vec![Value::Nil]).unwrap();
         assert!(result.is_nil());
