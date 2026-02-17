@@ -16559,15 +16559,15 @@ Omitted keys keep their current values.  */)
   int se = 1, sl = 4, so = 2, sop = 30;
 
   Lisp_Object val;
-  val = Fplist_get (plist, QCcorner_radius, Qunbound);
+  val = Fplist_get (plist, QCcorner_radius, Qnil);
   if (FIXNUMP (val)) cr = (float) XFIXNUM (val);
-  val = Fplist_get (plist, QCshadow, Qunbound);
-  if (!EQ (val, Qunbound)) se = !NILP (val);
-  val = Fplist_get (plist, QCshadow_layers, Qunbound);
+  if (!NILP (Fplist_member (plist, QCshadow, Qnil)))
+    se = !NILP (Fplist_get (plist, QCshadow, Qnil));
+  val = Fplist_get (plist, QCshadow_layers, Qnil);
   if (FIXNUMP (val)) sl = XFIXNUM (val);
-  val = Fplist_get (plist, QCshadow_offset, Qunbound);
+  val = Fplist_get (plist, QCshadow_offset, Qnil);
   if (FIXNUMP (val)) so = XFIXNUM (val);
-  val = Fplist_get (plist, QCshadow_opacity, Qunbound);
+  val = Fplist_get (plist, QCshadow_opacity, Qnil);
   if (FIXNUMP (val)) sop = XFIXNUM (val);
 
   neomacs_display_set_child_frame_style (
