@@ -419,7 +419,8 @@ pub(crate) fn builtin_font_put(args: Vec<Value>) -> EvalResult {
     }
 }
 
-/// `(list-fonts FONT-SPEC &optional FRAME MAXNUM PREFER)` -- batch stub.
+/// `(list-fonts FONT-SPEC &optional FRAME MAXNUM PREFER)` -- returns nil in
+/// batch-compatible mode.
 pub(crate) fn builtin_list_fonts(args: Vec<Value>) -> EvalResult {
     expect_min_args("list-fonts", &args, 1)?;
     expect_max_args("list-fonts", &args, 4)?;
@@ -451,7 +452,8 @@ pub(crate) fn builtin_list_fonts_eval(
     Ok(Value::Nil)
 }
 
-/// `(find-font FONT-SPEC &optional FRAME)` -- batch stub.
+/// `(find-font FONT-SPEC &optional FRAME)` -- returns nil in
+/// batch-compatible mode.
 pub(crate) fn builtin_find_font(args: Vec<Value>) -> EvalResult {
     expect_min_args("find-font", &args, 1)?;
     expect_max_args("find-font", &args, 2)?;
@@ -490,7 +492,7 @@ pub(crate) fn builtin_clear_font_cache(args: Vec<Value>) -> EvalResult {
     Ok(Value::Nil)
 }
 
-/// `(font-family-list &optional FRAME)` -- batch stub.
+/// `(font-family-list &optional FRAME)` -- returns nil in batch-compatible mode.
 pub(crate) fn builtin_font_family_list(args: Vec<Value>) -> EvalResult {
     expect_max_args("font-family-list", &args, 1)?;
     if let Some(frame) = args.first() {
