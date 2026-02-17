@@ -9354,6 +9354,7 @@ pub(crate) fn builtin_looking_at(
 ) -> EvalResult {
     expect_range_args("looking-at", &args, 1, 2)?;
     let pattern = expect_string(&args[0])?;
+    let inhibit_modify = args.get(1).is_some_and(|arg| !arg.is_nil());
 
     let buf = eval
         .buffers
@@ -9363,7 +9364,14 @@ pub(crate) fn builtin_looking_at(
         .map(|v| !v.is_nil())
         .unwrap_or(true);
 
-    match super::regex::looking_at(buf, &pattern, case_fold, &mut eval.match_data) {
+    let result = if inhibit_modify {
+        let mut preserved_match_data = eval.match_data.clone();
+        super::regex::looking_at(buf, &pattern, case_fold, &mut preserved_match_data)
+    } else {
+        super::regex::looking_at(buf, &pattern, case_fold, &mut eval.match_data)
+    };
+
+    match result {
         Ok(matched) => Ok(Value::bool(matched)),
         Err(msg) => Err(signal("invalid-regexp", vec![Value::string(msg)])),
     }
@@ -10808,6 +10816,47 @@ mod tests {
         let mut eval = crate::elisp::eval::Evaluator::new();
         let result = builtin_set_match_data_eval(&mut eval, vec![Value::Int(1)]);
         assert!(result.is_err());
+    }
+
+    #[test]
+    fn looking_at_inhibit_modify_preserves_match_data() {
+        use crate::elisp::eval::Evaluator;
+
+        let mut eval = Evaluator::new();
+        {
+            let buffer = eval.buffers.current_buffer_mut().expect("scratch buffer");
+            buffer.insert("abc");
+            buffer.goto_char(0);
+        }
+
+        let baseline = Value::list(vec![Value::Int(10), Value::Int(11)]);
+        builtin_set_match_data_eval(&mut eval, vec![baseline.clone()])
+            .expect("setting baseline match-data");
+        let result = builtin_looking_at(&mut eval, vec![Value::string("a"), Value::True]);
+        assert!(result.is_ok());
+
+        let observed = builtin_match_data_eval(&mut eval, vec![]).expect("read match-data");
+        assert_eq!(observed, baseline);
+    }
+
+    #[test]
+    fn looking_at_updates_match_data_when_allowed() {
+        use crate::elisp::eval::Evaluator;
+
+        let mut eval = Evaluator::new();
+        {
+            let buffer = eval.buffers.current_buffer_mut().expect("scratch buffer");
+            buffer.insert("abc");
+            buffer.goto_char(0);
+        }
+
+        builtin_set_match_data_eval(&mut eval, vec![Value::Nil])
+            .expect("clear match-data");
+        let result = builtin_looking_at(&mut eval, vec![Value::string("a"), Value::Nil]);
+        assert!(result.is_ok());
+
+        let observed = builtin_match_data_eval(&mut eval, vec![]).expect("read match-data");
+        assert_eq!(observed, Value::list(vec![Value::Int(0), Value::Int(1)]));
     }
 
     #[test]
