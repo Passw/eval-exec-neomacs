@@ -6,7 +6,7 @@ Last updated: 2026-02-17
 
 1. [x] Add `thread-yield` behavior lock-in (`cases/thread-yield-semantics`) and baseline.
 2. [x] Add `thread-join` nil-handle argument error-path lock-in (`cases/thread-join-error-paths`).
-3. [ ] Re-gate `check-all-neovm` and keep `stub-budget` in `compat-progress` output.
+3. [x] Re-gate `check-all-neovm` and keep `stub-budget` in `compat-progress` output.
 4. [ ] Continue `xdisp`/display no-op surface audit with one behavior lock-in per commit.
 5. [ ] Expand thread concurrency matrix coverage for argument errors and join edge-cases.
 6. [ ] Land next `font`/`font-lock` behavior lock-in slice with oracle-backed `font-spec` checks.

@@ -147,12 +147,12 @@ jobs:
       - name: Run NeoVM compatibility corpus
         working-directory: test/neovm/vm-compat
         run: |
-          RUSTFLAGS='-Awarnings' make check-all-neovm
+          RUSTFLAGS='-Awarnings' make check-all-neovm-strict
 
-      - name: Enforce explicit stub budget
+      - name: Run compatibility progress snapshot
         working-directory: test/neovm/vm-compat
         run: |
-          make check-stub-budget
+          make compat-progress
 
       - name: Check builtin registry fboundp parity
         working-directory: test/neovm/vm-compat
