@@ -1025,6 +1025,10 @@ mod tests {
             parse_run_at_time_delay(&Value::string("2 hr")),
             Err(_)
         ));
+        assert!(matches!(parse_run_at_time_delay(&Value::string("+")), Err(_)));
+        assert!(matches!(parse_run_at_time_delay(&Value::string("-")), Err(_)));
+        assert!(matches!(parse_run_at_time_delay(&Value::string("+ 2")), Err(_)));
+        assert!(matches!(parse_run_at_time_delay(&Value::string("- 2")), Err(_)));
     }
 
     #[test]
