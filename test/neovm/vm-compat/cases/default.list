@@ -530,6 +530,7 @@ cases/assoc-default-make-list-semantics
 cases/cl-setops-semantics
 cases/member-assoc-semantics
 cases/alist-get-semantics
+cases/seq-alist-improper-semantics
 cases/plist-semantics
 cases/seq-misc
 cases/seq-uniq
