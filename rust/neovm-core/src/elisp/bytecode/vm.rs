@@ -855,7 +855,8 @@ impl<'a> Vm<'a> {
                 }
                 Ok(result)
             }
-            Value::Subr(name) | Value::Symbol(name) => {
+            Value::Subr(name) => self.dispatch_vm_builtin(&name, args),
+            Value::Symbol(name) => {
                 // Try obarray function cell
                 if let Some(func) = self.obarray.symbol_function(&name).cloned() {
                     return self.call_function(func, args);
@@ -880,6 +881,31 @@ impl<'a> Vm<'a> {
     fn dispatch_vm_builtin(&mut self, name: &str, args: Vec<Value>) -> EvalResult {
         // Handle special VM builtins
         match name {
+            "apply" => {
+                if args.len() < 2 {
+                    return Err(signal(
+                        "wrong-number-of-arguments",
+                        vec![Value::symbol("apply"), Value::Int(args.len() as i64)],
+                    ));
+                }
+                let func = args[0].clone();
+                let last = &args[args.len() - 1];
+                let mut call_args: Vec<Value> = args[1..args.len() - 1].to_vec();
+                let spread = match last {
+                    Value::Nil => Vec::new(),
+                    Value::Cons(_) => list_to_vec(last).ok_or_else(|| {
+                        signal("wrong-type-argument", vec![Value::symbol("listp"), last.clone()])
+                    })?,
+                    _ => {
+                        return Err(signal(
+                            "wrong-type-argument",
+                            vec![Value::symbol("listp"), last.clone()],
+                        ))
+                    }
+                };
+                call_args.extend(spread);
+                return self.call_function(func, call_args);
+            }
             "%%defvar" => {
                 // args: [init_value, symbol_name]
                 if args.len() >= 2 {
@@ -935,8 +961,22 @@ impl<'a> Vm<'a> {
         if let Some(result) = builtins::dispatch_builtin_pure(name, args.clone()) {
             return result;
         }
+        if let Some(result) = self.dispatch_vm_builtin_eval(name, args.clone()) {
+            return result;
+        }
 
         Err(signal("void-function", vec![Value::symbol(name)]))
+    }
+
+    /// Dispatch builtins that require evaluator context by running them
+    /// on a temporary evaluator mirrored from the VM's current obarray/env.
+    fn dispatch_vm_builtin_eval(&mut self, name: &str, args: Vec<Value>) -> Option<EvalResult> {
+        let mut eval = crate::elisp::eval::Evaluator::new();
+        eval.obarray = self.obarray.clone();
+        eval.dynamic = self.dynamic.clone();
+        eval.lexenv = self.lexenv.clone();
+        eval.features = self.features.clone();
+        builtins::dispatch_builtin(&mut eval, name, args)
     }
 }
 
