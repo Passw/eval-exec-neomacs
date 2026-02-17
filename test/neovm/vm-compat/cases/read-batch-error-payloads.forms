@@ -13,3 +13,8 @@
 (condition-case err (progn (setq unread-command-events '(97)) (read-from-minibuffer "")) (error (list (car err) unread-command-events)))
 (condition-case err (progn (setq unread-command-events '(97)) (read-passwd "")) (error (list (car err) unread-command-events)))
 (condition-case err (progn (setq unread-command-events '(97)) (completing-read "" '(("a") ("b")))) (error (list (car err) unread-command-events)))
+(condition-case err (progn (setq unread-command-events '((mouse-1))) (read-number "")) (error (list (car err) unread-command-events)))
+(condition-case err (progn (setq unread-command-events '((mouse-1))) (read-string "")) (error (list (car err) unread-command-events)))
+(condition-case err (progn (setq unread-command-events '((mouse-1))) (read-from-minibuffer "")) (error (list (car err) unread-command-events)))
+(condition-case err (progn (setq unread-command-events '((mouse-1))) (read-passwd "")) (error (list (car err) unread-command-events)))
+(condition-case err (progn (setq unread-command-events '((mouse-1))) (completing-read "" '(("a") ("b")))) (error (list (car err) unread-command-events)))
