@@ -5,6 +5,8 @@ script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 repo_root="$(cd "$script_dir/../../.." && pwd)"
 registry_file="$repo_root/rust/neovm-core/src/elisp/builtin_registry.rs"
 allowlist_file="$script_dir/cases/builtin-registry-fboundp-allowlist.txt"
+function_kind_allowlist_file="$script_dir/cases/builtin-registry-function-kind-allowlist.txt"
+function_kind_check_script="$script_dir/check-builtin-registry-function-kind.sh"
 source "$script_dir/lib/builtin-registry.sh"
 compat_stub_index_script="$script_dir/compat-stub-index.sh"
 
@@ -18,6 +20,11 @@ if [[ ! -f "$allowlist_file" ]]; then
   exit 2
 fi
 
+if [[ ! -f "$function_kind_allowlist_file" ]]; then
+  echo "missing function-kind allowlist file: $function_kind_allowlist_file" >&2
+  exit 2
+fi
+
 tmp_all="$(mktemp)"
 tmp_core="$(mktemp)"
 tmp_tracker="$(mktemp)"
@@ -25,6 +32,7 @@ tmp_forms_basenames="$(mktemp)"
 tmp_expected_basenames="$(mktemp)"
 tmp_expected_only="$(mktemp)"
 tmp_forms_only="$(mktemp)"
+tmp_function_kind_check="$(mktemp)"
 cleanup() {
   rm -f \
     "$tmp_all" \
@@ -33,7 +41,8 @@ cleanup() {
     "$tmp_forms_basenames" \
     "$tmp_expected_basenames" \
     "$tmp_expected_only" \
-    "$tmp_forms_only"
+    "$tmp_forms_only" \
+    "$tmp_function_kind_check"
 }
 trap cleanup EXIT
 
@@ -60,7 +69,11 @@ all_builtins="$(wc -l < "$tmp_all" | tr -d ' ')"
 core_builtins="$(wc -l < "$tmp_core" | tr -d ' ')"
 extension_builtins="$((all_builtins - core_builtins))"
 allowlisted="$(awk 'NF && $1 !~ /^#/ { count++ } END { print count+0 }' "$allowlist_file")"
+function_kind_allowlisted="$(awk 'NF && $1 !~ /^#/ { count++ } END { print count+0 }' "$function_kind_allowlist_file")"
 tracked_unique="$(sort -u "$tmp_tracker" | awk 'END { print NR+0 }')"
+
+SHOW_ALLOWLISTED_DRIFTS=1 "$function_kind_check_script" > "$tmp_function_kind_check"
+function_kind_drift="$(awk '/oracle\/neovm function-kind drifts:/ { print $4 }' "$tmp_function_kind_check" | head -n 1)"
 
 printf 'compat progress snapshot\n'
 printf 'case lists (entries):\n'
@@ -103,5 +116,7 @@ printf '  total dispatch entries: %s\n' "$all_builtins"
 printf '  core-compat entries: %s\n' "$core_builtins"
 printf '  neovm extension entries: %s\n' "$extension_builtins"
 printf '  allowed fboundp drifts: %s\n' "$allowlisted"
+printf '  function-kind allowlisted drifts: %s\n' "$function_kind_allowlisted"
+printf '  function-kind current drifts: %s\n' "${function_kind_drift:-0}"
 
 echo "done"
