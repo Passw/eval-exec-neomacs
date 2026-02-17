@@ -48,9 +48,17 @@ Last updated: 2026-02-17
   - Added `cases/read-invalid-event-dispatch-semantics` covering
     `read-char`, `read-char-exclusive`, `read-key`,
     `read-key-sequence`, `read-key-sequence-vector`, and `read-event`
-    queue-tail behavior on symbol-head input.
+  queue-tail behavior on symbol-head input.
   - Added case to `cases/default.list` and validated with Oracle +
     `check-neovm`.
+
+- Completed command-dispatch max-arity parity slice:
+  - Updated `rust/neovm-core/src/elisp/interactive.rs` so
+    `command-execute` now enforces max arity 4 and
+    `call-interactively` enforces max arity 3.
+  - Added evaluator unit tests for overflow argument rejection.
+  - Added `cases/command-dispatch-arity-overflow-semantics` and
+    validated against Oracle with `check-neovm`.
 
 - Completed input queue-edge lock-in slice for list-event tails and queue-empty behavior:
   - Added `cases/read-event-empty-queue-semantics`.
