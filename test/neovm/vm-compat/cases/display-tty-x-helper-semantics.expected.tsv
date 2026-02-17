@@ -58,5 +58,6 @@
 58	(condition-case err (error-message-string (x-close-connection "foo")) (error (error-message-string err)))	OK "Display foo can’t be opened"
 59	(condition-case err (x-open-connection 1) (error (car err)))	OK wrong-type-argument
 60	(condition-case err (x-open-connection nil) (error (car err)))	OK wrong-type-argument
-61	(condition-case err (x-close-connection 1) (error (car err)))	OK wrong-type-argument
-62	(condition-case err (x-close-connection nil) (error (error-message-string err)))	OK "X windows are not in use or not initialized"
+61	(condition-case err (x-open-connection) (error (car err)))	OK wrong-number-of-arguments
+62	(condition-case err (x-close-connection 1) (error (car err)))	OK wrong-type-argument
+63	(condition-case err (x-close-connection nil) (error (error-message-string err)))	OK "X windows are not in use or not initialized"
