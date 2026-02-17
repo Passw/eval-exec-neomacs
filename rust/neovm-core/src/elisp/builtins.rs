@@ -10757,6 +10757,28 @@ mod tests {
             builtin_looking_at(&mut eval, vec![Value::string("a"), Value::True]);
         assert!(looking_at_optional_second.is_ok());
 
+        let looking_at_over_arity = builtin_looking_at(
+            &mut eval,
+            vec![Value::string("a"), Value::Nil, Value::Nil],
+        );
+        assert!(matches!(
+            looking_at_over_arity,
+            Err(Flow::Signal(sig)) if sig.symbol == "wrong-number-of-arguments"
+        ));
+
+        let looking_at_p_over_arity =
+            builtin_looking_at_p(&mut eval, vec![Value::string("a"), Value::Nil]);
+        assert!(matches!(
+            looking_at_p_over_arity,
+            Err(Flow::Signal(sig)) if sig.symbol == "wrong-number-of-arguments"
+        ));
+
+        let looking_at_p_bad_type = builtin_looking_at_p(&mut eval, vec![Value::Int(1)]);
+        assert!(matches!(
+            looking_at_p_bad_type,
+            Err(Flow::Signal(sig)) if sig.symbol == "wrong-type-argument"
+        ));
+
         let match_string_over_arity = builtin_match_string(
             &mut eval,
             vec![Value::Int(0), Value::string("a"), Value::Nil],
@@ -10858,6 +10880,34 @@ mod tests {
 
         let observed = builtin_match_data_eval(&mut eval, vec![]).expect("read match-data");
         assert_eq!(observed, Value::list(vec![Value::Int(0), Value::Int(1)]));
+    }
+
+    #[test]
+    fn looking_at_p_respects_case_fold_search() {
+        use crate::elisp::eval::Evaluator;
+
+        let mut eval = Evaluator::new();
+        {
+            let buffer = eval.buffers.current_buffer_mut().expect("scratch buffer");
+            buffer.insert("A");
+            buffer.goto_char(0);
+        }
+
+        eval.set_variable("case-fold-search", Value::Nil);
+        let sensitive = builtin_looking_at(&mut eval, vec![Value::string("a"), Value::Nil])
+            .expect("looking-at with case-fold-search=nil");
+        let sensitive_p = builtin_looking_at_p(&mut eval, vec![Value::string("a")])
+            .expect("looking-at-p with case-fold-search=nil");
+        assert!(sensitive.is_nil());
+        assert!(sensitive_p.is_nil());
+
+        eval.set_variable("case-fold-search", Value::True);
+        let insensitive = builtin_looking_at(&mut eval, vec![Value::string("a"), Value::Nil])
+            .expect("looking-at with case-fold-search=t");
+        let insensitive_p = builtin_looking_at_p(&mut eval, vec![Value::string("a")])
+            .expect("looking-at-p with case-fold-search=t");
+        assert!(insensitive.is_truthy());
+        assert!(insensitive_p.is_truthy());
     }
 
     #[test]
