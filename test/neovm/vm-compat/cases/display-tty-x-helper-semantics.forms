@@ -69,3 +69,11 @@
 (condition-case err
     (error-message-string (x-close-connection "foo"))
   (error (error-message-string err)))
+
+(condition-case err (x-open-connection 1) (error (car err)))
+
+(condition-case err (x-open-connection nil) (error (car err)))
+
+(condition-case err (x-close-connection 1) (error (car err)))
+
+(condition-case err (x-close-connection nil) (error (error-message-string err)))
