@@ -757,9 +757,18 @@ impl Evaluator {
                 if super::autoload::is_autoload_value(&func) {
                     return self.apply_named_callable(name, args, Value::Subr(name.clone()), false);
                 }
-                return match self.apply(func, args) {
-                    Err(Flow::Signal(sig)) if sig.symbol == "invalid-function" => {
-                        Err(signal("invalid-function", vec![Value::symbol(name)]))
+                let function_is_callable = match &func {
+                    Value::Lambda(_) | Value::ByteCode(_) | Value::Macro(_) => true,
+                    Value::Subr(bound_name) => !super::subr_info::is_special_form(bound_name),
+                    _ => false,
+                };
+                return match self.apply(func.clone(), args) {
+                    Err(Flow::Signal(sig)) if sig.symbol == "invalid-function" && !function_is_callable => {
+                        if matches!(func, Value::Symbol(_)) {
+                            Err(Flow::Signal(sig))
+                        } else {
+                            Err(signal("invalid-function", vec![Value::symbol(name)]))
+                        }
                     }
                     other => other,
                 };

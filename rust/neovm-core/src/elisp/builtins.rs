@@ -1215,6 +1215,50 @@ pub(crate) fn builtin_assoc(args: Vec<Value>) -> EvalResult {
     }
 }
 
+pub(crate) fn builtin_assoc_eval(
+    eval: &mut super::eval::Evaluator,
+    args: Vec<Value>,
+) -> EvalResult {
+    expect_range_args("assoc", &args, 2, 3)?;
+    let key = &args[0];
+    let list = args[1].clone();
+    let test_fn = args.get(2).and_then(|value| {
+        if value.is_nil() {
+            None
+        } else {
+            Some(value.clone())
+        }
+    });
+    let mut cursor = list.clone();
+    loop {
+        match cursor {
+            Value::Nil => return Ok(Value::Nil),
+            Value::Cons(cell) => {
+                let pair = cell.lock().expect("poisoned");
+                if let Value::Cons(ref entry) = pair.car {
+                    let entry_pair = entry.lock().expect("poisoned");
+                    let matches = if let Some(test_fn) = &test_fn {
+                        eval.apply(test_fn.clone(), vec![key.clone(), entry_pair.car.clone()])?
+                            .is_truthy()
+                    } else {
+                        equal_value(key, &entry_pair.car, 0)
+                    };
+                    if matches {
+                        return Ok(pair.car.clone());
+                    }
+                }
+                cursor = pair.cdr.clone();
+            }
+            _ => {
+                return Err(signal(
+                    "wrong-type-argument",
+                    vec![Value::symbol("listp"), list],
+                ))
+            }
+        }
+    }
+}
+
 pub(crate) fn builtin_assq(args: Vec<Value>) -> EvalResult {
     expect_args("assq", &args, 2)?;
     let key = &args[0];
@@ -4070,6 +4114,55 @@ pub(crate) fn builtin_alist_get(args: Vec<Value>) -> EvalResult {
                         equal_value(key, &entry_pair.car, 0)
                     } else {
                         eq_value(key, &entry_pair.car)
+                    };
+                    if matches {
+                        return Ok(entry_pair.cdr.clone());
+                    }
+                }
+            }
+            _ => {
+                return Err(signal(
+                    "wrong-type-argument",
+                    vec![Value::symbol("listp"), args[1].clone()],
+                ))
+            }
+        }
+    }
+}
+
+pub(crate) fn builtin_alist_get_eval(
+    eval: &mut super::eval::Evaluator,
+    args: Vec<Value>,
+) -> EvalResult {
+    expect_min_args("alist-get", &args, 2)?;
+    let key = &args[0];
+    let default = args.get(2).cloned().unwrap_or(Value::Nil);
+    let _remove = args.get(3); // not used
+    let test_fn = args.get(4).and_then(|value| {
+        if value.is_nil() {
+            None
+        } else {
+            Some(value.clone())
+        }
+    });
+
+    let mut cursor = args[1].clone();
+    loop {
+        match cursor {
+            Value::Nil => return Ok(default),
+            Value::Cons(cell) => {
+                let pair = cell.lock().expect("poisoned");
+                let entry = pair.car.clone();
+                cursor = pair.cdr.clone();
+                drop(pair);
+
+                if let Value::Cons(entry_cell) = entry {
+                    let entry_pair = entry_cell.lock().expect("poisoned");
+                    let matches = if let Some(test_fn) = &test_fn {
+                        eval.apply(test_fn.clone(), vec![key.clone(), entry_pair.car.clone()])?
+                            .is_truthy()
+                    } else {
+                        equal_value(key, &entry_pair.car, 0)
                     };
                     if matches {
                         return Ok(entry_pair.cdr.clone());
@@ -8084,6 +8177,8 @@ pub(crate) fn dispatch_builtin(
         "seq-some" => return Some(super::cl_lib::builtin_seq_some(eval, args)),
         "seq-every-p" => return Some(super::cl_lib::builtin_seq_every_p(eval, args)),
         "seq-sort" => return Some(super::cl_lib::builtin_seq_sort(eval, args)),
+        "assoc" => return Some(builtin_assoc_eval(eval, args)),
+        "alist-get" => return Some(builtin_alist_get_eval(eval, args)),
         "json-parse-buffer" => return Some(super::json::builtin_json_parse_buffer(eval, args)),
         "json-insert" => return Some(super::json::builtin_json_insert(eval, args)),
 
@@ -8800,6 +8895,11 @@ pub(crate) fn dispatch_builtin(
 /// Dispatch to pure builtins that don't need evaluator access.
 /// Used by the bytecode VM.
 pub(crate) fn dispatch_builtin_pure(name: &str, args: Vec<Value>) -> Option<EvalResult> {
+    match name {
+        "assoc" | "alist-get" => return None,
+        _ => {}
+    }
+
     if let Ok(id) = name.parse::<PureBuiltinId>() {
         return Some(dispatch_builtin_id_pure(id, args));
     }
