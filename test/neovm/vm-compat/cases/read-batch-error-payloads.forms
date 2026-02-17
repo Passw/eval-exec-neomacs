@@ -42,3 +42,5 @@
 (condition-case err (progn (setq unread-command-events '((1 2))) (read-variable "var")) (error (list (car err) unread-command-events)))
 (condition-case err (progn (setq unread-command-events '(97 98)) (read-buffer "")) (error (list (car err) unread-command-events)))
 (condition-case err (progn (setq unread-command-events '([1 2])) (read-command "foo")) (error (list (car err) unread-command-events)))
+(condition-case err (progn (setq unread-command-events '(foo)) (read-directory-name "d")) (error (list (car err) unread-command-events)))
+(condition-case err (progn (setq unread-command-events '([1 2])) (read-file-name "f")) (error (list (car err) unread-command-events)))
