@@ -70,14 +70,15 @@ fn resolve_window_id_with_pred(
     arg: Option<&Value>,
     pred: &str,
 ) -> Result<(FrameId, WindowId), Flow> {
-    let frame_id = ensure_selected_frame_id(eval);
-    let frame = eval
-        .frames
-        .get(frame_id)
-        .ok_or_else(|| signal("error", vec![Value::string("No selected frame")]))?;
-
     match arg {
-        None | Some(Value::Nil) => Ok((frame_id, frame.selected_window)),
+        None | Some(Value::Nil) => {
+            let frame_id = ensure_selected_frame_id(eval);
+            let frame = eval
+                .frames
+                .get(frame_id)
+                .ok_or_else(|| signal("error", vec![Value::string("No selected frame")]))?;
+            Ok((frame_id, frame.selected_window))
+        }
         Some(val) => {
             let wid = match val {
                 Value::Int(n) => WindowId(*n as u64),
@@ -88,7 +89,7 @@ fn resolve_window_id_with_pred(
                     ))
                 }
             };
-            if frame.find_window(wid).is_some() {
+            if let Some(frame_id) = eval.frames.find_window_frame_id(wid) {
                 Ok((frame_id, wid))
             } else {
                 Err(signal(
@@ -251,11 +252,36 @@ pub(crate) fn builtin_window_buffer(
     args: Vec<Value>,
 ) -> EvalResult {
     expect_max_args("window-buffer", &args, 1)?;
-    let (fid, wid) = resolve_window_id_with_pred(eval, args.first(), "windowp")?;
-    let w = get_leaf(&eval.frames, fid, wid)?;
-    match w.buffer_id() {
-        Some(bid) => Ok(Value::Buffer(bid)),
-        None => Ok(Value::Nil),
+    let resolve_buffer = |frames: &FrameManager, fid: FrameId, wid: WindowId| -> EvalResult {
+        let w = get_leaf(frames, fid, wid)?;
+        match w.buffer_id() {
+            Some(bid) => Ok(Value::Buffer(bid)),
+            None => Ok(Value::Nil),
+        }
+    };
+
+    match args.first() {
+        None | Some(Value::Nil) => {
+            let (fid, wid) = resolve_window_id_with_pred(eval, args.first(), "windowp")?;
+            resolve_buffer(&eval.frames, fid, wid)
+        }
+        Some(Value::Int(n)) => {
+            let wid = WindowId(*n as u64);
+            if let Some(fid) = eval.frames.find_window_frame_id(wid) {
+                return resolve_buffer(&eval.frames, fid, wid);
+            }
+            if eval.frames.is_window_object_id(wid) {
+                return Ok(Value::Nil);
+            }
+            Err(signal(
+                "wrong-type-argument",
+                vec![Value::symbol("windowp"), Value::Int(*n)],
+            ))
+        }
+        Some(other) => Err(signal(
+            "wrong-type-argument",
+            vec![Value::symbol("windowp"), other.clone()],
+        )),
     }
 }
 
@@ -636,11 +662,7 @@ pub(crate) fn builtin_windowp(eval: &mut super::eval::Evaluator, args: Vec<Value
         Some(n) => n as u64,
         None => return Ok(Value::Nil),
     };
-    let found = eval
-        .frames
-        .selected_frame()
-        .and_then(|f| f.find_window(WindowId(id)))
-        .is_some();
+    let found = eval.frames.is_window_object_id(WindowId(id));
     Ok(Value::bool(found))
 }
 
@@ -654,11 +676,7 @@ pub(crate) fn builtin_window_live_p(
         Some(n) => n as u64,
         None => return Ok(Value::Nil),
     };
-    let live = eval
-        .frames
-        .selected_frame()
-        .and_then(|f| f.find_window(WindowId(id)))
-        .map_or(false, |w| w.is_leaf());
+    let live = eval.frames.is_live_window_id(WindowId(id));
     Ok(Value::bool(live))
 }
 
@@ -1569,6 +1587,12 @@ mod tests {
     }
 
     #[test]
+    fn windowp_true_for_stale_deleted_window() {
+        let r = eval_one_with_frame("(let ((w (split-window))) (delete-window w) (windowp w))");
+        assert_eq!(r, "OK t");
+    }
+
+    #[test]
     fn windowp_false() {
         let r = eval_one_with_frame("(windowp 999999)");
         assert_eq!(r, "OK nil");
@@ -1590,6 +1614,13 @@ mod tests {
     fn window_buffer_returns_buffer() {
         let r = eval_one_with_frame("(bufferp (window-buffer))");
         assert_eq!(r, "OK t");
+    }
+
+    #[test]
+    fn window_buffer_returns_nil_for_stale_deleted_window() {
+        let r =
+            eval_one_with_frame("(let ((w (split-window))) (delete-window w) (window-buffer w))");
+        assert_eq!(r, "OK nil");
     }
 
     #[test]

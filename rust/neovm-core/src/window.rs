@@ -9,7 +9,7 @@
 
 use crate::buffer::BufferId;
 use crate::elisp::value::Value;
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 // ---------------------------------------------------------------------------
 // IDs
@@ -424,6 +424,7 @@ pub struct FrameManager {
     selected: Option<FrameId>,
     next_frame_id: u64,
     next_window_id: u64,
+    deleted_windows: HashSet<WindowId>,
 }
 
 impl FrameManager {
@@ -433,6 +434,7 @@ impl FrameManager {
             selected: None,
             next_frame_id: FRAME_ID_BASE,
             next_window_id: 1,
+            deleted_windows: HashSet::new(),
         }
     }
 
@@ -440,6 +442,7 @@ impl FrameManager {
     pub fn next_window_id(&mut self) -> WindowId {
         let id = WindowId(self.next_window_id);
         self.next_window_id += 1;
+        self.deleted_windows.remove(&id);
         id
     }
 
@@ -500,7 +503,10 @@ impl FrameManager {
 
     /// Delete a frame.
     pub fn delete_frame(&mut self, id: FrameId) -> bool {
-        if self.frames.remove(&id).is_some() {
+        if let Some(frame) = self.frames.remove(&id) {
+            for wid in frame.window_list() {
+                self.deleted_windows.insert(wid);
+            }
             if self.selected == Some(id) {
                 self.selected = self.frames.keys().next().copied();
             }
@@ -548,6 +554,9 @@ impl FrameManager {
         }
 
         let removed = delete_window_in_tree(&mut frame.root_window, window_id);
+        if removed {
+            self.deleted_windows.insert(window_id);
+        }
 
         if removed && frame.selected_window == window_id {
             // Select the first remaining leaf.
@@ -562,6 +571,7 @@ impl FrameManager {
     fn alloc_window_id(&mut self) -> WindowId {
         let id = WindowId(self.next_window_id);
         self.next_window_id += 1;
+        self.deleted_windows.remove(&id);
         id
     }
 
@@ -570,6 +580,29 @@ impl FrameManager {
         for frame in self.frames.values_mut() {
             frame.replace_buffer_bindings(old_id, new_id);
         }
+    }
+
+    /// Return the frame containing a live window ID, if any.
+    pub fn find_window_frame_id(&self, window_id: WindowId) -> Option<FrameId> {
+        self.frames.iter().find_map(|(frame_id, frame)| {
+            frame.find_window(window_id).and_then(|window| {
+                if window.is_leaf() {
+                    Some(*frame_id)
+                } else {
+                    None
+                }
+            })
+        })
+    }
+
+    /// Return true when WINDOW-ID designates a live window in any frame.
+    pub fn is_live_window_id(&self, window_id: WindowId) -> bool {
+        self.find_window_frame_id(window_id).is_some()
+    }
+
+    /// Return true when WINDOW-ID designates a live or stale window object.
+    pub fn is_window_object_id(&self, window_id: WindowId) -> bool {
+        self.is_live_window_id(window_id) || self.deleted_windows.contains(&window_id)
     }
 }
 
