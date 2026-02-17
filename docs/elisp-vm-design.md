@@ -135,6 +135,47 @@ Concurrency
   - Main editor isolate (semantic authority)
   - Worker isolates for async tasks (LSP/indexing/parsing)
   - Message passing between isolates
+
+## Decoupling the Editor from NeoVM
+
+Neomacs intentionally separates the editor storefront from the Elisp VM runtime. The C core remains the default backend but is registrable behind a `rust-backend` compile-time flag so the editor can fall back to GNU Emacs behavior while the Rust copies mature. The first-class surface for this split is `rust/neovm-host-abi`, which keeps the host/editor API idiomatic Rust (with `HostAbi`, `Affinity`, `EffectClass`, task snapshots/patches, and the scheduler hooks) while keeping `src/emacs` untouched until the runtime is stable. `Vm<H, S>` only depends on the host traits; editor-specific state (display, buffers, input queues, GTK/X11 handles, etc.) lives in the host implementation and communicates via safe RPC.
+
+Decoupling lets us treat editors as just another host. Every buffer/window/frame lives in the host; the VM only sees handles and dispatches requests through the ABI. The host still owns visual layout, asynchronous input, and windowing, but NeoVM can now run on other hosts (e.g., headless test harnesses or alternative GUIs) without dragging editor plumbing into the runtime.
+
+## Concurrency Model (Isolate-First)
+
+### Why isolate-first?
+
+Emacs-style dynamic binding, unlimited `catch`/`throw` unwinds, and Specpdl-backed handlers carry lots of transient, per-thread state. Global shared heaps make this extremely hard to reason about without extensive locking or performance pitfalls. NeoVM therefore opts for an isolate-first model similar to V8 or Deno: each thread owns a heap + stack, and shared state only flows through explicit message passing and host-managed handles.
+
+This is the version of “fearless concurrency” Rust enables us to build. Each isolate owns its own `Specpdl` stack, lexical frames, and feedback vectors. When workers need to coordinate—such as two buffers accessing the same variable—they send acquisition requests through a channel to the main isolate or use carefully constrained `Arc<Mutex<_>>` helpers with `RwLock`/`Mutex` APIs so `Send` and `Sync` invariants are upheld. Isolate-first means the runtime never mutates another isolate’s heap without coordination, eliminating a large class of race conditions.
+
+### Rust-powered fearless concurrency
+
+Rust ensures the compiler checks that only types with appropriate `Send`/`Sync` bounds cross threads. NeoVM leans on that; worker isolates are `!Send` (they are bound to scheduler threads), while shared data (the `HostAbi` command queue, cached `.neoc` files, editor metadata) is wrapped in `Arc<Mutex<_>>` or `Arc<RwLock<_>>` and accessed through well-defined APIs. We combine this with Go-style channel patterns in `neovm-worker`: bounded queues, `task_await`, cancellation tokens, and worker pool scheduling that keeps the UI responsive without busy waiting.
+
+We deliberately say “no Common Lisp shared-heap concurrency” unless the user opts into it. That model would require instrumenting every access to dynamic binding and the `Specpdl` stack, which is wherever `value`/`specpdl` entries live. The isolate-first path prevents that complexity while still allowing deterministic communication and message ordering.
+
+### Buffer-local and per-task concurrency
+
+Buffers or frames that run asynchronous operations delegate to worker isolates through the scheduler. Each worker can safely read immutable snapshots of buffer metadata, but mutable edits are serialized through the host’s command channel, which applies them on the main isolate. Specpdl frames governing dynamic bindings are kept per isolate, so nested `let`/`let*` forms executed by workers do not leak into the main thread. This pattern also opens the door to buffer-local concurrency: multiple tasks can process different buffer regions simultaneously as long as they never mutate the same spot without explicit locking on shared handles.
+
+### Shared variable access
+
+When multiple threads must coordinate on a single variable, NeoVM offers two patterns:
+
+- Host-backed locking: a host command `with-locked-variable` can be implemented using `Mutex<Rc<Cell<_>>>` (or `RwLock`) around the shared value, with the lock-granting and mutation performed within the host before returning control to the requesting isolate.
+- Message-based update: a worker sends a message to the owning isolate (often the main thread) describing the desired mutation. The owning isolate executes the `set`/`put` operation and sends back the new state. This matches Go’s goroutine+channel pattern where ownership can be passed through structured messages rather than mutable shared memory.
+
+In either case we avoid exposing raw global variables to arbitrary threads. The host is responsible for ensuring that only permitted operations run while the `Specpdl` stack remains consistent.
+
+### Specpdl explained
+
+`Specpdl` (special binding stack) tracks dynamic bindings, handlers registered via `condition-case`, and other context-sensitive frames. Each isolate keeps its own `Specpdl` so dynamic bindings (`let`, `setq` with special var, `add-hook` local binding, and `unwind-protect`) never race across threads. When an isolate yields or hands a task to another isolate, it serializes the necessary frame snapshots so the receiving isolate can preserve binding/handler invariants just as GNU Emacs does. That’s why dropping dynamic binding entirely is not compatible; we keep it, but the isolate-first model ensures it remains thread-local and safe.
+
+### What we gain by dropping `.elc` compatibility
+
+With `.elc` no longer a compatibility target, NeoVM only needs to prove `.el` source behavior. This lets us introduce a `.neoc` parse cache tailored for NeoVM’s feedback vectors and GC without reverse-engineering GNU bytecode encodings. We still support mutual portability via `check-neovm` and `make compat-progress`, but there’s no pressure to run the official bytecode loader or maintain binary compatibility with Emacs bytecode; the `.neoc` cache is strictly optional and versioned separately.
 ```
 
 ## Implementation Snapshot (February 13, 2026)
