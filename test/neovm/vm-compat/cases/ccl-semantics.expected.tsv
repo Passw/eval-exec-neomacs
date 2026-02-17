@@ -7,3 +7,5 @@
 7	(ccl-program-p [9 1 -1])	OK t
 8	(ccl-program-p [1 1.0 2])	OK nil
 9	(ccl-program-p [1 1 "a"])	OK nil
+10	(condition-case err (ccl-execute [1 2 3] 0) (error (car err)))	OK wrong-type-argument
+11	(condition-case err (ccl-execute-on-string [1 2 3] 0 "abc") (error (car err)))	OK wrong-type-argument
