@@ -12,6 +12,9 @@ Last updated: 2026-02-16
   - Aligned implementation with Oracle: batch-mode `y-or-n-p` and `yes-or-no-p` now return `end-of-file` without consuming `unread-command-events`.
   - Updated unit tests and added `input-batch-readers` oracle cases for queue behavior + nil prompt handling (`yes-or-no-p` rejects `nil`).
 - Added stale-tail input queue lock-in for `read-event` when a non-character event is consumed from `unread-command-events` in batch mode.
+- Added stale-tail queue lock-in for `read-key-sequence` and `read-key-sequence-vector`:
+  - Non-character head events are returned and numeric tails stay queued.
+  - Added oracle lock-in cases plus evaluator unit coverage in `reader.rs`.
 - Continue compatibility-first maintenance with small commit slices.
 - Keep builtin dispatch surface and registry in lock-step for `fboundp`/introspection parity.
 - Run targeted vm-compat checks after each behavior-affecting slice.

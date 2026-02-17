@@ -2473,6 +2473,25 @@ mod tests {
     }
 
     #[test]
+    fn read_key_sequence_consumes_non_character_event_and_preserves_tail() {
+        let mut ev = Evaluator::new();
+        let event = Value::symbol("foo");
+        ev.obarray
+            .set_symbol_value("unread-command-events", Value::list(vec![event.clone(), Value::Int(97)]));
+        let result = builtin_read_key_sequence(&mut ev, vec![Value::string("key: ")]).unwrap();
+        match result {
+            Value::Vector(v) => {
+                let items = v.lock().expect("poisoned");
+                assert_eq!(items.len(), 1);
+                assert_eq!(items[0], event);
+            }
+            other => panic!("expected vector event payload, got {other:?}"),
+        }
+        assert_eq!(ev.read_command_keys(), std::slice::from_ref(&event));
+        assert_eq!(ev.obarray.symbol_value("unread-command-events"), Some(&Value::list(vec![Value::Int(97)])));
+    }
+
+    #[test]
     fn read_key_sequence_accepts_nil_prompt() {
         let mut ev = Evaluator::new();
         ev.obarray
@@ -2550,6 +2569,25 @@ mod tests {
             other => panic!("expected vector event payload, got {other:?}"),
         }
         assert_eq!(ev.read_command_keys(), std::slice::from_ref(&event));
+    }
+
+    #[test]
+    fn read_key_sequence_vector_consumes_non_character_event_and_preserves_tail() {
+        let mut ev = Evaluator::new();
+        let event = Value::symbol("bar");
+        ev.obarray
+            .set_symbol_value("unread-command-events", Value::list(vec![event.clone(), Value::Int(97)]));
+        let result = builtin_read_key_sequence_vector(&mut ev, vec![Value::string("key: ")]).unwrap();
+        match result {
+            Value::Vector(v) => {
+                let items = v.lock().expect("poisoned");
+                assert_eq!(items.len(), 1);
+                assert_eq!(items[0], event);
+            }
+            other => panic!("expected vector, got {other:?}"),
+        }
+        assert_eq!(ev.read_command_keys(), std::slice::from_ref(&event));
+        assert_eq!(ev.obarray.symbol_value("unread-command-events"), Some(&Value::list(vec![Value::Int(97)])));
     }
 
     #[test]
