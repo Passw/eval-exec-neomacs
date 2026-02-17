@@ -86,6 +86,7 @@ cases/read-char-exclusive-non-character-tail-semantics
 cases/read-char-exclusive-symbol-tail-semantics
 cases/read-event-empty-queue-semantics
 cases/read-event-list-tail-semantics
+cases/read-invalid-event-dispatch-semantics
 cases/read-event-non-character-tail-semantics
 cases/read-event-vector-tail-semantics
 cases/read-event-vector-symbol-tail-semantics
