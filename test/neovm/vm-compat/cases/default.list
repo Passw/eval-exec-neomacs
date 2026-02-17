@@ -89,6 +89,7 @@ cases/read-key-sequence-non-character-tail-semantics
 cases/read-key-sequence-symbol-tail-semantics
 cases/read-key-sequence-vector-tail-semantics
 cases/read-key-sequence-vector-symbol-tail-semantics
+cases/read-key-sequence-vector-vector-tail-non-char-semantics
 cases/read-key-sequence-vector-non-character-tail-semantics
 cases/read-key-sequence-vector-vector-tail-semantics
 cases/read-region-helper-subr-arity-semantics

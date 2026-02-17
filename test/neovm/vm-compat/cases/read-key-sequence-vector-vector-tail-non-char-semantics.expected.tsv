@@ -1,0 +1,1 @@
+1	(let ((unread-command-events (list [foo] 97)) (out nil)) (progn (setq out (read-key-sequence-vector "")) (list out unread-command-events)))	OK ([[foo]] (97))
