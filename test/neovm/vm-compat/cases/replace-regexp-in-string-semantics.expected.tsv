@@ -7,5 +7,6 @@
 7	(condition-case err (replace-regexp-in-string "[a-" "x" "abc") (invalid-regexp (car err)))	OK invalid-regexp
 8	(condition-case err (replace-regexp-in-string 1 "x" "abc") (error err))	OK (wrong-type-argument stringp 1)
 9	(condition-case err (replace-regexp-in-string "\\([a-z]+\\)" "N" "aaa" nil nil 2 nil) (error (car err)))	OK error
-10	(replace-regexp-in-string "\\([a-z]+\\)-\\([0-9]+\\)" "N" "aaa-111 bbb-222" nil nil 1 nil)	OK "N-111 N-222"
-11	(condition-case err (replace-regexp-in-string "a") (wrong-number-of-arguments (car err)))	OK wrong-number-of-arguments
+10	(condition-case err (replace-regexp-in-string "\\(a\\)?b" "N" "b" nil nil 1 nil) (error (car err)))	OK error
+11	(replace-regexp-in-string "\\([a-z]+\\)-\\([0-9]+\\)" "N" "aaa-111 bbb-222" nil nil 1 nil)	OK "N-111 N-222"
+12	(condition-case err (replace-regexp-in-string "a") (wrong-number-of-arguments (car err)))	OK wrong-number-of-arguments

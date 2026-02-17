@@ -485,7 +485,13 @@ fn builtin_replace_regexp_in_string_with_case_fold(
             let src = g.as_str();
             (g.start(), g.end(), src)
         } else {
-            (full_match.end(), full_match.end(), "")
+            return Err(signal(
+                "error",
+                vec![
+                    Value::string("replace-match subexpression does not exist"),
+                    Value::Int(subexp),
+                ],
+            ));
         };
 
         out.push_str(&search_region[cursor..replace_start]);
@@ -809,6 +815,20 @@ mod tests {
             Value::Nil, // start
         ]);
         assert_str(result.unwrap(), "N-111 N-222");
+    }
+
+    #[test]
+    fn replace_regexp_subexp_unmatched_errors() {
+        let result = builtin_replace_regexp_in_string(vec![
+            Value::string("\\(a\\)?b"),
+            Value::string("N"),
+            Value::string("b"),
+            Value::Nil,
+            Value::Nil,
+            Value::Int(1),
+            Value::Nil,
+        ]);
+        assert!(result.is_err());
     }
 
     #[test]
