@@ -5,52 +5,53 @@
 5	(condition-case err (invisible-p 1 2) (error (car err)))	OK wrong-number-of-arguments
 6	(fboundp 'format-mode-line)	OK t
 7	(format-mode-line "fmt")	OK ""
-8	(condition-case err (format-mode-line "fmt" nil 'xwin) (error (car err)))	OK wrong-type-argument
-9	(condition-case err (format-mode-line "fmt" nil nil 'xbuf) (error (car err)))	OK wrong-type-argument
-10	(fboundp 'move-point-visually)	OK t
-11	(move-point-visually 1)	OK end-of-buffer
-12	(move-point-visually 0)	OK beginning-of-buffer
-13	(move-point-visually -1)	OK beginning-of-buffer
-14	(move-point-visually 'left)	ERR (wrong-type-argument (fixnump left))
-15	(condition-case err (move-point-visually) (error (car err)))	OK wrong-number-of-arguments
-16	(fboundp 'lookup-image-map)	OK t
-17	(lookup-image-map nil 1 2)	OK nil
-18	(lookup-image-map '(map) 10 20)	OK nil
-19	(condition-case err (lookup-image-map 1 2) (error (car err)))	OK wrong-number-of-arguments
-20	(fboundp 'current-bidi-paragraph-direction)	OK t
-21	(current-bidi-paragraph-direction)	OK left-to-right
-22	(current-bidi-paragraph-direction nil)	OK left-to-right
-23	(current-bidi-paragraph-direction (current-buffer))	OK left-to-right
-24	(condition-case err (current-bidi-paragraph-direction 1) (error err))	OK (wrong-type-argument bufferp 1)
-25	(condition-case err (current-bidi-paragraph-direction "x") (error err))	OK (wrong-type-argument bufferp "x")
-26	(condition-case err (current-bidi-paragraph-direction nil nil) (error (car err)))	OK wrong-number-of-arguments
-27	(fboundp 'move-to-window-line)	OK t
-28	(move-to-window-line 1)	OK 0
-29	(move-to-window-line nil)	OK 0
-30	(move-to-window-line 'x)	OK 0
-31	(condition-case err (move-to-window-line) (error (car err)))	OK wrong-number-of-arguments
-32	(fboundp 'tool-bar-height)	OK t
-33	(tool-bar-height)	OK 0
-34	(tool-bar-height nil)	OK 0
-35	(tool-bar-height nil t)	OK 0
-36	(tool-bar-height (selected-frame))	OK 0
-37	(condition-case err (tool-bar-height "x") (error err))	OK (wrong-type-argument framep "x")
-38	(condition-case err (tool-bar-height nil nil nil) (error (car err)))	OK wrong-number-of-arguments
-39	(condition-case err (tool-bar-height 1) (error err))	OK (wrong-type-argument framep 1)
-40	(condition-case err (tool-bar-height 1 t t) (error (car err)))	OK wrong-number-of-arguments
-41	(fboundp 'tab-bar-height)	OK t
-42	(tab-bar-height)	OK 0
-43	(tab-bar-height nil t)	OK 0
-44	(tab-bar-height (selected-frame))	OK 0
-45	(condition-case err (tab-bar-height "x") (error err))	OK (wrong-type-argument framep "x")
-46	(condition-case err (tab-bar-height nil nil nil) (error (car err)))	OK wrong-number-of-arguments
-47	(condition-case err (tab-bar-height 1) (error err))	OK (wrong-type-argument framep 1)
-48	(condition-case err (tab-bar-height 1 t t) (error (car err)))	OK wrong-number-of-arguments
-49	(fboundp 'line-number-display-width)	OK t
-50	(line-number-display-width)	OK 0
-51	(line-number-display-width t)	OK 0
-52	(line-number-display-width 'x)	OK 0
-53	(condition-case err (line-number-display-width nil nil) (error (car err)))	OK wrong-number-of-arguments
-54	(fboundp 'long-line-optimizations-p)	OK t
-55	(long-line-optimizations-p)	OK nil
-56	(condition-case err (long-line-optimizations-p 1) (error (car err)))	OK wrong-number-of-arguments
+8	(format-mode-line nil)	OK ""
+9	(condition-case err (format-mode-line "fmt" nil 'xwin) (error (car err)))	OK wrong-type-argument
+10	(condition-case err (format-mode-line "fmt" nil nil 'xbuf) (error (car err)))	OK wrong-type-argument
+11	(fboundp 'move-point-visually)	OK t
+12	(move-point-visually 1)	OK end-of-buffer
+13	(move-point-visually 0)	OK beginning-of-buffer
+14	(move-point-visually -1)	OK beginning-of-buffer
+15	(move-point-visually 'left)	ERR (wrong-type-argument (fixnump left))
+16	(condition-case err (move-point-visually) (error (car err)))	OK wrong-number-of-arguments
+17	(fboundp 'lookup-image-map)	OK t
+18	(lookup-image-map nil 1 2)	OK nil
+19	(lookup-image-map '(map) 10 20)	OK nil
+20	(condition-case err (lookup-image-map 1 2) (error (car err)))	OK wrong-number-of-arguments
+21	(fboundp 'current-bidi-paragraph-direction)	OK t
+22	(current-bidi-paragraph-direction)	OK left-to-right
+23	(current-bidi-paragraph-direction nil)	OK left-to-right
+24	(current-bidi-paragraph-direction (current-buffer))	OK left-to-right
+25	(condition-case err (current-bidi-paragraph-direction 1) (error err))	OK (wrong-type-argument bufferp 1)
+26	(condition-case err (current-bidi-paragraph-direction "x") (error err))	OK (wrong-type-argument bufferp "x")
+27	(condition-case err (current-bidi-paragraph-direction nil nil) (error (car err)))	OK wrong-number-of-arguments
+28	(fboundp 'move-to-window-line)	OK t
+29	(move-to-window-line 1)	OK 0
+30	(move-to-window-line nil)	OK 0
+31	(move-to-window-line 'x)	OK 0
+32	(condition-case err (move-to-window-line) (error (car err)))	OK wrong-number-of-arguments
+33	(fboundp 'tool-bar-height)	OK t
+34	(tool-bar-height)	OK 0
+35	(tool-bar-height nil)	OK 0
+36	(tool-bar-height nil t)	OK 0
+37	(tool-bar-height (selected-frame))	OK 0
+38	(condition-case err (tool-bar-height "x") (error err))	OK (wrong-type-argument framep "x")
+39	(condition-case err (tool-bar-height nil nil nil) (error (car err)))	OK wrong-number-of-arguments
+40	(condition-case err (tool-bar-height 1) (error err))	OK (wrong-type-argument framep 1)
+41	(condition-case err (tool-bar-height 1 t t) (error (car err)))	OK wrong-number-of-arguments
+42	(fboundp 'tab-bar-height)	OK t
+43	(tab-bar-height)	OK 0
+44	(tab-bar-height nil t)	OK 0
+45	(tab-bar-height (selected-frame))	OK 0
+46	(condition-case err (tab-bar-height "x") (error err))	OK (wrong-type-argument framep "x")
+47	(condition-case err (tab-bar-height nil nil nil) (error (car err)))	OK wrong-number-of-arguments
+48	(condition-case err (tab-bar-height 1) (error err))	OK (wrong-type-argument framep 1)
+49	(condition-case err (tab-bar-height 1 t t) (error (car err)))	OK wrong-number-of-arguments
+50	(fboundp 'line-number-display-width)	OK t
+51	(line-number-display-width)	OK 0
+52	(line-number-display-width t)	OK 0
+53	(line-number-display-width 'x)	OK 0
+54	(condition-case err (line-number-display-width nil nil) (error (car err)))	OK wrong-number-of-arguments
+55	(fboundp 'long-line-optimizations-p)	OK t
+56	(long-line-optimizations-p)	OK nil
+57	(condition-case err (long-line-optimizations-p 1) (error (car err)))	OK wrong-number-of-arguments

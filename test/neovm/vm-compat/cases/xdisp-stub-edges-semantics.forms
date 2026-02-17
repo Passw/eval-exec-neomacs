@@ -6,6 +6,7 @@
 
 (fboundp 'format-mode-line)
 (format-mode-line "fmt")
+(format-mode-line nil)
 (condition-case err (format-mode-line "fmt" nil 'xwin) (error (car err)))
 (condition-case err (format-mode-line "fmt" nil nil 'xbuf) (error (car err)))
 
