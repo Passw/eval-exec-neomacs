@@ -52,29 +52,30 @@
 52	(condition-case err (progn (setq unread-command-events (list 97 98)) (read-key nil)) (error (car err)))	OK 97
 53	(condition-case err (progn (setq unread-command-events (list '(mouse-1))) (read-key nil)) (error (car err)))	OK (mouse-1)
 54	(condition-case err (progn (setq unread-command-events (list 'foo)) (read-key nil)) (error (car err)))	OK foo
-55	(condition-case err (progn (setq unread-command-events (list 97)) (read-key "" 123)) (error (car err)))	OK 97
-56	(condition-case err (progn (setq unread-command-events (list 97)) (read-key "" nil 123)) (error (car err)))	OK wrong-number-of-arguments
-57	(condition-case err (progn (setq unread-command-events (list 97)) (read-key-sequence "")) (error (car err)))	OK "a"
-58	(condition-case err (progn (setq unread-command-events (list 97 98)) (read-key-sequence "")) (error (car err)))	OK "a"
-59	(condition-case err (progn (setq unread-command-events (list 'foo 97)) (cons (read-key-sequence "") unread-command-events)) (error (list (car err) unread-command-events)))	OK ([foo] 97)
-60	(condition-case err (progn (setq unread-command-events (list '(mouse-1))) (read-key-sequence "")) (error (car err)))	OK [(mouse-1)]
-61	(condition-case err (progn (setq unread-command-events (list 'foo)) (read-key-sequence "")) (error (car err)))	OK [foo]
-62	(condition-case err (progn (setq unread-command-events (list 97)) (read-key-sequence nil)) (error (car err)))	OK "a"
-63	(condition-case err (progn (setq unread-command-events (list 97)) (read-event)) (error (car err)))	OK 97
-64	(condition-case err (progn (setq unread-command-events (list 97)) (read-char-exclusive)) (error (car err)))	OK 97
-65	(condition-case err (progn (setq unread-command-events (list 97)) (read-key-sequence-vector "")) (error (car err)))	OK [97]
-66	(condition-case err (progn (setq unread-command-events (list 97 98)) (read-key-sequence-vector "")) (error (car err)))	OK [97]
-67	(condition-case err (progn (setq unread-command-events (list 'foo 97)) (cons (read-key-sequence-vector "") unread-command-events)) (error (list (car err) unread-command-events)))	OK ([foo] 97)
-68	(condition-case err (progn (setq unread-command-events (list '(mouse-1))) (read-key-sequence-vector "")) (error (car err)))	OK [(mouse-1)]
-69	(condition-case err (progn (setq unread-command-events (list 'foo)) (read-key-sequence-vector "")) (error (car err)))	OK [foo]
-70	(condition-case err (progn (setq unread-command-events (list 97)) (read-key-sequence-vector nil)) (error (car err)))	OK [97]
-71	(condition-case err (read-key-sequence-vector 123) (error (car err)))	OK wrong-type-argument
-72	(condition-case err (y-or-n-p "Continue? " nil) (error (car err)))	OK wrong-number-of-arguments
-73	(condition-case err (yes-or-no-p "Confirm? " nil) (error (car err)))	OK wrong-number-of-arguments
-74	(condition-case err (progn (setq unread-command-events (list 97)) (read-key-sequence "" nil nil nil nil nil nil)) (error (car err)))	OK wrong-number-of-arguments
-75	(condition-case err (progn (setq unread-command-events (list 97)) (read-key-sequence-vector "" nil nil nil nil nil nil)) (error (car err)))	OK wrong-number-of-arguments
-76	(condition-case err (read-file-name "" nil nil nil nil nil nil) (error (car err)))	OK wrong-number-of-arguments
-77	(condition-case err (read-directory-name "" nil nil nil nil nil) (error (car err)))	OK wrong-number-of-arguments
-78	(condition-case err (read-buffer "" nil nil nil nil) (error (car err)))	OK wrong-number-of-arguments
-79	(condition-case err (read-command "" nil nil) (error (car err)))	OK wrong-number-of-arguments
-80	(condition-case err (read-variable "" nil nil) (error (car err)))	OK wrong-number-of-arguments
+55	(condition-case err (progn (setq unread-command-events (list 'foo 97)) (cons (read-key "") unread-command-events)) (error (list (car err) unread-command-events)))	OK (foo 97)
+56	(condition-case err (progn (setq unread-command-events (list 97)) (read-key "" 123)) (error (car err)))	OK 97
+57	(condition-case err (progn (setq unread-command-events (list 97)) (read-key "" nil 123)) (error (car err)))	OK wrong-number-of-arguments
+58	(condition-case err (progn (setq unread-command-events (list 97)) (read-key-sequence "")) (error (car err)))	OK "a"
+59	(condition-case err (progn (setq unread-command-events (list 97 98)) (read-key-sequence "")) (error (car err)))	OK "a"
+60	(condition-case err (progn (setq unread-command-events (list 'foo 97)) (cons (read-key-sequence "") unread-command-events)) (error (list (car err) unread-command-events)))	OK ([foo] 97)
+61	(condition-case err (progn (setq unread-command-events (list '(mouse-1))) (read-key-sequence "")) (error (car err)))	OK [(mouse-1)]
+62	(condition-case err (progn (setq unread-command-events (list 'foo)) (read-key-sequence "")) (error (car err)))	OK [foo]
+63	(condition-case err (progn (setq unread-command-events (list 97)) (read-key-sequence nil)) (error (car err)))	OK "a"
+64	(condition-case err (progn (setq unread-command-events (list 97)) (read-event)) (error (car err)))	OK 97
+65	(condition-case err (progn (setq unread-command-events (list 97)) (read-char-exclusive)) (error (car err)))	OK 97
+66	(condition-case err (progn (setq unread-command-events (list 97)) (read-key-sequence-vector "")) (error (car err)))	OK [97]
+67	(condition-case err (progn (setq unread-command-events (list 97 98)) (read-key-sequence-vector "")) (error (car err)))	OK [97]
+68	(condition-case err (progn (setq unread-command-events (list 'foo 97)) (cons (read-key-sequence-vector "") unread-command-events)) (error (list (car err) unread-command-events)))	OK ([foo] 97)
+69	(condition-case err (progn (setq unread-command-events (list '(mouse-1))) (read-key-sequence-vector "")) (error (car err)))	OK [(mouse-1)]
+70	(condition-case err (progn (setq unread-command-events (list 'foo)) (read-key-sequence-vector "")) (error (car err)))	OK [foo]
+71	(condition-case err (progn (setq unread-command-events (list 97)) (read-key-sequence-vector nil)) (error (car err)))	OK [97]
+72	(condition-case err (read-key-sequence-vector 123) (error (car err)))	OK wrong-type-argument
+73	(condition-case err (y-or-n-p "Continue? " nil) (error (car err)))	OK wrong-number-of-arguments
+74	(condition-case err (yes-or-no-p "Confirm? " nil) (error (car err)))	OK wrong-number-of-arguments
+75	(condition-case err (progn (setq unread-command-events (list 97)) (read-key-sequence "" nil nil nil nil nil nil)) (error (car err)))	OK wrong-number-of-arguments
+76	(condition-case err (progn (setq unread-command-events (list 97)) (read-key-sequence-vector "" nil nil nil nil nil nil)) (error (car err)))	OK wrong-number-of-arguments
+77	(condition-case err (read-file-name "" nil nil nil nil nil nil) (error (car err)))	OK wrong-number-of-arguments
+78	(condition-case err (read-directory-name "" nil nil nil nil nil) (error (car err)))	OK wrong-number-of-arguments
+79	(condition-case err (read-buffer "" nil nil nil nil) (error (car err)))	OK wrong-number-of-arguments
+80	(condition-case err (read-command "" nil nil) (error (car err)))	OK wrong-number-of-arguments
+81	(condition-case err (read-variable "" nil nil) (error (car err)))	OK wrong-number-of-arguments

@@ -2438,6 +2438,18 @@ mod tests {
     }
 
     #[test]
+    fn read_key_consumes_unread_character_and_keeps_tail() {
+        let mut ev = Evaluator::new();
+        let event = Value::symbol("foo");
+        ev.obarray
+            .set_symbol_value("unread-command-events", Value::list(vec![event.clone(), Value::Int(97)]));
+        let result = builtin_read_key(&mut ev, vec![Value::string("key: ")]).unwrap();
+        assert_eq!(result, event);
+        assert_eq!(ev.read_command_keys(), std::slice::from_ref(&event));
+        assert_eq!(ev.obarray.symbol_value("unread-command-events"), Some(&Value::list(vec![Value::Int(97)])));
+    }
+
+    #[test]
     fn read_key_sequence_returns_empty_string() {
         let mut ev = Evaluator::new();
         let result = builtin_read_key_sequence(&mut ev, vec![Value::string("key: ")]).unwrap();
