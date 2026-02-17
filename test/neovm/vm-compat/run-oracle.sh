@@ -18,12 +18,12 @@ forms_file_abs="$forms_dir/$(basename "$forms_file")"
 script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "$script_dir/oracle-emacs-path.sh"
 oracle_el="$script_dir/oracle_eval.el"
-emacs_bin="${NEOVM_ORACLE_EMACS:-${ORACLE_EMACS:-$hardcoded_oracle_emacs}}"
+emacs_bin="$oracle_emacs_path"
 
 if [[ ! -x "$emacs_bin" ]]; then
   echo "oracle emacs binary is not executable: $emacs_bin" >&2
   echo "default oracle path is hardcoded to: $hardcoded_oracle_emacs" >&2
-  echo "override with NEOVM_ORACLE_EMACS/ORACLE_EMACS if needed" >&2
+  echo "override with NEOVM_FORCE_ORACLE_PATH for temporary local runs if needed" >&2
   exit 127
 fi
 
