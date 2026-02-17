@@ -31,10 +31,10 @@ test/neovm/vm-compat/run-oracle.sh test/neovm/vm-compat/cases/core.forms
 test/neovm/vm-compat/run-neovm.sh test/neovm/vm-compat/cases/core.forms
 ```
 
-Use official Emacs explicitly by setting `NEOVM_ORACLE_EMACS` (or `ORACLE_EMACS`), for example:
+Use official Emacs explicitly by setting `NEOVM_FORCE_ORACLE_PATH`, for example:
 
 ```bash
-NEOVM_ORACLE_EMACS=/nix/store/hql3zwz5b4ywd2qwx8jssp4dyb7nx4cb-emacs-30.2/bin/emacs \
+NEOVM_FORCE_ORACLE_PATH=/nix/store/hql3zwz5b4ywd2qwx8jssp4dyb7nx4cb-emacs-30.2/bin/emacs \
   test/neovm/vm-compat/run-oracle.sh test/neovm/vm-compat/cases/core.forms
 ```
 
@@ -151,12 +151,12 @@ The oracle runner defaults to this hardcoded GNU Emacs binary:
 /nix/store/hql3zwz5b4ywd2qwx8jssp4dyb7nx4cb-emacs-30.2/bin/emacs
 ```
 
-Override with `NEOVM_ORACLE_EMACS` only when you intentionally need a
+Override with `NEOVM_FORCE_ORACLE_PATH` only when you intentionally need a
 different oracle binary:
 
 ```bash
 cd test/neovm/vm-compat
-NEOVM_ORACLE_EMACS=/nix/store/hql3zwz5b4ywd2qwx8jssp4dyb7nx4cb-emacs-30.2/bin/emacs make check-ert-allowlist
+NEOVM_FORCE_ORACLE_PATH=/nix/store/hql3zwz5b4ywd2qwx8jssp4dyb7nx4cb-emacs-30.2/bin/emacs make check-ert-allowlist
 ```
 
 The default fixture uses:
