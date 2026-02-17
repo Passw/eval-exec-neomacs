@@ -82,6 +82,8 @@ cases/read-char-exclusive-vector-vector-tail-semantics
 cases/read-char-exclusive-symbol-vector-tail-semantics
 cases/read-char-exclusive-non-character-tail-semantics
 cases/read-char-exclusive-symbol-tail-semantics
+cases/read-event-empty-queue-semantics
+cases/read-event-list-tail-semantics
 cases/read-event-non-character-tail-semantics
 cases/read-event-vector-tail-semantics
 cases/read-event-vector-symbol-tail-semantics
@@ -96,9 +98,11 @@ cases/read-key-symbol-vector-tail-semantics
 cases/read-key-vector-vector-tail-semantics
 cases/read-key-vector-vector-tail-non-char-semantics
 cases/read-key-vector-vector-tail-non-character-tail-semantics
+cases/read-key-sequence-list-tail-semantics
 cases/read-key-sequence-non-character-tail-semantics
 cases/read-key-sequence-symbol-tail-semantics
 cases/read-key-sequence-symbol-vector-tail-semantics
+cases/read-key-sequence-vector-list-tail-semantics
 cases/read-key-sequence-vector-tail-semantics
 cases/read-key-sequence-vector-symbol-tail-semantics
 cases/read-key-sequence-vector-symbol-vector-tail-semantics
