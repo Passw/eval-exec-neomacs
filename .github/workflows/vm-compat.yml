@@ -149,6 +149,11 @@ jobs:
         run: |
           RUSTFLAGS='-Awarnings' make check-all-neovm-strict
 
+      - name: Run stub budget dashboard check
+        working-directory: test/neovm/vm-compat
+        run: |
+          make check-stub-budget
+
       - name: Run compatibility progress snapshot
         working-directory: test/neovm/vm-compat
         run: |

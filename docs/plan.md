@@ -14,7 +14,7 @@ Last updated: 2026-02-17
 8. [x] Add negative path cases for `terminal-parameter` argument validation and storage behavior.
 9. [x] Tighten `indent` semantics around arity and read-only mutation boundaries in interactive buffer-mode.
 10. [x] Sweep remaining display compatibility notes and convert stub wording to explicit behavior (`display-tty-x-helper-semantics` message assertions for open/close connection).
-11. [ ] Add focused `make` target for `check-stub-budget` in CI dry-run dashboards.
+11. [x] Add focused `check-stub-budget` step in vm-compat CI workflow for dashboard observability.
 12. [ ] Expand `window` and `frame` lifecycle cases around stale buffer references.
 13. [ ] Extend `timer` unit handling to integer/float edge payloads already in parser.
 14. [ ] Add dedicated `font`/`face` batch-mode argument validation corpus for no-op paths.
