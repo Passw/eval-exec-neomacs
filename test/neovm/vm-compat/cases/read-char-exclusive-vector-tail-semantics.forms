@@ -1,0 +1,4 @@
+(let ((unread-command-events (list 97 [mouse-1])))
+  (progn
+    (read-char-exclusive nil nil 0)
+    unread-command-events))
