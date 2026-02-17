@@ -1002,6 +1002,16 @@ mod tests {
             15.0
         );
         assert_eq!(
+            parse_run_at_time_delay(&Value::string("1 2 3 min"))
+                .expect("1 2 3 min should parse"),
+            7_380.0
+        );
+        assert_eq!(
+            parse_run_at_time_delay(&Value::string("1 2 e3 sec"))
+                .expect("1 2 e3 sec should parse"),
+            12_000.0
+        );
+        assert_eq!(
             parse_run_at_time_delay(&Value::string("1e3sec")).expect("1e3sec should parse"),
             1_000.0
         );
