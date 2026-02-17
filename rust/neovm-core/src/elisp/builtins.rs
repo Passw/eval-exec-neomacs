@@ -10757,10 +10757,8 @@ mod tests {
             builtin_looking_at(&mut eval, vec![Value::string("a"), Value::True]);
         assert!(looking_at_optional_second.is_ok());
 
-        let looking_at_over_arity = builtin_looking_at(
-            &mut eval,
-            vec![Value::string("a"), Value::Nil, Value::Nil],
-        );
+        let looking_at_over_arity =
+            builtin_looking_at(&mut eval, vec![Value::string("a"), Value::Nil, Value::Nil]);
         assert!(matches!(
             looking_at_over_arity,
             Err(Flow::Signal(sig)) if sig.symbol == "wrong-number-of-arguments"
@@ -10873,8 +10871,7 @@ mod tests {
             buffer.goto_char(0);
         }
 
-        builtin_set_match_data_eval(&mut eval, vec![Value::Nil])
-            .expect("clear match-data");
+        builtin_set_match_data_eval(&mut eval, vec![Value::Nil]).expect("clear match-data");
         let result = builtin_looking_at(&mut eval, vec![Value::string("a"), Value::Nil]);
         assert!(result.is_ok());
 

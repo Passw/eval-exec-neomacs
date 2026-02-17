@@ -499,7 +499,11 @@ fn builtin_replace_regexp_in_string_with_case_fold(
     if subexp < 0 {
         return Err(signal(
             "args-out-of-range",
-            vec![Value::Int(subexp), Value::Int(0), Value::Int(s.len() as i64)],
+            vec![
+                Value::Int(subexp),
+                Value::Int(0),
+                Value::Int(s.len() as i64),
+            ],
         ));
     }
 
@@ -782,8 +786,7 @@ mod tests {
 
     #[test]
     fn looking_at_with_text() {
-        let result =
-            builtin_looking_at(vec![Value::string("foo"), Value::string("foobar")]);
+        let result = builtin_looking_at(vec![Value::string("foo"), Value::string("foobar")]);
         assert_true(result.unwrap());
         let begin = builtin_match_beginning(vec![Value::Int(0)]).unwrap();
         let end = builtin_match_end(vec![Value::Int(0)]).unwrap();
@@ -793,22 +796,19 @@ mod tests {
 
     #[test]
     fn looking_at_with_text_case_fold_default() {
-        let result =
-            builtin_looking_at(vec![Value::string("foo"), Value::string("FOO BAR")]);
+        let result = builtin_looking_at(vec![Value::string("foo"), Value::string("FOO BAR")]);
         assert_true(result.unwrap());
     }
 
     #[test]
     fn looking_at_with_text_requires_start_position() {
-        let result =
-            builtin_looking_at(vec![Value::string("foo"), Value::string("bar foo")]);
+        let result = builtin_looking_at(vec![Value::string("foo"), Value::string("bar foo")]);
         assert_nil(result.unwrap());
     }
 
     #[test]
     fn looking_at_with_text_no_match() {
-        let result =
-            builtin_looking_at(vec![Value::string("foo"), Value::string("bar")]);
+        let result = builtin_looking_at(vec![Value::string("foo"), Value::string("bar")]);
         assert_nil(result.unwrap());
 
         let begin = builtin_match_beginning(vec![Value::Int(0)]).unwrap();
@@ -850,10 +850,7 @@ mod tests {
 
     #[test]
     fn looking_at_p_preserves_match_data() {
-        let _ = builtin_looking_at(vec![
-            Value::string("foo"),
-            Value::string("foobar"),
-        ]);
+        let _ = builtin_looking_at(vec![Value::string("foo"), Value::string("foobar")]);
         let before = builtin_match_data(vec![]).unwrap();
         let result = builtin_looking_at_p(vec![Value::string("foo")]);
         assert_nil(result.unwrap());

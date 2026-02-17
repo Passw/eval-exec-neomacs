@@ -129,7 +129,10 @@ pub enum SelectOp {
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum SelectResult {
-    Ready { op_index: usize, value: Option<LispValue> },
+    Ready {
+        op_index: usize,
+        value: Option<LispValue>,
+    },
     TimedOut,
     Cancelled,
 }
