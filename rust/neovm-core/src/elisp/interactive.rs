@@ -168,6 +168,18 @@ fn expect_max_args(name: &str, args: &[Value], max: usize) -> Result<(), Flow> {
     }
 }
 
+fn expect_optional_command_keys_vector(keys: Option<&Value>) -> Result<(), Flow> {
+    if let Some(keys_value) = keys {
+        if !keys_value.is_nil() && !keys_value.is_vector() {
+            return Err(signal(
+                "wrong-type-argument",
+                vec![Value::symbol("vectorp"), keys_value.clone()],
+            ));
+        }
+    }
+    Ok(())
+}
+
 // ---------------------------------------------------------------------------
 // Built-in functions (evaluator-dependent)
 // ---------------------------------------------------------------------------
@@ -177,6 +189,7 @@ fn expect_max_args(name: &str, args: &[Value], max: usize) -> Result<(), Flow> {
 /// interactive spec.
 pub(crate) fn builtin_call_interactively(eval: &mut Evaluator, args: Vec<Value>) -> EvalResult {
     expect_min_args("call-interactively", &args, 1)?;
+    expect_optional_command_keys_vector(args.get(2))?;
 
     let func_val = &args[0];
     if !command_designator_p(eval, func_val) {
@@ -704,6 +717,7 @@ fn resolve_command_target(eval: &Evaluator, designator: &Value) -> Option<(Strin
 /// Execute CMD as an editor command.
 pub(crate) fn builtin_command_execute(eval: &mut Evaluator, args: Vec<Value>) -> EvalResult {
     expect_min_args("command-execute", &args, 1)?;
+    expect_optional_command_keys_vector(args.get(2))?;
 
     let cmd = &args[0];
     if !command_designator_p(eval, cmd) {
@@ -3689,6 +3703,34 @@ mod tests {
     }
 
     #[test]
+    fn command_execute_rejects_non_vector_keys_argument() {
+        let mut ev = Evaluator::new();
+        let result = builtin_command_execute(
+            &mut ev,
+            vec![Value::symbol("ignore"), Value::Nil, Value::string("a")],
+        )
+        .expect_err("command-execute should reject non-vector keys argument");
+        match result {
+            Flow::Signal(sig) => {
+                assert_eq!(sig.symbol, "wrong-type-argument");
+                assert_eq!(sig.data, vec![Value::symbol("vectorp"), Value::string("a")]);
+            }
+            other => panic!("unexpected flow: {other:?}"),
+        }
+    }
+
+    #[test]
+    fn command_execute_accepts_vector_keys_argument() {
+        let mut ev = Evaluator::new();
+        let result = builtin_command_execute(
+            &mut ev,
+            vec![Value::symbol("ignore"), Value::Nil, Value::vector(vec![Value::Int(97)])],
+        )
+        .expect("command-execute should accept vector keys argument");
+        assert!(result.is_nil());
+    }
+
+    #[test]
     fn command_execute_builtin_eval_expression_reads_stdin_in_batch() {
         let mut ev = Evaluator::new();
         let result = builtin_command_execute(&mut ev, vec![Value::symbol("eval-expression")])
@@ -3736,6 +3778,34 @@ mod tests {
                  (buffer-string))"#,
         );
         assert_eq!(results[0], "OK \"bc\"");
+    }
+
+    #[test]
+    fn call_interactively_rejects_non_vector_keys_argument() {
+        let mut ev = Evaluator::new();
+        let result = builtin_call_interactively(
+            &mut ev,
+            vec![Value::symbol("ignore"), Value::Nil, Value::string("b")],
+        )
+        .expect_err("call-interactively should reject non-vector keys argument");
+        match result {
+            Flow::Signal(sig) => {
+                assert_eq!(sig.symbol, "wrong-type-argument");
+                assert_eq!(sig.data, vec![Value::symbol("vectorp"), Value::string("b")]);
+            }
+            other => panic!("unexpected flow: {other:?}"),
+        }
+    }
+
+    #[test]
+    fn call_interactively_accepts_vector_keys_argument() {
+        let mut ev = Evaluator::new();
+        let result = builtin_call_interactively(
+            &mut ev,
+            vec![Value::symbol("ignore"), Value::Nil, Value::vector(vec![Value::Int(98)])],
+        )
+        .expect("call-interactively should accept vector keys argument");
+        assert!(result.is_nil());
     }
 
     #[test]
