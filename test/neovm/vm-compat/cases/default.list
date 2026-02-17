@@ -331,6 +331,7 @@ cases/display-stub-semantics
 cases/xdisp-pixel-metrics-semantics
 cases/xdisp-navigation-semantics
 cases/xdisp-stub-edges-semantics
+cases/pos-visible-window-semantics
 cases/xdisp-image-map-semantics
 cases/format-mode-line-batch-semantics
 cases/display-batch-semantics

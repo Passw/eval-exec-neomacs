@@ -185,6 +185,19 @@ pub(crate) fn builtin_window_text_pixel_size_eval(
 /// returns nil.
 pub(crate) fn builtin_pos_visible_in_window_p(args: Vec<Value>) -> EvalResult {
     expect_args_range("pos-visible-in-window-p", &args, 0, 3)?;
+    if let Some(window) = args.get(1) {
+        if !window.is_nil() {
+            return Err(signal(
+                "wrong-type-argument",
+                vec![Value::symbol("window-live-p"), window.clone()],
+            ));
+        }
+    }
+    if let Some(pos) = args.first() {
+        if !pos.is_nil() {
+            expect_integer_or_marker(pos)?;
+        }
+    }
     Ok(Value::Nil)
 }
 
@@ -197,6 +210,11 @@ pub(crate) fn builtin_pos_visible_in_window_p_eval(
 ) -> EvalResult {
     expect_args_range("pos-visible-in-window-p", &args, 0, 3)?;
     validate_optional_window_designator(eval, args.get(1), "window-live-p")?;
+    if let Some(pos) = args.first() {
+        if !pos.is_nil() {
+            expect_integer_or_marker(pos)?;
+        }
+    }
     Ok(Value::Nil)
 }
 
@@ -570,12 +588,39 @@ mod tests {
 
     #[test]
     fn test_pos_visible_in_window_p() {
-        let result = builtin_pos_visible_in_window_p(vec![]).unwrap();
+        let result = builtin_pos_visible_in_window_p(vec![Value::Int(1)]).unwrap();
         assert!(result.is_nil());
 
-        let result =
-            builtin_pos_visible_in_window_p(vec![Value::Int(100), Value::symbol("window")])
-                .unwrap();
+        let result = builtin_pos_visible_in_window_p(vec![Value::Int(100), Value::symbol("window")])
+            .unwrap_err();
+        match result {
+            Flow::Signal(sig) => {
+                assert_eq!(sig.symbol, "wrong-type-argument");
+                assert_eq!(sig.data[0], Value::symbol("window-live-p"));
+            }
+            other => panic!("expected wrong-type-argument, got {:?}", other),
+        }
+
+        let result = builtin_pos_visible_in_window_p(vec![Value::symbol("left"), Value::Int(1)]).unwrap_err();
+        match result {
+            Flow::Signal(sig) => {
+                assert_eq!(sig.symbol, "wrong-type-argument");
+                assert_eq!(sig.data[0], Value::symbol("window-live-p"));
+            }
+            other => panic!("expected wrong-type-argument, got {:?}", other),
+        }
+
+        let result = builtin_pos_visible_in_window_p(vec![Value::symbol("left")]).unwrap_err();
+        match result {
+            Flow::Signal(sig) => {
+                assert_eq!(sig.symbol, "wrong-type-argument");
+                assert_eq!(sig.data[0], Value::symbol("integer-or-marker-p"));
+            }
+            other => panic!("expected wrong-type-argument, got {:?}", other),
+        }
+
+        let result = builtin_pos_visible_in_window_p(vec![Value::Int(1), Value::Nil, Value::Int(1)])
+            .unwrap();
         assert!(result.is_nil());
     }
 
@@ -587,6 +632,17 @@ mod tests {
                 .unwrap_err();
         match err {
             Flow::Signal(sig) => assert_eq!(sig.symbol, "wrong-type-argument"),
+            other => panic!("expected wrong-type-argument, got {:?}", other),
+        }
+
+        let err =
+            builtin_pos_visible_in_window_p_eval(&mut eval, vec![Value::symbol("left"), Value::Int(1)])
+                .unwrap_err();
+        match err {
+            Flow::Signal(sig) => {
+                assert_eq!(sig.symbol, "wrong-type-argument");
+                assert_eq!(sig.data[0], Value::symbol("window-live-p"));
+            }
             other => panic!("expected wrong-type-argument, got {:?}", other),
         }
 
