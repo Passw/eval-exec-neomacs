@@ -1009,6 +1009,16 @@ mod tests {
             parse_run_at_time_delay(&Value::string("+ .5 day")).expect("+ .5 day should parse"),
             43_200.0
         );
+        assert_eq!(
+            parse_run_at_time_delay(&Value::string(" \t+ 2 day \t"))
+                .expect("whitespace + 2 day should parse"),
+            172_800.0
+        );
+        assert_eq!(
+            parse_run_at_time_delay(&Value::string("\t+ .5day\n"))
+                .expect("whitespace + .5day should parse"),
+            43_200.0
+        );
         assert!(matches!(
             parse_run_at_time_delay(&Value::string("4 foo")),
             Err(_)
