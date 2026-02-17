@@ -53,6 +53,9 @@
     (send-string-to-terminal "" (car (terminal-list)))
   (error (car err)))
 (condition-case err
+    (send-string-to-terminal "" 1)
+  (error (car err)))
+(condition-case err
     (send-string-to-terminal)
   (error (car err)))
 
