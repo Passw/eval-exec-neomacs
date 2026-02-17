@@ -10,4 +10,6 @@
 10	(condition-case err (display-monitor-attributes-list 999999) (error (not (null (string-match-p "999999" (cadr err))))))	OK t
 11	(condition-case err (frame-monitor-attributes 999999) (error (car err)))	OK error
 12	(condition-case err (frame-monitor-attributes 999999) (error (not (null (string-match-p "999999" (cadr err))))))	OK t
-13	(let* ((attrs (frame-monitor-attributes (car (terminal-list)))) (g (cdr (assq 'geometry attrs)))) g)	OK (0 0 80 25)
+13	(condition-case err (display-monitor-attributes-list 1 2) (error (car err)))	OK wrong-number-of-arguments
+14	(condition-case err (frame-monitor-attributes 1 2) (error (car err)))	OK wrong-number-of-arguments
+15	(let* ((attrs (frame-monitor-attributes (car (terminal-list)))) (g (cdr (assq 'geometry attrs)))) g)	OK (0 0 80 25)
