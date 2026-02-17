@@ -401,15 +401,49 @@ pub(crate) fn builtin_set_match_data(args: Vec<Value>) -> EvalResult {
 }
 
 /// `(looking-at REGEXP)` -- test whether text after point matches REGEXP.
-/// Stub: returns nil (needs buffer context).
+/// In batch mode we support an optional second argument as a sample string.
+/// When absent, this returns nil after validating REGEXP.
 pub(crate) fn builtin_looking_at(args: Vec<Value>) -> EvalResult {
     expect_range_args("looking-at", &args, 1, 2)?;
     let pattern = expect_string(&args[0])?;
-    let rust_pattern = super::regex::translate_emacs_regex(&pattern);
-    let _ = regex::Regex::new(&rust_pattern)
-        .map_err(|e| signal("invalid-regexp", vec![Value::string(e.to_string())]))?;
-    // Pure path has no buffer/point context; keep nil return for valid regex.
-    Ok(Value::Nil)
+
+    let translated = super::regex::translate_emacs_regex(&pattern);
+    let anchored = if translated.starts_with("\\A") || translated.starts_with('^') {
+        translated
+    } else {
+        format!("\\A(?:{translated})")
+    };
+
+    let text = args.get(1).and_then(|value| value.as_str());
+    match text {
+        Some(text) => {
+            let re = regex::Regex::new(&format!("(?i:{anchored})"))
+                .map_err(|e| signal("invalid-regexp", vec![Value::string(e.to_string())]))?;
+
+            if let Some(caps) = re.captures(text) {
+                let mut groups = Vec::with_capacity(caps.len());
+                for i in 0..caps.len() {
+                    groups.push(caps.get(i).map(|m| (m.start(), m.end())));
+                }
+                PURE_MATCH_DATA.with(|slot| {
+                    *slot.borrow_mut() = Some(super::regex::MatchData {
+                        groups,
+                        searched_string: Some(text.to_string()),
+                    })
+                });
+                Ok(Value::True)
+            } else {
+                PURE_MATCH_DATA.with(|slot| *slot.borrow_mut() = None);
+                Ok(Value::Nil)
+            }
+        }
+        None => {
+            let _ = regex::Regex::new(&format!("(?i:{anchored})"))
+                .map_err(|e| signal("invalid-regexp", vec![Value::string(e.to_string())]))?;
+            PURE_MATCH_DATA.with(|slot| *slot.borrow_mut() = None);
+            Ok(Value::Nil)
+        }
+    }
 }
 
 /// `(replace-regexp-in-string REGEXP REP STRING &optional FIXEDCASE LITERAL SUBEXP START)`
@@ -545,6 +579,10 @@ mod tests {
 
     fn assert_nil(val: Value) {
         assert!(val.is_nil(), "Expected nil, got {:?}", val);
+    }
+
+    fn assert_true(val: Value) {
+        assert!(val.is_truthy(), "Expected true, got {:?}", val);
     }
 
     fn assert_str(val: Value, expected: &str) {
@@ -717,6 +755,27 @@ mod tests {
     fn looking_at_default_at_point() {
         let result = builtin_looking_at(vec![Value::string("foo")]);
         assert_nil(result.unwrap());
+    }
+
+    #[test]
+    fn looking_at_with_text() {
+        let result =
+            builtin_looking_at(vec![Value::string("foo"), Value::string("foobar")]);
+        assert_true(result.unwrap());
+        let begin = builtin_match_beginning(vec![Value::Int(0)]).unwrap();
+        let end = builtin_match_end(vec![Value::Int(0)]).unwrap();
+        assert_int(begin, 0);
+        assert_int(end, 3);
+    }
+
+    #[test]
+    fn looking_at_with_text_no_match() {
+        let result =
+            builtin_looking_at(vec![Value::string("foo"), Value::string("bar")]);
+        assert_nil(result.unwrap());
+
+        let begin = builtin_match_beginning(vec![Value::Int(0)]).unwrap();
+        assert_nil(begin);
     }
 
     #[test]
