@@ -4,8 +4,10 @@ use std::collections::HashMap;
 
 use super::chunk::ByteCodeFunction;
 use super::opcode::Op;
+use crate::buffer::BufferManager;
 use crate::elisp::builtins;
 use crate::elisp::error::*;
+use crate::elisp::regex::MatchData;
 use crate::elisp::symbol::Obarray;
 use crate::elisp::value::*;
 
@@ -30,6 +32,8 @@ pub struct Vm<'a> {
     lexenv: &'a mut Vec<HashMap<String, Value>>,
     #[allow(dead_code)]
     features: &'a mut Vec<String>,
+    buffers: &'a mut BufferManager,
+    match_data: &'a mut Option<MatchData>,
     depth: usize,
     max_depth: usize,
 }
@@ -40,12 +44,16 @@ impl<'a> Vm<'a> {
         dynamic: &'a mut Vec<HashMap<String, Value>>,
         lexenv: &'a mut Vec<HashMap<String, Value>>,
         features: &'a mut Vec<String>,
+        buffers: &'a mut BufferManager,
+        match_data: &'a mut Option<MatchData>,
     ) -> Self {
         Self {
             obarray,
             dynamic,
             lexenv,
             features,
+            buffers,
+            match_data,
             depth: 0,
             max_depth: 200,
         }
@@ -894,7 +902,10 @@ impl<'a> Vm<'a> {
                 let spread = match last {
                     Value::Nil => Vec::new(),
                     Value::Cons(_) => list_to_vec(last).ok_or_else(|| {
-                        signal("wrong-type-argument", vec![Value::symbol("listp"), last.clone()])
+                        signal(
+                            "wrong-type-argument",
+                            vec![Value::symbol("listp"), last.clone()],
+                        )
                     })?,
                     _ => {
                         return Err(signal(
@@ -976,7 +987,19 @@ impl<'a> Vm<'a> {
         eval.dynamic = self.dynamic.clone();
         eval.lexenv = self.lexenv.clone();
         eval.features = self.features.clone();
-        builtins::dispatch_builtin(&mut eval, name, args)
+        eval.buffers = self.buffers.clone();
+        eval.match_data = self.match_data.clone();
+
+        let result = builtins::dispatch_builtin(&mut eval, name, args);
+
+        std::mem::swap(self.obarray, &mut eval.obarray);
+        std::mem::swap(self.dynamic, &mut eval.dynamic);
+        std::mem::swap(self.lexenv, &mut eval.lexenv);
+        std::mem::swap(self.features, &mut eval.features);
+        std::mem::swap(self.buffers, &mut eval.buffers);
+        std::mem::swap(self.match_data, &mut eval.match_data);
+
+        result
     }
 }
 
@@ -1311,11 +1334,20 @@ mod tests {
         let mut dynamic: Vec<HashMap<String, Value>> = Vec::new();
         let mut lexenv: Vec<HashMap<String, Value>> = Vec::new();
         let mut features: Vec<String> = Vec::new();
+        let mut buffers = crate::buffer::BufferManager::new();
+        let mut match_data: Option<MatchData> = None;
 
         let mut last = Value::Nil;
         for form in &forms {
             let func = compiler.compile_toplevel(form);
-            let mut vm = Vm::new(&mut obarray, &mut dynamic, &mut lexenv, &mut features);
+            let mut vm = Vm::new(
+                &mut obarray,
+                &mut dynamic,
+                &mut lexenv,
+                &mut features,
+                &mut buffers,
+                &mut match_data,
+            );
             last = vm.execute(&func, vec![]).map_err(map_flow)?;
         }
         Ok(last)

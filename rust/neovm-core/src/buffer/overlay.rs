@@ -37,6 +37,7 @@ pub struct Overlay {
 // ---------------------------------------------------------------------------
 
 /// Manages all overlays for a single buffer.
+#[derive(Clone)]
 pub struct OverlayList {
     overlays: Vec<Overlay>,
     next_id: u64,

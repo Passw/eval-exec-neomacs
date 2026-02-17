@@ -52,6 +52,7 @@ pub struct MarkerEntry {
 // ---------------------------------------------------------------------------
 
 /// A single text buffer with point, mark, narrowing, markers, and local vars.
+#[derive(Clone)]
 pub struct Buffer {
     /// Unique identifier.
     pub id: BufferId,
@@ -354,6 +355,7 @@ impl Buffer {
 // ---------------------------------------------------------------------------
 
 /// Owns every live buffer, tracks the current buffer, and hands out ids.
+#[derive(Clone)]
 pub struct BufferManager {
     buffers: HashMap<BufferId, Buffer>,
     current: Option<BufferId>,

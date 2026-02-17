@@ -82,6 +82,7 @@ fn props_equal(a: &HashMap<String, Value>, b: &HashMap<String, Value>) -> bool {
 /// Internally stores a sorted (by start position), non-overlapping list of
 /// [`PropertyInterval`]s.  Intervals with empty property sets may exist
 /// transiently but are cleaned up during merge passes.
+#[derive(Clone)]
 pub struct TextPropertyTable {
     intervals: Vec<PropertyInterval>,
 }

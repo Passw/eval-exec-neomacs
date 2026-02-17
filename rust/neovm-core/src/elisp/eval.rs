@@ -1965,6 +1965,8 @@ impl Evaluator {
                     &mut self.dynamic,
                     &mut self.lexenv,
                     &mut self.features,
+                    &mut self.buffers,
+                    &mut self.match_data,
                 );
                 let result = vm.execute(&bc, args);
                 self.sync_features_variable();
