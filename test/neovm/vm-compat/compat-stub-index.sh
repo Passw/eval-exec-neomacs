@@ -34,8 +34,10 @@ fi
 
 uniq_names="$(printf "%s\n" "${entries[@]}" | cut -f1 | sort -u)"
 count="$(printf "%s\n" "${uniq_names}" | wc -l | tr -d ' ')"
+file_count="$(printf "%s\n" "${entries[@]}" | cut -f2 | cut -d: -f1 | sort -u | wc -l | tr -d ' ')"
 
 echo "explicitly annotated function stubs: ${count}"
+printf "across %s files\n" "$file_count"
 printf "%s\n" "${uniq_names}"
 printf "\n"
 printf "stub call-sites:"
