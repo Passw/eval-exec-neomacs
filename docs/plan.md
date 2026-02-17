@@ -1,6 +1,6 @@
 # NeoVM / Neomacs Plan
 
-Last updated: 2026-02-16
+Last updated: 2026-02-17
 
 ## Doing
 
@@ -27,6 +27,7 @@ Last updated: 2026-02-16
 - Keep low-risk list/alist primitive semantics aligned while shifting compatibility slices to remaining high-impact display/font/input stubs.
 - Keep newly landed `kbd` parser/encoding compatibility stable while running recurring vm-compat gates.
 - Keep newly landed `help-key-description` / `recent-keys` compatibility slice stable while expanding input/help coverage.
+- Keep case-list ownership drift cleanup active: move stable, oracle-verified behaviors into default corpus and keep `neovm-only` for true extension-policy cases only.
 - Keep newly landed `command-execute` / `compare-strings` / `completing-read` `subr-arity` parity stable while expanding the remaining command/input matrix.
 - Keep newly landed kmacro/command-loop `subr-arity` parity stable while expanding edit-command arity lock-ins.
 - Keep newly landed delete-family command `subr-arity` parity stable while expanding remaining edit/display command arity matrix.
