@@ -10,3 +10,4 @@
 10	(display-visual-class)	OK static-gray
 11	(display-backing-store)	OK not-useful
 12	(x-display-list)	OK nil
+13	(condition-case err (x-display-list 1) (error (car err)))	OK wrong-number-of-arguments

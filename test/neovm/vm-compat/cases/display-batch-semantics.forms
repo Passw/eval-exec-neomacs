@@ -10,3 +10,6 @@
 (display-visual-class)
 (display-backing-store)
 (x-display-list)
+(condition-case err
+    (x-display-list 1)
+  (error (car err)))
