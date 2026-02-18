@@ -11010,6 +11010,29 @@ Last updated: 2026-02-18
     - `make -C test/neovm/vm-compat check-one-neovm CASE=string-match-case-fold-semantics` (pass, 20/20)
     - `make -C test/neovm/vm-compat check-one-neovm CASE=match-data` (pass, 37/37)
     - `make -C test/neovm/vm-compat check-all-neovm` (pass)
+- Aligned symbol printer/reader round-trip behavior and empty-symbol `##` semantics with GNU Emacs:
+  - runtime changes:
+    - symbol printing now preserves Emacs empty-symbol spelling (`##`) while retaining reader-sensitive escaping for symbols with payload characters like space/comma/parens/backslash/hash
+    - parser atom handling now honors backslash escapes in symbols (for example `\\.foo`, `a\\ b`, `a\\,b`, `a\\\\b`) to prevent worker compat render/eval round-trip drift
+    - hash-reader dispatch now accepts bare `##` as the empty symbol, and escaped `\\#\\#` continues to read as literal symbol name `##`
+    - `face-font` empty-string invalid-face payload now uses the empty symbol value instead of a synthetic `"##"` symbol sentinel
+  - expanded runtime/unit lock-ins:
+    - `rust/neovm-core/src/elisp/parser.rs`
+    - `rust/neovm-core/src/elisp/expr.rs`
+    - `rust/neovm-core/src/elisp/print.rs`
+    - added parser/printer unit assertions for empty-symbol and hash-escape boundaries
+  - expanded oracle corpus:
+    - `test/neovm/vm-compat/cases/symbol-print-escape-semantics.forms`
+    - `test/neovm/vm-compat/cases/symbol-print-escape-semantics.expected.tsv`
+    - `test/neovm/vm-compat/cases/default.list`
+  - verified:
+    - `cargo test --manifest-path rust/neovm-core/Cargo.toml parse_symbols_honor_backslash_escapes` (pass)
+    - `cargo test --manifest-path rust/neovm-core/Cargo.toml print_symbol_escapes_reader_sensitive_chars` (pass)
+    - `make -C test/neovm/vm-compat check-one-neovm CASE=cases/face-font-semantics` (pass, 18/18)
+    - `make -C test/neovm/vm-compat check-one-neovm CASE=cases/reader-dot-leading-symbol-printing-semantics` (pass, 9/9)
+    - `make -C test/neovm/vm-compat check-one-neovm CASE=cases/symbol-print-escape-semantics` (pass, 20/20)
+    - `make -C test/neovm/vm-compat check-one-neovm CASE=cases/reader-special-float-plus-trailing-dot-semantics` (pass, 11/11)
+    - `make -C test/neovm/vm-compat check-all-neovm` (pass)
 
 ## Doing
 

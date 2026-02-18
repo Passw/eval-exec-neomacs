@@ -1833,7 +1833,7 @@ pub(crate) fn builtin_face_font(args: Vec<Value>) -> EvalResult {
                 Ok(Value::Nil)
             } else {
                 let payload = if name.is_empty() {
-                    Value::symbol("##")
+                    Value::symbol("")
                 } else {
                     Value::symbol(name.as_str())
                 };

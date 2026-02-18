@@ -87,11 +87,25 @@ pub fn print_expr(expr: &Expr) -> String {
 }
 
 fn format_symbol_name(name: &str) -> String {
-    if name.starts_with('.') {
-        format!("\\{}", name)
-    } else {
-        name.to_string()
+    if name.is_empty() {
+        return "##".to_string();
     }
+    let mut out = String::with_capacity(name.len());
+    for (idx, ch) in name.chars().enumerate() {
+        let needs_escape = matches!(
+            ch,
+            ' ' | '\t' | '\n' | '\r' | '\u{0c}' | '(' | ')' | '[' | ']' | '"' | '\\' | ';'
+                | '#'
+                | '\''
+                | '`'
+                | ','
+        ) || (idx == 0 && matches!(ch, '.' | '?'));
+        if needs_escape {
+            out.push('\\');
+        }
+        out.push(ch);
+    }
+    out
 }
 
 fn format_float(f: f64) -> String {
@@ -139,7 +153,27 @@ mod tests {
         assert_eq!(print_expr(&Expr::Float(3.14)), "3.14");
         assert_eq!(print_expr(&Expr::Symbol("foo".into())), "foo");
         assert_eq!(print_expr(&Expr::Symbol(".foo".into())), "\\.foo");
+        assert_eq!(print_expr(&Expr::Symbol("".into())), "##");
         assert_eq!(print_expr(&Expr::Str("hello".into())), "\"hello\"");
+    }
+
+    #[test]
+    fn print_symbol_escapes_reader_sensitive_chars() {
+        assert_eq!(print_expr(&Expr::Symbol("a b".into())), "a\\ b");
+        assert_eq!(print_expr(&Expr::Symbol("a,b".into())), "a\\,b");
+        assert_eq!(print_expr(&Expr::Symbol("a,@b".into())), "a\\,@b");
+        assert_eq!(print_expr(&Expr::Symbol("a#b".into())), "a\\#b");
+        assert_eq!(print_expr(&Expr::Symbol("a'b".into())), "a\\'b");
+        assert_eq!(print_expr(&Expr::Symbol("a`b".into())), "a\\`b");
+        assert_eq!(print_expr(&Expr::Symbol("a\\b".into())), "a\\\\b");
+        assert_eq!(print_expr(&Expr::Symbol("a\"b".into())), "a\\\"b");
+        assert_eq!(print_expr(&Expr::Symbol("a(b".into())), "a\\(b");
+        assert_eq!(print_expr(&Expr::Symbol("a)b".into())), "a\\)b");
+        assert_eq!(print_expr(&Expr::Symbol("a[b".into())), "a\\[b");
+        assert_eq!(print_expr(&Expr::Symbol("a]b".into())), "a\\]b");
+        assert_eq!(print_expr(&Expr::Symbol("##".into())), "\\#\\#");
+        assert_eq!(print_expr(&Expr::Symbol("?a".into())), "\\?a");
+        assert_eq!(print_expr(&Expr::Symbol("a?b".into())), "a?b");
     }
 
     #[test]

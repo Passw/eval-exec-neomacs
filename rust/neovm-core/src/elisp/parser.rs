@@ -413,6 +413,11 @@ impl<'a> Parser<'a> {
                 self.bump();
                 Ok(Expr::Symbol("load-file-name".into()))
             }
+            '#' => {
+                // ## — symbol with empty name.
+                self.bump();
+                Ok(Expr::Symbol(String::new()))
+            }
             'b' | 'B' => {
                 // #b... binary integer
                 self.bump();
@@ -497,25 +502,37 @@ impl<'a> Parser<'a> {
     // -- Atoms (numbers, symbols) --------------------------------------------
 
     fn parse_atom(&mut self) -> Result<Expr, ParseError> {
-        let start = self.pos;
+        let mut token = String::new();
+        let mut had_escape = false;
         while let Some(ch) = self.current() {
             if ch.is_ascii_whitespace()
                 || matches!(ch, '(' | ')' | '[' | ']' | '\'' | '`' | ',' | '"' | ';')
             {
                 break;
             }
+            if ch == '\\' {
+                had_escape = true;
+                self.bump();
+                match self.current() {
+                    Some(escaped) => {
+                        token.push(escaped);
+                        self.bump();
+                    }
+                    None => token.push('\\'),
+                }
+                continue;
+            }
+            token.push(ch);
             self.bump();
         }
 
-        if self.pos == start {
+        if token.is_empty() {
             return Err(self.error("expected atom"));
         }
 
-        let token = &self.input[start..self.pos];
-
         // Keywords (:foo)
         if token.starts_with(':') && token.len() > 1 {
-            return Ok(Expr::Keyword(token.to_string()));
+            return Ok(Expr::Keyword(token));
         }
 
         // Try integer
@@ -524,11 +541,11 @@ impl<'a> Parser<'a> {
         }
 
         // Try float — handles 1.5, 1e10, .5, 1.5e-3, etc.
-        if looks_like_float(token) {
+        if looks_like_float(&token) {
             if let Ok(f) = token.parse::<f64>() {
                 return Ok(Expr::Float(f));
             }
-            if let Some(f) = parse_emacs_special_float(token) {
+            if let Some(f) = parse_emacs_special_float(&token) {
                 return Ok(Expr::Float(f));
             }
         }
@@ -542,10 +559,15 @@ impl<'a> Parser<'a> {
 
         // Boolean
         if token == "nil" || token == "t" {
-            return Ok(Expr::Symbol(token.to_string()));
+            return Ok(Expr::Symbol(token));
         }
 
-        Ok(Expr::Symbol(token.to_string()))
+        // Emacs reader shorthand: bare ## reads as the symbol with empty name.
+        if token == "##" && !had_escape {
+            return Ok(Expr::Symbol(String::new()));
+        }
+
+        Ok(Expr::Symbol(token))
     }
 
     // -- Helpers -------------------------------------------------------------
@@ -882,6 +904,22 @@ mod tests {
         assert_eq!(
             forms,
             vec![Expr::Keyword(":test".into()), Expr::Keyword(":size".into()),]
+        );
+    }
+
+    #[test]
+    fn parse_symbols_honor_backslash_escapes() {
+        let forms = parse_forms("\\.foo a\\ b a\\,b a\\\\b ## \\#\\#").unwrap();
+        assert_eq!(
+            forms,
+            vec![
+                Expr::Symbol(".foo".into()),
+                Expr::Symbol("a b".into()),
+                Expr::Symbol("a,b".into()),
+                Expr::Symbol("a\\b".into()),
+                Expr::Symbol(String::new()),
+                Expr::Symbol("##".into()),
+            ]
         );
     }
 

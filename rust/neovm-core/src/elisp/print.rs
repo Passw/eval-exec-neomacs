@@ -91,12 +91,7 @@ fn append_print_value_bytes(value: &Value, out: &mut Vec<u8>) {
         Value::True => out.extend_from_slice(b"t"),
         Value::Int(v) => out.extend_from_slice(v.to_string().as_bytes()),
         Value::Float(f) => out.extend_from_slice(format_float(*f).as_bytes()),
-        Value::Symbol(s) => {
-            if s.starts_with('.') {
-                out.push(b'\\');
-            }
-            out.extend_from_slice(s.as_bytes());
-        }
+        Value::Symbol(s) => out.extend_from_slice(format_symbol_name(s).as_bytes()),
         Value::Keyword(s) => out.extend_from_slice(s.as_bytes()),
         Value::Str(s) => out.extend_from_slice(&format_lisp_string_bytes(s)),
         Value::Char(c) => out.extend_from_slice((*c as u32).to_string().as_bytes()),
@@ -164,11 +159,25 @@ pub fn print_expr(expr: &Expr) -> String {
 }
 
 fn format_symbol_name(name: &str) -> String {
-    if name.starts_with('.') {
-        format!("\\{}", name)
-    } else {
-        name.to_string()
+    if name.is_empty() {
+        return "##".to_string();
     }
+    let mut out = String::with_capacity(name.len());
+    for (idx, ch) in name.chars().enumerate() {
+        let needs_escape = matches!(
+            ch,
+            ' ' | '\t' | '\n' | '\r' | '\u{0c}' | '(' | ')' | '[' | ']' | '"' | '\\' | ';'
+                | '#'
+                | '\''
+                | '`'
+                | ','
+        ) || (idx == 0 && matches!(ch, '.' | '?'));
+        if needs_escape {
+            out.push('\\');
+        }
+        out.push(ch);
+    }
+    out
 }
 
 fn format_float(f: f64) -> String {
@@ -344,7 +353,27 @@ mod tests {
         assert_eq!(print_value(&Value::Float(1.0)), "1.0");
         assert_eq!(print_value(&Value::symbol("foo")), "foo");
         assert_eq!(print_value(&Value::symbol(".foo")), "\\.foo");
+        assert_eq!(print_value(&Value::symbol("")), "##");
         assert_eq!(print_value(&Value::keyword(":bar")), ":bar");
+    }
+
+    #[test]
+    fn print_symbol_escapes_reader_sensitive_chars() {
+        assert_eq!(print_value(&Value::symbol("a b")), "a\\ b");
+        assert_eq!(print_value(&Value::symbol("a,b")), "a\\,b");
+        assert_eq!(print_value(&Value::symbol("a,@b")), "a\\,@b");
+        assert_eq!(print_value(&Value::symbol("a#b")), "a\\#b");
+        assert_eq!(print_value(&Value::symbol("a'b")), "a\\'b");
+        assert_eq!(print_value(&Value::symbol("a`b")), "a\\`b");
+        assert_eq!(print_value(&Value::symbol("a\\b")), "a\\\\b");
+        assert_eq!(print_value(&Value::symbol("a\"b")), "a\\\"b");
+        assert_eq!(print_value(&Value::symbol("a(b")), "a\\(b");
+        assert_eq!(print_value(&Value::symbol("a)b")), "a\\)b");
+        assert_eq!(print_value(&Value::symbol("a[b")), "a\\[b");
+        assert_eq!(print_value(&Value::symbol("a]b")), "a\\]b");
+        assert_eq!(print_value(&Value::symbol("##")), "\\#\\#");
+        assert_eq!(print_value(&Value::symbol("?a")), "\\?a");
+        assert_eq!(print_value(&Value::symbol("a?b")), "a?b");
     }
 
     #[test]
