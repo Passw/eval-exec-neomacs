@@ -396,6 +396,7 @@ cases/terminal-parameter-storage-semantics
 cases/terminal-parameter-storage-edge-semantics
 cases/terminal-parameter-state-semantics
 cases/terminal-handle-printing
+cases/terminal-name-designator-payload-semantics
 cases/frame-batch-semantics
 cases/window-frame-stale-lifecycle-semantics
 cases/window-stale-object-semantics
