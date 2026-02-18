@@ -3718,6 +3718,806 @@ pub(crate) static STARTUP_VARIABLE_DOC_STRING_PROPERTIES: &[(&str, &str)] = &[
         "buffer-offer-save",
         "Non-nil in a buffer means always offer to save buffer on exiting Emacs.",
     ),
+    (
+        "buffer-quit-function",
+        "Function to call to \"quit\" the current buffer, or nil if none.",
+    ),
+    (
+        "buffer-save-without-query",
+        "Non-nil means `save-some-buffers' should save this buffer without asking.",
+    ),
+    (
+        "buffer-stale-function",
+        "Function to check whether a buffer needs reverting.",
+    ),
+    (
+        "buffers-menu-buffer-name-length",
+        "Maximum length of the buffer name on the Buffers menu.",
+    ),
+    (
+        "buffers-menu-max-size",
+        "Maximum number of entries which may appear on the Buffers menu.",
+    ),
+    (
+        "buffers-menu-show-directories",
+        "If non-nil, show directories in the Buffers menu for buffers that have them.",
+    ),
+    (
+        "buffers-menu-show-status",
+        "If non-nil, show modified/read-only status of buffers in the Buffers menu.",
+    ),
+    (
+        "button-buffer-map",
+        "Keymap useful for buffers containing buttons.",
+    ),
+    (
+        "button-map",
+        "Keymap used by buttons.",
+    ),
+    (
+        "button-mode",
+        "Non-nil if Button mode is enabled.",
+    ),
+    (
+        "button-mode-hook",
+        "Hook run after entering or leaving `button-mode'.",
+    ),
+    (
+        "byte-compile-form-stack",
+        "Dynamic list of successive enclosing forms.",
+    ),
+    (
+        "byte-count-to-string-function",
+        "Function that turns a number of bytes into a human-readable string.",
+    ),
+    (
+        "byte-run--ssp-seen",
+        "Which conses/vectors/records have been processed in strip-symbol-positions?",
+    ),
+    (
+        "c-guess-guessed-basic-offset",
+        "Currently guessed basic-offset.",
+    ),
+    (
+        "c-guess-guessed-offsets-alist",
+        "Currently guessed offsets-alist.",
+    ),
+    (
+        "called-interactively-p-functions",
+        "Special hook called to skip special frames in `called-interactively-p'.",
+    ),
+    (
+        "case-replace",
+        "Non-nil means `query-replace' should preserve case in replacements.",
+    ),
+    (
+        "ccl-encode-ethio-font",
+        "CCL program to encode an Ethiopic code to code point of Ethiopic font.",
+    ),
+    (
+        "cconv--dynbound-variables",
+        "List of variables known to be dynamically bound.",
+    ),
+    (
+        "cconv-liftwhen",
+        "Try to do lambda lifting if the number of arguments + free variables",
+    ),
+    (
+        "cd-path",
+        "Value of the CDPATH environment variable, as a list.",
+    ),
+    (
+        "change-major-mode-after-body-hook",
+        "Normal hook run in major mode functions, before the mode hooks.",
+    ),
+    (
+        "change-major-mode-with-file-name",
+        "Non-nil means \\[write-file] should set the major mode from the file name.",
+    ),
+    (
+        "char-acronym-table",
+        "Char table of acronyms for non-graphic characters.",
+    ),
+    (
+        "char-code-property-table",
+        "Char-table containing a property list of each character code.",
+    ),
+    (
+        "charset-script-alist",
+        "Alist of charsets vs the corresponding most appropriate scripts.",
+    ),
+    (
+        "choose-completion-deselect-if-after",
+        "If non-nil, don't choose a completion candidate if point is right after it.",
+    ),
+    (
+        "choose-completion-string-functions",
+        "Functions that may override the normal insertion of a completion choice.",
+    ),
+    (
+        "cjk-ambiguous-chars-are-wide",
+        "Whether the \"ambiguous-width\" characters take 2 columns on display.",
+    ),
+    (
+        "cl--generic-combined-method-memoization",
+        "Table storing previously built combined-methods.",
+    ),
+    (
+        "cl-custom-print-functions",
+        "This is a list of functions that format user objects for printing.",
+    ),
+    (
+        "cl-font-lock-built-in-mode",
+        "Non-nil if Cl-Font-Lock-Built-In mode is enabled.",
+    ),
+    (
+        "cl-old-struct-compat-mode",
+        "Non-nil if Cl-Old-Struct-Compat mode is enabled.",
+    ),
+    (
+        "clean-mode-abbrev-table",
+        "Abbrev table for `clean-mode'.",
+    ),
+    (
+        "clean-mode-hook",
+        "Hook run after entering `clean-mode'.",
+    ),
+    (
+        "clean-mode-map",
+        "Keymap for `clean-mode'.",
+    ),
+    (
+        "clean-mode-syntax-table",
+        "Syntax table for `clean-mode'.",
+    ),
+    (
+        "clone-buffer-hook",
+        "Normal hook to run in the new buffer at the end of `clone-buffer'.",
+    ),
+    (
+        "coding-system-iso-2022-flags",
+        "List of symbols that control ISO-2022 encoder/decoder.",
+    ),
+    (
+        "colon-double-space",
+        "Non-nil means put two spaces after a colon when filling.",
+    ),
+    (
+        "color-luminance-dark-limit",
+        "The relative luminance below which a color is considered \"dark\".",
+    ),
+    (
+        "color-name-rgb-alist",
+        "An alist of X color names and associated 16-bit RGB values.",
+    ),
+    (
+        "column-number-indicator-zero-based",
+        "When non-nil, mode line displays column numbers zero-based.",
+    ),
+    (
+        "column-number-mode",
+        "Non-nil if Column-Number mode is enabled.",
+    ),
+    (
+        "column-number-mode-hook",
+        "Hook run after entering or leaving `column-number-mode'.",
+    ),
+    (
+        "comint-file-name-prefix",
+        "Prefix prepended to absolute file names taken from process input.",
+    ),
+    (
+        "comint-output-filter-functions",
+        "Functions to call after output is inserted into the buffer.",
+    ),
+    (
+        "command-line-args-left",
+        "List of command-line args not yet processed.",
+    ),
+    (
+        "command-line-default-directory",
+        "Default directory to use for command line arguments.",
+    ),
+    (
+        "command-line-functions",
+        "List of functions to process unrecognized command-line arguments.",
+    ),
+    (
+        "command-line-ns-option-alist",
+        "Alist of NS options.",
+    ),
+    (
+        "command-line-processed",
+        "Non-nil once command line has been processed.",
+    ),
+    (
+        "command-line-x-option-alist",
+        "Alist of X Windows options.",
+    ),
+    (
+        "command-switch-alist",
+        "Alist of command-line switches.",
+    ),
+    (
+        "comment-add",
+        "How many more comment chars should be inserted by `comment-region'.",
+    ),
+    (
+        "comment-auto-fill-only-comments",
+        "Non-nil means to only auto-fill inside comments.",
+    ),
+    (
+        "comment-column",
+        "Column to indent right-margin comments to.",
+    ),
+    (
+        "comment-combine-change-calls",
+        "If non-nil (the default), use `combine-change-calls' around",
+    ),
+    (
+        "comment-continue",
+        "Continuation string to insert for multiline comments.",
+    ),
+    (
+        "comment-empty-lines",
+        "If nil, `comment-region' does not comment out empty lines.",
+    ),
+    (
+        "comment-end",
+        "String to insert to end a new comment.",
+    ),
+    (
+        "comment-end-skip",
+        "Regexp to match the end of a comment plus everything back to its body.",
+    ),
+    (
+        "comment-fill-column",
+        "Column to use for `comment-indent'.  If nil, use `fill-column' instead.",
+    ),
+    (
+        "comment-indent-function",
+        "Function to compute desired indentation for a comment.",
+    ),
+    (
+        "comment-inline-offset",
+        "Inline comments have to be preceded by at least this many spaces.",
+    ),
+    (
+        "comment-insert-comment-function",
+        "Function to insert a comment when a line doesn't contain one.",
+    ),
+    (
+        "comment-line-break-function",
+        "Mode-specific function that line breaks and continues a comment.",
+    ),
+    (
+        "comment-multi-line",
+        "Non-nil means `comment-indent-new-line' continues comments.",
+    ),
+    (
+        "comment-padding",
+        "Padding string that `comment-region' puts between comment chars and text.",
+    ),
+    (
+        "comment-quote-nested",
+        "Non-nil if nested comments should be quoted.",
+    ),
+    (
+        "comment-quote-nested-function",
+        "Function to quote nested comments in a region.",
+    ),
+    (
+        "comment-region-function",
+        "Function to comment a region.",
+    ),
+    (
+        "comment-start",
+        "String to insert to start a new comment, or nil if no comment syntax.",
+    ),
+    (
+        "comment-start-skip",
+        "Regexp to match the start of a comment plus everything up to its body.",
+    ),
+    (
+        "comment-style",
+        "Style to be used for `comment-region'.",
+    ),
+    (
+        "comment-styles",
+        "Comment region style definitions.",
+    ),
+    (
+        "comment-use-global-state",
+        "Non-nil means that the global syntactic context is used.",
+    ),
+    (
+        "comment-use-syntax",
+        "Non-nil if syntax-tables can be used instead of regexps.",
+    ),
+    (
+        "compilation-ask-about-save",
+        "Non-nil means \\[compile] asks which buffers to save before compiling.",
+    ),
+    (
+        "compilation-buffer-name-function",
+        "Function to compute the name of a compilation buffer.",
+    ),
+    (
+        "compilation-disable-input",
+        "If non-nil, send end-of-file as compilation process input.",
+    ),
+    (
+        "compilation-finish-functions",
+        "Functions to call when a compilation process finishes.",
+    ),
+    (
+        "compilation-mode-hook",
+        "List of hook functions run by `compilation-mode'.",
+    ),
+    (
+        "compilation-process-setup-function",
+        "Function to call to customize the compilation process.",
+    ),
+    (
+        "compilation-search-path",
+        "List of directories to search for source files named in error messages.",
+    ),
+    (
+        "compilation-start-hook",
+        "Hook run after starting a new compilation process.",
+    ),
+    (
+        "compilation-window-height",
+        "Number of lines in a compilation window.",
+    ),
+    (
+        "compile-command",
+        "Last shell command used to do a compilation; default for next compilation.",
+    ),
+    (
+        "completing-read-function",
+        "The function called by `completing-read' to do its work.",
+    ),
+    (
+        "completion--capf-misbehave-funs",
+        "List of functions found on `completion-at-point-functions' that misbehave.",
+    ),
+    (
+        "completion--capf-safe-funs",
+        "List of well-behaved functions found on `completion-at-point-functions'.",
+    ),
+    (
+        "completion--flex-score-last-md",
+        "Helper variable for `completion--flex-score'.",
+    ),
+    (
+        "completion-at-point-functions",
+        "Special hook to find the completion table for the entity at point.",
+    ),
+    (
+        "completion-auto-deselect",
+        "If non-nil, deselect current completion candidate when you type in minibuffer.",
+    ),
+    (
+        "completion-auto-help",
+        "Non-nil means automatically provide help for invalid completion input.",
+    ),
+    (
+        "completion-auto-select",
+        "If non-nil, automatically select the window showing the *Completions* buffer.",
+    ),
+    (
+        "completion-auto-wrap",
+        "Non-nil means to wrap around when selecting completion candidates.",
+    ),
+    (
+        "completion-base-position",
+        "Position of the base of the text corresponding to the shown completions.",
+    ),
+    (
+        "completion-category-defaults",
+        "Default settings for specific completion categories.",
+    ),
+    (
+        "completion-category-overrides",
+        "List of category-specific user overrides for completion metadata.",
+    ),
+    (
+        "completion-cycle-threshold",
+        "Number of completion candidates below which cycling is used.",
+    ),
+    (
+        "completion-extra-properties",
+        "Property list of extra properties of the current completion job.",
+    ),
+    (
+        "completion-fail-discreetly",
+        "If non-nil, stay quiet when there is no match.",
+    ),
+    (
+        "completion-flex-nospace",
+        "Non-nil if `flex' completion rejects spaces in search pattern.",
+    ),
+    (
+        "completion-in-region-function",
+        "Function to perform the job of `completion-in-region'.",
+    ),
+    (
+        "completion-in-region-functions",
+        "Wrapper hook around `completion--in-region'.",
+    ),
+    (
+        "completion-in-region-mode--predicate",
+        "Copy of the value of `completion-in-region-mode-predicate'.",
+    ),
+    (
+        "completion-in-region-mode-hook",
+        "Hook run after entering or leaving `completion-in-region-mode'.",
+    ),
+    (
+        "completion-in-region-mode-map",
+        "Keymap activated during `completion-in-region'.",
+    ),
+    (
+        "completion-in-region-mode-predicate",
+        "Predicate to tell `completion-in-region-mode' when to exit.",
+    ),
+    (
+        "completion-lazy-hilit",
+        "If non-nil, request lazy highlighting of completion candidates.",
+    ),
+    (
+        "completion-lazy-hilit-fn",
+        "Fontification function set by lazy-highlighting completions styles.",
+    ),
+    (
+        "completion-list-insert-choice-function",
+        "Function to use to insert the text chosen in *Completions*.",
+    ),
+    (
+        "completion-list-mode-abbrev-table",
+        "Abbrev table for `completion-list-mode'.",
+    ),
+    (
+        "completion-list-mode-hook",
+        "Hook run after entering `completion-list-mode'.",
+    ),
+    (
+        "completion-list-mode-map",
+        "Local map for completion list buffers.",
+    ),
+    (
+        "completion-list-mode-syntax-table",
+        "Syntax table for `completion-list-mode'.",
+    ),
+    (
+        "completion-no-auto-exit",
+        "Non-nil means `choose-completion-string' should never exit the minibuffer.",
+    ),
+    (
+        "completion-pcm--delim-wild-regex",
+        "Regular expression matching delimiters controlling the partial-completion.",
+    ),
+    (
+        "completion-pcm--regexp",
+        "Regexp from PCM pattern in `completion-pcm--hilit-commonality'.",
+    ),
+    (
+        "completion-pcm-complete-word-inserts-delimiters",
+        "Treat the SPC or - inserted by `minibuffer-complete-word' as delimiters.",
+    ),
+    (
+        "completion-pcm-word-delimiters",
+        "A string of characters treated as word delimiters for completion.",
+    ),
+    (
+        "completion-reference-buffer",
+        "Record the buffer that was current when the completion list was requested.",
+    ),
+    (
+        "completion-setup-hook",
+        "Normal hook run at the end of setting up a completion list buffer.",
+    ),
+    (
+        "completion-show-help",
+        "Non-nil means show help message in *Completions* buffer.",
+    ),
+    (
+        "completion-show-inline-help",
+        "If non-nil, print helpful inline messages during completion.",
+    ),
+    (
+        "completion-styles",
+        "List of completion styles to use.",
+    ),
+    (
+        "completion-styles-alist",
+        "List of available completion styles.",
+    ),
+    (
+        "completions-detailed",
+        "When non-nil, display completions with details added as prefix/suffix.",
+    ),
+    (
+        "completions-format",
+        "Define the appearance and sorting of completions.",
+    ),
+    (
+        "completions-group",
+        "Enable grouping of completion candidates in the *Completions* buffer.",
+    ),
+    (
+        "completions-group-format",
+        "Format string used for the group title.",
+    ),
+    (
+        "completions-group-sort",
+        "Sort groups in the *Completions* buffer.",
+    ),
+    (
+        "completions-header-format",
+        "If non-nil, the format string for completions heading line.",
+    ),
+    (
+        "completions-highlight-face",
+        "A face name to highlight the current completion candidate.",
+    ),
+    (
+        "completions-max-height",
+        "Maximum height for *Completions* buffer window.",
+    ),
+    (
+        "completions-sort",
+        "Sort candidates in the *Completions* buffer.",
+    ),
+    (
+        "compose-mail-user-agent-warnings",
+        "If non-nil, `compose-mail' warns about changes in `mail-user-agent'.",
+    ),
+    (
+        "confirm-kill-emacs",
+        "How to ask for confirmation when leaving Emacs.",
+    ),
+    (
+        "confirm-kill-processes",
+        "Non-nil if Emacs should confirm killing processes on exit.",
+    ),
+    (
+        "confirm-nonexistent-file-or-buffer",
+        "Whether confirmation is requested before visiting a new file or buffer.",
+    ),
+    (
+        "context-menu-entry",
+        "Menu item that creates the context menu and can be bound to a mouse key.",
+    ),
+    (
+        "context-menu-filter-function",
+        "Function that can filter the list produced by `context-menu-functions'.",
+    ),
+    (
+        "context-menu-functions",
+        "List of functions that produce the contents of the context menu.",
+    ),
+    (
+        "context-menu-mode",
+        "Non-nil if Context-Menu mode is enabled.",
+    ),
+    (
+        "context-menu-mode-hook",
+        "Hook run after entering or leaving `context-menu-mode'.",
+    ),
+    (
+        "context-menu-mode-map",
+        "Context Menu mode map.",
+    ),
+    (
+        "copy-directory-create-symlink",
+        "This option influences the handling of symbolic links in `copy-directory'.",
+    ),
+    (
+        "copy-region-blink-delay",
+        "Time in seconds to delay after showing the other end of the region.",
+    ),
+    (
+        "copy-region-blink-predicate",
+        "Whether the cursor must be blinked after a copy.",
+    ),
+    (
+        "cpp-font-lock-keywords",
+        "Font lock keywords for C preprocessor directives.",
+    ),
+    (
+        "cpp-font-lock-keywords-source-depth",
+        "Regular expression depth of `cpp-font-lock-keywords-source-directives'.",
+    ),
+    (
+        "cpp-font-lock-keywords-source-directives",
+        "Regular expression used in `cpp-font-lock-keywords'.",
+    ),
+    (
+        "ctext-non-standard-encodings",
+        "List of non-standard encoding names used in extended segments of CTEXT.",
+    ),
+    (
+        "ctext-non-standard-encodings-alist",
+        "Alist of non-standard encoding names vs the corresponding usages in CTEXT.",
+    ),
+    (
+        "ctext-standard-encodings",
+        "List of approved standard encodings (i.e. charsets) of X's Compound Text.",
+    ),
+    (
+        "ctl-x-4-map",
+        "Keymap for subcommands of \\`C-x 4'.",
+    ),
+    (
+        "ctl-x-5-map",
+        "Keymap for frame commands.",
+    ),
+    (
+        "ctl-x-map",
+        "Default keymap for \\`C-x' commands.",
+    ),
+    (
+        "ctl-x-r-map",
+        "Keymap for subcommands of \\`C-x r'.",
+    ),
+    (
+        "ctl-x-x-map",
+        "Keymap for subcommands of \\`C-x x'.",
+    ),
+    (
+        "cua-mode",
+        "Non-nil if Cua mode is enabled.",
+    ),
+    (
+        "current-input-method",
+        "The current input method for multilingual text.",
+    ),
+    (
+        "current-input-method-title",
+        "Title string of the current input method shown in mode line.",
+    ),
+    (
+        "current-language-environment",
+        "The last language environment specified with `set-language-environment'.",
+    ),
+    (
+        "current-locale-environment",
+        "The currently set locale environment.",
+    ),
+    (
+        "current-transient-input-method",
+        "Current input method temporarily enabled by `activate-transient-input-method'.",
+    ),
+    (
+        "cursor-face-highlight-mode",
+        "Non-nil if Cursor-Face-Highlight mode is enabled.",
+    ),
+    (
+        "cursor-face-highlight-mode-hook",
+        "Hook run after entering or leaving `cursor-face-highlight-mode'.",
+    ),
+    (
+        "cursor-face-highlight-nonselected-window",
+        "Non-nil means highlight text with `cursor-face' even in nonselected windows.",
+    ),
+    (
+        "cursor-sensor-inhibit",
+        "When non-nil, suspend `cursor-sensor-mode' and `cursor-intangible-mode'.",
+    ),
+    (
+        "custom--inhibit-theme-enable",
+        "Whether the custom-theme-set-* functions act immediately.",
+    ),
+    (
+        "custom-browse-sort-alphabetically",
+        "If non-nil, sort customization group alphabetically in `custom-browse'.",
+    ),
+    (
+        "custom-buffer-sort-alphabetically",
+        "Whether to sort customization groups alphabetically in Custom buffer.",
+    ),
+    (
+        "custom-current-group-alist",
+        "Alist of (FILE . GROUP) indicating the current group to use for FILE.",
+    ),
+    (
+        "custom-define-hook",
+        "Hook called after defining each customize option.",
+    ),
+    (
+        "custom-delayed-init-variables",
+        "List of variables whose initialization is pending until startup.",
+    ),
+    (
+        "custom-dont-initialize",
+        "Non-nil means `defcustom' should not initialize the variable.",
+    ),
+    (
+        "custom-enabled-themes",
+        "List of enabled Custom Themes, highest precedence first.",
+    ),
+    (
+        "custom-face-attributes",
+        "Alist of face attributes.",
+    ),
+    (
+        "custom-file",
+        "File used for storing customization information.",
+    ),
+    (
+        "custom-known-themes",
+        "Themes that have been defined with `deftheme'.",
+    ),
+    (
+        "custom-load-recursion",
+        "Hack to avoid recursive dependencies.",
+    ),
+    (
+        "custom-local-buffer",
+        "Non-nil, in a Customization buffer, means customize a specific buffer.",
+    ),
+    (
+        "custom-menu-sort-alphabetically",
+        "If non-nil, sort each customization group alphabetically in menus.",
+    ),
+    (
+        "custom-safe-themes",
+        "Themes that are considered safe to load.",
+    ),
+    (
+        "custom-theme-directory",
+        "Default user directory for storing custom theme files.",
+    ),
+    (
+        "custom-theme-load-path",
+        "List of directories to search for custom theme files.",
+    ),
+    (
+        "customize-package-emacs-version-alist",
+        "Alist mapping versions of a package to Emacs versions.",
+    ),
+    (
+        "cvs-dired-action",
+        "The action to be performed when opening a CVS directory.",
+    ),
+    (
+        "cvs-dired-use-hook",
+        "Whether or not opening a CVS directory should run PCL-CVS.",
+    ),
+    (
+        "cvs-global-menu",
+        "Global menu used by PCL-CVS.",
+    ),
+    (
+        "cycle-spacing--context",
+        "Stored context used in consecutive calls to `cycle-spacing' command.",
+    ),
+    (
+        "cycle-spacing-actions",
+        "List of actions cycled through by `cycle-spacing'.",
+    ),
+    (
+        "deactivate-current-input-method-function",
+        "Function to call for deactivating the current input method.",
+    ),
+    (
+        "deactivate-mark-hook",
+        "Hook run when the mark becomes inactive.",
+    ),
+    (
+        "default-input-method",
+        "Default input method for multilingual text (a string).",
+    ),
+    (
+        "default-justification",
+        "Method of justifying text not otherwise specified.",
+    ),
+    (
+        "default-keyboard-coding-system",
+        "Default value of the keyboard coding system.",
+    ),
     ("kill-ring", "List of killed text sequences."),
     (
         "kill-ring-yank-pointer",

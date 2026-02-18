@@ -3721,7 +3721,23 @@ mod tests {
              (stringp (get 'blink-cursor-mode 'variable-documentation))
              (integerp (get 'blink-cursor-mode 'variable-documentation))
              (stringp (get 'buffer-offer-save 'variable-documentation))
-             (integerp (get 'buffer-offer-save 'variable-documentation))",
+             (integerp (get 'buffer-offer-save 'variable-documentation))
+             (stringp (get 'buffer-quit-function 'variable-documentation))
+             (integerp (get 'buffer-quit-function 'variable-documentation))
+             (stringp (get 'command-line-functions 'variable-documentation))
+             (integerp (get 'command-line-functions 'variable-documentation))
+             (stringp (get 'comment-start 'variable-documentation))
+             (integerp (get 'comment-start 'variable-documentation))
+             (stringp (get 'completion-styles 'variable-documentation))
+             (integerp (get 'completion-styles 'variable-documentation))
+             (stringp (get 'context-menu-mode 'variable-documentation))
+             (integerp (get 'context-menu-mode 'variable-documentation))
+             (stringp (get 'current-input-method 'variable-documentation))
+             (integerp (get 'current-input-method 'variable-documentation))
+             (stringp (get 'custom-enabled-themes 'variable-documentation))
+             (integerp (get 'custom-enabled-themes 'variable-documentation))
+             (stringp (get 'default-input-method 'variable-documentation))
+             (integerp (get 'default-input-method 'variable-documentation))",
         );
         assert_eq!(results[0], "OK t");
         assert_eq!(results[1], "OK nil");
@@ -3745,6 +3761,22 @@ mod tests {
         assert_eq!(results[19], "OK nil");
         assert_eq!(results[20], "OK t");
         assert_eq!(results[21], "OK nil");
+        assert_eq!(results[22], "OK t");
+        assert_eq!(results[23], "OK nil");
+        assert_eq!(results[24], "OK t");
+        assert_eq!(results[25], "OK nil");
+        assert_eq!(results[26], "OK t");
+        assert_eq!(results[27], "OK nil");
+        assert_eq!(results[28], "OK t");
+        assert_eq!(results[29], "OK nil");
+        assert_eq!(results[30], "OK t");
+        assert_eq!(results[31], "OK nil");
+        assert_eq!(results[32], "OK t");
+        assert_eq!(results[33], "OK nil");
+        assert_eq!(results[34], "OK t");
+        assert_eq!(results[35], "OK nil");
+        assert_eq!(results[36], "OK t");
+        assert_eq!(results[37], "OK nil");
     }
 
     #[test]
