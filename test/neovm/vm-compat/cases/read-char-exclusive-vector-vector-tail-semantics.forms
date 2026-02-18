@@ -19,6 +19,11 @@
     (read-char-exclusive nil nil 0)
     unread-command-events))
 
+(let ((unread-command-events (list [foo] 98 [bar] [baz] [qux] [quux])))
+  (progn
+    (read-char-exclusive nil nil 0)
+    unread-command-events))
+
 (condition-case err
     (progn
       (setq unread-command-events '([foo] . [bar]))
