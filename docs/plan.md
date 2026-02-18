@@ -28,6 +28,15 @@ Last updated: 2026-02-18
 
 ## Doing
 
+- Expanded `read-char` non-character tail lock-ins with deeper payload depth:
+  - oracle corpus changes:
+    - `test/neovm/vm-compat/cases/read-char-non-character-tail-semantics.forms`
+    - `test/neovm/vm-compat/cases/read-char-non-character-tail-semantics.expected.tsv`
+    - added deeper-tail probe `(list 1.0 98 97 96 95)`.
+  - verified:
+    - `make -C test/neovm/vm-compat check-one-neovm CASE=cases/read-char-non-character-tail-semantics` (pass, 5/5)
+    - `make -C test/neovm/vm-compat check-all-neovm` (pass)
+
 - Expanded `read-char` symbol tail lock-ins with deeper payload depth:
   - oracle corpus changes:
     - `test/neovm/vm-compat/cases/read-char-symbol-tail-semantics.forms`
