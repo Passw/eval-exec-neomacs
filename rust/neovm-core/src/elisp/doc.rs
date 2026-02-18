@@ -5518,6 +5518,2806 @@ pub(crate) static STARTUP_VARIABLE_DOC_STRING_PROPERTIES: &[(&str, &str)] = &[
         "font-lock-comment-start-skip",
         "If non-nil, Font Lock mode uses this instead of `comment-start-skip'.",
     ),
+    (
+        "font-lock-constant-face",
+        "Face name to use for constant and label names.",
+    ),
+    (
+        "font-lock-defaults",
+        "Defaults for Font Lock mode specified by the major mode.",
+    ),
+    (
+        "font-lock-doc-face",
+        "Face name to use for documentation.",
+    ),
+    (
+        "font-lock-doc-markup-face",
+        "Face name to use for documentation mark-up.",
+    ),
+    (
+        "font-lock-dont-widen",
+        "If non-nil, font-lock will work on the non-widened buffer.",
+    ),
+    (
+        "font-lock-ensure-function",
+        "Function to make sure a region has been fontified.",
+    ),
+    (
+        "font-lock-extend-after-change-region-function",
+        "A function that determines the region to refontify after a change.",
+    ),
+    (
+        "font-lock-extend-region-functions",
+        "Special hook run just before proceeding to fontify a region.",
+    ),
+    (
+        "font-lock-extra-managed-props",
+        "Additional text properties managed by font-lock.",
+    ),
+    (
+        "font-lock-flush-function",
+        "Function to use to mark a region for refontification.",
+    ),
+    (
+        "font-lock-fontify-buffer-function",
+        "Function to use for fontifying the buffer.",
+    ),
+    (
+        "font-lock-fontify-region-function",
+        "Function to use for fontifying a region.",
+    ),
+    (
+        "font-lock-fontify-syntactically-function",
+        "Function to use for syntactically fontifying a region.",
+    ),
+    (
+        "font-lock-function",
+        "A function which is called when `font-lock-mode' is toggled.",
+    ),
+    (
+        "font-lock-function-name-face",
+        "Face name to use for function names.",
+    ),
+    (
+        "font-lock-global-modes",
+        "Modes for which Font Lock mode is automagically turned on.",
+    ),
+    (
+        "font-lock-ignore",
+        "Rules to selectively disable fontifications due to `font-lock-keywords'.",
+    ),
+    (
+        "font-lock-keyword-face",
+        "Face name to use for keywords.",
+    ),
+    (
+        "font-lock-keywords",
+        "A list of keywords and corresponding font-lock highlighting rules.",
+    ),
+    (
+        "font-lock-keywords-alist",
+        "Alist of additional `font-lock-keywords' elements for major modes.",
+    ),
+    (
+        "font-lock-keywords-case-fold-search",
+        "Non-nil means the patterns in `font-lock-keywords' are case-insensitive.",
+    ),
+    (
+        "font-lock-keywords-only",
+        "Non-nil means Font Lock should not fontify comments or strings.",
+    ),
+    (
+        "font-lock-major-mode",
+        "Major mode for which the font-lock settings have been setup.",
+    ),
+    (
+        "font-lock-mark-block-function",
+        "Non-nil means use this function to mark a block of text.",
+    ),
+    (
+        "font-lock-maximum-decoration",
+        "Maximum decoration level for fontification.",
+    ),
+    (
+        "font-lock-mode",
+        "Non-nil if Font-Lock mode is enabled.",
+    ),
+    (
+        "font-lock-mode-hook",
+        "Hook run after entering or leaving `font-lock-mode'.",
+    ),
+    (
+        "font-lock-multiline",
+        "Whether font-lock should cater to multiline keywords.",
+    ),
+    (
+        "font-lock-negation-char-face",
+        "Face name to use for easy to overlook negation.",
+    ),
+    (
+        "font-lock-preprocessor-face",
+        "Face name to use for preprocessor directives.",
+    ),
+    (
+        "font-lock-removed-keywords-alist",
+        "Alist of `font-lock-keywords' elements to be removed for major modes.",
+    ),
+    (
+        "font-lock-string-face",
+        "Face name to use for strings.",
+    ),
+    (
+        "font-lock-support-mode",
+        "Support mode for Font Lock mode.",
+    ),
+    (
+        "font-lock-syntactic-face-function",
+        "Function to determine which face to use when fontifying syntactically.",
+    ),
+    (
+        "font-lock-syntactic-keywords",
+        "A list of the syntactic keywords to put syntax properties on.",
+    ),
+    (
+        "font-lock-syntactically-fontified",
+        "Point up to which `font-lock-syntactic-keywords' has been applied.",
+    ),
+    (
+        "font-lock-syntax-table",
+        "Non-nil means use this syntax table for fontifying.",
+    ),
+    (
+        "font-lock-type-face",
+        "Face name to use for type and class names.",
+    ),
+    (
+        "font-lock-unfontify-buffer-function",
+        "Function to use for unfontifying the buffer.",
+    ),
+    (
+        "font-lock-unfontify-region-function",
+        "Function to use for unfontifying a region.",
+    ),
+    (
+        "font-lock-variable-name-face",
+        "Face name to use for variable names.",
+    ),
+    (
+        "font-lock-verbose",
+        "If non-nil, means show status messages for buffer fontification.",
+    ),
+    (
+        "font-lock-warning-face",
+        "Face name to use for things that should stand out.",
+    ),
+    (
+        "format-alist",
+        "List of information about understood file formats.",
+    ),
+    (
+        "forward-sentence-function",
+        "Function to be used to calculate sentence movements.",
+    ),
+    (
+        "forward-sexp-function",
+        "If non-nil, `forward-sexp' delegates to this function.",
+    ),
+    (
+        "frame-auto-hide-function",
+        "Function called to automatically hide frames.",
+    ),
+    (
+        "frame-background-mode",
+        "The brightness of the background.",
+    ),
+    (
+        "frame-inherited-parameters",
+        "Parameters `make-frame' copies from the selected to the new frame.",
+    ),
+    (
+        "frame-notice-user-settings",
+        "Non-nil means function `frame-notice-user-settings' wasn't run yet.",
+    ),
+    (
+        "frameset-filter-alist",
+        "Alist of frame parameters and filtering functions.",
+    ),
+    (
+        "frameset-persistent-filter-alist",
+        "Parameters to filter for persistent framesets.",
+    ),
+    (
+        "frameset-session-filter-alist",
+        "Minimum set of parameters to filter for live (on-session) framesets.",
+    ),
+    (
+        "fringe-mode",
+        "Default appearance of fringes on all frames.",
+    ),
+    (
+        "fringe-mode-explicit",
+        "Non-nil means `set-fringe-mode' should really do something.",
+    ),
+    (
+        "fringe-styles",
+        "Alist mapping fringe mode names to fringe widths.",
+    ),
+    (
+        "from--tty-menu-p",
+        "Non-nil means the current command was invoked from a TTY menu.",
+    ),
+    (
+        "fundamental-mode-abbrev-table",
+        "The abbrev table of mode-specific abbrevs for Fundamental Mode.",
+    ),
+    (
+        "gdb-enable-debug",
+        "Non-nil if Gdb-Enable-Debug mode is enabled.",
+    ),
+    (
+        "generic-mode-list",
+        "A list of mode names for `generic-mode'.",
+    ),
+    (
+        "gensym-counter",
+        "Number used to construct the name of the next symbol created by `gensym'.",
+    ),
+    (
+        "global-abbrev-table",
+        "The abbrev table whose abbrevs affect all buffers.",
+    ),
+    (
+        "global-auto-composition-mode-hook",
+        "Hook run after entering or leaving `global-auto-composition-mode'.",
+    ),
+    (
+        "global-auto-revert-mode",
+        "Non-nil if Global Auto-Revert mode is enabled.",
+    ),
+    (
+        "global-completion-preview-mode",
+        "Non-nil if Global Completion-Preview mode is enabled.",
+    ),
+    (
+        "global-completion-preview-modes",
+        "Which major modes `completion-preview-mode' is switched on in.",
+    ),
+    (
+        "global-cwarn-mode",
+        "Non-nil if Global Cwarn mode is enabled.",
+    ),
+    (
+        "global-display-fill-column-indicator-mode",
+        "Non-nil if Global Display-Fill-Column-Indicator mode is enabled.",
+    ),
+    (
+        "global-display-fill-column-indicator-modes",
+        "Which major modes `display-fill-column-indicator-mode' is switched on in.",
+    ),
+    (
+        "global-display-line-numbers-mode",
+        "Non-nil if Global Display-Line-Numbers mode is enabled.",
+    ),
+    (
+        "global-ede-mode",
+        "Non-nil if Global Ede mode is enabled.",
+    ),
+    (
+        "global-eldoc-mode",
+        "Non-nil if Global Eldoc mode is enabled.",
+    ),
+    (
+        "global-eldoc-mode-hook",
+        "Hook run after entering or leaving `global-eldoc-mode'.",
+    ),
+    (
+        "global-font-lock-mode",
+        "Non-nil if Global Font-Lock mode is enabled.",
+    ),
+    (
+        "global-font-lock-mode-hook",
+        "Hook run after entering or leaving `global-font-lock-mode'.",
+    ),
+    (
+        "global-goto-address-mode",
+        "Non-nil if Global Goto-Address mode is enabled.",
+    ),
+    (
+        "global-hi-lock-mode",
+        "Non-nil if Global Hi-Lock mode is enabled.",
+    ),
+    (
+        "global-highlight-changes-mode",
+        "Non-nil if Global Highlight-Changes mode is enabled.",
+    ),
+    (
+        "global-hl-line-mode",
+        "Non-nil if Global Hl-Line mode is enabled.",
+    ),
+    (
+        "global-map",
+        "Default global keymap mapping Emacs keyboard input into commands.",
+    ),
+    (
+        "global-mark-ring",
+        "The list of saved global marks, most recent first.",
+    ),
+    (
+        "global-mark-ring-max",
+        "Maximum size of global mark ring.  Start discarding off end if gets this big.",
+    ),
+    (
+        "global-minor-modes",
+        "A list of the currently enabled global minor modes.",
+    ),
+    (
+        "global-prettify-symbols-mode",
+        "Non-nil if Global Prettify-Symbols mode is enabled.",
+    ),
+    (
+        "global-prettify-symbols-mode-hook",
+        "Hook run after entering or leaving `global-prettify-symbols-mode'.",
+    ),
+    (
+        "global-reveal-mode",
+        "Non-nil if Global Reveal mode is enabled.",
+    ),
+    (
+        "global-so-long-mode",
+        "Non-nil if Global So-Long mode is enabled.",
+    ),
+    (
+        "global-subword-mode",
+        "Non-nil if Global Subword mode is enabled.",
+    ),
+    (
+        "global-superword-mode",
+        "Non-nil if Global Superword mode is enabled.",
+    ),
+    (
+        "global-tab-line-mode",
+        "Non-nil if Global Tab-Line mode is enabled.",
+    ),
+    (
+        "global-visual-line-mode",
+        "Non-nil if Global Visual-Line mode is enabled.",
+    ),
+    (
+        "global-visual-line-mode-hook",
+        "Hook run after entering or leaving `global-visual-line-mode'.",
+    ),
+    (
+        "global-visual-wrap-prefix-mode",
+        "Non-nil if Global Visual-Wrap-Prefix mode is enabled.",
+    ),
+    (
+        "global-whitespace-mode",
+        "Non-nil if Global Whitespace mode is enabled.",
+    ),
+    (
+        "global-whitespace-newline-mode",
+        "Non-nil if Global Whitespace-Newline mode is enabled.",
+    ),
+    (
+        "global-window-tool-bar-mode",
+        "Non-nil if Global Window-Tool-Bar mode is enabled.",
+    ),
+    (
+        "global-word-wrap-whitespace-mode",
+        "Non-nil if Global Word-Wrap-Whitespace mode is enabled.",
+    ),
+    (
+        "glyphless-char-display-control",
+        "List of directives to control display of glyphless characters.",
+    ),
+    (
+        "goal-column",
+        "Semipermanent goal column for vertical motion, as set by \\[set-goal-column], or nil.",
+    ),
+    (
+        "goto-line-history",
+        "History of values entered with `goto-line'.",
+    ),
+    (
+        "goto-line-history-local",
+        "If this option is nil, `goto-line-history' is shared between all buffers.",
+    ),
+    (
+        "goto-map",
+        "Keymap for navigation commands.",
+    ),
+    (
+        "gpm-mouse-mode",
+        "Non-nil if Gpm-Mouse mode is enabled.",
+    ),
+    (
+        "grep-command",
+        "The default grep command for \\[grep].",
+    ),
+    (
+        "grep-find-command",
+        "The default find command for \\[grep-find].",
+    ),
+    (
+        "grep-find-history",
+        "History list for `grep-find'.",
+    ),
+    (
+        "grep-find-use-xargs",
+        "How to invoke find and grep.",
+    ),
+    (
+        "grep-highlight-matches",
+        "Use special markers to highlight grep matches.",
+    ),
+    (
+        "grep-history",
+        "History list for grep.",
+    ),
+    (
+        "grep-match-face",
+        "Face name to use for grep matches.",
+    ),
+    (
+        "grep-program",
+        "The default grep program for `grep-command' and `grep-find-command'.",
+    ),
+    (
+        "grep-regexp-alist",
+        "Regexp used to match grep hits.",
+    ),
+    (
+        "grep-setup-hook",
+        "List of hook functions run by `grep-process-setup' (see `run-hooks').",
+    ),
+    (
+        "grep-window-height",
+        "Number of lines in a grep window.  If nil, use `compilation-window-height'.",
+    ),
+    (
+        "gud-tooltip-mode",
+        "Non-nil if Gud-Tooltip mode is enabled.",
+    ),
+    (
+        "gui--last-selected-text-clipboard",
+        "The value of the CLIPBOARD selection last seen.",
+    ),
+    (
+        "gui--last-selected-text-primary",
+        "The value of the PRIMARY selection last seen.",
+    ),
+    (
+        "gui--last-selection-timestamp-clipboard",
+        "The timestamp of the CLIPBOARD selection last seen.",
+    ),
+    (
+        "gui--last-selection-timestamp-primary",
+        "The timestamp of the PRIMARY selection last seen.",
+    ),
+    (
+        "gui-last-cut-in-clipboard",
+        "Whether or not the last call to `interprogram-cut-function' owned CLIPBOARD.",
+    ),
+    (
+        "gui-last-cut-in-primary",
+        "Whether or not the last call to `interprogram-cut-function' owned PRIMARY.",
+    ),
+    (
+        "gujarati-composable-pattern",
+        "Regexp matching a composable sequence of Gujarati characters.",
+    ),
+    (
+        "gurmukhi-composable-pattern",
+        "Regexp matching a composable sequence of Gurmukhi characters.",
+    ),
+    (
+        "hack-dir-local-get-variables-functions",
+        "Special hook to compute the set of dir-local variables.",
+    ),
+    (
+        "hack-local-variables-hook",
+        "Normal hook run after processing a file's local variables specs.",
+    ),
+    (
+        "hack-read-symbol-shorthands-function",
+        "Holds function to compute `read-symbol-shorthands'.",
+    ),
+    (
+        "hard-newline",
+        "Propertized string representing a hard newline character.",
+    ),
+    (
+        "header-line-indent",
+        "String of spaces to indent the beginning of header-line due to line numbers.",
+    ),
+    (
+        "header-line-indent-width",
+        "The width of the current line number display in the window.",
+    ),
+    (
+        "help-at-pt-display-when-idle",
+        "Automatically show local help on point-over.",
+    ),
+    (
+        "help-buffer-under-preparation",
+        "Whether a *Help* buffer is being prepared.",
+    ),
+    (
+        "help-enable-autoload",
+        "Whether Help commands can perform autoloading.",
+    ),
+    (
+        "help-for-help-buffer-name",
+        "Name of the `help-for-help' buffer.",
+    ),
+    (
+        "help-link-key-to-documentation",
+        "Non-nil means link keys to their command in *Help* buffers.",
+    ),
+    (
+        "help-map",
+        "Keymap for characters following the Help key.",
+    ),
+    (
+        "help-quick-sections",
+        "Data structure for `help-quick'.",
+    ),
+    (
+        "help-quick-use-map",
+        "Keymap that `help-quick' should use to lookup bindings.",
+    ),
+    (
+        "help-return-method",
+        "What to do to \"exit\" the help buffer.",
+    ),
+    (
+        "help-uni-confusables",
+        "An alist of confusable characters to give hints about.",
+    ),
+    (
+        "help-uni-confusables-regexp",
+        "Regexp matching any character listed in `help-uni-confusables'.",
+    ),
+    (
+        "help-window-keep-selected",
+        "If non-nil, navigation commands in the *Help* buffer will reuse the window.",
+    ),
+    (
+        "help-window-old-frame",
+        "Frame selected at the time `with-help-window' is invoked.",
+    ),
+    (
+        "help-window-point-marker",
+        "Marker to override default `window-point' in help windows.",
+    ),
+    (
+        "help-window-select",
+        "Non-nil means select help window for viewing.",
+    ),
+    (
+        "hippie-expand-try-functions-list",
+        "The list of expansion functions tried in order by `hippie-expand'.",
+    ),
+    (
+        "holiday-bahai-holidays",
+        "Bahá’í holidays.",
+    ),
+    (
+        "holiday-christian-holidays",
+        "Christian holidays.",
+    ),
+    (
+        "holiday-general-holidays",
+        "General holidays.  Default value is for the United States.",
+    ),
+    (
+        "holiday-hebrew-holidays",
+        "Jewish holidays.",
+    ),
+    (
+        "holiday-islamic-holidays",
+        "Islamic holidays.",
+    ),
+    (
+        "holiday-local-holidays",
+        "Local holidays.",
+    ),
+    (
+        "holiday-oriental-holidays",
+        "Oriental holidays.",
+    ),
+    (
+        "holiday-other-holidays",
+        "User defined holidays.",
+    ),
+    (
+        "holiday-solar-holidays",
+        "Sun-related holidays.",
+    ),
+    (
+        "horizontal-scroll-bar-mode",
+        "Non-nil if Horizontal-Scroll-Bar mode is enabled.",
+    ),
+    (
+        "horizontal-scroll-bar-mode-hook",
+        "Hook run after entering or leaving `horizontal-scroll-bar-mode'.",
+    ),
+    (
+        "hs-special-modes-alist",
+        "Alist for initializing the hideshow variables for different modes.",
+    ),
+    (
+        "icomplete-mode",
+        "Non-nil if Icomplete mode is enabled.",
+    ),
+    (
+        "icomplete-vertical-mode",
+        "Non-nil if Icomplete-Vertical mode is enabled.",
+    ),
+    (
+        "icon-map-list",
+        "A list of alists that map icon file names to stock/named icons.",
+    ),
+    (
+        "idle-update-delay",
+        "Idle time delay before updating various things on the screen.",
+    ),
+    (
+        "ido-mode",
+        "Determines for which buffer/file Ido should be enabled.",
+    ),
+    (
+        "ignore-window-parameters",
+        "If non-nil, standard functions ignore window parameters.",
+    ),
+    (
+        "ignored-local-variable-values",
+        "List of variable-value pairs that should always be ignored.",
+    ),
+    (
+        "ignored-local-variables",
+        "Variables to be ignored in a file's local variable spec.",
+    ),
+    (
+        "image-default-frame-delay",
+        "Default interval in seconds between frames of a multi-frame image.",
+    ),
+    (
+        "image-file-name-extensions",
+        "A list of image-file filename extensions.",
+    ),
+    (
+        "image-file-name-regexps",
+        "List of regexps matching image-file filenames.",
+    ),
+    (
+        "image-format-suffixes",
+        "An alist associating image types with file name suffixes.",
+    ),
+    (
+        "image-load-path",
+        "List of locations in which to search for image files.",
+    ),
+    (
+        "image-map",
+        "Map put into text properties on images.",
+    ),
+    (
+        "image-minimum-frame-delay",
+        "Minimum interval in seconds between frames of an animated image.",
+    ),
+    (
+        "image-recompute-map-p",
+        "Recompute image map when scaling, rotating, or flipping an image.",
+    ),
+    (
+        "image-slice-map",
+        "Map put into text properties on sliced images.",
+    ),
+    (
+        "image-transform-smoothing",
+        "Whether to do smoothing when applying transforms to images.",
+    ),
+    (
+        "image-type-auto-detectable",
+        "Alist of (IMAGE-TYPE . AUTODETECT) pairs used to auto-detect image files.",
+    ),
+    (
+        "image-type-file-name-regexps",
+        "Alist of (REGEXP . IMAGE-TYPE) pairs used to identify image files.",
+    ),
+    (
+        "image-type-header-regexps",
+        "Alist of (REGEXP . IMAGE-TYPE) pairs used to auto-detect image types.",
+    ),
+    (
+        "image-use-external-converter",
+        "If non-nil, `create-image' will use external converters for exotic formats.",
+    ),
+    (
+        "imagemagick--file-regexp",
+        "File extension regexp for ImageMagick files, if any.",
+    ),
+    (
+        "imagemagick-enabled-types",
+        "List of ImageMagick types to treat as images.",
+    ),
+    (
+        "imagemagick-types-inhibit",
+        "List of ImageMagick types that should never be treated as images.",
+    ),
+    (
+        "imenu-case-fold-search",
+        "Defines whether `imenu--generic-function' should fold case when matching.",
+    ),
+    (
+        "imenu-create-index-function",
+        "The function to use for creating an index alist of the current buffer.",
+    ),
+    (
+        "imenu-default-goto-function",
+        "The default function called when selecting an Imenu item.",
+    ),
+    (
+        "imenu-extract-index-name-function",
+        "Function for extracting the index item name, given a position.",
+    ),
+    (
+        "imenu-generic-expression",
+        "List of definition matchers for creating an Imenu index.",
+    ),
+    (
+        "imenu-name-lookup-function",
+        "Function to compare string with index item.",
+    ),
+    (
+        "imenu-prev-index-position-function",
+        "Function for finding the next index position.",
+    ),
+    (
+        "imenu-sort-function",
+        "The function to use for sorting the index mouse-menu.",
+    ),
+    (
+        "imenu-submenus-on-top",
+        "Flag specifying whether items with sublists should be kept at top.",
+    ),
+    (
+        "imenu-syntax-alist",
+        "Alist of syntax table modifiers to use while in `imenu--generic-function'.",
+    ),
+    (
+        "indent-line-function",
+        "Function to indent the current line.",
+    ),
+    (
+        "indent-line-ignored-functions",
+        "Values that are ignored by `indent-according-to-mode'.",
+    ),
+    (
+        "indent-region-function",
+        "Short cut function to indent region using `indent-according-to-mode'.",
+    ),
+    (
+        "indent-rigidly-map",
+        "Transient keymap for adjusting indentation interactively.",
+    ),
+    (
+        "indent-tabs-mode-hook",
+        "Hook run after entering or leaving `indent-tabs-mode'.",
+    ),
+    (
+        "inhibit-auto-fill",
+        "Non-nil means to do as if `auto-fill-mode' was disabled.",
+    ),
+    (
+        "inhibit-default-init",
+        "Non-nil inhibits loading the `default' library.",
+    ),
+    (
+        "inhibit-local-variables-ignore-case",
+        "Non-nil means `inhibit-local-variables-p' ignores case.",
+    ),
+    (
+        "inhibit-local-variables-regexps",
+        "List of regexps matching file names in which to ignore local variables.",
+    ),
+    (
+        "inhibit-local-variables-suffixes",
+        "List of regexps matching suffixes to remove from file names.",
+    ),
+    (
+        "inhibit-message-regexps",
+        "List of regexps that inhibit messages by the function `inhibit-message'.",
+    ),
+    (
+        "inhibit-startup-buffer-menu",
+        "Non-nil inhibits display of buffer list when more than 2 files are loaded.",
+    ),
+    (
+        "inhibit-startup-echo-area-message",
+        "Non-nil inhibits the initial startup echo area message.",
+    ),
+    (
+        "inhibit-startup-hooks",
+        "Non-nil means don't run some startup hooks, because we already did.",
+    ),
+    (
+        "inhibit-startup-screen",
+        "Non-nil inhibits the startup screen.",
+    ),
+    (
+        "init-file-had-error",
+        "Non-nil if there was an error loading the user's init file.",
+    ),
+    (
+        "init-file-user",
+        "Identity of user whose init file is or was read.",
+    ),
+    (
+        "initial-buffer-choice",
+        "Buffer to show after starting Emacs.",
+    ),
+    (
+        "initial-frame-alist",
+        "Alist of parameters for the initial window-system (a.k.a. \"GUI\") frame.",
+    ),
+    (
+        "initial-major-mode",
+        "Major mode command symbol to use for the initial `*scratch*' buffer.",
+    ),
+    (
+        "initial-scratch-message",
+        "Initial documentation displayed in *scratch* buffer at startup.",
+    ),
+    (
+        "input-method-activate-hook",
+        "Normal hook run just after an input method is activated.",
+    ),
+    (
+        "input-method-after-insert-chunk-hook",
+        "Normal hook run just after an input method insert some chunk of text.",
+    ),
+    (
+        "input-method-alist",
+        "Alist of input method names vs how to use them.",
+    ),
+    (
+        "input-method-deactivate-hook",
+        "Normal hook run just after an input method is deactivated.",
+    ),
+    (
+        "input-method-exit-on-first-char",
+        "This flag controls when an input method returns.",
+    ),
+    (
+        "input-method-exit-on-invalid-key",
+        "This flag controls the behavior of an input method on invalid key input.",
+    ),
+    (
+        "input-method-highlight-flag",
+        "If this flag is non-nil, input methods highlight partially-entered text.",
+    ),
+    (
+        "input-method-history",
+        "History list of input methods read from the minibuffer.",
+    ),
+    (
+        "input-method-use-echo-area",
+        "This flag controls how an input method shows an intermediate key sequence.",
+    ),
+    (
+        "input-method-verbose-flag",
+        "A flag to control extra guidance given by input methods.",
+    ),
+    (
+        "insert-default-directory",
+        "Non-nil means when reading a filename start with default dir in minibuffer.",
+    ),
+    (
+        "insert-directory-program",
+        "Absolute or relative name of the `ls'-like program.",
+    ),
+    (
+        "insert-pair-alist",
+        "Alist of paired characters inserted by `insert-pair'.",
+    ),
+    (
+        "interpreter-mode-alist",
+        "Alist mapping interpreter names to major modes.",
+    ),
+    (
+        "interprogram-cut-function",
+        "Function to call to make a killed region available to other programs.",
+    ),
+    (
+        "interprogram-paste-function",
+        "Function to call to get text cut from other programs.",
+    ),
+    (
+        "isearch-allow-motion",
+        "Whether to allow movement between isearch matches by cursor motion commands.",
+    ),
+    (
+        "isearch-allow-prefix",
+        "Whether prefix arguments are allowed during incremental search.",
+    ),
+    (
+        "isearch-allow-scroll",
+        "Whether scrolling is allowed during incremental search.",
+    ),
+    (
+        "isearch-barrier",
+        "Recorded minimum/maximal point for the current search.",
+    ),
+    (
+        "isearch-cmds",
+        "Stack of search status elements.",
+    ),
+    (
+        "isearch-filter-predicate",
+        "Predicate to filter hits of Isearch and replace commands.",
+    ),
+    (
+        "isearch-fold-quotes-mode",
+        "Non-nil if Isearch-Fold-Quotes mode is enabled.",
+    ),
+    (
+        "isearch-fold-quotes-mode-hook",
+        "Hook run after entering or leaving `isearch-fold-quotes-mode'.",
+    ),
+    (
+        "isearch-forward-thing-at-point",
+        "A list of symbols to try to get the \"thing\" at point.",
+    ),
+    (
+        "isearch-help-map",
+        "Keymap for characters following the Help key for Isearch mode.",
+    ),
+    (
+        "isearch-hide-immediately",
+        "If non-nil, re-hide an invisible match right away.",
+    ),
+    (
+        "isearch-lax-whitespace",
+        "If non-nil, a space will match a sequence of whitespace chars.",
+    ),
+    (
+        "isearch-lazy-count",
+        "Show match numbers in the search prompt.",
+    ),
+    (
+        "isearch-lazy-highlight",
+        "Controls the lazy-highlighting during incremental search.",
+    ),
+    (
+        "isearch-menu-bar-commands",
+        "List of commands that can open a menu during Isearch.",
+    ),
+    (
+        "isearch-menu-bar-map",
+        "Menu for `isearch-mode'.",
+    ),
+    (
+        "isearch-message-function",
+        "Function to call to display the search prompt.",
+    ),
+    (
+        "isearch-message-properties",
+        "Text properties that are added to the isearch prompt.",
+    ),
+    (
+        "isearch-mode-end-hook",
+        "Function(s) to call after terminating an incremental search.",
+    ),
+    (
+        "isearch-mode-end-hook-quit",
+        "Non-nil while running `isearch-mode-end-hook' if the user quits the search.",
+    ),
+    (
+        "isearch-mode-hook",
+        "Function(s) to call after starting up an incremental search.",
+    ),
+    (
+        "isearch-mode-map",
+        "Keymap for `isearch-mode'.",
+    ),
+    (
+        "isearch-motion-changes-direction",
+        "Whether motion commands during incremental search change search direction.",
+    ),
+    (
+        "isearch-mouse-commands",
+        "List of mouse commands that are allowed during Isearch.",
+    ),
+    (
+        "isearch-new-regexp-function",
+        "Holds the next `isearch-regexp-function' inside `with-isearch-suspended'.",
+    ),
+    (
+        "isearch-push-state-function",
+        "Function to save a function restoring the mode-specific Isearch state",
+    ),
+    (
+        "isearch-regexp-function",
+        "Regexp-based search mode for words/symbols.",
+    ),
+    (
+        "isearch-regexp-lax-whitespace",
+        "If non-nil, a space will match a sequence of whitespace chars.",
+    ),
+    (
+        "isearch-repeat-on-direction-change",
+        "Whether a direction change should move to another match.",
+    ),
+    (
+        "isearch-resume-in-command-history",
+        "If non-nil, `isearch-resume' commands are added to the command history.",
+    ),
+    (
+        "isearch-search-fun-function",
+        "Non-default value overrides the behavior of `isearch-search-fun-default'.",
+    ),
+    (
+        "isearch-text-conversion-style",
+        "Value of `text-conversion-style' before Isearch mode",
+    ),
+    (
+        "isearch-tool-bar-old-map",
+        "Variable holding the old local value of `tool-bar-map', if any.",
+    ),
+    (
+        "isearch-update-post-hook",
+        "Function(s) to call after isearch has found matches in the buffer.",
+    ),
+    (
+        "isearch-wrap-function",
+        "Function to call to wrap the search when search is failed.",
+    ),
+    (
+        "isearch-wrap-pause",
+        "Define the behavior of wrapping when there are no more matches.",
+    ),
+    (
+        "isearch-yank-on-move",
+        "Motion keys yank text to the search string while you move the cursor.",
+    ),
+    (
+        "iso-transl-char-map",
+        "Alist of character translations for entering ISO characters.",
+    ),
+    (
+        "iso-transl-ctl-x-8-map",
+        "Keymap for C-x 8 prefix.",
+    ),
+    (
+        "iso-transl-dead-key-alist",
+        "Mapping of ASCII characters to their corresponding dead-key symbols.",
+    ),
+    (
+        "ispell-html-skip-alists",
+        "Lists of start and end keys to skip in HTML buffers.",
+    ),
+    (
+        "ispell-menu-map",
+        "Key map for ispell menu.",
+    ),
+    (
+        "ispell-personal-dictionary",
+        "File name of your personal spelling dictionary, or nil.",
+    ),
+    (
+        "ispell-skip-region-alist",
+        "Alist expressing beginning and end of regions not to spell check.",
+    ),
+    (
+        "ispell-tex-skip-alists",
+        "Lists of regions to be skipped in TeX mode.",
+    ),
+    (
+        "jit-lock--antiblink-grace-timer",
+        "Idle timer for fontifying unterminated string or comment, or nil.",
+    ),
+    (
+        "jit-lock--antiblink-line-beginning-position",
+        "Last line beginning position after last command (a marker).",
+    ),
+    (
+        "jit-lock--antiblink-string-or-comment",
+        "Non-nil if in string or comment after last command (a boolean).",
+    ),
+    (
+        "jit-lock-after-change-extend-region-functions",
+        "Hook that can extend the text to refontify after a change.",
+    ),
+    (
+        "jit-lock-antiblink-grace",
+        "Delay after which to refontify unterminated strings and comments.",
+    ),
+    (
+        "jit-lock-chunk-size",
+        "Jit-lock asks to fontify chunks of at most this many characters at a time.",
+    ),
+    (
+        "jit-lock-context-time",
+        "Idle time after which text is contextually refontified, if applicable.",
+    ),
+    (
+        "jit-lock-context-timer",
+        "Timer for context fontification in Just-in-time Lock mode.",
+    ),
+    (
+        "jit-lock-context-unfontify-pos",
+        "Consider text after this position as contextually unfontified.",
+    ),
+    (
+        "jit-lock-contextually",
+        "If non-nil, fontification should be syntactically true.",
+    ),
+    (
+        "jit-lock-debug-mode",
+        "Non-nil if Jit-Lock-Debug mode is enabled.",
+    ),
+    (
+        "jit-lock-debug-mode-hook",
+        "Hook run after entering or leaving `jit-lock-debug-mode'.",
+    ),
+    (
+        "jit-lock-defer-buffers",
+        "List of buffers with pending deferred fontification.",
+    ),
+    (
+        "jit-lock-defer-time",
+        "Idle time after which deferred fontification should take place.",
+    ),
+    (
+        "jit-lock-defer-timer",
+        "Timer for deferred fontification in Just-in-time Lock mode.",
+    ),
+    (
+        "jit-lock-functions",
+        "Special hook run to do the actual fontification.",
+    ),
+    (
+        "jit-lock-mode",
+        "Non-nil means Just-in-time Lock mode is active.",
+    ),
+    (
+        "jit-lock-stealth-buffers",
+        "List of buffers that are being fontified stealthily.",
+    ),
+    (
+        "jit-lock-stealth-load",
+        "Load in percentage above which stealth fontification is suspended.",
+    ),
+    (
+        "jit-lock-stealth-nice",
+        "Time in seconds to pause between chunks of stealth fontification.",
+    ),
+    (
+        "jit-lock-stealth-repeat-timer",
+        "Timer for repeated stealth fontification in Just-in-time Lock mode.",
+    ),
+    (
+        "jit-lock-stealth-time",
+        "Time in seconds to wait before beginning stealth fontification.",
+    ),
+    (
+        "jit-lock-stealth-timer",
+        "Timer for stealth fontification in Just-in-time Lock mode.",
+    ),
+    (
+        "jit-lock-stealth-verbose",
+        "If non-nil, means stealth fontification should show status messages.",
+    ),
+    (
+        "jka-compr-compression-info-list",
+        "List of vectors that describe available compression techniques.",
+    ),
+    (
+        "jka-compr-compression-info-list--internal",
+        "Stored value of `jka-compr-compression-info-list'.",
+    ),
+    (
+        "jka-compr-file-name-handler-entry",
+        "`file-name-handler-alist' entry used by jka-compr I/O functions.",
+    ),
+    (
+        "jka-compr-inhibit",
+        "Non-nil means inhibit automatic uncompression temporarily.",
+    ),
+    (
+        "jka-compr-load-suffixes",
+        "List of compression related suffixes to try when loading files.",
+    ),
+    (
+        "jka-compr-load-suffixes--internal",
+        "Stored value of `jka-compr-load-suffixes'.",
+    ),
+    (
+        "jka-compr-mode-alist-additions",
+        "List of pairs added to `auto-mode-alist' when installing jka-compr.",
+    ),
+    (
+        "jka-compr-mode-alist-additions--internal",
+        "Stored value of `jka-compr-mode-alist-additions'.",
+    ),
+    (
+        "jka-compr-verbose",
+        "If non-nil, output messages whenever compressing or uncompressing files.",
+    ),
+    (
+        "kannada-composable-pattern",
+        "Regexp matching a composable sequence of Kannada characters.",
+    ),
+    (
+        "kept-new-versions",
+        "Number of newest versions to keep when a new numbered backup is made.",
+    ),
+    (
+        "kept-old-versions",
+        "Number of oldest versions to keep when a new numbered backup is made.",
+    ),
+    (
+        "key-substitution-in-progress",
+        "Used internally by `substitute-key-definition'.",
+    ),
+    (
+        "keyboard-coding-system",
+        "Specify coding system for keyboard input.",
+    ),
+    (
+        "keyboard-type",
+        "The brand of keyboard you are using.",
+    ),
+    (
+        "keypad-numlock-setup",
+        "Specifies the keypad setup for unshifted keypad keys when NumLock is on.",
+    ),
+    (
+        "keypad-numlock-shifted-setup",
+        "Specifies the keypad setup for shifted keypad keys when NumLock is off.",
+    ),
+    (
+        "keypad-setup",
+        "Specifies the keypad setup for unshifted keypad keys when NumLock is off.",
+    ),
+    (
+        "keypad-shifted-setup",
+        "Specifies the keypad setup for shifted keypad keys when NumLock is off.",
+    ),
+    (
+        "kill-append-merge-undo",
+        "Amalgamate appending kills with the last kill for undo.",
+    ),
+    (
+        "kill-buffer-hook",
+        "Hook run when a buffer is killed.",
+    ),
+    (
+        "kill-do-not-save-duplicates",
+        "If non-nil, don't add a string to `kill-ring' if it duplicates the last one.",
+    ),
+    (
+        "kill-emacs-query-functions",
+        "Functions to call with no arguments to query about killing Emacs.",
+    ),
+    (
+        "kill-read-only-ok",
+        "Non-nil means don't signal an error for killing read-only text.",
+    ),
+    (
+        "kill-ring-deindent-mode",
+        "Non-nil if Kill-Ring-Deindent mode is enabled.",
+    ),
+    (
+        "kill-ring-max",
+        "Maximum length of kill ring before oldest elements are thrown away.",
+    ),
+    (
+        "kill-transform-function",
+        "Function to call to transform a string before it's put on the kill ring.",
+    ),
+    (
+        "kill-whole-line",
+        "If non-nil, `kill-line' with no arg at start of line kills the whole line.",
+    ),
+    (
+        "kkc-after-update-conversion-functions",
+        "Functions to run after a conversion is selected in `japanese' input method.",
+    ),
+    (
+        "language-info-alist",
+        "Alist of language environment definitions.",
+    ),
+    (
+        "language-info-custom-alist",
+        "Customizations of language environment parameters.",
+    ),
+    (
+        "large-file-warning-threshold",
+        "Maximum size of file above which a confirmation is requested.",
+    ),
+    (
+        "last-abbrev",
+        "The abbrev-symbol of the last abbrev expanded.  See `abbrev-symbol'.",
+    ),
+    (
+        "last-abbrev-location",
+        "The location of the start of the last abbrev that was expanded.",
+    ),
+    (
+        "last-abbrev-text",
+        "The exact text of the last abbrev that was expanded.",
+    ),
+    (
+        "last-coding-system-specified",
+        "Most recent coding system explicitly specified by the user when asked.",
+    ),
+    (
+        "latex-block-names",
+        "User defined LaTeX block names.",
+    ),
+    (
+        "latex-inputenc-coding-alist",
+        "Mapping from LaTeX encodings in \"inputenc.sty\" to Emacs coding systems.",
+    ),
+    (
+        "latex-run-command",
+        "Command used to run LaTeX subjob.",
+    ),
+    (
+        "latin1-display",
+        "Set up Latin-1/ASCII display for ISO8859 character sets.",
+    ),
+    (
+        "latin1-display-ucs-per-lynx",
+        "Set up Latin-1/ASCII display for Unicode characters.",
+    ),
+    (
+        "lazy-count-invisible-format",
+        "Format of the number of invisible matches for the prompt.",
+    ),
+    (
+        "lazy-count-prefix-format",
+        "Format of the current/total number of matches for the prompt prefix.",
+    ),
+    (
+        "lazy-count-suffix-format",
+        "Format of the current/total number of matches for the prompt suffix.",
+    ),
+    (
+        "lazy-count-update-hook",
+        "Hook run after new lazy count results are computed.",
+    ),
+    (
+        "lazy-highlight-buffer",
+        "Controls the lazy-highlighting of the full buffer.",
+    ),
+    (
+        "lazy-highlight-buffer-max-at-a-time",
+        "Maximum matches to highlight at a time (for `lazy-highlight-buffer').",
+    ),
+    (
+        "lazy-highlight-cleanup",
+        "Controls whether to remove extra highlighting after a search.",
+    ),
+    (
+        "lazy-highlight-initial-delay",
+        "Seconds to wait before beginning to lazily highlight all matches.",
+    ),
+    (
+        "lazy-highlight-interval",
+        "Seconds between lazily highlighting successive matches.",
+    ),
+    (
+        "lazy-highlight-max-at-a-time",
+        "Maximum matches to highlight at a time (for `lazy-highlight').",
+    ),
+    (
+        "lazy-highlight-no-delay-length",
+        "For search strings at least this long, lazy highlight starts immediately.",
+    ),
+    (
+        "leim-list-entry-regexp",
+        "Regexp matching head of each entry in LEIM list file.",
+    ),
+    (
+        "leim-list-file-name",
+        "Name of LEIM list file.",
+    ),
+    (
+        "leim-list-header",
+        "Header to be inserted in LEIM list file.",
+    ),
+    (
+        "line-move-ignore-invisible",
+        "Non-nil means commands that move by lines ignore invisible newlines.",
+    ),
+    (
+        "line-move-visual",
+        "When non-nil, `line-move' moves point by visual lines.",
+    ),
+    (
+        "line-number-mode",
+        "Non-nil if Line-Number mode is enabled.",
+    ),
+    (
+        "line-number-mode-hook",
+        "Hook run after entering or leaving `line-number-mode'.",
+    ),
+    (
+        "lisp-body-indent",
+        "Number of columns to indent the second line of a `(def...)' form.",
+    ),
+    (
+        "lisp-cl-font-lock-keywords",
+        "Default expressions to highlight in Lisp modes.",
+    ),
+    (
+        "lisp-cl-font-lock-keywords-1",
+        "Subdued level highlighting for Lisp modes.",
+    ),
+    (
+        "lisp-cl-font-lock-keywords-2",
+        "Gaudy level highlighting for Lisp modes.",
+    ),
+    (
+        "lisp-data-mode-abbrev-table",
+        "Abbrev table for `lisp-data-mode'.",
+    ),
+    (
+        "lisp-data-mode-hook",
+        "Hook run after entering `lisp-data-mode'.",
+    ),
+    (
+        "lisp-data-mode-map",
+        "Keymap for `lisp-data-mode'.",
+    ),
+    (
+        "lisp-data-mode-syntax-table",
+        "Parent syntax table used in Lisp modes.",
+    ),
+    (
+        "lisp-directory",
+        "Directory where Emacs's own *.el and *.elc Lisp files are installed.",
+    ),
+    (
+        "lisp-doc-string-elt-property",
+        "The symbol property that holds the docstring position info.",
+    ),
+    (
+        "lisp-el-font-lock-keywords",
+        "Default expressions to highlight in Emacs Lisp mode.",
+    ),
+    (
+        "lisp-el-font-lock-keywords-1",
+        "Subdued level highlighting for Emacs Lisp mode.",
+    ),
+    (
+        "lisp-el-font-lock-keywords-2",
+        "Gaudy level highlighting for Emacs Lisp mode.",
+    ),
+    (
+        "lisp-el-font-lock-keywords-for-backtraces",
+        "Default highlighting from Emacs Lisp mode used in Backtrace mode.",
+    ),
+    (
+        "lisp-el-font-lock-keywords-for-backtraces-1",
+        "Subdued highlighting from Emacs Lisp mode used in Backtrace mode.",
+    ),
+    (
+        "lisp-el-font-lock-keywords-for-backtraces-2",
+        "Gaudy highlighting from Emacs Lisp mode used in Backtrace mode.",
+    ),
+    (
+        "lisp-imenu-generic-expression",
+        "Imenu generic expression for Lisp mode.  See `imenu-generic-expression'.",
+    ),
+    (
+        "lisp-indent-function",
+        "A function to be called by `calculate-lisp-indent'.",
+    ),
+    (
+        "lisp-indent-offset",
+        "If non-nil, indent second line of expressions that many more columns.",
+    ),
+    (
+        "lisp-interaction-mode-hook",
+        "Hook run when entering Lisp Interaction mode.",
+    ),
+    (
+        "lisp-interaction-mode-map",
+        "Keymap for Lisp Interaction mode.",
+    ),
+    (
+        "lisp-interaction-mode-menu",
+        "Menu for Lisp Interaction mode.",
+    ),
+    (
+        "lisp-interaction-mode-syntax-table",
+        "Syntax table for `lisp-interaction-mode'.",
+    ),
+    (
+        "lisp-mode-abbrev-table",
+        "Abbrev table for Lisp mode.",
+    ),
+    (
+        "lisp-mode-autoload-regexp",
+        "Regexp to match autoload cookies.",
+    ),
+    (
+        "lisp-mode-hook",
+        "Hook run when entering Lisp mode.",
+    ),
+    (
+        "lisp-mode-map",
+        "Keymap for ordinary Lisp mode.",
+    ),
+    (
+        "lisp-mode-menu",
+        "Menu for ordinary Lisp mode.",
+    ),
+    (
+        "lisp-mode-shared-map",
+        "Keymap for commands shared by all sorts of Lisp modes.",
+    ),
+    (
+        "lisp-mode-syntax-table",
+        "Syntax table used in `lisp-mode'.",
+    ),
+    (
+        "lisp-prettify-symbols-alist",
+        "Alist of symbol/\"pretty\" characters to be displayed.",
+    ),
+    (
+        "list-buffers-directory",
+        "String to display in buffer listings for buffers not visiting a file.",
+    ),
+    (
+        "list-directory-brief-switches",
+        "Switches for `list-directory' to pass to `ls' for brief listing.",
+    ),
+    (
+        "list-directory-verbose-switches",
+        "Switches for `list-directory' to pass to `ls' for verbose listing.",
+    ),
+    (
+        "list-faces-sample-text",
+        "Text string to display as the sample text for `list-faces-display'.",
+    ),
+    (
+        "list-matching-lines-buffer-name-face",
+        "Face used by \\[list-matching-lines] to show the names of buffers.",
+    ),
+    (
+        "list-matching-lines-current-line-face",
+        "Face used by \\[list-matching-lines] to highlight the current line.",
+    ),
+    (
+        "list-matching-lines-default-context-lines",
+        "Default number of context lines included around `list-matching-lines' matches.",
+    ),
+    (
+        "list-matching-lines-face",
+        "Face used by \\[list-matching-lines] to show the text that matches.",
+    ),
+    (
+        "list-matching-lines-jump-to-current-line",
+        "If non-nil, \\[list-matching-lines] shows the current line highlighted.",
+    ),
+    (
+        "list-matching-lines-prefix-face",
+        "Face used by \\[list-matching-lines] to show the prefix column.",
+    ),
+    (
+        "load--bin-dest-dir",
+        "Store the original value passed by \"--bin-dest\" during dump.",
+    ),
+    (
+        "load--eln-dest-dir",
+        "Store the original value passed by \"--eln-dest\" during dump.",
+    ),
+    (
+        "local-enable-local-variables",
+        "Like `enable-local-variables', except for major mode in a -*- line.",
+    ),
+    (
+        "locale-charset-alist",
+        "Coding system alist keyed on locale-style charset name.",
+    ),
+    (
+        "locale-charset-language-names",
+        "List of pairs of locale regexps and charset language names.",
+    ),
+    (
+        "locale-language-names",
+        "Alist of locale regexps vs the corresponding languages and coding systems.",
+    ),
+    (
+        "locale-preferred-coding-systems",
+        "List of pairs of locale regexps and preferred coding systems.",
+    ),
+    (
+        "locale-translation-file-name",
+        "File name for the system's file of locale-name aliases, or nil if none.",
+    ),
+    (
+        "locate-dominating-stop-dir-regexp",
+        "Regexp of directory names that stop the search in `locate-dominating-file'.",
+    ),
+    (
+        "locate-ls-subdir-switches",
+        "`ls' switches for inserting subdirectories in `*Locate*' buffers.",
+    ),
+    (
+        "lock-file-mode",
+        "Non-nil if Lock-File mode is enabled.",
+    ),
+    (
+        "lock-file-mode-hook",
+        "Hook run after entering or leaving `lock-file-mode'.",
+    ),
+    (
+        "lock-file-name-transforms",
+        "Transforms to apply to buffer file name before making a lock file name.",
+    ),
+    (
+        "lost-selection-last-region-buffer",
+        "The last buffer from which the region was selected.",
+    ),
+    (
+        "lost-selection-mode",
+        "Non-nil if Lost-Selection mode is enabled.",
+    ),
+    (
+        "lost-selection-mode-hook",
+        "Hook run after entering or leaving `lost-selection-mode'.",
+    ),
+    (
+        "lpr-command",
+        "Name of program for printing a file.",
+    ),
+    (
+        "lpr-lp-system",
+        "Non-nil if running on a system type that uses the \"lp\" command.",
+    ),
+    (
+        "lpr-switches",
+        "List of strings to pass as extra options for the printer program.",
+    ),
+    (
+        "lpr-windows-system",
+        "Non-nil if running on MS-DOS or MS Windows.",
+    ),
+    (
+        "ls-lisp-support-shell-wildcards",
+        "Non-nil means ls-lisp treats file patterns as shell wildcards.",
+    ),
+    (
+        "macro-declarations-alist",
+        "List associating properties of macros to their macro expansion.",
+    ),
+    (
+        "macroexp--pending-eager-loads",
+        "Stack of files currently undergoing eager macro-expansion.",
+    ),
+    (
+        "macroexp-inhibit-compiler-macros",
+        "Inhibit application of compiler macros if non-nil.",
+    ),
+    (
+        "magic-fallback-mode-alist",
+        "Like `magic-mode-alist' but has lower priority than `auto-mode-alist'.",
+    ),
+    (
+        "magic-mode-alist",
+        "Alist of buffer beginnings vs. corresponding major mode functions.",
+    ),
+    (
+        "magic-mode-regexp-match-limit",
+        "Upper limit on `magic-mode-alist' regexp matches.",
+    ),
+    (
+        "mail-abbrevs-mode",
+        "Non-nil if Mail-Abbrevs mode is enabled.",
+    ),
+    (
+        "mail-aliases",
+        "Alist of mail address aliases,",
+    ),
+    (
+        "mail-archive-file-name",
+        "Name of file to write all outgoing messages in, or nil for none.",
+    ),
+    (
+        "mail-citation-hook",
+        "Hook for modifying a citation just inserted in the mail buffer.",
+    ),
+    (
+        "mail-citation-prefix-regexp",
+        "Regular expression to match a citation prefix plus whitespace.",
+    ),
+    (
+        "mail-complete-style",
+        "Specifies how \\[mail-complete] formats the full name when it completes.",
+    ),
+    (
+        "mail-default-directory",
+        "Value of `default-directory' for Mail mode buffers.",
+    ),
+    (
+        "mail-default-headers",
+        "A string containing header lines, to be inserted in outgoing messages.",
+    ),
+    (
+        "mail-default-reply-to",
+        "Address to insert as default Reply-To field of outgoing messages.",
+    ),
+    (
+        "mail-dont-reply-to-names",
+        "Regexp specifying addresses to prune from a reply message.",
+    ),
+    (
+        "mail-encode-mml",
+        "If non-nil, mail-user-agent's `sendfunc' command should mml-encode",
+    ),
+    (
+        "mail-from-style",
+        "Specifies how \"From:\" fields look.",
+    ),
+    (
+        "mail-header-separator",
+        "Line used to separate headers from text in messages being composed.",
+    ),
+    (
+        "mail-hist-keep-history",
+        "Non-nil means keep a history for headers and text of outgoing mail.",
+    ),
+    (
+        "mail-host-address",
+        "The name of this machine, for use in constructing email addresses.",
+    ),
+    (
+        "mail-indentation-spaces",
+        "Number of spaces to insert at the beginning of each cited line.",
+    ),
+    (
+        "mail-interactive",
+        "Non-nil means when sending a message wait for and display errors.",
+    ),
+    (
+        "mail-mailing-lists",
+        "List of mailing list addresses the user is subscribed to.",
+    ),
+    (
+        "mail-personal-alias-file",
+        "If non-nil, the name of the user's personal mail alias file.",
+    ),
+    (
+        "mail-self-blind",
+        "Non-nil means insert Bcc to self in messages to be sent.",
+    ),
+    (
+        "mail-setup-hook",
+        "Normal hook, run each time a new outgoing message is initialized.",
+    ),
+    (
+        "mail-signature",
+        "Text inserted at end of mail buffer when a message is initialized.",
+    ),
+    (
+        "mail-signature-file",
+        "File containing the text inserted at end of mail buffer.",
+    ),
+    (
+        "mail-specify-envelope-from",
+        "If non-nil, specify the envelope-from address when sending mail.",
+    ),
+    (
+        "mail-use-rfc822",
+        "If non-nil, use a full, hairy RFC 822 (or later) parser on mail addresses.",
+    ),
+    (
+        "mail-user-agent",
+        "Your preference for a mail composition package.",
+    ),
+    (
+        "mail-yank-prefix",
+        "Prefix insert on lines of yanked message being replied to.",
+    ),
+    (
+        "major-mode-remap-alist",
+        "Alist mapping file-specified modes to alternative modes.",
+    ),
+    (
+        "major-mode-remap-defaults",
+        "Alist mapping file-specified modes to alternative modes.",
+    ),
+    (
+        "make-backup-file-name-function",
+        "A function that `make-backup-file-name' uses to create backup file names.",
+    ),
+    (
+        "make-backup-files",
+        "Non-nil means make a backup of a file the first time it is saved.",
+    ),
+    (
+        "malayalam-composable-pattern",
+        "Regexp matching a composable sequence of Malayalam characters.",
+    ),
+    (
+        "mark-ring",
+        "The list of former marks of the current buffer, most recent first.",
+    ),
+    (
+        "mark-ring-max",
+        "Maximum size of mark ring.  Start discarding off end if gets this big.",
+    ),
+    (
+        "max-specpdl-size",
+        "Former limit on specbindings, now without effect.",
+    ),
+    (
+        "menu-bar-buffers-menu-command-entries",
+        "Entries to be included at the end of the \"Buffers\" menu.",
+    ),
+    (
+        "menu-bar-close-window",
+        "Whether or not to close the current window from the menu bar.",
+    ),
+    (
+        "menu-bar-last-search-type",
+        "Type of last non-incremental search command called from the menu.",
+    ),
+    (
+        "menu-bar-mode-hook",
+        "Hook run after entering or leaving `menu-bar-mode'.",
+    ),
+    (
+        "menu-bar-select-buffer-function",
+        "Function to select the buffer chosen from the `Buffers' menu-bar menu.",
+    ),
+    (
+        "menu-bar-separator",
+        "Separator for menus.",
+    ),
+    (
+        "messages-buffer-mode-abbrev-table",
+        "Abbrev table for `messages-buffer-mode'.",
+    ),
+    (
+        "messages-buffer-mode-hook",
+        "Hook run after entering `messages-buffer-mode'.",
+    ),
+    (
+        "messages-buffer-mode-map",
+        "Keymap for `messages-buffer-mode'.",
+    ),
+    (
+        "messages-buffer-mode-syntax-table",
+        "Syntax table for `messages-buffer-mode'.",
+    ),
+    (
+        "midnight-mode",
+        "Non-nil if Midnight mode is enabled.",
+    ),
+    (
+        "minibuffer--original-buffer",
+        "Buffer that was current when `completing-read' was called.",
+    ),
+    (
+        "minibuffer--regexp-primed",
+        "Non-nil when minibuffer contents change.",
+    ),
+    (
+        "minibuffer--regexp-prompt-regexp",
+        "Regular expression compiled from `minibuffer-regexp-prompts'.",
+    ),
+    (
+        "minibuffer--require-match",
+        "Value of REQUIRE-MATCH passed to `completing-read'.",
+    ),
+    (
+        "minibuffer-beginning-of-buffer-movement",
+        "Control how the \\<minibuffer-local-map>\\[minibuffer-beginning-of-buffer] command in the minibuffer behaves.",
+    ),
+    (
+        "minibuffer-completion-auto-choose",
+        "Non-nil means to automatically insert completions to the minibuffer.",
+    ),
+    (
+        "minibuffer-completion-base",
+        "The base for the current completion.",
+    ),
+    (
+        "minibuffer-confirm-exit-commands",
+        "List of commands which cause an immediately following",
+    ),
+    (
+        "minibuffer-default",
+        "The current default value or list of default values in the minibuffer.",
+    ),
+    (
+        "minibuffer-default-add-done",
+        "When nil, add more elements to the end of the list of default values.",
+    ),
+    (
+        "minibuffer-default-add-function",
+        "Function run by `goto-history-element' before consuming default values.",
+    ),
+    (
+        "minibuffer-default-prompt-format",
+        "Format string used to output \"default\" values.",
+    ),
+    (
+        "minibuffer-depth-indicate-mode",
+        "Non-nil if Minibuffer-Depth-Indicate mode is enabled.",
+    ),
+    (
+        "minibuffer-electric-default-mode",
+        "Non-nil if Minibuffer-Electric-Default mode is enabled.",
+    ),
+    (
+        "minibuffer-frame-alist",
+        "Alist of parameters for the initial minibuffer frame.",
+    ),
+    (
+        "minibuffer-history",
+        "Default minibuffer history list.",
+    ),
+    (
+        "minibuffer-history-case-insensitive-variables",
+        "Minibuffer history variables for which matching should ignore case.",
+    ),
+    (
+        "minibuffer-history-sexp-flag",
+        "Control whether history list elements are expressions or strings.",
+    ),
+    (
+        "minibuffer-inactive-mode-abbrev-table",
+        "Abbrev table for `minibuffer-inactive-mode'.",
+    ),
+    (
+        "minibuffer-inactive-mode-hook",
+        "Hook run after entering `minibuffer-inactive-mode'.",
+    ),
+    (
+        "minibuffer-inactive-mode-map",
+        "Keymap for use in the minibuffer when it is not active.",
+    ),
+    (
+        "minibuffer-inactive-mode-syntax-table",
+        "Syntax table for `minibuffer-inactive-mode'.",
+    ),
+    (
+        "minibuffer-lazy-count-format",
+        "Format of the total number of matches for the prompt prefix.",
+    ),
+    (
+        "minibuffer-local-completion-map",
+        "Local keymap for minibuffer input with completion.",
+    ),
+    (
+        "minibuffer-local-filename-completion-map",
+        "Local keymap for minibuffer input with completion for filenames.",
+    ),
+    (
+        "minibuffer-local-filename-syntax",
+        "Syntax table used when reading a file name in the minibuffer.",
+    ),
+    (
+        "minibuffer-local-isearch-map",
+        "Keymap for editing Isearch strings in the minibuffer.",
+    ),
+    (
+        "minibuffer-local-must-match-map",
+        "Local keymap for minibuffer input with completion, for exact match.",
+    ),
+    (
+        "minibuffer-local-ns-map",
+        "Local keymap for the minibuffer when spaces are not allowed.",
+    ),
+    (
+        "minibuffer-local-shell-command-map",
+        "Keymap used for completing shell commands in minibuffer.",
+    ),
+    (
+        "minibuffer-message-clear-timeout",
+        "How long to display an echo-area message when the minibuffer is active.",
+    ),
+    (
+        "minibuffer-message-properties",
+        "Text properties added to the text shown by `minibuffer-message'.",
+    ),
+    (
+        "minibuffer-mode-abbrev-table",
+        "Abbrev table for `minibuffer-mode'.",
+    ),
+    (
+        "minibuffer-mode-hook",
+        "Hook run after entering `minibuffer-mode'.",
+    ),
+    (
+        "minibuffer-mode-map",
+        "Keymap for `minibuffer-mode'.",
+    ),
+    (
+        "minibuffer-on-screen-keyboard-displayed",
+        "Whether or not the on-screen keyboard has been displayed.",
+    ),
+    (
+        "minibuffer-on-screen-keyboard-timer",
+        "Timer run upon exiting the minibuffer.",
+    ),
+    (
+        "minibuffer-regexp-mode",
+        "Non-nil if Minibuffer-Regexp mode is enabled.",
+    ),
+    (
+        "minibuffer-regexp-mode-hook",
+        "Hook run after entering or leaving `minibuffer-regexp-mode'.",
+    ),
+    (
+        "minibuffer-regexp-prompts",
+        "List of regular expressions that trigger `minibuffer-regexp-mode' features.",
+    ),
+    (
+        "minibuffer-text-before-history",
+        "Text that was in this minibuffer before any history commands.",
+    ),
+    (
+        "minibuffer-visible-completions",
+        "Whether candidates shown in *Completions* can be navigated from minibuffer.",
+    ),
+    (
+        "minibuffer-visible-completions--always-bind",
+        "If non-nil, force the `minibuffer-visible-completions' bindings on.",
+    ),
+    (
+        "minibuffer-visible-completions-map",
+        "Local keymap for minibuffer input with visible completions.",
+    ),
+    (
+        "minor-mode-alist",
+        "Alist saying how to show minor modes in the mode line.",
+    ),
+    (
+        "minor-mode-list",
+        "List of all minor mode functions.",
+    ),
+    (
+        "mode-line-buffer-identification",
+        "Mode line construct for identifying the buffer being displayed.",
+    ),
+    (
+        "mode-line-buffer-identification-keymap",
+        "Keymap for what is displayed by `mode-line-buffer-identification'.",
+    ),
+    (
+        "mode-line-client",
+        "Mode line construct for identifying emacsclient frames.",
+    ),
+    (
+        "mode-line-coding-system-map",
+        "Local keymap for the coding-system part of the mode line.",
+    ),
+    (
+        "mode-line-column-line-number-mode-map",
+        "Keymap to display on column and line numbers.",
+    ),
+    (
+        "mode-line-default-help-echo",
+        "Default help text for the mode line.",
+    ),
+    (
+        "mode-line-defining-kbd-macro",
+        "String displayed in the mode line in keyboard macro recording mode.",
+    ),
+    (
+        "mode-line-end-spaces",
+        "Mode line construct to put at the end of the mode line.",
+    ),
+    (
+        "mode-line-format-right-align",
+        "Mode line construct to right align all following constructs.",
+    ),
+    (
+        "mode-line-frame-identification",
+        "Mode line construct to describe the current frame.",
+    ),
+    (
+        "mode-line-front-space",
+        "Mode line construct to put at the front of the mode line.",
+    ),
+    (
+        "mode-line-major-mode-keymap",
+        "Keymap to display on major mode.",
+    ),
+    (
+        "mode-line-minor-mode-keymap",
+        "Keymap to display on minor modes.",
+    ),
+    (
+        "mode-line-misc-info",
+        "Mode line construct for miscellaneous information.",
+    ),
+    (
+        "mode-line-mode-menu",
+        "Menu of mode operations in the mode line.",
+    ),
+    (
+        "mode-line-modes",
+        "Mode line construct for displaying major and minor modes.",
+    ),
+    (
+        "mode-line-modified",
+        "Mode line construct for displaying whether current buffer is modified.",
+    ),
+    (
+        "mode-line-mule-info",
+        "Mode line construct to report the multilingual environment.",
+    ),
+    (
+        "mode-line-percent-position",
+        "Specification of \"percentage offset\" of window through buffer.",
+    ),
+    (
+        "mode-line-position",
+        "Mode line construct for displaying the position in the buffer.",
+    ),
+    (
+        "mode-line-position-column-format",
+        "Format used to display column numbers in the mode line.",
+    ),
+    (
+        "mode-line-position-column-line-format",
+        "Format used to display combined line/column numbers in the mode line.",
+    ),
+    (
+        "mode-line-position-line-format",
+        "Format used to display line numbers in the mode line.",
+    ),
+    (
+        "mode-line-process",
+        "Mode line construct for displaying info on process status.",
+    ),
+    (
+        "mode-line-remote",
+        "Mode line construct to indicate a remote buffer.",
+    ),
+    (
+        "mode-line-right-align-edge",
+        "Where function `mode-line-format-right-align' should align to.",
+    ),
+    (
+        "mode-line-window-dedicated",
+        "Mode line construct to describe the current window.",
+    ),
+    (
+        "mode-line-window-dedicated-keymap",
+        "Keymap for what is displayed by `mode-line-window-dedicated'.",
+    ),
+    (
+        "mode-require-final-newline",
+        "Whether to add a newline at end of file, in certain major modes.",
+    ),
+    (
+        "mode-specific-map",
+        "Keymap for characters following \\`C-c'.",
+    ),
+    (
+        "modifier-bar-mode",
+        "Non-nil if Modifier-Bar mode is enabled.",
+    ),
+    (
+        "modifier-bar-mode-hook",
+        "Hook run after entering or leaving `modifier-bar-mode'.",
+    ),
+    (
+        "modifier-bar-modifier-list",
+        "List of modifiers that are currently applied.",
+    ),
+    (
+        "mounted-file-systems",
+        "File systems that ought to be mounted.",
+    ),
+    (
+        "mouse--rectangle-track-cursor",
+        "Whether the mouse tracks the cursor when selecting a rectangle.",
+    ),
+    (
+        "mouse-1-click-follows-link",
+        "Non-nil means that clicking Mouse-1 on a link follows the link.",
+    ),
+    (
+        "mouse-1-click-in-non-selected-windows",
+        "If non-nil, a Mouse-1 click also follows links in non-selected windows.",
+    ),
+    (
+        "mouse-1-double-click-prefer-symbols",
+        "If non-nil, double-clicking Mouse-1 attempts to select the symbol at click.",
+    ),
+    (
+        "mouse-autoselect-window-position",
+        "Last mouse position recorded by delayed window autoselection.",
+    ),
+    (
+        "mouse-autoselect-window-position-1",
+        "First mouse position recorded by delayed window autoselection.",
+    ),
+    (
+        "mouse-autoselect-window-state",
+        "When non-nil, special state of delayed window autoselection.",
+    ),
+    (
+        "mouse-autoselect-window-timer",
+        "Timer used by delayed window autoselection.",
+    ),
+    (
+        "mouse-autoselect-window-window",
+        "Last window recorded by delayed window autoselection.",
+    ),
+    (
+        "mouse-avoidance-mode",
+        "Activate Mouse Avoidance mode.",
+    ),
+    (
+        "mouse-buffer-menu-maxlen",
+        "Number of buffers in one pane (submenu) of the buffer menu.",
+    ),
+    (
+        "mouse-buffer-menu-mode-groups",
+        "How to group various major modes together in \\[mouse-buffer-menu].",
+    ),
+    (
+        "mouse-buffer-menu-mode-mult",
+        "Group the buffers by the major mode groups on \\[mouse-buffer-menu]?",
+    ),
+    (
+        "mouse-drag-and-drop-region",
+        "If non-nil, dragging the mouse drags the region, if it exists.",
+    ),
+    (
+        "mouse-drag-and-drop-region-cross-program",
+        "If non-nil, allow dragging text to other programs.",
+    ),
+    (
+        "mouse-drag-and-drop-region-cut-when-buffers-differ",
+        "If non-nil, cut text also when source and destination buffers differ.",
+    ),
+    (
+        "mouse-drag-and-drop-region-scroll-margin",
+        "If non-nil, the scroll margin inside a window when dragging text.",
+    ),
+    (
+        "mouse-drag-and-drop-region-show-cursor",
+        "If non-nil, move point with mouse cursor during dragging.",
+    ),
+    (
+        "mouse-drag-and-drop-region-show-tooltip",
+        "If non-nil, text is shown by a tooltip in a graphic display.",
+    ),
+    (
+        "mouse-drag-copy-region",
+        "If non-nil, copy to kill ring upon mouse adjustments of the region.",
+    ),
+    (
+        "mouse-drag-mode-line-buffer",
+        "If non-nil, allow dragging files from the mode line.",
+    ),
+    (
+        "mouse-scroll-delay",
+        "The pause between scroll steps caused by mouse drags, in seconds.",
+    ),
+    (
+        "mouse-scroll-min-lines",
+        "The minimum number of lines scrolled by dragging mouse out of window.",
+    ),
+    (
+        "mouse-secondary-overlay",
+        "An overlay which records the current secondary selection.",
+    ),
+    (
+        "mouse-select-region-move-to-beginning",
+        "Effect of selecting a region extending backward from double click.",
+    ),
+    (
+        "mouse-wheel--installed-bindings-alist",
+        "Alist of all installed mouse wheel key bindings.",
+    ),
+    (
+        "mouse-wheel-buttons",
+        "How to remap mouse button numbers to wheel events.",
+    ),
+    (
+        "mouse-wheel-click-event",
+        "Event that should be temporarily inhibited after mouse scrolling.",
+    ),
+    (
+        "mouse-wheel-down-event",
+        "Event used for scrolling down, beside `wheel-up', if any.",
+    ),
+    (
+        "mouse-wheel-flip-direction",
+        "Swap direction of `wheel-right' and `wheel-left'.",
+    ),
+    (
+        "mouse-wheel-follow-mouse",
+        "Whether the mouse wheel should scroll the window that the mouse is over.",
+    ),
+    (
+        "mouse-wheel-inhibit-click-time",
+        "Time in seconds to inhibit clicking on mouse wheel button after scroll.",
+    ),
+    (
+        "mouse-wheel-left-event",
+        "Event used for scrolling left, beside `wheel-left', if any.",
+    ),
+    (
+        "mouse-wheel-mode",
+        "Non-nil if Mouse-Wheel mode is enabled.",
+    ),
+    (
+        "mouse-wheel-mode-hook",
+        "Hook run after entering or leaving `mouse-wheel-mode'.",
+    ),
+    (
+        "mouse-wheel-progressive-speed",
+        "If nil, scrolling speed is proportional to the wheel speed.",
+    ),
+    (
+        "mouse-wheel-right-event",
+        "Event used for scrolling right, beside `wheel-right', if any.",
+    ),
+    (
+        "mouse-wheel-scroll-amount",
+        "Amount to scroll windows by when spinning the mouse wheel.",
+    ),
+    (
+        "mouse-wheel-scroll-amount-horizontal",
+        "Amount to scroll windows horizontally.",
+    ),
+    (
+        "mouse-wheel-tilt-scroll",
+        "Enable horizontal scrolling by tilting mouse wheel or via touchpad.",
+    ),
+    (
+        "mouse-wheel-up-event",
+        "Event used for scrolling up, beside `wheel-down', if any.",
+    ),
+    (
+        "mouse-yank-at-point",
+        "If non-nil, mouse yank commands yank at point instead of at click.",
+    ),
+    (
+        "msb-mode",
+        "Non-nil if Msb mode is enabled.",
+    ),
+    (
+        "mule-keymap",
+        "Keymap for Mule (Multilingual environment) specific commands.",
+    ),
+    (
+        "mule-menu-keymap",
+        "Keymap for Mule (Multilingual environment) menu specific commands.",
+    ),
+    (
+        "mule-version",
+        "Version number and name of this version of MULE (multilingual environment).",
+    ),
+    (
+        "mule-version-date",
+        "Distribution date of this version of MULE (multilingual environment).",
+    ),
+    (
+        "multi-isearch-buffer-list",
+        "Sequence of buffers visited by multiple buffers Isearch.",
+    ),
+    (
+        "multi-isearch-current-buffer",
+        "The buffer where the search is currently searching.",
+    ),
+    (
+        "multi-isearch-file-list",
+        "Sequence of files visited by multiple file buffers Isearch.",
+    ),
+    (
+        "multi-isearch-next-buffer-current-function",
+        "The currently active function to get the next buffer to search.",
+    ),
+    (
+        "multi-isearch-next-buffer-function",
+        "Function to call to get the next buffer to search.",
+    ),
+    (
+        "multi-message-max",
+        "Max size of the list of accumulated messages.",
+    ),
+    (
+        "multi-message-timeout",
+        "Number of seconds between messages before clearing the accumulated list.",
+    ),
+    (
+        "multi-query-replace-map",
+        "Keymap that defines additional bindings for multi-buffer replacements.",
+    ),
+    (
+        "mwheel-inhibit-click-event-timer",
+        "Timer running while mouse wheel click event is inhibited.",
+    ),
+    (
+        "mwheel-scroll-down-function",
+        "Function that does the job of scrolling downward.",
+    ),
+    (
+        "mwheel-scroll-left-function",
+        "Function that does the job of scrolling left.",
+    ),
+    (
+        "mwheel-scroll-right-function",
+        "Function that does the job of scrolling right.",
+    ),
+    (
+        "mwheel-scroll-up-function",
+        "Function that does the job of scrolling upward.",
+    ),
+    (
+        "narrow-map",
+        "Keymap for narrowing commands.",
+    ),
+    (
+        "narrow-to-defun-include-comments",
+        "If non-nil, `narrow-to-defun' will also show comments preceding the defun.",
+    ),
+    (
+        "next-error--message-highlight-overlay",
+        "Overlay highlighting the current error message in the `next-error' buffer.",
+    ),
+    (
+        "next-error-buffer",
+        "The buffer-local value of the most recent `next-error' buffer.",
+    ),
+    (
+        "next-error-find-buffer-function",
+        "Function called to find a `next-error' capable buffer.",
+    ),
+    (
+        "next-error-follow-minor-mode",
+        "Non-nil if Next-Error-Follow minor mode is enabled.",
+    ),
+    (
+        "next-error-follow-minor-mode-hook",
+        "Hook run after entering or leaving `next-error-follow-minor-mode'.",
+    ),
+    (
+        "next-error-found-function",
+        "Function called when a next locus is found and displayed.",
+    ),
+    (
+        "next-error-function",
+        "Function to use to find the next error in the current buffer.",
+    ),
+    (
+        "next-error-highlight",
+        "Highlighting of locations in the selected buffer.",
+    ),
+    (
+        "next-error-highlight-no-select",
+        "Highlighting of locations in non-selected source buffers.",
+    ),
+    (
+        "next-error-hook",
+        "List of hook functions run by `next-error' after visiting source file.",
+    ),
+    (
+        "next-error-last-buffer",
+        "The most recent `next-error' buffer.",
+    ),
+    (
+        "next-error-message-highlight",
+        "If non-nil, highlight the current error message in the `next-error' buffer.",
+    ),
+    (
+        "next-error-move-function",
+        "Function to use to move to an error locus.",
+    ),
+    (
+        "next-error-recenter",
+        "Display the line in the visited source file recentered as specified.",
+    ),
+    (
+        "next-error-repeat-map",
+        "Keymap to repeat `next-error' and `previous-error'.  Used in `repeat-mode'.",
+    ),
+    (
+        "next-error-verbose",
+        "If non-nil, `next-error' always outputs the current error buffer.",
+    ),
+    (
+        "next-line-add-newlines",
+        "If non-nil, `next-line' inserts newline to avoid `end of buffer' error.",
+    ),
+    (
+        "next-selection-coding-system",
+        "Coding system for the next communication with other programs.",
+    ),
+    (
+        "non-essential",
+        "Whether the currently executing code is performing an essential task.",
+    ),
+    (
+        "normal-auto-fill-function",
+        "The function to use for `auto-fill-function' if Auto Fill mode is turned on.",
+    ),
+    (
+        "normal-erase-is-backspace",
+        "Set the default behavior of the Delete and Backspace keys.",
+    ),
+    (
+        "normal-erase-is-backspace-mode-hook",
+        "Hook run after entering or leaving `normal-erase-is-backspace-mode'.",
+    ),
+    (
+        "null-device",
+        "The system null device.",
+    ),
+    (
+        "obarray-cache",
+        "If non-nil, a hash table of cached obarray-related information.",
+    ),
+    (
+        "occur-collect-regexp-history",
+        "History of regexp for occur's collect operation.",
+    ),
+    (
+        "occur-edit-mode-abbrev-table",
+        "Abbrev table for `occur-edit-mode'.",
+    ),
+    (
+        "occur-edit-mode-hook",
+        "Hook run after entering `occur-edit-mode'.",
+    ),
+    (
+        "occur-edit-mode-map",
+        "Keymap for `occur-edit-mode'.",
+    ),
+    (
+        "occur-edit-mode-syntax-table",
+        "Syntax table for `occur-edit-mode'.",
+    ),
+    (
+        "occur-excluded-properties",
+        "Text properties to discard when copying lines to the *Occur* buffer.",
+    ),
+    (
+        "occur-highlight-overlays",
+        "Overlays used to temporarily highlight occur matches.",
+    ),
+    (
+        "occur-hook",
+        "Hook run by Occur when there are any matches.",
+    ),
+    (
+        "occur-menu-map",
+        "Menu for `occur-mode'.",
+    ),
+    (
+        "occur-mode-abbrev-table",
+        "Abbrev table for `occur-mode'.",
+    ),
+    (
+        "occur-mode-find-occurrence-hook",
+        "Hook run by Occur after locating an occurrence.",
+    ),
+    (
+        "occur-mode-hook",
+        "Hook run when entering Occur mode.",
+    ),
+    (
+        "occur-mode-map",
+        "Keymap for `occur-mode'.",
+    ),
+    (
+        "occur-mode-syntax-table",
+        "Syntax table for `occur-mode'.",
+    ),
+    (
+        "occur-revert-arguments",
+        "Arguments to pass to `occur-1' to revert an Occur mode buffer.",
+    ),
+    (
+        "only-global-abbrevs",
+        "Non-nil means user plans to use only global abbrevs.",
+    ),
+    (
+        "oriya-composable-pattern",
+        "Regexp matching a composable sequence of Oriya characters.",
+    ),
+    (
+        "other-window-repeat-map",
+        "Keymap to repeat `other-window'.  Used in `repeat-mode'.",
+    ),
+    (
+        "out-of-memory-warning-percentage",
+        "Warn if file size exceeds this percentage of available free memory.",
+    ),
+    (
+        "overwrite-mode-binary",
+        "The string displayed in the mode line when in binary overwrite mode.",
+    ),
+    (
+        "overwrite-mode-hook",
+        "Hook run after entering or leaving `overwrite-mode'.",
+    ),
+    (
+        "overwrite-mode-textual",
+        "The string displayed in the mode line when in overwrite mode.",
+    ),
+    (
+        "package--activated",
+        "Non-nil if `package-activate-all' has been run.",
+    ),
+    (
+        "package--builtin-versions",
+        "Alist giving the version of each versioned builtin package.",
+    ),
+    (
+        "package-activated-list",
+        "List of the names of currently activated packages.",
+    ),
+    (
+        "package-directory-list",
+        "List of additional directories containing Emacs Lisp packages.",
+    ),
+    (
+        "package-enable-at-startup",
+        "Whether to make installed packages available when Emacs starts.",
+    ),
+    (
+        "package-quickstart-file",
+        "Location of the file used to speed up activation of packages at startup.",
+    ),
+    (
+        "package-user-dir",
+        "Directory containing the user's Emacs Lisp packages.",
+    ),
+    (
+        "page-delimiter",
+        "Regexp describing line-beginnings that separate pages.",
+    ),
+    (
+        "page-navigation-repeat-map",
+        "Keymap to repeat `forward-page' and `backward-page'.  Used in `repeat-mode'.",
+    ),
+    (
+        "paragraph-ignore-fill-prefix",
+        "Non-nil means the paragraph commands are not affected by `fill-prefix'.",
+    ),
+    (
+        "paragraph-indent-minor-mode",
+        "Non-nil if Paragraph-Indent minor mode is enabled.",
+    ),
+    (
+        "paragraph-indent-minor-mode-hook",
+        "Hook run after entering or leaving `paragraph-indent-minor-mode'.",
+    ),
+    (
+        "paragraph-indent-text-mode-hook",
+        "Hook run after entering `paragraph-indent-text-mode'.",
+    ),
+    (
+        "paragraph-indent-text-mode-map",
+        "Keymap for `paragraph-indent-text-mode'.",
+    ),
+    (
+        "paragraph-separate",
+        "Regexp for beginning of a line that separates paragraphs.",
+    ),
+    (
+        "paragraph-start",
+        "Regexp for beginning of a line that starts OR separates paragraphs.",
+    ),
+    (
+        "parens-require-spaces",
+        "If non-nil, add whitespace as needed when inserting parentheses.",
+    ),
+    (
+        "password-cache",
+        "Whether to cache passwords.",
+    ),
+    (
+        "password-cache-expiry",
+        "How many seconds passwords are cached, or nil to disable expiring.",
+    ),
+    (
+        "password-colon-equivalents",
+        "List of characters equivalent to trailing colon in \"password\" prompts.",
+    ),
+    (
+        "password-word-equivalents",
+        "List of words equivalent to \"password\".",
+    ),
+    (
+        "pending-undo-list",
+        "Within a run of consecutive undo commands, list remaining to be undone.",
+    ),
+    (
+        "permanently-enabled-local-variables",
+        "A list of file-local variables that are always enabled.",
+    ),
+    (
+        "personal-keybindings",
+        "List of bindings performed by `bind-key'.",
+    ),
+    (
+        "pi",
+        "Obsolete since Emacs-23.3.  Use `float-pi' instead.",
+    ),
+    (
+        "pixel-scroll-mode",
+        "Non-nil if Pixel-Scroll mode is enabled.",
+    ),
+    (
+        "pixel-scroll-precision-mode",
+        "Non-nil if Pixel-Scroll-Precision mode is enabled.",
+    ),
+    (
+        "pop-up-frame-alist",
+        "Alist of parameters for automatically generated new frames.",
+    ),
+    (
+        "pop-up-frame-function",
+        "Function used by `display-buffer' for creating a new frame.",
+    ),
+    (
+        "pop-up-frames",
+        "Whether `display-buffer' should make a separate frame.",
+    ),
+    (
+        "pop-up-windows",
+        "Non-nil means `display-buffer' should make a new window.",
+    ),
+    (
+        "post-text-conversion-hook",
+        "Hook run after text is inserted by an input method.",
+    ),
+    (
+        "pre-redisplay-functions",
+        "Hook run just before redisplay.",
+    ),
+    (
+        "prefix-command-echo-keystrokes-functions",
+        "Abnormal hook that constructs the description of the current prefix state.",
+    ),
+    (
+        "prefix-command-preserve-state-hook",
+        "Normal hook run when a command needs to preserve the prefix.",
+    ),
+    (
+        "prettify-symbols-alist",
+        "Alist of symbol prettifications.",
+    ),
+    (
+        "prettify-symbols-compose-predicate",
+        "A predicate for deciding if the currently matched symbol is to be composed.",
+    ),
+    (
+        "prettify-symbols-mode",
+        "Non-nil if Prettify-Symbols mode is enabled.",
+    ),
+    (
+        "prettify-symbols-mode-hook",
+        "Hook run after entering or leaving `prettify-symbols-mode'.",
+    ),
+    (
+        "prettify-symbols-unprettify-at-point",
+        "If non-nil, show the non-prettified version of a symbol when point is on it.",
+    ),
+    (
+        "previous-transient-input-method",
+        "The input method that was active before enabling the transient input method.",
+    ),
     ("kill-ring", "List of killed text sequences."),
     (
         "kill-ring-yank-pointer",

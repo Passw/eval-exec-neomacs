@@ -3753,7 +3753,53 @@ mod tests {
              (stringp (get 'fill-prefix 'variable-documentation))
              (integerp (get 'fill-prefix 'variable-documentation))
              (stringp (get 'font-lock-comment-start-skip 'variable-documentation))
-             (integerp (get 'font-lock-comment-start-skip 'variable-documentation))",
+             (integerp (get 'font-lock-comment-start-skip 'variable-documentation))
+             (stringp (get 'font-lock-mode 'variable-documentation))
+             (integerp (get 'font-lock-mode 'variable-documentation))
+             (stringp (get 'global-font-lock-mode 'variable-documentation))
+             (integerp (get 'global-font-lock-mode 'variable-documentation))
+             (stringp (get 'grep-command 'variable-documentation))
+             (integerp (get 'grep-command 'variable-documentation))
+             (stringp (get 'help-window-select 'variable-documentation))
+             (integerp (get 'help-window-select 'variable-documentation))
+             (stringp (get 'icomplete-mode 'variable-documentation))
+             (integerp (get 'icomplete-mode 'variable-documentation))
+             (stringp (get 'indent-line-function 'variable-documentation))
+             (integerp (get 'indent-line-function 'variable-documentation))
+             (stringp (get 'input-method-history 'variable-documentation))
+             (integerp (get 'input-method-history 'variable-documentation))
+             (stringp (get 'isearch-mode-hook 'variable-documentation))
+             (integerp (get 'isearch-mode-hook 'variable-documentation))
+             (stringp (get 'jit-lock-mode 'variable-documentation))
+             (integerp (get 'jit-lock-mode 'variable-documentation))
+             (stringp (get 'jka-compr-load-suffixes 'variable-documentation))
+             (integerp (get 'jka-compr-load-suffixes 'variable-documentation))
+             (stringp (get 'keyboard-coding-system 'variable-documentation))
+             (integerp (get 'keyboard-coding-system 'variable-documentation))
+             (stringp (get 'kill-ring-max 'variable-documentation))
+             (integerp (get 'kill-ring-max 'variable-documentation))
+             (stringp (get 'line-number-mode 'variable-documentation))
+             (integerp (get 'line-number-mode 'variable-documentation))
+             (stringp (get 'list-buffers-directory 'variable-documentation))
+             (integerp (get 'list-buffers-directory 'variable-documentation))
+             (stringp (get 'lock-file-mode 'variable-documentation))
+             (integerp (get 'lock-file-mode 'variable-documentation))
+             (stringp (get 'mail-user-agent 'variable-documentation))
+             (integerp (get 'mail-user-agent 'variable-documentation))
+             (stringp (get 'menu-bar-mode-hook 'variable-documentation))
+             (integerp (get 'menu-bar-mode-hook 'variable-documentation))
+             (stringp (get 'minibuffer-local-completion-map 'variable-documentation))
+             (integerp (get 'minibuffer-local-completion-map 'variable-documentation))
+             (stringp (get 'mouse-wheel-mode 'variable-documentation))
+             (integerp (get 'mouse-wheel-mode 'variable-documentation))
+             (stringp (get 'next-error-function 'variable-documentation))
+             (integerp (get 'next-error-function 'variable-documentation))
+             (stringp (get 'package-user-dir 'variable-documentation))
+             (integerp (get 'package-user-dir 'variable-documentation))
+             (stringp (get 'prettify-symbols-mode 'variable-documentation))
+             (integerp (get 'prettify-symbols-mode 'variable-documentation))
+             (stringp (get 'previous-transient-input-method 'variable-documentation))
+             (integerp (get 'previous-transient-input-method 'variable-documentation))",
         );
         assert_eq!(results[0], "OK t");
         assert_eq!(results[1], "OK nil");
@@ -3809,6 +3855,52 @@ mod tests {
         assert_eq!(results[51], "OK nil");
         assert_eq!(results[52], "OK t");
         assert_eq!(results[53], "OK nil");
+        assert_eq!(results[54], "OK t");
+        assert_eq!(results[55], "OK nil");
+        assert_eq!(results[56], "OK t");
+        assert_eq!(results[57], "OK nil");
+        assert_eq!(results[58], "OK t");
+        assert_eq!(results[59], "OK nil");
+        assert_eq!(results[60], "OK t");
+        assert_eq!(results[61], "OK nil");
+        assert_eq!(results[62], "OK t");
+        assert_eq!(results[63], "OK nil");
+        assert_eq!(results[64], "OK t");
+        assert_eq!(results[65], "OK nil");
+        assert_eq!(results[66], "OK t");
+        assert_eq!(results[67], "OK nil");
+        assert_eq!(results[68], "OK t");
+        assert_eq!(results[69], "OK nil");
+        assert_eq!(results[70], "OK t");
+        assert_eq!(results[71], "OK nil");
+        assert_eq!(results[72], "OK t");
+        assert_eq!(results[73], "OK nil");
+        assert_eq!(results[74], "OK t");
+        assert_eq!(results[75], "OK nil");
+        assert_eq!(results[76], "OK t");
+        assert_eq!(results[77], "OK nil");
+        assert_eq!(results[78], "OK t");
+        assert_eq!(results[79], "OK nil");
+        assert_eq!(results[80], "OK t");
+        assert_eq!(results[81], "OK nil");
+        assert_eq!(results[82], "OK t");
+        assert_eq!(results[83], "OK nil");
+        assert_eq!(results[84], "OK t");
+        assert_eq!(results[85], "OK nil");
+        assert_eq!(results[86], "OK t");
+        assert_eq!(results[87], "OK nil");
+        assert_eq!(results[88], "OK t");
+        assert_eq!(results[89], "OK nil");
+        assert_eq!(results[90], "OK t");
+        assert_eq!(results[91], "OK nil");
+        assert_eq!(results[92], "OK t");
+        assert_eq!(results[93], "OK nil");
+        assert_eq!(results[94], "OK t");
+        assert_eq!(results[95], "OK nil");
+        assert_eq!(results[96], "OK t");
+        assert_eq!(results[97], "OK nil");
+        assert_eq!(results[98], "OK t");
+        assert_eq!(results[99], "OK nil");
     }
 
     #[test]

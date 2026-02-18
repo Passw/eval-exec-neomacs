@@ -28,6 +28,28 @@ Last updated: 2026-02-18
 
 ## Doing
 
+- Expanded startup `variable-documentation` string-property seeding with two oracle-backed batches (+700 symbols; rounds 33-34):
+  - runtime changes:
+    - `rust/neovm-core/src/elisp/doc.rs`
+    - expanded `STARTUP_VARIABLE_DOC_STRING_PROPERTIES` with 700 additional non-integer startup symbols, including:
+      - `font-lock-*`, `global-*`, `grep-*`, `help-*`, `icomplete-*`, `imenu-*`, `indent-*`, `input-method-*`, `isearch-*`, `jit-lock-*`, `jka-compr-*`, `line-*`, `lisp-*`, `mail-*`, `menu-bar-*`, `minibuffer-*`, `mouse-wheel-*`, `next-error-*`, `package-*`, and `prettify-symbols-*`.
+    - `rust/neovm-core/src/elisp/eval.rs`
+    - expanded `startup_string_variable_docs_are_seeded_at_startup` with representative lock-ins from both batches (`font-lock-mode`, `global-font-lock-mode`, `grep-command`, `help-window-select`, `icomplete-mode`, `indent-line-function`, `input-method-history`, `isearch-mode-hook`, `jit-lock-mode`, `jka-compr-load-suffixes`, `keyboard-coding-system`, `kill-ring-max`, `line-number-mode`, `list-buffers-directory`, `lock-file-mode`, `mail-user-agent`, `menu-bar-mode-hook`, `minibuffer-local-completion-map`, `mouse-wheel-mode`, `next-error-function`, `package-user-dir`, `prettify-symbols-mode`, `previous-transient-input-method`) and integer-doc absence checks for the same symbols.
+  - oracle corpus changes:
+    - `test/neovm/vm-compat/cases/documentation-property-semantics.{forms,expected.tsv}`
+    - added two startup `get`-property matrix rows covering the same 300-symbol and 400-symbol batches (`(integerp/get, stringp/get)` parity).
+  - parity movement:
+    - startup `variable-documentation` type counts now:
+      - GNU Emacs oracle: `(integer=761, string=1904)`
+      - NeoVM: `(integer=761, string=1302)` (improved from `string=602`).
+  - verified:
+    - `cargo test --manifest-path rust/neovm-core/Cargo.toml startup_string_variable_docs_are_seeded_at_startup` (pass)
+    - `cargo test --manifest-path rust/neovm-core/Cargo.toml documentation_property_eval_` (pass; 28 tests)
+    - `make -C test/neovm/vm-compat record FORMS=cases/documentation-property-semantics.forms EXPECTED=cases/documentation-property-semantics.expected.tsv` (pass)
+    - `make -C test/neovm/vm-compat check-one-neovm CASE=documentation-property-semantics` (pass, 54/54)
+    - `make -C test/neovm/vm-compat check-startup-doc-stub-coverage` (pass; missing=0, extra=0)
+    - `make -C test/neovm/vm-compat check-all-neovm` (pass)
+
 - Expanded startup `variable-documentation` string-property seeding with a 250-symbol oracle-backed batch (round 32):
   - runtime changes:
     - `rust/neovm-core/src/elisp/doc.rs`
