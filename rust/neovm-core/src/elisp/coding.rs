@@ -113,6 +113,18 @@ fn coding_system_name(val: &Value) -> Result<String, Flow> {
     }
 }
 
+/// Extract a coding system name from a symbol-like argument.
+/// Accepts symbols, keywords, nil, and t.
+fn coding_symbol_name(val: &Value) -> Result<String, Flow> {
+    match val.as_symbol_name() {
+        Some(name) => Ok(name.to_string()),
+        None => Err(signal(
+            "wrong-type-argument",
+            vec![Value::symbol("symbolp"), val.clone()],
+        )),
+    }
+}
+
 // ---------------------------------------------------------------------------
 // EOL types
 // ---------------------------------------------------------------------------
@@ -188,6 +200,8 @@ pub struct CodingSystemInfo {
     pub eol_type: EolType,
     /// Arbitrary property list for coding-system-get / coding-system-put.
     pub properties: HashMap<String, Value>,
+    /// Integer property slots used by coding-system-get / coding-system-put.
+    pub int_properties: HashMap<i64, Value>,
 }
 
 impl CodingSystemInfo {
@@ -198,6 +212,7 @@ impl CodingSystemInfo {
             mnemonic,
             eol_type,
             properties: HashMap::new(),
+            int_properties: HashMap::new(),
         }
     }
 
@@ -303,27 +318,39 @@ impl CodingSystemManager {
             EolType::Unix,
         ));
         mgr.register(CodingSystemInfo::new(
+            "utf-8-emacs",
+            "utf-8",
+            'U',
+            EolType::Undecided,
+        ));
+        mgr.register(CodingSystemInfo::new(
             "no-conversion",
             "raw-text",
             '=',
             EolType::Unix,
+        ));
+        mgr.register(CodingSystemInfo::new(
+            "utf-8-auto",
+            "utf-8",
+            'U',
+            EolType::Undecided,
+        ));
+        mgr.register(CodingSystemInfo::new(
+            "prefer-utf-8",
+            "undecided",
+            '-',
+            EolType::Undecided,
         ));
 
         // Common aliases
         mgr.aliases
             .insert("mule-utf-8".to_string(), "utf-8".to_string());
         mgr.aliases
-            .insert("utf-8-emacs".to_string(), "utf-8".to_string());
-        mgr.aliases
             .insert("iso-8859-1".to_string(), "latin-1".to_string());
         mgr.aliases
             .insert("iso-latin-1".to_string(), "latin-1".to_string());
         mgr.aliases
             .insert("us-ascii".to_string(), "ascii".to_string());
-        mgr.aliases
-            .insert("utf-8-auto".to_string(), "utf-8".to_string());
-        mgr.aliases
-            .insert("prefer-utf-8".to_string(), "utf-8".to_string());
 
         // Default priority list
         mgr.priority = vec![
@@ -476,21 +503,53 @@ pub(crate) fn builtin_coding_system_aliases(
 /// Other properties are looked up from the per-system property list.
 pub(crate) fn builtin_coding_system_get(mgr: &CodingSystemManager, args: Vec<Value>) -> EvalResult {
     expect_args("coding-system-get", &args, 2)?;
-    let name = coding_system_name(&args[0])?;
-    let prop = coding_system_name(&args[1])?;
+    let coding_name = coding_symbol_name(&args[0])?;
+    let resolved_name = resolve_runtime_name(mgr, &coding_name)
+        .ok_or_else(|| signal("coding-system-error", vec![args[0].clone()]))?;
+    let bucket = runtime_bucket_name(mgr, &resolved_name)
+        .ok_or_else(|| signal("coding-system-error", vec![args[0].clone()]))?;
+    let info = mgr
+        .get(&bucket)
+        .ok_or_else(|| signal("coding-system-error", vec![args[0].clone()]))?;
 
-    let info = match mgr.get(&name) {
-        Some(i) => i,
-        None => return Ok(Value::Nil),
-    };
-
-    match prop.as_str() {
-        ":name" | "name" => Ok(Value::symbol(&info.name)),
-        ":type" | "type" | ":coding-type" | "coding-type" => Ok(Value::symbol(&info.coding_type)),
-        ":mnemonic" | "mnemonic" => Ok(Value::Char(info.mnemonic)),
-        ":eol-type" | "eol-type" => Ok(Value::Int(info.eol_type.to_int())),
-        _ => Ok(info.properties.get(&prop).cloned().unwrap_or(Value::Nil)),
+    if let Some(prop_name) = args[1].as_symbol_name() {
+        if let Some(value) = info.properties.get(prop_name) {
+            return Ok(value.clone());
+        }
+        if !prop_name.starts_with(':') {
+            let colon_key = format!(":{prop_name}");
+            if let Some(value) = info.properties.get(&colon_key) {
+                return Ok(value.clone());
+            }
+        }
+        return match prop_name {
+            ":name" | "name" => Ok(Value::symbol(display_base_name(strip_eol_suffix(
+                &resolved_name,
+            )))),
+            ":coding-type" | "coding-type" => Ok(Value::symbol(
+                coding_type_for_base(strip_eol_suffix(&resolved_name))
+                    .unwrap_or(info.coding_type.as_str()),
+            )),
+            ":type" | "type" => Ok(Value::Nil),
+            ":mnemonic" | "mnemonic" => Ok(Value::Int(
+                default_mnemonic_for_base(strip_eol_suffix(&resolved_name))
+                    .unwrap_or(info.mnemonic as i64),
+            )),
+            ":eol-type" | "eol-type" => Ok(Value::Nil),
+            _ => Ok(Value::Nil),
+        };
     }
+
+    if let Some(int_key) = args[1].as_int() {
+        if let Some(value) = info.int_properties.get(&int_key) {
+            return Ok(value.clone());
+        }
+    }
+
+    Err(signal(
+        "wrong-type-argument",
+        vec![Value::symbol("symbolp"), args[1].clone()],
+    ))
 }
 
 /// `(coding-system-put CODING-SYSTEM PROP VAL)` -- set a property of a coding system.
@@ -499,37 +558,50 @@ pub(crate) fn builtin_coding_system_put(
     args: Vec<Value>,
 ) -> EvalResult {
     expect_args("coding-system-put", &args, 3)?;
-    let name = coding_system_name(&args[0])?;
-    let prop = coding_system_name(&args[1])?;
     let val = args[2].clone();
 
-    let info = match mgr.get_mut(&name) {
-        Some(i) => i,
-        None => {
-            return Err(signal(
-                "coding-system-error",
-                vec![Value::string(format!("Unknown coding system: {}", name))],
-            ));
-        }
-    };
-
-    // Built-in properties are stored in dedicated fields
-    match prop.as_str() {
-        ":mnemonic" | "mnemonic" => {
-            if let Value::Char(c) = val {
-                info.mnemonic = c;
-            } else if let Value::Int(n) = val {
-                if let Some(c) = char::from_u32(n as u32) {
-                    info.mnemonic = c;
-                }
-            }
-        }
-        _ => {
-            info.properties.insert(prop, val);
-        }
+    if args[0].is_nil() {
+        return Err(signal(
+            "wrong-type-argument",
+            vec![Value::symbol("coding-system-p"), Value::Nil],
+        ));
     }
 
-    Ok(Value::Nil)
+    let coding_name = coding_symbol_name(&args[0])?;
+    let resolved_name = resolve_runtime_name(mgr, &coding_name)
+        .ok_or_else(|| signal("coding-system-error", vec![args[0].clone()]))?;
+    let bucket = runtime_bucket_name(mgr, &resolved_name)
+        .ok_or_else(|| signal("coding-system-error", vec![args[0].clone()]))?;
+    let info = mgr
+        .get_mut(&bucket)
+        .ok_or_else(|| signal("coding-system-error", vec![args[0].clone()]))?;
+
+    if let Some(prop_name) = args[1].as_symbol_name() {
+        if matches!(prop_name, ":mnemonic" | "mnemonic") {
+            let coerced = match &val {
+                Value::Char(c) => Value::Int(*c as i64),
+                Value::Int(n) if *n >= 0 => Value::Int(*n),
+                Value::Str(s) => Value::Int(s.chars().next().map(|ch| ch as i64).unwrap_or(0)),
+                other => {
+                    return Err(signal(
+                        "wrong-type-argument",
+                        vec![Value::symbol("characterp"), other.clone()],
+                    ));
+                }
+            };
+            info.properties.insert(prop_name.to_string(), coerced.clone());
+            return Ok(coerced);
+        }
+        info.properties.insert(prop_name.to_string(), val.clone());
+        return Ok(val);
+    }
+
+    if let Some(int_key) = args[1].as_int() {
+        info.int_properties.insert(int_key, val.clone());
+        return Ok(val);
+    }
+
+    Ok(val)
 }
 
 /// `(coding-system-base CODING-SYSTEM)` -- return the base coding system
@@ -539,15 +611,10 @@ pub(crate) fn builtin_coding_system_base(
     args: Vec<Value>,
 ) -> EvalResult {
     expect_args("coding-system-base", &args, 1)?;
-    let name = coding_system_name(&args[0])?;
-
-    if let Some(info) = mgr.get(&name) {
-        Ok(Value::symbol(info.base_name()))
-    } else {
-        // Even for unknown systems, strip the suffix
-        let base = strip_eol_suffix(&name);
-        Ok(Value::symbol(base))
-    }
+    let name = coding_symbol_name(&args[0])?;
+    let resolved_name = resolve_runtime_name(mgr, &name)
+        .ok_or_else(|| signal("coding-system-error", vec![args[0].clone()]))?;
+    Ok(Value::symbol(display_base_name(strip_eol_suffix(&resolved_name))))
 }
 
 /// `(coding-system-eol-type CODING-SYSTEM)` -- return the EOL type.
@@ -590,13 +657,19 @@ pub(crate) fn builtin_coding_system_type(
     args: Vec<Value>,
 ) -> EvalResult {
     expect_args("coding-system-type", &args, 1)?;
-    let name = coding_system_name(&args[0])?;
-
-    if let Some(info) = mgr.get(&name) {
-        Ok(Value::symbol(&info.coding_type))
-    } else {
-        Ok(Value::Nil)
+    let name = coding_symbol_name(&args[0])?;
+    let resolved_name = resolve_runtime_name(mgr, &name)
+        .ok_or_else(|| signal("coding-system-error", vec![args[0].clone()]))?;
+    let base = strip_eol_suffix(&resolved_name);
+    if let Some(kind) = coding_type_for_base(base) {
+        return Ok(Value::symbol(kind));
     }
+    let bucket = runtime_bucket_name(mgr, &resolved_name)
+        .ok_or_else(|| signal("coding-system-error", vec![args[0].clone()]))?;
+    let info = mgr
+        .get(&bucket)
+        .ok_or_else(|| signal("coding-system-error", vec![args[0].clone()]))?;
+    Ok(Value::symbol(info.coding_type.clone()))
 }
 
 /// `(coding-system-change-eol-conversion CODING-SYSTEM EOL-TYPE)` -- return
@@ -607,27 +680,118 @@ pub(crate) fn builtin_coding_system_change_eol_conversion(
     args: Vec<Value>,
 ) -> EvalResult {
     expect_args("coding-system-change-eol-conversion", &args, 2)?;
-    let name = coding_system_name(&args[0])?;
-    let eol = &args[1];
+    if matches!(args[0], Value::Str(_)) {
+        return Err(signal(
+            "wrong-type-argument",
+            vec![Value::symbol("symbolp"), args[0].clone()],
+        ));
+    }
+    let raw_name = coding_symbol_name(&args[0])?;
+    let is_nil_coding = raw_name == "nil";
+    if !is_nil_coding && resolve_runtime_name(mgr, &raw_name).is_none() {
+        return Err(signal("coding-system-error", vec![args[0].clone()]));
+    }
+    let resolved_name = normalize_coding_name_for_lookup(&raw_name).to_string();
+    let resolved_base = strip_eol_suffix(&resolved_name);
+    let no_conversion_family =
+        is_nil_coding || matches!(resolved_base, "no-conversion" | "binary");
 
-    let suffix = match eol {
-        Value::Int(0) => "-unix",
-        Value::Int(1) => "-dos",
-        Value::Int(2) => "-mac",
-        Value::Symbol(s) if s == "unix" => "-unix",
-        Value::Symbol(s) if s == "dos" => "-dos",
-        Value::Symbol(s) if s == "mac" => "-mac",
-        _ => return Ok(args[0].clone()),
+    if no_conversion_family {
+        let out = match &args[1] {
+            Value::Nil => Value::symbol("no-conversion"),
+            Value::Int(n) => {
+                if *n == 0 {
+                    if is_nil_coding {
+                        Value::Nil
+                    } else if resolved_base == "binary" {
+                        Value::symbol("binary")
+                    } else {
+                        Value::symbol("no-conversion")
+                    }
+                } else {
+                    Value::Nil
+                }
+            }
+            Value::Float(f) => {
+                if *f == 0.0 {
+                    if is_nil_coding {
+                        Value::Nil
+                    } else if resolved_base == "binary" {
+                        Value::symbol("binary")
+                    } else {
+                        Value::symbol("no-conversion")
+                    }
+                } else {
+                    Value::Nil
+                }
+            }
+            Value::Symbol(s) if s == "unix" => {
+                if is_nil_coding {
+                    Value::Nil
+                } else if resolved_base == "binary" {
+                    Value::symbol("binary")
+                } else {
+                    Value::symbol("no-conversion")
+                }
+            }
+            Value::Symbol(s) if s == "dos" || s == "mac" => Value::Nil,
+            other => {
+                return Err(signal(
+                    "wrong-type-argument",
+                    vec![Value::symbol("number-or-marker-p"), other.clone()],
+                ));
+            }
+        };
+        return Ok(out);
+    }
+
+    let target_eol = match &args[1] {
+        Value::Nil => None,
+        Value::Int(n) => Some(*n),
+        Value::Symbol(s) if s == "unix" => Some(0),
+        Value::Symbol(s) if s == "dos" => Some(1),
+        Value::Symbol(s) if s == "mac" => Some(2),
+        other => {
+            return Err(signal(
+                "wrong-type-argument",
+                vec![Value::symbol("fixnump"), other.clone()],
+            ));
+        }
     };
 
-    let base = if let Some(info) = mgr.get(&name) {
-        info.base_name().to_string()
+    let raw_base = strip_eol_suffix(&raw_name);
+    if target_eol.is_none() {
+        if EolType::from_suffix(&raw_name).is_some() {
+            return Ok(Value::symbol(display_base_name(raw_base)));
+        }
+        if raw_base == "emacs-internal" {
+            return Ok(Value::symbol("utf-8-emacs"));
+        }
+        return Ok(Value::symbol(raw_name));
+    }
+
+    let eol = target_eol.expect("checked above");
+    if !(0..=2).contains(&eol) {
+        let vec_base = eol_vector_base(resolved_base);
+        let variants = vec![
+            Value::symbol(format!("{vec_base}-unix")),
+            Value::symbol(format!("{vec_base}-dos")),
+            Value::symbol(format!("{vec_base}-mac")),
+        ];
+        return Err(signal(
+            "args-out-of-range",
+            vec![
+                Value::Vector(std::sync::Arc::new(std::sync::Mutex::new(variants))),
+                Value::Int(eol),
+            ],
+        ));
+    }
+
+    if let Some(derived) = derive_coding_for_eol(resolved_base, eol) {
+        Ok(Value::symbol(derived))
     } else {
-        strip_eol_suffix(&name).to_string()
-    };
-
-    let derived = format!("{}{}", base, suffix);
-    Ok(Value::symbol(derived))
+        Ok(Value::Nil)
+    }
 }
 
 /// `(coding-system-change-text-conversion CODING-SYSTEM TEXT-CODING)` -- return
@@ -638,34 +802,58 @@ pub(crate) fn builtin_coding_system_change_text_conversion(
     args: Vec<Value>,
 ) -> EvalResult {
     expect_args("coding-system-change-text-conversion", &args, 2)?;
-    let name = coding_system_name(&args[0])?;
-    let text_coding_name = coding_system_name(&args[1])?;
+    let first_eol = match &args[0] {
+        Value::Nil => Some(0),
+        Value::Str(_) => None,
+        other => match other.as_symbol_name() {
+            Some(name) if name == "nil" => Some(0),
+            Some(name) => {
+                if let Some(resolved) = resolve_runtime_name(mgr, name) {
+                    if let Some(eol) = EolType::from_suffix(&resolved) {
+                        Some(eol.to_int())
+                    } else if let Some(info) = mgr.get(&resolved) {
+                        match info.eol_type {
+                            EolType::Unix => Some(0),
+                            EolType::Dos => Some(1),
+                            EolType::Mac => Some(2),
+                            EolType::Undecided => None,
+                        }
+                    } else {
+                        None
+                    }
+                } else {
+                    None
+                }
+            }
+            None => None,
+        },
+    };
 
-    // Determine EOL type from the original system
-    let eol_suffix = if let Some(info) = mgr.get(&name) {
-        match info.eol_type {
-            EolType::Unix => "-unix",
-            EolType::Dos => "-dos",
-            EolType::Mac => "-mac",
-            EolType::Undecided => "",
+    let text_raw = coding_symbol_name(&args[1])?;
+    let text_name = if text_raw == "nil" {
+        "undecided".to_string()
+    } else {
+        text_raw.clone()
+    };
+    let resolved_text = resolve_runtime_name(mgr, &text_name)
+        .ok_or_else(|| signal("coding-system-error", vec![args[1].clone()]))?;
+    let resolved_text_base = strip_eol_suffix(&resolved_text);
+
+    if let Some(eol) = first_eol {
+        if let Some(derived) = derive_coding_for_eol(resolved_text_base, eol) {
+            return Ok(Value::symbol(derived));
         }
-    } else if let Some(eol) = EolType::from_suffix(&name) {
-        eol.suffix()
-    } else {
-        ""
-    };
+        return Ok(Value::Nil);
+    }
 
-    // Get the base of the text coding
-    let text_base = if let Some(info) = mgr.get(&text_coding_name) {
-        info.base_name().to_string()
-    } else {
-        strip_eol_suffix(&text_coding_name).to_string()
-    };
+    if EolType::from_suffix(&text_name).is_some() {
+        return Ok(Value::symbol(display_base_name(strip_eol_suffix(&text_name))));
+    }
 
-    if eol_suffix.is_empty() {
-        Ok(Value::symbol(text_base))
-    } else {
-        Ok(Value::symbol(format!("{}{}", text_base, eol_suffix)))
+    match text_name.as_str() {
+        "binary" => Ok(Value::symbol("no-conversion")),
+        "emacs-internal" => Ok(Value::symbol("utf-8-emacs")),
+        _ => Ok(Value::symbol(text_name)),
     }
 }
 
@@ -1001,6 +1189,7 @@ fn allows_derived_eol_variant(base: &str) -> bool {
     matches!(
         base,
         "utf-8"
+            | "mule-utf-8"
             | "latin-1"
             | "iso-8859-1"
             | "iso-latin-1"
@@ -1010,7 +1199,126 @@ fn allows_derived_eol_variant(base: &str) -> bool {
             | "undecided"
             | "utf-8-auto"
             | "prefer-utf-8"
+            | "utf-8-emacs"
     )
+}
+
+fn normalize_coding_name_for_lookup(name: &str) -> &str {
+    if name == "nil" { "no-conversion" } else { name }
+}
+
+fn display_base_name(base: &str) -> &str {
+    match base {
+        "latin-1" | "iso-8859-1" | "iso-latin-1" => "iso-latin-1",
+        "ascii" | "us-ascii" => "us-ascii",
+        "binary" | "no-conversion" | "nil" => "no-conversion",
+        "emacs-internal" | "utf-8-emacs" => "utf-8-emacs",
+        "mule-utf-8" => "utf-8",
+        other => other,
+    }
+}
+
+fn coding_type_for_base(base: &str) -> Option<&'static str> {
+    match base {
+        "utf-8" | "mule-utf-8" | "utf-8-auto" | "emacs-internal" | "utf-8-emacs" => Some("utf-8"),
+        "latin-1" | "iso-8859-1" | "iso-latin-1" | "ascii" | "us-ascii" => Some("charset"),
+        "raw-text" | "binary" | "no-conversion" => Some("raw-text"),
+        "undecided" | "prefer-utf-8" => Some("undecided"),
+        _ => None,
+    }
+}
+
+fn default_mnemonic_for_base(base: &str) -> Option<i64> {
+    match base {
+        "utf-8" | "mule-utf-8" | "utf-8-auto" | "emacs-internal" | "utf-8-emacs" => Some('U' as i64),
+        "latin-1" | "iso-8859-1" | "iso-latin-1" => Some('1' as i64),
+        "ascii" | "us-ascii" | "undecided" | "prefer-utf-8" => Some('-' as i64),
+        "raw-text" => Some('t' as i64),
+        "binary" | "no-conversion" => Some('=' as i64),
+        _ => None,
+    }
+}
+
+fn properties_bucket_base(base: &str) -> &str {
+    match base {
+        "latin-1" | "iso-8859-1" | "iso-latin-1" => "latin-1",
+        "ascii" | "us-ascii" => "ascii",
+        "binary" | "no-conversion" | "nil" => "no-conversion",
+        "emacs-internal" | "utf-8-emacs" => "utf-8-emacs",
+        "mule-utf-8" => "utf-8",
+        other => other,
+    }
+}
+
+fn eol_vector_base(base: &str) -> &str {
+    match base {
+        "latin-1" | "iso-8859-1" | "iso-latin-1" => "iso-latin-1",
+        "ascii" | "us-ascii" => "us-ascii",
+        "mule-utf-8" => "utf-8",
+        "emacs-internal" | "utf-8-emacs" => "utf-8-emacs",
+        other => other,
+    }
+}
+
+fn derive_coding_for_eol(base: &str, eol: i64) -> Option<String> {
+    let suffix = match eol {
+        0 => "-unix",
+        1 => "-dos",
+        2 => "-mac",
+        _ => return None,
+    };
+    let derived = match base {
+        "latin-1" | "iso-8859-1" | "iso-latin-1" => format!("iso-latin-1{suffix}"),
+        "ascii" | "us-ascii" => format!("us-ascii{suffix}"),
+        "mule-utf-8" | "utf-8" => format!("utf-8{suffix}"),
+        "utf-8-auto" => format!("utf-8-auto{suffix}"),
+        "prefer-utf-8" => format!("prefer-utf-8{suffix}"),
+        "undecided" => format!("undecided{suffix}"),
+        "raw-text" => format!("raw-text{suffix}"),
+        "utf-8-emacs" => format!("utf-8-emacs{suffix}"),
+        "emacs-internal" => match eol {
+            0 => "emacs-internal".to_string(),
+            1 => "utf-8-emacs-dos".to_string(),
+            2 => "utf-8-emacs-mac".to_string(),
+            _ => unreachable!("validated above"),
+        },
+        "no-conversion" => {
+            if eol == 0 {
+                "no-conversion".to_string()
+            } else {
+                return None;
+            }
+        }
+        "binary" => {
+            if eol == 0 {
+                "binary".to_string()
+            } else {
+                return None;
+            }
+        }
+        other => format!("{other}{suffix}"),
+    };
+    Some(derived)
+}
+
+fn resolve_runtime_name(mgr: &CodingSystemManager, name: &str) -> Option<String> {
+    let normalized = normalize_coding_name_for_lookup(name);
+    if is_known_or_derived_coding_system(mgr, normalized) {
+        Some(normalized.to_string())
+    } else {
+        None
+    }
+}
+
+fn runtime_bucket_name(mgr: &CodingSystemManager, resolved_name: &str) -> Option<String> {
+    let base = strip_eol_suffix(resolved_name);
+    let bucket_base = properties_bucket_base(base);
+    let bucket_name = mgr.resolve(bucket_base).unwrap_or(bucket_base).to_string();
+    if mgr.is_known(bucket_name.as_str()) {
+        Some(bucket_name)
+    } else {
+        None
+    }
 }
 
 // ===========================================================================
@@ -1148,7 +1456,7 @@ mod tests {
     fn coding_system_get_type() {
         let m = mgr();
         let result =
-            builtin_coding_system_get(&m, vec![Value::symbol("latin-1"), Value::symbol(":type")])
+            builtin_coding_system_get(&m, vec![Value::symbol("latin-1"), Value::symbol(":coding-type")])
                 .unwrap();
         assert!(matches!(result, Value::Symbol(s) if s == "charset"));
     }
@@ -1159,7 +1467,7 @@ mod tests {
         let result =
             builtin_coding_system_get(&m, vec![Value::symbol("utf-8"), Value::symbol(":mnemonic")])
                 .unwrap();
-        assert!(matches!(result, Value::Char('U')));
+        assert!(eq_value(&result, &Value::Int('U' as i64)));
     }
 
     #[test]
@@ -1170,7 +1478,7 @@ mod tests {
             vec![Value::symbol("utf-8-unix"), Value::symbol(":eol-type")],
         )
         .unwrap();
-        assert!(eq_value(&result, &Value::Int(0)));
+        assert!(result.is_nil());
     }
 
     #[test]
@@ -1187,10 +1495,8 @@ mod tests {
     #[test]
     fn coding_system_get_unknown_system() {
         let m = mgr();
-        let result =
-            builtin_coding_system_get(&m, vec![Value::symbol("bogus"), Value::symbol(":name")])
-                .unwrap();
-        assert!(result.is_nil());
+        let result = builtin_coding_system_get(&m, vec![Value::symbol("bogus"), Value::symbol(":name")]);
+        assert!(result.is_err());
     }
 
     // ----- coding-system-put -----
@@ -1207,7 +1513,7 @@ mod tests {
             ],
         )
         .unwrap();
-        assert!(result.is_nil());
+        assert_eq!(result, Value::list(vec![Value::symbol("unicode")]));
 
         // Verify it was stored
         let get_result = builtin_coding_system_get(
@@ -1234,7 +1540,7 @@ mod tests {
         let result =
             builtin_coding_system_get(&m, vec![Value::symbol("utf-8"), Value::symbol(":mnemonic")])
                 .unwrap();
-        assert!(matches!(result, Value::Char('X')));
+        assert!(eq_value(&result, &Value::Int('X' as i64)));
     }
 
     #[test]
@@ -1266,8 +1572,8 @@ mod tests {
     #[test]
     fn coding_system_base_unknown_still_strips() {
         let m = mgr();
-        let result = builtin_coding_system_base(&m, vec![Value::symbol("foo-bar-unix")]).unwrap();
-        assert!(matches!(result, Value::Symbol(s) if s == "foo-bar"));
+        let result = builtin_coding_system_base(&m, vec![Value::symbol("foo-bar-unix")]);
+        assert!(result.is_err());
     }
 
     // ----- coding-system-eol-type -----
@@ -1336,8 +1642,8 @@ mod tests {
     #[test]
     fn coding_system_type_unknown() {
         let m = mgr();
-        let result = builtin_coding_system_type(&m, vec![Value::symbol("bogus")]).unwrap();
-        assert!(result.is_nil());
+        let result = builtin_coding_system_type(&m, vec![Value::symbol("bogus")]);
+        assert!(result.is_err());
     }
 
     // ----- coding-system-change-eol-conversion -----

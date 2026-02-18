@@ -38,3 +38,73 @@
 38	(condition-case err (detect-coding-region 1 "b") (error err))	OK (wrong-type-argument integer-or-marker-p "b")
 39	(condition-case err (detect-coding-region nil 1) (error err))	OK (wrong-type-argument integer-or-marker-p nil)
 40	(condition-case err (detect-coding-region 1 nil) (error err))	OK (wrong-type-argument integer-or-marker-p nil)
+41	(coding-system-base 'utf-8-unix)	OK utf-8
+42	(coding-system-base nil)	OK no-conversion
+43	(condition-case err (coding-system-base 'vm-no-such-coding) (error err))	OK (coding-system-error vm-no-such-coding)
+44	(condition-case err (coding-system-base :utf-8) (error err))	OK (coding-system-error :utf-8)
+45	(coding-system-type 'utf-8)	OK utf-8
+46	(coding-system-type nil)	OK raw-text
+47	(condition-case err (coding-system-type 'vm-no-such-coding) (error err))	OK (coding-system-error vm-no-such-coding)
+48	(coding-system-change-eol-conversion 'utf-8 0)	OK utf-8-unix
+49	(coding-system-change-eol-conversion 'utf-8 1)	OK utf-8-dos
+50	(coding-system-change-eol-conversion 'utf-8 2)	OK utf-8-mac
+51	(condition-case err (coding-system-change-eol-conversion 'utf-8 3) (error err))	OK (args-out-of-range [utf-8-unix utf-8-dos utf-8-mac] 3)
+52	(condition-case err (coding-system-change-eol-conversion 'utf-8 "1") (error err))	OK (wrong-type-argument fixnump "1")
+53	(condition-case err (coding-system-change-eol-conversion 'vm-no-such-coding 1) (error err))	OK (coding-system-error vm-no-such-coding)
+54	(coding-system-change-eol-conversion 'no-conversion 0)	OK no-conversion
+55	(coding-system-change-eol-conversion 'no-conversion 1)	OK nil
+56	(coding-system-change-eol-conversion 'no-conversion 2)	OK nil
+57	(coding-system-change-eol-conversion nil 0)	OK nil
+58	(coding-system-change-eol-conversion nil 1)	OK nil
+59	(coding-system-change-eol-conversion nil 2)	OK nil
+60	(coding-system-change-eol-conversion 'binary nil)	OK no-conversion
+61	(coding-system-change-eol-conversion 'binary 0)	OK binary
+62	(condition-case err (coding-system-change-eol-conversion 'binary t) (error err))	OK (wrong-type-argument number-or-marker-p t)
+63	(coding-system-change-eol-conversion nil nil)	OK no-conversion
+64	(condition-case err (coding-system-change-eol-conversion nil t) (error err))	OK (wrong-type-argument number-or-marker-p t)
+65	(coding-system-change-eol-conversion 'iso-8859-1-dos nil)	OK iso-latin-1
+66	(coding-system-change-text-conversion 'utf-8-unix 'latin-1)	OK iso-latin-1-unix
+67	(coding-system-change-text-conversion "utf-8" 'latin-1)	OK latin-1
+68	(coding-system-change-text-conversion nil 'latin-1)	OK iso-latin-1-unix
+69	(condition-case err (coding-system-change-text-conversion 'utf-8-unix "latin-1") (error err))	OK (wrong-type-argument symbolp "latin-1")
+70	(condition-case err (coding-system-change-text-conversion 'utf-8-unix 'vm-no-such-coding) (error err))	OK (coding-system-error vm-no-such-coding)
+71	(coding-system-change-text-conversion 1 'latin-1)	OK latin-1
+72	(coding-system-change-text-conversion 'utf-8-unix nil)	OK undecided-unix
+73	(coding-system-get 'utf-8 :name)	OK utf-8
+74	(coding-system-get 'utf-8 'name)	OK utf-8
+75	(coding-system-get 'utf-8 :coding-type)	OK utf-8
+76	(coding-system-get 'utf-8 'coding-type)	OK utf-8
+77	(coding-system-get 'utf-8 :type)	OK nil
+78	(coding-system-get 'utf-8 'type)	OK nil
+79	(coding-system-get 'utf-8 :mnemonic)	OK 85
+80	(coding-system-get 'utf-8 :eol-type)	OK nil
+81	(condition-case err (coding-system-get 'vm-no-such-coding :name) (error err))	OK (coding-system-error vm-no-such-coding)
+82	(condition-case err (coding-system-get "utf-8" :name) (error err))	OK (wrong-type-argument symbolp "utf-8")
+83	(condition-case err (coding-system-get 'utf-8 "name") (error err))	OK (wrong-type-argument symbolp "name")
+84	(coding-system-get 'utf-8 :no-such-prop)	OK nil
+85	(condition-case err (coding-system-get 'utf-8 9) (error err))	OK (wrong-type-argument symbolp 9)
+86	(coding-system-put 'utf-8 :foo 11)	OK 11
+87	(coding-system-get 'utf-8 :foo)	OK 11
+88	(coding-system-get 'utf-8 'foo)	OK 11
+89	(coding-system-put 'utf-8 "bar" 12)	OK 12
+90	(condition-case err (coding-system-get 'utf-8 "bar") (error err))	OK (wrong-type-argument symbolp "bar")
+91	(coding-system-put 'utf-8 :mnemonic 88)	OK 88
+92	(coding-system-get 'utf-8 :mnemonic)	OK 88
+93	(coding-system-put 'utf-8 :mnemonic "")	OK 0
+94	(coding-system-get 'utf-8 :mnemonic)	OK 0
+95	(condition-case err (coding-system-put 'utf-8 :mnemonic -1) (error err))	OK (wrong-type-argument characterp -1)
+96	(condition-case err (coding-system-put 'utf-8 :mnemonic "x") (error err))	OK 120
+97	(condition-case err (coding-system-put nil :foo 1) (error err))	OK (wrong-type-argument coding-system-p nil)
+98	(condition-case err (coding-system-put 'vm-no-such-coding :foo 1) (error err))	OK (coding-system-error vm-no-such-coding)
+99	(coding-system-put 'utf-8 9 'nine)	OK nine
+100	(coding-system-get 'utf-8 9)	OK nine
+101	(coding-system-put 'utf-8 :name 'vm-name)	OK vm-name
+102	(list (coding-system-get 'utf-8 :name) (coding-system-get 'utf-8 'name))	OK (vm-name vm-name)
+103	(coding-system-put 'utf-8 'name 'vm-name-plain)	OK vm-name-plain
+104	(list (coding-system-get 'utf-8 :name) (coding-system-get 'utf-8 'name))	OK (vm-name vm-name-plain)
+105	(coding-system-put 'utf-8 :eol-type 'vm-eol)	OK vm-eol
+106	(list (coding-system-get 'utf-8 :eol-type) (coding-system-get 'utf-8 'eol-type))	OK (vm-eol vm-eol)
+107	(coding-system-put 'ascii-dos :vm-shared 1)	OK 1
+108	(list (coding-system-get 'ascii-dos :vm-shared) (coding-system-get 'ascii :vm-shared))	OK (1 1)
+109	(coding-system-put 'binary :vm-bin 2)	OK 2
+110	(list (coding-system-get 'binary :vm-bin) (coding-system-get 'no-conversion :vm-bin))	OK (2 2)

@@ -28,6 +28,23 @@ Last updated: 2026-02-18
 
 ## Doing
 
+- Aligned broad `coding-system-*` runtime semantics with GNU Emacs (batch round 23):
+  - runtime changes:
+    - `rust/neovm-core/src/elisp/coding.rs`
+    - expanded symbol-like coding designator resolution (`symbol`/`keyword`/`nil`/`t`) and error mapping (`wrong-type-argument symbolp`, `coding-system-error`) across `coding-system-get`, `coding-system-put`, `coding-system-base`, and `coding-system-type`.
+    - added runtime registrations for `utf-8-emacs`, `utf-8-auto`, and `prefer-utf-8`; removed incorrect aliasing of `utf-8-emacs` to `utf-8`.
+    - aligned default property semantics (including `name`/`:name` fallback), mnemonic coercion/validation, integer property-key storage, and shared property-bucket behavior for derived coding aliases.
+    - rewrote `coding-system-change-eol-conversion` and `coding-system-change-text-conversion` behavior and payload shapes to match oracle paths for nil/special families, designator validation, and `args-out-of-range`/type-error boundaries.
+    - updated coding runtime unit lock-ins for the above behavior shifts.
+  - oracle corpus changes:
+    - `test/neovm/vm-compat/cases/coding-system-runtime-semantics.forms`
+    - `test/neovm/vm-compat/cases/coding-system-runtime-semantics.expected.tsv`
+    - expanded to a broader runtime matrix covering base/type/get/put/change-eol/change-text behavior, error payload shapes, property fallback, integer property keys, and alias/shared-bucket semantics.
+  - verified:
+    - `cargo test --manifest-path rust/neovm-core/Cargo.toml coding_system_` (pass; 47 tests)
+    - `make -C test/neovm/vm-compat check-one-neovm CASE=cases/coding-system-runtime-semantics` (pass, 110/110)
+    - `make -C test/neovm/vm-compat check-all-neovm` (pass)
+
 - Aligned coding detection return-shape and region type validation with oracle (batch round 22):
   - runtime changes:
     - `rust/neovm-core/src/elisp/coding.rs`
