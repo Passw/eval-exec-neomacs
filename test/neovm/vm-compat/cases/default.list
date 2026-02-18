@@ -538,6 +538,7 @@ cases/mod-zero-remainder-negative-divisor-semantics
 cases/log-bitwise-type-semantics
 cases/numeric-error-predicate-semantics
 cases/max-min-type-preservation-semantics
+cases/reader-special-float-literals-semantics
 cases/division-float-zero-semantics
 cases/expt-isnan-type-semantics
 cases/round-half-even-semantics

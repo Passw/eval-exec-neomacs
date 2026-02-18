@@ -87,6 +87,20 @@ pub fn print_expr(expr: &Expr) -> String {
 }
 
 fn format_float(f: f64) -> String {
+    if f.is_nan() {
+        return if f.is_sign_negative() {
+            "-0.0e+NaN".to_string()
+        } else {
+            "0.0e+NaN".to_string()
+        };
+    }
+    if f.is_infinite() {
+        return if f > 0.0 {
+            "1.0e+INF".to_string()
+        } else {
+            "-1.0e+INF".to_string()
+        };
+    }
     if f.fract() == 0.0 && f.is_finite() {
         format!("{:.1}", f)
     } else {
@@ -133,5 +147,14 @@ mod tests {
             print_expr(&Expr::Str("\u{10ffff}".into())),
             "\"\u{10ffff}\""
         );
+    }
+
+    #[test]
+    fn print_special_float_spellings_match_oracle_shape() {
+        assert_eq!(print_expr(&Expr::Float(f64::NAN)), "0.0e+NaN");
+        let neg_nan = -f64::NAN;
+        assert_eq!(print_expr(&Expr::Float(neg_nan)), "-0.0e+NaN");
+        assert_eq!(print_expr(&Expr::Float(f64::INFINITY)), "1.0e+INF");
+        assert_eq!(print_expr(&Expr::Float(f64::NEG_INFINITY)), "-1.0e+INF");
     }
 }

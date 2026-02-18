@@ -528,6 +528,9 @@ impl<'a> Parser<'a> {
             if let Ok(f) = token.parse::<f64>() {
                 return Ok(Expr::Float(f));
             }
+            if let Some(f) = parse_emacs_special_float(token) {
+                return Ok(Expr::Float(f));
+            }
         }
 
         // Hex integer: 0xFF
@@ -624,6 +627,39 @@ fn looks_like_float(s: &str) -> bool {
     s.contains('.') || s.contains('e') || s.contains('E')
 }
 
+fn parse_emacs_special_float(token: &str) -> Option<f64> {
+    let exp_idx = token.find(['e', 'E'])?;
+    let (mantissa, exponent_suffix) = token.split_at(exp_idx);
+    let suffix = &exponent_suffix[1..];
+    match suffix {
+        "+INF" => {
+            let mantissa = mantissa.parse::<f64>().ok()?;
+            if !mantissa.is_finite() {
+                return None;
+            }
+            Some(if mantissa.is_sign_negative() {
+                f64::NEG_INFINITY
+            } else {
+                f64::INFINITY
+            })
+        }
+        "+NaN" => {
+            // NeoVM currently prints canonical NaN spellings (`±0.0e+NaN`).
+            // Accept those reader spellings to keep print/read compatibility.
+            let mantissa = mantissa.parse::<f64>().ok()?;
+            if mantissa != 0.0 {
+                return None;
+            }
+            Some(if mantissa.is_sign_negative() {
+                -f64::NAN
+            } else {
+                f64::NAN
+            })
+        }
+        _ => None,
+    }
+}
+
 // ---------------------------------------------------------------------------
 // Tests
 // ---------------------------------------------------------------------------
@@ -648,6 +684,56 @@ mod tests {
                 Expr::Float(1e10),
                 Expr::Float(0.5),
                 Expr::Float(-2.5),
+            ]
+        );
+    }
+
+    #[test]
+    fn parse_emacs_special_float_literals() {
+        let forms = parse_forms("0.0e+NaN -0.0e+NaN 1.0e+INF -1.0e+INF 0.0e+INF 0e+NaN 1.0E+INF")
+            .unwrap();
+        assert_eq!(forms.len(), 7);
+
+        match forms[0] {
+            Expr::Float(f) => assert!(f.is_nan() && !f.is_sign_negative()),
+            _ => panic!("expected float NaN"),
+        }
+        match forms[1] {
+            Expr::Float(f) => assert!(f.is_nan() && f.is_sign_negative()),
+            _ => panic!("expected float negative NaN"),
+        }
+        match forms[2] {
+            Expr::Float(f) => assert!(f.is_infinite() && f.is_sign_positive()),
+            _ => panic!("expected +inf"),
+        }
+        match forms[3] {
+            Expr::Float(f) => assert!(f.is_infinite() && f.is_sign_negative()),
+            _ => panic!("expected -inf"),
+        }
+        match forms[4] {
+            Expr::Float(f) => assert!(f.is_infinite() && f.is_sign_positive()),
+            _ => panic!("expected +inf"),
+        }
+        match forms[5] {
+            Expr::Float(f) => assert!(f.is_nan() && !f.is_sign_negative()),
+            _ => panic!("expected float NaN"),
+        }
+        match forms[6] {
+            Expr::Float(f) => assert!(f.is_infinite() && f.is_sign_positive()),
+            _ => panic!("expected +inf"),
+        }
+    }
+
+    #[test]
+    fn parse_noncanonical_nan_payload_literals_as_symbols() {
+        let forms = parse_forms("1.0e+NaN .5e+NaN 0.0e+inf 0.0e+nan").unwrap();
+        assert_eq!(
+            forms,
+            vec![
+                Expr::Symbol("1.0e+NaN".into()),
+                Expr::Symbol(".5e+NaN".into()),
+                Expr::Symbol("0.0e+inf".into()),
+                Expr::Symbol("0.0e+nan".into()),
             ]
         );
     }
