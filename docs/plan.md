@@ -11033,6 +11033,16 @@ Last updated: 2026-02-18
     - `make -C test/neovm/vm-compat check-one-neovm CASE=cases/symbol-print-escape-semantics` (pass, 20/20)
     - `make -C test/neovm/vm-compat check-one-neovm CASE=cases/reader-special-float-plus-trailing-dot-semantics` (pass, 11/11)
     - `make -C test/neovm/vm-compat check-all-neovm` (pass)
+- Expanded symbol-escape oracle corpus to lock empty-symbol and literal-`##` boundaries:
+  - corpus changes:
+    - `test/neovm/vm-compat/cases/symbol-print-escape-semantics.forms`
+    - `test/neovm/vm-compat/cases/symbol-print-escape-semantics.expected.tsv`
+    - added `(prin1-to-string (intern ""))` -> `##`
+    - added `(prin1-to-string (intern "##"))` -> `\\#\\#`
+  - verified:
+    - `make -C test/neovm/vm-compat record FORMS=cases/symbol-print-escape-semantics.forms EXPECTED=cases/symbol-print-escape-semantics.expected.tsv` (pass)
+    - `make -C test/neovm/vm-compat check-one-neovm CASE=cases/symbol-print-escape-semantics` (pass, 22/22)
+    - `make -C test/neovm/vm-compat check-all-neovm` (pass)
 
 ## Doing
 
