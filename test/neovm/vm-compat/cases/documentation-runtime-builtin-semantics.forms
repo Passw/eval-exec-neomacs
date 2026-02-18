@@ -17,3 +17,8 @@
 (condition-case err (documentation 1) (error (car err)))
 (stringp (documentation 'car t))
 (condition-case err (documentation 'car nil nil) (error (car err)))
+(stringp (documentation '(lambda (x) "d" x)))
+(documentation '(lambda (x) "d" x))
+(documentation '(lambda (x) x))
+(documentation [1 2])
+(documentation "abc")

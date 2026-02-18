@@ -86,17 +86,59 @@ pub(crate) fn builtin_documentation(
 }
 
 fn function_doc_or_error(func_val: Value) -> EvalResult {
+    if let Some(result) = quoted_lambda_documentation(&func_val) {
+        return result;
+    }
+
     match func_val {
         Value::Lambda(data) | Value::Macro(data) => match &data.docstring {
             Some(doc) => Ok(Value::string(doc.clone())),
             None => Ok(Value::Nil),
         },
         Value::Subr(_) => Ok(Value::string("Built-in function.")),
+        Value::Str(_) | Value::Vector(_) => Ok(Value::string("Keyboard macro.")),
         Value::ByteCode(bytecode) => Ok(bytecode
             .docstring
             .as_ref()
             .map_or(Value::Nil, |doc| Value::string(doc.clone()))),
         other => Err(signal("invalid-function", vec![other])),
+    }
+}
+
+fn quoted_lambda_documentation(function: &Value) -> Option<EvalResult> {
+    let Value::Cons(cell) = function else {
+        return None;
+    };
+
+    let pair = cell.lock().ok()?;
+    if pair.car.as_symbol_name() != Some("lambda") {
+        return None;
+    }
+
+    let mut tail = pair.cdr.clone();
+    drop(pair);
+
+    let Value::Cons(param_cell) = tail else {
+        return Some(Err(signal("invalid-function", vec![function.clone()])));
+    };
+    let params_and_body = param_cell.lock().ok()?;
+    tail = params_and_body.cdr.clone();
+    drop(params_and_body);
+
+    match tail {
+        Value::Nil => Some(Ok(Value::Nil)),
+        Value::Cons(body_cell) => {
+            let body = body_cell.lock().ok()?;
+            if let Some(doc) = body.car.as_str() {
+                Some(Ok(Value::string(doc)))
+            } else {
+                Some(Ok(Value::Nil))
+            }
+        }
+        other => Some(Err(signal(
+            "wrong-type-argument",
+            vec![Value::symbol("listp"), other],
+        ))),
     }
 }
 
@@ -1888,6 +1930,48 @@ mod tests {
             Err(Flow::Signal(sig)) => assert_eq!(sig.symbol, "invalid-function"),
             other => panic!("expected invalid-function signal, got {other:?}"),
         }
+    }
+
+    #[test]
+    fn documentation_quoted_lambda_docstring() {
+        let mut evaluator = super::super::eval::Evaluator::new();
+        let quoted = Value::list(vec![
+            Value::symbol("lambda"),
+            Value::list(vec![Value::symbol("x")]),
+            Value::string("d"),
+            Value::symbol("x"),
+        ]);
+
+        let result = builtin_documentation(&mut evaluator, vec![quoted]).unwrap();
+        assert_eq!(result.as_str(), Some("d"));
+    }
+
+    #[test]
+    fn documentation_quoted_lambda_without_docstring_returns_nil() {
+        let mut evaluator = super::super::eval::Evaluator::new();
+        let quoted = Value::list(vec![
+            Value::symbol("lambda"),
+            Value::list(vec![Value::symbol("x")]),
+            Value::symbol("x"),
+        ]);
+
+        let result = builtin_documentation(&mut evaluator, vec![quoted]).unwrap();
+        assert!(result.is_nil());
+    }
+
+    #[test]
+    fn documentation_vector_designator_returns_keyboard_macro_doc() {
+        let mut evaluator = super::super::eval::Evaluator::new();
+        let result =
+            builtin_documentation(&mut evaluator, vec![Value::vector(vec![Value::Int(1)])]).unwrap();
+        assert_eq!(result.as_str(), Some("Keyboard macro."));
+    }
+
+    #[test]
+    fn documentation_string_designator_returns_keyboard_macro_doc() {
+        let mut evaluator = super::super::eval::Evaluator::new();
+        let result = builtin_documentation(&mut evaluator, vec![Value::string("abc")]).unwrap();
+        assert_eq!(result.as_str(), Some("Keyboard macro."));
     }
 
     #[test]

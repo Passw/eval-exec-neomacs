@@ -17,3 +17,8 @@
 17	(condition-case err (documentation 1) (error (car err)))	OK invalid-function
 18	(stringp (documentation 'car t))	OK t
 19	(condition-case err (documentation 'car nil nil) (error (car err)))	OK wrong-number-of-arguments
+20	(stringp (documentation '(lambda (x) "d" x)))	OK t
+21	(documentation '(lambda (x) "d" x))	OK "d"
+22	(documentation '(lambda (x) x))	OK nil
+23	(documentation [1 2])	OK "Keyboard macro."
+24	(documentation "abc")	OK "Keyboard macro."
