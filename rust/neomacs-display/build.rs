@@ -13,6 +13,16 @@ fn main() {
     // Allow the wpe_platform_available cfg flag
     println!("cargo::rustc-check-cfg=cfg(wpe_platform_available)");
 
+    // On macOS, the cdylib has unresolved extern "C" symbols (neomacs_layout_*
+    // etc.) that are defined in the C side (neomacsterm.c) and resolved at load
+    // time when the dylib is loaded into the Emacs binary.  macOS's linker is
+    // strict and requires all symbols resolved by default, so we tell it to
+    // allow dynamic lookup for undefined symbols.
+    let target_os = env::var("CARGO_CFG_TARGET_OS").unwrap_or_default();
+    if target_os == "macos" {
+        println!("cargo:rustc-cdylib-link-arg=-Wl,-undefined,dynamic_lookup");
+    }
+
     // Generate C headers with cbindgen
     generate_c_headers(&crate_dir);
 
