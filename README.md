@@ -52,7 +52,7 @@ Throw it all away and start fresh.
 
 ## Showcase
 
-[![Neomacs Showcase](https://img.youtube.com/vi/WZRWWuuNZX0/maxresdefault.jpg)](https://youtu.be/WZRWWuuNZX0?si=yHUy1lUDTznUbTMx)
+🎬 [![Neomacs Showcase Video](https://img.youtube.com/vi/WZRWWuuNZX0/maxresdefault.jpg)](https://youtu.be/WZRWWuuNZX0?si=yHUy1lUDTznUbTMx)
 
 ### Animations (Cursor, Buffer Switch, Scroll)
 
