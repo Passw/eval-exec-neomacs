@@ -28,6 +28,17 @@ Last updated: 2026-02-18
 
 ## Doing
 
+- Expanded invalid/stale unread-queue dispatch lock-ins (batch round 7):
+  - oracle corpus changes:
+    - `test/neovm/vm-compat/cases/read-invalid-event-dispatch-semantics.{forms,expected.tsv}`
+    - `test/neovm/vm-compat/cases/read-event-empty-queue-semantics.{forms,expected.tsv}`
+    - `test/neovm/vm-compat/cases/read-char-queue-state-semantics.{forms,expected.tsv}`
+    - `test/neovm/vm-compat/cases/input-unread-command-events-dynamic-semantics.{forms,expected.tsv}`
+    - added deeper mixed-tail probes (invalid-head recovery, dotted-tail exhaustion, multi-step queue drain, and `recent-keys` updates via `read-key*`).
+  - verified:
+    - `make -C test/neovm/vm-compat check-neovm-list LIST=<batch-list>` (pass; 15/15, 6/6, 9/9, 10/10)
+    - `make -C test/neovm/vm-compat check-all-neovm` (pass)
+
 - Expanded remaining vector-vector non-char queue tails (batch round 6):
   - oracle corpus changes:
     - `test/neovm/vm-compat/cases/read-key-vector-vector-tail-non-char-semantics.{forms,expected.tsv}`

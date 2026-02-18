@@ -49,3 +49,24 @@
 
 (let ((unread-command-events '(foo . 97)))
   (list (read-char-exclusive nil nil 0) unread-command-events))
+
+(condition-case err
+    (progn
+      (setq unread-command-events '(foo 97 98 99))
+      (read-char nil nil 0))
+  (error (list (car err) unread-command-events)))
+
+(let ((unread-command-events '(foo 97 98 99)))
+  (list (read-char-exclusive nil nil 0)
+        unread-command-events))
+
+(let ((unread-command-events '(foo 97 98)))
+  (list (read-key nil)
+        unread-command-events
+        (read-key nil)
+        unread-command-events))
+
+(let ((unread-command-events '(97 . foo)))
+  (progn
+    (read-event nil nil 0)
+    (list (read-event nil nil 0) unread-command-events)))

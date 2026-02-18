@@ -5,3 +5,5 @@
 5	(let ((unread-command-events [97])) (list (read-char-exclusive nil nil 0) unread-command-events))	OK (nil [97])
 6	(let ((unread-command-events 'foo)) (list (read-char nil nil 0) unread-command-events))	OK (nil foo)
 7	(let ((unread-command-events [97])) (list (read-char nil nil 0) unread-command-events))	OK (nil [97])
+8	(let ((unread-command-events '(foo 97 98))) (condition-case err (read-char nil nil 0) (error unread-command-events)))	OK (foo)
+9	(let ((unread-command-events '(foo 97 98))) (progn (read-char-exclusive nil nil 0) unread-command-events))	OK (98)
