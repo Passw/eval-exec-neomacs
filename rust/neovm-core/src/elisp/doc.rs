@@ -2523,6 +2523,514 @@ pub(crate) static STARTUP_VARIABLE_DOC_STUBS: &[(&str, &str)] = &[
         "truncate-partial-width-windows",
         "Non-nil means truncate lines in windows narrower than the frame.",
     ),
+    (
+        "tty-defined-color-alist",
+        "An alist of defined terminal colors and their RGB values.",
+    ),
+    (
+        "tty-erase-char",
+        "The ERASE character as set by the user with stty.",
+    ),
+    (
+        "tty-menu-calls-mouse-position-function",
+        "Non-nil means TTY menu code will call ‘mouse-position-function’.",
+    ),
+    (
+        "underline-minimum-offset",
+        "Minimum distance between baseline and underline.",
+    ),
+    (
+        "undo-inhibit-record-point",
+        "Non-nil means do not record ‘point’ in ‘buffer-undo-list’.",
+    ),
+    (
+        "undo-outer-limit",
+        "Outer limit on size of undo information for one command.",
+    ),
+    (
+        "undo-outer-limit-function",
+        "Function to call when an undo list exceeds ‘undo-outer-limit’.",
+    ),
+    (
+        "unibyte-display-via-language-environment",
+        "Non-nil means display unibyte text according to language environment.",
+    ),
+    (
+        "unicode-category-table",
+        "Char table of Unicode’s \"General Category\".",
+    ),
+    (
+        "unread-post-input-method-events",
+        "List of events to be processed as input by input methods.",
+    ),
+    (
+        "use-default-ascent",
+        "Char table of characters whose ascent values should be ignored.",
+    ),
+    (
+        "use-default-font-for-symbols",
+        "If non-nil, use the default face’s font for symbols and punctuation.",
+    ),
+    (
+        "use-dialog-box",
+        "Non-nil means mouse commands use dialog boxes to ask questions.",
+    ),
+    (
+        "use-file-dialog",
+        "Non-nil means mouse commands use a file dialog to ask for files.",
+    ),
+    (
+        "use-short-answers",
+        "Non-nil means ‘yes-or-no-p’ uses shorter answers \"y\" or \"n\".",
+    ),
+    (
+        "use-system-tooltips",
+        "Whether to use the toolkit to display tooltips.",
+    ),
+    (
+        "user-init-file",
+        "File name, including directory, of user’s initialization file.",
+    ),
+    (
+        "user-login-name",
+        "The user’s name, taken from environment variables if possible.",
+    ),
+    (
+        "user-real-login-name",
+        "The user’s name, based upon the real uid only.",
+    ),
+    (
+        "values",
+        "List of values of all expressions which were read, evaluated and printed.",
+    ),
+    (
+        "vector-cells-consed",
+        "Number of vector cells that have been consed so far.",
+    ),
+    (
+        "vertical-centering-font-regexp",
+        "Regexp matching font names that require vertical centering on display.",
+    ),
+    (
+        "vertical-scroll-bar",
+        "Position of this buffer’s vertical scroll bar.",
+    ),
+    (
+        "visible-bell",
+        "Non-nil means try to flash the frame to represent a bell.",
+    ),
+    (
+        "visible-cursor",
+        "Non-nil means to make the cursor very visible.",
+    ),
+    (
+        "void-text-area-pointer",
+        "The pointer shape to show in void text areas.",
+    ),
+    (
+        "where-is-preferred-modifier",
+        "Preferred modifier key to use for ‘where-is’.",
+    ),
+    (
+        "while-no-input-ignore-events",
+        "Ignored events from ‘while-no-input’.",
+    ),
+    (
+        "window-buffer-change-functions",
+        "Functions called during redisplay when window buffers have changed.",
+    ),
+    (
+        "window-combination-limit",
+        "If non-nil, splitting a window makes a new parent window.",
+    ),
+    (
+        "window-combination-resize",
+        "If t, resize window combinations proportionally.",
+    ),
+    (
+        "window-configuration-change-hook",
+        "Functions called during redisplay when window configuration has changed.",
+    ),
+    (
+        "window-persistent-parameters",
+        "Alist of persistent window parameters.",
+    ),
+    (
+        "window-point-insertion-type",
+        "Insertion type of marker to use for ‘window-point’.",
+    ),
+    (
+        "window-resize-pixelwise",
+        "Non-nil means resize windows pixelwise.",
+    ),
+    (
+        "window-restore-killed-buffer-windows",
+        "Control restoring windows whose buffer was killed.",
+    ),
+    (
+        "window-scroll-functions",
+        "List of functions to call before redisplaying a window with scrolling.",
+    ),
+    (
+        "window-selection-change-functions",
+        "Functions called during redisplay when the selected window has changed.",
+    ),
+    (
+        "window-size-change-functions",
+        "Functions called during redisplay when window sizes have changed.",
+    ),
+    (
+        "window-state-change-functions",
+        "Functions called during redisplay when the window state changed.",
+    ),
+    (
+        "window-state-change-hook",
+        "Functions called during redisplay when the window state changed.",
+    ),
+    (
+        "word-combining-categories",
+        "List of pair (cons) of categories to determine word boundary.",
+    ),
+    (
+        "word-separating-categories",
+        "List of pair (cons) of categories to determine word boundary.",
+    ),
+    (
+        "word-wrap-by-category",
+        "Non-nil means also wrap after characters of a certain category.",
+    ),
+    (
+        "words-include-escapes",
+        "Non-nil means ‘forward-word’, etc., should treat escape chars part of words.",
+    ),
+    (
+        "wrap-prefix",
+        "Prefix prepended to all continuation lines at display time.",
+    ),
+    (
+        "write-region-annotate-functions",
+        "A list of functions to be called at the start of ‘write-region’.",
+    ),
+    (
+        "write-region-annotations-so-far",
+        "When an annotation function is called, this holds the previous annotations.",
+    ),
+    (
+        "write-region-inhibit-fsync",
+        "Non-nil means don’t call fsync in ‘write-region’.",
+    ),
+    (
+        "write-region-post-annotation-function",
+        "Function to call after ‘write-region’ completes.",
+    ),
+    (
+        "x-allow-focus-stealing",
+        "How to bypass window manager focus stealing prevention.",
+    ),
+    (
+        "x-alt-keysym",
+        "Which modifier value Emacs reports when Alt is depressed.",
+    ),
+    (
+        "x-auto-preserve-selections",
+        "Whether or not to transfer selection ownership when deleting a frame.",
+    ),
+    (
+        "x-bitmap-file-path",
+        "List of directories to search for window system bitmap files.",
+    ),
+    (
+        "x-color-cache-bucket-size",
+        "Max number of buckets allowed per display in the internal color cache.",
+    ),
+    (
+        "x-ctrl-keysym",
+        "Which modifier value Emacs reports when Ctrl is depressed.",
+    ),
+    (
+        "x-cursor-fore-pixel",
+        "A string indicating the foreground color of the cursor box.",
+    ),
+    (
+        "x-detect-server-trust",
+        "If non-nil, Emacs should detect whether or not it is trusted by X.",
+    ),
+    (
+        "x-dnd-disable-motif-drag",
+        "Disable the Motif drag protocol during DND.",
+    ),
+    (
+        "x-dnd-disable-motif-protocol",
+        "Disable the Motif drag-and-drop protocols.",
+    ),
+    (
+        "x-dnd-fix-motif-leave",
+        "Work around Motif bug during drag-and-drop.",
+    ),
+    (
+        "x-dnd-movement-function",
+        "Function called upon mouse movement on a frame during drag-and-drop.",
+    ),
+    (
+        "x-dnd-native-test-function",
+        "Function that determines return value of drag-and-drop on Emacs frames.",
+    ),
+    (
+        "x-dnd-preserve-selection-data",
+        "Preserve selection data after ‘x-begin-drag’ returns.",
+    ),
+    (
+        "x-dnd-targets-list",
+        "List of drag-and-drop targets.",
+    ),
+    (
+        "x-dnd-unsupported-drop-function",
+        "Function called when trying to drop on an unsupported window.",
+    ),
+    (
+        "x-dnd-use-unsupported-drop",
+        "Enable the emulation of drag-and-drop based on the primary selection.",
+    ),
+    (
+        "x-dnd-wheel-function",
+        "Function called upon wheel movement on a frame during drag-and-drop.",
+    ),
+    (
+        "x-fast-protocol-requests",
+        "Whether or not X protocol-related functions should wait for errors.",
+    ),
+    (
+        "x-fast-selection-list",
+        "List of selections for which ‘x-selection-exists-p’ should be fast.",
+    ),
+    (
+        "x-frame-normalize-before-maximize",
+        "Non-nil means normalize frame before maximizing.",
+    ),
+    (
+        "x-gtk-file-dialog-help-text",
+        "If non-nil, the GTK file chooser will show additional help text.",
+    ),
+    (
+        "x-gtk-resize-child-frames",
+        "If non-nil, resize child frames specially with GTK builds.",
+    ),
+    (
+        "x-gtk-show-hidden-files",
+        "If non-nil, the GTK file chooser will by default show hidden files.",
+    ),
+    (
+        "x-gtk-use-native-input",
+        "Non-nil means to use GTK for input method support.",
+    ),
+    (
+        "x-gtk-use-old-file-dialog",
+        "Non-nil means prompt with the old GTK file selection dialog.",
+    ),
+    (
+        "x-gtk-use-window-move",
+        "Non-nil means rely on gtk_window_move to set frame positions.",
+    ),
+    (
+        "x-hourglass-pointer-shape",
+        "The shape of the pointer when Emacs is busy.",
+    ),
+    (
+        "x-hyper-keysym",
+        "Which modifier value Emacs reports when Hyper is depressed.",
+    ),
+    (
+        "x-input-coding-function",
+        "Function used to determine the coding system used by input methods.",
+    ),
+    (
+        "x-input-coding-system",
+        "Coding system used for input from X input methods.",
+    ),
+    (
+        "x-input-grab-touch-events",
+        "Non-nil means to actively grab touch events.",
+    ),
+    (
+        "x-keysym-table",
+        "Hash table of character codes indexed by X keysym codes.",
+    ),
+    (
+        "x-lax-frame-positioning",
+        "If non-nil, Emacs won’t compensate for WM geometry behavior.",
+    ),
+    (
+        "x-lost-selection-functions",
+        "A list of functions to be called when Emacs loses an X selection.",
+    ),
+    (
+        "x-max-tooltip-size",
+        "Maximum size for tooltips.",
+    ),
+    (
+        "x-meta-keysym",
+        "Which modifier value Emacs reports when Meta is depressed.",
+    ),
+    (
+        "x-mouse-click-focus-ignore-position",
+        "Non-nil means that a mouse click to focus a frame does not move point.",
+    ),
+    (
+        "x-mouse-click-focus-ignore-time",
+        "Number of milliseconds for which to ignore buttons after focus change.",
+    ),
+    (
+        "x-no-window-manager",
+        "Non-nil if no X window manager is in use.",
+    ),
+    (
+        "x-pixel-size-width-font-regexp",
+        "Regexp matching a font name whose width is the same as ‘PIXEL_SIZE’.",
+    ),
+    (
+        "x-pointer-shape",
+        "The shape of the pointer when over text.",
+    ),
+    (
+        "x-pre-popup-menu-hook",
+        "Hook run before ‘x-popup-menu’ displays a popup menu.",
+    ),
+    (
+        "x-quit-keysym",
+        "Keysyms which will cause Emacs to quit if rapidly pressed twice.",
+    ),
+    (
+        "x-resource-class",
+        "The class Emacs uses to look up X resources.",
+    ),
+    (
+        "x-resource-name",
+        "The name Emacs uses to look up X resources.",
+    ),
+    (
+        "x-scroll-event-delta-factor",
+        "A scale to apply to pixel deltas reported in scroll events.",
+    ),
+    (
+        "x-select-enable-clipboard-manager",
+        "Whether to enable X clipboard manager support.",
+    ),
+    (
+        "x-selection-alias-alist",
+        "List of selections to alias to another.",
+    ),
+    (
+        "x-selection-timeout",
+        "Number of milliseconds to wait for a selection reply.",
+    ),
+    (
+        "x-sensitive-text-pointer-shape",
+        "The shape of the pointer when over mouse-sensitive text.",
+    ),
+    (
+        "x-sent-selection-functions",
+        "A list of functions to be called when Emacs answers a selection request.",
+    ),
+    (
+        "x-session-id",
+        "The session id Emacs got from the session manager for this session.",
+    ),
+    (
+        "x-session-previous-id",
+        "The previous session id Emacs got from session manager.",
+    ),
+    (
+        "x-set-frame-visibility-more-laxly",
+        "Non-nil means set frame visibility more laxly.",
+    ),
+    (
+        "x-show-tooltip-timeout",
+        "The default timeout (in seconds) for ‘x-show-tip’.",
+    ),
+    (
+        "x-stretch-cursor",
+        "Non-nil means draw block cursor as wide as the glyph under it.",
+    ),
+    (
+        "x-super-keysym",
+        "Which modifier value Emacs reports when Super is depressed.",
+    ),
+    (
+        "x-toolkit-scroll-bars",
+        "Which toolkit scroll bars Emacs uses, if any.",
+    ),
+    (
+        "x-treat-local-requests-remotely",
+        "Whether to treat local selection requests as remote ones.",
+    ),
+    (
+        "x-underline-at-descent-line",
+        "Non-nil means to draw the underline at the same place as the descent line.",
+    ),
+    (
+        "x-use-fast-mouse-position",
+        "How to make ‘mouse-position’ faster.",
+    ),
+    (
+        "x-use-underline-position-properties",
+        "Non-nil means make use of UNDERLINE_POSITION font properties.",
+    ),
+    (
+        "x-wait-for-event-timeout",
+        "How long to wait for X events.",
+    ),
+    (
+        "x-window-bottom-edge-cursor",
+        "Pointer shape indicating a bottom x-window edge can be dragged.",
+    ),
+    (
+        "x-window-bottom-left-corner-cursor",
+        "Pointer shape indicating a bottom left x-window corner can be dragged.",
+    ),
+    (
+        "x-window-bottom-right-corner-cursor",
+        "Pointer shape indicating a bottom right x-window corner can be dragged.",
+    ),
+    (
+        "x-window-horizontal-drag-cursor",
+        "Pointer shape to use for indicating a window can be dragged horizontally.",
+    ),
+    (
+        "x-window-left-edge-cursor",
+        "Pointer shape indicating a left x-window edge can be dragged.",
+    ),
+    (
+        "x-window-right-edge-cursor",
+        "Pointer shape indicating a right x-window edge can be dragged.",
+    ),
+    (
+        "x-window-top-edge-cursor",
+        "Pointer shape indicating a top x-window edge can be dragged.",
+    ),
+    (
+        "x-window-top-left-corner-cursor",
+        "Pointer shape indicating a top left x-window corner can be dragged.",
+    ),
+    (
+        "x-window-top-right-corner-cursor",
+        "Pointer shape indicating a top right x-window corner can be dragged.",
+    ),
+    (
+        "x-window-vertical-drag-cursor",
+        "Pointer shape to use for indicating a window can be dragged vertically.",
+    ),
+    (
+        "xft-ignore-color-fonts",
+        "Non-nil means don’t query fontconfig for color fonts, since they often",
+    ),
+    (
+        "xft-settings",
+        "Font settings applied to Xft.",
+    ),
+    (
+        "yes-or-no-prompt",
+        "String to append when ‘yes-or-no-p’ asks a question.",
+    ),
     ("kill-ring", "List of killed text sequences."),
     (
         "kill-ring-yank-pointer",
@@ -5382,6 +5890,20 @@ mod tests {
                 .as_str()
                 .is_some_and(|s| s.contains("windows narrower than the frame"))
         );
+    }
+
+    #[test]
+    fn documentation_property_eval_yes_or_no_prompt_integer_property_returns_string() {
+        let mut evaluator = super::super::eval::Evaluator::new();
+        let result = builtin_documentation_property_eval(
+            &mut evaluator,
+            vec![
+                Value::symbol("yes-or-no-prompt"),
+                Value::symbol("variable-documentation"),
+            ],
+        )
+        .unwrap();
+        assert!(result.as_str().is_some_and(|s| s.contains("append when")));
     }
 
     #[test]

@@ -14015,6 +14015,25 @@ Last updated: 2026-02-18
     - `make -C test/neovm/vm-compat record FORMS=cases/documentation-property-semantics.forms EXPECTED=cases/documentation-property-semantics.expected.tsv` (pass)
     - `make -C test/neovm/vm-compat check-one-neovm CASE=documentation-property-semantics` (pass, 42/42)
     - `make -C test/neovm/vm-compat check-all-neovm` (pass)
+- Completed startup-variable `documentation-property` integer-doc parity closure (combined rounds 48-52) with remaining tty/window/x11 metadata symbols:
+  - runtime changes:
+    - added startup doc stubs for all remaining 127 oracle symbols in `STARTUP_VARIABLE_DOC_STUBS`, including:
+      - rounds 48-49 terminal/window/undo vars: `tty-*`, `underline-minimum-offset`, `undo-*`, `unibyte-display-via-language-environment`, `unicode-category-table`, `unread-post-input-method-events`, `use-*`, `user-*`, `values`, `vector-cells-consed`, `vertical-*`, `visible-*`, `where-is-preferred-modifier`, `while-no-input-ignore-events`, `window-*`
+      - rounds 50-51 write-region/x-dnd/x-input vars: `word-*`, `wrap-prefix`, `write-region-*`, and broad `x-*` desktop/session/input/drag/drop configuration symbols
+      - round 52 completion tail: `x-window-*-cursor` edge/corner cursors, `xft-ignore-color-fonts`, `xft-settings`, `yes-or-no-prompt`
+    - integer `variable-documentation` lookups now cover the full oracle-derived startup integer-doc set through the shared startup stub mapping
+    - added eval lock-in tests:
+      - `documentation_property_eval_yes_or_no_prompt_integer_property_returns_string`
+  - expanded oracle corpus:
+    - `test/neovm/vm-compat/cases/documentation-property-semantics.forms`
+    - `test/neovm/vm-compat/cases/documentation-property-semantics.expected.tsv`
+    - added five startup-variable matrix rows (4x30 + 1x7 symbols) for rounds 48-52
+  - verified:
+    - `cargo test --manifest-path rust/neovm-core/Cargo.toml documentation_property_eval_` (pass, 28/28)
+    - `make -C test/neovm/vm-compat record FORMS=cases/documentation-property-semantics.forms EXPECTED=cases/documentation-property-semantics.expected.tsv` (pass)
+    - `make -C test/neovm/vm-compat check-one-neovm CASE=documentation-property-semantics` (pass, 47/47)
+    - `make -C test/neovm/vm-compat check-all-neovm` (pass)
+    - oracle gap check: `remaining_gap_count=0` for GNU Emacs integer `variable-documentation` symbols
 
 ## Doing
 
