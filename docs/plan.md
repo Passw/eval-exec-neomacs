@@ -28,6 +28,35 @@ Last updated: 2026-02-18
 
 ## Doing
 
+- Locked startup `variable-documentation` type-count parity into vm-compat corpus, gate checks, and progress snapshot:
+  - runtime/test changes:
+    - `rust/neovm-core/src/elisp/eval.rs`
+    - added `startup_variable_documentation_property_counts_match_oracle_snapshot` unit lock-in (`OK (761 1904)`).
+    - `test/neovm/vm-compat/cases/startup-variable-documentation-counts-semantics.{forms,expected.tsv}`
+    - added dedicated oracle-backed startup count case for `(integer-doc-count string-doc-count)` tuple parity.
+    - `test/neovm/vm-compat/cases/default.list`
+    - `test/neovm/vm-compat/cases/introspection.list`
+    - wired the new case into both default and introspection case lists.
+  - gate/progress tooling:
+    - `test/neovm/vm-compat/check-startup-variable-documentation-counts.sh`
+    - added oracle-vs-NeoVM runtime gate for startup `variable-documentation` integer/string count parity.
+    - fails on oracle baseline drift or NeoVM runtime drift.
+    - `test/neovm/vm-compat/Makefile`
+    - added `check-startup-variable-documentation-counts` target.
+    - `check-all-neovm` now enforces startup count parity after startup-doc coverage checks.
+    - `test/neovm/vm-compat/compat-progress.sh`
+    - now runs the startup count parity gate and reports:
+      - startup variable-doc counts `(expected|oracle|neovm integer/string)`.
+    - `test/neovm/vm-compat/README.md`
+    - documented the new startup count parity gate and usage.
+  - verified:
+    - `cargo test --manifest-path rust/neovm-core/Cargo.toml startup_variable_documentation_property_counts_match_oracle_snapshot` (pass)
+    - `make -C test/neovm/vm-compat check-one-neovm CASE=startup-variable-documentation-counts-semantics` (pass, 1/1)
+    - `make -C test/neovm/vm-compat check-startup-variable-documentation-counts` (pass)
+    - `make -C test/neovm/vm-compat compat-progress` (pass; includes startup variable-doc count line)
+    - `make -C test/neovm/vm-compat check-introspection-neovm` (pass)
+    - `make -C test/neovm/vm-compat check-all-neovm` (pass with startup count gate enabled)
+
 - Extended vm-compat progress snapshot with startup doc coverage observability:
   - harness changes:
     - `test/neovm/vm-compat/compat-progress.sh`

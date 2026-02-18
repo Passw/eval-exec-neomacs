@@ -10,6 +10,7 @@ function_kind_check_script="$script_dir/check-builtin-registry-function-kind.sh"
 fboundp_check_script="$script_dir/check-builtin-registry-fboundp.sh"
 startup_stub_coverage_script="$script_dir/check-startup-doc-stub-coverage.sh"
 startup_string_coverage_script="$script_dir/check-startup-doc-string-coverage.sh"
+startup_variable_doc_count_script="$script_dir/check-startup-variable-documentation-counts.sh"
 source "$script_dir/lib/builtin-registry.sh"
 compat_stub_index_script="$script_dir/compat-stub-index.sh"
 
@@ -42,6 +43,7 @@ tmp_fboundp_check="$(mktemp)"
 tmp_stub_budget="$(mktemp)"
 tmp_startup_stub_check="$(mktemp)"
 tmp_startup_string_check="$(mktemp)"
+tmp_startup_variable_doc_count_check="$(mktemp)"
 cleanup() {
   rm -f \
     "$tmp_all" \
@@ -57,7 +59,8 @@ cleanup() {
     "$tmp_fboundp_check" \
     "$tmp_stub_budget" \
     "$tmp_startup_stub_check" \
-    "$tmp_startup_string_check"
+    "$tmp_startup_string_check" \
+    "$tmp_startup_variable_doc_count_check"
 }
 trap cleanup EXIT
 
@@ -142,6 +145,11 @@ if ! "$startup_string_coverage_script" > "$tmp_startup_string_check" 2>&1; then
   sed 's/^/    /' "$tmp_startup_string_check"
   exit 1
 fi
+if ! "$startup_variable_doc_count_script" > "$tmp_startup_variable_doc_count_check" 2>&1; then
+  echo "  startup variable-doc count parity: check failed"
+  sed 's/^/    /' "$tmp_startup_variable_doc_count_check"
+  exit 1
+fi
 stub_oracle_count="$(awk -F': ' '/oracle integer-doc symbols:/ { print $2 }' "$tmp_startup_stub_check" | head -n 1)"
 stub_startup_count="$(awk -F': ' '/startup stub symbols:/ { print $2 }' "$tmp_startup_stub_check" | head -n 1)"
 stub_missing_count="$(awk -F': ' '/missing startup stubs:/ { print $2 }' "$tmp_startup_stub_check" | head -n 1)"
@@ -150,10 +158,15 @@ string_oracle_count="$(awk -F': ' '/oracle string-doc symbols:/ { print $2 }' "$
 string_startup_count="$(awk -F': ' '/startup string-doc symbols:/ { print $2 }' "$tmp_startup_string_check" | head -n 1)"
 string_missing_count="$(awk -F': ' '/missing startup string-docs:/ { print $2 }' "$tmp_startup_string_check" | head -n 1)"
 string_extra_count="$(awk -F': ' '/extra startup string-docs:/ { print $2 }' "$tmp_startup_string_check" | head -n 1)"
+startup_doc_expected_counts="$(awk -F': ' '/expected integer\/string:/ { print $2 }' "$tmp_startup_variable_doc_count_check" | head -n 1)"
+startup_doc_oracle_counts="$(awk -F': ' '/oracle integer\/string:/ { print $2 }' "$tmp_startup_variable_doc_count_check" | head -n 1)"
+startup_doc_neovm_counts="$(awk -F': ' '/neovm integer\/string:/ { print $2 }' "$tmp_startup_variable_doc_count_check" | head -n 1)"
 printf '  startup integer docs (oracle/startup/missing/extra): %s/%s/%s/%s\n' \
   "${stub_oracle_count:-0}" "${stub_startup_count:-0}" "${stub_missing_count:-0}" "${stub_extra_count:-0}"
 printf '  startup string docs (oracle/startup/missing/extra): %s/%s/%s/%s\n' \
   "${string_oracle_count:-0}" "${string_startup_count:-0}" "${string_missing_count:-0}" "${string_extra_count:-0}"
+printf '  startup variable-doc counts (expected|oracle|neovm integer/string): %s|%s|%s\n' \
+  "${startup_doc_expected_counts:-0/0}" "${startup_doc_oracle_counts:-0/0}" "${startup_doc_neovm_counts:-0/0}"
 if [[ "$expected_count" -ne "$forms_count" ]]; then
   printf '  corpus artifact delta (expected - forms): %+d\n' "$((expected_count - forms_count))"
   while IFS= read -r path; do
