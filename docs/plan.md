@@ -28,6 +28,13 @@ Last updated: 2026-02-18
 
 ## Doing
 
+- Extended arithmetic parity around `%`/`mod` and extreme shift counts:
+  - Updated `rust/neovm-core/src/elisp/builtins.rs` to split `%` and `mod` semantics so `%` now mirrors Emacs remainder sign behavior (sign of dividend) while `mod` keeps sign-of-divisor behavior.
+  - Aligned `%` and `mod` numeric contracts to reject non-integer operands with `integer-or-marker-p`, matching Oracle error payloads.
+  - Hardened overflow edges: `ash` no longer panics on `most-negative-fixnum` shift counts, and `abs` now signals `overflow-error` instead of trapping on minimum fixnum input.
+  - Added oracle lock-in case `cases/percent-mod-ash-semantics` and wired it into `test/neovm/vm-compat/cases/default.list`.
+  - Validated via `cargo test --manifest-path rust/neovm-core/Cargo.toml pure_dispatch_typed_`, `make -C test/neovm/vm-compat check-one-neovm CASE=cases/percent-mod-ash-semantics`, and full `make -C test/neovm/vm-compat check-all-neovm`.
+
 - Extended `help-function-arglist` non-preserve parity for core helper shapes:
   - Updated `rust/neovm-core/src/elisp/doc.rs` non-preserve mappings for `equal`, `substring`, `aref`, `aset`, `make-string`, `format`, and `funcall` to mirror Oracle positional arglists.
   - Expanded evaluator unit coverage in `help_function_arglist_eval_subr_arity_fallback_shapes` for representative non-preserve shapes.
