@@ -211,6 +211,24 @@ fn startup_variable_doc_stub(sym: &str) -> Option<&'static str> {
             "List of directories to search for files to load.\n\
 Each element is a string (directory name) or nil (try default directory).",
         ),
+        "load-history" => Some("Alist mapping loaded file names to symbols and features."),
+        "features" => Some("A list of symbols which are the features of the executing Emacs."),
+        "debug-on-error" => Some("Non-nil means enter debugger if an error is signaled."),
+        "default-directory" => Some("Name of default directory of current buffer."),
+        "load-file-name" => Some("Full name of file being loaded by `load'."),
+        "noninteractive" => Some("Non-nil means Emacs is running without interactive terminal."),
+        "inhibit-quit" => Some("Non-nil inhibits C-g quitting from happening immediately."),
+        "print-length" => Some("Maximum length of list to print before abbreviating."),
+        "print-level" => Some("Maximum depth of list nesting to print before abbreviating."),
+        "standard-output" => Some("Output stream `print' uses by default for outputting a character."),
+        "buffer-read-only" => Some("Non-nil if this buffer is read-only."),
+        "kill-ring" => Some("List of killed text sequences."),
+        "kill-ring-yank-pointer" => {
+            Some("The tail of the kill ring whose car is the last thing yanked.")
+        }
+        "last-command" => Some("The last command executed."),
+        "lexical-binding" => Some("Whether to use lexical binding when evaluating code."),
+        "load-prefer-newer" => Some("Non-nil means `load' prefers the newest version of a file."),
         _ => None,
     }
 }
@@ -2702,7 +2720,11 @@ mod tests {
             ],
         )
         .unwrap();
-        assert!(result.as_str().is_some_and(|s| s.contains("defined in")));
+        assert!(
+            result
+                .as_str()
+                .is_some_and(|s| s.contains("Non-nil means enter debugger if an error is signaled"))
+        );
     }
 
     #[test]

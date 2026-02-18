@@ -28,6 +28,21 @@ Last updated: 2026-02-18
 
 ## Doing
 
+- Aligned startup `documentation-property` first-line doc stubs with GNU Emacs (batch round 26):
+  - runtime changes:
+    - `rust/neovm-core/src/elisp/doc.rs`
+    - `startup_variable_doc_stub` now returns concrete startup docstring stubs for:
+      - `load-history`, `features`, `debug-on-error`, `default-directory`, `load-file-name`, `noninteractive`, `inhibit-quit`, `print-length`, `print-level`, `standard-output`, `buffer-read-only`, `kill-ring`, `kill-ring-yank-pointer`, `last-command`, `lexical-binding`, `load-prefer-newer`
+    - updated `documentation_property_eval_debug_on_error_integer_property_returns_string` to assert the new Emacs-aligned text.
+  - oracle corpus changes:
+    - `test/neovm/vm-compat/cases/documentation-property-semantics.{forms,expected.tsv}`
+    - added startup-variable first-line prefix lock-ins using `(split-string doc (string 10) t)` + `string-prefix-p`.
+  - verified:
+    - `cargo test --manifest-path rust/neovm-core/Cargo.toml documentation_property_eval_` (pass; 11 tests)
+    - `make -C test/neovm/vm-compat record FORMS=cases/documentation-property-semantics.forms EXPECTED=cases/documentation-property-semantics.expected.tsv` (pass)
+    - `make -C test/neovm/vm-compat check-one-neovm CASE=documentation-property-semantics` (pass, 21/21)
+    - `make -C test/neovm/vm-compat check-all-neovm` (pass)
+
 - Aligned doc/helper runtime edge semantics with GNU Emacs (batch round 25):
   - runtime changes:
     - `rust/neovm-core/src/elisp/doc.rs`
