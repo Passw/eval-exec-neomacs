@@ -28,6 +28,12 @@ Last updated: 2026-02-18
 
 ## Doing
 
+- Extended `help-function-arglist` preserve-names parity for variadic core math/message builtins:
+  - Updated `rust/neovm-core/src/elisp/doc.rs` preserve-name mappings so `max` reports `(number-or-marker &rest numbers-or-markers)` and `message` reports `(format-string &rest args)`.
+  - Expanded evaluator unit coverage in `help_function_arglist_eval_preserve_names_core_subrs` for `max` and `message`.
+  - Extended oracle lock-in case `cases/help-function-arglist-preserve-runtime-semantics`.
+  - Validated via `cargo test --manifest-path rust/neovm-core/Cargo.toml help_function_arglist`, `make -C test/neovm/vm-compat check-one-neovm CASE=cases/help-function-arglist-preserve-runtime-semantics`, and full `make -C test/neovm/vm-compat check-all-neovm`.
+
 - Completed `help-function-arglist` preserve-names runtime parity slice:
   - Expanded evaluator-backed name-preserving mappings in `rust/neovm-core/src/elisp/doc.rs` for core callables (`cdr`, `cons`, `list`, `eq`, `symbol-function`, `fboundp`, `substitute-command-keys`, `where-is-internal`, `read`, `documentation`) while keeping special-form `if` shape unchanged.
   - Added evaluator unit coverage: `help_function_arglist_eval_preserve_names_core_subrs`.
