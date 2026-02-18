@@ -5,6 +5,13 @@
         unread-command-events)
     (error (list (car err) unread-command-events))))
 
+(let ((unread-command-events (list [foo] 98 [bar])))
+  (condition-case err
+      (progn
+        (read-char nil nil 0)
+        unread-command-events)
+    (error (list (car err) unread-command-events))))
+
 (let ((unread-command-events '([foo] . [bar])))
   (condition-case err
       (progn
