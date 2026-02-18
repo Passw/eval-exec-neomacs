@@ -392,8 +392,11 @@ impl<'a> Parser<'a> {
                 Ok(Expr::List(vec![Expr::Symbol("function".into()), expr]))
             }
             '(' => {
-                // GNU Emacs rejects #(...): invalid-read-syntax "#"
-                Err(self.error("#"))
+                // GNU Emacs rejects complete #(...), but incomplete "#(" signals EOF.
+                match self.parse_list_or_dotted() {
+                    Ok(_) => Err(self.error("#")),
+                    Err(err) => Err(err),
+                }
             }
             '[' => {
                 // #[...] — compiled-function literal in .elc.
@@ -443,8 +446,7 @@ impl<'a> Parser<'a> {
                 }
             }
             _ => {
-                // Unknown # syntax — try to read as #N or just return error
-                Err(self.error(&format!("unknown reader syntax: #{}", ch)))
+                Err(self.error(&format!("#{}", ch)))
             }
         }
     }
@@ -481,7 +483,7 @@ impl<'a> Parser<'a> {
             .filter(|c| *c != '_' && *c != '-' && *c != '+')
             .collect();
         if digits.is_empty() {
-            return Err(self.error("expected digits after radix prefix"));
+            return Err(self.error(&format!("integer, radix {}", radix)));
         }
 
         let val =
@@ -1046,6 +1048,30 @@ mod tests {
     fn parse_trailing_hash_reports_hash_payload() {
         let err = parse_forms("#").expect_err("should fail");
         assert_eq!(err.message, "#");
+    }
+
+    #[test]
+    fn parse_hash_unknown_dispatch_preserves_payload() {
+        let err = parse_forms("#a").expect_err("should fail");
+        assert_eq!(err.message, "#a");
+
+        let err = parse_forms("#0").expect_err("should fail");
+        assert_eq!(err.message, "#0");
+
+        let err = parse_forms("# ").expect_err("should fail");
+        assert_eq!(err.message, "# ");
+    }
+
+    #[test]
+    fn parse_hash_radix_missing_digits_reports_oracle_payload() {
+        let err = parse_forms("#x").expect_err("should fail");
+        assert_eq!(err.message, "integer, radix 16");
+    }
+
+    #[test]
+    fn parse_hash_open_paren_without_close_reports_eof_shape() {
+        let err = parse_forms("#(").expect_err("should fail");
+        assert!(err.message.contains("unterminated"));
     }
 
     #[test]

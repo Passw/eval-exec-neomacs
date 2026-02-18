@@ -28,6 +28,25 @@ Last updated: 2026-02-18
 
 ## Doing
 
+- Aligned hash-dispatch `invalid-read-syntax` payloads in `read-from-string` with Oracle:
+  - runtime changes:
+    - updated `rust/neovm-core/src/elisp/parser.rs` hash dispatch error shapes:
+      - unknown dispatch now preserves payload text (`#a`, `#0`, `# `)
+      - missing radix digits now reports Oracle payload (`"integer, radix 16"` for `#x`)
+      - incomplete `"#("` now follows EOF shape while complete `#(...)` remains rejected
+    - updated `rust/neovm-core/src/elisp/reader.rs` sexp-span scanner so unknown `#` dispatch consumes the dispatch character (`#X`) instead of collapsing to bare `"#"` payload.
+    - added parser and reader unit coverage for the new hash payload/error boundaries.
+  - expanded oracle corpus:
+    - `test/neovm/vm-compat/cases/read-from-string-edges.forms`
+    - `test/neovm/vm-compat/cases/read-from-string-edges.expected.tsv`
+    - added probes for `"# "`, `"#x"`, `"#0"`, and `"#a"` via `condition-case`.
+  - verified:
+    - `cargo test --manifest-path rust/neovm-core/Cargo.toml parse_hash_` (pass)
+    - `cargo test --manifest-path rust/neovm-core/Cargo.toml read_from_string_hash_` (pass)
+    - `make -C test/neovm/vm-compat check-one-neovm CASE=cases/read-from-string-edges` (pass, 21/21)
+    - `make -C test/neovm/vm-compat check-one-neovm CASE=cases/reader-hash` (pass, 8/8)
+    - `make -C test/neovm/vm-compat check-all-neovm` (pass)
+
 - Aligned trailing-hash reader error payload shape and expanded `read-from-string` hash-edge lock-ins:
   - runtime changes:
     - updated `rust/neovm-core/src/elisp/parser.rs` so trailing hash syntax (`"#"`) reports `invalid-read-syntax` payload `"#"` (matching Oracle) instead of `"unexpected end after '#'"`.

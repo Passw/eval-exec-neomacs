@@ -513,7 +513,7 @@ fn skip_one_sexp(input: &str, mut pos: usize) -> usize {
                     }
                     pos
                 }
-                _ => pos,
+                _ => pos + 1,
             }
         }
         b'?' => {
@@ -2908,6 +2908,55 @@ mod tests {
                 assert!(matches!(&pair.car, Value::Int(255)));
             }
             _ => panic!("Expected cons"),
+        }
+    }
+
+    #[test]
+    fn read_from_string_hash_space_payload_matches_oracle() {
+        let mut ev = Evaluator::new();
+        let result = builtin_read_from_string(&mut ev, vec![Value::string("# ")]);
+        match result {
+            Err(Flow::Signal(sig)) => {
+                assert_eq!(sig.symbol, "invalid-read-syntax");
+                assert_eq!(sig.data, vec![Value::string("# ")]);
+            }
+            other => panic!("expected invalid-read-syntax, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn read_from_string_hash_unknown_dispatch_payload_matches_oracle() {
+        let mut ev = Evaluator::new();
+
+        let result = builtin_read_from_string(&mut ev, vec![Value::string("#a")]);
+        match result {
+            Err(Flow::Signal(sig)) => {
+                assert_eq!(sig.symbol, "invalid-read-syntax");
+                assert_eq!(sig.data, vec![Value::string("#a")]);
+            }
+            other => panic!("expected invalid-read-syntax, got {other:?}"),
+        }
+
+        let result = builtin_read_from_string(&mut ev, vec![Value::string("#0")]);
+        match result {
+            Err(Flow::Signal(sig)) => {
+                assert_eq!(sig.symbol, "invalid-read-syntax");
+                assert_eq!(sig.data, vec![Value::string("#0")]);
+            }
+            other => panic!("expected invalid-read-syntax, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn read_from_string_hash_radix_missing_digits_payload_matches_oracle() {
+        let mut ev = Evaluator::new();
+        let result = builtin_read_from_string(&mut ev, vec![Value::string("#x")]);
+        match result {
+            Err(Flow::Signal(sig)) => {
+                assert_eq!(sig.symbol, "invalid-read-syntax");
+                assert_eq!(sig.data, vec![Value::string("integer, radix 16")]);
+            }
+            other => panic!("expected invalid-read-syntax, got {other:?}"),
         }
     }
 
