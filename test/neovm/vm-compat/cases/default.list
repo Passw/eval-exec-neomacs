@@ -38,6 +38,7 @@ cases/functionp-callable-matrix
 cases/documentation-property-semantics
 cases/documentation-semantics
 cases/snarf-documentation-runtime-semantics
+cases/describe-variable-runtime-semantics
 cases/doc-helper-arity-semantics
 cases/doc-helper-subr-arity-semantics
 cases/ccl-arity-semantics

@@ -1,0 +1,5 @@
+(stringp (describe-variable 'load-path))
+(string-match-p "void as a variable" (describe-variable 'vm-desc-probe))
+(progn (setq vm-desc-probe 1) (string-match-p "value is" (describe-variable 'vm-desc-probe)))
+(condition-case err (describe-variable 1) (error (car err)))
+(condition-case err (describe-variable) (error (car err)))

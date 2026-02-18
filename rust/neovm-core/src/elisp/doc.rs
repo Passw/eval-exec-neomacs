@@ -150,8 +150,8 @@ pub(crate) fn builtin_describe_variable(
         Some(n) => n.to_string(),
         None => {
             return Err(signal(
-                "wrong-type-argument",
-                vec![Value::symbol("symbolp"), args[0].clone()],
+                "user-error",
+                vec![Value::string("You didn't specify a variable")],
             ));
         }
     };
@@ -167,9 +167,15 @@ pub(crate) fn builtin_describe_variable(
 
     // No documentation property. Check if the variable is at least bound.
     if eval.obarray.boundp(&name) {
-        Ok(Value::string(format!("{} is a variable.", name)))
+        let value = eval
+            .obarray
+            .symbol_value(&name)
+            .cloned()
+            .unwrap_or(Value::symbol("void"));
+        let rendered = super::print::print_value(&value);
+        Ok(Value::string(format!("{name}'s value is {rendered}")))
     } else {
-        Ok(Value::Nil)
+        Ok(Value::string(format!("{name} is void as a variable.")))
     }
 }
 
@@ -1145,7 +1151,12 @@ mod tests {
         let mut evaluator = super::super::eval::Evaluator::new();
         let result = builtin_describe_variable(&mut evaluator, vec![Value::symbol("nonexistent")]);
         assert!(result.is_ok());
-        assert!(result.unwrap().is_nil());
+        assert!(
+            result
+                .unwrap()
+                .as_str()
+                .is_some_and(|s| s.contains("void as a variable"))
+        );
     }
 
     #[test]

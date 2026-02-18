@@ -1,0 +1,5 @@
+1	(stringp (describe-variable 'load-path))	OK t
+2	(string-match-p "void as a variable" (describe-variable 'vm-desc-probe))	OK 17
+3	(progn (setq vm-desc-probe 1) (string-match-p "value is" (describe-variable 'vm-desc-probe)))	OK 16
+4	(condition-case err (describe-variable 1) (error (car err)))	OK user-error
+5	(condition-case err (describe-variable) (error (car err)))	OK wrong-number-of-arguments
