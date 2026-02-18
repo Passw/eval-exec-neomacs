@@ -420,6 +420,31 @@ pub(crate) static STARTUP_VARIABLE_DOC_STUBS: &[(&str, &str)] = &[
     ),
     ("charset-list", "List of all charsets ever defined."),
     (
+        "charset-map-path",
+        "List of directories to search for charset map files.",
+    ),
+    (
+        "charset-revision-table",
+        "Alist of charsets vs revision numbers.",
+    ),
+    (
+        "clear-message-function",
+        "If non-nil, function to clear echo-area messages.",
+    ),
+    (
+        "clone-indirect-buffer-hook",
+        "Normal hook to run in the new buffer at the end of `make-indirect-buffer'.",
+    ),
+    (
+        "code-conversion-map-vector",
+        "Vector of code conversion maps.",
+    ),
+    (
+        "coding-category-list",
+        "List of coding-categories (symbols) ordered by priority.",
+    ),
+    ("coding-system-alist", "Alist of coding system names."),
+    (
         "coding-system-for-read",
         "Specify the coding system for read operations.",
     ),
@@ -429,6 +454,86 @@ pub(crate) static STARTUP_VARIABLE_DOC_STUBS: &[(&str, &str)] = &[
     ),
     ("coding-system-list", "List of coding systems."),
     ("coding-system-require-warning", "Internal use only."),
+    (
+        "combine-after-change-calls",
+        "Used internally by the function `combine-after-change-calls' macro.",
+    ),
+    (
+        "comment-use-syntax-ppss",
+        "Non-nil means `forward-comment' can use `syntax-ppss' internally.",
+    ),
+    ("comp-abi-hash", "String signing the .eln files ABI."),
+    ("comp-ctxt", "The compiler context."),
+    (
+        "comp-deferred-pending-h",
+        "Hash table symbol-name -> function-value.",
+    ),
+    ("comp-eln-to-el-h", "Hash table eln-filename -> el-filename."),
+    (
+        "comp-file-preloaded-p",
+        "When non-nil, assume the file being compiled to be preloaded.",
+    ),
+    (
+        "comp-installed-trampolines-h",
+        "Hash table subr-name -> installed trampoline.",
+    ),
+    (
+        "comp-loaded-comp-units-h",
+        "Hash table recording all loaded compilation units, file -> CU.",
+    ),
+    (
+        "comp-native-version-dir",
+        "Directory in use to disambiguate eln compatibility.",
+    ),
+    (
+        "comp-no-native-file-h",
+        "Files for which no deferred compilation should be performed.",
+    ),
+    (
+        "comp-sanitizer-active",
+        "If non-nil, enable runtime execution of native-compiler sanitizer.",
+    ),
+    (
+        "comp-subr-arities-h",
+        "Hash table recording the arity of Lisp primitives.",
+    ),
+    ("comp-subr-list", "List of all defined subrs."),
+    (
+        "compose-chars-after-function",
+        "Function to adjust composition of buffer text.",
+    ),
+    (
+        "composition-break-at-point",
+        "If non-nil, prevent auto-composition of characters around point.",
+    ),
+    (
+        "composition-function-table",
+        "Char-table of functions for automatic character composition.",
+    ),
+    (
+        "configure-info-directory",
+        "For internal use by the build procedure only.",
+    ),
+    (
+        "cons-cells-consed",
+        "Number of cons cells that have been consed so far.",
+    ),
+    (
+        "create-lockfiles",
+        "Non-nil means use lockfiles to avoid editing collisions.",
+    ),
+    (
+        "cross-disabled-images",
+        "Non-nil means always draw a cross over disabled images.",
+    ),
+    (
+        "ctags-program-name",
+        "Name of the `ctags' program distributed with Emacs.",
+    ),
+    (
+        "ctl-arrow",
+        "Non-nil means display control chars with uparrow '^'.",
+    ),
     (
         "command-debug-status",
         "Debugging status of current interactive command.",
@@ -3152,6 +3257,24 @@ mod tests {
             result
                 .as_str()
                 .is_some_and(|s| s.contains("Auto-Composition mode is enabled"))
+        );
+    }
+
+    #[test]
+    fn documentation_property_eval_coding_system_alist_integer_property_returns_string() {
+        let mut evaluator = super::super::eval::Evaluator::new();
+        let result = builtin_documentation_property_eval(
+            &mut evaluator,
+            vec![
+                Value::symbol("coding-system-alist"),
+                Value::symbol("variable-documentation"),
+            ],
+        )
+        .unwrap();
+        assert!(
+            result
+                .as_str()
+                .is_some_and(|s| s.contains("Alist of coding system names"))
         );
     }
 

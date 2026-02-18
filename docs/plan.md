@@ -13821,6 +13821,23 @@ Last updated: 2026-02-18
     - `cargo test --manifest-path rust/neovm-core/Cargo.toml documentation_property_eval_` (pass, 15/15)
     - `make -C test/neovm/vm-compat check-all-neovm` (pass)
     - `make -C test/neovm/vm-compat check-one-neovm CASE=documentation-property-semantics` (pass, 25/25)
+- Expanded startup-variable `documentation-property` parity (round 31) with charset/coding/composition/compiler startup symbols:
+  - runtime changes:
+    - added startup doc stubs for 30 more symbols in `STARTUP_VARIABLE_DOC_STUBS`, including:
+      - `charset-map-path`, `charset-revision-table`, `coding-category-list`, `coding-system-alist`, `combine-after-change-calls`, `comment-use-syntax-ppss`
+      - native-compiler state vars (`comp-*` group), plus composition/display startup vars (`compose-chars-after-function`, `composition-function-table`, `ctl-arrow`)
+    - integer `variable-documentation` lookups for that round-31 symbol batch now resolve through the shared startup doc stub mapping
+    - added eval lock-in test:
+      - `documentation_property_eval_coding_system_alist_integer_property_returns_string`
+  - expanded oracle corpus:
+    - `test/neovm/vm-compat/cases/documentation-property-semantics.forms`
+    - `test/neovm/vm-compat/cases/documentation-property-semantics.expected.tsv`
+    - added a dedicated 30-symbol startup matrix row for the round-31 set (string doc + first-line prefix checks)
+  - verified:
+    - `cargo test --manifest-path rust/neovm-core/Cargo.toml documentation_property_eval_` (pass, 16/16)
+    - `make -C test/neovm/vm-compat record FORMS=cases/documentation-property-semantics.forms EXPECTED=cases/documentation-property-semantics.expected.tsv` (pass)
+    - `make -C test/neovm/vm-compat check-one-neovm CASE=documentation-property-semantics` (pass, 26/26)
+    - `make -C test/neovm/vm-compat check-all-neovm` (pass)
 
 ## Doing
 
