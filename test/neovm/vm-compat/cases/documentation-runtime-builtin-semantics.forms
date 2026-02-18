@@ -5,6 +5,7 @@
 (progn (fset 'vm-doc-lambda2 (lambda (x) "ldoc" x)) (documentation 'vm-doc-lambda2))
 (progn (put 'vm-doc-prop-only2 'function-documentation "pdoc") (documentation 'vm-doc-prop-only2))
 (progn (fset 'vm-doc-alias-target (lambda nil "aliasdoc" nil)) (defalias 'vm-doc-alias 'vm-doc-alias-target) (stringp (documentation 'vm-doc-alias)))
+(progn (fset 'vm-doc-alias-builtin 'car) (stringp (documentation 'vm-doc-alias-builtin)))
 (condition-case err (documentation 1) (error (car err)))
 (stringp (documentation 'car t))
 (condition-case err (documentation 'car nil nil) (error (car err)))

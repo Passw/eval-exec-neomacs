@@ -68,7 +68,9 @@ pub(crate) fn builtin_documentation(
         let mut func_val =
             super::builtins::builtin_symbol_function(eval, vec![Value::symbol(name.clone())])?;
         if let Some(alias_name) = func_val.as_symbol_name() {
-            if let Some(indirect) = eval.obarray.indirect_function(alias_name) {
+            let indirect =
+                super::builtins::builtin_indirect_function(eval, vec![Value::symbol(alias_name)])?;
+            if !indirect.is_nil() {
                 func_val = indirect;
             }
         }
@@ -1022,6 +1024,18 @@ mod tests {
             .set_symbol_function("plus", Value::Subr("+".to_string()));
 
         let result = builtin_documentation(&mut evaluator, vec![Value::symbol("plus")]);
+        assert!(result.is_ok());
+        assert!(result.unwrap().is_string());
+    }
+
+    #[test]
+    fn documentation_symbol_alias_to_builtin_returns_docstring() {
+        let mut evaluator = super::super::eval::Evaluator::new();
+        evaluator
+            .obarray
+            .set_symbol_function("alias-builtin", Value::symbol("car"));
+
+        let result = builtin_documentation(&mut evaluator, vec![Value::symbol("alias-builtin")]);
         assert!(result.is_ok());
         assert!(result.unwrap().is_string());
     }
