@@ -11,6 +11,7 @@
 (help-function-arglist '(lambda x x))
 (help-function-arglist '(lambda x . 1))
 (help-function-arglist '(macro (x) x))
+(help-function-arglist '(macro lambda))
 (condition-case err (help-function-arglist '(lambda . 1)) (error err))
 (condition-case err (help-function-arglist 1) (error (car err)))
 (condition-case err (help-function-arglist 'car nil nil) (error (car err)))

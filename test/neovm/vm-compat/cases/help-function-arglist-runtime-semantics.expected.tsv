@@ -11,6 +11,7 @@
 11	(help-function-arglist '(lambda x x))	OK x
 12	(help-function-arglist '(lambda x . 1))	OK x
 13	(help-function-arglist '(macro (x) x))	OK t
-14	(condition-case err (help-function-arglist '(lambda . 1)) (error err))	OK (wrong-type-argument listp 1)
-15	(condition-case err (help-function-arglist 1) (error (car err)))	OK t
-16	(condition-case err (help-function-arglist 'car nil nil) (error (car err)))	OK wrong-number-of-arguments
+14	(help-function-arglist '(macro lambda))	OK nil
+15	(condition-case err (help-function-arglist '(lambda . 1)) (error err))	OK (wrong-type-argument listp 1)
+16	(condition-case err (help-function-arglist 1) (error (car err)))	OK t
+17	(condition-case err (help-function-arglist 'car nil nil) (error (car err)))	OK wrong-number-of-arguments

@@ -205,6 +205,16 @@ fn startup_variable_doc_offset_symbol(sym: &str, prop: &str, value: &Value) -> b
         )
 }
 
+fn startup_variable_doc_stub(sym: &str) -> Option<&'static str> {
+    match sym {
+        "load-path" => Some(
+            "List of directories to search for files to load.\n\
+Each element is a string (directory name) or nil (try default directory).",
+        ),
+        _ => None,
+    }
+}
+
 /// `(describe-function FUNCTION)` -- return a short description string.
 ///
 /// This is a simplified stub that returns a type description of the function.
@@ -309,7 +319,7 @@ pub(crate) fn builtin_describe_variable(
         None => {
             return Err(signal(
                 "user-error",
-                vec![Value::string("You didn't specify a variable")],
+                vec![Value::string("You didn’t specify a variable")],
             ));
         }
     };
@@ -354,13 +364,26 @@ pub(crate) fn builtin_describe_variable(
 }
 
 fn describe_variable_value_or_void(eval: &super::eval::Evaluator, name: &str) -> Value {
-    if eval.obarray.boundp(name) {
-        let value = eval
-            .obarray
-            .symbol_value(name)
-            .cloned()
-            .unwrap_or(Value::symbol("void"));
+    let value = if name.starts_with(':') {
+        Some(Value::keyword(name))
+    } else if eval.obarray.boundp(name) {
+        Some(
+            eval.obarray
+                .symbol_value(name)
+                .cloned()
+                .unwrap_or(Value::symbol("void")),
+        )
+    } else {
+        None
+    };
+
+    if let Some(value) = value {
         let rendered = super::print::print_value(&value);
+        let rendered = if matches!(value, Value::Symbol(_) | Value::Keyword(_)) {
+            format!("\u{2018}{rendered}\u{2019}")
+        } else {
+            rendered
+        };
         Value::string(format!("{name}\u{2019}s value is {rendered}\n"))
     } else {
         Value::string(format!("{name} is void as a variable.\n"))
@@ -394,9 +417,15 @@ pub(crate) fn builtin_documentation_property_eval(
     };
 
     match eval.obarray.get_property(sym, prop).cloned() {
-        Some(value) if startup_variable_doc_offset_symbol(sym, prop, &value) => Ok(
-            Value::string(format!("{sym} is a variable defined in `C source code`.")),
-        ),
+        Some(value) if startup_variable_doc_offset_symbol(sym, prop, &value) => {
+            if let Some(doc) = startup_variable_doc_stub(sym) {
+                Ok(Value::string(doc))
+            } else {
+                Ok(Value::string(format!(
+                    "{sym} is a variable defined in `C source code`."
+                )))
+            }
+        }
         Some(value) => eval_documentation_property_value(eval, value),
         _ => Ok(Value::Nil),
     }
@@ -648,7 +677,17 @@ fn help_arglist_from_quoted_designator(function: &Value) -> Option<EvalResult> {
     };
 
     match head {
-        "macro" => Some(Ok(Value::True)),
+        "macro" => {
+            // GNU Emacs returns nil for the exact quoted shape `(macro lambda)`.
+            if let Value::Cons(payload_cell) = pair.cdr.clone() {
+                if let Ok(payload) = payload_cell.lock() {
+                    if payload.car.as_symbol_name() == Some("lambda") && payload.cdr.is_nil() {
+                        return Some(Ok(Value::Nil));
+                    }
+                }
+            }
+            Some(Ok(Value::True))
+        }
         "lambda" => match pair.cdr.clone() {
             Value::Nil => Some(Ok(Value::Nil)),
             Value::Cons(arg_cell) => {
@@ -1529,6 +1568,13 @@ mod tests {
         ]);
         let result = builtin_help_function_arglist(vec![quoted]).unwrap();
         assert!(result.is_truthy());
+    }
+
+    #[test]
+    fn help_function_arglist_macro_lambda_symbol_payload_returns_nil() {
+        let quoted = Value::list(vec![Value::symbol("macro"), Value::symbol("lambda")]);
+        let result = builtin_help_function_arglist(vec![quoted]).unwrap();
+        assert!(result.is_nil());
     }
 
     #[test]
@@ -2546,6 +2592,15 @@ mod tests {
     }
 
     #[test]
+    fn describe_variable_keyword_is_self_bound() {
+        let mut evaluator = super::super::eval::Evaluator::new();
+        let result = builtin_describe_variable(&mut evaluator, vec![Value::keyword(":x")]).unwrap();
+        let text = result.as_str().expect("describe-variable must return a string");
+        assert!(text.contains("value is"));
+        assert!(text.contains(":x"));
+    }
+
+    #[test]
     fn describe_variable_accepts_optional_second_arg() {
         let mut evaluator = super::super::eval::Evaluator::new();
         evaluator.obarray.set_symbol_value("x", Value::Int(10));
@@ -2629,7 +2684,11 @@ mod tests {
             ],
         )
         .unwrap();
-        assert!(result.as_str().is_some_and(|s| s.contains("defined in")));
+        assert!(
+            result
+                .as_str()
+                .is_some_and(|s| s.contains("List of directories to search for files to load"))
+        );
     }
 
     #[test]

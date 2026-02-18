@@ -12,5 +12,10 @@
 (progn (setq vm-desc-probe 1) (setq vm-desc-docsym-list '(identity "doc")) (put 'vm-desc-probe 'variable-documentation 'vm-desc-docsym-list) (condition-case err (describe-variable 'vm-desc-probe) (error (car err))))
 (condition-case err (describe-variable 1) (error (car err)))
 (condition-case err (describe-variable) (error (car err)))
+(condition-case err (describe-variable "x") (error (car err)))
+(let ((s (describe-variable :vm-desc-keyword-probe)))
+  (list
+   (not (null (string-match-p "value is" s)))
+   (not (null (string-match-p ":vm-desc-keyword-probe" s)))))
 (not (null (string-match-p "defined in" (describe-variable 'load-path nil nil))))
 (condition-case err (describe-variable 'load-path nil nil nil) (error (car err)))

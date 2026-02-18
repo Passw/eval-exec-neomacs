@@ -1,18 +1,20 @@
 1	(documentation-property 'vm-docprop-symbol 'variable-documentation)	OK nil
 2	(stringp (documentation-property 'load-path 'variable-documentation))	OK t
 3	(stringp (documentation-property 'load-path 'variable-documentation t))	OK t
-4	(mapcar (lambda (s) (let ((v (documentation-property s 'variable-documentation))) (list s (stringp v) (null v)))) '(load-path load-history features debug-on-error default-directory load-file-name noninteractive inhibit-quit print-length print-level standard-output buffer-read-only kill-ring kill-ring-yank-pointer last-command lexical-binding load-prefer-newer))	OK ((load-path t nil) (load-history t nil) (features t nil) (debug-on-error t nil) (default-directory t nil) (load-file-name t nil) (noninteractive t nil) (inhibit-quit t nil) (print-length t nil) (print-level t nil) (standard-output t nil) (buffer-read-only t nil) (kill-ring t nil) (kill-ring-yank-pointer t nil) (last-command t nil) (lexical-binding t nil) (load-prefer-newer t nil))
-5	(progn (put 'vm-docprop-symbol 'variable-documentation "doc") (documentation-property 'vm-docprop-symbol 'variable-documentation))	OK "doc"
-6	(progn (put 'vm-docprop-symbol 'variable-documentation 9) (documentation-property 'vm-docprop-symbol 'variable-documentation))	OK nil
-7	(progn (put 'vm-docprop-symbol 'function-documentation "fdoc") (documentation-property 'vm-docprop-symbol 'function-documentation))	OK "fdoc"
-8	(documentation-property 'vm-docprop-symbol 1)	OK nil
-9	(progn (put 'vm-docprop-symbol 'x "v") (documentation-property 'vm-docprop-symbol 'x t))	OK "v"
-10	(progn (put 'vm-docprop-symbol 'variable-documentation '(1 2)) (condition-case err (documentation-property 'vm-docprop-symbol 'variable-documentation) (error err)))	OK (invalid-function 1)
-11	(progn (put 'vm-docprop-symbol 'variable-documentation '(identity "doc")) (documentation-property 'vm-docprop-symbol 'variable-documentation))	OK "doc"
-12	(progn (put 'vm-docprop-symbol 'variable-documentation 'vm-docprop-unbound) (condition-case err (documentation-property 'vm-docprop-symbol 'variable-documentation) (error err)))	OK (void-variable vm-docprop-unbound)
-13	(progn (put 'vm-docprop-symbol 'variable-documentation 't) (documentation-property 'vm-docprop-symbol 'variable-documentation))	OK t
-14	(progn (put 'vm-docprop-symbol 'variable-documentation [1 2]) (documentation-property 'vm-docprop-symbol 'variable-documentation))	OK [1 2]
-15	(progn (put 'vm-docprop-symbol 'variable-documentation 1.5) (documentation-property 'vm-docprop-symbol 'variable-documentation))	OK 1.5
-16	(progn (put 'vm-docprop-symbol 'variable-documentation '(progn "doc")) (documentation-property 'vm-docprop-symbol 'variable-documentation t))	OK "doc"
-17	(condition-case err (documentation-property 1 'variable-documentation) (error (car err)))	OK wrong-type-argument
-18	(condition-case err (documentation-property 'vm-docprop-symbol) (error (car err)))	OK wrong-number-of-arguments
+4	(not (null (string-match-p "List of directories to search for files to load" (documentation-property 'load-path 'variable-documentation nil))))	OK t
+5	(not (null (string-match-p "List of directories to search for files to load" (documentation-property 'load-path 'variable-documentation t))))	OK t
+6	(mapcar (lambda (s) (let ((v (documentation-property s 'variable-documentation))) (list s (stringp v) (null v)))) '(load-path load-history features debug-on-error default-directory load-file-name noninteractive inhibit-quit print-length print-level standard-output buffer-read-only kill-ring kill-ring-yank-pointer last-command lexical-binding load-prefer-newer))	OK ((load-path t nil) (load-history t nil) (features t nil) (debug-on-error t nil) (default-directory t nil) (load-file-name t nil) (noninteractive t nil) (inhibit-quit t nil) (print-length t nil) (print-level t nil) (standard-output t nil) (buffer-read-only t nil) (kill-ring t nil) (kill-ring-yank-pointer t nil) (last-command t nil) (lexical-binding t nil) (load-prefer-newer t nil))
+7	(progn (put 'vm-docprop-symbol 'variable-documentation "doc") (documentation-property 'vm-docprop-symbol 'variable-documentation))	OK "doc"
+8	(progn (put 'vm-docprop-symbol 'variable-documentation 9) (documentation-property 'vm-docprop-symbol 'variable-documentation))	OK nil
+9	(progn (put 'vm-docprop-symbol 'function-documentation "fdoc") (documentation-property 'vm-docprop-symbol 'function-documentation))	OK "fdoc"
+10	(documentation-property 'vm-docprop-symbol 1)	OK nil
+11	(progn (put 'vm-docprop-symbol 'x "v") (documentation-property 'vm-docprop-symbol 'x t))	OK "v"
+12	(progn (put 'vm-docprop-symbol 'variable-documentation '(1 2)) (condition-case err (documentation-property 'vm-docprop-symbol 'variable-documentation) (error err)))	OK (invalid-function 1)
+13	(progn (put 'vm-docprop-symbol 'variable-documentation '(identity "doc")) (documentation-property 'vm-docprop-symbol 'variable-documentation))	OK "doc"
+14	(progn (put 'vm-docprop-symbol 'variable-documentation 'vm-docprop-unbound) (condition-case err (documentation-property 'vm-docprop-symbol 'variable-documentation) (error err)))	OK (void-variable vm-docprop-unbound)
+15	(progn (put 'vm-docprop-symbol 'variable-documentation 't) (documentation-property 'vm-docprop-symbol 'variable-documentation))	OK t
+16	(progn (put 'vm-docprop-symbol 'variable-documentation [1 2]) (documentation-property 'vm-docprop-symbol 'variable-documentation))	OK [1 2]
+17	(progn (put 'vm-docprop-symbol 'variable-documentation 1.5) (documentation-property 'vm-docprop-symbol 'variable-documentation))	OK 1.5
+18	(progn (put 'vm-docprop-symbol 'variable-documentation '(progn "doc")) (documentation-property 'vm-docprop-symbol 'variable-documentation t))	OK "doc"
+19	(condition-case err (documentation-property 1 'variable-documentation) (error (car err)))	OK wrong-type-argument
+20	(condition-case err (documentation-property 'vm-docprop-symbol) (error (car err)))	OK wrong-number-of-arguments

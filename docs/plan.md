@@ -28,6 +28,28 @@ Last updated: 2026-02-18
 
 ## Doing
 
+- Aligned doc/helper runtime edge semantics with GNU Emacs (batch round 25):
+  - runtime changes:
+    - `rust/neovm-core/src/elisp/doc.rs`
+    - `describe-variable` now treats keyword symbols as self-bound variables (for example `:foo`) and renders symbol-valued outputs with quote glyph shape matching oracle style.
+    - `describe-variable` non-symbol user error text now matches oracle apostrophe style (`You didn’t specify a variable`).
+    - `documentation-property` startup integer-doc handling now returns a concrete load-path docstring stub for `load-path` instead of the generic C-source placeholder.
+    - `help-function-arglist` quoted macro designator handling now matches oracle for the `(macro lambda)` edge case (`nil`).
+    - expanded unit lock-ins in `doc.rs` for the new keyword/docstub/macro-lambda behaviors.
+  - oracle corpus changes:
+    - `test/neovm/vm-compat/cases/describe-variable-runtime-semantics.{forms,expected.tsv}`
+    - `test/neovm/vm-compat/cases/documentation-property-semantics.{forms,expected.tsv}`
+    - `test/neovm/vm-compat/cases/help-function-arglist-runtime-semantics.{forms,expected.tsv}`
+    - added behavior lock-ins for keyword describe-variable output shape, load-path documentation-property content markers, and `help-function-arglist` macro-lambda nil behavior.
+  - verified:
+    - `cargo test --manifest-path rust/neovm-core/Cargo.toml help_function_arglist_quoted_macro` (pass)
+    - `cargo test --manifest-path rust/neovm-core/Cargo.toml describe_variable_keyword_is_self_bound` (pass)
+    - `cargo test --manifest-path rust/neovm-core/Cargo.toml documentation_property_eval_load_path_integer_property_returns_string` (pass)
+    - `make -C test/neovm/vm-compat check-one-neovm CASE=cases/describe-variable-runtime-semantics` (pass, 18/18)
+    - `make -C test/neovm/vm-compat check-one-neovm CASE=cases/documentation-property-semantics` (pass, 20/20)
+    - `make -C test/neovm/vm-compat check-one-neovm CASE=cases/help-function-arglist-runtime-semantics` (pass, 17/17)
+    - `make -C test/neovm/vm-compat check-all-neovm` (pass)
+
 - Aligned additional coding runtime designator/alias semantics with GNU Emacs (batch round 24):
   - runtime changes:
     - `rust/neovm-core/src/elisp/coding.rs`
