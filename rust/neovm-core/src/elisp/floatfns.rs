@@ -116,8 +116,8 @@ pub(crate) fn builtin_frexp(args: Vec<Value>) -> EvalResult {
 /// (ldexp SIGNIFICAND EXPONENT) -- return SIGNIFICAND * 2^EXPONENT
 pub(crate) fn builtin_ldexp(args: Vec<Value>) -> EvalResult {
     expect_args("ldexp", &args, 2)?;
-    let significand = extract_number(&args[0])?;
     let exponent = extract_fixnum(&args[1])?;
+    let significand = extract_number(&args[0])?;
 
     // Use ldexp equivalent: significand * 2.0^exponent
     // Rust doesn't have ldexp in std, but we can use f64::exp2 approach
@@ -389,6 +389,29 @@ mod tests {
         assert!(builtin_ldexp(vec![Value::Float(1.0), Value::Float(2.0)]).is_err());
         assert!(builtin_logb(vec![Value::True]).is_err());
         assert!(builtin_logb(vec![Value::string("y")]).is_err());
+    }
+
+    #[test]
+    fn test_ldexp_type_check_order_matches_oracle() {
+        let err = builtin_ldexp(vec![Value::symbol("sym"), Value::Float(2.0)])
+            .expect_err("ldexp should reject non-fixnum exponent first");
+        match err {
+            Flow::Signal(sig) => {
+                assert_eq!(sig.symbol, "wrong-type-argument");
+                assert_eq!(sig.data, vec![Value::symbol("fixnump"), Value::Float(2.0)]);
+            }
+            other => panic!("unexpected flow: {other:?}"),
+        }
+
+        let err = builtin_ldexp(vec![Value::symbol("sym"), Value::Int(2)])
+            .expect_err("ldexp should reject significand after exponent passes");
+        match err {
+            Flow::Signal(sig) => {
+                assert_eq!(sig.symbol, "wrong-type-argument");
+                assert_eq!(sig.data, vec![Value::symbol("numberp"), Value::symbol("sym")]);
+            }
+            other => panic!("unexpected flow: {other:?}"),
+        }
     }
 
     // ===== Wrong arity errors =====

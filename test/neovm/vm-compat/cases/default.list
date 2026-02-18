@@ -541,6 +541,7 @@ cases/expt-isnan-type-semantics
 cases/round-half-even-semantics
 cases/fround-negative-zero-semantics
 cases/floatfns-argument-contract-semantics
+cases/ldexp-type-check-order-semantics
 cases/md5-semantics
 cases/md5-coding-semantics
 cases/coding-system-runtime-semantics
