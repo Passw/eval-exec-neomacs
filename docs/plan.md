@@ -10654,6 +10654,20 @@ Last updated: 2026-02-18
     - `make -C test/neovm/vm-compat record FORMS=cases/describe-function-runtime-semantics.forms EXPECTED=cases/describe-function-runtime-semantics.expected.tsv` (pass)
     - `make -C test/neovm/vm-compat check-one-neovm CASE=describe-function-runtime-semantics` (pass, 10/10)
     - `make -C test/neovm/vm-compat check-all-neovm` (pass)
+- Aligned `describe-function` alias result-shape text with GNU Emacs:
+  - runtime changes:
+    - symbol-function aliases now return alias-description text (`"NAME is an alias for \`TARGET\`."`)
+    - alias text is returned even when the alias target is unresolved, matching string-return behavior
+    - existing autoload, special-form, keyboard-macro, and macro-marker classification behavior is preserved
+  - expanded oracle corpus:
+    - `test/neovm/vm-compat/cases/describe-function-runtime-semantics.forms`
+    - `test/neovm/vm-compat/cases/describe-function-runtime-semantics.expected.tsv`
+    - added explicit alias probe asserting `"alias for"` text class
+  - verified:
+    - `cargo test --manifest-path rust/neovm-core/Cargo.toml describe_function` (pass)
+    - `make -C test/neovm/vm-compat record FORMS=cases/describe-function-runtime-semantics.forms EXPECTED=cases/describe-function-runtime-semantics.expected.tsv` (pass)
+    - `make -C test/neovm/vm-compat check-one-neovm CASE=describe-function-runtime-semantics` (pass, 11/11)
+    - `make -C test/neovm/vm-compat check-all-neovm` (pass)
 
 ## Doing
 
