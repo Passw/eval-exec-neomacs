@@ -304,10 +304,11 @@ pub(crate) fn builtin_div(args: Vec<Value>) -> EvalResult {
         let mut acc = expect_number_or_marker_f64(&args[0])?;
         for a in &args[1..] {
             let d = expect_number_or_marker_f64(a)?;
-            if d == 0.0 {
-                return Err(signal("arith-error", vec![]));
-            }
             acc /= d;
+            if acc.is_nan() {
+                // Emacs prints negative-NaN for float zero-divisor paths.
+                acc = f64::from_bits(f64::NAN.to_bits() | (1_u64 << 63));
+            }
         }
         Ok(Value::Float(acc))
     } else {
@@ -10055,6 +10056,33 @@ mod tests {
                 }
                 other => panic!("unexpected flow: {other:?}"),
             }
+        }
+    }
+
+    #[test]
+    fn pure_dispatch_typed_div_float_zero_uses_ieee_results() {
+        let pos_inf = dispatch_builtin_pure("/", vec![Value::Float(1.0), Value::Float(0.0)])
+            .expect("builtin / should resolve")
+            .expect("float division should evaluate");
+        match pos_inf {
+            Value::Float(f) => assert!(f.is_infinite() && f.is_sign_positive()),
+            other => panic!("expected float, got {other:?}"),
+        }
+
+        let neg_inf = dispatch_builtin_pure("/", vec![Value::Float(-1.0), Value::Float(0.0)])
+            .expect("builtin / should resolve")
+            .expect("float division should evaluate");
+        match neg_inf {
+            Value::Float(f) => assert!(f.is_infinite() && f.is_sign_negative()),
+            other => panic!("expected float, got {other:?}"),
+        }
+
+        let neg_nan = dispatch_builtin_pure("/", vec![Value::Float(0.0), Value::Float(0.0)])
+            .expect("builtin / should resolve")
+            .expect("float division should evaluate");
+        match neg_nan {
+            Value::Float(f) => assert!(f.is_nan() && f.is_sign_negative()),
+            other => panic!("expected float, got {other:?}"),
         }
     }
 
