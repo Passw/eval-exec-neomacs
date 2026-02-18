@@ -13,6 +13,11 @@
     (read-key "")
     unread-command-events))
 
+(let ((unread-command-events (list 97 98 99 100 [mouse-1])))
+  (progn
+    (read-key "")
+    unread-command-events))
+
 (let ((unread-command-events '(97 . [mouse-1])))
   (progn
     (read-key "")
