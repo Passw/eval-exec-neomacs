@@ -28,6 +28,25 @@ Last updated: 2026-02-18
 
 ## Doing
 
+- Aligned coding detection/list helper max-arity behavior with oracle (batch round 21):
+  - runtime changes:
+    - `rust/neovm-core/src/elisp/coding.rs`
+    - enforced max arity for:
+      - `coding-system-list` (`0..1`)
+      - `detect-coding-string` (`1..2`)
+      - `detect-coding-region` (`2..3`)
+    - added unit lock-ins:
+      - `coding_system_list_rejects_too_many_args`
+      - `detect_coding_string_rejects_too_many_args`
+      - `detect_coding_region_rejects_too_many_args`
+  - oracle corpus changes:
+    - `test/neovm/vm-compat/cases/coding-system-runtime-semantics.{forms,expected.tsv}`
+    - added over-arity probes for `coding-system-list`, `detect-coding-string`, and `detect-coding-region`.
+  - verified:
+    - `cargo test --manifest-path rust/neovm-core/Cargo.toml rejects_too_many_args` (pass)
+    - `make -C test/neovm/vm-compat check-one-neovm CASE=cases/coding-system-runtime-semantics` (pass, 30/30)
+    - `make -C test/neovm/vm-compat check-all-neovm` (pass)
+
 - Aligned keyboard coding-system canonicalization for non-unix alias designators (batch round 20):
   - runtime changes:
     - `rust/neovm-core/src/elisp/coding.rs`

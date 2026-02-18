@@ -422,6 +422,7 @@ pub(crate) fn builtin_coding_system_list(
     mgr: &CodingSystemManager,
     args: Vec<Value>,
 ) -> EvalResult {
+    expect_max_args("coding-system-list", &args, 1)?;
     let base_only = args.first().is_some_and(|v| v.is_truthy());
     let names = mgr.list_all();
     let filtered: Vec<Value> = names
@@ -816,6 +817,7 @@ pub(crate) fn builtin_detect_coding_string(
     args: Vec<Value>,
 ) -> EvalResult {
     expect_min_args("detect-coding-string", &args, 1)?;
+    expect_max_args("detect-coding-string", &args, 2)?;
     match &args[0] {
         Value::Str(_) => {}
         other => {
@@ -840,6 +842,7 @@ pub(crate) fn builtin_detect_coding_region(
     args: Vec<Value>,
 ) -> EvalResult {
     expect_min_args("detect-coding-region", &args, 2)?;
+    expect_max_args("detect-coding-region", &args, 3)?;
     let highest = args.get(2).is_some_and(|v| v.is_truthy());
     if highest {
         Ok(Value::symbol("utf-8"))
@@ -1088,6 +1091,13 @@ mod tests {
                 );
             }
         }
+    }
+
+    #[test]
+    fn coding_system_list_rejects_too_many_args() {
+        let m = mgr();
+        let result = builtin_coding_system_list(&m, vec![Value::Nil, Value::Nil]);
+        assert!(result.is_err());
     }
 
     // ----- coding-system-aliases -----
@@ -1403,6 +1413,14 @@ mod tests {
         assert!(result.is_err());
     }
 
+    #[test]
+    fn detect_coding_string_rejects_too_many_args() {
+        let m = mgr();
+        let result =
+            builtin_detect_coding_string(&m, vec![Value::string("x"), Value::Nil, Value::Nil]);
+        assert!(result.is_err());
+    }
+
     // ----- detect-coding-region -----
 
     #[test]
@@ -1421,6 +1439,16 @@ mod tests {
             builtin_detect_coding_region(&m, vec![Value::Int(1), Value::Int(100)]).unwrap();
         let items = list_to_vec(&result).unwrap();
         assert_eq!(items.len(), 1);
+    }
+
+    #[test]
+    fn detect_coding_region_rejects_too_many_args() {
+        let m = mgr();
+        let result = builtin_detect_coding_region(
+            &m,
+            vec![Value::Int(1), Value::Int(100), Value::Nil, Value::Nil],
+        );
+        assert!(result.is_err());
     }
 
     // ----- keyboard/terminal coding system -----
