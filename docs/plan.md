@@ -28,6 +28,37 @@ Last updated: 2026-02-18
 
 ## Doing
 
+- Aligned additional coding runtime designator/alias semantics with GNU Emacs (batch round 24):
+  - runtime changes:
+    - `rust/neovm-core/src/elisp/coding.rs`
+    - `coding-system-aliases` now:
+      - rejects string designators with `wrong-type-argument symbolp`,
+      - signals `coding-system-error` for unknown symbol-like designators,
+      - maps `nil`/`binary`/`no-conversion` to the shared `(no-conversion binary)` alias family,
+      - emits Emacs-style display canonicals for latin/ascii families and deterministic alias ordering.
+    - `coding-system-eol-type` now:
+      - accepts only symbol-like designators (non-symbols return `nil`),
+      - maps `nil` to `no-conversion` (`0`),
+      - preserves explicit `-unix`/`-dos`/`-mac` designators as integer EOL codes,
+      - emits display vectors for undecided alias families (`iso-latin-1-*`, `us-ascii-*`).
+    - `coding-system-p` now returns true for `nil` and supported derived `-unix/-dos/-mac` designators (for example `ascii-dos`).
+    - keyword handling for coding setters/priority now follows symbol-like semantics:
+      - `set-keyboard-coding-system` / `set-terminal-coding-system` / `set-coding-system-priority`
+      - keywords now signal `coding-system-error` (instead of `wrong-type-argument symbolp`).
+    - added missing default coding aliases to match oracle alias sets:
+      - `cp65001 -> utf-8`
+      - `iso-safe -> ascii`
+    - expanded unit lock-ins for the above behavior changes.
+  - oracle corpus changes:
+    - `test/neovm/vm-compat/cases/coding-system-runtime-semantics.forms`
+    - `test/neovm/vm-compat/cases/coding-system-runtime-semantics.expected.tsv`
+    - expanded with alias/eol/predicate/setter/priority edge probes; case count increased to `128`.
+  - verified:
+    - `cargo test --manifest-path rust/neovm-core/Cargo.toml coding_system_` (pass; 53 tests)
+    - `make -C test/neovm/vm-compat record FORMS=cases/coding-system-runtime-semantics.forms EXPECTED=cases/coding-system-runtime-semantics.expected.tsv` (pass)
+    - `make -C test/neovm/vm-compat check-one-neovm CASE=cases/coding-system-runtime-semantics` (pass, `128/128`)
+    - `make -C test/neovm/vm-compat check-all-neovm` (pass)
+
 - Aligned broad `coding-system-*` runtime semantics with GNU Emacs (batch round 23):
   - runtime changes:
     - `rust/neovm-core/src/elisp/coding.rs`

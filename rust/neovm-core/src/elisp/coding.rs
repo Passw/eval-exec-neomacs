@@ -346,11 +346,15 @@ impl CodingSystemManager {
         mgr.aliases
             .insert("mule-utf-8".to_string(), "utf-8".to_string());
         mgr.aliases
+            .insert("cp65001".to_string(), "utf-8".to_string());
+        mgr.aliases
             .insert("iso-8859-1".to_string(), "latin-1".to_string());
         mgr.aliases
             .insert("iso-latin-1".to_string(), "latin-1".to_string());
         mgr.aliases
             .insert("us-ascii".to_string(), "ascii".to_string());
+        mgr.aliases
+            .insert("iso-safe".to_string(), "ascii".to_string());
 
         // Default priority list
         mgr.priority = vec![
@@ -484,16 +488,41 @@ pub(crate) fn builtin_coding_system_aliases(
     args: Vec<Value>,
 ) -> EvalResult {
     expect_args("coding-system-aliases", &args, 1)?;
-    let name = coding_system_name(&args[0])?;
+    if matches!(args[0], Value::Str(_)) {
+        return Err(signal(
+            "wrong-type-argument",
+            vec![Value::symbol("symbolp"), args[0].clone()],
+        ));
+    }
+    let raw_name = coding_symbol_name(&args[0])?;
+    let resolved_name = resolve_runtime_name(mgr, &raw_name)
+        .ok_or_else(|| signal("coding-system-error", vec![args[0].clone()]))?;
+    let base = strip_eol_suffix(&resolved_name);
 
-    if !mgr.is_known(&name) {
-        return Ok(Value::Nil);
+    if matches!(base, "binary" | "no-conversion") {
+        return Ok(Value::list(vec![
+            Value::symbol("no-conversion"),
+            Value::symbol("binary"),
+        ]));
     }
 
-    let canonical = mgr.resolve(&name).unwrap_or(&name).to_string();
-    let mut result = vec![Value::symbol(&canonical)];
-    for alias in mgr.aliases_for(&canonical) {
-        result.push(Value::symbol(alias));
+    let canonical = runtime_bucket_name(mgr, &resolved_name)
+        .ok_or_else(|| signal("coding-system-error", vec![args[0].clone()]))?;
+    let display = display_base_name(strip_eol_suffix(&resolved_name)).to_string();
+    let mut aliases = mgr.aliases_for(&canonical);
+    aliases.sort_by(|a, b| {
+        alias_sort_rank(&canonical, a)
+            .cmp(&alias_sort_rank(&canonical, b))
+            .then_with(|| a.cmp(b))
+    });
+    let mut result = vec![Value::symbol(display.clone())];
+    for alias in aliases {
+        if alias != display {
+            result.push(Value::symbol(alias));
+        }
+    }
+    if canonical != display {
+        result.push(Value::symbol(canonical));
     }
     Ok(Value::list(result))
 }
@@ -625,28 +654,40 @@ pub(crate) fn builtin_coding_system_eol_type(
     args: Vec<Value>,
 ) -> EvalResult {
     expect_args("coding-system-eol-type", &args, 1)?;
-    let name = coding_system_name(&args[0])?;
+    let Some(name) = args[0].as_symbol_name() else {
+        return Ok(Value::Nil);
+    };
+    let resolved_name = match resolve_runtime_name(mgr, name) {
+        Some(resolved) => resolved,
+        None => return Ok(Value::Nil),
+    };
+    if let Some(eol) = EolType::from_suffix(&resolved_name) {
+        return Ok(Value::Int(eol.to_int()));
+    }
+    let bucket = match runtime_bucket_name(mgr, &resolved_name) {
+        Some(bucket) => bucket,
+        None => return Ok(Value::Nil),
+    };
+    let Some(info) = mgr.get(&bucket) else {
+        return Ok(Value::Nil);
+    };
 
-    if let Some(info) = mgr.get(&name) {
-        match info.eol_type {
-            EolType::Unix => Ok(Value::Int(0)),
-            EolType::Dos => Ok(Value::Int(1)),
-            EolType::Mac => Ok(Value::Int(2)),
-            EolType::Undecided => {
-                // Return a vector of [base-unix base-dos base-mac]
-                let base = info.base_name().to_string();
-                let vec = vec![
-                    Value::symbol(format!("{}-unix", base)),
-                    Value::symbol(format!("{}-dos", base)),
-                    Value::symbol(format!("{}-mac", base)),
-                ];
-                Ok(Value::Vector(std::sync::Arc::new(std::sync::Mutex::new(
-                    vec,
-                ))))
-            }
+    match info.eol_type {
+        EolType::Unix => Ok(Value::Int(0)),
+        EolType::Dos => Ok(Value::Int(1)),
+        EolType::Mac => Ok(Value::Int(2)),
+        EolType::Undecided => {
+            // Return [base-unix base-dos base-mac] using Emacs display base names.
+            let base = eol_vector_base(strip_eol_suffix(&resolved_name));
+            let vec = vec![
+                Value::symbol(format!("{base}-unix")),
+                Value::symbol(format!("{base}-dos")),
+                Value::symbol(format!("{base}-mac")),
+            ];
+            Ok(Value::Vector(std::sync::Arc::new(std::sync::Mutex::new(
+                vec,
+            ))))
         }
-    } else {
-        Ok(Value::Nil)
     }
 }
 
@@ -861,10 +902,10 @@ pub(crate) fn builtin_coding_system_change_text_conversion(
 /// system or alias, nil otherwise.
 pub(crate) fn builtin_coding_system_p(mgr: &CodingSystemManager, args: Vec<Value>) -> EvalResult {
     expect_args("coding-system-p", &args, 1)?;
-    let known = match &args[0] {
-        Value::Symbol(name) => mgr.is_known(name),
-        Value::Nil => mgr.is_known("nil"),
-        _ => false,
+    let known = match args[0].as_symbol_name() {
+        Some(name) if name == "nil" => true,
+        Some(name) => is_known_or_derived_coding_system(mgr, name),
+        None => false,
     };
     Ok(Value::bool(known))
 }
@@ -965,26 +1006,22 @@ pub(crate) fn builtin_set_coding_system_priority(
 
     let mut requested: Vec<(String, String)> = Vec::with_capacity(args.len());
     for arg in &args {
-        match arg {
-            Value::Nil => {
-                return Err(signal(
-                    "wrong-type-argument",
-                    vec![Value::symbol("coding-system-p"), Value::Nil],
-                ));
-            }
-            Value::Symbol(name) => {
-                let canonical = mgr
-                    .resolve(name)
-                    .ok_or_else(|| signal("coding-system-error", vec![arg.clone()]))?;
-                requested.push((name.clone(), canonical.to_string()));
-            }
-            other => {
-                return Err(signal(
-                    "wrong-type-argument",
-                    vec![Value::symbol("symbolp"), other.clone()],
-                ));
-            }
+        if arg.is_nil() {
+            return Err(signal(
+                "wrong-type-argument",
+                vec![Value::symbol("coding-system-p"), Value::Nil],
+            ));
         }
+        let Some(name) = arg.as_symbol_name().map(|s| s.to_string()) else {
+            return Err(signal(
+                "wrong-type-argument",
+                vec![Value::symbol("symbolp"), arg.clone()],
+            ));
+        };
+        let resolved = resolve_runtime_name(mgr, &name)
+            .ok_or_else(|| signal("coding-system-error", vec![arg.clone()]))?;
+        let canonical = mgr.resolve(&resolved).unwrap_or(&resolved).to_string();
+        requested.push((name, canonical));
     }
 
     let mut seen_canonicals: HashSet<String> =
@@ -1080,44 +1117,39 @@ pub(crate) fn builtin_set_keyboard_coding_system(
 ) -> EvalResult {
     expect_min_args("set-keyboard-coding-system", &args, 1)?;
     expect_max_args("set-keyboard-coding-system", &args, 2)?;
-    match &args[0] {
-        Value::Nil => {
-            mgr.keyboard_coding = "no-conversion".to_string();
-            Ok(Value::Nil)
-        }
-        Value::Symbol(name) => {
-            if !is_known_or_derived_coding_system(mgr, name) {
-                return Err(signal(
-                    "coding-system-error",
-                    vec![Value::symbol(name.clone())],
-                ));
-            }
-            let base = strip_eol_suffix(name);
-            if matches!(base, "utf-8-auto" | "prefer-utf-8") {
-                return Err(signal(
-                    "error",
-                    vec![Value::string(format!(
-                        "Unsuitable coding system for keyboard: {name}"
-                    ))],
-                ));
-            }
-            if base == "undecided" {
-                return Err(signal(
-                    "error",
-                    vec![Value::string(format!(
-                        "Unsupported coding system for keyboard: {name}"
-                    ))],
-                ));
-            }
-            let normalized = normalize_keyboard_coding_system(name);
-            mgr.keyboard_coding = normalized.clone();
-            Ok(Value::symbol(normalized))
-        }
-        other => Err(signal(
-            "wrong-type-argument",
-            vec![Value::symbol("symbolp"), other.clone()],
-        )),
+    if args[0].is_nil() {
+        mgr.keyboard_coding = "no-conversion".to_string();
+        return Ok(Value::Nil);
     }
+    let Some(name) = args[0].as_symbol_name().map(|s| s.to_string()) else {
+        return Err(signal(
+            "wrong-type-argument",
+            vec![Value::symbol("symbolp"), args[0].clone()],
+        ));
+    };
+    if !is_known_or_derived_coding_system(mgr, &name) {
+        return Err(signal("coding-system-error", vec![args[0].clone()]));
+    }
+    let base = strip_eol_suffix(&name);
+    if matches!(base, "utf-8-auto" | "prefer-utf-8") {
+        return Err(signal(
+            "error",
+            vec![Value::string(format!(
+                "Unsuitable coding system for keyboard: {name}"
+            ))],
+        ));
+    }
+    if base == "undecided" {
+        return Err(signal(
+            "error",
+            vec![Value::string(format!(
+                "Unsupported coding system for keyboard: {name}"
+            ))],
+        ));
+    }
+    let normalized = normalize_keyboard_coding_system(&name);
+    mgr.keyboard_coding = normalized.clone();
+    Ok(Value::symbol(normalized))
 }
 
 /// `(set-terminal-coding-system CODING-SYSTEM &optional TERMINAL)` -- set the
@@ -1128,26 +1160,21 @@ pub(crate) fn builtin_set_terminal_coding_system(
 ) -> EvalResult {
     expect_min_args("set-terminal-coding-system", &args, 1)?;
     expect_max_args("set-terminal-coding-system", &args, 3)?;
-    match &args[0] {
-        Value::Nil => {
-            mgr.terminal_coding = "nil".to_string();
-            Ok(Value::Nil)
-        }
-        Value::Symbol(name) => {
-            if !is_known_or_derived_coding_system(mgr, name) {
-                return Err(signal(
-                    "coding-system-error",
-                    vec![Value::symbol(name.clone())],
-                ));
-            }
-            mgr.terminal_coding = name.clone();
-            Ok(Value::Nil)
-        }
-        other => Err(signal(
-            "wrong-type-argument",
-            vec![Value::symbol("symbolp"), other.clone()],
-        )),
+    if args[0].is_nil() {
+        mgr.terminal_coding = "nil".to_string();
+        return Ok(Value::Nil);
     }
+    let Some(name) = args[0].as_symbol_name().map(|s| s.to_string()) else {
+        return Err(signal(
+            "wrong-type-argument",
+            vec![Value::symbol("symbolp"), args[0].clone()],
+        ));
+    };
+    if !is_known_or_derived_coding_system(mgr, &name) {
+        return Err(signal("coding-system-error", vec![args[0].clone()]));
+    }
+    mgr.terminal_coding = name;
+    Ok(Value::Nil)
 }
 
 /// `(coding-system-priority-list &optional HIGHESTP)` -- return the current
@@ -1321,6 +1348,22 @@ fn runtime_bucket_name(mgr: &CodingSystemManager, resolved_name: &str) -> Option
     }
 }
 
+fn alias_sort_rank(canonical: &str, alias: &str) -> usize {
+    match canonical {
+        "utf-8" => match alias {
+            "mule-utf-8" => 0,
+            "cp65001" => 1,
+            _ => 2,
+        },
+        "ascii" => match alias {
+            "iso-safe" => 0,
+            "us-ascii" => 1,
+            _ => 2,
+        },
+        _ => 0,
+    }
+}
+
 // ===========================================================================
 // Tests
 // ===========================================================================
@@ -1437,8 +1480,25 @@ mod tests {
     #[test]
     fn coding_system_aliases_unknown() {
         let m = mgr();
-        let result = builtin_coding_system_aliases(&m, vec![Value::symbol("nonexistent")]).unwrap();
-        assert!(result.is_nil());
+        let result = builtin_coding_system_aliases(&m, vec![Value::symbol("nonexistent")]);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn coding_system_aliases_nil_maps_to_no_conversion_family() {
+        let m = mgr();
+        let result = builtin_coding_system_aliases(&m, vec![Value::Nil]).unwrap();
+        assert_eq!(
+            result,
+            Value::list(vec![Value::symbol("no-conversion"), Value::symbol("binary")])
+        );
+    }
+
+    #[test]
+    fn coding_system_aliases_string_is_type_error() {
+        let m = mgr();
+        let result = builtin_coding_system_aliases(&m, vec![Value::string("utf-8")]);
+        assert!(result.is_err());
     }
 
     // ----- coding-system-get -----
@@ -1613,6 +1673,39 @@ mod tests {
         } else {
             panic!("expected vector for undecided eol-type");
         }
+    }
+
+    #[test]
+    fn eol_type_latin_alias_uses_iso_latin_display_variants() {
+        let m = mgr();
+        let result = builtin_coding_system_eol_type(&m, vec![Value::symbol("latin-1")]).unwrap();
+        if let Value::Vector(v) = result {
+            let locked = v.lock().unwrap();
+            assert_eq!(locked.len(), 3);
+            assert_eq!(locked[0], Value::symbol("iso-latin-1-unix"));
+            assert_eq!(locked[1], Value::symbol("iso-latin-1-dos"));
+            assert_eq!(locked[2], Value::symbol("iso-latin-1-mac"));
+        } else {
+            panic!("expected vector for undecided latin-1 eol-type");
+        }
+    }
+
+    #[test]
+    fn eol_type_nil_maps_to_no_conversion() {
+        let m = mgr();
+        let result = builtin_coding_system_eol_type(&m, vec![Value::Nil]).unwrap();
+        assert_eq!(result, Value::Int(0));
+    }
+
+    #[test]
+    fn eol_type_non_symbol_designator_returns_nil() {
+        let m = mgr();
+        assert!(builtin_coding_system_eol_type(&m, vec![Value::string("utf-8")])
+            .unwrap()
+            .is_nil());
+        assert!(builtin_coding_system_eol_type(&m, vec![Value::Int(1)])
+            .unwrap()
+            .is_nil());
     }
 
     #[test]
@@ -1905,6 +1998,23 @@ mod tests {
     }
 
     #[test]
+    fn coding_system_setters_treat_keywords_as_symbol_designators() {
+        let mut m = mgr();
+        let keyword = Value::keyword(":utf-8");
+        let kb = builtin_set_keyboard_coding_system(&mut m, vec![keyword.clone()]);
+        let term = builtin_set_terminal_coding_system(&mut m, vec![keyword.clone()]);
+
+        match kb {
+            Err(Flow::Signal(sig)) => assert_eq!(sig.symbol, "coding-system-error"),
+            other => panic!("expected coding-system-error for keyword keyboard set, got {other:?}"),
+        }
+        match term {
+            Err(Flow::Signal(sig)) => assert_eq!(sig.symbol, "coding-system-error"),
+            other => panic!("expected coding-system-error for keyword terminal set, got {other:?}"),
+        }
+    }
+
+    #[test]
     fn coding_system_setters_validate_arity_edges() {
         let mut m = mgr();
         assert!(builtin_set_keyboard_coding_system(&mut m, vec![Value::Nil, Value::Nil]).is_ok());
@@ -2020,6 +2130,17 @@ mod tests {
         .unwrap();
         let after = builtin_coding_system_p(&m, vec![Value::symbol("vm-utf8")]).unwrap();
         assert!(after.is_truthy());
+    }
+
+    #[test]
+    fn coding_system_p_accepts_nil_and_supported_derived_variants() {
+        let m = mgr();
+        assert!(builtin_coding_system_p(&m, vec![Value::Nil]).unwrap().is_truthy());
+        assert!(
+            builtin_coding_system_p(&m, vec![Value::symbol("ascii-dos")])
+                .unwrap()
+                .is_truthy()
+        );
     }
 
     #[test]
@@ -2141,6 +2262,26 @@ mod tests {
                 assert_eq!(sig.symbol, "wrong-type-argument");
                 assert_eq!(sig.data, vec![Value::symbol("coding-system-p"), Value::Nil]);
             }
+            other => panic!("expected wrong-type-argument signal, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn set_coding_system_priority_keyword_signals_coding_system_error() {
+        let mut m = mgr();
+        let result = builtin_set_coding_system_priority(&mut m, vec![Value::keyword(":utf-8")]);
+        match result {
+            Err(Flow::Signal(sig)) => assert_eq!(sig.symbol, "coding-system-error"),
+            other => panic!("expected coding-system-error signal, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn set_coding_system_priority_string_is_type_error() {
+        let mut m = mgr();
+        let result = builtin_set_coding_system_priority(&mut m, vec![Value::string("utf-8")]);
+        match result {
+            Err(Flow::Signal(sig)) => assert_eq!(sig.symbol, "wrong-type-argument"),
             other => panic!("expected wrong-type-argument signal, got {other:?}"),
         }
     }
