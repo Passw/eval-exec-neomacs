@@ -770,6 +770,7 @@ impl Evaluator {
                 };
                 let alias_target = match &func {
                     Value::Symbol(target) => Some(target.clone()),
+                    Value::Subr(bound_name) if bound_name != name => Some(bound_name.clone()),
                     _ => None,
                 };
                 let result = match self.apply(func.clone(), args) {
@@ -2115,6 +2116,7 @@ impl Evaluator {
                 }
                 let alias_target = match &func {
                     Value::Symbol(target) => Some(target.clone()),
+                    Value::Subr(bound_name) if bound_name != name => Some(bound_name.clone()),
                     _ => None,
                 };
                 let result = match self.apply(func, args) {
@@ -2379,8 +2381,10 @@ fn rewrite_wrong_arity_alias_function_object(flow: Flow, alias: &str, target: &s
     match flow {
         Flow::Signal(mut sig) => {
             let target_is_payload = sig.data.first().is_some_and(|value| match value {
-                Value::Subr(name) => name == target,
-                _ => value.as_symbol_name() == Some(target),
+                Value::Subr(name) => name == target || name == alias,
+                _ => {
+                    value.as_symbol_name() == Some(target) || value.as_symbol_name() == Some(alias)
+                }
             });
             if sig.symbol == "wrong-number-of-arguments"
                 && !sig.data.is_empty()
