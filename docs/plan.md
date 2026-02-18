@@ -28,6 +28,15 @@ Last updated: 2026-02-18
 
 ## Doing
 
+- Expanded `read-char-exclusive` symbol-vector tail lock-ins with longer middle payload:
+  - oracle corpus changes:
+    - `test/neovm/vm-compat/cases/read-char-exclusive-symbol-vector-tail-semantics.forms`
+    - `test/neovm/vm-compat/cases/read-char-exclusive-symbol-vector-tail-semantics.expected.tsv`
+    - added longer-tail probe `(list 'foo 98 [bar] [baz])`.
+  - verified:
+    - `make -C test/neovm/vm-compat check-one-neovm CASE=cases/read-char-exclusive-symbol-vector-tail-semantics` (pass, 4/4)
+    - `make -C test/neovm/vm-compat check-all-neovm` (pass)
+
 - Expanded `read-char-exclusive` vector-symbol tail lock-ins with longer middle payload:
   - oracle corpus changes:
     - `test/neovm/vm-compat/cases/read-char-exclusive-vector-symbol-tail-semantics.forms`
