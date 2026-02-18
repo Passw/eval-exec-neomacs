@@ -395,6 +395,7 @@ cases/terminal-parameter-semantics
 cases/terminal-parameter-storage-semantics
 cases/terminal-parameter-storage-edge-semantics
 cases/terminal-parameter-state-semantics
+cases/terminal-live-p-designator-semantics
 cases/terminal-handle-printing
 cases/terminal-name-designator-payload-semantics
 cases/terminal-parameter-error-payload-semantics
