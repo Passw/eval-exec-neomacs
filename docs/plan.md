@@ -10469,6 +10469,25 @@ Last updated: 2026-02-18
     - `cargo test --manifest-path rust/neovm-core/Cargo.toml doc::tests::snarf_documentation -- --nocapture` (pass)
     - `make -C test/neovm/vm-compat check-one-neovm CASE=snarf-documentation-runtime-semantics` (pass, 9/9)
     - `make -C test/neovm/vm-compat check-all-neovm` (pass)
+- Refined `Snarf-documentation` path-class parity and expanded lock-in coverage:
+  - runtime changes:
+    - keeps empty string plus `"./"`/`"../"` on `(error "DOC file invalid at position 0")`
+    - special-cases `"DOC/"` to signal `file-error` (Read error class)
+    - keeps other trailing-slash names on `file-missing`
+  - expanded oracle corpus:
+    - `test/neovm/vm-compat/cases/snarf-documentation-runtime-semantics.forms`
+    - `test/neovm/vm-compat/cases/snarf-documentation-runtime-semantics.expected.tsv`
+    - added explicit probes for `../`, `DOC/`, and `NO_SUCH_DOC_DIR/`
+  - verified:
+    - `cargo test --manifest-path rust/neovm-core/Cargo.toml snarf_documentation` (pass)
+    - `make -C test/neovm/vm-compat check-one-neovm CASE=cases/snarf-documentation-runtime-semantics` (pass, 12/12)
+    - `make -C test/neovm/vm-compat check-all-neovm` (pass)
+    - direct oracle probes for new forms:
+      - `(condition-case err (Snarf-documentation "../") (error (car err)))` => `error`
+      - `(condition-case err (Snarf-documentation "DOC/") (error (car err)))` => `file-error`
+      - `(condition-case err (Snarf-documentation "NO_SUCH_DOC_DIR/") (error (car err)))` => `file-missing`
+  - note:
+    - full `make ... record FORMS=cases/snarf-documentation-runtime-semantics.forms` remains unreliable in this environment because GNU Emacs aborts when evaluating the existing empty-path probe; expected TSV was updated from baseline plus direct one-form oracle outputs for new rows.
 - Aligned `describe-variable` runtime semantics with GNU Emacs and added explicit runtime corpus:
   - runtime changes:
     - non-symbol input now signals `user-error` class
