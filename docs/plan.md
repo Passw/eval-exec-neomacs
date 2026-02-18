@@ -13981,6 +13981,23 @@ Last updated: 2026-02-18
     - `make -C test/neovm/vm-compat record FORMS=cases/documentation-property-semantics.forms EXPECTED=cases/documentation-property-semantics.expected.tsv` (pass)
     - `make -C test/neovm/vm-compat check-one-neovm CASE=documentation-property-semantics` (pass, 38/38)
     - `make -C test/neovm/vm-compat check-all-neovm` (pass)
+- Expanded startup-variable `documentation-property` parity (combined rounds 44-45) with process/read/redisplay/scroll/selection metadata symbols:
+  - runtime changes:
+    - added startup doc stubs for 60 additional symbols in `STARTUP_VARIABLE_DOC_STUBS`, including:
+      - round 44 process/read/redisplay vars: `process-prioritize-lower-fds`, `profiler-*`, `pure-bytes-used`, `purify-flag`, `query-all-font-backends`, `quit-flag`, `rcs2log-program-name`, `read-*`, `real-*`, `recenter-redisplay`, `record-all-keys`, `redisplay-*`, `region-extract-function`, `report-emacs-bug-address`, `resize-mini-frames`
+      - round 45 resize/scroll/selection/show vars: `resize-mini-windows`, `resume-tty-functions`, `right-*`, `ring-bell-function`, `saved-region-selection`, `scalable-fonts-allowed`, `script-representative-chars`, `scroll-*`, `search-spaces-regexp`, `select-safe-coding-system-function`, `selection-*`, `selective-display*`, `set-auto-coding-function`, `set-message-function`, `shared-game-score-directory`, `show-*`, `signal-hook-function`
+    - integer `variable-documentation` lookups for those 60 symbols now resolve through the shared startup doc stub mapping
+    - added eval lock-in test:
+      - `documentation_property_eval_scroll_margin_integer_property_returns_string`
+  - expanded oracle corpus:
+    - `test/neovm/vm-compat/cases/documentation-property-semantics.forms`
+    - `test/neovm/vm-compat/cases/documentation-property-semantics.expected.tsv`
+    - added dedicated startup-variable matrix rows for both 30-symbol batches (round 44 and round 45), asserting string docs and first-line prefixes
+  - verified:
+    - `cargo test --manifest-path rust/neovm-core/Cargo.toml documentation_property_eval_` (pass, 26/26)
+    - `make -C test/neovm/vm-compat record FORMS=cases/documentation-property-semantics.forms EXPECTED=cases/documentation-property-semantics.expected.tsv` (pass)
+    - `make -C test/neovm/vm-compat check-one-neovm CASE=documentation-property-semantics` (pass, 40/40)
+    - `make -C test/neovm/vm-compat check-all-neovm` (pass)
 
 ## Doing
 

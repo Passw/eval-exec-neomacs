@@ -2043,6 +2043,246 @@ pub(crate) static STARTUP_VARIABLE_DOC_STUBS: &[(&str, &str)] = &[
         "process-error-pause-time",
         "The number of seconds to pause after handling process errors.",
     ),
+    (
+        "process-prioritize-lower-fds",
+        "Whether to start checking for subprocess output from first file descriptor.",
+    ),
+    (
+        "profiler-log-size",
+        "Number of distinct call-stacks that can be recorded in a profiler log.",
+    ),
+    (
+        "profiler-max-stack-depth",
+        "Number of elements from the call-stack recorded in the log.",
+    ),
+    (
+        "pure-bytes-used",
+        "Number of bytes of shareable Lisp data allocated so far.",
+    ),
+    (
+        "purify-flag",
+        "Non-nil means loading Lisp code in order to dump an executable.",
+    ),
+    (
+        "query-all-font-backends",
+        "If non-nil, attempt to query all available font backends.",
+    ),
+    (
+        "quit-flag",
+        "Non-nil causes ‘eval’ to abort, unless ‘inhibit-quit’ is non-nil.",
+    ),
+    (
+        "rcs2log-program-name",
+        "Name of the ‘rcs2log’ program distributed with Emacs.",
+    ),
+    (
+        "read-buffer-completion-ignore-case",
+        "Non-nil means completion ignores case when reading a buffer name.",
+    ),
+    (
+        "read-buffer-function",
+        "If this is non-nil, ‘read-buffer’ does its work by calling this function.",
+    ),
+    (
+        "read-circle",
+        "Non-nil means read recursive structures using #N= and #N# syntax.",
+    ),
+    (
+        "read-expression-history",
+        "A history list for arguments that are Lisp expressions to evaluate.",
+    ),
+    (
+        "read-hide-char",
+        "Whether to hide input characters in noninteractive mode.",
+    ),
+    (
+        "read-minibuffer-restore-windows",
+        "Non-nil means restore window configurations on exit from minibuffer.",
+    ),
+    (
+        "read-process-output-max",
+        "Maximum number of bytes to read from subprocess in a single chunk.",
+    ),
+    (
+        "read-symbol-shorthands",
+        "Alist of known symbol-name shorthands.",
+    ),
+    (
+        "real-last-command",
+        "Same as ‘last-command’, but never altered by Lisp code.",
+    ),
+    (
+        "real-this-command",
+        "This is like ‘this-command’, except that commands should never modify it.",
+    ),
+    (
+        "recenter-redisplay",
+        "Non-nil means ‘recenter’ redraws entire frame.",
+    ),
+    (
+        "record-all-keys",
+        "Non-nil means record all keys you type.",
+    ),
+    (
+        "redisplay--all-windows-cause",
+        "Code of the cause for redisplaying all windows.",
+    ),
+    (
+        "redisplay--inhibit-bidi",
+        "Non-nil means it is not safe to attempt bidi reordering for display.",
+    ),
+    (
+        "redisplay--mode-lines-cause",
+        "Code of the cause for redisplaying mode lines.",
+    ),
+    (
+        "redisplay-adhoc-scroll-in-resize-mini-windows",
+        "If nil always use normal scrolling in minibuffer windows.",
+    ),
+    (
+        "redisplay-dont-pause",
+        "Nil means display update is paused when input is detected.",
+    ),
+    (
+        "redisplay-skip-fontification-on-input",
+        "Skip ‘fontification_functions‘ when there is input pending.",
+    ),
+    (
+        "redisplay-skip-initial-frame",
+        "Non-nil means skip redisplay of the initial frame.",
+    ),
+    (
+        "region-extract-function",
+        "Function to get the region’s content.",
+    ),
+    (
+        "report-emacs-bug-address",
+        "Address of mailing list for GNU Emacs bugs.",
+    ),
+    (
+        "resize-mini-frames",
+        "Non-nil means resize minibuffer-only frames automatically.",
+    ),
+    (
+        "resize-mini-windows",
+        "How to resize mini-windows (the minibuffer and the echo area).",
+    ),
+    (
+        "resume-tty-functions",
+        "Functions run after resuming a tty.",
+    ),
+    (
+        "right-fringe-width",
+        "Width of this buffer’s right fringe (in pixels).",
+    ),
+    (
+        "right-margin-width",
+        "Width in columns of right marginal area for display of a buffer.",
+    ),
+    (
+        "ring-bell-function",
+        "Non-nil means call this function to ring the bell.",
+    ),
+    (
+        "saved-region-selection",
+        "Contents of active region prior to buffer modification.",
+    ),
+    (
+        "scalable-fonts-allowed",
+        "Allowed scalable fonts.",
+    ),
+    (
+        "script-representative-chars",
+        "Alist of scripts vs the representative characters.",
+    ),
+    (
+        "scroll-bar-adjust-thumb-portion",
+        "Adjust scroll bars for overscrolling for Gtk+, Motif and Haiku.",
+    ),
+    (
+        "scroll-bar-height",
+        "Height of this buffer’s horizontal scroll bars in pixels.",
+    ),
+    (
+        "scroll-bar-width",
+        "Width of this buffer’s vertical scroll bars in pixels.",
+    ),
+    (
+        "scroll-conservatively",
+        "Scroll up to this many lines, to bring point back on screen.",
+    ),
+    (
+        "scroll-down-aggressively",
+        "How far to scroll windows downward.",
+    ),
+    (
+        "scroll-margin",
+        "Number of lines of margin at the top and bottom of a window.",
+    ),
+    (
+        "scroll-minibuffer-conservatively",
+        "Non-nil means scroll conservatively in minibuffer windows.",
+    ),
+    (
+        "scroll-preserve-screen-position",
+        "Controls if scroll commands move point to keep its screen position unchanged.",
+    ),
+    (
+        "scroll-step",
+        "The number of lines to try scrolling a window by when point moves out.",
+    ),
+    (
+        "scroll-up-aggressively",
+        "How far to scroll windows upward.",
+    ),
+    (
+        "search-spaces-regexp",
+        "Regexp to substitute for bunches of spaces in regexp search.",
+    ),
+    (
+        "select-safe-coding-system-function",
+        "Function to call to select safe coding system for encoding a text.",
+    ),
+    (
+        "selection-converter-alist",
+        "An alist associating X Windows selection-types with functions.",
+    ),
+    (
+        "selection-inhibit-update-commands",
+        "List of commands which should not update the selection.",
+    ),
+    (
+        "selective-display",
+        "Non-nil enables selective display.",
+    ),
+    (
+        "selective-display-ellipses",
+        "Non-nil means display ... on previous line when a line is invisible.",
+    ),
+    (
+        "set-auto-coding-function",
+        "If non-nil, a function to call to decide a coding system of file.",
+    ),
+    (
+        "set-message-function",
+        "If non-nil, function to handle display of echo-area messages.",
+    ),
+    (
+        "shared-game-score-directory",
+        "Directory of score files for games which come with GNU Emacs.",
+    ),
+    (
+        "show-help-function",
+        "If non-nil, the function that implements the display of help.",
+    ),
+    (
+        "show-trailing-whitespace",
+        "Non-nil means highlight trailing whitespace.",
+    ),
+    (
+        "signal-hook-function",
+        "If non-nil, this is a function for ‘signal’ to call.",
+    ),
     ("kill-ring", "List of killed text sequences."),
     (
         "kill-ring-yank-pointer",
@@ -4865,6 +5105,24 @@ mod tests {
             result
                 .as_str()
                 .is_some_and(|s| s.contains("environment variables for subprocesses"))
+        );
+    }
+
+    #[test]
+    fn documentation_property_eval_scroll_margin_integer_property_returns_string() {
+        let mut evaluator = super::super::eval::Evaluator::new();
+        let result = builtin_documentation_property_eval(
+            &mut evaluator,
+            vec![
+                Value::symbol("scroll-margin"),
+                Value::symbol("variable-documentation"),
+            ],
+        )
+        .unwrap();
+        assert!(
+            result
+                .as_str()
+                .is_some_and(|s| s.contains("margin at the top and bottom"))
         );
     }
 
