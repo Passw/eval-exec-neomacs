@@ -22,3 +22,8 @@
   (progn
     (read-key-sequence-vector "")
     unread-command-events))
+
+(let ((unread-command-events (list 'foo 98 [bar] [baz] [qux])))
+  (progn
+    (read-key-sequence-vector "")
+    unread-command-events))
