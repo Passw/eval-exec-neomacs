@@ -10739,6 +10739,20 @@ Last updated: 2026-02-18
     - `make -C test/neovm/vm-compat record FORMS=cases/describe-variable-runtime-semantics.forms EXPECTED=cases/describe-variable-runtime-semantics.expected.tsv` (pass)
     - `make -C test/neovm/vm-compat check-one-neovm CASE=describe-variable-runtime-semantics` (pass, 16/16)
     - `make -C test/neovm/vm-compat check-all-neovm` (pass)
+- Refined `documentation-property` handling for seeded `load-path` integer doc offsets:
+  - runtime changes:
+    - `documentation-property` now returns C-source marker text for `('load-path 'variable-documentation)` when the stored property is an integer offset
+    - optional `RAW` argument path (`... t`) now preserves the same string-return behavior for this seeded startup variable
+    - integer doc offsets for non-seeded symbols still follow existing unresolved behavior (`nil`)
+  - expanded oracle corpus:
+    - `test/neovm/vm-compat/cases/documentation-property-semantics.forms`
+    - `test/neovm/vm-compat/cases/documentation-property-semantics.expected.tsv`
+    - added explicit `stringp` probes for `documentation-property` on `load-path` with and without `RAW`
+  - verified:
+    - `cargo test --manifest-path rust/neovm-core/Cargo.toml documentation_property_eval` (pass)
+    - `make -C test/neovm/vm-compat record FORMS=cases/documentation-property-semantics.forms EXPECTED=cases/documentation-property-semantics.expected.tsv` (pass)
+    - `make -C test/neovm/vm-compat check-one-neovm CASE=documentation-property-semantics` (pass, 17/17)
+    - `make -C test/neovm/vm-compat check-all-neovm` (pass)
 
 ## Doing
 
