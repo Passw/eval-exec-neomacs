@@ -46,6 +46,12 @@
     (setq out (read-key-sequence-vector ""))
     (list out unread-command-events)))
 
+(let ((unread-command-events (list [foo] 105 104 103 102 101 100 99 98 97))
+      (out nil))
+  (progn
+    (setq out (read-key-sequence-vector ""))
+    (list out unread-command-events)))
+
 (let ((unread-command-events '([foo] . 97))
       (out nil))
   (progn
