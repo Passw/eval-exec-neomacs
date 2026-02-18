@@ -8,3 +8,5 @@
 8	-0.0e+NaN	OK -0.0e+NaN
 9	1.0e+NaN	OK 1.0e+NaN
 10	0.0e+NaN	OK 0.0e+NaN
+11	1.0e+NaN	OK 1.0e+NaN
+12	-1.0e+NaN	OK -1.0e+NaN

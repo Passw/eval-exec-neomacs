@@ -662,9 +662,18 @@ fn parse_emacs_special_float(token: &str) -> Option<f64> {
             if body.starts_with('.') {
                 payload = NAN_LEADING_DOT_PAYLOAD;
             } else {
-                let truncated = mantissa_value.abs().trunc();
-                if truncated >= 1.0 {
-                    payload = (truncated as u64) & NAN_PAYLOAD_MASK;
+                let integer_part = body.split_once('.').map(|(int_part, _)| int_part).unwrap_or(body);
+                let mut any_nonzero = false;
+                for digit in integer_part.bytes() {
+                    if !digit.is_ascii_digit() {
+                        return None;
+                    }
+                    let value = (digit - b'0') as u64;
+                    any_nonzero |= value != 0;
+                    payload = ((payload * 10) + value) & NAN_PAYLOAD_MASK;
+                }
+                if !any_nonzero {
+                    payload = 0;
                 }
             }
 
@@ -781,7 +790,7 @@ mod tests {
     #[test]
     fn parse_nan_payload_literals_render_to_oracle_shapes() {
         let forms = parse_forms(
-            "1.0e+NaN -2.0e+NaN .5e+NaN -.5e+NaN 1.5e+NaN 0.9e+NaN .0e+NaN -.0e+NaN 9007199254740991.0e+NaN 2251799813685248.0e+NaN 4503599627370495.0e+NaN 4503599627370496.0e+NaN -4503599627370496.0e+NaN",
+            "1.0e+NaN -2.0e+NaN .5e+NaN -.5e+NaN 1.5e+NaN 0.9e+NaN .0e+NaN -.0e+NaN 9007199254740991.0e+NaN 2251799813685248.0e+NaN 4503599627370495.0e+NaN 4503599627370496.0e+NaN -4503599627370496.0e+NaN 9007199254740993.0e+NaN -9007199254740993.0e+NaN",
         )
         .unwrap();
         let rendered: Vec<String> = forms.iter().map(crate::elisp::expr::print_expr).collect();
@@ -801,6 +810,8 @@ mod tests {
                 "2251799813685247.0e+NaN",
                 "0.0e+NaN",
                 "-0.0e+NaN",
+                "1.0e+NaN",
+                "-1.0e+NaN",
             ]
         );
     }
