@@ -28,6 +28,15 @@ Last updated: 2026-02-18
 
 ## Doing
 
+- Expanded minibuffer prompt-reader max-arity/error lock-ins (batch round 11):
+  - oracle corpus changes:
+    - `test/neovm/vm-compat/cases/reader-prompt-batch-error-semantics.{forms,expected.tsv}`
+    - `test/neovm/vm-compat/cases/minibuffer-batch.{forms,expected.tsv}`
+    - added max-arity end-of-file probes for `read-from-minibuffer`, `read-string`, `read-number`, and `completing-read`, plus explicit `yes-or-no-p` vector/over-arity boundaries.
+  - verified:
+    - `make -C test/neovm/vm-compat check-neovm-list LIST=<batch-list>` (pass; 42/42, 47/47)
+    - `make -C test/neovm/vm-compat check-all-neovm` (pass)
+
 - Expanded batch reader over-arity/error lock-ins (batch round 10):
   - oracle corpus changes:
     - `test/neovm/vm-compat/cases/read-passwd-batch-semantics.{forms,expected.tsv}`
