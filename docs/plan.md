@@ -14034,6 +14034,20 @@ Last updated: 2026-02-18
     - `make -C test/neovm/vm-compat check-one-neovm CASE=documentation-property-semantics` (pass, 47/47)
     - `make -C test/neovm/vm-compat check-all-neovm` (pass)
     - oracle gap check: `remaining_gap_count=0` for GNU Emacs integer `variable-documentation` symbols
+- Added startup-doc coverage guardrail to vm-compat gates:
+  - runtime/tooling changes:
+    - added `test/neovm/vm-compat/check-startup-doc-stub-coverage.sh`
+      - computes GNU Emacs `integerp` `variable-documentation` symbol set via the pinned oracle
+      - extracts `STARTUP_VARIABLE_DOC_STUBS` symbol names from `rust/neovm-core/src/elisp/doc.rs`
+      - fails if any oracle symbol is missing from startup stubs
+      - reports count summary and optional extra-stub listing (`SHOW_EXTRA_STUBS=1`)
+    - wired the new check into `test/neovm/vm-compat/Makefile`:
+      - new target: `check-startup-doc-stub-coverage`
+      - `check-all-neovm` now runs this check after `check-stub-budget`
+    - documented the new gate in `test/neovm/vm-compat/README.md`
+  - verified:
+    - `make -C test/neovm/vm-compat check-startup-doc-stub-coverage` (pass, missing startup stubs: 0)
+    - `make -C test/neovm/vm-compat check-all-neovm` (pass with startup-doc coverage gate enabled)
 
 ## Doing
 

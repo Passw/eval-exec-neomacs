@@ -14,6 +14,7 @@ results against that baseline once evaluator execution is wired in.
 - `run-neovm.sh`: runs NeoVM worker-runtime compatibility runner and prints TSV output
 - `compare-results.sh`: diffs oracle TSV vs NeoVM TSV
 - `check-builtin-registry-fboundp.sh`: checks `fboundp` parity for all names in `builtin_registry.rs`
+- `check-startup-doc-stub-coverage.sh`: checks startup integer-doc symbol coverage of `STARTUP_VARIABLE_DOC_STUBS`
 - `bench-load-cache.sh`: runs cold/warm/post-edit `.neoc` load benchmark reporting via `load_cache_bench`
 - `cases/default.list`: default `check-all-neovm` corpus order (one case per line)
 - `cases/neovm-only.list`: NeoVM-only policy corpus order
@@ -109,6 +110,17 @@ some markers):
 cd test/neovm/vm-compat
 NEOVM_STUB_BUDGET=0 make check-stub-budget
 ```
+
+Validate startup integer-doc coverage against the GNU Emacs oracle
+(reports counts and fails on missing startup stubs):
+
+```bash
+cd test/neovm/vm-compat
+make check-startup-doc-stub-coverage
+```
+
+Set `SHOW_EXTRA_STUBS=1` to print startup stub symbols that are currently
+not required by oracle integer-doc metadata.
 
 Run any case list file directly (avoids passing very long `CASES=...` values):
 
