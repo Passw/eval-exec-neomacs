@@ -28,6 +28,12 @@ Last updated: 2026-02-18
 
 ## Doing
 
+- Extended float division-by-zero parity for `/`:
+  - Updated `rust/neovm-core/src/elisp/builtins.rs` float division path so zero divisors follow Oracle IEEE behavior (`INF` / `NaN`) instead of signaling `arith-error`, while integer division by zero remains `arith-error`.
+  - Added `cases/division-float-zero-semantics` and wired it into `test/neovm/vm-compat/cases/default.list`.
+  - Added evaluator unit coverage in `pure_dispatch_typed_div_float_zero_uses_ieee_results`.
+  - Validated via `cargo test --manifest-path rust/neovm-core/Cargo.toml pure_dispatch_typed_div_float_zero_uses_ieee_results`, targeted `check-one-neovm` for `cases/division-float-zero-semantics`, and full `make -C test/neovm/vm-compat check-all-neovm`.
+
 - Extended numeric argument-contract parity across arithmetic/comparison/bitwise helpers:
   - Updated `rust/neovm-core/src/elisp/builtins.rs` to use Oracle-matching staged numeric validation, aligning `wrong-type-argument` payload predicates (`number-or-marker-p` vs `integer-or-marker-p`) for `+`, `-`, `*`, `/`, `max`, `min`, `%`, `mod`, `logand`, `logior`, `logxor`, and numeric comparison operators.
   - Restored Emacs-consistent `%` vs `mod` split: `%` remains integer-only remainder, while `mod` accepts float operands and mirrors float `NaN` behavior on zero divisors.
