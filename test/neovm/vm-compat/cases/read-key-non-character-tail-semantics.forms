@@ -2,3 +2,8 @@
   (progn
     (read-key "")
     unread-command-events))
+
+(let ((unread-command-events '(1.0 . 97)))
+  (progn
+    (read-key "")
+    unread-command-events))
