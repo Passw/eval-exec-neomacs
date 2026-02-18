@@ -10819,6 +10819,28 @@ Last updated: 2026-02-18
     - `make -C test/neovm/vm-compat check-one-neovm CASE=string-match-case-fold-semantics` (pass, 16/16)
     - `make -C test/neovm/vm-compat check-one-neovm CASE=match-data` (pass, 34/34)
     - `make -C test/neovm/vm-compat check-all-neovm` (pass)
+- Fixed `replace-match` UTF-8 replacement-text handling and aligned `SUBEXP` range error payloads:
+  - runtime changes:
+    - `build_replacement` now decodes replacement templates by Unicode scalar values (no per-byte `as char` corruption)
+    - multibyte replacement literals (for example `"é"` and `"\\1é"`) now preserve UTF-8 in string and backref replacement paths
+    - `replace-match` now reports negative `SUBEXP` on string replacements with source-length upper bounds (`args-out-of-range (N 0 LEN)`)
+    - buffer replacement path now reports out-of-range large `SUBEXP` indices as `args-out-of-range SUBEXP` when beyond captured group slots
+  - expanded runtime/unit lock-ins:
+    - `rust/neovm-core/src/elisp/regex.rs`
+    - added `replace_match_preserves_multibyte_replacement_literals`
+    - added `replace_match_preserves_multibyte_replacement_with_backref`
+    - `rust/neovm-core/src/elisp/builtins.rs`
+    - aligned `builtin_replace_match` `SUBEXP` validation and missing-group error mapping payloads
+  - expanded oracle corpus:
+    - `test/neovm/vm-compat/cases/replace-match.forms`
+    - `test/neovm/vm-compat/cases/replace-match.expected.tsv`
+    - added multibyte replacement probes for `"é"`, `"éz"`, `"\\&é"`, and `"\\1é"` string replacement paths
+    - updated oracle rows for existing high-`SUBEXP` and negative-`SUBEXP` payload shape checks
+  - verified:
+    - `cargo test --manifest-path rust/neovm-core/Cargo.toml replace_match_preserves_multibyte` (pass)
+    - `make -C test/neovm/vm-compat record FORMS=cases/replace-match.forms EXPECTED=cases/replace-match.expected.tsv` (pass)
+    - `make -C test/neovm/vm-compat check-one-neovm CASE=replace-match` (pass, 30/30)
+    - `make -C test/neovm/vm-compat check-all-neovm` (pass)
 
 ## Doing
 
