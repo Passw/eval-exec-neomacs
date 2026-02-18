@@ -4,3 +4,4 @@
 4	(let ((unread-command-events (list [foo] 98 'bar))) (progn (read-event nil nil 0) unread-command-events))	OK (98 bar)
 5	(let ((unread-command-events (list [foo] 98 'bar 'baz))) (progn (read-event nil nil 0) unread-command-events))	OK (98 bar baz)
 6	(let ((unread-command-events (list [foo] 98 'bar 'baz 'qux))) (progn (read-event nil nil 0) unread-command-events))	OK (98 bar baz qux)
+7	(let ((unread-command-events (list [foo] 98 'bar 'baz 'qux 'quux))) (progn (read-event nil nil 0) unread-command-events))	OK (98 bar baz qux quux)
