@@ -9,3 +9,8 @@
 
 (condition-case err (read-passwd) (error err))
 (condition-case err (read-passwd "pw: " nil nil nil) (error err))
+
+(condition-case err (read-passwd 'pw) (error err))
+(condition-case err (read-passwd "pw: " 'confirm) (error err))
+(condition-case err (read-passwd "pw: " nil 'confirm) (error err))
+(condition-case err (read-passwd "pw: " nil nil nil nil) (error err))

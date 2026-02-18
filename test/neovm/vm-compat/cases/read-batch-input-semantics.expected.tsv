@@ -16,7 +16,7 @@
 16	(condition-case err (read-buffer "") (error err))	OK (end-of-file "Error reading from stdin")
 17	(condition-case err (read-buffer "" nil nil nil nil) (error err))	OK (wrong-number-of-arguments read-buffer 5)
 18	(condition-case err (read-buffer 1) (error err))	OK (wrong-type-argument stringp 1)
-19	(condition-case err (read-buffer "" 1) (error err))	 (default 1): OK (end-of-file "Error reading from stdin")
+19	(condition-case err (read-buffer "" 1) (error err))	OK (end-of-file "Error reading from stdin")
 20	(fboundp 'read-command)	OK t
 21	(condition-case err (read-command "") (error err))	OK (end-of-file "Error reading from stdin")
 22	(condition-case err (read-command "" nil nil) (error err))	OK (wrong-number-of-arguments read-command 3)
@@ -27,3 +27,8 @@
 27	(condition-case err (read-variable "" nil nil) (error err))	OK (wrong-number-of-arguments read-variable 3)
 28	(condition-case err (read-variable 1) (error err))	OK (wrong-type-argument stringp 1)
 29	(condition-case err (read-variable "" 1) (error err))	OK (end-of-file "Error reading from stdin")
+30	(condition-case err (read-file-name "" nil nil nil nil nil nil nil) (error err))	OK (wrong-number-of-arguments read-file-name 8)
+31	(condition-case err (read-directory-name "" nil nil nil nil nil nil) (error err))	OK (wrong-number-of-arguments read-directory-name 7)
+32	(condition-case err (read-buffer "" nil nil nil nil nil) (error err))	OK (wrong-number-of-arguments read-buffer 6)
+33	(condition-case err (read-command "" nil nil nil) (error err))	OK (wrong-number-of-arguments read-command 4)
+34	(condition-case err (read-variable "" nil nil nil) (error err))	OK (wrong-number-of-arguments read-variable 4)

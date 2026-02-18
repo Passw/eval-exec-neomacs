@@ -28,6 +28,15 @@ Last updated: 2026-02-18
 
 ## Doing
 
+- Expanded batch reader over-arity/error lock-ins (batch round 10):
+  - oracle corpus changes:
+    - `test/neovm/vm-compat/cases/read-passwd-batch-semantics.{forms,expected.tsv}`
+    - `test/neovm/vm-compat/cases/read-batch-input-semantics.{forms,expected.tsv}`
+    - added prompt/type and over-arity probes for `read-passwd`, `read-file-name`, `read-directory-name`, `read-buffer`, `read-command`, and `read-variable`.
+  - verified:
+    - `make -C test/neovm/vm-compat check-neovm-list LIST=<batch-list>` (pass; 12/12, 34/34)
+    - `make -C test/neovm/vm-compat check-all-neovm` (pass)
+
 - Expanded input-mode coercion/no-op lock-ins (batch round 9):
   - oracle corpus changes:
     - `test/neovm/vm-compat/cases/input-mode-semantics.{forms,expected.tsv}`

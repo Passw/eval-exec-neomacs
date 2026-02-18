@@ -32,3 +32,9 @@
 (condition-case err (read-variable "" nil nil) (error err))
 (condition-case err (read-variable 1) (error err))
 (condition-case err (read-variable "" 1) (error err))
+
+(condition-case err (read-file-name "" nil nil nil nil nil nil nil) (error err))
+(condition-case err (read-directory-name "" nil nil nil nil nil nil) (error err))
+(condition-case err (read-buffer "" nil nil nil nil nil) (error err))
+(condition-case err (read-command "" nil nil nil) (error err))
+(condition-case err (read-variable "" nil nil nil) (error err))
