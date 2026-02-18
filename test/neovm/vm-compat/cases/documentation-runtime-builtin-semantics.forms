@@ -22,3 +22,5 @@
 (documentation '(lambda (x) x))
 (documentation [1 2])
 (documentation "abc")
+(condition-case err (documentation '(macro (x) "md" x)) (error err))
+(condition-case err (documentation '(macro)) (error err))

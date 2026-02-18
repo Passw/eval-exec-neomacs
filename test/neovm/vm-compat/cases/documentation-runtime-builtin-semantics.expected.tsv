@@ -22,3 +22,5 @@
 22	(documentation '(lambda (x) x))	OK nil
 23	(documentation [1 2])	OK "Keyboard macro."
 24	(documentation "abc")	OK "Keyboard macro."
+25	(condition-case err (documentation '(macro (x) "md" x)) (error err))	OK (invalid-function ((x) "md" x))
+26	(condition-case err (documentation '(macro)) (error err))	OK (void-function nil)

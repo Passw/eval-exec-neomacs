@@ -89,6 +89,9 @@ fn function_doc_or_error(func_val: Value) -> EvalResult {
     if let Some(result) = quoted_lambda_documentation(&func_val) {
         return result;
     }
+    if let Some(result) = quoted_macro_invalid_designator(&func_val) {
+        return result;
+    }
 
     match func_val {
         Value::Lambda(data) | Value::Macro(data) => match &data.docstring {
@@ -140,6 +143,24 @@ fn quoted_lambda_documentation(function: &Value) -> Option<EvalResult> {
             vec![Value::symbol("listp"), other],
         ))),
     }
+}
+
+fn quoted_macro_invalid_designator(function: &Value) -> Option<EvalResult> {
+    let Value::Cons(cell) = function else {
+        return None;
+    };
+
+    let pair = cell.lock().ok()?;
+    if pair.car.as_symbol_name() != Some("macro") {
+        return None;
+    }
+
+    let payload = pair.cdr.clone();
+    if payload.is_nil() {
+        return Some(Err(signal("void-function", vec![Value::Nil])));
+    }
+
+    Some(Err(signal("invalid-function", vec![payload])))
 }
 
 fn eval_documentation_property_value(
@@ -1972,6 +1993,48 @@ mod tests {
         let mut evaluator = super::super::eval::Evaluator::new();
         let result = builtin_documentation(&mut evaluator, vec![Value::string("abc")]).unwrap();
         assert_eq!(result.as_str(), Some("Keyboard macro."));
+    }
+
+    #[test]
+    fn documentation_quoted_macro_payload_matches_oracle_shape() {
+        let mut evaluator = super::super::eval::Evaluator::new();
+        let quoted = Value::list(vec![
+            Value::symbol("macro"),
+            Value::list(vec![Value::symbol("x")]),
+            Value::string("md"),
+            Value::symbol("x"),
+        ]);
+
+        let result = builtin_documentation(&mut evaluator, vec![quoted]);
+        match result {
+            Err(Flow::Signal(sig)) => {
+                assert_eq!(sig.symbol, "invalid-function");
+                assert_eq!(
+                    sig.data.first(),
+                    Some(&Value::list(vec![
+                        Value::list(vec![Value::symbol("x")]),
+                        Value::string("md"),
+                        Value::symbol("x"),
+                    ]))
+                );
+            }
+            other => panic!("expected invalid-function signal, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn documentation_empty_quoted_macro_errors_void_function_nil() {
+        let mut evaluator = super::super::eval::Evaluator::new();
+        let quoted = Value::list(vec![Value::symbol("macro")]);
+
+        let result = builtin_documentation(&mut evaluator, vec![quoted]);
+        match result {
+            Err(Flow::Signal(sig)) => {
+                assert_eq!(sig.symbol, "void-function");
+                assert!(sig.data.first().is_some_and(Value::is_nil));
+            }
+            other => panic!("expected void-function signal, got {other:?}"),
+        }
     }
 
     #[test]
