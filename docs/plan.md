@@ -28,6 +28,15 @@ Last updated: 2026-02-18
 
 ## Doing
 
+- Expanded `read-event` vector/symbol tail lock-ins for dotted unread queues:
+  - oracle corpus changes:
+    - `test/neovm/vm-compat/cases/read-event-vector-symbol-tail-semantics.forms`
+    - `test/neovm/vm-compat/cases/read-event-vector-symbol-tail-semantics.expected.tsv`
+    - added dotted-tail probe for `([foo] . bar)`.
+  - verified:
+    - `make -C test/neovm/vm-compat check-one-neovm CASE=cases/read-event-vector-symbol-tail-semantics` (pass, 2/2)
+    - `make -C test/neovm/vm-compat check-all-neovm` (pass)
+
 - Expanded `read-char` non-character tail lock-ins for dotted unread queues:
   - oracle corpus changes:
     - `test/neovm/vm-compat/cases/read-char-non-character-tail-semantics.forms`
