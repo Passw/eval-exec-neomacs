@@ -10697,6 +10697,20 @@ Last updated: 2026-02-18
     - `make -C test/neovm/vm-compat record FORMS=cases/describe-variable-runtime-semantics.forms EXPECTED=cases/describe-variable-runtime-semantics.expected.tsv` (pass)
     - `make -C test/neovm/vm-compat check-one-neovm CASE=describe-variable-runtime-semantics` (pass, 11/11)
     - `make -C test/neovm/vm-compat check-all-neovm` (pass)
+- Refined `describe-variable` symbol-resolved `variable-documentation` wrong-type handling with GNU Emacs:
+  - runtime changes:
+    - symbol doc-property targets that are unbound still signal `void-variable`
+    - symbol doc-property targets bound to strings or integers continue through the string-return `describe-variable` path
+    - symbol doc-property targets bound to non char/string payloads (for example `t` or lists) now signal `wrong-type-argument (char-or-string-p VALUE)`
+  - expanded oracle corpus:
+    - `test/neovm/vm-compat/cases/describe-variable-runtime-semantics.forms`
+    - `test/neovm/vm-compat/cases/describe-variable-runtime-semantics.expected.tsv`
+    - added explicit symbol-target probes for `t` and list payloads
+  - verified:
+    - `cargo test --manifest-path rust/neovm-core/Cargo.toml describe_variable` (pass)
+    - `make -C test/neovm/vm-compat record FORMS=cases/describe-variable-runtime-semantics.forms EXPECTED=cases/describe-variable-runtime-semantics.expected.tsv` (pass)
+    - `make -C test/neovm/vm-compat check-one-neovm CASE=describe-variable-runtime-semantics` (pass, 13/13)
+    - `make -C test/neovm/vm-compat check-all-neovm` (pass)
 
 ## Doing
 
