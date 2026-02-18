@@ -10795,6 +10795,30 @@ Last updated: 2026-02-18
     - `make -C test/neovm/vm-compat record FORMS=cases/match-data.forms EXPECTED=cases/match-data.expected.tsv` (pass)
     - `make -C test/neovm/vm-compat check-one-neovm CASE=match-data` (pass, 29/29)
     - `make -C test/neovm/vm-compat check-all-neovm` (pass)
+- Fixed UTF-8 regex translation for grouped multibyte literals (for example `\\(é\\)`):
+  - runtime changes:
+    - `translate_emacs_regex` now scans by Unicode scalar values instead of per-byte `as char` casts
+    - non-ASCII literal pattern chars are preserved across translation (including escaped non-ASCII tails after `\\`)
+    - Emacs-style grouped multibyte literals now compile and match correctly in the regex backend
+  - expanded runtime/unit lock-ins:
+    - `rust/neovm-core/src/elisp/regex.rs`
+    - added `translate_multibyte_literals`
+    - added `string_match_with_multibyte_group_literal`
+  - expanded oracle corpus:
+    - `test/neovm/vm-compat/cases/string-match-case-fold-semantics.forms`
+    - `test/neovm/vm-compat/cases/string-match-case-fold-semantics.expected.tsv`
+    - added grouped multibyte probes for `(string-match "\\(é\\)" "aéx")` and `(string-match-p "\\(é\\)" "aéx")`
+    - `test/neovm/vm-compat/cases/match-data.forms`
+    - `test/neovm/vm-compat/cases/match-data.expected.tsv`
+    - added grouped multibyte probes for `match-beginning`, `match-end`, and `match-data` subgroup reporting after `(string-match "\\(é\\)" "aéx")`
+  - verified:
+    - `cargo test --manifest-path rust/neovm-core/Cargo.toml string_match_with_multibyte_group_literal` (pass)
+    - `cargo test --manifest-path rust/neovm-core/Cargo.toml translate_multibyte_literals` (pass)
+    - `make -C test/neovm/vm-compat record FORMS=cases/string-match-case-fold-semantics.forms EXPECTED=cases/string-match-case-fold-semantics.expected.tsv` (pass)
+    - `make -C test/neovm/vm-compat record FORMS=cases/match-data.forms EXPECTED=cases/match-data.expected.tsv` (pass)
+    - `make -C test/neovm/vm-compat check-one-neovm CASE=string-match-case-fold-semantics` (pass, 16/16)
+    - `make -C test/neovm/vm-compat check-one-neovm CASE=match-data` (pass, 34/34)
+    - `make -C test/neovm/vm-compat check-all-neovm` (pass)
 
 ## Doing
 
