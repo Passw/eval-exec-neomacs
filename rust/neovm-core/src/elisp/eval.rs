@@ -12,6 +12,7 @@ use super::bytecode::Compiler;
 use super::category::CategoryManager;
 use super::coding::CodingSystemManager;
 use super::custom::CustomManager;
+use super::doc::STARTUP_VARIABLE_DOC_STUBS;
 use super::error::*;
 use super::expr::Expr;
 use super::interactive::InteractiveRegistry;
@@ -166,54 +167,7 @@ impl Evaluator {
         obarray.set_symbol_value("unread-command-events", Value::Nil);
         // GNU Emacs seeds core startup vars with integer
         // `variable-documentation` offsets in the DOC table.
-        for name in [
-            "abbrev-mode",
-            "after-change-functions",
-            "auto-fill-function",
-            "before-change-functions",
-            "buffer-file-name",
-            "buffer-undo-list",
-            "case-fold-search",
-            "comment-end-can-be-escaped",
-            "completion-ignore-case",
-            "current-prefix-arg",
-            "debug-on-quit",
-            "display-line-numbers",
-            "exec-path",
-            "fill-column",
-            "load-path",
-            "load-history",
-            "features",
-            "debug-on-error",
-            "default-directory",
-            "major-mode",
-            "mode-line-format",
-            "load-file-name",
-            "noninteractive",
-            "inhibit-quit",
-            "print-length",
-            "print-level",
-            "standard-output",
-            "buffer-read-only",
-            "kill-ring",
-            "kill-ring-yank-pointer",
-            "last-command",
-            "select-active-regions",
-            "shell-file-name",
-            "tab-bar-mode",
-            "this-command",
-            "tool-bar-mode",
-            "transient-mark-mode",
-            "truncate-lines",
-            "undo-limit",
-            "undo-strong-limit",
-            "unread-command-events",
-            "user-full-name",
-            "window-system",
-            "word-wrap",
-            "lexical-binding",
-            "load-prefer-newer",
-        ] {
+        for &(name, _) in STARTUP_VARIABLE_DOC_STUBS {
             obarray.put_property(name, "variable-documentation", Value::Int(0));
         }
 

@@ -28,6 +28,26 @@ Last updated: 2026-02-18
 
 ## Doing
 
+- Unified startup documentation-property stubs and expanded core coverage (batch round 28):
+  - runtime changes:
+    - `rust/neovm-core/src/elisp/doc.rs`
+    - introduced shared startup doc table: `STARTUP_VARIABLE_DOC_STUBS`.
+    - `startup_variable_doc_stub` now looks up docs from the shared table (single source of truth).
+    - expanded startup variable docs for:
+      - `auto-save-interval`, `auto-save-timeout`, `auto-save-no-message`, `buffer-auto-save-file-name`, `buffer-display-count`, `buffer-display-time`, `buffer-invisibility-spec`, `case-symbols-as-words`, `command-history`, `command-line-args`, `completion-ignored-extensions`, `completion-regexp-list`, `current-load-list`, `default-file-name-coding-system`, `default-process-coding-system`, `default-text-properties`, `enable-multibyte-characters`, `exec-suffixes`, `file-name-handler-alist`, `unread-command-events`, `unread-input-method-events`
+    - added unit lock-in:
+      - `documentation_property_eval_unread_command_events_integer_property_returns_string`
+    - `rust/neovm-core/src/elisp/eval.rs`
+    - startup integer `variable-documentation` seeding now iterates `STARTUP_VARIABLE_DOC_STUBS` to keep startup property seeding aligned with available docs.
+  - oracle corpus changes:
+    - `test/neovm/vm-compat/cases/documentation-property-semantics.{forms,expected.tsv}`
+    - added first-line parity matrix for the 21-symbol core set above.
+  - verified:
+    - `cargo test --manifest-path rust/neovm-core/Cargo.toml documentation_property_eval_` (pass; 13 tests)
+    - `make -C test/neovm/vm-compat record FORMS=cases/documentation-property-semantics.forms EXPECTED=cases/documentation-property-semantics.expected.tsv` (pass)
+    - `make -C test/neovm/vm-compat check-one-neovm CASE=documentation-property-semantics` (pass, 23/23)
+    - `make -C test/neovm/vm-compat check-all-neovm` (pass)
+
 - Expanded startup `documentation-property` integer-offset coverage for core editor variables (batch round 27):
   - runtime changes:
     - `rust/neovm-core/src/elisp/doc.rs`

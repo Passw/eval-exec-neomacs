@@ -186,72 +186,212 @@ fn startup_variable_doc_offset_symbol(sym: &str, prop: &str, value: &Value) -> b
         && startup_variable_doc_stub(sym).is_some()
 }
 
-fn startup_variable_doc_stub(sym: &str) -> Option<&'static str> {
-    match sym {
-        "abbrev-mode" => Some("Non-nil if Abbrev mode is enabled."),
-        "after-change-functions" => Some("List of functions to call after each text change."),
-        "auto-fill-function" => Some("Function called (if non-nil) to perform auto-fill."),
-        "before-change-functions" => Some("List of functions to call before each text change."),
-        "buffer-file-name" => {
-            Some("Name of file visited in current buffer, or nil if not visiting a file.")
-        }
-        "buffer-undo-list" => Some("List of undo entries in current buffer."),
-        "case-fold-search" => Some("Non-nil if searches and matches should ignore case."),
-        "comment-end-can-be-escaped" => {
-            Some("Non-nil means an escaped ender inside a comment doesn't end the comment.")
-        }
-        "completion-ignore-case" => {
-            Some("Non-nil means don't consider case significant in completion.")
-        }
-        "current-prefix-arg" => Some("The value of the prefix argument for this editing command."),
-        "debug-on-quit" => {
-            Some("Non-nil means enter debugger if quit is signaled (C-g, for example).")
-        }
-        "display-line-numbers" => Some("Non-nil means display line numbers."),
-        "exec-path" => Some("List of directories to search programs to run in subprocesses."),
-        "fill-column" => Some("Column beyond which automatic line-wrapping should happen."),
-        "load-path" => Some(
-            "List of directories to search for files to load.\n\
+pub(crate) static STARTUP_VARIABLE_DOC_STUBS: &[(&str, &str)] = &[
+    ("abbrev-mode", "Non-nil if Abbrev mode is enabled."),
+    (
+        "after-change-functions",
+        "List of functions to call after each text change.",
+    ),
+    ("auto-fill-function", "Function called (if non-nil) to perform auto-fill."),
+    ("auto-save-interval", "Number of input events between auto-saves."),
+    ("auto-save-no-message", "Non-nil means do not print any message when auto-saving."),
+    ("auto-save-timeout", "Number of seconds idle time before auto-save."),
+    (
+        "before-change-functions",
+        "List of functions to call before each text change.",
+    ),
+    ("buffer-auto-save-file-name", "Name of file for auto-saving current buffer."),
+    (
+        "buffer-display-count",
+        "A number incremented each time this buffer is displayed in a window.",
+    ),
+    (
+        "buffer-display-time",
+        "Time stamp updated each time this buffer is displayed in a window.",
+    ),
+    (
+        "buffer-file-name",
+        "Name of file visited in current buffer, or nil if not visiting a file.",
+    ),
+    ("buffer-invisibility-spec", "Invisibility spec of this buffer."),
+    ("buffer-read-only", "Non-nil if this buffer is read-only."),
+    ("buffer-undo-list", "List of undo entries in current buffer."),
+    ("case-fold-search", "Non-nil if searches and matches should ignore case."),
+    (
+        "case-symbols-as-words",
+        "If non-nil, case functions treat symbol syntax as part of words.",
+    ),
+    (
+        "command-history",
+        "List of recent commands that read arguments from terminal.",
+    ),
+    (
+        "command-line-args",
+        "Args passed by shell to Emacs, as a list of strings.",
+    ),
+    (
+        "comment-end-can-be-escaped",
+        "Non-nil means an escaped ender inside a comment doesn't end the comment.",
+    ),
+    (
+        "completion-ignore-case",
+        "Non-nil means don't consider case significant in completion.",
+    ),
+    (
+        "completion-ignored-extensions",
+        "Completion ignores file names ending in any string in this list.",
+    ),
+    (
+        "completion-regexp-list",
+        "List of regexps that should restrict possible completions.",
+    ),
+    ("current-load-list", "Used for internal purposes by `load'."),
+    (
+        "current-prefix-arg",
+        "The value of the prefix argument for this editing command.",
+    ),
+    (
+        "debug-on-error",
+        "Non-nil means enter debugger if an error is signaled.",
+    ),
+    (
+        "debug-on-quit",
+        "Non-nil means enter debugger if quit is signaled (C-g, for example).",
+    ),
+    (
+        "default-directory",
+        "Name of default directory of current buffer.",
+    ),
+    (
+        "default-file-name-coding-system",
+        "Default coding system for encoding file names.",
+    ),
+    (
+        "default-process-coding-system",
+        "Cons of coding systems used for process I/O by default.",
+    ),
+    (
+        "default-text-properties",
+        "Property-list used as default values.",
+    ),
+    (
+        "display-line-numbers",
+        "Non-nil means display line numbers.",
+    ),
+    (
+        "enable-multibyte-characters",
+        "Non-nil means the buffer contents are regarded as multi-byte characters.",
+    ),
+    ("exec-path", "List of directories to search programs to run in subprocesses."),
+    ("exec-suffixes", "List of suffixes to try to find executable file names."),
+    ("features", "A list of symbols which are the features of the executing Emacs."),
+    (
+        "file-name-handler-alist",
+        "Alist of elements (REGEXP . HANDLER) for file names handled specially.",
+    ),
+    (
+        "fill-column",
+        "Column beyond which automatic line-wrapping should happen.",
+    ),
+    (
+        "inhibit-quit",
+        "Non-nil inhibits C-g quitting from happening immediately.",
+    ),
+    ("kill-ring", "List of killed text sequences."),
+    (
+        "kill-ring-yank-pointer",
+        "The tail of the kill ring whose car is the last thing yanked.",
+    ),
+    ("last-command", "The last command executed."),
+    ("lexical-binding", "Whether to use lexical binding when evaluating code."),
+    (
+        "load-file-name",
+        "Full name of file being loaded by `load'.",
+    ),
+    (
+        "load-history",
+        "Alist mapping loaded file names to symbols and features.",
+    ),
+    (
+        "load-path",
+        "List of directories to search for files to load.\n\
 Each element is a string (directory name) or nil (try default directory).",
-        ),
-        "major-mode" => Some("Symbol for current buffer's major mode."),
-        "mode-line-format" => Some("Template for displaying mode line for a window's buffer."),
-        "shell-file-name" => Some("File name to load inferior shells from."),
-        "select-active-regions" => {
-            Some("If non-nil, any active region automatically sets the primary selection.")
-        }
-        "tab-bar-mode" => Some("Non-nil if Tab-Bar mode is enabled."),
-        "this-command" => Some("The command now being executed."),
-        "tool-bar-mode" => Some("Non-nil if Tool-Bar mode is enabled."),
-        "transient-mark-mode" => Some("Non-nil if Transient Mark mode is enabled."),
-        "truncate-lines" => Some("Non-nil means do not display continuation lines."),
-        "undo-limit" => Some("Keep no more undo information once it exceeds this size."),
-        "undo-strong-limit" => Some("Don't keep more than this much size of undo information."),
-        "user-full-name" => Some("The full name of the user logged in."),
-        "window-system" => {
-            Some("Name of window system through which the selected frame is displayed.")
-        }
-        "word-wrap" => Some("Non-nil means to use word-wrapping for continuation lines."),
-        "load-history" => Some("Alist mapping loaded file names to symbols and features."),
-        "features" => Some("A list of symbols which are the features of the executing Emacs."),
-        "debug-on-error" => Some("Non-nil means enter debugger if an error is signaled."),
-        "default-directory" => Some("Name of default directory of current buffer."),
-        "load-file-name" => Some("Full name of file being loaded by `load'."),
-        "noninteractive" => Some("Non-nil means Emacs is running without interactive terminal."),
-        "inhibit-quit" => Some("Non-nil inhibits C-g quitting from happening immediately."),
-        "print-length" => Some("Maximum length of list to print before abbreviating."),
-        "print-level" => Some("Maximum depth of list nesting to print before abbreviating."),
-        "standard-output" => Some("Output stream `print' uses by default for outputting a character."),
-        "buffer-read-only" => Some("Non-nil if this buffer is read-only."),
-        "kill-ring" => Some("List of killed text sequences."),
-        "kill-ring-yank-pointer" => {
-            Some("The tail of the kill ring whose car is the last thing yanked.")
-        }
-        "last-command" => Some("The last command executed."),
-        "lexical-binding" => Some("Whether to use lexical binding when evaluating code."),
-        "load-prefer-newer" => Some("Non-nil means `load' prefers the newest version of a file."),
-        _ => None,
-    }
+    ),
+    (
+        "load-prefer-newer",
+        "Non-nil means `load' prefers the newest version of a file.",
+    ),
+    ("major-mode", "Symbol for current buffer's major mode."),
+    (
+        "mode-line-format",
+        "Template for displaying mode line for a window's buffer.",
+    ),
+    (
+        "noninteractive",
+        "Non-nil means Emacs is running without interactive terminal.",
+    ),
+    (
+        "print-length",
+        "Maximum length of list to print before abbreviating.",
+    ),
+    (
+        "print-level",
+        "Maximum depth of list nesting to print before abbreviating.",
+    ),
+    (
+        "select-active-regions",
+        "If non-nil, any active region automatically sets the primary selection.",
+    ),
+    (
+        "shell-file-name",
+        "File name to load inferior shells from.",
+    ),
+    (
+        "standard-output",
+        "Output stream `print' uses by default for outputting a character.",
+    ),
+    ("tab-bar-mode", "Non-nil if Tab-Bar mode is enabled."),
+    ("this-command", "The command now being executed."),
+    ("tool-bar-mode", "Non-nil if Tool-Bar mode is enabled."),
+    (
+        "transient-mark-mode",
+        "Non-nil if Transient Mark mode is enabled.",
+    ),
+    (
+        "truncate-lines",
+        "Non-nil means do not display continuation lines.",
+    ),
+    (
+        "undo-limit",
+        "Keep no more undo information once it exceeds this size.",
+    ),
+    (
+        "undo-strong-limit",
+        "Don't keep more than this much size of undo information.",
+    ),
+    (
+        "unread-command-events",
+        "List of events to be read as the command input.",
+    ),
+    (
+        "unread-input-method-events",
+        "List of events to be processed as input by input methods.",
+    ),
+    ("user-full-name", "The full name of the user logged in."),
+    (
+        "window-system",
+        "Name of window system through which the selected frame is displayed.",
+    ),
+    (
+        "word-wrap",
+        "Non-nil means to use word-wrapping for continuation lines.",
+    ),
+];
+
+fn startup_variable_doc_stub(sym: &str) -> Option<&'static str> {
+    STARTUP_VARIABLE_DOC_STUBS
+        .iter()
+        .find_map(|(name, doc)| (*name == sym).then_some(*doc))
 }
 
 /// `(describe-function FUNCTION)` -- return a short description string.
@@ -2745,6 +2885,24 @@ mod tests {
             result
                 .as_str()
                 .is_some_and(|s| s.contains("searches and matches should ignore case"))
+        );
+    }
+
+    #[test]
+    fn documentation_property_eval_unread_command_events_integer_property_returns_string() {
+        let mut evaluator = super::super::eval::Evaluator::new();
+        let result = builtin_documentation_property_eval(
+            &mut evaluator,
+            vec![
+                Value::symbol("unread-command-events"),
+                Value::symbol("variable-documentation"),
+            ],
+        )
+        .unwrap();
+        assert!(
+            result
+                .as_str()
+                .is_some_and(|s| s.contains("events to be read as the command input"))
         );
     }
 
