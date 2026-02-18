@@ -713,8 +713,125 @@ pub(crate) static STARTUP_VARIABLE_DOC_STUBS: &[(&str, &str)] = &[
         "Non-nil while a keyboard macro is being defined.  Don't set this!",
     ),
     (
+        "delayed-warnings-list",
+        "List of warnings to be displayed after this command.",
+    ),
+    (
+        "delete-auto-save-files",
+        "Non-nil means delete auto-save file when a buffer is saved.",
+    ),
+    (
+        "delete-by-moving-to-trash",
+        "Specifies whether to use the system's trash can.",
+    ),
+    (
+        "delete-exited-processes",
+        "Non-nil means delete processes immediately when they exit.",
+    ),
+    (
+        "delete-frame-functions",
+        "Functions run before deleting a frame.",
+    ),
+    (
+        "delete-terminal-functions",
+        "Special hook run when a terminal is deleted.",
+    ),
+    (
+        "describe-bindings-check-shadowing-in-ranges",
+        "If non-nil, consider command shadowing when describing ranges of keys.",
+    ),
+    (
+        "disable-ascii-optimization",
+        "If non-nil, Emacs does not optimize code decoder for ASCII files.",
+    ),
+    (
+        "disable-inhibit-text-conversion",
+        "Don't disable text conversion inside `read-key-sequence`.",
+    ),
+    (
+        "disable-point-adjustment",
+        "If non-nil, suppress point adjustment after executing a command.",
+    ),
+    (
+        "display-fill-column-indicator",
+        "Non-nil means display the fill column indicator.",
+    ),
+    (
+        "display-fill-column-indicator-character",
+        "Character to draw the indicator when `display-fill-column-indicator` is non-nil.",
+    ),
+    (
+        "display-fill-column-indicator-column",
+        "Column for indicator when `display-fill-column-indicator` is non-nil.",
+    ),
+    (
+        "display-hourglass",
+        "Non-nil means show an hourglass pointer, when Emacs is busy.",
+    ),
+    (
+        "display-line-numbers-current-absolute",
+        "Non-nil means display absolute number of current line.",
+    ),
+    (
+        "display-line-numbers-major-tick",
+        "If an integer N > 0, highlight line number of every Nth line.",
+    ),
+    (
+        "display-line-numbers-minor-tick",
+        "If an integer N > 0, highlight line number of every Nth line.",
+    ),
+    (
+        "display-line-numbers-offset",
+        "A signed integer added to each absolute line number.",
+    ),
+    (
+        "display-line-numbers-widen",
+        "Non-nil means display line numbers disregarding any narrowing.",
+    ),
+    (
+        "display-line-numbers-width",
+        "Minimum width of space reserved for line number display.",
+    ),
+    (
+        "display-monitors-changed-functions",
+        "Abnormal hook run when the monitor configuration changes.",
+    ),
+    (
+        "display-pixels-per-inch",
+        "Pixels per inch value for non-window system displays.",
+    ),
+    (
+        "display-raw-bytes-as-hex",
+        "Non-nil means display raw bytes in hexadecimal format.",
+    ),
+    (
         "display-line-numbers",
         "Non-nil means display line numbers.",
+    ),
+    (
+        "doc-directory",
+        "Directory containing the DOC file that comes with GNU Emacs.",
+    ),
+    (
+        "double-click-fuzz",
+        "Maximum mouse movement between clicks to make a double-click.",
+    ),
+    (
+        "double-click-time",
+        "Maximum time between mouse clicks to make a double-click.",
+    ),
+    ("dump-mode", "Non-nil when Emacs is dumping itself."),
+    (
+        "dynamic-library-alist",
+        "Alist of dynamic libraries vs external files implementing them.",
+    ),
+    (
+        "dynamic-library-suffixes",
+        "A list of suffixes for loadable dynamic libraries.",
+    ),
+    (
+        "ebrowse-program-name",
+        "Name of the `ebrowse` program distributed with Emacs.",
     ),
     (
         "enable-multibyte-characters",
@@ -3413,6 +3530,24 @@ mod tests {
             result
                 .as_str()
                 .is_some_and(|s| s.contains("debug if a message matching this regexp is displayed"))
+        );
+    }
+
+    #[test]
+    fn documentation_property_eval_display_hourglass_integer_property_returns_string() {
+        let mut evaluator = super::super::eval::Evaluator::new();
+        let result = builtin_documentation_property_eval(
+            &mut evaluator,
+            vec![
+                Value::symbol("display-hourglass"),
+                Value::symbol("variable-documentation"),
+            ],
+        )
+        .unwrap();
+        assert!(
+            result
+                .as_str()
+                .is_some_and(|s| s.contains("show an hourglass pointer"))
         );
     }
 
