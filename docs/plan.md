@@ -28,6 +28,20 @@ Last updated: 2026-02-18
 
 ## Doing
 
+- Aligned trailing-hash reader error payload shape and expanded `read-from-string` hash-edge lock-ins:
+  - runtime changes:
+    - updated `rust/neovm-core/src/elisp/parser.rs` so trailing hash syntax (`"#"`) reports `invalid-read-syntax` payload `"#"` (matching Oracle) instead of `"unexpected end after '#'"`.
+    - added parser unit coverage in `parse_trailing_hash_reports_hash_payload`.
+  - expanded oracle corpus:
+    - `test/neovm/vm-compat/cases/read-from-string-edges.forms`
+    - `test/neovm/vm-compat/cases/read-from-string-edges.expected.tsv`
+    - added probes for `(read-from-string "#")` via `condition-case`, plus `"####"`, `"#####"` and `"## ##"` hash-token boundary forms.
+  - verified:
+    - `cargo test --manifest-path rust/neovm-core/Cargo.toml parse_trailing_hash_reports_hash_payload` (pass)
+    - `make -C test/neovm/vm-compat check-one-neovm CASE=cases/read-from-string-edges` (pass, 17/17)
+    - `make -C test/neovm/vm-compat check-one-neovm CASE=cases/reader-hash` (pass, 8/8)
+    - `make -C test/neovm/vm-compat check-all-neovm` (pass)
+
 - Fixed dot-leading symbol escaping parity in printed reader error payloads:
   - Updated symbol printing in `rust/neovm-core/src/elisp/print.rs` and `rust/neovm-core/src/elisp/expr.rs` to escape leading-dot symbol names with a leading backslash (for example `.foo` -> `\\.foo`), matching Oracle print shape.
   - This aligns `void-variable` payload rendering for dot-leading symbols, including forms like `.foo`, `.bar`, `..1`, `.+1`, and noncanonical special-float spellings such as `.0e+nan`.

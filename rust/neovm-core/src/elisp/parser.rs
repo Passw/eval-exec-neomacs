@@ -381,7 +381,7 @@ impl<'a> Parser<'a> {
     fn parse_hash_syntax(&mut self) -> Result<Expr, ParseError> {
         self.expect('#')?;
         let Some(ch) = self.current() else {
-            return Err(self.error("unexpected end after '#'"));
+            return Err(self.error("#"));
         };
 
         match ch {
@@ -1040,6 +1040,12 @@ mod tests {
     fn parse_paren_bytecode_literal_is_rejected() {
         let err = parse_forms("#((x) \"\\bT\\207\" [x] 1 (#$ . 83))").expect_err("should fail");
         assert!(err.message.contains('#'));
+    }
+
+    #[test]
+    fn parse_trailing_hash_reports_hash_payload() {
+        let err = parse_forms("#").expect_err("should fail");
+        assert_eq!(err.message, "#");
     }
 
     #[test]

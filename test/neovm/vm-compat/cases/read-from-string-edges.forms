@@ -11,3 +11,7 @@
 (read-from-string "##")
 (read-from-string "\\#\\#")
 (read-from-string "###")
+(condition-case err (read-from-string "#") (error err))
+(read-from-string "####")
+(read-from-string "#####")
+(read-from-string "## ##")

@@ -11,3 +11,7 @@
 11	(read-from-string "##")	OK (## . 2)
 12	(read-from-string "\\#\\#")	OK (\#\# . 4)
 13	(read-from-string "###")	OK (## . 2)
+14	(condition-case err (read-from-string "#") (error err))	OK (invalid-read-syntax "#")
+15	(read-from-string "####")	OK (## . 2)
+16	(read-from-string "#####")	OK (## . 2)
+17	(read-from-string "## ##")	OK (## . 2)
