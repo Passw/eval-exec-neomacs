@@ -2,5 +2,6 @@
 2	(let ((unread-command-events (list '(mouse-1) 'foo))) (progn (read-event nil nil 0) unread-command-events))	OK (foo)
 3	(let ((unread-command-events (list '(mouse-1) 97 'foo))) (progn (read-event nil nil 0) unread-command-events))	OK (97 foo)
 4	(let ((unread-command-events (list '(mouse-1) 98 'foo))) (progn (read-event nil nil 0) unread-command-events))	OK (98 foo)
-5	(let ((unread-command-events '((mouse-1) . 97))) (progn (read-event nil nil 0) unread-command-events))	OK 97
-6	(let ((unread-command-events '((mouse-1) . foo))) (progn (read-event nil nil 0) unread-command-events))	OK foo
+5	(let ((unread-command-events (list '(mouse-1) 98 'foo 'bar))) (progn (read-event nil nil 0) unread-command-events))	OK (98 foo bar)
+6	(let ((unread-command-events '((mouse-1) . 97))) (progn (read-event nil nil 0) unread-command-events))	OK 97
+7	(let ((unread-command-events '((mouse-1) . foo))) (progn (read-event nil nil 0) unread-command-events))	OK foo
