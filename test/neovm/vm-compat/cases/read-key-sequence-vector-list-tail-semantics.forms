@@ -13,6 +13,11 @@
     (read-key-sequence-vector "")
     unread-command-events))
 
+(let ((unread-command-events (list '(mouse-1) 98 'foo 'bar)))
+  (progn
+    (read-key-sequence-vector "")
+    unread-command-events))
+
 (let ((unread-command-events '((mouse-1) . 97)))
   (progn
     (read-key-sequence-vector "")
