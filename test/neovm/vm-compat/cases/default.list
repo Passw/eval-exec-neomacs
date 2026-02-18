@@ -361,6 +361,7 @@ cases/x-display-terminal-designator-semantics
 cases/x-display-color-get-device-terminal-error-payload-semantics
 cases/x-display-pixel-window-error-structure-semantics
 cases/x-server-window-error-structure-semantics
+cases/x-server-message-payload-semantics
 cases/x-open-close-window-error-structure-semantics
 cases/display-monitor-semantics
 cases/display-monitor-frames-semantics
