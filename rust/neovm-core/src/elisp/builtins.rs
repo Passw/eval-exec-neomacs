@@ -3456,8 +3456,8 @@ pub(crate) fn builtin_expt(args: Vec<Value>) -> EvalResult {
         let exp = expect_number(&args[1])?;
         Ok(Value::Float(base.powf(exp)))
     } else {
-        let base = expect_int(&args[0])?;
-        let exp = expect_int(&args[1])?;
+        let base = expect_number(&args[0])? as i64;
+        let exp = expect_number(&args[1])? as i64;
         if exp < 0 {
             Ok(Value::Float((base as f64).powf(exp as f64)))
         } else {
@@ -3499,7 +3499,10 @@ pub(crate) fn builtin_isnan(args: Vec<Value>) -> EvalResult {
     expect_args("isnan", &args, 1)?;
     match &args[0] {
         Value::Float(f) => Ok(Value::bool(f.is_nan())),
-        _ => Ok(Value::Nil),
+        other => Err(signal(
+            "wrong-type-argument",
+            vec![Value::symbol("floatp"), other.clone()],
+        )),
     }
 }
 
@@ -10930,6 +10933,42 @@ mod tests {
             .expect("builtin isnan should resolve")
             .expect("builtin isnan should evaluate");
         assert!(nan_check.is_truthy());
+    }
+
+    #[test]
+    fn pure_dispatch_typed_expt_and_isnan_type_errors_match_oracle() {
+        let expt_base = dispatch_builtin_pure("expt", vec![Value::symbol("a"), Value::Int(2)])
+            .expect("builtin expt should resolve")
+            .expect_err("expt should reject non-numeric base");
+        match expt_base {
+            Flow::Signal(sig) => {
+                assert_eq!(sig.symbol, "wrong-type-argument");
+                assert_eq!(sig.data, vec![Value::symbol("numberp"), Value::symbol("a")]);
+            }
+            other => panic!("unexpected flow: {other:?}"),
+        }
+
+        let expt_exp = dispatch_builtin_pure("expt", vec![Value::Int(2), Value::symbol("a")])
+            .expect("builtin expt should resolve")
+            .expect_err("expt should reject non-numeric exponent");
+        match expt_exp {
+            Flow::Signal(sig) => {
+                assert_eq!(sig.symbol, "wrong-type-argument");
+                assert_eq!(sig.data, vec![Value::symbol("numberp"), Value::symbol("a")]);
+            }
+            other => panic!("unexpected flow: {other:?}"),
+        }
+
+        let isnan_non_float = dispatch_builtin_pure("isnan", vec![Value::Int(1)])
+            .expect("builtin isnan should resolve")
+            .expect_err("isnan should reject non-floats");
+        match isnan_non_float {
+            Flow::Signal(sig) => {
+                assert_eq!(sig.symbol, "wrong-type-argument");
+                assert_eq!(sig.data, vec![Value::symbol("floatp"), Value::Int(1)]);
+            }
+            other => panic!("unexpected flow: {other:?}"),
+        }
     }
 
     #[test]

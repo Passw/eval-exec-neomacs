@@ -537,6 +537,7 @@ cases/percent-mod-ash-semantics
 cases/log-bitwise-type-semantics
 cases/numeric-error-predicate-semantics
 cases/division-float-zero-semantics
+cases/expt-isnan-type-semantics
 cases/md5-semantics
 cases/md5-coding-semantics
 cases/coding-system-runtime-semantics
