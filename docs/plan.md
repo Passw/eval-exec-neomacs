@@ -28,6 +28,15 @@ Last updated: 2026-02-18
 
 ## Doing
 
+- Expanded `read-event` empty-queue lock-ins for non-cons unread queue values:
+  - oracle corpus changes:
+    - `test/neovm/vm-compat/cases/read-event-empty-queue-semantics.forms`
+    - `test/neovm/vm-compat/cases/read-event-empty-queue-semantics.expected.tsv`
+    - added non-cons queue probes for symbol and vector values (`'foo`, `[97]`) to lock batch-mode behavior where `read-event` returns `nil` without consuming or mutating the queue value.
+  - verified:
+    - `make -C test/neovm/vm-compat check-one-neovm CASE=cases/read-event-empty-queue-semantics` (pass, 5/5)
+    - `make -C test/neovm/vm-compat check-all-neovm` (pass)
+
 - Aligned startup binding and queue-edge behavior for `unread-command-events` with Oracle:
   - runtime changes:
     - updated `rust/neovm-core/src/elisp/eval.rs` to seed `unread-command-events` to `nil` at evaluator startup.
