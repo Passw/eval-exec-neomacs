@@ -25,6 +25,9 @@ pub enum InputEvent {
         target_frame_id: u64,
         /// WebKit view ID hit by render-thread glyph search (0 = none)
         webkit_id: u32,
+        /// Coordinates relative to the WebKit view (valid when webkit_id != 0)
+        webkit_rel_x: i32,
+        webkit_rel_y: i32,
     },
     MouseMove {
         x: f32,
@@ -45,6 +48,9 @@ pub enum InputEvent {
         target_frame_id: u64,
         /// WebKit view ID hit by render-thread glyph search (0 = none)
         webkit_id: u32,
+        /// Coordinates relative to the WebKit view (valid when webkit_id != 0)
+        webkit_rel_x: i32,
+        webkit_rel_y: i32,
     },
     WindowResize {
         width: u32,
@@ -928,6 +934,8 @@ mod tests {
             modifiers: 0,
             target_frame_id: 0,
             webkit_id: 0,
+            webkit_rel_x: 0,
+            webkit_rel_y: 0,
         };
         match event {
             InputEvent::MouseButton { button, x, y, pressed, modifiers, target_frame_id, .. } => {
@@ -972,6 +980,8 @@ mod tests {
             pixel_precise: false,
             target_frame_id: 0,
             webkit_id: 0,
+            webkit_rel_x: 0,
+            webkit_rel_y: 0,
         };
         match event {
             InputEvent::MouseScroll { delta_x, delta_y, pixel_precise, .. } => {
@@ -994,6 +1004,8 @@ mod tests {
             pixel_precise: true,
             target_frame_id: 0,
             webkit_id: 0,
+            webkit_rel_x: 0,
+            webkit_rel_y: 0,
         };
         match event {
             InputEvent::MouseScroll { pixel_precise, .. } => assert!(pixel_precise),

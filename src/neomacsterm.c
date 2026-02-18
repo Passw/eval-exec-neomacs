@@ -15916,7 +15916,10 @@ neomacs_display_wakeup_handler (int fd, void *data)
       if (!f)
         continue;
 
-      /* If this event targets a child frame, find it. */
+      /* Resolve the target frame for this event.
+         targetFrameId != 0 means a specific child frame (pointer value).
+         targetFrameId == 0 for mouse events means the root (parent) frame,
+         NOT necessarily SELECTED_FRAME which could be a child frame.  */
       if (ev->targetFrameId != 0)
         {
           Lisp_Object tail2, frame2;
@@ -15928,6 +15931,32 @@ neomacs_display_wakeup_handler (int fd, void *data)
                 {
                   f = cf;
                   break;
+                }
+            }
+        }
+      else if (ev->kind == NEOMACS_EVENT_MOUSE_PRESS
+               || ev->kind == NEOMACS_EVENT_MOUSE_RELEASE
+               || ev->kind == NEOMACS_EVENT_MOUSE_MOVE
+               || ev->kind == NEOMACS_EVENT_SCROLL)
+        {
+          /* For mouse events targeting the parent frame (targetFrameId==0),
+             find the root (non-child) Neomacs frame.  Without this,
+             neomacs_event_target_frame falls back to SELECTED_FRAME which
+             may be a child frame, causing parent-frame clicks to be
+             dispatched to the child frame.  */
+          if (FRAME_PARENT_FRAME (f) != NULL)
+            {
+              Lisp_Object tail2, frame2;
+              FOR_EACH_FRAME (tail2, frame2)
+                {
+                  struct frame *rf = XFRAME (frame2);
+                  if (FRAME_LIVE_P (rf)
+                      && FRAME_NEOMACS_P (rf)
+                      && FRAME_PARENT_FRAME (rf) == NULL)
+                    {
+                      f = rf;
+                      break;
+                    }
                 }
             }
         }
@@ -15964,34 +15993,30 @@ neomacs_display_wakeup_handler (int fd, void *data)
         case NEOMACS_EVENT_MOUSE_RELEASE:
           {
             /* Check if click is on a webkit view (floating or inline).
-               The render thread already searched both parent and child frame
-               glyph buffers and dispatched the click directly to WebKit.
-               ev->webkitId is set when it found a hit.  */
+               The render thread searched both parent and child frame glyph
+               buffers and set ev->webkitId + relative coords when found.
+               C dispatches the click to WebKit so focus stays with Emacs.  */
             struct neomacs_display_info *dpyinfo = FRAME_NEOMACS_DISPLAY_INFO (f);
             if (ev->kind == NEOMACS_EVENT_MOUSE_PRESS
                 && dpyinfo && dpyinfo->display_handle)
               {
-                if (ev->webkitId != 0)
+                uint32_t webkit_id = ev->webkitId;
+                int rel_x = ev->webkitRelX;
+                int rel_y = ev->webkitRelY;
+
+                /* Fallback: if render thread didn't find it, check parent
+                   frame glyphs from C side (safety net).  */
+                if (webkit_id == 0)
+                  neomacs_display_webkit_at_position (dpyinfo->display_handle,
+                                                       ev->x, ev->y,
+                                                       &webkit_id, &rel_x, &rel_y);
+
+                if (webkit_id != 0)
                   {
-                    /* Render thread already sent the click to WebKit.
-                       Just record the view ID for Elisp.  */
-                    Vneomacs_webkit_clicked_view_id = make_fixnum (ev->webkitId);
-                  }
-                else
-                  {
-                    /* Fallback: search parent frame glyphs from C side.
-                       (Safety net — render thread should have caught it.)  */
-                    uint32_t webkit_id = 0;
-                    int rel_x = 0, rel_y = 0;
-                    if (neomacs_display_webkit_at_position (dpyinfo->display_handle,
-                                                             ev->x, ev->y,
-                                                             &webkit_id, &rel_x, &rel_y))
-                      {
-                        neomacs_display_webkit_click (dpyinfo->display_handle,
-                                                      webkit_id, rel_x, rel_y,
-                                                      ev->button);
-                        Vneomacs_webkit_clicked_view_id = make_fixnum (webkit_id);
-                      }
+                    neomacs_display_webkit_click (dpyinfo->display_handle,
+                                                  webkit_id, rel_x, rel_y,
+                                                  ev->button);
+                    Vneomacs_webkit_clicked_view_id = make_fixnum (webkit_id);
                   }
               }
 
@@ -16106,20 +16131,21 @@ neomacs_display_wakeup_handler (int fd, void *data)
                parent OR child frame glyph buffers.  */
             struct neomacs_display_info *dpyinfo
               = FRAME_NEOMACS_DISPLAY_INFO (f);
-            if (ev->webkitId != 0)
-              {
-                /* Render thread already sent scroll to WebKit.  */
-                break;
-              }
             if (dpyinfo && dpyinfo->display_handle)
               {
-                /* Fallback: search parent frame glyphs from C side.  */
-                uint32_t wk_id = 0;
-                int rel_x = 0, rel_y = 0;
-                if (neomacs_display_webkit_at_position (
-                      dpyinfo->display_handle,
-                      ev->x, ev->y,
-                      &wk_id, &rel_x, &rel_y))
+                uint32_t wk_id = ev->webkitId;
+                int rel_x = ev->webkitRelX;
+                int rel_y = ev->webkitRelY;
+
+                /* Fallback: if render thread didn't find it, check parent
+                   frame glyphs from C side.  */
+                if (wk_id == 0)
+                  neomacs_display_webkit_at_position (
+                    dpyinfo->display_handle,
+                    ev->x, ev->y,
+                    &wk_id, &rel_x, &rel_y);
+
+                if (wk_id != 0)
                   {
                     int sdx, sdy;
                     if (ev->pixelPrecise)

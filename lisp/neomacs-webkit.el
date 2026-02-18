@@ -638,6 +638,24 @@ When enabled, most keys are forwarded to the WebKit view."
 (defvar-local neomacs-webkit--input-view-id nil
   "View ID of the inline WebKit view currently accepting keyboard input, or nil.")
 
+(defvar neomacs-webkit--input-active-buffer nil
+  "Buffer where WebKit input mode is currently active, or nil.
+Used to deactivate input mode when the user switches to a different
+buffer or frame.")
+
+(defvar neomacs-webkit--deactivation-timer nil
+  "Idle timer that checks for cross-buffer WebKit input deactivation.")
+
+(defun neomacs-webkit--check-deactivation ()
+  "Idle timer callback: deactivate WebKit input if user left the buffer."
+  (when (and neomacs-webkit--input-active-buffer
+             (not (eq (current-buffer) neomacs-webkit--input-active-buffer)))
+    (let ((old-buf neomacs-webkit--input-active-buffer))
+      (neomacs-webkit--log "idle: left webkit buffer, deactivating in %s" old-buf)
+      (when (buffer-live-p old-buf)
+        (with-current-buffer old-buf
+          (neomacs-webkit--deactivate-input))))))
+
 ;;; Hover keymap — active when cursor is on a WebKit character but input is OFF
 
 (defvar neomacs-webkit-hover-keymap
@@ -711,10 +729,20 @@ Press ESC, C-g, or C-c C-c to exit."
 (defun neomacs-webkit--activate-input (view-id)
   "Activate input mode for VIEW-ID."
   (setq neomacs-webkit--input-view-id view-id)
+  (setq neomacs-webkit--input-active-buffer (current-buffer))
+  ;; Start idle timer to detect cross-buffer/frame switches
+  (unless neomacs-webkit--deactivation-timer
+    (setq neomacs-webkit--deactivation-timer
+          (run-with-idle-timer 0.1 t #'neomacs-webkit--check-deactivation)))
   (neomacs-webkit-interaction-mode 1))
 
 (defun neomacs-webkit--deactivate-input ()
   "Deactivate input mode."
+  (setq neomacs-webkit--input-active-buffer nil)
+  ;; Cancel the idle timer
+  (when neomacs-webkit--deactivation-timer
+    (cancel-timer neomacs-webkit--deactivation-timer)
+    (setq neomacs-webkit--deactivation-timer nil))
   (neomacs-webkit-interaction-mode -1))
 
 (defun neomacs-webkit-enter-input-mode ()
@@ -781,11 +809,13 @@ Reads the `neomacs-webkit-id' text property to determine which view."
 
 (defun neomacs-webkit--post-command-check ()
   "Post-command hook for WebKit input routing.
-Handles two concerns:
+Handles three concerns:
 1. Click-to-activate: when C sets `neomacs-webkit-clicked-view-id',
    auto-enter input mode if point is on that view.
-2. Auto-deactivate: if input mode is active but cursor has moved
-   off the view, deactivate."
+2. Auto-deactivate (same buffer): if input mode is active but cursor
+   has moved off the view, deactivate.
+3. Auto-deactivate (buffer/frame switch): if user switched to a
+   different buffer or frame, deactivate input in the original buffer."
   ;; 1. Click-to-activate
   (when (and (boundp 'neomacs-webkit-clicked-view-id)
              neomacs-webkit-clicked-view-id
@@ -797,7 +827,7 @@ Handles two concerns:
       ;; Only activate if point is on that view's character
       (when (eq (get-text-property (point) 'neomacs-webkit-id) clicked-id)
         (neomacs-webkit--activate-input clicked-id))))
-  ;; 2. Auto-deactivate: cursor left the input-mode view
+  ;; 2. Auto-deactivate (same buffer): cursor left the input-mode view
   (when neomacs-webkit--input-view-id
     (unless (eq (get-text-property (point) 'neomacs-webkit-id)
                 neomacs-webkit--input-view-id)

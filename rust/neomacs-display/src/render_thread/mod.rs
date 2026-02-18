@@ -3013,7 +3013,7 @@ impl ApplicationHandler for RenderApp {
                     self.frame_dirty = true;
                 } else {
                     if state == ElementState::Pressed && button == MouseButton::Left {
-                        log::info!("Left click at ({:.1}, {:.1}) NOT in menu bar (h={}) or toolbar (h={})",
+                        log::trace!("Left click at ({:.1}, {:.1}) NOT in menu bar (h={}) or toolbar (h={})",
                             self.mouse_pos.0, self.mouse_pos.1, self.menu_bar_height, self.toolbar_height);
                     }
                     let btn = match button {
@@ -3027,12 +3027,17 @@ impl ApplicationHandler for RenderApp {
                     // Hit test child frames
                     let (ev_x, ev_y, target_fid) =
                         if let Some((fid, lx, ly)) = self.child_frames.hit_test(self.mouse_pos.0, self.mouse_pos.1) {
+                            if let Some(entry) = self.child_frames.frames.get(&fid) {
+                                log::trace!("Child frame hit: fid={} abs=({:.1},{:.1}) size=({:.1}x{:.1}) mouse=({:.1},{:.1}) local=({:.1},{:.1})",
+                                    fid, entry.abs_x, entry.abs_y, entry.frame.width, entry.frame.height,
+                                    self.mouse_pos.0, self.mouse_pos.1, lx, ly);
+                            }
                             (lx, ly, fid)
                         } else {
                             (self.mouse_pos.0, self.mouse_pos.1, 0)
                         };
                     // WebKit glyph hit-test (search correct glyph buffer)
-                    let mut wk_id = 0u32;
+                    let (mut wk_id, mut wk_rx, mut wk_ry) = (0u32, 0i32, 0i32);
                     if state == ElementState::Pressed {
                         let glyphs: Option<&[FrameGlyph]> = if target_fid != 0 {
                             self.child_frames.frames.get(&target_fid).map(|e| e.frame.glyphs.as_slice())
@@ -3042,11 +3047,9 @@ impl ApplicationHandler for RenderApp {
                         if let Some(glyphs) = glyphs {
                             if let Some((id, rx, ry)) = webkit_glyph_hit_test(glyphs, ev_x, ev_y) {
                                 wk_id = id;
-                                // Send click directly to WebKit with relative coords
-                                #[cfg(feature = "wpe-webkit")]
-                                if let Some(view) = self.webkit_views.get(&id) {
-                                    view.click(rx, ry, btn);
-                                }
+                                wk_rx = rx;
+                                wk_ry = ry;
+                                log::trace!("WebKit hit: id={} rel=({},{})", id, rx, ry);
                             }
                         }
                         // Also check floating webkits (parent-frame absolute coords)
@@ -3057,15 +3060,16 @@ impl ApplicationHandler for RenderApp {
                             for wk in self.floating_webkits.iter().rev() {
                                 if mx >= wk.x && mx < wk.x + wk.width && my >= wk.y && my < wk.y + wk.height {
                                     wk_id = wk.webkit_id;
-                                    let rx = (mx - wk.x) as i32;
-                                    let ry = (my - wk.y) as i32;
-                                    if let Some(view) = self.webkit_views.get(&wk_id) {
-                                        view.click(rx, ry, btn);
-                                    }
+                                    wk_rx = (mx - wk.x) as i32;
+                                    wk_ry = (my - wk.y) as i32;
                                     break;
                                 }
                             }
                         }
+                    }
+                    if state == ElementState::Pressed {
+                        log::trace!("MouseButton: btn={} ev=({:.1},{:.1}) target_fid={} wk_id={} wk_rel=({},{})",
+                            btn, ev_x, ev_y, target_fid, wk_id, wk_rx, wk_ry);
                     }
                     self.comms.send_input(InputEvent::MouseButton {
                         button: btn,
@@ -3075,6 +3079,8 @@ impl ApplicationHandler for RenderApp {
                         modifiers: self.modifiers,
                         target_frame_id: target_fid,
                         webkit_id: wk_id,
+                        webkit_rel_x: wk_rx,
+                        webkit_rel_y: wk_ry,
                     });
                     // Click halo effect on press
                     if state == ElementState::Pressed && self.effects.click_halo.enabled {
@@ -3237,7 +3243,7 @@ impl ApplicationHandler for RenderApp {
                         (self.mouse_pos.0, self.mouse_pos.1, 0)
                     };
                 // WebKit glyph hit-test for scroll
-                let mut wk_id = 0u32;
+                let (mut wk_id, mut wk_rx, mut wk_ry) = (0u32, 0i32, 0i32);
                 {
                     let glyphs: Option<&[FrameGlyph]> = if target_fid != 0 {
                         self.child_frames.frames.get(&target_fid).map(|e| e.frame.glyphs.as_slice())
@@ -3247,16 +3253,8 @@ impl ApplicationHandler for RenderApp {
                     if let Some(glyphs) = glyphs {
                         if let Some((id, rx, ry)) = webkit_glyph_hit_test(glyphs, ev_x, ev_y) {
                             wk_id = id;
-                            // Send scroll directly to WebKit with relative coords
-                            #[cfg(feature = "wpe-webkit")]
-                            if let Some(view) = self.webkit_views.get(&id) {
-                                let (sdx, sdy) = if pixel_precise {
-                                    (dx as i32, dy as i32)
-                                } else {
-                                    ((dx * 53.0) as i32, (dy * 53.0) as i32)
-                                };
-                                view.scroll(rx, ry, sdx, sdy);
-                            }
+                            wk_rx = rx;
+                            wk_ry = ry;
                         }
                     }
                     // Also check floating webkits (parent-frame absolute coords)
@@ -3267,16 +3265,8 @@ impl ApplicationHandler for RenderApp {
                         for wk in self.floating_webkits.iter().rev() {
                             if mx >= wk.x && mx < wk.x + wk.width && my >= wk.y && my < wk.y + wk.height {
                                 wk_id = wk.webkit_id;
-                                let rx = (mx - wk.x) as i32;
-                                let ry = (my - wk.y) as i32;
-                                let (sdx, sdy) = if pixel_precise {
-                                    (dx as i32, dy as i32)
-                                } else {
-                                    ((dx * 53.0) as i32, (dy * 53.0) as i32)
-                                };
-                                if let Some(view) = self.webkit_views.get(&wk_id) {
-                                    view.scroll(rx, ry, sdx, sdy);
-                                }
+                                wk_rx = (mx - wk.x) as i32;
+                                wk_ry = (my - wk.y) as i32;
                                 break;
                             }
                         }
@@ -3291,6 +3281,8 @@ impl ApplicationHandler for RenderApp {
                     pixel_precise,
                     target_frame_id: target_fid,
                     webkit_id: wk_id,
+                    webkit_rel_x: wk_rx,
+                    webkit_rel_y: wk_ry,
                 });
             }
 

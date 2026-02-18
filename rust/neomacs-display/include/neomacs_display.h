@@ -305,6 +305,11 @@ typedef struct NeomacsInputEvent {
    * WebKit view ID hit by render-thread glyph search (0 = none)
    */
   uint32_t webkitId;
+  /**
+   * Coordinates relative to the WebKit view (valid when webkit_id != 0)
+   */
+  int32_t webkitRelX;
+  int32_t webkitRelY;
 } NeomacsInputEvent;
 
 /**

@@ -279,6 +279,8 @@ pub unsafe extern "C" fn neomacs_display_drain_input(
                         modifiers,
                         target_frame_id,
                         webkit_id,
+                        webkit_rel_x,
+                        webkit_rel_y,
                     } => {
                         out.kind = if pressed {
                             NEOMACS_EVENT_BUTTON_PRESS
@@ -291,6 +293,8 @@ pub unsafe extern "C" fn neomacs_display_drain_input(
                         out.modifiers = modifiers;
                         out.target_frame_id = target_frame_id;
                         out.webkit_id = webkit_id;
+                        out.webkit_rel_x = webkit_rel_x;
+                        out.webkit_rel_y = webkit_rel_y;
                     }
                     InputEvent::MouseMove { x, y, modifiers, target_frame_id } => {
                         out.kind = NEOMACS_EVENT_MOUSE_MOVE;
@@ -308,6 +312,8 @@ pub unsafe extern "C" fn neomacs_display_drain_input(
                         pixel_precise,
                         target_frame_id,
                         webkit_id,
+                        webkit_rel_x,
+                        webkit_rel_y,
                     } => {
                         out.kind = NEOMACS_EVENT_SCROLL;
                         out.x = x as i32;
@@ -318,6 +324,8 @@ pub unsafe extern "C" fn neomacs_display_drain_input(
                         out.pixel_precise = if pixel_precise { 1 } else { 0 };
                         out.target_frame_id = target_frame_id;
                         out.webkit_id = webkit_id;
+                        out.webkit_rel_x = webkit_rel_x;
+                        out.webkit_rel_y = webkit_rel_y;
                     }
                     InputEvent::WindowResize { width, height, emacs_frame_id } => {
                         out.kind = NEOMACS_EVENT_RESIZE;

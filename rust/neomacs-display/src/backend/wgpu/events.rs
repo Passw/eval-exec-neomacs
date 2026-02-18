@@ -70,6 +70,9 @@ pub struct NeomacsInputEvent {
     pub target_frame_id: u64,
     /// WebKit view ID hit by render-thread glyph search (0 = none)
     pub webkit_id: u32,
+    /// Coordinates relative to the WebKit view (valid when webkit_id != 0)
+    pub webkit_rel_x: i32,
+    pub webkit_rel_y: i32,
 }
 
 impl Default for NeomacsInputEvent {
@@ -91,6 +94,8 @@ impl Default for NeomacsInputEvent {
             height: 0,
             target_frame_id: 0,
             webkit_id: 0,
+            webkit_rel_x: 0,
+            webkit_rel_y: 0,
         }
     }
 }
@@ -286,13 +291,13 @@ mod tests {
 
     #[test]
     fn input_event_struct_size_is_reasonable() {
-        // The struct has 16 fields of various sizes. Ensure it's at least
+        // The struct has 18 fields of various sizes. Ensure it's at least
         // as large as the sum of field sizes and not absurdly large.
         let size = std::mem::size_of::<NeomacsInputEvent>();
-        // Minimum: 4+4+8+4+4+4+4+4+4+4+4+4+4+4+8+4 = 72 bytes
-        assert!(size >= 72, "struct too small: {}", size);
+        // Minimum: 4+4+8+4+4+4+4+4+4+4+4+4+4+4+8+4+4+4 = 80 bytes
+        assert!(size >= 80, "struct too small: {}", size);
         // Should not exceed a generous upper bound (padding included)
-        assert!(size <= 128, "struct unexpectedly large: {}", size);
+        assert!(size <= 136, "struct unexpectedly large: {}", size);
     }
 
     #[test]
