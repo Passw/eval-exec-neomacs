@@ -8,3 +8,6 @@
 (condition-case err (read-from-string "(a b" 0 nil) (error (car err)))
 (condition-case err (read-from-string "42" 2 1) (error err))
 (read-from-string "42" nil -1)
+(read-from-string "##")
+(read-from-string "\\#\\#")
+(read-from-string "###")

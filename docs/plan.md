@@ -11061,6 +11061,17 @@ Last updated: 2026-02-18
     - `make -C test/neovm/vm-compat check-one-neovm CASE=cases/reader-hash` (pass, 8/8)
     - `make -C test/neovm/vm-compat check-one-neovm CASE=cases/symbol-print-escape-semantics` (pass, 22/22)
     - `make -C test/neovm/vm-compat check-all-neovm` (pass)
+- Expanded `read-from-string` edge corpus for hash-empty-symbol boundaries:
+  - corpus changes:
+    - `test/neovm/vm-compat/cases/read-from-string-edges.forms`
+    - `test/neovm/vm-compat/cases/read-from-string-edges.expected.tsv`
+    - added probes:
+      - `(read-from-string "##")` -> `(## . 2)`
+      - `(read-from-string "\\#\\#")` -> `(\\#\\# . 4)`
+      - `(read-from-string "###")` -> `(## . 2)`
+  - verified:
+    - `make -C test/neovm/vm-compat record FORMS=cases/read-from-string-edges.forms EXPECTED=cases/read-from-string-edges.expected.tsv` (pass)
+    - `make -C test/neovm/vm-compat check-one-neovm CASE=cases/read-from-string-edges` (pass, 13/13)
 
 ## Doing
 

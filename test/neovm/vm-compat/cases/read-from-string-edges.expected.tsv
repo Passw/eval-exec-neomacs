@@ -8,3 +8,6 @@
 8	(condition-case err (read-from-string "(a b" 0 nil) (error (car err)))	OK end-of-file
 9	(condition-case err (read-from-string "42" 2 1) (error err))	OK (args-out-of-range "42" 2 1)
 10	(read-from-string "42" nil -1)	OK (4 . 1)
+11	(read-from-string "##")	OK (## . 2)
+12	(read-from-string "\\#\\#")	OK (\#\# . 4)
+13	(read-from-string "###")	OK (## . 2)
