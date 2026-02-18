@@ -1529,8 +1529,9 @@ The future of text editing is here.  It's called Neomacs.
   (write-region "" nil showcase--log-file nil 'silent)
   (showcase--log "=== SHOWCASE INIT ===")
   (setq showcase--original-mode-line-format (default-value 'mode-line-format))
-  (set-frame-size (selected-frame) 120 45)
-  (set-frame-position (selected-frame) 100 50)
+  ;; Double the default face height and maximize the frame
+  (set-face-attribute 'default nil :height (truncate (* 1.6 (face-attribute 'default :height))))
+  (set-frame-parameter nil 'fullscreen 'maximized)
   (set-frame-parameter nil 'alpha-background 100)
   ;; Download GitHub avatar if not cached
   (unless (file-exists-p "/tmp/eval-exec-avatar.jpg")
