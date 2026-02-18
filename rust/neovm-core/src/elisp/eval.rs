@@ -3799,7 +3799,37 @@ mod tests {
              (stringp (get 'prettify-symbols-mode 'variable-documentation))
              (integerp (get 'prettify-symbols-mode 'variable-documentation))
              (stringp (get 'previous-transient-input-method 'variable-documentation))
-             (integerp (get 'previous-transient-input-method 'variable-documentation))",
+             (integerp (get 'previous-transient-input-method 'variable-documentation))
+             (stringp (get 'process-file-side-effects 'variable-documentation))
+             (integerp (get 'process-file-side-effects 'variable-documentation))
+             (stringp (get 'process-menu-mode-map 'variable-documentation))
+             (integerp (get 'process-menu-mode-map 'variable-documentation))
+             (stringp (get 'prog-mode-map 'variable-documentation))
+             (integerp (get 'prog-mode-map 'variable-documentation))
+             (stringp (get 'query-about-changed-file 'variable-documentation))
+             (integerp (get 'query-about-changed-file 'variable-documentation))
+             (stringp (get 'read-extended-command-predicate 'variable-documentation))
+             (integerp (get 'read-extended-command-predicate 'variable-documentation))
+             (stringp (get 'regexp-search-ring-max 'variable-documentation))
+             (integerp (get 'regexp-search-ring-max 'variable-documentation))
+             (stringp (get 'safe-local-variable-values 'variable-documentation))
+             (integerp (get 'safe-local-variable-values 'variable-documentation))
+             (stringp (get 'selection-coding-system 'variable-documentation))
+             (integerp (get 'selection-coding-system 'variable-documentation))
+             (stringp (get 'show-paren-mode 'variable-documentation))
+             (integerp (get 'show-paren-mode 'variable-documentation))
+             (stringp (get 'tab-bar-format 'variable-documentation))
+             (integerp (get 'tab-bar-format 'variable-documentation))
+             (stringp (get 'tool-bar-map 'variable-documentation))
+             (integerp (get 'tool-bar-map 'variable-documentation))
+             (stringp (get 'transient-mark-mode-hook 'variable-documentation))
+             (integerp (get 'transient-mark-mode-hook 'variable-documentation))
+             (stringp (get 'user-emacs-directory 'variable-documentation))
+             (integerp (get 'user-emacs-directory 'variable-documentation))
+             (stringp (get 'window-size-fixed 'variable-documentation))
+             (integerp (get 'window-size-fixed 'variable-documentation))
+             (stringp (get 'yank-transform-functions 'variable-documentation))
+             (integerp (get 'yank-transform-functions 'variable-documentation))",
         );
         assert_eq!(results[0], "OK t");
         assert_eq!(results[1], "OK nil");
@@ -3901,6 +3931,36 @@ mod tests {
         assert_eq!(results[97], "OK nil");
         assert_eq!(results[98], "OK t");
         assert_eq!(results[99], "OK nil");
+        assert_eq!(results[100], "OK t");
+        assert_eq!(results[101], "OK nil");
+        assert_eq!(results[102], "OK t");
+        assert_eq!(results[103], "OK nil");
+        assert_eq!(results[104], "OK t");
+        assert_eq!(results[105], "OK nil");
+        assert_eq!(results[106], "OK t");
+        assert_eq!(results[107], "OK nil");
+        assert_eq!(results[108], "OK t");
+        assert_eq!(results[109], "OK nil");
+        assert_eq!(results[110], "OK t");
+        assert_eq!(results[111], "OK nil");
+        assert_eq!(results[112], "OK t");
+        assert_eq!(results[113], "OK nil");
+        assert_eq!(results[114], "OK t");
+        assert_eq!(results[115], "OK nil");
+        assert_eq!(results[116], "OK t");
+        assert_eq!(results[117], "OK nil");
+        assert_eq!(results[118], "OK t");
+        assert_eq!(results[119], "OK nil");
+        assert_eq!(results[120], "OK t");
+        assert_eq!(results[121], "OK nil");
+        assert_eq!(results[122], "OK t");
+        assert_eq!(results[123], "OK nil");
+        assert_eq!(results[124], "OK t");
+        assert_eq!(results[125], "OK nil");
+        assert_eq!(results[126], "OK t");
+        assert_eq!(results[127], "OK nil");
+        assert_eq!(results[128], "OK t");
+        assert_eq!(results[129], "OK nil");
     }
 
     #[test]

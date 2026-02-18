@@ -28,6 +28,28 @@ Last updated: 2026-02-18
 
 ## Doing
 
+- Closed startup `variable-documentation` string-property parity with a 602-symbol oracle-backed batch (round 35):
+  - runtime changes:
+    - `rust/neovm-core/src/elisp/doc.rs`
+    - expanded `STARTUP_VARIABLE_DOC_STRING_PROPERTIES` with the remaining startup string-doc symbols, including:
+      - `process-*`, `query-replace-*`, `read-*`, `regexp-*`, `safe-local-*`, `search-*`, `selection-*`, `show-paren-*`, `tab-bar-*`, `tabulated-list-*`, `tool-bar-*`, `touch-screen-*`, `tramp-*`, `undo-*`, `uniquify-*`, `user-*`, `vc-*`, `window-*`, `x-dnd-*`, and `yank-*`.
+    - `rust/neovm-core/src/elisp/eval.rs`
+    - expanded `startup_string_variable_docs_are_seeded_at_startup` with additional representative lock-ins (`process-file-side-effects`, `process-menu-mode-map`, `prog-mode-map`, `query-about-changed-file`, `read-extended-command-predicate`, `regexp-search-ring-max`, `safe-local-variable-values`, `selection-coding-system`, `show-paren-mode`, `tab-bar-format`, `tool-bar-map`, `transient-mark-mode-hook`, `user-emacs-directory`, `window-size-fixed`, `yank-transform-functions`) and integer-doc absence checks.
+  - oracle corpus changes:
+    - `test/neovm/vm-compat/cases/documentation-property-semantics.{forms,expected.tsv}`
+    - added one startup `get`-property matrix row covering the same 602-symbol batch (`(integerp/get, stringp/get)` parity).
+  - parity movement:
+    - startup `variable-documentation` type counts now:
+      - GNU Emacs oracle: `(integer=761, string=1904)`
+      - NeoVM: `(integer=761, string=1904)` (startup string-doc parity reached).
+  - verified:
+    - `cargo test --manifest-path rust/neovm-core/Cargo.toml startup_string_variable_docs_are_seeded_at_startup` (pass)
+    - `cargo test --manifest-path rust/neovm-core/Cargo.toml documentation_property_eval_` (pass; 28 tests)
+    - `make -C test/neovm/vm-compat record FORMS=cases/documentation-property-semantics.forms EXPECTED=cases/documentation-property-semantics.expected.tsv` (pass)
+    - `make -C test/neovm/vm-compat check-one-neovm CASE=documentation-property-semantics` (pass, 55/55)
+    - `make -C test/neovm/vm-compat check-startup-doc-stub-coverage` (pass; missing=0, extra=0)
+    - `make -C test/neovm/vm-compat check-all-neovm` (pass)
+
 - Expanded startup `variable-documentation` string-property seeding with two oracle-backed batches (+700 symbols; rounds 33-34):
   - runtime changes:
     - `rust/neovm-core/src/elisp/doc.rs`

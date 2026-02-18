@@ -8318,6 +8318,2414 @@ pub(crate) static STARTUP_VARIABLE_DOC_STRING_PROPERTIES: &[(&str, &str)] = &[
         "previous-transient-input-method",
         "The input method that was active before enabling the transient input method.",
     ),
+    (
+        "printer-name",
+        "The name of a local printer to which data is sent for printing.",
+    ),
+    (
+        "process-file-return-signal-string",
+        "Whether to return a string describing the signal interrupting a process.",
+    ),
+    (
+        "process-file-side-effects",
+        "Whether a call of `process-file' changes remote files.",
+    ),
+    (
+        "process-menu-mode-abbrev-table",
+        "Abbrev table for `process-menu-mode'.",
+    ),
+    (
+        "process-menu-mode-hook",
+        "Hook run after entering `process-menu-mode'.",
+    ),
+    (
+        "process-menu-mode-map",
+        "Keymap for `process-menu-mode'.",
+    ),
+    (
+        "process-menu-mode-syntax-table",
+        "Syntax table for `process-menu-mode'.",
+    ),
+    (
+        "prog-indentation-context",
+        "When non-nil, provides context for indenting embedded code chunks.",
+    ),
+    (
+        "prog-mode-abbrev-table",
+        "Abbrev table for `prog-mode'.",
+    ),
+    (
+        "prog-mode-hook",
+        "Normal hook run when entering programming modes.",
+    ),
+    (
+        "prog-mode-map",
+        "Keymap used for programming modes.",
+    ),
+    (
+        "prog-mode-syntax-table",
+        "Syntax table for `prog-mode'.",
+    ),
+    (
+        "progress-reporter--pulse-characters",
+        "Characters to use for pulsing progress reporters.",
+    ),
+    (
+        "project-mode-line",
+        "Whether to show current project name and Project menu on the mode line.",
+    ),
+    (
+        "project-prefix-map",
+        "Keymap for project commands.",
+    ),
+    (
+        "ps-page-dimensions-database",
+        "List associating a symbolic paper type to its width, height and doc media.",
+    ),
+    (
+        "ps-paper-type",
+        "Specify the size of paper to format for.",
+    ),
+    (
+        "ps-print-color-p",
+        "Specify how buffer's text color is printed.",
+    ),
+    (
+        "pure-space-overflow",
+        "Non-nil if building Emacs overflowed pure space.",
+    ),
+    (
+        "query-about-changed-file",
+        "If non-nil, query the user when re-visiting a file that has changed.",
+    ),
+    (
+        "query-replace-defaults",
+        "Default values of FROM-STRING and TO-STRING for `query-replace'.",
+    ),
+    (
+        "query-replace-from-history-variable",
+        "History list to use for the FROM argument of `query-replace' commands.",
+    ),
+    (
+        "query-replace-from-to-separator",
+        "String that separates FROM and TO in the history of replacement pairs.",
+    ),
+    (
+        "query-replace-help",
+        "Help message while in `query-replace'.",
+    ),
+    (
+        "query-replace-highlight",
+        "Non-nil means to highlight matches during query replacement.",
+    ),
+    (
+        "query-replace-highlight-submatches",
+        "Whether to highlight regexp subexpressions during query replacement.",
+    ),
+    (
+        "query-replace-history",
+        "Default history list for `query-replace' commands.",
+    ),
+    (
+        "query-replace-lazy-highlight",
+        "Controls the lazy-highlighting during query replacements.",
+    ),
+    (
+        "query-replace-map",
+        "Keymap of responses to questions posed by commands like `query-replace'.",
+    ),
+    (
+        "query-replace-read-from-default",
+        "Function to get default non-regexp value for `query-replace-read-from'.",
+    ),
+    (
+        "query-replace-read-from-regexp-default",
+        "Function to get default regexp value for `query-replace-read-from'.",
+    ),
+    (
+        "query-replace-show-replacement",
+        "Non-nil means show substituted replacement text in the minibuffer.",
+    ),
+    (
+        "query-replace-skip-read-only",
+        "Non-nil means `query-replace' and friends ignore read-only matches.",
+    ),
+    (
+        "query-replace-to-history-variable",
+        "History list to use for the TO argument of `query-replace' commands.",
+    ),
+    (
+        "quit-window-hook",
+        "Hook run before performing any other actions in the `quit-window' command.",
+    ),
+    (
+        "radians-to-degrees",
+        "Radian to degree conversion constant.",
+    ),
+    (
+        "rcirc-track-minor-mode",
+        "Non-nil if Rcirc-Track minor mode is enabled.",
+    ),
+    (
+        "read--expression-map",
+        "Keymap used by `read--expression'.",
+    ),
+    (
+        "read-answer-short",
+        "If non-nil, the `read-answer' function accepts single-character answers.",
+    ),
+    (
+        "read-char-by-name-sort",
+        "How to sort characters for `read-char-by-name' completion.",
+    ),
+    (
+        "read-char-choice-use-read-key",
+        "If non-nil, use `read-key' when reading a character by `read-char-choice'.",
+    ),
+    (
+        "read-char-from-minibuffer-map",
+        "Keymap for the `read-char-from-minibuffer' function.",
+    ),
+    (
+        "read-char-history",
+        "The default history for the `read-char-from-minibuffer' function.",
+    ),
+    (
+        "read-extended-command-mode",
+        "Non-nil if Read-Extended-Command mode is enabled.",
+    ),
+    (
+        "read-extended-command-mode-hook",
+        "Hook run after entering or leaving `read-extended-command-mode'.",
+    ),
+    (
+        "read-extended-command-mode-map",
+        "Local keymap added to the current map when reading an extended command.",
+    ),
+    (
+        "read-extended-command-predicate",
+        "Predicate to use to determine which commands to include when completing.",
+    ),
+    (
+        "read-face-name-sample-text",
+        "Text string to display as the sample text for `read-face-name'.",
+    ),
+    (
+        "read-file-name-completion-ignore-case",
+        "Non-nil means when reading a file name completion ignores case.",
+    ),
+    (
+        "read-file-name-function",
+        "The function called by `read-file-name' to do its work.",
+    ),
+    (
+        "read-key-empty-map",
+        "Used internally by `read-key'.",
+    ),
+    (
+        "read-key-full-map",
+        "Used internally by `read-key'.",
+    ),
+    (
+        "read-mail-command",
+        "Your preference for a mail reading package.",
+    ),
+    (
+        "read-number-history",
+        "The default history for the `read-number' function.",
+    ),
+    (
+        "read-only-mode-hook",
+        "Hook run after entering or leaving `read-only-mode'.",
+    ),
+    (
+        "read-quoted-char-radix",
+        "Radix for \\[quoted-insert] and other uses of `read-quoted-char'.",
+    ),
+    (
+        "read-regexp-defaults-function",
+        "Function that provides default regexp(s) for `read-regexp'.",
+    ),
+    (
+        "recenter-last-op",
+        "Indicates the last recenter operation performed.",
+    ),
+    (
+        "recenter-positions",
+        "Cycling order for `recenter-top-bottom'.",
+    ),
+    (
+        "recentf-mode",
+        "Non-nil if Recentf mode is enabled.",
+    ),
+    (
+        "redisplay-highlight-region-function",
+        "Function to move the region-highlight overlay.",
+    ),
+    (
+        "redisplay-unhighlight-region-function",
+        "Function to remove the region-highlight overlay.",
+    ),
+    (
+        "reference-point-alist",
+        "Alist of symbols vs integer codes of glyph reference points.",
+    ),
+    (
+        "regexp-history",
+        "History list for some commands that read regular expressions.",
+    ),
+    (
+        "regexp-search-ring",
+        "List of regular expression search string sequences.",
+    ),
+    (
+        "regexp-search-ring-max",
+        "Maximum length of regexp search ring before oldest elements are thrown away.",
+    ),
+    (
+        "regexp-search-ring-yank-pointer",
+        "Index in `regexp-search-ring' of last string reused.",
+    ),
+    (
+        "regexp-unmatchable",
+        "Standard regexp guaranteed not to match any string at all.",
+    ),
+    (
+        "region-insert-function",
+        "Function to insert the region's content.",
+    ),
+    (
+        "register--read-with-preview-function",
+        "Function to use for reading a register name with preview.",
+    ),
+    (
+        "register-alist",
+        "Alist of elements (NAME . CONTENTS), one for each Emacs register.",
+    ),
+    (
+        "register-preview-default-keys",
+        "Default keys for setting a new register.",
+    ),
+    (
+        "register-preview-delay",
+        "If non-nil, time to wait in seconds before popping up register preview window.",
+    ),
+    (
+        "register-preview-display-buffer-alist",
+        "Window configuration for the register preview buffer.",
+    ),
+    (
+        "register-preview-function",
+        "Function to format a register for previewing.",
+    ),
+    (
+        "register-separator",
+        "Register containing the text to put between collected texts, or nil if none.",
+    ),
+    (
+        "register-use-preview",
+        "Whether register commands show preview of registers with non-nil values.",
+    ),
+    (
+        "remote-file-name-access-timeout",
+        "Timeout (in seconds) for `access-file'.",
+    ),
+    (
+        "remote-file-name-inhibit-auto-save",
+        "When nil, `auto-save-mode' will auto-save remote files.",
+    ),
+    (
+        "remote-file-name-inhibit-auto-save-visited",
+        "When nil, `auto-save-visited-mode' will auto-save remote files.",
+    ),
+    (
+        "remote-file-name-inhibit-cache",
+        "Whether to use the remote file-name cache for read access.",
+    ),
+    (
+        "remote-file-name-inhibit-delete-by-moving-to-trash",
+        "Whether remote files shall be moved to the Trash.",
+    ),
+    (
+        "remote-file-name-inhibit-locks",
+        "Whether to create file locks for remote files.",
+    ),
+    (
+        "remote-shell-program",
+        "Program to use to execute commands on a remote host (i.e. ssh).",
+    ),
+    (
+        "reorder-enders",
+        "Regular expression for characters that end forced-reordered text.",
+    ),
+    (
+        "reorder-starters",
+        "Regular expression for characters that start forced-reordered text.",
+    ),
+    (
+        "repeat-map",
+        "The value of the repeating transient map for the next command.",
+    ),
+    (
+        "repeat-mode",
+        "Non-nil if Repeat mode is enabled.",
+    ),
+    (
+        "replace-char-fold",
+        "Non-nil means replacement commands should do character folding in matches.",
+    ),
+    (
+        "replace-count",
+        "Number of replacements done so far.",
+    ),
+    (
+        "replace-lax-whitespace",
+        "Non-nil means `query-replace' matches a sequence of whitespace chars.",
+    ),
+    (
+        "replace-re-search-function",
+        "Function to use when searching for regexps to replace.",
+    ),
+    (
+        "replace-regexp-function",
+        "Function to convert the FROM string of query-replace commands to a regexp.",
+    ),
+    (
+        "replace-regexp-lax-whitespace",
+        "Non-nil means `query-replace-regexp' matches a sequence of whitespace chars.",
+    ),
+    (
+        "replace-search-function",
+        "Function to use when searching for strings to replace.",
+    ),
+    (
+        "replace-update-post-hook",
+        "Function(s) to call after `query-replace' has found a match in the buffer.",
+    ),
+    (
+        "repunctuate-sentences-filter",
+        "The default filter used by `repunctuate-sentences'.",
+    ),
+    (
+        "require-final-newline",
+        "Whether to add a newline automatically at the end of the file.",
+    ),
+    (
+        "resize-temp-buffer-window-inhibit",
+        "Non-nil means `resize-temp-buffer-window' should not resize.",
+    ),
+    (
+        "resize-window-repeat-map",
+        "Keymap to repeat window resizing commands.",
+    ),
+    (
+        "revert-buffer-function",
+        "Function to use to revert this buffer.",
+    ),
+    (
+        "revert-buffer-in-progress-p",
+        "Non-nil if a `revert-buffer' operation is in progress, nil otherwise.",
+    ),
+    (
+        "revert-buffer-insert-file-contents-function",
+        "Function to use to insert contents when reverting this buffer.",
+    ),
+    (
+        "revert-buffer-quick-short-answers",
+        "How much confirmation to be done by the `revert-buffer-quick' command.",
+    ),
+    (
+        "revert-buffer-restore-functions",
+        "Functions to preserve buffer state during `revert-buffer'.",
+    ),
+    (
+        "revert-buffer-with-fine-grain-max-seconds",
+        "Maximum time that `revert-buffer-with-fine-grain' should use.",
+    ),
+    (
+        "revert-without-query",
+        "Specify which files should be reverted without query.",
+    ),
+    (
+        "rfn-eshadow-setup-minibuffer-hook",
+        "Minibuffer setup functions from other packages.",
+    ),
+    (
+        "rfn-eshadow-update-overlay-hook",
+        "Customer overlay functions from other packages.",
+    ),
+    (
+        "rmail-displayed-headers",
+        "Regexp to match Header fields that Rmail should display.",
+    ),
+    (
+        "rmail-file-coding-system",
+        "Coding system used in RMAIL file.",
+    ),
+    (
+        "rmail-file-name",
+        "Name of user's primary mail file.",
+    ),
+    (
+        "rmail-highlighted-headers",
+        "Regexp to match Header fields that Rmail should normally highlight.",
+    ),
+    (
+        "rmail-ignored-headers",
+        "Regexp to match header fields that Rmail should normally hide.",
+    ),
+    (
+        "rmail-insert-mime-forwarded-message-function",
+        "Function to insert a message in MIME format so it can be forwarded.",
+    ),
+    (
+        "rmail-mode-hook",
+        "List of functions to call when Rmail is invoked.",
+    ),
+    (
+        "rmail-primary-inbox-list",
+        "List of files that are inboxes for your primary mail file `rmail-file-name'.",
+    ),
+    (
+        "rmail-retry-ignored-headers",
+        "Headers that should be stripped when retrying a failed message.",
+    ),
+    (
+        "rmail-secondary-file-directory",
+        "Directory for additional secondary Rmail files.",
+    ),
+    (
+        "rmail-secondary-file-regexp",
+        "Regexp for which files are secondary Rmail files.",
+    ),
+    (
+        "rmail-show-message-hook",
+        "List of functions to call when Rmail displays a message.",
+    ),
+    (
+        "rmail-spool-directory",
+        "Name of directory used by system mailer for delivering new mail.",
+    ),
+    (
+        "rmail-user-mail-address-regexp",
+        "Regexp matching user mail addresses.",
+    ),
+    (
+        "ruler-mode",
+        "Non-nil if Ruler mode is enabled.",
+    ),
+    (
+        "safe-local-eval-forms",
+        "Expressions that are considered safe in an `eval:' local variable.",
+    ),
+    (
+        "safe-local-variable-directories",
+        "A list of directories where local variables are always enabled.",
+    ),
+    (
+        "safe-local-variable-values",
+        "List of variable-value pairs that are considered safe.",
+    ),
+    (
+        "same-window-buffer-names",
+        "List of names of buffers that should appear in the \"same\" window.",
+    ),
+    (
+        "same-window-regexps",
+        "List of regexps saying which buffers should appear in the \"same\" window.",
+    ),
+    (
+        "save-abbrevs",
+        "Non-nil means save word abbrevs too when files are saved.",
+    ),
+    (
+        "save-buffer-coding-system",
+        "If non-nil, use this coding system for saving the buffer.",
+    ),
+    (
+        "save-interprogram-paste-before-kill",
+        "Whether to save existing clipboard text into kill ring before replacing it.",
+    ),
+    (
+        "save-place-mode",
+        "Non-nil if Save-Place mode is enabled.",
+    ),
+    (
+        "save-silently",
+        "If non-nil, avoid messages when saving files.",
+    ),
+    (
+        "save-some-buffers-action-alist",
+        "ACTION-ALIST argument used in call to `map-y-or-n-p'.",
+    ),
+    (
+        "save-some-buffers-default-predicate",
+        "Default predicate for `save-some-buffers'.",
+    ),
+    (
+        "save-some-buffers-functions",
+        "Functions to be run by `save-some-buffers' after saving the buffers.",
+    ),
+    (
+        "savehist-mode",
+        "Non-nil if Savehist mode is enabled.",
+    ),
+    (
+        "scroll-all-mode",
+        "Non-nil if Scroll-All mode is enabled.",
+    ),
+    (
+        "scroll-bar-mode",
+        "Specify whether to have vertical scroll bars, and on which side.",
+    ),
+    (
+        "scroll-bar-mode-explicit",
+        "Non-nil means `set-scroll-bar-mode' should really do something.",
+    ),
+    (
+        "scroll-bar-mode-hook",
+        "Hook run after entering or leaving `scroll-bar-mode'.",
+    ),
+    (
+        "scroll-error-top-bottom",
+        "Move point to top/bottom of buffer before signaling a scrolling error.",
+    ),
+    (
+        "search-default-mode",
+        "Default mode to use when starting isearch.",
+    ),
+    (
+        "search-exit-option",
+        "Defines what control characters do in incremental search.",
+    ),
+    (
+        "search-highlight",
+        "Non-nil means incremental search highlights the current match.",
+    ),
+    (
+        "search-highlight-submatches",
+        "Whether to highlight regexp subexpressions of the current regexp match.",
+    ),
+    (
+        "search-invisible",
+        "If t incremental search/query-replace can match hidden text.",
+    ),
+    (
+        "search-map",
+        "Keymap for search related commands.",
+    ),
+    (
+        "search-nonincremental-instead",
+        "If non-nil, do a nonincremental search instead of exiting immediately.",
+    ),
+    (
+        "search-ring",
+        "List of search string sequences.",
+    ),
+    (
+        "search-ring-max",
+        "Maximum length of search ring before oldest elements are thrown away.",
+    ),
+    (
+        "search-ring-update",
+        "Non-nil if advancing or retreating in the search ring should cause search.",
+    ),
+    (
+        "search-ring-yank-pointer",
+        "Index in `search-ring' of last string reused.",
+    ),
+    (
+        "search-slow-speed",
+        "Highest terminal speed at which to use \"slow\" style incremental search.",
+    ),
+    (
+        "search-slow-window-lines",
+        "Number of lines in slow search display windows.",
+    ),
+    (
+        "search-upper-case",
+        "If non-nil, upper case chars disable case fold searching.",
+    ),
+    (
+        "search-whitespace-regexp",
+        "If non-nil, regular expression to match a sequence of whitespace chars.",
+    ),
+    (
+        "secondary-tool-bar-map",
+        "Optional secondary keymap for the tool bar.",
+    ),
+    (
+        "select-enable-clipboard",
+        "Non-nil means cutting and pasting uses the clipboard.",
+    ),
+    (
+        "select-enable-primary",
+        "Non-nil means cutting and pasting uses the primary selection.",
+    ),
+    (
+        "select-safe-coding-system-accept-default-p",
+        "If non-nil, a function to control the behavior of coding system selection.",
+    ),
+    (
+        "selection-coding-system",
+        "Coding system for communicating with other programs.",
+    ),
+    (
+        "self-insert-uses-region-functions",
+        "Special hook to tell if `self-insert-command' will use the region.",
+    ),
+    (
+        "semantic-default-submodes",
+        "List of auxiliary Semantic minor modes enabled by `semantic-mode'.",
+    ),
+    (
+        "semantic-mode",
+        "Non-nil if Semantic mode is enabled.",
+    ),
+    (
+        "send-mail-function",
+        "Function to call to send the current buffer as mail.",
+    ),
+    (
+        "sendmail-coding-system",
+        "Coding system for encoding the outgoing mail.",
+    ),
+    (
+        "sentence-end",
+        "Regexp describing the end of a sentence.",
+    ),
+    (
+        "sentence-end-base",
+        "Regexp matching the basic end of a sentence, not including following space.",
+    ),
+    (
+        "sentence-end-double-space",
+        "Non-nil means a single space does not end a sentence.",
+    ),
+    (
+        "sentence-end-without-period",
+        "Non-nil means a sentence will end without a period.",
+    ),
+    (
+        "sentence-end-without-space",
+        "String of characters that end sentence without following spaces.",
+    ),
+    (
+        "server-mode",
+        "Non-nil if Server mode is enabled.",
+    ),
+    (
+        "set-auto-coding-for-load",
+        "Non-nil means respect a \"unibyte: t\" entry in file local variables.",
+    ),
+    (
+        "set-auto-mode--last",
+        "Remember the mode we have set via `set-auto-mode-0'.",
+    ),
+    (
+        "set-language-environment-hook",
+        "Normal hook run after some language environment is set.",
+    ),
+    (
+        "set-mark-command-repeat-pop",
+        "Non-nil means repeating \\[set-mark-command] after popping mark pops it again.",
+    ),
+    (
+        "set-message-functions",
+        "List of functions to handle display of echo-area messages.",
+    ),
+    (
+        "set-transient-map-timeout",
+        "Timeout in seconds for deactivation of a transient keymap.",
+    ),
+    (
+        "set-transient-map-timer",
+        "Timer for `set-transient-map-timeout'.",
+    ),
+    (
+        "set-variable-value-history",
+        "History of values entered with `set-variable'.",
+    ),
+    (
+        "shell-command-buffer-name",
+        "Name of the output buffer for shell commands.",
+    ),
+    (
+        "shell-command-buffer-name-async",
+        "Name of the output buffer for asynchronous shell commands.",
+    ),
+    (
+        "shell-command-default-error-buffer",
+        "Buffer name for `shell-command' and `shell-command-on-region' error output.",
+    ),
+    (
+        "shell-command-dont-erase-buffer",
+        "Whether to erase the output buffer before executing shell command.",
+    ),
+    (
+        "shell-command-history",
+        "History list for some commands that read shell commands.",
+    ),
+    (
+        "shell-command-prompt-show-cwd",
+        "If non-nil, show current directory when prompting for a shell command.",
+    ),
+    (
+        "shell-command-saved-pos",
+        "Record of point positions in output buffers after command completion.",
+    ),
+    (
+        "shell-command-switch",
+        "Switch used to have the shell execute its command line argument.",
+    ),
+    (
+        "shell-dumb-shell-regexp",
+        "Regexp to match shells that don't save their command history, and",
+    ),
+    (
+        "shift-select-mode",
+        "When non-nil, shifted motion keys activate the mark momentarily.",
+    ),
+    (
+        "show-paren--overlay",
+        "Overlay used to highlight the matching paren.",
+    ),
+    (
+        "show-paren--overlay-1",
+        "Overlay used to highlight the paren at point.",
+    ),
+    (
+        "show-paren-context-when-offscreen",
+        "If non-nil, show context around the opening paren if it is offscreen.",
+    ),
+    (
+        "show-paren-data-function",
+        "Function to find the opener/closer \"near\" point and its match.",
+    ),
+    (
+        "show-paren-delay",
+        "Time in seconds to delay before showing a matching paren.",
+    ),
+    (
+        "show-paren-highlight-openparen",
+        "Non-nil turns on openparen highlighting when matching forward.",
+    ),
+    (
+        "show-paren-local-mode-hook",
+        "Hook run after entering or leaving `show-paren-local-mode'.",
+    ),
+    (
+        "show-paren-mode",
+        "Non-nil if Show-Paren mode is enabled.",
+    ),
+    (
+        "show-paren-mode-hook",
+        "Hook run after entering or leaving `show-paren-mode'.",
+    ),
+    (
+        "show-paren-predicate",
+        "Whether to use `show-paren-mode' in a buffer.",
+    ),
+    (
+        "show-paren-priority",
+        "Priority of paren highlighting overlays.",
+    ),
+    (
+        "show-paren-ring-bell-on-mismatch",
+        "If non-nil, beep if mismatched paren is detected.",
+    ),
+    (
+        "show-paren-style",
+        "Style used when showing a matching paren.",
+    ),
+    (
+        "show-paren-when-point-in-periphery",
+        "If non-nil, show parens when point is in the line's periphery.",
+    ),
+    (
+        "show-paren-when-point-inside-paren",
+        "If non-nil, show parens when point is just inside one.",
+    ),
+    (
+        "site-run-file",
+        "File containing site-wide run-time initializations.",
+    ),
+    (
+        "size-indication-mode",
+        "Non-nil if Size-Indication mode is enabled.",
+    ),
+    (
+        "size-indication-mode-hook",
+        "Hook run after entering or leaving `size-indication-mode'.",
+    ),
+    (
+        "skeleton-filter-function",
+        "Function for transforming a skeleton proxy's aliases' variable value.",
+    ),
+    (
+        "slitex-run-command",
+        "Command used to run SliTeX subjob.",
+    ),
+    (
+        "small-temporary-file-directory",
+        "The directory for writing small temporary files.",
+    ),
+    (
+        "sort-coding-systems-predicate",
+        "If non-nil, a predicate function to sort coding systems.",
+    ),
+    (
+        "special-display-buffer-names",
+        "List of names of buffers that should be displayed specially.",
+    ),
+    (
+        "special-display-frame-alist",
+        "Alist of parameters for special frames.",
+    ),
+    (
+        "special-display-function",
+        "Function to call for displaying special buffers.",
+    ),
+    (
+        "special-display-regexps",
+        "List of regexps saying which buffers should be displayed specially.",
+    ),
+    (
+        "special-mode-abbrev-table",
+        "Abbrev table for `special-mode'.",
+    ),
+    (
+        "special-mode-hook",
+        "Hook run after entering `special-mode'.",
+    ),
+    (
+        "special-mode-map",
+        "Keymap for `special-mode'.",
+    ),
+    (
+        "special-mode-syntax-table",
+        "Syntax table for `special-mode'.",
+    ),
+    (
+        "splash-screen-keymap",
+        "Keymap for splash screen buffer.",
+    ),
+    (
+        "split-height-threshold",
+        "Minimum height for splitting windows sensibly.",
+    ),
+    (
+        "split-string-default-separators",
+        "The default value of separators for `split-string'.",
+    ),
+    (
+        "split-width-threshold",
+        "Minimum width for splitting windows sensibly.",
+    ),
+    (
+        "split-window-keep-point",
+        "If non-nil, \\[split-window-below] preserves point in the new window.",
+    ),
+    (
+        "split-window-preferred-function",
+        "Function called by `display-buffer' routines to split a window.",
+    ),
+    (
+        "standard-fontset-spec",
+        "String of fontset spec of the standard fontset.",
+    ),
+    (
+        "standard-indent",
+        "Default number of columns for margin-changing functions to indent.",
+    ),
+    (
+        "startup--original-eln-load-path",
+        "Original value of `native-comp-eln-load-path'.",
+    ),
+    (
+        "strokes-mode",
+        "Non-nil if Strokes mode is enabled.",
+    ),
+    (
+        "suggest-key-bindings",
+        "Non-nil means show the equivalent keybinding when \\[execute-extended-command] has one.",
+    ),
+    (
+        "suspend-hook",
+        "Normal hook run by `suspend-emacs', before suspending.",
+    ),
+    (
+        "suspend-resume-hook",
+        "Normal hook run by `suspend-emacs', after Emacs is continued.",
+    ),
+    (
+        "switch-to-buffer-in-dedicated-window",
+        "Allow switching to buffer in strongly dedicated windows.",
+    ),
+    (
+        "switch-to-buffer-obey-display-actions",
+        "If non-nil, `switch-to-buffer' runs `pop-to-buffer-same-window' instead.",
+    ),
+    (
+        "switch-to-buffer-preserve-window-point",
+        "If non-nil, `switch-to-buffer' tries to preserve `window-point'.",
+    ),
+    (
+        "switch-to-prev-buffer-skip",
+        "Buffers `switch-to-prev-buffer' should skip.",
+    ),
+    (
+        "switch-to-prev-buffer-skip-regexp",
+        "Buffers that `switch-to-prev-buffer' and `switch-to-next-buffer' should skip.",
+    ),
+    (
+        "switch-to-visible-buffer",
+        "If non-nil, allow switching to an already visible buffer.",
+    ),
+    (
+        "syntax-begin-function",
+        "Function to move back outside of any comment/string/paren.",
+    ),
+    (
+        "syntax-ppss-max-span",
+        "Threshold below which cache info is deemed unnecessary.",
+    ),
+    (
+        "syntax-ppss-narrow",
+        "Same as `syntax-ppss-wide' but for a narrowed buffer.",
+    ),
+    (
+        "syntax-ppss-narrow-start",
+        "Start position of the narrowing for `syntax-ppss-narrow'.",
+    ),
+    (
+        "syntax-ppss-stats",
+        "Statistics about which case is more/less frequent in `syntax-ppss'.",
+    ),
+    (
+        "syntax-ppss-table",
+        "Syntax-table to use during `syntax-ppss', if any.",
+    ),
+    (
+        "syntax-ppss-wide",
+        "Cons of two elements (LAST . CACHE).",
+    ),
+    (
+        "syntax-propertize-extend-region-functions",
+        "Special hook run just before proceeding to propertize a region.",
+    ),
+    (
+        "syntax-propertize-function",
+        "Mode-specific function to apply `syntax-table' text properties.",
+    ),
+    (
+        "syntax-wholeline-max",
+        "Maximum line length for syntax operations.",
+    ),
+    (
+        "tab-always-indent",
+        "Controls the operation of the TAB key.",
+    ),
+    (
+        "tab-bar--auto-width-hash",
+        "Memoization table for `tab-bar-auto-width'.",
+    ),
+    (
+        "tab-bar-auto-width",
+        "Automatically resize width of tabs on tab bar to fill available tab-bar space.",
+    ),
+    (
+        "tab-bar-auto-width-faces",
+        "Resize tabs only with these faces.",
+    ),
+    (
+        "tab-bar-auto-width-max",
+        "Maximum width for automatic resizing of width of tab-bar tabs.",
+    ),
+    (
+        "tab-bar-auto-width-min",
+        "Minimum width of tabs for automatic resizing under `tab-bar-auto-width'.",
+    ),
+    (
+        "tab-bar-back-button",
+        "Button for going back in tab history.",
+    ),
+    (
+        "tab-bar-close-button",
+        "Button for closing the clicked tab.",
+    ),
+    (
+        "tab-bar-close-button-show",
+        "Defines where to show the close tab button.",
+    ),
+    (
+        "tab-bar-close-last-tab-choice",
+        "What to do when the last tab is closed.",
+    ),
+    (
+        "tab-bar-close-tab-select",
+        "Which tab to make current after closing the specified tab.",
+    ),
+    (
+        "tab-bar-closed-tabs",
+        "A list of closed tabs to be able to undo their closing.",
+    ),
+    (
+        "tab-bar-format",
+        "Template for displaying tab bar items.",
+    ),
+    (
+        "tab-bar-forward-button",
+        "Button for going forward in tab history.",
+    ),
+    (
+        "tab-bar-history-back",
+        "History of back changes in every tab per frame.",
+    ),
+    (
+        "tab-bar-history-done-command",
+        "Command handled by `window-configuration-change-hook'.",
+    ),
+    (
+        "tab-bar-history-forward",
+        "History of forward changes in every tab per frame.",
+    ),
+    (
+        "tab-bar-history-limit",
+        "The number of history elements to keep.",
+    ),
+    (
+        "tab-bar-history-mode",
+        "Non-nil if Tab-Bar-History mode is enabled.",
+    ),
+    (
+        "tab-bar-history-mode-hook",
+        "Hook run after entering or leaving `tab-bar-history-mode'.",
+    ),
+    (
+        "tab-bar-history-old",
+        "Window configuration before the current command.",
+    ),
+    (
+        "tab-bar-history-omit",
+        "When non-nil, omit window-configuration changes from the current command.",
+    ),
+    (
+        "tab-bar-history-pre-command",
+        "Command set to `this-command' by `pre-command-hook'.",
+    ),
+    (
+        "tab-bar-map",
+        "Keymap for the commands used on the tab bar.",
+    ),
+    (
+        "tab-bar-menu-bar-button",
+        "Button for the menu bar.",
+    ),
+    (
+        "tab-bar-minibuffer-restore-tab",
+        "Tab number for `tab-bar-minibuffer-restore-tab'.",
+    ),
+    (
+        "tab-bar-mode-hook",
+        "Hook run after entering or leaving `tab-bar-mode'.",
+    ),
+    (
+        "tab-bar-mode-map",
+        "Tab Bar mode map.",
+    ),
+    (
+        "tab-bar-move-repeat-map",
+        "Keymap to repeat tab move commands `tab-move' and `tab-bar-move-tab-backward'.",
+    ),
+    (
+        "tab-bar-new-button",
+        "Button for creating a new tab.",
+    ),
+    (
+        "tab-bar-new-button-show",
+        "If non-nil, show the \"New tab\" button in the tab bar.",
+    ),
+    (
+        "tab-bar-new-tab-choice",
+        "Defines what to show in a new tab.",
+    ),
+    (
+        "tab-bar-new-tab-group",
+        "Defines what group to assign to a new tab.",
+    ),
+    (
+        "tab-bar-new-tab-to",
+        "Where to create a new tab.",
+    ),
+    (
+        "tab-bar-select-restore-context",
+        "If this is non-nil, try to restore window points from their contexts.",
+    ),
+    (
+        "tab-bar-select-restore-windows",
+        "Function called when selecting a tab to handle windows whose buffer was killed.",
+    ),
+    (
+        "tab-bar-select-tab-modifiers",
+        "List of modifier keys for selecting tab-bar tabs by their numbers.",
+    ),
+    (
+        "tab-bar-separator",
+        "String that delimits tabs.",
+    ),
+    (
+        "tab-bar-show",
+        "Defines when to show the tab bar.",
+    ),
+    (
+        "tab-bar-switch-repeat-map",
+        "Keymap to repeat tab switch commands `tab-next' and `tab-previous'.",
+    ),
+    (
+        "tab-bar-tab-face-function",
+        "Function to define a tab face.",
+    ),
+    (
+        "tab-bar-tab-group-face-function",
+        "Function to define a tab group face.",
+    ),
+    (
+        "tab-bar-tab-group-format-function",
+        "Function to format a tab group name.",
+    ),
+    (
+        "tab-bar-tab-group-function",
+        "Function to get a tab group name.",
+    ),
+    (
+        "tab-bar-tab-hints",
+        "Show absolute numbers on tabs in the tab bar before the tab name.",
+    ),
+    (
+        "tab-bar-tab-name-format-function",
+        "Function to format a tab name.",
+    ),
+    (
+        "tab-bar-tab-name-format-functions",
+        "Functions called to modify the tab name.",
+    ),
+    (
+        "tab-bar-tab-name-function",
+        "Function to get a tab name.",
+    ),
+    (
+        "tab-bar-tab-name-truncated-max",
+        "Maximum length of the tab name from the current buffer.",
+    ),
+    (
+        "tab-bar-tab-post-change-group-functions",
+        "List of functions to call after changing a tab group.",
+    ),
+    (
+        "tab-bar-tab-post-open-functions",
+        "List of functions to call after creating a new tab.",
+    ),
+    (
+        "tab-bar-tab-post-select-functions",
+        "List of functions to call after selecting a tab.",
+    ),
+    (
+        "tab-bar-tab-pre-close-functions",
+        "List of functions to call before closing a tab.",
+    ),
+    (
+        "tab-bar-tab-prevent-close-functions",
+        "List of functions to call to determine whether to close a tab.",
+    ),
+    (
+        "tab-bar-tabs-function",
+        "Function to get a list of tabs to display in the tab bar.",
+    ),
+    (
+        "tab-first-completion",
+        "Governs the behavior of TAB completion on the first press of the key.",
+    ),
+    (
+        "tab-prefix-map",
+        "Keymap for tab-bar related commands.",
+    ),
+    (
+        "tab-stop-list",
+        "List of tab stop positions used by `tab-to-tab-stop'.",
+    ),
+    (
+        "tab-switcher-mode-abbrev-table",
+        "Abbrev table for `tab-switcher-mode'.",
+    ),
+    (
+        "tab-switcher-mode-hook",
+        "Hook run after entering `tab-switcher-mode'.",
+    ),
+    (
+        "tab-switcher-mode-map",
+        "Local keymap for `tab-switcher-mode' buffers.",
+    ),
+    (
+        "tab-switcher-mode-syntax-table",
+        "Syntax table for `tab-switcher-mode'.",
+    ),
+    (
+        "tabulated-list--header-string",
+        "Holds the header if `tabulated-list-use-header-line' is nil.",
+    ),
+    (
+        "tabulated-list-entries",
+        "Entries displayed in the current Tabulated List buffer.",
+    ),
+    (
+        "tabulated-list-format",
+        "The format of the current Tabulated List mode buffer.",
+    ),
+    (
+        "tabulated-list-groups",
+        "Groups displayed in the current Tabulated List buffer.",
+    ),
+    (
+        "tabulated-list-gui-sort-indicator-asc",
+        "Indicator for columns sorted in ascending order, for GUI frames.",
+    ),
+    (
+        "tabulated-list-gui-sort-indicator-desc",
+        "Indicator for columns sorted in descending order, for GUI frames.",
+    ),
+    (
+        "tabulated-list-mode-abbrev-table",
+        "Abbrev table for `tabulated-list-mode'.",
+    ),
+    (
+        "tabulated-list-mode-hook",
+        "Hook run after entering `tabulated-list-mode'.",
+    ),
+    (
+        "tabulated-list-mode-map",
+        "Local keymap for `tabulated-list-mode' buffers.",
+    ),
+    (
+        "tabulated-list-mode-syntax-table",
+        "Syntax table for `tabulated-list-mode'.",
+    ),
+    (
+        "tabulated-list-padding",
+        "Number of characters preceding each Tabulated List mode entry.",
+    ),
+    (
+        "tabulated-list-printer",
+        "Function for inserting a Tabulated List entry at point.",
+    ),
+    (
+        "tabulated-list-revert-hook",
+        "Hook run before reverting a Tabulated List buffer.",
+    ),
+    (
+        "tabulated-list-sort-button-map",
+        "Local keymap for `tabulated-list-mode' sort buttons.",
+    ),
+    (
+        "tabulated-list-sort-key",
+        "Sort key for the current Tabulated List mode buffer.",
+    ),
+    (
+        "tabulated-list-tty-sort-indicator-asc",
+        "Indicator for columns sorted in ascending order, for text-mode frames.",
+    ),
+    (
+        "tabulated-list-tty-sort-indicator-desc",
+        "Indicator for columns sorted in ascending order, for text-mode frames.",
+    ),
+    (
+        "tabulated-list-use-header-line",
+        "Whether the Tabulated List buffer should use a header line.",
+    ),
+    (
+        "tags-add-tables",
+        "Control whether to add a new tags table to the current list.",
+    ),
+    (
+        "tags-case-fold-search",
+        "Whether tags operations should be case-sensitive.",
+    ),
+    (
+        "tags-compression-info-list",
+        "List of extensions tried by etags when `auto-compression-mode' is on.",
+    ),
+    (
+        "tags-file-name",
+        "File name of tags table.",
+    ),
+    (
+        "tags-table-list",
+        "List of file names of tags tables to search.",
+    ),
+    (
+        "tamil-composable-pattern",
+        "Regexp matching a composable sequence of Tamil characters.",
+    ),
+    (
+        "telugu-composable-pattern",
+        "Regexp matching a composable sequence of Telugu characters.",
+    ),
+    (
+        "temp-buffer-max-height",
+        "Maximum height of a window displaying a temporary buffer.",
+    ),
+    (
+        "temp-buffer-max-width",
+        "Maximum width of a window displaying a temporary buffer.",
+    ),
+    (
+        "temp-buffer-resize-mode",
+        "Non-nil if Temp-Buffer-Resize mode is enabled.",
+    ),
+    (
+        "temp-buffer-resize-mode-hook",
+        "Hook run after entering or leaving `temp-buffer-resize-mode'.",
+    ),
+    (
+        "temp-buffer-setup-hook",
+        "Normal hook run by `with-output-to-temp-buffer' at the start.",
+    ),
+    (
+        "temp-buffer-show-hook",
+        "Normal hook run by `with-output-to-temp-buffer' after displaying the buffer.",
+    ),
+    (
+        "temp-buffer-window-setup-hook",
+        "Normal hook run by `with-temp-buffer-window' before buffer display.",
+    ),
+    (
+        "temp-buffer-window-show-hook",
+        "Normal hook run by `with-temp-buffer-window' after buffer display.",
+    ),
+    (
+        "temporary-goal-column",
+        "Current goal column for vertical motion.",
+    ),
+    (
+        "term-file-aliases",
+        "Alist of terminal type aliases.",
+    ),
+    (
+        "term-file-prefix",
+        "If non-nil, Emacs startup performs terminal-specific initialization.",
+    ),
+    (
+        "term-setup-hook",
+        "Normal hook run immediately after `emacs-startup-hook'.",
+    ),
+    (
+        "tex-alt-dvi-print-command",
+        "Command used by \\[tex-print] with a prefix arg to print a .dvi file.",
+    ),
+    (
+        "tex-bibtex-command",
+        "Command used by `tex-bibtex-file' to gather bibliographic data.",
+    ),
+    (
+        "tex-close-quote",
+        "String inserted by typing \\[tex-insert-quote] to close a quotation.",
+    ),
+    (
+        "tex-default-mode",
+        "Mode to enter for a new file that might be either TeX or LaTeX.",
+    ),
+    (
+        "tex-directory",
+        "Directory in which temporary files are written.",
+    ),
+    (
+        "tex-dvi-print-command",
+        "Command used by \\[tex-print] to print a .dvi file.",
+    ),
+    (
+        "tex-dvi-view-command",
+        "Command used by \\[tex-view] to display a `.dvi' file.",
+    ),
+    (
+        "tex-first-line-header-regexp",
+        "Regexp for matching a first line which `tex-region' should include.",
+    ),
+    (
+        "tex-main-file",
+        "The main TeX source file which includes this buffer's file.",
+    ),
+    (
+        "tex-offer-save",
+        "If non-nil, ask about saving modified buffers before \\[tex-file] is run.",
+    ),
+    (
+        "tex-open-quote",
+        "String inserted by typing \\[tex-insert-quote] to open a quotation.",
+    ),
+    (
+        "tex-run-command",
+        "Command used to run TeX subjob.",
+    ),
+    (
+        "tex-shell-file-name",
+        "If non-nil, the shell file name to run in the subshell used to run TeX.",
+    ),
+    (
+        "tex-show-queue-command",
+        "Command used by \\[tex-show-print-queue] to show the print queue.",
+    ),
+    (
+        "tex-start-commands",
+        "TeX commands to use when starting TeX.",
+    ),
+    (
+        "tex-start-options",
+        "TeX options to use when starting TeX.",
+    ),
+    (
+        "texinfo-close-quote",
+        "String inserted by typing \\[texinfo-insert-quote] to close a quotation.",
+    ),
+    (
+        "texinfo-open-quote",
+        "String inserted by typing \\[texinfo-insert-quote] to open a quotation.",
+    ),
+    (
+        "text-mode-abbrev-table",
+        "Abbrev table for `text-mode'.",
+    ),
+    (
+        "text-mode-hook",
+        "Normal hook run when entering Text mode and many related modes.",
+    ),
+    (
+        "text-mode-ispell-word-completion",
+        "How Text mode provides Ispell word completion.",
+    ),
+    (
+        "text-mode-map",
+        "Keymap for `text-mode'.",
+    ),
+    (
+        "text-mode-menu",
+        "Menu for `text-mode'.",
+    ),
+    (
+        "text-mode-syntax-table",
+        "Syntax table used while in `text-mode'.",
+    ),
+    (
+        "text-mode-variant",
+        "Non-nil if this buffer's major mode is a variant of Text mode.",
+    ),
+    (
+        "three-step-help",
+        "Non-nil means give more info about Help command in three steps.",
+    ),
+    (
+        "tibetan-composable-pattern",
+        "Regexp matching a composable sequence of Tibetan characters.",
+    ),
+    (
+        "tibetan-precomposed-regexp",
+        "Regexp string to match a romanized Tibetan complex consonant.",
+    ),
+    (
+        "tibetan-precomposition-rule-regexp",
+        "Regexp string to match a sequence of Tibetan consonantic components.",
+    ),
+    (
+        "tibetan-regexp",
+        "Regexp matching a Tibetan transcription of a composable Tibetan sequence.",
+    ),
+    (
+        "timeclock-mode-line-display",
+        "Non-nil if Timeclock-Mode-Line-Display mode is enabled.",
+    ),
+    (
+        "timer-duration-words",
+        "Alist mapping temporal words to durations in seconds.",
+    ),
+    (
+        "timer-event-last",
+        "Last timer that was run.",
+    ),
+    (
+        "timer-event-last-1",
+        "Next-to-last timer that was run.",
+    ),
+    (
+        "timer-event-last-2",
+        "Third-to-last timer that was run.",
+    ),
+    (
+        "timer-max-repeats",
+        "Maximum number of times to repeat a timer, if many repeats are delayed.",
+    ),
+    (
+        "toggle-input-method-active",
+        "Non-nil inside `toggle-input-method'.",
+    ),
+    (
+        "toggle-window-dedicated-flag",
+        "What dedicated flag should `toggle-window-dedicated' use by default.",
+    ),
+    (
+        "tool-bar-always-show-default",
+        "If non-nil, `tool-bar-mode' only shows the default tool bar.",
+    ),
+    (
+        "tool-bar-images-pixel-height",
+        "Height in pixels of images in the tool-bar.",
+    ),
+    (
+        "tool-bar-map",
+        "Keymap for the tool bar.",
+    ),
+    (
+        "tool-bar-mode-hook",
+        "Hook run after entering or leaving `tool-bar-mode'.",
+    ),
+    (
+        "tool-bar-position",
+        "Specify on which side the tool bar shall be.",
+    ),
+    (
+        "tooltip-delay",
+        "Seconds to wait before displaying a tooltip the first time.",
+    ),
+    (
+        "tooltip-frame-parameters",
+        "Frame parameters used for tooltips.",
+    ),
+    (
+        "tooltip-functions",
+        "Functions to call to display tooltips.",
+    ),
+    (
+        "tooltip-help-message",
+        "The last help message received via `show-help-function'.",
+    ),
+    (
+        "tooltip-hide-delay",
+        "Hide tooltips automatically after this many seconds.",
+    ),
+    (
+        "tooltip-hide-time",
+        "Time when the last tooltip was hidden.",
+    ),
+    (
+        "tooltip-last-mouse-motion-event",
+        "A copy of the last mouse motion event seen.",
+    ),
+    (
+        "tooltip-mode",
+        "Non-nil if Tooltip mode is enabled.",
+    ),
+    (
+        "tooltip-mode-hook",
+        "Hook run after entering or leaving `tooltip-mode'.",
+    ),
+    (
+        "tooltip-previous-message",
+        "The previous content of the echo area.",
+    ),
+    (
+        "tooltip-recent-seconds",
+        "Display tooltips if changing tip items within this many seconds.",
+    ),
+    (
+        "tooltip-resize-echo-area",
+        "If non-nil, using the echo area for tooltips will resize the echo area.",
+    ),
+    (
+        "tooltip-short-delay",
+        "Seconds to wait between subsequent tooltips on different items.",
+    ),
+    (
+        "tooltip-timeout-id",
+        "The id of the timeout started when Emacs becomes idle.",
+    ),
+    (
+        "tooltip-x-offset",
+        "X offset, in pixels, for the display of tooltips.",
+    ),
+    (
+        "tooltip-y-offset",
+        "Y offset, in pixels, for the display of tooltips.",
+    ),
+    (
+        "touch-screen-aux-tool",
+        "The ancillary tool being tracked, or nil.",
+    ),
+    (
+        "touch-screen-current-timer",
+        "Timer used to track long-presses.",
+    ),
+    (
+        "touch-screen-current-tool",
+        "The touch point currently being tracked, or nil.",
+    ),
+    (
+        "touch-screen-delay",
+        "Delay in seconds before Emacs considers a touch to be a long-press.",
+    ),
+    (
+        "touch-screen-display-keyboard",
+        "If non-nil, always display the on screen keyboard.",
+    ),
+    (
+        "touch-screen-enable-hscroll",
+        "If non-nil, hscroll can be changed from the touch screen.",
+    ),
+    (
+        "touch-screen-events-received",
+        "Whether a touch screen event has ever been translated.",
+    ),
+    (
+        "touch-screen-extend-selection",
+        "If non-nil, restart drag-to-select upon a tap on point or mark.",
+    ),
+    (
+        "touch-screen-keyboard-function",
+        "Function that decides whether to display the on screen keyboard.",
+    ),
+    (
+        "touch-screen-precision-scroll",
+        "Whether or not to use precision scrolling for touch screens.",
+    ),
+    (
+        "touch-screen-preview-select",
+        "If non-nil, display a preview while selecting text.",
+    ),
+    (
+        "touch-screen-set-point-commands",
+        "List of commands known to set the point.",
+    ),
+    (
+        "touch-screen-translate-prompt",
+        "Prompt given to the touch screen translation function.",
+    ),
+    (
+        "touch-screen-word-select",
+        "Whether or not to select whole words while dragging to select.",
+    ),
+    (
+        "touch-screen-word-select-bounds",
+        "The start and end positions of the word last selected.",
+    ),
+    (
+        "touch-screen-word-select-initial-word",
+        "The start and end positions of the first word to be selected.",
+    ),
+    (
+        "trace-buffer",
+        "Trace output will by default go to that buffer.",
+    ),
+    (
+        "track-eol",
+        "Non-nil means vertical motion starting at end of line keeps to ends of lines.",
+    ),
+    (
+        "tramp-archive-compression-suffixes",
+        "List of suffixes which indicate a compressed file.",
+    ),
+    (
+        "tramp-archive-enabled",
+        "Non-nil when file archive support is available.",
+    ),
+    (
+        "tramp-archive-suffixes",
+        "List of suffixes which indicate a file archive.",
+    ),
+    (
+        "tramp-autoload-file-name-regexp",
+        "Regular expression matching file names handled by Tramp autoload.",
+    ),
+    (
+        "tramp-file-name-regexp",
+        "Regular expression matching file names handled by Tramp.",
+    ),
+    (
+        "tramp-foreign-file-name-handler-alist",
+        "Alist of elements (FUNCTION . HANDLER) for foreign methods handled specially.",
+    ),
+    (
+        "tramp-ignored-file-name-regexp",
+        "Regular expression matching file names that are not under Tramp's control.",
+    ),
+    (
+        "tramp-initial-file-name-regexp",
+        "Value for `tramp-file-name-regexp' for autoload.",
+    ),
+    (
+        "tramp-mode",
+        "Whether Tramp is enabled.",
+    ),
+    (
+        "transient-mark-mode-hook",
+        "Hook run after entering or leaving `transient-mark-mode'.",
+    ),
+    (
+        "transpose-sexps-function",
+        "If non-nil, `transpose-sexps' delegates to this function.",
+    ),
+    (
+        "trash-directory",
+        "Directory for `move-file-to-trash' to move files and directories to.",
+    ),
+    (
+        "trusted-content",
+        "List of files and directories whose content we trust.",
+    ),
+    (
+        "tty-color-mode-alist",
+        "An alist of supported standard tty color modes and their aliases.",
+    ),
+    (
+        "tty-menu--initial-menu-x",
+        "X coordinate of the first menu-bar menu dropped by F10.",
+    ),
+    (
+        "tty-menu-navigation-map",
+        "Keymap used while processing TTY menus.",
+    ),
+    (
+        "tty-menu-open-use-tmm",
+        "If non-nil, \\[menu-bar-open] on a TTY will invoke `tmm-menubar'.",
+    ),
+    (
+        "tty-select-active-regions",
+        "If non-nil, update PRIMARY window-system selection on text-mode frames.",
+    ),
+    (
+        "tty-setup-hook",
+        "Hook run after running the initialization function of a new text terminal.",
+    ),
+    (
+        "tty-standard-colors",
+        "An alist of 8 standard tty colors, their indices and RGB values.",
+    ),
+    (
+        "tutorial-directory",
+        "Directory containing the Emacs TUTORIAL files.",
+    ),
+    (
+        "type-break-mode",
+        "Non-nil if Type-Break mode is enabled.",
+    ),
+    (
+        "ucs-names",
+        "Hash table of cached CHAR-NAME keys to CHAR-CODE values.",
+    ),
+    (
+        "uncomment-region-function",
+        "Function to uncomment a region.",
+    ),
+    (
+        "undelete-frame--deleted-frames",
+        "Internal variable used by `undelete-frame--save-deleted-frame'.",
+    ),
+    (
+        "undelete-frame-mode",
+        "Non-nil if Undelete-Frame mode is enabled.",
+    ),
+    (
+        "undelete-frame-mode-hook",
+        "Hook run after entering or leaving `undelete-frame-mode'.",
+    ),
+    (
+        "undo--combining-change-calls",
+        "Non-nil when `combine-change-calls-1' is running.",
+    ),
+    (
+        "undo-ask-before-discard",
+        "If non-nil ask about discarding undo info for the current command.",
+    ),
+    (
+        "undo-auto--last-boundary-cause",
+        "Describe the cause of the last `undo-boundary'.",
+    ),
+    (
+        "undo-auto--this-command-amalgamating",
+        "Non-nil if `this-command' should be amalgamated.",
+    ),
+    (
+        "undo-auto--undoably-changed-buffers",
+        "List of buffers that have changed recently.",
+    ),
+    (
+        "undo-auto-current-boundary-timer",
+        "Current timer which will run `undo-auto--boundary-timer' or nil.",
+    ),
+    (
+        "undo-equiv-table",
+        "Table mapping redo records to the corresponding undo one.",
+    ),
+    (
+        "undo-extra-outer-limit",
+        "If non-nil, an extra level of size that's ok in an undo item.",
+    ),
+    (
+        "undo-in-progress",
+        "Non-nil while performing an undo.",
+    ),
+    (
+        "undo-in-region",
+        "Non-nil if `pending-undo-list' is not just a tail of `buffer-undo-list'.",
+    ),
+    (
+        "undo-no-redo",
+        "If t, `undo' doesn't go through redo entries.",
+    ),
+    (
+        "undo-repeat-map",
+        "Keymap to repeat `undo' commands.  Used in `repeat-mode'.",
+    ),
+    (
+        "uniquify-after-kill-buffer-p",
+        "If non-nil, rerationalize buffer names after a buffer has been killed.",
+    ),
+    (
+        "uniquify-buffer-name-style",
+        "How to construct unique buffer names for files with the same base name.",
+    ),
+    (
+        "uniquify-dirname-transform",
+        "Function to transform buffer's directory name when uniquifying buffer's name.",
+    ),
+    (
+        "uniquify-ignore-buffers-re",
+        "Regular expression matching buffer names that should not be uniquified.",
+    ),
+    (
+        "uniquify-list-buffers-directory-modes",
+        "List of modes for which uniquify should obey `list-buffers-directory'.",
+    ),
+    (
+        "uniquify-managed",
+        "Non-nil if the name of this buffer is managed by uniquify.",
+    ),
+    (
+        "uniquify-min-dir-content",
+        "Minimum number of directory name components included in buffer name.",
+    ),
+    (
+        "uniquify-separator",
+        "String separator for buffer name components.",
+    ),
+    (
+        "uniquify-strip-common-suffix",
+        "If non-nil, strip common directory suffixes of conflicting files.",
+    ),
+    (
+        "uniquify-trailing-separator-p",
+        "If non-nil, add a file name separator to Dired buffer names.",
+    ),
+    (
+        "universal-argument-map",
+        "Keymap used while processing \\[universal-argument].",
+    ),
+    (
+        "untrusted-content",
+        "Non-nil means that current buffer originated from an untrusted source.",
+    ),
+    (
+        "update-leim-list-functions",
+        "List of functions to call to update LEIM list file.",
+    ),
+    (
+        "url-debug",
+        "What types of debug messages from the URL library to show.",
+    ),
+    (
+        "url-handler-mode",
+        "Non-nil if Url-Handler mode is enabled.",
+    ),
+    (
+        "url-ircs-default-port",
+        "Default port for IRCS connections.",
+    ),
+    (
+        "url-tramp-protocols",
+        "List of URL protocols for which the work is handled by Tramp.",
+    ),
+    (
+        "use-dialog-box-override",
+        "Whether `use-dialog-box-p' should always return t.",
+    ),
+    (
+        "use-empty-active-region",
+        "Whether \"region-aware\" commands should act on empty regions.",
+    ),
+    (
+        "use-hard-newlines",
+        "Non-nil if Use-Hard-Newlines mode is enabled.",
+    ),
+    (
+        "use-hard-newlines-hook",
+        "Hook run after entering or leaving `use-hard-newlines'.",
+    ),
+    (
+        "user-emacs-directory",
+        "Directory beneath which additional per-user Emacs-specific files are placed.",
+    ),
+    (
+        "user-emacs-directory-warning",
+        "Non-nil means warn if unable to access or create `user-emacs-directory'.",
+    ),
+    (
+        "user-mail-address",
+        "The email address of the current user.",
+    ),
+    (
+        "vc-before-checkin-hook",
+        "Normal hook (list of functions) run before a commit or a file checkin.",
+    ),
+    (
+        "vc-bzr-admin-checkout-format-file",
+        "Name of the format file in a .bzr directory.",
+    ),
+    (
+        "vc-bzr-admin-dirname",
+        "Name of the directory containing Bzr repository status files.",
+    ),
+    (
+        "vc-checkin-hook",
+        "Normal hook (list of functions) run after commit or file checkin.",
+    ),
+    (
+        "vc-checkout-hook",
+        "Normal hook (list of functions) run after checking out a file.",
+    ),
+    (
+        "vc-consult-headers",
+        "If non-nil, identify work files by searching for version headers.",
+    ),
+    (
+        "vc-dir-buffers",
+        "List of `vc-dir' buffers.",
+    ),
+    (
+        "vc-directory-exclusion-list",
+        "List of directory names to be ignored when walking directory trees.",
+    ),
+    (
+        "vc-display-status",
+        "If non-nil, display revision number and lock status in mode line.",
+    ),
+    (
+        "vc-file-prop-obarray",
+        "Obarray for per-file properties.",
+    ),
+    (
+        "vc-follow-symlinks",
+        "What to do if visiting a symbolic link to a file under version control.",
+    ),
+    (
+        "vc-handled-backends",
+        "List of version control backends for which VC will be used.",
+    ),
+    (
+        "vc-ignore-dir-regexp",
+        "Regexp matching directory names that are not under VC's control.",
+    ),
+    (
+        "vc-make-backup-files",
+        "If non-nil, backups of registered files are made as with other files.",
+    ),
+    (
+        "vc-rcs-master-templates",
+        "Where to look for RCS master files.",
+    ),
+    (
+        "vc-sccs-master-templates",
+        "Where to look for SCCS master files.",
+    ),
+    (
+        "vc-src-master-templates",
+        "Where to look for SRC master files.",
+    ),
+    (
+        "vc-use-short-revision",
+        "If non-nil, VC backend functions should return short revisions if possible.",
+    ),
+    (
+        "version-control",
+        "Control use of version-numbered backup files.",
+    ),
+    (
+        "version-regexp-alist",
+        "Specify association between non-numeric version and its priority.",
+    ),
+    (
+        "version-separator",
+        "Specify the string used to separate the version elements.",
+    ),
+    (
+        "view-mode",
+        "Non-nil if View mode is enabled.",
+    ),
+    (
+        "view-read-only",
+        "Non-nil means buffers visiting files read-only do so in view mode.",
+    ),
+    (
+        "vis-mode-saved-buffer-invisibility-spec",
+        "Saved value of `buffer-invisibility-spec' when Visible mode is on.",
+    ),
+    (
+        "visible-mode",
+        "Non-nil if Visible mode is enabled.",
+    ),
+    (
+        "visible-mode-hook",
+        "Hook run after entering or leaving `visible-mode'.",
+    ),
+    (
+        "visual-line-fringe-indicators",
+        "How fringe indicators are shown for wrapped lines in `visual-line-mode'.",
+    ),
+    (
+        "visual-line-mode",
+        "Non-nil if Visual-Line mode is enabled.",
+    ),
+    (
+        "visual-line-mode-hook",
+        "Hook run after entering or leaving `visual-line-mode'.",
+    ),
+    (
+        "visual-order-cursor-movement",
+        "If non-nil, moving cursor with arrow keys follows the visual order.",
+    ),
+    (
+        "warning-fill-prefix",
+        "Non-nil means fill each warning text using this string as `fill-prefix'.",
+    ),
+    (
+        "warning-prefix-function",
+        "Function to generate warning prefixes.",
+    ),
+    (
+        "warning-series",
+        "Non-nil means treat multiple `display-warning' calls as a series.",
+    ),
+    (
+        "warning-suppress-types",
+        "List of warning types not to display immediately.",
+    ),
+    (
+        "warning-type-format",
+        "Format for displaying the warning type in the warning message.",
+    ),
+    (
+        "what-cursor-show-names",
+        "Whether to show character names in `what-cursor-position'.",
+    ),
+    (
+        "which-function-mode",
+        "Non-nil if Which-Function mode is enabled.",
+    ),
+    (
+        "which-key-mode",
+        "Non-nil if Which-Key mode is enabled.",
+    ),
+    (
+        "widen-automatically",
+        "Non-nil means it is ok for commands to call `widen' when they want to.",
+    ),
+    (
+        "widget-keymap",
+        "Keymap containing useful binding for buffers containing widgets.",
+    ),
+    (
+        "windmove-mode",
+        "Non-nil if Windmove mode is enabled.",
+    ),
+    (
+        "window--sides-inhibit-check",
+        "Non-nil means inhibit any checks on side windows.",
+    ),
+    (
+        "window--sides-shown",
+        "Non-nil if this buffer was shown in a side window once.",
+    ),
+    (
+        "window-adjust-process-window-size-function",
+        "Control how Emacs chooses inferior process window sizes.",
+    ),
+    (
+        "window-area-factor",
+        "Factor by which the window area should be over-estimated.",
+    ),
+    (
+        "window-divider-default-bottom-width",
+        "Default width of dividers on bottom of windows.",
+    ),
+    (
+        "window-divider-default-places",
+        "Default positions of window dividers.",
+    ),
+    (
+        "window-divider-default-right-width",
+        "Default width of dividers on the right of windows.",
+    ),
+    (
+        "window-divider-mode",
+        "Non-nil if Window-Divider mode is enabled.",
+    ),
+    (
+        "window-divider-mode-hook",
+        "Hook run after entering or leaving `window-divider-mode'.",
+    ),
+    (
+        "window-min-height",
+        "The minimum total height, in lines, of any window.",
+    ),
+    (
+        "window-min-width",
+        "The minimum total width, in columns, of any window.",
+    ),
+    (
+        "window-prefix-map",
+        "Keymap for subcommands of \\`C-x w'.",
+    ),
+    (
+        "window-safe-min-height",
+        "The absolute minimum number of lines of any window.",
+    ),
+    (
+        "window-safe-min-width",
+        "The absolute minimum number of columns of a window.",
+    ),
+    (
+        "window-setup-hook",
+        "Normal hook run after loading init files and handling the command line.",
+    ),
+    (
+        "window-sides-reversed",
+        "Whether top/bottom side windows appear in reverse order.",
+    ),
+    (
+        "window-sides-slots",
+        "Number of available side window slots on each side of a frame.",
+    ),
+    (
+        "window-sides-vertical",
+        "If non-nil, left and right side windows occupy full frame height.",
+    ),
+    (
+        "window-size-fixed",
+        "Non-nil in a buffer means windows displaying the buffer are fixed-size.",
+    ),
+    (
+        "window-state-put-kept-windows",
+        "Helper variable for `window-state-put'.",
+    ),
+    (
+        "window-state-put-list",
+        "Helper variable for `window-state-put'.",
+    ),
+    (
+        "window-state-put-selected-window",
+        "Helper variable for `window-state-put'.",
+    ),
+    (
+        "window-state-put-stale-windows",
+        "Helper variable for `window-state-put'.",
+    ),
+    (
+        "window-system-default-frame-alist",
+        "Window-system dependent default frame parameters.",
+    ),
+    (
+        "winner-mode",
+        "Non-nil if Winner mode is enabled.",
+    ),
+    (
+        "with-timeout-timers",
+        "List of all timers used by currently pending `with-timeout' calls.",
+    ),
+    (
+        "woman-locale",
+        "String specifying a manual page locale, or nil.",
+    ),
+    (
+        "word-move-empty-char-table",
+        "Used in `forward-word-strictly' and `backward-word-strictly'",
+    ),
+    (
+        "write-contents-functions",
+        "List of functions to be called before writing out a buffer to a file.",
+    ),
+    (
+        "write-file-functions",
+        "List of functions to be called before saving a buffer to a file.",
+    ),
+    (
+        "x-alternatives-map",
+        "Keymap of possible alternative meanings for some keys.",
+    ),
+    (
+        "x-colors",
+        "List of basic colors available on color displays.",
+    ),
+    (
+        "x-display-cursor-at-start-of-preedit-string",
+        "If non-nil, display the cursor at the start of any pre-edit text.",
+    ),
+    (
+        "x-display-name",
+        "The name of the window display on which Emacs was started.",
+    ),
+    (
+        "x-dnd-click-count",
+        "Alist of button numbers to click counters during drag-and-drop.",
+    ),
+    (
+        "x-dnd-copy-types",
+        "List of data types offered by programs that don't support `private'.",
+    ),
+    (
+        "x-dnd-current-state",
+        "The current state for a drop.",
+    ),
+    (
+        "x-dnd-debug-errors",
+        "Whether or not to signal protocol errors during drag-and-drop.",
+    ),
+    (
+        "x-dnd-direct-save-function",
+        "Function called when a file is dropped via XDS protocol.",
+    ),
+    (
+        "x-dnd-known-types",
+        "The types accepted by default for dropped data.",
+    ),
+    (
+        "x-dnd-motif-message-types",
+        "Mapping from numbers to Motif DND message types.",
+    ),
+    (
+        "x-dnd-motif-to-action",
+        "Mapping from number to operation for Motif DND.",
+    ),
+    (
+        "x-dnd-offix-id-to-name",
+        "Alist of OffiX data types to their names.",
+    ),
+    (
+        "x-dnd-offix-old-kde-to-name",
+        "Alist of old KDE data types to their names.",
+    ),
+    (
+        "x-dnd-test-function",
+        "Function to be used by drag-and-drop to determine whether to accept a drop.",
+    ),
+    (
+        "x-dnd-types-alist",
+        "Functions to call to handle drag-and-drop of known types.",
+    ),
+    (
+        "x-dnd-use-offix-drop",
+        "If non-nil, use the OffiX protocol to drop files and text.",
+    ),
+    (
+        "x-dnd-xdnd-to-action",
+        "Mapping from XDND action types to Lisp symbols.",
+    ),
+    (
+        "x-dnd-xds-current-file",
+        "The file name for which a direct save is currently being performed.",
+    ),
+    (
+        "x-dnd-xds-performed",
+        "Whether or not the drop target made a request for `XdndDirectSave0'.",
+    ),
+    (
+        "x-dnd-xds-source-frame",
+        "The frame from which a direct save is currently being performed.",
+    ),
+    (
+        "x-dnd-xds-testing",
+        "Whether or not XDS is being tested from ERT.",
+    ),
+    (
+        "x-fixed-font-alist",
+        "X fonts suitable for use in Emacs.",
+    ),
+    (
+        "x-font-name-charset-alist",
+        "This variable has no meaning starting with Emacs 22.1.",
+    ),
+    (
+        "x-gtk-stock-map",
+        "How icons for tool bars are mapped to Gtk+ stock items.",
+    ),
+    (
+        "x-initialized",
+        "Non-nil if the X window system has been initialized.",
+    ),
+    (
+        "x-preedit-overlay",
+        "The overlay currently used to display preedit text from a compose sequence.",
+    ),
+    (
+        "x-select-request-type",
+        "Data type request for X selection.",
+    ),
+    (
+        "xargs-program",
+        "The default xargs program for `grep-find-command'.",
+    ),
+    (
+        "xterm-mouse-mode",
+        "Non-nil if Xterm-Mouse mode is enabled.",
+    ),
+    (
+        "y-or-n-p-history-variable",
+        "History list symbol to add `y-or-n-p' answers to.",
+    ),
+    (
+        "y-or-n-p-map",
+        "Keymap that defines additional bindings for `y-or-n-p' answers.",
+    ),
+    (
+        "y-or-n-p-use-read-key",
+        "Use `read-key' when reading answers to \"y or n\" questions by `y-or-n-p'.",
+    ),
+    (
+        "yank-excluded-properties",
+        "Text properties to discard when yanking.",
+    ),
+    (
+        "yank-from-kill-ring-rotate",
+        "Whether using `yank-from-kill-ring' should rotate `kill-ring-yank-pointer'.",
+    ),
+    (
+        "yank-handled-properties",
+        "List of special text property handling conditions for yanking.",
+    ),
+    (
+        "yank-menu-length",
+        "Text of items in `yank-menu' longer than this will be truncated.",
+    ),
+    (
+        "yank-menu-max-items",
+        "Maximum number of entries to display in the `yank-menu'.",
+    ),
+    (
+        "yank-pop-change-selection",
+        "Whether rotating the kill ring changes the window system selection.",
+    ),
+    (
+        "yank-transform-functions",
+        "Hook run on strings to be yanked.",
+    ),
+    (
+        "yank-undo-function",
+        "If non-nil, function used by `yank-pop' to delete last stretch of yanked text.",
+    ),
     ("kill-ring", "List of killed text sequences."),
     (
         "kill-ring-yank-pointer",
