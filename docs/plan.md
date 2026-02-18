@@ -10455,6 +10455,20 @@ Last updated: 2026-02-18
     - `make -C test/neovm/vm-compat check-one-neovm CASE=display-control-runtime-semantics` (pass, 17/17)
     - `make -C test/neovm/vm-compat validate-case-lists` (pass)
     - `make -C test/neovm/vm-compat check-all-neovm` (pass)
+- Aligned `help-function-arglist` quoted-designator runtime semantics with GNU Emacs:
+  - runtime changes:
+    - quoted lambda designators now return their raw argument spec (`(lambda x ...) -> x`, `(lambda (x y) ...) -> (x y)`)
+    - quoted macro designators now return `t` instead of attempting lambda-style arglist extraction
+    - malformed quoted lambda tails (for example `(lambda . 1)`) now signal `wrong-type-argument (listp ...)`
+  - expanded oracle corpus:
+    - `test/neovm/vm-compat/cases/help-function-arglist-runtime-semantics.forms`
+    - `test/neovm/vm-compat/cases/help-function-arglist-runtime-semantics.expected.tsv`
+    - added quoted lambda symbol-tail, quoted macro, and malformed-lambda probes
+  - verified:
+    - `cargo test --manifest-path rust/neovm-core/Cargo.toml help_function_arglist` (pass)
+    - `make -C test/neovm/vm-compat record FORMS=cases/help-function-arglist-runtime-semantics.forms EXPECTED=cases/help-function-arglist-runtime-semantics.expected.tsv` (pass)
+    - `make -C test/neovm/vm-compat check-one-neovm CASE=cases/help-function-arglist-runtime-semantics` (pass, 16/16)
+    - `make -C test/neovm/vm-compat check-all-neovm` (pass)
 - Refined `documentation` quoted-macro error payloads to match GNU Emacs:
   - runtime changes:
     - quoted macro designators now signal `invalid-function` with macro-tail payload (for example `((x) "md" x)`)
