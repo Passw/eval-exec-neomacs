@@ -1200,8 +1200,128 @@ pub(crate) static STARTUP_VARIABLE_DOC_STUBS: &[(&str, &str)] = &[
         "Visually indicate buffer boundaries and scrolling.",
     ),
     (
+        "indicate-empty-lines",
+        "Visually indicate unused (\"empty\") screen lines after the buffer end.",
+    ),
+    (
+        "inherit-process-coding-system",
+        "Non-nil means process buffer inherits coding system of process output.",
+    ),
+    (
+        "inhibit--record-char",
+        "If non-nil, don't record input events.",
+    ),
+    (
+        "inhibit-bidi-mirroring",
+        "Non-nil means don't mirror characters even when bidi context requires that.",
+    ),
+    (
+        "inhibit-changing-match-data",
+        "Internal use only.",
+    ),
+    (
+        "inhibit-compacting-font-caches",
+        "If non-nil, don't compact font caches during GC.",
+    ),
+    (
+        "inhibit-debugger",
+        "Non-nil means never enter the debugger.",
+    ),
+    (
+        "inhibit-eol-conversion",
+        "Non-nil means always inhibit code conversion of end-of-line format.",
+    ),
+    (
+        "inhibit-eval-during-redisplay",
+        "Non-nil means don't eval Lisp during redisplay.",
+    ),
+    (
+        "inhibit-field-text-motion",
+        "Non-nil means text motion commands don't notice fields.",
+    ),
+    (
+        "inhibit-file-name-handlers",
+        "A list of file name handlers that temporarily should not be used.",
+    ),
+    (
+        "inhibit-file-name-operation",
+        "The operation for which `inhibit-file-name-handlers' is applicable.",
+    ),
+    (
+        "inhibit-free-realized-faces",
+        "Non-nil means don't free realized faces.  Internal use only.",
+    ),
+    (
+        "inhibit-interaction",
+        "Non-nil means any user interaction will signal an error.",
+    ),
+    (
+        "inhibit-iso-escape-detection",
+        "If non-nil, Emacs ignores ISO-2022 escape sequences during code detection.",
+    ),
+    (
+        "inhibit-load-charset-map",
+        "Inhibit loading of charset maps.  Used when dumping Emacs.",
+    ),
+    (
+        "inhibit-menubar-update",
+        "Non-nil means don't update menu bars.  Internal use only.",
+    ),
+    (
+        "inhibit-message",
+        "Non-nil means calls to `message' are not displayed.",
+    ),
+    (
+        "inhibit-modification-hooks",
+        "Non-nil means don't run any of the hooks that respond to buffer changes.",
+    ),
+    (
+        "inhibit-mouse-event-check",
+        "Whether the interactive spec \"e\" requires a mouse gesture event.",
+    ),
+    (
+        "inhibit-null-byte-detection",
+        "If non-nil, Emacs ignores null bytes on code detection.",
+    ),
+    (
+        "inhibit-point-motion-hooks",
+        "If non-nil, don't run `point-left' and `point-entered' text properties.",
+    ),
+    (
         "inhibit-quit",
         "Non-nil inhibits C-g quitting from happening immediately.",
+    ),
+    (
+        "inhibit-read-only",
+        "Non-nil means disregard read-only status of buffers or characters.",
+    ),
+    (
+        "inhibit-redisplay",
+        "Non-nil means don't actually do any redisplay.",
+    ),
+    (
+        "inhibit-x-resources",
+        "If non-nil, X resources, Windows Registry settings, and NS defaults are not used.",
+    ),
+    (
+        "initial-environment",
+        "List of environment variables inherited from the parent process.",
+    ),
+    (
+        "initial-window-system",
+        "Name of the window system that Emacs uses for the first frame.",
+    ),
+    (
+        "input-decode-map",
+        "Keymap that decodes input escape sequences.",
+    ),
+    (
+        "input-method-function",
+        "If non-nil, the function that implements the current input method.",
+    ),
+    (
+        "input-method-previous-message",
+        "When `input-method-function' is called, hold the previous echo area message.",
     ),
     ("kill-ring", "List of killed text sequences."),
     (
@@ -3953,6 +4073,24 @@ mod tests {
             result
                 .as_str()
                 .is_some_and(|s| s.contains("controls the header line"))
+        );
+    }
+
+    #[test]
+    fn documentation_property_eval_input_method_function_integer_property_returns_string() {
+        let mut evaluator = super::super::eval::Evaluator::new();
+        let result = builtin_documentation_property_eval(
+            &mut evaluator,
+            vec![
+                Value::symbol("input-method-function"),
+                Value::symbol("variable-documentation"),
+            ],
+        )
+        .unwrap();
+        assert!(
+            result
+                .as_str()
+                .is_some_and(|s| s.contains("implements the current input method"))
         );
     }
 

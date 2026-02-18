@@ -13912,6 +13912,24 @@ Last updated: 2026-02-18
     - `make -C test/neovm/vm-compat record FORMS=cases/documentation-property-semantics.forms EXPECTED=cases/documentation-property-semantics.expected.tsv` (pass)
     - `make -C test/neovm/vm-compat check-one-neovm CASE=documentation-property-semantics` (pass, 31/31)
     - `make -C test/neovm/vm-compat check-all-neovm` (pass)
+- Expanded startup-variable `documentation-property` parity (round 37) with `inhibit-*` and startup input/env metadata symbols:
+  - runtime changes:
+    - added startup doc stubs for 30 additional symbols in `STARTUP_VARIABLE_DOC_STUBS`, including:
+      - display/motion state vars: `indicate-empty-lines`, `inherit-process-coding-system`, `inhibit-bidi-mirroring`, `inhibit-eol-conversion`, `inhibit-redisplay`
+      - runtime guard vars: `inhibit-*` family (`inhibit-debugger`, `inhibit-message`, `inhibit-modification-hooks`, `inhibit-read-only`, `inhibit-x-resources`, etc.)
+      - startup input/env vars: `initial-environment`, `initial-window-system`, `input-decode-map`, `input-method-function`, `input-method-previous-message`
+    - integer `variable-documentation` lookups for that round-37 symbol batch now resolve through the shared startup doc stub mapping
+    - added eval lock-in test:
+      - `documentation_property_eval_input_method_function_integer_property_returns_string`
+  - expanded oracle corpus:
+    - `test/neovm/vm-compat/cases/documentation-property-semantics.forms`
+    - `test/neovm/vm-compat/cases/documentation-property-semantics.expected.tsv`
+    - added a dedicated 30-symbol startup matrix row for the round-37 set (string doc + first-line prefix checks)
+  - verified:
+    - `cargo test --manifest-path rust/neovm-core/Cargo.toml documentation_property_eval_` (pass, 22/22)
+    - `make -C test/neovm/vm-compat record FORMS=cases/documentation-property-semantics.forms EXPECTED=cases/documentation-property-semantics.expected.tsv` (pass)
+    - `make -C test/neovm/vm-compat check-one-neovm CASE=documentation-property-semantics` (pass, 32/32)
+    - `make -C test/neovm/vm-compat check-all-neovm` (pass)
 
 ## Doing
 
