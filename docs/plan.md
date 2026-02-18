@@ -10711,6 +10711,20 @@ Last updated: 2026-02-18
     - `make -C test/neovm/vm-compat record FORMS=cases/describe-variable-runtime-semantics.forms EXPECTED=cases/describe-variable-runtime-semantics.expected.tsv` (pass)
     - `make -C test/neovm/vm-compat check-one-neovm CASE=describe-variable-runtime-semantics` (pass, 13/13)
     - `make -C test/neovm/vm-compat check-all-neovm` (pass)
+- Refined `describe-variable` fallback text shape to match GNU Emacs formatting details:
+  - runtime changes:
+    - bound fallback text now uses typographic possessive form (`NAME’s value is ...`)
+    - bound and unbound fallback text now ends with a trailing newline
+    - symbol-resolved doc-property paths that fall back to value text inherit the same shape
+  - expanded oracle corpus:
+    - `test/neovm/vm-compat/cases/describe-variable-runtime-semantics.forms`
+    - `test/neovm/vm-compat/cases/describe-variable-runtime-semantics.expected.tsv`
+    - added explicit probes for trailing newline and apostrophe shape on bound/unbound fallback strings
+  - verified:
+    - `cargo test --manifest-path rust/neovm-core/Cargo.toml describe_variable` (pass)
+    - `make -C test/neovm/vm-compat record FORMS=cases/describe-variable-runtime-semantics.forms EXPECTED=cases/describe-variable-runtime-semantics.expected.tsv` (pass)
+    - `make -C test/neovm/vm-compat check-one-neovm CASE=describe-variable-runtime-semantics` (pass, 15/15)
+    - `make -C test/neovm/vm-compat check-all-neovm` (pass)
 
 ## Doing
 
