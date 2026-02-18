@@ -10781,6 +10781,20 @@ Last updated: 2026-02-18
     - `make -C test/neovm/vm-compat record FORMS=cases/string-match-case-fold-semantics.forms EXPECTED=cases/string-match-case-fold-semantics.expected.tsv` (pass)
     - `make -C test/neovm/vm-compat check-one-neovm CASE=string-match-case-fold-semantics` (pass, 14/14)
     - `make -C test/neovm/vm-compat check-all-neovm` (pass)
+- Aligned multibyte string position reporting for `match-beginning`, `match-end`, and `match-data`:
+  - runtime changes:
+    - when match state comes from string-backed regex matching, exposed positions now convert internal byte offsets to character positions
+    - conversion is applied in both evaluator-backed and pure builtin match-data readers
+    - internal match-state storage remains byte-based, preserving existing string-slice replacement paths
+  - expanded oracle corpus:
+    - `test/neovm/vm-compat/cases/match-data.forms`
+    - `test/neovm/vm-compat/cases/match-data.expected.tsv`
+    - added multibyte probes for `"aéx"` covering `match-beginning 0`, `match-end 0`, and `match-data` after `string-match`
+  - verified:
+    - `cargo test --manifest-path rust/neovm-core/Cargo.toml match_data` (pass)
+    - `make -C test/neovm/vm-compat record FORMS=cases/match-data.forms EXPECTED=cases/match-data.expected.tsv` (pass)
+    - `make -C test/neovm/vm-compat check-one-neovm CASE=match-data` (pass, 29/29)
+    - `make -C test/neovm/vm-compat check-all-neovm` (pass)
 
 ## Doing
 
