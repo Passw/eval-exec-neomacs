@@ -1,0 +1,9 @@
+(condition-case err
+    (x-open-connection (car (terminal-list)))
+  (error (list (car err) (length err) (cadr err))))
+(condition-case err
+    (x-close-connection (car (terminal-list)))
+  (error (list (car err) (length err) (cadr err))))
+(condition-case err
+    (x-open-connection (selected-frame))
+  (error (list (car err) (length err) (framep (cadr err)))))
