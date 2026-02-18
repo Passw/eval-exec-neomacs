@@ -834,12 +834,131 @@ pub(crate) static STARTUP_VARIABLE_DOC_STUBS: &[(&str, &str)] = &[
         "Name of the `ebrowse` program distributed with Emacs.",
     ),
     (
+        "echo-area-clear-hook",
+        "Normal hook run when clearing the echo area.",
+    ),
+    (
+        "echo-keystrokes",
+        "Nonzero means echo unfinished commands after this many seconds of pause.",
+    ),
+    (
+        "echo-keystrokes-help",
+        "Whether to append help text to echoed commands.",
+    ),
+    (
+        "emacs-copyright",
+        "Short copyright string for this version of Emacs.",
+    ),
+    (
+        "emacs-version",
+        "Version numbers of this version of Emacs.",
+    ),
+    (
+        "emacsclient-program-name",
+        "Name of the `emacsclient` program distributed with Emacs.",
+    ),
+    (
+        "emulation-mode-map-alists",
+        "List of keymap alists to use for emulation modes.",
+    ),
+    (
+        "enable-character-translation",
+        "Non-nil enables character translation while encoding and decoding.",
+    ),
+    (
+        "enable-disabled-menus-and-buttons",
+        "If non-nil, don't ignore events produced by disabled menu items and tool-bar.",
+    ),
+    (
         "enable-multibyte-characters",
         "Non-nil means the buffer contents are regarded as multi-byte characters.",
     ),
+    (
+        "enable-recursive-minibuffers",
+        "Non-nil means to allow minibuffer commands while in the minibuffer.",
+    ),
+    (
+        "eol-mnemonic-dos",
+        "String displayed in mode line for DOS-like (CRLF) end-of-line format.",
+    ),
+    (
+        "eol-mnemonic-mac",
+        "String displayed in mode line for MAC-like (CR) end-of-line format.",
+    ),
+    (
+        "eol-mnemonic-undecided",
+        "String displayed in mode line when end-of-line format is not yet determined.",
+    ),
+    (
+        "eol-mnemonic-unix",
+        "String displayed in mode line for UNIX-like (LF) end-of-line format.",
+    ),
+    (
+        "etags-program-name",
+        "Name of the `etags` program distributed with Emacs.",
+    ),
+    (
+        "eval-buffer-list",
+        "List of buffers being read from by calls to `eval-buffer` and `eval-region`.",
+    ),
+    ("exec-directory", "Directory for executables for Emacs to invoke."),
+    (
+        "executing-kbd-macro",
+        "Currently executing keyboard macro (string or vector).",
+    ),
+    (
+        "executing-kbd-macro-index",
+        "Index in currently executing keyboard macro; undefined if none executing.",
+    ),
     ("exec-path", "List of directories to search programs to run in subprocesses."),
     ("exec-suffixes", "List of suffixes to try to find executable file names."),
+    (
+        "extra-keyboard-modifiers",
+        "A mask of additional modifier keys to use with every keyboard character.",
+    ),
+    (
+        "face--new-frame-defaults",
+        "Hash table of global face definitions (for internal use only.)",
+    ),
+    (
+        "face-default-stipple",
+        "Default stipple pattern used on monochrome displays.",
+    ),
+    (
+        "face-filters-always-match",
+        "Non-nil means that face filters are always deemed to match.",
+    ),
+    (
+        "face-font-lax-matched-attributes",
+        "Whether to match some face attributes in lax manner when realizing faces.",
+    ),
+    (
+        "face-font-rescale-alist",
+        "Alist of fonts vs the rescaling factors.",
+    ),
+    ("face-ignored-fonts", "List of ignored fonts."),
+    (
+        "face-near-same-color-threshold",
+        "Threshold for using distant-foreground color instead of foreground.",
+    ),
+    ("face-remapping-alist", "Alist of face remappings."),
+    (
+        "fast-but-imprecise-scrolling",
+        "When non-nil, accelerate scrolling operations.",
+    ),
+    (
+        "fast-read-process-output",
+        "Non-nil to optimize the insertion of process output.",
+    ),
     ("features", "A list of symbols which are the features of the executing Emacs."),
+    (
+        "file-coding-system-alist",
+        "Alist to decide a coding system to use for a file I/O operation.",
+    ),
+    (
+        "file-name-coding-system",
+        "Coding system for encoding file names.",
+    ),
     (
         "file-name-handler-alist",
         "Alist of elements (REGEXP . HANDLER) for file names handled specially.",
@@ -847,6 +966,118 @@ pub(crate) static STARTUP_VARIABLE_DOC_STUBS: &[(&str, &str)] = &[
     (
         "fill-column",
         "Column beyond which automatic line-wrapping should happen.",
+    ),
+    (
+        "find-word-boundary-function-table",
+        "Char table of functions to search for the word boundary.",
+    ),
+    (
+        "first-change-hook",
+        "A list of functions to call before changing a buffer which is unmodified.",
+    ),
+    (
+        "float-output-format",
+        "The format descriptor string used to print floats.",
+    ),
+    (
+        "floats-consed",
+        "Number of floats that have been consed so far.",
+    ),
+    (
+        "focus-follows-mouse",
+        "Non-nil if window system changes focus when you move the mouse.",
+    ),
+    (
+        "font-ccl-encoder-alist",
+        "Alist of fontname patterns vs corresponding CCL program.",
+    ),
+    (
+        "font-encoding-alist",
+        "Alist of fontname patterns vs the corresponding encoding and repertory info.",
+    ),
+    (
+        "font-encoding-charset-alist",
+        "Alist of charsets vs the charsets to determine the preferred font encoding.",
+    ),
+    (
+        "font-log",
+        "A list that logs font-related actions and results, for debugging.",
+    ),
+    (
+        "font-slant-table",
+        "Vector of font slant symbols vs the corresponding numeric values.",
+    ),
+    (
+        "font-use-system-font",
+        "Non-nil means to apply the system defined font dynamically.",
+    ),
+    (
+        "font-weight-table",
+        "Vector of valid font weight values.",
+    ),
+    (
+        "font-width-table",
+        "Alist of font width symbols vs the corresponding numeric values.",
+    ),
+    (
+        "fontification-functions",
+        "List of functions to call to fontify regions of text.",
+    ),
+    (
+        "fontset-alias-alist",
+        "Alist of fontset names vs the aliases.",
+    ),
+    (
+        "force-load-messages",
+        "Non-nil means force printing messages when loading Lisp files.",
+    ),
+    (
+        "frame-alpha-lower-limit",
+        "The lower limit of the frame opacity (alpha transparency).",
+    ),
+    (
+        "frame-inhibit-implied-resize",
+        "Whether frames should be resized implicitly.",
+    ),
+    (
+        "frame-internal-parameters",
+        "Frame parameters specific to every frame.",
+    ),
+    (
+        "frame-resize-pixelwise",
+        "Non-nil means resize frames pixelwise.",
+    ),
+    (
+        "frame-size-history",
+        "History of frame size adjustments.",
+    ),
+    (
+        "frame-title-format",
+        "Template for displaying the title bar of visible frames.",
+    ),
+    (
+        "fringe-bitmaps",
+        "List of fringe bitmap symbols.",
+    ),
+    (
+        "fringe-cursor-alist",
+        "Mapping from logical to physical fringe cursor bitmaps.",
+    ),
+    (
+        "fringe-indicator-alist",
+        "Mapping from logical to physical fringe indicator bitmaps.",
+    ),
+    (
+        "fringes-outside-margins",
+        "Non-nil means to display fringes outside display margins.",
+    ),
+    (
+        "function-key-map",
+        "The parent keymap of all `local-function-key-map' instances.",
+    ),
+    (
+        "garbage-collection-messages",
+        "Non-nil means display messages at start and end of garbage collection.",
     ),
     (
         "inhibit-quit",
@@ -3548,6 +3779,42 @@ mod tests {
             result
                 .as_str()
                 .is_some_and(|s| s.contains("show an hourglass pointer"))
+        );
+    }
+
+    #[test]
+    fn documentation_property_eval_exec_directory_integer_property_returns_string() {
+        let mut evaluator = super::super::eval::Evaluator::new();
+        let result = builtin_documentation_property_eval(
+            &mut evaluator,
+            vec![
+                Value::symbol("exec-directory"),
+                Value::symbol("variable-documentation"),
+            ],
+        )
+        .unwrap();
+        assert!(
+            result
+                .as_str()
+                .is_some_and(|s| s.contains("Directory for executables for Emacs to invoke"))
+        );
+    }
+
+    #[test]
+    fn documentation_property_eval_frame_title_format_integer_property_returns_string() {
+        let mut evaluator = super::super::eval::Evaluator::new();
+        let result = builtin_documentation_property_eval(
+            &mut evaluator,
+            vec![
+                Value::symbol("frame-title-format"),
+                Value::symbol("variable-documentation"),
+            ],
+        )
+        .unwrap();
+        assert!(
+            result
+                .as_str()
+                .is_some_and(|s| s.contains("Template for displaying the title bar of visible frames"))
         );
     }
 
