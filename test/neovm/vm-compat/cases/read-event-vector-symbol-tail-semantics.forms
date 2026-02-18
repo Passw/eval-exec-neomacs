@@ -32,3 +32,8 @@
   (progn
     (read-event nil nil 0)
     unread-command-events))
+
+(let ((unread-command-events (list [foo] 98 'bar 'baz 'qux 'quux 'quuz)))
+  (progn
+    (read-event nil nil 0)
+    unread-command-events))
