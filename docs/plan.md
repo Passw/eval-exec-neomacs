@@ -28,6 +28,12 @@ Last updated: 2026-02-18
 
 ## Doing
 
+- Completed `documentation` runtime alias-to-builtin parity follow-up:
+  - Updated `rust/neovm-core/src/elisp/doc.rs` so symbol aliases created via function cells (for example `(fset 'alias 'car)`) are resolved through `indirect-function` semantics before doc extraction.
+  - Added evaluator unit coverage: `documentation_symbol_alias_to_builtin_returns_docstring`.
+  - Extended `cases/documentation-runtime-builtin-semantics` with a runtime alias-to-builtin probe and re-recorded Oracle baseline.
+  - Validated via `cargo test --manifest-path rust/neovm-core/Cargo.toml documentation_`, `make -C test/neovm/vm-compat check-one-neovm CASE=cases/documentation-runtime-builtin-semantics`, and full `make -C test/neovm/vm-compat check-all-neovm`.
+
 - Completed `documentation` builtin/special-form runtime parity slice:
   - Updated `rust/neovm-core/src/elisp/doc.rs` so `documentation` now resolves callable values through `symbol-function` wrapper paths and follows alias indirection before doc extraction.
   - Aligned builtin/special-form behavior so `(stringp (documentation 'car))`, `(stringp (documentation 'cdr))`, and `(stringp (documentation 'if))` are true, matching Oracle.
