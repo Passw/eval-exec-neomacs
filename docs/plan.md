@@ -28,6 +28,19 @@ Last updated: 2026-02-18
 
 ## Doing
 
+- Fixed `coding-system-priority-list` over-arity drift and locked runtime behavior (batch round 19):
+  - runtime changes:
+    - `rust/neovm-core/src/elisp/coding.rs`
+    - enforced max arity (`0..1`) for `coding-system-priority-list` via `expect_max_args`.
+    - added unit lock-in `priority_list_rejects_too_many_args`.
+  - oracle corpus changes:
+    - `test/neovm/vm-compat/cases/coding-system-runtime-semantics.{forms,expected.tsv}`
+    - added `(condition-case err (coding-system-priority-list nil nil) (error err))` expecting `wrong-number-of-arguments`.
+  - verified:
+    - `cargo test --manifest-path rust/neovm-core/Cargo.toml priority_list_rejects_too_many_args` (pass)
+    - `make -C test/neovm/vm-compat check-neovm-list LIST=<batch-list>` (pass; 24/24)
+    - `make -C test/neovm/vm-compat check-all-neovm` (pass)
+
 - Expanded coding-system runtime optional-arg/arity lock-ins (batch round 18):
   - oracle corpus changes:
     - `test/neovm/vm-compat/cases/coding-system-runtime-semantics.{forms,expected.tsv}`

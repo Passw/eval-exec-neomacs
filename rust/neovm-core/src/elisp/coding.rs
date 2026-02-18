@@ -949,6 +949,7 @@ pub(crate) fn builtin_coding_system_priority_list(
     mgr: &CodingSystemManager,
     args: Vec<Value>,
 ) -> EvalResult {
+    expect_max_args("coding-system-priority-list", &args, 1)?;
     let highest_only = args.first().is_some_and(|v| v.is_truthy());
     if highest_only {
         if let Some(first) = mgr.priority.first() {
@@ -1537,6 +1538,13 @@ mod tests {
         let items = list_to_vec(&result).unwrap();
         assert_eq!(items.len(), 1);
         assert!(matches!(&items[0], Value::Symbol(s) if s == "utf-8"));
+    }
+
+    #[test]
+    fn priority_list_rejects_too_many_args() {
+        let m = mgr();
+        let result = builtin_coding_system_priority_list(&m, vec![Value::Nil, Value::Nil]);
+        assert!(result.is_err());
     }
 
     // ----- EolType -----

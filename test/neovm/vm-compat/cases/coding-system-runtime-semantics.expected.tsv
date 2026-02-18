@@ -21,3 +21,4 @@
 21	(condition-case err (define-coding-system-alias 'vm-cs6) (error err))	OK (wrong-number-of-arguments define-coding-system-alias 1)
 22	(condition-case err (define-coding-system-alias 'vm-cs6 'utf-8 nil) (error err))	OK (wrong-number-of-arguments define-coding-system-alias 3)
 23	(condition-case err (set-coding-system-priority 'utf-8 nil nil) (error err))	OK (wrong-type-argument coding-system-p nil)
+24	(condition-case err (coding-system-priority-list nil nil) (error err))	OK (wrong-number-of-arguments coding-system-priority-list 2)

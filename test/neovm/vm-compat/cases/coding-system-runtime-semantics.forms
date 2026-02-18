@@ -32,3 +32,4 @@
 (condition-case err (define-coding-system-alias 'vm-cs6) (error err))
 (condition-case err (define-coding-system-alias 'vm-cs6 'utf-8 nil) (error err))
 (condition-case err (set-coding-system-priority 'utf-8 nil nil) (error err))
+(condition-case err (coding-system-priority-list nil nil) (error err))
