@@ -10455,6 +10455,20 @@ Last updated: 2026-02-18
     - `make -C test/neovm/vm-compat check-one-neovm CASE=display-control-runtime-semantics` (pass, 17/17)
     - `make -C test/neovm/vm-compat validate-case-lists` (pass)
     - `make -C test/neovm/vm-compat check-all-neovm` (pass)
+- Aligned `documentation` runtime designator handling with GNU Emacs for quoted lambdas and keyboard macros:
+  - runtime changes:
+    - quoted lambda list designators (`'(lambda ...)`) now return inline docstring when present, otherwise `nil`
+    - string and vector designators now return `"Keyboard macro."` instead of signaling `invalid-function`
+    - preserved existing invalid/error classes for other non-callable payloads
+  - expanded oracle corpus:
+    - `test/neovm/vm-compat/cases/documentation-runtime-builtin-semantics.forms`
+    - `test/neovm/vm-compat/cases/documentation-runtime-builtin-semantics.expected.tsv`
+    - added explicit probes for quoted lambda doc extraction and direct string/vector designators
+  - verified:
+    - `cargo test --manifest-path rust/neovm-core/Cargo.toml documentation_` (pass)
+    - `make -C test/neovm/vm-compat record FORMS=cases/documentation-runtime-builtin-semantics.forms EXPECTED=cases/documentation-runtime-builtin-semantics.expected.tsv` (pass)
+    - `make -C test/neovm/vm-compat check-one-neovm CASE=cases/documentation-runtime-builtin-semantics` (pass, 24/24)
+    - `make -C test/neovm/vm-compat check-all-neovm` (pass)
 - Aligned `Snarf-documentation` runtime error classes with GNU Emacs and locked explicit corpus:
   - runtime changes:
     - still returns `nil` for canonical `"DOC"` token
