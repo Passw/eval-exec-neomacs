@@ -28,6 +28,15 @@ Last updated: 2026-02-18
 
 ## Doing
 
+- Expanded `#s` incomplete-form EOF lock-ins for `read-from-string`:
+  - oracle corpus changes:
+    - `test/neovm/vm-compat/cases/read-from-string-edges.forms`
+    - `test/neovm/vm-compat/cases/read-from-string-edges.expected.tsv`
+    - added `condition-case` probes for `"#s("` and `"#s(x"` with `(car err)` to lock `end-of-file` symbol behavior.
+  - verified:
+    - `make -C test/neovm/vm-compat check-one-neovm CASE=cases/read-from-string-edges` (pass, 33/33)
+    - `make -C test/neovm/vm-compat check-all-neovm` (pass)
+
 - Aligned `read-from-string` handling of `#@...` skip-byte reader syntax with Oracle EOF behavior:
   - runtime changes:
     - updated `rust/neovm-core/src/elisp/reader.rs` so `read-from-string` now signals `end-of-file` when the next token starts with `#@` (including payload forms like `#@0x`, `#@4data42`, `#@4data#$`), instead of parsing skip-byte content in this entrypoint.

@@ -17,6 +17,8 @@
 (condition-case err (read-from-string "#0") (error err))
 (condition-case err (read-from-string "#a") (error err))
 (condition-case err (read-from-string "#s") (error err))
+(condition-case err (read-from-string "#s(") (error (car err)))
+(condition-case err (read-from-string "#s(x") (error (car err)))
 (condition-case err (read-from-string "#@") (error (car err)))
 (condition-case err (read-from-string "#@x") (error (car err)))
 (condition-case err (read-from-string "#@0x") (error (car err)))

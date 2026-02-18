@@ -17,15 +17,17 @@
 17	(condition-case err (read-from-string "#0") (error err))	OK (invalid-read-syntax "#0")
 18	(condition-case err (read-from-string "#a") (error err))	OK (invalid-read-syntax "#a")
 19	(condition-case err (read-from-string "#s") (error err))	OK (invalid-read-syntax "#s")
-20	(condition-case err (read-from-string "#@") (error (car err)))	OK end-of-file
-21	(condition-case err (read-from-string "#@x") (error (car err)))	OK end-of-file
-22	(condition-case err (read-from-string "#@0x") (error (car err)))	OK end-of-file
-23	(condition-case err (read-from-string "#@4data42") (error (car err)))	OK end-of-file
-24	(condition-case err (read-from-string "#@4data#$") (error (car err)))	OK end-of-file
-25	(condition-case err (read-from-string "#@4data#x") (error (car err)))	OK end-of-file
-26	(condition-case err (read-from-string "#@4data#s") (error (car err)))	OK end-of-file
-27	(condition-case err (read-from-string "#(") (error (car err)))	OK end-of-file
-28	(condition-case err (read-from-string "#[") (error (car err)))	OK end-of-file
-29	(read-from-string "####")	OK (## . 2)
-30	(read-from-string "#####")	OK (## . 2)
-31	(read-from-string "## ##")	OK (## . 2)
+20	(condition-case err (read-from-string "#s(") (error (car err)))	OK end-of-file
+21	(condition-case err (read-from-string "#s(x") (error (car err)))	OK end-of-file
+22	(condition-case err (read-from-string "#@") (error (car err)))	OK end-of-file
+23	(condition-case err (read-from-string "#@x") (error (car err)))	OK end-of-file
+24	(condition-case err (read-from-string "#@0x") (error (car err)))	OK end-of-file
+25	(condition-case err (read-from-string "#@4data42") (error (car err)))	OK end-of-file
+26	(condition-case err (read-from-string "#@4data#$") (error (car err)))	OK end-of-file
+27	(condition-case err (read-from-string "#@4data#x") (error (car err)))	OK end-of-file
+28	(condition-case err (read-from-string "#@4data#s") (error (car err)))	OK end-of-file
+29	(condition-case err (read-from-string "#(") (error (car err)))	OK end-of-file
+30	(condition-case err (read-from-string "#[") (error (car err)))	OK end-of-file
+31	(read-from-string "####")	OK (## . 2)
+32	(read-from-string "#####")	OK (## . 2)
+33	(read-from-string "## ##")	OK (## . 2)
