@@ -57,6 +57,17 @@ fn expect_max_args(name: &str, args: &[Value], max: usize) -> Result<(), Flow> {
     }
 }
 
+fn expect_integer_or_marker(val: &Value) -> Result<(), Flow> {
+    match val {
+        Value::Int(_) => Ok(()),
+        v if super::marker::is_marker(v) => Ok(()),
+        other => Err(signal(
+            "wrong-type-argument",
+            vec![Value::symbol("integer-or-marker-p"), other.clone()],
+        )),
+    }
+}
+
 fn is_known_or_derived_coding_system(mgr: &CodingSystemManager, name: &str) -> bool {
     if mgr.is_known(name) {
         return true;
@@ -829,9 +840,9 @@ pub(crate) fn builtin_detect_coding_string(
     }
     let highest = args.get(1).is_some_and(|v| v.is_truthy());
     if highest {
-        Ok(Value::symbol("utf-8"))
+        Ok(Value::symbol("undecided"))
     } else {
-        Ok(Value::list(vec![Value::symbol("utf-8")]))
+        Ok(Value::list(vec![Value::symbol("undecided")]))
     }
 }
 
@@ -843,11 +854,13 @@ pub(crate) fn builtin_detect_coding_region(
 ) -> EvalResult {
     expect_min_args("detect-coding-region", &args, 2)?;
     expect_max_args("detect-coding-region", &args, 3)?;
+    expect_integer_or_marker(&args[0])?;
+    expect_integer_or_marker(&args[1])?;
     let highest = args.get(2).is_some_and(|v| v.is_truthy());
     if highest {
-        Ok(Value::symbol("utf-8"))
+        Ok(Value::symbol("undecided"))
     } else {
-        Ok(Value::list(vec![Value::symbol("utf-8")]))
+        Ok(Value::list(vec![Value::symbol("undecided")]))
     }
 }
 
@@ -1394,7 +1407,7 @@ mod tests {
         let m = mgr();
         let result =
             builtin_detect_coding_string(&m, vec![Value::string("hello"), Value::True]).unwrap();
-        assert!(matches!(result, Value::Symbol(s) if s == "utf-8"));
+        assert!(matches!(result, Value::Symbol(s) if s == "undecided"));
     }
 
     #[test]
@@ -1403,7 +1416,7 @@ mod tests {
         let result = builtin_detect_coding_string(&m, vec![Value::string("hello")]).unwrap();
         let items = list_to_vec(&result).unwrap();
         assert_eq!(items.len(), 1);
-        assert!(matches!(&items[0], Value::Symbol(s) if s == "utf-8"));
+        assert!(matches!(&items[0], Value::Symbol(s) if s == "undecided"));
     }
 
     #[test]
@@ -1429,7 +1442,7 @@ mod tests {
         let result =
             builtin_detect_coding_region(&m, vec![Value::Int(1), Value::Int(100), Value::True])
                 .unwrap();
-        assert!(matches!(result, Value::Symbol(s) if s == "utf-8"));
+        assert!(matches!(result, Value::Symbol(s) if s == "undecided"));
     }
 
     #[test]
@@ -1439,6 +1452,7 @@ mod tests {
             builtin_detect_coding_region(&m, vec![Value::Int(1), Value::Int(100)]).unwrap();
         let items = list_to_vec(&result).unwrap();
         assert_eq!(items.len(), 1);
+        assert!(matches!(&items[0], Value::Symbol(s) if s == "undecided"));
     }
 
     #[test]
@@ -1449,6 +1463,15 @@ mod tests {
             vec![Value::Int(1), Value::Int(100), Value::Nil, Value::Nil],
         );
         assert!(result.is_err());
+    }
+
+    #[test]
+    fn detect_coding_region_rejects_non_integer_or_marker_bounds() {
+        let m = mgr();
+        assert!(builtin_detect_coding_region(&m, vec![Value::string("a"), Value::Int(1)]).is_err());
+        assert!(builtin_detect_coding_region(&m, vec![Value::Int(1), Value::string("b")]).is_err());
+        assert!(builtin_detect_coding_region(&m, vec![Value::Nil, Value::Int(1)]).is_err());
+        assert!(builtin_detect_coding_region(&m, vec![Value::Int(1), Value::Nil]).is_err());
     }
 
     // ----- keyboard/terminal coding system -----

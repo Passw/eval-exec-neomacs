@@ -28,3 +28,13 @@
 28	(condition-case err (detect-coding-string "x" nil nil nil) (error err))	OK (wrong-number-of-arguments detect-coding-string 4)
 29	(condition-case err (detect-coding-region 1 1 nil nil) (error err))	OK (wrong-number-of-arguments detect-coding-region 4)
 30	(condition-case err (detect-coding-region 1 1 nil nil nil) (error err))	OK (wrong-number-of-arguments detect-coding-region 5)
+31	(detect-coding-string "x")	OK (undecided)
+32	(detect-coding-string "x" nil)	OK (undecided)
+33	(detect-coding-string "x" t)	OK undecided
+34	(detect-coding-region 1 1)	OK (undecided)
+35	(detect-coding-region 1 1 nil)	OK (undecided)
+36	(detect-coding-region 1 1 t)	OK undecided
+37	(condition-case err (detect-coding-region "a" 1) (error err))	OK (wrong-type-argument integer-or-marker-p "a")
+38	(condition-case err (detect-coding-region 1 "b") (error err))	OK (wrong-type-argument integer-or-marker-p "b")
+39	(condition-case err (detect-coding-region nil 1) (error err))	OK (wrong-type-argument integer-or-marker-p nil)
+40	(condition-case err (detect-coding-region 1 nil) (error err))	OK (wrong-type-argument integer-or-marker-p nil)

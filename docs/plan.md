@@ -28,6 +28,24 @@ Last updated: 2026-02-18
 
 ## Doing
 
+- Aligned coding detection return-shape and region type validation with oracle (batch round 22):
+  - runtime changes:
+    - `rust/neovm-core/src/elisp/coding.rs`
+    - `detect-coding-string` now returns `undecided` / `(undecided)` instead of `utf-8` / `(utf-8)`.
+    - `detect-coding-region` now:
+      - validates `START`/`END` as `integer-or-marker-p`.
+      - returns `undecided` / `(undecided)` to match oracle shape.
+    - added unit lock-ins:
+      - `detect_coding_region_rejects_non_integer_or_marker_bounds`
+      - updated detect-coding result-shape assertions for `undecided`.
+  - oracle corpus changes:
+    - `test/neovm/vm-compat/cases/coding-system-runtime-semantics.{forms,expected.tsv}`
+    - added detect-coding return-shape probes and `detect-coding-region` bad-bound type probes.
+  - verified:
+    - `cargo test --manifest-path rust/neovm-core/Cargo.toml detect_coding_` (pass)
+    - `make -C test/neovm/vm-compat check-one-neovm CASE=cases/coding-system-runtime-semantics` (pass, 40/40)
+    - `make -C test/neovm/vm-compat check-all-neovm` (pass)
+
 - Aligned coding detection/list helper max-arity behavior with oracle (batch round 21):
   - runtime changes:
     - `rust/neovm-core/src/elisp/coding.rs`
