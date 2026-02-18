@@ -12,3 +12,5 @@
 12	(string-match-p "x" "aéx" -1)	OK 2
 13	(string-match "x" "aéx" 3)	OK nil
 14	(string-match-p "x" "aéx" 3)	OK nil
+15	(string-match "\\(é\\)" "aéx")	OK 1
+16	(string-match-p "\\(é\\)" "aéx")	OK 1

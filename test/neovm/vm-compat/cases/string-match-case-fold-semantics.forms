@@ -12,3 +12,5 @@
 (string-match-p "x" "aéx" -1)
 (string-match "x" "aéx" 3)
 (string-match-p "x" "aéx" 3)
+(string-match "\\(é\\)" "aéx")
+(string-match-p "\\(é\\)" "aéx")

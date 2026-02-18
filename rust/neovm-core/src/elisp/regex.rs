@@ -45,6 +45,11 @@ pub struct MatchData {
 /// - Emacs `\<` `\>` (word boundaries)  →  Rust `\b`
 /// - Emacs character classes inside `[...]` are kept as-is.
 pub fn translate_emacs_regex(pattern: &str) -> String {
+    fn next_char_at(s: &str, byte_idx: usize) -> Option<(char, usize)> {
+        s.get(byte_idx..)
+            .and_then(|tail| tail.chars().next().map(|ch| (ch, ch.len_utf8())))
+    }
+
     let mut out = String::with_capacity(pattern.len() + 8);
     let bytes = pattern.as_bytes();
     let len = bytes.len();
@@ -52,7 +57,14 @@ pub fn translate_emacs_regex(pattern: &str) -> String {
     let mut in_bracket = false;
 
     while i < len {
-        let ch = bytes[i] as char;
+        let (ch, ch_len) = next_char_at(pattern, i).expect("byte index must be char boundary");
+
+        // Non-ASCII literal bytes should be preserved as full UTF-8 scalar values.
+        if !ch.is_ascii() {
+            out.push(ch);
+            i += ch_len;
+            continue;
+        }
 
         // Inside a character class [...], pass through mostly unchanged.
         if in_bracket {
@@ -102,39 +114,40 @@ pub fn translate_emacs_regex(pattern: &str) -> String {
                 i += 1;
             }
             '\\' if i + 1 < len => {
-                let next = bytes[i + 1] as char;
+                let (next, next_len) =
+                    next_char_at(pattern, i + 1).expect("byte index must be char boundary");
                 match next {
                     // Emacs group → Rust group
                     '(' => {
                         out.push('(');
-                        i += 2;
+                        i += 1 + next_len;
                     }
                     ')' => {
                         out.push(')');
-                        i += 2;
+                        i += 1 + next_len;
                     }
                     // Emacs alternation → Rust alternation
                     '|' => {
                         out.push('|');
-                        i += 2;
+                        i += 1 + next_len;
                     }
                     // Emacs repetition braces → Rust repetition braces
                     '{' => {
                         out.push('{');
-                        i += 2;
+                        i += 1 + next_len;
                     }
                     '}' => {
                         out.push('}');
-                        i += 2;
+                        i += 1 + next_len;
                     }
                     // Word boundaries
                     '<' => {
                         out.push_str("\\b");
-                        i += 2;
+                        i += 1 + next_len;
                     }
                     '>' => {
                         out.push_str("\\b");
-                        i += 2;
+                        i += 1 + next_len;
                     }
                     // Back-references (1-9) — not supported by `regex` crate,
                     // but translate the syntax for pattern acceptance.
@@ -144,17 +157,18 @@ pub fn translate_emacs_regex(pattern: &str) -> String {
                         // which is acceptable for now.
                         out.push('\\');
                         out.push(next);
-                        i += 2;
+                        i += 1 + next_len;
                     }
                     // Emacs syntax classes (\s-, \s , etc.) → simplified to \s
                     's' => {
-                        i += 2;
+                        i += 1 + next_len;
                         // Consume the optional syntax-class character
                         if i < len {
-                            let class_ch = bytes[i] as char;
+                            let (class_ch, class_len) =
+                                next_char_at(pattern, i).expect("byte index must be char boundary");
                             match class_ch {
                                 '-' | ' ' | '.' | '_' | 'w' => {
-                                    i += 1;
+                                    i += class_len;
                                 }
                                 _ => {}
                             }
@@ -162,12 +176,13 @@ pub fn translate_emacs_regex(pattern: &str) -> String {
                         out.push_str("\\s");
                     }
                     'S' => {
-                        i += 2;
+                        i += 1 + next_len;
                         if i < len {
-                            let class_ch = bytes[i] as char;
+                            let (class_ch, class_len) =
+                                next_char_at(pattern, i).expect("byte index must be char boundary");
                             match class_ch {
                                 '-' | ' ' | '.' | '_' | 'w' => {
-                                    i += 1;
+                                    i += class_len;
                                 }
                                 _ => {}
                             }
@@ -180,29 +195,29 @@ pub fn translate_emacs_regex(pattern: &str) -> String {
                             // \` (beginning of buffer) and \' (end of buffer) → \A and \z
                             '`' => {
                                 out.push_str("\\A");
-                                i += 2;
+                                i += 1 + next_len;
                             }
                             '\'' => {
                                 out.push_str("\\z");
-                                i += 2;
+                                i += 1 + next_len;
                             }
                             _ => {
                                 out.push('\\');
                                 out.push(next);
-                                i += 2;
+                                i += 1 + next_len;
                             }
                         }
                     }
                     // Literal backslash
                     '\\' => {
                         out.push_str("\\\\");
-                        i += 2;
+                        i += 1 + next_len;
                     }
                     // Anything else after `\` — pass through the escape
                     _ => {
                         out.push('\\');
                         out.push(next);
-                        i += 2;
+                        i += 1 + next_len;
                     }
                 }
             }
@@ -789,6 +804,12 @@ mod tests {
         assert_eq!(translate_emacs_regex("\\\\"), "\\\\");
     }
 
+    #[test]
+    fn translate_multibyte_literals() {
+        assert_eq!(translate_emacs_regex("\\(é\\)"), "(é)");
+        assert_eq!(translate_emacs_regex("[éx]"), "[éx]");
+    }
+
     // -----------------------------------------------------------------------
     // string_match_full
     // -----------------------------------------------------------------------
@@ -816,6 +837,17 @@ mod tests {
         assert_eq!(md.groups[0], Some((0, 9)));
         assert_eq!(md.groups[1], Some((0, 4))); // "user"
         assert_eq!(md.groups[2], Some((5, 9))); // "host"
+    }
+
+    #[test]
+    fn string_match_with_multibyte_group_literal() {
+        let mut md = None;
+        let result = string_match_full("\\(é\\)", "aéx", 0, &mut md);
+        assert!(result.is_ok());
+        assert_eq!(result.unwrap(), Some(1));
+        let md = md.unwrap();
+        assert_eq!(md.groups[0], Some((1, 3))); // "é" in byte offsets
+        assert_eq!(md.groups[1], Some((1, 3))); // capture group
     }
 
     #[test]
