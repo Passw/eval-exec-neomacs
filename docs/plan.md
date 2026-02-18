@@ -118,6 +118,15 @@ Last updated: 2026-02-18
     - `make -C test/neovm/vm-compat check-one-neovm CASE=cases/read-char-vector-vector-tail-semantics` (pass, 7/7)
     - `make -C test/neovm/vm-compat check-all-neovm` (pass)
 
+- Expanded `read-char` vector-symbol tail lock-ins with deeper payload depth (round 3):
+  - oracle corpus changes:
+    - `test/neovm/vm-compat/cases/read-char-vector-symbol-tail-semantics.forms`
+    - `test/neovm/vm-compat/cases/read-char-vector-symbol-tail-semantics.expected.tsv`
+    - added deeper-tail probe `(list [foo] 98 'bar 'baz 'qux 'quux 'quuz)`.
+  - verified:
+    - `make -C test/neovm/vm-compat check-one-neovm CASE=cases/read-char-vector-symbol-tail-semantics` (pass, 7/7)
+    - `make -C test/neovm/vm-compat check-all-neovm` (pass)
+
 - Expanded `read-char-exclusive` symbol-vector tail lock-ins with deeper payload depth (round 2):
   - oracle corpus changes:
     - `test/neovm/vm-compat/cases/read-char-exclusive-symbol-vector-tail-semantics.forms`
