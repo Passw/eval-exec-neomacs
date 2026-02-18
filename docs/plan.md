@@ -28,6 +28,12 @@ Last updated: 2026-02-18
 
 ## Doing
 
+- Extended `ldexp` argument-validation order parity:
+  - Updated `rust/neovm-core/src/elisp/floatfns.rs` so `ldexp` validates exponent (`fixnump`) before significand (`numberp`), matching Oracle error precedence for mixed-invalid inputs.
+  - Added unit coverage in `test_ldexp_type_check_order_matches_oracle`.
+  - Added oracle lock-in case `cases/ldexp-type-check-order-semantics` and wired it into `test/neovm/vm-compat/cases/default.list`.
+  - Validated via `cargo test --manifest-path rust/neovm-core/Cargo.toml test_ldexp_type_check_order_matches_oracle`, `make -C test/neovm/vm-compat check-one-neovm CASE=cases/ldexp-type-check-order-semantics`, and full `make -C test/neovm/vm-compat check-all-neovm`.
+
 - Extended `floatfns` argument-contract and signed-zero parity:
   - Updated `rust/neovm-core/src/elisp/floatfns.rs` contracts to match Oracle:
     - `copysign`, `fceiling`, `ffloor`, `fround`, `ftruncate` now require `floatp`.
