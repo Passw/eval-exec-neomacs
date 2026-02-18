@@ -11,3 +11,12 @@
   (list (input-pending-p t) unread-command-events))
 (let ((unread-command-events (list 97))) (input-pending-p 'check))
 (condition-case err (input-pending-p nil nil) (list (car err) (cdr err)))
+
+(let ((unread-command-events '(97 . foo)))
+  (list (input-pending-p) unread-command-events))
+
+(let ((unread-command-events [97]))
+  (list (input-pending-p) unread-command-events))
+
+(let ((unread-command-events '(foo . 97)))
+  (list (input-pending-p) unread-command-events))

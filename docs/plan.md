@@ -28,6 +28,16 @@ Last updated: 2026-02-18
 
 ## Doing
 
+- Expanded input-state unread queue shape lock-ins (batch round 8):
+  - oracle corpus changes:
+    - `test/neovm/vm-compat/cases/waiting-for-user-input-semantics.{forms,expected.tsv}`
+    - `test/neovm/vm-compat/cases/input-pending-semantics.{forms,expected.tsv}`
+    - `test/neovm/vm-compat/cases/discard-input-semantics.{forms,expected.tsv}`
+    - added dotted-pair and vector queue probes plus post-`discard-input` pending-state checks.
+  - verified:
+    - `make -C test/neovm/vm-compat check-neovm-list LIST=<batch-list>` (pass; 7/7, 13/13, 13/13)
+    - `make -C test/neovm/vm-compat check-all-neovm` (pass)
+
 - Expanded invalid/stale unread-queue dispatch lock-ins (batch round 7):
   - oracle corpus changes:
     - `test/neovm/vm-compat/cases/read-invalid-event-dispatch-semantics.{forms,expected.tsv}`

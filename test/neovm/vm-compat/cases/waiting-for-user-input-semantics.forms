@@ -4,3 +4,12 @@
 (let ((unread-command-events (list 97)))
   (list (waiting-for-user-input-p) unread-command-events))
 (condition-case err (waiting-for-user-input-p nil) (list (car err) (cdr err)))
+
+(let ((unread-command-events (list 'foo 97)))
+  (list (waiting-for-user-input-p) unread-command-events))
+
+(let ((unread-command-events [97]))
+  (list (waiting-for-user-input-p) unread-command-events))
+
+(let ((unread-command-events '(97 . foo)))
+  (list (waiting-for-user-input-p) unread-command-events))
