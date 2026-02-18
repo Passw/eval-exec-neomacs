@@ -6,3 +6,4 @@
 6	(let ((unread-command-events (list 'foo 98 [bar] [baz] [qux]))) (progn (read-key-sequence "") unread-command-events))	OK (98 [bar] [baz] [qux])
 7	(let ((unread-command-events (list 'foo 98 [bar] [baz] [qux] [quux]))) (progn (read-key-sequence "") unread-command-events))	OK (98 [bar] [baz] [qux] [quux])
 8	(let ((unread-command-events (list 'foo 98 [bar] [baz] [qux] [quux] [quuz]))) (progn (read-key-sequence "") unread-command-events))	OK (98 [bar] [baz] [qux] [quux] [quuz])
+9	(let ((unread-command-events (list 'foo 98 [bar] [baz] [qux] [quux] [quuz] [corge]))) (progn (read-key-sequence "") unread-command-events))	OK (98 [bar] [baz] [qux] [quux] [quuz] [corge])
