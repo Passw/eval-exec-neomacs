@@ -14,3 +14,7 @@
 14	(string-match-p "x" "aéx" 3)	OK nil
 15	(string-match "\\(é\\)" "aéx")	OK 1
 16	(string-match-p "\\(é\\)" "aéx")	OK 1
+17	(condition-case err (string-match "\\é" "é") (error err))	OK 0
+18	(condition-case err (string-match "\\é" "aé") (error err))	OK 1
+19	(condition-case err (string-match-p "\\é" "aé") (error err))	OK 1
+20	(condition-case err (string-match "\\😀" "a😀") (error err))	OK 1

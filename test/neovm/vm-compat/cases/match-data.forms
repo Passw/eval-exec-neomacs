@@ -32,3 +32,6 @@
 (progn (string-match "\\(é\\)" "aéx") (match-beginning 1))
 (progn (string-match "\\(é\\)" "aéx") (match-end 1))
 (progn (string-match "\\(é\\)" "aéx") (match-data))
+(progn (string-match "\\é" "aéx") (match-beginning 0))
+(progn (string-match "\\é" "aéx") (match-end 0))
+(progn (string-match "\\é" "aéx") (match-data))

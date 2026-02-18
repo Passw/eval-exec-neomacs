@@ -215,7 +215,9 @@ pub fn translate_emacs_regex(pattern: &str) -> String {
                     }
                     // Anything else after `\` — pass through the escape
                     _ => {
-                        out.push('\\');
+                        if next.is_ascii() {
+                            out.push('\\');
+                        }
                         out.push(next);
                         i += 1 + next_len;
                     }
@@ -815,6 +817,8 @@ mod tests {
     fn translate_multibyte_literals() {
         assert_eq!(translate_emacs_regex("\\(é\\)"), "(é)");
         assert_eq!(translate_emacs_regex("[éx]"), "[éx]");
+        assert_eq!(translate_emacs_regex("\\é"), "é");
+        assert_eq!(translate_emacs_regex("\\😀"), "😀");
     }
 
     // -----------------------------------------------------------------------
@@ -855,6 +859,14 @@ mod tests {
         let md = md.unwrap();
         assert_eq!(md.groups[0], Some((1, 3))); // "é" in byte offsets
         assert_eq!(md.groups[1], Some((1, 3))); // capture group
+    }
+
+    #[test]
+    fn string_match_with_escaped_multibyte_literal() {
+        let mut md = None;
+        let result = string_match_full("\\é", "aéx", 0, &mut md);
+        assert!(result.is_ok());
+        assert_eq!(result.unwrap(), Some(1));
     }
 
     #[test]

@@ -14,3 +14,7 @@
 (string-match-p "x" "aéx" 3)
 (string-match "\\(é\\)" "aéx")
 (string-match-p "\\(é\\)" "aéx")
+(condition-case err (string-match "\\é" "é") (error err))
+(condition-case err (string-match "\\é" "aé") (error err))
+(condition-case err (string-match-p "\\é" "aé") (error err))
+(condition-case err (string-match "\\😀" "a😀") (error err))
