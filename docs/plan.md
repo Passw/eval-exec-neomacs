@@ -28,6 +28,12 @@ Last updated: 2026-02-18
 
 ## Doing
 
+- Extended `fround` float tie parity for signed-zero edge behavior:
+  - Updated `rust/neovm-core/src/elisp/floatfns.rs` so `fround` uses IEEE ties-to-even directly (`round_ties_even`), preserving negative zero for `-0.5` (`-0.0`) to match Oracle.
+  - Added unit coverage in `test_fround` for the negative-zero tie case.
+  - Added oracle lock-in case `cases/fround-negative-zero-semantics` and wired it into `test/neovm/vm-compat/cases/default.list`.
+  - Validated via `cargo test --manifest-path rust/neovm-core/Cargo.toml test_fround`, `make -C test/neovm/vm-compat check-one-neovm CASE=cases/fround-negative-zero-semantics`, and full `make -C test/neovm/vm-compat check-all-neovm`.
+
 - Extended `round` float tie parity to Oracle half-even behavior:
   - Updated `rust/neovm-core/src/elisp/builtins.rs` so float `round` now uses tie-to-even semantics (for example `0.5 -> 0`, `2.5 -> 2`, `-2.5 -> -2`) instead of away-from-zero ties.
   - Added evaluator unit coverage in `pure_dispatch_typed_round_half_ties_to_even`.
