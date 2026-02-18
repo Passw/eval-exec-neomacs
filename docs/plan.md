@@ -28,6 +28,13 @@ Last updated: 2026-02-18
 
 ## Doing
 
+- Extended NaN payload reader parity for integer mantissas:
+  - Updated `rust/neovm-core/src/elisp/parser.rs` so special float literals like `1.0e+NaN`, `-1.0e+NaN`, and `2.0e+NaN` parse as floats (while fractional payload forms like `.5e+NaN` remain symbols for now).
+  - Updated `rust/neovm-core/src/elisp/expr.rs` and `rust/neovm-core/src/elisp/print.rs` to preserve tagged integer NaN payload spellings (`±N.0e+NaN`) through compat-runner round-trips and result printing.
+  - Added parser/print unit coverage in `parse_emacs_special_float_literals`, `parse_noncanonical_nan_payload_literals_as_symbols`, `print_special_float_spellings_match_oracle_shape`, and `print_float_nan_payload_tag_round_trip_shape`.
+  - Added oracle lock-in case `cases/reader-nan-payload-literals-semantics` and wired it into `test/neovm/vm-compat/cases/default.list`.
+  - Validated via targeted `cargo test --manifest-path rust/neovm-core/Cargo.toml` runs for the new/updated tests, targeted `check-one-neovm` runs for `reader-special-float-literals-semantics` and `reader-nan-payload-literals-semantics`, and full `make -C test/neovm/vm-compat check-all-neovm`.
+
 - Extended reader parity for Emacs special float literal spellings:
   - Updated `rust/neovm-core/src/elisp/parser.rs` to parse canonical Emacs special float literals (`0.0e+NaN`, `-0.0e+NaN`, `±1.0e+INF`, plus equivalent `E` forms) and keep lower-case `inf`/`nan` symbol behavior.
   - Updated `rust/neovm-core/src/elisp/expr.rs` float rendering so compat-runner round-trips preserve Emacs spellings (`0.0e+NaN` / `1.0e+INF`) instead of Rust `NaN`/`inf` tokens.
