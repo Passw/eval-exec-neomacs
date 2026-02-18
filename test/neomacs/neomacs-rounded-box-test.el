@@ -113,6 +113,73 @@
        :box (:line-width 2 :color "dark orange")))
   "Sharp gold box for adjacency test.")
 
+;; --- Fancy border styles ---
+(defface neomacs-rbox-style-solid
+  '((t :foreground "white" :background "gray20"
+       :box (:line-width 3 :color "dodger blue" :corner-radius 10
+             :border-style solid :border-speed 100)))
+  "Fancy: solid.")
+
+(defface neomacs-rbox-style-rainbow
+  '((t :foreground "white" :background "gray20"
+       :box (:line-width 3 :color "white" :corner-radius 12
+             :border-style rainbow :border-speed 100)))
+  "Fancy: rainbow.")
+
+(defface neomacs-rbox-style-animated-rainbow
+  '((t :foreground "white" :background "gray20"
+       :box (:line-width 3 :color "white" :corner-radius 12
+             :border-style animated-rainbow :border-speed 100)))
+  "Fancy: animated rainbow.")
+
+(defface neomacs-rbox-style-gradient
+  '((t :foreground "white" :background "gray20"
+       :box (:line-width 3 :color "deep pink" :corner-radius 10
+             :border-style gradient :border-speed 100 :color2 "cyan")))
+  "Fancy: gradient.")
+
+(defface neomacs-rbox-style-glow
+  '((t :foreground "white" :background "gray20"
+       :box (:line-width 2 :color "lime green" :corner-radius 10
+             :border-style glow :border-speed 100)))
+  "Fancy: pulsing glow.")
+
+(defface neomacs-rbox-style-neon
+  '((t :foreground "white" :background "gray20"
+       :box (:line-width 3 :color "magenta" :corner-radius 10
+             :border-style neon :border-speed 100 :color2 "cyan")))
+  "Fancy: neon double-stroke.")
+
+(defface neomacs-rbox-style-dashed
+  '((t :foreground "white" :background "gray20"
+       :box (:line-width 3 :color "gold" :corner-radius 10
+             :border-style dashed :border-speed 100)))
+  "Fancy: dashed.")
+
+(defface neomacs-rbox-style-comet
+  '((t :foreground "white" :background "gray20"
+       :box (:line-width 3 :color "orange red" :corner-radius 12
+             :border-style comet :border-speed 100)))
+  "Fancy: comet trail.")
+
+(defface neomacs-rbox-style-iridescent
+  '((t :foreground "white" :background "gray20"
+       :box (:line-width 3 :color "steel blue" :corner-radius 10
+             :border-style iridescent :border-speed 100)))
+  "Fancy: iridescent.")
+
+(defface neomacs-rbox-style-fire
+  '((t :foreground "white" :background "gray20"
+       :box (:line-width 3 :color "dark red" :corner-radius 10
+             :border-style fire :border-speed 100)))
+  "Fancy: fire / plasma.")
+
+(defface neomacs-rbox-style-heartbeat
+  '((t :foreground "white" :background "gray20"
+       :box (:line-width 2 :color "red" :corner-radius 10
+             :border-style heartbeat :border-speed 100)))
+  "Fancy: heartbeat.")
+
 ;; --- Comparison: sharp vs rounded side by side ---
 (defface neomacs-rbox-compare-sharp
   '((t :foreground "white" :background "#404060"
@@ -253,6 +320,48 @@
     (let ((s (point)))
       (insert " Gold ")
       (put-text-property s (point) 'face 'neomacs-rbox-adj-sharp-gold))
+    (insert "\n")
+
+    ;; === FANCY BORDER STYLES ===
+    (neomacs-rbox--insert-section "FANCY BORDER STYLES (:border-style)")
+    (neomacs-rbox--insert-sample "solid:" 'neomacs-rbox-style-solid)
+    (neomacs-rbox--insert-sample "rainbow:" 'neomacs-rbox-style-rainbow)
+    (neomacs-rbox--insert-sample "animated-rainbow:" 'neomacs-rbox-style-animated-rainbow)
+    (neomacs-rbox--insert-sample "gradient (pink→cyan):" 'neomacs-rbox-style-gradient)
+    (neomacs-rbox--insert-sample "glow:" 'neomacs-rbox-style-glow)
+    (neomacs-rbox--insert-sample "neon (magenta+cyan):" 'neomacs-rbox-style-neon)
+    (neomacs-rbox--insert-sample "dashed:" 'neomacs-rbox-style-dashed)
+    (neomacs-rbox--insert-sample "comet:" 'neomacs-rbox-style-comet)
+    (neomacs-rbox--insert-sample "iridescent:" 'neomacs-rbox-style-iridescent)
+    (neomacs-rbox--insert-sample "fire:" 'neomacs-rbox-style-fire)
+    (neomacs-rbox--insert-sample "heartbeat:" 'neomacs-rbox-style-heartbeat)
+
+    ;; === FANCY STYLES INLINE ===
+    (neomacs-rbox--insert-section "FANCY STYLES: INLINE CONTEXT")
+    (neomacs-rbox--insert-inline "animated-rainbow inline:" 'neomacs-rbox-style-animated-rainbow)
+    (neomacs-rbox--insert-inline "gradient inline:" 'neomacs-rbox-style-gradient)
+    (neomacs-rbox--insert-inline "neon inline:" 'neomacs-rbox-style-neon)
+    (neomacs-rbox--insert-inline "comet inline:" 'neomacs-rbox-style-comet)
+    (neomacs-rbox--insert-inline "heartbeat inline:" 'neomacs-rbox-style-heartbeat)
+
+    ;; === ADJACENT FANCY BOXES ===
+    (neomacs-rbox--insert-section "ADJACENT FANCY BOXES")
+    (insert "  ")
+    (let ((s (point)))
+      (insert " Rainbow ")
+      (put-text-property s (point) 'face 'neomacs-rbox-style-rainbow))
+    (let ((s (point)))
+      (insert " Gradient ")
+      (put-text-property s (point) 'face 'neomacs-rbox-style-gradient))
+    (let ((s (point)))
+      (insert " Neon ")
+      (put-text-property s (point) 'face 'neomacs-rbox-style-neon))
+    (let ((s (point)))
+      (insert " Fire ")
+      (put-text-property s (point) 'face 'neomacs-rbox-style-fire))
+    (let ((s (point)))
+      (insert " Heartbeat ")
+      (put-text-property s (point) 'face 'neomacs-rbox-style-heartbeat))
     (insert "\n")
 
     ;; === EXPECTED BEHAVIOR ===
