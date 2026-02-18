@@ -210,7 +210,17 @@ pub(crate) fn builtin_describe_function(
 
     if let Some(alias_name) = func_val.as_symbol_name() {
         if alias_name != name {
-            return Ok(Value::string(format!("{name} is an alias for `{alias_name}`.")));
+            let indirect =
+                super::builtins::builtin_indirect_function(eval, vec![Value::symbol(alias_name)]);
+            let text = match indirect {
+                Ok(value) if !value.is_nil() => {
+                    format!("{name} is an alias for `{alias_name}`.")
+                }
+                _ => format!(
+                    "{name} is an alias for `{alias_name}`, which is not known to be defined."
+                ),
+            };
+            return Ok(Value::string(text));
         }
     }
 
@@ -2231,7 +2241,7 @@ mod tests {
         assert!(result.is_ok());
         assert_eq!(
             result.unwrap().as_str(),
-            Some("vm-alias-missing is an alias for `vm-no-such-fn`.")
+            Some("vm-alias-missing is an alias for `vm-no-such-fn`, which is not known to be defined.")
         );
     }
 
