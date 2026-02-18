@@ -28,6 +28,15 @@ Last updated: 2026-02-18
 
 ## Doing
 
+- Expanded `read-key` symbol-tail lock-ins for dotted unread queue tails:
+  - oracle corpus changes:
+    - `test/neovm/vm-compat/cases/read-key-symbol-tail-semantics.forms`
+    - `test/neovm/vm-compat/cases/read-key-symbol-tail-semantics.expected.tsv`
+    - added improper-list queue probes for `(97 . foo)` and `(foo . 97)` to lock stale-tail behavior after one `read-key` consumption.
+  - verified:
+    - `make -C test/neovm/vm-compat check-one-neovm CASE=cases/read-key-symbol-tail-semantics` (pass, 3/3)
+    - `make -C test/neovm/vm-compat check-all-neovm` (pass)
+
 - Expanded `read-char`/`read-char-exclusive` queue-state lock-ins for non-cons unread queue values:
   - oracle corpus changes:
     - `test/neovm/vm-compat/cases/read-char-queue-state-semantics.forms`
