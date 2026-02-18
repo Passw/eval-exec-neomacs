@@ -10403,6 +10403,33 @@ Last updated: 2026-02-17
     - `cargo test --manifest-path rust/neovm-core/Cargo.toml doc::tests::snarf_documentation -- --nocapture` (pass)
     - `make -C test/neovm/vm-compat check-one-neovm CASE=snarf-documentation-runtime-semantics` (pass, 9/9)
     - `make -C test/neovm/vm-compat check-all-neovm` (pass)
+- Aligned `describe-variable` runtime semantics with GNU Emacs and added explicit runtime corpus:
+  - runtime changes:
+    - non-symbol input now signals `user-error` class
+    - unbound symbols return `"NAME is void as a variable."` text
+    - bound symbols without doc property return `"NAME's value is ..."` text
+    - existing doc-property behavior and optional second argument support preserved
+  - added and enabled oracle corpus:
+    - `test/neovm/vm-compat/cases/describe-variable-runtime-semantics.forms`
+    - `test/neovm/vm-compat/cases/describe-variable-runtime-semantics.expected.tsv`
+    - `test/neovm/vm-compat/cases/default.list`
+  - verified:
+    - `cargo test --manifest-path rust/neovm-core/Cargo.toml doc::tests::describe_variable -- --nocapture` (pass)
+    - `make -C test/neovm/vm-compat check-one-neovm CASE=describe-variable-runtime-semantics` (pass, 5/5)
+    - `make -C test/neovm/vm-compat check-all-neovm` (pass)
+- Aligned `describe-function` builtin-name resolution semantics and added explicit runtime corpus:
+  - runtime changes:
+    - resolver now uses `symbol-function` parity path so builtins like `car` are describable
+    - preserves `void-function` signaling for unresolved function names
+    - keeps existing return shape (`stringp`) for callable function designators
+  - added and enabled oracle corpus:
+    - `test/neovm/vm-compat/cases/describe-function-runtime-semantics.forms`
+    - `test/neovm/vm-compat/cases/describe-function-runtime-semantics.expected.tsv`
+    - `test/neovm/vm-compat/cases/default.list`
+  - verified:
+    - `cargo test --manifest-path rust/neovm-core/Cargo.toml doc::tests::describe_function -- --nocapture` (pass)
+    - `make -C test/neovm/vm-compat check-one-neovm CASE=describe-function-runtime-semantics` (pass, 5/5)
+    - `make -C test/neovm/vm-compat check-all-neovm` (pass)
 
 ## Doing
 
@@ -10411,7 +10438,7 @@ Last updated: 2026-02-17
   - run oracle/parity checks after each behavior-affecting change
   - remove dead helper code that is not part of exposed compatibility surface
 - Identify the next high-impact builtin still stubbed in NeoVM core and land it as a small implementation + oracle-corpus lock-in slice.
-  - current focus: continue evaluator-backed doc/helper parity slices after `Snarf-documentation` error-class alignment
+  - current focus: continue evaluator-backed doc/helper parity slices after `describe-variable` and `describe-function` lock-ins
 - Reduce vm-compat operator friction for large case sets (small Makefile UX improvements).
   - added list-driven targets: `record-list`, `check-list`, `check-neovm-list` with `LIST=cases/<name>.list`
 
