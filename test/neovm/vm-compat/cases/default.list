@@ -359,6 +359,7 @@ cases/window-alias-introspection-semantics
 cases/x-display-batch-semantics
 cases/x-display-terminal-designator-semantics
 cases/x-display-color-get-device-terminal-error-payload-semantics
+cases/x-server-window-error-structure-semantics
 cases/display-monitor-semantics
 cases/display-monitor-frames-semantics
 cases/display-monitor-window-designator-errors-semantics
