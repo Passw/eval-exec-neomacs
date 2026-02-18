@@ -4,4 +4,5 @@
 4	(let ((unread-command-events (list [foo] 98 97 1.0))) (progn (read-key "") unread-command-events))	OK (98 97 1.0)
 5	(let ((unread-command-events (list [foo] 98 97 96 1.0))) (progn (read-key "") unread-command-events))	OK (98 97 96 1.0)
 6	(let ((unread-command-events (list [foo] 98 97 96 95 1.0))) (progn (read-key "") unread-command-events))	OK (98 97 96 95 1.0)
-7	(let ((unread-command-events '([foo] . 1.0))) (progn (read-key "") unread-command-events))	OK 1.0
+7	(let ((unread-command-events (list [foo] 98 97 96 95 94 1.0))) (progn (read-key "") unread-command-events))	OK (98 97 96 95 94 1.0)
+8	(let ((unread-command-events '([foo] . 1.0))) (progn (read-key "") unread-command-events))	OK 1.0
