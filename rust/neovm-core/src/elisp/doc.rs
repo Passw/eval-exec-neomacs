@@ -2283,6 +2283,246 @@ pub(crate) static STARTUP_VARIABLE_DOC_STUBS: &[(&str, &str)] = &[
         "signal-hook-function",
         "If non-nil, this is a function for ‘signal’ to call.",
     ),
+    (
+        "signal-process-functions",
+        "List of functions to be called for ‘signal-process’.",
+    ),
+    (
+        "source-directory",
+        "Directory in which Emacs sources were found when Emacs was built.",
+    ),
+    (
+        "special-event-map",
+        "Keymap defining bindings for special events to execute at low level.",
+    ),
+    (
+        "standard-display-table",
+        "Display table to use for buffers that specify none.",
+    ),
+    (
+        "standard-input",
+        "Stream for read to get input from.",
+    ),
+    (
+        "standard-translation-table-for-decode",
+        "Table for translating characters while decoding.",
+    ),
+    (
+        "standard-translation-table-for-encode",
+        "Table for translating characters while encoding.",
+    ),
+    (
+        "string-chars-consed",
+        "Number of string characters that have been consed so far.",
+    ),
+    (
+        "strings-consed",
+        "Number of strings that have been consed so far.",
+    ),
+    (
+        "suspend-tty-functions",
+        "Functions run after suspending a tty.",
+    ),
+    (
+        "symbols-consed",
+        "Number of symbols that have been consed so far.",
+    ),
+    (
+        "symbols-with-pos-enabled",
+        "If non-nil, a symbol with position ordinarily behaves as its bare symbol.",
+    ),
+    (
+        "syntax-propertize--done",
+        "Position up to which syntax-table properties have been set.",
+    ),
+    (
+        "system-configuration",
+        "Value is string indicating configuration Emacs was built for.",
+    ),
+    (
+        "system-configuration-features",
+        "String listing some of the main features this Emacs was compiled with.",
+    ),
+    (
+        "system-configuration-options",
+        "String containing the configuration options Emacs was built with.",
+    ),
+    (
+        "system-key-alist",
+        "Alist of system-specific X windows key symbols.",
+    ),
+    (
+        "system-messages-locale",
+        "System locale for messages.",
+    ),
+    (
+        "system-name",
+        "The host name of the machine Emacs is running on.",
+    ),
+    (
+        "system-time-locale",
+        "System locale for time.",
+    ),
+    (
+        "system-type",
+        "The value is a symbol indicating the type of operating system you are using.",
+    ),
+    (
+        "system-uses-terminfo",
+        "Non-nil means the system uses terminfo rather than termcap.",
+    ),
+    (
+        "tab-bar--dragging-in-progress",
+        "Non-nil when maybe dragging tab bar item.",
+    ),
+    (
+        "tab-bar-border",
+        "Border below tab-bar in pixels.",
+    ),
+    (
+        "tab-bar-button-margin",
+        "Margin around tab-bar buttons in pixels.",
+    ),
+    (
+        "tab-bar-button-relief",
+        "Relief thickness of tab-bar buttons.",
+    ),
+    (
+        "tab-bar-position",
+        "Specify on which side from the tool bar the tab bar shall be.",
+    ),
+    (
+        "tab-bar-separator-image-expression",
+        "Expression evaluating to the image spec for a tab-bar separator.",
+    ),
+    (
+        "tab-line-format",
+        "Analogous to ‘mode-line-format’, but controls the tab line.",
+    ),
+    (
+        "tab-width",
+        "Distance between tab stops (for display of tab characters), in columns.",
+    ),
+    (
+        "temp-buffer-show-function",
+        "Non-nil means call as function to display a help buffer.",
+    ),
+    (
+        "temporary-file-directory",
+        "The directory for writing temporary files.",
+    ),
+    (
+        "terminal-frame",
+        "The initial frame-object, which represents Emacs’s stdout.",
+    ),
+    (
+        "text-conversion-edits",
+        "List of buffers last edited as a result of text conversion.",
+    ),
+    (
+        "text-conversion-face",
+        "Face in which to display temporary edits by an input method.",
+    ),
+    (
+        "text-conversion-style",
+        "How the on screen keyboard’s input method should insert in this buffer.",
+    ),
+    (
+        "text-property-default-nonsticky",
+        "Alist of properties vs the corresponding non-stickiness.",
+    ),
+    (
+        "text-quoting-style",
+        "Style to use for single quotes in help and messages.",
+    ),
+    (
+        "this-command-keys-shift-translated",
+        "Non-nil if the key sequence activating this command was shift-translated.",
+    ),
+    (
+        "this-original-command",
+        "The command bound to the current key sequence before remapping.",
+    ),
+    (
+        "throw-on-input",
+        "If non-nil, any keyboard input throws to this symbol.",
+    ),
+    (
+        "timer-idle-list",
+        "List of active idle-time timers in order of increasing time.",
+    ),
+    (
+        "timer-list",
+        "List of active absolute time timers in order of increasing time.",
+    ),
+    (
+        "tool-bar-border",
+        "Border below tool-bar in pixels.",
+    ),
+    (
+        "tool-bar-button-margin",
+        "Margin around tool-bar buttons in pixels.",
+    ),
+    (
+        "tool-bar-button-relief",
+        "Relief thickness of tool-bar buttons.",
+    ),
+    (
+        "tool-bar-max-label-size",
+        "Maximum number of characters a label can have to be shown.",
+    ),
+    (
+        "tool-bar-separator-image-expression",
+        "Expression evaluating to the image spec for a tool-bar separator.",
+    ),
+    (
+        "tool-bar-style",
+        "Tool bar style to use.",
+    ),
+    (
+        "tooltip-reuse-hidden-frame",
+        "Non-nil means reuse hidden tooltip frames.",
+    ),
+    (
+        "top-level",
+        "Form to evaluate when Emacs starts up.",
+    ),
+    (
+        "track-mouse",
+        "Non-nil means generate motion events for mouse motion.",
+    ),
+    (
+        "translate-upper-case-key-bindings",
+        "If non-nil, interpret upper case keys as lower case (when applicable).",
+    ),
+    (
+        "translation-hash-table-vector",
+        "Vector containing all translation hash tables ever defined.",
+    ),
+    (
+        "translation-table-for-input",
+        "Char table for translating self-inserting characters.",
+    ),
+    (
+        "translation-table-vector",
+        "Vector recording all translation tables ever defined.",
+    ),
+    (
+        "treesit-extra-load-path",
+        "Additional directories to look for tree-sitter language definitions.",
+    ),
+    (
+        "treesit-load-name-override-list",
+        "An override list for unconventional tree-sitter libraries.",
+    ),
+    (
+        "treesit-thing-settings",
+        "A list defining things.",
+    ),
+    (
+        "truncate-partial-width-windows",
+        "Non-nil means truncate lines in windows narrower than the frame.",
+    ),
     ("kill-ring", "List of killed text sequences."),
     (
         "kill-ring-yank-pointer",
@@ -5123,6 +5363,24 @@ mod tests {
             result
                 .as_str()
                 .is_some_and(|s| s.contains("margin at the top and bottom"))
+        );
+    }
+
+    #[test]
+    fn documentation_property_eval_truncate_partial_width_windows_integer_property_returns_string() {
+        let mut evaluator = super::super::eval::Evaluator::new();
+        let result = builtin_documentation_property_eval(
+            &mut evaluator,
+            vec![
+                Value::symbol("truncate-partial-width-windows"),
+                Value::symbol("variable-documentation"),
+            ],
+        )
+        .unwrap();
+        assert!(
+            result
+                .as_str()
+                .is_some_and(|s| s.contains("windows narrower than the frame"))
         );
     }
 
