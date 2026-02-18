@@ -589,7 +589,7 @@ fn help_arglist_from_subr_name(name: &str, preserve_names: bool) -> Option<Value
         return Some(if preserve_names {
             help_arglist(&["string"], &[], Some("objects"))
         } else {
-            help_arglist(&[], &[], Some("rest"))
+            help_arglist(&["arg1"], &[], Some("rest"))
         });
     }
 
@@ -613,8 +613,12 @@ fn help_arglist_from_subr_name(name: &str, preserve_names: bool) -> Option<Value
         return Some(help_arglist(&["elt", "list"], &[], None));
     }
 
-    if preserve_names && name == "equal" {
-        return Some(help_arglist(&["o1", "o2"], &[], None));
+    if name == "equal" {
+        return Some(if preserve_names {
+            help_arglist(&["o1", "o2"], &[], None)
+        } else {
+            help_arglist(&["arg1", "arg2"], &[], None)
+        });
     }
 
     if preserve_names && name == "string-match" {
@@ -625,28 +629,48 @@ fn help_arglist_from_subr_name(name: &str, preserve_names: bool) -> Option<Value
         ));
     }
 
-    if preserve_names && name == "substring" {
-        return Some(help_arglist(&["string"], &["from", "to"], None));
+    if name == "substring" {
+        return Some(if preserve_names {
+            help_arglist(&["string"], &["from", "to"], None)
+        } else {
+            help_arglist(&["arg1"], &["arg2", "arg3"], None)
+        });
     }
 
-    if preserve_names && name == "aref" {
-        return Some(help_arglist(&["array", "idx"], &[], None));
+    if name == "aref" {
+        return Some(if preserve_names {
+            help_arglist(&["array", "idx"], &[], None)
+        } else {
+            help_arglist(&["arg1", "arg2"], &[], None)
+        });
     }
 
-    if preserve_names && name == "aset" {
-        return Some(help_arglist(&["array", "idx", "newelt"], &[], None));
+    if name == "aset" {
+        return Some(if preserve_names {
+            help_arglist(&["array", "idx", "newelt"], &[], None)
+        } else {
+            help_arglist(&["arg1", "arg2", "arg3"], &[], None)
+        });
     }
 
-    if preserve_names && name == "make-string" {
-        return Some(help_arglist(&["length", "init"], &["multibyte"], None));
+    if name == "make-string" {
+        return Some(if preserve_names {
+            help_arglist(&["length", "init"], &["multibyte"], None)
+        } else {
+            help_arglist(&["arg1", "arg2"], &["arg3"], None)
+        });
     }
 
     if preserve_names && name == "read-from-string" {
         return Some(help_arglist(&["string"], &["start", "end"], None));
     }
 
-    if preserve_names && name == "funcall" {
-        return Some(help_arglist(&["function"], &[], Some("arguments")));
+    if name == "funcall" {
+        return Some(if preserve_names {
+            help_arglist(&["function"], &[], Some("arguments"))
+        } else {
+            help_arglist(&["arg1"], &[], Some("rest"))
+        });
     }
 
     if preserve_names && name == "mapcar" {
@@ -1315,6 +1339,45 @@ mod tests {
         assert_eq!(
             arglist_names(&read),
             vec!["&optional".to_string(), "arg1".to_string()]
+        );
+
+        let equal = builtin_help_function_arglist_eval(
+            &mut evaluator,
+            vec![Value::symbol("equal")],
+        )
+        .unwrap();
+        assert_eq!(
+            arglist_names(&equal),
+            vec!["arg1".to_string(), "arg2".to_string()]
+        );
+
+        let substring = builtin_help_function_arglist_eval(
+            &mut evaluator,
+            vec![Value::symbol("substring")],
+        )
+        .unwrap();
+        assert_eq!(
+            arglist_names(&substring),
+            vec![
+                "arg1".to_string(),
+                "&optional".to_string(),
+                "arg2".to_string(),
+                "arg3".to_string()
+            ]
+        );
+
+        let funcall = builtin_help_function_arglist_eval(
+            &mut evaluator,
+            vec![Value::symbol("funcall")],
+        )
+        .unwrap();
+        assert_eq!(
+            arglist_names(&funcall),
+            vec![
+                "arg1".to_string(),
+                "&rest".to_string(),
+                "rest".to_string()
+            ]
         );
     }
 
