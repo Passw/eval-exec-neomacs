@@ -1563,6 +1563,246 @@ pub(crate) static STARTUP_VARIABLE_DOC_STUBS: &[(&str, &str)] = &[
         "lucid--menu-grab-keyboard",
         "If non-nil, grab keyboard during menu operations.",
     ),
+    (
+        "macroexp--dynvars",
+        "List of variables declared dynamic in the current scope.",
+    ),
+    (
+        "main-thread",
+        "The main thread of Emacs.",
+    ),
+    (
+        "make-cursor-line-fully-visible",
+        "Whether to scroll the window if the cursor line is not fully visible.",
+    ),
+    (
+        "make-pointer-invisible",
+        "If non-nil, make mouse pointer invisible while typing.",
+    ),
+    (
+        "make-window-start-visible",
+        "Whether to ensure `window-start' position is never invisible.",
+    ),
+    (
+        "mark-active",
+        "Non-nil means the mark and region are currently active in this buffer.",
+    ),
+    (
+        "mark-even-if-inactive",
+        "Non-nil means you can use the mark even when inactive.",
+    ),
+    (
+        "max-image-size",
+        "Maximum size of images.",
+    ),
+    (
+        "max-lisp-eval-depth",
+        "Limit on depth in `eval', `apply' and `funcall' before error.",
+    ),
+    (
+        "max-mini-window-height",
+        "Maximum height for resizing mini-windows (the minibuffer and the echo area).",
+    ),
+    (
+        "max-redisplay-ticks",
+        "Maximum number of redisplay ticks before aborting redisplay of a window.",
+    ),
+    (
+        "maximum-scroll-margin",
+        "Maximum effective value of `scroll-margin'.",
+    ),
+    (
+        "memory-full",
+        "Non-nil means Emacs cannot get much more Lisp memory.",
+    ),
+    (
+        "memory-signal-data",
+        "Precomputed `signal' argument for memory-full error.",
+    ),
+    (
+        "menu-bar-final-items",
+        "List of menu bar items to move to the end of the menu bar.",
+    ),
+    (
+        "menu-bar-mode",
+        "Non-nil if Menu-Bar mode is enabled.",
+    ),
+    (
+        "menu-bar-update-hook",
+        "Normal hook run to update the menu bar definitions.",
+    ),
+    (
+        "menu-prompt-more-char",
+        "Character to see next line of menu prompt.",
+    ),
+    (
+        "menu-prompting",
+        "Non-nil means prompt with menus when appropriate.",
+    ),
+    (
+        "menu-updating-frame",
+        "Frame for which we are updating a menu.",
+    ),
+    (
+        "message-log-max",
+        "Maximum number of lines to keep in the message log buffer.",
+    ),
+    (
+        "message-truncate-lines",
+        "If non-nil, messages are truncated when displaying the echo area.",
+    ),
+    (
+        "messages-buffer-name",
+        "The name of the buffer where messages are logged.",
+    ),
+    (
+        "meta-prefix-char",
+        "Meta-prefix character code.",
+    ),
+    (
+        "minibuffer-allow-text-properties",
+        "Non-nil means `read-from-minibuffer' should not discard text properties.",
+    ),
+    (
+        "minibuffer-auto-raise",
+        "Non-nil means entering the minibuffer raises the minibuffer's frame.",
+    ),
+    (
+        "minibuffer-completing-file-name",
+        "Non-nil means completing file names.",
+    ),
+    (
+        "minibuffer-completion-confirm",
+        "Whether to demand confirmation of completion before exiting minibuffer.",
+    ),
+    (
+        "minibuffer-completion-predicate",
+        "Within call to `completing-read', this holds the PREDICATE argument.",
+    ),
+    (
+        "minibuffer-completion-table",
+        "Alist or obarray used for completion in the minibuffer.",
+    ),
+    (
+        "minibuffer-exit-hook",
+        "Normal hook run whenever a minibuffer is exited.",
+    ),
+    (
+        "minibuffer-follows-selected-frame",
+        "t means the active minibuffer always displays on the selected frame.",
+    ),
+    (
+        "minibuffer-help-form",
+        "Value that `help-form' takes on inside the minibuffer.",
+    ),
+    (
+        "minibuffer-history-position",
+        "Current position of redoing in the history list.",
+    ),
+    (
+        "minibuffer-history-variable",
+        "History list symbol to add minibuffer values to.",
+    ),
+    (
+        "minibuffer-local-map",
+        "Default keymap to use when reading from the minibuffer.",
+    ),
+    (
+        "minibuffer-message-timeout",
+        "How long to display an echo-area message when the minibuffer is active.",
+    ),
+    (
+        "minibuffer-prompt-properties",
+        "Text properties that are added to minibuffer prompts.",
+    ),
+    (
+        "minibuffer-scroll-window",
+        "Non-nil means it is the window that C-M-v in minibuffer should scroll.",
+    ),
+    (
+        "minibuffer-setup-hook",
+        "Normal hook run just after entry to minibuffer.",
+    ),
+    (
+        "minor-mode-map-alist",
+        "Alist of keymaps to use for minor modes.",
+    ),
+    (
+        "minor-mode-overriding-map-alist",
+        "Alist of keymaps to use for minor modes, in current major mode.",
+    ),
+    (
+        "mode-line-compact",
+        "Non-nil means that mode lines should be compact.",
+    ),
+    (
+        "mode-line-in-non-selected-windows",
+        "Non-nil means to use `mode-line-inactive' face in non-selected windows.",
+    ),
+    (
+        "mode-name",
+        "Pretty name of current buffer's major mode.",
+    ),
+    (
+        "module-file-suffix",
+        "Suffix of loadable module file, or nil if modules are not supported.",
+    ),
+    (
+        "most-negative-fixnum",
+        "The least integer that is represented efficiently.",
+    ),
+    (
+        "most-positive-fixnum",
+        "The greatest integer that is represented efficiently.",
+    ),
+    (
+        "mouse-autoselect-window",
+        "Non-nil means autoselect window with mouse pointer.",
+    ),
+    (
+        "mouse-fine-grained-tracking",
+        "Non-nil for pixelwise mouse-movement.",
+    ),
+    (
+        "mouse-highlight",
+        "If non-nil, clickable text is highlighted when mouse is over it.",
+    ),
+    (
+        "mouse-leave-buffer-hook",
+        "Hook run when the user mouse-clicks in a window.",
+    ),
+    (
+        "mouse-position-function",
+        "If non-nil, function to transform normal value of `mouse-position'.",
+    ),
+    (
+        "mouse-prefer-closest-glyph",
+        "Non-nil means mouse click position is taken from glyph closest to click.",
+    ),
+    (
+        "move-frame-functions",
+        "Functions run after a frame was moved.",
+    ),
+    (
+        "movemail-program-name",
+        "Name of the `movemail' program distributed with Emacs.",
+    ),
+    (
+        "multibyte-syntax-as-symbol",
+        "Non-nil means `scan-sexps' treats all multibyte characters as symbol.",
+    ),
+    (
+        "multiple-frames",
+        "Non-nil if more than one frame is visible on this display.",
+    ),
+    (
+        "mwheel-coalesce-scroll-events",
+        "Non-nil means send a wheel event only for scrolling at least one screen line.",
+    ),
+    (
+        "native-comp-eln-load-path",
+        "List of directories to look for natively-compiled *.eln files.",
+    ),
     ("kill-ring", "List of killed text sequences."),
     (
         "kill-ring-yank-pointer",
@@ -4349,6 +4589,24 @@ mod tests {
             result
                 .as_str()
                 .is_some_and(|s| s.contains("suffixes for Emacs Lisp files and dynamic modules"))
+        );
+    }
+
+    #[test]
+    fn documentation_property_eval_native_comp_eln_load_path_integer_property_returns_string() {
+        let mut evaluator = super::super::eval::Evaluator::new();
+        let result = builtin_documentation_property_eval(
+            &mut evaluator,
+            vec![
+                Value::symbol("native-comp-eln-load-path"),
+                Value::symbol("variable-documentation"),
+            ],
+        )
+        .unwrap();
+        assert!(
+            result
+                .as_str()
+                .is_some_and(|s| s.contains("natively-compiled *.eln files"))
         );
     }
 

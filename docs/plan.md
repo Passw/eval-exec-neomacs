@@ -13947,6 +13947,23 @@ Last updated: 2026-02-18
     - `make -C test/neovm/vm-compat record FORMS=cases/documentation-property-semantics.forms EXPECTED=cases/documentation-property-semantics.expected.tsv` (pass)
     - `make -C test/neovm/vm-compat check-one-neovm CASE=documentation-property-semantics` (pass, 34/34)
     - `make -C test/neovm/vm-compat check-all-neovm` (pass)
+- Expanded startup-variable `documentation-property` parity (combined rounds 40-41) with macro/menu/minibuffer/mode-line/mouse/native-comp metadata symbols:
+  - runtime changes:
+    - added startup doc stubs for 60 additional symbols in `STARTUP_VARIABLE_DOC_STUBS`, including:
+      - round 40 macro/menu/minibuffer control vars: `macroexp--dynvars`, `main-thread`, `make-*`, `mark-*`, `max-*`, `memory-*`, `menu-*`, `message-*`, `meta-prefix-char`, and the first minibuffer completion variables
+      - round 41 minibuffer/mode-line/mouse/native vars: remaining `minibuffer-*` setup/history vars, `minor-mode-*`, `mode-line-*`, `mode-name`, `module-file-suffix`, `most-*fixnum`, `mouse-*`, `move-frame-functions`, `movemail-program-name`, `multibyte-syntax-as-symbol`, `multiple-frames`, `mwheel-coalesce-scroll-events`, `native-comp-eln-load-path`
+    - integer `variable-documentation` lookups for those 60 symbols now resolve through the shared startup doc stub mapping
+    - added eval lock-in test:
+      - `documentation_property_eval_native_comp_eln_load_path_integer_property_returns_string`
+  - expanded oracle corpus:
+    - `test/neovm/vm-compat/cases/documentation-property-semantics.forms`
+    - `test/neovm/vm-compat/cases/documentation-property-semantics.expected.tsv`
+    - added dedicated startup-variable matrix rows for both 30-symbol batches (round 40 and round 41), asserting string docs and first-line prefixes
+  - verified:
+    - `cargo test --manifest-path rust/neovm-core/Cargo.toml documentation_property_eval_` (pass, 24/24)
+    - `make -C test/neovm/vm-compat record FORMS=cases/documentation-property-semantics.forms EXPECTED=cases/documentation-property-semantics.expected.tsv` (pass)
+    - `make -C test/neovm/vm-compat check-one-neovm CASE=documentation-property-semantics` (pass, 36/36)
+    - `make -C test/neovm/vm-compat check-all-neovm` (pass)
 
 ## Doing
 
