@@ -28,6 +28,15 @@ Last updated: 2026-02-18
 
 ## Doing
 
+- Expanded input-mode coercion/no-op lock-ins (batch round 9):
+  - oracle corpus changes:
+    - `test/neovm/vm-compat/cases/input-mode-semantics.{forms,expected.tsv}`
+    - `test/neovm/vm-compat/cases/input-mode-helper-setters-semantics.{forms,expected.tsv}`
+    - added non-boolean/non-integer setter payload probes and explicit no-op/current-state preservation checks.
+  - verified:
+    - `make -C test/neovm/vm-compat check-neovm-list LIST=<batch-list>` (pass; 17/17, 22/22)
+    - `make -C test/neovm/vm-compat check-all-neovm` (pass)
+
 - Expanded input-state unread queue shape lock-ins (batch round 8):
   - oracle corpus changes:
     - `test/neovm/vm-compat/cases/waiting-for-user-input-semantics.{forms,expected.tsv}`
