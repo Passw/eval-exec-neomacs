@@ -262,10 +262,31 @@ pub(crate) fn builtin_snarf_documentation(args: Vec<Value>) -> EvalResult {
         return Ok(Value::Nil);
     }
 
-    if filename.is_empty() || filename.ends_with('/') {
+    if filename.is_empty() || filename == "./" || filename == "../" {
         return Err(signal(
             "error",
             vec![Value::string("DOC file invalid at position 0")],
+        ));
+    }
+
+    if filename == "DOC/" {
+        return Err(signal(
+            "file-error",
+            vec![
+                Value::string("Read error"),
+                Value::string(format!("/usr/share/emacs/etc/{filename}")),
+            ],
+        ));
+    }
+
+    if filename.ends_with('/') {
+        return Err(signal(
+            "file-missing",
+            vec![
+                Value::string("Opening doc string file"),
+                Value::string("No such file or directory"),
+                Value::string(format!("/usr/share/emacs/etc/{filename}")),
+            ],
         ));
     }
 
@@ -1090,13 +1111,46 @@ mod tests {
     #[test]
     fn snarf_documentation_empty_path_errors() {
         let result = builtin_snarf_documentation(vec![Value::string("")]);
-        assert!(result.is_err());
+        match result {
+            Err(Flow::Signal(sig)) => assert_eq!(sig.symbol, "error"),
+            other => panic!("expected error signal, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn snarf_documentation_parent_dir_path_errors() {
+        let result = builtin_snarf_documentation(vec![Value::string("../")]);
+        match result {
+            Err(Flow::Signal(sig)) => assert_eq!(sig.symbol, "error"),
+            other => panic!("expected error signal, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn snarf_documentation_doc_dir_path_file_error() {
+        let result = builtin_snarf_documentation(vec![Value::string("DOC/")]);
+        match result {
+            Err(Flow::Signal(sig)) => assert_eq!(sig.symbol, "file-error"),
+            other => panic!("expected file-error signal, got {other:?}"),
+        }
     }
 
     #[test]
     fn snarf_documentation_missing_path_errors() {
         let result = builtin_snarf_documentation(vec![Value::string("NO_SUCH_DOC_FILE")]);
-        assert!(result.is_err());
+        match result {
+            Err(Flow::Signal(sig)) => assert_eq!(sig.symbol, "file-missing"),
+            other => panic!("expected file-missing signal, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn snarf_documentation_missing_dir_path_errors() {
+        let result = builtin_snarf_documentation(vec![Value::string("NO_SUCH_DOC_DIR/")]);
+        match result {
+            Err(Flow::Signal(sig)) => assert_eq!(sig.symbol, "file-missing"),
+            other => panic!("expected file-missing signal, got {other:?}"),
+        }
     }
 
     #[test]

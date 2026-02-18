@@ -1,9 +1,12 @@
 1	(Snarf-documentation "DOC")	OK nil
 2	(condition-case err (Snarf-documentation "") (error (car err)))	OK error
 3	(condition-case err (Snarf-documentation "./") (error (car err)))	OK error
-4	(condition-case err (Snarf-documentation "NO_SUCH_DOC_FILE") (error (car err)))	OK file-missing
-5	(condition-case err (Snarf-documentation "/tmp/no-such-doc") (error (car err)))	OK file-missing
-6	(condition-case err (Snarf-documentation nil) (error err))	OK (wrong-type-argument stringp nil)
-7	(condition-case err (Snarf-documentation 1) (error err))	OK (wrong-type-argument stringp 1)
-8	(condition-case err (Snarf-documentation '(a)) (error err))	OK (wrong-type-argument stringp (a))
-9	(condition-case err (Snarf-documentation "" nil) (error err))	OK (wrong-number-of-arguments Snarf-documentation 2)
+4	(condition-case err (Snarf-documentation "../") (error (car err)))	OK error
+5	(condition-case err (Snarf-documentation "DOC/") (error (car err)))	OK file-error
+6	(condition-case err (Snarf-documentation "NO_SUCH_DOC_FILE") (error (car err)))	OK file-missing
+7	(condition-case err (Snarf-documentation "/tmp/no-such-doc") (error (car err)))	OK file-missing
+8	(condition-case err (Snarf-documentation "NO_SUCH_DOC_DIR/") (error (car err)))	OK file-missing
+9	(condition-case err (Snarf-documentation nil) (error err))	OK (wrong-type-argument stringp nil)
+10	(condition-case err (Snarf-documentation 1) (error err))	OK (wrong-type-argument stringp 1)
+11	(condition-case err (Snarf-documentation '(a)) (error err))	OK (wrong-type-argument stringp (a))
+12	(condition-case err (Snarf-documentation "" nil) (error err))	OK (wrong-number-of-arguments Snarf-documentation 2)
