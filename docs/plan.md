@@ -13838,6 +13838,26 @@ Last updated: 2026-02-18
     - `make -C test/neovm/vm-compat record FORMS=cases/documentation-property-semantics.forms EXPECTED=cases/documentation-property-semantics.expected.tsv` (pass)
     - `make -C test/neovm/vm-compat check-one-neovm CASE=documentation-property-semantics` (pass, 26/26)
     - `make -C test/neovm/vm-compat check-all-neovm` (pass)
+- Expanded startup-variable `documentation-property` parity (round 32) with `current-*`, `dbus-*`, `debug-*`, and `default-*` startup symbols:
+  - runtime changes:
+    - added startup doc stubs for 30 additional symbols in `STARTUP_VARIABLE_DOC_STUBS`, including:
+      - `current-iso639-language`, `current-key-remap-sequence`, `current-minibuffer-command`, `current-time-list`
+      - `cursor-*` and `data-directory` startup vars
+      - `dbus-*` message/version/registry vars
+      - `debug-*` and debugger control vars
+      - `default-frame-*`, `default-minibuffer-frame`, and `defining-kbd-macro`
+    - integer `variable-documentation` lookups for that round-32 symbol batch now resolve through the shared startup doc stub mapping
+    - added eval lock-in test:
+      - `documentation_property_eval_debug_on_message_integer_property_returns_string`
+  - expanded oracle corpus:
+    - `test/neovm/vm-compat/cases/documentation-property-semantics.forms`
+    - `test/neovm/vm-compat/cases/documentation-property-semantics.expected.tsv`
+    - added a dedicated 30-symbol startup matrix row for the round-32 set (string doc + first-line prefix checks)
+  - verified:
+    - `cargo test --manifest-path rust/neovm-core/Cargo.toml documentation_property_eval_` (pass, 17/17)
+    - `make -C test/neovm/vm-compat record FORMS=cases/documentation-property-semantics.forms EXPECTED=cases/documentation-property-semantics.expected.tsv` (pass)
+    - `make -C test/neovm/vm-compat check-one-neovm CASE=documentation-property-semantics` (pass, 27/27)
+    - `make -C test/neovm/vm-compat check-all-neovm` (pass)
 
 ## Doing
 

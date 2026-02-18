@@ -563,10 +563,98 @@ pub(crate) static STARTUP_VARIABLE_DOC_STUBS: &[(&str, &str)] = &[
         "completion-regexp-list",
         "List of regexps that should restrict possible completions.",
     ),
+    (
+        "current-iso639-language",
+        "ISO639 language mnemonic symbol for the current language environment.",
+    ),
+    (
+        "current-key-remap-sequence",
+        "The key sequence currently being remap, or nil.",
+    ),
     ("current-load-list", "Used for internal purposes by `load'."),
+    (
+        "current-minibuffer-command",
+        "This is like `this-command`, but bound recursively.",
+    ),
     (
         "current-prefix-arg",
         "The value of the prefix argument for this editing command.",
+    ),
+    (
+        "current-time-list",
+        "Whether `current-time' should return list or (TICKS . HZ) form.",
+    ),
+    (
+        "cursor-in-echo-area",
+        "Non-nil means put cursor in minibuffer, at end of any message there.",
+    ),
+    (
+        "cursor-in-non-selected-windows",
+        "Non-nil means show a cursor in non-selected windows.",
+    ),
+    (
+        "cursor-type",
+        "Cursor to use when this buffer is in the selected window.",
+    ),
+    (
+        "data-directory",
+        "Directory of machine-independent files that come with GNU Emacs.",
+    ),
+    (
+        "dbus-compiled-version",
+        "The version of D-Bus Emacs is compiled against.",
+    ),
+    (
+        "dbus-debug",
+        "If non-nil, debug messages of D-Bus bindings are raised.",
+    ),
+    (
+        "dbus-message-type-error",
+        "Message type of an error reply message.",
+    ),
+    (
+        "dbus-message-type-invalid",
+        "This value is never a valid message type.",
+    ),
+    (
+        "dbus-message-type-method-call",
+        "Message type of a method call message.",
+    ),
+    (
+        "dbus-message-type-method-return",
+        "Message type of a method return message.",
+    ),
+    (
+        "dbus-message-type-signal",
+        "Message type of a signal message.",
+    ),
+    (
+        "dbus-registered-objects-table",
+        "Hash table of registered functions for D-Bus.",
+    ),
+    (
+        "dbus-runtime-version",
+        "The version of D-Bus Emacs runs with.",
+    ),
+    (
+        "deactivate-mark",
+        "Whether to deactivate the mark after an editing command.",
+    ),
+    (
+        "debug-ignored-errors",
+        "List of errors for which the debugger should not be called.",
+    ),
+    (
+        "debug-on-event",
+        "Enter debugger on this event.",
+    ),
+    (
+        "debug-on-message",
+        "If non-nil, debug if a message matching this regexp is displayed.",
+    ),
+    (
+        "debug-on-next-call",
+        "Non-nil means enter debugger before next `eval', `apply' or `funcall'.",
     ),
     (
         "debug-on-error",
@@ -577,12 +665,40 @@ pub(crate) static STARTUP_VARIABLE_DOC_STUBS: &[(&str, &str)] = &[
         "Non-nil means enter debugger if quit is signaled (C-g, for example).",
     ),
     (
+        "debug-on-signal",
+        "Non-nil means call the debugger regardless of condition handlers.",
+    ),
+    (
+        "debugger",
+        "Function to call to invoke debugger.",
+    ),
+    (
+        "debugger-may-continue",
+        "Non-nil means debugger may continue execution.",
+    ),
+    (
+        "debugger-stack-frame-as-list",
+        "Non-nil means display call stack frames as lists.",
+    ),
+    (
         "default-directory",
         "Name of default directory of current buffer.",
     ),
     (
+        "default-frame-alist",
+        "Alist of default values of frame parameters for frame creation.",
+    ),
+    (
+        "default-frame-scroll-bars",
+        "Default position of vertical scroll bars on this window-system.",
+    ),
+    (
         "default-file-name-coding-system",
         "Default coding system for encoding file names.",
+    ),
+    (
+        "default-minibuffer-frame",
+        "Minibuffer-less frames by default use this frame's minibuffer.",
     ),
     (
         "default-process-coding-system",
@@ -591,6 +707,10 @@ pub(crate) static STARTUP_VARIABLE_DOC_STUBS: &[(&str, &str)] = &[
     (
         "default-text-properties",
         "Property-list used as default values.",
+    ),
+    (
+        "defining-kbd-macro",
+        "Non-nil while a keyboard macro is being defined.  Don't set this!",
     ),
     (
         "display-line-numbers",
@@ -3275,6 +3395,24 @@ mod tests {
             result
                 .as_str()
                 .is_some_and(|s| s.contains("Alist of coding system names"))
+        );
+    }
+
+    #[test]
+    fn documentation_property_eval_debug_on_message_integer_property_returns_string() {
+        let mut evaluator = super::super::eval::Evaluator::new();
+        let result = builtin_documentation_property_eval(
+            &mut evaluator,
+            vec![
+                Value::symbol("debug-on-message"),
+                Value::symbol("variable-documentation"),
+            ],
+        )
+        .unwrap();
+        assert!(
+            result
+                .as_str()
+                .is_some_and(|s| s.contains("debug if a message matching this regexp is displayed"))
         );
     }
 
