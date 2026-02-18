@@ -10371,6 +10371,38 @@ Last updated: 2026-02-17
     - `cargo test --manifest-path rust/neovm-core/Cargo.toml select_frame_set_input_focus_arity_designators_and_result` (pass)
     - `make -C test/neovm/vm-compat check-one-neovm CASE=cases/select-frame-set-input-focus-semantics` (pass, 8/8)
     - `make -C test/neovm/vm-compat check-all-neovm-strict` (pass)
+- Added display/frame designator edge lock-in corpus and enabled it in default suite:
+  - added and enabled oracle corpus:
+    - `test/neovm/vm-compat/cases/display-frame-designator-edge-semantics.forms`
+    - `test/neovm/vm-compat/cases/display-frame-designator-edge-semantics.expected.tsv`
+    - `test/neovm/vm-compat/cases/default.list`
+  - verified:
+    - `make -C test/neovm/vm-compat check-one-neovm CASE=display-frame-designator-edge-semantics` (pass, 40/40)
+    - `make -C test/neovm/vm-compat validate-case-lists` (pass)
+    - `make -C test/neovm/vm-compat check-all-neovm` (pass)
+- Added display-control runtime lock-in corpus and enabled it in default suite:
+  - added and enabled oracle corpus:
+    - `test/neovm/vm-compat/cases/display-control-runtime-semantics.forms`
+    - `test/neovm/vm-compat/cases/display-control-runtime-semantics.expected.tsv`
+    - `test/neovm/vm-compat/cases/default.list`
+  - verified:
+    - `make -C test/neovm/vm-compat check-one-neovm CASE=display-control-runtime-semantics` (pass, 17/17)
+    - `make -C test/neovm/vm-compat validate-case-lists` (pass)
+    - `make -C test/neovm/vm-compat check-all-neovm` (pass)
+- Aligned `Snarf-documentation` runtime error classes with GNU Emacs and locked explicit corpus:
+  - runtime changes:
+    - still returns `nil` for canonical `"DOC"` token
+    - signals `(error "DOC file invalid at position 0")` for empty/invalid path forms
+    - signals `file-missing` class for missing doc-file names
+    - preserves existing `wrong-type-argument stringp` and arity behavior
+  - added and enabled oracle corpus:
+    - `test/neovm/vm-compat/cases/snarf-documentation-runtime-semantics.forms`
+    - `test/neovm/vm-compat/cases/snarf-documentation-runtime-semantics.expected.tsv`
+    - `test/neovm/vm-compat/cases/default.list`
+  - verified:
+    - `cargo test --manifest-path rust/neovm-core/Cargo.toml doc::tests::snarf_documentation -- --nocapture` (pass)
+    - `make -C test/neovm/vm-compat check-one-neovm CASE=snarf-documentation-runtime-semantics` (pass, 9/9)
+    - `make -C test/neovm/vm-compat check-all-neovm` (pass)
 
 ## Doing
 
@@ -10379,13 +10411,13 @@ Last updated: 2026-02-17
   - run oracle/parity checks after each behavior-affecting change
   - remove dead helper code that is not part of exposed compatibility surface
 - Identify the next high-impact builtin still stubbed in NeoVM core and land it as a small implementation + oracle-corpus lock-in slice.
-  - current focus: continue targeted frame/window semantic parity lock-ins (designator + error payload precision), then pivot to next evaluator-backed stub replacement
+  - current focus: continue evaluator-backed doc/helper parity slices after `Snarf-documentation` error-class alignment
 - Reduce vm-compat operator friction for large case sets (small Makefile UX improvements).
   - added list-driven targets: `record-list`, `check-list`, `check-neovm-list` with `LIST=cases/<name>.list`
 
 ## Next
 
 1. Keep `check-all-neovm` as a recurring post-slice gate (detect regressions before they batch up).
-2. Continue frame/window semantic lock-ins for non-arity behavior drifts (designator/type payload precision), next around `frame-terminal`/display frame-designator surfaces.
+2. Continue doc/runtime helper lock-ins for non-arity behavior drifts (`describe-variable`, `documentation-property` edge paths, remaining startup-doc shims).
 3. Continue `subr-arity` oracle cluster slices until next `check-builtin-registry-fboundp` drift report meaningfully drops.
 4. Keep Rust backend behind compile-time switch and preserve Emacs C core as default backend.
