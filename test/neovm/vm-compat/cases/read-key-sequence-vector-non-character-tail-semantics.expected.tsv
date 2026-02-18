@@ -4,5 +4,6 @@
 4	(let ((unread-command-events (list 1.0 98 97 96 95))) (progn (read-key-sequence-vector "") unread-command-events))	OK (98 97 96 95)
 5	(let ((unread-command-events (list 1.0 98 97 96 95 94))) (progn (read-key-sequence-vector "") unread-command-events))	OK (98 97 96 95 94)
 6	(let ((unread-command-events (list 1.0 98 97 96 95 94 93))) (progn (read-key-sequence-vector "") unread-command-events))	OK (98 97 96 95 94 93)
-7	(let ((unread-command-events '(1.0 . 97))) (progn (read-key-sequence-vector "") unread-command-events))	OK 97
-8	(let ((unread-command-events '(97 . 1.0))) (progn (read-key-sequence-vector "") unread-command-events))	OK 1.0
+7	(let ((unread-command-events (list 1.0 98 97 96 95 94 93 92))) (progn (read-key-sequence-vector "") unread-command-events))	OK (98 97 96 95 94 93 92)
+8	(let ((unread-command-events '(1.0 . 97))) (progn (read-key-sequence-vector "") unread-command-events))	OK 97
+9	(let ((unread-command-events '(97 . 1.0))) (progn (read-key-sequence-vector "") unread-command-events))	OK 1.0
