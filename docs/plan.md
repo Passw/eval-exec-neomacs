@@ -28,13 +28,15 @@ Last updated: 2026-02-18
 
 ## Doing
 
-- Expanded coding-reader queue-shape and arity payload lock-ins (batch round 12):
+- Expanded coding-system runtime/designator error lock-ins (batch round 13):
   - oracle corpus changes:
+    - `test/neovm/vm-compat/cases/coding-system-runtime-semantics.{forms,expected.tsv}`
+    - `test/neovm/vm-compat/cases/coding-system-io-runtime-semantics.{forms,expected.tsv}`
     - `test/neovm/vm-compat/cases/read-coding-system-semantics.{forms,expected.tsv}`
     - `test/neovm/vm-compat/cases/read-batch-error-payloads.{forms,expected.tsv}`
-    - added `read-coding-system`/`read-non-nil-coding-system` dotted-pair/vector unread-queue probes and extra over-arity boundaries.
+    - added alias/designator type-error and priority-argument probes plus dotted/vector unread-queue payload coverage for coding readers.
   - verified:
-    - `make -C test/neovm/vm-compat check-neovm-list LIST=<batch-list>` (pass; 16/16, 56/56)
+    - `make -C test/neovm/vm-compat check-neovm-list LIST=<batch-list>` (pass; 18/18, 38/38, 16/16, 56/56)
     - `make -C test/neovm/vm-compat check-all-neovm` (pass)
 
 - Expanded minibuffer prompt-reader max-arity/error lock-ins (batch round 11):

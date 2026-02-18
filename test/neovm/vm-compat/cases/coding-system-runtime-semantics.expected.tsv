@@ -4,6 +4,15 @@
 4	(define-coding-system-alias 'vm-cs 'utf-8)	OK nil
 5	(coding-system-p 'vm-cs)	OK t
 6	(condition-case err (define-coding-system-alias 'vm-cs2 nil) (error err))	OK (wrong-type-argument coding-system-p nil)
-7	(let ((orig (coding-system-priority-list))) (set-coding-system-priority 'raw-text 'utf-8) (prog1 (list (car (coding-system-priority-list)) (car (cdr (coding-system-priority-list)))) (apply #'set-coding-system-priority orig)))	OK (raw-text utf-8)
-8	(let ((orig (coding-system-priority-list))) (prog1 (list (condition-case err (set-coding-system-priority 'utf-8 'no-such-coding) (error err)) (car (coding-system-priority-list))) (apply #'set-coding-system-priority orig)))	OK ((coding-system-error no-such-coding) utf-8)
-9	(condition-case err (set-coding-system-priority "utf-8") (error err))	OK (wrong-type-argument symbolp "utf-8")
+7	(condition-case err (define-coding-system-alias 'vm-cs3 'no-such-coding) (error err))	OK (coding-system-error no-such-coding)
+8	(condition-case err (define-coding-system-alias "vm-cs4" 'utf-8) (error err))	OK (wrong-type-argument symbolp "vm-cs4")
+9	(condition-case err (define-coding-system-alias 'vm-cs4 "utf-8") (error err))	OK (wrong-type-argument symbolp "utf-8")
+10	(condition-case err (define-coding-system-alias 'vm-cs5 nil) (error err))	OK (wrong-type-argument coding-system-p nil)
+11	(let ((orig (coding-system-priority-list))) (set-coding-system-priority 'raw-text 'utf-8) (prog1 (list (car (coding-system-priority-list)) (car (cdr (coding-system-priority-list)))) (apply #'set-coding-system-priority orig)))	OK (raw-text utf-8)
+12	(let ((orig (coding-system-priority-list))) (prog1 (list (condition-case err (set-coding-system-priority 'utf-8 'no-such-coding) (error err)) (car (coding-system-priority-list))) (apply #'set-coding-system-priority orig)))	OK ((coding-system-error no-such-coding) utf-8)
+13	(condition-case err (set-coding-system-priority "utf-8") (error err))	OK (wrong-type-argument symbolp "utf-8")
+14	(condition-case err (set-coding-system-priority) (error err))	OK nil
+15	(condition-case err (set-coding-system-priority nil) (error err))	OK (wrong-type-argument coding-system-p nil)
+16	(condition-case err (set-coding-system-priority 'utf-8 nil) (error err))	OK (wrong-type-argument coding-system-p nil)
+17	(condition-case err (set-coding-system-priority 'utf-8 'raw-text 'no-such-coding) (error err))	OK (coding-system-error no-such-coding)
+18	(condition-case err (set-coding-system-priority 'utf-8 'raw-text "latin-1") (error err))	OK (wrong-type-argument symbolp "latin-1")

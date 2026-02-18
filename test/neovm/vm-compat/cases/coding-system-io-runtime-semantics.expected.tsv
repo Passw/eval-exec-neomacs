@@ -22,3 +22,17 @@
 22	(keyboard-coding-system)	OK iso-latin-1-unix
 23	(condition-case err (set-keyboard-coding-system 'latin-1-unix) (error err))	OK latin-1-unix
 24	(keyboard-coding-system)	OK latin-1-unix
+25	(condition-case err (set-terminal-coding-system 'latin-1) (error err))	OK nil
+26	(terminal-coding-system)	OK latin-1
+27	(condition-case err (set-terminal-coding-system 'ascii) (error err))	OK nil
+28	(terminal-coding-system)	OK ascii
+29	(condition-case err (set-terminal-coding-system 'iso-8859-1) (error err))	OK nil
+30	(terminal-coding-system)	OK iso-8859-1
+31	(condition-case err (set-terminal-coding-system 'latin-1-unix) (error err))	OK nil
+32	(terminal-coding-system)	OK latin-1-unix
+33	(condition-case err (set-keyboard-coding-system 'utf-8-unix) (error err))	OK utf-8-unix
+34	(keyboard-coding-system)	OK utf-8-unix
+35	(condition-case err (set-keyboard-coding-system 'ascii-unix) (error err))	OK ascii-unix
+36	(keyboard-coding-system)	OK ascii-unix
+37	(condition-case err (set-keyboard-coding-system 'no-conversion-unix) (error err))	OK (coding-system-error no-conversion-unix)
+38	(keyboard-coding-system)	OK ascii-unix
