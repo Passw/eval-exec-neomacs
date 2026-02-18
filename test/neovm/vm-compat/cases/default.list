@@ -534,6 +534,7 @@ cases/string-join-semantics
 cases/string-concat-error-paths
 cases/string-to-number-semantics
 cases/percent-mod-ash-semantics
+cases/log-bitwise-type-semantics
 cases/md5-semantics
 cases/md5-coding-semantics
 cases/coding-system-runtime-semantics

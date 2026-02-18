@@ -403,7 +403,7 @@ pub(crate) fn builtin_abs(args: Vec<Value>) -> EvalResult {
 pub(crate) fn builtin_logand(args: Vec<Value>) -> EvalResult {
     let mut acc = -1i64; // all bits set
     for a in &args {
-        acc &= expect_int(a)?;
+        acc &= expect_integer_or_marker(a)?;
     }
     Ok(Value::Int(acc))
 }
@@ -411,7 +411,7 @@ pub(crate) fn builtin_logand(args: Vec<Value>) -> EvalResult {
 pub(crate) fn builtin_logior(args: Vec<Value>) -> EvalResult {
     let mut acc = 0i64;
     for a in &args {
-        acc |= expect_int(a)?;
+        acc |= expect_integer_or_marker(a)?;
     }
     Ok(Value::Int(acc))
 }
@@ -419,7 +419,7 @@ pub(crate) fn builtin_logior(args: Vec<Value>) -> EvalResult {
 pub(crate) fn builtin_logxor(args: Vec<Value>) -> EvalResult {
     let mut acc = 0i64;
     for a in &args {
-        acc ^= expect_int(a)?;
+        acc ^= expect_integer_or_marker(a)?;
     }
     Ok(Value::Int(acc))
 }
@@ -9965,6 +9965,25 @@ mod tests {
                 );
             }
             other => panic!("unexpected flow: {other:?}"),
+        }
+    }
+
+    #[test]
+    fn pure_dispatch_typed_log_bitops_reject_with_integer_or_marker_p() {
+        for name in ["logand", "logior", "logxor"] {
+            let err = dispatch_builtin_pure(name, vec![Value::Int(1), Value::Float(2.0)])
+                .expect("builtin should resolve")
+                .expect_err("bit operation should reject non-integer args");
+            match err {
+                Flow::Signal(sig) => {
+                    assert_eq!(sig.symbol, "wrong-type-argument");
+                    assert_eq!(
+                        sig.data,
+                        vec![Value::symbol("integer-or-marker-p"), Value::Float(2.0)]
+                    );
+                }
+                other => panic!("unexpected flow: {other:?}"),
+            }
         }
     }
 
