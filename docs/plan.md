@@ -10841,6 +10841,19 @@ Last updated: 2026-02-18
     - `make -C test/neovm/vm-compat record FORMS=cases/replace-match.forms EXPECTED=cases/replace-match.expected.tsv` (pass)
     - `make -C test/neovm/vm-compat check-one-neovm CASE=replace-match` (pass, 30/30)
     - `make -C test/neovm/vm-compat check-all-neovm` (pass)
+- Aligned high positive `replace-match` `SUBEXP` error payload shape with GNU Emacs:
+  - runtime changes:
+    - string replacement path now reports `SUBEXP` values greater than available group slots as `args-out-of-range (SUBEXP 0 LEN)` where `LEN` is source string character length
+    - buffer replacement path now mirrors the same `args-out-of-range (SUBEXP 0 LEN)` payload shape for out-of-range high `SUBEXP` values
+    - `SUBEXP == group-count` keeps existing `replace-match subexpression does not exist` behavior
+  - expanded oracle corpus:
+    - `test/neovm/vm-compat/cases/replace-match.forms`
+    - `test/neovm/vm-compat/cases/replace-match.expected.tsv`
+    - added explicit full-error probes (`condition-case ... (error err)`) for high `SUBEXP` in both string and buffer replacement paths
+  - verified:
+    - `make -C test/neovm/vm-compat record FORMS=cases/replace-match.forms EXPECTED=cases/replace-match.expected.tsv` (pass)
+    - `make -C test/neovm/vm-compat check-one-neovm CASE=replace-match` (pass, 32/32)
+    - `make -C test/neovm/vm-compat check-all-neovm` (pass)
 
 ## Doing
 
