@@ -28,9 +28,11 @@
 
   outputs = { self, nixpkgs, rust-overlay, crane, nix-wpe-webkit }:
     let
-      supportedSystems = [ "x86_64-linux" "aarch64-linux" ];
+      lib = nixpkgs.lib;
 
-      forAllSystems = nixpkgs.lib.genAttrs supportedSystems;
+      supportedSystems = [ "x86_64-linux" "aarch64-linux" "aarch64-darwin" "x86_64-darwin" ];
+
+      forAllSystems = lib.genAttrs supportedSystems;
 
       # Create pkgs with overlays for each system
       pkgsFor = system: import nixpkgs {
@@ -42,21 +44,24 @@
       };
 
     in {
-      # Overlay that provides wpewebkit and rust toolchain
+      # Overlay that provides wpewebkit (Linux only) and rust toolchain
       overlays.default = final: prev: {
-        # WPE WebKit from nix-wpe-webkit flake (with Cachix binary cache)
-        wpewebkit = nix-wpe-webkit.packages.${final.system}.wpewebkit;
-
         # Rust nightly toolchain (needed for cbindgen [parse.expand] macro expansion)
         rust-neomacs = final.rust-bin.nightly.latest.default.override {
           extensions = [ "rust-src" "rust-analyzer" ];
         };
-      };
+      } // (lib.optionalAttrs prev.stdenv.isLinux {
+        # WPE WebKit from nix-wpe-webkit flake (with Cachix binary cache)
+        # Only available on Linux — WPE WebKit does not support macOS.
+        wpewebkit = nix-wpe-webkit.packages.${final.system}.wpewebkit;
+      });
 
       # Development shell
       devShells = forAllSystems (system:
         let
           pkgs = pkgsFor system;
+          isLinux = pkgs.stdenv.isLinux;
+          isDarwin = pkgs.stdenv.isDarwin;
         in {
           default = pkgs.mkShell {
             name = "neomacs-dev";
@@ -102,10 +107,6 @@
               gst_all_1.gst-plugins-ugly
               gst_all_1.gst-libav
               gst_all_1.gst-plugins-rs
-              gst_all_1.gst-vaapi
-
-              # VA-API for hardware video decoding (used by gst-va plugin)
-              libva
 
               # libsoup for HTTP
               libsoup_3
@@ -127,11 +128,19 @@
               # Other useful libraries
               dbus
               sqlite
-              libselinux
               tree-sitter
 
               # GMP for bignum support
               gmp
+            ]
+            # Linux-only dependencies
+            ++ lib.optionals isLinux (with pkgs; [
+              gst_all_1.gst-vaapi
+
+              # VA-API for hardware video decoding (used by gst-va plugin)
+              libva
+
+              libselinux
 
               # For native compilation
               libgccjit
@@ -159,7 +168,7 @@
               # xdg-dbus-proxy for WebKit sandbox
               xdg-dbus-proxy
               gcc
-            ];
+            ]);
 
             # pkg-config paths for dev headers
             PKG_CONFIG_PATH = pkgs.lib.makeSearchPath "lib/pkgconfig" (with pkgs; [
@@ -167,7 +176,6 @@
               cairo.dev
               gst_all_1.gstreamer.dev
               gst_all_1.gst-plugins-base.dev
-              libva
               fontconfig.dev
               freetype.dev
               harfbuzz.dev
@@ -177,10 +185,14 @@
               ncurses.dev
               dbus.dev
               sqlite.dev
-              libselinux.dev
               tree-sitter
               gmp.dev
               libsoup_3.dev
+              poppler.dev
+            ]
+            ++ lib.optionals isLinux [
+              libva
+              libselinux.dev
               libGL.dev
               libxkbcommon.dev
               libdrm.dev
@@ -189,7 +201,6 @@
               wpewebkit
               libwpe
               libwpe-fdo
-              poppler.dev
             ]);
 
             # For bindgen to find libclang
@@ -200,8 +211,11 @@
               echo ""
               echo "Rust: $(rustc --version)"
               echo "Cargo: $(cargo --version)"
-              echo "xkbcommon: $(pkg-config --modversion xkbcommon 2>/dev/null || echo 'not found')"
               echo "GStreamer: $(pkg-config --modversion gstreamer-1.0 2>/dev/null || echo 'not found')"
+            ''
+            # Linux-specific shell hook
+            + lib.optionalString isLinux ''
+              echo "xkbcommon: $(pkg-config --modversion xkbcommon 2>/dev/null || echo 'not found')"
               echo "WPE WebKit: $(pkg-config --modversion wpe-webkit-2.0 2>/dev/null || echo 'not found')"
               echo ""
 
@@ -297,16 +311,25 @@
               else
                 echo "Display: (no X11/Wayland display detected)"
               fi
-
+            ''
+            # Darwin-specific shell hook
+            + lib.optionalString isDarwin ''
+              echo ""
+              echo "Note: WPE WebKit is not available on macOS."
+              echo "      WebKit-based features will be disabled."
+            ''
+            # Common shell hook (both platforms)
+            + ''
               # Set default log levels (can be overridden before entering nix develop)
               export RUST_LOG="''${RUST_LOG:-info}"
               export NEOMACS_LOG="''${NEOMACS_LOG:-info}"
 
+              echo ""
               echo "Build commands:"
               echo "  1. cd rust/neomacs-display && cargo build --release"
               echo "  2. ./autogen.sh"
               echo "  3. ./configure --with-neomacs"
-              echo "  4. make -j$(nproc)"
+              echo "  4. make -j$(nproc 2>/dev/null || sysctl -n hw.ncpu 2>/dev/null || echo 4)"
               echo ""
               echo "Logging (set before entering nix develop to override):"
               echo "  RUST_LOG=$RUST_LOG      (Rust render thread: trace|debug|info|warn|error)"

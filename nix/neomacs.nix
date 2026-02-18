@@ -31,26 +31,31 @@
 , libwebp
 , dbus
 , sqlite
-, libselinux
 , tree-sitter
 , gmp
-, libgccjit
-, libGL
-, libxkbcommon
-, mesa
-, libdrm
-, libgbm
-, libva
-, wayland
-, wayland-protocols
-, wpewebkit
-, libwpe
-, libwpe-fdo
-, weston
 , makeWrapper
+# Linux-only deps (optional on darwin)
+, libselinux ? null
+, libgccjit ? null
+, libGL ? null
+, libxkbcommon ? null
+, mesa ? null
+, libdrm ? null
+, libgbm ? null
+, libva ? null
+, wayland ? null
+, wayland-protocols ? null
+, wpewebkit ? null
+, libwpe ? null
+, libwpe-fdo ? null
+, weston ? null
+, vulkan-loader ? null
 }:
 
 let
+  isLinux = stdenv.isLinux;
+  isDarwin = stdenv.isDarwin;
+
   # Rust crate source — include assets/ and shaders alongside Cargo sources
   rustSrc = lib.cleanSourceWith {
     src = ../rust/neomacs-display;
@@ -87,6 +92,9 @@ let
       gst_all_1.gstreamer
       gst_all_1.gst-plugins-base
       gst_all_1.gst-plugins-bad
+      libsoup_3
+    ]
+    ++ lib.optionals isLinux [
       libva
       libGL
       libxkbcommon
@@ -95,10 +103,9 @@ let
       wpewebkit
       libwpe
       libwpe-fdo
-      libsoup_3
     ];
 
-    PKG_CONFIG_PATH = lib.makeSearchPath "lib/pkgconfig" [
+    PKG_CONFIG_PATH = lib.makeSearchPath "lib/pkgconfig" ([
       gtk4.dev
       glib.dev
       graphene
@@ -108,6 +115,9 @@ let
       gst_all_1.gstreamer.dev
       gst_all_1.gst-plugins-base.dev
       gst_all_1.gst-plugins-bad.dev
+      libsoup_3.dev
+    ]
+    ++ lib.optionals isLinux [
       libva
       libGL.dev
       libxkbcommon.dev
@@ -115,14 +125,11 @@ let
       wpewebkit
       libwpe
       libwpe-fdo
-      libsoup_3.dev
-    ];
+    ]);
 
     LIBCLANG_PATH = "${llvmPackages.libclang.lib}/lib";
 
-    BINDGEN_EXTRA_CLANG_ARGS = builtins.concatStringsSep " " [
-      "-isystem ${stdenv.cc.libc.dev}/include"
-      "-isystem ${libxkbcommon.dev}/include"
+    BINDGEN_EXTRA_CLANG_ARGS = builtins.concatStringsSep " " ([
       "-isystem ${glib.dev}/include/glib-2.0"
       "-isystem ${glib.out}/lib/glib-2.0/include"
       "-isystem ${gtk4.dev}/include/gtk-4.0"
@@ -130,11 +137,15 @@ let
       "-isystem ${pango.dev}/include/pango-1.0"
       "-isystem ${graphene}/include/graphene-1.0"
       "-isystem ${gdk-pixbuf.dev}/include/gdk-pixbuf-2.0"
+    ]
+    ++ lib.optionals isLinux [
+      "-isystem ${stdenv.cc.libc.dev}/include"
+      "-isystem ${libxkbcommon.dev}/include"
       "-isystem ${wayland.dev}/include"
       "-isystem ${libGL.dev}/include"
-    ];
+    ]);
 
-    cargoExtraArgs = "--lib";
+    cargoExtraArgs = if isLinux then "--lib" else "--lib --no-default-features --features video,neo-term";
     doCheck = false;
   };
 
@@ -201,9 +212,13 @@ in stdenv.mkDerivation {
     libwebp
     dbus
     sqlite
-    libselinux
     tree-sitter
     gmp
+    # Link against our Rust library
+    neomacs-display
+  ]
+  ++ lib.optionals isLinux [
+    libselinux
     libgccjit
     libGL
     libxkbcommon
@@ -216,8 +231,6 @@ in stdenv.mkDerivation {
     libwpe
     libwpe-fdo
     weston
-    # Link against our Rust library
-    neomacs-display
   ];
 
   # Point to the pre-built Rust library
@@ -242,26 +255,29 @@ in stdenv.mkDerivation {
     "LDFLAGS=-L${neomacs-display}/lib"
   ];
 
-  # Set up environment for WPE WebKit
-  preBuild = ''
+  # Set up environment for WPE WebKit (Linux only)
+  preBuild = lib.optionalString isLinux ''
     export WPE_BACKEND_LIBRARY="${libwpe-fdo}/lib/libWPEBackend-fdo-1.0.so"
     export GIO_MODULE_DIR="${glib-networking}/lib/gio/modules"
   '';
 
   # Wrap the binary with required environment variables
-  postInstall = ''
+  postInstall = if isLinux then ''
     wrapProgram $out/bin/emacs \
       --set WPE_BACKEND_LIBRARY "${libwpe-fdo}/lib/libWPEBackend-fdo-1.0.so" \
       --set GIO_MODULE_DIR "${glib-networking}/lib/gio/modules" \
       --set WEBKIT_DISABLE_SANDBOX_THIS_IS_DANGEROUS "1" \
       --prefix PATH : "${wpewebkit}/libexec/wpe-webkit-2.0"
+  '' else ''
+    wrapProgram $out/bin/emacs \
+      --set GIO_MODULE_DIR "${glib-networking}/lib/gio/modules"
   '';
 
   meta = with lib; {
     description = "Neomacs - GPU-accelerated Emacs with GTK4, GStreamer, and WPE WebKit";
     homepage = "https://github.com/eval-exec/neomacs";
     license = licenses.gpl3Plus;
-    platforms = platforms.linux;
+    platforms = platforms.linux ++ platforms.darwin;
     mainProgram = "emacs";
     maintainers = [ ];
   };
