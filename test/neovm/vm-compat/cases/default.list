@@ -540,6 +540,7 @@ cases/numeric-error-predicate-semantics
 cases/max-min-type-preservation-semantics
 cases/reader-special-float-literals-semantics
 cases/reader-nan-payload-literals-semantics
+cases/reader-nan-fractional-payload-semantics
 cases/division-float-zero-semantics
 cases/expt-isnan-type-semantics
 cases/round-half-even-semantics

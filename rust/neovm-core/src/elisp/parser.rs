@@ -629,8 +629,8 @@ fn looks_like_float(s: &str) -> bool {
 
 fn parse_emacs_special_float(token: &str) -> Option<f64> {
     const NAN_QUIET_BIT: u64 = 1u64 << 51;
-    const NAN_PAYLOAD_TAG_BITS: u64 = 0b101u64 << 48;
-    const NAN_PAYLOAD_VALUE_MASK: u64 = (1u64 << 48) - 1;
+    const NAN_PAYLOAD_MASK: u64 = (1u64 << 51) - 1;
+    const NAN_LEADING_DOT_PAYLOAD: u64 = 2_251_799_813_685_246;
 
     let exp_idx = token.find(['e', 'E'])?;
     let (mantissa, exponent_suffix) = token.split_at(exp_idx);
@@ -648,33 +648,45 @@ fn parse_emacs_special_float(token: &str) -> Option<f64> {
             })
         }
         "+NaN" => {
-            let mantissa = mantissa.parse::<f64>().ok()?;
-            if mantissa != 0.0 {
-                if !mantissa.is_finite() || mantissa.fract() != 0.0 {
-                    return None;
-                }
-                let abs = mantissa.abs();
-                if abs < 1.0 || abs > NAN_PAYLOAD_VALUE_MASK as f64 {
-                    return None;
-                }
-                let payload = abs as u64;
-                let sign = if mantissa.is_sign_negative() {
-                    1u64 << 63
-                } else {
-                    0
-                };
-                let bits = sign
-                    | (0x7ffu64 << 52)
-                    | NAN_QUIET_BIT
-                    | NAN_PAYLOAD_TAG_BITS
-                    | (payload & NAN_PAYLOAD_VALUE_MASK);
-                return Some(f64::from_bits(bits));
+            let mantissa_value = mantissa.parse::<f64>().ok()?;
+            if !mantissa_value.is_finite() {
+                return None;
             }
-            Some(if mantissa.is_sign_negative() {
-                -f64::NAN
+
+            let mut payload = 0u64;
+            if mantissa_value != 0.0 {
+                let body = mantissa
+                    .strip_prefix('+')
+                    .or_else(|| mantissa.strip_prefix('-'))
+                    .unwrap_or(mantissa);
+                if body.starts_with('.') {
+                    payload = NAN_LEADING_DOT_PAYLOAD;
+                } else {
+                    let truncated = mantissa_value.abs().trunc();
+                    if truncated >= 1.0 {
+                        if truncated > NAN_PAYLOAD_MASK as f64 {
+                            return None;
+                        }
+                        payload = truncated as u64;
+                    }
+                }
+            }
+
+            if payload == 0 {
+                return Some(if mantissa_value.is_sign_negative() {
+                    -f64::NAN
+                } else {
+                    f64::NAN
+                });
+            }
+
+            let sign = if mantissa_value.is_sign_negative() {
+                1u64 << 63
             } else {
-                f64::NAN
-            })
+                0
+            };
+            let bits = sign | (0x7ffu64 << 52) | NAN_QUIET_BIT | (payload & NAN_PAYLOAD_MASK);
+            Some(f64::from_bits(bits))
         }
         _ => None,
     }
@@ -711,10 +723,10 @@ mod tests {
     #[test]
     fn parse_emacs_special_float_literals() {
         let forms = parse_forms(
-            "0.0e+NaN -0.0e+NaN 1.0e+INF -1.0e+INF 0.0e+INF 0e+NaN 1.0E+INF 1.0e+NaN -2.0e+NaN",
+            "0.0e+NaN -0.0e+NaN 1.0e+INF -1.0e+INF 0.0e+INF 0e+NaN 1.0E+INF 1.0e+NaN -2.0e+NaN .5e+NaN -.5e+NaN 1.5e+NaN 0.9e+NaN",
         )
         .unwrap();
-        assert_eq!(forms.len(), 9);
+        assert_eq!(forms.len(), 13);
 
         match forms[0] {
             Expr::Float(f) => assert!(f.is_nan() && !f.is_sign_negative()),
@@ -752,17 +764,52 @@ mod tests {
             Expr::Float(f) => assert!(f.is_nan() && f.is_sign_negative()),
             _ => panic!("expected negative NaN payload literal"),
         }
+        match forms[9] {
+            Expr::Float(f) => assert!(f.is_nan() && !f.is_sign_negative()),
+            _ => panic!("expected leading-dot NaN payload literal"),
+        }
+        match forms[10] {
+            Expr::Float(f) => assert!(f.is_nan() && f.is_sign_negative()),
+            _ => panic!("expected negative leading-dot NaN payload literal"),
+        }
+        match forms[11] {
+            Expr::Float(f) => assert!(f.is_nan() && !f.is_sign_negative()),
+            _ => panic!("expected fractional NaN literal"),
+        }
+        match forms[12] {
+            Expr::Float(f) => assert!(f.is_nan() && !f.is_sign_negative()),
+            _ => panic!("expected subunit fractional NaN literal"),
+        }
     }
 
     #[test]
-    fn parse_noncanonical_nan_payload_literals_as_symbols() {
-        let forms = parse_forms(".5e+NaN 0.0e+inf 0.0e+nan").unwrap();
+    fn parse_nan_payload_literals_render_to_oracle_shapes() {
+        let forms =
+            parse_forms("1.0e+NaN -2.0e+NaN .5e+NaN -.5e+NaN 1.5e+NaN 0.9e+NaN").unwrap();
+        let rendered: Vec<String> = forms.iter().map(crate::elisp::expr::print_expr).collect();
+        assert_eq!(
+            rendered,
+            vec![
+                "1.0e+NaN",
+                "-2.0e+NaN",
+                "2251799813685246.0e+NaN",
+                "-2251799813685246.0e+NaN",
+                "1.0e+NaN",
+                "0.0e+NaN",
+            ]
+        );
+    }
+
+    #[test]
+    fn parse_invalid_nan_inf_spellings_as_symbols() {
+        let forms = parse_forms("0.0e+inf 0.0e+nan 1.0eNaN 1.0eINF").unwrap();
         assert_eq!(
             forms,
             vec![
-                Expr::Symbol(".5e+NaN".into()),
                 Expr::Symbol("0.0e+inf".into()),
                 Expr::Symbol("0.0e+nan".into()),
+                Expr::Symbol("1.0eNaN".into()),
+                Expr::Symbol("1.0eINF".into()),
             ]
         );
     }
