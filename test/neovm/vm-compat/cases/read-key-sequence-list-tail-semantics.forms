@@ -43,6 +43,11 @@
     (read-key-sequence "")
     unread-command-events))
 
+(let ((unread-command-events (list '(mouse-1) 98 'foo 'bar 'baz 'qux 'quux 'quuz 'corge 'grault)))
+  (progn
+    (read-key-sequence "")
+    unread-command-events))
+
 (let ((unread-command-events '((mouse-1) . 97)))
   (progn
     (read-key-sequence "")

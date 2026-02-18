@@ -28,6 +28,23 @@ Last updated: 2026-02-18
 
 ## Doing
 
+- Expanded `read-key-sequence*` tail lock-ins with deeper payload depth (batch round 5):
+  - oracle corpus changes:
+    - `test/neovm/vm-compat/cases/read-key-sequence-list-tail-semantics.{forms,expected.tsv}`
+    - `test/neovm/vm-compat/cases/read-key-sequence-non-character-tail-semantics.{forms,expected.tsv}`
+    - `test/neovm/vm-compat/cases/read-key-sequence-symbol-tail-semantics.{forms,expected.tsv}`
+    - `test/neovm/vm-compat/cases/read-key-sequence-symbol-vector-tail-semantics.{forms,expected.tsv}`
+    - `test/neovm/vm-compat/cases/read-key-sequence-vector-list-tail-semantics.{forms,expected.tsv}`
+    - `test/neovm/vm-compat/cases/read-key-sequence-vector-non-character-tail-semantics.{forms,expected.tsv}`
+    - `test/neovm/vm-compat/cases/read-key-sequence-vector-symbol-tail-semantics.{forms,expected.tsv}`
+    - `test/neovm/vm-compat/cases/read-key-sequence-vector-symbol-vector-tail-semantics.{forms,expected.tsv}`
+    - `test/neovm/vm-compat/cases/read-key-sequence-vector-tail-semantics.{forms,expected.tsv}`
+    - `test/neovm/vm-compat/cases/read-key-sequence-vector-vector-tail-semantics.{forms,expected.tsv}`
+    - added one deeper-tail probe per case (extra scalar/symbol/vector/list tail element).
+  - verified:
+    - `make -C test/neovm/vm-compat check-neovm-list LIST=<batch-list>` (pass; updated cases now 10/10, list-tail cases 12/12)
+    - `make -C test/neovm/vm-compat check-all-neovm` (pass)
+
 - Expanded `read-event` / `read-key` tail lock-ins with deeper payload depth (batch round 4):
   - oracle corpus changes:
     - `test/neovm/vm-compat/cases/read-event-list-tail-semantics.{forms,expected.tsv}`
