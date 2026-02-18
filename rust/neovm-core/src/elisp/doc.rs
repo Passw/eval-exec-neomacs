@@ -385,6 +385,33 @@ pub(crate) fn builtin_help_function_arglist(args: Vec<Value>) -> EvalResult {
     Ok(Value::True)
 }
 
+pub(crate) fn builtin_help_function_arglist_eval(
+    eval: &mut super::eval::Evaluator,
+    args: Vec<Value>,
+) -> EvalResult {
+    expect_min_max_args("help-function-arglist", &args, 1, 2)?;
+    let preserve_names = args.get(1).is_some_and(Value::is_truthy);
+
+    if let Some(name) = args[0].as_symbol_name() {
+        let resolved =
+            super::builtins::builtin_indirect_function(eval, vec![Value::symbol(name)])?;
+        if let Some(arglist) = help_arglist_from_value(&resolved, preserve_names) {
+            return Ok(arglist);
+        }
+        if super::autoload::is_autoload_value(&resolved) {
+            return Ok(Value::string(
+                "[Arg list not available until function definition is loaded.]",
+            ));
+        }
+    }
+
+    if let Some(arglist) = help_arglist_from_value(&args[0], preserve_names) {
+        return Ok(arglist);
+    }
+
+    Ok(Value::True)
+}
+
 fn help_arglist(required: &[&str], optional: &[&str], rest: Option<&str>) -> Value {
     if required.is_empty() && optional.is_empty() && rest.is_none() {
         return Value::Nil;
@@ -461,6 +488,22 @@ fn help_arglist_from_quoted_lambda(function: &Value) -> Option<Value> {
 }
 
 fn help_arglist_from_subr_name(name: &str, preserve_names: bool) -> Option<Value> {
+    if name == "car" {
+        return Some(if preserve_names {
+            help_arglist(&["list"], &[], None)
+        } else {
+            help_arglist(&["arg1"], &[], None)
+        });
+    }
+
+    if name == "if" {
+        return Some(help_arglist(&["arg1", "arg2"], &[], Some("rest")));
+    }
+
+    if name == "documentation" {
+        return Some(help_arglist(&["arg1"], &["arg2"], None));
+    }
+
     if name == "-" {
         return Some(if preserve_names {
             help_arglist(&[], &["number-or-marker"], Some("more-numbers-or-markers"))
@@ -968,6 +1011,70 @@ mod tests {
     fn help_function_arglist_wrong_arity() {
         let result = builtin_help_function_arglist(vec![]);
         assert!(result.is_err());
+    }
+
+    #[test]
+    fn help_function_arglist_eval_builtin_car() {
+        let mut evaluator = super::super::eval::Evaluator::new();
+        let result =
+            builtin_help_function_arglist_eval(&mut evaluator, vec![Value::symbol("car")]).unwrap();
+        assert_eq!(arglist_names(&result), vec!["arg1".to_string()]);
+    }
+
+    #[test]
+    fn help_function_arglist_eval_builtin_car_preserve_names() {
+        let mut evaluator = super::super::eval::Evaluator::new();
+        let result = builtin_help_function_arglist_eval(
+            &mut evaluator,
+            vec![Value::symbol("car"), Value::True],
+        )
+        .unwrap();
+        assert_eq!(arglist_names(&result), vec!["list".to_string()]);
+    }
+
+    #[test]
+    fn help_function_arglist_eval_special_form_if() {
+        let mut evaluator = super::super::eval::Evaluator::new();
+        let result =
+            builtin_help_function_arglist_eval(&mut evaluator, vec![Value::symbol("if")]).unwrap();
+        assert_eq!(
+            arglist_names(&result),
+            vec![
+                "arg1".to_string(),
+                "arg2".to_string(),
+                "&rest".to_string(),
+                "rest".to_string()
+            ]
+        );
+    }
+
+    #[test]
+    fn help_function_arglist_eval_runtime_alias_builtin() {
+        let mut evaluator = super::super::eval::Evaluator::new();
+        evaluator
+            .obarray
+            .set_symbol_function("vm-hfa-alias-builtin", Value::symbol("car"));
+
+        let result = builtin_help_function_arglist_eval(
+            &mut evaluator,
+            vec![Value::symbol("vm-hfa-alias-builtin")],
+        )
+        .unwrap();
+        assert_eq!(arglist_names(&result), vec!["arg1".to_string()]);
+    }
+
+    #[test]
+    fn help_function_arglist_eval_autoload_placeholder() {
+        let mut evaluator = super::super::eval::Evaluator::new();
+        let result = builtin_help_function_arglist_eval(
+            &mut evaluator,
+            vec![Value::symbol("describe-function")],
+        )
+        .unwrap();
+        assert_eq!(
+            result.as_str(),
+            Some("[Arg list not available until function definition is loaded.]")
+        );
     }
 
     // =======================================================================

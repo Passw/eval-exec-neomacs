@@ -41,6 +41,7 @@ cases/snarf-documentation-runtime-semantics
 cases/describe-variable-runtime-semantics
 cases/describe-function-runtime-semantics
 cases/documentation-runtime-builtin-semantics
+cases/help-function-arglist-runtime-semantics
 cases/doc-helper-arity-semantics
 cases/doc-helper-subr-arity-semantics
 cases/ccl-arity-semantics

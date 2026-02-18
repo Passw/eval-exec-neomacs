@@ -8727,7 +8727,7 @@ pub(crate) fn dispatch_builtin(
         "documentation-property" => super::doc::builtin_documentation_property(args),
         "Snarf-documentation" => super::doc::builtin_snarf_documentation(args),
         "substitute-command-keys" => super::doc::builtin_substitute_command_keys(args),
-        "help-function-arglist" => super::doc::builtin_help_function_arglist(args),
+        "help-function-arglist" => super::doc::builtin_help_function_arglist_eval(eval, args),
 
         // JSON (pure)
         "json-serialize" => super::json::builtin_json_serialize(args),
