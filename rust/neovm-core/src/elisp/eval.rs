@@ -12,7 +12,7 @@ use super::bytecode::Compiler;
 use super::category::CategoryManager;
 use super::coding::CodingSystemManager;
 use super::custom::CustomManager;
-use super::doc::STARTUP_VARIABLE_DOC_STUBS;
+use super::doc::{STARTUP_VARIABLE_DOC_STRING_PROPERTIES, STARTUP_VARIABLE_DOC_STUBS};
 use super::error::*;
 use super::expr::Expr;
 use super::interactive::InteractiveRegistry;
@@ -169,6 +169,10 @@ impl Evaluator {
         // `variable-documentation` offsets in the DOC table.
         for &(name, _) in STARTUP_VARIABLE_DOC_STUBS {
             obarray.put_property(name, "variable-documentation", Value::Int(0));
+        }
+        // Some startup docs are string-valued in GNU Emacs (not integer offsets).
+        for &(name, doc) in STARTUP_VARIABLE_DOC_STRING_PROPERTIES {
+            obarray.put_property(name, "variable-documentation", Value::string(doc));
         }
 
         // GNU Emacs exposes `x-display-color-p` as an alias to
@@ -3690,6 +3694,20 @@ mod tests {
         assert_eq!(results[0], "OK nil");
         assert_eq!(results[1], "OK t");
         assert_eq!(results[2], "OK (97)");
+        assert_eq!(results[3], "OK nil");
+    }
+
+    #[test]
+    fn kill_ring_variable_docs_are_string_valued_at_startup() {
+        let results = eval_all(
+            "(stringp (get 'kill-ring 'variable-documentation))
+             (integerp (get 'kill-ring 'variable-documentation))
+             (stringp (get 'kill-ring-yank-pointer 'variable-documentation))
+             (integerp (get 'kill-ring-yank-pointer 'variable-documentation))",
+        );
+        assert_eq!(results[0], "OK t");
+        assert_eq!(results[1], "OK nil");
+        assert_eq!(results[2], "OK t");
         assert_eq!(results[3], "OK nil");
     }
 

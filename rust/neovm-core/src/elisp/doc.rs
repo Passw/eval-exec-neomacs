@@ -3031,11 +3031,6 @@ pub(crate) static STARTUP_VARIABLE_DOC_STUBS: &[(&str, &str)] = &[
         "yes-or-no-prompt",
         "String to append when ‘yes-or-no-p’ asks a question.",
     ),
-    ("kill-ring", "List of killed text sequences."),
-    (
-        "kill-ring-yank-pointer",
-        "The tail of the kill ring whose car is the last thing yanked.",
-    ),
     ("last-command", "The last command executed."),
     ("lexical-binding", "Whether to use lexical binding when evaluating code."),
     (
@@ -3119,6 +3114,14 @@ Each element is a string (directory name) or nil (try default directory).",
     (
         "word-wrap",
         "Non-nil means to use word-wrapping for continuation lines.",
+    ),
+];
+
+pub(crate) static STARTUP_VARIABLE_DOC_STRING_PROPERTIES: &[(&str, &str)] = &[
+    ("kill-ring", "List of killed text sequences."),
+    (
+        "kill-ring-yank-pointer",
+        "The tail of the kill ring whose car is the last thing yanked.",
     ),
 ];
 

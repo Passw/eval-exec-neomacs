@@ -14056,14 +14056,36 @@ Last updated: 2026-02-18
       - fails on stale allowlist entries (allowlisted symbol no longer extra)
       - keeps optional extra listing via `SHOW_EXTRA_STUBS=1`
     - added `test/neovm/vm-compat/cases/startup-doc-stub-extra-allowlist.txt`
-      - current allowlisted extras:
-        - `kill-ring`
-        - `kill-ring-yank-pointer`
+      - current expected steady state keeps this file empty (`extra startup stubs: 0`)
     - documented allowlist behavior in `test/neovm/vm-compat/README.md`
   - verified:
     - `make -C test/neovm/vm-compat check-startup-doc-stub-coverage` (pass)
-    - `SHOW_EXTRA_STUBS=1 test/neovm/vm-compat/check-startup-doc-stub-coverage.sh` (pass; extra list prints allowlisted symbols)
+    - `SHOW_EXTRA_STUBS=1 test/neovm/vm-compat/check-startup-doc-stub-coverage.sh` (pass)
     - `make -C test/neovm/vm-compat check-all-neovm` (pass with allowlist enforcement)
+- Aligned startup variable-doc property types for `kill-ring` and `kill-ring-yank-pointer` with GNU Emacs:
+  - runtime changes:
+    - `rust/neovm-core/src/elisp/doc.rs`
+      - removed `kill-ring*` entries from `STARTUP_VARIABLE_DOC_STUBS` (integer-offset startup set)
+      - added `STARTUP_VARIABLE_DOC_STRING_PROPERTIES` for string-valued startup docs
+    - `rust/neovm-core/src/elisp/eval.rs`
+      - startup seeding now writes string `variable-documentation` properties for `kill-ring*`
+      - added unit lock-in `kill_ring_variable_docs_are_string_valued_at_startup`
+  - oracle corpus changes:
+    - `test/neovm/vm-compat/cases/documentation-property-semantics.forms`
+    - `test/neovm/vm-compat/cases/documentation-property-semantics.expected.tsv`
+    - added lock-in asserting:
+      - `(integerp (get 'kill-ring* 'variable-documentation)) => nil`
+      - `(stringp (get 'kill-ring* 'variable-documentation)) => t`
+  - tooling/docs changes:
+    - `test/neovm/vm-compat/cases/startup-doc-stub-extra-allowlist.txt` now empty
+    - `test/neovm/vm-compat/README.md` now documents empty-allowlist steady state
+  - verified:
+    - `cargo test --manifest-path rust/neovm-core/Cargo.toml kill_ring_variable_docs_are_string_valued_at_startup` (pass)
+    - `cargo test --manifest-path rust/neovm-core/Cargo.toml documentation_property_eval_` (pass, 28/28)
+    - `make -C test/neovm/vm-compat record FORMS=cases/documentation-property-semantics.forms EXPECTED=cases/documentation-property-semantics.expected.tsv` (pass)
+    - `make -C test/neovm/vm-compat check-one-neovm CASE=documentation-property-semantics` (pass, 48/48)
+    - `make -C test/neovm/vm-compat check-startup-doc-stub-coverage` (pass; extra startup stubs: 0)
+    - `make -C test/neovm/vm-compat check-all-neovm` (pass)
 
 ## Doing
 

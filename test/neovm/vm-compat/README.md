@@ -134,6 +134,8 @@ The check fails on:
 - unexpected extra startup stubs (extra symbol not in allowlist)
 - stale allowlist entries (allowlisted symbol no longer extra)
 
+Current expected steady state is an empty allowlist (`extra startup stubs: 0`).
+
 Run any case list file directly (avoids passing very long `CASES=...` values):
 
 ```bash
