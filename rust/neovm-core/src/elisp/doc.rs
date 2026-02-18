@@ -183,34 +183,55 @@ fn eval_documentation_property_value(
 fn startup_variable_doc_offset_symbol(sym: &str, prop: &str, value: &Value) -> bool {
     prop == "variable-documentation"
         && matches!(value, Value::Int(_))
-        && matches!(
-            sym,
-            "load-path"
-                | "load-history"
-                | "features"
-                | "debug-on-error"
-                | "default-directory"
-                | "load-file-name"
-                | "noninteractive"
-                | "inhibit-quit"
-                | "print-length"
-                | "print-level"
-                | "standard-output"
-                | "buffer-read-only"
-                | "kill-ring"
-                | "kill-ring-yank-pointer"
-                | "last-command"
-                | "lexical-binding"
-                | "load-prefer-newer"
-        )
+        && startup_variable_doc_stub(sym).is_some()
 }
 
 fn startup_variable_doc_stub(sym: &str) -> Option<&'static str> {
     match sym {
+        "abbrev-mode" => Some("Non-nil if Abbrev mode is enabled."),
+        "after-change-functions" => Some("List of functions to call after each text change."),
+        "auto-fill-function" => Some("Function called (if non-nil) to perform auto-fill."),
+        "before-change-functions" => Some("List of functions to call before each text change."),
+        "buffer-file-name" => {
+            Some("Name of file visited in current buffer, or nil if not visiting a file.")
+        }
+        "buffer-undo-list" => Some("List of undo entries in current buffer."),
+        "case-fold-search" => Some("Non-nil if searches and matches should ignore case."),
+        "comment-end-can-be-escaped" => {
+            Some("Non-nil means an escaped ender inside a comment doesn't end the comment.")
+        }
+        "completion-ignore-case" => {
+            Some("Non-nil means don't consider case significant in completion.")
+        }
+        "current-prefix-arg" => Some("The value of the prefix argument for this editing command."),
+        "debug-on-quit" => {
+            Some("Non-nil means enter debugger if quit is signaled (C-g, for example).")
+        }
+        "display-line-numbers" => Some("Non-nil means display line numbers."),
+        "exec-path" => Some("List of directories to search programs to run in subprocesses."),
+        "fill-column" => Some("Column beyond which automatic line-wrapping should happen."),
         "load-path" => Some(
             "List of directories to search for files to load.\n\
 Each element is a string (directory name) or nil (try default directory).",
         ),
+        "major-mode" => Some("Symbol for current buffer's major mode."),
+        "mode-line-format" => Some("Template for displaying mode line for a window's buffer."),
+        "shell-file-name" => Some("File name to load inferior shells from."),
+        "select-active-regions" => {
+            Some("If non-nil, any active region automatically sets the primary selection.")
+        }
+        "tab-bar-mode" => Some("Non-nil if Tab-Bar mode is enabled."),
+        "this-command" => Some("The command now being executed."),
+        "tool-bar-mode" => Some("Non-nil if Tool-Bar mode is enabled."),
+        "transient-mark-mode" => Some("Non-nil if Transient Mark mode is enabled."),
+        "truncate-lines" => Some("Non-nil means do not display continuation lines."),
+        "undo-limit" => Some("Keep no more undo information once it exceeds this size."),
+        "undo-strong-limit" => Some("Don't keep more than this much size of undo information."),
+        "user-full-name" => Some("The full name of the user logged in."),
+        "window-system" => {
+            Some("Name of window system through which the selected frame is displayed.")
+        }
+        "word-wrap" => Some("Non-nil means to use word-wrapping for continuation lines."),
         "load-history" => Some("Alist mapping loaded file names to symbols and features."),
         "features" => Some("A list of symbols which are the features of the executing Emacs."),
         "debug-on-error" => Some("Non-nil means enter debugger if an error is signaled."),
@@ -2706,6 +2727,24 @@ mod tests {
             result
                 .as_str()
                 .is_some_and(|s| s.contains("List of directories to search for files to load"))
+        );
+    }
+
+    #[test]
+    fn documentation_property_eval_case_fold_search_integer_property_returns_string() {
+        let mut evaluator = super::super::eval::Evaluator::new();
+        let result = builtin_documentation_property_eval(
+            &mut evaluator,
+            vec![
+                Value::symbol("case-fold-search"),
+                Value::symbol("variable-documentation"),
+            ],
+        )
+        .unwrap();
+        assert!(
+            result
+                .as_str()
+                .is_some_and(|s| s.contains("searches and matches should ignore case"))
         );
     }
 
