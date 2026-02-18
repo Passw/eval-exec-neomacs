@@ -28,6 +28,22 @@ Last updated: 2026-02-18
 
 ## Doing
 
+- Added a startup string-doc coverage gate and wired it into vm-compat CI flow:
+  - harness changes:
+    - `test/neovm/vm-compat/check-startup-doc-string-coverage.sh`
+    - added an oracle-vs-NeoVM startup string-doc parity checker for `STARTUP_VARIABLE_DOC_STRING_PROPERTIES`.
+    - reports counts and fails on any missing or extra startup string-doc symbols.
+    - `test/neovm/vm-compat/Makefile`
+    - added target: `check-startup-doc-string-coverage`.
+    - `check-all-neovm` now runs both startup doc gates:
+      - `check-startup-doc-stub-coverage`
+      - `check-startup-doc-string-coverage`
+    - `test/neovm/vm-compat/README.md`
+    - documented the new startup string-doc coverage gate and usage.
+  - verified:
+    - `make -C test/neovm/vm-compat check-startup-doc-string-coverage` (pass; missing=0, extra=0)
+    - `make -C test/neovm/vm-compat check-all-neovm` (pass with new gate enabled)
+
 - Closed startup `variable-documentation` string-property parity with a 602-symbol oracle-backed batch (round 35):
   - runtime changes:
     - `rust/neovm-core/src/elisp/doc.rs`

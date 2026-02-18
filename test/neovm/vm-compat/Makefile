@@ -24,7 +24,7 @@ ERT_ALLOWLIST ?= cases/ert-allowlist-smoke.txt
 ERT_EXPECTED ?= cases/ert-allowlist-smoke.expected.tsv
 ERT_LOAD_FILES ?= cases/ert-allowlist-fixtures/smoke-tests.el
 
-.PHONY: oracle neovm record check compare check-neovm record-all check-all check-all-neovm check-all-neovm-only check-all-neovm-strict check-legacy-elc-neovm check-introspection-neovm check-thread-neovm check-runner-feature-stamp check-builtin-registry-all check-builtin-registry-fboundp check-builtin-registry-function-cell check-builtin-registry-function-kind check-builtin-registry-commandp check-builtin-registry-extension-policy check-oracle-default-path check-case-line-filter list-cases record-list check-list check-neovm-list check-one-neovm validate-case-lists case-inventory ert-oracle record-ert-allowlist check-ert-allowlist bench-load-cache compat-progress compat-stub-index compat-stub-index-json check-stub-budget check-startup-doc-stub-coverage show-function-kind-drifts
+.PHONY: oracle neovm record check compare check-neovm record-all check-all check-all-neovm check-all-neovm-only check-all-neovm-strict check-legacy-elc-neovm check-introspection-neovm check-thread-neovm check-runner-feature-stamp check-builtin-registry-all check-builtin-registry-fboundp check-builtin-registry-function-cell check-builtin-registry-function-kind check-builtin-registry-commandp check-builtin-registry-extension-policy check-oracle-default-path check-case-line-filter list-cases record-list check-list check-neovm-list check-one-neovm validate-case-lists case-inventory ert-oracle record-ert-allowlist check-ert-allowlist bench-load-cache compat-progress compat-stub-index compat-stub-index-json check-stub-budget check-startup-doc-stub-coverage check-startup-doc-string-coverage show-function-kind-drifts
 
 oracle:
 	./run-oracle.sh $(FORMS)
@@ -77,6 +77,7 @@ check-all-neovm:
 	done
 	$(MAKE) --no-print-directory check-stub-budget
 	$(MAKE) --no-print-directory check-startup-doc-stub-coverage
+	$(MAKE) --no-print-directory check-startup-doc-string-coverage
 
 check-all-neovm-strict:
 	@set -e; \
@@ -131,6 +132,9 @@ check-stub-budget:
 
 check-startup-doc-stub-coverage:
 	./check-startup-doc-stub-coverage.sh
+
+check-startup-doc-string-coverage:
+	./check-startup-doc-string-coverage.sh
 
 check-builtin-registry-all:
 	@set -e; \
