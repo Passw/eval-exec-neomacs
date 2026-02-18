@@ -653,22 +653,18 @@ fn parse_emacs_special_float(token: &str) -> Option<f64> {
                 return None;
             }
 
+            let body = mantissa
+                .strip_prefix('+')
+                .or_else(|| mantissa.strip_prefix('-'))
+                .unwrap_or(mantissa);
+
             let mut payload = 0u64;
-            if mantissa_value != 0.0 {
-                let body = mantissa
-                    .strip_prefix('+')
-                    .or_else(|| mantissa.strip_prefix('-'))
-                    .unwrap_or(mantissa);
-                if body.starts_with('.') {
-                    payload = NAN_LEADING_DOT_PAYLOAD;
-                } else {
-                    let truncated = mantissa_value.abs().trunc();
-                    if truncated >= 1.0 {
-                        if truncated > NAN_PAYLOAD_MASK as f64 {
-                            return None;
-                        }
-                        payload = truncated as u64;
-                    }
+            if body.starts_with('.') {
+                payload = NAN_LEADING_DOT_PAYLOAD;
+            } else {
+                let truncated = mantissa_value.abs().trunc();
+                if truncated >= 1.0 {
+                    payload = (truncated as u64) & NAN_PAYLOAD_MASK;
                 }
             }
 
@@ -784,8 +780,10 @@ mod tests {
 
     #[test]
     fn parse_nan_payload_literals_render_to_oracle_shapes() {
-        let forms =
-            parse_forms("1.0e+NaN -2.0e+NaN .5e+NaN -.5e+NaN 1.5e+NaN 0.9e+NaN").unwrap();
+        let forms = parse_forms(
+            "1.0e+NaN -2.0e+NaN .5e+NaN -.5e+NaN 1.5e+NaN 0.9e+NaN .0e+NaN -.0e+NaN 9007199254740991.0e+NaN 2251799813685248.0e+NaN 4503599627370495.0e+NaN 4503599627370496.0e+NaN -4503599627370496.0e+NaN",
+        )
+        .unwrap();
         let rendered: Vec<String> = forms.iter().map(crate::elisp::expr::print_expr).collect();
         assert_eq!(
             rendered,
@@ -796,6 +794,13 @@ mod tests {
                 "-2251799813685246.0e+NaN",
                 "1.0e+NaN",
                 "0.0e+NaN",
+                "2251799813685246.0e+NaN",
+                "-2251799813685246.0e+NaN",
+                "2251799813685247.0e+NaN",
+                "0.0e+NaN",
+                "2251799813685247.0e+NaN",
+                "0.0e+NaN",
+                "-0.0e+NaN",
             ]
         );
     }
