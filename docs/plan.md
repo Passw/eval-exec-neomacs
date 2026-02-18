@@ -28,6 +28,21 @@ Last updated: 2026-02-18
 
 ## Doing
 
+- Expanded remaining `read-char-exclusive` tail lock-ins for dotted unread queues:
+  - oracle corpus changes:
+    - `test/neovm/vm-compat/cases/read-char-exclusive-vector-tail-semantics.forms`
+    - `test/neovm/vm-compat/cases/read-char-exclusive-vector-tail-semantics.expected.tsv`
+    - `test/neovm/vm-compat/cases/read-char-exclusive-symbol-vector-tail-semantics.forms`
+    - `test/neovm/vm-compat/cases/read-char-exclusive-symbol-vector-tail-semantics.expected.tsv`
+    - `test/neovm/vm-compat/cases/read-char-exclusive-non-character-tail-semantics.forms`
+    - `test/neovm/vm-compat/cases/read-char-exclusive-non-character-tail-semantics.expected.tsv`
+    - added dotted-tail probes for `(97 . [mouse-1])`, `(foo . [bar])`, and `(1.0 . 97)`.
+  - verified:
+    - `make -C test/neovm/vm-compat check-one-neovm CASE=cases/read-char-exclusive-vector-tail-semantics` (pass, 2/2)
+    - `make -C test/neovm/vm-compat check-one-neovm CASE=cases/read-char-exclusive-symbol-vector-tail-semantics` (pass, 2/2)
+    - `make -C test/neovm/vm-compat check-one-neovm CASE=cases/read-char-exclusive-non-character-tail-semantics` (pass, 2/2)
+    - `make -C test/neovm/vm-compat check-all-neovm` (pass)
+
 - Expanded `read-char-exclusive` symbol/vector tail lock-ins for dotted unread queues:
   - oracle corpus changes:
     - `test/neovm/vm-compat/cases/read-char-exclusive-symbol-tail-semantics.forms`
