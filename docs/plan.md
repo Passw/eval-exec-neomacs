@@ -28,6 +28,12 @@ Last updated: 2026-02-18
 
 ## Doing
 
+- Extended `round` float tie parity to Oracle half-even behavior:
+  - Updated `rust/neovm-core/src/elisp/builtins.rs` so float `round` now uses tie-to-even semantics (for example `0.5 -> 0`, `2.5 -> 2`, `-2.5 -> -2`) instead of away-from-zero ties.
+  - Added evaluator unit coverage in `pure_dispatch_typed_round_half_ties_to_even`.
+  - Added oracle lock-in case `cases/round-half-even-semantics` and wired it into `test/neovm/vm-compat/cases/default.list`.
+  - Validated via `cargo test --manifest-path rust/neovm-core/Cargo.toml pure_dispatch_typed_round_half_ties_to_even`, `make -C test/neovm/vm-compat check-one-neovm CASE=cases/round-half-even-semantics`, and full `make -C test/neovm/vm-compat check-all-neovm`.
+
 - Extended `expt` / `isnan` type-contract parity:
   - Updated `rust/neovm-core/src/elisp/builtins.rs` so `expt` now validates non-float operand paths with `number-or-marker-p` contract semantics, matching Oracle `wrong-type-argument` payloads.
   - Updated `isnan` to reject non-float arguments with `(wrong-type-argument floatp VALUE)` instead of returning `nil`.
