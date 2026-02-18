@@ -28,6 +28,18 @@ Last updated: 2026-02-18
 
 ## Doing
 
+- Extended vm-compat progress snapshot with startup doc coverage observability:
+  - harness changes:
+    - `test/neovm/vm-compat/compat-progress.sh`
+    - now runs both startup doc coverage checks and reports:
+      - startup integer docs `(oracle/startup/missing/extra)`
+      - startup string docs `(oracle/startup/missing/extra)`
+    - keeps failing fast if either startup coverage check regresses.
+    - `test/neovm/vm-compat/README.md`
+    - updated compact snapshot description to include startup doc coverage counts.
+  - verified:
+    - `make -C test/neovm/vm-compat compat-progress` (pass; includes startup doc coverage lines)
+
 - Added a startup string-doc coverage gate and wired it into vm-compat CI flow:
   - harness changes:
     - `test/neovm/vm-compat/check-startup-doc-string-coverage.sh`

@@ -8,6 +8,8 @@ allowlist_file="$script_dir/cases/builtin-registry-fboundp-allowlist.txt"
 function_kind_allowlist_file="$script_dir/cases/builtin-registry-function-kind-allowlist.txt"
 function_kind_check_script="$script_dir/check-builtin-registry-function-kind.sh"
 fboundp_check_script="$script_dir/check-builtin-registry-fboundp.sh"
+startup_stub_coverage_script="$script_dir/check-startup-doc-stub-coverage.sh"
+startup_string_coverage_script="$script_dir/check-startup-doc-string-coverage.sh"
 source "$script_dir/lib/builtin-registry.sh"
 compat_stub_index_script="$script_dir/compat-stub-index.sh"
 
@@ -38,6 +40,8 @@ tmp_forms_only="$(mktemp)"
 tmp_function_kind_check="$(mktemp)"
 tmp_fboundp_check="$(mktemp)"
 tmp_stub_budget="$(mktemp)"
+tmp_startup_stub_check="$(mktemp)"
+tmp_startup_string_check="$(mktemp)"
 cleanup() {
   rm -f \
     "$tmp_all" \
@@ -51,7 +55,9 @@ cleanup() {
     "$tmp_forms_only" \
     "$tmp_function_kind_check" \
     "$tmp_fboundp_check" \
-    "$tmp_stub_budget"
+    "$tmp_stub_budget" \
+    "$tmp_startup_stub_check" \
+    "$tmp_startup_string_check"
 }
 trap cleanup EXIT
 
@@ -126,6 +132,28 @@ if ! "$script_dir/check-stub-budget.sh" > "$tmp_stub_budget" 2>&1; then
   exit 1
 fi
 printf '  explicit stub budget: %s\n' "$(sed -n '1p' "$tmp_stub_budget")"
+if ! "$startup_stub_coverage_script" > "$tmp_startup_stub_check" 2>&1; then
+  echo "  startup integer-doc coverage: check failed"
+  sed 's/^/    /' "$tmp_startup_stub_check"
+  exit 1
+fi
+if ! "$startup_string_coverage_script" > "$tmp_startup_string_check" 2>&1; then
+  echo "  startup string-doc coverage: check failed"
+  sed 's/^/    /' "$tmp_startup_string_check"
+  exit 1
+fi
+stub_oracle_count="$(awk -F': ' '/oracle integer-doc symbols:/ { print $2 }' "$tmp_startup_stub_check" | head -n 1)"
+stub_startup_count="$(awk -F': ' '/startup stub symbols:/ { print $2 }' "$tmp_startup_stub_check" | head -n 1)"
+stub_missing_count="$(awk -F': ' '/missing startup stubs:/ { print $2 }' "$tmp_startup_stub_check" | head -n 1)"
+stub_extra_count="$(awk -F': ' '/extra startup stubs:/ { print $2 }' "$tmp_startup_stub_check" | head -n 1)"
+string_oracle_count="$(awk -F': ' '/oracle string-doc symbols:/ { print $2 }' "$tmp_startup_string_check" | head -n 1)"
+string_startup_count="$(awk -F': ' '/startup string-doc symbols:/ { print $2 }' "$tmp_startup_string_check" | head -n 1)"
+string_missing_count="$(awk -F': ' '/missing startup string-docs:/ { print $2 }' "$tmp_startup_string_check" | head -n 1)"
+string_extra_count="$(awk -F': ' '/extra startup string-docs:/ { print $2 }' "$tmp_startup_string_check" | head -n 1)"
+printf '  startup integer docs (oracle/startup/missing/extra): %s/%s/%s/%s\n' \
+  "${stub_oracle_count:-0}" "${stub_startup_count:-0}" "${stub_missing_count:-0}" "${stub_extra_count:-0}"
+printf '  startup string docs (oracle/startup/missing/extra): %s/%s/%s/%s\n' \
+  "${string_oracle_count:-0}" "${string_startup_count:-0}" "${string_missing_count:-0}" "${string_extra_count:-0}"
 if [[ "$expected_count" -ne "$forms_count" ]]; then
   printf '  corpus artifact delta (expected - forms): %+d\n' "$((expected_count - forms_count))"
   while IFS= read -r path; do

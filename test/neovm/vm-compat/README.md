@@ -82,7 +82,7 @@ cd test/neovm/vm-compat
 make list-cases
 ```
 
-Get a compact status snapshot (case counts + explicit stub count + builtin registry counts + allowlist size):
+Get a compact status snapshot (case counts + explicit stub count + startup doc coverage counts + builtin registry counts + allowlist size):
 
 ```bash
 cd test/neovm/vm-compat
