@@ -1,4 +1,6 @@
 (documentation-property 'vm-docprop-symbol 'variable-documentation)
+(stringp (documentation-property 'load-path 'variable-documentation))
+(stringp (documentation-property 'load-path 'variable-documentation t))
 (progn (put 'vm-docprop-symbol 'variable-documentation "doc") (documentation-property 'vm-docprop-symbol 'variable-documentation))
 (progn (put 'vm-docprop-symbol 'variable-documentation 9) (documentation-property 'vm-docprop-symbol 'variable-documentation))
 (progn (put 'vm-docprop-symbol 'function-documentation "fdoc") (documentation-property 'vm-docprop-symbol 'function-documentation))

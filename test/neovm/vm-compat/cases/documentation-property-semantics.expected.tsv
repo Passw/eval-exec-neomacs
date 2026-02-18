@@ -1,15 +1,17 @@
 1	(documentation-property 'vm-docprop-symbol 'variable-documentation)	OK nil
-2	(progn (put 'vm-docprop-symbol 'variable-documentation "doc") (documentation-property 'vm-docprop-symbol 'variable-documentation))	OK "doc"
-3	(progn (put 'vm-docprop-symbol 'variable-documentation 9) (documentation-property 'vm-docprop-symbol 'variable-documentation))	OK nil
-4	(progn (put 'vm-docprop-symbol 'function-documentation "fdoc") (documentation-property 'vm-docprop-symbol 'function-documentation))	OK "fdoc"
-5	(documentation-property 'vm-docprop-symbol 1)	OK nil
-6	(progn (put 'vm-docprop-symbol 'x "v") (documentation-property 'vm-docprop-symbol 'x t))	OK "v"
-7	(progn (put 'vm-docprop-symbol 'variable-documentation '(1 2)) (condition-case err (documentation-property 'vm-docprop-symbol 'variable-documentation) (error err)))	OK (invalid-function 1)
-8	(progn (put 'vm-docprop-symbol 'variable-documentation '(identity "doc")) (documentation-property 'vm-docprop-symbol 'variable-documentation))	OK "doc"
-9	(progn (put 'vm-docprop-symbol 'variable-documentation 'vm-docprop-unbound) (condition-case err (documentation-property 'vm-docprop-symbol 'variable-documentation) (error err)))	OK (void-variable vm-docprop-unbound)
-10	(progn (put 'vm-docprop-symbol 'variable-documentation 't) (documentation-property 'vm-docprop-symbol 'variable-documentation))	OK t
-11	(progn (put 'vm-docprop-symbol 'variable-documentation [1 2]) (documentation-property 'vm-docprop-symbol 'variable-documentation))	OK [1 2]
-12	(progn (put 'vm-docprop-symbol 'variable-documentation 1.5) (documentation-property 'vm-docprop-symbol 'variable-documentation))	OK 1.5
-13	(progn (put 'vm-docprop-symbol 'variable-documentation '(progn "doc")) (documentation-property 'vm-docprop-symbol 'variable-documentation t))	OK "doc"
-14	(condition-case err (documentation-property 1 'variable-documentation) (error (car err)))	OK wrong-type-argument
-15	(condition-case err (documentation-property 'vm-docprop-symbol) (error (car err)))	OK wrong-number-of-arguments
+2	(stringp (documentation-property 'load-path 'variable-documentation))	OK t
+3	(stringp (documentation-property 'load-path 'variable-documentation t))	OK t
+4	(progn (put 'vm-docprop-symbol 'variable-documentation "doc") (documentation-property 'vm-docprop-symbol 'variable-documentation))	OK "doc"
+5	(progn (put 'vm-docprop-symbol 'variable-documentation 9) (documentation-property 'vm-docprop-symbol 'variable-documentation))	OK nil
+6	(progn (put 'vm-docprop-symbol 'function-documentation "fdoc") (documentation-property 'vm-docprop-symbol 'function-documentation))	OK "fdoc"
+7	(documentation-property 'vm-docprop-symbol 1)	OK nil
+8	(progn (put 'vm-docprop-symbol 'x "v") (documentation-property 'vm-docprop-symbol 'x t))	OK "v"
+9	(progn (put 'vm-docprop-symbol 'variable-documentation '(1 2)) (condition-case err (documentation-property 'vm-docprop-symbol 'variable-documentation) (error err)))	OK (invalid-function 1)
+10	(progn (put 'vm-docprop-symbol 'variable-documentation '(identity "doc")) (documentation-property 'vm-docprop-symbol 'variable-documentation))	OK "doc"
+11	(progn (put 'vm-docprop-symbol 'variable-documentation 'vm-docprop-unbound) (condition-case err (documentation-property 'vm-docprop-symbol 'variable-documentation) (error err)))	OK (void-variable vm-docprop-unbound)
+12	(progn (put 'vm-docprop-symbol 'variable-documentation 't) (documentation-property 'vm-docprop-symbol 'variable-documentation))	OK t
+13	(progn (put 'vm-docprop-symbol 'variable-documentation [1 2]) (documentation-property 'vm-docprop-symbol 'variable-documentation))	OK [1 2]
+14	(progn (put 'vm-docprop-symbol 'variable-documentation 1.5) (documentation-property 'vm-docprop-symbol 'variable-documentation))	OK 1.5
+15	(progn (put 'vm-docprop-symbol 'variable-documentation '(progn "doc")) (documentation-property 'vm-docprop-symbol 'variable-documentation t))	OK "doc"
+16	(condition-case err (documentation-property 1 'variable-documentation) (error (car err)))	OK wrong-type-argument
+17	(condition-case err (documentation-property 'vm-docprop-symbol) (error (car err)))	OK wrong-number-of-arguments

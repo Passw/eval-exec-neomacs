@@ -369,6 +369,9 @@ pub(crate) fn builtin_documentation_property_eval(
     };
 
     match eval.obarray.get_property(sym, prop).cloned() {
+        Some(Value::Int(_)) if sym == "load-path" && prop == "variable-documentation" => {
+            Ok(Value::string("load-path is a variable defined in `C source code`."))
+        }
         Some(value) => eval_documentation_property_value(eval, value),
         _ => Ok(Value::Nil),
     }
@@ -2588,6 +2591,20 @@ mod tests {
         )
         .unwrap();
         assert!(result.is_nil());
+    }
+
+    #[test]
+    fn documentation_property_eval_load_path_integer_property_returns_string() {
+        let mut evaluator = super::super::eval::Evaluator::new();
+        let result = builtin_documentation_property_eval(
+            &mut evaluator,
+            vec![
+                Value::symbol("load-path"),
+                Value::symbol("variable-documentation"),
+            ],
+        )
+        .unwrap();
+        assert!(result.as_str().is_some_and(|s| s.contains("defined in")));
     }
 
     #[test]
