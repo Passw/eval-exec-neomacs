@@ -302,29 +302,27 @@ pub(crate) fn builtin_div(args: Vec<Value>) -> EvalResult {
     }
 }
 
-pub(crate) fn builtin_mod(args: Vec<Value>) -> EvalResult {
+pub(crate) fn builtin_percent(args: Vec<Value>) -> EvalResult {
     expect_args("%", &args, 2)?;
-    if has_float(&args) {
-        let a = expect_number(&args[0])?;
-        let b = expect_number(&args[1])?;
-        if b == 0.0 {
-            return Err(signal("arith-error", vec![]));
-        }
-        // Emacs mod: result has sign of divisor
-        let r = a % b;
-        let r = if (r < 0.0) != (b < 0.0) { r + b } else { r };
-        Ok(Value::Float(r))
-    } else {
-        let a = expect_int(&args[0])?;
-        let b = expect_int(&args[1])?;
-        if b == 0 {
-            return Err(signal("arith-error", vec![]));
-        }
-        // Emacs mod: result has sign of divisor
-        let r = a % b;
-        let r = if (r < 0) != (b < 0) { r + b } else { r };
-        Ok(Value::Int(r))
+    let a = expect_integer_or_marker(&args[0])?;
+    let b = expect_integer_or_marker(&args[1])?;
+    if b == 0 {
+        return Err(signal("arith-error", vec![]));
     }
+    Ok(Value::Int(a % b))
+}
+
+pub(crate) fn builtin_mod(args: Vec<Value>) -> EvalResult {
+    expect_args("mod", &args, 2)?;
+    let a = expect_integer_or_marker(&args[0])?;
+    let b = expect_integer_or_marker(&args[1])?;
+    if b == 0 {
+        return Err(signal("arith-error", vec![]));
+    }
+    // Emacs mod: result has sign of divisor.
+    let r = a % b;
+    let r = if (r < 0) != (b < 0) { r + b } else { r };
+    Ok(Value::Int(r))
 }
 
 pub(crate) fn builtin_add1(args: Vec<Value>) -> EvalResult {
@@ -386,7 +384,10 @@ pub(crate) fn builtin_min(args: Vec<Value>) -> EvalResult {
 pub(crate) fn builtin_abs(args: Vec<Value>) -> EvalResult {
     expect_args("abs", &args, 1)?;
     match &args[0] {
-        Value::Int(n) => Ok(Value::Int(n.abs())),
+        Value::Int(n) => Ok(Value::Int(
+            n.checked_abs()
+                .ok_or_else(|| signal("overflow-error", vec![]))?,
+        )),
         Value::Float(f) => Ok(Value::Float(f.abs())),
         other => Err(signal(
             "wrong-type-argument",
@@ -433,9 +434,11 @@ pub(crate) fn builtin_ash(args: Vec<Value>) -> EvalResult {
     let n = expect_int(&args[0])?;
     let count = expect_int(&args[1])?;
     if count >= 0 {
-        Ok(Value::Int(n.checked_shl(count as u32).unwrap_or(0)))
+        let shift = u32::try_from(count).unwrap_or(u32::MAX);
+        Ok(Value::Int(n.checked_shl(shift).unwrap_or(0)))
     } else {
-        Ok(Value::Int(n >> (-count).min(63) as u32))
+        let shift = count.unsigned_abs().min(63) as u32;
+        Ok(Value::Int(n >> shift))
     }
 }
 
@@ -6618,7 +6621,9 @@ enum PureBuiltinId {
     Mul,
     #[strum(serialize = "/")]
     Div,
-    #[strum(serialize = "%", serialize = "mod")]
+    #[strum(serialize = "%")]
+    Percent,
+    #[strum(serialize = "mod")]
     Mod,
     #[strum(serialize = "1+")]
     Add1,
@@ -6928,6 +6933,7 @@ fn dispatch_builtin_id_pure(id: PureBuiltinId, args: Vec<Value>) -> EvalResult {
         PureBuiltinId::Sub => builtin_sub(args),
         PureBuiltinId::Mul => builtin_mul(args),
         PureBuiltinId::Div => builtin_div(args),
+        PureBuiltinId::Percent => builtin_percent(args),
         PureBuiltinId::Mod => builtin_mod(args),
         PureBuiltinId::Add1 => builtin_add1(args),
         PureBuiltinId::Sub1 => builtin_sub1(args),
@@ -8286,7 +8292,8 @@ pub(crate) fn dispatch_builtin(
         "-" => builtin_sub(args),
         "*" => builtin_mul(args),
         "/" => builtin_div(args),
-        "%" | "mod" => builtin_mod(args),
+        "%" => builtin_percent(args),
+        "mod" => builtin_mod(args),
         "1+" => builtin_add1(args),
         "1-" => builtin_sub1(args),
         "max" => builtin_max(args),
@@ -9933,15 +9940,56 @@ mod tests {
     }
 
     #[test]
-    fn pure_dispatch_typed_mod_aliases_match() {
-        let percent = dispatch_builtin_pure("%", vec![Value::Int(11), Value::Int(4)])
+    fn pure_dispatch_typed_percent_and_mod_follow_emacs_sign_rules() {
+        let percent = dispatch_builtin_pure("%", vec![Value::Int(-5), Value::Int(2)])
             .expect("builtin % should resolve")
             .expect("builtin % should evaluate");
-        let mod_name = dispatch_builtin_pure("mod", vec![Value::Int(11), Value::Int(4)])
+        let mod_name = dispatch_builtin_pure("mod", vec![Value::Int(-5), Value::Int(2)])
             .expect("builtin mod should resolve")
             .expect("builtin mod should evaluate");
-        assert_eq!(percent, Value::Int(3));
-        assert_eq!(mod_name, Value::Int(3));
+        assert_eq!(percent, Value::Int(-1));
+        assert_eq!(mod_name, Value::Int(1));
+    }
+
+    #[test]
+    fn pure_dispatch_typed_percent_rejects_float_args() {
+        let err = dispatch_builtin_pure("%", vec![Value::Float(1.5), Value::Int(2)])
+            .expect("builtin % should resolve")
+            .expect_err("builtin % should reject non-integer args");
+        match err {
+            Flow::Signal(sig) => {
+                assert_eq!(sig.symbol, "wrong-type-argument");
+                assert_eq!(
+                    sig.data,
+                    vec![Value::symbol("integer-or-marker-p"), Value::Float(1.5)]
+                );
+            }
+            other => panic!("unexpected flow: {other:?}"),
+        }
+    }
+
+    #[test]
+    fn pure_dispatch_typed_ash_handles_extreme_negative_shift_counts() {
+        let right = dispatch_builtin_pure("ash", vec![Value::Int(3), Value::Int(i64::MIN)])
+            .expect("builtin ash should resolve")
+            .expect("builtin ash should evaluate");
+        assert_eq!(right, Value::Int(0));
+
+        let right_neg = dispatch_builtin_pure("ash", vec![Value::Int(-3), Value::Int(i64::MIN)])
+            .expect("builtin ash should resolve")
+            .expect("builtin ash should evaluate");
+        assert_eq!(right_neg, Value::Int(-1));
+    }
+
+    #[test]
+    fn pure_dispatch_typed_abs_min_fixnum_signals_overflow_error() {
+        let err = dispatch_builtin_pure("abs", vec![Value::Int(i64::MIN)])
+            .expect("builtin abs should resolve")
+            .expect_err("abs on i64::MIN should not panic");
+        match err {
+            Flow::Signal(sig) => assert_eq!(sig.symbol, "overflow-error"),
+            other => panic!("unexpected flow: {other:?}"),
+        }
     }
 
     #[test]
