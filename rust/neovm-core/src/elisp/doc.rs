@@ -561,6 +561,46 @@ fn help_arglist_from_subr_name(name: &str, preserve_names: bool) -> Option<Value
         });
     }
 
+    if name == "concat" || name == "append" {
+        return Some(if preserve_names {
+            help_arglist(&[], &[], Some("sequences"))
+        } else {
+            help_arglist(&[], &[], Some("rest"))
+        });
+    }
+
+    if name == "nconc" {
+        return Some(if preserve_names {
+            help_arglist(&[], &[], Some("lists"))
+        } else {
+            help_arglist(&[], &[], Some("rest"))
+        });
+    }
+
+    if name == "vector" {
+        return Some(if preserve_names {
+            help_arglist(&[], &[], Some("objects"))
+        } else {
+            help_arglist(&[], &[], Some("rest"))
+        });
+    }
+
+    if name == "format" {
+        return Some(if preserve_names {
+            help_arglist(&["string"], &[], Some("objects"))
+        } else {
+            help_arglist(&[], &[], Some("rest"))
+        });
+    }
+
+    if name == "apply" {
+        return Some(if preserve_names {
+            help_arglist(&["function"], &[], Some("arguments"))
+        } else {
+            help_arglist(&["arg1"], &[], Some("rest"))
+        });
+    }
+
     if name == "symbol-function" || name == "fboundp" {
         return Some(if preserve_names {
             help_arglist(&["symbol"], &[], None)
@@ -1290,6 +1330,54 @@ mod tests {
                 "format-string".to_string(),
                 "&rest".to_string(),
                 "args".to_string()
+            ]
+        );
+
+        let concat = builtin_help_function_arglist_eval(
+            &mut evaluator,
+            vec![Value::symbol("concat"), Value::True],
+        )
+        .unwrap();
+        assert_eq!(
+            arglist_names(&concat),
+            vec!["&rest".to_string(), "sequences".to_string()]
+        );
+
+        let nconc = builtin_help_function_arglist_eval(
+            &mut evaluator,
+            vec![Value::symbol("nconc"), Value::True],
+        )
+        .unwrap();
+        assert_eq!(
+            arglist_names(&nconc),
+            vec!["&rest".to_string(), "lists".to_string()]
+        );
+
+        let format = builtin_help_function_arglist_eval(
+            &mut evaluator,
+            vec![Value::symbol("format"), Value::True],
+        )
+        .unwrap();
+        assert_eq!(
+            arglist_names(&format),
+            vec![
+                "string".to_string(),
+                "&rest".to_string(),
+                "objects".to_string()
+            ]
+        );
+
+        let apply = builtin_help_function_arglist_eval(
+            &mut evaluator,
+            vec![Value::symbol("apply"), Value::True],
+        )
+        .unwrap();
+        assert_eq!(
+            arglist_names(&apply),
+            vec![
+                "function".to_string(),
+                "&rest".to_string(),
+                "arguments".to_string()
             ]
         );
 
