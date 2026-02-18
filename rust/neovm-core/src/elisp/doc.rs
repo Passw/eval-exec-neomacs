@@ -216,6 +216,26 @@ pub(crate) static STARTUP_VARIABLE_DOC_STUBS: &[(&str, &str)] = &[
         "ambiguous-width-chars",
         "A char-table for characters whose width (columns) can be 1 or 2.",
     ),
+    (
+        "attempt-orderly-shutdown-on-fatal-signal",
+        "If non-nil, attempt orderly shutdown on fatal signals.",
+    ),
+    (
+        "attempt-stack-overflow-recovery",
+        "If non-nil, attempt to recover from C stack overflows.",
+    ),
+    (
+        "auto-composition-emoji-eligible-codepoints",
+        "List of codepoints for which auto-composition will check for an emoji font.",
+    ),
+    (
+        "auto-composition-function",
+        "Function to call to compose characters automatically.",
+    ),
+    (
+        "auto-composition-mode",
+        "Non-nil if Auto-Composition mode is enabled.",
+    ),
     ("auto-fill-function", "Function called (if non-nil) to perform auto-fill."),
     (
         "auto-fill-chars",
@@ -224,6 +244,22 @@ pub(crate) static STARTUP_VARIABLE_DOC_STUBS: &[(&str, &str)] = &[
     (
         "auto-hscroll-mode",
         "Allow or disallow automatic horizontal scrolling of windows.",
+    ),
+    (
+        "auto-raise-tab-bar-buttons",
+        "Non-nil means raise tab-bar buttons when the mouse moves over them.",
+    ),
+    (
+        "auto-raise-tool-bar-buttons",
+        "Non-nil means raise tool-bar buttons when the mouse moves over them.",
+    ),
+    (
+        "auto-resize-tab-bars",
+        "Non-nil means automatically resize tab-bars.",
+    ),
+    (
+        "auto-resize-tool-bars",
+        "Non-nil means automatically resize tool-bars.",
     ),
     (
         "auto-save-include-big-deletions",
@@ -252,6 +288,7 @@ pub(crate) static STARTUP_VARIABLE_DOC_STUBS: &[(&str, &str)] = &[
         "backtrace-on-redisplay-error",
         "Non-nil means create a backtrace if a lisp error occurs in redisplay.",
     ),
+    ("baud-rate", "The output baud rate of the terminal."),
     (
         "before-change-functions",
         "List of functions to call before each text change.",
@@ -263,6 +300,38 @@ pub(crate) static STARTUP_VARIABLE_DOC_STUBS: &[(&str, &str)] = &[
     (
         "binary-as-unsigned",
         "Non-nil means `format' %x and %o treat integers as unsigned.",
+    ),
+    (
+        "bidi-display-reordering",
+        "Non-nil means reorder bidirectional text for display in the visual order.",
+    ),
+    (
+        "bidi-inhibit-bpa",
+        "Non-nil means inhibit the Bidirectional Parentheses Algorithm.",
+    ),
+    (
+        "bidi-paragraph-direction",
+        "If non-nil, forces directionality of text paragraphs in the buffer.",
+    ),
+    (
+        "bidi-paragraph-separate-re",
+        "If non-nil, a regexp matching a line that separates paragraphs.",
+    ),
+    (
+        "bidi-paragraph-start-re",
+        "If non-nil, a regexp matching a line that starts OR separates paragraphs.",
+    ),
+    (
+        "blink-cursor-alist",
+        "Alist specifying how to blink the cursor off.",
+    ),
+    (
+        "buffer-access-fontified-property",
+        "Property which (if non-nil) indicates text has been fontified.",
+    ),
+    (
+        "buffer-access-fontify-functions",
+        "List of functions called by `buffer-substring' to fontify if necessary.",
     ),
     (
         "buffer-auto-save-file-format",
@@ -305,12 +374,51 @@ pub(crate) static STARTUP_VARIABLE_DOC_STUBS: &[(&str, &str)] = &[
         "buffer-saved-size",
         "Length of current buffer when last read in, saved or auto-saved.",
     ),
+    (
+        "build-files",
+        "A list of files used to build this Emacs binary.",
+    ),
+    (
+        "byte-boolean-vars",
+        "List of all DEFVAR_BOOL variables, used by the byte code optimizer.",
+    ),
+    (
+        "bytecomp-version-regexp",
+        "Regular expression matching safe to load compiled Lisp files.",
+    ),
     ("buffer-undo-list", "List of undo entries in current buffer."),
+    (
+        "cache-long-scans",
+        "Non-nil means that Emacs should use caches in attempt to speedup buffer scans.",
+    ),
+    ("cairo-version-string", "Version info for cairo."),
+    (
+        "cannot-suspend",
+        "Non-nil means to always spawn a subshell instead of suspending.",
+    ),
     ("case-fold-search", "Non-nil if searches and matches should ignore case."),
     (
         "case-symbols-as-words",
         "If non-nil, case functions treat symbol syntax as part of words.",
     ),
+    (
+        "change-major-mode-hook",
+        "Normal hook run before changing the major mode of a buffer.",
+    ),
+    (
+        "char-code-property-alist",
+        "Alist of character property name vs char-table containing property values.",
+    ),
+    (
+        "char-property-alias-alist",
+        "Alist of alternative properties for properties without a value.",
+    ),
+    ("char-script-table", "Char table of script symbols."),
+    (
+        "char-width-table",
+        "A char-table for width (columns) of each character.",
+    ),
+    ("charset-list", "List of all charsets ever defined."),
     (
         "coding-system-for-read",
         "Specify the coding system for read operations.",
@@ -3026,6 +3134,24 @@ mod tests {
             result
                 .as_str()
                 .is_some_and(|s| s.contains("automatic horizontal scrolling of windows"))
+        );
+    }
+
+    #[test]
+    fn documentation_property_eval_auto_composition_mode_integer_property_returns_string() {
+        let mut evaluator = super::super::eval::Evaluator::new();
+        let result = builtin_documentation_property_eval(
+            &mut evaluator,
+            vec![
+                Value::symbol("auto-composition-mode"),
+                Value::symbol("variable-documentation"),
+            ],
+        )
+        .unwrap();
+        assert!(
+            result
+                .as_str()
+                .is_some_and(|s| s.contains("Auto-Composition mode is enabled"))
         );
     }
 

@@ -13808,6 +13808,19 @@ Last updated: 2026-02-18
   - verified:
     - `make -C test/neovm/vm-compat record FORMS=cases/read-from-string-edges.forms EXPECTED=cases/read-from-string-edges.expected.tsv` (pass)
     - `make -C test/neovm/vm-compat check-one-neovm CASE=cases/read-from-string-edges` (pass, 13/13)
+- Expanded startup-variable `documentation-property` parity (round 30) with a larger evaluator-seeded stub matrix:
+  - runtime changes:
+    - added startup doc stubs for 30 symbols in `STARTUP_VARIABLE_DOC_STUBS` including `auto-composition-mode`, bidi/display startup vars, and charset/core startup metadata vars
+    - integer `variable-documentation` lookups for that round-30 symbol batch now resolve to C-source marker strings via startup doc stub mapping
+    - added eval lock-in test for `auto-composition-mode` integer-doc path
+  - expanded oracle corpus:
+    - `test/neovm/vm-compat/cases/documentation-property-semantics.forms`
+    - `test/neovm/vm-compat/cases/documentation-property-semantics.expected.tsv`
+    - added a dedicated startup-variable matrix row asserting string docs and first-line prefixes across the 30-symbol round-30 set
+  - verified:
+    - `cargo test --manifest-path rust/neovm-core/Cargo.toml documentation_property_eval_` (pass, 15/15)
+    - `make -C test/neovm/vm-compat check-all-neovm` (pass)
+    - `make -C test/neovm/vm-compat check-one-neovm CASE=documentation-property-semantics` (pass, 25/25)
 
 ## Doing
 
