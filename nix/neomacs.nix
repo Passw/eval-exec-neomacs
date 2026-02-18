@@ -58,8 +58,10 @@ let
       (craneLib.filterCargoSources path type)
       || (lib.hasInfix "/assets/" path)
       || (lib.hasInfix "/shaders/" path)
+      || (lib.hasInfix "/icons/" path)
       || (lib.hasSuffix ".wgsl" path)
-      || (lib.hasSuffix ".png" path);
+      || (lib.hasSuffix ".png" path)
+      || (lib.hasSuffix ".svg" path);
   };
 
   # Common arguments shared between deps-only and full builds
