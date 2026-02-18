@@ -12936,20 +12936,34 @@ enum neomacs_keyword_index
   NEOMACS_MAX_WIDTH,
   NEOMACS_MAX_HEIGHT,
   NEOMACS_SCALE,
+  NEOMACS_ASCENT,
+  NEOMACS_MARGIN,
+  NEOMACS_RELIEF,
+  NEOMACS_CONVERSION,
+  NEOMACS_HEURISTIC_MASK,
+  NEOMACS_MASK,
+  NEOMACS_BACKGROUND,
   NEOMACS_LAST
 };
 
 static const struct image_keyword neomacs_format[NEOMACS_LAST] =
 {
-  {":type",       IMAGE_SYMBOL_VALUE,                   1},
-  {":file",       IMAGE_STRING_VALUE,                   0},
-  {":data",       IMAGE_STRING_VALUE,                   0},
-  {":neomacs-id", IMAGE_POSITIVE_INTEGER_VALUE,         0},
-  {":width",      IMAGE_POSITIVE_INTEGER_VALUE,         0},
-  {":height",     IMAGE_POSITIVE_INTEGER_VALUE,         0},
-  {":max-width",  IMAGE_POSITIVE_INTEGER_VALUE,         0},
-  {":max-height", IMAGE_POSITIVE_INTEGER_VALUE,         0},
-  {":scale",      IMAGE_DONT_CHECK_VALUE_TYPE,          0},
+  {":type",            IMAGE_SYMBOL_VALUE,                        1},
+  {":file",            IMAGE_STRING_VALUE,                        0},
+  {":data",            IMAGE_STRING_VALUE,                        0},
+  {":neomacs-id",      IMAGE_POSITIVE_INTEGER_VALUE,              0},
+  {":width",           IMAGE_POSITIVE_INTEGER_VALUE,              0},
+  {":height",          IMAGE_POSITIVE_INTEGER_VALUE,              0},
+  {":max-width",       IMAGE_POSITIVE_INTEGER_VALUE,              0},
+  {":max-height",      IMAGE_POSITIVE_INTEGER_VALUE,              0},
+  {":scale",           IMAGE_DONT_CHECK_VALUE_TYPE,               0},
+  {":ascent",          IMAGE_ASCENT_VALUE,                        0},
+  {":margin",          IMAGE_NON_NEGATIVE_INTEGER_VALUE_OR_PAIR,  0},
+  {":relief",          IMAGE_INTEGER_VALUE,                       0},
+  {":conversion",      IMAGE_DONT_CHECK_VALUE_TYPE,               0},
+  {":heuristic-mask",  IMAGE_DONT_CHECK_VALUE_TYPE,               0},
+  {":mask",            IMAGE_DONT_CHECK_VALUE_TYPE,               0},
+  {":background",      IMAGE_STRING_OR_NIL_VALUE,                 0},
 };
 
 /* Return true if OBJECT is a valid neomacs image specification.  */
