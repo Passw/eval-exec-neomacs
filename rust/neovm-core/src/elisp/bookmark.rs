@@ -421,20 +421,65 @@ pub(crate) fn builtin_bookmark_rename(
     eval: &mut super::eval::Evaluator,
     args: Vec<Value>,
 ) -> EvalResult {
-    expect_args("bookmark-rename", &args, 2)?;
-    let old = expect_string(&args[0])?;
-    let new_name = expect_string(&args[1])?;
-    if eval.bookmarks.rename(&old, &new_name) {
-        Ok(Value::Nil)
-    } else {
-        Err(signal(
-            "error",
-            vec![Value::string(format!(
-                "Cannot rename bookmark \"{}\" to \"{}\"",
-                old, new_name
-            ))],
-        ))
+    if args.is_empty() || args.len() > 2 {
+        return Err(signal(
+            "wrong-number-of-arguments",
+            vec![Value::symbol("bookmark-rename"), Value::Int(args.len() as i64)],
+        ));
     }
+
+    // Batch-mode prompt fallbacks in GNU Emacs become end-of-file.
+    if args.len() == 1 || args.get(1).is_some_and(Value::is_nil) {
+        return Err(signal(
+            "end-of-file",
+            vec![Value::string("Error reading from stdin")],
+        ));
+    }
+
+    let old = &args[0];
+    let new_name = &args[1];
+
+    if let Value::Str(old_name) = old {
+        if eval.bookmarks.get(old_name).is_none() {
+            return Err(signal(
+                "error",
+                vec![Value::string(format!("Invalid bookmark {old_name}"))],
+            ));
+        }
+
+        let target = match new_name {
+            Value::Str(name) => (**name).clone(),
+            _ => {
+                return Err(signal(
+                    "error",
+                    vec![Value::string(format!("Invalid bookmark {old_name}"))],
+                ))
+            }
+        };
+
+        if eval.bookmarks.rename(old_name, &target) {
+            return Ok(Value::Nil);
+        }
+        return Err(signal(
+            "error",
+            vec![Value::string(format!("Invalid bookmark {old_name}"))],
+        ));
+    }
+
+    if old.is_cons() {
+        if let Value::Str(name) = new_name {
+            return Err(signal(
+                "error",
+                vec![Value::string(format!("Invalid bookmark {name}"))],
+            ));
+        }
+        return Ok(Value::Nil);
+    }
+
+    Err(signal(
+        "wrong-type-argument",
+        vec![Value::symbol("consp"), Value::Nil],
+    ))
 }
 
 /// (bookmark-all-names) -> list of bookmark names (sorted)
@@ -957,6 +1002,49 @@ mod tests {
         assert!(result.is_ok());
 
         // Old name gone, new name exists.
+        assert!(eval.bookmarks.get("old-name").is_none());
+        assert!(eval.bookmarks.get("new-name").is_some());
+    }
+
+    #[test]
+    fn test_builtin_bookmark_rename_permissive_designators() {
+        use super::super::eval::Evaluator;
+
+        let mut eval = Evaluator::new();
+        set_current_buffer_file(&mut eval, "/tmp/rename-permissive.el");
+        builtin_bookmark_set(&mut eval, vec![Value::string("old-name")]).unwrap();
+
+        // One-arg calls fall back to prompt behavior in batch mode and error.
+        let one_arg = builtin_bookmark_rename(&mut eval, vec![Value::string("old-name")]);
+        assert!(one_arg.is_err());
+
+        // Non-cons old payloads signal wrong-type in this compatibility path.
+        let ints = builtin_bookmark_rename(&mut eval, vec![Value::Int(1), Value::Int(2)]);
+        assert!(ints.is_err());
+
+        // Cons/list old payloads with non-string NEW are tolerated and return nil.
+        let list_ok = builtin_bookmark_rename(
+            &mut eval,
+            vec![
+                Value::list(vec![Value::symbol("a")]),
+                Value::list(vec![Value::symbol("b")]),
+            ],
+        );
+        assert!(list_ok.unwrap().is_nil());
+
+        // Cons/list old payloads with string NEW error on invalid bookmark designator.
+        let list_str = builtin_bookmark_rename(
+            &mut eval,
+            vec![Value::list(vec![Value::symbol("a")]), Value::string("new-name")],
+        );
+        assert!(list_str.is_err());
+
+        // String path still renames when the source bookmark exists.
+        let rename_ok = builtin_bookmark_rename(
+            &mut eval,
+            vec![Value::string("old-name"), Value::string("new-name")],
+        );
+        assert!(rename_ok.is_ok());
         assert!(eval.bookmarks.get("old-name").is_none());
         assert!(eval.bookmarks.get("new-name").is_some());
     }

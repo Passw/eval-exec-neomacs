@@ -1,0 +1,13 @@
+1	(condition-case err (bookmark-rename) (error err))	OK (wrong-number-of-arguments bookmark-rename 0)
+2	(condition-case err (bookmark-rename "a") (error err))	OK (end-of-file "Error reading from stdin")
+3	(condition-case err (bookmark-rename "a" "b") (error err))	OK (error "Invalid bookmark a")
+4	(condition-case err (bookmark-rename 1 2) (error err))	OK (wrong-type-argument consp nil)
+5	(condition-case err (bookmark-rename nil nil) (error err))	OK (end-of-file "Error reading from stdin")
+6	(condition-case err (bookmark-rename '(a) '(b)) (error err))	OK nil
+7	(condition-case err (bookmark-rename "a" "b" t) (error err))	OK (wrong-number-of-arguments bookmark-rename 3)
+8	(condition-case err (funcall 'bookmark-rename "a" "b") (error err))	OK (error "Invalid bookmark a")
+9	(condition-case err (funcall 'bookmark-rename 1 2) (error err))	OK (wrong-type-argument consp nil)
+10	(condition-case err (funcall 'bookmark-rename "a" "b" t) (error err))	OK (wrong-number-of-arguments #<subr bookmark-rename> 3)
+11	(condition-case err (apply 'bookmark-rename '("a" "b")) (error err))	OK (error "Invalid bookmark a")
+12	(condition-case err (apply 'bookmark-rename '(1 2)) (error err))	OK (wrong-type-argument consp nil)
+13	(condition-case err (apply 'bookmark-rename '("a" "b" t)) (error err))	OK (wrong-number-of-arguments #<subr bookmark-rename> 3)
