@@ -28,6 +28,13 @@ Last updated: 2026-02-18
 
 ## Doing
 
+- Extended NaN payload reader parity for high-precision integer mantissas:
+  - Updated `rust/neovm-core/src/elisp/parser.rs` payload extraction for `+NaN` literals to derive masked payload bits from the mantissa integer-part text directly (modulo `2^51`) instead of relying on `f64` truncation.
+  - This fixes precision-loss drift for values above IEEE exact-integer range, including `9007199254740993.0e+NaN` (`1.0e+NaN`) and `-9007199254740993.0e+NaN` (`-1.0e+NaN`).
+  - Extended parser coverage in `parse_nan_payload_literals_render_to_oracle_shapes` for the new high-precision signed boundary forms.
+  - Extended oracle lock-in case `cases/reader-nan-payload-mask-semantics` with high-precision signed payload forms and refreshed expected output.
+  - Validated via targeted `cargo test --manifest-path rust/neovm-core/Cargo.toml` runs for parser/print NaN tests, targeted `check-one-neovm` runs for `reader-nan-payload-mask-semantics` and related reader float cases, and full `make -C test/neovm/vm-compat check-all-neovm`.
+
 - Extended NaN payload reader parity for mask/boundary literals:
   - Updated `rust/neovm-core/src/elisp/parser.rs` so leading-dot mantissas always map to Oracle special payload shape (including `.0e+NaN` / `-.0e+NaN`) and non-leading-dot mantissas use truncated absolute integer payload masked to 51 bits.
   - This aligns large mantissa behavior with Oracle for boundary forms like `9007199254740991.0e+NaN`, `2251799813685248.0e+NaN`, and `4503599627370496.0e+NaN`.
