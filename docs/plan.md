@@ -1,6 +1,6 @@
 # NeoVM / Neomacs Plan
 
-Last updated: 2026-02-17
+Last updated: 2026-02-18
 
 ## Execution Queue (next 20)
 
@@ -27,6 +27,12 @@ Last updated: 2026-02-17
 21. [x] Add periodic `make compat-progress` output diff check in PR review templates.
 
 ## Doing
+
+- Completed `documentation` builtin/special-form runtime parity slice:
+  - Updated `rust/neovm-core/src/elisp/doc.rs` so `documentation` now resolves callable values through `symbol-function` wrapper paths and follows alias indirection before doc extraction.
+  - Aligned builtin/special-form behavior so `(stringp (documentation 'car))`, `(stringp (documentation 'cdr))`, and `(stringp (documentation 'if))` are true, matching Oracle.
+  - Added oracle lock-in case `cases/documentation-runtime-builtin-semantics` and wired it into `test/neovm/vm-compat/cases/default.list`.
+  - Validated via `cargo test --manifest-path rust/neovm-core/Cargo.toml documentation_`, `make -C test/neovm/vm-compat check-one-neovm CASE=cases/documentation-runtime-builtin-semantics`, and full `make -C test/neovm/vm-compat check-all-neovm`.
 
 - Completed command-dispatch `KEYS` argument parity slice:
   - Updated `rust/neovm-core/src/elisp/interactive.rs` so
