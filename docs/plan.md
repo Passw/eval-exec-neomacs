@@ -28,6 +28,15 @@ Last updated: 2026-02-18
 
 ## Doing
 
+- Expanded `read-key-sequence` symbol tail lock-ins with deeper payload depth:
+  - oracle corpus changes:
+    - `test/neovm/vm-compat/cases/read-key-sequence-symbol-tail-semantics.forms`
+    - `test/neovm/vm-compat/cases/read-key-sequence-symbol-tail-semantics.expected.tsv`
+    - added deeper-tail probe `(list 'foo 98 'bar 'baz 'qux 'quux)`.
+  - verified:
+    - `make -C test/neovm/vm-compat check-one-neovm CASE=cases/read-key-sequence-symbol-tail-semantics` (pass, 7/7)
+    - `make -C test/neovm/vm-compat check-all-neovm` (pass)
+
 - Expanded `read-key-sequence` list tail lock-ins with deeper payload depth:
   - oracle corpus changes:
     - `test/neovm/vm-compat/cases/read-key-sequence-list-tail-semantics.forms`
