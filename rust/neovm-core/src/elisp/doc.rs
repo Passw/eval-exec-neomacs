@@ -649,6 +649,13 @@ fn help_arglist_from_subr_name(name: &str, preserve_names: bool) -> Option<Value
         return Some(help_arglist(&["function"], &[], Some("arguments")));
     }
 
+    if preserve_names && name == "mapcar" {
+        return Some(Value::list(vec![
+            Value::symbol("function"),
+            Value::symbol("sequence"),
+        ]));
+    }
+
     if name == "symbol-function" || name == "fboundp" {
         return Some(if preserve_names {
             help_arglist(&["symbol"], &[], None)
@@ -1497,6 +1504,16 @@ mod tests {
                 "&rest".to_string(),
                 "arguments".to_string()
             ]
+        );
+
+        let mapcar = builtin_help_function_arglist_eval(
+            &mut evaluator,
+            vec![Value::symbol("mapcar"), Value::True],
+        )
+        .unwrap();
+        assert_eq!(
+            arglist_names(&mapcar),
+            vec!["function".to_string(), "sequence".to_string()]
         );
 
         let read = builtin_help_function_arglist_eval(

@@ -22,6 +22,7 @@
 (help-function-arglist 'make-string t)
 (help-function-arglist 'read-from-string t)
 (help-function-arglist 'funcall t)
+(help-function-arglist 'mapcar t)
 (help-function-arglist 'eq t)
 (help-function-arglist 'symbol-function t)
 (help-function-arglist 'substitute-command-keys t)
