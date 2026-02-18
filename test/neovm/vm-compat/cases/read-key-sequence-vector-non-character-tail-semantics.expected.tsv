@@ -1,2 +1,3 @@
 1	(let ((unread-command-events (list 1.0 97))) (progn (read-key-sequence-vector "") unread-command-events))	OK (97)
 2	(let ((unread-command-events '(1.0 . 97))) (progn (read-key-sequence-vector "") unread-command-events))	OK 97
+3	(let ((unread-command-events '(97 . 1.0))) (progn (read-key-sequence-vector "") unread-command-events))	OK 1.0

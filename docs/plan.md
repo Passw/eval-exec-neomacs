@@ -28,6 +28,18 @@ Last updated: 2026-02-18
 
 ## Doing
 
+- Expanded `read-key-sequence-vector` char-head dotted-tail lock-ins:
+  - oracle corpus changes:
+    - `test/neovm/vm-compat/cases/read-key-sequence-vector-vector-tail-semantics.forms`
+    - `test/neovm/vm-compat/cases/read-key-sequence-vector-vector-tail-semantics.expected.tsv`
+    - `test/neovm/vm-compat/cases/read-key-sequence-vector-non-character-tail-semantics.forms`
+    - `test/neovm/vm-compat/cases/read-key-sequence-vector-non-character-tail-semantics.expected.tsv`
+    - added dotted-tail probes for `(97 . [mouse-1])` and `(97 . 1.0)`.
+  - verified:
+    - `make -C test/neovm/vm-compat check-one-neovm CASE=cases/read-key-sequence-vector-vector-tail-semantics` (pass, 3/3)
+    - `make -C test/neovm/vm-compat check-one-neovm CASE=cases/read-key-sequence-vector-non-character-tail-semantics` (pass, 3/3)
+    - `make -C test/neovm/vm-compat check-all-neovm` (pass)
+
 - Expanded non-character-tail lock-ins for mirrored dotted unread queues:
   - oracle corpus changes:
     - `test/neovm/vm-compat/cases/read-event-non-character-tail-semantics.forms`

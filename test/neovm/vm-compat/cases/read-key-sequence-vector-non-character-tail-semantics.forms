@@ -7,3 +7,8 @@
   (progn
     (read-key-sequence-vector "")
     unread-command-events))
+
+(let ((unread-command-events '(97 . 1.0)))
+  (progn
+    (read-key-sequence-vector "")
+    unread-command-events))
