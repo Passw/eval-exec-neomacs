@@ -28,6 +28,21 @@ Last updated: 2026-02-18
 
 ## Doing
 
+- Expanded `read-key` vector-tail lock-ins for dotted unread queue tails:
+  - oracle corpus changes:
+    - `test/neovm/vm-compat/cases/read-key-vector-tail-semantics.forms`
+    - `test/neovm/vm-compat/cases/read-key-vector-tail-semantics.expected.tsv`
+    - `test/neovm/vm-compat/cases/read-key-vector-symbol-tail-semantics.forms`
+    - `test/neovm/vm-compat/cases/read-key-vector-symbol-tail-semantics.expected.tsv`
+    - `test/neovm/vm-compat/cases/read-key-vector-vector-tail-semantics.forms`
+    - `test/neovm/vm-compat/cases/read-key-vector-vector-tail-semantics.expected.tsv`
+    - added improper-list queue probes for dotted tails `(97 . [mouse-1])`, `(97 . [foo])`, and `([foo] . [bar])`.
+  - verified:
+    - `make -C test/neovm/vm-compat check-one-neovm CASE=cases/read-key-vector-tail-semantics` (pass, 2/2)
+    - `make -C test/neovm/vm-compat check-one-neovm CASE=cases/read-key-vector-symbol-tail-semantics` (pass, 2/2)
+    - `make -C test/neovm/vm-compat check-one-neovm CASE=cases/read-key-vector-vector-tail-semantics` (pass, 2/2)
+    - `make -C test/neovm/vm-compat check-all-neovm` (pass)
+
 - Expanded `read-key` symbol-tail lock-ins for dotted unread queue tails:
   - oracle corpus changes:
     - `test/neovm/vm-compat/cases/read-key-symbol-tail-semantics.forms`

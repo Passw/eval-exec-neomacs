@@ -1,1 +1,2 @@
 1	(let ((unread-command-events (list [foo] [bar]))) (progn (read-key "") unread-command-events))	OK ([bar])
+2	(let ((unread-command-events '([foo] . [bar]))) (progn (read-key "") unread-command-events))	OK [bar]

@@ -1,1 +1,2 @@
 1	(let ((unread-command-events (list 97 [foo]))) (progn (read-key "") unread-command-events))	OK ([foo])
+2	(let ((unread-command-events '(97 . [foo]))) (progn (read-key "") unread-command-events))	OK [foo]
