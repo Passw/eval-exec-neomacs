@@ -78,6 +78,38 @@ fn invalid_get_device_terminal_error(value: &Value) -> Flow {
     )
 }
 
+fn format_get_device_terminal_arg_eval(eval: &super::eval::Evaluator, value: &Value) -> String {
+    if let Value::Int(id) = value {
+        if *id >= 0 {
+            let window_id = WindowId(*id as u64);
+            if let Some(frame_id) = eval.frames.find_window_frame_id(window_id) {
+                if let Some(frame) = eval.frames.get(frame_id) {
+                    if let Some(window) = frame.find_window(window_id) {
+                        if let Some(buffer_id) = window.buffer_id() {
+                            if let Some(buffer) = eval.buffers.get(buffer_id) {
+                                return format!("#<window {} on {}>", id, buffer.name);
+                            }
+                        }
+                        return format!("#<window {} on {}>", id, frame.name);
+                    }
+                }
+            }
+        }
+    }
+
+    super::print::print_value(value)
+}
+
+fn invalid_get_device_terminal_error_eval(eval: &super::eval::Evaluator, value: &Value) -> Flow {
+    signal(
+        "error",
+        vec![Value::string(format!(
+            "Invalid argument {} in 'get-device-terminal'",
+            format_get_device_terminal_arg_eval(eval, value)
+        ))],
+    )
+}
+
 fn terminal_not_x_display_error(value: &Value) -> Option<Flow> {
     terminal_handle_id(value).map(|id| {
         signal(
@@ -189,7 +221,7 @@ fn expect_display_designator_eval(
     if value.is_nil() || terminal_designator_p(value) || live_frame_designator_p(eval, value) {
         Ok(())
     } else {
-        Err(invalid_get_device_terminal_error(value))
+        Err(invalid_get_device_terminal_error_eval(eval, value))
     }
 }
 
@@ -2154,6 +2186,42 @@ mod tests {
         let _ = crate::elisp::window_cmds::ensure_selected_frame_id(&mut eval);
         let result = builtin_display_pixel_width_eval(&mut eval, vec![Value::Int(999_999)]);
         assert!(result.is_err());
+    }
+
+    #[test]
+    fn eval_display_monitor_errors_render_window_designators() {
+        let mut eval = crate::elisp::Evaluator::new();
+        let _ = crate::elisp::window_cmds::ensure_selected_frame_id(&mut eval);
+        let window_id = crate::elisp::window_cmds::builtin_selected_window(&mut eval, vec![])
+            .unwrap()
+            .as_int()
+            .expect("selected-window should return id");
+
+        let list_err = builtin_display_monitor_attributes_list_eval(
+            &mut eval,
+            vec![Value::Int(window_id)],
+        )
+        .expect_err("window designator should be rejected");
+        let frame_err =
+            builtin_frame_monitor_attributes_eval(&mut eval, vec![Value::Int(window_id)])
+                .expect_err("window designator should be rejected");
+
+        for err in [list_err, frame_err] {
+            match err {
+                Flow::Signal(sig) => {
+                    assert_eq!(sig.symbol, "error");
+                    match sig.data.as_slice() {
+                        [Value::Str(msg)] => {
+                            assert!(msg.contains("get-device-terminal"));
+                            assert!(msg.contains("#<window"));
+                            assert!(msg.contains("*scratch*"));
+                        }
+                        other => panic!("unexpected signal payload: {other:?}"),
+                    }
+                }
+                other => panic!("expected signal, got {other:?}"),
+            }
+        }
     }
 
     #[test]

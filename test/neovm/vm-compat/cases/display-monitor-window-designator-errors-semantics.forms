@@ -1,0 +1,15 @@
+(let ((w (selected-window)))
+  (condition-case err
+      (display-monitor-attributes-list w)
+    (error
+     (list (car err)
+           (not (null (string-match-p "get-device-terminal" (cadr err))))
+           (not (null (string-match-p "window" (cadr err))))))))
+
+(let ((w (selected-window)))
+  (condition-case err
+      (frame-monitor-attributes w)
+    (error
+     (list (car err)
+           (not (null (string-match-p "get-device-terminal" (cadr err))))
+           (not (null (string-match-p "window" (cadr err))))))))

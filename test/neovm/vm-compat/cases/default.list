@@ -360,6 +360,7 @@ cases/x-display-batch-semantics
 cases/x-display-terminal-designator-semantics
 cases/display-monitor-semantics
 cases/display-monitor-frames-semantics
+cases/display-monitor-window-designator-errors-semantics
 cases/image-clear-cache-semantics
 cases/image-clear-cache-optional-semantics
 cases/image-batch-query-semantics
