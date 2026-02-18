@@ -13894,6 +13894,24 @@ Last updated: 2026-02-18
     - `make -C test/neovm/vm-compat record FORMS=cases/documentation-property-semantics.forms EXPECTED=cases/documentation-property-semantics.expected.tsv` (pass)
     - `make -C test/neovm/vm-compat check-one-neovm CASE=documentation-property-semantics` (pass, 30/30)
     - `make -C test/neovm/vm-compat check-all-neovm` (pass)
+- Expanded startup-variable `documentation-property` parity (round 36) with GC/help/image/startup UI metadata symbols:
+  - runtime changes:
+    - added startup doc stubs for 30 additional symbols in `STARTUP_VARIABLE_DOC_STUBS`, including:
+      - GC/runtime counters: `gc-cons-percentage`, `gc-cons-threshold`, `gc-elapsed`, `gcs-done`
+      - mode-line/help/UI vars: `global-mode-string`, `header-line-format`, `help-char`, `help-event-list`, `help-form`, `horizontal-scroll-bar`, `hourglass-delay`, `hscroll-*`
+      - rendering/image vars: `glyph-table`, `glyphless-char-display`, `ignore-relative-composition`, `image-cache-eviction-delay`, `image-scaling-factor`, `image-types`, `indent-tabs-mode`, `indicate-buffer-boundaries`
+    - integer `variable-documentation` lookups for that round-36 symbol batch now resolve through the shared startup doc stub mapping
+    - added eval lock-in test:
+      - `documentation_property_eval_header_line_format_integer_property_returns_string`
+  - expanded oracle corpus:
+    - `test/neovm/vm-compat/cases/documentation-property-semantics.forms`
+    - `test/neovm/vm-compat/cases/documentation-property-semantics.expected.tsv`
+    - added a dedicated 30-symbol startup matrix row for the round-36 set (string doc + first-line prefix checks)
+  - verified:
+    - `cargo test --manifest-path rust/neovm-core/Cargo.toml documentation_property_eval_` (pass, 21/21)
+    - `make -C test/neovm/vm-compat record FORMS=cases/documentation-property-semantics.forms EXPECTED=cases/documentation-property-semantics.expected.tsv` (pass)
+    - `make -C test/neovm/vm-compat check-one-neovm CASE=documentation-property-semantics` (pass, 31/31)
+    - `make -C test/neovm/vm-compat check-all-neovm` (pass)
 
 ## Doing
 

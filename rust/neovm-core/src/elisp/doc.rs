@@ -1080,6 +1080,126 @@ pub(crate) static STARTUP_VARIABLE_DOC_STUBS: &[(&str, &str)] = &[
         "Non-nil means display messages at start and end of garbage collection.",
     ),
     (
+        "gc-cons-percentage",
+        "Portion of the heap used for allocation.",
+    ),
+    (
+        "gc-cons-threshold",
+        "Number of bytes of consing between garbage collections.",
+    ),
+    (
+        "gc-elapsed",
+        "Accumulated time elapsed in garbage collections.",
+    ),
+    (
+        "gcs-done",
+        "Accumulated number of garbage collections done.",
+    ),
+    (
+        "global-disable-point-adjustment",
+        "If non-nil, always suppress point adjustments.",
+    ),
+    (
+        "global-mode-string",
+        "String (or mode line construct) included (normally) in `mode-line-misc-info'.",
+    ),
+    (
+        "glyph-table",
+        "Table defining how to output a glyph code to the frame.",
+    ),
+    (
+        "glyphless-char-display",
+        "Char-table defining glyphless characters.",
+    ),
+    (
+        "gnutls-log-level",
+        "Logging level used by the GnuTLS functions.",
+    ),
+    (
+        "header-line-format",
+        "Analogous to `mode-line-format', but controls the header line.",
+    ),
+    (
+        "help-char",
+        "Character to recognize as meaning Help.",
+    ),
+    (
+        "help-event-list",
+        "List of input events to recognize as meaning Help.",
+    ),
+    (
+        "help-form",
+        "Form to execute when character `help-char' is read.",
+    ),
+    (
+        "hexl-program-name",
+        "Name of the `hexl' program distributed with Emacs.",
+    ),
+    (
+        "highlight-nonselected-windows",
+        "Non-nil means highlight active region even in nonselected windows.",
+    ),
+    (
+        "history-add-new-input",
+        "Non-nil means to add new elements in history.",
+    ),
+    (
+        "history-delete-duplicates",
+        "Non-nil means to delete duplicates in history.",
+    ),
+    (
+        "history-length",
+        "Maximum length of history lists before truncation takes place.",
+    ),
+    (
+        "horizontal-scroll-bar",
+        "Position of this buffer's horizontal scroll bar.",
+    ),
+    (
+        "hourglass-delay",
+        "Seconds to wait before displaying an hourglass pointer when Emacs is busy.",
+    ),
+    (
+        "hscroll-margin",
+        "How many columns away from the window edge point is allowed to get.",
+    ),
+    (
+        "hscroll-step",
+        "How many columns to scroll the window when point gets too close to the edge.",
+    ),
+    (
+        "icon-title-format",
+        "Template for displaying the title bar of an iconified frame.",
+    ),
+    (
+        "iconify-child-frame",
+        "How to handle iconification of child frames.",
+    ),
+    (
+        "ignore-relative-composition",
+        "Char table of characters which are not composed relatively.",
+    ),
+    (
+        "image-cache-eviction-delay",
+        "Maximum time after which images are removed from the cache.",
+    ),
+    (
+        "image-scaling-factor",
+        "When displaying images, apply this scaling factor before displaying.",
+    ),
+    (
+        "image-types",
+        "List of potentially supported image types.",
+    ),
+    (
+        "indent-tabs-mode",
+        "Indentation can insert tabs if this is non-nil.",
+    ),
+    (
+        "indicate-buffer-boundaries",
+        "Visually indicate buffer boundaries and scrolling.",
+    ),
+    (
         "inhibit-quit",
         "Non-nil inhibits C-g quitting from happening immediately.",
     ),
@@ -3815,6 +3935,24 @@ mod tests {
             result
                 .as_str()
                 .is_some_and(|s| s.contains("Template for displaying the title bar of visible frames"))
+        );
+    }
+
+    #[test]
+    fn documentation_property_eval_header_line_format_integer_property_returns_string() {
+        let mut evaluator = super::super::eval::Evaluator::new();
+        let result = builtin_documentation_property_eval(
+            &mut evaluator,
+            vec![
+                Value::symbol("header-line-format"),
+                Value::symbol("variable-documentation"),
+            ],
+        )
+        .unwrap();
+        assert!(
+            result
+                .as_str()
+                .is_some_and(|s| s.contains("controls the header line"))
         );
     }
 
