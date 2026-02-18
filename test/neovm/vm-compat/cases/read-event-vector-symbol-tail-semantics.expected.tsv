@@ -1,2 +1,3 @@
 1	(let ((unread-command-events (list [foo]))) (progn (read-event nil nil 0) unread-command-events))	OK nil
 2	(let ((unread-command-events '([foo] . bar))) (progn (read-event nil nil 0) unread-command-events))	OK bar
+3	(let ((unread-command-events (list [foo] 97 'bar))) (progn (read-event nil nil 0) unread-command-events))	OK (97 bar)
