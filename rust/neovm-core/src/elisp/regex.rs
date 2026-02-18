@@ -615,6 +615,11 @@ fn compute_replacement(
 
 /// Build a replacement string handling `\&` (whole match) and `\N` (group N).
 fn build_replacement(template: &str, md: &MatchData, source: &str) -> String {
+    fn next_char_at(s: &str, byte_idx: usize) -> Option<(char, usize)> {
+        s.get(byte_idx..)
+            .and_then(|tail| tail.chars().next().map(|ch| (ch, ch.len_utf8())))
+    }
+
     let mut out = String::with_capacity(template.len());
     let bytes = template.as_bytes();
     let len = bytes.len();
@@ -622,39 +627,41 @@ fn build_replacement(template: &str, md: &MatchData, source: &str) -> String {
 
     while i < len {
         if bytes[i] == b'\\' && i + 1 < len {
-            let next = bytes[i + 1];
+            let (next, next_len) =
+                next_char_at(template, i + 1).expect("byte index must be char boundary");
             match next {
-                b'&' => {
+                '&' => {
                     // Whole match
                     if let Some(Some((s, e))) = md.groups.first() {
                         if *e <= source.len() && *s <= *e {
                             out.push_str(&source[*s..*e]);
                         }
                     }
-                    i += 2;
+                    i += 1 + next_len;
                 }
-                b'0'..=b'9' => {
-                    let group = (next - b'0') as usize;
+                '0'..='9' => {
+                    let group = (next as u8 - b'0') as usize;
                     if let Some(Some((s, e))) = md.groups.get(group) {
                         if *e <= source.len() && *s <= *e {
                             out.push_str(&source[*s..*e]);
                         }
                     }
-                    i += 2;
+                    i += 1 + next_len;
                 }
-                b'\\' => {
+                '\\' => {
                     out.push('\\');
-                    i += 2;
+                    i += 1 + next_len;
                 }
                 _ => {
                     out.push('\\');
-                    out.push(next as char);
-                    i += 2;
+                    out.push(next);
+                    i += 1 + next_len;
                 }
             }
         } else {
-            out.push(bytes[i] as char);
-            i += 1;
+            let (ch, ch_len) = next_char_at(template, i).expect("byte index must be char boundary");
+            out.push(ch);
+            i += ch_len;
         }
     }
 
@@ -1164,6 +1171,22 @@ mod tests {
         let _ = string_match_full("\\([a-z]+\\)?\\([0-9]+\\)", "123", 0, &mut md);
         let err = replace_match_string("123", "X", false, false, 1, &md).unwrap_err();
         assert_eq!(err, REPLACE_MATCH_SUBEXP_MISSING);
+    }
+
+    #[test]
+    fn replace_match_preserves_multibyte_replacement_literals() {
+        let mut md = None;
+        let _ = string_match_full("x", "x", 0, &mut md);
+        let replaced = replace_match_string("x", "éz", false, false, 0, &md).unwrap();
+        assert_eq!(replaced, "éz");
+    }
+
+    #[test]
+    fn replace_match_preserves_multibyte_replacement_with_backref() {
+        let mut md = None;
+        let _ = string_match_full("\\(x\\)", "x", 0, &mut md);
+        let replaced = replace_match_string("x", "\\1é", false, false, 0, &md).unwrap();
+        assert_eq!(replaced, "xé");
     }
 
     // -----------------------------------------------------------------------

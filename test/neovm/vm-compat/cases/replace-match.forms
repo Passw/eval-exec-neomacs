@@ -24,3 +24,7 @@
 (with-temp-buffer (insert "abc") (goto-char (point-min)) (condition-case err (replace-match "Z" nil nil nil "x") (error (list (car err) (car (cdr err))))))
 (with-temp-buffer (insert "abc") (goto-char (point-min)) (condition-case err (replace-match "Z" nil nil nil -1) (error (list (car err) (car (cdr err))))))
 (with-temp-buffer (insert "abc") (goto-char (point-min)) (condition-case err (replace-match "Z" nil nil nil 0 1 2) (error (list (car err) (car (cdr err))))))
+(let ((s "x")) (string-match "x" s) (replace-match "é" nil nil s))
+(let ((s "x")) (string-match "x" s) (replace-match "éz" nil nil s))
+(let ((s "x")) (string-match "x" s) (replace-match "\\&é" nil nil s))
+(let ((s "x")) (string-match "\\(x\\)" s) (replace-match "\\1é" nil nil s))

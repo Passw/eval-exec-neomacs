@@ -9825,12 +9825,19 @@ pub(crate) fn builtin_replace_match(
     };
     let subexp = if args.len() > 4 && !args[4].is_nil() {
         let n = expect_int(&args[4])?;
-        // Emacs clamps SUBEXP argument range checks to 0..29.
-        if !(0..=29).contains(&n) {
-            return Err(signal(
-                "args-out-of-range",
-                vec![Value::Int(n), Value::Int(0), Value::Int(29)],
-            ));
+        if n < 0 {
+            return if let Some(source) = string_arg.as_ref() {
+                Err(signal(
+                    "args-out-of-range",
+                    vec![
+                        Value::Int(n),
+                        Value::Int(0),
+                        Value::Int(source.chars().count() as i64),
+                    ],
+                ))
+            } else {
+                Err(signal("args-out-of-range", vec![Value::Int(n)]))
+            };
         }
         n as usize
     } else {
@@ -9879,10 +9886,16 @@ pub(crate) fn builtin_replace_match(
         Err(msg) if msg == missing_subexp_error && subexp == 0 => {
             Err(signal("args-out-of-range", vec![Value::Int(0)]))
         }
-        Err(msg) if msg == missing_subexp_error => Err(signal(
-            "error",
-            vec![Value::string(msg), Value::Int(subexp as i64)],
-        )),
+        Err(msg) if msg == missing_subexp_error => {
+            if md
+                .as_ref()
+                .is_some_and(|m| subexp >= m.groups.len())
+            {
+                Err(signal("args-out-of-range", vec![Value::Int(subexp as i64)]))
+            } else {
+                Err(signal("error", vec![Value::string(msg), Value::Int(subexp as i64)]))
+            }
+        }
         Err(msg) => Err(signal("error", vec![Value::string(msg)])),
     }
 }
