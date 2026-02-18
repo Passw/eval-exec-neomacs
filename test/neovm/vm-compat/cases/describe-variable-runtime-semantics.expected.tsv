@@ -5,7 +5,9 @@
 5	(progn (setq vm-desc-probe 1) (put 'vm-desc-probe 'variable-documentation 9) (stringp (describe-variable 'vm-desc-probe)))	OK t
 6	(progn (setq vm-desc-probe 1) (put 'vm-desc-probe 'variable-documentation 'vm-desc-prop-unbound) (condition-case err (describe-variable 'vm-desc-probe) (error (car err))))	OK void-variable
 7	(progn (setq vm-desc-probe 1) (put 'vm-desc-probe 'variable-documentation 't) (condition-case err (describe-variable 'vm-desc-probe) (error (car err))))	OK wrong-type-argument
-8	(condition-case err (describe-variable 1) (error (car err)))	OK user-error
-9	(condition-case err (describe-variable) (error (car err)))	OK wrong-number-of-arguments
-10	(stringp (describe-variable 'load-path nil nil))	OK t
-11	(condition-case err (describe-variable 'load-path nil nil nil) (error (car err)))	OK wrong-number-of-arguments
+8	(progn (setq vm-desc-probe 1) (setq vm-desc-docsym-t t) (put 'vm-desc-probe 'variable-documentation 'vm-desc-docsym-t) (condition-case err (describe-variable 'vm-desc-probe) (error (car err))))	OK wrong-type-argument
+9	(progn (setq vm-desc-probe 1) (setq vm-desc-docsym-list '(identity "doc")) (put 'vm-desc-probe 'variable-documentation 'vm-desc-docsym-list) (condition-case err (describe-variable 'vm-desc-probe) (error (car err))))	OK wrong-type-argument
+10	(condition-case err (describe-variable 1) (error (car err)))	OK user-error
+11	(condition-case err (describe-variable) (error (car err)))	OK wrong-number-of-arguments
+12	(stringp (describe-variable 'load-path nil nil))	OK t
+13	(condition-case err (describe-variable 'load-path nil nil nil) (error (car err)))	OK wrong-number-of-arguments

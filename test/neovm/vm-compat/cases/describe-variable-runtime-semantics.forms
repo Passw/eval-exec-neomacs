@@ -5,6 +5,8 @@
 (progn (setq vm-desc-probe 1) (put 'vm-desc-probe 'variable-documentation 9) (stringp (describe-variable 'vm-desc-probe)))
 (progn (setq vm-desc-probe 1) (put 'vm-desc-probe 'variable-documentation 'vm-desc-prop-unbound) (condition-case err (describe-variable 'vm-desc-probe) (error (car err))))
 (progn (setq vm-desc-probe 1) (put 'vm-desc-probe 'variable-documentation 't) (condition-case err (describe-variable 'vm-desc-probe) (error (car err))))
+(progn (setq vm-desc-probe 1) (setq vm-desc-docsym-t t) (put 'vm-desc-probe 'variable-documentation 'vm-desc-docsym-t) (condition-case err (describe-variable 'vm-desc-probe) (error (car err))))
+(progn (setq vm-desc-probe 1) (setq vm-desc-docsym-list '(identity "doc")) (put 'vm-desc-probe 'variable-documentation 'vm-desc-docsym-list) (condition-case err (describe-variable 'vm-desc-probe) (error (car err))))
 (condition-case err (describe-variable 1) (error (car err)))
 (condition-case err (describe-variable) (error (car err)))
 (stringp (describe-variable 'load-path nil nil))

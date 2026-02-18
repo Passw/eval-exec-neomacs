@@ -306,7 +306,14 @@ pub(crate) fn builtin_describe_variable(
                 if !eval.obarray.boundp(&sym) {
                     return Err(signal("void-variable", vec![Value::symbol(sym)]));
                 }
-                return Ok(describe_variable_value_or_void(eval, &name));
+                let sym_value = eval.obarray.symbol_value(&sym).cloned().unwrap_or(Value::Nil);
+                return match sym_value {
+                    Value::Str(_) | Value::Int(_) => Ok(describe_variable_value_or_void(eval, &name)),
+                    other => Err(signal(
+                        "wrong-type-argument",
+                        vec![Value::symbol("char-or-string-p"), other],
+                    )),
+                };
             }
             Value::True => {
                 return Err(signal(
@@ -2373,6 +2380,51 @@ mod tests {
         match result {
             Err(Flow::Signal(sig)) => assert_eq!(sig.symbol, "void-variable"),
             other => panic!("expected void-variable signal, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn describe_variable_symbol_doc_property_bound_true_errors_wrong_type_argument() {
+        let mut evaluator = super::super::eval::Evaluator::new();
+        evaluator.obarray.set_symbol_value("my-var", Value::Int(42));
+        evaluator.obarray.set_symbol_value("my-doc", Value::True);
+        evaluator.obarray.put_property(
+            "my-var",
+            "variable-documentation",
+            Value::symbol("my-doc"),
+        );
+
+        let result = builtin_describe_variable(&mut evaluator, vec![Value::symbol("my-var")]);
+        match result {
+            Err(Flow::Signal(sig)) => {
+                assert_eq!(sig.symbol, "wrong-type-argument");
+                assert_eq!(
+                    sig.data.first().and_then(Value::as_symbol_name),
+                    Some("char-or-string-p")
+                );
+            }
+            other => panic!("expected wrong-type-argument signal, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn describe_variable_symbol_doc_property_bound_list_errors_wrong_type_argument() {
+        let mut evaluator = super::super::eval::Evaluator::new();
+        evaluator.obarray.set_symbol_value("my-var", Value::Int(42));
+        evaluator.obarray.set_symbol_value(
+            "my-doc",
+            Value::list(vec![Value::symbol("identity"), Value::string("doc")]),
+        );
+        evaluator.obarray.put_property(
+            "my-var",
+            "variable-documentation",
+            Value::symbol("my-doc"),
+        );
+
+        let result = builtin_describe_variable(&mut evaluator, vec![Value::symbol("my-var")]);
+        match result {
+            Err(Flow::Signal(sig)) => assert_eq!(sig.symbol, "wrong-type-argument"),
+            other => panic!("expected wrong-type-argument signal, got {other:?}"),
         }
     }
 
