@@ -28,6 +28,14 @@ Last updated: 2026-02-18
 
 ## Doing
 
+- Extended numeric argument-contract parity across arithmetic/comparison/bitwise helpers:
+  - Updated `rust/neovm-core/src/elisp/builtins.rs` to use Oracle-matching staged numeric validation, aligning `wrong-type-argument` payload predicates (`number-or-marker-p` vs `integer-or-marker-p`) for `+`, `-`, `*`, `/`, `max`, `min`, `%`, `mod`, `logand`, `logior`, `logxor`, and numeric comparison operators.
+  - Restored Emacs-consistent `%` vs `mod` split: `%` remains integer-only remainder, while `mod` accepts float operands and mirrors float `NaN` behavior on zero divisors.
+  - Added `cases/numeric-error-predicate-semantics` and wired it into `test/neovm/vm-compat/cases/default.list`.
+  - Updated `rust/neovm-core/src/elisp/print.rs` float formatting so NaN sign is preserved (`-0.0e+NaN` vs `0.0e+NaN`), matching Oracle output for `mod` float zero-divisor paths.
+  - Expanded evaluator unit coverage in `pure_dispatch_typed_numeric_symbol_rejections_use_number_or_marker_p` and `print_float_nan_preserves_sign`.
+  - Validated via `cargo test --manifest-path rust/neovm-core/Cargo.toml pure_dispatch_typed_`, targeted `check-one-neovm` runs (`cases/numeric-error-predicate-semantics`, `cases/percent-mod-ash-semantics`), and full `make -C test/neovm/vm-compat check-all-neovm`.
+
 - Extended bitwise type-contract parity for `log*` family:
   - Updated `rust/neovm-core/src/elisp/builtins.rs` so `logand`, `logior`, and `logxor` now validate operands with `integer-or-marker-p` (instead of `integerp`), matching Oracle error payloads for float operands.
   - Added evaluator unit coverage in `pure_dispatch_typed_log_bitops_reject_with_integer_or_marker_p`.
