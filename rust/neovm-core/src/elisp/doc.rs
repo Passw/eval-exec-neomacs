@@ -1323,6 +1323,246 @@ pub(crate) static STARTUP_VARIABLE_DOC_STUBS: &[(&str, &str)] = &[
         "input-method-previous-message",
         "When `input-method-function' is called, hold the previous echo area message.",
     ),
+    (
+        "input-pending-p-filter-events",
+        "If non-nil, `input-pending-p' ignores some input events.",
+    ),
+    (
+        "installation-directory",
+        "A directory within which to look for the `lib-src' and `etc' directories.",
+    ),
+    (
+        "integer-width",
+        "Maximum number N of bits in safely-calculated integers.",
+    ),
+    (
+        "internal--daemon-sockname",
+        "Name of external socket passed to Emacs, or nil if none.",
+    ),
+    (
+        "internal--text-quoting-flag",
+        "If nil, a nil `text-quoting-style' is treated as `grave'.",
+    ),
+    (
+        "internal--top-level-message",
+        "Message displayed by `normal-top-level'.",
+    ),
+    (
+        "internal-doc-file-name",
+        "Name of file containing documentation strings of built-in symbols.",
+    ),
+    (
+        "internal-make-interpreted-closure-function",
+        "Function to filter the env when constructing a closure.",
+    ),
+    (
+        "internal-when-entered-debugger",
+        "The number of keyboard events as of last time `debugger' was called.",
+    ),
+    (
+        "interrupt-process-functions",
+        "List of functions to be called for `interrupt-process'.",
+    ),
+    (
+        "intervals-consed",
+        "Number of intervals that have been consed so far.",
+    ),
+    (
+        "inverse-video",
+        "Non-nil means invert the entire frame display.",
+    ),
+    (
+        "invocation-directory",
+        "The directory in which the Emacs executable was found, to run it.",
+    ),
+    (
+        "invocation-name",
+        "The program name that was used to run Emacs.",
+    ),
+    (
+        "kbd-macro-termination-hook",
+        "Normal hook run whenever a keyboard macro terminates.",
+    ),
+    (
+        "key-translation-map",
+        "Keymap of key translations that can override keymaps.",
+    ),
+    (
+        "keyboard-translate-table",
+        "Translate table for local keyboard input, or nil.",
+    ),
+    (
+        "kill-buffer-delete-auto-save-files",
+        "If non-nil, offer to delete any autosave file when killing a buffer.",
+    ),
+    (
+        "kill-buffer-query-functions",
+        "List of functions called with no args to query before killing a buffer.",
+    ),
+    (
+        "kill-emacs-hook",
+        "Hook run when `kill-emacs' is called.",
+    ),
+    (
+        "large-hscroll-threshold",
+        "Horizontal scroll of truncated lines above which to use redisplay shortcuts.",
+    ),
+    (
+        "last-code-conversion-error",
+        "Error status of the last code conversion.",
+    ),
+    (
+        "last-coding-system-used",
+        "Coding system used in the latest file or process I/O.",
+    ),
+    (
+        "last-command-event",
+        "Last input event of a key sequence that called a command.",
+    ),
+    (
+        "last-event-device",
+        "The name of the input device of the most recently read event.",
+    ),
+    (
+        "last-event-frame",
+        "The frame in which the most recently read event occurred.",
+    ),
+    (
+        "last-input-event",
+        "Last input event.",
+    ),
+    (
+        "last-kbd-macro",
+        "Last kbd macro defined, as a string or vector; nil if none defined.",
+    ),
+    (
+        "last-nonmenu-event",
+        "Last input event in a command, except for mouse menu events.",
+    ),
+    (
+        "last-prefix-arg",
+        "The value of the prefix argument for the previous editing command.",
+    ),
+    (
+        "last-repeatable-command",
+        "Last command that may be repeated.",
+    ),
+    (
+        "latin-extra-code-table",
+        "Table of extra Latin codes in the range 128..159 (inclusive).",
+    ),
+    (
+        "left-fringe-width",
+        "Width of this buffer's left fringe (in pixels).",
+    ),
+    (
+        "left-margin",
+        "Column for the default `indent-line-function' to indent to.",
+    ),
+    (
+        "left-margin-width",
+        "Width in columns of left marginal area for display of a buffer.",
+    ),
+    (
+        "libgnutls-version",
+        "The version of libgnutls that Emacs was compiled with.",
+    ),
+    (
+        "line-number-display-limit",
+        "Maximum buffer size for which line number should be displayed.",
+    ),
+    (
+        "line-number-display-limit-width",
+        "Maximum line width (in characters) for line number display.",
+    ),
+    (
+        "line-prefix",
+        "Prefix prepended to all non-continuation lines at display time.",
+    ),
+    (
+        "line-spacing",
+        "Additional space to put between lines when displaying a buffer.",
+    ),
+    (
+        "lisp-eval-depth-reserve",
+        "Extra depth that can be allocated to handle errors.",
+    ),
+    (
+        "load-convert-to-unibyte",
+        "Non-nil means `read' converts strings to unibyte whenever possible.",
+    ),
+    (
+        "load-dangerous-libraries",
+        "Non-nil means load dangerous compiled Lisp files.",
+    ),
+    (
+        "load-file-rep-suffixes",
+        "List of suffixes that indicate representations of the same file.",
+    ),
+    (
+        "load-force-doc-strings",
+        "Non-nil means `load' should force-load all dynamic doc strings.",
+    ),
+    (
+        "load-in-progress",
+        "Non-nil if inside of `load'.",
+    ),
+    (
+        "load-no-native",
+        "Non-nil means not to load native code unless explicitly requested.",
+    ),
+    (
+        "load-read-function",
+        "Function used for reading expressions.",
+    ),
+    (
+        "load-source-file-function",
+        "Function called in `load' to load an Emacs Lisp source file.",
+    ),
+    (
+        "load-suffixes",
+        "List of suffixes for Emacs Lisp files and dynamic modules.",
+    ),
+    (
+        "load-true-file-name",
+        "Full name of file being loaded by `load'.",
+    ),
+    (
+        "local-abbrev-table",
+        "Local (mode-specific) abbrev table of current buffer.",
+    ),
+    (
+        "local-function-key-map",
+        "Keymap that translates key sequences to key sequences during input.",
+    ),
+    (
+        "local-minor-modes",
+        "Minor modes currently active in the current buffer.",
+    ),
+    (
+        "locale-coding-system",
+        "Coding system to use with system messages.",
+    ),
+    (
+        "long-line-optimizations-bol-search-limit",
+        "Limit for beginning of line search in buffers with long lines.",
+    ),
+    (
+        "long-line-optimizations-region-size",
+        "Region size for narrowing in buffers with long lines.",
+    ),
+    (
+        "long-line-threshold",
+        "Line length above which to use redisplay shortcuts.",
+    ),
+    (
+        "lread--unescaped-character-literals",
+        "List of deprecated unescaped character literals encountered by `read'.",
+    ),
+    (
+        "lucid--menu-grab-keyboard",
+        "If non-nil, grab keyboard during menu operations.",
+    ),
     ("kill-ring", "List of killed text sequences."),
     (
         "kill-ring-yank-pointer",
@@ -4091,6 +4331,24 @@ mod tests {
             result
                 .as_str()
                 .is_some_and(|s| s.contains("implements the current input method"))
+        );
+    }
+
+    #[test]
+    fn documentation_property_eval_load_suffixes_integer_property_returns_string() {
+        let mut evaluator = super::super::eval::Evaluator::new();
+        let result = builtin_documentation_property_eval(
+            &mut evaluator,
+            vec![
+                Value::symbol("load-suffixes"),
+                Value::symbol("variable-documentation"),
+            ],
+        )
+        .unwrap();
+        assert!(
+            result
+                .as_str()
+                .is_some_and(|s| s.contains("suffixes for Emacs Lisp files and dynamic modules"))
         );
     }
 
