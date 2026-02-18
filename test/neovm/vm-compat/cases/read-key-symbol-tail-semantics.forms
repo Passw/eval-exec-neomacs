@@ -33,6 +33,11 @@
     (read-key "")
     unread-command-events))
 
+(let ((unread-command-events (list 'foo 98 'bar 'baz 'qux 'quux 'quuz 'corge)))
+  (progn
+    (read-key "")
+    unread-command-events))
+
 (let ((unread-command-events '(97 . foo)))
   (progn
     (read-key "")
