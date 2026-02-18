@@ -1,5 +1,6 @@
 1	(stringp (describe-function 'car))	OK t
 2	(condition-case err (describe-function 'vm-desc-fn-missing) (error (car err)))	OK void-function
 3	(progn (fset 'vm-desc-fn (lambda nil 1)) (stringp (describe-function 'vm-desc-fn)))	OK t
-4	(condition-case err (describe-function 1) (error (car err)))	OK wrong-type-argument
-5	(condition-case err (describe-function) (error (car err)))	OK wrong-number-of-arguments
+4	(not (null (string-match-p "special-form" (downcase (describe-function 'if)))))	OK t
+5	(condition-case err (describe-function 1) (error (car err)))	OK wrong-type-argument
+6	(condition-case err (describe-function) (error (car err)))	OK wrong-number-of-arguments

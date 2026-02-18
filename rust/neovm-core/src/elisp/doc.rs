@@ -212,7 +212,13 @@ pub(crate) fn builtin_describe_function(
     let description = match func_val {
         Value::Lambda(_) => "Lisp function",
         Value::Macro(_) => "Lisp macro",
-        Value::Subr(_) => "Built-in function",
+        Value::Subr(name) => {
+            if super::subr_info::is_special_form(&name) {
+                "Special-form"
+            } else {
+                "Built-in function"
+            }
+        }
         Value::ByteCode(_) => "Compiled Lisp function",
         _ => "Lisp function",
     };
@@ -2116,6 +2122,14 @@ mod tests {
         let result = builtin_describe_function(&mut evaluator, vec![Value::symbol("car")]);
         assert!(result.is_ok());
         assert_eq!(result.unwrap().as_str(), Some("Built-in function"));
+    }
+
+    #[test]
+    fn describe_function_special_form_if() {
+        let mut evaluator = super::super::eval::Evaluator::new();
+        let result = builtin_describe_function(&mut evaluator, vec![Value::symbol("if")]);
+        assert!(result.is_ok());
+        assert_eq!(result.unwrap().as_str(), Some("Special-form"));
     }
 
     #[test]

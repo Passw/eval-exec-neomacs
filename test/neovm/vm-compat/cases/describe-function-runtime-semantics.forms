@@ -1,5 +1,6 @@
 (stringp (describe-function 'car))
 (condition-case err (describe-function 'vm-desc-fn-missing) (error (car err)))
 (progn (fset 'vm-desc-fn (lambda nil 1)) (stringp (describe-function 'vm-desc-fn)))
+(not (null (string-match-p "special-form" (downcase (describe-function 'if)))))
 (condition-case err (describe-function 1) (error (car err)))
 (condition-case err (describe-function) (error (car err)))
