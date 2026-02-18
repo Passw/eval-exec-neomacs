@@ -172,7 +172,7 @@ fn normalize_string_start_arg(string: &str, start: Option<&Value>) -> Result<usi
     }
 
     let raw_start = expect_int(start_val)?;
-    let len = string.len() as i64;
+    let len = string.chars().count() as i64;
     let normalized = if raw_start < 0 {
         len.checked_add(raw_start)
     } else {
@@ -193,7 +193,16 @@ fn normalize_string_start_arg(string: &str, start: Option<&Value>) -> Result<usi
         ));
     }
 
-    Ok(start_idx as usize)
+    let start_char_idx = start_idx as usize;
+    if start_char_idx == len as usize {
+        return Ok(string.len());
+    }
+
+    Ok(string
+        .char_indices()
+        .nth(start_char_idx)
+        .map(|(byte_idx, _)| byte_idx)
+        .unwrap_or(string.len()))
 }
 
 // ===========================================================================
@@ -9532,7 +9541,7 @@ pub(crate) fn builtin_string_match_eval(
         case_fold,
         &mut eval.match_data,
     ) {
-        Ok(Some(pos)) => Ok(Value::Int(pos as i64)),
+        Ok(Some(pos)) => Ok(Value::Int(s[..pos].chars().count() as i64)),
         Ok(None) => Ok(Value::Nil),
         Err(msg) => Err(signal("invalid-regexp", vec![Value::string(msg)])),
     }
@@ -9558,7 +9567,7 @@ pub(crate) fn builtin_string_match_p_eval(
         case_fold,
         &mut throwaway,
     ) {
-        Ok(Some(pos)) => Ok(Value::Int(pos as i64)),
+        Ok(Some(pos)) => Ok(Value::Int(s[..pos].chars().count() as i64)),
         Ok(None) => Ok(Value::Nil),
         Err(msg) => Err(signal("invalid-regexp", vec![Value::string(msg)])),
     }

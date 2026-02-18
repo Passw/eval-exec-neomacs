@@ -98,7 +98,7 @@ fn normalize_string_start_arg(string: &str, start: Option<&Value>) -> Result<usi
     }
 
     let raw_start = expect_int(start_val)?;
-    let len = string.len() as i64;
+    let len = string.chars().count() as i64;
     let normalized = if raw_start < 0 {
         len.checked_add(raw_start)
     } else {
@@ -119,7 +119,16 @@ fn normalize_string_start_arg(string: &str, start: Option<&Value>) -> Result<usi
         ));
     }
 
-    Ok(start_idx as usize)
+    let start_char_idx = start_idx as usize;
+    if start_char_idx == len as usize {
+        return Ok(string.len());
+    }
+
+    Ok(string
+        .char_indices()
+        .nth(start_char_idx)
+        .map(|(byte_idx, _)| byte_idx)
+        .unwrap_or(string.len()))
 }
 
 fn preserve_case(replacement: &str, matched: &str) -> String {
@@ -230,7 +239,7 @@ pub(crate) fn builtin_string_match(args: Vec<Value>) -> EvalResult {
     PURE_MATCH_DATA.with(|slot| {
         let mut md = slot.borrow_mut();
         match super::regex::string_match_full(&pattern, &s, start, &mut md) {
-            Ok(Some(pos)) => Ok(Value::Int(pos as i64)),
+            Ok(Some(pos)) => Ok(Value::Int(s[..pos].chars().count() as i64)),
             Ok(None) => Ok(Value::Nil),
             Err(msg) => Err(signal("invalid-regexp", vec![Value::string(msg)])),
         }
@@ -254,7 +263,7 @@ pub(crate) fn builtin_string_match_p(args: Vec<Value>) -> EvalResult {
     match re.find(search_region) {
         Some(m) => {
             let match_start = m.start() + start;
-            Ok(Value::Int(match_start as i64))
+            Ok(Value::Int(s[..match_start].chars().count() as i64))
         }
         None => Ok(Value::Nil),
     }

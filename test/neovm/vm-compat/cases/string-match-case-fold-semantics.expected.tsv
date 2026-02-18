@@ -4,3 +4,11 @@
 4	(string-match-p "a" "A")	OK 0
 5	(string-match "A" "a")	OK 0
 6	(string-match-p "A" "a")	OK 0
+7	(string-match "x" "aéx")	OK 2
+8	(string-match-p "x" "aéx")	OK 2
+9	(string-match "x" "aéx" 2)	OK 2
+10	(string-match-p "x" "aéx" 2)	OK 2
+11	(string-match "x" "aéx" -1)	OK 2
+12	(string-match-p "x" "aéx" -1)	OK 2
+13	(string-match "x" "aéx" 3)	OK nil
+14	(string-match-p "x" "aéx" 3)	OK nil
