@@ -28,6 +28,15 @@ Last updated: 2026-02-18
 
 ## Doing
 
+- Expanded batch reader unread-queue payload lock-ins (batch round 16):
+  - oracle corpus changes:
+    - `test/neovm/vm-compat/cases/read-batch-error-payloads.{forms,expected.tsv}`
+    - `test/neovm/vm-compat/cases/read-passwd-batch-semantics.{forms,expected.tsv}`
+    - added dotted-pair/vector unread-queue probes across `read-passwd`, `read-file-name`, `read-directory-name`, `read-buffer`, `read-command`, and `read-variable`.
+  - verified:
+    - `make -C test/neovm/vm-compat check-neovm-list LIST=<batch-list>` (pass; 16/16, 76/76)
+    - `make -C test/neovm/vm-compat check-all-neovm` (pass)
+
 - Expanded coding-system API arity lock-ins (batch round 15):
   - oracle corpus changes:
     - `test/neovm/vm-compat/cases/coding-system-subr-arity-semantics.{forms,expected.tsv}`
