@@ -150,7 +150,11 @@ impl VideoCache {
         }
 
         let (load_tx, load_rx) = mpsc::channel::<LoadRequest>();
-        let (frame_tx, frame_rx) = mpsc::channel::<DecodedFrame>();
+        // Bounded channel: caps the number of decoded frames (and their open
+        // DMA-BUF fds) waiting for the render thread.  When the channel is full,
+        // the decode thread blocks — providing natural backpressure instead of
+        // accumulating hundreds of open fds that exhaust the process limit.
+        let (frame_tx, frame_rx) = mpsc::sync_channel::<DecodedFrame>(4);
 
         // Spawn decoder thread
         thread::spawn(move || {
@@ -678,7 +682,7 @@ impl VideoCache {
         let va_display = get_va_display_from_memory(memory)?;
 
         // Export surface as DMA-BUF
-        let export = try_export_va_dmabuf(
+        let mut export = try_export_va_dmabuf(
             buffer,
             va_display,
             info.width(),
@@ -688,12 +692,7 @@ impl VideoCache {
         // Use the first fd and plane info
         if export.num_planes == 0 || export.fds[0] < 0 {
             log::warn!("VA export returned no valid planes");
-            // Close all valid fds since we can't use this export
-            for i in 0..4 {
-                if export.fds[i] >= 0 {
-                    unsafe { libc::close(export.fds[i]); }
-                }
-            }
+            // Drop will close all valid fds automatically
             return None;
         }
 
@@ -702,18 +701,13 @@ impl VideoCache {
             export.fds[0], export.pitches[0], export.fourcc, export.modifier
         );
 
-        // Close any extra object fds we don't use (we only keep fds[0]).
-        // vaExportSurfaceHandle may return multiple objects for multi-plane formats.
-        for i in 1..4 {
-            if export.fds[i] >= 0 {
-                unsafe { libc::close(export.fds[i]); }
-                log::trace!("Closed unused VA export fd[{}]={}", i, export.fds[i]);
-            }
-        }
+        // Take ownership of fds[0] — set to -1 so VaDmaBufExport::drop skips it.
+        // VaDmaBufExport::drop will close any remaining fds (fds[1..]) automatically.
+        let fd = export.fds[0];
+        export.fds[0] = -1;
 
-        // fds[0] is now owned by DmaBufInfo (its Drop will close it)
         Some(DmaBufInfo {
-            fd: export.fds[0],
+            fd,
             stride: export.pitches[0],
             fourcc: export.fourcc,
             modifier: export.modifier,
@@ -723,7 +717,7 @@ impl VideoCache {
     /// Background decoder thread — dispatches each video to its own thread
     fn decoder_thread(
         rx: mpsc::Receiver<LoadRequest>,
-        tx: mpsc::Sender<DecodedFrame>,
+        tx: mpsc::SyncSender<DecodedFrame>,
     ) {
         log::debug!("Video decoder thread started");
 
@@ -744,7 +738,7 @@ impl VideoCache {
     fn decode_single_video(
         video_id: u32,
         raw_path: &str,
-        tx: mpsc::Sender<DecodedFrame>,
+        tx: mpsc::SyncSender<DecodedFrame>,
         loop_count: Arc<AtomicI32>,
     ) {
         log::info!("Video thread: loading video {}: {}", video_id, raw_path);

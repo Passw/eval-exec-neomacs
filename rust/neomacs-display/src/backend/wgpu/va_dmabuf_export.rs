@@ -6,12 +6,17 @@
 #[cfg(all(target_os = "linux", feature = "video"))]
 use std::os::unix::io::RawFd;
 
-/// DMA-BUF export parameters from VA surface
+/// DMA-BUF export parameters from VA surface.
+///
+/// Owns the exported file descriptors — Drop closes any that are still >= 0.
+/// NOT Clone: each fd must have exactly one owner.
 #[cfg(all(target_os = "linux", feature = "video"))]
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub struct VaDmaBufExport {
-    /// DMA-BUF file descriptors (up to 4 planes)
+    /// DMA-BUF file descriptors (up to 4 objects, -1 = unused/taken)
     pub fds: [RawFd; 4],
+    /// Number of DRM objects returned by vaExportSurfaceHandle
+    pub num_objects: u32,
     /// Number of planes
     pub num_planes: u32,
     /// Byte offset per plane
@@ -26,6 +31,18 @@ pub struct VaDmaBufExport {
     pub width: u32,
     /// Height in pixels
     pub height: u32,
+}
+
+#[cfg(all(target_os = "linux", feature = "video"))]
+impl Drop for VaDmaBufExport {
+    fn drop(&mut self) {
+        for i in 0..self.num_objects.min(4) as usize {
+            if self.fds[i] >= 0 {
+                unsafe { libc::close(self.fds[i]); }
+                log::trace!("VaDmaBufExport::drop closed fd[{}]={}", i, self.fds[i]);
+            }
+        }
+    }
 }
 
 /// FFI bindings to GStreamer VA plugin and libva
@@ -162,6 +179,7 @@ pub fn try_export_va_dmabuf(
     // Extract DMA-BUF info from descriptor
     let mut export = VaDmaBufExport {
         fds: [-1; 4],
+        num_objects: descriptor.num_objects,
         num_planes: 0,
         offsets: [0; 4],
         pitches: [0; 4],
