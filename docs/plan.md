@@ -28,6 +28,15 @@ Last updated: 2026-02-18
 
 ## Doing
 
+- Expanded `read-key` vector-symbol tail lock-ins with deeper payload depth (round 2):
+  - oracle corpus changes:
+    - `test/neovm/vm-compat/cases/read-key-vector-symbol-tail-semantics.forms`
+    - `test/neovm/vm-compat/cases/read-key-vector-symbol-tail-semantics.expected.tsv`
+    - added deeper-tail probe `(list 97 98 99 100 101 102 103 104 [foo])`.
+  - verified:
+    - `make -C test/neovm/vm-compat check-one-neovm CASE=cases/read-key-vector-symbol-tail-semantics` (pass, 9/9)
+    - `make -C test/neovm/vm-compat check-all-neovm` (pass)
+
 - Expanded `read-key` symbol tail lock-ins with deeper payload depth (round 2):
   - oracle corpus changes:
     - `test/neovm/vm-compat/cases/read-key-symbol-tail-semantics.forms`
