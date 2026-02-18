@@ -148,6 +148,9 @@ impl Evaluator {
         obarray.set_symbol_value("system-type", Value::symbol("gnu/linux"));
         obarray.set_symbol_value("default-directory", Value::string(default_directory));
         obarray.set_symbol_value("load-path", Value::Nil);
+        // GNU Emacs seeds `load-path` with an integer `variable-documentation`
+        // offset, which `describe-variable` renders as a C-source doc marker.
+        obarray.put_property("load-path", "variable-documentation", Value::Int(0));
         obarray.set_symbol_value("load-history", Value::Nil);
         obarray.set_symbol_value("features", Value::Nil);
         obarray.set_symbol_value("debug-on-error", Value::Nil);

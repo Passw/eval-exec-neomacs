@@ -2329,6 +2329,19 @@ mod tests {
     }
 
     #[test]
+    fn describe_variable_load_path_uses_c_source_text() {
+        let mut evaluator = super::super::eval::Evaluator::new();
+        let result = builtin_describe_variable(&mut evaluator, vec![Value::symbol("load-path")]);
+        assert!(result.is_ok());
+        assert!(
+            result
+                .unwrap()
+                .as_str()
+                .is_some_and(|s| s.contains("defined in"))
+        );
+    }
+
+    #[test]
     fn describe_variable_list_doc_property_falls_back_to_value_text() {
         let mut evaluator = super::super::eval::Evaluator::new();
         evaluator.obarray.set_symbol_value("my-var", Value::Int(42));
