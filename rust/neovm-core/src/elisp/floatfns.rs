@@ -22,28 +22,38 @@ fn expect_args(name: &str, args: &[Value], n: usize) -> Result<(), Flow> {
     }
 }
 
-/// Extract a numeric argument as `f64`.  Accepts `Value::Int` and `Value::Float`.
-/// Signals `wrong-type-argument` with `number-or-marker-p` for anything else
-/// (matching Emacs behaviour).
-fn extract_float(_name: &str, val: &Value) -> Result<f64, Flow> {
+/// Extract a numeric argument as `f64` with `numberp` contract semantics.
+fn extract_number(val: &Value) -> Result<f64, Flow> {
     match val {
         Value::Int(n) => Ok(*n as f64),
+        Value::Char(c) => Ok(*c as u32 as f64),
         Value::Float(f) => Ok(*f),
         other => Err(signal(
             "wrong-type-argument",
-            vec![Value::symbol("number-or-marker-p"), other.clone()],
+            vec![Value::symbol("numberp"), other.clone()],
         )),
     }
 }
 
-/// Extract a numeric argument that must be an integer.  Signals
-/// `wrong-type-argument` with `integerp` for non-integer values.
-fn extract_int(_name: &str, val: &Value) -> Result<i64, Flow> {
+/// Extract a float argument with `floatp` contract semantics.
+fn extract_float(val: &Value) -> Result<f64, Flow> {
     match val {
-        Value::Int(n) => Ok(*n),
+        Value::Float(f) => Ok(*f),
         other => Err(signal(
             "wrong-type-argument",
-            vec![Value::symbol("integerp"), other.clone()],
+            vec![Value::symbol("floatp"), other.clone()],
+        )),
+    }
+}
+
+/// Extract a fixnum argument with `fixnump` contract semantics.
+fn extract_fixnum(val: &Value) -> Result<i64, Flow> {
+    match val {
+        Value::Int(n) => Ok(*n),
+        Value::Char(c) => Ok(*c as i64),
+        other => Err(signal(
+            "wrong-type-argument",
+            vec![Value::symbol("fixnump"), other.clone()],
         )),
     }
 }
@@ -55,8 +65,8 @@ fn extract_int(_name: &str, val: &Value) -> Result<i64, Flow> {
 /// (copysign X1 X2) -- copy sign of X2 to magnitude of X1
 pub(crate) fn builtin_copysign(args: Vec<Value>) -> EvalResult {
     expect_args("copysign", &args, 2)?;
-    let x1 = extract_float("copysign", &args[0])?;
-    let x2 = extract_float("copysign", &args[1])?;
+    let x1 = extract_float(&args[0])?;
+    let x2 = extract_float(&args[1])?;
     Ok(Value::Float(x1.copysign(x2)))
 }
 
@@ -66,10 +76,10 @@ pub(crate) fn builtin_copysign(args: Vec<Value>) -> EvalResult {
 /// Uses the C `frexp` convention that Emacs follows.
 pub(crate) fn builtin_frexp(args: Vec<Value>) -> EvalResult {
     expect_args("frexp", &args, 1)?;
-    let x = extract_float("frexp", &args[0])?;
+    let x = extract_number(&args[0])?;
 
     if x == 0.0 {
-        return Ok(Value::cons(Value::Float(0.0), Value::Int(0)));
+        return Ok(Value::cons(Value::Float(x), Value::Int(0)));
     }
     if x.is_nan() {
         return Ok(Value::cons(Value::Float(x), Value::Int(0)));
@@ -106,8 +116,8 @@ pub(crate) fn builtin_frexp(args: Vec<Value>) -> EvalResult {
 /// (ldexp SIGNIFICAND EXPONENT) -- return SIGNIFICAND * 2^EXPONENT
 pub(crate) fn builtin_ldexp(args: Vec<Value>) -> EvalResult {
     expect_args("ldexp", &args, 2)?;
-    let significand = extract_float("ldexp", &args[0])?;
-    let exponent = extract_int("ldexp", &args[1])?;
+    let significand = extract_number(&args[0])?;
+    let exponent = extract_fixnum(&args[1])?;
 
     // Use ldexp equivalent: significand * 2.0^exponent
     // Rust doesn't have ldexp in std, but we can use f64::exp2 approach
@@ -138,7 +148,7 @@ pub(crate) fn builtin_ldexp(args: Vec<Value>) -> EvalResult {
 /// For X = 0, signals a domain error (like Emacs).
 pub(crate) fn builtin_logb(args: Vec<Value>) -> EvalResult {
     expect_args("logb", &args, 1)?;
-    let x = extract_float("logb", &args[0])?;
+    let x = extract_number(&args[0])?;
 
     if x == 0.0 {
         // Emacs returns -infinity as a float for logb(0)
@@ -165,28 +175,28 @@ pub(crate) fn builtin_logb(args: Vec<Value>) -> EvalResult {
 /// (fceiling X) -- smallest integer not less than X, as a float
 pub(crate) fn builtin_fceiling(args: Vec<Value>) -> EvalResult {
     expect_args("fceiling", &args, 1)?;
-    let x = extract_float("fceiling", &args[0])?;
+    let x = extract_float(&args[0])?;
     Ok(Value::Float(x.ceil()))
 }
 
 /// (ffloor X) -- largest integer not greater than X, as a float
 pub(crate) fn builtin_ffloor(args: Vec<Value>) -> EvalResult {
     expect_args("ffloor", &args, 1)?;
-    let x = extract_float("ffloor", &args[0])?;
+    let x = extract_float(&args[0])?;
     Ok(Value::Float(x.floor()))
 }
 
 /// (fround X) -- nearest integer to X, as a float (banker's rounding)
 pub(crate) fn builtin_fround(args: Vec<Value>) -> EvalResult {
     expect_args("fround", &args, 1)?;
-    let x = extract_float("fround", &args[0])?;
+    let x = extract_float(&args[0])?;
     Ok(Value::Float(x.round_ties_even()))
 }
 
 /// (ftruncate X) -- round X toward zero, as a float
 pub(crate) fn builtin_ftruncate(args: Vec<Value>) -> EvalResult {
     expect_args("ftruncate", &args, 1)?;
-    let x = extract_float("ftruncate", &args[0])?;
+    let x = extract_float(&args[0])?;
     Ok(Value::Float(x.trunc()))
 }
 
@@ -252,6 +262,22 @@ mod tests {
         } else {
             panic!("expected cons");
         }
+
+        // frexp(-0.0) preserves signed-zero in significand.
+        let result = builtin_frexp(vec![Value::Float(-0.0)]).unwrap();
+        if let Value::Cons(cell) = &result {
+            let pair = cell.lock().unwrap();
+            match pair.car {
+                Value::Float(f) => {
+                    assert_eq!(f, 0.0);
+                    assert!(f.is_sign_negative(), "expected negative zero");
+                }
+                ref other => panic!("expected Float, got {:?}", other),
+            }
+            assert_int_eq(&pair.cdr, 0);
+        } else {
+            panic!("expected cons");
+        }
     }
 
     #[test]
@@ -304,9 +330,6 @@ mod tests {
 
         let result = builtin_fceiling(vec![Value::Float(-1.1)]).unwrap();
         assert_float_eq(&result, -1.0, 1e-10);
-
-        let result = builtin_fceiling(vec![Value::Int(5)]).unwrap();
-        assert_float_eq(&result, 5.0, 1e-10);
     }
 
     #[test]
@@ -357,7 +380,13 @@ mod tests {
     #[test]
     fn test_wrong_type_errors() {
         assert!(builtin_copysign(vec![Value::string("x"), Value::Float(1.0)]).is_err());
+        assert!(builtin_copysign(vec![Value::Int(1), Value::Float(1.0)]).is_err());
         assert!(builtin_fceiling(vec![Value::Nil]).is_err());
+        assert!(builtin_fceiling(vec![Value::Int(1)]).is_err());
+        assert!(builtin_ffloor(vec![Value::Int(1)]).is_err());
+        assert!(builtin_fround(vec![Value::Int(1)]).is_err());
+        assert!(builtin_ftruncate(vec![Value::Int(1)]).is_err());
+        assert!(builtin_ldexp(vec![Value::Float(1.0), Value::Float(2.0)]).is_err());
         assert!(builtin_logb(vec![Value::True]).is_err());
         assert!(builtin_logb(vec![Value::string("y")]).is_err());
     }
