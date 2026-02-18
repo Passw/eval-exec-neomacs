@@ -373,14 +373,24 @@ pub(crate) fn builtin_bookmark_jump(
     }
 }
 
-/// (bookmark-delete NAME) -> t or nil
+/// (bookmark-delete NAME &optional BATCH) -> nil
 pub(crate) fn builtin_bookmark_delete(
     eval: &mut super::eval::Evaluator,
     args: Vec<Value>,
 ) -> EvalResult {
-    expect_args("bookmark-delete", &args, 1)?;
-    let name = expect_string(&args[0])?;
-    Ok(Value::bool(eval.bookmarks.delete(&name)))
+    if args.is_empty() || args.len() > 2 {
+        return Err(signal(
+            "wrong-number-of-arguments",
+            vec![Value::symbol("bookmark-delete"), Value::Int(args.len() as i64)],
+        ));
+    }
+
+    // GNU Emacs accepts non-string NAME payloads and simply returns nil.
+    // Only string names are actionable for deletion.
+    if let Value::Str(name) = &args[0] {
+        let _ = eval.bookmarks.delete(name);
+    }
+    Ok(Value::Nil)
 }
 
 /// (bookmark-rename OLD NEW) -> nil
@@ -860,13 +870,24 @@ mod tests {
         // Set a bookmark
         builtin_bookmark_set(&mut eval, vec![Value::string("del-me")]).unwrap();
 
-        // Delete it
+        // Delete it (returns nil) and verify side effect.
         let result = builtin_bookmark_delete(&mut eval, vec![Value::string("del-me")]);
         assert!(result.is_ok());
-        assert!(result.unwrap().is_truthy());
+        assert!(result.unwrap().is_nil());
+        assert!(eval.bookmarks.get("del-me").is_none());
 
-        // Delete again -> nil (not found)
+        // Delete again -> nil (not found).
         let result = builtin_bookmark_delete(&mut eval, vec![Value::string("del-me")]);
+        assert!(result.is_ok());
+        assert!(result.unwrap().is_nil());
+
+        // Non-string payloads are accepted and return nil.
+        let result = builtin_bookmark_delete(&mut eval, vec![Value::Int(1)]);
+        assert!(result.is_ok());
+        assert!(result.unwrap().is_nil());
+
+        // Optional second argument is accepted.
+        let result = builtin_bookmark_delete(&mut eval, vec![Value::Int(1), Value::True]);
         assert!(result.is_ok());
         assert!(result.unwrap().is_nil());
     }

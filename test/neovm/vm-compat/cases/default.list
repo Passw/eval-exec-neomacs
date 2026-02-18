@@ -8,6 +8,7 @@ cases/fboundp-macro-boundary
 cases/symbol-function-core
 cases/symbol-function-alias-wrapper-semantics
 cases/bookmark-autoload-wrapper-semantics
+cases/bookmark-delete-permissive-semantics
 cases/format-subrx-autoload-wrapper-semantics
 cases/thingatpt-time-auth-autoload-wrapper-semantics
 cases/rect-help-macros-subrx-autoload-wrapper-semantics
