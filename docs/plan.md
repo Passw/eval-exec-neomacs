@@ -10455,6 +10455,20 @@ Last updated: 2026-02-18
     - `make -C test/neovm/vm-compat check-one-neovm CASE=display-control-runtime-semantics` (pass, 17/17)
     - `make -C test/neovm/vm-compat validate-case-lists` (pass)
     - `make -C test/neovm/vm-compat check-all-neovm` (pass)
+- Refined `documentation` quoted-macro error payloads to match GNU Emacs:
+  - runtime changes:
+    - quoted macro designators now signal `invalid-function` with macro-tail payload (for example `((x) "md" x)`)
+    - empty quoted macro designator now signals `void-function` with `nil` payload
+    - preserved quoted-lambda and keyboard-macro designator behavior from prior slice
+  - expanded oracle corpus:
+    - `test/neovm/vm-compat/cases/documentation-runtime-builtin-semantics.forms`
+    - `test/neovm/vm-compat/cases/documentation-runtime-builtin-semantics.expected.tsv`
+    - added explicit probes for quoted macro payload and empty quoted macro signaling
+  - verified:
+    - `cargo test --manifest-path rust/neovm-core/Cargo.toml documentation_` (pass)
+    - `make -C test/neovm/vm-compat record FORMS=cases/documentation-runtime-builtin-semantics.forms EXPECTED=cases/documentation-runtime-builtin-semantics.expected.tsv` (pass)
+    - `make -C test/neovm/vm-compat check-one-neovm CASE=cases/documentation-runtime-builtin-semantics` (pass, 26/26)
+    - `make -C test/neovm/vm-compat check-all-neovm` (pass)
 - Aligned `documentation` runtime designator handling with GNU Emacs for quoted lambdas and keyboard macros:
   - runtime changes:
     - quoted lambda list designators (`'(lambda ...)`) now return inline docstring when present, otherwise `nil`
