@@ -24,3 +24,6 @@
 24	(set-match-data nil)	OK nil
 25	(match-beginning 0)	OK nil
 26	(match-end 9)	OK nil
+27	(progn (string-match "x" "aéx") (match-beginning 0))	OK 2
+28	(progn (string-match "x" "aéx") (match-end 0))	OK 3
+29	(progn (string-match "x" "aéx") (match-data))	OK (2 3)

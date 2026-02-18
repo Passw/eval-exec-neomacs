@@ -131,6 +131,10 @@ fn normalize_string_start_arg(string: &str, start: Option<&Value>) -> Result<usi
         .unwrap_or(string.len()))
 }
 
+fn string_byte_to_char_index(s: &str, byte_idx: usize) -> Option<usize> {
+    s.get(..byte_idx).map(|prefix| prefix.chars().count())
+}
+
 fn preserve_case(replacement: &str, matched: &str) -> String {
     if matched.is_empty() || replacement.is_empty() {
         return replacement.to_string();
@@ -211,8 +215,23 @@ fn flatten_match_data(md: &super::regex::MatchData) -> Value {
     for grp in md.groups.iter().take(trailing) {
         match grp {
             Some((start, end)) => {
-                flat.push(Value::Int(*start as i64));
-                flat.push(Value::Int(*end as i64));
+                if let Some(searched) = md.searched_string.as_ref() {
+                    let start_char = string_byte_to_char_index(searched, *start);
+                    let end_char = string_byte_to_char_index(searched, *end);
+                    match (start_char, end_char) {
+                        (Some(s), Some(e)) => {
+                            flat.push(Value::Int(s as i64));
+                            flat.push(Value::Int(e as i64));
+                        }
+                        _ => {
+                            flat.push(Value::Nil);
+                            flat.push(Value::Nil);
+                        }
+                    }
+                } else {
+                    flat.push(Value::Int(*start as i64));
+                    flat.push(Value::Int(*end as i64));
+                }
             }
             None => {
                 flat.push(Value::Nil);
@@ -304,7 +323,16 @@ pub(crate) fn builtin_match_beginning(args: Vec<Value>) -> EvalResult {
             return Ok(Value::Nil);
         };
         match md.groups.get(subexp) {
-            Some(Some((start, _end))) => Ok(Value::Int(*start as i64)),
+            Some(Some((start, _end))) => {
+                if let Some(searched) = md.searched_string.as_ref() {
+                    match string_byte_to_char_index(searched, *start) {
+                        Some(pos) => Ok(Value::Int(pos as i64)),
+                        None => Ok(Value::Nil),
+                    }
+                } else {
+                    Ok(Value::Int(*start as i64))
+                }
+            }
             _ => Ok(Value::Nil),
         }
     })
@@ -321,7 +349,16 @@ pub(crate) fn builtin_match_end(args: Vec<Value>) -> EvalResult {
             return Ok(Value::Nil);
         };
         match md.groups.get(subexp) {
-            Some(Some((_start, end))) => Ok(Value::Int(*end as i64)),
+            Some(Some((_start, end))) => {
+                if let Some(searched) = md.searched_string.as_ref() {
+                    match string_byte_to_char_index(searched, *end) {
+                        Some(pos) => Ok(Value::Int(pos as i64)),
+                        None => Ok(Value::Nil),
+                    }
+                } else {
+                    Ok(Value::Int(*end as i64))
+                }
+            }
             _ => Ok(Value::Nil),
         }
     })

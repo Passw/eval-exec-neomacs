@@ -205,6 +205,10 @@ fn normalize_string_start_arg(string: &str, start: Option<&Value>) -> Result<usi
         .unwrap_or(string.len()))
 }
 
+fn string_byte_to_char_index(s: &str, byte_idx: usize) -> Option<usize> {
+    s.get(..byte_idx).map(|prefix| prefix.chars().count())
+}
+
 // ===========================================================================
 // Arithmetic
 // ===========================================================================
@@ -9634,9 +9638,11 @@ pub(crate) fn builtin_match_beginning(
 
     match md.groups.get(group) {
         Some(Some((start, _end))) => {
-            if md.searched_string.is_some() {
-                // `string-match` positions are 0-based.
-                Ok(Value::Int(*start as i64))
+            if let Some(searched) = md.searched_string.as_ref() {
+                match string_byte_to_char_index(searched, *start) {
+                    Some(pos) => Ok(Value::Int(pos as i64)),
+                    None => Ok(Value::Nil),
+                }
             } else if let Some(buf) = eval.buffers.current_buffer() {
                 // Buffer positions are 1-based character positions.
                 let pos = buf.text.byte_to_char(*start) as i64 + 1;
@@ -9661,8 +9667,11 @@ pub(crate) fn builtin_match_end(eval: &mut super::eval::Evaluator, args: Vec<Val
 
     match md.groups.get(group) {
         Some(Some((_start, end))) => {
-            if md.searched_string.is_some() {
-                Ok(Value::Int(*end as i64))
+            if let Some(searched) = md.searched_string.as_ref() {
+                match string_byte_to_char_index(searched, *end) {
+                    Some(pos) => Ok(Value::Int(pos as i64)),
+                    None => Ok(Value::Nil),
+                }
             } else if let Some(buf) = eval.buffers.current_buffer() {
                 let pos = buf.text.byte_to_char(*end) as i64 + 1;
                 Ok(Value::Int(pos))
@@ -9700,8 +9709,23 @@ pub(crate) fn builtin_match_data_eval(
     for grp in md.groups.iter().take(trailing) {
         match grp {
             Some((start, end)) => {
-                flat.push(Value::Int(*start as i64));
-                flat.push(Value::Int(*end as i64));
+                if let Some(searched) = md.searched_string.as_ref() {
+                    let start_char = string_byte_to_char_index(searched, *start);
+                    let end_char = string_byte_to_char_index(searched, *end);
+                    match (start_char, end_char) {
+                        (Some(s), Some(e)) => {
+                            flat.push(Value::Int(s as i64));
+                            flat.push(Value::Int(e as i64));
+                        }
+                        _ => {
+                            flat.push(Value::Nil);
+                            flat.push(Value::Nil);
+                        }
+                    }
+                } else {
+                    flat.push(Value::Int(*start as i64));
+                    flat.push(Value::Int(*end as i64));
+                }
             }
             None => {
                 flat.push(Value::Nil);

@@ -24,3 +24,6 @@
 (set-match-data nil)
 (match-beginning 0)
 (match-end 9)
+(progn (string-match "x" "aéx") (match-beginning 0))
+(progn (string-match "x" "aéx") (match-end 0))
+(progn (string-match "x" "aéx") (match-data))
