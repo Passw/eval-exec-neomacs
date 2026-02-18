@@ -12,6 +12,12 @@
 
 (condition-case err
     (progn
+      (setq unread-command-events (list 'foo 98 'bar 'baz))
+      (read-char-exclusive nil nil 0))
+  (error (list (car err) unread-command-events)))
+
+(condition-case err
+    (progn
       (setq unread-command-events '(foo . 97))
       (read-char-exclusive nil nil 0))
   (error (list (car err) unread-command-events)))
