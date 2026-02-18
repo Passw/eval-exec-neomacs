@@ -1803,6 +1803,246 @@ pub(crate) static STARTUP_VARIABLE_DOC_STUBS: &[(&str, &str)] = &[
         "native-comp-eln-load-path",
         "List of directories to look for natively-compiled *.eln files.",
     ),
+    (
+        "native-comp-enable-subr-trampolines",
+        "If non-nil, enable generation of trampolines for calling primitives.",
+    ),
+    (
+        "native-comp-jit-compilation",
+        "If non-nil, compile loaded .elc files asynchronously.",
+    ),
+    (
+        "network-coding-system-alist",
+        "Alist to decide a coding system to use for a network I/O operation.",
+    ),
+    (
+        "next-screen-context-lines",
+        "Number of lines of continuity when scrolling by screenfuls.",
+    ),
+    (
+        "no-redraw-on-reenter",
+        "Non-nil means no need to redraw entire frame after suspending.",
+    ),
+    (
+        "nobreak-char-ascii-display",
+        "Control display of non-ASCII space and hyphen chars.",
+    ),
+    (
+        "nobreak-char-display",
+        "Control highlighting of non-ASCII space and hyphen chars.",
+    ),
+    (
+        "num-input-keys",
+        "Number of complete key sequences read as input so far.",
+    ),
+    (
+        "num-nonmacro-input-events",
+        "Number of input events read from the keyboard so far.",
+    ),
+    (
+        "obarray",
+        "Symbol table for use by ‘intern’ and ‘read’.",
+    ),
+    (
+        "open-paren-in-column-0-is-defun-start",
+        "Non-nil means an open paren in column 0 denotes the start of a defun.",
+    ),
+    (
+        "operating-system-release",
+        "The kernel version of the operating system on which Emacs is running.",
+    ),
+    (
+        "otf-script-alist",
+        "Alist of OpenType script tags vs the corresponding script names.",
+    ),
+    (
+        "other-window-scroll-buffer",
+        "If this is a live buffer, C-M-v should scroll its window.",
+    ),
+    (
+        "other-window-scroll-default",
+        "Function that provides the window to scroll by C-M-v.",
+    ),
+    (
+        "overflow-newline-into-fringe",
+        "Non-nil means that newline may flow into the right fringe.",
+    ),
+    (
+        "overlay-arrow-position",
+        "Marker for where to display an arrow on top of the buffer text.",
+    ),
+    (
+        "overlay-arrow-string",
+        "String to display as an arrow in text-mode frames.",
+    ),
+    (
+        "overlay-arrow-variable-list",
+        "List of variables (symbols) which hold markers for overlay arrows.",
+    ),
+    (
+        "overline-margin",
+        "Space between overline and text, in pixels.",
+    ),
+    (
+        "overriding-local-map",
+        "Keymap that replaces (overrides) local keymaps.",
+    ),
+    (
+        "overriding-local-map-menu-flag",
+        "Non-nil means ‘overriding-local-map’ applies to the menu bar.",
+    ),
+    (
+        "overriding-plist-environment",
+        "An alist that overrides the plists of the symbols which it lists.",
+    ),
+    (
+        "overriding-terminal-local-map",
+        "Per-terminal keymap that takes precedence over all other keymaps.",
+    ),
+    (
+        "overriding-text-conversion-style",
+        "Non-buffer local version of ‘text-conversion-style’.",
+    ),
+    (
+        "overwrite-mode",
+        "Non-nil if self-insertion should replace existing text.",
+    ),
+    (
+        "parse-sexp-ignore-comments",
+        "Non-nil means ‘forward-sexp’, etc., should treat comments as whitespace.",
+    ),
+    (
+        "parse-sexp-lookup-properties",
+        "Non-nil means ‘forward-sexp’, etc., obey ‘syntax-table’ property.",
+    ),
+    (
+        "path-separator",
+        "String containing the character that separates directories in",
+    ),
+    (
+        "pdumper-fingerprint",
+        "The fingerprint of this Emacs binary.",
+    ),
+    (
+        "point-before-scroll",
+        "Value of point before the last series of scroll operations, or nil.",
+    ),
+    (
+        "polling-period",
+        "Interval between polling for input during Lisp execution.",
+    ),
+    (
+        "post-command-hook",
+        "Normal hook run after each command is executed.",
+    ),
+    (
+        "post-gc-hook",
+        "Hook run after garbage collection has finished.",
+    ),
+    (
+        "post-select-region-hook",
+        "Abnormal hook run after the region is selected.",
+    ),
+    (
+        "post-self-insert-hook",
+        "Hook run at the end of ‘self-insert-command’.",
+    ),
+    (
+        "pre-command-hook",
+        "Normal hook run before each command is executed.",
+    ),
+    (
+        "pre-redisplay-function",
+        "Function run just before redisplay.",
+    ),
+    (
+        "prefix-arg",
+        "The value of the prefix argument for the next editing command.",
+    ),
+    (
+        "prefix-help-command",
+        "Command to run when ‘help-char’ character follows a prefix key.",
+    ),
+    (
+        "preloaded-file-list",
+        "List of files that were preloaded (when dumping Emacs).",
+    ),
+    (
+        "print-charset-text-property",
+        "A flag to control printing of ‘charset’ text property on printing a string.",
+    ),
+    (
+        "print-circle",
+        "Non-nil means print recursive structures using #N= and #N# syntax.",
+    ),
+    (
+        "print-continuous-numbering",
+        "Non-nil means number continuously across print calls.",
+    ),
+    (
+        "print-escape-control-characters",
+        "Non-nil means print control characters in strings as ‘\\OOO’.",
+    ),
+    (
+        "print-escape-multibyte",
+        "Non-nil means print multibyte characters in strings as \\xXXXX.",
+    ),
+    (
+        "print-escape-newlines",
+        "Non-nil means print newlines in strings as ‘\\n’.",
+    ),
+    (
+        "print-escape-nonascii",
+        "Non-nil means print unibyte non-ASCII chars in strings as \\OOO.",
+    ),
+    (
+        "print-gensym",
+        "Non-nil means print uninterned symbols so they will read as uninterned.",
+    ),
+    (
+        "print-integers-as-characters",
+        "Non-nil means integers are printed using characters syntax.",
+    ),
+    (
+        "print-number-table",
+        "A vector used internally to produce ‘#N=’ labels and ‘#N#’ references.",
+    ),
+    (
+        "print-quoted",
+        "Non-nil means print quoted forms with reader syntax.",
+    ),
+    (
+        "print-symbols-bare",
+        "A flag to control printing of symbols with position.",
+    ),
+    (
+        "print-unreadable-function",
+        "If non-nil, a function to call when printing unreadable objects.",
+    ),
+    (
+        "printable-chars",
+        "A char-table for each printable character.",
+    ),
+    (
+        "process-adaptive-read-buffering",
+        "If non-nil, improve receive buffering by delaying after short reads.",
+    ),
+    (
+        "process-coding-system-alist",
+        "Alist to decide a coding system to use for a process I/O operation.",
+    ),
+    (
+        "process-connection-type",
+        "Control type of device used to communicate with subprocesses.",
+    ),
+    (
+        "process-environment",
+        "List of overridden environment variables for subprocesses to inherit.",
+    ),
+    (
+        "process-error-pause-time",
+        "The number of seconds to pause after handling process errors.",
+    ),
     ("kill-ring", "List of killed text sequences."),
     (
         "kill-ring-yank-pointer",
@@ -4607,6 +4847,24 @@ mod tests {
             result
                 .as_str()
                 .is_some_and(|s| s.contains("natively-compiled *.eln files"))
+        );
+    }
+
+    #[test]
+    fn documentation_property_eval_process_environment_integer_property_returns_string() {
+        let mut evaluator = super::super::eval::Evaluator::new();
+        let result = builtin_documentation_property_eval(
+            &mut evaluator,
+            vec![
+                Value::symbol("process-environment"),
+                Value::symbol("variable-documentation"),
+            ],
+        )
+        .unwrap();
+        assert!(
+            result
+                .as_str()
+                .is_some_and(|s| s.contains("environment variables for subprocesses"))
         );
     }
 
