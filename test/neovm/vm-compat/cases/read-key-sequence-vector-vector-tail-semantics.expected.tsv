@@ -1,1 +1,2 @@
 1	(let ((unread-command-events (list 97 [mouse-1]))) (progn (read-key-sequence-vector "") unread-command-events))	OK ([mouse-1])
+2	(let ((unread-command-events '([foo] . [bar]))) (progn (read-key-sequence-vector "") unread-command-events))	OK [bar]
