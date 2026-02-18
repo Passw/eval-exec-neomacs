@@ -209,21 +209,37 @@ pub(crate) fn builtin_describe_function(
         return Err(signal("void-function", vec![Value::symbol(&name)]));
     }
 
-    let description = match func_val {
+    let description = describe_function_kind(&func_val);
+
+    Ok(Value::string(description))
+}
+
+fn describe_function_kind(function: &Value) -> &'static str {
+    match function {
         Value::Lambda(_) => "Lisp function",
         Value::Macro(_) => "Lisp macro",
         Value::Subr(name) => {
-            if super::subr_info::is_special_form(&name) {
+            if super::subr_info::is_special_form(name) {
                 "Special-form"
             } else {
                 "Built-in function"
             }
         }
         Value::ByteCode(_) => "Compiled Lisp function",
+        Value::Str(_) | Value::Vector(_) => "Keyboard macro",
+        Value::Cons(cell) => {
+            let pair = match cell.lock() {
+                Ok(pair) => pair,
+                Err(_) => return "Lisp function",
+            };
+            match pair.car.as_symbol_name() {
+                Some("macro") => "Lisp macro",
+                Some("lambda") => "Lisp function",
+                _ => "Lisp function",
+            }
+        }
         _ => "Lisp function",
-    };
-
-    Ok(Value::string(description))
+    }
 }
 
 /// `(describe-variable VARIABLE)` -- return the documentation string for a
@@ -2130,6 +2146,50 @@ mod tests {
         let result = builtin_describe_function(&mut evaluator, vec![Value::symbol("if")]);
         assert!(result.is_ok());
         assert_eq!(result.unwrap().as_str(), Some("Special-form"));
+    }
+
+    #[test]
+    fn describe_function_keyboard_macro_string() {
+        let mut evaluator = super::super::eval::Evaluator::new();
+        evaluator
+            .obarray
+            .set_symbol_function("vm-kmacro-string", Value::string("abc"));
+
+        let result =
+            builtin_describe_function(&mut evaluator, vec![Value::symbol("vm-kmacro-string")]);
+        assert!(result.is_ok());
+        assert_eq!(result.unwrap().as_str(), Some("Keyboard macro"));
+    }
+
+    #[test]
+    fn describe_function_keyboard_macro_vector() {
+        let mut evaluator = super::super::eval::Evaluator::new();
+        evaluator.obarray.set_symbol_function(
+            "vm-kmacro-vector",
+            Value::vector(vec![Value::Int(97), Value::Int(98)]),
+        );
+
+        let result =
+            builtin_describe_function(&mut evaluator, vec![Value::symbol("vm-kmacro-vector")]);
+        assert!(result.is_ok());
+        assert_eq!(result.unwrap().as_str(), Some("Keyboard macro"));
+    }
+
+    #[test]
+    fn describe_function_macro_marker_list() {
+        let mut evaluator = super::super::eval::Evaluator::new();
+        let macro_marker = Value::cons(
+            Value::symbol("macro"),
+            Value::list(vec![Value::symbol("lambda"), Value::Nil, Value::Int(1)]),
+        );
+        evaluator
+            .obarray
+            .set_symbol_function("vm-macro-marker", macro_marker);
+
+        let result =
+            builtin_describe_function(&mut evaluator, vec![Value::symbol("vm-macro-marker")]);
+        assert!(result.is_ok());
+        assert_eq!(result.unwrap().as_str(), Some("Lisp macro"));
     }
 
     #[test]

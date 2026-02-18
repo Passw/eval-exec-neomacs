@@ -2,5 +2,7 @@
 (condition-case err (describe-function 'vm-desc-fn-missing) (error (car err)))
 (progn (fset 'vm-desc-fn (lambda nil 1)) (stringp (describe-function 'vm-desc-fn)))
 (not (null (string-match-p "special-form" (downcase (describe-function 'if)))))
+(progn (fset 'vm-desc-fn-kmacro "abc") (not (null (string-match-p "keyboard macro" (downcase (describe-function 'vm-desc-fn-kmacro))))))
+(progn (fset 'vm-desc-fn-macro (cons 'macro (cons '(lambda nil "m" nil) nil)))(not (null (string-match-p "lisp macro" (downcase (describe-function 'vm-desc-fn-macro))))))
 (condition-case err (describe-function 1) (error (car err)))
 (condition-case err (describe-function) (error (car err)))
