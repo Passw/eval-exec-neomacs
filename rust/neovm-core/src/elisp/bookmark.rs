@@ -640,6 +640,15 @@ fn active_bookmark_default_file(eval: &super::eval::Evaluator) -> String {
     default_bookmark_file()
 }
 
+fn bookmark_timestamp_file(eval: &super::eval::Evaluator) -> Option<String> {
+    let value = eval.obarray.symbol_value("bookmark-bookmarks-timestamp")?;
+    let Value::Cons(cell) = value else {
+        return None;
+    };
+    let pair = cell.lock().expect("poisoned");
+    pair.car.as_str().map(|s| s.to_string())
+}
+
 fn bookmark_save_stamp(path: &str) -> Value {
     let now = SystemTime::now()
         .duration_since(UNIX_EPOCH)
@@ -651,6 +660,11 @@ fn bookmark_save_stamp(path: &str) -> Value {
         Value::Int((now.subsec_nanos() / 1_000) as i64),
         Value::Int(0),
     ])
+}
+
+fn set_bookmark_timestamp(eval: &mut super::eval::Evaluator, file: &str) {
+    eval.obarray
+        .set_symbol_value("bookmark-bookmarks-timestamp", bookmark_save_stamp(file));
 }
 
 /// (bookmark-save &optional PARG FILE BATCH) -> nil or save-stamp list
@@ -676,19 +690,37 @@ pub(crate) fn builtin_bookmark_save(
         ));
     }
 
-    if file_arg.is_nil() && !parg.is_nil() {
-        return Err(signal(
-            "end-of-file",
-            vec![Value::string("Error reading from stdin")],
-        ));
+    let make_default = !batch.is_nil();
+
+    // Mirror bookmark-maybe-load-default-file: if we have never tracked a
+    // bookmark file in this session, and there are no in-memory bookmarks,
+    // eagerly load the default file if it exists.
+    let configured_default = active_bookmark_default_file(eval);
+    if bookmark_timestamp_file(eval).is_none()
+        && eval.bookmarks.all_names().is_empty()
+        && Path::new(&configured_default).is_file()
+    {
+        let _ = builtin_bookmark_load(
+            eval,
+            vec![
+                Value::string(configured_default.clone()),
+                Value::True,
+                Value::True,
+            ],
+        )?;
     }
 
-    let has_file = !file_arg.is_nil();
-    let path = match &file_arg {
-        Value::Str(path) => (**path).clone(),
-        _ => active_bookmark_default_file(eval),
+    let path = if let Value::Str(path) = &file_arg {
+        (**path).clone()
+    } else {
+        if !parg.is_nil() {
+            return Err(signal(
+                "end-of-file",
+                vec![Value::string("Error reading from stdin")],
+            ));
+        }
+        bookmark_timestamp_file(eval).unwrap_or(configured_default)
     };
-    let path_existed_before_save = Path::new(&path).exists();
 
     let data = eval.bookmarks.save_to_string();
     if let Some(parent) = Path::new(&path).parent() {
@@ -697,18 +729,20 @@ pub(crate) fn builtin_bookmark_save(
     let _ = fs::write(&path, data);
     eval.bookmarks.mark_saved();
 
-    if has_file && !batch.is_nil() {
-        eval.obarray
-            .set_symbol_value("bookmark-default-file", Value::string(path.clone()));
+    if make_default {
+        set_bookmark_timestamp(eval, &path);
+        return Ok(bookmark_save_stamp(&path));
     }
 
-    if has_file && batch.is_nil() {
-        return Ok(Value::Nil);
+    if bookmark_timestamp_file(eval)
+        .as_deref()
+        .is_some_and(|default| default == path)
+    {
+        set_bookmark_timestamp(eval, &path);
+        return Ok(bookmark_save_stamp(&path));
     }
-    if !has_file && batch.is_nil() && !path_existed_before_save {
-        return Ok(Value::Nil);
-    }
-    Ok(bookmark_save_stamp(&path))
+
+    Ok(Value::Nil)
 }
 
 /// (bookmark-load FILE &optional OVERWRITE NO-MSG BATCH) -> message string or nil
@@ -744,6 +778,12 @@ pub(crate) fn builtin_bookmark_load(
     };
 
     eval.bookmarks.load_from_string(&data);
+
+    let current_default = bookmark_timestamp_file(eval).unwrap_or_else(|| active_bookmark_default_file(eval));
+    let set_default = args.get(3).is_some_and(|v| !v.is_nil()) || file == current_default;
+    if set_default {
+        set_bookmark_timestamp(eval, &file);
+    }
 
     let no_msg = args.get(2).is_some_and(|v| !v.is_nil());
     if no_msg {
