@@ -10725,6 +10725,20 @@ Last updated: 2026-02-18
     - `make -C test/neovm/vm-compat record FORMS=cases/describe-variable-runtime-semantics.forms EXPECTED=cases/describe-variable-runtime-semantics.expected.tsv` (pass)
     - `make -C test/neovm/vm-compat check-one-neovm CASE=describe-variable-runtime-semantics` (pass, 15/15)
     - `make -C test/neovm/vm-compat check-all-neovm` (pass)
+- Seeded `load-path` startup `variable-documentation` metadata for `describe-variable` parity:
+  - runtime changes:
+    - evaluator startup now sets `load-path` plist property `variable-documentation` to an integer offset marker
+    - `describe-variable 'load-path` now follows the C-source doc branch instead of falling back to `"... value is ..."` text
+    - optional-arg path (`describe-variable 'load-path nil nil`) now preserves the same C-source doc shape
+  - expanded oracle corpus:
+    - `test/neovm/vm-compat/cases/describe-variable-runtime-semantics.forms`
+    - `test/neovm/vm-compat/cases/describe-variable-runtime-semantics.expected.tsv`
+    - added explicit probes that assert `"defined in"` text for `load-path` in 1-arg and 3-arg forms
+  - verified:
+    - `cargo test --manifest-path rust/neovm-core/Cargo.toml describe_variable` (pass)
+    - `make -C test/neovm/vm-compat record FORMS=cases/describe-variable-runtime-semantics.forms EXPECTED=cases/describe-variable-runtime-semantics.expected.tsv` (pass)
+    - `make -C test/neovm/vm-compat check-one-neovm CASE=describe-variable-runtime-semantics` (pass, 16/16)
+    - `make -C test/neovm/vm-compat check-all-neovm` (pass)
 
 ## Doing
 
