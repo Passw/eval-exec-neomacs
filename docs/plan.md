@@ -28,6 +28,22 @@ Last updated: 2026-02-18
 
 ## Doing
 
+- Expanded startup `documentation-property` parity with a 30-symbol core batch (round 29):
+  - runtime changes:
+    - `rust/neovm-core/src/elisp/doc.rs`
+    - expanded `STARTUP_VARIABLE_DOC_STUBS` with:
+      - `after-delete-frame-functions`, `after-init-time`, `after-insert-file-functions`, `after-load-alist`, `alternate-fontname-alist`, `ambiguous-width-chars`, `auto-fill-chars`, `auto-hscroll-mode`, `auto-save-include-big-deletions`, `auto-save-list-file-name`, `auto-save-visited-file-name`, `auto-window-vscroll`, `backtrace-on-error-noninteractive`, `backtrace-on-redisplay-error`, `before-init-time`, `binary-as-unsigned`, `buffer-auto-save-file-format`, `buffer-backed-up`, `buffer-display-table`, `buffer-file-coding-system`, `buffer-file-format`, `buffer-file-truename`, `buffer-list-update-hook`, `buffer-saved-size`, `command-debug-status`, `command-error-function`, `coding-system-for-read`, `coding-system-for-write`, `coding-system-list`, `coding-system-require-warning`
+    - added unit lock-in:
+      - `documentation_property_eval_auto_hscroll_mode_integer_property_returns_string`
+  - oracle corpus changes:
+    - `test/neovm/vm-compat/cases/documentation-property-semantics.{forms,expected.tsv}`
+    - added first-line prefix matrix for the same 30-symbol startup set.
+  - verified:
+    - `cargo test --manifest-path rust/neovm-core/Cargo.toml documentation_property_eval_` (pass; 14 tests)
+    - `make -C test/neovm/vm-compat record FORMS=cases/documentation-property-semantics.forms EXPECTED=cases/documentation-property-semantics.expected.tsv` (pass)
+    - `make -C test/neovm/vm-compat check-one-neovm CASE=documentation-property-semantics` (pass, 24/24)
+    - `make -C test/neovm/vm-compat check-all-neovm` (pass)
+
 - Unified startup documentation-property stubs and expanded core coverage (batch round 28):
   - runtime changes:
     - `rust/neovm-core/src/elisp/doc.rs`

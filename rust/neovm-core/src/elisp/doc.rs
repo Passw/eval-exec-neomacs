@@ -192,35 +192,140 @@ pub(crate) static STARTUP_VARIABLE_DOC_STUBS: &[(&str, &str)] = &[
         "after-change-functions",
         "List of functions to call after each text change.",
     ),
+    (
+        "after-delete-frame-functions",
+        "Functions run after deleting a frame.",
+    ),
+    (
+        "after-init-time",
+        "Value of `current-time' after loading the init files.",
+    ),
+    (
+        "after-insert-file-functions",
+        "A list of functions to be called at the end of `insert-file-contents'.",
+    ),
+    (
+        "after-load-alist",
+        "An alist of functions to be evalled when particular files are loaded.",
+    ),
+    (
+        "alternate-fontname-alist",
+        "Alist of fontname vs list of the alternate fontnames.",
+    ),
+    (
+        "ambiguous-width-chars",
+        "A char-table for characters whose width (columns) can be 1 or 2.",
+    ),
     ("auto-fill-function", "Function called (if non-nil) to perform auto-fill."),
+    (
+        "auto-fill-chars",
+        "A char-table for characters which invoke auto-filling.",
+    ),
+    (
+        "auto-hscroll-mode",
+        "Allow or disallow automatic horizontal scrolling of windows.",
+    ),
+    (
+        "auto-save-include-big-deletions",
+        "If non-nil, auto-save even if a large part of the text is deleted.",
+    ),
     ("auto-save-interval", "Number of input events between auto-saves."),
+    (
+        "auto-save-list-file-name",
+        "File name in which to write a list of all auto save file names.",
+    ),
     ("auto-save-no-message", "Non-nil means do not print any message when auto-saving."),
     ("auto-save-timeout", "Number of seconds idle time before auto-save."),
+    (
+        "auto-save-visited-file-name",
+        "Non-nil says auto-save a buffer in the file it is visiting, when practical.",
+    ),
+    (
+        "auto-window-vscroll",
+        "Non-nil means to automatically adjust `window-vscroll' to view tall lines.",
+    ),
+    (
+        "backtrace-on-error-noninteractive",
+        "Non-nil means print backtrace on error in batch mode.",
+    ),
+    (
+        "backtrace-on-redisplay-error",
+        "Non-nil means create a backtrace if a lisp error occurs in redisplay.",
+    ),
     (
         "before-change-functions",
         "List of functions to call before each text change.",
     ),
+    (
+        "before-init-time",
+        "Value of `current-time' before Emacs begins initialization.",
+    ),
+    (
+        "binary-as-unsigned",
+        "Non-nil means `format' %x and %o treat integers as unsigned.",
+    ),
+    (
+        "buffer-auto-save-file-format",
+        "Format in which to write auto-save files.",
+    ),
     ("buffer-auto-save-file-name", "Name of file for auto-saving current buffer."),
+    ("buffer-backed-up", "Non-nil if this buffer's file has been backed up."),
     (
         "buffer-display-count",
         "A number incremented each time this buffer is displayed in a window.",
+    ),
+    (
+        "buffer-display-table",
+        "Display table that controls display of the contents of current buffer.",
     ),
     (
         "buffer-display-time",
         "Time stamp updated each time this buffer is displayed in a window.",
     ),
     (
+        "buffer-file-coding-system",
+        "Coding system to be used for encoding the buffer contents on saving.",
+    ),
+    (
+        "buffer-file-format",
+        "List of formats to use when saving this buffer.",
+    ),
+    (
         "buffer-file-name",
         "Name of file visited in current buffer, or nil if not visiting a file.",
     ),
+    (
+        "buffer-file-truename",
+        "Abbreviated truename of file visited in current buffer, or nil if none.",
+    ),
     ("buffer-invisibility-spec", "Invisibility spec of this buffer."),
+    ("buffer-list-update-hook", "Hook run when the buffer list changes."),
     ("buffer-read-only", "Non-nil if this buffer is read-only."),
+    (
+        "buffer-saved-size",
+        "Length of current buffer when last read in, saved or auto-saved.",
+    ),
     ("buffer-undo-list", "List of undo entries in current buffer."),
     ("case-fold-search", "Non-nil if searches and matches should ignore case."),
     (
         "case-symbols-as-words",
         "If non-nil, case functions treat symbol syntax as part of words.",
     ),
+    (
+        "coding-system-for-read",
+        "Specify the coding system for read operations.",
+    ),
+    (
+        "coding-system-for-write",
+        "Specify the coding system for write operations.",
+    ),
+    ("coding-system-list", "List of coding systems."),
+    ("coding-system-require-warning", "Internal use only."),
+    (
+        "command-debug-status",
+        "Debugging status of current interactive command.",
+    ),
+    ("command-error-function", "Function to output error messages."),
     (
         "command-history",
         "List of recent commands that read arguments from terminal.",
@@ -2903,6 +3008,24 @@ mod tests {
             result
                 .as_str()
                 .is_some_and(|s| s.contains("events to be read as the command input"))
+        );
+    }
+
+    #[test]
+    fn documentation_property_eval_auto_hscroll_mode_integer_property_returns_string() {
+        let mut evaluator = super::super::eval::Evaluator::new();
+        let result = builtin_documentation_property_eval(
+            &mut evaluator,
+            vec![
+                Value::symbol("auto-hscroll-mode"),
+                Value::symbol("variable-documentation"),
+            ],
+        )
+        .unwrap();
+        assert!(
+            result
+                .as_str()
+                .is_some_and(|s| s.contains("automatic horizontal scrolling of windows"))
         );
     }
 
