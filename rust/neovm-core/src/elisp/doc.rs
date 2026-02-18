@@ -4518,6 +4518,1006 @@ pub(crate) static STARTUP_VARIABLE_DOC_STRING_PROPERTIES: &[(&str, &str)] = &[
         "default-keyboard-coding-system",
         "Default value of the keyboard coding system.",
     ),
+    (
+        "default-korean-keyboard",
+        "The kind of Korean keyboard for Korean (Hangul) input method.",
+    ),
+    (
+        "default-sendmail-coding-system",
+        "Default coding system for encoding the outgoing mail.",
+    ),
+    (
+        "default-terminal-coding-system",
+        "Default value for the terminal coding system.",
+    ),
+    (
+        "default-transient-input-method",
+        "Default transient input method.",
+    ),
+    (
+        "definition-prefixes",
+        "Hash table mapping prefixes to the files in which they're used.",
+    ),
+    (
+        "defun-declarations-alist",
+        "List associating function properties to their macro expansion.",
+    ),
+    (
+        "defun-prompt-regexp",
+        "If non-nil, a regexp to ignore before a defun.",
+    ),
+    (
+        "degrees-to-radians",
+        "Degrees to radian conversion constant.",
+    ),
+    (
+        "delay-mode-hooks",
+        "If non-nil, `run-mode-hooks' should delay running the hooks.",
+    ),
+    (
+        "delayed-after-hook-functions",
+        "List of delayed :after-hook forms waiting to be run.",
+    ),
+    (
+        "delayed-mode-hooks",
+        "List of delayed mode hooks waiting to be run.",
+    ),
+    (
+        "delayed-warnings-hook",
+        "Normal hook run to process and display delayed warnings.",
+    ),
+    (
+        "delete-active-region",
+        "Whether single-char deletion commands delete an active region.",
+    ),
+    (
+        "delete-old-versions",
+        "If t, delete excess numbered backup files silently.",
+    ),
+    (
+        "delete-pair-blink-delay",
+        "Time in seconds to delay after showing a paired character to delete.",
+    ),
+    (
+        "delete-selection-mode",
+        "Non-nil if Delete-Selection mode is enabled.",
+    ),
+    (
+        "delete-trailing-lines",
+        "If non-nil, \\[delete-trailing-whitespace] deletes trailing lines.",
+    ),
+    (
+        "delete-window-choose-selected",
+        "How to choose a frame's selected window after window deletion.",
+    ),
+    (
+        "describe-bindings-outline",
+        "Non-nil enables outlines in the output buffer of `describe-bindings'.",
+    ),
+    (
+        "describe-bindings-outline-rules",
+        "Visibility rules for outline sections of `describe-bindings'.",
+    ),
+    (
+        "describe-bindings-show-prefix-commands",
+        "Non-nil means show prefix commands in the output of `describe-bindings'.",
+    ),
+    (
+        "describe-current-input-method-function",
+        "Function to call for describing the current input method.",
+    ),
+    (
+        "desktop-buffer-mode-handlers",
+        "Alist of major mode specific functions to restore a desktop buffer.",
+    ),
+    (
+        "desktop-locals-to-save",
+        "List of local variables to save for each buffer.",
+    ),
+    (
+        "desktop-minor-mode-handlers",
+        "Alist of functions to restore non-standard minor modes.",
+    ),
+    (
+        "desktop-save-buffer",
+        "When non-nil, save buffer status in desktop file.",
+    ),
+    (
+        "desktop-save-mode",
+        "Non-nil if Desktop-Save mode is enabled.",
+    ),
+    (
+        "devanagari-composable-pattern",
+        "Regexp matching a composable sequence of Devanagari characters.",
+    ),
+    (
+        "diff-add-log-use-relative-names",
+        "Use relative file names when generating ChangeLog skeletons.",
+    ),
+    (
+        "diff-command",
+        "The command to use to run diff.",
+    ),
+    (
+        "diff-switches",
+        "A string or list of strings specifying switches to be passed to diff.",
+    ),
+    (
+        "dir-local-variables-alist",
+        "Alist of directory-local variable settings in the current buffer.",
+    ),
+    (
+        "dir-locals-class-alist",
+        "Alist mapping directory-local variable classes (symbols) to variable lists.",
+    ),
+    (
+        "dir-locals-directory-cache",
+        "List of cached directory roots for directory-local variable classes.",
+    ),
+    (
+        "dir-locals-file",
+        "File that contains directory-local variables.",
+    ),
+    (
+        "directory-abbrev-alist",
+        "Alist of abbreviations for file directories.",
+    ),
+    (
+        "directory-files-no-dot-files-regexp",
+        "Regexp matching any file name except \".\" and \"..\".",
+    ),
+    (
+        "directory-free-space-args",
+        "Options to use when running `directory-free-space-program'.",
+    ),
+    (
+        "directory-free-space-program",
+        "Program to get the amount of free space on a file system.",
+    ),
+    (
+        "directory-listing-before-filename-regexp",
+        "Regular expression to match up to the file name in a directory listing.",
+    ),
+    (
+        "dired-directory",
+        "The directory name or wildcard spec that this Dired directory lists.",
+    ),
+    (
+        "dired-kept-versions",
+        "When cleaning directory, number of versions of numbered backups to keep.",
+    ),
+    (
+        "dired-listing-switches",
+        "Switches passed to `ls' for Dired.  MUST contain the `l' option.",
+    ),
+    (
+        "disable-theme-functions",
+        "Abnormal hook that is run after a theme has been disabled.",
+    ),
+    (
+        "disabled-command-function",
+        "Function to call to handle disabled commands.",
+    ),
+    (
+        "display-battery-mode",
+        "Non-nil if Display-Battery mode is enabled.",
+    ),
+    (
+        "display-buffer--action-custom-type",
+        "Custom type for `display-buffer' actions.",
+    ),
+    (
+        "display-buffer--action-function-custom-type",
+        "Custom type for `display-buffer' action functions.",
+    ),
+    (
+        "display-buffer--other-frame-action",
+        "A `display-buffer' action for displaying in another frame.",
+    ),
+    (
+        "display-buffer--same-window-action",
+        "A `display-buffer' action for displaying in the same window.",
+    ),
+    (
+        "display-buffer-alist",
+        "Alist of user-defined conditional actions for `display-buffer'.",
+    ),
+    (
+        "display-buffer-base-action",
+        "User-specified default action for `display-buffer'.",
+    ),
+    (
+        "display-buffer-fallback-action",
+        "Default fallback action for `display-buffer'.",
+    ),
+    (
+        "display-buffer-mark-dedicated",
+        "If non-nil, `display-buffer' marks the windows it creates as dedicated.",
+    ),
+    (
+        "display-buffer-overriding-action",
+        "Overriding action for buffer display.",
+    ),
+    (
+        "display-buffer-reuse-frames",
+        "Non-nil means `display-buffer' should reuse frames.",
+    ),
+    (
+        "display-comint-buffer-action",
+        "`display-buffer' action for displaying comint buffers.",
+    ),
+    (
+        "display-format-alist",
+        "Alist of patterns to decode display names.",
+    ),
+    (
+        "display-mm-dimensions-alist",
+        "Alist for specifying screen dimensions in millimeters.",
+    ),
+    (
+        "display-tex-shell-buffer-action",
+        "`display-buffer' action for displaying TeX shell buffers.",
+    ),
+    (
+        "display-time-day-and-date",
+        "Non-nil means \\[display-time] should display day and date as well as time.",
+    ),
+    (
+        "display-time-mode",
+        "Non-nil if Display-Time mode is enabled.",
+    ),
+    (
+        "dnd-direct-save-remote-files",
+        "Whether or not to perform a direct save of remote files.",
+    ),
+    (
+        "dnd-indicate-insertion-point",
+        "Whether or not point should follow the position of the mouse.",
+    ),
+    (
+        "dnd-last-dragged-remote-file",
+        "If non-nil, the name of a local copy of the last remote file that was dragged.",
+    ),
+    (
+        "dnd-open-file-other-window",
+        "If non-nil, always use `find-file-other-window' to open dropped files.",
+    ),
+    (
+        "dnd-open-remote-file-function",
+        "The function to call when opening a file on a remote machine.",
+    ),
+    (
+        "dnd-protocol-alist",
+        "The functions to call for different protocols when a drop is made.",
+    ),
+    (
+        "dnd-scroll-margin",
+        "The scroll margin inside a window underneath the cursor during drag-and-drop.",
+    ),
+    (
+        "dnd-unescape-file-uris",
+        "Whether to unescape file: URIs before they are opened.",
+    ),
+    (
+        "dynamic-completion-mode",
+        "Non-nil if Dynamic-Completion mode is enabled.",
+    ),
+    (
+        "early-init-file",
+        "File name, including directory, of user's early init file.",
+    ),
+    (
+        "easy-menu-avoid-duplicate-keys",
+        "Dynamically scoped var to register already used keys in a menu.",
+    ),
+    (
+        "edebug-all-defs",
+        "If non-nil, evaluating defining forms instruments for Edebug.",
+    ),
+    (
+        "edebug-all-forms",
+        "Non-nil means evaluation of all forms will instrument for Edebug.",
+    ),
+    (
+        "edit-abbrevs-mode-abbrev-table",
+        "Abbrev table for `edit-abbrevs-mode'.",
+    ),
+    (
+        "edit-abbrevs-mode-hook",
+        "Hook run after entering `edit-abbrevs-mode'.",
+    ),
+    (
+        "edit-abbrevs-mode-map",
+        "Keymap used in `edit-abbrevs'.",
+    ),
+    (
+        "edit-abbrevs-mode-syntax-table",
+        "Syntax table for `edit-abbrevs-mode'.",
+    ),
+    (
+        "edit-tab-stops-buffer",
+        "Buffer whose tab stops are being edited.",
+    ),
+    (
+        "edit-tab-stops-map",
+        "Keymap used in `edit-tab-stops'.",
+    ),
+    (
+        "editorconfig-mode",
+        "Non-nil if Editorconfig mode is enabled.",
+    ),
+    (
+        "eldoc--doc-buffer",
+        "Buffer displaying latest ElDoc-produced docs.",
+    ),
+    (
+        "eldoc--enthusiasm-curbing-timer",
+        "Timer used by the `eldoc-documentation-enthusiast' strategy.",
+    ),
+    (
+        "eldoc--last-request-state",
+        "Tuple containing information about last ElDoc request.",
+    ),
+    (
+        "eldoc--make-callback",
+        "Helper for function `eldoc--make-callback'.",
+    ),
+    (
+        "eldoc-argument-case",
+        "Case to display argument names of functions, as a symbol.",
+    ),
+    (
+        "eldoc-current-idle-delay",
+        "Idle time delay currently in use by timer.",
+    ),
+    (
+        "eldoc-display-functions",
+        "Hook of functions tasked with displaying ElDoc results.",
+    ),
+    (
+        "eldoc-doc-buffer-separator",
+        "String used to separate items in Eldoc documentation buffer.",
+    ),
+    (
+        "eldoc-documentation-function",
+        "How to collect and display results of `eldoc-documentation-functions'.",
+    ),
+    (
+        "eldoc-documentation-functions",
+        "Hook of functions that produce doc strings.",
+    ),
+    (
+        "eldoc-documentation-strategy",
+        "How to collect and display results of `eldoc-documentation-functions'.",
+    ),
+    (
+        "eldoc-echo-area-display-truncation-message",
+        "If non-nil, provide verbose help when a message has been truncated.",
+    ),
+    (
+        "eldoc-echo-area-prefer-doc-buffer",
+        "Prefer ElDoc's documentation buffer if it is displayed in some window.",
+    ),
+    (
+        "eldoc-echo-area-use-multiline-p",
+        "Allow long ElDoc doc strings to resize echo area display.",
+    ),
+    (
+        "eldoc-idle-delay",
+        "Number of seconds of idle time to wait before displaying documentation.",
+    ),
+    (
+        "eldoc-last-data",
+        "Bookkeeping; elements are as follows:",
+    ),
+    (
+        "eldoc-message-commands",
+        "Commands after which it is appropriate to print in the echo area.",
+    ),
+    (
+        "eldoc-message-commands-table-size",
+        "Used by `eldoc-add-command' to initialize `eldoc-message-commands' obarray.",
+    ),
+    (
+        "eldoc-message-function",
+        "The function used by `eldoc--message' to display messages.",
+    ),
+    (
+        "eldoc-minor-mode-string",
+        "String to display in mode line when ElDoc Mode is enabled; nil for none.",
+    ),
+    (
+        "eldoc-mode",
+        "Non-nil if Eldoc mode is enabled.",
+    ),
+    (
+        "eldoc-mode-hook",
+        "Hook run after entering or leaving `eldoc-mode'.",
+    ),
+    (
+        "eldoc-print-after-edit",
+        "If non-nil, eldoc info is only shown after editing commands.",
+    ),
+    (
+        "eldoc-timer",
+        "ElDoc's timer object.",
+    ),
+    (
+        "electric-indent-chars",
+        "Characters that should cause automatic reindentation.",
+    ),
+    (
+        "electric-indent-functions",
+        "Special hook run to decide whether to auto-indent.",
+    ),
+    (
+        "electric-indent-functions-without-reindent",
+        "List of indent functions that can't reindent.",
+    ),
+    (
+        "electric-indent-inhibit",
+        "If non-nil, reindentation is not appropriate for this buffer.",
+    ),
+    (
+        "electric-indent-local-mode-hook",
+        "Hook run after entering or leaving `electric-indent-local-mode'.",
+    ),
+    (
+        "electric-indent-mode",
+        "Non-nil if Electric-Indent mode is enabled.",
+    ),
+    (
+        "electric-indent-mode-hook",
+        "Hook run after entering or leaving `electric-indent-mode'.",
+    ),
+    (
+        "electric-layout-allow-duplicate-newlines",
+        "If non-nil, allow duplication of `before' newlines.",
+    ),
+    (
+        "electric-layout-allow-in-comment-or-string",
+        "If non-nil, allow inserting newlines inside a comment or string.",
+    ),
+    (
+        "electric-layout-local-mode-hook",
+        "Hook run after entering or leaving `electric-layout-local-mode'.",
+    ),
+    (
+        "electric-layout-mode",
+        "Non-nil if Electric-Layout mode is enabled.",
+    ),
+    (
+        "electric-layout-mode-hook",
+        "Hook run after entering or leaving `electric-layout-mode'.",
+    ),
+    (
+        "electric-layout-rules",
+        "List of rules saying where to automatically insert newlines.",
+    ),
+    (
+        "electric-pair-mode",
+        "Non-nil if Electric-Pair mode is enabled.",
+    ),
+    (
+        "electric-quote-chars",
+        "Curved quote characters for `electric-quote-mode'.",
+    ),
+    (
+        "electric-quote-comment",
+        "Non-nil means to use electric quoting in program comments.",
+    ),
+    (
+        "electric-quote-context-sensitive",
+        "Non-nil means to replace \\=' with an electric quote depending on context.",
+    ),
+    (
+        "electric-quote-inhibit-functions",
+        "List of functions that should inhibit electric quoting.",
+    ),
+    (
+        "electric-quote-local-mode-hook",
+        "Hook run after entering or leaving `electric-quote-local-mode'.",
+    ),
+    (
+        "electric-quote-mode",
+        "Non-nil if Electric-Quote mode is enabled.",
+    ),
+    (
+        "electric-quote-mode-hook",
+        "Hook run after entering or leaving `electric-quote-mode'.",
+    ),
+    (
+        "electric-quote-paragraph",
+        "Non-nil means to use electric quoting in text paragraphs.",
+    ),
+    (
+        "electric-quote-replace-consecutive",
+        "Non-nil means to replace a pair of single quotes with a double quote.",
+    ),
+    (
+        "electric-quote-replace-double",
+        "Non-nil means to replace \" with an electric double quote.",
+    ),
+    (
+        "electric-quote-string",
+        "Non-nil means to use electric quoting in program strings.",
+    ),
+    (
+        "elisp--eldoc-last-data",
+        "Bookkeeping.",
+    ),
+    (
+        "elisp--local-macroenv",
+        "Environment to use while tentatively expanding macros.",
+    ),
+    (
+        "elisp-byte-code-mode-abbrev-table",
+        "Abbrev table for `elisp-byte-code-mode'.",
+    ),
+    (
+        "elisp-byte-code-mode-hook",
+        "Hook run after entering `elisp-byte-code-mode'.",
+    ),
+    (
+        "elisp-byte-code-mode-map",
+        "Keymap for `elisp-byte-code-mode'.",
+    ),
+    (
+        "elisp-byte-code-mode-syntax-table",
+        "Syntax table for `elisp-byte-code-mode'.",
+    ),
+    (
+        "elisp-flymake--byte-compile-process",
+        "Buffer-local process started for byte-compiling the buffer.",
+    ),
+    (
+        "elisp-flymake-byte-compile-load-path",
+        "Like `load-path' but used by `elisp-flymake-byte-compile'.",
+    ),
+    (
+        "elisp-xref-find-def-functions",
+        "List of functions run from `elisp--xref-find-definitions' to add more xrefs.",
+    ),
+    (
+        "emacs-build-number",
+        "The build number of this version of Emacs.",
+    ),
+    (
+        "emacs-build-system",
+        "Name of the system on which Emacs was built, or nil if not available.",
+    ),
+    (
+        "emacs-build-time",
+        "Time at which Emacs was dumped out, or nil if not available.",
+    ),
+    (
+        "emacs-lisp-byte-code-comment-re",
+        "Regular expression matching a dynamic doc string comment.",
+    ),
+    (
+        "emacs-lisp-docstring-fill-column",
+        "Value of `fill-column' to use when filling a docstring.",
+    ),
+    (
+        "emacs-lisp-mode-abbrev-table",
+        "Abbrev table for Emacs Lisp mode.",
+    ),
+    (
+        "emacs-lisp-mode-hook",
+        "Hook run when entering Emacs Lisp mode.",
+    ),
+    (
+        "emacs-lisp-mode-map",
+        "Keymap for Emacs Lisp mode.",
+    ),
+    (
+        "emacs-lisp-mode-menu",
+        "Menu for Emacs Lisp mode.",
+    ),
+    (
+        "emacs-lisp-mode-syntax-table",
+        "Syntax table used in `emacs-lisp-mode'.",
+    ),
+    (
+        "emacs-major-version",
+        "Major version number of this version of Emacs.",
+    ),
+    (
+        "emacs-minor-version",
+        "Minor version number of this version of Emacs.",
+    ),
+    (
+        "emacs-repository-branch",
+        "String giving the repository branch from which this Emacs was built.",
+    ),
+    (
+        "emacs-repository-version",
+        "String giving the repository revision from which this Emacs was built.",
+    ),
+    (
+        "emacs-save-session-functions",
+        "Special hook run when a save-session event occurs.",
+    ),
+    (
+        "emacs-startup-hook",
+        "Normal hook run after loading init files and handling the command line.",
+    ),
+    (
+        "enable-connection-local-variables",
+        "Non-nil means enable use of connection-local variables.",
+    ),
+    (
+        "enable-dir-local-variables",
+        "Non-nil means enable use of directory-local variables.",
+    ),
+    (
+        "enable-kinsoku",
+        "Non-nil means enable \"kinsoku\" processing on filling paragraphs.",
+    ),
+    (
+        "enable-local-eval",
+        "Control processing of the \"variable\" `eval' in a file's local variables.",
+    ),
+    (
+        "enable-local-variables",
+        "Control use of local variables in files you visit.",
+    ),
+    (
+        "enable-remote-dir-locals",
+        "Non-nil means dir-local variables will be applied to remote files.",
+    ),
+    (
+        "enable-theme-functions",
+        "Abnormal hook that is run after a theme has been enabled.",
+    ),
+    (
+        "end-of-defun-function",
+        "Function for `end-of-defun' to call.",
+    ),
+    (
+        "end-of-defun-moves-to-eol",
+        "Whether `end-of-defun' moves to eol before doing anything else.",
+    ),
+    (
+        "epa-file-encrypt-to",
+        "Recipient(s) used for encrypting files.",
+    ),
+    (
+        "epa-file-inhibit-auto-save",
+        "If non-nil, disable auto-saving when opening an encrypted file.",
+    ),
+    (
+        "epa-file-name-regexp",
+        "Regexp which matches filenames to be encrypted with GnuPG.",
+    ),
+    (
+        "epa-global-mail-mode",
+        "Non-nil if Epa-Global-Mail mode is enabled.",
+    ),
+    (
+        "esc-map",
+        "Default keymap for ESC (meta) commands.",
+    ),
+    (
+        "escaped-string-quote",
+        "String to insert before a string quote character in a string to escape it.",
+    ),
+    (
+        "etags-regen-mode",
+        "Non-nil if Etags-Regen mode is enabled.",
+    ),
+    (
+        "eval-expression-debug-on-error",
+        "If non-nil set `debug-on-error' to t in `eval-expression'.",
+    ),
+    (
+        "eval-expression-minibuffer-setup-hook",
+        "Hook run by `eval-expression' when entering the minibuffer.",
+    ),
+    (
+        "eval-expression-print-length",
+        "Value for `print-length' while printing value in `eval-expression'.",
+    ),
+    (
+        "eval-expression-print-level",
+        "Value for `print-level' while printing value in `eval-expression'.",
+    ),
+    (
+        "eval-expression-print-maximum-character",
+        "The largest integer that will be displayed as a character.",
+    ),
+    (
+        "even-window-sizes",
+        "If non-nil `display-buffer' will try to even window sizes.",
+    ),
+    (
+        "eww-suggest-uris",
+        "List of functions called to form the list of default URIs for `eww'.",
+    ),
+    (
+        "exit-language-environment-hook",
+        "Normal hook run after exiting from some language environment.",
+    ),
+    (
+        "extended-command-suggest-shorter",
+        "If non-nil, show a shorter \\[execute-extended-command] invocation when there is one.",
+    ),
+    (
+        "extended-command-versions",
+        "Alist of prompts and what the extended command predicate should be.",
+    ),
+    (
+        "face-attribute-name-alist",
+        "An alist of descriptive names for face attributes.",
+    ),
+    (
+        "face-font-family-alternatives",
+        "Alist of alternative font family names.",
+    ),
+    (
+        "face-font-registry-alternatives",
+        "Alist of alternative font registry names.",
+    ),
+    (
+        "face-font-selection-order",
+        "A list specifying how face font selection chooses fonts.",
+    ),
+    (
+        "face-name-history",
+        "History list for some commands that read face names.",
+    ),
+    (
+        "face-x-resources",
+        "List of X resources and classes for face attributes.",
+    ),
+    (
+        "fancy-about-text",
+        "A list of texts to show in the middle part of the About screen.",
+    ),
+    (
+        "fancy-splash-image",
+        "The image to show in the splash screens, or nil for defaults.",
+    ),
+    (
+        "fancy-startup-text",
+        "A list of texts to show in the middle part of splash screens.",
+    ),
+    (
+        "ff-special-constructs",
+        "List of special constructs recognized by `ff-treat-as-special'.",
+    ),
+    (
+        "ffap-file-finder",
+        "The command called by `find-file-at-point' to find a file.",
+    ),
+    (
+        "fido-mode",
+        "Non-nil if Fido mode is enabled.",
+    ),
+    (
+        "fido-vertical-mode",
+        "Non-nil if Fido-Vertical mode is enabled.",
+    ),
+    (
+        "file-auto-mode-skip",
+        "Regexp of lines to skip when looking for file-local settings.",
+    ),
+    (
+        "file-has-changed-p--hash-table",
+        "Internal variable used by `file-has-changed-p'.",
+    ),
+    (
+        "file-local-variables-alist",
+        "Alist of file-local variable settings in the current buffer.",
+    ),
+    (
+        "file-name-at-point-functions",
+        "List of functions to try in sequence to get a file name at point.",
+    ),
+    (
+        "file-name-history",
+        "History list of file names entered in the minibuffer.",
+    ),
+    (
+        "file-name-invalid-regexp",
+        "Regexp recognizing file names that aren't allowed by the filesystem.",
+    ),
+    (
+        "file-name-shadow-mode",
+        "Non-nil if File-Name-Shadow mode is enabled.",
+    ),
+    (
+        "file-name-shadow-mode-hook",
+        "Hook run after entering or leaving `file-name-shadow-mode'.",
+    ),
+    (
+        "file-name-shadow-properties",
+        "Properties given to the `shadowed' part of a filename in the minibuffer.",
+    ),
+    (
+        "file-name-shadow-tty-properties",
+        "Properties given to the `shadowed' part of a filename in the minibuffer.",
+    ),
+    (
+        "file-name-version-regexp",
+        "Regular expression matching the backup/version part of a file name.",
+    ),
+    (
+        "file-precious-flag",
+        "Non-nil means protect against I/O errors while saving files.",
+    ),
+    (
+        "file-preserve-symlinks-on-save",
+        "If non-nil, saving a buffer visited via a symlink won't overwrite the symlink.",
+    ),
+    (
+        "fill-find-break-point-function-table",
+        "Char-table of special functions to find line breaking point.",
+    ),
+    (
+        "fill-forward-paragraph-function",
+        "Function to move over paragraphs used by the filling code.",
+    ),
+    (
+        "fill-indent-according-to-mode",
+        "Whether or not filling should try to use the major mode's indentation.",
+    ),
+    (
+        "fill-individual-varying-indent",
+        "Controls criterion for a new paragraph in `fill-individual-paragraphs'.",
+    ),
+    (
+        "fill-nobreak-invisible",
+        "Non-nil means that fill commands do not break lines in invisible text.",
+    ),
+    (
+        "fill-nobreak-predicate",
+        "List of predicates for recognizing places not to break a line.",
+    ),
+    (
+        "fill-nospace-between-words-table",
+        "Char-table of characters that don't use space between words.",
+    ),
+    (
+        "fill-paragraph-function",
+        "Mode-specific function to fill a paragraph, or nil if there is none.",
+    ),
+    (
+        "fill-paragraph-handle-comment",
+        "Non-nil means paragraph filling will try to pay attention to comments.",
+    ),
+    (
+        "fill-prefix",
+        "String for filling to insert at front of new line, or nil for none.",
+    ),
+    (
+        "fill-separate-heterogeneous-words-with-space",
+        "Non-nil means to use a space to separate words of a different kind.",
+    ),
+    (
+        "filter-buffer-substring-function",
+        "Function to perform the filtering in `filter-buffer-substring'.",
+    ),
+    (
+        "filter-buffer-substring-functions",
+        "This variable is a wrapper hook around `buffer-substring--filter'.",
+    ),
+    (
+        "find-alternate-file-dont-kill-client",
+        "If non-nil, `server-buffer-done' should not delete the client.",
+    ),
+    (
+        "find-directory-functions",
+        "List of functions to try in sequence to visit a directory.",
+    ),
+    (
+        "find-file-existing-other-name",
+        "Non-nil means find a file under alternative names, in existing buffers.",
+    ),
+    (
+        "find-file-hook",
+        "List of functions to be called after a buffer is loaded from a file.",
+    ),
+    (
+        "find-file-literally",
+        "Non-nil if this buffer was made by `find-file-literally' or equivalent.",
+    ),
+    (
+        "find-file-not-found-functions",
+        "List of functions to be called for `find-file' on nonexistent file.",
+    ),
+    (
+        "find-file-run-dired",
+        "Non-nil means allow `find-file' to visit directories.",
+    ),
+    (
+        "find-file-suppress-same-file-warnings",
+        "Non-nil means suppress warning messages for symlinked files.",
+    ),
+    (
+        "find-file-visit-truename",
+        "Non-nil means visiting a file uses its truename as the visited-file name.",
+    ),
+    (
+        "find-file-wildcards",
+        "Non-nil means file-visiting commands should handle wildcards.",
+    ),
+    (
+        "find-program",
+        "The default find program.",
+    ),
+    (
+        "find-sibling-rules",
+        "Rules for finding \"sibling\" files.",
+    ),
+    (
+        "find-tag-default-function",
+        "A function of no arguments used by \\[find-tag] to pick a default tag.",
+    ),
+    (
+        "find-tag-hook",
+        "Hook to be run by \\[find-tag] after finding a tag.  See `run-hooks'.",
+    ),
+    (
+        "fit-frame-to-buffer",
+        "Non-nil means `fit-window-to-buffer' can fit a frame to its buffer.",
+    ),
+    (
+        "fit-frame-to-buffer-margins",
+        "Margins around frame for `fit-frame-to-buffer'.",
+    ),
+    (
+        "fit-frame-to-buffer-sizes",
+        "Size boundaries of frame for `fit-frame-to-buffer'.",
+    ),
+    (
+        "fit-window-to-buffer-horizontally",
+        "Non-nil means `fit-window-to-buffer' can resize windows horizontally.",
+    ),
+    (
+        "flex-score-match-tightness",
+        "Controls how the `flex' completion style scores its matches.",
+    ),
+    (
+        "float-e",
+        "The value of e (2.7182818...).",
+    ),
+    (
+        "float-pi",
+        "The value of Pi (3.1415926...).",
+    ),
+    (
+        "flyspell-mode",
+        "Non-nil if Flyspell mode is enabled.",
+    ),
+    (
+        "focus-in-hook",
+        "Normal hook run when a frame gains focus.",
+    ),
+    (
+        "focus-out-hook",
+        "Normal hook run when all frames lost input focus.",
+    ),
+    (
+        "font-lock-builtin-face",
+        "Face name to use for builtins.",
+    ),
+    (
+        "font-lock-comment-delimiter-face",
+        "Face name to use for comment delimiters.",
+    ),
+    (
+        "font-lock-comment-end-skip",
+        "If non-nil, Font Lock mode uses this instead of `comment-end-skip'.",
+    ),
+    (
+        "font-lock-comment-face",
+        "Face name to use for comments.",
+    ),
+    (
+        "font-lock-comment-start-skip",
+        "If non-nil, Font Lock mode uses this instead of `comment-start-skip'.",
+    ),
     ("kill-ring", "List of killed text sequences."),
     (
         "kill-ring-yank-pointer",

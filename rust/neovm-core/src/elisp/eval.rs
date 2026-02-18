@@ -3737,7 +3737,23 @@ mod tests {
              (stringp (get 'custom-enabled-themes 'variable-documentation))
              (integerp (get 'custom-enabled-themes 'variable-documentation))
              (stringp (get 'default-input-method 'variable-documentation))
-             (integerp (get 'default-input-method 'variable-documentation))",
+             (integerp (get 'default-input-method 'variable-documentation))
+             (stringp (get 'default-korean-keyboard 'variable-documentation))
+             (integerp (get 'default-korean-keyboard 'variable-documentation))
+             (stringp (get 'delete-selection-mode 'variable-documentation))
+             (integerp (get 'delete-selection-mode 'variable-documentation))
+             (stringp (get 'display-buffer-alist 'variable-documentation))
+             (integerp (get 'display-buffer-alist 'variable-documentation))
+             (stringp (get 'eldoc-mode 'variable-documentation))
+             (integerp (get 'eldoc-mode 'variable-documentation))
+             (stringp (get 'emacs-major-version 'variable-documentation))
+             (integerp (get 'emacs-major-version 'variable-documentation))
+             (stringp (get 'file-name-shadow-mode 'variable-documentation))
+             (integerp (get 'file-name-shadow-mode 'variable-documentation))
+             (stringp (get 'fill-prefix 'variable-documentation))
+             (integerp (get 'fill-prefix 'variable-documentation))
+             (stringp (get 'font-lock-comment-start-skip 'variable-documentation))
+             (integerp (get 'font-lock-comment-start-skip 'variable-documentation))",
         );
         assert_eq!(results[0], "OK t");
         assert_eq!(results[1], "OK nil");
@@ -3777,6 +3793,22 @@ mod tests {
         assert_eq!(results[35], "OK nil");
         assert_eq!(results[36], "OK t");
         assert_eq!(results[37], "OK nil");
+        assert_eq!(results[38], "OK t");
+        assert_eq!(results[39], "OK nil");
+        assert_eq!(results[40], "OK t");
+        assert_eq!(results[41], "OK nil");
+        assert_eq!(results[42], "OK t");
+        assert_eq!(results[43], "OK nil");
+        assert_eq!(results[44], "OK t");
+        assert_eq!(results[45], "OK nil");
+        assert_eq!(results[46], "OK t");
+        assert_eq!(results[47], "OK nil");
+        assert_eq!(results[48], "OK t");
+        assert_eq!(results[49], "OK nil");
+        assert_eq!(results[50], "OK t");
+        assert_eq!(results[51], "OK nil");
+        assert_eq!(results[52], "OK t");
+        assert_eq!(results[53], "OK nil");
     }
 
     #[test]
