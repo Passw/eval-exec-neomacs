@@ -3118,6 +3118,606 @@ Each element is a string (directory name) or nil (try default directory).",
 ];
 
 pub(crate) static STARTUP_VARIABLE_DOC_STRING_PROPERTIES: &[(&str, &str)] = &[
+    (
+        "abbrev--suggest-saved-recommendations",
+        "Keeps the list of expansions that have abbrevs defined.",
+    ),
+    (
+        "abbrev-all-caps",
+        "Non-nil means expand multi-word abbrevs in all caps if the abbrev was so.",
+    ),
+    (
+        "abbrev-expand-function",
+        "Function that ‘expand-abbrev’ uses to perform abbrev expansion.",
+    ),
+    (
+        "abbrev-expand-functions",
+        "Wrapper hook around ‘abbrev--default-expand’.",
+    ),
+    (
+        "abbrev-file-name",
+        "Default name of file from which to read and where to save abbrevs.",
+    ),
+    (
+        "abbrev-map",
+        "Keymap for abbrev commands.",
+    ),
+    (
+        "abbrev-minor-mode-table-alist",
+        "Alist of abbrev tables to use for minor modes.",
+    ),
+    (
+        "abbrev-mode-hook",
+        "Hook run after entering or leaving ‘abbrev-mode’.",
+    ),
+    (
+        "abbrev-start-location",
+        "Buffer position for ‘expand-abbrev’ to use as the start of the abbrev.",
+    ),
+    (
+        "abbrev-start-location-buffer",
+        "Buffer that ‘abbrev-start-location’ has been set for.",
+    ),
+    (
+        "abbrev-suggest",
+        "Non-nil means suggest using abbrevs to save typing.",
+    ),
+    (
+        "abbrev-suggest-hint-threshold",
+        "Threshold for when to suggest to use an abbrev to save typing.",
+    ),
+    (
+        "abbrev-table-name-list",
+        "List of symbols whose values are abbrev tables.",
+    ),
+    (
+        "abbreviated-home-dir",
+        "Regexp matching the user’s homedir at the beginning of file name.",
+    ),
+    (
+        "abbrevs-changed",
+        "Non-nil if any word abbrevs were defined or altered.",
+    ),
+    (
+        "activate-mark-hook",
+        "Hook run when the mark becomes active.",
+    ),
+    (
+        "after-change-major-mode-hook",
+        "Normal hook run at the very end of major mode functions.",
+    ),
+    (
+        "after-focus-change-function",
+        "Function called after frame focus may have changed.",
+    ),
+    (
+        "after-init-hook",
+        "Normal hook run after initializing the Emacs session.",
+    ),
+    (
+        "after-load-functions",
+        "Special hook run after loading a file.",
+    ),
+    (
+        "after-make-frame-functions",
+        "Functions to run after ‘make-frame’ created a new frame.",
+    ),
+    (
+        "after-pdump-load-hook",
+        "Normal hook run after loading the .pdmp file.",
+    ),
+    (
+        "after-revert-hook",
+        "Normal hook for ‘revert-buffer’ to run after reverting.",
+    ),
+    (
+        "after-save-hook",
+        "Normal hook that is run after a buffer is saved to its file.",
+    ),
+    (
+        "after-set-visited-file-name-hook",
+        "Normal hook run just after setting visited file name of current buffer.",
+    ),
+    (
+        "after-setting-font-hook",
+        "Functions to run after a frame’s font has been changed.",
+    ),
+    (
+        "allout-auto-activation",
+        "Configure allout outline mode auto-activation.",
+    ),
+    (
+        "allout-widgets-auto-activation",
+        "Activate to enable allout icon graphics wherever allout mode is active.",
+    ),
+    (
+        "amalgamating-undo-limit",
+        "The maximum number of changes to possibly amalgamate when undoing changes.",
+    ),
+    (
+        "android-fonts-enumerated",
+        "Whether or not fonts have been enumerated already.",
+    ),
+    (
+        "Buffer-menu-buffer-list",
+        "The current list of buffers or function to return buffers.",
+    ),
+    (
+        "Buffer-menu-del-char",
+        "Character used to flag buffers for deletion.",
+    ),
+    (
+        "Buffer-menu-files-only",
+        "Non-nil if the current Buffer Menu lists only file buffers.",
+    ),
+    (
+        "Buffer-menu-filter-predicate",
+        "Function to filter out buffers in the buffer list.",
+    ),
+    (
+        "Buffer-menu-group-by",
+        "If non-nil, functions to call to divide buffer-menu buffers into groups.",
+    ),
+    (
+        "Buffer-menu-group-sort-by",
+        "If non-nil, function to sort buffer-menu groups by name.",
+    ),
+    (
+        "Buffer-menu-marker-char",
+        "The mark character for marked buffers.",
+    ),
+    (
+        "Buffer-menu-mode-abbrev-table",
+        "Abbrev table for `Buffer-menu-mode'.",
+    ),
+    (
+        "Buffer-menu-mode-hook",
+        "Hook run after entering `Buffer-menu-mode'.",
+    ),
+    (
+        "Buffer-menu-mode-map",
+        "Local keymap for `Buffer-menu-mode' buffers.",
+    ),
+    (
+        "Buffer-menu-mode-menu",
+        "Menu for `Buffer-menu-mode' buffers.",
+    ),
+    (
+        "Buffer-menu-mode-syntax-table",
+        "Syntax table for `Buffer-menu-mode'.",
+    ),
+    (
+        "Buffer-menu-mode-width",
+        "Width of mode name column in the Buffer Menu.",
+    ),
+    (
+        "Buffer-menu-name-width",
+        "Width of buffer name column in the Buffer Menu.",
+    ),
+    (
+        "Buffer-menu-show-internal",
+        "Non-nil if the current Buffer Menu lists internal buffers.",
+    ),
+    (
+        "Buffer-menu-size-width",
+        "Width of buffer size column in the Buffer Menu.",
+    ),
+    (
+        "Buffer-menu-use-frame-buffer-list",
+        "If non-nil, the Buffer Menu uses the selected frame's buffer list.",
+    ),
+    (
+        "Buffer-menu-use-header-line",
+        "If non-nil, use the header line to display Buffer Menu column titles.",
+    ),
+    (
+        "Info-default-directory-list",
+        "Default list of directories to search for Info documentation files.",
+    ),
+    (
+        "Info-split-threshold",
+        "The number of characters by which `Info-split' splits an info file.",
+    ),
+    (
+        "ad-default-compilation-action",
+        "Defines whether to compile advised definitions during activation.",
+    ),
+    (
+        "ad-redefinition-action",
+        "Defines what to do with redefinitions during Advice de/activation.",
+    ),
+    (
+        "adaptive-fill-first-line-regexp",
+        "Regexp specifying whether to set fill prefix from a one-line paragraph.",
+    ),
+    (
+        "adaptive-fill-function",
+        "Function to call to choose a fill prefix for a paragraph.",
+    ),
+    (
+        "adaptive-fill-mode",
+        "Non-nil means determine a paragraph's fill prefix from its text.",
+    ),
+    (
+        "adaptive-fill-regexp",
+        "Regexp to match text at start of line that constitutes indentation.",
+    ),
+    (
+        "add-log-current-defun-function",
+        "If non-nil, function to guess name of surrounding function.",
+    ),
+    (
+        "add-log-full-name",
+        "Full name of user, for inclusion in ChangeLog daily headers.",
+    ),
+    (
+        "add-log-mailing-address",
+        "Email addresses of user, for inclusion in ChangeLog headers.",
+    ),
+    (
+        "advice--how-alist",
+        "List of descriptions of how to add a function.",
+    ),
+    (
+        "arabic-shaper-ZWNJ-handling",
+        "How to handle ZWNJ (Zero-width Non-Joiner) in Arabic text rendering.",
+    ),
+    (
+        "argi",
+        "Current command-line argument.",
+    ),
+    (
+        "argv",
+        "List of command-line args not yet processed.",
+    ),
+    (
+        "ascii-case-table",
+        "Case table for the ASCII character set.",
+    ),
+    (
+        "async-shell-command-buffer",
+        "What to do when the output buffer is used by another shell command.",
+    ),
+    (
+        "async-shell-command-display-buffer",
+        "Whether to display the command buffer immediately.",
+    ),
+    (
+        "async-shell-command-mode",
+        "Major mode to use for the output of asynchronous `shell-command'.",
+    ),
+    (
+        "async-shell-command-width",
+        "Number of display columns available for asynchronous shell command output.",
+    ),
+    (
+        "auth-source-cache-expiry",
+        "How many seconds passwords are cached, or nil to disable expiring.",
+    ),
+    (
+        "auto-coding-alist",
+        "Alist of filename patterns vs corresponding coding systems.",
+    ),
+    (
+        "auto-coding-file-name",
+        "Variable holding the name of the file for `auto-coding-functions'.",
+    ),
+    (
+        "auto-coding-functions",
+        "A list of functions which attempt to determine a coding system.",
+    ),
+    (
+        "auto-coding-regexp-alist",
+        "Alist of patterns vs corresponding coding systems.",
+    ),
+    (
+        "auto-composition-mode-hook",
+        "Hook run after entering or leaving `auto-composition-mode'.",
+    ),
+    (
+        "auto-compression-mode",
+        "Non-nil if Auto-Compression mode is enabled.",
+    ),
+    (
+        "auto-compression-mode-hook",
+        "Hook run after entering or leaving `auto-compression-mode'.",
+    ),
+    (
+        "auto-encryption-mode",
+        "Non-nil if Auto-Encryption mode is enabled.",
+    ),
+    (
+        "auto-encryption-mode-hook",
+        "Hook run after entering or leaving `auto-encryption-mode'.",
+    ),
+    (
+        "auto-fill-inhibit-regexp",
+        "Regexp to match lines that should not be auto-filled.",
+    ),
+    (
+        "auto-fill-mode-hook",
+        "Hook run after entering or leaving `auto-fill-mode'.",
+    ),
+    (
+        "auto-image-file-mode",
+        "Non-nil if Auto-Image-File mode is enabled.",
+    ),
+    (
+        "auto-insert-mode",
+        "Non-nil if Auto-Insert mode is enabled.",
+    ),
+    (
+        "auto-lower-mode-hook",
+        "Hook run after entering or leaving `auto-lower-mode'.",
+    ),
+    (
+        "auto-mode-alist",
+        "Alist of file name patterns vs corresponding major mode functions.",
+    ),
+    (
+        "auto-mode-case-fold",
+        "Non-nil means to try second pass through `auto-mode-alist'.",
+    ),
+    (
+        "auto-mode-interpreter-regexp",
+        "Regexp matching interpreters, for file mode determination.",
+    ),
+    (
+        "auto-raise-mode-hook",
+        "Hook run after entering or leaving `auto-raise-mode'.",
+    ),
+    (
+        "auto-save--timer",
+        "Timer for `auto-save-visited-mode'.",
+    ),
+    (
+        "auto-save-default",
+        "Non-nil says by default do auto-saving of every file-visiting buffer.",
+    ),
+    (
+        "auto-save-file-name-transforms",
+        "Transforms to apply to buffer file name before making auto-save file name.",
+    ),
+    (
+        "auto-save-hook",
+        "Normal hook run just before auto-saving.",
+    ),
+    (
+        "auto-save-list-file-prefix",
+        "Prefix for generating `auto-save-list-file-name'.",
+    ),
+    (
+        "auto-save-mode-hook",
+        "Hook run after entering or leaving `auto-save-mode'.",
+    ),
+    (
+        "auto-save-visited-interval",
+        "Interval in seconds for `auto-save-visited-mode'.",
+    ),
+    (
+        "auto-save-visited-mode",
+        "Non-nil if Auto-Save-Visited mode is enabled.",
+    ),
+    (
+        "auto-save-visited-mode-hook",
+        "Hook run after entering or leaving `auto-save-visited-mode'.",
+    ),
+    (
+        "auto-save-visited-predicate",
+        "Predicate function for `auto-save-visited-mode'.",
+    ),
+    (
+        "backquote-backquote-symbol",
+        "Symbol used to represent a backquote or nested backquote.",
+    ),
+    (
+        "backquote-splice-symbol",
+        "Symbol used to represent a splice inside a backquote.",
+    ),
+    (
+        "backquote-unquote-symbol",
+        "Symbol used to represent an unquote inside a backquote.",
+    ),
+    (
+        "backup-by-copying",
+        "Non-nil means always use copying to create backup files.",
+    ),
+    (
+        "backup-by-copying-when-linked",
+        "Non-nil means use copying to create backups for files with multiple names.",
+    ),
+    (
+        "backup-by-copying-when-mismatch",
+        "Non-nil means create backups by copying if this preserves owner or group.",
+    ),
+    (
+        "backup-by-copying-when-privileged-mismatch",
+        "Non-nil means create backups by copying to preserve a privileged owner.",
+    ),
+    (
+        "backup-directory-alist",
+        "Alist of file name patterns and backup directory names.",
+    ),
+    (
+        "backup-enable-predicate",
+        "Predicate that looks at a file name and decides whether to make backups.",
+    ),
+    (
+        "backup-inhibited",
+        "If non-nil, backups will be inhibited.",
+    ),
+    (
+        "backward-delete-char-untabify-method",
+        "The method for untabifying when deleting backward.",
+    ),
+    (
+        "bad-packages-alist",
+        "Alist of packages known to cause problems in this version of Emacs.",
+    ),
+    (
+        "bdf-directory-list",
+        "List of directories to search for `BDF' font files.",
+    ),
+    (
+        "before-hack-local-variables-hook",
+        "Normal hook run before setting file-local variables.",
+    ),
+    (
+        "before-init-hook",
+        "Normal hook run after handling urgent options but before loading init files.",
+    ),
+    (
+        "before-make-frame-hook",
+        "Functions to run before `make-frame' creates a new frame.",
+    ),
+    (
+        "before-revert-hook",
+        "Normal hook for `revert-buffer' to run before reverting.",
+    ),
+    (
+        "before-save-hook",
+        "Normal hook that is run before a buffer is saved to its file.",
+    ),
+    (
+        "beginning-of-defun-function",
+        "If non-nil, function for `beginning-of-defun-raw' to call.",
+    ),
+    (
+        "bengali-composable-pattern",
+        "Regexp matching a composable sequence of Bengali characters.",
+    ),
+    (
+        "bidi-control-characters",
+        "List of bidirectional control characters.",
+    ),
+    (
+        "bidi-directional-controls-chars",
+        "Character set that matches bidirectional formatting control characters.",
+    ),
+    (
+        "bidi-directional-non-controls-chars",
+        "Character set that matches any character except bidirectional controls.",
+    ),
+    (
+        "binary-overwrite-mode-hook",
+        "Hook run after entering or leaving `binary-overwrite-mode'.",
+    ),
+    (
+        "binhex-begin-line",
+        "Regular expression matching the start of a BinHex encoded region.",
+    ),
+    (
+        "blink-cursor-blinks",
+        "How many times to blink before using a solid cursor on NS, X, and MS-Windows.",
+    ),
+    (
+        "blink-cursor-blinks-done",
+        "Number of blinks done since we started blinking on NS, X, and MS-Windows.",
+    ),
+    (
+        "blink-cursor-delay",
+        "Seconds of idle time before the first blink of the cursor.",
+    ),
+    (
+        "blink-cursor-idle-timer",
+        "Timer started after `blink-cursor-delay' seconds of Emacs idle time.",
+    ),
+    (
+        "blink-cursor-interval",
+        "Length of cursor blink interval in seconds.",
+    ),
+    (
+        "blink-cursor-mode",
+        "Non-nil if Blink-Cursor mode is enabled.",
+    ),
+    (
+        "blink-cursor-mode-hook",
+        "Hook run after entering or leaving `blink-cursor-mode'.",
+    ),
+    (
+        "blink-cursor-timer",
+        "Timer started from `blink-cursor-start'.",
+    ),
+    (
+        "blink-matching--overlay",
+        "Overlay used to highlight the matching paren.",
+    ),
+    (
+        "blink-matching-check-function",
+        "Function to check parentheses mismatches.",
+    ),
+    (
+        "blink-matching-delay",
+        "Time in seconds to delay after showing a matching paren.",
+    ),
+    (
+        "blink-matching-paren",
+        "Non-nil means show matching open-paren when close-paren is inserted.",
+    ),
+    (
+        "blink-matching-paren-distance",
+        "If non-nil, maximum distance to search backwards for matching open-paren.",
+    ),
+    (
+        "blink-matching-paren-dont-ignore-comments",
+        "If nil, `blink-matching-paren' ignores comments.",
+    ),
+    (
+        "blink-matching-paren-highlight-offscreen",
+        "If non-nil, highlight matched off-screen open paren in the echo area.",
+    ),
+    (
+        "blink-matching-paren-on-screen",
+        "Non-nil means show matching open-paren when it is on screen.",
+    ),
+    (
+        "blink-paren-function",
+        "Function called, if non-nil, whenever a close parenthesis is inserted.",
+    ),
+    (
+        "bookmark-map",
+        "Keymap containing bindings to bookmark functions.",
+    ),
+    (
+        "break-hardlink-on-save",
+        "Whether to allow breaking hardlinks when saving files.",
+    ),
+    (
+        "browse-url-browser-function",
+        "Function to display the current buffer in a WWW browser.",
+    ),
+    (
+        "browse-url-default-handlers",
+        "Like `browse-url-handlers' but populated by Emacs and packages.",
+    ),
+    (
+        "buffer-auto-revert-by-notification",
+        "Whether a buffer can rely on notification in Auto-Revert mode.",
+    ),
+    (
+        "buffer-file-coding-system-explicit",
+        "The file coding system explicitly specified for the current buffer.",
+    ),
+    (
+        "buffer-file-number",
+        "The inode number and the device of the file visited in the current buffer.",
+    ),
+    (
+        "buffer-file-numbers-unique",
+        "Non-nil means that `buffer-file-number' uniquely identifies files.",
+    ),
+    (
+        "buffer-file-read-only",
+        "Non-nil if visited file was read-only when visited.",
+    ),
+    (
+        "buffer-navigation-repeat-map",
+        "Keymap to repeat `next-buffer' and `previous-buffer'.  Used in `repeat-mode'.",
+    ),
+    (
+        "buffer-offer-save",
+        "Non-nil in a buffer means always offer to save buffer on exiting Emacs.",
+    ),
     ("kill-ring", "List of killed text sequences."),
     (
         "kill-ring-yank-pointer",

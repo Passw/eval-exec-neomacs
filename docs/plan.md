@@ -28,6 +28,28 @@ Last updated: 2026-02-18
 
 ## Doing
 
+- Expanded startup `variable-documentation` string-property seeding with a 120-symbol oracle-backed batch (round 30):
+  - runtime changes:
+    - `rust/neovm-core/src/elisp/doc.rs`
+    - expanded `STARTUP_VARIABLE_DOC_STRING_PROPERTIES` with 120 additional non-integer startup symbols, including:
+      - `Buffer-menu-*`, `Info-*`, `ad-*`, `adaptive-fill-*`, `auto-coding-*`, `auto-save-*`, `backup-*`, `before-*`, `blink-*`, `bookmark-map`, `browse-url-*`, and `buffer-offer-save`.
+    - `rust/neovm-core/src/elisp/eval.rs`
+    - expanded `startup_string_variable_docs_are_seeded_at_startup` to lock in string-valued startup docs for newly seeded symbols (`Buffer-menu-buffer-list`, `Info-default-directory-list`, `auto-coding-alist`, `auto-save--timer`, `backup-directory-alist`, `before-init-hook`, `blink-cursor-mode`, `buffer-offer-save`) while asserting integer-doc absence for the same properties.
+  - oracle corpus changes:
+    - `test/neovm/vm-compat/cases/documentation-property-semantics.{forms,expected.tsv}`
+    - added a dedicated startup `get`-property matrix row covering the same 120-symbol string-doc batch (`(integerp/get, stringp/get)` parity).
+  - parity movement:
+    - startup `variable-documentation` type counts now:
+      - GNU Emacs oracle: `(integer=761, string=1904)`
+      - NeoVM: `(integer=761, string=152)` (improved from `string=32`).
+  - verified:
+    - `cargo test --manifest-path rust/neovm-core/Cargo.toml startup_string_variable_docs_are_seeded_at_startup` (pass)
+    - `cargo test --manifest-path rust/neovm-core/Cargo.toml documentation_property_eval_` (pass; 28 tests)
+    - `make -C test/neovm/vm-compat record FORMS=cases/documentation-property-semantics.forms EXPECTED=cases/documentation-property-semantics.expected.tsv` (pass)
+    - `make -C test/neovm/vm-compat check-one-neovm CASE=documentation-property-semantics` (pass, 50/50)
+    - `make -C test/neovm/vm-compat check-startup-doc-stub-coverage` (pass; missing=0, extra=0)
+    - `make -C test/neovm/vm-compat check-all-neovm` (pass)
+
 - Expanded startup `documentation-property` parity with a 30-symbol core batch (round 29):
   - runtime changes:
     - `rust/neovm-core/src/elisp/doc.rs`
@@ -14069,7 +14091,7 @@ Last updated: 2026-02-18
       - added `STARTUP_VARIABLE_DOC_STRING_PROPERTIES` for string-valued startup docs
     - `rust/neovm-core/src/elisp/eval.rs`
       - startup seeding now writes string `variable-documentation` properties for `kill-ring*`
-      - added unit lock-in `kill_ring_variable_docs_are_string_valued_at_startup`
+      - added unit lock-in `startup_string_variable_docs_are_seeded_at_startup`
   - oracle corpus changes:
     - `test/neovm/vm-compat/cases/documentation-property-semantics.forms`
     - `test/neovm/vm-compat/cases/documentation-property-semantics.expected.tsv`
@@ -14080,11 +14102,33 @@ Last updated: 2026-02-18
     - `test/neovm/vm-compat/cases/startup-doc-stub-extra-allowlist.txt` now empty
     - `test/neovm/vm-compat/README.md` now documents empty-allowlist steady state
   - verified:
-    - `cargo test --manifest-path rust/neovm-core/Cargo.toml kill_ring_variable_docs_are_string_valued_at_startup` (pass)
+    - `cargo test --manifest-path rust/neovm-core/Cargo.toml startup_string_variable_docs_are_seeded_at_startup` (pass)
     - `cargo test --manifest-path rust/neovm-core/Cargo.toml documentation_property_eval_` (pass, 28/28)
     - `make -C test/neovm/vm-compat record FORMS=cases/documentation-property-semantics.forms EXPECTED=cases/documentation-property-semantics.expected.tsv` (pass)
-    - `make -C test/neovm/vm-compat check-one-neovm CASE=documentation-property-semantics` (pass, 48/48)
+    - `make -C test/neovm/vm-compat check-one-neovm CASE=documentation-property-semantics` (pass, 49/49)
     - `make -C test/neovm/vm-compat check-startup-doc-stub-coverage` (pass; extra startup stubs: 0)
+    - `make -C test/neovm/vm-compat check-all-neovm` (pass)
+- Expanded startup string `variable-documentation` parity with an initial 30-symbol batch (abbrev/after-* families):
+  - runtime changes:
+    - `rust/neovm-core/src/elisp/doc.rs`
+      - expanded `STARTUP_VARIABLE_DOC_STRING_PROPERTIES` with 30 additional oracle-backed string-doc symbols:
+        - `abbrev--suggest-saved-recommendations`, `abbrev-all-caps`, `abbrev-expand-function`, `abbrev-expand-functions`, `abbrev-file-name`, `abbrev-map`, `abbrev-minor-mode-table-alist`, `abbrev-mode-hook`, `abbrev-start-location`, `abbrev-start-location-buffer`, `abbrev-suggest`, `abbrev-suggest-hint-threshold`, `abbrev-table-name-list`, `abbreviated-home-dir`, `abbrevs-changed`, `activate-mark-hook`, `after-change-major-mode-hook`, `after-focus-change-function`, `after-init-hook`, `after-load-functions`, `after-make-frame-functions`, `after-pdump-load-hook`, `after-revert-hook`, `after-save-hook`, `after-set-visited-file-name-hook`, `after-setting-font-hook`, `allout-auto-activation`, `allout-widgets-auto-activation`, `amalgamating-undo-limit`, `android-fonts-enumerated`
+      - aligned quote glyph style for selected entries to match GNU Emacs first-line text (`‘...’`)
+    - `rust/neovm-core/src/elisp/eval.rs`
+      - startup string-doc seeding test now covers both `kill-ring*` and `after-init-hook`
+  - oracle corpus changes:
+    - `test/neovm/vm-compat/cases/documentation-property-semantics.forms`
+    - `test/neovm/vm-compat/cases/documentation-property-semantics.expected.tsv`
+    - added a 30-symbol first-line prefix matrix for the new startup string-doc batch
+  - observed parity movement:
+    - startup `stringp` `variable-documentation` symbol count: NeoVM `2 -> 32` (oracle remains `1904`)
+    - startup integer-doc count remains exact parity: oracle `761`, NeoVM `761`
+  - verified:
+    - `cargo test --manifest-path rust/neovm-core/Cargo.toml startup_string_variable_docs_are_seeded_at_startup` (pass)
+    - `cargo test --manifest-path rust/neovm-core/Cargo.toml documentation_property_eval_` (pass, 28/28)
+    - `make -C test/neovm/vm-compat record FORMS=cases/documentation-property-semantics.forms EXPECTED=cases/documentation-property-semantics.expected.tsv` (pass)
+    - `make -C test/neovm/vm-compat check-one-neovm CASE=documentation-property-semantics` (pass, 49/49)
+    - `make -C test/neovm/vm-compat check-startup-doc-stub-coverage` (pass)
     - `make -C test/neovm/vm-compat check-all-neovm` (pass)
 
 ## Doing

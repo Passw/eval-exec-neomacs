@@ -3698,17 +3698,53 @@ mod tests {
     }
 
     #[test]
-    fn kill_ring_variable_docs_are_string_valued_at_startup() {
+    fn startup_string_variable_docs_are_seeded_at_startup() {
         let results = eval_all(
             "(stringp (get 'kill-ring 'variable-documentation))
              (integerp (get 'kill-ring 'variable-documentation))
              (stringp (get 'kill-ring-yank-pointer 'variable-documentation))
-             (integerp (get 'kill-ring-yank-pointer 'variable-documentation))",
+             (integerp (get 'kill-ring-yank-pointer 'variable-documentation))
+             (stringp (get 'after-init-hook 'variable-documentation))
+             (integerp (get 'after-init-hook 'variable-documentation))
+             (stringp (get 'Buffer-menu-buffer-list 'variable-documentation))
+             (integerp (get 'Buffer-menu-buffer-list 'variable-documentation))
+             (stringp (get 'Info-default-directory-list 'variable-documentation))
+             (integerp (get 'Info-default-directory-list 'variable-documentation))
+             (stringp (get 'auto-coding-alist 'variable-documentation))
+             (integerp (get 'auto-coding-alist 'variable-documentation))
+             (stringp (get 'auto-save--timer 'variable-documentation))
+             (integerp (get 'auto-save--timer 'variable-documentation))
+             (stringp (get 'backup-directory-alist 'variable-documentation))
+             (integerp (get 'backup-directory-alist 'variable-documentation))
+             (stringp (get 'before-init-hook 'variable-documentation))
+             (integerp (get 'before-init-hook 'variable-documentation))
+             (stringp (get 'blink-cursor-mode 'variable-documentation))
+             (integerp (get 'blink-cursor-mode 'variable-documentation))
+             (stringp (get 'buffer-offer-save 'variable-documentation))
+             (integerp (get 'buffer-offer-save 'variable-documentation))",
         );
         assert_eq!(results[0], "OK t");
         assert_eq!(results[1], "OK nil");
         assert_eq!(results[2], "OK t");
         assert_eq!(results[3], "OK nil");
+        assert_eq!(results[4], "OK t");
+        assert_eq!(results[5], "OK nil");
+        assert_eq!(results[6], "OK t");
+        assert_eq!(results[7], "OK nil");
+        assert_eq!(results[8], "OK t");
+        assert_eq!(results[9], "OK nil");
+        assert_eq!(results[10], "OK t");
+        assert_eq!(results[11], "OK nil");
+        assert_eq!(results[12], "OK t");
+        assert_eq!(results[13], "OK nil");
+        assert_eq!(results[14], "OK t");
+        assert_eq!(results[15], "OK nil");
+        assert_eq!(results[16], "OK t");
+        assert_eq!(results[17], "OK nil");
+        assert_eq!(results[18], "OK t");
+        assert_eq!(results[19], "OK nil");
+        assert_eq!(results[20], "OK t");
+        assert_eq!(results[21], "OK nil");
     }
 
     #[test]
