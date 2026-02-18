@@ -2,7 +2,9 @@
 2	(condition-case err (describe-function 'vm-desc-fn-missing) (error (car err)))	OK void-function
 3	(progn (fset 'vm-desc-fn (lambda nil 1)) (stringp (describe-function 'vm-desc-fn)))	OK t
 4	(not (null (string-match-p "special-form" (downcase (describe-function 'if)))))	OK t
-5	(progn (fset 'vm-desc-fn-kmacro "abc") (not (null (string-match-p "keyboard macro" (downcase (describe-function 'vm-desc-fn-kmacro))))))	OK t
-6	(progn (fset 'vm-desc-fn-macro (cons 'macro (cons '(lambda nil "m" nil) nil))) (not (null (string-match-p "lisp macro" (downcase (describe-function 'vm-desc-fn-macro))))))	OK t
-7	(condition-case err (describe-function 1) (error (car err)))	OK wrong-type-argument
-8	(condition-case err (describe-function) (error (car err)))	OK wrong-number-of-arguments
+5	(progn (autoload 'vm-desc-fn-auto "files" "doc" nil nil) (not (null (string-match-p "lisp function" (downcase (describe-function 'vm-desc-fn-auto))))))	OK t
+6	(progn (autoload 'vm-desc-fn-auto-m "files" "doc" nil 'macro) (not (null (string-match-p "lisp macro" (downcase (describe-function 'vm-desc-fn-auto-m))))))	OK t
+7	(progn (fset 'vm-desc-fn-kmacro "abc") (not (null (string-match-p "keyboard macro" (downcase (describe-function 'vm-desc-fn-kmacro))))))	OK t
+8	(progn (fset 'vm-desc-fn-macro (cons 'macro (cons '(lambda nil "m" nil) nil))) (not (null (string-match-p "lisp macro" (downcase (describe-function 'vm-desc-fn-macro))))))	OK t
+9	(condition-case err (describe-function 1) (error (car err)))	OK wrong-type-argument
+10	(condition-case err (describe-function) (error (car err)))	OK wrong-number-of-arguments

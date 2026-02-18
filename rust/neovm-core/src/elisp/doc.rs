@@ -203,8 +203,16 @@ pub(crate) fn builtin_describe_function(
 
     // Reuse symbol-function resolution so builtins and wrapper-backed callables
     // are visible here even when not explicitly interned in the function cell.
-    let func_val =
+    let mut func_val =
         super::builtins::builtin_symbol_function(eval, vec![Value::symbol(name.clone())])?;
+    if let Some(alias_name) = func_val.as_symbol_name() {
+        let indirect =
+            super::builtins::builtin_indirect_function(eval, vec![Value::symbol(alias_name)])?;
+        if !indirect.is_nil() {
+            func_val = indirect;
+        }
+    }
+
     if func_val.is_nil() {
         return Err(signal("void-function", vec![Value::symbol(&name)]));
     }
@@ -228,6 +236,15 @@ fn describe_function_kind(function: &Value) -> &'static str {
         Value::ByteCode(_) => "Compiled Lisp function",
         Value::Str(_) | Value::Vector(_) => "Keyboard macro",
         Value::Cons(cell) => {
+            if super::autoload::is_autoload_value(function) {
+                if let Some(items) = list_to_vec(function) {
+                    if matches!(items.get(4).and_then(Value::as_symbol_name), Some("macro")) {
+                        return "Lisp macro";
+                    }
+                }
+                return "Lisp function";
+            }
+
             let pair = match cell.lock() {
                 Ok(pair) => pair,
                 Err(_) => return "Lisp function",
@@ -2188,6 +2205,39 @@ mod tests {
 
         let result =
             builtin_describe_function(&mut evaluator, vec![Value::symbol("vm-macro-marker")]);
+        assert!(result.is_ok());
+        assert_eq!(result.unwrap().as_str(), Some("Lisp macro"));
+    }
+
+    #[test]
+    fn describe_function_alias_resolves_builtin_kind() {
+        let mut evaluator = super::super::eval::Evaluator::new();
+        evaluator
+            .obarray
+            .set_symbol_function("vm-alias-car", Value::symbol("car"));
+
+        let result =
+            builtin_describe_function(&mut evaluator, vec![Value::symbol("vm-alias-car")]);
+        assert!(result.is_ok());
+        assert_eq!(result.unwrap().as_str(), Some("Built-in function"));
+    }
+
+    #[test]
+    fn describe_function_autoload_macro_form() {
+        let mut evaluator = super::super::eval::Evaluator::new();
+        let autoload_macro = Value::list(vec![
+            Value::symbol("autoload"),
+            Value::string("files"),
+            Value::string("doc"),
+            Value::Nil,
+            Value::symbol("macro"),
+        ]);
+        evaluator
+            .obarray
+            .set_symbol_function("vm-autoload-macro", autoload_macro);
+
+        let result =
+            builtin_describe_function(&mut evaluator, vec![Value::symbol("vm-autoload-macro")]);
         assert!(result.is_ok());
         assert_eq!(result.unwrap().as_str(), Some("Lisp macro"));
     }
