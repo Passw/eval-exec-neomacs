@@ -28,6 +28,15 @@ Last updated: 2026-02-18
 
 ## Doing
 
+- Expanded `read-char-exclusive` vector tail lock-ins with deeper payload depth (round 2):
+  - oracle corpus changes:
+    - `test/neovm/vm-compat/cases/read-char-exclusive-vector-tail-semantics.forms`
+    - `test/neovm/vm-compat/cases/read-char-exclusive-vector-tail-semantics.expected.tsv`
+    - added deeper-tail probe `(list 97 98 99 100 101 [mouse-1])`.
+  - verified:
+    - `make -C test/neovm/vm-compat check-one-neovm CASE=cases/read-char-exclusive-vector-tail-semantics` (pass, 6/6)
+    - `make -C test/neovm/vm-compat check-all-neovm` (pass)
+
 - Expanded `read-char` non-character-vector tail lock-ins with deeper payload depth (round 2):
   - oracle corpus changes:
     - `test/neovm/vm-compat/cases/read-char-non-character-vector-tail-semantics.forms`
