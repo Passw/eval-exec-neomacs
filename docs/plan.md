@@ -28,6 +28,12 @@ Last updated: 2026-02-18
 
 ## Doing
 
+- Extended `help-function-arglist` non-preserve parity for core helper shapes:
+  - Updated `rust/neovm-core/src/elisp/doc.rs` non-preserve mappings for `equal`, `substring`, `aref`, `aset`, `make-string`, `format`, and `funcall` to mirror Oracle positional arglists.
+  - Expanded evaluator unit coverage in `help_function_arglist_eval_subr_arity_fallback_shapes` for representative non-preserve shapes.
+  - Extended oracle lock-in case `cases/help-function-arglist-subr-runtime-semantics`.
+  - Validated via `cargo test --manifest-path rust/neovm-core/Cargo.toml help_function_arglist`, `make -C test/neovm/vm-compat check-one-neovm CASE=cases/help-function-arglist-subr-runtime-semantics`, and full `make -C test/neovm/vm-compat check-all-neovm`.
+
 - Extended `help-function-arglist` preserve-names parity for `mapcar` function-form shape:
   - Updated `rust/neovm-core/src/elisp/doc.rs` to return `(function sequence)` for preserve-name `mapcar`, matching Oracle printed shape `#'sequence`.
   - Expanded evaluator unit coverage in `help_function_arglist_eval_preserve_names_core_subrs` for `mapcar`.
