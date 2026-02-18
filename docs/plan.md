@@ -28,6 +28,12 @@ Last updated: 2026-02-18
 
 ## Doing
 
+- Completed `help-function-arglist` runtime builtin/special-form parity slice:
+  - Updated dispatch to use evaluator-backed resolution for `help-function-arglist`, enabling runtime alias and wrapper-aware behavior.
+  - Expanded `rust/neovm-core/src/elisp/doc.rs` arglist mapping for key core callables (`car`, `if`, `documentation`) and autoload-placeholder response paths (`describe-function`, `describe-variable`).
+  - Added oracle lock-in case `cases/help-function-arglist-runtime-semantics` and wired it into `test/neovm/vm-compat/cases/default.list`.
+  - Validated via `cargo test --manifest-path rust/neovm-core/Cargo.toml help_function_arglist`, `make -C test/neovm/vm-compat check-one-neovm CASE=cases/help-function-arglist-runtime-semantics`, and full `make -C test/neovm/vm-compat check-all-neovm`.
+
 - Completed `documentation` runtime alias-to-builtin parity follow-up:
   - Updated `rust/neovm-core/src/elisp/doc.rs` so symbol aliases created via function cells (for example `(fset 'alias 'car)`) are resolved through `indirect-function` semantics before doc extraction.
   - Added evaluator unit coverage: `documentation_symbol_alias_to_builtin_returns_docstring`.
