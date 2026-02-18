@@ -601,6 +601,54 @@ fn help_arglist_from_subr_name(name: &str, preserve_names: bool) -> Option<Value
         });
     }
 
+    if preserve_names && name == "assq" {
+        return Some(help_arglist(&["key", "alist"], &[], None));
+    }
+
+    if preserve_names && name == "assoc" {
+        return Some(help_arglist(&["key", "alist"], &["testfn"], None));
+    }
+
+    if preserve_names && (name == "memq" || name == "member") {
+        return Some(help_arglist(&["elt", "list"], &[], None));
+    }
+
+    if preserve_names && name == "equal" {
+        return Some(help_arglist(&["o1", "o2"], &[], None));
+    }
+
+    if preserve_names && name == "string-match" {
+        return Some(help_arglist(
+            &["regexp", "string"],
+            &["start", "inhibit-modify"],
+            None,
+        ));
+    }
+
+    if preserve_names && name == "substring" {
+        return Some(help_arglist(&["string"], &["from", "to"], None));
+    }
+
+    if preserve_names && name == "aref" {
+        return Some(help_arglist(&["array", "idx"], &[], None));
+    }
+
+    if preserve_names && name == "aset" {
+        return Some(help_arglist(&["array", "idx", "newelt"], &[], None));
+    }
+
+    if preserve_names && name == "make-string" {
+        return Some(help_arglist(&["length", "init"], &["multibyte"], None));
+    }
+
+    if preserve_names && name == "read-from-string" {
+        return Some(help_arglist(&["string"], &["start", "end"], None));
+    }
+
+    if preserve_names && name == "funcall" {
+        return Some(help_arglist(&["function"], &[], Some("arguments")));
+    }
+
     if name == "symbol-function" || name == "fboundp" {
         return Some(if preserve_names {
             help_arglist(&["symbol"], &[], None)
@@ -1374,6 +1422,76 @@ mod tests {
         .unwrap();
         assert_eq!(
             arglist_names(&apply),
+            vec![
+                "function".to_string(),
+                "&rest".to_string(),
+                "arguments".to_string()
+            ]
+        );
+
+        let assq = builtin_help_function_arglist_eval(
+            &mut evaluator,
+            vec![Value::symbol("assq"), Value::True],
+        )
+        .unwrap();
+        assert_eq!(
+            arglist_names(&assq),
+            vec!["key".to_string(), "alist".to_string()]
+        );
+
+        let string_match = builtin_help_function_arglist_eval(
+            &mut evaluator,
+            vec![Value::symbol("string-match"), Value::True],
+        )
+        .unwrap();
+        assert_eq!(
+            arglist_names(&string_match),
+            vec![
+                "regexp".to_string(),
+                "string".to_string(),
+                "&optional".to_string(),
+                "start".to_string(),
+                "inhibit-modify".to_string()
+            ]
+        );
+
+        let make_string = builtin_help_function_arglist_eval(
+            &mut evaluator,
+            vec![Value::symbol("make-string"), Value::True],
+        )
+        .unwrap();
+        assert_eq!(
+            arglist_names(&make_string),
+            vec![
+                "length".to_string(),
+                "init".to_string(),
+                "&optional".to_string(),
+                "multibyte".to_string()
+            ]
+        );
+
+        let read_from_string = builtin_help_function_arglist_eval(
+            &mut evaluator,
+            vec![Value::symbol("read-from-string"), Value::True],
+        )
+        .unwrap();
+        assert_eq!(
+            arglist_names(&read_from_string),
+            vec![
+                "string".to_string(),
+                "&optional".to_string(),
+                "start".to_string(),
+                "end".to_string()
+            ]
+        );
+
+        let funcall = builtin_help_function_arglist_eval(
+            &mut evaluator,
+            vec![Value::symbol("funcall"), Value::True],
+        )
+        .unwrap();
+        assert_eq!(
+            arglist_names(&funcall),
             vec![
                 "function".to_string(),
                 "&rest".to_string(),
