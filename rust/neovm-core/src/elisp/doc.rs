@@ -180,6 +180,31 @@ fn eval_documentation_property_value(
     eval.eval(&expr)
 }
 
+fn startup_variable_doc_offset_symbol(sym: &str, prop: &str, value: &Value) -> bool {
+    prop == "variable-documentation"
+        && matches!(value, Value::Int(_))
+        && matches!(
+            sym,
+            "load-path"
+                | "load-history"
+                | "features"
+                | "debug-on-error"
+                | "default-directory"
+                | "load-file-name"
+                | "noninteractive"
+                | "inhibit-quit"
+                | "print-length"
+                | "print-level"
+                | "standard-output"
+                | "buffer-read-only"
+                | "kill-ring"
+                | "kill-ring-yank-pointer"
+                | "last-command"
+                | "lexical-binding"
+                | "load-prefer-newer"
+        )
+}
+
 /// `(describe-function FUNCTION)` -- return a short description string.
 ///
 /// This is a simplified stub that returns a type description of the function.
@@ -369,9 +394,9 @@ pub(crate) fn builtin_documentation_property_eval(
     };
 
     match eval.obarray.get_property(sym, prop).cloned() {
-        Some(Value::Int(_)) if sym == "load-path" && prop == "variable-documentation" => {
-            Ok(Value::string("load-path is a variable defined in `C source code`."))
-        }
+        Some(value) if startup_variable_doc_offset_symbol(sym, prop, &value) => Ok(
+            Value::string(format!("{sym} is a variable defined in `C source code`.")),
+        ),
         Some(value) => eval_documentation_property_value(eval, value),
         _ => Ok(Value::Nil),
     }
@@ -2600,6 +2625,20 @@ mod tests {
             &mut evaluator,
             vec![
                 Value::symbol("load-path"),
+                Value::symbol("variable-documentation"),
+            ],
+        )
+        .unwrap();
+        assert!(result.as_str().is_some_and(|s| s.contains("defined in")));
+    }
+
+    #[test]
+    fn documentation_property_eval_debug_on_error_integer_property_returns_string() {
+        let mut evaluator = super::super::eval::Evaluator::new();
+        let result = builtin_documentation_property_eval(
+            &mut evaluator,
+            vec![
+                Value::symbol("debug-on-error"),
                 Value::symbol("variable-documentation"),
             ],
         )

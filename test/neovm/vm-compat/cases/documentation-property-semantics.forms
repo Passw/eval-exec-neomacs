@@ -1,6 +1,7 @@
 (documentation-property 'vm-docprop-symbol 'variable-documentation)
 (stringp (documentation-property 'load-path 'variable-documentation))
 (stringp (documentation-property 'load-path 'variable-documentation t))
+(mapcar (lambda (s) (let ((v (documentation-property s 'variable-documentation))) (list s (stringp v) (null v)))) '(load-path load-history features debug-on-error default-directory load-file-name noninteractive inhibit-quit print-length print-level standard-output buffer-read-only kill-ring kill-ring-yank-pointer last-command lexical-binding load-prefer-newer))
 (progn (put 'vm-docprop-symbol 'variable-documentation "doc") (documentation-property 'vm-docprop-symbol 'variable-documentation))
 (progn (put 'vm-docprop-symbol 'variable-documentation 9) (documentation-property 'vm-docprop-symbol 'variable-documentation))
 (progn (put 'vm-docprop-symbol 'function-documentation "fdoc") (documentation-property 'vm-docprop-symbol 'function-documentation))
