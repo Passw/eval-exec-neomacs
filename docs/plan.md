@@ -10455,6 +10455,20 @@ Last updated: 2026-02-18
     - `make -C test/neovm/vm-compat check-one-neovm CASE=display-control-runtime-semantics` (pass, 17/17)
     - `make -C test/neovm/vm-compat validate-case-lists` (pass)
     - `make -C test/neovm/vm-compat check-all-neovm` (pass)
+- Refined `describe-variable` arity handling to match GNU Emacs:
+  - runtime changes:
+    - `describe-variable` now accepts 1 to 3 arguments
+    - continues to signal `wrong-number-of-arguments` for 0 or 4+ arguments
+    - preserves existing non-symbol `user-error` behavior and value/void string paths
+  - expanded oracle corpus:
+    - `test/neovm/vm-compat/cases/describe-variable-runtime-semantics.forms`
+    - `test/neovm/vm-compat/cases/describe-variable-runtime-semantics.expected.tsv`
+    - added 3-argument success probe and 4-argument arity-error probe
+  - verified:
+    - `cargo test --manifest-path rust/neovm-core/Cargo.toml describe_variable` (pass)
+    - `make -C test/neovm/vm-compat record FORMS=cases/describe-variable-runtime-semantics.forms EXPECTED=cases/describe-variable-runtime-semantics.expected.tsv` (pass)
+    - `make -C test/neovm/vm-compat check-one-neovm CASE=cases/describe-variable-runtime-semantics` (pass, 7/7)
+    - `make -C test/neovm/vm-compat check-all-neovm` (pass)
 - Aligned `help-function-arglist` quoted-designator runtime semantics with GNU Emacs:
   - runtime changes:
     - quoted lambda designators now return their raw argument spec (`(lambda x ...) -> x`, `(lambda (x y) ...) -> (x y)`)
