@@ -1,0 +1,4 @@
+# Startup variable-doc stub symbols intentionally outside current oracle
+# integer-doc set. Keep this list minimal; gate fails on stale entries.
+kill-ring
+kill-ring-yank-pointer

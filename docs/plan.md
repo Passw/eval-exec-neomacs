@@ -14048,6 +14048,22 @@ Last updated: 2026-02-18
   - verified:
     - `make -C test/neovm/vm-compat check-startup-doc-stub-coverage` (pass, missing startup stubs: 0)
     - `make -C test/neovm/vm-compat check-all-neovm` (pass with startup-doc coverage gate enabled)
+- Tightened startup-doc coverage guardrail with explicit extra-stub allowlist enforcement:
+  - runtime/tooling changes:
+    - updated `test/neovm/vm-compat/check-startup-doc-stub-coverage.sh`
+      - requires an allowlist file for extra startup stubs
+      - fails on unexpected extra stubs (extra symbol not in allowlist)
+      - fails on stale allowlist entries (allowlisted symbol no longer extra)
+      - keeps optional extra listing via `SHOW_EXTRA_STUBS=1`
+    - added `test/neovm/vm-compat/cases/startup-doc-stub-extra-allowlist.txt`
+      - current allowlisted extras:
+        - `kill-ring`
+        - `kill-ring-yank-pointer`
+    - documented allowlist behavior in `test/neovm/vm-compat/README.md`
+  - verified:
+    - `make -C test/neovm/vm-compat check-startup-doc-stub-coverage` (pass)
+    - `SHOW_EXTRA_STUBS=1 test/neovm/vm-compat/check-startup-doc-stub-coverage.sh` (pass; extra list prints allowlisted symbols)
+    - `make -C test/neovm/vm-compat check-all-neovm` (pass with allowlist enforcement)
 
 ## Doing
 
