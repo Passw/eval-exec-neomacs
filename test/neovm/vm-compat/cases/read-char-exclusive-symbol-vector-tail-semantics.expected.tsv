@@ -3,4 +3,5 @@
 3	(condition-case err (progn (setq unread-command-events (list 'foo 98 [bar] [baz])) (read-char-exclusive nil nil 0)) (error (list (car err) unread-command-events)))	OK 98
 4	(condition-case err (progn (setq unread-command-events (list 'foo 98 [bar] [baz] [qux])) (read-char-exclusive nil nil 0)) (error (list (car err) unread-command-events)))	OK 98
 5	(condition-case err (progn (setq unread-command-events (list 'foo 98 [bar] [baz] [qux] [quux])) (read-char-exclusive nil nil 0)) (error (list (car err) unread-command-events)))	OK 98
-6	(condition-case err (progn (setq unread-command-events '(foo . [bar])) (read-char-exclusive nil nil 0)) (error (list (car err) unread-command-events)))	OK nil
+6	(condition-case err (progn (setq unread-command-events (list 'foo 98 [bar] [baz] [qux] [quux] [quuz])) (read-char-exclusive nil nil 0)) (error (list (car err) unread-command-events)))	OK 98
+7	(condition-case err (progn (setq unread-command-events '(foo . [bar])) (read-char-exclusive nil nil 0)) (error (list (car err) unread-command-events)))	OK nil
