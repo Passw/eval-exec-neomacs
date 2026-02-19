@@ -57,6 +57,7 @@ fn expect_frame_designator(_name: &str, value: &Value) -> Result<(), Flow> {
     match value {
         Value::Nil => Ok(()),
         Value::Int(id) if *id >= 0 && (*id as u64) >= FRAME_ID_BASE => Ok(()),
+        Value::Frame(id) if *id >= FRAME_ID_BASE => Ok(()),
         _ => Err(signal(
             "wrong-type-argument",
             vec![Value::symbol("frame-live-p"), value.clone()],

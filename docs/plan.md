@@ -28,6 +28,26 @@ Last updated: 2026-02-19
 
 ## Doing
 
+- Aligned frame-returning APIs to frame-handle object semantics end-to-end:
+  - runtime changes:
+    - `rust/neovm-core/src/elisp/window_cmds.rs`
+      - `selected-frame`, `window-frame`, `frame-list`, `make-frame`, and `select-frame` now return `Value::Frame`.
+      - `window-list` FRAME argument now accepts `Value::Frame` designators.
+    - `rust/neovm-core/src/elisp/xdisp.rs`, `rust/neovm-core/src/elisp/image.rs`, `rust/neovm-core/src/elisp/font.rs`
+      - optional frame/designator validation now accepts frame-handle objects where oracle accepts frame designators.
+      - fixed `color-defined-p` / `color-values` / `defined-colors` optional FRAME and `internal-merge-in-global-face` FRAME checks after `selected-frame` handle migration.
+  - corpus changes:
+    - added and wired:
+      - `test/neovm/vm-compat/cases/frame-object-return-semantics.{forms,expected.tsv}`
+      - `test/neovm/vm-compat/cases/default.list`
+  - verified:
+    - `cargo test --manifest-path rust/neovm-core/Cargo.toml selected_frame_returns_frame_handle -- --nocapture` (pass)
+    - `cargo test --manifest-path rust/neovm-core/Cargo.toml frame_builtins_accept_frame_handle_values -- --nocapture` (pass)
+    - `make -C test/neovm/vm-compat check-one-neovm CASE=cases/frame-object-return-semantics` (pass, `4/4`)
+    - `make -C test/neovm/vm-compat check-one-neovm CASE=cases/font-color-semantics` (pass, `35/35`)
+    - `make -C test/neovm/vm-compat check-one-neovm CASE=cases/internal-merge-in-global-face-semantics` (pass, `32/32`)
+    - `make -C test/neovm/vm-compat check-all-neovm-strict` (pass; case inventory `763`)
+
 - Aligned monitor `frames` payload semantics to frame-handle objects (instead of integers):
   - runtime changes:
     - `rust/neovm-core/src/elisp/value.rs`

@@ -374,10 +374,18 @@ fn validate_optional_frame_designator(
     if frameish.is_nil() {
         return Ok(());
     }
-    if let Value::Int(id) = frameish {
-        if *id >= 0 && eval.frames.get(FrameId(*id as u64)).is_some() {
-            return Ok(());
+    match frameish {
+        Value::Int(id) if *id >= 0 => {
+            if eval.frames.get(FrameId(*id as u64)).is_some() {
+                return Ok(());
+            }
         }
+        Value::Frame(id) => {
+            if eval.frames.get(FrameId(*id)).is_some() {
+                return Ok(());
+            }
+        }
+        _ => {}
     }
     Err(signal(
         "wrong-type-argument",

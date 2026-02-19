@@ -19,7 +19,7 @@ use std::sync::{Mutex, OnceLock};
 
 use super::error::{signal, EvalResult, Flow};
 use super::value::*;
-use crate::window::FrameId;
+use crate::window::{FrameId, FRAME_ID_BASE};
 
 // ---------------------------------------------------------------------------
 // Argument helpers (local to this module)
@@ -61,6 +61,7 @@ fn expect_max_args(name: &str, args: &[Value], max: usize) -> Result<(), Flow> {
 fn live_frame_designator_p(eval: &mut super::eval::Evaluator, value: &Value) -> bool {
     match value {
         Value::Int(id) if *id >= 0 => eval.frames.get(FrameId(*id as u64)).is_some(),
+        Value::Frame(id) => eval.frames.get(FrameId(*id)).is_some(),
         _ => false,
     }
 }
@@ -78,6 +79,14 @@ fn expect_optional_frame_designator_eval(
         }
     }
     Ok(())
+}
+
+fn frame_device_designator_p(value: &Value) -> bool {
+    match value {
+        Value::Int(id) => *id >= FRAME_ID_BASE as i64,
+        Value::Frame(id) => *id >= FRAME_ID_BASE,
+        _ => false,
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -1583,7 +1592,7 @@ pub(crate) fn builtin_internal_lisp_face_empty_p(args: Vec<Value>) -> EvalResult
 /// overrides into selected-frame face state.
 pub(crate) fn builtin_internal_merge_in_global_face(args: Vec<Value>) -> EvalResult {
     expect_args("internal-merge-in-global-face", &args, 2)?;
-    if !matches!(args[1], Value::Int(n) if n > 0) {
+    if !frame_device_designator_p(&args[1]) {
         return Err(signal(
             "wrong-type-argument",
             vec![Value::symbol("frame-live-p"), args[1].clone()],
@@ -1768,8 +1777,7 @@ fn invalid_get_device_terminal_error(value: &Value) -> Flow {
 fn color_device_designator_p(value: &Value) -> bool {
     match value {
         Value::Nil => true,
-        Value::Int(id) => *id >= crate::window::FRAME_ID_BASE as i64,
-        _ => false,
+        other => frame_device_designator_p(other),
     }
 }
 
@@ -2470,6 +2478,11 @@ mod tests {
         let result =
             builtin_internal_merge_in_global_face(vec![Value::symbol("default"), Value::Nil]);
         assert!(result.is_err());
+        let frame_handle_result = builtin_internal_merge_in_global_face(vec![
+            Value::symbol("default"),
+            Value::Frame(1),
+        ]);
+        assert!(frame_handle_result.is_err());
     }
 
     #[test]
@@ -2483,8 +2496,11 @@ mod tests {
             Value::True,
         ])
         .unwrap();
-        let merged =
-            builtin_internal_merge_in_global_face(vec![face.clone(), Value::Int(1)]).unwrap();
+        let merged = builtin_internal_merge_in_global_face(vec![
+            face.clone(),
+            Value::Frame(FRAME_ID_BASE),
+        ])
+        .unwrap();
         assert!(merged.is_nil());
         let got = builtin_internal_get_lisp_face_attribute(vec![
             face.clone(),
@@ -2577,6 +2593,17 @@ mod tests {
         assert!(builtin_color_defined_p(vec![Value::string("red"), Value::Int(1)]).is_err());
         assert!(builtin_color_values(vec![Value::string("red"), Value::Int(1)]).is_err());
         assert!(builtin_defined_colors(vec![Value::Int(1)]).is_err());
+        assert!(builtin_color_defined_p(vec![Value::string("red"), Value::Frame(1)]).is_err());
+        assert!(builtin_color_values(vec![Value::string("red"), Value::Frame(1)]).is_err());
+        assert!(builtin_defined_colors(vec![Value::Frame(1)]).is_err());
+        assert!(
+            builtin_color_defined_p(vec![Value::string("red"), Value::Frame(FRAME_ID_BASE)])
+                .is_ok()
+        );
+        assert!(
+            builtin_color_values(vec![Value::string("red"), Value::Frame(FRAME_ID_BASE)]).is_ok()
+        );
+        assert!(builtin_defined_colors(vec![Value::Frame(FRAME_ID_BASE)]).is_ok());
     }
 
     #[test]

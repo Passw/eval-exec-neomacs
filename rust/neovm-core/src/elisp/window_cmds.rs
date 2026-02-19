@@ -816,7 +816,7 @@ pub(crate) fn builtin_window_frame(
 ) -> EvalResult {
     expect_max_args("window-frame", &args, 1)?;
     let (fid, _wid) = resolve_window_id_with_pred(eval, args.first(), "window-valid-p")?;
-    Ok(Value::Int(fid.0 as i64))
+    Ok(Value::Frame(fid.0))
 }
 
 /// `(window-buffer &optional WINDOW)` -> buffer object.
@@ -1895,6 +1895,17 @@ pub(crate) fn builtin_window_list(
                 ));
             }
         }
+        Some(Value::Frame(id)) => {
+            let fid = FrameId(*id);
+            if eval.frames.get(fid).is_some() {
+                fid
+            } else {
+                return Err(signal(
+                    "error",
+                    vec![Value::string("Window is on a different frame")],
+                ));
+            }
+        }
         Some(_) => {
             return Err(signal(
                 "error",
@@ -2608,14 +2619,14 @@ pub(crate) fn builtin_pop_to_buffer(
 // Frame operations
 // ===========================================================================
 
-/// `(selected-frame)` -> frame id (int).
+/// `(selected-frame)` -> frame object.
 pub(crate) fn builtin_selected_frame(
     eval: &mut super::eval::Evaluator,
     args: Vec<Value>,
 ) -> EvalResult {
     expect_args("selected-frame", &args, 0)?;
     let fid = ensure_selected_frame_id(eval);
-    Ok(Value::Int(fid.0 as i64))
+    Ok(Value::Frame(fid.0))
 }
 
 /// `(select-frame FRAME &optional NORECORD)` -> frame.
@@ -2667,7 +2678,7 @@ pub(crate) fn builtin_select_frame(
     {
         eval.buffers.set_current(buf_id);
     }
-    Ok(Value::Int(fid.0 as i64))
+    Ok(Value::Frame(fid.0))
 }
 
 /// `(select-frame-set-input-focus FRAME &optional NORECORD)` -> nil.
@@ -2722,7 +2733,7 @@ pub(crate) fn builtin_select_frame_set_input_focus(
     Ok(Value::Nil)
 }
 
-/// `(frame-list)` -> list of frame ids.
+/// `(frame-list)` -> list of frame objects.
 pub(crate) fn builtin_frame_list(
     eval: &mut super::eval::Evaluator,
     args: Vec<Value>,
@@ -2733,7 +2744,7 @@ pub(crate) fn builtin_frame_list(
         .frames
         .frame_list()
         .into_iter()
-        .map(|fid| Value::Int(fid.0 as i64))
+        .map(|fid| Value::Frame(fid.0))
         .collect();
     Ok(Value::list(ids))
 }
@@ -2789,7 +2800,7 @@ pub(crate) fn builtin_make_frame(
         .map(|b| b.id)
         .unwrap_or(BufferId(0));
     let fid = eval.frames.create_frame(&name, width, height, buf_id);
-    Ok(Value::Int(fid.0 as i64))
+    Ok(Value::Frame(fid.0))
 }
 
 /// `(delete-frame &optional FRAME FORCE)` -> nil.
@@ -4854,11 +4865,15 @@ mod tests {
     }
 
     #[test]
-    fn selected_frame_returns_int() {
-        let r = eval_one_with_frame("(selected-frame)");
-        assert!(r.starts_with("OK "));
-        let val: i64 = r.strip_prefix("OK ").unwrap().trim().parse().unwrap();
-        assert!(val > 0);
+    fn selected_frame_returns_frame_handle() {
+        let r = eval_one_with_frame(
+            "(let ((f (selected-frame)))
+               (list (framep f)
+                     (frame-live-p f)
+                     (integerp f)
+                     (eq f (window-frame))))",
+        );
+        assert_eq!(r, "OK (t t nil t)");
     }
 
     #[test]
@@ -4931,7 +4946,7 @@ mod tests {
         );
         assert_eq!(
             super::builtin_select_frame(&mut ev, vec![frame.clone()]).unwrap(),
-            Value::Int(fid.0 as i64)
+            Value::Frame(fid.0)
         );
         assert_eq!(
             super::builtin_select_frame_set_input_focus(&mut ev, vec![frame]).unwrap(),
