@@ -465,6 +465,7 @@ cases/select-frame-set-input-focus-semantics
 cases/window-designator-bootstrap-semantics
 cases/window-size-query-semantics
 cases/window-list-frame-designator-semantics
+cases/window-list-minibuf-all-frames-semantics
 cases/get-buffer-window-optional-buffer-semantics
 cases/other-buffer-semantics
 cases/kill-buffer-runtime-semantics

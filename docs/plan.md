@@ -3832,6 +3832,34 @@ Last updated: 2026-02-19
     - `cargo test --manifest-path rust/neovm-core/Cargo.toml window_list_bootstraps_and_rejects_non_nil_frame_designators -- --nocapture` (pass)
     - `make -C test/neovm/vm-compat check-one-neovm CASE=cases/window-list-frame-designator-semantics` (pass)
 
+- Aligned `window-list` `FRAME`/`MINIBUF`/`ALL-FRAMES` batch semantics with GNU Emacs:
+  - updated runtime behavior:
+    - `rust/neovm-core/src/elisp/window_cmds.rs`
+    - `window-list` now accepts `(selected-frame)` as the `FRAME` argument in batch mode while preserving `(error "Window is on a different frame")` for non-frame designators.
+    - `MINIBUF=t` now includes the frame minibuffer window in returned IDs; non-`t` non-`nil` values remain excluded in batch parity paths.
+    - `ALL-FRAMES` validation now matches GNU Emacs precedence and payload shape:
+      - validated before `FRAME` mismatch signaling.
+      - live window designators accepted.
+      - non-window designators signal `(wrong-type-argument windowp VALUE)`.
+      - stale window-object designators signal `(wrong-type-argument window-live-p VALUE)`.
+  - updated frame/window bookkeeping:
+    - `rust/neovm-core/src/window.rs`
+    - introduced a synthetic minibuffer window-id domain (`MINIBUFFER_WINDOW_ID_BASE`) so each frame has a stable minibuffer window ID without perturbing normal leaf window ID allocation.
+    - `find_window_frame_id` now recognizes minibuffer window IDs as live frame-associated windows.
+    - `delete_frame` now marks minibuffer window IDs as stale window objects.
+  - added evaluator regression:
+    - `window_list_matches_frame_minibuffer_and_all_frames_batch_semantics`
+  - added oracle corpus case:
+    - `test/neovm/vm-compat/cases/window-list-minibuf-all-frames-semantics.{forms,expected.tsv}`
+    - wired into:
+      - `test/neovm/vm-compat/cases/default.list`
+  - verified:
+    - `cargo test --manifest-path rust/neovm-core/Cargo.toml window_list_matches_frame_minibuffer_and_all_frames_batch_semantics` (pass)
+    - `make -C test/neovm/vm-compat record FORMS=cases/window-list-minibuf-all-frames-semantics.forms EXPECTED=cases/window-list-minibuf-all-frames-semantics.expected.tsv` (pass)
+    - `make -C test/neovm/vm-compat check-one-neovm CASE=cases/window-list-minibuf-all-frames-semantics` (pass)
+    - `make -C test/neovm/vm-compat check-one-neovm CASE=cases/window-list-frame-designator-semantics` (pass)
+    - `make -C test/neovm/vm-compat check-all-neovm-strict` (pass)
+
 - Aligned window size-query defaults and invalid-handle predicates with GNU Emacs:
   - updated runtime behavior:
     - `rust/neovm-core/src/elisp/window_cmds.rs`

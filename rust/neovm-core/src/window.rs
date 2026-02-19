@@ -26,6 +26,8 @@ pub struct FrameId(pub u64);
 /// Keep frame and window numeric domains disjoint while both are represented
 /// as Lisp integers.
 pub(crate) const FRAME_ID_BASE: u64 = 1 << 32;
+/// Synthetic window-id domain reserved for per-frame minibuffer windows.
+pub(crate) const MINIBUFFER_WINDOW_ID_BASE: u64 = 1 << 48;
 
 // ---------------------------------------------------------------------------
 // Window geometry
@@ -338,7 +340,7 @@ impl Frame {
             name,
             root_window,
             selected_window: selected,
-            minibuffer_window: None,
+            minibuffer_window: Some(WindowId(MINIBUFFER_WINDOW_ID_BASE + id.0)),
             width,
             height,
             parameters: HashMap::new(),
@@ -507,6 +509,9 @@ impl FrameManager {
             for wid in frame.window_list() {
                 self.deleted_windows.insert(wid);
             }
+            if let Some(minibuffer_wid) = frame.minibuffer_window {
+                self.deleted_windows.insert(minibuffer_wid);
+            }
             if self.selected == Some(id) {
                 self.selected = self.frames.keys().next().copied();
             }
@@ -585,6 +590,9 @@ impl FrameManager {
     /// Return the frame containing a live window ID, if any.
     pub fn find_window_frame_id(&self, window_id: WindowId) -> Option<FrameId> {
         self.frames.iter().find_map(|(frame_id, frame)| {
+            if frame.minibuffer_window == Some(window_id) {
+                return Some(*frame_id);
+            }
             frame.find_window(window_id).and_then(|window| {
                 if window.is_leaf() {
                     Some(*frame_id)

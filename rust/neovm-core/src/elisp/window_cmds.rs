@@ -503,22 +503,71 @@ pub(crate) fn builtin_window_list(
     args: Vec<Value>,
 ) -> EvalResult {
     expect_max_args("window-list", &args, 3)?;
-    let fid = ensure_selected_frame_id(eval);
-    if args.first().is_some_and(|value| !value.is_nil()) {
-        return Err(signal(
-            "error",
-            vec![Value::string("Window is on a different frame")],
-        ));
+    let selected_fid = ensure_selected_frame_id(eval);
+    // GNU Emacs validates ALL-FRAMES before FRAME mismatch checks.
+    let all_frames_fid = match args.get(2) {
+        None | Some(Value::Nil) => None,
+        Some(Value::Int(n)) => {
+            let wid = WindowId(*n as u64);
+            if let Some(fid) = eval.frames.find_window_frame_id(wid) {
+                Some(fid)
+            } else if eval.frames.is_window_object_id(wid) {
+                return Err(signal(
+                    "wrong-type-argument",
+                    vec![Value::symbol("window-live-p"), Value::Int(*n)],
+                ));
+            } else {
+                return Err(signal(
+                    "wrong-type-argument",
+                    vec![Value::symbol("windowp"), Value::Int(*n)],
+                ));
+            }
+        }
+        Some(other) => {
+            return Err(signal(
+                "wrong-type-argument",
+                vec![Value::symbol("windowp"), other.clone()],
+            ))
+        }
+    };
+    let mut fid = match args.first() {
+        None | Some(Value::Nil) => selected_fid,
+        Some(Value::Int(n)) => {
+            let fid = FrameId(*n as u64);
+            if eval.frames.get(fid).is_some() {
+                fid
+            } else {
+                return Err(signal(
+                    "error",
+                    vec![Value::string("Window is on a different frame")],
+                ));
+            }
+        }
+        Some(_) => {
+            return Err(signal(
+                "error",
+                vec![Value::string("Window is on a different frame")],
+            ))
+        }
+    };
+    if let Some(all_frames_fid) = all_frames_fid {
+        fid = all_frames_fid;
     }
+    let include_minibuffer = matches!(args.get(1), Some(Value::True));
     let frame = eval
         .frames
         .get(fid)
         .ok_or_else(|| signal("error", vec![Value::string("Frame not found")]))?;
-    let ids: Vec<Value> = frame
+    let mut ids: Vec<Value> = frame
         .window_list()
         .into_iter()
         .map(|wid| Value::Int(wid.0 as i64))
         .collect();
+    if include_minibuffer {
+        if let Some(minibuffer_wid) = frame.minibuffer_window {
+            ids.push(Value::Int(minibuffer_wid.0 as i64));
+        }
+    }
     Ok(Value::list(ids))
 }
 
@@ -1828,12 +1877,20 @@ mod tests {
     }
 
     #[test]
-    fn window_list_bootstraps_and_rejects_non_nil_frame_designators() {
+    fn window_list_matches_frame_minibuffer_and_all_frames_batch_semantics() {
         let forms = parse_forms(
             "(condition-case err (length (window-list)) (error err))
+             (condition-case err (length (window-list (selected-frame))) (error err))
              (condition-case err (window-list 999999) (error err))
              (condition-case err (window-list 'foo) (error err))
-             (condition-case err (window-list (selected-window)) (error err))",
+             (condition-case err (window-list (selected-window)) (error err))
+             (condition-case err (window-list 999999 nil t) (error err))
+             (condition-case err (window-list nil nil t) (error err))
+             (condition-case err (window-list nil nil 0) (error err))
+             (length (window-list nil t))
+             (length (window-list (selected-frame) t))
+             (length (window-list nil nil (selected-window)))
+             (length (window-list nil t (selected-window)))",
         )
         .expect("parse");
         let mut ev = Evaluator::new();
@@ -1843,9 +1900,17 @@ mod tests {
             .map(format_eval_result)
             .collect::<Vec<_>>();
         assert_eq!(out[0], "OK 1");
-        assert_eq!(out[1], "OK (error \"Window is on a different frame\")");
+        assert_eq!(out[1], "OK 1");
         assert_eq!(out[2], "OK (error \"Window is on a different frame\")");
         assert_eq!(out[3], "OK (error \"Window is on a different frame\")");
+        assert_eq!(out[4], "OK (error \"Window is on a different frame\")");
+        assert_eq!(out[5], "OK (wrong-type-argument windowp t)");
+        assert_eq!(out[6], "OK (wrong-type-argument windowp t)");
+        assert_eq!(out[7], "OK (wrong-type-argument windowp 0)");
+        assert_eq!(out[8], "OK 2");
+        assert_eq!(out[9], "OK 2");
+        assert_eq!(out[10], "OK 1");
+        assert_eq!(out[11], "OK 2");
     }
 
     #[test]
