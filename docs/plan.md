@@ -128,6 +128,35 @@ Last updated: 2026-02-19
     - `make -C test/neovm/vm-compat check-one-neovm CASE=cases/input-command-state-startup-semantics` (pass, `5/5`)
     - `make -C test/neovm/vm-compat check-all-neovm-strict` (pass)
 
+- Extended startup command/input state parity and fixed `use-region-p` mark lookup precedence:
+  - runtime changes:
+    - `rust/neovm-core/src/elisp/eval.rs`
+      - evaluator startup now additionally seeds:
+        - `this-command-keys-shift-translated`, `mark-active`, `transient-mark-mode`, `overriding-local-map`, `overriding-terminal-local-map`
+        - `unread-post-input-method-events`
+        - input-method state vars:
+          - `input-method-activate-hook`, `input-method-after-insert-chunk-hook`, `input-method-deactivate-hook`
+          - `input-method-exit-on-first-char`, `input-method-exit-on-invalid-key`
+          - `input-method-function` (`list`), `input-method-highlight-flag` (`t`), `input-method-history`
+          - `input-method-previous-message`, `input-method-use-echo-area`, `input-method-verbose-flag` (`default`)
+    - `rust/neovm-core/src/elisp/navigation.rs`
+      - `use-region-p` now resolves symbols using evaluator precedence (lexical -> dynamic -> buffer-local -> global) so buffer-local `mark-active` is honored when global startup `mark-active` is `nil`.
+      - added regression unit:
+        - `test_use_region_p_honors_buffer_local_mark_active_when_global_is_nil`
+      - updated existing `use-region-p` tests to explicitly bind `transient-mark-mode` for oracle-compatible gating.
+  - corpus changes:
+    - expanded and re-recorded:
+      - `test/neovm/vm-compat/cases/input-command-state-startup-semantics.{forms,expected.tsv}`
+    - lock-ins now include:
+      - startup boundness/default-value shape for the new input-method state vars
+      - startup invariance for those vars across `read-key`/`read-event` and batch prompt-reader EOF paths
+  - verified:
+    - `make -C test/neovm/vm-compat record FORMS=cases/input-command-state-startup-semantics.forms EXPECTED=cases/input-command-state-startup-semantics.expected.tsv` (pass)
+    - `make -C test/neovm/vm-compat check-one-neovm CASE=cases/input-command-state-startup-semantics` (pass, `5/5`)
+    - `make -C test/neovm/vm-compat check-one-neovm CASE=cases/use-region-p-semantics` (pass, `8/8`)
+    - `cargo test --manifest-path rust/neovm-core/Cargo.toml use_region_p` (pass)
+    - `make -C test/neovm/vm-compat check-all-neovm-strict` (pass)
+
 - Expanded batch prompt/input queue-edge lock-ins for stale/invalid unread tails:
   - corpus changes:
     - expanded and re-recorded:

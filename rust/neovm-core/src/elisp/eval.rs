@@ -182,8 +182,25 @@ impl Evaluator {
         obarray.set_symbol_value("last-coding-system-used", Value::symbol("undecided-unix"));
         obarray.set_symbol_value("this-command", Value::Nil);
         obarray.set_symbol_value("real-this-command", Value::Nil);
+        obarray.set_symbol_value("this-command-keys-shift-translated", Value::Nil);
         obarray.set_symbol_value("current-prefix-arg", Value::Nil);
         obarray.set_symbol_value("deactivate-mark", Value::True);
+        obarray.set_symbol_value("mark-active", Value::Nil);
+        obarray.set_symbol_value("transient-mark-mode", Value::Nil);
+        obarray.set_symbol_value("overriding-local-map", Value::Nil);
+        obarray.set_symbol_value("overriding-terminal-local-map", Value::Nil);
+        obarray.set_symbol_value("unread-post-input-method-events", Value::Nil);
+        obarray.set_symbol_value("input-method-activate-hook", Value::Nil);
+        obarray.set_symbol_value("input-method-after-insert-chunk-hook", Value::Nil);
+        obarray.set_symbol_value("input-method-deactivate-hook", Value::Nil);
+        obarray.set_symbol_value("input-method-exit-on-first-char", Value::Nil);
+        obarray.set_symbol_value("input-method-exit-on-invalid-key", Value::Nil);
+        obarray.set_symbol_value("input-method-function", Value::symbol("list"));
+        obarray.set_symbol_value("input-method-highlight-flag", Value::True);
+        obarray.set_symbol_value("input-method-history", Value::Nil);
+        obarray.set_symbol_value("input-method-previous-message", Value::Nil);
+        obarray.set_symbol_value("input-method-use-echo-area", Value::Nil);
+        obarray.set_symbol_value("input-method-verbose-flag", Value::symbol("default"));
         obarray.set_symbol_value("unread-command-events", Value::Nil);
         // GNU Emacs seeds core startup vars with integer
         // `variable-documentation` offsets in the DOC table.

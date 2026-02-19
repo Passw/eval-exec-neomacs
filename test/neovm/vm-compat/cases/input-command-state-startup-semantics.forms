@@ -19,8 +19,25 @@
    last-coding-system-used
    this-command
    real-this-command
+   this-command-keys-shift-translated
    current-prefix-arg
+   overriding-local-map
+   overriding-terminal-local-map
    deactivate-mark
+   mark-active
+   transient-mark-mode
+   unread-post-input-method-events
+   input-method-activate-hook
+   input-method-after-insert-chunk-hook
+   input-method-deactivate-hook
+   input-method-exit-on-first-char
+   input-method-exit-on-invalid-key
+   input-method-function
+   input-method-highlight-flag
+   input-method-history
+   input-method-previous-message
+   input-method-use-echo-area
+   input-method-verbose-flag
    unread-command-events))
 
 (list
@@ -42,8 +59,25 @@
  last-coding-system-used
  this-command
  real-this-command
+ this-command-keys-shift-translated
  current-prefix-arg
- deactivate-mark)
+ overriding-local-map
+ overriding-terminal-local-map
+ deactivate-mark
+ mark-active
+ transient-mark-mode
+ unread-post-input-method-events
+ input-method-activate-hook
+ input-method-after-insert-chunk-hook
+ input-method-deactivate-hook
+ input-method-exit-on-first-char
+ input-method-exit-on-invalid-key
+ input-method-function
+ input-method-highlight-flag
+ input-method-history
+ input-method-previous-message
+ input-method-use-echo-area
+ input-method-verbose-flag)
 
 (progn
   (setq unread-command-events (list 97))
@@ -61,8 +95,25 @@
         executing-kbd-macro-index
         this-command
         real-this-command
+        this-command-keys-shift-translated
         current-prefix-arg
-        deactivate-mark))
+        overriding-local-map
+        overriding-terminal-local-map
+        deactivate-mark
+        mark-active
+        transient-mark-mode
+        unread-post-input-method-events
+        input-method-activate-hook
+        input-method-after-insert-chunk-hook
+        input-method-deactivate-hook
+        input-method-exit-on-first-char
+        input-method-exit-on-invalid-key
+        input-method-function
+        input-method-highlight-flag
+        input-method-history
+        input-method-previous-message
+        input-method-use-echo-area
+        input-method-verbose-flag))
 
 (progn
   (setq unread-command-events (list '(mouse-1)))
@@ -80,8 +131,25 @@
         executing-kbd-macro-index
         this-command
         real-this-command
+        this-command-keys-shift-translated
         current-prefix-arg
-        deactivate-mark))
+        overriding-local-map
+        overriding-terminal-local-map
+        deactivate-mark
+        mark-active
+        transient-mark-mode
+        unread-post-input-method-events
+        input-method-activate-hook
+        input-method-after-insert-chunk-hook
+        input-method-deactivate-hook
+        input-method-exit-on-first-char
+        input-method-exit-on-invalid-key
+        input-method-function
+        input-method-highlight-flag
+        input-method-history
+        input-method-previous-message
+        input-method-use-echo-area
+        input-method-verbose-flag))
 
 ; Prompt/input readers in batch preserve startup command/input state variables
 ; while signaling end-of-file on queued unread events.
@@ -111,8 +179,25 @@
                          executing-kbd-macro-index
                          this-command
                          real-this-command
+                         this-command-keys-shift-translated
                          current-prefix-arg
-                         deactivate-mark)))
+                         overriding-local-map
+                         overriding-terminal-local-map
+                         deactivate-mark
+                         mark-active
+                         transient-mark-mode
+                         unread-post-input-method-events
+                         input-method-activate-hook
+                         input-method-after-insert-chunk-hook
+                         input-method-deactivate-hook
+                         input-method-exit-on-first-char
+                         input-method-exit-on-invalid-key
+                         input-method-function
+                         input-method-highlight-flag
+                         input-method-history
+                         input-method-previous-message
+                         input-method-use-echo-area
+                         input-method-verbose-flag)))
        (condition-case _
            (progn
              (setq unread-command-events (list 97 'foo))
@@ -133,7 +218,24 @@
                    executing-kbd-macro-index
                    this-command
                    real-this-command
+                   this-command-keys-shift-translated
                    current-prefix-arg
-                   deactivate-mark)
+                   overriding-local-map
+                   overriding-terminal-local-map
+                   deactivate-mark
+                   mark-active
+                   transient-mark-mode
+                   unread-post-input-method-events
+                   input-method-activate-hook
+                   input-method-after-insert-chunk-hook
+                   input-method-deactivate-hook
+                   input-method-exit-on-first-char
+                   input-method-exit-on-invalid-key
+                   input-method-function
+                   input-method-highlight-flag
+                   input-method-history
+                   input-method-previous-message
+                   input-method-use-echo-area
+                   input-method-verbose-flag)
              unread-command-events)))
    probes))

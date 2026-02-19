@@ -60,11 +60,26 @@ fn no_buffer() -> Flow {
 }
 
 fn dynamic_or_global_symbol_value(eval: &super::eval::Evaluator, name: &str) -> Option<Value> {
+    if eval.lexical_binding() && !eval.obarray.is_special(name) {
+        for frame in eval.lexenv.iter().rev() {
+            if let Some(v) = frame.get(name) {
+                return Some(v.clone());
+            }
+        }
+    }
+
     for frame in eval.dynamic.iter().rev() {
         if let Some(v) = frame.get(name) {
             return Some(v.clone());
         }
     }
+
+    if let Some(buf) = eval.buffers.current_buffer() {
+        if let Some(v) = buf.get_buffer_local(name) {
+            return Some(v.clone());
+        }
+    }
+
     eval.obarray.symbol_value(name).cloned()
 }
 
@@ -1326,8 +1341,12 @@ mod tests {
     #[test]
     fn test_use_region_p() {
         let mut ev = eval_with_text("hello");
-        eval_str(&mut ev, "(push-mark 3 nil t)"); // activate
-        let active = eval_str(&mut ev, "(use-region-p)");
+        let active = eval_str(
+            &mut ev,
+            "(let ((transient-mark-mode t))
+               (push-mark 3 nil t)
+               (use-region-p))",
+        );
         assert!(active.is_truthy());
     }
 
@@ -1403,8 +1422,28 @@ mod tests {
     #[test]
     fn test_set_mark_activates() {
         let mut ev = eval_with_text("hello");
-        eval_str(&mut ev, "(set-mark 3)");
-        let active = eval_str(&mut ev, "(use-region-p)");
+        let active = eval_str(
+            &mut ev,
+            "(let ((transient-mark-mode t))
+               (set-mark 3)
+               (use-region-p))",
+        );
+        assert!(active.is_truthy());
+    }
+
+    #[test]
+    fn test_use_region_p_honors_buffer_local_mark_active_when_global_is_nil() {
+        let mut ev = eval_with_text("hello");
+        let active = eval_str(
+            &mut ev,
+            "(with-temp-buffer
+               (let ((transient-mark-mode t))
+                 (insert \"abc\")
+                 (goto-char (point-max))
+                 (set-mark (point-min))
+                 (setq mark-active t)
+                 (use-region-p)))",
+        );
         assert!(active.is_truthy());
     }
 
