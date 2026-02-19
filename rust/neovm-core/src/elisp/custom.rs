@@ -159,21 +159,6 @@ pub(crate) fn builtin_custom_variable_p(
     Ok(Value::bool(eval.custom.is_custom_variable(name)))
 }
 
-/// `(custom-group-p SYMBOL)` -- returns t if SYMBOL is a custom group.
-pub(crate) fn builtin_custom_group_p(
-    eval: &mut super::eval::Evaluator,
-    args: Vec<Value>,
-) -> EvalResult {
-    expect_args("custom-group-p", &args, 1)?;
-    let name = match &args[0] {
-        Value::Symbol(s) => s.as_str(),
-        Value::Nil => "nil",
-        Value::True => "t",
-        _ => return Ok(Value::Nil),
-    };
-    Ok(Value::bool(eval.custom.is_custom_group(name)))
-}
-
 // ---------------------------------------------------------------------------
 // Evaluator-dependent builtins
 // ---------------------------------------------------------------------------
@@ -898,14 +883,16 @@ mod tests {
     }
 
     #[test]
-    fn defgroup_custom_group_p() {
+    fn custom_group_p_unavailable_without_custom_library() {
         let results = eval_all(
             r#"(defgroup my-group nil "Docs.")
+               (fboundp 'custom-group-p)
                (custom-group-p 'my-group)
                (custom-group-p 'other)"#,
         );
-        assert_eq!(results[1], "OK t");
-        assert_eq!(results[2], "OK nil");
+        assert_eq!(results[1], "OK nil");
+        assert_eq!(results[2], "ERR (void-function (custom-group-p))");
+        assert_eq!(results[3], "ERR (void-function (custom-group-p))");
     }
 
     #[test]
@@ -1038,13 +1025,15 @@ mod tests {
     // -- buffer-local-variables builtin ------------------------------------
 
     #[test]
-    fn buffer_local_variables_empty() {
+    fn buffer_local_variables_include_default_entries() {
         let results = eval_all(
             r#"(get-buffer-create "test-buf")
                (set-buffer "test-buf")
-               (buffer-local-variables)"#,
+               (let ((locals (buffer-local-variables)))
+                 (and (listp locals)
+                      (assq 'buffer-read-only locals)))"#,
         );
-        assert_eq!(results[2], "OK nil");
+        assert_eq!(results[2], "OK (buffer-read-only)");
     }
 
     #[test]

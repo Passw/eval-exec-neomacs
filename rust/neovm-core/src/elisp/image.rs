@@ -140,15 +140,6 @@ fn infer_image_type_from_filename(path: &str) -> Option<&'static str> {
     normalize_image_type_name(ext)
 }
 
-fn infer_image_type_from_data_hint(hint: &Value) -> Option<&'static str> {
-    let name = hint.as_symbol_name()?;
-    if !name.starts_with("image/") {
-        return None;
-    }
-    let suffix = &name["image/".len()..];
-    normalize_image_type_name(suffix)
-}
-
 /// Validate that a value looks like an image spec.
 /// An image spec is a list starting with the symbol `image` followed by
 /// property-list key/value pairs, or simply a property list with a `:type` key.

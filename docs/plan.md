@@ -28,6 +28,25 @@ Last updated: 2026-02-19
 
 ## Doing
 
+- Cleaned stale custom/image helper paths and aligned Rust unit tests with current startup oracle behavior:
+  - runtime/code cleanup:
+    - `rust/neovm-core/src/elisp/custom.rs`
+      - removed dead `builtin_custom_group_p` helper that was not wired into builtin dispatch.
+    - `rust/neovm-core/src/elisp/image.rs`
+      - removed dead `infer_image_type_from_data_hint` helper.
+  - test alignment:
+    - `rust/neovm-core/src/elisp/custom.rs`
+      - replaced stale expectation that `custom-group-p` is callable by default with an explicit startup lock-in:
+        - `custom_group_p_unavailable_without_custom_library`
+      - updated buffer-local variables test to match oracle/runtime behavior where local lists include default entries:
+        - `buffer_local_variables_include_default_entries`
+  - verified:
+    - `cargo test --manifest-path rust/neovm-core/Cargo.toml elisp::custom::tests:: -- --nocapture` (pass, `44/44`)
+    - `cargo test --manifest-path rust/neovm-core/Cargo.toml image_` (pass, `53/53`)
+    - `make -C test/neovm/vm-compat check-one-neovm CASE=cases/custom-group-p-availability` (pass, `2/2`)
+    - `make -C test/neovm/vm-compat check-one-neovm CASE=cases/buffer-local-variables-semantics` (pass, `7/7`)
+    - `make -C test/neovm/vm-compat check-all-neovm-strict` (pass)
+
 - Tagged NeoVM keymap handles and eliminated integer false positives in `keymapp`:
   - runtime changes:
     - `rust/neovm-core/src/elisp/keymap.rs`
