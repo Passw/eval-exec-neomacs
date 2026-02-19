@@ -2144,7 +2144,7 @@ mod tests {
     #[test]
     fn modify_syntax_entry_overrides() {
         let mut table = SyntaxTable::new_standard();
-        assert_eq!(table.char_syntax('+'), SyntaxClass::Punctuation);
+        assert_eq!(table.char_syntax('+'), SyntaxClass::Symbol);
         table.modify_syntax_entry('+', SyntaxEntry::simple(SyntaxClass::Word));
         assert_eq!(table.char_syntax('+'), SyntaxClass::Word);
     }

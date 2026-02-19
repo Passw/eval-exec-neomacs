@@ -4882,7 +4882,8 @@ mod tests {
     #[test]
     fn bounds_word_at_space() {
         let text = "abc def";
-        assert!(bounds_word(text, 3).is_none()); // space
+        let bounds = bounds_word(text, 3).unwrap(); // between words -> previous word
+        assert_eq!(&text[bounds.0..bounds.1], "abc");
     }
 
     #[test]

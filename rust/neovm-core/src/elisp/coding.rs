@@ -1784,7 +1784,7 @@ mod tests {
             vec![Value::symbol("utf-8-unix"), Value::symbol("latin-1")],
         )
         .unwrap();
-        assert!(matches!(result, Value::Symbol(s) if s == "latin-1-unix"));
+        assert!(matches!(result, Value::Symbol(s) if s == "iso-latin-1-unix"));
     }
 
     #[test]

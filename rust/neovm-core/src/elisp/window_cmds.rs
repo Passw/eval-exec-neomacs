@@ -3176,7 +3176,11 @@ mod tests {
     #[test]
     fn set_window_start_and_read() {
         let results = eval_with_frame(
-            "(set-window-start (selected-window) 42)
+            "(let ((w (selected-window)))
+                (with-current-buffer (window-buffer w)
+                  (erase-buffer)
+                  (insert (make-string 200 ?x)))
+                (set-window-start w 42))
              (window-start)",
         );
         assert_eq!(results[0], "OK 42");
@@ -3192,7 +3196,11 @@ mod tests {
     #[test]
     fn set_window_point_and_read() {
         let results = eval_with_frame(
-            "(set-window-point (selected-window) 10)
+            "(let ((w (selected-window)))
+                (with-current-buffer (window-buffer w)
+                  (erase-buffer)
+                  (insert (make-string 200 ?x)))
+                (set-window-point w 10))
              (window-point)",
         );
         assert_eq!(results[0], "OK 10");
@@ -4766,7 +4774,7 @@ mod tests {
 
     #[test]
     fn frame_visible_p_requires_one_arg() {
-        let r = eval_one_with_frame("(frame-visible-p)");
+        let r = eval_one_with_frame("(condition-case err (frame-visible-p) (error (car err)))");
         assert_eq!(r, "OK wrong-number-of-arguments");
     }
 

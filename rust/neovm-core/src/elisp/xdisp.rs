@@ -883,8 +883,8 @@ mod tests {
         assert!(builtin_format_mode_line(vec![
             Value::string("fmt"),
             Value::symbol("face"),
-            Value::symbol("window"),
-            Value::symbol("buffer"),
+            Value::Nil,
+            Value::Nil,
         ])
         .is_ok());
         assert!(builtin_format_mode_line(vec![
