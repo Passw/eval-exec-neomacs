@@ -1,0 +1,24 @@
+; Lock in frame-handle designator acceptance for internal face helper builtins.
+(fboundp 'internal-lisp-face-p)
+(let ((v (internal-lisp-face-p 'default (selected-frame))))
+  (and (vectorp v) (eq (aref v 0) 'face)))
+(condition-case err (internal-lisp-face-p 'default (selected-window)) (error (car err)))
+
+(fboundp 'internal-make-lisp-face)
+(let ((v (internal-make-lisp-face 'neovm-face-frame-arg (selected-frame))))
+  (and (vectorp v) (eq (aref v 0) 'face)))
+(condition-case err (internal-make-lisp-face 'neovm-face-frame-arg (selected-window)) (error (car err)))
+
+(fboundp 'internal-copy-lisp-face)
+(condition-case err (internal-copy-lisp-face 'default 'neovm-face-copy (selected-frame) nil) (error err))
+(condition-case err (internal-copy-lisp-face 'default 'neovm-face-copy (selected-window) nil) (error (car err)))
+
+(fboundp 'internal-set-lisp-face-attribute)
+(condition-case err (internal-set-lisp-face-attribute 'default :foreground "green" (selected-frame)) (error err))
+(condition-case err (internal-set-lisp-face-attribute 'default :foreground "green" (selected-window)) (error (car err)))
+
+(fboundp 'internal-get-lisp-face-attribute)
+(condition-case err (internal-get-lisp-face-attribute 'default :foreground (selected-frame)) (error err))
+(condition-case err (internal-get-lisp-face-attribute 'default :foreground (selected-window)) (error (car err)))
+(equal (internal-get-lisp-face-attribute 'default :foreground (selected-frame))
+       (internal-get-lisp-face-attribute 'default :foreground))

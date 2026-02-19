@@ -28,6 +28,27 @@ Last updated: 2026-02-19
 
 ## Doing
 
+- Aligned `internal-*lisp-face*` optional frame/designator behavior to accept frame-handle objects:
+  - runtime changes:
+    - `rust/neovm-core/src/elisp/font.rs`
+      - `internal-lisp-face-p` and `internal-make-lisp-face` now accept optional live-frame designators (`Value::Frame`/frame-id ints) in addition to `nil`.
+      - `internal-copy-lisp-face` now accepts live-frame designators for its FRAME argument (while preserving existing `t` behavior).
+      - `internal-set-lisp-face-attribute` and `internal-get-lisp-face-attribute` now accept frame-handle designators for selected-frame domain operations.
+      - added unit coverage:
+        - `internal_lisp_face_helpers_accept_frame_handles`
+  - corpus changes:
+    - added and wired:
+      - `test/neovm/vm-compat/cases/internal-face-frame-designator-semantics.{forms,expected.tsv}`
+      - `test/neovm/vm-compat/cases/default.list`
+  - verified:
+    - `cargo test --manifest-path rust/neovm-core/Cargo.toml internal_lisp_face_helpers_accept_frame_handles -- --nocapture` (pass)
+    - `make -C test/neovm/vm-compat record FORMS=cases/internal-face-frame-designator-semantics.forms EXPECTED=cases/internal-face-frame-designator-semantics.expected.tsv` (pass)
+    - `make -C test/neovm/vm-compat check-one-neovm CASE=cases/internal-face-frame-designator-semantics` (pass, `16/16`)
+    - `make -C test/neovm/vm-compat check-one-neovm CASE=cases/internal-lisp-face-semantics` (pass, `34/34`)
+    - `make -C test/neovm/vm-compat check-one-neovm CASE=cases/internal-set-lisp-face-attribute-semantics` (pass, `55/55`)
+    - `make -C test/neovm/vm-compat check-one-neovm CASE=cases/internal-make-copy-lisp-face-semantics` (pass, `42/42`)
+    - `make -C test/neovm/vm-compat check-all-neovm-strict` (pass; case inventory `764`)
+
 - Aligned frame-returning APIs to frame-handle object semantics end-to-end:
   - runtime changes:
     - `rust/neovm-core/src/elisp/window_cmds.rs`
