@@ -3446,6 +3446,103 @@ pub(crate) fn builtin_run_mode_hooks(
     builtin_run_hooks(eval, args)
 }
 
+pub(crate) fn builtin_run_hook_query_error_with_timeout(
+    eval: &mut super::eval::Evaluator,
+    args: Vec<Value>,
+) -> EvalResult {
+    expect_args("run-hook-query-error-with-timeout", &args, 1)?;
+    let hook_name = args[0].as_symbol_name().ok_or_else(|| {
+        signal(
+            "wrong-type-argument",
+            vec![Value::symbol("symbolp"), args[0].clone()],
+        )
+    })?;
+    let hook_value = symbol_dynamic_buffer_or_global_value(eval, hook_name).unwrap_or(Value::Nil);
+    match run_hook_value(eval, hook_name, hook_value, &[], true) {
+        Ok(()) => Ok(Value::Nil),
+        Err(Flow::Signal(_)) => Err(signal(
+            "end-of-file",
+            vec![Value::string("Error reading from stdin")],
+        )),
+        Err(flow) => Err(flow),
+    }
+}
+
+fn expect_optional_live_frame_designator(
+    value: &Value,
+    eval: &super::eval::Evaluator,
+) -> Result<(), Flow> {
+    if value.is_nil() {
+        return Ok(());
+    }
+    if let Value::Frame(id) = value {
+        if eval.frames.get(crate::window::FrameId(*id)).is_some() {
+            return Ok(());
+        }
+    }
+    Err(signal(
+        "wrong-type-argument",
+        vec![Value::symbol("frame-live-p"), value.clone()],
+    ))
+}
+
+fn expect_optional_live_window_designator(
+    value: &Value,
+    eval: &super::eval::Evaluator,
+) -> Result<(), Flow> {
+    if value.is_nil() {
+        return Ok(());
+    }
+    if let Value::Window(id) = value {
+        if eval
+            .frames
+            .is_live_window_id(crate::window::WindowId(*id))
+        {
+            return Ok(());
+        }
+    }
+    Err(signal(
+        "wrong-type-argument",
+        vec![Value::symbol("window-live-p"), value.clone()],
+    ))
+}
+
+pub(crate) fn builtin_run_window_configuration_change_hook(
+    eval: &mut super::eval::Evaluator,
+    args: Vec<Value>,
+) -> EvalResult {
+    expect_max_args("run-window-configuration-change-hook", &args, 1)?;
+    if let Some(frame) = args.first() {
+        expect_optional_live_frame_designator(frame, eval)?;
+    }
+    let hook_name = "window-configuration-change-hook";
+    let hook_value = symbol_dynamic_buffer_or_global_value(eval, hook_name).unwrap_or(Value::Nil);
+    run_hook_value(eval, hook_name, hook_value, &[], true)?;
+    Ok(Value::Nil)
+}
+
+pub(crate) fn builtin_run_window_scroll_functions(
+    eval: &mut super::eval::Evaluator,
+    args: Vec<Value>,
+) -> EvalResult {
+    expect_max_args("run-window-scroll-functions", &args, 1)?;
+    if let Some(window) = args.first() {
+        expect_optional_live_window_designator(window, eval)?;
+    }
+
+    let window_arg = args.first().cloned().unwrap_or(Value::Nil);
+    let window_start = if window_arg.is_nil() {
+        super::window_cmds::builtin_window_start(eval, vec![])?
+    } else {
+        super::window_cmds::builtin_window_start(eval, vec![window_arg.clone()])?
+    };
+
+    let hook_name = "window-scroll-functions";
+    let hook_value = symbol_dynamic_buffer_or_global_value(eval, hook_name).unwrap_or(Value::Nil);
+    run_hook_value(eval, hook_name, hook_value, &[window_arg, window_start], true)?;
+    Ok(Value::Nil)
+}
+
 pub(crate) fn builtin_featurep(eval: &mut super::eval::Evaluator, args: Vec<Value>) -> EvalResult {
     expect_min_args("featurep", &args, 1)?;
     expect_max_args("featurep", &args, 2)?;
@@ -7405,7 +7502,16 @@ pub(crate) fn dispatch_builtin(
             return Some(builtin_run_hook_with_args_until_failure(eval, args))
         }
         "run-hook-wrapped" => return Some(builtin_run_hook_wrapped(eval, args)),
+        "run-hook-query-error-with-timeout" => {
+            return Some(builtin_run_hook_query_error_with_timeout(eval, args))
+        }
         "run-mode-hooks" => return Some(builtin_run_mode_hooks(eval, args)),
+        "run-window-configuration-change-hook" => {
+            return Some(builtin_run_window_configuration_change_hook(eval, args))
+        }
+        "run-window-scroll-functions" => {
+            return Some(builtin_run_window_scroll_functions(eval, args))
+        }
         "featurep" => return Some(builtin_featurep(eval, args)),
         // Loading
         "load" => return Some(builtin_load(eval, args)),
@@ -7621,6 +7727,7 @@ pub(crate) fn dispatch_builtin(
         "process-name" => return Some(super::process::builtin_process_name(eval, args)),
         "process-buffer" => return Some(super::process::builtin_process_buffer(eval, args)),
         // Timer operations (evaluator-dependent)
+        "add-timeout" => return Some(super::timer::builtin_add_timeout(eval, args)),
         "run-at-time" => return Some(super::timer::builtin_run_at_time(eval, args)),
         "run-with-timer" => return Some(super::timer::builtin_run_with_timer(eval, args)),
         "run-with-idle-timer" => {

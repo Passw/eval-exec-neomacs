@@ -16945,6 +16945,53 @@ Last updated: 2026-02-19
 
 ## Doing
 
+- Added timeout + window-hook compatibility slice and locked oracle parity:
+  - runtime changes:
+    - `rust/neovm-core/src/elisp/timer.rs`
+      - implemented `add-timeout` with oracle-compatible arity/error shape and timer return semantics.
+    - `rust/neovm-core/src/elisp/builtins.rs`
+      - implemented:
+        - `run-hook-query-error-with-timeout`
+        - `run-window-configuration-change-hook`
+        - `run-window-scroll-functions`
+      - aligned hook lookup/dispatch and optional frame/window designator validation to oracle payload shape.
+    - `rust/neovm-core/src/elisp/builtin_registry.rs`
+      - registered all four symbols in `DISPATCH_BUILTIN_NAMES`.
+    - `rust/neovm-core/src/elisp/subr_info.rs`
+      - added arity metadata and oracle assertions:
+        - `(3 . 4)` `add-timeout`
+        - `(1 . 1)` `run-hook-query-error-with-timeout`
+        - `(0 . 1)` `run-window-configuration-change-hook`
+        - `(0 . 1)` `run-window-scroll-functions`
+  - corpus changes:
+    - added and wired:
+      - `test/neovm/vm-compat/cases/timeout-window-hook-semantics.forms`
+      - `test/neovm/vm-compat/cases/timeout-window-hook-semantics.expected.tsv`
+      - `test/neovm/vm-compat/cases/default.list`
+  - verified:
+    - `make -C test/neovm/vm-compat check-one-neovm CASE=cases/timeout-window-hook-semantics` (pass, `2/2`)
+    - `make -C test/neovm/vm-compat check-all-neovm-strict` (pass; inventory `778`)
+
+- Added completion builtin introspection surface parity and lock-ins:
+  - runtime changes:
+    - `rust/neovm-core/src/elisp/builtin_registry.rs`
+      - registered `try-completion`, `all-completions`, `test-completion`.
+    - `rust/neovm-core/src/elisp/subr_info.rs`
+      - added arity metadata + oracle assertions:
+        - `(2 . 3)` `try-completion`
+        - `(2 . 4)` `all-completions`
+        - `(2 . 3)` `test-completion`
+  - corpus changes:
+    - added and wired:
+      - `test/neovm/vm-compat/cases/completion-subr-surface-semantics.forms`
+      - `test/neovm/vm-compat/cases/completion-subr-surface-semantics.expected.tsv`
+      - `test/neovm/vm-compat/cases/default.list`
+  - verified:
+    - `cargo test --manifest-path rust/neovm-core/Cargo.toml subr_arity_command_read_primitives_match_oracle -- --nocapture` (pass)
+    - `make -C test/neovm/vm-compat check-one-neovm CASE=cases/completion-subr-surface-semantics` (pass, `18/18`)
+    - `make -C test/neovm/vm-compat check-builtin-registry-all` (pass)
+    - `make -C test/neovm/vm-compat check-all-neovm-strict` (pass; inventory `778`)
+
 - Continue compatibility-first maintenance with small commit slices:
   - keep builtin surface and registry in lock-step
   - run oracle/parity checks after each behavior-affecting change

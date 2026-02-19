@@ -422,6 +422,41 @@ pub(crate) fn builtin_run_at_time(
     Ok(Value::Timer(id))
 }
 
+/// (add-timeout SECS REPEAT FUNCTION &optional OBJECT) -> timer
+///
+/// Legacy timeout helper used by some runtime paths. In batch mode oracle
+/// accepts any non-nil REPEAT marker and signals an "Invalid or uninitialized
+/// timer" error when REPEAT is nil.
+pub(crate) fn builtin_add_timeout(
+    eval: &mut super::eval::Evaluator,
+    args: Vec<Value>,
+) -> EvalResult {
+    expect_min_args("add-timeout", &args, 3)?;
+    if args.len() > 4 {
+        return Err(signal(
+            "wrong-number-of-arguments",
+            vec![Value::symbol("add-timeout"), Value::Int(args.len() as i64)],
+        ));
+    }
+
+    let delay = parse_run_at_time_delay(&args[0])?;
+    let repeat_marker = &args[1];
+    if repeat_marker.is_nil() {
+        return Err(signal(
+            "error",
+            vec![Value::string("Invalid or uninitialized timer")],
+        ));
+    }
+    let repeat = expect_number(repeat_marker).unwrap_or(0.0);
+    let callback = args[2].clone();
+    let timer_args = args.get(3).cloned().into_iter().collect();
+
+    let id = eval
+        .timers
+        .add_timer(delay, repeat, callback, timer_args, false);
+    Ok(Value::Timer(id))
+}
+
 /// (run-with-timer SECS REPEAT FUNCTION &rest ARGS) -> timer
 ///
 /// Alias for run-at-time.

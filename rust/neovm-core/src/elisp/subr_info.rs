@@ -609,6 +609,7 @@ fn subr_arity_value(name: &str) -> Value {
         | "posix-search-backward"
         | "word-search-forward"
         | "word-search-backward" => arity_cons(1, Some(4)),
+        "add-timeout" => arity_cons(3, Some(4)),
         "add-variable-watcher" => arity_cons(2, Some(2)),
         "remove-hook" => arity_cons(2, Some(3)),
         "remove" | "remove-variable-watcher" | "narrow-to-region" => arity_cons(2, Some(2)),
@@ -648,8 +649,12 @@ fn subr_arity_value(name: &str) -> Value {
         "run-hook-with-args"
         | "run-hook-with-args-until-failure"
         | "run-hook-with-args-until-success" => arity_cons(1, None),
+        "run-hook-query-error-with-timeout" => arity_cons(1, Some(1)),
         "run-hook-wrapped" => arity_cons(2, None),
         "run-mode-hooks" => arity_cons(0, None),
+        "run-window-configuration-change-hook" | "run-window-scroll-functions" => {
+            arity_cons(0, Some(1))
+        }
         "base64-decode-string" => arity_cons(1, Some(3)),
         "base64-encode-string" | "base64url-encode-string" => arity_cons(1, Some(2)),
         "md5" => arity_cons(1, Some(5)),
@@ -670,6 +675,8 @@ fn subr_arity_value(name: &str) -> Value {
         "command-execute" => arity_cons(1, Some(4)),
         "compare-strings" => arity_cons(6, Some(7)),
         "completing-read" => arity_cons(2, Some(8)),
+        "try-completion" | "test-completion" => arity_cons(2, Some(3)),
+        "all-completions" => arity_cons(2, Some(4)),
         "read" => arity_cons(0, Some(1)),
         "read-char" | "read-char-exclusive" | "read-event" => arity_cons(0, Some(3)),
         "read-key" => arity_cons(0, Some(2)),
@@ -1745,6 +1752,7 @@ mod tests {
         assert_subr_arity("add-hook", 2, Some(4));
         assert_subr_arity("add-name-to-file", 2, Some(3));
         assert_subr_arity("add-text-properties", 3, Some(4));
+        assert_subr_arity("add-timeout", 3, Some(4));
         assert_subr_arity("add-variable-watcher", 2, Some(2));
         assert_subr_arity("remove-hook", 2, Some(3));
         assert_subr_arity("advice-add", 3, Some(4));
@@ -1755,8 +1763,11 @@ mod tests {
         assert_subr_arity("run-hook-with-args", 1, None);
         assert_subr_arity("run-hook-with-args-until-failure", 1, None);
         assert_subr_arity("run-hook-with-args-until-success", 1, None);
+        assert_subr_arity("run-hook-query-error-with-timeout", 1, Some(1));
         assert_subr_arity("run-hook-wrapped", 2, None);
         assert_subr_arity("run-mode-hooks", 0, None);
+        assert_subr_arity("run-window-configuration-change-hook", 0, Some(1));
+        assert_subr_arity("run-window-scroll-functions", 0, Some(1));
     }
 
     #[test]
@@ -1852,6 +1863,9 @@ mod tests {
         assert_subr_arity("command-execute", 1, Some(4));
         assert_subr_arity("compare-strings", 6, Some(7));
         assert_subr_arity("completing-read", 2, Some(8));
+        assert_subr_arity("try-completion", 2, Some(3));
+        assert_subr_arity("all-completions", 2, Some(4));
+        assert_subr_arity("test-completion", 2, Some(3));
     }
 
     #[test]

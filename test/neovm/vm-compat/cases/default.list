@@ -93,6 +93,7 @@ cases/count-lines-subr-arity-semantics
 cases/hook-advice-subr-arity-semantics
 cases/hook-runner-builtins-semantics
 cases/hook-runtime-semantics
+cases/timeout-window-hook-semantics
 cases/startup-helper-subr-arity-semantics
 cases/encoding-bool-vector-subr-arity-semantics
 cases/command-timer-subr-arity-semantics
@@ -738,6 +739,7 @@ cases/load-suffixes
 cases/reader-hash
 cases/read-from-string-edges
 cases/read-stream-semantics
+cases/completion-subr-surface-semantics
 cases/eval-buffer-region-semantics
 cases/hash-basics
 cases/hash-make-table-options-semantics
