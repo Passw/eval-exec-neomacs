@@ -324,6 +324,53 @@ Last updated: 2026-02-19
     - `make -C test/neovm/vm-compat check-builtin-registry-all` (pass)
     - `make -C test/neovm/vm-compat check-all-neovm-strict` (pass)
 
+- Completed window group-start and buffer-history mutator parity slice and added oracle lock-ins:
+  - runtime changes:
+    - `rust/neovm-core/src/window.rs`
+      - added frame-manager storage and helpers for per-window history objects:
+        - `window_prev_buffers` / `set_window_prev_buffers`
+        - `window_next_buffers` / `set_window_next_buffers`
+    - `rust/neovm-core/src/elisp/window_cmds.rs`
+      - added evaluator-backed builtins:
+        - `window-group-start`
+        - `set-window-group-start`
+        - `set-window-prev-buffers`
+        - `set-window-next-buffers`
+      - switched `window-prev-buffers` / `window-next-buffers` to evaluator-backed per-window state reads.
+      - added evaluator unit coverage:
+        - `window_group_start_and_buffer_history_setters_match_batch_semantics`
+    - `rust/neovm-core/src/elisp/builtins.rs`
+      - wired dispatch for all four new mutator/query builtins.
+    - `rust/neovm-core/src/elisp/builtin_registry.rs`
+      - registered:
+        - `window-group-start`
+        - `set-window-group-start`
+        - `set-window-prev-buffers`
+        - `set-window-next-buffers`
+      - parity registry counts now remain:
+        - `DISPATCH_BUILTIN_NAMES`: `1006`
+        - core parity entries: `1005`
+    - `rust/neovm-core/src/elisp/subr_info.rs`
+      - added `subr-arity` metadata:
+        - `(0 . 1)`: `window-group-start`
+        - `(2 . 3)`: `set-window-group-start`
+        - `(2 . 2)`: `set-window-prev-buffers`, `set-window-next-buffers`
+      - extended `subr_arity_window_frame_primitives_match_oracle`.
+  - corpus changes:
+    - added:
+      - `test/neovm/vm-compat/cases/window-group-prev-next-state-semantics.{forms,expected.tsv}`
+    - expanded and re-recorded:
+      - `test/neovm/vm-compat/cases/window-frame-subr-arity-semantics.{forms,expected.tsv}`
+    - wired new case into:
+      - `test/neovm/vm-compat/cases/default.list`
+  - verified:
+    - `cargo test --manifest-path rust/neovm-core/Cargo.toml window_group_start_and_buffer_history_setters_match_batch_semantics` (pass)
+    - `cargo test --manifest-path rust/neovm-core/Cargo.toml subr_arity_window_frame_primitives_match_oracle` (pass)
+    - `make -C test/neovm/vm-compat check-one-neovm CASE=cases/window-group-prev-next-state-semantics` (pass)
+    - `make -C test/neovm/vm-compat check-one-neovm CASE=cases/window-frame-subr-arity-semantics` (pass)
+    - `make -C test/neovm/vm-compat check-one-neovm CASE=cases/window-old-state-semantics` (pass)
+    - `make -C test/neovm/vm-compat check-all-neovm-strict` (pass)
+
 - Completed window old-state helper parity slice and added oracle lock-ins:
   - runtime changes:
     - `rust/neovm-core/src/elisp/window_cmds.rs`

@@ -468,6 +468,8 @@ pub struct FrameManager {
     window_parameters: HashMap<WindowId, Vec<(Value, Value)>>,
     window_display_tables: HashMap<WindowId, Value>,
     window_cursor_types: HashMap<WindowId, Value>,
+    window_prev_buffers: HashMap<WindowId, Value>,
+    window_next_buffers: HashMap<WindowId, Value>,
 }
 
 impl FrameManager {
@@ -481,6 +483,8 @@ impl FrameManager {
             window_parameters: HashMap::new(),
             window_display_tables: HashMap::new(),
             window_cursor_types: HashMap::new(),
+            window_prev_buffers: HashMap::new(),
+            window_next_buffers: HashMap::new(),
         }
     }
 
@@ -726,6 +730,40 @@ impl FrameManager {
             self.window_cursor_types.remove(&window_id);
         } else {
             self.window_cursor_types.insert(window_id, cursor_type);
+        }
+    }
+
+    /// Return previous-buffer list object for WINDOW-ID, or nil when unset.
+    pub fn window_prev_buffers(&self, window_id: WindowId) -> Value {
+        self.window_prev_buffers
+            .get(&window_id)
+            .cloned()
+            .unwrap_or(Value::Nil)
+    }
+
+    /// Set previous-buffer list object for WINDOW-ID.
+    pub fn set_window_prev_buffers(&mut self, window_id: WindowId, prev_buffers: Value) {
+        if prev_buffers.is_nil() {
+            self.window_prev_buffers.remove(&window_id);
+        } else {
+            self.window_prev_buffers.insert(window_id, prev_buffers);
+        }
+    }
+
+    /// Return next-buffer list object for WINDOW-ID, or nil when unset.
+    pub fn window_next_buffers(&self, window_id: WindowId) -> Value {
+        self.window_next_buffers
+            .get(&window_id)
+            .cloned()
+            .unwrap_or(Value::Nil)
+    }
+
+    /// Set next-buffer list object for WINDOW-ID.
+    pub fn set_window_next_buffers(&mut self, window_id: WindowId, next_buffers: Value) {
+        if next_buffers.is_nil() {
+            self.window_next_buffers.remove(&window_id);
+        } else {
+            self.window_next_buffers.insert(window_id, next_buffers);
         }
     }
 }

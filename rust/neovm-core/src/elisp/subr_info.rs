@@ -864,8 +864,13 @@ fn subr_arity_value(name: &str) -> Value {
         | "set-window-point"
         | "set-window-hscroll"
         | "set-window-display-table"
-        | "set-window-cursor-type" => arity_cons(2, Some(2)),
-        "set-window-buffer" | "set-window-start" | "set-window-margins" => {
+        | "set-window-cursor-type"
+        | "set-window-prev-buffers"
+        | "set-window-next-buffers" => arity_cons(2, Some(2)),
+        "set-window-buffer"
+        | "set-window-start"
+        | "set-window-group-start"
+        | "set-window-margins" => {
             arity_cons(2, Some(3))
         }
         "set-window-vscroll" => arity_cons(2, Some(4)),
@@ -932,6 +937,7 @@ fn subr_arity_value(name: &str) -> Value {
         | "window-body-pixel-edges"
         | "window-frame"
         | "window-fringes"
+        | "window-group-start"
         | "window-header-line-height"
         | "window-dedicated-p"
         | "window-hscroll"
@@ -2415,14 +2421,18 @@ mod tests {
         assert_subr_arity("set-window-hscroll", 2, Some(2));
         assert_subr_arity("set-window-display-table", 2, Some(2));
         assert_subr_arity("set-window-cursor-type", 2, Some(2));
+        assert_subr_arity("set-window-prev-buffers", 2, Some(2));
+        assert_subr_arity("set-window-next-buffers", 2, Some(2));
         assert_subr_arity("set-window-margins", 2, Some(3));
         assert_subr_arity("set-window-point", 2, Some(2));
         assert_subr_arity("set-window-fringes", 2, Some(5));
         assert_subr_arity("set-window-scroll-bars", 1, Some(6));
         assert_subr_arity("set-window-start", 2, Some(3));
+        assert_subr_arity("set-window-group-start", 2, Some(3));
         assert_subr_arity("set-window-vscroll", 2, Some(4));
         assert_subr_arity("window-frame", 0, Some(1));
         assert_subr_arity("window-fringes", 0, Some(1));
+        assert_subr_arity("window-group-start", 0, Some(1));
         assert_subr_arity("window-header-line-height", 0, Some(1));
         assert_subr_arity("window-hscroll", 0, Some(1));
         assert_subr_arity("window-left-column", 0, Some(1));

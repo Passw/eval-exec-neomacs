@@ -468,6 +468,7 @@ cases/window-geometry-helper-semantics
 cases/window-cursor-type-semantics
 cases/window-display-table-semantics
 cases/window-fringes-scroll-bars-setter-semantics
+cases/window-group-prev-next-state-semantics
 cases/window-hscroll-margins-setter-semantics
 cases/window-old-state-semantics
 cases/window-parameter-semantics

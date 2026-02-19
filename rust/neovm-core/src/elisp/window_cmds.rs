@@ -61,6 +61,18 @@ fn expect_int(value: &Value) -> Result<i64, Flow> {
     }
 }
 
+/// Extract an integer-or-marker argument as i64.
+fn expect_integer_or_marker(value: &Value) -> Result<i64, Flow> {
+    match value {
+        Value::Int(n) => Ok(*n),
+        Value::Char(c) => Ok(*c as i64),
+        other => Err(signal(
+            "wrong-type-argument",
+            vec![Value::symbol("integer-or-marker-p"), other.clone()],
+        )),
+    }
+}
+
 /// Extract a fixnum-like integer from a Value.
 fn expect_fixnum(value: &Value) -> Result<i64, Flow> {
     match value {
@@ -988,6 +1000,19 @@ pub(crate) fn builtin_window_start(
     }
 }
 
+/// `(window-group-start &optional WINDOW)` -> integer position.
+///
+/// Batch GNU Emacs exposes group-start as point-min (`1`) in startup flows.
+pub(crate) fn builtin_window_group_start(
+    eval: &mut super::eval::Evaluator,
+    args: Vec<Value>,
+) -> EvalResult {
+    expect_max_args("window-group-start", &args, 1)?;
+    let _ = ensure_selected_frame_id(eval);
+    let (_fid, _wid) = resolve_window_id(eval, args.first())?;
+    Ok(Value::Int(1))
+}
+
 /// `(window-end &optional WINDOW UPDATE)` -> integer position.
 ///
 /// We approximate window-end as window-start since we don't have real
@@ -1061,6 +1086,18 @@ pub(crate) fn builtin_set_window_start(
         }
     }
     Ok(Value::Int(pos as i64))
+}
+
+/// `(set-window-group-start WINDOW POS &optional NOFORCE)` -> POS.
+pub(crate) fn builtin_set_window_group_start(
+    eval: &mut super::eval::Evaluator,
+    args: Vec<Value>,
+) -> EvalResult {
+    expect_min_args("set-window-group-start", &args, 2)?;
+    expect_max_args("set-window-group-start", &args, 3)?;
+    let (_fid, _wid) = resolve_window_id(eval, args.first())?;
+    let pos = expect_integer_or_marker(&args[1])?;
+    Ok(Value::Int(pos))
 }
 
 /// `(set-window-point WINDOW POS)` -> POS.
@@ -1154,26 +1191,52 @@ pub(crate) fn builtin_window_old_buffer(
     Ok(Value::Nil)
 }
 
-/// `(window-prev-buffers &optional WINDOW)` -> nil in batch.
+/// `(window-prev-buffers &optional WINDOW)` -> previous buffer list or nil.
 pub(crate) fn builtin_window_prev_buffers(
     eval: &mut super::eval::Evaluator,
     args: Vec<Value>,
 ) -> EvalResult {
     expect_max_args("window-prev-buffers", &args, 1)?;
     let _ = ensure_selected_frame_id(eval);
-    let (_fid, _wid) = resolve_window_id(eval, args.first())?;
-    Ok(Value::Nil)
+    let (_fid, wid) = resolve_window_id(eval, args.first())?;
+    Ok(eval.frames.window_prev_buffers(wid))
 }
 
-/// `(window-next-buffers &optional WINDOW)` -> nil in batch.
+/// `(window-next-buffers &optional WINDOW)` -> next buffer list or nil.
 pub(crate) fn builtin_window_next_buffers(
     eval: &mut super::eval::Evaluator,
     args: Vec<Value>,
 ) -> EvalResult {
     expect_max_args("window-next-buffers", &args, 1)?;
     let _ = ensure_selected_frame_id(eval);
-    let (_fid, _wid) = resolve_window_id(eval, args.first())?;
-    Ok(Value::Nil)
+    let (_fid, wid) = resolve_window_id(eval, args.first())?;
+    Ok(eval.frames.window_next_buffers(wid))
+}
+
+/// `(set-window-prev-buffers WINDOW PREV-BUFFERS)` -> PREV-BUFFERS.
+pub(crate) fn builtin_set_window_prev_buffers(
+    eval: &mut super::eval::Evaluator,
+    args: Vec<Value>,
+) -> EvalResult {
+    expect_args("set-window-prev-buffers", &args, 2)?;
+    let _ = ensure_selected_frame_id(eval);
+    let (_fid, wid) = resolve_window_id(eval, args.first())?;
+    let value = args[1].clone();
+    eval.frames.set_window_prev_buffers(wid, value.clone());
+    Ok(value)
+}
+
+/// `(set-window-next-buffers WINDOW NEXT-BUFFERS)` -> NEXT-BUFFERS.
+pub(crate) fn builtin_set_window_next_buffers(
+    eval: &mut super::eval::Evaluator,
+    args: Vec<Value>,
+) -> EvalResult {
+    expect_args("set-window-next-buffers", &args, 2)?;
+    let _ = ensure_selected_frame_id(eval);
+    let (_fid, wid) = resolve_window_id(eval, args.first())?;
+    let value = args[1].clone();
+    eval.frames.set_window_next_buffers(wid, value.clone());
+    Ok(value)
 }
 
 /// `(window-left-column &optional WINDOW)` -> integer.
@@ -3659,6 +3722,80 @@ mod tests {
         assert_eq!(
             out[2],
             "OK ((wrong-type-argument window-live-p 999999) (wrong-type-argument window-live-p 999999) (wrong-type-argument window-live-p 999999) (wrong-type-argument window-live-p 999999) (wrong-type-argument window-live-p 999999) (wrong-number-of-arguments window-use-time 2) (wrong-number-of-arguments window-old-point 2) (wrong-number-of-arguments window-old-buffer 2) (wrong-number-of-arguments window-prev-buffers 2) (wrong-number-of-arguments window-next-buffers 2))"
+        );
+    }
+
+    #[test]
+    fn window_group_start_and_buffer_history_setters_match_batch_semantics() {
+        let forms = parse_forms(
+            "(list (equal (subr-arity (symbol-function 'window-group-start)) '(0 . 1))
+                   (equal (subr-arity (symbol-function 'set-window-group-start)) '(2 . 3))
+                   (equal (subr-arity (symbol-function 'set-window-prev-buffers)) '(2 . 2))
+                   (equal (subr-arity (symbol-function 'set-window-next-buffers)) '(2 . 2)))
+             (let* ((w (selected-window))
+                    (m (car (last (window-list nil t)))))
+               (list (= (window-group-start w) 1)
+                     (= (window-group-start m) 1)
+                     (null (window-prev-buffers w))
+                     (null (window-next-buffers w))
+                     (null (window-prev-buffers m))
+                     (null (window-next-buffers m))))
+             (let* ((w (selected-window))
+                    (p '((alpha 1 2)))
+                    (n '((beta 3 4))))
+               (list (equal (set-window-prev-buffers w p) p)
+                     (equal (window-prev-buffers w) p)
+                     (equal (set-window-next-buffers w n) n)
+                     (equal (window-next-buffers w) n)
+                     (null (set-window-prev-buffers w nil))
+                     (null (window-prev-buffers w))
+                     (null (set-window-next-buffers w nil))
+                     (null (window-next-buffers w))))
+             (let* ((m (car (last (window-list nil t))))
+                    (p '(mini-prev))
+                    (n '(mini-next)))
+               (list (= (set-window-group-start m 42) 42)
+                     (= (set-window-group-start m ?A t) 65)
+                     (= (window-group-start m) 1)
+                     (equal (set-window-prev-buffers m p) p)
+                     (equal (window-prev-buffers m) p)
+                     (equal (set-window-next-buffers m n) n)
+                     (equal (window-next-buffers m) n)
+                     (null (set-window-prev-buffers m nil))
+                     (null (set-window-next-buffers m nil))
+                     (null (window-prev-buffers m))
+                     (null (window-next-buffers m))))
+             (list (condition-case err (window-group-start 999999) (error (car err)))
+                   (condition-case err (set-window-group-start 999999 1) (error (car err)))
+                   (condition-case err (set-window-group-start nil 'foo) (error err))
+                   (condition-case err (set-window-prev-buffers 999999 nil) (error (car err)))
+                   (condition-case err (set-window-next-buffers 999999 nil) (error (car err)))
+                   (condition-case err (set-window-prev-buffers 'foo nil) (error (car err)))
+                   (condition-case err (set-window-next-buffers 'foo nil) (error (car err))))
+             (list (condition-case err (window-group-start nil nil) (error err))
+                   (condition-case err (set-window-group-start nil) (error err))
+                   (condition-case err (set-window-group-start nil nil nil nil) (error err))
+                   (condition-case err (set-window-prev-buffers nil) (error err))
+                   (condition-case err (set-window-next-buffers nil nil nil) (error err)))",
+        )
+        .expect("parse");
+        let mut ev = Evaluator::new();
+        let out = ev
+            .eval_forms(&forms)
+            .iter()
+            .map(format_eval_result)
+            .collect::<Vec<_>>();
+        assert_eq!(out[0], "OK (t t t t)");
+        assert_eq!(out[1], "OK (t t t t t t)");
+        assert_eq!(out[2], "OK (t t t t t t t t)");
+        assert_eq!(out[3], "OK (t t t t t t t t t t t)");
+        assert_eq!(
+            out[4],
+            "OK (wrong-type-argument wrong-type-argument (wrong-type-argument integer-or-marker-p foo) wrong-type-argument wrong-type-argument wrong-type-argument wrong-type-argument)"
+        );
+        assert_eq!(
+            out[5],
+            "OK ((wrong-number-of-arguments window-group-start 2) (wrong-number-of-arguments set-window-group-start 1) (wrong-number-of-arguments set-window-group-start 4) (wrong-number-of-arguments set-window-prev-buffers 1) (wrong-number-of-arguments set-window-next-buffers 3))"
         );
     }
 

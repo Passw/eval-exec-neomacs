@@ -7744,6 +7744,9 @@ pub(crate) fn dispatch_builtin(
         }
         "window-buffer" => return Some(super::window_cmds::builtin_window_buffer(eval, args)),
         "window-start" => return Some(super::window_cmds::builtin_window_start(eval, args)),
+        "window-group-start" => {
+            return Some(super::window_cmds::builtin_window_group_start(eval, args))
+        }
         "window-end" => return Some(super::window_cmds::builtin_window_end(eval, args)),
         "window-point" => return Some(super::window_cmds::builtin_window_point(eval, args)),
         "window-height" => return Some(super::window_cmds::builtin_window_height(eval, args)),
@@ -7830,6 +7833,11 @@ pub(crate) fn dispatch_builtin(
         "set-window-start" => {
             return Some(super::window_cmds::builtin_set_window_start(eval, args))
         }
+        "set-window-group-start" => {
+            return Some(super::window_cmds::builtin_set_window_group_start(
+                eval, args,
+            ))
+        }
         "set-window-hscroll" => {
             return Some(super::window_cmds::builtin_set_window_hscroll(
                 eval, args,
@@ -7867,6 +7875,16 @@ pub(crate) fn dispatch_builtin(
         }
         "set-window-point" => {
             return Some(super::window_cmds::builtin_set_window_point(eval, args))
+        }
+        "set-window-next-buffers" => {
+            return Some(super::window_cmds::builtin_set_window_next_buffers(
+                eval, args,
+            ))
+        }
+        "set-window-prev-buffers" => {
+            return Some(super::window_cmds::builtin_set_window_prev_buffers(
+                eval, args,
+            ))
         }
         "set-window-dedicated-p" => {
             return Some(super::window_cmds::builtin_set_window_dedicated_p(
