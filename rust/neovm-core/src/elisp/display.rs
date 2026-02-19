@@ -1196,19 +1196,26 @@ pub(crate) fn builtin_x_popup_dialog(args: Vec<Value>) -> EvalResult {
     }
 
     let contents = &args[1];
-    let items = list_to_vec(contents).ok_or_else(|| {
-        signal(
-            "wrong-type-argument",
-            vec![Value::symbol("listp"), contents.clone()],
-        )
-    })?;
-
-    let Some(title) = items.first() else {
+    if contents.is_nil() {
         return Err(signal(
             "wrong-type-argument",
             vec![Value::symbol("stringp"), Value::Nil],
         ));
+    }
+
+    let (title, rest) = match contents {
+        Value::Cons(cell) => {
+            let pair = cell.lock().expect("poisoned");
+            (pair.car.clone(), pair.cdr.clone())
+        }
+        other => {
+            return Err(signal(
+                "wrong-type-argument",
+                vec![Value::symbol("listp"), other.clone()],
+            ))
+        }
     };
+
     if !title.is_string() {
         return Err(signal(
             "wrong-type-argument",
@@ -1216,16 +1223,10 @@ pub(crate) fn builtin_x_popup_dialog(args: Vec<Value>) -> EvalResult {
         ));
     }
 
-    let Some(button_spec) = items.get(1) else {
+    if !rest.is_cons() {
         return Err(signal(
             "wrong-type-argument",
-            vec![Value::symbol("consp"), Value::Nil],
-        ));
-    };
-    if !button_spec.is_cons() {
-        return Err(signal(
-            "wrong-type-argument",
-            vec![Value::symbol("consp"), button_spec.clone()],
+            vec![Value::symbol("consp"), rest],
         ));
     }
 
@@ -1262,6 +1263,12 @@ pub(crate) fn builtin_x_popup_menu(args: Vec<Value>) -> EvalResult {
                 vec![Value::symbol("listp"), position_car],
             ));
         }
+        if menu.is_nil() {
+            return Err(signal(
+                "wrong-type-argument",
+                vec![Value::symbol("stringp"), Value::Nil],
+            ));
+        }
         return Err(signal(
             "wrong-type-argument",
             vec![Value::symbol("consp"), Value::True],
@@ -1275,16 +1282,92 @@ pub(crate) fn builtin_x_popup_menu(args: Vec<Value>) -> EvalResult {
         ));
     }
 
-    if position_car.is_nil() {
-        if menu.is_nil() {
-            return Err(signal(
-                "wrong-type-argument",
-                vec![Value::symbol("stringp"), Value::Nil],
-            ));
-        }
+    if !position_car.is_nil() {
+        let window_designator = match position_cdr {
+            Value::Cons(cell) => {
+                let pair = cell.lock().expect("poisoned");
+                pair.car.clone()
+            }
+            _ => Value::Nil,
+        };
         return Err(signal(
             "wrong-type-argument",
-            vec![Value::symbol("consp"), Value::True],
+            vec![Value::symbol("windowp"), window_designator],
+        ));
+    }
+
+    // This follows the menu descriptor shape expected by batch-mode oracle:
+    // MENU = (TITLE . REST), REST either nil or (PANE . _)
+    // PANE = (PANE-TITLE . PANE-ITEMS)
+    if menu.is_nil() {
+        return Err(signal(
+            "wrong-type-argument",
+            vec![Value::symbol("stringp"), Value::Nil],
+        ));
+    }
+
+    let (title, rest) = match menu {
+        Value::Cons(cell) => {
+            let pair = cell.lock().expect("poisoned");
+            (pair.car.clone(), pair.cdr.clone())
+        }
+        other => {
+            return Err(signal(
+                "wrong-type-argument",
+                vec![Value::symbol("listp"), other.clone()],
+            ))
+        }
+    };
+
+    if !title.is_string() {
+        return Err(signal(
+            "wrong-type-argument",
+            vec![Value::symbol("stringp"), title],
+        ));
+    }
+
+    if rest.is_nil() {
+        return Ok(Value::Nil);
+    }
+
+    let pane = match rest {
+        Value::Cons(cell) => {
+            let pair = cell.lock().expect("poisoned");
+            pair.car.clone()
+        }
+        other => {
+            return Err(signal(
+                "wrong-type-argument",
+                vec![Value::symbol("listp"), other],
+            ))
+        }
+    };
+
+    let (pane_title, pane_items) = match pane {
+        Value::Cons(cell) => {
+            let pair = cell.lock().expect("poisoned");
+            (pair.car.clone(), pair.cdr.clone())
+        }
+        Value::Nil => (Value::Nil, Value::Nil),
+        other => {
+            return Err(signal(
+                "wrong-type-argument",
+                vec![Value::symbol("listp"), other],
+            ))
+        }
+    };
+
+    if !pane_title.is_string() {
+        return Err(signal(
+            "wrong-type-argument",
+            vec![Value::symbol("stringp"), pane_title],
+        ));
+    }
+
+    if !pane_items.is_cons() {
+        return Err(signal(
+            "wrong-type-argument",
+            vec![Value::symbol("consp"), pane_items],
         ));
     }
 
@@ -3567,6 +3650,14 @@ mod tests {
             .unwrap()
             .is_nil()
         );
+        assert!(
+            builtin_x_popup_dialog(vec![
+                Value::Frame(1),
+                Value::list(vec![Value::string("A"), Value::Int(1)]),
+            ])
+            .unwrap()
+            .is_nil()
+        );
         for arg in [Value::string("x"), Value::Int(1), term.clone()] {
             match builtin_x_popup_dialog(vec![arg, Value::Nil]) {
                 Err(Flow::Signal(sig)) => {
@@ -3589,76 +3680,223 @@ mod tests {
             other => panic!("expected wrong-number-of-arguments signal, got {other:?}"),
         }
 
-        assert!(builtin_x_popup_menu(vec![Value::Nil, Value::Nil])
-            .unwrap()
-            .is_nil());
+        let assert_wta = |result: EvalResult, pred: &str, arg: Value| match result {
+            Err(Flow::Signal(sig)) => {
+                assert_eq!(sig.symbol, "wrong-type-argument");
+                assert_eq!(sig.data, vec![Value::symbol(pred), arg]);
+            }
+            other => panic!("expected wrong-type-argument signal, got {other:?}"),
+        };
+        let basic_menu = Value::list(vec![
+            Value::string("A"),
+            Value::cons(Value::string("Yes"), Value::True),
+        ]);
+
+        assert!(builtin_x_popup_menu(vec![Value::Nil, Value::Nil]).unwrap().is_nil());
+        assert!(
+            builtin_x_popup_menu(vec![Value::Nil, basic_menu.clone()])
+                .unwrap()
+                .is_nil()
+        );
+        for pos in [Value::Frame(1), Value::string("x"), Value::Int(1), term] {
+            assert_wta(
+                builtin_x_popup_menu(vec![pos.clone(), Value::Nil]),
+                "listp",
+                pos,
+            );
+        }
+
+        assert_wta(
+            builtin_x_popup_menu(vec![Value::list(vec![Value::Int(0), Value::Int(0)]), Value::Nil]),
+            "listp",
+            Value::Int(0),
+        );
+        assert_wta(
+            builtin_x_popup_menu(vec![Value::list(vec![Value::Int(0), Value::Int(0)]), basic_menu.clone()]),
+            "listp",
+            Value::Int(0),
+        );
+        assert_wta(
+            builtin_x_popup_menu(vec![Value::list(vec![Value::Nil]), Value::Nil]),
+            "stringp",
+            Value::Nil,
+        );
+        assert_wta(
+            builtin_x_popup_menu(vec![Value::list(vec![Value::Nil]), basic_menu.clone()]),
+            "consp",
+            Value::True,
+        );
+        assert_wta(
+            builtin_x_popup_menu(vec![Value::list(vec![Value::symbol("menu-bar")]), Value::Nil]),
+            "stringp",
+            Value::Nil,
+        );
+        assert_wta(
+            builtin_x_popup_menu(vec![Value::list(vec![Value::symbol("menu-bar")]), basic_menu.clone()]),
+            "consp",
+            Value::True,
+        );
+        assert_wta(
+            builtin_x_popup_menu(vec![Value::list(vec![Value::symbol("mouse-1")]), Value::Nil]),
+            "stringp",
+            Value::Nil,
+        );
+        assert_wta(
+            builtin_x_popup_menu(vec![Value::list(vec![Value::symbol("mouse-1")]), basic_menu.clone()]),
+            "consp",
+            Value::True,
+        );
+
+        assert_wta(
+            builtin_x_popup_menu(vec![Value::list(vec![Value::Nil, Value::Nil]), Value::Nil]),
+            "stringp",
+            Value::Nil,
+        );
+        assert_wta(
+            builtin_x_popup_menu(vec![Value::list(vec![Value::Nil, Value::Nil]), basic_menu.clone()]),
+            "consp",
+            Value::True,
+        );
         assert!(
             builtin_x_popup_menu(vec![
-                Value::Nil,
+                Value::list(vec![Value::Nil, Value::Nil]),
+                Value::list(vec![Value::string("A")]),
+            ])
+            .unwrap()
+            .is_nil()
+        );
+        assert_wta(
+            builtin_x_popup_menu(vec![
+                Value::list(vec![Value::Nil, Value::Nil]),
+                Value::list(vec![Value::string("A"), Value::Int(1)]),
+            ]),
+            "listp",
+            Value::Int(1),
+        );
+        assert_wta(
+            builtin_x_popup_menu(vec![
+                Value::list(vec![Value::Nil, Value::Nil]),
+                Value::list(vec![Value::Int(1), Value::cons(Value::string("Yes"), Value::True)]),
+            ]),
+            "stringp",
+            Value::Int(1),
+        );
+        assert_wta(
+            builtin_x_popup_menu(vec![
+                Value::list(vec![Value::Nil, Value::Nil]),
+                Value::list(vec![Value::cons(Value::string("A"), Value::True)]),
+            ]),
+            "stringp",
+            Value::cons(Value::string("A"), Value::True),
+        );
+        assert_wta(
+            builtin_x_popup_menu(vec![Value::list(vec![Value::Nil, Value::Nil]), Value::Int(1)]),
+            "listp",
+            Value::Int(1),
+        );
+        assert_wta(
+            builtin_x_popup_menu(vec![Value::list(vec![Value::Nil, Value::Nil]), Value::string("x")]),
+            "listp",
+            Value::string("x"),
+        );
+        assert_wta(
+            builtin_x_popup_menu(vec![
+                Value::list(vec![Value::Nil, Value::Nil]),
+                Value::list(vec![Value::string("A"), Value::Nil]),
+            ]),
+            "stringp",
+            Value::Nil,
+        );
+        assert_wta(
+            builtin_x_popup_menu(vec![
+                Value::list(vec![Value::Nil, Value::Nil]),
                 Value::list(vec![
                     Value::string("A"),
-                    Value::cons(Value::string("Yes"), Value::True),
+                    Value::list(vec![Value::string("Pane")]),
+                ]),
+            ]),
+            "consp",
+            Value::Nil,
+        );
+        assert!(
+            builtin_x_popup_menu(vec![
+                Value::list(vec![Value::Nil, Value::Nil]),
+                Value::list(vec![
+                    Value::string("A"),
+                    Value::list(vec![Value::string("Pane"), Value::Nil]),
                 ]),
             ])
             .unwrap()
             .is_nil()
         );
-        for pos in [Value::Frame(1), Value::string("x"), Value::Int(1), term] {
-            match builtin_x_popup_menu(vec![pos.clone(), Value::Nil]) {
-                Err(Flow::Signal(sig)) => {
-                    assert_eq!(sig.symbol, "wrong-type-argument");
-                    assert_eq!(sig.data, vec![Value::symbol("listp"), pos]);
-                }
-                other => panic!("expected wrong-type-argument signal, got {other:?}"),
-            }
-        }
-        match builtin_x_popup_menu(vec![Value::list(vec![Value::Int(0), Value::Int(0)]), Value::Nil]) {
-            Err(Flow::Signal(sig)) => {
-                assert_eq!(sig.symbol, "wrong-type-argument");
-                assert_eq!(sig.data, vec![Value::symbol("listp"), Value::Int(0)]);
-            }
-            other => panic!("expected wrong-type-argument signal, got {other:?}"),
-        }
-        match builtin_x_popup_menu(vec![
-            Value::list(vec![Value::Int(0), Value::Int(0)]),
-            Value::list(vec![
-                Value::string("A"),
-                Value::cons(Value::string("Yes"), Value::True),
+        assert!(
+            builtin_x_popup_menu(vec![
+                Value::list(vec![Value::Nil, Value::Nil]),
+                Value::list(vec![
+                    Value::string("A"),
+                    Value::list(vec![
+                        Value::string("Pane"),
+                        Value::cons(Value::string("Y"), Value::True),
+                    ]),
+                ]),
+            ])
+            .unwrap()
+            .is_nil()
+        );
+        assert_wta(
+            builtin_x_popup_menu(vec![
+                Value::list(vec![Value::Nil, Value::Nil]),
+                Value::list(vec![
+                    Value::string("A"),
+                    Value::cons(Value::string("Pane"), Value::Int(1)),
+                ]),
             ]),
-        ]) {
-            Err(Flow::Signal(sig)) => {
-                assert_eq!(sig.symbol, "wrong-type-argument");
-                assert_eq!(sig.data, vec![Value::symbol("listp"), Value::Int(0)]);
-            }
-            other => panic!("expected wrong-type-argument signal, got {other:?}"),
-        }
-        match builtin_x_popup_menu(vec![Value::list(vec![Value::Nil, Value::Nil]), Value::Nil]) {
-            Err(Flow::Signal(sig)) => {
-                assert_eq!(sig.symbol, "wrong-type-argument");
-                assert_eq!(sig.data, vec![Value::symbol("stringp"), Value::Nil]);
-            }
-            other => panic!("expected wrong-type-argument signal, got {other:?}"),
-        }
-        match builtin_x_popup_menu(vec![
-            Value::list(vec![Value::Nil, Value::Nil]),
-            Value::list(vec![
-                Value::string("A"),
-                Value::cons(Value::string("Yes"), Value::True),
+            "consp",
+            Value::Int(1),
+        );
+        assert_wta(
+            builtin_x_popup_menu(vec![
+                Value::list(vec![Value::Nil, Value::Nil]),
+                Value::list(vec![
+                    Value::string("A"),
+                    Value::cons(Value::Int(1), Value::Int(2)),
+                ]),
             ]),
-        ]) {
-            Err(Flow::Signal(sig)) => {
-                assert_eq!(sig.symbol, "wrong-type-argument");
-                assert_eq!(sig.data, vec![Value::symbol("consp"), Value::True]);
-            }
-            other => panic!("expected wrong-type-argument signal, got {other:?}"),
-        }
-        match builtin_x_popup_menu(vec![Value::cons(Value::list(vec![Value::Int(0), Value::Int(0)]), Value::Int(0)), Value::Nil]) {
-            Err(Flow::Signal(sig)) => {
-                assert_eq!(sig.symbol, "wrong-type-argument");
-                assert_eq!(sig.data, vec![Value::symbol("listp"), Value::Int(0)]);
-            }
-            other => panic!("expected wrong-type-argument signal, got {other:?}"),
-        }
+            "stringp",
+            Value::Int(1),
+        );
+
+        assert_wta(
+            builtin_x_popup_menu(vec![Value::list(vec![Value::list(vec![Value::Int(0), Value::Int(0)])]), Value::Nil]),
+            "windowp",
+            Value::Nil,
+        );
+        assert_wta(
+            builtin_x_popup_menu(vec![Value::list(vec![Value::list(vec![Value::Int(0), Value::Int(0)])]), basic_menu.clone()]),
+            "windowp",
+            Value::Nil,
+        );
+        assert_wta(
+            builtin_x_popup_menu(vec![
+                Value::list(vec![Value::list(vec![Value::Int(0), Value::Int(0)]), Value::Int(1)]),
+                Value::Nil,
+            ]),
+            "windowp",
+            Value::Int(1),
+        );
+        assert_wta(
+            builtin_x_popup_menu(vec![
+                Value::list(vec![Value::list(vec![Value::Int(0), Value::Int(0)]), Value::Int(1)]),
+                basic_menu,
+            ]),
+            "windowp",
+            Value::Int(1),
+        );
+        assert_wta(
+            builtin_x_popup_menu(vec![Value::cons(Value::list(vec![Value::Int(0), Value::Int(0)]), Value::Int(0)), Value::Nil]),
+            "listp",
+            Value::Int(0),
+        );
         match builtin_x_popup_menu(vec![]) {
             Err(Flow::Signal(sig)) => assert_eq!(sig.symbol, "wrong-number-of-arguments"),
             other => panic!("expected wrong-number-of-arguments signal, got {other:?}"),

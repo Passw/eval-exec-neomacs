@@ -28,6 +28,26 @@ Last updated: 2026-02-19
 
 ## Doing
 
+- Aligned `x-popup-dialog` / `x-popup-menu` batch-shape compatibility against oracle, including position/menu parser error payload parity:
+  - runtime changes:
+    - `rust/neovm-core/src/elisp/display.rs`
+      - tightened `x-popup-dialog` and `x-popup-menu` argument-shape validation to match oracle `wrong-type-argument` predicates and payload values across:
+        - popup menu position forms (`nil`, `(nil)`, `(nil nil)`, `(0 0)`, `((0 0))`, `((0 0) 1)`, `(menu-bar)`, `(mouse-1)`, dotted tails).
+        - menu descriptor forms (title/pane/pane-item list and dotted-pair boundaries).
+      - expanded unit lock-ins in `x_popup_dialog_and_menu_batch_semantics` with the full shape/error matrix.
+  - corpus changes:
+    - updated:
+      - `test/neovm/vm-compat/cases/x-popup-restack-semantics.forms`
+      - `test/neovm/vm-compat/cases/x-popup-restack-semantics.expected.tsv`
+    - lock-ins now include extended popup-menu shape coverage and retained `x-frame-restack` arity checks.
+  - verified:
+    - `cargo test --manifest-path rust/neovm-core/Cargo.toml x_popup_dialog_and_menu_batch_semantics -- --nocapture` (pass)
+    - `cargo test --manifest-path rust/neovm-core/Cargo.toml x_popup_ -- --nocapture` (pass)
+    - `cargo test --manifest-path rust/neovm-core/Cargo.toml subr_arity_display_terminal_primitives_match_oracle -- --nocapture` (pass)
+    - `make -C test/neovm/vm-compat record FORMS=cases/x-popup-restack-semantics.forms EXPECTED=cases/x-popup-restack-semantics.expected.tsv` (pass)
+    - `make -C test/neovm/vm-compat check-one-neovm CASE=cases/x-popup-restack-semantics` (pass, `4/4`)
+    - `make -C test/neovm/vm-compat check-all-neovm-strict` (pass; case inventory `771`)
+
 - Added `x-*` selection/resource/property/font compatibility slice and locked oracle parity:
   - runtime changes:
     - `rust/neovm-core/src/elisp/display.rs`
