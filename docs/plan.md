@@ -132,6 +132,20 @@ Last updated: 2026-02-19
     - `make -C test/neovm/vm-compat check-one-neovm CASE=cases/read-batch-input-semantics` (pass, `45/45`)
     - `make -C test/neovm/vm-compat check-all-neovm-strict` (pass)
 
+- Resolved extension-vs-oracle policy documentation for `neovm-precompile-file`:
+  - docs/policy updates:
+    - `test/neovm/vm-compat/cases/builtin-registry-extension-policy.txt`
+      - documented the extension-policy contract and required vm-compat lock-ins.
+    - `test/neovm/vm-compat/README.md`
+      - added dedicated extension policy subsection for `neovm-precompile-file` with
+        oracle/NeoVM `fboundp` expectations and gating commands.
+    - `docs/elisp-vm-design.md`
+      - added explicit extension-policy notes under compatibility scope.
+    - `docs/ongoing-tasks.md`
+      - removed stale heredoc artifact and refreshed batching language.
+  - verified:
+    - `make -C test/neovm/vm-compat check-builtin-registry-extension-policy` (pass)
+
 - Aligned `read-char` / `read-char-exclusive` command-key publication with oracle:
   - runtime changes:
     - `rust/neovm-core/src/elisp/reader.rs`

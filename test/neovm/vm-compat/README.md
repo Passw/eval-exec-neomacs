@@ -301,6 +301,28 @@ rejection and `.neoc` fallback safety) plus NeoVM extension behavior
 (`neovm-precompile-file` cache warming), and default-build `#[...]` literal
 non-callability policy (`cases/bytecode-literal-default-policy`).
 
+### Extension policy note: `neovm-precompile-file`
+
+`neovm-precompile-file` is an intentional NeoVM extension symbol, not part of
+GNU Emacs core compatibility.
+
+- Oracle expectation: `(fboundp 'neovm-precompile-file)` is `nil`
+- NeoVM expectation: `(fboundp 'neovm-precompile-file)` is `t`
+
+The policy is enforced by:
+
+- `cases/builtin-registry-extension-policy.txt` (declared extension set)
+- `check-builtin-registry-extension-policy.sh` (oracle-vs-neovm `fboundp` gate)
+- `cases/neovm-precompile-function-cell-semantics` (function-cell shape lock-in)
+- `cases/precompile` (runtime extension behavior lock-in)
+
+Run the extension policy gate directly:
+
+```bash
+cd test/neovm/vm-compat
+make check-builtin-registry-extension-policy
+```
+
 You can also precompile source files into NeoVM cache sidecars ahead of load:
 
 ```bash

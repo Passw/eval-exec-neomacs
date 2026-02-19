@@ -29,6 +29,15 @@ Compatibility scope is source-first and explicit:
 - `.elc` (GNU Emacs byte-compiled artifact): unsupported; loader must signal `file-error`.
 - `.neoc` (NeoVM parse cache sidecar): optional internal optimization artifact; never part of compatibility contract.
 
+Extension policy is explicit and narrow:
+
+- NeoVM extension symbols (currently `neovm-precompile-file`) are not treated
+  as GNU Emacs parity targets.
+- They are tracked as extension-only names in
+  `test/neovm/vm-compat/cases/builtin-registry-extension-policy.txt`.
+- vm-compat gate `make -C test/neovm/vm-compat check-builtin-registry-extension-policy`
+  enforces oracle `fboundp=nil` and NeoVM `fboundp=t` for extension names.
+
 ## Compatibility Verification Harness
 
 NeoVM compatibility should be verified continuously against GNU Emacs oracle results.
