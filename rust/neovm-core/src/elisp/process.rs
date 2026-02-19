@@ -1314,7 +1314,10 @@ fn resolve_network_lookup_addresses(
         }
     }
 
-    let c_name = match CString::new(name) {
+    // Emacs forwards names through C APIs where embedded NUL terminates the
+    // effective hostname. Match that behavior instead of rejecting interior NUL.
+    let normalized_name = name.split('\0').next().unwrap_or_default();
+    let c_name = match CString::new(normalized_name) {
         Ok(value) => value,
         Err(_) => return Vec::new(),
     };
@@ -5088,6 +5091,17 @@ mod tests {
     }
 
     #[test]
+    fn network_lookup_embedded_nul_normalizes_like_c_strings() {
+        let plain = resolve_network_lookup_addresses("abc", None);
+        let embedded_nul = resolve_network_lookup_addresses("abc\0def", None);
+        assert_eq!(embedded_nul, plain);
+
+        let empty = resolve_network_lookup_addresses("", None);
+        let nul_only = resolve_network_lookup_addresses("\0", None);
+        assert_eq!(nul_only, empty);
+    }
+
+    #[test]
     fn process_network_interface_and_signal_runtime_surface() {
         let results = eval_all(
             r#"(mapcar (lambda (s)
@@ -5256,6 +5270,10 @@ mod tests {
                       (setq ok (= (length (car entries)) 9))
                       (setq entries (cdr entries)))
                     ok)
+                  (equal (network-lookup-address-info (concat "abc" (string 0) "def"))
+                         (network-lookup-address-info "abc"))
+                  (equal (network-lookup-address-info (string 0))
+                         (network-lookup-address-info ""))
                   (condition-case err (network-lookup-address-info "localhost" t) (error err))
                   (condition-case err (network-lookup-address-info "localhost" 'ipv4 t) (error err))
                   (condition-case err (network-lookup-address-info 1) (error err))
@@ -5272,7 +5290,7 @@ mod tests {
         );
         assert_eq!(
             results[1],
-            "OK (\"127.0.0.1:80\" \"127.0.0.1\" \"[0:0:0:0:0:0:0:1]:80\" \"0:0:0:0:0:0:0:1\" \"x\" nil nil nil nil (wrong-number-of-arguments format-network-address 0) t t t t t t t (wrong-number-of-arguments network-interface-list 3) (error \"Unsupported address family\") t t t t t t t t t (wrong-type-argument stringp nil) (error \"interface name too long\") t t t t t t t t t t (error \"Unsupported family\") (error \"Unsupported hints value\") (wrong-type-argument stringp 1) t t t (wrong-number-of-arguments signal-names 1) (void-function process-connection))"
+            "OK (\"127.0.0.1:80\" \"127.0.0.1\" \"[0:0:0:0:0:0:0:1]:80\" \"0:0:0:0:0:0:0:1\" \"x\" nil nil nil nil (wrong-number-of-arguments format-network-address 0) t t t t t t t (wrong-number-of-arguments network-interface-list 3) (error \"Unsupported address family\") t t t t t t t t t (wrong-type-argument stringp nil) (error \"interface name too long\") t t t t t t t t t t t t (error \"Unsupported family\") (error \"Unsupported hints value\") (wrong-type-argument stringp 1) t t t (wrong-number-of-arguments signal-names 1) (void-function process-connection))"
         );
     }
 }

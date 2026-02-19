@@ -28,6 +28,26 @@ Last updated: 2026-02-19
 
 ## Doing
 
+- Fixed embedded-NUL hostname handling in `network-lookup-address-info`:
+  - runtime changes:
+    - `rust/neovm-core/src/elisp/process.rs`
+      - normalized lookup names by truncating at first `\0` before calling `getaddrinfo`, matching Emacs C-string hostname behavior instead of returning `nil` on interior NUL.
+      - added helper lock-in:
+        - `network_lookup_embedded_nul_normalizes_like_c_strings`.
+      - expanded runtime surface lock-ins to assert:
+        - `(network-lookup-address-info (concat "abc" (string 0) "def")) == (network-lookup-address-info "abc")`
+        - `(network-lookup-address-info (string 0)) == (network-lookup-address-info "")`
+  - corpus changes:
+    - expanded and re-recorded:
+      - `test/neovm/vm-compat/cases/process-network-interface-signal-semantics.forms`
+      - `test/neovm/vm-compat/cases/process-network-interface-signal-semantics.expected.tsv`
+  - verified:
+    - `cargo test --manifest-path rust/neovm-core/Cargo.toml network_lookup_embedded_nul_normalizes_like_c_strings` (pass)
+    - `cargo test --manifest-path rust/neovm-core/Cargo.toml process_network_interface_and_signal_runtime_surface` (pass)
+    - `make -C test/neovm/vm-compat record FORMS=cases/process-network-interface-signal-semantics.forms EXPECTED=cases/process-network-interface-signal-semantics.expected.tsv` (pass)
+    - `make -C test/neovm/vm-compat check-one-neovm CASE=cases/process-network-interface-signal-semantics` (pass, `2/2`)
+    - `make -C test/neovm/vm-compat check-all-neovm-strict` (pass; case inventory `788`)
+
 - Added `network-interface-info` coherence lock-ins against list snapshots:
   - runtime lock-ins:
     - `rust/neovm-core/src/elisp/process.rs`
