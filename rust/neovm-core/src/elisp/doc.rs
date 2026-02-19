@@ -10833,12 +10833,15 @@ fn describe_function_first_line(name: &str, function: &Value) -> String {
                 let is_macro =
                     matches!(items.get(4).and_then(Value::as_symbol_name), Some("macro"));
                 let kind = if is_macro { "Lisp macro" } else { "Lisp function" };
-                let file = items
+                let file_clause = items
                     .get(1)
                     .and_then(Value::as_str)
-                    .map(describe_function_autoload_file)
-                    .unwrap_or_else(|| "loaddefs.el".to_string());
-                return format!("{name} is an autoloaded {kind} in ‘{file}’.");
+                    .and_then(describe_function_autoload_file_clause);
+                return if let Some(file) = file_clause {
+                    format!("{name} is an autoloaded {kind} in ‘{file}’.")
+                } else {
+                    format!("{name} is an autoloaded {kind}.")
+                };
             }
 
             let pair = match cell.lock() {
@@ -10855,12 +10858,11 @@ fn describe_function_first_line(name: &str, function: &Value) -> String {
     }
 }
 
-fn describe_function_autoload_file(file: &str) -> String {
-    if file.ends_with(".el") {
-        file.to_string()
-    } else {
-        format!("{file}.el")
+fn describe_function_autoload_file_clause(file: &str) -> Option<String> {
+    if file.is_empty() || file.contains('/') || file.contains('\\') || file.contains('.') {
+        return None;
     }
+    Some(format!("{file}.el"))
 }
 
 /// `(describe-variable VARIABLE)` -- return the documentation string for a
@@ -13002,6 +13004,94 @@ mod tests {
                 .is_some_and(
                     |s| s.contains("vm-autoload-macro is an autoloaded Lisp macro in ‘files.el’")
                 )
+        );
+    }
+
+    #[test]
+    fn describe_function_autoload_file_clause_is_only_used_for_bare_file_names() {
+        let mut evaluator = super::super::eval::Evaluator::new();
+
+        let autoload_bare = Value::list(vec![
+            Value::symbol("autoload"),
+            Value::string("files"),
+            Value::string("doc"),
+            Value::Nil,
+            Value::Nil,
+        ]);
+        evaluator
+            .obarray
+            .set_symbol_function("vm-autoload-bare", autoload_bare);
+
+        let autoload_el = Value::list(vec![
+            Value::symbol("autoload"),
+            Value::string("files.el"),
+            Value::string("doc"),
+            Value::Nil,
+            Value::Nil,
+        ]);
+        evaluator
+            .obarray
+            .set_symbol_function("vm-autoload-el", autoload_el);
+
+        let autoload_elc = Value::list(vec![
+            Value::symbol("autoload"),
+            Value::string("files.elc"),
+            Value::string("doc"),
+            Value::Nil,
+            Value::Nil,
+        ]);
+        evaluator
+            .obarray
+            .set_symbol_function("vm-autoload-elc", autoload_elc);
+
+        let autoload_path = Value::list(vec![
+            Value::symbol("autoload"),
+            Value::string("/tmp/files"),
+            Value::string("doc"),
+            Value::Nil,
+            Value::Nil,
+        ]);
+        evaluator
+            .obarray
+            .set_symbol_function("vm-autoload-path", autoload_path);
+
+        let bare =
+            builtin_describe_function(&mut evaluator, vec![Value::symbol("vm-autoload-bare")]);
+        assert!(bare.is_ok());
+        assert!(
+            bare.unwrap()
+                .as_str()
+                .is_some_and(|s| s.contains("autoloaded Lisp function in ‘files.el’"))
+        );
+
+        let el = builtin_describe_function(&mut evaluator, vec![Value::symbol("vm-autoload-el")]);
+        assert!(el.is_ok());
+        assert!(
+            el.unwrap().as_str().is_some_and(
+                |s| s.contains("autoloaded Lisp function.") && !s.contains(" in ‘files.el’")
+            )
+        );
+
+        let elc =
+            builtin_describe_function(&mut evaluator, vec![Value::symbol("vm-autoload-elc")]);
+        assert!(elc.is_ok());
+        assert!(
+            elc.unwrap().as_str().is_some_and(
+                |s| s.contains("autoloaded Lisp function.")
+                    && !s.contains("files.elc")
+                    && !s.contains("files.elc.el")
+            )
+        );
+
+        let path =
+            builtin_describe_function(&mut evaluator, vec![Value::symbol("vm-autoload-path")]);
+        assert!(path.is_ok());
+        assert!(
+            path.unwrap().as_str().is_some_and(
+                |s| s.contains("autoloaded Lisp function.")
+                    && !s.contains("/tmp/files")
+                    && !s.contains("/tmp/files.el")
+            )
         );
     }
 

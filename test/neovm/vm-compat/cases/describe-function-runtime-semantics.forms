@@ -32,3 +32,23 @@
     (list
      (not (null (string-match-p "alias for ‘car’" s)))
      (null (string-match-p "`car`" s)))))
+(progn
+  (autoload 'vm-desc-fn-auto-el-shape "files.el" "doc" nil nil)
+  (let ((s (describe-function 'vm-desc-fn-auto-el-shape)))
+    (list
+     (not (null (string-match-p "autoloaded Lisp function\\." s)))
+     (null (string-match-p " in ‘files.el’" s)))))
+(progn
+  (autoload 'vm-desc-fn-auto-elc-shape "files.elc" "doc" nil nil)
+  (let ((s (describe-function 'vm-desc-fn-auto-elc-shape)))
+    (list
+     (not (null (string-match-p "autoloaded Lisp function\\." s)))
+     (null (string-match-p "files.elc" s))
+     (null (string-match-p "files.elc.el" s)))))
+(progn
+  (autoload 'vm-desc-fn-auto-path-shape "/tmp/files" "doc" nil nil)
+  (let ((s (describe-function 'vm-desc-fn-auto-path-shape)))
+    (list
+     (not (null (string-match-p "autoloaded Lisp function\\." s)))
+     (null (string-match-p "/tmp/files" s))
+     (null (string-match-p "/tmp/files.el" s)))))

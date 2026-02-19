@@ -4296,6 +4296,26 @@ Last updated: 2026-02-19
 
 ## Done
 
+- Aligned `describe-function` autoload file-clause semantics with GNU Emacs for dotted/path autoload files:
+  - runtime changes:
+    - `rust/neovm-core/src/elisp/doc.rs`
+      - updated autoload first-line shaping so `in ‘<file>.el’` is emitted only for bare autoload file names (for example `"files"`).
+      - `.el` / `.elc` / `.el.gz` and path-like autoload files now omit the file clause instead of appending `.el`.
+      - added evaluator lock-in:
+        - `describe_function_autoload_file_clause_is_only_used_for_bare_file_names`
+  - corpus changes:
+    - expanded and re-recorded:
+      - `test/neovm/vm-compat/cases/describe-function-runtime-semantics.{forms,expected.tsv}`
+      - added lock-ins for:
+        - `.el` autoload file shape (no `in ‘files.el’` clause)
+        - `.elc` autoload file shape (no `files.elc` / `files.elc.el`)
+        - path autoload file shape (no path file clause)
+  - verified:
+    - `cargo test --manifest-path rust/neovm-core/Cargo.toml describe_function_` (pass, 18/18)
+    - `make -C test/neovm/vm-compat record FORMS=cases/describe-function-runtime-semantics.forms EXPECTED=cases/describe-function-runtime-semantics.expected.tsv` (pass)
+    - `make -C test/neovm/vm-compat check-one-neovm CASE=cases/describe-function-runtime-semantics` (pass, 19/19)
+    - `make -C test/neovm/vm-compat check-all-neovm-strict` (pass)
+
 - Aligned `font-xlfd-name` non-folded and fold-wildcard behavior with GNU Emacs XLFD rules:
   - `rust/neovm-core/src/elisp/font.rs`
     - Implemented full XLFD field mapping for font-spec keys (`foundry`, `family`, `weight`, `slant`, `set-width`, `adstyle`, `size`, `dpi`, `spacing`, `avg-width`, `registry`).
