@@ -871,6 +871,41 @@ pub(crate) fn builtin_window_hscroll(
     }
 }
 
+/// `(window-vscroll &optional WINDOW PIXELWISE)` -> integer.
+///
+/// Batch-mode GNU Emacs reports zero vertical scroll, including for minibuffer
+/// windows; `PIXELWISE` is accepted but ignored.
+pub(crate) fn builtin_window_vscroll(
+    eval: &mut super::eval::Evaluator,
+    args: Vec<Value>,
+) -> EvalResult {
+    expect_max_args("window-vscroll", &args, 2)?;
+    let _ = ensure_selected_frame_id(eval);
+    let (_fid, _wid) = resolve_window_id(eval, args.first())?;
+    Ok(Value::Int(0))
+}
+
+/// `(set-window-vscroll WINDOW VSCROLL &optional PIXELWISE PRESERVE)` -> integer.
+///
+/// We currently model batch semantics where visible vertical scrolling remains
+/// zero; argument validation follows GNU Emacs (`WINDOW` live predicate and
+/// `VSCROLL` as `numberp`).
+pub(crate) fn builtin_set_window_vscroll(
+    eval: &mut super::eval::Evaluator,
+    args: Vec<Value>,
+) -> EvalResult {
+    expect_min_args("set-window-vscroll", &args, 2)?;
+    expect_max_args("set-window-vscroll", &args, 4)?;
+    let (_fid, _wid) = resolve_window_id(eval, args.first())?;
+    match &args[1] {
+        Value::Int(_) | Value::Float(_) | Value::Char(_) => Ok(Value::Int(0)),
+        other => Err(signal(
+            "wrong-type-argument",
+            vec![Value::symbol("numberp"), other.clone()],
+        )),
+    }
+}
+
 /// `(window-margins &optional WINDOW)` -> margins pair or nil.
 pub(crate) fn builtin_window_margins(
     eval: &mut super::eval::Evaluator,
@@ -3200,6 +3235,48 @@ mod tests {
             out[2],
             "OK ((wrong-type-argument window-live-p 999999) (wrong-type-argument window-live-p 999999) (wrong-type-argument window-live-p 999999) (wrong-type-argument window-live-p 999999) (wrong-type-argument window-live-p 999999) (wrong-number-of-arguments window-use-time 2) (wrong-number-of-arguments window-old-point 2) (wrong-number-of-arguments window-old-buffer 2) (wrong-number-of-arguments window-prev-buffers 2) (wrong-number-of-arguments window-next-buffers 2))"
         );
+    }
+
+    #[test]
+    fn window_vscroll_helpers_match_batch_defaults_and_error_predicates() {
+        let forms = parse_forms(
+            "(let* ((w (selected-window))
+                    (m (car (last (window-list nil t)))))
+               (list (window-vscroll w)
+                     (window-vscroll m)
+                     (window-vscroll w t)
+                     (window-vscroll m t)
+                     (set-window-vscroll w 1)
+                     (set-window-vscroll w 2 t)
+                     (set-window-vscroll w 3 t t)
+                     (set-window-vscroll nil 1.5)
+                     (window-vscroll w)
+                     (window-vscroll w t)))
+             (list (condition-case err (window-vscroll 999999) (error err))
+                   (condition-case err (window-vscroll 'foo) (error err))
+                   (condition-case err (set-window-vscroll 999999 1) (error err))
+                   (condition-case err (set-window-vscroll 'foo 1) (error err))
+                   (condition-case err (set-window-vscroll nil 'foo) (error err))
+                   (condition-case err (window-vscroll nil nil nil) (error err))
+                   (condition-case err (set-window-vscroll nil 1 nil nil nil) (error err)))
+             (let ((w (split-window)))
+               (delete-window w)
+               (list (condition-case err (window-vscroll w) (error (car err)))
+                     (condition-case err (set-window-vscroll w 1) (error (car err)))))",
+        )
+        .expect("parse");
+        let mut ev = Evaluator::new();
+        let out = ev
+            .eval_forms(&forms)
+            .iter()
+            .map(format_eval_result)
+            .collect::<Vec<_>>();
+        assert_eq!(out[0], "OK (0 0 0 0 0 0 0 0 0 0)");
+        assert_eq!(
+            out[1],
+            "OK ((wrong-type-argument window-live-p 999999) (wrong-type-argument window-live-p foo) (wrong-type-argument window-live-p 999999) (wrong-type-argument window-live-p foo) (wrong-type-argument numberp foo) (wrong-number-of-arguments window-vscroll 3) (wrong-number-of-arguments set-window-vscroll 5))"
+        );
+        assert_eq!(out[2], "OK (wrong-type-argument wrong-type-argument)");
     }
 
     #[test]

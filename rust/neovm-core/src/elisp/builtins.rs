@@ -7739,6 +7739,7 @@ pub(crate) fn dispatch_builtin(
         }
         "window-top-line" => return Some(super::window_cmds::builtin_window_top_line(eval, args)),
         "window-hscroll" => return Some(super::window_cmds::builtin_window_hscroll(eval, args)),
+        "window-vscroll" => return Some(super::window_cmds::builtin_window_vscroll(eval, args)),
         "window-margins" => return Some(super::window_cmds::builtin_window_margins(eval, args)),
         "window-fringes" => return Some(super::window_cmds::builtin_window_fringes(eval, args)),
         "window-scroll-bars" => {
@@ -7803,6 +7804,11 @@ pub(crate) fn dispatch_builtin(
         "window-live-p" => return Some(super::window_cmds::builtin_window_live_p(eval, args)),
         "set-window-start" => {
             return Some(super::window_cmds::builtin_set_window_start(eval, args))
+        }
+        "set-window-vscroll" => {
+            return Some(super::window_cmds::builtin_set_window_vscroll(
+                eval, args,
+            ))
         }
         "set-window-point" => {
             return Some(super::window_cmds::builtin_set_window_point(eval, args))

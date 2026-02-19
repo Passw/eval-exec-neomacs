@@ -862,6 +862,7 @@ fn subr_arity_value(name: &str) -> Value {
         "list-fonts" => arity_cons(1, Some(4)),
         "frame-parameter" | "set-window-point" => arity_cons(2, Some(2)),
         "set-window-buffer" | "set-window-start" => arity_cons(2, Some(3)),
+        "set-window-vscroll" => arity_cons(2, Some(4)),
         "fit-window-to-buffer" => arity_cons(0, Some(6)),
         "window-text-pixel-size" => arity_cons(0, Some(7)),
         // Process primitives
@@ -953,6 +954,7 @@ fn subr_arity_value(name: &str) -> Value {
         | "window-text-width"
         | "window-total-height"
         | "window-total-width"
+        | "window-vscroll"
         | "get-buffer-window" => arity_cons(0, Some(2)),
         "window-edges" => arity_cons(0, Some(4)),
         "window-list" | "get-buffer-window-list" => arity_cons(0, Some(3)),
@@ -2400,6 +2402,7 @@ mod tests {
         assert_subr_arity("set-window-buffer", 2, Some(3));
         assert_subr_arity("set-window-point", 2, Some(2));
         assert_subr_arity("set-window-start", 2, Some(3));
+        assert_subr_arity("set-window-vscroll", 2, Some(4));
         assert_subr_arity("window-frame", 0, Some(1));
         assert_subr_arity("window-fringes", 0, Some(1));
         assert_subr_arity("window-header-line-height", 0, Some(1));
@@ -2434,6 +2437,7 @@ mod tests {
         assert_subr_arity("window-point", 0, Some(1));
         assert_subr_arity("window-start", 0, Some(1));
         assert_subr_arity("window-use-time", 0, Some(1));
+        assert_subr_arity("window-vscroll", 0, Some(2));
         assert_subr_arity("window-top-line", 0, Some(1));
         assert_subr_arity("window-text-pixel-size", 0, Some(7));
         assert_subr_arity("windowp", 1, Some(1));

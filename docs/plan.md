@@ -28,6 +28,45 @@ Last updated: 2026-02-19
 
 ## Doing
 
+- Completed `window-vscroll` helper parity slice and added oracle lock-ins:
+  - runtime changes:
+    - `rust/neovm-core/src/elisp/window_cmds.rs`
+      - added evaluator-backed builtins:
+        - `window-vscroll`
+        - `set-window-vscroll`
+      - matched GNU Emacs batch behavior:
+        - `window-vscroll` returns `0` for selected/minibuffer windows
+        - `set-window-vscroll` validates `WINDOW` with `window-live-p` semantics
+        - `set-window-vscroll` validates `VSCROLL` with `numberp` and accepts optional `PIXELWISE`/`PRESERVE` args
+      - added evaluator unit coverage:
+        - `window_vscroll_helpers_match_batch_defaults_and_error_predicates`
+    - `rust/neovm-core/src/elisp/builtins.rs`
+      - wired dispatch for both `window-vscroll` helpers.
+    - `rust/neovm-core/src/elisp/builtin_registry.rs`
+      - registered both helper names in builtin registry.
+      - parity registry counts now remain:
+        - `DISPATCH_BUILTIN_NAMES`: `991`
+        - core parity entries: `990`
+    - `rust/neovm-core/src/elisp/subr_info.rs`
+      - added `subr-arity` metadata:
+        - `(2 . 4)`: `set-window-vscroll`
+        - `(0 . 2)`: `window-vscroll`
+      - extended `subr_arity_window_frame_primitives_match_oracle`.
+  - corpus changes:
+    - added:
+      - `test/neovm/vm-compat/cases/window-vscroll-semantics.{forms,expected.tsv}`
+    - expanded and re-recorded:
+      - `test/neovm/vm-compat/cases/window-frame-subr-arity-semantics.{forms,expected.tsv}`
+    - wired new case into:
+      - `test/neovm/vm-compat/cases/default.list`
+  - verified:
+    - `cargo test --manifest-path rust/neovm-core/Cargo.toml window_vscroll_helpers_match_batch_defaults_and_error_predicates` (pass)
+    - `cargo test --manifest-path rust/neovm-core/Cargo.toml subr_arity_window_frame_primitives_match_oracle` (pass)
+    - `make -C test/neovm/vm-compat check-one-neovm CASE=cases/window-vscroll-semantics` (pass)
+    - `make -C test/neovm/vm-compat check-one-neovm CASE=cases/window-frame-subr-arity-semantics` (pass)
+    - `make -C test/neovm/vm-compat check-builtin-registry-all` (pass)
+    - `make -C test/neovm/vm-compat check-all-neovm-strict` (pass)
+
 - Completed `window-parameter*` parity slice and added oracle lock-ins:
   - runtime changes:
     - `rust/neovm-core/src/window.rs`
