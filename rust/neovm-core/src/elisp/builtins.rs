@@ -5803,11 +5803,20 @@ fn builtin_set_keymap_parent(eval: &mut super::eval::Evaluator, args: Vec<Value>
     Ok(args[1].clone())
 }
 
+fn is_lisp_keymap_object(value: &Value) -> bool {
+    let Value::Cons(cell) = value else {
+        return false;
+    };
+    let pair = cell.lock().expect("poisoned");
+    pair.car.as_symbol_name() == Some("keymap")
+}
+
 /// (keymapp OBJ) -> t or nil
 fn builtin_keymapp(eval: &mut super::eval::Evaluator, args: Vec<Value>) -> EvalResult {
     expect_args("keymapp", &args, 1)?;
     match &args[0] {
-        Value::Int(n) => Ok(Value::bool(eval.keymaps.is_keymap(*n as u64))),
+        Value::Int(n) if *n >= 0 => Ok(Value::bool(eval.keymaps.is_keymap(*n as u64))),
+        Value::Cons(_) => Ok(Value::bool(is_lisp_keymap_object(&args[0]))),
         _ => Ok(Value::Nil),
     }
 }
@@ -10369,6 +10378,43 @@ mod tests {
             .expect("builtin string= should evaluate");
         assert_eq!(full, short);
         assert!(full.is_truthy());
+    }
+
+    #[test]
+    fn keymapp_accepts_lisp_keymap_cons_cells() {
+        let mut eval = super::super::eval::Evaluator::new();
+
+        let proper = Value::list(vec![Value::symbol("keymap")]);
+        assert_eq!(builtin_keymapp(&mut eval, vec![proper]).unwrap(), Value::True);
+
+        let proper_with_entry = Value::cons(
+            Value::symbol("keymap"),
+            Value::cons(
+                Value::cons(Value::Int(97), Value::symbol("ignore")),
+                Value::Nil,
+            ),
+        );
+        assert_eq!(
+            builtin_keymapp(&mut eval, vec![proper_with_entry]).unwrap(),
+            Value::True
+        );
+
+        let improper = Value::cons(Value::symbol("keymap"), Value::symbol("tail"));
+        assert_eq!(builtin_keymapp(&mut eval, vec![improper]).unwrap(), Value::True);
+
+        let non_keymap = Value::list(vec![Value::symbol("foo"), Value::symbol("keymap")]);
+        assert_eq!(builtin_keymapp(&mut eval, vec![non_keymap]).unwrap(), Value::Nil);
+    }
+
+    #[test]
+    fn keymapp_rejects_non_keymap_integer_designators() {
+        let mut eval = super::super::eval::Evaluator::new();
+        let keymap = builtin_make_sparse_keymap(&mut eval, vec![]).unwrap();
+        assert_eq!(builtin_keymapp(&mut eval, vec![keymap]).unwrap(), Value::True);
+        assert_eq!(
+            builtin_keymapp(&mut eval, vec![Value::Int(999_999)]).unwrap(),
+            Value::Nil
+        );
     }
 
     #[test]

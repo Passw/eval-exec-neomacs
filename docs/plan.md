@@ -15859,6 +15859,30 @@ Last updated: 2026-02-19
     - `make -C test/neovm/vm-compat check-one-neovm CASE=cases/input-last-event-reader-semantics` (pass, `13/13`)
     - `make -C test/neovm/vm-compat check-one-neovm CASE=cases/minibuffer-batch` (pass, `47/47`)
     - `make -C test/neovm/vm-compat check-all-neovm-strict` (pass)
+- Fixed `keymapp` Lisp keymap-object semantics and added dedicated lock-ins:
+  - runtime changes:
+    - `rust/neovm-core/src/elisp/builtins.rs`
+      - `keymapp` now accepts Lisp keymap objects represented as cons cells whose `car` is symbol `keymap` (including improper `(keymap . tail)` forms), matching GNU Emacs behavior.
+      - retained internal handle check for NeoVM keymap IDs while rejecting non-keymap/non-cons inputs.
+      - added evaluator unit coverage:
+        - `keymapp_accepts_lisp_keymap_cons_cells`
+        - `keymapp_rejects_non_keymap_integer_designators`
+  - corpus changes:
+    - added and wired:
+      - `test/neovm/vm-compat/cases/keymapp-lisp-object-semantics.{forms,expected.tsv}`
+      - `test/neovm/vm-compat/cases/default.list`
+    - lock-ins cover:
+      - literal Lisp keymap objects: `(keymapp '(keymap))`, `(keymapp '(keymap ...))`, `(keymapp '(keymap . tail))`, `(keymapp (list 'keymap))`
+      - non-keymap list/symbol/vector negatives and large non-keymap integer designator
+      - NeoVM-generated keymap handles from `make-sparse-keymap`/`make-keymap` still returning `t` under `keymapp`
+  - verified:
+    - `make -C test/neovm/vm-compat record FORMS=cases/keymapp-lisp-object-semantics.forms EXPECTED=cases/keymapp-lisp-object-semantics.expected.tsv` (pass)
+    - `make -C test/neovm/vm-compat check-one-neovm CASE=cases/keymapp-lisp-object-semantics` (pass, `10/10`)
+    - `make -C test/neovm/vm-compat check-one-neovm CASE=cases/keymap-map-selection-semantics` (pass, `13/13`)
+    - `make -C test/neovm/vm-compat check-one-neovm CASE=cases/keymap-parent-semantics` (pass, `8/8`)
+    - `make -C test/neovm/vm-compat check-one-neovm CASE=cases/input-command-state-startup-semantics` (pass, `11/11`)
+    - `cargo test --manifest-path rust/neovm-core/Cargo.toml keymapp_` (pass)
+    - `make -C test/neovm/vm-compat check-all-neovm-strict` (pass)
 
 ## Doing
 

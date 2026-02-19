@@ -70,6 +70,7 @@ cases/keymap-binding-basics-semantics
 cases/keymap-map-selection-semantics
 cases/keymap-parent-semantics
 cases/keymap-kbd-designator-semantics
+cases/keymapp-lisp-object-semantics
 cases/kbd-modifier-composition-semantics
 cases/key-description-semantics
 cases/vector-literal-self-eval-semantics

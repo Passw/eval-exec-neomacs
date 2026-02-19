@@ -1,0 +1,10 @@
+1	(keymapp '(keymap))	OK t
+2	(keymapp '(keymap (97 . ignore)))	OK t
+3	(keymapp '(keymap . foo))	OK t
+4	(keymapp (list 'keymap))	OK t
+5	(keymapp '(foo keymap))	OK nil
+6	(keymapp 'keymap)	OK nil
+7	(keymapp [keymap])	OK nil
+8	(keymapp (make-sparse-keymap))	OK t
+9	(let ((m (make-keymap))) (list (keymapp m) (equal (lookup-key m "") m)))	OK (t t)
+10	(keymapp 999999)	OK nil

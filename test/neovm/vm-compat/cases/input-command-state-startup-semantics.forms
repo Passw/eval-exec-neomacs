@@ -19,6 +19,7 @@
         current-iso639-language
         current-key-remap-sequence
         current-language-environment
+        current-load-list
         current-locale-environment
         current-minibuffer-command
         current-time-list
