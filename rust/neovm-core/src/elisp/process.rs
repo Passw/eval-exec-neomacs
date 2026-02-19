@@ -677,6 +677,14 @@ fn process_live_status_value(status: &ProcessStatus) -> Value {
     }
 }
 
+fn process_tty_stream_selector_p(value: &Value) -> bool {
+    match value {
+        Value::Nil => true,
+        Value::Symbol(sym) => matches!(sym.as_str(), "stdin" | "stdout" | "stderr"),
+        _ => false,
+    }
+}
+
 // ---------------------------------------------------------------------------
 // Builtins (eval-dependent)
 // ---------------------------------------------------------------------------
@@ -1029,6 +1037,68 @@ pub(crate) fn builtin_process_buffer(
         },
         None => Err(signal("error", vec![Value::string("Process not found")])),
     }
+}
+
+/// (process-coding-system PROCESS) -> (decode . encode)
+pub(crate) fn builtin_process_coding_system(
+    eval: &mut super::eval::Evaluator,
+    args: Vec<Value>,
+) -> EvalResult {
+    expect_args("process-coding-system", &args, 1)?;
+    let _id = resolve_live_process_or_wrong_type(eval, &args[0])?;
+    Ok(Value::cons(
+        Value::symbol("utf-8-unix"),
+        Value::symbol("utf-8-unix"),
+    ))
+}
+
+/// (process-datagram-address PROCESS) -> address-or-nil
+pub(crate) fn builtin_process_datagram_address(
+    eval: &mut super::eval::Evaluator,
+    args: Vec<Value>,
+) -> EvalResult {
+    expect_args("process-datagram-address", &args, 1)?;
+    let _id = resolve_live_process_or_wrong_type(eval, &args[0])?;
+    Ok(Value::Nil)
+}
+
+/// (process-inherit-coding-system-flag PROCESS) -> bool
+pub(crate) fn builtin_process_inherit_coding_system_flag(
+    eval: &mut super::eval::Evaluator,
+    args: Vec<Value>,
+) -> EvalResult {
+    expect_args("process-inherit-coding-system-flag", &args, 1)?;
+    let _id = resolve_live_process_or_wrong_type(eval, &args[0])?;
+    Ok(Value::Nil)
+}
+
+/// (process-kill-buffer-query-function) -> bool
+pub(crate) fn builtin_process_kill_buffer_query_function(args: Vec<Value>) -> EvalResult {
+    expect_args("process-kill-buffer-query-function", &args, 0)?;
+    Ok(Value::True)
+}
+
+/// (process-tty-name PROCESS &optional STREAM) -> string
+pub(crate) fn builtin_process_tty_name(
+    eval: &mut super::eval::Evaluator,
+    args: Vec<Value>,
+) -> EvalResult {
+    expect_min_args("process-tty-name", &args, 1)?;
+    if args.len() > 2 {
+        return Err(signal(
+            "wrong-number-of-arguments",
+            vec![Value::symbol("process-tty-name"), Value::Int(args.len() as i64)],
+        ));
+    }
+    let _id = resolve_live_process_or_wrong_type(eval, &args[0])?;
+    let stream = args.get(1).cloned().unwrap_or(Value::Nil);
+    if !process_tty_stream_selector_p(&stream) {
+        return Err(signal(
+            "error",
+            vec![Value::string("Unknown stream"), stream],
+        ));
+    }
+    Ok(Value::string("/dev/pts/0"))
 }
 
 /// (process-mark PROCESS) -> marker
@@ -2304,5 +2374,53 @@ mod tests {
         assert_eq!(results[8], "OK (wrong-type-argument processp 1)");
         assert_eq!(results[9], "OK wrong-number-of-arguments");
         assert_eq!(results[10], "OK wrong-number-of-arguments");
+    }
+
+    #[test]
+    fn process_coding_tty_and_kill_buffer_query_runtime_surface() {
+        let cat = find_bin("cat");
+        let results = eval_all(&format!(
+            r#"(let ((p (start-process "proc-coding-tty-query" nil "{cat}")))
+                 (unwind-protect
+                     (list
+                      (equal (process-coding-system p) '(utf-8-unix . utf-8-unix))
+                      (process-datagram-address p)
+                      (process-inherit-coding-system-flag p)
+                      (process-kill-buffer-query-function)
+                      (stringp (process-tty-name p))
+                      (stringp (process-tty-name p 'stdin))
+                      (stringp (process-tty-name p 'stdout))
+                      (stringp (process-tty-name p 'stderr))
+                      (condition-case err (process-tty-name p 0) (error err))
+                      (delete-process p)
+                      (process-live-p p))
+                   (ignore-errors (delete-process p))))
+               (condition-case err (process-coding-system 1) (error err))
+               (condition-case err (process-datagram-address 1) (error err))
+               (condition-case err (process-inherit-coding-system-flag 1) (error err))
+               (condition-case err (process-tty-name 1) (error err))
+               (condition-case err (process-tty-name nil) (error err))
+               (condition-case err (process-tty-name 1 t) (error err))
+               (condition-case err (process-kill-buffer-query-function nil) (error (car err)))
+               (condition-case err (process-coding-system) (error (car err)))
+               (condition-case err (process-datagram-address) (error (car err)))
+               (condition-case err (process-inherit-coding-system-flag) (error (car err)))
+               (condition-case err (process-tty-name) (error (car err)))"#,
+        ));
+        assert_eq!(
+            results[0],
+            "OK (t nil nil t t t t t (error \"Unknown stream\" 0) nil nil)"
+        );
+        assert_eq!(results[1], "OK (wrong-type-argument processp 1)");
+        assert_eq!(results[2], "OK (wrong-type-argument processp 1)");
+        assert_eq!(results[3], "OK (wrong-type-argument processp 1)");
+        assert_eq!(results[4], "OK (wrong-type-argument processp 1)");
+        assert_eq!(results[5], "OK (wrong-type-argument processp nil)");
+        assert_eq!(results[6], "OK (wrong-type-argument processp 1)");
+        assert_eq!(results[7], "OK wrong-number-of-arguments");
+        assert_eq!(results[8], "OK wrong-number-of-arguments");
+        assert_eq!(results[9], "OK wrong-number-of-arguments");
+        assert_eq!(results[10], "OK wrong-number-of-arguments");
+        assert_eq!(results[11], "OK wrong-number-of-arguments");
     }
 }

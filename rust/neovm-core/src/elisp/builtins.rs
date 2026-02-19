@@ -7737,6 +7737,21 @@ pub(crate) fn dispatch_builtin(
         "set-process-sentinel" => {
             return Some(super::process::builtin_set_process_sentinel(eval, args))
         }
+        "process-coding-system" => {
+            return Some(super::process::builtin_process_coding_system(eval, args))
+        }
+        "process-datagram-address" => {
+            return Some(super::process::builtin_process_datagram_address(eval, args))
+        }
+        "process-inherit-coding-system-flag" => {
+            return Some(super::process::builtin_process_inherit_coding_system_flag(
+                eval, args,
+            ))
+        }
+        "process-kill-buffer-query-function" => {
+            return Some(super::process::builtin_process_kill_buffer_query_function(args))
+        }
+        "process-tty-name" => return Some(super::process::builtin_process_tty_name(eval, args)),
         "process-plist" => return Some(super::process::builtin_process_plist(eval, args)),
         "set-process-plist" => return Some(super::process::builtin_set_process_plist(eval, args)),
         "process-put" => return Some(super::process::builtin_process_put(eval, args)),

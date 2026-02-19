@@ -932,10 +932,13 @@ fn subr_arity_value(name: &str) -> Value {
         "delete-process" => arity_cons(0, Some(1)),
         "get-process" => arity_cons(1, Some(1)),
         "process-buffer"
+        | "process-coding-system"
         | "process-command"
+        | "process-datagram-address"
         | "process-exit-status"
         | "process-filter"
         | "process-id"
+        | "process-inherit-coding-system-flag"
         | "process-live-p"
         | "process-mark"
         | "process-name"
@@ -948,6 +951,7 @@ fn subr_arity_value(name: &str) -> Value {
         | "processp" => {
             arity_cons(1, Some(1))
         }
+        "process-kill-buffer-query-function" => arity_cons(0, Some(0)),
         "process-running-child-p" | "process-send-eof" => arity_cons(0, Some(1)),
         "process-contact" => arity_cons(1, Some(3)),
         "process-list" => arity_cons(0, Some(0)),
@@ -955,6 +959,7 @@ fn subr_arity_value(name: &str) -> Value {
         "process-put" => arity_cons(3, Some(3)),
         "process-send-region" => arity_cons(3, Some(3)),
         "process-send-string" => arity_cons(2, Some(2)),
+        "process-tty-name" => arity_cons(1, Some(2)),
         "set-process-filter"
         | "set-process-plist"
         | "set-process-query-on-exit-flag"
@@ -1573,12 +1578,16 @@ mod tests {
         assert_subr_arity("get-process", 1, Some(1));
         assert_subr_arity("getenv", 1, Some(2));
         assert_subr_arity("process-buffer", 1, Some(1));
+        assert_subr_arity("process-coding-system", 1, Some(1));
         assert_subr_arity("process-command", 1, Some(1));
         assert_subr_arity("process-contact", 1, Some(3));
+        assert_subr_arity("process-datagram-address", 1, Some(1));
         assert_subr_arity("process-exit-status", 1, Some(1));
         assert_subr_arity("process-filter", 1, Some(1));
         assert_subr_arity("process-get", 2, Some(2));
         assert_subr_arity("process-id", 1, Some(1));
+        assert_subr_arity("process-inherit-coding-system-flag", 1, Some(1));
+        assert_subr_arity("process-kill-buffer-query-function", 0, Some(0));
         assert_subr_arity("process-live-p", 1, Some(1));
         assert_subr_arity("process-list", 0, Some(0));
         assert_subr_arity("process-mark", 1, Some(1));
@@ -1593,6 +1602,7 @@ mod tests {
         assert_subr_arity("process-sentinel", 1, Some(1));
         assert_subr_arity("process-status", 1, Some(1));
         assert_subr_arity("process-thread", 1, Some(1));
+        assert_subr_arity("process-tty-name", 1, Some(2));
         assert_subr_arity("process-type", 1, Some(1));
         assert_subr_arity("processp", 1, Some(1));
         assert_subr_arity("set-process-filter", 2, Some(2));

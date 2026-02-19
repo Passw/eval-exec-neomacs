@@ -16945,6 +16945,39 @@ Last updated: 2026-02-19
 
 ## Doing
 
+- Added process coding/datagram/tty/query compatibility slice and locked oracle parity:
+  - runtime changes:
+    - `rust/neovm-core/src/elisp/process.rs`
+      - implemented:
+        - `process-coding-system`
+        - `process-datagram-address`
+        - `process-inherit-coding-system-flag`
+        - `process-kill-buffer-query-function`
+        - `process-tty-name`
+      - aligned optional stream validation for `process-tty-name` to oracle-compatible `"Unknown stream"` error payload shape.
+      - added process module unit coverage for coding/tty/query behavior.
+    - `rust/neovm-core/src/elisp/builtins.rs`
+      - wired evaluator dispatch for all five new process symbols.
+    - `rust/neovm-core/src/elisp/builtin_registry.rs`
+      - registered all five symbols in `DISPATCH_BUILTIN_NAMES`.
+    - `rust/neovm-core/src/elisp/subr_info.rs`
+      - added arity metadata/assertions:
+        - `(1 . 1)` `process-coding-system`, `process-datagram-address`, `process-inherit-coding-system-flag`
+        - `(0 . 0)` `process-kill-buffer-query-function`
+        - `(1 . 2)` `process-tty-name`
+  - corpus changes:
+    - added and wired:
+      - `test/neovm/vm-compat/cases/process-coding-tty-query-semantics.forms`
+      - `test/neovm/vm-compat/cases/process-coding-tty-query-semantics.expected.tsv`
+      - `test/neovm/vm-compat/cases/default.list`
+  - verified:
+    - `cargo test --manifest-path rust/neovm-core/Cargo.toml process_coding_tty_and_kill_buffer_query_runtime_surface -- --nocapture` (pass)
+    - `cargo test --manifest-path rust/neovm-core/Cargo.toml subr_arity_process_primitives_match_oracle -- --nocapture` (pass)
+    - `make -C test/neovm/vm-compat record FORMS=cases/process-coding-tty-query-semantics.forms EXPECTED=cases/process-coding-tty-query-semantics.expected.tsv` (pass)
+    - `make -C test/neovm/vm-compat check-one-neovm CASE=cases/process-coding-tty-query-semantics` (pass, `3/3`)
+    - `make -C test/neovm/vm-compat check-builtin-registry-all` (pass; `1115` dispatch / `1114` core parity entries)
+    - `make -C test/neovm/vm-compat check-all-neovm-strict` (pass; inventory `781`)
+
 - Added process marker/type/thread/send/runtime-child compatibility slice and locked oracle parity:
   - runtime changes:
     - `rust/neovm-core/src/elisp/process.rs`
