@@ -16,4 +16,13 @@
 16	(this-command-keys-vector)	OK [(mouse-1)]
 17	(clear-this-command-keys 1)	OK nil
 18	(this-command-keys-vector)	OK []
-19	(condition-case err (clear-this-command-keys 1 2) (list (car err) (cdr err)))	ERR (wrong-number-of-arguments (clear-this-command-keys 2))
+19	(let ((unread-command-events (list 120))) (read-key nil))	OK 120
+20	(append (recent-keys) nil)	OK ((mouse-1) 120)
+21	(progn (clear-this-command-keys) (append (recent-keys) nil))	OK nil
+22	(let ((unread-command-events (list 121))) (read-key nil))	OK 121
+23	(append (recent-keys) nil)	OK (121)
+24	(progn (clear-this-command-keys t) (append (recent-keys) nil))	OK (121)
+25	(let ((unread-command-events (list 122))) (read-key nil))	OK 122
+26	(append (recent-keys) nil)	OK (121 122)
+27	(progn (clear-this-command-keys nil) (append (recent-keys) nil))	OK nil
+28	(condition-case err (clear-this-command-keys 1 2) (list (car err) (cdr err)))	ERR (wrong-number-of-arguments (clear-this-command-keys 2))

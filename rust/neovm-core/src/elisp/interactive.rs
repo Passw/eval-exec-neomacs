@@ -1893,13 +1893,19 @@ pub(crate) fn builtin_this_command_keys_vector(
 /// `(clear-this-command-keys &optional KEEP-RECORD)` -> nil.
 ///
 /// Clears current command-key context used by `this-command-keys*`.
+/// When KEEP-RECORD is nil or omitted, also clears recent input history used
+/// by `recent-keys`.
 pub(crate) fn builtin_clear_this_command_keys(
     eval: &mut Evaluator,
     args: Vec<Value>,
 ) -> EvalResult {
     expect_max_args("clear-this-command-keys", &args, 1)?;
+    let keep_record = args.first().is_some_and(|arg| arg.is_truthy());
     eval.clear_read_command_keys();
     eval.interactive.set_this_command_keys(Vec::new());
+    if !keep_record {
+        eval.clear_recent_input_events();
+    }
     Ok(Value::Nil)
 }
 
@@ -3535,6 +3541,40 @@ mod tests {
 
         let keys = builtin_this_command_keys(&mut ev, vec![]).unwrap();
         assert_eq!(keys.as_str(), Some(""));
+    }
+
+    #[test]
+    fn clear_this_command_keys_without_keep_record_clears_recent_input_history() {
+        let mut ev = Evaluator::new();
+        ev.record_input_event(Value::Int(97));
+        assert_eq!(ev.recent_input_events(), &[Value::Int(97)]);
+
+        let result = builtin_clear_this_command_keys(&mut ev, vec![]).unwrap();
+        assert!(result.is_nil());
+        assert!(ev.recent_input_events().is_empty());
+    }
+
+    #[test]
+    fn clear_this_command_keys_with_nil_keep_record_clears_recent_input_history() {
+        let mut ev = Evaluator::new();
+        ev.record_input_event(Value::Int(98));
+        assert_eq!(ev.recent_input_events(), &[Value::Int(98)]);
+
+        let result = builtin_clear_this_command_keys(&mut ev, vec![Value::Nil]).unwrap();
+        assert!(result.is_nil());
+        assert!(ev.recent_input_events().is_empty());
+    }
+
+    #[test]
+    fn clear_this_command_keys_with_keep_record_preserves_recent_input_history() {
+        let mut ev = Evaluator::new();
+        ev.record_input_event(Value::Int(99));
+        assert_eq!(ev.recent_input_events(), &[Value::Int(99)]);
+
+        let result =
+            builtin_clear_this_command_keys(&mut ev, vec![Value::symbol("t")]).unwrap();
+        assert!(result.is_nil());
+        assert_eq!(ev.recent_input_events(), &[Value::Int(99)]);
     }
 
     #[test]

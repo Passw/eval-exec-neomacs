@@ -67,6 +67,30 @@ Last updated: 2026-02-19
     - `make -C test/neovm/vm-compat check-one-neovm CASE=cases/command-edit-runtime-subr-arity-semantics` (pass, `40/40`)
     - `make -C test/neovm/vm-compat check-one-neovm CASE=cases/this-command-keys-readers-semantics` (pass, `16/16`)
 
+- Follow-up `KEEP-RECORD` parity correction for `clear-this-command-keys`:
+  - runtime changes:
+    - `rust/neovm-core/src/elisp/eval.rs`
+      - added `clear_recent_input_events` helper for explicit `recent-keys` history resets.
+    - `rust/neovm-core/src/elisp/interactive.rs`
+      - `clear-this-command-keys` now:
+        - always clears `this-command-keys*` context
+        - clears `recent-keys` history when `KEEP-RECORD` is omitted or `nil`
+        - preserves `recent-keys` history when `KEEP-RECORD` is non-`nil`
+      - added unit coverage:
+        - `clear_this_command_keys_without_keep_record_clears_recent_input_history`
+        - `clear_this_command_keys_with_nil_keep_record_clears_recent_input_history`
+        - `clear_this_command_keys_with_keep_record_preserves_recent_input_history`
+  - corpus changes:
+    - `test/neovm/vm-compat/cases/clear-this-command-keys-semantics.{forms,expected.tsv}`
+      - added oracle-backed `recent-keys` lock-ins for omitted/`t`/`nil` `KEEP-RECORD` paths.
+  - verified:
+    - `cargo test --manifest-path rust/neovm-core/Cargo.toml clear_this_command_keys -- --nocapture` (pass)
+    - `make -C test/neovm/vm-compat record FORMS=cases/clear-this-command-keys-semantics.forms EXPECTED=cases/clear-this-command-keys-semantics.expected.tsv` (pass)
+    - `make -C test/neovm/vm-compat check-one-neovm CASE=cases/clear-this-command-keys-semantics` (pass, `28/28`)
+    - `make -C test/neovm/vm-compat check-one-neovm CASE=cases/this-command-keys-readers-semantics` (pass, `16/16`)
+    - `make -C test/neovm/vm-compat check-one-neovm CASE=cases/help-key-recent-keys-semantics` (pass, `50/50`)
+    - `make -C test/neovm/vm-compat check-all-neovm-strict` (pass)
+
 - Aligned `read-char` / `read-char-exclusive` command-key publication with oracle:
   - runtime changes:
     - `rust/neovm-core/src/elisp/reader.rs`

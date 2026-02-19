@@ -1151,6 +1151,10 @@ impl Evaluator {
         &self.recent_input_events
     }
 
+    pub(crate) fn clear_recent_input_events(&mut self) {
+        self.recent_input_events.clear();
+    }
+
     pub(crate) fn set_read_command_keys(&mut self, keys: Vec<Value>) {
         self.read_command_keys = keys;
     }
