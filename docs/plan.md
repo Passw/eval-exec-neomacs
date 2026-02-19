@@ -1,6 +1,6 @@
 # NeoVM / Neomacs Plan
 
-Last updated: 2026-02-18
+Last updated: 2026-02-19
 
 ## Execution Queue (next 20)
 
@@ -27,6 +27,35 @@ Last updated: 2026-02-18
 21. [x] Add periodic `make compat-progress` output diff check in PR review templates.
 
 ## Doing
+
+- Hardened vm-compat list integrity checks and promoted them to explicit CI fast-fail gates:
+  - new integrity tooling:
+    - `test/neovm/vm-compat/check-tracked-lists.sh`
+    - validates `cases/tracked-lists.txt` is non-empty, duplicate-free, uses `cases/*.list` relative paths, and points only to existing files.
+    - `test/neovm/vm-compat/case-inventory.sh`
+    - now fails on unreferenced `.forms` entries by default (override with `NEOVM_ALLOW_UNREFERENCED_FORMS=1` for non-failing inventory reports).
+  - make/wiring changes:
+    - `test/neovm/vm-compat/Makefile`
+    - added `check-tracked-lists` and `check-list-integrity` targets.
+    - `validate-case-lists` now runs tracked-list manifest validation first.
+    - `check-all` and `check-all-neovm` now run `check-list-integrity` before corpus execution to fail early on list drift.
+  - CI changes:
+    - `.github/workflows/vm-compat.yml`
+    - added job: `neovm-vm-compat-list-integrity`
+    - runs `make check-list-integrity` for a fast list/inventory guard independent of heavier runtime jobs.
+    - added job: `neovm-vm-compat-startup-doc`
+    - installs GNU Emacs oracle (`emacs-nox`) and Rust nightly.
+    - runs `make check-startup-doc-neovm` with `NEOVM_FORCE_ORACLE_PATH=/usr/bin/emacs`.
+  - docs:
+    - `test/neovm/vm-compat/README.md`
+    - documented `check-tracked-lists.sh`, `make check-list-integrity`, and strict `case-inventory` behavior.
+  - oracle corpus stabilization:
+    - `test/neovm/vm-compat/cases/bookmark-delete-permissive-semantics.{forms,expected.tsv}`
+    - `test/neovm/vm-compat/cases/bookmark-jump-permissive-semantics.{forms,expected.tsv}`
+    - `test/neovm/vm-compat/cases/bookmark-rename-permissive-semantics.{forms,expected.tsv}`
+    - each form now binds `bookmark-default-file` to a deterministic temp path and deletes it before evaluation to avoid host `~/.config/emacs/bookmarks` bleed-through.
+    - `test/neovm/vm-compat/cases/command-dispatch-line-motion-semantics.{forms,expected.tsv}`
+    - dropped the unstable `call-interactively 'other-window` line (stdin-sensitive in batch oracle mode) while keeping the `command-execute 'other-window` compatibility assertion.
 
 - Unified vm-compat list-of-lists tracking to prevent drift between Makefile, inventory, and progress scripts:
   - source-of-truth list tracking:

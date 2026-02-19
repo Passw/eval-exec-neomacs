@@ -73,4 +73,8 @@ fi
 if [[ "$unreferenced_count" -gt 0 ]]; then
   echo "unreferenced forms (consider adding to a list):"
   cat "$tmp_unreferenced"
+  if [[ "${NEOVM_ALLOW_UNREFERENCED_FORMS:-0}" != "1" ]]; then
+    echo "set NEOVM_ALLOW_UNREFERENCED_FORMS=1 to report without failing" >&2
+    exit 1
+  fi
 fi

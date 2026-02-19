@@ -6,4 +6,3 @@
 6	(condition-case err (with-temp-buffer (insert "abc") (goto-char 2) (command-execute 'beginning-of-line) (point)) (error err))	OK 1
 7	(condition-case err (with-temp-buffer (insert "abc") (goto-char 1) (command-execute 'end-of-line) (point)) (error err))	OK 4
 8	(condition-case err (command-execute 'other-window) (error err))	OK nil
-9	(condition-case err (call-interactively 'other-window) (error err))	OK nil

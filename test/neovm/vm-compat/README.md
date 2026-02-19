@@ -13,6 +13,7 @@ results against that baseline once evaluator execution is wired in.
 - `run-oracle.sh`: runs all forms from a corpus file and prints TSV output
 - `run-neovm.sh`: runs NeoVM worker-runtime compatibility runner and prints TSV output
 - `compare-results.sh`: diffs oracle TSV vs NeoVM TSV
+- `check-tracked-lists.sh`: validates `cases/tracked-lists.txt` manifest shape and references
 - `check-builtin-registry-fboundp.sh`: checks `fboundp` parity for all names in `builtin_registry.rs`
 - `check-startup-doc-stub-coverage.sh`: checks startup integer-doc symbol coverage of `STARTUP_VARIABLE_DOC_STUBS`
 - `check-startup-doc-string-coverage.sh`: checks startup string-doc symbol coverage of `STARTUP_VARIABLE_DOC_STRING_PROPERTIES`
@@ -73,6 +74,7 @@ Run all checked-in corpora in one shot:
 
 ```bash
 cd test/neovm/vm-compat
+make check-list-integrity
 make validate-case-lists
 make check-all
 make check-all-neovm
@@ -80,6 +82,9 @@ make check-all-neovm
 
 When adding a new case list file, register it in `cases/tracked-lists.txt` so
 `validate-case-lists`, `case-inventory`, and `compat-progress` all include it.
+
+`case-inventory` fails on unreferenced `.forms` files by default; set
+`NEOVM_ALLOW_UNREFERENCED_FORMS=1` when you only want a non-failing report.
 
 List default case order without running:
 
@@ -237,6 +242,14 @@ hardcoded GNU Emacs oracle binary):
 ```bash
 cd test/neovm/vm-compat
 make check-oracle-default-path
+```
+
+Run the tracked list/inventory preflight (manifest validity + per-list file
+checks + unreferenced-forms guard):
+
+```bash
+cd test/neovm/vm-compat
+make check-list-integrity
 ```
 
 Run the ERT allowlist oracle scaffold (for upstream differential bootstrapping):

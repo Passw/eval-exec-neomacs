@@ -58,7 +58,3 @@
 (condition-case err
     (command-execute 'other-window)
   (error err))
-
-(condition-case err
-    (call-interactively 'other-window)
-  (error err))

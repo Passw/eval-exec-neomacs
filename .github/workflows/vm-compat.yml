@@ -52,6 +52,18 @@ jobs:
             --no-default-features \
             --features ${{ matrix.backend }}
 
+  neovm-vm-compat-list-integrity:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Validate vm-compat list integrity
+        working-directory: test/neovm/vm-compat
+        run: |
+          make check-list-integrity
+
   neovm-vm-compat-thread:
     runs-on: ubuntu-latest
     timeout-minutes: 20
@@ -95,6 +107,35 @@ jobs:
         working-directory: test/neovm/vm-compat
         run: |
           RUSTFLAGS='-Awarnings' make check-introspection-neovm
+
+  neovm-vm-compat-startup-doc:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install Emacs for oracle checks
+        run: |
+          sudo apt-get update
+          sudo DEBIAN_FRONTEND=noninteractive apt-get install -y emacs-nox
+
+      - name: Install Rust nightly
+        uses: dtolnay/rust-toolchain@nightly
+
+      - name: Cache cargo artifacts
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: |
+            rust/neovm-core
+            rust/neovm-worker
+
+      - name: Run NeoVM startup-doc compatibility suite
+        working-directory: test/neovm/vm-compat
+        env:
+          NEOVM_FORCE_ORACLE_PATH: /usr/bin/emacs
+        run: |
+          RUSTFLAGS='-Awarnings' make check-startup-doc-neovm
 
   vm-compat-ert-allowlist:
     runs-on: ubuntu-latest
