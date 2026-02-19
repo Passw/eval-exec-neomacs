@@ -28,6 +28,19 @@ Last updated: 2026-02-19
 
 ## Doing
 
+- Expanded batch prompt/input queue-edge lock-ins for stale/invalid unread tails:
+  - corpus changes:
+    - expanded and re-recorded:
+      - `test/neovm/vm-compat/cases/input-batch-readers.{forms,expected.tsv}`
+    - added oracle lock-ins for prompt readers in batch mode:
+      - `read-string`, `read-number`, `read-from-minibuffer`, `completing-read`, `read-command`, `read-variable`, `read-buffer`, `read-file-name`
+      - all continue to signal `end-of-file` without mutating `unread-command-events` tail payloads
+      - stale/invalid tail variants are now covered (`foo`, `mouse` event forms, vector payload tail)
+  - verified:
+    - `make -C test/neovm/vm-compat record FORMS=cases/input-batch-readers.forms EXPECTED=cases/input-batch-readers.expected.tsv` (pass)
+    - `make -C test/neovm/vm-compat check-one-neovm CASE=cases/input-batch-readers` (pass, `98/98`)
+    - `make -C test/neovm/vm-compat check-all-neovm-strict` (pass)
+
 - Completed core builtin `documentation` text-shape expansion and hardened startup-doc coverage parsers:
   - runtime changes:
     - `rust/neovm-core/src/elisp/doc.rs`
