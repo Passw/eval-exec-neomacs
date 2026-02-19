@@ -366,6 +366,7 @@ cases/thing-at-point-url-email-semantics
 cases/thing-at-point-filename-semantics
 cases/symbol-word-at-point-semantics
 cases/word-at-point-lazy-bootstrap-semantics
+cases/word-at-point-fmakunbound-func-arity-semantics
 cases/read-batch-input-semantics
 cases/read-batch-error-payloads
 cases/zlib-decompress-region-semantics

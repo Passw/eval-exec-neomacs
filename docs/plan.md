@@ -28,6 +28,21 @@ Last updated: 2026-02-19
 
 ## Doing
 
+- Fixed `func-arity` startup materialization parity after explicit `fmakunbound` of `word-at-point`:
+  - runtime changes:
+    - `rust/neovm-core/src/elisp/builtins.rs`
+      - `maybe_materialize_thingatpt_word_symbol` now respects explicit `fmakunbound` masking once `word-at-point` is already interned, avoiding unintended rematerialization on later `func-arity` symbol probes.
+  - vm-compat corpus changes:
+    - added:
+      - `test/neovm/vm-compat/cases/word-at-point-fmakunbound-func-arity-semantics.forms`
+      - `test/neovm/vm-compat/cases/word-at-point-fmakunbound-func-arity-semantics.expected.tsv`
+    - wired case into:
+      - `test/neovm/vm-compat/cases/default.list`
+  - verified:
+    - `make -C test/neovm/vm-compat check-one-neovm CASE=cases/word-at-point-fmakunbound-func-arity-semantics` (pass, `8/8`)
+    - `make -C test/neovm/vm-compat check-builtin-registry-all` (pass)
+    - `make -C test/neovm/vm-compat check-all-neovm-strict` (pass; case inventory `791`)
+
 - Added builtin-registry `func-arity` parity gate to keep symbol-designator arity drift at zero:
   - vm-compat gate changes:
     - added:

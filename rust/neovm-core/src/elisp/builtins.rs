@@ -2939,7 +2939,15 @@ fn maybe_materialize_thingatpt_word_symbol(
     ) {
         return;
     }
-    if eval.obarray().fboundp("word-at-point") {
+    let obarray = eval.obarray();
+    if obarray.fboundp("word-at-point") {
+        return;
+    }
+    // Respect explicit user-level `fmakunbound` after materialization. Startup
+    // masking keeps the symbol uninterned and should still allow first bootstrap.
+    if obarray.is_function_unbound("word-at-point")
+        && obarray.intern_soft("word-at-point").is_some()
+    {
         return;
     }
     eval.set_function("word-at-point", Value::Subr("word-at-point".to_string()));
