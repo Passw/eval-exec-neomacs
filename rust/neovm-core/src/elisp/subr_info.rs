@@ -857,8 +857,10 @@ fn subr_arity_value(name: &str) -> Value {
         | "x-display-set-last-user-time" => arity_cons(1, Some(2)),
         "x-send-client-message" => arity_cons(6, Some(6)),
         "x-set-mouse-absolute-pixel-position" => arity_cons(2, Some(2)),
+        "x-popup-menu" => arity_cons(2, Some(2)),
         "x-window-property-attributes" => arity_cons(1, Some(3)),
         "x-open-connection" => arity_cons(1, Some(3)),
+        "x-popup-dialog" | "x-frame-restack" => arity_cons(2, Some(3)),
         "x-get-resource" => arity_cons(2, Some(4)),
         "x-list-fonts" => arity_cons(1, Some(5)),
         "x-window-property" | "x-translate-coordinates" => arity_cons(1, Some(6)),
@@ -1418,12 +1420,15 @@ mod tests {
         assert_subr_arity("x-frame-edges", 0, Some(2));
         assert_subr_arity("x-frame-geometry", 0, Some(1));
         assert_subr_arity("x-frame-list-z-order", 0, Some(1));
+        assert_subr_arity("x-frame-restack", 2, Some(3));
         assert_subr_arity("x-get-atom-name", 1, Some(2));
         assert_subr_arity("x-mouse-absolute-pixel-position", 0, Some(0));
         assert_subr_arity("x-get-resource", 2, Some(4));
         assert_subr_arity("x-list-fonts", 1, Some(5));
         assert_subr_arity("x-open-connection", 1, Some(3));
         assert_subr_arity("x-parse-geometry", 1, Some(1));
+        assert_subr_arity("x-popup-dialog", 2, Some(3));
+        assert_subr_arity("x-popup-menu", 2, Some(2));
         assert_subr_arity("x-register-dnd-atom", 1, Some(2));
         assert_subr_arity("x-selection-exists-p", 0, Some(2));
         assert_subr_arity("x-selection-owner-p", 0, Some(2));

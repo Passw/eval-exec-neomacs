@@ -16697,6 +16697,42 @@ Last updated: 2026-02-19
     - `make -C test/neovm/vm-compat record FORMS=cases/x-coordinate-frame-query-semantics.forms EXPECTED=cases/x-coordinate-frame-query-semantics.expected.tsv` (pass)
     - `make -C test/neovm/vm-compat check-one-neovm CASE=cases/x-coordinate-frame-query-semantics` (pass, `5/5`)
     - `make -C test/neovm/vm-compat check-all-neovm-strict` (pass)
+- Added popup/restack `x-*` compatibility surface and locked oracle parity with crash-safe probes:
+  - runtime changes:
+    - `rust/neovm-core/src/elisp/display.rs`
+      - implemented:
+        - `x-popup-dialog`
+        - `x-popup-menu`
+        - `x-frame-restack`
+      - aligned `x-popup-dialog`/`x-popup-menu` batch error payloads and menu/position shape checks to oracle.
+      - exposed `x-frame-restack` with arity-compatible surface and conservative batch/no-X error result.
+      - added display unit coverage:
+        - `x_popup_dialog_and_menu_batch_semantics`
+        - `x_frame_restack_safe_arity_surface`
+    - `rust/neovm-core/src/elisp/builtins.rs`
+      - wired pure dispatch for all 3 symbols.
+    - `rust/neovm-core/src/elisp/builtin_registry.rs`
+      - added `x-popup-dialog`, `x-popup-menu`, `x-frame-restack` to `DISPATCH_BUILTIN_NAMES`.
+    - `rust/neovm-core/src/elisp/subr_info.rs`
+      - aligned arity metadata/assertions in `subr_arity_display_terminal_primitives_match_oracle`:
+        - `(2 . 3)`: `x-popup-dialog`, `x-frame-restack`
+        - `(2 . 2)`: `x-popup-menu`
+  - corpus changes:
+    - added and wired:
+      - `test/neovm/vm-compat/cases/x-popup-restack-semantics.forms`
+      - `test/neovm/vm-compat/cases/x-popup-restack-semantics.expected.tsv`
+      - `test/neovm/vm-compat/cases/default.list`
+    - lock-ins cover:
+      - `fboundp`/`subrp`/`subr-arity` matrix for the 3 builtins.
+      - runtime popup error/return matrix in batch context.
+      - `x-frame-restack` non-crashing arity boundary behavior only (oracle valid-arity runtime calls segfault in this environment).
+  - verified:
+    - `cargo test --manifest-path rust/neovm-core/Cargo.toml x_popup_ -- --nocapture` (pass)
+    - `cargo test --manifest-path rust/neovm-core/Cargo.toml x_frame_restack_safe_arity_surface -- --nocapture` (pass)
+    - `cargo test --manifest-path rust/neovm-core/Cargo.toml subr_arity_display_terminal_primitives_match_oracle -- --nocapture` (pass)
+    - `make -C test/neovm/vm-compat record FORMS=cases/x-popup-restack-semantics.forms EXPECTED=cases/x-popup-restack-semantics.expected.tsv` (pass)
+    - `make -C test/neovm/vm-compat check-one-neovm CASE=cases/x-popup-restack-semantics` (pass, `4/4`)
+    - `make -C test/neovm/vm-compat check-all-neovm-strict` (pass)
 
 ## Doing
 

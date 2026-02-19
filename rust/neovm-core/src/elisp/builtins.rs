@@ -8882,6 +8882,7 @@ pub(crate) fn dispatch_builtin(
         "x-frame-edges" => super::display::builtin_x_frame_edges(args),
         "x-frame-geometry" => super::display::builtin_x_frame_geometry(args),
         "x-frame-list-z-order" => super::display::builtin_x_frame_list_z_order(args),
+        "x-frame-restack" => super::display::builtin_x_frame_restack(args),
         "x-family-fonts" => super::display::builtin_x_family_fonts(args),
         "x-get-atom-name" => super::display::builtin_x_get_atom_name(args),
         "x-mouse-absolute-pixel-position" => {
@@ -8891,6 +8892,8 @@ pub(crate) fn dispatch_builtin(
         "x-list-fonts" => super::display::builtin_x_list_fonts(args),
         "x-open-connection" => super::display::builtin_x_open_connection(args),
         "x-parse-geometry" => super::display::builtin_x_parse_geometry(args),
+        "x-popup-dialog" => super::display::builtin_x_popup_dialog(args),
+        "x-popup-menu" => super::display::builtin_x_popup_menu(args),
         "x-register-dnd-atom" => super::display::builtin_x_register_dnd_atom(args),
         "x-selection-exists-p" => super::display::builtin_x_selection_exists_p(args),
         "x-selection-owner-p" => super::display::builtin_x_selection_owner_p(args),

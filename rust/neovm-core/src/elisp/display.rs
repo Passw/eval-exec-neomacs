@@ -1156,6 +1156,16 @@ pub(crate) fn builtin_x_frame_list_z_order(args: Vec<Value>) -> EvalResult {
     }
 }
 
+/// (x-frame-restack FRAME1 FRAME2 &optional ABOVE) -> error in batch/no-X context.
+///
+/// Oracle batch behavior crashes on valid-arity runtime calls in this
+/// environment, so we only expose arity/fboundp compatibility surface and a
+/// conservative batch/no-X error result.
+pub(crate) fn builtin_x_frame_restack(args: Vec<Value>) -> EvalResult {
+    expect_range_args("x-frame-restack", &args, 2, 3)?;
+    Err(x_window_system_frame_error())
+}
+
 /// (x-mouse-absolute-pixel-position) -> nil in batch/no-X context.
 pub(crate) fn builtin_x_mouse_absolute_pixel_position(args: Vec<Value>) -> EvalResult {
     expect_args("x-mouse-absolute-pixel-position", &args, 0)?;
@@ -1172,6 +1182,113 @@ pub(crate) fn builtin_x_set_mouse_absolute_pixel_position(args: Vec<Value>) -> E
 pub(crate) fn builtin_x_send_client_message(args: Vec<Value>) -> EvalResult {
     expect_args("x-send-client-message", &args, 6)?;
     Err(x_display_query_first_arg_error(&args[0]))
+}
+
+/// (x-popup-dialog POSITION CONTENTS &optional HEADER) -> nil/error in batch context.
+pub(crate) fn builtin_x_popup_dialog(args: Vec<Value>) -> EvalResult {
+    expect_range_args("x-popup-dialog", &args, 2, 3)?;
+
+    if !matches!(args[0], Value::Frame(_)) {
+        return Err(signal(
+            "wrong-type-argument",
+            vec![Value::symbol("windowp"), Value::Nil],
+        ));
+    }
+
+    let contents = &args[1];
+    let items = list_to_vec(contents).ok_or_else(|| {
+        signal(
+            "wrong-type-argument",
+            vec![Value::symbol("listp"), contents.clone()],
+        )
+    })?;
+
+    let Some(title) = items.first() else {
+        return Err(signal(
+            "wrong-type-argument",
+            vec![Value::symbol("stringp"), Value::Nil],
+        ));
+    };
+    if !title.is_string() {
+        return Err(signal(
+            "wrong-type-argument",
+            vec![Value::symbol("stringp"), title.clone()],
+        ));
+    }
+
+    let Some(button_spec) = items.get(1) else {
+        return Err(signal(
+            "wrong-type-argument",
+            vec![Value::symbol("consp"), Value::Nil],
+        ));
+    };
+    if !button_spec.is_cons() {
+        return Err(signal(
+            "wrong-type-argument",
+            vec![Value::symbol("consp"), button_spec.clone()],
+        ));
+    }
+
+    Ok(Value::Nil)
+}
+
+/// (x-popup-menu POSITION MENU) -> nil/error in batch context.
+pub(crate) fn builtin_x_popup_menu(args: Vec<Value>) -> EvalResult {
+    expect_args("x-popup-menu", &args, 2)?;
+    let position = &args[0];
+    let menu = &args[1];
+
+    if position.is_nil() {
+        return Ok(Value::Nil);
+    }
+
+    let (position_car, position_cdr) = match position {
+        Value::Cons(cell) => {
+            let pair = cell.lock().expect("poisoned");
+            (pair.car.clone(), pair.cdr.clone())
+        }
+        other => {
+            return Err(signal(
+                "wrong-type-argument",
+                vec![Value::symbol("listp"), other.clone()],
+            ))
+        }
+    };
+
+    if !position_car.is_list() {
+        if matches!(position_car, Value::Int(_)) {
+            return Err(signal(
+                "wrong-type-argument",
+                vec![Value::symbol("listp"), position_car],
+            ));
+        }
+        return Err(signal(
+            "wrong-type-argument",
+            vec![Value::symbol("consp"), Value::True],
+        ));
+    }
+
+    if !position_cdr.is_list() {
+        return Err(signal(
+            "wrong-type-argument",
+            vec![Value::symbol("listp"), position_cdr],
+        ));
+    }
+
+    if position_car.is_nil() {
+        if menu.is_nil() {
+            return Err(signal(
+                "wrong-type-argument",
+                vec![Value::symbol("stringp"), Value::Nil],
+            ));
+        }
+        return Err(signal(
+            "wrong-type-argument",
+            vec![Value::symbol("consp"), Value::True],
+        ));
+    }
+
+    Ok(Value::Nil)
 }
 
 /// (x-synchronize DISPLAY &optional NO-OP) -> error in batch/no-X context.
@@ -3409,6 +3526,184 @@ mod tests {
             Value::Nil,
             Value::Nil,
         ]) {
+            Err(Flow::Signal(sig)) => assert_eq!(sig.symbol, "wrong-number-of-arguments"),
+            other => panic!("expected wrong-number-of-arguments signal, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn x_popup_dialog_and_menu_batch_semantics() {
+        let term = terminal_handle_value();
+
+        match builtin_x_popup_dialog(vec![Value::Nil, Value::Nil]) {
+            Err(Flow::Signal(sig)) => {
+                assert_eq!(sig.symbol, "wrong-type-argument");
+                assert_eq!(sig.data, vec![Value::symbol("windowp"), Value::Nil]);
+            }
+            other => panic!("expected wrong-type-argument signal, got {other:?}"),
+        }
+        match builtin_x_popup_dialog(vec![Value::Frame(1), Value::Nil]) {
+            Err(Flow::Signal(sig)) => {
+                assert_eq!(sig.symbol, "wrong-type-argument");
+                assert_eq!(sig.data, vec![Value::symbol("stringp"), Value::Nil]);
+            }
+            other => panic!("expected wrong-type-argument signal, got {other:?}"),
+        }
+        match builtin_x_popup_dialog(vec![Value::Frame(1), Value::list(vec![Value::string("A")])]) {
+            Err(Flow::Signal(sig)) => {
+                assert_eq!(sig.symbol, "wrong-type-argument");
+                assert_eq!(sig.data, vec![Value::symbol("consp"), Value::Nil]);
+            }
+            other => panic!("expected wrong-type-argument signal, got {other:?}"),
+        }
+        assert!(
+            builtin_x_popup_dialog(vec![
+                Value::Frame(1),
+                Value::list(vec![
+                    Value::string("Title"),
+                    Value::cons(Value::string("Yes"), Value::True),
+                ]),
+            ])
+            .unwrap()
+            .is_nil()
+        );
+        for arg in [Value::string("x"), Value::Int(1), term.clone()] {
+            match builtin_x_popup_dialog(vec![arg, Value::Nil]) {
+                Err(Flow::Signal(sig)) => {
+                    assert_eq!(sig.symbol, "wrong-type-argument");
+                    assert_eq!(sig.data, vec![Value::symbol("windowp"), Value::Nil]);
+                }
+                other => panic!("expected wrong-type-argument signal, got {other:?}"),
+            }
+        }
+        match builtin_x_popup_dialog(vec![]) {
+            Err(Flow::Signal(sig)) => assert_eq!(sig.symbol, "wrong-number-of-arguments"),
+            other => panic!("expected wrong-number-of-arguments signal, got {other:?}"),
+        }
+        match builtin_x_popup_dialog(vec![Value::Nil]) {
+            Err(Flow::Signal(sig)) => assert_eq!(sig.symbol, "wrong-number-of-arguments"),
+            other => panic!("expected wrong-number-of-arguments signal, got {other:?}"),
+        }
+        match builtin_x_popup_dialog(vec![Value::Nil, Value::Nil, Value::Nil, Value::Nil]) {
+            Err(Flow::Signal(sig)) => assert_eq!(sig.symbol, "wrong-number-of-arguments"),
+            other => panic!("expected wrong-number-of-arguments signal, got {other:?}"),
+        }
+
+        assert!(builtin_x_popup_menu(vec![Value::Nil, Value::Nil])
+            .unwrap()
+            .is_nil());
+        assert!(
+            builtin_x_popup_menu(vec![
+                Value::Nil,
+                Value::list(vec![
+                    Value::string("A"),
+                    Value::cons(Value::string("Yes"), Value::True),
+                ]),
+            ])
+            .unwrap()
+            .is_nil()
+        );
+        for pos in [Value::Frame(1), Value::string("x"), Value::Int(1), term] {
+            match builtin_x_popup_menu(vec![pos.clone(), Value::Nil]) {
+                Err(Flow::Signal(sig)) => {
+                    assert_eq!(sig.symbol, "wrong-type-argument");
+                    assert_eq!(sig.data, vec![Value::symbol("listp"), pos]);
+                }
+                other => panic!("expected wrong-type-argument signal, got {other:?}"),
+            }
+        }
+        match builtin_x_popup_menu(vec![Value::list(vec![Value::Int(0), Value::Int(0)]), Value::Nil]) {
+            Err(Flow::Signal(sig)) => {
+                assert_eq!(sig.symbol, "wrong-type-argument");
+                assert_eq!(sig.data, vec![Value::symbol("listp"), Value::Int(0)]);
+            }
+            other => panic!("expected wrong-type-argument signal, got {other:?}"),
+        }
+        match builtin_x_popup_menu(vec![
+            Value::list(vec![Value::Int(0), Value::Int(0)]),
+            Value::list(vec![
+                Value::string("A"),
+                Value::cons(Value::string("Yes"), Value::True),
+            ]),
+        ]) {
+            Err(Flow::Signal(sig)) => {
+                assert_eq!(sig.symbol, "wrong-type-argument");
+                assert_eq!(sig.data, vec![Value::symbol("listp"), Value::Int(0)]);
+            }
+            other => panic!("expected wrong-type-argument signal, got {other:?}"),
+        }
+        match builtin_x_popup_menu(vec![Value::list(vec![Value::Nil, Value::Nil]), Value::Nil]) {
+            Err(Flow::Signal(sig)) => {
+                assert_eq!(sig.symbol, "wrong-type-argument");
+                assert_eq!(sig.data, vec![Value::symbol("stringp"), Value::Nil]);
+            }
+            other => panic!("expected wrong-type-argument signal, got {other:?}"),
+        }
+        match builtin_x_popup_menu(vec![
+            Value::list(vec![Value::Nil, Value::Nil]),
+            Value::list(vec![
+                Value::string("A"),
+                Value::cons(Value::string("Yes"), Value::True),
+            ]),
+        ]) {
+            Err(Flow::Signal(sig)) => {
+                assert_eq!(sig.symbol, "wrong-type-argument");
+                assert_eq!(sig.data, vec![Value::symbol("consp"), Value::True]);
+            }
+            other => panic!("expected wrong-type-argument signal, got {other:?}"),
+        }
+        match builtin_x_popup_menu(vec![Value::cons(Value::list(vec![Value::Int(0), Value::Int(0)]), Value::Int(0)), Value::Nil]) {
+            Err(Flow::Signal(sig)) => {
+                assert_eq!(sig.symbol, "wrong-type-argument");
+                assert_eq!(sig.data, vec![Value::symbol("listp"), Value::Int(0)]);
+            }
+            other => panic!("expected wrong-type-argument signal, got {other:?}"),
+        }
+        match builtin_x_popup_menu(vec![]) {
+            Err(Flow::Signal(sig)) => assert_eq!(sig.symbol, "wrong-number-of-arguments"),
+            other => panic!("expected wrong-number-of-arguments signal, got {other:?}"),
+        }
+        match builtin_x_popup_menu(vec![Value::Nil]) {
+            Err(Flow::Signal(sig)) => assert_eq!(sig.symbol, "wrong-number-of-arguments"),
+            other => panic!("expected wrong-number-of-arguments signal, got {other:?}"),
+        }
+        match builtin_x_popup_menu(vec![Value::Nil, Value::Nil, Value::Nil]) {
+            Err(Flow::Signal(sig)) => assert_eq!(sig.symbol, "wrong-number-of-arguments"),
+            other => panic!("expected wrong-number-of-arguments signal, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn x_frame_restack_safe_arity_surface() {
+        match builtin_x_frame_restack(vec![Value::Nil, Value::Nil]) {
+            Err(Flow::Signal(sig)) => {
+                assert_eq!(sig.symbol, "error");
+                assert_eq!(
+                    sig.data,
+                    vec![Value::string("Window system frame should be used")]
+                );
+            }
+            other => panic!("expected error signal, got {other:?}"),
+        }
+        match builtin_x_frame_restack(vec![Value::Nil, Value::Nil, Value::Nil]) {
+            Err(Flow::Signal(sig)) => {
+                assert_eq!(sig.symbol, "error");
+                assert_eq!(
+                    sig.data,
+                    vec![Value::string("Window system frame should be used")]
+                );
+            }
+            other => panic!("expected error signal, got {other:?}"),
+        }
+        match builtin_x_frame_restack(vec![]) {
+            Err(Flow::Signal(sig)) => assert_eq!(sig.symbol, "wrong-number-of-arguments"),
+            other => panic!("expected wrong-number-of-arguments signal, got {other:?}"),
+        }
+        match builtin_x_frame_restack(vec![Value::Nil]) {
+            Err(Flow::Signal(sig)) => assert_eq!(sig.symbol, "wrong-number-of-arguments"),
+            other => panic!("expected wrong-number-of-arguments signal, got {other:?}"),
+        }
+        match builtin_x_frame_restack(vec![Value::Nil, Value::Nil, Value::Nil, Value::Nil]) {
             Err(Flow::Signal(sig)) => assert_eq!(sig.symbol, "wrong-number-of-arguments"),
             other => panic!("expected wrong-number-of-arguments signal, got {other:?}"),
         }
