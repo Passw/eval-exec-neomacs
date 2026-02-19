@@ -522,6 +522,24 @@ Last updated: 2026-02-19
     - `make -C test/neovm/vm-compat check-one-neovm CASE=cases/describe-variable-runtime-semantics` (pass)
     - `make -C test/neovm/vm-compat check-all-neovm-strict` (pass)
 
+- Completed `describe-variable` symbol-doc indirection parity for string-valued doc symbols:
+  - runtime changes:
+    - `rust/neovm-core/src/elisp/doc.rs`
+      - aligned `variable-documentation` symbol indirection handling:
+        - symbol resolving to string doc now includes both value text and resolved doc text.
+        - symbol resolving to integer doc keeps existing oracle-aligned value-text shape.
+      - added evaluator unit lock-in:
+        - `describe_variable_symbol_doc_property_bound_string_includes_doc_and_value_text`
+  - corpus changes:
+    - expanded and re-recorded:
+      - `test/neovm/vm-compat/cases/describe-variable-runtime-semantics.{forms,expected.tsv}`
+      - added lock-in for symbol-valued `variable-documentation` resolving to string doc text.
+  - verified:
+    - `cargo test --manifest-path rust/neovm-core/Cargo.toml describe_variable_` (pass)
+    - `make -C test/neovm/vm-compat record FORMS=cases/describe-variable-runtime-semantics.forms EXPECTED=cases/describe-variable-runtime-semantics.expected.tsv` (pass)
+    - `make -C test/neovm/vm-compat check-one-neovm CASE=cases/describe-variable-runtime-semantics` (pass, 22/22)
+    - `make -C test/neovm/vm-compat check-all-neovm-strict` (pass)
+
 - Completed window old-state helper parity slice and added oracle lock-ins:
   - runtime changes:
     - `rust/neovm-core/src/elisp/window_cmds.rs`

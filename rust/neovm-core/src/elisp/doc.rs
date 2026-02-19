@@ -10901,9 +10901,8 @@ pub(crate) fn builtin_describe_variable(
                 }
                 let sym_value = eval.obarray.symbol_value(&sym).cloned().unwrap_or(Value::Nil);
                 return match sym_value {
-                    Value::Str(_) | Value::Int(_) => {
-                        Ok(Value::string(describe_variable_value_or_void_string(eval, &name)))
-                    }
+                    Value::Str(s) => Ok(Value::string(format!("{value_text}{s}\n"))),
+                    Value::Int(_) => Ok(Value::string(value_text)),
                     other => Err(signal(
                         "wrong-type-argument",
                         vec![Value::symbol("char-or-string-p"), other],
@@ -13037,6 +13036,29 @@ mod tests {
                 .unwrap()
                 .as_str()
                 .is_some_and(|s| s.contains("value is"))
+        );
+    }
+
+    #[test]
+    fn describe_variable_symbol_doc_property_bound_string_includes_doc_and_value_text() {
+        let mut evaluator = super::super::eval::Evaluator::new();
+        evaluator.obarray.set_symbol_value("my-var", Value::Int(42));
+        evaluator
+            .obarray
+            .set_symbol_value("my-doc", Value::string("Doc from indirection."));
+        evaluator.obarray.put_property(
+            "my-var",
+            "variable-documentation",
+            Value::symbol("my-doc"),
+        );
+
+        let result = builtin_describe_variable(&mut evaluator, vec![Value::symbol("my-var")]);
+        assert!(result.is_ok());
+        assert!(
+            result
+                .unwrap()
+                .as_str()
+                .is_some_and(|s| s.contains("Doc from indirection.") && s.contains("value is"))
         );
     }
 
