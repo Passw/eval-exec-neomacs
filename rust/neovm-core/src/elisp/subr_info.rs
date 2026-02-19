@@ -577,7 +577,9 @@ fn subr_arity_value(name: &str) -> Value {
         | "undo-boundary"
         | "universal-argument"
         | "use-region-p" => arity_cons(0, Some(0)),
-        "transient-mark-mode" | "undo" | "yank" | "yank-pop" => arity_cons(0, Some(1)),
+        "clear-this-command-keys" | "transient-mark-mode" | "undo" | "yank" | "yank-pop" => {
+            arity_cons(0, Some(1))
+        }
         "transpose-chars"
         | "transpose-lines"
         | "transpose-paragraphs"
@@ -2258,6 +2260,7 @@ mod tests {
         assert_subr_arity("switch-to-buffer", 1, Some(3));
         assert_subr_arity("take", 2, Some(2));
         assert_subr_arity("reindent-then-newline-and-indent", 0, Some(0));
+        assert_subr_arity("clear-this-command-keys", 0, Some(1));
         assert_subr_arity("this-command-keys", 0, Some(0));
         assert_subr_arity("this-command-keys-vector", 0, Some(0));
         assert_subr_arity("transient-mark-mode", 0, Some(1));

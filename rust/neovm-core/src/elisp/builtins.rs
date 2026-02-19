@@ -8157,6 +8157,11 @@ pub(crate) fn dispatch_builtin(
                 eval, args,
             ))
         }
+        "clear-this-command-keys" => {
+            return Some(super::interactive::builtin_clear_this_command_keys(
+                eval, args,
+            ))
+        }
         "thing-at-point" => return Some(super::interactive::builtin_thing_at_point(eval, args)),
         "bounds-of-thing-at-point" => {
             return Some(super::interactive::builtin_bounds_of_thing_at_point(

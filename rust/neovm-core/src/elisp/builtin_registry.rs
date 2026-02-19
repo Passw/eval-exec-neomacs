@@ -161,6 +161,7 @@ const DISPATCH_BUILTIN_NAMES: &[&str] = &[
     "clear-font-cache",
     "clear-image-cache",
     "clear-rectangle",
+    "clear-this-command-keys",
     "closurep",
     "coding-system-aliases",
     "coding-system-base",

@@ -1890,6 +1890,19 @@ pub(crate) fn builtin_this_command_keys_vector(
     Ok(Value::vector(vals))
 }
 
+/// `(clear-this-command-keys &optional KEEP-RECORD)` -> nil.
+///
+/// Clears current command-key context used by `this-command-keys*`.
+pub(crate) fn builtin_clear_this_command_keys(
+    eval: &mut Evaluator,
+    args: Vec<Value>,
+) -> EvalResult {
+    expect_max_args("clear-this-command-keys", &args, 1)?;
+    eval.clear_read_command_keys();
+    eval.interactive.set_this_command_keys(Vec::new());
+    Ok(Value::Nil)
+}
+
 fn command_key_events_to_string(events: &[Value]) -> Option<String> {
     let mut out = String::new();
     for event in events {
@@ -3490,6 +3503,51 @@ mod tests {
             }
             other => panic!("expected vector, got {other:?}"),
         }
+    }
+
+    #[test]
+    fn clear_this_command_keys_clears_read_key_context() {
+        let mut ev = Evaluator::new();
+        ev.set_read_command_keys(vec![Value::Int(97)]);
+
+        let result = builtin_clear_this_command_keys(&mut ev, vec![]).unwrap();
+        assert!(result.is_nil());
+        assert_eq!(ev.read_command_keys(), &[]);
+
+        let vec_result = builtin_this_command_keys_vector(&mut ev, vec![]).unwrap();
+        match vec_result {
+            Value::Vector(v) => {
+                let items = v.lock().expect("poisoned");
+                assert!(items.is_empty());
+            }
+            other => panic!("expected vector, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn clear_this_command_keys_clears_interactive_fallback_context() {
+        let mut ev = Evaluator::new();
+        ev.interactive
+            .set_this_command_keys(vec!["C-x".to_string(), "C-f".to_string()]);
+
+        let result = builtin_clear_this_command_keys(&mut ev, vec![Value::Int(1)]).unwrap();
+        assert!(result.is_nil());
+
+        let keys = builtin_this_command_keys(&mut ev, vec![]).unwrap();
+        assert_eq!(keys.as_str(), Some(""));
+    }
+
+    #[test]
+    fn clear_this_command_keys_rejects_more_than_one_arg() {
+        let mut ev = Evaluator::new();
+        let result = builtin_clear_this_command_keys(&mut ev, vec![Value::Int(1), Value::Int(2)]);
+        assert!(matches!(
+            result,
+            Err(Flow::Signal(sig))
+                if sig.symbol == "wrong-number-of-arguments"
+                    && sig.data
+                        == vec![Value::symbol("clear-this-command-keys"), Value::Int(2)]
+        ));
     }
 
     // -------------------------------------------------------------------

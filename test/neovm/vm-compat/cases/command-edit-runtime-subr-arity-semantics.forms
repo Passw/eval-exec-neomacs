@@ -12,6 +12,7 @@
 (subr-arity (symbol-function 'store-kbd-macro-event))
 (subr-arity (symbol-function 'switch-to-buffer))
 (subr-arity (symbol-function 'take))
+(subr-arity (symbol-function 'clear-this-command-keys))
 (subr-arity (symbol-function 'this-command-keys))
 (subr-arity (symbol-function 'this-command-keys-vector))
 (subr-arity (symbol-function 'transient-mark-mode))

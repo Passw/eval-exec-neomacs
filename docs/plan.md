@@ -28,6 +28,45 @@ Last updated: 2026-02-19
 
 ## Doing
 
+- Implemented `clear-this-command-keys` parity and lock-ins:
+  - runtime changes:
+    - `rust/neovm-core/src/elisp/interactive.rs`
+      - added `clear-this-command-keys` builtin with arity `(0 . 1)`.
+      - behavior:
+        - returns `nil`
+        - clears `read_command_keys` context
+        - clears interactive fallback command-key context
+      - added unit coverage:
+        - `clear_this_command_keys_clears_read_key_context`
+        - `clear_this_command_keys_clears_interactive_fallback_context`
+        - `clear_this_command_keys_rejects_more_than_one_arg`
+    - `rust/neovm-core/src/elisp/builtins.rs`
+      - wired evaluator dispatch for `clear-this-command-keys`.
+    - `rust/neovm-core/src/elisp/builtin_registry.rs`
+      - added `clear-this-command-keys` to dispatch name registry.
+    - `rust/neovm-core/src/elisp/subr_info.rs`
+      - added arity mapping for `clear-this-command-keys` as `(0 . 1)`.
+      - extended arity assertions in `subr_arity_command_edit_runtime_helpers_match_oracle`.
+  - corpus changes:
+    - added and wired:
+      - `test/neovm/vm-compat/cases/clear-this-command-keys-semantics.{forms,expected.tsv}`
+      - `test/neovm/vm-compat/cases/default.list`
+    - expanded:
+      - `test/neovm/vm-compat/cases/command-edit-runtime-subr-arity-semantics.{forms,expected.tsv}`
+        - added `clear-this-command-keys` arity lock-in
+    - lock-ins cover:
+      - `fboundp`, `commandp`, and `subr-arity` shape
+      - clearing of seeded `this-command-keys*` context from `read-event`, `read-char`, `read-char-exclusive`, and `read-key`
+      - optional-arg acceptance and over-arity error payload
+  - verified:
+    - `cargo test --manifest-path rust/neovm-core/Cargo.toml clear_this_command_keys -- --nocapture` (pass)
+    - `cargo test --manifest-path rust/neovm-core/Cargo.toml subr_arity_command_edit_runtime_helpers_match_oracle -- --nocapture` (pass)
+    - `make -C test/neovm/vm-compat record FORMS=cases/clear-this-command-keys-semantics.forms EXPECTED=cases/clear-this-command-keys-semantics.expected.tsv` (pass)
+    - `make -C test/neovm/vm-compat record FORMS=cases/command-edit-runtime-subr-arity-semantics.forms EXPECTED=cases/command-edit-runtime-subr-arity-semantics.expected.tsv` (pass)
+    - `make -C test/neovm/vm-compat check-one-neovm CASE=cases/clear-this-command-keys-semantics` (pass, `19/19`)
+    - `make -C test/neovm/vm-compat check-one-neovm CASE=cases/command-edit-runtime-subr-arity-semantics` (pass, `40/40`)
+    - `make -C test/neovm/vm-compat check-one-neovm CASE=cases/this-command-keys-readers-semantics` (pass, `16/16`)
+
 - Aligned `read-char` / `read-char-exclusive` command-key publication with oracle:
   - runtime changes:
     - `rust/neovm-core/src/elisp/reader.rs`
