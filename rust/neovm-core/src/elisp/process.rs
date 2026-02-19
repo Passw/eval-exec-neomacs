@@ -5201,6 +5201,31 @@ mod tests {
                          (vectorp (car lo-info))
                          (vectorp (nth 1 lo-info))
                          (vectorp (nth 2 lo-info))))
+                  (let* ((ifname (car (car (network-interface-list nil 'ipv4))))
+                         (info (and ifname (network-interface-info ifname)))
+                         (entries (network-interface-list nil 'ipv4))
+                         (found nil))
+                    (while entries
+                      (let ((entry (car entries)))
+                        (if (and (equal (car entry) ifname)
+                                 (equal (cdr entry) (car info)))
+                            (setq found t)))
+                      (setq entries (cdr entries)))
+                    (or (null ifname) found))
+                  (let* ((info (network-interface-info ifname))
+                         (addr (car info))
+                         (bc (nth 1 info))
+                         (mask (nth 2 info))
+                         (len (length addr)))
+                    (and (or (= len 5) (= len 9))
+                         (= (length bc) len)
+                         (= (length mask) len)))
+                  (let* ((lo-info (network-interface-info "lo"))
+                         (addr (car lo-info))
+                         (bc (nth 1 lo-info))
+                         (mask (nth 2 lo-info)))
+                    (and (= (length addr) (length bc))
+                         (= (length addr) (length mask))))
                   (condition-case err (network-interface-info nil) (error err))
                   (condition-case err (network-interface-info "abcdefghijklmnop") (error err))
                   (listp (network-lookup-address-info "localhost"))
@@ -5247,7 +5272,7 @@ mod tests {
         );
         assert_eq!(
             results[1],
-            "OK (\"127.0.0.1:80\" \"127.0.0.1\" \"[0:0:0:0:0:0:0:1]:80\" \"0:0:0:0:0:0:0:1\" \"x\" nil nil nil nil (wrong-number-of-arguments format-network-address 0) t t t t t t t (wrong-number-of-arguments network-interface-list 3) (error \"Unsupported address family\") t t t t t t (wrong-type-argument stringp nil) (error \"interface name too long\") t t t t t t t t t t (error \"Unsupported family\") (error \"Unsupported hints value\") (wrong-type-argument stringp 1) t t t (wrong-number-of-arguments signal-names 1) (void-function process-connection))"
+            "OK (\"127.0.0.1:80\" \"127.0.0.1\" \"[0:0:0:0:0:0:0:1]:80\" \"0:0:0:0:0:0:0:1\" \"x\" nil nil nil nil (wrong-number-of-arguments format-network-address 0) t t t t t t t (wrong-number-of-arguments network-interface-list 3) (error \"Unsupported address family\") t t t t t t t t t (wrong-type-argument stringp nil) (error \"interface name too long\") t t t t t t t t t t (error \"Unsupported family\") (error \"Unsupported hints value\") (wrong-type-argument stringp 1) t t t (wrong-number-of-arguments signal-names 1) (void-function process-connection))"
         );
     }
 }

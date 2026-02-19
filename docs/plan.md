@@ -28,6 +28,25 @@ Last updated: 2026-02-19
 
 ## Doing
 
+- Added `network-interface-info` coherence lock-ins against list snapshots:
+  - runtime lock-ins:
+    - `rust/neovm-core/src/elisp/process.rs`
+      - expanded `process_network_interface_and_signal_runtime_surface` assertions to enforce:
+        - for IPv4-filtered interface snapshots, `network-interface-info` address payload matches at least one `(NAME . ADDRESS)` entry for the same interface.
+        - `network-interface-info` vector widths are internally consistent:
+          - `ADDRESS`, `BROADCAST`, and `NETMASK` vector lengths are equal
+          - width is constrained to IPv4 (`5`) or IPv6 (`9`) payload shape.
+        - loopback `network-interface-info` vector widths stay aligned across the same three fields.
+  - corpus changes:
+    - expanded and re-recorded:
+      - `test/neovm/vm-compat/cases/process-network-interface-signal-semantics.forms`
+      - `test/neovm/vm-compat/cases/process-network-interface-signal-semantics.expected.tsv`
+  - verified:
+    - `cargo test --manifest-path rust/neovm-core/Cargo.toml process_network_interface_and_signal_runtime_surface` (pass)
+    - `make -C test/neovm/vm-compat record FORMS=cases/process-network-interface-signal-semantics.forms EXPECTED=cases/process-network-interface-signal-semantics.expected.tsv` (pass)
+    - `make -C test/neovm/vm-compat check-one-neovm CASE=cases/process-network-interface-signal-semantics` (pass, `2/2`)
+    - `make -C test/neovm/vm-compat check-all-neovm-strict` (pass; case inventory `788`)
+
 - Strengthened network family-width invariants for interface and lookup helpers:
   - runtime lock-ins:
     - `rust/neovm-core/src/elisp/process.rs`
