@@ -167,6 +167,14 @@ pub struct LayoutEngine {
     /// Used for overstrike: when bold variant unavailable, renderer uses this
     /// family instead of the proportional fallback.
     default_font_family: String,
+    /// Resolved font family name for the current face.
+    /// When a font_file_path is available and cosmic-text metrics are active,
+    /// this holds the fontdb-registered family name. Otherwise it mirrors
+    /// the Emacs font_family. Avoids per-character String allocation.
+    current_resolved_family: String,
+    /// Face ID for which current_resolved_family was computed.
+    /// Used to avoid re-resolving on every character.
+    resolved_family_face_id: u32,
     /// Cosmic-text font metrics service (lazily initialized on first use)
     font_metrics: Option<FontMetricsService>,
     /// Whether to use cosmic-text for font metrics instead of C FFI
@@ -184,6 +192,8 @@ impl LayoutEngine {
             run_buf: LigatureRunBuffer::new(),
             ligatures_enabled: false,
             default_font_family: String::new(),
+            current_resolved_family: String::new(),
+            resolved_family_face_id: u32::MAX,
             font_metrics: None,
             use_cosmic_metrics: true,
         }
@@ -470,6 +480,15 @@ impl LayoutEngine {
             "monospace"
         };
 
+        // Get font file path from C pointer (absolute path from Fontconfig)
+        let font_file_path = if !face.font_file_path.is_null() {
+            CStr::from_ptr(face.font_file_path).to_str().ok()
+                .filter(|s| !s.is_empty())
+                .map(|s| s.to_string())
+        } else {
+            None
+        };
+
         // When overstrike is set, Emacs couldn't find a bold variant of the
         // font, so it kept the regular (non-bold) font. Use the default
         // face's font family for rendering so the renderer draws with the
@@ -552,6 +571,7 @@ impl LayoutEngine {
             box_border_style: face.box_border_style as u32,
             box_border_speed: face.box_border_speed as f32 / 100.0,
             box_color2: if face.box_color2 != 0 { Some(Color::from_pixel(face.box_color2)) } else { None },
+            font_file_path: font_file_path,
             font_ascent: face.font_ascent as i32,
             font_descent: face.font_descent,
             underline_position: face.underline_position.max(1),
@@ -619,6 +639,10 @@ impl LayoutEngine {
             log::debug!("  layout_window: EARLY RETURN — null buffer={:?} or window={:?}", buffer, window);
             return;
         }
+
+        // Reset resolved family cache for this window (face IDs may map
+        // to different fonts in different windows due to text-scale-adjust).
+        self.resolved_family_face_id = u32::MAX;
 
         // Calculate available text area
         let text_x = params.text_bounds.x;
@@ -2640,11 +2664,26 @@ impl LayoutEngine {
                         let face_id = self.face_data.face_id;
                         let font_size = self.face_data.font_size;
                         let face_char_w = self.face_data.font_char_width;
-                        let font_family = if !self.face_data.font_family.is_null() {
-                            CStr::from_ptr(self.face_data.font_family).to_str().unwrap_or("")
-                        } else {
-                            ""
-                        };
+                        // Resolve effective family once per face change (not per char)
+                        if face_id != self.resolved_family_face_id {
+                            let font_family = if !self.face_data.font_family.is_null() {
+                                CStr::from_ptr(self.face_data.font_family).to_str().unwrap_or("")
+                            } else {
+                                ""
+                            };
+                            let font_file_path_str = if !self.face_data.font_file_path.is_null() {
+                                CStr::from_ptr(self.face_data.font_file_path).to_str().ok()
+                                    .filter(|s| !s.is_empty())
+                            } else {
+                                None
+                            };
+                            self.current_resolved_family = if let Some(ref mut svc) = self.font_metrics {
+                                svc.resolve_family(font_family, font_file_path_str)
+                            } else {
+                                font_family.to_string()
+                            };
+                            self.resolved_family_face_id = face_id;
+                        }
                         let font_weight = self.face_data.font_weight as u16;
                         let font_italic = self.face_data.italic != 0;
                         char_advance(
@@ -2652,7 +2691,7 @@ impl LayoutEngine {
                             &mut self.font_metrics,
                             ch, char_cols, char_w,
                             face_id, font_size, face_char_w, window,
-                            font_family, font_weight, font_italic,
+                            &self.current_resolved_family, font_weight, font_italic,
                         )
                     };
 

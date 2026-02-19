@@ -2433,6 +2433,7 @@ struct FaceDataFFI {
   int font_descent;  /* FONT_DESCENT in pixels */
   int underline_position;  /* font->underline_position (>=1) */
   int underline_thickness;  /* font->underline_thickness (>=1) */
+  const char *font_file_path;  /* Absolute path to resolved font file, or NULL */
 };
 
 static void
@@ -2629,6 +2630,19 @@ fill_face_data (struct frame *f, struct face *face, struct FaceDataFFI *out)
         out->underline_position = face->font->underline_position;
       if (face->font->underline_thickness > 0)
         out->underline_thickness = face->font->underline_thickness;
+    }
+
+  /* Font file path from the realized font object.
+     FONT_FILE_INDEX is set by ftfont_open() / ftcrfont_open() to the
+     absolute path Fontconfig resolved (e.g. /usr/share/fonts/...).
+     Passing this to the Rust renderer ensures both sides use the
+     identical font file. */
+  out->font_file_path = NULL;
+  if (face->font)
+    {
+      Lisp_Object file_attr = face->font->props[FONT_FILE_INDEX];
+      if (!NILP (file_attr) && STRINGP (file_attr))
+        out->font_file_path = SSDATA (file_attr);
     }
 }
 

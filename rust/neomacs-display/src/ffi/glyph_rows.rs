@@ -333,6 +333,7 @@ pub unsafe extern "C" fn neomacs_display_set_face(
         box_border_style: 0,
         box_border_speed: 1.0,
         box_color2: None,
+        font_file_path: None,
         font_ascent,
         font_descent,
         underline_position: if ul_position > 0 { ul_position } else { 1 },

@@ -634,4 +634,7 @@ pub struct FaceDataFFI {
     pub underline_position: c_int,
     /// Underline thickness in pixels (font->underline_thickness, >=1)
     pub underline_thickness: c_int,
+    /// Absolute path to resolved font file (from Fontconfig), or NULL.
+    /// Used to pre-load the exact font file into the Rust renderer's fontdb.
+    pub font_file_path: *const c_char,
 }

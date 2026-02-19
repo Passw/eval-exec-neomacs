@@ -9,6 +9,7 @@ use cosmic_text::{
 };
 
 use crate::core::face::Face;
+use crate::core::font_loader::FontFileCache;
 
 /// Key for glyph cache lookup
 #[derive(Debug, Clone, Hash, PartialEq, Eq)]
@@ -111,6 +112,8 @@ pub struct WgpuGlyphAtlas {
     cached_char_width: Option<f32>,
     /// Cached default font ascent (logical pixels), populated on first face_id=0 rasterization
     cached_font_ascent: Option<f32>,
+    /// Cache for pre-loading font files and resolving fontdb family names
+    font_file_cache: FontFileCache,
 }
 
 impl WgpuGlyphAtlas {
@@ -168,6 +171,7 @@ impl WgpuGlyphAtlas {
             generation: 0,
             cached_char_width: None,
             cached_font_ascent: None,
+            font_file_cache: FontFileCache::new(),
         }
     }
 
@@ -617,13 +621,27 @@ impl WgpuGlyphAtlas {
         self.rasterize_text(&c.to_string(), face)
     }
 
-    /// Convert Face to cosmic-text Attrs
+    /// Convert Face to cosmic-text Attrs.
+    ///
+    /// If the face has a `font_file_path`, pre-loads the exact font file into
+    /// fontdb and uses the fontdb-registered family name. This ensures cosmic-text
+    /// uses the identical font file that Emacs/Fontconfig resolved.
     fn face_to_attrs(&mut self, face: Option<&Face>) -> Attrs<'static> {
         let mut attrs = Attrs::new();
 
         if let Some(f) = face {
+            // Resolve effective family name: prefer fontdb family from exact file path
+            let effective_family = if let Some(ref path) = f.font_file_path {
+                self.font_file_cache
+                    .resolve_family(&mut self.font_system, path)
+                    .map(|s| s.to_string())
+                    .unwrap_or_else(|| f.font_family.clone())
+            } else {
+                f.font_family.clone()
+            };
+
             // Font family - support specific font names
-            let family_lower = f.font_family.to_lowercase();
+            let family_lower = effective_family.to_lowercase();
             attrs = match family_lower.as_str() {
                 "monospace" | "mono" | "" => attrs.family(Family::Monospace),
                 "serif" => attrs.family(Family::Serif),
@@ -631,10 +649,10 @@ impl WgpuGlyphAtlas {
                 // For specific font names, intern the string to get 'static lifetime
                 // without unbounded memory growth (each unique name leaked only once)
                 _ => {
-                    let interned = if let Some(&existing) = self.interned_families.get(f.font_family.as_str()) {
+                    let interned = if let Some(&existing) = self.interned_families.get(effective_family.as_str()) {
                         existing
                     } else {
-                        let leaked: &'static str = Box::leak(f.font_family.clone().into_boxed_str());
+                        let leaked: &'static str = Box::leak(effective_family.into_boxed_str());
                         self.interned_families.insert(leaked);
                         leaked
                     };

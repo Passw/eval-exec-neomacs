@@ -9,6 +9,7 @@
 
 use cosmic_text::{Attrs, Buffer, Family, FontSystem, Metrics, Style, Weight};
 use std::collections::HashMap;
+use crate::core::font_loader::FontFileCache;
 
 /// Font metrics returned for a given face configuration.
 #[derive(Debug, Clone, Copy)]
@@ -60,6 +61,8 @@ pub struct FontMetricsService {
     metrics_cache: HashMap<MetricsCacheKey, FontMetrics>,
     /// Interned font family strings for cosmic-text Attrs (requires 'static)
     interned_families: HashMap<String, &'static str>,
+    /// Cache for pre-loading font files and resolving fontdb family names
+    font_file_cache: FontFileCache,
 }
 
 impl FontMetricsService {
@@ -77,7 +80,23 @@ impl FontMetricsService {
             char_cache: HashMap::new(),
             metrics_cache: HashMap::new(),
             interned_families: HashMap::new(),
+            font_file_cache: FontFileCache::new(),
         }
+    }
+
+    /// Resolve the effective font family name for a face.
+    ///
+    /// If `font_file_path` is provided, pre-loads the exact font file into fontdb
+    /// and returns the fontdb-registered family name. This ensures cosmic-text uses
+    /// the identical font file that Emacs/Fontconfig resolved.
+    /// Falls back to `emacs_family` if the file path is None or loading fails.
+    pub fn resolve_family(&mut self, emacs_family: &str, font_file_path: Option<&str>) -> String {
+        if let Some(path) = font_file_path {
+            if let Some(fontdb_family) = self.font_file_cache.resolve_family(&mut self.font_system, path) {
+                return fontdb_family.to_string();
+            }
+        }
+        emacs_family.to_string()
     }
 
     /// Build cosmic-text `Attrs` from face parameters.

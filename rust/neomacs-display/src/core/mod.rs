@@ -27,6 +27,7 @@ pub mod casefiddle;
 pub mod composite;
 pub mod profiler;
 pub mod textprop;
+pub mod font_loader;
 
 pub use types::*;
 pub use scene::*;

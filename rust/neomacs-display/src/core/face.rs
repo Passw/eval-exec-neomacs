@@ -100,6 +100,10 @@ pub struct Face {
     /// Secondary box color (for gradient, neon, etc.)
     pub box_color2: Option<Color>,
 
+    /// Absolute path to the resolved font file (from Fontconfig), if available.
+    /// Used to pre-load the exact font file into cosmic-text's fontdb.
+    pub font_file_path: Option<String>,
+
     /// Font metrics from Emacs's realized font
     /// Font ascent (FONT_BASE) in pixels
     pub font_ascent: i32,
@@ -132,6 +136,7 @@ impl Default for Face {
             box_border_style: 0,
             box_border_speed: 1.0,
             box_color2: None,
+            font_file_path: None,
             font_ascent: 0,
             font_descent: 0,
             underline_position: 1,
@@ -278,6 +283,7 @@ mod tests {
         assert!(face.overline_color.is_none());
         assert!(face.strike_through_color.is_none());
         assert!(face.box_color.is_none());
+        assert!(face.font_file_path.is_none());
         assert_eq!(face.font_ascent, 0);
         assert_eq!(face.font_descent, 0);
         assert_eq!(face.underline_position, 1);

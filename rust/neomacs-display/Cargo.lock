@@ -1810,6 +1810,7 @@ dependencies = [
  "cosmic-text",
  "crossbeam-channel",
  "env_logger",
+ "fontdb 0.16.2",
  "gstreamer",
  "gstreamer-allocators",
  "gstreamer-app",

@@ -669,6 +669,11 @@ typedef struct FaceDataFFI {
    * Underline thickness in pixels (font->underline_thickness, >=1)
    */
   int underlineThickness;
+  /**
+   * Absolute path to resolved font file (from Fontconfig), or NULL.
+   * Used to pre-load the exact font file into the Rust renderer's fontdb.
+   */
+  const char *fontFilePath;
 } FaceDataFFI;
 
 /**

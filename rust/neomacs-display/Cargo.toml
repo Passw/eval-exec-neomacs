@@ -13,6 +13,8 @@ crate-type = ["staticlib", "cdylib", "rlib"]
 [dependencies]
 # Text rendering - Pure Rust stack
 cosmic-text = "0.12"
+# Font database (same version as cosmic-text uses, for fontdb::Source::File)
+fontdb = "0.16"
 
 # Vulkan for DMA-BUF import (WPE WebKit integration)
 ash = "0.38"
