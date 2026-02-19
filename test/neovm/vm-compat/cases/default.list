@@ -374,6 +374,7 @@ cases/timer-semantics
 cases/timer-unit-delay-semantics
 cases/timer-float-int-edge-semantics
 cases/display-stub-semantics
+cases/internal-show-cursor-window-state-semantics
 cases/xdisp-pixel-metrics-semantics
 cases/xdisp-navigation-semantics
 cases/xdisp-stub-edges-semantics
@@ -503,6 +504,7 @@ cases/window-minibuffer-frame-first-window-semantics
 cases/window-root-valid-minibuffer-active-semantics
 cases/window-list-frame-designator-semantics
 cases/window-list-minibuf-all-frames-semantics
+cases/window-object-return-semantics
 cases/window-list-minibuffer-window-accessor-semantics
 cases/get-buffer-window-optional-buffer-semantics
 cases/other-buffer-semantics

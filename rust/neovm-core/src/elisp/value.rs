@@ -54,6 +54,8 @@ pub enum Value {
     ByteCode(Arc<super::bytecode::ByteCodeFunction>),
     /// Buffer reference (opaque id into the BufferManager).
     Buffer(crate::buffer::BufferId),
+    /// Window reference (opaque id into the FrameManager).
+    Window(u64),
     /// Frame reference (opaque id into the FrameManager).
     Frame(u64),
     /// Timer reference (opaque id into the TimerManager).
@@ -152,6 +154,7 @@ pub enum HashKey {
     Keyword(String),
     Str(String),
     Char(char),
+    Window(u64),
     Frame(u64),
     /// Pointer identity for eq hash tables.
     Ptr(usize),
@@ -346,6 +349,7 @@ impl Value {
             Value::Subr(_) => "subr",
             Value::ByteCode(_) => "byte-code-function",
             Value::Buffer(_) => "buffer",
+            Value::Window(_) => "window",
             Value::Frame(_) => "frame",
             Value::Timer(_) => "timer",
         }
@@ -421,6 +425,7 @@ impl Value {
             Value::Subr(n) => HashKey::Symbol(n.clone()),
             Value::ByteCode(b) => HashKey::Ptr(Arc::as_ptr(b) as usize),
             Value::Buffer(id) => HashKey::Int(id.0 as i64),
+            Value::Window(id) => HashKey::Window(*id),
             Value::Frame(id) => HashKey::Frame(*id),
             Value::Timer(id) => HashKey::Int(*id as i64),
         }
@@ -446,6 +451,7 @@ impl Value {
             Value::Keyword(s) => HashKey::Keyword(s.clone()),
             Value::Str(s) => HashKey::Str((**s).clone()),
             Value::Char(c) => HashKey::Int(*c as i64),
+            Value::Window(id) => HashKey::Window(*id),
             Value::Frame(id) => HashKey::Frame(*id),
             // For compound types, fall back to eq identity
             other => other.to_eq_key(),
@@ -477,6 +483,7 @@ pub fn eq_value(left: &Value, right: &Value) -> bool {
         (Value::Subr(a), Value::Subr(b)) => a == b,
         (Value::ByteCode(a), Value::ByteCode(b)) => Arc::ptr_eq(a, b),
         (Value::Buffer(a), Value::Buffer(b)) => a == b,
+        (Value::Window(a), Value::Window(b)) => a == b,
         (Value::Frame(a), Value::Frame(b)) => a == b,
         (Value::Timer(a), Value::Timer(b)) => a == b,
         _ => false,
@@ -531,6 +538,7 @@ pub fn equal_value(left: &Value, right: &Value, depth: usize) -> bool {
         (Value::Subr(a), Value::Subr(b)) => a == b,
         (Value::ByteCode(a), Value::ByteCode(b)) => Arc::ptr_eq(a, b),
         (Value::Buffer(a), Value::Buffer(b)) => a == b,
+        (Value::Window(a), Value::Window(b)) => a == b,
         (Value::Frame(a), Value::Frame(b)) => a == b,
         (Value::Timer(a), Value::Timer(b)) => a == b,
         _ => false,

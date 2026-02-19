@@ -15,6 +15,7 @@ thread_local! {
     static TERMINAL_PARAMS: RefCell<Vec<(Value, Value)>> = const { RefCell::new(Vec::new()) };
     static TERMINAL_HANDLE: Arc<Mutex<Vec<Value>>> =
         Arc::new(Mutex::new(vec![Value::symbol("--neovm-terminal--")]));
+    static CURSOR_VISIBLE_WINDOWS: RefCell<Vec<(u64, bool)>> = const { RefCell::new(Vec::new()) };
 }
 
 const TERMINAL_NAME: &str = "initial_terminal";
@@ -86,19 +87,22 @@ fn display_does_not_exist_error(display: &str) -> Flow {
 }
 
 fn format_get_device_terminal_arg_eval(eval: &super::eval::Evaluator, value: &Value) -> String {
-    if let Value::Int(id) = value {
-        if *id >= 0 {
-            let window_id = WindowId(*id as u64);
-            if let Some(frame_id) = eval.frames.find_window_frame_id(window_id) {
-                if let Some(frame) = eval.frames.get(frame_id) {
-                    if let Some(window) = frame.find_window(window_id) {
-                        if let Some(buffer_id) = window.buffer_id() {
-                            if let Some(buffer) = eval.buffers.get(buffer_id) {
-                                return format!("#<window {} on {}>", id, buffer.name);
-                            }
+    let window_id = match value {
+        Value::Window(id) => Some(WindowId(*id)),
+        Value::Int(id) if *id >= 0 => Some(WindowId(*id as u64)),
+        _ => None,
+    };
+
+    if let Some(window_id) = window_id {
+        if let Some(frame_id) = eval.frames.find_window_frame_id(window_id) {
+            if let Some(frame) = eval.frames.get(frame_id) {
+                if let Some(window) = frame.find_window(window_id) {
+                    if let Some(buffer_id) = window.buffer_id() {
+                        if let Some(buffer) = eval.buffers.get(buffer_id) {
+                            return format!("#<window {} on {}>", window_id.0, buffer.name);
                         }
-                        return format!("#<window {} on {}>", id, frame.name);
                     }
+                    return format!("#<window {} on {}>", window_id.0, frame.name);
                 }
             }
         }
@@ -184,10 +188,10 @@ fn expect_window_designator(value: &Value) -> Result<(), Flow> {
 
 fn live_window_designator_p(eval: &mut super::eval::Evaluator, value: &Value) -> bool {
     match value {
+        Value::Window(id) => eval.frames.find_window_frame_id(WindowId(*id)).is_some(),
         Value::Int(id) if *id >= 0 => eval
             .frames
-            .selected_frame()
-            .and_then(|frame| frame.find_window(WindowId(*id as u64)))
+            .find_window_frame_id(WindowId(*id as u64))
             .is_some(),
         _ => false,
     }
@@ -205,6 +209,59 @@ fn expect_window_designator_eval(
             vec![Value::symbol("windowp"), value.clone()],
         ))
     }
+}
+
+fn window_id_from_window_designator(value: &Value) -> Option<WindowId> {
+    match value {
+        Value::Window(id) => Some(WindowId(*id)),
+        Value::Int(id) if *id >= 0 => Some(WindowId(*id as u64)),
+        _ => None,
+    }
+}
+
+fn selected_window_id(eval: &mut super::eval::Evaluator) -> Option<WindowId> {
+    let frame_id = crate::elisp::window_cmds::ensure_selected_frame_id(eval);
+    eval.frames.get(frame_id).map(|frame| frame.selected_window)
+}
+
+fn resolve_internal_show_cursor_window_id(
+    eval: &mut super::eval::Evaluator,
+    value: &Value,
+) -> Option<WindowId> {
+    if value.is_nil() {
+        selected_window_id(eval)
+    } else {
+        window_id_from_window_designator(value)
+    }
+}
+
+fn set_window_cursor_visible(window_id: WindowId, visible: bool) {
+    CURSOR_VISIBLE_WINDOWS.with(|slot| {
+        let mut states = slot.borrow_mut();
+        if let Some((_, existing)) = states
+            .iter_mut()
+            .find(|(stored_window_id, _)| *stored_window_id == window_id.0)
+        {
+            *existing = visible;
+        } else {
+            states.push((window_id.0, visible));
+        }
+    });
+}
+
+fn window_cursor_visible(window_id: WindowId) -> bool {
+    CURSOR_VISIBLE_WINDOWS.with(|slot| {
+        slot.borrow()
+            .iter()
+            .find_map(|(stored_window_id, visible)| {
+                if *stored_window_id == window_id.0 {
+                    Some(*visible)
+                } else {
+                    None
+                }
+            })
+            .unwrap_or(true)
+    })
 }
 
 fn expect_display_designator(value: &Value) -> Result<(), Flow> {
@@ -428,7 +485,12 @@ pub(crate) fn builtin_internal_show_cursor_eval(
 ) -> EvalResult {
     expect_args("internal-show-cursor", &args, 2)?;
     expect_window_designator_eval(eval, &args[0])?;
-    CURSOR_VISIBLE.store(!args[1].is_nil(), Ordering::Relaxed);
+    let visible = !args[1].is_nil();
+    if let Some(window_id) = resolve_internal_show_cursor_window_id(eval, &args[0]) {
+        set_window_cursor_visible(window_id, visible);
+    } else {
+        CURSOR_VISIBLE.store(visible, Ordering::Relaxed);
+    }
     Ok(Value::Nil)
 }
 
@@ -451,6 +513,10 @@ pub(crate) fn builtin_internal_show_cursor_p_eval(
     expect_range_args("internal-show-cursor-p", &args, 0, 1)?;
     if let Some(window) = args.first() {
         expect_window_designator_eval(eval, window)?;
+    }
+    let query_window = args.first().unwrap_or(&Value::Nil);
+    if let Some(window_id) = resolve_internal_show_cursor_window_id(eval, query_window) {
+        return Ok(Value::bool(window_cursor_visible(window_id)));
     }
     Ok(Value::bool(CURSOR_VISIBLE.load(Ordering::Relaxed)))
 }
@@ -1579,6 +1645,7 @@ mod tests {
 
     fn reset_cursor_visible() {
         CURSOR_VISIBLE.store(true, Ordering::Relaxed);
+        CURSOR_VISIBLE_WINDOWS.with(|slot| slot.borrow_mut().clear());
     }
 
     #[test]
@@ -1875,13 +1942,9 @@ mod tests {
     fn eval_internal_show_cursor_accepts_live_window_designator() {
         let mut eval = crate::elisp::Evaluator::new();
         let _ = crate::elisp::window_cmds::ensure_selected_frame_id(&mut eval);
-        let window_id = crate::elisp::window_cmds::builtin_selected_window(&mut eval, vec![])
-            .unwrap()
-            .as_int()
-            .expect("selected-window should return id");
+        let window = crate::elisp::window_cmds::builtin_selected_window(&mut eval, vec![]).unwrap();
         let result =
-            builtin_internal_show_cursor_eval(&mut eval, vec![Value::Int(window_id), Value::True])
-                .unwrap();
+            builtin_internal_show_cursor_eval(&mut eval, vec![window, Value::True]).unwrap();
         assert!(result.is_nil());
     }
 
@@ -1889,13 +1952,59 @@ mod tests {
     fn eval_internal_show_cursor_p_accepts_live_window_designator() {
         let mut eval = crate::elisp::Evaluator::new();
         let _ = crate::elisp::window_cmds::ensure_selected_frame_id(&mut eval);
-        let window_id = crate::elisp::window_cmds::builtin_selected_window(&mut eval, vec![])
-            .unwrap()
-            .as_int()
-            .expect("selected-window should return id");
-        let result =
-            builtin_internal_show_cursor_p_eval(&mut eval, vec![Value::Int(window_id)]).unwrap();
+        let window = crate::elisp::window_cmds::builtin_selected_window(&mut eval, vec![]).unwrap();
+        let result = builtin_internal_show_cursor_p_eval(&mut eval, vec![window]).unwrap();
         assert!(matches!(result, Value::True | Value::Nil));
+    }
+
+    #[test]
+    fn eval_internal_show_cursor_tracks_per_window_state() {
+        reset_cursor_visible();
+        let mut eval = crate::elisp::Evaluator::new();
+        let _ = crate::elisp::window_cmds::ensure_selected_frame_id(&mut eval);
+        let selected = crate::elisp::window_cmds::builtin_selected_window(&mut eval, vec![]).unwrap();
+        let other = crate::elisp::window_cmds::builtin_split_window(
+            &mut eval,
+            vec![Value::Nil, Value::Nil, Value::Nil, Value::Nil],
+        )
+        .unwrap();
+
+        assert_eq!(
+            builtin_internal_show_cursor_p_eval(&mut eval, vec![selected.clone()]).unwrap(),
+            Value::True
+        );
+        assert_eq!(
+            builtin_internal_show_cursor_p_eval(&mut eval, vec![other.clone()]).unwrap(),
+            Value::True
+        );
+
+        builtin_internal_show_cursor_eval(&mut eval, vec![Value::Nil, Value::Nil]).unwrap();
+        assert!(
+            builtin_internal_show_cursor_p_eval(&mut eval, vec![selected.clone()])
+                .unwrap()
+                .is_nil()
+        );
+        assert_eq!(
+            builtin_internal_show_cursor_p_eval(&mut eval, vec![other.clone()]).unwrap(),
+            Value::True
+        );
+        assert!(builtin_internal_show_cursor_p_eval(&mut eval, vec![])
+            .unwrap()
+            .is_nil());
+
+        builtin_internal_show_cursor_eval(&mut eval, vec![other.clone(), Value::True]).unwrap();
+        assert!(
+            builtin_internal_show_cursor_p_eval(&mut eval, vec![selected])
+                .unwrap()
+                .is_nil()
+        );
+        assert_eq!(
+            builtin_internal_show_cursor_p_eval(&mut eval, vec![other]).unwrap(),
+            Value::True
+        );
+        assert!(builtin_internal_show_cursor_p_eval(&mut eval, vec![])
+            .unwrap()
+            .is_nil());
     }
 
     #[test]
@@ -2360,17 +2469,12 @@ mod tests {
     fn eval_display_monitor_errors_render_window_designators() {
         let mut eval = crate::elisp::Evaluator::new();
         let _ = crate::elisp::window_cmds::ensure_selected_frame_id(&mut eval);
-        let window_id = crate::elisp::window_cmds::builtin_selected_window(&mut eval, vec![])
-            .unwrap()
-            .as_int()
-            .expect("selected-window should return id");
+        let window = crate::elisp::window_cmds::builtin_selected_window(&mut eval, vec![]).unwrap();
 
-        let list_err =
-            builtin_display_monitor_attributes_list_eval(&mut eval, vec![Value::Int(window_id)])
-                .expect_err("window designator should be rejected");
-        let frame_err =
-            builtin_frame_monitor_attributes_eval(&mut eval, vec![Value::Int(window_id)])
-                .expect_err("window designator should be rejected");
+        let list_err = builtin_display_monitor_attributes_list_eval(&mut eval, vec![window.clone()])
+            .expect_err("window designator should be rejected");
+        let frame_err = builtin_frame_monitor_attributes_eval(&mut eval, vec![window])
+            .expect_err("window designator should be rejected");
 
         for err in [list_err, frame_err] {
             match err {

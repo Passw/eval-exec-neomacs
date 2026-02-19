@@ -404,14 +404,16 @@ fn validate_optional_window_designator(
     if windowish.is_nil() {
         return Ok(());
     }
-    if let Value::Int(id) = windowish {
-        if *id >= 0 {
-            let wid = WindowId(*id as u64);
-            for fid in eval.frames.frame_list() {
-                if let Some(frame) = eval.frames.get(fid) {
-                    if frame.find_window(wid).is_some() {
-                        return Ok(());
-                    }
+    let wid = match windowish {
+        Value::Window(id) => Some(WindowId(*id)),
+        Value::Int(id) if *id >= 0 => Some(WindowId(*id as u64)),
+        _ => None,
+    };
+    if let Some(wid) = wid {
+        for fid in eval.frames.frame_list() {
+            if let Some(frame) = eval.frames.get(fid) {
+                if frame.find_window(wid).is_some() {
+                    return Ok(());
                 }
             }
         }

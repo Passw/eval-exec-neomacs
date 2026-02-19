@@ -2,7 +2,9 @@
 //!
 //! Bridges the `FrameManager` (in `crate::window`) to Elisp by exposing
 //! builtins such as `selected-window`, `split-window`, `selected-frame`, etc.
-//! Windows and frames are represented as integer IDs in Lisp.
+//! Frames are represented as frame handles. Windows are represented as window
+//! handles, while legacy integer designators are still accepted in resolver
+//! paths for compatibility.
 
 use super::error::{signal, EvalResult, Flow};
 use super::value::{list_to_vec, Value};
@@ -192,6 +194,18 @@ fn expect_margin_width(value: &Value) -> Result<usize, Flow> {
     }
 }
 
+fn window_value(wid: WindowId) -> Value {
+    Value::Window(wid.0)
+}
+
+fn window_id_from_designator(value: &Value) -> Option<WindowId> {
+    match value {
+        Value::Window(id) => Some(WindowId(*id)),
+        Value::Int(n) if *n >= 0 => Some(WindowId(*n as u64)),
+        _ => None,
+    }
+}
+
 /// Resolve an optional window designator.
 ///
 /// - nil/omitted => selected window of selected frame
@@ -211,14 +225,11 @@ fn resolve_window_id_with_pred(
             Ok((frame_id, frame.selected_window))
         }
         Some(val) => {
-            let wid = match val {
-                Value::Int(n) => WindowId(*n as u64),
-                _ => {
-                    return Err(signal(
-                        "wrong-type-argument",
-                        vec![Value::symbol(pred), val.clone()],
-                    ))
-                }
+            let Some(wid) = window_id_from_designator(val) else {
+                return Err(signal(
+                    "wrong-type-argument",
+                    vec![Value::symbol(pred), val.clone()],
+                ));
             };
             if let Some(frame_id) = eval.frames.find_window_frame_id(wid) {
                 Ok((frame_id, wid))
@@ -254,14 +265,11 @@ fn resolve_window_object_id_with_pred(
             Ok(wid)
         }
         Some(val) => {
-            let wid = match val {
-                Value::Int(n) => WindowId(*n as u64),
-                _ => {
-                    return Err(signal(
-                        "wrong-type-argument",
-                        vec![Value::symbol(pred), val.clone()],
-                    ))
-                }
+            let Some(wid) = window_id_from_designator(val) else {
+                return Err(signal(
+                    "wrong-type-argument",
+                    vec![Value::symbol(pred), val.clone()],
+                ));
             };
             if eval.frames.is_window_object_id(wid) {
                 Ok(wid)
@@ -285,25 +293,23 @@ fn resolve_window_id_or_error(
 ) -> Result<(FrameId, WindowId), Flow> {
     match arg {
         None | Some(Value::Nil) => resolve_window_id(eval, arg),
-        Some(Value::Int(n)) => {
-            let wid = WindowId(*n as u64);
+        Some(value) => {
+            let Some(wid) = window_id_from_designator(value) else {
+                return Err(signal("error", vec![Value::string("Invalid window")]));
+            };
             if let Some(fid) = eval.frames.find_window_frame_id(wid) {
                 Ok((fid, wid))
             } else {
                 Err(signal("error", vec![Value::string("Invalid window")]))
             }
         }
-        Some(_) => Err(signal("error", vec![Value::string("Invalid window")])),
     }
 }
 
 fn format_window_designator_for_error(eval: &super::eval::Evaluator, value: &Value) -> String {
-    if let Value::Int(n) = value {
-        if *n >= 0 {
-            let wid = WindowId(*n as u64);
-            if eval.frames.is_window_object_id(wid) {
-                return format!("#<window {}>", n);
-            }
+    if let Some(wid) = window_id_from_designator(value) {
+        if eval.frames.is_window_object_id(wid) || matches!(value, Value::Window(_)) {
+            return format!("#<window {}>", wid.0);
         }
     }
     super::print::print_value(value)
@@ -316,8 +322,18 @@ fn resolve_window_id_or_window_error(
 ) -> Result<(FrameId, WindowId), Flow> {
     match arg {
         None | Some(Value::Nil) => resolve_window_id(eval, arg),
-        Some(val @ Value::Int(n)) if *n >= 0 => {
-            let wid = WindowId(*n as u64);
+        Some(val) => {
+            let Some(wid) = window_id_from_designator(val) else {
+                let window_kind = if live_only { "live" } else { "valid" };
+                return Err(signal(
+                    "error",
+                    vec![Value::string(format!(
+                        "{} is not a {} window",
+                        format_window_designator_for_error(eval, val),
+                        window_kind
+                    ))],
+                ));
+            };
             if let Some(fid) = eval.frames.find_window_frame_id(wid) {
                 Ok((fid, wid))
             } else {
@@ -331,17 +347,6 @@ fn resolve_window_id_or_window_error(
                     ))],
                 ))
             }
-        }
-        Some(val) => {
-            let window_kind = if live_only { "live" } else { "valid" };
-            Err(signal(
-                "error",
-                vec![Value::string(format!(
-                    "{} is not a {} window",
-                    format_window_designator_for_error(eval, val),
-                    window_kind
-                ))],
-            ))
         }
     }
 }
@@ -419,6 +424,16 @@ fn resolve_frame_or_window_frame_id(
             Err(signal(
                 "wrong-type-argument",
                 vec![Value::symbol(predicate), Value::Int(*n)],
+            ))
+        }
+        Some(Value::Window(id)) => {
+            let wid = WindowId(*id);
+            if let Some(fid) = eval.frames.find_window_frame_id(wid) {
+                return Ok(fid);
+            }
+            Err(signal(
+                "wrong-type-argument",
+                vec![Value::symbol(predicate), Value::Window(*id)],
             ))
         }
         Some(other) => Err(signal(
@@ -691,7 +706,7 @@ fn window_body_edges_cols_lines(
 // Window queries
 // ===========================================================================
 
-/// `(selected-window)` -> window id (int).
+/// `(selected-window)` -> window object.
 pub(crate) fn builtin_selected_window(
     eval: &mut super::eval::Evaluator,
     args: Vec<Value>,
@@ -702,7 +717,7 @@ pub(crate) fn builtin_selected_window(
         .frames
         .get(fid)
         .ok_or_else(|| signal("error", vec![Value::string("No selected frame")]))?;
-    Ok(Value::Int(frame.selected_window.0 as i64))
+    Ok(window_value(frame.selected_window))
 }
 
 /// `(frame-selected-window &optional FRAME)` -> selected window of FRAME.
@@ -716,7 +731,7 @@ pub(crate) fn builtin_frame_selected_window(
         .frames
         .get(fid)
         .ok_or_else(|| signal("error", vec![Value::string("Frame not found")]))?;
-    Ok(Value::Int(frame.selected_window.0 as i64))
+    Ok(window_value(frame.selected_window))
 }
 
 /// `(frame-first-window &optional FRAME-OR-WINDOW)` -> first window on frame.
@@ -735,7 +750,7 @@ pub(crate) fn builtin_frame_first_window(
         .first()
         .copied()
         .unwrap_or(frame.selected_window);
-    Ok(Value::Int(first.0 as i64))
+    Ok(window_value(first))
 }
 
 /// `(frame-root-window &optional FRAME-OR-WINDOW)` -> root window on frame.
@@ -757,7 +772,7 @@ pub(crate) fn builtin_frame_root_window(
         .first()
         .copied()
         .unwrap_or(frame.selected_window);
-    Ok(Value::Int(root.0 as i64))
+    Ok(window_value(root))
 }
 
 /// `(minibuffer-window &optional FRAME)` -> minibuffer window of FRAME.
@@ -772,7 +787,7 @@ pub(crate) fn builtin_minibuffer_window(
         .get(fid)
         .ok_or_else(|| signal("error", vec![Value::string("Frame not found")]))?;
     match frame.minibuffer_window {
-        Some(wid) => Ok(Value::Int(wid.0 as i64)),
+        Some(wid) => Ok(window_value(wid)),
         None => Ok(Value::Nil),
     }
 }
@@ -838,8 +853,13 @@ pub(crate) fn builtin_window_buffer(
             let (fid, wid) = resolve_window_id_with_pred(eval, args.first(), "windowp")?;
             resolve_buffer(&eval.frames, fid, wid)
         }
-        Some(Value::Int(n)) => {
-            let wid = WindowId(*n as u64);
+        Some(val) => {
+            let Some(wid) = window_id_from_designator(val) else {
+                return Err(signal(
+                    "wrong-type-argument",
+                    vec![Value::symbol("windowp"), val.clone()],
+                ));
+            };
             if let Some(fid) = eval.frames.find_window_frame_id(wid) {
                 return resolve_buffer(&eval.frames, fid, wid);
             }
@@ -848,13 +868,9 @@ pub(crate) fn builtin_window_buffer(
             }
             Err(signal(
                 "wrong-type-argument",
-                vec![Value::symbol("windowp"), Value::Int(*n)],
+                vec![Value::symbol("windowp"), val.clone()],
             ))
         }
-        Some(other) => Err(signal(
-            "wrong-type-argument",
-            vec![Value::symbol("windowp"), other.clone()],
-        )),
     }
 }
 
@@ -1849,7 +1865,7 @@ pub(crate) fn builtin_window_total_width(
     Ok(Value::Int(window_width_cols(w, cw)))
 }
 
-/// `(window-list &optional FRAME MINIBUF ALL-FRAMES)` -> list of window ids.
+/// `(window-list &optional FRAME MINIBUF ALL-FRAMES)` -> list of window objects.
 pub(crate) fn builtin_window_list(
     eval: &mut super::eval::Evaluator,
     args: Vec<Value>,
@@ -1859,27 +1875,26 @@ pub(crate) fn builtin_window_list(
     // GNU Emacs validates ALL-FRAMES before FRAME mismatch checks.
     let all_frames_fid = match args.get(2) {
         None | Some(Value::Nil) => None,
-        Some(Value::Int(n)) => {
-            let wid = WindowId(*n as u64);
+        Some(arg) => {
+            let Some(wid) = window_id_from_designator(arg) else {
+                return Err(signal(
+                    "wrong-type-argument",
+                    vec![Value::symbol("windowp"), arg.clone()],
+                ));
+            };
             if let Some(fid) = eval.frames.find_window_frame_id(wid) {
                 Some(fid)
             } else if eval.frames.is_window_object_id(wid) {
                 return Err(signal(
                     "wrong-type-argument",
-                    vec![Value::symbol("window-live-p"), Value::Int(*n)],
+                    vec![Value::symbol("window-live-p"), arg.clone()],
                 ));
             } else {
                 return Err(signal(
                     "wrong-type-argument",
-                    vec![Value::symbol("windowp"), Value::Int(*n)],
+                    vec![Value::symbol("windowp"), arg.clone()],
                 ));
             }
-        }
-        Some(other) => {
-            return Err(signal(
-                "wrong-type-argument",
-                vec![Value::symbol("windowp"), other.clone()],
-            ))
         }
     };
     let mut fid = match args.first() {
@@ -1924,11 +1939,11 @@ pub(crate) fn builtin_window_list(
     let mut ids: Vec<Value> = frame
         .window_list()
         .into_iter()
-        .map(|wid| Value::Int(wid.0 as i64))
+        .map(window_value)
         .collect();
     if include_minibuffer {
         if let Some(minibuffer_wid) = frame.minibuffer_window {
-            ids.push(Value::Int(minibuffer_wid.0 as i64));
+            ids.push(window_value(minibuffer_wid));
         }
     }
     Ok(Value::list(ids))
@@ -1974,7 +1989,7 @@ pub(crate) fn builtin_get_buffer_window(
             .and_then(|w| w.buffer_id())
             .is_some_and(|bid| bid == target);
         if matches {
-            return Ok(Value::Int(wid.0 as i64));
+            return Ok(window_value(wid));
         }
     }
 
@@ -2031,7 +2046,7 @@ pub(crate) fn builtin_get_buffer_window_list(
             .and_then(|w| w.buffer_id())
             .is_some_and(|bid| bid == target);
         if matches {
-            windows.push(Value::Int(wid.0 as i64));
+            windows.push(window_value(wid));
         }
     }
 
@@ -2057,15 +2072,16 @@ pub(crate) fn builtin_fit_window_to_buffer(
             let (_, wid) = resolve_window_id(eval, None)?;
             wid
         }
-        Some(Value::Int(n)) => {
-            let wid = WindowId(*n as u64);
+        Some(value) => {
+            let Some(wid) = window_id_from_designator(value) else {
+                return Err(signal("error", vec![Value::string("Invalid window")]));
+            };
             if eval.frames.find_window_frame_id(wid).is_some() {
                 wid
             } else {
                 return Err(signal("error", vec![Value::string("Invalid window")]));
             }
         }
-        Some(_) => return Err(signal("error", vec![Value::string("Invalid window")])),
     };
     let _ = wid;
     Ok(Value::Nil)
@@ -2105,41 +2121,41 @@ pub(crate) fn builtin_set_window_dedicated_p(
     Ok(Value::bool(flag))
 }
 
-/// `(windowp OBJ)` -> t if OBJ is a window id (integer) that exists.
+/// `(windowp OBJ)` -> t if OBJ is a window object/designator that exists.
 pub(crate) fn builtin_windowp(eval: &mut super::eval::Evaluator, args: Vec<Value>) -> EvalResult {
     expect_args("windowp", &args, 1)?;
-    let id = match args[0].as_int() {
-        Some(n) => n as u64,
+    let wid = match window_id_from_designator(&args[0]) {
+        Some(wid) => wid,
         None => return Ok(Value::Nil),
     };
-    let found = eval.frames.is_window_object_id(WindowId(id));
+    let found = eval.frames.is_window_object_id(wid);
     Ok(Value::bool(found))
 }
 
-/// `(window-valid-p OBJ)` -> t if OBJ is a live window id.
+/// `(window-valid-p OBJ)` -> t if OBJ is a live window.
 pub(crate) fn builtin_window_valid_p(
     eval: &mut super::eval::Evaluator,
     args: Vec<Value>,
 ) -> EvalResult {
     expect_args("window-valid-p", &args, 1)?;
-    let id = match args[0].as_int() {
-        Some(n) => n as u64,
+    let wid = match window_id_from_designator(&args[0]) {
+        Some(wid) => wid,
         None => return Ok(Value::Nil),
     };
-    Ok(Value::bool(eval.frames.is_live_window_id(WindowId(id))))
+    Ok(Value::bool(eval.frames.is_live_window_id(wid)))
 }
 
-/// `(window-live-p OBJ)` -> t if OBJ is a live leaf window id.
+/// `(window-live-p OBJ)` -> t if OBJ is a live leaf window.
 pub(crate) fn builtin_window_live_p(
     eval: &mut super::eval::Evaluator,
     args: Vec<Value>,
 ) -> EvalResult {
     expect_args("window-live-p", &args, 1)?;
-    let id = match args[0].as_int() {
-        Some(n) => n as u64,
+    let wid = match window_id_from_designator(&args[0]) {
+        Some(wid) => wid,
         None => return Ok(Value::Nil),
     };
-    let live = eval.frames.is_live_window_id(WindowId(id));
+    let live = eval.frames.is_live_window_id(wid);
     Ok(Value::bool(live))
 }
 
@@ -2147,7 +2163,7 @@ pub(crate) fn builtin_window_live_p(
 // Window manipulation
 // ===========================================================================
 
-/// `(split-window &optional WINDOW SIZE SIDE)` -> new window id.
+/// `(split-window &optional WINDOW SIZE SIDE)` -> new window object.
 ///
 /// SIDE: nil or `below` = vertical split, `right` = horizontal split.
 pub(crate) fn builtin_split_window(
@@ -2173,7 +2189,7 @@ pub(crate) fn builtin_split_window(
         .frames
         .split_window(fid, wid, direction, buf_id)
         .ok_or_else(|| signal("error", vec![Value::string("Cannot split window")]))?;
-    Ok(Value::Int(new_wid.0 as i64))
+    Ok(window_value(new_wid))
 }
 
 /// `(delete-window &optional WINDOW)` -> nil.
@@ -2241,15 +2257,14 @@ pub(crate) fn builtin_select_window(
     expect_min_args("select-window", &args, 1)?;
     expect_max_args("select-window", &args, 2)?;
     let fid = ensure_selected_frame_id(eval);
-    let wid = match args.first() {
-        Some(Value::Int(n)) => WindowId(*n as u64),
-        Some(other) => {
+    let wid = match args.first().and_then(window_id_from_designator) {
+        Some(wid) => wid,
+        None => {
             return Err(signal(
                 "wrong-type-argument",
-                vec![Value::symbol("window-live-p"), other.clone()],
+                vec![Value::symbol("window-live-p"), args[0].clone()],
             ))
         }
-        None => unreachable!("expect_min_args enforced"),
     };
     let selected_buffer = {
         let frame = eval
@@ -2267,7 +2282,7 @@ pub(crate) fn builtin_select_window(
     if let Some(buffer_id) = selected_buffer {
         eval.buffers.set_current(buffer_id);
     }
-    Ok(Value::Int(wid.0 as i64))
+    Ok(window_value(wid))
 }
 
 /// `(other-window COUNT &optional ALL-FRAMES)` -> nil.
@@ -2310,7 +2325,7 @@ pub(crate) fn builtin_other_window(
     Ok(Value::Nil)
 }
 
-/// `(next-window &optional WINDOW MINIBUF ALL-FRAMES)` -> window id.
+/// `(next-window &optional WINDOW MINIBUF ALL-FRAMES)` -> window object.
 pub(crate) fn builtin_next_window(
     eval: &mut super::eval::Evaluator,
     args: Vec<Value>,
@@ -2327,10 +2342,10 @@ pub(crate) fn builtin_next_window(
     }
     let idx = list.iter().position(|w| *w == wid).unwrap_or(0);
     let next = (idx + 1) % list.len();
-    Ok(Value::Int(list[next].0 as i64))
+    Ok(window_value(list[next]))
 }
 
-/// `(previous-window &optional WINDOW MINIBUF ALL-FRAMES)` -> window id.
+/// `(previous-window &optional WINDOW MINIBUF ALL-FRAMES)` -> window object.
 pub(crate) fn builtin_previous_window(
     eval: &mut super::eval::Evaluator,
     args: Vec<Value>,
@@ -2347,7 +2362,7 @@ pub(crate) fn builtin_previous_window(
     }
     let idx = list.iter().position(|w| *w == wid).unwrap_or(0);
     let prev = if idx == 0 { list.len() - 1 } else { idx - 1 };
-    Ok(Value::Int(list[prev].0 as i64))
+    Ok(window_value(list[prev]))
 }
 
 /// `(set-window-buffer WINDOW BUFFER-OR-NAME &optional KEEP-MARGINS)` -> nil.
@@ -2525,7 +2540,7 @@ pub(crate) fn builtin_switch_to_buffer(
     Ok(Value::Buffer(buf_id))
 }
 
-/// `(display-buffer BUFFER-OR-NAME &optional ACTION FRAME)` -> window id or nil.
+/// `(display-buffer BUFFER-OR-NAME &optional ACTION FRAME)` -> window object or nil.
 ///
 /// Simplified: displays the buffer in the selected window.
 pub(crate) fn builtin_display_buffer(
@@ -2566,7 +2581,7 @@ pub(crate) fn builtin_display_buffer(
     {
         w.set_buffer(buf_id);
     }
-    Ok(Value::Int(sel_wid.0 as i64))
+    Ok(window_value(sel_wid))
 }
 
 /// `(pop-to-buffer BUFFER-OR-NAME &optional ACTION NORECORD)` -> buffer.
@@ -3048,11 +3063,9 @@ mod tests {
     // -- Window queries --
 
     #[test]
-    fn selected_window_returns_int() {
+    fn selected_window_returns_window_handle() {
         let r = eval_one_with_frame("(selected-window)");
-        assert!(r.starts_with("OK "), "expected OK, got: {r}");
-        let val: i64 = r.strip_prefix("OK ").unwrap().trim().parse().unwrap();
-        assert!(val > 0);
+        assert!(r.starts_with("OK #<window "), "expected window handle, got: {r}");
     }
 
     #[test]
@@ -3888,7 +3901,7 @@ mod tests {
         let results = eval_with_frame(
             "(let ((new-win (split-window)))
                (select-window new-win)
-               (= (selected-window) new-win))",
+               (eq (selected-window) new-win))",
         );
         assert_eq!(results[0], "OK t");
     }
@@ -3937,7 +3950,7 @@ mod tests {
             "(let ((w1 (selected-window)))
                (split-window)
                (other-window 1)
-               (/= (selected-window) w1))",
+               (not (eq (selected-window) w1)))",
         );
         assert_eq!(results[0], "OK t");
     }
@@ -3963,7 +3976,7 @@ mod tests {
             "(let ((w1 (selected-window)))
                (split-window)
                (other-window)
-               (/= (selected-window) w1))",
+               (not (eq (selected-window) w1)))",
         );
         assert_eq!(results[0], "OK t");
     }
@@ -4689,7 +4702,7 @@ mod tests {
             "(let ((w1 (selected-window)))
                (split-window)
                (let ((w2 (next-window)))
-                 (/= w1 w2)))",
+                 (not (eq w1 w2))))",
         );
         assert_eq!(results[0], "OK t");
     }

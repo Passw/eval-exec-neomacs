@@ -28,6 +28,67 @@ Last updated: 2026-02-19
 
 ## Doing
 
+- Aligned `internal-show-cursor` / `internal-show-cursor-p` to per-window visibility semantics (instead of global visibility) and added lock-ins:
+  - runtime changes:
+    - `rust/neovm-core/src/elisp/display.rs`
+      - evaluator paths now resolve cursor visibility per live window designator (including `nil` / omitted selected-window behavior).
+      - `internal-show-cursor` now updates only the targeted window’s visibility state.
+      - `internal-show-cursor-p` now reads visibility from the targeted window, with no-arg/nil keyed to the selected window.
+      - kept non-evaluator fallback behavior unchanged for non-runtime call sites.
+      - added unit coverage:
+        - `eval_internal_show_cursor_tracks_per_window_state`
+  - corpus changes:
+    - added and wired:
+      - `test/neovm/vm-compat/cases/internal-show-cursor-window-state-semantics.{forms,expected.tsv}`
+      - `test/neovm/vm-compat/cases/default.list`
+    - lock-ins cover:
+      - per-window isolation (`internal-show-cursor` on one window does not mutate sibling visibility).
+      - no-arg and `nil` behavior following selected-window visibility.
+      - wrong-type error path for non-live window designators.
+      - forms are wrapped with `save-current-buffer` so oracle form-reader state is preserved when `select-window` is used.
+  - verified:
+    - `cargo test --manifest-path rust/neovm-core/Cargo.toml eval_internal_show_cursor_tracks_per_window_state -- --nocapture` (pass)
+    - `cargo test --manifest-path rust/neovm-core/Cargo.toml elisp::display::tests:: -- --nocapture` (pass, `53/53`)
+    - `make -C test/neovm/vm-compat record FORMS=cases/internal-show-cursor-window-state-semantics.forms EXPECTED=cases/internal-show-cursor-window-state-semantics.expected.tsv` (pass)
+    - `make -C test/neovm/vm-compat check-one-neovm CASE=cases/internal-show-cursor-window-state-semantics` (pass, `4/4`)
+    - `make -C test/neovm/vm-compat check-one-neovm CASE=cases/display-stub-semantics` (pass, `36/36`)
+    - `make -C test/neovm/vm-compat check-all-neovm-strict` (pass; case inventory `766`)
+
+- Aligned window-returning API surface to window-handle object semantics and locked object-shape parity:
+  - runtime changes:
+    - `rust/neovm-core/src/elisp/value.rs`
+      - added `Value::Window(u64)` and `HashKey::Window(u64)` runtime variants.
+      - wired `window` type-name and equality/hash-key behavior for `eq`/`eql`/`equal`.
+    - `rust/neovm-core/src/elisp/print.rs`
+      - window handles now print as `#<window ...>`.
+    - `rust/neovm-core/src/elisp/window_cmds.rs`
+      - window-returning builtins now return `Value::Window` handles:
+        - `selected-window`, `frame-selected-window`, `frame-first-window`, `frame-root-window`, `minibuffer-window`
+        - `window-list`, `get-buffer-window`, `get-buffer-window-list`
+        - `split-window`, `select-window`, `next-window`, `previous-window`, `display-buffer`
+      - window designator resolution now accepts `Value::Window` (and keeps legacy non-negative integer acceptance in resolver paths).
+      - added shared `window_id_from_designator`/`window_value` helpers and updated stale-window error rendering to preserve `#<window ...>` payload shape.
+      - updated evaluator unit coverage and assertions to use object equality (`eq`) instead of numeric comparison for windows.
+    - `rust/neovm-core/src/elisp/display.rs`, `rust/neovm-core/src/elisp/xdisp.rs`
+      - evaluator-backed window designator validators now accept `Value::Window`.
+      - display terminal-error formatting now renders live window designators from `Value::Window`.
+    - `rust/neovm-core/src/elisp/hashtab.rs`
+      - hash-key reification now maps `HashKey::Window` back to `Value::Window`.
+  - corpus changes:
+    - added and wired:
+      - `test/neovm/vm-compat/cases/window-object-return-semantics.{forms,expected.tsv}`
+      - `test/neovm/vm-compat/cases/default.list`
+    - lock-ins cover:
+      - window-returning builtins producing `windowp` objects that are non-`integerp`/non-`numberp`.
+      - printed object prefix shape (`#<window `) for selected-window values.
+  - verified:
+    - `cargo test -p neovm-core elisp::window_cmds::tests:: -- --nocapture` (pass, `105/105`)
+    - `cargo test -p neovm-core elisp::display::tests:: -- --nocapture` (pass, `52/52`)
+    - `cargo test -p neovm-core elisp::xdisp::tests:: -- --nocapture` (pass, `21/21`)
+    - `make -C test/neovm/vm-compat record FORMS=cases/window-object-return-semantics.forms EXPECTED=cases/window-object-return-semantics.expected.tsv` (pass)
+    - `make -C test/neovm/vm-compat check-one-neovm CASE=cases/window-object-return-semantics` (pass, `11/11`)
+    - `make -C test/neovm/vm-compat check-all-neovm-strict` (pass; case inventory `765`)
+
 - Aligned `internal-lisp-face-p` frame-domain vector resolution and `internal-copy-lisp-face` `NEW-FRAME` validation:
   - runtime changes:
     - `rust/neovm-core/src/elisp/font.rs`

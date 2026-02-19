@@ -68,6 +68,7 @@ pub fn print_value(value: &Value) -> String {
             format!("#<bytecode {} ({} ops)>", params, bc.ops.len())
         }
         Value::Buffer(id) => format!("#<buffer {}>", id.0),
+        Value::Window(id) => format!("#<window {}>", id),
         Value::Frame(id) => format!("#<frame {}>", id),
         Value::Timer(id) => format!("#<timer {}>", id),
     }
@@ -150,6 +151,7 @@ fn append_print_value_bytes(value: &Value, out: &mut Vec<u8>) {
             );
         }
         Value::Buffer(id) => out.extend_from_slice(format!("#<buffer {}>", id.0).as_bytes()),
+        Value::Window(id) => out.extend_from_slice(format!("#<window {}>", id).as_bytes()),
         Value::Frame(id) => out.extend_from_slice(format!("#<frame {}>", id).as_bytes()),
         Value::Timer(id) => out.extend_from_slice(format!("#<timer {}>", id).as_bytes()),
     }
