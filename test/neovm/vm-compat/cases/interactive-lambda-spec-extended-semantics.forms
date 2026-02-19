@@ -161,6 +161,32 @@
       (command-execute (lambda (x) (interactive "e") x))
     (error (list err unread-command-events))))
 
+; "e" can read event objects from explicit KEYS vectors.
+(let ((evt (list 'mouse-1 (list (list (selected-window) (point) '(0 . 0) 0))))
+      (r nil))
+  (setq r (call-interactively (lambda (x) (interactive "e") x) nil (vector evt)))
+  (and (consp r) (eq (car r) 'mouse-1)))
+(let ((evt (list 'mouse-1 (list (list (selected-window) (point) '(0 . 0) 0))))
+      (r nil))
+  (setq r (command-execute (lambda (x) (interactive "e") x) nil (vector evt)))
+  (and (consp r) (eq (car r) 'mouse-1)))
+(let ((evt (list 'mouse-1 (list (list (selected-window) (point) '(0 . 0) 0))))
+      (r nil))
+  (setq r (call-interactively (lambda (x) (interactive "e") x) nil (vector 97 evt)))
+  (and (consp r) (eq (car r) 'mouse-1)))
+(equal
+ (call-interactively (lambda (x) (interactive "e") x) nil (vector '(mouse-1)))
+ '(mouse-1))
+(condition-case err
+    (call-interactively (lambda (x) (interactive "e") x) nil [mouse-1])
+  (error (car err)))
+(condition-case err
+    (command-execute (lambda (x) (interactive "e") x) nil [mouse-1])
+  (error (car err)))
+(condition-case err
+    (call-interactively (lambda (x) (interactive "e") x) nil (vector [mouse-1]))
+  (error (car err)))
+
 ; Prefix flags on first line: "*", "^", "@" (including ordered combinations).
 (with-temp-buffer
   (let ((buffer-read-only nil))

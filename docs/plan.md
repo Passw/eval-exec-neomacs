@@ -16052,6 +16052,28 @@ Last updated: 2026-02-19
     - `make -C test/neovm/vm-compat record FORMS=cases/interactive-lambda-spec-extended-semantics.forms EXPECTED=cases/interactive-lambda-spec-extended-semantics.expected.tsv` (pass)
     - `make -C test/neovm/vm-compat check-one-neovm CASE=cases/interactive-lambda-spec-extended-semantics` (pass, `54/54`)
     - `make -C test/neovm/vm-compat check-all-neovm-strict` (pass)
+- Aligned lambda `interactive "e"` event-argument plumbing with explicit `KEYS` vectors:
+  - runtime changes:
+    - `rust/neovm-core/src/elisp/interactive.rs`
+      - introduced invocation-context tracking for `call-interactively` / `command-execute` `KEYS` vectors.
+      - `interactive "e"` now scans `KEYS` entries for the next event object represented as a cons/list value and returns it.
+      - preserved existing batch behavior when no suitable event object exists (signals `error` with `"command must be bound to an event with parameters"`).
+      - retained current `interactive "U"` batch behavior (`nil`).
+      - added unit coverage:
+        - `interactive_lambda_e_spec_reads_parameterized_events_from_keys_vector`
+  - oracle corpus changes:
+    - `test/neovm/vm-compat/cases/interactive-lambda-spec-extended-semantics.forms`
+      - added lock-ins for:
+        - `e` success from explicit event-object `KEYS` vectors (`call-interactively` and `command-execute`)
+        - mixed `KEYS` vectors where non-event entries are skipped before a later event object
+        - list-event acceptance (`'(mouse-1)`) and error paths for non-parameter symbol/vector entries
+    - `test/neovm/vm-compat/cases/interactive-lambda-spec-extended-semantics.expected.tsv`
+      - re-recorded oracle baseline from `54/54` to `61/61`.
+  - verified:
+    - `cargo test --manifest-path rust/neovm-core/Cargo.toml interactive_lambda_ -- --nocapture` (pass)
+    - `make -C test/neovm/vm-compat record FORMS=cases/interactive-lambda-spec-extended-semantics.forms EXPECTED=cases/interactive-lambda-spec-extended-semantics.expected.tsv` (pass)
+    - `make -C test/neovm/vm-compat check-one-neovm CASE=cases/interactive-lambda-spec-extended-semantics` (pass, `61/61`)
+    - `make -C test/neovm/vm-compat check-all-neovm-strict` (pass)
 
 ## Doing
 
