@@ -204,12 +204,17 @@ pub(crate) fn builtin_call_interactively(eval: &mut Evaluator, args: Vec<Value>)
     let Some((resolved_name, func)) = resolve_command_target(eval, func_val) else {
         return Err(signal("void-function", vec![func_val.clone()]));
     };
-    let call_args = default_call_interactively_args(eval, &resolved_name)?;
+    let func = normalize_command_callable(eval, func)?;
+    let call_args = resolve_interactive_invocation_args(
+        eval,
+        &resolved_name,
+        &func,
+        CommandInvocationKind::CallInteractively,
+    )?;
 
     // Mark as interactive call
     eval.interactive.push_interactive_call(true);
 
-    // Call the function with no args (interactive arg reading is stubbed)
     let result = eval.apply(func, call_args);
 
     eval.interactive.pop_interactive_call();
@@ -575,6 +580,19 @@ fn command_designator_p(eval: &Evaluator, designator: &Value) -> bool {
     command_object_p(eval, None, designator)
 }
 
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+enum CommandInvocationKind {
+    CallInteractively,
+    CommandExecute,
+}
+
+#[derive(Clone, Debug)]
+enum ParsedInteractiveSpec {
+    NoArgs,
+    StringCode(String),
+    Form(Expr),
+}
+
 fn dynamic_or_global_symbol_value(eval: &Evaluator, name: &str) -> Option<Value> {
     for frame in eval.dynamic.iter().rev() {
         if let Some(v) = frame.get(name) {
@@ -607,8 +625,16 @@ fn prefix_numeric_value(value: &Value) -> i64 {
     }
 }
 
-fn interactive_prefix_numeric_arg(eval: &Evaluator) -> Value {
-    let raw = dynamic_or_global_symbol_value(eval, "current-prefix-arg").unwrap_or(Value::Nil);
+fn interactive_prefix_raw_arg(eval: &Evaluator, kind: CommandInvocationKind) -> Value {
+    let symbol = match kind {
+        CommandInvocationKind::CallInteractively => "current-prefix-arg",
+        CommandInvocationKind::CommandExecute => "prefix-arg",
+    };
+    dynamic_or_global_symbol_value(eval, symbol).unwrap_or(Value::Nil)
+}
+
+fn interactive_prefix_numeric_arg(eval: &Evaluator, kind: CommandInvocationKind) -> Value {
+    let raw = interactive_prefix_raw_arg(eval, kind);
     Value::Int(prefix_numeric_value(&raw))
 }
 
@@ -635,6 +661,222 @@ fn interactive_region_args(
     let beg_char = buf.text.byte_to_char(beg) as i64 + 1;
     let end_char = buf.text.byte_to_char(end) as i64 + 1;
     Ok(vec![Value::Int(beg_char), Value::Int(end_char)])
+}
+
+fn interactive_point_arg(eval: &Evaluator) -> Result<Value, Flow> {
+    let buf = eval
+        .buffers
+        .current_buffer()
+        .ok_or_else(|| signal("error", vec![Value::string("No current buffer")]))?;
+    let point_char = buf.text.byte_to_char(buf.point()) as i64 + 1;
+    Ok(Value::Int(point_char))
+}
+
+fn interactive_mark_arg(eval: &Evaluator) -> Result<Value, Flow> {
+    let buf = eval
+        .buffers
+        .current_buffer()
+        .ok_or_else(|| signal("error", vec![Value::string("No current buffer")]))?;
+    let mark = buf.mark().ok_or_else(|| {
+        signal(
+            "error",
+            vec![Value::string("The mark is not set now")],
+        )
+    })?;
+    let mark_char = buf.text.byte_to_char(mark) as i64 + 1;
+    Ok(Value::Int(mark_char))
+}
+
+fn parse_interactive_spec(expr: &Expr) -> Option<ParsedInteractiveSpec> {
+    let Expr::List(items) = expr else {
+        return None;
+    };
+    if !items
+        .first()
+        .is_some_and(|head| matches!(head, Expr::Symbol(sym) if sym == "interactive"))
+    {
+        return None;
+    }
+    match items.get(1) {
+        Some(Expr::Str(code)) => Some(ParsedInteractiveSpec::StringCode(code.clone())),
+        Some(form) => Some(ParsedInteractiveSpec::Form(form.clone())),
+        None => Some(ParsedInteractiveSpec::NoArgs),
+    }
+}
+
+fn parsed_interactive_spec_from_lambda(lambda: &LambdaData) -> Option<ParsedInteractiveSpec> {
+    lambda.body.first().and_then(parse_interactive_spec)
+}
+
+fn interactive_form_value_to_args(value: Value) -> Result<Vec<Value>, Flow> {
+    if value.is_nil() {
+        return Ok(Vec::new());
+    }
+    if let Some(values) = value_list_to_vec(&value) {
+        return Ok(values);
+    }
+    Err(signal(
+        "wrong-type-argument",
+        vec![Value::symbol("listp"), value],
+    ))
+}
+
+fn strip_interactive_prefix_flags(mut line: &str) -> &str {
+    while let Some(ch) = line.chars().next() {
+        if matches!(ch, '*' | '@' | '^') {
+            line = &line[ch.len_utf8()..];
+        } else {
+            break;
+        }
+    }
+    line
+}
+
+fn parse_interactive_code_entries(code: &str) -> Vec<(char, String)> {
+    if code.is_empty() {
+        return Vec::new();
+    }
+
+    let mut entries = Vec::new();
+    for (index, raw_line) in code.split('\n').enumerate() {
+        let line = if index == 0 {
+            strip_interactive_prefix_flags(raw_line)
+        } else {
+            raw_line
+        };
+        if line.is_empty() {
+            continue;
+        }
+        let mut chars = line.chars();
+        let Some(letter) = chars.next() else {
+            continue;
+        };
+        entries.push((letter, chars.collect::<String>()));
+    }
+    entries
+}
+
+fn interactive_args_from_string_code(
+    eval: &mut Evaluator,
+    code: &str,
+    kind: CommandInvocationKind,
+) -> Result<Option<Vec<Value>>, Flow> {
+    let entries = parse_interactive_code_entries(code);
+    if entries.is_empty() {
+        return Ok(Some(Vec::new()));
+    }
+
+    let mut args = Vec::new();
+    for (letter, prompt) in entries {
+        match letter {
+            'a' => args.push(super::minibuffer::builtin_read_command(vec![Value::string(prompt)])?),
+            'b' => args.push(super::minibuffer::builtin_read_buffer(vec![
+                Value::string(prompt),
+                Value::Nil,
+                Value::True,
+            ])?),
+            'B' => args.push(super::minibuffer::builtin_read_buffer(vec![
+                Value::string(prompt),
+                Value::Nil,
+                Value::Nil,
+            ])?),
+            'c' => args.push(super::reader::builtin_read_char(eval, vec![Value::string(prompt)])?),
+            'C' => args.push(super::minibuffer::builtin_read_command(vec![Value::string(prompt)])?),
+            'd' => args.push(interactive_point_arg(eval)?),
+            'D' => args.push(super::minibuffer::builtin_read_directory_name(vec![
+                Value::string(prompt),
+            ])?),
+            'f' => args.push(super::minibuffer::builtin_read_file_name(vec![
+                Value::string(prompt),
+                Value::Nil,
+                Value::Nil,
+                Value::True,
+            ])?),
+            'F' => args.push(super::minibuffer::builtin_read_file_name(vec![
+                Value::string(prompt),
+            ])?),
+            'i' => args.push(Value::Nil),
+            'k' => args.push(super::reader::builtin_read_key_sequence(
+                eval,
+                vec![Value::string(prompt)],
+            )?),
+            'K' => args.push(super::reader::builtin_read_key_sequence_vector(
+                eval,
+                vec![Value::string(prompt)],
+            )?),
+            'm' => args.push(interactive_mark_arg(eval)?),
+            'p' => args.push(interactive_prefix_numeric_arg(eval, kind)),
+            'P' => args.push(interactive_prefix_raw_arg(eval, kind)),
+            'r' => args.extend(interactive_region_args(eval, "error")?),
+            's' => args.push(super::reader::builtin_read_string(
+                eval,
+                vec![Value::string(prompt)],
+            )?),
+            'n' => args.push(super::reader::builtin_read_number(
+                eval,
+                vec![Value::string(prompt)],
+            )?),
+            'v' => args.push(super::minibuffer::builtin_read_variable(vec![Value::string(prompt)])?),
+            _ => return Ok(None),
+        }
+    }
+
+    Ok(Some(args))
+}
+
+fn resolve_interactive_invocation_args(
+    eval: &mut Evaluator,
+    resolved_name: &str,
+    func: &Value,
+    kind: CommandInvocationKind,
+) -> Result<Vec<Value>, Flow> {
+    if let Some(code) = eval
+        .interactive
+        .get_spec(resolved_name)
+        .map(|spec| spec.code.clone())
+    {
+        if let Some(args) = interactive_args_from_string_code(eval, &code, kind)? {
+            return Ok(args);
+        }
+    }
+
+    if let Value::Lambda(lambda) = func {
+        if let Some(spec) = parsed_interactive_spec_from_lambda(lambda) {
+            let maybe_args = match spec {
+                ParsedInteractiveSpec::NoArgs => Some(Vec::new()),
+                ParsedInteractiveSpec::StringCode(code) => {
+                    interactive_args_from_string_code(eval, &code, kind)?
+                }
+                ParsedInteractiveSpec::Form(form) => {
+                    let value = eval.eval(&form)?;
+                    Some(interactive_form_value_to_args(value)?)
+                }
+            };
+            if let Some(args) = maybe_args {
+                return Ok(args);
+            }
+        }
+    }
+
+    match kind {
+        CommandInvocationKind::CallInteractively => default_call_interactively_args(eval, resolved_name),
+        CommandInvocationKind::CommandExecute => default_command_execute_args(eval, resolved_name),
+    }
+}
+
+fn value_is_lambda_form(value: &Value) -> bool {
+    let Some(items) = value_list_to_vec(value) else {
+        return false;
+    };
+    items.first().and_then(Value::as_symbol_name) == Some("lambda")
+}
+
+fn normalize_command_callable(eval: &mut Evaluator, value: Value) -> Result<Value, Flow> {
+    if value_is_lambda_form(&value) {
+        let expr = super::eval::value_to_expr_pub(&value);
+        return eval.eval(&expr);
+    }
+    Ok(value)
 }
 
 fn default_command_execute_args(eval: &Evaluator, name: &str) -> Result<Vec<Value>, Flow> {
@@ -686,7 +928,10 @@ fn default_call_interactively_args(eval: &Evaluator, name: &str) -> Result<Vec<V
         | "beginning-of-line"
         | "end-of-line"
         | "move-beginning-of-line"
-        | "move-end-of-line" => Ok(vec![interactive_prefix_numeric_arg(eval)]),
+        | "move-end-of-line" => Ok(vec![interactive_prefix_numeric_arg(
+            eval,
+            CommandInvocationKind::CallInteractively,
+        )]),
         "set-mark-command" => Ok(vec![dynamic_or_global_symbol_value(
             eval,
             "current-prefix-arg",
@@ -734,7 +979,13 @@ pub(crate) fn builtin_command_execute(eval: &mut Evaluator, args: Vec<Value>) ->
     let Some((resolved_name, func)) = resolve_command_target(eval, cmd) else {
         return Err(signal("void-function", vec![cmd.clone()]));
     };
-    let call_args = default_command_execute_args(eval, &resolved_name)?;
+    let func = normalize_command_callable(eval, func)?;
+    let call_args = resolve_interactive_invocation_args(
+        eval,
+        &resolved_name,
+        &func,
+        CommandInvocationKind::CommandExecute,
+    )?;
 
     eval.interactive.push_interactive_call(true);
     let result = eval.apply(func, call_args);
@@ -4559,6 +4810,221 @@ mod tests {
         let mut ev = Evaluator::new();
         let result = builtin_call_interactively(&mut ev, vec![Value::symbol("ignore")]).unwrap();
         assert!(result.is_nil());
+    }
+
+    #[test]
+    fn call_interactively_lambda_interactive_p_uses_current_prefix_arg() {
+        let mut ev = Evaluator::new();
+        let results = eval_all_with(
+            &mut ev,
+            r#"(let ((f (lambda (n) (interactive "p") n))
+                     (current-prefix-arg '(4)))
+                 (call-interactively f))"#,
+        );
+        assert_eq!(results[0], "OK 4");
+    }
+
+    #[test]
+    fn command_execute_lambda_interactive_p_uses_prefix_arg() {
+        let mut ev = Evaluator::new();
+        let results = eval_all_with(
+            &mut ev,
+            r#"(list
+                 (let ((f (lambda (n) (interactive "p") n))
+                       (current-prefix-arg '(4)))
+                   (command-execute f))
+                 (let ((f (lambda (n) (interactive "p") n))
+                       (current-prefix-arg '(4))
+                       (prefix-arg '(5)))
+                   (command-execute f)))"#,
+        );
+        assert_eq!(results[0], "OK (1 5)");
+    }
+
+    #[test]
+    fn call_interactively_lambda_interactive_p_prefers_current_prefix_arg() {
+        let mut ev = Evaluator::new();
+        let results = eval_all_with(
+            &mut ev,
+            r#"(let ((f (lambda (n) (interactive "p") n))
+                     (current-prefix-arg '(4))
+                     (prefix-arg '(5)))
+                 (call-interactively f))"#,
+        );
+        assert_eq!(results[0], "OK 4");
+    }
+
+    #[test]
+    fn interactive_lambda_forms_support_p_p_and_expression_specs() {
+        let mut ev = Evaluator::new();
+        let results = eval_all_with(
+            &mut ev,
+            r#"(list
+                 (let ((f (lambda (arg) (interactive "P") arg))
+                       (current-prefix-arg '(4)))
+                   (call-interactively f))
+                 (let ((f (lambda (arg) (interactive "P") arg))
+                       (prefix-arg '(5)))
+                   (command-execute f))
+                 (call-interactively (lambda (x) (interactive (list 7)) x))
+                 (command-execute (lambda (x) (interactive (list 8)) x))
+                 (condition-case err
+                     (call-interactively (lambda (x) (interactive 7) x))
+                   (error err)))"#,
+        );
+        assert_eq!(
+            results[0],
+            "OK ((4) (5) 7 8 (wrong-type-argument listp 7))"
+        );
+    }
+
+    #[test]
+    fn call_interactively_accepts_quoted_lambda_commands() {
+        let mut ev = Evaluator::new();
+        let results = eval_all_with(
+            &mut ev,
+            r#"(let ((current-prefix-arg 3))
+                 (call-interactively '(lambda (n) (interactive "p") n)))"#,
+        );
+        assert_eq!(results[0], "OK 3");
+    }
+
+    #[test]
+    fn interactive_lambda_r_spec_reads_region_for_call_and_command_execute() {
+        let mut ev = Evaluator::new();
+        let results = eval_all_with(
+            &mut ev,
+            r#"(list
+                 (with-temp-buffer
+                   (insert "abc")
+                   (goto-char 2)
+                   (set-mark 3)
+                   (call-interactively (lambda (b e) (interactive "r") (list b e))))
+                 (with-temp-buffer
+                   (insert "abc")
+                   (goto-char 2)
+                   (set-mark 3)
+                   (command-execute (lambda (b e) (interactive "r") (list b e))))
+                 (with-temp-buffer
+                   (insert "abc")
+                   (goto-char 2)
+                   (condition-case err
+                       (call-interactively (lambda (b e) (interactive "r") (list b e)))
+                     (error err))))"#,
+        );
+        assert_eq!(
+            results[0],
+            "OK ((2 3) (2 3) (error \"The mark is not set now, so there is no region\"))"
+        );
+    }
+
+    #[test]
+    fn interactive_lambda_s_spec_reads_prompt_and_signals_eof_in_batch() {
+        let mut ev = Evaluator::new();
+        let results = eval_all_with(
+            &mut ev,
+            r#"(list
+                 (condition-case err
+                     (call-interactively (lambda (s) (interactive "sPrompt: ") s))
+                   (error err))
+                 (condition-case err
+                     (command-execute (lambda (s) (interactive "sPrompt: ") s))
+                   (error err)))"#,
+        );
+        assert_eq!(
+            results[0],
+            "OK ((end-of-file \"Error reading from stdin\") (end-of-file \"Error reading from stdin\"))"
+        );
+    }
+
+    #[test]
+    fn interactive_lambda_extended_string_codes_cover_point_mark_ignored_and_key_readers() {
+        let mut ev = Evaluator::new();
+        let results = eval_all_with(
+            &mut ev,
+            r#"(list
+                 (let ((unread-command-events (list 97 98 99)))
+                   (with-temp-buffer
+                     (insert "abcd")
+                     (goto-char 3)
+                     (set-mark 2)
+                     (call-interactively
+                      (lambda (pt mk ignored ch keys keyvec)
+                        (interactive "d
+m
+i
+c
+k
+K")
+                        (list pt mk ignored ch keys keyvec)))))
+                 (let ((unread-command-events (list 97 98 99)))
+                   (with-temp-buffer
+                     (insert "abcd")
+                     (goto-char 3)
+                     (set-mark 2)
+                     (command-execute
+                      (lambda (pt mk ignored ch keys keyvec)
+                        (interactive "d
+m
+i
+c
+k
+K")
+                        (list pt mk ignored ch keys keyvec)))))
+                 (with-temp-buffer
+                   (insert "abc")
+                   (goto-char 2)
+                   (condition-case err
+                       (call-interactively (lambda (mk) (interactive "m") mk))
+                     (error err))))"#,
+        );
+        assert_eq!(
+            results[0],
+            "OK ((3 2 nil 97 \"b\" [99]) (3 2 nil 97 \"b\" [99]) (error \"The mark is not set now\"))"
+        );
+    }
+
+    #[test]
+    fn interactive_lambda_extended_reader_prompt_codes_signal_eof_in_batch() {
+        let mut ev = Evaluator::new();
+        let results = eval_all_with(
+            &mut ev,
+            r#"(list
+                 (condition-case err
+                     (call-interactively (lambda (x) (interactive "aFunction: ") x))
+                   (error err))
+                 (condition-case err
+                     (call-interactively (lambda (x) (interactive "bBuffer: ") x))
+                   (error err))
+                 (condition-case err
+                     (call-interactively (lambda (x) (interactive "BBuffer: ") x))
+                   (error err))
+                 (condition-case err
+                     (call-interactively (lambda (x) (interactive "CCommand: ") x))
+                   (error err))
+                 (condition-case err
+                     (call-interactively (lambda (x) (interactive "DDirectory: ") x))
+                   (error err))
+                 (condition-case err
+                     (call-interactively (lambda (x) (interactive "fFind file: ") x))
+                   (error err))
+                 (condition-case err
+                     (call-interactively (lambda (x) (interactive "FFind file: ") x))
+                   (error err))
+                 (condition-case err
+                     (call-interactively (lambda (x) (interactive "vVariable: ") x))
+                   (error err))
+                 (condition-case err
+                     (command-execute (lambda (x) (interactive "bBuffer: ") x))
+                   (error err))
+                 (condition-case err
+                     (command-execute (lambda (x) (interactive "fFind file: ") x))
+                   (error err)))"#,
+        );
+        assert_eq!(
+            results[0],
+            "OK ((end-of-file \"Error reading from stdin\") (end-of-file \"Error reading from stdin\") (end-of-file \"Error reading from stdin\") (end-of-file \"Error reading from stdin\") (end-of-file \"Error reading from stdin\") (end-of-file \"Error reading from stdin\") (end-of-file \"Error reading from stdin\") (end-of-file \"Error reading from stdin\") (end-of-file \"Error reading from stdin\") (end-of-file \"Error reading from stdin\"))"
+        );
     }
 
     #[test]

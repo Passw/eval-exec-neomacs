@@ -1,0 +1,74 @@
+; Extended interactive string-code behavior for lambda command designators.
+
+; "d" reads point as a 1-based character position.
+(with-temp-buffer
+  (insert "abcd")
+  (goto-char 3)
+  (call-interactively (lambda (pt) (interactive "d") pt)))
+(with-temp-buffer
+  (insert "abcd")
+  (goto-char 3)
+  (command-execute (lambda (pt) (interactive "d") pt)))
+
+; "m" reads mark as a 1-based character position, or signals when missing.
+(with-temp-buffer
+  (insert "abcd")
+  (goto-char 3)
+  (set-mark 2)
+  (call-interactively (lambda (mk) (interactive "m") mk)))
+(with-temp-buffer
+  (insert "abcd")
+  (goto-char 3)
+  (condition-case err
+      (call-interactively (lambda (mk) (interactive "m") mk))
+    (error err)))
+
+; "i" inserts a nil argument.
+(call-interactively (lambda (ignored) (interactive "i") ignored))
+(command-execute (lambda (ignored) (interactive "i") ignored))
+
+; "c", "k", and "K" read character/key events from unread queue state.
+(let ((unread-command-events (list 97)))
+  (call-interactively (lambda (ch) (interactive "cChar: ") ch)))
+(let ((unread-command-events (list 97)))
+  (command-execute (lambda (ch) (interactive "cChar: ") ch)))
+(let ((unread-command-events (list 97)))
+  (call-interactively (lambda (keys) (interactive "kKeys: ") keys)))
+(let ((unread-command-events (list 97)))
+  (command-execute (lambda (keys) (interactive "kKeys: ") keys)))
+(let ((unread-command-events (list 97)))
+  (call-interactively (lambda (keys) (interactive "KKeys: ") keys)))
+(let ((unread-command-events (list 97)))
+  (command-execute (lambda (keys) (interactive "KKeys: ") keys)))
+
+; Minibuffer-backed prompt codes currently signal EOF in batch mode.
+(condition-case err
+    (call-interactively (lambda (x) (interactive "aFunction: ") x))
+  (error err))
+(condition-case err
+    (call-interactively (lambda (x) (interactive "bBuffer: ") x))
+  (error err))
+(condition-case err
+    (call-interactively (lambda (x) (interactive "BBuffer: ") x))
+  (error err))
+(condition-case err
+    (call-interactively (lambda (x) (interactive "CCommand: ") x))
+  (error err))
+(condition-case err
+    (call-interactively (lambda (x) (interactive "DDirectory: ") x))
+  (error err))
+(condition-case err
+    (call-interactively (lambda (x) (interactive "fFind file: ") x))
+  (error err))
+(condition-case err
+    (call-interactively (lambda (x) (interactive "FFind file: ") x))
+  (error err))
+(condition-case err
+    (call-interactively (lambda (x) (interactive "vVariable: ") x))
+  (error err))
+(condition-case err
+    (command-execute (lambda (x) (interactive "bBuffer: ") x))
+  (error err))
+(condition-case err
+    (command-execute (lambda (x) (interactive "fFind file: ") x))
+  (error err))
