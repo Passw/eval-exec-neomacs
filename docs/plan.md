@@ -28,6 +28,21 @@ Last updated: 2026-02-19
 
 ## Doing
 
+- Aligned host-backed `network-interface-list`/`network-interface-info` behavior with oracle and fixed IPv4 byte-order parity:
+  - runtime changes:
+    - `rust/neovm-core/src/elisp/process.rs`
+      - added Linux `getifaddrs` host-interface snapshot wiring for:
+        - `network-interface-list` (family filtering + full/non-full shape)
+        - `network-interface-info` (address/broadcast/netmask/hwaddr/flags payloads)
+      - added interface flag mapping and AF_PACKET hwaddr extraction for interface records.
+      - fixed IPv4 sockaddr decoding endianness (`sin_addr.s_addr` bytes) to preserve oracle octet order.
+  - corpus changes:
+    - none (existing oracle corpus remained valid after runtime parity fix).
+  - verified:
+    - `cargo test --manifest-path rust/neovm-core/Cargo.toml process_network_interface_and_signal_runtime_surface` (pass)
+    - `make -C test/neovm/vm-compat check-one-neovm CASE=cases/process-network-interface-signal-semantics` (pass, `2/2`)
+    - `make -C test/neovm/vm-compat check-all-neovm-strict` (pass; case inventory `788`)
+
 - Aligned `network-interface-list` `FULL` entry shape with oracle and re-locked runtime/corpus parity:
   - runtime changes:
     - `rust/neovm-core/src/elisp/process.rs`

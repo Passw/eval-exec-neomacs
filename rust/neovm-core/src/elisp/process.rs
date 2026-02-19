@@ -6,7 +6,11 @@
 //! commands via `std::process::Command`.
 
 use std::collections::HashMap;
+#[cfg(target_os = "linux")]
+use std::ffi::CStr;
 use std::fs::OpenOptions;
+#[cfg(target_os = "linux")]
+use std::ptr;
 use std::process::{Command, Stdio};
 
 use super::error::{signal, EvalResult, Flow};
@@ -1095,6 +1099,23 @@ fn value_as_nonnegative_integer(value: &Value) -> Option<i64> {
     }
 }
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum NetworkAddressFamily {
+    Ipv4,
+    Ipv6,
+}
+
+#[derive(Clone, Debug)]
+struct HostInterfaceEntry {
+    name: String,
+    family: NetworkAddressFamily,
+    address: Value,
+    broadcast: Value,
+    netmask: Value,
+    hwaddr: Option<Value>,
+    flags: Value,
+}
+
 fn vector_nonnegative_integers(value: &Value) -> Option<Vec<i64>> {
     let Value::Vector(values) = value else {
         return None;
@@ -1145,6 +1166,187 @@ fn loopback_flags() -> Value {
         Value::symbol("loopback"),
         Value::symbol("up"),
     ])
+}
+
+fn zero_network_address(family: NetworkAddressFamily) -> Value {
+    match family {
+        NetworkAddressFamily::Ipv4 => int_vector(&[0, 0, 0, 0, 0]),
+        NetworkAddressFamily::Ipv6 => int_vector(&[0, 0, 0, 0, 0, 0, 0, 0, 0]),
+    }
+}
+
+fn interface_flags(flags: libc::c_uint) -> Value {
+    let mut out = Vec::new();
+    if flags & (libc::IFF_MULTICAST as libc::c_uint) != 0 {
+        out.push(Value::symbol("multicast"));
+    }
+    if flags & (libc::IFF_NOARP as libc::c_uint) != 0 {
+        out.push(Value::symbol("noarp"));
+    }
+    if flags & (libc::IFF_RUNNING as libc::c_uint) != 0 {
+        out.push(Value::symbol("running"));
+    }
+    if flags & (libc::IFF_POINTOPOINT as libc::c_uint) != 0 {
+        out.push(Value::symbol("pointopoint"));
+    }
+    if flags & (libc::IFF_BROADCAST as libc::c_uint) != 0 {
+        out.push(Value::symbol("broadcast"));
+    }
+    if flags & (libc::IFF_LOOPBACK as libc::c_uint) != 0 {
+        out.push(Value::symbol("loopback"));
+    }
+    if flags & (libc::IFF_UP as libc::c_uint) != 0 {
+        out.push(Value::symbol("up"));
+    }
+    Value::list(out)
+}
+
+fn parse_network_sockaddr(
+    addr: *const libc::sockaddr,
+) -> Option<(NetworkAddressFamily, Value)> {
+    if addr.is_null() {
+        return None;
+    }
+
+    // SAFETY: The caller passes pointers obtained from libc APIs that provide
+    // valid `sockaddr*` records for the lifetime of iteration.
+    unsafe {
+        match (*addr).sa_family as i32 {
+            libc::AF_INET => {
+                let in4 = &*(addr as *const libc::sockaddr_in);
+                let octets = in4.sin_addr.s_addr.to_ne_bytes();
+                Some((
+                    NetworkAddressFamily::Ipv4,
+                    int_vector(&[
+                        octets[0] as i64,
+                        octets[1] as i64,
+                        octets[2] as i64,
+                        octets[3] as i64,
+                        0,
+                    ]),
+                ))
+            }
+            libc::AF_INET6 => {
+                let in6 = &*(addr as *const libc::sockaddr_in6);
+                let mut segments = [0_i64; 9];
+                for (idx, chunk) in in6.sin6_addr.s6_addr.chunks_exact(2).enumerate() {
+                    segments[idx] = u16::from_be_bytes([chunk[0], chunk[1]]) as i64;
+                }
+                Some((NetworkAddressFamily::Ipv6, int_vector(&segments)))
+            }
+            _ => None,
+        }
+    }
+}
+
+#[cfg(target_os = "linux")]
+fn parse_hwaddr(addr: *const libc::sockaddr) -> Option<Value> {
+    if addr.is_null() {
+        return None;
+    }
+
+    // SAFETY: The pointer is from `ifaddrs` and points to a valid socket
+    // address for the current iteration node.
+    unsafe {
+        if (*addr).sa_family as i32 != libc::AF_PACKET {
+            return None;
+        }
+        let ll = &*(addr as *const libc::sockaddr_ll);
+        let len = usize::min(ll.sll_halen as usize, ll.sll_addr.len());
+        let bytes = ll.sll_addr[..len]
+            .iter()
+            .map(|byte| Value::Int(*byte as i64))
+            .collect::<Vec<_>>();
+        Some(Value::cons(
+            Value::Int(ll.sll_hatype as i64),
+            Value::vector(bytes),
+        ))
+    }
+}
+
+#[cfg(target_os = "linux")]
+fn host_interface_snapshot() -> Option<Vec<HostInterfaceEntry>> {
+    struct IfAddrsGuard(*mut libc::ifaddrs);
+
+    impl Drop for IfAddrsGuard {
+        fn drop(&mut self) {
+            // SAFETY: `self.0` comes from `getifaddrs` and is released exactly once.
+            unsafe {
+                if !self.0.is_null() {
+                    libc::freeifaddrs(self.0);
+                }
+            }
+        }
+    }
+
+    let mut root: *mut libc::ifaddrs = ptr::null_mut();
+    // SAFETY: `getifaddrs` initializes `root` on success.
+    unsafe {
+        if libc::getifaddrs(&mut root as *mut *mut libc::ifaddrs) != 0 || root.is_null() {
+            return None;
+        }
+    }
+    let _guard = IfAddrsGuard(root);
+
+    let mut entries = Vec::new();
+    let mut hwaddr_by_name: HashMap<String, Value> = HashMap::new();
+
+    let mut current = root;
+    while !current.is_null() {
+        // SAFETY: `current` is either null or points into the linked list
+        // produced by `getifaddrs`; we advance using `ifa_next`.
+        unsafe {
+            let ifa = &*current;
+            if !ifa.ifa_name.is_null() {
+                let name = CStr::from_ptr(ifa.ifa_name).to_string_lossy().into_owned();
+
+                if let Some(hwaddr) = parse_hwaddr(ifa.ifa_addr) {
+                    hwaddr_by_name.entry(name.clone()).or_insert(hwaddr);
+                }
+
+                if let Some((family, address)) =
+                    parse_network_sockaddr(ifa.ifa_addr as *const libc::sockaddr)
+                {
+                    let netmask = parse_network_sockaddr(ifa.ifa_netmask as *const libc::sockaddr)
+                        .and_then(|(mask_family, mask)| (mask_family == family).then_some(mask))
+                        .unwrap_or_else(|| zero_network_address(family));
+                    let broadcast = parse_network_sockaddr(ifa.ifa_ifu as *const libc::sockaddr)
+                        .and_then(|(bc_family, bc)| (bc_family == family).then_some(bc))
+                        .unwrap_or_else(|| zero_network_address(family));
+
+                    entries.push(HostInterfaceEntry {
+                        name,
+                        family,
+                        address,
+                        broadcast,
+                        netmask,
+                        hwaddr: None,
+                        flags: interface_flags(ifa.ifa_flags),
+                    });
+                }
+            }
+            current = ifa.ifa_next;
+        }
+    }
+
+    if entries.is_empty() {
+        return None;
+    }
+
+    for entry in &mut entries {
+        if let Some(hwaddr) = hwaddr_by_name.get(&entry.name) {
+            entry.hwaddr = Some(hwaddr.clone());
+        } else if entry.name == "lo" {
+            entry.hwaddr = Some(loopback_hwaddr());
+        }
+    }
+
+    Some(entries)
+}
+
+#[cfg(not(target_os = "linux"))]
+fn host_interface_snapshot() -> Option<Vec<HostInterfaceEntry>> {
+    None
 }
 
 fn interface_entry(name: &str, address: Value, full: bool) -> Value {
@@ -1510,11 +1712,36 @@ pub(crate) fn builtin_network_interface_list(
     }
 
     let mut entries = Vec::new();
-    if include_ipv6 {
-        entries.push(interface_entry("lo", loopback_ipv6_address(), full));
+    if let Some(host_entries) = host_interface_snapshot() {
+        for entry in host_entries {
+            let include = match entry.family {
+                NetworkAddressFamily::Ipv4 => include_ipv4,
+                NetworkAddressFamily::Ipv6 => include_ipv6,
+            };
+            if !include {
+                continue;
+            }
+
+            if full {
+                entries.push(Value::list(vec![
+                    Value::string(entry.name),
+                    entry.address,
+                    entry.broadcast,
+                    entry.netmask,
+                ]));
+            } else {
+                entries.push(Value::cons(Value::string(entry.name), entry.address));
+            }
+        }
     }
-    if include_ipv4 {
-        entries.push(interface_entry("lo", loopback_ipv4_address(), full));
+
+    if entries.is_empty() {
+        if include_ipv6 {
+            entries.push(interface_entry("lo", loopback_ipv6_address(), full));
+        }
+        if include_ipv4 {
+            entries.push(interface_entry("lo", loopback_ipv4_address(), full));
+        }
     }
     Ok(Value::list(entries))
 }
@@ -1529,17 +1756,46 @@ pub(crate) fn builtin_network_interface_info(
     if ifname.chars().count() >= 16 {
         return Err(signal("error", vec![Value::string("interface name too long")]));
     }
-    if ifname != "lo" {
-        return Ok(Value::Nil);
+
+    if let Some(host_entries) = host_interface_snapshot() {
+        let mut first_match: Option<HostInterfaceEntry> = None;
+        let mut ipv4_match: Option<HostInterfaceEntry> = None;
+
+        for entry in host_entries {
+            if entry.name != ifname {
+                continue;
+            }
+            if first_match.is_none() {
+                first_match = Some(entry.clone());
+            }
+            if entry.family == NetworkAddressFamily::Ipv4 {
+                ipv4_match = Some(entry);
+                break;
+            }
+        }
+
+        if let Some(entry) = ipv4_match.or(first_match) {
+            return Ok(Value::list(vec![
+                entry.address,
+                entry.broadcast,
+                entry.netmask,
+                entry.hwaddr.unwrap_or(Value::Nil),
+                entry.flags,
+            ]));
+        }
     }
 
-    Ok(Value::list(vec![
-        loopback_ipv4_address(),
-        loopback_ipv4_broadcast(),
-        loopback_ipv4_netmask(),
-        loopback_hwaddr(),
-        loopback_flags(),
-    ]))
+    if ifname == "lo" {
+        return Ok(Value::list(vec![
+            loopback_ipv4_address(),
+            loopback_ipv4_broadcast(),
+            loopback_ipv4_netmask(),
+            loopback_hwaddr(),
+            loopback_flags(),
+        ]));
+    }
+
+    Ok(Value::Nil)
 }
 
 /// (network-lookup-address-info NAME &optional FAMILY HINTS) -> address-list
