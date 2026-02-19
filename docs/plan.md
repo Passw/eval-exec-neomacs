@@ -28,6 +28,24 @@ Last updated: 2026-02-19
 
 ## Doing
 
+- Fixed `format-network-address` out-of-range port drift for IPv4/IPv6 and re-locked oracle parity:
+  - runtime changes:
+    - `rust/neovm-core/src/elisp/process.rs`
+      - tightened `format-network-address` port validation:
+        - with `OMIT-PORT=nil`, ports outside `0..=65535` now return `nil` (matching oracle) for both IPv4 and IPv6 vectors.
+        - with `OMIT-PORT=t`, address rendering remains unchanged and ignores invalid port payloads.
+      - expanded runtime lock-in:
+        - `process_network_interface_and_signal_runtime_surface` now asserts out-of-range IPv4/IPv6 port behavior.
+  - corpus changes:
+    - updated and re-recorded:
+      - `test/neovm/vm-compat/cases/process-network-interface-signal-semantics.forms`
+      - `test/neovm/vm-compat/cases/process-network-interface-signal-semantics.expected.tsv`
+  - verified:
+    - `cargo test --manifest-path rust/neovm-core/Cargo.toml process_network_interface_and_signal_runtime_surface` (pass)
+    - `make -C test/neovm/vm-compat record FORMS=cases/process-network-interface-signal-semantics.forms EXPECTED=cases/process-network-interface-signal-semantics.expected.tsv` (pass)
+    - `make -C test/neovm/vm-compat check-one-neovm CASE=cases/process-network-interface-signal-semantics` (pass, `2/2`)
+    - `make -C test/neovm/vm-compat check-all-neovm-strict` (pass; case inventory `788`)
+
 - Added process network-address/interface/signal compatibility slice and locked oracle parity:
   - runtime changes:
     - `rust/neovm-core/src/elisp/process.rs`

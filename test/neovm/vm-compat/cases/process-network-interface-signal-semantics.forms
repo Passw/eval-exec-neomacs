@@ -25,6 +25,8 @@
    (format-network-address "x")
    (format-network-address nil)
    (format-network-address [1])
+   (format-network-address [127 0 0 1 65536])
+   (format-network-address [0 0 0 0 0 0 0 1 65536])
    (condition-case err (format-network-address) (error err))
    (listp (network-interface-list))
    (consp (car (network-interface-list)))

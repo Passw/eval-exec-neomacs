@@ -1179,7 +1179,8 @@ fn format_ipv4_network_address(items: &[i64], omit_port: bool) -> Option<String>
         .collect::<Option<Vec<_>>>()?;
     let addr = format!("{}.{}.{}.{}", octets[0], octets[1], octets[2], octets[3]);
     if items.len() == 5 && !omit_port {
-        Some(format!("{addr}:{}", items[4]))
+        let port = u16::try_from(items[4]).ok()?;
+        Some(format!("{addr}:{port}"))
     } else {
         Some(addr)
     }
@@ -1196,7 +1197,8 @@ fn format_ipv6_network_address(items: &[i64], omit_port: bool) -> Option<String>
     }
     let addr = segments.join(":");
     if items.len() == 9 && !omit_port {
-        Some(format!("[{addr}]:{}", items[8]))
+        let port = u16::try_from(items[8]).ok()?;
+        Some(format!("[{addr}]:{port}"))
     } else {
         Some(addr)
     }
@@ -4602,6 +4604,8 @@ mod tests {
                   (format-network-address "x")
                   (format-network-address nil)
                   (format-network-address [1])
+                  (format-network-address [127 0 0 1 65536])
+                  (format-network-address [0 0 0 0 0 0 0 1 65536])
                   (condition-case err (format-network-address) (error err))
                   (listp (network-interface-list))
                   (consp (car (network-interface-list)))
@@ -4636,7 +4640,7 @@ mod tests {
         );
         assert_eq!(
             results[1],
-            "OK (\"127.0.0.1:80\" \"127.0.0.1\" \"[0:0:0:0:0:0:0:1]:80\" \"0:0:0:0:0:0:0:1\" \"x\" nil nil (wrong-number-of-arguments format-network-address 0) t t t t t (wrong-number-of-arguments network-interface-list 3) (error \"Unsupported address family\") t (wrong-type-argument stringp nil) (error \"interface name too long\") t t t t (error \"Unsupported family\") (error \"Unsupported hints value\") (wrong-type-argument stringp 1) t t t (wrong-number-of-arguments signal-names 1) (void-function process-connection))"
+            "OK (\"127.0.0.1:80\" \"127.0.0.1\" \"[0:0:0:0:0:0:0:1]:80\" \"0:0:0:0:0:0:0:1\" \"x\" nil nil nil nil (wrong-number-of-arguments format-network-address 0) t t t t t (wrong-number-of-arguments network-interface-list 3) (error \"Unsupported address family\") t (wrong-type-argument stringp nil) (error \"interface name too long\") t t t t (error \"Unsupported family\") (error \"Unsupported hints value\") (wrong-type-argument stringp 1) t t t (wrong-number-of-arguments signal-names 1) (void-function process-connection))"
         );
     }
 }
