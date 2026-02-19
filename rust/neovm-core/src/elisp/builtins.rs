@@ -7710,6 +7710,13 @@ pub(crate) fn dispatch_builtin(
         "minibuffer-window-active-p" => {
             return Some(super::window_cmds::builtin_minibuffer_window_active_p(args))
         }
+        "window-parameter" => return Some(super::window_cmds::builtin_window_parameter(eval, args)),
+        "set-window-parameter" => {
+            return Some(super::window_cmds::builtin_set_window_parameter(
+                eval, args,
+            ))
+        }
+        "window-parameters" => return Some(super::window_cmds::builtin_window_parameters(eval, args)),
         "window-buffer" => return Some(super::window_cmds::builtin_window_buffer(eval, args)),
         "window-start" => return Some(super::window_cmds::builtin_window_start(eval, args)),
         "window-end" => return Some(super::window_cmds::builtin_window_end(eval, args)),

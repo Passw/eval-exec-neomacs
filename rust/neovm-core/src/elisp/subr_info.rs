@@ -935,6 +935,7 @@ fn subr_arity_value(name: &str) -> Value {
         | "window-next-buffers"
         | "window-old-buffer"
         | "window-old-point"
+        | "window-parameters"
         | "window-prev-buffers"
         | "window-scroll-bars"
         | "window-start"
@@ -964,6 +965,8 @@ fn subr_arity_value(name: &str) -> Value {
         | "minibuffer-window-active-p" => {
             arity_cons(1, Some(1))
         }
+        "window-parameter" => arity_cons(2, Some(2)),
+        "set-window-parameter" => arity_cons(3, Some(3)),
         "terminal-parameter" => arity_cons(2, Some(2)),
         "set-terminal-parameter" => arity_cons(3, Some(3)),
         // Threading primitives
@@ -2393,6 +2396,7 @@ mod tests {
         assert_subr_arity("minibuffer-window-active-p", 1, Some(1));
         assert_subr_arity("minibuffer-window", 0, Some(1));
         assert_subr_arity("selected-window", 0, Some(0));
+        assert_subr_arity("set-window-parameter", 3, Some(3));
         assert_subr_arity("set-window-buffer", 2, Some(3));
         assert_subr_arity("set-window-point", 2, Some(2));
         assert_subr_arity("set-window-start", 2, Some(3));
@@ -2421,6 +2425,8 @@ mod tests {
         assert_subr_arity("window-next-buffers", 0, Some(1));
         assert_subr_arity("window-old-buffer", 0, Some(1));
         assert_subr_arity("window-old-point", 0, Some(1));
+        assert_subr_arity("window-parameter", 2, Some(2));
+        assert_subr_arity("window-parameters", 0, Some(1));
         assert_subr_arity("window-prev-buffers", 0, Some(1));
         assert_subr_arity("window-scroll-bars", 0, Some(1));
         assert_subr_arity("window-valid-p", 1, Some(1));

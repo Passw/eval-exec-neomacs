@@ -108,6 +108,42 @@ fn resolve_window_id(
     resolve_window_id_with_pred(eval, arg, "window-live-p")
 }
 
+/// Resolve an optional window designator that may be stale (window object).
+///
+/// - nil/omitted => selected live window
+/// - non-nil invalid designator => `(wrong-type-argument PRED VALUE)`
+fn resolve_window_object_id_with_pred(
+    eval: &mut super::eval::Evaluator,
+    arg: Option<&Value>,
+    pred: &str,
+) -> Result<WindowId, Flow> {
+    match arg {
+        None | Some(Value::Nil) => {
+            let (_fid, wid) = resolve_window_id(eval, None)?;
+            Ok(wid)
+        }
+        Some(val) => {
+            let wid = match val {
+                Value::Int(n) => WindowId(*n as u64),
+                _ => {
+                    return Err(signal(
+                        "wrong-type-argument",
+                        vec![Value::symbol(pred), val.clone()],
+                    ))
+                }
+            };
+            if eval.frames.is_window_object_id(wid) {
+                Ok(wid)
+            } else {
+                Err(signal(
+                    "wrong-type-argument",
+                    vec![Value::symbol(pred), val.clone()],
+                ))
+            }
+        }
+    }
+}
+
 /// Resolve a window designator for mutation-style window ops.
 ///
 /// GNU Emacs uses generic `error` signaling for invalid designators in some
@@ -541,6 +577,45 @@ pub(crate) fn builtin_window_buffer(
             vec![Value::symbol("windowp"), other.clone()],
         )),
     }
+}
+
+/// `(window-parameter WINDOW PARAMETER)` -> window parameter or nil.
+pub(crate) fn builtin_window_parameter(
+    eval: &mut super::eval::Evaluator,
+    args: Vec<Value>,
+) -> EvalResult {
+    expect_args("window-parameter", &args, 2)?;
+    let _ = ensure_selected_frame_id(eval);
+    let wid = resolve_window_object_id_with_pred(eval, args.first(), "windowp")?;
+    Ok(eval
+        .frames
+        .window_parameter(wid, &args[1])
+        .unwrap_or(Value::Nil))
+}
+
+/// `(set-window-parameter WINDOW PARAMETER VALUE)` -> VALUE.
+pub(crate) fn builtin_set_window_parameter(
+    eval: &mut super::eval::Evaluator,
+    args: Vec<Value>,
+) -> EvalResult {
+    expect_args("set-window-parameter", &args, 3)?;
+    let _ = ensure_selected_frame_id(eval);
+    let wid = resolve_window_object_id_with_pred(eval, args.first(), "windowp")?;
+    let value = args[2].clone();
+    eval.frames
+        .set_window_parameter(wid, args[1].clone(), value.clone());
+    Ok(value)
+}
+
+/// `(window-parameters &optional WINDOW)` -> alist of parameters.
+pub(crate) fn builtin_window_parameters(
+    eval: &mut super::eval::Evaluator,
+    args: Vec<Value>,
+) -> EvalResult {
+    expect_max_args("window-parameters", &args, 1)?;
+    let _ = ensure_selected_frame_id(eval);
+    let (_fid, wid) = resolve_window_id_with_pred(eval, args.first(), "window-valid-p")?;
+    Ok(eval.frames.window_parameters_alist(wid))
 }
 
 /// `(window-start &optional WINDOW)` -> integer position.
@@ -3124,6 +3199,55 @@ mod tests {
         assert_eq!(
             out[2],
             "OK ((wrong-type-argument window-live-p 999999) (wrong-type-argument window-live-p 999999) (wrong-type-argument window-live-p 999999) (wrong-type-argument window-live-p 999999) (wrong-type-argument window-live-p 999999) (wrong-number-of-arguments window-use-time 2) (wrong-number-of-arguments window-old-point 2) (wrong-number-of-arguments window-old-buffer 2) (wrong-number-of-arguments window-prev-buffers 2) (wrong-number-of-arguments window-next-buffers 2))"
+        );
+    }
+
+    #[test]
+    fn window_parameter_helpers_match_batch_defaults_and_key_semantics() {
+        let forms = parse_forms(
+            "(let* ((w (selected-window))
+                    (m (car (last (window-list nil t)))))
+               (list (window-parameters w)
+                     (window-parameters m)
+                     (window-parameter w 'foo)
+                     (window-parameter m 'foo)
+                     (set-window-parameter w 'foo 'bar)
+                     (window-parameter w 'foo)
+                     (window-parameters w)
+                     (set-window-parameter m 'foo 42)
+                     (window-parameter m 'foo)
+                     (window-parameters m)
+                     (set-window-parameter w 'foo nil)
+                     (window-parameter w 'foo)
+                     (window-parameters w)
+                     (set-window-parameter w 1 2)
+                     (window-parameter w 1)
+                     (window-parameters w)))
+             (list (condition-case err (window-parameter 999999 'foo) (error err))
+                   (condition-case err (set-window-parameter 999999 'foo 'bar) (error err))
+                   (condition-case err (window-parameters 999999) (error err))
+                   (condition-case err (window-parameter nil) (error err))
+                   (condition-case err (window-parameter nil nil nil) (error err))
+                   (condition-case err (set-window-parameter nil nil) (error err))
+                   (condition-case err (set-window-parameter nil nil nil nil) (error err))
+                   (condition-case err (window-parameters nil nil) (error err))
+                   (condition-case err (window-parameter 'foo 'bar) (error err))
+                   (condition-case err (set-window-parameter 'foo 'bar 'baz) (error err)))",
+        )
+        .expect("parse");
+        let mut ev = Evaluator::new();
+        let out = ev
+            .eval_forms(&forms)
+            .iter()
+            .map(format_eval_result)
+            .collect::<Vec<_>>();
+        assert_eq!(
+            out[0],
+            "OK (nil nil nil nil bar bar ((foo . bar)) 42 42 ((foo . 42)) nil nil ((foo)) 2 2 ((1 . 2) (foo)))"
+        );
+        assert_eq!(
+            out[1],
+            "OK ((wrong-type-argument windowp 999999) (wrong-type-argument windowp 999999) (wrong-type-argument window-valid-p 999999) (wrong-number-of-arguments window-parameter 1) (wrong-number-of-arguments window-parameter 3) (wrong-number-of-arguments set-window-parameter 2) (wrong-number-of-arguments set-window-parameter 4) (wrong-number-of-arguments window-parameters 2) (wrong-type-argument windowp foo) (wrong-type-argument windowp foo))"
         );
     }
 

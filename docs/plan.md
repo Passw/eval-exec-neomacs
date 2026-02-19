@@ -28,6 +28,52 @@ Last updated: 2026-02-19
 
 ## Doing
 
+- Completed `window-parameter*` parity slice and added oracle lock-ins:
+  - runtime changes:
+    - `rust/neovm-core/src/window.rs`
+      - added frame-manager storage and helpers for per-window parameters:
+        - `window_parameter`
+        - `set_window_parameter`
+        - `window_parameters_alist`
+      - matched GNU Emacs key/value behavior:
+        - `eq` key matching for arbitrary Lisp keys
+        - alist emission in reverse insertion/update order
+    - `rust/neovm-core/src/elisp/window_cmds.rs`
+      - added evaluator-backed builtins:
+        - `window-parameter`
+        - `set-window-parameter`
+        - `window-parameters`
+      - added stale-window resolver path for `windowp`-predicate-compatible object handling.
+      - added evaluator unit coverage:
+        - `window_parameter_helpers_match_batch_defaults_and_key_semantics`
+    - `rust/neovm-core/src/elisp/builtins.rs`
+      - wired dispatch for all three window-parameter builtins.
+    - `rust/neovm-core/src/elisp/builtin_registry.rs`
+      - registered three helper names in builtin registry.
+      - parity registry counts now remain:
+        - `DISPATCH_BUILTIN_NAMES`: `989`
+        - core parity entries: `988`
+    - `rust/neovm-core/src/elisp/subr_info.rs`
+      - added `subr-arity` metadata:
+        - `(3 . 3)`: `set-window-parameter`
+        - `(2 . 2)`: `window-parameter`
+        - `(0 . 1)`: `window-parameters`
+      - extended `subr_arity_window_frame_primitives_match_oracle`.
+  - corpus changes:
+    - added:
+      - `test/neovm/vm-compat/cases/window-parameter-semantics.{forms,expected.tsv}`
+    - expanded and re-recorded:
+      - `test/neovm/vm-compat/cases/window-frame-subr-arity-semantics.{forms,expected.tsv}`
+    - wired new case into:
+      - `test/neovm/vm-compat/cases/default.list`
+  - verified:
+    - `cargo test --manifest-path rust/neovm-core/Cargo.toml window_parameter_helpers_match_batch_defaults_and_key_semantics` (pass)
+    - `cargo test --manifest-path rust/neovm-core/Cargo.toml subr_arity_window_frame_primitives_match_oracle` (pass)
+    - `make -C test/neovm/vm-compat check-one-neovm CASE=cases/window-parameter-semantics` (pass)
+    - `make -C test/neovm/vm-compat check-one-neovm CASE=cases/window-frame-subr-arity-semantics` (pass)
+    - `make -C test/neovm/vm-compat check-builtin-registry-all` (pass)
+    - `make -C test/neovm/vm-compat check-all-neovm-strict` (pass)
+
 - Completed window old-state helper parity slice and added oracle lock-ins:
   - runtime changes:
     - `rust/neovm-core/src/elisp/window_cmds.rs`

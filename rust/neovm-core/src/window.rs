@@ -8,7 +8,7 @@
 //! - The **minibuffer window** is a special single-line window at the bottom.
 
 use crate::buffer::BufferId;
-use crate::elisp::value::Value;
+use crate::elisp::value::{eq_value, Value};
 use std::collections::{HashMap, HashSet};
 
 // ---------------------------------------------------------------------------
@@ -465,6 +465,7 @@ pub struct FrameManager {
     next_frame_id: u64,
     next_window_id: u64,
     deleted_windows: HashSet<WindowId>,
+    window_parameters: HashMap<WindowId, Vec<(Value, Value)>>,
 }
 
 impl FrameManager {
@@ -475,6 +476,7 @@ impl FrameManager {
             next_frame_id: FRAME_ID_BASE,
             next_window_id: 1,
             deleted_windows: HashSet::new(),
+            window_parameters: HashMap::new(),
         }
     }
 
@@ -649,6 +651,42 @@ impl FrameManager {
     /// Return true when WINDOW-ID designates a live or stale window object.
     pub fn is_window_object_id(&self, window_id: WindowId) -> bool {
         self.is_live_window_id(window_id) || self.deleted_windows.contains(&window_id)
+    }
+
+    /// Return window parameter KEY for WINDOW-ID, or nil when unset.
+    pub fn window_parameter(&self, window_id: WindowId, key: &Value) -> Option<Value> {
+        self.window_parameters.get(&window_id).and_then(|pairs| {
+            pairs
+                .iter()
+                .find(|(k, _)| eq_value(k, key))
+                .map(|(_, v)| v.clone())
+        })
+    }
+
+    /// Set window parameter KEY on WINDOW-ID to VALUE.
+    pub fn set_window_parameter(&mut self, window_id: WindowId, key: Value, value: Value) {
+        let params = self.window_parameters.entry(window_id).or_default();
+        if let Some((_, existing)) = params.iter_mut().find(|(k, _)| eq_value(k, &key)) {
+            *existing = value;
+        } else {
+            params.push((key, value));
+        }
+    }
+
+    /// Return window parameters alist for WINDOW-ID.
+    pub fn window_parameters_alist(&self, window_id: WindowId) -> Value {
+        let Some(params) = self.window_parameters.get(&window_id) else {
+            return Value::Nil;
+        };
+        if params.is_empty() {
+            return Value::Nil;
+        }
+        let alist = params
+            .iter()
+            .rev()
+            .map(|(k, v)| Value::cons(k.clone(), v.clone()))
+            .collect::<Vec<_>>();
+        Value::list(alist)
     }
 }
 
