@@ -297,7 +297,7 @@ fn subr_arity_value(name: &str) -> Value {
     match name {
         // Oracle-compatible overrides for core subrs used in vm-compat.
         n if is_cxr_subr_name(n) => arity_cons(1, Some(1)),
-        "message" => arity_cons(1, None),
+        "message" | "format" => arity_cons(1, None),
         "/" | "<" | "<=" | "=" | ">" | ">=" | "apply" => arity_cons(1, None),
         "cons" => arity_cons(2, Some(2)),
         "1+" | "1-" | "abs" => arity_cons(1, Some(1)),
@@ -409,7 +409,8 @@ fn subr_arity_value(name: &str) -> Value {
         "bignump" | "boundp" | "byte-code-function-p" | "car-safe" | "cdr-safe" => {
             arity_cons(1, Some(1))
         }
-        "identity" | "length" | "interpreted-function-p" | "invisible-p" | "macrop" => {
+        "identity" | "length" | "interpreted-function-p" | "invisible-p" | "macrop"
+        | "functionp" => {
             arity_cons(1, Some(1))
         }
         "gensym" => arity_cons(0, Some(1)),
@@ -445,6 +446,7 @@ fn subr_arity_value(name: &str) -> Value {
         "mapconcat" => arity_cons(2, Some(3)),
         "assoc" => arity_cons(2, Some(3)),
         "assoc-default" => arity_cons(2, Some(4)),
+        "alist-get" => arity_cons(2, Some(5)),
         "nreverse" | "proper-list-p" | "reverse" | "safe-length" => arity_cons(1, Some(1)),
         "back-to-indentation" | "backward-prefix-chars" => arity_cons(0, Some(0)),
         "backward-sexp" => arity_cons(0, Some(2)),

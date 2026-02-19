@@ -28,6 +28,31 @@ Last updated: 2026-02-19
 
 ## Doing
 
+- Fixed builtin registry drift against actual `dispatch_builtin` coverage and added a hard sync gate:
+  - runtime/registry changes:
+    - `rust/neovm-core/src/elisp/builtin_registry.rs`
+      - added missing dispatch names previously reachable in `builtins.rs` but absent from `DISPATCH_BUILTIN_NAMES`:
+        - `alist-get`
+        - `format`
+        - `functionp`
+      - intentionally kept `word-at-point` out of core registry (startup oracle policy: `fboundp` is `nil` under `-Q`).
+  - vm-compat gate changes:
+    - added new sync checker:
+      - `test/neovm/vm-compat/check-builtin-registry-sync.sh`
+      - enforces evaluator-dispatch coverage parity:
+        - every evaluator match-arm name in `dispatch_builtin` must appear in `DISPATCH_BUILTIN_NAMES`.
+      - supports explicit startup-policy exceptions via:
+        - `test/neovm/vm-compat/cases/builtin-registry-sync-allowlist.txt`
+    - wired into aggregate gate:
+      - `test/neovm/vm-compat/Makefile`
+      - `check-builtin-registry-all` now runs `check-builtin-registry-sync` first.
+    - documented gate usage:
+      - `test/neovm/vm-compat/README.md`
+  - verified:
+    - `make -C test/neovm/vm-compat check-builtin-registry-sync` (pass)
+    - `make -C test/neovm/vm-compat check-builtin-registry-all` (pass)
+    - `make -C test/neovm/vm-compat check-all-neovm-strict` (pass)
+
 - Fixed interface-name length validation to use byte limits (not char count):
   - runtime changes:
     - `rust/neovm-core/src/elisp/process.rs`

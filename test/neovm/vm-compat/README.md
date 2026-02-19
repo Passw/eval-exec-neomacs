@@ -14,6 +14,7 @@ results against that baseline once evaluator execution is wired in.
 - `run-neovm.sh`: runs NeoVM worker-runtime compatibility runner and prints TSV output
 - `compare-results.sh`: diffs oracle TSV vs NeoVM TSV
 - `check-tracked-lists.sh`: validates `cases/tracked-lists.txt` manifest shape and references
+- `check-builtin-registry-sync.sh`: checks `builtin_registry.rs` exactly matches names dispatched by `builtins.rs`
 - `check-builtin-registry-fboundp.sh`: checks `fboundp` parity for all names in `builtin_registry.rs`
 - `check-startup-doc-stub-coverage.sh`: checks startup integer-doc symbol coverage of `STARTUP_VARIABLE_DOC_STUBS`
 - `check-startup-doc-string-coverage.sh`: checks startup string-doc symbol coverage of `STARTUP_VARIABLE_DOC_STRING_PROPERTIES`
@@ -28,6 +29,7 @@ results against that baseline once evaluator execution is wired in.
 - `cases/startup-doc.list`: focused startup documentation parity corpus order
 - `cases/tracked-lists.txt`: source-of-truth list-of-lists used by inventory/progress validation
 - `cases/builtin-registry-fboundp-allowlist.txt`: intentional `fboundp` drift allowlist for registry parity checks
+- `cases/builtin-registry-sync-allowlist.txt`: intentional evaluator-dispatch names excluded from core registry startup policy
 - `cases/core.forms`: starter corpus for expression and error behavior
 - `cases/input-batch-readers.forms`: batch-mode input reader compatibility corpus
 
@@ -226,6 +228,20 @@ Run the builtin registry `fboundp` parity gate (GNU Emacs `-Q` vs NeoVM core bui
 ```bash
 cd test/neovm/vm-compat
 make check-builtin-registry-fboundp
+```
+
+Run the full builtin registry gate bundle (dispatch/registry sync + fboundp/function-cell/function-kind/commandp/extension-policy checks):
+
+```bash
+cd test/neovm/vm-compat
+make check-builtin-registry-all
+```
+
+Run only the dispatch/registry sync gate (uses `cases/builtin-registry-sync-allowlist.txt` for intentional startup-policy exclusions):
+
+```bash
+cd test/neovm/vm-compat
+make check-builtin-registry-sync
 ```
 
 Show all currently allowlisted `function-kind` drift entries in detail (useful when
