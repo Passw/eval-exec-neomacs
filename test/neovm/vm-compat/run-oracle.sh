@@ -34,5 +34,35 @@ if [[ "$version_banner" =~ [Nn][Ee][Oo][Mm][Aa][Cc][Ss] ]] || [[ "$emacs_bin" =~
   exit 2
 fi
 
-NEOVM_FORMS_FILE="$forms_file_abs" "$emacs_bin" --batch -Q -l "$oracle_el" 2>/dev/null \
-  | LC_ALL=C awk -f "$script_dir/filter-case-lines.awk"
+tmp_stdout="$(mktemp)"
+tmp_stderr="$(mktemp)"
+trap 'rm -f "$tmp_stdout" "$tmp_stderr"' EXIT
+
+set +e
+NEOVM_FORMS_FILE="$forms_file_abs" "$emacs_bin" --batch -Q -l "$oracle_el" >"$tmp_stdout" 2>"$tmp_stderr"
+emacs_rc=$?
+set -e
+if [[ "$emacs_rc" -ne 0 ]]; then
+  echo "oracle emacs run failed (exit=$emacs_rc): $forms_file_abs" >&2
+  if [[ -s "$tmp_stderr" ]]; then
+    echo "oracle stderr:" >&2
+    cat "$tmp_stderr" >&2
+  fi
+  exit "$emacs_rc"
+fi
+
+set +e
+LC_ALL=C awk -f "$script_dir/filter-case-lines.awk" "$tmp_stdout"
+awk_rc=$?
+set -e
+if [[ "$awk_rc" -ne 0 ]]; then
+  if [[ -s "$tmp_stderr" ]]; then
+    echo "oracle stderr:" >&2
+    cat "$tmp_stderr" >&2
+  fi
+  if [[ -s "$tmp_stdout" ]]; then
+    echo "oracle stdout (first 20 lines):" >&2
+    head -n 20 "$tmp_stdout" >&2
+  fi
+  exit "$awk_rc"
+fi

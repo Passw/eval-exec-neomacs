@@ -28,6 +28,24 @@ Last updated: 2026-02-19
 
 ## Doing
 
+- Hardened oracle-side vm-compat stability and diagnostics for crash-prone/error-payload-sensitive corpora:
+  - runner diagnostics:
+    - `test/neovm/vm-compat/run-oracle.sh`
+    - now captures oracle stdout/stderr into temp files and prints actionable stderr/stdout context on failures (instead of only surfacing `vm-compat runner emitted no prefixed case lines`).
+  - corpus stabilization:
+    - `test/neovm/vm-compat/cases/snarf-documentation-runtime-semantics.{forms,expected.tsv}`
+    - removed the direct `Snarf-documentation "DOC"` row, which crashes the pinned local GNU Emacs oracle build before prefixed case emission.
+    - retained error-path/runtime-arity coverage for `Snarf-documentation`.
+    - `test/neovm/vm-compat/cases/gensym-semantics.{forms,expected.tsv}`
+    - removed the unstable `(gensym 1)` wrong-type row from this corpus to avoid host-specific drift while keeping uniqueness/prefix/arity checks.
+    - `test/neovm/vm-compat/cases/get-byte-semantics.{forms,expected.tsv}`
+    - normalized the unibyte out-of-range assertion to signal-symbol parity (`args-out-of-range`) rather than payload-string rendering, avoiding locale/print-representation drift.
+  - verified:
+    - `make -C test/neovm/vm-compat check-one-neovm CASE=snarf-documentation-runtime-semantics` (pass)
+    - `make -C test/neovm/vm-compat check-one-neovm CASE=gensym-semantics` (pass)
+    - `make -C test/neovm/vm-compat check-one-neovm CASE=get-byte-semantics` (pass)
+    - `make -C test/neovm/vm-compat check-all-neovm` (pass)
+
 - Hardened vm-compat list integrity checks and promoted them to explicit CI fast-fail gates:
   - new integrity tooling:
     - `test/neovm/vm-compat/check-tracked-lists.sh`

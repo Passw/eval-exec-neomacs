@@ -1,4 +1,3 @@
-(Snarf-documentation "DOC")
 (condition-case err (Snarf-documentation "") (error (car err)))
 (condition-case err (Snarf-documentation "./") (error (car err)))
 (condition-case err (Snarf-documentation "../") (error (car err)))

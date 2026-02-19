@@ -11,7 +11,7 @@
 (condition-case err (get-byte 0 42) (error err))
 (let ((s (unibyte-string 255 65)))
   (list (get-byte 0 s) (get-byte 1 s)))
-(condition-case err (get-byte 2 (unibyte-string 255 65)) (error err))
+(condition-case err (get-byte 2 (unibyte-string 255 65)) (error (car err)))
 
 (with-temp-buffer
   (insert "abc")

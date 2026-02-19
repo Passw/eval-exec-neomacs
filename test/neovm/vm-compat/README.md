@@ -10,7 +10,7 @@ results against that baseline once evaluator execution is wired in.
 ## Files
 
 - `oracle_eval.el`: batch-mode evaluator used as the GNU Emacs oracle
-- `run-oracle.sh`: runs all forms from a corpus file and prints TSV output
+- `run-oracle.sh`: runs all forms from a corpus file, prints TSV output, and surfaces oracle stderr/stdout diagnostics when prefixed case output is missing
 - `run-neovm.sh`: runs NeoVM worker-runtime compatibility runner and prints TSV output
 - `compare-results.sh`: diffs oracle TSV vs NeoVM TSV
 - `check-tracked-lists.sh`: validates `cases/tracked-lists.txt` manifest shape and references

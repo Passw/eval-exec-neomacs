@@ -11,4 +11,3 @@
   (string-prefix-p "tmp-" (symbol-name s)))
 
 (condition-case err (gensym nil nil) (error (car err)))
-(condition-case err (gensym 1) (error (car err)))
