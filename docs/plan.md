@@ -28,6 +28,29 @@ Last updated: 2026-02-19
 
 ## Doing
 
+- Aligned `internal-lisp-face-p` frame-domain vector resolution and `internal-copy-lisp-face` `NEW-FRAME` validation:
+  - runtime changes:
+    - `rust/neovm-core/src/elisp/font.rs`
+      - `internal-lisp-face-p` now returns resolved face vectors for non-`nil` frame designators (matching oracle slot ordering/values for default and inherited face fields).
+      - `internal-copy-lisp-face` now validates `NEW-FRAME` as `nil` or frame designator when `FRAME` is a frame designator (preserving existing `FRAME=t` behavior).
+      - added unit coverage:
+        - `internal_lisp_face_p_with_frame_designator_returns_resolved_vector`
+        - `internal_copy_lisp_face_validates_new_frame_when_frame_designator_used`
+  - corpus changes:
+    - updated:
+      - `test/neovm/vm-compat/cases/internal-face-frame-designator-semantics.forms`
+      - `test/neovm/vm-compat/cases/internal-face-frame-designator-semantics.expected.tsv`
+    - lock-ins now cover:
+      - resolved vector slot/value parity for `internal-lisp-face-p` with `(selected-frame)` on `default` and `mode-line`.
+      - `internal-copy-lisp-face` `NEW-FRAME` acceptance/rejection matrix when `FRAME` is `(selected-frame)`.
+  - verified:
+    - `cargo test -p neovm-core internal_lisp_face_p_with_frame_designator_returns_resolved_vector -- --nocapture` (pass)
+    - `cargo test -p neovm-core internal_copy_lisp_face_validates_new_frame_when_frame_designator_used -- --nocapture` (pass)
+    - `make -C test/neovm/vm-compat check-one-neovm CASE=cases/internal-face-frame-designator-semantics` (pass, `22/22`)
+    - `make -C test/neovm/vm-compat check-one-neovm CASE=cases/internal-lisp-face-semantics` (pass, `34/34`)
+    - `make -C test/neovm/vm-compat check-one-neovm CASE=cases/internal-make-copy-lisp-face-semantics` (pass, `42/42`)
+    - `make -C test/neovm/vm-compat check-all-neovm-strict` (pass; case inventory `764`)
+
 - Aligned `internal-lisp-face-empty-p` / `internal-lisp-face-equal-p` optional FRAME handling for frame-handle inputs:
   - runtime changes:
     - `rust/neovm-core/src/elisp/font.rs`

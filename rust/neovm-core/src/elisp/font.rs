@@ -692,6 +692,27 @@ const VALID_FACE_ATTRIBUTES: &[&str] = &[
     ":font",
     ":fontset",
 ];
+const LISP_FACE_VECTOR_ATTRIBUTES: &[&str] = &[
+    ":family",
+    ":foundry",
+    ":width",
+    ":height",
+    ":weight",
+    ":slant",
+    ":underline",
+    ":inverse-video",
+    ":foreground",
+    ":background",
+    ":stipple",
+    ":overline",
+    ":strike-through",
+    ":box",
+    ":font",
+    ":inherit",
+    ":extend",
+    ":distant-foreground",
+    ":fontset",
+];
 const DISCRETE_BOOLEAN_FACE_ATTRIBUTES: &[&str] = &[
     ":underline",
     ":overline",
@@ -1009,6 +1030,17 @@ fn make_lisp_face_vector() -> Value {
     let mut values = Vec::with_capacity(LISP_FACE_VECTOR_LEN);
     values.push(Value::symbol("face"));
     values.extend((1..LISP_FACE_VECTOR_LEN).map(|_| Value::symbol("unspecified")));
+    Value::vector(values)
+}
+
+fn make_lisp_face_vector_for_domain(face_name: &str, defaults_frame: bool) -> Value {
+    let mut values = Vec::with_capacity(LISP_FACE_VECTOR_LEN);
+    values.push(Value::symbol("face"));
+    values.extend(
+        LISP_FACE_VECTOR_ATTRIBUTES
+            .iter()
+            .map(|attr| lisp_face_attribute_value(face_name, attr, defaults_frame)),
+    );
     Value::vector(values)
 }
 
@@ -1414,16 +1446,23 @@ fn normalize_face_attr_for_set(
 pub(crate) fn builtin_internal_lisp_face_p(args: Vec<Value>) -> EvalResult {
     expect_min_args("internal-lisp-face-p", &args, 1)?;
     expect_max_args("internal-lisp-face-p", &args, 2)?;
-    if let Some(frame) = args.get(1) {
+    let frame_designator = if let Some(frame) = args.get(1) {
         if !optional_selected_frame_designator_p(frame) {
             return Err(signal(
                 "wrong-type-argument",
                 vec![Value::symbol("frame-live-p"), frame.clone()],
             ));
         }
-    }
-    if known_face_name(&args[0]).is_some() {
-        Ok(make_lisp_face_vector())
+        !frame.is_nil()
+    } else {
+        false
+    };
+    if let Some(face_name) = known_face_name(&args[0]) {
+        if frame_designator {
+            Ok(make_lisp_face_vector_for_domain(&face_name, false))
+        } else {
+            Ok(make_lisp_face_vector())
+        }
     } else {
         Ok(Value::Nil)
     }
@@ -1454,10 +1493,17 @@ pub(crate) fn builtin_internal_copy_lisp_face(args: Vec<Value>) -> EvalResult {
     expect_args("internal-copy-lisp-face", &args, 4)?;
     let _ = require_symbol_face_name(&args[0])?;
     let to_name = require_symbol_face_name(&args[1])?;
-    if !matches!(args[2], Value::True) && !frame_device_designator_p(&args[2]) {
+    let copy_defaults_domain = matches!(args[2], Value::True);
+    if !copy_defaults_domain && !frame_device_designator_p(&args[2]) {
         return Err(signal(
             "wrong-type-argument",
             vec![Value::symbol("frame-live-p"), args[2].clone()],
+        ));
+    }
+    if !copy_defaults_domain && !args[3].is_nil() && !frame_device_designator_p(&args[3]) {
+        return Err(signal(
+            "wrong-type-argument",
+            vec![Value::symbol("frame-live-p"), args[3].clone()],
         ));
     }
     let from_name = resolve_copy_source_face_symbol(&args[0])?;
@@ -2283,6 +2329,28 @@ mod tests {
     }
 
     #[test]
+    fn internal_lisp_face_p_with_frame_designator_returns_resolved_vector() {
+        let result = builtin_internal_lisp_face_p(vec![
+            Value::symbol("default"),
+            Value::Frame(FRAME_ID_BASE),
+        ])
+        .unwrap();
+        let values = match result {
+            Value::Vector(v) => v.lock().expect("poisoned").clone(),
+            _ => panic!("expected vector"),
+        };
+        assert_eq!(values[0].as_symbol_name(), Some("face"));
+        assert_eq!(values[1].as_str(), Some("default"));
+        assert_eq!(values[2].as_str(), Some("default"));
+        assert_eq!(values[3].as_symbol_name(), Some("normal"));
+        assert_eq!(values[4].as_int(), Some(1));
+        assert_eq!(values[5].as_symbol_name(), Some("normal"));
+        assert_eq!(values[8].as_symbol_name(), Some("nil"));
+        assert_eq!(values[9].as_str(), Some("unspecified-fg"));
+        assert_eq!(values[10].as_str(), Some("unspecified-bg"));
+    }
+
+    #[test]
     fn internal_make_lisp_face_creates_symbol_visible_to_internal_lisp_face_p() {
         let name = Value::symbol("__neovm_make_face_unit_test");
         let made = builtin_internal_make_lisp_face(vec![name.clone()]).unwrap();
@@ -2320,6 +2388,35 @@ mod tests {
             Value::Nil,
         ]);
         assert!(result.is_err());
+    }
+
+    #[test]
+    fn internal_copy_lisp_face_validates_new_frame_when_frame_designator_used() {
+        let frame = Value::Frame(FRAME_ID_BASE);
+        let err_t = builtin_internal_copy_lisp_face(vec![
+            Value::symbol("default"),
+            Value::symbol("my-face"),
+            frame.clone(),
+            Value::True,
+        ]);
+        assert!(err_t.is_err());
+
+        let err_small_int = builtin_internal_copy_lisp_face(vec![
+            Value::symbol("default"),
+            Value::symbol("my-face"),
+            frame.clone(),
+            Value::Int(1),
+        ]);
+        assert!(err_small_int.is_err());
+
+        let ok = builtin_internal_copy_lisp_face(vec![
+            Value::symbol("default"),
+            Value::symbol("my-face"),
+            frame.clone(),
+            frame,
+        ])
+        .unwrap();
+        assert_eq!(ok.as_symbol_name(), Some("my-face"));
     }
 
     #[test]
