@@ -472,6 +472,29 @@ Last updated: 2026-02-19
     - `make -C test/neovm/vm-compat check-one-neovm CASE=cases/window-group-prev-next-state-semantics` (pass)
     - `make -C test/neovm/vm-compat check-all-neovm-strict` (pass)
 
+- Completed `documentation-property` RAW startup-doc quote-style parity and lock-ins:
+  - runtime changes:
+    - `rust/neovm-core/src/elisp/doc.rs`
+      - aligned evaluator-backed `documentation-property` RAW behavior for startup offset-backed `variable-documentation` entries:
+        - RAW `nil` now returns display-style quote text (`‘…’`).
+        - RAW non-`nil` now returns raw ASCII quote text (``...`'``).
+      - expanded startup `load-path` doc stub text to the oracle-backed multi-line content that exercises RAW quote-style differences.
+      - added quote-style normalization helpers for startup-doc fallback paths.
+      - expanded evaluator unit coverage:
+        - `documentation_property_eval_load_path_raw_t_preserves_ascii_quotes`
+  - corpus changes:
+    - expanded and re-recorded:
+      - `test/neovm/vm-compat/cases/documentation-property-semantics.{forms,expected.tsv}`
+      - now locks RAW-vs-display quote-style divergence for `load-path` startup documentation.
+  - verified:
+    - `cargo test --manifest-path rust/neovm-core/Cargo.toml documentation_property_eval_` (pass)
+    - `cargo test --manifest-path rust/neovm-core/Cargo.toml startup_string_variable_docs_are_seeded_at_startup` (pass)
+    - `make -C test/neovm/vm-compat record FORMS=cases/documentation-property-semantics.forms EXPECTED=cases/documentation-property-semantics.expected.tsv` (pass)
+    - `make -C test/neovm/vm-compat check-one-neovm CASE=cases/documentation-property-semantics` (pass)
+    - `make -C test/neovm/vm-compat check-startup-doc-string-coverage` (pass)
+    - `make -C test/neovm/vm-compat check-startup-variable-documentation-counts` (pass)
+    - `make -C test/neovm/vm-compat check-all-neovm-strict` (pass)
+
 - Completed window old-state helper parity slice and added oracle lock-ins:
   - runtime changes:
     - `rust/neovm-core/src/elisp/window_cmds.rs`

@@ -3044,7 +3044,13 @@ pub(crate) static STARTUP_VARIABLE_DOC_STUBS: &[(&str, &str)] = &[
     (
         "load-path",
         "List of directories to search for files to load.\n\
-Each element is a string (directory name) or nil (try default directory).",
+Each element is a string (directory file name) or nil (meaning\n\
+`default-directory').\n\
+This list is consulted by the `require' function.\n\
+Initialized during startup as described in Info node `(elisp)Library Search'.\n\
+Use `directory-file-name' when adding items to this path.  However, Lisp\n\
+programs that process this list should tolerate directories both with\n\
+and without trailing slashes.",
     ),
     (
         "load-prefer-newer",
@@ -10739,6 +10745,26 @@ fn startup_variable_doc_stub(sym: &str) -> Option<&'static str> {
         .find_map(|(name, doc)| (*name == sym).then_some(*doc))
 }
 
+fn startup_doc_quote_style_display(doc: &str) -> String {
+    doc.chars()
+        .map(|ch| match ch {
+            '`' => '\u{2018}',
+            '\'' => '\u{2019}',
+            _ => ch,
+        })
+        .collect()
+}
+
+fn startup_doc_quote_style_raw(doc: &str) -> String {
+    doc.chars()
+        .map(|ch| match ch {
+            '\u{2018}' => '`',
+            '\u{2019}' => '\'',
+            _ => ch,
+        })
+        .collect()
+}
+
 /// `(describe-function FUNCTION)` -- return a short description string.
 ///
 /// This is a simplified stub that returns a type description of the function.
@@ -10939,16 +10965,19 @@ pub(crate) fn builtin_documentation_property_eval(
     let Some(prop) = args[1].as_symbol_name() else {
         return Ok(Value::Nil);
     };
+    let raw = args.get(2).is_some_and(Value::is_truthy);
 
     match eval.obarray.get_property(sym, prop).cloned() {
         Some(value) if startup_variable_doc_offset_symbol(sym, prop, &value) => {
-            if let Some(doc) = startup_variable_doc_stub(sym) {
-                Ok(Value::string(doc))
+            let base_doc = startup_variable_doc_stub(sym)
+                .map(ToString::to_string)
+                .unwrap_or_else(|| format!("{sym} is a variable defined in `C source code`."));
+            let doc = if raw {
+                startup_doc_quote_style_raw(&base_doc)
             } else {
-                Ok(Value::string(format!(
-                    "{sym} is a variable defined in `C source code`."
-                )))
-            }
+                startup_doc_quote_style_display(&base_doc)
+            };
+            Ok(Value::string(doc))
         }
         Some(value) => eval_documentation_property_value(eval, value),
         _ => Ok(Value::Nil),
@@ -13213,6 +13242,39 @@ mod tests {
                 .as_str()
                 .is_some_and(|s| s.contains("List of directories to search for files to load"))
         );
+    }
+
+    #[test]
+    fn documentation_property_eval_load_path_raw_t_preserves_ascii_quotes() {
+        let mut evaluator = super::super::eval::Evaluator::new();
+        let display = builtin_documentation_property_eval(
+            &mut evaluator,
+            vec![
+                Value::symbol("load-path"),
+                Value::symbol("variable-documentation"),
+                Value::Nil,
+            ],
+        )
+        .unwrap();
+        let raw = builtin_documentation_property_eval(
+            &mut evaluator,
+            vec![
+                Value::symbol("load-path"),
+                Value::symbol("variable-documentation"),
+                Value::True,
+            ],
+        )
+        .unwrap();
+        let display = display
+            .as_str()
+            .expect("display documentation-property should return a string");
+        let raw = raw
+            .as_str()
+            .expect("raw documentation-property should return a string");
+
+        assert_ne!(display, raw);
+        assert!(display.contains("‘default-directory’"));
+        assert!(raw.contains("`default-directory'"));
     }
 
     #[test]
