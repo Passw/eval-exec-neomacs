@@ -51,9 +51,10 @@ fi
 
 # Evaluator-backed names are direct dispatch_builtin string match arms.
 awk '
-  /pub\(crate\) fn dispatch_builtin\(/ { in_dispatch=1; next }
-  in_dispatch && /pub\(crate\) fn dispatch_builtin_pure\(/ { in_dispatch=0; next }
-  in_dispatch && /^[[:space:]]*"[-+*/%<>=a-z0-9]+"[[:space:]]*=>[[:space:]]*return Some/ {
+  /pub\(crate\) fn dispatch_builtin\(/ { in_fn=1; next }
+  in_fn && /match name[[:space:]]*\{/ { in_dispatch_match=1; next }
+  in_dispatch_match && /^[[:space:]]*_ =>[[:space:]]*\{/ { in_dispatch_match=0; next }
+  in_dispatch_match && /^[[:space:]]*"[-+*/%<>=a-z0-9]+"[[:space:]]*=>/ {
     line = $0
     sub(/^[[:space:]]*"/, "", line)
     sub(/".*$/, "", line)

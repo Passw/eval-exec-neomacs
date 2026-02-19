@@ -405,6 +405,12 @@ fn subr_arity_value(name: &str) -> Value {
             arity_cons(1, Some(1))
         }
         "ldexp" => arity_cons(2, Some(2)),
+        "sqrt" | "sin" | "cos" | "tan" | "asin" | "acos" | "exp" | "isnan" => {
+            arity_cons(1, Some(1))
+        }
+        "atan" | "log" => arity_cons(1, Some(2)),
+        "expt" => arity_cons(2, Some(2)),
+        "random" => arity_cons(0, Some(1)),
         "logb" | "lognot" => arity_cons(1, Some(1)),
         "bignump" | "boundp" | "byte-code-function-p" | "car-safe" | "cdr-safe" => {
             arity_cons(1, Some(1))
@@ -443,10 +449,14 @@ fn subr_arity_value(name: &str) -> Value {
         "mod" | "make-list" | "mapc" | "mapcan" | "mapcar" | "nth" | "nthcdr" | "remq" => {
             arity_cons(2, Some(2))
         }
+        "delete" | "delq" | "elt" => arity_cons(2, Some(2)),
         "mapconcat" => arity_cons(2, Some(3)),
         "assoc" => arity_cons(2, Some(3)),
         "assoc-default" => arity_cons(2, Some(4)),
         "alist-get" => arity_cons(2, Some(5)),
+        "last" | "butlast" => arity_cons(1, Some(2)),
+        "nconc" => arity_cons(0, None),
+        "number-sequence" => arity_cons(1, Some(3)),
         "nreverse" | "proper-list-p" | "reverse" | "safe-length" => arity_cons(1, Some(1)),
         "back-to-indentation" | "backward-prefix-chars" => arity_cons(0, Some(0)),
         "backward-sexp" => arity_cons(0, Some(2)),
@@ -535,9 +545,11 @@ fn subr_arity_value(name: &str) -> Value {
         "string-match" => arity_cons(2, Some(4)),
         "string-as-multibyte"
         | "string-as-unibyte"
+        | "string-bytes"
         | "string-make-multibyte"
         | "string-make-unibyte"
         | "string-to-multibyte"
+        | "string-to-list"
         | "string-to-syntax"
         | "string-to-unibyte"
         | "substitute-in-file-name"
@@ -545,10 +557,17 @@ fn subr_arity_value(name: &str) -> Value {
         | "syntax-class-to-char"
         | "syntax-table-p" => arity_cons(1, Some(1)),
         "string-collate-equalp" | "string-collate-lessp" => arity_cons(2, Some(4)),
+        "make-string" => arity_cons(2, Some(3)),
+        "string-join" => arity_cons(1, Some(2)),
         "string-lines" => arity_cons(1, Some(3)),
         "string-replace" => arity_cons(3, Some(3)),
+        "split-string" => arity_cons(1, Some(4)),
         "string-search" => arity_cons(2, Some(3)),
+        "string-prefix-p" | "string-suffix-p" => arity_cons(2, Some(3)),
+        "string-trim" => arity_cons(1, Some(3)),
+        "string-trim-left" | "string-trim-right" => arity_cons(1, Some(2)),
         "string-version-lessp" => arity_cons(2, Some(2)),
+        "string-width" => arity_cons(1, Some(3)),
         "sort" | "syntax-ppss-flush-cache" => arity_cons(1, None),
         "subst-char-in-string" => arity_cons(3, Some(4)),
         "self-insert-command"
@@ -805,6 +824,7 @@ fn subr_arity_value(name: &str) -> Value {
         "if" => Value::cons(Value::Int(2), Value::symbol("unevalled")),
         "defining-kbd-macro" => arity_cons(1, Some(2)),
         "start-kbd-macro" => arity_cons(1, Some(2)),
+        "name-last-kbd-macro" | "kmacro-name-last-macro" => arity_cons(1, Some(1)),
         "end-kbd-macro" | "call-last-kbd-macro" => arity_cons(0, Some(2)),
         "execute-kbd-macro" | "execute-extended-command" => arity_cons(1, Some(3)),
         "describe-key-briefly" => arity_cons(0, Some(3)),

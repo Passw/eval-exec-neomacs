@@ -28,6 +28,28 @@ Last updated: 2026-02-19
 
 ## Doing
 
+- Expanded builtin registry coverage and arity parity for dispatch-backed core builtins:
+  - runtime/registry changes:
+    - `rust/neovm-core/src/elisp/builtin_registry.rs`
+      - added missing dispatch names now covered in `DISPATCH_BUILTIN_NAMES`:
+        - `acos`, `asin`, `atan`, `butlast`, `cos`, `delete`, `delq`, `elt`, `exp`, `expt`, `isnan`, `last`, `log`, `make-string`, `nconc`, `number-sequence`, `random`, `sin`, `split-string`, `sqrt`, `string-bytes`, `string-prefix-p`, `string-suffix-p`, `string-trim`, `string-trim-left`, `string-trim-right`, `string-width`, `tan`
+    - `rust/neovm-core/src/elisp/subr_info.rs`
+      - added oracle-aligned arity metadata for newly surfaced dispatch names.
+      - aligned startup wrapper payload arity for `name-last-kbd-macro` / `kmacro-name-last-macro`.
+  - vm-compat policy/docs changes:
+    - `test/neovm/vm-compat/cases/builtin-registry-sync-allowlist.txt`
+      - reduced intentional sync exclusions to startup-policy exceptions:
+        - `kmacro-name-last-macro`
+        - `string-join`
+        - `string-to-list`
+        - `word-at-point`
+    - `test/neovm/vm-compat/README.md`
+      - documented current intentional sync exclusions and rationale.
+  - verified:
+    - `make -C test/neovm/vm-compat check-builtin-registry-sync` (pass)
+    - `make -C test/neovm/vm-compat check-builtin-registry-all` (pass)
+    - `make -C test/neovm/vm-compat check-all-neovm-strict` (pass)
+
 - Fixed builtin registry drift against actual `dispatch_builtin` coverage and added a hard sync gate:
   - runtime/registry changes:
     - `rust/neovm-core/src/elisp/builtin_registry.rs`
