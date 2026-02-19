@@ -91,6 +91,24 @@ Last updated: 2026-02-19
     - `make -C test/neovm/vm-compat check-one-neovm CASE=cases/help-key-recent-keys-semantics` (pass, `50/50`)
     - `make -C test/neovm/vm-compat check-all-neovm-strict` (pass)
 
+- Expanded batch `read-coding-system*` input queue-edge lock-ins:
+  - corpus changes:
+    - added and wired:
+      - `test/neovm/vm-compat/cases/read-coding-system-input-queue-semantics.{forms,expected.tsv}`
+      - `test/neovm/vm-compat/cases/default.list`
+    - new oracle probes cover `read-coding-system` / `read-non-nil-coding-system` with:
+      - list, symbol-head, mouse-event, vector-head, dotted-pair, and vector queue payloads
+      - invariant expectations in batch mode:
+        - signal symbol stays `end-of-file`
+        - `unread-command-events` payload remains unchanged
+        - `recent-keys` receives no published events
+  - verified:
+    - `make -C test/neovm/vm-compat record FORMS=cases/read-coding-system-input-queue-semantics.forms EXPECTED=cases/read-coding-system-input-queue-semantics.expected.tsv` (pass)
+    - `make -C test/neovm/vm-compat check-one-neovm CASE=cases/read-coding-system-input-queue-semantics` (pass, `13/13`)
+    - `make -C test/neovm/vm-compat check-one-neovm CASE=cases/read-coding-system-semantics` (pass, `16/16`)
+    - `make -C test/neovm/vm-compat check-one-neovm CASE=cases/input-batch-readers` (pass, `98/98`)
+    - `make -C test/neovm/vm-compat check-all-neovm-strict` (pass)
+
 - Aligned `read-char` / `read-char-exclusive` command-key publication with oracle:
   - runtime changes:
     - `rust/neovm-core/src/elisp/reader.rs`

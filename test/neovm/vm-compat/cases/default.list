@@ -365,6 +365,7 @@ cases/libxml-parse-xml-region-semantics
 cases/libxml-parse-html-region-semantics
 cases/xml-zlib-availability-semantics
 cases/read-coding-system-semantics
+cases/read-coding-system-input-queue-semantics
 cases/timer-semantics
 cases/timer-unit-delay-semantics
 cases/timer-float-int-edge-semantics
