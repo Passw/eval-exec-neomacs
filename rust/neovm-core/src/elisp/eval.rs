@@ -164,6 +164,9 @@ impl Evaluator {
         obarray.set_symbol_value("kill-ring", Value::Nil);
         obarray.set_symbol_value("kill-ring-yank-pointer", Value::Nil);
         obarray.set_symbol_value("last-command", Value::Nil);
+        obarray.set_symbol_value("last-command-event", Value::Nil);
+        obarray.set_symbol_value("last-input-event", Value::Nil);
+        obarray.set_symbol_value("last-nonmenu-event", Value::Nil);
         obarray.set_symbol_value("unread-command-events", Value::Nil);
         // GNU Emacs seeds core startup vars with integer
         // `variable-documentation` offsets in the DOC table.
@@ -545,10 +548,15 @@ impl Evaluator {
     }
 
     pub(crate) fn record_input_event(&mut self, event: Value) {
+        self.assign("last-input-event", event.clone());
         self.recent_input_events.push(event);
         if self.recent_input_events.len() > RECENT_INPUT_EVENT_LIMIT {
             self.recent_input_events.remove(0);
         }
+    }
+
+    pub(crate) fn record_nonmenu_input_event(&mut self, event: Value) {
+        self.assign("last-nonmenu-event", event);
     }
 
     pub(crate) fn recent_input_events(&self) -> &[Value] {

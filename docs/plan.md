@@ -49,9 +49,31 @@ Last updated: 2026-02-19
     - added oracle lock-in covering:
       - `read-string`, `read-number`, `read-from-minibuffer`, `completing-read`, `read-command`, `read-variable`, `read-buffer`, `read-file-name`
       - each reader (with queued unread events in batch) leaves `recent-keys` unchanged while signaling `end-of-file`
+      - seeded prior key-state variants now lock in no-publication behavior for both mouse-seeded and char-seeded histories
   - verified:
     - `make -C test/neovm/vm-compat record FORMS=cases/help-key-recent-keys-semantics.forms EXPECTED=cases/help-key-recent-keys-semantics.expected.tsv` (pass)
-    - `make -C test/neovm/vm-compat check-one-neovm CASE=cases/help-key-recent-keys-semantics` (pass, `46/46`)
+    - `make -C test/neovm/vm-compat check-one-neovm CASE=cases/help-key-recent-keys-semantics` (pass, `50/50`)
+    - `make -C test/neovm/vm-compat check-all-neovm-strict` (pass)
+
+- Implemented `last-input-event` / `last-nonmenu-event` reader publication parity and added oracle lock-ins:
+  - runtime changes:
+    - `rust/neovm-core/src/elisp/eval.rs`
+      - startup now seeds `last-command-event`, `last-input-event`, and `last-nonmenu-event` as bound `nil` variables.
+      - input-event recording now publishes `last-input-event` as queued events are consumed.
+      - added helper publication path for `last-nonmenu-event`.
+    - `rust/neovm-core/src/elisp/reader.rs`
+      - `read-key`, `read-key-sequence`, and `read-key-sequence-vector` now publish `last-nonmenu-event` to match GNU Emacs batch reader behavior.
+  - corpus changes:
+    - added and wired:
+      - `test/neovm/vm-compat/cases/input-last-event-reader-semantics.{forms,expected.tsv}`
+      - `test/neovm/vm-compat/cases/default.list`
+    - new lock-ins cover:
+      - boundness/startup-nil shape for `last-command-event`, `last-input-event`, `last-nonmenu-event`
+      - per-reader publication behavior across `read-key*`, `read-event`, `read-char`, `read-char-exclusive`
+      - prompt-reader EOF paths preserving prior `last-input-event` / `last-nonmenu-event` state and queued unread tails
+  - verified:
+    - `make -C test/neovm/vm-compat record FORMS=cases/input-last-event-reader-semantics.forms EXPECTED=cases/input-last-event-reader-semantics.expected.tsv` (pass)
+    - `make -C test/neovm/vm-compat check-one-neovm CASE=cases/input-last-event-reader-semantics` (pass, `13/13`)
     - `make -C test/neovm/vm-compat check-all-neovm-strict` (pass)
 
 - Expanded batch prompt/input queue-edge lock-ins for stale/invalid unread tails:

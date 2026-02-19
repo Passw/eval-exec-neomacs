@@ -1107,6 +1107,7 @@ pub(crate) fn builtin_read_key(eval: &mut super::eval::Evaluator, args: Vec<Valu
     }
     expect_optional_prompt_string(&args)?;
     if let Some(event) = eval.pop_unread_command_event() {
+        eval.record_nonmenu_input_event(event.clone());
         eval.set_read_command_keys(vec![event.clone()]);
         if let Some(n) = event_to_int(&event) {
             return Ok(Value::Int(n));
@@ -1132,6 +1133,7 @@ pub(crate) fn builtin_read_key_sequence(
     expect_max_args("read-key-sequence", &args, 6)?;
     expect_optional_prompt_string(&args)?;
     if let Some(event) = eval.pop_unread_command_event() {
+        eval.record_nonmenu_input_event(event.clone());
         eval.set_read_command_keys(vec![event.clone()]);
         if let Some(c) = event_to_char(&event) {
             return Ok(Value::string(c.to_string()));
@@ -1154,6 +1156,7 @@ pub(crate) fn builtin_read_key_sequence_vector(
     expect_max_args("read-key-sequence-vector", &args, 6)?;
     expect_optional_prompt_string(&args)?;
     if let Some(event) = eval.pop_unread_command_event() {
+        eval.record_nonmenu_input_event(event.clone());
         eval.set_read_command_keys(vec![event.clone()]);
         if let Some(n) = event_to_int(&event) {
             return Ok(Value::vector(vec![Value::Int(n)]));
