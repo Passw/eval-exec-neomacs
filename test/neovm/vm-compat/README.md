@@ -25,6 +25,7 @@ results against that baseline once evaluator execution is wired in.
 - `cases/introspection.list`: focused callable/special-form introspection corpus order
 - `cases/thread.list`: focused thread primitive corpus order
 - `cases/startup-doc.list`: focused startup documentation parity corpus order
+- `cases/tracked-lists.txt`: source-of-truth list-of-lists used by inventory/progress validation
 - `cases/builtin-registry-fboundp-allowlist.txt`: intentional `fboundp` drift allowlist for registry parity checks
 - `cases/core.forms`: starter corpus for expression and error behavior
 - `cases/input-batch-readers.forms`: batch-mode input reader compatibility corpus
@@ -76,6 +77,9 @@ make validate-case-lists
 make check-all
 make check-all-neovm
 ```
+
+When adding a new case list file, register it in `cases/tracked-lists.txt` so
+`validate-case-lists`, `case-inventory`, and `compat-progress` all include it.
 
 List default case order without running:
 

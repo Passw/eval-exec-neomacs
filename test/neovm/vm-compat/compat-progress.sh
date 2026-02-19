@@ -11,6 +11,7 @@ fboundp_check_script="$script_dir/check-builtin-registry-fboundp.sh"
 startup_stub_coverage_script="$script_dir/check-startup-doc-stub-coverage.sh"
 startup_string_coverage_script="$script_dir/check-startup-doc-string-coverage.sh"
 startup_variable_doc_count_script="$script_dir/check-startup-variable-documentation-counts.sh"
+tracked_lists_file="$script_dir/cases/tracked-lists.txt"
 source "$script_dir/lib/builtin-registry.sh"
 compat_stub_index_script="$script_dir/compat-stub-index.sh"
 
@@ -73,15 +74,53 @@ count_lines() {
   awk 'NF && $1 !~ /^#/ { count++ } END { print count+0 }' "$file"
 }
 
+list_label() {
+  local list_file="$1"
+  local label
+  label="$(basename "$list_file" .list)"
+  if [[ "$label" == "legacy-elc-literal" ]]; then
+    echo "legacy-elc"
+    return
+  fi
+  echo "$label"
+}
+
+read_list_files() {
+  local default_list_files=(
+    "$script_dir/cases/default.list"
+    "$script_dir/cases/neovm-only.list"
+    "$script_dir/cases/legacy-elc-literal.list"
+    "$script_dir/cases/introspection.list"
+    "$script_dir/cases/thread.list"
+    "$script_dir/cases/startup-doc.list"
+  )
+  local collected=()
+  if [[ -f "$tracked_lists_file" ]]; then
+    while IFS= read -r rel_path; do
+      rel_path="${rel_path%$'\r'}"
+      [[ -n "$rel_path" ]] || continue
+      [[ "$rel_path" =~ ^[[:space:]]*# ]] && continue
+      if [[ "$rel_path" = /* ]]; then
+        collected+=("$rel_path")
+      else
+        collected+=("$script_dir/$rel_path")
+      fi
+    done < "$tracked_lists_file"
+  fi
+  if [[ ${#collected[@]} -eq 0 ]]; then
+    collected=("${default_list_files[@]}")
+  fi
+  printf '%s\n' "${collected[@]}"
+}
+
+mapfile -t list_files < <(read_list_files)
+
 collect_dispatch_builtin_names "$registry_file" "$tmp_all"
 collect_core_dispatch_builtin_names "$tmp_all" "$tmp_core"
 {
-  awk 'NF && $1 !~ /^#/ { print $1 }' "$script_dir/cases/default.list"
-  awk 'NF && $1 !~ /^#/ { print $1 }' "$script_dir/cases/neovm-only.list"
-  awk 'NF && $1 !~ /^#/ { print $1 }' "$script_dir/cases/legacy-elc-literal.list"
-  awk 'NF && $1 !~ /^#/ { print $1 }' "$script_dir/cases/introspection.list"
-  awk 'NF && $1 !~ /^#/ { print $1 }' "$script_dir/cases/thread.list"
-  awk 'NF && $1 !~ /^#/ { print $1 }' "$script_dir/cases/startup-doc.list"
+  for list_file in "${list_files[@]}"; do
+    awk 'NF && $1 !~ /^#/ { print $1 }' "$list_file"
+  done
 } > "$tmp_tracker"
 
 while IFS= read -r case_path; do
@@ -113,12 +152,9 @@ fboundp_stale="$(awk '/stale allowlist entries with no current drift:/ { stale=1
 
 printf 'compat progress snapshot\n'
 printf 'case lists (entries):\n'
-printf '  default: %s\n' "$(count_lines "$script_dir/cases/default.list")"
-printf '  neovm-only: %s\n' "$(count_lines "$script_dir/cases/neovm-only.list")"
-printf '  legacy-elc: %s\n' "$(count_lines "$script_dir/cases/legacy-elc-literal.list")"
-printf '  introspection: %s\n' "$(count_lines "$script_dir/cases/introspection.list")"
-printf '  thread: %s\n' "$(count_lines "$script_dir/cases/thread.list")"
-printf '  startup-doc: %s\n' "$(count_lines "$script_dir/cases/startup-doc.list")"
+for list_file in "${list_files[@]}"; do
+  printf '  %s: %s\n' "$(list_label "$list_file")" "$(count_lines "$list_file")"
+done
 printf '  total unique tracked: %s\n' "$tracked_unique"
 forms_count=0
 while IFS= read -r path; do

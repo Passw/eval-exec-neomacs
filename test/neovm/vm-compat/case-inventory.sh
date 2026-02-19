@@ -2,14 +2,34 @@
 set -euo pipefail
 
 script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+tracked_lists_file="$script_dir/cases/tracked-lists.txt"
 
-list_files=(
+default_list_files=(
   "$script_dir/cases/default.list"
   "$script_dir/cases/neovm-only.list"
   "$script_dir/cases/legacy-elc-literal.list"
   "$script_dir/cases/introspection.list"
   "$script_dir/cases/thread.list"
+  "$script_dir/cases/startup-doc.list"
 )
+list_files=()
+
+if [[ -f "$tracked_lists_file" ]]; then
+  while IFS= read -r rel_path; do
+    rel_path="${rel_path%$'\r'}"
+    [[ -n "$rel_path" ]] || continue
+    [[ "$rel_path" =~ ^[[:space:]]*# ]] && continue
+    if [[ "$rel_path" = /* ]]; then
+      list_files+=("$rel_path")
+    else
+      list_files+=("$script_dir/$rel_path")
+    fi
+  done < "$tracked_lists_file"
+fi
+
+if [[ ${#list_files[@]} -eq 0 ]]; then
+  list_files=("${default_list_files[@]}")
+fi
 
 tmp_list="$(mktemp)"
 tmp_forms="$(mktemp)"

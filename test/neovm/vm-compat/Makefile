@@ -3,6 +3,7 @@ EXPECTED ?= cases/core.expected.tsv
 NEOVM_OUT ?= cases/core.neovm.tsv
 
 read_case_list = $(strip $(shell awk 'NF && $$1 !~ /^#/' $(1) | tr '\n' ' '))
+read_list_file_paths = $(strip $(shell awk 'NF && $$1 !~ /^#/' $(1) 2>/dev/null | tr '\n' ' '))
 dedupe_case_list = $(strip $(shell printf '%s\n' $(1) | awk 'NF && !seen[$$0]++'))
 
 CASES_LIST ?= cases/default.list
@@ -19,7 +20,9 @@ THREAD_CASES_LIST ?= cases/thread.list
 THREAD_CASES ?= $(call read_case_list,$(THREAD_CASES_LIST))
 STARTUP_DOC_CASES_LIST ?= cases/startup-doc.list
 STARTUP_DOC_CASES ?= $(call read_case_list,$(STARTUP_DOC_CASES_LIST))
-CASE_LIST_FILES ?= $(CASES_LIST) $(NEOVM_ONLY_CASES_LIST) $(LEGACY_ELC_CASES_LIST) $(INTROSPECTION_CASES_LIST) $(THREAD_CASES_LIST) $(STARTUP_DOC_CASES_LIST)
+TRACKED_LISTS_FILE ?= cases/tracked-lists.txt
+TRACKED_LIST_FILES ?= $(call read_list_file_paths,$(TRACKED_LISTS_FILE))
+CASE_LIST_FILES ?= $(if $(TRACKED_LIST_FILES),$(TRACKED_LIST_FILES),$(CASES_LIST) $(NEOVM_ONLY_CASES_LIST) $(LEGACY_ELC_CASES_LIST) $(INTROSPECTION_CASES_LIST) $(THREAD_CASES_LIST) $(STARTUP_DOC_CASES_LIST))
 BENCH_SOURCE ?= cases/load-policy-fixtures/vm-policy-cache-probe.el
 BENCH_ITERS ?= 100
 ERT_ALLOWLIST ?= cases/ert-allowlist-smoke.txt

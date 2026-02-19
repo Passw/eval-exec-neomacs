@@ -28,6 +28,34 @@ Last updated: 2026-02-18
 
 ## Doing
 
+- Unified vm-compat list-of-lists tracking to prevent drift between Makefile, inventory, and progress scripts:
+  - source-of-truth list tracking:
+    - added `test/neovm/vm-compat/cases/tracked-lists.txt`
+    - includes:
+      - `cases/default.list`
+      - `cases/neovm-only.list`
+      - `cases/legacy-elc-literal.list`
+      - `cases/introspection.list`
+      - `cases/thread.list`
+      - `cases/startup-doc.list`
+  - wiring changes:
+    - `test/neovm/vm-compat/Makefile`
+    - added `TRACKED_LISTS_FILE` and `TRACKED_LIST_FILES` variables.
+    - `CASE_LIST_FILES` now reads from `cases/tracked-lists.txt` with fallback to legacy list variables if needed.
+    - `test/neovm/vm-compat/case-inventory.sh`
+    - now reads tracked list files from `cases/tracked-lists.txt` (with fallback defaults) instead of hardcoded list paths.
+    - `test/neovm/vm-compat/compat-progress.sh`
+    - now reads tracked list files from `cases/tracked-lists.txt` (with fallback defaults).
+    - list-count lines are generated from the loaded list files, keeping snapshot output aligned with tracked list inventory.
+  - docs:
+    - `test/neovm/vm-compat/README.md`
+    - documented `cases/tracked-lists.txt` as list-of-lists source of truth and noted that new list files must be registered there.
+  - verified:
+    - `make -C test/neovm/vm-compat validate-case-lists` (pass)
+    - `make -C test/neovm/vm-compat case-inventory` (pass)
+    - `make -C test/neovm/vm-compat compat-progress` (pass)
+    - `make -C test/neovm/vm-compat check-startup-doc-neovm` (pass)
+
 - Corrected `compat-progress` tracked artifact accounting to dedupe overlapping list entries:
   - tooling changes:
     - `test/neovm/vm-compat/compat-progress.sh`
