@@ -1,0 +1,16 @@
+; read-event publishes into this-command-keys* when empty and preserves
+; existing key context on later reads.
+
+(this-command-keys-vector)
+
+(let ((unread-command-events (list 97)))
+  (read-event nil nil 0))
+(this-command-keys-vector)
+
+(let ((unread-command-events (list '(mouse-1))))
+  (read-event nil nil 0))
+(this-command-keys-vector)
+
+(let ((unread-command-events nil))
+  (read-event nil nil 0))
+(this-command-keys-vector)

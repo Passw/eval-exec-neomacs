@@ -208,9 +208,10 @@ pub(crate) fn builtin_read_event(
     expect_optional_prompt_string(&args)?;
     if let Some(event) = eval.pop_unread_command_event() {
         // Oracle compatibility: `read-event` seeds this-command-keys* only when
-        // no prior key context is present; otherwise existing key context
-        // remains authoritative.
-        if eval.read_command_keys().is_empty() {
+        // no prior key context is present, and only when SECONDS is omitted or
+        // nil. Existing key context remains authoritative.
+        let seconds_is_nil_or_omitted = args.get(2).is_none_or(Value::is_nil);
+        if eval.read_command_keys().is_empty() && seconds_is_nil_or_omitted {
             eval.set_read_command_keys(vec![event.clone()]);
         }
         if let Some(n) = event_to_int(&event) {
@@ -725,6 +726,24 @@ mod tests {
         );
         let result = builtin_read_event(&mut ev, vec![]).unwrap();
         assert!(matches!(result, Value::Cons(_)));
+        assert_eq!(ev.read_command_keys(), &[Value::Int(97)]);
+    }
+
+    #[test]
+    fn read_event_with_seconds_does_not_set_command_keys_when_empty() {
+        let mut ev = Evaluator::new();
+        ev.obarray
+            .set_symbol_value("unread-command-events", Value::list(vec![Value::Int(97)]));
+        let _ = builtin_read_event(&mut ev, vec![Value::Nil, Value::Nil, Value::Int(0)]).unwrap();
+        assert_eq!(ev.read_command_keys(), &[]);
+    }
+
+    #[test]
+    fn read_event_with_nil_seconds_sets_command_keys_when_empty() {
+        let mut ev = Evaluator::new();
+        ev.obarray
+            .set_symbol_value("unread-command-events", Value::list(vec![Value::Int(97)]));
+        let _ = builtin_read_event(&mut ev, vec![Value::Nil, Value::Nil, Value::Nil]).unwrap();
         assert_eq!(ev.read_command_keys(), &[Value::Int(97)]);
     }
 

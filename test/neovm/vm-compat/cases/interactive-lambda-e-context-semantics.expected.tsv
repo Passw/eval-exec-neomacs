@@ -1,7 +1,7 @@
-1	(let ((unread-command-events (list '(mouse-1)))) (list (read-event) (call-interactively (lambda (x) (interactive "e") x)) unread-command-events))	OK ((mouse-1) (mouse-1) nil)
-2	(let ((unread-command-events (list '(mouse-1)))) (list (read-event) (command-execute (lambda (x) (interactive "e") x)) unread-command-events))	OK ((mouse-1) (mouse-1) nil)
-3	(let ((unread-command-events (list 97 '(mouse-1)))) (list (read-event) (call-interactively (lambda (x) (interactive "e") x)) unread-command-events))	OK (97 (mouse-1) ((mouse-1)))
-4	(let ((unread-command-events (list 97 '(mouse-1)))) (list (read-event) (command-execute (lambda (x) (interactive "e") x)) unread-command-events))	OK (97 (mouse-1) ((mouse-1)))
+1	(let ((unread-command-events (list '(mouse-1)))) (list (read-event) (this-command-keys-vector) (call-interactively (lambda (x) (interactive "e") x)) (this-command-keys-vector) unread-command-events))	OK ((mouse-1) [(mouse-1)] (mouse-1) [(mouse-1)] nil)
+2	(let ((unread-command-events (list '(mouse-1)))) (list (read-event) (this-command-keys-vector) (command-execute (lambda (x) (interactive "e") x)) (this-command-keys-vector) unread-command-events))	OK ((mouse-1) [(mouse-1)] (mouse-1) [(mouse-1)] nil)
+3	(let ((unread-command-events (list 97 '(mouse-1)))) (list (read-event) (this-command-keys-vector) (call-interactively (lambda (x) (interactive "e") x)) (this-command-keys-vector) unread-command-events))	OK (97 [(mouse-1)] (mouse-1) [(mouse-1)] ((mouse-1)))
+4	(let ((unread-command-events (list 97 '(mouse-1)))) (list (read-event) (this-command-keys-vector) (command-execute (lambda (x) (interactive "e") x)) (this-command-keys-vector) unread-command-events))	OK (97 [(mouse-1)] (mouse-1) [(mouse-1)] ((mouse-1)))
 5	(let ((last-input-event 'mouse-1) (unread-command-events nil)) (call-interactively (lambda (x) (interactive "e") x)))	OK (mouse-1)
 6	(let ((unread-command-events (list 97))) (read-key-sequence ""))	OK "a"
 7	(this-command-keys-vector)	OK [97]

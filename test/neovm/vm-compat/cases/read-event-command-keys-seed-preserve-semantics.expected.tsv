@@ -1,0 +1,7 @@
+1	(this-command-keys-vector)	OK []
+2	(let ((unread-command-events (list 97))) (read-event nil nil 0))	OK 97
+3	(this-command-keys-vector)	OK []
+4	(let ((unread-command-events (list '(mouse-1)))) (read-event nil nil 0))	OK (mouse-1)
+5	(this-command-keys-vector)	OK []
+6	(let ((unread-command-events nil)) (read-event nil nil 0))	OK nil
+7	(this-command-keys-vector)	OK []
