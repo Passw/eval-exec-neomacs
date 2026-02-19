@@ -17,6 +17,7 @@ results against that baseline once evaluator execution is wired in.
 - `check-builtin-registry-sync.sh`: checks `builtin_registry.rs` exactly matches names dispatched by `builtins.rs`
 - `check-builtin-registry-fboundp.sh`: checks `fboundp` parity for all names in `builtin_registry.rs`
 - `check-builtin-registry-func-arity.sh`: checks `func-arity` parity for all core names in `builtin_registry.rs`
+- `check-builtin-registry-autoload-metadata.sh`: checks startup autoload metadata tuple parity (`fboundp`, autoload file, autoload interactive slot, autoload type slot) for all core names in `builtin_registry.rs`
 - `check-startup-doc-stub-coverage.sh`: checks startup integer-doc symbol coverage of `STARTUP_VARIABLE_DOC_STUBS`
 - `check-startup-doc-string-coverage.sh`: checks startup string-doc symbol coverage of `STARTUP_VARIABLE_DOC_STRING_PROPERTIES`
 - `check-startup-variable-documentation-counts.sh`: checks startup `variable-documentation` property-count and runtime-resolution count parity (oracle vs NeoVM)
@@ -31,6 +32,7 @@ results against that baseline once evaluator execution is wired in.
 - `cases/tracked-lists.txt`: source-of-truth list-of-lists used by inventory/progress validation
 - `cases/builtin-registry-fboundp-allowlist.txt`: intentional `fboundp` drift allowlist for registry parity checks
 - `cases/builtin-registry-func-arity-allowlist.txt`: intentional `func-arity` drift allowlist for registry parity checks
+- `cases/builtin-registry-autoload-metadata-allowlist.txt`: intentional startup autoload metadata drift allowlist for registry parity checks
 - `cases/builtin-registry-sync-allowlist.txt`: intentional evaluator-dispatch names excluded from core registry startup policy
 - `cases/core.forms`: starter corpus for expression and error behavior
 - `cases/input-batch-readers.forms`: batch-mode input reader compatibility corpus
@@ -239,7 +241,14 @@ cd test/neovm/vm-compat
 make check-builtin-registry-func-arity
 ```
 
-Run the full builtin registry gate bundle (dispatch/registry sync + fboundp/function-cell/func-arity/function-kind/commandp/extension-policy checks):
+Run the builtin registry startup autoload-metadata parity gate (GNU Emacs `-Q` vs NeoVM core builtin names):
+
+```bash
+cd test/neovm/vm-compat
+make check-builtin-registry-autoload-metadata
+```
+
+Run the full builtin registry gate bundle (dispatch/registry sync + fboundp/function-cell/func-arity/autoload-metadata/function-kind/commandp/extension-policy checks):
 
 ```bash
 cd test/neovm/vm-compat

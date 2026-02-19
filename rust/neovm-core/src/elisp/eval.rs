@@ -175,8 +175,7 @@ impl Evaluator {
         let read_extended_command_mode_map =
             keymaps.make_sparse_keymap(Some("read-extended-command-mode-map".to_string()));
         let read_regexp_map = keymaps.make_sparse_keymap(Some("read-regexp-map".to_string()));
-        let read_key_empty_map =
-            keymaps.make_sparse_keymap(Some("read-key-empty-map".to_string()));
+        let read_key_empty_map = keymaps.make_sparse_keymap(Some("read-key-empty-map".to_string()));
         let read_key_full_map = keymaps.make_keymap();
         let keymap_handle = |id: u64| Value::Int(encode_keymap_handle(id));
 
@@ -190,7 +189,10 @@ impl Evaluator {
             Some(minibuffer_local_completion_map),
         );
         keymaps.set_keymap_parent(minibuffer_local_ns_map, Some(minibuffer_local_map));
-        keymaps.set_keymap_parent(minibuffer_local_shell_command_map, Some(minibuffer_local_map));
+        keymaps.set_keymap_parent(
+            minibuffer_local_shell_command_map,
+            Some(minibuffer_local_map),
+        );
         keymaps.set_keymap_parent(minibuffer_local_isearch_map, Some(minibuffer_local_map));
         keymaps.set_keymap_parent(minibuffer_mode_map, Some(minibuffer_local_map));
         keymaps.set_keymap_parent(read_expression_map, Some(minibuffer_local_map));
@@ -198,7 +200,10 @@ impl Evaluator {
         keymaps.set_keymap_parent(read_char_from_minibuffer_map, Some(minibuffer_local_map));
         keymaps.set_keymap_parent(read_extended_command_mode_map, Some(minibuffer_local_map));
         keymaps.set_keymap_parent(read_regexp_map, Some(minibuffer_local_map));
-        keymaps.set_keymap_parent(minibuffer_visible_completions_map, Some(completion_list_mode_map));
+        keymaps.set_keymap_parent(
+            minibuffer_visible_completions_map,
+            Some(completion_list_mode_map),
+        );
 
         let standard_syntax_table = super::syntax::builtin_standard_syntax_table(Vec::new())
             .expect("startup seeding requires standard syntax table");
@@ -208,7 +213,10 @@ impl Evaluator {
         obarray.set_symbol_value("most-negative-fixnum", Value::Int(i64::MIN));
         obarray.set_symbol_value("emacs-version", Value::string("29.1"));
         obarray.set_symbol_value("system-type", Value::symbol("gnu/linux"));
-        obarray.set_symbol_value("default-directory", Value::string(default_directory.clone()));
+        obarray.set_symbol_value(
+            "default-directory",
+            Value::string(default_directory.clone()),
+        );
         obarray.set_symbol_value(
             "command-line-default-directory",
             Value::string(default_directory),
@@ -296,7 +304,9 @@ impl Evaluator {
         obarray.set_symbol_value("completion--capf-safe-funs", Value::Nil);
         obarray.set_symbol_value(
             "completion--embedded-envvar-re",
-            Value::string("\\(?:^\\|[^$]\\(?:\\$\\$\\)*\\)\\$\\([[:alnum:]_]*\\|{\\([^}]*\\)\\)\\'"),
+            Value::string(
+                "\\(?:^\\|[^$]\\(?:\\$\\$\\)*\\)\\$\\([[:alnum:]_]*\\|{\\([^}]*\\)\\)\\'",
+            ),
         );
         obarray.set_symbol_value("completion--flex-score-last-md", Value::Nil);
         obarray.set_symbol_value("completion-all-sorted-completions", Value::Nil);
@@ -409,7 +419,9 @@ impl Evaluator {
                     Value::symbol("basic"),
                     Value::symbol("completion-basic-try-completion"),
                     Value::symbol("completion-basic-all-completions"),
-                    Value::string("Completion of the prefix before point and the suffix after point."),
+                    Value::string(
+                        "Completion of the prefix before point and the suffix after point.",
+                    ),
                 ]),
                 Value::list(vec![
                     Value::symbol("partial-completion"),
@@ -436,7 +448,10 @@ impl Evaluator {
             "completions-header-format",
             Value::string("%s possible completions:\n"),
         );
-        obarray.set_symbol_value("completions-highlight-face", Value::symbol("completions-highlight"));
+        obarray.set_symbol_value(
+            "completions-highlight-face",
+            Value::symbol("completions-highlight"),
+        );
         obarray.set_symbol_value("completions-max-height", Value::Nil);
         obarray.set_symbol_value("completions-sort", Value::symbol("alphabetical"));
         obarray.set_symbol_value("completion-auto-help", Value::True);
@@ -449,7 +464,10 @@ impl Evaluator {
         obarray.set_symbol_value("completion-fail-discreetly", Value::Nil);
         obarray.set_symbol_value("completion-flex-nospace", Value::Nil);
         obarray.set_symbol_value("completion-in-region--data", Value::Nil);
-        obarray.set_symbol_value("completion-in-region-function", Value::symbol("completion--in-region"));
+        obarray.set_symbol_value(
+            "completion-in-region-function",
+            Value::symbol("completion--in-region"),
+        );
         obarray.set_symbol_value("completion-in-region-functions", Value::Nil);
         obarray.set_symbol_value("completion-in-region-mode", Value::Nil);
         obarray.set_symbol_value("completion-in-region-mode--predicate", Value::Nil);
@@ -464,9 +482,15 @@ impl Evaluator {
             Value::symbol("completion--replace"),
         );
         obarray.set_symbol_value("completion-no-auto-exit", Value::Nil);
-        obarray.set_symbol_value("completion-pcm--delim-wild-regex", Value::string("[-_./:| *]"));
+        obarray.set_symbol_value(
+            "completion-pcm--delim-wild-regex",
+            Value::string("[-_./:| *]"),
+        );
         obarray.set_symbol_value("completion-pcm--regexp", Value::Nil);
-        obarray.set_symbol_value("completion-pcm-complete-word-inserts-delimiters", Value::Nil);
+        obarray.set_symbol_value(
+            "completion-pcm-complete-word-inserts-delimiters",
+            Value::Nil,
+        );
         obarray.set_symbol_value("completion-pcm-word-delimiters", Value::string("-_./:| "));
         obarray.set_symbol_value("completion-reference-buffer", Value::Nil);
         obarray.set_symbol_value("completion-tab-width", Value::Nil);
@@ -475,7 +499,10 @@ impl Evaluator {
         obarray.set_symbol_value("history-delete-duplicates", Value::Nil);
         obarray.set_symbol_value("history-add-new-input", Value::True);
         obarray.set_symbol_value("read-buffer-function", Value::Nil);
-        obarray.set_symbol_value("read-file-name-function", Value::symbol("read-file-name-default"));
+        obarray.set_symbol_value(
+            "read-file-name-function",
+            Value::symbol("read-file-name-default"),
+        );
         obarray.set_symbol_value("read-expression-history", Value::Nil);
         obarray.set_symbol_value("read-number-history", Value::Nil);
         obarray.set_symbol_value("read-char-history", Value::Nil);
@@ -548,10 +575,7 @@ impl Evaluator {
         );
         obarray.set_symbol_value("minibuffer-mode-hook", Value::Nil);
         obarray.set_symbol_value("minibuffer-mode-map", keymap_handle(minibuffer_mode_map));
-        obarray.set_symbol_value(
-            "minibuffer-local-map",
-            keymap_handle(minibuffer_local_map),
-        );
+        obarray.set_symbol_value("minibuffer-local-map", keymap_handle(minibuffer_local_map));
         obarray.set_symbol_value(
             "minibuffer-local-completion-map",
             keymap_handle(minibuffer_local_completion_map),
@@ -581,7 +605,10 @@ impl Evaluator {
             keymap_handle(minibuffer_local_shell_command_map),
         );
         obarray.set_symbol_value("minibuffer-history", Value::Nil);
-        obarray.set_symbol_value("minibuffer-history-variable", Value::symbol("minibuffer-history"));
+        obarray.set_symbol_value(
+            "minibuffer-history-variable",
+            Value::symbol("minibuffer-history"),
+        );
         obarray.set_symbol_value("minibuffer-history-position", Value::Nil);
         obarray.set_symbol_value("minibuffer-history-isearch-message-overlay", Value::Nil);
         obarray.set_symbol_value("minibuffer-history-search-history", Value::Nil);
@@ -596,7 +623,9 @@ impl Evaluator {
         obarray.set_symbol_value("minibuffer--regexp-primed", Value::Nil);
         obarray.set_symbol_value(
             "minibuffer--regexp-prompt-regexp",
-            Value::string("\\(?:Posix search\\|RE search\\|Search for regexp\\|Query replace regexp\\)"),
+            Value::string(
+                "\\(?:Posix search\\|RE search\\|Search for regexp\\|Query replace regexp\\)",
+            ),
         );
         obarray.set_symbol_value("minibuffer--require-match", Value::Nil);
         obarray.set_symbol_value("minibuffer-auto-raise", Value::Nil);
@@ -652,7 +681,10 @@ impl Evaluator {
             keymap_handle(minibuffer_visible_completions_map),
         );
         obarray.set_symbol_value("minibuffer-depth-indicate-mode", Value::Nil);
-        obarray.set_symbol_value("minibuffer-default-prompt-format", Value::string(" (default %s)"));
+        obarray.set_symbol_value(
+            "minibuffer-default-prompt-format",
+            Value::string(" (default %s)"),
+        );
         obarray.set_symbol_value("minibuffer-beginning-of-buffer-movement", Value::Nil);
         obarray.set_symbol_value("minibuffer-electric-default-mode", Value::Nil);
         obarray.set_symbol_value("minibuffer-temporary-goal-position", Value::Nil);
@@ -974,10 +1006,86 @@ impl Evaluator {
             "rect",
             "Insert the last killed rectangle with its upper left corner at point.",
         );
+        drop(seed_autoload);
+        let mut seed_autoload_noninteractive = |name: &str, file: &str, doc: &str| {
+            obarray.set_symbol_function(
+                name,
+                Value::list(vec![
+                    Value::symbol("autoload"),
+                    Value::string(file),
+                    Value::string(doc),
+                    Value::Nil,
+                    Value::Nil,
+                ]),
+            );
+        };
+        // Some helper autoloads are non-interactive in GNU Emacs startup
+        // function-cells; override their startup metadata accordingly.
+        seed_autoload_noninteractive(
+            "bounds-of-thing-at-point",
+            "thingatpt",
+            "Determine the start and end buffer locations for the THING at point.",
+        );
+        seed_autoload_noninteractive("thing-at-point", "thingatpt", "Return the THING at point.");
+        seed_autoload_noninteractive(
+            "symbol-at-point",
+            "thingatpt",
+            "Return the symbol at point, or nil if none is found.",
+        );
+        seed_autoload_noninteractive(
+            "format-seconds",
+            "time-date",
+            "Use format control STRING to format the number SECONDS.",
+        );
+        seed_autoload_noninteractive(
+            "format-spec",
+            "format-spec",
+            "Return a string based on FORMAT and SPECIFICATION.",
+        );
+        seed_autoload_noninteractive(
+            "read-passwd",
+            "auth-source",
+            "Read a password, prompting with PROMPT, and return password as a string.",
+        );
+        seed_autoload_noninteractive(
+            "safe-date-to-time",
+            "time-date",
+            "Parse a string DATE that represents a date-time and return a time value.",
+        );
+        seed_autoload_noninteractive(
+            "delete-extract-rectangle",
+            "rect",
+            "Delete the rectangle with corners START and END and return it as a list of strings.",
+        );
+        seed_autoload_noninteractive(
+            "extract-rectangle",
+            "rect",
+            "Return rectangle corners START and END as a list of strings.",
+        );
+        seed_autoload_noninteractive(
+            "insert-rectangle",
+            "rect",
+            "Insert lines of RECTANGLE with upper left corner at point.",
+        );
+        seed_autoload_noninteractive(
+            "string-clean-whitespace",
+            "subr-x",
+            "Clean up whitespace in STRING.",
+        );
+        seed_autoload_noninteractive(
+            "string-glyph-split",
+            "subr-x",
+            "Split STRING into a list of strings representing separate glyphs.",
+        );
+        seed_autoload_noninteractive(
+            "string-pixel-width",
+            "subr-x",
+            "Return the width in pixels of STRING.",
+        );
         // Keep these as non-interactive autoload wrappers to match GNU Emacs
         // `symbol-function` shape while preserving runtime callability through
         // builtin dispatch.
-        drop(seed_autoload);
+        drop(seed_autoload_noninteractive);
         obarray.set_symbol_function(
             "string-chop-newline",
             Value::list(vec![
@@ -1003,7 +1111,9 @@ impl Evaluator {
             Value::list(vec![
                 Value::symbol("autoload"),
                 Value::string("subr-x"),
-                Value::string("Try to word-wrap STRING so that it displays with lines no wider than WIDTH."),
+                Value::string(
+                    "Try to word-wrap STRING so that it displays with lines no wider than WIDTH.",
+                ),
                 Value::Nil,
                 Value::Nil,
             ]),
@@ -1013,7 +1123,9 @@ impl Evaluator {
             Value::list(vec![
                 Value::symbol("autoload"),
                 Value::string("subr-x"),
-                Value::string("Return a substring of STRING that is (up to) LENGTH characters long."),
+                Value::string(
+                    "Return a substring of STRING that is (up to) LENGTH characters long.",
+                ),
                 Value::Nil,
                 Value::Nil,
             ]),

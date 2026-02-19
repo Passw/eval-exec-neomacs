@@ -17767,6 +17767,38 @@ Last updated: 2026-02-19
     - `make -C test/neovm/vm-compat check-builtin-registry-all` (pass)
     - `make -C test/neovm/vm-compat check-all-neovm-strict` (pass; inventory `778`)
 
+- Added startup autoload-metadata parity lock-in and strict gate coverage:
+  - runtime changes:
+    - `rust/neovm-core/src/elisp/eval.rs`
+      - aligned startup `symbol-function` autoload metadata for selected helper wrappers by seeding non-interactive autoload forms (`nth 3 fn => nil`) for:
+        - `bounds-of-thing-at-point`
+        - `thing-at-point`
+        - `symbol-at-point`
+        - `format-seconds`
+        - `format-spec`
+        - `read-passwd`
+        - `safe-date-to-time`
+        - `delete-extract-rectangle`
+        - `extract-rectangle`
+        - `insert-rectangle`
+        - `string-clean-whitespace`
+        - `string-glyph-split`
+        - `string-pixel-width`
+  - vm-compat changes:
+    - added and wired:
+      - `test/neovm/vm-compat/cases/autoload-startup-metadata-noninteractive-semantics.forms`
+      - `test/neovm/vm-compat/cases/autoload-startup-metadata-noninteractive-semantics.expected.tsv`
+      - `test/neovm/vm-compat/cases/default.list`
+      - `test/neovm/vm-compat/check-builtin-registry-autoload-metadata.sh`
+      - `test/neovm/vm-compat/cases/builtin-registry-autoload-metadata-allowlist.txt`
+      - `test/neovm/vm-compat/Makefile` (`check-builtin-registry-autoload-metadata`, wired into `check-builtin-registry-all`)
+      - `test/neovm/vm-compat/README.md` (new gate/allowlist docs and usage command)
+  - verified:
+    - `make -C test/neovm/vm-compat check-one-neovm CASE=cases/autoload-startup-metadata-noninteractive-semantics` (pass, `13/13`)
+    - `make -C test/neovm/vm-compat check-builtin-registry-autoload-metadata` (pass; `1210` dispatch entries / `1209` core entries; drifts `0`)
+    - `make -C test/neovm/vm-compat check-builtin-registry-all` (pass)
+    - `make -C test/neovm/vm-compat check-all-neovm-strict` (pass; inventory `793`)
+
 - Continue compatibility-first maintenance with small commit slices:
   - keep builtin surface and registry in lock-step
   - run oracle/parity checks after each behavior-affecting change
