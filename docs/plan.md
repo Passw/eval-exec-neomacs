@@ -276,6 +276,33 @@ Last updated: 2026-02-19
     - `make -C test/neovm/vm-compat check-one-neovm CASE=cases/minibuffer-batch` (pass, `47/47`)
     - `make -C test/neovm/vm-compat check-all-neovm-strict` (pass)
 
+- Extended startup completion-style list defaults parity:
+  - runtime changes:
+    - `rust/neovm-core/src/elisp/eval.rs`
+      - evaluator startup now also seeds:
+        - `completion-styles` as `(basic partial-completion emacs22)`
+        - `completion-category-defaults` as:
+          - `((buffer (styles basic substring))`
+          - `(unicode-name (styles basic substring))`
+          - `(project-file (styles substring))`
+          - `(xref-location (styles substring))`
+          - `(info-menu (styles basic substring))`
+          - `(symbol-help (styles basic shorthand substring))`
+          - `(calendar-month (display-sort-function . identity)))`
+  - corpus changes:
+    - expanded and re-recorded:
+      - `test/neovm/vm-compat/cases/input-command-state-startup-semantics.{forms,expected.tsv}`
+    - lock-ins now include:
+      - startup boundness/default-value shape for `completion-styles` and `completion-category-defaults`
+      - reader-path invariance for those vars across `read-key`/`read-event` and batch prompt-reader EOF paths
+  - verified:
+    - `make -C test/neovm/vm-compat record FORMS=cases/input-command-state-startup-semantics.forms EXPECTED=cases/input-command-state-startup-semantics.expected.tsv` (pass)
+    - `make -C test/neovm/vm-compat check-one-neovm CASE=cases/input-command-state-startup-semantics` (pass, `6/6`)
+    - `make -C test/neovm/vm-compat check-one-neovm CASE=cases/use-region-p-semantics` (pass, `8/8`)
+    - `make -C test/neovm/vm-compat check-one-neovm CASE=cases/input-last-event-reader-semantics` (pass, `13/13`)
+    - `make -C test/neovm/vm-compat check-one-neovm CASE=cases/minibuffer-batch` (pass, `47/47`)
+    - `make -C test/neovm/vm-compat check-all-neovm-strict` (pass)
+
 - Expanded batch prompt/input queue-edge lock-ins for stale/invalid unread tails:
   - corpus changes:
     - expanded and re-recorded:

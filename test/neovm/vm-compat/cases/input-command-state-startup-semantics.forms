@@ -18,6 +18,8 @@
    read-buffer-completion-ignore-case
    read-file-name-completion-ignore-case
    completion-regexp-list
+   completion-styles
+   completion-category-defaults
    completion-category-overrides
    completion-cycle-threshold
    completion-auto-help
@@ -129,6 +131,8 @@
  read-buffer-completion-ignore-case
  read-file-name-completion-ignore-case
  completion-regexp-list
+ completion-styles
+ completion-category-defaults
  completion-category-overrides
  completion-cycle-threshold
  completion-auto-help
@@ -233,6 +237,8 @@
         read-buffer-completion-ignore-case
         read-file-name-completion-ignore-case
         completion-regexp-list
+        completion-styles
+        completion-category-defaults
         completion-category-overrides
         completion-cycle-threshold
         completion-auto-help
@@ -333,6 +339,8 @@
         read-buffer-completion-ignore-case
         read-file-name-completion-ignore-case
         completion-regexp-list
+        completion-styles
+        completion-category-defaults
         completion-category-overrides
         completion-cycle-threshold
         completion-auto-help
@@ -445,6 +453,8 @@
                          read-buffer-completion-ignore-case
                          read-file-name-completion-ignore-case
                          completion-regexp-list
+                         completion-styles
+                         completion-category-defaults
                          completion-category-overrides
                          completion-cycle-threshold
                          completion-auto-help
@@ -548,6 +558,8 @@
                    read-buffer-completion-ignore-case
                    read-file-name-completion-ignore-case
                    completion-regexp-list
+                   completion-styles
+                   completion-category-defaults
                    completion-category-overrides
                    completion-cycle-threshold
                    completion-auto-help
