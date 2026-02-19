@@ -28,6 +28,20 @@ Last updated: 2026-02-19
 
 ## Doing
 
+- Added builtin-registry `func-arity` parity gate to keep symbol-designator arity drift at zero:
+  - vm-compat gate changes:
+    - added:
+      - `test/neovm/vm-compat/check-builtin-registry-func-arity.sh`
+      - `test/neovm/vm-compat/cases/builtin-registry-func-arity-allowlist.txt`
+    - wired into:
+      - `test/neovm/vm-compat/Makefile` (`check-builtin-registry-all`)
+    - documented in:
+      - `test/neovm/vm-compat/README.md`
+  - verified:
+    - `make -C test/neovm/vm-compat check-builtin-registry-func-arity` (pass)
+    - `make -C test/neovm/vm-compat check-builtin-registry-all` (pass)
+    - `make -C test/neovm/vm-compat check-all-neovm-strict` (pass)
+
 - Aligned `func-arity` symbol-designator parity for startup wrapper/autoload dispatch helpers:
   - runtime changes:
     - `rust/neovm-core/src/elisp/builtins.rs`
@@ -45,10 +59,11 @@ Last updated: 2026-02-19
     - added:
       - `test/neovm/vm-compat/cases/func-arity-dispatch-symbol-wrapper-semantics.forms`
       - `test/neovm/vm-compat/cases/func-arity-dispatch-symbol-wrapper-semantics.expected.tsv`
+      - extra lock-ins for `bounds-of-thing-at-point` startup `word-at-point` materialization path
     - wired case into:
       - `test/neovm/vm-compat/cases/default.list`
   - verified:
-    - `make -C test/neovm/vm-compat check-one-neovm CASE=cases/func-arity-dispatch-symbol-wrapper-semantics` (pass, `21/21`)
+    - `make -C test/neovm/vm-compat check-one-neovm CASE=cases/func-arity-dispatch-symbol-wrapper-semantics` (pass, `23/23`)
     - `make -C test/neovm/vm-compat check-builtin-registry-all` (pass)
     - `make -C test/neovm/vm-compat check-all-neovm-strict` (pass)
     - registry-wide `func-arity` drift scan reduced from `63` to `0` (`drift_count=0`).

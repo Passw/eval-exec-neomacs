@@ -15,6 +15,8 @@
 (func-arity 'extract-rectangle)
 (func-arity 'safe-date-to-time)
 (fboundp 'word-at-point)
+(func-arity 'bounds-of-thing-at-point)
+(fboundp 'word-at-point)
 (func-arity 'symbol-at-point)
 (fboundp 'word-at-point)
 (func-arity 'word-at-point)

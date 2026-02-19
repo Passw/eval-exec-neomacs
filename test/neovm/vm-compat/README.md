@@ -16,6 +16,7 @@ results against that baseline once evaluator execution is wired in.
 - `check-tracked-lists.sh`: validates `cases/tracked-lists.txt` manifest shape and references
 - `check-builtin-registry-sync.sh`: checks `builtin_registry.rs` exactly matches names dispatched by `builtins.rs`
 - `check-builtin-registry-fboundp.sh`: checks `fboundp` parity for all names in `builtin_registry.rs`
+- `check-builtin-registry-func-arity.sh`: checks `func-arity` parity for all core names in `builtin_registry.rs`
 - `check-startup-doc-stub-coverage.sh`: checks startup integer-doc symbol coverage of `STARTUP_VARIABLE_DOC_STUBS`
 - `check-startup-doc-string-coverage.sh`: checks startup string-doc symbol coverage of `STARTUP_VARIABLE_DOC_STRING_PROPERTIES`
 - `check-startup-variable-documentation-counts.sh`: checks startup `variable-documentation` property-count and runtime-resolution count parity (oracle vs NeoVM)
@@ -29,6 +30,7 @@ results against that baseline once evaluator execution is wired in.
 - `cases/startup-doc.list`: focused startup documentation parity corpus order
 - `cases/tracked-lists.txt`: source-of-truth list-of-lists used by inventory/progress validation
 - `cases/builtin-registry-fboundp-allowlist.txt`: intentional `fboundp` drift allowlist for registry parity checks
+- `cases/builtin-registry-func-arity-allowlist.txt`: intentional `func-arity` drift allowlist for registry parity checks
 - `cases/builtin-registry-sync-allowlist.txt`: intentional evaluator-dispatch names excluded from core registry startup policy
 - `cases/core.forms`: starter corpus for expression and error behavior
 - `cases/input-batch-readers.forms`: batch-mode input reader compatibility corpus
@@ -230,7 +232,14 @@ cd test/neovm/vm-compat
 make check-builtin-registry-fboundp
 ```
 
-Run the full builtin registry gate bundle (dispatch/registry sync + fboundp/function-cell/function-kind/commandp/extension-policy checks):
+Run the builtin registry `func-arity` parity gate (GNU Emacs `-Q` vs NeoVM core builtin names):
+
+```bash
+cd test/neovm/vm-compat
+make check-builtin-registry-func-arity
+```
+
+Run the full builtin registry gate bundle (dispatch/registry sync + fboundp/function-cell/func-arity/function-kind/commandp/extension-policy checks):
 
 ```bash
 cd test/neovm/vm-compat
