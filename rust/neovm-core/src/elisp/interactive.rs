@@ -354,6 +354,8 @@ fn builtin_command_name(name: &str) -> bool {
             | "delete-frame"
             | "delete-other-windows"
             | "delete-process"
+            | "kill-process"
+            | "signal-process"
             | "process-menu-delete-process"
             | "process-menu-mode"
             | "delete-rectangle"
@@ -3311,6 +3313,8 @@ mod tests {
             "re-search-forward",
             "select-frame",
             "setenv",
+            "kill-process",
+            "signal-process",
             "process-menu-delete-process",
             "process-menu-mode",
             "top-level",

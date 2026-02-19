@@ -28,6 +28,48 @@ Last updated: 2026-02-19
 
 ## Doing
 
+- Added process control/make/setter compatibility slice and locked oracle parity:
+  - runtime changes:
+    - `rust/neovm-core/src/elisp/process.rs`
+      - implemented:
+        - `continue-process`, `interrupt-process`, `kill-process`, `signal-process`, `stop-process`
+        - `make-process`
+        - `process-attributes`
+        - `set-process-buffer`
+        - `set-process-coding-system`
+        - `set-process-datagram-address`
+        - `set-process-inherit-coding-system-flag`
+        - `set-process-thread`
+        - `set-process-window-size`
+      - updated process state model so coding-system/thread/inherit-coding/window-size setters read back through existing getters where applicable.
+      - aligned tested oracle error/return paths:
+        - `signal-process` missing string process => `nil`
+        - `signal-process` integer PID fallback => `0`/`-1` existence probe
+        - undefined signal-name payload errors and symbol/string predicate behavior
+        - control builtins `(0 . 2)` argument contracts and process-designator error shapes.
+    - `rust/neovm-core/src/elisp/builtins.rs`
+      - wired evaluator dispatch for all new process builtins above.
+    - `rust/neovm-core/src/elisp/builtin_registry.rs`
+      - registered all new process symbols in `DISPATCH_BUILTIN_NAMES`.
+    - `rust/neovm-core/src/elisp/subr_info.rs`
+      - added oracle arity metadata/assertions for the new symbols.
+    - `rust/neovm-core/src/elisp/interactive.rs`
+      - marked `kill-process` and `signal-process` as command builtins for `commandp` parity.
+  - corpus changes:
+    - added and wired:
+      - `test/neovm/vm-compat/cases/process-control-make-setter-semantics.forms`
+      - `test/neovm/vm-compat/cases/process-control-make-setter-semantics.expected.tsv`
+      - `test/neovm/vm-compat/cases/default.list`
+  - verified:
+    - `cargo test --manifest-path rust/neovm-core/Cargo.toml process_runtime_introspection_controls -- --nocapture` (pass)
+    - `cargo test --manifest-path rust/neovm-core/Cargo.toml process_mark_type_thread_send_and_running_child_runtime_surface -- --nocapture` (pass)
+    - `cargo test --manifest-path rust/neovm-core/Cargo.toml subr_arity_process_primitives_match_oracle -- --nocapture` (pass)
+    - `cargo test --manifest-path rust/neovm-core/Cargo.toml commandp_true_for_additional_builtin_commands -- --nocapture` (pass)
+    - `make -C test/neovm/vm-compat record FORMS=cases/process-control-make-setter-semantics.forms EXPECTED=cases/process-control-make-setter-semantics.expected.tsv` (pass)
+    - `make -C test/neovm/vm-compat check-one-neovm CASE=cases/process-control-make-setter-semantics` (pass, `7/7`)
+    - `make -C test/neovm/vm-compat check-builtin-registry-all` (pass; drifts `0`)
+    - `make -C test/neovm/vm-compat check-all-neovm-strict` (pass; case inventory `784`)
+
 - Aligned process designator + buffer lookup compatibility surface with oracle-backed lock-ins:
   - runtime changes:
     - `rust/neovm-core/src/elisp/process.rs`

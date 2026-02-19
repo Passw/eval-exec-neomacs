@@ -51,6 +51,18 @@ pub struct Process {
     pub sentinel: Value,
     /// Process plist state.
     pub plist: Value,
+    /// Current decoding coding-system.
+    pub coding_decode: Value,
+    /// Current encoding coding-system.
+    pub coding_encode: Value,
+    /// Inherit-coding-system flag.
+    pub inherit_coding_system_flag: bool,
+    /// Attached thread object.
+    pub thread: Value,
+    /// Last process-window-size columns value.
+    pub window_cols: Option<i64>,
+    /// Last process-window-size rows value.
+    pub window_rows: Option<i64>,
 }
 
 /// Manages the set of live processes.
@@ -101,6 +113,12 @@ impl ProcessManager {
             filter: Value::symbol(DEFAULT_PROCESS_FILTER_SYMBOL),
             sentinel: Value::symbol(DEFAULT_PROCESS_SENTINEL_SYMBOL),
             plist: Value::Nil,
+            coding_decode: Value::symbol("utf-8-unix"),
+            coding_encode: Value::symbol("utf-8-unix"),
+            inherit_coding_system_flag: false,
+            thread: Value::Nil,
+            window_cols: None,
+            window_rows: None,
         };
         self.processes.insert(id, proc);
         id
@@ -876,6 +894,158 @@ fn process_tty_stream_selector_p(value: &Value) -> bool {
     }
 }
 
+fn signal_wrong_type_bufferp(value: Value) -> Flow {
+    signal(
+        "wrong-type-argument",
+        vec![Value::symbol("bufferp"), value],
+    )
+}
+
+fn signal_wrong_type_threadp(value: Value) -> Flow {
+    signal(
+        "wrong-type-argument",
+        vec![Value::symbol("threadp"), value],
+    )
+}
+
+fn signal_wrong_type_integerp(value: Value) -> Flow {
+    signal(
+        "wrong-type-argument",
+        vec![Value::symbol("integerp"), value],
+    )
+}
+
+fn signal_wrong_type_numberp(value: Value) -> Flow {
+    signal(
+        "wrong-type-argument",
+        vec![Value::symbol("numberp"), value],
+    )
+}
+
+fn signal_undefined_signal_name(name: &str) -> Flow {
+    signal(
+        "error",
+        vec![Value::string(format!("Undefined signal name {name}"))],
+    )
+}
+
+fn resolve_optional_process_with_explicit_return(
+    eval: &super::eval::Evaluator,
+    value: Option<&Value>,
+) -> Result<(ProcessId, Value), Flow> {
+    if let Some(v) = value {
+        if !v.is_nil() {
+            let id = resolve_process_or_missing_error(eval, v)?;
+            return Ok((id, v.clone()));
+        }
+    }
+    let id = resolve_optional_process_or_current_buffer(eval, value)?;
+    Ok((id, Value::Nil))
+}
+
+enum SignalProcessTarget {
+    Process(ProcessId),
+    MissingNamedProcess,
+    Pid(i64),
+}
+
+fn resolve_signal_process_target(
+    eval: &super::eval::Evaluator,
+    value: Option<&Value>,
+) -> Result<SignalProcessTarget, Flow> {
+    if let Some(v) = value {
+        if !v.is_nil() {
+            return match v {
+                Value::Str(name) => Ok(match eval.processes.find_by_name(name) {
+                    Some(id) => SignalProcessTarget::Process(id),
+                    None => SignalProcessTarget::MissingNamedProcess,
+                }),
+                Value::Int(pid) if *pid >= 0 => {
+                    let id = *pid as ProcessId;
+                    if eval.processes.get(id).is_some() {
+                        Ok(SignalProcessTarget::Process(id))
+                    } else {
+                        Ok(SignalProcessTarget::Pid(*pid))
+                    }
+                }
+                _ => Err(signal_wrong_type_processp(v.clone())),
+            };
+        }
+    }
+
+    let id = resolve_optional_process_or_current_buffer(eval, value)?;
+    Ok(SignalProcessTarget::Process(id))
+}
+
+fn parse_signal_number(value: &Value) -> Result<i32, Flow> {
+    match value {
+        Value::Int(n) => Ok(*n as i32),
+        Value::Char(c) => Ok(*c as i32),
+        Value::Str(_) => Err(signal(
+            "wrong-type-argument",
+            vec![Value::symbol("symbolp"), value.clone()],
+        )),
+        _ => {
+            if let Some(name) = value.as_symbol_name() {
+                Err(signal_undefined_signal_name(name))
+            } else {
+                Err(signal_wrong_type_integerp(value.clone()))
+            }
+        }
+    }
+}
+
+fn pid_exists(pid: i64) -> bool {
+    if pid < 0 {
+        return false;
+    }
+    std::fs::metadata(format!("/proc/{pid}")).is_ok()
+}
+
+fn parse_make_process_command(value: &Value) -> Result<Vec<String>, Flow> {
+    let as_vec = match value {
+        Value::Vector(items) => Some(items.lock().expect("poisoned").clone()),
+        Value::Cons(_) | Value::Nil => list_to_vec(value),
+        _ => None,
+    };
+
+    let Some(items) = as_vec else {
+        return Err(signal(
+            "wrong-type-argument",
+            vec![Value::symbol("sequencep"), value.clone()],
+        ));
+    };
+
+    items
+        .into_iter()
+        .map(|item| expect_string_strict(&item))
+        .collect()
+}
+
+fn parse_make_process_buffer(
+    eval: &super::eval::Evaluator,
+    value: &Value,
+) -> Result<Option<String>, Flow> {
+    match value {
+        Value::Nil => Ok(None),
+        Value::Str(name) => Ok(Some((**name).clone())),
+        Value::Buffer(id) => eval
+            .buffers
+            .get(*id)
+            .map(|buf| Some(buf.name.clone()))
+            .ok_or_else(|| signal("error", vec![Value::string("Selecting deleted buffer")])),
+        _ => Err(signal_wrong_type_string(value.clone())),
+    }
+}
+
+fn expect_integer(value: &Value) -> Result<i64, Flow> {
+    match value {
+        Value::Int(n) => Ok(*n),
+        Value::Char(c) => Ok(*c as i64),
+        _ => Err(signal_wrong_type_integerp(value.clone())),
+    }
+}
+
 // ---------------------------------------------------------------------------
 // Builtins (eval-dependent)
 // ---------------------------------------------------------------------------
@@ -1180,6 +1350,182 @@ pub(crate) fn builtin_delete_process(
     Ok(Value::Nil)
 }
 
+/// (continue-process &optional PROCESS CURRENT-GROUP) -> process-or-nil
+pub(crate) fn builtin_continue_process(
+    eval: &mut super::eval::Evaluator,
+    args: Vec<Value>,
+) -> EvalResult {
+    if args.len() > 2 {
+        return Err(signal(
+            "wrong-number-of-arguments",
+            vec![Value::symbol("continue-process"), Value::Int(args.len() as i64)],
+        ));
+    }
+    let (id, ret) = resolve_optional_process_with_explicit_return(eval, args.first())?;
+    if let Some(proc) = eval.processes.get_mut(id) {
+        proc.status = ProcessStatus::Run;
+    }
+    Ok(ret)
+}
+
+/// (interrupt-process &optional PROCESS CURRENT-GROUP) -> process-or-nil
+pub(crate) fn builtin_interrupt_process(
+    eval: &mut super::eval::Evaluator,
+    args: Vec<Value>,
+) -> EvalResult {
+    if args.len() > 2 {
+        return Err(signal(
+            "wrong-number-of-arguments",
+            vec![Value::symbol("interrupt-process"), Value::Int(args.len() as i64)],
+        ));
+    }
+    let (id, ret) = resolve_optional_process_with_explicit_return(eval, args.first())?;
+    if let Some(proc) = eval.processes.get_mut(id) {
+        proc.status = ProcessStatus::Signal(2);
+    }
+    Ok(ret)
+}
+
+/// (kill-process &optional PROCESS CURRENT-GROUP) -> process-or-nil
+pub(crate) fn builtin_kill_process(
+    eval: &mut super::eval::Evaluator,
+    args: Vec<Value>,
+) -> EvalResult {
+    if args.len() > 2 {
+        return Err(signal(
+            "wrong-number-of-arguments",
+            vec![Value::symbol("kill-process"), Value::Int(args.len() as i64)],
+        ));
+    }
+    let (id, ret) = resolve_optional_process_with_explicit_return(eval, args.first())?;
+    if let Some(proc) = eval.processes.get_mut(id) {
+        proc.status = ProcessStatus::Signal(9);
+    }
+    Ok(ret)
+}
+
+/// (signal-process PROCESS SIGNAL &optional CURRENT-GROUP) -> int-or-nil
+pub(crate) fn builtin_signal_process(
+    eval: &mut super::eval::Evaluator,
+    args: Vec<Value>,
+) -> EvalResult {
+    expect_min_args("signal-process", &args, 2)?;
+    if args.len() > 3 {
+        return Err(signal(
+            "wrong-number-of-arguments",
+            vec![Value::symbol("signal-process"), Value::Int(args.len() as i64)],
+        ));
+    }
+
+    let signal_num = parse_signal_number(&args[1])?;
+    match resolve_signal_process_target(eval, args.first())? {
+        SignalProcessTarget::Process(id) => {
+            if let Some(proc) = eval.processes.get_mut(id) {
+                proc.status = ProcessStatus::Signal(signal_num);
+            }
+            Ok(Value::Int(0))
+        }
+        SignalProcessTarget::MissingNamedProcess => Ok(Value::Nil),
+        SignalProcessTarget::Pid(pid) => Ok(Value::Int(if pid_exists(pid) { 0 } else { -1 })),
+    }
+}
+
+/// (stop-process &optional PROCESS CURRENT-GROUP) -> process-or-nil
+pub(crate) fn builtin_stop_process(
+    eval: &mut super::eval::Evaluator,
+    args: Vec<Value>,
+) -> EvalResult {
+    if args.len() > 2 {
+        return Err(signal(
+            "wrong-number-of-arguments",
+            vec![Value::symbol("stop-process"), Value::Int(args.len() as i64)],
+        ));
+    }
+    let (id, ret) = resolve_optional_process_with_explicit_return(eval, args.first())?;
+    if let Some(proc) = eval.processes.get_mut(id) {
+        proc.status = ProcessStatus::Stop;
+    }
+    Ok(ret)
+}
+
+/// (process-attributes PID) -> alist-or-nil
+pub(crate) fn builtin_process_attributes(
+    _eval: &mut super::eval::Evaluator,
+    args: Vec<Value>,
+) -> EvalResult {
+    expect_args("process-attributes", &args, 1)?;
+    let pid = match &args[0] {
+        Value::Int(n) if *n >= 0 => *n,
+        Value::Char(c) => *c as i64,
+        _ => return Err(signal_wrong_type_numberp(args[0].clone())),
+    };
+    if !pid_exists(pid) {
+        return Ok(Value::Nil);
+    }
+    Ok(Value::list(vec![Value::cons(
+        Value::symbol("pid"),
+        Value::Int(pid),
+    )]))
+}
+
+/// (make-process &rest ARGS) -> process-or-nil
+pub(crate) fn builtin_make_process(
+    eval: &mut super::eval::Evaluator,
+    args: Vec<Value>,
+) -> EvalResult {
+    if args.is_empty() {
+        return Ok(Value::Nil);
+    }
+
+    let mut name: Option<String> = None;
+    let mut buffer_name: Option<Option<String>> = None;
+    let mut command: Option<Vec<String>> = None;
+
+    let mut i = 0usize;
+    while i < args.len() {
+        let key = &args[i];
+        let value = args.get(i + 1).cloned().unwrap_or(Value::Nil);
+        let key_name = match key {
+            Value::Keyword(k) => Some(k.as_str()),
+            Value::Symbol(s) if s.starts_with(':') => Some(s.as_str()),
+            _ => None,
+        };
+        match key_name {
+            Some(":name") => match value {
+                Value::Str(s) => name = Some((*s).clone()),
+                _ => {
+                    return Err(signal(
+                        "error",
+                        vec![Value::string(":name value not a string")],
+                    ))
+                }
+            },
+            Some(":buffer") => buffer_name = Some(parse_make_process_buffer(eval, &value)?),
+            Some(":command") => command = Some(parse_make_process_command(&value)?),
+            _ => {}
+        }
+        i += 2;
+    }
+
+    let Some(name) = name else {
+        return Err(signal(
+            "error",
+            vec![Value::string("Missing :name keyword parameter")],
+        ));
+    };
+
+    let command = command.unwrap_or_default();
+    let (program, argv) = if command.is_empty() {
+        (String::new(), Vec::new())
+    } else {
+        (command[0].clone(), command[1..].to_vec())
+    };
+    let id = eval
+        .processes
+        .create_process(name, buffer_name.unwrap_or(None), program, argv);
+    Ok(Value::Int(id as i64))
+}
+
 /// (process-send-string PROCESS STRING) -> nil
 pub(crate) fn builtin_process_send_string(
     eval: &mut super::eval::Evaluator,
@@ -1273,10 +1619,16 @@ pub(crate) fn builtin_process_coding_system(
     args: Vec<Value>,
 ) -> EvalResult {
     expect_args("process-coding-system", &args, 1)?;
-    let _id = resolve_live_process_or_wrong_type(eval, &args[0])?;
+    let id = resolve_live_process_or_wrong_type(eval, &args[0])?;
+    let proc = eval.processes.get(id).ok_or_else(|| {
+        signal(
+            "wrong-type-argument",
+            vec![Value::symbol("processp"), args[0].clone()],
+        )
+    })?;
     Ok(Value::cons(
-        Value::symbol("utf-8-unix"),
-        Value::symbol("utf-8-unix"),
+        proc.coding_decode.clone(),
+        proc.coding_encode.clone(),
     ))
 }
 
@@ -1296,8 +1648,142 @@ pub(crate) fn builtin_process_inherit_coding_system_flag(
     args: Vec<Value>,
 ) -> EvalResult {
     expect_args("process-inherit-coding-system-flag", &args, 1)?;
-    let _id = resolve_live_process_or_wrong_type(eval, &args[0])?;
+    let id = resolve_live_process_or_wrong_type(eval, &args[0])?;
+    let proc = eval.processes.get(id).ok_or_else(|| {
+        signal(
+            "wrong-type-argument",
+            vec![Value::symbol("processp"), args[0].clone()],
+        )
+    })?;
+    Ok(Value::bool(proc.inherit_coding_system_flag))
+}
+
+/// (set-process-buffer PROCESS BUFFER) -> BUFFER
+pub(crate) fn builtin_set_process_buffer(
+    eval: &mut super::eval::Evaluator,
+    args: Vec<Value>,
+) -> EvalResult {
+    expect_args("set-process-buffer", &args, 2)?;
+    let id = resolve_process_or_wrong_type(eval, &args[0])?;
+    let next_buffer_name = match &args[1] {
+        Value::Nil => None,
+        Value::Buffer(buffer_id) => Some(
+            eval.buffers
+                .get(*buffer_id)
+                .ok_or_else(|| signal("error", vec![Value::string("Selecting deleted buffer")]))?
+                .name
+                .clone(),
+        ),
+        _ => return Err(signal_wrong_type_bufferp(args[1].clone())),
+    };
+    let proc = eval.processes.get_mut(id).ok_or_else(|| {
+        signal(
+            "wrong-type-argument",
+            vec![Value::symbol("processp"), args[0].clone()],
+        )
+    })?;
+    proc.buffer_name = next_buffer_name;
+    Ok(args[1].clone())
+}
+
+/// (set-process-coding-system PROCESS &optional DECODING ENCODING) -> nil
+pub(crate) fn builtin_set_process_coding_system(
+    eval: &mut super::eval::Evaluator,
+    args: Vec<Value>,
+) -> EvalResult {
+    expect_min_args("set-process-coding-system", &args, 1)?;
+    if args.len() > 3 {
+        return Err(signal(
+            "wrong-number-of-arguments",
+            vec![
+                Value::symbol("set-process-coding-system"),
+                Value::Int(args.len() as i64),
+            ],
+        ));
+    }
+    let id = resolve_process_or_wrong_type(eval, &args[0])?;
+    let proc = eval.processes.get_mut(id).ok_or_else(|| {
+        signal(
+            "wrong-type-argument",
+            vec![Value::symbol("processp"), args[0].clone()],
+        )
+    })?;
+    if let Some(coding) = args.get(1) {
+        proc.coding_decode = coding.clone();
+        proc.coding_encode = args.get(2).cloned().unwrap_or_else(|| coding.clone());
+    }
     Ok(Value::Nil)
+}
+
+/// (set-process-datagram-address PROCESS ADDRESS) -> nil
+pub(crate) fn builtin_set_process_datagram_address(
+    eval: &mut super::eval::Evaluator,
+    args: Vec<Value>,
+) -> EvalResult {
+    expect_args("set-process-datagram-address", &args, 2)?;
+    let _id = resolve_process_or_wrong_type(eval, &args[0])?;
+    Ok(Value::Nil)
+}
+
+/// (set-process-inherit-coding-system-flag PROCESS FLAG) -> FLAG
+pub(crate) fn builtin_set_process_inherit_coding_system_flag(
+    eval: &mut super::eval::Evaluator,
+    args: Vec<Value>,
+) -> EvalResult {
+    expect_args("set-process-inherit-coding-system-flag", &args, 2)?;
+    let id = resolve_process_or_wrong_type(eval, &args[0])?;
+    let proc = eval.processes.get_mut(id).ok_or_else(|| {
+        signal(
+            "wrong-type-argument",
+            vec![Value::symbol("processp"), args[0].clone()],
+        )
+    })?;
+    proc.inherit_coding_system_flag = args[1].is_truthy();
+    Ok(args[1].clone())
+}
+
+/// (set-process-thread PROCESS THREAD) -> thread-or-nil
+pub(crate) fn builtin_set_process_thread(
+    eval: &mut super::eval::Evaluator,
+    args: Vec<Value>,
+) -> EvalResult {
+    expect_args("set-process-thread", &args, 2)?;
+    let id = resolve_process_or_wrong_type(eval, &args[0])?;
+    let value = if args[1].is_nil() {
+        Value::Nil
+    } else if eval.threads.thread_id_from_handle(&args[1]).is_some() {
+        args[1].clone()
+    } else {
+        return Err(signal_wrong_type_threadp(args[1].clone()));
+    };
+    let proc = eval.processes.get_mut(id).ok_or_else(|| {
+        signal(
+            "wrong-type-argument",
+            vec![Value::symbol("processp"), args[0].clone()],
+        )
+    })?;
+    proc.thread = value.clone();
+    Ok(value)
+}
+
+/// (set-process-window-size PROCESS COLS ROWS) -> t
+pub(crate) fn builtin_set_process_window_size(
+    eval: &mut super::eval::Evaluator,
+    args: Vec<Value>,
+) -> EvalResult {
+    expect_args("set-process-window-size", &args, 3)?;
+    let id = resolve_process_or_wrong_type(eval, &args[0])?;
+    let cols = expect_integer(&args[1])?;
+    let rows = expect_integer(&args[2])?;
+    let proc = eval.processes.get_mut(id).ok_or_else(|| {
+        signal(
+            "wrong-type-argument",
+            vec![Value::symbol("processp"), args[0].clone()],
+        )
+    })?;
+    proc.window_cols = Some(cols);
+    proc.window_rows = Some(rows);
+    Ok(Value::True)
 }
 
 /// (process-kill-buffer-query-function) -> bool
@@ -1414,8 +1900,14 @@ pub(crate) fn builtin_process_thread(
     args: Vec<Value>,
 ) -> EvalResult {
     expect_args("process-thread", &args, 1)?;
-    let _id = resolve_live_process_or_wrong_type(eval, &args[0])?;
-    Ok(Value::Nil)
+    let id = resolve_live_process_or_wrong_type(eval, &args[0])?;
+    let proc = eval.processes.get(id).ok_or_else(|| {
+        signal(
+            "wrong-type-argument",
+            vec![Value::symbol("processp"), args[0].clone()],
+        )
+    })?;
+    Ok(proc.thread.clone())
 }
 
 /// (process-send-region PROCESS START END) -> nil

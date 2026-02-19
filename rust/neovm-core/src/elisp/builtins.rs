@@ -7705,6 +7705,7 @@ pub(crate) fn dispatch_builtin(
         "accept-process-output" => {
             return Some(super::process::builtin_accept_process_output(eval, args))
         }
+        "make-process" => return Some(super::process::builtin_make_process(eval, args)),
         "start-process" => return Some(super::process::builtin_start_process(eval, args)),
         "call-process" => return Some(super::process::builtin_call_process(eval, args)),
         "process-file" => return Some(super::process::builtin_process_file(eval, args)),
@@ -7716,9 +7717,15 @@ pub(crate) fn dispatch_builtin(
         "call-process-region" => {
             return Some(super::process::builtin_call_process_region(eval, args))
         }
+        "continue-process" => return Some(super::process::builtin_continue_process(eval, args)),
         "delete-process" => return Some(super::process::builtin_delete_process(eval, args)),
+        "interrupt-process" => return Some(super::process::builtin_interrupt_process(eval, args)),
+        "kill-process" => return Some(super::process::builtin_kill_process(eval, args)),
+        "signal-process" => return Some(super::process::builtin_signal_process(eval, args)),
+        "stop-process" => return Some(super::process::builtin_stop_process(eval, args)),
         "get-process" => return Some(super::process::builtin_get_process(eval, args)),
         "get-buffer-process" => return Some(super::process::builtin_get_buffer_process(eval, args)),
+        "process-attributes" => return Some(super::process::builtin_process_attributes(eval, args)),
         "process-live-p" => return Some(super::process::builtin_process_live_p(eval, args)),
         "processp" => return Some(super::process::builtin_processp(eval, args)),
         "process-id" => return Some(super::process::builtin_process_id(eval, args)),
@@ -7752,6 +7759,24 @@ pub(crate) fn dispatch_builtin(
             return Some(super::process::builtin_process_inherit_coding_system_flag(
                 eval, args,
             ))
+        }
+        "set-process-buffer" => return Some(super::process::builtin_set_process_buffer(eval, args)),
+        "set-process-coding-system" => {
+            return Some(super::process::builtin_set_process_coding_system(eval, args))
+        }
+        "set-process-datagram-address" => {
+            return Some(super::process::builtin_set_process_datagram_address(
+                eval, args,
+            ))
+        }
+        "set-process-inherit-coding-system-flag" => {
+            return Some(super::process::builtin_set_process_inherit_coding_system_flag(
+                eval, args,
+            ))
+        }
+        "set-process-thread" => return Some(super::process::builtin_set_process_thread(eval, args)),
+        "set-process-window-size" => {
+            return Some(super::process::builtin_set_process_window_size(eval, args))
         }
         "process-lines" => return Some(super::process::builtin_process_lines(eval, args)),
         "process-lines-ignore-status" => {

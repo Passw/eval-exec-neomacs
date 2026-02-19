@@ -925,10 +925,15 @@ fn subr_arity_value(name: &str) -> Value {
         "accept-process-output" => arity_cons(0, Some(4)),
         "call-process" => arity_cons(1, None),
         "call-process-region" => arity_cons(3, None),
+        "continue-process" | "interrupt-process" | "kill-process" | "stop-process" => {
+            arity_cons(0, Some(2))
+        }
         "delete-process" => arity_cons(0, Some(1)),
         "get-buffer-process" => arity_cons(1, Some(1)),
         "get-process" => arity_cons(1, Some(1)),
+        "make-process" => arity_cons(0, None),
         "process-buffer"
+        | "process-attributes"
         | "process-coding-system"
         | "process-command"
         | "process-datagram-address"
@@ -956,6 +961,7 @@ fn subr_arity_value(name: &str) -> Value {
         | "process-lines-ignore-status" => arity_cons(1, None),
         "process-lines-handling-status" => arity_cons(2, None),
         "process-running-child-p" | "process-send-eof" => arity_cons(0, Some(1)),
+        "signal-process" => arity_cons(2, Some(3)),
         "process-contact" => arity_cons(1, Some(3)),
         "process-list" => arity_cons(0, Some(0)),
         "process-get" => arity_cons(2, Some(2)),
@@ -963,10 +969,16 @@ fn subr_arity_value(name: &str) -> Value {
         "process-send-region" => arity_cons(3, Some(3)),
         "process-send-string" => arity_cons(2, Some(2)),
         "process-tty-name" => arity_cons(1, Some(2)),
+        "set-process-coding-system" => arity_cons(1, Some(3)),
         "set-process-filter"
+        | "set-process-buffer"
+        | "set-process-datagram-address"
+        | "set-process-inherit-coding-system-flag"
         | "set-process-plist"
         | "set-process-query-on-exit-flag"
+        | "set-process-thread"
         | "set-process-sentinel" => arity_cons(2, Some(2)),
+        "set-process-window-size" => arity_cons(3, Some(3)),
         "setenv" => arity_cons(1, Some(3)),
         "start-process" => arity_cons(3, None),
         "getenv" => arity_cons(1, Some(2)),
@@ -1573,10 +1585,15 @@ mod tests {
         assert_subr_arity("accept-process-output", 0, Some(4));
         assert_subr_arity("call-process", 1, None);
         assert_subr_arity("call-process-region", 3, None);
+        assert_subr_arity("continue-process", 0, Some(2));
         assert_subr_arity("delete-process", 0, Some(1));
         assert_subr_arity("get-buffer-process", 1, Some(1));
         assert_subr_arity("get-process", 1, Some(1));
         assert_subr_arity("getenv", 1, Some(2));
+        assert_subr_arity("interrupt-process", 0, Some(2));
+        assert_subr_arity("kill-process", 0, Some(2));
+        assert_subr_arity("make-process", 0, None);
+        assert_subr_arity("process-attributes", 1, Some(1));
         assert_subr_arity("process-buffer", 1, Some(1));
         assert_subr_arity("process-coding-system", 1, Some(1));
         assert_subr_arity("process-command", 1, Some(1));
@@ -1608,15 +1625,23 @@ mod tests {
         assert_subr_arity("process-send-region", 3, Some(3));
         assert_subr_arity("process-send-string", 2, Some(2));
         assert_subr_arity("process-sentinel", 1, Some(1));
+        assert_subr_arity("signal-process", 2, Some(3));
         assert_subr_arity("process-status", 1, Some(1));
+        assert_subr_arity("stop-process", 0, Some(2));
         assert_subr_arity("process-thread", 1, Some(1));
         assert_subr_arity("process-tty-name", 1, Some(2));
         assert_subr_arity("process-type", 1, Some(1));
         assert_subr_arity("processp", 1, Some(1));
+        assert_subr_arity("set-process-buffer", 2, Some(2));
+        assert_subr_arity("set-process-coding-system", 1, Some(3));
+        assert_subr_arity("set-process-datagram-address", 2, Some(2));
         assert_subr_arity("set-process-filter", 2, Some(2));
+        assert_subr_arity("set-process-inherit-coding-system-flag", 2, Some(2));
         assert_subr_arity("set-process-plist", 2, Some(2));
         assert_subr_arity("set-process-query-on-exit-flag", 2, Some(2));
         assert_subr_arity("set-process-sentinel", 2, Some(2));
+        assert_subr_arity("set-process-thread", 2, Some(2));
+        assert_subr_arity("set-process-window-size", 3, Some(3));
         assert_subr_arity("setenv", 1, Some(3));
         assert_subr_arity("start-process", 3, None);
     }
