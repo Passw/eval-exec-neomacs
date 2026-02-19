@@ -1164,6 +1164,7 @@ fn frame_defaults_flag(frame: Option<&Value>) -> Result<bool, Flow> {
         None => Ok(false),
         Some(v) if v.is_nil() => Ok(false),
         Some(Value::True) => Ok(true),
+        Some(v) if frame_device_designator_p(v) => Ok(false),
         Some(v) => Err(signal(
             "wrong-type-argument",
             vec![Value::symbol("frame-live-p"), v.clone()],
@@ -2447,6 +2448,26 @@ mod tests {
         let result =
             builtin_internal_lisp_face_empty_p(vec![Value::symbol("default"), Value::Int(1)]);
         assert!(result.is_err());
+        let frame_result =
+            builtin_internal_lisp_face_empty_p(vec![Value::symbol("default"), Value::Frame(1)]);
+        assert!(frame_result.is_err());
+    }
+
+    #[test]
+    fn internal_lisp_face_comparators_accept_frame_handles() {
+        let frame = Value::Frame(FRAME_ID_BASE);
+        let empty_result =
+            builtin_internal_lisp_face_empty_p(vec![Value::symbol("default"), frame.clone()])
+                .unwrap();
+        assert!(empty_result.is_nil());
+
+        let equal_result = builtin_internal_lisp_face_equal_p(vec![
+            Value::symbol("default"),
+            Value::symbol("mode-line"),
+            frame,
+        ])
+        .unwrap();
+        assert!(equal_result.is_nil());
     }
 
     #[test]

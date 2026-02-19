@@ -28,6 +28,26 @@ Last updated: 2026-02-19
 
 ## Doing
 
+- Aligned `internal-lisp-face-empty-p` / `internal-lisp-face-equal-p` optional FRAME handling for frame-handle inputs:
+  - runtime changes:
+    - `rust/neovm-core/src/elisp/font.rs`
+      - `frame_defaults_flag` now accepts live-frame designators (`Value::Frame` and frame-id ints) as selected-frame domain inputs (`defaults_frame = false`).
+      - added unit coverage:
+        - `internal_lisp_face_comparators_accept_frame_handles`
+        - expanded `internal_lisp_face_empty_p_rejects_non_nil_non_t_frame_designator` with invalid frame-handle checks.
+  - corpus changes:
+    - updated:
+      - `test/neovm/vm-compat/cases/internal-lisp-face-comparators.forms`
+      - `test/neovm/vm-compat/cases/internal-lisp-face-comparators.expected.tsv`
+    - added lock-ins for:
+      - `(selected-frame)` acceptance in `internal-lisp-face-empty-p` and `internal-lisp-face-equal-p`
+      - `(selected-window)` wrong-type error paths for both comparators
+  - verified:
+    - `cargo test --manifest-path rust/neovm-core/Cargo.toml internal_lisp_face_comparators_accept_frame_handles -- --nocapture` (pass)
+    - `make -C test/neovm/vm-compat record FORMS=cases/internal-lisp-face-comparators.forms EXPECTED=cases/internal-lisp-face-comparators.expected.tsv` (pass)
+    - `make -C test/neovm/vm-compat check-one-neovm CASE=cases/internal-lisp-face-comparators` (pass, `38/38`)
+    - `make -C test/neovm/vm-compat check-all-neovm-strict` (pass; case inventory `764`)
+
 - Aligned `internal-*lisp-face*` optional frame/designator behavior to accept frame-handle objects:
   - runtime changes:
     - `rust/neovm-core/src/elisp/font.rs`

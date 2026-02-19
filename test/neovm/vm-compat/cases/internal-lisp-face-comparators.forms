@@ -20,6 +20,10 @@
 (internal-lisp-face-empty-p "default")
 (internal-lisp-face-empty-p 'default t)
 (internal-lisp-face-empty-p 'mode-line t)
+(internal-lisp-face-empty-p 'default (selected-frame))
+(condition-case err
+    (internal-lisp-face-empty-p 'default (selected-window))
+  (error (car err)))
 (condition-case err
     (internal-lisp-face-empty-p 'unknown-face)
   (error err))
@@ -42,6 +46,10 @@
 (internal-lisp-face-equal-p 'highlight 'region)
 (internal-lisp-face-equal-p 'bold 'italic)
 (internal-lisp-face-equal-p 'default 'mode-line t)
+(internal-lisp-face-equal-p 'default 'mode-line (selected-frame))
+(condition-case err
+    (internal-lisp-face-equal-p 'default 'mode-line (selected-window))
+  (error (car err)))
 (internal-lisp-face-equal-p "default" "default")
 (condition-case err
     (internal-lisp-face-equal-p 'unknown-face 'default)
