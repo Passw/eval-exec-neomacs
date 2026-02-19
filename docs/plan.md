@@ -28,6 +28,46 @@ Last updated: 2026-02-19
 
 ## Doing
 
+- Added missing display/X/terminal compatibility surface (`17` builtins) and locked oracle parity:
+  - runtime changes:
+    - `rust/neovm-core/src/elisp/display.rs`
+      - implemented optional display capability builtins:
+        - `display-grayscale-p`, `display-mouse-p`, `display-popup-menus-p`, `display-symbol-keys-p`
+      - implemented optional X display query builtins:
+        - `x-display-backing-store`, `x-display-color-cells`, `x-display-mm-height`, `x-display-mm-width`
+        - `x-display-monitor-attributes-list`, `x-display-planes`, `x-display-save-under`, `x-display-screens`
+        - `x-display-visual-class`, `x-server-input-extension-version`, `x-server-vendor`
+      - implemented `terminal-parameters` and `x-display-set-last-user-time` batch/no-X semantics.
+      - added evaluator-aware variants for optional display/X query builtins so live frame designators follow oracle error-shape behavior.
+      - aligned `x-display-set-last-user-time` 2-arg wrong-type payload to oracle (`frame-live-p` over `USER-TIME` argument value).
+      - expanded display unit coverage for new builtins and payload/error-shape matrixes.
+    - `rust/neovm-core/src/elisp/builtins.rs`
+      - wired pure/eval dispatch for all new display/X/terminal symbols.
+    - `rust/neovm-core/src/elisp/builtin_registry.rs`
+      - registered all new symbols in `DISPATCH_BUILTIN_NAMES`.
+    - `rust/neovm-core/src/elisp/subr_info.rs`
+      - added subr-arity metadata:
+        - `(0 . 1)` for new optional display/X/terminal query builtins
+        - `(1 . 2)` for `x-display-set-last-user-time`
+      - updated `subr_arity_display_terminal_primitives_match_oracle` assertions.
+  - corpus changes:
+    - added and wired:
+      - `test/neovm/vm-compat/cases/display-x-terminal-compat-surface-semantics.forms`
+      - `test/neovm/vm-compat/cases/display-x-terminal-compat-surface-semantics.expected.tsv`
+      - `test/neovm/vm-compat/cases/default.list`
+    - lock-ins cover:
+      - `fboundp`/`subrp`/`subr-arity` parity for the new surface.
+      - runtime semantics across omitted/nil/terminal/frame/window/string/int designators.
+      - batch/no-X error payload parity for X display/server helper builtins.
+      - `terminal-parameters` alist behavior and argument error paths.
+      - `x-display-set-last-user-time` arity and payload semantics.
+  - verified:
+    - `cargo test --manifest-path rust/neovm-core/Cargo.toml elisp::display::tests:: -- --nocapture` (pass, `58/58`)
+    - `cargo test --manifest-path rust/neovm-core/Cargo.toml subr_arity_display_terminal_primitives_match_oracle -- --nocapture` (pass)
+    - `make -C test/neovm/vm-compat record FORMS=cases/display-x-terminal-compat-surface-semantics.forms EXPECTED=cases/display-x-terminal-compat-surface-semantics.expected.tsv` (pass)
+    - `make -C test/neovm/vm-compat check-one-neovm CASE=cases/display-x-terminal-compat-surface-semantics` (pass, `5/5`)
+    - `make -C test/neovm/vm-compat check-all-neovm-strict` (pass; case inventory `768`)
+
 - Added `display-save-under` / `display-selections-p` compatibility surface and locked oracle parity:
   - runtime changes:
     - `rust/neovm-core/src/elisp/display.rs`

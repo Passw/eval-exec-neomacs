@@ -374,6 +374,73 @@ fn x_window_system_frame_error() -> Flow {
     )
 }
 
+fn display_optional_capability_p(name: &str, args: &[Value]) -> EvalResult {
+    expect_max_args(name, args, 1)?;
+    match args.first() {
+        None | Some(Value::Nil) => Ok(Value::Nil),
+        Some(display) if is_terminal_handle(display) => Ok(Value::Nil),
+        Some(Value::Str(display)) => Err(signal(
+            "error",
+            vec![Value::string(format!("Display {display} does not exist"))],
+        )),
+        Some(other) => Err(invalid_get_device_terminal_error(other)),
+    }
+}
+
+fn display_optional_capability_p_eval(
+    eval: &mut super::eval::Evaluator,
+    name: &str,
+    args: &[Value],
+) -> EvalResult {
+    expect_max_args(name, args, 1)?;
+    match args.first() {
+        None | Some(Value::Nil) => Ok(Value::Nil),
+        Some(display) if is_terminal_handle(display) => Ok(Value::Nil),
+        Some(display) if live_frame_designator_p(eval, display) => Ok(Value::Nil),
+        Some(Value::Str(display)) => Err(signal(
+            "error",
+            vec![Value::string(format!("Display {display} does not exist"))],
+        )),
+        Some(other) => Err(invalid_get_device_terminal_error_eval(eval, other)),
+    }
+}
+
+fn x_optional_display_query_error(name: &str, args: &[Value]) -> EvalResult {
+    expect_max_args(name, args, 1)?;
+    match args.first() {
+        None | Some(Value::Nil) => Err(x_windows_not_initialized_error()),
+        Some(display) if is_terminal_handle(display) => {
+            if let Some(err) = terminal_not_x_display_error(display) {
+                Err(err)
+            } else {
+                Err(invalid_get_device_terminal_error(display))
+            }
+        }
+        Some(Value::Str(display)) => Err(signal(
+            "error",
+            vec![Value::string(format!("Display {display} can’t be opened"))],
+        )),
+        Some(other) => Err(signal(
+            "wrong-type-argument",
+            vec![Value::symbol("frame-live-p"), other.clone()],
+        )),
+    }
+}
+
+fn x_optional_display_query_error_eval(
+    eval: &mut super::eval::Evaluator,
+    name: &str,
+    args: Vec<Value>,
+) -> EvalResult {
+    expect_max_args(name, &args, 1)?;
+    if let Some(display) = args.first() {
+        if live_frame_designator_p(eval, display) {
+            return Err(x_window_system_frame_error());
+        }
+    }
+    x_optional_display_query_error(name, &args)
+}
+
 // ---------------------------------------------------------------------------
 // Display query builtins
 // ---------------------------------------------------------------------------
@@ -532,16 +599,27 @@ pub(crate) fn builtin_display_graphic_p(args: Vec<Value>) -> EvalResult {
 
 /// (display-color-p &optional DISPLAY) -> nil in batch-style vm context.
 pub(crate) fn builtin_display_color_p(args: Vec<Value>) -> EvalResult {
-    expect_max_args("display-color-p", &args, 1)?;
-    match args.first() {
-        None | Some(Value::Nil) => Ok(Value::Nil),
-        Some(display) if is_terminal_handle(display) => Ok(Value::Nil),
-        Some(Value::Str(display)) => Err(signal(
-            "error",
-            vec![Value::string(format!("Display {display} does not exist"))],
-        )),
-        Some(other) => Err(invalid_get_device_terminal_error(other)),
-    }
+    display_optional_capability_p("display-color-p", &args)
+}
+
+/// (display-grayscale-p &optional DISPLAY) -> nil in batch-style vm context.
+pub(crate) fn builtin_display_grayscale_p(args: Vec<Value>) -> EvalResult {
+    display_optional_capability_p("display-grayscale-p", &args)
+}
+
+/// (display-mouse-p &optional DISPLAY) -> nil in batch-style vm context.
+pub(crate) fn builtin_display_mouse_p(args: Vec<Value>) -> EvalResult {
+    display_optional_capability_p("display-mouse-p", &args)
+}
+
+/// (display-popup-menus-p &optional DISPLAY) -> nil in batch-style vm context.
+pub(crate) fn builtin_display_popup_menus_p(args: Vec<Value>) -> EvalResult {
+    display_optional_capability_p("display-popup-menus-p", &args)
+}
+
+/// (display-symbol-keys-p &optional DISPLAY) -> nil in batch-style vm context.
+pub(crate) fn builtin_display_symbol_keys_p(args: Vec<Value>) -> EvalResult {
+    display_optional_capability_p("display-symbol-keys-p", &args)
 }
 
 /// (display-pixel-width &optional DISPLAY) -> 80 (terminal columns in batch).
@@ -673,17 +751,39 @@ pub(crate) fn builtin_display_color_p_eval(
     eval: &mut super::eval::Evaluator,
     args: Vec<Value>,
 ) -> EvalResult {
-    expect_max_args("display-color-p", &args, 1)?;
-    match args.first() {
-        None | Some(Value::Nil) => Ok(Value::Nil),
-        Some(display) if is_terminal_handle(display) => Ok(Value::Nil),
-        Some(display) if live_frame_designator_p(eval, display) => Ok(Value::Nil),
-        Some(Value::Str(display)) => Err(signal(
-            "error",
-            vec![Value::string(format!("Display {display} does not exist"))],
-        )),
-        Some(other) => Err(invalid_get_device_terminal_error_eval(eval, other)),
-    }
+    display_optional_capability_p_eval(eval, "display-color-p", &args)
+}
+
+/// Evaluator-aware variant of `display-grayscale-p`.
+pub(crate) fn builtin_display_grayscale_p_eval(
+    eval: &mut super::eval::Evaluator,
+    args: Vec<Value>,
+) -> EvalResult {
+    display_optional_capability_p_eval(eval, "display-grayscale-p", &args)
+}
+
+/// Evaluator-aware variant of `display-mouse-p`.
+pub(crate) fn builtin_display_mouse_p_eval(
+    eval: &mut super::eval::Evaluator,
+    args: Vec<Value>,
+) -> EvalResult {
+    display_optional_capability_p_eval(eval, "display-mouse-p", &args)
+}
+
+/// Evaluator-aware variant of `display-popup-menus-p`.
+pub(crate) fn builtin_display_popup_menus_p_eval(
+    eval: &mut super::eval::Evaluator,
+    args: Vec<Value>,
+) -> EvalResult {
+    display_optional_capability_p_eval(eval, "display-popup-menus-p", &args)
+}
+
+/// Evaluator-aware variant of `display-symbol-keys-p`.
+pub(crate) fn builtin_display_symbol_keys_p_eval(
+    eval: &mut super::eval::Evaluator,
+    args: Vec<Value>,
+) -> EvalResult {
+    display_optional_capability_p_eval(eval, "display-symbol-keys-p", &args)
 }
 
 /// Evaluator-aware variant of `display-pixel-width`.
@@ -884,25 +984,7 @@ pub(crate) fn builtin_x_display_list(args: Vec<Value>) -> EvalResult {
 
 /// (x-server-version &optional DISPLAY) -> error in batch/no-X context.
 pub(crate) fn builtin_x_server_version(args: Vec<Value>) -> EvalResult {
-    expect_max_args("x-server-version", &args, 1)?;
-    match args.first() {
-        None | Some(Value::Nil) => Err(x_windows_not_initialized_error()),
-        Some(display) if is_terminal_handle(display) => {
-            if let Some(err) = terminal_not_x_display_error(display) {
-                Err(err)
-            } else {
-                Err(invalid_get_device_terminal_error(display))
-            }
-        }
-        Some(Value::Str(display)) => Err(signal(
-            "error",
-            vec![Value::string(format!("Display {display} can’t be opened"))],
-        )),
-        Some(other) => Err(signal(
-            "wrong-type-argument",
-            vec![Value::symbol("frame-live-p"), other.clone()],
-        )),
-    }
+    x_optional_display_query_error("x-server-version", &args)
 }
 
 /// Evaluator-aware variant of `x-server-version`.
@@ -910,36 +992,12 @@ pub(crate) fn builtin_x_server_version_eval(
     eval: &mut super::eval::Evaluator,
     args: Vec<Value>,
 ) -> EvalResult {
-    expect_max_args("x-server-version", &args, 1)?;
-    if let Some(display) = args.first() {
-        if live_frame_designator_p(eval, display) {
-            return Err(x_window_system_frame_error());
-        }
-    }
-    builtin_x_server_version(args)
+    x_optional_display_query_error_eval(eval, "x-server-version", args)
 }
 
 /// (x-server-max-request-size &optional DISPLAY) -> error in batch/no-X context.
 pub(crate) fn builtin_x_server_max_request_size(args: Vec<Value>) -> EvalResult {
-    expect_max_args("x-server-max-request-size", &args, 1)?;
-    match args.first() {
-        None | Some(Value::Nil) => Err(x_windows_not_initialized_error()),
-        Some(display) if is_terminal_handle(display) => {
-            if let Some(err) = terminal_not_x_display_error(display) {
-                Err(err)
-            } else {
-                Err(invalid_get_device_terminal_error(display))
-            }
-        }
-        Some(Value::Str(display)) => Err(signal(
-            "error",
-            vec![Value::string(format!("Display {display} can’t be opened"))],
-        )),
-        Some(other) => Err(signal(
-            "wrong-type-argument",
-            vec![Value::symbol("frame-live-p"), other.clone()],
-        )),
-    }
+    x_optional_display_query_error("x-server-max-request-size", &args)
 }
 
 /// Evaluator-aware variant of `x-server-max-request-size`.
@@ -947,36 +1005,12 @@ pub(crate) fn builtin_x_server_max_request_size_eval(
     eval: &mut super::eval::Evaluator,
     args: Vec<Value>,
 ) -> EvalResult {
-    expect_max_args("x-server-max-request-size", &args, 1)?;
-    if let Some(display) = args.first() {
-        if live_frame_designator_p(eval, display) {
-            return Err(x_window_system_frame_error());
-        }
-    }
-    builtin_x_server_max_request_size(args)
+    x_optional_display_query_error_eval(eval, "x-server-max-request-size", args)
 }
 
 /// (x-display-grayscale-p &optional DISPLAY) -> error in batch/no-X context.
 pub(crate) fn builtin_x_display_grayscale_p(args: Vec<Value>) -> EvalResult {
-    expect_max_args("x-display-grayscale-p", &args, 1)?;
-    match args.first() {
-        None | Some(Value::Nil) => Err(x_windows_not_initialized_error()),
-        Some(display) if is_terminal_handle(display) => {
-            if let Some(err) = terminal_not_x_display_error(display) {
-                Err(err)
-            } else {
-                Err(invalid_get_device_terminal_error(display))
-            }
-        }
-        Some(Value::Str(display)) => Err(signal(
-            "error",
-            vec![Value::string(format!("Display {display} can’t be opened"))],
-        )),
-        Some(other) => Err(signal(
-            "wrong-type-argument",
-            vec![Value::symbol("frame-live-p"), other.clone()],
-        )),
-    }
+    x_optional_display_query_error("x-display-grayscale-p", &args)
 }
 
 /// Evaluator-aware variant of `x-display-grayscale-p`.
@@ -984,13 +1018,162 @@ pub(crate) fn builtin_x_display_grayscale_p_eval(
     eval: &mut super::eval::Evaluator,
     args: Vec<Value>,
 ) -> EvalResult {
-    expect_max_args("x-display-grayscale-p", &args, 1)?;
-    if let Some(display) = args.first() {
-        if live_frame_designator_p(eval, display) {
-            return Err(x_window_system_frame_error());
-        }
+    x_optional_display_query_error_eval(eval, "x-display-grayscale-p", args)
+}
+
+/// (x-display-backing-store &optional DISPLAY) -> error in batch/no-X context.
+pub(crate) fn builtin_x_display_backing_store(args: Vec<Value>) -> EvalResult {
+    x_optional_display_query_error("x-display-backing-store", &args)
+}
+
+/// Evaluator-aware variant of `x-display-backing-store`.
+pub(crate) fn builtin_x_display_backing_store_eval(
+    eval: &mut super::eval::Evaluator,
+    args: Vec<Value>,
+) -> EvalResult {
+    x_optional_display_query_error_eval(eval, "x-display-backing-store", args)
+}
+
+/// (x-display-color-cells &optional DISPLAY) -> error in batch/no-X context.
+pub(crate) fn builtin_x_display_color_cells(args: Vec<Value>) -> EvalResult {
+    x_optional_display_query_error("x-display-color-cells", &args)
+}
+
+/// Evaluator-aware variant of `x-display-color-cells`.
+pub(crate) fn builtin_x_display_color_cells_eval(
+    eval: &mut super::eval::Evaluator,
+    args: Vec<Value>,
+) -> EvalResult {
+    x_optional_display_query_error_eval(eval, "x-display-color-cells", args)
+}
+
+/// (x-display-mm-height &optional DISPLAY) -> error in batch/no-X context.
+pub(crate) fn builtin_x_display_mm_height(args: Vec<Value>) -> EvalResult {
+    x_optional_display_query_error("x-display-mm-height", &args)
+}
+
+/// Evaluator-aware variant of `x-display-mm-height`.
+pub(crate) fn builtin_x_display_mm_height_eval(
+    eval: &mut super::eval::Evaluator,
+    args: Vec<Value>,
+) -> EvalResult {
+    x_optional_display_query_error_eval(eval, "x-display-mm-height", args)
+}
+
+/// (x-display-mm-width &optional DISPLAY) -> error in batch/no-X context.
+pub(crate) fn builtin_x_display_mm_width(args: Vec<Value>) -> EvalResult {
+    x_optional_display_query_error("x-display-mm-width", &args)
+}
+
+/// Evaluator-aware variant of `x-display-mm-width`.
+pub(crate) fn builtin_x_display_mm_width_eval(
+    eval: &mut super::eval::Evaluator,
+    args: Vec<Value>,
+) -> EvalResult {
+    x_optional_display_query_error_eval(eval, "x-display-mm-width", args)
+}
+
+/// (x-display-monitor-attributes-list &optional DISPLAY) -> error in batch/no-X context.
+pub(crate) fn builtin_x_display_monitor_attributes_list(args: Vec<Value>) -> EvalResult {
+    x_optional_display_query_error("x-display-monitor-attributes-list", &args)
+}
+
+/// Evaluator-aware variant of `x-display-monitor-attributes-list`.
+pub(crate) fn builtin_x_display_monitor_attributes_list_eval(
+    eval: &mut super::eval::Evaluator,
+    args: Vec<Value>,
+) -> EvalResult {
+    x_optional_display_query_error_eval(eval, "x-display-monitor-attributes-list", args)
+}
+
+/// (x-display-planes &optional DISPLAY) -> error in batch/no-X context.
+pub(crate) fn builtin_x_display_planes(args: Vec<Value>) -> EvalResult {
+    x_optional_display_query_error("x-display-planes", &args)
+}
+
+/// Evaluator-aware variant of `x-display-planes`.
+pub(crate) fn builtin_x_display_planes_eval(
+    eval: &mut super::eval::Evaluator,
+    args: Vec<Value>,
+) -> EvalResult {
+    x_optional_display_query_error_eval(eval, "x-display-planes", args)
+}
+
+/// (x-display-save-under &optional DISPLAY) -> error in batch/no-X context.
+pub(crate) fn builtin_x_display_save_under(args: Vec<Value>) -> EvalResult {
+    x_optional_display_query_error("x-display-save-under", &args)
+}
+
+/// Evaluator-aware variant of `x-display-save-under`.
+pub(crate) fn builtin_x_display_save_under_eval(
+    eval: &mut super::eval::Evaluator,
+    args: Vec<Value>,
+) -> EvalResult {
+    x_optional_display_query_error_eval(eval, "x-display-save-under", args)
+}
+
+/// (x-display-screens &optional DISPLAY) -> error in batch/no-X context.
+pub(crate) fn builtin_x_display_screens(args: Vec<Value>) -> EvalResult {
+    x_optional_display_query_error("x-display-screens", &args)
+}
+
+/// Evaluator-aware variant of `x-display-screens`.
+pub(crate) fn builtin_x_display_screens_eval(
+    eval: &mut super::eval::Evaluator,
+    args: Vec<Value>,
+) -> EvalResult {
+    x_optional_display_query_error_eval(eval, "x-display-screens", args)
+}
+
+/// (x-display-visual-class &optional DISPLAY) -> error in batch/no-X context.
+pub(crate) fn builtin_x_display_visual_class(args: Vec<Value>) -> EvalResult {
+    x_optional_display_query_error("x-display-visual-class", &args)
+}
+
+/// Evaluator-aware variant of `x-display-visual-class`.
+pub(crate) fn builtin_x_display_visual_class_eval(
+    eval: &mut super::eval::Evaluator,
+    args: Vec<Value>,
+) -> EvalResult {
+    x_optional_display_query_error_eval(eval, "x-display-visual-class", args)
+}
+
+/// (x-server-input-extension-version &optional DISPLAY) -> error in batch/no-X context.
+pub(crate) fn builtin_x_server_input_extension_version(args: Vec<Value>) -> EvalResult {
+    x_optional_display_query_error("x-server-input-extension-version", &args)
+}
+
+/// Evaluator-aware variant of `x-server-input-extension-version`.
+pub(crate) fn builtin_x_server_input_extension_version_eval(
+    eval: &mut super::eval::Evaluator,
+    args: Vec<Value>,
+) -> EvalResult {
+    x_optional_display_query_error_eval(eval, "x-server-input-extension-version", args)
+}
+
+/// (x-server-vendor &optional DISPLAY) -> error in batch/no-X context.
+pub(crate) fn builtin_x_server_vendor(args: Vec<Value>) -> EvalResult {
+    x_optional_display_query_error("x-server-vendor", &args)
+}
+
+/// Evaluator-aware variant of `x-server-vendor`.
+pub(crate) fn builtin_x_server_vendor_eval(
+    eval: &mut super::eval::Evaluator,
+    args: Vec<Value>,
+) -> EvalResult {
+    x_optional_display_query_error_eval(eval, "x-server-vendor", args)
+}
+
+/// (x-display-set-last-user-time DISPLAY USER-TIME) -> error in batch/no-X context.
+pub(crate) fn builtin_x_display_set_last_user_time(args: Vec<Value>) -> EvalResult {
+    expect_range_args("x-display-set-last-user-time", &args, 1, 2)?;
+    if args.len() == 1 {
+        return Err(x_windows_not_initialized_error());
     }
-    builtin_x_display_grayscale_p(args)
+    Err(signal(
+        "wrong-type-argument",
+        vec![Value::symbol("frame-live-p"), args[1].clone()],
+    ))
 }
 
 /// (x-open-connection DISPLAY &optional XRM-STRING MUST-SUCCEED) -> nil
@@ -1317,6 +1500,33 @@ pub(crate) fn builtin_terminal_parameter_eval(
             })
             .unwrap_or(Value::Nil))
     })
+}
+
+/// (terminal-parameters &optional TERMINAL) -> alist of terminal parameters
+pub(crate) fn builtin_terminal_parameters(args: Vec<Value>) -> EvalResult {
+    expect_max_args("terminal-parameters", &args, 1)?;
+    if let Some(term) = args.first() {
+        if !term.is_nil() {
+            expect_terminal_designator(term)?;
+        }
+    }
+    TERMINAL_PARAMS.with(|slot| Ok(make_alist(slot.borrow().clone())))
+}
+
+/// Evaluator-aware variant of `terminal-parameters`.
+///
+/// Accepts live frame designators in addition to terminal designators.
+pub(crate) fn builtin_terminal_parameters_eval(
+    eval: &mut super::eval::Evaluator,
+    args: Vec<Value>,
+) -> EvalResult {
+    expect_max_args("terminal-parameters", &args, 1)?;
+    if let Some(term) = args.first() {
+        if !term.is_nil() {
+            expect_terminal_designator_eval(eval, term)?;
+        }
+    }
+    TERMINAL_PARAMS.with(|slot| Ok(make_alist(slot.borrow().clone())))
 }
 
 /// (set-terminal-parameter TERMINAL PARAMETER VALUE) -> previous value
@@ -1762,6 +1972,38 @@ mod tests {
         clear_terminal_parameters();
         let result = builtin_terminal_parameter(vec![Value::Int(1), Value::symbol("k")]);
         assert!(result.is_err());
+    }
+
+    #[test]
+    fn terminal_parameters_lists_mutated_symbol_entries() {
+        clear_terminal_parameters();
+        let _ = builtin_set_terminal_parameter(vec![Value::Nil, Value::symbol("k1"), Value::Int(1)])
+            .unwrap();
+        let _ = builtin_set_terminal_parameter(vec![Value::Nil, Value::symbol("k2"), Value::Int(2)])
+            .unwrap();
+
+        let params = builtin_terminal_parameters(vec![Value::Nil]).unwrap();
+        let entries = list_to_vec(&params).expect("parameter alist");
+        assert_eq!(entries.len(), 2);
+        assert!(entries
+            .iter()
+            .any(|entry| matches!(entry, Value::Cons(cell) if {
+                let pair = cell.lock().expect("poisoned");
+                pair.car == Value::symbol("k1") && pair.cdr == Value::Int(1)
+            })));
+        assert!(entries
+            .iter()
+            .any(|entry| matches!(entry, Value::Cons(cell) if {
+                let pair = cell.lock().expect("poisoned");
+                pair.car == Value::symbol("k2") && pair.cdr == Value::Int(2)
+            })));
+
+        let mut eval = crate::elisp::Evaluator::new();
+        let frame_id = crate::elisp::window_cmds::ensure_selected_frame_id(&mut eval).0 as i64;
+        let via_frame = builtin_terminal_parameters_eval(&mut eval, vec![Value::Int(frame_id)])
+            .expect("eval terminal-parameters");
+        let eval_entries = list_to_vec(&via_frame).expect("parameter alist");
+        assert_eq!(eval_entries.len(), 2);
     }
 
     #[test]
@@ -2268,6 +2510,128 @@ mod tests {
     }
 
     #[test]
+    fn x_missing_optional_display_queries_match_batch_no_x_shapes() {
+        let term = terminal_handle_value();
+        let mut eval = crate::elisp::Evaluator::new();
+        let frame_id = crate::elisp::window_cmds::ensure_selected_frame_id(&mut eval).0 as i64;
+
+        type PureXQuery = fn(Vec<Value>) -> EvalResult;
+        type EvalXQuery = fn(&mut crate::elisp::eval::Evaluator, Vec<Value>) -> EvalResult;
+        for (pure, eval_query) in [
+            (
+                builtin_x_display_backing_store as PureXQuery,
+                builtin_x_display_backing_store_eval as EvalXQuery,
+            ),
+            (builtin_x_display_color_cells, builtin_x_display_color_cells_eval),
+            (builtin_x_display_mm_height, builtin_x_display_mm_height_eval),
+            (builtin_x_display_mm_width, builtin_x_display_mm_width_eval),
+            (
+                builtin_x_display_monitor_attributes_list,
+                builtin_x_display_monitor_attributes_list_eval,
+            ),
+            (builtin_x_display_planes, builtin_x_display_planes_eval),
+            (builtin_x_display_save_under, builtin_x_display_save_under_eval),
+            (builtin_x_display_screens, builtin_x_display_screens_eval),
+            (
+                builtin_x_display_visual_class,
+                builtin_x_display_visual_class_eval,
+            ),
+            (
+                builtin_x_server_input_extension_version,
+                builtin_x_server_input_extension_version_eval,
+            ),
+            (builtin_x_server_vendor, builtin_x_server_vendor_eval),
+        ] {
+            match pure(vec![]) {
+                Err(Flow::Signal(sig)) => {
+                    assert_eq!(sig.symbol, "error");
+                    assert_eq!(
+                        sig.data,
+                        vec![Value::string("X windows are not in use or not initialized")]
+                    );
+                }
+                other => panic!("expected error signal, got {other:?}"),
+            }
+
+            match pure(vec![term.clone()]) {
+                Err(Flow::Signal(sig)) => {
+                    assert_eq!(sig.symbol, "error");
+                    assert_eq!(
+                        sig.data,
+                        vec![Value::string("Terminal 0 is not an X display")]
+                    );
+                }
+                other => panic!("expected error signal, got {other:?}"),
+            }
+
+            match pure(vec![Value::string("x")]) {
+                Err(Flow::Signal(sig)) => {
+                    assert_eq!(sig.symbol, "error");
+                    assert_eq!(sig.data, vec![Value::string("Display x can’t be opened")]);
+                }
+                other => panic!("expected error signal, got {other:?}"),
+            }
+
+            match pure(vec![Value::Int(1)]) {
+                Err(Flow::Signal(sig)) => {
+                    assert_eq!(sig.symbol, "wrong-type-argument");
+                    assert_eq!(
+                        sig.data,
+                        vec![Value::symbol("frame-live-p"), Value::Int(1)]
+                    );
+                }
+                other => panic!("expected wrong-type-argument signal, got {other:?}"),
+            }
+
+            match eval_query(&mut eval, vec![Value::Int(frame_id)]) {
+                Err(Flow::Signal(sig)) => {
+                    assert_eq!(sig.symbol, "error");
+                    assert_eq!(
+                        sig.data,
+                        vec![Value::string("Window system frame should be used")]
+                    );
+                }
+                other => panic!("expected error signal, got {other:?}"),
+            }
+        }
+    }
+
+    #[test]
+    fn x_display_set_last_user_time_batch_semantics() {
+        match builtin_x_display_set_last_user_time(vec![Value::Nil]) {
+            Err(Flow::Signal(sig)) => {
+                assert_eq!(sig.symbol, "error");
+                assert_eq!(
+                    sig.data,
+                    vec![Value::string("X windows are not in use or not initialized")]
+                );
+            }
+            other => panic!("expected error signal, got {other:?}"),
+        }
+
+        match builtin_x_display_set_last_user_time(vec![Value::Nil, Value::Int(1)]) {
+            Err(Flow::Signal(sig)) => {
+                assert_eq!(sig.symbol, "wrong-type-argument");
+                assert_eq!(
+                    sig.data,
+                    vec![Value::symbol("frame-live-p"), Value::Int(1)]
+                );
+            }
+            other => panic!("expected wrong-type-argument signal, got {other:?}"),
+        }
+
+        match builtin_x_display_set_last_user_time(vec![]) {
+            Err(Flow::Signal(sig)) => assert_eq!(sig.symbol, "wrong-number-of-arguments"),
+            other => panic!("expected wrong-number-of-arguments signal, got {other:?}"),
+        }
+
+        match builtin_x_display_set_last_user_time(vec![Value::Nil, Value::Int(1), Value::Nil]) {
+            Err(Flow::Signal(sig)) => assert_eq!(sig.symbol, "wrong-number-of-arguments"),
+            other => panic!("expected wrong-number-of-arguments signal, got {other:?}"),
+        }
+    }
+
+    #[test]
     fn eval_x_display_queries_accept_live_frame_designator() {
         let mut eval = crate::elisp::Evaluator::new();
         let frame_id = crate::elisp::window_cmds::ensure_selected_frame_id(&mut eval).0 as i64;
@@ -2613,6 +2977,48 @@ mod tests {
             Err(Flow::Signal(sig)) => assert_eq!(sig.symbol, "wrong-number-of-arguments"),
             other => panic!("expected wrong-number-of-arguments, got {other:?}"),
         }
+    }
+
+    #[test]
+    fn display_optional_capability_queries_match_color_shapes() {
+        for query in [
+            builtin_display_grayscale_p as fn(Vec<Value>) -> EvalResult,
+            builtin_display_mouse_p,
+            builtin_display_popup_menus_p,
+            builtin_display_symbol_keys_p,
+        ] {
+            assert!(query(vec![]).unwrap().is_nil());
+            assert!(query(vec![Value::Nil]).unwrap().is_nil());
+            assert!(query(vec![terminal_handle_value()]).unwrap().is_nil());
+
+            match query(vec![Value::Int(1)]) {
+                Err(Flow::Signal(sig)) => assert_eq!(sig.symbol, "error"),
+                other => panic!("expected error signal, got {other:?}"),
+            }
+
+            match query(vec![Value::string("x")]) {
+                Err(Flow::Signal(sig)) => {
+                    assert_eq!(sig.symbol, "error");
+                    assert_eq!(sig.data, vec![Value::string("Display x does not exist")]);
+                }
+                other => panic!("expected error signal, got {other:?}"),
+            }
+        }
+
+        let mut eval = crate::elisp::Evaluator::new();
+        let frame_id = crate::elisp::window_cmds::ensure_selected_frame_id(&mut eval).0 as i64;
+        assert!(builtin_display_grayscale_p_eval(&mut eval, vec![Value::Int(frame_id)])
+            .unwrap()
+            .is_nil());
+        assert!(builtin_display_mouse_p_eval(&mut eval, vec![Value::Int(frame_id)])
+            .unwrap()
+            .is_nil());
+        assert!(builtin_display_popup_menus_p_eval(&mut eval, vec![Value::Int(frame_id)])
+            .unwrap()
+            .is_nil());
+        assert!(builtin_display_symbol_keys_p_eval(&mut eval, vec![Value::Int(frame_id)])
+            .unwrap()
+            .is_nil());
     }
 
     #[test]

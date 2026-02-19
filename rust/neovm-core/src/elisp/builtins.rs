@@ -8020,6 +8020,24 @@ pub(crate) fn dispatch_builtin(
         }
         "redraw-frame" => return Some(super::display::builtin_redraw_frame_eval(eval, args)),
         "display-color-p" => return Some(super::display::builtin_display_color_p_eval(eval, args)),
+        "display-grayscale-p" => {
+            return Some(super::display::builtin_display_grayscale_p_eval(
+                eval, args,
+            ))
+        }
+        "display-mouse-p" => {
+            return Some(super::display::builtin_display_mouse_p_eval(eval, args))
+        }
+        "display-popup-menus-p" => {
+            return Some(super::display::builtin_display_popup_menus_p_eval(
+                eval, args,
+            ))
+        }
+        "display-symbol-keys-p" => {
+            return Some(super::display::builtin_display_symbol_keys_p_eval(
+                eval, args,
+            ))
+        }
         "display-pixel-width" => {
             return Some(super::display::builtin_display_pixel_width_eval(eval, args))
         }
@@ -8074,6 +8092,9 @@ pub(crate) fn dispatch_builtin(
         "terminal-parameter" => {
             return Some(super::display::builtin_terminal_parameter_eval(eval, args))
         }
+        "terminal-parameters" => {
+            return Some(super::display::builtin_terminal_parameters_eval(eval, args))
+        }
         "set-terminal-parameter" => {
             return Some(super::display::builtin_set_terminal_parameter_eval(
                 eval, args,
@@ -8124,8 +8145,57 @@ pub(crate) fn dispatch_builtin(
                 eval, args,
             ))
         }
+        "x-server-input-extension-version" => {
+            return Some(super::display::builtin_x_server_input_extension_version_eval(
+                eval, args,
+            ))
+        }
+        "x-server-vendor" => {
+            return Some(super::display::builtin_x_server_vendor_eval(eval, args))
+        }
         "x-display-grayscale-p" => {
             return Some(super::display::builtin_x_display_grayscale_p_eval(
+                eval, args,
+            ))
+        }
+        "x-display-backing-store" => {
+            return Some(super::display::builtin_x_display_backing_store_eval(
+                eval, args,
+            ))
+        }
+        "x-display-color-cells" => {
+            return Some(super::display::builtin_x_display_color_cells_eval(
+                eval, args,
+            ))
+        }
+        "x-display-mm-height" => {
+            return Some(super::display::builtin_x_display_mm_height_eval(
+                eval, args,
+            ))
+        }
+        "x-display-mm-width" => {
+            return Some(super::display::builtin_x_display_mm_width_eval(
+                eval, args,
+            ))
+        }
+        "x-display-monitor-attributes-list" => {
+            return Some(super::display::builtin_x_display_monitor_attributes_list_eval(
+                eval, args,
+            ))
+        }
+        "x-display-planes" => {
+            return Some(super::display::builtin_x_display_planes_eval(eval, args))
+        }
+        "x-display-save-under" => {
+            return Some(super::display::builtin_x_display_save_under_eval(
+                eval, args,
+            ))
+        }
+        "x-display-screens" => {
+            return Some(super::display::builtin_x_display_screens_eval(eval, args))
+        }
+        "x-display-visual-class" => {
+            return Some(super::display::builtin_x_display_visual_class_eval(
                 eval, args,
             ))
         }
@@ -8790,6 +8860,10 @@ pub(crate) fn dispatch_builtin(
         "internal-show-cursor-p" => super::display::builtin_internal_show_cursor_p(args),
         "display-graphic-p" => super::display::builtin_display_graphic_p(args),
         "display-color-p" => super::display::builtin_display_color_p(args),
+        "display-grayscale-p" => super::display::builtin_display_grayscale_p(args),
+        "display-mouse-p" => super::display::builtin_display_mouse_p(args),
+        "display-popup-menus-p" => super::display::builtin_display_popup_menus_p(args),
+        "display-symbol-keys-p" => super::display::builtin_display_symbol_keys_p(args),
         "display-pixel-width" => super::display::builtin_display_pixel_width(args),
         "display-pixel-height" => super::display::builtin_display_pixel_height(args),
         "display-mm-width" => super::display::builtin_display_mm_width(args),
@@ -8812,6 +8886,7 @@ pub(crate) fn dispatch_builtin(
         "frame-terminal" => super::display::builtin_frame_terminal(args),
         "terminal-live-p" => super::display::builtin_terminal_live_p(args),
         "terminal-parameter" => super::display::builtin_terminal_parameter(args),
+        "terminal-parameters" => super::display::builtin_terminal_parameters(args),
         "set-terminal-parameter" => super::display::builtin_set_terminal_parameter(args),
         "tty-type" => super::display::builtin_tty_type(args),
         "tty-top-frame" => super::display::builtin_tty_top_frame(args),
@@ -8833,7 +8908,23 @@ pub(crate) fn dispatch_builtin(
         }
         "x-server-version" => super::display::builtin_x_server_version(args),
         "x-server-max-request-size" => super::display::builtin_x_server_max_request_size(args),
+        "x-server-input-extension-version" => {
+            super::display::builtin_x_server_input_extension_version(args)
+        }
+        "x-server-vendor" => super::display::builtin_x_server_vendor(args),
         "x-display-grayscale-p" => super::display::builtin_x_display_grayscale_p(args),
+        "x-display-backing-store" => super::display::builtin_x_display_backing_store(args),
+        "x-display-color-cells" => super::display::builtin_x_display_color_cells(args),
+        "x-display-mm-height" => super::display::builtin_x_display_mm_height(args),
+        "x-display-mm-width" => super::display::builtin_x_display_mm_width(args),
+        "x-display-monitor-attributes-list" => {
+            super::display::builtin_x_display_monitor_attributes_list(args)
+        }
+        "x-display-planes" => super::display::builtin_x_display_planes(args),
+        "x-display-save-under" => super::display::builtin_x_display_save_under(args),
+        "x-display-screens" => super::display::builtin_x_display_screens(args),
+        "x-display-set-last-user-time" => super::display::builtin_x_display_set_last_user_time(args),
+        "x-display-visual-class" => super::display::builtin_x_display_visual_class(args),
 
         // Image (pure)
         "image-type-available-p" => super::image::builtin_image_type_available_p(args),

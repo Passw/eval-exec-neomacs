@@ -384,6 +384,7 @@ cases/format-mode-line-batch-semantics
 cases/display-batch-semantics
 cases/display-query-designator-semantics
 cases/display-save-under-selections-semantics
+cases/display-x-terminal-compat-surface-semantics
 cases/display-query-string-designator-error-semantics
 cases/display-images-face-support-semantics
 cases/display-frame-designator-semantics

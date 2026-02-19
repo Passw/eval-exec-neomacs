@@ -848,7 +848,9 @@ fn subr_arity_value(name: &str) -> Value {
         "event-apply-modifier" => arity_cons(4, Some(4)),
         "regexp-quote" => arity_cons(1, Some(1)),
         "open-termscript" | "x-close-connection" => arity_cons(1, Some(1)),
-        "send-string-to-terminal" | "display-supports-face-attributes-p" => arity_cons(1, Some(2)),
+        "send-string-to-terminal"
+        | "display-supports-face-attributes-p"
+        | "x-display-set-last-user-time" => arity_cons(1, Some(2)),
         "x-open-connection" => arity_cons(1, Some(3)),
         "internal-show-cursor" => arity_cons(2, Some(2)),
         "display-buffer" => arity_cons(1, Some(3)),
@@ -896,6 +898,10 @@ fn subr_arity_value(name: &str) -> Value {
         "display-images-p"
         | "display-graphic-p"
         | "display-color-p"
+        | "display-grayscale-p"
+        | "display-mouse-p"
+        | "display-popup-menus-p"
+        | "display-symbol-keys-p"
         | "display-pixel-width"
         | "display-pixel-height"
         | "display-mm-width"
@@ -910,6 +916,7 @@ fn subr_arity_value(name: &str) -> Value {
         | "display-monitor-attributes-list"
         | "frame-monitor-attributes"
         | "terminal-name"
+        | "terminal-parameters"
         | "frame-terminal"
         | "tty-type"
         | "tty-top-frame"
@@ -919,8 +926,19 @@ fn subr_arity_value(name: &str) -> Value {
         | "window-system"
         | "x-display-pixel-width"
         | "x-display-pixel-height"
+        | "x-display-backing-store"
+        | "x-display-color-cells"
+        | "x-display-mm-height"
+        | "x-display-mm-width"
+        | "x-display-monitor-attributes-list"
+        | "x-display-planes"
+        | "x-display-save-under"
+        | "x-display-screens"
+        | "x-display-visual-class"
         | "x-server-version"
+        | "x-server-input-extension-version"
         | "x-server-max-request-size"
+        | "x-server-vendor"
         | "x-display-grayscale-p"
         | "redraw-frame"
         | "ding"
@@ -1325,6 +1343,10 @@ mod tests {
         assert_subr_arity("display-images-p", 0, Some(1));
         assert_subr_arity("display-graphic-p", 0, Some(1));
         assert_subr_arity("display-color-p", 0, Some(1));
+        assert_subr_arity("display-grayscale-p", 0, Some(1));
+        assert_subr_arity("display-mouse-p", 0, Some(1));
+        assert_subr_arity("display-popup-menus-p", 0, Some(1));
+        assert_subr_arity("display-symbol-keys-p", 0, Some(1));
         assert_subr_arity("display-pixel-width", 0, Some(1));
         assert_subr_arity("display-pixel-height", 0, Some(1));
         assert_subr_arity("display-mm-width", 0, Some(1));
@@ -1354,6 +1376,7 @@ mod tests {
         assert_subr_arity("frame-terminal", 0, Some(1));
         assert_subr_arity("frame-selected-window", 0, Some(1));
         assert_subr_arity("terminal-parameter", 2, Some(2));
+        assert_subr_arity("terminal-parameters", 0, Some(1));
         assert_subr_arity("set-terminal-parameter", 3, Some(3));
         assert_subr_arity("tty-type", 0, Some(1));
         assert_subr_arity("tty-display-color-p", 0, Some(1));
@@ -1368,10 +1391,22 @@ mod tests {
         assert_subr_arity("x-open-connection", 1, Some(3));
         assert_subr_arity("x-close-connection", 1, Some(1));
         assert_subr_arity("x-server-version", 0, Some(1));
+        assert_subr_arity("x-server-input-extension-version", 0, Some(1));
         assert_subr_arity("x-server-max-request-size", 0, Some(1));
+        assert_subr_arity("x-server-vendor", 0, Some(1));
         assert_subr_arity("x-display-grayscale-p", 0, Some(1));
+        assert_subr_arity("x-display-backing-store", 0, Some(1));
+        assert_subr_arity("x-display-color-cells", 0, Some(1));
+        assert_subr_arity("x-display-mm-height", 0, Some(1));
+        assert_subr_arity("x-display-mm-width", 0, Some(1));
+        assert_subr_arity("x-display-monitor-attributes-list", 0, Some(1));
         assert_subr_arity("x-display-pixel-width", 0, Some(1));
         assert_subr_arity("x-display-pixel-height", 0, Some(1));
+        assert_subr_arity("x-display-planes", 0, Some(1));
+        assert_subr_arity("x-display-save-under", 0, Some(1));
+        assert_subr_arity("x-display-screens", 0, Some(1));
+        assert_subr_arity("x-display-set-last-user-time", 1, Some(2));
+        assert_subr_arity("x-display-visual-class", 0, Some(1));
     }
 
     #[test]
