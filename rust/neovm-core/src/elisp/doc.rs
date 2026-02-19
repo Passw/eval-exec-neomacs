@@ -98,13 +98,47 @@ fn function_doc_or_error(func_val: Value) -> EvalResult {
             Some(doc) => Ok(Value::string(doc.clone())),
             None => Ok(Value::Nil),
         },
-        Value::Subr(_) => Ok(Value::string("Built-in function.")),
+        Value::Subr(name) => Ok(Value::string(
+            subr_documentation_stub(&name).unwrap_or("Built-in function."),
+        )),
         Value::Str(_) | Value::Vector(_) => Ok(Value::string("Keyboard macro.")),
         Value::ByteCode(bytecode) => Ok(bytecode
             .docstring
             .as_ref()
             .map_or(Value::Nil, |doc| Value::string(doc.clone()))),
         other => Err(signal("invalid-function", vec![other])),
+    }
+}
+
+fn subr_documentation_stub(name: &str) -> Option<&'static str> {
+    match name {
+        "car" => Some(
+            "Return the car of LIST.  If LIST is nil, return nil.\n\
+Error if LIST is not nil and not a cons cell.  See also ‘car-safe’.\n\
+\n\
+See Info node ‘(elisp)Cons Cells’ for a discussion of related basic\n\
+Lisp concepts such as car, cdr, cons cell and list.\n\
+\n\
+(fn LIST)",
+        ),
+        "cdr" => Some(
+            "Return the cdr of LIST.  If LIST is nil, return nil.\n\
+Error if LIST is not nil and not a cons cell.  See also ‘cdr-safe’.\n\
+\n\
+See Info node ‘(elisp)Cons Cells’ for a discussion of related basic\n\
+Lisp concepts such as cdr, car, cons cell and list.\n\
+\n\
+(fn LIST)",
+        ),
+        "if" => Some(
+            "If COND yields non-nil, do THEN, else do ELSE...\n\
+Returns the value of THEN or the value of the last of the ELSE’s.\n\
+THEN must be one expression, but ELSE... can be zero or more expressions.\n\
+If COND yields nil, and there are no ELSE’s, the value is nil.\n\
+\n\
+(fn COND THEN ELSE...)",
+        ),
+        _ => None,
     }
 }
 
@@ -12671,15 +12705,49 @@ mod tests {
     }
 
     #[test]
+    fn documentation_car_subr_uses_oracle_text_shape() {
+        let mut evaluator = super::super::eval::Evaluator::new();
+        evaluator
+            .obarray
+            .set_symbol_function("car", Value::Subr("car".to_string()));
+
+        let result = builtin_documentation(&mut evaluator, vec![Value::symbol("car")]).unwrap();
+        let text = result
+            .as_str()
+            .expect("documentation for car should return a string");
+        assert!(text.starts_with("Return the car of LIST.  If LIST is nil, return nil."));
+        assert_ne!(text, "Built-in function.");
+    }
+
+    #[test]
+    fn documentation_if_special_form_uses_oracle_text_shape() {
+        let mut evaluator = super::super::eval::Evaluator::new();
+        evaluator
+            .obarray
+            .set_symbol_function("if", Value::Subr("if".to_string()));
+
+        let result = builtin_documentation(&mut evaluator, vec![Value::symbol("if")]).unwrap();
+        let text = result
+            .as_str()
+            .expect("documentation for if should return a string");
+        assert!(text.starts_with("If COND yields non-nil, do THEN, else do ELSE..."));
+        assert_ne!(text, "Built-in function.");
+    }
+
+    #[test]
     fn documentation_symbol_alias_to_builtin_returns_docstring() {
         let mut evaluator = super::super::eval::Evaluator::new();
         evaluator
             .obarray
             .set_symbol_function("alias-builtin", Value::symbol("car"));
 
-        let result = builtin_documentation(&mut evaluator, vec![Value::symbol("alias-builtin")]);
-        assert!(result.is_ok());
-        assert!(result.unwrap().is_string());
+        let result = builtin_documentation(&mut evaluator, vec![Value::symbol("alias-builtin")])
+            .unwrap();
+        let text = result
+            .as_str()
+            .expect("documentation alias to car should return a string");
+        assert!(text.starts_with("Return the car of LIST.  If LIST is nil, return nil."));
+        assert_ne!(text, "Built-in function.");
     }
 
     #[test]

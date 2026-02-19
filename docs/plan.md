@@ -4296,6 +4296,30 @@ Last updated: 2026-02-19
 
 ## Done
 
+- Aligned `documentation` builtin-doc text for core `subr`/special-form symbols (`car`, `cdr`, `if`) with GNU Emacs text shape:
+  - runtime changes:
+    - `rust/neovm-core/src/elisp/doc.rs`
+      - added `subr_documentation_stub` mapping for:
+        - `car`
+        - `cdr`
+        - `if`
+      - updated `function_doc_or_error` so `Value::Subr(name)` uses mapped doc text when available, preserving existing `"Built-in function."` fallback for unmapped builtins.
+      - expanded evaluator lock-ins:
+        - `documentation_car_subr_uses_oracle_text_shape`
+        - `documentation_if_special_form_uses_oracle_text_shape`
+        - strengthened `documentation_symbol_alias_to_builtin_returns_docstring`
+  - corpus changes:
+    - expanded and re-recorded:
+      - `test/neovm/vm-compat/cases/documentation-runtime-builtin-semantics.{forms,expected.tsv}`
+      - added lock-ins asserting `documentation` for `car`/`cdr`/`if` and an alias-to-`car` no longer return the generic `"Built-in function."` placeholder and match oracle-style first-line text.
+  - verified:
+    - `cargo test --manifest-path rust/neovm-core/Cargo.toml documentation_car_subr_uses_oracle_text_shape` (pass)
+    - `cargo test --manifest-path rust/neovm-core/Cargo.toml documentation_if_special_form_uses_oracle_text_shape` (pass)
+    - `cargo test --manifest-path rust/neovm-core/Cargo.toml documentation_symbol_alias_to_builtin_returns_docstring` (pass)
+    - `make -C test/neovm/vm-compat record FORMS=cases/documentation-runtime-builtin-semantics.forms EXPECTED=cases/documentation-runtime-builtin-semantics.expected.tsv` (pass)
+    - `make -C test/neovm/vm-compat check-one-neovm CASE=cases/documentation-runtime-builtin-semantics` (pass, 30/30)
+    - `make -C test/neovm/vm-compat check-all-neovm-strict` (pass)
+
 - Aligned `documentation-property` startup string-doc escaped quote-markup display semantics with GNU Emacs:
   - runtime changes:
     - `rust/neovm-core/src/elisp/doc.rs`

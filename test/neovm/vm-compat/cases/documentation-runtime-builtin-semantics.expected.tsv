@@ -24,3 +24,7 @@
 24	(documentation "abc")	OK "Keyboard macro."
 25	(condition-case err (documentation '(macro (x) "md" x)) (error err))	OK (invalid-function ((x) "md" x))
 26	(condition-case err (documentation '(macro)) (error err))	OK (void-function nil)
+27	(let ((s (documentation 'car))) (list (not (null (string-match-p "^Return the car of LIST\\." s))) (null (string-match-p "^Built-in function\\.$" s))))	OK (t t)
+28	(let ((s (documentation 'cdr))) (list (not (null (string-match-p "^Return the cdr of LIST\\." s))) (null (string-match-p "^Built-in function\\.$" s))))	OK (t t)
+29	(let ((s (documentation 'if))) (list (not (null (string-match-p "^If COND yields non-nil, do THEN, else do ELSE\\.\\.\\." s))) (null (string-match-p "^Built-in function\\.$" s))))	OK (t t)
+30	(progn (fset 'vm-doc-alias-builtin 'car) (let ((s (documentation 'vm-doc-alias-builtin))) (list (not (null (string-match-p "^Return the car of LIST\\." s))) (null (string-match-p "^Built-in function\\.$" s)))))	OK (t t)
