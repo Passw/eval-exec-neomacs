@@ -28,6 +28,37 @@ Last updated: 2026-02-19
 
 ## Doing
 
+- Aligned lambda `interactive "e"` event sourcing precedence with oracle and added dedicated lock-ins:
+  - runtime changes:
+    - `rust/neovm-core/src/elisp/interactive.rs`
+      - `interactive "e"` now treats non-empty command-key context as authoritative:
+        - explicit `KEYS` vector when non-empty
+        - otherwise current `this-command-keys-vector`/read-command-key context
+      - unread/last-input fallback is now used only when command-key context is empty.
+      - added unit coverage:
+        - `interactive_lambda_e_spec_falls_back_to_unread_queue_and_last_input_event`
+        - `interactive_lambda_e_spec_prefers_existing_command_keys_context`
+    - `rust/neovm-core/src/elisp/lread.rs`
+      - `read-event` now seeds `this-command-keys*` only when no prior key context exists, and preserves existing key context otherwise.
+      - added unit coverage:
+        - `read_event_sets_command_keys_when_empty`
+        - `read_event_preserves_existing_command_keys_context`
+  - corpus changes:
+    - added and wired:
+      - `test/neovm/vm-compat/cases/interactive-lambda-e-context-semantics.{forms,expected.tsv}`
+      - `test/neovm/vm-compat/cases/default.list`
+    - lock-ins cover:
+      - fallback from unread/last-input when command-key context is empty
+      - stale command-key-context precedence over unread/last fallback
+      - explicit non-empty `KEYS` override while stale context exists
+  - verified:
+    - `cargo test --manifest-path rust/neovm-core/Cargo.toml read_event_ -- --nocapture` (pass)
+    - `cargo test --manifest-path rust/neovm-core/Cargo.toml interactive_lambda_ -- --nocapture` (pass)
+    - `make -C test/neovm/vm-compat record FORMS=cases/interactive-lambda-e-context-semantics.forms EXPECTED=cases/interactive-lambda-e-context-semantics.expected.tsv` (pass)
+    - `make -C test/neovm/vm-compat check-one-neovm CASE=cases/interactive-lambda-e-context-semantics` (pass, `12/12`)
+    - `make -C test/neovm/vm-compat check-one-neovm CASE=cases/interactive-lambda-spec-extended-semantics` (pass, `61/61`)
+    - `make -C test/neovm/vm-compat check-all-neovm-strict` (pass)
+
 - Expanded lambda `interactive` string-code parity for `call-interactively` / `command-execute` and locked the extended matrix in vm-compat:
   - runtime changes:
     - `rust/neovm-core/src/elisp/interactive.rs`

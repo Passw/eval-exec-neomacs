@@ -205,7 +205,7 @@ pub(crate) fn builtin_call_interactively(eval: &mut Evaluator, args: Vec<Value>)
         return Err(signal("void-function", vec![func_val.clone()]));
     };
     let func = normalize_command_callable(eval, func)?;
-    let mut context = InteractiveInvocationContext::from_keys_arg(args.get(2));
+    let mut context = InteractiveInvocationContext::from_keys_arg(eval, args.get(2));
     let call_args = resolve_interactive_invocation_args(
         eval,
         &resolved_name,
@@ -605,14 +605,23 @@ struct ParsedInteractiveStringCode {
 struct InteractiveInvocationContext {
     command_keys: Vec<Value>,
     next_event_with_parameters_index: usize,
+    has_command_keys_context: bool,
 }
 
 impl InteractiveInvocationContext {
-    fn from_keys_arg(keys: Option<&Value>) -> Self {
+    fn from_keys_arg(eval: &Evaluator, keys: Option<&Value>) -> Self {
         let mut context = Self::default();
         if let Some(Value::Vector(values)) = keys {
             let values = values.lock().expect("poisoned");
-            context.command_keys = values.clone();
+            if !values.is_empty() {
+                context.command_keys = values.clone();
+                context.has_command_keys_context = true;
+                return context;
+            }
+        }
+        if !eval.read_command_keys().is_empty() {
+            context.command_keys = eval.read_command_keys().to_vec();
+            context.has_command_keys_context = true;
         }
         context
     }
@@ -803,17 +812,56 @@ fn interactive_apply_prefix_flags(eval: &mut Evaluator, prefix_flags: &[char]) -
     Ok(())
 }
 
-fn interactive_next_event_with_parameters(
+fn interactive_event_with_parameters_p(event: &Value) -> bool {
+    matches!(event, Value::Cons(_))
+}
+
+fn interactive_next_event_with_parameters_from_keys(
     context: &mut InteractiveInvocationContext,
 ) -> Option<Value> {
     while context.next_event_with_parameters_index < context.command_keys.len() {
         let event = context.command_keys[context.next_event_with_parameters_index].clone();
         context.next_event_with_parameters_index += 1;
-        if matches!(event, Value::Cons(_)) {
+        if interactive_event_with_parameters_p(&event) {
             return Some(event);
         }
     }
     None
+}
+
+fn interactive_first_unread_event_with_parameters(eval: &Evaluator) -> Option<Value> {
+    let mut unread_events = dynamic_or_global_symbol_value(eval, "unread-command-events")?;
+    loop {
+        match unread_events {
+            Value::Cons(cell) => {
+                let pair = cell.lock().expect("poisoned");
+                let head = pair.car.clone();
+                let tail = pair.cdr.clone();
+                drop(pair);
+                if interactive_event_with_parameters_p(&head) {
+                    return Some(head);
+                }
+                unread_events = tail;
+            }
+            _ => return None,
+        }
+    }
+}
+
+fn interactive_last_input_event_with_parameters(eval: &Evaluator) -> Option<Value> {
+    let event = dynamic_or_global_symbol_value(eval, "last-input-event")?;
+    interactive_event_with_parameters_p(&event).then_some(event)
+}
+
+fn interactive_next_event_with_parameters(
+    eval: &Evaluator,
+    context: &mut InteractiveInvocationContext,
+) -> Option<Value> {
+    if context.has_command_keys_context {
+        return interactive_next_event_with_parameters_from_keys(context);
+    }
+    interactive_first_unread_event_with_parameters(eval)
+        .or_else(|| interactive_last_input_event_with_parameters(eval))
 }
 
 fn parse_interactive_spec(expr: &Expr) -> Option<ParsedInteractiveSpec> {
@@ -922,7 +970,7 @@ fn interactive_args_from_string_code(
                 Value::string(prompt),
             ])?),
             'e' => {
-                if let Some(event) = interactive_next_event_with_parameters(context) {
+                if let Some(event) = interactive_next_event_with_parameters(eval, context) {
                     args.push(event);
                 } else {
                     return Err(signal(
@@ -1163,7 +1211,7 @@ pub(crate) fn builtin_command_execute(eval: &mut Evaluator, args: Vec<Value>) ->
         return Err(signal("void-function", vec![cmd.clone()]));
     };
     let func = normalize_command_callable(eval, func)?;
-    let mut context = InteractiveInvocationContext::from_keys_arg(args.get(2));
+    let mut context = InteractiveInvocationContext::from_keys_arg(eval, args.get(2));
     let call_args = resolve_interactive_invocation_args(
         eval,
         &resolved_name,
@@ -5447,6 +5495,62 @@ K")
                    (error (car err))))"#,
         );
         assert_eq!(results[0], "OK (t t t t error error error)");
+    }
+
+    #[test]
+    fn interactive_lambda_e_spec_falls_back_to_unread_queue_and_last_input_event() {
+        let mut ev = Evaluator::new();
+        let results = eval_all_with(
+            &mut ev,
+            r#"(list
+                 (let ((unread-command-events (list '(mouse-1))))
+                   (list
+                    (read-event)
+                    (call-interactively (lambda (x) (interactive "e") x))))
+                 (let ((unread-command-events (list '(mouse-1))))
+                   (list
+                    (read-event)
+                    (command-execute (lambda (x) (interactive "e") x))))
+                 (let ((unread-command-events (list 97 '(mouse-1))))
+                   (list
+                    (read-event)
+                    (call-interactively (lambda (x) (interactive "e") x))
+                    unread-command-events))
+                 (let ((unread-command-events (list 97 '(mouse-1))))
+                   (list
+                    (read-event)
+                    (command-execute (lambda (x) (interactive "e") x))
+                    unread-command-events)))"#,
+        );
+        assert_eq!(
+            results[0],
+            "OK (((mouse-1) (mouse-1)) ((mouse-1) (mouse-1)) (97 (mouse-1) ((mouse-1))) (97 (mouse-1) ((mouse-1))))"
+        );
+    }
+
+    #[test]
+    fn interactive_lambda_e_spec_prefers_existing_command_keys_context() {
+        let mut ev = Evaluator::new();
+        let results = eval_all_with(
+            &mut ev,
+            r#"(list
+                 (let ((unread-command-events (list 97)))
+                   (read-key-sequence ""))
+                 (this-command-keys-vector)
+                 (let ((unread-command-events (list '(mouse-1))))
+                   (condition-case err
+                       (call-interactively (lambda (x) (interactive "e") x))
+                     (error (car err))))
+                 (let ((unread-command-events (list '(mouse-1))))
+                   (condition-case err
+                       (call-interactively (lambda (x) (interactive "e") x) nil [])
+                     (error (car err))))
+                 (call-interactively
+                  (lambda (x) (interactive "e") x)
+                  nil
+                  (vector '(mouse-1))))"#,
+        );
+        assert_eq!(results[0], "OK (\"a\" [97] error error (mouse-1))");
     }
 
     #[test]
