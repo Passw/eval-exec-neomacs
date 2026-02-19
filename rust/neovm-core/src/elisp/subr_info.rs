@@ -911,14 +911,17 @@ fn subr_arity_value(name: &str) -> Value {
         | "suspend-tty"
         | "resume-tty"
         | "terminal-coding-system"
+        | "frame-first-window"
         | "frame-parameters"
         | "frame-selected-window"
+        | "minibuffer-window"
         | "window-buffer"
         | "window-body-edges"
         | "window-body-pixel-edges"
         | "window-frame"
         | "window-header-line-height"
         | "window-dedicated-p"
+        | "window-minibuffer-p"
         | "window-mode-line-height"
         | "window-pixel-edges"
         | "window-pixel-height"
@@ -2358,11 +2361,13 @@ mod tests {
     #[test]
     fn subr_arity_window_frame_primitives_match_oracle() {
         assert_subr_arity("display-buffer", 1, Some(3));
+        assert_subr_arity("frame-first-window", 0, Some(1));
         assert_subr_arity("frame-list", 0, Some(0));
         assert_subr_arity("frame-live-p", 1, Some(1));
         assert_subr_arity("frame-parameter", 2, Some(2));
         assert_subr_arity("frame-parameters", 0, Some(1));
         assert_subr_arity("frame-visible-p", 1, Some(1));
+        assert_subr_arity("minibuffer-window", 0, Some(1));
         assert_subr_arity("selected-window", 0, Some(0));
         assert_subr_arity("set-window-buffer", 2, Some(3));
         assert_subr_arity("set-window-point", 2, Some(2));
@@ -2385,6 +2390,7 @@ mod tests {
         assert_subr_arity("window-end", 0, Some(2));
         assert_subr_arity("window-list", 0, Some(3));
         assert_subr_arity("window-live-p", 1, Some(1));
+        assert_subr_arity("window-minibuffer-p", 0, Some(1));
         assert_subr_arity("window-point", 0, Some(1));
         assert_subr_arity("window-start", 0, Some(1));
         assert_subr_arity("window-text-pixel-size", 0, Some(7));

@@ -7698,6 +7698,9 @@ pub(crate) fn dispatch_builtin(
 
         // Window/frame operations (evaluator-dependent)
         "selected-window" => return Some(super::window_cmds::builtin_selected_window(eval, args)),
+        "minibuffer-window" => {
+            return Some(super::window_cmds::builtin_minibuffer_window(eval, args))
+        }
         "window-buffer" => return Some(super::window_cmds::builtin_window_buffer(eval, args)),
         "window-start" => return Some(super::window_cmds::builtin_window_start(eval, args)),
         "window-end" => return Some(super::window_cmds::builtin_window_end(eval, args)),
@@ -7755,6 +7758,9 @@ pub(crate) fn dispatch_builtin(
         "window-dedicated-p" => {
             return Some(super::window_cmds::builtin_window_dedicated_p(eval, args))
         }
+        "window-minibuffer-p" => {
+            return Some(super::window_cmds::builtin_window_minibuffer_p(eval, args))
+        }
         "window-live-p" => return Some(super::window_cmds::builtin_window_live_p(eval, args)),
         "set-window-start" => {
             return Some(super::window_cmds::builtin_set_window_start(eval, args))
@@ -7808,6 +7814,9 @@ pub(crate) fn dispatch_builtin(
         }
         "frame-visible-p" => return Some(super::window_cmds::builtin_frame_visible_p(eval, args)),
         "frame-live-p" => return Some(super::window_cmds::builtin_frame_live_p(eval, args)),
+        "frame-first-window" => {
+            return Some(super::window_cmds::builtin_frame_first_window(eval, args))
+        }
         "windowp" => return Some(super::window_cmds::builtin_windowp(eval, args)),
         "framep" => return Some(super::window_cmds::builtin_framep(eval, args)),
         "window-frame" => return Some(super::window_cmds::builtin_window_frame(eval, args)),

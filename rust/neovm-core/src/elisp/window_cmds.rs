@@ -208,6 +208,37 @@ fn resolve_frame_id(
     }
 }
 
+/// Resolve a frame designator that may also be a live window designator.
+///
+/// `frame-first-window` accepts either a frame or window object in GNU Emacs.
+fn resolve_frame_or_window_frame_id(
+    eval: &mut super::eval::Evaluator,
+    arg: Option<&Value>,
+    predicate: &str,
+) -> Result<FrameId, Flow> {
+    match arg {
+        None | Some(Value::Nil) => Ok(ensure_selected_frame_id(eval)),
+        Some(Value::Int(n)) => {
+            let fid = FrameId(*n as u64);
+            if eval.frames.get(fid).is_some() {
+                return Ok(fid);
+            }
+            let wid = WindowId(*n as u64);
+            if let Some(fid) = eval.frames.find_window_frame_id(wid) {
+                return Ok(fid);
+            }
+            Err(signal(
+                "wrong-type-argument",
+                vec![Value::symbol(predicate), Value::Int(*n)],
+            ))
+        }
+        Some(other) => Err(signal(
+            "wrong-type-argument",
+            vec![Value::symbol(predicate), other.clone()],
+        )),
+    }
+}
+
 /// Helper: get a reference to a leaf window by id.
 fn get_leaf<'a>(frames: &'a FrameManager, fid: FrameId, wid: WindowId) -> Result<&'a Window, Flow> {
     let frame = frames
@@ -371,6 +402,56 @@ pub(crate) fn builtin_frame_selected_window(
         .get(fid)
         .ok_or_else(|| signal("error", vec![Value::string("Frame not found")]))?;
     Ok(Value::Int(frame.selected_window.0 as i64))
+}
+
+/// `(frame-first-window &optional FRAME-OR-WINDOW)` -> first window on frame.
+pub(crate) fn builtin_frame_first_window(
+    eval: &mut super::eval::Evaluator,
+    args: Vec<Value>,
+) -> EvalResult {
+    expect_max_args("frame-first-window", &args, 1)?;
+    let fid = resolve_frame_or_window_frame_id(eval, args.first(), "frame-live-p")?;
+    let frame = eval
+        .frames
+        .get(fid)
+        .ok_or_else(|| signal("error", vec![Value::string("Frame not found")]))?;
+    let first = frame
+        .window_list()
+        .first()
+        .copied()
+        .unwrap_or(frame.selected_window);
+    Ok(Value::Int(first.0 as i64))
+}
+
+/// `(minibuffer-window &optional FRAME)` -> minibuffer window of FRAME.
+pub(crate) fn builtin_minibuffer_window(
+    eval: &mut super::eval::Evaluator,
+    args: Vec<Value>,
+) -> EvalResult {
+    expect_max_args("minibuffer-window", &args, 1)?;
+    let fid = resolve_frame_id(eval, args.first(), "frame-live-p")?;
+    let frame = eval
+        .frames
+        .get(fid)
+        .ok_or_else(|| signal("error", vec![Value::string("Frame not found")]))?;
+    match frame.minibuffer_window {
+        Some(wid) => Ok(Value::Int(wid.0 as i64)),
+        None => Ok(Value::Nil),
+    }
+}
+
+/// `(window-minibuffer-p &optional WINDOW)` -> t when WINDOW is minibuffer.
+pub(crate) fn builtin_window_minibuffer_p(
+    eval: &mut super::eval::Evaluator,
+    args: Vec<Value>,
+) -> EvalResult {
+    expect_max_args("window-minibuffer-p", &args, 1)?;
+    let (fid, wid) = resolve_window_id_with_pred(eval, args.first(), "window-valid-p")?;
+    let is_minibuffer = eval
+        .frames
+        .get(fid)
+        .is_some_and(|frame| frame.minibuffer_window == Some(wid));
+    Ok(Value::bool(is_minibuffer))
 }
 
 /// `(window-frame &optional WINDOW)` -> frame of WINDOW.
@@ -1888,6 +1969,47 @@ mod tests {
         assert_eq!(out[3], "OK (wrong-type-argument frame-live-p \"x\")");
         assert_eq!(out[4], "OK (wrong-type-argument frame-live-p 999999)");
         assert_eq!(out[5], "OK wrong-number-of-arguments");
+    }
+
+    #[test]
+    fn minibuffer_window_frame_first_window_and_window_minibuffer_p_semantics() {
+        let forms = parse_forms(
+            "(window-minibuffer-p)
+             (windowp (minibuffer-window))
+             (windowp (minibuffer-window (selected-frame)))
+             (window-minibuffer-p (minibuffer-window))
+             (eq (frame-first-window) (selected-window))
+             (eq (frame-first-window (selected-window)) (selected-window))
+             (eq (frame-first-window (minibuffer-window)) (selected-window))
+             (eq (minibuffer-window) (car (last (window-list nil t))))
+             (condition-case err (minibuffer-window 999999) (error err))
+             (condition-case err (window-minibuffer-p 999999) (error err))
+             (condition-case err (frame-first-window 999999) (error err))
+             (condition-case err (minibuffer-window (selected-window)) (error (car err)))
+             (condition-case err (window-minibuffer-p nil nil) (error (car err)))
+             (condition-case err (frame-first-window nil nil) (error (car err)))",
+        )
+        .expect("parse");
+        let mut ev = Evaluator::new();
+        let out = ev
+            .eval_forms(&forms)
+            .iter()
+            .map(format_eval_result)
+            .collect::<Vec<_>>();
+        assert_eq!(out[0], "OK nil");
+        assert_eq!(out[1], "OK t");
+        assert_eq!(out[2], "OK t");
+        assert_eq!(out[3], "OK t");
+        assert_eq!(out[4], "OK t");
+        assert_eq!(out[5], "OK t");
+        assert_eq!(out[6], "OK t");
+        assert_eq!(out[7], "OK t");
+        assert_eq!(out[8], "OK (wrong-type-argument frame-live-p 999999)");
+        assert_eq!(out[9], "OK (wrong-type-argument window-valid-p 999999)");
+        assert_eq!(out[10], "OK (wrong-type-argument frame-live-p 999999)");
+        assert_eq!(out[11], "OK wrong-type-argument");
+        assert_eq!(out[12], "OK wrong-number-of-arguments");
+        assert_eq!(out[13], "OK wrong-number-of-arguments");
     }
 
     #[test]

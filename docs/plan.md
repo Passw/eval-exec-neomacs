@@ -28,6 +28,48 @@ Last updated: 2026-02-19
 
 ## Doing
 
+- Completed frame/minibuffer window accessor parity slice and extended oracle lock-ins:
+  - runtime changes:
+    - `rust/neovm-core/src/elisp/window_cmds.rs`
+      - added evaluator-backed builtins:
+        - `frame-first-window` (accepts frame or live window designators)
+        - `minibuffer-window`
+        - `window-minibuffer-p`
+      - added shared frame-or-window designator resolver for GNU-compatible `frame-live-p` error shaping.
+      - added evaluator unit coverage:
+        - `minibuffer_window_frame_first_window_and_window_minibuffer_p_semantics`
+    - `rust/neovm-core/src/elisp/builtins.rs`
+      - wired dispatch for:
+        - `frame-first-window`
+        - `minibuffer-window`
+        - `window-minibuffer-p`
+    - `rust/neovm-core/src/elisp/builtin_registry.rs`
+      - registered the three new runtime names in dispatch registry.
+      - parity registry counts now remain:
+        - `DISPATCH_BUILTIN_NAMES`: `970`
+        - core parity entries: `969`
+    - `rust/neovm-core/src/elisp/subr_info.rs`
+      - added `subr-arity` metadata:
+        - `frame-first-window` `(0 . 1)`
+        - `minibuffer-window` `(0 . 1)`
+        - `window-minibuffer-p` `(0 . 1)`
+      - extended `subr_arity_window_frame_primitives_match_oracle` coverage.
+  - corpus changes:
+    - added:
+      - `test/neovm/vm-compat/cases/window-minibuffer-frame-first-window-semantics.{forms,expected.tsv}`
+    - expanded and re-recorded:
+      - `test/neovm/vm-compat/cases/window-frame-subr-arity-semantics.{forms,expected.tsv}`
+    - wired new case into:
+      - `test/neovm/vm-compat/cases/default.list`
+    - normalized one error row in new case to assert error-symbol parity (`wrong-type-argument`) instead of window object print payload, avoiding oracle `#<window ...>` vs NeoVM integer representation drift.
+  - verified:
+    - `cargo test --manifest-path rust/neovm-core/Cargo.toml minibuffer_window_frame_first_window_and_window_minibuffer_p_semantics` (pass)
+    - `cargo test --manifest-path rust/neovm-core/Cargo.toml subr_arity_window_frame_primitives_match_oracle` (pass)
+    - `make -C test/neovm/vm-compat check-one-neovm CASE=cases/window-minibuffer-frame-first-window-semantics` (pass)
+    - `make -C test/neovm/vm-compat check-one-neovm CASE=cases/window-frame-subr-arity-semantics` (pass)
+    - `make -C test/neovm/vm-compat check-builtin-registry-all` (pass)
+    - `make -C test/neovm/vm-compat check-all-neovm-strict` (pass)
+
 - Completed window geometry/edge builtin parity slice and extended oracle lock-ins:
   - runtime changes:
     - `rust/neovm-core/src/elisp/window_cmds.rs`
