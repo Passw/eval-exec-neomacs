@@ -440,6 +440,7 @@ fn builtin_command_name(name: &str) -> bool {
             | "search-backward"
             | "search-forward"
             | "set-file-modes"
+            | "set-buffer-process-coding-system"
             | "set-keyboard-coding-system"
             | "set-terminal-coding-system"
             | "setenv"
@@ -3313,6 +3314,7 @@ mod tests {
             "re-search-forward",
             "select-frame",
             "setenv",
+            "set-buffer-process-coding-system",
             "kill-process",
             "signal-process",
             "process-menu-delete-process",

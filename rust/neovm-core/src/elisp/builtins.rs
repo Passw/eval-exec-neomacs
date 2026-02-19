@@ -7707,7 +7707,23 @@ pub(crate) fn dispatch_builtin(
         }
         "make-process" => return Some(super::process::builtin_make_process(eval, args)),
         "start-process" => return Some(super::process::builtin_start_process(eval, args)),
+        "start-process-shell-command" => {
+            return Some(super::process::builtin_start_process_shell_command(
+                eval, args,
+            ))
+        }
+        "start-file-process" => return Some(super::process::builtin_start_file_process(eval, args)),
+        "start-file-process-shell-command" => {
+            return Some(super::process::builtin_start_file_process_shell_command(
+                eval, args,
+            ))
+        }
         "call-process" => return Some(super::process::builtin_call_process(eval, args)),
+        "call-process-shell-command" => {
+            return Some(super::process::builtin_call_process_shell_command(
+                eval, args,
+            ))
+        }
         "process-file" => return Some(super::process::builtin_process_file(eval, args)),
         "process-file-shell-command" => {
             return Some(super::process::builtin_process_file_shell_command(
@@ -7721,6 +7737,7 @@ pub(crate) fn dispatch_builtin(
         "delete-process" => return Some(super::process::builtin_delete_process(eval, args)),
         "interrupt-process" => return Some(super::process::builtin_interrupt_process(eval, args)),
         "kill-process" => return Some(super::process::builtin_kill_process(eval, args)),
+        "quit-process" => return Some(super::process::builtin_quit_process(eval, args)),
         "signal-process" => return Some(super::process::builtin_signal_process(eval, args)),
         "stop-process" => return Some(super::process::builtin_stop_process(eval, args)),
         "get-process" => return Some(super::process::builtin_get_process(eval, args)),
@@ -7777,6 +7794,11 @@ pub(crate) fn dispatch_builtin(
         "set-process-thread" => return Some(super::process::builtin_set_process_thread(eval, args)),
         "set-process-window-size" => {
             return Some(super::process::builtin_set_process_window_size(eval, args))
+        }
+        "set-buffer-process-coding-system" => {
+            return Some(super::process::builtin_set_buffer_process_coding_system(
+                eval, args,
+            ))
         }
         "process-lines" => return Some(super::process::builtin_process_lines(eval, args)),
         "process-lines-ignore-status" => {

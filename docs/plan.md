@@ -28,6 +28,45 @@ Last updated: 2026-02-19
 
 ## Doing
 
+- Added process shell-wrapper + quit/buffer-coding compatibility slice and locked oracle parity:
+  - runtime changes:
+    - `rust/neovm-core/src/elisp/process.rs`
+      - implemented:
+        - `start-process-shell-command`
+        - `start-file-process`
+        - `start-file-process-shell-command`
+        - `call-process-shell-command`
+        - `quit-process`
+        - `set-buffer-process-coding-system`
+      - aligned oracle behavior:
+        - strict `:name` validation error for shell-wrapper starters (`:name value not a string`)
+        - `call-process-shell-command` sequence/string contract and arity behavior
+        - `start-file-process` permissive `PROGRAM=nil` path
+        - `quit-process` return semantics with explicit designator vs current-buffer fallback
+        - immediate `process-live-p` after `quit-process` remains live (`run` state) per oracle
+      - added runtime unit lock-in:
+        - `process_shell_wrappers_quit_and_buffer_coding_runtime_surface`
+    - `rust/neovm-core/src/elisp/builtins.rs`
+      - wired evaluator dispatch for all new process builtins above.
+    - `rust/neovm-core/src/elisp/builtin_registry.rs`
+      - registered new process symbols in `DISPATCH_BUILTIN_NAMES`.
+    - `rust/neovm-core/src/elisp/subr_info.rs`
+      - added oracle arity metadata/assertions for the new symbols.
+    - `rust/neovm-core/src/elisp/interactive.rs`
+      - marked `set-buffer-process-coding-system` as command builtin for `commandp` parity.
+  - corpus changes:
+    - added and wired:
+      - `test/neovm/vm-compat/cases/process-shell-wrappers-quit-buffer-coding-semantics.forms`
+      - `test/neovm/vm-compat/cases/process-shell-wrappers-quit-buffer-coding-semantics.expected.tsv`
+      - `test/neovm/vm-compat/cases/default.list`
+  - verified:
+    - `cargo test --manifest-path rust/neovm-core/Cargo.toml process:: -- --nocapture` (pass)
+    - `cargo test --manifest-path rust/neovm-core/Cargo.toml subr_arity_process_primitives_match_oracle -- --nocapture` (pass)
+    - `cargo test --manifest-path rust/neovm-core/Cargo.toml commandp_true_for_additional_builtin_commands -- --nocapture` (pass)
+    - `make -C test/neovm/vm-compat check-one-neovm CASE=cases/process-shell-wrappers-quit-buffer-coding-semantics` (pass, `6/6`)
+    - `make -C test/neovm/vm-compat check-builtin-registry-all` (pass; drifts `0`)
+    - `make -C test/neovm/vm-compat check-all-neovm-strict` (pass; case inventory `785`)
+
 - Added process control/make/setter compatibility slice and locked oracle parity:
   - runtime changes:
     - `rust/neovm-core/src/elisp/process.rs`

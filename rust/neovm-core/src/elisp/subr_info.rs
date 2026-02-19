@@ -924,8 +924,10 @@ fn subr_arity_value(name: &str) -> Value {
         // Process primitives
         "accept-process-output" => arity_cons(0, Some(4)),
         "call-process" => arity_cons(1, None),
+        "call-process-shell-command" => arity_cons(1, None),
         "call-process-region" => arity_cons(3, None),
-        "continue-process" | "interrupt-process" | "kill-process" | "stop-process" => {
+        "continue-process" | "interrupt-process" | "kill-process" | "quit-process"
+        | "stop-process" => {
             arity_cons(0, Some(2))
         }
         "delete-process" => arity_cons(0, Some(1)),
@@ -979,8 +981,10 @@ fn subr_arity_value(name: &str) -> Value {
         | "set-process-thread"
         | "set-process-sentinel" => arity_cons(2, Some(2)),
         "set-process-window-size" => arity_cons(3, Some(3)),
+        "set-buffer-process-coding-system" => arity_cons(2, Some(2)),
         "setenv" => arity_cons(1, Some(3)),
-        "start-process" => arity_cons(3, None),
+        "start-process" | "start-file-process" => arity_cons(3, None),
+        "start-process-shell-command" | "start-file-process-shell-command" => arity_cons(3, Some(3)),
         "getenv" => arity_cons(1, Some(2)),
         // Display/terminal query primitives
         "display-images-p"
@@ -1584,6 +1588,7 @@ mod tests {
     fn subr_arity_process_primitives_match_oracle() {
         assert_subr_arity("accept-process-output", 0, Some(4));
         assert_subr_arity("call-process", 1, None);
+        assert_subr_arity("call-process-shell-command", 1, None);
         assert_subr_arity("call-process-region", 3, None);
         assert_subr_arity("continue-process", 0, Some(2));
         assert_subr_arity("delete-process", 0, Some(1));
@@ -1620,6 +1625,7 @@ mod tests {
         assert_subr_arity("process-plist", 1, Some(1));
         assert_subr_arity("process-put", 3, Some(3));
         assert_subr_arity("process-query-on-exit-flag", 1, Some(1));
+        assert_subr_arity("quit-process", 0, Some(2));
         assert_subr_arity("process-running-child-p", 0, Some(1));
         assert_subr_arity("process-send-eof", 0, Some(1));
         assert_subr_arity("process-send-region", 3, Some(3));
@@ -1642,8 +1648,12 @@ mod tests {
         assert_subr_arity("set-process-sentinel", 2, Some(2));
         assert_subr_arity("set-process-thread", 2, Some(2));
         assert_subr_arity("set-process-window-size", 3, Some(3));
+        assert_subr_arity("set-buffer-process-coding-system", 2, Some(2));
         assert_subr_arity("setenv", 1, Some(3));
         assert_subr_arity("start-process", 3, None);
+        assert_subr_arity("start-process-shell-command", 3, Some(3));
+        assert_subr_arity("start-file-process", 3, None);
+        assert_subr_arity("start-file-process-shell-command", 3, Some(3));
     }
 
     #[test]

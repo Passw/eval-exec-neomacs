@@ -396,6 +396,16 @@ fn expect_string_strict(value: &Value) -> Result<String, Flow> {
     }
 }
 
+fn expect_process_name_string(value: &Value) -> Result<String, Flow> {
+    match value {
+        Value::Str(s) => Ok((**s).clone()),
+        _ => Err(signal(
+            "error",
+            vec![Value::string(":name value not a string")],
+        )),
+    }
+}
+
 fn is_file_keyword(value: &Value) -> bool {
     matches!(value, Value::Keyword(k) if k == ":file" || k == "file")
 }
@@ -1074,6 +1084,61 @@ pub(crate) fn builtin_start_process(
     Ok(Value::Int(id as i64))
 }
 
+/// (start-process-shell-command NAME BUFFER COMMAND) -> process-id
+pub(crate) fn builtin_start_process_shell_command(
+    eval: &mut super::eval::Evaluator,
+    args: Vec<Value>,
+) -> EvalResult {
+    expect_args("start-process-shell-command", &args, 3)?;
+    let name = expect_process_name_string(&args[0])?;
+    let buffer = parse_make_process_buffer(eval, &args[1])?;
+    let command = expect_string_strict(&args[2])?;
+    let id = eval.processes.create_process(
+        name,
+        buffer,
+        "sh".to_string(),
+        vec!["-c".to_string(), command],
+    );
+    Ok(Value::Int(id as i64))
+}
+
+/// (start-file-process NAME BUFFER PROGRAM &rest PROGRAM-ARGS) -> process-id
+pub(crate) fn builtin_start_file_process(
+    eval: &mut super::eval::Evaluator,
+    args: Vec<Value>,
+) -> EvalResult {
+    expect_min_args("start-file-process", &args, 3)?;
+    let name = expect_process_name_string(&args[0])?;
+    let buffer = parse_make_process_buffer(eval, &args[1])?;
+    let program = expect_string(&args[2])?;
+    let proc_args = args[3..]
+        .iter()
+        .map(expect_string)
+        .collect::<Result<Vec<_>, _>>()?;
+    let id = eval
+        .processes
+        .create_process(name, buffer, program, proc_args);
+    Ok(Value::Int(id as i64))
+}
+
+/// (start-file-process-shell-command NAME BUFFER COMMAND) -> process-id
+pub(crate) fn builtin_start_file_process_shell_command(
+    eval: &mut super::eval::Evaluator,
+    args: Vec<Value>,
+) -> EvalResult {
+    expect_args("start-file-process-shell-command", &args, 3)?;
+    let name = expect_process_name_string(&args[0])?;
+    let buffer = parse_make_process_buffer(eval, &args[1])?;
+    let command = expect_string_strict(&args[2])?;
+    let id = eval.processes.create_process(
+        name,
+        buffer,
+        "sh".to_string(),
+        vec!["-c".to_string(), command],
+    );
+    Ok(Value::Int(id as i64))
+}
+
 /// (call-process PROGRAM &optional INFILE DESTINATION DISPLAY &rest ARGS)
 ///
 /// Runs the command synchronously using `std::process::Command`, captures
@@ -1097,6 +1162,27 @@ pub(crate) fn builtin_call_process(
 
     // DISPLAY (arg index 3): ignored in this implementation.
     run_process_command(eval, &program, infile, destination, &cmd_args)
+}
+
+/// (call-process-shell-command COMMAND &optional INFILE DESTINATION DISPLAY &rest ARGS)
+pub(crate) fn builtin_call_process_shell_command(
+    eval: &mut super::eval::Evaluator,
+    args: Vec<Value>,
+) -> EvalResult {
+    expect_min_args("call-process-shell-command", &args, 1)?;
+    let command = sequence_value_to_env_string(&args[0])?;
+    let infile = parse_optional_infile(&args, 1)?;
+    let destination = args.get(2).unwrap_or(&Value::Nil);
+    let cmd_args = if args.len() > 4 {
+        parse_sequence_args(&args[4..])?
+    } else {
+        Vec::new()
+    };
+    let shell_command = shell_command_with_args(&command, &cmd_args);
+    let shell_args = vec!["-c".to_string(), shell_command];
+
+    // DISPLAY (arg index 3): ignored in this implementation.
+    run_process_command(eval, "sh", infile, destination, &shell_args)
 }
 
 /// (process-file PROGRAM &optional INFILE DESTINATION DISPLAY &rest ARGS)
@@ -1448,6 +1534,22 @@ pub(crate) fn builtin_stop_process(
     Ok(ret)
 }
 
+/// (quit-process &optional PROCESS CURRENT-GROUP) -> process-or-nil
+pub(crate) fn builtin_quit_process(
+    eval: &mut super::eval::Evaluator,
+    args: Vec<Value>,
+) -> EvalResult {
+    if args.len() > 2 {
+        return Err(signal(
+            "wrong-number-of-arguments",
+            vec![Value::symbol("quit-process"), Value::Int(args.len() as i64)],
+        ));
+    }
+    let (id, ret) = resolve_optional_process_with_explicit_return(eval, args.first())?;
+    let _ = eval.processes.get(id);
+    Ok(ret)
+}
+
 /// (process-attributes PID) -> alist-or-nil
 pub(crate) fn builtin_process_attributes(
     _eval: &mut super::eval::Evaluator,
@@ -1712,6 +1814,24 @@ pub(crate) fn builtin_set_process_coding_system(
         proc.coding_decode = coding.clone();
         proc.coding_encode = args.get(2).cloned().unwrap_or_else(|| coding.clone());
     }
+    Ok(Value::Nil)
+}
+
+/// (set-buffer-process-coding-system DECODING ENCODING) -> nil
+pub(crate) fn builtin_set_buffer_process_coding_system(
+    eval: &mut super::eval::Evaluator,
+    args: Vec<Value>,
+) -> EvalResult {
+    expect_args("set-buffer-process-coding-system", &args, 2)?;
+    let id = resolve_optional_process_or_current_buffer(eval, None)?;
+    let proc = eval.processes.get_mut(id).ok_or_else(|| {
+        signal(
+            "wrong-type-argument",
+            vec![Value::symbol("processp"), Value::Int(id as i64)],
+        )
+    })?;
+    proc.coding_decode = args[0].clone();
+    proc.coding_encode = args[1].clone();
     Ok(Value::Nil)
 }
 
@@ -3328,5 +3448,95 @@ mod tests {
         );
         assert_eq!(results[13], "OK (wrong-type-argument stringp nil)");
         assert_eq!(results[14], "OK nil");
+    }
+
+    #[test]
+    fn process_shell_wrappers_quit_and_buffer_coding_runtime_surface() {
+        let cat = find_bin("cat");
+        let results = eval_all(&format!(
+            r#"(mapcar (lambda (s)
+                         (list s
+                               (fboundp s)
+                               (subrp (symbol-function s))
+                               (subr-arity (symbol-function s))
+                               (commandp s)))
+                       '(call-process-shell-command
+                         start-process-shell-command
+                         start-file-process
+                         start-file-process-shell-command
+                         quit-process
+                         set-buffer-process-coding-system))
+               (list
+                (call-process-shell-command "echo hi")
+                (call-process-shell-command nil)
+                (condition-case err (call-process-shell-command 1) (error err))
+                (condition-case err (call-process-shell-command) (error (car err))))
+               (list
+                (let ((p (start-process-shell-command "proc-spc-ok" nil "echo hi")))
+                  (unwind-protect
+                      (processp p)
+                    (ignore-errors (delete-process p))))
+                (condition-case err (start-process-shell-command nil nil "echo hi") (error err))
+                (condition-case err (start-process-shell-command "proc-spc-e" nil nil) (error err))
+                (condition-case err (start-process-shell-command "proc-spc-e2" nil 1) (error err))
+                (let ((p (start-file-process "proc-sfp-ok" nil nil)))
+                  (unwind-protect
+                      (processp p)
+                    (ignore-errors (delete-process p))))
+                (condition-case err (start-file-process nil nil "{cat}") (error err))
+                (let ((p (start-file-process-shell-command "proc-sfpsc-ok" nil "echo hi")))
+                  (unwind-protect
+                      (processp p)
+                    (ignore-errors (delete-process p))))
+                (condition-case err (start-file-process-shell-command nil nil "echo hi") (error err))
+                (condition-case err (start-file-process-shell-command "proc-sfpsc-e" nil nil) (error err)))
+               (list
+                (let ((p (start-process "proc-quit-id" nil "{cat}")))
+                  (unwind-protect
+                      (list (eq (quit-process p) p) (process-live-p p))
+                    (ignore-errors (delete-process p))))
+                (let ((p (start-process "proc-quit-name" nil "{cat}")))
+                  (unwind-protect
+                      (equal (quit-process "proc-quit-name") "proc-quit-name")
+                    (ignore-errors (delete-process p))))
+                (with-temp-buffer
+                  (let ((p (start-process "proc-quit-current" (buffer-name (current-buffer)) "{cat}")))
+                    (unwind-protect
+                        (eq (quit-process nil) nil)
+                      (ignore-errors (delete-process p)))))
+                (condition-case err (quit-process "__missing-neovm-proc__") (error err))
+                (condition-case err (quit-process 'x) (error err))
+                (condition-case err (quit-process 1 nil nil) (error (car err))))
+               (with-temp-buffer
+                 (let ((p (start-process "proc-buffer-coding" (buffer-name (current-buffer)) "{cat}")))
+                   (unwind-protect
+                       (list
+                        (set-buffer-process-coding-system 'utf-8-unix 'binary)
+                        (equal (process-coding-system p) '(utf-8-unix . binary)))
+                     (ignore-errors (delete-process p)))))
+               (with-temp-buffer
+                 (condition-case err
+                     (set-buffer-process-coding-system 'utf-8-unix 'utf-8-unix)
+                   (error (car err))))"#
+        ));
+
+        assert_eq!(
+            results[0],
+            "OK ((call-process-shell-command t t (1 . many) nil) (start-process-shell-command t t (3 . 3) nil) (start-file-process t t (3 . many) nil) (start-file-process-shell-command t t (3 . 3) nil) (quit-process t t (0 . 2) nil) (set-buffer-process-coding-system t t (2 . 2) t))"
+        );
+        assert_eq!(
+            results[1],
+            "OK (0 0 (wrong-type-argument sequencep 1) wrong-number-of-arguments)"
+        );
+        assert_eq!(
+            results[2],
+            "OK (t (error \":name value not a string\") (wrong-type-argument stringp nil) (wrong-type-argument stringp 1) t (error \":name value not a string\") t (error \":name value not a string\") (wrong-type-argument stringp nil))"
+        );
+        assert_eq!(
+            results[3],
+            "OK ((t (run open listen connect stop)) t t (error \"Process __missing-neovm-proc__ does not exist\") (wrong-type-argument processp x) wrong-number-of-arguments)"
+        );
+        assert_eq!(results[4], "OK (nil t)");
+        assert_eq!(results[5], "OK error");
     }
 }
