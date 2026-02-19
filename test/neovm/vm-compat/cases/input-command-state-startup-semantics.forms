@@ -12,6 +12,17 @@
         executing-kbd-macro
         executing-kbd-macro-index
         command-history
+        last-command
+        current-fill-column--has-warned
+        current-input-method
+        current-input-method-title
+        current-iso639-language
+        current-key-remap-sequence
+        current-language-environment
+        current-locale-environment
+        current-minibuffer-command
+        current-time-list
+        current-transient-input-method
         command-line-args-left
         command-line-functions
         command-line-processed
@@ -255,6 +266,17 @@
         executing-kbd-macro
         executing-kbd-macro-index
         command-history
+        last-command
+        current-fill-column--has-warned
+        current-input-method
+        current-input-method-title
+        current-iso639-language
+        current-key-remap-sequence
+        current-language-environment
+        current-locale-environment
+        current-minibuffer-command
+        current-time-list
+        current-transient-input-method
         command-line-args-left
         command-line-functions
         command-line-processed
@@ -449,6 +471,10 @@
         command-line-args
         command-line-ns-option-alist
         command-line-x-option-alist
+        current-language-environment
+        current-load-list
+        current-locale-environment
+        current-time-list
         completion-ignored-extensions
         completion--cycling-threshold-type
         completion--styles-type

@@ -15835,6 +15835,30 @@ Last updated: 2026-02-19
     - `make -C test/neovm/vm-compat check-one-neovm CASE=cases/input-last-event-reader-semantics` (pass, `13/13`)
     - `make -C test/neovm/vm-compat check-one-neovm CASE=cases/minibuffer-batch` (pass, `47/47`)
     - `make -C test/neovm/vm-compat check-all-neovm-strict` (pass)
+- Extended startup `current-*` command/input-state parity and stabilized dynamic `current-load-list` lock-in strategy:
+  - runtime changes:
+    - `rust/neovm-core/src/elisp/eval.rs`
+      - seeded startup values for:
+        - `last-command`
+        - `current-fill-column--has-warned`, `current-input-method`, `current-input-method-title`
+        - `current-iso639-language`, `current-key-remap-sequence`
+        - `current-language-environment` (`"UTF-8"`), `current-locale-environment` (`"C.UTF-8"`)
+        - `current-minibuffer-command`, `current-time-list` (`t`), `current-transient-input-method`
+        - `current-load-list` (startup cons shape seed)
+  - oracle corpus changes:
+    - `test/neovm/vm-compat/cases/input-command-state-startup-semantics.forms`
+      - added `boundp` lock-ins for the new `current-*` and `last-command` vars
+      - added exact value lock-ins for stable vars (all new vars except `current-load-list`)
+      - kept `current-load-list` in shape lock-ins only, because oracle mutates it during prompt-reader probes (`oracle_eval.el` path cons), while NeoVM keeps a static startup seed
+    - `test/neovm/vm-compat/cases/input-command-state-startup-semantics.expected.tsv`
+      - re-recorded oracle baseline for the expanded `current-*` matrix
+  - verified:
+    - `make -C test/neovm/vm-compat record FORMS=cases/input-command-state-startup-semantics.forms EXPECTED=cases/input-command-state-startup-semantics.expected.tsv` (pass)
+    - `make -C test/neovm/vm-compat check-one-neovm CASE=cases/input-command-state-startup-semantics` (pass, `11/11`)
+    - `make -C test/neovm/vm-compat check-one-neovm CASE=cases/use-region-p-semantics` (pass, `8/8`)
+    - `make -C test/neovm/vm-compat check-one-neovm CASE=cases/input-last-event-reader-semantics` (pass, `13/13`)
+    - `make -C test/neovm/vm-compat check-one-neovm CASE=cases/minibuffer-batch` (pass, `47/47`)
+    - `make -C test/neovm/vm-compat check-all-neovm-strict` (pass)
 
 ## Doing
 

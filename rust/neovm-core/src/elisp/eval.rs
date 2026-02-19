@@ -255,6 +255,28 @@ impl Evaluator {
         obarray.set_symbol_value("kill-ring", Value::Nil);
         obarray.set_symbol_value("kill-ring-yank-pointer", Value::Nil);
         obarray.set_symbol_value("last-command", Value::Nil);
+        obarray.set_symbol_value("current-fill-column--has-warned", Value::Nil);
+        obarray.set_symbol_value("current-input-method", Value::Nil);
+        obarray.set_symbol_value("current-input-method-title", Value::Nil);
+        obarray.set_symbol_value("current-iso639-language", Value::Nil);
+        obarray.set_symbol_value("current-key-remap-sequence", Value::Nil);
+        obarray.set_symbol_value("current-language-environment", Value::string("UTF-8"));
+        obarray.set_symbol_value(
+            "current-load-list",
+            Value::list(vec![
+                Value::symbol("comp--no-native-compile"),
+                Value::cons(
+                    Value::symbol("defun"),
+                    Value::symbol("load--fixup-all-elns"),
+                ),
+                Value::symbol("load--eln-dest-dir"),
+                Value::symbol("load--bin-dest-dir"),
+            ]),
+        );
+        obarray.set_symbol_value("current-locale-environment", Value::string("C.UTF-8"));
+        obarray.set_symbol_value("current-minibuffer-command", Value::Nil);
+        obarray.set_symbol_value("current-time-list", Value::True);
+        obarray.set_symbol_value("current-transient-input-method", Value::Nil);
         obarray.set_symbol_value("real-last-command", Value::Nil);
         obarray.set_symbol_value("last-repeatable-command", Value::Nil);
         obarray.set_symbol_value("this-original-command", Value::Nil);
