@@ -19,3 +19,23 @@
    (not (null (string-match-p ":vm-desc-keyword-probe" s)))))
 (not (null (string-match-p "defined in" (describe-variable 'load-path nil nil))))
 (condition-case err (describe-variable 'load-path nil nil nil) (error (car err)))
+(let ((s (describe-variable 'load-path)))
+  (list
+   (not (null (string-match-p "List of directories to search for files to load" s)))
+   (not (null (string-match-p "‘default-directory’" s)))
+   (null (string-match-p "`default-directory'" s))
+   (not (null (string-match-p "value is" s)))))
+(progn
+  (setq vm-desc-probe2 1)
+  (put 'vm-desc-probe2 'variable-documentation '(identity "doc"))
+  (let ((s (describe-variable 'vm-desc-probe2)))
+    (list
+     (not (null (string-match-p "doc" s)))
+     (not (null (string-match-p "value is" s))))))
+(progn
+  (setq vm-desc-probe2 1)
+  (put 'vm-desc-probe2 'variable-documentation 9)
+  (let ((s (describe-variable 'vm-desc-probe2)))
+    (list
+     (not (null (string-match-p "Not documented as a variable" s)))
+     (not (null (string-match-p "value is" s))))))

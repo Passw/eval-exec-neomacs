@@ -495,6 +495,33 @@ Last updated: 2026-02-19
     - `make -C test/neovm/vm-compat check-startup-variable-documentation-counts` (pass)
     - `make -C test/neovm/vm-compat check-all-neovm-strict` (pass)
 
+- Completed `describe-variable` documentation/value composition parity and lock-ins:
+  - runtime changes:
+    - `rust/neovm-core/src/elisp/doc.rs`
+      - aligned evaluator-backed `describe-variable` output assembly for `variable-documentation` property variants:
+        - string docs now include both value text and documentation text.
+        - startup integer-doc offsets now include C-source header, resolved startup doc text, and value text.
+        - unresolved integer docs now include C-source header, `Not documented as a variable.`, and value text.
+        - evaluable list docs now include resolved doc text plus value text.
+      - added helpers for shared C-source header formatting and value-string rendering to keep output shape consistent.
+      - expanded evaluator unit coverage for:
+        - `describe_variable_with_doc`
+        - `describe_variable_load_path_uses_c_source_text`
+        - `describe_variable_list_doc_property_includes_doc_and_value_text`
+        - `describe_variable_integer_doc_property_returns_string`
+  - corpus changes:
+    - expanded and re-recorded:
+      - `test/neovm/vm-compat/cases/describe-variable-runtime-semantics.{forms,expected.tsv}`
+      - now locks:
+        - startup `load-path` describe text markers (doc text + display-quote token + value text)
+        - list-doc property output containing both doc and value text
+        - unresolved integer-doc fallback text plus value text
+  - verified:
+    - `cargo test --manifest-path rust/neovm-core/Cargo.toml describe_variable_` (pass)
+    - `make -C test/neovm/vm-compat record FORMS=cases/describe-variable-runtime-semantics.forms EXPECTED=cases/describe-variable-runtime-semantics.expected.tsv` (pass)
+    - `make -C test/neovm/vm-compat check-one-neovm CASE=cases/describe-variable-runtime-semantics` (pass)
+    - `make -C test/neovm/vm-compat check-all-neovm-strict` (pass)
+
 - Completed window old-state helper parity slice and added oracle lock-ins:
   - runtime changes:
     - `rust/neovm-core/src/elisp/window_cmds.rs`

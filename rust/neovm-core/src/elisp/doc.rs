@@ -10880,11 +10880,19 @@ pub(crate) fn builtin_describe_variable(
         .get_property(&name, "variable-documentation")
         .cloned()
     {
+        let value_text = describe_variable_value_or_void_string(eval, &name);
         match doc_val {
-            Value::Str(_) => return Ok(doc_val),
+            Value::Str(s) => return Ok(Value::string(format!("{value_text}{s}\n"))),
             Value::Int(_) => {
+                let header = describe_variable_defined_in_c_source(&name);
+                if startup_variable_doc_offset_symbol(&name, "variable-documentation", &doc_val) {
+                    let doc = startup_variable_doc_stub(&name)
+                        .map(startup_doc_quote_style_display)
+                        .unwrap_or_else(|| "Not documented as a variable.".to_string());
+                    return Ok(Value::string(format!("{header}\n\n{doc}\n\n{value_text}")));
+                }
                 return Ok(Value::string(format!(
-                    "{name} is a variable defined in `C source code`."
+                    "{header}\n\nNot documented as a variable.\n\n{value_text}"
                 )));
             }
             Value::Symbol(sym) => {
@@ -10893,7 +10901,9 @@ pub(crate) fn builtin_describe_variable(
                 }
                 let sym_value = eval.obarray.symbol_value(&sym).cloned().unwrap_or(Value::Nil);
                 return match sym_value {
-                    Value::Str(_) | Value::Int(_) => Ok(describe_variable_value_or_void(eval, &name)),
+                    Value::Str(_) | Value::Int(_) => {
+                        Ok(Value::string(describe_variable_value_or_void_string(eval, &name)))
+                    }
                     other => Err(signal(
                         "wrong-type-argument",
                         vec![Value::symbol("char-or-string-p"), other],
@@ -10906,11 +10916,28 @@ pub(crate) fn builtin_describe_variable(
                     vec![Value::symbol("char-or-string-p"), Value::True],
                 ));
             }
-            _ => return Ok(describe_variable_value_or_void(eval, &name)),
+            other => {
+                let resolved = eval_documentation_property_value(eval, other)?;
+                if let Some(doc) = resolved.as_str() {
+                    return Ok(Value::string(format!("{value_text}{doc}\n")));
+                }
+                return Ok(Value::string(value_text));
+            }
         }
     }
 
     Ok(describe_variable_value_or_void(eval, &name))
+}
+
+fn describe_variable_defined_in_c_source(name: &str) -> String {
+    startup_doc_quote_style_display(&format!("{name} is a variable defined in `C source code`."))
+}
+
+fn describe_variable_value_or_void_string(eval: &super::eval::Evaluator, name: &str) -> String {
+    describe_variable_value_or_void(eval, name)
+        .as_str()
+        .unwrap_or_default()
+        .to_string()
 }
 
 fn describe_variable_value_or_void(eval: &super::eval::Evaluator, name: &str) -> Value {
@@ -12952,7 +12979,12 @@ mod tests {
 
         let result = builtin_describe_variable(&mut evaluator, vec![Value::symbol("my-var")]);
         assert!(result.is_ok());
-        assert_eq!(result.unwrap().as_str(), Some("The answer."));
+        let text = result.unwrap();
+        let text = text
+            .as_str()
+            .expect("describe-variable with string doc should return a string");
+        assert!(text.contains("my-var\u{2019}s value is 42"));
+        assert!(text.contains("The answer."));
     }
 
     #[test]
@@ -12960,16 +12992,18 @@ mod tests {
         let mut evaluator = super::super::eval::Evaluator::new();
         let result = builtin_describe_variable(&mut evaluator, vec![Value::symbol("load-path")]);
         assert!(result.is_ok());
-        assert!(
-            result
-                .unwrap()
-                .as_str()
-                .is_some_and(|s| s.contains("defined in"))
-        );
+        let text = result.unwrap();
+        let text = text
+            .as_str()
+            .expect("describe-variable load-path should return a string");
+        assert!(text.contains("defined in"));
+        assert!(text.contains("List of directories to search for files to load"));
+        assert!(text.contains("‘default-directory’"));
+        assert!(text.contains("value is"));
     }
 
     #[test]
-    fn describe_variable_list_doc_property_falls_back_to_value_text() {
+    fn describe_variable_list_doc_property_includes_doc_and_value_text() {
         let mut evaluator = super::super::eval::Evaluator::new();
         evaluator.obarray.set_symbol_value("my-var", Value::Int(42));
         evaluator.obarray.put_property(
@@ -12984,7 +13018,7 @@ mod tests {
             result
                 .unwrap()
                 .as_str()
-                .is_some_and(|s| s.contains("value is"))
+                .is_some_and(|s| s.contains("doc") && s.contains("value is"))
         );
     }
 
@@ -13002,7 +13036,7 @@ mod tests {
             result
                 .unwrap()
                 .as_str()
-                .is_some_and(|s| s.contains("defined in"))
+                .is_some_and(|s| s.contains("value is"))
         );
     }
 
