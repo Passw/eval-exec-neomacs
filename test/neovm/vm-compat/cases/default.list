@@ -596,6 +596,7 @@ cases/vconcat-mixed-sequence-semantics
 cases/string-trim-semantics
 cases/string-prefix-suffix-semantics
 cases/string-join-semantics
+cases/string-startup-bytecode-wrapper-semantics
 cases/string-concat-error-paths
 cases/string-to-number-semantics
 cases/percent-mod-ash-semantics

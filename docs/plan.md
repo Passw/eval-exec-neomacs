@@ -28,6 +28,26 @@ Last updated: 2026-02-19
 
 ## Doing
 
+- Tightened startup wrapper arglist/arity parity for `string-join` and `string-to-list`:
+  - runtime changes:
+    - `rust/neovm-core/src/elisp/eval.rs`
+      - split startup wrapper seeding into:
+        - generic `&rest` wrapper path for variadic startup helpers.
+        - fixed-arity wrapper path for startup helpers that must expose oracle arglists.
+      - moved `string-join` / `string-to-list` onto fixed-arity startup bytecode wrappers so startup introspection matches oracle:
+        - `func-arity`: `(1 . 2)` / `(1 . 1)`
+        - `help-function-arglist`: `(strings &optional separator)` / `(string)`
+  - vm-compat corpus changes:
+    - added:
+      - `test/neovm/vm-compat/cases/string-startup-bytecode-wrapper-semantics.forms`
+      - `test/neovm/vm-compat/cases/string-startup-bytecode-wrapper-semantics.expected.tsv`
+    - wired case into:
+      - `test/neovm/vm-compat/cases/default.list`
+  - verified:
+    - `make -C test/neovm/vm-compat check-one-neovm CASE=cases/string-startup-bytecode-wrapper-semantics` (pass, `6/6`)
+    - `make -C test/neovm/vm-compat check-builtin-registry-all` (pass)
+    - `make -C test/neovm/vm-compat check-all-neovm-strict` (pass)
+
 - Cleared the builtin-registry sync allowlist by aligning remaining startup-policy names with oracle surface:
   - runtime/registry changes:
     - `rust/neovm-core/src/elisp/eval.rs`

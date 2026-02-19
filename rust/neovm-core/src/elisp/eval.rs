@@ -1020,7 +1020,7 @@ impl Evaluator {
         );
         // Some startup helpers are Lisp functions that delegate to primitives.
         // Seed lightweight bytecode wrappers so `symbol-function` shape matches GNU Emacs.
-        let mut seed_function_wrapper = |name: &str| {
+        let seed_function_wrapper = |obarray: &mut Obarray, name: &str| {
             let wrapper = format!("neovm--startup-subr-wrapper-{name}");
             obarray.set_symbol_function(&wrapper, Value::Subr(name.to_string()));
 
@@ -1040,6 +1040,25 @@ impl Evaluator {
             let bc = Compiler::new(false).compile_lambda(&params, &body);
             obarray.set_symbol_function(name, Value::ByteCode(Arc::new(bc)));
         };
+        let seed_fixed_arity_wrapper =
+            |obarray: &mut Obarray, name: &str, required: &[&str], optional: &[&str]| {
+                let wrapper = format!("neovm--startup-subr-wrapper-{name}");
+                obarray.set_symbol_function(&wrapper, Value::Subr(name.to_string()));
+
+                let params = LambdaParams {
+                    required: required.iter().map(|s| (*s).to_string()).collect(),
+                    optional: optional.iter().map(|s| (*s).to_string()).collect(),
+                    rest: None,
+                };
+
+                let mut call = Vec::with_capacity(1 + required.len() + optional.len());
+                call.push(Expr::Symbol(wrapper));
+                call.extend(required.iter().map(|s| Expr::Symbol((*s).to_string())));
+                call.extend(optional.iter().map(|s| Expr::Symbol((*s).to_string())));
+
+                let bc = Compiler::new(false).compile_lambda(&params, &[Expr::List(call)]);
+                obarray.set_symbol_function(name, Value::ByteCode(Arc::new(bc)));
+            };
         for name in [
             "autoloadp",
             "seq-count",
@@ -1067,12 +1086,13 @@ impl Evaluator {
             "string-blank-p",
             "string-empty-p",
             "string-equal-ignore-case",
-            "string-join",
-            "string-to-list",
             "string-to-vector",
         ] {
-            seed_function_wrapper(name);
+            seed_function_wrapper(&mut obarray, name);
         }
+
+        seed_fixed_arity_wrapper(&mut obarray, "string-join", &["strings"], &["separator"]);
+        seed_fixed_arity_wrapper(&mut obarray, "string-to-list", &["string"], &[]);
 
         // Keep word-at-point unavailable at startup; symbol-at-point lazily
         // materializes it to mirror GNU Emacs thing-at-point bootstrap.
