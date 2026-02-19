@@ -1,5 +1,5 @@
-; read-event publishes into this-command-keys* when empty and preserves
-; existing key context on later reads.
+; read-event with non-nil SECONDS does not seed this-command-keys* when empty.
+; once key context exists, later non-nil SECONDS reads preserve that context.
 
 (this-command-keys-vector)
 
@@ -7,10 +7,22 @@
   (read-event nil nil 0))
 (this-command-keys-vector)
 
+(let ((unread-command-events (list 98)))
+  (read-event nil nil 1))
+(this-command-keys-vector)
+
+(let ((unread-command-events (list 99)))
+  (read-event nil nil 0.25))
+(this-command-keys-vector)
+
+(let ((unread-command-events (list 100)))
+  (read-event nil nil nil))
+(this-command-keys-vector)
+
 (let ((unread-command-events (list '(mouse-1))))
   (read-event nil nil 0))
 (this-command-keys-vector)
 
 (let ((unread-command-events nil))
-  (read-event nil nil 0))
+  (read-event nil nil 1))
 (this-command-keys-vector)

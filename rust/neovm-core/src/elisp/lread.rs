@@ -739,6 +739,36 @@ mod tests {
     }
 
     #[test]
+    fn read_event_with_positive_seconds_does_not_set_command_keys_when_empty() {
+        let mut ev = Evaluator::new();
+        ev.obarray
+            .set_symbol_value("unread-command-events", Value::list(vec![Value::Int(97)]));
+        let _ = builtin_read_event(&mut ev, vec![Value::Nil, Value::Nil, Value::Int(1)]).unwrap();
+        assert_eq!(ev.read_command_keys(), &[]);
+    }
+
+    #[test]
+    fn read_event_with_float_seconds_does_not_set_command_keys_when_empty() {
+        let mut ev = Evaluator::new();
+        ev.obarray
+            .set_symbol_value("unread-command-events", Value::list(vec![Value::Int(97)]));
+        let _ =
+            builtin_read_event(&mut ev, vec![Value::Nil, Value::Nil, Value::Float(0.25)]).unwrap();
+        assert_eq!(ev.read_command_keys(), &[]);
+    }
+
+    #[test]
+    fn read_event_with_non_nil_seconds_preserves_existing_command_keys_context() {
+        let mut ev = Evaluator::new();
+        ev.set_read_command_keys(vec![Value::Int(97)]);
+        ev.obarray
+            .set_symbol_value("unread-command-events", Value::list(vec![Value::Int(98)]));
+        let _ =
+            builtin_read_event(&mut ev, vec![Value::Nil, Value::Nil, Value::Float(0.25)]).unwrap();
+        assert_eq!(ev.read_command_keys(), &[Value::Int(97)]);
+    }
+
+    #[test]
     fn read_event_with_nil_seconds_sets_command_keys_when_empty() {
         let mut ev = Evaluator::new();
         ev.obarray

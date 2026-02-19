@@ -1,0 +1,11 @@
+; Zero-arg read-event seeds this-command-keys* from empty key context.
+
+(this-command-keys-vector)
+
+(let ((unread-command-events (list 97)))
+  (read-event))
+(this-command-keys-vector)
+
+(let ((unread-command-events (list '(mouse-1))))
+  (read-event))
+(this-command-keys-vector)

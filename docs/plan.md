@@ -47,24 +47,31 @@ Last updated: 2026-02-19
         - `read_event_sets_command_keys_when_empty`
         - `read_event_preserves_existing_command_keys_context`
         - `read_event_with_seconds_does_not_set_command_keys_when_empty`
+        - `read_event_with_positive_seconds_does_not_set_command_keys_when_empty`
+        - `read_event_with_float_seconds_does_not_set_command_keys_when_empty`
+        - `read_event_with_non_nil_seconds_preserves_existing_command_keys_context`
         - `read_event_with_nil_seconds_sets_command_keys_when_empty`
   - corpus changes:
     - added and wired:
       - `test/neovm/vm-compat/cases/interactive-lambda-e-context-semantics.{forms,expected.tsv}`
+      - `test/neovm/vm-compat/cases/read-event-command-keys-noarg-seeding-semantics.{forms,expected.tsv}`
       - `test/neovm/vm-compat/cases/read-event-command-keys-seed-preserve-semantics.{forms,expected.tsv}`
       - `test/neovm/vm-compat/cases/default.list`
     - lock-ins cover:
       - fallback from unread/last-input when command-key context is empty
+      - no-arg `read-event` seeding into empty command-key context
       - stale command-key-context precedence over unread/last fallback
       - explicit non-empty `KEYS` override while stale context exists
-      - `read-event` command-key publication with `SECONDS` timeout nuance
+      - `read-event` command-key publication with `SECONDS` timeout nuance (`0`, positive int, float, `nil`)
   - verified:
     - `cargo test --manifest-path rust/neovm-core/Cargo.toml read_event_ -- --nocapture` (pass)
     - `cargo test --manifest-path rust/neovm-core/Cargo.toml interactive_lambda_ -- --nocapture` (pass)
     - `make -C test/neovm/vm-compat record FORMS=cases/interactive-lambda-e-context-semantics.forms EXPECTED=cases/interactive-lambda-e-context-semantics.expected.tsv` (pass)
+    - `make -C test/neovm/vm-compat record FORMS=cases/read-event-command-keys-noarg-seeding-semantics.forms EXPECTED=cases/read-event-command-keys-noarg-seeding-semantics.expected.tsv` (pass)
     - `make -C test/neovm/vm-compat record FORMS=cases/read-event-command-keys-seed-preserve-semantics.forms EXPECTED=cases/read-event-command-keys-seed-preserve-semantics.expected.tsv` (pass)
     - `make -C test/neovm/vm-compat check-one-neovm CASE=cases/interactive-lambda-e-context-semantics` (pass, `12/12`)
-    - `make -C test/neovm/vm-compat check-one-neovm CASE=cases/read-event-command-keys-seed-preserve-semantics` (pass, `7/7`)
+    - `make -C test/neovm/vm-compat check-one-neovm CASE=cases/read-event-command-keys-noarg-seeding-semantics` (pass, `5/5`)
+    - `make -C test/neovm/vm-compat check-one-neovm CASE=cases/read-event-command-keys-seed-preserve-semantics` (pass, `13/13`)
     - `make -C test/neovm/vm-compat check-one-neovm CASE=cases/interactive-lambda-spec-extended-semantics` (pass, `61/61`)
     - `make -C test/neovm/vm-compat check-all-neovm-strict` (pass)
 
