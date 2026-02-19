@@ -4296,6 +4296,29 @@ Last updated: 2026-02-19
 
 ## Done
 
+- Aligned `documentation-property` startup string-doc escaped quote-markup display semantics with GNU Emacs:
+  - runtime changes:
+    - `rust/neovm-core/src/elisp/doc.rs`
+      - refined `startup_doc_quote_style_display` to strip escaped doc quote markup (`\\\`...\’`) while preserving display normalization for regular backtick/apostrophe pairs.
+      - added startup string-doc path handling in `builtin_documentation_property_eval`:
+        - startup string docs now use display normalization for `RAW=nil`
+        - startup string docs preserve raw markup for `RAW=t`
+      - added evaluator lock-ins:
+        - `documentation_property_eval_ctl_x_4_map_display_strips_markup_and_raw_preserves_it`
+        - expanded `startup_doc_quote_style_display_handles_backtick_pairs`
+  - corpus changes:
+    - expanded and re-recorded:
+      - `test/neovm/vm-compat/cases/documentation-property-semantics.{forms,expected.tsv}`
+      - added lock-in for `ctl-x-4-map`:
+        - display output includes `C-x 4` and excludes `\\\`C-x 4'`
+        - raw output preserves `\\\`C-x 4'`
+  - verified:
+    - `cargo test --manifest-path rust/neovm-core/Cargo.toml documentation_property_eval_` (pass, 30/30)
+    - `cargo test --manifest-path rust/neovm-core/Cargo.toml startup_doc_quote_style_display_handles_backtick_pairs` (pass)
+    - `make -C test/neovm/vm-compat record FORMS=cases/documentation-property-semantics.forms EXPECTED=cases/documentation-property-semantics.expected.tsv` (pass)
+    - `make -C test/neovm/vm-compat check-one-neovm CASE=cases/documentation-property-semantics` (pass, 57/57)
+    - `make -C test/neovm/vm-compat check-all-neovm-strict` (pass)
+
 - Aligned `describe-variable` startup-doc quote-style normalization for paired backticks with GNU Emacs:
   - runtime changes:
     - `rust/neovm-core/src/elisp/doc.rs`

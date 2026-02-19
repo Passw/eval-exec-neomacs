@@ -10745,10 +10745,50 @@ fn startup_variable_doc_stub(sym: &str) -> Option<&'static str> {
         .find_map(|(name, doc)| (*name == sym).then_some(*doc))
 }
 
+fn startup_variable_doc_string_symbol(sym: &str, prop: &str, value: &Value) -> bool {
+    prop == "variable-documentation"
+        && value.as_str().is_some()
+        && STARTUP_VARIABLE_DOC_STRING_PROPERTIES
+            .iter()
+            .any(|(name, _)| *name == sym)
+}
+
 fn startup_doc_quote_style_display(doc: &str) -> String {
     let mut out = String::with_capacity(doc.len());
     let mut backtick_open = false;
-    for ch in doc.chars() {
+    let mut escaped_backtick_open = false;
+    let mut chars = doc.chars().peekable();
+
+    while let Some(ch) = chars.next() {
+        if ch == '\\' {
+            match chars.peek().copied() {
+                Some('`') => {
+                    chars.next();
+                    escaped_backtick_open = true;
+                    backtick_open = false;
+                    continue;
+                }
+                Some('\'') if escaped_backtick_open => {
+                    chars.next();
+                    escaped_backtick_open = false;
+                    continue;
+                }
+                _ => {
+                    out.push(ch);
+                    continue;
+                }
+            }
+        }
+
+        if escaped_backtick_open {
+            if ch == '\'' {
+                escaped_backtick_open = false;
+            } else {
+                out.push(ch);
+            }
+            continue;
+        }
+
         match ch {
             '`' => {
                 if backtick_open {
@@ -10768,6 +10808,7 @@ fn startup_doc_quote_style_display(doc: &str) -> String {
             _ => out.push(ch),
         }
     }
+
     out
 }
 
@@ -11041,6 +11082,17 @@ pub(crate) fn builtin_documentation_property_eval(
                 startup_doc_quote_style_raw(&base_doc)
             } else {
                 startup_doc_quote_style_display(&base_doc)
+            };
+            Ok(Value::string(doc))
+        }
+        Some(value) if startup_variable_doc_string_symbol(sym, prop, &value) => {
+            let text = value
+                .as_str()
+                .expect("startup string variable-documentation should be string");
+            let doc = if raw {
+                startup_doc_quote_style_raw(text)
+            } else {
+                startup_doc_quote_style_display(text)
             };
             Ok(Value::string(doc))
         }
@@ -13279,6 +13331,10 @@ mod tests {
             startup_doc_quote_style_display("`default-directory'"),
             "‘default-directory’"
         );
+        assert_eq!(
+            startup_doc_quote_style_display("Keymap for subcommands of \\`C-x 4'."),
+            "Keymap for subcommands of C-x 4."
+        );
     }
 
     #[test]
@@ -13611,6 +13667,39 @@ mod tests {
         assert_ne!(display, raw);
         assert!(display.contains("‘default-directory’"));
         assert!(raw.contains("`default-directory'"));
+    }
+
+    #[test]
+    fn documentation_property_eval_ctl_x_4_map_display_strips_markup_and_raw_preserves_it() {
+        let mut evaluator = super::super::eval::Evaluator::new();
+        let display = builtin_documentation_property_eval(
+            &mut evaluator,
+            vec![
+                Value::symbol("ctl-x-4-map"),
+                Value::symbol("variable-documentation"),
+                Value::Nil,
+            ],
+        )
+        .unwrap();
+        let raw = builtin_documentation_property_eval(
+            &mut evaluator,
+            vec![
+                Value::symbol("ctl-x-4-map"),
+                Value::symbol("variable-documentation"),
+                Value::True,
+            ],
+        )
+        .unwrap();
+        let display = display
+            .as_str()
+            .expect("display documentation-property should return a string");
+        let raw = raw
+            .as_str()
+            .expect("raw documentation-property should return a string");
+
+        assert!(display.contains("C-x 4"));
+        assert!(!display.contains("\\`C-x 4'"));
+        assert!(raw.contains("\\`C-x 4'"));
     }
 
     #[test]

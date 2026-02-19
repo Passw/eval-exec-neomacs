@@ -54,3 +54,4 @@
 54	(progn (put 'vm-docprop-symbol 'variable-documentation '(progn "doc")) (documentation-property 'vm-docprop-symbol 'variable-documentation t))	OK "doc"
 55	(condition-case err (documentation-property 1 'variable-documentation) (error (car err)))	OK wrong-type-argument
 56	(condition-case err (documentation-property 'vm-docprop-symbol) (error (car err)))	OK wrong-number-of-arguments
+57	(let ((display (documentation-property 'ctl-x-4-map 'variable-documentation nil)) (raw (documentation-property 'ctl-x-4-map 'variable-documentation t))) (list (not (null (string-match-p "C-x 4" display))) (null (string-match-p "\\\\`C-x 4'" display)) (not (null (string-match-p "\\\\`C-x 4'" raw)))))	OK (t t t)
