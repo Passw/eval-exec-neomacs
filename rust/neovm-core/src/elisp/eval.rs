@@ -173,6 +173,23 @@ impl Evaluator {
         obarray.set_symbol_value("executing-kbd-macro-index", Value::Int(0));
         obarray.set_symbol_value("command-history", Value::Nil);
         obarray.set_symbol_value("extended-command-history", Value::Nil);
+        obarray.set_symbol_value("completion-ignore-case", Value::Nil);
+        obarray.set_symbol_value("read-buffer-completion-ignore-case", Value::Nil);
+        obarray.set_symbol_value("read-file-name-completion-ignore-case", Value::Nil);
+        obarray.set_symbol_value("completion-regexp-list", Value::Nil);
+        obarray.set_symbol_value("completion-category-overrides", Value::Nil);
+        obarray.set_symbol_value("completion-cycle-threshold", Value::Nil);
+        obarray.set_symbol_value("completion-auto-help", Value::True);
+        obarray.set_symbol_value("completion-auto-select", Value::Nil);
+        obarray.set_symbol_value("completion-show-help", Value::True);
+        obarray.set_symbol_value("completion-show-inline-help", Value::True);
+        obarray.set_symbol_value("completion-lazy-hilit", Value::Nil);
+        obarray.set_symbol_value("enable-recursive-minibuffers", Value::Nil);
+        obarray.set_symbol_value("history-length", Value::Int(100));
+        obarray.set_symbol_value("history-delete-duplicates", Value::Nil);
+        obarray.set_symbol_value("history-add-new-input", Value::True);
+        obarray.set_symbol_value("read-buffer-function", Value::Nil);
+        obarray.set_symbol_value("read-file-name-function", Value::symbol("read-file-name-default"));
         obarray.set_symbol_value("read-expression-history", Value::Nil);
         obarray.set_symbol_value("read-number-history", Value::Nil);
         obarray.set_symbol_value("read-char-history", Value::Nil);
@@ -195,6 +212,34 @@ impl Evaluator {
         obarray.set_symbol_value("minibuffer-message-clear-timeout", Value::Nil);
         obarray.set_symbol_value("minibuffer-message-properties", Value::Nil);
         obarray.set_symbol_value("minibuffer-text-before-history", Value::Nil);
+        obarray.set_symbol_value(
+            "minibuffer-prompt-properties",
+            Value::list(vec![
+                Value::symbol("read-only"),
+                Value::True,
+                Value::symbol("face"),
+                Value::symbol("minibuffer-prompt"),
+            ]),
+        );
+        obarray.set_symbol_value("minibuffer-allow-text-properties", Value::Nil);
+        obarray.set_symbol_value("minibuffer-scroll-window", Value::Nil);
+        obarray.set_symbol_value("minibuffer-visible-completions", Value::Nil);
+        obarray.set_symbol_value("minibuffer-visible-completions--always-bind", Value::Nil);
+        obarray.set_symbol_value("minibuffer-depth-indicate-mode", Value::Nil);
+        obarray.set_symbol_value("minibuffer-default-prompt-format", Value::string(" (default %s)"));
+        obarray.set_symbol_value("minibuffer-beginning-of-buffer-movement", Value::Nil);
+        obarray.set_symbol_value("minibuffer-electric-default-mode", Value::Nil);
+        obarray.set_symbol_value(
+            "minibuffer-confirm-exit-commands",
+            Value::list(vec![
+                Value::symbol("completion-at-point"),
+                Value::symbol("minibuffer-complete"),
+                Value::symbol("minibuffer-complete-word"),
+            ]),
+        );
+        obarray.set_symbol_value("minibuffer-history-case-insensitive-variables", Value::Nil);
+        obarray.set_symbol_value("minibuffer-on-screen-keyboard-displayed", Value::Nil);
+        obarray.set_symbol_value("minibuffer-on-screen-keyboard-timer", Value::Nil);
         obarray.set_symbol_value("regexp-search-ring", Value::Nil);
         obarray.set_symbol_value("regexp-search-ring-yank-pointer", Value::Nil);
         obarray.set_symbol_value("search-ring", Value::Nil);

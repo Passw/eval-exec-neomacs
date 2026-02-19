@@ -242,6 +242,40 @@ Last updated: 2026-02-19
     - `make -C test/neovm/vm-compat check-one-neovm CASE=cases/input-last-event-reader-semantics` (pass, `13/13`)
     - `make -C test/neovm/vm-compat check-all-neovm-strict` (pass)
 
+- Extended startup completion/minibuffer helper parity:
+  - runtime changes:
+    - `rust/neovm-core/src/elisp/eval.rs`
+      - evaluator startup now also seeds:
+        - completion/history/read helpers:
+          - `completion-ignore-case`, `read-buffer-completion-ignore-case`, `read-file-name-completion-ignore-case`
+          - `completion-regexp-list`, `completion-category-overrides`, `completion-cycle-threshold`
+          - `completion-auto-help` (`t`), `completion-auto-select`, `completion-show-help` (`t`), `completion-show-inline-help` (`t`), `completion-lazy-hilit`
+          - `enable-recursive-minibuffers`, `history-length` (`100`), `history-delete-duplicates`, `history-add-new-input` (`t`)
+          - `read-buffer-function`, `read-file-name-function` (`read-file-name-default`)
+        - minibuffer helper defaults:
+          - `minibuffer-prompt-properties` (`(read-only t face minibuffer-prompt)`)
+          - `minibuffer-allow-text-properties`, `minibuffer-scroll-window`
+          - `minibuffer-visible-completions`, `minibuffer-visible-completions--always-bind`
+          - `minibuffer-depth-indicate-mode`
+          - `minibuffer-default-prompt-format` (`" (default %s)"`)
+          - `minibuffer-beginning-of-buffer-movement`, `minibuffer-electric-default-mode`
+          - `minibuffer-confirm-exit-commands` (`(completion-at-point minibuffer-complete minibuffer-complete-word)`)
+          - `minibuffer-history-case-insensitive-variables`
+          - `minibuffer-on-screen-keyboard-displayed`, `minibuffer-on-screen-keyboard-timer`
+  - corpus changes:
+    - expanded and re-recorded:
+      - `test/neovm/vm-compat/cases/input-command-state-startup-semantics.{forms,expected.tsv}`
+    - lock-ins now include:
+      - startup boundness/default-value shape for completion/minibuffer helper vars above
+      - reader-path invariance for those vars across `read-key`/`read-event` and batch prompt-reader EOF paths
+  - verified:
+    - `make -C test/neovm/vm-compat record FORMS=cases/input-command-state-startup-semantics.forms EXPECTED=cases/input-command-state-startup-semantics.expected.tsv` (pass)
+    - `make -C test/neovm/vm-compat check-one-neovm CASE=cases/input-command-state-startup-semantics` (pass, `6/6`)
+    - `make -C test/neovm/vm-compat check-one-neovm CASE=cases/use-region-p-semantics` (pass, `8/8`)
+    - `make -C test/neovm/vm-compat check-one-neovm CASE=cases/input-last-event-reader-semantics` (pass, `13/13`)
+    - `make -C test/neovm/vm-compat check-one-neovm CASE=cases/minibuffer-batch` (pass, `47/47`)
+    - `make -C test/neovm/vm-compat check-all-neovm-strict` (pass)
+
 - Expanded batch prompt/input queue-edge lock-ins for stale/invalid unread tails:
   - corpus changes:
     - expanded and re-recorded:
