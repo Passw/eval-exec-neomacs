@@ -164,9 +164,26 @@ impl Evaluator {
         obarray.set_symbol_value("kill-ring", Value::Nil);
         obarray.set_symbol_value("kill-ring-yank-pointer", Value::Nil);
         obarray.set_symbol_value("last-command", Value::Nil);
+        obarray.set_symbol_value("real-last-command", Value::Nil);
+        obarray.set_symbol_value("last-repeatable-command", Value::Nil);
+        obarray.set_symbol_value("this-original-command", Value::Nil);
+        obarray.set_symbol_value("prefix-arg", Value::Nil);
+        obarray.set_symbol_value("defining-kbd-macro", Value::Nil);
+        obarray.set_symbol_value("executing-kbd-macro", Value::Nil);
+        obarray.set_symbol_value("executing-kbd-macro-index", Value::Int(0));
         obarray.set_symbol_value("last-command-event", Value::Nil);
+        obarray.set_symbol_value("last-event-frame", Value::Nil);
+        obarray.set_symbol_value("last-event-device", Value::Nil);
         obarray.set_symbol_value("last-input-event", Value::Nil);
         obarray.set_symbol_value("last-nonmenu-event", Value::Nil);
+        obarray.set_symbol_value("last-prefix-arg", Value::Nil);
+        obarray.set_symbol_value("last-kbd-macro", Value::Nil);
+        obarray.set_symbol_value("last-code-conversion-error", Value::Nil);
+        obarray.set_symbol_value("last-coding-system-used", Value::symbol("undecided-unix"));
+        obarray.set_symbol_value("this-command", Value::Nil);
+        obarray.set_symbol_value("real-this-command", Value::Nil);
+        obarray.set_symbol_value("current-prefix-arg", Value::Nil);
+        obarray.set_symbol_value("deactivate-mark", Value::True);
         obarray.set_symbol_value("unread-command-events", Value::Nil);
         // GNU Emacs seeds core startup vars with integer
         // `variable-documentation` offsets in the DOC table.

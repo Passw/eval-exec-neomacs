@@ -102,6 +102,32 @@ Last updated: 2026-02-19
     - `cargo test --manifest-path rust/neovm-core/Cargo.toml command_execute_self_insert_uses_last_command_event_when_available` (pass)
     - `make -C test/neovm/vm-compat check-all-neovm-strict` (pass)
 
+- Aligned startup command/input state variable seeding with GNU Emacs and added oracle lock-ins:
+  - runtime changes:
+    - `rust/neovm-core/src/elisp/eval.rs`
+      - evaluator startup now seeds bound defaults for:
+        - command state vars as `nil`:
+          - `real-last-command`, `last-repeatable-command`, `this-original-command`, `prefix-arg`
+          - `defining-kbd-macro`, `executing-kbd-macro`
+          - `last-event-frame`, `last-event-device`, `last-prefix-arg`, `last-kbd-macro`, `last-code-conversion-error`
+          - `this-command`, `real-this-command`, `current-prefix-arg`
+        - `executing-kbd-macro-index` as `0`
+        - `last-coding-system-used` as symbol `undecided-unix`
+        - `deactivate-mark` as `t`
+  - corpus changes:
+    - added and wired:
+      - `test/neovm/vm-compat/cases/input-command-state-startup-semantics.{forms,expected.tsv}`
+      - `test/neovm/vm-compat/cases/default.list`
+    - lock-ins cover:
+      - startup boundness/default-value shape for command/input state variables
+      - explicit startup unboundness for `executing-kbd-macro-prefix-arg`
+      - state publication through `read-key`/`read-event` without mutating command-prefix vars
+      - prompt/input readers in batch preserving startup command/input vars while signaling `end-of-file` on queued unread tails
+  - verified:
+    - `make -C test/neovm/vm-compat record FORMS=cases/input-command-state-startup-semantics.forms EXPECTED=cases/input-command-state-startup-semantics.expected.tsv` (pass)
+    - `make -C test/neovm/vm-compat check-one-neovm CASE=cases/input-command-state-startup-semantics` (pass, `5/5`)
+    - `make -C test/neovm/vm-compat check-all-neovm-strict` (pass)
+
 - Expanded batch prompt/input queue-edge lock-ins for stale/invalid unread tails:
   - corpus changes:
     - expanded and re-recorded:

@@ -1,0 +1,139 @@
+(mapcar
+ (lambda (sym) (list sym (boundp sym)))
+ '(last-event-frame
+   last-event-device
+   last-input-event
+   last-nonmenu-event
+   last-command-event
+   real-last-command
+   last-repeatable-command
+   this-original-command
+   prefix-arg
+   defining-kbd-macro
+   executing-kbd-macro
+   executing-kbd-macro-index
+   executing-kbd-macro-prefix-arg
+   last-prefix-arg
+   last-kbd-macro
+   last-code-conversion-error
+   last-coding-system-used
+   this-command
+   real-this-command
+   current-prefix-arg
+   deactivate-mark
+   unread-command-events))
+
+(list
+ last-event-frame
+ last-event-device
+ last-input-event
+ last-nonmenu-event
+ last-command-event
+ real-last-command
+ last-repeatable-command
+ this-original-command
+ prefix-arg
+ defining-kbd-macro
+ executing-kbd-macro
+ executing-kbd-macro-index
+ last-prefix-arg
+ last-kbd-macro
+ last-code-conversion-error
+ last-coding-system-used
+ this-command
+ real-this-command
+ current-prefix-arg
+ deactivate-mark)
+
+(progn
+  (setq unread-command-events (list 97))
+  (read-key nil)
+  (list last-event-frame
+        last-event-device
+        last-input-event
+        last-nonmenu-event
+        real-last-command
+        last-repeatable-command
+        this-original-command
+        prefix-arg
+        defining-kbd-macro
+        executing-kbd-macro
+        executing-kbd-macro-index
+        this-command
+        real-this-command
+        current-prefix-arg
+        deactivate-mark))
+
+(progn
+  (setq unread-command-events (list '(mouse-1)))
+  (read-event nil nil 0)
+  (list last-event-frame
+        last-event-device
+        last-input-event
+        last-nonmenu-event
+        real-last-command
+        last-repeatable-command
+        this-original-command
+        prefix-arg
+        defining-kbd-macro
+        executing-kbd-macro
+        executing-kbd-macro-index
+        this-command
+        real-this-command
+        current-prefix-arg
+        deactivate-mark))
+
+; Prompt/input readers in batch preserve startup command/input state variables
+; while signaling end-of-file on queued unread events.
+(let ((probes
+       '((read-string "")
+         (read-number "")
+         (read-from-minibuffer "")
+         (completing-read "" (("a") ("b")))
+         (read-command "")
+         (read-variable "")
+         (read-buffer "")
+         (read-file-name ""))))
+  (mapcar
+   (lambda (entry)
+     (let ((fn (car entry))
+           (args (cdr entry))
+           (before (list last-event-frame
+                         last-event-device
+                         last-input-event
+                         last-nonmenu-event
+                         real-last-command
+                         last-repeatable-command
+                         this-original-command
+                         prefix-arg
+                         defining-kbd-macro
+                         executing-kbd-macro
+                         executing-kbd-macro-index
+                         this-command
+                         real-this-command
+                         current-prefix-arg
+                         deactivate-mark)))
+       (condition-case _
+           (progn
+             (setq unread-command-events (list 97 'foo))
+             (apply fn args))
+         (error nil))
+       (list fn
+             before
+             (list last-event-frame
+                   last-event-device
+                   last-input-event
+                   last-nonmenu-event
+                   real-last-command
+                   last-repeatable-command
+                   this-original-command
+                   prefix-arg
+                   defining-kbd-macro
+                   executing-kbd-macro
+                   executing-kbd-macro-index
+                   this-command
+                   real-this-command
+                   current-prefix-arg
+                   deactivate-mark)
+             unread-command-events)))
+   probes))
