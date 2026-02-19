@@ -7722,6 +7722,21 @@ pub(crate) fn dispatch_builtin(
                 eval, args,
             ))
         }
+        "window-size-fixed-p" => {
+            return Some(super::window_cmds::builtin_window_size_fixed_p(
+                eval, args,
+            ))
+        }
+        "window-preserve-size" => {
+            return Some(super::window_cmds::builtin_window_preserve_size(
+                eval, args,
+            ))
+        }
+        "window-resizable" => {
+            return Some(super::window_cmds::builtin_window_resizable(
+                eval, args,
+            ))
+        }
         "window-cursor-type" => {
             return Some(super::window_cmds::builtin_window_cursor_type(
                 eval, args,

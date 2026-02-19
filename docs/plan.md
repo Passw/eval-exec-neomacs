@@ -28,6 +28,46 @@ Last updated: 2026-02-19
 
 ## Doing
 
+- Completed `window-preserve-size` / `window-size-fixed-p` / `window-resizable` parity slice and added oracle lock-ins:
+  - runtime changes:
+    - `rust/neovm-core/src/elisp/window_cmds.rs`
+      - added evaluator-backed builtins:
+        - `window-preserve-size`
+        - `window-size-fixed-p`
+        - `window-resizable`
+      - aligned batch behavior with GNU Emacs:
+        - `window-preserve-size` validates live window designators and persists `window-preserved-size` tuple state `(BUFFER WIDTH HEIGHT)` using body dimensions.
+        - `window-size-fixed-p` validates valid-window designators, supports `HORIZONTAL`/`IGNORE`, and tracks preserved-size constraints.
+        - `window-resizable` validates valid-window designators and `number-or-marker-p` `DELTA`, honors preserved-size fixed constraints (unless `IGNORE` is non-nil), and computes split-tree resize limits for vertical/horizontal dimensions.
+      - added evaluator unit coverage:
+        - `window_preserve_size_fixed_and_resizable_helpers_match_batch_semantics`
+    - `rust/neovm-core/src/elisp/builtins.rs`
+      - wired dispatch for all three builtins.
+    - `rust/neovm-core/src/elisp/builtin_registry.rs`
+      - registered all three names in builtin registry.
+      - parity registry counts now remain:
+        - `DISPATCH_BUILTIN_NAMES`: `1002`
+        - core parity entries: `1001`
+    - `rust/neovm-core/src/elisp/subr_info.rs`
+      - added `subr-arity` metadata:
+        - `(0 . 3)`: `window-preserve-size`, `window-size-fixed-p`
+        - `(2 . 5)`: `window-resizable`
+      - extended `subr_arity_window_frame_primitives_match_oracle`.
+  - corpus changes:
+    - added:
+      - `test/neovm/vm-compat/cases/window-preserve-size-resizable-semantics.{forms,expected.tsv}`
+    - expanded and re-recorded:
+      - `test/neovm/vm-compat/cases/window-frame-subr-arity-semantics.{forms,expected.tsv}`
+    - wired new case into:
+      - `test/neovm/vm-compat/cases/default.list`
+  - verified:
+    - `cargo test --manifest-path rust/neovm-core/Cargo.toml window_preserve_size_fixed_and_resizable_helpers_match_batch_semantics` (pass)
+    - `cargo test --manifest-path rust/neovm-core/Cargo.toml subr_arity_window_frame_primitives_match_oracle` (pass)
+    - `make -C test/neovm/vm-compat check-one-neovm CASE=cases/window-preserve-size-resizable-semantics` (pass)
+    - `make -C test/neovm/vm-compat check-one-neovm CASE=cases/window-frame-subr-arity-semantics` (pass)
+    - `make -C test/neovm/vm-compat check-builtin-registry-all` (pass)
+    - `make -C test/neovm/vm-compat check-all-neovm-strict` (pass)
+
 - Completed `window-cursor-type` parity slice and added oracle lock-ins:
   - runtime changes:
     - `rust/neovm-core/src/window.rs`

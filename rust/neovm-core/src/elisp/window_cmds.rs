@@ -5,7 +5,7 @@
 //! Windows and frames are represented as integer IDs in Lisp.
 
 use super::error::{signal, EvalResult, Flow};
-use super::value::Value;
+use super::value::{list_to_vec, Value};
 use crate::buffer::BufferId;
 use crate::window::{FrameId, FrameManager, SplitDirection, Window, WindowId};
 
@@ -70,6 +70,35 @@ fn expect_fixnum(value: &Value) -> Result<i64, Flow> {
             "wrong-type-argument",
             vec![Value::symbol("fixnump"), other.clone()],
         )),
+    }
+}
+
+/// Extract a number-or-marker argument as f64.
+fn expect_number_or_marker(value: &Value) -> Result<f64, Flow> {
+    match value {
+        Value::Int(n) => Ok(*n as f64),
+        Value::Char(c) => Ok(*c as i64 as f64),
+        Value::Float(f) => Ok(*f),
+        other => Err(signal(
+            "wrong-type-argument",
+            vec![Value::symbol("number-or-marker-p"), other.clone()],
+        )),
+    }
+}
+
+/// Convert a numeric result into Lisp integer/float shape.
+fn numeric_value(value: f64) -> Value {
+    if value.abs() < f64::EPSILON {
+        return Value::Int(0);
+    }
+    if value.fract().abs() < f64::EPSILON
+        && value.is_finite()
+        && value >= i64::MIN as f64
+        && value <= i64::MAX as f64
+    {
+        Value::Int(value as i64)
+    } else {
+        Value::Float(value)
     }
 }
 
@@ -409,6 +438,135 @@ fn window_body_height_lines(frames: &FrameManager, fid: FrameId, wid: WindowId, 
     }
 }
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum ResizeAxis {
+    Vertical,
+    Horizontal,
+}
+
+fn resize_axis(horizontal: bool) -> ResizeAxis {
+    if horizontal {
+        ResizeAxis::Horizontal
+    } else {
+        ResizeAxis::Vertical
+    }
+}
+
+fn axis_size_units(window: &Window, axis: ResizeAxis, char_width: f32, char_height: f32) -> i64 {
+    match axis {
+        ResizeAxis::Vertical => window_height_lines(window, char_height),
+        ResizeAxis::Horizontal => window_width_cols(window, char_width),
+    }
+}
+
+fn split_matches_axis(direction: SplitDirection, axis: ResizeAxis) -> bool {
+    matches!(
+        (direction, axis),
+        (SplitDirection::Vertical, ResizeAxis::Vertical)
+            | (SplitDirection::Horizontal, ResizeAxis::Horizontal)
+    )
+}
+
+/// Find resize capacities for TARGET in NODE.
+///
+/// Returns `(target_size, sibling_expand_capacity)` where expand capacity is
+/// derived from the nearest ancestor split matching AXIS.
+fn find_resize_caps(
+    node: &Window,
+    target: WindowId,
+    axis: ResizeAxis,
+    min_size: i64,
+    char_width: f32,
+    char_height: f32,
+) -> Option<(i64, Option<i64>)> {
+    match node {
+        Window::Leaf { id, .. } => {
+            if *id == target {
+                Some((axis_size_units(node, axis, char_width, char_height), None))
+            } else {
+                None
+            }
+        }
+        Window::Internal {
+            direction,
+            children,
+            ..
+        } => {
+            for (idx, child) in children.iter().enumerate() {
+                if let Some((target_size, expand_capacity)) =
+                    find_resize_caps(child, target, axis, min_size, char_width, char_height)
+                {
+                    if expand_capacity.is_some() {
+                        return Some((target_size, expand_capacity));
+                    }
+                    if split_matches_axis(*direction, axis) {
+                        let capacity = children
+                            .iter()
+                            .enumerate()
+                            .filter(|(sibling_idx, _)| *sibling_idx != idx)
+                            .map(|(_, sibling)| {
+                                let sibling_size =
+                                    axis_size_units(sibling, axis, char_width, char_height);
+                                (sibling_size - min_size).max(0)
+                            })
+                            .sum::<i64>();
+                        return Some((target_size, Some(capacity)));
+                    }
+                    return Some((target_size, None));
+                }
+            }
+            None
+        }
+    }
+}
+
+fn window_preserved_size_key() -> Value {
+    Value::symbol("window-preserved-size")
+}
+
+fn decode_preserved_size(raw: &Value) -> Result<(Value, Value), Flow> {
+    if raw.is_nil() {
+        return Ok((Value::Nil, Value::Nil));
+    }
+    let items = list_to_vec(raw).ok_or_else(|| {
+        signal(
+            "wrong-type-argument",
+            vec![Value::symbol("listp"), raw.clone()],
+        )
+    })?;
+    let width = items.get(1).cloned().unwrap_or(Value::Nil);
+    let height = items.get(2).cloned().unwrap_or(Value::Nil);
+    Ok((width, height))
+}
+
+fn preserved_size_components(
+    frames: &FrameManager,
+    wid: WindowId,
+) -> Result<(Value, Value), Flow> {
+    let key = window_preserved_size_key();
+    match frames.window_parameter(wid, &key) {
+        Some(raw) => decode_preserved_size(&raw),
+        None => Ok((Value::Nil, Value::Nil)),
+    }
+}
+
+fn window_is_fixed_for_axis(
+    frames: &FrameManager,
+    wid: WindowId,
+    horizontal: bool,
+    ignore: bool,
+) -> Result<bool, Flow> {
+    if ignore {
+        return Ok(false);
+    }
+    let (width, height) = preserved_size_components(frames, wid)?;
+    Ok(if horizontal {
+        !width.is_nil()
+    } else {
+        !height.is_nil()
+    })
+}
+
 fn window_edges_cols_lines(w: &Window, char_width: f32, char_height: f32) -> (i64, i64, i64, i64) {
     let b = w.bounds();
     let left = if char_width > 0.0 {
@@ -669,6 +827,112 @@ pub(crate) fn builtin_set_window_cursor_type(
     eval.frames
         .set_window_cursor_type(wid, cursor_type.clone());
     Ok(cursor_type)
+}
+
+/// `(window-size-fixed-p &optional WINDOW HORIZONTAL IGNORE)` -> t/nil.
+pub(crate) fn builtin_window_size_fixed_p(
+    eval: &mut super::eval::Evaluator,
+    args: Vec<Value>,
+) -> EvalResult {
+    expect_max_args("window-size-fixed-p", &args, 3)?;
+    let _ = ensure_selected_frame_id(eval);
+    let (_fid, wid) = resolve_window_id_or_window_error(eval, args.first(), false)?;
+    let horizontal = args.get(1).is_some_and(Value::is_truthy);
+    let ignore = args.get(2).is_some_and(Value::is_truthy);
+    Ok(Value::bool(window_is_fixed_for_axis(
+        &eval.frames,
+        wid,
+        horizontal,
+        ignore,
+    )?))
+}
+
+/// `(window-preserve-size &optional WINDOW HORIZONTAL PRESERVE)` -> size tuple.
+pub(crate) fn builtin_window_preserve_size(
+    eval: &mut super::eval::Evaluator,
+    args: Vec<Value>,
+) -> EvalResult {
+    expect_max_args("window-preserve-size", &args, 3)?;
+    let _ = ensure_selected_frame_id(eval);
+    let (fid, wid) = resolve_window_id_or_window_error(eval, args.first(), true)?;
+
+    let horizontal = args.get(1).is_some_and(Value::is_truthy);
+    let preserve = args.get(2).is_some_and(Value::is_truthy);
+    let (mut width, mut height) = preserved_size_components(&eval.frames, wid)?;
+
+    let window = get_leaf(&eval.frames, fid, wid)?;
+    let buffer = Value::Buffer(window.buffer_id().unwrap_or(BufferId(0)));
+    let frame = eval
+        .frames
+        .get(fid)
+        .ok_or_else(|| signal("error", vec![Value::string("Frame not found")]))?;
+    let current_width = Value::Int(window_width_cols(window, frame.char_width));
+    let current_height = Value::Int(window_body_height_lines(&eval.frames, fid, wid, window));
+
+    if horizontal {
+        width = if preserve { current_width } else { Value::Nil };
+    } else {
+        height = if preserve { current_height } else { Value::Nil };
+    }
+    let preserved = Value::list(vec![buffer, width, height]);
+    eval.frames
+        .set_window_parameter(wid, window_preserved_size_key(), preserved.clone());
+    Ok(preserved)
+}
+
+/// `(window-resizable WINDOW DELTA &optional HORIZONTAL IGNORE PIXELWISE)` -> number.
+pub(crate) fn builtin_window_resizable(
+    eval: &mut super::eval::Evaluator,
+    args: Vec<Value>,
+) -> EvalResult {
+    expect_min_args("window-resizable", &args, 2)?;
+    expect_max_args("window-resizable", &args, 5)?;
+    let _ = ensure_selected_frame_id(eval);
+
+    let (fid, wid) = resolve_window_id_or_window_error(eval, args.first(), false)?;
+    let delta = expect_number_or_marker(&args[1])?;
+    let horizontal = args.get(2).is_some_and(Value::is_truthy);
+    let ignore = args.get(3).is_some_and(Value::is_truthy);
+    let _pixelwise = args.get(4).is_some_and(Value::is_truthy);
+
+    if window_is_fixed_for_axis(&eval.frames, wid, horizontal, ignore)? {
+        return Ok(Value::Int(0));
+    }
+
+    let axis = resize_axis(horizontal);
+    let frame = eval
+        .frames
+        .get(fid)
+        .ok_or_else(|| signal("error", vec![Value::string("Frame not found")]))?;
+
+    if frame.minibuffer_window == Some(wid) {
+        return Ok(Value::Int(0));
+    }
+
+    let min_size = match axis {
+        ResizeAxis::Vertical => 4,
+        ResizeAxis::Horizontal => 10,
+    };
+    let (target_size, expand_capacity) = find_resize_caps(
+        &frame.root_window,
+        wid,
+        axis,
+        min_size,
+        frame.char_width,
+        frame.char_height,
+    )
+    .unwrap_or((0, Some(0)));
+    let max_expand = expand_capacity.unwrap_or(0).max(0) as f64;
+    let max_shrink = (target_size - min_size).max(0) as f64;
+
+    let result = if delta > 0.0 {
+        delta.min(max_expand)
+    } else if delta < 0.0 {
+        delta.max(-max_shrink)
+    } else {
+        0.0
+    };
+    Ok(numeric_value(result))
 }
 
 /// `(window-parameter WINDOW PARAMETER)` -> window parameter or nil.
@@ -3693,6 +3957,73 @@ mod tests {
             "OK ((wrong-number-of-arguments window-cursor-type 2) (wrong-number-of-arguments set-window-cursor-type 1) (wrong-number-of-arguments set-window-cursor-type 3) (wrong-type-argument window-live-p 999999) (wrong-type-argument window-live-p 999999) (wrong-type-argument window-live-p foo) (wrong-type-argument window-live-p foo))"
         );
         assert_eq!(out[2], "OK (wrong-type-argument wrong-type-argument)");
+    }
+
+    #[test]
+    fn window_preserve_size_fixed_and_resizable_helpers_match_batch_semantics() {
+        let forms = parse_forms(
+            "(let ((w (selected-window)))
+               (list (window-size-fixed-p w)
+                     (window-size-fixed-p w t)
+                     (let ((r (window-preserve-size w nil t)))
+                       (list (bufferp (car r))
+                             (nth 1 r)
+                             (integerp (nth 2 r))))
+                     (window-size-fixed-p w)
+                     (window-size-fixed-p w t)
+                     (let ((r (window-preserve-size w t t)))
+                       (list (bufferp (car r))
+                             (integerp (nth 1 r))
+                             (integerp (nth 2 r))))
+                     (window-size-fixed-p w)
+                     (window-size-fixed-p w t)
+                     (window-size-fixed-p w nil t)
+                     (window-size-fixed-p w t t)
+                     (progn
+                       (window-preserve-size w nil nil)
+                       (window-preserve-size w t nil)
+                       (list (window-size-fixed-p w)
+                             (window-size-fixed-p w t)))))
+             (let ((w (split-window nil nil 'right)))
+               (split-window w nil 'below)
+               (window-preserve-size w t t)
+               (let ((before (list (window-resizable w 100 t)
+                                   (window-resizable w -100 t)
+                                   (window-resizable w 100 nil)
+                                   (window-resizable w -100 nil)
+                                   (window-size-fixed-p w)
+                                   (window-size-fixed-p w t)
+                                   (window-resizable w 1 t)
+                                   (window-resizable w 1 t 'preserved)
+                                   (window-resizable w 1.5 t)
+                                   (window-resizable w -1.5 t))))
+                 (window-preserve-size w t nil)
+                 (list before
+                       (window-size-fixed-p w t)
+                       (window-resizable w 1 t)
+                       (window-resizable w 1.5 t)
+                       (window-resizable w -1.5 t))))
+             (list (condition-case err (window-size-fixed-p 999999) (error (car err)))
+                   (condition-case err (window-preserve-size 999999 nil t) (error (car err)))
+                   (condition-case err (window-resizable 999999 1) (error (car err)))
+                   (condition-case err (window-resizable nil 'foo) (error (car err)))
+                   (condition-case err (window-size-fixed-p nil nil nil nil) (error err))
+                   (condition-case err (window-preserve-size nil nil nil nil) (error err))
+                   (condition-case err (window-resizable nil 1 nil nil nil nil) (error err)))",
+        )
+        .expect("parse");
+        let mut ev = Evaluator::new();
+        let out = ev
+            .eval_forms(&forms)
+            .iter()
+            .map(format_eval_result)
+            .collect::<Vec<_>>();
+        assert_eq!(out[0], "OK (nil nil (t nil t) t nil (t t t) t t nil nil (nil nil))");
+        assert_eq!(out[1], "OK ((0 0 8 -8 nil t 0 1 0 0) nil 1 1.5 -1.5)");
+        assert_eq!(
+            out[2],
+            "OK (error error error wrong-type-argument (wrong-number-of-arguments window-size-fixed-p 4) (wrong-number-of-arguments window-preserve-size 4) (wrong-number-of-arguments window-resizable 6))"
+        );
     }
 
     #[test]

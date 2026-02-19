@@ -966,6 +966,8 @@ fn subr_arity_value(name: &str) -> Value {
         | "window-total-width"
         | "window-vscroll"
         | "get-buffer-window" => arity_cons(0, Some(2)),
+        "window-preserve-size" | "window-size-fixed-p" => arity_cons(0, Some(3)),
+        "window-resizable" => arity_cons(2, Some(5)),
         "window-edges" => arity_cons(0, Some(4)),
         "window-list" | "get-buffer-window-list" => arity_cons(0, Some(3)),
         "terminal-live-p"
@@ -2448,8 +2450,11 @@ mod tests {
         assert_subr_arity("window-old-point", 0, Some(1));
         assert_subr_arity("window-parameter", 2, Some(2));
         assert_subr_arity("window-parameters", 0, Some(1));
+        assert_subr_arity("window-preserve-size", 0, Some(3));
         assert_subr_arity("window-prev-buffers", 0, Some(1));
+        assert_subr_arity("window-resizable", 2, Some(5));
         assert_subr_arity("window-scroll-bars", 0, Some(1));
+        assert_subr_arity("window-size-fixed-p", 0, Some(3));
         assert_subr_arity("window-valid-p", 1, Some(1));
         assert_subr_arity("window-minibuffer-p", 0, Some(1));
         assert_subr_arity("window-point", 0, Some(1));
