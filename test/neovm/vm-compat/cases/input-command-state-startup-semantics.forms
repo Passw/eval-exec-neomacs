@@ -26,7 +26,9 @@
    deactivate-mark
    mark-active
    transient-mark-mode
+   unread-input-method-events
    unread-post-input-method-events
+   input-method-alist
    input-method-activate-hook
    input-method-after-insert-chunk-hook
    input-method-deactivate-hook
@@ -39,6 +41,11 @@
    input-method-use-echo-area
    input-method-verbose-flag
    unread-command-events))
+
+; Oracle startup seeds input-method-alist as a list object.
+; Keep only list-ness (not full content) locked for now.
+(list (boundp 'input-method-alist)
+      (listp input-method-alist))
 
 (list
  last-event-frame
@@ -66,6 +73,7 @@
  deactivate-mark
  mark-active
  transient-mark-mode
+ unread-input-method-events
  unread-post-input-method-events
  input-method-activate-hook
  input-method-after-insert-chunk-hook
@@ -102,6 +110,7 @@
         deactivate-mark
         mark-active
         transient-mark-mode
+        unread-input-method-events
         unread-post-input-method-events
         input-method-activate-hook
         input-method-after-insert-chunk-hook
@@ -138,6 +147,7 @@
         deactivate-mark
         mark-active
         transient-mark-mode
+        unread-input-method-events
         unread-post-input-method-events
         input-method-activate-hook
         input-method-after-insert-chunk-hook
@@ -186,6 +196,7 @@
                          deactivate-mark
                          mark-active
                          transient-mark-mode
+                         unread-input-method-events
                          unread-post-input-method-events
                          input-method-activate-hook
                          input-method-after-insert-chunk-hook
@@ -225,6 +236,7 @@
                    deactivate-mark
                    mark-active
                    transient-mark-mode
+                   unread-input-method-events
                    unread-post-input-method-events
                    input-method-activate-hook
                    input-method-after-insert-chunk-hook

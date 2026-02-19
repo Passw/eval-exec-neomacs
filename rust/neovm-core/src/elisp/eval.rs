@@ -189,7 +189,9 @@ impl Evaluator {
         obarray.set_symbol_value("transient-mark-mode", Value::Nil);
         obarray.set_symbol_value("overriding-local-map", Value::Nil);
         obarray.set_symbol_value("overriding-terminal-local-map", Value::Nil);
+        obarray.set_symbol_value("unread-input-method-events", Value::Nil);
         obarray.set_symbol_value("unread-post-input-method-events", Value::Nil);
+        obarray.set_symbol_value("input-method-alist", Value::Nil);
         obarray.set_symbol_value("input-method-activate-hook", Value::Nil);
         obarray.set_symbol_value("input-method-after-insert-chunk-hook", Value::Nil);
         obarray.set_symbol_value("input-method-deactivate-hook", Value::Nil);
