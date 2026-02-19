@@ -141,6 +141,66 @@ impl Evaluator {
                 s
             })
             .unwrap_or_else(|| "./".to_string());
+        let mut keymaps = KeymapManager::new();
+        let completion_in_region_mode_map =
+            keymaps.make_sparse_keymap(Some("completion-in-region-mode-map".to_string()));
+        let completion_list_mode_map =
+            keymaps.make_sparse_keymap(Some("completion-list-mode-map".to_string()));
+        let minibuffer_local_map =
+            keymaps.make_sparse_keymap(Some("minibuffer-local-map".to_string()));
+        let minibuffer_local_completion_map =
+            keymaps.make_sparse_keymap(Some("minibuffer-local-completion-map".to_string()));
+        let minibuffer_local_filename_completion_map = keymaps
+            .make_sparse_keymap(Some("minibuffer-local-filename-completion-map".to_string()));
+        let minibuffer_local_must_match_map =
+            keymaps.make_sparse_keymap(Some("minibuffer-local-must-match-map".to_string()));
+        let minibuffer_local_ns_map =
+            keymaps.make_sparse_keymap(Some("minibuffer-local-ns-map".to_string()));
+        let minibuffer_local_shell_command_map =
+            keymaps.make_sparse_keymap(Some("minibuffer-local-shell-command-map".to_string()));
+        let minibuffer_local_isearch_map =
+            keymaps.make_sparse_keymap(Some("minibuffer-local-isearch-map".to_string()));
+        let minibuffer_inactive_mode_map =
+            keymaps.make_sparse_keymap(Some("minibuffer-inactive-mode-map".to_string()));
+        let minibuffer_mode_map =
+            keymaps.make_sparse_keymap(Some("minibuffer-mode-map".to_string()));
+        let minibuffer_visible_completions_map =
+            keymaps.make_sparse_keymap(Some("minibuffer-visible-completions-map".to_string()));
+        let read_expression_map =
+            keymaps.make_sparse_keymap(Some("read-expression-map".to_string()));
+        let read_expression_internal_map =
+            keymaps.make_sparse_keymap(Some("read--expression-map".to_string()));
+        let read_char_from_minibuffer_map =
+            keymaps.make_sparse_keymap(Some("read-char-from-minibuffer-map".to_string()));
+        let read_extended_command_mode_map =
+            keymaps.make_sparse_keymap(Some("read-extended-command-mode-map".to_string()));
+        let read_regexp_map = keymaps.make_sparse_keymap(Some("read-regexp-map".to_string()));
+        let read_key_empty_map =
+            keymaps.make_sparse_keymap(Some("read-key-empty-map".to_string()));
+        let read_key_full_map = keymaps.make_keymap();
+
+        keymaps.set_keymap_parent(minibuffer_local_completion_map, Some(minibuffer_local_map));
+        keymaps.set_keymap_parent(
+            minibuffer_local_filename_completion_map,
+            Some(minibuffer_local_completion_map),
+        );
+        keymaps.set_keymap_parent(
+            minibuffer_local_must_match_map,
+            Some(minibuffer_local_completion_map),
+        );
+        keymaps.set_keymap_parent(minibuffer_local_ns_map, Some(minibuffer_local_map));
+        keymaps.set_keymap_parent(minibuffer_local_shell_command_map, Some(minibuffer_local_map));
+        keymaps.set_keymap_parent(minibuffer_local_isearch_map, Some(minibuffer_local_map));
+        keymaps.set_keymap_parent(minibuffer_mode_map, Some(minibuffer_local_map));
+        keymaps.set_keymap_parent(read_expression_map, Some(minibuffer_local_map));
+        keymaps.set_keymap_parent(read_expression_internal_map, Some(read_expression_map));
+        keymaps.set_keymap_parent(read_char_from_minibuffer_map, Some(minibuffer_local_map));
+        keymaps.set_keymap_parent(read_extended_command_mode_map, Some(minibuffer_local_map));
+        keymaps.set_keymap_parent(read_regexp_map, Some(minibuffer_local_map));
+        keymaps.set_keymap_parent(minibuffer_visible_completions_map, Some(completion_list_mode_map));
+
+        let standard_syntax_table = super::syntax::builtin_standard_syntax_table(Vec::new())
+            .expect("startup seeding requires standard syntax table");
 
         // Set up standard global variables
         obarray.set_symbol_value("most-positive-fixnum", Value::Int(i64::MAX));
@@ -234,6 +294,23 @@ impl Evaluator {
             Value::list(vec![Value::symbol("completion-setup-function")]),
         );
         obarray.set_symbol_value(
+            "completion-in-region-mode-map",
+            Value::Int(completion_in_region_mode_map as i64),
+        );
+        obarray.set_symbol_value(
+            "completion-list-mode-map",
+            Value::Int(completion_list_mode_map as i64),
+        );
+        obarray.set_symbol_value(
+            "completion-list-mode-syntax-table",
+            standard_syntax_table.clone(),
+        );
+        obarray.set_symbol_value(
+            "completion-list-mode-abbrev-table",
+            Value::symbol("completion-list-mode-abbrev-table"),
+        );
+        obarray.set_symbol_value("completion-list-mode-hook", Value::Nil);
+        obarray.set_symbol_value(
             "completion-ignored-extensions",
             Value::list(vec![
                 Value::string(".o"),
@@ -302,8 +379,43 @@ impl Evaluator {
                 ]),
             ]),
         );
+        obarray.set_symbol_value(
+            "completion-styles-alist",
+            Value::list(vec![
+                Value::list(vec![
+                    Value::symbol("basic"),
+                    Value::symbol("completion-basic-try-completion"),
+                    Value::symbol("completion-basic-all-completions"),
+                    Value::string("Completion of the prefix before point and the suffix after point."),
+                ]),
+                Value::list(vec![
+                    Value::symbol("partial-completion"),
+                    Value::symbol("completion-pcm-try-completion"),
+                    Value::symbol("completion-pcm-all-completions"),
+                    Value::string("Completion of multiple words, each one taken as a prefix."),
+                ]),
+                Value::list(vec![
+                    Value::symbol("emacs22"),
+                    Value::symbol("completion-emacs22-try-completion"),
+                    Value::symbol("completion-emacs22-all-completions"),
+                    Value::string("Prefix completion that only operates on the text before point."),
+                ]),
+            ]),
+        );
         obarray.set_symbol_value("completion-category-overrides", Value::Nil);
         obarray.set_symbol_value("completion-cycle-threshold", Value::Nil);
+        obarray.set_symbol_value("completions-detailed", Value::Nil);
+        obarray.set_symbol_value("completions-format", Value::symbol("horizontal"));
+        obarray.set_symbol_value("completions-group", Value::Nil);
+        obarray.set_symbol_value("completions-group-format", Value::string("     %s  "));
+        obarray.set_symbol_value("completions-group-sort", Value::Nil);
+        obarray.set_symbol_value(
+            "completions-header-format",
+            Value::string("%s possible completions:\n"),
+        );
+        obarray.set_symbol_value("completions-highlight-face", Value::symbol("completions-highlight"));
+        obarray.set_symbol_value("completions-max-height", Value::Nil);
+        obarray.set_symbol_value("completions-sort", Value::symbol("alphabetical"));
         obarray.set_symbol_value("completion-auto-help", Value::True);
         obarray.set_symbol_value("completion-auto-deselect", Value::True);
         obarray.set_symbol_value("completion-auto-select", Value::Nil);
@@ -351,6 +463,30 @@ impl Evaluator {
         obarray.set_symbol_value("read-envvar-name-history", Value::Nil);
         obarray.set_symbol_value("read-face-name-sample-text", Value::string("SAMPLE"));
         obarray.set_symbol_value("read-key-delay", Value::Float(0.01));
+        obarray.set_symbol_value(
+            "read-answer-map--memoize",
+            Value::hash_table(HashTableTest::Equal),
+        );
+        obarray.set_symbol_value(
+            "read-char-from-minibuffer-map",
+            Value::Int(read_char_from_minibuffer_map as i64),
+        );
+        obarray.set_symbol_value(
+            "read-char-from-minibuffer-map-hash",
+            Value::hash_table(HashTableTest::Equal),
+        );
+        obarray.set_symbol_value("read-expression-map", Value::Int(read_expression_map as i64));
+        obarray.set_symbol_value(
+            "read--expression-map",
+            Value::Int(read_expression_internal_map as i64),
+        );
+        obarray.set_symbol_value(
+            "read-extended-command-mode-map",
+            Value::Int(read_extended_command_mode_map as i64),
+        );
+        obarray.set_symbol_value("read-key-empty-map", Value::Int(read_key_empty_map as i64));
+        obarray.set_symbol_value("read-key-full-map", Value::Int(read_key_full_map as i64));
+        obarray.set_symbol_value("read-regexp-map", Value::Int(read_regexp_map as i64));
         obarray.set_symbol_value("read-extended-command-mode", Value::Nil);
         obarray.set_symbol_value("read-extended-command-mode-hook", Value::Nil);
         obarray.set_symbol_value("read-extended-command-predicate", Value::Nil);
@@ -363,6 +499,64 @@ impl Evaluator {
         obarray.set_symbol_value("read-regexp--case-fold", Value::Nil);
         obarray.set_symbol_value("read-regexp-defaults-function", Value::Nil);
         obarray.set_symbol_value("read-symbol-shorthands", Value::Nil);
+        obarray.set_symbol_value(
+            "minibuffer-frame-alist",
+            Value::list(vec![
+                Value::cons(Value::symbol("width"), Value::Int(80)),
+                Value::cons(Value::symbol("height"), Value::Int(2)),
+            ]),
+        );
+        obarray.set_symbol_value(
+            "minibuffer-inactive-mode-abbrev-table",
+            Value::symbol("minibuffer-inactive-mode-abbrev-table"),
+        );
+        obarray.set_symbol_value("minibuffer-inactive-mode-hook", Value::Nil);
+        obarray.set_symbol_value(
+            "minibuffer-inactive-mode-map",
+            Value::Int(minibuffer_inactive_mode_map as i64),
+        );
+        obarray.set_symbol_value(
+            "minibuffer-inactive-mode-syntax-table",
+            standard_syntax_table.clone(),
+        );
+        obarray.set_symbol_value(
+            "minibuffer-mode-abbrev-table",
+            Value::symbol("minibuffer-mode-abbrev-table"),
+        );
+        obarray.set_symbol_value("minibuffer-mode-hook", Value::Nil);
+        obarray.set_symbol_value("minibuffer-mode-map", Value::Int(minibuffer_mode_map as i64));
+        obarray.set_symbol_value(
+            "minibuffer-local-map",
+            Value::Int(minibuffer_local_map as i64),
+        );
+        obarray.set_symbol_value(
+            "minibuffer-local-completion-map",
+            Value::Int(minibuffer_local_completion_map as i64),
+        );
+        obarray.set_symbol_value(
+            "minibuffer-local-filename-completion-map",
+            Value::Int(minibuffer_local_filename_completion_map as i64),
+        );
+        obarray.set_symbol_value(
+            "minibuffer-local-filename-syntax",
+            standard_syntax_table.clone(),
+        );
+        obarray.set_symbol_value(
+            "minibuffer-local-isearch-map",
+            Value::Int(minibuffer_local_isearch_map as i64),
+        );
+        obarray.set_symbol_value(
+            "minibuffer-local-must-match-map",
+            Value::Int(minibuffer_local_must_match_map as i64),
+        );
+        obarray.set_symbol_value(
+            "minibuffer-local-ns-map",
+            Value::Int(minibuffer_local_ns_map as i64),
+        );
+        obarray.set_symbol_value(
+            "minibuffer-local-shell-command-map",
+            Value::Int(minibuffer_local_shell_command_map as i64),
+        );
         obarray.set_symbol_value("minibuffer-history", Value::Nil);
         obarray.set_symbol_value("minibuffer-history-variable", Value::symbol("minibuffer-history"));
         obarray.set_symbol_value("minibuffer-history-position", Value::Nil);
@@ -430,6 +624,10 @@ impl Evaluator {
         obarray.set_symbol_value("minibuffer-scroll-window", Value::Nil);
         obarray.set_symbol_value("minibuffer-visible-completions", Value::Nil);
         obarray.set_symbol_value("minibuffer-visible-completions--always-bind", Value::Nil);
+        obarray.set_symbol_value(
+            "minibuffer-visible-completions-map",
+            Value::Int(minibuffer_visible_completions_map as i64),
+        );
         obarray.set_symbol_value("minibuffer-depth-indicate-mode", Value::Nil);
         obarray.set_symbol_value("minibuffer-default-prompt-format", Value::string(" (default %s)"));
         obarray.set_symbol_value("minibuffer-beginning-of-buffer-movement", Value::Nil);
@@ -878,7 +1076,7 @@ impl Evaluator {
             require_stack: Vec::new(),
             buffers: BufferManager::new(),
             match_data: None,
-            keymaps: KeymapManager::new(),
+            keymaps,
             processes: ProcessManager::new(),
             timers: TimerManager::new(),
             advice: AdviceManager::new(),

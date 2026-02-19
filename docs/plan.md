@@ -15812,6 +15812,29 @@ Last updated: 2026-02-19
     - `make -C test/neovm/vm-compat check-one-neovm CASE=cases/input-last-event-reader-semantics` (pass, `13/13`)
     - `make -C test/neovm/vm-compat check-one-neovm CASE=cases/minibuffer-batch` (pass, `47/47`)
     - `make -C test/neovm/vm-compat check-all-neovm-strict` (pass)
+- Extended startup completion/minibuffer/read map-table parity with keymap/hash/syntax shape lock-ins:
+  - runtime changes:
+    - `rust/neovm-core/src/elisp/eval.rs`
+      - seeded startup map/table vars previously missing from oracle startup-bound set:
+        - completion maps/tables: `completion-in-region-mode-map`, `completion-list-mode-map`, `completion-list-mode-syntax-table`, `completion-list-mode-abbrev-table`, `completion-list-mode-hook`
+        - completion UI/style vars: `completion-styles-alist`, `completions-*`, including `completions-format`, `completions-group-format`, `completions-header-format`, `completions-highlight-face`, `completions-sort`
+        - read maps/tables: `read--expression-map`, `read-expression-map`, `read-char-from-minibuffer-map`, `read-extended-command-mode-map`, `read-key-empty-map`, `read-key-full-map`, `read-regexp-map`, `read-answer-map--memoize`, `read-char-from-minibuffer-map-hash`
+        - minibuffer maps/tables: `minibuffer-frame-alist`, `minibuffer-inactive-mode-*`, `minibuffer-local-*`, `minibuffer-mode-*`, `minibuffer-visible-completions-map`
+      - wired startup keymap creation and parent relationships in evaluator bootstrap, and reused standard syntax-table object for syntax-table startup vars.
+  - oracle corpus changes:
+    - `test/neovm/vm-compat/cases/input-command-state-startup-semantics.forms`
+      - expanded startup `boundp` lock-ins to include the missing map/table vars
+      - expanded startup value lock-ins for stable scalar/list vars (`completions-format`, `completions-sort`, `completions-highlight-face`, `minibuffer-frame-alist`, etc.)
+      - upgraded shape classifier to lock `keymap`/`hash-table`/`syntax-table`/`symbol`/`string`/`cons` startup object classes
+    - `test/neovm/vm-compat/cases/input-command-state-startup-semantics.expected.tsv`
+      - re-recorded oracle baseline for the expanded startup map/table matrix
+  - verified:
+    - `make -C test/neovm/vm-compat record FORMS=cases/input-command-state-startup-semantics.forms EXPECTED=cases/input-command-state-startup-semantics.expected.tsv` (pass)
+    - `make -C test/neovm/vm-compat check-one-neovm CASE=cases/input-command-state-startup-semantics` (pass, `11/11`)
+    - `make -C test/neovm/vm-compat check-one-neovm CASE=cases/use-region-p-semantics` (pass, `8/8`)
+    - `make -C test/neovm/vm-compat check-one-neovm CASE=cases/input-last-event-reader-semantics` (pass, `13/13`)
+    - `make -C test/neovm/vm-compat check-one-neovm CASE=cases/minibuffer-batch` (pass, `47/47`)
+    - `make -C test/neovm/vm-compat check-all-neovm-strict` (pass)
 
 ## Doing
 
