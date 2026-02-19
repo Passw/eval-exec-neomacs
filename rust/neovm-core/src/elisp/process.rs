@@ -1164,8 +1164,6 @@ fn interface_entry(name: &str, address: Value, full: bool) -> Value {
         address,
         broadcast,
         netmask,
-        loopback_hwaddr(),
-        loopback_flags(),
     ])
 }
 
@@ -4612,6 +4610,12 @@ mod tests {
                   (stringp (caar (network-interface-list)))
                   (vectorp (cdar (network-interface-list)))
                   (listp (network-interface-list nil))
+                  (let ((entry (car (network-interface-list t))))
+                    (and (listp entry)
+                         (= (length entry) 4)
+                         (vectorp (nth 1 entry))
+                         (vectorp (nth 2 entry))
+                         (vectorp (nth 3 entry))))
                   (condition-case err (network-interface-list nil nil nil) (error err))
                   (condition-case err (network-interface-list nil t) (error err))
                   (let ((info (network-interface-info ifname)))
@@ -4640,7 +4644,7 @@ mod tests {
         );
         assert_eq!(
             results[1],
-            "OK (\"127.0.0.1:80\" \"127.0.0.1\" \"[0:0:0:0:0:0:0:1]:80\" \"0:0:0:0:0:0:0:1\" \"x\" nil nil nil nil (wrong-number-of-arguments format-network-address 0) t t t t t (wrong-number-of-arguments network-interface-list 3) (error \"Unsupported address family\") t (wrong-type-argument stringp nil) (error \"interface name too long\") t t t t (error \"Unsupported family\") (error \"Unsupported hints value\") (wrong-type-argument stringp 1) t t t (wrong-number-of-arguments signal-names 1) (void-function process-connection))"
+            "OK (\"127.0.0.1:80\" \"127.0.0.1\" \"[0:0:0:0:0:0:0:1]:80\" \"0:0:0:0:0:0:0:1\" \"x\" nil nil nil nil (wrong-number-of-arguments format-network-address 0) t t t t t t (wrong-number-of-arguments network-interface-list 3) (error \"Unsupported address family\") t (wrong-type-argument stringp nil) (error \"interface name too long\") t t t t (error \"Unsupported family\") (error \"Unsupported hints value\") (wrong-type-argument stringp 1) t t t (wrong-number-of-arguments signal-names 1) (void-function process-connection))"
         );
     }
 }

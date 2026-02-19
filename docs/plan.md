@@ -28,6 +28,24 @@ Last updated: 2026-02-19
 
 ## Doing
 
+- Aligned `network-interface-list` `FULL` entry shape with oracle and re-locked runtime/corpus parity:
+  - runtime changes:
+    - `rust/neovm-core/src/elisp/process.rs`
+      - changed `network-interface-list` full-mode entries from 6 fields to 4 fields:
+        - `(NAME ADDRESS BROADCAST NETMASK)`
+      - retained `network-interface-info` 5-field shape (`ADDRESS BROADCAST NETMASK HWADDR FLAGS`) unchanged.
+      - expanded runtime lock-in:
+        - `process_network_interface_and_signal_runtime_surface` now asserts full-entry structural shape (`length=4`, vector payloads in positions 2..4).
+  - corpus changes:
+    - updated and re-recorded:
+      - `test/neovm/vm-compat/cases/process-network-interface-signal-semantics.forms`
+      - `test/neovm/vm-compat/cases/process-network-interface-signal-semantics.expected.tsv`
+  - verified:
+    - `cargo test --manifest-path rust/neovm-core/Cargo.toml process_network_interface_and_signal_runtime_surface` (pass)
+    - `make -C test/neovm/vm-compat record FORMS=cases/process-network-interface-signal-semantics.forms EXPECTED=cases/process-network-interface-signal-semantics.expected.tsv` (pass)
+    - `make -C test/neovm/vm-compat check-one-neovm CASE=cases/process-network-interface-signal-semantics` (pass, `2/2`)
+    - `make -C test/neovm/vm-compat check-all-neovm-strict` (pass; case inventory `788`)
+
 - Fixed `format-network-address` out-of-range port drift for IPv4/IPv6 and re-locked oracle parity:
   - runtime changes:
     - `rust/neovm-core/src/elisp/process.rs`
