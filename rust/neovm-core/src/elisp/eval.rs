@@ -208,12 +208,39 @@ impl Evaluator {
         obarray.set_symbol_value("last-kbd-macro", Value::Nil);
         obarray.set_symbol_value("last-code-conversion-error", Value::Nil);
         obarray.set_symbol_value("last-coding-system-used", Value::symbol("undecided-unix"));
+        obarray.set_symbol_value("command-debug-status", Value::Nil);
+        obarray.set_symbol_value(
+            "command-error-function",
+            Value::symbol("help-command-error-confusable-suggestions"),
+        );
+        obarray.set_symbol_value("key-substitution-in-progress", Value::Nil);
         obarray.set_symbol_value("this-command", Value::Nil);
         obarray.set_symbol_value("real-this-command", Value::Nil);
         obarray.set_symbol_value("this-command-keys-shift-translated", Value::Nil);
         obarray.set_symbol_value("current-prefix-arg", Value::Nil);
+        obarray.set_symbol_value("track-mouse", Value::Nil);
+        obarray.set_symbol_value("throw-on-input", Value::Nil);
+        obarray.set_symbol_value(
+            "while-no-input-ignore-events",
+            Value::list(vec![
+                Value::symbol("thread-event"),
+                Value::symbol("file-notify"),
+                Value::symbol("dbus-event"),
+                Value::symbol("select-window"),
+                Value::symbol("help-echo"),
+                Value::symbol("move-frame"),
+                Value::symbol("iconify-frame"),
+                Value::symbol("make-frame-visible"),
+                Value::symbol("focus-in"),
+                Value::symbol("focus-out"),
+                Value::symbol("config-changed-event"),
+                Value::symbol("selection-request"),
+            ]),
+        );
         obarray.set_symbol_value("deactivate-mark", Value::True);
         obarray.set_symbol_value("mark-active", Value::Nil);
+        obarray.set_symbol_value("mark-even-if-inactive", Value::True);
+        obarray.set_symbol_value("saved-region-selection", Value::Nil);
         obarray.set_symbol_value("transient-mark-mode", Value::Nil);
         obarray.set_symbol_value("overriding-local-map", Value::Nil);
         obarray.set_symbol_value("overriding-terminal-local-map", Value::Nil);

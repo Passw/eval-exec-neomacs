@@ -42,14 +42,22 @@
    last-kbd-macro
    last-code-conversion-error
    last-coding-system-used
+   command-debug-status
+   command-error-function
+   key-substitution-in-progress
    this-command
    real-this-command
    this-command-keys-shift-translated
    current-prefix-arg
+   track-mouse
+   throw-on-input
+   while-no-input-ignore-events
    overriding-local-map
    overriding-terminal-local-map
    deactivate-mark
    mark-active
+   mark-even-if-inactive
+   saved-region-selection
    transient-mark-mode
    unread-input-method-events
    unread-post-input-method-events
@@ -114,14 +122,22 @@
  last-kbd-macro
  last-code-conversion-error
  last-coding-system-used
+ command-debug-status
+ command-error-function
+ key-substitution-in-progress
  this-command
  real-this-command
  this-command-keys-shift-translated
  current-prefix-arg
+ track-mouse
+ throw-on-input
+ while-no-input-ignore-events
  overriding-local-map
  overriding-terminal-local-map
  deactivate-mark
  mark-active
+ mark-even-if-inactive
+ saved-region-selection
  transient-mark-mode
  unread-input-method-events
  unread-post-input-method-events
@@ -176,14 +192,22 @@
         regexp-search-ring-yank-pointer
         search-ring
         search-ring-yank-pointer
+        command-debug-status
+        command-error-function
+        key-substitution-in-progress
         this-command
         real-this-command
         this-command-keys-shift-translated
         current-prefix-arg
+        track-mouse
+        throw-on-input
+        while-no-input-ignore-events
         overriding-local-map
         overriding-terminal-local-map
         deactivate-mark
         mark-active
+        mark-even-if-inactive
+        saved-region-selection
         transient-mark-mode
         unread-input-method-events
         unread-post-input-method-events
@@ -238,14 +262,22 @@
         regexp-search-ring-yank-pointer
         search-ring
         search-ring-yank-pointer
+        command-debug-status
+        command-error-function
+        key-substitution-in-progress
         this-command
         real-this-command
         this-command-keys-shift-translated
         current-prefix-arg
+        track-mouse
+        throw-on-input
+        while-no-input-ignore-events
         overriding-local-map
         overriding-terminal-local-map
         deactivate-mark
         mark-active
+        mark-even-if-inactive
+        saved-region-selection
         transient-mark-mode
         unread-input-method-events
         unread-post-input-method-events
@@ -312,14 +344,22 @@
                          regexp-search-ring-yank-pointer
                          search-ring
                          search-ring-yank-pointer
+                         command-debug-status
+                         command-error-function
+                         key-substitution-in-progress
                          this-command
                          real-this-command
                          this-command-keys-shift-translated
                          current-prefix-arg
+                         track-mouse
+                         throw-on-input
+                         while-no-input-ignore-events
                          overriding-local-map
                          overriding-terminal-local-map
                          deactivate-mark
                          mark-active
+                         mark-even-if-inactive
+                         saved-region-selection
                          transient-mark-mode
                          unread-input-method-events
                          unread-post-input-method-events
@@ -377,14 +417,22 @@
                    regexp-search-ring-yank-pointer
                    search-ring
                    search-ring-yank-pointer
+                   command-debug-status
+                   command-error-function
+                   key-substitution-in-progress
                    this-command
                    real-this-command
                    this-command-keys-shift-translated
                    current-prefix-arg
+                   track-mouse
+                   throw-on-input
+                   while-no-input-ignore-events
                    overriding-local-map
                    overriding-terminal-local-map
                    deactivate-mark
                    mark-active
+                   mark-even-if-inactive
+                   saved-region-selection
                    transient-mark-mode
                    unread-input-method-events
                    unread-post-input-method-events
