@@ -1941,7 +1941,9 @@ pub(crate) fn builtin_network_interface_info(
     args: Vec<Value>,
 ) -> EvalResult {
     expect_args("network-interface-info", &args, 1)?;
-    let ifname = expect_string_strict(&args[0])?;
+    let ifname_raw = expect_string_strict(&args[0])?;
+    // Match C-string interface-name handling: embedded NUL truncates lookup.
+    let ifname = ifname_raw.split('\0').next().unwrap_or_default();
     if ifname.chars().count() >= 16 {
         return Err(signal("error", vec![Value::string("interface name too long")]));
     }
@@ -5240,8 +5242,11 @@ mod tests {
                          (mask (nth 2 lo-info)))
                     (and (= (length addr) (length bc))
                          (= (length addr) (length mask))))
+                  (equal (network-interface-info (concat "lo" (string 0) "x"))
+                         (network-interface-info "lo"))
                   (condition-case err (network-interface-info nil) (error err))
                   (condition-case err (network-interface-info "abcdefghijklmnop") (error err))
+                  (condition-case err (network-interface-info (concat "abcdefghijklmnop" (string 0))) (error err))
                   (listp (network-lookup-address-info "localhost"))
                   (vectorp (car (network-lookup-address-info "localhost")))
                   (listp (network-lookup-address-info "localhost" 'ipv4))
@@ -5290,7 +5295,7 @@ mod tests {
         );
         assert_eq!(
             results[1],
-            "OK (\"127.0.0.1:80\" \"127.0.0.1\" \"[0:0:0:0:0:0:0:1]:80\" \"0:0:0:0:0:0:0:1\" \"x\" nil nil nil nil (wrong-number-of-arguments format-network-address 0) t t t t t t t (wrong-number-of-arguments network-interface-list 3) (error \"Unsupported address family\") t t t t t t t t t (wrong-type-argument stringp nil) (error \"interface name too long\") t t t t t t t t t t t t (error \"Unsupported family\") (error \"Unsupported hints value\") (wrong-type-argument stringp 1) t t t (wrong-number-of-arguments signal-names 1) (void-function process-connection))"
+            "OK (\"127.0.0.1:80\" \"127.0.0.1\" \"[0:0:0:0:0:0:0:1]:80\" \"0:0:0:0:0:0:0:1\" \"x\" nil nil nil nil (wrong-number-of-arguments format-network-address 0) t t t t t t t (wrong-number-of-arguments network-interface-list 3) (error \"Unsupported address family\") t t t t t t t t t t (wrong-type-argument stringp nil) (error \"interface name too long\") (error \"interface name too long\") t t t t t t t t t t t t (error \"Unsupported family\") (error \"Unsupported hints value\") (wrong-type-argument stringp 1) t t t (wrong-number-of-arguments signal-names 1) (void-function process-connection))"
         );
     }
 }

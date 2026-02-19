@@ -28,6 +28,24 @@ Last updated: 2026-02-19
 
 ## Doing
 
+- Fixed embedded-NUL interface-name handling in `network-interface-info`:
+  - runtime changes:
+    - `rust/neovm-core/src/elisp/process.rs`
+      - normalized interface names by truncating at first `\0` before length validation and host-entry lookup, matching Emacs C-string interface-name behavior.
+      - expanded runtime lock-ins to assert:
+        - `(network-interface-info (concat "lo" (string 0) "x")) == (network-interface-info "lo")`
+        - long-name validation still triggers with embedded-NUL payloads:
+          - `(network-interface-info (concat "abcdefghijklmnop" (string 0))) -> (error "interface name too long")`
+  - corpus changes:
+    - expanded and re-recorded:
+      - `test/neovm/vm-compat/cases/process-network-interface-signal-semantics.forms`
+      - `test/neovm/vm-compat/cases/process-network-interface-signal-semantics.expected.tsv`
+  - verified:
+    - `cargo test --manifest-path rust/neovm-core/Cargo.toml process_network_interface_and_signal_runtime_surface` (pass)
+    - `make -C test/neovm/vm-compat record FORMS=cases/process-network-interface-signal-semantics.forms EXPECTED=cases/process-network-interface-signal-semantics.expected.tsv` (pass)
+    - `make -C test/neovm/vm-compat check-one-neovm CASE=cases/process-network-interface-signal-semantics` (pass, `2/2`)
+    - `make -C test/neovm/vm-compat check-all-neovm-strict` (pass; case inventory `788`)
+
 - Fixed embedded-NUL hostname handling in `network-lookup-address-info`:
   - runtime changes:
     - `rust/neovm-core/src/elisp/process.rs`
