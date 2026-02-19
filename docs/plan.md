@@ -28,6 +28,22 @@ Last updated: 2026-02-19
 
 ## Doing
 
+- Closed `start-kbd-macro` arity drift against oracle behavior and re-locked vm-compat corpus:
+  - runtime changes:
+    - `rust/neovm-core/src/elisp/kmacro.rs`
+    - updated `builtin_start_kbd_macro` signature handling from max-1 to max-2 args to match `(start-kbd-macro &optional APPEND NO-EXEC)`.
+    - second optional arg is now accepted (ignored for behavior parity with current compatibility subset).
+    - updated unit coverage in `test_kmacro_builtin_arity_contracts`:
+      - 2-arg call now accepted.
+      - >2 args still error.
+  - oracle corpus update:
+    - `test/neovm/vm-compat/cases/kmacro-arity-semantics.expected.tsv`
+    - refreshed oracle baseline for `(condition-case err (start-kbd-macro nil nil) ...)` from `wrong-number-of-arguments` to `nil`.
+  - verified:
+    - `cargo test --manifest-path rust/neovm-core/Cargo.toml kmacro_builtin_arity_contracts` (pass)
+    - `make -C test/neovm/vm-compat check-one-neovm CASE=kmacro-arity-semantics` (pass)
+    - `make -C test/neovm/vm-compat check-all-neovm` (pass)
+
 - Hardened oracle-side vm-compat stability and diagnostics for crash-prone/error-payload-sensitive corpora:
   - runner diagnostics:
     - `test/neovm/vm-compat/run-oracle.sh`

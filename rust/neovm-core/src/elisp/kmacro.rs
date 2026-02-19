@@ -200,16 +200,17 @@ pub(crate) fn builtin_defining_kbd_macro(
     Ok(Value::Nil)
 }
 
-/// (start-kbd-macro &optional APPEND) -> nil
+/// (start-kbd-macro &optional APPEND NO-EXEC) -> nil
 ///
 /// Start recording a keyboard macro.  With non-nil APPEND, append to
 /// the last macro instead of starting a new one.  Signals an error if
-/// already recording.
+/// already recording.  NO-EXEC is accepted for arity compatibility and
+/// currently ignored.
 pub(crate) fn builtin_start_kbd_macro(
     eval: &mut super::eval::Evaluator,
     args: Vec<Value>,
 ) -> EvalResult {
-    expect_max_args("start-kbd-macro", &args, 1)?;
+    expect_max_args("start-kbd-macro", &args, 2)?;
     if eval.kmacro.recording {
         return Err(signal(
             "error",
@@ -1058,7 +1059,15 @@ mod tests {
 
         let mut eval = Evaluator::new();
 
+        assert_eq!(
+            builtin_start_kbd_macro(&mut eval, vec![Value::Nil, Value::Nil]).unwrap(),
+            Value::Nil
+        );
         assert!(builtin_start_kbd_macro(&mut eval, vec![Value::Nil, Value::Nil]).is_err());
+        assert_eq!(builtin_end_kbd_macro(&mut eval, vec![]).unwrap(), Value::Nil);
+        assert!(
+            builtin_start_kbd_macro(&mut eval, vec![Value::Nil, Value::Nil, Value::Nil]).is_err()
+        );
         assert!(
             builtin_end_kbd_macro(&mut eval, vec![Value::Nil, Value::Nil, Value::Nil]).is_err()
         );
