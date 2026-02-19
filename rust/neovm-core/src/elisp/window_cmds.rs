@@ -1039,6 +1039,17 @@ pub(crate) fn builtin_window_fringes(
     ]))
 }
 
+/// `(set-window-fringes WINDOW LEFT &optional RIGHT OUTSIDE-MARGINS PERSISTENT)` -> nil.
+pub(crate) fn builtin_set_window_fringes(
+    eval: &mut super::eval::Evaluator,
+    args: Vec<Value>,
+) -> EvalResult {
+    expect_min_args("set-window-fringes", &args, 2)?;
+    expect_max_args("set-window-fringes", &args, 5)?;
+    let (_fid, _wid) = resolve_window_id(eval, args.first())?;
+    Ok(Value::Nil)
+}
+
 /// `(window-scroll-bars &optional WINDOW)` -> scroll-bar tuple.
 pub(crate) fn builtin_window_scroll_bars(
     eval: &mut super::eval::Evaluator,
@@ -1057,6 +1068,17 @@ pub(crate) fn builtin_window_scroll_bars(
         Value::True,
         Value::Nil,
     ]))
+}
+
+/// `(set-window-scroll-bars WINDOW &optional WIDTH VERTICAL-TYPE HEIGHT HORIZONTAL-TYPE)` -> nil.
+pub(crate) fn builtin_set_window_scroll_bars(
+    eval: &mut super::eval::Evaluator,
+    args: Vec<Value>,
+) -> EvalResult {
+    expect_min_args("set-window-scroll-bars", &args, 1)?;
+    expect_max_args("set-window-scroll-bars", &args, 6)?;
+    let (_fid, _wid) = resolve_window_id(eval, args.first())?;
+    Ok(Value::Nil)
 }
 
 /// `(window-mode-line-height &optional WINDOW)` -> integer.
@@ -3430,6 +3452,59 @@ mod tests {
         assert_eq!(
             out[1],
             "OK ((wrong-type-argument fixnump 1.5) (wrong-type-argument fixnump foo) (wrong-type-argument window-live-p 999999) (wrong-type-argument window-live-p foo) (wrong-number-of-arguments set-window-hscroll 1) (wrong-number-of-arguments set-window-hscroll 3) (args-out-of-range -1 0 2147483647) (args-out-of-range -2 0 2147483647) (wrong-type-argument integerp 1.5) (wrong-type-argument integerp foo) (wrong-type-argument integerp foo) (wrong-type-argument window-live-p 999999) (wrong-type-argument window-live-p foo) (wrong-number-of-arguments set-window-margins 1) (wrong-number-of-arguments set-window-margins 4))"
+        );
+        assert_eq!(out[2], "OK (wrong-type-argument wrong-type-argument)");
+    }
+
+    #[test]
+    fn window_fringes_and_scroll_bar_setters_match_batch_defaults_and_error_predicates() {
+        let forms = parse_forms(
+            "(let* ((w (selected-window))
+                    (m (car (last (window-list nil t)))))
+               (list (window-fringes w)
+                     (window-fringes m)
+                     (set-window-fringes w 0 0)
+                     (set-window-fringes w 1 2)
+                     (set-window-fringes w nil nil)
+                     (window-fringes w)
+                     (window-fringes m)
+                     (window-scroll-bars w)
+                     (window-scroll-bars m)
+                     (set-window-scroll-bars w nil nil nil nil)
+                     (set-window-scroll-bars w 'left)
+                     (window-scroll-bars w)
+                     (window-scroll-bars m)
+                     (set-window-fringes m 0 0)
+                     (set-window-scroll-bars m nil)
+                     (window-fringes m)
+                     (window-scroll-bars m)))
+             (list (condition-case err (set-window-fringes nil 1 2 nil nil nil) (error err))
+                   (condition-case err (set-window-scroll-bars nil nil nil nil nil nil nil) (error err))
+                   (condition-case err (set-window-fringes 999999 0 0) (error err))
+                   (condition-case err (set-window-fringes 'foo 0 0) (error err))
+                   (condition-case err (set-window-scroll-bars 999999 nil) (error err))
+                   (condition-case err (set-window-scroll-bars 'foo nil) (error err))
+                   (condition-case err (set-window-fringes nil) (error err))
+                   (condition-case err (set-window-scroll-bars) (error err)))
+             (let ((w (split-window)))
+               (delete-window w)
+               (list (condition-case err (set-window-fringes w 0 0) (error (car err)))
+                     (condition-case err (set-window-scroll-bars w nil) (error (car err)))))",
+        )
+        .expect("parse");
+        let mut ev = Evaluator::new();
+        let out = ev
+            .eval_forms(&forms)
+            .iter()
+            .map(format_eval_result)
+            .collect::<Vec<_>>();
+        assert_eq!(
+            out[0],
+            "OK ((0 0 nil nil) (0 0 nil nil) nil nil nil (0 0 nil nil) (0 0 nil nil) (nil 0 t nil 0 t nil) (nil 0 t nil 0 t nil) nil nil (nil 0 t nil 0 t nil) (nil 0 t nil 0 t nil) nil nil (0 0 nil nil) (nil 0 t nil 0 t nil))"
+        );
+        assert_eq!(
+            out[1],
+            "OK ((wrong-number-of-arguments set-window-fringes 6) (wrong-number-of-arguments set-window-scroll-bars 7) (wrong-type-argument window-live-p 999999) (wrong-type-argument window-live-p foo) (wrong-type-argument window-live-p 999999) (wrong-type-argument window-live-p foo) (wrong-number-of-arguments set-window-fringes 1) (wrong-number-of-arguments set-window-scroll-bars 0))"
         );
         assert_eq!(out[2], "OK (wrong-type-argument wrong-type-argument)");
     }

@@ -865,6 +865,8 @@ fn subr_arity_value(name: &str) -> Value {
             arity_cons(2, Some(3))
         }
         "set-window-vscroll" => arity_cons(2, Some(4)),
+        "set-window-fringes" => arity_cons(2, Some(5)),
+        "set-window-scroll-bars" => arity_cons(1, Some(6)),
         "fit-window-to-buffer" => arity_cons(0, Some(6)),
         "window-text-pixel-size" => arity_cons(0, Some(7)),
         // Process primitives
@@ -2405,6 +2407,8 @@ mod tests {
         assert_subr_arity("set-window-hscroll", 2, Some(2));
         assert_subr_arity("set-window-margins", 2, Some(3));
         assert_subr_arity("set-window-point", 2, Some(2));
+        assert_subr_arity("set-window-fringes", 2, Some(5));
+        assert_subr_arity("set-window-scroll-bars", 1, Some(6));
         assert_subr_arity("set-window-start", 2, Some(3));
         assert_subr_arity("set-window-vscroll", 2, Some(4));
         assert_subr_arity("window-frame", 0, Some(1));

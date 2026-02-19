@@ -7815,6 +7815,16 @@ pub(crate) fn dispatch_builtin(
                 eval, args,
             ))
         }
+        "set-window-fringes" => {
+            return Some(super::window_cmds::builtin_set_window_fringes(
+                eval, args,
+            ))
+        }
+        "set-window-scroll-bars" => {
+            return Some(super::window_cmds::builtin_set_window_scroll_bars(
+                eval, args,
+            ))
+        }
         "set-window-vscroll" => {
             return Some(super::window_cmds::builtin_set_window_vscroll(
                 eval, args,
