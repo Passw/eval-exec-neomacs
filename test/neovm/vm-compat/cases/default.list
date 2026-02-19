@@ -465,6 +465,7 @@ cases/select-frame-set-input-focus-semantics
 cases/window-designator-bootstrap-semantics
 cases/window-size-query-semantics
 cases/window-geometry-helper-semantics
+cases/window-cursor-type-semantics
 cases/window-display-table-semantics
 cases/window-fringes-scroll-bars-setter-semantics
 cases/window-hscroll-margins-setter-semantics

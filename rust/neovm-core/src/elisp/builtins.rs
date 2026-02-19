@@ -7722,6 +7722,11 @@ pub(crate) fn dispatch_builtin(
                 eval, args,
             ))
         }
+        "window-cursor-type" => {
+            return Some(super::window_cmds::builtin_window_cursor_type(
+                eval, args,
+            ))
+        }
         "window-buffer" => return Some(super::window_cmds::builtin_window_buffer(eval, args)),
         "window-start" => return Some(super::window_cmds::builtin_window_start(eval, args)),
         "window-end" => return Some(super::window_cmds::builtin_window_end(eval, args)),
@@ -7827,6 +7832,11 @@ pub(crate) fn dispatch_builtin(
         }
         "set-window-display-table" => {
             return Some(super::window_cmds::builtin_set_window_display_table(
+                eval, args,
+            ))
+        }
+        "set-window-cursor-type" => {
+            return Some(super::window_cmds::builtin_set_window_cursor_type(
                 eval, args,
             ))
         }

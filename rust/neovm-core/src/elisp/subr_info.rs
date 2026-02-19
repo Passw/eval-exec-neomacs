@@ -863,7 +863,8 @@ fn subr_arity_value(name: &str) -> Value {
         "frame-parameter"
         | "set-window-point"
         | "set-window-hscroll"
-        | "set-window-display-table" => arity_cons(2, Some(2)),
+        | "set-window-display-table"
+        | "set-window-cursor-type" => arity_cons(2, Some(2)),
         "set-window-buffer" | "set-window-start" | "set-window-margins" => {
             arity_cons(2, Some(3))
         }
@@ -925,6 +926,7 @@ fn subr_arity_value(name: &str) -> Value {
         | "frame-selected-window"
         | "minibuffer-window"
         | "window-buffer"
+        | "window-cursor-type"
         | "window-display-table"
         | "window-body-edges"
         | "window-body-pixel-edges"
@@ -2410,6 +2412,7 @@ mod tests {
         assert_subr_arity("set-window-buffer", 2, Some(3));
         assert_subr_arity("set-window-hscroll", 2, Some(2));
         assert_subr_arity("set-window-display-table", 2, Some(2));
+        assert_subr_arity("set-window-cursor-type", 2, Some(2));
         assert_subr_arity("set-window-margins", 2, Some(3));
         assert_subr_arity("set-window-point", 2, Some(2));
         assert_subr_arity("set-window-fringes", 2, Some(5));
@@ -2434,6 +2437,7 @@ mod tests {
         assert_subr_arity("window-text-height", 0, Some(2));
         assert_subr_arity("window-text-width", 0, Some(2));
         assert_subr_arity("window-buffer", 0, Some(1));
+        assert_subr_arity("window-cursor-type", 0, Some(1));
         assert_subr_arity("window-display-table", 0, Some(1));
         assert_subr_arity("window-dedicated-p", 0, Some(1));
         assert_subr_arity("window-end", 0, Some(2));

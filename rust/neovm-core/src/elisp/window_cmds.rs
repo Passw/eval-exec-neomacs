@@ -646,6 +646,31 @@ pub(crate) fn builtin_set_window_display_table(
     Ok(table)
 }
 
+/// `(window-cursor-type &optional WINDOW)` -> cursor type object.
+pub(crate) fn builtin_window_cursor_type(
+    eval: &mut super::eval::Evaluator,
+    args: Vec<Value>,
+) -> EvalResult {
+    expect_max_args("window-cursor-type", &args, 1)?;
+    let _ = ensure_selected_frame_id(eval);
+    let (_fid, wid) = resolve_window_id(eval, args.first())?;
+    Ok(eval.frames.window_cursor_type(wid))
+}
+
+/// `(set-window-cursor-type WINDOW TYPE)` -> TYPE.
+pub(crate) fn builtin_set_window_cursor_type(
+    eval: &mut super::eval::Evaluator,
+    args: Vec<Value>,
+) -> EvalResult {
+    expect_args("set-window-cursor-type", &args, 2)?;
+    let _ = ensure_selected_frame_id(eval);
+    let (_fid, wid) = resolve_window_id(eval, args.first())?;
+    let cursor_type = args[1].clone();
+    eval.frames
+        .set_window_cursor_type(wid, cursor_type.clone());
+    Ok(cursor_type)
+}
+
 /// `(window-parameter WINDOW PARAMETER)` -> window parameter or nil.
 pub(crate) fn builtin_window_parameter(
     eval: &mut super::eval::Evaluator,
@@ -3622,6 +3647,50 @@ mod tests {
         assert_eq!(
             out[1],
             "OK ((wrong-number-of-arguments window-display-table 2) (wrong-number-of-arguments set-window-display-table 3) (wrong-type-argument window-live-p 999999) (wrong-type-argument window-live-p 999999) (wrong-type-argument window-live-p foo) (wrong-type-argument window-live-p foo))"
+        );
+        assert_eq!(out[2], "OK (wrong-type-argument wrong-type-argument)");
+    }
+
+    #[test]
+    fn window_cursor_type_helpers_match_batch_defaults_and_set_get_semantics() {
+        let forms = parse_forms(
+            "(let* ((w (selected-window))
+                    (m (car (last (window-list nil t)))))
+               (list (window-cursor-type w)
+                     (window-cursor-type m)
+                     (set-window-cursor-type w nil)
+                     (window-cursor-type w)
+                     (set-window-cursor-type w 'bar)
+                     (window-cursor-type w)
+                     (set-window-cursor-type w t)
+                     (window-cursor-type w)
+                     (set-window-cursor-type m 'hbar)
+                     (window-cursor-type m)
+                     (set-window-cursor-type m nil)
+                     (window-cursor-type m)))
+             (list (condition-case err (window-cursor-type nil nil) (error err))
+                   (condition-case err (set-window-cursor-type nil) (error err))
+                   (condition-case err (set-window-cursor-type nil nil nil) (error err))
+                   (condition-case err (window-cursor-type 999999) (error err))
+                   (condition-case err (set-window-cursor-type 999999 nil) (error err))
+                   (condition-case err (window-cursor-type 'foo) (error err))
+                   (condition-case err (set-window-cursor-type 'foo nil) (error err)))
+             (let ((w (split-window)))
+               (delete-window w)
+               (list (condition-case err (window-cursor-type w) (error (car err)))
+                     (condition-case err (set-window-cursor-type w nil) (error (car err)))))",
+        )
+        .expect("parse");
+        let mut ev = Evaluator::new();
+        let out = ev
+            .eval_forms(&forms)
+            .iter()
+            .map(format_eval_result)
+            .collect::<Vec<_>>();
+        assert_eq!(out[0], "OK (t t nil nil bar bar t t hbar hbar nil nil)");
+        assert_eq!(
+            out[1],
+            "OK ((wrong-number-of-arguments window-cursor-type 2) (wrong-number-of-arguments set-window-cursor-type 1) (wrong-number-of-arguments set-window-cursor-type 3) (wrong-type-argument window-live-p 999999) (wrong-type-argument window-live-p 999999) (wrong-type-argument window-live-p foo) (wrong-type-argument window-live-p foo))"
         );
         assert_eq!(out[2], "OK (wrong-type-argument wrong-type-argument)");
     }

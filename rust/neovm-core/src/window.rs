@@ -467,6 +467,7 @@ pub struct FrameManager {
     deleted_windows: HashSet<WindowId>,
     window_parameters: HashMap<WindowId, Vec<(Value, Value)>>,
     window_display_tables: HashMap<WindowId, Value>,
+    window_cursor_types: HashMap<WindowId, Value>,
 }
 
 impl FrameManager {
@@ -479,6 +480,7 @@ impl FrameManager {
             deleted_windows: HashSet::new(),
             window_parameters: HashMap::new(),
             window_display_tables: HashMap::new(),
+            window_cursor_types: HashMap::new(),
         }
     }
 
@@ -705,6 +707,25 @@ impl FrameManager {
             self.window_display_tables.remove(&window_id);
         } else {
             self.window_display_tables.insert(window_id, table);
+        }
+    }
+
+    /// Return window cursor-type object for WINDOW-ID.
+    ///
+    /// GNU Emacs defaults to `t` when no explicit per-window cursor-type is set.
+    pub fn window_cursor_type(&self, window_id: WindowId) -> Value {
+        self.window_cursor_types
+            .get(&window_id)
+            .cloned()
+            .unwrap_or(Value::True)
+    }
+
+    /// Set window cursor-type object for WINDOW-ID.
+    pub fn set_window_cursor_type(&mut self, window_id: WindowId, cursor_type: Value) {
+        if cursor_type == Value::True {
+            self.window_cursor_types.remove(&window_id);
+        } else {
+            self.window_cursor_types.insert(window_id, cursor_type);
         }
     }
 }
