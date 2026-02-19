@@ -177,6 +177,15 @@ impl Evaluator {
         obarray.set_symbol_value("read-buffer-completion-ignore-case", Value::Nil);
         obarray.set_symbol_value("read-file-name-completion-ignore-case", Value::Nil);
         obarray.set_symbol_value("completion-regexp-list", Value::Nil);
+        obarray.set_symbol_value("completion--all-sorted-completions-location", Value::Nil);
+        obarray.set_symbol_value("completion--capf-misbehave-funs", Value::Nil);
+        obarray.set_symbol_value("completion--capf-safe-funs", Value::Nil);
+        obarray.set_symbol_value(
+            "completion--embedded-envvar-re",
+            Value::string("\\(?:^\\|[^$]\\(?:\\$\\$\\)*\\)\\$\\([[:alnum:]_]*\\|{\\([^}]*\\)\\)\\'"),
+        );
+        obarray.set_symbol_value("completion--flex-score-last-md", Value::Nil);
+        obarray.set_symbol_value("completion-all-sorted-completions", Value::Nil);
         obarray.set_symbol_value(
             "completion-styles",
             Value::list(vec![
@@ -241,10 +250,36 @@ impl Evaluator {
         obarray.set_symbol_value("completion-category-overrides", Value::Nil);
         obarray.set_symbol_value("completion-cycle-threshold", Value::Nil);
         obarray.set_symbol_value("completion-auto-help", Value::True);
+        obarray.set_symbol_value("completion-auto-deselect", Value::True);
         obarray.set_symbol_value("completion-auto-select", Value::Nil);
+        obarray.set_symbol_value("completion-auto-wrap", Value::True);
+        obarray.set_symbol_value("completion-base-position", Value::Nil);
+        obarray.set_symbol_value("completion-cycling", Value::Nil);
+        obarray.set_symbol_value("completion-extra-properties", Value::Nil);
+        obarray.set_symbol_value("completion-fail-discreetly", Value::Nil);
+        obarray.set_symbol_value("completion-flex-nospace", Value::Nil);
+        obarray.set_symbol_value("completion-in-region--data", Value::Nil);
+        obarray.set_symbol_value("completion-in-region-function", Value::symbol("completion--in-region"));
+        obarray.set_symbol_value("completion-in-region-functions", Value::Nil);
+        obarray.set_symbol_value("completion-in-region-mode", Value::Nil);
+        obarray.set_symbol_value("completion-in-region-mode--predicate", Value::Nil);
+        obarray.set_symbol_value("completion-in-region-mode-hook", Value::Nil);
+        obarray.set_symbol_value("completion-in-region-mode-predicate", Value::Nil);
         obarray.set_symbol_value("completion-show-help", Value::True);
         obarray.set_symbol_value("completion-show-inline-help", Value::True);
         obarray.set_symbol_value("completion-lazy-hilit", Value::Nil);
+        obarray.set_symbol_value("completion-lazy-hilit-fn", Value::Nil);
+        obarray.set_symbol_value(
+            "completion-list-insert-choice-function",
+            Value::symbol("completion--replace"),
+        );
+        obarray.set_symbol_value("completion-no-auto-exit", Value::Nil);
+        obarray.set_symbol_value("completion-pcm--delim-wild-regex", Value::string("[-_./:| *]"));
+        obarray.set_symbol_value("completion-pcm--regexp", Value::Nil);
+        obarray.set_symbol_value("completion-pcm-complete-word-inserts-delimiters", Value::Nil);
+        obarray.set_symbol_value("completion-pcm-word-delimiters", Value::string("-_./:| "));
+        obarray.set_symbol_value("completion-reference-buffer", Value::Nil);
+        obarray.set_symbol_value("completion-tab-width", Value::Nil);
         obarray.set_symbol_value("enable-recursive-minibuffers", Value::Nil);
         obarray.set_symbol_value("history-length", Value::Int(100));
         obarray.set_symbol_value("history-delete-duplicates", Value::Nil);
@@ -254,14 +289,40 @@ impl Evaluator {
         obarray.set_symbol_value("read-expression-history", Value::Nil);
         obarray.set_symbol_value("read-number-history", Value::Nil);
         obarray.set_symbol_value("read-char-history", Value::Nil);
+        obarray.set_symbol_value("read-answer-short", Value::symbol("auto"));
+        obarray.set_symbol_value("read-char-by-name-sort", Value::Nil);
+        obarray.set_symbol_value("read-char-choice-use-read-key", Value::Nil);
+        obarray.set_symbol_value("read-circle", Value::True);
+        obarray.set_symbol_value("read-envvar-name-history", Value::Nil);
+        obarray.set_symbol_value("read-extended-command-mode", Value::Nil);
+        obarray.set_symbol_value("read-extended-command-mode-hook", Value::Nil);
+        obarray.set_symbol_value("read-extended-command-predicate", Value::Nil);
+        obarray.set_symbol_value("read-hide-char", Value::Nil);
+        obarray.set_symbol_value("read-mail-command", Value::symbol("rmail"));
+        obarray.set_symbol_value("read-minibuffer-restore-windows", Value::True);
+        obarray.set_symbol_value("read-only-mode-hook", Value::Nil);
+        obarray.set_symbol_value("read-process-output-max", Value::Int(65536));
+        obarray.set_symbol_value("read-quoted-char-radix", Value::Int(8));
+        obarray.set_symbol_value("read-regexp--case-fold", Value::Nil);
+        obarray.set_symbol_value("read-regexp-defaults-function", Value::Nil);
+        obarray.set_symbol_value("read-symbol-shorthands", Value::Nil);
         obarray.set_symbol_value("minibuffer-history", Value::Nil);
         obarray.set_symbol_value("minibuffer-history-variable", Value::symbol("minibuffer-history"));
         obarray.set_symbol_value("minibuffer-history-position", Value::Nil);
+        obarray.set_symbol_value("minibuffer-history-isearch-message-overlay", Value::Nil);
+        obarray.set_symbol_value("minibuffer-history-search-history", Value::Nil);
+        obarray.set_symbol_value("minibuffer-history-sexp-flag", Value::Nil);
         obarray.set_symbol_value("minibuffer-default", Value::Nil);
+        obarray.set_symbol_value("minibuffer-default-add-done", Value::Nil);
         obarray.set_symbol_value(
             "minibuffer-default-add-function",
             Value::symbol("minibuffer-default-add-completions"),
         );
+        obarray.set_symbol_value("minibuffer--original-buffer", Value::Nil);
+        obarray.set_symbol_value("minibuffer--regexp-primed", Value::Nil);
+        obarray.set_symbol_value("minibuffer--require-match", Value::Nil);
+        obarray.set_symbol_value("minibuffer-auto-raise", Value::Nil);
+        obarray.set_symbol_value("minibuffer-follows-selected-frame", Value::True);
         obarray.set_symbol_value("minibuffer-completion-table", Value::Nil);
         obarray.set_symbol_value("minibuffer-completion-predicate", Value::Nil);
         obarray.set_symbol_value("minibuffer-completion-confirm", Value::Nil);
@@ -270,8 +331,12 @@ impl Evaluator {
         obarray.set_symbol_value("minibuffer-help-form", Value::Nil);
         obarray.set_symbol_value("minibuffer-completing-file-name", Value::Nil);
         obarray.set_symbol_value("minibuffer-regexp-mode", Value::True);
+        obarray.set_symbol_value("minibuffer-regexp-mode-hook", Value::Nil);
         obarray.set_symbol_value("minibuffer-message-clear-timeout", Value::Nil);
+        obarray.set_symbol_value("minibuffer-message-overlay", Value::Nil);
         obarray.set_symbol_value("minibuffer-message-properties", Value::Nil);
+        obarray.set_symbol_value("minibuffer-message-timeout", Value::Int(2));
+        obarray.set_symbol_value("minibuffer-message-timer", Value::Nil);
         obarray.set_symbol_value("minibuffer-text-before-history", Value::Nil);
         obarray.set_symbol_value(
             "minibuffer-prompt-properties",
@@ -290,6 +355,7 @@ impl Evaluator {
         obarray.set_symbol_value("minibuffer-default-prompt-format", Value::string(" (default %s)"));
         obarray.set_symbol_value("minibuffer-beginning-of-buffer-movement", Value::Nil);
         obarray.set_symbol_value("minibuffer-electric-default-mode", Value::Nil);
+        obarray.set_symbol_value("minibuffer-temporary-goal-position", Value::Nil);
         obarray.set_symbol_value(
             "minibuffer-confirm-exit-commands",
             Value::list(vec![
@@ -302,9 +368,15 @@ impl Evaluator {
         obarray.set_symbol_value("minibuffer-on-screen-keyboard-displayed", Value::Nil);
         obarray.set_symbol_value("minibuffer-on-screen-keyboard-timer", Value::Nil);
         obarray.set_symbol_value("regexp-search-ring", Value::Nil);
+        obarray.set_symbol_value("regexp-search-ring-max", Value::Int(16));
         obarray.set_symbol_value("regexp-search-ring-yank-pointer", Value::Nil);
         obarray.set_symbol_value("search-ring", Value::Nil);
+        obarray.set_symbol_value("search-ring-max", Value::Int(16));
+        obarray.set_symbol_value("search-ring-update", Value::Nil);
         obarray.set_symbol_value("search-ring-yank-pointer", Value::Nil);
+        obarray.set_symbol_value("last-abbrev", Value::Nil);
+        obarray.set_symbol_value("last-abbrev-location", Value::Int(0));
+        obarray.set_symbol_value("last-abbrev-text", Value::Nil);
         obarray.set_symbol_value("last-command-event", Value::Nil);
         obarray.set_symbol_value("last-event-frame", Value::Nil);
         obarray.set_symbol_value("last-event-device", Value::Nil);
@@ -313,7 +385,9 @@ impl Evaluator {
         obarray.set_symbol_value("last-prefix-arg", Value::Nil);
         obarray.set_symbol_value("last-kbd-macro", Value::Nil);
         obarray.set_symbol_value("last-code-conversion-error", Value::Nil);
+        obarray.set_symbol_value("last-coding-system-specified", Value::Nil);
         obarray.set_symbol_value("last-coding-system-used", Value::symbol("undecided-unix"));
+        obarray.set_symbol_value("last-next-selection-coding-system", Value::Nil);
         obarray.set_symbol_value("command-debug-status", Value::Nil);
         obarray.set_symbol_value(
             "command-error-function",
@@ -346,10 +420,16 @@ impl Evaluator {
         obarray.set_symbol_value("deactivate-mark", Value::True);
         obarray.set_symbol_value("mark-active", Value::Nil);
         obarray.set_symbol_value("mark-even-if-inactive", Value::True);
+        obarray.set_symbol_value("mark-ring", Value::Nil);
+        obarray.set_symbol_value("mark-ring-max", Value::Int(16));
         obarray.set_symbol_value("saved-region-selection", Value::Nil);
         obarray.set_symbol_value("transient-mark-mode", Value::Nil);
+        obarray.set_symbol_value("transient-mark-mode-hook", Value::Nil);
         obarray.set_symbol_value("overriding-local-map", Value::Nil);
+        obarray.set_symbol_value("overriding-local-map-menu-flag", Value::Nil);
+        obarray.set_symbol_value("overriding-plist-environment", Value::Nil);
         obarray.set_symbol_value("overriding-terminal-local-map", Value::Nil);
+        obarray.set_symbol_value("overriding-text-conversion-style", Value::symbol("lambda"));
         obarray.set_symbol_value("unread-input-method-events", Value::Nil);
         obarray.set_symbol_value("unread-post-input-method-events", Value::Nil);
         obarray.set_symbol_value("input-method-alist", Value::Nil);

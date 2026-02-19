@@ -303,6 +303,42 @@ Last updated: 2026-02-19
     - `make -C test/neovm/vm-compat check-one-neovm CASE=cases/minibuffer-batch` (pass, `47/47`)
     - `make -C test/neovm/vm-compat check-all-neovm-strict` (pass)
 
+- Expanded startup completion/minibuffer/read scalar defaults and de-duplicated startup-state lock-ins:
+  - runtime changes:
+    - `rust/neovm-core/src/elisp/eval.rs`
+      - evaluator startup now additionally seeds oracle-matching scalar defaults for:
+        - completion internals/helpers:
+          - `completion--all-sorted-completions-location`, `completion--capf-misbehave-funs`, `completion--capf-safe-funs`, `completion--embedded-envvar-re`, `completion--flex-score-last-md`, `completion-all-sorted-completions`
+          - `completion-auto-deselect` (`t`), `completion-auto-wrap` (`t`), `completion-base-position`, `completion-cycling`, `completion-extra-properties`, `completion-fail-discreetly`, `completion-flex-nospace`
+          - `completion-in-region--data`, `completion-in-region-function` (`completion--in-region`), `completion-in-region-functions`, `completion-in-region-mode`, `completion-in-region-mode--predicate`, `completion-in-region-mode-hook`, `completion-in-region-mode-predicate`
+          - `completion-lazy-hilit-fn`, `completion-list-insert-choice-function` (`completion--replace`), `completion-no-auto-exit`
+          - `completion-pcm--delim-wild-regex`, `completion-pcm--regexp`, `completion-pcm-complete-word-inserts-delimiters`, `completion-pcm-word-delimiters`, `completion-reference-buffer`, `completion-tab-width`
+        - read/minibuffer helpers:
+          - `read-answer-short` (`auto`), `read-char-by-name-sort`, `read-char-choice-use-read-key`, `read-circle` (`t`), `read-envvar-name-history`, `read-extended-command-mode`, `read-extended-command-mode-hook`, `read-extended-command-predicate`, `read-hide-char`, `read-mail-command` (`rmail`), `read-minibuffer-restore-windows` (`t`), `read-only-mode-hook`, `read-process-output-max` (`65536`), `read-quoted-char-radix` (`8`), `read-regexp--case-fold`, `read-regexp-defaults-function`, `read-symbol-shorthands`
+          - `minibuffer-history-isearch-message-overlay`, `minibuffer-history-search-history`, `minibuffer-history-sexp-flag`, `minibuffer-default-add-done`
+          - `minibuffer--original-buffer`, `minibuffer--regexp-primed`, `minibuffer--require-match`, `minibuffer-auto-raise`, `minibuffer-follows-selected-frame` (`t`)
+          - `minibuffer-regexp-mode-hook`, `minibuffer-message-overlay`, `minibuffer-message-timeout` (`2`), `minibuffer-message-timer`, `minibuffer-temporary-goal-position`
+        - command/mark/override helpers:
+          - `last-abbrev`, `last-abbrev-location` (`0`), `last-abbrev-text`, `last-coding-system-specified`, `last-next-selection-coding-system`
+          - `mark-ring`, `mark-ring-max` (`16`), `transient-mark-mode-hook`
+          - `overriding-local-map-menu-flag`, `overriding-plist-environment`, `overriding-text-conversion-style` (`lambda`)
+          - `regexp-search-ring-max` (`16`), `search-ring-max` (`16`), `search-ring-update`
+  - corpus changes:
+    - refactored `test/neovm/vm-compat/cases/input-command-state-startup-semantics.forms` to declare shared startup symbol lists once and reuse them across:
+      - startup `boundp` lock-ins
+      - startup default-value lock-ins
+      - `read-key` / `read-event` reader-path lock-ins
+      - prompt-reader EOF preservation lock-ins
+    - expanded lock-ins to include the new scalar startup vars above.
+    - re-recorded `test/neovm/vm-compat/cases/input-command-state-startup-semantics.expected.tsv`.
+  - verified:
+    - `make -C test/neovm/vm-compat record FORMS=cases/input-command-state-startup-semantics.forms EXPECTED=cases/input-command-state-startup-semantics.expected.tsv` (pass)
+    - `make -C test/neovm/vm-compat check-one-neovm CASE=cases/input-command-state-startup-semantics` (pass, `9/9`)
+    - `make -C test/neovm/vm-compat check-one-neovm CASE=cases/use-region-p-semantics` (pass, `8/8`)
+    - `make -C test/neovm/vm-compat check-one-neovm CASE=cases/input-last-event-reader-semantics` (pass, `13/13`)
+    - `make -C test/neovm/vm-compat check-one-neovm CASE=cases/minibuffer-batch` (pass, `47/47`)
+    - `make -C test/neovm/vm-compat check-all-neovm-strict` (pass)
+
 - Expanded batch prompt/input queue-edge lock-ins for stale/invalid unread tails:
   - corpus changes:
     - expanded and re-recorded:
