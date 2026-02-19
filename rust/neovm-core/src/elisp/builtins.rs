@@ -7717,6 +7717,11 @@ pub(crate) fn dispatch_builtin(
             ))
         }
         "window-parameters" => return Some(super::window_cmds::builtin_window_parameters(eval, args)),
+        "window-display-table" => {
+            return Some(super::window_cmds::builtin_window_display_table(
+                eval, args,
+            ))
+        }
         "window-buffer" => return Some(super::window_cmds::builtin_window_buffer(eval, args)),
         "window-start" => return Some(super::window_cmds::builtin_window_start(eval, args)),
         "window-end" => return Some(super::window_cmds::builtin_window_end(eval, args)),
@@ -7817,6 +7822,11 @@ pub(crate) fn dispatch_builtin(
         }
         "set-window-fringes" => {
             return Some(super::window_cmds::builtin_set_window_fringes(
+                eval, args,
+            ))
+        }
+        "set-window-display-table" => {
+            return Some(super::window_cmds::builtin_set_window_display_table(
                 eval, args,
             ))
         }

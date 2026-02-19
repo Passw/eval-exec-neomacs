@@ -466,6 +466,7 @@ pub struct FrameManager {
     next_window_id: u64,
     deleted_windows: HashSet<WindowId>,
     window_parameters: HashMap<WindowId, Vec<(Value, Value)>>,
+    window_display_tables: HashMap<WindowId, Value>,
 }
 
 impl FrameManager {
@@ -477,6 +478,7 @@ impl FrameManager {
             next_window_id: 1,
             deleted_windows: HashSet::new(),
             window_parameters: HashMap::new(),
+            window_display_tables: HashMap::new(),
         }
     }
 
@@ -687,6 +689,23 @@ impl FrameManager {
             .map(|(k, v)| Value::cons(k.clone(), v.clone()))
             .collect::<Vec<_>>();
         Value::list(alist)
+    }
+
+    /// Return window display table object for WINDOW-ID, or nil when unset.
+    pub fn window_display_table(&self, window_id: WindowId) -> Value {
+        self.window_display_tables
+            .get(&window_id)
+            .cloned()
+            .unwrap_or(Value::Nil)
+    }
+
+    /// Set window display table object for WINDOW-ID.
+    pub fn set_window_display_table(&mut self, window_id: WindowId, table: Value) {
+        if table.is_nil() {
+            self.window_display_tables.remove(&window_id);
+        } else {
+            self.window_display_tables.insert(window_id, table);
+        }
     }
 }
 

@@ -622,6 +622,30 @@ pub(crate) fn builtin_window_buffer(
     }
 }
 
+/// `(window-display-table &optional WINDOW)` -> display table or nil.
+pub(crate) fn builtin_window_display_table(
+    eval: &mut super::eval::Evaluator,
+    args: Vec<Value>,
+) -> EvalResult {
+    expect_max_args("window-display-table", &args, 1)?;
+    let _ = ensure_selected_frame_id(eval);
+    let (_fid, wid) = resolve_window_id(eval, args.first())?;
+    Ok(eval.frames.window_display_table(wid))
+}
+
+/// `(set-window-display-table WINDOW TABLE)` -> TABLE.
+pub(crate) fn builtin_set_window_display_table(
+    eval: &mut super::eval::Evaluator,
+    args: Vec<Value>,
+) -> EvalResult {
+    expect_args("set-window-display-table", &args, 2)?;
+    let _ = ensure_selected_frame_id(eval);
+    let (_fid, wid) = resolve_window_id(eval, args.first())?;
+    let table = args[1].clone();
+    eval.frames.set_window_display_table(wid, table.clone());
+    Ok(table)
+}
+
 /// `(window-parameter WINDOW PARAMETER)` -> window parameter or nil.
 pub(crate) fn builtin_window_parameter(
     eval: &mut super::eval::Evaluator,
@@ -3556,6 +3580,50 @@ mod tests {
             out[1],
             "OK ((wrong-type-argument windowp 999999) (wrong-type-argument windowp 999999) (wrong-type-argument window-valid-p 999999) (wrong-number-of-arguments window-parameter 1) (wrong-number-of-arguments window-parameter 3) (wrong-number-of-arguments set-window-parameter 2) (wrong-number-of-arguments set-window-parameter 4) (wrong-number-of-arguments window-parameters 2) (wrong-type-argument windowp foo) (wrong-type-argument windowp foo))"
         );
+    }
+
+    #[test]
+    fn window_display_table_helpers_match_batch_defaults_and_set_get_semantics() {
+        let forms = parse_forms(
+            "(let* ((w (selected-window))
+                    (m (car (last (window-list nil t))))
+                    (dt '(1 2 3)))
+               (list (null (window-display-table w))
+                     (null (window-display-table m))
+                     (let ((rv (set-window-display-table w dt))) (equal rv dt))
+                     (equal (window-display-table w) dt)
+                     (null (set-window-display-table w nil))
+                     (null (window-display-table w))
+                     (let ((rv (set-window-display-table m dt))) (equal rv dt))
+                     (equal (window-display-table m) dt)
+                     (eq (set-window-display-table m 'foo) 'foo)
+                     (eq (window-display-table m) 'foo)
+                     (null (set-window-display-table m nil))
+                     (null (window-display-table m))))
+             (list (condition-case err (window-display-table nil nil) (error err))
+                   (condition-case err (set-window-display-table nil nil nil) (error err))
+                   (condition-case err (window-display-table 999999) (error err))
+                   (condition-case err (set-window-display-table 999999 nil) (error err))
+                   (condition-case err (window-display-table 'foo) (error err))
+                   (condition-case err (set-window-display-table 'foo nil) (error err)))
+             (let ((w (split-window)))
+               (delete-window w)
+               (list (condition-case err (window-display-table w) (error (car err)))
+                     (condition-case err (set-window-display-table w nil) (error (car err)))))",
+        )
+        .expect("parse");
+        let mut ev = Evaluator::new();
+        let out = ev
+            .eval_forms(&forms)
+            .iter()
+            .map(format_eval_result)
+            .collect::<Vec<_>>();
+        assert_eq!(out[0], "OK (t t t t t t t t t t t t)");
+        assert_eq!(
+            out[1],
+            "OK ((wrong-number-of-arguments window-display-table 2) (wrong-number-of-arguments set-window-display-table 3) (wrong-type-argument window-live-p 999999) (wrong-type-argument window-live-p 999999) (wrong-type-argument window-live-p foo) (wrong-type-argument window-live-p foo))"
+        );
+        assert_eq!(out[2], "OK (wrong-type-argument wrong-type-argument)");
     }
 
     #[test]

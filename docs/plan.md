@@ -28,6 +28,50 @@ Last updated: 2026-02-19
 
 ## Doing
 
+- Completed `window-display-table` parity slice and added oracle lock-ins:
+  - runtime changes:
+    - `rust/neovm-core/src/window.rs`
+      - added frame-manager storage for per-window display-table objects.
+      - added helpers:
+        - `window_display_table`
+        - `set_window_display_table`
+    - `rust/neovm-core/src/elisp/window_cmds.rs`
+      - added evaluator-backed builtins:
+        - `window-display-table`
+        - `set-window-display-table`
+      - aligned batch behavior with GNU Emacs:
+        - optional window argument resolves via `window-live-p` semantics
+        - setter accepts arbitrary Lisp payload and returns it verbatim
+        - getter returns stored payload or `nil` when unset
+      - added evaluator unit coverage:
+        - `window_display_table_helpers_match_batch_defaults_and_set_get_semantics`
+    - `rust/neovm-core/src/elisp/builtins.rs`
+      - wired dispatch for both display-table builtins.
+    - `rust/neovm-core/src/elisp/builtin_registry.rs`
+      - registered both names in builtin registry.
+      - parity registry counts now remain:
+        - `DISPATCH_BUILTIN_NAMES`: `997`
+        - core parity entries: `996`
+    - `rust/neovm-core/src/elisp/subr_info.rs`
+      - added `subr-arity` metadata:
+        - `(0 . 1)`: `window-display-table`
+        - `(2 . 2)`: `set-window-display-table`
+      - extended `subr_arity_window_frame_primitives_match_oracle`.
+  - corpus changes:
+    - added:
+      - `test/neovm/vm-compat/cases/window-display-table-semantics.{forms,expected.tsv}`
+    - expanded and re-recorded:
+      - `test/neovm/vm-compat/cases/window-frame-subr-arity-semantics.{forms,expected.tsv}`
+    - wired new case into:
+      - `test/neovm/vm-compat/cases/default.list`
+  - verified:
+    - `cargo test --manifest-path rust/neovm-core/Cargo.toml window_display_table_helpers_match_batch_defaults_and_set_get_semantics` (pass)
+    - `cargo test --manifest-path rust/neovm-core/Cargo.toml subr_arity_window_frame_primitives_match_oracle` (pass)
+    - `make -C test/neovm/vm-compat check-one-neovm CASE=cases/window-display-table-semantics` (pass)
+    - `make -C test/neovm/vm-compat check-one-neovm CASE=cases/window-frame-subr-arity-semantics` (pass)
+    - `make -C test/neovm/vm-compat check-builtin-registry-all` (pass)
+    - `make -C test/neovm/vm-compat check-all-neovm-strict` (pass)
+
 - Completed `set-window-fringes` / `set-window-scroll-bars` parity slice and added oracle lock-ins:
   - runtime changes:
     - `rust/neovm-core/src/elisp/window_cmds.rs`
