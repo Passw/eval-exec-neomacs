@@ -28,6 +28,48 @@ Last updated: 2026-02-19
 
 ## Doing
 
+- Added process list/network/serial compatibility slice and locked oracle parity:
+  - runtime changes:
+    - `rust/neovm-core/src/elisp/process.rs`
+      - implemented:
+        - `list-system-processes`
+        - `num-processors`
+        - `list-processes`
+        - `list-processes--refresh`
+        - `make-network-process`
+        - `make-pipe-process`
+        - `make-serial-process`
+        - `serial-process-configure`
+        - `set-network-process-option`
+      - added process kind tracking for runtime validation paths used by network-option checks.
+      - aligned oracle behavior for:
+        - list/arity semantics for process-list/processor/system-process surfaces
+        - network/pipe/serial constructor nil/error contracts
+        - serial configure current-buffer error path
+        - network-option wrong-arity/wrong-type/non-network/unsupported-option payloads.
+      - added runtime unit lock-in:
+        - `process_list_network_serial_runtime_surface`
+    - `rust/neovm-core/src/elisp/builtins.rs`
+      - wired evaluator dispatch for all new process builtins above.
+    - `rust/neovm-core/src/elisp/builtin_registry.rs`
+      - registered new symbols in `DISPATCH_BUILTIN_NAMES`.
+    - `rust/neovm-core/src/elisp/subr_info.rs`
+      - added oracle arity metadata/assertions for the new symbols.
+    - `rust/neovm-core/src/elisp/interactive.rs`
+      - marked `list-processes` as command builtin for `commandp` parity.
+  - corpus changes:
+    - added and wired:
+      - `test/neovm/vm-compat/cases/process-list-network-serial-semantics.forms`
+      - `test/neovm/vm-compat/cases/process-list-network-serial-semantics.expected.tsv`
+      - `test/neovm/vm-compat/cases/default.list`
+  - verified:
+    - `cargo test --manifest-path rust/neovm-core/Cargo.toml process:: -- --nocapture` (pass)
+    - `cargo test --manifest-path rust/neovm-core/Cargo.toml subr_arity_process_primitives_match_oracle -- --nocapture` (pass)
+    - `cargo test --manifest-path rust/neovm-core/Cargo.toml commandp_true_for_additional_builtin_commands -- --nocapture` (pass)
+    - `make -C test/neovm/vm-compat check-one-neovm CASE=cases/process-list-network-serial-semantics` (pass, `3/3`)
+    - `make -C test/neovm/vm-compat check-builtin-registry-all` (pass; drifts `0`; core count `1151`)
+    - `make -C test/neovm/vm-compat check-all-neovm-strict` (pass; case inventory `786`)
+
 - Added process shell-wrapper + quit/buffer-coding compatibility slice and locked oracle parity:
   - runtime changes:
     - `rust/neovm-core/src/elisp/process.rs`

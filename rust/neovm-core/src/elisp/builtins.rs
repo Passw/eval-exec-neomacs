@@ -7705,7 +7705,30 @@ pub(crate) fn dispatch_builtin(
         "accept-process-output" => {
             return Some(super::process::builtin_accept_process_output(eval, args))
         }
+        "list-system-processes" => {
+            return Some(super::process::builtin_list_system_processes(eval, args))
+        }
+        "num-processors" => return Some(super::process::builtin_num_processors(eval, args)),
+        "list-processes" => return Some(super::process::builtin_list_processes(eval, args)),
+        "list-processes--refresh" => {
+            return Some(super::process::builtin_list_processes_refresh(eval, args))
+        }
         "make-process" => return Some(super::process::builtin_make_process(eval, args)),
+        "make-network-process" => {
+            return Some(super::process::builtin_make_network_process(eval, args))
+        }
+        "make-pipe-process" => return Some(super::process::builtin_make_pipe_process(eval, args)),
+        "make-serial-process" => {
+            return Some(super::process::builtin_make_serial_process(eval, args))
+        }
+        "serial-process-configure" => {
+            return Some(super::process::builtin_serial_process_configure(eval, args))
+        }
+        "set-network-process-option" => {
+            return Some(super::process::builtin_set_network_process_option(
+                eval, args,
+            ))
+        }
         "start-process" => return Some(super::process::builtin_start_process(eval, args)),
         "start-process-shell-command" => {
             return Some(super::process::builtin_start_process_shell_command(

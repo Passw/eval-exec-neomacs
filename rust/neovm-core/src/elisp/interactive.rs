@@ -402,6 +402,7 @@ fn builtin_command_name(name: &str) -> bool {
             | "kill-local-variable"
             | "kill-rectangle"
             | "load-file"
+            | "list-processes"
             | "local-set-key"
             | "make-directory"
             | "make-frame"
@@ -3309,6 +3310,7 @@ mod tests {
             "goto-char",
             "indent-region",
             "isearch-forward",
+            "list-processes",
             "make-directory",
             "query-replace",
             "re-search-forward",

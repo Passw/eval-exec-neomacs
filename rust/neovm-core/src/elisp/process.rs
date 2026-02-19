@@ -28,6 +28,15 @@ pub enum ProcessStatus {
     Signal(i32),
 }
 
+/// Process family used by compatibility helpers.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum ProcessKind {
+    Real,
+    Network,
+    Pipe,
+    Serial,
+}
+
 /// A tracked process record.
 #[derive(Clone, Debug)]
 pub struct Process {
@@ -35,6 +44,7 @@ pub struct Process {
     pub name: String,
     pub command: String,
     pub args: Vec<String>,
+    pub kind: ProcessKind,
     pub status: ProcessStatus,
     pub buffer_name: Option<String>,
     /// Queued input (sent via `process-send-string`).
@@ -97,6 +107,18 @@ impl ProcessManager {
         command: String,
         args: Vec<String>,
     ) -> ProcessId {
+        self.create_process_with_kind(name, buffer_name, command, args, ProcessKind::Real)
+    }
+
+    /// Create a new process record with an explicit process kind.
+    pub fn create_process_with_kind(
+        &mut self,
+        name: String,
+        buffer_name: Option<String>,
+        command: String,
+        args: Vec<String>,
+        kind: ProcessKind,
+    ) -> ProcessId {
         let id = self.next_id;
         self.next_id += 1;
         let proc = Process {
@@ -104,6 +126,7 @@ impl ProcessManager {
             name,
             command,
             args,
+            kind,
             status: ProcessStatus::Run,
             buffer_name,
             stdin_queue: String::new(),
@@ -403,6 +426,14 @@ fn expect_process_name_string(value: &Value) -> Result<String, Flow> {
             "error",
             vec![Value::string(":name value not a string")],
         )),
+    }
+}
+
+fn keyword_name(value: &Value) -> Option<&str> {
+    match value {
+        Value::Keyword(k) => Some(k.as_str()),
+        Value::Symbol(s) if s.starts_with(':') => Some(s.as_str()),
+        _ => None,
     }
 }
 
@@ -1059,6 +1090,286 @@ fn expect_integer(value: &Value) -> Result<i64, Flow> {
 // ---------------------------------------------------------------------------
 // Builtins (eval-dependent)
 // ---------------------------------------------------------------------------
+
+/// (list-system-processes) -> process-id-list
+pub(crate) fn builtin_list_system_processes(
+    _eval: &mut super::eval::Evaluator,
+    args: Vec<Value>,
+) -> EvalResult {
+    expect_args("list-system-processes", &args, 0)?;
+
+    let mut pids: Vec<i64> = std::fs::read_dir("/proc")
+        .ok()
+        .into_iter()
+        .flat_map(|entries| entries.filter_map(Result::ok))
+        .filter_map(|entry| entry.file_name().to_string_lossy().parse::<i64>().ok())
+        .collect();
+    pids.sort_unstable();
+    Ok(Value::list(pids.into_iter().map(Value::Int).collect()))
+}
+
+/// (num-processors &optional QUERY) -> integer
+pub(crate) fn builtin_num_processors(
+    _eval: &mut super::eval::Evaluator,
+    args: Vec<Value>,
+) -> EvalResult {
+    if args.len() > 1 {
+        return Err(signal(
+            "wrong-number-of-arguments",
+            vec![Value::symbol("num-processors"), Value::Int(args.len() as i64)],
+        ));
+    }
+    let count = std::thread::available_parallelism()
+        .map(|n| n.get() as i64)
+        .unwrap_or(1);
+    Ok(Value::Int(count))
+}
+
+/// (list-processes &optional QUERY-ONLY BUFFER) -> nil
+pub(crate) fn builtin_list_processes(
+    _eval: &mut super::eval::Evaluator,
+    args: Vec<Value>,
+) -> EvalResult {
+    if args.len() > 2 {
+        return Err(signal(
+            "wrong-number-of-arguments",
+            vec![Value::symbol("list-processes"), Value::Int(args.len() as i64)],
+        ));
+    }
+    Ok(Value::Nil)
+}
+
+/// (list-processes--refresh) -> row-spec
+pub(crate) fn builtin_list_processes_refresh(
+    _eval: &mut super::eval::Evaluator,
+    args: Vec<Value>,
+) -> EvalResult {
+    expect_args("list-processes--refresh", &args, 0)?;
+    Ok(Value::list(vec![
+        Value::string(""),
+        Value::symbol("header-line-indent"),
+        Value::string(" "),
+    ]))
+}
+
+/// (make-network-process &rest ARGS) -> process-or-nil
+pub(crate) fn builtin_make_network_process(
+    eval: &mut super::eval::Evaluator,
+    args: Vec<Value>,
+) -> EvalResult {
+    if args.is_empty() {
+        return Ok(Value::Nil);
+    }
+
+    let mut name: Option<String> = None;
+    let mut service: Option<Value> = None;
+    let mut server = false;
+
+    let mut i = 0usize;
+    while i < args.len() {
+        let key = &args[i];
+        let value = args.get(i + 1).cloned().unwrap_or(Value::Nil);
+        let Some(key_name) = keyword_name(key) else {
+            i += 1;
+            continue;
+        };
+        match key_name {
+            ":name" => {
+                name = Some(expect_process_name_string(&value)?);
+            }
+            ":service" => {
+                service = Some(value);
+            }
+            ":server" => {
+                server = value.is_truthy();
+            }
+            _ => {}
+        }
+        i += 2;
+    }
+
+    let Some(name) = name else {
+        return Err(signal(
+            "error",
+            vec![Value::string("Missing :name keyword parameter")],
+        ));
+    };
+
+    let service = service.unwrap_or(Value::Nil);
+    if service.is_nil() {
+        return Err(signal_wrong_type_string(Value::Nil));
+    }
+    if !server {
+        return Err(signal(
+            "file-error",
+            vec![
+                Value::string("make client process failed"),
+                Value::string("Connection refused"),
+                Value::keyword(":name"),
+                Value::string(name),
+                Value::keyword(":service"),
+                service,
+            ],
+        ));
+    }
+
+    let id = eval.processes.create_process_with_kind(
+        name,
+        None,
+        "network".to_string(),
+        Vec::new(),
+        ProcessKind::Network,
+    );
+    Ok(Value::Int(id as i64))
+}
+
+/// (make-pipe-process &rest ARGS) -> process-or-nil
+pub(crate) fn builtin_make_pipe_process(
+    eval: &mut super::eval::Evaluator,
+    args: Vec<Value>,
+) -> EvalResult {
+    if args.is_empty() {
+        return Ok(Value::Nil);
+    }
+
+    let mut name: Option<String> = None;
+    let mut buffer_name: Option<Option<String>> = None;
+
+    let mut i = 0usize;
+    while i < args.len() {
+        let key = &args[i];
+        let value = args.get(i + 1).cloned().unwrap_or(Value::Nil);
+        let Some(key_name) = keyword_name(key) else {
+            i += 1;
+            continue;
+        };
+        match key_name {
+            ":name" => {
+                name = Some(expect_process_name_string(&value)?);
+            }
+            ":buffer" => {
+                buffer_name = Some(parse_make_process_buffer(eval, &value)?);
+            }
+            _ => {}
+        }
+        i += 2;
+    }
+
+    let Some(name) = name else {
+        return Err(signal(
+            "error",
+            vec![Value::string("Missing :name keyword parameter")],
+        ));
+    };
+
+    let id = eval.processes.create_process_with_kind(
+        name,
+        buffer_name.unwrap_or(None),
+        "pipe".to_string(),
+        Vec::new(),
+        ProcessKind::Pipe,
+    );
+    Ok(Value::Int(id as i64))
+}
+
+/// (make-serial-process &rest ARGS) -> process-or-nil
+pub(crate) fn builtin_make_serial_process(
+    eval: &mut super::eval::Evaluator,
+    args: Vec<Value>,
+) -> EvalResult {
+    if args.is_empty() {
+        return Ok(Value::Nil);
+    }
+
+    let mut name: Option<String> = None;
+    let mut port: Option<Value> = None;
+    let mut speed: Option<Value> = None;
+
+    let mut i = 0usize;
+    while i < args.len() {
+        let key = &args[i];
+        let value = args.get(i + 1).cloned().unwrap_or(Value::Nil);
+        let Some(key_name) = keyword_name(key) else {
+            i += 1;
+            continue;
+        };
+        match key_name {
+            ":name" => {
+                name = Some(expect_process_name_string(&value)?);
+            }
+            ":port" => {
+                port = Some(value);
+            }
+            ":speed" => {
+                speed = Some(value);
+            }
+            _ => {}
+        }
+        i += 2;
+    }
+
+    if port.is_none() {
+        return Err(signal("error", vec![Value::string("No port specified")]));
+    }
+    if speed.is_none() {
+        return Err(signal("error", vec![Value::string(":speed not specified")]));
+    }
+
+    let id = eval.processes.create_process_with_kind(
+        name.unwrap_or_else(|| "serial".to_string()),
+        None,
+        "serial".to_string(),
+        Vec::new(),
+        ProcessKind::Serial,
+    );
+    Ok(Value::Int(id as i64))
+}
+
+/// (serial-process-configure &rest ARGS) -> nil
+pub(crate) fn builtin_serial_process_configure(
+    eval: &mut super::eval::Evaluator,
+    _args: Vec<Value>,
+) -> EvalResult {
+    let _ = resolve_optional_process_or_current_buffer(eval, None)?;
+    Ok(Value::Nil)
+}
+
+/// (set-network-process-option PROCESS OPTION VALUE &optional NO-ERROR) -> nil
+pub(crate) fn builtin_set_network_process_option(
+    eval: &mut super::eval::Evaluator,
+    args: Vec<Value>,
+) -> EvalResult {
+    if args.len() < 3 || args.len() > 4 {
+        return Err(signal(
+            "wrong-number-of-arguments",
+            vec![
+                Value::symbol("set-network-process-option"),
+                Value::Int(args.len() as i64),
+            ],
+        ));
+    }
+
+    let id = resolve_live_process_or_wrong_type(eval, &args[0])?;
+    let proc = eval.processes.get(id).ok_or_else(|| {
+        signal(
+            "wrong-type-argument",
+            vec![Value::symbol("processp"), args[0].clone()],
+        )
+    })?;
+    if proc.kind != ProcessKind::Network {
+        return Err(signal(
+            "error",
+            vec![Value::string("Process is not a network process")],
+        ));
+    }
+    if args.get(3).is_some_and(Value::is_truthy) {
+        return Ok(Value::Nil);
+    }
+    Err(signal(
+        "error",
+        vec![Value::string("Unknown or unsupported option")],
+    ))
+}
 
 /// (start-process NAME BUFFER PROGRAM &rest ARGS) -> process-id
 pub(crate) fn builtin_start_process(
@@ -3538,5 +3849,95 @@ mod tests {
         );
         assert_eq!(results[4], "OK (nil t)");
         assert_eq!(results[5], "OK error");
+    }
+
+    #[test]
+    fn process_list_network_serial_runtime_surface() {
+        let results = eval_all(
+            r#"(mapcar (lambda (s)
+                         (list s
+                               (fboundp s)
+                               (subrp (symbol-function s))
+                               (subr-arity (symbol-function s))
+                               (commandp s)))
+                       '(list-system-processes
+                         num-processors
+                         list-processes
+                         list-processes--refresh
+                         make-network-process
+                         make-pipe-process
+                         make-serial-process
+                         serial-process-configure
+                         set-network-process-option))
+               (let ((n0 (num-processors))
+                     (n1 (num-processors t)))
+                 (list
+                  (listp (list-system-processes))
+                  (integerp (car (list-system-processes)))
+                  (not (null (member (emacs-pid) (list-system-processes))))
+                  (condition-case err (list-system-processes nil) (error (car err)))
+                  (integerp n0)
+                  (integerp n1)
+                  (> n0 0)
+                  (= n0 n1)
+                  (condition-case err (num-processors 1 2) (error (car err)))
+                  (list-processes)
+                  (list-processes nil)
+                  (list-processes t)
+                  (list-processes nil nil)
+                  (list-processes nil t)
+                  (condition-case err (list-processes nil nil nil) (error (car err)))
+                  (listp (list-processes--refresh))
+                  (equal (car (list-processes--refresh)) "")
+                  (condition-case err (list-processes--refresh nil) (error (car err)))))
+               (list
+                (make-network-process)
+                (condition-case err (make-network-process :name "np") (error err))
+                (condition-case err (make-network-process :name 1) (error err))
+                (condition-case err (make-network-process :service 80) (error err))
+                (let ((p (make-network-process :name "np-server" :server t :service 0)))
+                  (unwind-protect
+                      (processp p)
+                    (ignore-errors (delete-process p))))
+                (make-pipe-process)
+                (let ((p (make-pipe-process :name "pp")))
+                  (unwind-protect
+                      (processp p)
+                    (ignore-errors (delete-process p))))
+                (condition-case err (make-pipe-process :name 1) (error err))
+                (make-serial-process)
+                (condition-case err (make-serial-process :name "sp") (error err))
+                (condition-case err (make-serial-process :name "sp" :port "/tmp/no-port") (error err))
+                (with-temp-buffer
+                  (condition-case err (serial-process-configure) (error (car err))))
+                (with-temp-buffer
+                  (let ((p (start-process "serial-cfg-proc" nil "cat")))
+                    (unwind-protect
+                        (condition-case err (serial-process-configure p) (error (car err)))
+                      (ignore-errors (delete-process p)))))
+                (condition-case err (set-network-process-option) (error (car err)))
+                (condition-case err (set-network-process-option 1 :foo 1) (error err))
+                (let ((p (start-process "netopt-real" nil "cat")))
+                  (unwind-protect
+                      (condition-case err (set-network-process-option p :foo 1) (error err))
+                    (ignore-errors (delete-process p))))
+                (let ((p (make-network-process :name "netopt-network" :server t :service 0)))
+                  (unwind-protect
+                      (condition-case err (set-network-process-option p :foo 1) (error err))
+                    (ignore-errors (delete-process p)))))"#,
+        );
+
+        assert_eq!(
+            results[0],
+            "OK ((list-system-processes t t (0 . 0) nil) (num-processors t t (0 . 1) nil) (list-processes t t (0 . 2) t) (list-processes--refresh t t (0 . 0) nil) (make-network-process t t (0 . many) nil) (make-pipe-process t t (0 . many) nil) (make-serial-process t t (0 . many) nil) (serial-process-configure t t (0 . many) nil) (set-network-process-option t t (3 . 4) nil))"
+        );
+        assert_eq!(
+            results[1],
+            "OK (t t t wrong-number-of-arguments t t t t wrong-number-of-arguments nil nil nil nil nil wrong-number-of-arguments t t wrong-number-of-arguments)"
+        );
+        assert_eq!(
+            results[2],
+            "OK (nil (wrong-type-argument stringp nil) (error \":name value not a string\") (error \"Missing :name keyword parameter\") t nil t (error \":name value not a string\") nil (error \"No port specified\") (error \":speed not specified\") error error wrong-number-of-arguments (wrong-type-argument processp 1) (error \"Process is not a network process\") (error \"Unknown or unsupported option\"))"
+        );
     }
 }

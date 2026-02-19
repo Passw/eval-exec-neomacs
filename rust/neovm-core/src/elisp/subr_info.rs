@@ -933,7 +933,13 @@ fn subr_arity_value(name: &str) -> Value {
         "delete-process" => arity_cons(0, Some(1)),
         "get-buffer-process" => arity_cons(1, Some(1)),
         "get-process" => arity_cons(1, Some(1)),
+        "list-processes" => arity_cons(0, Some(2)),
+        "list-processes--refresh" | "list-system-processes" => arity_cons(0, Some(0)),
         "make-process" => arity_cons(0, None),
+        "make-network-process" | "make-pipe-process" | "make-serial-process" => {
+            arity_cons(0, None)
+        }
+        "num-processors" => arity_cons(0, Some(1)),
         "process-buffer"
         | "process-attributes"
         | "process-coding-system"
@@ -982,6 +988,8 @@ fn subr_arity_value(name: &str) -> Value {
         | "set-process-sentinel" => arity_cons(2, Some(2)),
         "set-process-window-size" => arity_cons(3, Some(3)),
         "set-buffer-process-coding-system" => arity_cons(2, Some(2)),
+        "set-network-process-option" => arity_cons(3, Some(4)),
+        "serial-process-configure" => arity_cons(0, None),
         "setenv" => arity_cons(1, Some(3)),
         "start-process" | "start-file-process" => arity_cons(3, None),
         "start-process-shell-command" | "start-file-process-shell-command" => arity_cons(3, Some(3)),
@@ -1597,7 +1605,14 @@ mod tests {
         assert_subr_arity("getenv", 1, Some(2));
         assert_subr_arity("interrupt-process", 0, Some(2));
         assert_subr_arity("kill-process", 0, Some(2));
+        assert_subr_arity("list-processes", 0, Some(2));
+        assert_subr_arity("list-processes--refresh", 0, Some(0));
+        assert_subr_arity("list-system-processes", 0, Some(0));
         assert_subr_arity("make-process", 0, None);
+        assert_subr_arity("make-network-process", 0, None);
+        assert_subr_arity("make-pipe-process", 0, None);
+        assert_subr_arity("make-serial-process", 0, None);
+        assert_subr_arity("num-processors", 0, Some(1));
         assert_subr_arity("process-attributes", 1, Some(1));
         assert_subr_arity("process-buffer", 1, Some(1));
         assert_subr_arity("process-coding-system", 1, Some(1));
@@ -1649,6 +1664,8 @@ mod tests {
         assert_subr_arity("set-process-thread", 2, Some(2));
         assert_subr_arity("set-process-window-size", 3, Some(3));
         assert_subr_arity("set-buffer-process-coding-system", 2, Some(2));
+        assert_subr_arity("set-network-process-option", 3, Some(4));
+        assert_subr_arity("serial-process-configure", 0, None);
         assert_subr_arity("setenv", 1, Some(3));
         assert_subr_arity("start-process", 3, None);
         assert_subr_arity("start-process-shell-command", 3, Some(3));
