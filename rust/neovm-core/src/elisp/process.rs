@@ -1110,7 +1110,8 @@ struct HostInterfaceEntry {
     name: String,
     family: NetworkAddressFamily,
     address: Value,
-    broadcast: Value,
+    list_broadcast: Value,
+    info_broadcast: Value,
     netmask: Value,
     hwaddr: Option<Value>,
     flags: Value,
@@ -1172,6 +1173,62 @@ fn zero_network_address(family: NetworkAddressFamily) -> Value {
     match family {
         NetworkAddressFamily::Ipv4 => int_vector(&[0, 0, 0, 0, 0]),
         NetworkAddressFamily::Ipv6 => int_vector(&[0, 0, 0, 0, 0, 0, 0, 0, 0]),
+    }
+}
+
+fn network_directed_broadcast(
+    family: NetworkAddressFamily,
+    address: &Value,
+    netmask: &Value,
+) -> Option<Value> {
+    let address_items = vector_nonnegative_integers(address)?;
+    let netmask_items = vector_nonnegative_integers(netmask)?;
+    match family {
+        NetworkAddressFamily::Ipv4 => {
+            if address_items.len() != 5 || netmask_items.len() != 5 {
+                return None;
+            }
+            let mut out = [0_i64; 5];
+            for idx in 0..4 {
+                let addr = u8::try_from(address_items[idx]).ok()?;
+                let mask = u8::try_from(netmask_items[idx]).ok()?;
+                out[idx] = (addr | !mask) as i64;
+            }
+            Some(int_vector(&out))
+        }
+        NetworkAddressFamily::Ipv6 => {
+            if address_items.len() != 9 || netmask_items.len() != 9 {
+                return None;
+            }
+            let mut out = [0_i64; 9];
+            for idx in 0..8 {
+                let addr = u16::try_from(address_items[idx]).ok()?;
+                let mask = u16::try_from(netmask_items[idx]).ok()?;
+                out[idx] = (addr | !mask) as i64;
+            }
+            Some(int_vector(&out))
+        }
+    }
+}
+
+fn derive_network_interface_list_broadcast(
+    family: NetworkAddressFamily,
+    address: &Value,
+    netmask: &Value,
+    raw_broadcast: &Value,
+) -> Value {
+    network_directed_broadcast(family, address, netmask).unwrap_or_else(|| raw_broadcast.clone())
+}
+
+fn derive_network_interface_info_broadcast(
+    family: NetworkAddressFamily,
+    address: &Value,
+    raw_broadcast: &Value,
+) -> Value {
+    if raw_broadcast == address {
+        zero_network_address(family)
+    } else {
+        raw_broadcast.clone()
     }
 }
 
@@ -1265,6 +1322,51 @@ fn parse_hwaddr(addr: *const libc::sockaddr) -> Option<Value> {
 }
 
 #[cfg(target_os = "linux")]
+fn parse_hwaddr_text(raw: &str) -> Option<Vec<Value>> {
+    let mut bytes = Vec::new();
+    for part in raw.trim().split(':') {
+        if part.is_empty() {
+            continue;
+        }
+        let byte = u8::from_str_radix(part, 16).ok()?;
+        bytes.push(Value::Int(byte as i64));
+    }
+    Some(bytes)
+}
+
+#[cfg(target_os = "linux")]
+fn read_hwaddr_from_sysfs(name: &str) -> Option<Value> {
+    let hatype_path = format!("/sys/class/net/{name}/type");
+    let address_path = format!("/sys/class/net/{name}/address");
+    let addr_len_path = format!("/sys/class/net/{name}/addr_len");
+
+    let hatype = std::fs::read_to_string(hatype_path).ok()?;
+    let hatype = hatype.trim().parse::<i64>().ok()?;
+
+    let default_len = std::fs::read_to_string(addr_len_path)
+        .ok()
+        .and_then(|raw| raw.trim().parse::<usize>().ok())
+        .map(|len| if len == 0 { 6 } else { len })
+        .unwrap_or(6)
+        .min(32);
+
+    let bytes = std::fs::read_to_string(address_path)
+        .ok()
+        .and_then(|raw| parse_hwaddr_text(&raw))
+        .map(|mut parsed| {
+            if parsed.len() < default_len {
+                parsed.extend(std::iter::repeat(Value::Int(0)).take(default_len - parsed.len()));
+            } else if parsed.len() > default_len {
+                parsed.truncate(default_len);
+            }
+            parsed
+        })
+        .unwrap_or_else(|| vec![Value::Int(0); default_len]);
+
+    Some(Value::cons(Value::Int(hatype), Value::vector(bytes)))
+}
+
+#[cfg(target_os = "linux")]
 fn host_interface_snapshot() -> Option<Vec<HostInterfaceEntry>> {
     struct IfAddrsGuard(*mut libc::ifaddrs);
 
@@ -1310,15 +1412,25 @@ fn host_interface_snapshot() -> Option<Vec<HostInterfaceEntry>> {
                     let netmask = parse_network_sockaddr(ifa.ifa_netmask as *const libc::sockaddr)
                         .and_then(|(mask_family, mask)| (mask_family == family).then_some(mask))
                         .unwrap_or_else(|| zero_network_address(family));
-                    let broadcast = parse_network_sockaddr(ifa.ifa_ifu as *const libc::sockaddr)
+                    let raw_broadcast =
+                        parse_network_sockaddr(ifa.ifa_ifu as *const libc::sockaddr)
                         .and_then(|(bc_family, bc)| (bc_family == family).then_some(bc))
                         .unwrap_or_else(|| zero_network_address(family));
+                    let list_broadcast = derive_network_interface_list_broadcast(
+                        family,
+                        &address,
+                        &netmask,
+                        &raw_broadcast,
+                    );
+                    let info_broadcast =
+                        derive_network_interface_info_broadcast(family, &address, &raw_broadcast);
 
                     entries.push(HostInterfaceEntry {
                         name,
                         family,
                         address,
-                        broadcast,
+                        list_broadcast,
+                        info_broadcast,
                         netmask,
                         hwaddr: None,
                         flags: interface_flags(ifa.ifa_flags),
@@ -1336,6 +1448,8 @@ fn host_interface_snapshot() -> Option<Vec<HostInterfaceEntry>> {
     for entry in &mut entries {
         if let Some(hwaddr) = hwaddr_by_name.get(&entry.name) {
             entry.hwaddr = Some(hwaddr.clone());
+        } else if let Some(hwaddr) = read_hwaddr_from_sysfs(&entry.name) {
+            entry.hwaddr = Some(hwaddr);
         } else if entry.name == "lo" {
             entry.hwaddr = Some(loopback_hwaddr());
         }
@@ -1713,7 +1827,7 @@ pub(crate) fn builtin_network_interface_list(
 
     let mut entries = Vec::new();
     if let Some(host_entries) = host_interface_snapshot() {
-        for entry in host_entries {
+        for entry in host_entries.into_iter().rev() {
             let include = match entry.family {
                 NetworkAddressFamily::Ipv4 => include_ipv4,
                 NetworkAddressFamily::Ipv6 => include_ipv6,
@@ -1726,7 +1840,7 @@ pub(crate) fn builtin_network_interface_list(
                 entries.push(Value::list(vec![
                     Value::string(entry.name),
                     entry.address,
-                    entry.broadcast,
+                    entry.list_broadcast,
                     entry.netmask,
                 ]));
             } else {
@@ -1777,7 +1891,7 @@ pub(crate) fn builtin_network_interface_info(
         if let Some(entry) = ipv4_match.or(first_match) {
             return Ok(Value::list(vec![
                 entry.address,
-                entry.broadcast,
+                entry.info_broadcast,
                 entry.netmask,
                 entry.hwaddr.unwrap_or(Value::Nil),
                 entry.flags,
@@ -4831,6 +4945,51 @@ mod tests {
     }
 
     #[test]
+    fn network_interface_broadcast_derivation_helpers() {
+        let ipv4_address = int_vector(&[192, 168, 1, 30, 0]);
+        let ipv4_netmask = int_vector(&[255, 255, 255, 0, 0]);
+        let ipv4_raw = int_vector(&[0, 0, 0, 0, 0]);
+        assert_eq!(
+            derive_network_interface_list_broadcast(
+                NetworkAddressFamily::Ipv4,
+                &ipv4_address,
+                &ipv4_netmask,
+                &ipv4_raw,
+            ),
+            int_vector(&[192, 168, 1, 255, 0])
+        );
+        assert_eq!(
+            derive_network_interface_info_broadcast(
+                NetworkAddressFamily::Ipv4,
+                &ipv4_address,
+                &ipv4_address,
+            ),
+            int_vector(&[0, 0, 0, 0, 0])
+        );
+        let ipv4_nontrivial_raw = int_vector(&[172, 17, 255, 255, 0]);
+        assert_eq!(
+            derive_network_interface_info_broadcast(
+                NetworkAddressFamily::Ipv4,
+                &int_vector(&[172, 17, 0, 1, 0]),
+                &ipv4_nontrivial_raw,
+            ),
+            ipv4_nontrivial_raw
+        );
+
+        let ipv6_address = int_vector(&[9224, 33287, 9568, 22592, 60060, 9727, 65190, 14566, 0]);
+        let ipv6_netmask = int_vector(&[65535, 65535, 65535, 65535, 0, 0, 0, 0, 0]);
+        assert_eq!(
+            derive_network_interface_list_broadcast(
+                NetworkAddressFamily::Ipv6,
+                &ipv6_address,
+                &ipv6_netmask,
+                &int_vector(&[0, 0, 0, 0, 0, 0, 0, 0, 0]),
+            ),
+            int_vector(&[9224, 33287, 9568, 22592, 65535, 65535, 65535, 65535, 0])
+        );
+    }
+
+    #[test]
     fn process_network_interface_and_signal_runtime_surface() {
         let results = eval_all(
             r#"(mapcar (lambda (s)
@@ -4876,8 +5035,19 @@ mod tests {
                   (condition-case err (network-interface-list nil t) (error err))
                   (let ((info (network-interface-info ifname)))
                     (and (listp info)
+                         (= (length info) 5)
                          (vectorp (car info))
-                         (vectorp (nth 1 info))))
+                         (vectorp (nth 1 info))
+                         (vectorp (nth 2 info))
+                         (or (null (nth 3 info))
+                             (consp (nth 3 info)))
+                         (listp (nth 4 info))))
+                  (let ((lo-info (network-interface-info "lo")))
+                    (and (listp lo-info)
+                         (= (length lo-info) 5)
+                         (vectorp (car lo-info))
+                         (vectorp (nth 1 lo-info))
+                         (vectorp (nth 2 lo-info))))
                   (condition-case err (network-interface-info nil) (error err))
                   (condition-case err (network-interface-info "abcdefghijklmnop") (error err))
                   (listp (network-lookup-address-info "localhost"))
@@ -4900,7 +5070,7 @@ mod tests {
         );
         assert_eq!(
             results[1],
-            "OK (\"127.0.0.1:80\" \"127.0.0.1\" \"[0:0:0:0:0:0:0:1]:80\" \"0:0:0:0:0:0:0:1\" \"x\" nil nil nil nil (wrong-number-of-arguments format-network-address 0) t t t t t t (wrong-number-of-arguments network-interface-list 3) (error \"Unsupported address family\") t (wrong-type-argument stringp nil) (error \"interface name too long\") t t t t (error \"Unsupported family\") (error \"Unsupported hints value\") (wrong-type-argument stringp 1) t t t (wrong-number-of-arguments signal-names 1) (void-function process-connection))"
+            "OK (\"127.0.0.1:80\" \"127.0.0.1\" \"[0:0:0:0:0:0:0:1]:80\" \"0:0:0:0:0:0:0:1\" \"x\" nil nil nil nil (wrong-number-of-arguments format-network-address 0) t t t t t t (wrong-number-of-arguments network-interface-list 3) (error \"Unsupported address family\") t t (wrong-type-argument stringp nil) (error \"interface name too long\") t t t t (error \"Unsupported family\") (error \"Unsupported hints value\") (wrong-type-argument stringp 1) t t t (wrong-number-of-arguments signal-names 1) (void-function process-connection))"
         );
     }
 }

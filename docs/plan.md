@@ -28,6 +28,27 @@ Last updated: 2026-02-19
 
 ## Doing
 
+- Closed remaining host-interface payload drift for `network-interface-list` / `network-interface-info` and strengthened runtime lock-ins:
+  - runtime changes:
+    - `rust/neovm-core/src/elisp/process.rs`
+      - split host-interface broadcast derivation paths:
+        - `network-interface-list` now emits directed-broadcast values derived from address/netmask (matching oracle full-entry payloads for IPv4/IPv6).
+        - `network-interface-info` now keeps raw broadcast/dstaddr semantics and normalizes address-equal broadcast payloads to zero vectors (matching oracle info payloads).
+      - aligned host list ordering with oracle by reversing collected `getifaddrs` records before materializing Lisp results.
+      - added Linux sysfs hwaddr fallback (`/sys/class/net/*`) for interfaces without AF_PACKET rows, restoring oracle-compatible hwaddr tuples for noarp/point-to-point interfaces.
+      - added deterministic helper coverage:
+        - `network_interface_broadcast_derivation_helpers`.
+  - corpus changes:
+    - strengthened network-interface info shape assertions and re-recorded:
+      - `test/neovm/vm-compat/cases/process-network-interface-signal-semantics.forms`
+      - `test/neovm/vm-compat/cases/process-network-interface-signal-semantics.expected.tsv`
+  - verified:
+    - `cargo test --manifest-path rust/neovm-core/Cargo.toml network_interface_broadcast_derivation_helpers` (pass)
+    - `cargo test --manifest-path rust/neovm-core/Cargo.toml process_network_interface_and_signal_runtime_surface` (pass)
+    - `make -C test/neovm/vm-compat record FORMS=cases/process-network-interface-signal-semantics.forms EXPECTED=cases/process-network-interface-signal-semantics.expected.tsv` (pass)
+    - `make -C test/neovm/vm-compat check-one-neovm CASE=cases/process-network-interface-signal-semantics` (pass, `2/2`)
+    - `make -C test/neovm/vm-compat check-all-neovm-strict` (pass; case inventory `788`)
+
 - Aligned host-backed `network-interface-list`/`network-interface-info` behavior with oracle and fixed IPv4 byte-order parity:
   - runtime changes:
     - `rust/neovm-core/src/elisp/process.rs`
