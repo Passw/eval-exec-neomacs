@@ -374,6 +374,118 @@ fn x_window_system_frame_error() -> Flow {
     )
 }
 
+fn window_system_not_initialized_error() -> Flow {
+    signal(
+        "error",
+        vec![Value::string("Window system is not in use or not initialized")],
+    )
+}
+
+fn expect_optional_window_system_frame_arg(value: &Value) -> Result<(), Flow> {
+    if value.is_nil() || matches!(value, Value::Frame(_)) {
+        Ok(())
+    } else {
+        Err(signal(
+            "wrong-type-argument",
+            vec![Value::symbol("frame-live-p"), value.clone()],
+        ))
+    }
+}
+
+fn parse_geometry_unsigned(bytes: &[u8], index: &mut usize) -> Option<i64> {
+    let start = *index;
+    while *index < bytes.len() && bytes[*index].is_ascii_digit() {
+        *index += 1;
+    }
+    if *index == start {
+        return None;
+    }
+    std::str::from_utf8(&bytes[start..*index])
+        .ok()?
+        .parse::<i64>()
+        .ok()
+}
+
+fn parse_geometry_signed_offset(bytes: &[u8], index: &mut usize) -> Option<i64> {
+    if *index >= bytes.len() {
+        return None;
+    }
+    let sign = match bytes[*index] {
+        b'+' => 1,
+        b'-' => -1,
+        _ => return None,
+    };
+    *index += 1;
+    Some(sign * parse_geometry_unsigned(bytes, index)?)
+}
+
+fn parse_x_geometry(spec: &str) -> Option<Value> {
+    let spec = spec.trim();
+    if spec.is_empty() {
+        return None;
+    }
+
+    let bytes = spec.as_bytes();
+    let mut index = 0usize;
+    if bytes[index] == b'=' {
+        index += 1;
+        if index >= bytes.len() {
+            return None;
+        }
+    }
+
+    let mut width = None;
+    let mut height = None;
+    let mut left = None;
+    let mut top = None;
+
+    let geometry_start = index;
+    if let Some(parsed_width) = parse_geometry_unsigned(bytes, &mut index) {
+        if index < bytes.len() && bytes[index] == b'x' {
+            index += 1;
+            let parsed_height = parse_geometry_unsigned(bytes, &mut index)?;
+            width = Some(parsed_width);
+            height = Some(parsed_height);
+        } else {
+            index = geometry_start;
+        }
+    } else if index < bytes.len() && bytes[index] == b'x' {
+        return None;
+    }
+
+    if index < bytes.len() {
+        let parsed_left = parse_geometry_signed_offset(bytes, &mut index)?;
+        left = Some(parsed_left);
+        if index < bytes.len() {
+            let parsed_top = parse_geometry_signed_offset(bytes, &mut index)?;
+            top = Some(parsed_top);
+        }
+    }
+
+    if index != bytes.len() {
+        return None;
+    }
+
+    if width.is_none() && height.is_none() && left.is_none() && top.is_none() {
+        return None;
+    }
+
+    let mut pairs = Vec::new();
+    if let Some(h) = height {
+        pairs.push(Value::cons(Value::symbol("height"), Value::Int(h)));
+    }
+    if let Some(w) = width {
+        pairs.push(Value::cons(Value::symbol("width"), Value::Int(w)));
+    }
+    if let Some(y) = top {
+        pairs.push(Value::cons(Value::symbol("top"), Value::Int(y)));
+    }
+    if let Some(x) = left {
+        pairs.push(Value::cons(Value::symbol("left"), Value::Int(x)));
+    }
+    Some(Value::list(pairs))
+}
+
 fn display_optional_capability_p(name: &str, args: &[Value]) -> EvalResult {
     expect_max_args(name, args, 1)?;
     match args.first() {
@@ -980,6 +1092,111 @@ pub(crate) fn builtin_display_supports_face_attributes_p_eval(
 pub(crate) fn builtin_x_display_list(args: Vec<Value>) -> EvalResult {
     expect_max_args("x-display-list", &args, 0)?;
     Ok(Value::Nil)
+}
+
+/// (x-backspace-delete-keys-p &optional FRAME) -> error in batch/no-X context.
+pub(crate) fn builtin_x_backspace_delete_keys_p(args: Vec<Value>) -> EvalResult {
+    expect_max_args("x-backspace-delete-keys-p", &args, 1)?;
+    if let Some(frame) = args.first() {
+        expect_optional_window_system_frame_arg(frame)?;
+    }
+    Err(x_window_system_frame_error())
+}
+
+/// (x-family-fonts &optional FAMILY FRAME) -> nil in batch/no-X context.
+pub(crate) fn builtin_x_family_fonts(args: Vec<Value>) -> EvalResult {
+    expect_max_args("x-family-fonts", &args, 2)?;
+    if let Some(frame) = args.get(1) {
+        expect_optional_window_system_frame_arg(frame)?;
+    }
+    if let Some(family) = args.first() {
+        if !family.is_nil() && !family.is_string() {
+            return Err(signal(
+                "wrong-type-argument",
+                vec![Value::symbol("stringp"), family.clone()],
+            ));
+        }
+    }
+    Ok(Value::Nil)
+}
+
+/// (x-get-atom-name ATOM &optional FRAME) -> error in batch/no-X context.
+pub(crate) fn builtin_x_get_atom_name(args: Vec<Value>) -> EvalResult {
+    expect_range_args("x-get-atom-name", &args, 1, 2)?;
+    if let Some(frame) = args.get(1) {
+        expect_optional_window_system_frame_arg(frame)?;
+    }
+    Err(x_window_system_frame_error())
+}
+
+/// (x-get-resource ATTRIBUTE CLASS &optional COMPONENT SUBCLASS) -> error in batch/no-X context.
+pub(crate) fn builtin_x_get_resource(args: Vec<Value>) -> EvalResult {
+    expect_range_args("x-get-resource", &args, 2, 4)?;
+    Err(window_system_not_initialized_error())
+}
+
+/// (x-list-fonts PATTERN &optional FACE FRAME MAXIMUM WIDTH) -> error in batch/no-X context.
+pub(crate) fn builtin_x_list_fonts(args: Vec<Value>) -> EvalResult {
+    expect_range_args("x-list-fonts", &args, 1, 5)?;
+    Err(window_system_not_initialized_error())
+}
+
+/// (x-parse-geometry STRING) -> alist or nil.
+pub(crate) fn builtin_x_parse_geometry(args: Vec<Value>) -> EvalResult {
+    expect_args("x-parse-geometry", &args, 1)?;
+    match &args[0] {
+        Value::Str(spec) => Ok(parse_x_geometry(spec).unwrap_or(Value::Nil)),
+        other => Err(signal(
+            "wrong-type-argument",
+            vec![Value::symbol("stringp"), other.clone()],
+        )),
+    }
+}
+
+/// (x-selection-exists-p &optional SELECTION TYPE) -> nil in batch/no-X context.
+pub(crate) fn builtin_x_selection_exists_p(args: Vec<Value>) -> EvalResult {
+    expect_max_args("x-selection-exists-p", &args, 2)?;
+    if let Some(selection) = args.first() {
+        if !selection.is_nil() {
+            expect_symbol_key(selection)?;
+        }
+    }
+    Ok(Value::Nil)
+}
+
+/// (x-selection-owner-p &optional SELECTION TYPE) -> nil in batch/no-X context.
+pub(crate) fn builtin_x_selection_owner_p(args: Vec<Value>) -> EvalResult {
+    expect_max_args("x-selection-owner-p", &args, 2)?;
+    if let Some(selection) = args.first() {
+        if !selection.is_nil() {
+            expect_symbol_key(selection)?;
+        }
+    }
+    Ok(Value::Nil)
+}
+
+/// (x-uses-old-gtk-dialog) -> nil
+pub(crate) fn builtin_x_uses_old_gtk_dialog(args: Vec<Value>) -> EvalResult {
+    expect_args("x-uses-old-gtk-dialog", &args, 0)?;
+    Ok(Value::Nil)
+}
+
+/// (x-window-property PROPERTY &optional FRAME TYPE DELETE-P VECTOR-RET-P) -> error in batch/no-X context.
+pub(crate) fn builtin_x_window_property(args: Vec<Value>) -> EvalResult {
+    expect_range_args("x-window-property", &args, 1, 6)?;
+    if let Some(frame) = args.get(1) {
+        expect_optional_window_system_frame_arg(frame)?;
+    }
+    Err(x_window_system_frame_error())
+}
+
+/// (x-window-property-attributes PROPERTY &optional FRAME TYPE) -> error in batch/no-X context.
+pub(crate) fn builtin_x_window_property_attributes(args: Vec<Value>) -> EvalResult {
+    expect_range_args("x-window-property-attributes", &args, 1, 3)?;
+    if let Some(frame) = args.get(1) {
+        expect_optional_window_system_frame_arg(frame)?;
+    }
+    Err(x_window_system_frame_error())
 }
 
 /// (x-server-version &optional DISPLAY) -> error in batch/no-X context.
@@ -2626,6 +2843,216 @@ mod tests {
         }
 
         match builtin_x_display_set_last_user_time(vec![Value::Nil, Value::Int(1), Value::Nil]) {
+            Err(Flow::Signal(sig)) => assert_eq!(sig.symbol, "wrong-number-of-arguments"),
+            other => panic!("expected wrong-number-of-arguments signal, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn x_selection_queries_and_old_gtk_dialog_batch_semantics() {
+        assert!(builtin_x_selection_exists_p(vec![]).unwrap().is_nil());
+        assert!(builtin_x_selection_owner_p(vec![]).unwrap().is_nil());
+        assert!(
+            builtin_x_selection_exists_p(vec![Value::symbol("PRIMARY"), Value::symbol("STRING")])
+                .unwrap()
+                .is_nil()
+        );
+        assert!(
+            builtin_x_selection_owner_p(vec![Value::symbol("PRIMARY"), Value::Int(1)])
+                .unwrap()
+                .is_nil()
+        );
+        match builtin_x_selection_exists_p(vec![Value::Int(1)]) {
+            Err(Flow::Signal(sig)) => {
+                assert_eq!(sig.symbol, "wrong-type-argument");
+                assert_eq!(sig.data, vec![Value::symbol("symbolp"), Value::Int(1)]);
+            }
+            other => panic!("expected wrong-type-argument signal, got {other:?}"),
+        }
+        match builtin_x_selection_owner_p(vec![Value::Int(1)]) {
+            Err(Flow::Signal(sig)) => {
+                assert_eq!(sig.symbol, "wrong-type-argument");
+                assert_eq!(sig.data, vec![Value::symbol("symbolp"), Value::Int(1)]);
+            }
+            other => panic!("expected wrong-type-argument signal, got {other:?}"),
+        }
+
+        assert!(builtin_x_uses_old_gtk_dialog(vec![]).unwrap().is_nil());
+        match builtin_x_uses_old_gtk_dialog(vec![Value::Nil]) {
+            Err(Flow::Signal(sig)) => assert_eq!(sig.symbol, "wrong-number-of-arguments"),
+            other => panic!("expected wrong-number-of-arguments signal, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn x_geometry_fonts_and_resource_batch_semantics() {
+        assert_eq!(
+            builtin_x_parse_geometry(vec![Value::string("80x24+10+20")]).unwrap(),
+            Value::list(vec![
+                Value::cons(Value::symbol("height"), Value::Int(24)),
+                Value::cons(Value::symbol("width"), Value::Int(80)),
+                Value::cons(Value::symbol("top"), Value::Int(20)),
+                Value::cons(Value::symbol("left"), Value::Int(10)),
+            ])
+        );
+        assert_eq!(
+            builtin_x_parse_geometry(vec![Value::string("80x24")]).unwrap(),
+            Value::list(vec![
+                Value::cons(Value::symbol("height"), Value::Int(24)),
+                Value::cons(Value::symbol("width"), Value::Int(80)),
+            ])
+        );
+        assert!(builtin_x_parse_geometry(vec![Value::string("x")])
+            .unwrap()
+            .is_nil());
+        match builtin_x_parse_geometry(vec![Value::Int(1)]) {
+            Err(Flow::Signal(sig)) => {
+                assert_eq!(sig.symbol, "wrong-type-argument");
+                assert_eq!(sig.data, vec![Value::symbol("stringp"), Value::Int(1)]);
+            }
+            other => panic!("expected wrong-type-argument signal, got {other:?}"),
+        }
+
+        assert!(builtin_x_family_fonts(vec![]).unwrap().is_nil());
+        assert!(builtin_x_family_fonts(vec![Value::string("abc"), Value::Nil])
+            .unwrap()
+            .is_nil());
+        match builtin_x_family_fonts(vec![Value::Int(1), Value::Int(1)]) {
+            Err(Flow::Signal(sig)) => {
+                assert_eq!(sig.symbol, "wrong-type-argument");
+                assert_eq!(sig.data, vec![Value::symbol("frame-live-p"), Value::Int(1)]);
+            }
+            other => panic!("expected wrong-type-argument signal, got {other:?}"),
+        }
+        match builtin_x_family_fonts(vec![Value::Int(1), Value::Nil]) {
+            Err(Flow::Signal(sig)) => {
+                assert_eq!(sig.symbol, "wrong-type-argument");
+                assert_eq!(sig.data, vec![Value::symbol("stringp"), Value::Int(1)]);
+            }
+            other => panic!("expected wrong-type-argument signal, got {other:?}"),
+        }
+
+        match builtin_x_list_fonts(vec![Value::Nil]) {
+            Err(Flow::Signal(sig)) => {
+                assert_eq!(sig.symbol, "error");
+                assert_eq!(
+                    sig.data,
+                    vec![Value::string("Window system is not in use or not initialized")]
+                );
+            }
+            other => panic!("expected error signal, got {other:?}"),
+        }
+
+        match builtin_x_get_resource(vec![Value::Nil, Value::Nil]) {
+            Err(Flow::Signal(sig)) => {
+                assert_eq!(sig.symbol, "error");
+                assert_eq!(
+                    sig.data,
+                    vec![Value::string("Window system is not in use or not initialized")]
+                );
+            }
+            other => panic!("expected error signal, got {other:?}"),
+        }
+        match builtin_x_get_resource(vec![Value::Nil]) {
+            Err(Flow::Signal(sig)) => assert_eq!(sig.symbol, "wrong-number-of-arguments"),
+            other => panic!("expected wrong-number-of-arguments signal, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn x_property_and_frame_arg_batch_semantics() {
+        for args in [vec![], vec![Value::Nil], vec![Value::Frame(1)]] {
+            match builtin_x_backspace_delete_keys_p(args) {
+                Err(Flow::Signal(sig)) => {
+                    assert_eq!(sig.symbol, "error");
+                    assert_eq!(
+                        sig.data,
+                        vec![Value::string("Window system frame should be used")]
+                    );
+                }
+                other => panic!("expected error signal, got {other:?}"),
+            }
+        }
+        match builtin_x_backspace_delete_keys_p(vec![Value::Int(1)]) {
+            Err(Flow::Signal(sig)) => {
+                assert_eq!(sig.symbol, "wrong-type-argument");
+                assert_eq!(sig.data, vec![Value::symbol("frame-live-p"), Value::Int(1)]);
+            }
+            other => panic!("expected wrong-type-argument signal, got {other:?}"),
+        }
+
+        match builtin_x_get_atom_name(vec![Value::symbol("WM_CLASS")]) {
+            Err(Flow::Signal(sig)) => {
+                assert_eq!(sig.symbol, "error");
+                assert_eq!(
+                    sig.data,
+                    vec![Value::string("Window system frame should be used")]
+                );
+            }
+            other => panic!("expected error signal, got {other:?}"),
+        }
+        match builtin_x_get_atom_name(vec![Value::symbol("WM_CLASS"), Value::Int(1)]) {
+            Err(Flow::Signal(sig)) => {
+                assert_eq!(sig.symbol, "wrong-type-argument");
+                assert_eq!(sig.data, vec![Value::symbol("frame-live-p"), Value::Int(1)]);
+            }
+            other => panic!("expected wrong-type-argument signal, got {other:?}"),
+        }
+
+        match builtin_x_window_property(vec![Value::string("WM_NAME")]) {
+            Err(Flow::Signal(sig)) => {
+                assert_eq!(sig.symbol, "error");
+                assert_eq!(
+                    sig.data,
+                    vec![Value::string("Window system frame should be used")]
+                );
+            }
+            other => panic!("expected error signal, got {other:?}"),
+        }
+        match builtin_x_window_property(vec![Value::string("WM_NAME"), Value::Int(1)]) {
+            Err(Flow::Signal(sig)) => {
+                assert_eq!(sig.symbol, "wrong-type-argument");
+                assert_eq!(sig.data, vec![Value::symbol("frame-live-p"), Value::Int(1)]);
+            }
+            other => panic!("expected wrong-type-argument signal, got {other:?}"),
+        }
+        match builtin_x_window_property(vec![
+            Value::string("WM_NAME"),
+            Value::Nil,
+            Value::Nil,
+            Value::Nil,
+            Value::Nil,
+            Value::Nil,
+            Value::Nil,
+        ]) {
+            Err(Flow::Signal(sig)) => assert_eq!(sig.symbol, "wrong-number-of-arguments"),
+            other => panic!("expected wrong-number-of-arguments signal, got {other:?}"),
+        }
+
+        match builtin_x_window_property_attributes(vec![Value::string("WM_NAME")]) {
+            Err(Flow::Signal(sig)) => {
+                assert_eq!(sig.symbol, "error");
+                assert_eq!(
+                    sig.data,
+                    vec![Value::string("Window system frame should be used")]
+                );
+            }
+            other => panic!("expected error signal, got {other:?}"),
+        }
+        match builtin_x_window_property_attributes(vec![Value::string("WM_NAME"), Value::Int(1)])
+        {
+            Err(Flow::Signal(sig)) => {
+                assert_eq!(sig.symbol, "wrong-type-argument");
+                assert_eq!(sig.data, vec![Value::symbol("frame-live-p"), Value::Int(1)]);
+            }
+            other => panic!("expected wrong-type-argument signal, got {other:?}"),
+        }
+        match builtin_x_window_property_attributes(vec![
+            Value::string("WM_NAME"),
+            Value::Nil,
+            Value::Nil,
+            Value::Nil,
+        ]) {
             Err(Flow::Signal(sig)) => assert_eq!(sig.symbol, "wrong-number-of-arguments"),
             other => panic!("expected wrong-number-of-arguments signal, got {other:?}"),
         }

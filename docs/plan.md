@@ -28,6 +28,59 @@ Last updated: 2026-02-19
 
 ## Doing
 
+- Added `x-*` selection/resource/property/font compatibility slice and locked oracle parity:
+  - runtime changes:
+    - `rust/neovm-core/src/elisp/display.rs`
+      - implemented:
+        - `x-backspace-delete-keys-p`
+        - `x-family-fonts`
+        - `x-get-atom-name`
+        - `x-get-resource`
+        - `x-list-fonts`
+        - `x-parse-geometry`
+        - `x-selection-exists-p`
+        - `x-selection-owner-p`
+        - `x-uses-old-gtk-dialog`
+        - `x-window-property`
+        - `x-window-property-attributes`
+      - added shared helpers for:
+        - window-system/no-X error payload parity
+        - optional frame-argument validation (`frame-live-p` payloads)
+        - `x-parse-geometry` parsing to oracle-style alist ordering (`height`, `width`, `top`, `left`).
+      - expanded display unit coverage for new `x-*` behaviors and arity/error-path matrixes.
+    - `rust/neovm-core/src/elisp/builtins.rs`
+      - wired pure dispatch entries for all new `x-*` builtins.
+    - `rust/neovm-core/src/elisp/builtin_registry.rs`
+      - registered all new symbols in `DISPATCH_BUILTIN_NAMES`.
+    - `rust/neovm-core/src/elisp/subr_info.rs`
+      - added arity metadata and oracle parity assertions:
+        - `(0 . 1)` `x-backspace-delete-keys-p`
+        - `(0 . 2)` `x-family-fonts`, `x-selection-exists-p`, `x-selection-owner-p`
+        - `(1 . 2)` `x-get-atom-name`
+        - `(2 . 4)` `x-get-resource`
+        - `(1 . 5)` `x-list-fonts`
+        - `(1 . 1)` `x-parse-geometry`
+        - `(0 . 0)` `x-uses-old-gtk-dialog`
+        - `(1 . 6)` `x-window-property`
+        - `(1 . 3)` `x-window-property-attributes`
+  - corpus changes:
+    - added and wired:
+      - `test/neovm/vm-compat/cases/x-selection-resource-property-semantics.forms`
+      - `test/neovm/vm-compat/cases/x-selection-resource-property-semantics.expected.tsv`
+      - `test/neovm/vm-compat/cases/default.list`
+    - lock-ins cover:
+      - `fboundp` / `subrp` / `subr-arity` parity for the new surface.
+      - batch/no-X message payloads for resource/font/property helpers.
+      - optional frame-argument validation precedence and `wrong-type-argument` payload parity.
+      - selection helper symbol validation and nil-return behavior.
+      - `x-parse-geometry` parsing outputs and invalid-input behavior.
+  - verified:
+    - `cargo test --manifest-path rust/neovm-core/Cargo.toml elisp::display::tests:: -- --nocapture` (pass, `61/61`)
+    - `cargo test --manifest-path rust/neovm-core/Cargo.toml subr_arity_display_terminal_primitives_match_oracle -- --nocapture` (pass)
+    - `make -C test/neovm/vm-compat record FORMS=cases/x-selection-resource-property-semantics.forms EXPECTED=cases/x-selection-resource-property-semantics.expected.tsv` (pass)
+    - `make -C test/neovm/vm-compat check-one-neovm CASE=cases/x-selection-resource-property-semantics` (pass, `7/7`)
+    - `make -C test/neovm/vm-compat check-all-neovm-strict` (pass; case inventory `769`)
+
 - Added missing display/X/terminal compatibility surface (`17` builtins) and locked oracle parity:
   - runtime changes:
     - `rust/neovm-core/src/elisp/display.rs`

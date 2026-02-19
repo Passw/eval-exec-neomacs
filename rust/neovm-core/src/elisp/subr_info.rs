@@ -847,11 +847,16 @@ fn subr_arity_value(name: &str) -> Value {
         "read-passwd" => arity_cons(1, Some(3)),
         "event-apply-modifier" => arity_cons(4, Some(4)),
         "regexp-quote" => arity_cons(1, Some(1)),
-        "open-termscript" | "x-close-connection" => arity_cons(1, Some(1)),
+        "open-termscript" | "x-close-connection" | "x-parse-geometry" => arity_cons(1, Some(1)),
         "send-string-to-terminal"
         | "display-supports-face-attributes-p"
+        | "x-get-atom-name"
         | "x-display-set-last-user-time" => arity_cons(1, Some(2)),
+        "x-window-property-attributes" => arity_cons(1, Some(3)),
         "x-open-connection" => arity_cons(1, Some(3)),
+        "x-get-resource" => arity_cons(2, Some(4)),
+        "x-list-fonts" => arity_cons(1, Some(5)),
+        "x-window-property" => arity_cons(1, Some(6)),
         "internal-show-cursor" => arity_cons(2, Some(2)),
         "display-buffer" => arity_cons(1, Some(3)),
         "clear-font-cache" => arity_cons(0, Some(0)),
@@ -940,6 +945,7 @@ fn subr_arity_value(name: &str) -> Value {
         | "x-server-max-request-size"
         | "x-server-vendor"
         | "x-display-grayscale-p"
+        | "x-backspace-delete-keys-p"
         | "redraw-frame"
         | "ding"
         | "internal-show-cursor-p"
@@ -981,6 +987,7 @@ fn subr_arity_value(name: &str) -> Value {
         | "window-use-time"
         | "window-top-line" => arity_cons(0, Some(1)),
         "terminal-list" | "x-display-list" | "redraw-display" | "frame-list"
+        | "x-uses-old-gtk-dialog"
         | "selected-window"
         | "active-minibuffer-window"
         | "minibuffer-selected-window" => arity_cons(0, Some(0)),
@@ -993,6 +1000,9 @@ fn subr_arity_value(name: &str) -> Value {
         | "window-total-height"
         | "window-total-width"
         | "window-vscroll"
+        | "x-family-fonts"
+        | "x-selection-exists-p"
+        | "x-selection-owner-p"
         | "get-buffer-window" => arity_cons(0, Some(2)),
         "window-preserve-size" | "window-size-fixed-p" => arity_cons(0, Some(3)),
         "window-resizable" => arity_cons(2, Some(5)),
@@ -1387,8 +1397,16 @@ mod tests {
         assert_subr_arity("suspend-tty", 0, Some(1));
         assert_subr_arity("resume-tty", 0, Some(1));
         assert_subr_arity("terminal-coding-system", 0, Some(1));
+        assert_subr_arity("x-backspace-delete-keys-p", 0, Some(1));
         assert_subr_arity("x-display-list", 0, Some(0));
+        assert_subr_arity("x-family-fonts", 0, Some(2));
+        assert_subr_arity("x-get-atom-name", 1, Some(2));
+        assert_subr_arity("x-get-resource", 2, Some(4));
+        assert_subr_arity("x-list-fonts", 1, Some(5));
         assert_subr_arity("x-open-connection", 1, Some(3));
+        assert_subr_arity("x-parse-geometry", 1, Some(1));
+        assert_subr_arity("x-selection-exists-p", 0, Some(2));
+        assert_subr_arity("x-selection-owner-p", 0, Some(2));
         assert_subr_arity("x-close-connection", 1, Some(1));
         assert_subr_arity("x-server-version", 0, Some(1));
         assert_subr_arity("x-server-input-extension-version", 0, Some(1));
@@ -1407,6 +1425,9 @@ mod tests {
         assert_subr_arity("x-display-screens", 0, Some(1));
         assert_subr_arity("x-display-set-last-user-time", 1, Some(2));
         assert_subr_arity("x-display-visual-class", 0, Some(1));
+        assert_subr_arity("x-uses-old-gtk-dialog", 0, Some(0));
+        assert_subr_arity("x-window-property", 1, Some(6));
+        assert_subr_arity("x-window-property-attributes", 1, Some(3));
     }
 
     #[test]
