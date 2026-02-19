@@ -374,6 +374,13 @@ fn x_window_system_frame_error() -> Flow {
     )
 }
 
+fn x_selection_unavailable_error() -> Flow {
+    signal(
+        "error",
+        vec![Value::string("X selection unavailable for this frame")],
+    )
+}
+
 fn x_display_open_error(display: &str) -> Flow {
     signal(
         "error",
@@ -1460,6 +1467,18 @@ pub(crate) fn builtin_x_hide_tip(args: Vec<Value>) -> EvalResult {
     Ok(Value::Nil)
 }
 
+/// (x-show-tip STRING &optional FRAME PARMS TIMEOUT DX DY) -> error in batch/no-X context.
+pub(crate) fn builtin_x_show_tip(args: Vec<Value>) -> EvalResult {
+    expect_range_args("x-show-tip", &args, 1, 6)?;
+    if !args[0].is_string() {
+        return Err(signal(
+            "wrong-type-argument",
+            vec![Value::symbol("stringp"), args[0].clone()],
+        ));
+    }
+    Err(x_window_system_frame_error())
+}
+
 /// (x-setup-function-keys TERMINAL) -> nil/error in batch/no-X context.
 pub(crate) fn builtin_x_setup_function_keys(args: Vec<Value>) -> EvalResult {
     expect_args("x-setup-function-keys", &args, 1)?;
@@ -1607,6 +1626,18 @@ pub(crate) fn builtin_x_get_resource(args: Vec<Value>) -> EvalResult {
     Err(window_system_not_initialized_error())
 }
 
+/// (x-apply-session-resources) -> error in batch/no-X context.
+pub(crate) fn builtin_x_apply_session_resources(args: Vec<Value>) -> EvalResult {
+    expect_args("x-apply-session-resources", &args, 0)?;
+    Err(window_system_not_initialized_error())
+}
+
+/// (x-clipboard-yank) -> error in batch/no-X context.
+pub(crate) fn builtin_x_clipboard_yank(args: Vec<Value>) -> EvalResult {
+    expect_args("x-clipboard-yank", &args, 0)?;
+    Err(signal("error", vec![Value::string("Kill ring is empty")]))
+}
+
 /// (x-list-fonts PATTERN &optional FACE FRAME MAXIMUM WIDTH) -> error in batch/no-X context.
 pub(crate) fn builtin_x_list_fonts(args: Vec<Value>) -> EvalResult {
     expect_range_args("x-list-fonts", &args, 1, 5)?;
@@ -1623,6 +1654,58 @@ pub(crate) fn builtin_x_parse_geometry(args: Vec<Value>) -> EvalResult {
             vec![Value::symbol("stringp"), other.clone()],
         )),
     }
+}
+
+/// (x-change-window-property PROPERTY VALUE &optional FRAME TYPE FORMAT OUTER-P DELETE-P)
+/// -> error in batch/no-X context.
+pub(crate) fn builtin_x_change_window_property(args: Vec<Value>) -> EvalResult {
+    expect_range_args("x-change-window-property", &args, 2, 7)?;
+    if let Some(frame) = args.get(2) {
+        expect_optional_window_system_frame_arg(frame)?;
+    }
+    Err(x_window_system_frame_error())
+}
+
+/// (x-delete-window-property PROPERTY &optional FRAME TYPE) -> error in batch/no-X context.
+pub(crate) fn builtin_x_delete_window_property(args: Vec<Value>) -> EvalResult {
+    expect_range_args("x-delete-window-property", &args, 1, 3)?;
+    if let Some(frame) = args.get(1) {
+        expect_optional_window_system_frame_arg(frame)?;
+    }
+    Err(x_window_system_frame_error())
+}
+
+/// (x-disown-selection-internal SELECTION &optional TYPE FRAME) -> nil.
+pub(crate) fn builtin_x_disown_selection_internal(args: Vec<Value>) -> EvalResult {
+    expect_range_args("x-disown-selection-internal", &args, 1, 3)?;
+    Ok(Value::Nil)
+}
+
+/// (x-get-local-selection &optional SELECTION TYPE) -> nil/error.
+pub(crate) fn builtin_x_get_local_selection(args: Vec<Value>) -> EvalResult {
+    expect_max_args("x-get-local-selection", &args, 2)?;
+    let selection = args.first().cloned().unwrap_or(Value::Nil);
+    if !selection.is_cons() {
+        return Err(signal(
+            "wrong-type-argument",
+            vec![Value::symbol("consp"), selection],
+        ));
+    }
+    Ok(Value::Nil)
+}
+
+/// (x-get-selection-internal SELECTION TYPE &optional DATA-TYPE FRAME)
+/// -> error in batch/no-X context.
+pub(crate) fn builtin_x_get_selection_internal(args: Vec<Value>) -> EvalResult {
+    expect_range_args("x-get-selection-internal", &args, 2, 4)?;
+    Err(x_selection_unavailable_error())
+}
+
+/// (x-own-selection-internal SELECTION VALUE &optional FRAME)
+/// -> error in batch/no-X context.
+pub(crate) fn builtin_x_own_selection_internal(args: Vec<Value>) -> EvalResult {
+    expect_range_args("x-own-selection-internal", &args, 2, 3)?;
+    Err(x_selection_unavailable_error())
 }
 
 /// (x-selection-exists-p &optional SELECTION TYPE) -> nil in batch/no-X context.
@@ -4280,6 +4363,209 @@ mod tests {
             "Window system frame should be used",
         );
         assert_wrong_number(builtin_x_wm_set_size_hint(vec![Value::Nil, Value::Nil]));
+    }
+
+    #[test]
+    fn x_selection_property_tip_batch_semantics() {
+        let assert_wrong_type = |result: EvalResult, pred: &str, arg: Value| match result {
+            Err(Flow::Signal(sig)) => {
+                assert_eq!(sig.symbol, "wrong-type-argument");
+                assert_eq!(sig.data, vec![Value::symbol(pred), arg]);
+            }
+            other => panic!("expected wrong-type-argument signal, got {other:?}"),
+        };
+        let assert_error = |result: EvalResult, msg: &str| match result {
+            Err(Flow::Signal(sig)) => {
+                assert_eq!(sig.symbol, "error");
+                assert_eq!(sig.data, vec![Value::string(msg)]);
+            }
+            other => panic!("expected error signal, got {other:?}"),
+        };
+        let assert_wrong_number = |result: EvalResult| match result {
+            Err(Flow::Signal(sig)) => assert_eq!(sig.symbol, "wrong-number-of-arguments"),
+            other => panic!("expected wrong-number-of-arguments signal, got {other:?}"),
+        };
+
+        assert_error(
+            builtin_x_apply_session_resources(vec![]),
+            "Window system is not in use or not initialized",
+        );
+        assert_wrong_number(builtin_x_apply_session_resources(vec![Value::Nil]));
+
+        assert_error(
+            builtin_x_change_window_property(vec![Value::string("P"), Value::string("V")]),
+            "Window system frame should be used",
+        );
+        assert_error(
+            builtin_x_change_window_property(vec![
+                Value::string("P"),
+                Value::string("V"),
+                Value::Nil,
+            ]),
+            "Window system frame should be used",
+        );
+        assert_error(
+            builtin_x_change_window_property(vec![
+                Value::string("P"),
+                Value::string("V"),
+                Value::Nil,
+                Value::Nil,
+                Value::Nil,
+                Value::Nil,
+                Value::Nil,
+            ]),
+            "Window system frame should be used",
+        );
+        assert_wrong_number(builtin_x_change_window_property(vec![
+            Value::string("P"),
+            Value::string("V"),
+            Value::Nil,
+            Value::Nil,
+            Value::Nil,
+            Value::Nil,
+            Value::Nil,
+            Value::Nil,
+        ]));
+
+        assert_error(
+            builtin_x_delete_window_property(vec![Value::string("P")]),
+            "Window system frame should be used",
+        );
+        assert_error(
+            builtin_x_delete_window_property(vec![Value::string("P"), Value::Nil]),
+            "Window system frame should be used",
+        );
+        assert_error(
+            builtin_x_delete_window_property(vec![
+                Value::string("P"),
+                Value::Nil,
+                Value::Nil,
+            ]),
+            "Window system frame should be used",
+        );
+        assert_wrong_number(builtin_x_delete_window_property(vec![
+            Value::string("P"),
+            Value::Nil,
+            Value::Nil,
+            Value::Nil,
+        ]));
+
+        assert_error(
+            builtin_x_clipboard_yank(vec![]),
+            "Kill ring is empty",
+        );
+        assert_wrong_number(builtin_x_clipboard_yank(vec![Value::Nil]));
+
+        assert!(builtin_x_disown_selection_internal(vec![Value::Nil])
+            .unwrap()
+            .is_nil());
+        assert!(builtin_x_disown_selection_internal(vec![Value::Nil, Value::Nil])
+            .unwrap()
+            .is_nil());
+        assert!(builtin_x_disown_selection_internal(vec![Value::Nil, Value::Nil, Value::Nil])
+            .unwrap()
+            .is_nil());
+        assert_wrong_number(builtin_x_disown_selection_internal(vec![]));
+        assert_wrong_number(builtin_x_disown_selection_internal(vec![
+            Value::Nil,
+            Value::Nil,
+            Value::Nil,
+            Value::Nil,
+        ]));
+
+        assert_wrong_type(
+            builtin_x_get_local_selection(vec![]),
+            "consp",
+            Value::Nil,
+        );
+        assert_wrong_type(
+            builtin_x_get_local_selection(vec![Value::Nil]),
+            "consp",
+            Value::Nil,
+        );
+        assert_wrong_type(
+            builtin_x_get_local_selection(vec![Value::Nil, Value::Nil]),
+            "consp",
+            Value::Nil,
+        );
+        assert_wrong_number(builtin_x_get_local_selection(vec![
+            Value::Nil,
+            Value::Nil,
+            Value::Nil,
+        ]));
+
+        assert_error(
+            builtin_x_get_selection_internal(vec![Value::Nil, Value::Nil]),
+            "X selection unavailable for this frame",
+        );
+        assert_error(
+            builtin_x_get_selection_internal(vec![Value::Nil, Value::Nil, Value::Nil]),
+            "X selection unavailable for this frame",
+        );
+        assert_error(
+            builtin_x_get_selection_internal(vec![
+                Value::Nil,
+                Value::Nil,
+                Value::Nil,
+                Value::Nil,
+            ]),
+            "X selection unavailable for this frame",
+        );
+        assert_wrong_number(builtin_x_get_selection_internal(vec![]));
+        assert_wrong_number(builtin_x_get_selection_internal(vec![
+            Value::Nil,
+            Value::Nil,
+            Value::Nil,
+            Value::Nil,
+            Value::Nil,
+        ]));
+
+        assert_error(
+            builtin_x_own_selection_internal(vec![Value::Nil, Value::Nil]),
+            "X selection unavailable for this frame",
+        );
+        assert_error(
+            builtin_x_own_selection_internal(vec![Value::Nil, Value::Nil, Value::Nil]),
+            "X selection unavailable for this frame",
+        );
+        assert_wrong_number(builtin_x_own_selection_internal(vec![Value::Nil]));
+        assert_wrong_number(builtin_x_own_selection_internal(vec![
+            Value::Nil,
+            Value::Nil,
+            Value::Nil,
+            Value::Nil,
+        ]));
+
+        assert_error(
+            builtin_x_show_tip(vec![Value::string("m")]),
+            "Window system frame should be used",
+        );
+        assert_wrong_type(
+            builtin_x_show_tip(vec![Value::Int(1)]),
+            "stringp",
+            Value::Int(1),
+        );
+        assert_error(
+            builtin_x_show_tip(vec![
+                Value::string("m"),
+                Value::Nil,
+                Value::Nil,
+                Value::Nil,
+                Value::Nil,
+                Value::Nil,
+            ]),
+            "Window system frame should be used",
+        );
+        assert_wrong_number(builtin_x_show_tip(vec![]));
+        assert_wrong_number(builtin_x_show_tip(vec![
+            Value::string("m"),
+            Value::Nil,
+            Value::Nil,
+            Value::Nil,
+            Value::Nil,
+            Value::Nil,
+            Value::Nil,
+        ]));
     }
 
     #[test]

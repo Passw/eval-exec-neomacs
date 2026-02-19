@@ -16790,6 +16790,50 @@ Last updated: 2026-02-19
     - `make -C test/neovm/vm-compat check-one-neovm CASE=cases/x-clipboard-input-context-semantics` (pass, `2/2`)
     - `test/neovm/vm-compat/check-builtin-registry-commandp.sh` (pass, drifts: `0`)
     - `make -C test/neovm/vm-compat check-all-neovm-strict` (pass)
+- Added X selection/property/tip internal builtin slice and kept registry/function-kind/command parity green:
+  - runtime changes:
+    - `rust/neovm-core/src/elisp/display.rs`
+      - implemented:
+        - `x-apply-session-resources`
+        - `x-change-window-property`
+        - `x-delete-window-property`
+        - `x-clipboard-yank`
+        - `x-disown-selection-internal`
+        - `x-get-local-selection`
+        - `x-get-selection-internal`
+        - `x-own-selection-internal`
+        - `x-show-tip`
+      - aligned batch/no-X return and error payloads to oracle behavior for arity-valid calls.
+      - added unit coverage:
+        - `x_selection_property_tip_batch_semantics`
+    - `rust/neovm-core/src/elisp/builtins.rs`
+      - wired pure dispatch for all 9 symbols.
+    - `rust/neovm-core/src/elisp/builtin_registry.rs`
+      - added all 9 names to `DISPATCH_BUILTIN_NAMES`.
+    - `rust/neovm-core/src/elisp/subr_info.rs`
+      - aligned arity metadata/assertions in `subr_arity_display_terminal_primitives_match_oracle`:
+        - `(0 . 0)`: `x-apply-session-resources`, `x-clipboard-yank`
+        - `(2 . 7)`: `x-change-window-property`
+        - `(1 . 3)`: `x-delete-window-property`, `x-disown-selection-internal`
+        - `(0 . 2)`: `x-get-local-selection`
+        - `(2 . 4)`: `x-get-selection-internal`
+        - `(2 . 3)`: `x-own-selection-internal`
+        - `(1 . 6)`: `x-show-tip`
+    - `rust/neovm-core/src/elisp/interactive.rs`
+      - added `x-clipboard-yank` to builtin command allowlist to preserve oracle `commandp` parity.
+  - corpus changes:
+    - added and wired:
+      - `test/neovm/vm-compat/cases/x-selection-property-tip-internal-semantics.forms`
+      - `test/neovm/vm-compat/cases/x-selection-property-tip-internal-semantics.expected.tsv`
+      - `test/neovm/vm-compat/cases/default.list`
+  - verified:
+    - `cargo test --manifest-path rust/neovm-core/Cargo.toml x_selection_property_tip_batch_semantics -- --nocapture` (pass)
+    - `cargo test --manifest-path rust/neovm-core/Cargo.toml commandp_true_for_additional_builtin_commands -- --nocapture` (pass)
+    - `cargo test --manifest-path rust/neovm-core/Cargo.toml subr_arity_display_terminal_primitives_match_oracle -- --nocapture` (pass)
+    - `make -C test/neovm/vm-compat record FORMS=cases/x-selection-property-tip-internal-semantics.forms EXPECTED=cases/x-selection-property-tip-internal-semantics.expected.tsv` (pass)
+    - `make -C test/neovm/vm-compat check-one-neovm CASE=cases/x-selection-property-tip-internal-semantics` (pass, `2/2`)
+    - `test/neovm/vm-compat/check-builtin-registry-commandp.sh` (pass, drifts: `0`)
+    - `make -C test/neovm/vm-compat check-all-neovm-strict` (pass)
 
 ## Doing
 

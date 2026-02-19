@@ -847,6 +847,7 @@ fn subr_arity_value(name: &str) -> Value {
         "read-passwd" => arity_cons(1, Some(3)),
         "event-apply-modifier" => arity_cons(4, Some(4)),
         "regexp-quote" => arity_cons(1, Some(1)),
+        "x-apply-session-resources" | "x-clipboard-yank" => arity_cons(0, Some(0)),
         "open-termscript"
         | "x-close-connection"
         | "x-device-class"
@@ -855,6 +856,7 @@ fn subr_arity_value(name: &str) -> Value {
         | "x-parse-geometry"
         | "x-preedit-text"
         | "x-setup-function-keys" => arity_cons(1, Some(1)),
+        "x-get-local-selection" => arity_cons(0, Some(2)),
         "send-string-to-terminal"
         | "display-supports-face-attributes-p"
         | "x-focus-frame"
@@ -862,15 +864,22 @@ fn subr_arity_value(name: &str) -> Value {
         | "x-register-dnd-atom"
         | "x-synchronize"
         | "x-display-set-last-user-time" => arity_cons(1, Some(2)),
+        "x-own-selection-internal" => arity_cons(2, Some(3)),
+        "x-get-selection-internal" => arity_cons(2, Some(4)),
+        "x-change-window-property" => arity_cons(2, Some(7)),
         "x-send-client-message" => arity_cons(6, Some(6)),
         "x-set-mouse-absolute-pixel-position" => arity_cons(2, Some(2)),
         "x-popup-menu" => arity_cons(2, Some(2)),
-        "x-window-property-attributes" => arity_cons(1, Some(3)),
+        "x-delete-window-property" | "x-disown-selection-internal" | "x-window-property-attributes" => {
+            arity_cons(1, Some(3))
+        }
         "x-open-connection" => arity_cons(1, Some(3)),
         "x-popup-dialog" | "x-frame-restack" => arity_cons(2, Some(3)),
         "x-get-resource" => arity_cons(2, Some(4)),
         "x-list-fonts" => arity_cons(1, Some(5)),
-        "x-window-property" | "x-translate-coordinates" => arity_cons(1, Some(6)),
+        "x-show-tip" | "x-window-property" | "x-translate-coordinates" => {
+            arity_cons(1, Some(6))
+        }
         "internal-show-cursor" => arity_cons(2, Some(2)),
         "display-buffer" => arity_cons(1, Some(3)),
         "clear-font-cache" => arity_cons(0, Some(0)),
@@ -1425,9 +1434,14 @@ mod tests {
         assert_subr_arity("suspend-tty", 0, Some(1));
         assert_subr_arity("resume-tty", 0, Some(1));
         assert_subr_arity("terminal-coding-system", 0, Some(1));
+        assert_subr_arity("x-apply-session-resources", 0, Some(0));
         assert_subr_arity("x-backspace-delete-keys-p", 0, Some(1));
+        assert_subr_arity("x-change-window-property", 2, Some(7));
         assert_subr_arity("x-clear-preedit-text", 0, Some(0));
+        assert_subr_arity("x-clipboard-yank", 0, Some(0));
+        assert_subr_arity("x-delete-window-property", 1, Some(3));
         assert_subr_arity("x-device-class", 1, Some(1));
+        assert_subr_arity("x-disown-selection-internal", 1, Some(3));
         assert_subr_arity("x-export-frames", 0, Some(2));
         assert_subr_arity("x-display-list", 0, Some(0));
         assert_subr_arity("x-family-fonts", 0, Some(2));
@@ -1439,13 +1453,16 @@ mod tests {
         assert_subr_arity("x-get-atom-name", 1, Some(2));
         assert_subr_arity("x-get-clipboard", 0, Some(0));
         assert_subr_arity("x-get-input-coding-system", 1, Some(1));
+        assert_subr_arity("x-get-local-selection", 0, Some(2));
         assert_subr_arity("x-get-modifier-masks", 0, Some(1));
+        assert_subr_arity("x-get-selection-internal", 2, Some(4));
         assert_subr_arity("x-hide-tip", 0, Some(0));
         assert_subr_arity("x-internal-focus-input-context", 1, Some(1));
         assert_subr_arity("x-mouse-absolute-pixel-position", 0, Some(0));
         assert_subr_arity("x-get-resource", 2, Some(4));
         assert_subr_arity("x-list-fonts", 1, Some(5));
         assert_subr_arity("x-open-connection", 1, Some(3));
+        assert_subr_arity("x-own-selection-internal", 2, Some(3));
         assert_subr_arity("x-parse-geometry", 1, Some(1));
         assert_subr_arity("x-preedit-text", 1, Some(1));
         assert_subr_arity("x-popup-dialog", 2, Some(3));
@@ -1460,6 +1477,7 @@ mod tests {
         assert_subr_arity("x-server-max-request-size", 0, Some(1));
         assert_subr_arity("x-server-vendor", 0, Some(1));
         assert_subr_arity("x-setup-function-keys", 1, Some(1));
+        assert_subr_arity("x-show-tip", 1, Some(6));
         assert_subr_arity("x-display-grayscale-p", 0, Some(1));
         assert_subr_arity("x-display-backing-store", 0, Some(1));
         assert_subr_arity("x-display-color-cells", 0, Some(1));

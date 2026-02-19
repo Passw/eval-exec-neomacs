@@ -450,6 +450,7 @@ fn builtin_command_name(name: &str) -> bool {
             | "word-search-backward"
             | "word-search-forward"
             | "write-region"
+            | "x-clipboard-yank"
             | "x-preedit-text"
             | "yank-rectangle"
     )
@@ -3299,6 +3300,7 @@ mod tests {
             "setenv",
             "top-level",
             "write-region",
+            "x-clipboard-yank",
             "x-preedit-text",
             "yank-rectangle",
         ] {
