@@ -28,6 +28,27 @@ Last updated: 2026-02-19
 
 ## Doing
 
+- Aligned `network-lookup-address-info` host resolution with oracle and locked literal family-filter parity:
+  - runtime changes:
+    - `rust/neovm-core/src/elisp/process.rs`
+      - replaced placeholder loopback-only lookup payloads with host resolver results via `libc::getaddrinfo`.
+      - added guarded `freeaddrinfo` cleanup and family-aware filtering (`AF_UNSPEC`/`AF_INET`/`AF_INET6`) over parsed sockaddr entries.
+      - added deterministic helper lock-in:
+        - `network_lookup_literal_family_filtering_helpers`.
+      - expanded runtime surface lock-ins for numeric literals:
+        - `"127.0.0.1"`/`"::1"` parity across default and explicit family lookups.
+        - explicit cross-family empty-result checks (`'ipv6` for IPv4 literal, `'ipv4` for IPv6 literal).
+  - corpus changes:
+    - expanded and re-recorded:
+      - `test/neovm/vm-compat/cases/process-network-interface-signal-semantics.forms`
+      - `test/neovm/vm-compat/cases/process-network-interface-signal-semantics.expected.tsv`
+  - verified:
+    - `cargo test --manifest-path rust/neovm-core/Cargo.toml network_lookup_literal_family_filtering_helpers` (pass)
+    - `cargo test --manifest-path rust/neovm-core/Cargo.toml process_network_interface_and_signal_runtime_surface` (pass)
+    - `make -C test/neovm/vm-compat record FORMS=cases/process-network-interface-signal-semantics.forms EXPECTED=cases/process-network-interface-signal-semantics.expected.tsv` (pass)
+    - `make -C test/neovm/vm-compat check-one-neovm CASE=cases/process-network-interface-signal-semantics` (pass, `2/2`)
+    - `make -C test/neovm/vm-compat check-all-neovm-strict` (pass; case inventory `788`)
+
 - Closed remaining host-interface payload drift for `network-interface-list` / `network-interface-info` and strengthened runtime lock-ins:
   - runtime changes:
     - `rust/neovm-core/src/elisp/process.rs`

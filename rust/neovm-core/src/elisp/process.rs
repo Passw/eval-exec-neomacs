@@ -8,6 +8,7 @@
 use std::collections::HashMap;
 #[cfg(target_os = "linux")]
 use std::ffi::CStr;
+use std::ffi::CString;
 use std::fs::OpenOptions;
 #[cfg(target_os = "linux")]
 use std::ptr;
@@ -1296,6 +1297,77 @@ fn parse_network_sockaddr(
     }
 }
 
+fn resolve_network_lookup_addresses(
+    name: &str,
+    family: Option<NetworkAddressFamily>,
+) -> Vec<Value> {
+    struct AddrInfoGuard(*mut libc::addrinfo);
+
+    impl Drop for AddrInfoGuard {
+        fn drop(&mut self) {
+            // SAFETY: Pointer is owned by `getaddrinfo` and released once.
+            unsafe {
+                if !self.0.is_null() {
+                    libc::freeaddrinfo(self.0);
+                }
+            }
+        }
+    }
+
+    let c_name = match CString::new(name) {
+        Ok(value) => value,
+        Err(_) => return Vec::new(),
+    };
+    let mut hints: libc::addrinfo = unsafe { std::mem::zeroed() };
+    hints.ai_family = match family {
+        Some(NetworkAddressFamily::Ipv4) => libc::AF_INET,
+        Some(NetworkAddressFamily::Ipv6) => libc::AF_INET6,
+        None => libc::AF_UNSPEC,
+    };
+    hints.ai_socktype = libc::SOCK_STREAM;
+    hints.ai_protocol = 0;
+    hints.ai_flags = 0;
+
+    let mut root: *mut libc::addrinfo = std::ptr::null_mut();
+    // SAFETY: `getaddrinfo` initializes `root` when successful.
+    let status = unsafe {
+        libc::getaddrinfo(
+            c_name.as_ptr(),
+            std::ptr::null(),
+            &hints as *const libc::addrinfo,
+            &mut root as *mut *mut libc::addrinfo,
+        )
+    };
+    if status != 0 || root.is_null() {
+        return Vec::new();
+    }
+    let _guard = AddrInfoGuard(root);
+
+    let mut out = Vec::new();
+    let mut current = root;
+    while !current.is_null() {
+        // SAFETY: `current` points to the `addrinfo` linked list returned by
+        // `getaddrinfo` until the guard drops and frees it.
+        unsafe {
+            let info = &*current;
+            if let Some((resolved_family, address)) =
+                parse_network_sockaddr(info.ai_addr as *const libc::sockaddr)
+            {
+                let include = match family {
+                    Some(expected) => expected == resolved_family,
+                    None => true,
+                };
+                if include {
+                    out.push(address);
+                }
+            }
+            current = info.ai_next;
+        }
+    }
+
+    out
+}
+
 #[cfg(target_os = "linux")]
 fn parse_hwaddr(addr: *const libc::sockaddr) -> Option<Value> {
     if addr.is_null() {
@@ -1927,7 +1999,7 @@ pub(crate) fn builtin_network_lookup_address_info(
             ],
         ));
     }
-    let _name = expect_string_strict(&args[0])?;
+    let name = expect_string_strict(&args[0])?;
 
     let family = args.get(1).cloned().unwrap_or(Value::Nil);
     let hints = args.get(2).cloned().unwrap_or(Value::Nil);
@@ -1938,15 +2010,16 @@ pub(crate) fn builtin_network_lookup_address_info(
         ));
     }
 
-    let entries = if family.is_nil() {
-        vec![loopback_ipv6_address(), loopback_ipv4_address()]
+    let lookup_family = if family.is_nil() {
+        None
     } else if matches!(family.as_symbol_name(), Some("ipv4")) {
-        vec![loopback_ipv4_address(), loopback_ipv4_address()]
+        Some(NetworkAddressFamily::Ipv4)
     } else if matches!(family.as_symbol_name(), Some("ipv6")) {
-        vec![loopback_ipv6_address()]
+        Some(NetworkAddressFamily::Ipv6)
     } else {
         return Err(signal("error", vec![Value::string("Unsupported family")]));
     };
+    let entries = resolve_network_lookup_addresses(&name, lookup_family);
     Ok(Value::list(entries))
 }
 
@@ -4990,6 +5063,31 @@ mod tests {
     }
 
     #[test]
+    fn network_lookup_literal_family_filtering_helpers() {
+        let loopback_v4 = int_vector(&[127, 0, 0, 1, 0]);
+        let loopback_v6 = int_vector(&[0, 0, 0, 0, 0, 0, 0, 1, 0]);
+
+        let v4_any = resolve_network_lookup_addresses("127.0.0.1", None);
+        let v4_only = resolve_network_lookup_addresses("127.0.0.1", Some(NetworkAddressFamily::Ipv4));
+        let v4_rejected =
+            resolve_network_lookup_addresses("127.0.0.1", Some(NetworkAddressFamily::Ipv6));
+        assert!(!v4_any.is_empty());
+        assert_eq!(v4_any, v4_only);
+        assert_eq!(v4_any[0], loopback_v4);
+        assert!(v4_rejected.is_empty());
+
+        let v6_any = resolve_network_lookup_addresses("::1", None);
+        let v6_only = resolve_network_lookup_addresses("::1", Some(NetworkAddressFamily::Ipv6));
+        let v6_rejected =
+            resolve_network_lookup_addresses("::1", Some(NetworkAddressFamily::Ipv4));
+        assert_eq!(v6_any, v6_only);
+        if let Some(first) = v6_any.first() {
+            assert_eq!(first, &loopback_v6);
+        }
+        assert!(v6_rejected.is_empty());
+    }
+
+    #[test]
     fn process_network_interface_and_signal_runtime_surface() {
         let results = eval_all(
             r#"(mapcar (lambda (s)
@@ -5077,6 +5175,18 @@ mod tests {
                   (vectorp (car (network-lookup-address-info "localhost")))
                   (listp (network-lookup-address-info "localhost" 'ipv4))
                   (vectorp (car (network-lookup-address-info "localhost" 'ipv6)))
+                  (let* ((v4-any (network-lookup-address-info "127.0.0.1"))
+                         (v4-only (network-lookup-address-info "127.0.0.1" 'ipv4)))
+                    (and (equal v4-any v4-only)
+                         (consp v4-only)
+                         (equal (car v4-only) [127 0 0 1 0])))
+                  (null (network-lookup-address-info "127.0.0.1" 'ipv6))
+                  (let* ((v6-any (network-lookup-address-info "::1"))
+                         (v6-only (network-lookup-address-info "::1" 'ipv6)))
+                    (and (equal v6-any v6-only)
+                         (or (null v6-only)
+                             (equal (car v6-only) [0 0 0 0 0 0 0 1 0]))))
+                  (null (network-lookup-address-info "::1" 'ipv4))
                   (condition-case err (network-lookup-address-info "localhost" t) (error err))
                   (condition-case err (network-lookup-address-info "localhost" 'ipv4 t) (error err))
                   (condition-case err (network-lookup-address-info 1) (error err))
@@ -5093,7 +5203,7 @@ mod tests {
         );
         assert_eq!(
             results[1],
-            "OK (\"127.0.0.1:80\" \"127.0.0.1\" \"[0:0:0:0:0:0:0:1]:80\" \"0:0:0:0:0:0:0:1\" \"x\" nil nil nil nil (wrong-number-of-arguments format-network-address 0) t t t t t t t (wrong-number-of-arguments network-interface-list 3) (error \"Unsupported address family\") t t (wrong-type-argument stringp nil) (error \"interface name too long\") t t t t (error \"Unsupported family\") (error \"Unsupported hints value\") (wrong-type-argument stringp 1) t t t (wrong-number-of-arguments signal-names 1) (void-function process-connection))"
+            "OK (\"127.0.0.1:80\" \"127.0.0.1\" \"[0:0:0:0:0:0:0:1]:80\" \"0:0:0:0:0:0:0:1\" \"x\" nil nil nil nil (wrong-number-of-arguments format-network-address 0) t t t t t t t (wrong-number-of-arguments network-interface-list 3) (error \"Unsupported address family\") t t (wrong-type-argument stringp nil) (error \"interface name too long\") t t t t t t t t (error \"Unsupported family\") (error \"Unsupported hints value\") (wrong-type-argument stringp 1) t t t (wrong-number-of-arguments signal-names 1) (void-function process-connection))"
         );
     }
 }
