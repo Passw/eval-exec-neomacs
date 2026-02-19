@@ -1,3 +1,5 @@
+(keymapp 16)
+(keymapp 0)
 (keymapp '(keymap))
 (keymapp '(keymap (97 . ignore)))
 (keymapp '(keymap . foo))

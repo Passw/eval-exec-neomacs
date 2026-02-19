@@ -16,7 +16,7 @@ use super::doc::{STARTUP_VARIABLE_DOC_STRING_PROPERTIES, STARTUP_VARIABLE_DOC_ST
 use super::error::*;
 use super::expr::Expr;
 use super::interactive::InteractiveRegistry;
-use super::keymap::KeymapManager;
+use super::keymap::{encode_keymap_handle, KeymapManager};
 use super::kill_ring::KillRing;
 use super::kmacro::KmacroManager;
 use super::mode::ModeRegistry;
@@ -178,6 +178,7 @@ impl Evaluator {
         let read_key_empty_map =
             keymaps.make_sparse_keymap(Some("read-key-empty-map".to_string()));
         let read_key_full_map = keymaps.make_keymap();
+        let keymap_handle = |id: u64| Value::Int(encode_keymap_handle(id));
 
         keymaps.set_keymap_parent(minibuffer_local_completion_map, Some(minibuffer_local_map));
         keymaps.set_keymap_parent(
@@ -317,11 +318,11 @@ impl Evaluator {
         );
         obarray.set_symbol_value(
             "completion-in-region-mode-map",
-            Value::Int(completion_in_region_mode_map as i64),
+            keymap_handle(completion_in_region_mode_map),
         );
         obarray.set_symbol_value(
             "completion-list-mode-map",
-            Value::Int(completion_list_mode_map as i64),
+            keymap_handle(completion_list_mode_map),
         );
         obarray.set_symbol_value(
             "completion-list-mode-syntax-table",
@@ -491,24 +492,24 @@ impl Evaluator {
         );
         obarray.set_symbol_value(
             "read-char-from-minibuffer-map",
-            Value::Int(read_char_from_minibuffer_map as i64),
+            keymap_handle(read_char_from_minibuffer_map),
         );
         obarray.set_symbol_value(
             "read-char-from-minibuffer-map-hash",
             Value::hash_table(HashTableTest::Equal),
         );
-        obarray.set_symbol_value("read-expression-map", Value::Int(read_expression_map as i64));
+        obarray.set_symbol_value("read-expression-map", keymap_handle(read_expression_map));
         obarray.set_symbol_value(
             "read--expression-map",
-            Value::Int(read_expression_internal_map as i64),
+            keymap_handle(read_expression_internal_map),
         );
         obarray.set_symbol_value(
             "read-extended-command-mode-map",
-            Value::Int(read_extended_command_mode_map as i64),
+            keymap_handle(read_extended_command_mode_map),
         );
-        obarray.set_symbol_value("read-key-empty-map", Value::Int(read_key_empty_map as i64));
-        obarray.set_symbol_value("read-key-full-map", Value::Int(read_key_full_map as i64));
-        obarray.set_symbol_value("read-regexp-map", Value::Int(read_regexp_map as i64));
+        obarray.set_symbol_value("read-key-empty-map", keymap_handle(read_key_empty_map));
+        obarray.set_symbol_value("read-key-full-map", keymap_handle(read_key_full_map));
+        obarray.set_symbol_value("read-regexp-map", keymap_handle(read_regexp_map));
         obarray.set_symbol_value("read-extended-command-mode", Value::Nil);
         obarray.set_symbol_value("read-extended-command-mode-hook", Value::Nil);
         obarray.set_symbol_value("read-extended-command-predicate", Value::Nil);
@@ -535,7 +536,7 @@ impl Evaluator {
         obarray.set_symbol_value("minibuffer-inactive-mode-hook", Value::Nil);
         obarray.set_symbol_value(
             "minibuffer-inactive-mode-map",
-            Value::Int(minibuffer_inactive_mode_map as i64),
+            keymap_handle(minibuffer_inactive_mode_map),
         );
         obarray.set_symbol_value(
             "minibuffer-inactive-mode-syntax-table",
@@ -546,18 +547,18 @@ impl Evaluator {
             Value::symbol("minibuffer-mode-abbrev-table"),
         );
         obarray.set_symbol_value("minibuffer-mode-hook", Value::Nil);
-        obarray.set_symbol_value("minibuffer-mode-map", Value::Int(minibuffer_mode_map as i64));
+        obarray.set_symbol_value("minibuffer-mode-map", keymap_handle(minibuffer_mode_map));
         obarray.set_symbol_value(
             "minibuffer-local-map",
-            Value::Int(minibuffer_local_map as i64),
+            keymap_handle(minibuffer_local_map),
         );
         obarray.set_symbol_value(
             "minibuffer-local-completion-map",
-            Value::Int(minibuffer_local_completion_map as i64),
+            keymap_handle(minibuffer_local_completion_map),
         );
         obarray.set_symbol_value(
             "minibuffer-local-filename-completion-map",
-            Value::Int(minibuffer_local_filename_completion_map as i64),
+            keymap_handle(minibuffer_local_filename_completion_map),
         );
         obarray.set_symbol_value(
             "minibuffer-local-filename-syntax",
@@ -565,19 +566,19 @@ impl Evaluator {
         );
         obarray.set_symbol_value(
             "minibuffer-local-isearch-map",
-            Value::Int(minibuffer_local_isearch_map as i64),
+            keymap_handle(minibuffer_local_isearch_map),
         );
         obarray.set_symbol_value(
             "minibuffer-local-must-match-map",
-            Value::Int(minibuffer_local_must_match_map as i64),
+            keymap_handle(minibuffer_local_must_match_map),
         );
         obarray.set_symbol_value(
             "minibuffer-local-ns-map",
-            Value::Int(minibuffer_local_ns_map as i64),
+            keymap_handle(minibuffer_local_ns_map),
         );
         obarray.set_symbol_value(
             "minibuffer-local-shell-command-map",
-            Value::Int(minibuffer_local_shell_command_map as i64),
+            keymap_handle(minibuffer_local_shell_command_map),
         );
         obarray.set_symbol_value("minibuffer-history", Value::Nil);
         obarray.set_symbol_value("minibuffer-history-variable", Value::symbol("minibuffer-history"));
@@ -648,7 +649,7 @@ impl Evaluator {
         obarray.set_symbol_value("minibuffer-visible-completions--always-bind", Value::Nil);
         obarray.set_symbol_value(
             "minibuffer-visible-completions-map",
-            Value::Int(minibuffer_visible_completions_map as i64),
+            keymap_handle(minibuffer_visible_completions_map),
         );
         obarray.set_symbol_value("minibuffer-depth-indicate-mode", Value::Nil);
         obarray.set_symbol_value("minibuffer-default-prompt-format", Value::string(" (default %s)"));

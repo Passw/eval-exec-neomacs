@@ -18,7 +18,9 @@ use std::collections::{HashMap, HashSet};
 use super::error::{signal, EvalResult, Flow};
 use super::eval::Evaluator;
 use super::expr::Expr;
-use super::keymap::{KeyBinding, KeyEvent, KeymapManager};
+use super::keymap::{
+    decode_keymap_handle, encode_keymap_handle, KeyBinding, KeyEvent, KeymapManager,
+};
 use super::mode::{MajorMode, MinorMode};
 use super::value::*;
 
@@ -1007,9 +1009,9 @@ pub(crate) fn builtin_key_binding(eval: &mut Evaluator, args: Vec<Value>) -> Eva
         let global_id = ensure_global_keymap(eval);
         let mut maps = Vec::new();
         if let Some(local_id) = eval.current_local_map {
-            maps.push(Value::Int(local_id as i64));
+            maps.push(Value::Int(encode_keymap_handle(local_id)));
         }
-        maps.push(Value::Int(global_id as i64));
+        maps.push(Value::Int(encode_keymap_handle(global_id)));
         return Ok(Value::list(maps));
     }
 
@@ -1087,7 +1089,7 @@ pub(crate) fn builtin_global_key_binding(eval: &mut Evaluator, args: Vec<Value>)
         }
     };
     if events.is_empty() {
-        return Ok(Value::Int(ensure_global_keymap(eval) as i64));
+        return Ok(Value::Int(encode_keymap_handle(ensure_global_keymap(eval))));
     }
     if let Some(global_id) = eval.keymaps.global_map() {
         return Ok(lookup_keymap_with_partial(eval, global_id, &events));
@@ -1915,7 +1917,12 @@ fn ensure_global_keymap(eval: &mut Evaluator) -> u64 {
 fn expect_keymap_id(eval: &Evaluator, value: &Value) -> Result<u64, Flow> {
     match value {
         Value::Int(n) => {
-            let id = *n as u64;
+            let Some(id) = decode_keymap_handle(*n) else {
+                return Err(signal(
+                    "wrong-type-argument",
+                    vec![Value::symbol("keymapp"), value.clone()],
+                ));
+            };
             if eval.keymaps.is_keymap(id) {
                 Ok(id)
             } else {
@@ -1951,7 +1958,7 @@ fn key_sequence_to_value(seq: &[KeyEvent]) -> Value {
 
 fn lookup_keymap_with_partial(eval: &Evaluator, map_id: u64, events: &[KeyEvent]) -> Value {
     if events.is_empty() {
-        return Value::Int(map_id as i64);
+        return Value::Int(encode_keymap_handle(map_id));
     }
 
     if events.len() == 1 {

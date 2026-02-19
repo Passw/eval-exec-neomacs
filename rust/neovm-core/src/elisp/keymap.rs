@@ -11,6 +11,26 @@ use std::collections::HashMap;
 use super::value::Value;
 
 // ---------------------------------------------------------------------------
+// Keymap handle encoding
+// ---------------------------------------------------------------------------
+
+/// Public Lisp-visible keymap handles are tagged integers rather than raw ids.
+/// This avoids collisions with ordinary small integers in predicates like
+/// `keymapp`.
+pub const KEYMAP_HANDLE_BASE: i64 = 1_i64 << 50;
+
+pub fn encode_keymap_handle(id: u64) -> i64 {
+    KEYMAP_HANDLE_BASE + id as i64
+}
+
+pub fn decode_keymap_handle(raw: i64) -> Option<u64> {
+    if raw < KEYMAP_HANDLE_BASE {
+        return None;
+    }
+    Some((raw - KEYMAP_HANDLE_BASE) as u64)
+}
+
+// ---------------------------------------------------------------------------
 // Key events
 // ---------------------------------------------------------------------------
 

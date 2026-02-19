@@ -28,6 +28,48 @@ Last updated: 2026-02-19
 
 ## Doing
 
+- Tagged NeoVM keymap handles and eliminated integer false positives in `keymapp`:
+  - runtime changes:
+    - `rust/neovm-core/src/elisp/keymap.rs`
+      - added tagged keymap-handle codec helpers:
+        - `KEYMAP_HANDLE_BASE`
+        - `encode_keymap_handle`
+        - `decode_keymap_handle`
+    - `rust/neovm-core/src/elisp/builtins.rs`
+      - switched keymap-returning builtins to encoded handles:
+        - `make-keymap`, `make-sparse-keymap`
+        - `lookup-key` (empty sequence path)
+        - `current-local-map`, `current-global-map`, `keymap-parent`
+      - tightened keymap designator handling:
+        - `expect_keymap_id` now decodes and validates tagged handles
+        - `key_binding_to_value` / `value_to_key_binding` now emit/accept only tagged+valid keymap handles for prefix maps
+      - `keymapp` integer path now accepts only tagged+valid keymap handles; plain integers are rejected.
+      - extended keymapp unit assertion:
+        - `(keymapp 16)` is `nil`
+    - `rust/neovm-core/src/elisp/interactive.rs`
+      - `key-binding` / `global-key-binding` empty-designator map payloads now return encoded keymap handles.
+      - interactive keymap lookup/designator paths now decode and validate tagged handles.
+    - `rust/neovm-core/src/elisp/eval.rs`
+      - startup keymap symbols are now seeded with encoded keymap handles instead of raw IDs.
+  - corpus changes:
+    - expanded and re-recorded:
+      - `test/neovm/vm-compat/cases/keymapp-lisp-object-semantics.{forms,expected.tsv}`
+    - added explicit integer-negative lock-ins:
+      - `(keymapp 16)` -> `nil`
+      - `(keymapp 0)` -> `nil`
+  - verified:
+    - `make -C test/neovm/vm-compat record FORMS=cases/keymapp-lisp-object-semantics.forms EXPECTED=cases/keymapp-lisp-object-semantics.expected.tsv` (pass)
+    - `cargo test --manifest-path rust/neovm-core/Cargo.toml keymapp_` (pass)
+    - `make -C test/neovm/vm-compat check-one-neovm CASE=cases/keymapp-lisp-object-semantics` (pass, `12/12`)
+    - `make -C test/neovm/vm-compat check-one-neovm CASE=cases/keymap-map-selection-semantics` (pass, `13/13`)
+    - `make -C test/neovm/vm-compat check-one-neovm CASE=cases/keymap-parent-semantics` (pass, `8/8`)
+    - `make -C test/neovm/vm-compat check-one-neovm CASE=cases/lookup-key-partial-semantics` (pass, `12/12`)
+    - `make -C test/neovm/vm-compat check-one-neovm CASE=cases/key-binding-partial-semantics` (pass, `14/14`)
+    - `make -C test/neovm/vm-compat check-one-neovm CASE=cases/key-binding-empty-designator-semantics` (pass, `6/6`)
+    - `make -C test/neovm/vm-compat check-one-neovm CASE=cases/where-is-internal-semantics` (pass, `12/12`)
+    - `make -C test/neovm/vm-compat check-one-neovm CASE=cases/input-command-state-startup-semantics` (pass, `11/11`)
+    - `make -C test/neovm/vm-compat check-all-neovm-strict` (pass)
+
 - Expanded prompt-reader `this-command-keys`/`this-command-keys-vector` lock-ins:
   - corpus changes:
     - expanded and re-recorded:

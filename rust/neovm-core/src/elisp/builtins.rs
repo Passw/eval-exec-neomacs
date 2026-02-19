@@ -5521,13 +5521,18 @@ pub(crate) fn builtin_buffer_local_value(
 // ===========================================================================
 // Keymap builtins
 // ===========================================================================
-use super::keymap::{KeyBinding, KeyEvent};
+use super::keymap::{decode_keymap_handle, encode_keymap_handle, KeyBinding, KeyEvent};
 
 /// Extract a keymap id from a Value, signaling wrong-type-argument if invalid.
 fn expect_keymap_id(eval: &super::eval::Evaluator, value: &Value) -> Result<u64, Flow> {
     match value {
         Value::Int(n) => {
-            let id = *n as u64;
+            let Some(id) = decode_keymap_handle(*n) else {
+                return Err(signal(
+                    "wrong-type-argument",
+                    vec![Value::symbol("keymapp"), value.clone()],
+                ));
+            };
             if eval.keymaps.is_keymap(id) {
                 Ok(id)
             } else {
@@ -5548,7 +5553,7 @@ fn expect_keymap_id(eval: &super::eval::Evaluator, value: &Value) -> Result<u64,
 fn key_binding_to_value(binding: &KeyBinding) -> Value {
     match binding {
         KeyBinding::Command(name) => Value::symbol(name.clone()),
-        KeyBinding::Prefix(id) => Value::Int(*id as i64),
+        KeyBinding::Prefix(id) => Value::Int(encode_keymap_handle(*id)),
         KeyBinding::LispValue(v) => v.clone(),
     }
 }
@@ -5559,12 +5564,12 @@ fn value_to_key_binding(eval: &super::eval::Evaluator, value: &Value) -> KeyBind
         Value::Symbol(name) => KeyBinding::Command(name.clone()),
         Value::Nil => KeyBinding::Command("nil".to_string()),
         Value::Int(n) => {
-            let id = *n as u64;
-            if eval.keymaps.is_keymap(id) {
-                KeyBinding::Prefix(id)
-            } else {
-                KeyBinding::LispValue(value.clone())
+            if let Some(id) = decode_keymap_handle(*n) {
+                if eval.keymaps.is_keymap(id) {
+                    return KeyBinding::Prefix(id);
+                }
             }
+            KeyBinding::LispValue(value.clone())
         }
         other => KeyBinding::LispValue(other.clone()),
     }
@@ -5624,7 +5629,7 @@ fn define_key_in_map(
 fn builtin_make_keymap(eval: &mut super::eval::Evaluator, args: Vec<Value>) -> EvalResult {
     expect_max_args("make-keymap", &args, 1)?;
     let id = eval.keymaps.make_keymap();
-    Ok(Value::Int(id as i64))
+    Ok(Value::Int(encode_keymap_handle(id)))
 }
 
 /// (make-sparse-keymap &optional NAME) -> keymap-id
@@ -5640,7 +5645,7 @@ fn builtin_make_sparse_keymap(eval: &mut super::eval::Evaluator, args: Vec<Value
         None
     };
     let id = eval.keymaps.make_sparse_keymap(name);
-    Ok(Value::Int(id as i64))
+    Ok(Value::Int(encode_keymap_handle(id)))
 }
 
 /// (define-key KEYMAP KEY DEF &optional REMOVE) -> DEF
@@ -5662,7 +5667,7 @@ fn builtin_lookup_key(eval: &mut super::eval::Evaluator, args: Vec<Value>) -> Ev
 
     if keys.is_empty() {
         // Oracle returns the original keymap object for empty key sequences.
-        return Ok(Value::Int(keymap_id as i64));
+        return Ok(Value::Int(encode_keymap_handle(keymap_id)));
     }
 
     if keys.len() == 1 {
@@ -5761,7 +5766,7 @@ fn builtin_use_global_map(eval: &mut super::eval::Evaluator, args: Vec<Value>) -
 fn builtin_current_local_map(eval: &mut super::eval::Evaluator, args: Vec<Value>) -> EvalResult {
     expect_args("current-local-map", &args, 0)?;
     match eval.current_local_map {
-        Some(id) => Ok(Value::Int(id as i64)),
+        Some(id) => Ok(Value::Int(encode_keymap_handle(id))),
         None => Ok(Value::Nil),
     }
 }
@@ -5777,7 +5782,7 @@ fn builtin_current_global_map(eval: &mut super::eval::Evaluator, args: Vec<Value
             id
         }
     };
-    Ok(Value::Int(id as i64))
+    Ok(Value::Int(encode_keymap_handle(id)))
 }
 
 /// (keymap-parent KEYMAP) -> keymap-id or nil
@@ -5785,7 +5790,7 @@ fn builtin_keymap_parent(eval: &mut super::eval::Evaluator, args: Vec<Value>) ->
     expect_args("keymap-parent", &args, 1)?;
     let id = expect_keymap_id(eval, &args[0])?;
     match eval.keymaps.keymap_parent(id) {
-        Some(parent_id) => Ok(Value::Int(parent_id as i64)),
+        Some(parent_id) => Ok(Value::Int(encode_keymap_handle(parent_id))),
         None => Ok(Value::Nil),
     }
 }
@@ -5815,7 +5820,9 @@ fn is_lisp_keymap_object(value: &Value) -> bool {
 fn builtin_keymapp(eval: &mut super::eval::Evaluator, args: Vec<Value>) -> EvalResult {
     expect_args("keymapp", &args, 1)?;
     match &args[0] {
-        Value::Int(n) if *n >= 0 => Ok(Value::bool(eval.keymaps.is_keymap(*n as u64))),
+        Value::Int(n) => Ok(Value::bool(
+            decode_keymap_handle(*n).is_some_and(|id| eval.keymaps.is_keymap(id)),
+        )),
         Value::Cons(_) => Ok(Value::bool(is_lisp_keymap_object(&args[0]))),
         _ => Ok(Value::Nil),
     }
@@ -10411,6 +10418,7 @@ mod tests {
         let mut eval = super::super::eval::Evaluator::new();
         let keymap = builtin_make_sparse_keymap(&mut eval, vec![]).unwrap();
         assert_eq!(builtin_keymapp(&mut eval, vec![keymap]).unwrap(), Value::True);
+        assert_eq!(builtin_keymapp(&mut eval, vec![Value::Int(16)]).unwrap(), Value::Nil);
         assert_eq!(
             builtin_keymapp(&mut eval, vec![Value::Int(999_999)]).unwrap(),
             Value::Nil
