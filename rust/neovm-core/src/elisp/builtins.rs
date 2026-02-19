@@ -8051,6 +8051,16 @@ pub(crate) fn dispatch_builtin(
                 eval, args,
             ))
         }
+        "display-save-under" => {
+            return Some(super::display::builtin_display_save_under_eval(
+                eval, args,
+            ))
+        }
+        "display-selections-p" => {
+            return Some(super::display::builtin_display_selections_p_eval(
+                eval, args,
+            ))
+        }
         "display-images-p" => {
             return Some(super::display::builtin_display_images_p_eval(eval, args))
         }
@@ -8789,6 +8799,8 @@ pub(crate) fn dispatch_builtin(
         "display-planes" => super::display::builtin_display_planes(args),
         "display-visual-class" => super::display::builtin_display_visual_class(args),
         "display-backing-store" => super::display::builtin_display_backing_store(args),
+        "display-save-under" => super::display::builtin_display_save_under(args),
+        "display-selections-p" => super::display::builtin_display_selections_p(args),
         "x-display-list" => super::display::builtin_x_display_list(args),
         "x-open-connection" => super::display::builtin_x_open_connection(args),
         "x-close-connection" => super::display::builtin_x_close_connection(args),

@@ -28,6 +28,38 @@ Last updated: 2026-02-19
 
 ## Doing
 
+- Added `display-save-under` / `display-selections-p` compatibility surface and locked oracle parity:
+  - runtime changes:
+    - `rust/neovm-core/src/elisp/display.rs`
+      - implemented both builtins with `(0 . 1)` arity and batch-compatible return values:
+        - `display-save-under` -> `not-useful`
+        - `display-selections-p` -> `nil`
+      - added evaluator variants that accept live frame designators and preserve display designator error-shape parity.
+      - extended display unit coverage for new builtins across nil/frame acceptance, invalid designators, and missing-display payloads.
+    - `rust/neovm-core/src/elisp/builtins.rs`
+      - wired evaluator and pure dispatch for:
+        - `display-save-under`
+        - `display-selections-p`
+    - `rust/neovm-core/src/elisp/builtin_registry.rs`
+      - registered both symbols in `DISPATCH_BUILTIN_NAMES`.
+    - `rust/neovm-core/src/elisp/subr_info.rs`
+      - added arity metadata `(0 . 1)` for both symbols and updated subr-arity oracle test expectations.
+  - corpus changes:
+    - added and wired:
+      - `test/neovm/vm-compat/cases/display-save-under-selections-semantics.{forms,expected.tsv}`
+      - `test/neovm/vm-compat/cases/default.list`
+    - lock-ins cover:
+      - `fboundp` presence.
+      - default/nil/terminal/frame designator behavior.
+      - non-display designator and string-display error semantics.
+      - `subr-arity` parity for both builtins.
+  - verified:
+    - `cargo test --manifest-path rust/neovm-core/Cargo.toml elisp::display::tests:: -- --nocapture` (pass, `54/54`)
+    - `cargo test --manifest-path rust/neovm-core/Cargo.toml subr_arity_display_terminal_primitives_match_oracle -- --nocapture` (pass)
+    - `make -C test/neovm/vm-compat record FORMS=cases/display-save-under-selections-semantics.forms EXPECTED=cases/display-save-under-selections-semantics.expected.tsv` (pass)
+    - `make -C test/neovm/vm-compat check-one-neovm CASE=cases/display-save-under-selections-semantics` (pass, `20/20`)
+    - `make -C test/neovm/vm-compat check-all-neovm-strict` (pass; case inventory `767`)
+
 - Aligned `internal-show-cursor` / `internal-show-cursor-p` to per-window visibility semantics (instead of global visibility) and added lock-ins:
   - runtime changes:
     - `rust/neovm-core/src/elisp/display.rs`

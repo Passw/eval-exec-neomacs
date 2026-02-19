@@ -625,6 +625,24 @@ pub(crate) fn builtin_display_backing_store(args: Vec<Value>) -> EvalResult {
     Ok(Value::symbol("not-useful"))
 }
 
+/// (display-save-under &optional DISPLAY) -> 'not-useful in batch-style vm context.
+pub(crate) fn builtin_display_save_under(args: Vec<Value>) -> EvalResult {
+    expect_max_args("display-save-under", &args, 1)?;
+    if let Some(display) = args.first() {
+        expect_display_designator(display)?;
+    }
+    Ok(Value::symbol("not-useful"))
+}
+
+/// (display-selections-p &optional DISPLAY) -> nil in batch-style vm context.
+pub(crate) fn builtin_display_selections_p(args: Vec<Value>) -> EvalResult {
+    expect_max_args("display-selections-p", &args, 1)?;
+    if let Some(display) = args.first() {
+        expect_display_designator(display)?;
+    }
+    Ok(Value::Nil)
+}
+
 /// (display-images-p &optional DISPLAY) -> nil in batch-style vm context.
 pub(crate) fn builtin_display_images_p(args: Vec<Value>) -> EvalResult {
     expect_max_args("display-images-p", &args, 1)?;
@@ -747,6 +765,24 @@ pub(crate) fn builtin_display_backing_store_eval(
 ) -> EvalResult {
     expect_optional_display_designator_eval(eval, "display-backing-store", &args)?;
     Ok(Value::symbol("not-useful"))
+}
+
+/// Evaluator-aware variant of `display-save-under`.
+pub(crate) fn builtin_display_save_under_eval(
+    eval: &mut super::eval::Evaluator,
+    args: Vec<Value>,
+) -> EvalResult {
+    expect_optional_display_designator_eval(eval, "display-save-under", &args)?;
+    Ok(Value::symbol("not-useful"))
+}
+
+/// Evaluator-aware variant of `display-selections-p`.
+pub(crate) fn builtin_display_selections_p_eval(
+    eval: &mut super::eval::Evaluator,
+    args: Vec<Value>,
+) -> EvalResult {
+    expect_optional_display_designator_eval(eval, "display-selections-p", &args)?;
+    Ok(Value::Nil)
 }
 
 /// (window-system &optional FRAME) -> nil in batch-style vm context.
@@ -2378,6 +2414,15 @@ mod tests {
             builtin_display_backing_store_eval(&mut eval, vec![Value::Int(frame_id)]).unwrap(),
             Value::symbol("not-useful")
         );
+        assert_eq!(
+            builtin_display_save_under_eval(&mut eval, vec![Value::Int(frame_id)]).unwrap(),
+            Value::symbol("not-useful")
+        );
+        assert!(
+            builtin_display_selections_p_eval(&mut eval, vec![Value::Int(frame_id)])
+                .unwrap()
+                .is_nil()
+        );
         assert!(
             builtin_display_images_p_eval(&mut eval, vec![Value::Int(frame_id)])
                 .unwrap()
@@ -2459,6 +2504,14 @@ mod tests {
             &mut eval,
             vec![Value::string("x")],
         ));
+        assert_missing_display(builtin_display_save_under_eval(
+            &mut eval,
+            vec![Value::string("x")],
+        ));
+        assert_missing_display(builtin_display_selections_p_eval(
+            &mut eval,
+            vec![Value::string("x")],
+        ));
         assert_missing_display(builtin_display_images_p_eval(
             &mut eval,
             vec![Value::string("x")],
@@ -2511,6 +2564,52 @@ mod tests {
         }
 
         match builtin_display_images_p(vec![Value::Nil, Value::Nil]) {
+            Err(Flow::Signal(sig)) => assert_eq!(sig.symbol, "wrong-number-of-arguments"),
+            other => panic!("expected wrong-number-of-arguments, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn display_save_under_and_display_selections_p_shapes_and_errors() {
+        assert_eq!(
+            builtin_display_save_under(vec![]).unwrap(),
+            Value::symbol("not-useful")
+        );
+        assert_eq!(
+            builtin_display_save_under(vec![Value::Nil]).unwrap(),
+            Value::symbol("not-useful")
+        );
+        assert!(builtin_display_selections_p(vec![]).unwrap().is_nil());
+        assert!(builtin_display_selections_p(vec![Value::Nil]).unwrap().is_nil());
+
+        match builtin_display_save_under(vec![Value::Int(1)]) {
+            Err(Flow::Signal(sig)) => {
+                assert_eq!(sig.symbol, "error");
+                assert_eq!(
+                    sig.data,
+                    vec![Value::string("Invalid argument 1 in ‘get-device-terminal’")]
+                );
+            }
+            other => panic!("expected error signal, got {other:?}"),
+        }
+
+        match builtin_display_selections_p(vec![Value::Int(1)]) {
+            Err(Flow::Signal(sig)) => {
+                assert_eq!(sig.symbol, "error");
+                assert_eq!(
+                    sig.data,
+                    vec![Value::string("Invalid argument 1 in ‘get-device-terminal’")]
+                );
+            }
+            other => panic!("expected error signal, got {other:?}"),
+        }
+
+        match builtin_display_save_under(vec![Value::Nil, Value::Nil]) {
+            Err(Flow::Signal(sig)) => assert_eq!(sig.symbol, "wrong-number-of-arguments"),
+            other => panic!("expected wrong-number-of-arguments, got {other:?}"),
+        }
+
+        match builtin_display_selections_p(vec![Value::Nil, Value::Nil]) {
             Err(Flow::Signal(sig)) => assert_eq!(sig.symbol, "wrong-number-of-arguments"),
             other => panic!("expected wrong-number-of-arguments, got {other:?}"),
         }

@@ -905,6 +905,8 @@ fn subr_arity_value(name: &str) -> Value {
         | "display-planes"
         | "display-visual-class"
         | "display-backing-store"
+        | "display-save-under"
+        | "display-selections-p"
         | "display-monitor-attributes-list"
         | "frame-monitor-attributes"
         | "terminal-name"
@@ -1332,6 +1334,8 @@ mod tests {
         assert_subr_arity("display-planes", 0, Some(1));
         assert_subr_arity("display-visual-class", 0, Some(1));
         assert_subr_arity("display-backing-store", 0, Some(1));
+        assert_subr_arity("display-save-under", 0, Some(1));
+        assert_subr_arity("display-selections-p", 0, Some(1));
         assert_subr_arity("display-supports-face-attributes-p", 1, Some(2));
         assert_subr_arity("ding", 0, Some(1));
         assert_subr_arity("redraw-display", 0, Some(0));
