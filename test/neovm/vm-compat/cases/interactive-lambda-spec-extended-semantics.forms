@@ -160,3 +160,86 @@
   (condition-case err
       (command-execute (lambda (x) (interactive "e") x))
     (error (list err unread-command-events))))
+
+; Prefix flags on first line: "*", "^", "@" (including ordered combinations).
+(with-temp-buffer
+  (let ((buffer-read-only nil))
+    (call-interactively (lambda () (interactive "*") 'ok))))
+(with-temp-buffer
+  (let ((buffer-read-only t))
+    (condition-case err
+        (call-interactively (lambda () (interactive "*") 'ok))
+      (error (car err)))))
+(with-temp-buffer
+  (let ((buffer-read-only t)
+        (inhibit-read-only t))
+    (call-interactively (lambda () (interactive "*") 'ok))))
+
+; "^" seeds mark/mark-active only when shift selection is active.
+(with-temp-buffer
+  (insert "abcd")
+  (goto-char 3)
+  (setq mark-active nil)
+  (let ((this-command-keys-shift-translated t)
+        (shift-select-mode t))
+    (list
+     (call-interactively (lambda (pt) (interactive "^d") pt))
+     mark-active
+     (mark t))))
+(with-temp-buffer
+  (insert "abcd")
+  (goto-char 3)
+  (setq mark-active nil)
+  (let ((this-command-keys-shift-translated t)
+        (shift-select-mode t))
+    (list
+     (command-execute (lambda (pt) (interactive "^d") pt))
+     mark-active
+     (mark t))))
+(with-temp-buffer
+  (insert "abcd")
+  (goto-char 3)
+  (set-mark 1)
+  (setq mark-active nil)
+  (let ((this-command-keys-shift-translated nil)
+        (shift-select-mode t))
+    (list
+     (call-interactively (lambda (pt) (interactive "^d") pt))
+     mark-active
+     (mark t))))
+
+; "@" is currently a no-op without mouse event context.
+(with-temp-buffer
+  (insert "ab")
+  (goto-char 2)
+  (call-interactively (lambda (pt) (interactive "@d") pt)))
+(with-temp-buffer
+  (insert "ab")
+  (goto-char 2)
+  (command-execute (lambda (pt) (interactive "@d") pt)))
+
+; Flag order matters ("*^" vs "^*").
+(with-temp-buffer
+  (insert "abcd")
+  (goto-char 3)
+  (setq buffer-read-only t)
+  (setq mark-active nil)
+  (let ((this-command-keys-shift-translated t)
+        (shift-select-mode t))
+    (condition-case err
+        (progn
+          (call-interactively (lambda (x) (interactive "*^d") x))
+          (list 'ok mark-active (mark t)))
+      (error (list (car err) mark-active (mark t))))))
+(with-temp-buffer
+  (insert "abcd")
+  (goto-char 3)
+  (setq buffer-read-only t)
+  (setq mark-active nil)
+  (let ((this-command-keys-shift-translated t)
+        (shift-select-mode t))
+    (condition-case err
+        (progn
+          (call-interactively (lambda (x) (interactive "^*d") x))
+          (list 'ok mark-active (mark t)))
+      (error (list (car err) mark-active (mark t))))))

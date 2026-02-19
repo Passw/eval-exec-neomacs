@@ -593,11 +593,33 @@ enum ParsedInteractiveSpec {
     Form(Expr),
 }
 
+#[derive(Clone, Debug, Default)]
+struct ParsedInteractiveStringCode {
+    prefix_flags: Vec<char>,
+    entries: Vec<(char, String)>,
+}
+
 fn dynamic_or_global_symbol_value(eval: &Evaluator, name: &str) -> Option<Value> {
     for frame in eval.dynamic.iter().rev() {
         if let Some(v) = frame.get(name) {
             return Some(v.clone());
         }
+    }
+    eval.obarray.symbol_value(name).cloned()
+}
+
+fn dynamic_buffer_or_global_symbol_value(
+    eval: &Evaluator,
+    buf: &crate::buffer::Buffer,
+    name: &str,
+) -> Option<Value> {
+    for frame in eval.dynamic.iter().rev() {
+        if let Some(v) = frame.get(name) {
+            return Some(v.clone());
+        }
+    }
+    if let Some(v) = buf.get_buffer_local(name) {
+        return Some(v.clone());
     }
     eval.obarray.symbol_value(name).cloned()
 }
@@ -703,6 +725,65 @@ fn interactive_read_coding_system_optional_arg(prompt: String) -> Result<Value, 
     }
 }
 
+fn interactive_buffer_read_only_active(eval: &Evaluator, buf: &crate::buffer::Buffer) -> bool {
+    if buf.read_only {
+        return true;
+    }
+    dynamic_buffer_or_global_symbol_value(eval, buf, "buffer-read-only")
+        .is_some_and(|v| v.is_truthy())
+}
+
+fn interactive_require_writable_current_buffer(eval: &Evaluator) -> Result<(), Flow> {
+    let Some(buf) = eval.buffers.current_buffer() else {
+        return Ok(());
+    };
+    if dynamic_buffer_or_global_symbol_value(eval, buf, "inhibit-read-only")
+        .is_some_and(|v| v.is_truthy())
+    {
+        return Ok(());
+    }
+    if interactive_buffer_read_only_active(eval, buf) {
+        return Err(signal("buffer-read-only", vec![Value::string(&buf.name)]));
+    }
+    Ok(())
+}
+
+fn interactive_apply_shift_selection_prefix(eval: &mut Evaluator) {
+    let shifted = dynamic_or_global_symbol_value(eval, "this-command-keys-shift-translated")
+        .is_some_and(|v| v.is_truthy());
+    let shift_select_mode =
+        dynamic_or_global_symbol_value(eval, "shift-select-mode").is_some_and(|v| v.is_truthy());
+    if !shifted || !shift_select_mode {
+        return;
+    }
+
+    let mut mark_activated = false;
+    if let Some(buf) = eval.buffers.current_buffer_mut() {
+        let point = buf.point();
+        buf.set_mark(point);
+        buf.properties.insert("mark-active".to_string(), Value::True);
+        mark_activated = true;
+    }
+    if mark_activated {
+        eval.assign("mark-active", Value::True);
+    }
+}
+
+fn interactive_apply_prefix_flags(eval: &mut Evaluator, prefix_flags: &[char]) -> Result<(), Flow> {
+    for prefix_flag in prefix_flags {
+        match prefix_flag {
+            '*' => interactive_require_writable_current_buffer(eval)?,
+            '@' => {
+                // Selecting the window from the first mouse event requires command-loop
+                // event context; current batch paths have no such events yet.
+            }
+            '^' => interactive_apply_shift_selection_prefix(eval),
+            _ => {}
+        }
+    }
+    Ok(())
+}
+
 fn parse_interactive_spec(expr: &Expr) -> Option<ParsedInteractiveSpec> {
     let Expr::List(items) = expr else {
         return None;
@@ -737,26 +818,30 @@ fn interactive_form_value_to_args(value: Value) -> Result<Vec<Value>, Flow> {
     ))
 }
 
-fn strip_interactive_prefix_flags(mut line: &str) -> &str {
+fn parse_interactive_prefix_flags(mut line: &str) -> (Vec<char>, &str) {
+    let mut flags = Vec::new();
     while let Some(ch) = line.chars().next() {
         if matches!(ch, '*' | '@' | '^') {
+            flags.push(ch);
             line = &line[ch.len_utf8()..];
         } else {
             break;
         }
     }
-    line
+    (flags, line)
 }
 
-fn parse_interactive_code_entries(code: &str) -> Vec<(char, String)> {
+fn parse_interactive_code_entries(code: &str) -> ParsedInteractiveStringCode {
+    let mut parsed = ParsedInteractiveStringCode::default();
     if code.is_empty() {
-        return Vec::new();
+        return parsed;
     }
 
-    let mut entries = Vec::new();
     for (index, raw_line) in code.split('\n').enumerate() {
         let line = if index == 0 {
-            strip_interactive_prefix_flags(raw_line)
+            let (flags, stripped) = parse_interactive_prefix_flags(raw_line);
+            parsed.prefix_flags = flags;
+            stripped
         } else {
             raw_line
         };
@@ -767,9 +852,9 @@ fn parse_interactive_code_entries(code: &str) -> Vec<(char, String)> {
         let Some(letter) = chars.next() else {
             continue;
         };
-        entries.push((letter, chars.collect::<String>()));
+        parsed.entries.push((letter, chars.collect::<String>()));
     }
-    entries
+    parsed
 }
 
 fn interactive_args_from_string_code(
@@ -777,13 +862,14 @@ fn interactive_args_from_string_code(
     code: &str,
     kind: CommandInvocationKind,
 ) -> Result<Option<Vec<Value>>, Flow> {
-    let entries = parse_interactive_code_entries(code);
-    if entries.is_empty() {
+    let parsed = parse_interactive_code_entries(code);
+    interactive_apply_prefix_flags(eval, &parsed.prefix_flags)?;
+    if parsed.entries.is_empty() {
         return Ok(Some(Vec::new()));
     }
 
     let mut args = Vec::new();
-    for (letter, prompt) in entries {
+    for (letter, prompt) in parsed.entries {
         match letter {
             'a' => args.push(super::minibuffer::builtin_read_command(vec![Value::string(prompt)])?),
             'b' => args.push(super::minibuffer::builtin_read_buffer(vec![
@@ -5198,6 +5284,94 @@ K")
         assert_eq!(
             results[0],
             "OK ((end-of-file \"Error reading from stdin\") (end-of-file \"Error reading from stdin\") (nil (97)) (nil (97)) ((error \"command must be bound to an event with parameters\") (97)) ((error \"command must be bound to an event with parameters\") (97)))"
+        );
+    }
+
+    #[test]
+    fn interactive_lambda_prefix_flags_star_hat_and_at_follow_batch_semantics() {
+        let mut ev = Evaluator::new();
+        let results = eval_all_with(
+            &mut ev,
+            r#"(list
+                 (with-temp-buffer
+                   (let ((buffer-read-only nil))
+                     (call-interactively (lambda () (interactive "*") 'ok))))
+                 (with-temp-buffer
+                   (let ((buffer-read-only t))
+                     (condition-case err
+                         (call-interactively (lambda () (interactive "*") 'ok))
+                       (error (car err)))))
+                 (with-temp-buffer
+                   (let ((buffer-read-only t)
+                         (inhibit-read-only t))
+                     (call-interactively (lambda () (interactive "*") 'ok))))
+                 (with-temp-buffer
+                   (insert "abcd")
+                   (goto-char 3)
+                   (setq mark-active nil)
+                   (let ((this-command-keys-shift-translated t)
+                         (shift-select-mode t))
+                     (list
+                      (call-interactively (lambda (pt) (interactive "^d") pt))
+                      mark-active
+                      (mark t))))
+                 (with-temp-buffer
+                   (insert "abcd")
+                   (goto-char 3)
+                   (setq mark-active nil)
+                   (let ((this-command-keys-shift-translated t)
+                         (shift-select-mode t))
+                     (list
+                      (command-execute (lambda (pt) (interactive "^d") pt))
+                      mark-active
+                      (mark t))))
+                 (with-temp-buffer
+                   (insert "abcd")
+                   (goto-char 3)
+                   (set-mark 1)
+                   (setq mark-active nil)
+                   (let ((this-command-keys-shift-translated nil)
+                         (shift-select-mode t))
+                     (list
+                      (call-interactively (lambda (pt) (interactive "^d") pt))
+                      mark-active
+                      (mark t))))
+                 (with-temp-buffer
+                   (insert "ab")
+                   (goto-char 2)
+                   (call-interactively (lambda (pt) (interactive "@d") pt)))
+                 (with-temp-buffer
+                   (insert "ab")
+                   (goto-char 2)
+                   (command-execute (lambda (pt) (interactive "@d") pt)))
+                 (with-temp-buffer
+                   (insert "abcd")
+                   (goto-char 3)
+                   (setq buffer-read-only t)
+                   (setq mark-active nil)
+                   (let ((this-command-keys-shift-translated t)
+                         (shift-select-mode t))
+                     (condition-case err
+                         (progn
+                           (call-interactively (lambda (x) (interactive "*^d") x))
+                           (list 'ok mark-active (mark t)))
+                       (error (list (car err) mark-active (mark t))))))
+                 (with-temp-buffer
+                   (insert "abcd")
+                   (goto-char 3)
+                   (setq buffer-read-only t)
+                   (setq mark-active nil)
+                   (let ((this-command-keys-shift-translated t)
+                         (shift-select-mode t))
+                     (condition-case err
+                         (progn
+                           (call-interactively (lambda (x) (interactive "^*d") x))
+                           (list 'ok mark-active (mark t)))
+                       (error (list (car err) mark-active (mark t)))))))"#,
+        );
+        assert_eq!(
+            results[0],
+            "OK (ok buffer-read-only ok (3 t 3) (3 t 3) (3 nil 1) 2 2 (buffer-read-only nil nil) (buffer-read-only t 3))"
         );
     }
 

@@ -42,3 +42,13 @@
 42	(let ((unread-command-events (list 97))) (list (command-execute (lambda (x) (interactive "U") x)) unread-command-events))	OK (nil (97))
 43	(let ((unread-command-events (list 97))) (condition-case err (call-interactively (lambda (x) (interactive "e") x)) (error (list err unread-command-events))))	OK ((error "command must be bound to an event with parameters") (97))
 44	(let ((unread-command-events (list 97))) (condition-case err (command-execute (lambda (x) (interactive "e") x)) (error (list err unread-command-events))))	OK ((error "command must be bound to an event with parameters") (97))
+45	(with-temp-buffer (let ((buffer-read-only nil)) (call-interactively (lambda nil (interactive "*") 'ok))))	OK ok
+46	(with-temp-buffer (let ((buffer-read-only t)) (condition-case err (call-interactively (lambda nil (interactive "*") 'ok)) (error (car err)))))	OK buffer-read-only
+47	(with-temp-buffer (let ((buffer-read-only t) (inhibit-read-only t)) (call-interactively (lambda nil (interactive "*") 'ok))))	OK ok
+48	(with-temp-buffer (insert "abcd") (goto-char 3) (setq mark-active nil) (let ((this-command-keys-shift-translated t) (shift-select-mode t)) (list (call-interactively (lambda (pt) (interactive "^d") pt)) mark-active (mark t))))	OK (3 t 3)
+49	(with-temp-buffer (insert "abcd") (goto-char 3) (setq mark-active nil) (let ((this-command-keys-shift-translated t) (shift-select-mode t)) (list (command-execute (lambda (pt) (interactive "^d") pt)) mark-active (mark t))))	OK (3 t 3)
+50	(with-temp-buffer (insert "abcd") (goto-char 3) (set-mark 1) (setq mark-active nil) (let ((this-command-keys-shift-translated nil) (shift-select-mode t)) (list (call-interactively (lambda (pt) (interactive "^d") pt)) mark-active (mark t))))	OK (3 nil 1)
+51	(with-temp-buffer (insert "ab") (goto-char 2) (call-interactively (lambda (pt) (interactive "@d") pt)))	OK 2
+52	(with-temp-buffer (insert "ab") (goto-char 2) (command-execute (lambda (pt) (interactive "@d") pt)))	OK 2
+53	(with-temp-buffer (insert "abcd") (goto-char 3) (setq buffer-read-only t) (setq mark-active nil) (let ((this-command-keys-shift-translated t) (shift-select-mode t)) (condition-case err (progn (call-interactively (lambda (x) (interactive "*^d") x)) (list 'ok mark-active (mark t))) (error (list (car err) mark-active (mark t))))))	OK (buffer-read-only nil nil)
+54	(with-temp-buffer (insert "abcd") (goto-char 3) (setq buffer-read-only t) (setq mark-active nil) (let ((this-command-keys-shift-translated t) (shift-select-mode t)) (condition-case err (progn (call-interactively (lambda (x) (interactive "^*d") x)) (list 'ok mark-active (mark t))) (error (list (car err) mark-active (mark t))))))	OK (buffer-read-only t 3)

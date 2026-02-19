@@ -16033,6 +16033,25 @@ Last updated: 2026-02-19
     - `cargo test --manifest-path rust/neovm-core/Cargo.toml --no-run 2>&1 | rg \"warning:\"` (pass, no warnings)
     - `cargo test --manifest-path rust/neovm-core/Cargo.toml` (pass, `3753/3753`)
     - `make -C test/neovm/vm-compat check-all-neovm-strict` (pass)
+- Aligned lambda `interactive` prefix-flag semantics (`*`, `^`, `@`) and locked ordered behavior:
+  - runtime changes:
+    - `rust/neovm-core/src/elisp/interactive.rs`
+      - parsed first-line interactive prefix flags into an ordered list (instead of stripping blindly).
+      - applied flags before argument-code execution, preserving source order (`*^` and `^*` now diverge like GNU Emacs).
+      - `*` now checks writable-buffer state and respects `inhibit-read-only`.
+      - `^` now seeds mark/activation when `this-command-keys-shift-translated` and `shift-select-mode` are non-nil.
+      - `@` retained as no-op in current batch/no-mouse-event path, but now routed through ordered flag execution.
+      - added unit coverage: `interactive_lambda_prefix_flags_star_hat_and_at_follow_batch_semantics`.
+  - oracle corpus changes:
+    - `test/neovm/vm-compat/cases/interactive-lambda-spec-extended-semantics.forms`
+      - added prefix-flag lock-ins for writable/read-only behavior, `inhibit-read-only` bypass, shift-selection mark seeding, `@` no-op batch path, and order-sensitive `*^` vs `^*` behavior.
+    - `test/neovm/vm-compat/cases/interactive-lambda-spec-extended-semantics.expected.tsv`
+      - re-recorded oracle baseline from `44/44` to `54/54`.
+  - verified:
+    - `cargo test --manifest-path rust/neovm-core/Cargo.toml interactive_lambda_ -- --nocapture` (pass)
+    - `make -C test/neovm/vm-compat record FORMS=cases/interactive-lambda-spec-extended-semantics.forms EXPECTED=cases/interactive-lambda-spec-extended-semantics.expected.tsv` (pass)
+    - `make -C test/neovm/vm-compat check-one-neovm CASE=cases/interactive-lambda-spec-extended-semantics` (pass, `54/54`)
+    - `make -C test/neovm/vm-compat check-all-neovm-strict` (pass)
 
 ## Doing
 
