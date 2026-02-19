@@ -181,6 +181,11 @@ impl Evaluator {
         // Window size aliases are also preseeded in startup state.
         obarray.set_symbol_function("window-height", Value::symbol("window-total-height"));
         obarray.set_symbol_function("window-width", Value::symbol("window-body-width"));
+        obarray.set_symbol_function(
+            "window-inside-pixel-edges",
+            Value::symbol("window-body-pixel-edges"),
+        );
+        obarray.set_symbol_function("window-inside-edges", Value::symbol("window-body-edges"));
         // Additional startup aliases exposed as symbol indirections in GNU Emacs.
         obarray.set_symbol_function("count-matches", Value::symbol("how-many"));
         obarray.set_symbol_function("replace-rectangle", Value::symbol("string-rectangle"));

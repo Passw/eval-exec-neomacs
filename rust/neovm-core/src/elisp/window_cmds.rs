@@ -130,6 +130,55 @@ fn resolve_window_id_or_error(
     }
 }
 
+fn format_window_designator_for_error(eval: &super::eval::Evaluator, value: &Value) -> String {
+    if let Value::Int(n) = value {
+        if *n >= 0 {
+            let wid = WindowId(*n as u64);
+            if eval.frames.is_window_object_id(wid) {
+                return format!("#<window {}>", n);
+            }
+        }
+    }
+    super::print::print_value(value)
+}
+
+fn resolve_window_id_or_window_error(
+    eval: &mut super::eval::Evaluator,
+    arg: Option<&Value>,
+    live_only: bool,
+) -> Result<(FrameId, WindowId), Flow> {
+    match arg {
+        None | Some(Value::Nil) => resolve_window_id(eval, arg),
+        Some(val @ Value::Int(n)) if *n >= 0 => {
+            let wid = WindowId(*n as u64);
+            if let Some(fid) = eval.frames.find_window_frame_id(wid) {
+                Ok((fid, wid))
+            } else {
+                let window_kind = if live_only { "live" } else { "valid" };
+                Err(signal(
+                    "error",
+                    vec![Value::string(format!(
+                        "{} is not a {} window",
+                        format_window_designator_for_error(eval, val),
+                        window_kind
+                    ))],
+                ))
+            }
+        }
+        Some(val) => {
+            let window_kind = if live_only { "live" } else { "valid" };
+            Err(signal(
+                "error",
+                vec![Value::string(format!(
+                    "{} is not a {} window",
+                    format_window_designator_for_error(eval, val),
+                    window_kind
+                ))],
+            ))
+        }
+    }
+}
+
 /// Resolve a frame designator, signaling predicate-shaped type errors.
 ///
 /// When ARG is nil/omitted, GNU Emacs resolves against the selected frame.
@@ -232,6 +281,64 @@ fn window_width_cols(w: &Window, char_width: f32) -> i64 {
     } else {
         0
     }
+}
+
+fn is_minibuffer_window(frames: &FrameManager, fid: FrameId, wid: WindowId) -> bool {
+    frames
+        .get(fid)
+        .is_some_and(|frame| frame.minibuffer_window == Some(wid))
+}
+
+fn window_body_height_lines(frames: &FrameManager, fid: FrameId, wid: WindowId, w: &Window) -> i64 {
+    let ch = frames.get(fid).map(|f| f.char_height).unwrap_or(16.0);
+    let lines = window_height_lines(w, ch);
+    if is_minibuffer_window(frames, fid, wid) {
+        lines
+    } else {
+        lines.saturating_sub(1)
+    }
+}
+
+fn window_edges_cols_lines(w: &Window, char_width: f32, char_height: f32) -> (i64, i64, i64, i64) {
+    let b = w.bounds();
+    let left = if char_width > 0.0 {
+        (b.x / char_width) as i64
+    } else {
+        0
+    };
+    let top = if char_height > 0.0 {
+        (b.y / char_height) as i64
+    } else {
+        0
+    };
+    let right = if char_width > 0.0 {
+        ((b.x + b.width) / char_width) as i64
+    } else {
+        0
+    };
+    let bottom = if char_height > 0.0 {
+        ((b.y + b.height) / char_height) as i64
+    } else {
+        0
+    };
+    (left, top, right, bottom)
+}
+
+fn window_body_edges_cols_lines(
+    frames: &FrameManager,
+    fid: FrameId,
+    wid: WindowId,
+    w: &Window,
+    char_width: f32,
+    char_height: f32,
+) -> (i64, i64, i64, i64) {
+    let (left, top, right, bottom) = window_edges_cols_lines(w, char_width, char_height);
+    let body_bottom = if is_minibuffer_window(frames, fid, wid) {
+        bottom
+    } else {
+        bottom.saturating_sub(1)
+    };
+    (left, top, right, body_bottom)
 }
 
 // ===========================================================================
@@ -454,6 +561,63 @@ pub(crate) fn builtin_window_width(
     Ok(Value::Int(window_width_cols(w, cw)))
 }
 
+/// `(window-mode-line-height &optional WINDOW)` -> integer.
+pub(crate) fn builtin_window_mode_line_height(
+    eval: &mut super::eval::Evaluator,
+    args: Vec<Value>,
+) -> EvalResult {
+    expect_max_args("window-mode-line-height", &args, 1)?;
+    let _ = ensure_selected_frame_id(eval);
+    let (fid, wid) = resolve_window_id(eval, args.first())?;
+    let height = if is_minibuffer_window(&eval.frames, fid, wid) {
+        0
+    } else {
+        1
+    };
+    Ok(Value::Int(height))
+}
+
+/// `(window-header-line-height &optional WINDOW)` -> integer.
+pub(crate) fn builtin_window_header_line_height(
+    eval: &mut super::eval::Evaluator,
+    args: Vec<Value>,
+) -> EvalResult {
+    expect_max_args("window-header-line-height", &args, 1)?;
+    let _ = ensure_selected_frame_id(eval);
+    let _ = resolve_window_id(eval, args.first())?;
+    Ok(Value::Int(0))
+}
+
+/// `(window-pixel-height &optional WINDOW)` -> integer.
+///
+/// Batch GNU Emacs reports character-line units for this query.
+pub(crate) fn builtin_window_pixel_height(
+    eval: &mut super::eval::Evaluator,
+    args: Vec<Value>,
+) -> EvalResult {
+    expect_max_args("window-pixel-height", &args, 1)?;
+    let _ = ensure_selected_frame_id(eval);
+    let (fid, wid) = resolve_window_id_with_pred(eval, args.first(), "window-valid-p")?;
+    let w = get_leaf(&eval.frames, fid, wid)?;
+    let ch = eval.frames.get(fid).map(|f| f.char_height).unwrap_or(16.0);
+    Ok(Value::Int(window_height_lines(w, ch)))
+}
+
+/// `(window-pixel-width &optional WINDOW)` -> integer.
+///
+/// Batch GNU Emacs reports character-column units for this query.
+pub(crate) fn builtin_window_pixel_width(
+    eval: &mut super::eval::Evaluator,
+    args: Vec<Value>,
+) -> EvalResult {
+    expect_max_args("window-pixel-width", &args, 1)?;
+    let _ = ensure_selected_frame_id(eval);
+    let (fid, wid) = resolve_window_id_with_pred(eval, args.first(), "window-valid-p")?;
+    let w = get_leaf(&eval.frames, fid, wid)?;
+    let cw = eval.frames.get(fid).map(|f| f.char_width).unwrap_or(8.0);
+    Ok(Value::Int(window_width_cols(w, cw)))
+}
+
 /// `(window-body-height &optional WINDOW PIXELWISE)` -> integer.
 pub(crate) fn builtin_window_body_height(
     eval: &mut super::eval::Evaluator,
@@ -465,9 +629,10 @@ pub(crate) fn builtin_window_body_height(
     let w = get_leaf(&eval.frames, fid, wid)?;
     let _pixelwise = args.get(1);
     // Batch GNU Emacs returns character-height values even when PIXELWISE is non-nil.
-    // The body area excludes one mode-line row in the default window.
-    let ch = eval.frames.get(fid).map(|f| f.char_height).unwrap_or(16.0);
-    Ok(Value::Int(window_height_lines(w, ch).saturating_sub(1)))
+    // The body area excludes one mode-line row for regular windows, but
+    // minibuffer windows report their full single-line height.
+    let body_lines = window_body_height_lines(&eval.frames, fid, wid, w);
+    Ok(Value::Int(body_lines))
 }
 
 /// `(window-body-width &optional WINDOW PIXELWISE)` -> integer.
@@ -483,6 +648,104 @@ pub(crate) fn builtin_window_body_width(
     // Batch GNU Emacs returns character-width values even when PIXELWISE is non-nil.
     let cw = eval.frames.get(fid).map(|f| f.char_width).unwrap_or(8.0);
     Ok(Value::Int(window_width_cols(w, cw)))
+}
+
+/// `(window-text-height &optional WINDOW PIXELWISE)` -> integer.
+pub(crate) fn builtin_window_text_height(
+    eval: &mut super::eval::Evaluator,
+    args: Vec<Value>,
+) -> EvalResult {
+    expect_max_args("window-text-height", &args, 2)?;
+    let _ = ensure_selected_frame_id(eval);
+    let (fid, wid) = resolve_window_id(eval, args.first())?;
+    let w = get_leaf(&eval.frames, fid, wid)?;
+    let _pixelwise = args.get(1);
+    Ok(Value::Int(window_body_height_lines(&eval.frames, fid, wid, w)))
+}
+
+/// `(window-text-width &optional WINDOW PIXELWISE)` -> integer.
+pub(crate) fn builtin_window_text_width(
+    eval: &mut super::eval::Evaluator,
+    args: Vec<Value>,
+) -> EvalResult {
+    expect_max_args("window-text-width", &args, 2)?;
+    let _ = ensure_selected_frame_id(eval);
+    let (fid, wid) = resolve_window_id(eval, args.first())?;
+    let w = get_leaf(&eval.frames, fid, wid)?;
+    let _pixelwise = args.get(1);
+    let cw = eval.frames.get(fid).map(|f| f.char_width).unwrap_or(8.0);
+    Ok(Value::Int(window_width_cols(w, cw)))
+}
+
+/// `(window-body-pixel-edges &optional WINDOW)` -> (LEFT TOP RIGHT BOTTOM).
+pub(crate) fn builtin_window_body_pixel_edges(
+    eval: &mut super::eval::Evaluator,
+    args: Vec<Value>,
+) -> EvalResult {
+    expect_max_args("window-body-pixel-edges", &args, 1)?;
+    let _ = ensure_selected_frame_id(eval);
+    let (fid, wid) = resolve_window_id_or_window_error(eval, args.first(), true)?;
+    let w = get_leaf(&eval.frames, fid, wid)?;
+    let frame = eval
+        .frames
+        .get(fid)
+        .ok_or_else(|| signal("error", vec![Value::string("Frame not found")]))?;
+    let (left, top, right, bottom) =
+        window_body_edges_cols_lines(&eval.frames, fid, wid, w, frame.char_width, frame.char_height);
+    Ok(Value::list(vec![
+        Value::Int(left),
+        Value::Int(top),
+        Value::Int(right),
+        Value::Int(bottom),
+    ]))
+}
+
+/// `(window-body-edges &optional WINDOW)` -> (LEFT TOP RIGHT BOTTOM).
+pub(crate) fn builtin_window_body_edges(
+    eval: &mut super::eval::Evaluator,
+    args: Vec<Value>,
+) -> EvalResult {
+    expect_max_args("window-body-edges", &args, 1)?;
+    builtin_window_body_pixel_edges(eval, args)
+}
+
+/// `(window-pixel-edges &optional WINDOW)` -> (LEFT TOP RIGHT BOTTOM).
+pub(crate) fn builtin_window_pixel_edges(
+    eval: &mut super::eval::Evaluator,
+    args: Vec<Value>,
+) -> EvalResult {
+    expect_max_args("window-pixel-edges", &args, 1)?;
+    let _ = ensure_selected_frame_id(eval);
+    let (fid, wid) = resolve_window_id_or_window_error(eval, args.first(), false)?;
+    let w = get_leaf(&eval.frames, fid, wid)?;
+    let frame = eval
+        .frames
+        .get(fid)
+        .ok_or_else(|| signal("error", vec![Value::string("Frame not found")]))?;
+    let (left, top, right, bottom) =
+        window_edges_cols_lines(w, frame.char_width, frame.char_height);
+    Ok(Value::list(vec![
+        Value::Int(left),
+        Value::Int(top),
+        Value::Int(right),
+        Value::Int(bottom),
+    ]))
+}
+
+/// `(window-edges &optional WINDOW BODY ABSOLUTE)`.
+///
+/// GNU Emacs currently reports max arity 4; trailing args are accepted.
+pub(crate) fn builtin_window_edges(
+    eval: &mut super::eval::Evaluator,
+    args: Vec<Value>,
+) -> EvalResult {
+    expect_max_args("window-edges", &args, 4)?;
+    let _ = ensure_selected_frame_id(eval);
+    let body = args.get(1).is_some_and(Value::is_truthy);
+    if body {
+        return builtin_window_body_edges(eval, vec![args.first().cloned().unwrap_or(Value::Nil)]);
+    }
+    builtin_window_pixel_edges(eval, vec![args.first().cloned().unwrap_or(Value::Nil)])
 }
 
 /// `(window-total-height &optional WINDOW ROUND)` -> integer.
@@ -1937,7 +2200,9 @@ mod tests {
                      (windowp m)
                      (buffer-name (window-buffer m))
                      (window-start m)
-                     (window-point m)))
+                     (window-point m)
+                     (window-body-height m)
+                     (window-body-height m t)))
              (let ((m (car (last (window-list nil t)))))
                (set-window-start m 7)
                (window-start m))
@@ -1952,7 +2217,7 @@ mod tests {
             .iter()
             .map(format_eval_result)
             .collect::<Vec<_>>();
-        assert_eq!(out[0], "OK (t t \" *Minibuf-0*\" 1 1)");
+        assert_eq!(out[0], "OK (t t \" *Minibuf-0*\" 1 1 1 1)");
         assert_eq!(out[1], "OK 1");
         assert_eq!(out[2], "OK 1");
     }
@@ -2326,6 +2591,73 @@ mod tests {
         assert_eq!(out[9], "OK (wrong-type-argument window-live-p 999999)");
         assert_eq!(out[10], "OK (wrong-type-argument window-valid-p 999999)");
         assert_eq!(out[11], "OK (wrong-type-argument window-valid-p 999999)");
+    }
+
+    #[test]
+    fn window_geometry_queries_match_batch_alias_and_edge_shapes() {
+        let forms = parse_forms(
+            "(list (symbol-function 'window-inside-pixel-edges)
+                   (symbol-function 'window-inside-edges))
+             (let* ((w (selected-window))
+                    (m (car (last (window-list nil t)))))
+               (list (window-mode-line-height w)
+                     (window-mode-line-height m)
+                     (window-header-line-height w)
+                     (window-header-line-height m)
+                     (window-pixel-height w)
+                     (window-pixel-height m)
+                     (window-pixel-width w)
+                     (window-pixel-width m)
+                     (window-text-height w)
+                     (window-text-height m)
+                     (window-text-height w t)
+                     (window-text-height m t)
+                     (window-text-width w)
+                     (window-text-width m)
+                     (window-text-width w t)
+                     (window-text-width m t)
+                     (window-body-pixel-edges w)
+                     (window-body-pixel-edges m)
+                     (window-pixel-edges w)
+                     (window-pixel-edges m)
+                     (window-body-edges w)
+                     (window-body-edges m)
+                     (window-edges w)
+                     (window-edges m)
+                     (window-edges w t)
+                     (window-edges m t)))
+             (list (condition-case err (window-mode-line-height 999999) (error err))
+                   (condition-case err (window-header-line-height 999999) (error err))
+                   (condition-case err (window-pixel-height 999999) (error err))
+                   (condition-case err (window-pixel-width 999999) (error err))
+                   (condition-case err (window-text-height 999999) (error err))
+                   (condition-case err (window-text-width 999999) (error err))
+                   (condition-case err (window-body-pixel-edges 999999) (error err))
+                   (condition-case err (window-pixel-edges 999999) (error err))
+                   (condition-case err (window-body-edges 999999) (error err))
+                   (condition-case err (window-edges 999999) (error err))
+                   (condition-case err (window-text-height nil nil nil) (error err))
+                   (condition-case err (window-mode-line-height nil nil) (error err))
+                   (condition-case err (window-inside-pixel-edges nil nil) (error err))
+                   (condition-case err (window-edges nil nil nil nil) (error err))
+                   (condition-case err (window-edges nil nil nil nil nil) (error err)))",
+        )
+        .expect("parse");
+        let mut ev = Evaluator::new();
+        let out = ev
+            .eval_forms(&forms)
+            .iter()
+            .map(format_eval_result)
+            .collect::<Vec<_>>();
+        assert_eq!(out[0], "OK (window-body-pixel-edges window-body-edges)");
+        assert_eq!(
+            out[1],
+            "OK (1 0 0 0 24 1 80 80 23 1 23 1 80 80 80 80 (0 0 80 23) (0 24 80 25) (0 0 80 24) (0 24 80 25) (0 0 80 23) (0 24 80 25) (0 0 80 24) (0 24 80 25) (0 0 80 23) (0 24 80 25))"
+        );
+        assert_eq!(
+            out[2],
+            "OK ((wrong-type-argument window-live-p 999999) (wrong-type-argument window-live-p 999999) (wrong-type-argument window-valid-p 999999) (wrong-type-argument window-valid-p 999999) (wrong-type-argument window-live-p 999999) (wrong-type-argument window-live-p 999999) (error \"999999 is not a live window\") (error \"999999 is not a valid window\") (error \"999999 is not a live window\") (error \"999999 is not a valid window\") (wrong-number-of-arguments window-text-height 3) (wrong-number-of-arguments window-mode-line-height 2) (wrong-number-of-arguments window-inside-pixel-edges 2) (0 0 80 24) (wrong-number-of-arguments window-edges 5))"
+        );
     }
 
     #[test]

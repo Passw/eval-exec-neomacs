@@ -28,6 +28,50 @@ Last updated: 2026-02-19
 
 ## Doing
 
+- Completed window geometry/edge builtin parity slice and extended oracle lock-ins:
+  - runtime changes:
+    - `rust/neovm-core/src/elisp/window_cmds.rs`
+      - added evaluator-backed geometry builtins:
+        - `window-mode-line-height`, `window-header-line-height`
+        - `window-pixel-height`, `window-pixel-width`
+        - `window-text-height`, `window-text-width`
+        - `window-body-pixel-edges`, `window-body-edges`
+        - `window-pixel-edges`, `window-edges`
+      - aligned minibuffer/body-height behavior through shared helpers and GNU-style invalid-window error wording for geometry entry points.
+    - `rust/neovm-core/src/elisp/builtins.rs`
+      - wired dispatch for all new window geometry builtins.
+    - `rust/neovm-core/src/elisp/builtin_registry.rs`
+      - registered new geometry names and alias symbols:
+        - `window-inside-edges`, `window-inside-pixel-edges`
+      - parity registry counts now remain:
+        - `DISPATCH_BUILTIN_NAMES`: `967`
+        - core parity entries: `966`
+    - `rust/neovm-core/src/elisp/subr_info.rs`
+      - added `subr-arity` metadata for new window geometry primitives, including `(0 . 4)` for `window-edges`.
+    - `rust/neovm-core/src/elisp/eval.rs`
+      - seeded startup alias function-cells:
+        - `window-inside-edges -> window-body-edges`
+        - `window-inside-pixel-edges -> window-body-pixel-edges`
+  - corpus changes:
+    - added:
+      - `test/neovm/vm-compat/cases/window-edge-geometry-semantics.{forms,expected.tsv}`
+    - expanded and re-recorded:
+      - `test/neovm/vm-compat/cases/window-frame-subr-arity-semantics.{forms,expected.tsv}`
+      - `test/neovm/vm-compat/cases/window-alias-introspection-semantics.{forms,expected.tsv}`
+      - `test/neovm/vm-compat/cases/window-list-minibuffer-window-accessor-semantics.{forms,expected.tsv}`
+    - wired new case into:
+      - `test/neovm/vm-compat/cases/default.list`
+  - verified:
+    - `cargo test --manifest-path rust/neovm-core/Cargo.toml window_geometry_queries_match_batch_alias_and_edge_shapes` (pass)
+    - `cargo test --manifest-path rust/neovm-core/Cargo.toml subr_arity_window_frame_primitives_match_oracle` (pass)
+    - `cargo test --manifest-path rust/neovm-core/Cargo.toml symbol_function_resolves_builtin_and_special_names` (pass)
+    - `make -C test/neovm/vm-compat check-one-neovm CASE=cases/window-edge-geometry-semantics` (pass)
+    - `make -C test/neovm/vm-compat check-one-neovm CASE=cases/window-frame-subr-arity-semantics` (pass)
+    - `make -C test/neovm/vm-compat check-one-neovm CASE=cases/window-alias-introspection-semantics` (pass)
+    - `make -C test/neovm/vm-compat check-one-neovm CASE=cases/window-list-minibuffer-window-accessor-semantics` (pass)
+    - `make -C test/neovm/vm-compat check-builtin-registry-all` (pass)
+    - `make -C test/neovm/vm-compat check-all-neovm-strict` (pass)
+
 - Expanded command-loop KEYS publication lock-ins for batch-mode compatibility:
   - corpus changes:
     - added `test/neovm/vm-compat/cases/command-loop-keys-publication-semantics.{forms,expected.tsv}`

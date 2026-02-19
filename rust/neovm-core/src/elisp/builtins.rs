@@ -7704,12 +7704,36 @@ pub(crate) fn dispatch_builtin(
         "window-point" => return Some(super::window_cmds::builtin_window_point(eval, args)),
         "window-height" => return Some(super::window_cmds::builtin_window_height(eval, args)),
         "window-width" => return Some(super::window_cmds::builtin_window_width(eval, args)),
+        "window-mode-line-height" => {
+            return Some(super::window_cmds::builtin_window_mode_line_height(eval, args))
+        }
+        "window-header-line-height" => {
+            return Some(super::window_cmds::builtin_window_header_line_height(eval, args))
+        }
+        "window-pixel-height" => {
+            return Some(super::window_cmds::builtin_window_pixel_height(eval, args))
+        }
+        "window-pixel-width" => {
+            return Some(super::window_cmds::builtin_window_pixel_width(eval, args))
+        }
         "window-body-height" => {
             return Some(super::window_cmds::builtin_window_body_height(eval, args))
         }
         "window-body-width" => {
             return Some(super::window_cmds::builtin_window_body_width(eval, args))
         }
+        "window-text-height" => return Some(super::window_cmds::builtin_window_text_height(eval, args)),
+        "window-text-width" => return Some(super::window_cmds::builtin_window_text_width(eval, args)),
+        "window-body-pixel-edges" => {
+            return Some(super::window_cmds::builtin_window_body_pixel_edges(eval, args))
+        }
+        "window-body-edges" => {
+            return Some(super::window_cmds::builtin_window_body_edges(eval, args))
+        }
+        "window-pixel-edges" => {
+            return Some(super::window_cmds::builtin_window_pixel_edges(eval, args))
+        }
+        "window-edges" => return Some(super::window_cmds::builtin_window_edges(eval, args)),
         "window-total-height" => {
             return Some(super::window_cmds::builtin_window_total_height(eval, args))
         }
@@ -11748,6 +11772,16 @@ mod tests {
         let window_width = builtin_symbol_function(&mut eval, vec![Value::symbol("window-width")])
             .expect("symbol-function should resolve window-width alias");
         assert_eq!(window_width, Value::symbol("window-body-width"));
+
+        let inside_pixel_edges =
+            builtin_symbol_function(&mut eval, vec![Value::symbol("window-inside-pixel-edges")])
+                .expect("symbol-function should resolve window-inside-pixel-edges alias");
+        assert_eq!(inside_pixel_edges, Value::symbol("window-body-pixel-edges"));
+
+        let inside_edges =
+            builtin_symbol_function(&mut eval, vec![Value::symbol("window-inside-edges")])
+                .expect("symbol-function should resolve window-inside-edges alias");
+        assert_eq!(inside_edges, Value::symbol("window-body-edges"));
 
         let count_matches =
             builtin_symbol_function(&mut eval, vec![Value::symbol("count-matches")])
