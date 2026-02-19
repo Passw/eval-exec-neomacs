@@ -16834,6 +16834,53 @@ Last updated: 2026-02-19
     - `make -C test/neovm/vm-compat check-one-neovm CASE=cases/x-selection-property-tip-internal-semantics` (pass, `2/2`)
     - `test/neovm/vm-compat/check-builtin-registry-commandp.sh` (pass, drifts: `0`)
     - `make -C test/neovm/vm-compat check-all-neovm-strict` (pass)
+- Added GUI selection builtins and X color/selection alias startup wiring for oracle parity:
+  - runtime changes:
+    - `rust/neovm-core/src/elisp/display.rs`
+      - implemented:
+        - `gui-get-selection`
+        - `gui-get-primary-selection`
+        - `gui-select-text`
+        - `gui-selection-value`
+        - `gui-set-selection`
+      - aligned batch/no-X returns and error payloads with oracle surface.
+      - added unit coverage:
+        - `gui_selection_batch_semantics`
+    - `rust/neovm-core/src/elisp/builtins.rs`
+      - wired pure dispatch for all 5 `gui-*` symbols.
+    - `rust/neovm-core/src/elisp/builtin_registry.rs`
+      - added all 5 names to `DISPATCH_BUILTIN_NAMES`.
+    - `rust/neovm-core/src/elisp/subr_info.rs`
+      - aligned arity metadata/assertions in `subr_arity_display_terminal_primitives_match_oracle`:
+        - `(0 . 2)`: `gui-get-selection`
+        - `(0 . 0)`: `gui-get-primary-selection`, `gui-selection-value`
+        - `(1 . 1)`: `gui-select-text`
+        - `(2 . 2)`: `gui-set-selection`
+    - `rust/neovm-core/src/elisp/interactive.rs`
+      - added `gui-set-selection` to builtin command allowlist/tests so `commandp` matches oracle.
+    - `rust/neovm-core/src/elisp/eval.rs`
+      - added startup aliases:
+        - `x-color-defined-p` -> `color-defined-p`
+        - `x-color-values` -> `color-values`
+        - `x-defined-colors` -> `defined-colors`
+        - `x-get-selection` -> `gui-get-selection`
+        - `x-get-selection-value` -> `gui-get-primary-selection`
+        - `x-select-text` -> `gui-select-text`
+        - `x-selection-value` -> `gui-selection-value`
+        - `x-set-selection` -> `gui-set-selection`
+  - corpus changes:
+    - added and wired:
+      - `test/neovm/vm-compat/cases/x-color-selection-gui-alias-semantics.forms`
+      - `test/neovm/vm-compat/cases/x-color-selection-gui-alias-semantics.expected.tsv`
+      - `test/neovm/vm-compat/cases/default.list`
+  - verified:
+    - `cargo test --manifest-path rust/neovm-core/Cargo.toml gui_selection_batch_semantics -- --nocapture` (pass)
+    - `cargo test --manifest-path rust/neovm-core/Cargo.toml commandp_true_for_additional_builtin_commands -- --nocapture` (pass)
+    - `cargo test --manifest-path rust/neovm-core/Cargo.toml subr_arity_display_terminal_primitives_match_oracle -- --nocapture` (pass)
+    - `make -C test/neovm/vm-compat record FORMS=cases/x-color-selection-gui-alias-semantics.forms EXPECTED=cases/x-color-selection-gui-alias-semantics.expected.tsv` (pass)
+    - `make -C test/neovm/vm-compat check-one-neovm CASE=cases/x-color-selection-gui-alias-semantics` (pass, `2/2`)
+    - `test/neovm/vm-compat/check-builtin-registry-commandp.sh` (pass, drifts: `0`)
+    - `make -C test/neovm/vm-compat check-all-neovm-strict` (pass)
 
 ## Doing
 

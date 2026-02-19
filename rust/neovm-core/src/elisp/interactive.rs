@@ -379,6 +379,7 @@ fn builtin_command_name(name: &str) -> bool {
             | "garbage-collect"
             | "getenv"
             | "global-set-key"
+            | "gui-set-selection"
             | "goto-char"
             | "goto-line"
             | "how-many"
@@ -3290,6 +3291,7 @@ mod tests {
             "display-buffer",
             "eval-buffer",
             "forward-sexp",
+            "gui-set-selection",
             "goto-char",
             "indent-region",
             "isearch-forward",

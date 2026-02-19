@@ -413,6 +413,7 @@ cases/x-open-close-terminal-handle-shape-semantics
 cases/x-coordinate-frame-query-semantics
 cases/x-popup-restack-semantics
 cases/x-clipboard-input-context-semantics
+cases/x-color-selection-gui-alias-semantics
 cases/x-selection-property-tip-internal-semantics
 cases/x-selection-resource-property-semantics
 cases/display-monitor-semantics

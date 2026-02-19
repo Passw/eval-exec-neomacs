@@ -1708,6 +1708,36 @@ pub(crate) fn builtin_x_own_selection_internal(args: Vec<Value>) -> EvalResult {
     Err(x_selection_unavailable_error())
 }
 
+/// (gui-get-selection &optional TYPE DATA-TYPE) -> nil.
+pub(crate) fn builtin_gui_get_selection(args: Vec<Value>) -> EvalResult {
+    expect_max_args("gui-get-selection", &args, 2)?;
+    Ok(Value::Nil)
+}
+
+/// (gui-get-primary-selection) -> error in batch/no-X context.
+pub(crate) fn builtin_gui_get_primary_selection(args: Vec<Value>) -> EvalResult {
+    expect_args("gui-get-primary-selection", &args, 0)?;
+    Err(signal("error", vec![Value::string("No selection is available")]))
+}
+
+/// (gui-select-text TEXT) -> nil.
+pub(crate) fn builtin_gui_select_text(args: Vec<Value>) -> EvalResult {
+    expect_args("gui-select-text", &args, 1)?;
+    Ok(Value::Nil)
+}
+
+/// (gui-selection-value) -> nil.
+pub(crate) fn builtin_gui_selection_value(args: Vec<Value>) -> EvalResult {
+    expect_args("gui-selection-value", &args, 0)?;
+    Ok(Value::Nil)
+}
+
+/// (gui-set-selection TYPE VALUE) -> nil.
+pub(crate) fn builtin_gui_set_selection(args: Vec<Value>) -> EvalResult {
+    expect_args("gui-set-selection", &args, 2)?;
+    Ok(Value::Nil)
+}
+
 /// (x-selection-exists-p &optional SELECTION TYPE) -> nil in batch/no-X context.
 pub(crate) fn builtin_x_selection_exists_p(args: Vec<Value>) -> EvalResult {
     expect_max_args("x-selection-exists-p", &args, 2)?;
@@ -4562,6 +4592,56 @@ mod tests {
             Value::Nil,
             Value::Nil,
             Value::Nil,
+            Value::Nil,
+            Value::Nil,
+            Value::Nil,
+        ]));
+    }
+
+    #[test]
+    fn gui_selection_batch_semantics() {
+        let assert_error = |result: EvalResult, msg: &str| match result {
+            Err(Flow::Signal(sig)) => {
+                assert_eq!(sig.symbol, "error");
+                assert_eq!(sig.data, vec![Value::string(msg)]);
+            }
+            other => panic!("expected error signal, got {other:?}"),
+        };
+        let assert_wrong_number = |result: EvalResult| match result {
+            Err(Flow::Signal(sig)) => assert_eq!(sig.symbol, "wrong-number-of-arguments"),
+            other => panic!("expected wrong-number-of-arguments signal, got {other:?}"),
+        };
+
+        assert!(builtin_gui_get_selection(vec![]).unwrap().is_nil());
+        assert!(builtin_gui_get_selection(vec![Value::Nil]).unwrap().is_nil());
+        assert!(builtin_gui_get_selection(vec![Value::Nil, Value::Nil])
+            .unwrap()
+            .is_nil());
+        assert_wrong_number(builtin_gui_get_selection(vec![
+            Value::Nil,
+            Value::Nil,
+            Value::Nil,
+        ]));
+
+        assert_error(
+            builtin_gui_get_primary_selection(vec![]),
+            "No selection is available",
+        );
+        assert_wrong_number(builtin_gui_get_primary_selection(vec![Value::Nil]));
+
+        assert!(builtin_gui_select_text(vec![Value::string("a")])
+            .unwrap()
+            .is_nil());
+        assert!(builtin_gui_select_text(vec![Value::Int(1)]).unwrap().is_nil());
+        assert_wrong_number(builtin_gui_select_text(vec![Value::string("a"), Value::Nil]));
+
+        assert!(builtin_gui_selection_value(vec![]).unwrap().is_nil());
+        assert_wrong_number(builtin_gui_selection_value(vec![Value::Nil]));
+
+        assert!(builtin_gui_set_selection(vec![Value::Nil, Value::Nil])
+            .unwrap()
+            .is_nil());
+        assert_wrong_number(builtin_gui_set_selection(vec![
             Value::Nil,
             Value::Nil,
             Value::Nil,

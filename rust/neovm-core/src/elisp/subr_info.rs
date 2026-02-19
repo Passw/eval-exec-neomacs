@@ -847,6 +847,10 @@ fn subr_arity_value(name: &str) -> Value {
         "read-passwd" => arity_cons(1, Some(3)),
         "event-apply-modifier" => arity_cons(4, Some(4)),
         "regexp-quote" => arity_cons(1, Some(1)),
+        "gui-get-primary-selection" | "gui-selection-value" => arity_cons(0, Some(0)),
+        "gui-get-selection" => arity_cons(0, Some(2)),
+        "gui-select-text" => arity_cons(1, Some(1)),
+        "gui-set-selection" => arity_cons(2, Some(2)),
         "x-apply-session-resources" | "x-clipboard-yank" => arity_cons(0, Some(0)),
         "open-termscript"
         | "x-close-connection"
@@ -1405,6 +1409,11 @@ mod tests {
         assert_subr_arity("display-backing-store", 0, Some(1));
         assert_subr_arity("display-save-under", 0, Some(1));
         assert_subr_arity("display-selections-p", 0, Some(1));
+        assert_subr_arity("gui-get-primary-selection", 0, Some(0));
+        assert_subr_arity("gui-get-selection", 0, Some(2));
+        assert_subr_arity("gui-select-text", 1, Some(1));
+        assert_subr_arity("gui-selection-value", 0, Some(0));
+        assert_subr_arity("gui-set-selection", 2, Some(2));
         assert_subr_arity("display-supports-face-attributes-p", 1, Some(2));
         assert_subr_arity("ding", 0, Some(1));
         assert_subr_arity("redraw-display", 0, Some(0));
