@@ -147,7 +147,38 @@ impl Evaluator {
         obarray.set_symbol_value("most-negative-fixnum", Value::Int(i64::MIN));
         obarray.set_symbol_value("emacs-version", Value::string("29.1"));
         obarray.set_symbol_value("system-type", Value::symbol("gnu/linux"));
-        obarray.set_symbol_value("default-directory", Value::string(default_directory));
+        obarray.set_symbol_value("default-directory", Value::string(default_directory.clone()));
+        obarray.set_symbol_value(
+            "command-line-default-directory",
+            Value::string(default_directory),
+        );
+        obarray.set_symbol_value(
+            "command-line-args",
+            Value::list(vec![
+                Value::string("neovm-worker"),
+                Value::string("--batch"),
+            ]),
+        );
+        obarray.set_symbol_value("command-line-args-left", Value::Nil);
+        obarray.set_symbol_value("command-line-functions", Value::Nil);
+        obarray.set_symbol_value("command-line-processed", Value::True);
+        obarray.set_symbol_value("command-switch-alist", Value::Nil);
+        obarray.set_symbol_value(
+            "command-line-ns-option-alist",
+            Value::list(vec![Value::list(vec![
+                Value::string("-NSOpen"),
+                Value::Int(1),
+                Value::symbol("ns-handle-nxopen"),
+            ])]),
+        );
+        obarray.set_symbol_value(
+            "command-line-x-option-alist",
+            Value::list(vec![Value::list(vec![
+                Value::string("-display"),
+                Value::Int(1),
+                Value::symbol("x-handle-display"),
+            ])]),
+        );
         obarray.set_symbol_value("load-path", Value::Nil);
         obarray.set_symbol_value("load-history", Value::Nil);
         obarray.set_symbol_value("features", Value::Nil);
@@ -186,6 +217,30 @@ impl Evaluator {
         );
         obarray.set_symbol_value("completion--flex-score-last-md", Value::Nil);
         obarray.set_symbol_value("completion-all-sorted-completions", Value::Nil);
+        obarray.set_symbol_value(
+            "completion--cycling-threshold-type",
+            Value::list(vec![Value::symbol("choice")]),
+        );
+        obarray.set_symbol_value(
+            "completion--styles-type",
+            Value::list(vec![Value::symbol("repeat")]),
+        );
+        obarray.set_symbol_value(
+            "completion-at-point-functions",
+            Value::list(vec![Value::symbol("tags-completion-at-point-function")]),
+        );
+        obarray.set_symbol_value(
+            "completion-setup-hook",
+            Value::list(vec![Value::symbol("completion-setup-function")]),
+        );
+        obarray.set_symbol_value(
+            "completion-ignored-extensions",
+            Value::list(vec![
+                Value::string(".o"),
+                Value::string("~"),
+                Value::string(".elc"),
+            ]),
+        );
         obarray.set_symbol_value(
             "completion-styles",
             Value::list(vec![
@@ -294,6 +349,8 @@ impl Evaluator {
         obarray.set_symbol_value("read-char-choice-use-read-key", Value::Nil);
         obarray.set_symbol_value("read-circle", Value::True);
         obarray.set_symbol_value("read-envvar-name-history", Value::Nil);
+        obarray.set_symbol_value("read-face-name-sample-text", Value::string("SAMPLE"));
+        obarray.set_symbol_value("read-key-delay", Value::Float(0.01));
         obarray.set_symbol_value("read-extended-command-mode", Value::Nil);
         obarray.set_symbol_value("read-extended-command-mode-hook", Value::Nil);
         obarray.set_symbol_value("read-extended-command-predicate", Value::Nil);
@@ -320,9 +377,21 @@ impl Evaluator {
         );
         obarray.set_symbol_value("minibuffer--original-buffer", Value::Nil);
         obarray.set_symbol_value("minibuffer--regexp-primed", Value::Nil);
+        obarray.set_symbol_value(
+            "minibuffer--regexp-prompt-regexp",
+            Value::string("\\(?:Posix search\\|RE search\\|Search for regexp\\|Query replace regexp\\)"),
+        );
         obarray.set_symbol_value("minibuffer--require-match", Value::Nil);
         obarray.set_symbol_value("minibuffer-auto-raise", Value::Nil);
         obarray.set_symbol_value("minibuffer-follows-selected-frame", Value::True);
+        obarray.set_symbol_value(
+            "minibuffer-exit-hook",
+            Value::list(vec![
+                Value::symbol("minibuffer--regexp-exit"),
+                Value::symbol("minibuffer-exit-on-screen-keyboard"),
+                Value::symbol("minibuffer-restore-windows"),
+            ]),
+        );
         obarray.set_symbol_value("minibuffer-completion-table", Value::Nil);
         obarray.set_symbol_value("minibuffer-completion-predicate", Value::Nil);
         obarray.set_symbol_value("minibuffer-completion-confirm", Value::Nil);
@@ -332,11 +401,21 @@ impl Evaluator {
         obarray.set_symbol_value("minibuffer-completing-file-name", Value::Nil);
         obarray.set_symbol_value("minibuffer-regexp-mode", Value::True);
         obarray.set_symbol_value("minibuffer-regexp-mode-hook", Value::Nil);
+        obarray.set_symbol_value(
+            "minibuffer-regexp-prompts",
+            Value::list(vec![
+                Value::string("Posix search"),
+                Value::string("RE search"),
+                Value::string("Search for regexp"),
+                Value::string("Query replace regexp"),
+            ]),
+        );
         obarray.set_symbol_value("minibuffer-message-clear-timeout", Value::Nil);
         obarray.set_symbol_value("minibuffer-message-overlay", Value::Nil);
         obarray.set_symbol_value("minibuffer-message-properties", Value::Nil);
         obarray.set_symbol_value("minibuffer-message-timeout", Value::Int(2));
         obarray.set_symbol_value("minibuffer-message-timer", Value::Nil);
+        obarray.set_symbol_value("minibuffer-lazy-count-format", Value::string("%s "));
         obarray.set_symbol_value("minibuffer-text-before-history", Value::Nil);
         obarray.set_symbol_value(
             "minibuffer-prompt-properties",
@@ -367,6 +446,17 @@ impl Evaluator {
         obarray.set_symbol_value("minibuffer-history-case-insensitive-variables", Value::Nil);
         obarray.set_symbol_value("minibuffer-on-screen-keyboard-displayed", Value::Nil);
         obarray.set_symbol_value("minibuffer-on-screen-keyboard-timer", Value::Nil);
+        obarray.set_symbol_value(
+            "minibuffer-setup-hook",
+            Value::list(vec![
+                Value::symbol("rfn-eshadow-setup-minibuffer"),
+                Value::symbol("minibuffer--regexp-setup"),
+                Value::symbol("minibuffer-setup-on-screen-keyboard"),
+                Value::symbol("minibuffer-error-initialize"),
+                Value::symbol("minibuffer-history-isearch-setup"),
+                Value::symbol("minibuffer-history-initialize"),
+            ]),
+        );
         obarray.set_symbol_value("regexp-search-ring", Value::Nil);
         obarray.set_symbol_value("regexp-search-ring-max", Value::Int(16));
         obarray.set_symbol_value("regexp-search-ring-yank-pointer", Value::Nil);

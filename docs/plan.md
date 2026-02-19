@@ -15789,6 +15789,29 @@ Last updated: 2026-02-19
     - `make -C test/neovm/vm-compat check-one-neovm CASE=documentation-property-semantics` (pass, 49/49)
     - `make -C test/neovm/vm-compat check-startup-doc-stub-coverage` (pass)
     - `make -C test/neovm/vm-compat check-all-neovm` (pass)
+- Extended startup command-line/completion/minibuffer prompt-state parity and lock-ins:
+  - runtime changes:
+    - `rust/neovm-core/src/elisp/eval.rs`
+      - seeded startup command-line vars:
+        - `command-line-default-directory`, `command-line-args`, `command-line-args-left`, `command-line-functions`, `command-line-processed`, `command-switch-alist`, `command-line-ns-option-alist`, `command-line-x-option-alist`
+      - seeded startup completion vars:
+        - `completion--cycling-threshold-type`, `completion--styles-type`, `completion-at-point-functions`, `completion-setup-hook`, `completion-ignored-extensions`
+      - seeded startup read/minibuffer vars:
+        - `read-face-name-sample-text`, `read-key-delay`
+        - `minibuffer--regexp-prompt-regexp`, `minibuffer-exit-hook`, `minibuffer-regexp-prompts`, `minibuffer-lazy-count-format`, `minibuffer-setup-hook`
+  - oracle corpus changes:
+    - `test/neovm/vm-compat/cases/input-command-state-startup-semantics.forms`
+      - expanded startup boundness/default-value lock-ins for the vars above
+      - added `neovm-startup-command-state-shape-symbols` to lock startup object shape (`string`/`cons`) for key list/scalar vars
+    - `test/neovm/vm-compat/cases/input-command-state-startup-semantics.expected.tsv`
+      - re-recorded with startup lock-ins expanded from `9/9` to `11/11`
+  - verified:
+    - `make -C test/neovm/vm-compat record FORMS=cases/input-command-state-startup-semantics.forms EXPECTED=cases/input-command-state-startup-semantics.expected.tsv` (pass)
+    - `make -C test/neovm/vm-compat check-one-neovm CASE=cases/input-command-state-startup-semantics` (pass, `11/11`)
+    - `make -C test/neovm/vm-compat check-one-neovm CASE=cases/use-region-p-semantics` (pass, `8/8`)
+    - `make -C test/neovm/vm-compat check-one-neovm CASE=cases/input-last-event-reader-semantics` (pass, `13/13`)
+    - `make -C test/neovm/vm-compat check-one-neovm CASE=cases/minibuffer-batch` (pass, `47/47`)
+    - `make -C test/neovm/vm-compat check-all-neovm-strict` (pass)
 
 ## Doing
 
