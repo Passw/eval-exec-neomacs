@@ -400,6 +400,29 @@ Last updated: 2026-02-19
     - `make -C test/neovm/vm-compat check-one-neovm CASE=cases/window-group-prev-next-state-semantics` (pass)
     - `make -C test/neovm/vm-compat check-one-neovm CASE=cases/window-designator-bootstrap-semantics` (pass)
 
+- Completed `window-group-start` integer/setter follow-up parity and expanded lock-ins:
+  - runtime changes:
+    - `rust/neovm-core/src/elisp/window_cmds.rs`
+      - aligned `window-group-start` accessor behavior:
+        - non-minibuffer windows now report the live `window-start` position.
+        - minibuffer windows continue to report `1` in batch startup flows.
+      - aligned `set-window-group-start` integer/char behavior:
+        - updates `window-start` but preserves `window-point` on non-minibuffer windows.
+        - marker payload behavior remains position-driven for both `window-start` and `window-point`.
+      - expanded evaluator unit coverage:
+        - `window_group_start_and_buffer_history_setters_match_batch_semantics`
+  - corpus changes:
+    - expanded and re-recorded:
+      - `test/neovm/vm-compat/cases/window-group-prev-next-state-semantics.{forms,expected.tsv}`
+      - now locks that integer `set-window-group-start` updates group/start while leaving `window-point` unchanged.
+  - verified:
+    - `cargo test --manifest-path rust/neovm-core/Cargo.toml window_group_start_and_buffer_history_setters_match_batch_semantics` (pass)
+    - `cargo test --manifest-path rust/neovm-core/Cargo.toml set_window_start_point_and_group_start_accept_marker_positions` (pass)
+    - `make -C test/neovm/vm-compat check-one-neovm CASE=cases/window-group-prev-next-state-semantics` (pass)
+    - `make -C test/neovm/vm-compat check-one-neovm CASE=cases/window-set-start-point-marker-semantics` (pass)
+    - `make -C test/neovm/vm-compat check-one-neovm CASE=cases/window-designator-bootstrap-semantics` (pass)
+    - `make -C test/neovm/vm-compat check-all-neovm-strict` (pass)
+
 - Completed window old-state helper parity slice and added oracle lock-ins:
   - runtime changes:
     - `rust/neovm-core/src/elisp/window_cmds.rs`

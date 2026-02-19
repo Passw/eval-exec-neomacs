@@ -1030,9 +1030,19 @@ pub(crate) fn builtin_window_group_start(
     args: Vec<Value>,
 ) -> EvalResult {
     expect_max_args("window-group-start", &args, 1)?;
-    let _ = ensure_selected_frame_id(eval);
-    let (_fid, _wid) = resolve_window_id(eval, args.first())?;
-    Ok(Value::Int(1))
+    let (fid, wid) = resolve_window_id(eval, args.first())?;
+    if eval
+        .frames
+        .get(fid)
+        .is_some_and(|frame| frame.minibuffer_window == Some(wid))
+    {
+        return Ok(Value::Int(1));
+    }
+    let w = get_leaf(&eval.frames, fid, wid)?;
+    match w {
+        Window::Leaf { window_start, .. } => Ok(Value::Int(*window_start as i64)),
+        _ => Ok(Value::Int(1)),
+    }
 }
 
 /// `(window-end &optional WINDOW UPDATE)` -> integer position.
@@ -1147,15 +1157,12 @@ pub(crate) fn builtin_set_window_group_start(
     match pos {
         IntegerOrMarkerArg::Int(pos) => {
             if !is_minibuffer {
-                if let Some(Window::Leaf {
-                    window_start, point, ..
-                }) = eval
+                if let Some(Window::Leaf { window_start, .. }) = eval
                     .frames
                     .get_mut(fid)
                     .and_then(|frame| frame.find_window_mut(wid))
                 {
                     *window_start = pos as usize;
-                    *point = pos as usize;
                 }
             }
             Ok(Value::Int(pos))
@@ -3920,6 +3927,19 @@ mod tests {
                      (null (window-prev-buffers w))
                      (null (set-window-next-buffers w nil))
                      (null (window-next-buffers w))))
+             (let* ((w (selected-window))
+                    (_ (with-current-buffer (window-buffer w)
+                         (erase-buffer)
+                         (insert (make-string 400 ?x))
+                         (goto-char 1)))
+                    (_ (set-window-start w 1))
+                    (_ (set-window-point w 1)))
+               (list (= (set-window-group-start w 120 nil) 120)
+                     (= (window-group-start w) 120)
+                     (= (window-point w) 1)
+                     (= (set-window-group-start w ?A t) 65)
+                     (= (window-group-start w) 65)
+                     (= (window-point w) 1)))
              (let* ((m (car (last (window-list nil t))))
                     (p '(mini-prev))
                     (n '(mini-next)))
@@ -3957,13 +3977,14 @@ mod tests {
         assert_eq!(out[0], "OK (t t t t)");
         assert_eq!(out[1], "OK (t t t t t t)");
         assert_eq!(out[2], "OK (t t t t t t t t)");
-        assert_eq!(out[3], "OK (t t t t t t t t t t t)");
+        assert_eq!(out[3], "OK (t t t t t t)");
+        assert_eq!(out[4], "OK (t t t t t t t t t t t)");
         assert_eq!(
-            out[4],
+            out[5],
             "OK (wrong-type-argument wrong-type-argument (wrong-type-argument integer-or-marker-p foo) wrong-type-argument wrong-type-argument wrong-type-argument wrong-type-argument)"
         );
         assert_eq!(
-            out[5],
+            out[6],
             "OK ((wrong-number-of-arguments window-group-start 2) (wrong-number-of-arguments set-window-group-start 1) (wrong-number-of-arguments set-window-group-start 4) (wrong-number-of-arguments set-window-prev-buffers 1) (wrong-number-of-arguments set-window-next-buffers 3))"
         );
     }
