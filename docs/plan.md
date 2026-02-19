@@ -540,6 +540,31 @@ Last updated: 2026-02-19
     - `make -C test/neovm/vm-compat check-one-neovm CASE=cases/describe-variable-runtime-semantics` (pass, 22/22)
     - `make -C test/neovm/vm-compat check-all-neovm-strict` (pass)
 
+- Completed `describe-function` first-line shape parity for core callable kinds:
+  - runtime changes:
+    - `rust/neovm-core/src/elisp/doc.rs`
+      - replaced generic kind-only strings with name-first oracle-style first-line descriptions:
+        - primitive/special form in `C source code`
+        - interpreted function
+        - keyboard macro
+        - Lisp macro
+        - autoloaded Lisp function/macro with `‘<file>.el’` source marker
+        - alias and missing-alias text using display-style quote glyphs
+      - expanded evaluator unit assertions for subr/lambda/special-form/keyboard-macro/macro/alias/autoload description text.
+  - corpus changes:
+    - expanded and re-recorded:
+      - `test/neovm/vm-compat/cases/describe-function-runtime-semantics.{forms,expected.tsv}`
+      - added lock-ins for:
+        - primitive-function name-first text (`car`)
+        - interpreted-function name-first text (lambda function)
+        - autoload source-file marker (`‘files.el’`)
+        - alias quote-style (`‘car’` vs raw backticks)
+  - verified:
+    - `cargo test --manifest-path rust/neovm-core/Cargo.toml describe_function_` (pass)
+    - `make -C test/neovm/vm-compat record FORMS=cases/describe-function-runtime-semantics.forms EXPECTED=cases/describe-function-runtime-semantics.expected.tsv` (pass)
+    - `make -C test/neovm/vm-compat check-one-neovm CASE=cases/describe-function-runtime-semantics` (pass, 16/16)
+    - `make -C test/neovm/vm-compat check-all-neovm-strict` (pass)
+
 - Completed window old-state helper parity slice and added oracle lock-ins:
   - runtime changes:
     - `rust/neovm-core/src/elisp/window_cmds.rs`

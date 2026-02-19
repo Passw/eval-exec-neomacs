@@ -10799,55 +10799,67 @@ pub(crate) fn builtin_describe_function(
                 super::builtins::builtin_indirect_function(eval, vec![Value::symbol(alias_name)]);
             let text = match indirect {
                 Ok(value) if !value.is_nil() => {
-                    format!("{name} is an alias for `{alias_name}`.")
+                    format!("{name} is an alias for ‘{alias_name}’.")
                 }
                 _ => format!(
-                    "{name} is an alias for `{alias_name}`, which is not known to be defined."
+                    "{name} is an alias for ‘{alias_name}’, which is not known to be defined."
                 ),
             };
             return Ok(Value::string(text));
         }
     }
 
-    let description = describe_function_kind(&func_val);
+    let description = describe_function_first_line(&name, &func_val);
 
     Ok(Value::string(description))
 }
 
-fn describe_function_kind(function: &Value) -> &'static str {
+fn describe_function_first_line(name: &str, function: &Value) -> String {
     match function {
-        Value::Lambda(_) => "Lisp function",
-        Value::Macro(_) => "Lisp macro",
-        Value::Subr(name) => {
-            if super::subr_info::is_special_form(name) {
-                "Special-form"
+        Value::Lambda(_) => format!("{name} is a interpreted-function."),
+        Value::Macro(_) => format!("{name} is a Lisp macro."),
+        Value::Subr(subr_name) => {
+            if super::subr_info::is_special_form(subr_name) {
+                format!("{name} is a special-form in ‘C source code’.")
             } else {
-                "Built-in function"
+                format!("{name} is a primitive-function in ‘C source code’.")
             }
         }
-        Value::ByteCode(_) => "Compiled Lisp function",
-        Value::Str(_) | Value::Vector(_) => "Keyboard macro",
+        Value::ByteCode(_) => format!("{name} is a compiled Lisp function."),
+        Value::Str(_) | Value::Vector(_) => format!("{name} is a keyboard macro."),
         Value::Cons(cell) => {
             if super::autoload::is_autoload_value(function) {
-                if let Some(items) = list_to_vec(function) {
-                    if matches!(items.get(4).and_then(Value::as_symbol_name), Some("macro")) {
-                        return "Lisp macro";
-                    }
-                }
-                return "Lisp function";
+                let items = list_to_vec(function).unwrap_or_default();
+                let is_macro =
+                    matches!(items.get(4).and_then(Value::as_symbol_name), Some("macro"));
+                let kind = if is_macro { "Lisp macro" } else { "Lisp function" };
+                let file = items
+                    .get(1)
+                    .and_then(Value::as_str)
+                    .map(describe_function_autoload_file)
+                    .unwrap_or_else(|| "loaddefs.el".to_string());
+                return format!("{name} is an autoloaded {kind} in ‘{file}’.");
             }
 
             let pair = match cell.lock() {
                 Ok(pair) => pair,
-                Err(_) => return "Lisp function",
+                Err(_) => return format!("{name} is a Lisp function."),
             };
             match pair.car.as_symbol_name() {
-                Some("macro") => "Lisp macro",
-                Some("lambda") => "Lisp function",
-                _ => "Lisp function",
+                Some("macro") => format!("{name} is a Lisp macro."),
+                Some("lambda") => format!("{name} is a interpreted-function."),
+                _ => format!("{name} is a Lisp function."),
             }
         }
-        _ => "Lisp function",
+        _ => format!("{name} is a Lisp function."),
+    }
+}
+
+fn describe_function_autoload_file(file: &str) -> String {
+    if file.ends_with(".el") {
+        file.to_string()
+    } else {
+        format!("{file}.el")
     }
 }
 
@@ -12824,7 +12836,12 @@ mod tests {
 
         let result = builtin_describe_function(&mut evaluator, vec![Value::symbol("my-fn")]);
         assert!(result.is_ok());
-        assert_eq!(result.unwrap().as_str(), Some("Lisp function"));
+        assert!(
+            result
+                .unwrap()
+                .as_str()
+                .is_some_and(|s| s.contains("my-fn is a interpreted-function"))
+        );
     }
 
     #[test]
@@ -12836,7 +12853,12 @@ mod tests {
 
         let result = builtin_describe_function(&mut evaluator, vec![Value::symbol("plus")]);
         assert!(result.is_ok());
-        assert_eq!(result.unwrap().as_str(), Some("Built-in function"));
+        assert!(
+            result
+                .unwrap()
+                .as_str()
+                .is_some_and(|s| s.contains("plus is a primitive-function in ‘C source code’"))
+        );
     }
 
     #[test]
@@ -12844,7 +12866,12 @@ mod tests {
         let mut evaluator = super::super::eval::Evaluator::new();
         let result = builtin_describe_function(&mut evaluator, vec![Value::symbol("car")]);
         assert!(result.is_ok());
-        assert_eq!(result.unwrap().as_str(), Some("Built-in function"));
+        assert!(
+            result
+                .unwrap()
+                .as_str()
+                .is_some_and(|s| s.contains("car is a primitive-function in ‘C source code’"))
+        );
     }
 
     #[test]
@@ -12852,7 +12879,12 @@ mod tests {
         let mut evaluator = super::super::eval::Evaluator::new();
         let result = builtin_describe_function(&mut evaluator, vec![Value::symbol("if")]);
         assert!(result.is_ok());
-        assert_eq!(result.unwrap().as_str(), Some("Special-form"));
+        assert!(
+            result
+                .unwrap()
+                .as_str()
+                .is_some_and(|s| s.contains("if is a special-form in ‘C source code’"))
+        );
     }
 
     #[test]
@@ -12865,7 +12897,12 @@ mod tests {
         let result =
             builtin_describe_function(&mut evaluator, vec![Value::symbol("vm-kmacro-string")]);
         assert!(result.is_ok());
-        assert_eq!(result.unwrap().as_str(), Some("Keyboard macro"));
+        assert!(
+            result
+                .unwrap()
+                .as_str()
+                .is_some_and(|s| s.contains("vm-kmacro-string is a keyboard macro"))
+        );
     }
 
     #[test]
@@ -12879,7 +12916,12 @@ mod tests {
         let result =
             builtin_describe_function(&mut evaluator, vec![Value::symbol("vm-kmacro-vector")]);
         assert!(result.is_ok());
-        assert_eq!(result.unwrap().as_str(), Some("Keyboard macro"));
+        assert!(
+            result
+                .unwrap()
+                .as_str()
+                .is_some_and(|s| s.contains("vm-kmacro-vector is a keyboard macro"))
+        );
     }
 
     #[test]
@@ -12896,7 +12938,12 @@ mod tests {
         let result =
             builtin_describe_function(&mut evaluator, vec![Value::symbol("vm-macro-marker")]);
         assert!(result.is_ok());
-        assert_eq!(result.unwrap().as_str(), Some("Lisp macro"));
+        assert!(
+            result
+                .unwrap()
+                .as_str()
+                .is_some_and(|s| s.contains("vm-macro-marker is a Lisp macro"))
+        );
     }
 
     #[test]
@@ -12909,7 +12956,10 @@ mod tests {
         let result =
             builtin_describe_function(&mut evaluator, vec![Value::symbol("vm-alias-car")]);
         assert!(result.is_ok());
-        assert_eq!(result.unwrap().as_str(), Some("vm-alias-car is an alias for `car`."));
+        assert_eq!(
+            result.unwrap().as_str(),
+            Some("vm-alias-car is an alias for ‘car’.")
+        );
     }
 
     #[test]
@@ -12924,7 +12974,7 @@ mod tests {
         assert!(result.is_ok());
         assert_eq!(
             result.unwrap().as_str(),
-            Some("vm-alias-missing is an alias for `vm-no-such-fn`, which is not known to be defined.")
+            Some("vm-alias-missing is an alias for ‘vm-no-such-fn’, which is not known to be defined.")
         );
     }
 
@@ -12945,7 +12995,14 @@ mod tests {
         let result =
             builtin_describe_function(&mut evaluator, vec![Value::symbol("vm-autoload-macro")]);
         assert!(result.is_ok());
-        assert_eq!(result.unwrap().as_str(), Some("Lisp macro"));
+        assert!(
+            result
+                .unwrap()
+                .as_str()
+                .is_some_and(
+                    |s| s.contains("vm-autoload-macro is an autoloaded Lisp macro in ‘files.el’")
+                )
+        );
     }
 
     #[test]

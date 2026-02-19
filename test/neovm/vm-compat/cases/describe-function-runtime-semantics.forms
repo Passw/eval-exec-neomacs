@@ -10,3 +10,25 @@
 (progn (fset 'vm-desc-fn-macro (cons 'macro (cons '(lambda nil "m" nil) nil))) (not (null (string-match-p "lisp macro" (downcase (describe-function 'vm-desc-fn-macro))))))
 (condition-case err (describe-function 1) (error (car err)))
 (condition-case err (describe-function) (error (car err)))
+(let ((s (describe-function 'car)))
+  (list
+   (not (null (string-match-p "car is a primitive-function" s)))
+   (null (string-match-p "Built-in function" s))))
+(progn
+  (fset 'vm-desc-fn-shape2 (lambda nil 1))
+  (let ((s (describe-function 'vm-desc-fn-shape2)))
+    (list
+     (not (null (string-match-p "vm-desc-fn-shape2 is a interpreted-function" s)))
+     (null (string-match-p "Lisp function" s)))))
+(progn
+  (autoload 'vm-desc-fn-auto-shape "files" "doc" nil nil)
+  (let ((s (describe-function 'vm-desc-fn-auto-shape)))
+    (list
+     (not (null (string-match-p "autoloaded Lisp function" s)))
+     (not (null (string-match-p "‘files.el’" s))))))
+(progn
+  (defalias 'vm-desc-fn-alias-shape 'car)
+  (let ((s (describe-function 'vm-desc-fn-alias-shape)))
+    (list
+     (not (null (string-match-p "alias for ‘car’" s)))
+     (null (string-match-p "`car`" s)))))
