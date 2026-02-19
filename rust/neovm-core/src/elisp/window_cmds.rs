@@ -682,6 +682,69 @@ pub(crate) fn builtin_window_width(
     Ok(Value::Int(window_width_cols(w, cw)))
 }
 
+/// `(window-use-time &optional WINDOW)` -> integer.
+pub(crate) fn builtin_window_use_time(
+    eval: &mut super::eval::Evaluator,
+    args: Vec<Value>,
+) -> EvalResult {
+    expect_max_args("window-use-time", &args, 1)?;
+    let _ = ensure_selected_frame_id(eval);
+    let (fid, wid) = resolve_window_id(eval, args.first())?;
+    let use_time = eval
+        .frames
+        .get(fid)
+        .map_or(0, |frame| if frame.selected_window == wid { 1 } else { 0 });
+    Ok(Value::Int(use_time))
+}
+
+/// `(window-old-point &optional WINDOW)` -> integer.
+pub(crate) fn builtin_window_old_point(
+    eval: &mut super::eval::Evaluator,
+    args: Vec<Value>,
+) -> EvalResult {
+    expect_max_args("window-old-point", &args, 1)?;
+    let _ = ensure_selected_frame_id(eval);
+    let (fid, wid) = resolve_window_id(eval, args.first())?;
+    let w = get_leaf(&eval.frames, fid, wid)?;
+    match w {
+        Window::Leaf { point, .. } => Ok(Value::Int((*point).max(1) as i64)),
+        _ => Ok(Value::Int(1)),
+    }
+}
+
+/// `(window-old-buffer &optional WINDOW)` -> nil in batch.
+pub(crate) fn builtin_window_old_buffer(
+    eval: &mut super::eval::Evaluator,
+    args: Vec<Value>,
+) -> EvalResult {
+    expect_max_args("window-old-buffer", &args, 1)?;
+    let _ = ensure_selected_frame_id(eval);
+    let (_fid, _wid) = resolve_window_id(eval, args.first())?;
+    Ok(Value::Nil)
+}
+
+/// `(window-prev-buffers &optional WINDOW)` -> nil in batch.
+pub(crate) fn builtin_window_prev_buffers(
+    eval: &mut super::eval::Evaluator,
+    args: Vec<Value>,
+) -> EvalResult {
+    expect_max_args("window-prev-buffers", &args, 1)?;
+    let _ = ensure_selected_frame_id(eval);
+    let (_fid, _wid) = resolve_window_id(eval, args.first())?;
+    Ok(Value::Nil)
+}
+
+/// `(window-next-buffers &optional WINDOW)` -> nil in batch.
+pub(crate) fn builtin_window_next_buffers(
+    eval: &mut super::eval::Evaluator,
+    args: Vec<Value>,
+) -> EvalResult {
+    expect_max_args("window-next-buffers", &args, 1)?;
+    let _ = ensure_selected_frame_id(eval);
+    let (_fid, _wid) = resolve_window_id(eval, args.first())?;
+    Ok(Value::Nil)
+}
+
 /// `(window-left-column &optional WINDOW)` -> integer.
 pub(crate) fn builtin_window_left_column(
     eval: &mut super::eval::Evaluator,
@@ -3005,6 +3068,62 @@ mod tests {
         assert_eq!(
             out[1],
             "OK ((wrong-type-argument window-valid-p 999999) (wrong-type-argument window-valid-p 999999) (wrong-type-argument window-live-p 999999) (wrong-type-argument window-live-p 999999) (wrong-type-argument window-live-p 999999) (wrong-type-argument window-live-p 999999) (wrong-number-of-arguments window-left-column 2) (wrong-number-of-arguments window-top-line 2) (wrong-number-of-arguments window-hscroll 2) (wrong-number-of-arguments window-margins 2) (wrong-number-of-arguments window-fringes 2) (wrong-number-of-arguments window-scroll-bars 2))"
+        );
+    }
+
+    #[test]
+    fn window_use_time_and_old_state_queries_match_batch_defaults_and_error_predicates() {
+        let forms = parse_forms(
+            "(let* ((w (selected-window))
+                    (m (car (last (window-list nil t)))))
+               (list (window-use-time w)
+                     (window-use-time m)
+                     (window-old-point w)
+                     (window-old-point m)
+                     (window-old-buffer w)
+                     (window-old-buffer m)
+                     (window-prev-buffers w)
+                     (window-prev-buffers m)
+                     (window-next-buffers w)
+                     (window-next-buffers m)))
+             (let* ((w1 (selected-window))
+                    (w2 (split-window))
+                    (m (car (last (window-list nil t)))))
+               (list (window-use-time w1)
+                     (window-use-time w2)
+                     (window-use-time m)
+                     (window-old-point w1)
+                     (window-old-point w2)
+                     (window-old-point m)
+                     (window-old-buffer w1)
+                     (window-old-buffer w2)
+                     (window-prev-buffers w1)
+                     (window-prev-buffers w2)
+                     (window-next-buffers w1)
+                     (window-next-buffers w2)))
+             (list (condition-case err (window-use-time 999999) (error err))
+                   (condition-case err (window-old-point 999999) (error err))
+                   (condition-case err (window-old-buffer 999999) (error err))
+                   (condition-case err (window-prev-buffers 999999) (error err))
+                   (condition-case err (window-next-buffers 999999) (error err))
+                   (condition-case err (window-use-time nil nil) (error err))
+                   (condition-case err (window-old-point nil nil) (error err))
+                   (condition-case err (window-old-buffer nil nil) (error err))
+                   (condition-case err (window-prev-buffers nil nil) (error err))
+                   (condition-case err (window-next-buffers nil nil) (error err)))",
+        )
+        .expect("parse");
+        let mut ev = Evaluator::new();
+        let out = ev
+            .eval_forms(&forms)
+            .iter()
+            .map(format_eval_result)
+            .collect::<Vec<_>>();
+        assert_eq!(out[0], "OK (1 0 1 1 nil nil nil nil nil nil)");
+        assert_eq!(out[1], "OK (1 0 0 1 1 1 nil nil nil nil nil nil)");
+        assert_eq!(
+            out[2],
+            "OK ((wrong-type-argument window-live-p 999999) (wrong-type-argument window-live-p 999999) (wrong-type-argument window-live-p 999999) (wrong-type-argument window-live-p 999999) (wrong-type-argument window-live-p 999999) (wrong-number-of-arguments window-use-time 2) (wrong-number-of-arguments window-old-point 2) (wrong-number-of-arguments window-old-buffer 2) (wrong-number-of-arguments window-prev-buffers 2) (wrong-number-of-arguments window-next-buffers 2))"
         );
     }
 

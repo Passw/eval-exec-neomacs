@@ -932,8 +932,13 @@ fn subr_arity_value(name: &str) -> Value {
         | "window-pixel-height"
         | "window-pixel-width"
         | "window-point"
+        | "window-next-buffers"
+        | "window-old-buffer"
+        | "window-old-point"
+        | "window-prev-buffers"
         | "window-scroll-bars"
         | "window-start"
+        | "window-use-time"
         | "window-top-line" => arity_cons(0, Some(1)),
         "terminal-list" | "x-display-list" | "redraw-display" | "frame-list"
         | "selected-window"
@@ -2413,11 +2418,16 @@ mod tests {
         assert_subr_arity("window-end", 0, Some(2));
         assert_subr_arity("window-list", 0, Some(3));
         assert_subr_arity("window-live-p", 1, Some(1));
+        assert_subr_arity("window-next-buffers", 0, Some(1));
+        assert_subr_arity("window-old-buffer", 0, Some(1));
+        assert_subr_arity("window-old-point", 0, Some(1));
+        assert_subr_arity("window-prev-buffers", 0, Some(1));
         assert_subr_arity("window-scroll-bars", 0, Some(1));
         assert_subr_arity("window-valid-p", 1, Some(1));
         assert_subr_arity("window-minibuffer-p", 0, Some(1));
         assert_subr_arity("window-point", 0, Some(1));
         assert_subr_arity("window-start", 0, Some(1));
+        assert_subr_arity("window-use-time", 0, Some(1));
         assert_subr_arity("window-top-line", 0, Some(1));
         assert_subr_arity("window-text-pixel-size", 0, Some(7));
         assert_subr_arity("windowp", 1, Some(1));

@@ -7716,6 +7716,17 @@ pub(crate) fn dispatch_builtin(
         "window-point" => return Some(super::window_cmds::builtin_window_point(eval, args)),
         "window-height" => return Some(super::window_cmds::builtin_window_height(eval, args)),
         "window-width" => return Some(super::window_cmds::builtin_window_width(eval, args)),
+        "window-use-time" => return Some(super::window_cmds::builtin_window_use_time(eval, args)),
+        "window-old-point" => return Some(super::window_cmds::builtin_window_old_point(eval, args)),
+        "window-old-buffer" => {
+            return Some(super::window_cmds::builtin_window_old_buffer(eval, args))
+        }
+        "window-prev-buffers" => {
+            return Some(super::window_cmds::builtin_window_prev_buffers(eval, args))
+        }
+        "window-next-buffers" => {
+            return Some(super::window_cmds::builtin_window_next_buffers(eval, args))
+        }
         "window-left-column" => {
             return Some(super::window_cmds::builtin_window_left_column(eval, args))
         }

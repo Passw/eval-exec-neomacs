@@ -465,6 +465,7 @@ cases/select-frame-set-input-focus-semantics
 cases/window-designator-bootstrap-semantics
 cases/window-size-query-semantics
 cases/window-geometry-helper-semantics
+cases/window-old-state-semantics
 cases/window-edge-geometry-semantics
 cases/window-minibuffer-frame-first-window-semantics
 cases/window-root-valid-minibuffer-active-semantics
