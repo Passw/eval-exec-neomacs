@@ -16651,6 +16651,52 @@ Last updated: 2026-02-19
     - `make -C test/neovm/vm-compat check-one-neovm CASE=cases/frame-edges-error-message-semantics` (pass, `3/3`)
     - `make -C test/neovm/vm-compat check-one-neovm CASE=cases/display-tty-x-helper-semantics` (pass, `65/65`)
     - `make -C test/neovm/vm-compat check-all-neovm-strict` (pass)
+- Added missing `x-*` coordinate/frame-query compatibility surface and locked oracle parity:
+  - runtime changes:
+    - `rust/neovm-core/src/elisp/display.rs`
+      - implemented:
+        - `x-send-client-message`
+        - `x-synchronize`
+        - `x-translate-coordinates`
+        - `x-mouse-absolute-pixel-position`
+        - `x-set-mouse-absolute-pixel-position`
+        - `x-register-dnd-atom`
+        - `x-export-frames`
+        - `x-focus-frame`
+        - `x-frame-edges`
+        - `x-frame-geometry`
+        - `x-frame-list-z-order`
+      - aligned batch/no-X error payloads and optional display/frame designator behavior to oracle shape.
+      - added display unit coverage for the new `x-*` matrix:
+        - `x_coordinate_sync_and_message_batch_semantics`
+        - `x_frame_mouse_and_dnd_batch_semantics`
+    - `rust/neovm-core/src/elisp/builtins.rs`
+      - wired pure dispatch for all 11 new `x-*` builtins.
+    - `rust/neovm-core/src/elisp/builtin_registry.rs`
+      - added all 11 names to `DISPATCH_BUILTIN_NAMES`.
+    - `rust/neovm-core/src/elisp/subr_info.rs`
+      - aligned arity metadata and assertions in `subr_arity_display_terminal_primitives_match_oracle`:
+        - `(6 . 6)`: `x-send-client-message`
+        - `(2 . 2)`: `x-set-mouse-absolute-pixel-position`
+        - `(1 . 2)`: `x-focus-frame`, `x-register-dnd-atom`, `x-synchronize`
+        - `(1 . 6)`: `x-translate-coordinates`
+        - `(0 . 1)`: `x-frame-geometry`, `x-frame-list-z-order`
+        - `(0 . 0)`: `x-mouse-absolute-pixel-position`
+        - `(0 . 2)`: `x-export-frames`, `x-frame-edges`
+  - corpus changes:
+    - added and wired:
+      - `test/neovm/vm-compat/cases/x-coordinate-frame-query-semantics.forms`
+      - `test/neovm/vm-compat/cases/x-coordinate-frame-query-semantics.expected.tsv`
+      - `test/neovm/vm-compat/cases/default.list`
+    - lock-ins cover:
+      - `fboundp`/`subrp`/`subr-arity` matrix for all 11 builtins.
+      - runtime return/error payload matrix for frame/display/terminal/string/numeric designators and arity boundaries.
+  - verified:
+    - `cargo test --manifest-path rust/neovm-core/Cargo.toml elisp::display::tests:: -- --nocapture` (pass, `63/63`)
+    - `cargo test --manifest-path rust/neovm-core/Cargo.toml subr_arity_display_terminal_primitives_match_oracle -- --nocapture` (pass)
+    - `make -C test/neovm/vm-compat record FORMS=cases/x-coordinate-frame-query-semantics.forms EXPECTED=cases/x-coordinate-frame-query-semantics.expected.tsv` (pass)
+    - `make -C test/neovm/vm-compat check-one-neovm CASE=cases/x-coordinate-frame-query-semantics` (pass, `5/5`)
+    - `make -C test/neovm/vm-compat check-all-neovm-strict` (pass)
 
 ## Doing
 

@@ -8875,16 +8875,31 @@ pub(crate) fn dispatch_builtin(
         "display-backing-store" => super::display::builtin_display_backing_store(args),
         "display-save-under" => super::display::builtin_display_save_under(args),
         "display-selections-p" => super::display::builtin_display_selections_p(args),
+        "x-export-frames" => super::display::builtin_x_export_frames(args),
         "x-backspace-delete-keys-p" => super::display::builtin_x_backspace_delete_keys_p(args),
+        "x-focus-frame" => super::display::builtin_x_focus_frame(args),
         "x-display-list" => super::display::builtin_x_display_list(args),
+        "x-frame-edges" => super::display::builtin_x_frame_edges(args),
+        "x-frame-geometry" => super::display::builtin_x_frame_geometry(args),
+        "x-frame-list-z-order" => super::display::builtin_x_frame_list_z_order(args),
         "x-family-fonts" => super::display::builtin_x_family_fonts(args),
         "x-get-atom-name" => super::display::builtin_x_get_atom_name(args),
+        "x-mouse-absolute-pixel-position" => {
+            super::display::builtin_x_mouse_absolute_pixel_position(args)
+        }
         "x-get-resource" => super::display::builtin_x_get_resource(args),
         "x-list-fonts" => super::display::builtin_x_list_fonts(args),
         "x-open-connection" => super::display::builtin_x_open_connection(args),
         "x-parse-geometry" => super::display::builtin_x_parse_geometry(args),
+        "x-register-dnd-atom" => super::display::builtin_x_register_dnd_atom(args),
         "x-selection-exists-p" => super::display::builtin_x_selection_exists_p(args),
         "x-selection-owner-p" => super::display::builtin_x_selection_owner_p(args),
+        "x-send-client-message" => super::display::builtin_x_send_client_message(args),
+        "x-set-mouse-absolute-pixel-position" => {
+            super::display::builtin_x_set_mouse_absolute_pixel_position(args)
+        }
+        "x-synchronize" => super::display::builtin_x_synchronize(args),
+        "x-translate-coordinates" => super::display::builtin_x_translate_coordinates(args),
         "x-uses-old-gtk-dialog" => super::display::builtin_x_uses_old_gtk_dialog(args),
         "x-close-connection" => super::display::builtin_x_close_connection(args),
         "x-display-pixel-width" => super::display::builtin_x_display_pixel_width(args),

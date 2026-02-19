@@ -374,6 +374,31 @@ fn x_window_system_frame_error() -> Flow {
     )
 }
 
+fn x_display_open_error(display: &str) -> Flow {
+    signal(
+        "error",
+        vec![Value::string(format!("Display {display} can’t be opened"))],
+    )
+}
+
+fn x_display_query_first_arg_error(value: &Value) -> Flow {
+    match value {
+        Value::Nil => x_windows_not_initialized_error(),
+        Value::Str(display) => x_display_open_error(display),
+        Value::Frame(_) => x_window_system_frame_error(),
+        other => {
+            if let Some(err) = terminal_not_x_display_error(other) {
+                err
+            } else {
+                signal(
+                    "wrong-type-argument",
+                    vec![Value::symbol("frame-live-p"), other.clone()],
+                )
+            }
+        }
+    }
+}
+
 fn window_system_not_initialized_error() -> Flow {
     signal(
         "error",
@@ -1092,6 +1117,108 @@ pub(crate) fn builtin_display_supports_face_attributes_p_eval(
 pub(crate) fn builtin_x_display_list(args: Vec<Value>) -> EvalResult {
     expect_max_args("x-display-list", &args, 0)?;
     Ok(Value::Nil)
+}
+
+/// (x-frame-edges &optional FRAME TYPE) -> nil in batch/no-X context.
+pub(crate) fn builtin_x_frame_edges(args: Vec<Value>) -> EvalResult {
+    expect_max_args("x-frame-edges", &args, 2)?;
+    if let Some(frame) = args.first() {
+        if !frame.is_nil() && !matches!(frame, Value::Frame(_)) {
+            return Err(signal(
+                "wrong-type-argument",
+                vec![Value::symbol("frame-live-p"), frame.clone()],
+            ));
+        }
+    }
+    Ok(Value::Nil)
+}
+
+/// (x-frame-geometry &optional FRAME) -> nil in batch/no-X context.
+pub(crate) fn builtin_x_frame_geometry(args: Vec<Value>) -> EvalResult {
+    expect_max_args("x-frame-geometry", &args, 1)?;
+    if let Some(frame) = args.first() {
+        if !frame.is_nil() && !matches!(frame, Value::Frame(_)) {
+            return Err(signal(
+                "wrong-type-argument",
+                vec![Value::symbol("frame-live-p"), frame.clone()],
+            ));
+        }
+    }
+    Ok(Value::Nil)
+}
+
+/// (x-frame-list-z-order &optional DISPLAY) -> error in batch/no-X context.
+pub(crate) fn builtin_x_frame_list_z_order(args: Vec<Value>) -> EvalResult {
+    expect_max_args("x-frame-list-z-order", &args, 1)?;
+    match args.first() {
+        None => Err(x_windows_not_initialized_error()),
+        Some(display) => Err(x_display_query_first_arg_error(display)),
+    }
+}
+
+/// (x-mouse-absolute-pixel-position) -> nil in batch/no-X context.
+pub(crate) fn builtin_x_mouse_absolute_pixel_position(args: Vec<Value>) -> EvalResult {
+    expect_args("x-mouse-absolute-pixel-position", &args, 0)?;
+    Ok(Value::Nil)
+}
+
+/// (x-set-mouse-absolute-pixel-position X Y) -> nil in batch/no-X context.
+pub(crate) fn builtin_x_set_mouse_absolute_pixel_position(args: Vec<Value>) -> EvalResult {
+    expect_args("x-set-mouse-absolute-pixel-position", &args, 2)?;
+    Ok(Value::Nil)
+}
+
+/// (x-send-client-message DISPLAY PROP VALUE-0 VALUE-1 VALUE-2 VALUE-3) -> error in batch/no-X context.
+pub(crate) fn builtin_x_send_client_message(args: Vec<Value>) -> EvalResult {
+    expect_args("x-send-client-message", &args, 6)?;
+    Err(x_display_query_first_arg_error(&args[0]))
+}
+
+/// (x-synchronize DISPLAY &optional NO-OP) -> error in batch/no-X context.
+pub(crate) fn builtin_x_synchronize(args: Vec<Value>) -> EvalResult {
+    expect_range_args("x-synchronize", &args, 1, 2)?;
+    Err(x_windows_not_initialized_error())
+}
+
+/// (x-translate-coordinates DISPLAY X Y &optional FRAME SOURCE-FRAME) -> error in batch/no-X context.
+pub(crate) fn builtin_x_translate_coordinates(args: Vec<Value>) -> EvalResult {
+    expect_range_args("x-translate-coordinates", &args, 1, 6)?;
+    Err(x_display_query_first_arg_error(&args[0]))
+}
+
+/// (x-register-dnd-atom ATOM &optional OLD-ATOM) -> error in batch/no-X context.
+pub(crate) fn builtin_x_register_dnd_atom(args: Vec<Value>) -> EvalResult {
+    expect_range_args("x-register-dnd-atom", &args, 1, 2)?;
+    Err(x_window_system_frame_error())
+}
+
+/// (x-export-frames &optional FRAME TYPE) -> error in batch/no-X context.
+pub(crate) fn builtin_x_export_frames(args: Vec<Value>) -> EvalResult {
+    expect_max_args("x-export-frames", &args, 2)?;
+    match args.first() {
+        None => Err(x_window_system_frame_error()),
+        Some(frame) if frame.is_nil() || matches!(frame, Value::Frame(_)) => {
+            Err(x_window_system_frame_error())
+        }
+        Some(other) => Err(signal(
+            "wrong-type-argument",
+            vec![Value::symbol("frame-live-p"), other.clone()],
+        )),
+    }
+}
+
+/// (x-focus-frame FRAME &optional NO-ACTIVATE) -> error in batch/no-X context.
+pub(crate) fn builtin_x_focus_frame(args: Vec<Value>) -> EvalResult {
+    expect_range_args("x-focus-frame", &args, 1, 2)?;
+    let frame = &args[0];
+    if frame.is_nil() || matches!(frame, Value::Frame(_)) {
+        Err(x_window_system_frame_error())
+    } else {
+        Err(signal(
+            "wrong-type-argument",
+            vec![Value::symbol("frame-live-p"), frame.clone()],
+        ))
+    }
 }
 
 /// (x-backspace-delete-keys-p &optional FRAME) -> error in batch/no-X context.
@@ -3053,6 +3180,391 @@ mod tests {
             Value::Nil,
             Value::Nil,
         ]) {
+            Err(Flow::Signal(sig)) => assert_eq!(sig.symbol, "wrong-number-of-arguments"),
+            other => panic!("expected wrong-number-of-arguments signal, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn x_coordinate_sync_and_message_batch_semantics() {
+        let term = terminal_handle_value();
+
+        for args in [
+            vec![Value::Nil],
+            vec![Value::Nil, Value::Nil],
+            vec![Value::Frame(1)],
+            vec![Value::Int(1), Value::Nil],
+            vec![Value::string("x"), Value::Nil],
+            vec![term.clone(), Value::Nil],
+        ] {
+            match builtin_x_synchronize(args) {
+                Err(Flow::Signal(sig)) => {
+                    assert_eq!(sig.symbol, "error");
+                    assert_eq!(
+                        sig.data,
+                        vec![Value::string("X windows are not in use or not initialized")]
+                    );
+                }
+                other => panic!("expected error signal, got {other:?}"),
+            }
+        }
+        match builtin_x_synchronize(vec![]) {
+            Err(Flow::Signal(sig)) => assert_eq!(sig.symbol, "wrong-number-of-arguments"),
+            other => panic!("expected wrong-number-of-arguments signal, got {other:?}"),
+        }
+
+        match builtin_x_translate_coordinates(vec![Value::Nil]) {
+            Err(Flow::Signal(sig)) => {
+                assert_eq!(sig.symbol, "error");
+                assert_eq!(
+                    sig.data,
+                    vec![Value::string("X windows are not in use or not initialized")]
+                );
+            }
+            other => panic!("expected error signal, got {other:?}"),
+        }
+        match builtin_x_translate_coordinates(vec![Value::Frame(1)]) {
+            Err(Flow::Signal(sig)) => {
+                assert_eq!(sig.symbol, "error");
+                assert_eq!(
+                    sig.data,
+                    vec![Value::string("Window system frame should be used")]
+                );
+            }
+            other => panic!("expected error signal, got {other:?}"),
+        }
+        match builtin_x_translate_coordinates(vec![Value::Int(1)]) {
+            Err(Flow::Signal(sig)) => {
+                assert_eq!(sig.symbol, "wrong-type-argument");
+                assert_eq!(sig.data, vec![Value::symbol("frame-live-p"), Value::Int(1)]);
+            }
+            other => panic!("expected wrong-type-argument signal, got {other:?}"),
+        }
+        match builtin_x_translate_coordinates(vec![Value::string("x")]) {
+            Err(Flow::Signal(sig)) => {
+                assert_eq!(sig.symbol, "error");
+                assert_eq!(sig.data, vec![Value::string("Display x can’t be opened")]);
+            }
+            other => panic!("expected error signal, got {other:?}"),
+        }
+        match builtin_x_translate_coordinates(vec![term.clone()]) {
+            Err(Flow::Signal(sig)) => {
+                assert_eq!(sig.symbol, "error");
+                assert_eq!(
+                    sig.data,
+                    vec![Value::string("Terminal 0 is not an X display")]
+                );
+            }
+            other => panic!("expected error signal, got {other:?}"),
+        }
+        match builtin_x_translate_coordinates(vec![]) {
+            Err(Flow::Signal(sig)) => assert_eq!(sig.symbol, "wrong-number-of-arguments"),
+            other => panic!("expected wrong-number-of-arguments signal, got {other:?}"),
+        }
+        match builtin_x_translate_coordinates(vec![
+            Value::Nil,
+            Value::Nil,
+            Value::Nil,
+            Value::Nil,
+            Value::Nil,
+            Value::Nil,
+            Value::Nil,
+        ]) {
+            Err(Flow::Signal(sig)) => assert_eq!(sig.symbol, "wrong-number-of-arguments"),
+            other => panic!("expected wrong-number-of-arguments signal, got {other:?}"),
+        }
+
+        match builtin_x_frame_list_z_order(vec![]) {
+            Err(Flow::Signal(sig)) => {
+                assert_eq!(sig.symbol, "error");
+                assert_eq!(
+                    sig.data,
+                    vec![Value::string("X windows are not in use or not initialized")]
+                );
+            }
+            other => panic!("expected error signal, got {other:?}"),
+        }
+        match builtin_x_frame_list_z_order(vec![Value::Frame(1)]) {
+            Err(Flow::Signal(sig)) => {
+                assert_eq!(sig.symbol, "error");
+                assert_eq!(
+                    sig.data,
+                    vec![Value::string("Window system frame should be used")]
+                );
+            }
+            other => panic!("expected error signal, got {other:?}"),
+        }
+        match builtin_x_frame_list_z_order(vec![Value::Int(1)]) {
+            Err(Flow::Signal(sig)) => {
+                assert_eq!(sig.symbol, "wrong-type-argument");
+                assert_eq!(sig.data, vec![Value::symbol("frame-live-p"), Value::Int(1)]);
+            }
+            other => panic!("expected wrong-type-argument signal, got {other:?}"),
+        }
+        match builtin_x_frame_list_z_order(vec![Value::string("x")]) {
+            Err(Flow::Signal(sig)) => {
+                assert_eq!(sig.symbol, "error");
+                assert_eq!(sig.data, vec![Value::string("Display x can’t be opened")]);
+            }
+            other => panic!("expected error signal, got {other:?}"),
+        }
+        match builtin_x_frame_list_z_order(vec![term.clone()]) {
+            Err(Flow::Signal(sig)) => {
+                assert_eq!(sig.symbol, "error");
+                assert_eq!(
+                    sig.data,
+                    vec![Value::string("Terminal 0 is not an X display")]
+                );
+            }
+            other => panic!("expected error signal, got {other:?}"),
+        }
+        match builtin_x_frame_list_z_order(vec![Value::Nil, Value::Nil]) {
+            Err(Flow::Signal(sig)) => assert_eq!(sig.symbol, "wrong-number-of-arguments"),
+            other => panic!("expected wrong-number-of-arguments signal, got {other:?}"),
+        }
+
+        match builtin_x_send_client_message(vec![
+            Value::Nil,
+            Value::Nil,
+            Value::Nil,
+            Value::Nil,
+            Value::Nil,
+            Value::Nil,
+        ]) {
+            Err(Flow::Signal(sig)) => {
+                assert_eq!(sig.symbol, "error");
+                assert_eq!(
+                    sig.data,
+                    vec![Value::string("X windows are not in use or not initialized")]
+                );
+            }
+            other => panic!("expected error signal, got {other:?}"),
+        }
+        match builtin_x_send_client_message(vec![
+            Value::Frame(1),
+            Value::Nil,
+            Value::Nil,
+            Value::Nil,
+            Value::Nil,
+            Value::Nil,
+        ]) {
+            Err(Flow::Signal(sig)) => {
+                assert_eq!(sig.symbol, "error");
+                assert_eq!(
+                    sig.data,
+                    vec![Value::string("Window system frame should be used")]
+                );
+            }
+            other => panic!("expected error signal, got {other:?}"),
+        }
+        match builtin_x_send_client_message(vec![
+            Value::Int(1),
+            Value::Nil,
+            Value::Nil,
+            Value::Nil,
+            Value::Nil,
+            Value::Nil,
+        ]) {
+            Err(Flow::Signal(sig)) => {
+                assert_eq!(sig.symbol, "wrong-type-argument");
+                assert_eq!(sig.data, vec![Value::symbol("frame-live-p"), Value::Int(1)]);
+            }
+            other => panic!("expected wrong-type-argument signal, got {other:?}"),
+        }
+        match builtin_x_send_client_message(vec![
+            Value::string("x"),
+            Value::Nil,
+            Value::Nil,
+            Value::Nil,
+            Value::Nil,
+            Value::Nil,
+        ]) {
+            Err(Flow::Signal(sig)) => {
+                assert_eq!(sig.symbol, "error");
+                assert_eq!(sig.data, vec![Value::string("Display x can’t be opened")]);
+            }
+            other => panic!("expected error signal, got {other:?}"),
+        }
+        match builtin_x_send_client_message(vec![
+            term,
+            Value::Nil,
+            Value::Nil,
+            Value::Nil,
+            Value::Nil,
+            Value::Nil,
+        ]) {
+            Err(Flow::Signal(sig)) => {
+                assert_eq!(sig.symbol, "error");
+                assert_eq!(
+                    sig.data,
+                    vec![Value::string("Terminal 0 is not an X display")]
+                );
+            }
+            other => panic!("expected error signal, got {other:?}"),
+        }
+        match builtin_x_send_client_message(vec![
+            Value::Nil,
+            Value::Nil,
+            Value::Nil,
+            Value::Nil,
+            Value::Nil,
+        ]) {
+            Err(Flow::Signal(sig)) => assert_eq!(sig.symbol, "wrong-number-of-arguments"),
+            other => panic!("expected wrong-number-of-arguments signal, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn x_frame_mouse_and_dnd_batch_semantics() {
+        let term = terminal_handle_value();
+
+        for args in [vec![], vec![Value::Nil], vec![Value::Frame(1)], vec![Value::Nil, Value::Nil]] {
+            match builtin_x_export_frames(args) {
+                Err(Flow::Signal(sig)) => {
+                    assert_eq!(sig.symbol, "error");
+                    assert_eq!(
+                        sig.data,
+                        vec![Value::string("Window system frame should be used")]
+                    );
+                }
+                other => panic!("expected error signal, got {other:?}"),
+            }
+        }
+        for arg in [Value::Int(1), Value::string("x"), term.clone()] {
+            match builtin_x_export_frames(vec![arg.clone()]) {
+                Err(Flow::Signal(sig)) => {
+                    assert_eq!(sig.symbol, "wrong-type-argument");
+                    assert_eq!(sig.data, vec![Value::symbol("frame-live-p"), arg]);
+                }
+                other => panic!("expected wrong-type-argument signal, got {other:?}"),
+            }
+        }
+        match builtin_x_export_frames(vec![Value::Nil, Value::Nil, Value::Nil]) {
+            Err(Flow::Signal(sig)) => assert_eq!(sig.symbol, "wrong-number-of-arguments"),
+            other => panic!("expected wrong-number-of-arguments signal, got {other:?}"),
+        }
+
+        for args in [vec![Value::Nil], vec![Value::Frame(1)], vec![Value::Nil, Value::Nil]] {
+            match builtin_x_focus_frame(args) {
+                Err(Flow::Signal(sig)) => {
+                    assert_eq!(sig.symbol, "error");
+                    assert_eq!(
+                        sig.data,
+                        vec![Value::string("Window system frame should be used")]
+                    );
+                }
+                other => panic!("expected error signal, got {other:?}"),
+            }
+        }
+        for arg in [Value::Int(1), Value::string("x"), term] {
+            match builtin_x_focus_frame(vec![arg.clone()]) {
+                Err(Flow::Signal(sig)) => {
+                    assert_eq!(sig.symbol, "wrong-type-argument");
+                    assert_eq!(sig.data, vec![Value::symbol("frame-live-p"), arg]);
+                }
+                other => panic!("expected wrong-type-argument signal, got {other:?}"),
+            }
+        }
+        match builtin_x_focus_frame(vec![]) {
+            Err(Flow::Signal(sig)) => assert_eq!(sig.symbol, "wrong-number-of-arguments"),
+            other => panic!("expected wrong-number-of-arguments signal, got {other:?}"),
+        }
+
+        assert!(builtin_x_frame_edges(vec![]).unwrap().is_nil());
+        assert!(builtin_x_frame_edges(vec![Value::Nil]).unwrap().is_nil());
+        assert!(builtin_x_frame_edges(vec![Value::Frame(1)]).unwrap().is_nil());
+        assert!(
+            builtin_x_frame_edges(vec![Value::Nil, Value::Nil])
+                .unwrap()
+                .is_nil()
+        );
+        match builtin_x_frame_edges(vec![Value::Int(1)]) {
+            Err(Flow::Signal(sig)) => {
+                assert_eq!(sig.symbol, "wrong-type-argument");
+                assert_eq!(sig.data, vec![Value::symbol("frame-live-p"), Value::Int(1)]);
+            }
+            other => panic!("expected wrong-type-argument signal, got {other:?}"),
+        }
+        match builtin_x_frame_edges(vec![Value::string("x")]) {
+            Err(Flow::Signal(sig)) => {
+                assert_eq!(sig.symbol, "wrong-type-argument");
+                assert_eq!(sig.data, vec![Value::symbol("frame-live-p"), Value::string("x")]);
+            }
+            other => panic!("expected wrong-type-argument signal, got {other:?}"),
+        }
+        match builtin_x_frame_edges(vec![Value::Nil, Value::Nil, Value::Nil]) {
+            Err(Flow::Signal(sig)) => assert_eq!(sig.symbol, "wrong-number-of-arguments"),
+            other => panic!("expected wrong-number-of-arguments signal, got {other:?}"),
+        }
+
+        assert!(builtin_x_frame_geometry(vec![]).unwrap().is_nil());
+        assert!(builtin_x_frame_geometry(vec![Value::Nil]).unwrap().is_nil());
+        assert!(builtin_x_frame_geometry(vec![Value::Frame(1)]).unwrap().is_nil());
+        match builtin_x_frame_geometry(vec![Value::Int(1)]) {
+            Err(Flow::Signal(sig)) => {
+                assert_eq!(sig.symbol, "wrong-type-argument");
+                assert_eq!(sig.data, vec![Value::symbol("frame-live-p"), Value::Int(1)]);
+            }
+            other => panic!("expected wrong-type-argument signal, got {other:?}"),
+        }
+        match builtin_x_frame_geometry(vec![Value::string("x")]) {
+            Err(Flow::Signal(sig)) => {
+                assert_eq!(sig.symbol, "wrong-type-argument");
+                assert_eq!(sig.data, vec![Value::symbol("frame-live-p"), Value::string("x")]);
+            }
+            other => panic!("expected wrong-type-argument signal, got {other:?}"),
+        }
+        match builtin_x_frame_geometry(vec![Value::Nil, Value::Nil]) {
+            Err(Flow::Signal(sig)) => assert_eq!(sig.symbol, "wrong-number-of-arguments"),
+            other => panic!("expected wrong-number-of-arguments signal, got {other:?}"),
+        }
+
+        assert!(builtin_x_mouse_absolute_pixel_position(vec![])
+            .unwrap()
+            .is_nil());
+        match builtin_x_mouse_absolute_pixel_position(vec![Value::Nil]) {
+            Err(Flow::Signal(sig)) => assert_eq!(sig.symbol, "wrong-number-of-arguments"),
+            other => panic!("expected wrong-number-of-arguments signal, got {other:?}"),
+        }
+
+        assert!(builtin_x_set_mouse_absolute_pixel_position(vec![Value::Nil, Value::Nil])
+            .unwrap()
+            .is_nil());
+        assert!(builtin_x_set_mouse_absolute_pixel_position(vec![Value::Int(1), Value::Int(2)])
+            .unwrap()
+            .is_nil());
+        match builtin_x_set_mouse_absolute_pixel_position(vec![Value::Nil]) {
+            Err(Flow::Signal(sig)) => assert_eq!(sig.symbol, "wrong-number-of-arguments"),
+            other => panic!("expected wrong-number-of-arguments signal, got {other:?}"),
+        }
+        match builtin_x_set_mouse_absolute_pixel_position(vec![Value::Nil, Value::Nil, Value::Nil]) {
+            Err(Flow::Signal(sig)) => assert_eq!(sig.symbol, "wrong-number-of-arguments"),
+            other => panic!("expected wrong-number-of-arguments signal, got {other:?}"),
+        }
+
+        for args in [
+            vec![Value::Nil],
+            vec![Value::Frame(1)],
+            vec![Value::Int(1)],
+            vec![terminal_handle_value()],
+            vec![Value::Nil, Value::Nil],
+        ] {
+            match builtin_x_register_dnd_atom(args) {
+                Err(Flow::Signal(sig)) => {
+                    assert_eq!(sig.symbol, "error");
+                    assert_eq!(
+                        sig.data,
+                        vec![Value::string("Window system frame should be used")]
+                    );
+                }
+                other => panic!("expected error signal, got {other:?}"),
+            }
+        }
+        match builtin_x_register_dnd_atom(vec![]) {
+            Err(Flow::Signal(sig)) => assert_eq!(sig.symbol, "wrong-number-of-arguments"),
+            other => panic!("expected wrong-number-of-arguments signal, got {other:?}"),
+        }
+        match builtin_x_register_dnd_atom(vec![Value::Nil, Value::Nil, Value::Nil]) {
             Err(Flow::Signal(sig)) => assert_eq!(sig.symbol, "wrong-number-of-arguments"),
             other => panic!("expected wrong-number-of-arguments signal, got {other:?}"),
         }

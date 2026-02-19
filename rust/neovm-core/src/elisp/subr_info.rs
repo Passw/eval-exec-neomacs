@@ -850,13 +850,18 @@ fn subr_arity_value(name: &str) -> Value {
         "open-termscript" | "x-close-connection" | "x-parse-geometry" => arity_cons(1, Some(1)),
         "send-string-to-terminal"
         | "display-supports-face-attributes-p"
+        | "x-focus-frame"
         | "x-get-atom-name"
+        | "x-register-dnd-atom"
+        | "x-synchronize"
         | "x-display-set-last-user-time" => arity_cons(1, Some(2)),
+        "x-send-client-message" => arity_cons(6, Some(6)),
+        "x-set-mouse-absolute-pixel-position" => arity_cons(2, Some(2)),
         "x-window-property-attributes" => arity_cons(1, Some(3)),
         "x-open-connection" => arity_cons(1, Some(3)),
         "x-get-resource" => arity_cons(2, Some(4)),
         "x-list-fonts" => arity_cons(1, Some(5)),
-        "x-window-property" => arity_cons(1, Some(6)),
+        "x-window-property" | "x-translate-coordinates" => arity_cons(1, Some(6)),
         "internal-show-cursor" => arity_cons(2, Some(2)),
         "display-buffer" => arity_cons(1, Some(3)),
         "clear-font-cache" => arity_cons(0, Some(0)),
@@ -946,6 +951,8 @@ fn subr_arity_value(name: &str) -> Value {
         | "x-server-vendor"
         | "x-display-grayscale-p"
         | "x-backspace-delete-keys-p"
+        | "x-frame-geometry"
+        | "x-frame-list-z-order"
         | "redraw-frame"
         | "ding"
         | "internal-show-cursor-p"
@@ -986,7 +993,11 @@ fn subr_arity_value(name: &str) -> Value {
         | "window-start"
         | "window-use-time"
         | "window-top-line" => arity_cons(0, Some(1)),
-        "terminal-list" | "x-display-list" | "redraw-display" | "frame-list"
+        "terminal-list"
+        | "x-display-list"
+        | "x-mouse-absolute-pixel-position"
+        | "redraw-display"
+        | "frame-list"
         | "x-uses-old-gtk-dialog"
         | "selected-window"
         | "active-minibuffer-window"
@@ -1000,6 +1011,8 @@ fn subr_arity_value(name: &str) -> Value {
         | "window-total-height"
         | "window-total-width"
         | "window-vscroll"
+        | "x-export-frames"
+        | "x-frame-edges"
         | "x-family-fonts"
         | "x-selection-exists-p"
         | "x-selection-owner-p"
@@ -1398,15 +1411,23 @@ mod tests {
         assert_subr_arity("resume-tty", 0, Some(1));
         assert_subr_arity("terminal-coding-system", 0, Some(1));
         assert_subr_arity("x-backspace-delete-keys-p", 0, Some(1));
+        assert_subr_arity("x-export-frames", 0, Some(2));
         assert_subr_arity("x-display-list", 0, Some(0));
         assert_subr_arity("x-family-fonts", 0, Some(2));
+        assert_subr_arity("x-focus-frame", 1, Some(2));
+        assert_subr_arity("x-frame-edges", 0, Some(2));
+        assert_subr_arity("x-frame-geometry", 0, Some(1));
+        assert_subr_arity("x-frame-list-z-order", 0, Some(1));
         assert_subr_arity("x-get-atom-name", 1, Some(2));
+        assert_subr_arity("x-mouse-absolute-pixel-position", 0, Some(0));
         assert_subr_arity("x-get-resource", 2, Some(4));
         assert_subr_arity("x-list-fonts", 1, Some(5));
         assert_subr_arity("x-open-connection", 1, Some(3));
         assert_subr_arity("x-parse-geometry", 1, Some(1));
+        assert_subr_arity("x-register-dnd-atom", 1, Some(2));
         assert_subr_arity("x-selection-exists-p", 0, Some(2));
         assert_subr_arity("x-selection-owner-p", 0, Some(2));
+        assert_subr_arity("x-send-client-message", 6, Some(6));
         assert_subr_arity("x-close-connection", 1, Some(1));
         assert_subr_arity("x-server-version", 0, Some(1));
         assert_subr_arity("x-server-input-extension-version", 0, Some(1));
@@ -1425,6 +1446,9 @@ mod tests {
         assert_subr_arity("x-display-screens", 0, Some(1));
         assert_subr_arity("x-display-set-last-user-time", 1, Some(2));
         assert_subr_arity("x-display-visual-class", 0, Some(1));
+        assert_subr_arity("x-set-mouse-absolute-pixel-position", 2, Some(2));
+        assert_subr_arity("x-synchronize", 1, Some(2));
+        assert_subr_arity("x-translate-coordinates", 1, Some(6));
         assert_subr_arity("x-uses-old-gtk-dialog", 0, Some(0));
         assert_subr_arity("x-window-property", 1, Some(6));
         assert_subr_arity("x-window-property-attributes", 1, Some(3));
