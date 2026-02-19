@@ -28,6 +28,22 @@ Last updated: 2026-02-19
 
 ## Doing
 
+- Cleared the builtin-registry sync allowlist by aligning remaining startup-policy names with oracle surface:
+  - runtime/registry changes:
+    - `rust/neovm-core/src/elisp/eval.rs`
+      - seeded startup bytecode wrappers for `string-join` / `string-to-list` so `symbol-function` startup shape matches GNU Emacs (`byte-code-function`).
+      - explicitly marked `word-at-point` function-cell unbound at startup via `fmakunbound`, preserving lazy bootstrap behavior and restoring pre-bootstrap `(word-at-point)` -> `void-function`.
+    - `rust/neovm-core/src/elisp/builtin_registry.rs`
+      - added `string-join`, `string-to-list`, and `word-at-point` to `DISPATCH_BUILTIN_NAMES`.
+  - vm-compat policy/docs/corpus changes:
+    - `test/neovm/vm-compat/cases/builtin-registry-sync-allowlist.txt`
+      - removed remaining exclusions; file is now intentionally empty.
+    - `test/neovm/vm-compat/README.md`
+      - updated sync gate docs to reflect no current exclusions.
+    - `test/neovm/vm-compat/cases/word-at-point-lazy-bootstrap-semantics.forms`
+    - `test/neovm/vm-compat/cases/word-at-point-lazy-bootstrap-semantics.expected.tsv`
+      - added explicit pre-bootstrap `word-at-point` `void-function` lock-in before lazy materialization.
+
 - Removed `kmacro-name-last-macro` from builtin-registry sync allowlist by aligning startup introspection semantics:
   - runtime changes:
     - `rust/neovm-core/src/elisp/builtins.rs`

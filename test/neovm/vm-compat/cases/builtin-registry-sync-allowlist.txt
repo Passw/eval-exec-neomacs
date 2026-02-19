@@ -1,6 +1,2 @@
 # Evaluator-dispatch names intentionally excluded from DISPATCH_BUILTIN_NAMES.
 # Keep this list minimal and startup-policy driven.
-
-string-join
-string-to-list
-word-at-point

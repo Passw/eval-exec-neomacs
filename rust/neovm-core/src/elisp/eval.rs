@@ -1067,10 +1067,16 @@ impl Evaluator {
             "string-blank-p",
             "string-empty-p",
             "string-equal-ignore-case",
+            "string-join",
+            "string-to-list",
             "string-to-vector",
         ] {
             seed_function_wrapper(name);
         }
+
+        // Keep word-at-point unavailable at startup; symbol-at-point lazily
+        // materializes it to mirror GNU Emacs thing-at-point bootstrap.
+        obarray.fmakunbound("word-at-point");
 
         // Mark standard variables as special (dynamically bound)
         for name in &[

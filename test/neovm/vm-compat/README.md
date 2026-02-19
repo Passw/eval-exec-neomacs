@@ -244,10 +244,8 @@ cd test/neovm/vm-compat
 make check-builtin-registry-sync
 ```
 
-Current intentional sync exclusions are startup-shape driven:
-- `word-at-point` (`fboundp` is `nil` at startup)
-- `string-join` (bytecode-shaped at startup)
-- `string-to-list` (bytecode-shaped at startup)
+Current intentional sync exclusions:
+- none (`cases/builtin-registry-sync-allowlist.txt` is intentionally empty)
 
 Show all currently allowlisted `function-kind` drift entries in detail (useful when
 triaging `function-kind` allowlist scope):
