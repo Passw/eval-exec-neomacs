@@ -1110,7 +1110,7 @@ pub(crate) fn builtin_set_window_start(
         .is_some_and(|frame| frame.minibuffer_window == Some(wid));
     match pos {
         IntegerOrMarkerArg::Int(pos) => {
-            if !is_minibuffer {
+            if !is_minibuffer && pos > 0 {
                 if let Some(Window::Leaf { window_start, .. }) = eval
                     .frames
                     .get_mut(fid)
@@ -1127,12 +1127,14 @@ pub(crate) fn builtin_set_window_start(
         } => {
             if !is_minibuffer {
                 if let Some(pos) = position {
-                    if let Some(Window::Leaf { window_start, .. }) = eval
-                        .frames
-                        .get_mut(fid)
-                        .and_then(|frame| frame.find_window_mut(wid))
-                    {
-                        *window_start = pos as usize;
+                    if pos > 0 {
+                        if let Some(Window::Leaf { window_start, .. }) = eval
+                            .frames
+                            .get_mut(fid)
+                            .and_then(|frame| frame.find_window_mut(wid))
+                        {
+                            *window_start = pos as usize;
+                        }
                     }
                 }
             }
@@ -1156,7 +1158,7 @@ pub(crate) fn builtin_set_window_group_start(
         .is_some_and(|frame| frame.minibuffer_window == Some(wid));
     match pos {
         IntegerOrMarkerArg::Int(pos) => {
-            if !is_minibuffer {
+            if !is_minibuffer && pos > 0 {
                 if let Some(Window::Leaf { window_start, .. }) = eval
                     .frames
                     .get_mut(fid)
@@ -1173,16 +1175,18 @@ pub(crate) fn builtin_set_window_group_start(
         } => {
             if !is_minibuffer {
                 if let Some(pos) = position {
-                    if let Some(Window::Leaf {
-                        window_start, point, ..
-                    }) = eval
-                        .frames
-                        .get_mut(fid)
-                        .and_then(|frame| frame.find_window_mut(wid))
-                    {
-                        let n = pos as usize;
-                        *window_start = n;
-                        *point = n;
+                    if pos > 0 {
+                        if let Some(Window::Leaf {
+                            window_start, point, ..
+                        }) = eval
+                            .frames
+                            .get_mut(fid)
+                            .and_then(|frame| frame.find_window_mut(wid))
+                        {
+                            let n = pos as usize;
+                            *window_start = n;
+                            *point = n;
+                        }
                     }
                 }
             }
@@ -1205,7 +1209,7 @@ pub(crate) fn builtin_set_window_point(
         .is_some_and(|frame| frame.minibuffer_window == Some(wid));
     match pos {
         IntegerOrMarkerArg::Int(pos) => {
-            if !is_minibuffer {
+            if !is_minibuffer && pos > 0 {
                 if let Some(Window::Leaf { point, .. }) = eval
                     .frames
                     .get_mut(fid)
@@ -1226,14 +1230,18 @@ pub(crate) fn builtin_set_window_point(
             let pos = position.ok_or_else(|| {
                 signal("error", vec![Value::string("Marker does not point anywhere")])
             })?;
-            if let Some(Window::Leaf { point, .. }) = eval
-                .frames
-                .get_mut(fid)
-                .and_then(|frame| frame.find_window_mut(wid))
-            {
-                *point = pos as usize;
+            if pos > 0 {
+                if let Some(Window::Leaf { point, .. }) = eval
+                    .frames
+                    .get_mut(fid)
+                    .and_then(|frame| frame.find_window_mut(wid))
+                {
+                    *point = pos as usize;
+                }
+                Ok(Value::Int(pos))
+            } else {
+                Ok(Value::Int(1))
             }
-            Ok(Value::Int(pos))
         }
     }
 }
@@ -3196,6 +3204,44 @@ mod tests {
                      (markerp (set-window-group-start w m))
                      (window-start w)
                      (window-point w)))
+             (let* ((w (selected-window))
+                    (_ (set-window-start w 1))
+                    (_ (set-window-point w 1)))
+               (list (= (set-window-start w 0) 0)
+                     (= (window-start w) 1)
+                     (= (set-window-point w 0) 0)
+                     (= (window-point w) 1)
+                     (= (set-window-group-start w 0) 0)
+                     (= (window-group-start w) 1)
+                     (= (window-point w) 1)
+                     (= (set-window-start w -10) -10)
+                     (= (window-start w) 1)
+                     (= (set-window-point w -10) -10)
+                     (= (window-point w) 1)
+                     (= (set-window-group-start w -10) -10)
+                     (= (window-group-start w) 1)
+                     (= (window-point w) 1)))
+             (let* ((w (selected-window))
+                    (_ (set-window-start w 1))
+                    (_ (set-window-point w 1))
+                    (m0 (make-marker))
+                    (_ (set-marker m0 0 (window-buffer w)))
+                    (mneg (make-marker))
+                    (_ (set-marker mneg -5 (window-buffer w))))
+               (list (markerp (set-window-start w m0))
+                     (= (window-start w) 1)
+                     (= (set-window-point w m0) 1)
+                     (= (window-point w) 1)
+                     (markerp (set-window-group-start w m0))
+                     (= (window-group-start w) 1)
+                     (= (window-point w) 1)
+                     (markerp (set-window-start w mneg))
+                     (= (window-start w) 1)
+                     (= (set-window-point w mneg) 1)
+                     (= (window-point w) 1)
+                     (markerp (set-window-group-start w mneg))
+                     (= (window-group-start w) 1)
+                     (= (window-point w) 1)))
              (let ((m (make-marker)))
                (list (condition-case err (set-window-start (selected-window) m) (error err))
                      (condition-case err (set-window-point (selected-window) m) (error err))
@@ -3216,12 +3262,14 @@ mod tests {
             .collect::<Vec<_>>();
         assert_eq!(out[0], "OK (t 3 3 3 t 3 3)");
         assert_eq!(out[1], "OK (t 2 2 2 t 2 2)");
+        assert_eq!(out[2], "OK (t t t t t t t t t t t t t t)");
+        assert_eq!(out[3], "OK (t t t t t t t t t t t t t t)");
         assert_eq!(
-            out[2],
+            out[4],
             "OK ([:marker nil nil nil] (error \"Marker does not point anywhere\") [:marker nil nil nil])"
         );
         assert_eq!(
-            out[3],
+            out[5],
             "OK ((wrong-type-argument integer-or-marker-p 1.5) (wrong-type-argument integer-or-marker-p 1.5) (wrong-type-argument integer-or-marker-p 1.5) (wrong-type-argument integer-or-marker-p foo) (wrong-type-argument integer-or-marker-p foo) (wrong-type-argument integer-or-marker-p foo))"
         );
     }

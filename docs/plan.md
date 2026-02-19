@@ -423,6 +423,28 @@ Last updated: 2026-02-19
     - `make -C test/neovm/vm-compat check-one-neovm CASE=cases/window-designator-bootstrap-semantics` (pass)
     - `make -C test/neovm/vm-compat check-all-neovm-strict` (pass)
 
+- Completed non-positive window start/point/group-start position parity and lock-ins:
+  - runtime changes:
+    - `rust/neovm-core/src/elisp/window_cmds.rs`
+      - aligned non-positive (`0`/negative) integer behavior:
+        - `set-window-start`, `set-window-point`, and `set-window-group-start` now return the provided integer but preserve existing window state.
+      - aligned non-positive marker-position behavior on non-minibuffer windows:
+        - `set-window-start` / `set-window-group-start` return marker and preserve existing window state.
+        - `set-window-point` returns integer `1` and preserves existing point.
+      - retained existing minibuffer no-mutation behavior.
+      - expanded evaluator unit coverage:
+        - `set_window_start_point_and_group_start_accept_marker_positions`
+  - corpus changes:
+    - expanded and re-recorded:
+      - `test/neovm/vm-compat/cases/window-set-start-point-marker-semantics.{forms,expected.tsv}`
+      - now locks non-positive integer and non-positive marker-position behavior across all three setters.
+  - verified:
+    - `cargo test --manifest-path rust/neovm-core/Cargo.toml set_window_start_point_and_group_start_accept_marker_positions` (pass)
+    - `cargo test --manifest-path rust/neovm-core/Cargo.toml window_group_start_and_buffer_history_setters_match_batch_semantics` (pass)
+    - `make -C test/neovm/vm-compat check-one-neovm CASE=cases/window-set-start-point-marker-semantics` (pass)
+    - `make -C test/neovm/vm-compat check-one-neovm CASE=cases/window-group-prev-next-state-semantics` (pass)
+    - `make -C test/neovm/vm-compat check-all-neovm-strict` (pass)
+
 - Completed window old-state helper parity slice and added oracle lock-ins:
   - runtime changes:
     - `rust/neovm-core/src/elisp/window_cmds.rs`
