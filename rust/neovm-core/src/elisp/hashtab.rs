@@ -70,6 +70,7 @@ fn hash_key_to_value(key: &HashKey) -> Value {
         HashKey::Keyword(s) => Value::Keyword(s.clone()),
         HashKey::Str(s) => Value::string(s.clone()),
         HashKey::Char(c) => Value::Char(*c),
+        HashKey::Frame(id) => Value::Frame(*id),
         HashKey::Ptr(_) => Value::Nil, // can't reconstruct from pointer
     }
 }

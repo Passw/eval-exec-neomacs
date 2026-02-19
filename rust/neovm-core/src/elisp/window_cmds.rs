@@ -64,10 +64,7 @@ fn expect_int(value: &Value) -> Result<i64, Flow> {
 #[derive(Clone, Debug)]
 enum IntegerOrMarkerArg {
     Int(i64),
-    Marker {
-        raw: Value,
-        position: Option<i64>,
-    },
+    Marker { raw: Value, position: Option<i64> },
 }
 
 fn parse_integer_or_marker_arg(value: &Value) -> Result<IntegerOrMarkerArg, Flow> {
@@ -86,7 +83,10 @@ fn parse_integer_or_marker_arg(value: &Value) -> Result<IntegerOrMarkerArg, Flow
                 }
                 _ => None,
             };
-            Ok(IntegerOrMarkerArg::Marker { raw: value.clone(), position })
+            Ok(IntegerOrMarkerArg::Marker {
+                raw: value.clone(),
+                position,
+            })
         }
         other => Err(signal(
             "wrong-type-argument",
@@ -105,7 +105,10 @@ fn clamped_window_position(
         return None;
     }
     let requested = pos as usize;
-    let Some(Window::Leaf { buffer_id, .. }) = eval.frames.get(fid).and_then(|frame| frame.find_window(wid))
+    let Some(Window::Leaf { buffer_id, .. }) = eval
+        .frames
+        .get(fid)
+        .and_then(|frame| frame.find_window(wid))
     else {
         return Some(requested);
     };
@@ -365,6 +368,17 @@ fn resolve_frame_id(
                 ))
             }
         }
+        Some(Value::Frame(id)) => {
+            let fid = FrameId(*id);
+            if eval.frames.get(fid).is_some() {
+                Ok(fid)
+            } else {
+                Err(signal(
+                    "wrong-type-argument",
+                    vec![Value::symbol(predicate), Value::Frame(*id)],
+                ))
+            }
+        }
         Some(other) => Err(signal(
             "wrong-type-argument",
             vec![Value::symbol(predicate), other.clone()],
@@ -382,6 +396,17 @@ fn resolve_frame_or_window_frame_id(
 ) -> Result<FrameId, Flow> {
     match arg {
         None | Some(Value::Nil) => Ok(ensure_selected_frame_id(eval)),
+        Some(Value::Frame(id)) => {
+            let fid = FrameId(*id);
+            if eval.frames.get(fid).is_some() {
+                Ok(fid)
+            } else {
+                Err(signal(
+                    "wrong-type-argument",
+                    vec![Value::symbol(predicate), Value::Frame(*id)],
+                ))
+            }
+        }
         Some(Value::Int(n)) => {
             let fid = FrameId(*n as u64);
             if eval.frames.get(fid).is_some() {
@@ -595,10 +620,7 @@ fn decode_preserved_size(raw: &Value) -> Result<(Value, Value), Flow> {
     Ok((width, height))
 }
 
-fn preserved_size_components(
-    frames: &FrameManager,
-    wid: WindowId,
-) -> Result<(Value, Value), Flow> {
+fn preserved_size_components(frames: &FrameManager, wid: WindowId) -> Result<(Value, Value), Flow> {
     let key = window_preserved_size_key();
     match frames.window_parameter(wid, &key) {
         Some(raw) => decode_preserved_size(&raw),
@@ -880,8 +902,7 @@ pub(crate) fn builtin_set_window_cursor_type(
     let _ = ensure_selected_frame_id(eval);
     let (_fid, wid) = resolve_window_id(eval, args.first())?;
     let cursor_type = args[1].clone();
-    eval.frames
-        .set_window_cursor_type(wid, cursor_type.clone());
+    eval.frames.set_window_cursor_type(wid, cursor_type.clone());
     Ok(cursor_type)
 }
 
@@ -1145,10 +1166,7 @@ pub(crate) fn builtin_set_window_start(
             }
             Ok(Value::Int(pos))
         }
-        IntegerOrMarkerArg::Marker {
-            raw,
-            position,
-        } => {
+        IntegerOrMarkerArg::Marker { raw, position } => {
             if !is_minibuffer {
                 if let Some(pos) = position {
                     if let Some(clamped) = clamped_window_position(eval, fid, wid, pos) {
@@ -1195,15 +1213,14 @@ pub(crate) fn builtin_set_window_group_start(
             }
             Ok(Value::Int(pos))
         }
-        IntegerOrMarkerArg::Marker {
-            raw,
-            position,
-        } => {
+        IntegerOrMarkerArg::Marker { raw, position } => {
             if !is_minibuffer {
                 if let Some(pos) = position {
                     if let Some(clamped) = clamped_window_position(eval, fid, wid, pos) {
                         if let Some(Window::Leaf {
-                            window_start, point, ..
+                            window_start,
+                            point,
+                            ..
                         }) = eval
                             .frames
                             .get_mut(fid)
@@ -1247,15 +1264,15 @@ pub(crate) fn builtin_set_window_point(
             }
             Ok(Value::Int(pos))
         }
-        IntegerOrMarkerArg::Marker {
-            raw,
-            position,
-        } => {
+        IntegerOrMarkerArg::Marker { raw, position } => {
             if is_minibuffer {
                 return Ok(raw);
             }
             let pos = position.ok_or_else(|| {
-                signal("error", vec![Value::string("Marker does not point anywhere")])
+                signal(
+                    "error",
+                    vec![Value::string("Marker does not point anywhere")],
+                )
             })?;
             if let Some(clamped) = clamped_window_position(eval, fid, wid, pos) {
                 if let Some(Window::Leaf { point, .. }) = eval
@@ -1705,7 +1722,12 @@ pub(crate) fn builtin_window_text_height(
     let (fid, wid) = resolve_window_id(eval, args.first())?;
     let w = get_leaf(&eval.frames, fid, wid)?;
     let _pixelwise = args.get(1);
-    Ok(Value::Int(window_body_height_lines(&eval.frames, fid, wid, w)))
+    Ok(Value::Int(window_body_height_lines(
+        &eval.frames,
+        fid,
+        wid,
+        w,
+    )))
 }
 
 /// `(window-text-width &optional WINDOW PIXELWISE)` -> integer.
@@ -1735,8 +1757,14 @@ pub(crate) fn builtin_window_body_pixel_edges(
         .frames
         .get(fid)
         .ok_or_else(|| signal("error", vec![Value::string("Frame not found")]))?;
-    let (left, top, right, bottom) =
-        window_body_edges_cols_lines(&eval.frames, fid, wid, w, frame.char_width, frame.char_height);
+    let (left, top, right, bottom) = window_body_edges_cols_lines(
+        &eval.frames,
+        fid,
+        wid,
+        w,
+        frame.char_width,
+        frame.char_height,
+    );
     Ok(Value::list(vec![
         Value::Int(left),
         Value::Int(top),
@@ -2407,7 +2435,8 @@ pub(crate) fn builtin_set_window_buffer(
             let mut next_prev = Vec::with_capacity(filtered_prev.len() + 1);
             next_prev.push(history_entry);
             next_prev.extend(filtered_prev);
-            eval.frames.set_window_prev_buffers(wid, Value::list(next_prev));
+            eval.frames
+                .set_window_prev_buffers(wid, Value::list(next_prev));
             eval.frames.set_window_next_buffers(wid, Value::Nil);
         }
     }
@@ -2607,6 +2636,16 @@ pub(crate) fn builtin_select_frame(
             }
             fid
         }
+        Value::Frame(id) => {
+            let fid = FrameId(*id);
+            if eval.frames.get(fid).is_none() {
+                return Err(signal(
+                    "wrong-type-argument",
+                    vec![Value::symbol("frame-live-p"), Value::Frame(*id)],
+                ));
+            }
+            fid
+        }
         other => {
             return Err(signal(
                 "wrong-type-argument",
@@ -2645,6 +2684,16 @@ pub(crate) fn builtin_select_frame_set_input_focus(
                 return Err(signal(
                     "wrong-type-argument",
                     vec![Value::symbol("frame-live-p"), Value::Int(*n)],
+                ));
+            }
+            fid
+        }
+        Value::Frame(id) => {
+            let fid = FrameId(*id);
+            if eval.frames.get(fid).is_none() {
+                return Err(signal(
+                    "wrong-type-argument",
+                    vec![Value::symbol("frame-live-p"), Value::Frame(*id)],
                 ));
             }
             fid
@@ -2916,6 +2965,7 @@ pub(crate) fn builtin_frame_visible_p(
     expect_args("frame-visible-p", &args, 1)?;
     let fid = match args.first() {
         Some(Value::Int(n)) => FrameId(*n as u64),
+        Some(Value::Frame(id)) => FrameId(*id),
         Some(other) => {
             return Err(signal(
                 "wrong-type-argument",
@@ -2933,25 +2983,27 @@ pub(crate) fn builtin_frame_visible_p(
     Ok(Value::bool(frame.visible))
 }
 
-/// `(framep OBJ)` -> t if OBJ is a frame id that exists.
+/// `(framep OBJ)` -> t if OBJ is a frame object or frame id that exists.
 pub(crate) fn builtin_framep(eval: &mut super::eval::Evaluator, args: Vec<Value>) -> EvalResult {
     expect_args("framep", &args, 1)?;
-    let id = match args[0].as_int() {
-        Some(n) => n as u64,
-        None => return Ok(Value::Nil),
+    let id = match &args[0] {
+        Value::Frame(id) => *id,
+        Value::Int(n) => *n as u64,
+        _ => return Ok(Value::Nil),
     };
     Ok(Value::bool(eval.frames.get(FrameId(id)).is_some()))
 }
 
-/// `(frame-live-p OBJ)` -> t if OBJ is a live frame id.
+/// `(frame-live-p OBJ)` -> t if OBJ is a live frame object or frame id.
 pub(crate) fn builtin_frame_live_p(
     eval: &mut super::eval::Evaluator,
     args: Vec<Value>,
 ) -> EvalResult {
     expect_args("frame-live-p", &args, 1)?;
-    let id = match args[0].as_int() {
-        Some(n) => n as u64,
-        None => return Ok(Value::Nil),
+    let id = match &args[0] {
+        Value::Frame(id) => *id,
+        Value::Int(n) => *n as u64,
+        _ => return Ok(Value::Nil),
     };
     Ok(Value::bool(eval.frames.get(FrameId(id)).is_some()))
 }
@@ -2962,7 +3014,7 @@ pub(crate) fn builtin_frame_live_p(
 
 #[cfg(test)]
 mod tests {
-    use crate::elisp::{format_eval_result, parse_forms, Evaluator};
+    use crate::elisp::{format_eval_result, parse_forms, Evaluator, Value};
 
     /// Evaluate all forms with a fresh evaluator that has a frame+window set up.
     fn eval_with_frame(src: &str) -> Vec<String> {
@@ -3130,7 +3182,10 @@ mod tests {
         assert_eq!(out[18], "OK (wrong-number-of-arguments window-valid-p 2)");
         assert_eq!(out[19], "OK (wrong-type-argument frame-live-p 999999)");
         assert_eq!(out[20], "OK (wrong-type-argument frame-live-p foo)");
-        assert_eq!(out[21], "OK (wrong-number-of-arguments frame-root-window 2)");
+        assert_eq!(
+            out[21],
+            "OK (wrong-number-of-arguments frame-root-window 2)"
+        );
         assert_eq!(
             out[22],
             "OK (wrong-number-of-arguments minibuffer-selected-window 1)"
@@ -4539,7 +4594,10 @@ mod tests {
             .iter()
             .map(format_eval_result)
             .collect::<Vec<_>>();
-        assert_eq!(out[0], "OK (nil nil (t nil t) t nil (t t t) t t nil nil (nil nil))");
+        assert_eq!(
+            out[0],
+            "OK (nil nil (t nil t) t nil (t t t) t t nil nil (nil nil))"
+        );
         assert_eq!(out[1], "OK ((0 0 8 -8 nil t 0 1 0 0) nil 1 1.5 -1.5)");
         assert_eq!(
             out[2],
@@ -4851,6 +4909,34 @@ mod tests {
     fn frame_live_p_false() {
         let r = eval_one_with_frame("(frame-live-p 999999)");
         assert_eq!(r, "OK nil");
+    }
+
+    #[test]
+    fn frame_builtins_accept_frame_handle_values() {
+        let mut ev = Evaluator::new();
+        let fid = super::ensure_selected_frame_id(&mut ev);
+        let frame = Value::Frame(fid.0);
+
+        assert_eq!(
+            super::builtin_framep(&mut ev, vec![frame.clone()]).unwrap(),
+            Value::True
+        );
+        assert_eq!(
+            super::builtin_frame_live_p(&mut ev, vec![frame.clone()]).unwrap(),
+            Value::True
+        );
+        assert_eq!(
+            super::builtin_frame_visible_p(&mut ev, vec![frame.clone()]).unwrap(),
+            Value::True
+        );
+        assert_eq!(
+            super::builtin_select_frame(&mut ev, vec![frame.clone()]).unwrap(),
+            Value::Int(fid.0 as i64)
+        );
+        assert_eq!(
+            super::builtin_select_frame_set_input_focus(&mut ev, vec![frame]).unwrap(),
+            Value::Nil
+        );
     }
 
     #[test]

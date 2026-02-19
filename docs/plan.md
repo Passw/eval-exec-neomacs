@@ -28,6 +28,39 @@ Last updated: 2026-02-19
 
 ## Doing
 
+- Aligned monitor `frames` payload semantics to frame-handle objects (instead of integers):
+  - runtime changes:
+    - `rust/neovm-core/src/elisp/value.rs`
+      - added `Value::Frame(u64)` and `HashKey::Frame(u64)` runtime variants.
+    - `rust/neovm-core/src/elisp/print.rs`
+      - frame handles now print as `#<frame ...>`.
+    - `rust/neovm-core/src/elisp/window_cmds.rs`
+      - frame designator resolvers now accept `Value::Frame`.
+      - `framep`/`frame-live-p`/`frame-visible-p`/`select-frame`/`select-frame-set-input-focus` accept frame handles.
+      - added unit test: `frame_builtins_accept_frame_handle_values`.
+    - `rust/neovm-core/src/elisp/display.rs`
+      - `display-monitor-attributes-list` and `frame-monitor-attributes` now publish `frames` as frame handles.
+      - evaluator display/frame designator checks now treat frame handles as live frame designators.
+      - added unit tests:
+        - `eval_monitor_attributes_include_bootstrapped_frame`
+        - `eval_monitor_queries_accept_frame_handle_designator`
+    - `rust/neovm-core/src/elisp/hashtab.rs`
+      - hash-key reification supports `HashKey::Frame`.
+  - corpus changes:
+    - added and wired:
+      - `test/neovm/vm-compat/cases/display-monitor-frame-handle-semantics.{forms,expected.tsv}`
+      - `test/neovm/vm-compat/cases/default.list`
+    - lock-ins assert monitor `frames` entries are:
+      - accepted by frame predicates/designators
+      - non-`integerp`/non-`numberp`/non-`listp`/non-`vectorp`
+  - verified:
+    - `cargo test --manifest-path rust/neovm-core/Cargo.toml eval_monitor_ -- --nocapture` (pass)
+    - `cargo test --manifest-path rust/neovm-core/Cargo.toml frame_builtins_accept_frame_handle_values -- --nocapture` (pass)
+    - `make -C test/neovm/vm-compat record FORMS=cases/display-monitor-frame-handle-semantics.forms EXPECTED=cases/display-monitor-frame-handle-semantics.expected.tsv` (pass)
+    - `make -C test/neovm/vm-compat check-one-neovm CASE=cases/display-monitor-frame-handle-semantics` (pass, `3/3`)
+    - `make -C test/neovm/vm-compat check-all-neovm-strict` (pass; case inventory `762`)
+    - `make -C test/neovm/vm-compat compat-progress` (default list `756`, tracked `762`)
+
 - Completed three queued compatibility tracks in one batch:
   - `set-window-buffer` state/margins parity:
     - runtime changes:

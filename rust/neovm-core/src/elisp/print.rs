@@ -68,6 +68,7 @@ pub fn print_value(value: &Value) -> String {
             format!("#<bytecode {} ({} ops)>", params, bc.ops.len())
         }
         Value::Buffer(id) => format!("#<buffer {}>", id.0),
+        Value::Frame(id) => format!("#<frame {}>", id),
         Value::Timer(id) => format!("#<timer {}>", id),
     }
 }
@@ -149,6 +150,7 @@ fn append_print_value_bytes(value: &Value, out: &mut Vec<u8>) {
             );
         }
         Value::Buffer(id) => out.extend_from_slice(format!("#<buffer {}>", id.0).as_bytes()),
+        Value::Frame(id) => out.extend_from_slice(format!("#<frame {}>", id).as_bytes()),
         Value::Timer(id) => out.extend_from_slice(format!("#<timer {}>", id).as_bytes()),
     }
 }
@@ -166,7 +168,17 @@ fn format_symbol_name(name: &str) -> String {
     for (idx, ch) in name.chars().enumerate() {
         let needs_escape = matches!(
             ch,
-            ' ' | '\t' | '\n' | '\r' | '\u{0c}' | '(' | ')' | '[' | ']' | '"' | '\\' | ';'
+            ' ' | '\t'
+                | '\n'
+                | '\r'
+                | '\u{0c}'
+                | '('
+                | ')'
+                | '['
+                | ']'
+                | '"'
+                | '\\'
+                | ';'
                 | '#'
                 | '\''
                 | '`'

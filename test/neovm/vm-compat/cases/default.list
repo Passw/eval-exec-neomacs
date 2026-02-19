@@ -409,6 +409,7 @@ cases/x-open-close-arity-type-payload-semantics
 cases/x-open-close-terminal-handle-shape-semantics
 cases/display-monitor-semantics
 cases/display-monitor-frames-semantics
+cases/display-monitor-frame-handle-semantics
 cases/display-monitor-window-designator-errors-semantics
 cases/image-clear-cache-semantics
 cases/image-clear-cache-optional-semantics

@@ -162,6 +162,7 @@ fn expect_terminal_designator(value: &Value) -> Result<(), Flow> {
 fn expect_frame_designator(value: &Value) -> Result<(), Flow> {
     match value {
         Value::Int(id) if *id >= 0 => Ok(()),
+        Value::Frame(_) => Ok(()),
         v if v.is_nil() => Ok(()),
         _ => Err(signal(
             "wrong-type-argument",
@@ -218,6 +219,7 @@ fn expect_display_designator(value: &Value) -> Result<(), Flow> {
 fn live_frame_designator_p(eval: &mut super::eval::Evaluator, value: &Value) -> bool {
     match value {
         Value::Int(id) if *id >= 0 => eval.frames.get(FrameId(*id as u64)).is_some(),
+        Value::Frame(id) => eval.frames.get(FrameId(*id)).is_some(),
         _ => false,
     }
 }
@@ -1503,7 +1505,7 @@ pub(crate) fn builtin_display_monitor_attributes_list_eval(
         .frames
         .frame_list()
         .into_iter()
-        .map(|fid| Value::Int(fid.0 as i64))
+        .map(|fid| Value::Frame(fid.0))
         .collect::<Vec<_>>();
     Ok(Value::list(vec![make_monitor_alist(Value::list(frames))]))
 }
@@ -1533,7 +1535,7 @@ pub(crate) fn builtin_frame_monitor_attributes_eval(
         .frames
         .frame_list()
         .into_iter()
-        .map(|fid| Value::Int(fid.0 as i64))
+        .map(|fid| Value::Frame(fid.0))
         .collect::<Vec<_>>();
     Ok(make_monitor_alist(Value::list(frames)))
 }
@@ -2154,6 +2156,17 @@ mod tests {
 
         let frames = list_to_vec(&frames_value).expect("frames list");
         assert_eq!(frames.len(), 1);
+        assert!(matches!(frames.first(), Some(Value::Frame(_))));
+        assert!(!frames[0].is_integer());
+        assert_eq!(
+            crate::elisp::window_cmds::builtin_framep(&mut eval, vec![frames[0].clone()]).unwrap(),
+            Value::True
+        );
+        assert_eq!(
+            crate::elisp::window_cmds::builtin_frame_live_p(&mut eval, vec![frames[0].clone()])
+                .unwrap(),
+            Value::True
+        );
     }
 
     #[test]
@@ -2171,6 +2184,36 @@ mod tests {
             builtin_frame_monitor_attributes_eval(&mut eval, vec![Value::Int(frame_id)]).unwrap();
         let attr_list = list_to_vec(&attrs).expect("monitor attrs");
         assert!(!attr_list.is_empty());
+    }
+
+    #[test]
+    fn eval_monitor_queries_accept_frame_handle_designator() {
+        let mut eval = crate::elisp::Evaluator::new();
+        let list = builtin_display_monitor_attributes_list_eval(&mut eval, vec![]).unwrap();
+        let monitors = list_to_vec(&list).expect("monitor list");
+        let attrs = list_to_vec(monitors.first().expect("first monitor")).expect("monitor attrs");
+
+        let mut frame = Value::Nil;
+        for attr in attrs {
+            if let Value::Cons(cell) = attr {
+                let pair = cell.lock().expect("poisoned");
+                if matches!(&pair.car, Value::Symbol(name) if name == "frames") {
+                    let frames = list_to_vec(&pair.cdr).expect("frames list");
+                    frame = frames.first().cloned().expect("first frame");
+                    break;
+                }
+            }
+        }
+        assert!(matches!(frame, Value::Frame(_)));
+
+        let by_display =
+            builtin_display_monitor_attributes_list_eval(&mut eval, vec![frame.clone()]).unwrap();
+        let display_list = list_to_vec(&by_display).expect("monitor list");
+        assert_eq!(display_list.len(), 1);
+
+        let by_frame = builtin_frame_monitor_attributes_eval(&mut eval, vec![frame]).unwrap();
+        let frame_attrs = list_to_vec(&by_frame).expect("monitor attrs");
+        assert!(!frame_attrs.is_empty());
     }
 
     #[test]
@@ -2322,11 +2365,9 @@ mod tests {
             .as_int()
             .expect("selected-window should return id");
 
-        let list_err = builtin_display_monitor_attributes_list_eval(
-            &mut eval,
-            vec![Value::Int(window_id)],
-        )
-        .expect_err("window designator should be rejected");
+        let list_err =
+            builtin_display_monitor_attributes_list_eval(&mut eval, vec![Value::Int(window_id)])
+                .expect_err("window designator should be rejected");
         let frame_err =
             builtin_frame_monitor_attributes_eval(&mut eval, vec![Value::Int(window_id)])
                 .expect_err("window designator should be rejected");
