@@ -29,8 +29,8 @@ extra_symbols="$tmp_dir/extra-startup-string-docs.txt"
   | sort -u > "$oracle_symbols"
 
 perl -ne '
-if(/STARTUP_VARIABLE_DOC_STRING_PROPERTIES/){$in=1; next}
-if($in && /^\];/){$in=0}
+if(/^pub\(crate\)\s+static\s+STARTUP_VARIABLE_DOC_STRING_PROPERTIES:\s*&\[.*=\s*&\[/){$in=1; next}
+if($in && /^\s*\];/){$in=0}
 next unless $in;
 if(/^\s*\(\s*"([^"]+)",/){print "$1\n"; $expect=0; next}
 if(/^\s*\(\s*$/){$expect=1; next}

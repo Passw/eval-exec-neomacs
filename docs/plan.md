@@ -28,6 +28,34 @@ Last updated: 2026-02-19
 
 ## Doing
 
+- Completed core builtin `documentation` text-shape expansion and hardened startup-doc coverage parsers:
+  - runtime changes:
+    - `rust/neovm-core/src/elisp/doc.rs`
+      - expanded `subr_documentation_stub` coverage for core builtins:
+        - `cons`, `list`, `eq`, `equal`, `length`, `append`, `mapcar`, `assoc`, `member`, `symbol-name`
+      - added evaluator unit coverage:
+        - `documentation_core_subr_stubs_use_oracle_first_line_shapes`
+  - corpus changes:
+    - expanded and re-recorded:
+      - `test/neovm/vm-compat/cases/documentation-runtime-builtin-semantics.{forms,expected.tsv}`
+    - added lock-ins to ensure expanded builtins:
+      - return string docs
+      - match oracle first-line prefixes
+      - do not regress to the generic `Built-in function.` fallback
+  - tooling/strict-gate hardening:
+    - `test/neovm/vm-compat/check-startup-doc-stub-coverage.sh`
+      - parser now anchors on the `STARTUP_VARIABLE_DOC_STUBS` static declaration and accepts indented `];` closure lines.
+    - `test/neovm/vm-compat/check-startup-doc-string-coverage.sh`
+      - parser now anchors on the `STARTUP_VARIABLE_DOC_STRING_PROPERTIES` static declaration and accepts indented `];` closure lines.
+    - this prevents false positives from unrelated tuple literals appearing later in `doc.rs` (including test tables).
+  - verified:
+    - `cargo test --manifest-path rust/neovm-core/Cargo.toml documentation_core_subr_stubs_use_oracle_first_line_shapes` (pass)
+    - `make -C test/neovm/vm-compat record FORMS=cases/documentation-runtime-builtin-semantics.forms EXPECTED=cases/documentation-runtime-builtin-semantics.expected.tsv` (pass)
+    - `make -C test/neovm/vm-compat check-one-neovm CASE=cases/documentation-runtime-builtin-semantics` (pass)
+    - `make -C test/neovm/vm-compat check-startup-doc-stub-coverage` (pass)
+    - `make -C test/neovm/vm-compat check-startup-doc-string-coverage` (pass)
+    - `make -C test/neovm/vm-compat check-all-neovm-strict` (pass)
+
 - Completed `window-preserve-size` / `window-size-fixed-p` / `window-resizable` parity slice and added oracle lock-ins:
   - runtime changes:
     - `rust/neovm-core/src/elisp/window_cmds.rs`

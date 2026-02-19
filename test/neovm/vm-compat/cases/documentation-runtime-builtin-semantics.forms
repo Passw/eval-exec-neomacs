@@ -42,3 +42,25 @@
     (list
      (not (null (string-match-p "^Return the car of LIST\\." s)))
      (null (string-match-p "^Built-in function\\.$" s)))))
+(let ((probes
+       '((cons "Create a new cons, give it CAR and CDR as components, and return it.")
+         (list "Return a newly created list with specified arguments as elements.")
+         (eq "Return t if the two args are the same Lisp object.")
+         (equal "Return t if two Lisp objects have similar structure and contents.")
+         (length "Return the length of vector, list or string SEQUENCE.")
+         (append "Concatenate all the arguments and make the result a list.")
+         (mapcar "Apply FUNCTION to each element of SEQUENCE, and make a list of the results.")
+         (assoc "Return non-nil if KEY is equal to the car of an element of ALIST.")
+         (member "Return non-nil if ELT is an element of LIST.  Comparison done with ‘equal’.")
+         (symbol-name "Return SYMBOL’s name, a string."))))
+  (mapcar
+   (lambda (entry)
+     (let* ((sym (car entry))
+            (prefix (cadr entry))
+            (doc (documentation sym)))
+       (list
+        sym
+        (stringp doc)
+        (not (null (string-match-p (concat "^" (regexp-quote prefix)) doc)))
+        (null (string-match-p "^Built-in function\\.$" doc)))))
+   probes))

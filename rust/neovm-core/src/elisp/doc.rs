@@ -130,6 +130,18 @@ Lisp concepts such as cdr, car, cons cell and list.\n\
 \n\
 (fn LIST)",
         ),
+        "cons" => Some("Create a new cons, give it CAR and CDR as components, and return it."),
+        "list" => Some("Return a newly created list with specified arguments as elements."),
+        "eq" => Some("Return t if the two args are the same Lisp object."),
+        "equal" => Some("Return t if two Lisp objects have similar structure and contents."),
+        "length" => Some("Return the length of vector, list or string SEQUENCE."),
+        "append" => Some("Concatenate all the arguments and make the result a list."),
+        "mapcar" => {
+            Some("Apply FUNCTION to each element of SEQUENCE, and make a list of the results.")
+        }
+        "assoc" => Some("Return non-nil if KEY is equal to the car of an element of ALIST."),
+        "member" => Some("Return non-nil if ELT is an element of LIST.  Comparison done with ‘equal’."),
+        "symbol-name" => Some("Return SYMBOL’s name, a string."),
         "if" => Some(
             "If COND yields non-nil, do THEN, else do ELSE...\n\
 Returns the value of THEN or the value of the last of the ELSE’s.\n\
@@ -12732,6 +12744,59 @@ mod tests {
             .expect("documentation for if should return a string");
         assert!(text.starts_with("If COND yields non-nil, do THEN, else do ELSE..."));
         assert_ne!(text, "Built-in function.");
+    }
+
+    #[test]
+    fn documentation_core_subr_stubs_use_oracle_first_line_shapes() {
+        let mut evaluator = super::super::eval::Evaluator::new();
+        let probes = [
+            (
+                "cons",
+                "Create a new cons, give it CAR and CDR as components, and return it.",
+            ),
+            (
+                "list",
+                "Return a newly created list with specified arguments as elements.",
+            ),
+            ("eq", "Return t if the two args are the same Lisp object."),
+            (
+                "equal",
+                "Return t if two Lisp objects have similar structure and contents.",
+            ),
+            ("length", "Return the length of vector, list or string SEQUENCE."),
+            (
+                "append",
+                "Concatenate all the arguments and make the result a list.",
+            ),
+            (
+                "mapcar",
+                "Apply FUNCTION to each element of SEQUENCE, and make a list of the results.",
+            ),
+            (
+                "assoc",
+                "Return non-nil if KEY is equal to the car of an element of ALIST.",
+            ),
+            (
+                "member",
+                "Return non-nil if ELT is an element of LIST.  Comparison done with ‘equal’.",
+            ),
+            ("symbol-name", "Return SYMBOL’s name, a string."),
+        ];
+
+        for (name, expected_prefix) in probes {
+            evaluator
+                .obarray
+                .set_symbol_function(name, Value::Subr(name.to_string()));
+            let result = builtin_documentation(&mut evaluator, vec![Value::symbol(name)]).unwrap();
+            let text = result
+                .as_str()
+                .expect("core subr documentation should return a string");
+            assert!(
+                text.starts_with(expected_prefix),
+                "unexpected documentation text for {name}: {text:?}"
+            );
+            assert_ne!(text, "Built-in function.");
+        }
     }
 
     #[test]
