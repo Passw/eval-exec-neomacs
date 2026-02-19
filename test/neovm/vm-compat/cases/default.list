@@ -104,6 +104,7 @@ cases/read-char-exclusive-vector-vector-tail-semantics
 cases/read-char-exclusive-symbol-vector-tail-semantics
 cases/read-char-exclusive-non-character-tail-semantics
 cases/read-char-exclusive-symbol-tail-semantics
+cases/read-char-command-keys-seeding-semantics
 cases/read-event-empty-queue-semantics
 cases/read-event-command-keys-noarg-seeding-semantics
 cases/read-event-command-keys-seed-preserve-semantics

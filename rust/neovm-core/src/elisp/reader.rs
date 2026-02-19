@@ -1083,9 +1083,13 @@ pub(crate) fn builtin_read_char(eval: &mut super::eval::Evaluator, args: Vec<Val
         ));
     }
     expect_optional_prompt_string(&args)?;
+    let seconds_is_nil_or_omitted = args.get(2).is_none_or(Value::is_nil);
     if let Some(event) = eval.peek_unread_command_event() {
         if let Some(n) = event_to_int(&event) {
             let _ = eval.pop_unread_command_event();
+            if eval.read_command_keys().is_empty() && seconds_is_nil_or_omitted {
+                eval.set_read_command_keys(vec![event.clone()]);
+            }
             return Ok(Value::Int(n));
         }
         eval.assign("unread-command-events", Value::list(vec![event.clone()]));
@@ -2412,6 +2416,38 @@ mod tests {
         let result = builtin_read_char(&mut ev, vec![]).unwrap();
         assert_eq!(result.as_int(), Some(97));
         assert_eq!(ev.recent_input_events(), &[Value::Int(97)]);
+        assert_eq!(ev.read_command_keys(), &[Value::Int(97)]);
+    }
+
+    #[test]
+    fn read_char_with_seconds_does_not_set_command_keys_when_empty() {
+        let mut ev = Evaluator::new();
+        ev.obarray
+            .set_symbol_value("unread-command-events", Value::list(vec![Value::Int(97)]));
+        let result = builtin_read_char(&mut ev, vec![Value::Nil, Value::Nil, Value::Int(0)]).unwrap();
+        assert_eq!(result.as_int(), Some(97));
+        assert_eq!(ev.read_command_keys(), &[]);
+    }
+
+    #[test]
+    fn read_char_with_nil_seconds_sets_command_keys_when_empty() {
+        let mut ev = Evaluator::new();
+        ev.obarray
+            .set_symbol_value("unread-command-events", Value::list(vec![Value::Int(97)]));
+        let result = builtin_read_char(&mut ev, vec![Value::Nil, Value::Nil, Value::Nil]).unwrap();
+        assert_eq!(result.as_int(), Some(97));
+        assert_eq!(ev.read_command_keys(), &[Value::Int(97)]);
+    }
+
+    #[test]
+    fn read_char_preserves_existing_command_keys_context() {
+        let mut ev = Evaluator::new();
+        ev.set_read_command_keys(vec![Value::Int(97)]);
+        ev.obarray
+            .set_symbol_value("unread-command-events", Value::list(vec![Value::Int(98)]));
+        let result = builtin_read_char(&mut ev, vec![Value::Nil, Value::Nil, Value::Int(0)]).unwrap();
+        assert_eq!(result.as_int(), Some(98));
+        assert_eq!(ev.read_command_keys(), &[Value::Int(97)]);
     }
 
     #[test]

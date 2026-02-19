@@ -28,6 +28,40 @@ Last updated: 2026-02-19
 
 ## Doing
 
+- Aligned `read-char` / `read-char-exclusive` command-key publication with oracle:
+  - runtime changes:
+    - `rust/neovm-core/src/elisp/reader.rs`
+      - `read-char` now seeds `this-command-keys*` only when:
+        - no prior key context exists, and
+        - `SECONDS` is omitted or `nil`
+      - existing key context remains authoritative for later `read-char` calls.
+      - added unit coverage:
+        - `read_char_with_seconds_does_not_set_command_keys_when_empty`
+        - `read_char_with_nil_seconds_sets_command_keys_when_empty`
+        - `read_char_preserves_existing_command_keys_context`
+    - `rust/neovm-core/src/elisp/lread.rs`
+      - `read-char-exclusive` now follows the same command-key seeding rule as `read-char`/`read-event`.
+      - added unit coverage:
+        - `read_char_exclusive_with_seconds_does_not_set_command_keys_when_empty`
+        - `read_char_exclusive_with_nil_seconds_sets_command_keys_when_empty`
+        - `read_char_exclusive_preserves_existing_command_keys_context`
+  - corpus changes:
+    - added and wired:
+      - `test/neovm/vm-compat/cases/read-char-command-keys-seeding-semantics.{forms,expected.tsv}`
+      - `test/neovm/vm-compat/cases/default.list`
+    - lock-ins cover:
+      - no-arg and `SECONDS=nil` seeding from empty key context
+      - `SECONDS` non-`nil` no-seeding behavior
+      - preservation of pre-existing key context across subsequent `read-char`/`read-char-exclusive` calls
+  - verified:
+    - `cargo test --manifest-path rust/neovm-core/Cargo.toml read_char_ -- --nocapture` (pass)
+    - `cargo test --manifest-path rust/neovm-core/Cargo.toml read_char_exclusive_ -- --nocapture` (pass)
+    - `make -C test/neovm/vm-compat record FORMS=cases/read-char-command-keys-seeding-semantics.forms EXPECTED=cases/read-char-command-keys-seeding-semantics.expected.tsv` (pass)
+    - `make -C test/neovm/vm-compat check-one-neovm CASE=cases/read-char-command-keys-seeding-semantics` (pass, `13/13`)
+    - `make -C test/neovm/vm-compat check-one-neovm CASE=cases/this-command-keys-readers-semantics` (pass, `16/16`)
+    - `make -C test/neovm/vm-compat check-one-neovm CASE=cases/read-event-command-keys-seed-preserve-semantics` (pass, `13/13`)
+    - `make -C test/neovm/vm-compat check-one-neovm CASE=cases/read-event-command-keys-noarg-seeding-semantics` (pass, `5/5`)
+
 - Aligned lambda `interactive "e"` event sourcing precedence with oracle and added dedicated lock-ins:
   - runtime changes:
     - `rust/neovm-core/src/elisp/interactive.rs`
