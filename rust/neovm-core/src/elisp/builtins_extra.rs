@@ -510,10 +510,12 @@ fn lookup_full_name_by_login(login: &str) -> Option<String> {
 
 fn expect_uid_arg(val: &Value) -> Result<i64, Flow> {
     match val {
-        Value::Int(uid) => Ok(*uid),
-        other => Err(signal(
-            "wrong-type-argument",
-            vec![Value::symbol("integerp"), other.clone()],
+        Value::Int(uid) if *uid >= 0 => Ok(*uid),
+        _ => Err(signal(
+            "error",
+            vec![Value::string(
+                "Not an in-range integer, integral float, or cons of integers",
+            )],
         )),
     }
 }
@@ -572,16 +574,28 @@ pub(crate) fn builtin_user_full_name(args: Vec<Value>) -> EvalResult {
         }
 
         return Ok(match target {
-            Value::Int(uid) => lookup_full_name_by_uid(*uid)
-                .map(Value::string)
-                .unwrap_or(Value::Nil),
+            Value::Int(uid) => {
+                if *uid < 0 {
+                    return Err(signal(
+                        "error",
+                        vec![Value::string(
+                            "Not an in-range integer, integral float, or cons of integers",
+                        )],
+                    ));
+                }
+                lookup_full_name_by_uid(*uid)
+                    .map(Value::string)
+                    .unwrap_or(Value::Nil)
+            }
             Value::Str(login) => lookup_full_name_by_login(login)
                 .map(Value::string)
                 .unwrap_or(Value::Nil),
-            other => {
+            _ => {
                 return Err(signal(
-                    "wrong-type-argument",
-                    vec![Value::symbol("stringp"), other.clone()],
+                    "error",
+                    vec![Value::string(
+                        "Not an in-range integer, integral float, or cons of integers",
+                    )],
                 ))
             }
         });
@@ -856,14 +870,26 @@ mod tests {
     fn user_identity_type_contracts() {
         let login_name_err = builtin_user_login_name(vec![Value::string("root")]).unwrap_err();
         match login_name_err {
-            Flow::Signal(sig) => assert_eq!(sig.symbol, "wrong-type-argument"),
+            Flow::Signal(sig) => assert_eq!(sig.symbol, "error"),
             other => panic!("expected signal, got {other:?}"),
         }
 
         let full_name_err =
             builtin_user_full_name(vec![Value::list(vec![Value::Int(1)])]).unwrap_err();
         match full_name_err {
-            Flow::Signal(sig) => assert_eq!(sig.symbol, "wrong-type-argument"),
+            Flow::Signal(sig) => assert_eq!(sig.symbol, "error"),
+            other => panic!("expected signal, got {other:?}"),
+        }
+
+        let negative_uid_login = builtin_user_login_name(vec![Value::Int(-1)]).unwrap_err();
+        match negative_uid_login {
+            Flow::Signal(sig) => assert_eq!(sig.symbol, "error"),
+            other => panic!("expected signal, got {other:?}"),
+        }
+
+        let negative_uid_full_name = builtin_user_full_name(vec![Value::Int(-1)]).unwrap_err();
+        match negative_uid_full_name {
+            Flow::Signal(sig) => assert_eq!(sig.symbol, "error"),
             other => panic!("expected signal, got {other:?}"),
         }
     }

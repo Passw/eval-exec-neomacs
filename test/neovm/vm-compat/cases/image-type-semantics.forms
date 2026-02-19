@@ -3,18 +3,24 @@
 
 (image-type-available-p 'neomacs)
 
-(image-type (create-image "x" 'pbm t))
+(condition-case err
+    (image-type (create-image "x" 'pbm t))
+  (error (car err)))
 (image-type "foo.jpg")
-(image-type "foo.unknown")
+(condition-case err
+    (image-type "foo.unknown")
+  (error (car err)))
 (image-type "noext" 'png nil)
-(image-type "raw" nil 'image/jpeg)
+(condition-case err
+    (image-type "raw" nil 'image/jpeg)
+  (error (car err)))
 
 (condition-case err
     (image-type 42)
-  (error err))
+  (error (car err)))
 (condition-case err
     (image-type "x" 42 nil)
-  (error err))
+  (error (car err)))
 
 (condition-case err
     (image-type)

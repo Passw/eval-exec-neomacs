@@ -26,12 +26,14 @@
       (stringp (user-full-name uid))))
 
 (let ((uid -1))
-  (or (null (user-login-name uid))
-      (stringp (user-login-name uid))))
+  (condition-case err
+      (user-login-name uid)
+    (error (car err))))
 
 (let ((uid -1))
-  (or (null (user-full-name uid))
-      (stringp (user-full-name uid))))
+  (condition-case err
+      (user-full-name uid)
+    (error (car err))))
 
 (condition-case err (user-login-name "root") (error (car err)))
 (condition-case err (user-real-login-name nil) (error (car err)))

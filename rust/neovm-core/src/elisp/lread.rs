@@ -254,6 +254,8 @@ pub(crate) fn builtin_get_load_suffixes(args: Vec<Value>) -> EvalResult {
     Ok(Value::list(vec![
         Value::string(".so"),
         Value::string(".so.gz"),
+        Value::string(".elc"),
+        Value::string(".elc.gz"),
         Value::string(".el"),
         Value::string(".el.gz"),
     ]))
@@ -856,11 +858,13 @@ mod tests {
     fn get_load_suffixes_returns_list() {
         let result = builtin_get_load_suffixes(vec![]).unwrap();
         let items = list_to_vec(&result).unwrap();
-        assert_eq!(items.len(), 4);
+        assert_eq!(items.len(), 6);
         assert_eq!(items[0].as_str(), Some(".so"));
         assert_eq!(items[1].as_str(), Some(".so.gz"));
-        assert_eq!(items[2].as_str(), Some(".el"));
-        assert_eq!(items[3].as_str(), Some(".el.gz"));
+        assert_eq!(items[2].as_str(), Some(".elc"));
+        assert_eq!(items[3].as_str(), Some(".elc.gz"));
+        assert_eq!(items[4].as_str(), Some(".el"));
+        assert_eq!(items[5].as_str(), Some(".el.gz"));
     }
 
     #[test]

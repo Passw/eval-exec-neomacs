@@ -5,9 +5,9 @@
     (insert-image (create-image "x" 'pbm t) nil 'center)
   (error err))
 
-(put-image (create-image "x" 'pbm t) 1 nil nil)
-(put-image (create-image "x" 'pbm t) 1 nil 'left-margin)
-(put-image (create-image "x" 'pbm t) 1 nil 'right-margin)
+(if (put-image (create-image "x" 'pbm t) 1 nil nil) t nil)
+(if (put-image (create-image "x" 'pbm t) 1 nil 'left-margin) t nil)
+(if (put-image (create-image "x" 'pbm t) 1 nil 'right-margin) t nil)
 
 (insert-image (create-image "x" 'pbm t) nil nil)
 (insert-image (create-image "x" 'pbm t) nil 'left-margin)

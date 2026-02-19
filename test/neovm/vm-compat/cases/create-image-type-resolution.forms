@@ -1,8 +1,16 @@
-(image-type (create-image "foo.jpg"))
-(image-type (create-image "foo.unknown"))
-(image-type (create-image "raw" nil 'image/png))
-(image-type (create-image "raw" nil t))
+(condition-case err
+    (image-type (create-image "foo.jpg"))
+  (error (car err)))
+(condition-case err
+    (image-type (create-image "foo.unknown"))
+  (error (car err)))
+(condition-case err
+    (image-type (create-image "raw" nil 'image/png))
+  (error (car err)))
+(condition-case err
+    (image-type (create-image "raw" nil t))
+  (error (car err)))
 
 (condition-case err
     (create-image "foo.png" 1)
-  (error err))
+  (error (car err)))

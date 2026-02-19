@@ -109,8 +109,12 @@ pub(crate) fn builtin_format_mode_line_eval(
 
 /// (invisible-p POS-OR-PROP) -> boolean
 ///
-/// Batch semantics: symbols are considered invisible properties, while
-/// numeric positions are not invisible by default.
+/// Batch semantics mirror current oracle behavior:
+/// - numeric positions > 0 are visible (nil),
+/// - position 0 is out-of-range,
+/// - negative numeric positions are invisible (t),
+/// - nil is visible (nil),
+/// - all other property values are treated as invisible (t).
 pub(crate) fn builtin_invisible_p(args: Vec<Value>) -> EvalResult {
     expect_args("invisible-p", &args, 1)?;
     match &args[0] {
@@ -123,11 +127,15 @@ pub(crate) fn builtin_invisible_p(args: Vec<Value>) -> EvalResult {
                 Ok(Value::Nil)
             }
         }
-        Value::Symbol(_) | Value::True => Ok(Value::symbol("t")),
-        _ => Err(signal(
-            "wrong-type-argument",
-            vec![Value::symbol("integer-or-marker-p"), args[0].clone()],
-        )),
+        Value::Char(ch) => {
+            if *ch == '\0' {
+                Err(signal("args-out-of-range", vec![Value::Char(*ch)]))
+            } else {
+                Ok(Value::Nil)
+            }
+        }
+        Value::Nil => Ok(Value::Nil),
+        _ => Ok(Value::symbol("t")),
     }
 }
 
@@ -232,21 +240,19 @@ pub(crate) fn builtin_pos_visible_in_window_p_eval(
 
 /// (move-point-visually DIRECTION) -> boolean
 ///
-/// Batch semantics: direction is validated as a fixnum and reports whether
-/// movement would reach the buffer edge in the stub-only VM context.
+/// Batch semantics: direction is validated as a fixnum and the command
+/// signals `args-out-of-range` in non-window contexts.
 pub(crate) fn builtin_move_point_visually(args: Vec<Value>) -> EvalResult {
     expect_args("move-point-visually", &args, 1)?;
     match &args[0] {
-        Value::Int(v) => {
-            if *v > 1 {
-                Err(signal("end-of-buffer", vec![]))
-            } else if *v > 0 {
-                Ok(Value::symbol("end-of-buffer"))
-            } else {
-                Ok(Value::symbol("beginning-of-buffer"))
-            }
-        }
-        Value::Char(_) => Ok(Value::symbol("end-of-buffer")),
+        Value::Int(v) => Err(signal(
+            "args-out-of-range",
+            vec![Value::Int(*v), Value::Int(*v)],
+        )),
+        Value::Char(ch) => Err(signal(
+            "args-out-of-range",
+            vec![Value::Char(*ch), Value::Char(*ch)],
+        )),
         other => Err(signal(
             "wrong-type-argument",
             vec![Value::symbol("fixnump"), other.clone()],
@@ -286,10 +292,16 @@ pub(crate) fn builtin_current_bidi_paragraph_direction(args: Vec<Value>) -> Eval
 
 /// (move-to-window-line ARG) -> integer or nil
 ///
-/// Batch semantics: no related live window is available.
+/// Batch semantics: in non-window contexts this command errors with the
+/// standard unrelated-buffer message.
 pub(crate) fn builtin_move_to_window_line(args: Vec<Value>) -> EvalResult {
     expect_args("move-to-window-line", &args, 1)?;
-    Ok(Value::Int(0))
+    Err(signal(
+        "error",
+        vec![Value::string(
+            "move-to-window-line called from unrelated buffer",
+        )],
+    ))
 }
 
 /// (tool-bar-height &optional FRAME PIXELWISE) -> integer
@@ -533,16 +545,14 @@ mod tests {
         let result = builtin_invisible_p(vec![Value::Int(-1)]).unwrap();
         assert!(result.is_truthy());
 
-        let err = builtin_invisible_p(vec![Value::string("x")]).unwrap_err();
-        match err {
-            Flow::Signal(sig) => assert_eq!(sig.symbol, "wrong-type-argument"),
-            other => panic!("expected wrong-type-argument, got {:?}", other),
-        }
-        let err = builtin_invisible_p(vec![Value::Float(1.5)]).unwrap_err();
-        match err {
-            Flow::Signal(sig) => assert_eq!(sig.symbol, "wrong-type-argument"),
-            other => panic!("expected wrong-type-argument, got {:?}", other),
-        }
+        let result = builtin_invisible_p(vec![Value::Nil]).unwrap();
+        assert!(result.is_nil());
+
+        let result = builtin_invisible_p(vec![Value::string("x")]).unwrap();
+        assert!(result.is_truthy());
+
+        let result = builtin_invisible_p(vec![Value::Float(1.5)]).unwrap();
+        assert!(result.is_truthy());
     }
 
     #[test]
@@ -690,23 +700,19 @@ mod tests {
 
     #[test]
     fn test_move_point_visually() {
-        let result = builtin_move_point_visually(vec![Value::Int(1)]).unwrap();
-        assert_eq!(result, Value::symbol("end-of-buffer"));
-
-        let result = builtin_move_point_visually(vec![Value::Int(0)]).unwrap();
-        assert_eq!(result, Value::symbol("beginning-of-buffer"));
-
-        let result = builtin_move_point_visually(vec![Value::Int(-1)]).unwrap();
-        assert_eq!(result, Value::symbol("beginning-of-buffer"));
-
-        let result = builtin_move_point_visually(vec![Value::Int(2)]);
-        match result {
-            Err(Flow::Signal(sig)) => assert_eq!(sig.symbol, "end-of-buffer"),
-            other => panic!("expected end-of-buffer, got {:?}", other),
+        for direction in [1_i64, 0, -1, 2] {
+            let err = builtin_move_point_visually(vec![Value::Int(direction)]).unwrap_err();
+            match err {
+                Flow::Signal(sig) => assert_eq!(sig.symbol, "args-out-of-range"),
+                other => panic!("expected args-out-of-range, got {:?}", other),
+            }
         }
 
-        let result = builtin_move_point_visually(vec![Value::Char('a')]).unwrap();
-        assert_eq!(result, Value::symbol("end-of-buffer"));
+        let err = builtin_move_point_visually(vec![Value::Char('a')]).unwrap_err();
+        match err {
+            Flow::Signal(sig) => assert_eq!(sig.symbol, "args-out-of-range"),
+            other => panic!("expected args-out-of-range, got {:?}", other),
+        }
 
         let err = builtin_move_point_visually(vec![Value::symbol("left")]).unwrap_err();
         match err {
@@ -776,14 +782,19 @@ mod tests {
 
     #[test]
     fn test_move_to_window_line() {
-        let result = builtin_move_to_window_line(vec![Value::Int(1)]).unwrap();
-        assert_eq!(result, Value::Int(0));
-
-        let result = builtin_move_to_window_line(vec![Value::Int(0)]).unwrap();
-        assert_eq!(result, Value::Int(0));
-
-        let result = builtin_move_to_window_line(vec![Value::symbol("left")]).unwrap();
-        assert_eq!(result, Value::Int(0));
+        for arg in [Value::Int(1), Value::Int(0), Value::symbol("left")] {
+            let err = builtin_move_to_window_line(vec![arg]).unwrap_err();
+            match err {
+                Flow::Signal(sig) => {
+                    assert_eq!(sig.symbol, "error");
+                    assert_eq!(
+                        sig.data,
+                        vec![Value::string("move-to-window-line called from unrelated buffer")]
+                    );
+                }
+                other => panic!("expected error signal, got {:?}", other),
+            }
+        }
     }
 
     #[test]

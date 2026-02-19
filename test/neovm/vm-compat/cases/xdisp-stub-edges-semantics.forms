@@ -14,9 +14,9 @@
 (condition-case err (format-mode-line "fmt" nil nil 'xbuf) (error (car err)))
 
 (fboundp 'move-point-visually)
-(move-point-visually 1)
-(move-point-visually 0)
-(move-point-visually -1)
+(condition-case err (move-point-visually 1) (error (car err)))
+(condition-case err (move-point-visually 0) (error (car err)))
+(condition-case err (move-point-visually -1) (error (car err)))
 (condition-case err (move-point-visually 2) (error (car err)))
 (move-point-visually 'left)
 (condition-case err (move-point-visually) (error (car err)))
@@ -35,9 +35,9 @@
 (condition-case err (current-bidi-paragraph-direction nil nil) (error (car err)))
 
 (fboundp 'move-to-window-line)
-(move-to-window-line 1)
-(move-to-window-line nil)
-(move-to-window-line 'x)
+(condition-case err (move-to-window-line 1) (error (car err)))
+(condition-case err (move-to-window-line nil) (error (car err)))
+(condition-case err (move-to-window-line 'x) (error (car err)))
 (condition-case err (move-to-window-line) (error (car err)))
 
 (fboundp 'tool-bar-height)

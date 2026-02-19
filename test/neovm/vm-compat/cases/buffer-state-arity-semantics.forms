@@ -16,7 +16,8 @@
 
 (let ((tm (current-time)))
   (and (listp tm)
-       (= (length tm) 3)
+       (or (= (length tm) 3)
+           (= (length tm) 4))
        (integerp (nth 0 tm))
        (integerp (nth 1 tm))
        (integerp (nth 2 tm))))

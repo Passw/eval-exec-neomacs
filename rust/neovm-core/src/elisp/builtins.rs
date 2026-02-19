@@ -4558,34 +4558,34 @@ fn number_or_marker_to_f64(value: NumberOrMarker) -> f64 {
 }
 
 fn decode_float_time_arg(value: &Value) -> Result<f64, Flow> {
+    let invalid_time_spec = || {
+        signal(
+            "error",
+            vec![Value::string("Invalid time specification")],
+        )
+    };
+    let parse_number = |v: &Value| expect_number_or_marker(v).map(number_or_marker_to_f64);
+
     match value {
         Value::Cons(_) => {
-            let items = list_to_vec(value).ok_or_else(|| {
-                signal(
-                    "wrong-type-argument",
-                    vec![Value::symbol("listp"), value.clone()],
-                )
-            })?;
+            let items = list_to_vec(value).ok_or_else(invalid_time_spec)?;
             if items.len() < 2 {
-                return Err(signal(
-                    "wrong-type-argument",
-                    vec![Value::symbol("listp"), value.clone()],
-                ));
+                return Err(invalid_time_spec());
             }
 
-            let high = number_or_marker_to_f64(expect_number_or_marker(&items[0])?);
-            let low = number_or_marker_to_f64(expect_number_or_marker(&items[1])?);
+            let high = parse_number(&items[0]).map_err(|_| invalid_time_spec())?;
+            let low = parse_number(&items[1]).map_err(|_| invalid_time_spec())?;
             let mut seconds = high * 65536.0 + low;
             if let Some(usec) = items.get(2) {
-                seconds += number_or_marker_to_f64(expect_number_or_marker(usec)?) / 1_000_000.0;
+                seconds += parse_number(usec).map_err(|_| invalid_time_spec())? / 1_000_000.0;
             }
             if let Some(psec) = items.get(3) {
-                seconds +=
-                    number_or_marker_to_f64(expect_number_or_marker(psec)?) / 1_000_000_000_000.0;
+                seconds += parse_number(psec).map_err(|_| invalid_time_spec())?
+                    / 1_000_000_000_000.0;
             }
             Ok(seconds)
         }
-        _ => Ok(number_or_marker_to_f64(expect_number_or_marker(value)?)),
+        _ => Ok(parse_number(value).map_err(|_| invalid_time_spec())?),
     }
 }
 
@@ -8826,6 +8826,10 @@ pub(crate) fn dispatch_builtin(
         "format-spec" => super::format::builtin_format_spec(args),
         "format-time-string" => super::format::builtin_format_time_string(args),
         "format-seconds" => super::format::builtin_format_seconds(args),
+        "string-pad" => super::format::builtin_string_pad(args),
+        "string-fill" => super::format::builtin_string_fill(args),
+        "string-limit" => super::format::builtin_string_limit(args),
+        "string-chop-newline" => super::format::builtin_string_chop_newline(args),
         "string-lines" => super::format::builtin_string_lines(args),
         "string-clean-whitespace" => super::format::builtin_string_clean_whitespace(args),
         "string-pixel-width" => super::format::builtin_string_pixel_width(args),

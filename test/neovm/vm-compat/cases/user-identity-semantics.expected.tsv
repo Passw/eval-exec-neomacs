@@ -13,10 +13,10 @@
 13	(let ((uid (user-real-uid))) (or (null (user-login-name uid)) (stringp (user-login-name uid))))	OK t
 14	(let ((name (user-login-name))) (or (null (user-full-name name)) (stringp (user-full-name name))))	OK t
 15	(let ((uid (user-real-uid))) (or (null (user-full-name uid)) (stringp (user-full-name uid))))	OK t
-16	(let ((uid -1)) (or (null (user-login-name uid)) (stringp (user-login-name uid))))	OK t
-17	(let ((uid -1)) (or (null (user-full-name uid)) (stringp (user-full-name uid))))	OK t
-18	(condition-case err (user-login-name "root") (error (car err)))	OK wrong-type-argument
+16	(let ((uid -1)) (condition-case err (user-login-name uid) (error (car err))))	OK error
+17	(let ((uid -1)) (condition-case err (user-full-name uid) (error (car err))))	OK error
+18	(condition-case err (user-login-name "root") (error (car err)))	OK error
 19	(condition-case err (user-real-login-name nil) (error (car err)))	OK wrong-number-of-arguments
-20	(condition-case err (user-full-name '(x)) (error (car err)))	OK wrong-type-argument
+20	(condition-case err (user-full-name '(x)) (error (car err)))	OK error
 21	(condition-case err (user-login-name nil nil) (error (car err)))	OK wrong-number-of-arguments
 22	(condition-case err (user-full-name nil nil) (error (car err)))	OK wrong-number-of-arguments

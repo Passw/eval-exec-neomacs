@@ -8,7 +8,11 @@
   (kill-new "first")
   (kill-new "second")
   (yank)
-  (condition-case err (yank-pop) (error (car err))))
+  (let ((inhibit-message t)
+        (message-log-max nil))
+    (condition-case err
+        (yank-pop)
+      (error (car err)))))
 
 ; with explicit yank command context, yank-pop rotates the previous yank region.
 (with-temp-buffer
@@ -36,6 +40,8 @@
   (kill-new "three")
   (yank)
   (setq last-command 'yank-pop)
-  (condition-case err
-      (yank-pop)
-    (error (car err))))
+  (let ((inhibit-message t)
+        (message-log-max nil))
+    (condition-case err
+        (yank-pop)
+      (error (car err)))))

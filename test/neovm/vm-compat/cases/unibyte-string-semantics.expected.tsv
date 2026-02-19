@@ -1,7 +1,7 @@
 1	(unibyte-string)	OK ""
 2	(unibyte-string 65)	OK "A"
-3	(unibyte-string 255)	OK "Á¿"
-4	(unibyte-string 65 255 66)	OK "AÁ¿B"
+3	(equal (string-to-list (unibyte-string 255)) '(255))	OK t
+4	(equal (string-to-list (unibyte-string 65 255 66)) '(65 255 66))	OK t
 5	(condition-case err (unibyte-string -1) (error err))	OK (args-out-of-range -1 0 255)
 6	(condition-case err (unibyte-string 256) (error err))	OK (args-out-of-range 256 0 255)
 7	(condition-case err (unibyte-string 1114112) (error err))	OK (args-out-of-range 1114112 0 255)

@@ -9,5 +9,5 @@
 9	(= (float-time '(0 1 500000 250000000000)) 1.75)	OK t
 10	(let ((tm (current-time))) (numberp (float-time tm)))	OK t
 11	(condition-case err (float-time nil nil) (error (car err)))	OK wrong-number-of-arguments
-12	(condition-case err (float-time 'foo) (error (car err)))	OK wrong-type-argument
-13	(condition-case err (float-time '(1)) (error (car err)))	OK wrong-type-argument
+12	(condition-case err (float-time 'foo) (error (car err)))	OK error
+13	(condition-case err (float-time '(1)) (error (car err)))	OK error

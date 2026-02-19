@@ -28,6 +28,31 @@ Last updated: 2026-02-19
 
 ## Doing
 
+- Closed subr-x string helper availability drift by wiring existing implementations into NeoVM dispatch/registry:
+  - runtime wiring:
+    - `rust/neovm-core/src/elisp/builtins.rs`
+    - registered dispatch handlers for:
+      - `string-pad`
+      - `string-fill`
+      - `string-limit`
+      - `string-chop-newline`
+    - `rust/neovm-core/src/elisp/builtin_registry.rs`
+    - added the same four symbols to dispatch builtin name registry so `fboundp`/introspection parity matches oracle availability.
+  - corpus updates:
+    - `test/neovm/vm-compat/cases/subr-x-string-helper-availability.{forms,expected.tsv}`
+    - updated oracle baseline from `void-function` expectations to callable helper behavior.
+    - normalized newline fixture construction to `(string 120 10)` so oracle form rendering remains line-stable in TSV output.
+    - `test/neovm/vm-compat/cases/buffer-state-arity-semantics.{forms,expected.tsv}`
+    - relaxed `current-time` shape assertion from fixed 3-tuple to `(length 3|4)` compatibility to match current oracle time tuple shape.
+    - `test/neovm/vm-compat/cases/yank-pop-semantics.{forms,expected.tsv}`
+    - suppressed transient minibuffer prompt noise with `inhibit-message`/`message-log-max` bindings in non-context `yank-pop` error rows for stable oracle baselines.
+  - verified:
+    - `make -C test/neovm/vm-compat check-one-neovm CASE=subr-x-string-helper-availability` (pass)
+    - `make -C test/neovm/vm-compat check-one-neovm CASE=buffer-state-arity-semantics` (pass)
+    - `make -C test/neovm/vm-compat check-one-neovm CASE=yank-pop-semantics` (pass)
+    - `cargo test --manifest-path rust/neovm-core/Cargo.toml string_` (pass)
+    - `make -C test/neovm/vm-compat check-all-neovm` (pass)
+
 - Closed `start-kbd-macro` arity drift against oracle behavior and re-locked vm-compat corpus:
   - runtime changes:
     - `rust/neovm-core/src/elisp/kmacro.rs`

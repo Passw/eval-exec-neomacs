@@ -363,7 +363,7 @@ pub fn precompile_source_file(source_path: &Path) -> Result<PathBuf, EvalError> 
 pub fn load_file(eval: &mut super::eval::Evaluator, path: &Path) -> Result<Value, EvalError> {
     if is_unsupported_compiled_path(path) {
         return Err(EvalError::Signal {
-            symbol: "file-error".to_string(),
+            symbol: "error".to_string(),
             data: vec![Value::string(format!(
                 "Loading compiled Elisp artifacts (.elc/.elc.gz) is unsupported in neomacs. Rebuild from source and load the .el file: {}",
                 path.display()
@@ -833,7 +833,7 @@ mod tests {
         let err = load_file(&mut eval, &compiled).expect_err("load should reject .elc");
         match err {
             EvalError::Signal { symbol, data } => {
-                assert_eq!(symbol, "file-error");
+                assert_eq!(symbol, "error");
                 assert!(
                     data.iter().any(|v| v
                         .as_str()
@@ -863,7 +863,7 @@ mod tests {
         let mut eval = super::super::eval::Evaluator::new();
         let err = load_file(&mut eval, &compiled).expect_err("load should reject .elc");
         match err {
-            EvalError::Signal { symbol, .. } => assert_eq!(symbol, "file-error"),
+            EvalError::Signal { symbol, .. } => assert_eq!(symbol, "error"),
             other => panic!("unexpected error: {other:?}"),
         }
         assert_eq!(
@@ -908,7 +908,7 @@ mod tests {
         let mut eval = super::super::eval::Evaluator::new();
         let err = load_file(&mut eval, &compiled).expect_err("load should reject .elc.gz");
         match err {
-            EvalError::Signal { symbol, .. } => assert_eq!(symbol, "file-error"),
+            EvalError::Signal { symbol, .. } => assert_eq!(symbol, "error"),
             other => panic!("unexpected error: {other:?}"),
         }
 

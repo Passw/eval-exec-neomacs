@@ -3,7 +3,7 @@
 3	(invisible-p 'foo)	OK t
 4	(condition-case err (invisible-p 0) (error (car err)))	OK args-out-of-range
 5	(with-temp-buffer (insert "abc") (invisible-p -1))	OK t
-6	(condition-case err (invisible-p "x") (error (car err)))	OK wrong-type-argument
+6	(condition-case err (invisible-p "x") (error (car err)))	OK t
 7	(condition-case err (invisible-p) (error (car err)))	OK wrong-number-of-arguments
 8	(condition-case err (invisible-p 1 2) (error (car err)))	OK wrong-number-of-arguments
 9	(fboundp 'format-mode-line)	OK t
@@ -12,10 +12,10 @@
 12	(condition-case err (format-mode-line "fmt" nil 'xwin) (error (car err)))	OK wrong-type-argument
 13	(condition-case err (format-mode-line "fmt" nil nil 'xbuf) (error (car err)))	OK wrong-type-argument
 14	(fboundp 'move-point-visually)	OK t
-15	(move-point-visually 1)	OK end-of-buffer
-16	(move-point-visually 0)	OK beginning-of-buffer
-17	(move-point-visually -1)	OK beginning-of-buffer
-18	(condition-case err (move-point-visually 2) (error (car err)))	OK end-of-buffer
+15	(condition-case err (move-point-visually 1) (error (car err)))	OK args-out-of-range
+16	(condition-case err (move-point-visually 0) (error (car err)))	OK args-out-of-range
+17	(condition-case err (move-point-visually -1) (error (car err)))	OK args-out-of-range
+18	(condition-case err (move-point-visually 2) (error (car err)))	OK args-out-of-range
 19	(move-point-visually 'left)	ERR (wrong-type-argument (fixnump left))
 20	(condition-case err (move-point-visually) (error (car err)))	OK wrong-number-of-arguments
 21	(fboundp 'lookup-image-map)	OK t
@@ -30,9 +30,9 @@
 30	(condition-case err (current-bidi-paragraph-direction "x") (error err))	OK (wrong-type-argument bufferp "x")
 31	(condition-case err (current-bidi-paragraph-direction nil nil) (error (car err)))	OK wrong-number-of-arguments
 32	(fboundp 'move-to-window-line)	OK t
-33	(move-to-window-line 1)	OK 0
-34	(move-to-window-line nil)	OK 0
-35	(move-to-window-line 'x)	OK 0
+33	(condition-case err (move-to-window-line 1) (error (car err)))	OK error
+34	(condition-case err (move-to-window-line nil) (error (car err)))	OK error
+35	(condition-case err (move-to-window-line 'x) (error (car err)))	OK error
 36	(condition-case err (move-to-window-line) (error (car err)))	OK wrong-number-of-arguments
 37	(fboundp 'tool-bar-height)	OK t
 38	(tool-bar-height)	OK 0

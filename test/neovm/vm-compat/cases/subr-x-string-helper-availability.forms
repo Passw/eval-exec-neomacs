@@ -1,5 +1,5 @@
 (fboundp 'string-chop-newline)
-(condition-case err (string-chop-newline "x\n") (error err))
+(condition-case err (string-chop-newline (string 120 10)) (error err))
 
 (fboundp 'string-pad)
 (condition-case err (string-pad "x" 2) (error err))

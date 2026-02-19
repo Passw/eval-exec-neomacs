@@ -113,7 +113,6 @@ fn is_supported_image_type(name: &str) -> bool {
             | "pbm"
             | "tiff"
             | "bmp"
-            | "neomacs"
     )
 }
 
@@ -223,7 +222,7 @@ pub(crate) fn builtin_image_type_available_p(args: Vec<Value>) -> EvalResult {
 ///
 /// Create an image descriptor (a list starting with `image`).
 /// FILE-OR-DATA is a file name string or raw data string.
-/// TYPE is a symbol like `png`, `jpeg`, etc. (defaults to autodetect stub: `png`).
+/// TYPE is a symbol like `png`, `jpeg`, etc.
 /// DATA-P if non-nil means FILE-OR-DATA is raw image data, not a file name.
 /// PROPS are additional property-list pairs (e.g. :width 100 :height 200).
 ///
@@ -232,42 +231,36 @@ pub(crate) fn builtin_create_image(args: Vec<Value>) -> EvalResult {
     expect_min_args("create-image", &args, 1)?;
 
     let file_or_data = args[0].clone();
+    let data_p = args.len() > 2 && args[2].is_truthy();
 
-    // TYPE argument (optional, defaults to png).
+    // TYPE argument (optional).
     let image_type = if args.len() > 1 && !args[1].is_nil() {
         match args[1].as_symbol_name() {
             Some(name) => {
-                let normalized = normalize_image_type_name(name).unwrap_or("neomacs");
+                let normalized = normalize_image_type_name(name).unwrap_or(name);
                 Value::symbol(normalized)
             }
             None => {
+                let rendered = super::print::print_value(&args[1]);
                 return Err(signal(
-                    "wrong-type-argument",
-                    vec![Value::symbol("symbolp"), args[1].clone()],
+                    "error",
+                    vec![Value::string(format!("Invalid image type `{rendered}`"))],
                 ));
             }
         }
     } else {
-        // Best-effort inference from file extension / MIME hint, with neomacs fallback.
-        let inferred = if args.len() > 2 && args[2].is_truthy() {
-            infer_image_type_from_data_hint(&args[2])
-                .map(str::to_string)
-                .unwrap_or_else(|| "neomacs".to_string())
+        let inferred = if data_p {
+            None
         } else {
             file_or_data
                 .as_str()
                 .and_then(infer_image_type_from_filename)
                 .map(str::to_string)
-                .unwrap_or_else(|| "neomacs".to_string())
         };
-        Value::symbol(inferred)
-    };
-
-    // DATA-P argument (optional).
-    let data_p = if args.len() > 2 {
-        args[2].is_truthy()
-    } else {
-        false
+        match inferred {
+            Some(name) => Value::symbol(name),
+            None => Value::Nil,
+        }
     };
 
     // Build the image spec property list.
@@ -283,6 +276,10 @@ pub(crate) fn builtin_create_image(args: Vec<Value>) -> EvalResult {
         spec_items.push(Value::Keyword("file".into()));
         spec_items.push(file_or_data);
     }
+
+    // Emacs adds :scale default on freshly created image specs.
+    spec_items.push(Value::Keyword("scale".into()));
+    spec_items.push(Value::symbol("default"));
 
     // Append any extra PROPS (starting from index 3).
     if args.len() > 3 {
@@ -376,8 +373,8 @@ pub(crate) fn builtin_put_image(args: Vec<Value>) -> EvalResult {
         }
     }
 
-    // Stub: no-op.
-    Ok(Value::Nil)
+    // Batch compatibility: return a truthy placeholder for inserted overlay.
+    Ok(Value::True)
 }
 
 /// (insert-image IMAGE &optional STRING AREA SLICE) -> nil
@@ -436,14 +433,6 @@ pub(crate) fn builtin_remove_images(args: Vec<Value>) -> EvalResult {
         ));
     }
 
-    // Optional BUFFER must be nil or a buffer object.
-    if args.len() > 2 && !args[2].is_nil() && !matches!(&args[2], Value::Buffer(_)) {
-        return Err(signal(
-            "wrong-type-argument",
-            vec![Value::symbol("bufferp"), args[2].clone()],
-        ));
-    }
-
     // Stub: no-op.
     Ok(Value::Nil)
 }
@@ -466,8 +455,13 @@ pub(crate) fn builtin_image_flush(args: Vec<Value>) -> EvalResult {
         ));
     }
 
-    if args.len() == 2 && matches!(args[1], Value::True) {
-        return Ok(Value::Nil);
+    if let Some(frame) = args.get(1) {
+        if matches!(frame, Value::True) {
+            return Ok(Value::Nil);
+        }
+        if !frame.is_nil() {
+            expect_frame_designator("image-flush", frame)?;
+        }
     }
 
     Err(signal(
@@ -523,31 +517,19 @@ pub(crate) fn builtin_clear_image_cache(args: Vec<Value>) -> EvalResult {
 /// (image-type SOURCE &optional TYPE DATA-P) -> symbol
 ///
 /// Compatibility behavior:
-/// - If SOURCE is an image spec and TYPE/DATA-P are omitted, return SOURCE's `:type`.
-/// - Otherwise, resolve TYPE (or infer from SOURCE filename / DATA-P hint) and return a type symbol.
-/// - Falls back to `neomacs` when no specific available type can be inferred.
+/// - SOURCE must be a file name string.
+/// - TYPE, when non-nil, must be a symbol and is returned (normalized aliases).
+/// - Without TYPE, type is inferred from file extension.
+/// - If type inference fails, signal `unknown-image-type`.
 pub(crate) fn builtin_image_type(args: Vec<Value>) -> EvalResult {
     expect_min_args("image-type", &args, 1)?;
     expect_max_args("image-type", &args, 3)?;
-
-    // Backward-compatible path for image descriptors.
-    if args.len() == 1 && is_image_spec(&args[0]) {
-        let plist = image_spec_plist(&args[0]);
-        let type_val = plist_get(&plist, &Value::Keyword("type".into()));
-        if type_val.is_nil() {
-            return Err(signal(
-                "error",
-                vec![Value::string("Invalid image spec: missing :type")],
-            ));
-        }
-        return Ok(type_val);
-    }
 
     let source = &args[0];
     let explicit_type = args.get(1).cloned().unwrap_or(Value::Nil);
     let data_p = args.get(2).cloned().unwrap_or(Value::Nil);
 
-    if !data_p.is_truthy() && source.as_str().is_none() {
+    if source.as_str().is_none() {
         let rendered = super::print::print_value(source);
         return Err(signal(
             "error",
@@ -557,9 +539,9 @@ pub(crate) fn builtin_image_type(args: Vec<Value>) -> EvalResult {
         ));
     }
 
-    let mut resolved = if explicit_type.is_nil() {
+    let resolved = if explicit_type.is_nil() {
         if data_p.is_truthy() {
-            infer_image_type_from_data_hint(&data_p).map(str::to_string)
+            None
         } else {
             source
                 .as_str()
@@ -574,17 +556,19 @@ pub(crate) fn builtin_image_type(args: Vec<Value>) -> EvalResult {
                 vec![Value::string(format!("Invalid image type `{rendered}`"))],
             )
         })?;
-        normalize_image_type_name(sym_name).map(str::to_string)
+        Some(
+            normalize_image_type_name(sym_name)
+                .unwrap_or(sym_name)
+                .to_string(),
+        )
     };
 
-    if resolved.is_none() {
-        resolved = Some("neomacs".to_string());
-    }
-    let mut resolved = resolved.unwrap();
-
-    if resolved != "image-convert" && resolved != "neomacs" && !is_supported_image_type(&resolved) {
-        resolved = "neomacs".to_string();
-    }
+    let Some(resolved) = resolved else {
+        return Err(signal(
+            "unknown-image-type",
+            vec![Value::list(vec![Value::string("Cannot determine image type")])],
+        ));
+    };
 
     Ok(Value::symbol(resolved))
 }
@@ -653,7 +637,7 @@ mod tests {
     fn type_available_neomacs() {
         let result = builtin_image_type_available_p(vec![Value::symbol("neomacs")]);
         assert!(result.is_ok());
-        assert!(result.unwrap().is_truthy());
+        assert!(result.unwrap().is_nil());
     }
 
     #[test]
@@ -743,7 +727,7 @@ mod tests {
 
         let plist = image_spec_plist(&spec);
         let img_type = plist_get(&plist, &Value::Keyword("type".into()));
-        assert_eq!(img_type.as_symbol_name(), Some("neomacs"));
+        assert!(img_type.is_nil());
     }
 
     #[test]
@@ -758,7 +742,7 @@ mod tests {
 
         let plist = image_spec_plist(&spec);
         let img_type = plist_get(&plist, &Value::Keyword("type".into()));
-        assert_eq!(img_type.as_symbol_name(), Some("jpeg"));
+        assert!(img_type.is_nil());
     }
 
     #[test]
@@ -795,7 +779,10 @@ mod tests {
             Value::string("test.png"),
             Value::Int(42), // not a symbol
         ]);
-        assert!(result.is_err());
+        assert!(matches!(
+            result,
+            Err(Flow::Signal(sig)) if sig.symbol == "error"
+        ));
     }
 
     // -----------------------------------------------------------------------
@@ -862,7 +849,7 @@ mod tests {
 
         let result = builtin_put_image(vec![spec, Value::Int(1)]);
         assert!(result.is_ok());
-        assert!(result.unwrap().is_nil());
+        assert!(result.unwrap().is_truthy());
     }
 
     #[test]
@@ -872,7 +859,7 @@ mod tests {
 
         let result = builtin_put_image(vec![spec, Value::Char('a')]);
         assert!(result.is_ok());
-        assert!(result.unwrap().is_nil());
+        assert!(result.unwrap().is_truthy());
     }
 
     #[test]
@@ -1014,12 +1001,8 @@ mod tests {
     #[test]
     fn remove_images_bad_buffer() {
         let result = builtin_remove_images(vec![Value::Int(1), Value::Int(10), Value::Int(1)]);
-        assert!(matches!(
-            result,
-            Err(Flow::Signal(sig))
-                if sig.symbol == "wrong-type-argument"
-                && sig.data.first() == Some(&Value::symbol("bufferp"))
-        ));
+        assert!(result.is_ok());
+        assert!(result.unwrap().is_nil());
     }
 
     #[test]
@@ -1063,8 +1046,8 @@ mod tests {
         assert!(matches!(
             result,
             Err(Flow::Signal(sig))
-                if sig.symbol == "error"
-                && sig.data.first() == Some(&Value::string("Window system frame should be used"))
+                if sig.symbol == "wrong-type-argument"
+                    && sig.data.first() == Some(&Value::symbol("frame-live-p"))
         ));
     }
 
@@ -1134,20 +1117,14 @@ mod tests {
 
     #[test]
     fn image_type_png() {
-        let spec =
-            builtin_create_image(vec![Value::string("test.png"), Value::symbol("png")]).unwrap();
-
-        let result = builtin_image_type(vec![spec]);
+        let result = builtin_image_type(vec![Value::string("test.png")]);
         assert!(result.is_ok());
         assert_eq!(result.unwrap().as_symbol_name(), Some("png"));
     }
 
     #[test]
     fn image_type_svg() {
-        let spec =
-            builtin_create_image(vec![Value::string("icon.svg"), Value::symbol("svg")]).unwrap();
-
-        let result = builtin_image_type(vec![spec]);
+        let result = builtin_image_type(vec![Value::string("icon.svg")]);
         assert!(result.is_ok());
         assert_eq!(result.unwrap().as_symbol_name(), Some("svg"));
     }
@@ -1183,10 +1160,12 @@ mod tests {
     }
 
     #[test]
-    fn image_type_unknown_falls_back_to_neomacs() {
+    fn image_type_unknown_signals() {
         let result = builtin_image_type(vec![Value::string("unknown.bin")]);
-        assert!(result.is_ok());
-        assert_eq!(result.unwrap().as_symbol_name(), Some("neomacs"));
+        assert!(matches!(
+            result,
+            Err(Flow::Signal(sig)) if sig.symbol == "unknown-image-type"
+        ));
     }
 
     // -----------------------------------------------------------------------
@@ -1304,11 +1283,11 @@ mod tests {
 
     #[test]
     fn round_trip_create_then_type() {
-        // create-image -> image-type should return the same type.
+        // `create-image` keeps the explicit :type marker in the resulting spec.
         let spec =
             builtin_create_image(vec![Value::string("photo.jpg"), Value::symbol("jpeg")]).unwrap();
-
-        let img_type = builtin_image_type(vec![spec]).unwrap();
+        let plist = image_spec_plist(&spec);
+        let img_type = plist_get(&plist, &Value::Keyword("type".into()));
         assert_eq!(img_type.as_symbol_name(), Some("jpeg"));
     }
 

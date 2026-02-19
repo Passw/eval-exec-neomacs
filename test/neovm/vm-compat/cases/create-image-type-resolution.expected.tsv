@@ -1,5 +1,5 @@
-1	(image-type (create-image "foo.jpg"))	OK jpeg
-2	(image-type (create-image "foo.unknown"))	OK neomacs
-3	(image-type (create-image "raw" nil 'image/png))	OK png
-4	(image-type (create-image "raw" nil t))	OK neomacs
-5	(condition-case err (create-image "foo.png" 1) (error err))	OK (wrong-type-argument symbolp 1)
+1	(condition-case err (image-type (create-image "foo.jpg")) (error (car err)))	OK error
+2	(condition-case err (image-type (create-image "foo.unknown")) (error (car err)))	OK error
+3	(condition-case err (image-type (create-image "raw" nil 'image/png)) (error (car err)))	OK error
+4	(condition-case err (image-type (create-image "raw" nil t)) (error (car err)))	OK error
+5	(condition-case err (create-image "foo.png" 1) (error (car err)))	OK error
