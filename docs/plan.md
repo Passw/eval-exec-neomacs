@@ -28,6 +28,18 @@ Last updated: 2026-02-19
 
 ## Doing
 
+- Expanded `recent-keys` prompt-reader publication lock-ins in batch mode:
+  - corpus changes:
+    - expanded and re-recorded:
+      - `test/neovm/vm-compat/cases/help-key-recent-keys-semantics.{forms,expected.tsv}`
+    - added oracle lock-in covering:
+      - `read-string`, `read-number`, `read-from-minibuffer`, `completing-read`, `read-command`, `read-variable`, `read-buffer`, `read-file-name`
+      - each reader (with queued unread events in batch) leaves `recent-keys` unchanged while signaling `end-of-file`
+  - verified:
+    - `make -C test/neovm/vm-compat record FORMS=cases/help-key-recent-keys-semantics.forms EXPECTED=cases/help-key-recent-keys-semantics.expected.tsv` (pass)
+    - `make -C test/neovm/vm-compat check-one-neovm CASE=cases/help-key-recent-keys-semantics` (pass, `46/46`)
+    - `make -C test/neovm/vm-compat check-all-neovm-strict` (pass)
+
 - Expanded batch prompt/input queue-edge lock-ins for stale/invalid unread tails:
   - corpus changes:
     - expanded and re-recorded:

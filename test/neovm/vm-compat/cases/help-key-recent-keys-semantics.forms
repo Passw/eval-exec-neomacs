@@ -58,4 +58,29 @@
   (setq unread-command-events (list '(control 97)))
   (read-event nil nil 0)
   (append (nthcdr start (append (recent-keys) nil)) nil))
+
+; Prompt/input readers in batch do not publish recent-keys entries when they
+; terminate with end-of-file on queued unread events.
+(let ((probes
+       '((read-string "")
+         (read-number "")
+         (read-from-minibuffer "")
+         (completing-read "" (("a") ("b")))
+         (read-command "")
+         (read-variable "")
+         (read-buffer "")
+         (read-file-name ""))))
+  (mapcar
+   (lambda (entry)
+     (let ((fn (car entry))
+           (args (cdr entry))
+           (start (length (recent-keys))))
+       (condition-case _
+           (progn
+             (setq unread-command-events (list 97 'foo))
+             (apply fn args))
+         (error nil))
+       (list fn (append (nthcdr start (append (recent-keys) nil)) nil))))
+   probes))
+
 (equal (append (recent-keys) nil) (append (recent-keys t) nil))

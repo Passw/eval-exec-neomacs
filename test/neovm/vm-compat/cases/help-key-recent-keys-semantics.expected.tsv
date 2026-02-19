@@ -42,4 +42,5 @@
 42	(let ((start (length (recent-keys)))) (setq unread-command-events (list 'foo 97)) (condition-case _ (read-char nil nil 0) (error nil)) (append (nthcdr start (append (recent-keys) nil)) nil))	OK (foo)
 43	(let ((start (length (recent-keys)))) (setq unread-command-events (list 99 100)) (read-key nil) (append (nthcdr start (append (recent-keys) nil)) nil))	OK (99)
 44	(let ((start (length (recent-keys)))) (setq unread-command-events (list '(control 97))) (read-event nil nil 0) (append (nthcdr start (append (recent-keys) nil)) nil))	OK ((control 97))
-45	(equal (append (recent-keys) nil) (append (recent-keys t) nil))	OK t
+45	(let ((probes '((read-string "") (read-number "") (read-from-minibuffer "") (completing-read "" (("a") ("b"))) (read-command "") (read-variable "") (read-buffer "") (read-file-name "")))) (mapcar (lambda (entry) (let ((fn (car entry)) (args (cdr entry)) (start (length (recent-keys)))) (condition-case _ (progn (setq unread-command-events (list 97 'foo)) (apply fn args)) (error nil)) (list fn (append (nthcdr start (append (recent-keys) nil)) nil)))) probes))	OK ((read-string nil) (read-number nil) (read-from-minibuffer nil) (completing-read nil) (read-command nil) (read-variable nil) (read-buffer nil) (read-file-name nil))
+46	(equal (append (recent-keys) nil) (append (recent-keys t) nil))	OK t
