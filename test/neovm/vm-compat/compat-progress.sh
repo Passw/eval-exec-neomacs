@@ -81,6 +81,7 @@ collect_core_dispatch_builtin_names "$tmp_all" "$tmp_core"
   awk 'NF && $1 !~ /^#/ { print $1 }' "$script_dir/cases/legacy-elc-literal.list"
   awk 'NF && $1 !~ /^#/ { print $1 }' "$script_dir/cases/introspection.list"
   awk 'NF && $1 !~ /^#/ { print $1 }' "$script_dir/cases/thread.list"
+  awk 'NF && $1 !~ /^#/ { print $1 }' "$script_dir/cases/startup-doc.list"
 } > "$tmp_tracker"
 
 while IFS= read -r case_path; do
@@ -115,6 +116,7 @@ printf '  neovm-only: %s\n' "$(count_lines "$script_dir/cases/neovm-only.list")"
 printf '  legacy-elc: %s\n' "$(count_lines "$script_dir/cases/legacy-elc-literal.list")"
 printf '  introspection: %s\n' "$(count_lines "$script_dir/cases/introspection.list")"
 printf '  thread: %s\n' "$(count_lines "$script_dir/cases/thread.list")"
+printf '  startup-doc: %s\n' "$(count_lines "$script_dir/cases/startup-doc.list")"
 printf '  total unique tracked: %s\n' "$tracked_unique"
 forms_count=0
 while IFS= read -r path; do

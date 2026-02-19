@@ -24,6 +24,7 @@ results against that baseline once evaluator execution is wired in.
 - `cases/legacy-elc-literal.list`: opt-in `.elc` literal compatibility corpus order
 - `cases/introspection.list`: focused callable/special-form introspection corpus order
 - `cases/thread.list`: focused thread primitive corpus order
+- `cases/startup-doc.list`: focused startup documentation parity corpus order
 - `cases/builtin-registry-fboundp-allowlist.txt`: intentional `fboundp` drift allowlist for registry parity checks
 - `cases/core.forms`: starter corpus for expression and error behavior
 - `cases/input-batch-readers.forms`: batch-mode input reader compatibility corpus
@@ -164,6 +165,7 @@ Run any case list file directly (avoids passing very long `CASES=...` values):
 ```bash
 cd test/neovm/vm-compat
 make check-neovm-list LIST=cases/thread.list
+make check-neovm-list LIST=cases/startup-doc.list
 make check-list LIST=cases/introspection.list
 make record-list LIST=cases/default.list
 ```
@@ -201,6 +203,13 @@ Run the focused thread primitive suite (faster loop for `make-thread`/`thread-jo
 ```bash
 cd test/neovm/vm-compat
 make check-thread-neovm
+```
+
+Run the focused startup-doc parity suite (startup doc oracle corpus + startup doc coverage/count gates):
+
+```bash
+cd test/neovm/vm-compat
+make check-startup-doc-neovm
 ```
 
 Run the builtin registry `fboundp` parity gate (GNU Emacs `-Q` vs NeoVM core builtin names):

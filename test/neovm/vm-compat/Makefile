@@ -17,14 +17,16 @@ INTROSPECTION_CASES_LIST ?= cases/introspection.list
 INTROSPECTION_CASES ?= $(call read_case_list,$(INTROSPECTION_CASES_LIST))
 THREAD_CASES_LIST ?= cases/thread.list
 THREAD_CASES ?= $(call read_case_list,$(THREAD_CASES_LIST))
-CASE_LIST_FILES ?= $(CASES_LIST) $(NEOVM_ONLY_CASES_LIST) $(LEGACY_ELC_CASES_LIST) $(INTROSPECTION_CASES_LIST) $(THREAD_CASES_LIST)
+STARTUP_DOC_CASES_LIST ?= cases/startup-doc.list
+STARTUP_DOC_CASES ?= $(call read_case_list,$(STARTUP_DOC_CASES_LIST))
+CASE_LIST_FILES ?= $(CASES_LIST) $(NEOVM_ONLY_CASES_LIST) $(LEGACY_ELC_CASES_LIST) $(INTROSPECTION_CASES_LIST) $(THREAD_CASES_LIST) $(STARTUP_DOC_CASES_LIST)
 BENCH_SOURCE ?= cases/load-policy-fixtures/vm-policy-cache-probe.el
 BENCH_ITERS ?= 100
 ERT_ALLOWLIST ?= cases/ert-allowlist-smoke.txt
 ERT_EXPECTED ?= cases/ert-allowlist-smoke.expected.tsv
 ERT_LOAD_FILES ?= cases/ert-allowlist-fixtures/smoke-tests.el
 
-.PHONY: oracle neovm record check compare check-neovm record-all check-all check-all-neovm check-all-neovm-only check-all-neovm-strict check-legacy-elc-neovm check-introspection-neovm check-thread-neovm check-runner-feature-stamp check-builtin-registry-all check-builtin-registry-fboundp check-builtin-registry-function-cell check-builtin-registry-function-kind check-builtin-registry-commandp check-builtin-registry-extension-policy check-oracle-default-path check-case-line-filter list-cases record-list check-list check-neovm-list check-one-neovm validate-case-lists case-inventory ert-oracle record-ert-allowlist check-ert-allowlist bench-load-cache compat-progress compat-stub-index compat-stub-index-json check-stub-budget check-startup-doc-stub-coverage check-startup-doc-string-coverage check-startup-variable-documentation-counts show-function-kind-drifts
+.PHONY: oracle neovm record check compare check-neovm record-all check-all check-all-neovm check-all-neovm-only check-all-neovm-strict check-legacy-elc-neovm check-introspection-neovm check-thread-neovm check-startup-doc-neovm check-runner-feature-stamp check-builtin-registry-all check-builtin-registry-fboundp check-builtin-registry-function-cell check-builtin-registry-function-kind check-builtin-registry-commandp check-builtin-registry-extension-policy check-oracle-default-path check-case-line-filter list-cases record-list check-list check-neovm-list check-one-neovm validate-case-lists case-inventory ert-oracle record-ert-allowlist check-ert-allowlist bench-load-cache compat-progress compat-stub-index compat-stub-index-json check-stub-budget check-startup-doc-stub-coverage check-startup-doc-string-coverage check-startup-variable-documentation-counts show-function-kind-drifts
 
 oracle:
 	./run-oracle.sh $(FORMS)
@@ -115,6 +117,13 @@ check-thread-neovm:
 		echo "== $$case =="; \
 		$(MAKE) --no-print-directory check-neovm FORMS="$$case.forms" EXPECTED="$$case.expected.tsv"; \
 	done
+
+check-startup-doc-neovm:
+	@set -e; \
+	$(MAKE) --no-print-directory check-neovm-list LIST="$(STARTUP_DOC_CASES_LIST)"; \
+	$(MAKE) --no-print-directory check-startup-doc-stub-coverage; \
+	$(MAKE) --no-print-directory check-startup-doc-string-coverage; \
+	$(MAKE) --no-print-directory check-startup-variable-documentation-counts
 
 check-runner-feature-stamp:
 	./check-run-neovm-feature-stamp.sh

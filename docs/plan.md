@@ -28,6 +28,35 @@ Last updated: 2026-02-18
 
 ## Doing
 
+- Added a focused startup-doc parity workflow for faster operator loops while preserving full-gate coverage:
+  - list/target changes:
+    - `test/neovm/vm-compat/cases/startup-doc.list`
+    - new focused startup-doc corpus list:
+      - `cases/documentation-property-semantics`
+      - `cases/startup-variable-documentation-counts-semantics`
+      - `cases/startup-variable-documentation-runtime-resolution-semantics`
+    - `test/neovm/vm-compat/Makefile`
+    - added `STARTUP_DOC_CASES_LIST`/`STARTUP_DOC_CASES`.
+    - added target: `check-startup-doc-neovm`.
+    - `check-startup-doc-neovm` runs:
+      - `check-neovm-list LIST=cases/startup-doc.list`
+      - `check-startup-doc-stub-coverage`
+      - `check-startup-doc-string-coverage`
+      - `check-startup-variable-documentation-counts`
+    - extended `CASE_LIST_FILES` so `validate-case-lists` enforces `cases/startup-doc.list`.
+  - observability/docs:
+    - `test/neovm/vm-compat/compat-progress.sh`
+    - now includes `startup-doc` list entry count and tracks it in unique-case inventory accounting.
+    - `test/neovm/vm-compat/README.md`
+    - documented:
+      - `cases/startup-doc.list`
+      - `make check-startup-doc-neovm`
+      - list-driven startup-doc loop usage example.
+  - verified:
+    - `make -C test/neovm/vm-compat validate-case-lists` (pass; includes `cases/startup-doc.list`)
+    - `make -C test/neovm/vm-compat check-startup-doc-neovm` (pass)
+    - `make -C test/neovm/vm-compat compat-progress` (pass; includes `startup-doc: 3`)
+
 - Added startup `documentation-property` runtime-resolution parity lock-in and upgraded startup count gate to enforce both models:
   - runtime/test changes:
     - `rust/neovm-core/src/elisp/eval.rs`
