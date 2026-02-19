@@ -937,18 +937,23 @@ fn subr_arity_value(name: &str) -> Value {
         | "process-filter"
         | "process-id"
         | "process-live-p"
+        | "process-mark"
         | "process-name"
         | "process-plist"
         | "process-query-on-exit-flag"
         | "process-sentinel"
         | "process-status"
+        | "process-thread"
+        | "process-type"
         | "processp" => {
             arity_cons(1, Some(1))
         }
+        "process-running-child-p" | "process-send-eof" => arity_cons(0, Some(1)),
         "process-contact" => arity_cons(1, Some(3)),
         "process-list" => arity_cons(0, Some(0)),
         "process-get" => arity_cons(2, Some(2)),
         "process-put" => arity_cons(3, Some(3)),
+        "process-send-region" => arity_cons(3, Some(3)),
         "process-send-string" => arity_cons(2, Some(2)),
         "set-process-filter"
         | "set-process-plist"
@@ -1576,13 +1581,19 @@ mod tests {
         assert_subr_arity("process-id", 1, Some(1));
         assert_subr_arity("process-live-p", 1, Some(1));
         assert_subr_arity("process-list", 0, Some(0));
+        assert_subr_arity("process-mark", 1, Some(1));
         assert_subr_arity("process-name", 1, Some(1));
         assert_subr_arity("process-plist", 1, Some(1));
         assert_subr_arity("process-put", 3, Some(3));
         assert_subr_arity("process-query-on-exit-flag", 1, Some(1));
+        assert_subr_arity("process-running-child-p", 0, Some(1));
+        assert_subr_arity("process-send-eof", 0, Some(1));
+        assert_subr_arity("process-send-region", 3, Some(3));
         assert_subr_arity("process-send-string", 2, Some(2));
         assert_subr_arity("process-sentinel", 1, Some(1));
         assert_subr_arity("process-status", 1, Some(1));
+        assert_subr_arity("process-thread", 1, Some(1));
+        assert_subr_arity("process-type", 1, Some(1));
         assert_subr_arity("processp", 1, Some(1));
         assert_subr_arity("set-process-filter", 2, Some(2));
         assert_subr_arity("set-process-plist", 2, Some(2));

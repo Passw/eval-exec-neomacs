@@ -16945,6 +16945,40 @@ Last updated: 2026-02-19
 
 ## Doing
 
+- Added process marker/type/thread/send/runtime-child compatibility slice and locked oracle parity:
+  - runtime changes:
+    - `rust/neovm-core/src/elisp/process.rs`
+      - implemented:
+        - `process-mark`
+        - `process-type`
+        - `process-thread`
+        - `process-send-region`
+        - `process-send-eof`
+        - `process-running-child-p`
+      - added optional process resolution (`nil`/omitted => current buffer process) for `process-send-eof` / `process-running-child-p` / `process-send-region`.
+      - added process module unit coverage for the new runtime surface.
+    - `rust/neovm-core/src/elisp/builtins.rs`
+      - wired evaluator dispatch for all six new process symbols.
+    - `rust/neovm-core/src/elisp/builtin_registry.rs`
+      - registered all six symbols in `DISPATCH_BUILTIN_NAMES`.
+    - `rust/neovm-core/src/elisp/subr_info.rs`
+      - added arity metadata/assertions:
+        - `(1 . 1)` `process-mark`, `process-type`, `process-thread`
+        - `(3 . 3)` `process-send-region`
+        - `(0 . 1)` `process-send-eof`, `process-running-child-p`
+  - corpus changes:
+    - added and wired:
+      - `test/neovm/vm-compat/cases/process-mark-type-thread-send-semantics.forms`
+      - `test/neovm/vm-compat/cases/process-mark-type-thread-send-semantics.expected.tsv`
+      - `test/neovm/vm-compat/cases/default.list`
+  - verified:
+    - `cargo test --manifest-path rust/neovm-core/Cargo.toml process_mark_type_thread_send_and_running_child_runtime_surface -- --nocapture` (pass)
+    - `cargo test --manifest-path rust/neovm-core/Cargo.toml subr_arity_process_primitives_match_oracle -- --nocapture` (pass)
+    - `make -C test/neovm/vm-compat record FORMS=cases/process-mark-type-thread-send-semantics.forms EXPECTED=cases/process-mark-type-thread-send-semantics.expected.tsv` (pass)
+    - `make -C test/neovm/vm-compat check-one-neovm CASE=cases/process-mark-type-thread-send-semantics` (pass, `4/4`)
+    - `make -C test/neovm/vm-compat check-builtin-registry-all` (pass; `1110` dispatch / `1109` core parity entries)
+    - `make -C test/neovm/vm-compat check-all-neovm-strict` (pass; inventory `780`)
+
 - Added process runtime introspection/control compatibility slice and locked oracle parity:
   - runtime changes:
     - `rust/neovm-core/src/elisp/process.rs`

@@ -555,6 +555,7 @@ cases/process-error-conditions
 cases/process-basics
 cases/process-subr-arity-semantics
 cases/process-runtime-introspection-semantics
+cases/process-mark-type-thread-send-semantics
 cases/getenv-optional-frame-semantics
 cases/setenv-sequence-semantics
 cases/file-name-concat

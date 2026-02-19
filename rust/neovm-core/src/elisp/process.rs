@@ -149,6 +149,14 @@ impl ProcessManager {
             .map(|p| p.id)
     }
 
+    /// Find a process associated with BUFFER-NAME.
+    pub fn find_by_buffer_name(&self, buffer_name: &str) -> Option<ProcessId> {
+        self.processes
+            .values()
+            .find(|p| p.buffer_name.as_deref() == Some(buffer_name))
+            .map(|p| p.id)
+    }
+
     /// Queue input for a process.
     pub fn send_input(&mut self, id: ProcessId, input: &str) -> bool {
         if let Some(proc) = self.processes.get_mut(&id) {
@@ -626,6 +634,35 @@ fn resolve_live_process_or_wrong_type(
     })
 }
 
+fn resolve_optional_process_or_current_buffer(
+    eval: &super::eval::Evaluator,
+    value: Option<&Value>,
+) -> Result<ProcessId, Flow> {
+    if let Some(v) = value {
+        if !v.is_nil() {
+            return resolve_live_process_or_wrong_type(eval, v);
+        }
+    }
+
+    let current_buffer_name = eval
+        .buffers
+        .current_buffer()
+        .map(|buffer| buffer.name.clone())
+        .ok_or_else(|| signal("error", vec![Value::string("No current buffer")]))?;
+
+    eval.processes
+        .find_by_buffer_name(&current_buffer_name)
+        .ok_or_else(|| {
+            signal(
+                "error",
+                vec![Value::string(format!(
+                    "Buffer  {} has no process",
+                    current_buffer_name
+                ))],
+            )
+        })
+}
+
 fn process_live_status_value(status: &ProcessStatus) -> Value {
     match status {
         ProcessStatus::Run => Value::list(vec![
@@ -992,6 +1029,104 @@ pub(crate) fn builtin_process_buffer(
         },
         None => Err(signal("error", vec![Value::string("Process not found")])),
     }
+}
+
+/// (process-mark PROCESS) -> marker
+pub(crate) fn builtin_process_mark(
+    eval: &mut super::eval::Evaluator,
+    args: Vec<Value>,
+) -> EvalResult {
+    expect_args("process-mark", &args, 1)?;
+    let id = resolve_live_process_or_wrong_type(eval, &args[0])?;
+    let proc = eval.processes.get(id).ok_or_else(|| {
+        signal(
+            "wrong-type-argument",
+            vec![Value::symbol("processp"), args[0].clone()],
+        )
+    })?;
+    Ok(super::marker::make_marker_value(
+        proc.buffer_name.as_deref(),
+        None,
+        false,
+    ))
+}
+
+/// (process-type PROCESS) -> symbol
+pub(crate) fn builtin_process_type(
+    eval: &mut super::eval::Evaluator,
+    args: Vec<Value>,
+) -> EvalResult {
+    expect_args("process-type", &args, 1)?;
+    let _id = resolve_live_process_or_wrong_type(eval, &args[0])?;
+    Ok(Value::symbol("real"))
+}
+
+/// (process-thread PROCESS) -> object-or-nil
+pub(crate) fn builtin_process_thread(
+    eval: &mut super::eval::Evaluator,
+    args: Vec<Value>,
+) -> EvalResult {
+    expect_args("process-thread", &args, 1)?;
+    let _id = resolve_live_process_or_wrong_type(eval, &args[0])?;
+    Ok(Value::Nil)
+}
+
+/// (process-send-region PROCESS START END) -> nil
+pub(crate) fn builtin_process_send_region(
+    eval: &mut super::eval::Evaluator,
+    args: Vec<Value>,
+) -> EvalResult {
+    expect_args("process-send-region", &args, 3)?;
+    let id = resolve_optional_process_or_current_buffer(eval, Some(&args[0]))?;
+    let start = expect_int_or_marker(&args[1])?;
+    let end = expect_int_or_marker(&args[2])?;
+
+    let region_text = {
+        let buf = eval
+            .buffers
+            .current_buffer()
+            .ok_or_else(|| signal("error", vec![Value::string("No current buffer")]))?;
+        let (region_beg, region_end) = checked_region_bytes(buf, start, end)?;
+        buf.text.text_range(region_beg, region_end)
+    };
+
+    if !eval.processes.send_input(id, &region_text) {
+        return Err(signal("error", vec![Value::string("Process not found")]));
+    }
+    Ok(Value::Nil)
+}
+
+/// (process-send-eof &optional PROCESS) -> process
+pub(crate) fn builtin_process_send_eof(
+    eval: &mut super::eval::Evaluator,
+    args: Vec<Value>,
+) -> EvalResult {
+    if args.len() > 1 {
+        return Err(signal(
+            "wrong-number-of-arguments",
+            vec![Value::symbol("process-send-eof"), Value::Int(args.len() as i64)],
+        ));
+    }
+    let id = resolve_optional_process_or_current_buffer(eval, args.first())?;
+    Ok(Value::Int(id as i64))
+}
+
+/// (process-running-child-p &optional PROCESS) -> bool
+pub(crate) fn builtin_process_running_child_p(
+    eval: &mut super::eval::Evaluator,
+    args: Vec<Value>,
+) -> EvalResult {
+    if args.len() > 1 {
+        return Err(signal(
+            "wrong-number-of-arguments",
+            vec![
+                Value::symbol("process-running-child-p"),
+                Value::Int(args.len() as i64),
+            ],
+        ));
+    }
+    let _id = resolve_optional_process_or_current_buffer(eval, args.first())?;
+    Ok(Value::Nil)
 }
 
 /// (accept-process-output &optional PROCESS SECONDS MILLISECS JUST-THIS-ONE) -> bool
@@ -2124,5 +2259,50 @@ mod tests {
             results[5],
             "OK (wrong-type-argument stringp proc-get-probe)"
         );
+    }
+
+    #[test]
+    fn process_mark_type_thread_send_and_running_child_runtime_surface() {
+        let cat = find_bin("cat");
+        let results = eval_all(&format!(
+            r#"(let ((p (start-process "proc-mark-type-thread-send" nil "{cat}")))
+                 (unwind-protect
+                     (list
+                      (processp p)
+                      (eq (process-type p) 'real)
+                      (not (processp (process-thread p)))
+                      (markerp (process-mark p))
+                      (marker-buffer (process-mark p))
+                      (marker-position (process-mark p))
+                      (process-running-child-p p)
+                      (processp (process-send-eof p))
+                      (with-temp-buffer
+                        (insert "abc")
+                        (process-send-region p (point-min) (point-max)))
+                      (delete-process p)
+                      (process-live-p p))
+                   (ignore-errors (delete-process p))))
+               (condition-case err (process-send-eof) (error (car err)))
+               (condition-case err (process-running-child-p) (error (car err)))
+               (condition-case err (process-mark 1) (error err))
+               (condition-case err (process-type 1) (error err))
+               (condition-case err (process-thread 1) (error err))
+               (condition-case err (process-send-region 1 1 1) (error err))
+               (condition-case err (process-send-eof 1) (error err))
+               (condition-case err (process-running-child-p 1) (error err))
+               (condition-case err (process-send-eof nil nil) (error (car err)))
+               (condition-case err (process-running-child-p nil nil) (error (car err)))"#,
+        ));
+        assert_eq!(results[0], "OK (t t t t nil nil nil t nil nil nil)");
+        assert_eq!(results[1], "OK error");
+        assert_eq!(results[2], "OK error");
+        assert_eq!(results[3], "OK (wrong-type-argument processp 1)");
+        assert_eq!(results[4], "OK (wrong-type-argument processp 1)");
+        assert_eq!(results[5], "OK (wrong-type-argument processp 1)");
+        assert_eq!(results[6], "OK (wrong-type-argument processp 1)");
+        assert_eq!(results[7], "OK (wrong-type-argument processp 1)");
+        assert_eq!(results[8], "OK (wrong-type-argument processp 1)");
+        assert_eq!(results[9], "OK wrong-number-of-arguments");
+        assert_eq!(results[10], "OK wrong-number-of-arguments");
     }
 }

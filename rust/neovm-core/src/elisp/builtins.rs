@@ -7741,6 +7741,16 @@ pub(crate) fn dispatch_builtin(
         "set-process-plist" => return Some(super::process::builtin_set_process_plist(eval, args)),
         "process-put" => return Some(super::process::builtin_process_put(eval, args)),
         "process-get" => return Some(super::process::builtin_process_get(eval, args)),
+        "process-mark" => return Some(super::process::builtin_process_mark(eval, args)),
+        "process-type" => return Some(super::process::builtin_process_type(eval, args)),
+        "process-thread" => return Some(super::process::builtin_process_thread(eval, args)),
+        "process-running-child-p" => {
+            return Some(super::process::builtin_process_running_child_p(eval, args))
+        }
+        "process-send-region" => {
+            return Some(super::process::builtin_process_send_region(eval, args))
+        }
+        "process-send-eof" => return Some(super::process::builtin_process_send_eof(eval, args)),
         "process-send-string" => {
             return Some(super::process::builtin_process_send_string(eval, args))
         }
