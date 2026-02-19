@@ -16,7 +16,7 @@ results against that baseline once evaluator execution is wired in.
 - `check-builtin-registry-fboundp.sh`: checks `fboundp` parity for all names in `builtin_registry.rs`
 - `check-startup-doc-stub-coverage.sh`: checks startup integer-doc symbol coverage of `STARTUP_VARIABLE_DOC_STUBS`
 - `check-startup-doc-string-coverage.sh`: checks startup string-doc symbol coverage of `STARTUP_VARIABLE_DOC_STRING_PROPERTIES`
-- `check-startup-variable-documentation-counts.sh`: checks startup integer/string `variable-documentation` count parity (oracle vs NeoVM)
+- `check-startup-variable-documentation-counts.sh`: checks startup `variable-documentation` property-count and runtime-resolution count parity (oracle vs NeoVM)
 - `cases/startup-doc-stub-extra-allowlist.txt`: allowlisted startup doc stubs intentionally beyond oracle integer-doc set
 - `bench-load-cache.sh`: runs cold/warm/post-edit `.neoc` load benchmark reporting via `load_cache_bench`
 - `cases/default.list`: default `check-all-neovm` corpus order (one case per line)
@@ -83,7 +83,7 @@ cd test/neovm/vm-compat
 make list-cases
 ```
 
-Get a compact status snapshot (case counts + explicit stub count + startup doc coverage + startup variable-doc count parity + builtin registry counts + allowlist size):
+Get a compact status snapshot (case counts + explicit stub count + startup doc coverage + startup variable-doc property/runtime-resolution count parity + builtin registry counts + allowlist size):
 
 ```bash
 cd test/neovm/vm-compat
@@ -133,6 +133,10 @@ make check-startup-doc-string-coverage
 ```
 
 Validate startup runtime `variable-documentation` integer/string type counts
+for both:
+- raw startup property types (`get`)
+- runtime doc resolution (`documentation-property`)
+
 against both the oracle baseline and NeoVM runtime:
 
 ```bash

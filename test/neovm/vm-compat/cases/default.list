@@ -37,6 +37,7 @@ cases/symbol-obarray-subr-arity-semantics
 cases/functionp-callable-matrix
 cases/documentation-property-semantics
 cases/startup-variable-documentation-counts-semantics
+cases/startup-variable-documentation-runtime-resolution-semantics
 cases/documentation-semantics
 cases/snarf-documentation-runtime-semantics
 cases/describe-variable-runtime-semantics

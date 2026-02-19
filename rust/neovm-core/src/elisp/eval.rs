@@ -3984,6 +3984,30 @@ mod tests {
     }
 
     #[test]
+    fn startup_variable_documentation_runtime_resolution_counts_match_oracle_snapshot() {
+        let results = eval_all(
+            "(list
+              (let ((n 0))
+                (mapatoms
+                 (lambda (s)
+                   (let ((d (get s 'variable-documentation)))
+                     (when (and (integerp d)
+                                (stringp (documentation-property s 'variable-documentation t)))
+                       (setq n (1+ n))))))
+                n)
+              (let ((n 0))
+                (mapatoms
+                 (lambda (s)
+                   (let ((d (get s 'variable-documentation)))
+                     (when (and (stringp d)
+                                (stringp (documentation-property s 'variable-documentation t)))
+                       (setq n (1+ n))))))
+                n))",
+        );
+        assert_eq!(results[0], "OK (761 1904)");
+    }
+
+    #[test]
     fn features_variable_controls_featurep_and_require() {
         let results = eval_all(
             "(setq features '(vm-existing))

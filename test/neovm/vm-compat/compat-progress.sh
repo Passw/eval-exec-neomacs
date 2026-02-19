@@ -158,15 +158,16 @@ string_oracle_count="$(awk -F': ' '/oracle string-doc symbols:/ { print $2 }' "$
 string_startup_count="$(awk -F': ' '/startup string-doc symbols:/ { print $2 }' "$tmp_startup_string_check" | head -n 1)"
 string_missing_count="$(awk -F': ' '/missing startup string-docs:/ { print $2 }' "$tmp_startup_string_check" | head -n 1)"
 string_extra_count="$(awk -F': ' '/extra startup string-docs:/ { print $2 }' "$tmp_startup_string_check" | head -n 1)"
-startup_doc_expected_counts="$(awk -F': ' '/expected integer\/string:/ { print $2 }' "$tmp_startup_variable_doc_count_check" | head -n 1)"
-startup_doc_oracle_counts="$(awk -F': ' '/oracle integer\/string:/ { print $2 }' "$tmp_startup_variable_doc_count_check" | head -n 1)"
-startup_doc_neovm_counts="$(awk -F': ' '/neovm integer\/string:/ { print $2 }' "$tmp_startup_variable_doc_count_check" | head -n 1)"
+startup_doc_property_summary="$(awk -F': ' '/startup variable-documentation property-count summary:/ { print $2 }' "$tmp_startup_variable_doc_count_check" | head -n 1)"
+startup_doc_runtime_resolution_summary="$(awk -F': ' '/startup variable-documentation runtime-resolution summary:/ { print $2 }' "$tmp_startup_variable_doc_count_check" | head -n 1)"
 printf '  startup integer docs (oracle/startup/missing/extra): %s/%s/%s/%s\n' \
   "${stub_oracle_count:-0}" "${stub_startup_count:-0}" "${stub_missing_count:-0}" "${stub_extra_count:-0}"
 printf '  startup string docs (oracle/startup/missing/extra): %s/%s/%s/%s\n' \
   "${string_oracle_count:-0}" "${string_startup_count:-0}" "${string_missing_count:-0}" "${string_extra_count:-0}"
-printf '  startup variable-doc counts (expected|oracle|neovm integer/string): %s|%s|%s\n' \
-  "${startup_doc_expected_counts:-0/0}" "${startup_doc_oracle_counts:-0/0}" "${startup_doc_neovm_counts:-0/0}"
+printf '  startup variable-doc property-counts (expected|oracle|neovm integer/string): %s\n' \
+  "${startup_doc_property_summary:-0/0|0/0|0/0}"
+printf '  startup variable-doc runtime-resolution counts (expected|oracle|neovm integer/string): %s\n' \
+  "${startup_doc_runtime_resolution_summary:-0/0|0/0|0/0}"
 if [[ "$expected_count" -ne "$forms_count" ]]; then
   printf '  corpus artifact delta (expected - forms): %+d\n' "$((expected_count - forms_count))"
   while IFS= read -r path; do

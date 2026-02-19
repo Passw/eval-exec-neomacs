@@ -28,6 +28,37 @@ Last updated: 2026-02-18
 
 ## Doing
 
+- Added startup `documentation-property` runtime-resolution parity lock-in and upgraded startup count gate to enforce both models:
+  - runtime/test changes:
+    - `rust/neovm-core/src/elisp/eval.rs`
+    - added `startup_variable_documentation_runtime_resolution_counts_match_oracle_snapshot` unit lock-in (`OK (761 1904)`).
+    - `test/neovm/vm-compat/cases/startup-variable-documentation-runtime-resolution-semantics.{forms,expected.tsv}`
+    - added oracle-backed runtime-resolution startup case counting symbols where:
+      - `(integerp (get ... 'variable-documentation))` resolves through `(documentation-property ... t)` to string docs
+      - `(stringp (get ... 'variable-documentation))` also resolves through `(documentation-property ... t)` to string docs
+    - `test/neovm/vm-compat/cases/default.list`
+    - `test/neovm/vm-compat/cases/introspection.list`
+    - wired the new runtime-resolution case into both default and introspection case lists.
+  - gate/progress tooling:
+    - `test/neovm/vm-compat/check-startup-variable-documentation-counts.sh`
+    - now enforces two startup parity checks:
+      - `property-count` parity (`get` integer/string type counts)
+      - `runtime-resolution` parity (`documentation-property` string-resolution counts)
+    - emits stable summary lines for both checks (`expected|oracle|neovm`).
+    - `test/neovm/vm-compat/compat-progress.sh`
+    - now reports both startup variable-doc parity lines:
+      - property-counts `(expected|oracle|neovm integer/string)`
+      - runtime-resolution counts `(expected|oracle|neovm integer/string)`
+    - `test/neovm/vm-compat/README.md`
+    - documented dual-mode startup variable-doc parity coverage.
+  - verified:
+    - `make -C test/neovm/vm-compat record FORMS=cases/startup-variable-documentation-runtime-resolution-semantics.forms EXPECTED=cases/startup-variable-documentation-runtime-resolution-semantics.expected.tsv` (pass)
+    - `cargo test --manifest-path rust/neovm-core/Cargo.toml startup_variable_documentation_` (pass; 2 tests)
+    - `make -C test/neovm/vm-compat check-one-neovm CASE=startup-variable-documentation-runtime-resolution-semantics` (pass, 1/1)
+    - `make -C test/neovm/vm-compat check-startup-variable-documentation-counts` (pass; property-count + runtime-resolution)
+    - `make -C test/neovm/vm-compat compat-progress` (pass; includes both startup variable-doc lines)
+    - `make -C test/neovm/vm-compat check-all-neovm` (pass with dual startup count gate)
+
 - Locked startup `variable-documentation` type-count parity into vm-compat corpus, gate checks, and progress snapshot:
   - runtime/test changes:
     - `rust/neovm-core/src/elisp/eval.rs`
