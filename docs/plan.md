@@ -445,6 +445,33 @@ Last updated: 2026-02-19
     - `make -C test/neovm/vm-compat check-one-neovm CASE=cases/window-group-prev-next-state-semantics` (pass)
     - `make -C test/neovm/vm-compat check-all-neovm-strict` (pass)
 
+- Completed oversized positive window setter position clamp parity and lock-ins:
+  - runtime changes:
+    - `rust/neovm-core/src/elisp/window_cmds.rs`
+      - aligned oversized positive position handling for:
+        - `set-window-start`
+        - `set-window-point`
+        - `set-window-group-start`
+      - on non-minibuffer windows, positive positions now clamp stored state to buffer end (`point-max + 1`) instead of storing out-of-range values.
+      - preserved oracle return-value semantics:
+        - integer args return the original integer argument.
+        - marker args:
+          - `set-window-start` / `set-window-group-start` return the marker object unchanged.
+          - `set-window-point` returns the clamped integer position.
+      - retained previously aligned non-positive and minibuffer no-mutation behavior.
+      - expanded evaluator unit coverage:
+        - `set_window_start_point_and_group_start_accept_marker_positions`
+  - corpus changes:
+    - expanded and re-recorded:
+      - `test/neovm/vm-compat/cases/window-set-start-point-marker-semantics.{forms,expected.tsv}`
+      - now locks oversized positive integer and marker-position clamping semantics across all three setters.
+  - verified:
+    - `cargo test --manifest-path rust/neovm-core/Cargo.toml set_window_start_point_and_group_start_accept_marker_positions` (pass)
+    - `cargo test --manifest-path rust/neovm-core/Cargo.toml window_group_start_and_buffer_history_setters_match_batch_semantics` (pass)
+    - `make -C test/neovm/vm-compat check-one-neovm CASE=cases/window-set-start-point-marker-semantics` (pass)
+    - `make -C test/neovm/vm-compat check-one-neovm CASE=cases/window-group-prev-next-state-semantics` (pass)
+    - `make -C test/neovm/vm-compat check-all-neovm-strict` (pass)
+
 - Completed window old-state helper parity slice and added oracle lock-ins:
   - runtime changes:
     - `rust/neovm-core/src/elisp/window_cmds.rs`
