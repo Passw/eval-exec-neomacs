@@ -28,6 +28,20 @@ Last updated: 2026-02-19
 
 ## Doing
 
+- Expanded prompt-reader `this-command-keys`/`this-command-keys-vector` lock-ins:
+  - corpus changes:
+    - expanded and re-recorded:
+      - `test/neovm/vm-compat/cases/this-command-keys-readers-semantics.{forms,expected.tsv}`
+    - added oracle-backed lock-ins that prompt/input readers in batch:
+      - do not publish queued unread events into `this-command-keys*`
+      - preserve pre-existing key state across prompt-reader EOF paths
+      - validated across both char-seeded and mouse-seeded prior key states
+      - readers covered: `read-string`, `read-number`, `read-from-minibuffer`, `completing-read`, `read-command`, `read-variable`, `read-buffer`, `read-file-name`
+  - verified:
+    - `make -C test/neovm/vm-compat record FORMS=cases/this-command-keys-readers-semantics.forms EXPECTED=cases/this-command-keys-readers-semantics.expected.tsv` (pass)
+    - `make -C test/neovm/vm-compat check-one-neovm CASE=cases/this-command-keys-readers-semantics` (pass, `16/16`)
+    - `make -C test/neovm/vm-compat check-all-neovm-strict` (pass)
+
 - Expanded `recent-keys` prompt-reader publication lock-ins in batch mode:
   - corpus changes:
     - expanded and re-recorded:
