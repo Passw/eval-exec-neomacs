@@ -246,7 +246,6 @@ make check-builtin-registry-sync
 
 Current intentional sync exclusions are startup-shape driven:
 - `word-at-point` (`fboundp` is `nil` at startup)
-- `kmacro-name-last-macro` (autoload-shaped at startup)
 - `string-join` (bytecode-shaped at startup)
 - `string-to-list` (bytecode-shaped at startup)
 

@@ -646,6 +646,7 @@ const DISPATCH_BUILTIN_NAMES: &[&str] = &[
     "mutex-lock",
     "mutex-unlock",
     "mutexp",
+    "kmacro-name-last-macro",
     "name-last-kbd-macro",
     "narrow-to-region",
     "nconc",

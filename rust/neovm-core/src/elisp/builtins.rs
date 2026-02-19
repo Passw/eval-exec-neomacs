@@ -2862,12 +2862,29 @@ pub(crate) fn builtin_symbol_function(
             vec![Value::symbol("symbolp"), args[0].clone()],
         )
     })?;
-    if let Some(function) = eval.obarray().symbol_function(name) {
-        return Ok(function.clone());
-    }
-
     if eval.obarray().is_function_unbound(name) {
         return Ok(Value::Nil);
+    }
+
+    if let Some(function) = eval.obarray().symbol_function(name) {
+        // GNU Emacs exposes this symbol as autoload-shaped in startup state,
+        // then subr-shaped after first invocation triggers autoload materialization.
+        if name == "kmacro-name-last-macro"
+            && matches!(function, Value::Subr(subr) if subr == "kmacro-name-last-macro")
+            && eval
+                .obarray()
+                .get_property("kmacro-name-last-macro", "neovm--kmacro-autoload-promoted")
+                .is_none()
+        {
+            return Ok(Value::list(vec![
+                Value::symbol("autoload"),
+                Value::string("kmacro"),
+                Value::string("Assign a name to the last keyboard macro defined."),
+                Value::True,
+                Value::Nil,
+            ]));
+        }
+        return Ok(function.clone());
     }
 
     if let Some(function) = super::subr_info::fallback_macro_value(name) {
@@ -8045,6 +8062,11 @@ pub(crate) fn dispatch_builtin(
             return Some(super::kmacro::builtin_name_last_kbd_macro(eval, args))
         }
         "kmacro-name-last-macro" => {
+            eval.obarray_mut().put_property(
+                "kmacro-name-last-macro",
+                "neovm--kmacro-autoload-promoted",
+                Value::True,
+            );
             return Some(super::kmacro::builtin_kmacro_name_last_macro(eval, args))
         }
         "insert-kbd-macro" => return Some(super::kmacro::builtin_insert_kbd_macro(eval, args)),

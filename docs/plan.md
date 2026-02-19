@@ -28,6 +28,19 @@ Last updated: 2026-02-19
 
 ## Doing
 
+- Removed `kmacro-name-last-macro` from builtin-registry sync allowlist by aligning startup introspection semantics:
+  - runtime changes:
+    - `rust/neovm-core/src/elisp/builtins.rs`
+      - `symbol-function` now reports startup autoload shape for `kmacro-name-last-macro` until first invocation.
+      - first dispatch of `kmacro-name-last-macro` now marks the symbol as promoted so subsequent `symbol-function` reflects subr shape, matching oracle post-call behavior.
+    - `rust/neovm-core/src/elisp/builtin_registry.rs`
+      - added `kmacro-name-last-macro` to `DISPATCH_BUILTIN_NAMES`.
+  - vm-compat policy/docs changes:
+    - `test/neovm/vm-compat/cases/builtin-registry-sync-allowlist.txt`
+      - removed `kmacro-name-last-macro` from intentional sync exclusions.
+    - `test/neovm/vm-compat/README.md`
+      - updated documented intentional sync exclusions.
+
 - Expanded builtin registry coverage and arity parity for dispatch-backed core builtins:
   - runtime/registry changes:
     - `rust/neovm-core/src/elisp/builtin_registry.rs`
