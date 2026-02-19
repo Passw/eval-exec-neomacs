@@ -2913,6 +2913,7 @@ pub(crate) fn builtin_func_arity_eval(
             if function.is_nil() {
                 return Err(signal("void-function", vec![Value::symbol(name)]));
             }
+            maybe_materialize_thingatpt_word_symbol(eval, name, &function);
             if let Some(arity) = dispatch_symbol_func_arity_override(eval, name, &function) {
                 return Ok(arity);
             }
@@ -2922,6 +2923,26 @@ pub(crate) fn builtin_func_arity_eval(
     }
 
     super::subr_info::builtin_func_arity(vec![args[0].clone()])
+}
+
+fn maybe_materialize_thingatpt_word_symbol(
+    eval: &mut super::eval::Evaluator,
+    name: &str,
+    function: &Value,
+) {
+    if !super::autoload::is_autoload_value(function) {
+        return;
+    }
+    if !matches!(
+        name,
+        "symbol-at-point" | "thing-at-point" | "bounds-of-thing-at-point"
+    ) {
+        return;
+    }
+    if eval.obarray().fboundp("word-at-point") {
+        return;
+    }
+    eval.set_function("word-at-point", Value::Subr("word-at-point".to_string()));
 }
 
 fn has_startup_subr_wrapper(eval: &super::eval::Evaluator, name: &str) -> bool {

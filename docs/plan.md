@@ -34,7 +34,8 @@ Last updated: 2026-02-19
       - `func-arity` symbol path now applies dispatch-arity override when function-cell is:
         - startup bytecode wrapper (`neovm--startup-subr-wrapper-<name>`)
         - autoload object for a dispatch-backed builtin
-      - preserves existing `void-function` behavior for explicitly unbound symbols (e.g. startup `word-at-point`).
+      - preserves existing `void-function` behavior for explicitly unbound symbols before lazy bootstrap.
+      - materializes `word-at-point` on first `func-arity` probe of thing-at-point autoload symbols (`symbol-at-point`, `thing-at-point`, `bounds-of-thing-at-point`) so post-probe startup state matches oracle.
     - `rust/neovm-core/src/elisp/subr_info.rs`
       - added oracle-aligned `subr_arity_value` entries for startup wrapper/autoload-backed helper symbols:
         - `autoloadp`, `looking-at-p`, `string-match-p`, `string-empty-p`, `string-blank-p`, `string-equal-ignore-case`, `string-to-vector`
@@ -47,10 +48,10 @@ Last updated: 2026-02-19
     - wired case into:
       - `test/neovm/vm-compat/cases/default.list`
   - verified:
-    - `make -C test/neovm/vm-compat check-one-neovm CASE=cases/func-arity-dispatch-symbol-wrapper-semantics` (pass, `18/18`)
+    - `make -C test/neovm/vm-compat check-one-neovm CASE=cases/func-arity-dispatch-symbol-wrapper-semantics` (pass, `21/21`)
     - `make -C test/neovm/vm-compat check-builtin-registry-all` (pass)
     - `make -C test/neovm/vm-compat check-all-neovm-strict` (pass)
-    - registry-wide `func-arity` drift scan reduced from `63` to `1` residual startup-policy case (`word-at-point` lazy bootstrap materialization order).
+    - registry-wide `func-arity` drift scan reduced from `63` to `0` (`drift_count=0`).
 
 - Tightened startup wrapper arglist/arity parity for `string-join` and `string-to-list`:
   - runtime changes:
