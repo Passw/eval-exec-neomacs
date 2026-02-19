@@ -12943,6 +12943,8 @@ enum neomacs_keyword_index
   NEOMACS_HEURISTIC_MASK,
   NEOMACS_MASK,
   NEOMACS_BACKGROUND,
+  NEOMACS_INDEX,
+  NEOMACS_FOREGROUND,
   NEOMACS_LAST
 };
 
@@ -12964,6 +12966,8 @@ static const struct image_keyword neomacs_format[NEOMACS_LAST] =
   {":heuristic-mask",  IMAGE_DONT_CHECK_VALUE_TYPE,               0},
   {":mask",            IMAGE_DONT_CHECK_VALUE_TYPE,               0},
   {":background",      IMAGE_STRING_OR_NIL_VALUE,                 0},
+  {":index",           IMAGE_NON_NEGATIVE_INTEGER_VALUE,          0},
+  {":foreground",      IMAGE_STRING_OR_NIL_VALUE,                 0},
 };
 
 /* Return true if OBJECT is a valid neomacs image specification.  */
