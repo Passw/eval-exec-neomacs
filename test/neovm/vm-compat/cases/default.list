@@ -91,6 +91,7 @@ cases/text-property-overlay-subr-arity-semantics
 cases/navigation-case-subr-arity-semantics
 cases/count-lines-subr-arity-semantics
 cases/hook-advice-subr-arity-semantics
+cases/hook-runner-builtins-semantics
 cases/hook-runtime-semantics
 cases/startup-helper-subr-arity-semantics
 cases/encoding-bool-vector-subr-arity-semantics

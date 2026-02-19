@@ -3254,15 +3254,23 @@ fn symbol_dynamic_buffer_or_global_value(
     eval.obarray().symbol_value(name).cloned()
 }
 
-fn run_hook_value(
+enum HookControl {
+    Continue,
+    Return(Value),
+}
+
+fn walk_hook_value_with<F>(
     eval: &mut super::eval::Evaluator,
     hook_name: &str,
     hook_value: Value,
-    hook_args: &[Value],
     inherit_global: bool,
-) -> Result<(), Flow> {
+    callback: &mut F,
+) -> Result<HookControl, Flow>
+where
+    F: FnMut(&mut super::eval::Evaluator, Value) -> Result<HookControl, Flow>,
+{
     match hook_value {
-        Value::Nil => Ok(()),
+        Value::Nil => Ok(HookControl::Continue),
         Value::Cons(_) => {
             // Oracle-compatible traversal: iterate cons cells, ignore improper
             // list tails, and treat `t` as "also run the global value".
@@ -3276,7 +3284,10 @@ fn run_hook_value(
                 if func.as_symbol_name() == Some("t") {
                     saw_global_marker = true;
                 } else {
-                    eval.apply(func, hook_args.to_vec())?;
+                    match callback(eval, func)? {
+                        HookControl::Continue => {}
+                        HookControl::Return(value) => return Ok(HookControl::Return(value)),
+                    }
                 }
                 cursor = next;
             }
@@ -3287,14 +3298,33 @@ fn run_hook_value(
                     .symbol_value(hook_name)
                     .cloned()
                     .unwrap_or(Value::Nil);
-                run_hook_value(eval, hook_name, global_value, hook_args, false)?;
+                return walk_hook_value_with(eval, hook_name, global_value, false, callback);
             }
-            Ok(())
+            Ok(HookControl::Continue)
         }
-        value => {
-            eval.apply(value, hook_args.to_vec())?;
-            Ok(())
-        }
+        value => callback(eval, value),
+    }
+}
+
+fn run_hook_value(
+    eval: &mut super::eval::Evaluator,
+    hook_name: &str,
+    hook_value: Value,
+    hook_args: &[Value],
+    inherit_global: bool,
+) -> Result<(), Flow> {
+    let mut callback = |eval: &mut super::eval::Evaluator, value: Value| {
+        eval.apply(value, hook_args.to_vec())?;
+        Ok(HookControl::Continue)
+    };
+    match walk_hook_value_with(
+        eval,
+        hook_name,
+        hook_value,
+        inherit_global,
+        &mut callback,
+    )? {
+        HookControl::Continue | HookControl::Return(_) => Ok(()),
     }
 }
 
@@ -3328,6 +3358,92 @@ pub(crate) fn builtin_run_hook_with_args(
     let hook_value = symbol_dynamic_buffer_or_global_value(eval, hook_name).unwrap_or(Value::Nil);
     run_hook_value(eval, hook_name, hook_value, &hook_args, true)?;
     Ok(Value::Nil)
+}
+
+pub(crate) fn builtin_run_hook_with_args_until_success(
+    eval: &mut super::eval::Evaluator,
+    args: Vec<Value>,
+) -> EvalResult {
+    expect_min_args("run-hook-with-args-until-success", &args, 1)?;
+    let hook_name = args[0].as_symbol_name().ok_or_else(|| {
+        signal(
+            "wrong-type-argument",
+            vec![Value::symbol("symbolp"), args[0].clone()],
+        )
+    })?;
+    let hook_args: Vec<Value> = args[1..].to_vec();
+    let hook_value = symbol_dynamic_buffer_or_global_value(eval, hook_name).unwrap_or(Value::Nil);
+    let mut callback = |eval: &mut super::eval::Evaluator, func: Value| {
+        let value = eval.apply(func, hook_args.clone())?;
+        if value.is_truthy() {
+            Ok(HookControl::Return(value))
+        } else {
+            Ok(HookControl::Continue)
+        }
+    };
+    match walk_hook_value_with(eval, hook_name, hook_value, true, &mut callback)? {
+        HookControl::Continue => Ok(Value::Nil),
+        HookControl::Return(value) => Ok(value),
+    }
+}
+
+pub(crate) fn builtin_run_hook_with_args_until_failure(
+    eval: &mut super::eval::Evaluator,
+    args: Vec<Value>,
+) -> EvalResult {
+    expect_min_args("run-hook-with-args-until-failure", &args, 1)?;
+    let hook_name = args[0].as_symbol_name().ok_or_else(|| {
+        signal(
+            "wrong-type-argument",
+            vec![Value::symbol("symbolp"), args[0].clone()],
+        )
+    })?;
+    let hook_args: Vec<Value> = args[1..].to_vec();
+    let hook_value = symbol_dynamic_buffer_or_global_value(eval, hook_name).unwrap_or(Value::Nil);
+    let mut callback = |eval: &mut super::eval::Evaluator, func: Value| {
+        let value = eval.apply(func, hook_args.clone())?;
+        if value.is_nil() {
+            Ok(HookControl::Return(Value::Nil))
+        } else {
+            Ok(HookControl::Continue)
+        }
+    };
+    match walk_hook_value_with(eval, hook_name, hook_value, true, &mut callback)? {
+        HookControl::Continue => Ok(Value::True),
+        HookControl::Return(value) => Ok(value),
+    }
+}
+
+pub(crate) fn builtin_run_hook_wrapped(
+    eval: &mut super::eval::Evaluator,
+    args: Vec<Value>,
+) -> EvalResult {
+    expect_min_args("run-hook-wrapped", &args, 2)?;
+    let hook_name = args[0].as_symbol_name().ok_or_else(|| {
+        signal(
+            "wrong-type-argument",
+            vec![Value::symbol("symbolp"), args[0].clone()],
+        )
+    })?;
+    let wrapper = args[1].clone();
+    let wrapped_args: Vec<Value> = args[2..].to_vec();
+    let hook_value = symbol_dynamic_buffer_or_global_value(eval, hook_name).unwrap_or(Value::Nil);
+    let mut callback = |eval: &mut super::eval::Evaluator, func: Value| {
+        let mut call_args = Vec::with_capacity(wrapped_args.len() + 1);
+        call_args.push(func);
+        call_args.extend(wrapped_args.clone());
+        eval.apply(wrapper.clone(), call_args)?;
+        Ok(HookControl::Continue)
+    };
+    let _ = walk_hook_value_with(eval, hook_name, hook_value, true, &mut callback)?;
+    Ok(Value::Nil)
+}
+
+pub(crate) fn builtin_run_mode_hooks(
+    eval: &mut super::eval::Evaluator,
+    args: Vec<Value>,
+) -> EvalResult {
+    builtin_run_hooks(eval, args)
 }
 
 pub(crate) fn builtin_featurep(eval: &mut super::eval::Evaluator, args: Vec<Value>) -> EvalResult {
@@ -7282,6 +7398,14 @@ pub(crate) fn dispatch_builtin(
         "remove-hook" => return Some(builtin_remove_hook(eval, args)),
         "run-hooks" => return Some(builtin_run_hooks(eval, args)),
         "run-hook-with-args" => return Some(builtin_run_hook_with_args(eval, args)),
+        "run-hook-with-args-until-success" => {
+            return Some(builtin_run_hook_with_args_until_success(eval, args))
+        }
+        "run-hook-with-args-until-failure" => {
+            return Some(builtin_run_hook_with_args_until_failure(eval, args))
+        }
+        "run-hook-wrapped" => return Some(builtin_run_hook_wrapped(eval, args)),
+        "run-mode-hooks" => return Some(builtin_run_mode_hooks(eval, args)),
         "featurep" => return Some(builtin_featurep(eval, args)),
         // Loading
         "load" => return Some(builtin_load(eval, args)),

@@ -16910,6 +16910,38 @@ Last updated: 2026-02-19
     - `make -C test/neovm/vm-compat record FORMS=cases/hook-runtime-semantics.forms EXPECTED=cases/hook-runtime-semantics.expected.tsv` (pass)
     - `make -C test/neovm/vm-compat check-one-neovm CASE=cases/hook-runtime-semantics` (pass, `2/2`)
     - `make -C test/neovm/vm-compat check-all-neovm-strict` (pass)
+- Added missing hook runner builtins and locked runtime parity with oracle:
+  - runtime changes:
+    - `rust/neovm-core/src/elisp/builtins.rs`
+      - implemented:
+        - `run-hook-with-args-until-success`
+        - `run-hook-with-args-until-failure`
+        - `run-hook-wrapped`
+        - `run-mode-hooks`
+      - added shared hook walker control flow so hook list traversal, dotted-tail handling, and `t` marker inheritance semantics are consistent across all hook runners.
+    - `rust/neovm-core/src/elisp/builtin_registry.rs`
+      - added all 4 names to `DISPATCH_BUILTIN_NAMES`.
+    - `rust/neovm-core/src/elisp/subr_info.rs`
+      - aligned arity metadata and oracle assertions:
+        - `(1 . many)` `run-hook-with-args-until-success`
+        - `(1 . many)` `run-hook-with-args-until-failure`
+        - `(2 . many)` `run-hook-wrapped`
+        - `(0 . many)` `run-mode-hooks`
+  - corpus changes:
+    - added and wired:
+      - `test/neovm/vm-compat/cases/hook-runner-builtins-semantics.forms`
+      - `test/neovm/vm-compat/cases/hook-runner-builtins-semantics.expected.tsv`
+      - `test/neovm/vm-compat/cases/default.list`
+    - lock-ins cover:
+      - builtin presence / `subrp` / `subr-arity` parity for all 4 symbols,
+      - truthy/falsey early-stop semantics for both `until-*` runners,
+      - wrapper invocation order/shape for `run-hook-wrapped`,
+      - `run-mode-hooks` multi-hook dispatch and symbol argument validation parity.
+  - verified:
+    - `cargo test --manifest-path rust/neovm-core/Cargo.toml subr_arity_hook_advice_primitives_match_oracle -- --nocapture` (pass)
+    - `make -C test/neovm/vm-compat record FORMS=cases/hook-runner-builtins-semantics.forms EXPECTED=cases/hook-runner-builtins-semantics.expected.tsv` (pass)
+    - `make -C test/neovm/vm-compat check-one-neovm CASE=cases/hook-runner-builtins-semantics` (pass, `2/2`)
+    - `make -C test/neovm/vm-compat check-all-neovm-strict` (pass)
 
 ## Doing
 

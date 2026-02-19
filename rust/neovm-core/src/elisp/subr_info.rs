@@ -645,7 +645,11 @@ fn subr_arity_value(name: &str) -> Value {
         "indent-to" | "move-to-column" => arity_cons(1, Some(2)),
         "tab-to-tab-stop" => arity_cons(0, Some(0)),
         "backtrace-frame" => arity_cons(1, Some(2)),
-        "run-hook-with-args" => arity_cons(1, None),
+        "run-hook-with-args"
+        | "run-hook-with-args-until-failure"
+        | "run-hook-with-args-until-success" => arity_cons(1, None),
+        "run-hook-wrapped" => arity_cons(2, None),
+        "run-mode-hooks" => arity_cons(0, None),
         "base64-decode-string" => arity_cons(1, Some(3)),
         "base64-encode-string" | "base64url-encode-string" => arity_cons(1, Some(2)),
         "md5" => arity_cons(1, Some(5)),
@@ -1749,6 +1753,10 @@ mod tests {
         assert_subr_arity("autoload-do-load", 1, Some(3));
         assert_subr_arity("backtrace-frame", 1, Some(2));
         assert_subr_arity("run-hook-with-args", 1, None);
+        assert_subr_arity("run-hook-with-args-until-failure", 1, None);
+        assert_subr_arity("run-hook-with-args-until-success", 1, None);
+        assert_subr_arity("run-hook-wrapped", 2, None);
+        assert_subr_arity("run-mode-hooks", 0, None);
     }
 
     #[test]
