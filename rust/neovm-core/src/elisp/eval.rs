@@ -171,6 +171,15 @@ impl Evaluator {
         obarray.set_symbol_value("defining-kbd-macro", Value::Nil);
         obarray.set_symbol_value("executing-kbd-macro", Value::Nil);
         obarray.set_symbol_value("executing-kbd-macro-index", Value::Int(0));
+        obarray.set_symbol_value("command-history", Value::Nil);
+        obarray.set_symbol_value("read-expression-history", Value::Nil);
+        obarray.set_symbol_value("read-number-history", Value::Nil);
+        obarray.set_symbol_value("read-char-history", Value::Nil);
+        obarray.set_symbol_value("minibuffer-history", Value::Nil);
+        obarray.set_symbol_value("regexp-search-ring", Value::Nil);
+        obarray.set_symbol_value("regexp-search-ring-yank-pointer", Value::Nil);
+        obarray.set_symbol_value("search-ring", Value::Nil);
+        obarray.set_symbol_value("search-ring-yank-pointer", Value::Nil);
         obarray.set_symbol_value("last-command-event", Value::Nil);
         obarray.set_symbol_value("last-event-frame", Value::Nil);
         obarray.set_symbol_value("last-event-device", Value::Nil);
