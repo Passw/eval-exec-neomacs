@@ -28,6 +28,14 @@ Last updated: 2026-02-18
 
 ## Doing
 
+- Corrected `compat-progress` tracked artifact accounting to dedupe overlapping list entries:
+  - tooling changes:
+    - `test/neovm/vm-compat/compat-progress.sh`
+    - dedupes tracked `.forms`/`.expected.tsv` path sets before artifact counting (`sort -u` on tracker files).
+    - keeps `tracked .forms artifacts`/`tracked expected artifacts` aligned with unique tracked case entries when cases appear in multiple lists (for example `default.list`, `introspection.list`, and `startup-doc.list` overlap).
+  - verified:
+    - `make -C test/neovm/vm-compat compat-progress` (pass; `tracked .forms artifacts: 724`, `tracked expected artifacts: 724`)
+
 - Added a focused startup-doc parity workflow for faster operator loops while preserving full-gate coverage:
   - list/target changes:
     - `test/neovm/vm-compat/cases/startup-doc.list`

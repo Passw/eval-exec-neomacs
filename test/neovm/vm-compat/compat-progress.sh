@@ -89,11 +89,13 @@ while IFS= read -r case_path; do
   [[ -n "$case_path" ]] || continue
   printf '%s\n' "$script_dir/$case_path.forms"
 done < "$tmp_tracker" > "$tmp_tracker_forms"
+sort -u "$tmp_tracker_forms" -o "$tmp_tracker_forms"
 while IFS= read -r case_path; do
   case_path="${case_path%$'\r'}"
   [[ -n "$case_path" ]] || continue
   printf '%s\n' "$script_dir/$case_path.expected.tsv"
 done < "$tmp_tracker" > "$tmp_tracker_expected"
+sort -u "$tmp_tracker_expected" -o "$tmp_tracker_expected"
 
 all_builtins="$(wc -l < "$tmp_all" | tr -d ' ')"
 core_builtins="$(wc -l < "$tmp_core" | tr -d ' ')"
