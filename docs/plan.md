@@ -32,13 +32,16 @@ Last updated: 2026-02-19
   - runtime changes:
     - `rust/neovm-core/src/elisp/interactive.rs`
       - interactive string-code argument synthesis now supports:
-        - prompt/minibuffer-backed codes: `a`, `b`, `B`, `C`, `D`, `f`, `F`, `v`
+        - prompt/minibuffer-backed codes: `a`, `b`, `B`, `C`, `D`, `f`, `F`, `v`, `M`, `S`, `x`, `X`, `z`, `Z`
         - editor/input state codes: `d`, `m`, `i`, `c`, `k`, `K`
+        - prefix-aware numeric code: `N` (`current-prefix-arg` for `call-interactively`, `prefix-arg` for `command-execute`; falls back to numeric reader when absent)
         - existing coverage retained: `p`, `P`, `r`, `s`, `n`
       - added point/mark argument helpers for `d`/`m` with oracle-aligned mark-missing error payload.
       - expanded evaluator unit coverage:
         - `interactive_lambda_extended_string_codes_cover_point_mark_ignored_and_key_readers`
         - `interactive_lambda_extended_reader_prompt_codes_signal_eof_in_batch`
+        - `interactive_lambda_n_and_optional_coding_specs_follow_prefix_and_batch_behavior`
+        - `interactive_lambda_m_s_x_x_and_z_specs_signal_eof_in_batch`
   - corpus changes:
     - added and wired:
       - `test/neovm/vm-compat/cases/interactive-lambda-spec-extended-semantics.{forms,expected.tsv}`
@@ -47,13 +50,17 @@ Last updated: 2026-02-19
       - `d`/`m` point and mark argument synthesis (including missing-mark error path)
       - `i` nil-argument injection
       - `c`/`k`/`K` unread-event reader behavior in interactive invocation
-      - batch EOF behavior for `a`/`b`/`B`/`C`/`D`/`f`/`F`/`v`
+      - `N` prefix-or-reader behavior split across `call-interactively` vs `command-execute`
+      - batch EOF behavior for `a`/`b`/`B`/`C`/`D`/`f`/`F`/`v`/`M`/`S`/`x`/`X`/`z`
+      - `Z` optional coding-system behavior in batch (`nil`) with unread-event queue preservation
   - verified:
     - `cargo test --manifest-path rust/neovm-core/Cargo.toml interactive_lambda_extended_string_codes_cover_point_mark_ignored_and_key_readers -- --nocapture` (pass)
     - `cargo test --manifest-path rust/neovm-core/Cargo.toml interactive_lambda_extended_reader_prompt_codes_signal_eof_in_batch -- --nocapture` (pass)
+    - `cargo test --manifest-path rust/neovm-core/Cargo.toml interactive_lambda_n_and_optional_coding_specs_follow_prefix_and_batch_behavior -- --nocapture` (pass)
+    - `cargo test --manifest-path rust/neovm-core/Cargo.toml interactive_lambda_m_s_x_x_and_z_specs_signal_eof_in_batch -- --nocapture` (pass)
     - `cargo test --manifest-path rust/neovm-core/Cargo.toml interactive_lambda_ -- --nocapture` (pass)
     - `make -C test/neovm/vm-compat record FORMS=cases/interactive-lambda-spec-extended-semantics.forms EXPECTED=cases/interactive-lambda-spec-extended-semantics.expected.tsv` (pass)
-    - `make -C test/neovm/vm-compat check-one-neovm CASE=cases/interactive-lambda-spec-extended-semantics` (pass, `22/22`)
+    - `make -C test/neovm/vm-compat check-one-neovm CASE=cases/interactive-lambda-spec-extended-semantics` (pass, `38/38`)
     - `make -C test/neovm/vm-compat check-all-neovm-strict` (pass)
 
 - Fixed full-suite Rust unit-test drift by aligning stale expectations with current NeoVM/oracle behavior:

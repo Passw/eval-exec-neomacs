@@ -687,6 +687,22 @@ fn interactive_mark_arg(eval: &Evaluator) -> Result<Value, Flow> {
     Ok(Value::Int(mark_char))
 }
 
+fn interactive_read_expression_arg(
+    eval: &mut Evaluator,
+    prompt: String,
+) -> Result<Value, Flow> {
+    let input = super::reader::builtin_read_from_minibuffer(eval, vec![Value::string(prompt)])?;
+    super::reader::builtin_read(eval, vec![input])
+}
+
+fn interactive_read_coding_system_optional_arg(prompt: String) -> Result<Value, Flow> {
+    match super::lread::builtin_read_coding_system(vec![Value::string(prompt)]) {
+        Ok(value) => Ok(value),
+        Err(Flow::Signal(sig)) if sig.symbol == "end-of-file" => Ok(Value::Nil),
+        Err(flow) => Err(flow),
+    }
+}
+
 fn parse_interactive_spec(expr: &Expr) -> Option<ParsedInteractiveSpec> {
     let Expr::List(items) = expr else {
         return None;
@@ -804,10 +820,33 @@ fn interactive_args_from_string_code(
                 eval,
                 vec![Value::string(prompt)],
             )?),
+            'M' => args.push(super::reader::builtin_read_string(
+                eval,
+                vec![Value::string(prompt)],
+            )?),
             'm' => args.push(interactive_mark_arg(eval)?),
+            'N' => {
+                let raw = interactive_prefix_raw_arg(eval, kind);
+                if raw.is_nil() {
+                    args.push(super::reader::builtin_read_number(
+                        eval,
+                        vec![Value::string(prompt)],
+                    )?);
+                } else {
+                    args.push(Value::Int(prefix_numeric_value(&raw)));
+                }
+            }
             'p' => args.push(interactive_prefix_numeric_arg(eval, kind)),
             'P' => args.push(interactive_prefix_raw_arg(eval, kind)),
             'r' => args.extend(interactive_region_args(eval, "error")?),
+            'S' => {
+                let sym_name = super::reader::builtin_read_string(eval, vec![Value::string(prompt)])?;
+                if let Some(name) = sym_name.as_str() {
+                    args.push(Value::symbol(name));
+                } else {
+                    return Ok(None);
+                }
+            }
             's' => args.push(super::reader::builtin_read_string(
                 eval,
                 vec![Value::string(prompt)],
@@ -816,7 +855,15 @@ fn interactive_args_from_string_code(
                 eval,
                 vec![Value::string(prompt)],
             )?),
+            'x' => args.push(interactive_read_expression_arg(eval, prompt)?),
+            'X' => {
+                let expr_value = interactive_read_expression_arg(eval, prompt)?;
+                let expr = super::eval::value_to_expr_pub(&expr_value);
+                args.push(eval.eval(&expr)?);
+            }
             'v' => args.push(super::minibuffer::builtin_read_variable(vec![Value::string(prompt)])?),
+            'z' => args.push(super::lread::builtin_read_coding_system(vec![Value::string(prompt)])?),
+            'Z' => args.push(interactive_read_coding_system_optional_arg(prompt)?),
             _ => return Ok(None),
         }
     }
@@ -5019,6 +5066,86 @@ K")
                    (error err))
                  (condition-case err
                      (command-execute (lambda (x) (interactive "fFind file: ") x))
+                   (error err)))"#,
+        );
+        assert_eq!(
+            results[0],
+            "OK ((end-of-file \"Error reading from stdin\") (end-of-file \"Error reading from stdin\") (end-of-file \"Error reading from stdin\") (end-of-file \"Error reading from stdin\") (end-of-file \"Error reading from stdin\") (end-of-file \"Error reading from stdin\") (end-of-file \"Error reading from stdin\") (end-of-file \"Error reading from stdin\") (end-of-file \"Error reading from stdin\") (end-of-file \"Error reading from stdin\"))"
+        );
+    }
+
+    #[test]
+    fn interactive_lambda_n_and_optional_coding_specs_follow_prefix_and_batch_behavior() {
+        let mut ev = Evaluator::new();
+        let results = eval_all_with(
+            &mut ev,
+            r#"(list
+                 (let ((current-prefix-arg '(4))
+                       (prefix-arg nil))
+                   (call-interactively (lambda (n) (interactive "NNumber: ") n)))
+                 (let ((current-prefix-arg nil)
+                       (prefix-arg '(5)))
+                   (command-execute (lambda (n) (interactive "NNumber: ") n)))
+                 (let ((current-prefix-arg nil)
+                       (prefix-arg nil))
+                   (condition-case err
+                       (call-interactively (lambda (n) (interactive "NNumber: ") n))
+                     (error err)))
+                 (let ((current-prefix-arg nil)
+                       (prefix-arg nil))
+                   (condition-case err
+                       (command-execute (lambda (n) (interactive "NNumber: ") n))
+                     (error err)))
+                 (let ((unread-command-events (list 97)))
+                   (list
+                    (call-interactively (lambda (c) (interactive "ZCoding: ") c))
+                    unread-command-events))
+                 (let ((unread-command-events (list 97)))
+                   (list
+                    (command-execute (lambda (c) (interactive "ZCoding: ") c))
+                    unread-command-events)))"#,
+        );
+        assert_eq!(
+            results[0],
+            "OK (4 5 (end-of-file \"Error reading from stdin\") (end-of-file \"Error reading from stdin\") (nil (97)) (nil (97)))"
+        );
+    }
+
+    #[test]
+    fn interactive_lambda_m_s_x_x_and_z_specs_signal_eof_in_batch() {
+        let mut ev = Evaluator::new();
+        let results = eval_all_with(
+            &mut ev,
+            r#"(list
+                 (condition-case err
+                     (call-interactively (lambda (s) (interactive "MString: ") s))
+                   (error err))
+                 (condition-case err
+                     (call-interactively (lambda (s) (interactive "SSymbol: ") s))
+                   (error err))
+                 (condition-case err
+                     (call-interactively (lambda (x) (interactive "xExpr: ") x))
+                   (error err))
+                 (condition-case err
+                     (call-interactively (lambda (x) (interactive "XExpr: ") x))
+                   (error err))
+                 (condition-case err
+                     (call-interactively (lambda (c) (interactive "zCoding: ") c))
+                   (error err))
+                 (condition-case err
+                     (command-execute (lambda (s) (interactive "MString: ") s))
+                   (error err))
+                 (condition-case err
+                     (command-execute (lambda (s) (interactive "SSymbol: ") s))
+                   (error err))
+                 (condition-case err
+                     (command-execute (lambda (x) (interactive "xExpr: ") x))
+                   (error err))
+                 (condition-case err
+                     (command-execute (lambda (x) (interactive "XExpr: ") x))
+                   (error err))
+                 (condition-case err
+                     (command-execute (lambda (c) (interactive "zCoding: ") c))
                    (error err)))"#,
         );
         assert_eq!(
