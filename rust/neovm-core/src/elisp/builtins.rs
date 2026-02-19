@@ -7710,12 +7710,37 @@ pub(crate) fn dispatch_builtin(
         "set-keymap-parent" => return Some(builtin_set_keymap_parent(eval, args)),
         "keymapp" => return Some(builtin_keymapp(eval, args)),
         // Process operations (evaluator-dependent)
+        "accept-process-output" => {
+            return Some(super::process::builtin_accept_process_output(eval, args))
+        }
         "start-process" => return Some(super::process::builtin_start_process(eval, args)),
         "call-process" => return Some(super::process::builtin_call_process(eval, args)),
         "call-process-region" => {
             return Some(super::process::builtin_call_process_region(eval, args))
         }
         "delete-process" => return Some(super::process::builtin_delete_process(eval, args)),
+        "get-process" => return Some(super::process::builtin_get_process(eval, args)),
+        "process-live-p" => return Some(super::process::builtin_process_live_p(eval, args)),
+        "processp" => return Some(super::process::builtin_processp(eval, args)),
+        "process-id" => return Some(super::process::builtin_process_id(eval, args)),
+        "process-query-on-exit-flag" => {
+            return Some(super::process::builtin_process_query_on_exit_flag(eval, args))
+        }
+        "set-process-query-on-exit-flag" => {
+            return Some(super::process::builtin_set_process_query_on_exit_flag(eval, args))
+        }
+        "process-command" => return Some(super::process::builtin_process_command(eval, args)),
+        "process-contact" => return Some(super::process::builtin_process_contact(eval, args)),
+        "process-filter" => return Some(super::process::builtin_process_filter(eval, args)),
+        "set-process-filter" => return Some(super::process::builtin_set_process_filter(eval, args)),
+        "process-sentinel" => return Some(super::process::builtin_process_sentinel(eval, args)),
+        "set-process-sentinel" => {
+            return Some(super::process::builtin_set_process_sentinel(eval, args))
+        }
+        "process-plist" => return Some(super::process::builtin_process_plist(eval, args)),
+        "set-process-plist" => return Some(super::process::builtin_set_process_plist(eval, args)),
+        "process-put" => return Some(super::process::builtin_process_put(eval, args)),
+        "process-get" => return Some(super::process::builtin_process_get(eval, args)),
         "process-send-string" => {
             return Some(super::process::builtin_process_send_string(eval, args))
         }

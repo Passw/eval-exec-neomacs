@@ -43,6 +43,14 @@ pub struct Process {
     pub stdout: String,
     /// Captured stderr.
     pub stderr: String,
+    /// Query-on-exit flag state.
+    pub query_on_exit_flag: bool,
+    /// Process filter callback (or default marker symbol).
+    pub filter: Value,
+    /// Process sentinel callback (or default marker symbol).
+    pub sentinel: Value,
+    /// Process plist state.
+    pub plist: Value,
 }
 
 /// Manages the set of live processes.
@@ -89,6 +97,10 @@ impl ProcessManager {
             stdin_queue: String::new(),
             stdout: String::new(),
             stderr: String::new(),
+            query_on_exit_flag: true,
+            filter: Value::symbol(DEFAULT_PROCESS_FILTER_SYMBOL),
+            sentinel: Value::symbol(DEFAULT_PROCESS_SENTINEL_SYMBOL),
+            plist: Value::Nil,
         };
         self.processes.insert(id, proc);
         id
@@ -117,6 +129,11 @@ impl ProcessManager {
     /// Get a process by id.
     pub fn get(&self, id: ProcessId) -> Option<&Process> {
         self.processes.get(&id)
+    }
+
+    /// Get a mutable process by id.
+    pub fn get_mut(&mut self, id: ProcessId) -> Option<&mut Process> {
+        self.processes.get_mut(&id)
     }
 
     /// List all process ids.
@@ -160,6 +177,9 @@ impl ProcessManager {
         self.env_overrides.insert(name, value);
     }
 }
+
+const DEFAULT_PROCESS_FILTER_SYMBOL: &str = "internal-default-process-filter";
+const DEFAULT_PROCESS_SENTINEL_SYMBOL: &str = "internal-default-process-sentinel";
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -580,6 +600,46 @@ fn resolve_process(eval: &super::eval::Evaluator, value: &Value) -> Result<Proce
     }
 }
 
+/// Resolve a live process designator for compatibility builtins.
+///
+/// NeoVM currently models process handles as integer ids.  These helpers treat
+/// a live process id as a process designator for runtime parity surfaces.
+fn resolve_live_process_designator(eval: &super::eval::Evaluator, value: &Value) -> Option<ProcessId> {
+    match value {
+        Value::Int(n) if *n >= 0 => {
+            let id = *n as ProcessId;
+            eval.processes.get(id).map(|_| id)
+        }
+        _ => None,
+    }
+}
+
+fn resolve_live_process_or_wrong_type(
+    eval: &super::eval::Evaluator,
+    value: &Value,
+) -> Result<ProcessId, Flow> {
+    resolve_live_process_designator(eval, value).ok_or_else(|| {
+        signal(
+            "wrong-type-argument",
+            vec![Value::symbol("processp"), value.clone()],
+        )
+    })
+}
+
+fn process_live_status_value(status: &ProcessStatus) -> Value {
+    match status {
+        ProcessStatus::Run => Value::list(vec![
+            Value::symbol("run"),
+            Value::symbol("open"),
+            Value::symbol("listen"),
+            Value::symbol("connect"),
+            Value::symbol("stop"),
+        ]),
+        ProcessStatus::Stop => Value::list(vec![Value::symbol("stop")]),
+        ProcessStatus::Exit(_) | ProcessStatus::Signal(_) => Value::Nil,
+    }
+}
+
 // ---------------------------------------------------------------------------
 // Builtins (eval-dependent)
 // ---------------------------------------------------------------------------
@@ -932,6 +992,299 @@ pub(crate) fn builtin_process_buffer(
         },
         None => Err(signal("error", vec![Value::string("Process not found")])),
     }
+}
+
+/// (accept-process-output &optional PROCESS SECONDS MILLISECS JUST-THIS-ONE) -> bool
+///
+/// Batch/runtime compatibility path: validates arguments, then returns nil.
+pub(crate) fn builtin_accept_process_output(
+    eval: &mut super::eval::Evaluator,
+    args: Vec<Value>,
+) -> EvalResult {
+    if args.len() > 4 {
+        return Err(signal(
+            "wrong-number-of-arguments",
+            vec![
+                Value::symbol("accept-process-output"),
+                Value::Int(args.len() as i64),
+            ],
+        ));
+    }
+
+    if let Some(process) = args.first() {
+        if !process.is_nil() && resolve_live_process_designator(eval, process).is_none() {
+            return Err(signal(
+                "wrong-type-argument",
+                vec![Value::symbol("processp"), process.clone()],
+            ));
+        }
+    }
+
+    if let Some(seconds) = args.get(1) {
+        if args.get(2).is_some() {
+            if !seconds.is_nil() && !matches!(seconds, Value::Int(_)) {
+                return Err(signal(
+                    "wrong-type-argument",
+                    vec![Value::symbol("fixnump"), seconds.clone()],
+                ));
+            }
+        } else if !seconds.is_nil() && !seconds.is_number() {
+            return Err(signal(
+                "wrong-type-argument",
+                vec![Value::symbol("numberp"), seconds.clone()],
+            ));
+        }
+    }
+
+    Ok(Value::Nil)
+}
+
+/// (get-process NAME) -> process-or-nil
+pub(crate) fn builtin_get_process(
+    eval: &mut super::eval::Evaluator,
+    args: Vec<Value>,
+) -> EvalResult {
+    expect_args("get-process", &args, 1)?;
+    let name = expect_string_strict(&args[0])?;
+    match eval.processes.find_by_name(&name) {
+        Some(id) => Ok(Value::Int(id as i64)),
+        None => Ok(Value::Nil),
+    }
+}
+
+/// (processp OBJECT) -> bool
+pub(crate) fn builtin_processp(eval: &mut super::eval::Evaluator, args: Vec<Value>) -> EvalResult {
+    expect_args("processp", &args, 1)?;
+    Ok(Value::bool(
+        resolve_live_process_designator(eval, &args[0]).is_some(),
+    ))
+}
+
+/// (process-live-p PROCESS) -> list-or-nil
+pub(crate) fn builtin_process_live_p(
+    eval: &mut super::eval::Evaluator,
+    args: Vec<Value>,
+) -> EvalResult {
+    expect_args("process-live-p", &args, 1)?;
+    let Some(id) = resolve_live_process_designator(eval, &args[0]) else {
+        return Ok(Value::Nil);
+    };
+    match eval.processes.process_status(id) {
+        Some(status) => Ok(process_live_status_value(status)),
+        None => Ok(Value::Nil),
+    }
+}
+
+/// (process-id PROCESS) -> integer
+pub(crate) fn builtin_process_id(eval: &mut super::eval::Evaluator, args: Vec<Value>) -> EvalResult {
+    expect_args("process-id", &args, 1)?;
+    let id = resolve_live_process_or_wrong_type(eval, &args[0])?;
+    Ok(Value::Int(id as i64))
+}
+
+/// (process-query-on-exit-flag PROCESS) -> bool
+pub(crate) fn builtin_process_query_on_exit_flag(
+    eval: &mut super::eval::Evaluator,
+    args: Vec<Value>,
+) -> EvalResult {
+    expect_args("process-query-on-exit-flag", &args, 1)?;
+    let id = resolve_live_process_or_wrong_type(eval, &args[0])?;
+    let proc = eval
+        .processes
+        .get(id)
+        .ok_or_else(|| signal("wrong-type-argument", vec![Value::symbol("processp"), args[0].clone()]))?;
+    Ok(Value::bool(proc.query_on_exit_flag))
+}
+
+/// (set-process-query-on-exit-flag PROCESS FLAG) -> FLAG
+pub(crate) fn builtin_set_process_query_on_exit_flag(
+    eval: &mut super::eval::Evaluator,
+    args: Vec<Value>,
+) -> EvalResult {
+    expect_args("set-process-query-on-exit-flag", &args, 2)?;
+    let id = resolve_live_process_or_wrong_type(eval, &args[0])?;
+    let flag = args[1].is_truthy();
+    let proc = eval
+        .processes
+        .get_mut(id)
+        .ok_or_else(|| signal("wrong-type-argument", vec![Value::symbol("processp"), args[0].clone()]))?;
+    proc.query_on_exit_flag = flag;
+    Ok(args[1].clone())
+}
+
+/// (process-command PROCESS) -> list
+pub(crate) fn builtin_process_command(
+    eval: &mut super::eval::Evaluator,
+    args: Vec<Value>,
+) -> EvalResult {
+    expect_args("process-command", &args, 1)?;
+    let id = resolve_live_process_or_wrong_type(eval, &args[0])?;
+    let proc = eval
+        .processes
+        .get(id)
+        .ok_or_else(|| signal("wrong-type-argument", vec![Value::symbol("processp"), args[0].clone()]))?;
+    let mut items = Vec::with_capacity(proc.args.len() + 1);
+    items.push(Value::string(proc.command.clone()));
+    items.extend(proc.args.iter().cloned().map(Value::string));
+    Ok(Value::list(items))
+}
+
+/// (process-contact PROCESS &optional KEY NO-BLOCK) -> value
+pub(crate) fn builtin_process_contact(
+    eval: &mut super::eval::Evaluator,
+    args: Vec<Value>,
+) -> EvalResult {
+    expect_min_args("process-contact", &args, 1)?;
+    if args.len() > 3 {
+        return Err(signal(
+            "wrong-number-of-arguments",
+            vec![Value::symbol("process-contact"), Value::Int(args.len() as i64)],
+        ));
+    }
+    let _id = resolve_live_process_or_wrong_type(eval, &args[0])?;
+    Ok(Value::True)
+}
+
+/// (process-filter PROCESS) -> function
+pub(crate) fn builtin_process_filter(
+    eval: &mut super::eval::Evaluator,
+    args: Vec<Value>,
+) -> EvalResult {
+    expect_args("process-filter", &args, 1)?;
+    let id = resolve_live_process_or_wrong_type(eval, &args[0])?;
+    let proc = eval
+        .processes
+        .get(id)
+        .ok_or_else(|| signal("wrong-type-argument", vec![Value::symbol("processp"), args[0].clone()]))?;
+    Ok(proc.filter.clone())
+}
+
+/// (set-process-filter PROCESS FILTER) -> FILTER
+pub(crate) fn builtin_set_process_filter(
+    eval: &mut super::eval::Evaluator,
+    args: Vec<Value>,
+) -> EvalResult {
+    expect_args("set-process-filter", &args, 2)?;
+    let id = resolve_live_process_or_wrong_type(eval, &args[0])?;
+    let stored = if args[1].is_nil() {
+        Value::symbol(DEFAULT_PROCESS_FILTER_SYMBOL)
+    } else {
+        args[1].clone()
+    };
+    let proc = eval
+        .processes
+        .get_mut(id)
+        .ok_or_else(|| signal("wrong-type-argument", vec![Value::symbol("processp"), args[0].clone()]))?;
+    proc.filter = stored.clone();
+    Ok(stored)
+}
+
+/// (process-sentinel PROCESS) -> function
+pub(crate) fn builtin_process_sentinel(
+    eval: &mut super::eval::Evaluator,
+    args: Vec<Value>,
+) -> EvalResult {
+    expect_args("process-sentinel", &args, 1)?;
+    let id = resolve_live_process_or_wrong_type(eval, &args[0])?;
+    let proc = eval
+        .processes
+        .get(id)
+        .ok_or_else(|| signal("wrong-type-argument", vec![Value::symbol("processp"), args[0].clone()]))?;
+    Ok(proc.sentinel.clone())
+}
+
+/// (set-process-sentinel PROCESS SENTINEL) -> SENTINEL
+pub(crate) fn builtin_set_process_sentinel(
+    eval: &mut super::eval::Evaluator,
+    args: Vec<Value>,
+) -> EvalResult {
+    expect_args("set-process-sentinel", &args, 2)?;
+    let id = resolve_live_process_or_wrong_type(eval, &args[0])?;
+    let stored = if args[1].is_nil() {
+        Value::symbol(DEFAULT_PROCESS_SENTINEL_SYMBOL)
+    } else {
+        args[1].clone()
+    };
+    let proc = eval
+        .processes
+        .get_mut(id)
+        .ok_or_else(|| signal("wrong-type-argument", vec![Value::symbol("processp"), args[0].clone()]))?;
+    proc.sentinel = stored.clone();
+    Ok(stored)
+}
+
+/// (process-plist PROCESS) -> plist
+pub(crate) fn builtin_process_plist(
+    eval: &mut super::eval::Evaluator,
+    args: Vec<Value>,
+) -> EvalResult {
+    expect_args("process-plist", &args, 1)?;
+    let id = resolve_live_process_or_wrong_type(eval, &args[0])?;
+    let proc = eval
+        .processes
+        .get(id)
+        .ok_or_else(|| signal("wrong-type-argument", vec![Value::symbol("processp"), args[0].clone()]))?;
+    Ok(proc.plist.clone())
+}
+
+/// (set-process-plist PROCESS PLIST) -> plist
+pub(crate) fn builtin_set_process_plist(
+    eval: &mut super::eval::Evaluator,
+    args: Vec<Value>,
+) -> EvalResult {
+    expect_args("set-process-plist", &args, 2)?;
+    if !args[1].is_list() {
+        return Err(signal(
+            "wrong-type-argument",
+            vec![Value::symbol("listp"), args[1].clone()],
+        ));
+    }
+    let id = resolve_live_process_or_wrong_type(eval, &args[0])?;
+    let proc = eval
+        .processes
+        .get_mut(id)
+        .ok_or_else(|| signal("wrong-type-argument", vec![Value::symbol("processp"), args[0].clone()]))?;
+    proc.plist = args[1].clone();
+    Ok(proc.plist.clone())
+}
+
+/// (process-put PROCESS PROP VALUE) -> plist
+pub(crate) fn builtin_process_put(
+    eval: &mut super::eval::Evaluator,
+    args: Vec<Value>,
+) -> EvalResult {
+    expect_args("process-put", &args, 3)?;
+    let id = resolve_live_process_or_wrong_type(eval, &args[0])?;
+    let current_plist = eval
+        .processes
+        .get(id)
+        .ok_or_else(|| signal("wrong-type-argument", vec![Value::symbol("processp"), args[0].clone()]))?
+        .plist
+        .clone();
+    let new_plist =
+        super::builtins::builtin_plist_put(vec![current_plist, args[1].clone(), args[2].clone()])?;
+    let proc = eval
+        .processes
+        .get_mut(id)
+        .ok_or_else(|| signal("wrong-type-argument", vec![Value::symbol("processp"), args[0].clone()]))?;
+    proc.plist = new_plist.clone();
+    Ok(new_plist)
+}
+
+/// (process-get PROCESS PROP) -> value
+pub(crate) fn builtin_process_get(
+    eval: &mut super::eval::Evaluator,
+    args: Vec<Value>,
+) -> EvalResult {
+    expect_args("process-get", &args, 2)?;
+    let id = resolve_live_process_or_wrong_type(eval, &args[0])?;
+    let plist = eval
+        .processes
+        .get(id)
+        .ok_or_else(|| signal("wrong-type-argument", vec![Value::symbol("processp"), args[0].clone()]))?
+        .plist
+        .clone();
+    super::builtins::builtin_plist_get(vec![plist, args[1].clone()])
 }
 
 // ---------------------------------------------------------------------------
@@ -1709,5 +2062,67 @@ mod tests {
         ));
         assert_eq!(results[0], "OK 1");
         assert_eq!(results[1], r#"OK "echo""#);
+    }
+
+    #[test]
+    fn process_runtime_introspection_controls() {
+        let cat = find_bin("cat");
+        let results = eval_all(&format!(
+            r#"(let ((p (start-process "proc-introspect" nil "{cat}")))
+                 (list
+                  (processp p)
+                  (equal (process-live-p p) '(run open listen connect stop))
+                  (integerp (process-id p))
+                  (process-contact p t)
+                  (process-filter p)
+                  (set-process-filter p nil)
+                  (set-process-filter p 'ignore)
+                  (process-filter p)
+                  (process-sentinel p)
+                  (set-process-sentinel p nil)
+                  (set-process-sentinel p 'ignore)
+                  (process-sentinel p)
+                  (set-process-plist p '(a 1))
+                  (process-get p 'a)
+                  (process-put p 'k 2)
+                  (process-get p 'k)
+                  (process-query-on-exit-flag p)
+                  (set-process-query-on-exit-flag p nil)
+                  (process-query-on-exit-flag p)
+                  (delete-process p)
+                  (process-live-p p)))"#,
+        ));
+        assert_eq!(
+            results[0],
+            "OK (t t t t internal-default-process-filter internal-default-process-filter ignore ignore internal-default-process-sentinel internal-default-process-sentinel ignore ignore (a 1 k 2) 1 (a 1 k 2) 2 t nil nil nil nil)"
+        );
+    }
+
+    #[test]
+    fn accept_process_output_and_get_process_runtime_surface() {
+        let cat = find_bin("cat");
+        let results = eval_all(&format!(
+            r#"(condition-case err (accept-process-output) (error err))
+               (condition-case err (accept-process-output nil 0.01) (error err))
+               (condition-case err (accept-process-output 1) (error err))
+               (condition-case err (accept-process-output nil "x") (error err))
+               (let ((p (start-process "proc-get-probe" nil "{cat}")))
+                 (list
+                  (processp (get-process "proc-get-probe"))
+                  (eq p (get-process "proc-get-probe"))
+                  (accept-process-output p 0.0)
+                  (delete-process p)
+                  (get-process "proc-get-probe")))
+               (condition-case err (get-process 'proc-get-probe) (error err))"#,
+        ));
+        assert_eq!(results[0], "OK nil");
+        assert_eq!(results[1], "OK nil");
+        assert_eq!(results[2], "OK (wrong-type-argument processp 1)");
+        assert_eq!(results[3], r#"OK (wrong-type-argument numberp "x")"#);
+        assert_eq!(results[4], "OK (t t nil nil nil)");
+        assert_eq!(
+            results[5],
+            "OK (wrong-type-argument stringp proc-get-probe)"
+        );
     }
 }

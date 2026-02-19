@@ -926,14 +926,36 @@ fn subr_arity_value(name: &str) -> Value {
         "fit-window-to-buffer" => arity_cons(0, Some(6)),
         "window-text-pixel-size" => arity_cons(0, Some(7)),
         // Process primitives
+        "accept-process-output" => arity_cons(0, Some(4)),
         "call-process" => arity_cons(1, None),
         "call-process-region" => arity_cons(3, None),
         "delete-process" => arity_cons(0, Some(1)),
-        "process-buffer" | "process-exit-status" | "process-name" | "process-status" => {
+        "get-process" => arity_cons(1, Some(1)),
+        "process-buffer"
+        | "process-command"
+        | "process-exit-status"
+        | "process-filter"
+        | "process-id"
+        | "process-live-p"
+        | "process-name"
+        | "process-plist"
+        | "process-query-on-exit-flag"
+        | "process-sentinel"
+        | "process-status"
+        | "processp" => {
             arity_cons(1, Some(1))
         }
+        "process-contact" => arity_cons(1, Some(3)),
         "process-list" => arity_cons(0, Some(0)),
+        "process-get" => arity_cons(2, Some(2)),
+        "process-put" => arity_cons(3, Some(3)),
         "process-send-string" => arity_cons(2, Some(2)),
+        "set-process-filter"
+        | "set-process-plist"
+        | "set-process-query-on-exit-flag"
+        | "set-process-sentinel" => {
+            arity_cons(2, Some(2))
+        }
         "setenv" => arity_cons(1, Some(3)),
         "start-process" => arity_cons(3, None),
         "getenv" => arity_cons(1, Some(2)),
@@ -1539,16 +1561,33 @@ mod tests {
 
     #[test]
     fn subr_arity_process_primitives_match_oracle() {
+        assert_subr_arity("accept-process-output", 0, Some(4));
         assert_subr_arity("call-process", 1, None);
         assert_subr_arity("call-process-region", 3, None);
         assert_subr_arity("delete-process", 0, Some(1));
+        assert_subr_arity("get-process", 1, Some(1));
         assert_subr_arity("getenv", 1, Some(2));
         assert_subr_arity("process-buffer", 1, Some(1));
+        assert_subr_arity("process-command", 1, Some(1));
+        assert_subr_arity("process-contact", 1, Some(3));
         assert_subr_arity("process-exit-status", 1, Some(1));
+        assert_subr_arity("process-filter", 1, Some(1));
+        assert_subr_arity("process-get", 2, Some(2));
+        assert_subr_arity("process-id", 1, Some(1));
+        assert_subr_arity("process-live-p", 1, Some(1));
         assert_subr_arity("process-list", 0, Some(0));
         assert_subr_arity("process-name", 1, Some(1));
+        assert_subr_arity("process-plist", 1, Some(1));
+        assert_subr_arity("process-put", 3, Some(3));
+        assert_subr_arity("process-query-on-exit-flag", 1, Some(1));
         assert_subr_arity("process-send-string", 2, Some(2));
+        assert_subr_arity("process-sentinel", 1, Some(1));
         assert_subr_arity("process-status", 1, Some(1));
+        assert_subr_arity("processp", 1, Some(1));
+        assert_subr_arity("set-process-filter", 2, Some(2));
+        assert_subr_arity("set-process-plist", 2, Some(2));
+        assert_subr_arity("set-process-query-on-exit-flag", 2, Some(2));
+        assert_subr_arity("set-process-sentinel", 2, Some(2));
         assert_subr_arity("setenv", 1, Some(3));
         assert_subr_arity("start-process", 3, None);
     }

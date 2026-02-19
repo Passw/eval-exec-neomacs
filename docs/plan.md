@@ -16945,6 +16945,54 @@ Last updated: 2026-02-19
 
 ## Doing
 
+- Added process runtime introspection/control compatibility slice and locked oracle parity:
+  - runtime changes:
+    - `rust/neovm-core/src/elisp/process.rs`
+      - implemented:
+        - `accept-process-output`
+        - `get-process`
+        - `process-live-p`
+        - `processp`
+        - `process-id`
+        - `process-query-on-exit-flag`
+        - `set-process-query-on-exit-flag`
+        - `process-command`
+        - `process-contact`
+        - `process-filter`
+        - `set-process-filter`
+        - `process-sentinel`
+        - `set-process-sentinel`
+        - `process-plist`
+        - `set-process-plist`
+        - `process-put`
+        - `process-get`
+      - added process runtime state for query-on-exit/filter/sentinel/plist compatibility defaults.
+      - added process module unit coverage for the new runtime surface.
+    - `rust/neovm-core/src/elisp/builtins.rs`
+      - wired evaluator dispatch for all new process symbols.
+    - `rust/neovm-core/src/elisp/builtin_registry.rs`
+      - registered all new symbols in `DISPATCH_BUILTIN_NAMES`.
+    - `rust/neovm-core/src/elisp/subr_info.rs`
+      - added arity metadata/assertions for the new process symbols:
+        - `(0 . 4)` `accept-process-output`
+        - `(1 . 1)` `get-process`, `process-live-p`, `processp`, `process-id`, `process-query-on-exit-flag`, `process-command`, `process-filter`, `process-sentinel`, `process-plist`
+        - `(1 . 3)` `process-contact`
+        - `(2 . 2)` `set-process-query-on-exit-flag`, `set-process-filter`, `set-process-sentinel`, `set-process-plist`, `process-get`
+        - `(3 . 3)` `process-put`
+  - corpus changes:
+    - added and wired:
+      - `test/neovm/vm-compat/cases/process-runtime-introspection-semantics.forms`
+      - `test/neovm/vm-compat/cases/process-runtime-introspection-semantics.expected.tsv`
+      - `test/neovm/vm-compat/cases/default.list`
+  - verified:
+    - `cargo test --manifest-path rust/neovm-core/Cargo.toml process_runtime_introspection_controls -- --nocapture` (pass)
+    - `cargo test --manifest-path rust/neovm-core/Cargo.toml accept_process_output_and_get_process_runtime_surface -- --nocapture` (pass)
+    - `cargo test --manifest-path rust/neovm-core/Cargo.toml subr_arity_process_primitives_match_oracle -- --nocapture` (pass)
+    - `make -C test/neovm/vm-compat record FORMS=cases/process-runtime-introspection-semantics.forms EXPECTED=cases/process-runtime-introspection-semantics.expected.tsv` (pass)
+    - `make -C test/neovm/vm-compat check-one-neovm CASE=cases/process-runtime-introspection-semantics` (pass, `5/5`)
+    - `make -C test/neovm/vm-compat check-builtin-registry-all` (pass; `1104` dispatch / `1103` core parity entries)
+    - `make -C test/neovm/vm-compat check-all-neovm-strict` (pass; inventory `779`)
+
 - Added timeout + window-hook compatibility slice and locked oracle parity:
   - runtime changes:
     - `rust/neovm-core/src/elisp/timer.rs`
