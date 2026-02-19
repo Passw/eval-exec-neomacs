@@ -28,6 +28,30 @@ Last updated: 2026-02-19
 
 ## Doing
 
+- Aligned `func-arity` symbol-designator parity for startup wrapper/autoload dispatch helpers:
+  - runtime changes:
+    - `rust/neovm-core/src/elisp/builtins.rs`
+      - `func-arity` symbol path now applies dispatch-arity override when function-cell is:
+        - startup bytecode wrapper (`neovm--startup-subr-wrapper-<name>`)
+        - autoload object for a dispatch-backed builtin
+      - preserves existing `void-function` behavior for explicitly unbound symbols (e.g. startup `word-at-point`).
+    - `rust/neovm-core/src/elisp/subr_info.rs`
+      - added oracle-aligned `subr_arity_value` entries for startup wrapper/autoload-backed helper symbols:
+        - `autoloadp`, `looking-at-p`, `string-match-p`, `string-empty-p`, `string-blank-p`, `string-equal-ignore-case`, `string-to-vector`
+        - `seq-*` helper surface (`seq-count`, `seq-position`, `seq-reduce`, etc.)
+        - bookmark/rect/subr-x/thing-at-point helper symbols used via startup autoload shape (`bookmark-*`, `extract-rectangle`, `string-chop-newline`, `symbol-at-point`, `thing-at-point`, ...)
+  - vm-compat corpus changes:
+    - added:
+      - `test/neovm/vm-compat/cases/func-arity-dispatch-symbol-wrapper-semantics.forms`
+      - `test/neovm/vm-compat/cases/func-arity-dispatch-symbol-wrapper-semantics.expected.tsv`
+    - wired case into:
+      - `test/neovm/vm-compat/cases/default.list`
+  - verified:
+    - `make -C test/neovm/vm-compat check-one-neovm CASE=cases/func-arity-dispatch-symbol-wrapper-semantics` (pass, `18/18`)
+    - `make -C test/neovm/vm-compat check-builtin-registry-all` (pass)
+    - `make -C test/neovm/vm-compat check-all-neovm-strict` (pass)
+    - registry-wide `func-arity` drift scan reduced from `63` to `1` residual startup-policy case (`word-at-point` lazy bootstrap materialization order).
+
 - Tightened startup wrapper arglist/arity parity for `string-join` and `string-to-list`:
   - runtime changes:
     - `rust/neovm-core/src/elisp/eval.rs`

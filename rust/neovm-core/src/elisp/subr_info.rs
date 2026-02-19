@@ -568,6 +568,49 @@ fn subr_arity_value(name: &str) -> Value {
         "string-trim-left" | "string-trim-right" => arity_cons(1, Some(2)),
         "string-version-lessp" => arity_cons(2, Some(2)),
         "string-width" => arity_cons(1, Some(3)),
+        // Startup helper wrappers / autoload-backed dispatch helpers.
+        "autoloadp"
+        | "bounds-of-thing-at-point"
+        | "describe-function"
+        | "insert-rectangle"
+        | "kbd-macro-query"
+        | "looking-at-p"
+        | "safe-date-to-time"
+        | "string-blank-p"
+        | "string-chop-newline"
+        | "string-clean-whitespace"
+        | "string-empty-p"
+        | "string-glyph-split"
+        | "string-pixel-width"
+        | "string-to-vector"
+        | "upcase-char" => arity_cons(1, Some(1)),
+        "symbol-at-point" | "yank-rectangle" => arity_cons(0, Some(0)),
+        "word-at-point" => arity_cons(0, Some(1)),
+        "bookmark-delete" | "bookmark-jump" | "bookmark-rename" | "insert-kbd-macro" => {
+            arity_cons(1, Some(2))
+        }
+        "bookmark-load" => arity_cons(1, Some(4)),
+        "bookmark-save" => arity_cons(0, Some(3)),
+        "bookmark-set" => arity_cons(0, Some(2)),
+        "clear-rectangle" | "delete-extract-rectangle" | "delete-rectangle" | "kill-rectangle"
+        | "open-rectangle" => arity_cons(2, Some(3)),
+        "extract-rectangle" => arity_cons(2, Some(2)),
+        "describe-variable" => arity_cons(1, Some(3)),
+        "format-seconds" => arity_cons(2, Some(2)),
+        "format-spec" => arity_cons(2, Some(4)),
+        "replace-rectangle" | "string-rectangle" => arity_cons(3, Some(3)),
+        "thing-at-point" => arity_cons(1, Some(2)),
+        "seq-concatenate" | "seq-drop" | "seq-empty-p" | "seq-reverse" | "seq-take"
+        | "seq-uniq" => arity_cons(1, None),
+        "seq-count" | "seq-do" | "seq-every-p" | "seq-into" | "seq-some" | "string-fill"
+        | "string-equal-ignore-case" => arity_cons(2, Some(2)),
+        "seq-contains-p" | "seq-position" | "seq-subseq" | "string-match-p" => {
+            arity_cons(2, Some(3))
+        }
+        "seq-length" | "seq-max" | "seq-min" => arity_cons(1, Some(1)),
+        "seq-mapn" | "seq-sort" => arity_cons(2, None),
+        "seq-reduce" => arity_cons(3, Some(3)),
+        "string-limit" | "string-pad" => arity_cons(2, Some(4)),
         "sort" | "syntax-ppss-flush-cache" => arity_cons(1, None),
         "subst-char-in-string" => arity_cons(3, Some(4)),
         "self-insert-command"
@@ -1191,6 +1234,10 @@ fn subr_arity_value(name: &str) -> Value {
         "make-thread" | "make-condition-variable" | "condition-notify" => arity_cons(1, Some(2)),
         _ => arity_cons(0, None),
     }
+}
+
+pub(crate) fn dispatch_subr_arity_value(name: &str) -> Value {
+    subr_arity_value(name)
 }
 
 fn is_macro_object(value: &Value) -> bool {

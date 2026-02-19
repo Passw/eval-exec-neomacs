@@ -2913,12 +2913,41 @@ pub(crate) fn builtin_func_arity_eval(
             if function.is_nil() {
                 return Err(signal("void-function", vec![Value::symbol(name)]));
             }
+            if let Some(arity) = dispatch_symbol_func_arity_override(eval, name, &function) {
+                return Ok(arity);
+            }
             return super::subr_info::builtin_func_arity(vec![function]);
         }
         return Err(signal("void-function", vec![Value::symbol(name)]));
     }
 
     super::subr_info::builtin_func_arity(vec![args[0].clone()])
+}
+
+fn has_startup_subr_wrapper(eval: &super::eval::Evaluator, name: &str) -> bool {
+    let wrapper = format!("neovm--startup-subr-wrapper-{name}");
+    matches!(
+        eval.obarray().symbol_function(&wrapper),
+        Some(Value::Subr(subr_name)) if subr_name == name
+    )
+}
+
+fn dispatch_symbol_func_arity_override(
+    eval: &super::eval::Evaluator,
+    name: &str,
+    function: &Value,
+) -> Option<Value> {
+    if !super::builtin_registry::is_dispatch_builtin_name(name) {
+        return None;
+    }
+
+    if super::autoload::is_autoload_value(function)
+        || (matches!(function, Value::ByteCode(_)) && has_startup_subr_wrapper(eval, name))
+    {
+        return Some(super::subr_info::dispatch_subr_arity_value(name));
+    }
+
+    None
 }
 
 pub(crate) fn builtin_set(eval: &mut super::eval::Evaluator, args: Vec<Value>) -> EvalResult {

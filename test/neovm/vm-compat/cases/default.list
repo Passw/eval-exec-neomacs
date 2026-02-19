@@ -240,6 +240,7 @@ cases/special-form-arity-errors
 cases/special-form-type-errors
 cases/def-special-form-errors
 cases/func-arity-fallback-macros
+cases/func-arity-dispatch-symbol-wrapper-semantics
 cases/misc-special-forms-semantics
 cases/recursion-depth-semantics
 cases/printing
