@@ -10859,9 +10859,8 @@ fn describe_function_first_line(name: &str, function: &Value) -> String {
 fn describe_function_autoload_kind(autoload_type: Option<&Value>) -> &'static str {
     match autoload_type {
         Some(Value::Symbol(sym)) if sym == "keymap" => "keymap",
-        Some(Value::Symbol(sym)) if sym == "macro" => "Lisp macro",
-        Some(Value::True) => "Lisp macro",
-        _ => "Lisp function",
+        None | Some(Value::Nil) => "Lisp function",
+        _ => "Lisp macro",
     }
 }
 
@@ -13155,6 +13154,17 @@ mod tests {
             .obarray
             .set_symbol_function("vm-autoload-keymap", autoload_keymap);
 
+        let autoload_macro_other = Value::list(vec![
+            Value::symbol("autoload"),
+            Value::string("files"),
+            Value::string("doc"),
+            Value::Nil,
+            Value::symbol("foo"),
+        ]);
+        evaluator
+            .obarray
+            .set_symbol_function("vm-autoload-macro-other", autoload_macro_other);
+
         let macro_t = builtin_describe_function(
             &mut evaluator,
             vec![Value::symbol("vm-autoload-macro-t")],
@@ -13174,6 +13184,17 @@ mod tests {
             |s| s.contains("autoloaded keymap")
                 && !s.contains("autoloaded Lisp function")
                 && s.contains(" in ‘files.el’")
+        ));
+
+        let macro_other = builtin_describe_function(
+            &mut evaluator,
+            vec![Value::symbol("vm-autoload-macro-other")],
+        );
+        assert!(macro_other.is_ok());
+        assert!(macro_other.unwrap().as_str().is_some_and(
+            |s| s.contains("autoloaded Lisp macro")
+                && !s.contains("autoloaded Lisp function")
+                && !s.contains("autoloaded keymap")
         ));
     }
 

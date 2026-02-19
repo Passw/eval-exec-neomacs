@@ -73,3 +73,10 @@
      (not (null (string-match-p "autoloaded keymap" s)))
      (null (string-match-p "autoloaded Lisp function" s))
      (not (null (string-match-p " in ‘files.el’" s))))))
+(progn
+  (autoload 'vm-desc-fn-auto-type-other-shape "files" "doc" nil 'foo)
+  (let ((s (describe-function 'vm-desc-fn-auto-type-other-shape)))
+    (list
+     (not (null (string-match-p "autoloaded Lisp macro" s)))
+     (null (string-match-p "autoloaded Lisp function" s))
+     (null (string-match-p "autoloaded keymap" s)))))

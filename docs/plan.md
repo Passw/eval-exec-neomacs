@@ -4296,6 +4296,27 @@ Last updated: 2026-02-19
 
 ## Done
 
+- Aligned `describe-function` autoload type classification for non-`nil` non-`keymap` payloads:
+  - runtime changes:
+    - `rust/neovm-core/src/elisp/doc.rs`
+      - updated autoload kind mapping so:
+        - `TYPE=nil` => `autoloaded Lisp function`
+        - `TYPE='keymap` => `autoloaded keymap`
+        - any other non-`nil` type payload => `autoloaded Lisp macro`
+      - expanded evaluator lock-ins in:
+        - `describe_function_autoload_kind_shapes_match_oracle`
+  - corpus changes:
+    - expanded and re-recorded:
+      - `test/neovm/vm-compat/cases/describe-function-runtime-semantics.{forms,expected.tsv}`
+      - added lock-in for `autoload ... 'foo` shape:
+        - macro wording present
+        - function/keymap wording absent
+  - verified:
+    - `cargo test --manifest-path rust/neovm-core/Cargo.toml describe_function_` (pass, 19/19)
+    - `make -C test/neovm/vm-compat record FORMS=cases/describe-function-runtime-semantics.forms EXPECTED=cases/describe-function-runtime-semantics.expected.tsv` (pass)
+    - `make -C test/neovm/vm-compat check-one-neovm CASE=cases/describe-function-runtime-semantics` (pass, 23/23)
+    - `make -C test/neovm/vm-compat check-all-neovm-strict` (pass)
+
 - Aligned `describe-function` autoload kind semantics for `t`/`keymap` type payloads with GNU Emacs:
   - runtime changes:
     - `rust/neovm-core/src/elisp/doc.rs`
