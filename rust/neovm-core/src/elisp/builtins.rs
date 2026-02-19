@@ -3237,6 +3237,67 @@ pub(crate) fn builtin_remove_hook(
     Ok(Value::Nil)
 }
 
+fn symbol_dynamic_buffer_or_global_value(
+    eval: &super::eval::Evaluator,
+    name: &str,
+) -> Option<Value> {
+    for frame in eval.dynamic.iter().rev() {
+        if let Some(value) = frame.get(name) {
+            return Some(value.clone());
+        }
+    }
+    if let Some(buf) = eval.buffers.current_buffer() {
+        if let Some(value) = buf.get_buffer_local(name) {
+            return Some(value.clone());
+        }
+    }
+    eval.obarray().symbol_value(name).cloned()
+}
+
+fn run_hook_value(
+    eval: &mut super::eval::Evaluator,
+    hook_name: &str,
+    hook_value: Value,
+    hook_args: &[Value],
+    inherit_global: bool,
+) -> Result<(), Flow> {
+    match hook_value {
+        Value::Nil => Ok(()),
+        Value::Cons(_) => {
+            // Oracle-compatible traversal: iterate cons cells, ignore improper
+            // list tails, and treat `t` as "also run the global value".
+            let mut cursor = hook_value;
+            let mut saw_global_marker = false;
+            while let Value::Cons(cell) = cursor {
+                let (func, next) = {
+                    let pair = cell.lock().expect("poisoned");
+                    (pair.car.clone(), pair.cdr.clone())
+                };
+                if func.as_symbol_name() == Some("t") {
+                    saw_global_marker = true;
+                } else {
+                    eval.apply(func, hook_args.to_vec())?;
+                }
+                cursor = next;
+            }
+
+            if saw_global_marker && inherit_global {
+                let global_value = eval
+                    .obarray()
+                    .symbol_value(hook_name)
+                    .cloned()
+                    .unwrap_or(Value::Nil);
+                run_hook_value(eval, hook_name, global_value, hook_args, false)?;
+            }
+            Ok(())
+        }
+        value => {
+            eval.apply(value, hook_args.to_vec())?;
+            Ok(())
+        }
+    }
+}
+
 pub(crate) fn builtin_run_hooks(eval: &mut super::eval::Evaluator, args: Vec<Value>) -> EvalResult {
     for hook_sym in &args {
         let hook_name = hook_sym.as_symbol_name().ok_or_else(|| {
@@ -3245,15 +3306,9 @@ pub(crate) fn builtin_run_hooks(eval: &mut super::eval::Evaluator, args: Vec<Val
                 vec![Value::symbol("symbolp"), hook_sym.clone()],
             )
         })?;
-        let hook_val = eval
-            .obarray()
-            .symbol_value(hook_name)
-            .cloned()
-            .unwrap_or(Value::Nil);
-        let fns = list_to_vec(&hook_val).unwrap_or_default();
-        for func in fns {
-            eval.apply(func, vec![])?;
-        }
+        let hook_value =
+            symbol_dynamic_buffer_or_global_value(eval, hook_name).unwrap_or(Value::Nil);
+        run_hook_value(eval, hook_name, hook_value, &[], true)?;
     }
     Ok(Value::Nil)
 }
@@ -3270,15 +3325,8 @@ pub(crate) fn builtin_run_hook_with_args(
         )
     })?;
     let hook_args: Vec<Value> = args[1..].to_vec();
-    let hook_val = eval
-        .obarray()
-        .symbol_value(hook_name)
-        .cloned()
-        .unwrap_or(Value::Nil);
-    let fns = list_to_vec(&hook_val).unwrap_or_default();
-    for func in fns {
-        eval.apply(func, hook_args.clone())?;
-    }
+    let hook_value = symbol_dynamic_buffer_or_global_value(eval, hook_name).unwrap_or(Value::Nil);
+    run_hook_value(eval, hook_name, hook_value, &hook_args, true)?;
     Ok(Value::Nil)
 }
 

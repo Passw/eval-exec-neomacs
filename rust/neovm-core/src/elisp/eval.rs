@@ -4770,6 +4770,68 @@ mod tests {
     }
 
     #[test]
+    fn hook_system_runtime_value_shapes() {
+        let results = eval_all(
+            "(setq hook-count 0)
+             (defun hook-inc () (setq hook-count (1+ hook-count)))
+             (setq hook-probe-hook 'hook-inc)
+             (condition-case err (run-hooks 'hook-probe-hook) (error err))
+             hook-count
+             (setq hook-count 0)
+             (setq hook-probe-hook (cons 'hook-inc 1))
+             (condition-case err (run-hooks 'hook-probe-hook) (error err))
+             hook-count
+             (setq hook-probe-hook t)
+             (condition-case err (run-hooks 'hook-probe-hook) (error err))
+             (setq hook-probe-hook 42)
+             (condition-case err (run-hooks 'hook-probe-hook) (error err))
+             (setq hook-probe-hook '(t hook-inc))
+             (setq hook-count 0)
+             (condition-case err (run-hooks 'hook-probe-hook) (error err))
+             hook-count",
+        );
+        assert_eq!(results[3], "OK nil");
+        assert_eq!(results[4], "OK 1");
+        assert_eq!(results[7], "OK nil");
+        assert_eq!(results[8], "OK 1");
+        assert_eq!(results[10], "OK (void-function t)");
+        assert_eq!(results[12], "OK (invalid-function 42)");
+        assert_eq!(results[15], "OK nil");
+        assert_eq!(results[16], "OK 2");
+    }
+
+    #[test]
+    fn run_hook_with_args_runtime_value_shapes() {
+        let results = eval_all(
+            "(setq hook-log nil)
+             (defun hook-log-fn (&rest args) (setq hook-log (cons args hook-log)))
+             (setq hook-probe-hook 'hook-log-fn)
+             (condition-case err (run-hook-with-args 'hook-probe-hook 1 2) (error err))
+             hook-log
+             (setq hook-log nil)
+             (setq hook-probe-hook (cons 'hook-log-fn 1))
+             (condition-case err (run-hook-with-args 'hook-probe-hook 3) (error err))
+             hook-log
+             (setq hook-probe-hook t)
+             (condition-case err (run-hook-with-args 'hook-probe-hook 4) (error err))
+             (setq hook-probe-hook 42)
+             (condition-case err (run-hook-with-args 'hook-probe-hook 5) (error err))
+             (setq hook-log nil)
+             (setq hook-probe-hook '(t hook-log-fn))
+             (condition-case err (run-hook-with-args 'hook-probe-hook 6) (error err))
+             hook-log",
+        );
+        assert_eq!(results[3], "OK nil");
+        assert_eq!(results[4], "OK ((1 2))");
+        assert_eq!(results[7], "OK nil");
+        assert_eq!(results[8], "OK ((3))");
+        assert_eq!(results[10], "OK (void-function t)");
+        assert_eq!(results[12], "OK (invalid-function 42)");
+        assert_eq!(results[15], "OK nil");
+        assert_eq!(results[16], "OK ((6) (6))");
+    }
+
+    #[test]
     fn symbol_operations() {
         let results = eval_all(
             "(defvar x 42)

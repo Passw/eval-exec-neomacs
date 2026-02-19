@@ -16881,6 +16881,35 @@ Last updated: 2026-02-19
     - `make -C test/neovm/vm-compat check-one-neovm CASE=cases/x-color-selection-gui-alias-semantics` (pass, `2/2`)
     - `test/neovm/vm-compat/check-builtin-registry-commandp.sh` (pass, drifts: `0`)
     - `make -C test/neovm/vm-compat check-all-neovm-strict` (pass)
+- Aligned `run-hooks`/`run-hook-with-args` runtime hook-value semantics with oracle and added lock-ins:
+  - runtime changes:
+    - `rust/neovm-core/src/elisp/builtins.rs`
+      - `run-hooks` and `run-hook-with-args` now:
+        - execute non-list hook values as callables (instead of silently no-oping),
+        - traverse dotted hook lists by cons cells (ignoring improper tails),
+        - treat `t` list entries as global/default hook markers rather than callable functions,
+        - preserve `invalid-function`/`void-function` payload parity for non-callables.
+      - added helper paths for dynamic/buffer-local/global hook-value lookup and marker-aware execution.
+    - `rust/neovm-core/src/elisp/eval.rs`
+      - added unit coverage:
+        - `hook_system_runtime_value_shapes`
+        - `run_hook_with_args_runtime_value_shapes`
+  - corpus changes:
+    - added and wired:
+      - `test/neovm/vm-compat/cases/hook-runtime-semantics.forms`
+      - `test/neovm/vm-compat/cases/hook-runtime-semantics.expected.tsv`
+      - `test/neovm/vm-compat/cases/default.list`
+    - lock-ins cover:
+      - single-function hook variables (symbol/lambda) executing for both builtins,
+      - dotted-list hook values executing the cons chain and ignoring improper tail payloads,
+      - non-callable hook payload error parity (`t`, integers, vectors),
+      - `t` marker behavior in list hook values for global inheritance paths.
+  - verified:
+    - `cargo test --manifest-path rust/neovm-core/Cargo.toml hook_system_runtime_value_shapes -- --nocapture` (pass)
+    - `cargo test --manifest-path rust/neovm-core/Cargo.toml run_hook_with_args_runtime_value_shapes -- --nocapture` (pass)
+    - `make -C test/neovm/vm-compat record FORMS=cases/hook-runtime-semantics.forms EXPECTED=cases/hook-runtime-semantics.expected.tsv` (pass)
+    - `make -C test/neovm/vm-compat check-one-neovm CASE=cases/hook-runtime-semantics` (pass, `2/2`)
+    - `make -C test/neovm/vm-compat check-all-neovm-strict` (pass)
 
 ## Doing
 
