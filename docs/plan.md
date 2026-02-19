@@ -28,6 +28,29 @@ Last updated: 2026-02-19
 
 ## Doing
 
+- Expanded command-loop KEYS publication lock-ins for batch-mode compatibility:
+  - corpus changes:
+    - added `test/neovm/vm-compat/cases/command-loop-keys-publication-semantics.{forms,expected.tsv}`
+    - wired into `test/neovm/vm-compat/cases/default.list`
+    - covered:
+      - vector `KEYS` acceptance for `command-execute` / `call-interactively`
+      - non-vector `KEYS` type-error payloads (`wrong-type-argument vectorp`)
+      - batch-mode non-publication of `KEYS` into `recent-keys`
+      - batch-mode `this-command-keys` / `this-command-keys-vector` staying empty under `KEYS`-provided dispatch
+  - runtime unit lock-ins:
+    - `rust/neovm-core/src/elisp/interactive.rs`
+    - added tests:
+      - `command_execute_keys_vector_keeps_this_command_keys_empty_in_batch`
+      - `call_interactively_keys_vector_keeps_this_command_keys_empty_in_batch`
+      - `command_execute_rejects_list_keys_argument_without_recording_recent_history`
+      - `call_interactively_rejects_list_keys_argument_without_recording_recent_history`
+  - verified:
+    - `make -C test/neovm/vm-compat record FORMS=cases/command-loop-keys-publication-semantics.forms EXPECTED=cases/command-loop-keys-publication-semantics.expected.tsv` (pass)
+    - `make -C test/neovm/vm-compat check-one-neovm CASE=command-loop-keys-publication-semantics` (pass, 13/13)
+    - `cargo test --manifest-path rust/neovm-core/Cargo.toml keys_vector_keeps_this_command_keys_empty_in_batch` (pass)
+    - `cargo test --manifest-path rust/neovm-core/Cargo.toml rejects_list_keys_argument_without_recording_recent_history` (pass)
+    - `make -C test/neovm/vm-compat check-all-neovm-strict` (pass)
+
 - Tightened `subr-x` string helper startup autoload shape parity and locked it in corpus:
   - runtime change:
     - `rust/neovm-core/src/elisp/eval.rs`

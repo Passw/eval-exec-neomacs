@@ -3754,6 +3754,50 @@ mod tests {
     }
 
     #[test]
+    fn command_execute_keys_vector_keeps_this_command_keys_empty_in_batch() {
+        let mut ev = Evaluator::new();
+        let _ = eval_all_with(
+            &mut ev,
+            "(fset 'neo-rk-loop-probe
+                    (lambda ()
+                      (interactive)
+                      (list (this-command-keys) (this-command-keys-vector))))",
+        );
+
+        let result = builtin_command_execute(
+            &mut ev,
+            vec![
+                Value::symbol("neo-rk-loop-probe"),
+                Value::Nil,
+                Value::vector(vec![Value::Int(97), Value::Int(98)]),
+            ],
+        )
+        .expect("command-execute should accept vector keys argument");
+        let output = list_to_vec(&result).expect("probe result should be list");
+        assert_eq!(output, vec![Value::string(""), Value::vector(vec![])]);
+        assert!(ev.recent_input_events().is_empty());
+    }
+
+    #[test]
+    fn command_execute_rejects_list_keys_argument_without_recording_recent_history() {
+        let mut ev = Evaluator::new();
+        let keys = Value::list(vec![Value::Int(97), Value::Int(98)]);
+        let result = builtin_command_execute(
+            &mut ev,
+            vec![Value::symbol("ignore"), Value::Nil, keys.clone()],
+        )
+        .expect_err("command-execute should reject list keys argument");
+        match result {
+            Flow::Signal(sig) => {
+                assert_eq!(sig.symbol, "wrong-type-argument");
+                assert_eq!(sig.data, vec![Value::symbol("vectorp"), keys]);
+            }
+            other => panic!("unexpected flow: {other:?}"),
+        }
+        assert!(ev.recent_input_events().is_empty());
+    }
+
+    #[test]
     fn command_execute_rejects_too_many_arguments() {
         let mut ev = Evaluator::new();
         let result = builtin_command_execute(
@@ -3868,6 +3912,50 @@ mod tests {
         )
         .expect("call-interactively should accept vector keys argument");
         assert!(result.is_nil());
+        assert!(ev.recent_input_events().is_empty());
+    }
+
+    #[test]
+    fn call_interactively_keys_vector_keeps_this_command_keys_empty_in_batch() {
+        let mut ev = Evaluator::new();
+        let _ = eval_all_with(
+            &mut ev,
+            "(fset 'neo-rk-loop-probe
+                    (lambda ()
+                      (interactive)
+                      (list (this-command-keys) (this-command-keys-vector))))",
+        );
+
+        let result = builtin_call_interactively(
+            &mut ev,
+            vec![
+                Value::symbol("neo-rk-loop-probe"),
+                Value::Nil,
+                Value::vector(vec![Value::symbol("foo")]),
+            ],
+        )
+        .expect("call-interactively should accept vector keys argument");
+        let output = list_to_vec(&result).expect("probe result should be list");
+        assert_eq!(output, vec![Value::string(""), Value::vector(vec![])]);
+        assert!(ev.recent_input_events().is_empty());
+    }
+
+    #[test]
+    fn call_interactively_rejects_list_keys_argument_without_recording_recent_history() {
+        let mut ev = Evaluator::new();
+        let keys = Value::list(vec![Value::Int(97), Value::Int(98)]);
+        let result = builtin_call_interactively(
+            &mut ev,
+            vec![Value::symbol("ignore"), Value::Nil, keys.clone()],
+        )
+        .expect_err("call-interactively should reject list keys argument");
+        match result {
+            Flow::Signal(sig) => {
+                assert_eq!(sig.symbol, "wrong-type-argument");
+                assert_eq!(sig.data, vec![Value::symbol("vectorp"), keys]);
+            }
+            other => panic!("unexpected flow: {other:?}"),
+        }
         assert!(ev.recent_input_events().is_empty());
     }
 
