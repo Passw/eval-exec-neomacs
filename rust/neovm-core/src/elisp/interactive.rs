@@ -1944,8 +1944,26 @@ fn command_key_events_to_string(events: &[Value]) -> Option<String> {
 // Thing-at-point functions
 // ---------------------------------------------------------------------------
 
+fn maybe_materialize_word_at_point(eval: &mut Evaluator) {
+    let should_materialize = {
+        let obarray = &eval.obarray;
+        if obarray.fboundp("word-at-point") {
+            return;
+        }
+        // Respect explicit user-level `fmakunbound` after materialization.
+        // Startup masking keeps the symbol uninterned and should still allow
+        // first bootstrap.
+        !(obarray.is_function_unbound("word-at-point")
+            && obarray.intern_soft("word-at-point").is_some())
+    };
+    if should_materialize {
+        eval.set_function("word-at-point", Value::Subr("word-at-point".to_string()));
+    }
+}
+
 /// `(thing-at-point THING &optional NO-PROPERTIES)` -> the THING at point.
 pub(crate) fn builtin_thing_at_point(eval: &mut Evaluator, args: Vec<Value>) -> EvalResult {
+    maybe_materialize_word_at_point(eval);
     expect_min_args("thing-at-point", &args, 1)?;
 
     let thing = match args[0].as_symbol_name() {
@@ -1988,6 +2006,7 @@ pub(crate) fn builtin_bounds_of_thing_at_point(
     eval: &mut Evaluator,
     args: Vec<Value>,
 ) -> EvalResult {
+    maybe_materialize_word_at_point(eval);
     expect_args("bounds-of-thing-at-point", &args, 1)?;
 
     let thing = match args[0].as_symbol_name() {
@@ -2038,12 +2057,7 @@ pub(crate) fn builtin_bounds_of_thing_at_point(
 
 /// `(symbol-at-point)` -> symbol at point or nil.
 pub(crate) fn builtin_symbol_at_point(eval: &mut Evaluator, _args: Vec<Value>) -> EvalResult {
-    // GNU Emacs loads thing-at-point helpers lazily. Keep word-at-point
-    // absent from startup fboundp surface, but materialize it when
-    // symbol-at-point flow is exercised.
-    if !eval.obarray.fboundp("word-at-point") {
-        eval.set_function("word-at-point", Value::Subr("word-at-point".to_string()));
-    }
+    maybe_materialize_word_at_point(eval);
 
     let thing = builtin_thing_at_point(eval, vec![Value::symbol("symbol")])?;
     match thing {
@@ -4326,6 +4340,45 @@ mod tests {
 
         let _ = builtin_symbol_at_point(&mut ev, vec![]).unwrap();
         assert!(ev.obarray.fboundp("word-at-point"));
+    }
+
+    #[test]
+    fn thing_at_point_bootstraps_word_at_point_binding() {
+        let mut ev = Evaluator::new();
+        assert!(!ev.obarray.fboundp("word-at-point"));
+
+        eval_all_with(
+            &mut ev,
+            r#"(get-buffer-create "tap-bootstrap")
+               (set-buffer "tap-bootstrap")
+               (insert "my-symbol other")
+               (goto-char 3)"#,
+        );
+
+        let _ = builtin_thing_at_point(&mut ev, vec![Value::symbol("symbol")]).unwrap();
+        assert!(ev.obarray.fboundp("word-at-point"));
+    }
+
+    #[test]
+    fn symbol_at_point_respects_explicit_fmakunbound_word_at_point() {
+        let mut ev = Evaluator::new();
+        eval_all_with(
+            &mut ev,
+            r#"(get-buffer-create "sap-fmakunbound")
+               (set-buffer "sap-fmakunbound")
+               (insert "my-symbol other")
+               (goto-char 3)"#,
+        );
+
+        let _ = builtin_symbol_at_point(&mut ev, vec![]).unwrap();
+        assert!(ev.obarray.fboundp("word-at-point"));
+
+        eval_all_with(&mut ev, "(fmakunbound 'word-at-point)");
+        assert!(!ev.obarray.fboundp("word-at-point"));
+
+        let result = builtin_symbol_at_point(&mut ev, vec![]).unwrap();
+        assert_eq!(result.as_symbol_name(), Some("my-symbol"));
+        assert!(!ev.obarray.fboundp("word-at-point"));
     }
 
     #[test]

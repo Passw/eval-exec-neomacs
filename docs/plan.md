@@ -28,6 +28,30 @@ Last updated: 2026-02-19
 
 ## Doing
 
+- Aligned thing-at-point lazy bootstrap behavior with explicit `fmakunbound` masking:
+  - runtime changes:
+    - `rust/neovm-core/src/elisp/interactive.rs`
+      - unified `word-at-point` lazy materialization for:
+        - `thing-at-point`
+        - `bounds-of-thing-at-point`
+        - `symbol-at-point`
+      - preserves startup lazy bootstrap while respecting explicit post-bootstrap `fmakunbound` masking.
+    - added regression tests in `interactive.rs` for:
+      - startup bootstrap via `thing-at-point`
+      - no rematerialization after explicit `fmakunbound`
+  - vm-compat corpus changes:
+    - added:
+      - `test/neovm/vm-compat/cases/word-at-point-fmakunbound-thingatpt-semantics.forms`
+      - `test/neovm/vm-compat/cases/word-at-point-fmakunbound-thingatpt-semantics.expected.tsv`
+    - wired case into:
+      - `test/neovm/vm-compat/cases/default.list`
+  - verified:
+    - `cargo test --manifest-path rust/neovm-core/Cargo.toml symbol_at_point_` (pass)
+    - `cargo test --manifest-path rust/neovm-core/Cargo.toml thing_at_point_bootstraps_word_at_point_binding` (pass)
+    - `make -C test/neovm/vm-compat check-one-neovm CASE=cases/word-at-point-fmakunbound-thingatpt-semantics` (pass, `11/11`)
+    - `make -C test/neovm/vm-compat check-builtin-registry-all` (pass)
+    - `make -C test/neovm/vm-compat check-all-neovm-strict` (pass; case inventory `792`)
+
 - Fixed `func-arity` startup materialization parity after explicit `fmakunbound` of `word-at-point`:
   - runtime changes:
     - `rust/neovm-core/src/elisp/builtins.rs`
