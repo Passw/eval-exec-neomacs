@@ -923,9 +923,12 @@ fn subr_arity_value(name: &str) -> Value {
         "window-text-pixel-size" => arity_cons(0, Some(7)),
         // Process primitives
         "accept-process-output" => arity_cons(0, Some(4)),
+        "backquote-delay-process" => arity_cons(2, Some(2)),
+        "backquote-process" => arity_cons(1, Some(2)),
         "call-process" => arity_cons(1, None),
         "call-process-shell-command" => arity_cons(1, None),
         "call-process-region" => arity_cons(3, None),
+        "clone-process" => arity_cons(1, Some(2)),
         "continue-process" | "interrupt-process" | "kill-process" | "quit-process"
         | "stop-process" => {
             arity_cons(0, Some(2))
@@ -933,13 +936,22 @@ fn subr_arity_value(name: &str) -> Value {
         "delete-process" => arity_cons(0, Some(1)),
         "get-buffer-process" => arity_cons(1, Some(1)),
         "get-process" => arity_cons(1, Some(1)),
+        "internal-default-interrupt-process" => arity_cons(0, Some(2)),
+        "internal-default-process-filter" | "internal-default-process-sentinel" => {
+            arity_cons(2, Some(2))
+        }
+        "internal-default-signal-process" => arity_cons(2, Some(3)),
+        "isearch-process-search-char" => arity_cons(1, Some(2)),
+        "isearch-process-search-string" => arity_cons(2, Some(2)),
         "list-processes" => arity_cons(0, Some(2)),
         "list-processes--refresh" | "list-system-processes" => arity_cons(0, Some(0)),
         "make-process" => arity_cons(0, None),
         "make-network-process" | "make-pipe-process" | "make-serial-process" => {
             arity_cons(0, None)
         }
+        "minibuffer--sort-preprocess-history" => arity_cons(1, Some(1)),
         "num-processors" => arity_cons(0, Some(1)),
+        "print--preprocess" => arity_cons(1, Some(1)),
         "process-buffer"
         | "process-attributes"
         | "process-coding-system"
@@ -993,6 +1005,14 @@ fn subr_arity_value(name: &str) -> Value {
         "setenv" => arity_cons(1, Some(3)),
         "start-process" | "start-file-process" => arity_cons(3, None),
         "start-process-shell-command" | "start-file-process-shell-command" => arity_cons(3, Some(3)),
+        "syntax-propertize--in-process-p" => arity_cons(0, Some(0)),
+        "tooltip-process-prompt-regexp" => arity_cons(1, Some(1)),
+        "window--adjust-process-windows" | "window--process-window-list" => {
+            arity_cons(0, Some(0))
+        }
+        "window-adjust-process-window-size"
+        | "window-adjust-process-window-size-largest"
+        | "window-adjust-process-window-size-smallest" => arity_cons(2, Some(2)),
         "getenv" => arity_cons(1, Some(2)),
         // Display/terminal query primitives
         "display-images-p"
@@ -1595,15 +1615,24 @@ mod tests {
     #[test]
     fn subr_arity_process_primitives_match_oracle() {
         assert_subr_arity("accept-process-output", 0, Some(4));
+        assert_subr_arity("backquote-delay-process", 2, Some(2));
+        assert_subr_arity("backquote-process", 1, Some(2));
         assert_subr_arity("call-process", 1, None);
         assert_subr_arity("call-process-shell-command", 1, None);
         assert_subr_arity("call-process-region", 3, None);
+        assert_subr_arity("clone-process", 1, Some(2));
         assert_subr_arity("continue-process", 0, Some(2));
         assert_subr_arity("delete-process", 0, Some(1));
         assert_subr_arity("get-buffer-process", 1, Some(1));
         assert_subr_arity("get-process", 1, Some(1));
         assert_subr_arity("getenv", 1, Some(2));
+        assert_subr_arity("internal-default-interrupt-process", 0, Some(2));
+        assert_subr_arity("internal-default-process-filter", 2, Some(2));
+        assert_subr_arity("internal-default-process-sentinel", 2, Some(2));
+        assert_subr_arity("internal-default-signal-process", 2, Some(3));
         assert_subr_arity("interrupt-process", 0, Some(2));
+        assert_subr_arity("isearch-process-search-char", 1, Some(2));
+        assert_subr_arity("isearch-process-search-string", 2, Some(2));
         assert_subr_arity("kill-process", 0, Some(2));
         assert_subr_arity("list-processes", 0, Some(2));
         assert_subr_arity("list-processes--refresh", 0, Some(0));
@@ -1612,7 +1641,9 @@ mod tests {
         assert_subr_arity("make-network-process", 0, None);
         assert_subr_arity("make-pipe-process", 0, None);
         assert_subr_arity("make-serial-process", 0, None);
+        assert_subr_arity("minibuffer--sort-preprocess-history", 1, Some(1));
         assert_subr_arity("num-processors", 0, Some(1));
+        assert_subr_arity("print--preprocess", 1, Some(1));
         assert_subr_arity("process-attributes", 1, Some(1));
         assert_subr_arity("process-buffer", 1, Some(1));
         assert_subr_arity("process-coding-system", 1, Some(1));
@@ -1671,6 +1702,13 @@ mod tests {
         assert_subr_arity("start-process-shell-command", 3, Some(3));
         assert_subr_arity("start-file-process", 3, None);
         assert_subr_arity("start-file-process-shell-command", 3, Some(3));
+        assert_subr_arity("syntax-propertize--in-process-p", 0, Some(0));
+        assert_subr_arity("tooltip-process-prompt-regexp", 1, Some(1));
+        assert_subr_arity("window--adjust-process-windows", 0, Some(0));
+        assert_subr_arity("window--process-window-list", 0, Some(0));
+        assert_subr_arity("window-adjust-process-window-size", 2, Some(2));
+        assert_subr_arity("window-adjust-process-window-size-largest", 2, Some(2));
+        assert_subr_arity("window-adjust-process-window-size-smallest", 2, Some(2));
     }
 
     #[test]

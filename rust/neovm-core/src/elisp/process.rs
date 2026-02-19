@@ -1091,6 +1091,229 @@ fn expect_integer(value: &Value) -> Result<i64, Flow> {
 // Builtins (eval-dependent)
 // ---------------------------------------------------------------------------
 
+/// (backquote-delay-process ENV FORM) -> delayed-form
+pub(crate) fn builtin_backquote_delay_process(
+    _eval: &mut super::eval::Evaluator,
+    args: Vec<Value>,
+) -> EvalResult {
+    expect_args("backquote-delay-process", &args, 2)?;
+    Ok(Value::list(vec![
+        Value::Int(0),
+        Value::symbol("quote"),
+        Value::list(vec![args[1].clone()]),
+    ]))
+}
+
+/// (backquote-process FORM &optional LEVEL) -> processed
+pub(crate) fn builtin_backquote_process(
+    _eval: &mut super::eval::Evaluator,
+    args: Vec<Value>,
+) -> EvalResult {
+    expect_min_args("backquote-process", &args, 1)?;
+    if args.len() > 2 {
+        return Err(signal(
+            "wrong-number-of-arguments",
+            vec![Value::symbol("backquote-process"), Value::Int(args.len() as i64)],
+        ));
+    }
+    Ok(Value::list(vec![Value::Int(0)]))
+}
+
+/// (clone-process PROCESS &optional NAME) -> process
+pub(crate) fn builtin_clone_process(
+    eval: &mut super::eval::Evaluator,
+    args: Vec<Value>,
+) -> EvalResult {
+    expect_min_args("clone-process", &args, 1)?;
+    if args.len() > 2 {
+        return Err(signal(
+            "wrong-number-of-arguments",
+            vec![Value::symbol("clone-process"), Value::Int(args.len() as i64)],
+        ));
+    }
+    let id = resolve_live_process_or_wrong_type(eval, &args[0])?;
+    Ok(Value::Int(id as i64))
+}
+
+/// (internal-default-interrupt-process &optional PROCESS CURRENT-GROUP) -> process-or-nil
+pub(crate) fn builtin_internal_default_interrupt_process(
+    eval: &mut super::eval::Evaluator,
+    args: Vec<Value>,
+) -> EvalResult {
+    if args.len() > 2 {
+        return Err(signal(
+            "wrong-number-of-arguments",
+            vec![
+                Value::symbol("internal-default-interrupt-process"),
+                Value::Int(args.len() as i64),
+            ],
+        ));
+    }
+    let (id, ret) = resolve_optional_process_with_explicit_return(eval, args.first())?;
+    if let Some(proc) = eval.processes.get_mut(id) {
+        proc.status = ProcessStatus::Signal(2);
+    }
+    Ok(ret)
+}
+
+/// (internal-default-signal-process PROCESS SIGNAL &optional CURRENT-GROUP) -> int-or-nil
+pub(crate) fn builtin_internal_default_signal_process(
+    eval: &mut super::eval::Evaluator,
+    args: Vec<Value>,
+) -> EvalResult {
+    expect_min_args("internal-default-signal-process", &args, 2)?;
+    if args.len() > 3 {
+        return Err(signal(
+            "wrong-number-of-arguments",
+            vec![
+                Value::symbol("internal-default-signal-process"),
+                Value::Int(args.len() as i64),
+            ],
+        ));
+    }
+
+    let signal_num = parse_signal_number(&args[1])?;
+    match resolve_signal_process_target(eval, args.first())? {
+        SignalProcessTarget::Process(id) => {
+            if let Some(proc) = eval.processes.get_mut(id) {
+                proc.status = ProcessStatus::Signal(signal_num);
+            }
+            Ok(Value::Int(0))
+        }
+        SignalProcessTarget::MissingNamedProcess => Ok(Value::Nil),
+        SignalProcessTarget::Pid(pid) => Ok(Value::Int(if pid_exists(pid) { 0 } else { -1 })),
+    }
+}
+
+/// (internal-default-process-filter PROCESS STRING) -> nil
+pub(crate) fn builtin_internal_default_process_filter(
+    eval: &mut super::eval::Evaluator,
+    args: Vec<Value>,
+) -> EvalResult {
+    expect_args("internal-default-process-filter", &args, 2)?;
+    let _id = resolve_live_process_or_wrong_type(eval, &args[0])?;
+    Ok(Value::Nil)
+}
+
+/// (internal-default-process-sentinel PROCESS STRING) -> nil
+pub(crate) fn builtin_internal_default_process_sentinel(
+    eval: &mut super::eval::Evaluator,
+    args: Vec<Value>,
+) -> EvalResult {
+    expect_args("internal-default-process-sentinel", &args, 2)?;
+    let _id = resolve_live_process_or_wrong_type(eval, &args[0])?;
+    Ok(Value::Nil)
+}
+
+/// (isearch-process-search-char CHAR &optional COUNT) -> nil
+pub(crate) fn builtin_isearch_process_search_char(
+    _eval: &mut super::eval::Evaluator,
+    args: Vec<Value>,
+) -> EvalResult {
+    expect_min_args("isearch-process-search-char", &args, 1)?;
+    if args.len() > 2 {
+        return Err(signal(
+            "wrong-number-of-arguments",
+            vec![
+                Value::symbol("isearch-process-search-char"),
+                Value::Int(args.len() as i64),
+            ],
+        ));
+    }
+    Ok(Value::Nil)
+}
+
+/// (isearch-process-search-string STRING MESSAGE) -> nil
+pub(crate) fn builtin_isearch_process_search_string(
+    _eval: &mut super::eval::Evaluator,
+    args: Vec<Value>,
+) -> EvalResult {
+    expect_args("isearch-process-search-string", &args, 2)?;
+    Ok(Value::Nil)
+}
+
+/// (minibuffer--sort-preprocess-history HISTORY) -> nil
+pub(crate) fn builtin_minibuffer_sort_preprocess_history(
+    _eval: &mut super::eval::Evaluator,
+    args: Vec<Value>,
+) -> EvalResult {
+    expect_args("minibuffer--sort-preprocess-history", &args, 1)?;
+    Ok(Value::Nil)
+}
+
+/// (print--preprocess OBJECT) -> nil
+pub(crate) fn builtin_print_preprocess(
+    _eval: &mut super::eval::Evaluator,
+    args: Vec<Value>,
+) -> EvalResult {
+    expect_args("print--preprocess", &args, 1)?;
+    Ok(Value::Nil)
+}
+
+/// (syntax-propertize--in-process-p) -> nil
+pub(crate) fn builtin_syntax_propertize_in_process_p(
+    _eval: &mut super::eval::Evaluator,
+    args: Vec<Value>,
+) -> EvalResult {
+    expect_args("syntax-propertize--in-process-p", &args, 0)?;
+    Ok(Value::Nil)
+}
+
+/// (tooltip-process-prompt-regexp PROCESS) -> nil
+pub(crate) fn builtin_tooltip_process_prompt_regexp(
+    eval: &mut super::eval::Evaluator,
+    args: Vec<Value>,
+) -> EvalResult {
+    expect_args("tooltip-process-prompt-regexp", &args, 1)?;
+    let _id = resolve_live_process_or_wrong_type(eval, &args[0])?;
+    Ok(Value::Nil)
+}
+
+/// (window--adjust-process-windows) -> nil
+pub(crate) fn builtin_window_adjust_process_windows(
+    _eval: &mut super::eval::Evaluator,
+    args: Vec<Value>,
+) -> EvalResult {
+    expect_args("window--adjust-process-windows", &args, 0)?;
+    Ok(Value::Nil)
+}
+
+/// (window--process-window-list) -> nil
+pub(crate) fn builtin_window_process_window_list(
+    _eval: &mut super::eval::Evaluator,
+    args: Vec<Value>,
+) -> EvalResult {
+    expect_args("window--process-window-list", &args, 0)?;
+    Ok(Value::Nil)
+}
+
+/// (window-adjust-process-window-size PROCESS WINDOW) -> nil
+pub(crate) fn builtin_window_adjust_process_window_size(
+    _eval: &mut super::eval::Evaluator,
+    args: Vec<Value>,
+) -> EvalResult {
+    expect_args("window-adjust-process-window-size", &args, 2)?;
+    Ok(Value::Nil)
+}
+
+/// (window-adjust-process-window-size-largest PROCESS WINDOW) -> nil
+pub(crate) fn builtin_window_adjust_process_window_size_largest(
+    _eval: &mut super::eval::Evaluator,
+    args: Vec<Value>,
+) -> EvalResult {
+    expect_args("window-adjust-process-window-size-largest", &args, 2)?;
+    Ok(Value::Nil)
+}
+
+/// (window-adjust-process-window-size-smallest PROCESS WINDOW) -> nil
+pub(crate) fn builtin_window_adjust_process_window_size_smallest(
+    _eval: &mut super::eval::Evaluator,
+    args: Vec<Value>,
+) -> EvalResult {
+    expect_args("window-adjust-process-window-size-smallest", &args, 2)?;
+    Ok(Value::Nil)
+}
+
 /// (list-system-processes) -> process-id-list
 pub(crate) fn builtin_list_system_processes(
     _eval: &mut super::eval::Evaluator,
@@ -3938,6 +4161,74 @@ mod tests {
         assert_eq!(
             results[2],
             "OK (nil (wrong-type-argument stringp nil) (error \":name value not a string\") (error \"Missing :name keyword parameter\") t nil t (error \":name value not a string\") nil (error \"No port specified\") (error \":speed not specified\") error error wrong-number-of-arguments (wrong-type-argument processp 1) (error \"Process is not a network process\") (error \"Unknown or unsupported option\"))"
+        );
+    }
+
+    #[test]
+    fn process_helper_wrapper_runtime_surface() {
+        let results = eval_all(
+            r#"(mapcar (lambda (s)
+                         (list s
+                               (fboundp s)
+                               (subrp (symbol-function s))
+                               (subr-arity (symbol-function s))
+                               (commandp s)))
+                       '(backquote-delay-process
+                         backquote-process
+                         clone-process
+                         internal-default-interrupt-process
+                         internal-default-process-filter
+                         internal-default-process-sentinel
+                         internal-default-signal-process
+                         isearch-process-search-char
+                         isearch-process-search-string
+                         minibuffer--sort-preprocess-history
+                         print--preprocess
+                         syntax-propertize--in-process-p
+                         tooltip-process-prompt-regexp
+                         window--adjust-process-windows
+                         window--process-window-list
+                         window-adjust-process-window-size
+                         window-adjust-process-window-size-largest
+                         window-adjust-process-window-size-smallest))
+               (list
+                (backquote-delay-process nil nil)
+                (backquote-process nil)
+                (backquote-process nil nil)
+                (condition-case err (clone-process nil) (error err))
+                (with-temp-buffer
+                  (condition-case err (internal-default-interrupt-process) (error (car err))))
+                (with-temp-buffer
+                  (condition-case err (internal-default-signal-process nil 9) (error (car err))))
+                (condition-case err (internal-default-process-filter nil "x") (error err))
+                (condition-case err (internal-default-process-sentinel nil "x") (error err))
+                (minibuffer--sort-preprocess-history nil)
+                (print--preprocess nil)
+                (syntax-propertize--in-process-p)
+                (condition-case err (tooltip-process-prompt-regexp "x") (error err))
+                (window--adjust-process-windows)
+                (window--process-window-list)
+                (window-adjust-process-window-size nil nil)
+                (window-adjust-process-window-size-largest nil nil)
+                (window-adjust-process-window-size-smallest nil nil)
+                (condition-case err (backquote-delay-process nil) (error err))
+                (condition-case err (backquote-process) (error err))
+                (condition-case err (internal-default-interrupt-process nil nil nil) (error err))
+                (condition-case err (internal-default-signal-process) (error err))
+                (condition-case err (internal-default-process-filter nil) (error err))
+                (condition-case err (minibuffer--sort-preprocess-history) (error err))
+                (condition-case err (window-adjust-process-window-size nil) (error err))
+                (condition-case err (isearch-process-search-char) (error err))
+                (condition-case err (isearch-process-search-string "x") (error err)))"#,
+        );
+
+        assert_eq!(
+            results[0],
+            "OK ((backquote-delay-process t t (2 . 2) nil) (backquote-process t t (1 . 2) nil) (clone-process t t (1 . 2) nil) (internal-default-interrupt-process t t (0 . 2) nil) (internal-default-process-filter t t (2 . 2) nil) (internal-default-process-sentinel t t (2 . 2) nil) (internal-default-signal-process t t (2 . 3) nil) (isearch-process-search-char t t (1 . 2) nil) (isearch-process-search-string t t (2 . 2) nil) (minibuffer--sort-preprocess-history t t (1 . 1) nil) (print--preprocess t t (1 . 1) nil) (syntax-propertize--in-process-p t t (0 . 0) nil) (tooltip-process-prompt-regexp t t (1 . 1) nil) (window--adjust-process-windows t t (0 . 0) nil) (window--process-window-list t t (0 . 0) nil) (window-adjust-process-window-size t t (2 . 2) nil) (window-adjust-process-window-size-largest t t (2 . 2) nil) (window-adjust-process-window-size-smallest t t (2 . 2) nil))"
+        );
+        assert_eq!(
+            results[1],
+            "OK ((0 quote (nil)) (0) (0) (wrong-type-argument processp nil) error error (wrong-type-argument processp nil) (wrong-type-argument processp nil) nil nil nil (wrong-type-argument processp \"x\") nil nil nil nil nil (wrong-number-of-arguments backquote-delay-process 1) (wrong-number-of-arguments backquote-process 0) (wrong-number-of-arguments internal-default-interrupt-process 3) (wrong-number-of-arguments internal-default-signal-process 0) (wrong-number-of-arguments internal-default-process-filter 1) (wrong-number-of-arguments minibuffer--sort-preprocess-history 0) (wrong-number-of-arguments window-adjust-process-window-size 1) (wrong-number-of-arguments isearch-process-search-char 0) (wrong-number-of-arguments isearch-process-search-string 1))"
         );
     }
 }

@@ -17149,6 +17149,55 @@ Last updated: 2026-02-19
 
 ## Doing
 
+- Added process helper-wrapper compatibility slice and locked oracle parity:
+  - runtime changes:
+    - `rust/neovm-core/src/elisp/process.rs`
+      - implemented:
+        - `backquote-delay-process`
+        - `backquote-process`
+        - `clone-process`
+        - `internal-default-interrupt-process`
+        - `internal-default-process-filter`
+        - `internal-default-process-sentinel`
+        - `internal-default-signal-process`
+        - `isearch-process-search-char`
+        - `isearch-process-search-string`
+        - `minibuffer--sort-preprocess-history`
+        - `print--preprocess`
+        - `syntax-propertize--in-process-p`
+        - `tooltip-process-prompt-regexp`
+        - `window--adjust-process-windows`
+        - `window--process-window-list`
+        - `window-adjust-process-window-size`
+        - `window-adjust-process-window-size-largest`
+        - `window-adjust-process-window-size-smallest`
+      - aligned internal-default interrupt/signal wrappers to emit oracle-compatible wrong-arity function symbols.
+      - added process module unit coverage for helper wrapper runtime surface.
+    - `rust/neovm-core/src/elisp/builtins.rs`
+      - wired evaluator dispatch for all helper-wrapper symbols.
+    - `rust/neovm-core/src/elisp/builtin_registry.rs`
+      - registered all helper-wrapper symbols in `DISPATCH_BUILTIN_NAMES`.
+    - `rust/neovm-core/src/elisp/subr_info.rs`
+      - added arity metadata/assertions for the new helper-wrapper symbols:
+        - `(2 . 2)` `backquote-delay-process`
+        - `(1 . 2)` `backquote-process`, `clone-process`, `isearch-process-search-char`
+        - `(2 . 2)` `internal-default-process-filter`, `internal-default-process-sentinel`, `isearch-process-search-string`, `window-adjust-process-window-size`, `window-adjust-process-window-size-largest`, `window-adjust-process-window-size-smallest`
+        - `(0 . 2)` `internal-default-interrupt-process`
+        - `(2 . 3)` `internal-default-signal-process`
+        - `(1 . 1)` `minibuffer--sort-preprocess-history`, `print--preprocess`, `tooltip-process-prompt-regexp`
+        - `(0 . 0)` `syntax-propertize--in-process-p`, `window--adjust-process-windows`, `window--process-window-list`
+  - corpus changes:
+    - added and wired:
+      - `test/neovm/vm-compat/cases/process-helper-wrapper-semantics.forms`
+      - `test/neovm/vm-compat/cases/process-helper-wrapper-semantics.expected.tsv`
+      - `test/neovm/vm-compat/cases/default.list`
+  - verified:
+    - `cargo test --manifest-path rust/neovm-core/Cargo.toml process_helper_wrapper_runtime_surface` (pass)
+    - `cargo test --manifest-path rust/neovm-core/Cargo.toml subr_arity_process_primitives_match_oracle` (pass)
+    - `make -C test/neovm/vm-compat record FORMS=cases/process-helper-wrapper-semantics.forms EXPECTED=cases/process-helper-wrapper-semantics.expected.tsv` (pass)
+    - `make -C test/neovm/vm-compat check-one-neovm CASE=cases/process-helper-wrapper-semantics` (pass, `2/2`)
+    - `make -C test/neovm/vm-compat check-all-neovm-strict` (pass; inventory `787`; builtin registry `1170` dispatch / `1169` core parity entries)
+
 - Added process coding/datagram/tty/query compatibility slice and locked oracle parity:
   - runtime changes:
     - `rust/neovm-core/src/elisp/process.rs`

@@ -7702,6 +7702,86 @@ pub(crate) fn dispatch_builtin(
         "set-keymap-parent" => return Some(builtin_set_keymap_parent(eval, args)),
         "keymapp" => return Some(builtin_keymapp(eval, args)),
         // Process operations (evaluator-dependent)
+        "backquote-delay-process" => {
+            return Some(super::process::builtin_backquote_delay_process(eval, args))
+        }
+        "backquote-process" => return Some(super::process::builtin_backquote_process(eval, args)),
+        "clone-process" => return Some(super::process::builtin_clone_process(eval, args)),
+        "internal-default-interrupt-process" => {
+            return Some(super::process::builtin_internal_default_interrupt_process(
+                eval, args,
+            ))
+        }
+        "internal-default-process-filter" => {
+            return Some(super::process::builtin_internal_default_process_filter(
+                eval, args,
+            ))
+        }
+        "internal-default-process-sentinel" => {
+            return Some(super::process::builtin_internal_default_process_sentinel(
+                eval, args,
+            ))
+        }
+        "internal-default-signal-process" => {
+            return Some(super::process::builtin_internal_default_signal_process(
+                eval, args,
+            ))
+        }
+        "isearch-process-search-char" => {
+            return Some(super::process::builtin_isearch_process_search_char(
+                eval, args,
+            ))
+        }
+        "isearch-process-search-string" => {
+            return Some(super::process::builtin_isearch_process_search_string(
+                eval, args,
+            ))
+        }
+        "minibuffer--sort-preprocess-history" => {
+            return Some(super::process::builtin_minibuffer_sort_preprocess_history(
+                eval, args,
+            ))
+        }
+        "print--preprocess" => return Some(super::process::builtin_print_preprocess(eval, args)),
+        "syntax-propertize--in-process-p" => {
+            return Some(super::process::builtin_syntax_propertize_in_process_p(
+                eval, args,
+            ))
+        }
+        "tooltip-process-prompt-regexp" => {
+            return Some(super::process::builtin_tooltip_process_prompt_regexp(
+                eval, args,
+            ))
+        }
+        "window--adjust-process-windows" => {
+            return Some(super::process::builtin_window_adjust_process_windows(
+                eval, args,
+            ))
+        }
+        "window--process-window-list" => {
+            return Some(super::process::builtin_window_process_window_list(
+                eval, args,
+            ))
+        }
+        "window-adjust-process-window-size" => {
+            return Some(super::process::builtin_window_adjust_process_window_size(
+                eval, args,
+            ))
+        }
+        "window-adjust-process-window-size-largest" => {
+            return Some(
+                super::process::builtin_window_adjust_process_window_size_largest(
+                    eval, args,
+                ),
+            )
+        }
+        "window-adjust-process-window-size-smallest" => {
+            return Some(
+                super::process::builtin_window_adjust_process_window_size_smallest(
+                    eval, args,
+                ),
+            )
+        }
         "accept-process-output" => {
             return Some(super::process::builtin_accept_process_output(eval, args))
         }

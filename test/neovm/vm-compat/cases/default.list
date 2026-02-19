@@ -561,6 +561,7 @@ cases/process-control-make-setter-semantics
 cases/process-coding-tty-query-semantics
 cases/process-file-lines-menu-semantics
 cases/process-list-network-serial-semantics
+cases/process-helper-wrapper-semantics
 cases/process-shell-wrappers-quit-buffer-coding-semantics
 cases/getenv-optional-frame-semantics
 cases/setenv-sequence-semantics
