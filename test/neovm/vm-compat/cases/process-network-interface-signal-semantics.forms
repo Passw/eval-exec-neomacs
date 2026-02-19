@@ -1,0 +1,53 @@
+; Process network/signal helper compatibility semantics.
+(mapcar (lambda (s)
+          (let ((fn (and (fboundp s) (symbol-function s))))
+            (list s
+                  (fboundp s)
+                  (and fn (subrp fn))
+                  (and fn (subr-arity fn))
+                  (commandp s))))
+        '(process-connection
+          format-network-address
+          network-interface-list
+          network-interface-info
+          network-lookup-address-info
+          signal-names))
+
+(let* ((ifname (or (and (fboundp 'network-interface-list)
+                        (stringp (caar (network-interface-list)))
+                        (caar (network-interface-list)))
+                   "lo")))
+  (list
+   (format-network-address [127 0 0 1 80])
+   (format-network-address [127 0 0 1 80] t)
+   (format-network-address [0 0 0 0 0 0 0 1 80])
+   (format-network-address [0 0 0 0 0 0 0 1 80] t)
+   (format-network-address "x")
+   (format-network-address nil)
+   (format-network-address [1])
+   (condition-case err (format-network-address) (error err))
+   (listp (network-interface-list))
+   (consp (car (network-interface-list)))
+   (stringp (caar (network-interface-list)))
+   (vectorp (cdar (network-interface-list)))
+   (listp (network-interface-list nil))
+   (condition-case err (network-interface-list nil nil nil) (error err))
+   (condition-case err (network-interface-list nil t) (error err))
+   (let ((info (network-interface-info ifname)))
+     (and (listp info)
+          (vectorp (car info))
+          (vectorp (nth 1 info))))
+   (condition-case err (network-interface-info nil) (error err))
+   (condition-case err (network-interface-info "abcdefghijklmnop") (error err))
+   (listp (network-lookup-address-info "localhost"))
+   (vectorp (car (network-lookup-address-info "localhost")))
+   (listp (network-lookup-address-info "localhost" 'ipv4))
+   (vectorp (car (network-lookup-address-info "localhost" 'ipv6)))
+   (condition-case err (network-lookup-address-info "localhost" t) (error err))
+   (condition-case err (network-lookup-address-info "localhost" 'ipv4 t) (error err))
+   (condition-case err (network-lookup-address-info 1) (error err))
+   (listp (signal-names))
+   (stringp (car (signal-names)))
+   (not (null (member "KILL" (signal-names))))
+   (condition-case err (signal-names nil) (error err))
+   (condition-case err (process-connection nil) (error err))))

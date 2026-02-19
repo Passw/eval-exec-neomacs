@@ -934,6 +934,7 @@ fn subr_arity_value(name: &str) -> Value {
             arity_cons(0, Some(2))
         }
         "delete-process" => arity_cons(0, Some(1)),
+        "format-network-address" => arity_cons(1, Some(2)),
         "get-buffer-process" => arity_cons(1, Some(1)),
         "get-process" => arity_cons(1, Some(1)),
         "internal-default-interrupt-process" => arity_cons(0, Some(2)),
@@ -950,6 +951,9 @@ fn subr_arity_value(name: &str) -> Value {
             arity_cons(0, None)
         }
         "minibuffer--sort-preprocess-history" => arity_cons(1, Some(1)),
+        "network-interface-info" => arity_cons(1, Some(1)),
+        "network-interface-list" => arity_cons(0, Some(2)),
+        "network-lookup-address-info" => arity_cons(1, Some(3)),
         "num-processors" => arity_cons(0, Some(1)),
         "print--preprocess" => arity_cons(1, Some(1)),
         "process-buffer"
@@ -982,6 +986,7 @@ fn subr_arity_value(name: &str) -> Value {
         "process-lines-handling-status" => arity_cons(2, None),
         "process-running-child-p" | "process-send-eof" => arity_cons(0, Some(1)),
         "signal-process" => arity_cons(2, Some(3)),
+        "signal-names" => arity_cons(0, Some(0)),
         "process-contact" => arity_cons(1, Some(3)),
         "process-list" => arity_cons(0, Some(0)),
         "process-get" => arity_cons(2, Some(2)),
@@ -1623,6 +1628,7 @@ mod tests {
         assert_subr_arity("clone-process", 1, Some(2));
         assert_subr_arity("continue-process", 0, Some(2));
         assert_subr_arity("delete-process", 0, Some(1));
+        assert_subr_arity("format-network-address", 1, Some(2));
         assert_subr_arity("get-buffer-process", 1, Some(1));
         assert_subr_arity("get-process", 1, Some(1));
         assert_subr_arity("getenv", 1, Some(2));
@@ -1642,6 +1648,9 @@ mod tests {
         assert_subr_arity("make-pipe-process", 0, None);
         assert_subr_arity("make-serial-process", 0, None);
         assert_subr_arity("minibuffer--sort-preprocess-history", 1, Some(1));
+        assert_subr_arity("network-interface-info", 1, Some(1));
+        assert_subr_arity("network-interface-list", 0, Some(2));
+        assert_subr_arity("network-lookup-address-info", 1, Some(3));
         assert_subr_arity("num-processors", 0, Some(1));
         assert_subr_arity("print--preprocess", 1, Some(1));
         assert_subr_arity("process-attributes", 1, Some(1));
@@ -1677,6 +1686,7 @@ mod tests {
         assert_subr_arity("process-send-region", 3, Some(3));
         assert_subr_arity("process-send-string", 2, Some(2));
         assert_subr_arity("process-sentinel", 1, Some(1));
+        assert_subr_arity("signal-names", 0, Some(0));
         assert_subr_arity("signal-process", 2, Some(3));
         assert_subr_arity("process-status", 1, Some(1));
         assert_subr_arity("stop-process", 0, Some(2));

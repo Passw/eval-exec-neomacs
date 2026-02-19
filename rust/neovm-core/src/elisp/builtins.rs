@@ -7782,6 +7782,21 @@ pub(crate) fn dispatch_builtin(
                 ),
             )
         }
+        "format-network-address" => {
+            return Some(super::process::builtin_format_network_address(eval, args))
+        }
+        "network-interface-list" => {
+            return Some(super::process::builtin_network_interface_list(eval, args))
+        }
+        "network-interface-info" => {
+            return Some(super::process::builtin_network_interface_info(eval, args))
+        }
+        "network-lookup-address-info" => {
+            return Some(super::process::builtin_network_lookup_address_info(
+                eval, args,
+            ))
+        }
+        "signal-names" => return Some(super::process::builtin_signal_names(eval, args)),
         "accept-process-output" => {
             return Some(super::process::builtin_accept_process_output(eval, args))
         }

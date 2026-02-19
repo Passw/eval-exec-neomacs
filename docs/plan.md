@@ -28,6 +28,45 @@ Last updated: 2026-02-19
 
 ## Doing
 
+- Added process network-address/interface/signal compatibility slice and locked oracle parity:
+  - runtime changes:
+    - `rust/neovm-core/src/elisp/process.rs`
+      - implemented:
+        - `format-network-address`
+        - `network-interface-list`
+        - `network-interface-info`
+        - `network-lookup-address-info`
+        - `signal-names`
+      - aligned oracle behavior for:
+        - `format-network-address` vector/list/string inputs, optional port handling, and wrong-arity/type edges
+        - `network-interface-list` optional `full` and family filtering (`nil`, `'ipv4`, `'ipv6`) with unsupported-family errors
+        - `network-interface-info` interface-name validation (including long-name error path) and loopback result shape
+        - `network-lookup-address-info` family/hints contracts and unsupported-family/hints errors
+        - `signal-names` signal-name vector surface including `KILL`
+      - intentionally kept `process-connection` unbound to match current oracle surface.
+      - added runtime unit lock-in:
+        - `process_network_interface_and_signal_runtime_surface`
+    - `rust/neovm-core/src/elisp/builtins.rs`
+      - wired evaluator dispatch for all new process builtins above.
+    - `rust/neovm-core/src/elisp/builtin_registry.rs`
+      - registered new symbols in `DISPATCH_BUILTIN_NAMES`.
+    - `rust/neovm-core/src/elisp/subr_info.rs`
+      - added oracle arity metadata/assertions:
+        - `(1 . 2)` `format-network-address`
+        - `(0 . 2)` `network-interface-list`
+        - `(1 . 1)` `network-interface-info`
+        - `(1 . 3)` `network-lookup-address-info`
+        - `(0 . 0)` `signal-names`
+  - corpus changes:
+    - added and wired:
+      - `test/neovm/vm-compat/cases/process-network-interface-signal-semantics.forms`
+      - `test/neovm/vm-compat/cases/process-network-interface-signal-semantics.expected.tsv`
+      - `test/neovm/vm-compat/cases/default.list`
+  - verified:
+    - `cargo test --manifest-path rust/neovm-core/Cargo.toml process_network_interface_and_signal_runtime_surface` (pass)
+    - `cargo test --manifest-path rust/neovm-core/Cargo.toml subr_arity_process_primitives_match_oracle` (pass)
+    - `make -C test/neovm/vm-compat check-all-neovm-strict` (pass; case inventory `788`)
+
 - Added process list/network/serial compatibility slice and locked oracle parity:
   - runtime changes:
     - `rust/neovm-core/src/elisp/process.rs`

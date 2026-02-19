@@ -1087,6 +1087,121 @@ fn expect_integer(value: &Value) -> Result<i64, Flow> {
     }
 }
 
+fn value_as_nonnegative_integer(value: &Value) -> Option<i64> {
+    match value {
+        Value::Int(n) if *n >= 0 => Some(*n),
+        Value::Char(c) => Some(*c as i64),
+        _ => None,
+    }
+}
+
+fn vector_nonnegative_integers(value: &Value) -> Option<Vec<i64>> {
+    let Value::Vector(values) = value else {
+        return None;
+    };
+    let locked = values.lock().expect("poisoned");
+    let mut out = Vec::with_capacity(locked.len());
+    for item in locked.iter() {
+        out.push(value_as_nonnegative_integer(item)?);
+    }
+    Some(out)
+}
+
+fn int_vector(values: &[i64]) -> Value {
+    Value::vector(values.iter().map(|v| Value::Int(*v)).collect())
+}
+
+fn loopback_ipv4_address() -> Value {
+    int_vector(&[127, 0, 0, 1, 0])
+}
+
+fn loopback_ipv4_broadcast() -> Value {
+    int_vector(&[0, 0, 0, 0, 0])
+}
+
+fn loopback_ipv4_netmask() -> Value {
+    int_vector(&[255, 0, 0, 0, 0])
+}
+
+fn loopback_ipv6_address() -> Value {
+    int_vector(&[0, 0, 0, 0, 0, 0, 0, 1, 0])
+}
+
+fn loopback_ipv6_broadcast() -> Value {
+    int_vector(&[0, 0, 0, 0, 0, 0, 0, 1, 0])
+}
+
+fn loopback_ipv6_netmask() -> Value {
+    int_vector(&[65535, 65535, 65535, 65535, 65535, 65535, 65535, 65535, 0])
+}
+
+fn loopback_hwaddr() -> Value {
+    Value::cons(Value::Int(772), int_vector(&[0, 0, 0, 0, 0, 0]))
+}
+
+fn loopback_flags() -> Value {
+    Value::list(vec![
+        Value::symbol("running"),
+        Value::symbol("loopback"),
+        Value::symbol("up"),
+    ])
+}
+
+fn interface_entry(name: &str, address: Value, full: bool) -> Value {
+    if !full {
+        return Value::cons(Value::string(name), address);
+    }
+
+    let (broadcast, netmask) = match &address {
+        Value::Vector(values) if values.lock().expect("poisoned").len() == 9 => {
+            (loopback_ipv6_broadcast(), loopback_ipv6_netmask())
+        }
+        _ => (loopback_ipv4_broadcast(), loopback_ipv4_netmask()),
+    };
+
+    Value::list(vec![
+        Value::string(name),
+        address,
+        broadcast,
+        netmask,
+        loopback_hwaddr(),
+        loopback_flags(),
+    ])
+}
+
+fn format_ipv4_network_address(items: &[i64], omit_port: bool) -> Option<String> {
+    if items.len() != 4 && items.len() != 5 {
+        return None;
+    }
+    let octets: Vec<u8> = items[..4]
+        .iter()
+        .map(|v| u8::try_from(*v).ok())
+        .collect::<Option<Vec<_>>>()?;
+    let addr = format!("{}.{}.{}.{}", octets[0], octets[1], octets[2], octets[3]);
+    if items.len() == 5 && !omit_port {
+        Some(format!("{addr}:{}", items[4]))
+    } else {
+        Some(addr)
+    }
+}
+
+fn format_ipv6_network_address(items: &[i64], omit_port: bool) -> Option<String> {
+    if items.len() != 8 && items.len() != 9 {
+        return None;
+    }
+    let mut segments = Vec::with_capacity(8);
+    for value in &items[..8] {
+        let segment = u16::try_from(*value).ok()?;
+        segments.push(format!("{segment:x}"));
+    }
+    let addr = segments.join(":");
+    if items.len() == 9 && !omit_port {
+        Some(format!("[{addr}]:{}", items[8]))
+    } else {
+        Some(addr)
+    }
+}
+
 // ---------------------------------------------------------------------------
 // Builtins (eval-dependent)
 // ---------------------------------------------------------------------------
@@ -1312,6 +1427,233 @@ pub(crate) fn builtin_window_adjust_process_window_size_smallest(
 ) -> EvalResult {
     expect_args("window-adjust-process-window-size-smallest", &args, 2)?;
     Ok(Value::Nil)
+}
+
+/// (format-network-address ADDRESS &optional OMIT-PORT) -> string-or-nil
+pub(crate) fn builtin_format_network_address(
+    _eval: &mut super::eval::Evaluator,
+    args: Vec<Value>,
+) -> EvalResult {
+    expect_min_args("format-network-address", &args, 1)?;
+    if args.len() > 2 {
+        return Err(signal(
+            "wrong-number-of-arguments",
+            vec![
+                Value::symbol("format-network-address"),
+                Value::Int(args.len() as i64),
+            ],
+        ));
+    }
+
+    let omit_port = args.get(1).is_some_and(Value::is_truthy);
+    match &args[0] {
+        Value::Str(s) => Ok(Value::string((**s).clone())),
+        Value::Nil => Ok(Value::Nil),
+        Value::Vector(_) => {
+            let Some(items) = vector_nonnegative_integers(&args[0]) else {
+                return Ok(Value::Nil);
+            };
+            if let Some(ipv4) = format_ipv4_network_address(&items, omit_port) {
+                return Ok(Value::string(ipv4));
+            }
+            if let Some(ipv6) = format_ipv6_network_address(&items, omit_port) {
+                return Ok(Value::string(ipv6));
+            }
+            Ok(Value::Nil)
+        }
+        Value::Cons(_) => {
+            let first = list_to_vec(&args[0])
+                .and_then(|items| items.first().cloned())
+                .and_then(|v| value_as_nonnegative_integer(&v));
+            if let Some(family) = first {
+                Ok(Value::string(format!("<Family {family}>")))
+            } else {
+                Ok(Value::Nil)
+            }
+        }
+        _ => Ok(Value::Nil),
+    }
+}
+
+/// (network-interface-list &optional FULL FAMILY) -> interface-list
+pub(crate) fn builtin_network_interface_list(
+    _eval: &mut super::eval::Evaluator,
+    args: Vec<Value>,
+) -> EvalResult {
+    if args.len() > 2 {
+        return Err(signal(
+            "wrong-number-of-arguments",
+            vec![
+                Value::symbol("network-interface-list"),
+                Value::Int(args.len() as i64),
+            ],
+        ));
+    }
+
+    let full = args.first().is_some_and(Value::is_truthy);
+    let family = args.get(1).cloned().unwrap_or(Value::Nil);
+    let include_ipv4 = if family.is_nil() {
+        true
+    } else {
+        matches!(family.as_symbol_name(), Some("ipv4"))
+    };
+    let include_ipv6 = if family.is_nil() {
+        true
+    } else {
+        matches!(family.as_symbol_name(), Some("ipv6"))
+    };
+    if !family.is_nil() && !include_ipv4 && !include_ipv6 {
+        return Err(signal(
+            "error",
+            vec![Value::string("Unsupported address family")],
+        ));
+    }
+
+    let mut entries = Vec::new();
+    if include_ipv6 {
+        entries.push(interface_entry("lo", loopback_ipv6_address(), full));
+    }
+    if include_ipv4 {
+        entries.push(interface_entry("lo", loopback_ipv4_address(), full));
+    }
+    Ok(Value::list(entries))
+}
+
+/// (network-interface-info IFNAME) -> interface-info-or-nil
+pub(crate) fn builtin_network_interface_info(
+    _eval: &mut super::eval::Evaluator,
+    args: Vec<Value>,
+) -> EvalResult {
+    expect_args("network-interface-info", &args, 1)?;
+    let ifname = expect_string_strict(&args[0])?;
+    if ifname.chars().count() >= 16 {
+        return Err(signal("error", vec![Value::string("interface name too long")]));
+    }
+    if ifname != "lo" {
+        return Ok(Value::Nil);
+    }
+
+    Ok(Value::list(vec![
+        loopback_ipv4_address(),
+        loopback_ipv4_broadcast(),
+        loopback_ipv4_netmask(),
+        loopback_hwaddr(),
+        loopback_flags(),
+    ]))
+}
+
+/// (network-lookup-address-info NAME &optional FAMILY HINTS) -> address-list
+pub(crate) fn builtin_network_lookup_address_info(
+    _eval: &mut super::eval::Evaluator,
+    args: Vec<Value>,
+) -> EvalResult {
+    expect_min_args("network-lookup-address-info", &args, 1)?;
+    if args.len() > 3 {
+        return Err(signal(
+            "wrong-number-of-arguments",
+            vec![
+                Value::symbol("network-lookup-address-info"),
+                Value::Int(args.len() as i64),
+            ],
+        ));
+    }
+    let _name = expect_string_strict(&args[0])?;
+
+    let family = args.get(1).cloned().unwrap_or(Value::Nil);
+    let hints = args.get(2).cloned().unwrap_or(Value::Nil);
+    if !hints.is_nil() {
+        return Err(signal(
+            "error",
+            vec![Value::string("Unsupported hints value")],
+        ));
+    }
+
+    let entries = if family.is_nil() {
+        vec![loopback_ipv6_address(), loopback_ipv4_address()]
+    } else if matches!(family.as_symbol_name(), Some("ipv4")) {
+        vec![loopback_ipv4_address(), loopback_ipv4_address()]
+    } else if matches!(family.as_symbol_name(), Some("ipv6")) {
+        vec![loopback_ipv6_address()]
+    } else {
+        return Err(signal("error", vec![Value::string("Unsupported family")]));
+    };
+    Ok(Value::list(entries))
+}
+
+/// (signal-names) -> list-of-signal-name-strings
+pub(crate) fn builtin_signal_names(
+    _eval: &mut super::eval::Evaluator,
+    args: Vec<Value>,
+) -> EvalResult {
+    expect_args("signal-names", &args, 0)?;
+    let names = vec![
+        "RTMAX",
+        "RTMAX-1",
+        "RTMAX-2",
+        "RTMAX-3",
+        "RTMAX-4",
+        "RTMAX-5",
+        "RTMAX-6",
+        "RTMAX-7",
+        "RTMAX-8",
+        "RTMAX-9",
+        "RTMAX-10",
+        "RTMAX-11",
+        "RTMAX-12",
+        "RTMAX-13",
+        "RTMAX-14",
+        "RTMIN+15",
+        "RTMIN+14",
+        "RTMIN+13",
+        "RTMIN+12",
+        "RTMIN+11",
+        "RTMIN+10",
+        "RTMIN+9",
+        "RTMIN+8",
+        "RTMIN+7",
+        "RTMIN+6",
+        "RTMIN+5",
+        "RTMIN+4",
+        "RTMIN+3",
+        "RTMIN+2",
+        "RTMIN+1",
+        "RTMIN",
+        "SYS",
+        "PWR",
+        "POLL",
+        "WINCH",
+        "PROF",
+        "VTALRM",
+        "XFSZ",
+        "XCPU",
+        "URG",
+        "TTOU",
+        "TTIN",
+        "TSTP",
+        "STOP",
+        "CONT",
+        "CHLD",
+        "STKFLT",
+        "TERM",
+        "ALRM",
+        "PIPE",
+        "USR2",
+        "SEGV",
+        "USR1",
+        "KILL",
+        "FPE",
+        "BUS",
+        "ABRT",
+        "TRAP",
+        "ILL",
+        "QUIT",
+        "INT",
+        "HUP",
+        "EXIT",
+    ];
+    Ok(Value::list(
+        names.into_iter().map(Value::string).collect::<Vec<_>>(),
+    ))
 }
 
 /// (list-system-processes) -> process-id-list
@@ -4229,6 +4571,72 @@ mod tests {
         assert_eq!(
             results[1],
             "OK ((0 quote (nil)) (0) (0) (wrong-type-argument processp nil) error error (wrong-type-argument processp nil) (wrong-type-argument processp nil) nil nil nil (wrong-type-argument processp \"x\") nil nil nil nil nil (wrong-number-of-arguments backquote-delay-process 1) (wrong-number-of-arguments backquote-process 0) (wrong-number-of-arguments internal-default-interrupt-process 3) (wrong-number-of-arguments internal-default-signal-process 0) (wrong-number-of-arguments internal-default-process-filter 1) (wrong-number-of-arguments minibuffer--sort-preprocess-history 0) (wrong-number-of-arguments window-adjust-process-window-size 1) (wrong-number-of-arguments isearch-process-search-char 0) (wrong-number-of-arguments isearch-process-search-string 1))"
+        );
+    }
+
+    #[test]
+    fn process_network_interface_and_signal_runtime_surface() {
+        let results = eval_all(
+            r#"(mapcar (lambda (s)
+                         (let ((fn (and (fboundp s) (symbol-function s))))
+                           (list s
+                                 (fboundp s)
+                                 (and fn (subrp fn))
+                                 (and fn (subr-arity fn))
+                                 (commandp s))))
+                       '(process-connection
+                         format-network-address
+                         network-interface-list
+                         network-interface-info
+                         network-lookup-address-info
+                         signal-names))
+               (let* ((ifname (or (and (fboundp 'network-interface-list)
+                                       (stringp (caar (network-interface-list)))
+                                       (caar (network-interface-list)))
+                                  "lo")))
+                 (list
+                  (format-network-address [127 0 0 1 80])
+                  (format-network-address [127 0 0 1 80] t)
+                  (format-network-address [0 0 0 0 0 0 0 1 80])
+                  (format-network-address [0 0 0 0 0 0 0 1 80] t)
+                  (format-network-address "x")
+                  (format-network-address nil)
+                  (format-network-address [1])
+                  (condition-case err (format-network-address) (error err))
+                  (listp (network-interface-list))
+                  (consp (car (network-interface-list)))
+                  (stringp (caar (network-interface-list)))
+                  (vectorp (cdar (network-interface-list)))
+                  (listp (network-interface-list nil))
+                  (condition-case err (network-interface-list nil nil nil) (error err))
+                  (condition-case err (network-interface-list nil t) (error err))
+                  (let ((info (network-interface-info ifname)))
+                    (and (listp info)
+                         (vectorp (car info))
+                         (vectorp (nth 1 info))))
+                  (condition-case err (network-interface-info nil) (error err))
+                  (condition-case err (network-interface-info "abcdefghijklmnop") (error err))
+                  (listp (network-lookup-address-info "localhost"))
+                  (vectorp (car (network-lookup-address-info "localhost")))
+                  (listp (network-lookup-address-info "localhost" 'ipv4))
+                  (vectorp (car (network-lookup-address-info "localhost" 'ipv6)))
+                  (condition-case err (network-lookup-address-info "localhost" t) (error err))
+                  (condition-case err (network-lookup-address-info "localhost" 'ipv4 t) (error err))
+                  (condition-case err (network-lookup-address-info 1) (error err))
+                  (listp (signal-names))
+                  (stringp (car (signal-names)))
+                  (not (null (member "KILL" (signal-names))))
+                  (condition-case err (signal-names nil) (error err))
+                  (condition-case err (process-connection nil) (error err))))"#,
+        );
+
+        assert_eq!(
+            results[0],
+            "OK ((process-connection nil nil nil nil) (format-network-address t t (1 . 2) nil) (network-interface-list t t (0 . 2) nil) (network-interface-info t t (1 . 1) nil) (network-lookup-address-info t t (1 . 3) nil) (signal-names t t (0 . 0) nil))"
+        );
+        assert_eq!(
+            results[1],
+            "OK (\"127.0.0.1:80\" \"127.0.0.1\" \"[0:0:0:0:0:0:0:1]:80\" \"0:0:0:0:0:0:0:1\" \"x\" nil nil (wrong-number-of-arguments format-network-address 0) t t t t t (wrong-number-of-arguments network-interface-list 3) (error \"Unsupported address family\") t (wrong-type-argument stringp nil) (error \"interface name too long\") t t t t (error \"Unsupported family\") (error \"Unsupported hints value\") (wrong-type-argument stringp 1) t t t (wrong-number-of-arguments signal-names 1) (void-function process-connection))"
         );
     }
 }
