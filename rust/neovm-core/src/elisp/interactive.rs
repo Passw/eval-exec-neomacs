@@ -802,6 +802,14 @@ fn interactive_args_from_string_code(
             'D' => args.push(super::minibuffer::builtin_read_directory_name(vec![
                 Value::string(prompt),
             ])?),
+            'e' => {
+                return Err(signal(
+                    "error",
+                    vec![Value::string(
+                        "command must be bound to an event with parameters",
+                    )],
+                ))
+            }
             'f' => args.push(super::minibuffer::builtin_read_file_name(vec![
                 Value::string(prompt),
                 Value::Nil,
@@ -809,6 +817,9 @@ fn interactive_args_from_string_code(
                 Value::True,
             ])?),
             'F' => args.push(super::minibuffer::builtin_read_file_name(vec![
+                Value::string(prompt),
+            ])?),
+            'G' => args.push(super::minibuffer::builtin_read_file_name(vec![
                 Value::string(prompt),
             ])?),
             'i' => args.push(Value::Nil),
@@ -861,6 +872,7 @@ fn interactive_args_from_string_code(
                 let expr = super::eval::value_to_expr_pub(&expr_value);
                 args.push(eval.eval(&expr)?);
             }
+            'U' => args.push(Value::Nil),
             'v' => args.push(super::minibuffer::builtin_read_variable(vec![Value::string(prompt)])?),
             'z' => args.push(super::lread::builtin_read_coding_system(vec![Value::string(prompt)])?),
             'Z' => args.push(interactive_read_coding_system_optional_arg(prompt)?),
@@ -5151,6 +5163,41 @@ K")
         assert_eq!(
             results[0],
             "OK ((end-of-file \"Error reading from stdin\") (end-of-file \"Error reading from stdin\") (end-of-file \"Error reading from stdin\") (end-of-file \"Error reading from stdin\") (end-of-file \"Error reading from stdin\") (end-of-file \"Error reading from stdin\") (end-of-file \"Error reading from stdin\") (end-of-file \"Error reading from stdin\") (end-of-file \"Error reading from stdin\") (end-of-file \"Error reading from stdin\"))"
+        );
+    }
+
+    #[test]
+    fn interactive_lambda_g_e_and_u_specs_follow_batch_behavior() {
+        let mut ev = Evaluator::new();
+        let results = eval_all_with(
+            &mut ev,
+            r#"(list
+                 (condition-case err
+                     (call-interactively (lambda (x) (interactive "GFind file: ") x))
+                   (error err))
+                 (condition-case err
+                     (command-execute (lambda (x) (interactive "GFind file: ") x))
+                   (error err))
+                 (let ((unread-command-events (list 97)))
+                   (list
+                    (call-interactively (lambda (x) (interactive "U") x))
+                    unread-command-events))
+                 (let ((unread-command-events (list 97)))
+                   (list
+                    (command-execute (lambda (x) (interactive "U") x))
+                    unread-command-events))
+                 (let ((unread-command-events (list 97)))
+                   (condition-case err
+                       (call-interactively (lambda (x) (interactive "e") x))
+                     (error (list err unread-command-events))))
+                 (let ((unread-command-events (list 97)))
+                   (condition-case err
+                       (command-execute (lambda (x) (interactive "e") x))
+                     (error (list err unread-command-events)))))"#,
+        );
+        assert_eq!(
+            results[0],
+            "OK ((end-of-file \"Error reading from stdin\") (end-of-file \"Error reading from stdin\") (nil (97)) (nil (97)) ((error \"command must be bound to an event with parameters\") (97)) ((error \"command must be bound to an event with parameters\") (97)))"
         );
     }
 

@@ -132,3 +132,31 @@
   (list
    (command-execute (lambda (c) (interactive "ZCoding: ") c))
    unread-command-events))
+
+; "G" file prompt variant currently signals EOF in batch.
+(condition-case err
+    (call-interactively (lambda (x) (interactive "GFind file: ") x))
+  (error err))
+(condition-case err
+    (command-execute (lambda (x) (interactive "GFind file: ") x))
+  (error err))
+
+; "U" currently yields nil in batch and leaves unread queue unchanged.
+(let ((unread-command-events (list 97)))
+  (list
+   (call-interactively (lambda (x) (interactive "U") x))
+   unread-command-events))
+(let ((unread-command-events (list 97)))
+  (list
+   (command-execute (lambda (x) (interactive "U") x))
+   unread-command-events))
+
+; "e" errors when no event-with-parameters context is available and preserves queue.
+(let ((unread-command-events (list 97)))
+  (condition-case err
+      (call-interactively (lambda (x) (interactive "e") x))
+    (error (list err unread-command-events))))
+(let ((unread-command-events (list 97)))
+  (condition-case err
+      (command-execute (lambda (x) (interactive "e") x))
+    (error (list err unread-command-events))))
