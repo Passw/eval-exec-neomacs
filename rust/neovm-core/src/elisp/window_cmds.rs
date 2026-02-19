@@ -423,6 +423,28 @@ pub(crate) fn builtin_frame_first_window(
     Ok(Value::Int(first.0 as i64))
 }
 
+/// `(frame-root-window &optional FRAME-OR-WINDOW)` -> root window on frame.
+///
+/// NeoVM currently models leaf window IDs only; batch startup parity in our
+/// corpus expects root and first windows to coincide.
+pub(crate) fn builtin_frame_root_window(
+    eval: &mut super::eval::Evaluator,
+    args: Vec<Value>,
+) -> EvalResult {
+    expect_max_args("frame-root-window", &args, 1)?;
+    let fid = resolve_frame_or_window_frame_id(eval, args.first(), "frame-live-p")?;
+    let frame = eval
+        .frames
+        .get(fid)
+        .ok_or_else(|| signal("error", vec![Value::string("Frame not found")]))?;
+    let root = frame
+        .window_list()
+        .first()
+        .copied()
+        .unwrap_or(frame.selected_window);
+    Ok(Value::Int(root.0 as i64))
+}
+
 /// `(minibuffer-window &optional FRAME)` -> minibuffer window of FRAME.
 pub(crate) fn builtin_minibuffer_window(
     eval: &mut super::eval::Evaluator,
@@ -452,6 +474,24 @@ pub(crate) fn builtin_window_minibuffer_p(
         .get(fid)
         .is_some_and(|frame| frame.minibuffer_window == Some(wid));
     Ok(Value::bool(is_minibuffer))
+}
+
+/// `(minibuffer-selected-window)` -> nil in batch (no active minibuffer).
+pub(crate) fn builtin_minibuffer_selected_window(args: Vec<Value>) -> EvalResult {
+    expect_args("minibuffer-selected-window", &args, 0)?;
+    Ok(Value::Nil)
+}
+
+/// `(active-minibuffer-window)` -> nil in batch.
+pub(crate) fn builtin_active_minibuffer_window(args: Vec<Value>) -> EvalResult {
+    expect_args("active-minibuffer-window", &args, 0)?;
+    Ok(Value::Nil)
+}
+
+/// `(minibuffer-window-active-p WINDOW)` -> nil in batch.
+pub(crate) fn builtin_minibuffer_window_active_p(args: Vec<Value>) -> EvalResult {
+    expect_args("minibuffer-window-active-p", &args, 1)?;
+    Ok(Value::Nil)
 }
 
 /// `(window-frame &optional WINDOW)` -> frame of WINDOW.
@@ -1111,6 +1151,19 @@ pub(crate) fn builtin_windowp(eval: &mut super::eval::Evaluator, args: Vec<Value
     };
     let found = eval.frames.is_window_object_id(WindowId(id));
     Ok(Value::bool(found))
+}
+
+/// `(window-valid-p OBJ)` -> t if OBJ is a live window id.
+pub(crate) fn builtin_window_valid_p(
+    eval: &mut super::eval::Evaluator,
+    args: Vec<Value>,
+) -> EvalResult {
+    expect_args("window-valid-p", &args, 1)?;
+    let id = match args[0].as_int() {
+        Some(n) => n as u64,
+        None => return Ok(Value::Nil),
+    };
+    Ok(Value::bool(eval.frames.is_live_window_id(WindowId(id))))
 }
 
 /// `(window-live-p OBJ)` -> t if OBJ is a live leaf window id.
@@ -2010,6 +2063,85 @@ mod tests {
         assert_eq!(out[11], "OK wrong-type-argument");
         assert_eq!(out[12], "OK wrong-number-of-arguments");
         assert_eq!(out[13], "OK wrong-number-of-arguments");
+    }
+
+    #[test]
+    fn frame_root_window_window_valid_and_minibuffer_activity_semantics() {
+        let forms = parse_forms(
+            "(window-valid-p (selected-window))
+             (window-valid-p (minibuffer-window))
+             (window-valid-p nil)
+             (window-valid-p 999999)
+             (window-valid-p 'foo)
+             (eq (frame-root-window) (selected-window))
+             (eq (frame-root-window (selected-frame)) (selected-window))
+             (eq (frame-root-window (selected-window)) (selected-window))
+             (eq (frame-root-window (minibuffer-window)) (selected-window))
+             (minibuffer-selected-window)
+             (active-minibuffer-window)
+             (minibuffer-window-active-p (minibuffer-window))
+             (minibuffer-window-active-p (selected-window))
+             (minibuffer-window-active-p nil)
+             (minibuffer-window-active-p 999999)
+             (minibuffer-window-active-p 'foo)
+             (let ((w (split-window)))
+               (delete-window w)
+               (window-valid-p w))
+             (condition-case err (window-valid-p) (error err))
+             (condition-case err (window-valid-p nil nil) (error err))
+             (condition-case err (frame-root-window 999999) (error err))
+             (condition-case err (frame-root-window 'foo) (error err))
+             (condition-case err (frame-root-window nil nil) (error err))
+             (condition-case err (minibuffer-selected-window nil) (error err))
+             (condition-case err (active-minibuffer-window nil) (error err))
+             (condition-case err (minibuffer-window-active-p) (error err))
+             (condition-case err (minibuffer-window-active-p nil nil) (error err))",
+        )
+        .expect("parse");
+        let mut ev = Evaluator::new();
+        let out = ev
+            .eval_forms(&forms)
+            .iter()
+            .map(format_eval_result)
+            .collect::<Vec<_>>();
+        assert_eq!(out[0], "OK t");
+        assert_eq!(out[1], "OK t");
+        assert_eq!(out[2], "OK nil");
+        assert_eq!(out[3], "OK nil");
+        assert_eq!(out[4], "OK nil");
+        assert_eq!(out[5], "OK t");
+        assert_eq!(out[6], "OK t");
+        assert_eq!(out[7], "OK t");
+        assert_eq!(out[8], "OK t");
+        assert_eq!(out[9], "OK nil");
+        assert_eq!(out[10], "OK nil");
+        assert_eq!(out[11], "OK nil");
+        assert_eq!(out[12], "OK nil");
+        assert_eq!(out[13], "OK nil");
+        assert_eq!(out[14], "OK nil");
+        assert_eq!(out[15], "OK nil");
+        assert_eq!(out[16], "OK nil");
+        assert_eq!(out[17], "OK (wrong-number-of-arguments window-valid-p 0)");
+        assert_eq!(out[18], "OK (wrong-number-of-arguments window-valid-p 2)");
+        assert_eq!(out[19], "OK (wrong-type-argument frame-live-p 999999)");
+        assert_eq!(out[20], "OK (wrong-type-argument frame-live-p foo)");
+        assert_eq!(out[21], "OK (wrong-number-of-arguments frame-root-window 2)");
+        assert_eq!(
+            out[22],
+            "OK (wrong-number-of-arguments minibuffer-selected-window 1)"
+        );
+        assert_eq!(
+            out[23],
+            "OK (wrong-number-of-arguments active-minibuffer-window 1)"
+        );
+        assert_eq!(
+            out[24],
+            "OK (wrong-number-of-arguments minibuffer-window-active-p 0)"
+        );
+        assert_eq!(
+            out[25],
+            "OK (wrong-number-of-arguments minibuffer-window-active-p 2)"
+        );
     }
 
     #[test]

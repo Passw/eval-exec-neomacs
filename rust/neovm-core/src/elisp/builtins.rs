@@ -7698,8 +7698,17 @@ pub(crate) fn dispatch_builtin(
 
         // Window/frame operations (evaluator-dependent)
         "selected-window" => return Some(super::window_cmds::builtin_selected_window(eval, args)),
+        "active-minibuffer-window" => {
+            return Some(super::window_cmds::builtin_active_minibuffer_window(args))
+        }
         "minibuffer-window" => {
             return Some(super::window_cmds::builtin_minibuffer_window(eval, args))
+        }
+        "minibuffer-selected-window" => {
+            return Some(super::window_cmds::builtin_minibuffer_selected_window(args))
+        }
+        "minibuffer-window-active-p" => {
+            return Some(super::window_cmds::builtin_minibuffer_window_active_p(args))
         }
         "window-buffer" => return Some(super::window_cmds::builtin_window_buffer(eval, args)),
         "window-start" => return Some(super::window_cmds::builtin_window_start(eval, args)),
@@ -7817,7 +7826,11 @@ pub(crate) fn dispatch_builtin(
         "frame-first-window" => {
             return Some(super::window_cmds::builtin_frame_first_window(eval, args))
         }
+        "frame-root-window" => {
+            return Some(super::window_cmds::builtin_frame_root_window(eval, args))
+        }
         "windowp" => return Some(super::window_cmds::builtin_windowp(eval, args)),
+        "window-valid-p" => return Some(super::window_cmds::builtin_window_valid_p(eval, args)),
         "framep" => return Some(super::window_cmds::builtin_framep(eval, args)),
         "window-frame" => return Some(super::window_cmds::builtin_window_frame(eval, args)),
         "frame-selected-window" => {

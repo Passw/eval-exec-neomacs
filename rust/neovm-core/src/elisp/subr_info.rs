@@ -912,6 +912,7 @@ fn subr_arity_value(name: &str) -> Value {
         | "resume-tty"
         | "terminal-coding-system"
         | "frame-first-window"
+        | "frame-root-window"
         | "frame-parameters"
         | "frame-selected-window"
         | "minibuffer-window"
@@ -929,7 +930,9 @@ fn subr_arity_value(name: &str) -> Value {
         | "window-point"
         | "window-start" => arity_cons(0, Some(1)),
         "terminal-list" | "x-display-list" | "redraw-display" | "frame-list"
-        | "selected-window" => arity_cons(0, Some(0)),
+        | "selected-window"
+        | "active-minibuffer-window"
+        | "minibuffer-selected-window" => arity_cons(0, Some(0)),
         "frame-edges"
         | "window-body-height"
         | "window-body-width"
@@ -941,7 +944,13 @@ fn subr_arity_value(name: &str) -> Value {
         | "get-buffer-window" => arity_cons(0, Some(2)),
         "window-edges" => arity_cons(0, Some(4)),
         "window-list" | "get-buffer-window-list" => arity_cons(0, Some(3)),
-        "terminal-live-p" | "frame-live-p" | "frame-visible-p" | "window-live-p" | "windowp" => {
+        "terminal-live-p"
+        | "frame-live-p"
+        | "frame-visible-p"
+        | "window-live-p"
+        | "window-valid-p"
+        | "windowp"
+        | "minibuffer-window-active-p" => {
             arity_cons(1, Some(1))
         }
         "terminal-parameter" => arity_cons(2, Some(2)),
@@ -2361,12 +2370,16 @@ mod tests {
     #[test]
     fn subr_arity_window_frame_primitives_match_oracle() {
         assert_subr_arity("display-buffer", 1, Some(3));
+        assert_subr_arity("active-minibuffer-window", 0, Some(0));
         assert_subr_arity("frame-first-window", 0, Some(1));
         assert_subr_arity("frame-list", 0, Some(0));
         assert_subr_arity("frame-live-p", 1, Some(1));
         assert_subr_arity("frame-parameter", 2, Some(2));
         assert_subr_arity("frame-parameters", 0, Some(1));
+        assert_subr_arity("frame-root-window", 0, Some(1));
         assert_subr_arity("frame-visible-p", 1, Some(1));
+        assert_subr_arity("minibuffer-selected-window", 0, Some(0));
+        assert_subr_arity("minibuffer-window-active-p", 1, Some(1));
         assert_subr_arity("minibuffer-window", 0, Some(1));
         assert_subr_arity("selected-window", 0, Some(0));
         assert_subr_arity("set-window-buffer", 2, Some(3));
@@ -2390,6 +2403,7 @@ mod tests {
         assert_subr_arity("window-end", 0, Some(2));
         assert_subr_arity("window-list", 0, Some(3));
         assert_subr_arity("window-live-p", 1, Some(1));
+        assert_subr_arity("window-valid-p", 1, Some(1));
         assert_subr_arity("window-minibuffer-p", 0, Some(1));
         assert_subr_arity("window-point", 0, Some(1));
         assert_subr_arity("window-start", 0, Some(1));

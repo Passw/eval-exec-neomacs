@@ -28,6 +28,46 @@ Last updated: 2026-02-19
 
 ## Doing
 
+- Completed root/valid/minibuffer-active window parity slice and extended oracle lock-ins:
+  - runtime changes:
+    - `rust/neovm-core/src/elisp/window_cmds.rs`
+      - added evaluator-backed builtins:
+        - `frame-root-window`
+        - `window-valid-p`
+        - `minibuffer-selected-window`
+        - `active-minibuffer-window`
+        - `minibuffer-window-active-p`
+      - added evaluator unit coverage:
+        - `frame_root_window_window_valid_and_minibuffer_activity_semantics`
+    - `rust/neovm-core/src/elisp/builtins.rs`
+      - wired dispatch for all five new window/minibuffer builtins.
+    - `rust/neovm-core/src/elisp/builtin_registry.rs`
+      - registered new names in dispatch registry.
+      - parity registry counts now remain:
+        - `DISPATCH_BUILTIN_NAMES`: `975`
+        - core parity entries: `974`
+    - `rust/neovm-core/src/elisp/subr_info.rs`
+      - added `subr-arity` metadata:
+        - `(0 . 1)`: `frame-root-window`
+        - `(1 . 1)`: `window-valid-p`, `minibuffer-window-active-p`
+        - `(0 . 0)`: `minibuffer-selected-window`, `active-minibuffer-window`
+      - extended `subr_arity_window_frame_primitives_match_oracle`.
+  - corpus changes:
+    - added:
+      - `test/neovm/vm-compat/cases/window-root-valid-minibuffer-active-semantics.{forms,expected.tsv}`
+    - expanded and re-recorded:
+      - `test/neovm/vm-compat/cases/window-frame-subr-arity-semantics.{forms,expected.tsv}`
+    - wired new case into:
+      - `test/neovm/vm-compat/cases/default.list`
+  - verified:
+    - `cargo test --manifest-path rust/neovm-core/Cargo.toml frame_root_window_window_valid_and_minibuffer_activity_semantics` (pass)
+    - `cargo test --manifest-path rust/neovm-core/Cargo.toml subr_arity_window_frame_primitives_match_oracle` (pass)
+    - `make -C test/neovm/vm-compat check-one-neovm CASE=cases/window-root-valid-minibuffer-active-semantics` (pass)
+    - `make -C test/neovm/vm-compat check-one-neovm CASE=cases/window-frame-subr-arity-semantics` (pass)
+    - `make -C test/neovm/vm-compat check-one-neovm CASE=cases/window-minibuffer-frame-first-window-semantics` (pass)
+    - `make -C test/neovm/vm-compat check-builtin-registry-all` (pass)
+    - `make -C test/neovm/vm-compat check-all-neovm-strict` (pass)
+
 - Completed frame/minibuffer window accessor parity slice and extended oracle lock-ins:
   - runtime changes:
     - `rust/neovm-core/src/elisp/window_cmds.rs`
