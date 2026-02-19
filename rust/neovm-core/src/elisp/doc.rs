@@ -11328,6 +11328,7 @@ pub(crate) fn builtin_substitute_command_keys(args: Vec<Value>) -> EvalResult {
 /// This returns oracle-compatible arglists for core thread/mutex/condition
 /// primitives and for lambda-like objects. For unresolved shapes, Emacs
 /// returns `t`, which we mirror here.
+#[cfg(test)]
 pub(crate) fn builtin_help_function_arglist(args: Vec<Value>) -> EvalResult {
     expect_min_max_args("help-function-arglist", &args, 1, 2)?;
     let preserve_names = args.get(1).is_some_and(Value::is_truthy);

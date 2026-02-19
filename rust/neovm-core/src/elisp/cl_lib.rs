@@ -5,6 +5,7 @@
 
 use super::error::{signal, EvalResult, Flow};
 use super::value::*;
+#[cfg(test)]
 use std::sync::atomic::{AtomicU64, Ordering};
 
 // ---------------------------------------------------------------------------
@@ -32,6 +33,7 @@ fn expect_min_args(name: &str, args: &[Value], min: usize) -> Result<(), Flow> {
         Ok(())
     }
 }
+#[cfg(test)]
 
 fn expect_max_args(name: &str, args: &[Value], max: usize) -> Result<(), Flow> {
     if args.len() > max {
@@ -44,6 +46,7 @@ fn expect_max_args(name: &str, args: &[Value], max: usize) -> Result<(), Flow> {
     }
 }
 
+#[cfg(test)]
 static CL_GENSYM_COUNTER: AtomicU64 = AtomicU64::new(0);
 
 fn expect_int(val: &Value) -> Result<i64, Flow> {
@@ -79,6 +82,7 @@ fn collect_sequence(val: &Value) -> Vec<Value> {
         _ => vec![val.clone()],
     }
 }
+#[cfg(test)]
 
 fn cl_list_nth(list: &Value, index: usize) -> EvalResult {
     let mut cursor = list.clone();
@@ -109,66 +113,77 @@ fn cl_list_nth(list: &Value, index: usize) -> EvalResult {
 }
 
 /// `(cl-first LIST)` -- return the first element of LIST.
+#[cfg(test)]
 pub(crate) fn builtin_cl_first(args: Vec<Value>) -> EvalResult {
     expect_args("cl-first", &args, 1)?;
     cl_list_nth(&args[0], 0)
 }
 
 /// `(cl-second LIST)` -- return the second element of LIST.
+#[cfg(test)]
 pub(crate) fn builtin_cl_second(args: Vec<Value>) -> EvalResult {
     expect_args("cl-second", &args, 1)?;
     cl_list_nth(&args[0], 1)
 }
 
 /// `(cl-third LIST)` -- return the third element of LIST.
+#[cfg(test)]
 pub(crate) fn builtin_cl_third(args: Vec<Value>) -> EvalResult {
     expect_args("cl-third", &args, 1)?;
     cl_list_nth(&args[0], 2)
 }
 
 /// `(cl-fourth LIST)` -- return the fourth element of LIST.
+#[cfg(test)]
 pub(crate) fn builtin_cl_fourth(args: Vec<Value>) -> EvalResult {
     expect_args("cl-fourth", &args, 1)?;
     cl_list_nth(&args[0], 3)
 }
 
 /// `(cl-fifth LIST)` -- return the fifth element of LIST.
+#[cfg(test)]
 pub(crate) fn builtin_cl_fifth(args: Vec<Value>) -> EvalResult {
     expect_args("cl-fifth", &args, 1)?;
     cl_list_nth(&args[0], 4)
 }
 
 /// `(cl-sixth LIST)` -- return the sixth element of LIST.
+#[cfg(test)]
 pub(crate) fn builtin_cl_sixth(args: Vec<Value>) -> EvalResult {
     expect_args("cl-sixth", &args, 1)?;
     cl_list_nth(&args[0], 5)
 }
 
 /// `(cl-seventh LIST)` -- return the seventh element of LIST.
+#[cfg(test)]
 pub(crate) fn builtin_cl_seventh(args: Vec<Value>) -> EvalResult {
     expect_args("cl-seventh", &args, 1)?;
     cl_list_nth(&args[0], 6)
 }
 
 /// `(cl-eighth LIST)` -- return the eighth element of LIST.
+#[cfg(test)]
 pub(crate) fn builtin_cl_eighth(args: Vec<Value>) -> EvalResult {
     expect_args("cl-eighth", &args, 1)?;
     cl_list_nth(&args[0], 7)
 }
 
 /// `(cl-ninth LIST)` -- return the ninth element of LIST.
+#[cfg(test)]
 pub(crate) fn builtin_cl_ninth(args: Vec<Value>) -> EvalResult {
     expect_args("cl-ninth", &args, 1)?;
     cl_list_nth(&args[0], 8)
 }
 
 /// `(cl-tenth LIST)` -- return the tenth element of LIST.
+#[cfg(test)]
 pub(crate) fn builtin_cl_tenth(args: Vec<Value>) -> EvalResult {
     expect_args("cl-tenth", &args, 1)?;
     cl_list_nth(&args[0], 9)
 }
 
 /// `(cl-rest LIST)` -- return the tail (cdr) of LIST.
+#[cfg(test)]
 pub(crate) fn builtin_cl_rest(args: Vec<Value>) -> EvalResult {
     expect_args("cl-rest", &args, 1)?;
     match &args[0] {
@@ -182,6 +197,7 @@ pub(crate) fn builtin_cl_rest(args: Vec<Value>) -> EvalResult {
 }
 
 /// `(cl-evenp N)` -- return t if N is even.
+#[cfg(test)]
 pub(crate) fn builtin_cl_evenp(args: Vec<Value>) -> EvalResult {
     expect_args("cl-evenp", &args, 1)?;
     let n = expect_int(&args[0])?;
@@ -189,6 +205,7 @@ pub(crate) fn builtin_cl_evenp(args: Vec<Value>) -> EvalResult {
 }
 
 /// `(cl-oddp N)` -- return t if N is odd.
+#[cfg(test)]
 pub(crate) fn builtin_cl_oddp(args: Vec<Value>) -> EvalResult {
     expect_args("cl-oddp", &args, 1)?;
     let n = expect_int(&args[0])?;
@@ -196,6 +213,7 @@ pub(crate) fn builtin_cl_oddp(args: Vec<Value>) -> EvalResult {
 }
 
 /// `(cl-plusp N)` -- return t if N is strictly positive.
+#[cfg(test)]
 pub(crate) fn builtin_cl_plusp(args: Vec<Value>) -> EvalResult {
     expect_args("cl-plusp", &args, 1)?;
     let n = expect_number_or_marker(&args[0])?;
@@ -203,6 +221,7 @@ pub(crate) fn builtin_cl_plusp(args: Vec<Value>) -> EvalResult {
 }
 
 /// `(cl-minusp N)` -- return t if N is strictly negative.
+#[cfg(test)]
 pub(crate) fn builtin_cl_minusp(args: Vec<Value>) -> EvalResult {
     expect_args("cl-minusp", &args, 1)?;
     let n = expect_number_or_marker(&args[0])?;
@@ -210,6 +229,7 @@ pub(crate) fn builtin_cl_minusp(args: Vec<Value>) -> EvalResult {
 }
 
 /// `(cl-subseq SEQ START &optional END)` -- CL alias for `seq-subseq`.
+#[cfg(test)]
 pub(crate) fn builtin_cl_subseq(args: Vec<Value>) -> EvalResult {
     expect_min_args("cl-subseq", &args, 2)?;
     expect_max_args("cl-subseq", &args, 3)?;
@@ -217,22 +237,26 @@ pub(crate) fn builtin_cl_subseq(args: Vec<Value>) -> EvalResult {
 }
 
 /// `(cl-concatenate TYPE &rest SEQS)` -- CL alias for `seq-concatenate`.
+#[cfg(test)]
 pub(crate) fn builtin_cl_concatenate(args: Vec<Value>) -> EvalResult {
     builtin_seq_concatenate(args)
 }
 
 /// `(cl-member ITEM LIST)` -- CL alias for `member`.
+#[cfg(test)]
 pub(crate) fn builtin_cl_member(args: Vec<Value>) -> EvalResult {
     super::builtins::builtin_member(args)
 }
 
 /// `(cl-coerce OBJECT TYPE)` -- coerce a sequence to TYPE.
+#[cfg(test)]
 pub(crate) fn builtin_cl_coerce(args: Vec<Value>) -> EvalResult {
     expect_args("cl-coerce", &args, 2)?;
     builtin_seq_concatenate(vec![args[1].clone(), args[0].clone()])
 }
 
 /// `(cl-adjoin ITEM LIST)` -- add ITEM to LIST if not already present.
+#[cfg(test)]
 pub(crate) fn builtin_cl_adjoin(args: Vec<Value>) -> EvalResult {
     expect_args("cl-adjoin", &args, 2)?;
     let item = args[0].clone();
@@ -246,11 +270,13 @@ pub(crate) fn builtin_cl_adjoin(args: Vec<Value>) -> EvalResult {
 }
 
 /// `(cl-remove ITEM LIST)` -- CL alias for `remove`.
+#[cfg(test)]
 pub(crate) fn builtin_cl_remove(args: Vec<Value>) -> EvalResult {
     super::builtins_extra::builtin_remove(args)
 }
 
 /// `(cl-remove-duplicates SEQ)` -- CL alias for `seq-uniq`.
+#[cfg(test)]
 pub(crate) fn builtin_cl_remove_duplicates(args: Vec<Value>) -> EvalResult {
     super::builtins_extra::builtin_seq_uniq(args)
 }
@@ -691,6 +717,7 @@ pub(crate) fn builtin_seq_position(
 }
 
 /// `(cl-position ITEM SEQ &optional TESTFN)` -- CL argument order wrapper.
+#[cfg(test)]
 pub(crate) fn builtin_cl_position(
     eval: &mut super::eval::Evaluator,
     args: Vec<Value>,
@@ -709,16 +736,19 @@ pub(crate) fn builtin_cl_position(
 }
 
 /// `(cl-reduce FUNCTION SEQ &optional INITIAL-VALUE)` -- CL alias for `seq-reduce`.
+#[cfg(test)]
 pub(crate) fn builtin_cl_reduce(eval: &mut super::eval::Evaluator, args: Vec<Value>) -> EvalResult {
     builtin_seq_reduce(eval, args)
 }
 
 /// `(cl-count PREDICATE SEQ)` -- CL alias for `seq-count`.
+#[cfg(test)]
 pub(crate) fn builtin_cl_count(eval: &mut super::eval::Evaluator, args: Vec<Value>) -> EvalResult {
     builtin_seq_count(eval, args)
 }
 
 /// `(cl-count-if PREDICATE SEQ)` -- CL alias for `seq-count`.
+#[cfg(test)]
 pub(crate) fn builtin_cl_count_if(
     eval: &mut super::eval::Evaluator,
     args: Vec<Value>,
@@ -727,22 +757,26 @@ pub(crate) fn builtin_cl_count_if(
 }
 
 /// `(cl-some PREDICATE SEQ)` -- CL alias for `seq-some`.
+#[cfg(test)]
 pub(crate) fn builtin_cl_some(eval: &mut super::eval::Evaluator, args: Vec<Value>) -> EvalResult {
     builtin_seq_some(eval, args)
 }
 
 /// `(cl-every PREDICATE SEQ)` -- CL alias for `seq-every-p`.
+#[cfg(test)]
 pub(crate) fn builtin_cl_every(eval: &mut super::eval::Evaluator, args: Vec<Value>) -> EvalResult {
     builtin_seq_every_p(eval, args)
 }
 
 /// `(cl-notany PREDICATE SEQ)` -- true when no element satisfies PREDICATE.
+#[cfg(test)]
 pub(crate) fn builtin_cl_notany(eval: &mut super::eval::Evaluator, args: Vec<Value>) -> EvalResult {
     let found = builtin_seq_some(eval, args)?;
     Ok(Value::bool(found.is_nil()))
 }
 
 /// `(cl-notevery PREDICATE SEQ)` -- true when not all elements satisfy PREDICATE.
+#[cfg(test)]
 pub(crate) fn builtin_cl_notevery(
     eval: &mut super::eval::Evaluator,
     args: Vec<Value>,
@@ -752,6 +786,7 @@ pub(crate) fn builtin_cl_notevery(
 }
 
 /// `(cl-gensym &optional PREFIX)` -- generate an uninterned-style symbol name.
+#[cfg(test)]
 pub(crate) fn builtin_cl_gensym(args: Vec<Value>) -> EvalResult {
     expect_max_args("cl-gensym", &args, 1)?;
     let prefix = match args.first() {
@@ -770,6 +805,7 @@ pub(crate) fn builtin_cl_gensym(args: Vec<Value>) -> EvalResult {
 }
 
 /// `(cl-find ITEM SEQ)` -- return first element in SEQ equal to ITEM.
+#[cfg(test)]
 pub(crate) fn builtin_cl_find(args: Vec<Value>) -> EvalResult {
     expect_args("cl-find", &args, 2)?;
     let target = &args[0];
@@ -783,6 +819,7 @@ pub(crate) fn builtin_cl_find(args: Vec<Value>) -> EvalResult {
 }
 
 /// `(cl-find-if PREDICATE SEQ)` -- return first element satisfying PREDICATE.
+#[cfg(test)]
 pub(crate) fn builtin_cl_find_if(
     eval: &mut super::eval::Evaluator,
     args: Vec<Value>,
@@ -800,6 +837,7 @@ pub(crate) fn builtin_cl_find_if(
 }
 
 /// `(cl-subsetp LIST1 LIST2)` -- return t if every element of LIST1 appears in LIST2.
+#[cfg(test)]
 pub(crate) fn builtin_cl_subsetp(args: Vec<Value>) -> EvalResult {
     expect_args("cl-subsetp", &args, 2)?;
     let left = seq_position_elements(&args[0])?;
@@ -817,6 +855,7 @@ pub(crate) fn builtin_cl_subsetp(args: Vec<Value>) -> EvalResult {
 }
 
 /// `(cl-intersection LIST1 LIST2)` -- set-style intersection preserving LIST1 order.
+#[cfg(test)]
 pub(crate) fn builtin_cl_intersection(args: Vec<Value>) -> EvalResult {
     expect_args("cl-intersection", &args, 2)?;
     let left = seq_position_elements(&args[0])?;
@@ -836,6 +875,7 @@ pub(crate) fn builtin_cl_intersection(args: Vec<Value>) -> EvalResult {
 }
 
 /// `(cl-set-difference LIST1 LIST2)` -- set-style difference preserving LIST1 order.
+#[cfg(test)]
 pub(crate) fn builtin_cl_set_difference(args: Vec<Value>) -> EvalResult {
     expect_args("cl-set-difference", &args, 2)?;
     let left = seq_position_elements(&args[0])?;
@@ -855,6 +895,7 @@ pub(crate) fn builtin_cl_set_difference(args: Vec<Value>) -> EvalResult {
 }
 
 /// `(cl-union LIST1 LIST2)` -- set-style union preserving left-to-right discovery order.
+#[cfg(test)]
 pub(crate) fn builtin_cl_union(args: Vec<Value>) -> EvalResult {
     expect_args("cl-union", &args, 2)?;
     let left = seq_position_elements(&args[0])?;
@@ -871,6 +912,7 @@ pub(crate) fn builtin_cl_union(args: Vec<Value>) -> EvalResult {
 }
 
 /// `(cl-substitute NEW OLD SEQ)` -- replace OLD with NEW across SEQ.
+#[cfg(test)]
 pub(crate) fn builtin_cl_substitute(args: Vec<Value>) -> EvalResult {
     expect_args("cl-substitute", &args, 3)?;
     let new_value = args[0].clone();
@@ -891,11 +933,13 @@ pub(crate) fn builtin_cl_substitute(args: Vec<Value>) -> EvalResult {
 }
 
 /// `(cl-sort SEQ PREDICATE)` -- CL alias for `sort`.
+#[cfg(test)]
 pub(crate) fn builtin_cl_sort(eval: &mut super::eval::Evaluator, args: Vec<Value>) -> EvalResult {
     super::builtins::builtin_sort(eval, args)
 }
 
 /// `(cl-stable-sort SEQ PREDICATE)` -- CL alias for stable `sort`.
+#[cfg(test)]
 pub(crate) fn builtin_cl_stable_sort(
     eval: &mut super::eval::Evaluator,
     args: Vec<Value>,
@@ -904,6 +948,7 @@ pub(crate) fn builtin_cl_stable_sort(
 }
 
 /// `(cl-remove-if PREDICATE SEQ)` -- remove elements satisfying PREDICATE.
+#[cfg(test)]
 pub(crate) fn builtin_cl_remove_if(
     eval: &mut super::eval::Evaluator,
     args: Vec<Value>,
@@ -923,6 +968,7 @@ pub(crate) fn builtin_cl_remove_if(
 }
 
 /// `(cl-remove-if-not PREDICATE SEQ)` -- keep elements satisfying PREDICATE.
+#[cfg(test)]
 pub(crate) fn builtin_cl_remove_if_not(
     eval: &mut super::eval::Evaluator,
     args: Vec<Value>,
@@ -942,6 +988,7 @@ pub(crate) fn builtin_cl_remove_if_not(
 }
 
 /// `(cl-map RESULT-TYPE FUNCTION SEQ...)` -- CL map with explicit result type.
+#[cfg(test)]
 pub(crate) fn builtin_cl_map(eval: &mut super::eval::Evaluator, args: Vec<Value>) -> EvalResult {
     expect_min_args("cl-map", &args, 3)?;
     let result_type = args[0].clone();

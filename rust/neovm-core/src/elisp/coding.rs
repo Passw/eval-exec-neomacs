@@ -101,6 +101,7 @@ fn normalize_keyboard_coding_system(name: &str) -> String {
 }
 
 /// Extract a coding system name from a symbol or string argument.
+#[cfg(test)]
 fn coding_system_name(val: &Value) -> Result<String, Flow> {
     match val {
         Value::Symbol(s) => Ok(s.clone()),
@@ -217,6 +218,7 @@ impl CodingSystemInfo {
     }
 
     /// Return the base name (strip -unix/-dos/-mac suffix).
+#[cfg(test)]
     fn base_name(&self) -> &str {
         for suffix in &["-unix", "-dos", "-mac"] {
             if self.name.ends_with(suffix) {
@@ -935,6 +937,7 @@ pub(crate) fn builtin_check_coding_system(
 
 /// `(find-coding-system CODING-SYSTEM)` -- resolve CODING-SYSTEM to a known
 /// canonical symbol, or return nil when unknown.
+#[cfg(test)]
 pub(crate) fn builtin_find_coding_system(
     mgr: &CodingSystemManager,
     args: Vec<Value>,

@@ -249,6 +249,7 @@ impl BookmarkManager {
 // ===========================================================================
 // Builtin helpers
 // ===========================================================================
+#[cfg(test)]
 
 fn expect_args(name: &str, args: &[Value], n: usize) -> Result<(), Flow> {
     if args.len() != n {
@@ -486,6 +487,7 @@ pub(crate) fn builtin_bookmark_rename(
 }
 
 /// (bookmark-all-names) -> list of bookmark names (sorted)
+#[cfg(test)]
 pub(crate) fn builtin_bookmark_all_names(
     eval: &mut super::eval::Evaluator,
     args: Vec<Value>,
@@ -503,6 +505,7 @@ pub(crate) fn builtin_bookmark_all_names(
 /// (bookmark-get-filename BOOKMARK) -> filename string or nil
 ///
 /// BOOKMARK may be a bookmark name or a bookmark record alist.
+#[cfg(test)]
 pub(crate) fn builtin_bookmark_get_filename(
     eval: &mut super::eval::Evaluator,
     args: Vec<Value>,
@@ -536,6 +539,7 @@ pub(crate) fn builtin_bookmark_get_filename(
 /// (bookmark-get-position BOOKMARK) -> integer position or nil
 ///
 /// BOOKMARK may be a bookmark name or a bookmark record alist.
+#[cfg(test)]
 pub(crate) fn builtin_bookmark_get_position(
     eval: &mut super::eval::Evaluator,
     args: Vec<Value>,
@@ -568,6 +572,7 @@ pub(crate) fn builtin_bookmark_get_position(
 /// (bookmark-get-annotation BOOKMARK) -> annotation string or nil
 ///
 /// BOOKMARK may be a bookmark name or a bookmark record alist.
+#[cfg(test)]
 pub(crate) fn builtin_bookmark_get_annotation(
     eval: &mut super::eval::Evaluator,
     args: Vec<Value>,
@@ -601,6 +606,7 @@ pub(crate) fn builtin_bookmark_get_annotation(
 /// (bookmark-set-annotation BOOKMARK ANNOTATION) -> annotation string or nil
 ///
 /// BOOKMARK is a bookmark name.  If missing, returns nil.
+#[cfg(test)]
 pub(crate) fn builtin_bookmark_set_annotation(
     eval: &mut super::eval::Evaluator,
     args: Vec<Value>,

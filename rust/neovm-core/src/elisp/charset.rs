@@ -266,6 +266,7 @@ pub(crate) fn builtin_charsetp(args: Vec<Value>) -> EvalResult {
 }
 
 /// `(charset-list)` -- return charset symbols in priority order.
+#[cfg(test)]
 pub(crate) fn builtin_charset_list(args: Vec<Value>) -> EvalResult {
     expect_args("charset-list", &args, 0)?;
     let reg = global_registry().lock().expect("poisoned");
@@ -278,6 +279,7 @@ pub(crate) fn builtin_charset_list(args: Vec<Value>) -> EvalResult {
 }
 
 /// `(unibyte-charset)` -- return the charset used for unibyte strings.
+#[cfg(test)]
 pub(crate) fn builtin_unibyte_charset(args: Vec<Value>) -> EvalResult {
     expect_args("unibyte-charset", &args, 0)?;
     Ok(Value::symbol("eight-bit"))

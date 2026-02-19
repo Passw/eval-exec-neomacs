@@ -431,6 +431,7 @@ pub(crate) fn builtin_get_register(
 /// (register-to-string REGISTER) -> string or nil
 ///
 /// Return textual content from REGISTER when available.
+#[cfg(test)]
 pub(crate) fn builtin_register_to_string(
     eval: &mut super::eval::Evaluator,
     args: Vec<Value>,

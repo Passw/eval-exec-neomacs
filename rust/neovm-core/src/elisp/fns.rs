@@ -257,6 +257,7 @@ pub(crate) fn builtin_base64url_encode_string(args: Vec<Value>) -> EvalResult {
 }
 
 /// (base64url-decode-string STRING &optional IGNORE-INVALID)
+#[cfg(test)]
 pub(crate) fn builtin_base64url_decode_string(args: Vec<Value>) -> EvalResult {
     expect_range_args("base64url-decode-string", &args, 1, 2)?;
     let s = require_string("base64url-decode-string", &args[0])?;

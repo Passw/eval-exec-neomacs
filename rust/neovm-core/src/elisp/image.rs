@@ -169,6 +169,7 @@ fn is_image_spec(value: &Value) -> bool {
 
 /// Extract the plist portion of an image spec.
 /// If the spec starts with `image`, skip that first element.
+#[cfg(test)]
 fn image_spec_plist(spec: &Value) -> Value {
     let items = match list_to_vec(spec) {
         Some(v) => v,

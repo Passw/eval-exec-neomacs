@@ -623,6 +623,7 @@ pub(crate) fn builtin_bool_vector_exclusive_or(args: Vec<Value>) -> EvalResult {
 ///
 /// If B is provided, store result in B and return B; otherwise return a new
 /// bool-vector.
+#[cfg(test)]
 pub(crate) fn builtin_bool_vector_complement(args: Vec<Value>) -> EvalResult {
     expect_min_args("bool-vector-complement", &args, 1)?;
     expect_max_args("bool-vector-complement", &args, 2)?;

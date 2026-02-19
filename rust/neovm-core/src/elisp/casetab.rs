@@ -312,6 +312,7 @@ pub(crate) fn builtin_upcase_char(args: Vec<Value>) -> EvalResult {
 /// If the argument is an integer or character, returns the lowercase version
 /// using the standard ASCII case table. Characters outside A-Z are returned
 /// unchanged.
+#[cfg(test)]
 pub(crate) fn builtin_downcase_char(args: Vec<Value>) -> EvalResult {
     expect_args("downcase", &args, 1)?;
     let c = expect_char(&args[0])?;

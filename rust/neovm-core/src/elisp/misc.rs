@@ -354,6 +354,7 @@ pub(crate) fn builtin_make_list(args: Vec<Value>) -> EvalResult {
 }
 
 /// `(string-repeat STRING COUNT)` -- repeat STRING COUNT times.
+#[cfg(test)]
 pub(crate) fn builtin_string_repeat(args: Vec<Value>) -> EvalResult {
     expect_args("string-repeat", &args, 2)?;
     let s = expect_string(&args[0])?;
@@ -577,6 +578,7 @@ pub(crate) fn builtin_locale_info(args: Vec<Value>) -> EvalResult {
 }
 
 /// `(display-line-numbers-update-width)` -- compatibility no-op in batch mode.
+#[cfg(test)]
 pub(crate) fn builtin_display_line_numbers_update_width(args: Vec<Value>) -> EvalResult {
     expect_args("display-line-numbers-update-width", &args, 0)?;
     Ok(Value::Nil)

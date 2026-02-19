@@ -15969,6 +15969,30 @@ Last updated: 2026-02-19
     - `make -C test/neovm/vm-compat check-one-neovm CASE=cases/input-command-state-startup-semantics` (pass, `11/11`)
     - `cargo test --manifest-path rust/neovm-core/Cargo.toml keymapp_` (pass)
     - `make -C test/neovm/vm-compat check-all-neovm-strict` (pass)
+- Reduced NeoVM dead-code warning noise by gating non-dispatched helper paths to test-only builds:
+  - runtime/build-surface cleanup:
+    - added `#[cfg(test)]` to non-dispatched helper/builtin paths in:
+      - `rust/neovm-core/src/elisp/bookmark.rs`
+      - `rust/neovm-core/src/elisp/casetab.rs`
+      - `rust/neovm-core/src/elisp/charset.rs`
+      - `rust/neovm-core/src/elisp/chartable.rs`
+      - `rust/neovm-core/src/elisp/cl_lib.rs`
+      - `rust/neovm-core/src/elisp/coding.rs`
+      - `rust/neovm-core/src/elisp/display.rs`
+      - `rust/neovm-core/src/elisp/doc.rs`
+      - `rust/neovm-core/src/elisp/fns.rs`
+      - `rust/neovm-core/src/elisp/hashtab.rs`
+      - `rust/neovm-core/src/elisp/image.rs`
+      - `rust/neovm-core/src/elisp/kmacro.rs`
+      - `rust/neovm-core/src/elisp/misc.rs`
+      - `rust/neovm-core/src/elisp/rect.rs`
+      - `rust/neovm-core/src/elisp/register.rs`
+      - `rust/neovm-core/src/encoding.rs`
+    - also gated `cl_lib`'s gensym counter/import to match test-only usage.
+  - parity/verification:
+    - `cargo test --manifest-path rust/neovm-core/Cargo.toml --no-run 2>&1 | rg \"warning:\"` (pass, no warnings)
+    - `cargo test --manifest-path rust/neovm-core/Cargo.toml` (pass, `3753/3753`)
+    - `make -C test/neovm/vm-compat check-all-neovm-strict` (pass)
 
 ## Doing
 

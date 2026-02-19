@@ -61,6 +61,7 @@ fn expect_int(value: &Value) -> Result<i64, Flow> {
         )),
     }
 }
+#[cfg(test)]
 
 fn expect_string(value: &Value) -> Result<String, Flow> {
     match value {
@@ -384,6 +385,7 @@ fn clamped_rect_inputs(
 /// Compatibility behavior:
 /// - with optional LINE, returns substring between STARTCOL and ENDCOL
 /// - without LINE, returns an empty string (legacy stub path)
+#[cfg(test)]
 pub(crate) fn builtin_extract_rectangle_line(args: Vec<Value>) -> EvalResult {
     expect_min_args("extract-rectangle-line", &args, 2)?;
     expect_max_args("extract-rectangle-line", &args, 3)?;

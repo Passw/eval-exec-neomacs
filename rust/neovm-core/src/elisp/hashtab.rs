@@ -183,6 +183,7 @@ pub(crate) fn builtin_copy_hash_table(args: Vec<Value>) -> EvalResult {
 }
 
 /// (hash-table-keys TABLE) -> list of keys
+#[cfg(test)]
 pub(crate) fn builtin_hash_table_keys(args: Vec<Value>) -> EvalResult {
     expect_args("hash-table-keys", &args, 1)?;
     match &args[0] {
@@ -199,6 +200,7 @@ pub(crate) fn builtin_hash_table_keys(args: Vec<Value>) -> EvalResult {
 }
 
 /// (hash-table-values TABLE) -> list of values
+#[cfg(test)]
 pub(crate) fn builtin_hash_table_values(args: Vec<Value>) -> EvalResult {
     expect_args("hash-table-values", &args, 1)?;
     match &args[0] {

@@ -261,6 +261,7 @@ pub(crate) fn builtin_multibyte_string_p(args: Vec<Value>) -> EvalResult {
 }
 
 /// `(unibyte-string-p STRING)` -> t or nil
+#[cfg(test)]
 pub(crate) fn builtin_unibyte_string_p(args: Vec<Value>) -> EvalResult {
     expect_args("unibyte-string-p", &args, 1)?;
     let s = expect_string(&args[0])?;
