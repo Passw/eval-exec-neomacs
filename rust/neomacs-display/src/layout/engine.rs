@@ -1410,8 +1410,13 @@ impl LayoutEngine {
                             continue;
                         }
 
-                        // Apply face run if needed
+                        // Apply face run if needed; track :extend for end-of-line fill
+                        // Uses shared row_extend_bg (unified with buffer text extend tracking)
                         if before_has_runs && bcurrent_run < before_face_runs.len() {
+                            if let Some((ext_bg, true)) = overlay_run_bg_extend_at(&before_face_runs, bi) {
+                                row_extend_bg = Some((ext_bg, 0));
+                                row_extend_row = row as i32;
+                            }
                             bcurrent_run = apply_overlay_face_run(
                                 &before_face_runs, bi, bcurrent_run, frame_glyphs,
                             );
@@ -1420,6 +1425,16 @@ impl LayoutEngine {
                         let (bch, blen) = decode_utf8(&bstr[bi..]);
                         bi += blen;
                         if bch == '\n' {
+                            // Fill rest of line if any face on this row had :extend
+                            // (shared row_extend_bg covers both buffer text and overlay faces)
+                            let remaining = avail_width - x_offset;
+                            if remaining > 0.0 {
+                                if let Some((ext_bg, _)) = row_extend_bg.filter(|_| row_extend_row == row as i32) {
+                                    let gx = content_x + x_offset;
+                                    let gy = row_y[row as usize];
+                                    frame_glyphs.add_stretch(gx, gy, remaining, char_h, ext_bg, 0, false);
+                                }
+                            }
                             reorder_row_bidi(frame_glyphs, row_glyph_start, frame_glyphs.glyphs.len(), content_x);
                             col = 0;
                             x_offset = 0.0;
@@ -3208,6 +3223,10 @@ impl LayoutEngine {
                     }
 
                     if eob_before_has_runs && bcurrent_run < eob_before_face_runs.len() {
+                        if let Some((ext_bg, true)) = overlay_run_bg_extend_at(&eob_before_face_runs, bi) {
+                            row_extend_bg = Some((ext_bg, 0));
+                            row_extend_row = row as i32;
+                        }
                         bcurrent_run = apply_overlay_face_run(
                             &eob_before_face_runs, bi, bcurrent_run, frame_glyphs,
                         );
@@ -3216,6 +3235,16 @@ impl LayoutEngine {
                     let (bch, blen) = decode_utf8(&bstr[bi..]);
                     bi += blen;
                     if bch == '\n' {
+                        // Fill rest of line if any face on this row had :extend
+                        // (shared row_extend_bg covers both buffer text and overlay faces)
+                        let remaining = avail_width - x_offset;
+                        if remaining > 0.0 {
+                            if let Some((ext_bg, _)) = row_extend_bg.filter(|_| row_extend_row == row as i32) {
+                                let gx = content_x + x_offset;
+                                let gy = row_y[row as usize];
+                                frame_glyphs.add_stretch(gx, gy, remaining, char_h, ext_bg, 0, false);
+                            }
+                        }
                         reorder_row_bidi(frame_glyphs, row_glyph_start, frame_glyphs.glyphs.len(), content_x);
                         col = 0;
                         x_offset = 0.0;
