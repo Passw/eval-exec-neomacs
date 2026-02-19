@@ -28,6 +28,41 @@ Last updated: 2026-02-19
 
 ## Doing
 
+- Aligned process designator + buffer lookup compatibility surface with oracle-backed lock-ins:
+  - runtime changes:
+    - `rust/neovm-core/src/elisp/process.rs`
+      - implemented `get-buffer-process` (`(1 . 1)`) with oracle-compatible designators:
+        - `nil` resolves via selected-window buffer
+        - live buffer object / live buffer-name string resolve to that buffer
+        - missing buffer returns `nil`
+        - non buffer/string values signal `(wrong-type-argument stringp VALUE)`
+      - updated `process-send-eof` return semantics:
+        - explicit non-`nil` process designator returns the original designator
+        - omitted/`nil` resolves current-buffer process and returns `nil`
+      - retained/extended process designator behavior for:
+        - `delete-process` optional arg (`(0 . 1)`)
+        - `process-status` missing string => `nil`
+        - `process-exit-status`/`process-name`/`process-buffer` missing string => `(wrong-type-argument processp "...")`
+    - `rust/neovm-core/src/elisp/builtins.rs`
+      - wired evaluator dispatch for `get-buffer-process`.
+    - `rust/neovm-core/src/elisp/builtin_registry.rs`
+      - registered `get-buffer-process` in `DISPATCH_BUILTIN_NAMES`.
+    - `rust/neovm-core/src/elisp/subr_info.rs`
+      - added process-primitive arity metadata/assertion for `get-buffer-process` as `(1 . 1)`.
+  - corpus changes:
+    - added:
+      - `test/neovm/vm-compat/cases/process-designator-buffer-lookup-semantics.forms`
+      - `test/neovm/vm-compat/cases/process-designator-buffer-lookup-semantics.expected.tsv`
+    - updated:
+      - `test/neovm/vm-compat/cases/default.list`
+  - verified:
+    - `cargo test --manifest-path rust/neovm-core/Cargo.toml process_mark_type_thread_send_and_running_child_runtime_surface -- --nocapture` (pass)
+    - `cargo test --manifest-path rust/neovm-core/Cargo.toml subr_arity_process_primitives_match_oracle -- --nocapture` (pass)
+    - `make -C test/neovm/vm-compat record FORMS=cases/process-designator-buffer-lookup-semantics.forms EXPECTED=cases/process-designator-buffer-lookup-semantics.expected.tsv` (pass)
+    - `make -C test/neovm/vm-compat check-one-neovm CASE=cases/process-designator-buffer-lookup-semantics` (pass, `8/8`)
+    - `make -C test/neovm/vm-compat check-builtin-registry-all` (pass; drifts `0`)
+    - `make -C test/neovm/vm-compat check-all-neovm-strict` (pass; case inventory `783`)
+
 - Added `process-file*`, `process-lines*`, and `process-menu*` compatibility surface with oracle-locked behavior:
   - runtime changes:
     - `rust/neovm-core/src/elisp/process.rs`

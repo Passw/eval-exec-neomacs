@@ -926,6 +926,7 @@ fn subr_arity_value(name: &str) -> Value {
         "call-process" => arity_cons(1, None),
         "call-process-region" => arity_cons(3, None),
         "delete-process" => arity_cons(0, Some(1)),
+        "get-buffer-process" => arity_cons(1, Some(1)),
         "get-process" => arity_cons(1, Some(1)),
         "process-buffer"
         | "process-coding-system"
@@ -1573,6 +1574,7 @@ mod tests {
         assert_subr_arity("call-process", 1, None);
         assert_subr_arity("call-process-region", 3, None);
         assert_subr_arity("delete-process", 0, Some(1));
+        assert_subr_arity("get-buffer-process", 1, Some(1));
         assert_subr_arity("get-process", 1, Some(1));
         assert_subr_arity("getenv", 1, Some(2));
         assert_subr_arity("process-buffer", 1, Some(1));

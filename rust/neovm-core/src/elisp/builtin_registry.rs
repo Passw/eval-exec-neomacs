@@ -399,6 +399,7 @@ const DISPATCH_BUILTIN_NAMES: &[&str] = &[
     "get",
     "get-buffer",
     "get-buffer-create",
+    "get-buffer-process",
     "get-buffer-window",
     "get-buffer-window-list",
     "get-file-buffer",

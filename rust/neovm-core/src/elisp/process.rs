@@ -709,36 +709,93 @@ fn shell_command_with_args(command: &str, args: &[String]) -> String {
     }
 }
 
-/// Resolve a process argument: either a ProcessId integer or a name string.
-fn resolve_process(eval: &super::eval::Evaluator, value: &Value) -> Result<ProcessId, Flow> {
+fn signal_wrong_type_processp(value: Value) -> Flow {
+    signal(
+        "wrong-type-argument",
+        vec![Value::symbol("processp"), value],
+    )
+}
+
+fn signal_process_does_not_exist(name: &str) -> Flow {
+    signal(
+        "error",
+        vec![Value::string(format!("Process {name} does not exist"))],
+    )
+}
+
+fn resolve_process_or_wrong_type(
+    eval: &super::eval::Evaluator,
+    value: &Value,
+) -> Result<ProcessId, Flow> {
     match value {
-        Value::Int(n) => {
+        Value::Int(n) if *n >= 0 => {
             let id = *n as ProcessId;
             if eval.processes.get(id).is_some() {
                 Ok(id)
             } else {
-                Err(signal(
-                    "error",
-                    vec![Value::string(format!("No process {}", n))],
-                ))
+                Err(signal_wrong_type_processp(value.clone()))
             }
         }
-        Value::Str(s) => eval.processes.find_by_name(s).ok_or_else(|| {
-            signal(
-                "error",
-                vec![Value::string(format!("No process named {}", s))],
-            )
-        }),
-        Value::Symbol(s) => eval.processes.find_by_name(s).ok_or_else(|| {
-            signal(
-                "error",
-                vec![Value::string(format!("No process named {}", s))],
-            )
-        }),
-        other => Err(signal(
-            "wrong-type-argument",
-            vec![Value::symbol("processp"), other.clone()],
-        )),
+        Value::Str(s) => eval
+            .processes
+            .find_by_name(s)
+            .ok_or_else(|| signal_wrong_type_processp(value.clone())),
+        _ => Err(signal_wrong_type_processp(value.clone())),
+    }
+}
+
+fn resolve_process_or_missing_error(
+    eval: &super::eval::Evaluator,
+    value: &Value,
+) -> Result<ProcessId, Flow> {
+    match value {
+        Value::Str(s) => eval
+            .processes
+            .find_by_name(s)
+            .ok_or_else(|| signal_process_does_not_exist(s)),
+        _ => resolve_process_or_wrong_type(eval, value),
+    }
+}
+
+fn resolve_process_for_status(
+    eval: &super::eval::Evaluator,
+    value: &Value,
+) -> Result<Option<ProcessId>, Flow> {
+    match value {
+        Value::Int(n) if *n >= 0 => {
+            let id = *n as ProcessId;
+            if eval.processes.get(id).is_some() {
+                Ok(Some(id))
+            } else {
+                Err(signal_wrong_type_processp(value.clone()))
+            }
+        }
+        Value::Str(s) => Ok(eval.processes.find_by_name(s)),
+        _ => Err(signal_wrong_type_processp(value.clone())),
+    }
+}
+
+fn resolve_buffer_name_for_process_lookup(
+    eval: &super::eval::Evaluator,
+    value: &Value,
+) -> Result<Option<String>, Flow> {
+    match value {
+        Value::Nil => Ok(
+            eval.frames
+                .selected_frame()
+                .and_then(|frame| frame.selected_window())
+                .and_then(|window| window.buffer_id())
+                .and_then(|id| eval.buffers.get(id))
+                .map(|buf| buf.name.clone()),
+        ),
+        Value::Str(name) => Ok(
+            eval.buffers
+                .find_buffer_by_name(name)
+                .and_then(|id| eval.buffers.get(id))
+                .map(|buf| buf.name.clone()),
+        ),
+        Value::Buffer(id) => Ok(eval.buffers.get(*id).map(|buf| buf.name.clone())),
+        other => Err(signal_wrong_type_string(other.clone())),
     }
 }
 
@@ -777,7 +834,7 @@ fn resolve_optional_process_or_current_buffer(
 ) -> Result<ProcessId, Flow> {
     if let Some(v) = value {
         if !v.is_nil() {
-            return resolve_live_process_or_wrong_type(eval, v);
+            return resolve_process_or_missing_error(eval, v);
         }
     }
 
@@ -792,10 +849,7 @@ fn resolve_optional_process_or_current_buffer(
         .ok_or_else(|| {
             signal(
                 "error",
-                vec![Value::string(format!(
-                    "Buffer  {} has no process",
-                    current_buffer_name
-                ))],
+                vec![Value::string(format!("Buffer {} has no process", current_buffer_name))],
             )
         })
 }
@@ -1115,8 +1169,13 @@ pub(crate) fn builtin_delete_process(
     eval: &mut super::eval::Evaluator,
     args: Vec<Value>,
 ) -> EvalResult {
-    expect_args("delete-process", &args, 1)?;
-    let id = resolve_process(eval, &args[0])?;
+    if args.len() > 1 {
+        return Err(signal(
+            "wrong-number-of-arguments",
+            vec![Value::symbol("delete-process"), Value::Int(args.len() as i64)],
+        ));
+    }
+    let id = resolve_optional_process_or_current_buffer(eval, args.first())?;
     eval.processes.delete_process(id);
     Ok(Value::Nil)
 }
@@ -1127,7 +1186,7 @@ pub(crate) fn builtin_process_send_string(
     args: Vec<Value>,
 ) -> EvalResult {
     expect_args("process-send-string", &args, 2)?;
-    let id = resolve_process(eval, &args[0])?;
+    let id = resolve_process_or_missing_error(eval, &args[0])?;
     let input = expect_string(&args[1])?;
     if !eval.processes.send_input(id, &input) {
         return Err(signal("error", vec![Value::string("Process not found")]));
@@ -1141,13 +1200,15 @@ pub(crate) fn builtin_process_status(
     args: Vec<Value>,
 ) -> EvalResult {
     expect_args("process-status", &args, 1)?;
-    let id = resolve_process(eval, &args[0])?;
+    let Some(id) = resolve_process_for_status(eval, &args[0])? else {
+        return Ok(Value::Nil);
+    };
     match eval.processes.process_status(id) {
         Some(ProcessStatus::Run) => Ok(Value::symbol("run")),
         Some(ProcessStatus::Stop) => Ok(Value::symbol("stop")),
         Some(ProcessStatus::Exit(_)) => Ok(Value::symbol("exit")),
         Some(ProcessStatus::Signal(_)) => Ok(Value::symbol("signal")),
-        None => Err(signal("error", vec![Value::string("Process not found")])),
+        None => Ok(Value::Nil),
     }
 }
 
@@ -1157,12 +1218,12 @@ pub(crate) fn builtin_process_exit_status(
     args: Vec<Value>,
 ) -> EvalResult {
     expect_args("process-exit-status", &args, 1)?;
-    let id = resolve_process(eval, &args[0])?;
+    let id = resolve_process_or_wrong_type(eval, &args[0])?;
     match eval.processes.process_status(id) {
         Some(ProcessStatus::Exit(code)) => Ok(Value::Int(*code as i64)),
         Some(ProcessStatus::Signal(sig)) => Ok(Value::Int(*sig as i64)),
         Some(_) => Ok(Value::Int(0)),
-        None => Err(signal("error", vec![Value::string("Process not found")])),
+        None => Err(signal_wrong_type_processp(args[0].clone())),
     }
 }
 
@@ -1183,10 +1244,10 @@ pub(crate) fn builtin_process_name(
     args: Vec<Value>,
 ) -> EvalResult {
     expect_args("process-name", &args, 1)?;
-    let id = resolve_process(eval, &args[0])?;
+    let id = resolve_process_or_wrong_type(eval, &args[0])?;
     match eval.processes.get(id) {
         Some(proc) => Ok(Value::string(proc.name.clone())),
-        None => Err(signal("error", vec![Value::string("Process not found")])),
+        None => Err(signal_wrong_type_processp(args[0].clone())),
     }
 }
 
@@ -1196,13 +1257,13 @@ pub(crate) fn builtin_process_buffer(
     args: Vec<Value>,
 ) -> EvalResult {
     expect_args("process-buffer", &args, 1)?;
-    let id = resolve_process(eval, &args[0])?;
+    let id = resolve_process_or_wrong_type(eval, &args[0])?;
     match eval.processes.get(id) {
         Some(proc) => match &proc.buffer_name {
             Some(name) => Ok(Value::string(name.clone())),
             None => Ok(Value::Nil),
         },
-        None => Err(signal("error", vec![Value::string("Process not found")])),
+        None => Err(signal_wrong_type_processp(args[0].clone())),
     }
 }
 
@@ -1382,7 +1443,7 @@ pub(crate) fn builtin_process_send_region(
     Ok(Value::Nil)
 }
 
-/// (process-send-eof &optional PROCESS) -> process
+/// (process-send-eof &optional PROCESS) -> process-or-nil
 pub(crate) fn builtin_process_send_eof(
     eval: &mut super::eval::Evaluator,
     args: Vec<Value>,
@@ -1396,8 +1457,14 @@ pub(crate) fn builtin_process_send_eof(
             ],
         ));
     }
-    let id = resolve_optional_process_or_current_buffer(eval, args.first())?;
-    Ok(Value::Int(id as i64))
+    if let Some(process) = args.first() {
+        if !process.is_nil() {
+            let _id = resolve_process_or_missing_error(eval, process)?;
+            return Ok(process.clone());
+        }
+    }
+    let _id = resolve_optional_process_or_current_buffer(eval, args.first())?;
+    Ok(Value::Nil)
 }
 
 /// (process-running-child-p &optional PROCESS) -> bool
@@ -1471,6 +1538,21 @@ pub(crate) fn builtin_get_process(
     expect_args("get-process", &args, 1)?;
     let name = expect_string_strict(&args[0])?;
     match eval.processes.find_by_name(&name) {
+        Some(id) => Ok(Value::Int(id as i64)),
+        None => Ok(Value::Nil),
+    }
+}
+
+/// (get-buffer-process BUFFER-OR-NAME) -> process-or-nil
+pub(crate) fn builtin_get_buffer_process(
+    eval: &mut super::eval::Evaluator,
+    args: Vec<Value>,
+) -> EvalResult {
+    expect_args("get-buffer-process", &args, 1)?;
+    let Some(buffer_name) = resolve_buffer_name_for_process_lookup(eval, &args[0])? else {
+        return Ok(Value::Nil);
+    };
+    match eval.processes.find_by_buffer_name(&buffer_name) {
         Some(id) => Ok(Value::Int(id as i64)),
         None => Ok(Value::Nil),
     }

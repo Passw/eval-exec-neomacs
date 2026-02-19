@@ -7718,6 +7718,7 @@ pub(crate) fn dispatch_builtin(
         }
         "delete-process" => return Some(super::process::builtin_delete_process(eval, args)),
         "get-process" => return Some(super::process::builtin_get_process(eval, args)),
+        "get-buffer-process" => return Some(super::process::builtin_get_buffer_process(eval, args)),
         "process-live-p" => return Some(super::process::builtin_process_live_p(eval, args)),
         "processp" => return Some(super::process::builtin_processp(eval, args)),
         "process-id" => return Some(super::process::builtin_process_id(eval, args)),
