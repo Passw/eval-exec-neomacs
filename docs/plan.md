@@ -39,7 +39,10 @@ Last updated: 2026-02-19
       - added deterministic helper coverage:
         - `network_interface_broadcast_derivation_helpers`.
   - corpus changes:
-    - strengthened network-interface info shape assertions and re-recorded:
+    - strengthened network-interface lock-ins and re-recorded:
+      - added an oracle-backed directed-broadcast invariant over `network-interface-list t` payloads:
+        - each entry now asserts `BROADCAST = ADDRESS OR (NOT NETMASK)` with IPv4/IPv6 width-aware masking.
+      - expanded `network-interface-info` shape assertions (`length=5`, vector fields, hwaddr/flags shape).
       - `test/neovm/vm-compat/cases/process-network-interface-signal-semantics.forms`
       - `test/neovm/vm-compat/cases/process-network-interface-signal-semantics.expected.tsv`
   - verified:

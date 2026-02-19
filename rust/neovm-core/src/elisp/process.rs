@@ -5031,6 +5031,29 @@ mod tests {
                          (vectorp (nth 1 entry))
                          (vectorp (nth 2 entry))
                          (vectorp (nth 3 entry))))
+                  (let* ((entries (network-interface-list t))
+                         (ok t))
+                    (while (and ok entries)
+                      (let* ((entry (car entries))
+                             (addr (nth 1 entry))
+                             (bc (nth 2 entry))
+                             (mask (nth 3 entry))
+                             (len (length addr))
+                             (limit (if (= len 5) 4 8))
+                             (bits-mask (if (= len 5) #xff #xffff))
+                             (idx 0)
+                             (vals nil))
+                        (while (< idx limit)
+                          (setq vals
+                                (append vals
+                                        (list (logand bits-mask
+                                                      (logior (aref addr idx)
+                                                              (lognot (aref mask idx)))))))
+                          (setq idx (1+ idx)))
+                        (setq vals (append vals '(0)))
+                        (setq ok (equal bc (apply #'vector vals))))
+                      (setq entries (cdr entries)))
+                    ok)
                   (condition-case err (network-interface-list nil nil nil) (error err))
                   (condition-case err (network-interface-list nil t) (error err))
                   (let ((info (network-interface-info ifname)))
@@ -5070,7 +5093,7 @@ mod tests {
         );
         assert_eq!(
             results[1],
-            "OK (\"127.0.0.1:80\" \"127.0.0.1\" \"[0:0:0:0:0:0:0:1]:80\" \"0:0:0:0:0:0:0:1\" \"x\" nil nil nil nil (wrong-number-of-arguments format-network-address 0) t t t t t t (wrong-number-of-arguments network-interface-list 3) (error \"Unsupported address family\") t t (wrong-type-argument stringp nil) (error \"interface name too long\") t t t t (error \"Unsupported family\") (error \"Unsupported hints value\") (wrong-type-argument stringp 1) t t t (wrong-number-of-arguments signal-names 1) (void-function process-connection))"
+            "OK (\"127.0.0.1:80\" \"127.0.0.1\" \"[0:0:0:0:0:0:0:1]:80\" \"0:0:0:0:0:0:0:1\" \"x\" nil nil nil nil (wrong-number-of-arguments format-network-address 0) t t t t t t t (wrong-number-of-arguments network-interface-list 3) (error \"Unsupported address family\") t t (wrong-type-argument stringp nil) (error \"interface name too long\") t t t t (error \"Unsupported family\") (error \"Unsupported hints value\") (wrong-type-argument stringp 1) t t t (wrong-number-of-arguments signal-names 1) (void-function process-connection))"
         );
     }
 }
