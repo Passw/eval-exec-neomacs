@@ -305,6 +305,8 @@ pub struct Frame {
     pub selected_window: WindowId,
     /// Minibuffer window (always a leaf).
     pub minibuffer_window: Option<WindowId>,
+    /// Storage for the minibuffer leaf, which is not part of the split tree.
+    pub minibuffer_leaf: Option<Window>,
     /// Frame pixel dimensions.
     pub width: u32,
     pub height: u32,
@@ -330,6 +332,20 @@ pub struct Frame {
 
 impl Frame {
     pub fn new(id: FrameId, name: String, width: u32, height: u32, root_window: Window) -> Self {
+        let minibuffer_window = WindowId(MINIBUFFER_WINDOW_ID_BASE + id.0);
+        let minibuffer_buffer_id = root_window.buffer_id().unwrap_or(BufferId(0));
+        let mut minibuffer_leaf = Window::new_leaf(
+            minibuffer_window,
+            minibuffer_buffer_id,
+            Rect::new(0.0, height as f32, width as f32, 16.0),
+        );
+        if let Window::Leaf {
+            window_start, point, ..
+        } = &mut minibuffer_leaf
+        {
+            *window_start = 1;
+            *point = 1;
+        }
         let selected = root_window
             .leaf_ids()
             .first()
@@ -340,7 +356,8 @@ impl Frame {
             name,
             root_window,
             selected_window: selected,
-            minibuffer_window: Some(WindowId(MINIBUFFER_WINDOW_ID_BASE + id.0)),
+            minibuffer_window: Some(minibuffer_window),
+            minibuffer_leaf: Some(minibuffer_leaf),
             width,
             height,
             parameters: HashMap::new(),
@@ -368,6 +385,9 @@ impl Frame {
     /// Replace all leaf window buffer bindings for `old_id` with `new_id`.
     pub fn replace_buffer_bindings(&mut self, old_id: BufferId, new_id: BufferId) {
         self.root_window.replace_buffer_id(old_id, new_id);
+        if let Some(minibuffer_leaf) = self.minibuffer_leaf.as_mut() {
+            minibuffer_leaf.replace_buffer_id(old_id, new_id);
+        }
     }
 
     /// Select a window by ID.
@@ -382,12 +402,30 @@ impl Frame {
 
     /// Find a window by ID.
     pub fn find_window(&self, id: WindowId) -> Option<&Window> {
-        self.root_window.find(id)
+        if let Some(window) = self.root_window.find(id) {
+            return Some(window);
+        }
+        self.minibuffer_leaf.as_ref().and_then(|window| {
+            if window.id() == id {
+                Some(window)
+            } else {
+                None
+            }
+        })
     }
 
     /// Find a mutable window by ID.
     pub fn find_window_mut(&mut self, id: WindowId) -> Option<&mut Window> {
-        self.root_window.find_mut(id)
+        if let Some(window) = self.root_window.find_mut(id) {
+            return Some(window);
+        }
+        self.minibuffer_leaf.as_mut().and_then(|window| {
+            if window.id() == id {
+                Some(window)
+            } else {
+                None
+            }
+        })
     }
 
     /// All leaf window IDs.

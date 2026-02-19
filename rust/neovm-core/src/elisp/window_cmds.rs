@@ -187,6 +187,10 @@ pub(crate) fn ensure_selected_frame_id(eval: &mut super::eval::Evaluator) -> Fra
     // a minibuffer line; frame parameters report 80x25.
     // With our default 8x16 char metrics the text area corresponds to 640x384.
     let fid = eval.frames.create_frame("F1", 640, 384, buf_id);
+    let minibuffer_buf_id = eval
+        .buffers
+        .find_buffer_by_name(" *Minibuf-0*")
+        .unwrap_or_else(|| eval.buffers.create_buffer(" *Minibuf-0*"));
     if let Some(frame) = eval.frames.get_mut(fid) {
         frame.parameters.insert("width".to_string(), Value::Int(80));
         frame
@@ -201,6 +205,10 @@ pub(crate) fn ensure_selected_frame_id(eval: &mut super::eval::Evaluator) -> Fra
             // Batch-mode startup in GNU Emacs reports point/window-start as 1.
             *window_start = 1;
             *point = 1;
+        }
+        if let Some(minibuffer_leaf) = frame.minibuffer_leaf.as_mut() {
+            // Keep minibuffer window accessors aligned with GNU Emacs batch startup.
+            minibuffer_leaf.set_buffer(minibuffer_buf_id);
         }
     }
     fid
@@ -380,11 +388,15 @@ pub(crate) fn builtin_set_window_start(
     expect_max_args("set-window-start", &args, 3)?;
     let (fid, wid) = resolve_window_id(eval, args.first())?;
     let pos = expect_int(&args[1])? as usize;
-    if let Some(w) = eval
-        .frames
-        .get_mut(fid)
-        .and_then(|f| f.find_window_mut(wid))
-    {
+    if let Some(frame) = eval.frames.get_mut(fid) {
+        if frame.minibuffer_window == Some(wid) {
+            if let Some(Window::Leaf { window_start, .. }) = frame.find_window(wid) {
+                return Ok(Value::Int(*window_start as i64));
+            }
+            return Ok(Value::Int(1));
+        }
+    }
+    if let Some(w) = eval.frames.get_mut(fid).and_then(|f| f.find_window_mut(wid)) {
         if let Window::Leaf { window_start, .. } = w {
             *window_start = pos;
         }
@@ -400,11 +412,15 @@ pub(crate) fn builtin_set_window_point(
     expect_args("set-window-point", &args, 2)?;
     let (fid, wid) = resolve_window_id(eval, args.first())?;
     let pos = expect_int(&args[1])? as usize;
-    if let Some(w) = eval
-        .frames
-        .get_mut(fid)
-        .and_then(|f| f.find_window_mut(wid))
-    {
+    if let Some(frame) = eval.frames.get_mut(fid) {
+        if frame.minibuffer_window == Some(wid) {
+            if let Some(Window::Leaf { point, .. }) = frame.find_window(wid) {
+                return Ok(Value::Int(*point as i64));
+            }
+            return Ok(Value::Int(1));
+        }
+    }
+    if let Some(w) = eval.frames.get_mut(fid).and_then(|f| f.find_window_mut(wid)) {
         if let Window::Leaf { point, .. } = w {
             *point = pos;
         }
@@ -1911,6 +1927,34 @@ mod tests {
         assert_eq!(out[9], "OK 2");
         assert_eq!(out[10], "OK 1");
         assert_eq!(out[11], "OK 2");
+    }
+
+    #[test]
+    fn minibuffer_window_from_window_list_supports_basic_accessors() {
+        let forms = parse_forms(
+            "(let ((m (car (last (window-list nil t)))))
+               (list (window-live-p m)
+                     (windowp m)
+                     (buffer-name (window-buffer m))
+                     (window-start m)
+                     (window-point m)))
+             (let ((m (car (last (window-list nil t)))))
+               (set-window-start m 7)
+               (window-start m))
+             (let ((m (car (last (window-list nil t)))))
+               (set-window-point m 8)
+               (window-point m))",
+        )
+        .expect("parse");
+        let mut ev = Evaluator::new();
+        let out = ev
+            .eval_forms(&forms)
+            .iter()
+            .map(format_eval_result)
+            .collect::<Vec<_>>();
+        assert_eq!(out[0], "OK (t t \" *Minibuf-0*\" 1 1)");
+        assert_eq!(out[1], "OK 1");
+        assert_eq!(out[2], "OK 1");
     }
 
     #[test]
