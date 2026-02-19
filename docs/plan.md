@@ -28,6 +28,25 @@ Last updated: 2026-02-19
 
 ## Doing
 
+- Fixed interface-name length validation to use byte limits (not char count):
+  - runtime changes:
+    - `rust/neovm-core/src/elisp/process.rs`
+      - switched `network-interface-info` name-length guard to byte-length (`IFNAMSIZ`-style) after NUL-truncation, matching oracle behavior for multibyte payloads.
+      - expanded runtime lock-ins to assert:
+        - multibyte boundary overflows now error:
+          - `(network-interface-info (concat "aaaaaaaaaaaaaa" (string 233))) -> (error "interface name too long")`
+        - sub-boundary multibyte names remain non-error and unresolved when missing:
+          - `(null (network-interface-info (concat "aaaaaaaaaaaaa" (string 233))))`
+  - corpus changes:
+    - expanded and re-recorded:
+      - `test/neovm/vm-compat/cases/process-network-interface-signal-semantics.forms`
+      - `test/neovm/vm-compat/cases/process-network-interface-signal-semantics.expected.tsv`
+  - verified:
+    - `cargo test --manifest-path rust/neovm-core/Cargo.toml process_network_interface_and_signal_runtime_surface` (pass)
+    - `make -C test/neovm/vm-compat record FORMS=cases/process-network-interface-signal-semantics.forms EXPECTED=cases/process-network-interface-signal-semantics.expected.tsv` (pass)
+    - `make -C test/neovm/vm-compat check-one-neovm CASE=cases/process-network-interface-signal-semantics` (pass, `2/2`)
+    - `make -C test/neovm/vm-compat check-all-neovm-strict` (pass; case inventory `788`)
+
 - Fixed embedded-NUL interface-name handling in `network-interface-info`:
   - runtime changes:
     - `rust/neovm-core/src/elisp/process.rs`

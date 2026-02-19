@@ -141,6 +141,8 @@
    (condition-case err (network-interface-info nil) (error err))
    (condition-case err (network-interface-info "abcdefghijklmnop") (error err))
    (condition-case err (network-interface-info (concat "abcdefghijklmnop" (string 0))) (error err))
+   (condition-case err (network-interface-info (concat "aaaaaaaaaaaaaa" (string 233))) (error err))
+   (null (network-interface-info (concat "aaaaaaaaaaaaa" (string 233))))
    (listp (network-lookup-address-info "localhost"))
    (vectorp (car (network-lookup-address-info "localhost")))
    (listp (network-lookup-address-info "localhost" 'ipv4))
