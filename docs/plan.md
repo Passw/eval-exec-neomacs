@@ -16319,6 +16319,35 @@ Last updated: 2026-02-19
     - `make -C test/neovm/vm-compat record FORMS=cases/interactive-lambda-spec-extended-semantics.forms EXPECTED=cases/interactive-lambda-spec-extended-semantics.expected.tsv` (pass)
     - `make -C test/neovm/vm-compat check-one-neovm CASE=cases/interactive-lambda-spec-extended-semantics` (pass, `61/61`)
     - `make -C test/neovm/vm-compat check-all-neovm-strict` (pass)
+- Aligned display-query string-designator error payloads with oracle and added lock-ins:
+  - runtime changes:
+    - `rust/neovm-core/src/elisp/display.rs`
+      - display query designator validation now reports `Display <name> does not exist` for string designators across evaluator-backed display query builtins.
+      - `frame-edges` live-frame error text now avoids extra string quoting (`x is not a live frame`).
+      - added/updated unit coverage:
+        - `eval_display_queries_string_designator_reports_missing_display`
+        - `frame_edges_string_designator_uses_unquoted_live_frame_error_message`
+        - `eval_frame_edges_numeric_designator_reports_numeric_message`
+  - corpus changes:
+    - added and wired:
+      - `test/neovm/vm-compat/cases/display-query-string-designator-error-semantics.{forms,expected.tsv}`
+      - `test/neovm/vm-compat/cases/frame-edges-error-message-semantics.{forms,expected.tsv}`
+      - `test/neovm/vm-compat/cases/default.list`
+    - lock-ins cover:
+      - string-designator error-message parity for:
+        - `display-graphic-p`, `display-color-p`, `display-pixel-width`, `display-pixel-height`
+        - `display-mm-width`, `display-mm-height`, `display-screens`, `display-color-cells`
+        - `display-planes`, `display-visual-class`, `display-backing-store`, `display-images-p`
+      - `frame-edges` message payload parity for string and numeric non-live frame designators.
+  - verified:
+    - `cargo test --manifest-path rust/neovm-core/Cargo.toml frame_edges_string_designator_uses_unquoted_live_frame_error_message -- --nocapture` (pass)
+    - `cargo test --manifest-path rust/neovm-core/Cargo.toml eval_frame_edges_numeric_designator_reports_numeric_message -- --nocapture` (pass)
+    - `cargo test --manifest-path rust/neovm-core/Cargo.toml eval_display_queries_string_designator_reports_missing_display -- --nocapture` (pass)
+    - `cargo test --manifest-path rust/neovm-core/Cargo.toml elisp::display::tests:: -- --nocapture` (pass, `51/51`)
+    - `make -C test/neovm/vm-compat check-one-neovm CASE=cases/display-query-string-designator-error-semantics` (pass, `12/12`)
+    - `make -C test/neovm/vm-compat check-one-neovm CASE=cases/frame-edges-error-message-semantics` (pass, `3/3`)
+    - `make -C test/neovm/vm-compat check-one-neovm CASE=cases/display-tty-x-helper-semantics` (pass, `65/65`)
+    - `make -C test/neovm/vm-compat check-all-neovm-strict` (pass)
 
 ## Doing
 

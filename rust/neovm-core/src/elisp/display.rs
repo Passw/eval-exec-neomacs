@@ -78,6 +78,13 @@ fn invalid_get_device_terminal_error(value: &Value) -> Flow {
     )
 }
 
+fn display_does_not_exist_error(display: &str) -> Flow {
+    signal(
+        "error",
+        vec![Value::string(format!("Display {display} does not exist"))],
+    )
+}
+
 fn format_get_device_terminal_arg_eval(eval: &super::eval::Evaluator, value: &Value) -> String {
     if let Value::Int(id) = value {
         if *id >= 0 {
@@ -200,10 +207,11 @@ fn expect_window_designator_eval(
 }
 
 fn expect_display_designator(value: &Value) -> Result<(), Flow> {
-    if value.is_nil() || terminal_designator_p(value) {
-        Ok(())
-    } else {
-        Err(invalid_get_device_terminal_error(value))
+    match value {
+        Value::Nil => Ok(()),
+        display if terminal_designator_p(display) => Ok(()),
+        Value::Str(display) => Err(display_does_not_exist_error(display)),
+        _ => Err(invalid_get_device_terminal_error(value)),
     }
 }
 
@@ -219,10 +227,12 @@ fn expect_display_designator_eval(
     value: &Value,
 ) -> Result<(), Flow> {
     if value.is_nil() || terminal_designator_p(value) || live_frame_designator_p(eval, value) {
-        Ok(())
-    } else {
-        Err(invalid_get_device_terminal_error_eval(eval, value))
+        return Ok(());
     }
+    if let Value::Str(display) = value {
+        return Err(display_does_not_exist_error(display));
+    }
+    Err(invalid_get_device_terminal_error_eval(eval, value))
 }
 
 fn expect_optional_display_designator_eval(
@@ -270,12 +280,24 @@ fn make_alist(pairs: Vec<(Value, Value)>) -> Value {
 }
 
 fn frame_not_live_error(value: &Value) -> Flow {
+    let printable = match value {
+        Value::Str(s) => s.to_string(),
+        _ => super::print::print_value(value),
+    };
     signal(
         "error",
-        vec![Value::string(format!(
-            "{} is not a live frame",
-            super::print::print_value(value)
-        ))],
+        vec![Value::string(format!("{printable} is not a live frame"))],
+    )
+}
+
+fn frame_not_live_error_eval(_eval: &super::eval::Evaluator, value: &Value) -> Flow {
+    let printable = match value {
+        Value::Str(s) => s.to_string(),
+        _ => super::print::print_value(value),
+    };
+    signal(
+        "error",
+        vec![Value::string(format!("{printable} is not a live frame"))],
     )
 }
 
@@ -714,7 +736,7 @@ pub(crate) fn builtin_frame_edges_eval(
     expect_range_args("frame-edges", &args, 0, 2)?;
     if let Some(frame) = args.first() {
         if !frame.is_nil() && !live_frame_designator_p(eval, frame) {
-            return Err(frame_not_live_error(frame));
+            return Err(frame_not_live_error_eval(eval, frame));
         }
     }
     Ok(Value::list(vec![
@@ -1762,6 +1784,31 @@ mod tests {
     }
 
     #[test]
+    fn frame_edges_string_designator_uses_unquoted_live_frame_error_message() {
+        let result = builtin_frame_edges(vec![Value::string("x")]);
+        match result {
+            Err(Flow::Signal(sig)) => {
+                assert_eq!(sig.symbol, "error");
+                assert_eq!(sig.data, vec![Value::string("x is not a live frame")]);
+            }
+            other => panic!("expected error signal, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn eval_frame_edges_numeric_designator_reports_numeric_message() {
+        let mut eval = crate::elisp::Evaluator::new();
+        let result = builtin_frame_edges_eval(&mut eval, vec![Value::Int(999_999)]);
+        match result {
+            Err(Flow::Signal(sig)) => {
+                assert_eq!(sig.symbol, "error");
+                assert_eq!(sig.data, vec![Value::string("999999 is not a live frame")]);
+            }
+            other => panic!("expected error signal, got {other:?}"),
+        }
+    }
+
+    #[test]
     fn open_termscript_uses_batch_tty_error_payload() {
         let result = builtin_open_termscript(vec![Value::Nil]);
         match result {
@@ -2201,6 +2248,69 @@ mod tests {
         let _ = crate::elisp::window_cmds::ensure_selected_frame_id(&mut eval);
         let result = builtin_display_pixel_width_eval(&mut eval, vec![Value::Int(999_999)]);
         assert!(result.is_err());
+    }
+
+    #[test]
+    fn eval_display_queries_string_designator_reports_missing_display() {
+        fn assert_missing_display(result: EvalResult) {
+            match result {
+                Err(Flow::Signal(sig)) => {
+                    assert_eq!(sig.symbol, "error");
+                    assert_eq!(sig.data, vec![Value::string("Display x does not exist")]);
+                }
+                other => panic!("expected error signal, got {other:?}"),
+            }
+        }
+
+        let mut eval = crate::elisp::Evaluator::new();
+        assert_missing_display(builtin_display_graphic_p_eval(
+            &mut eval,
+            vec![Value::string("x")],
+        ));
+        assert_missing_display(builtin_display_color_p_eval(
+            &mut eval,
+            vec![Value::string("x")],
+        ));
+        assert_missing_display(builtin_display_pixel_width_eval(
+            &mut eval,
+            vec![Value::string("x")],
+        ));
+        assert_missing_display(builtin_display_pixel_height_eval(
+            &mut eval,
+            vec![Value::string("x")],
+        ));
+        assert_missing_display(builtin_display_mm_width_eval(
+            &mut eval,
+            vec![Value::string("x")],
+        ));
+        assert_missing_display(builtin_display_mm_height_eval(
+            &mut eval,
+            vec![Value::string("x")],
+        ));
+        assert_missing_display(builtin_display_screens_eval(
+            &mut eval,
+            vec![Value::string("x")],
+        ));
+        assert_missing_display(builtin_display_color_cells_eval(
+            &mut eval,
+            vec![Value::string("x")],
+        ));
+        assert_missing_display(builtin_display_planes_eval(
+            &mut eval,
+            vec![Value::string("x")],
+        ));
+        assert_missing_display(builtin_display_visual_class_eval(
+            &mut eval,
+            vec![Value::string("x")],
+        ));
+        assert_missing_display(builtin_display_backing_store_eval(
+            &mut eval,
+            vec![Value::string("x")],
+        ));
+        assert_missing_display(builtin_display_images_p_eval(
+            &mut eval,
+            vec![Value::string("x")],
+        ));
     }
 
     #[test]

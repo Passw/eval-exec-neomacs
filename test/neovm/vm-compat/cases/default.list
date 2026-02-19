@@ -382,9 +382,11 @@ cases/xdisp-image-map-semantics
 cases/format-mode-line-batch-semantics
 cases/display-batch-semantics
 cases/display-query-designator-semantics
+cases/display-query-string-designator-error-semantics
 cases/display-images-face-support-semantics
 cases/display-frame-designator-semantics
 cases/display-frame-designator-edge-semantics
+cases/frame-edges-error-message-semantics
 cases/display-terminal-subr-arity-semantics
 cases/display-control-runtime-semantics
 cases/display-control-subr-arity-semantics
