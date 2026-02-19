@@ -1421,6 +1421,151 @@ pub(crate) fn builtin_x_focus_frame(args: Vec<Value>) -> EvalResult {
     }
 }
 
+/// (x-get-clipboard) -> nil in batch/no-X context.
+pub(crate) fn builtin_x_get_clipboard(args: Vec<Value>) -> EvalResult {
+    expect_args("x-get-clipboard", &args, 0)?;
+    Ok(Value::Nil)
+}
+
+/// (x-get-modifier-masks &optional DISPLAY) -> error in batch/no-X context.
+pub(crate) fn builtin_x_get_modifier_masks(args: Vec<Value>) -> EvalResult {
+    expect_max_args("x-get-modifier-masks", &args, 1)?;
+    match args.first() {
+        None => Err(x_windows_not_initialized_error()),
+        Some(display) if display.is_nil() => Err(x_windows_not_initialized_error()),
+        Some(Value::Frame(_)) => Err(x_window_system_frame_error()),
+        Some(display) => Err(x_display_query_first_arg_error(display)),
+    }
+}
+
+/// (x-get-input-coding-system NAME) -> nil/error in batch/no-X context.
+pub(crate) fn builtin_x_get_input_coding_system(args: Vec<Value>) -> EvalResult {
+    expect_args("x-get-input-coding-system", &args, 1)?;
+    match &args[0] {
+        Value::Str(_) => Ok(Value::Nil),
+        Value::Int(_) => Err(signal(
+            "wrong-type-argument",
+            vec![Value::symbol("stringp"), args[0].clone()],
+        )),
+        other => Err(signal(
+            "wrong-type-argument",
+            vec![Value::symbol("char-or-string-p"), other.clone()],
+        )),
+    }
+}
+
+/// (x-hide-tip) -> nil in batch/no-X context.
+pub(crate) fn builtin_x_hide_tip(args: Vec<Value>) -> EvalResult {
+    expect_args("x-hide-tip", &args, 0)?;
+    Ok(Value::Nil)
+}
+
+/// (x-setup-function-keys TERMINAL) -> nil/error in batch/no-X context.
+pub(crate) fn builtin_x_setup_function_keys(args: Vec<Value>) -> EvalResult {
+    expect_args("x-setup-function-keys", &args, 1)?;
+    match &args[0] {
+        Value::Frame(_) => Ok(Value::Nil),
+        Value::Int(_) | Value::Str(_) => Err(signal(
+            "wrong-type-argument",
+            vec![Value::symbol("terminal-live-p"), args[0].clone()],
+        )),
+        other => Err(signal(
+            "wrong-type-argument",
+            vec![Value::symbol("frame-live-p"), other.clone()],
+        )),
+    }
+}
+
+/// (x-clear-preedit-text) -> 'tooltip-hide in batch/no-X context.
+pub(crate) fn builtin_x_clear_preedit_text(args: Vec<Value>) -> EvalResult {
+    expect_args("x-clear-preedit-text", &args, 0)?;
+    Ok(Value::list(vec![Value::symbol("tooltip-hide")]))
+}
+
+/// (x-preedit-text ARG) -> nil/error in batch/no-X context.
+pub(crate) fn builtin_x_preedit_text(args: Vec<Value>) -> EvalResult {
+    expect_args("x-preedit-text", &args, 1)?;
+    let arg = &args[0];
+    if arg.is_nil() {
+        return Ok(Value::Nil);
+    }
+
+    let rest = match arg {
+        Value::Cons(cell) => {
+            let pair = cell.lock().expect("poisoned");
+            pair.cdr.clone()
+        }
+        other => {
+            return Err(signal(
+                "wrong-type-argument",
+                vec![Value::symbol("listp"), other.clone()],
+            ))
+        }
+    };
+
+    if !rest.is_list() {
+        return Err(signal(
+            "wrong-type-argument",
+            vec![Value::symbol("listp"), rest],
+        ));
+    }
+
+    if let Value::Cons(cell) = rest {
+        let pair = cell.lock().expect("poisoned");
+        let second = pair.car.clone();
+        if !second.is_nil() && !second.is_string() && !second.is_list() {
+            return Err(signal(
+                "wrong-type-argument",
+                vec![Value::symbol("stringp"), second],
+            ));
+        }
+    }
+
+    Ok(Value::Nil)
+}
+
+/// (x-win-suspend-error) -> nil in batch/no-X context.
+pub(crate) fn builtin_x_win_suspend_error(args: Vec<Value>) -> EvalResult {
+    expect_args("x-win-suspend-error", &args, 0)?;
+    Ok(Value::Nil)
+}
+
+/// (x-device-class DISPLAY) -> nil/error in batch/no-X context.
+pub(crate) fn builtin_x_device_class(args: Vec<Value>) -> EvalResult {
+    expect_args("x-device-class", &args, 1)?;
+    match &args[0] {
+        Value::Nil | Value::Str(_) => Ok(Value::Nil),
+        Value::Int(_) => Err(signal(
+            "wrong-type-argument",
+            vec![Value::symbol("stringp"), args[0].clone()],
+        )),
+        other => Err(signal(
+            "wrong-type-argument",
+            vec![Value::symbol("char-or-string-p"), other.clone()],
+        )),
+    }
+}
+
+/// (x-internal-focus-input-context FRAME) -> nil in batch/no-X context.
+pub(crate) fn builtin_x_internal_focus_input_context(args: Vec<Value>) -> EvalResult {
+    expect_args("x-internal-focus-input-context", &args, 1)?;
+    Ok(Value::Nil)
+}
+
+/// (x-wm-set-size-hint &optional FRAME) -> error in batch/no-X context.
+pub(crate) fn builtin_x_wm_set_size_hint(args: Vec<Value>) -> EvalResult {
+    expect_max_args("x-wm-set-size-hint", &args, 1)?;
+    match args.first() {
+        None => Err(x_window_system_frame_error()),
+        Some(frame) if frame.is_nil() => Err(x_window_system_frame_error()),
+        Some(Value::Frame(_)) => Err(x_window_system_frame_error()),
+        Some(other) => Err(signal(
+            "wrong-type-argument",
+            vec![Value::symbol("frame-live-p"), other.clone()],
+        )),
+    }
+}
+
 /// (x-backspace-delete-keys-p &optional FRAME) -> error in batch/no-X context.
 pub(crate) fn builtin_x_backspace_delete_keys_p(args: Vec<Value>) -> EvalResult {
     expect_max_args("x-backspace-delete-keys-p", &args, 1)?;
@@ -3909,6 +4054,232 @@ mod tests {
             Err(Flow::Signal(sig)) => assert_eq!(sig.symbol, "wrong-number-of-arguments"),
             other => panic!("expected wrong-number-of-arguments signal, got {other:?}"),
         }
+    }
+
+    #[test]
+    fn x_clipboard_input_context_batch_semantics() {
+        let term = terminal_handle_value();
+        let frame = Value::Frame(1);
+
+        let assert_wrong_type = |result: EvalResult, pred: &str, arg: Value| match result {
+            Err(Flow::Signal(sig)) => {
+                assert_eq!(sig.symbol, "wrong-type-argument");
+                assert_eq!(sig.data, vec![Value::symbol(pred), arg]);
+            }
+            other => panic!("expected wrong-type-argument signal, got {other:?}"),
+        };
+        let assert_error = |result: EvalResult, msg: &str| match result {
+            Err(Flow::Signal(sig)) => {
+                assert_eq!(sig.symbol, "error");
+                assert_eq!(sig.data, vec![Value::string(msg)]);
+            }
+            other => panic!("expected error signal, got {other:?}"),
+        };
+        let assert_wrong_number = |result: EvalResult| match result {
+            Err(Flow::Signal(sig)) => assert_eq!(sig.symbol, "wrong-number-of-arguments"),
+            other => panic!("expected wrong-number-of-arguments signal, got {other:?}"),
+        };
+
+        assert!(builtin_x_get_clipboard(vec![]).unwrap().is_nil());
+        assert_wrong_number(builtin_x_get_clipboard(vec![Value::Nil]));
+
+        assert_error(
+            builtin_x_get_modifier_masks(vec![]),
+            "X windows are not in use or not initialized",
+        );
+        assert_error(
+            builtin_x_get_modifier_masks(vec![Value::Nil]),
+            "X windows are not in use or not initialized",
+        );
+        assert_error(
+            builtin_x_get_modifier_masks(vec![term.clone()]),
+            "Terminal 0 is not an X display",
+        );
+        assert_wrong_type(
+            builtin_x_get_modifier_masks(vec![Value::Int(1)]),
+            "frame-live-p",
+            Value::Int(1),
+        );
+        assert_error(
+            builtin_x_get_modifier_masks(vec![Value::string("x")]),
+            "Display x can’t be opened",
+        );
+        assert_error(
+            builtin_x_get_modifier_masks(vec![frame.clone()]),
+            "Window system frame should be used",
+        );
+        assert_wrong_number(builtin_x_get_modifier_masks(vec![Value::Nil, Value::Nil]));
+
+        assert_wrong_type(
+            builtin_x_get_input_coding_system(vec![Value::Nil]),
+            "char-or-string-p",
+            Value::Nil,
+        );
+        assert_wrong_type(
+            builtin_x_get_input_coding_system(vec![term.clone()]),
+            "char-or-string-p",
+            term.clone(),
+        );
+        assert_wrong_type(
+            builtin_x_get_input_coding_system(vec![Value::Int(1)]),
+            "stringp",
+            Value::Int(1),
+        );
+        assert!(builtin_x_get_input_coding_system(vec![Value::string("x")])
+            .unwrap()
+            .is_nil());
+        assert_wrong_type(
+            builtin_x_get_input_coding_system(vec![frame.clone()]),
+            "char-or-string-p",
+            frame.clone(),
+        );
+        assert_wrong_number(builtin_x_get_input_coding_system(vec![Value::Nil, Value::Nil]));
+
+        assert!(builtin_x_hide_tip(vec![]).unwrap().is_nil());
+        assert_wrong_number(builtin_x_hide_tip(vec![Value::Nil]));
+
+        assert_wrong_type(
+            builtin_x_setup_function_keys(vec![Value::Nil]),
+            "frame-live-p",
+            Value::Nil,
+        );
+        assert_wrong_type(
+            builtin_x_setup_function_keys(vec![term.clone()]),
+            "frame-live-p",
+            term.clone(),
+        );
+        assert_wrong_type(
+            builtin_x_setup_function_keys(vec![Value::Int(1)]),
+            "terminal-live-p",
+            Value::Int(1),
+        );
+        assert_wrong_type(
+            builtin_x_setup_function_keys(vec![Value::string("x")]),
+            "terminal-live-p",
+            Value::string("x"),
+        );
+        assert!(builtin_x_setup_function_keys(vec![frame.clone()])
+            .unwrap()
+            .is_nil());
+        assert_wrong_number(builtin_x_setup_function_keys(vec![]));
+        assert_wrong_number(builtin_x_setup_function_keys(vec![Value::Nil, Value::Nil]));
+
+        assert_eq!(
+            builtin_x_clear_preedit_text(vec![]).unwrap(),
+            Value::list(vec![Value::symbol("tooltip-hide")])
+        );
+        assert_wrong_number(builtin_x_clear_preedit_text(vec![Value::Nil]));
+
+        assert!(builtin_x_preedit_text(vec![Value::Nil]).unwrap().is_nil());
+        assert_wrong_type(
+            builtin_x_preedit_text(vec![term.clone()]),
+            "listp",
+            term.clone(),
+        );
+        assert_wrong_type(
+            builtin_x_preedit_text(vec![Value::Int(1)]),
+            "listp",
+            Value::Int(1),
+        );
+        assert_wrong_type(
+            builtin_x_preedit_text(vec![Value::string("x")]),
+            "listp",
+            Value::string("x"),
+        );
+        assert_wrong_type(
+            builtin_x_preedit_text(vec![frame.clone()]),
+            "listp",
+            frame.clone(),
+        );
+        assert_wrong_type(
+            builtin_x_preedit_text(vec![Value::list(vec![Value::Int(1), Value::Int(2)])]),
+            "stringp",
+            Value::Int(2),
+        );
+        assert!(builtin_x_preedit_text(vec![Value::list(vec![Value::Nil, Value::Nil])])
+            .unwrap()
+            .is_nil());
+        assert!(builtin_x_preedit_text(vec![Value::list(vec![Value::list(vec![
+            Value::Int(1),
+            Value::Int(2),
+        ])])])
+        .unwrap()
+        .is_nil());
+        assert_wrong_type(
+            builtin_x_preedit_text(vec![Value::cons(Value::Int(1), Value::Int(2))]),
+            "listp",
+            Value::Int(2),
+        );
+        assert_wrong_number(builtin_x_preedit_text(vec![]));
+        assert_wrong_number(builtin_x_preedit_text(vec![Value::Nil, Value::Nil]));
+
+        assert!(builtin_x_win_suspend_error(vec![]).unwrap().is_nil());
+        assert_wrong_number(builtin_x_win_suspend_error(vec![Value::Nil]));
+
+        assert!(builtin_x_device_class(vec![Value::Nil]).unwrap().is_nil());
+        assert_wrong_type(
+            builtin_x_device_class(vec![term.clone()]),
+            "char-or-string-p",
+            term.clone(),
+        );
+        assert_wrong_type(
+            builtin_x_device_class(vec![Value::Int(1)]),
+            "stringp",
+            Value::Int(1),
+        );
+        assert!(builtin_x_device_class(vec![Value::string("x")])
+            .unwrap()
+            .is_nil());
+        assert_wrong_type(
+            builtin_x_device_class(vec![frame.clone()]),
+            "char-or-string-p",
+            frame.clone(),
+        );
+        assert_wrong_number(builtin_x_device_class(vec![]));
+        assert_wrong_number(builtin_x_device_class(vec![Value::Nil, Value::Nil]));
+
+        for arg in [
+            Value::Nil,
+            term.clone(),
+            Value::Int(1),
+            Value::string("x"),
+            frame.clone(),
+        ] {
+            assert!(builtin_x_internal_focus_input_context(vec![arg])
+                .unwrap()
+                .is_nil());
+        }
+        assert_wrong_number(builtin_x_internal_focus_input_context(vec![]));
+        assert_wrong_number(builtin_x_internal_focus_input_context(vec![Value::Nil, Value::Nil]));
+
+        assert_error(
+            builtin_x_wm_set_size_hint(vec![]),
+            "Window system frame should be used",
+        );
+        assert_error(
+            builtin_x_wm_set_size_hint(vec![Value::Nil]),
+            "Window system frame should be used",
+        );
+        assert_wrong_type(
+            builtin_x_wm_set_size_hint(vec![term]),
+            "frame-live-p",
+            terminal_handle_value(),
+        );
+        assert_wrong_type(
+            builtin_x_wm_set_size_hint(vec![Value::Int(1)]),
+            "frame-live-p",
+            Value::Int(1),
+        );
+        assert_wrong_type(
+            builtin_x_wm_set_size_hint(vec![Value::string("x")]),
+            "frame-live-p",
+            Value::string("x"),
+        );
+        assert_error(
+            builtin_x_wm_set_size_hint(vec![frame]),
+            "Window system frame should be used",
+        );
+        assert_wrong_number(builtin_x_wm_set_size_hint(vec![Value::Nil, Value::Nil]));
     }
 
     #[test]

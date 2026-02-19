@@ -8877,8 +8877,13 @@ pub(crate) fn dispatch_builtin(
         "display-selections-p" => super::display::builtin_display_selections_p(args),
         "x-export-frames" => super::display::builtin_x_export_frames(args),
         "x-backspace-delete-keys-p" => super::display::builtin_x_backspace_delete_keys_p(args),
+        "x-clear-preedit-text" => super::display::builtin_x_clear_preedit_text(args),
         "x-focus-frame" => super::display::builtin_x_focus_frame(args),
+        "x-get-clipboard" => super::display::builtin_x_get_clipboard(args),
+        "x-get-input-coding-system" => super::display::builtin_x_get_input_coding_system(args),
+        "x-get-modifier-masks" => super::display::builtin_x_get_modifier_masks(args),
         "x-display-list" => super::display::builtin_x_display_list(args),
+        "x-device-class" => super::display::builtin_x_device_class(args),
         "x-frame-edges" => super::display::builtin_x_frame_edges(args),
         "x-frame-geometry" => super::display::builtin_x_frame_geometry(args),
         "x-frame-list-z-order" => super::display::builtin_x_frame_list_z_order(args),
@@ -8897,7 +8902,13 @@ pub(crate) fn dispatch_builtin(
         "x-register-dnd-atom" => super::display::builtin_x_register_dnd_atom(args),
         "x-selection-exists-p" => super::display::builtin_x_selection_exists_p(args),
         "x-selection-owner-p" => super::display::builtin_x_selection_owner_p(args),
+        "x-hide-tip" => super::display::builtin_x_hide_tip(args),
+        "x-internal-focus-input-context" => {
+            super::display::builtin_x_internal_focus_input_context(args)
+        }
+        "x-preedit-text" => super::display::builtin_x_preedit_text(args),
         "x-send-client-message" => super::display::builtin_x_send_client_message(args),
+        "x-setup-function-keys" => super::display::builtin_x_setup_function_keys(args),
         "x-set-mouse-absolute-pixel-position" => {
             super::display::builtin_x_set_mouse_absolute_pixel_position(args)
         }
@@ -8956,6 +8967,8 @@ pub(crate) fn dispatch_builtin(
         "x-display-screens" => super::display::builtin_x_display_screens(args),
         "x-display-set-last-user-time" => super::display::builtin_x_display_set_last_user_time(args),
         "x-display-visual-class" => super::display::builtin_x_display_visual_class(args),
+        "x-win-suspend-error" => super::display::builtin_x_win_suspend_error(args),
+        "x-wm-set-size-hint" => super::display::builtin_x_wm_set_size_hint(args),
 
         // Image (pure)
         "image-type-available-p" => super::image::builtin_image_type_available_p(args),

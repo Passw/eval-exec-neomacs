@@ -16753,6 +16753,43 @@ Last updated: 2026-02-19
     - `make -C test/neovm/vm-compat record FORMS=cases/x-popup-restack-semantics.forms EXPECTED=cases/x-popup-restack-semantics.expected.tsv` (pass)
     - `make -C test/neovm/vm-compat check-one-neovm CASE=cases/x-popup-restack-semantics` (pass, `4/4`)
     - `make -C test/neovm/vm-compat check-all-neovm-strict` (pass)
+- Added clipboard/input-context `x-*` compatibility surface and closed builtin `commandp` parity for `x-preedit-text`:
+  - runtime changes:
+    - `rust/neovm-core/src/elisp/display.rs`
+      - implemented:
+        - `x-get-clipboard`
+        - `x-get-modifier-masks`
+        - `x-get-input-coding-system`
+        - `x-hide-tip`
+        - `x-setup-function-keys`
+        - `x-clear-preedit-text`
+        - `x-preedit-text`
+        - `x-win-suspend-error`
+        - `x-device-class`
+        - `x-internal-focus-input-context`
+        - `x-wm-set-size-hint`
+      - aligned batch/no-X return and error payload semantics to oracle for terminal/frame/string/numeric/list designator paths.
+    - `rust/neovm-core/src/elisp/builtins.rs`
+      - wired pure dispatch for all 11 symbols.
+    - `rust/neovm-core/src/elisp/builtin_registry.rs`
+      - added all 11 names to `DISPATCH_BUILTIN_NAMES`.
+    - `rust/neovm-core/src/elisp/subr_info.rs`
+      - aligned arity metadata/assertions in `subr_arity_display_terminal_primitives_match_oracle` for all 11 symbols.
+    - `rust/neovm-core/src/elisp/interactive.rs`
+      - added `x-preedit-text` to the builtin command allowlist so `commandp` matches oracle.
+  - corpus changes:
+    - added and wired:
+      - `test/neovm/vm-compat/cases/x-clipboard-input-context-semantics.forms`
+      - `test/neovm/vm-compat/cases/x-clipboard-input-context-semantics.expected.tsv`
+      - `test/neovm/vm-compat/cases/default.list`
+  - verified:
+    - `cargo test --manifest-path rust/neovm-core/Cargo.toml x_clipboard_input_context_batch_semantics -- --nocapture` (pass)
+    - `cargo test --manifest-path rust/neovm-core/Cargo.toml commandp_true_for_additional_builtin_commands -- --nocapture` (pass)
+    - `cargo test --manifest-path rust/neovm-core/Cargo.toml subr_arity_display_terminal_primitives_match_oracle -- --nocapture` (pass)
+    - `make -C test/neovm/vm-compat record FORMS=cases/x-clipboard-input-context-semantics.forms EXPECTED=cases/x-clipboard-input-context-semantics.expected.tsv` (pass)
+    - `make -C test/neovm/vm-compat check-one-neovm CASE=cases/x-clipboard-input-context-semantics` (pass, `2/2`)
+    - `test/neovm/vm-compat/check-builtin-registry-commandp.sh` (pass, drifts: `0`)
+    - `make -C test/neovm/vm-compat check-all-neovm-strict` (pass)
 
 ## Doing
 

@@ -847,7 +847,14 @@ fn subr_arity_value(name: &str) -> Value {
         "read-passwd" => arity_cons(1, Some(3)),
         "event-apply-modifier" => arity_cons(4, Some(4)),
         "regexp-quote" => arity_cons(1, Some(1)),
-        "open-termscript" | "x-close-connection" | "x-parse-geometry" => arity_cons(1, Some(1)),
+        "open-termscript"
+        | "x-close-connection"
+        | "x-device-class"
+        | "x-get-input-coding-system"
+        | "x-internal-focus-input-context"
+        | "x-parse-geometry"
+        | "x-preedit-text"
+        | "x-setup-function-keys" => arity_cons(1, Some(1)),
         "send-string-to-terminal"
         | "display-supports-face-attributes-p"
         | "x-focus-frame"
@@ -947,6 +954,8 @@ fn subr_arity_value(name: &str) -> Value {
         | "x-display-save-under"
         | "x-display-screens"
         | "x-display-visual-class"
+        | "x-get-modifier-masks"
+        | "x-wm-set-size-hint"
         | "x-server-version"
         | "x-server-input-extension-version"
         | "x-server-max-request-size"
@@ -996,11 +1005,15 @@ fn subr_arity_value(name: &str) -> Value {
         | "window-use-time"
         | "window-top-line" => arity_cons(0, Some(1)),
         "terminal-list"
+        | "x-clear-preedit-text"
         | "x-display-list"
+        | "x-get-clipboard"
+        | "x-hide-tip"
         | "x-mouse-absolute-pixel-position"
         | "redraw-display"
         | "frame-list"
         | "x-uses-old-gtk-dialog"
+        | "x-win-suspend-error"
         | "selected-window"
         | "active-minibuffer-window"
         | "minibuffer-selected-window" => arity_cons(0, Some(0)),
@@ -1413,6 +1426,8 @@ mod tests {
         assert_subr_arity("resume-tty", 0, Some(1));
         assert_subr_arity("terminal-coding-system", 0, Some(1));
         assert_subr_arity("x-backspace-delete-keys-p", 0, Some(1));
+        assert_subr_arity("x-clear-preedit-text", 0, Some(0));
+        assert_subr_arity("x-device-class", 1, Some(1));
         assert_subr_arity("x-export-frames", 0, Some(2));
         assert_subr_arity("x-display-list", 0, Some(0));
         assert_subr_arity("x-family-fonts", 0, Some(2));
@@ -1422,11 +1437,17 @@ mod tests {
         assert_subr_arity("x-frame-list-z-order", 0, Some(1));
         assert_subr_arity("x-frame-restack", 2, Some(3));
         assert_subr_arity("x-get-atom-name", 1, Some(2));
+        assert_subr_arity("x-get-clipboard", 0, Some(0));
+        assert_subr_arity("x-get-input-coding-system", 1, Some(1));
+        assert_subr_arity("x-get-modifier-masks", 0, Some(1));
+        assert_subr_arity("x-hide-tip", 0, Some(0));
+        assert_subr_arity("x-internal-focus-input-context", 1, Some(1));
         assert_subr_arity("x-mouse-absolute-pixel-position", 0, Some(0));
         assert_subr_arity("x-get-resource", 2, Some(4));
         assert_subr_arity("x-list-fonts", 1, Some(5));
         assert_subr_arity("x-open-connection", 1, Some(3));
         assert_subr_arity("x-parse-geometry", 1, Some(1));
+        assert_subr_arity("x-preedit-text", 1, Some(1));
         assert_subr_arity("x-popup-dialog", 2, Some(3));
         assert_subr_arity("x-popup-menu", 2, Some(2));
         assert_subr_arity("x-register-dnd-atom", 1, Some(2));
@@ -1438,6 +1459,7 @@ mod tests {
         assert_subr_arity("x-server-input-extension-version", 0, Some(1));
         assert_subr_arity("x-server-max-request-size", 0, Some(1));
         assert_subr_arity("x-server-vendor", 0, Some(1));
+        assert_subr_arity("x-setup-function-keys", 1, Some(1));
         assert_subr_arity("x-display-grayscale-p", 0, Some(1));
         assert_subr_arity("x-display-backing-store", 0, Some(1));
         assert_subr_arity("x-display-color-cells", 0, Some(1));
@@ -1455,8 +1477,10 @@ mod tests {
         assert_subr_arity("x-synchronize", 1, Some(2));
         assert_subr_arity("x-translate-coordinates", 1, Some(6));
         assert_subr_arity("x-uses-old-gtk-dialog", 0, Some(0));
+        assert_subr_arity("x-win-suspend-error", 0, Some(0));
         assert_subr_arity("x-window-property", 1, Some(6));
         assert_subr_arity("x-window-property-attributes", 1, Some(3));
+        assert_subr_arity("x-wm-set-size-hint", 0, Some(1));
     }
 
     #[test]

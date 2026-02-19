@@ -450,6 +450,7 @@ fn builtin_command_name(name: &str) -> bool {
             | "word-search-backward"
             | "word-search-forward"
             | "write-region"
+            | "x-preedit-text"
             | "yank-rectangle"
     )
 }
@@ -3298,6 +3299,7 @@ mod tests {
             "setenv",
             "top-level",
             "write-region",
+            "x-preedit-text",
             "yank-rectangle",
         ] {
             let result = builtin_commandp_interactive(&mut ev, vec![Value::symbol(name)])
