@@ -61,11 +61,33 @@ fn expect_int(value: &Value) -> Result<i64, Flow> {
     }
 }
 
-/// Extract an integer-or-marker argument as i64.
-fn expect_integer_or_marker(value: &Value) -> Result<i64, Flow> {
+#[derive(Clone, Debug)]
+enum IntegerOrMarkerArg {
+    Int(i64),
+    Marker {
+        raw: Value,
+        position: Option<i64>,
+    },
+}
+
+fn parse_integer_or_marker_arg(value: &Value) -> Result<IntegerOrMarkerArg, Flow> {
     match value {
-        Value::Int(n) => Ok(*n),
-        Value::Char(c) => Ok(*c as i64),
+        Value::Int(n) => Ok(IntegerOrMarkerArg::Int(*n)),
+        Value::Char(c) => Ok(IntegerOrMarkerArg::Int(*c as i64)),
+        v if super::marker::is_marker(v) => {
+            let position = match v {
+                Value::Vector(vec) => {
+                    let elems = vec.lock().expect("poisoned");
+                    match elems.get(2) {
+                        Some(Value::Int(n)) => Some(*n),
+                        Some(Value::Char(c)) => Some(*c as i64),
+                        _ => None,
+                    }
+                }
+                _ => None,
+            };
+            Ok(IntegerOrMarkerArg::Marker { raw: value.clone(), position })
+        }
         other => Err(signal(
             "wrong-type-argument",
             vec![Value::symbol("integer-or-marker-p"), other.clone()],
@@ -1071,21 +1093,42 @@ pub(crate) fn builtin_set_window_start(
     expect_min_args("set-window-start", &args, 2)?;
     expect_max_args("set-window-start", &args, 3)?;
     let (fid, wid) = resolve_window_id(eval, args.first())?;
-    let pos = expect_int(&args[1])? as usize;
-    if let Some(frame) = eval.frames.get_mut(fid) {
-        if frame.minibuffer_window == Some(wid) {
-            if let Some(Window::Leaf { window_start, .. }) = frame.find_window(wid) {
-                return Ok(Value::Int(*window_start as i64));
+    let pos = parse_integer_or_marker_arg(&args[1])?;
+    let is_minibuffer = eval
+        .frames
+        .get(fid)
+        .is_some_and(|frame| frame.minibuffer_window == Some(wid));
+    match pos {
+        IntegerOrMarkerArg::Int(pos) => {
+            if !is_minibuffer {
+                if let Some(Window::Leaf { window_start, .. }) = eval
+                    .frames
+                    .get_mut(fid)
+                    .and_then(|frame| frame.find_window_mut(wid))
+                {
+                    *window_start = pos as usize;
+                }
             }
-            return Ok(Value::Int(1));
+            Ok(Value::Int(pos))
+        }
+        IntegerOrMarkerArg::Marker {
+            raw,
+            position,
+        } => {
+            if !is_minibuffer {
+                if let Some(pos) = position {
+                    if let Some(Window::Leaf { window_start, .. }) = eval
+                        .frames
+                        .get_mut(fid)
+                        .and_then(|frame| frame.find_window_mut(wid))
+                    {
+                        *window_start = pos as usize;
+                    }
+                }
+            }
+            Ok(raw)
         }
     }
-    if let Some(w) = eval.frames.get_mut(fid).and_then(|f| f.find_window_mut(wid)) {
-        if let Window::Leaf { window_start, .. } = w {
-            *window_start = pos;
-        }
-    }
-    Ok(Value::Int(pos as i64))
 }
 
 /// `(set-window-group-start WINDOW POS &optional NOFORCE)` -> POS.
@@ -1095,9 +1138,50 @@ pub(crate) fn builtin_set_window_group_start(
 ) -> EvalResult {
     expect_min_args("set-window-group-start", &args, 2)?;
     expect_max_args("set-window-group-start", &args, 3)?;
-    let (_fid, _wid) = resolve_window_id(eval, args.first())?;
-    let pos = expect_integer_or_marker(&args[1])?;
-    Ok(Value::Int(pos))
+    let (fid, wid) = resolve_window_id(eval, args.first())?;
+    let pos = parse_integer_or_marker_arg(&args[1])?;
+    let is_minibuffer = eval
+        .frames
+        .get(fid)
+        .is_some_and(|frame| frame.minibuffer_window == Some(wid));
+    match pos {
+        IntegerOrMarkerArg::Int(pos) => {
+            if !is_minibuffer {
+                if let Some(Window::Leaf {
+                    window_start, point, ..
+                }) = eval
+                    .frames
+                    .get_mut(fid)
+                    .and_then(|frame| frame.find_window_mut(wid))
+                {
+                    *window_start = pos as usize;
+                    *point = pos as usize;
+                }
+            }
+            Ok(Value::Int(pos))
+        }
+        IntegerOrMarkerArg::Marker {
+            raw,
+            position,
+        } => {
+            if !is_minibuffer {
+                if let Some(pos) = position {
+                    if let Some(Window::Leaf {
+                        window_start, point, ..
+                    }) = eval
+                        .frames
+                        .get_mut(fid)
+                        .and_then(|frame| frame.find_window_mut(wid))
+                    {
+                        let n = pos as usize;
+                        *window_start = n;
+                        *point = n;
+                    }
+                }
+            }
+            Ok(raw)
+        }
+    }
 }
 
 /// `(set-window-point WINDOW POS)` -> POS.
@@ -1107,21 +1191,44 @@ pub(crate) fn builtin_set_window_point(
 ) -> EvalResult {
     expect_args("set-window-point", &args, 2)?;
     let (fid, wid) = resolve_window_id(eval, args.first())?;
-    let pos = expect_int(&args[1])? as usize;
-    if let Some(frame) = eval.frames.get_mut(fid) {
-        if frame.minibuffer_window == Some(wid) {
-            if let Some(Window::Leaf { point, .. }) = frame.find_window(wid) {
-                return Ok(Value::Int(*point as i64));
+    let pos = parse_integer_or_marker_arg(&args[1])?;
+    let is_minibuffer = eval
+        .frames
+        .get(fid)
+        .is_some_and(|frame| frame.minibuffer_window == Some(wid));
+    match pos {
+        IntegerOrMarkerArg::Int(pos) => {
+            if !is_minibuffer {
+                if let Some(Window::Leaf { point, .. }) = eval
+                    .frames
+                    .get_mut(fid)
+                    .and_then(|frame| frame.find_window_mut(wid))
+                {
+                    *point = pos as usize;
+                }
             }
-            return Ok(Value::Int(1));
+            Ok(Value::Int(pos))
+        }
+        IntegerOrMarkerArg::Marker {
+            raw,
+            position,
+        } => {
+            if is_minibuffer {
+                return Ok(raw);
+            }
+            let pos = position.ok_or_else(|| {
+                signal("error", vec![Value::string("Marker does not point anywhere")])
+            })?;
+            if let Some(Window::Leaf { point, .. }) = eval
+                .frames
+                .get_mut(fid)
+                .and_then(|frame| frame.find_window_mut(wid))
+            {
+                *point = pos as usize;
+            }
+            Ok(Value::Int(pos))
         }
     }
-    if let Some(w) = eval.frames.get_mut(fid).and_then(|f| f.find_window_mut(wid)) {
-        if let Window::Leaf { point, .. } = w {
-            *point = pos;
-        }
-    }
-    Ok(Value::Int(pos as i64))
 }
 
 /// `(window-height &optional WINDOW)` -> integer (lines).
@@ -3048,6 +3155,68 @@ mod tests {
         );
         assert_eq!(results[0], "OK 10");
         assert_eq!(results[1], "OK 10");
+    }
+
+    #[test]
+    fn set_window_start_point_and_group_start_accept_marker_positions() {
+        let forms = parse_forms(
+            "(let* ((w (selected-window))
+                    (m (with-current-buffer (window-buffer w)
+                         (erase-buffer)
+                         (insert \"abcdef\")
+                         (goto-char 3)
+                         (point-marker))))
+               (list (markerp (set-window-start w m))
+                     (window-start w)
+                     (set-window-point w m)
+                     (window-point w)
+                     (markerp (set-window-group-start w m))
+                     (window-start w)
+                     (window-point w)))
+             (let* ((w (selected-window))
+                    (_ (progn
+                         (set-window-start w 7)
+                         (set-window-point w 7)))
+                    (m (with-current-buffer (get-buffer-create \" *neovm-marker-other*\")
+                         (erase-buffer)
+                         (insert \"xyz\")
+                         (goto-char 2)
+                         (point-marker))))
+               (list (markerp (set-window-start w m))
+                     (window-start w)
+                     (set-window-point w m)
+                     (window-point w)
+                     (markerp (set-window-group-start w m))
+                     (window-start w)
+                     (window-point w)))
+             (let ((m (make-marker)))
+               (list (condition-case err (set-window-start (selected-window) m) (error err))
+                     (condition-case err (set-window-point (selected-window) m) (error err))
+                     (condition-case err (set-window-group-start (selected-window) m) (error err))))
+             (list (condition-case err (set-window-start nil 1.5) (error err))
+                   (condition-case err (set-window-point nil 1.5) (error err))
+                   (condition-case err (set-window-group-start nil 1.5) (error err))
+                   (condition-case err (set-window-start nil 'foo) (error err))
+                   (condition-case err (set-window-point nil 'foo) (error err))
+                   (condition-case err (set-window-group-start nil 'foo) (error err)))",
+        )
+        .expect("parse");
+        let mut ev = Evaluator::new();
+        let out = ev
+            .eval_forms(&forms)
+            .iter()
+            .map(format_eval_result)
+            .collect::<Vec<_>>();
+        assert_eq!(out[0], "OK (t 3 3 3 t 3 3)");
+        assert_eq!(out[1], "OK (t 2 2 2 t 2 2)");
+        assert_eq!(
+            out[2],
+            "OK ([:marker nil nil nil] (error \"Marker does not point anywhere\") [:marker nil nil nil])"
+        );
+        assert_eq!(
+            out[3],
+            "OK ((wrong-type-argument integer-or-marker-p 1.5) (wrong-type-argument integer-or-marker-p 1.5) (wrong-type-argument integer-or-marker-p 1.5) (wrong-type-argument integer-or-marker-p foo) (wrong-type-argument integer-or-marker-p foo) (wrong-type-argument integer-or-marker-p foo))"
+        );
     }
 
     #[test]

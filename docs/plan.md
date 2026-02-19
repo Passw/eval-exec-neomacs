@@ -371,6 +371,35 @@ Last updated: 2026-02-19
     - `make -C test/neovm/vm-compat check-one-neovm CASE=cases/window-old-state-semantics` (pass)
     - `make -C test/neovm/vm-compat check-all-neovm-strict` (pass)
 
+- Completed window start/point marker setter parity slice and added oracle lock-ins:
+  - runtime changes:
+    - `rust/neovm-core/src/elisp/window_cmds.rs`
+      - aligned marker handling for:
+        - `set-window-start`
+        - `set-window-point`
+        - `set-window-group-start`
+      - matched batch GNU Emacs semantics:
+        - accepts `integer-or-marker-p` payloads for all three setters.
+        - signals `(wrong-type-argument integer-or-marker-p VALUE)` for non-integer/non-marker payloads.
+        - on non-minibuffer windows, marker positions are applied regardless of marker buffer affinity.
+        - marker without position:
+          - `set-window-start`/`set-window-group-start` return marker unchanged.
+          - `set-window-point` signals `(error "Marker does not point anywhere")`.
+      - updated evaluator unit coverage:
+        - `set_window_start_point_and_group_start_accept_marker_positions`
+  - corpus changes:
+    - added:
+      - `test/neovm/vm-compat/cases/window-set-start-point-marker-semantics.{forms,expected.tsv}`
+    - wired new case into:
+      - `test/neovm/vm-compat/cases/default.list`
+  - verified:
+    - `cargo test --manifest-path rust/neovm-core/Cargo.toml set_window_start_point_and_group_start_accept_marker_positions` (pass)
+    - `cargo test --manifest-path rust/neovm-core/Cargo.toml subr_arity_window_frame_primitives_match_oracle` (pass)
+    - `make -C test/neovm/vm-compat record FORMS=cases/window-set-start-point-marker-semantics.forms EXPECTED=cases/window-set-start-point-marker-semantics.expected.tsv` (pass)
+    - `make -C test/neovm/vm-compat check-one-neovm CASE=cases/window-set-start-point-marker-semantics` (pass)
+    - `make -C test/neovm/vm-compat check-one-neovm CASE=cases/window-group-prev-next-state-semantics` (pass)
+    - `make -C test/neovm/vm-compat check-one-neovm CASE=cases/window-designator-bootstrap-semantics` (pass)
+
 - Completed window old-state helper parity slice and added oracle lock-ins:
   - runtime changes:
     - `rust/neovm-core/src/elisp/window_cmds.rs`
