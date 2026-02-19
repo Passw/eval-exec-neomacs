@@ -4296,6 +4296,24 @@ Last updated: 2026-02-19
 
 ## Done
 
+- Aligned `describe-variable` startup-doc quote-style normalization for paired backticks with GNU Emacs:
+  - runtime changes:
+    - `rust/neovm-core/src/elisp/doc.rs`
+      - updated `startup_doc_quote_style_display` to treat backtick pairs as opening/closing display quotes instead of emitting opening quotes for both marks.
+      - preserved apostrophe normalization while resetting pending backtick state when a closing apostrophe appears.
+      - expanded evaluator lock-ins:
+        - `describe_variable_load_path_uses_c_source_text`
+        - `startup_doc_quote_style_display_handles_backtick_pairs`
+  - corpus changes:
+    - expanded and re-recorded:
+      - `test/neovm/vm-compat/cases/describe-variable-runtime-semantics.{forms,expected.tsv}`
+      - added lock-in asserting `‘C source code’.` is present and `‘C source code‘.` is absent in `describe-variable 'load-path` output.
+  - verified:
+    - `cargo test --manifest-path rust/neovm-core/Cargo.toml describe_variable_` (pass, 19/19)
+    - `cargo test --manifest-path rust/neovm-core/Cargo.toml startup_doc_quote_style_display_handles_backtick_pairs` (pass)
+    - `make -C test/neovm/vm-compat check-one-neovm CASE=cases/describe-variable-runtime-semantics` (pass, 23/23)
+    - `make -C test/neovm/vm-compat check-all-neovm-strict` (pass)
+
 - Aligned `describe-function` autoload type classification for non-`nil` non-`keymap` payloads:
   - runtime changes:
     - `rust/neovm-core/src/elisp/doc.rs`

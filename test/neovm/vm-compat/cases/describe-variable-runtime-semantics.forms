@@ -47,3 +47,7 @@
     (list
      (not (null (string-match-p "Doc from indirection." s)))
      (not (null (string-match-p "value is" s))))))
+(let ((s (describe-variable 'load-path t nil)))
+  (list
+   (not (null (string-match-p "‘C source code’\\." s)))
+   (null (string-match-p "‘C source code‘\\." s))))

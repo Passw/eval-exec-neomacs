@@ -10746,13 +10746,29 @@ fn startup_variable_doc_stub(sym: &str) -> Option<&'static str> {
 }
 
 fn startup_doc_quote_style_display(doc: &str) -> String {
-    doc.chars()
-        .map(|ch| match ch {
-            '`' => '\u{2018}',
-            '\'' => '\u{2019}',
-            _ => ch,
-        })
-        .collect()
+    let mut out = String::with_capacity(doc.len());
+    let mut backtick_open = false;
+    for ch in doc.chars() {
+        match ch {
+            '`' => {
+                if backtick_open {
+                    out.push('\u{2019}');
+                    backtick_open = false;
+                } else {
+                    out.push('\u{2018}');
+                    backtick_open = true;
+                }
+            }
+            '\'' => {
+                out.push('\u{2019}');
+                if backtick_open {
+                    backtick_open = false;
+                }
+            }
+            _ => out.push(ch),
+        }
+    }
+    out
 }
 
 fn startup_doc_quote_style_raw(doc: &str) -> String {
@@ -13246,9 +13262,23 @@ mod tests {
             .as_str()
             .expect("describe-variable load-path should return a string");
         assert!(text.contains("defined in"));
+        assert!(text.contains("‘C source code’."));
+        assert!(!text.contains("‘C source code‘."));
         assert!(text.contains("List of directories to search for files to load"));
         assert!(text.contains("‘default-directory’"));
         assert!(text.contains("value is"));
+    }
+
+    #[test]
+    fn startup_doc_quote_style_display_handles_backtick_pairs() {
+        assert_eq!(
+            startup_doc_quote_style_display("`C source code`."),
+            "‘C source code’."
+        );
+        assert_eq!(
+            startup_doc_quote_style_display("`default-directory'"),
+            "‘default-directory’"
+        );
     }
 
     #[test]
