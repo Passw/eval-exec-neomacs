@@ -920,15 +920,21 @@ fn subr_arity_value(name: &str) -> Value {
         | "window-body-edges"
         | "window-body-pixel-edges"
         | "window-frame"
+        | "window-fringes"
         | "window-header-line-height"
         | "window-dedicated-p"
+        | "window-hscroll"
+        | "window-left-column"
+        | "window-margins"
         | "window-minibuffer-p"
         | "window-mode-line-height"
         | "window-pixel-edges"
         | "window-pixel-height"
         | "window-pixel-width"
         | "window-point"
-        | "window-start" => arity_cons(0, Some(1)),
+        | "window-scroll-bars"
+        | "window-start"
+        | "window-top-line" => arity_cons(0, Some(1)),
         "terminal-list" | "x-display-list" | "redraw-display" | "frame-list"
         | "selected-window"
         | "active-minibuffer-window"
@@ -2386,7 +2392,11 @@ mod tests {
         assert_subr_arity("set-window-point", 2, Some(2));
         assert_subr_arity("set-window-start", 2, Some(3));
         assert_subr_arity("window-frame", 0, Some(1));
+        assert_subr_arity("window-fringes", 0, Some(1));
         assert_subr_arity("window-header-line-height", 0, Some(1));
+        assert_subr_arity("window-hscroll", 0, Some(1));
+        assert_subr_arity("window-left-column", 0, Some(1));
+        assert_subr_arity("window-margins", 0, Some(1));
         assert_subr_arity("window-mode-line-height", 0, Some(1));
         assert_subr_arity("window-pixel-height", 0, Some(1));
         assert_subr_arity("window-pixel-width", 0, Some(1));
@@ -2403,10 +2413,12 @@ mod tests {
         assert_subr_arity("window-end", 0, Some(2));
         assert_subr_arity("window-list", 0, Some(3));
         assert_subr_arity("window-live-p", 1, Some(1));
+        assert_subr_arity("window-scroll-bars", 0, Some(1));
         assert_subr_arity("window-valid-p", 1, Some(1));
         assert_subr_arity("window-minibuffer-p", 0, Some(1));
         assert_subr_arity("window-point", 0, Some(1));
         assert_subr_arity("window-start", 0, Some(1));
+        assert_subr_arity("window-top-line", 0, Some(1));
         assert_subr_arity("window-text-pixel-size", 0, Some(7));
         assert_subr_arity("windowp", 1, Some(1));
         assert_subr_arity("get-buffer-window", 0, Some(2));

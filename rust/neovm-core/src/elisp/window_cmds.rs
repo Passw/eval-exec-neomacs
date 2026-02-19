@@ -682,6 +682,120 @@ pub(crate) fn builtin_window_width(
     Ok(Value::Int(window_width_cols(w, cw)))
 }
 
+/// `(window-left-column &optional WINDOW)` -> integer.
+pub(crate) fn builtin_window_left_column(
+    eval: &mut super::eval::Evaluator,
+    args: Vec<Value>,
+) -> EvalResult {
+    expect_max_args("window-left-column", &args, 1)?;
+    let _ = ensure_selected_frame_id(eval);
+    let (fid, wid) = resolve_window_id_with_pred(eval, args.first(), "window-valid-p")?;
+    let w = get_leaf(&eval.frames, fid, wid)?;
+    let cw = eval.frames.get(fid).map(|f| f.char_width).unwrap_or(8.0);
+    let left = if cw > 0.0 {
+        (w.bounds().x / cw) as i64
+    } else {
+        0
+    };
+    Ok(Value::Int(left))
+}
+
+/// `(window-top-line &optional WINDOW)` -> integer.
+pub(crate) fn builtin_window_top_line(
+    eval: &mut super::eval::Evaluator,
+    args: Vec<Value>,
+) -> EvalResult {
+    expect_max_args("window-top-line", &args, 1)?;
+    let _ = ensure_selected_frame_id(eval);
+    let (fid, wid) = resolve_window_id_with_pred(eval, args.first(), "window-valid-p")?;
+    let w = get_leaf(&eval.frames, fid, wid)?;
+    let ch = eval.frames.get(fid).map(|f| f.char_height).unwrap_or(16.0);
+    let top = if ch > 0.0 {
+        (w.bounds().y / ch) as i64
+    } else {
+        0
+    };
+    Ok(Value::Int(top))
+}
+
+/// `(window-hscroll &optional WINDOW)` -> integer.
+pub(crate) fn builtin_window_hscroll(
+    eval: &mut super::eval::Evaluator,
+    args: Vec<Value>,
+) -> EvalResult {
+    expect_max_args("window-hscroll", &args, 1)?;
+    let _ = ensure_selected_frame_id(eval);
+    let (fid, wid) = resolve_window_id(eval, args.first())?;
+    let w = get_leaf(&eval.frames, fid, wid)?;
+    match w {
+        Window::Leaf { hscroll, .. } => Ok(Value::Int(*hscroll as i64)),
+        _ => Ok(Value::Int(0)),
+    }
+}
+
+/// `(window-margins &optional WINDOW)` -> margins pair or nil.
+pub(crate) fn builtin_window_margins(
+    eval: &mut super::eval::Evaluator,
+    args: Vec<Value>,
+) -> EvalResult {
+    expect_max_args("window-margins", &args, 1)?;
+    let _ = ensure_selected_frame_id(eval);
+    let (fid, wid) = resolve_window_id(eval, args.first())?;
+    let w = get_leaf(&eval.frames, fid, wid)?;
+    let (left, right) = match w {
+        Window::Leaf { margins, .. } => *margins,
+        _ => (0, 0),
+    };
+    let left_v = if left == 0 {
+        Value::Nil
+    } else {
+        Value::Int(left as i64)
+    };
+    let right_v = if right == 0 {
+        Value::Nil
+    } else {
+        Value::Int(right as i64)
+    };
+    Ok(Value::cons(left_v, right_v))
+}
+
+/// `(window-fringes &optional WINDOW)` -> fringe tuple.
+pub(crate) fn builtin_window_fringes(
+    eval: &mut super::eval::Evaluator,
+    args: Vec<Value>,
+) -> EvalResult {
+    expect_max_args("window-fringes", &args, 1)?;
+    let _ = ensure_selected_frame_id(eval);
+    let (_fid, _wid) = resolve_window_id(eval, args.first())?;
+    // Batch GNU Emacs startup reports zero-width fringes.
+    Ok(Value::list(vec![
+        Value::Int(0),
+        Value::Int(0),
+        Value::Nil,
+        Value::Nil,
+    ]))
+}
+
+/// `(window-scroll-bars &optional WINDOW)` -> scroll-bar tuple.
+pub(crate) fn builtin_window_scroll_bars(
+    eval: &mut super::eval::Evaluator,
+    args: Vec<Value>,
+) -> EvalResult {
+    expect_max_args("window-scroll-bars", &args, 1)?;
+    let _ = ensure_selected_frame_id(eval);
+    let (_fid, _wid) = resolve_window_id(eval, args.first())?;
+    // Batch GNU Emacs startup reports no scroll-bars with default sizing payload.
+    Ok(Value::list(vec![
+        Value::Nil,
+        Value::Int(0),
+        Value::True,
+        Value::Nil,
+        Value::Int(0),
+        Value::True,
+        Value::Nil,
+    ]))
+}
+
 /// `(window-mode-line-height &optional WINDOW)` -> integer.
 pub(crate) fn builtin_window_mode_line_height(
     eval: &mut super::eval::Evaluator,
@@ -2845,6 +2959,53 @@ mod tests {
         assert_eq!(out[9], "OK (wrong-type-argument window-live-p 999999)");
         assert_eq!(out[10], "OK (wrong-type-argument window-valid-p 999999)");
         assert_eq!(out[11], "OK (wrong-type-argument window-valid-p 999999)");
+    }
+
+    #[test]
+    fn window_geometry_helper_queries_match_batch_defaults_and_error_predicates() {
+        let forms = parse_forms(
+            "(let* ((w (selected-window))
+                    (m (car (last (window-list nil t)))))
+               (list (window-left-column w)
+                     (window-left-column m)
+                     (window-top-line w)
+                     (window-top-line m)
+                     (window-hscroll w)
+                     (window-hscroll m)
+                     (window-margins w)
+                     (window-margins m)
+                     (window-fringes w)
+                     (window-fringes m)
+                     (window-scroll-bars w)
+                     (window-scroll-bars m)))
+             (list (condition-case err (window-left-column 999999) (error err))
+                   (condition-case err (window-top-line 999999) (error err))
+                   (condition-case err (window-hscroll 999999) (error err))
+                   (condition-case err (window-margins 999999) (error err))
+                   (condition-case err (window-fringes 999999) (error err))
+                   (condition-case err (window-scroll-bars 999999) (error err))
+                   (condition-case err (window-left-column nil nil) (error err))
+                   (condition-case err (window-top-line nil nil) (error err))
+                   (condition-case err (window-hscroll nil nil) (error err))
+                   (condition-case err (window-margins nil nil) (error err))
+                   (condition-case err (window-fringes nil nil) (error err))
+                   (condition-case err (window-scroll-bars nil nil) (error err)))",
+        )
+        .expect("parse");
+        let mut ev = Evaluator::new();
+        let out = ev
+            .eval_forms(&forms)
+            .iter()
+            .map(format_eval_result)
+            .collect::<Vec<_>>();
+        assert_eq!(
+            out[0],
+            "OK (0 0 0 24 0 0 (nil) (nil) (0 0 nil nil) (0 0 nil nil) (nil 0 t nil 0 t nil) (nil 0 t nil 0 t nil))"
+        );
+        assert_eq!(
+            out[1],
+            "OK ((wrong-type-argument window-valid-p 999999) (wrong-type-argument window-valid-p 999999) (wrong-type-argument window-live-p 999999) (wrong-type-argument window-live-p 999999) (wrong-type-argument window-live-p 999999) (wrong-type-argument window-live-p 999999) (wrong-number-of-arguments window-left-column 2) (wrong-number-of-arguments window-top-line 2) (wrong-number-of-arguments window-hscroll 2) (wrong-number-of-arguments window-margins 2) (wrong-number-of-arguments window-fringes 2) (wrong-number-of-arguments window-scroll-bars 2))"
+        );
     }
 
     #[test]
