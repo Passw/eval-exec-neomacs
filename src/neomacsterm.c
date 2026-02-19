@@ -4503,7 +4503,8 @@ neomacs_layout_overlay_strings_at (void *buffer_ptr, void *window_ptr,
 
               /* Extract per-character face runs from before-string text
                  properties.  Face runs are stored after the string text in
-                 before_buf, 10 bytes each: u16 byte_offset + u32 fg + u32 bg. */
+                 before_buf, 10 bytes each: u16 byte_offset + u32 fg + u32 bg.
+                 Bit 31 of bg encodes :extend (1=extends to end of line). */
               if (SCHARS (bstr) > 0
                   && string_intervals (bstr)
                   && f && copy > 0
@@ -4541,6 +4542,8 @@ neomacs_layout_overlay_strings_at (void *buffer_ptr, void *window_ptr,
                           bg = ((RED_FROM_ULONG (c) << 16)
                                 | (GREEN_FROM_ULONG (c) << 8)
                                 | BLUE_FROM_ULONG (c));
+                          if (FACE_EXTENSIBLE_P (rf))
+                            bg |= 0x80000000u;
                         }
 
                       if (fg != prev_fg || bg != prev_bg)
@@ -4681,7 +4684,8 @@ neomacs_layout_overlay_strings_at (void *buffer_ptr, void *window_ptr,
 
               /* Extract per-character face runs from after-string text
                  properties.  Face runs are stored after the string text in
-                 after_buf, 10 bytes each: u16 byte_offset + u32 fg + u32 bg. */
+                 after_buf, 10 bytes each: u16 byte_offset + u32 fg + u32 bg.
+                 Bit 31 of bg encodes :extend (1=extends to end of line). */
               if (SCHARS (astr) > 0
                   && string_intervals (astr)
                   && f && copy > 0
@@ -4719,6 +4723,8 @@ neomacs_layout_overlay_strings_at (void *buffer_ptr, void *window_ptr,
                           bg = ((RED_FROM_ULONG (c) << 16)
                                 | (GREEN_FROM_ULONG (c) << 8)
                                 | BLUE_FROM_ULONG (c));
+                          if (FACE_EXTENSIBLE_P (rf))
+                            bg |= 0x80000000u;
                         }
 
                       if (fg != prev_fg || bg != prev_bg)

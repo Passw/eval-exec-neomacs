@@ -904,6 +904,12 @@ impl LayoutEngine {
         let mut box_start_x: f32 = 0.0;
         let mut box_row: i32 = 0;
 
+        // Track the last face with :extend on the current row.
+        // Used to fill end-of-line even when the newline itself lacks :extend.
+        // (Matches upstream Emacs extend_face_to_end_of_line behavior.)
+        let mut row_extend_bg: Option<(Color, u32)> = None; // (bg_color, face_id)
+        let mut row_extend_row: i32 = -1; // which row the extend bg belongs to
+
         // Pixel Y limit: stop rendering when rows exceed the text area,
         // which can happen with variable-height faces pushing rows down.
         let text_y_limit = text_y + text_height;
@@ -1364,6 +1370,11 @@ impl LayoutEngine {
                                 face_fg = Color::from_pixel(self.face_data.fg);
                                 face_bg = Color::from_pixel(self.face_data.bg);
                                 self.apply_face(&self.face_data, frame, frame_glyphs);
+                                // Track last face with :extend on this row
+                                if self.face_data.extend != 0 {
+                                    row_extend_bg = Some((face_bg, self.face_data.face_id));
+                                    row_extend_row = row as i32;
+                                }
                             }
                             next_face_check = if next_check > charpos { next_check } else { charpos + 1 };
                         }
@@ -1969,6 +1980,12 @@ impl LayoutEngine {
 
                         self.apply_face(&self.face_data, frame, frame_glyphs);
 
+                        // Track last face with :extend on this row
+                        if self.face_data.extend != 0 {
+                            row_extend_bg = Some((face_bg, self.face_data.face_id));
+                            row_extend_row = row as i32;
+                        }
+
                         // Debug: check all face properties
                         if charpos < window_start + 5 {
                             log::debug!("face: id={} fg=0x{:06X} bg=0x{:06X} underline_style={} underline_color=0x{:06X} strike_through={} strike_color=0x{:06X} overline={} overline_color=0x{:06X} box_type={} box_color=0x{:06X} box_lw={}",
@@ -2074,17 +2091,25 @@ impl LayoutEngine {
                     trailing_ws_start_col = -1;
 
                     // Fill rest of line with stretch.
-                    // Use face bg if :extend is set, default bg otherwise.
+                    // Use face bg if :extend is set; fall back to row_extend_bg
+                    // (last face with :extend on this row) for cases where the
+                    // newline itself lacks :extend but earlier text had it
+                    // (e.g., completion overlays that don't cover the newline).
                     let remaining = avail_width - x_offset;
                     if remaining > 0.0 {
                         let gx = content_x + x_offset;
                         let gy = row_y[row as usize];
-                        let fill_bg = if self.face_data.extend != 0 { face_bg } else { default_bg };
-                        let fill_face = if self.face_data.extend != 0 { self.face_data.face_id } else { 0 };
-                        if self.face_data.extend != 0 {
-                            Self::add_stretch_for_face(&self.face_data, frame_glyphs, gx, gy, remaining, char_h, fill_bg, fill_face, false);
+                        let (fill_bg, fill_face) = if self.face_data.extend != 0 {
+                            (face_bg, self.face_data.face_id)
+                        } else if let Some((ext_bg, ext_face)) = row_extend_bg.filter(|_| row_extend_row == row as i32) {
+                            (ext_bg, ext_face)
                         } else {
+                            (default_bg, 0)
+                        };
+                        if fill_face != 0 {
                             frame_glyphs.add_stretch(gx, gy, remaining, char_h, fill_bg, fill_face, false);
+                        } else {
+                            frame_glyphs.add_stretch(gx, gy, remaining, char_h, fill_bg, 0, false);
                         }
                     }
 
@@ -2929,6 +2954,8 @@ impl LayoutEngine {
                 let astr = &overlay_after_buf[..overlay_after_len as usize];
                 let mut ai = 0usize;
                 let mut acurrent_run = 0usize;
+                // Track extend bg across the current row for end-of-line fill
+                let mut arow_extend_bg: Option<Color> = None;
                 while ai < astr.len() && row < max_rows {
                     // Check for align-to entry at this byte offset
                     if acurrent_align < after_align_entries.len()
@@ -2952,8 +2979,12 @@ impl LayoutEngine {
                         continue;
                     }
 
-                    // Apply face run if needed
+                    // Apply face run if needed; track :extend for end-of-line fill
                     if after_has_runs && acurrent_run < after_face_runs.len() {
+                        // Check if this byte's face run has :extend before applying
+                        if let Some((ext_bg, true)) = overlay_run_bg_extend_at(&after_face_runs, ai) {
+                            arow_extend_bg = Some(ext_bg);
+                        }
                         acurrent_run = apply_overlay_face_run(
                             &after_face_runs, ai, acurrent_run, frame_glyphs,
                         );
@@ -2962,6 +2993,16 @@ impl LayoutEngine {
                     let (ach, alen) = decode_utf8(&astr[ai..]);
                     ai += alen;
                     if ach == '\n' {
+                        // Fill rest of line if any face on this row had :extend
+                        let remaining = avail_width - x_offset;
+                        if remaining > 0.0 {
+                            if let Some(ext_bg) = arow_extend_bg {
+                                let gx = content_x + x_offset;
+                                let gy = row_y[row as usize];
+                                frame_glyphs.add_stretch(gx, gy, remaining, char_h, ext_bg, 0, false);
+                            }
+                        }
+                        arow_extend_bg = None; // reset for next row
                         reorder_row_bidi(frame_glyphs, row_glyph_start, frame_glyphs.glyphs.len(), content_x);
                         col = 0;
                         x_offset = 0.0;
@@ -3243,6 +3284,7 @@ impl LayoutEngine {
                 let astr = &overlay_after_buf[..overlay_after_len as usize];
                 let mut ai = 0usize;
                 let mut acurrent_run = 0usize;
+                let mut eob_arow_extend_bg: Option<Color> = None;
                 while ai < astr.len() && row < max_rows {
                     // Check for align-to entry at this byte offset
                     if eob_acurrent_align < eob_after_align_entries.len()
@@ -3265,6 +3307,9 @@ impl LayoutEngine {
                     }
 
                     if eob_after_has_runs && acurrent_run < eob_after_face_runs.len() {
+                        if let Some((ext_bg, true)) = overlay_run_bg_extend_at(&eob_after_face_runs, ai) {
+                            eob_arow_extend_bg = Some(ext_bg);
+                        }
                         acurrent_run = apply_overlay_face_run(
                             &eob_after_face_runs, ai, acurrent_run, frame_glyphs,
                         );
@@ -3273,6 +3318,16 @@ impl LayoutEngine {
                     let (ach, alen) = decode_utf8(&astr[ai..]);
                     ai += alen;
                     if ach == '\n' {
+                        // Fill rest of line if any face on this row had :extend
+                        let remaining = avail_width - x_offset;
+                        if remaining > 0.0 {
+                            if let Some(ext_bg) = eob_arow_extend_bg {
+                                let gx = content_x + x_offset;
+                                let gy = row_y[row as usize];
+                                frame_glyphs.add_stretch(gx, gy, remaining, char_h, ext_bg, 0, false);
+                            }
+                        }
+                        eob_arow_extend_bg = None;
                         reorder_row_bidi(frame_glyphs, row_glyph_start, frame_glyphs.glyphs.len(), content_x);
                         col = 0;
                         x_offset = 0.0;
@@ -3333,13 +3388,14 @@ impl LayoutEngine {
             if remaining > 0.0 {
                 let gx = content_x + x_offset;
                 let gy = row_y[row as usize];
-                let fill_bg = if self.face_data.extend != 0 { face_bg } else { default_bg };
-                let fill_face = if self.face_data.extend != 0 { self.face_data.face_id } else { 0 };
-                if self.face_data.extend != 0 {
-                    Self::add_stretch_for_face(&self.face_data, frame_glyphs, gx, gy, remaining, char_h, fill_bg, fill_face, false);
+                let (fill_bg, fill_face) = if self.face_data.extend != 0 {
+                    (face_bg, self.face_data.face_id)
+                } else if let Some((ext_bg, ext_face)) = row_extend_bg.filter(|_| row_extend_row == row as i32) {
+                    (ext_bg, ext_face)
                 } else {
-                    frame_glyphs.add_stretch(gx, gy, remaining, char_h, fill_bg, fill_face, false);
-                }
+                    (default_bg, 0)
+                };
+                frame_glyphs.add_stretch(gx, gy, remaining, char_h, fill_bg, fill_face, false);
             }
         }
 

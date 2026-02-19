@@ -22,10 +22,13 @@ pub(crate) struct OverlayFaceRun {
     pub byte_offset: u16,
     pub fg: u32,
     pub bg: u32,
+    /// Face has :extend attribute (bg extends to end of visual line)
+    pub extend: bool,
 }
 
 /// Parse face runs appended after text in a buffer.
 /// Runs are stored as 10-byte records: u16 byte_offset + u32 fg + u32 bg.
+/// Bit 31 of bg encodes the :extend flag (1 = extends to end of line).
 pub(crate) fn parse_overlay_face_runs(buf: &[u8], text_len: usize, nruns: i32) -> Vec<OverlayFaceRun> {
     let mut runs = Vec::with_capacity(nruns as usize);
     let runs_start = text_len;
@@ -34,8 +37,10 @@ pub(crate) fn parse_overlay_face_runs(buf: &[u8], text_len: usize, nruns: i32) -
         if off + 10 <= buf.len() {
             let byte_offset = u16::from_ne_bytes([buf[off], buf[off + 1]]);
             let fg = u32::from_ne_bytes([buf[off + 2], buf[off + 3], buf[off + 4], buf[off + 5]]);
-            let bg = u32::from_ne_bytes([buf[off + 6], buf[off + 7], buf[off + 8], buf[off + 9]]);
-            runs.push(OverlayFaceRun { byte_offset, fg, bg });
+            let raw_bg = u32::from_ne_bytes([buf[off + 6], buf[off + 7], buf[off + 8], buf[off + 9]]);
+            let extend = (raw_bg & 0x80000000) != 0;
+            let bg = raw_bg & 0x00FFFFFF;
+            runs.push(OverlayFaceRun { byte_offset, fg, bg, extend });
         }
     }
     runs
@@ -84,6 +89,26 @@ pub(crate) fn overlay_run_bg_at(
         Color::from_pixel(runs[cr].bg)
     } else {
         fallback
+    }
+}
+
+/// Get the background color and extend flag from the overlay face run at byte_idx.
+/// Returns (bg_color, extend) if a run covers byte_idx, otherwise None.
+pub(crate) fn overlay_run_bg_extend_at(
+    runs: &[OverlayFaceRun],
+    byte_idx: usize,
+) -> Option<(Color, bool)> {
+    if runs.is_empty() {
+        return None;
+    }
+    let mut cr = 0;
+    while cr + 1 < runs.len() && byte_idx >= runs[cr + 1].byte_offset as usize {
+        cr += 1;
+    }
+    if byte_idx >= runs[cr].byte_offset as usize && runs[cr].bg != 0 {
+        Some((Color::from_pixel(runs[cr].bg), runs[cr].extend))
+    } else {
+        None
     }
 }
 
@@ -499,10 +524,12 @@ mod tests {
             byte_offset: 0,
             fg: 0,
             bg: 0,
+            extend: false,
         };
         assert_eq!(run.byte_offset, 0);
         assert_eq!(run.fg, 0);
         assert_eq!(run.bg, 0);
+        assert_eq!(run.extend, false);
     }
 
     #[test]
@@ -511,10 +538,12 @@ mod tests {
             byte_offset: u16::MAX,
             fg: u32::MAX,
             bg: u32::MAX,
+            extend: true,
         };
         assert_eq!(run.byte_offset, u16::MAX);
         assert_eq!(run.fg, u32::MAX);
         assert_eq!(run.bg, u32::MAX);
+        assert_eq!(run.extend, true);
     }
 
     #[test]
@@ -524,10 +553,12 @@ mod tests {
             byte_offset: 42,
             fg: 0x00FFFFFF,
             bg: 0x00000000,
+            extend: false,
         };
         assert_eq!(run.byte_offset, 42);
         assert_eq!(run.fg, 0x00FFFFFF);
         assert_eq!(run.bg, 0x00000000);
+        assert_eq!(run.extend, false);
     }
 
     // ---------------------------------------------------------------
@@ -573,7 +604,8 @@ mod tests {
     fn parse_single_run_nonzero_offset() {
         let text = b"ABCDEF";
         let text_len = text.len(); // 6
-        let rec = make_run_bytes(3, 0xAABBCCDD, 0x11223344);
+        // Use 24-bit bg (realistic sRGB). Bit 31 = 0 → extend = false.
+        let rec = make_run_bytes(3, 0xAABBCCDD, 0x00223344);
 
         let mut buf = Vec::from(&text[..]);
         buf.extend_from_slice(&rec);
@@ -582,7 +614,8 @@ mod tests {
         assert_eq!(runs.len(), 1);
         assert_eq!(runs[0].byte_offset, 3);
         assert_eq!(runs[0].fg, 0xAABBCCDD);
-        assert_eq!(runs[0].bg, 0x11223344);
+        assert_eq!(runs[0].bg, 0x00223344);
+        assert_eq!(runs[0].extend, false);
     }
 
     // ---------------------------------------------------------------
@@ -676,13 +709,15 @@ mod tests {
     #[test]
     fn parse_zero_text_len() {
         // No text at all; runs start at offset 0 in the buffer.
+        // 0xCAFEBABE has bit 31 set → extend = true, bg = lower 24 bits.
         let rec = make_run_bytes(0, 0xDEADBEEF, 0xCAFEBABE);
         let buf = Vec::from(&rec[..]);
 
         let runs = parse_overlay_face_runs(&buf, 0, 1);
         assert_eq!(runs.len(), 1);
         assert_eq!(runs[0].fg, 0xDEADBEEF);
-        assert_eq!(runs[0].bg, 0xCAFEBABE);
+        assert_eq!(runs[0].bg, 0x00FEBABE); // lower 24 bits of 0xCAFEBABE
+        assert_eq!(runs[0].extend, true);   // bit 31 was set
     }
 
     // ---------------------------------------------------------------
@@ -706,14 +741,16 @@ mod tests {
     #[test]
     fn parse_verifies_native_endian_u32() {
         // Similarly for u32 fg/bg.
+        // Use 24-bit bg to avoid extend bit masking.
         let fg_expected: u32 = 0x01020304;
-        let bg_expected: u32 = 0x05060708;
+        let bg_expected: u32 = 0x00060708;
         let rec = make_run_bytes(0, fg_expected, bg_expected);
         let buf = Vec::from(&rec[..]);
 
         let runs = parse_overlay_face_runs(&buf, 0, 1);
         assert_eq!(runs[0].fg, fg_expected);
         assert_eq!(runs[0].bg, bg_expected);
+        assert_eq!(runs[0].extend, false);
     }
 
     // ---------------------------------------------------------------
@@ -757,7 +794,7 @@ mod tests {
     fn apply_overlay_single_run_before_offset() {
         // byte_idx < run.byte_offset  =>  no face change, cr unchanged.
         let runs = vec![
-            OverlayFaceRun { byte_offset: 5, fg: 0x00FF0000, bg: 0x00000000 },
+            OverlayFaceRun { byte_offset: 5, fg: 0x00FF0000, bg: 0x00000000, extend: false },
         ];
         let mut fgb = FrameGlyphBuffer::new();
 
@@ -773,7 +810,7 @@ mod tests {
     fn apply_overlay_single_run_at_offset() {
         // byte_idx == run.byte_offset  =>  face applied, cr stays 0.
         let runs = vec![
-            OverlayFaceRun { byte_offset: 5, fg: 0x00FF0000, bg: 0x0000FF00 },
+            OverlayFaceRun { byte_offset: 5, fg: 0x00FF0000, bg: 0x0000FF00, extend: false },
         ];
         let mut fgb = FrameGlyphBuffer::new();
 
@@ -784,7 +821,7 @@ mod tests {
     #[test]
     fn apply_overlay_single_run_past_offset() {
         let runs = vec![
-            OverlayFaceRun { byte_offset: 5, fg: 0x00FF0000, bg: 0x0000FF00 },
+            OverlayFaceRun { byte_offset: 5, fg: 0x00FF0000, bg: 0x0000FF00, extend: false },
         ];
         let mut fgb = FrameGlyphBuffer::new();
 
@@ -795,9 +832,9 @@ mod tests {
     #[test]
     fn apply_overlay_multiple_runs_advance() {
         let runs = vec![
-            OverlayFaceRun { byte_offset: 0, fg: 0x00FF0000, bg: 0x00000000 },
-            OverlayFaceRun { byte_offset: 5, fg: 0x0000FF00, bg: 0x00000000 },
-            OverlayFaceRun { byte_offset: 10, fg: 0x000000FF, bg: 0x00000000 },
+            OverlayFaceRun { byte_offset: 0, fg: 0x00FF0000, bg: 0x00000000, extend: false },
+            OverlayFaceRun { byte_offset: 5, fg: 0x0000FF00, bg: 0x00000000, extend: false },
+            OverlayFaceRun { byte_offset: 10, fg: 0x000000FF, bg: 0x00000000, extend: false },
         ];
         let mut fgb = FrameGlyphBuffer::new();
 
@@ -819,8 +856,8 @@ mod tests {
         // Test the pre-advance logic: if byte_idx + 1 >= next run's byte_offset,
         // cr is pre-advanced.
         let runs = vec![
-            OverlayFaceRun { byte_offset: 0, fg: 1, bg: 0 },
-            OverlayFaceRun { byte_offset: 5, fg: 2, bg: 0 },
+            OverlayFaceRun { byte_offset: 0, fg: 1, bg: 0, extend: false },
+            OverlayFaceRun { byte_offset: 5, fg: 2, bg: 0, extend: false },
         ];
         let mut fgb = FrameGlyphBuffer::new();
 
@@ -845,7 +882,7 @@ mod tests {
         // When both fg and bg are 0, set_face should NOT be called
         // (the early-return `if run.fg != 0 || run.bg != 0` skips it).
         let runs = vec![
-            OverlayFaceRun { byte_offset: 0, fg: 0, bg: 0 },
+            OverlayFaceRun { byte_offset: 0, fg: 0, bg: 0, extend: false },
         ];
         let mut fgb = FrameGlyphBuffer::new();
         // Record initial state by snapshotting via a glyph
@@ -864,7 +901,7 @@ mod tests {
     fn apply_overlay_fg_nonzero_bg_zero_still_applies() {
         // fg != 0 || bg != 0 is true when only fg is nonzero
         let runs = vec![
-            OverlayFaceRun { byte_offset: 0, fg: 0x00FF0000, bg: 0 },
+            OverlayFaceRun { byte_offset: 0, fg: 0x00FF0000, bg: 0, extend: false },
         ];
         let mut fgb = FrameGlyphBuffer::new();
         let (initial_fg, _) = snapshot_face(&mut fgb);
@@ -880,7 +917,7 @@ mod tests {
     fn apply_overlay_fg_zero_bg_nonzero_still_applies() {
         // fg != 0 || bg != 0 is true when only bg is nonzero
         let runs = vec![
-            OverlayFaceRun { byte_offset: 0, fg: 0, bg: 0x00FF0000 },
+            OverlayFaceRun { byte_offset: 0, fg: 0, bg: 0x00FF0000, extend: false },
         ];
         let mut fgb = FrameGlyphBuffer::new();
 
@@ -943,9 +980,9 @@ mod tests {
     #[test]
     fn apply_overlay_start_from_middle_run() {
         let runs = vec![
-            OverlayFaceRun { byte_offset: 0, fg: 1, bg: 0 },
-            OverlayFaceRun { byte_offset: 5, fg: 2, bg: 0 },
-            OverlayFaceRun { byte_offset: 10, fg: 3, bg: 0 },
+            OverlayFaceRun { byte_offset: 0, fg: 1, bg: 0, extend: false },
+            OverlayFaceRun { byte_offset: 5, fg: 2, bg: 0, extend: false },
+            OverlayFaceRun { byte_offset: 10, fg: 3, bg: 0, extend: false },
         ];
         let mut fgb = FrameGlyphBuffer::new();
 
@@ -957,8 +994,8 @@ mod tests {
     #[test]
     fn apply_overlay_start_at_last_run() {
         let runs = vec![
-            OverlayFaceRun { byte_offset: 0, fg: 1, bg: 0 },
-            OverlayFaceRun { byte_offset: 5, fg: 2, bg: 0 },
+            OverlayFaceRun { byte_offset: 0, fg: 1, bg: 0, extend: false },
+            OverlayFaceRun { byte_offset: 5, fg: 2, bg: 0, extend: false },
         ];
         let mut fgb = FrameGlyphBuffer::new();
 
