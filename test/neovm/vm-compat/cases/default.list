@@ -345,6 +345,7 @@ cases/minibuffer-contents-no-properties-semantics
 cases/transient-mark-mode-semantics
 cases/discard-input-semantics
 cases/input-batch-readers
+cases/prompt-readers-queue-preserve-recent-keys-semantics
 cases/input-mode-helper-setters-semantics
 cases/input-mode-semantics
 cases/input-pending-semantics

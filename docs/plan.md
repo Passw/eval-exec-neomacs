@@ -109,6 +109,29 @@ Last updated: 2026-02-19
     - `make -C test/neovm/vm-compat check-one-neovm CASE=cases/input-batch-readers` (pass, `98/98`)
     - `make -C test/neovm/vm-compat check-all-neovm-strict` (pass)
 
+- Expanded prompt-reader queue preservation and `recent-keys` non-publication matrix:
+  - corpus changes:
+    - added and wired:
+      - `test/neovm/vm-compat/cases/prompt-readers-queue-preserve-recent-keys-semantics.{forms,expected.tsv}`
+      - `test/neovm/vm-compat/cases/default.list`
+    - added oracle lock-ins for:
+      - `read-file-name`, `read-directory-name`, `read-buffer`, `read-command`,
+        `read-variable`, `read-from-minibuffer`, `read-string`, `read-number`,
+        and `completing-read`
+      - queue payload matrix: list-head char/symbol, mouse-event head,
+        vector-head, dotted-pair, and vector storage
+      - invariants in batch mode:
+        - signal symbol remains `end-of-file`
+        - `unread-command-events` is preserved as-is
+        - `recent-keys` receives no new entries
+  - verified:
+    - `make -C test/neovm/vm-compat record FORMS=cases/prompt-readers-queue-preserve-recent-keys-semantics.forms EXPECTED=cases/prompt-readers-queue-preserve-recent-keys-semantics.expected.tsv` (pass)
+    - `make -C test/neovm/vm-compat check-one-neovm CASE=cases/prompt-readers-queue-preserve-recent-keys-semantics` (pass, `1/1`)
+    - `make -C test/neovm/vm-compat check-one-neovm CASE=cases/input-batch-readers` (pass, `98/98`)
+    - `make -C test/neovm/vm-compat check-one-neovm CASE=cases/read-batch-error-payloads` (pass, `76/76`)
+    - `make -C test/neovm/vm-compat check-one-neovm CASE=cases/read-batch-input-semantics` (pass, `45/45`)
+    - `make -C test/neovm/vm-compat check-all-neovm-strict` (pass)
+
 - Aligned `read-char` / `read-char-exclusive` command-key publication with oracle:
   - runtime changes:
     - `rust/neovm-core/src/elisp/reader.rs`
