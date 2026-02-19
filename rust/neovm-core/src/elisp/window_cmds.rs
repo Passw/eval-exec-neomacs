@@ -2346,12 +2346,53 @@ pub(crate) fn builtin_set_window_buffer(
         }
     };
 
-    if let Some(w) = eval
+    let keep_margins = args.get(2).is_some_and(|arg| !arg.is_nil());
+    let target_point = eval
+        .buffers
+        .get(buf_id)
+        .map(|buf| buf.point_char().saturating_add(1))
+        .unwrap_or(1)
+        .max(1);
+
+    let mut old_state = None;
+    if let Some(Window::Leaf {
+        buffer_id,
+        window_start,
+        point,
+        ..
+    }) = eval
         .frames
         .get_mut(fid)
         .and_then(|f| f.find_window_mut(wid))
     {
-        w.set_buffer(buf_id);
+        old_state = Some((*buffer_id, *window_start, *point));
+    }
+    if let Some((old_buffer_id, old_window_start, old_point)) = old_state {
+        eval.frames
+            .set_window_buffer_position(wid, old_buffer_id, old_window_start, old_point);
+    }
+
+    let (next_window_start, next_point) = eval
+        .frames
+        .window_buffer_position(wid, buf_id)
+        .unwrap_or((1, target_point));
+    if let Some(Window::Leaf {
+        buffer_id,
+        window_start,
+        point,
+        margins,
+        ..
+    }) = eval
+        .frames
+        .get_mut(fid)
+        .and_then(|f| f.find_window_mut(wid))
+    {
+        *buffer_id = buf_id;
+        *window_start = next_window_start.max(1);
+        *point = next_point.max(1);
+        if !keep_margins {
+            *margins = (0, 0);
+        }
     }
     Ok(Value::Nil)
 }
@@ -4831,6 +4872,58 @@ mod tests {
         );
         assert_eq!(results[1], "OK nil"); // set-window-buffer returns nil
         assert_eq!(results[2], "OK t");
+    }
+
+    #[test]
+    fn set_window_buffer_restores_saved_window_point_and_keep_margins() {
+        let results = eval_with_frame(
+            "(setq swb-test-w (selected-window))
+             (setq swb-test-b1 (get-buffer-create \"swb-state-a\"))
+             (setq swb-test-b2 (get-buffer-create \"swb-state-b\"))
+             (with-current-buffer swb-test-b1
+               (erase-buffer)
+               (insert (make-string 300 ?a))
+               (goto-char 120))
+             (with-current-buffer swb-test-b2
+               (erase-buffer)
+               (insert (make-string 300 ?b))
+               (goto-char 150))
+             (set-window-buffer swb-test-w swb-test-b1)
+             (set-window-start swb-test-w 110)
+             (set-window-point swb-test-w 120)
+             (set-window-margins swb-test-w 3 4)
+             (list (window-start swb-test-w)
+                   (window-point swb-test-w)
+                   (window-margins swb-test-w))
+             (progn
+               (set-window-buffer swb-test-w swb-test-b2)
+               (list (window-start swb-test-w)
+                     (window-point swb-test-w)
+                     (window-margins swb-test-w)))
+             (progn
+               (set-window-margins swb-test-w 7 8)
+               (set-window-buffer swb-test-w swb-test-b1 t)
+               (list (window-start swb-test-w)
+                     (window-point swb-test-w)
+                     (window-margins swb-test-w)))
+             (progn
+               (set-window-margins swb-test-w 9 10)
+               (set-window-buffer swb-test-w swb-test-b2 t)
+               (list (window-start swb-test-w)
+                     (window-point swb-test-w)
+                     (window-margins swb-test-w)))
+             (progn
+               (set-window-margins swb-test-w 11 12)
+               (set-window-buffer swb-test-w swb-test-b1 nil)
+               (list (window-start swb-test-w)
+                     (window-point swb-test-w)
+                     (window-margins swb-test-w)))",
+        );
+        assert_eq!(results[9], "OK (110 120 (3 . 4))");
+        assert_eq!(results[10], "OK (1 150 (nil))");
+        assert_eq!(results[11], "OK (110 120 (7 . 8))");
+        assert_eq!(results[12], "OK (1 150 (9 . 10))");
+        assert_eq!(results[13], "OK (110 120 (nil))");
     }
 
     #[test]

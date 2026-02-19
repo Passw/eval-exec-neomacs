@@ -470,6 +470,7 @@ pub struct FrameManager {
     window_cursor_types: HashMap<WindowId, Value>,
     window_prev_buffers: HashMap<WindowId, Value>,
     window_next_buffers: HashMap<WindowId, Value>,
+    window_buffer_positions: HashMap<WindowId, HashMap<BufferId, (usize, usize)>>,
 }
 
 impl FrameManager {
@@ -485,6 +486,7 @@ impl FrameManager {
             window_cursor_types: HashMap::new(),
             window_prev_buffers: HashMap::new(),
             window_next_buffers: HashMap::new(),
+            window_buffer_positions: HashMap::new(),
         }
     }
 
@@ -556,9 +558,11 @@ impl FrameManager {
         if let Some(frame) = self.frames.remove(&id) {
             for wid in frame.window_list() {
                 self.deleted_windows.insert(wid);
+                self.window_buffer_positions.remove(&wid);
             }
             if let Some(minibuffer_wid) = frame.minibuffer_window {
                 self.deleted_windows.insert(minibuffer_wid);
+                self.window_buffer_positions.remove(&minibuffer_wid);
             }
             if self.selected == Some(id) {
                 self.selected = self.frames.keys().next().copied();
@@ -609,6 +613,7 @@ impl FrameManager {
         let removed = delete_window_in_tree(&mut frame.root_window, window_id);
         if removed {
             self.deleted_windows.insert(window_id);
+            self.window_buffer_positions.remove(&window_id);
         }
 
         if removed && frame.selected_window == window_id {
@@ -765,6 +770,29 @@ impl FrameManager {
         } else {
             self.window_next_buffers.insert(window_id, next_buffers);
         }
+    }
+
+    /// Return saved window state (window-start, point) for BUFFER-ID in WINDOW-ID.
+    pub fn window_buffer_position(
+        &self,
+        window_id: WindowId,
+        buffer_id: BufferId,
+    ) -> Option<(usize, usize)> {
+        self.window_buffer_positions
+            .get(&window_id)
+            .and_then(|by_buffer| by_buffer.get(&buffer_id).copied())
+    }
+
+    /// Save per-window state (window-start, point) for BUFFER-ID in WINDOW-ID.
+    pub fn set_window_buffer_position(
+        &mut self,
+        window_id: WindowId,
+        buffer_id: BufferId,
+        window_start: usize,
+        point: usize,
+    ) {
+        let by_buffer = self.window_buffer_positions.entry(window_id).or_default();
+        by_buffer.insert(buffer_id, (window_start.max(1), point.max(1)));
     }
 }
 

@@ -28,6 +28,52 @@ Last updated: 2026-02-19
 
 ## Doing
 
+- Completed three queued compatibility tracks in one batch:
+  - `set-window-buffer` state/margins parity:
+    - runtime changes:
+      - `rust/neovm-core/src/elisp/window_cmds.rs`
+        - `set-window-buffer` now snapshots/restores per-window per-buffer
+          `window-start`/`window-point`.
+        - when no saved window-state exists for the target buffer, window point
+          seeds from target buffer point and window-start defaults to `1`.
+        - `KEEP-MARGINS=nil`/omitted now resets margins to `(nil)`; non-`nil`
+          preserves current margins.
+      - `rust/neovm-core/src/window.rs`
+        - added `FrameManager` per-window buffer-position store
+          (`window_buffer_positions`) plus accessors used by
+          `set-window-buffer`.
+      - `rust/neovm-core/src/elisp/window_cmds.rs`
+        - added unit test:
+          `set_window_buffer_restores_saved_window_point_and_keep_margins`.
+    - corpus changes:
+      - added and wired:
+        - `test/neovm/vm-compat/cases/set-window-buffer-state-keep-margins-semantics.{forms,expected.tsv}`
+        - `test/neovm/vm-compat/cases/default.list`
+  - command-loop/recent-keys expansion:
+    - added and wired:
+      - `test/neovm/vm-compat/cases/command-loop-empty-keys-and-errors-semantics.{forms,expected.tsv}`
+      - `test/neovm/vm-compat/cases/default.list`
+    - lock-ins cover empty `KEYS` vectors for `command-execute`/`call-interactively`,
+      non-vector `KEYS` error payloads, and no `recent-keys` publication in batch.
+  - `kbd`/`key-description` super-prefix expansion:
+    - runtime changes:
+      - `rust/neovm-core/src/elisp/builtins.rs`
+        - fixed super/hyper/alt-prefixed symbol rendering for
+          `single-key-description` / `key-description` to match oracle angle
+          placement (e.g. `s-<f1>`, `C-s-<f1>`).
+        - added unit test:
+          `key_description_renders_super_prefixed_symbol_events_with_expected_angles`.
+    - added and wired:
+      - `test/neovm/vm-compat/cases/kbd-key-description-super-prefix-semantics.{forms,expected.tsv}`
+      - `test/neovm/vm-compat/cases/default.list`
+  - verified:
+    - `cargo test --manifest-path rust/neovm-core/Cargo.toml set_window_buffer_ -- --nocapture` (pass)
+    - `cargo test --manifest-path rust/neovm-core/Cargo.toml key_description_renders_super_prefixed_symbol_events_with_expected_angles -- --nocapture` (pass)
+    - `make -C test/neovm/vm-compat check-one-neovm CASE=cases/set-window-buffer-state-keep-margins-semantics` (pass, `1/1`)
+    - `make -C test/neovm/vm-compat check-one-neovm CASE=cases/command-loop-empty-keys-and-errors-semantics` (pass, `9/9`)
+    - `make -C test/neovm/vm-compat check-one-neovm CASE=cases/kbd-key-description-super-prefix-semantics` (pass, `17/17`)
+    - `make -C test/neovm/vm-compat check-all-neovm-strict` (pass; case inventory `757`)
+
 - Implemented `clear-this-command-keys` parity and lock-ins:
   - runtime changes:
     - `rust/neovm-core/src/elisp/interactive.rs`

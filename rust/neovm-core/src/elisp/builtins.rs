@@ -5888,6 +5888,10 @@ fn named_char_name(code: i64) -> Option<&'static str> {
 
 fn split_symbol_modifiers(mut name: &str) -> (String, &str) {
     let mut prefix = String::new();
+    let is_single_char = |s: &str| {
+        let mut chars = s.chars();
+        chars.next().is_some() && chars.next().is_none()
+    };
     loop {
         if let Some(rest) = name.strip_prefix("C-") {
             prefix.push_str("C-");
@@ -5901,6 +5905,30 @@ fn split_symbol_modifiers(mut name: &str) -> (String, &str) {
         }
         if let Some(rest) = name.strip_prefix("S-") {
             prefix.push_str("S-");
+            name = rest;
+            continue;
+        }
+        if let Some(rest) = name.strip_prefix("s-") {
+            if is_single_char(rest) {
+                break;
+            }
+            prefix.push_str("s-");
+            name = rest;
+            continue;
+        }
+        if let Some(rest) = name.strip_prefix("H-") {
+            if is_single_char(rest) {
+                break;
+            }
+            prefix.push_str("H-");
+            name = rest;
+            continue;
+        }
+        if let Some(rest) = name.strip_prefix("A-") {
+            if is_single_char(rest) {
+                break;
+            }
+            prefix.push_str("A-");
             name = rest;
             continue;
         }
@@ -10428,6 +10456,22 @@ mod tests {
             builtin_keymapp(&mut eval, vec![Value::Int(999_999)]).unwrap(),
             Value::Nil
         );
+    }
+
+    #[test]
+    fn key_description_renders_super_prefixed_symbol_events_with_expected_angles() {
+        let super_only = builtin_key_description(vec![Value::vector(vec![Value::symbol("s-f1")])])
+            .expect("key-description should succeed");
+        assert_eq!(super_only, Value::string("s-<f1>"));
+
+        let ctrl_super =
+            builtin_key_description(vec![Value::vector(vec![Value::symbol("C-s-f1")])])
+                .expect("key-description should succeed");
+        assert_eq!(ctrl_super, Value::string("C-s-<f1>"));
+
+        let single = builtin_single_key_description(vec![Value::symbol("s-f1")])
+            .expect("single-key-description should succeed");
+        assert_eq!(single, Value::string("s-<f1>"));
     }
 
     #[test]

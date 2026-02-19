@@ -61,6 +61,7 @@ cases/command-keys-arg-semantics
 cases/command-keys-recent-keys-semantics
 cases/clear-this-command-keys-semantics
 cases/command-loop-keys-publication-semantics
+cases/command-loop-empty-keys-and-errors-semantics
 cases/self-insert-command-semantics
 cases/called-interactively-p-semantics
 cases/interactive-p-semantics
@@ -74,6 +75,7 @@ cases/keymap-kbd-designator-semantics
 cases/keymapp-lisp-object-semantics
 cases/kbd-modifier-composition-semantics
 cases/key-description-semantics
+cases/kbd-key-description-super-prefix-semantics
 cases/vector-literal-self-eval-semantics
 cases/sub-zero-arity-semantics
 cases/core-math-subr-arity-semantics
@@ -453,6 +455,7 @@ cases/window-buffer-designator-errors-semantics
 cases/window-buffer-missing-designator-semantics
 cases/set-window-buffer-arity-semantics
 cases/set-window-buffer-bootstrap-semantics
+cases/set-window-buffer-state-keep-margins-semantics
 cases/set-window-dedicated-p-designator-semantics
 cases/select-window-designator-semantics
 cases/select-window-current-buffer-semantics
