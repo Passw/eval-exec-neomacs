@@ -28,6 +28,52 @@ Last updated: 2026-02-19
 
 ## Doing
 
+- Added `process-file*`, `process-lines*`, and `process-menu*` compatibility surface with oracle-locked behavior:
+  - runtime changes:
+    - `rust/neovm-core/src/elisp/process.rs`
+      - implemented:
+        - `process-file`
+        - `process-file-shell-command`
+        - `process-lines`
+        - `process-lines-ignore-status`
+        - `process-lines-handling-status`
+        - `process-menu-delete-process`
+        - `process-menu-visit-buffer`
+        - `process-menu-mode`
+      - added shared process execution helpers used by `call-process`/`process-file` paths.
+      - aligned `process-menu-delete-process` non-menu-buffer error behavior:
+        - current buffer with process -> `(error "Buffer does not seem to be associated with any file")`
+        - current buffer without process -> existing `has no process` path.
+      - added runtime unit lock-in:
+        - `process_file_lines_shell_and_menu_runtime_surface`
+    - `rust/neovm-core/src/elisp/builtins.rs`
+      - wired evaluator dispatch for all new process builtins.
+    - `rust/neovm-core/src/elisp/builtin_registry.rs`
+      - registered new process symbols in `DISPATCH_BUILTIN_NAMES`.
+    - `rust/neovm-core/src/elisp/subr_info.rs`
+      - added subr-arity metadata:
+        - `(1 . many)` `process-file`, `process-file-shell-command`, `process-lines`, `process-lines-ignore-status`
+        - `(2 . many)` `process-lines-handling-status`
+        - `(0 . 0)` `process-menu-delete-process`, `process-menu-mode`
+        - `(1 . 1)` `process-menu-visit-buffer`
+      - updated `subr_arity_process_primitives_match_oracle` assertions.
+    - `rust/neovm-core/src/elisp/interactive.rs`
+      - marked `process-menu-delete-process` and `process-menu-mode` as command builtins for `commandp` parity.
+  - corpus changes:
+    - added and wired:
+      - `test/neovm/vm-compat/cases/process-file-lines-menu-semantics.forms`
+      - `test/neovm/vm-compat/cases/process-file-lines-menu-semantics.expected.tsv`
+      - `test/neovm/vm-compat/cases/default.list`
+  - verified:
+    - `cargo test --manifest-path rust/neovm-core/Cargo.toml process_file_lines_shell_and_menu_runtime_surface -- --nocapture` (pass)
+    - `cargo test --manifest-path rust/neovm-core/Cargo.toml process_coding_tty_and_kill_buffer_query_runtime_surface -- --nocapture` (pass)
+    - `cargo test --manifest-path rust/neovm-core/Cargo.toml subr_arity_process_primitives_match_oracle -- --nocapture` (pass)
+    - `cargo test --manifest-path rust/neovm-core/Cargo.toml commandp_true_for_additional_builtin_commands -- --nocapture` (pass)
+    - `make -C test/neovm/vm-compat record FORMS=cases/process-file-lines-menu-semantics.forms EXPECTED=cases/process-file-lines-menu-semantics.expected.tsv` (pass)
+    - `make -C test/neovm/vm-compat check-one-neovm CASE=cases/process-file-lines-menu-semantics` (pass, `4/4`)
+    - `make -C test/neovm/vm-compat check-builtin-registry-all` (pass; drifts `0`)
+    - `make -C test/neovm/vm-compat check-all-neovm-strict` (pass; case inventory `782`)
+
 - Aligned `x-popup-dialog` / `x-popup-menu` batch-shape compatibility against oracle, including position/menu parser error payload parity:
   - runtime changes:
     - `rust/neovm-core/src/elisp/display.rs`

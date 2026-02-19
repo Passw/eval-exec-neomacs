@@ -3317,13 +3317,7 @@ fn run_hook_value(
         eval.apply(value, hook_args.to_vec())?;
         Ok(HookControl::Continue)
     };
-    match walk_hook_value_with(
-        eval,
-        hook_name,
-        hook_value,
-        inherit_global,
-        &mut callback,
-    )? {
+    match walk_hook_value_with(eval, hook_name, hook_value, inherit_global, &mut callback)? {
         HookControl::Continue | HookControl::Return(_) => Ok(()),
     }
 }
@@ -3494,10 +3488,7 @@ fn expect_optional_live_window_designator(
         return Ok(());
     }
     if let Value::Window(id) = value {
-        if eval
-            .frames
-            .is_live_window_id(crate::window::WindowId(*id))
-        {
+        if eval.frames.is_live_window_id(crate::window::WindowId(*id)) {
             return Ok(());
         }
     }
@@ -3539,7 +3530,13 @@ pub(crate) fn builtin_run_window_scroll_functions(
 
     let hook_name = "window-scroll-functions";
     let hook_value = symbol_dynamic_buffer_or_global_value(eval, hook_name).unwrap_or(Value::Nil);
-    run_hook_value(eval, hook_name, hook_value, &[window_arg, window_start], true)?;
+    run_hook_value(
+        eval,
+        hook_name,
+        hook_value,
+        &[window_arg, window_start],
+        true,
+    )?;
     Ok(Value::Nil)
 }
 
@@ -4819,12 +4816,7 @@ fn number_or_marker_to_f64(value: NumberOrMarker) -> f64 {
 }
 
 fn decode_float_time_arg(value: &Value) -> Result<f64, Flow> {
-    let invalid_time_spec = || {
-        signal(
-            "error",
-            vec![Value::string("Invalid time specification")],
-        )
-    };
+    let invalid_time_spec = || signal("error", vec![Value::string("Invalid time specification")]);
     let parse_number = |v: &Value| expect_number_or_marker(v).map(number_or_marker_to_f64);
 
     match value {
@@ -4841,8 +4833,8 @@ fn decode_float_time_arg(value: &Value) -> Result<f64, Flow> {
                 seconds += parse_number(usec).map_err(|_| invalid_time_spec())? / 1_000_000.0;
             }
             if let Some(psec) = items.get(3) {
-                seconds += parse_number(psec).map_err(|_| invalid_time_spec())?
-                    / 1_000_000_000_000.0;
+                seconds +=
+                    parse_number(psec).map_err(|_| invalid_time_spec())? / 1_000_000_000_000.0;
             }
             Ok(seconds)
         }
@@ -7715,6 +7707,12 @@ pub(crate) fn dispatch_builtin(
         }
         "start-process" => return Some(super::process::builtin_start_process(eval, args)),
         "call-process" => return Some(super::process::builtin_call_process(eval, args)),
+        "process-file" => return Some(super::process::builtin_process_file(eval, args)),
+        "process-file-shell-command" => {
+            return Some(super::process::builtin_process_file_shell_command(
+                eval, args,
+            ))
+        }
         "call-process-region" => {
             return Some(super::process::builtin_call_process_region(eval, args))
         }
@@ -7724,15 +7722,21 @@ pub(crate) fn dispatch_builtin(
         "processp" => return Some(super::process::builtin_processp(eval, args)),
         "process-id" => return Some(super::process::builtin_process_id(eval, args)),
         "process-query-on-exit-flag" => {
-            return Some(super::process::builtin_process_query_on_exit_flag(eval, args))
+            return Some(super::process::builtin_process_query_on_exit_flag(
+                eval, args,
+            ))
         }
         "set-process-query-on-exit-flag" => {
-            return Some(super::process::builtin_set_process_query_on_exit_flag(eval, args))
+            return Some(super::process::builtin_set_process_query_on_exit_flag(
+                eval, args,
+            ))
         }
         "process-command" => return Some(super::process::builtin_process_command(eval, args)),
         "process-contact" => return Some(super::process::builtin_process_contact(eval, args)),
         "process-filter" => return Some(super::process::builtin_process_filter(eval, args)),
-        "set-process-filter" => return Some(super::process::builtin_set_process_filter(eval, args)),
+        "set-process-filter" => {
+            return Some(super::process::builtin_set_process_filter(eval, args))
+        }
         "process-sentinel" => return Some(super::process::builtin_process_sentinel(eval, args)),
         "set-process-sentinel" => {
             return Some(super::process::builtin_set_process_sentinel(eval, args))
@@ -7748,9 +7752,33 @@ pub(crate) fn dispatch_builtin(
                 eval, args,
             ))
         }
-        "process-kill-buffer-query-function" => {
-            return Some(super::process::builtin_process_kill_buffer_query_function(args))
+        "process-lines" => return Some(super::process::builtin_process_lines(eval, args)),
+        "process-lines-ignore-status" => {
+            return Some(super::process::builtin_process_lines_ignore_status(
+                eval, args,
+            ))
         }
+        "process-lines-handling-status" => {
+            return Some(super::process::builtin_process_lines_handling_status(
+                eval, args,
+            ))
+        }
+        "process-kill-buffer-query-function" => {
+            return Some(super::process::builtin_process_kill_buffer_query_function(
+                args,
+            ))
+        }
+        "process-menu-delete-process" => {
+            return Some(super::process::builtin_process_menu_delete_process(
+                eval, args,
+            ))
+        }
+        "process-menu-visit-buffer" => {
+            return Some(super::process::builtin_process_menu_visit_buffer(
+                eval, args,
+            ))
+        }
+        "process-menu-mode" => return Some(super::process::builtin_process_menu_mode(args)),
         "process-tty-name" => return Some(super::process::builtin_process_tty_name(eval, args)),
         "process-plist" => return Some(super::process::builtin_process_plist(eval, args)),
         "set-process-plist" => return Some(super::process::builtin_set_process_plist(eval, args)),
@@ -8092,37 +8120,29 @@ pub(crate) fn dispatch_builtin(
         "minibuffer-window-active-p" => {
             return Some(super::window_cmds::builtin_minibuffer_window_active_p(args))
         }
-        "window-parameter" => return Some(super::window_cmds::builtin_window_parameter(eval, args)),
-        "set-window-parameter" => {
-            return Some(super::window_cmds::builtin_set_window_parameter(
-                eval, args,
-            ))
+        "window-parameter" => {
+            return Some(super::window_cmds::builtin_window_parameter(eval, args))
         }
-        "window-parameters" => return Some(super::window_cmds::builtin_window_parameters(eval, args)),
+        "set-window-parameter" => {
+            return Some(super::window_cmds::builtin_set_window_parameter(eval, args))
+        }
+        "window-parameters" => {
+            return Some(super::window_cmds::builtin_window_parameters(eval, args))
+        }
         "window-display-table" => {
-            return Some(super::window_cmds::builtin_window_display_table(
-                eval, args,
-            ))
+            return Some(super::window_cmds::builtin_window_display_table(eval, args))
         }
         "window-size-fixed-p" => {
-            return Some(super::window_cmds::builtin_window_size_fixed_p(
-                eval, args,
-            ))
+            return Some(super::window_cmds::builtin_window_size_fixed_p(eval, args))
         }
         "window-preserve-size" => {
-            return Some(super::window_cmds::builtin_window_preserve_size(
-                eval, args,
-            ))
+            return Some(super::window_cmds::builtin_window_preserve_size(eval, args))
         }
         "window-resizable" => {
-            return Some(super::window_cmds::builtin_window_resizable(
-                eval, args,
-            ))
+            return Some(super::window_cmds::builtin_window_resizable(eval, args))
         }
         "window-cursor-type" => {
-            return Some(super::window_cmds::builtin_window_cursor_type(
-                eval, args,
-            ))
+            return Some(super::window_cmds::builtin_window_cursor_type(eval, args))
         }
         "window-buffer" => return Some(super::window_cmds::builtin_window_buffer(eval, args)),
         "window-start" => return Some(super::window_cmds::builtin_window_start(eval, args)),
@@ -8134,7 +8154,9 @@ pub(crate) fn dispatch_builtin(
         "window-height" => return Some(super::window_cmds::builtin_window_height(eval, args)),
         "window-width" => return Some(super::window_cmds::builtin_window_width(eval, args)),
         "window-use-time" => return Some(super::window_cmds::builtin_window_use_time(eval, args)),
-        "window-old-point" => return Some(super::window_cmds::builtin_window_old_point(eval, args)),
+        "window-old-point" => {
+            return Some(super::window_cmds::builtin_window_old_point(eval, args))
+        }
         "window-old-buffer" => {
             return Some(super::window_cmds::builtin_window_old_buffer(eval, args))
         }
@@ -8153,15 +8175,17 @@ pub(crate) fn dispatch_builtin(
         "window-margins" => return Some(super::window_cmds::builtin_window_margins(eval, args)),
         "window-fringes" => return Some(super::window_cmds::builtin_window_fringes(eval, args)),
         "window-scroll-bars" => {
-            return Some(super::window_cmds::builtin_window_scroll_bars(
+            return Some(super::window_cmds::builtin_window_scroll_bars(eval, args))
+        }
+        "window-mode-line-height" => {
+            return Some(super::window_cmds::builtin_window_mode_line_height(
                 eval, args,
             ))
         }
-        "window-mode-line-height" => {
-            return Some(super::window_cmds::builtin_window_mode_line_height(eval, args))
-        }
         "window-header-line-height" => {
-            return Some(super::window_cmds::builtin_window_header_line_height(eval, args))
+            return Some(super::window_cmds::builtin_window_header_line_height(
+                eval, args,
+            ))
         }
         "window-pixel-height" => {
             return Some(super::window_cmds::builtin_window_pixel_height(eval, args))
@@ -8175,10 +8199,16 @@ pub(crate) fn dispatch_builtin(
         "window-body-width" => {
             return Some(super::window_cmds::builtin_window_body_width(eval, args))
         }
-        "window-text-height" => return Some(super::window_cmds::builtin_window_text_height(eval, args)),
-        "window-text-width" => return Some(super::window_cmds::builtin_window_text_width(eval, args)),
+        "window-text-height" => {
+            return Some(super::window_cmds::builtin_window_text_height(eval, args))
+        }
+        "window-text-width" => {
+            return Some(super::window_cmds::builtin_window_text_width(eval, args))
+        }
         "window-body-pixel-edges" => {
-            return Some(super::window_cmds::builtin_window_body_pixel_edges(eval, args))
+            return Some(super::window_cmds::builtin_window_body_pixel_edges(
+                eval, args,
+            ))
         }
         "window-body-edges" => {
             return Some(super::window_cmds::builtin_window_body_edges(eval, args))
@@ -8221,19 +8251,13 @@ pub(crate) fn dispatch_builtin(
             ))
         }
         "set-window-hscroll" => {
-            return Some(super::window_cmds::builtin_set_window_hscroll(
-                eval, args,
-            ))
+            return Some(super::window_cmds::builtin_set_window_hscroll(eval, args))
         }
         "set-window-margins" => {
-            return Some(super::window_cmds::builtin_set_window_margins(
-                eval, args,
-            ))
+            return Some(super::window_cmds::builtin_set_window_margins(eval, args))
         }
         "set-window-fringes" => {
-            return Some(super::window_cmds::builtin_set_window_fringes(
-                eval, args,
-            ))
+            return Some(super::window_cmds::builtin_set_window_fringes(eval, args))
         }
         "set-window-display-table" => {
             return Some(super::window_cmds::builtin_set_window_display_table(
@@ -8251,9 +8275,7 @@ pub(crate) fn dispatch_builtin(
             ))
         }
         "set-window-vscroll" => {
-            return Some(super::window_cmds::builtin_set_window_vscroll(
-                eval, args,
-            ))
+            return Some(super::window_cmds::builtin_set_window_vscroll(eval, args))
         }
         "set-window-point" => {
             return Some(super::window_cmds::builtin_set_window_point(eval, args))
@@ -8350,13 +8372,9 @@ pub(crate) fn dispatch_builtin(
         "redraw-frame" => return Some(super::display::builtin_redraw_frame_eval(eval, args)),
         "display-color-p" => return Some(super::display::builtin_display_color_p_eval(eval, args)),
         "display-grayscale-p" => {
-            return Some(super::display::builtin_display_grayscale_p_eval(
-                eval, args,
-            ))
+            return Some(super::display::builtin_display_grayscale_p_eval(eval, args))
         }
-        "display-mouse-p" => {
-            return Some(super::display::builtin_display_mouse_p_eval(eval, args))
-        }
+        "display-mouse-p" => return Some(super::display::builtin_display_mouse_p_eval(eval, args)),
         "display-popup-menus-p" => {
             return Some(super::display::builtin_display_popup_menus_p_eval(
                 eval, args,
@@ -8399,9 +8417,7 @@ pub(crate) fn dispatch_builtin(
             ))
         }
         "display-save-under" => {
-            return Some(super::display::builtin_display_save_under_eval(
-                eval, args,
-            ))
+            return Some(super::display::builtin_display_save_under_eval(eval, args))
         }
         "display-selections-p" => {
             return Some(super::display::builtin_display_selections_p_eval(
@@ -8475,13 +8491,9 @@ pub(crate) fn dispatch_builtin(
             ))
         }
         "x-server-input-extension-version" => {
-            return Some(super::display::builtin_x_server_input_extension_version_eval(
-                eval, args,
-            ))
+            return Some(super::display::builtin_x_server_input_extension_version_eval(eval, args))
         }
-        "x-server-vendor" => {
-            return Some(super::display::builtin_x_server_vendor_eval(eval, args))
-        }
+        "x-server-vendor" => return Some(super::display::builtin_x_server_vendor_eval(eval, args)),
         "x-display-grayscale-p" => {
             return Some(super::display::builtin_x_display_grayscale_p_eval(
                 eval, args,
@@ -8498,19 +8510,13 @@ pub(crate) fn dispatch_builtin(
             ))
         }
         "x-display-mm-height" => {
-            return Some(super::display::builtin_x_display_mm_height_eval(
-                eval, args,
-            ))
+            return Some(super::display::builtin_x_display_mm_height_eval(eval, args))
         }
         "x-display-mm-width" => {
-            return Some(super::display::builtin_x_display_mm_width_eval(
-                eval, args,
-            ))
+            return Some(super::display::builtin_x_display_mm_width_eval(eval, args))
         }
         "x-display-monitor-attributes-list" => {
-            return Some(super::display::builtin_x_display_monitor_attributes_list_eval(
-                eval, args,
-            ))
+            return Some(super::display::builtin_x_display_monitor_attributes_list_eval(eval, args))
         }
         "x-display-planes" => {
             return Some(super::display::builtin_x_display_planes_eval(eval, args))
@@ -9308,7 +9314,9 @@ pub(crate) fn dispatch_builtin(
         "x-display-planes" => super::display::builtin_x_display_planes(args),
         "x-display-save-under" => super::display::builtin_x_display_save_under(args),
         "x-display-screens" => super::display::builtin_x_display_screens(args),
-        "x-display-set-last-user-time" => super::display::builtin_x_display_set_last_user_time(args),
+        "x-display-set-last-user-time" => {
+            super::display::builtin_x_display_set_last_user_time(args)
+        }
         "x-display-visual-class" => super::display::builtin_x_display_visual_class(args),
         "x-win-suspend-error" => super::display::builtin_x_win_suspend_error(args),
         "x-wm-set-size-hint" => super::display::builtin_x_wm_set_size_hint(args),
@@ -10637,10 +10645,7 @@ pub(crate) fn builtin_replace_match(
                 Err(signal("args-out-of-range", vec![Value::Int(0)]))
             }
             Err(msg) if msg == missing_subexp_error => {
-                if md
-                    .as_ref()
-                    .is_some_and(|m| subexp > m.groups.len())
-                {
+                if md.as_ref().is_some_and(|m| subexp > m.groups.len()) {
                     Err(signal(
                         "args-out-of-range",
                         vec![
@@ -10650,7 +10655,10 @@ pub(crate) fn builtin_replace_match(
                         ],
                     ))
                 } else {
-                    Err(signal("error", vec![Value::string(msg), Value::Int(subexp as i64)]))
+                    Err(signal(
+                        "error",
+                        vec![Value::string(msg), Value::Int(subexp as i64)],
+                    ))
                 }
             }
             Err(msg) => Err(signal("error", vec![Value::string(msg)])),
@@ -10671,10 +10679,7 @@ pub(crate) fn builtin_replace_match(
             Err(signal("args-out-of-range", vec![Value::Int(0)]))
         }
         Err(msg) if msg == missing_subexp_error => {
-            if md
-                .as_ref()
-                .is_some_and(|m| subexp > m.groups.len())
-            {
+            if md.as_ref().is_some_and(|m| subexp > m.groups.len()) {
                 Err(signal(
                     "args-out-of-range",
                     vec![
@@ -10684,7 +10689,10 @@ pub(crate) fn builtin_replace_match(
                     ],
                 ))
             } else {
-                Err(signal("error", vec![Value::string(msg), Value::Int(subexp as i64)]))
+                Err(signal(
+                    "error",
+                    vec![Value::string(msg), Value::Int(subexp as i64)],
+                ))
             }
         }
         Err(msg) => Err(signal("error", vec![Value::string(msg)])),
@@ -10924,7 +10932,10 @@ mod tests {
         let mut eval = super::super::eval::Evaluator::new();
 
         let proper = Value::list(vec![Value::symbol("keymap")]);
-        assert_eq!(builtin_keymapp(&mut eval, vec![proper]).unwrap(), Value::True);
+        assert_eq!(
+            builtin_keymapp(&mut eval, vec![proper]).unwrap(),
+            Value::True
+        );
 
         let proper_with_entry = Value::cons(
             Value::symbol("keymap"),
@@ -10939,18 +10950,30 @@ mod tests {
         );
 
         let improper = Value::cons(Value::symbol("keymap"), Value::symbol("tail"));
-        assert_eq!(builtin_keymapp(&mut eval, vec![improper]).unwrap(), Value::True);
+        assert_eq!(
+            builtin_keymapp(&mut eval, vec![improper]).unwrap(),
+            Value::True
+        );
 
         let non_keymap = Value::list(vec![Value::symbol("foo"), Value::symbol("keymap")]);
-        assert_eq!(builtin_keymapp(&mut eval, vec![non_keymap]).unwrap(), Value::Nil);
+        assert_eq!(
+            builtin_keymapp(&mut eval, vec![non_keymap]).unwrap(),
+            Value::Nil
+        );
     }
 
     #[test]
     fn keymapp_rejects_non_keymap_integer_designators() {
         let mut eval = super::super::eval::Evaluator::new();
         let keymap = builtin_make_sparse_keymap(&mut eval, vec![]).unwrap();
-        assert_eq!(builtin_keymapp(&mut eval, vec![keymap]).unwrap(), Value::True);
-        assert_eq!(builtin_keymapp(&mut eval, vec![Value::Int(16)]).unwrap(), Value::Nil);
+        assert_eq!(
+            builtin_keymapp(&mut eval, vec![keymap]).unwrap(),
+            Value::True
+        );
+        assert_eq!(
+            builtin_keymapp(&mut eval, vec![Value::Int(16)]).unwrap(),
+            Value::Nil
+        );
         assert_eq!(
             builtin_keymapp(&mut eval, vec![Value::Int(999_999)]).unwrap(),
             Value::Nil

@@ -885,16 +885,14 @@ fn subr_arity_value(name: &str) -> Value {
         "x-send-client-message" => arity_cons(6, Some(6)),
         "x-set-mouse-absolute-pixel-position" => arity_cons(2, Some(2)),
         "x-popup-menu" => arity_cons(2, Some(2)),
-        "x-delete-window-property" | "x-disown-selection-internal" | "x-window-property-attributes" => {
-            arity_cons(1, Some(3))
-        }
+        "x-delete-window-property"
+        | "x-disown-selection-internal"
+        | "x-window-property-attributes" => arity_cons(1, Some(3)),
         "x-open-connection" => arity_cons(1, Some(3)),
         "x-popup-dialog" | "x-frame-restack" => arity_cons(2, Some(3)),
         "x-get-resource" => arity_cons(2, Some(4)),
         "x-list-fonts" => arity_cons(1, Some(5)),
-        "x-show-tip" | "x-window-property" | "x-translate-coordinates" => {
-            arity_cons(1, Some(6))
-        }
+        "x-show-tip" | "x-window-property" | "x-translate-coordinates" => arity_cons(1, Some(6)),
         "internal-show-cursor" => arity_cons(2, Some(2)),
         "display-buffer" => arity_cons(1, Some(3)),
         "clear-font-cache" => arity_cons(0, Some(0)),
@@ -917,9 +915,7 @@ fn subr_arity_value(name: &str) -> Value {
         "set-window-buffer"
         | "set-window-start"
         | "set-window-group-start"
-        | "set-window-margins" => {
-            arity_cons(2, Some(3))
-        }
+        | "set-window-margins" => arity_cons(2, Some(3)),
         "set-window-vscroll" => arity_cons(2, Some(4)),
         "set-window-fringes" => arity_cons(2, Some(5)),
         "set-window-scroll-bars" => arity_cons(1, Some(6)),
@@ -937,6 +933,7 @@ fn subr_arity_value(name: &str) -> Value {
         | "process-datagram-address"
         | "process-exit-status"
         | "process-filter"
+        | "process-menu-visit-buffer"
         | "process-id"
         | "process-inherit-coding-system-flag"
         | "process-live-p"
@@ -948,10 +945,15 @@ fn subr_arity_value(name: &str) -> Value {
         | "process-status"
         | "process-thread"
         | "process-type"
-        | "processp" => {
-            arity_cons(1, Some(1))
-        }
-        "process-kill-buffer-query-function" => arity_cons(0, Some(0)),
+        | "processp" => arity_cons(1, Some(1)),
+        "process-kill-buffer-query-function"
+        | "process-menu-delete-process"
+        | "process-menu-mode" => arity_cons(0, Some(0)),
+        "process-file"
+        | "process-file-shell-command"
+        | "process-lines"
+        | "process-lines-ignore-status" => arity_cons(1, None),
+        "process-lines-handling-status" => arity_cons(2, None),
         "process-running-child-p" | "process-send-eof" => arity_cons(0, Some(1)),
         "process-contact" => arity_cons(1, Some(3)),
         "process-list" => arity_cons(0, Some(0)),
@@ -963,9 +965,7 @@ fn subr_arity_value(name: &str) -> Value {
         "set-process-filter"
         | "set-process-plist"
         | "set-process-query-on-exit-flag"
-        | "set-process-sentinel" => {
-            arity_cons(2, Some(2))
-        }
+        | "set-process-sentinel" => arity_cons(2, Some(2)),
         "setenv" => arity_cons(1, Some(3)),
         "start-process" => arity_cons(3, None),
         "getenv" => arity_cons(1, Some(2)),
@@ -1098,9 +1098,7 @@ fn subr_arity_value(name: &str) -> Value {
         | "window-live-p"
         | "window-valid-p"
         | "windowp"
-        | "minibuffer-window-active-p" => {
-            arity_cons(1, Some(1))
-        }
+        | "minibuffer-window-active-p" => arity_cons(1, Some(1)),
         "window-parameter" => arity_cons(2, Some(2)),
         "set-window-parameter" => arity_cons(3, Some(3)),
         "terminal-parameter" => arity_cons(2, Some(2)),
@@ -1583,14 +1581,22 @@ mod tests {
         assert_subr_arity("process-contact", 1, Some(3));
         assert_subr_arity("process-datagram-address", 1, Some(1));
         assert_subr_arity("process-exit-status", 1, Some(1));
+        assert_subr_arity("process-file", 1, None);
+        assert_subr_arity("process-file-shell-command", 1, None);
         assert_subr_arity("process-filter", 1, Some(1));
         assert_subr_arity("process-get", 2, Some(2));
         assert_subr_arity("process-id", 1, Some(1));
         assert_subr_arity("process-inherit-coding-system-flag", 1, Some(1));
         assert_subr_arity("process-kill-buffer-query-function", 0, Some(0));
+        assert_subr_arity("process-lines", 1, None);
+        assert_subr_arity("process-lines-ignore-status", 1, None);
+        assert_subr_arity("process-lines-handling-status", 2, None);
         assert_subr_arity("process-live-p", 1, Some(1));
         assert_subr_arity("process-list", 0, Some(0));
         assert_subr_arity("process-mark", 1, Some(1));
+        assert_subr_arity("process-menu-delete-process", 0, Some(0));
+        assert_subr_arity("process-menu-mode", 0, Some(0));
+        assert_subr_arity("process-menu-visit-buffer", 1, Some(1));
         assert_subr_arity("process-name", 1, Some(1));
         assert_subr_arity("process-plist", 1, Some(1));
         assert_subr_arity("process-put", 3, Some(3));

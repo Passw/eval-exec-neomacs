@@ -354,6 +354,8 @@ fn builtin_command_name(name: &str) -> bool {
             | "delete-frame"
             | "delete-other-windows"
             | "delete-process"
+            | "process-menu-delete-process"
+            | "process-menu-mode"
             | "delete-rectangle"
             | "delete-region"
             | "delete-window"
@@ -730,20 +732,14 @@ fn interactive_mark_arg(eval: &Evaluator) -> Result<Value, Flow> {
         .buffers
         .current_buffer()
         .ok_or_else(|| signal("error", vec![Value::string("No current buffer")]))?;
-    let mark = buf.mark().ok_or_else(|| {
-        signal(
-            "error",
-            vec![Value::string("The mark is not set now")],
-        )
-    })?;
+    let mark = buf
+        .mark()
+        .ok_or_else(|| signal("error", vec![Value::string("The mark is not set now")]))?;
     let mark_char = buf.text.byte_to_char(mark) as i64 + 1;
     Ok(Value::Int(mark_char))
 }
 
-fn interactive_read_expression_arg(
-    eval: &mut Evaluator,
-    prompt: String,
-) -> Result<Value, Flow> {
+fn interactive_read_expression_arg(eval: &mut Evaluator, prompt: String) -> Result<Value, Flow> {
     let input = super::reader::builtin_read_from_minibuffer(eval, vec![Value::string(prompt)])?;
     super::reader::builtin_read(eval, vec![input])
 }
@@ -792,7 +788,8 @@ fn interactive_apply_shift_selection_prefix(eval: &mut Evaluator) {
     if let Some(buf) = eval.buffers.current_buffer_mut() {
         let point = buf.point();
         buf.set_mark(point);
-        buf.properties.insert("mark-active".to_string(), Value::True);
+        buf.properties
+            .insert("mark-active".to_string(), Value::True);
         mark_activated = true;
     }
     if mark_activated {
@@ -955,7 +952,9 @@ fn interactive_args_from_string_code(
     let mut args = Vec::new();
     for (letter, prompt) in parsed.entries {
         match letter {
-            'a' => args.push(super::minibuffer::builtin_read_command(vec![Value::string(prompt)])?),
+            'a' => args.push(super::minibuffer::builtin_read_command(vec![
+                Value::string(prompt),
+            ])?),
             'b' => args.push(super::minibuffer::builtin_read_buffer(vec![
                 Value::string(prompt),
                 Value::Nil,
@@ -966,8 +965,13 @@ fn interactive_args_from_string_code(
                 Value::Nil,
                 Value::Nil,
             ])?),
-            'c' => args.push(super::reader::builtin_read_char(eval, vec![Value::string(prompt)])?),
-            'C' => args.push(super::minibuffer::builtin_read_command(vec![Value::string(prompt)])?),
+            'c' => args.push(super::reader::builtin_read_char(
+                eval,
+                vec![Value::string(prompt)],
+            )?),
+            'C' => args.push(super::minibuffer::builtin_read_command(vec![
+                Value::string(prompt),
+            ])?),
             'd' => args.push(interactive_point_arg(eval)?),
             'D' => args.push(super::minibuffer::builtin_read_directory_name(vec![
                 Value::string(prompt),
@@ -1025,7 +1029,8 @@ fn interactive_args_from_string_code(
             'P' => args.push(interactive_prefix_raw_arg(eval, kind)),
             'r' => args.extend(interactive_region_args(eval, "error")?),
             'S' => {
-                let sym_name = super::reader::builtin_read_string(eval, vec![Value::string(prompt)])?;
+                let sym_name =
+                    super::reader::builtin_read_string(eval, vec![Value::string(prompt)])?;
                 if let Some(name) = sym_name.as_str() {
                     args.push(Value::symbol(name));
                 } else {
@@ -1047,8 +1052,12 @@ fn interactive_args_from_string_code(
                 args.push(eval.eval(&expr)?);
             }
             'U' => args.push(Value::Nil),
-            'v' => args.push(super::minibuffer::builtin_read_variable(vec![Value::string(prompt)])?),
-            'z' => args.push(super::lread::builtin_read_coding_system(vec![Value::string(prompt)])?),
+            'v' => args.push(super::minibuffer::builtin_read_variable(vec![
+                Value::string(prompt),
+            ])?),
+            'z' => args.push(super::lread::builtin_read_coding_system(vec![
+                Value::string(prompt),
+            ])?),
             'Z' => args.push(interactive_read_coding_system_optional_arg(prompt)?),
             _ => return Ok(None),
         }
@@ -1093,7 +1102,9 @@ fn resolve_interactive_invocation_args(
     }
 
     match kind {
-        CommandInvocationKind::CallInteractively => default_call_interactively_args(eval, resolved_name),
+        CommandInvocationKind::CallInteractively => {
+            default_call_interactively_args(eval, resolved_name)
+        }
         CommandInvocationKind::CommandExecute => default_command_execute_args(eval, resolved_name),
     }
 }
@@ -3300,6 +3311,8 @@ mod tests {
             "re-search-forward",
             "select-frame",
             "setenv",
+            "process-menu-delete-process",
+            "process-menu-mode",
             "top-level",
             "write-region",
             "x-clipboard-yank",
@@ -3577,8 +3590,7 @@ mod tests {
         ev.record_input_event(Value::Int(99));
         assert_eq!(ev.recent_input_events(), &[Value::Int(99)]);
 
-        let result =
-            builtin_clear_this_command_keys(&mut ev, vec![Value::symbol("t")]).unwrap();
+        let result = builtin_clear_this_command_keys(&mut ev, vec![Value::symbol("t")]).unwrap();
         assert!(result.is_nil());
         assert_eq!(ev.recent_input_events(), &[Value::Int(99)]);
     }
@@ -5209,10 +5221,7 @@ mod tests {
                      (call-interactively (lambda (x) (interactive 7) x))
                    (error err)))"#,
         );
-        assert_eq!(
-            results[0],
-            "OK ((4) (5) 7 8 (wrong-type-argument listp 7))"
-        );
+        assert_eq!(results[0], "OK ((4) (5) 7 8 (wrong-type-argument listp 7))");
     }
 
     #[test]

@@ -575,6 +575,140 @@ fn configure_call_process_stdin(command: &mut Command, infile: Option<&str>) -> 
     }
 }
 
+fn run_process_command(
+    eval: &mut super::eval::Evaluator,
+    program: &str,
+    infile: Option<String>,
+    destination: &Value,
+    cmd_args: &[String],
+) -> EvalResult {
+    let destination_spec = parse_call_process_destination(eval, destination)?;
+
+    if destination_spec.no_wait {
+        let mut command = Command::new(program);
+        command.args(cmd_args).stdout(Stdio::null());
+        configure_call_process_stdin(&mut command, infile.as_deref())?;
+        match destination_spec.stderr {
+            StderrTarget::Discard | StderrTarget::ToStdoutTarget => {
+                command.stderr(Stdio::null());
+            }
+            StderrTarget::File => {
+                let path = destination_spec.stderr_file.as_ref().ok_or_else(|| {
+                    signal("error", vec![Value::string("Missing stderr file target")])
+                })?;
+                let file = OpenOptions::new()
+                    .create(true)
+                    .truncate(true)
+                    .write(true)
+                    .open(path)
+                    .map_err(|e| signal_process_io("Writing process output", Some(path), e))?;
+                command.stderr(Stdio::from(file));
+            }
+        };
+
+        let mut child = command
+            .spawn()
+            .map_err(|e| signal_process_io("Searching for program", Some(program), e))?;
+        std::thread::spawn(move || {
+            let _ = child.wait();
+        });
+        return Ok(Value::Nil);
+    }
+
+    let mut command = Command::new(program);
+    command
+        .args(cmd_args)
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped());
+    configure_call_process_stdin(&mut command, infile.as_deref())?;
+    let output = command
+        .output()
+        .map_err(|e| signal_process_io("Searching for program", Some(program), e))?;
+
+    let exit_code = output.status.code().unwrap_or(-1);
+    route_captured_output(eval, &destination_spec, &output.stdout, &output.stderr)?;
+    Ok(Value::Int(exit_code as i64))
+}
+
+fn run_process_capture_output(program: &str, cmd_args: &[String]) -> Result<(i32, Vec<u8>), Flow> {
+    let mut command = Command::new(program);
+    command
+        .args(cmd_args)
+        .stdin(Stdio::null())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::null());
+    let output = command
+        .output()
+        .map_err(|e| signal_process_io("Searching for program", Some(program), e))?;
+    Ok((output.status.code().unwrap_or(-1), output.stdout))
+}
+
+fn parse_output_lines(stdout: &[u8]) -> Value {
+    let mut text = String::from_utf8_lossy(stdout).into_owned();
+    if text.ends_with('\n') {
+        text.pop();
+    }
+    if text.is_empty() {
+        Value::Nil
+    } else {
+        Value::list(text.split('\n').map(Value::string).collect())
+    }
+}
+
+fn parse_optional_infile(args: &[Value], index: usize) -> Result<Option<String>, Flow> {
+    if args.len() > index && !args[index].is_nil() {
+        Ok(Some(expect_string_strict(&args[index])?))
+    } else {
+        Ok(None)
+    }
+}
+
+fn parse_string_args_strict(args: &[Value]) -> Result<Vec<String>, Flow> {
+    args.iter().map(expect_string_strict).collect()
+}
+
+fn parse_sequence_args(args: &[Value]) -> Result<Vec<String>, Flow> {
+    args.iter().map(sequence_value_to_env_string).collect()
+}
+
+fn signal_process_lines_status_error(program: &str, status: i32) -> Flow {
+    signal(
+        "error",
+        vec![Value::string(format!(
+            "{program} exited with status {status}"
+        ))],
+    )
+}
+
+fn shell_quote_argument(arg: &str) -> String {
+    let mut out = String::from("'");
+    for ch in arg.chars() {
+        if ch == '\'' {
+            out.push_str("'\\''");
+        } else {
+            out.push(ch);
+        }
+    }
+    out.push('\'');
+    out
+}
+
+fn shell_command_with_args(command: &str, args: &[String]) -> String {
+    if args.is_empty() {
+        return command.to_string();
+    }
+    let quoted = args
+        .iter()
+        .map(|arg| shell_quote_argument(arg))
+        .collect::<Vec<_>>()
+        .join(" ");
+    if command.is_empty() {
+        quoted
+    } else {
+        format!("{command} {quoted}")
+    }
+}
+
 /// Resolve a process argument: either a ProcessId integer or a name string.
 fn resolve_process(eval: &super::eval::Evaluator, value: &Value) -> Result<ProcessId, Flow> {
     match value {
@@ -612,7 +746,10 @@ fn resolve_process(eval: &super::eval::Evaluator, value: &Value) -> Result<Proce
 ///
 /// NeoVM currently models process handles as integer ids.  These helpers treat
 /// a live process id as a process designator for runtime parity surfaces.
-fn resolve_live_process_designator(eval: &super::eval::Evaluator, value: &Value) -> Option<ProcessId> {
+fn resolve_live_process_designator(
+    eval: &super::eval::Evaluator,
+    value: &Value,
+) -> Option<ProcessId> {
     match value {
         Value::Int(n) if *n >= 0 => {
             let id = *n as ProcessId;
@@ -723,22 +860,8 @@ pub(crate) fn builtin_call_process(
 ) -> EvalResult {
     expect_min_args("call-process", &args, 1)?;
     let program = expect_string(&args[0])?;
-
-    let infile = if args.len() > 1 && !args[1].is_nil() {
-        Some(expect_string_strict(&args[1])?)
-    } else {
-        None
-    };
-
-    let destination = if args.len() > 2 {
-        &args[2]
-    } else {
-        &Value::Nil
-    };
-    let destination_spec = parse_call_process_destination(eval, destination)?;
-
-    // DISPLAY (arg index 3): ignored in this implementation.
-
+    let infile = parse_optional_infile(&args, 1)?;
+    let destination = args.get(2).unwrap_or(&Value::Nil);
     let cmd_args: Vec<String> = if args.len() > 4 {
         args[4..]
             .iter()
@@ -748,50 +871,94 @@ pub(crate) fn builtin_call_process(
         Vec::new()
     };
 
-    if destination_spec.no_wait {
-        let mut command = Command::new(&program);
-        command.args(&cmd_args).stdout(Stdio::null());
-        configure_call_process_stdin(&mut command, infile.as_deref())?;
-        match destination_spec.stderr {
-            StderrTarget::Discard | StderrTarget::ToStdoutTarget => {
-                command.stderr(Stdio::null());
-            }
-            StderrTarget::File => {
-                let path = destination_spec.stderr_file.as_ref().ok_or_else(|| {
-                    signal("error", vec![Value::string("Missing stderr file target")])
-                })?;
-                let file = OpenOptions::new()
-                    .create(true)
-                    .truncate(true)
-                    .write(true)
-                    .open(path)
-                    .map_err(|e| signal_process_io("Writing process output", Some(path), e))?;
-                command.stderr(Stdio::from(file));
-            }
-        };
+    // DISPLAY (arg index 3): ignored in this implementation.
+    run_process_command(eval, &program, infile, destination, &cmd_args)
+}
 
-        let mut child = command
-            .spawn()
-            .map_err(|e| signal_process_io("Searching for program", Some(&program), e))?;
-        std::thread::spawn(move || {
-            let _ = child.wait();
-        });
-        return Ok(Value::Nil);
+/// (process-file PROGRAM &optional INFILE DESTINATION DISPLAY &rest ARGS)
+pub(crate) fn builtin_process_file(
+    eval: &mut super::eval::Evaluator,
+    args: Vec<Value>,
+) -> EvalResult {
+    expect_min_args("process-file", &args, 1)?;
+    let program = expect_string_strict(&args[0])?;
+    let infile = parse_optional_infile(&args, 1)?;
+    let destination = args.get(2).unwrap_or(&Value::Nil);
+    let cmd_args = if args.len() > 4 {
+        parse_string_args_strict(&args[4..])?
+    } else {
+        Vec::new()
+    };
+    run_process_command(eval, &program, infile, destination, &cmd_args)
+}
+
+/// (process-file-shell-command COMMAND &optional INFILE DESTINATION DISPLAY &rest ARGS)
+pub(crate) fn builtin_process_file_shell_command(
+    eval: &mut super::eval::Evaluator,
+    args: Vec<Value>,
+) -> EvalResult {
+    expect_min_args("process-file-shell-command", &args, 1)?;
+    let command = sequence_value_to_env_string(&args[0])?;
+    let infile = parse_optional_infile(&args, 1)?;
+    let destination = args.get(2).unwrap_or(&Value::Nil);
+    let cmd_args = if args.len() > 4 {
+        parse_sequence_args(&args[4..])?
+    } else {
+        Vec::new()
+    };
+    let shell_command = shell_command_with_args(&command, &cmd_args);
+    let shell_args = vec!["-c".to_string(), shell_command];
+
+    // DISPLAY (arg index 3): ignored in this implementation.
+    run_process_command(eval, "sh", infile, destination, &shell_args)
+}
+
+/// (process-lines PROGRAM &rest ARGS) -> list of lines
+pub(crate) fn builtin_process_lines(
+    _eval: &mut super::eval::Evaluator,
+    args: Vec<Value>,
+) -> EvalResult {
+    expect_min_args("process-lines", &args, 1)?;
+    let program = expect_string_strict(&args[0])?;
+    let cmd_args = parse_string_args_strict(&args[1..])?;
+    let (status, stdout) = run_process_capture_output(&program, &cmd_args)?;
+    if status != 0 {
+        return Err(signal_process_lines_status_error(&program, status));
+    }
+    Ok(parse_output_lines(&stdout))
+}
+
+/// (process-lines-ignore-status PROGRAM &rest ARGS) -> list of lines
+pub(crate) fn builtin_process_lines_ignore_status(
+    _eval: &mut super::eval::Evaluator,
+    args: Vec<Value>,
+) -> EvalResult {
+    expect_min_args("process-lines-ignore-status", &args, 1)?;
+    let program = expect_string_strict(&args[0])?;
+    let cmd_args = parse_string_args_strict(&args[1..])?;
+    let (_, stdout) = run_process_capture_output(&program, &cmd_args)?;
+    Ok(parse_output_lines(&stdout))
+}
+
+/// (process-lines-handling-status PROGRAM STATUS-HANDLER &rest ARGS) -> list of lines
+pub(crate) fn builtin_process_lines_handling_status(
+    eval: &mut super::eval::Evaluator,
+    args: Vec<Value>,
+) -> EvalResult {
+    expect_min_args("process-lines-handling-status", &args, 2)?;
+    let program = expect_string_strict(&args[0])?;
+    let status_handler = args[1].clone();
+    let cmd_args = parse_string_args_strict(&args[2..])?;
+    let (status, stdout) = run_process_capture_output(&program, &cmd_args)?;
+    let lines = parse_output_lines(&stdout);
+
+    if !status_handler.is_nil() {
+        let _ = eval.apply(status_handler, vec![Value::Int(status as i64)])?;
+    } else if status != 0 {
+        return Err(signal_process_lines_status_error(&program, status));
     }
 
-    let mut command = Command::new(&program);
-    command
-        .args(&cmd_args)
-        .stdout(Stdio::piped())
-        .stderr(Stdio::piped());
-    configure_call_process_stdin(&mut command, infile.as_deref())?;
-    let output = command
-        .output()
-        .map_err(|e| signal_process_io("Searching for program", Some(&program), e))?;
-
-    let exit_code = output.status.code().unwrap_or(-1);
-    route_captured_output(eval, &destination_spec, &output.stdout, &output.stderr)?;
-    Ok(Value::Int(exit_code as i64))
+    Ok(lines)
 }
 
 /// (call-process-region START END PROGRAM &optional DELETE DESTINATION DISPLAY &rest ARGS)
@@ -1078,6 +1245,52 @@ pub(crate) fn builtin_process_kill_buffer_query_function(args: Vec<Value>) -> Ev
     Ok(Value::True)
 }
 
+/// (process-menu-delete-process) -> nil
+pub(crate) fn builtin_process_menu_delete_process(
+    eval: &mut super::eval::Evaluator,
+    args: Vec<Value>,
+) -> EvalResult {
+    expect_args("process-menu-delete-process", &args, 0)?;
+    let current_buffer_name = eval
+        .buffers
+        .current_buffer()
+        .map(|buffer| buffer.name.clone())
+        .ok_or_else(|| signal("error", vec![Value::string("No current buffer")]))?;
+    if eval
+        .processes
+        .find_by_buffer_name(&current_buffer_name)
+        .is_some()
+    {
+        return Err(signal(
+            "error",
+            vec![Value::string(
+                "Buffer does not seem to be associated with any file",
+            )],
+        ));
+    }
+    let _ = resolve_optional_process_or_current_buffer(eval, None)?;
+    Ok(Value::Nil)
+}
+
+/// (process-menu-visit-buffer LINE) -> nil
+pub(crate) fn builtin_process_menu_visit_buffer(
+    _eval: &mut super::eval::Evaluator,
+    args: Vec<Value>,
+) -> EvalResult {
+    expect_args("process-menu-visit-buffer", &args, 1)?;
+    let _line = expect_int_or_marker(&args[0])?;
+    Err(signal(
+        "wrong-type-argument",
+        vec![Value::symbol("stringp"), Value::Nil],
+    ))
+}
+
+/// (process-menu-mode) -> nil
+pub(crate) fn builtin_process_menu_mode(args: Vec<Value>) -> EvalResult {
+    expect_args("process-menu-mode", &args, 0)?;
+    Ok(Value::Nil)
+}
+
 /// (process-tty-name PROCESS &optional STREAM) -> string
 pub(crate) fn builtin_process_tty_name(
     eval: &mut super::eval::Evaluator,
@@ -1087,7 +1300,10 @@ pub(crate) fn builtin_process_tty_name(
     if args.len() > 2 {
         return Err(signal(
             "wrong-number-of-arguments",
-            vec![Value::symbol("process-tty-name"), Value::Int(args.len() as i64)],
+            vec![
+                Value::symbol("process-tty-name"),
+                Value::Int(args.len() as i64),
+            ],
         ));
     }
     let _id = resolve_live_process_or_wrong_type(eval, &args[0])?;
@@ -1174,7 +1390,10 @@ pub(crate) fn builtin_process_send_eof(
     if args.len() > 1 {
         return Err(signal(
             "wrong-number-of-arguments",
-            vec![Value::symbol("process-send-eof"), Value::Int(args.len() as i64)],
+            vec![
+                Value::symbol("process-send-eof"),
+                Value::Int(args.len() as i64),
+            ],
         ));
     }
     let id = resolve_optional_process_or_current_buffer(eval, args.first())?;
@@ -1281,7 +1500,10 @@ pub(crate) fn builtin_process_live_p(
 }
 
 /// (process-id PROCESS) -> integer
-pub(crate) fn builtin_process_id(eval: &mut super::eval::Evaluator, args: Vec<Value>) -> EvalResult {
+pub(crate) fn builtin_process_id(
+    eval: &mut super::eval::Evaluator,
+    args: Vec<Value>,
+) -> EvalResult {
     expect_args("process-id", &args, 1)?;
     let id = resolve_live_process_or_wrong_type(eval, &args[0])?;
     Ok(Value::Int(id as i64))
@@ -1294,10 +1516,12 @@ pub(crate) fn builtin_process_query_on_exit_flag(
 ) -> EvalResult {
     expect_args("process-query-on-exit-flag", &args, 1)?;
     let id = resolve_live_process_or_wrong_type(eval, &args[0])?;
-    let proc = eval
-        .processes
-        .get(id)
-        .ok_or_else(|| signal("wrong-type-argument", vec![Value::symbol("processp"), args[0].clone()]))?;
+    let proc = eval.processes.get(id).ok_or_else(|| {
+        signal(
+            "wrong-type-argument",
+            vec![Value::symbol("processp"), args[0].clone()],
+        )
+    })?;
     Ok(Value::bool(proc.query_on_exit_flag))
 }
 
@@ -1309,10 +1533,12 @@ pub(crate) fn builtin_set_process_query_on_exit_flag(
     expect_args("set-process-query-on-exit-flag", &args, 2)?;
     let id = resolve_live_process_or_wrong_type(eval, &args[0])?;
     let flag = args[1].is_truthy();
-    let proc = eval
-        .processes
-        .get_mut(id)
-        .ok_or_else(|| signal("wrong-type-argument", vec![Value::symbol("processp"), args[0].clone()]))?;
+    let proc = eval.processes.get_mut(id).ok_or_else(|| {
+        signal(
+            "wrong-type-argument",
+            vec![Value::symbol("processp"), args[0].clone()],
+        )
+    })?;
     proc.query_on_exit_flag = flag;
     Ok(args[1].clone())
 }
@@ -1324,10 +1550,12 @@ pub(crate) fn builtin_process_command(
 ) -> EvalResult {
     expect_args("process-command", &args, 1)?;
     let id = resolve_live_process_or_wrong_type(eval, &args[0])?;
-    let proc = eval
-        .processes
-        .get(id)
-        .ok_or_else(|| signal("wrong-type-argument", vec![Value::symbol("processp"), args[0].clone()]))?;
+    let proc = eval.processes.get(id).ok_or_else(|| {
+        signal(
+            "wrong-type-argument",
+            vec![Value::symbol("processp"), args[0].clone()],
+        )
+    })?;
     let mut items = Vec::with_capacity(proc.args.len() + 1);
     items.push(Value::string(proc.command.clone()));
     items.extend(proc.args.iter().cloned().map(Value::string));
@@ -1343,7 +1571,10 @@ pub(crate) fn builtin_process_contact(
     if args.len() > 3 {
         return Err(signal(
             "wrong-number-of-arguments",
-            vec![Value::symbol("process-contact"), Value::Int(args.len() as i64)],
+            vec![
+                Value::symbol("process-contact"),
+                Value::Int(args.len() as i64),
+            ],
         ));
     }
     let _id = resolve_live_process_or_wrong_type(eval, &args[0])?;
@@ -1357,10 +1588,12 @@ pub(crate) fn builtin_process_filter(
 ) -> EvalResult {
     expect_args("process-filter", &args, 1)?;
     let id = resolve_live_process_or_wrong_type(eval, &args[0])?;
-    let proc = eval
-        .processes
-        .get(id)
-        .ok_or_else(|| signal("wrong-type-argument", vec![Value::symbol("processp"), args[0].clone()]))?;
+    let proc = eval.processes.get(id).ok_or_else(|| {
+        signal(
+            "wrong-type-argument",
+            vec![Value::symbol("processp"), args[0].clone()],
+        )
+    })?;
     Ok(proc.filter.clone())
 }
 
@@ -1376,10 +1609,12 @@ pub(crate) fn builtin_set_process_filter(
     } else {
         args[1].clone()
     };
-    let proc = eval
-        .processes
-        .get_mut(id)
-        .ok_or_else(|| signal("wrong-type-argument", vec![Value::symbol("processp"), args[0].clone()]))?;
+    let proc = eval.processes.get_mut(id).ok_or_else(|| {
+        signal(
+            "wrong-type-argument",
+            vec![Value::symbol("processp"), args[0].clone()],
+        )
+    })?;
     proc.filter = stored.clone();
     Ok(stored)
 }
@@ -1391,10 +1626,12 @@ pub(crate) fn builtin_process_sentinel(
 ) -> EvalResult {
     expect_args("process-sentinel", &args, 1)?;
     let id = resolve_live_process_or_wrong_type(eval, &args[0])?;
-    let proc = eval
-        .processes
-        .get(id)
-        .ok_or_else(|| signal("wrong-type-argument", vec![Value::symbol("processp"), args[0].clone()]))?;
+    let proc = eval.processes.get(id).ok_or_else(|| {
+        signal(
+            "wrong-type-argument",
+            vec![Value::symbol("processp"), args[0].clone()],
+        )
+    })?;
     Ok(proc.sentinel.clone())
 }
 
@@ -1410,10 +1647,12 @@ pub(crate) fn builtin_set_process_sentinel(
     } else {
         args[1].clone()
     };
-    let proc = eval
-        .processes
-        .get_mut(id)
-        .ok_or_else(|| signal("wrong-type-argument", vec![Value::symbol("processp"), args[0].clone()]))?;
+    let proc = eval.processes.get_mut(id).ok_or_else(|| {
+        signal(
+            "wrong-type-argument",
+            vec![Value::symbol("processp"), args[0].clone()],
+        )
+    })?;
     proc.sentinel = stored.clone();
     Ok(stored)
 }
@@ -1425,10 +1664,12 @@ pub(crate) fn builtin_process_plist(
 ) -> EvalResult {
     expect_args("process-plist", &args, 1)?;
     let id = resolve_live_process_or_wrong_type(eval, &args[0])?;
-    let proc = eval
-        .processes
-        .get(id)
-        .ok_or_else(|| signal("wrong-type-argument", vec![Value::symbol("processp"), args[0].clone()]))?;
+    let proc = eval.processes.get(id).ok_or_else(|| {
+        signal(
+            "wrong-type-argument",
+            vec![Value::symbol("processp"), args[0].clone()],
+        )
+    })?;
     Ok(proc.plist.clone())
 }
 
@@ -1445,10 +1686,12 @@ pub(crate) fn builtin_set_process_plist(
         ));
     }
     let id = resolve_live_process_or_wrong_type(eval, &args[0])?;
-    let proc = eval
-        .processes
-        .get_mut(id)
-        .ok_or_else(|| signal("wrong-type-argument", vec![Value::symbol("processp"), args[0].clone()]))?;
+    let proc = eval.processes.get_mut(id).ok_or_else(|| {
+        signal(
+            "wrong-type-argument",
+            vec![Value::symbol("processp"), args[0].clone()],
+        )
+    })?;
     proc.plist = args[1].clone();
     Ok(proc.plist.clone())
 }
@@ -1463,15 +1706,22 @@ pub(crate) fn builtin_process_put(
     let current_plist = eval
         .processes
         .get(id)
-        .ok_or_else(|| signal("wrong-type-argument", vec![Value::symbol("processp"), args[0].clone()]))?
+        .ok_or_else(|| {
+            signal(
+                "wrong-type-argument",
+                vec![Value::symbol("processp"), args[0].clone()],
+            )
+        })?
         .plist
         .clone();
     let new_plist =
         super::builtins::builtin_plist_put(vec![current_plist, args[1].clone(), args[2].clone()])?;
-    let proc = eval
-        .processes
-        .get_mut(id)
-        .ok_or_else(|| signal("wrong-type-argument", vec![Value::symbol("processp"), args[0].clone()]))?;
+    let proc = eval.processes.get_mut(id).ok_or_else(|| {
+        signal(
+            "wrong-type-argument",
+            vec![Value::symbol("processp"), args[0].clone()],
+        )
+    })?;
     proc.plist = new_plist.clone();
     Ok(new_plist)
 }
@@ -1486,7 +1736,12 @@ pub(crate) fn builtin_process_get(
     let plist = eval
         .processes
         .get(id)
-        .ok_or_else(|| signal("wrong-type-argument", vec![Value::symbol("processp"), args[0].clone()]))?
+        .ok_or_else(|| {
+            signal(
+                "wrong-type-argument",
+                vec![Value::symbol("processp"), args[0].clone()],
+            )
+        })?
         .plist
         .clone();
     super::builtins::builtin_plist_get(vec![plist, args[1].clone()])
@@ -2422,5 +2677,82 @@ mod tests {
         assert_eq!(results[9], "OK wrong-number-of-arguments");
         assert_eq!(results[10], "OK wrong-number-of-arguments");
         assert_eq!(results[11], "OK wrong-number-of-arguments");
+    }
+
+    #[test]
+    fn process_file_lines_shell_and_menu_runtime_surface() {
+        let echo = find_bin("echo");
+        let cat = find_bin("cat");
+        let results = eval_all(&format!(
+            r#"(mapcar (lambda (s)
+                         (list s
+                               (fboundp s)
+                               (subrp (symbol-function s))
+                               (subr-arity (symbol-function s))
+                               (commandp s)))
+                       '(process-file
+                         process-file-shell-command
+                         process-lines
+                         process-lines-ignore-status
+                         process-lines-handling-status
+                         process-menu-delete-process
+                         process-menu-visit-buffer
+                         process-menu-mode))
+               (with-temp-buffer
+                 (list (process-file "{echo}" nil t nil "hi")
+                       (string-prefix-p "hi" (buffer-string))))
+               (condition-case err (process-file nil nil t nil) (error err))
+               (with-temp-buffer
+                 (list (process-file-shell-command "echo hi" nil t nil)
+                       (string-prefix-p "hi" (buffer-string))))
+               (condition-case err (process-file-shell-command 1 nil t nil) (error err))
+               (process-lines "{echo}" "hello")
+               (condition-case err (process-lines "sh" "-c" "exit 5") (error err))
+               (process-lines-ignore-status "sh" "-c" "echo hi; exit 5")
+               (let ((x nil))
+                 (list
+                  (process-lines-handling-status "sh" (lambda (&rest args) (setq x args)) "-c" "exit 9")
+                  x))
+               (condition-case err (process-lines-handling-status "echo" "hello") (error err))
+               (condition-case err
+                   (let ((b (get-buffer-create "pmenu-test")))
+                     (with-current-buffer b
+                       (let ((p (start-process "pmenu-proc" "pmenu-test" "{cat}")))
+                         (list (processp p) (process-menu-delete-process) (process-live-p p)))))
+                 (error err))
+               (with-temp-buffer
+                 (condition-case err
+                     (process-menu-delete-process)
+                   (error (and (eq (car err) 'error)
+                               (string-match-p "has no process" (cadr err))
+                               t))))
+               (condition-case err (process-menu-visit-buffer nil) (error err))
+               (condition-case err (process-menu-visit-buffer 1) (error err))
+               (process-menu-mode)"#,
+        ));
+        assert_eq!(
+            results[0],
+            "OK ((process-file t t (1 . many) nil) (process-file-shell-command t t (1 . many) nil) (process-lines t t (1 . many) nil) (process-lines-ignore-status t t (1 . many) nil) (process-lines-handling-status t t (2 . many) nil) (process-menu-delete-process t t (0 . 0) t) (process-menu-visit-buffer t t (1 . 1) nil) (process-menu-mode t t (0 . 0) t))"
+        );
+        assert_eq!(results[1], "OK (0 t)");
+        assert_eq!(results[2], "OK (wrong-type-argument stringp nil)");
+        assert_eq!(results[3], "OK (0 t)");
+        assert_eq!(results[4], "OK (wrong-type-argument sequencep 1)");
+        assert_eq!(results[5], r#"OK ("hello")"#);
+        assert_eq!(results[6], r#"OK (error "sh exited with status 5")"#);
+        assert_eq!(results[7], r#"OK ("hi")"#);
+        assert_eq!(results[8], "OK (nil (9))");
+        assert_eq!(results[9], r#"OK (invalid-function "hello")"#);
+        assert_eq!(
+            results[10],
+            r#"OK (error "Buffer does not seem to be associated with any file")"#
+        );
+        assert_eq!(results[11], "OK t");
+        assert_eq!(
+            results[12],
+            "OK (wrong-type-argument integer-or-marker-p nil)"
+        );
+        assert_eq!(results[13], "OK (wrong-type-argument stringp nil)");
+        assert_eq!(results[14], "OK nil");
     }
 }

@@ -557,6 +557,7 @@ cases/process-subr-arity-semantics
 cases/process-runtime-introspection-semantics
 cases/process-mark-type-thread-send-semantics
 cases/process-coding-tty-query-semantics
+cases/process-file-lines-menu-semantics
 cases/getenv-optional-frame-semantics
 cases/setenv-sequence-semantics
 cases/file-name-concat
