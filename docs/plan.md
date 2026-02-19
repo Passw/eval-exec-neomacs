@@ -28,6 +28,27 @@ Last updated: 2026-02-19
 
 ## Doing
 
+- Strengthened network family-width invariants for interface and lookup helpers:
+  - runtime lock-ins:
+    - `rust/neovm-core/src/elisp/process.rs`
+      - expanded `process_network_interface_and_signal_runtime_surface` assertions to enforce:
+        - `network-interface-list` family filtering width parity:
+          - `'ipv4` entries carry 5-slot vectors
+          - `'ipv6` entries carry 9-slot vectors
+          - both `FULL=t` and default cons-entry surfaces
+        - `network-lookup-address-info` family filtering width parity:
+          - `'ipv4` results carry 5-slot vectors
+          - `'ipv6` results carry 9-slot vectors
+  - corpus changes:
+    - expanded and re-recorded:
+      - `test/neovm/vm-compat/cases/process-network-interface-signal-semantics.forms`
+      - `test/neovm/vm-compat/cases/process-network-interface-signal-semantics.expected.tsv`
+  - verified:
+    - `cargo test --manifest-path rust/neovm-core/Cargo.toml process_network_interface_and_signal_runtime_surface` (pass)
+    - `make -C test/neovm/vm-compat record FORMS=cases/process-network-interface-signal-semantics.forms EXPECTED=cases/process-network-interface-signal-semantics.expected.tsv` (pass)
+    - `make -C test/neovm/vm-compat check-one-neovm CASE=cases/process-network-interface-signal-semantics` (pass, `2/2`)
+    - `make -C test/neovm/vm-compat check-all-neovm-strict` (pass; case inventory `788`)
+
 - Aligned `network-lookup-address-info` host resolution with oracle and locked literal family-filter parity:
   - runtime changes:
     - `rust/neovm-core/src/elisp/process.rs`
