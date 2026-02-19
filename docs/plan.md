@@ -28,6 +28,49 @@ Last updated: 2026-02-19
 
 ## Doing
 
+- Completed `set-window-hscroll` / `set-window-margins` parity slice and added oracle lock-ins:
+  - runtime changes:
+    - `rust/neovm-core/src/elisp/window_cmds.rs`
+      - added evaluator-backed setter builtins:
+        - `set-window-hscroll`
+        - `set-window-margins`
+      - aligned `set-window-hscroll` behavior:
+        - validates `NCOLS` as `fixnump`
+        - clamps negative values to `0`
+        - returns the resulting hscroll value
+      - aligned `set-window-margins` behavior:
+        - validates `LEFT/RIGHT` as `nil` or non-negative integers (`args-out-of-range` for negatives)
+        - stores margin state on window leaves
+        - returns `t` on margin change and `nil` when unchanged
+      - added evaluator unit coverage:
+        - `window_hscroll_and_margin_setters_match_batch_defaults_and_error_predicates`
+    - `rust/neovm-core/src/elisp/builtins.rs`
+      - wired dispatch for `set-window-hscroll` and `set-window-margins`.
+    - `rust/neovm-core/src/elisp/builtin_registry.rs`
+      - registered both setter names in builtin registry.
+      - parity registry counts now remain:
+        - `DISPATCH_BUILTIN_NAMES`: `993`
+        - core parity entries: `992`
+    - `rust/neovm-core/src/elisp/subr_info.rs`
+      - added `subr-arity` metadata:
+        - `(2 . 2)`: `set-window-hscroll`
+        - `(2 . 3)`: `set-window-margins`
+      - extended `subr_arity_window_frame_primitives_match_oracle`.
+  - corpus changes:
+    - added:
+      - `test/neovm/vm-compat/cases/window-hscroll-margins-setter-semantics.{forms,expected.tsv}`
+    - expanded and re-recorded:
+      - `test/neovm/vm-compat/cases/window-frame-subr-arity-semantics.{forms,expected.tsv}`
+    - wired new case into:
+      - `test/neovm/vm-compat/cases/default.list`
+  - verified:
+    - `cargo test --manifest-path rust/neovm-core/Cargo.toml window_hscroll_and_margin_setters_match_batch_defaults_and_error_predicates` (pass)
+    - `cargo test --manifest-path rust/neovm-core/Cargo.toml subr_arity_window_frame_primitives_match_oracle` (pass)
+    - `make -C test/neovm/vm-compat check-one-neovm CASE=cases/window-hscroll-margins-setter-semantics` (pass)
+    - `make -C test/neovm/vm-compat check-one-neovm CASE=cases/window-frame-subr-arity-semantics` (pass)
+    - `make -C test/neovm/vm-compat check-builtin-registry-all` (pass)
+    - `make -C test/neovm/vm-compat check-all-neovm-strict` (pass)
+
 - Completed `window-vscroll` helper parity slice and added oracle lock-ins:
   - runtime changes:
     - `rust/neovm-core/src/elisp/window_cmds.rs`

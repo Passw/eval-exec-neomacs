@@ -860,8 +860,10 @@ fn subr_arity_value(name: &str) -> Value {
         "image-transforms-p" => arity_cons(0, Some(1)),
         "image-type-available-p" => arity_cons(1, Some(1)),
         "list-fonts" => arity_cons(1, Some(4)),
-        "frame-parameter" | "set-window-point" => arity_cons(2, Some(2)),
-        "set-window-buffer" | "set-window-start" => arity_cons(2, Some(3)),
+        "frame-parameter" | "set-window-point" | "set-window-hscroll" => arity_cons(2, Some(2)),
+        "set-window-buffer" | "set-window-start" | "set-window-margins" => {
+            arity_cons(2, Some(3))
+        }
         "set-window-vscroll" => arity_cons(2, Some(4)),
         "fit-window-to-buffer" => arity_cons(0, Some(6)),
         "window-text-pixel-size" => arity_cons(0, Some(7)),
@@ -2400,6 +2402,8 @@ mod tests {
         assert_subr_arity("selected-window", 0, Some(0));
         assert_subr_arity("set-window-parameter", 3, Some(3));
         assert_subr_arity("set-window-buffer", 2, Some(3));
+        assert_subr_arity("set-window-hscroll", 2, Some(2));
+        assert_subr_arity("set-window-margins", 2, Some(3));
         assert_subr_arity("set-window-point", 2, Some(2));
         assert_subr_arity("set-window-start", 2, Some(3));
         assert_subr_arity("set-window-vscroll", 2, Some(4));

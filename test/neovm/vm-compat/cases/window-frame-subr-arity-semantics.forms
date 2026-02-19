@@ -12,6 +12,8 @@
 (subr-arity (symbol-function 'minibuffer-window))
 (subr-arity (symbol-function 'selected-window))
 (subr-arity (symbol-function 'set-window-buffer))
+(subr-arity (symbol-function 'set-window-hscroll))
+(subr-arity (symbol-function 'set-window-margins))
 (subr-arity (symbol-function 'set-window-parameter))
 (subr-arity (symbol-function 'set-window-point))
 (subr-arity (symbol-function 'set-window-start))

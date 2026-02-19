@@ -7805,6 +7805,16 @@ pub(crate) fn dispatch_builtin(
         "set-window-start" => {
             return Some(super::window_cmds::builtin_set_window_start(eval, args))
         }
+        "set-window-hscroll" => {
+            return Some(super::window_cmds::builtin_set_window_hscroll(
+                eval, args,
+            ))
+        }
+        "set-window-margins" => {
+            return Some(super::window_cmds::builtin_set_window_margins(
+                eval, args,
+            ))
+        }
         "set-window-vscroll" => {
             return Some(super::window_cmds::builtin_set_window_vscroll(
                 eval, args,

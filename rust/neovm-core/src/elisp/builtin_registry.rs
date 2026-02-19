@@ -781,6 +781,8 @@ const DISPATCH_BUILTIN_NAMES: &[&str] = &[
     "set-time-zone-rule",
     "set-window-buffer",
     "set-window-dedicated-p",
+    "set-window-hscroll",
+    "set-window-margins",
     "set-window-parameter",
     "set-window-point",
     "set-window-start",

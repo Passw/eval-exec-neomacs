@@ -61,6 +61,49 @@ fn expect_int(value: &Value) -> Result<i64, Flow> {
     }
 }
 
+/// Extract a fixnum-like integer from a Value.
+fn expect_fixnum(value: &Value) -> Result<i64, Flow> {
+    match value {
+        Value::Int(n) => Ok(*n),
+        Value::Char(c) => Ok(*c as i64),
+        other => Err(signal(
+            "wrong-type-argument",
+            vec![Value::symbol("fixnump"), other.clone()],
+        )),
+    }
+}
+
+/// Parse a window margin argument (`nil` or non-negative integer).
+fn expect_margin_width(value: &Value) -> Result<usize, Flow> {
+    const MAX_MARGIN: i64 = 2_147_483_647;
+    match value {
+        Value::Nil => Ok(0),
+        Value::Int(n) => {
+            if *n < 0 || *n > MAX_MARGIN {
+                return Err(signal(
+                    "args-out-of-range",
+                    vec![Value::Int(*n), Value::Int(0), Value::Int(MAX_MARGIN)],
+                ));
+            }
+            Ok(*n as usize)
+        }
+        Value::Char(c) => {
+            let n = *c as i64;
+            if n > MAX_MARGIN {
+                return Err(signal(
+                    "args-out-of-range",
+                    vec![Value::Int(n), Value::Int(0), Value::Int(MAX_MARGIN)],
+                ));
+            }
+            Ok(n as usize)
+        }
+        other => Err(signal(
+            "wrong-type-argument",
+            vec![Value::symbol("integerp"), other.clone()],
+        )),
+    }
+}
+
 /// Resolve an optional window designator.
 ///
 /// - nil/omitted => selected window of selected frame
@@ -871,6 +914,24 @@ pub(crate) fn builtin_window_hscroll(
     }
 }
 
+/// `(set-window-hscroll WINDOW NCOLS)` -> integer.
+pub(crate) fn builtin_set_window_hscroll(
+    eval: &mut super::eval::Evaluator,
+    args: Vec<Value>,
+) -> EvalResult {
+    expect_args("set-window-hscroll", &args, 2)?;
+    let (fid, wid) = resolve_window_id(eval, args.first())?;
+    let cols = expect_fixnum(&args[1])?.max(0) as usize;
+    if let Some(Window::Leaf { hscroll, .. }) = eval
+        .frames
+        .get_mut(fid)
+        .and_then(|frame| frame.find_window_mut(wid))
+    {
+        *hscroll = cols;
+    }
+    Ok(Value::Int(cols as i64))
+}
+
 /// `(window-vscroll &optional WINDOW PIXELWISE)` -> integer.
 ///
 /// Batch-mode GNU Emacs reports zero vertical scroll, including for minibuffer
@@ -904,6 +965,35 @@ pub(crate) fn builtin_set_window_vscroll(
             vec![Value::symbol("numberp"), other.clone()],
         )),
     }
+}
+
+/// `(set-window-margins WINDOW LEFT-WIDTH &optional RIGHT-WIDTH)` -> changed-p.
+pub(crate) fn builtin_set_window_margins(
+    eval: &mut super::eval::Evaluator,
+    args: Vec<Value>,
+) -> EvalResult {
+    expect_min_args("set-window-margins", &args, 2)?;
+    expect_max_args("set-window-margins", &args, 3)?;
+    let (fid, wid) = resolve_window_id(eval, args.first())?;
+    let left = expect_margin_width(&args[1])?;
+    let right = if let Some(arg) = args.get(2) {
+        expect_margin_width(arg)?
+    } else {
+        0
+    };
+
+    if let Some(Window::Leaf { margins, .. }) = eval
+        .frames
+        .get_mut(fid)
+        .and_then(|frame| frame.find_window_mut(wid))
+    {
+        let next = (left, right);
+        if *margins != next {
+            *margins = next;
+            return Ok(Value::True);
+        }
+    }
+    Ok(Value::Nil)
 }
 
 /// `(window-margins &optional WINDOW)` -> margins pair or nil.
@@ -3275,6 +3365,71 @@ mod tests {
         assert_eq!(
             out[1],
             "OK ((wrong-type-argument window-live-p 999999) (wrong-type-argument window-live-p foo) (wrong-type-argument window-live-p 999999) (wrong-type-argument window-live-p foo) (wrong-type-argument numberp foo) (wrong-number-of-arguments window-vscroll 3) (wrong-number-of-arguments set-window-vscroll 5))"
+        );
+        assert_eq!(out[2], "OK (wrong-type-argument wrong-type-argument)");
+    }
+
+    #[test]
+    fn window_hscroll_and_margin_setters_match_batch_defaults_and_error_predicates() {
+        let forms = parse_forms(
+            "(let* ((w (selected-window))
+                    (m (car (last (window-list nil t)))))
+               (list (window-hscroll w)
+                     (set-window-hscroll w 3)
+                     (window-hscroll w)
+                     (set-window-hscroll w -1)
+                     (window-hscroll w)
+                     (set-window-hscroll w ?a)
+                     (window-hscroll w)
+                     (window-margins w)
+                     (set-window-margins w 1 2)
+                     (window-margins w)
+                     (set-window-margins w 1 2)
+                     (set-window-margins w nil nil)
+                     (window-margins w)
+                     (set-window-margins w 3)
+                     (window-margins w)
+                     (set-window-margins w 3)
+                     (window-hscroll m)
+                     (set-window-hscroll m 4)
+                     (window-hscroll m)
+                     (window-margins m)
+                     (set-window-margins m 4 5)
+                     (window-margins m)))
+             (list (condition-case err (set-window-hscroll nil 1.5) (error err))
+                   (condition-case err (set-window-hscroll nil 'foo) (error err))
+                   (condition-case err (set-window-hscroll 999999 1) (error err))
+                   (condition-case err (set-window-hscroll 'foo 1) (error err))
+                   (condition-case err (set-window-hscroll nil) (error err))
+                   (condition-case err (set-window-hscroll nil 1 nil) (error err))
+                   (condition-case err (set-window-margins nil -1 0) (error err))
+                   (condition-case err (set-window-margins nil 1 -2) (error err))
+                   (condition-case err (set-window-margins nil 1.5 0) (error err))
+                   (condition-case err (set-window-margins nil 'foo 0) (error err))
+                   (condition-case err (set-window-margins nil 1 'foo) (error err))
+                   (condition-case err (set-window-margins 999999 1 2) (error err))
+                   (condition-case err (set-window-margins 'foo 1 2) (error err))
+                   (condition-case err (set-window-margins nil) (error err))
+                   (condition-case err (set-window-margins nil 1 2 3) (error err)))
+             (let ((w (split-window)))
+               (delete-window w)
+               (list (condition-case err (set-window-hscroll w 1) (error (car err)))
+                     (condition-case err (set-window-margins w 1 2) (error (car err)))))",
+        )
+        .expect("parse");
+        let mut ev = Evaluator::new();
+        let out = ev
+            .eval_forms(&forms)
+            .iter()
+            .map(format_eval_result)
+            .collect::<Vec<_>>();
+        assert_eq!(
+            out[0],
+            "OK (0 3 3 0 0 97 97 (nil) t (1 . 2) nil t (nil) t (3) nil 0 4 4 (nil) t (4 . 5))"
+        );
+        assert_eq!(
+            out[1],
+            "OK ((wrong-type-argument fixnump 1.5) (wrong-type-argument fixnump foo) (wrong-type-argument window-live-p 999999) (wrong-type-argument window-live-p foo) (wrong-number-of-arguments set-window-hscroll 1) (wrong-number-of-arguments set-window-hscroll 3) (args-out-of-range -1 0 2147483647) (args-out-of-range -2 0 2147483647) (wrong-type-argument integerp 1.5) (wrong-type-argument integerp foo) (wrong-type-argument integerp foo) (wrong-type-argument window-live-p 999999) (wrong-type-argument window-live-p foo) (wrong-number-of-arguments set-window-margins 1) (wrong-number-of-arguments set-window-margins 4))"
         );
         assert_eq!(out[2], "OK (wrong-type-argument wrong-type-argument)");
     }
