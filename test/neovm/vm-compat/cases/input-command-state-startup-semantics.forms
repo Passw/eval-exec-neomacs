@@ -13,10 +13,26 @@
    executing-kbd-macro
    executing-kbd-macro-index
    command-history
+   extended-command-history
    read-expression-history
    read-number-history
    read-char-history
    minibuffer-history
+   minibuffer-history-variable
+   minibuffer-history-position
+   minibuffer-default
+   minibuffer-default-add-function
+   minibuffer-completion-table
+   minibuffer-completion-predicate
+   minibuffer-completion-confirm
+   minibuffer-completion-auto-choose
+   minibuffer-completion-base
+   minibuffer-help-form
+   minibuffer-completing-file-name
+   minibuffer-regexp-mode
+   minibuffer-message-clear-timeout
+   minibuffer-message-properties
+   minibuffer-text-before-history
    regexp-search-ring
    regexp-search-ring-yank-pointer
    search-ring
@@ -70,10 +86,26 @@
  executing-kbd-macro
  executing-kbd-macro-index
  command-history
+ extended-command-history
  read-expression-history
  read-number-history
  read-char-history
  minibuffer-history
+ minibuffer-history-variable
+ minibuffer-history-position
+ minibuffer-default
+ minibuffer-default-add-function
+ minibuffer-completion-table
+ minibuffer-completion-predicate
+ minibuffer-completion-confirm
+ minibuffer-completion-auto-choose
+ minibuffer-completion-base
+ minibuffer-help-form
+ minibuffer-completing-file-name
+ minibuffer-regexp-mode
+ minibuffer-message-clear-timeout
+ minibuffer-message-properties
+ minibuffer-text-before-history
  regexp-search-ring
  regexp-search-ring-yank-pointer
  search-ring
@@ -120,10 +152,26 @@
         executing-kbd-macro
         executing-kbd-macro-index
         command-history
+        extended-command-history
         read-expression-history
         read-number-history
         read-char-history
         minibuffer-history
+        minibuffer-history-variable
+        minibuffer-history-position
+        minibuffer-default
+        minibuffer-default-add-function
+        minibuffer-completion-table
+        minibuffer-completion-predicate
+        minibuffer-completion-confirm
+        minibuffer-completion-auto-choose
+        minibuffer-completion-base
+        minibuffer-help-form
+        minibuffer-completing-file-name
+        minibuffer-regexp-mode
+        minibuffer-message-clear-timeout
+        minibuffer-message-properties
+        minibuffer-text-before-history
         regexp-search-ring
         regexp-search-ring-yank-pointer
         search-ring
@@ -166,10 +214,26 @@
         executing-kbd-macro
         executing-kbd-macro-index
         command-history
+        extended-command-history
         read-expression-history
         read-number-history
         read-char-history
         minibuffer-history
+        minibuffer-history-variable
+        minibuffer-history-position
+        minibuffer-default
+        minibuffer-default-add-function
+        minibuffer-completion-table
+        minibuffer-completion-predicate
+        minibuffer-completion-confirm
+        minibuffer-completion-auto-choose
+        minibuffer-completion-base
+        minibuffer-help-form
+        minibuffer-completing-file-name
+        minibuffer-regexp-mode
+        minibuffer-message-clear-timeout
+        minibuffer-message-properties
+        minibuffer-text-before-history
         regexp-search-ring
         regexp-search-ring-yank-pointer
         search-ring
@@ -224,10 +288,26 @@
                          executing-kbd-macro
                          executing-kbd-macro-index
                          command-history
+                         extended-command-history
                          read-expression-history
                          read-number-history
                          read-char-history
                          minibuffer-history
+                         minibuffer-history-variable
+                         minibuffer-history-position
+                         minibuffer-default
+                         minibuffer-default-add-function
+                         minibuffer-completion-table
+                         minibuffer-completion-predicate
+                         minibuffer-completion-confirm
+                         minibuffer-completion-auto-choose
+                         minibuffer-completion-base
+                         minibuffer-help-form
+                         minibuffer-completing-file-name
+                         minibuffer-regexp-mode
+                         minibuffer-message-clear-timeout
+                         minibuffer-message-properties
+                         minibuffer-text-before-history
                          regexp-search-ring
                          regexp-search-ring-yank-pointer
                          search-ring
@@ -273,10 +353,26 @@
                    executing-kbd-macro
                    executing-kbd-macro-index
                    command-history
+                   extended-command-history
                    read-expression-history
                    read-number-history
                    read-char-history
                    minibuffer-history
+                   minibuffer-history-variable
+                   minibuffer-history-position
+                   minibuffer-default
+                   minibuffer-default-add-function
+                   minibuffer-completion-table
+                   minibuffer-completion-predicate
+                   minibuffer-completion-confirm
+                   minibuffer-completion-auto-choose
+                   minibuffer-completion-base
+                   minibuffer-help-form
+                   minibuffer-completing-file-name
+                   minibuffer-regexp-mode
+                   minibuffer-message-clear-timeout
+                   minibuffer-message-properties
+                   minibuffer-text-before-history
                    regexp-search-ring
                    regexp-search-ring-yank-pointer
                    search-ring

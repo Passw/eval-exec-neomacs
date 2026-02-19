@@ -172,10 +172,29 @@ impl Evaluator {
         obarray.set_symbol_value("executing-kbd-macro", Value::Nil);
         obarray.set_symbol_value("executing-kbd-macro-index", Value::Int(0));
         obarray.set_symbol_value("command-history", Value::Nil);
+        obarray.set_symbol_value("extended-command-history", Value::Nil);
         obarray.set_symbol_value("read-expression-history", Value::Nil);
         obarray.set_symbol_value("read-number-history", Value::Nil);
         obarray.set_symbol_value("read-char-history", Value::Nil);
         obarray.set_symbol_value("minibuffer-history", Value::Nil);
+        obarray.set_symbol_value("minibuffer-history-variable", Value::symbol("minibuffer-history"));
+        obarray.set_symbol_value("minibuffer-history-position", Value::Nil);
+        obarray.set_symbol_value("minibuffer-default", Value::Nil);
+        obarray.set_symbol_value(
+            "minibuffer-default-add-function",
+            Value::symbol("minibuffer-default-add-completions"),
+        );
+        obarray.set_symbol_value("minibuffer-completion-table", Value::Nil);
+        obarray.set_symbol_value("minibuffer-completion-predicate", Value::Nil);
+        obarray.set_symbol_value("minibuffer-completion-confirm", Value::Nil);
+        obarray.set_symbol_value("minibuffer-completion-auto-choose", Value::True);
+        obarray.set_symbol_value("minibuffer-completion-base", Value::Nil);
+        obarray.set_symbol_value("minibuffer-help-form", Value::Nil);
+        obarray.set_symbol_value("minibuffer-completing-file-name", Value::Nil);
+        obarray.set_symbol_value("minibuffer-regexp-mode", Value::True);
+        obarray.set_symbol_value("minibuffer-message-clear-timeout", Value::Nil);
+        obarray.set_symbol_value("minibuffer-message-properties", Value::Nil);
+        obarray.set_symbol_value("minibuffer-text-before-history", Value::Nil);
         obarray.set_symbol_value("regexp-search-ring", Value::Nil);
         obarray.set_symbol_value("regexp-search-ring-yank-pointer", Value::Nil);
         obarray.set_symbol_value("search-ring", Value::Nil);
