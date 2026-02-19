@@ -28,6 +28,19 @@ Last updated: 2026-02-19
 
 ## Doing
 
+- Closed builtin-registry drift for `subr-x` string helpers by aligning startup function-cell shape with GNU Emacs:
+  - runtime change:
+    - `rust/neovm-core/src/elisp/eval.rs`
+    - seeded `string-chop-newline`, `string-pad`, `string-fill`, and `string-limit` as startup `autoload` wrappers (while preserving runtime callability via builtin dispatch).
+  - allowlist cleanup:
+    - `test/neovm/vm-compat/cases/builtin-registry-function-cell-allowlist.txt`
+    - `test/neovm/vm-compat/cases/builtin-registry-function-kind-allowlist.txt`
+    - removed temporary `string-*` allowlist entries; both files are empty again.
+  - verified:
+    - `make -C test/neovm/vm-compat check-one-neovm CASE=subr-x-string-helper-availability` (pass)
+    - `make -C test/neovm/vm-compat check-builtin-registry-all` (pass; function-cell drift 0, function-kind drift 0)
+    - `make -C test/neovm/vm-compat check-all-neovm-strict` (pass)
+
 - Closed subr-x string helper availability drift by wiring existing implementations into NeoVM dispatch/registry:
   - runtime wiring:
     - `rust/neovm-core/src/elisp/builtins.rs`

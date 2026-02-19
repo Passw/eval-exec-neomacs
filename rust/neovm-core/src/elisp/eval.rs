@@ -266,6 +266,29 @@ impl Evaluator {
             "subr-x",
             "Clean up whitespace in STRING.",
         );
+        // subr-x string helpers are startup autoload wrappers in GNU Emacs.
+        // Keep autoload-shaped function cells for introspection parity while
+        // runtime callability is preserved by builtin dispatch.
+        seed_autoload(
+            "string-chop-newline",
+            "subr-x",
+            "Remove trailing CR/LF from STRING.",
+        );
+        seed_autoload(
+            "string-pad",
+            "subr-x",
+            "Pad STRING to LENGTH using optional PADDING.",
+        );
+        seed_autoload(
+            "string-fill",
+            "subr-x",
+            "Fill STRING to WIDTH using optional justification.",
+        );
+        seed_autoload(
+            "string-limit",
+            "subr-x",
+            "Truncate STRING to LIMIT with optional ellipsis.",
+        );
         seed_autoload(
             "string-glyph-split",
             "subr-x",

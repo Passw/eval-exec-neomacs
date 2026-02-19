@@ -1,7 +1,3 @@
 # One builtin name per line.
 # Intentionally allowlistable function-kind mismatches.
 # Kept empty for now; add entries only when intentional policy drift exists.
-string-chop-newline
-string-fill
-string-limit
-string-pad
