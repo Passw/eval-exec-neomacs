@@ -76,6 +76,32 @@ Last updated: 2026-02-19
     - `make -C test/neovm/vm-compat check-one-neovm CASE=cases/input-last-event-reader-semantics` (pass, `13/13`)
     - `make -C test/neovm/vm-compat check-all-neovm-strict` (pass)
 
+- Implemented `self-insert-command` runtime insertion parity and added oracle lock-ins:
+  - runtime changes:
+    - `rust/neovm-core/src/elisp/interactive.rs`
+      - `self-insert-command` now follows GNU Emacs batch semantics for:
+        - arity bounds `(1 . 2)`
+        - negative repetition payload (`(error "Negative repetition argument N")`)
+        - insertion from `last-command-event` when it is a valid character event
+        - no-op behavior for non-character/`nil` `last-command-event`
+        - no-op behavior when optional second arg is non-`nil`
+      - added evaluator unit coverage:
+        - `self_insert_command_argument_validation`
+        - `self_insert_command_uses_last_command_event_character`
+        - `self_insert_command_non_nil_second_arg_is_noop`
+        - `command_execute_self_insert_uses_last_command_event_when_available`
+  - corpus changes:
+    - added and wired:
+      - `test/neovm/vm-compat/cases/self-insert-command-semantics.{forms,expected.tsv}`
+      - `test/neovm/vm-compat/cases/default.list`
+    - lock-ins cover direct invocation plus `command-execute`/`call-interactively` paths with and without seeded `last-command-event`.
+  - verified:
+    - `make -C test/neovm/vm-compat record FORMS=cases/self-insert-command-semantics.forms EXPECTED=cases/self-insert-command-semantics.expected.tsv` (pass)
+    - `make -C test/neovm/vm-compat check-one-neovm CASE=cases/self-insert-command-semantics` (pass, `16/16`)
+    - `cargo test --manifest-path rust/neovm-core/Cargo.toml self_insert_command_` (pass)
+    - `cargo test --manifest-path rust/neovm-core/Cargo.toml command_execute_self_insert_uses_last_command_event_when_available` (pass)
+    - `make -C test/neovm/vm-compat check-all-neovm-strict` (pass)
+
 - Expanded batch prompt/input queue-edge lock-ins for stale/invalid unread tails:
   - corpus changes:
     - expanded and re-recorded:

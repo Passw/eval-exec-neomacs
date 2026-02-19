@@ -60,6 +60,7 @@ cases/command-dispatch-arity-overflow-semantics
 cases/command-keys-arg-semantics
 cases/command-keys-recent-keys-semantics
 cases/command-loop-keys-publication-semantics
+cases/self-insert-command-semantics
 cases/called-interactively-p-semantics
 cases/interactive-p-semantics
 cases/where-is-internal-semantics

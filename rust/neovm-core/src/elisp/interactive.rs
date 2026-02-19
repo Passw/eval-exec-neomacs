@@ -769,22 +769,64 @@ pub(crate) fn builtin_eval_expression(eval: &mut Evaluator, args: Vec<Value>) ->
     eval.eval(&expr)
 }
 
-/// `(self-insert-command N)` -- insert the last typed character N times.
-///
-/// NeoVM currently does not track `last-command-event`; when it is unavailable
-/// this command acts as a no-op and returns nil.
-pub(crate) fn builtin_self_insert_command(_eval: &mut Evaluator, args: Vec<Value>) -> EvalResult {
-    if args.is_empty() {
+fn last_command_event_char(eval: &Evaluator) -> Option<char> {
+    let event = dynamic_or_global_symbol_value(eval, "last-command-event")?;
+    match event {
+        Value::Char(c) => Some(c),
+        Value::Int(n) if n >= 0 => char::from_u32(n as u32),
+        _ => None,
+    }
+}
+
+/// `(self-insert-command N &optional NOAUTOFILL)` -- insert the last typed
+/// character N times.
+pub(crate) fn builtin_self_insert_command(eval: &mut Evaluator, args: Vec<Value>) -> EvalResult {
+    if args.is_empty() || args.len() > 2 {
         return Err(signal(
             "wrong-number-of-arguments",
-            vec![Value::symbol("self-insert-command"), Value::Int(0)],
+            vec![
+                Value::symbol("self-insert-command"),
+                Value::Int(args.len() as i64),
+            ],
         ));
     }
-    if !matches!(&args[0], Value::Int(_)) {
+    let repeats = match args[0] {
+        Value::Int(n) => n,
+        _ => {
+            return Err(signal(
+                "wrong-type-argument",
+                vec![Value::symbol("fixnump"), args[0].clone()],
+            ))
+        }
+    };
+    if repeats < 0 {
         return Err(signal(
-            "wrong-type-argument",
-            vec![Value::symbol("fixnump"), args[0].clone()],
+            "error",
+            vec![Value::string(format!(
+                "Negative repetition argument {}",
+                repeats
+            ))],
         ));
+    }
+    if repeats == 0 {
+        return Ok(Value::Nil);
+    }
+    if args.get(1).is_some_and(|v| !v.is_nil()) {
+        return Ok(Value::Nil);
+    }
+
+    let Some(ch) = last_command_event_char(eval) else {
+        return Ok(Value::Nil);
+    };
+    let Some(repeat_count) = usize::try_from(repeats).ok() else {
+        return Ok(Value::Nil);
+    };
+    let mut text = String::new();
+    for _ in 0..repeat_count {
+        text.push(ch);
+    }
+    if let Some(buf) = eval.buffers.current_buffer_mut() {
+        buf.insert(&text);
     }
     Ok(Value::Nil)
 }
@@ -4586,6 +4628,20 @@ mod tests {
             other => panic!("unexpected flow: {other:?}"),
         }
 
+        let too_many =
+            builtin_self_insert_command(&mut ev, vec![Value::Int(1), Value::Nil, Value::Nil])
+                .expect_err("self-insert-command should reject too many args");
+        match too_many {
+            Flow::Signal(sig) => {
+                assert_eq!(sig.symbol, "wrong-number-of-arguments");
+                assert_eq!(
+                    sig.data,
+                    vec![Value::symbol("self-insert-command"), Value::Int(3)]
+                );
+            }
+            other => panic!("unexpected flow: {other:?}"),
+        }
+
         let wrong_type = builtin_self_insert_command(&mut ev, vec![Value::symbol("x")])
             .expect_err("self-insert-command should type check arg");
         match wrong_type {
@@ -4595,6 +4651,58 @@ mod tests {
             }
             other => panic!("unexpected flow: {other:?}"),
         }
+
+        let negative = builtin_self_insert_command(&mut ev, vec![Value::Int(-1)])
+            .expect_err("self-insert-command should reject negative repetition");
+        match negative {
+            Flow::Signal(sig) => {
+                assert_eq!(sig.symbol, "error");
+                assert_eq!(
+                    sig.data,
+                    vec![Value::string("Negative repetition argument -1")]
+                );
+            }
+            other => panic!("unexpected flow: {other:?}"),
+        }
+    }
+
+    #[test]
+    fn self_insert_command_uses_last_command_event_character() {
+        let mut ev = Evaluator::new();
+        let results = eval_all_with(
+            &mut ev,
+            r#"(with-temp-buffer
+                 (let ((last-command-event 97))
+                   (self-insert-command 2)
+                   (buffer-string)))"#,
+        );
+        assert_eq!(results[0], "OK \"aa\"");
+    }
+
+    #[test]
+    fn self_insert_command_non_nil_second_arg_is_noop() {
+        let mut ev = Evaluator::new();
+        let results = eval_all_with(
+            &mut ev,
+            r#"(with-temp-buffer
+                 (let ((last-command-event 97))
+                   (self-insert-command 2 t)
+                   (buffer-string)))"#,
+        );
+        assert_eq!(results[0], "OK \"\"");
+    }
+
+    #[test]
+    fn command_execute_self_insert_uses_last_command_event_when_available() {
+        let mut ev = Evaluator::new();
+        let results = eval_all_with(
+            &mut ev,
+            r#"(with-temp-buffer
+                 (let ((last-command-event 98))
+                   (command-execute 'self-insert-command nil [98])
+                   (buffer-string)))"#,
+        );
+        assert_eq!(results[0], "OK \"b\"");
     }
 
     #[test]
