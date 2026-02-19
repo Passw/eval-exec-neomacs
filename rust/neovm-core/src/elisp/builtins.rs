@@ -5894,16 +5894,25 @@ fn split_symbol_modifiers(mut name: &str) -> (String, &str) {
     };
     loop {
         if let Some(rest) = name.strip_prefix("C-") {
+            if is_single_char(rest) {
+                break;
+            }
             prefix.push_str("C-");
             name = rest;
             continue;
         }
         if let Some(rest) = name.strip_prefix("M-") {
+            if is_single_char(rest) {
+                break;
+            }
             prefix.push_str("M-");
             name = rest;
             continue;
         }
         if let Some(rest) = name.strip_prefix("S-") {
+            if is_single_char(rest) {
+                break;
+            }
             prefix.push_str("S-");
             name = rest;
             continue;
@@ -10472,6 +10481,40 @@ mod tests {
         let single = builtin_single_key_description(vec![Value::symbol("s-f1")])
             .expect("single-key-description should succeed");
         assert_eq!(single, Value::string("s-<f1>"));
+    }
+
+    #[test]
+    fn key_description_symbol_modifier_edges_match_emacs() {
+        assert_eq!(
+            builtin_single_key_description(vec![Value::symbol("M-a")])
+                .expect("single-key-description should succeed"),
+            Value::string("<M-a>")
+        );
+        assert_eq!(
+            builtin_single_key_description(vec![Value::symbol("C-a")])
+                .expect("single-key-description should succeed"),
+            Value::string("<C-a>")
+        );
+        assert_eq!(
+            builtin_single_key_description(vec![Value::symbol("C-M-a")])
+                .expect("single-key-description should succeed"),
+            Value::string("C-<M-a>")
+        );
+        assert_eq!(
+            builtin_single_key_description(vec![Value::symbol("M-a"), Value::True])
+                .expect("single-key-description should succeed"),
+            Value::string("M-a")
+        );
+        assert_eq!(
+            builtin_key_description(vec![Value::vector(vec![Value::symbol("M-a")])])
+                .expect("key-description should succeed"),
+            Value::string("<M-a>")
+        );
+        assert_eq!(
+            builtin_key_description(vec![Value::vector(vec![Value::symbol("C-s-f1")])])
+                .expect("key-description should succeed"),
+            Value::string("C-s-<f1>")
+        );
     }
 
     #[test]

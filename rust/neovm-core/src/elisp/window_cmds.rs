@@ -2370,6 +2370,46 @@ pub(crate) fn builtin_set_window_buffer(
     if let Some((old_buffer_id, old_window_start, old_point)) = old_state {
         eval.frames
             .set_window_buffer_position(wid, old_buffer_id, old_window_start, old_point);
+        if old_buffer_id != buf_id {
+            let prev_raw = eval.frames.window_prev_buffers(wid);
+            let prev_entries = list_to_vec(&prev_raw).ok_or_else(|| {
+                signal(
+                    "wrong-type-argument",
+                    vec![Value::symbol("listp"), prev_raw.clone()],
+                )
+            })?;
+            let old_buffer_value = Value::Buffer(old_buffer_id);
+            let marker_buffer_name = eval.buffers.get(old_buffer_id).map(|buf| buf.name.clone());
+            let old_window_start_pos = old_window_start.max(1) as i64;
+            let old_point_pos = old_point.max(1) as i64;
+            let history_entry = Value::list(vec![
+                old_buffer_value.clone(),
+                super::marker::make_marker_value(
+                    marker_buffer_name.as_deref(),
+                    Some(old_window_start_pos),
+                    false,
+                ),
+                super::marker::make_marker_value(
+                    marker_buffer_name.as_deref(),
+                    Some(old_point_pos),
+                    false,
+                ),
+            ]);
+            let filtered_prev = prev_entries
+                .into_iter()
+                .filter(|entry| {
+                    let Some(items) = list_to_vec(entry) else {
+                        return true;
+                    };
+                    !matches!(items.first(), Some(first) if *first == old_buffer_value)
+                })
+                .collect::<Vec<_>>();
+            let mut next_prev = Vec::with_capacity(filtered_prev.len() + 1);
+            next_prev.push(history_entry);
+            next_prev.extend(filtered_prev);
+            eval.frames.set_window_prev_buffers(wid, Value::list(next_prev));
+            eval.frames.set_window_next_buffers(wid, Value::Nil);
+        }
     }
 
     let (next_window_start, next_point) = eval
@@ -4924,6 +4964,63 @@ mod tests {
         assert_eq!(results[11], "OK (110 120 (7 . 8))");
         assert_eq!(results[12], "OK (1 150 (9 . 10))");
         assert_eq!(results[13], "OK (110 120 (nil))");
+    }
+
+    #[test]
+    fn set_window_buffer_updates_history_lists_on_real_buffer_switches() {
+        let results = eval_with_frame(
+            "(let* ((w (selected-window))
+                    (b1 (get-buffer-create \"swb-hist-a\"))
+                    (b2 (get-buffer-create \"swb-hist-b\"))
+                    (n '((foo 1 2))))
+               (with-current-buffer b1
+                 (erase-buffer)
+                 (insert (make-string 300 ?a)))
+               (with-current-buffer b2
+                 (erase-buffer)
+                 (insert (make-string 300 ?b)))
+               (set-window-prev-buffers w nil)
+               (set-window-next-buffers w nil)
+               (set-window-buffer w b1)
+               (set-window-start w 7)
+               (set-window-point w 11)
+               (set-window-next-buffers w n)
+               (set-window-buffer w b2)
+               (list (null (window-next-buffers w))
+                     (mapcar (lambda (e) (buffer-name (car e))) (window-prev-buffers w))
+                     (mapcar (lambda (e)
+                               (list (markerp (nth 1 e))
+                                     (marker-position (nth 1 e))
+                                     (markerp (nth 2 e))
+                                     (marker-position (nth 2 e))))
+                             (window-prev-buffers w))))
+             (let* ((w (selected-window))
+                    (same (window-buffer w))
+                    (n '((foo 1 2)))
+                    (before (window-prev-buffers w)))
+               (set-window-next-buffers w n)
+               (set-window-buffer w same)
+               (list (equal (window-prev-buffers w) before)
+                     (equal (window-next-buffers w) n)))
+             (let* ((w (selected-window))
+                    (b1 (get-buffer-create \"swb-hist-d1\"))
+                    (b2 (get-buffer-create \"swb-hist-d2\")))
+               (set-window-prev-buffers w nil)
+               (set-window-buffer w b1)
+               (set-window-buffer w b2)
+               (set-window-buffer w b1)
+               (set-window-buffer w b2)
+               (mapcar (lambda (e) (buffer-name (car e))) (window-prev-buffers w)))",
+        );
+        assert_eq!(
+            results[0],
+            "OK (t (\"swb-hist-a\" \"*scratch*\") ((t 7 t 11) (t 1 t 1)))"
+        );
+        assert_eq!(results[1], "OK (t t)");
+        assert_eq!(
+            results[2],
+            "OK (\"swb-hist-d1\" \"swb-hist-d2\" \"swb-hist-b\")"
+        );
     }
 
     #[test]
