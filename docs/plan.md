@@ -28,6 +28,24 @@ Last updated: 2026-02-19
 
 ## Doing
 
+- Tightened `subr-x` string helper startup autoload shape parity and locked it in corpus:
+  - runtime change:
+    - `rust/neovm-core/src/elisp/eval.rs`
+    - moved `string-chop-newline` / `string-pad` / `string-fill` / `string-limit` seeding to explicit non-interactive autoload forms (`(autoload "subr-x" DOC nil nil)`), with GNU-like first-line docstrings.
+  - corpus change:
+    - `test/neovm/vm-compat/cases/subr-x-string-helper-availability.forms`
+    - `test/neovm/vm-compat/cases/subr-x-string-helper-availability.expected.tsv`
+    - added lock-in rows asserting autoload shape fields for the four helpers:
+      - file (`"subr-x"`)
+      - interactive slot (`nil`)
+      - type slot (`nil`)
+      - docstring prefix
+    - reordered rows so shape assertions execute before helper calls (to avoid autoload materialization drift in oracle runs).
+  - verified:
+    - `make -C test/neovm/vm-compat check-one-neovm CASE=subr-x-string-helper-availability` (pass, 12/12)
+    - `make -C test/neovm/vm-compat check-builtin-registry-all` (pass)
+    - `make -C test/neovm/vm-compat check-all-neovm-strict` (pass)
+
 - Closed builtin-registry drift for `subr-x` string helpers by aligning startup function-cell shape with GNU Emacs:
   - runtime change:
     - `rust/neovm-core/src/elisp/eval.rs`

@@ -266,29 +266,6 @@ impl Evaluator {
             "subr-x",
             "Clean up whitespace in STRING.",
         );
-        // subr-x string helpers are startup autoload wrappers in GNU Emacs.
-        // Keep autoload-shaped function cells for introspection parity while
-        // runtime callability is preserved by builtin dispatch.
-        seed_autoload(
-            "string-chop-newline",
-            "subr-x",
-            "Remove trailing CR/LF from STRING.",
-        );
-        seed_autoload(
-            "string-pad",
-            "subr-x",
-            "Pad STRING to LENGTH using optional PADDING.",
-        );
-        seed_autoload(
-            "string-fill",
-            "subr-x",
-            "Fill STRING to WIDTH using optional justification.",
-        );
-        seed_autoload(
-            "string-limit",
-            "subr-x",
-            "Truncate STRING to LIMIT with optional ellipsis.",
-        );
         seed_autoload(
             "string-glyph-split",
             "subr-x",
@@ -389,6 +366,50 @@ impl Evaluator {
             "yank-rectangle",
             "rect",
             "Insert the last killed rectangle with its upper left corner at point.",
+        );
+        // Keep these as non-interactive autoload wrappers to match GNU Emacs
+        // `symbol-function` shape while preserving runtime callability through
+        // builtin dispatch.
+        drop(seed_autoload);
+        obarray.set_symbol_function(
+            "string-chop-newline",
+            Value::list(vec![
+                Value::symbol("autoload"),
+                Value::string("subr-x"),
+                Value::string("Remove the final newline (if any) from STRING."),
+                Value::Nil,
+                Value::Nil,
+            ]),
+        );
+        obarray.set_symbol_function(
+            "string-pad",
+            Value::list(vec![
+                Value::symbol("autoload"),
+                Value::string("subr-x"),
+                Value::string("Pad STRING to LENGTH using PADDING."),
+                Value::Nil,
+                Value::Nil,
+            ]),
+        );
+        obarray.set_symbol_function(
+            "string-fill",
+            Value::list(vec![
+                Value::symbol("autoload"),
+                Value::string("subr-x"),
+                Value::string("Try to word-wrap STRING so that it displays with lines no wider than WIDTH."),
+                Value::Nil,
+                Value::Nil,
+            ]),
+        );
+        obarray.set_symbol_function(
+            "string-limit",
+            Value::list(vec![
+                Value::symbol("autoload"),
+                Value::string("subr-x"),
+                Value::string("Return a substring of STRING that is (up to) LENGTH characters long."),
+                Value::Nil,
+                Value::Nil,
+            ]),
         );
         // Some startup helpers are Lisp functions that delegate to primitives.
         // Seed lightweight bytecode wrappers so `symbol-function` shape matches GNU Emacs.
