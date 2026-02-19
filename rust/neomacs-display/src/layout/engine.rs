@@ -2954,8 +2954,6 @@ impl LayoutEngine {
                 let astr = &overlay_after_buf[..overlay_after_len as usize];
                 let mut ai = 0usize;
                 let mut acurrent_run = 0usize;
-                // Track extend bg across the current row for end-of-line fill
-                let mut arow_extend_bg: Option<Color> = None;
                 while ai < astr.len() && row < max_rows {
                     // Check for align-to entry at this byte offset
                     if acurrent_align < after_align_entries.len()
@@ -2980,10 +2978,11 @@ impl LayoutEngine {
                     }
 
                     // Apply face run if needed; track :extend for end-of-line fill
+                    // Uses shared row_extend_bg (unified with buffer text extend tracking)
                     if after_has_runs && acurrent_run < after_face_runs.len() {
-                        // Check if this byte's face run has :extend before applying
                         if let Some((ext_bg, true)) = overlay_run_bg_extend_at(&after_face_runs, ai) {
-                            arow_extend_bg = Some(ext_bg);
+                            row_extend_bg = Some((ext_bg, 0));
+                            row_extend_row = row as i32;
                         }
                         acurrent_run = apply_overlay_face_run(
                             &after_face_runs, ai, acurrent_run, frame_glyphs,
@@ -2994,15 +2993,15 @@ impl LayoutEngine {
                     ai += alen;
                     if ach == '\n' {
                         // Fill rest of line if any face on this row had :extend
+                        // (shared row_extend_bg covers both buffer text and overlay faces)
                         let remaining = avail_width - x_offset;
                         if remaining > 0.0 {
-                            if let Some(ext_bg) = arow_extend_bg {
+                            if let Some((ext_bg, _)) = row_extend_bg.filter(|_| row_extend_row == row as i32) {
                                 let gx = content_x + x_offset;
                                 let gy = row_y[row as usize];
                                 frame_glyphs.add_stretch(gx, gy, remaining, char_h, ext_bg, 0, false);
                             }
                         }
-                        arow_extend_bg = None; // reset for next row
                         reorder_row_bidi(frame_glyphs, row_glyph_start, frame_glyphs.glyphs.len(), content_x);
                         col = 0;
                         x_offset = 0.0;
@@ -3284,7 +3283,6 @@ impl LayoutEngine {
                 let astr = &overlay_after_buf[..overlay_after_len as usize];
                 let mut ai = 0usize;
                 let mut acurrent_run = 0usize;
-                let mut eob_arow_extend_bg: Option<Color> = None;
                 while ai < astr.len() && row < max_rows {
                     // Check for align-to entry at this byte offset
                     if eob_acurrent_align < eob_after_align_entries.len()
@@ -3308,7 +3306,8 @@ impl LayoutEngine {
 
                     if eob_after_has_runs && acurrent_run < eob_after_face_runs.len() {
                         if let Some((ext_bg, true)) = overlay_run_bg_extend_at(&eob_after_face_runs, ai) {
-                            eob_arow_extend_bg = Some(ext_bg);
+                            row_extend_bg = Some((ext_bg, 0));
+                            row_extend_row = row as i32;
                         }
                         acurrent_run = apply_overlay_face_run(
                             &eob_after_face_runs, ai, acurrent_run, frame_glyphs,
@@ -3319,15 +3318,15 @@ impl LayoutEngine {
                     ai += alen;
                     if ach == '\n' {
                         // Fill rest of line if any face on this row had :extend
+                        // (shared row_extend_bg covers both buffer text and overlay faces)
                         let remaining = avail_width - x_offset;
                         if remaining > 0.0 {
-                            if let Some(ext_bg) = eob_arow_extend_bg {
+                            if let Some((ext_bg, _)) = row_extend_bg.filter(|_| row_extend_row == row as i32) {
                                 let gx = content_x + x_offset;
                                 let gy = row_y[row as usize];
                                 frame_glyphs.add_stretch(gx, gy, remaining, char_h, ext_bg, 0, false);
                             }
                         }
-                        eob_arow_extend_bg = None;
                         reorder_row_bidi(frame_glyphs, row_glyph_start, frame_glyphs.glyphs.len(), content_x);
                         col = 0;
                         x_offset = 0.0;
