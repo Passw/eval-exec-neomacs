@@ -10830,9 +10830,7 @@ fn describe_function_first_line(name: &str, function: &Value) -> String {
         Value::Cons(cell) => {
             if super::autoload::is_autoload_value(function) {
                 let items = list_to_vec(function).unwrap_or_default();
-                let is_macro =
-                    matches!(items.get(4).and_then(Value::as_symbol_name), Some("macro"));
-                let kind = if is_macro { "Lisp macro" } else { "Lisp function" };
+                let kind = describe_function_autoload_kind(items.get(4));
                 let file_clause = items
                     .get(1)
                     .and_then(Value::as_str)
@@ -10858,8 +10856,20 @@ fn describe_function_first_line(name: &str, function: &Value) -> String {
     }
 }
 
+fn describe_function_autoload_kind(autoload_type: Option<&Value>) -> &'static str {
+    match autoload_type {
+        Some(Value::Symbol(sym)) if sym == "keymap" => "keymap",
+        Some(Value::Symbol(sym)) if sym == "macro" => "Lisp macro",
+        Some(Value::True) => "Lisp macro",
+        _ => "Lisp function",
+    }
+}
+
 fn describe_function_autoload_file_clause(file: &str) -> Option<String> {
-    if file.is_empty() || file.contains('/') || file.contains('\\') || file.contains('.') {
+    if file.is_empty() {
+        return None;
+    }
+    if file.contains('/') || file.contains('\\') || file.contains('.') {
         return None;
     }
     Some(format!("{file}.el"))
@@ -13011,6 +13021,17 @@ mod tests {
     fn describe_function_autoload_file_clause_is_only_used_for_bare_file_names() {
         let mut evaluator = super::super::eval::Evaluator::new();
 
+        let autoload_empty = Value::list(vec![
+            Value::symbol("autoload"),
+            Value::string(""),
+            Value::string("doc"),
+            Value::Nil,
+            Value::Nil,
+        ]);
+        evaluator
+            .obarray
+            .set_symbol_function("vm-autoload-empty", autoload_empty);
+
         let autoload_bare = Value::list(vec![
             Value::symbol("autoload"),
             Value::string("files"),
@@ -13055,6 +13076,19 @@ mod tests {
             .obarray
             .set_symbol_function("vm-autoload-path", autoload_path);
 
+        let empty =
+            builtin_describe_function(&mut evaluator, vec![Value::symbol("vm-autoload-empty")]);
+        assert!(empty.is_ok());
+        assert!(
+            empty.unwrap()
+                .as_str()
+                .is_some_and(|s| {
+                    s.contains("autoloaded Lisp function.")
+                        && !s.contains(" in ‘")
+                        && !s.contains("image.el")
+                })
+        );
+
         let bare =
             builtin_describe_function(&mut evaluator, vec![Value::symbol("vm-autoload-bare")]);
         assert!(bare.is_ok());
@@ -13093,6 +13127,54 @@ mod tests {
                     && !s.contains("/tmp/files.el")
             )
         );
+    }
+
+    #[test]
+    fn describe_function_autoload_kind_shapes_match_oracle() {
+        let mut evaluator = super::super::eval::Evaluator::new();
+
+        let autoload_macro_t = Value::list(vec![
+            Value::symbol("autoload"),
+            Value::string("files.elc"),
+            Value::string("doc"),
+            Value::Nil,
+            Value::True,
+        ]);
+        evaluator
+            .obarray
+            .set_symbol_function("vm-autoload-macro-t", autoload_macro_t);
+
+        let autoload_keymap = Value::list(vec![
+            Value::symbol("autoload"),
+            Value::string("files"),
+            Value::string("doc"),
+            Value::Nil,
+            Value::symbol("keymap"),
+        ]);
+        evaluator
+            .obarray
+            .set_symbol_function("vm-autoload-keymap", autoload_keymap);
+
+        let macro_t = builtin_describe_function(
+            &mut evaluator,
+            vec![Value::symbol("vm-autoload-macro-t")],
+        );
+        assert!(macro_t.is_ok());
+        assert!(macro_t.unwrap().as_str().is_some_and(
+            |s| s.contains("autoloaded Lisp macro")
+                && !s.contains("autoloaded Lisp function")
+                && !s.contains("files.elc")
+                && !s.contains("files.elc.el")
+        ));
+
+        let keymap =
+            builtin_describe_function(&mut evaluator, vec![Value::symbol("vm-autoload-keymap")]);
+        assert!(keymap.is_ok());
+        assert!(keymap.unwrap().as_str().is_some_and(
+            |s| s.contains("autoloaded keymap")
+                && !s.contains("autoloaded Lisp function")
+                && s.contains(" in ‘files.el’")
+        ));
     }
 
     #[test]

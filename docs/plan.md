@@ -4296,6 +4296,30 @@ Last updated: 2026-02-19
 
 ## Done
 
+- Aligned `describe-function` autoload kind semantics for `t`/`keymap` type payloads with GNU Emacs:
+  - runtime changes:
+    - `rust/neovm-core/src/elisp/doc.rs`
+      - added explicit autoload type classification in first-line shaping:
+        - `TYPE=t` and `TYPE='macro` now report `autoloaded Lisp macro`.
+        - `TYPE='keymap` now reports `autoloaded keymap`.
+      - kept dotted/path/empty-file autoload file-clause behavior oracle-aligned:
+        - bare names keep `in ‘<file>.el’`
+        - dotted/path/empty file names omit the file clause
+      - added evaluator lock-in:
+        - `describe_function_autoload_kind_shapes_match_oracle`
+  - corpus changes:
+    - expanded and re-recorded:
+      - `test/neovm/vm-compat/cases/describe-function-runtime-semantics.{forms,expected.tsv}`
+      - added lock-ins for:
+        - `autoload ... t` => macro first-line shape
+        - `autoload ... 'keymap` => keymap first-line shape
+        - empty autoload file => no explicit `in ‘...’` file clause
+  - verified:
+    - `cargo test --manifest-path rust/neovm-core/Cargo.toml describe_function_` (pass, 19/19)
+    - `make -C test/neovm/vm-compat record FORMS=cases/describe-function-runtime-semantics.forms EXPECTED=cases/describe-function-runtime-semantics.expected.tsv` (pass)
+    - `make -C test/neovm/vm-compat check-one-neovm CASE=cases/describe-function-runtime-semantics` (pass, 22/22)
+    - `make -C test/neovm/vm-compat check-all-neovm-strict` (pass)
+
 - Aligned `describe-function` autoload file-clause semantics with GNU Emacs for dotted/path autoload files:
   - runtime changes:
     - `rust/neovm-core/src/elisp/doc.rs`
