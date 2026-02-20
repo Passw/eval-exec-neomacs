@@ -1102,7 +1102,7 @@ pub(crate) fn builtin_length(args: Vec<Value>) -> EvalResult {
             )),
         },
         Value::Str(s) => Ok(Value::Int(storage_char_len(s) as i64)),
-        Value::Vector(v) => Ok(Value::Int(v.lock().expect("poisoned").len() as i64)),
+        Value::Vector(v) => Ok(Value::Int(vector_sequence_length(&args[0], v))),
         _ => Err(signal(
             "wrong-type-argument",
             vec![Value::symbol("sequencep"), args[0].clone()],
@@ -1110,11 +1110,19 @@ pub(crate) fn builtin_length(args: Vec<Value>) -> EvalResult {
     }
 }
 
+fn vector_sequence_length(
+    sequence: &Value,
+    vector: &std::sync::Arc<std::sync::Mutex<Vec<Value>>>,
+) -> i64 {
+    super::chartable::bool_vector_length(sequence)
+        .unwrap_or_else(|| vector.lock().expect("poisoned").len() as i64)
+}
+
 fn sequence_length_less_than(sequence: &Value, target: i64) -> Result<bool, Flow> {
     match sequence {
         Value::Nil => Ok(0 < target),
         Value::Str(s) => Ok((storage_char_len(s) as i64) < target),
-        Value::Vector(v) => Ok((v.lock().expect("poisoned").len() as i64) < target),
+        Value::Vector(v) => Ok(vector_sequence_length(sequence, v) < target),
         Value::Cons(_) => {
             if target <= 0 {
                 return Ok(false);
@@ -1143,7 +1151,7 @@ fn sequence_length_equal(sequence: &Value, target: i64) -> Result<bool, Flow> {
     match sequence {
         Value::Nil => Ok(target == 0),
         Value::Str(s) => Ok((storage_char_len(s) as i64) == target),
-        Value::Vector(v) => Ok((v.lock().expect("poisoned").len() as i64) == target),
+        Value::Vector(v) => Ok(vector_sequence_length(sequence, v) == target),
         Value::Cons(_) => {
             if target < 0 {
                 return Ok(false);
@@ -1172,7 +1180,7 @@ fn sequence_length_greater_than(sequence: &Value, target: i64) -> Result<bool, F
     match sequence {
         Value::Nil => Ok(0 > target),
         Value::Str(s) => Ok((storage_char_len(s) as i64) > target),
-        Value::Vector(v) => Ok((v.lock().expect("poisoned").len() as i64) > target),
+        Value::Vector(v) => Ok(vector_sequence_length(sequence, v) > target),
         Value::Cons(_) => {
             if target < 0 {
                 return Ok(true);
@@ -17252,6 +17260,37 @@ mod tests {
             .expect("builtin aref should resolve")
             .expect("builtin aref should evaluate");
         assert!(updated.is_truthy());
+    }
+
+    #[test]
+    fn pure_dispatch_typed_length_family_uses_bool_vector_logical_length() {
+        let bv = Value::vector(vec![
+            Value::symbol("--bool-vector--"),
+            Value::Int(3),
+            Value::Int(1),
+            Value::Int(0),
+            Value::Int(1),
+        ]);
+
+        let len = dispatch_builtin_pure("length", vec![bv.clone()])
+            .expect("builtin length should resolve")
+            .expect("builtin length should evaluate");
+        assert_eq!(len, Value::Int(3));
+
+        let lt = dispatch_builtin_pure("length<", vec![bv.clone(), Value::Int(4)])
+            .expect("builtin length< should resolve")
+            .expect("builtin length< should evaluate");
+        assert_eq!(lt, Value::True);
+
+        let eq = dispatch_builtin_pure("length=", vec![bv.clone(), Value::Int(3)])
+            .expect("builtin length= should resolve")
+            .expect("builtin length= should evaluate");
+        assert_eq!(eq, Value::True);
+
+        let gt = dispatch_builtin_pure("length>", vec![bv, Value::Int(2)])
+            .expect("builtin length> should resolve")
+            .expect("builtin length> should evaluate");
+        assert_eq!(gt, Value::True);
     }
 
     #[test]

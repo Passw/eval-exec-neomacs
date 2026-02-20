@@ -63,6 +63,21 @@ pub fn is_bool_vector(v: &Value) -> bool {
     }
 }
 
+/// Return the logical bit length if `v` is a bool-vector.
+pub(crate) fn bool_vector_length(v: &Value) -> Option<i64> {
+    let Value::Vector(arc) = v else {
+        return None;
+    };
+    let vec = arc.lock().expect("poisoned");
+    if vec.len() < 2 || !matches!(&vec[0], Value::Symbol(s) if s == BOOL_VECTOR_TAG) {
+        return None;
+    }
+    Some(match &vec[BV_SIZE] {
+        Value::Int(n) => *n,
+        _ => 0,
+    })
+}
+
 // ---------------------------------------------------------------------------
 // Internal helpers
 // ---------------------------------------------------------------------------
