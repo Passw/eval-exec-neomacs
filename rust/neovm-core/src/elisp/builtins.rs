@@ -2302,10 +2302,19 @@ pub(crate) fn builtin_make_hash_table(args: Vec<Value>) -> EvalResult {
                             "eql" => HashTableTest::Eql,
                             "equal" => HashTableTest::Equal,
                             _ => {
-                                return Err(signal(
-                                    "error",
-                                    vec![Value::string("Invalid hash table test"), value.clone()],
-                                ));
+                                if let Some(alias_test) =
+                                    super::compat_internal::lookup_hash_table_test_alias(name)
+                                {
+                                    alias_test
+                                } else {
+                                    return Err(signal(
+                                        "error",
+                                        vec![
+                                            Value::string("Invalid hash table test"),
+                                            value.clone(),
+                                        ],
+                                    ));
+                                }
                             }
                         };
                     }
@@ -12320,6 +12329,49 @@ pub(crate) fn dispatch_builtin(
         // Custom system (pure)
         "custom-set-faces" => super::custom::builtin_custom_set_faces(args),
 
+        // Internal compatibility surface (pure)
+        "define-fringe-bitmap" => super::compat_internal::builtin_define_fringe_bitmap(args),
+        "destroy-fringe-bitmap" => super::compat_internal::builtin_destroy_fringe_bitmap(args),
+        "display--line-is-continued-p" => {
+            super::compat_internal::builtin_display_line_is_continued_p(args)
+        }
+        "display--update-for-mouse-movement" => {
+            super::compat_internal::builtin_display_update_for_mouse_movement(args)
+        }
+        "do-auto-save" => super::compat_internal::builtin_do_auto_save(args),
+        "external-debugging-output" => {
+            super::compat_internal::builtin_external_debugging_output(args)
+        }
+        "describe-buffer-bindings" => {
+            super::compat_internal::builtin_describe_buffer_bindings(args)
+        }
+        "describe-vector" => super::compat_internal::builtin_describe_vector(args),
+        "delete-terminal" => super::compat_internal::builtin_delete_terminal(args),
+        "face-attributes-as-vector" => {
+            super::compat_internal::builtin_face_attributes_as_vector(args)
+        }
+        "font-at" => super::compat_internal::builtin_font_at(args),
+        "font-face-attributes" => super::compat_internal::builtin_font_face_attributes(args),
+        "font-get-glyphs" => super::compat_internal::builtin_font_get_glyphs(args),
+        "font-get-system-font" => super::compat_internal::builtin_font_get_system_font(args),
+        "font-get-system-normal-font" => {
+            super::compat_internal::builtin_font_get_system_normal_font(args)
+        }
+        "font-has-char-p" => super::compat_internal::builtin_font_has_char_p(args),
+        "font-info" => super::compat_internal::builtin_font_info(args),
+        "font-match-p" => super::compat_internal::builtin_font_match_p(args),
+        "font-shape-gstring" => super::compat_internal::builtin_font_shape_gstring(args),
+        "font-variation-glyphs" => super::compat_internal::builtin_font_variation_glyphs(args),
+        "fontset-font" => super::compat_internal::builtin_fontset_font(args),
+        "fontset-info" => super::compat_internal::builtin_fontset_info(args),
+        "fontset-list" => super::compat_internal::builtin_fontset_list(args),
+        "frame--face-hash-table" => super::compat_internal::builtin_frame_face_hash_table(args),
+        "fillarray" => super::compat_internal::builtin_fillarray(args),
+        "define-hash-table-test" => super::compat_internal::builtin_define_hash_table_test(args),
+        "find-coding-systems-region-internal" => {
+            super::compat_internal::builtin_find_coding_systems_region_internal(args)
+        }
+
         // Native compilation compatibility (pure)
         "comp--compile-ctxt-to-file0" => super::comp::builtin_comp_compile_ctxt_to_file0(args),
         "comp--init-ctxt" => super::comp::builtin_comp_init_ctxt(args),
@@ -12773,6 +12825,48 @@ pub(crate) fn dispatch_builtin_pure(name: &str, args: Vec<Value>) -> Option<Eval
         "display-pixel-height" => super::display::builtin_display_pixel_height(args),
         "terminal-name" => super::display::builtin_terminal_name(args),
         "terminal-live-p" => super::display::builtin_terminal_live_p(args),
+        // Internal compatibility surface (pure)
+        "define-fringe-bitmap" => super::compat_internal::builtin_define_fringe_bitmap(args),
+        "destroy-fringe-bitmap" => super::compat_internal::builtin_destroy_fringe_bitmap(args),
+        "display--line-is-continued-p" => {
+            super::compat_internal::builtin_display_line_is_continued_p(args)
+        }
+        "display--update-for-mouse-movement" => {
+            super::compat_internal::builtin_display_update_for_mouse_movement(args)
+        }
+        "do-auto-save" => super::compat_internal::builtin_do_auto_save(args),
+        "external-debugging-output" => {
+            super::compat_internal::builtin_external_debugging_output(args)
+        }
+        "describe-buffer-bindings" => {
+            super::compat_internal::builtin_describe_buffer_bindings(args)
+        }
+        "describe-vector" => super::compat_internal::builtin_describe_vector(args),
+        "delete-terminal" => super::compat_internal::builtin_delete_terminal(args),
+        "face-attributes-as-vector" => {
+            super::compat_internal::builtin_face_attributes_as_vector(args)
+        }
+        "font-at" => super::compat_internal::builtin_font_at(args),
+        "font-face-attributes" => super::compat_internal::builtin_font_face_attributes(args),
+        "font-get-glyphs" => super::compat_internal::builtin_font_get_glyphs(args),
+        "font-get-system-font" => super::compat_internal::builtin_font_get_system_font(args),
+        "font-get-system-normal-font" => {
+            super::compat_internal::builtin_font_get_system_normal_font(args)
+        }
+        "font-has-char-p" => super::compat_internal::builtin_font_has_char_p(args),
+        "font-info" => super::compat_internal::builtin_font_info(args),
+        "font-match-p" => super::compat_internal::builtin_font_match_p(args),
+        "font-shape-gstring" => super::compat_internal::builtin_font_shape_gstring(args),
+        "font-variation-glyphs" => super::compat_internal::builtin_font_variation_glyphs(args),
+        "fontset-font" => super::compat_internal::builtin_fontset_font(args),
+        "fontset-info" => super::compat_internal::builtin_fontset_info(args),
+        "fontset-list" => super::compat_internal::builtin_fontset_list(args),
+        "frame--face-hash-table" => super::compat_internal::builtin_frame_face_hash_table(args),
+        "fillarray" => super::compat_internal::builtin_fillarray(args),
+        "define-hash-table-test" => super::compat_internal::builtin_define_hash_table_test(args),
+        "find-coding-systems-region-internal" => {
+            super::compat_internal::builtin_find_coding_systems_region_internal(args)
+        }
         _ => return None,
     })
 }

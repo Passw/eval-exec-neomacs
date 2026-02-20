@@ -825,3 +825,5 @@ cases/scroll-horizontal-other-window-semantics
 cases/charset-big5-sjis-iso-final-semantics
 cases/hash-coding-internal-sxhash-semantics
 cases/comp-dbus-internal-semantics
+cases/internal-compat-misc-semantics
+cases/internal-font-face-compat-semantics

@@ -885,6 +885,27 @@ fn subr_arity_value(name: &str) -> Value {
             arity_cons(7, Some(7))
         }
         "dbus-message-internal" => arity_cons(4, None),
+        "define-fringe-bitmap" => arity_cons(2, Some(5)),
+        "destroy-fringe-bitmap" | "external-debugging-output" => arity_cons(1, Some(1)),
+        "display--line-is-continued-p" => arity_cons(0, Some(0)),
+        "display--update-for-mouse-movement" | "fillarray" => arity_cons(2, Some(2)),
+        "do-auto-save" | "delete-terminal" => arity_cons(0, Some(2)),
+        "describe-buffer-bindings" => arity_cons(1, Some(3)),
+        "describe-vector" => arity_cons(1, Some(2)),
+        "face-attributes-as-vector" => arity_cons(1, Some(1)),
+        "font-at" => arity_cons(1, Some(3)),
+        "font-face-attributes" | "font-info" | "fontset-info" => arity_cons(1, Some(2)),
+        "font-get-glyphs" => arity_cons(3, Some(4)),
+        "font-get-system-font" | "font-get-system-normal-font" | "fontset-list" => {
+            arity_cons(0, Some(0))
+        }
+        "font-has-char-p" | "fontset-font" => arity_cons(2, Some(3)),
+        "font-match-p" | "font-shape-gstring" | "font-variation-glyphs" => {
+            arity_cons(2, Some(2))
+        }
+        "frame--face-hash-table" => arity_cons(0, Some(1)),
+        "define-hash-table-test" => arity_cons(3, Some(3)),
+        "find-coding-systems-region-internal" => arity_cons(2, Some(3)),
         "completing-read" => arity_cons(2, Some(8)),
         "try-completion" | "test-completion" => arity_cons(2, Some(3)),
         "all-completions" => arity_cons(2, Some(4)),
@@ -2479,6 +2500,33 @@ mod tests {
         assert_subr_arity("comp-libgccjit-version", 0, Some(0));
         assert_subr_arity("comp-native-compiler-options-effective-p", 0, Some(0));
         assert_subr_arity("comp-native-driver-options-effective-p", 0, Some(0));
+        assert_subr_arity("define-fringe-bitmap", 2, Some(5));
+        assert_subr_arity("destroy-fringe-bitmap", 1, Some(1));
+        assert_subr_arity("display--line-is-continued-p", 0, Some(0));
+        assert_subr_arity("display--update-for-mouse-movement", 2, Some(2));
+        assert_subr_arity("do-auto-save", 0, Some(2));
+        assert_subr_arity("external-debugging-output", 1, Some(1));
+        assert_subr_arity("describe-buffer-bindings", 1, Some(3));
+        assert_subr_arity("describe-vector", 1, Some(2));
+        assert_subr_arity("delete-terminal", 0, Some(2));
+        assert_subr_arity("face-attributes-as-vector", 1, Some(1));
+        assert_subr_arity("font-at", 1, Some(3));
+        assert_subr_arity("font-face-attributes", 1, Some(2));
+        assert_subr_arity("font-get-glyphs", 3, Some(4));
+        assert_subr_arity("font-get-system-font", 0, Some(0));
+        assert_subr_arity("font-get-system-normal-font", 0, Some(0));
+        assert_subr_arity("font-has-char-p", 2, Some(3));
+        assert_subr_arity("font-info", 1, Some(2));
+        assert_subr_arity("font-match-p", 2, Some(2));
+        assert_subr_arity("font-shape-gstring", 2, Some(2));
+        assert_subr_arity("font-variation-glyphs", 2, Some(2));
+        assert_subr_arity("fontset-font", 2, Some(3));
+        assert_subr_arity("fontset-info", 1, Some(2));
+        assert_subr_arity("fontset-list", 0, Some(0));
+        assert_subr_arity("frame--face-hash-table", 0, Some(1));
+        assert_subr_arity("fillarray", 2, Some(2));
+        assert_subr_arity("define-hash-table-test", 3, Some(3));
+        assert_subr_arity("find-coding-systems-region-internal", 2, Some(3));
         assert_subr_arity("completing-read", 2, Some(8));
         assert_subr_arity("try-completion", 2, Some(3));
         assert_subr_arity("all-completions", 2, Some(4));

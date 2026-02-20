@@ -391,6 +391,7 @@ fn builtin_command_name(name: &str) -> bool {
             | "delete-rectangle"
             | "delete-region"
             | "delete-window"
+            | "do-auto-save"
             | "describe-function"
             | "describe-key-briefly"
             | "describe-variable"
