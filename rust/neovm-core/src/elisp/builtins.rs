@@ -12365,7 +12365,31 @@ pub(crate) fn dispatch_builtin(
         "fontset-font" => super::compat_internal::builtin_fontset_font(args),
         "fontset-info" => super::compat_internal::builtin_fontset_info(args),
         "fontset-list" => super::compat_internal::builtin_fontset_list(args),
+        "frame--set-was-invisible" => super::compat_internal::builtin_frame_set_was_invisible(args),
+        "frame-after-make-frame" => super::compat_internal::builtin_frame_after_make_frame(args),
+        "frame-ancestor-p" => super::compat_internal::builtin_frame_ancestor_p(args),
+        "frame-bottom-divider-width" => {
+            super::compat_internal::builtin_frame_bottom_divider_width(args)
+        }
+        "frame-child-frame-border-width" => {
+            super::compat_internal::builtin_frame_child_frame_border_width(args)
+        }
+        "frame-focus" => super::compat_internal::builtin_frame_focus(args),
+        "frame-font-cache" => super::compat_internal::builtin_frame_font_cache(args),
         "frame--face-hash-table" => super::compat_internal::builtin_frame_face_hash_table(args),
+        "frame-fringe-width" => super::compat_internal::builtin_frame_fringe_width(args),
+        "frame-internal-border-width" => {
+            super::compat_internal::builtin_frame_internal_border_width(args)
+        }
+        "frame-old-selected-window" => {
+            super::compat_internal::builtin_frame_old_selected_window(args)
+        }
+        "frame-or-buffer-changed-p" => super::compat_internal::builtin_frame_or_buffer_changed_p(args),
+        "frame-parent" => super::compat_internal::builtin_frame_parent(args),
+        "frame-pointer-visible-p" => super::compat_internal::builtin_frame_pointer_visible_p(args),
+        "frame-right-divider-width" => {
+            super::compat_internal::builtin_frame_right_divider_width(args)
+        }
         "fillarray" => super::compat_internal::builtin_fillarray(args),
         "define-hash-table-test" => super::compat_internal::builtin_define_hash_table_test(args),
         "find-coding-systems-region-internal" => {
@@ -12861,7 +12885,31 @@ pub(crate) fn dispatch_builtin_pure(name: &str, args: Vec<Value>) -> Option<Eval
         "fontset-font" => super::compat_internal::builtin_fontset_font(args),
         "fontset-info" => super::compat_internal::builtin_fontset_info(args),
         "fontset-list" => super::compat_internal::builtin_fontset_list(args),
+        "frame--set-was-invisible" => super::compat_internal::builtin_frame_set_was_invisible(args),
+        "frame-after-make-frame" => super::compat_internal::builtin_frame_after_make_frame(args),
+        "frame-ancestor-p" => super::compat_internal::builtin_frame_ancestor_p(args),
+        "frame-bottom-divider-width" => {
+            super::compat_internal::builtin_frame_bottom_divider_width(args)
+        }
+        "frame-child-frame-border-width" => {
+            super::compat_internal::builtin_frame_child_frame_border_width(args)
+        }
+        "frame-focus" => super::compat_internal::builtin_frame_focus(args),
+        "frame-font-cache" => super::compat_internal::builtin_frame_font_cache(args),
         "frame--face-hash-table" => super::compat_internal::builtin_frame_face_hash_table(args),
+        "frame-fringe-width" => super::compat_internal::builtin_frame_fringe_width(args),
+        "frame-internal-border-width" => {
+            super::compat_internal::builtin_frame_internal_border_width(args)
+        }
+        "frame-old-selected-window" => {
+            super::compat_internal::builtin_frame_old_selected_window(args)
+        }
+        "frame-or-buffer-changed-p" => super::compat_internal::builtin_frame_or_buffer_changed_p(args),
+        "frame-parent" => super::compat_internal::builtin_frame_parent(args),
+        "frame-pointer-visible-p" => super::compat_internal::builtin_frame_pointer_visible_p(args),
+        "frame-right-divider-width" => {
+            super::compat_internal::builtin_frame_right_divider_width(args)
+        }
         "fillarray" => super::compat_internal::builtin_fillarray(args),
         "define-hash-table-test" => super::compat_internal::builtin_define_hash_table_test(args),
         "find-coding-systems-region-internal" => {

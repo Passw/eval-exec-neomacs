@@ -903,7 +903,21 @@ fn subr_arity_value(name: &str) -> Value {
         "font-match-p" | "font-shape-gstring" | "font-variation-glyphs" => {
             arity_cons(2, Some(2))
         }
-        "frame--face-hash-table" => arity_cons(0, Some(1)),
+        "frame--set-was-invisible" | "frame-after-make-frame" | "frame-ancestor-p" => {
+            arity_cons(2, Some(2))
+        }
+        "frame--face-hash-table"
+        | "frame-bottom-divider-width"
+        | "frame-child-frame-border-width"
+        | "frame-focus"
+        | "frame-font-cache"
+        | "frame-fringe-width"
+        | "frame-internal-border-width"
+        | "frame-old-selected-window"
+        | "frame-or-buffer-changed-p"
+        | "frame-parent"
+        | "frame-pointer-visible-p"
+        | "frame-right-divider-width" => arity_cons(0, Some(1)),
         "define-hash-table-test" => arity_cons(3, Some(3)),
         "find-coding-systems-region-internal" => arity_cons(2, Some(3)),
         "completing-read" => arity_cons(2, Some(8)),
@@ -2523,7 +2537,21 @@ mod tests {
         assert_subr_arity("fontset-font", 2, Some(3));
         assert_subr_arity("fontset-info", 1, Some(2));
         assert_subr_arity("fontset-list", 0, Some(0));
+        assert_subr_arity("frame--set-was-invisible", 2, Some(2));
+        assert_subr_arity("frame-after-make-frame", 2, Some(2));
+        assert_subr_arity("frame-ancestor-p", 2, Some(2));
         assert_subr_arity("frame--face-hash-table", 0, Some(1));
+        assert_subr_arity("frame-bottom-divider-width", 0, Some(1));
+        assert_subr_arity("frame-child-frame-border-width", 0, Some(1));
+        assert_subr_arity("frame-focus", 0, Some(1));
+        assert_subr_arity("frame-font-cache", 0, Some(1));
+        assert_subr_arity("frame-fringe-width", 0, Some(1));
+        assert_subr_arity("frame-internal-border-width", 0, Some(1));
+        assert_subr_arity("frame-old-selected-window", 0, Some(1));
+        assert_subr_arity("frame-or-buffer-changed-p", 0, Some(1));
+        assert_subr_arity("frame-parent", 0, Some(1));
+        assert_subr_arity("frame-pointer-visible-p", 0, Some(1));
+        assert_subr_arity("frame-right-divider-width", 0, Some(1));
         assert_subr_arity("fillarray", 2, Some(2));
         assert_subr_arity("define-hash-table-test", 3, Some(3));
         assert_subr_arity("find-coding-systems-region-internal", 2, Some(3));
