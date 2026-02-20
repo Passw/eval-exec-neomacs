@@ -2136,6 +2136,24 @@ pub(crate) fn builtin_delete_file_eval(eval: &Evaluator, args: Vec<Value>) -> Ev
     Ok(Value::Nil)
 }
 
+/// (delete-file-internal FILENAME) -> nil
+pub(crate) fn builtin_delete_file_internal(args: Vec<Value>) -> EvalResult {
+    expect_args("delete-file-internal", &args, 1)?;
+    let filename = expect_string_strict(&args[0])?;
+    delete_file_compat(&filename)?;
+    Ok(Value::Nil)
+}
+
+/// Evaluator-aware variant of `delete-file-internal` that resolves relative
+/// paths against dynamic/default `default-directory`.
+pub(crate) fn builtin_delete_file_internal_eval(eval: &Evaluator, args: Vec<Value>) -> EvalResult {
+    expect_args("delete-file-internal", &args, 1)?;
+    let filename = expect_string_strict(&args[0])?;
+    let filename = resolve_filename_for_eval(eval, &filename);
+    delete_file_compat(&filename)?;
+    Ok(Value::Nil)
+}
+
 /// (delete-directory DIRECTORY &optional RECURSIVE TRASH) -> nil
 pub(crate) fn builtin_delete_directory(args: Vec<Value>) -> EvalResult {
     expect_min_args("delete-directory", &args, 1)?;
@@ -2156,6 +2174,29 @@ pub(crate) fn builtin_delete_directory(args: Vec<Value>) -> EvalResult {
         fs::remove_dir(&directory)
     };
     result.map_err(|err| signal_file_io_path(err, "Removing directory", &directory))?;
+    Ok(Value::Nil)
+}
+
+/// (delete-directory-internal DIRECTORY) -> nil
+pub(crate) fn builtin_delete_directory_internal(args: Vec<Value>) -> EvalResult {
+    expect_args("delete-directory-internal", &args, 1)?;
+    let directory = expect_string_strict(&args[0])?;
+    fs::remove_dir(&directory)
+        .map_err(|err| signal_file_io_path(err, "Removing directory", &directory))?;
+    Ok(Value::Nil)
+}
+
+/// Evaluator-aware variant of `delete-directory-internal` that resolves
+/// relative paths against dynamic/default `default-directory`.
+pub(crate) fn builtin_delete_directory_internal_eval(
+    eval: &Evaluator,
+    args: Vec<Value>,
+) -> EvalResult {
+    expect_args("delete-directory-internal", &args, 1)?;
+    let directory = expect_string_strict(&args[0])?;
+    let directory = resolve_filename_for_eval(eval, &directory);
+    fs::remove_dir(&directory)
+        .map_err(|err| signal_file_io_path(err, "Removing directory", &directory))?;
     Ok(Value::Nil)
 }
 
@@ -2470,6 +2511,47 @@ pub(crate) fn builtin_make_directory_eval(eval: &Evaluator, args: Vec<Value>) ->
     let parents = args.get(1).is_some_and(|v| v.is_truthy());
     make_directory(&dir, parents)
         .map_err(|e| signal_file_io_path(e, "Creating directory", &dir))?;
+    Ok(Value::Nil)
+}
+
+/// (make-directory-internal DIR) -> nil
+pub(crate) fn builtin_make_directory_internal(args: Vec<Value>) -> EvalResult {
+    expect_args("make-directory-internal", &args, 1)?;
+    let dir = expect_string_strict(&args[0])?;
+    make_directory(&dir, false).map_err(|e| signal_file_io_path(e, "Creating directory", &dir))?;
+    Ok(Value::Nil)
+}
+
+/// Evaluator-aware variant of `make-directory-internal` that resolves relative
+/// paths against dynamic/default `default-directory`.
+pub(crate) fn builtin_make_directory_internal_eval(
+    eval: &Evaluator,
+    args: Vec<Value>,
+) -> EvalResult {
+    expect_args("make-directory-internal", &args, 1)?;
+    let dir = expect_string_strict(&args[0])?;
+    let dir = resolve_filename_for_eval(eval, &dir);
+    make_directory(&dir, false).map_err(|e| signal_file_io_path(e, "Creating directory", &dir))?;
+    Ok(Value::Nil)
+}
+
+/// (find-file-name-handler FILENAME OPERATION) -> handler or nil
+pub(crate) fn builtin_find_file_name_handler(args: Vec<Value>) -> EvalResult {
+    expect_args("find-file-name-handler", &args, 2)?;
+    let _filename = expect_string_strict(&args[0])?;
+    let _operation = &args[1];
+    Ok(Value::Nil)
+}
+
+/// Evaluator-aware variant of `find-file-name-handler`.
+pub(crate) fn builtin_find_file_name_handler_eval(
+    eval: &Evaluator,
+    args: Vec<Value>,
+) -> EvalResult {
+    expect_args("find-file-name-handler", &args, 2)?;
+    let filename = expect_string_strict(&args[0])?;
+    let _filename = resolve_filename_for_eval(eval, &filename);
+    let _operation = &args[1];
     Ok(Value::Nil)
 }
 

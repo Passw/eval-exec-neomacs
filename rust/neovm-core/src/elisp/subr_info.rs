@@ -312,6 +312,7 @@ fn subr_arity_value(name: &str) -> Value {
         "copy-region-as-kill" => arity_cons(2, Some(3)),
         "copy-to-register" => arity_cons(3, Some(5)),
         "make-directory" => arity_cons(1, Some(2)),
+        "make-directory-internal" => arity_cons(1, Some(1)),
         "make-temp-file" => arity_cons(1, Some(4)),
         "make-nearby-temp-file" => arity_cons(1, Some(3)),
         "make-symbolic-link" | "rename-file" => arity_cons(2, Some(3)),
@@ -327,6 +328,7 @@ fn subr_arity_value(name: &str) -> Value {
         "file-name-concat" => arity_cons(1, None),
         "file-truename" => arity_cons(1, Some(3)),
         "find-file" => arity_cons(1, Some(2)),
+        "find-file-name-handler" => arity_cons(2, Some(2)),
         "find-file-noselect" => arity_cons(1, Some(4)),
         "insert-file-contents" => arity_cons(1, Some(5)),
         "load" => arity_cons(1, Some(5)),
@@ -992,7 +994,9 @@ fn subr_arity_value(name: &str) -> Value {
         "delete-overlay" => arity_cons(1, Some(1)),
         "delete-window" => arity_cons(0, Some(1)),
         "delete-directory" => arity_cons(1, Some(3)),
+        "delete-directory-internal" => arity_cons(1, Some(1)),
         "delete-file" => arity_cons(1, Some(2)),
+        "delete-file-internal" => arity_cons(1, Some(1)),
         "access-file" => arity_cons(2, Some(2)),
         "default-file-modes" => arity_cons(0, Some(0)),
         "directory-file-name" | "directory-name-p" => arity_cons(1, Some(1)),
@@ -2387,7 +2391,9 @@ mod tests {
     fn subr_arity_filesystem_path_primitives_match_oracle() {
         assert_subr_arity("access-file", 2, Some(2));
         assert_subr_arity("delete-directory", 1, Some(3));
+        assert_subr_arity("delete-directory-internal", 1, Some(1));
         assert_subr_arity("delete-file", 1, Some(2));
+        assert_subr_arity("delete-file-internal", 1, Some(1));
         assert_subr_arity("directory-file-name", 1, Some(1));
         assert_subr_arity("directory-files", 1, Some(5));
         assert_subr_arity("directory-files-and-attributes", 1, Some(6));
@@ -2398,6 +2404,7 @@ mod tests {
     #[test]
     fn subr_arity_filesystem_create_primitives_match_oracle() {
         assert_subr_arity("make-directory", 1, Some(2));
+        assert_subr_arity("make-directory-internal", 1, Some(1));
         assert_subr_arity("make-temp-file", 1, Some(4));
         assert_subr_arity("make-nearby-temp-file", 1, Some(3));
         assert_subr_arity("make-symbolic-link", 2, Some(3));
@@ -2408,6 +2415,7 @@ mod tests {
     #[test]
     fn subr_arity_file_load_primitives_match_oracle() {
         assert_subr_arity("find-file", 1, Some(2));
+        assert_subr_arity("find-file-name-handler", 2, Some(2));
         assert_subr_arity("find-file-noselect", 1, Some(4));
         assert_subr_arity("insert-file-contents", 1, Some(5));
         assert_subr_arity("load", 1, Some(5));

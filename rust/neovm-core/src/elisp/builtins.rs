@@ -9157,8 +9157,14 @@ pub(crate) fn dispatch_builtin(
         }
         "write-region" => return Some(super::fileio::builtin_write_region(eval, args)),
         "delete-file" => return Some(super::fileio::builtin_delete_file_eval(eval, args)),
+        "delete-file-internal" => {
+            return Some(super::fileio::builtin_delete_file_internal_eval(eval, args))
+        }
         "delete-directory" => {
             return Some(super::fileio::builtin_delete_directory_eval(eval, args))
+        }
+        "delete-directory-internal" => {
+            return Some(super::fileio::builtin_delete_directory_internal_eval(eval, args))
         }
         "rename-file" => return Some(super::fileio::builtin_rename_file_eval(eval, args)),
         "copy-file" => return Some(super::fileio::builtin_copy_file_eval(eval, args)),
@@ -9169,6 +9175,9 @@ pub(crate) fn dispatch_builtin(
             return Some(super::fileio::builtin_make_symbolic_link_eval(eval, args))
         }
         "make-directory" => return Some(super::fileio::builtin_make_directory_eval(eval, args)),
+        "make-directory-internal" => {
+            return Some(super::fileio::builtin_make_directory_internal_eval(eval, args))
+        }
         "make-temp-file" => return Some(super::fileio::builtin_make_temp_file_eval(eval, args)),
         "make-nearby-temp-file" => {
             return Some(super::fileio::builtin_make_nearby_temp_file_eval(
@@ -9181,6 +9190,9 @@ pub(crate) fn dispatch_builtin(
             return Some(super::dired::builtin_directory_files_and_attributes_eval(
                 eval, args,
             ))
+        }
+        "find-file-name-handler" => {
+            return Some(super::fileio::builtin_find_file_name_handler_eval(eval, args))
         }
         "file-name-completion" => {
             return Some(super::dired::builtin_file_name_completion_eval(eval, args))
@@ -10917,15 +10929,19 @@ pub(crate) fn dispatch_builtin(
         "default-file-modes" => super::fileio::builtin_default_file_modes(args),
         "set-default-file-modes" => super::fileio::builtin_set_default_file_modes(args),
         "delete-file" => super::fileio::builtin_delete_file(args),
+        "delete-file-internal" => super::fileio::builtin_delete_file_internal(args),
         "delete-directory" => super::fileio::builtin_delete_directory(args),
+        "delete-directory-internal" => super::fileio::builtin_delete_directory_internal(args),
         "rename-file" => super::fileio::builtin_rename_file(args),
         "copy-file" => super::fileio::builtin_copy_file(args),
         "add-name-to-file" => super::fileio::builtin_add_name_to_file(args),
         "make-symbolic-link" => super::fileio::builtin_make_symbolic_link(args),
         "make-directory" => super::fileio::builtin_make_directory(args),
+        "make-directory-internal" => super::fileio::builtin_make_directory_internal(args),
         "make-temp-file" => super::fileio::builtin_make_temp_file(args),
         "make-nearby-temp-file" => super::fileio::builtin_make_nearby_temp_file(args),
         "directory-files" => super::fileio::builtin_directory_files(args),
+        "find-file-name-handler" => super::fileio::builtin_find_file_name_handler(args),
         "file-attributes" => super::dired::builtin_file_attributes(args),
 
         // Keymap (pure — no evaluator needed)
@@ -11641,15 +11657,19 @@ pub(crate) fn dispatch_builtin_pure(name: &str, args: Vec<Value>) -> Option<Eval
         "default-file-modes" => super::fileio::builtin_default_file_modes(args),
         "set-default-file-modes" => super::fileio::builtin_set_default_file_modes(args),
         "delete-file" => super::fileio::builtin_delete_file(args),
+        "delete-file-internal" => super::fileio::builtin_delete_file_internal(args),
         "delete-directory" => super::fileio::builtin_delete_directory(args),
+        "delete-directory-internal" => super::fileio::builtin_delete_directory_internal(args),
         "rename-file" => super::fileio::builtin_rename_file(args),
         "copy-file" => super::fileio::builtin_copy_file(args),
         "add-name-to-file" => super::fileio::builtin_add_name_to_file(args),
         "make-symbolic-link" => super::fileio::builtin_make_symbolic_link(args),
         "make-directory" => super::fileio::builtin_make_directory(args),
+        "make-directory-internal" => super::fileio::builtin_make_directory_internal(args),
         "make-temp-file" => super::fileio::builtin_make_temp_file(args),
         "make-nearby-temp-file" => super::fileio::builtin_make_nearby_temp_file(args),
         "directory-files" => super::fileio::builtin_directory_files(args),
+        "find-file-name-handler" => super::fileio::builtin_find_file_name_handler(args),
         "file-attributes" => super::dired::builtin_file_attributes(args),
         // Keymap (pure)
         "kbd" => builtin_kbd(args),
