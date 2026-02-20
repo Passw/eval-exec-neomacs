@@ -1483,6 +1483,282 @@ pub(crate) fn builtin_window_top_child(args: Vec<Value>) -> EvalResult {
     Ok(Value::Nil)
 }
 
+/// `(treesit-available-p)` -> nil.
+pub(crate) fn builtin_treesit_available_p(args: Vec<Value>) -> EvalResult {
+    expect_args("treesit-available-p", &args, 0)?;
+    Ok(Value::Nil)
+}
+
+/// `(treesit-compiled-query-p ...)` -> nil.
+pub(crate) fn builtin_treesit_compiled_query_p(args: Vec<Value>) -> EvalResult {
+    expect_args("treesit-compiled-query-p", &args, 1)?;
+    Ok(Value::Nil)
+}
+
+/// `(treesit-induce-sparse-tree ...)` -> nil.
+pub(crate) fn builtin_treesit_induce_sparse_tree(args: Vec<Value>) -> EvalResult {
+    expect_range_args("treesit-induce-sparse-tree", &args, 2, 4)?;
+    Ok(Value::Nil)
+}
+
+/// `(treesit-language-abi-version ...)` -> nil.
+pub(crate) fn builtin_treesit_language_abi_version(args: Vec<Value>) -> EvalResult {
+    expect_range_args("treesit-language-abi-version", &args, 0, 1)?;
+    Ok(Value::Nil)
+}
+
+/// `(treesit-language-available-p ...)` -> nil.
+pub(crate) fn builtin_treesit_language_available_p(args: Vec<Value>) -> EvalResult {
+    expect_range_args("treesit-language-available-p", &args, 1, 2)?;
+    Ok(Value::Nil)
+}
+
+/// `(treesit-library-abi-version ...)` -> nil.
+pub(crate) fn builtin_treesit_library_abi_version(args: Vec<Value>) -> EvalResult {
+    expect_range_args("treesit-library-abi-version", &args, 0, 1)?;
+    Ok(Value::Nil)
+}
+
+/// `(treesit-node-check ...)` -> nil.
+pub(crate) fn builtin_treesit_node_check(args: Vec<Value>) -> EvalResult {
+    expect_args("treesit-node-check", &args, 2)?;
+    Ok(Value::Nil)
+}
+
+/// `(treesit-node-child ...)` -> nil.
+pub(crate) fn builtin_treesit_node_child(args: Vec<Value>) -> EvalResult {
+    expect_range_args("treesit-node-child", &args, 2, 3)?;
+    Ok(Value::Nil)
+}
+
+/// `(treesit-node-child-by-field-name ...)` -> nil.
+pub(crate) fn builtin_treesit_node_child_by_field_name(args: Vec<Value>) -> EvalResult {
+    expect_args("treesit-node-child-by-field-name", &args, 2)?;
+    Ok(Value::Nil)
+}
+
+/// `(treesit-node-child-count ...)` -> nil.
+pub(crate) fn builtin_treesit_node_child_count(args: Vec<Value>) -> EvalResult {
+    expect_range_args("treesit-node-child-count", &args, 1, 2)?;
+    Ok(Value::Nil)
+}
+
+/// `(treesit-node-descendant-for-range ...)` -> nil.
+pub(crate) fn builtin_treesit_node_descendant_for_range(args: Vec<Value>) -> EvalResult {
+    expect_range_args("treesit-node-descendant-for-range", &args, 3, 4)?;
+    Ok(Value::Nil)
+}
+
+/// `(treesit-node-end ...)` -> nil.
+pub(crate) fn builtin_treesit_node_end(args: Vec<Value>) -> EvalResult {
+    expect_args("treesit-node-end", &args, 1)?;
+    Ok(Value::Nil)
+}
+
+/// `(treesit-node-eq ...)` -> nil.
+pub(crate) fn builtin_treesit_node_eq(args: Vec<Value>) -> EvalResult {
+    expect_args("treesit-node-eq", &args, 2)?;
+    Ok(Value::Nil)
+}
+
+/// `(treesit-node-field-name-for-child ...)` -> nil.
+pub(crate) fn builtin_treesit_node_field_name_for_child(args: Vec<Value>) -> EvalResult {
+    expect_args("treesit-node-field-name-for-child", &args, 2)?;
+    Ok(Value::Nil)
+}
+
+/// `(treesit-node-first-child-for-pos ...)` -> nil.
+pub(crate) fn builtin_treesit_node_first_child_for_pos(args: Vec<Value>) -> EvalResult {
+    expect_range_args("treesit-node-first-child-for-pos", &args, 2, 3)?;
+    Ok(Value::Nil)
+}
+
+/// `(treesit-node-match-p ...)` -> nil.
+pub(crate) fn builtin_treesit_node_match_p(args: Vec<Value>) -> EvalResult {
+    expect_range_args("treesit-node-match-p", &args, 2, 3)?;
+    Ok(Value::Nil)
+}
+
+/// `(treesit-node-next-sibling ...)` -> nil.
+pub(crate) fn builtin_treesit_node_next_sibling(args: Vec<Value>) -> EvalResult {
+    expect_range_args("treesit-node-next-sibling", &args, 1, 2)?;
+    Ok(Value::Nil)
+}
+
+/// `(treesit-node-p ...)` -> nil.
+pub(crate) fn builtin_treesit_node_p(args: Vec<Value>) -> EvalResult {
+    expect_args("treesit-node-p", &args, 1)?;
+    Ok(Value::Nil)
+}
+
+/// `(treesit-node-parent ...)` -> nil.
+pub(crate) fn builtin_treesit_node_parent(args: Vec<Value>) -> EvalResult {
+    expect_args("treesit-node-parent", &args, 1)?;
+    Ok(Value::Nil)
+}
+
+/// `(treesit-node-parser ...)` -> nil.
+pub(crate) fn builtin_treesit_node_parser(args: Vec<Value>) -> EvalResult {
+    expect_args("treesit-node-parser", &args, 1)?;
+    Ok(Value::Nil)
+}
+
+/// `(treesit-node-prev-sibling ...)` -> nil.
+pub(crate) fn builtin_treesit_node_prev_sibling(args: Vec<Value>) -> EvalResult {
+    expect_range_args("treesit-node-prev-sibling", &args, 1, 2)?;
+    Ok(Value::Nil)
+}
+
+/// `(treesit-node-start ...)` -> nil.
+pub(crate) fn builtin_treesit_node_start(args: Vec<Value>) -> EvalResult {
+    expect_args("treesit-node-start", &args, 1)?;
+    Ok(Value::Nil)
+}
+
+/// `(treesit-node-string ...)` -> nil.
+pub(crate) fn builtin_treesit_node_string(args: Vec<Value>) -> EvalResult {
+    expect_args("treesit-node-string", &args, 1)?;
+    Ok(Value::Nil)
+}
+
+/// `(treesit-node-type ...)` -> nil.
+pub(crate) fn builtin_treesit_node_type(args: Vec<Value>) -> EvalResult {
+    expect_args("treesit-node-type", &args, 1)?;
+    Ok(Value::Nil)
+}
+
+/// `(treesit-parser-add-notifier ...)` -> nil.
+pub(crate) fn builtin_treesit_parser_add_notifier(args: Vec<Value>) -> EvalResult {
+    expect_args("treesit-parser-add-notifier", &args, 2)?;
+    Ok(Value::Nil)
+}
+
+/// `(treesit-parser-buffer ...)` -> nil.
+pub(crate) fn builtin_treesit_parser_buffer(args: Vec<Value>) -> EvalResult {
+    expect_args("treesit-parser-buffer", &args, 1)?;
+    Ok(Value::Nil)
+}
+
+/// `(treesit-parser-create ...)` -> nil.
+pub(crate) fn builtin_treesit_parser_create(args: Vec<Value>) -> EvalResult {
+    expect_range_args("treesit-parser-create", &args, 1, 4)?;
+    Ok(Value::Nil)
+}
+
+/// `(treesit-parser-delete ...)` -> nil.
+pub(crate) fn builtin_treesit_parser_delete(args: Vec<Value>) -> EvalResult {
+    expect_args("treesit-parser-delete", &args, 1)?;
+    Ok(Value::Nil)
+}
+
+/// `(treesit-parser-included-ranges ...)` -> nil.
+pub(crate) fn builtin_treesit_parser_included_ranges(args: Vec<Value>) -> EvalResult {
+    expect_args("treesit-parser-included-ranges", &args, 1)?;
+    Ok(Value::Nil)
+}
+
+/// `(treesit-parser-language ...)` -> nil.
+pub(crate) fn builtin_treesit_parser_language(args: Vec<Value>) -> EvalResult {
+    expect_args("treesit-parser-language", &args, 1)?;
+    Ok(Value::Nil)
+}
+
+/// `(treesit-parser-list ...)` -> nil.
+pub(crate) fn builtin_treesit_parser_list(args: Vec<Value>) -> EvalResult {
+    expect_range_args("treesit-parser-list", &args, 0, 3)?;
+    Ok(Value::Nil)
+}
+
+/// `(treesit-parser-notifiers ...)` -> nil.
+pub(crate) fn builtin_treesit_parser_notifiers(args: Vec<Value>) -> EvalResult {
+    expect_args("treesit-parser-notifiers", &args, 1)?;
+    Ok(Value::Nil)
+}
+
+/// `(treesit-parser-p ...)` -> nil.
+pub(crate) fn builtin_treesit_parser_p(args: Vec<Value>) -> EvalResult {
+    expect_args("treesit-parser-p", &args, 1)?;
+    Ok(Value::Nil)
+}
+
+/// `(treesit-parser-remove-notifier ...)` -> nil.
+pub(crate) fn builtin_treesit_parser_remove_notifier(args: Vec<Value>) -> EvalResult {
+    expect_args("treesit-parser-remove-notifier", &args, 2)?;
+    Ok(Value::Nil)
+}
+
+/// `(treesit-parser-root-node ...)` -> nil.
+pub(crate) fn builtin_treesit_parser_root_node(args: Vec<Value>) -> EvalResult {
+    expect_args("treesit-parser-root-node", &args, 1)?;
+    Ok(Value::Nil)
+}
+
+/// `(treesit-parser-set-included-ranges ...)` -> nil.
+pub(crate) fn builtin_treesit_parser_set_included_ranges(args: Vec<Value>) -> EvalResult {
+    expect_args("treesit-parser-set-included-ranges", &args, 2)?;
+    Ok(Value::Nil)
+}
+
+/// `(treesit-parser-tag ...)` -> nil.
+pub(crate) fn builtin_treesit_parser_tag(args: Vec<Value>) -> EvalResult {
+    expect_args("treesit-parser-tag", &args, 1)?;
+    Ok(Value::Nil)
+}
+
+/// `(treesit-pattern-expand ...)` -> nil.
+pub(crate) fn builtin_treesit_pattern_expand(args: Vec<Value>) -> EvalResult {
+    expect_args("treesit-pattern-expand", &args, 1)?;
+    Ok(Value::Nil)
+}
+
+/// `(treesit-query-capture ...)` -> nil.
+pub(crate) fn builtin_treesit_query_capture(args: Vec<Value>) -> EvalResult {
+    expect_range_args("treesit-query-capture", &args, 2, 5)?;
+    Ok(Value::Nil)
+}
+
+/// `(treesit-query-compile ...)` -> nil.
+pub(crate) fn builtin_treesit_query_compile(args: Vec<Value>) -> EvalResult {
+    expect_range_args("treesit-query-compile", &args, 2, 3)?;
+    Ok(Value::Nil)
+}
+
+/// `(treesit-query-expand ...)` -> nil.
+pub(crate) fn builtin_treesit_query_expand(args: Vec<Value>) -> EvalResult {
+    expect_args("treesit-query-expand", &args, 1)?;
+    Ok(Value::Nil)
+}
+
+/// `(treesit-query-language ...)` -> nil.
+pub(crate) fn builtin_treesit_query_language(args: Vec<Value>) -> EvalResult {
+    expect_args("treesit-query-language", &args, 1)?;
+    Ok(Value::Nil)
+}
+
+/// `(treesit-query-p ...)` -> nil.
+pub(crate) fn builtin_treesit_query_p(args: Vec<Value>) -> EvalResult {
+    expect_args("treesit-query-p", &args, 1)?;
+    Ok(Value::Nil)
+}
+
+/// `(treesit-search-forward ...)` -> nil.
+pub(crate) fn builtin_treesit_search_forward(args: Vec<Value>) -> EvalResult {
+    expect_range_args("treesit-search-forward", &args, 2, 4)?;
+    Ok(Value::Nil)
+}
+
+/// `(treesit-search-subtree ...)` -> nil.
+pub(crate) fn builtin_treesit_search_subtree(args: Vec<Value>) -> EvalResult {
+    expect_range_args("treesit-search-subtree", &args, 2, 5)?;
+    Ok(Value::Nil)
+}
+
+/// `(treesit-subtree-stat ...)` -> nil.
+pub(crate) fn builtin_treesit_subtree_stat(args: Vec<Value>) -> EvalResult {
+    expect_args("treesit-subtree-stat", &args, 1)?;
+    Ok(Value::Nil)
+}
+
 /// `(lossage-size &optional NEW-SIZE)` -> 300.
 pub(crate) fn builtin_lossage_size(args: Vec<Value>) -> EvalResult {
     expect_range_args("lossage-size", &args, 0, 1)?;
@@ -2002,6 +2278,21 @@ mod tests {
                 assert_eq!(sig.symbol, "wrong-type-argument");
                 assert_eq!(sig.data.first(), Some(&Value::symbol("window-live-p")));
             }
+            other => panic!("expected signal, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn treesit_available_p_defaults_to_nil() {
+        let out = builtin_treesit_available_p(vec![]).unwrap();
+        assert_eq!(out, Value::Nil);
+    }
+
+    #[test]
+    fn treesit_query_compile_validates_arity() {
+        let err = builtin_treesit_query_compile(vec![Value::Nil]).unwrap_err();
+        match err {
+            Flow::Signal(sig) => assert_eq!(sig.symbol, "wrong-number-of-arguments"),
             other => panic!("expected signal, got {other:?}"),
         }
     }

@@ -742,6 +742,52 @@ fn subr_arity_value(name: &str) -> Value {
         | "transpose-paragraphs"
         | "transpose-sentences"
         | "transpose-words" => arity_cons(1, Some(1)),
+        "treesit-available-p" => arity_cons(0, Some(0)),
+        "treesit-compiled-query-p" => arity_cons(1, Some(1)),
+        "treesit-induce-sparse-tree" => arity_cons(2, Some(4)),
+        "treesit-language-abi-version" => arity_cons(0, Some(1)),
+        "treesit-language-available-p" => arity_cons(1, Some(2)),
+        "treesit-library-abi-version" => arity_cons(0, Some(1)),
+        "treesit-node-check" => arity_cons(2, Some(2)),
+        "treesit-node-child" => arity_cons(2, Some(3)),
+        "treesit-node-child-by-field-name" => arity_cons(2, Some(2)),
+        "treesit-node-child-count" => arity_cons(1, Some(2)),
+        "treesit-node-descendant-for-range" => arity_cons(3, Some(4)),
+        "treesit-node-end" => arity_cons(1, Some(1)),
+        "treesit-node-eq" => arity_cons(2, Some(2)),
+        "treesit-node-field-name-for-child" => arity_cons(2, Some(2)),
+        "treesit-node-first-child-for-pos" => arity_cons(2, Some(3)),
+        "treesit-node-match-p" => arity_cons(2, Some(3)),
+        "treesit-node-next-sibling" => arity_cons(1, Some(2)),
+        "treesit-node-p" => arity_cons(1, Some(1)),
+        "treesit-node-parent" => arity_cons(1, Some(1)),
+        "treesit-node-parser" => arity_cons(1, Some(1)),
+        "treesit-node-prev-sibling" => arity_cons(1, Some(2)),
+        "treesit-node-start" => arity_cons(1, Some(1)),
+        "treesit-node-string" => arity_cons(1, Some(1)),
+        "treesit-node-type" => arity_cons(1, Some(1)),
+        "treesit-parser-add-notifier" => arity_cons(2, Some(2)),
+        "treesit-parser-buffer" => arity_cons(1, Some(1)),
+        "treesit-parser-create" => arity_cons(1, Some(4)),
+        "treesit-parser-delete" => arity_cons(1, Some(1)),
+        "treesit-parser-included-ranges" => arity_cons(1, Some(1)),
+        "treesit-parser-language" => arity_cons(1, Some(1)),
+        "treesit-parser-list" => arity_cons(0, Some(3)),
+        "treesit-parser-notifiers" => arity_cons(1, Some(1)),
+        "treesit-parser-p" => arity_cons(1, Some(1)),
+        "treesit-parser-remove-notifier" => arity_cons(2, Some(2)),
+        "treesit-parser-root-node" => arity_cons(1, Some(1)),
+        "treesit-parser-set-included-ranges" => arity_cons(2, Some(2)),
+        "treesit-parser-tag" => arity_cons(1, Some(1)),
+        "treesit-pattern-expand" => arity_cons(1, Some(1)),
+        "treesit-query-capture" => arity_cons(2, Some(5)),
+        "treesit-query-compile" => arity_cons(2, Some(3)),
+        "treesit-query-expand" => arity_cons(1, Some(1)),
+        "treesit-query-language" => arity_cons(1, Some(1)),
+        "treesit-query-p" => arity_cons(1, Some(1)),
+        "treesit-search-forward" => arity_cons(2, Some(4)),
+        "treesit-search-subtree" => arity_cons(2, Some(5)),
+        "treesit-subtree-stat" => arity_cons(1, Some(1)),
         "upcase-initials-region" | "upcase-region" => arity_cons(2, Some(3)),
         "widget-get" => arity_cons(2, Some(2)),
         "widget-put" => arity_cons(3, Some(3)),
@@ -2726,6 +2772,52 @@ mod tests {
         assert_subr_arity("window-scroll-bar-width", 0, Some(1));
         assert_subr_arity("window-tab-line-height", 0, Some(1));
         assert_subr_arity("window-top-child", 0, Some(1));
+        assert_subr_arity("treesit-available-p", 0, Some(0));
+        assert_subr_arity("treesit-compiled-query-p", 1, Some(1));
+        assert_subr_arity("treesit-induce-sparse-tree", 2, Some(4));
+        assert_subr_arity("treesit-language-abi-version", 0, Some(1));
+        assert_subr_arity("treesit-language-available-p", 1, Some(2));
+        assert_subr_arity("treesit-library-abi-version", 0, Some(1));
+        assert_subr_arity("treesit-node-check", 2, Some(2));
+        assert_subr_arity("treesit-node-child", 2, Some(3));
+        assert_subr_arity("treesit-node-child-by-field-name", 2, Some(2));
+        assert_subr_arity("treesit-node-child-count", 1, Some(2));
+        assert_subr_arity("treesit-node-descendant-for-range", 3, Some(4));
+        assert_subr_arity("treesit-node-end", 1, Some(1));
+        assert_subr_arity("treesit-node-eq", 2, Some(2));
+        assert_subr_arity("treesit-node-field-name-for-child", 2, Some(2));
+        assert_subr_arity("treesit-node-first-child-for-pos", 2, Some(3));
+        assert_subr_arity("treesit-node-match-p", 2, Some(3));
+        assert_subr_arity("treesit-node-next-sibling", 1, Some(2));
+        assert_subr_arity("treesit-node-p", 1, Some(1));
+        assert_subr_arity("treesit-node-parent", 1, Some(1));
+        assert_subr_arity("treesit-node-parser", 1, Some(1));
+        assert_subr_arity("treesit-node-prev-sibling", 1, Some(2));
+        assert_subr_arity("treesit-node-start", 1, Some(1));
+        assert_subr_arity("treesit-node-string", 1, Some(1));
+        assert_subr_arity("treesit-node-type", 1, Some(1));
+        assert_subr_arity("treesit-parser-add-notifier", 2, Some(2));
+        assert_subr_arity("treesit-parser-buffer", 1, Some(1));
+        assert_subr_arity("treesit-parser-create", 1, Some(4));
+        assert_subr_arity("treesit-parser-delete", 1, Some(1));
+        assert_subr_arity("treesit-parser-included-ranges", 1, Some(1));
+        assert_subr_arity("treesit-parser-language", 1, Some(1));
+        assert_subr_arity("treesit-parser-list", 0, Some(3));
+        assert_subr_arity("treesit-parser-notifiers", 1, Some(1));
+        assert_subr_arity("treesit-parser-p", 1, Some(1));
+        assert_subr_arity("treesit-parser-remove-notifier", 2, Some(2));
+        assert_subr_arity("treesit-parser-root-node", 1, Some(1));
+        assert_subr_arity("treesit-parser-set-included-ranges", 2, Some(2));
+        assert_subr_arity("treesit-parser-tag", 1, Some(1));
+        assert_subr_arity("treesit-pattern-expand", 1, Some(1));
+        assert_subr_arity("treesit-query-capture", 2, Some(5));
+        assert_subr_arity("treesit-query-compile", 2, Some(3));
+        assert_subr_arity("treesit-query-expand", 1, Some(1));
+        assert_subr_arity("treesit-query-language", 1, Some(1));
+        assert_subr_arity("treesit-query-p", 1, Some(1));
+        assert_subr_arity("treesit-search-forward", 2, Some(4));
+        assert_subr_arity("treesit-search-subtree", 2, Some(5));
+        assert_subr_arity("treesit-subtree-stat", 1, Some(1));
         assert_subr_arity("get-unicode-property-internal", 2, Some(2));
         assert_subr_arity("get-variable-watchers", 1, Some(1));
         assert_subr_arity("fillarray", 2, Some(2));
