@@ -28,6 +28,58 @@ Last updated: 2026-02-20
 
 ## Doing
 
+- Added compatibility slice for `access-file`, `combine-after-change-execute`, `color-values-from-color-spec`, `color-gray-p`, and `color-supported-p`:
+  - runtime changes:
+    - `rust/neovm-core/src/elisp/fileio.rs`
+      - implemented `access-file` in both pure and evaluator-aware paths with Emacs-compatible signal shape for missing files and strict `stringp` checks on both arguments.
+      - added focused unit coverage in `test_builtin_access_file_semantics`.
+    - `rust/neovm-core/src/elisp/font.rs`
+      - implemented:
+        - `color-values-from-color-spec` (`1..1`)
+        - `color-gray-p` (`1..2`)
+        - `color-supported-p` (`1..3`)
+      - aligned argument validation to oracle:
+        - strict `stringp` for color input
+        - optional `FRAME` validated as `framep` when non-`nil`
+        - invalid/unknown specs return `nil`.
+      - added focused unit coverage:
+        - `color_values_from_color_spec_semantics`
+        - `color_gray_and_supported_semantics`
+    - `rust/neovm-core/src/elisp/builtins.rs`
+      - implemented `combine-after-change-execute` (`0..0`) returning `nil`.
+      - wired evaluator/pure dispatch for all five new builtins.
+    - `rust/neovm-core/src/elisp/builtin_registry.rs`
+      - registered:
+        - `access-file`
+        - `combine-after-change-execute`
+        - `color-values-from-color-spec`
+        - `color-gray-p`
+        - `color-supported-p`
+    - `rust/neovm-core/src/elisp/subr_info.rs`
+      - added arity metadata + assertion coverage:
+        - `access-file` => `(2 . 2)`
+        - `combine-after-change-execute` => `(0 . 0)`
+        - `color-values-from-color-spec` => `(1 . 1)`
+        - `color-gray-p` => `(1 . 2)`
+        - `color-supported-p` => `(1 . 3)`
+  - vm-compat corpus changes:
+    - added:
+      - `test/neovm/vm-compat/cases/access-combine-color-semantics.forms`
+      - `test/neovm/vm-compat/cases/access-combine-color-semantics.expected.tsv`
+    - wired case into:
+      - `test/neovm/vm-compat/cases/default.list`
+  - verified:
+    - `cargo test --manifest-path rust/neovm-core/Cargo.toml test_builtin_access_file_semantics -- --nocapture` (pass)
+    - `cargo test --manifest-path rust/neovm-core/Cargo.toml color_values_from_color_spec_semantics -- --nocapture` (pass)
+    - `cargo test --manifest-path rust/neovm-core/Cargo.toml color_gray_and_supported_semantics -- --nocapture` (pass)
+    - `cargo test --manifest-path rust/neovm-core/Cargo.toml subr_arity_filesystem_path_primitives_match_oracle -- --nocapture` (pass)
+    - `cargo test --manifest-path rust/neovm-core/Cargo.toml subr_arity_color_primitives_match_oracle -- --nocapture` (pass)
+    - `cargo test --manifest-path rust/neovm-core/Cargo.toml subr_arity_command_edit_runtime_helpers_match_oracle -- --nocapture` (pass)
+    - `make -C test/neovm/vm-compat check-one-neovm CASE=cases/access-combine-color-semantics` (pass; `35/35`)
+    - `make -C test/neovm/vm-compat check-builtin-registry-all` (pass; `1293` dispatch / `1292` core)
+    - `make -C test/neovm/vm-compat compat-progress` (pass; default list `800`, tracked `806`, oracle builtin coverage registry/runtime `892/542`)
+    - `make -C test/neovm/vm-compat check-all-neovm-strict` (pass; strict suite green)
+
 - Added compatibility slice for `byte-to-position`, `byte-to-string`, `bitmap-spec-p`, `clear-face-cache`, and `clear-buffer-auto-save-failure`:
   - runtime changes:
     - `rust/neovm-core/src/elisp/builtins.rs`

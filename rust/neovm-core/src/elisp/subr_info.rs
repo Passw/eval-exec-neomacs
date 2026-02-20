@@ -652,7 +652,8 @@ fn subr_arity_value(name: &str) -> Value {
         "secure-hash" => arity_cons(2, Some(5)),
         "split-window" => arity_cons(0, Some(4)),
         "switch-to-buffer" => arity_cons(1, Some(3)),
-        "this-command-keys"
+        "combine-after-change-execute"
+        | "this-command-keys"
         | "this-command-keys-vector"
         | "undo-boundary"
         | "universal-argument"
@@ -915,6 +916,9 @@ fn subr_arity_value(name: &str) -> Value {
         "coding-system-list" | "coding-system-priority-list" => arity_cons(0, Some(1)),
         "defined-colors" => arity_cons(0, Some(1)),
         "color-defined-p" | "color-values" => arity_cons(1, Some(2)),
+        "color-gray-p" => arity_cons(1, Some(2)),
+        "color-supported-p" => arity_cons(1, Some(3)),
+        "color-values-from-color-spec" => arity_cons(1, Some(1)),
         "category-docstring" => arity_cons(1, Some(2)),
         "ccl-execute" => arity_cons(2, Some(2)),
         "ccl-execute-on-string" => arity_cons(3, Some(5)),
@@ -941,6 +945,7 @@ fn subr_arity_value(name: &str) -> Value {
         "delete-window" => arity_cons(0, Some(1)),
         "delete-directory" => arity_cons(1, Some(3)),
         "delete-file" => arity_cons(1, Some(2)),
+        "access-file" => arity_cons(2, Some(2)),
         "default-file-modes" => arity_cons(0, Some(0)),
         "directory-file-name" | "directory-name-p" => arity_cons(1, Some(1)),
         "directory-files" => arity_cons(1, Some(5)),
@@ -2307,6 +2312,7 @@ mod tests {
 
     #[test]
     fn subr_arity_filesystem_path_primitives_match_oracle() {
+        assert_subr_arity("access-file", 2, Some(2));
         assert_subr_arity("delete-directory", 1, Some(3));
         assert_subr_arity("delete-file", 1, Some(2));
         assert_subr_arity("directory-file-name", 1, Some(1));
@@ -2428,7 +2434,10 @@ mod tests {
     fn subr_arity_color_primitives_match_oracle() {
         assert_subr_arity("defined-colors", 0, Some(1));
         assert_subr_arity("color-defined-p", 1, Some(2));
+        assert_subr_arity("color-gray-p", 1, Some(2));
+        assert_subr_arity("color-supported-p", 1, Some(3));
         assert_subr_arity("color-values", 1, Some(2));
+        assert_subr_arity("color-values-from-color-spec", 1, Some(1));
     }
 
     #[test]
@@ -2798,6 +2807,7 @@ mod tests {
         assert_subr_arity("take", 2, Some(2));
         assert_subr_arity("reindent-then-newline-and-indent", 0, Some(0));
         assert_subr_arity("clear-this-command-keys", 0, Some(1));
+        assert_subr_arity("combine-after-change-execute", 0, Some(0));
         assert_subr_arity("this-command-keys", 0, Some(0));
         assert_subr_arity("this-command-keys-vector", 0, Some(0));
         assert_subr_arity("transient-mark-mode", 0, Some(1));

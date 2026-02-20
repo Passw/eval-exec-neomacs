@@ -1508,6 +1508,29 @@ fn delete_file_compat(filename: &str) -> Result<(), Flow> {
     }
 }
 
+/// `(access-file FILE OPERATION)` -- verify FILE is accessible for OPERATION.
+pub(crate) fn builtin_access_file(args: Vec<Value>) -> EvalResult {
+    expect_args("access-file", &args, 2)?;
+    let filename = expect_string_strict(&args[0])?;
+    let operation = expect_string_strict(&args[1])?;
+    match fs::metadata(&filename) {
+        Ok(_) => Ok(Value::Nil),
+        Err(err) => Err(signal_file_action_error(err, &operation, &filename)),
+    }
+}
+
+/// Evaluator-aware variant of `access-file` that resolves relative paths
+/// against dynamic/default `default-directory`.
+pub(crate) fn builtin_access_file_eval(eval: &Evaluator, args: Vec<Value>) -> EvalResult {
+    expect_args("access-file", &args, 2)?;
+    let filename = resolve_filename_for_eval(eval, &expect_string_strict(&args[0])?);
+    let operation = expect_string_strict(&args[1])?;
+    match fs::metadata(&filename) {
+        Ok(_) => Ok(Value::Nil),
+        Err(err) => Err(signal_file_action_error(err, &operation, &filename)),
+    }
+}
+
 /// (file-exists-p FILENAME) -> t or nil
 pub(crate) fn builtin_file_exists_p(args: Vec<Value>) -> EvalResult {
     expect_args("file-exists-p", &args, 1)?;
@@ -3498,6 +3521,51 @@ mod tests {
         let result = builtin_file_exists_p(vec![Value::string("/no_such_file_xyz")]);
         assert!(result.is_ok());
         assert!(result.unwrap().is_nil());
+    }
+
+    #[test]
+    fn test_builtin_access_file_semantics() {
+        assert_eq!(
+            builtin_access_file(vec![Value::string("/tmp"), Value::string("read")]).unwrap(),
+            Value::Nil
+        );
+
+        let missing = builtin_access_file(vec![
+            Value::string("/definitely-not-here-neovm"),
+            Value::string("read"),
+        ])
+        .expect_err("missing file should signal");
+        match missing {
+            Flow::Signal(sig) => {
+                assert_eq!(sig.symbol, "file-missing");
+                assert_eq!(sig.data.first(), Some(&Value::string("read")));
+                assert_eq!(
+                    sig.data.last(),
+                    Some(&Value::string("/definitely-not-here-neovm"))
+                );
+            }
+            other => panic!("expected file-missing signal, got {:?}", other),
+        }
+
+        let file_type = builtin_access_file(vec![Value::Int(1), Value::string("read")])
+            .expect_err("FILE should require string");
+        match file_type {
+            Flow::Signal(sig) => {
+                assert_eq!(sig.symbol, "wrong-type-argument");
+                assert_eq!(sig.data, vec![Value::symbol("stringp"), Value::Int(1)]);
+            }
+            other => panic!("expected wrong-type-argument, got {:?}", other),
+        }
+
+        let op_type = builtin_access_file(vec![Value::string("/tmp"), Value::Int(1)])
+            .expect_err("OPERATION should require string");
+        match op_type {
+            Flow::Signal(sig) => {
+                assert_eq!(sig.symbol, "wrong-type-argument");
+                assert_eq!(sig.data, vec![Value::symbol("stringp"), Value::Int(1)]);
+            }
+            other => panic!("expected wrong-type-argument, got {:?}", other),
+        }
     }
 
     #[test]

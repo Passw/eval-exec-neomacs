@@ -4780,6 +4780,11 @@ pub(crate) fn builtin_cancel_kbd_macro_events(args: Vec<Value>) -> EvalResult {
     Ok(Value::Nil)
 }
 
+pub(crate) fn builtin_combine_after_change_execute(args: Vec<Value>) -> EvalResult {
+    expect_args("combine-after-change-execute", &args, 0)?;
+    Ok(Value::Nil)
+}
+
 fn resolve_print_target(eval: &super::eval::Evaluator, printcharfun: Option<&Value>) -> Value {
     match printcharfun {
         Some(dest) if !dest.is_nil() => dest.clone(),
@@ -7965,6 +7970,7 @@ pub(crate) fn dispatch_builtin(
         "font-family-list" => return Some(super::font::builtin_font_family_list_eval(eval, args)),
 
         // File I/O (evaluator-dependent)
+        "access-file" => return Some(super::fileio::builtin_access_file_eval(eval, args)),
         "expand-file-name" => {
             return Some(super::fileio::builtin_expand_file_name_eval(eval, args))
         }
@@ -9609,6 +9615,7 @@ pub(crate) fn dispatch_builtin(
         "identity" => builtin_identity(args),
         "message" => builtin_message(args),
         "error" => builtin_error(args),
+        "combine-after-change-execute" => builtin_combine_after_change_execute(args),
         "princ" => builtin_princ(args),
         "prin1" => builtin_prin1(args),
         "prin1-to-string" => builtin_prin1_to_string(args),
@@ -9626,6 +9633,7 @@ pub(crate) fn dispatch_builtin(
         "float-time" => builtin_float_time(args),
 
         // File I/O (pure)
+        "access-file" => super::fileio::builtin_access_file(args),
         "expand-file-name" => super::fileio::builtin_expand_file_name(args),
         "file-truename" => super::fileio::builtin_file_truename(args),
         "file-name-directory" => super::fileio::builtin_file_name_directory(args),
@@ -9970,7 +9978,10 @@ pub(crate) fn dispatch_builtin(
         "merge-face-attribute" => super::font::builtin_merge_face_attribute(args),
         "face-list" => super::font::builtin_face_list(args),
         "color-defined-p" => super::font::builtin_color_defined_p(args),
+        "color-gray-p" => super::font::builtin_color_gray_p(args),
+        "color-supported-p" => super::font::builtin_color_supported_p(args),
         "color-values" => super::font::builtin_color_values(args),
+        "color-values-from-color-spec" => super::font::builtin_color_values_from_color_spec(args),
         "defined-colors" => super::font::builtin_defined_colors(args),
         "face-id" => super::font::builtin_face_id(args),
         "face-font" => super::font::builtin_face_font(args),

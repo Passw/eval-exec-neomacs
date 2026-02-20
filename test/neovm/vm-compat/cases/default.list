@@ -168,6 +168,7 @@ cases/replace-window-io-subr-arity-semantics
 cases/charset-json-libxml-display-subr-arity-semantics
 cases/coding-system-subr-arity-semantics
 cases/color-subr-arity-semantics
+cases/access-combine-color-semantics
 cases/copy-cons-subr-arity-semantics
 cases/current-state-subr-arity-semantics
 cases/misc-helper-subr-arity-semantics

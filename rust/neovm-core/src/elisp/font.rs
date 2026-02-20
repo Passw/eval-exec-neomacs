@@ -1702,6 +1702,37 @@ pub(crate) fn builtin_face_list(args: Vec<Value>) -> EvalResult {
     ))
 }
 
+fn expect_color_string(value: &Value) -> Result<String, Flow> {
+    match value {
+        Value::Str(s) => Ok((**s).clone()),
+        other => Err(signal(
+            "wrong-type-argument",
+            vec![Value::symbol("stringp"), other.clone()],
+        )),
+    }
+}
+
+fn expect_optional_color_frame_arg(args: &[Value], idx: usize) -> Result<(), Flow> {
+    if let Some(frame) = args.get(idx) {
+        if !frame.is_nil() && !matches!(frame, Value::Frame(_)) {
+            return Err(signal(
+                "wrong-type-argument",
+                vec![Value::symbol("framep"), frame.clone()],
+            ));
+        }
+    }
+    Ok(())
+}
+
+fn parse_color_16bit_any(color_name: &str) -> Option<(i64, i64, i64)> {
+    let lower = color_name.trim().to_lowercase();
+    if let Some(hex) = lower.strip_prefix('#') {
+        parse_hex_color_16bit(hex)
+    } else {
+        parse_named_color_16bit(&lower)
+    }
+}
+
 /// `(color-defined-p COLOR &optional FRAME)` -- nil if unknown; otherwise truthy
 /// for known RGB/hex and supported terminal color names.
 pub(crate) fn builtin_color_defined_p(args: Vec<Value>) -> EvalResult {
@@ -1743,6 +1774,49 @@ pub(crate) fn builtin_color_values(args: Vec<Value>) -> EvalResult {
         Value::Int(g),
         Value::Int(b),
     ]))
+}
+
+/// `(color-values-from-color-spec COLOR-SPEC)` -- parse hex color spec and
+/// return raw `(R G B)` 16-bit channel values.
+pub(crate) fn builtin_color_values_from_color_spec(args: Vec<Value>) -> EvalResult {
+    expect_args("color-values-from-color-spec", &args, 1)?;
+    let color_spec = expect_color_string(&args[0])?;
+    let lower = color_spec.trim().to_lowercase();
+    let Some(hex) = lower.strip_prefix('#') else {
+        return Ok(Value::Nil);
+    };
+    let Some((r, g, b)) = parse_hex_color_16bit(hex) else {
+        return Ok(Value::Nil);
+    };
+    Ok(Value::list(vec![
+        Value::Int(r),
+        Value::Int(g),
+        Value::Int(b),
+    ]))
+}
+
+/// `(color-gray-p COLOR &optional FRAME)` -- t if COLOR resolves to equal RGB
+/// channels, nil otherwise.
+pub(crate) fn builtin_color_gray_p(args: Vec<Value>) -> EvalResult {
+    expect_min_args("color-gray-p", &args, 1)?;
+    expect_max_args("color-gray-p", &args, 2)?;
+    let color = expect_color_string(&args[0])?;
+    expect_optional_color_frame_arg(&args, 1)?;
+    let Some((r, g, b)) = parse_color_16bit_any(&color) else {
+        return Ok(Value::Nil);
+    };
+    Ok(Value::bool(r == g && g == b))
+}
+
+/// `(color-supported-p COLOR &optional FRAME BACKGROUND-P)` -- t if COLOR
+/// resolves on this build's color parser.
+pub(crate) fn builtin_color_supported_p(args: Vec<Value>) -> EvalResult {
+    expect_min_args("color-supported-p", &args, 1)?;
+    expect_max_args("color-supported-p", &args, 3)?;
+    let color = expect_color_string(&args[0])?;
+    expect_optional_color_frame_arg(&args, 1)?;
+    let _ = args.get(2);
+    Ok(Value::bool(parse_color_16bit_any(&color).is_some()))
 }
 
 fn parse_hex_color_16bit(hex: &str) -> Option<(i64, i64, i64)> {
@@ -2603,10 +2677,8 @@ mod tests {
         let result =
             builtin_internal_merge_in_global_face(vec![Value::symbol("default"), Value::Nil]);
         assert!(result.is_err());
-        let frame_handle_result = builtin_internal_merge_in_global_face(vec![
-            Value::symbol("default"),
-            Value::Frame(1),
-        ]);
+        let frame_handle_result =
+            builtin_internal_merge_in_global_face(vec![Value::symbol("default"), Value::Frame(1)]);
         assert!(frame_handle_result.is_err());
     }
 
@@ -2621,11 +2693,9 @@ mod tests {
             Value::True,
         ])
         .unwrap();
-        let merged = builtin_internal_merge_in_global_face(vec![
-            face.clone(),
-            Value::Frame(FRAME_ID_BASE),
-        ])
-        .unwrap();
+        let merged =
+            builtin_internal_merge_in_global_face(vec![face.clone(), Value::Frame(FRAME_ID_BASE)])
+                .unwrap();
         assert!(merged.is_nil());
         let got = builtin_internal_get_lisp_face_attribute(vec![
             face.clone(),
@@ -3038,6 +3108,126 @@ mod tests {
     fn color_values_invalid_hex_returns_nil() {
         let result = builtin_color_values(vec![Value::string("#ggg")]).unwrap();
         assert!(result.is_nil());
+    }
+
+    #[test]
+    fn color_values_from_color_spec_semantics() {
+        let rgb_short = list_to_vec(
+            &builtin_color_values_from_color_spec(vec![Value::string("#000")]).unwrap(),
+        )
+        .unwrap();
+        assert_eq!(
+            rgb_short,
+            vec![Value::Int(0), Value::Int(0), Value::Int(0)]
+        );
+
+        let rgb_12 = list_to_vec(
+            &builtin_color_values_from_color_spec(vec![Value::string("#111122223333")]).unwrap(),
+        )
+        .unwrap();
+        assert_eq!(
+            rgb_12,
+            vec![Value::Int(4369), Value::Int(8738), Value::Int(13107)]
+        );
+
+        assert!(builtin_color_values_from_color_spec(vec![Value::string("#abcd")])
+            .unwrap()
+            .is_nil());
+        assert!(builtin_color_values_from_color_spec(vec![Value::string("bogus")])
+            .unwrap()
+            .is_nil());
+
+        let type_err = builtin_color_values_from_color_spec(vec![Value::Int(1)])
+            .expect_err("color-values-from-color-spec should enforce stringp");
+        match type_err {
+            Flow::Signal(sig) => {
+                assert_eq!(sig.symbol, "wrong-type-argument");
+                assert_eq!(sig.data, vec![Value::symbol("stringp"), Value::Int(1)]);
+            }
+            other => panic!("unexpected flow: {other:?}"),
+        }
+    }
+
+    #[test]
+    fn color_gray_and_supported_semantics() {
+        assert!(
+            builtin_color_gray_p(vec![Value::string("#000000")])
+                .unwrap()
+                .is_truthy()
+        );
+        assert!(
+            builtin_color_gray_p(vec![Value::string("#808080")])
+                .unwrap()
+                .is_truthy()
+        );
+        assert!(
+            builtin_color_gray_p(vec![Value::string("#ff0000")])
+                .unwrap()
+                .is_nil()
+        );
+        assert!(
+            builtin_color_gray_p(vec![Value::string("#fff"), Value::Nil])
+                .unwrap()
+                .is_truthy()
+        );
+
+        let gray_color_type = builtin_color_gray_p(vec![Value::Int(1)])
+            .expect_err("color-gray-p should enforce stringp");
+        match gray_color_type {
+            Flow::Signal(sig) => {
+                assert_eq!(sig.symbol, "wrong-type-argument");
+                assert_eq!(sig.data, vec![Value::symbol("stringp"), Value::Int(1)]);
+            }
+            other => panic!("unexpected flow: {other:?}"),
+        }
+
+        let gray_frame_type =
+            builtin_color_gray_p(vec![Value::string("#fff"), Value::Int(0)])
+                .expect_err("color-gray-p should validate FRAME");
+        match gray_frame_type {
+            Flow::Signal(sig) => {
+                assert_eq!(sig.symbol, "wrong-type-argument");
+                assert_eq!(sig.data, vec![Value::symbol("framep"), Value::Int(0)]);
+            }
+            other => panic!("unexpected flow: {other:?}"),
+        }
+
+        assert!(
+            builtin_color_supported_p(vec![Value::string("#123456")])
+                .unwrap()
+                .is_truthy()
+        );
+        assert!(
+            builtin_color_supported_p(vec![Value::string("#fff"), Value::Nil, Value::True])
+                .unwrap()
+                .is_truthy()
+        );
+        assert!(
+            builtin_color_supported_p(vec![Value::string("bogus"), Value::Nil, Value::Nil])
+                .unwrap()
+                .is_nil()
+        );
+
+        let supported_type = builtin_color_supported_p(vec![Value::Int(1)])
+            .expect_err("color-supported-p should enforce stringp");
+        match supported_type {
+            Flow::Signal(sig) => {
+                assert_eq!(sig.symbol, "wrong-type-argument");
+                assert_eq!(sig.data, vec![Value::symbol("stringp"), Value::Int(1)]);
+            }
+            other => panic!("unexpected flow: {other:?}"),
+        }
+
+        let supported_frame_type =
+            builtin_color_supported_p(vec![Value::string("#fff"), Value::Int(1)])
+                .expect_err("color-supported-p should validate FRAME");
+        match supported_frame_type {
+            Flow::Signal(sig) => {
+                assert_eq!(sig.symbol, "wrong-type-argument");
+                assert_eq!(sig.data, vec![Value::symbol("framep"), Value::Int(1)]);
+            }
+            other => panic!("unexpected flow: {other:?}"),
+        }
     }
 
     #[test]
