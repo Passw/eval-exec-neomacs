@@ -1,0 +1,157 @@
+//! DBus compatibility builtins.
+//!
+//! NeoVM does not include DBus transport, but a subset of DBus primitives are
+//! exposed for startup/runtime compatibility with expected arity and basic
+//! error contracts.
+
+use super::error::{signal, EvalResult, Flow};
+use super::value::Value;
+
+fn expect_args(name: &str, args: &[Value], n: usize) -> Result<(), Flow> {
+    if args.len() != n {
+        Err(signal(
+            "wrong-number-of-arguments",
+            vec![Value::symbol(name), Value::Int(args.len() as i64)],
+        ))
+    } else {
+        Ok(())
+    }
+}
+
+fn expect_range_args(name: &str, args: &[Value], min: usize, max: Option<usize>) -> Result<(), Flow> {
+    let out_of_range = match max {
+        Some(max) => args.len() < min || args.len() > max,
+        None => args.len() < min,
+    };
+    if out_of_range {
+        Err(signal(
+            "wrong-number-of-arguments",
+            vec![Value::symbol(name), Value::Int(args.len() as i64)],
+        ))
+    } else {
+        Ok(())
+    }
+}
+
+fn expect_symbolp(value: &Value) -> Result<String, Flow> {
+    match value {
+        Value::Symbol(s) | Value::Keyword(s) => Ok(s.clone()),
+        other => Err(signal(
+            "wrong-type-argument",
+            vec![Value::symbol("symbolp"), other.clone()],
+        )),
+    }
+}
+
+fn expect_wholenump(value: &Value) -> Result<i64, Flow> {
+    match value {
+        Value::Int(n) if *n >= 0 => Ok(*n),
+        Value::Char(c) => Ok(*c as i64),
+        other => Err(signal(
+            "wrong-type-argument",
+            vec![Value::symbol("wholenump"), other.clone()],
+        )),
+    }
+}
+
+fn dbus_error(msg: &str, details: Value) -> Flow {
+    signal("dbus-error", vec![Value::string(msg), details])
+}
+
+fn recognized_bus_name(name: &str) -> bool {
+    matches!(name, ":system" | ":session")
+}
+
+/// `(dbus--init-bus BUS &optional PRIVATE)` -- initialize BUS and return
+/// a numeric handle.
+pub(crate) fn builtin_dbus_init_bus(args: Vec<Value>) -> EvalResult {
+    expect_range_args("dbus--init-bus", &args, 1, Some(2))?;
+    let bus = expect_symbolp(&args[0])?;
+    if recognized_bus_name(&bus) {
+        Ok(Value::Int(2))
+    } else {
+        Err(dbus_error("Wrong bus name", Value::symbol(bus)))
+    }
+}
+
+/// `(dbus-get-unique-name BUS)` -- resolve unique name for BUS.
+pub(crate) fn builtin_dbus_get_unique_name(args: Vec<Value>) -> EvalResult {
+    expect_args("dbus-get-unique-name", &args, 1)?;
+    let bus = expect_symbolp(&args[0])?;
+    if recognized_bus_name(&bus) {
+        Err(dbus_error("No connection to bus", Value::symbol(bus)))
+    } else {
+        Err(dbus_error("Wrong bus name", Value::symbol(bus)))
+    }
+}
+
+/// `(dbus-message-internal BUS-ID DESTINATION ... )` -- DBus call helper.
+pub(crate) fn builtin_dbus_message_internal(args: Vec<Value>) -> EvalResult {
+    expect_range_args("dbus-message-internal", &args, 4, None)?;
+    let _bus_id = expect_wholenump(&args[0])?;
+
+    match &args[1] {
+        Value::Symbol(_) | Value::Keyword(_) => Ok(Value::Nil),
+        Value::Str(dest) => {
+            if !dest.contains(':') {
+                Err(signal(
+                    "dbus-error",
+                    vec![Value::string("Address does not contain a colon")],
+                ))
+            } else if args.len() == 4 {
+                Err(signal(
+                    "wrong-number-of-arguments",
+                    vec![Value::symbol("dbus-message-internal"), Value::Int(4)],
+                ))
+            } else {
+                Ok(Value::Nil)
+            }
+        }
+        other => Err(signal(
+            "wrong-type-argument",
+            vec![Value::symbol("symbolp"), other.clone()],
+        )),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn dbus_init_bus_contract() {
+        assert_eq!(
+            builtin_dbus_init_bus(vec![Value::keyword(":session")]).unwrap(),
+            Value::Int(2)
+        );
+        let err = builtin_dbus_init_bus(vec![Value::Int(1)]).unwrap_err();
+        match err {
+            Flow::Signal(sig) => assert_eq!(sig.symbol, "wrong-type-argument"),
+            other => panic!("expected signal, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn dbus_get_unique_name_errors_without_connection() {
+        let err = builtin_dbus_get_unique_name(vec![Value::keyword(":system")]).unwrap_err();
+        match err {
+            Flow::Signal(sig) => assert_eq!(sig.symbol, "dbus-error"),
+            other => panic!("expected signal, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn dbus_message_internal_validates_first_arg() {
+        let err = builtin_dbus_message_internal(vec![
+            Value::keyword(":session"),
+            Value::string("/"),
+            Value::string("org.example"),
+            Value::string("Ping"),
+        ])
+        .unwrap_err();
+        match err {
+            Flow::Signal(sig) => assert_eq!(sig.symbol, "wrong-type-argument"),
+            other => panic!("expected signal, got {other:?}"),
+        }
+    }
+}

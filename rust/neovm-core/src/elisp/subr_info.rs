@@ -870,6 +870,21 @@ fn subr_arity_value(name: &str) -> Value {
         "command-error-default-function" | "ngettext" => arity_cons(3, Some(3)),
         "compare-strings" => arity_cons(6, Some(7)),
         "compare-buffer-substrings" => arity_cons(6, Some(6)),
+        "comp--init-ctxt"
+        | "comp--release-ctxt"
+        | "comp-libgccjit-version"
+        | "comp-native-compiler-options-effective-p"
+        | "comp-native-driver-options-effective-p" => arity_cons(0, Some(0)),
+        "comp--compile-ctxt-to-file0"
+        | "comp--subr-signature"
+        | "comp-el-to-eln-rel-filename"
+        | "dbus-get-unique-name" => arity_cons(1, Some(1)),
+        "comp-el-to-eln-filename" | "dbus--init-bus" => arity_cons(1, Some(2)),
+        "comp--install-trampoline" => arity_cons(2, Some(2)),
+        "comp--late-register-subr" | "comp--register-lambda" | "comp--register-subr" => {
+            arity_cons(7, Some(7))
+        }
+        "dbus-message-internal" => arity_cons(4, None),
         "completing-read" => arity_cons(2, Some(8)),
         "try-completion" | "test-completion" => arity_cons(2, Some(3)),
         "all-completions" => arity_cons(2, Some(4)),
@@ -2451,10 +2466,26 @@ mod tests {
         assert_subr_arity("command-execute", 1, Some(4));
         assert_subr_arity("compare-buffer-substrings", 6, Some(6));
         assert_subr_arity("compare-strings", 6, Some(7));
+        assert_subr_arity("comp--compile-ctxt-to-file0", 1, Some(1));
+        assert_subr_arity("comp--init-ctxt", 0, Some(0));
+        assert_subr_arity("comp--install-trampoline", 2, Some(2));
+        assert_subr_arity("comp--late-register-subr", 7, Some(7));
+        assert_subr_arity("comp--register-lambda", 7, Some(7));
+        assert_subr_arity("comp--register-subr", 7, Some(7));
+        assert_subr_arity("comp--release-ctxt", 0, Some(0));
+        assert_subr_arity("comp--subr-signature", 1, Some(1));
+        assert_subr_arity("comp-el-to-eln-filename", 1, Some(2));
+        assert_subr_arity("comp-el-to-eln-rel-filename", 1, Some(1));
+        assert_subr_arity("comp-libgccjit-version", 0, Some(0));
+        assert_subr_arity("comp-native-compiler-options-effective-p", 0, Some(0));
+        assert_subr_arity("comp-native-driver-options-effective-p", 0, Some(0));
         assert_subr_arity("completing-read", 2, Some(8));
         assert_subr_arity("try-completion", 2, Some(3));
         assert_subr_arity("all-completions", 2, Some(4));
         assert_subr_arity("test-completion", 2, Some(3));
+        assert_subr_arity("dbus--init-bus", 1, Some(2));
+        assert_subr_arity("dbus-get-unique-name", 1, Some(1));
+        assert_subr_arity("dbus-message-internal", 4, None);
     }
 
     #[test]

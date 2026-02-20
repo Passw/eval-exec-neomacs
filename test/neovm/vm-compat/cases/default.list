@@ -824,3 +824,4 @@ cases/scroll-frame-visibility-wrapper-semantics
 cases/scroll-horizontal-other-window-semantics
 cases/charset-big5-sjis-iso-final-semantics
 cases/hash-coding-internal-sxhash-semantics
+cases/comp-dbus-internal-semantics

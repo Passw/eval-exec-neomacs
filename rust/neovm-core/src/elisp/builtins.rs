@@ -12320,6 +12320,30 @@ pub(crate) fn dispatch_builtin(
         // Custom system (pure)
         "custom-set-faces" => super::custom::builtin_custom_set_faces(args),
 
+        // Native compilation compatibility (pure)
+        "comp--compile-ctxt-to-file0" => super::comp::builtin_comp_compile_ctxt_to_file0(args),
+        "comp--init-ctxt" => super::comp::builtin_comp_init_ctxt(args),
+        "comp--install-trampoline" => super::comp::builtin_comp_install_trampoline(args),
+        "comp--late-register-subr" => super::comp::builtin_comp_late_register_subr(args),
+        "comp--register-lambda" => super::comp::builtin_comp_register_lambda(args),
+        "comp--register-subr" => super::comp::builtin_comp_register_subr(args),
+        "comp--release-ctxt" => super::comp::builtin_comp_release_ctxt(args),
+        "comp--subr-signature" => super::comp::builtin_comp_subr_signature(args),
+        "comp-el-to-eln-filename" => super::comp::builtin_comp_el_to_eln_filename(args),
+        "comp-el-to-eln-rel-filename" => super::comp::builtin_comp_el_to_eln_rel_filename(args),
+        "comp-libgccjit-version" => super::comp::builtin_comp_libgccjit_version(args),
+        "comp-native-compiler-options-effective-p" => {
+            super::comp::builtin_comp_native_compiler_options_effective_p(args)
+        }
+        "comp-native-driver-options-effective-p" => {
+            super::comp::builtin_comp_native_driver_options_effective_p(args)
+        }
+
+        // DBus compatibility (pure)
+        "dbus--init-bus" => super::dbus::builtin_dbus_init_bus(args),
+        "dbus-get-unique-name" => super::dbus::builtin_dbus_get_unique_name(args),
+        "dbus-message-internal" => super::dbus::builtin_dbus_message_internal(args),
+
         // Documentation/help (pure)
         "documentation-property" => super::doc::builtin_documentation_property(args),
         "Snarf-documentation" => super::doc::builtin_snarf_documentation(args),

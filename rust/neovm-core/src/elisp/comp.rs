@@ -1,0 +1,198 @@
+//! Native compilation compatibility builtins.
+//!
+//! Emacs exposes a small set of `comp-*` and `comp--*` primitives used by the
+//! native compilation pipeline. NeoVM does not perform native compilation, but
+//! these implementations provide compatible arity/type/error behavior for
+//! startup code.
+
+use std::env;
+use std::path::{Path, PathBuf};
+
+use super::error::{signal, EvalResult, Flow};
+use super::value::Value;
+
+fn expect_args(name: &str, args: &[Value], n: usize) -> Result<(), Flow> {
+    if args.len() != n {
+        Err(signal(
+            "wrong-number-of-arguments",
+            vec![Value::symbol(name), Value::Int(args.len() as i64)],
+        ))
+    } else {
+        Ok(())
+    }
+}
+
+fn expect_range_args(name: &str, args: &[Value], min: usize, max: usize) -> Result<(), Flow> {
+    if args.len() < min || args.len() > max {
+        Err(signal(
+            "wrong-number-of-arguments",
+            vec![Value::symbol(name), Value::Int(args.len() as i64)],
+        ))
+    } else {
+        Ok(())
+    }
+}
+
+fn expect_string(value: &Value) -> Result<String, Flow> {
+    match value {
+        Value::Str(s) => Ok((**s).clone()),
+        other => Err(signal(
+            "wrong-type-argument",
+            vec![Value::symbol("stringp"), other.clone()],
+        )),
+    }
+}
+
+fn expect_subr(value: &Value) -> Result<(), Flow> {
+    match value {
+        Value::Subr(_) => Ok(()),
+        other => Err(signal(
+            "wrong-type-argument",
+            vec![Value::symbol("subrp"), other.clone()],
+        )),
+    }
+}
+
+fn absolutize_path(path: &str) -> PathBuf {
+    let p = Path::new(path);
+    if p.is_absolute() {
+        p.to_path_buf()
+    } else {
+        env::current_dir()
+            .unwrap_or_else(|_| PathBuf::from("."))
+            .join(p)
+    }
+}
+
+fn ensure_existing_file(path: &str) -> Result<PathBuf, Flow> {
+    let abs = absolutize_path(path);
+    if abs.exists() {
+        Ok(abs)
+    } else {
+        Err(signal(
+            "file-missing",
+            vec![Value::string(abs.display().to_string())],
+        ))
+    }
+}
+
+/// `(comp--compile-ctxt-to-file0 CTXT)` -- no-op native compilation compatibility entry.
+pub(crate) fn builtin_comp_compile_ctxt_to_file0(args: Vec<Value>) -> EvalResult {
+    expect_args("comp--compile-ctxt-to-file0", &args, 1)?;
+    Ok(Value::True)
+}
+
+/// `(comp--init-ctxt)` -- initialize native compilation context.
+pub(crate) fn builtin_comp_init_ctxt(args: Vec<Value>) -> EvalResult {
+    expect_args("comp--init-ctxt", &args, 0)?;
+    Ok(Value::True)
+}
+
+/// `(comp--install-trampoline FUN TARGET)` -- no-op in NeoVM.
+pub(crate) fn builtin_comp_install_trampoline(args: Vec<Value>) -> EvalResult {
+    expect_args("comp--install-trampoline", &args, 2)?;
+    Ok(Value::Nil)
+}
+
+/// `(comp--late-register-subr ...)` -- no-op in NeoVM.
+pub(crate) fn builtin_comp_late_register_subr(args: Vec<Value>) -> EvalResult {
+    expect_args("comp--late-register-subr", &args, 7)?;
+    Ok(Value::Nil)
+}
+
+/// `(comp--register-lambda ...)` -- no-op in NeoVM.
+pub(crate) fn builtin_comp_register_lambda(args: Vec<Value>) -> EvalResult {
+    expect_args("comp--register-lambda", &args, 7)?;
+    Ok(Value::Nil)
+}
+
+/// `(comp--register-subr ...)` -- no-op in NeoVM.
+pub(crate) fn builtin_comp_register_subr(args: Vec<Value>) -> EvalResult {
+    expect_args("comp--register-subr", &args, 7)?;
+    Ok(Value::Nil)
+}
+
+/// `(comp--release-ctxt)` -- release native compilation context.
+pub(crate) fn builtin_comp_release_ctxt(args: Vec<Value>) -> EvalResult {
+    expect_args("comp--release-ctxt", &args, 0)?;
+    Ok(Value::True)
+}
+
+/// `(comp--subr-signature SUBR)` -- return native signature metadata.
+///
+/// NeoVM does not expose signatures; returns nil after validating SUBR.
+pub(crate) fn builtin_comp_subr_signature(args: Vec<Value>) -> EvalResult {
+    expect_args("comp--subr-signature", &args, 1)?;
+    expect_subr(&args[0])?;
+    Ok(Value::Nil)
+}
+
+/// `(comp-el-to-eln-filename FILE &optional OUTPUT-DIR)` -- map .el -> .eln.
+pub(crate) fn builtin_comp_el_to_eln_filename(args: Vec<Value>) -> EvalResult {
+    expect_range_args("comp-el-to-eln-filename", &args, 1, 2)?;
+    let file = expect_string(&args[0])?;
+    let mut out = ensure_existing_file(&file)?;
+    out.set_extension("eln");
+    Ok(Value::string(out.display().to_string()))
+}
+
+/// `(comp-el-to-eln-rel-filename FILE)` -- relative .el -> .eln mapping.
+pub(crate) fn builtin_comp_el_to_eln_rel_filename(args: Vec<Value>) -> EvalResult {
+    expect_args("comp-el-to-eln-rel-filename", &args, 1)?;
+    let file = expect_string(&args[0])?;
+    let _ = ensure_existing_file(&file)?;
+    let mut out = PathBuf::from(file);
+    out.set_extension("eln");
+    Ok(Value::string(out.display().to_string()))
+}
+
+/// `(comp-libgccjit-version)` -- report libgccjit version tuple.
+pub(crate) fn builtin_comp_libgccjit_version(args: Vec<Value>) -> EvalResult {
+    expect_args("comp-libgccjit-version", &args, 0)?;
+    Ok(Value::list(vec![
+        Value::Int(14),
+        Value::Int(3),
+        Value::Int(0),
+    ]))
+}
+
+/// `(comp-native-compiler-options-effective-p)` -- options are effective.
+pub(crate) fn builtin_comp_native_compiler_options_effective_p(args: Vec<Value>) -> EvalResult {
+    expect_args("comp-native-compiler-options-effective-p", &args, 0)?;
+    Ok(Value::True)
+}
+
+/// `(comp-native-driver-options-effective-p)` -- options are effective.
+pub(crate) fn builtin_comp_native_driver_options_effective_p(args: Vec<Value>) -> EvalResult {
+    expect_args("comp-native-driver-options-effective-p", &args, 0)?;
+    Ok(Value::True)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn comp_init_and_release_return_true() {
+        assert_eq!(builtin_comp_init_ctxt(vec![]).unwrap(), Value::True);
+        assert_eq!(builtin_comp_release_ctxt(vec![]).unwrap(), Value::True);
+    }
+
+    #[test]
+    fn comp_subr_signature_requires_subr() {
+        let err = builtin_comp_subr_signature(vec![Value::symbol("+")]).unwrap_err();
+        match err {
+            Flow::Signal(sig) => assert_eq!(sig.symbol, "wrong-type-argument"),
+            other => panic!("expected signal, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn comp_el_to_eln_reports_missing_file() {
+        let err = builtin_comp_el_to_eln_filename(vec![Value::string("no-such-file.el")]).unwrap_err();
+        match err {
+            Flow::Signal(sig) => assert_eq!(sig.symbol, "file-missing"),
+            other => panic!("expected signal, got {other:?}"),
+        }
+    }
+}
