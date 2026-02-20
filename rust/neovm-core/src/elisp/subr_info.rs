@@ -917,7 +917,15 @@ fn subr_arity_value(name: &str) -> Value {
         | "frame-or-buffer-changed-p"
         | "frame-parent"
         | "frame-pointer-visible-p"
+        | "frame-scale-factor"
+        | "frame-scroll-bar-height"
+        | "frame-scroll-bar-width"
+        | "frame-window-state-change"
         | "frame-right-divider-width" => arity_cons(0, Some(1)),
+        "fringe-bitmaps-at-pos" => arity_cons(0, Some(2)),
+        "gap-position" | "gap-size" => arity_cons(0, Some(0)),
+        "garbage-collect-maybe" | "get-variable-watchers" => arity_cons(1, Some(1)),
+        "get-unicode-property-internal" => arity_cons(2, Some(2)),
         "define-hash-table-test" => arity_cons(3, Some(3)),
         "find-coding-systems-region-internal" => arity_cons(2, Some(3)),
         "completing-read" => arity_cons(2, Some(8)),
@@ -2551,7 +2559,17 @@ mod tests {
         assert_subr_arity("frame-or-buffer-changed-p", 0, Some(1));
         assert_subr_arity("frame-parent", 0, Some(1));
         assert_subr_arity("frame-pointer-visible-p", 0, Some(1));
+        assert_subr_arity("frame-scale-factor", 0, Some(1));
+        assert_subr_arity("frame-scroll-bar-height", 0, Some(1));
+        assert_subr_arity("frame-scroll-bar-width", 0, Some(1));
+        assert_subr_arity("frame-window-state-change", 0, Some(1));
         assert_subr_arity("frame-right-divider-width", 0, Some(1));
+        assert_subr_arity("fringe-bitmaps-at-pos", 0, Some(2));
+        assert_subr_arity("gap-position", 0, Some(0));
+        assert_subr_arity("gap-size", 0, Some(0));
+        assert_subr_arity("garbage-collect-maybe", 1, Some(1));
+        assert_subr_arity("get-unicode-property-internal", 2, Some(2));
+        assert_subr_arity("get-variable-watchers", 1, Some(1));
         assert_subr_arity("fillarray", 2, Some(2));
         assert_subr_arity("define-hash-table-test", 3, Some(3));
         assert_subr_arity("find-coding-systems-region-internal", 2, Some(3));

@@ -828,3 +828,4 @@ cases/comp-dbus-internal-semantics
 cases/internal-compat-misc-semantics
 cases/internal-font-face-compat-semantics
 cases/internal-frame-compat-semantics
+cases/internal-runtime-misc-compat-semantics

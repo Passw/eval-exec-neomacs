@@ -475,6 +475,112 @@ pub(crate) fn builtin_frame_right_divider_width(args: Vec<Value>) -> EvalResult 
     Ok(Value::Int(0))
 }
 
+/// `(frame-scale-factor &optional FRAME)` -> 1.0.
+pub(crate) fn builtin_frame_scale_factor(args: Vec<Value>) -> EvalResult {
+    expect_range_args("frame-scale-factor", &args, 0, 1)?;
+    if let Some(frame) = args.first() {
+        expect_frame_live_or_nil(frame)?;
+    }
+    Ok(Value::Float(1.0))
+}
+
+/// `(frame-scroll-bar-height &optional FRAME)` -> 0.
+pub(crate) fn builtin_frame_scroll_bar_height(args: Vec<Value>) -> EvalResult {
+    expect_range_args("frame-scroll-bar-height", &args, 0, 1)?;
+    if let Some(frame) = args.first() {
+        expect_frame_live_or_nil(frame)?;
+    }
+    Ok(Value::Int(0))
+}
+
+/// `(frame-scroll-bar-width &optional FRAME)` -> 0.
+pub(crate) fn builtin_frame_scroll_bar_width(args: Vec<Value>) -> EvalResult {
+    expect_range_args("frame-scroll-bar-width", &args, 0, 1)?;
+    if let Some(frame) = args.first() {
+        expect_frame_live_or_nil(frame)?;
+    }
+    Ok(Value::Int(0))
+}
+
+/// `(frame-window-state-change &optional FRAME)` -> nil.
+pub(crate) fn builtin_frame_window_state_change(args: Vec<Value>) -> EvalResult {
+    expect_range_args("frame-window-state-change", &args, 0, 1)?;
+    if let Some(frame) = args.first() {
+        expect_frame_live_or_nil(frame)?;
+    }
+    Ok(Value::Nil)
+}
+
+/// `(fringe-bitmaps-at-pos &optional POS WINDOW)` -> nil.
+pub(crate) fn builtin_fringe_bitmaps_at_pos(args: Vec<Value>) -> EvalResult {
+    expect_range_args("fringe-bitmaps-at-pos", &args, 0, 2)?;
+    if let Some(pos) = args.first() {
+        if !pos.is_nil() {
+            expect_integer_or_marker_p(pos)?;
+        }
+    }
+    if let Some(window) = args.get(1) {
+        if !window.is_nil() && !matches!(window, Value::Window(_)) {
+            return Err(signal(
+                "wrong-type-argument",
+                vec![Value::symbol("window-live-p"), window.clone()],
+            ));
+        }
+    }
+    Ok(Value::Nil)
+}
+
+/// `(gap-position)` -> 1.
+pub(crate) fn builtin_gap_position(args: Vec<Value>) -> EvalResult {
+    expect_args("gap-position", &args, 0)?;
+    Ok(Value::Int(1))
+}
+
+/// `(gap-size)` -> 2001.
+pub(crate) fn builtin_gap_size(args: Vec<Value>) -> EvalResult {
+    expect_args("gap-size", &args, 0)?;
+    Ok(Value::Int(2001))
+}
+
+/// `(garbage-collect-maybe N)` -> nil.
+pub(crate) fn builtin_garbage_collect_maybe(args: Vec<Value>) -> EvalResult {
+    expect_args("garbage-collect-maybe", &args, 1)?;
+    let Value::Int(n) = args[0] else {
+        return Err(signal(
+            "wrong-type-argument",
+            vec![Value::symbol("wholenump"), args[0].clone()],
+        ));
+    };
+    if n < 0 {
+        return Err(signal(
+            "wrong-type-argument",
+            vec![Value::symbol("wholenump"), Value::Int(n)],
+        ));
+    }
+    Ok(Value::Nil)
+}
+
+/// `(get-unicode-property-internal TABLE INDEX)` -> compatibility type error.
+pub(crate) fn builtin_get_unicode_property_internal(args: Vec<Value>) -> EvalResult {
+    expect_args("get-unicode-property-internal", &args, 2)?;
+    Err(signal(
+        "wrong-type-argument",
+        vec![Value::symbol("char-table-p"), args[0].clone()],
+    ))
+}
+
+/// `(get-variable-watchers SYMBOL)` -> nil.
+pub(crate) fn builtin_get_variable_watchers(args: Vec<Value>) -> EvalResult {
+    expect_args("get-variable-watchers", &args, 1)?;
+    if !args[0].is_nil() && args[0].as_symbol_name().is_none() {
+        return Err(signal(
+            "wrong-type-argument",
+            vec![Value::symbol("symbolp"), args[0].clone()],
+        ));
+    }
+    Ok(Value::Nil)
+}
+
 /// `(define-fringe-bitmap NAME BITS &optional HEIGHT WIDTH ALIGN)` -> NAME.
 pub(crate) fn builtin_define_fringe_bitmap(args: Vec<Value>) -> EvalResult {
     expect_range_args("define-fringe-bitmap", &args, 2, 5)?;
@@ -742,6 +848,21 @@ mod tests {
     #[test]
     fn frame_bottom_divider_width_rejects_non_frame_designator() {
         let err = builtin_frame_bottom_divider_width(vec![Value::Int(0)]).unwrap_err();
+        match err {
+            Flow::Signal(sig) => assert_eq!(sig.symbol, "wrong-type-argument"),
+            other => panic!("expected signal, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn frame_scale_factor_defaults_to_one_float() {
+        let out = builtin_frame_scale_factor(vec![]).unwrap();
+        assert_eq!(out, Value::Float(1.0));
+    }
+
+    #[test]
+    fn garbage_collect_maybe_requires_whole_number() {
+        let err = builtin_garbage_collect_maybe(vec![Value::True]).unwrap_err();
         match err {
             Flow::Signal(sig) => assert_eq!(sig.symbol, "wrong-type-argument"),
             other => panic!("expected signal, got {other:?}"),

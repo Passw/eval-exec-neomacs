@@ -12390,6 +12390,20 @@ pub(crate) fn dispatch_builtin(
         "frame-right-divider-width" => {
             super::compat_internal::builtin_frame_right_divider_width(args)
         }
+        "frame-scale-factor" => super::compat_internal::builtin_frame_scale_factor(args),
+        "frame-scroll-bar-height" => super::compat_internal::builtin_frame_scroll_bar_height(args),
+        "frame-scroll-bar-width" => super::compat_internal::builtin_frame_scroll_bar_width(args),
+        "frame-window-state-change" => {
+            super::compat_internal::builtin_frame_window_state_change(args)
+        }
+        "fringe-bitmaps-at-pos" => super::compat_internal::builtin_fringe_bitmaps_at_pos(args),
+        "gap-position" => super::compat_internal::builtin_gap_position(args),
+        "gap-size" => super::compat_internal::builtin_gap_size(args),
+        "garbage-collect-maybe" => super::compat_internal::builtin_garbage_collect_maybe(args),
+        "get-unicode-property-internal" => {
+            super::compat_internal::builtin_get_unicode_property_internal(args)
+        }
+        "get-variable-watchers" => super::compat_internal::builtin_get_variable_watchers(args),
         "fillarray" => super::compat_internal::builtin_fillarray(args),
         "define-hash-table-test" => super::compat_internal::builtin_define_hash_table_test(args),
         "find-coding-systems-region-internal" => {
@@ -12910,6 +12924,20 @@ pub(crate) fn dispatch_builtin_pure(name: &str, args: Vec<Value>) -> Option<Eval
         "frame-right-divider-width" => {
             super::compat_internal::builtin_frame_right_divider_width(args)
         }
+        "frame-scale-factor" => super::compat_internal::builtin_frame_scale_factor(args),
+        "frame-scroll-bar-height" => super::compat_internal::builtin_frame_scroll_bar_height(args),
+        "frame-scroll-bar-width" => super::compat_internal::builtin_frame_scroll_bar_width(args),
+        "frame-window-state-change" => {
+            super::compat_internal::builtin_frame_window_state_change(args)
+        }
+        "fringe-bitmaps-at-pos" => super::compat_internal::builtin_fringe_bitmaps_at_pos(args),
+        "gap-position" => super::compat_internal::builtin_gap_position(args),
+        "gap-size" => super::compat_internal::builtin_gap_size(args),
+        "garbage-collect-maybe" => super::compat_internal::builtin_garbage_collect_maybe(args),
+        "get-unicode-property-internal" => {
+            super::compat_internal::builtin_get_unicode_property_internal(args)
+        }
+        "get-variable-watchers" => super::compat_internal::builtin_get_variable_watchers(args),
         "fillarray" => super::compat_internal::builtin_fillarray(args),
         "define-hash-table-test" => super::compat_internal::builtin_define_hash_table_test(args),
         "find-coding-systems-region-internal" => {
