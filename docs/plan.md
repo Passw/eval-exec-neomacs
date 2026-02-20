@@ -28,6 +28,57 @@ Last updated: 2026-02-20
 
 ## Doing
 
+- Added compatibility slice for `category-set-mnemonics`, `check-coding-systems-region`, `command-remapping`, `command-modes`, and `close-font`:
+  - runtime changes:
+    - `rust/neovm-core/src/elisp/category.rs`
+      - implemented `category-set-mnemonics` (`1..1`) with `categorysetp` validation and sorted mnemonic output.
+      - added focused tests for round-trip output, non-category-set rejection, and arity checks.
+    - `rust/neovm-core/src/elisp/coding.rs`
+      - implemented `check-coding-systems-region` (`3..3`) compatibility semantics:
+        - validate only arg2 as `integer-or-marker-p`
+        - return `nil`.
+      - added focused tests for accepted/rejected argument shapes.
+    - `rust/neovm-core/src/elisp/interactive.rs`
+      - implemented:
+        - `command-modes` (`1..1`) returning `nil`
+        - `command-remapping` (`1..3`) returning `nil` with KEYMAP slot `keymapp` validation when non-`nil`.
+      - added focused tests for arity and KEYMAP type-check behavior.
+    - `rust/neovm-core/src/elisp/font.rs`
+      - implemented `close-font` (`1..2`) with `font-object` type validation and compatibility `nil` return for accepted tagged objects.
+      - added focused tests for type and arity behavior.
+    - `rust/neovm-core/src/elisp/builtins.rs`
+      - wired evaluator/pure dispatch for all five builtins.
+    - `rust/neovm-core/src/elisp/builtin_registry.rs`
+      - registered all five names.
+    - `rust/neovm-core/src/elisp/subr_info.rs`
+      - added arity metadata and assertion coverage:
+        - `category-set-mnemonics` => `(1 . 1)`
+        - `check-coding-systems-region` => `(3 . 3)`
+        - `command-modes` => `(1 . 1)`
+        - `command-remapping` => `(1 . 3)`
+        - `close-font` => `(1 . 2)`
+  - vm-compat corpus changes:
+    - added:
+      - `test/neovm/vm-compat/cases/category-coding-command-font-semantics.forms`
+      - `test/neovm/vm-compat/cases/category-coding-command-font-semantics.expected.tsv`
+    - wired case into:
+      - `test/neovm/vm-compat/cases/default.list`
+  - verified:
+    - `cargo test --manifest-path rust/neovm-core/Cargo.toml command_remapping_nil_and_keymap_type_checks -- --nocapture` (pass)
+    - `cargo test --manifest-path rust/neovm-core/Cargo.toml command_modes_returns_nil_with_arity_checks -- --nocapture` (pass)
+    - `cargo test --manifest-path rust/neovm-core/Cargo.toml builtin_category_set_mnemonics_round_trip -- --nocapture` (pass)
+    - `cargo test --manifest-path rust/neovm-core/Cargo.toml check_coding_systems_region_semantics -- --nocapture` (pass)
+    - `cargo test --manifest-path rust/neovm-core/Cargo.toml close_font_requires_font_object -- --nocapture` (pass)
+    - `cargo test --manifest-path rust/neovm-core/Cargo.toml subr_arity_command_timer_primitives_match_oracle -- --nocapture` (pass)
+    - `cargo test --manifest-path rust/neovm-core/Cargo.toml subr_arity_category_ccl_primitives_match_oracle -- --nocapture` (pass)
+    - `cargo test --manifest-path rust/neovm-core/Cargo.toml subr_arity_coding_system_primitives_match_oracle -- --nocapture` (pass)
+    - `cargo test --manifest-path rust/neovm-core/Cargo.toml subr_arity_face_font_helper_primitives_match_oracle -- --nocapture` (pass)
+    - `cargo test --manifest-path rust/neovm-core/Cargo.toml subr_arity_syntax_category_plist_helpers_match_oracle -- --nocapture` (pass)
+    - `make -C test/neovm/vm-compat check-one-neovm CASE=cases/category-coding-command-font-semantics` (pass; `36/36`)
+    - `make -C test/neovm/vm-compat check-builtin-registry-all` (pass; `1298` dispatch / `1297` core)
+    - `make -C test/neovm/vm-compat compat-progress` (pass; default list `801`, tracked `807`, oracle builtin coverage registry/runtime `897/537`)
+    - `make -C test/neovm/vm-compat check-all-neovm-strict` (pass; strict suite green)
+
 - Added compatibility slice for `access-file`, `combine-after-change-execute`, `color-values-from-color-spec`, `color-gray-p`, and `color-supported-p`:
   - runtime changes:
     - `rust/neovm-core/src/elisp/fileio.rs`

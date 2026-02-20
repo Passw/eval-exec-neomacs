@@ -9081,6 +9081,9 @@ pub(crate) fn dispatch_builtin(
             ))
         }
         "commandp" => return Some(super::interactive::builtin_commandp_interactive(eval, args)),
+        "command-remapping" => {
+            return Some(super::interactive::builtin_command_remapping(eval, args))
+        }
         "command-execute" => return Some(super::interactive::builtin_command_execute(eval, args)),
         "find-file" => return Some(super::interactive::builtin_find_file_command(eval, args)),
         "save-buffer" => return Some(super::interactive::builtin_save_buffer_command(eval, args)),
@@ -9720,6 +9723,7 @@ pub(crate) fn dispatch_builtin(
         "make-category-table" => super::category::builtin_make_category_table(args),
         "set-category-table" => super::category::builtin_set_category_table(args),
         "make-category-set" => super::category::builtin_make_category_set(args),
+        "category-set-mnemonics" => super::category::builtin_category_set_mnemonics(args),
 
         // Display/terminal (pure)
         "redraw-frame" => super::display::builtin_redraw_frame(args),
@@ -9959,6 +9963,7 @@ pub(crate) fn dispatch_builtin(
         "clear-font-cache" => super::font::builtin_clear_font_cache(args),
         "font-family-list" => super::font::builtin_font_family_list(args),
         "font-xlfd-name" => super::font::builtin_font_xlfd_name(args),
+        "close-font" => super::font::builtin_close_font(args),
         "internal-make-lisp-face" => super::font::builtin_internal_make_lisp_face(args),
         "internal-lisp-face-p" => super::font::builtin_internal_lisp_face_p(args),
         "internal-copy-lisp-face" => super::font::builtin_internal_copy_lisp_face(args),
@@ -10075,6 +10080,7 @@ pub(crate) fn dispatch_builtin(
         "special-form-p" => super::subr_info::builtin_special_form_p(args),
         "macrop" => super::subr_info::builtin_macrop(args),
         "commandp" => super::subr_info::builtin_commandp(args),
+        "command-modes" => super::interactive::builtin_command_modes(args),
         "func-arity" => builtin_func_arity_eval(eval, args),
 
         // Format/string utilities (pure)
@@ -10147,6 +10153,9 @@ pub(crate) fn dispatch_builtin(
         "coding-system-p" => super::coding::builtin_coding_system_p(&eval.coding_systems, args),
         "check-coding-system" => {
             super::coding::builtin_check_coding_system(&eval.coding_systems, args)
+        }
+        "check-coding-systems-region" => {
+            super::coding::builtin_check_coding_systems_region(&eval.coding_systems, args)
         }
         "set-coding-system-priority" => {
             super::coding::builtin_set_coding_system_priority(&mut eval.coding_systems, args)

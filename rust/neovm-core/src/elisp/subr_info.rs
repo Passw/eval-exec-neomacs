@@ -530,6 +530,7 @@ fn subr_arity_value(name: &str) -> Value {
             arity_cons(2, Some(2))
         }
         "face-font" | "font-xlfd-name" => arity_cons(1, Some(3)),
+        "close-font" => arity_cons(1, Some(2)),
         "face-id"
         | "fontp"
         | "internal-make-lisp-face"
@@ -874,7 +875,11 @@ fn subr_arity_value(name: &str) -> Value {
         "modify-frame-parameters" => arity_cons(2, Some(2)),
         "make-frame" => arity_cons(0, Some(1)),
         "get-unused-category" => arity_cons(0, Some(1)),
-        "make-category-set" | "flatten-tree" | "forward-comment" | "natnump" => {
+        "make-category-set"
+        | "category-set-mnemonics"
+        | "flatten-tree"
+        | "forward-comment"
+        | "natnump" => {
             arity_cons(1, Some(1))
         }
         "make-category-table" | "preceding-char" => arity_cons(0, Some(0)),
@@ -889,6 +894,8 @@ fn subr_arity_value(name: &str) -> Value {
         "called-interactively-p" | "float-time" => arity_cons(0, Some(1)),
         "featurep" => arity_cons(1, Some(2)),
         "commandp" => arity_cons(1, Some(2)),
+        "command-modes" => arity_cons(1, Some(1)),
+        "command-remapping" => arity_cons(1, Some(3)),
         "cancel-timer" | "timerp" => arity_cons(1, Some(1)),
         "run-at-time" | "run-with-timer" | "run-with-idle-timer" => arity_cons(3, None),
         "timer-activate" => arity_cons(1, Some(3)),
@@ -912,6 +919,7 @@ fn subr_arity_value(name: &str) -> Value {
         "coding-system-change-eol-conversion"
         | "coding-system-change-text-conversion"
         | "coding-system-get" => arity_cons(2, Some(2)),
+        "check-coding-systems-region" => arity_cons(3, Some(3)),
         "coding-system-put" => arity_cons(3, Some(3)),
         "coding-system-list" | "coding-system-priority-list" => arity_cons(0, Some(1)),
         "defined-colors" => arity_cons(0, Some(1)),
@@ -2219,6 +2227,8 @@ mod tests {
     fn subr_arity_command_timer_primitives_match_oracle() {
         assert_subr_arity("call-interactively", 1, Some(3));
         assert_subr_arity("called-interactively-p", 0, Some(1));
+        assert_subr_arity("command-modes", 1, Some(1));
+        assert_subr_arity("command-remapping", 1, Some(3));
         assert_subr_arity("commandp", 1, Some(2));
         assert_subr_arity("cancel-timer", 1, Some(1));
         assert_subr_arity("timerp", 1, Some(1));
@@ -2406,6 +2416,7 @@ mod tests {
         assert_subr_arity("category-table", 0, Some(0));
         assert_subr_arity("clear-charset-maps", 0, Some(0));
         assert_subr_arity("case-table-p", 1, Some(1));
+        assert_subr_arity("category-set-mnemonics", 1, Some(1));
         assert_subr_arity("category-table-p", 1, Some(1));
         assert_subr_arity("ccl-program-p", 1, Some(1));
         assert_subr_arity("check-coding-system", 1, Some(1));
@@ -2417,6 +2428,7 @@ mod tests {
 
     #[test]
     fn subr_arity_coding_system_primitives_match_oracle() {
+        assert_subr_arity("check-coding-systems-region", 3, Some(3));
         assert_subr_arity("coding-system-aliases", 1, Some(1));
         assert_subr_arity("coding-system-base", 1, Some(1));
         assert_subr_arity("coding-system-change-eol-conversion", 2, Some(2));
@@ -2666,6 +2678,7 @@ mod tests {
 
     #[test]
     fn subr_arity_face_font_helper_primitives_match_oracle() {
+        assert_subr_arity("close-font", 1, Some(2));
         assert_subr_arity("face-attribute-relative-p", 2, Some(2));
         assert_subr_arity("face-font", 1, Some(3));
         assert_subr_arity("face-id", 1, Some(2));
@@ -2691,6 +2704,7 @@ mod tests {
 
     #[test]
     fn subr_arity_syntax_category_plist_helpers_match_oracle() {
+        assert_subr_arity("category-set-mnemonics", 1, Some(1));
         assert_subr_arity("file-attributes-lessp", 2, Some(2));
         assert_subr_arity("flatten-tree", 1, Some(1));
         assert_subr_arity("forward-comment", 1, Some(1));

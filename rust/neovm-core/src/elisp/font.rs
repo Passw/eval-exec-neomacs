@@ -115,6 +115,17 @@ fn is_font_spec(val: &Value) -> bool {
     }
 }
 
+/// Check whether a value is represented as a font-object vector.
+fn is_font_object(val: &Value) -> bool {
+    match val {
+        Value::Vector(v) => {
+            let elems = v.lock().expect("poisoned");
+            matches!(&elems.first(), Some(Value::Keyword(tag)) if tag == "font-object")
+        }
+        _ => false,
+    }
+}
+
 /// Extract a property from a font-spec vector.
 ///
 /// Property lookup is strict: keys only match if they are exactly equal to
@@ -632,6 +643,22 @@ pub(crate) fn builtin_font_xlfd_name(args: Vec<Value>) -> EvalResult {
         )
     };
     Ok(Value::string(rendered))
+}
+
+/// `(close-font FONT-OBJECT &optional FRAME)` -- close an open font object.
+///
+/// NeoVM currently has no runtime font-object handles, so this validates the
+/// argument shape and returns nil for accepted objects.
+pub(crate) fn builtin_close_font(args: Vec<Value>) -> EvalResult {
+    expect_min_args("close-font", &args, 1)?;
+    expect_max_args("close-font", &args, 2)?;
+    if !is_font_object(&args[0]) {
+        return Err(signal(
+            "wrong-type-argument",
+            vec![Value::symbol("font-object"), args[0].clone()],
+        ));
+    }
+    Ok(Value::Nil)
 }
 
 // ===========================================================================
@@ -2367,6 +2394,37 @@ mod tests {
             result,
             Err(Flow::Signal(sig)) if sig.symbol == "wrong-number-of-arguments"
         ));
+    }
+
+    #[test]
+    fn close_font_requires_font_object() {
+        let wrong_nil = builtin_close_font(vec![Value::Nil]).unwrap_err();
+        match wrong_nil {
+            Flow::Signal(sig) => {
+                assert_eq!(sig.symbol, "wrong-type-argument");
+                assert_eq!(sig.data, vec![Value::symbol("font-object"), Value::Nil]);
+            }
+            other => panic!("expected wrong-type-argument, got {other:?}"),
+        }
+
+        let wrong_spec = builtin_close_font(vec![builtin_font_spec(vec![]).unwrap()]).unwrap_err();
+        match wrong_spec {
+            Flow::Signal(sig) => {
+                assert_eq!(sig.symbol, "wrong-type-argument");
+                assert_eq!(sig.data[0], Value::symbol("font-object"));
+            }
+            other => panic!("expected wrong-type-argument, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn close_font_accepts_tagged_font_object_and_checks_arity() {
+        let font_obj = Value::vector(vec![Value::keyword("font-object"), Value::Int(1)]);
+        assert!(builtin_close_font(vec![font_obj.clone()]).unwrap().is_nil());
+        assert!(builtin_close_font(vec![font_obj, Value::Nil]).unwrap().is_nil());
+
+        assert!(builtin_close_font(vec![]).is_err());
+        assert!(builtin_close_font(vec![Value::Nil, Value::Nil, Value::Nil]).is_err());
     }
 
     // -----------------------------------------------------------------------

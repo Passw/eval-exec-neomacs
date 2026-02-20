@@ -218,7 +218,7 @@ impl CodingSystemInfo {
     }
 
     /// Return the base name (strip -unix/-dos/-mac suffix).
-#[cfg(test)]
+    #[cfg(test)]
     fn base_name(&self) -> &str {
         for suffix in &["-unix", "-dos", "-mac"] {
             if self.name.ends_with(suffix) {
@@ -620,7 +620,8 @@ pub(crate) fn builtin_coding_system_put(
                     ));
                 }
             };
-            info.properties.insert(prop_name.to_string(), coerced.clone());
+            info.properties
+                .insert(prop_name.to_string(), coerced.clone());
             return Ok(coerced);
         }
         info.properties.insert(prop_name.to_string(), val.clone());
@@ -645,7 +646,9 @@ pub(crate) fn builtin_coding_system_base(
     let name = coding_symbol_name(&args[0])?;
     let resolved_name = resolve_runtime_name(mgr, &name)
         .ok_or_else(|| signal("coding-system-error", vec![args[0].clone()]))?;
-    Ok(Value::symbol(display_base_name(strip_eol_suffix(&resolved_name))))
+    Ok(Value::symbol(display_base_name(strip_eol_suffix(
+        &resolved_name,
+    ))))
 }
 
 /// `(coding-system-eol-type CODING-SYSTEM)` -- return the EOL type.
@@ -736,8 +739,7 @@ pub(crate) fn builtin_coding_system_change_eol_conversion(
     }
     let resolved_name = normalize_coding_name_for_lookup(&raw_name).to_string();
     let resolved_base = strip_eol_suffix(&resolved_name);
-    let no_conversion_family =
-        is_nil_coding || matches!(resolved_base, "no-conversion" | "binary");
+    let no_conversion_family = is_nil_coding || matches!(resolved_base, "no-conversion" | "binary");
 
     if no_conversion_family {
         let out = match &args[1] {
@@ -890,7 +892,9 @@ pub(crate) fn builtin_coding_system_change_text_conversion(
     }
 
     if EolType::from_suffix(&text_name).is_some() {
-        return Ok(Value::symbol(display_base_name(strip_eol_suffix(&text_name))));
+        return Ok(Value::symbol(display_base_name(strip_eol_suffix(
+            &text_name,
+        ))));
     }
 
     match text_name.as_str() {
@@ -933,6 +937,17 @@ pub(crate) fn builtin_check_coding_system(
             vec![Value::symbol("symbolp"), other.clone()],
         )),
     }
+}
+
+/// `(check-coding-systems-region START END CODING-SYSTEMS)` -- compatibility
+/// helper that currently performs argument shape checks and returns nil.
+pub(crate) fn builtin_check_coding_systems_region(
+    _mgr: &CodingSystemManager,
+    args: Vec<Value>,
+) -> EvalResult {
+    expect_args("check-coding-systems-region", &args, 3)?;
+    expect_integer_or_marker(&args[1])?;
+    Ok(Value::Nil)
 }
 
 /// `(find-coding-system CODING-SYSTEM)` -- resolve CODING-SYSTEM to a known
@@ -1234,7 +1249,11 @@ fn allows_derived_eol_variant(base: &str) -> bool {
 }
 
 fn normalize_coding_name_for_lookup(name: &str) -> &str {
-    if name == "nil" { "no-conversion" } else { name }
+    if name == "nil" {
+        "no-conversion"
+    } else {
+        name
+    }
 }
 
 fn display_base_name(base: &str) -> &str {
@@ -1260,7 +1279,9 @@ fn coding_type_for_base(base: &str) -> Option<&'static str> {
 
 fn default_mnemonic_for_base(base: &str) -> Option<i64> {
     match base {
-        "utf-8" | "mule-utf-8" | "utf-8-auto" | "emacs-internal" | "utf-8-emacs" => Some('U' as i64),
+        "utf-8" | "mule-utf-8" | "utf-8-auto" | "emacs-internal" | "utf-8-emacs" => {
+            Some('U' as i64)
+        }
         "latin-1" | "iso-8859-1" | "iso-latin-1" => Some('1' as i64),
         "ascii" | "us-ascii" | "undecided" | "prefer-utf-8" => Some('-' as i64),
         "raw-text" => Some('t' as i64),
@@ -1493,7 +1514,10 @@ mod tests {
         let result = builtin_coding_system_aliases(&m, vec![Value::Nil]).unwrap();
         assert_eq!(
             result,
-            Value::list(vec![Value::symbol("no-conversion"), Value::symbol("binary")])
+            Value::list(vec![
+                Value::symbol("no-conversion"),
+                Value::symbol("binary")
+            ])
         );
     }
 
@@ -1518,9 +1542,11 @@ mod tests {
     #[test]
     fn coding_system_get_type() {
         let m = mgr();
-        let result =
-            builtin_coding_system_get(&m, vec![Value::symbol("latin-1"), Value::symbol(":coding-type")])
-                .unwrap();
+        let result = builtin_coding_system_get(
+            &m,
+            vec![Value::symbol("latin-1"), Value::symbol(":coding-type")],
+        )
+        .unwrap();
         assert!(matches!(result, Value::Symbol(s) if s == "charset"));
     }
 
@@ -1558,7 +1584,8 @@ mod tests {
     #[test]
     fn coding_system_get_unknown_system() {
         let m = mgr();
-        let result = builtin_coding_system_get(&m, vec![Value::symbol("bogus"), Value::symbol(":name")]);
+        let result =
+            builtin_coding_system_get(&m, vec![Value::symbol("bogus"), Value::symbol(":name")]);
         assert!(result.is_err());
     }
 
@@ -1703,9 +1730,11 @@ mod tests {
     #[test]
     fn eol_type_non_symbol_designator_returns_nil() {
         let m = mgr();
-        assert!(builtin_coding_system_eol_type(&m, vec![Value::string("utf-8")])
-            .unwrap()
-            .is_nil());
+        assert!(
+            builtin_coding_system_eol_type(&m, vec![Value::string("utf-8")])
+                .unwrap()
+                .is_nil()
+        );
         assert!(builtin_coding_system_eol_type(&m, vec![Value::Int(1)])
             .unwrap()
             .is_nil());
@@ -1916,13 +1945,11 @@ mod tests {
         let mut m = mgr();
 
         let latin_dos =
-            builtin_set_keyboard_coding_system(&mut m, vec![Value::symbol("latin-1-dos")])
-                .unwrap();
+            builtin_set_keyboard_coding_system(&mut m, vec![Value::symbol("latin-1-dos")]).unwrap();
         assert_eq!(latin_dos, Value::symbol("iso-latin-1-unix"));
 
         let latin_mac =
-            builtin_set_keyboard_coding_system(&mut m, vec![Value::symbol("latin-1-mac")])
-                .unwrap();
+            builtin_set_keyboard_coding_system(&mut m, vec![Value::symbol("latin-1-mac")]).unwrap();
         assert_eq!(latin_mac, Value::symbol("iso-latin-1-unix"));
 
         let iso_dos =
@@ -2138,7 +2165,9 @@ mod tests {
     #[test]
     fn coding_system_p_accepts_nil_and_supported_derived_variants() {
         let m = mgr();
-        assert!(builtin_coding_system_p(&m, vec![Value::Nil]).unwrap().is_truthy());
+        assert!(builtin_coding_system_p(&m, vec![Value::Nil])
+            .unwrap()
+            .is_truthy());
         assert!(
             builtin_coding_system_p(&m, vec![Value::symbol("ascii-dos")])
                 .unwrap()
@@ -2193,6 +2222,48 @@ mod tests {
         assert!(builtin_check_coding_system(&m, vec![Value::symbol("binary-unix")]).is_err());
         assert!(
             builtin_check_coding_system(&m, vec![Value::symbol("emacs-internal-unix")]).is_err()
+        );
+    }
+
+    #[test]
+    fn check_coding_systems_region_semantics() {
+        let m = mgr();
+        assert!(
+            builtin_check_coding_systems_region(
+                &m,
+                vec![Value::Int(1), Value::Int(1), Value::list(vec![Value::symbol("utf-8")])]
+            )
+            .unwrap()
+            .is_nil()
+        );
+        assert!(
+            builtin_check_coding_systems_region(
+                &m,
+                vec![Value::string("x"), Value::Int(1), Value::symbol("utf-8")]
+            )
+            .unwrap()
+            .is_nil()
+        );
+
+        let type_err = builtin_check_coding_systems_region(
+            &m,
+            vec![Value::Int(1), Value::string("x"), Value::symbol("utf-8")],
+        )
+        .unwrap_err();
+        match type_err {
+            Flow::Signal(sig) => {
+                assert_eq!(sig.symbol, "wrong-type-argument");
+                assert_eq!(
+                    sig.data,
+                    vec![Value::symbol("integer-or-marker-p"), Value::string("x")]
+                );
+            }
+            other => panic!("expected wrong-type-argument, got {other:?}"),
+        }
+
+        assert!(builtin_check_coding_systems_region(&m, vec![]).is_err());
+        assert!(
+            builtin_check_coding_systems_region(&m, vec![Value::Int(1), Value::Int(1)]).is_err()
         );
     }
 

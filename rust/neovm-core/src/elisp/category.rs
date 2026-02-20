@@ -483,6 +483,48 @@ pub(crate) fn builtin_make_category_set(args: Vec<Value>) -> EvalResult {
     Ok(Value::vector(vec))
 }
 
+/// `(category-set-mnemonics CATEGORY-SET)`
+///
+/// Return CATEGORY-SET as a sorted mnemonic string.
+pub(crate) fn builtin_category_set_mnemonics(args: Vec<Value>) -> EvalResult {
+    expect_args("category-set-mnemonics", &args, 1)?;
+
+    let Value::Vector(bits_arc) = &args[0] else {
+        return Err(signal(
+            "wrong-type-argument",
+            vec![Value::symbol("categorysetp"), args[0].clone()],
+        ));
+    };
+
+    let bits = bits_arc.lock().expect("poisoned");
+    let valid_shape = bits.len() >= 130
+        && matches!(&bits[0], Value::Symbol(tag) if tag == "--bool-vector--")
+        && matches!(&bits[1], Value::Int(128));
+    if !valid_shape {
+        return Err(signal(
+            "wrong-type-argument",
+            vec![Value::symbol("categorysetp"), args[0].clone()],
+        ));
+    }
+
+    let mut out = String::new();
+    for idx in 0..128usize {
+        let is_set = match &bits[2 + idx] {
+            Value::Nil => false,
+            Value::Int(0) => false,
+            _ => true,
+        };
+        if is_set {
+            let ch = idx as u8 as char;
+            if is_category_letter(ch) {
+                out.push(ch);
+            }
+        }
+    }
+
+    Ok(Value::string(&out))
+}
+
 // ===========================================================================
 // Eval-dependent builtins (require evaluator / CategoryManager access)
 // ===========================================================================
@@ -1080,6 +1122,48 @@ mod tests {
     fn builtin_make_category_set_wrong_args() {
         assert!(builtin_make_category_set(vec![]).is_err());
         assert!(builtin_make_category_set(vec![Value::string("a"), Value::string("b"),]).is_err());
+    }
+
+    #[test]
+    fn builtin_category_set_mnemonics_round_trip() {
+        let set = builtin_make_category_set(vec![Value::string("a1!")]).unwrap();
+        assert_eq!(
+            builtin_category_set_mnemonics(vec![set]).unwrap(),
+            Value::string("!1a")
+        );
+    }
+
+    #[test]
+    fn builtin_category_set_mnemonics_rejects_non_category_set() {
+        let nil_err = builtin_category_set_mnemonics(vec![Value::Nil]).unwrap_err();
+        match nil_err {
+            Flow::Signal(sig) => {
+                assert_eq!(sig.symbol, "wrong-type-argument");
+                assert_eq!(sig.data, vec![Value::symbol("categorysetp"), Value::Nil]);
+            }
+            other => panic!("expected wrong-type-argument, got {other:?}"),
+        }
+
+        let non_category_set = Value::vector(vec![
+            Value::symbol("--bool-vector--"),
+            Value::Int(2),
+            Value::Int(1),
+            Value::Int(0),
+        ]);
+        let short_err = builtin_category_set_mnemonics(vec![non_category_set.clone()]).unwrap_err();
+        match short_err {
+            Flow::Signal(sig) => {
+                assert_eq!(sig.symbol, "wrong-type-argument");
+                assert_eq!(sig.data, vec![Value::symbol("categorysetp"), non_category_set]);
+            }
+            other => panic!("expected wrong-type-argument, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn builtin_category_set_mnemonics_wrong_args() {
+        assert!(builtin_category_set_mnemonics(vec![]).is_err());
+        assert!(builtin_category_set_mnemonics(vec![Value::Nil, Value::Nil]).is_err());
     }
 
     #[test]
