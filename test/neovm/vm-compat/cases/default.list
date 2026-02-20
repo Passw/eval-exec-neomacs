@@ -839,3 +839,4 @@ cases/internal-runtime-core-compat-semantics
 cases/internal-runtime-introspection-compat-semantics
 cases/internal-gui-frame-runtime-compat-semantics
 cases/internal-runtime-state-compat-semantics
+cases/internal-runtime-remaining-compat-semantics

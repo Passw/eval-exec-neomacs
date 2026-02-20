@@ -12454,6 +12454,14 @@ pub(crate) fn dispatch_builtin(
         "internal-set-lisp-face-attribute-from-resource" => super::compat_internal::builtin_internal_set_lisp_face_attribute_from_resource(args),
         "internal-stack-stats" => super::compat_internal::builtin_internal_stack_stats(args),
         "internal-subr-documentation" => super::compat_internal::builtin_internal_subr_documentation(args),
+        "byte-code" => super::compat_internal::builtin_byte_code(args),
+        "decode-coding-region" => super::compat_internal::builtin_decode_coding_region(args),
+        "defconst-1" => super::compat_internal::builtin_defconst_1(args),
+        "define-coding-system-internal" => {
+            super::compat_internal::builtin_define_coding_system_internal(args)
+        }
+        "defvar-1" => super::compat_internal::builtin_defvar_1(args),
+        "defvaralias" => super::compat_internal::builtin_defvaralias(args),
         "dump-emacs-portable" => super::compat_internal::builtin_dump_emacs_portable(args),
         "dump-emacs-portable--sort-predicate" => {
             super::compat_internal::builtin_dump_emacs_portable_sort_predicate(args)
@@ -12461,15 +12469,52 @@ pub(crate) fn dispatch_builtin(
         "dump-emacs-portable--sort-predicate-copied" => {
             super::compat_internal::builtin_dump_emacs_portable_sort_predicate_copied(args)
         }
+        "encode-coding-region" => super::compat_internal::builtin_encode_coding_region(args),
+        "find-operation-coding-system" => {
+            super::compat_internal::builtin_find_operation_coding_system(args)
+        }
+        "handler-bind-1" => super::compat_internal::builtin_handler_bind_1(args),
+        "indirect-variable" => super::compat_internal::builtin_indirect_variable(args),
+        "insert-and-inherit" => super::compat_internal::builtin_insert_and_inherit(args),
+        "insert-before-markers-and-inherit" => {
+            super::compat_internal::builtin_insert_before_markers_and_inherit(args)
+        }
+        "insert-buffer-substring" => super::compat_internal::builtin_insert_buffer_substring(args),
+        "iso-charset" => super::compat_internal::builtin_iso_charset(args),
+        "keymap--get-keyelt" => super::compat_internal::builtin_keymap_get_keyelt(args),
+        "keymap-prompt" => super::compat_internal::builtin_keymap_prompt(args),
+        "kill-all-local-variables" => super::compat_internal::builtin_kill_all_local_variables(args),
+        "kill-emacs" => super::compat_internal::builtin_kill_emacs(args),
+        "lower-frame" => super::compat_internal::builtin_lower_frame(args),
+        "lread--substitute-object-in-subtree" => {
+            super::compat_internal::builtin_lread_substitute_object_in_subtree(args)
+        }
+        "macroexpand" => super::compat_internal::builtin_macroexpand(args),
         "malloc-info" => super::compat_internal::builtin_malloc_info(args),
         "malloc-trim" => super::compat_internal::builtin_malloc_trim(args),
+        "make-byte-code" => super::compat_internal::builtin_make_byte_code(args),
+        "make-char" => super::compat_internal::builtin_make_char(args),
+        "make-closure" => super::compat_internal::builtin_make_closure(args),
+        "make-finalizer" => super::compat_internal::builtin_make_finalizer(args),
         "marker-last-position" => super::compat_internal::builtin_marker_last_position(args),
+        "make-indirect-buffer" => super::compat_internal::builtin_make_indirect_buffer(args),
+        "make-interpreted-closure" => super::compat_internal::builtin_make_interpreted_closure(args),
+        "make-record" => super::compat_internal::builtin_make_record(args),
+        "make-temp-file-internal" => super::compat_internal::builtin_make_temp_file_internal(args),
+        "map-charset-chars" => super::compat_internal::builtin_map_charset_chars(args),
+        "map-keymap" => super::compat_internal::builtin_map_keymap(args),
+        "map-keymap-internal" => super::compat_internal::builtin_map_keymap_internal(args),
+        "mapbacktrace" => super::compat_internal::builtin_mapbacktrace(args),
         "match-data--translate" => super::compat_internal::builtin_match_data_translate(args),
         "memory-info" => super::compat_internal::builtin_memory_info(args),
         "make-frame-invisible" => super::compat_internal::builtin_make_frame_invisible(args),
         "make-terminal-frame" => super::compat_internal::builtin_make_terminal_frame(args),
         "menu-bar-menu-at-x-y" => super::compat_internal::builtin_menu_bar_menu_at_x_y(args),
         "menu-or-popup-active-p" => super::compat_internal::builtin_menu_or_popup_active_p(args),
+        "minibuffer-innermost-command-loop-p" => {
+            super::compat_internal::builtin_minibuffer_innermost_command_loop_p(args)
+        }
+        "minibuffer-prompt-end" => super::compat_internal::builtin_minibuffer_prompt_end(args),
         "module-load" => super::compat_internal::builtin_module_load(args),
         "mouse-pixel-position" => super::compat_internal::builtin_mouse_pixel_position(args),
         "mouse-position" => super::compat_internal::builtin_mouse_position(args),
@@ -12479,6 +12524,10 @@ pub(crate) fn dispatch_builtin(
         "native-comp-unit-set-file" => super::compat_internal::builtin_native_comp_unit_set_file(args),
         "native-elisp-load" => super::compat_internal::builtin_native_elisp_load(args),
         "new-fontset" => super::compat_internal::builtin_new_fontset(args),
+        "next-frame" => super::compat_internal::builtin_next_frame(args),
+        "ntake" => super::compat_internal::builtin_ntake(args),
+        "obarray-clear" => super::compat_internal::builtin_obarray_clear(args),
+        "obarray-make" => super::compat_internal::builtin_obarray_make(args),
         "object-intervals" => super::compat_internal::builtin_object_intervals(args),
         "old-selected-frame" => super::compat_internal::builtin_old_selected_frame(args),
         "old-selected-window" => super::compat_internal::builtin_old_selected_window(args),
@@ -12492,6 +12541,7 @@ pub(crate) fn dispatch_builtin(
         "position-symbol" => super::compat_internal::builtin_position_symbol(args),
         "posn-at-point" => super::compat_internal::builtin_posn_at_point(args),
         "posn-at-x-y" => super::compat_internal::builtin_posn_at_x_y(args),
+        "previous-frame" => super::compat_internal::builtin_previous_frame(args),
         "profiler-cpu-log" => super::compat_internal::builtin_profiler_cpu_log(args),
         "profiler-cpu-running-p" => super::compat_internal::builtin_profiler_cpu_running_p(args),
         "profiler-cpu-start" => super::compat_internal::builtin_profiler_cpu_start(args),
@@ -12500,22 +12550,32 @@ pub(crate) fn dispatch_builtin(
         "profiler-memory-running-p" => super::compat_internal::builtin_profiler_memory_running_p(args),
         "profiler-memory-start" => super::compat_internal::builtin_profiler_memory_start(args),
         "profiler-memory-stop" => super::compat_internal::builtin_profiler_memory_stop(args),
+        "put-unicode-property-internal" => {
+            super::compat_internal::builtin_put_unicode_property_internal(args)
+        }
         "query-font" => super::compat_internal::builtin_query_font(args),
         "query-fontset" => super::compat_internal::builtin_query_fontset(args),
+        "raise-frame" => super::compat_internal::builtin_raise_frame(args),
         "read-positioning-symbols" => super::compat_internal::builtin_read_positioning_symbols(args),
+        "re--describe-compiled" => super::compat_internal::builtin_re_describe_compiled(args),
         "recent-auto-save-p" => super::compat_internal::builtin_recent_auto_save_p(args),
+        "redisplay" => super::compat_internal::builtin_redisplay(args),
         "record" => super::compat_internal::builtin_record(args),
         "recordp" => super::compat_internal::builtin_recordp(args),
         "reconsider-frame-fonts" => super::compat_internal::builtin_reconsider_frame_fonts(args),
         "redirect-debugging-output" => super::compat_internal::builtin_redirect_debugging_output(args),
         "redirect-frame-focus" => super::compat_internal::builtin_redirect_frame_focus(args),
         "remove-pos-from-symbol" => super::compat_internal::builtin_remove_pos_from_symbol(args),
+        "rename-buffer" => super::compat_internal::builtin_rename_buffer(args),
+        "replace-buffer-contents" => super::compat_internal::builtin_replace_buffer_contents(args),
         "resize-mini-window-internal" => {
             super::compat_internal::builtin_resize_mini_window_internal(args)
         }
         "restore-buffer-modified-p" => super::compat_internal::builtin_restore_buffer_modified_p(args),
         "set--this-command-keys" => super::compat_internal::builtin_set_this_command_keys(args),
         "set-buffer-auto-saved" => super::compat_internal::builtin_set_buffer_auto_saved(args),
+        "set-buffer-major-mode" => super::compat_internal::builtin_set_buffer_major_mode(args),
+        "set-buffer-multibyte" => super::compat_internal::builtin_set_buffer_multibyte(args),
         "set-buffer-redisplay" => super::compat_internal::builtin_set_buffer_redisplay(args),
         "set-charset-plist" => super::compat_internal::builtin_set_charset_plist(args),
         "set-fontset-font" => super::compat_internal::builtin_set_fontset_font(args),
@@ -12533,13 +12593,16 @@ pub(crate) fn dispatch_builtin(
         "set-window-new-normal" => super::compat_internal::builtin_set_window_new_normal(args),
         "set-window-new-pixel" => super::compat_internal::builtin_set_window_new_pixel(args),
         "set-window-new-total" => super::compat_internal::builtin_set_window_new_total(args),
+        "setplist" => super::compat_internal::builtin_setplist(args),
         "sort-charsets" => super::compat_internal::builtin_sort_charsets(args),
         "split-char" => super::compat_internal::builtin_split_char(args),
+        "split-window-internal" => super::compat_internal::builtin_split_window_internal(args),
         "string-distance" => super::compat_internal::builtin_string_distance(args),
         "subst-char-in-region" => super::compat_internal::builtin_subst_char_in_region(args),
         "subr-native-comp-unit" => super::compat_internal::builtin_subr_native_comp_unit(args),
         "subr-native-lambda-list" => super::compat_internal::builtin_subr_native_lambda_list(args),
         "subr-type" => super::compat_internal::builtin_subr_type(args),
+        "suspend-emacs" => super::compat_internal::builtin_suspend_emacs(args),
         "this-single-command-keys" => super::compat_internal::builtin_this_single_command_keys(args),
         "this-single-command-raw-keys" => {
             super::compat_internal::builtin_this_single_command_raw_keys(args)
@@ -12560,6 +12623,7 @@ pub(crate) fn dispatch_builtin(
         "unix-sync" => super::compat_internal::builtin_unix_sync(args),
         "value<" => super::compat_internal::builtin_value_lt(args),
         "variable-binding-locus" => super::compat_internal::builtin_variable_binding_locus(args),
+        "vertical-motion" => super::compat_internal::builtin_vertical_motion(args),
         "x-begin-drag" => super::compat_internal::builtin_x_begin_drag(args),
         "x-create-frame" => super::compat_internal::builtin_x_create_frame(args),
         "x-double-buffered-p" => super::compat_internal::builtin_x_double_buffered_p(args),
@@ -13265,6 +13329,14 @@ pub(crate) fn dispatch_builtin_pure(name: &str, args: Vec<Value>) -> Option<Eval
         "internal-set-lisp-face-attribute-from-resource" => super::compat_internal::builtin_internal_set_lisp_face_attribute_from_resource(args),
         "internal-stack-stats" => super::compat_internal::builtin_internal_stack_stats(args),
         "internal-subr-documentation" => super::compat_internal::builtin_internal_subr_documentation(args),
+        "byte-code" => super::compat_internal::builtin_byte_code(args),
+        "decode-coding-region" => super::compat_internal::builtin_decode_coding_region(args),
+        "defconst-1" => super::compat_internal::builtin_defconst_1(args),
+        "define-coding-system-internal" => {
+            super::compat_internal::builtin_define_coding_system_internal(args)
+        }
+        "defvar-1" => super::compat_internal::builtin_defvar_1(args),
+        "defvaralias" => super::compat_internal::builtin_defvaralias(args),
         "dump-emacs-portable" => super::compat_internal::builtin_dump_emacs_portable(args),
         "dump-emacs-portable--sort-predicate" => {
             super::compat_internal::builtin_dump_emacs_portable_sort_predicate(args)
@@ -13272,15 +13344,52 @@ pub(crate) fn dispatch_builtin_pure(name: &str, args: Vec<Value>) -> Option<Eval
         "dump-emacs-portable--sort-predicate-copied" => {
             super::compat_internal::builtin_dump_emacs_portable_sort_predicate_copied(args)
         }
+        "encode-coding-region" => super::compat_internal::builtin_encode_coding_region(args),
+        "find-operation-coding-system" => {
+            super::compat_internal::builtin_find_operation_coding_system(args)
+        }
+        "handler-bind-1" => super::compat_internal::builtin_handler_bind_1(args),
+        "indirect-variable" => super::compat_internal::builtin_indirect_variable(args),
+        "insert-and-inherit" => super::compat_internal::builtin_insert_and_inherit(args),
+        "insert-before-markers-and-inherit" => {
+            super::compat_internal::builtin_insert_before_markers_and_inherit(args)
+        }
+        "insert-buffer-substring" => super::compat_internal::builtin_insert_buffer_substring(args),
+        "iso-charset" => super::compat_internal::builtin_iso_charset(args),
+        "keymap--get-keyelt" => super::compat_internal::builtin_keymap_get_keyelt(args),
+        "keymap-prompt" => super::compat_internal::builtin_keymap_prompt(args),
+        "kill-all-local-variables" => super::compat_internal::builtin_kill_all_local_variables(args),
+        "kill-emacs" => super::compat_internal::builtin_kill_emacs(args),
+        "lower-frame" => super::compat_internal::builtin_lower_frame(args),
+        "lread--substitute-object-in-subtree" => {
+            super::compat_internal::builtin_lread_substitute_object_in_subtree(args)
+        }
+        "macroexpand" => super::compat_internal::builtin_macroexpand(args),
         "malloc-info" => super::compat_internal::builtin_malloc_info(args),
         "malloc-trim" => super::compat_internal::builtin_malloc_trim(args),
+        "make-byte-code" => super::compat_internal::builtin_make_byte_code(args),
+        "make-char" => super::compat_internal::builtin_make_char(args),
+        "make-closure" => super::compat_internal::builtin_make_closure(args),
+        "make-finalizer" => super::compat_internal::builtin_make_finalizer(args),
         "marker-last-position" => super::compat_internal::builtin_marker_last_position(args),
+        "make-indirect-buffer" => super::compat_internal::builtin_make_indirect_buffer(args),
+        "make-interpreted-closure" => super::compat_internal::builtin_make_interpreted_closure(args),
+        "make-record" => super::compat_internal::builtin_make_record(args),
+        "make-temp-file-internal" => super::compat_internal::builtin_make_temp_file_internal(args),
+        "map-charset-chars" => super::compat_internal::builtin_map_charset_chars(args),
+        "map-keymap" => super::compat_internal::builtin_map_keymap(args),
+        "map-keymap-internal" => super::compat_internal::builtin_map_keymap_internal(args),
+        "mapbacktrace" => super::compat_internal::builtin_mapbacktrace(args),
         "match-data--translate" => super::compat_internal::builtin_match_data_translate(args),
         "memory-info" => super::compat_internal::builtin_memory_info(args),
         "make-frame-invisible" => super::compat_internal::builtin_make_frame_invisible(args),
         "make-terminal-frame" => super::compat_internal::builtin_make_terminal_frame(args),
         "menu-bar-menu-at-x-y" => super::compat_internal::builtin_menu_bar_menu_at_x_y(args),
         "menu-or-popup-active-p" => super::compat_internal::builtin_menu_or_popup_active_p(args),
+        "minibuffer-innermost-command-loop-p" => {
+            super::compat_internal::builtin_minibuffer_innermost_command_loop_p(args)
+        }
+        "minibuffer-prompt-end" => super::compat_internal::builtin_minibuffer_prompt_end(args),
         "module-load" => super::compat_internal::builtin_module_load(args),
         "mouse-pixel-position" => super::compat_internal::builtin_mouse_pixel_position(args),
         "mouse-position" => super::compat_internal::builtin_mouse_position(args),
@@ -13290,6 +13399,10 @@ pub(crate) fn dispatch_builtin_pure(name: &str, args: Vec<Value>) -> Option<Eval
         "native-comp-unit-set-file" => super::compat_internal::builtin_native_comp_unit_set_file(args),
         "native-elisp-load" => super::compat_internal::builtin_native_elisp_load(args),
         "new-fontset" => super::compat_internal::builtin_new_fontset(args),
+        "next-frame" => super::compat_internal::builtin_next_frame(args),
+        "ntake" => super::compat_internal::builtin_ntake(args),
+        "obarray-clear" => super::compat_internal::builtin_obarray_clear(args),
+        "obarray-make" => super::compat_internal::builtin_obarray_make(args),
         "object-intervals" => super::compat_internal::builtin_object_intervals(args),
         "old-selected-frame" => super::compat_internal::builtin_old_selected_frame(args),
         "old-selected-window" => super::compat_internal::builtin_old_selected_window(args),
@@ -13303,6 +13416,7 @@ pub(crate) fn dispatch_builtin_pure(name: &str, args: Vec<Value>) -> Option<Eval
         "position-symbol" => super::compat_internal::builtin_position_symbol(args),
         "posn-at-point" => super::compat_internal::builtin_posn_at_point(args),
         "posn-at-x-y" => super::compat_internal::builtin_posn_at_x_y(args),
+        "previous-frame" => super::compat_internal::builtin_previous_frame(args),
         "profiler-cpu-log" => super::compat_internal::builtin_profiler_cpu_log(args),
         "profiler-cpu-running-p" => super::compat_internal::builtin_profiler_cpu_running_p(args),
         "profiler-cpu-start" => super::compat_internal::builtin_profiler_cpu_start(args),
@@ -13311,22 +13425,32 @@ pub(crate) fn dispatch_builtin_pure(name: &str, args: Vec<Value>) -> Option<Eval
         "profiler-memory-running-p" => super::compat_internal::builtin_profiler_memory_running_p(args),
         "profiler-memory-start" => super::compat_internal::builtin_profiler_memory_start(args),
         "profiler-memory-stop" => super::compat_internal::builtin_profiler_memory_stop(args),
+        "put-unicode-property-internal" => {
+            super::compat_internal::builtin_put_unicode_property_internal(args)
+        }
         "query-font" => super::compat_internal::builtin_query_font(args),
         "query-fontset" => super::compat_internal::builtin_query_fontset(args),
+        "raise-frame" => super::compat_internal::builtin_raise_frame(args),
         "read-positioning-symbols" => super::compat_internal::builtin_read_positioning_symbols(args),
+        "re--describe-compiled" => super::compat_internal::builtin_re_describe_compiled(args),
         "recent-auto-save-p" => super::compat_internal::builtin_recent_auto_save_p(args),
+        "redisplay" => super::compat_internal::builtin_redisplay(args),
         "record" => super::compat_internal::builtin_record(args),
         "recordp" => super::compat_internal::builtin_recordp(args),
         "reconsider-frame-fonts" => super::compat_internal::builtin_reconsider_frame_fonts(args),
         "redirect-debugging-output" => super::compat_internal::builtin_redirect_debugging_output(args),
         "redirect-frame-focus" => super::compat_internal::builtin_redirect_frame_focus(args),
         "remove-pos-from-symbol" => super::compat_internal::builtin_remove_pos_from_symbol(args),
+        "rename-buffer" => super::compat_internal::builtin_rename_buffer(args),
+        "replace-buffer-contents" => super::compat_internal::builtin_replace_buffer_contents(args),
         "resize-mini-window-internal" => {
             super::compat_internal::builtin_resize_mini_window_internal(args)
         }
         "restore-buffer-modified-p" => super::compat_internal::builtin_restore_buffer_modified_p(args),
         "set--this-command-keys" => super::compat_internal::builtin_set_this_command_keys(args),
         "set-buffer-auto-saved" => super::compat_internal::builtin_set_buffer_auto_saved(args),
+        "set-buffer-major-mode" => super::compat_internal::builtin_set_buffer_major_mode(args),
+        "set-buffer-multibyte" => super::compat_internal::builtin_set_buffer_multibyte(args),
         "set-buffer-redisplay" => super::compat_internal::builtin_set_buffer_redisplay(args),
         "set-charset-plist" => super::compat_internal::builtin_set_charset_plist(args),
         "set-fontset-font" => super::compat_internal::builtin_set_fontset_font(args),
@@ -13344,13 +13468,16 @@ pub(crate) fn dispatch_builtin_pure(name: &str, args: Vec<Value>) -> Option<Eval
         "set-window-new-normal" => super::compat_internal::builtin_set_window_new_normal(args),
         "set-window-new-pixel" => super::compat_internal::builtin_set_window_new_pixel(args),
         "set-window-new-total" => super::compat_internal::builtin_set_window_new_total(args),
+        "setplist" => super::compat_internal::builtin_setplist(args),
         "sort-charsets" => super::compat_internal::builtin_sort_charsets(args),
         "split-char" => super::compat_internal::builtin_split_char(args),
+        "split-window-internal" => super::compat_internal::builtin_split_window_internal(args),
         "string-distance" => super::compat_internal::builtin_string_distance(args),
         "subst-char-in-region" => super::compat_internal::builtin_subst_char_in_region(args),
         "subr-native-comp-unit" => super::compat_internal::builtin_subr_native_comp_unit(args),
         "subr-native-lambda-list" => super::compat_internal::builtin_subr_native_lambda_list(args),
         "subr-type" => super::compat_internal::builtin_subr_type(args),
+        "suspend-emacs" => super::compat_internal::builtin_suspend_emacs(args),
         "this-single-command-keys" => super::compat_internal::builtin_this_single_command_keys(args),
         "this-single-command-raw-keys" => {
             super::compat_internal::builtin_this_single_command_raw_keys(args)
@@ -13371,6 +13498,7 @@ pub(crate) fn dispatch_builtin_pure(name: &str, args: Vec<Value>) -> Option<Eval
         "unix-sync" => super::compat_internal::builtin_unix_sync(args),
         "value<" => super::compat_internal::builtin_value_lt(args),
         "variable-binding-locus" => super::compat_internal::builtin_variable_binding_locus(args),
+        "vertical-motion" => super::compat_internal::builtin_vertical_motion(args),
         "x-begin-drag" => super::compat_internal::builtin_x_begin_drag(args),
         "x-create-frame" => super::compat_internal::builtin_x_create_frame(args),
         "x-double-buffered-p" => super::compat_internal::builtin_x_double_buffered_p(args),

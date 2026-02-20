@@ -720,6 +720,58 @@ fn subr_arity_value(name: &str) -> Value {
         "unix-sync" => arity_cons(0, Some(0)),
         "value<" => arity_cons(2, Some(2)),
         "variable-binding-locus" => arity_cons(1, Some(1)),
+        "byte-code" => arity_cons(3, Some(3)),
+        "decode-coding-region" => arity_cons(3, Some(4)),
+        "defconst-1" => arity_cons(2, Some(3)),
+        "define-coding-system-internal" => arity_cons(13, None),
+        "defvar-1" => arity_cons(2, Some(3)),
+        "defvaralias" => arity_cons(2, Some(3)),
+        "encode-coding-region" => arity_cons(3, Some(4)),
+        "find-operation-coding-system" => arity_cons(1, None),
+        "handler-bind-1" => arity_cons(1, None),
+        "indirect-variable" => arity_cons(1, Some(1)),
+        "insert-and-inherit" => arity_cons(0, None),
+        "insert-before-markers-and-inherit" => arity_cons(0, None),
+        "insert-buffer-substring" => arity_cons(1, Some(3)),
+        "iso-charset" => arity_cons(3, Some(3)),
+        "keymap--get-keyelt" => arity_cons(2, Some(2)),
+        "keymap-prompt" => arity_cons(1, Some(1)),
+        "kill-all-local-variables" => arity_cons(0, Some(1)),
+        "kill-emacs" => arity_cons(0, Some(2)),
+        "lower-frame" => arity_cons(0, Some(1)),
+        "lread--substitute-object-in-subtree" => arity_cons(3, Some(3)),
+        "macroexpand" => arity_cons(1, Some(2)),
+        "make-byte-code" => arity_cons(4, None),
+        "make-char" => arity_cons(1, Some(5)),
+        "make-closure" => arity_cons(1, None),
+        "make-finalizer" => arity_cons(1, Some(1)),
+        "make-indirect-buffer" => arity_cons(2, Some(4)),
+        "make-interpreted-closure" => arity_cons(3, Some(5)),
+        "make-record" => arity_cons(3, Some(3)),
+        "make-temp-file-internal" => arity_cons(4, Some(4)),
+        "map-charset-chars" => arity_cons(2, Some(5)),
+        "map-keymap" => arity_cons(2, Some(3)),
+        "map-keymap-internal" => arity_cons(2, Some(2)),
+        "mapbacktrace" => arity_cons(1, Some(2)),
+        "minibuffer-innermost-command-loop-p" => arity_cons(0, Some(1)),
+        "minibuffer-prompt-end" => arity_cons(0, Some(0)),
+        "next-frame" => arity_cons(0, Some(2)),
+        "ntake" => arity_cons(2, Some(2)),
+        "obarray-clear" => arity_cons(1, Some(1)),
+        "obarray-make" => arity_cons(0, Some(1)),
+        "previous-frame" => arity_cons(0, Some(2)),
+        "put-unicode-property-internal" => arity_cons(3, Some(3)),
+        "raise-frame" => arity_cons(0, Some(1)),
+        "re--describe-compiled" => arity_cons(1, Some(2)),
+        "redisplay" => arity_cons(0, Some(1)),
+        "rename-buffer" => arity_cons(1, Some(2)),
+        "replace-buffer-contents" => arity_cons(1, Some(3)),
+        "set-buffer-major-mode" => arity_cons(1, Some(1)),
+        "set-buffer-multibyte" => arity_cons(1, Some(1)),
+        "setplist" => arity_cons(2, Some(2)),
+        "split-window-internal" => arity_cons(4, Some(4)),
+        "suspend-emacs" => arity_cons(0, Some(1)),
+        "vertical-motion" => arity_cons(1, Some(3)),
         "x-begin-drag" => arity_cons(1, Some(6)),
         "x-create-frame" => arity_cons(1, Some(1)),
         "x-double-buffered-p" => arity_cons(0, Some(1)),
@@ -3039,6 +3091,58 @@ mod tests {
         assert_subr_arity("unix-sync", 0, Some(0));
         assert_subr_arity("value<", 2, Some(2));
         assert_subr_arity("variable-binding-locus", 1, Some(1));
+        assert_subr_arity("byte-code", 3, Some(3));
+        assert_subr_arity("decode-coding-region", 3, Some(4));
+        assert_subr_arity("defconst-1", 2, Some(3));
+        assert_subr_arity("define-coding-system-internal", 13, None);
+        assert_subr_arity("defvar-1", 2, Some(3));
+        assert_subr_arity("defvaralias", 2, Some(3));
+        assert_subr_arity("encode-coding-region", 3, Some(4));
+        assert_subr_arity("find-operation-coding-system", 1, None);
+        assert_subr_arity("handler-bind-1", 1, None);
+        assert_subr_arity("indirect-variable", 1, Some(1));
+        assert_subr_arity("insert-and-inherit", 0, None);
+        assert_subr_arity("insert-before-markers-and-inherit", 0, None);
+        assert_subr_arity("insert-buffer-substring", 1, Some(3));
+        assert_subr_arity("iso-charset", 3, Some(3));
+        assert_subr_arity("keymap--get-keyelt", 2, Some(2));
+        assert_subr_arity("keymap-prompt", 1, Some(1));
+        assert_subr_arity("kill-all-local-variables", 0, Some(1));
+        assert_subr_arity("kill-emacs", 0, Some(2));
+        assert_subr_arity("lower-frame", 0, Some(1));
+        assert_subr_arity("lread--substitute-object-in-subtree", 3, Some(3));
+        assert_subr_arity("macroexpand", 1, Some(2));
+        assert_subr_arity("make-byte-code", 4, None);
+        assert_subr_arity("make-char", 1, Some(5));
+        assert_subr_arity("make-closure", 1, None);
+        assert_subr_arity("make-finalizer", 1, Some(1));
+        assert_subr_arity("make-indirect-buffer", 2, Some(4));
+        assert_subr_arity("make-interpreted-closure", 3, Some(5));
+        assert_subr_arity("make-record", 3, Some(3));
+        assert_subr_arity("make-temp-file-internal", 4, Some(4));
+        assert_subr_arity("map-charset-chars", 2, Some(5));
+        assert_subr_arity("map-keymap", 2, Some(3));
+        assert_subr_arity("map-keymap-internal", 2, Some(2));
+        assert_subr_arity("mapbacktrace", 1, Some(2));
+        assert_subr_arity("minibuffer-innermost-command-loop-p", 0, Some(1));
+        assert_subr_arity("minibuffer-prompt-end", 0, Some(0));
+        assert_subr_arity("next-frame", 0, Some(2));
+        assert_subr_arity("ntake", 2, Some(2));
+        assert_subr_arity("obarray-clear", 1, Some(1));
+        assert_subr_arity("obarray-make", 0, Some(1));
+        assert_subr_arity("previous-frame", 0, Some(2));
+        assert_subr_arity("put-unicode-property-internal", 3, Some(3));
+        assert_subr_arity("raise-frame", 0, Some(1));
+        assert_subr_arity("re--describe-compiled", 1, Some(2));
+        assert_subr_arity("redisplay", 0, Some(1));
+        assert_subr_arity("rename-buffer", 1, Some(2));
+        assert_subr_arity("replace-buffer-contents", 1, Some(3));
+        assert_subr_arity("set-buffer-major-mode", 1, Some(1));
+        assert_subr_arity("set-buffer-multibyte", 1, Some(1));
+        assert_subr_arity("setplist", 2, Some(2));
+        assert_subr_arity("split-window-internal", 4, Some(4));
+        assert_subr_arity("suspend-emacs", 0, Some(1));
+        assert_subr_arity("vertical-motion", 1, Some(3));
         assert_subr_arity("x-begin-drag", 1, Some(6));
         assert_subr_arity("x-create-frame", 1, Some(1));
         assert_subr_arity("x-double-buffered-p", 0, Some(1));

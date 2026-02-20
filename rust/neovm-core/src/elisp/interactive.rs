@@ -391,6 +391,7 @@ fn builtin_command_name(name: &str) -> bool {
             | "delete-rectangle"
             | "delete-region"
             | "delete-window"
+            | "decode-coding-region"
             | "do-auto-save"
             | "handle-save-session"
             | "handle-switch-frame"
@@ -404,6 +405,7 @@ fn builtin_command_name(name: &str) -> bool {
             | "erase-buffer"
             | "eval-buffer"
             | "eval-region"
+            | "encode-coding-region"
             | "exchange-point-and-mark"
             | "exit-minibuffer"
             | "exit-recursive-edit"
@@ -433,9 +435,11 @@ fn builtin_command_name(name: &str) -> bool {
             | "kbd-macro-query"
             | "keep-lines"
             | "kill-buffer"
+            | "kill-emacs"
             | "kill-local-variable"
             | "kill-rectangle"
             | "load-file"
+            | "lower-frame"
             | "lossage-size"
             | "malloc-info"
             | "malloc-trim"
@@ -445,6 +449,7 @@ fn builtin_command_name(name: &str) -> bool {
             | "make-frame"
             | "make-frame-invisible"
             | "make-frame-visible"
+            | "make-indirect-buffer"
             | "make-local-variable"
             | "make-symbolic-link"
             | "make-variable-buffer-local"
@@ -465,6 +470,7 @@ fn builtin_command_name(name: &str) -> bool {
             | "posix-search-forward"
             | "query-replace"
             | "query-replace-regexp"
+            | "raise-frame"
             | "recenter"
             | "redirect-debugging-output"
             | "re-search-backward"
@@ -474,7 +480,9 @@ fn builtin_command_name(name: &str) -> bool {
             | "recursive-edit"
             | "reindent-then-newline-and-indent"
             | "remove-hook"
+            | "rename-buffer"
             | "rename-file"
+            | "replace-buffer-contents"
             | "replace-regexp"
             | "replace-string"
             | "replace-rectangle"
@@ -498,6 +506,7 @@ fn builtin_command_name(name: &str) -> bool {
             | "start-kbd-macro"
             | "string-rectangle"
             | "tab-to-tab-stop"
+            | "suspend-emacs"
             | "top-level"
             | "transient-mark-mode"
             | "transpose-regions"
@@ -3378,8 +3387,10 @@ mod tests {
             "base64-decode-region",
             "base64-encode-region",
             "base64url-encode-region",
+            "decode-coding-region",
             "describe-function",
             "display-buffer",
+            "encode-coding-region",
             "eval-buffer",
             "forward-sexp",
             "gui-set-selection",
@@ -3387,14 +3398,20 @@ mod tests {
             "indent-region",
             "isearch-forward",
             "iconify-frame",
+            "kill-emacs",
             "list-processes",
+            "lower-frame",
             "make-directory",
             "make-frame-invisible",
             "make-frame-visible",
+            "make-indirect-buffer",
             "open-dribble-file",
             "query-replace",
+            "raise-frame",
             "re-search-forward",
             "redirect-debugging-output",
+            "rename-buffer",
+            "replace-buffer-contents",
             "select-frame",
             "setenv",
             "set-buffer-process-coding-system",
@@ -3403,6 +3420,7 @@ mod tests {
             "signal-process",
             "process-menu-delete-process",
             "process-menu-mode",
+            "suspend-emacs",
             "top-level",
             "unix-sync",
             "write-region",

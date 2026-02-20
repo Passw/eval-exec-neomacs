@@ -1597,6 +1597,347 @@ pub(crate) fn builtin_module_load(args: Vec<Value>) -> EvalResult {
     Ok(Value::Nil)
 }
 
+/// `(byte-code BYTE-STR VECTOR MAXDEPTH)` -> nil.
+pub(crate) fn builtin_byte_code(args: Vec<Value>) -> EvalResult {
+    expect_args("byte-code", &args, 3)?;
+    Ok(Value::Nil)
+}
+
+/// `(decode-coding-region START END CODING &optional DESTINATION)` -> nil.
+pub(crate) fn builtin_decode_coding_region(args: Vec<Value>) -> EvalResult {
+    expect_range_args("decode-coding-region", &args, 3, 4)?;
+    Ok(Value::Nil)
+}
+
+/// `(defconst-1 SYMBOL VALUE &optional DOCSTRING)` -> nil.
+pub(crate) fn builtin_defconst_1(args: Vec<Value>) -> EvalResult {
+    expect_range_args("defconst-1", &args, 2, 3)?;
+    Ok(Value::Nil)
+}
+
+/// `(define-coding-system-internal ...)` -> nil.
+pub(crate) fn builtin_define_coding_system_internal(args: Vec<Value>) -> EvalResult {
+    if args.len() < 13 {
+        return Err(signal(
+            "wrong-number-of-arguments",
+            vec![
+                Value::symbol("define-coding-system-internal"),
+                Value::Int(args.len() as i64),
+            ],
+        ));
+    }
+    Ok(Value::Nil)
+}
+
+/// `(defvar-1 SYMBOL VALUE &optional DOCSTRING)` -> nil.
+pub(crate) fn builtin_defvar_1(args: Vec<Value>) -> EvalResult {
+    expect_range_args("defvar-1", &args, 2, 3)?;
+    Ok(Value::Nil)
+}
+
+/// `(defvaralias NEWBASE OLD-BASE &optional DOCSTRING)` -> nil.
+pub(crate) fn builtin_defvaralias(args: Vec<Value>) -> EvalResult {
+    expect_range_args("defvaralias", &args, 2, 3)?;
+    Ok(Value::Nil)
+}
+
+/// `(encode-coding-region START END CODING &optional DESTINATION)` -> nil.
+pub(crate) fn builtin_encode_coding_region(args: Vec<Value>) -> EvalResult {
+    expect_range_args("encode-coding-region", &args, 3, 4)?;
+    Ok(Value::Nil)
+}
+
+/// `(find-operation-coding-system OPERATION &rest ARGS)` -> nil.
+pub(crate) fn builtin_find_operation_coding_system(args: Vec<Value>) -> EvalResult {
+    if args.is_empty() {
+        return Err(signal(
+            "wrong-number-of-arguments",
+            vec![
+                Value::symbol("find-operation-coding-system"),
+                Value::Int(args.len() as i64),
+            ],
+        ));
+    }
+    Ok(Value::Nil)
+}
+
+/// `(handler-bind-1 HANDLERS &rest BODY)` -> nil.
+pub(crate) fn builtin_handler_bind_1(args: Vec<Value>) -> EvalResult {
+    if args.is_empty() {
+        return Err(signal(
+            "wrong-number-of-arguments",
+            vec![Value::symbol("handler-bind-1"), Value::Int(args.len() as i64)],
+        ));
+    }
+    Ok(Value::Nil)
+}
+
+/// `(indirect-variable VARIABLE)` -> nil.
+pub(crate) fn builtin_indirect_variable(args: Vec<Value>) -> EvalResult {
+    expect_args("indirect-variable", &args, 1)?;
+    Ok(Value::Nil)
+}
+
+/// `(insert-and-inherit &rest ARGS)` -> nil.
+pub(crate) fn builtin_insert_and_inherit(_args: Vec<Value>) -> EvalResult {
+    Ok(Value::Nil)
+}
+
+/// `(insert-before-markers-and-inherit &rest ARGS)` -> nil.
+pub(crate) fn builtin_insert_before_markers_and_inherit(_args: Vec<Value>) -> EvalResult {
+    Ok(Value::Nil)
+}
+
+/// `(insert-buffer-substring BUFFER &optional START END)` -> nil.
+pub(crate) fn builtin_insert_buffer_substring(args: Vec<Value>) -> EvalResult {
+    expect_range_args("insert-buffer-substring", &args, 1, 3)?;
+    Ok(Value::Nil)
+}
+
+/// `(iso-charset DIMENSION CHARS FINAL-CHAR)` -> nil.
+pub(crate) fn builtin_iso_charset(args: Vec<Value>) -> EvalResult {
+    expect_args("iso-charset", &args, 3)?;
+    Ok(Value::Nil)
+}
+
+/// `(keymap--get-keyelt KEYMAP KEY)` -> nil.
+pub(crate) fn builtin_keymap_get_keyelt(args: Vec<Value>) -> EvalResult {
+    expect_args("keymap--get-keyelt", &args, 2)?;
+    Ok(Value::Nil)
+}
+
+/// `(keymap-prompt KEYMAP)` -> nil.
+pub(crate) fn builtin_keymap_prompt(args: Vec<Value>) -> EvalResult {
+    expect_args("keymap-prompt", &args, 1)?;
+    Ok(Value::Nil)
+}
+
+/// `(kill-all-local-variables &optional KILL-PERMANENT)` -> nil.
+pub(crate) fn builtin_kill_all_local_variables(args: Vec<Value>) -> EvalResult {
+    expect_range_args("kill-all-local-variables", &args, 0, 1)?;
+    Ok(Value::Nil)
+}
+
+/// `(kill-emacs &optional ARG RESTART)` -> nil.
+pub(crate) fn builtin_kill_emacs(args: Vec<Value>) -> EvalResult {
+    expect_range_args("kill-emacs", &args, 0, 2)?;
+    Ok(Value::Nil)
+}
+
+/// `(lower-frame &optional FRAME)` -> nil.
+pub(crate) fn builtin_lower_frame(args: Vec<Value>) -> EvalResult {
+    expect_range_args("lower-frame", &args, 0, 1)?;
+    Ok(Value::Nil)
+}
+
+/// `(lread--substitute-object-in-subtree NEW OLD TREE)` -> nil.
+pub(crate) fn builtin_lread_substitute_object_in_subtree(args: Vec<Value>) -> EvalResult {
+    expect_args("lread--substitute-object-in-subtree", &args, 3)?;
+    Ok(Value::Nil)
+}
+
+/// `(macroexpand FORM &optional ENVIRONMENT)` -> FORM.
+pub(crate) fn builtin_macroexpand(args: Vec<Value>) -> EvalResult {
+    expect_range_args("macroexpand", &args, 1, 2)?;
+    Ok(args[0].clone())
+}
+
+/// `(make-byte-code ARGDESC BYTE-CODE CONSTANTS DEPTH &rest EXTRA)` -> nil.
+pub(crate) fn builtin_make_byte_code(args: Vec<Value>) -> EvalResult {
+    if args.len() < 4 {
+        return Err(signal(
+            "wrong-number-of-arguments",
+            vec![Value::symbol("make-byte-code"), Value::Int(args.len() as i64)],
+        ));
+    }
+    Ok(Value::Nil)
+}
+
+/// `(make-char CHARSET CODE1 &optional CODE2 CODE3 CODE4)` -> nil.
+pub(crate) fn builtin_make_char(args: Vec<Value>) -> EvalResult {
+    expect_range_args("make-char", &args, 1, 5)?;
+    Ok(Value::Nil)
+}
+
+/// `(make-closure PROTO &rest CLOSURE-VARS)` -> nil.
+pub(crate) fn builtin_make_closure(args: Vec<Value>) -> EvalResult {
+    if args.is_empty() {
+        return Err(signal(
+            "wrong-number-of-arguments",
+            vec![Value::symbol("make-closure"), Value::Int(args.len() as i64)],
+        ));
+    }
+    Ok(Value::Nil)
+}
+
+/// `(make-finalizer FUNCTION)` -> nil.
+pub(crate) fn builtin_make_finalizer(args: Vec<Value>) -> EvalResult {
+    expect_args("make-finalizer", &args, 1)?;
+    Ok(Value::Nil)
+}
+
+/// `(make-indirect-buffer BUFFER NAME CLONE &optional INHIBIT-BUFFER-HOOKS)` -> nil.
+pub(crate) fn builtin_make_indirect_buffer(args: Vec<Value>) -> EvalResult {
+    expect_range_args("make-indirect-buffer", &args, 2, 4)?;
+    Ok(Value::Nil)
+}
+
+/// `(make-interpreted-closure ARGLIST BODY &optional ENV DOCSTRING IFORM)` -> nil.
+pub(crate) fn builtin_make_interpreted_closure(args: Vec<Value>) -> EvalResult {
+    expect_range_args("make-interpreted-closure", &args, 3, 5)?;
+    Ok(Value::Nil)
+}
+
+/// `(make-record TYPE SLOTS WORDS)` -> nil.
+pub(crate) fn builtin_make_record(args: Vec<Value>) -> EvalResult {
+    expect_args("make-record", &args, 3)?;
+    Ok(Value::Nil)
+}
+
+/// `(make-temp-file-internal PREFIX DIR-FLAG SUFFIX MODE)` -> nil.
+pub(crate) fn builtin_make_temp_file_internal(args: Vec<Value>) -> EvalResult {
+    expect_args("make-temp-file-internal", &args, 4)?;
+    Ok(Value::Nil)
+}
+
+/// `(map-charset-chars FUNCTION CHARSET &optional ARG FROM TO)` -> nil.
+pub(crate) fn builtin_map_charset_chars(args: Vec<Value>) -> EvalResult {
+    expect_range_args("map-charset-chars", &args, 2, 5)?;
+    Ok(Value::Nil)
+}
+
+/// `(map-keymap FUNCTION KEYMAP &optional SORT-FIRST)` -> nil.
+pub(crate) fn builtin_map_keymap(args: Vec<Value>) -> EvalResult {
+    expect_range_args("map-keymap", &args, 2, 3)?;
+    Ok(Value::Nil)
+}
+
+/// `(map-keymap-internal FUNCTION KEYMAP)` -> nil.
+pub(crate) fn builtin_map_keymap_internal(args: Vec<Value>) -> EvalResult {
+    expect_args("map-keymap-internal", &args, 2)?;
+    Ok(Value::Nil)
+}
+
+/// `(mapbacktrace FUNCTION &optional BASE)` -> nil.
+pub(crate) fn builtin_mapbacktrace(args: Vec<Value>) -> EvalResult {
+    expect_range_args("mapbacktrace", &args, 1, 2)?;
+    Ok(Value::Nil)
+}
+
+/// `(minibuffer-innermost-command-loop-p &optional WINDOW)` -> nil.
+pub(crate) fn builtin_minibuffer_innermost_command_loop_p(args: Vec<Value>) -> EvalResult {
+    expect_range_args("minibuffer-innermost-command-loop-p", &args, 0, 1)?;
+    Ok(Value::Nil)
+}
+
+/// `(minibuffer-prompt-end)` -> 1.
+pub(crate) fn builtin_minibuffer_prompt_end(args: Vec<Value>) -> EvalResult {
+    expect_args("minibuffer-prompt-end", &args, 0)?;
+    Ok(Value::Int(1))
+}
+
+/// `(next-frame &optional FRAME MINIFRAME)` -> nil.
+pub(crate) fn builtin_next_frame(args: Vec<Value>) -> EvalResult {
+    expect_range_args("next-frame", &args, 0, 2)?;
+    Ok(Value::Nil)
+}
+
+/// `(ntake N LIST)` -> nil.
+pub(crate) fn builtin_ntake(args: Vec<Value>) -> EvalResult {
+    expect_args("ntake", &args, 2)?;
+    Ok(Value::Nil)
+}
+
+/// `(obarray-clear OBARRAY)` -> nil.
+pub(crate) fn builtin_obarray_clear(args: Vec<Value>) -> EvalResult {
+    expect_args("obarray-clear", &args, 1)?;
+    Ok(Value::Nil)
+}
+
+/// `(obarray-make &optional SIZE)` -> nil.
+pub(crate) fn builtin_obarray_make(args: Vec<Value>) -> EvalResult {
+    expect_range_args("obarray-make", &args, 0, 1)?;
+    Ok(Value::Nil)
+}
+
+/// `(previous-frame &optional FRAME MINIFRAME)` -> nil.
+pub(crate) fn builtin_previous_frame(args: Vec<Value>) -> EvalResult {
+    expect_range_args("previous-frame", &args, 0, 2)?;
+    Ok(Value::Nil)
+}
+
+/// `(put-unicode-property-internal TABLE INDEX VALUE)` -> nil.
+pub(crate) fn builtin_put_unicode_property_internal(args: Vec<Value>) -> EvalResult {
+    expect_args("put-unicode-property-internal", &args, 3)?;
+    Ok(Value::Nil)
+}
+
+/// `(raise-frame &optional FRAME)` -> nil.
+pub(crate) fn builtin_raise_frame(args: Vec<Value>) -> EvalResult {
+    expect_range_args("raise-frame", &args, 0, 1)?;
+    Ok(Value::Nil)
+}
+
+/// `(re--describe-compiled OBJECT &optional INDENT)` -> nil.
+pub(crate) fn builtin_re_describe_compiled(args: Vec<Value>) -> EvalResult {
+    expect_range_args("re--describe-compiled", &args, 1, 2)?;
+    Ok(Value::Nil)
+}
+
+/// `(redisplay &optional FORCE)` -> nil.
+pub(crate) fn builtin_redisplay(args: Vec<Value>) -> EvalResult {
+    expect_range_args("redisplay", &args, 0, 1)?;
+    Ok(Value::Nil)
+}
+
+/// `(rename-buffer NEWNAME &optional UNIQUE)` -> nil.
+pub(crate) fn builtin_rename_buffer(args: Vec<Value>) -> EvalResult {
+    expect_range_args("rename-buffer", &args, 1, 2)?;
+    Ok(Value::Nil)
+}
+
+/// `(replace-buffer-contents SOURCE &optional MAX-SECS MAX-COSTS)` -> nil.
+pub(crate) fn builtin_replace_buffer_contents(args: Vec<Value>) -> EvalResult {
+    expect_range_args("replace-buffer-contents", &args, 1, 3)?;
+    Ok(Value::Nil)
+}
+
+/// `(set-buffer-major-mode BUFFER)` -> nil.
+pub(crate) fn builtin_set_buffer_major_mode(args: Vec<Value>) -> EvalResult {
+    expect_args("set-buffer-major-mode", &args, 1)?;
+    Ok(Value::Nil)
+}
+
+/// `(set-buffer-multibyte FLAG)` -> nil.
+pub(crate) fn builtin_set_buffer_multibyte(args: Vec<Value>) -> EvalResult {
+    expect_args("set-buffer-multibyte", &args, 1)?;
+    Ok(Value::Nil)
+}
+
+/// `(setplist SYMBOL PLIST)` -> PLIST.
+pub(crate) fn builtin_setplist(args: Vec<Value>) -> EvalResult {
+    expect_args("setplist", &args, 2)?;
+    Ok(args[1].clone())
+}
+
+/// `(split-window-internal WINDOW SIZE SIDE NORMALIZE)` -> nil.
+pub(crate) fn builtin_split_window_internal(args: Vec<Value>) -> EvalResult {
+    expect_args("split-window-internal", &args, 4)?;
+    Ok(Value::Nil)
+}
+
+/// `(suspend-emacs &optional STRING)` -> nil.
+pub(crate) fn builtin_suspend_emacs(args: Vec<Value>) -> EvalResult {
+    expect_range_args("suspend-emacs", &args, 0, 1)?;
+    Ok(Value::Nil)
+}
+
+/// `(vertical-motion LINES &optional WINDOW CURCOL)` -> 0.
+pub(crate) fn builtin_vertical_motion(args: Vec<Value>) -> EvalResult {
+    expect_range_args("vertical-motion", &args, 1, 3)?;
+    Ok(Value::Int(0))
+}
+
 /// `(dump-emacs-portable FILE &optional TRACK-REFERRERS)` -> nil.
 pub(crate) fn builtin_dump_emacs_portable(args: Vec<Value>) -> EvalResult {
     expect_range_args("dump-emacs-portable", &args, 1, 2)?;
