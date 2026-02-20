@@ -1597,6 +1597,42 @@ pub(crate) fn builtin_module_load(args: Vec<Value>) -> EvalResult {
     Ok(Value::Nil)
 }
 
+/// `(make-frame-invisible &optional FRAME FORCE)` -> nil.
+pub(crate) fn builtin_make_frame_invisible(args: Vec<Value>) -> EvalResult {
+    expect_range_args("make-frame-invisible", &args, 0, 2)?;
+    Ok(Value::Nil)
+}
+
+/// `(make-terminal-frame TERMINAL)` -> nil.
+pub(crate) fn builtin_make_terminal_frame(args: Vec<Value>) -> EvalResult {
+    expect_args("make-terminal-frame", &args, 1)?;
+    Ok(Value::Nil)
+}
+
+/// `(menu-bar-menu-at-x-y X Y &optional POPUP)` -> nil.
+pub(crate) fn builtin_menu_bar_menu_at_x_y(args: Vec<Value>) -> EvalResult {
+    expect_range_args("menu-bar-menu-at-x-y", &args, 2, 3)?;
+    Ok(Value::Nil)
+}
+
+/// `(menu-or-popup-active-p)` -> nil.
+pub(crate) fn builtin_menu_or_popup_active_p(args: Vec<Value>) -> EvalResult {
+    expect_args("menu-or-popup-active-p", &args, 0)?;
+    Ok(Value::Nil)
+}
+
+/// `(mouse-pixel-position)` -> nil.
+pub(crate) fn builtin_mouse_pixel_position(args: Vec<Value>) -> EvalResult {
+    expect_args("mouse-pixel-position", &args, 0)?;
+    Ok(Value::Nil)
+}
+
+/// `(mouse-position)` -> nil.
+pub(crate) fn builtin_mouse_position(args: Vec<Value>) -> EvalResult {
+    expect_args("mouse-position", &args, 0)?;
+    Ok(Value::Nil)
+}
+
 /// `(native-comp-available-p)` -> nil.
 pub(crate) fn builtin_native_comp_available_p(args: Vec<Value>) -> EvalResult {
     expect_args("native-comp-available-p", &args, 0)?;
@@ -1621,9 +1657,51 @@ pub(crate) fn builtin_native_elisp_load(args: Vec<Value>) -> EvalResult {
     Ok(Value::Nil)
 }
 
+/// `(new-fontset NAME FONTLIST)` -> nil.
+pub(crate) fn builtin_new_fontset(args: Vec<Value>) -> EvalResult {
+    expect_args("new-fontset", &args, 2)?;
+    Ok(Value::Nil)
+}
+
+/// `(old-selected-frame)` -> nil.
+pub(crate) fn builtin_old_selected_frame(args: Vec<Value>) -> EvalResult {
+    expect_args("old-selected-frame", &args, 0)?;
+    Ok(Value::Nil)
+}
+
+/// `(old-selected-window)` -> nil.
+pub(crate) fn builtin_old_selected_window(args: Vec<Value>) -> EvalResult {
+    expect_args("old-selected-window", &args, 0)?;
+    Ok(Value::Nil)
+}
+
+/// `(open-font FONT-ENTITY &optional PIXEL-SIZE FRAME)` -> nil.
+pub(crate) fn builtin_open_font(args: Vec<Value>) -> EvalResult {
+    expect_range_args("open-font", &args, 1, 3)?;
+    Ok(Value::Nil)
+}
+
 /// `(pdumper-stats)` -> nil.
 pub(crate) fn builtin_pdumper_stats(args: Vec<Value>) -> EvalResult {
     expect_args("pdumper-stats", &args, 0)?;
+    Ok(Value::Nil)
+}
+
+/// `(position-symbol SYMBOL PROPERTY)` -> nil.
+pub(crate) fn builtin_position_symbol(args: Vec<Value>) -> EvalResult {
+    expect_args("position-symbol", &args, 2)?;
+    Ok(Value::Nil)
+}
+
+/// `(posn-at-point &optional POSITION WINDOW)` -> nil.
+pub(crate) fn builtin_posn_at_point(args: Vec<Value>) -> EvalResult {
+    expect_range_args("posn-at-point", &args, 0, 2)?;
+    Ok(Value::Nil)
+}
+
+/// `(posn-at-x-y X Y &optional FRAME-OR-WINDOW WHOLE)` -> nil.
+pub(crate) fn builtin_posn_at_x_y(args: Vec<Value>) -> EvalResult {
+    expect_range_args("posn-at-x-y", &args, 2, 4)?;
     Ok(Value::Nil)
 }
 
@@ -1692,6 +1770,78 @@ pub(crate) fn builtin_recordp(args: Vec<Value>) -> EvalResult {
     Ok(Value::Nil)
 }
 
+/// `(query-font FONT-OBJECT)` -> nil.
+pub(crate) fn builtin_query_font(args: Vec<Value>) -> EvalResult {
+    expect_args("query-font", &args, 1)?;
+    Ok(Value::Nil)
+}
+
+/// `(query-fontset FONTSET &optional FRAME)` -> nil.
+pub(crate) fn builtin_query_fontset(args: Vec<Value>) -> EvalResult {
+    expect_range_args("query-fontset", &args, 1, 2)?;
+    Ok(Value::Nil)
+}
+
+/// `(reconsider-frame-fonts FRAME)` -> nil.
+pub(crate) fn builtin_reconsider_frame_fonts(args: Vec<Value>) -> EvalResult {
+    expect_args("reconsider-frame-fonts", &args, 1)?;
+    Ok(Value::Nil)
+}
+
+/// `(redirect-debugging-output FILE &optional APPEND)` -> nil.
+pub(crate) fn builtin_redirect_debugging_output(args: Vec<Value>) -> EvalResult {
+    expect_range_args("redirect-debugging-output", &args, 1, 2)?;
+    Ok(Value::Nil)
+}
+
+/// `(redirect-frame-focus FRAME FOCUS-FRAME)` -> nil.
+pub(crate) fn builtin_redirect_frame_focus(args: Vec<Value>) -> EvalResult {
+    expect_range_args("redirect-frame-focus", &args, 1, 2)?;
+    Ok(Value::Nil)
+}
+
+/// `(set-fontset-font NAME TARGET FONT-SPEC &optional FRAME ADD)` -> nil.
+pub(crate) fn builtin_set_fontset_font(args: Vec<Value>) -> EvalResult {
+    expect_range_args("set-fontset-font", &args, 3, 5)?;
+    Ok(Value::Nil)
+}
+
+/// `(set-frame-selected-window FRAME WINDOW &optional NORECORD)` -> nil.
+pub(crate) fn builtin_set_frame_selected_window(args: Vec<Value>) -> EvalResult {
+    expect_range_args("set-frame-selected-window", &args, 2, 3)?;
+    Ok(Value::Nil)
+}
+
+/// `(set-frame-window-state-change &optional FRAME STATE)` -> nil.
+pub(crate) fn builtin_set_frame_window_state_change(args: Vec<Value>) -> EvalResult {
+    expect_range_args("set-frame-window-state-change", &args, 0, 2)?;
+    Ok(Value::Nil)
+}
+
+/// `(set-fringe-bitmap-face FRINGE-BITMAP FACE)` -> nil.
+pub(crate) fn builtin_set_fringe_bitmap_face(args: Vec<Value>) -> EvalResult {
+    expect_range_args("set-fringe-bitmap-face", &args, 1, 2)?;
+    Ok(Value::Nil)
+}
+
+/// `(set-minibuffer-window WINDOW)` -> nil.
+pub(crate) fn builtin_set_minibuffer_window(args: Vec<Value>) -> EvalResult {
+    expect_args("set-minibuffer-window", &args, 1)?;
+    Ok(Value::Nil)
+}
+
+/// `(set-mouse-pixel-position FRAME X Y)` -> nil.
+pub(crate) fn builtin_set_mouse_pixel_position(args: Vec<Value>) -> EvalResult {
+    expect_args("set-mouse-pixel-position", &args, 3)?;
+    Ok(Value::Nil)
+}
+
+/// `(set-mouse-position FRAME X Y)` -> nil.
+pub(crate) fn builtin_set_mouse_position(args: Vec<Value>) -> EvalResult {
+    expect_args("set-mouse-position", &args, 3)?;
+    Ok(Value::Nil)
+}
+
 /// `(subr-native-comp-unit SUBR)` -> nil.
 pub(crate) fn builtin_subr_native_comp_unit(args: Vec<Value>) -> EvalResult {
     expect_args("subr-native-comp-unit", &args, 1)?;
@@ -1726,6 +1876,18 @@ pub(crate) fn builtin_tty_set_output_buffer_size(args: Vec<Value>) -> EvalResult
 pub(crate) fn builtin_tty_suppress_bold_inverse_default_colors(args: Vec<Value>) -> EvalResult {
     expect_args("tty-suppress-bold-inverse-default-colors", &args, 1)?;
     Ok(Value::Nil)
+}
+
+/// `(tool-bar-get-system-style)` -> nil.
+pub(crate) fn builtin_tool_bar_get_system_style(args: Vec<Value>) -> EvalResult {
+    expect_args("tool-bar-get-system-style", &args, 0)?;
+    Ok(Value::Nil)
+}
+
+/// `(tool-bar-pixel-width &optional FRAME)` -> 0.
+pub(crate) fn builtin_tool_bar_pixel_width(args: Vec<Value>) -> EvalResult {
+    expect_range_args("tool-bar-pixel-width", &args, 0, 1)?;
+    Ok(Value::Int(0))
 }
 
 /// `(treesit-available-p)` -> nil.
@@ -1875,6 +2037,48 @@ pub(crate) fn builtin_treesit_node_type(args: Vec<Value>) -> EvalResult {
 /// `(treesit-parser-add-notifier ...)` -> nil.
 pub(crate) fn builtin_treesit_parser_add_notifier(args: Vec<Value>) -> EvalResult {
     expect_args("treesit-parser-add-notifier", &args, 2)?;
+    Ok(Value::Nil)
+}
+
+/// `(x-begin-drag OBJECT &optional START-EVENT TRACKING-FRAME ALLOW-EXTERNAL RETURN-FRAME ALLOW-SCROLL-BARS)` -> nil.
+pub(crate) fn builtin_x_begin_drag(args: Vec<Value>) -> EvalResult {
+    expect_range_args("x-begin-drag", &args, 1, 6)?;
+    Ok(Value::Nil)
+}
+
+/// `(x-create-frame PARAMS)` -> nil.
+pub(crate) fn builtin_x_create_frame(args: Vec<Value>) -> EvalResult {
+    expect_args("x-create-frame", &args, 1)?;
+    Ok(Value::Nil)
+}
+
+/// `(x-double-buffered-p &optional FRAME)` -> nil.
+pub(crate) fn builtin_x_double_buffered_p(args: Vec<Value>) -> EvalResult {
+    expect_range_args("x-double-buffered-p", &args, 0, 1)?;
+    Ok(Value::Nil)
+}
+
+/// `(x-menu-bar-open-internal &optional FRAME)` -> nil.
+pub(crate) fn builtin_x_menu_bar_open_internal(args: Vec<Value>) -> EvalResult {
+    expect_range_args("x-menu-bar-open-internal", &args, 0, 1)?;
+    Ok(Value::Nil)
+}
+
+/// `(xw-color-defined-p COLOR &optional FRAME)` -> nil.
+pub(crate) fn builtin_xw_color_defined_p(args: Vec<Value>) -> EvalResult {
+    expect_range_args("xw-color-defined-p", &args, 1, 2)?;
+    Ok(Value::Nil)
+}
+
+/// `(xw-color-values COLOR &optional FRAME)` -> nil.
+pub(crate) fn builtin_xw_color_values(args: Vec<Value>) -> EvalResult {
+    expect_range_args("xw-color-values", &args, 1, 2)?;
+    Ok(Value::Nil)
+}
+
+/// `(xw-display-color-p &optional FRAME)` -> nil.
+pub(crate) fn builtin_xw_display_color_p(args: Vec<Value>) -> EvalResult {
+    expect_range_args("xw-display-color-p", &args, 0, 1)?;
     Ok(Value::Nil)
 }
 

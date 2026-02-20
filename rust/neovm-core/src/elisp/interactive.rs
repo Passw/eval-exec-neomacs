@@ -443,6 +443,7 @@ fn builtin_command_name(name: &str) -> bool {
             | "local-set-key"
             | "make-directory"
             | "make-frame"
+            | "make-frame-invisible"
             | "make-frame-visible"
             | "make-local-variable"
             | "make-symbolic-link"
@@ -464,6 +465,7 @@ fn builtin_command_name(name: &str) -> bool {
             | "query-replace"
             | "query-replace-regexp"
             | "recenter"
+            | "redirect-debugging-output"
             | "re-search-backward"
             | "re-search-forward"
             | "search-backward-regexp"
@@ -505,6 +507,7 @@ fn builtin_command_name(name: &str) -> bool {
             | "word-search-forward"
             | "write-region"
             | "x-clipboard-yank"
+            | "x-menu-bar-open-internal"
             | "x-preedit-text"
             | "yank-rectangle"
     )
@@ -3383,9 +3386,11 @@ mod tests {
             "iconify-frame",
             "list-processes",
             "make-directory",
+            "make-frame-invisible",
             "make-frame-visible",
             "query-replace",
             "re-search-forward",
+            "redirect-debugging-output",
             "select-frame",
             "setenv",
             "set-buffer-process-coding-system",
@@ -3396,6 +3401,7 @@ mod tests {
             "top-level",
             "write-region",
             "x-clipboard-yank",
+            "x-menu-bar-open-internal",
             "x-preedit-text",
             "yank-rectangle",
         ] {
