@@ -456,7 +456,7 @@ pub(crate) fn builtin_previous_single_property_change(
                 if prev == 0 {
                     break;
                 }
-                cursor = prev;
+                cursor = if prev < cursor { prev } else { prev - 1 };
             }
             None => break,
         }
@@ -1309,6 +1309,28 @@ mod tests {
         )
         .unwrap();
         assert!(matches!(result, Value::Int(6)));
+    }
+
+    #[test]
+    fn previous_single_property_change_from_interval_end_boundary() {
+        let mut eval = eval_with_text("abcd");
+        builtin_put_text_property(
+            &mut eval,
+            vec![
+                Value::Int(2),
+                Value::Int(4),
+                Value::symbol("p"),
+                Value::symbol("v"),
+            ],
+        )
+        .unwrap();
+
+        let result = builtin_previous_single_property_change(
+            &mut eval,
+            vec![Value::Int(4), Value::symbol("p")],
+        )
+        .unwrap();
+        assert!(matches!(result, Value::Int(2)));
     }
 
     // -----------------------------------------------------------------------

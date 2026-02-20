@@ -2963,14 +2963,209 @@ pub(crate) fn builtin_next_char_property_change(
 ) -> EvalResult {
     expect_min_args("next-char-property-change", &args, 1)?;
     expect_max_args("next-char-property-change", &args, 2)?;
-    match args.len() {
-        1 => super::textprop::builtin_next_property_change(eval, args),
+    let result = match args.len() {
+        1 => super::textprop::builtin_next_property_change(eval, args)?,
         2 => super::textprop::builtin_next_property_change(
             eval,
             vec![args[0].clone(), Value::Nil, args[1].clone()],
-        ),
+        )?,
         _ => unreachable!(),
+    };
+    if !result.is_nil() {
+        return Ok(result);
     }
+
+    let buf = eval
+        .buffers
+        .current_buffer()
+        .ok_or_else(|| signal("error", vec![Value::string("No current buffer")]))?;
+    Ok(Value::Int(buf.text.byte_to_char(buf.point_max()) as i64 + 1))
+}
+
+pub(crate) fn builtin_previous_property_change(
+    eval: &mut super::eval::Evaluator,
+    args: Vec<Value>,
+) -> EvalResult {
+    expect_min_args("previous-property-change", &args, 1)?;
+    expect_max_args("previous-property-change", &args, 3)?;
+
+    let pos = expect_integer_or_marker(&args[0])?;
+    if let Some(Value::Str(_)) = args.get(1) {
+        if let Some(limit) = args.get(2) {
+            if !limit.is_nil() {
+                return Ok(Value::Int(expect_integer_or_marker(limit)?));
+            }
+        }
+        return Ok(Value::Nil);
+    }
+
+    let buf_id = match args.get(1) {
+        None | Some(Value::Nil) => eval
+            .buffers
+            .current_buffer()
+            .map(|b| b.id)
+            .ok_or_else(|| signal("error", vec![Value::string("No current buffer")])),
+        Some(Value::Buffer(id)) => Ok(*id),
+        Some(other) => Err(signal(
+            "wrong-type-argument",
+            vec![Value::symbol("buffer-or-string-p"), other.clone()],
+        )),
+    }?;
+
+    let buf = eval
+        .buffers
+        .get(buf_id)
+        .ok_or_else(|| signal("error", vec![Value::string("Buffer does not exist")]))?;
+
+    let char_pos = if pos > 0 { (pos - 1) as usize } else { 0 };
+    let byte_pos = buf.text.char_to_byte(char_pos.min(buf.text.char_count()));
+
+    let (byte_limit, limit_pos) = match args.get(2) {
+        Some(v) if !v.is_nil() => {
+            let limit = expect_integer_or_marker(v)?;
+            let limit_char = if limit > 0 { (limit - 1) as usize } else { 0 };
+            let limit_byte = buf.text.char_to_byte(limit_char.min(buf.text.char_count()));
+            let limit_elisp = buf.text.byte_to_char(limit_byte) as i64 + 1;
+            (Some(limit_byte), Some(limit_elisp))
+        }
+        _ => (None, None),
+    };
+
+    let ref_byte = if byte_pos > 0 { byte_pos - 1 } else { 0 };
+    let current_props = buf.text_props.get_properties(ref_byte);
+    let mut cursor = byte_pos;
+
+    loop {
+        match buf.text_props.previous_property_change(cursor) {
+            Some(prev) => {
+                if let (Some(lim_byte), Some(limit_elisp)) = (byte_limit, limit_pos) {
+                    if prev < lim_byte {
+                        return Ok(Value::Int(limit_elisp));
+                    }
+                }
+
+                let check = if prev > 0 { prev - 1 } else { 0 };
+                let new_props = buf.text_props.get_properties(check);
+                if new_props != current_props {
+                    return Ok(Value::Int(buf.text.byte_to_char(prev) as i64 + 1));
+                }
+
+                if prev == 0 {
+                    break;
+                }
+                cursor = if prev < cursor { prev } else { prev - 1 };
+            }
+            None => break,
+        }
+    }
+
+    match limit_pos {
+        Some(limit_elisp) => Ok(Value::Int(limit_elisp)),
+        None => Ok(Value::Nil),
+    }
+}
+
+pub(crate) fn builtin_previous_char_property_change(
+    eval: &mut super::eval::Evaluator,
+    args: Vec<Value>,
+) -> EvalResult {
+    expect_min_args("previous-char-property-change", &args, 1)?;
+    expect_max_args("previous-char-property-change", &args, 2)?;
+
+    let mut forwarded = vec![args[0].clone(), Value::Nil];
+    if let Some(limit) = args.get(1) {
+        forwarded.push(limit.clone());
+    }
+    let result = builtin_previous_property_change(eval, forwarded)?;
+    if !result.is_nil() {
+        return Ok(result);
+    }
+
+    let buf = eval
+        .buffers
+        .current_buffer()
+        .ok_or_else(|| signal("error", vec![Value::string("No current buffer")]))?;
+    Ok(Value::Int(buf.text.byte_to_char(buf.point_min()) as i64 + 1))
+}
+
+pub(crate) fn builtin_next_single_char_property_change(
+    eval: &mut super::eval::Evaluator,
+    args: Vec<Value>,
+) -> EvalResult {
+    expect_min_args("next-single-char-property-change", &args, 2)?;
+    expect_max_args("next-single-char-property-change", &args, 4)?;
+
+    if let Some(Value::Str(s)) = args.get(2) {
+        if let Some(limit) = args.get(3) {
+            if !limit.is_nil() {
+                return Ok(Value::Int(expect_integer_or_marker(limit)?));
+            }
+        }
+        return Ok(Value::Int(s.chars().count() as i64));
+    }
+
+    let result = super::textprop::builtin_next_single_property_change(eval, args.clone())?;
+    if !result.is_nil() {
+        return Ok(result);
+    }
+
+    let upper = match args.get(2) {
+        Some(Value::Buffer(id)) => {
+            let buf = eval
+                .buffers
+                .get(*id)
+                .ok_or_else(|| signal("error", vec![Value::string("Buffer does not exist")]))?;
+            buf.text.byte_to_char(buf.point_max()) as i64 + 1
+        }
+        _ => {
+            let buf = eval
+                .buffers
+                .current_buffer()
+                .ok_or_else(|| signal("error", vec![Value::string("No current buffer")]))?;
+            buf.text.byte_to_char(buf.point_max()) as i64 + 1
+        }
+    };
+    Ok(Value::Int(upper))
+}
+
+pub(crate) fn builtin_previous_single_char_property_change(
+    eval: &mut super::eval::Evaluator,
+    args: Vec<Value>,
+) -> EvalResult {
+    expect_min_args("previous-single-char-property-change", &args, 2)?;
+    expect_max_args("previous-single-char-property-change", &args, 4)?;
+
+    if let Some(Value::Str(_)) = args.get(2) {
+        if let Some(limit) = args.get(3) {
+            if !limit.is_nil() {
+                return Ok(Value::Int(expect_integer_or_marker(limit)?));
+            }
+        }
+        return Ok(Value::Int(0));
+    }
+
+    let result = super::textprop::builtin_previous_single_property_change(eval, args.clone())?;
+    if !result.is_nil() {
+        return Ok(result);
+    }
+
+    let lower = match args.get(2) {
+        Some(Value::Buffer(id)) => {
+            let buf = eval
+                .buffers
+                .get(*id)
+                .ok_or_else(|| signal("error", vec![Value::string("Buffer does not exist")]))?;
+            buf.text.byte_to_char(buf.point_min()) as i64 + 1
+        }
+        _ => {
+            let buf = eval
+                .buffers
+                .current_buffer()
+                .ok_or_else(|| signal("error", vec![Value::string("No current buffer")]))?;
+            buf.text.byte_to_char(buf.point_min()) as i64 + 1
+        }
+    };
+    Ok(Value::Int(lower))
 }
 
 pub(crate) fn builtin_defalias(
@@ -10028,15 +10223,25 @@ pub(crate) fn dispatch_builtin(
                 eval, args,
             ))
         }
+        "next-single-char-property-change" => {
+            return Some(builtin_next_single_char_property_change(eval, args))
+        }
         "previous-single-property-change" => {
             return Some(super::textprop::builtin_previous_single_property_change(
                 eval, args,
             ))
         }
+        "previous-single-char-property-change" => {
+            return Some(builtin_previous_single_char_property_change(eval, args))
+        }
         "next-property-change" => {
             return Some(super::textprop::builtin_next_property_change(eval, args))
         }
         "next-char-property-change" => return Some(builtin_next_char_property_change(eval, args)),
+        "previous-property-change" => return Some(builtin_previous_property_change(eval, args)),
+        "previous-char-property-change" => {
+            return Some(builtin_previous_char_property_change(eval, args))
+        }
         "text-property-any" => return Some(super::textprop::builtin_text_property_any(eval, args)),
         "make-overlay" => return Some(super::textprop::builtin_make_overlay(eval, args)),
         "delete-overlay" => return Some(super::textprop::builtin_delete_overlay(eval, args)),
