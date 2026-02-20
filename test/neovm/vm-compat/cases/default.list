@@ -644,6 +644,7 @@ cases/round-half-even-semantics
 cases/fround-negative-zero-semantics
 cases/floatfns-argument-contract-semantics
 cases/trig-rounding-and-core-predicate-runtime-semantics
+cases/negative-index-subgroup-runtime-semantics
 cases/ldexp-type-check-order-semantics
 cases/md5-semantics
 cases/md5-coding-semantics

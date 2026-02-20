@@ -7293,12 +7293,22 @@ pub(crate) fn builtin_buffer_substring(
     args: Vec<Value>,
 ) -> EvalResult {
     expect_args("buffer-substring", &args, 2)?;
-    let start = expect_int(&args[0])? as usize;
-    let end = expect_int(&args[1])? as usize;
+    let start = expect_int(&args[0])?;
+    let end = expect_int(&args[1])?;
     let buf = eval
         .buffers
         .current_buffer_mut()
         .ok_or_else(|| signal("error", vec![Value::string("No current buffer")]))?;
+    let point_min = buf.text.byte_to_char(buf.point_min()) as i64 + 1;
+    let point_max = buf.text.byte_to_char(buf.point_max()) as i64 + 1;
+    if start < point_min || start > point_max || end < point_min || end > point_max {
+        return Err(signal(
+            "args-out-of-range",
+            vec![Value::Buffer(buf.id), Value::Int(start), Value::Int(end)],
+        ));
+    }
+    let start = start as usize;
+    let end = end as usize;
     // Emacs uses 1-based positions, convert to 0-based byte positions
     let s = if start > 0 { start - 1 } else { 0 };
     let e = if end > 0 { end - 1 } else { 0 };
@@ -8202,8 +8212,8 @@ pub(crate) fn builtin_delete_region(
     args: Vec<Value>,
 ) -> EvalResult {
     expect_args("delete-region", &args, 2)?;
-    let start = expect_int(&args[0])? as usize;
-    let end = expect_int(&args[1])? as usize;
+    let start = expect_int(&args[0])?;
+    let end = expect_int(&args[1])?;
     let read_only_buffer_name = eval.buffers.current_buffer().and_then(|buf| {
         if buffer_read_only_active(eval, buf) {
             Some(buf.name.clone())
@@ -8219,6 +8229,16 @@ pub(crate) fn builtin_delete_region(
         .buffers
         .current_buffer_mut()
         .ok_or_else(|| signal("error", vec![Value::string("No current buffer")]))?;
+    let point_min = buf.text.byte_to_char(buf.point_min()) as i64 + 1;
+    let point_max = buf.text.byte_to_char(buf.point_max()) as i64 + 1;
+    if start < point_min || start > point_max || end < point_min || end > point_max {
+        return Err(signal(
+            "args-out-of-range",
+            vec![Value::Buffer(buf.id), Value::Int(start), Value::Int(end)],
+        ));
+    }
+    let start = start as usize;
+    let end = end as usize;
     // Convert 1-based to 0-based char positions, then to byte positions
     let s = if start > 0 { start - 1 } else { 0 };
     let e = if end > 0 { end - 1 } else { 0 };
@@ -8426,12 +8446,22 @@ pub(crate) fn builtin_narrow_to_region(
     args: Vec<Value>,
 ) -> EvalResult {
     expect_args("narrow-to-region", &args, 2)?;
-    let start = expect_int(&args[0])? as usize;
-    let end = expect_int(&args[1])? as usize;
+    let start = expect_int(&args[0])?;
+    let end = expect_int(&args[1])?;
     let buf = eval
         .buffers
         .current_buffer_mut()
         .ok_or_else(|| signal("error", vec![Value::string("No current buffer")]))?;
+    let point_min = buf.text.byte_to_char(buf.point_min()) as i64 + 1;
+    let point_max = buf.text.byte_to_char(buf.point_max()) as i64 + 1;
+    if start < point_min || start > point_max || end < point_min || end > point_max {
+        return Err(signal(
+            "args-out-of-range",
+            vec![Value::Int(start), Value::Int(end)],
+        ));
+    }
+    let start = start as usize;
+    let end = end as usize;
     let s = if start > 0 { start - 1 } else { 0 };
     let e = if end > 0 { end - 1 } else { 0 };
     let byte_start = buf.text.char_to_byte(s);
@@ -8637,7 +8667,11 @@ pub(crate) fn builtin_char_after(
     let byte_pos = if args.is_empty() || matches!(args[0], Value::Nil) {
         buf.point()
     } else {
-        let pos = expect_int(&args[0])? as usize;
+        let pos = expect_int(&args[0])?;
+        if pos <= 0 {
+            return Ok(Value::Nil);
+        }
+        let pos = pos as usize;
         let char_pos = if pos > 0 { pos - 1 } else { 0 };
         buf.text.char_to_byte(char_pos.min(buf.text.char_count()))
     };
@@ -8659,7 +8693,11 @@ pub(crate) fn builtin_char_before(
     let byte_pos = if args.is_empty() || matches!(args[0], Value::Nil) {
         buf.point()
     } else {
-        let pos = expect_int(&args[0])? as usize;
+        let pos = expect_int(&args[0])?;
+        if pos <= 0 {
+            return Ok(Value::Nil);
+        }
+        let pos = pos as usize;
         let char_pos = if pos > 0 { pos - 1 } else { 0 };
         buf.text.char_to_byte(char_pos.min(buf.text.char_count()))
     };
@@ -15421,7 +15459,14 @@ pub(crate) fn builtin_match_string(
     args: Vec<Value>,
 ) -> EvalResult {
     expect_range_args("match-string", &args, 1, 2)?;
-    let group = expect_int(&args[0])? as usize;
+    let group = expect_int(&args[0])?;
+    if group < 0 {
+        return Err(signal(
+            "args-out-of-range",
+            vec![Value::Int(group), Value::Int(0)],
+        ));
+    }
+    let group = group as usize;
 
     let md = match &eval.match_data {
         Some(md) => md,
@@ -15468,7 +15513,14 @@ pub(crate) fn builtin_match_beginning(
     args: Vec<Value>,
 ) -> EvalResult {
     expect_args("match-beginning", &args, 1)?;
-    let group = expect_int(&args[0])? as usize;
+    let group = expect_int(&args[0])?;
+    if group < 0 {
+        return Err(signal(
+            "args-out-of-range",
+            vec![Value::Int(group), Value::Int(0)],
+        ));
+    }
+    let group = group as usize;
 
     let md = match &eval.match_data {
         Some(md) => md,
@@ -15497,7 +15549,14 @@ pub(crate) fn builtin_match_beginning(
 
 pub(crate) fn builtin_match_end(eval: &mut super::eval::Evaluator, args: Vec<Value>) -> EvalResult {
     expect_args("match-end", &args, 1)?;
-    let group = expect_int(&args[0])? as usize;
+    let group = expect_int(&args[0])?;
+    if group < 0 {
+        return Err(signal(
+            "args-out-of-range",
+            vec![Value::Int(group), Value::Int(0)],
+        ));
+    }
+    let group = group as usize;
 
     let md = match &eval.match_data {
         Some(md) => md,
@@ -18049,6 +18108,87 @@ mod tests {
             builtin_match_end(&mut eval, vec![Value::Int(0)]).expect("match-end should not error");
         assert!(beg.is_nil());
         assert!(end.is_nil());
+    }
+
+    #[test]
+    fn negative_match_group_signals_args_out_of_range() {
+        let mut eval = crate::elisp::eval::Evaluator::new();
+
+        let match_string_err = builtin_match_string(&mut eval, vec![Value::Int(-1)])
+            .expect_err("negative subgroup should signal");
+        match match_string_err {
+            Flow::Signal(sig) => {
+                assert_eq!(sig.symbol, "args-out-of-range");
+                assert_eq!(sig.data, vec![Value::Int(-1), Value::Int(0)]);
+            }
+            other => panic!("unexpected flow: {other:?}"),
+        }
+
+        let match_beginning_err = builtin_match_beginning(&mut eval, vec![Value::Int(-1)])
+            .expect_err("negative subgroup should signal");
+        match match_beginning_err {
+            Flow::Signal(sig) => {
+                assert_eq!(sig.symbol, "args-out-of-range");
+                assert_eq!(sig.data, vec![Value::Int(-1), Value::Int(0)]);
+            }
+            other => panic!("unexpected flow: {other:?}"),
+        }
+
+        let match_end_err = builtin_match_end(&mut eval, vec![Value::Int(-1)])
+            .expect_err("negative subgroup should signal");
+        match match_end_err {
+            Flow::Signal(sig) => {
+                assert_eq!(sig.symbol, "args-out-of-range");
+                assert_eq!(sig.data, vec![Value::Int(-1), Value::Int(0)]);
+            }
+            other => panic!("unexpected flow: {other:?}"),
+        }
+    }
+
+    #[test]
+    fn buffer_region_negative_bounds_signal_without_panicking() {
+        let mut eval = crate::elisp::eval::Evaluator::new();
+        builtin_insert(&mut eval, vec![Value::string("abc")]).expect("insert should succeed");
+        let current = builtin_current_buffer(&mut eval, vec![]).expect("current-buffer should work");
+
+        let substring_err = builtin_buffer_substring(&mut eval, vec![Value::Int(-1), Value::Int(2)])
+            .expect_err("negative start should signal");
+        match substring_err {
+            Flow::Signal(sig) => {
+                assert_eq!(sig.symbol, "args-out-of-range");
+                assert_eq!(sig.data, vec![current.clone(), Value::Int(-1), Value::Int(2)]);
+            }
+            other => panic!("unexpected flow: {other:?}"),
+        }
+
+        let delete_err = builtin_delete_region(&mut eval, vec![Value::Int(-1), Value::Int(2)])
+            .expect_err("negative start should signal");
+        match delete_err {
+            Flow::Signal(sig) => {
+                assert_eq!(sig.symbol, "args-out-of-range");
+                assert_eq!(sig.data, vec![current, Value::Int(-1), Value::Int(2)]);
+            }
+            other => panic!("unexpected flow: {other:?}"),
+        }
+
+        let narrow_err = builtin_narrow_to_region(&mut eval, vec![Value::Int(-1), Value::Int(2)])
+            .expect_err("negative start should signal");
+        match narrow_err {
+            Flow::Signal(sig) => {
+                assert_eq!(sig.symbol, "args-out-of-range");
+                assert_eq!(sig.data, vec![Value::Int(-1), Value::Int(2)]);
+            }
+            other => panic!("unexpected flow: {other:?}"),
+        }
+
+        assert_eq!(
+            builtin_char_after(&mut eval, vec![Value::Int(-1)]).expect("char-after should succeed"),
+            Value::Nil
+        );
+        assert_eq!(
+            builtin_char_before(&mut eval, vec![Value::Int(0)]).expect("char-before should succeed"),
+            Value::Nil
+        );
     }
 
     #[test]
