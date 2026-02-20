@@ -356,6 +356,8 @@ fn subr_arity_value(name: &str) -> Value {
         }
         "following-char" | "garbage-collect" | "get-load-suffixes" => arity_cons(0, Some(0)),
         "buffer-file-name"
+        | "buffer-base-buffer"
+        | "buffer-last-name"
         | "buffer-name"
         | "buffer-size"
         | "buffer-modified-p"
@@ -1897,6 +1899,8 @@ mod tests {
         assert_subr_arity("erase-buffer", 0, Some(0));
         assert_subr_arity("widen", 0, Some(0));
         assert_subr_arity("buffer-file-name", 0, Some(1));
+        assert_subr_arity("buffer-base-buffer", 0, Some(1));
+        assert_subr_arity("buffer-last-name", 0, Some(1));
         assert_subr_arity("buffer-name", 0, Some(1));
         assert_subr_arity("buffer-size", 0, Some(1));
         assert_subr_arity("buffer-modified-p", 0, Some(1));

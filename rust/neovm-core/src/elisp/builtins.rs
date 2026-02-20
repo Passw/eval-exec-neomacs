@@ -5192,6 +5192,54 @@ pub(crate) fn builtin_buffer_file_name(
     }
 }
 
+/// (buffer-base-buffer &optional BUFFER) → buffer or nil
+pub(crate) fn builtin_buffer_base_buffer(
+    eval: &mut super::eval::Evaluator,
+    args: Vec<Value>,
+) -> EvalResult {
+    expect_max_args("buffer-base-buffer", &args, 1)?;
+    let target = if args.is_empty() || matches!(args[0], Value::Nil) {
+        match eval.buffers.current_buffer() {
+            Some(buf) => buf.id,
+            None => return Ok(Value::Nil),
+        }
+    } else {
+        expect_buffer_id(&args[0])?
+    };
+
+    // NeoVM does not currently model indirect buffers; direct and deleted
+    // buffers both report no base buffer.
+    let _ = target;
+    Ok(Value::Nil)
+}
+
+/// (buffer-last-name &optional BUFFER) → string or nil
+pub(crate) fn builtin_buffer_last_name(
+    eval: &mut super::eval::Evaluator,
+    args: Vec<Value>,
+) -> EvalResult {
+    expect_max_args("buffer-last-name", &args, 1)?;
+    let target = if args.is_empty() || matches!(args[0], Value::Nil) {
+        match eval.buffers.current_buffer() {
+            Some(buf) => buf.id,
+            None => return Ok(Value::Nil),
+        }
+    } else {
+        expect_buffer_id(&args[0])?
+    };
+
+    if let Some(buf) = eval.buffers.get(target) {
+        if buf.name == "*scratch*" {
+            return Ok(Value::Nil);
+        }
+        return Ok(Value::string(&buf.name));
+    }
+    if let Some(name) = eval.buffers.dead_buffer_last_name(target) {
+        return Ok(Value::string(name));
+    }
+    Ok(Value::Nil)
+}
+
 /// (buffer-string) → string
 pub(crate) fn builtin_buffer_string(
     eval: &mut super::eval::Evaluator,
@@ -7596,6 +7644,8 @@ pub(crate) fn dispatch_builtin(
         "current-buffer" => return Some(builtin_current_buffer(eval, args)),
         "buffer-name" => return Some(builtin_buffer_name(eval, args)),
         "buffer-file-name" => return Some(builtin_buffer_file_name(eval, args)),
+        "buffer-base-buffer" => return Some(builtin_buffer_base_buffer(eval, args)),
+        "buffer-last-name" => return Some(builtin_buffer_last_name(eval, args)),
         "buffer-string" => return Some(builtin_buffer_string(eval, args)),
         "base64-encode-region" => {
             return Some(super::fns::builtin_base64_encode_region_eval(eval, args))
@@ -11654,6 +11704,83 @@ mod tests {
         let _ = builtin_kill_buffer(&mut eval, vec![dead_for_modified.clone()]).unwrap();
         let modified = builtin_buffer_modified_p(&mut eval, vec![dead_for_modified]).unwrap();
         assert_eq!(modified, Value::Nil);
+    }
+
+    #[test]
+    fn buffer_base_buffer_and_last_name_semantics() {
+        let mut eval = super::super::eval::Evaluator::new();
+
+        assert_eq!(
+            builtin_buffer_base_buffer(&mut eval, vec![]).unwrap(),
+            Value::Nil
+        );
+        assert_eq!(
+            builtin_buffer_last_name(&mut eval, vec![]).unwrap(),
+            Value::Nil
+        );
+        assert_eq!(
+            builtin_buffer_base_buffer(&mut eval, vec![Value::Nil]).unwrap(),
+            Value::Nil
+        );
+        assert_eq!(
+            builtin_buffer_last_name(&mut eval, vec![Value::Nil]).unwrap(),
+            Value::Nil
+        );
+
+        let base_type =
+            builtin_buffer_base_buffer(&mut eval, vec![Value::symbol("x")]).expect_err(
+                "buffer-base-buffer should reject non-buffer, non-nil optional arg",
+            );
+        match base_type {
+            Flow::Signal(sig) => {
+                assert_eq!(sig.symbol, "wrong-type-argument");
+                assert_eq!(sig.data, vec![Value::symbol("bufferp"), Value::symbol("x")]);
+            }
+            other => panic!("unexpected flow: {other:?}"),
+        }
+
+        let last_type =
+            builtin_buffer_last_name(&mut eval, vec![Value::symbol("x")]).expect_err(
+                "buffer-last-name should reject non-buffer, non-nil optional arg",
+            );
+        match last_type {
+            Flow::Signal(sig) => {
+                assert_eq!(sig.symbol, "wrong-type-argument");
+                assert_eq!(sig.data, vec![Value::symbol("bufferp"), Value::symbol("x")]);
+            }
+            other => panic!("unexpected flow: {other:?}"),
+        }
+
+        let base_arity = builtin_buffer_base_buffer(&mut eval, vec![Value::Nil, Value::Nil])
+            .expect_err("buffer-base-buffer should reject >1 args");
+        match base_arity {
+            Flow::Signal(sig) => {
+                assert_eq!(sig.symbol, "wrong-number-of-arguments");
+                assert_eq!(sig.data, vec![Value::symbol("buffer-base-buffer"), Value::Int(2)]);
+            }
+            other => panic!("unexpected flow: {other:?}"),
+        }
+
+        let last_arity = builtin_buffer_last_name(&mut eval, vec![Value::Nil, Value::Nil])
+            .expect_err("buffer-last-name should reject >1 args");
+        match last_arity {
+            Flow::Signal(sig) => {
+                assert_eq!(sig.symbol, "wrong-number-of-arguments");
+                assert_eq!(sig.data, vec![Value::symbol("buffer-last-name"), Value::Int(2)]);
+            }
+            other => panic!("unexpected flow: {other:?}"),
+        }
+
+        let dead =
+            builtin_generate_new_buffer(&mut eval, vec![Value::string("*bln-dead*")]).unwrap();
+        let live_name = builtin_buffer_name(&mut eval, vec![dead.clone()]).unwrap();
+        let _ = builtin_kill_buffer(&mut eval, vec![dead.clone()]).unwrap();
+
+        assert_eq!(
+            builtin_buffer_base_buffer(&mut eval, vec![dead.clone()]).unwrap(),
+            Value::Nil
+        );
+        assert_eq!(builtin_buffer_last_name(&mut eval, vec![dead]).unwrap(), live_name);
     }
 
     #[test]

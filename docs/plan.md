@@ -28,6 +28,40 @@ Last updated: 2026-02-20
 
 ## Doing
 
+- Added buffer metadata compatibility slice for `buffer-base-buffer` / `buffer-last-name`:
+  - runtime changes:
+    - `rust/neovm-core/src/buffer/buffer.rs`
+      - tracked dead-buffer tombstones in `BufferManager` to preserve `buffer-last-name` payloads after `kill-buffer`.
+    - `rust/neovm-core/src/elisp/builtins.rs`
+      - implemented:
+        - `buffer-base-buffer` (`0..1` args)
+        - `buffer-last-name` (`0..1` args)
+      - aligned optional-arg and error behavior:
+        - `nil`/omitted optional arg uses current buffer
+        - non-buffer non-`nil` signals `wrong-type-argument (bufferp ...)`
+        - arity > 1 signals `wrong-number-of-arguments`
+      - wired both builtins into evaluator dispatch and added unit coverage for live/dead/error paths.
+    - `rust/neovm-core/src/elisp/builtin_registry.rs`
+      - registered:
+        - `buffer-base-buffer`
+        - `buffer-last-name`
+    - `rust/neovm-core/src/elisp/subr_info.rs`
+      - added arity metadata + assertions:
+        - `buffer-base-buffer` => `(0 . 1)`
+        - `buffer-last-name` => `(0 . 1)`
+  - vm-compat corpus changes:
+    - added:
+      - `test/neovm/vm-compat/cases/buffer-base-last-name-semantics.forms`
+      - `test/neovm/vm-compat/cases/buffer-base-last-name-semantics.expected.tsv`
+    - wired case into:
+      - `test/neovm/vm-compat/cases/default.list`
+  - verified:
+    - `cargo test --manifest-path rust/neovm-core/Cargo.toml buffer_base_buffer_and_last_name_semantics -- --nocapture` (pass)
+    - `make -C test/neovm/vm-compat check-one-neovm CASE=cases/buffer-base-last-name-semantics` (pass; `13/13`)
+    - `make -C test/neovm/vm-compat check-builtin-registry-all` (pass; `1271` dispatch / `1270` core)
+    - `make -C test/neovm/vm-compat compat-progress` (pass; default list `795`, tracked `801`, oracle builtin coverage registry/runtime `870/564`)
+    - `make -C test/neovm/vm-compat check-all-neovm-strict` (pass; case inventory `801`)
+
 - Expanded builtin registry core primitive coverage to close runtime-covered/oracle drift:
   - runtime/registry changes:
     - `rust/neovm-core/src/elisp/builtin_registry.rs`

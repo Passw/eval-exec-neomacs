@@ -361,6 +361,7 @@ pub struct BufferManager {
     current: Option<BufferId>,
     next_id: u64,
     next_marker_id: u64,
+    dead_buffer_last_names: HashMap<BufferId, String>,
 }
 
 impl BufferManager {
@@ -371,6 +372,7 @@ impl BufferManager {
             current: None,
             next_id: 1,
             next_marker_id: 1,
+            dead_buffer_last_names: HashMap::new(),
         };
         let scratch = mgr.create_buffer("*scratch*");
         mgr.current = Some(scratch);
@@ -422,7 +424,8 @@ impl BufferManager {
     ///
     /// If the killed buffer was current, `current` is set to `None`.
     pub fn kill_buffer(&mut self, id: BufferId) -> bool {
-        if self.buffers.remove(&id).is_some() {
+        if let Some(buf) = self.buffers.remove(&id) {
+            self.dead_buffer_last_names.insert(id, buf.name);
             if self.current == Some(id) {
                 self.current = None;
             }
@@ -430,6 +433,11 @@ impl BufferManager {
         } else {
             false
         }
+    }
+
+    /// Return the last known name for a dead buffer id, if available.
+    pub fn dead_buffer_last_name(&self, id: BufferId) -> Option<&str> {
+        self.dead_buffer_last_names.get(&id).map(|s| s.as_str())
     }
 
     /// List all live buffer ids (arbitrary order).
