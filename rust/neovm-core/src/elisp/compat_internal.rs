@@ -1597,6 +1597,24 @@ pub(crate) fn builtin_module_load(args: Vec<Value>) -> EvalResult {
     Ok(Value::Nil)
 }
 
+/// `(dump-emacs-portable FILE &optional TRACK-REFERRERS)` -> nil.
+pub(crate) fn builtin_dump_emacs_portable(args: Vec<Value>) -> EvalResult {
+    expect_range_args("dump-emacs-portable", &args, 1, 2)?;
+    Ok(Value::Nil)
+}
+
+/// `(dump-emacs-portable--sort-predicate A B)` -> nil.
+pub(crate) fn builtin_dump_emacs_portable_sort_predicate(args: Vec<Value>) -> EvalResult {
+    expect_args("dump-emacs-portable--sort-predicate", &args, 2)?;
+    Ok(Value::Nil)
+}
+
+/// `(dump-emacs-portable--sort-predicate-copied A B)` -> nil.
+pub(crate) fn builtin_dump_emacs_portable_sort_predicate_copied(args: Vec<Value>) -> EvalResult {
+    expect_args("dump-emacs-portable--sort-predicate-copied", &args, 2)?;
+    Ok(Value::Nil)
+}
+
 /// `(make-frame-invisible &optional FRAME FORCE)` -> nil.
 pub(crate) fn builtin_make_frame_invisible(args: Vec<Value>) -> EvalResult {
     expect_range_args("make-frame-invisible", &args, 0, 2)?;
@@ -1663,6 +1681,24 @@ pub(crate) fn builtin_new_fontset(args: Vec<Value>) -> EvalResult {
     Ok(Value::Nil)
 }
 
+/// `(marker-last-position MARKER)` -> nil.
+pub(crate) fn builtin_marker_last_position(args: Vec<Value>) -> EvalResult {
+    expect_args("marker-last-position", &args, 1)?;
+    Ok(Value::Nil)
+}
+
+/// `(match-data--translate MAP)` -> nil.
+pub(crate) fn builtin_match_data_translate(args: Vec<Value>) -> EvalResult {
+    expect_args("match-data--translate", &args, 1)?;
+    Ok(Value::Nil)
+}
+
+/// `(newline-cache-check &optional BEG)` -> nil.
+pub(crate) fn builtin_newline_cache_check(args: Vec<Value>) -> EvalResult {
+    expect_range_args("newline-cache-check", &args, 0, 1)?;
+    Ok(Value::Nil)
+}
+
 /// `(old-selected-frame)` -> nil.
 pub(crate) fn builtin_old_selected_frame(args: Vec<Value>) -> EvalResult {
     expect_args("old-selected-frame", &args, 0)?;
@@ -1678,6 +1714,36 @@ pub(crate) fn builtin_old_selected_window(args: Vec<Value>) -> EvalResult {
 /// `(open-font FONT-ENTITY &optional PIXEL-SIZE FRAME)` -> nil.
 pub(crate) fn builtin_open_font(args: Vec<Value>) -> EvalResult {
     expect_range_args("open-font", &args, 1, 3)?;
+    Ok(Value::Nil)
+}
+
+/// `(open-dribble-file FILE)` -> nil.
+pub(crate) fn builtin_open_dribble_file(args: Vec<Value>) -> EvalResult {
+    expect_args("open-dribble-file", &args, 1)?;
+    Ok(Value::Nil)
+}
+
+/// `(object-intervals OBJECT)` -> nil.
+pub(crate) fn builtin_object_intervals(args: Vec<Value>) -> EvalResult {
+    expect_args("object-intervals", &args, 1)?;
+    Ok(Value::Nil)
+}
+
+/// `(optimize-char-table CHAR-TABLE &optional TEST-ONLY)` -> nil.
+pub(crate) fn builtin_optimize_char_table(args: Vec<Value>) -> EvalResult {
+    expect_range_args("optimize-char-table", &args, 1, 2)?;
+    Ok(Value::Nil)
+}
+
+/// `(overlay-lists)` -> nil.
+pub(crate) fn builtin_overlay_lists(args: Vec<Value>) -> EvalResult {
+    expect_args("overlay-lists", &args, 0)?;
+    Ok(Value::Nil)
+}
+
+/// `(overlay-recenter POS)` -> nil.
+pub(crate) fn builtin_overlay_recenter(args: Vec<Value>) -> EvalResult {
+    expect_args("overlay-recenter", &args, 1)?;
     Ok(Value::Nil)
 }
 
@@ -1702,6 +1768,12 @@ pub(crate) fn builtin_posn_at_point(args: Vec<Value>) -> EvalResult {
 /// `(posn-at-x-y X Y &optional FRAME-OR-WINDOW WHOLE)` -> nil.
 pub(crate) fn builtin_posn_at_x_y(args: Vec<Value>) -> EvalResult {
     expect_range_args("posn-at-x-y", &args, 2, 4)?;
+    Ok(Value::Nil)
+}
+
+/// `(play-sound-internal SOUND)` -> nil.
+pub(crate) fn builtin_play_sound_internal(args: Vec<Value>) -> EvalResult {
+    expect_args("play-sound-internal", &args, 1)?;
     Ok(Value::Nil)
 }
 
@@ -1782,6 +1854,18 @@ pub(crate) fn builtin_query_fontset(args: Vec<Value>) -> EvalResult {
     Ok(Value::Nil)
 }
 
+/// `(read-positioning-symbols &optional STRING)` -> nil.
+pub(crate) fn builtin_read_positioning_symbols(args: Vec<Value>) -> EvalResult {
+    expect_range_args("read-positioning-symbols", &args, 0, 1)?;
+    Ok(Value::Nil)
+}
+
+/// `(recent-auto-save-p)` -> nil.
+pub(crate) fn builtin_recent_auto_save_p(args: Vec<Value>) -> EvalResult {
+    expect_args("recent-auto-save-p", &args, 0)?;
+    Ok(Value::Nil)
+}
+
 /// `(reconsider-frame-fonts FRAME)` -> nil.
 pub(crate) fn builtin_reconsider_frame_fonts(args: Vec<Value>) -> EvalResult {
     expect_args("reconsider-frame-fonts", &args, 1)?;
@@ -1797,6 +1881,48 @@ pub(crate) fn builtin_redirect_debugging_output(args: Vec<Value>) -> EvalResult 
 /// `(redirect-frame-focus FRAME FOCUS-FRAME)` -> nil.
 pub(crate) fn builtin_redirect_frame_focus(args: Vec<Value>) -> EvalResult {
     expect_range_args("redirect-frame-focus", &args, 1, 2)?;
+    Ok(Value::Nil)
+}
+
+/// `(remove-pos-from-symbol SYMBOL)` -> nil.
+pub(crate) fn builtin_remove_pos_from_symbol(args: Vec<Value>) -> EvalResult {
+    expect_args("remove-pos-from-symbol", &args, 1)?;
+    Ok(Value::Nil)
+}
+
+/// `(resize-mini-window-internal WINDOW)` -> nil.
+pub(crate) fn builtin_resize_mini_window_internal(args: Vec<Value>) -> EvalResult {
+    expect_args("resize-mini-window-internal", &args, 1)?;
+    Ok(Value::Nil)
+}
+
+/// `(restore-buffer-modified-p FLAG)` -> nil.
+pub(crate) fn builtin_restore_buffer_modified_p(args: Vec<Value>) -> EvalResult {
+    expect_args("restore-buffer-modified-p", &args, 1)?;
+    Ok(Value::Nil)
+}
+
+/// `(set--this-command-keys KEYS)` -> nil.
+pub(crate) fn builtin_set_this_command_keys(args: Vec<Value>) -> EvalResult {
+    expect_args("set--this-command-keys", &args, 1)?;
+    Ok(Value::Nil)
+}
+
+/// `(set-buffer-auto-saved)` -> nil.
+pub(crate) fn builtin_set_buffer_auto_saved(args: Vec<Value>) -> EvalResult {
+    expect_args("set-buffer-auto-saved", &args, 0)?;
+    Ok(Value::Nil)
+}
+
+/// `(set-buffer-redisplay BUFFER START END BYTE-BEG)` -> nil.
+pub(crate) fn builtin_set_buffer_redisplay(args: Vec<Value>) -> EvalResult {
+    expect_args("set-buffer-redisplay", &args, 4)?;
+    Ok(Value::Nil)
+}
+
+/// `(set-charset-plist CHARSET PLIST)` -> nil.
+pub(crate) fn builtin_set_charset_plist(args: Vec<Value>) -> EvalResult {
+    expect_args("set-charset-plist", &args, 2)?;
     Ok(Value::Nil)
 }
 
@@ -1839,6 +1965,54 @@ pub(crate) fn builtin_set_mouse_pixel_position(args: Vec<Value>) -> EvalResult {
 /// `(set-mouse-position FRAME X Y)` -> nil.
 pub(crate) fn builtin_set_mouse_position(args: Vec<Value>) -> EvalResult {
     expect_args("set-mouse-position", &args, 3)?;
+    Ok(Value::Nil)
+}
+
+/// `(set-window-combination-limit WINDOW LIMIT)` -> nil.
+pub(crate) fn builtin_set_window_combination_limit(args: Vec<Value>) -> EvalResult {
+    expect_args("set-window-combination-limit", &args, 2)?;
+    Ok(Value::Nil)
+}
+
+/// `(set-window-new-normal WINDOW NORMAL)` -> nil.
+pub(crate) fn builtin_set_window_new_normal(args: Vec<Value>) -> EvalResult {
+    expect_range_args("set-window-new-normal", &args, 1, 2)?;
+    Ok(Value::Nil)
+}
+
+/// `(set-window-new-pixel WINDOW HEIGHT &optional WIDTH)` -> nil.
+pub(crate) fn builtin_set_window_new_pixel(args: Vec<Value>) -> EvalResult {
+    expect_range_args("set-window-new-pixel", &args, 2, 3)?;
+    Ok(Value::Nil)
+}
+
+/// `(set-window-new-total WINDOW HEIGHT &optional WIDTH)` -> nil.
+pub(crate) fn builtin_set_window_new_total(args: Vec<Value>) -> EvalResult {
+    expect_range_args("set-window-new-total", &args, 2, 3)?;
+    Ok(Value::Nil)
+}
+
+/// `(sort-charsets LIST)` -> nil.
+pub(crate) fn builtin_sort_charsets(args: Vec<Value>) -> EvalResult {
+    expect_args("sort-charsets", &args, 1)?;
+    Ok(Value::Nil)
+}
+
+/// `(split-char CHARACTER)` -> nil.
+pub(crate) fn builtin_split_char(args: Vec<Value>) -> EvalResult {
+    expect_args("split-char", &args, 1)?;
+    Ok(Value::Nil)
+}
+
+/// `(string-distance STRING1 STRING2 &optional BYTECOMPARE)` -> 0.
+pub(crate) fn builtin_string_distance(args: Vec<Value>) -> EvalResult {
+    expect_range_args("string-distance", &args, 2, 3)?;
+    Ok(Value::Int(0))
+}
+
+/// `(subst-char-in-region START END FROMCHAR TOCHAR &optional NOUNDO)` -> nil.
+pub(crate) fn builtin_subst_char_in_region(args: Vec<Value>) -> EvalResult {
+    expect_range_args("subst-char-in-region", &args, 4, 5)?;
     Ok(Value::Nil)
 }
 
@@ -1888,6 +2062,36 @@ pub(crate) fn builtin_tool_bar_get_system_style(args: Vec<Value>) -> EvalResult 
 pub(crate) fn builtin_tool_bar_pixel_width(args: Vec<Value>) -> EvalResult {
     expect_range_args("tool-bar-pixel-width", &args, 0, 1)?;
     Ok(Value::Int(0))
+}
+
+/// `(this-single-command-keys)` -> nil.
+pub(crate) fn builtin_this_single_command_keys(args: Vec<Value>) -> EvalResult {
+    expect_args("this-single-command-keys", &args, 0)?;
+    Ok(Value::Nil)
+}
+
+/// `(this-single-command-raw-keys)` -> nil.
+pub(crate) fn builtin_this_single_command_raw_keys(args: Vec<Value>) -> EvalResult {
+    expect_args("this-single-command-raw-keys", &args, 0)?;
+    Ok(Value::Nil)
+}
+
+/// `(thread--blocker THREAD)` -> nil.
+pub(crate) fn builtin_thread_blocker(args: Vec<Value>) -> EvalResult {
+    expect_args("thread--blocker", &args, 1)?;
+    Ok(Value::Nil)
+}
+
+/// `(translate-region-internal START END TABLE)` -> nil.
+pub(crate) fn builtin_translate_region_internal(args: Vec<Value>) -> EvalResult {
+    expect_args("translate-region-internal", &args, 3)?;
+    Ok(Value::Nil)
+}
+
+/// `(transpose-regions STARTR1 ENDR1 STARTR2 ENDR2 &optional LEAVE-MARKERS)` -> nil.
+pub(crate) fn builtin_transpose_regions(args: Vec<Value>) -> EvalResult {
+    expect_range_args("transpose-regions", &args, 4, 5)?;
+    Ok(Value::Nil)
 }
 
 /// `(treesit-available-p)` -> nil.
@@ -2079,6 +2283,42 @@ pub(crate) fn builtin_xw_color_values(args: Vec<Value>) -> EvalResult {
 /// `(xw-display-color-p &optional FRAME)` -> nil.
 pub(crate) fn builtin_xw_display_color_p(args: Vec<Value>) -> EvalResult {
     expect_range_args("xw-display-color-p", &args, 0, 1)?;
+    Ok(Value::Nil)
+}
+
+/// `(unencodable-char-position START END CODING-SYSTEM &optional COUNT STRING)` -> nil.
+pub(crate) fn builtin_unencodable_char_position(args: Vec<Value>) -> EvalResult {
+    expect_range_args("unencodable-char-position", &args, 3, 5)?;
+    Ok(Value::Nil)
+}
+
+/// `(unicode-property-table-internal PROP)` -> nil.
+pub(crate) fn builtin_unicode_property_table_internal(args: Vec<Value>) -> EvalResult {
+    expect_args("unicode-property-table-internal", &args, 1)?;
+    Ok(Value::Nil)
+}
+
+/// `(unify-charset FROM TO &optional TABLE)` -> nil.
+pub(crate) fn builtin_unify_charset(args: Vec<Value>) -> EvalResult {
+    expect_range_args("unify-charset", &args, 1, 3)?;
+    Ok(Value::Nil)
+}
+
+/// `(unix-sync)` -> nil.
+pub(crate) fn builtin_unix_sync(args: Vec<Value>) -> EvalResult {
+    expect_args("unix-sync", &args, 0)?;
+    Ok(Value::Nil)
+}
+
+/// `(value< A B)` -> nil.
+pub(crate) fn builtin_value_lt(args: Vec<Value>) -> EvalResult {
+    expect_args("value<", &args, 2)?;
+    Ok(Value::Nil)
+}
+
+/// `(variable-binding-locus SYMBOL)` -> nil.
+pub(crate) fn builtin_variable_binding_locus(args: Vec<Value>) -> EvalResult {
+    expect_args("variable-binding-locus", &args, 1)?;
     Ok(Value::Nil)
 }
 

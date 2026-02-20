@@ -456,6 +456,7 @@ fn builtin_command_name(name: &str) -> bool {
             | "narrow-to-region"
             | "newline-and-indent"
             | "number-to-register"
+            | "open-dribble-file"
             | "open-rectangle"
             | "open-termscript"
             | "point-to-register"
@@ -499,7 +500,9 @@ fn builtin_command_name(name: &str) -> bool {
             | "tab-to-tab-stop"
             | "top-level"
             | "transient-mark-mode"
+            | "transpose-regions"
             | "undo"
+            | "unix-sync"
             | "upcase-char"
             | "view-register"
             | "widen"
@@ -3388,17 +3391,20 @@ mod tests {
             "make-directory",
             "make-frame-invisible",
             "make-frame-visible",
+            "open-dribble-file",
             "query-replace",
             "re-search-forward",
             "redirect-debugging-output",
             "select-frame",
             "setenv",
             "set-buffer-process-coding-system",
+            "transpose-regions",
             "kill-process",
             "signal-process",
             "process-menu-delete-process",
             "process-menu-mode",
             "top-level",
+            "unix-sync",
             "write-region",
             "x-clipboard-yank",
             "x-menu-bar-open-internal",

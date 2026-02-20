@@ -628,8 +628,13 @@ fn subr_arity_value(name: &str) -> Value {
         "internal-set-lisp-face-attribute-from-resource" => arity_cons(3, Some(4)),
         "internal-stack-stats" => arity_cons(0, Some(0)),
         "internal-subr-documentation" => arity_cons(1, Some(1)),
+        "dump-emacs-portable" => arity_cons(1, Some(2)),
+        "dump-emacs-portable--sort-predicate" => arity_cons(2, Some(2)),
+        "dump-emacs-portable--sort-predicate-copied" => arity_cons(2, Some(2)),
         "malloc-info" => arity_cons(0, Some(0)),
         "malloc-trim" => arity_cons(0, Some(1)),
+        "marker-last-position" => arity_cons(1, Some(1)),
+        "match-data--translate" => arity_cons(1, Some(1)),
         "memory-info" => arity_cons(0, Some(0)),
         "make-frame-invisible" => arity_cons(0, Some(2)),
         "make-terminal-frame" => arity_cons(1, Some(1)),
@@ -638,15 +643,22 @@ fn subr_arity_value(name: &str) -> Value {
         "module-load" => arity_cons(1, Some(1)),
         "mouse-pixel-position" => arity_cons(0, Some(0)),
         "mouse-position" => arity_cons(0, Some(0)),
+        "newline-cache-check" => arity_cons(0, Some(1)),
         "native-comp-available-p" => arity_cons(0, Some(0)),
         "native-comp-unit-file" => arity_cons(1, Some(1)),
         "native-comp-unit-set-file" => arity_cons(2, Some(2)),
         "native-elisp-load" => arity_cons(1, Some(2)),
         "new-fontset" => arity_cons(2, Some(2)),
+        "object-intervals" => arity_cons(1, Some(1)),
         "old-selected-frame" => arity_cons(0, Some(0)),
         "old-selected-window" => arity_cons(0, Some(0)),
+        "open-dribble-file" => arity_cons(1, Some(1)),
         "open-font" => arity_cons(1, Some(3)),
+        "optimize-char-table" => arity_cons(1, Some(2)),
+        "overlay-lists" => arity_cons(0, Some(0)),
+        "overlay-recenter" => arity_cons(1, Some(1)),
         "pdumper-stats" => arity_cons(0, Some(0)),
+        "play-sound-internal" => arity_cons(1, Some(1)),
         "position-symbol" => arity_cons(2, Some(2)),
         "posn-at-point" => arity_cons(0, Some(2)),
         "posn-at-x-y" => arity_cons(2, Some(4)),
@@ -660,11 +672,20 @@ fn subr_arity_value(name: &str) -> Value {
         "profiler-memory-stop" => arity_cons(0, Some(0)),
         "query-font" => arity_cons(1, Some(1)),
         "query-fontset" => arity_cons(1, Some(2)),
+        "read-positioning-symbols" => arity_cons(0, Some(1)),
+        "recent-auto-save-p" => arity_cons(0, Some(0)),
         "record" => arity_cons(1, None),
         "recordp" => arity_cons(1, Some(1)),
         "reconsider-frame-fonts" => arity_cons(1, Some(1)),
         "redirect-debugging-output" => arity_cons(1, Some(2)),
         "redirect-frame-focus" => arity_cons(1, Some(2)),
+        "remove-pos-from-symbol" => arity_cons(1, Some(1)),
+        "resize-mini-window-internal" => arity_cons(1, Some(1)),
+        "restore-buffer-modified-p" => arity_cons(1, Some(1)),
+        "set--this-command-keys" => arity_cons(1, Some(1)),
+        "set-buffer-auto-saved" => arity_cons(0, Some(0)),
+        "set-buffer-redisplay" => arity_cons(4, Some(4)),
+        "set-charset-plist" => arity_cons(2, Some(2)),
         "set-fontset-font" => arity_cons(3, Some(5)),
         "set-frame-selected-window" => arity_cons(2, Some(3)),
         "set-frame-window-state-change" => arity_cons(0, Some(2)),
@@ -672,14 +693,33 @@ fn subr_arity_value(name: &str) -> Value {
         "set-minibuffer-window" => arity_cons(1, Some(1)),
         "set-mouse-pixel-position" => arity_cons(3, Some(3)),
         "set-mouse-position" => arity_cons(3, Some(3)),
+        "set-window-combination-limit" => arity_cons(2, Some(2)),
+        "set-window-new-normal" => arity_cons(1, Some(2)),
+        "set-window-new-pixel" => arity_cons(2, Some(3)),
+        "set-window-new-total" => arity_cons(2, Some(3)),
+        "sort-charsets" => arity_cons(1, Some(1)),
+        "split-char" => arity_cons(1, Some(1)),
+        "string-distance" => arity_cons(2, Some(3)),
+        "subst-char-in-region" => arity_cons(4, Some(5)),
         "subr-native-comp-unit" => arity_cons(1, Some(1)),
         "subr-native-lambda-list" => arity_cons(1, Some(1)),
         "subr-type" => arity_cons(1, Some(1)),
+        "this-single-command-keys" => arity_cons(0, Some(0)),
+        "this-single-command-raw-keys" => arity_cons(0, Some(0)),
+        "thread--blocker" => arity_cons(1, Some(1)),
         "tool-bar-get-system-style" => arity_cons(0, Some(0)),
         "tool-bar-pixel-width" => arity_cons(0, Some(1)),
+        "translate-region-internal" => arity_cons(3, Some(3)),
+        "transpose-regions" => arity_cons(4, Some(5)),
         "tty--output-buffer-size" => arity_cons(0, Some(1)),
         "tty--set-output-buffer-size" => arity_cons(1, Some(2)),
         "tty-suppress-bold-inverse-default-colors" => arity_cons(1, Some(1)),
+        "unencodable-char-position" => arity_cons(3, Some(5)),
+        "unicode-property-table-internal" => arity_cons(1, Some(1)),
+        "unify-charset" => arity_cons(1, Some(3)),
+        "unix-sync" => arity_cons(0, Some(0)),
+        "value<" => arity_cons(2, Some(2)),
+        "variable-binding-locus" => arity_cons(1, Some(1)),
         "x-begin-drag" => arity_cons(1, Some(6)),
         "x-create-frame" => arity_cons(1, Some(1)),
         "x-double-buffered-p" => arity_cons(0, Some(1)),
@@ -2907,8 +2947,13 @@ mod tests {
         assert_subr_arity("internal-set-lisp-face-attribute-from-resource", 3, Some(4));
         assert_subr_arity("internal-stack-stats", 0, Some(0));
         assert_subr_arity("internal-subr-documentation", 1, Some(1));
+        assert_subr_arity("dump-emacs-portable", 1, Some(2));
+        assert_subr_arity("dump-emacs-portable--sort-predicate", 2, Some(2));
+        assert_subr_arity("dump-emacs-portable--sort-predicate-copied", 2, Some(2));
         assert_subr_arity("malloc-info", 0, Some(0));
         assert_subr_arity("malloc-trim", 0, Some(1));
+        assert_subr_arity("marker-last-position", 1, Some(1));
+        assert_subr_arity("match-data--translate", 1, Some(1));
         assert_subr_arity("memory-info", 0, Some(0));
         assert_subr_arity("make-frame-invisible", 0, Some(2));
         assert_subr_arity("make-terminal-frame", 1, Some(1));
@@ -2917,15 +2962,22 @@ mod tests {
         assert_subr_arity("module-load", 1, Some(1));
         assert_subr_arity("mouse-pixel-position", 0, Some(0));
         assert_subr_arity("mouse-position", 0, Some(0));
+        assert_subr_arity("newline-cache-check", 0, Some(1));
         assert_subr_arity("native-comp-available-p", 0, Some(0));
         assert_subr_arity("native-comp-unit-file", 1, Some(1));
         assert_subr_arity("native-comp-unit-set-file", 2, Some(2));
         assert_subr_arity("native-elisp-load", 1, Some(2));
         assert_subr_arity("new-fontset", 2, Some(2));
+        assert_subr_arity("object-intervals", 1, Some(1));
         assert_subr_arity("old-selected-frame", 0, Some(0));
         assert_subr_arity("old-selected-window", 0, Some(0));
+        assert_subr_arity("open-dribble-file", 1, Some(1));
         assert_subr_arity("open-font", 1, Some(3));
+        assert_subr_arity("optimize-char-table", 1, Some(2));
+        assert_subr_arity("overlay-lists", 0, Some(0));
+        assert_subr_arity("overlay-recenter", 1, Some(1));
         assert_subr_arity("pdumper-stats", 0, Some(0));
+        assert_subr_arity("play-sound-internal", 1, Some(1));
         assert_subr_arity("position-symbol", 2, Some(2));
         assert_subr_arity("posn-at-point", 0, Some(2));
         assert_subr_arity("posn-at-x-y", 2, Some(4));
@@ -2939,11 +2991,20 @@ mod tests {
         assert_subr_arity("profiler-memory-stop", 0, Some(0));
         assert_subr_arity("query-font", 1, Some(1));
         assert_subr_arity("query-fontset", 1, Some(2));
+        assert_subr_arity("read-positioning-symbols", 0, Some(1));
+        assert_subr_arity("recent-auto-save-p", 0, Some(0));
         assert_subr_arity("record", 1, None);
         assert_subr_arity("recordp", 1, Some(1));
         assert_subr_arity("reconsider-frame-fonts", 1, Some(1));
         assert_subr_arity("redirect-debugging-output", 1, Some(2));
         assert_subr_arity("redirect-frame-focus", 1, Some(2));
+        assert_subr_arity("remove-pos-from-symbol", 1, Some(1));
+        assert_subr_arity("resize-mini-window-internal", 1, Some(1));
+        assert_subr_arity("restore-buffer-modified-p", 1, Some(1));
+        assert_subr_arity("set--this-command-keys", 1, Some(1));
+        assert_subr_arity("set-buffer-auto-saved", 0, Some(0));
+        assert_subr_arity("set-buffer-redisplay", 4, Some(4));
+        assert_subr_arity("set-charset-plist", 2, Some(2));
         assert_subr_arity("set-fontset-font", 3, Some(5));
         assert_subr_arity("set-frame-selected-window", 2, Some(3));
         assert_subr_arity("set-frame-window-state-change", 0, Some(2));
@@ -2951,14 +3012,33 @@ mod tests {
         assert_subr_arity("set-minibuffer-window", 1, Some(1));
         assert_subr_arity("set-mouse-pixel-position", 3, Some(3));
         assert_subr_arity("set-mouse-position", 3, Some(3));
+        assert_subr_arity("set-window-combination-limit", 2, Some(2));
+        assert_subr_arity("set-window-new-normal", 1, Some(2));
+        assert_subr_arity("set-window-new-pixel", 2, Some(3));
+        assert_subr_arity("set-window-new-total", 2, Some(3));
+        assert_subr_arity("sort-charsets", 1, Some(1));
+        assert_subr_arity("split-char", 1, Some(1));
+        assert_subr_arity("string-distance", 2, Some(3));
+        assert_subr_arity("subst-char-in-region", 4, Some(5));
         assert_subr_arity("subr-native-comp-unit", 1, Some(1));
         assert_subr_arity("subr-native-lambda-list", 1, Some(1));
         assert_subr_arity("subr-type", 1, Some(1));
+        assert_subr_arity("this-single-command-keys", 0, Some(0));
+        assert_subr_arity("this-single-command-raw-keys", 0, Some(0));
+        assert_subr_arity("thread--blocker", 1, Some(1));
         assert_subr_arity("tool-bar-get-system-style", 0, Some(0));
         assert_subr_arity("tool-bar-pixel-width", 0, Some(1));
+        assert_subr_arity("translate-region-internal", 3, Some(3));
+        assert_subr_arity("transpose-regions", 4, Some(5));
         assert_subr_arity("tty--output-buffer-size", 0, Some(1));
         assert_subr_arity("tty--set-output-buffer-size", 1, Some(2));
         assert_subr_arity("tty-suppress-bold-inverse-default-colors", 1, Some(1));
+        assert_subr_arity("unencodable-char-position", 3, Some(5));
+        assert_subr_arity("unicode-property-table-internal", 1, Some(1));
+        assert_subr_arity("unify-charset", 1, Some(3));
+        assert_subr_arity("unix-sync", 0, Some(0));
+        assert_subr_arity("value<", 2, Some(2));
+        assert_subr_arity("variable-binding-locus", 1, Some(1));
         assert_subr_arity("x-begin-drag", 1, Some(6));
         assert_subr_arity("x-create-frame", 1, Some(1));
         assert_subr_arity("x-double-buffered-p", 0, Some(1));
