@@ -947,6 +947,14 @@ fn subr_arity_value(name: &str) -> Value {
         | "gnutls-peer-status-warning-describe"
         | "inotify-valid-p" => arity_cons(1, Some(1)),
         "gnutls-symmetric-decrypt" | "gnutls-symmetric-encrypt" => arity_cons(4, Some(5)),
+        "handle-save-session"
+        | "handle-switch-frame"
+        | "init-image-library"
+        | "interactive-form"
+        | "lock-file" => arity_cons(1, Some(1)),
+        "help--describe-vector" => arity_cons(7, Some(7)),
+        "innermost-minibuffer-p" | "lock-buffer" | "lossage-size" => arity_cons(0, Some(1)),
+        "local-variable-if-set-p" => arity_cons(1, Some(2)),
         "get-unicode-property-internal" => arity_cons(2, Some(2)),
         "define-hash-table-test" => arity_cons(3, Some(3)),
         "find-coding-systems-region-internal" => arity_cons(2, Some(3)),
@@ -2613,7 +2621,17 @@ mod tests {
         assert_subr_arity("gnutls-peer-status-warning-describe", 1, Some(1));
         assert_subr_arity("gnutls-symmetric-decrypt", 4, Some(5));
         assert_subr_arity("gnutls-symmetric-encrypt", 4, Some(5));
+        assert_subr_arity("handle-save-session", 1, Some(1));
+        assert_subr_arity("handle-switch-frame", 1, Some(1));
+        assert_subr_arity("help--describe-vector", 7, Some(7));
+        assert_subr_arity("init-image-library", 1, Some(1));
         assert_subr_arity("inotify-valid-p", 1, Some(1));
+        assert_subr_arity("innermost-minibuffer-p", 0, Some(1));
+        assert_subr_arity("interactive-form", 1, Some(1));
+        assert_subr_arity("local-variable-if-set-p", 1, Some(2));
+        assert_subr_arity("lock-buffer", 0, Some(1));
+        assert_subr_arity("lock-file", 1, Some(1));
+        assert_subr_arity("lossage-size", 0, Some(1));
         assert_subr_arity("get-unicode-property-internal", 2, Some(2));
         assert_subr_arity("get-variable-watchers", 1, Some(1));
         assert_subr_arity("fillarray", 2, Some(2));
