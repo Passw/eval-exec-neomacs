@@ -139,6 +139,21 @@ impl CharsetRegistry {
     pub fn id(&self, name: &str) -> Option<i64> {
         self.charsets.get(name).map(|info| info.id)
     }
+
+    /// Register ALIAS as another name for TARGET.
+    pub fn define_alias(&mut self, alias: &str, target: &str) {
+        let Some(target_info) = self.charsets.get(target) else {
+            return;
+        };
+        self.charsets.insert(
+            alias.to_string(),
+            CharsetInfo {
+                id: target_info.id,
+                name: alias.to_string(),
+                plist: target_info.plist.clone(),
+            },
+        );
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -562,6 +577,44 @@ pub(crate) fn builtin_get_unused_iso_final_char(args: Vec<Value>) -> EvalResult 
         _ => 48,
     };
     Ok(Value::Int(final_char))
+}
+
+/// `(declare-equiv-charset DIMENSION CHARS CH CHARSET)` -- declare an
+/// equivalent charset mapping tuple.
+pub(crate) fn builtin_declare_equiv_charset(args: Vec<Value>) -> EvalResult {
+    expect_args("declare-equiv-charset", &args, 4)?;
+    let _charset = require_known_charset(&args[3])?;
+    let dimension = expect_fixnump(&args[0])?;
+    let chars = expect_fixnump(&args[1])?;
+    let _ch = encode_char_input(&args[2])?;
+    if !matches!(dimension, 1..=3) {
+        return Err(signal(
+            "error",
+            vec![Value::string(format!(
+                "Invalid DIMENSION {dimension}, it should be 1, 2, or 3"
+            ))],
+        ));
+    }
+    if !matches!(chars, 94 | 96) {
+        return Err(signal(
+            "error",
+            vec![Value::string(format!(
+                "Invalid CHARS {chars}, it should be 94 or 96"
+            ))],
+        ));
+    }
+    Ok(Value::Nil)
+}
+
+/// `(define-charset-alias ALIAS CHARSET)` -- add ALIAS for CHARSET.
+pub(crate) fn builtin_define_charset_alias(args: Vec<Value>) -> EvalResult {
+    expect_args("define-charset-alias", &args, 2)?;
+    let target = require_known_charset(&args[1])?;
+    if let Value::Symbol(alias) = &args[0] {
+        let mut reg = global_registry().lock().expect("poisoned");
+        reg.define_alias(alias, &target);
+    }
+    Ok(Value::Nil)
 }
 
 /// `(find-charset-string STR &optional TABLE)` -- returns a list of charsets
@@ -1458,6 +1511,58 @@ mod tests {
         let bad_chars = builtin_get_unused_iso_final_char(vec![Value::Int(1), Value::Int(0)])
             .expect_err("chars 0 should error");
         assert!(matches!(bad_chars, Flow::Signal(_)));
+    }
+
+    #[test]
+    fn declare_equiv_charset_validates_and_accepts_valid_tuple() {
+        assert!(builtin_declare_equiv_charset(vec![
+            Value::Int(1),
+            Value::Int(94),
+            Value::Int(65),
+            Value::symbol("ascii"),
+        ])
+        .is_ok());
+
+        assert!(builtin_declare_equiv_charset(vec![
+            Value::Int(0),
+            Value::Int(94),
+            Value::Int(65),
+            Value::symbol("ascii"),
+        ])
+        .is_err());
+        assert!(builtin_declare_equiv_charset(vec![
+            Value::Int(1),
+            Value::Int(0),
+            Value::Int(65),
+            Value::symbol("ascii"),
+        ])
+        .is_err());
+        assert!(builtin_declare_equiv_charset(vec![
+            Value::Int(1),
+            Value::Int(94),
+            Value::symbol("A"),
+            Value::symbol("ascii"),
+        ])
+        .is_err());
+    }
+
+    #[test]
+    fn define_charset_alias_adds_symbol_alias_only() {
+        assert!(builtin_define_charset_alias(vec![
+            Value::symbol("latin-1"),
+            Value::symbol("latin-iso8859-1"),
+        ])
+        .is_ok());
+        assert!(builtin_charsetp(vec![Value::symbol("latin-1")])
+            .expect("charsetp latin-1")
+            .is_truthy());
+        assert_eq!(
+            builtin_charset_id_internal(vec![Value::symbol("latin-1")]).expect("id latin-1"),
+            Value::Int(5)
+        );
+
+        // Non-symbol aliases are accepted but do not register a new symbol alias.
+        assert!(builtin_define_charset_alias(vec![Value::Int(1), Value::symbol("ascii")]).is_ok());
     }
 
     // -----------------------------------------------------------------------

@@ -440,9 +440,13 @@ fn subr_arity_value(name: &str) -> Value {
         | "encode-sjis-char"
         | "native-comp-function-p" => arity_cons(1, Some(1)),
         "char-charset" => arity_cons(1, Some(2)),
-        "char-table-extra-slot" | "char-table-range" | "get-unused-iso-final-char" => {
+        "char-table-extra-slot"
+        | "char-table-range"
+        | "define-charset-alias"
+        | "get-unused-iso-final-char" => {
             arity_cons(2, Some(2))
         }
+        "declare-equiv-charset" => arity_cons(4, Some(4)),
         "decode-char" => arity_cons(2, Some(2)),
         "fceiling" | "ffloor" | "frexp" | "fround" | "framep" | "ftruncate" | "fixnump" => {
             arity_cons(1, Some(1))
@@ -2186,6 +2190,8 @@ mod tests {
         assert_subr_arity("charset-id-internal", 0, Some(1));
         assert_subr_arity("charset-plist", 1, Some(1));
         assert_subr_arity("charset-priority-list", 0, Some(1));
+        assert_subr_arity("define-charset-alias", 2, Some(2));
+        assert_subr_arity("declare-equiv-charset", 4, Some(4));
         assert_subr_arity("decode-big5-char", 1, Some(1));
         assert_subr_arity("decode-sjis-char", 1, Some(1));
         assert_subr_arity("encode-big5-char", 1, Some(1));

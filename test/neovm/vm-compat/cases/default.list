@@ -650,6 +650,7 @@ cases/charset-plist-error-semantics
 cases/charset-priority-semantics
 cases/charset-id-internal-semantics
 cases/charset-internal-arity-semantics
+cases/charset-alias-declare-equiv-semantics
 cases/charset-encode-decode-semantics
 cases/find-charset-string-semantics
 cases/charset-region-after-semantics
