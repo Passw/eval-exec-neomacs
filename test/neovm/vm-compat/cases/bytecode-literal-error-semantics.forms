@@ -112,3 +112,11 @@
 (condition-case err
     (funcall (car (read-from-string "#[nil \"\\300\\62\\11\\0\\301\\302\\303\\42\\60\\207\" [a throw b 7] 3]")))
   (error err))
+
+(condition-case err
+    (funcall (car (read-from-string "#[(x) \"\\10\\100\\207\" [x] 1]")) 1)
+  (error err))
+
+(condition-case err
+    (funcall (car (read-from-string "#[(x) \"\\10\\101\\207\" [x] 1]")) 1)
+  (error err))

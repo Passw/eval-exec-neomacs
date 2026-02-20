@@ -26,3 +26,5 @@
 26	(condition-case err (funcall (car (read-from-string "#[nil \"\\300\\40\\207\" [car] 1]"))) (error err))	OK (wrong-number-of-arguments #<subr car> 0)
 27	(condition-case err (funcall (car (read-from-string "#[(x y) \"\\302\\10\\11\\42\\207\" [x y car] 3]")) 1 2) (error err))	OK (wrong-number-of-arguments #<subr car> 2)
 28	(condition-case err (funcall (car (read-from-string "#[nil \"\\300\\62\\11\\0\\301\\302\\303\\42\\60\\207\" [a throw b 7] 3]"))) (error err))	OK (no-catch b 7)
+29	(condition-case err (funcall (car (read-from-string "#[(x) \"\\10\\100\\207\" [x] 1]")) 1) (error err))	OK (wrong-type-argument listp 1)
+30	(condition-case err (funcall (car (read-from-string "#[(x) \"\\10\\101\\207\" [x] 1]")) 1) (error err))	OK (wrong-type-argument listp 1)

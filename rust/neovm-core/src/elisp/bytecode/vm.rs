@@ -411,11 +411,13 @@ impl<'a> Vm<'a> {
                 // -- List operations --
                 Op::Car => {
                     let val = stack.pop().unwrap_or(Value::Nil);
-                    stack.push(car(&val));
+                    let result = self.dispatch_vm_builtin("car", vec![val])?;
+                    stack.push(result);
                 }
                 Op::Cdr => {
                     let val = stack.pop().unwrap_or(Value::Nil);
-                    stack.push(cdr(&val));
+                    let result = self.dispatch_vm_builtin("cdr", vec![val])?;
+                    stack.push(result);
                 }
                 Op::CarSafe => {
                     let val = stack.pop().unwrap_or(Value::Nil);
@@ -1362,24 +1364,6 @@ fn num_cmp(a: &Value, b: &Value) -> Result<i32, Flow> {
     }
 }
 
-// -- List helpers --
-
-fn car(val: &Value) -> Value {
-    match val {
-        Value::Cons(c) => c.lock().expect("poisoned").car.clone(),
-        Value::Nil => Value::Nil,
-        _ => Value::Nil,
-    }
-}
-
-fn cdr(val: &Value) -> Value {
-    match val {
-        Value::Cons(c) => c.lock().expect("poisoned").cdr.clone(),
-        Value::Nil => Value::Nil,
-        _ => Value::Nil,
-    }
-}
-
 fn length_value(val: &Value) -> EvalResult {
     match val {
         Value::Nil => Ok(Value::Int(0)),
@@ -1829,6 +1813,27 @@ mod tests {
 
     #[test]
     fn vm_list_lookup_type_errors_match_oracle() {
+        let car_err = vm_eval("(car 1)").expect_err("car must type-check list");
+        match car_err {
+            EvalError::Signal { symbol, data } => {
+                assert_eq!(symbol, "wrong-type-argument");
+                assert_eq!(data, vec![Value::symbol("listp"), Value::Int(1)]);
+            }
+            other => panic!("unexpected error: {other:?}"),
+        }
+
+        let cdr_err = vm_eval("(cdr 1)").expect_err("cdr must type-check list");
+        match cdr_err {
+            EvalError::Signal { symbol, data } => {
+                assert_eq!(symbol, "wrong-type-argument");
+                assert_eq!(data, vec![Value::symbol("listp"), Value::Int(1)]);
+            }
+            other => panic!("unexpected error: {other:?}"),
+        }
+
+        assert_eq!(vm_eval("(car-safe 1)").expect("car-safe should be nil"), Value::Nil);
+        assert_eq!(vm_eval("(cdr-safe 1)").expect("cdr-safe should be nil"), Value::Nil);
+
         let nth_int_err = vm_eval("(nth 'a '(1 2 3))").expect_err("nth must type-check index");
         match nth_int_err {
             EvalError::Signal { symbol, data } => {
