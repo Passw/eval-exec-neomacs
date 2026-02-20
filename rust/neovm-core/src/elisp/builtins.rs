@@ -12389,6 +12389,19 @@ pub(crate) fn dispatch_builtin(
         "hash-table-rehash-threshold" => super::hashtab::builtin_hash_table_rehash_threshold(args),
         "hash-table-weakness" => super::hashtab::builtin_hash_table_weakness(args),
         "copy-hash-table" => super::hashtab::builtin_copy_hash_table(args),
+        "sxhash-eq" => super::hashtab::builtin_sxhash_eq(args),
+        "sxhash-eql" => super::hashtab::builtin_sxhash_eql(args),
+        "sxhash-equal" => super::hashtab::builtin_sxhash_equal(args),
+        "sxhash-equal-including-properties" => {
+            super::hashtab::builtin_sxhash_equal_including_properties(args)
+        }
+        "internal--hash-table-buckets" => super::hashtab::builtin_internal_hash_table_buckets(args),
+        "internal--hash-table-histogram" => {
+            super::hashtab::builtin_internal_hash_table_histogram(args)
+        }
+        "internal--hash-table-index-size" => {
+            super::hashtab::builtin_internal_hash_table_index_size(args)
+        }
 
         // Threading (pure)
         // Misc (pure)
@@ -12418,6 +12431,26 @@ pub(crate) fn dispatch_builtin(
         "set-coding-system-priority" => {
             super::coding::builtin_set_coding_system_priority(&mut eval.coding_systems, args)
         }
+        "set-keyboard-coding-system-internal" => {
+            super::coding::builtin_set_keyboard_coding_system_internal(
+                &mut eval.coding_systems,
+                args,
+            )
+        }
+        "set-safe-terminal-coding-system-internal" => {
+            super::coding::builtin_set_safe_terminal_coding_system_internal(
+                &mut eval.coding_systems,
+                args,
+            )
+        }
+        "set-terminal-coding-system-internal" => {
+            super::coding::builtin_set_terminal_coding_system_internal(
+                &mut eval.coding_systems,
+                args,
+            )
+        }
+        "set-text-conversion-style" => super::coding::builtin_set_text_conversion_style(args),
+        "text-quoting-style" => super::coding::builtin_text_quoting_style(args),
         "locale-info" => super::misc::builtin_locale_info(args),
         // Reader/printer (pure)
         "y-or-n-p" => super::reader::builtin_y_or_n_p(eval, args),

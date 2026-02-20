@@ -1328,6 +1328,56 @@ pub(crate) fn builtin_set_terminal_coding_system(
     Ok(Value::Nil)
 }
 
+/// `(set-keyboard-coding-system-internal CODING-SYSTEM &optional TERMINAL)` --
+/// internal keyboard coding setter. Mirrors the surface validation but always
+/// returns nil.
+pub(crate) fn builtin_set_keyboard_coding_system_internal(
+    mgr: &mut CodingSystemManager,
+    args: Vec<Value>,
+) -> EvalResult {
+    expect_min_args("set-keyboard-coding-system-internal", &args, 1)?;
+    expect_max_args("set-keyboard-coding-system-internal", &args, 2)?;
+    let _ = builtin_set_keyboard_coding_system(mgr, args)?;
+    Ok(Value::Nil)
+}
+
+/// `(set-terminal-coding-system-internal CODING-SYSTEM &optional TERMINAL)` --
+/// internal terminal coding setter.
+pub(crate) fn builtin_set_terminal_coding_system_internal(
+    mgr: &mut CodingSystemManager,
+    args: Vec<Value>,
+) -> EvalResult {
+    expect_min_args("set-terminal-coding-system-internal", &args, 1)?;
+    expect_max_args("set-terminal-coding-system-internal", &args, 2)?;
+    let _ = builtin_set_terminal_coding_system(mgr, args)?;
+    Ok(Value::Nil)
+}
+
+/// `(set-safe-terminal-coding-system-internal CODING-SYSTEM)` -- internal safe
+/// terminal coding setter.
+pub(crate) fn builtin_set_safe_terminal_coding_system_internal(
+    mgr: &mut CodingSystemManager,
+    args: Vec<Value>,
+) -> EvalResult {
+    expect_args("set-safe-terminal-coding-system-internal", &args, 1)?;
+    let _ = builtin_set_terminal_coding_system(mgr, args)?;
+    Ok(Value::Nil)
+}
+
+/// `(text-quoting-style)` -- return current text quoting style.
+pub(crate) fn builtin_text_quoting_style(args: Vec<Value>) -> EvalResult {
+    expect_args("text-quoting-style", &args, 0)?;
+    Ok(Value::symbol("curve"))
+}
+
+/// `(set-text-conversion-style STYLE &optional WHERE)` -- set conversion style.
+/// NeoVM currently accepts all values and returns nil.
+pub(crate) fn builtin_set_text_conversion_style(args: Vec<Value>) -> EvalResult {
+    expect_min_args("set-text-conversion-style", &args, 1)?;
+    expect_max_args("set-text-conversion-style", &args, 2)?;
+    Ok(Value::Nil)
+}
+
 /// `(coding-system-priority-list &optional HIGHESTP)` -- return the current
 /// priority list of coding systems for detection. If HIGHESTP is non-nil,
 /// return only the highest-priority system.
@@ -2581,5 +2631,53 @@ mod tests {
             Err(Flow::Signal(sig)) => assert_eq!(sig.symbol, "wrong-type-argument"),
             other => panic!("expected wrong-type-argument signal, got {other:?}"),
         }
+    }
+
+    #[test]
+    fn internal_coding_system_setters_match_surface_validation() {
+        let mut m = mgr();
+        assert_eq!(
+            builtin_set_keyboard_coding_system_internal(&mut m, vec![Value::symbol("utf-8")])
+                .unwrap(),
+            Value::Nil
+        );
+        assert_eq!(
+            builtin_set_terminal_coding_system_internal(&mut m, vec![Value::symbol("utf-8")])
+                .unwrap(),
+            Value::Nil
+        );
+        assert_eq!(
+            builtin_set_safe_terminal_coding_system_internal(&mut m, vec![Value::symbol("utf-8")])
+                .unwrap(),
+            Value::Nil
+        );
+        assert!(builtin_set_keyboard_coding_system_internal(&mut m, vec![Value::symbol("foo")])
+            .is_err());
+        assert!(builtin_set_terminal_coding_system_internal(&mut m, vec![Value::symbol("foo")])
+            .is_err());
+        assert!(
+            builtin_set_safe_terminal_coding_system_internal(&mut m, vec![Value::symbol("foo")])
+                .is_err()
+        );
+    }
+
+    #[test]
+    fn text_quoting_and_conversion_style_basics() {
+        assert_eq!(
+            builtin_text_quoting_style(vec![]).expect("text-quoting-style"),
+            Value::symbol("curve")
+        );
+        assert!(builtin_text_quoting_style(vec![Value::Nil]).is_err());
+        assert_eq!(
+            builtin_set_text_conversion_style(vec![Value::symbol("latin-1")])
+                .expect("set-text-conversion-style"),
+            Value::Nil
+        );
+        assert_eq!(
+            builtin_set_text_conversion_style(vec![Value::symbol("foo"), Value::symbol("bar")])
+                .expect("set-text-conversion-style 2 args"),
+            Value::Nil
+        );
+        assert!(builtin_set_text_conversion_style(vec![]).is_err());
     }
 }

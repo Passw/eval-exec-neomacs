@@ -822,3 +822,4 @@ cases/search-posix-write-plist-default-hash-purecopy-semantics
 cases/scroll-frame-visibility-wrapper-semantics
 cases/scroll-horizontal-other-window-semantics
 cases/charset-big5-sjis-iso-final-semantics
+cases/hash-coding-internal-sxhash-semantics

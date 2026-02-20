@@ -489,7 +489,16 @@ fn subr_arity_value(name: &str) -> Value {
         "insert-register" | "point-to-register" => arity_cons(1, Some(2)),
         "insert-byte" => arity_cons(2, Some(3)),
         "insert-char" => arity_cons(1, Some(3)),
-        "hash-table-p" | "clrhash" | "hash-table-count" => arity_cons(1, Some(1)),
+        "hash-table-p"
+        | "clrhash"
+        | "hash-table-count"
+        | "internal--hash-table-buckets"
+        | "internal--hash-table-histogram"
+        | "internal--hash-table-index-size"
+        | "sxhash-eq"
+        | "sxhash-eql"
+        | "sxhash-equal"
+        | "sxhash-equal-including-properties" => arity_cons(1, Some(1)),
         "gethash" => arity_cons(2, Some(3)),
         "puthash" => arity_cons(3, Some(3)),
         "remhash" | "maphash" => arity_cons(2, Some(2)),
@@ -915,8 +924,13 @@ fn subr_arity_value(name: &str) -> Value {
         "set-file-modes" => arity_cons(2, Some(3)),
         "set-file-acl" | "set-file-selinux-context" => arity_cons(2, Some(2)),
         "set-file-times" => arity_cons(1, Some(3)),
-        "set-keyboard-coding-system" | "set-match-data" => arity_cons(1, Some(2)),
+        "set-keyboard-coding-system"
+        | "set-keyboard-coding-system-internal"
+        | "set-match-data"
+        | "set-text-conversion-style" => arity_cons(1, Some(2)),
         "set-terminal-coding-system" => arity_cons(1, Some(3)),
+        "set-terminal-coding-system-internal" => arity_cons(1, Some(2)),
+        "set-safe-terminal-coding-system-internal" => arity_cons(1, Some(1)),
         "set-visited-file-modtime" | "verify-visited-file-modtime" => arity_cons(0, Some(1)),
         "visited-file-modtime" => arity_cons(0, Some(0)),
         "scan-lists" => arity_cons(3, Some(3)),
@@ -989,6 +1003,7 @@ fn subr_arity_value(name: &str) -> Value {
         | "get-internal-run-time"
         | "invocation-directory"
         | "invocation-name" => arity_cons(0, Some(0)),
+        "text-quoting-style" => arity_cons(0, Some(0)),
         "daemon-initialized" | "daemonp" => arity_cons(0, Some(0)),
         "category-table" | "clear-buffer-auto-save-failure" | "clear-charset-maps" => {
             arity_cons(0, Some(0))
@@ -2987,11 +3002,15 @@ mod tests {
         assert_subr_arity("set-file-selinux-context", 2, Some(2));
         assert_subr_arity("set-file-times", 1, Some(3));
         assert_subr_arity("set-keyboard-coding-system", 1, Some(2));
+        assert_subr_arity("set-keyboard-coding-system-internal", 1, Some(2));
         assert_subr_arity("set-keymap-parent", 2, Some(2));
         assert_subr_arity("set-match-data", 1, Some(2));
+        assert_subr_arity("set-safe-terminal-coding-system-internal", 1, Some(1));
         assert_subr_arity("set-standard-case-table", 1, Some(1));
         assert_subr_arity("set-syntax-table", 1, Some(1));
         assert_subr_arity("set-terminal-coding-system", 1, Some(3));
+        assert_subr_arity("set-terminal-coding-system-internal", 1, Some(2));
+        assert_subr_arity("set-text-conversion-style", 1, Some(2));
         assert_subr_arity("set-time-zone-rule", 1, Some(1));
         assert_subr_arity("set-visited-file-modtime", 0, Some(1));
         assert_subr_arity("set-window-dedicated-p", 2, Some(2));
@@ -3168,6 +3187,13 @@ mod tests {
         assert_subr_arity("hash-table-rehash-size", 1, Some(1));
         assert_subr_arity("hash-table-rehash-threshold", 1, Some(1));
         assert_subr_arity("hash-table-weakness", 1, Some(1));
+        assert_subr_arity("internal--hash-table-buckets", 1, Some(1));
+        assert_subr_arity("internal--hash-table-histogram", 1, Some(1));
+        assert_subr_arity("internal--hash-table-index-size", 1, Some(1));
+        assert_subr_arity("sxhash-eq", 1, Some(1));
+        assert_subr_arity("sxhash-eql", 1, Some(1));
+        assert_subr_arity("sxhash-equal", 1, Some(1));
+        assert_subr_arity("sxhash-equal-including-properties", 1, Some(1));
     }
 
     #[test]
@@ -3218,6 +3244,7 @@ mod tests {
         assert_subr_arity("ldexp", 2, Some(2));
         assert_subr_arity("logb", 1, Some(1));
         assert_subr_arity("logcount", 1, Some(1));
+        assert_subr_arity("text-quoting-style", 0, Some(0));
         assert_subr_arity("lognot", 1, Some(1));
         assert_subr_arity("ngettext", 3, Some(3));
         assert_subr_arity("substring-no-properties", 1, Some(3));

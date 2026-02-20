@@ -8,7 +8,10 @@
 //! - `mapatoms`, `unintern`
 
 use super::error::{signal, EvalResult, Flow};
+use super::print::print_value;
 use super::value::*;
+use std::collections::{hash_map::DefaultHasher, BTreeMap};
+use std::hash::{Hash, Hasher};
 
 // ---------------------------------------------------------------------------
 // Argument helpers
@@ -74,6 +77,132 @@ fn hash_key_to_value(key: &HashKey) -> Value {
         HashKey::Frame(id) => Value::Frame(*id),
         HashKey::Ptr(_) => Value::Nil, // can't reconstruct from pointer
     }
+}
+
+fn hash_value_for_equal(value: &Value, hasher: &mut DefaultHasher, depth: usize) {
+    if depth > 4096 {
+        0_u8.hash(hasher);
+        return;
+    }
+    match value {
+        Value::Nil => 0_u8.hash(hasher),
+        Value::True => 1_u8.hash(hasher),
+        Value::Int(n) => {
+            // `equal` treats chars and ints with same codepoint as equal.
+            2_u8.hash(hasher);
+            n.hash(hasher);
+        }
+        Value::Char(c) => {
+            2_u8.hash(hasher);
+            (*c as i64).hash(hasher);
+        }
+        Value::Float(f) => {
+            3_u8.hash(hasher);
+            f.to_bits().hash(hasher);
+        }
+        Value::Symbol(s) => {
+            4_u8.hash(hasher);
+            s.hash(hasher);
+        }
+        Value::Keyword(s) => {
+            5_u8.hash(hasher);
+            s.hash(hasher);
+        }
+        Value::Str(s) => {
+            6_u8.hash(hasher);
+            s.hash(hasher);
+        }
+        Value::Cons(cons) => {
+            7_u8.hash(hasher);
+            let pair = cons.lock().expect("poisoned");
+            hash_value_for_equal(&pair.car, hasher, depth + 1);
+            hash_value_for_equal(&pair.cdr, hasher, depth + 1);
+        }
+        Value::Vector(vec) => {
+            8_u8.hash(hasher);
+            let items = vec.lock().expect("poisoned");
+            items.len().hash(hasher);
+            for item in items.iter() {
+                hash_value_for_equal(item, hasher, depth + 1);
+            }
+        }
+        Value::Window(id) => {
+            9_u8.hash(hasher);
+            id.hash(hasher);
+        }
+        Value::Frame(id) => {
+            10_u8.hash(hasher);
+            id.hash(hasher);
+        }
+        Value::Buffer(id) => {
+            11_u8.hash(hasher);
+            id.0.hash(hasher);
+        }
+        Value::Timer(id) => {
+            12_u8.hash(hasher);
+            id.hash(hasher);
+        }
+        Value::Subr(name) => {
+            13_u8.hash(hasher);
+            name.hash(hasher);
+        }
+        Value::Lambda(lambda) => {
+            14_u8.hash(hasher);
+            (std::sync::Arc::as_ptr(lambda) as usize).hash(hasher);
+        }
+        Value::Macro(macro_fn) => {
+            15_u8.hash(hasher);
+            (std::sync::Arc::as_ptr(macro_fn) as usize).hash(hasher);
+        }
+        Value::HashTable(table) => {
+            16_u8.hash(hasher);
+            (std::sync::Arc::as_ptr(table) as usize).hash(hasher);
+        }
+        Value::ByteCode(bytecode) => {
+            17_u8.hash(hasher);
+            (std::sync::Arc::as_ptr(bytecode) as usize).hash(hasher);
+        }
+    }
+}
+
+fn sxhash_for(value: &Value, test: HashTableTest) -> i64 {
+    let mut hasher = DefaultHasher::new();
+    match test {
+        HashTableTest::Equal => hash_value_for_equal(value, &mut hasher, 0),
+        _ => value.to_hash_key(&test).hash(&mut hasher),
+    }
+    // Emacs returns fixnums; keep the top bit clear to stay non-negative.
+    (hasher.finish() & (i64::MAX as u64)) as i64
+}
+
+fn internal_hash_table_index_size(table: &LispHashTable) -> usize {
+    let requested = if table.size <= 0 {
+        1_u64
+    } else {
+        (table.size as u64).saturating_add(1)
+    };
+    let from_entries = (table.data.len() as u64).saturating_add(1);
+    let needed = requested.max(from_entries);
+    let pow2 = needed.next_power_of_two();
+    pow2.min(usize::MAX as u64) as usize
+}
+
+fn internal_hash_table_nonempty_buckets(table: &LispHashTable) -> Vec<Vec<(Value, Value)>> {
+    if table.data.is_empty() {
+        return Vec::new();
+    }
+    let bucket_count = internal_hash_table_index_size(table).max(1);
+    let mut buckets: Vec<Vec<(Value, Value)>> = vec![Vec::new(); bucket_count];
+    for (key, value) in &table.data {
+        let mut hasher = DefaultHasher::new();
+        key.hash(&mut hasher);
+        let index = (hasher.finish() as usize) % bucket_count;
+        buckets[index].push((hash_key_to_value(key), value.clone()));
+    }
+    for bucket in &mut buckets {
+        bucket.sort_by_key(|(key, value)| (print_value(key), print_value(value)));
+    }
+    buckets.into_iter().filter(|bucket| !bucket.is_empty()).collect()
 }
 
 // ---------------------------------------------------------------------------
@@ -210,6 +339,108 @@ pub(crate) fn builtin_hash_table_values(args: Vec<Value>) -> EvalResult {
             let table = ht.lock().expect("poisoned");
             let values: Vec<Value> = table.data.values().cloned().collect();
             Ok(Value::list(values))
+        }
+        other => Err(signal(
+            "wrong-type-argument",
+            vec![Value::symbol("hash-table-p"), other.clone()],
+        )),
+    }
+}
+
+/// `(sxhash-eq OBJECT)` -- hash OBJECT according to `eq` semantics.
+pub(crate) fn builtin_sxhash_eq(args: Vec<Value>) -> EvalResult {
+    expect_args("sxhash-eq", &args, 1)?;
+    Ok(Value::Int(sxhash_for(&args[0], HashTableTest::Eq)))
+}
+
+/// `(sxhash-eql OBJECT)` -- hash OBJECT according to `eql` semantics.
+pub(crate) fn builtin_sxhash_eql(args: Vec<Value>) -> EvalResult {
+    expect_args("sxhash-eql", &args, 1)?;
+    Ok(Value::Int(sxhash_for(&args[0], HashTableTest::Eql)))
+}
+
+/// `(sxhash-equal OBJECT)` -- hash OBJECT according to `equal` semantics.
+pub(crate) fn builtin_sxhash_equal(args: Vec<Value>) -> EvalResult {
+    expect_args("sxhash-equal", &args, 1)?;
+    Ok(Value::Int(sxhash_for(&args[0], HashTableTest::Equal)))
+}
+
+/// `(sxhash-equal-including-properties OBJECT)` -- hash OBJECT like
+/// `equal-including-properties`. NeoVM currently has no text properties, so
+/// this matches `sxhash-equal`.
+pub(crate) fn builtin_sxhash_equal_including_properties(args: Vec<Value>) -> EvalResult {
+    expect_args("sxhash-equal-including-properties", &args, 1)?;
+    Ok(Value::Int(sxhash_for(&args[0], HashTableTest::Equal)))
+}
+
+/// `(internal--hash-table-index-size TABLE)` -- report hash index width.
+pub(crate) fn builtin_internal_hash_table_index_size(args: Vec<Value>) -> EvalResult {
+    expect_args("internal--hash-table-index-size", &args, 1)?;
+    match &args[0] {
+        Value::HashTable(ht) => {
+            let table = ht.lock().expect("poisoned");
+            Ok(Value::Int(
+                internal_hash_table_index_size(&table)
+                    .min(i64::MAX as usize) as i64,
+            ))
+        }
+        other => Err(signal(
+            "wrong-type-argument",
+            vec![Value::symbol("hash-table-p"), other.clone()],
+        )),
+    }
+}
+
+/// `(internal--hash-table-buckets TABLE)` -- return non-empty bucket alists.
+pub(crate) fn builtin_internal_hash_table_buckets(args: Vec<Value>) -> EvalResult {
+    expect_args("internal--hash-table-buckets", &args, 1)?;
+    match &args[0] {
+        Value::HashTable(ht) => {
+            let table = ht.lock().expect("poisoned");
+            let buckets = internal_hash_table_nonempty_buckets(&table);
+            if buckets.is_empty() {
+                return Ok(Value::Nil);
+            }
+            let rendered = buckets
+                .into_iter()
+                .map(|bucket| {
+                    let alist_items: Vec<Value> = bucket
+                        .into_iter()
+                        .map(|(key, value)| Value::cons(key, value))
+                        .collect();
+                    Value::list(alist_items)
+                })
+                .collect();
+            Ok(Value::list(rendered))
+        }
+        other => Err(signal(
+            "wrong-type-argument",
+            vec![Value::symbol("hash-table-p"), other.clone()],
+        )),
+    }
+}
+
+/// `(internal--hash-table-histogram TABLE)` -- return (bucket-size . count)
+/// alist for non-empty buckets.
+pub(crate) fn builtin_internal_hash_table_histogram(args: Vec<Value>) -> EvalResult {
+    expect_args("internal--hash-table-histogram", &args, 1)?;
+    match &args[0] {
+        Value::HashTable(ht) => {
+            let table = ht.lock().expect("poisoned");
+            let buckets = internal_hash_table_nonempty_buckets(&table);
+            if buckets.is_empty() {
+                return Ok(Value::Nil);
+            }
+            let mut histogram: BTreeMap<i64, i64> = BTreeMap::new();
+            for bucket in buckets {
+                let size = bucket.len() as i64;
+                *histogram.entry(size).or_insert(0) += 1;
+            }
+            let entries: Vec<Value> = histogram
+                .into_iter()
+                .map(|(size, count)| Value::cons(Value::Int(size), Value::Int(count)))
+                .collect();
+            Ok(Value::list(entries))
         }
         other => Err(signal(
             "wrong-type-argument",
@@ -366,5 +597,81 @@ mod tests {
             Value::Float(1.5),
         ])
         .is_ok());
+    }
+
+    #[test]
+    fn sxhash_variants_return_fixnums_and_preserve_hash_contracts() {
+        assert!(matches!(
+            builtin_sxhash_eq(vec![Value::symbol("foo")]),
+            Ok(Value::Int(_))
+        ));
+        assert!(matches!(
+            builtin_sxhash_eql(vec![Value::symbol("foo")]),
+            Ok(Value::Int(_))
+        ));
+        assert!(matches!(
+            builtin_sxhash_equal(vec![Value::symbol("foo")]),
+            Ok(Value::Int(_))
+        ));
+        assert!(matches!(
+            builtin_sxhash_equal_including_properties(vec![Value::symbol("foo")]),
+            Ok(Value::Int(_))
+        ));
+
+        let left = Value::string("x");
+        let right = Value::string("x");
+        assert_eq!(
+            builtin_sxhash_equal(vec![left.clone()]).unwrap(),
+            builtin_sxhash_equal(vec![right.clone()]).unwrap()
+        );
+        assert_eq!(
+            builtin_sxhash_equal_including_properties(vec![left]).unwrap(),
+            builtin_sxhash_equal_including_properties(vec![right]).unwrap()
+        );
+        assert_eq!(
+            builtin_sxhash_equal(vec![Value::list(vec![Value::Int(1), Value::Int(2)])]).unwrap(),
+            builtin_sxhash_equal(vec![Value::list(vec![Value::Int(1), Value::Int(2)])]).unwrap()
+        );
+    }
+
+    #[test]
+    fn internal_hash_table_introspection_empty_defaults() {
+        let table = builtin_make_hash_table(vec![]).unwrap();
+        assert_eq!(
+            builtin_internal_hash_table_buckets(vec![table.clone()]).unwrap(),
+            Value::Nil
+        );
+        assert_eq!(
+            builtin_internal_hash_table_histogram(vec![table.clone()]).unwrap(),
+            Value::Nil
+        );
+        assert_eq!(
+            builtin_internal_hash_table_index_size(vec![table]).unwrap(),
+            Value::Int(1)
+        );
+    }
+
+    #[test]
+    fn internal_hash_table_index_size_uses_declared_size() {
+        let table_one = builtin_make_hash_table(vec![Value::keyword(":size"), Value::Int(1)])
+            .expect("size 1 table");
+        assert_eq!(
+            builtin_internal_hash_table_index_size(vec![table_one]).unwrap(),
+            Value::Int(2)
+        );
+
+        let table_mid = builtin_make_hash_table(vec![Value::keyword(":size"), Value::Int(37)])
+            .expect("size 37 table");
+        assert_eq!(
+            builtin_internal_hash_table_index_size(vec![table_mid]).unwrap(),
+            Value::Int(64)
+        );
+    }
+
+    #[test]
+    fn internal_hash_table_introspection_type_errors() {
+        assert!(builtin_internal_hash_table_buckets(vec![Value::Nil]).is_err());
+        assert!(builtin_internal_hash_table_histogram(vec![Value::Nil]).is_err());
+        assert!(builtin_internal_hash_table_index_size(vec![Value::Nil]).is_err());
     }
 }
