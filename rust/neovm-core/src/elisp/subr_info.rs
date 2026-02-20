@@ -934,6 +934,7 @@ fn subr_arity_value(name: &str) -> Value {
         }
         "line-number-at-pos" => arity_cons(0, Some(2)),
         "line-pixel-height" | "long-line-optimizations-p" => arity_cons(0, Some(0)),
+        "scroll-left" | "scroll-right" => arity_cons(0, Some(2)),
         "recenter-top-bottom" => arity_cons(0, Some(1)),
         "recenter" => arity_cons(0, Some(2)),
         "recursion-depth" | "region-beginning" | "region-end" => arity_cons(0, Some(0)),
@@ -941,6 +942,7 @@ fn subr_arity_value(name: &str) -> Value {
             arity_cons(0, Some(2))
         }
         "next-window" | "previous-window" | "pos-visible-in-window-p" => arity_cons(0, Some(3)),
+        "other-window-for-scrolling" => arity_cons(0, Some(0)),
         "coordinates-in-window-p" => arity_cons(2, Some(2)),
         "pop-to-buffer" => arity_cons(1, Some(3)),
         "move-to-window-line" | "move-point-visually" => arity_cons(1, Some(1)),
@@ -2840,6 +2842,7 @@ mod tests {
         assert_subr_arity("newline-and-indent", 0, Some(1));
         assert_subr_arity("open-line", 1, Some(1));
         assert_subr_arity("other-window", 1, Some(3));
+        assert_subr_arity("other-window-for-scrolling", 0, Some(0));
         assert_subr_arity("goto-line", 1, Some(3));
         assert_subr_arity("flush-lines", 1, Some(4));
         assert_subr_arity("keep-lines", 1, Some(4));
@@ -3102,6 +3105,8 @@ mod tests {
         assert_subr_arity("save-buffer", 0, Some(1));
         assert_subr_arity("scroll-down", 0, Some(1));
         assert_subr_arity("scroll-down-command", 0, Some(1));
+        assert_subr_arity("scroll-left", 0, Some(2));
+        assert_subr_arity("scroll-right", 0, Some(2));
         assert_subr_arity("scroll-up", 0, Some(1));
         assert_subr_arity("scroll-up-command", 0, Some(1));
         assert_subr_arity("select-frame", 1, Some(2));

@@ -474,6 +474,8 @@ fn builtin_command_name(name: &str) -> bool {
             | "run-with-idle-timer"
             | "run-with-timer"
             | "scroll-down"
+            | "scroll-left"
+            | "scroll-right"
             | "search-backward"
             | "search-forward"
             | "scroll-up"
@@ -3340,6 +3342,8 @@ mod tests {
             "transpose-words",
             "scroll-up",
             "scroll-down",
+            "scroll-left",
+            "scroll-right",
             "scroll-up-command",
             "scroll-down-command",
             "recenter",

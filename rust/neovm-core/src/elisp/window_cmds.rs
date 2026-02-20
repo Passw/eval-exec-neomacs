@@ -1490,6 +1490,115 @@ pub(crate) fn builtin_set_window_hscroll(
     Ok(Value::Int(cols as i64))
 }
 
+fn scroll_prefix_value(value: &Value) -> i64 {
+    match value {
+        Value::Int(n) => *n,
+        Value::Float(f) => *f as i64,
+        Value::Char(c) => *c as i64,
+        Value::Symbol(s) if s == "-" => -1,
+        Value::Cons(cell) => {
+            let car = {
+                let pair = cell.lock().expect("poisoned");
+                pair.car.clone()
+            };
+            match car {
+                Value::Int(n) => n,
+                Value::Float(f) => f as i64,
+                Value::Char(c) => c as i64,
+                _ => 1,
+            }
+        }
+        _ => 1,
+    }
+}
+
+fn default_scroll_columns(eval: &super::eval::Evaluator, fid: FrameId, wid: WindowId) -> i64 {
+    let char_width = eval.frames.get(fid).map(|f| f.char_width).unwrap_or(8.0);
+    let window_cols = get_leaf(&eval.frames, fid, wid)
+        .ok()
+        .map(|leaf| {
+            if char_width > 0.0 {
+                (leaf.bounds().width / char_width).floor() as i64
+            } else {
+                80
+            }
+        })
+        .unwrap_or(80);
+    (window_cols - 2).max(1)
+}
+
+/// `(scroll-left &optional SET-MINIMUM ARG)` -> new horizontal scroll amount.
+pub(crate) fn builtin_scroll_left(
+    eval: &mut super::eval::Evaluator,
+    args: Vec<Value>,
+) -> EvalResult {
+    expect_max_args("scroll-left", &args, 2)?;
+    let _ = ensure_selected_frame_id(eval);
+    let (fid, wid) = resolve_window_id(eval, None)?;
+    let base = eval
+        .frames
+        .get(fid)
+        .and_then(|frame| frame.find_window(wid))
+        .and_then(|window| match window {
+            Window::Leaf { hscroll, .. } => Some(*hscroll as i64),
+            _ => None,
+        })
+        .unwrap_or(0);
+    let delta = match args.first() {
+        None | Some(Value::Nil) => default_scroll_columns(eval, fid, wid),
+        Some(value) => scroll_prefix_value(value),
+    };
+    let mut next = base as i128 + delta as i128;
+    if next < 0 {
+        next = 0;
+    }
+    let next = next.min(i64::MAX as i128) as i64;
+    if let Some(Window::Leaf { hscroll, .. }) = eval
+        .frames
+        .get_mut(fid)
+        .and_then(|frame| frame.find_window_mut(wid))
+    {
+        *hscroll = next as usize;
+    }
+    Ok(Value::Int(next))
+}
+
+/// `(scroll-right &optional SET-MINIMUM ARG)` -> new horizontal scroll amount.
+pub(crate) fn builtin_scroll_right(
+    eval: &mut super::eval::Evaluator,
+    args: Vec<Value>,
+) -> EvalResult {
+    expect_max_args("scroll-right", &args, 2)?;
+    let _ = ensure_selected_frame_id(eval);
+    let (fid, wid) = resolve_window_id(eval, None)?;
+    let base = eval
+        .frames
+        .get(fid)
+        .and_then(|frame| frame.find_window(wid))
+        .and_then(|window| match window {
+            Window::Leaf { hscroll, .. } => Some(*hscroll as i64),
+            _ => None,
+        })
+        .unwrap_or(0);
+    let delta = match args.first() {
+        None | Some(Value::Nil) => default_scroll_columns(eval, fid, wid),
+        Some(value) => scroll_prefix_value(value),
+    };
+    let mut next = base as i128 - delta as i128;
+    if next < 0 {
+        next = 0;
+    }
+    let next = next.min(i64::MAX as i128) as i64;
+    if let Some(Window::Leaf { hscroll, .. }) = eval
+        .frames
+        .get_mut(fid)
+        .and_then(|frame| frame.find_window_mut(wid))
+    {
+        *hscroll = next as usize;
+    }
+    Ok(Value::Int(next))
+}
+
 /// `(window-vscroll &optional WINDOW PIXELWISE)` -> integer.
 ///
 /// Batch-mode GNU Emacs reports zero vertical scroll, including for minibuffer
@@ -2388,6 +2497,32 @@ pub(crate) fn builtin_other_window(
         eval.buffers.set_current(buffer_id);
     }
     Ok(Value::Nil)
+}
+
+/// `(other-window-for-scrolling)` -> window object used for scrolling.
+pub(crate) fn builtin_other_window_for_scrolling(
+    eval: &mut super::eval::Evaluator,
+    args: Vec<Value>,
+) -> EvalResult {
+    expect_args("other-window-for-scrolling", &args, 0)?;
+    let fid = ensure_selected_frame_id(eval);
+    let frame = eval
+        .frames
+        .get(fid)
+        .ok_or_else(|| signal("error", vec![Value::string("No selected frame")]))?;
+    let windows = frame.window_list();
+    if windows.len() <= 1 {
+        return Err(signal(
+            "error",
+            vec![Value::string("There is no other window")],
+        ));
+    }
+    let selected = frame.selected_window;
+    let other = windows
+        .into_iter()
+        .find(|wid| *wid != selected)
+        .unwrap_or(selected);
+    Ok(window_value(other))
 }
 
 /// `(next-window &optional WINDOW MINIBUF ALL-FRAMES)` -> window object.

@@ -10944,10 +10944,15 @@ pub(crate) fn dispatch_builtin(
         }
         "scroll-up" => return Some(super::window_cmds::builtin_scroll_up(eval, args)),
         "scroll-down" => return Some(super::window_cmds::builtin_scroll_down(eval, args)),
+        "scroll-left" => return Some(super::window_cmds::builtin_scroll_left(eval, args)),
+        "scroll-right" => return Some(super::window_cmds::builtin_scroll_right(eval, args)),
         "recenter-top-bottom" => {
             return Some(super::window_cmds::builtin_recenter_top_bottom(eval, args))
         }
         "recenter" => return Some(super::window_cmds::builtin_recenter(eval, args)),
+        "other-window-for-scrolling" => {
+            return Some(super::window_cmds::builtin_other_window_for_scrolling(eval, args))
+        }
         "next-window" => return Some(super::window_cmds::builtin_next_window(eval, args)),
         "previous-window" => return Some(super::window_cmds::builtin_previous_window(eval, args)),
         "set-window-buffer" => {
