@@ -586,20 +586,14 @@ impl<'a> Vm<'a> {
                 Op::StringEqual => {
                     let b = stack.pop().unwrap_or(Value::Nil);
                     let a = stack.pop().unwrap_or(Value::Nil);
-                    let eq = match (a.as_str(), b.as_str()) {
-                        (Some(a), Some(b)) => a == b,
-                        _ => false,
-                    };
-                    stack.push(Value::bool(eq));
+                    let result = self.dispatch_vm_builtin("string=", vec![a, b])?;
+                    stack.push(result);
                 }
                 Op::StringLessp => {
                     let b = stack.pop().unwrap_or(Value::Nil);
                     let a = stack.pop().unwrap_or(Value::Nil);
-                    let lt = match (a.as_str(), b.as_str()) {
-                        (Some(a), Some(b)) => a < b,
-                        _ => false,
-                    };
-                    stack.push(Value::bool(lt));
+                    let result = self.dispatch_vm_builtin("string-lessp", vec![a, b])?;
+                    stack.push(result);
                 }
 
                 // -- Vector operations --
@@ -1767,6 +1761,28 @@ mod tests {
             EvalError::Signal { symbol, data } => {
                 assert_eq!(symbol, "wrong-number-of-arguments");
                 assert_eq!(data, vec![Value::Subr("car".to_string()), Value::Int(2)]);
+            }
+            other => panic!("unexpected error: {other:?}"),
+        }
+    }
+
+    #[test]
+    fn vm_string_compare_type_errors_match_oracle() {
+        let string_equal_err = vm_eval("(string= \"ab\" 1)").expect_err("string= must type-check");
+        match string_equal_err {
+            EvalError::Signal { symbol, data } => {
+                assert_eq!(symbol, "wrong-type-argument");
+                assert_eq!(data, vec![Value::symbol("stringp"), Value::Int(1)]);
+            }
+            other => panic!("unexpected error: {other:?}"),
+        }
+
+        let string_lessp_err =
+            vm_eval("(string-lessp \"ab\" 1)").expect_err("string-lessp must type-check");
+        match string_lessp_err {
+            EvalError::Signal { symbol, data } => {
+                assert_eq!(symbol, "wrong-type-argument");
+                assert_eq!(data, vec![Value::symbol("stringp"), Value::Int(1)]);
             }
             other => panic!("unexpected error: {other:?}"),
         }
