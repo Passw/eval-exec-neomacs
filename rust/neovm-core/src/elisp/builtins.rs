@@ -10936,6 +10936,18 @@ pub(crate) fn dispatch_builtin(
         }
         "select-window" => return Some(super::window_cmds::builtin_select_window(eval, args)),
         "other-window" => return Some(super::window_cmds::builtin_other_window(eval, args)),
+        "scroll-up-command" => {
+            return Some(super::window_cmds::builtin_scroll_up_command(eval, args))
+        }
+        "scroll-down-command" => {
+            return Some(super::window_cmds::builtin_scroll_down_command(eval, args))
+        }
+        "scroll-up" => return Some(super::window_cmds::builtin_scroll_up(eval, args)),
+        "scroll-down" => return Some(super::window_cmds::builtin_scroll_down(eval, args)),
+        "recenter-top-bottom" => {
+            return Some(super::window_cmds::builtin_recenter_top_bottom(eval, args))
+        }
+        "recenter" => return Some(super::window_cmds::builtin_recenter(eval, args)),
         "next-window" => return Some(super::window_cmds::builtin_next_window(eval, args)),
         "previous-window" => return Some(super::window_cmds::builtin_previous_window(eval, args)),
         "set-window-buffer" => {
@@ -10968,6 +10980,10 @@ pub(crate) fn dispatch_builtin(
         }
         "frame-list" => return Some(super::window_cmds::builtin_frame_list(eval, args)),
         "make-frame" => return Some(super::window_cmds::builtin_make_frame(eval, args)),
+        "make-frame-visible" => {
+            return Some(super::window_cmds::builtin_make_frame_visible(eval, args))
+        }
+        "iconify-frame" => return Some(super::window_cmds::builtin_iconify_frame(eval, args)),
         "delete-frame" => return Some(super::window_cmds::builtin_delete_frame(eval, args)),
         "frame-char-height" => return Some(super::window_cmds::builtin_frame_char_height(eval, args)),
         "frame-char-width" => return Some(super::window_cmds::builtin_frame_char_width(eval, args)),

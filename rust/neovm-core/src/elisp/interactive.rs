@@ -424,6 +424,7 @@ fn builtin_command_name(name: &str) -> bool {
             | "indent-to"
             | "insert-kbd-macro"
             | "insert-register"
+            | "iconify-frame"
             | "isearch-backward"
             | "isearch-forward"
             | "kbd-macro-query"
@@ -436,6 +437,7 @@ fn builtin_command_name(name: &str) -> bool {
             | "local-set-key"
             | "make-directory"
             | "make-frame"
+            | "make-frame-visible"
             | "make-local-variable"
             | "make-symbolic-link"
             | "make-variable-buffer-local"
@@ -455,6 +457,7 @@ fn builtin_command_name(name: &str) -> bool {
             | "posix-search-forward"
             | "query-replace"
             | "query-replace-regexp"
+            | "recenter"
             | "re-search-backward"
             | "re-search-forward"
             | "search-backward-regexp"
@@ -470,8 +473,10 @@ fn builtin_command_name(name: &str) -> bool {
             | "run-at-time"
             | "run-with-idle-timer"
             | "run-with-timer"
+            | "scroll-down"
             | "search-backward"
             | "search-forward"
+            | "scroll-up"
             | "set-file-modes"
             | "set-frame-height"
             | "set-frame-width"
@@ -3333,8 +3338,11 @@ mod tests {
             "delete-indentation",
             "indent-for-tab-command",
             "transpose-words",
+            "scroll-up",
+            "scroll-down",
             "scroll-up-command",
             "scroll-down-command",
+            "recenter",
             "recenter-top-bottom",
             "move-beginning-of-line",
             "move-end-of-line",
@@ -3362,8 +3370,10 @@ mod tests {
             "goto-char",
             "indent-region",
             "isearch-forward",
+            "iconify-frame",
             "list-processes",
             "make-directory",
+            "make-frame-visible",
             "query-replace",
             "re-search-forward",
             "select-frame",

@@ -819,3 +819,4 @@ cases/previous-char-single-property-wrapper-semantics
 cases/textprop-overlay-change-wrapper-semantics
 cases/pos-prefix-position-bytes-ngettext-terpri-memql-semantics
 cases/search-posix-write-plist-default-hash-purecopy-semantics
+cases/scroll-frame-visibility-wrapper-semantics

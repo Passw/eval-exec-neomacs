@@ -2746,6 +2746,111 @@ fn set_frame_text_size(frame: &mut crate::window::Frame, cols: i64, text_lines: 
 }
 
 // ===========================================================================
+// Scroll / frame visibility command shims
+// ===========================================================================
+
+fn recenter_missing_display_error() -> Flow {
+    signal(
+        "error",
+        vec![Value::string(
+            "‘recenter’ing a window that does not display current-buffer.",
+        )],
+    )
+}
+
+fn scroll_up_batch_error() -> Flow {
+    signal("end-of-buffer", vec![])
+}
+
+fn scroll_down_batch_error() -> Flow {
+    signal("beginning-of-buffer", vec![])
+}
+
+/// `(scroll-up-command &optional ARG)` -> signal `end-of-buffer` in batch mode.
+pub(crate) fn builtin_scroll_up_command(
+    _eval: &mut super::eval::Evaluator,
+    args: Vec<Value>,
+) -> EvalResult {
+    expect_max_args("scroll-up-command", &args, 1)?;
+    Err(scroll_up_batch_error())
+}
+
+/// `(scroll-down-command &optional ARG)` -> signal `beginning-of-buffer` in batch mode.
+pub(crate) fn builtin_scroll_down_command(
+    _eval: &mut super::eval::Evaluator,
+    args: Vec<Value>,
+) -> EvalResult {
+    expect_max_args("scroll-down-command", &args, 1)?;
+    Err(scroll_down_batch_error())
+}
+
+/// `(scroll-up &optional ARG)` -> command alias behavior.
+pub(crate) fn builtin_scroll_up(
+    _eval: &mut super::eval::Evaluator,
+    args: Vec<Value>,
+) -> EvalResult {
+    expect_max_args("scroll-up", &args, 1)?;
+    Err(scroll_up_batch_error())
+}
+
+/// `(scroll-down &optional ARG)` -> command alias behavior.
+pub(crate) fn builtin_scroll_down(
+    _eval: &mut super::eval::Evaluator,
+    args: Vec<Value>,
+) -> EvalResult {
+    expect_max_args("scroll-down", &args, 1)?;
+    Err(scroll_down_batch_error())
+}
+
+/// `(recenter-top-bottom &optional ARG)` -> signal no-window error in batch mode.
+pub(crate) fn builtin_recenter_top_bottom(
+    _eval: &mut super::eval::Evaluator,
+    args: Vec<Value>,
+) -> EvalResult {
+    expect_max_args("recenter-top-bottom", &args, 1)?;
+    Err(recenter_missing_display_error())
+}
+
+/// `(recenter &optional ARG REDISPLAY)` -> signal no-window error in batch mode.
+pub(crate) fn builtin_recenter(
+    _eval: &mut super::eval::Evaluator,
+    args: Vec<Value>,
+) -> EvalResult {
+    expect_max_args("recenter", &args, 2)?;
+    Err(recenter_missing_display_error())
+}
+
+/// `(iconify-frame &optional FRAME)` -> nil.
+pub(crate) fn builtin_iconify_frame(
+    eval: &mut super::eval::Evaluator,
+    args: Vec<Value>,
+) -> EvalResult {
+    expect_max_args("iconify-frame", &args, 1)?;
+    let fid = resolve_frame_id(eval, args.first(), "frame-live-p")?;
+    let frame = eval
+        .frames
+        .get_mut(fid)
+        .ok_or_else(|| signal("error", vec![Value::string("Frame not found")]))?;
+    frame.visible = false;
+    Ok(Value::Nil)
+}
+
+/// `(make-frame-visible &optional FRAME)` -> frame.
+pub(crate) fn builtin_make_frame_visible(
+    eval: &mut super::eval::Evaluator,
+    args: Vec<Value>,
+) -> EvalResult {
+    expect_max_args("make-frame-visible", &args, 1)?;
+    let fid = resolve_frame_id(eval, args.first(), "frame-live-p")?;
+    let frame = eval
+        .frames
+        .get_mut(fid)
+        .ok_or_else(|| signal("error", vec![Value::string("Frame not found")]))?;
+    frame.visible = true;
+    Ok(Value::Frame(frame.id.0))
+}
+
+// ===========================================================================
 // Frame operations
 // ===========================================================================
 

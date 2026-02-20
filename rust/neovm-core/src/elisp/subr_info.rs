@@ -760,7 +760,9 @@ fn subr_arity_value(name: &str) -> Value {
         "remove" | "remove-variable-watcher" | "narrow-to-region" => arity_cons(2, Some(2)),
         "remove-images" => arity_cons(2, Some(3)),
         "replace-regexp" | "replace-string" => arity_cons(2, Some(7)),
-        "save-buffer" | "scroll-down-command" | "scroll-up-command" => arity_cons(0, Some(1)),
+        "save-buffer" | "scroll-down" | "scroll-down-command" | "scroll-up" | "scroll-up-command" => {
+            arity_cons(0, Some(1))
+        }
         "load-average" => arity_cons(0, Some(1)),
         "select-window" | "minor-mode-key-binding" => arity_cons(1, Some(2)),
         "select-frame" => arity_cons(1, Some(2)),
@@ -933,6 +935,7 @@ fn subr_arity_value(name: &str) -> Value {
         "line-number-at-pos" => arity_cons(0, Some(2)),
         "line-pixel-height" | "long-line-optimizations-p" => arity_cons(0, Some(0)),
         "recenter-top-bottom" => arity_cons(0, Some(1)),
+        "recenter" => arity_cons(0, Some(2)),
         "recursion-depth" | "region-beginning" | "region-end" => arity_cons(0, Some(0)),
         "delete-frame" | "delete-other-windows" | "delete-other-windows-internal" => {
             arity_cons(0, Some(2))
@@ -942,7 +945,7 @@ fn subr_arity_value(name: &str) -> Value {
         "pop-to-buffer" => arity_cons(1, Some(3)),
         "move-to-window-line" | "move-point-visually" => arity_cons(1, Some(1)),
         "modify-frame-parameters" => arity_cons(2, Some(2)),
-        "make-frame" => arity_cons(0, Some(1)),
+        "make-frame" | "make-frame-visible" | "iconify-frame" => arity_cons(0, Some(1)),
         "get-unused-category" => arity_cons(0, Some(1)),
         "make-category-set"
         | "category-set-mnemonics"
@@ -2863,6 +2866,7 @@ mod tests {
         assert_subr_arity("read-key-sequence", 1, Some(6));
         assert_subr_arity("read-key-sequence-vector", 1, Some(6));
         assert_subr_arity("read-non-nil-coding-system", 1, Some(1));
+        assert_subr_arity("recenter", 0, Some(2));
         assert_subr_arity("recenter-top-bottom", 0, Some(1));
         assert_subr_arity("recursion-depth", 0, Some(0));
         assert_subr_arity("region-beginning", 0, Some(0));
@@ -2899,7 +2903,9 @@ mod tests {
         assert_subr_arity("move-to-window-line", 1, Some(1));
         assert_subr_arity("move-point-visually", 1, Some(1));
         assert_subr_arity("modify-frame-parameters", 2, Some(2));
+        assert_subr_arity("iconify-frame", 0, Some(1));
         assert_subr_arity("make-frame", 0, Some(1));
+        assert_subr_arity("make-frame-visible", 0, Some(1));
     }
 
     #[test]
@@ -3094,7 +3100,9 @@ mod tests {
         assert_subr_arity("replace-regexp", 2, Some(7));
         assert_subr_arity("replace-string", 2, Some(7));
         assert_subr_arity("save-buffer", 0, Some(1));
+        assert_subr_arity("scroll-down", 0, Some(1));
         assert_subr_arity("scroll-down-command", 0, Some(1));
+        assert_subr_arity("scroll-up", 0, Some(1));
         assert_subr_arity("scroll-up-command", 0, Some(1));
         assert_subr_arity("select-frame", 1, Some(2));
         assert_subr_arity("select-frame-set-input-focus", 1, Some(2));
