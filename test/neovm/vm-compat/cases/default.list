@@ -27,6 +27,7 @@ cases/autoload-callable-subr-semantics
 cases/symbol-function-error-paths
 cases/indirect-function-core
 cases/indirect-function-alias-chains
+cases/variable-alias-setplist-runtime-semantics
 cases/condition-case-unwind-introspection
 cases/backtrace-frame-semantics
 cases/backtrace-helper-wrapper-semantics

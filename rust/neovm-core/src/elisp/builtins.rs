@@ -3575,6 +3575,103 @@ fn expect_strict_string(value: &Value) -> Result<String, Flow> {
 // Symbol operations (need evaluator for obarray access)
 // ===========================================================================
 
+const VARIABLE_ALIAS_PROPERTY: &str = "neovm--variable-alias";
+const RAW_SYMBOL_PLIST_PROPERTY: &str = "neovm--raw-symbol-plist";
+
+fn is_internal_symbol_plist_property(property: &str) -> bool {
+    property == VARIABLE_ALIAS_PROPERTY || property == RAW_SYMBOL_PLIST_PROPERTY
+}
+
+fn resolve_variable_alias_name(eval: &super::eval::Evaluator, name: &str) -> Result<String, Flow> {
+    let mut current = name.to_string();
+    let mut seen = HashSet::new();
+
+    loop {
+        if !seen.insert(current.clone()) {
+            return Err(signal(
+                "cyclic-variable-indirection",
+                vec![Value::symbol(name)],
+            ));
+        }
+        let next = eval
+            .obarray()
+            .get_property(&current, VARIABLE_ALIAS_PROPERTY)
+            .and_then(|value| value.as_symbol_name())
+            .map(|value| value.to_string());
+        match next {
+            Some(next_name) => current = next_name,
+            None => return Ok(current),
+        }
+    }
+}
+
+fn would_create_variable_alias_cycle(eval: &super::eval::Evaluator, new: &str, old: &str) -> bool {
+    let mut current = old.to_string();
+    let mut seen = HashSet::new();
+
+    loop {
+        if current == new {
+            return true;
+        }
+        if !seen.insert(current.clone()) {
+            return true;
+        }
+        let next = eval
+            .obarray()
+            .get_property(&current, VARIABLE_ALIAS_PROPERTY)
+            .and_then(|value| value.as_symbol_name())
+            .map(|value| value.to_string());
+        match next {
+            Some(next_name) => current = next_name,
+            None => return false,
+        }
+    }
+}
+
+fn symbol_raw_plist_value(eval: &super::eval::Evaluator, name: &str) -> Option<Value> {
+    eval.obarray()
+        .get_property(name, RAW_SYMBOL_PLIST_PROPERTY)
+        .cloned()
+}
+
+fn set_symbol_raw_plist(eval: &mut super::eval::Evaluator, name: &str, plist: Value) {
+    let sym = eval.obarray_mut().get_or_intern(name);
+    let alias = sym.plist.get(VARIABLE_ALIAS_PROPERTY).cloned();
+    sym.plist.clear();
+    if let Some(value) = alias {
+        sym.plist.insert(VARIABLE_ALIAS_PROPERTY.to_string(), value);
+    }
+    sym.plist
+        .insert(RAW_SYMBOL_PLIST_PROPERTY.to_string(), plist);
+}
+
+fn plist_lookup_value(plist: &Value, prop: &Value) -> Option<Value> {
+    let mut cursor = plist.clone();
+    loop {
+        match cursor {
+            Value::Nil => return None,
+            Value::Cons(pair_cell) => {
+                let pair = pair_cell.lock().expect("poisoned");
+                let key = pair.car.clone();
+                let rest = pair.cdr.clone();
+                drop(pair);
+                let Value::Cons(value_cell) = rest else {
+                    return None;
+                };
+                let value_pair = value_cell.lock().expect("poisoned");
+                let value = value_pair.car.clone();
+                let next = value_pair.cdr.clone();
+                drop(value_pair);
+                if eq_value(&key, prop) {
+                    return Some(value);
+                }
+                cursor = next;
+            }
+            _ => return None,
+        }
+    }
+}
+
 pub(crate) fn builtin_boundp(eval: &mut super::eval::Evaluator, args: Vec<Value>) -> EvalResult {
     expect_args("boundp", &args, 1)?;
     let name = args[0].as_symbol_name().ok_or_else(|| {
@@ -3583,7 +3680,8 @@ pub(crate) fn builtin_boundp(eval: &mut super::eval::Evaluator, args: Vec<Value>
             vec![Value::symbol("symbolp"), args[0].clone()],
         )
     })?;
-    Ok(Value::bool(eval.obarray().boundp(name)))
+    let resolved = resolve_variable_alias_name(eval, name)?;
+    Ok(Value::bool(eval.obarray().boundp(&resolved)))
 }
 
 pub(crate) fn builtin_obarrayp_eval(
@@ -3611,7 +3709,8 @@ pub(crate) fn builtin_special_variable_p(
             vec![Value::symbol("symbolp"), args[0].clone()],
         )
     })?;
-    Ok(Value::bool(eval.obarray().is_special(name)))
+    let resolved = resolve_variable_alias_name(eval, name)?;
+    Ok(Value::bool(eval.obarray().is_special(&resolved)))
 }
 
 pub(crate) fn builtin_default_boundp(
@@ -3625,7 +3724,8 @@ pub(crate) fn builtin_default_boundp(
             vec![Value::symbol("symbolp"), args[0].clone()],
         )
     })?;
-    Ok(Value::bool(eval.obarray().boundp(name)))
+    let resolved = resolve_variable_alias_name(eval, name)?;
+    Ok(Value::bool(eval.obarray().boundp(&resolved)))
 }
 
 pub(crate) fn builtin_default_toplevel_value(
@@ -3639,8 +3739,9 @@ pub(crate) fn builtin_default_toplevel_value(
             vec![Value::symbol("symbolp"), args[0].clone()],
         )
     })?;
+    let resolved = resolve_variable_alias_name(eval, name)?;
     eval.obarray()
-        .symbol_value(name)
+        .symbol_value(&resolved)
         .cloned()
         .ok_or_else(|| signal("void-variable", vec![Value::symbol(name)]))
 }
@@ -3656,8 +3757,77 @@ pub(crate) fn builtin_set_default_toplevel_value(
             vec![Value::symbol("symbolp"), args[0].clone()],
         )
     })?;
-    eval.obarray.set_symbol_value(name, args[1].clone());
+    let resolved = resolve_variable_alias_name(eval, name)?;
+    if eval.obarray().is_constant(&resolved) {
+        return Err(signal("setting-constant", vec![Value::symbol(name)]));
+    }
+    eval.obarray.set_symbol_value(&resolved, args[1].clone());
     Ok(Value::Nil)
+}
+
+pub(crate) fn builtin_defvaralias_eval(
+    eval: &mut super::eval::Evaluator,
+    args: Vec<Value>,
+) -> EvalResult {
+    expect_range_args("defvaralias", &args, 2, 3)?;
+    let new_name = args[0].as_symbol_name().ok_or_else(|| {
+        signal(
+            "wrong-type-argument",
+            vec![Value::symbol("symbolp"), args[0].clone()],
+        )
+    })?;
+    let old_name = args[1].as_symbol_name().ok_or_else(|| {
+        signal(
+            "wrong-type-argument",
+            vec![Value::symbol("symbolp"), args[1].clone()],
+        )
+    })?;
+    if eval.obarray().is_constant(new_name) {
+        return Err(signal(
+            "error",
+            vec![Value::string(format!(
+                "Cannot make a constant an alias: {new_name}"
+            ))],
+        ));
+    }
+    if would_create_variable_alias_cycle(eval, new_name, old_name) {
+        return Err(signal(
+            "cyclic-variable-indirection",
+            vec![Value::symbol(old_name)],
+        ));
+    }
+    {
+        let sym = eval.obarray_mut().get_or_intern(new_name);
+        sym.special = true;
+        sym.plist
+            .insert(VARIABLE_ALIAS_PROPERTY.to_string(), Value::symbol(old_name));
+    }
+    eval.obarray_mut().make_special(old_name);
+    // GNU Emacs updates `variable-documentation` through plist machinery after
+    // installing alias state, so malformed raw plists still raise
+    // `(wrong-type-argument plistp ...)` with the alias edge retained.
+    let docstring = args.get(2).cloned().unwrap_or(Value::Nil);
+    builtin_put(
+        eval,
+        vec![
+            Value::symbol(new_name),
+            Value::symbol("variable-documentation"),
+            docstring,
+        ],
+    )?;
+    Ok(Value::symbol(old_name))
+}
+
+pub(crate) fn builtin_indirect_variable_eval(
+    eval: &mut super::eval::Evaluator,
+    args: Vec<Value>,
+) -> EvalResult {
+    expect_args("indirect-variable", &args, 1)?;
+    let Some(name) = args[0].as_symbol_name() else {
+        return Ok(args[0].clone());
+    };
+    let resolved = resolve_variable_alias_name(eval, name)?;
+    Ok(Value::symbol(resolved))
 }
 
 pub(crate) fn builtin_fboundp(eval: &mut super::eval::Evaluator, args: Vec<Value>) -> EvalResult {
@@ -3695,20 +3865,21 @@ pub(crate) fn builtin_symbol_value(
             vec![Value::symbol("symbolp"), args[0].clone()],
         )
     })?;
+    let resolved = resolve_variable_alias_name(eval, name)?;
     // Check dynamic bindings first
     for frame in eval.dynamic.iter().rev() {
-        if let Some(value) = frame.get(name) {
+        if let Some(value) = frame.get(&resolved) {
             return Ok(value.clone());
         }
     }
     // Check current buffer-local binding.
     if let Some(buf) = eval.buffers.current_buffer() {
-        if let Some(value) = buf.get_buffer_local(name) {
+        if let Some(value) = buf.get_buffer_local(&resolved) {
             return Ok(value.clone());
         }
     }
     eval.obarray()
-        .symbol_value(name)
+        .symbol_value(&resolved)
         .cloned()
         .ok_or_else(|| signal("void-variable", vec![Value::symbol(name)]))
 }
@@ -3849,8 +4020,12 @@ pub(crate) fn builtin_set(eval: &mut super::eval::Evaluator, args: Vec<Value>) -
             vec![Value::symbol("symbolp"), args[0].clone()],
         )
     })?;
+    let resolved = resolve_variable_alias_name(eval, name)?;
+    if eval.obarray().is_constant(&resolved) {
+        return Err(signal("setting-constant", vec![Value::symbol(name)]));
+    }
     let value = args[1].clone();
-    eval.assign(name, value.clone());
+    eval.assign(&resolved, value.clone());
     Ok(value)
 }
 
@@ -3920,7 +4095,11 @@ pub(crate) fn builtin_makunbound(
             vec![Value::symbol("symbolp"), args[0].clone()],
         )
     })?;
-    eval.obarray_mut().makunbound(name);
+    let resolved = resolve_variable_alias_name(eval, name)?;
+    if eval.obarray().is_constant(&resolved) {
+        return Err(signal("setting-constant", vec![Value::symbol(name)]));
+    }
+    eval.obarray_mut().makunbound(&resolved);
     Ok(args[0].clone())
 }
 
@@ -3947,12 +4126,18 @@ pub(crate) fn builtin_get(eval: &mut super::eval::Evaluator, args: Vec<Value>) -
             vec![Value::symbol("symbolp"), args[0].clone()],
         )
     })?;
+    if let Some(raw) = symbol_raw_plist_value(eval, sym) {
+        return Ok(plist_lookup_value(&raw, &args[1]).unwrap_or(Value::Nil));
+    }
     let prop = args[1].as_symbol_name().ok_or_else(|| {
         signal(
             "wrong-type-argument",
             vec![Value::symbol("symbolp"), args[1].clone()],
         )
     })?;
+    if is_internal_symbol_plist_property(prop) {
+        return Ok(Value::Nil);
+    }
     Ok(eval
         .obarray()
         .get_property(sym, prop)
@@ -3975,6 +4160,11 @@ pub(crate) fn builtin_put(eval: &mut super::eval::Evaluator, args: Vec<Value>) -
         )
     })?;
     let value = args[2].clone();
+    if let Some(raw) = symbol_raw_plist_value(eval, sym) {
+        let plist = builtin_plist_put(vec![raw, args[1].clone(), value.clone()])?;
+        set_symbol_raw_plist(eval, sym, plist);
+        return Ok(value);
+    }
     eval.obarray_mut().put_property(sym, prop, value.clone());
     Ok(value)
 }
@@ -3990,7 +4180,41 @@ pub(crate) fn builtin_symbol_plist_fn(
             vec![Value::symbol("symbolp"), args[0].clone()],
         )
     })?;
-    Ok(eval.obarray().symbol_plist(name))
+    if let Some(raw) = symbol_raw_plist_value(eval, name) {
+        return Ok(raw);
+    }
+    let Some(sym) = eval.obarray().get(name) else {
+        return Ok(Value::Nil);
+    };
+    let mut items = Vec::new();
+    for (key, value) in &sym.plist {
+        if is_internal_symbol_plist_property(key) {
+            continue;
+        }
+        items.push(Value::symbol(key.clone()));
+        items.push(value.clone());
+    }
+    if items.is_empty() {
+        Ok(Value::Nil)
+    } else {
+        Ok(Value::list(items))
+    }
+}
+
+pub(crate) fn builtin_setplist_eval(
+    eval: &mut super::eval::Evaluator,
+    args: Vec<Value>,
+) -> EvalResult {
+    expect_args("setplist", &args, 2)?;
+    let name = args[0].as_symbol_name().ok_or_else(|| {
+        signal(
+            "wrong-type-argument",
+            vec![Value::symbol("symbolp"), args[0].clone()],
+        )
+    })?;
+    let plist = args[1].clone();
+    set_symbol_raw_plist(eval, name, plist.clone());
+    Ok(plist)
 }
 
 pub(crate) fn builtin_indirect_function(
@@ -10008,10 +10232,12 @@ pub(crate) fn dispatch_builtin(
         "functionp" => return Some(builtin_functionp_eval(eval, args)),
         "macrop" => return Some(builtin_macrop_eval(eval, args)),
         // Symbol/obarray
+        "defvaralias" => return Some(builtin_defvaralias_eval(eval, args)),
         "boundp" => return Some(builtin_boundp(eval, args)),
         "default-boundp" => return Some(builtin_default_boundp(eval, args)),
         "default-toplevel-value" => return Some(builtin_default_toplevel_value(eval, args)),
         "fboundp" => return Some(builtin_fboundp(eval, args)),
+        "indirect-variable" => return Some(builtin_indirect_variable_eval(eval, args)),
         "symbol-value" => return Some(builtin_symbol_value(eval, args)),
         "symbol-function" => return Some(builtin_symbol_function(eval, args)),
         "set" => return Some(builtin_set(eval, args)),
@@ -10020,6 +10246,7 @@ pub(crate) fn dispatch_builtin(
         "fmakunbound" => return Some(builtin_fmakunbound(eval, args)),
         "get" => return Some(builtin_get(eval, args)),
         "put" => return Some(builtin_put(eval, args)),
+        "setplist" => return Some(builtin_setplist_eval(eval, args)),
         "symbol-plist" => return Some(builtin_symbol_plist_fn(eval, args)),
         "indirect-function" => return Some(builtin_indirect_function(eval, args)),
         "obarrayp" => return Some(builtin_obarrayp_eval(eval, args)),
@@ -18277,6 +18504,312 @@ mod tests {
         let resolved = builtin_indirect_function(&mut eval, vec![Value::True])
             .expect("indirect-function should resolve t after fset");
         assert_eq!(resolved, Value::Subr("car".to_string()));
+    }
+
+    #[test]
+    fn defvaralias_and_indirect_variable_follow_runtime_aliases() {
+        let mut eval = crate::elisp::eval::Evaluator::new();
+
+        let aliased = builtin_defvaralias_eval(
+            &mut eval,
+            vec![
+                Value::symbol("vm-defvaralias-new"),
+                Value::symbol("vm-defvaralias-old"),
+                Value::string("vm-doc"),
+            ],
+        )
+        .expect("defvaralias should succeed");
+        assert_eq!(aliased, Value::symbol("vm-defvaralias-old"));
+
+        let doc = builtin_get(
+            &mut eval,
+            vec![
+                Value::symbol("vm-defvaralias-new"),
+                Value::symbol("variable-documentation"),
+            ],
+        )
+        .expect("get should return variable doc");
+        assert_eq!(doc, Value::string("vm-doc"));
+
+        let direct =
+            builtin_indirect_variable_eval(&mut eval, vec![Value::symbol("vm-defvaralias-new")])
+                .expect("indirect-variable should resolve aliases");
+        assert_eq!(direct, Value::symbol("vm-defvaralias-old"));
+
+        let special_new =
+            builtin_special_variable_p(&mut eval, vec![Value::symbol("vm-defvaralias-new")])
+                .expect("special-variable-p should accept alias");
+        assert!(special_new.is_truthy());
+        let special_old =
+            builtin_special_variable_p(&mut eval, vec![Value::symbol("vm-defvaralias-old")])
+                .expect("special-variable-p should mark target special");
+        assert!(special_old.is_truthy());
+
+        let set_value = builtin_set(
+            &mut eval,
+            vec![Value::symbol("vm-defvaralias-new"), Value::Int(7)],
+        )
+        .expect("set should assign through aliases");
+        assert_eq!(set_value, Value::Int(7));
+        let old_value = builtin_symbol_value(&mut eval, vec![Value::symbol("vm-defvaralias-old")])
+            .expect("symbol-value should read aliased target");
+        assert_eq!(old_value, Value::Int(7));
+
+        builtin_defvaralias_eval(
+            &mut eval,
+            vec![
+                Value::symbol("vm-defvaralias-new"),
+                Value::symbol("vm-defvaralias-old"),
+            ],
+        )
+        .expect("defvaralias without doc should clear variable-documentation");
+        let cleared_doc = builtin_get(
+            &mut eval,
+            vec![
+                Value::symbol("vm-defvaralias-new"),
+                Value::symbol("variable-documentation"),
+            ],
+        )
+        .expect("get should read cleared documentation");
+        assert!(cleared_doc.is_nil());
+
+        let unbound = builtin_makunbound(&mut eval, vec![Value::symbol("vm-defvaralias-new")])
+            .expect("makunbound should clear target through alias");
+        assert_eq!(unbound, Value::symbol("vm-defvaralias-new"));
+        let bound_old = builtin_boundp(&mut eval, vec![Value::symbol("vm-defvaralias-old")])
+            .expect("boundp should read aliased target");
+        assert!(bound_old.is_nil());
+    }
+
+    #[test]
+    fn defvaralias_rejects_invalid_inputs_and_cycles() {
+        let mut eval = crate::elisp::eval::Evaluator::new();
+
+        let constant_err = builtin_defvaralias_eval(
+            &mut eval,
+            vec![Value::symbol("nil"), Value::symbol("vm-defvaralias-x")],
+        )
+        .expect_err("defvaralias should reject constant aliases");
+        match constant_err {
+            Flow::Signal(sig) => {
+                assert_eq!(sig.symbol, "error");
+                assert_eq!(
+                    sig.data,
+                    vec![Value::string("Cannot make a constant an alias: nil")]
+                );
+            }
+            other => panic!("unexpected flow: {other:?}"),
+        }
+
+        let type_err = builtin_defvaralias_eval(
+            &mut eval,
+            vec![Value::symbol("vm-defvaralias-bad"), Value::Int(1)],
+        )
+        .expect_err("defvaralias should validate OLD-BASE");
+        match type_err {
+            Flow::Signal(sig) => {
+                assert_eq!(sig.symbol, "wrong-type-argument");
+                assert_eq!(sig.data, vec![Value::symbol("symbolp"), Value::Int(1)]);
+            }
+            other => panic!("unexpected flow: {other:?}"),
+        }
+
+        builtin_defvaralias_eval(
+            &mut eval,
+            vec![
+                Value::symbol("vm-defvaralias-a"),
+                Value::symbol("vm-defvaralias-b"),
+            ],
+        )
+        .expect("first alias edge should succeed");
+        let cycle_err = builtin_defvaralias_eval(
+            &mut eval,
+            vec![
+                Value::symbol("vm-defvaralias-b"),
+                Value::symbol("vm-defvaralias-a"),
+            ],
+        )
+        .expect_err("second alias edge should be rejected as a cycle");
+        match cycle_err {
+            Flow::Signal(sig) => {
+                assert_eq!(sig.symbol, "cyclic-variable-indirection");
+                assert_eq!(sig.data, vec![Value::symbol("vm-defvaralias-a")]);
+            }
+            other => panic!("unexpected flow: {other:?}"),
+        }
+    }
+
+    #[test]
+    fn setplist_runtime_controls_get_put_and_symbol_plist_edges() {
+        let mut eval = crate::elisp::eval::Evaluator::new();
+
+        let initial_plist = Value::list(vec![
+            Value::symbol("a"),
+            Value::Int(1),
+            Value::symbol("b"),
+            Value::Int(2),
+        ]);
+        let stored = builtin_setplist_eval(
+            &mut eval,
+            vec![Value::symbol("vm-setplist"), initial_plist.clone()],
+        )
+        .expect("setplist should store plist values");
+        assert_eq!(stored, initial_plist);
+
+        let read_plist = builtin_symbol_plist_fn(&mut eval, vec![Value::symbol("vm-setplist")])
+            .expect("symbol-plist should return stored raw plist");
+        assert_eq!(
+            read_plist,
+            Value::list(vec![
+                Value::symbol("a"),
+                Value::Int(1),
+                Value::symbol("b"),
+                Value::Int(2),
+            ])
+        );
+
+        let lookup = builtin_get(
+            &mut eval,
+            vec![Value::symbol("vm-setplist"), Value::symbol("a")],
+        )
+        .expect("get should read entries from raw plist");
+        assert_eq!(lookup, Value::Int(1));
+
+        let put = builtin_put(
+            &mut eval,
+            vec![
+                Value::symbol("vm-setplist"),
+                Value::symbol("a"),
+                Value::Int(5),
+            ],
+        )
+        .expect("put should update raw plist entries");
+        assert_eq!(put, Value::Int(5));
+        let updated = builtin_symbol_plist_fn(&mut eval, vec![Value::symbol("vm-setplist")])
+            .expect("symbol-plist should reflect updated plist values");
+        assert_eq!(
+            updated,
+            Value::list(vec![
+                Value::symbol("a"),
+                Value::Int(5),
+                Value::symbol("b"),
+                Value::Int(2),
+            ])
+        );
+
+        builtin_setplist_eval(&mut eval, vec![Value::symbol("vm-setplist"), Value::Int(1)])
+            .expect("setplist should accept non-list plist values");
+        let non_list = builtin_symbol_plist_fn(&mut eval, vec![Value::symbol("vm-setplist")])
+            .expect("symbol-plist should return raw non-list values");
+        assert_eq!(non_list, Value::Int(1));
+
+        let missing = builtin_get(
+            &mut eval,
+            vec![Value::symbol("vm-setplist"), Value::symbol("a")],
+        )
+        .expect("get should treat non-list plist as missing keys");
+        assert!(missing.is_nil());
+
+        let put_err = builtin_put(
+            &mut eval,
+            vec![
+                Value::symbol("vm-setplist"),
+                Value::symbol("a"),
+                Value::Int(8),
+            ],
+        )
+        .expect_err("put should fail on non-plist raw values");
+        match put_err {
+            Flow::Signal(sig) => {
+                assert_eq!(sig.symbol, "wrong-type-argument");
+                assert_eq!(sig.data, vec![Value::symbol("plistp"), Value::Int(1)]);
+            }
+            other => panic!("unexpected flow: {other:?}"),
+        }
+    }
+
+    #[test]
+    fn variable_alias_to_constant_reports_alias_in_setting_constant_errors() {
+        let mut eval = crate::elisp::eval::Evaluator::new();
+        builtin_defvaralias_eval(
+            &mut eval,
+            vec![
+                Value::symbol("vm-alias-constant"),
+                Value::symbol("nil"),
+                Value::Nil,
+            ],
+        )
+        .expect("defvaralias should allow aliasing to nil");
+
+        let set_err = builtin_set(
+            &mut eval,
+            vec![Value::symbol("vm-alias-constant"), Value::Int(1)],
+        )
+        .expect_err("set should reject writes through nil aliases");
+        match set_err {
+            Flow::Signal(sig) => {
+                assert_eq!(sig.symbol, "setting-constant");
+                assert_eq!(sig.data, vec![Value::symbol("vm-alias-constant")]);
+            }
+            other => panic!("unexpected flow: {other:?}"),
+        }
+
+        let default_err = builtin_set_default_toplevel_value(
+            &mut eval,
+            vec![Value::symbol("vm-alias-constant"), Value::Int(1)],
+        )
+        .expect_err("set-default-toplevel-value should reject nil aliases");
+        match default_err {
+            Flow::Signal(sig) => {
+                assert_eq!(sig.symbol, "setting-constant");
+                assert_eq!(sig.data, vec![Value::symbol("vm-alias-constant")]);
+            }
+            other => panic!("unexpected flow: {other:?}"),
+        }
+
+        let unbind_err = builtin_makunbound(&mut eval, vec![Value::symbol("vm-alias-constant")])
+            .expect_err("makunbound should reject nil aliases");
+        match unbind_err {
+            Flow::Signal(sig) => {
+                assert_eq!(sig.symbol, "setting-constant");
+                assert_eq!(sig.data, vec![Value::symbol("vm-alias-constant")]);
+            }
+            other => panic!("unexpected flow: {other:?}"),
+        }
+    }
+
+    #[test]
+    fn defvaralias_raises_plistp_errors_when_symbol_plist_is_non_list() {
+        let mut eval = crate::elisp::eval::Evaluator::new();
+        builtin_setplist_eval(
+            &mut eval,
+            vec![Value::symbol("vm-defvaralias-bad-plist"), Value::Int(1)],
+        )
+        .expect("setplist should seed malformed symbol plist value");
+
+        let err = builtin_defvaralias_eval(
+            &mut eval,
+            vec![
+                Value::symbol("vm-defvaralias-bad-plist"),
+                Value::symbol("vm-defvaralias-target"),
+                Value::string("doc"),
+            ],
+        )
+        .expect_err("defvaralias should preserve put-style plistp failures");
+        match err {
+            Flow::Signal(sig) => {
+                assert_eq!(sig.symbol, "wrong-type-argument");
+                assert_eq!(sig.data, vec![Value::symbol("plistp"), Value::Int(1)]);
+            }
+            other => panic!("unexpected flow: {other:?}"),
+        }
+
+        let unresolved = builtin_indirect_variable_eval(
+            &mut eval,
+            vec![Value::symbol("vm-defvaralias-bad-plist")],
+        )
+        .expect("failed defvaralias should still install alias edges");
+        assert_eq!(unresolved, Value::symbol("vm-defvaralias-target"));
     }
 
     #[test]
