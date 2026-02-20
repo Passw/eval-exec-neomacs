@@ -38,6 +38,7 @@ cases/function-special-form-edges
 cases/autoload-macro-introspection
 cases/macroexpand-runtime-semantics
 cases/fillarray-bool-char-table-runtime-semantics
+cases/char-table-range-nil-t-runtime-semantics
 cases/symbol-file-semantics
 cases/symbol-obarray-subr-arity-semantics
 cases/functionp-callable-matrix

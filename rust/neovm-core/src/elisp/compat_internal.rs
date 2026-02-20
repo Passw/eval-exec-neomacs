@@ -3097,7 +3097,7 @@ mod tests {
             Value::Int(9)
         );
         assert_eq!(
-            crate::elisp::chartable::builtin_char_table_range(vec![table, Value::True]).unwrap(),
+            crate::elisp::chartable::builtin_char_table_range(vec![table, Value::Nil]).unwrap(),
             Value::Int(7)
         );
     }

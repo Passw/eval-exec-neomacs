@@ -33,6 +33,8 @@ const CT_PARENT: usize = 2; // parent char-table or nil
 const CT_SUBTYPE: usize = 3; // sub-type symbol
 const CT_EXTRA_COUNT: usize = 4; // Value::Int — number of extra slots
 const CT_EXTRA_START: usize = 5; // first extra slot (if any)
+const CT_ALL_CHARS_SENTINEL: i64 = i64::MIN; // wildcard range set via RANGE=t
+const CT_BASE_FALLBACK_SENTINEL: i64 = i64::MIN + 1; // initial/default char fallback
 
 // Bool-vector fixed-layout indices:
 const BV_SIZE: usize = 1; // Value::Int — logical length
@@ -163,13 +165,18 @@ pub(crate) fn builtin_make_char_table(args: Vec<Value>) -> EvalResult {
     } else {
         Value::Nil
     };
-    let vec = vec![
+    let mut vec = vec![
         Value::Symbol(CHAR_TABLE_TAG.to_string()),
-        default,       // CT_DEFAULT
-        Value::Nil,    // CT_PARENT
-        sub_type,      // CT_SUBTYPE
-        Value::Int(0), // CT_EXTRA_COUNT
+        default.clone(), // CT_DEFAULT
+        Value::Nil,      // CT_PARENT
+        sub_type,        // CT_SUBTYPE
+        Value::Int(0),   // CT_EXTRA_COUNT
     ];
+    // Keep a dedicated char-lookup fallback separate from the NIL range
+    // default slot so `(set-char-table-range TABLE nil VALUE)` can update NIL
+    // lookups without retroactively changing existing character fallback.
+    vec.push(Value::Int(CT_BASE_FALLBACK_SENTINEL));
+    vec.push(default);
     Ok(Value::vector(vec))
 }
 
@@ -184,7 +191,8 @@ pub(crate) fn builtin_char_table_p(args: Vec<Value>) -> EvalResult {
 /// RANGE may be:
 /// - a character (integer/char) -- set that single entry
 /// - a cons `(MIN . MAX)` -- set all characters MIN..=MAX
-/// - `t` -- set the default value
+/// - `nil` -- set the default value
+/// - `t` -- set all character entries (without changing the default slot)
 pub(crate) fn builtin_set_char_table_range(args: Vec<Value>) -> EvalResult {
     expect_args("set-char-table-range", &args, 3)?;
     let table = &args[0];
@@ -199,9 +207,13 @@ pub(crate) fn builtin_set_char_table_range(args: Vec<Value>) -> EvalResult {
     let mut vec = arc.lock().expect("poisoned");
 
     match range {
-        // t -> set default
-        Value::True => {
+        // nil -> set default
+        Value::Nil => {
             vec[CT_DEFAULT] = value.clone();
+        }
+        // t -> set all characters (but keep default slot unchanged).
+        Value::True => {
+            ct_set_char(&mut vec, CT_ALL_CHARS_SENTINEL, value.clone());
         }
         // Single character
         Value::Int(_) | Value::Char(_) => {
@@ -273,7 +285,7 @@ fn ct_get_char(vec: &[Value], ch: i64) -> Option<Value> {
 ///
 /// RANGE may be:
 /// - a character -- look up that character (with parent fallback)
-/// - `t` -- return the default value
+/// - `nil` -- return the default value
 pub(crate) fn builtin_char_table_range(args: Vec<Value>) -> EvalResult {
     expect_args("char-table-range", &args, 2)?;
     let table = &args[0];
@@ -284,7 +296,7 @@ pub(crate) fn builtin_char_table_range(args: Vec<Value>) -> EvalResult {
     }
 
     match range {
-        Value::True => {
+        Value::Nil => {
             // Return the default value.
             let arc = match table {
                 Value::Vector(a) => a,
@@ -293,6 +305,12 @@ pub(crate) fn builtin_char_table_range(args: Vec<Value>) -> EvalResult {
             let vec = arc.lock().expect("poisoned");
             Ok(vec[CT_DEFAULT].clone())
         }
+        Value::True => Err(signal(
+            "error",
+            vec![Value::string(
+                "Invalid RANGE argument to `char-table-range'",
+            )],
+        )),
         Value::Int(_) | Value::Char(_) => {
             let ch = expect_int(range)?;
             ct_lookup(table, ch)
@@ -304,8 +322,8 @@ pub(crate) fn builtin_char_table_range(args: Vec<Value>) -> EvalResult {
     }
 }
 
-/// Recursive char-table lookup: check own entries, then parent chain, then
-/// default.
+/// Recursive char-table lookup: check own entries, then all-char wildcard,
+/// then char fallback/default, then parent chain.
 fn ct_lookup(table: &Value, ch: i64) -> EvalResult {
     let arc = match table {
         Value::Vector(a) => a,
@@ -316,16 +334,25 @@ fn ct_lookup(table: &Value, ch: i64) -> EvalResult {
     if let Some(val) = ct_get_char(&vec, ch) {
         return Ok(val);
     }
+    if let Some(val) = ct_get_char(&vec, CT_ALL_CHARS_SENTINEL) {
+        return Ok(val);
+    }
+    if let Some(val) = ct_get_char(&vec, CT_BASE_FALLBACK_SENTINEL) {
+        if !val.is_nil() {
+            return Ok(val);
+        }
+    }
 
-    // Try parent.
     let parent = vec[CT_PARENT].clone();
     let default = vec[CT_DEFAULT].clone();
     drop(vec);
 
-    if is_char_table(&parent) {
+    if !default.is_nil() {
+        Ok(default)
+    } else if is_char_table(&parent) {
         ct_lookup(&parent, ch)
     } else {
-        Ok(default)
+        Ok(Value::Nil)
     }
 }
 
@@ -778,7 +805,7 @@ mod tests {
             builtin_make_char_table(vec![Value::symbol("syntax-table"), Value::Int(42)]).unwrap();
         assert!(is_char_table(&ct));
         // Default lookup should return the default.
-        let def = builtin_char_table_range(vec![ct.clone(), Value::True]).unwrap();
+        let def = builtin_char_table_range(vec![ct.clone(), Value::Nil]).unwrap();
         assert!(matches!(def, Value::Int(42)));
     }
 
@@ -833,11 +860,39 @@ mod tests {
     }
 
     #[test]
-    fn set_default_via_range_t() {
+    fn set_default_via_range_nil() {
         let ct = builtin_make_char_table(vec![Value::symbol("test"), Value::Nil]).unwrap();
-        builtin_set_char_table_range(vec![ct.clone(), Value::True, Value::Int(999)]).unwrap();
-        let def = builtin_char_table_range(vec![ct.clone(), Value::True]).unwrap();
+        builtin_set_char_table_range(vec![ct.clone(), Value::Nil, Value::Int(999)]).unwrap();
+        let def = builtin_char_table_range(vec![ct.clone(), Value::Nil]).unwrap();
         assert!(matches!(def, Value::Int(999)));
+    }
+
+    #[test]
+    fn set_range_t_sets_all_chars_without_changing_default() {
+        let ct = builtin_make_char_table(vec![Value::symbol("test"), Value::Int(0)]).unwrap();
+        builtin_set_char_table_range(vec![ct.clone(), Value::True, Value::Int(5)]).unwrap();
+
+        let a = builtin_char_table_range(vec![ct.clone(), Value::Int('a' as i64)]).unwrap();
+        let b = builtin_char_table_range(vec![ct.clone(), Value::Int('b' as i64)]).unwrap();
+        let def = builtin_char_table_range(vec![ct.clone(), Value::Nil]).unwrap();
+        assert!(matches!(a, Value::Int(5)));
+        assert!(matches!(b, Value::Int(5)));
+        assert!(matches!(def, Value::Int(0)));
+    }
+
+    #[test]
+    fn set_range_t_wildcard_allows_single_char_override() {
+        let ct = builtin_make_char_table(vec![Value::symbol("test"), Value::Nil]).unwrap();
+        builtin_set_char_table_range(vec![ct.clone(), Value::True, Value::Int(5)]).unwrap();
+        builtin_set_char_table_range(vec![ct.clone(), Value::Int('a' as i64), Value::Int(9)])
+            .unwrap();
+
+        let a = builtin_char_table_range(vec![ct.clone(), Value::Int('a' as i64)]).unwrap();
+        let b = builtin_char_table_range(vec![ct.clone(), Value::Int('b' as i64)]).unwrap();
+        let def = builtin_char_table_range(vec![ct.clone(), Value::Nil]).unwrap();
+        assert!(matches!(a, Value::Int(9)));
+        assert!(matches!(b, Value::Int(5)));
+        assert!(def.is_nil());
     }
 
     #[test]
@@ -994,6 +1049,16 @@ mod tests {
         assert!(matches!(val, Value::Symbol(ref s) if s == "parent-default"));
     }
 
+    #[test]
+    fn non_nil_child_default_overrides_parent_lookup() {
+        let parent = builtin_make_char_table(vec![Value::symbol("test"), Value::Int(8)]).unwrap();
+        let child = builtin_make_char_table(vec![Value::symbol("test"), Value::Int(0)]).unwrap();
+        builtin_set_char_table_parent(vec![child.clone(), parent]).unwrap();
+
+        let val = builtin_char_table_range(vec![child, Value::Int('a' as i64)]).unwrap();
+        assert!(matches!(val, Value::Int(0)));
+    }
+
     // -----------------------------------------------------------------------
     // Bool-vector tests
     // -----------------------------------------------------------------------
@@ -1101,24 +1166,15 @@ mod tests {
     #[test]
     fn bool_vector_count_consecutive() {
         let bv = make_bv(&[true, true, false, false, true, true]);
-        let count_true_start = builtin_bool_vector_count_consecutive(vec![
-            bv.clone(),
-            Value::True,
-            Value::Int(0),
-        ])
-        .unwrap();
-        let count_false_middle = builtin_bool_vector_count_consecutive(vec![
-            bv.clone(),
-            Value::Nil,
-            Value::Int(2),
-        ])
-        .unwrap();
-        let count_true_mismatch = builtin_bool_vector_count_consecutive(vec![
-            bv.clone(),
-            Value::True,
-            Value::Int(2),
-        ])
-        .unwrap();
+        let count_true_start =
+            builtin_bool_vector_count_consecutive(vec![bv.clone(), Value::True, Value::Int(0)])
+                .unwrap();
+        let count_false_middle =
+            builtin_bool_vector_count_consecutive(vec![bv.clone(), Value::Nil, Value::Int(2)])
+                .unwrap();
+        let count_true_mismatch =
+            builtin_bool_vector_count_consecutive(vec![bv.clone(), Value::True, Value::Int(2)])
+                .unwrap();
         assert!(matches!(count_true_start, Value::Int(2)));
         assert!(matches!(count_false_middle, Value::Int(2)));
         assert!(matches!(count_true_mismatch, Value::Int(0)));
