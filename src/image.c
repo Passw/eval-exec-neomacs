@@ -1755,6 +1755,9 @@ make_image (Lisp_Object spec, EMACS_UINT hash)
   img->ascent = DEFAULT_IMAGE_ASCENT;
   img->hash = hash;
   img->corners[BOT_CORNER] = -1;  /* Full image */
+#ifdef HAVE_NEOMACS
+  img->neomacs_gpu_id = 0;
+#endif
   return img;
 }
 
@@ -13186,6 +13189,16 @@ neomacs_load (struct frame *f, struct image *img)
 static void
 neomacs_clear_image (struct frame *f, struct image *img)
 {
+  /* Free GPU resource if uploaded */
+  if (img->neomacs_gpu_id != 0)
+    {
+      struct neomacs_display_info *dpyinfo = FRAME_NEOMACS_DISPLAY_INFO (f);
+      if (dpyinfo && dpyinfo->display_handle)
+        neomacs_display_free_image (dpyinfo->display_handle,
+                                    img->neomacs_gpu_id);
+      img->neomacs_gpu_id = 0;
+    }
+
   if (img->pixmap == (Emacs_Pixmap) 1)
     img->pixmap = NO_PIXMAP;
   image_clear_image (f, img);

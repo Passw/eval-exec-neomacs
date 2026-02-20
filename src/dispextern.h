@@ -3372,6 +3372,12 @@ struct image
 
   /* Hash collision chain.  */
   struct image *next, *prev;
+
+#ifdef HAVE_NEOMACS
+  /* GPU image ID managed by the neomacs render backend.
+     0 = not uploaded to GPU yet.  Cleaned up by neomacs_clear_image. */
+  uint32_t neomacs_gpu_id;
+#endif
 };
 
 

@@ -51,15 +51,6 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 /* List of Neomacs display info structures */
 struct neomacs_display_info *neomacs_display_list = NULL;
 
-/* GPU image ID cache - maps Emacs image pointer to GPU image ID */
-#define IMAGE_CACHE_SIZE 256
-struct neomacs_image_cache_entry {
-  struct image *emacs_img;  /* Emacs image (key) */
-  uint32_t gpu_id;          /* GPU image ID */
-};
-static struct neomacs_image_cache_entry neomacs_image_cache[IMAGE_CACHE_SIZE];
-static int neomacs_image_cache_count = 0;
-
 /* Track popup/menu activation for tooltip/auto-select suppression */
 static int neomacs_popup_activated_flag;
 
@@ -7640,37 +7631,35 @@ neomacs_compute_glyph_string_overhangs (struct glyph_string *s)
     }
 }
 
-/* Get GPU image ID for an Emacs image, loading it if necessary */
+/* Get GPU image ID for an Emacs image, loading it if necessary.
+   GPU ID is stored directly on struct image (img->neomacs_gpu_id),
+   eliminating the separate cache that caused dangling pointer bugs
+   when Emacs freed and reallocated image structs.  */
 static uint32_t
 neomacs_get_or_load_image (struct neomacs_display_info *dpyinfo, struct image *img)
 {
-  int i;
-
   if (!dpyinfo || !dpyinfo->display_handle || !img)
     return 0;
 
-  /* Check cache first */
-  for (i = 0; i < neomacs_image_cache_count; i++)
+  /* Already uploaded to GPU? */
+  if (img->neomacs_gpu_id != 0)
     {
-      if (neomacs_image_cache[i].emacs_img == img)
+      /* If dimensions aren't set yet, try to get them now (async load may have completed) */
+      if (img->width == 0 || img->height == 0)
         {
-          uint32_t cached_id = neomacs_image_cache[i].gpu_id;
-          /* If dimensions aren't set yet, try to get them now (async load may have completed) */
-          if (img->width == 0 || img->height == 0)
+          int actual_w, actual_h;
+          if (neomacs_display_get_image_size (dpyinfo->display_handle,
+                                               img->neomacs_gpu_id,
+                                               &actual_w, &actual_h) == 0)
             {
-              int actual_w, actual_h;
-              if (neomacs_display_get_image_size (dpyinfo->display_handle, cached_id,
-                                                   &actual_w, &actual_h) == 0)
-                {
-                  img->width = actual_w;
-                  img->height = actual_h;
-                }
+              img->width = actual_w;
+              img->height = actual_h;
             }
-          return cached_id;
         }
+      return img->neomacs_gpu_id;
     }
 
-  /* Not in cache - load the image */
+  /* Not yet on GPU - load the image */
   uint32_t gpu_id = 0;
 
   /* Try to load from pixmap data if available (Emacs decoded it).
@@ -7801,20 +7790,8 @@ neomacs_get_or_load_image (struct neomacs_display_info *dpyinfo, struct image *i
       return 0;
     }
 
-  /* Add to cache (evict oldest entry if full) */
-  if (neomacs_image_cache_count >= IMAGE_CACHE_SIZE)
-    {
-      /* Free the oldest GPU image */
-      neomacs_display_free_image (dpyinfo->display_handle,
-                                  neomacs_image_cache[0].gpu_id);
-      /* Shift entries down */
-      memmove (&neomacs_image_cache[0], &neomacs_image_cache[1],
-               (IMAGE_CACHE_SIZE - 1) * sizeof (neomacs_image_cache[0]));
-      neomacs_image_cache_count = IMAGE_CACHE_SIZE - 1;
-    }
-  neomacs_image_cache[neomacs_image_cache_count].emacs_img = img;
-  neomacs_image_cache[neomacs_image_cache_count].gpu_id = gpu_id;
-  neomacs_image_cache_count++;
+  /* Store GPU ID directly on the image struct */
+  img->neomacs_gpu_id = gpu_id;
 
   return gpu_id;
 }
