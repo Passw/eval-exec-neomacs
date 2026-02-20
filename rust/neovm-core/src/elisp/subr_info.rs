@@ -919,6 +919,8 @@ fn subr_arity_value(name: &str) -> Value {
         "modify-syntax-entry" | "plist-get" => arity_cons(2, Some(3)),
         "plist-put" => arity_cons(3, Some(4)),
         "constrain-to-field" => arity_cons(2, Some(5)),
+        "field-beginning" | "field-end" => arity_cons(0, Some(3)),
+        "field-string" | "field-string-no-properties" => arity_cons(0, Some(1)),
         "parse-partial-sexp" => arity_cons(2, Some(6)),
         "matching-paren" => arity_cons(1, Some(1)),
         "forward-sexp" => arity_cons(0, Some(2)),
@@ -997,6 +999,9 @@ fn subr_arity_value(name: &str) -> Value {
         "execute-kbd-macro" | "execute-extended-command" => arity_cons(1, Some(3)),
         "describe-key-briefly" => arity_cons(0, Some(3)),
         "delete-char" => arity_cons(1, Some(2)),
+        "delete-all-overlays" => arity_cons(0, Some(1)),
+        "delete-and-extract-region" => arity_cons(2, Some(2)),
+        "delete-field" => arity_cons(0, Some(1)),
         "delete-region" => arity_cons(2, Some(2)),
         "delete-horizontal-space" => arity_cons(0, Some(1)),
         "delete-indentation" => arity_cons(0, Some(3)),
@@ -2022,6 +2027,10 @@ mod tests {
         assert_subr_arity("buffer-substring", 2, Some(2));
         assert_subr_arity("buffer-substring-no-properties", 2, Some(2));
         assert_subr_arity("constrain-to-field", 2, Some(5));
+        assert_subr_arity("field-beginning", 0, Some(3));
+        assert_subr_arity("field-end", 0, Some(3));
+        assert_subr_arity("field-string", 0, Some(1));
+        assert_subr_arity("field-string-no-properties", 0, Some(1));
         assert_subr_arity("byte-to-position", 1, Some(1));
     }
 
@@ -2398,6 +2407,9 @@ mod tests {
     #[test]
     fn subr_arity_delete_primitives_match_oracle() {
         assert_subr_arity("delete-char", 1, Some(2));
+        assert_subr_arity("delete-all-overlays", 0, Some(1));
+        assert_subr_arity("delete-and-extract-region", 2, Some(2));
+        assert_subr_arity("delete-field", 0, Some(1));
         assert_subr_arity("delete-region", 2, Some(2));
         assert_subr_arity("delete-horizontal-space", 0, Some(1));
         assert_subr_arity("delete-indentation", 0, Some(3));

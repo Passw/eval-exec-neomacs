@@ -5552,6 +5552,35 @@ pub(crate) fn builtin_get_buffer(
     }
 }
 
+/// `(delete-all-overlays &optional BUFFER)` -> nil
+///
+/// Removes every overlay from BUFFER (or the current buffer when omitted/nil).
+pub(crate) fn builtin_delete_all_overlays(
+    eval: &mut super::eval::Evaluator,
+    args: Vec<Value>,
+) -> EvalResult {
+    expect_max_args("delete-all-overlays", &args, 1)?;
+    let target = if args.is_empty() || args[0].is_nil() {
+        eval.buffers.current_buffer().map(|buf| buf.id)
+    } else {
+        Some(expect_buffer_id(&args[0])?)
+    };
+
+    let Some(target_id) = target else {
+        return Ok(Value::Nil);
+    };
+    let Some(buf) = eval.buffers.get_mut(target_id) else {
+        // GNU Emacs treats dead buffers as a no-op.
+        return Ok(Value::Nil);
+    };
+
+    let ids = buf.overlays.overlays_in(buf.point_min(), buf.point_max());
+    for ov_id in ids {
+        buf.overlays.delete_overlay(ov_id);
+    }
+    Ok(Value::Nil)
+}
+
 /// (buffer-live-p OBJECT) -> t or nil
 pub(crate) fn builtin_buffer_live_p(
     eval: &mut super::eval::Evaluator,
@@ -6235,6 +6264,94 @@ pub(crate) fn builtin_constrain_to_field(
     Ok(Value::Int(new_pos))
 }
 
+fn resolve_field_position(
+    eval: &super::eval::Evaluator,
+    position_value: Option<&Value>,
+) -> Result<(i64, i64, i64), Flow> {
+    let buf = eval
+        .buffers
+        .current_buffer()
+        .ok_or_else(|| signal("error", vec![Value::string("No current buffer")]))?;
+    let point_min = buf.text.byte_to_char(buf.point_min()) as i64 + 1;
+    let point_max = buf.text.byte_to_char(buf.point_max()) as i64 + 1;
+    let pos = match position_value {
+        None | Some(Value::Nil) => buf.text.byte_to_char(buf.pt) as i64 + 1,
+        Some(value) => expect_integer_or_marker(value)?,
+    };
+    if pos < point_min || pos > point_max {
+        return Err(signal("args-out-of-range", vec![Value::Int(pos)]));
+    }
+    Ok((pos, point_min, point_max))
+}
+
+/// `(field-beginning &optional POS ESCAPE-FROM-EDGE LIMIT)` -> position
+pub(crate) fn builtin_field_beginning(
+    eval: &mut super::eval::Evaluator,
+    args: Vec<Value>,
+) -> EvalResult {
+    expect_max_args("field-beginning", &args, 3)?;
+    let (_pos, point_min, _point_max) = resolve_field_position(eval, args.first())?;
+    if let Some(limit_value) = args.get(2) {
+        if !limit_value.is_nil() {
+            let limit = expect_integer_or_marker(limit_value)?;
+            if limit <= 0 {
+                return Err(signal("args-out-of-range", vec![Value::Int(limit)]));
+            }
+            return Ok(Value::Int(point_min.max(limit)));
+        }
+    }
+    Ok(Value::Int(point_min))
+}
+
+/// `(field-end &optional POS ESCAPE-FROM-EDGE LIMIT)` -> position
+pub(crate) fn builtin_field_end(
+    eval: &mut super::eval::Evaluator,
+    args: Vec<Value>,
+) -> EvalResult {
+    expect_max_args("field-end", &args, 3)?;
+    let (_pos, _point_min, point_max) = resolve_field_position(eval, args.first())?;
+    if let Some(limit_value) = args.get(2) {
+        if !limit_value.is_nil() {
+            let limit = expect_integer_or_marker(limit_value)?;
+            return Ok(Value::Int(point_max.min(limit)));
+        }
+    }
+    Ok(Value::Int(point_max))
+}
+
+/// `(field-string &optional POS)` -> field text at POS.
+pub(crate) fn builtin_field_string(
+    eval: &mut super::eval::Evaluator,
+    args: Vec<Value>,
+) -> EvalResult {
+    expect_max_args("field-string", &args, 1)?;
+    let (_pos, point_min, point_max) = resolve_field_position(eval, args.first())?;
+    builtin_buffer_substring(eval, vec![Value::Int(point_min), Value::Int(point_max)])
+}
+
+/// `(field-string-no-properties &optional POS)` -> field text at POS.
+pub(crate) fn builtin_field_string_no_properties(
+    eval: &mut super::eval::Evaluator,
+    args: Vec<Value>,
+) -> EvalResult {
+    expect_max_args("field-string-no-properties", &args, 1)?;
+    let (_pos, point_min, point_max) = resolve_field_position(eval, args.first())?;
+    super::editfns::builtin_buffer_substring_no_properties(
+        eval,
+        vec![Value::Int(point_min), Value::Int(point_max)],
+    )
+}
+
+/// `(delete-field &optional POS)` -> nil
+pub(crate) fn builtin_delete_field(
+    eval: &mut super::eval::Evaluator,
+    args: Vec<Value>,
+) -> EvalResult {
+    expect_max_args("delete-field", &args, 1)?;
+    let (_pos, point_min, point_max) = resolve_field_position(eval, args.first())?;
+    builtin_delete_region(eval, vec![Value::Int(point_min), Value::Int(point_max)])
+}
+
 /// `(clear-string STRING)` -> nil
 pub(crate) fn builtin_clear_string(args: Vec<Value>) -> EvalResult {
     expect_args("clear-string", &args, 1)?;
@@ -6463,6 +6580,41 @@ pub(crate) fn builtin_delete_region(
     let byte_end = buf.text.char_to_byte(e);
     buf.delete_region(byte_start, byte_end);
     Ok(Value::Nil)
+}
+
+/// `(delete-and-extract-region START END)` -> deleted text
+pub(crate) fn builtin_delete_and_extract_region(
+    eval: &mut super::eval::Evaluator,
+    args: Vec<Value>,
+) -> EvalResult {
+    expect_args("delete-and-extract-region", &args, 2)?;
+    let start = expect_integer_or_marker(&args[0])?;
+    let end = expect_integer_or_marker(&args[1])?;
+
+    let (point_min, point_max, current_buffer) = {
+        let buf = eval
+            .buffers
+            .current_buffer()
+            .ok_or_else(|| signal("error", vec![Value::string("No current buffer")]))?;
+        (
+            buf.text.byte_to_char(buf.point_min()) as i64 + 1,
+            buf.text.byte_to_char(buf.point_max()) as i64 + 1,
+            Value::Buffer(buf.id),
+        )
+    };
+
+    if start < point_min || start > point_max || end < point_min || end > point_max {
+        return Err(signal(
+            "args-out-of-range",
+            vec![current_buffer, Value::Int(start), Value::Int(end)],
+        ));
+    }
+
+    let lo = start.min(end);
+    let hi = start.max(end);
+    let deleted = builtin_buffer_substring(eval, vec![Value::Int(lo), Value::Int(hi)])?;
+    let _ = builtin_delete_region(eval, vec![Value::Int(lo), Value::Int(hi)])?;
+    Ok(deleted)
 }
 
 /// (erase-buffer) → nil
@@ -9052,12 +9204,21 @@ pub(crate) fn dispatch_builtin(
         "point-min" => return Some(builtin_point_min(eval, args)),
         "point-max" => return Some(builtin_point_max(eval, args)),
         "goto-char" => return Some(builtin_goto_char(eval, args)),
+        "field-beginning" => return Some(builtin_field_beginning(eval, args)),
+        "field-end" => return Some(builtin_field_end(eval, args)),
+        "field-string" => return Some(builtin_field_string(eval, args)),
+        "field-string-no-properties" => {
+            return Some(builtin_field_string_no_properties(eval, args))
+        }
         "constrain-to-field" => return Some(builtin_constrain_to_field(eval, args)),
         "insert" => return Some(builtin_insert(eval, args)),
         "insert-char" => return Some(builtin_insert_char(eval, args)),
         "insert-byte" => return Some(builtin_insert_byte(eval, args)),
         "buffer-swap-text" => return Some(builtin_buffer_swap_text(eval, args)),
         "delete-region" => return Some(builtin_delete_region(eval, args)),
+        "delete-and-extract-region" => return Some(builtin_delete_and_extract_region(eval, args)),
+        "delete-field" => return Some(builtin_delete_field(eval, args)),
+        "delete-all-overlays" => return Some(builtin_delete_all_overlays(eval, args)),
         "erase-buffer" => return Some(builtin_erase_buffer(eval, args)),
         "buffer-enable-undo" => return Some(builtin_buffer_enable_undo(eval, args)),
         "buffer-disable-undo" => return Some(builtin_buffer_disable_undo(eval, args)),
