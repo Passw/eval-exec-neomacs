@@ -12450,6 +12450,46 @@ pub(crate) fn dispatch_builtin(
         "lossage-size" => super::compat_internal::builtin_lossage_size(args),
         "unlock-buffer" => super::compat_internal::builtin_unlock_buffer(args),
         "unlock-file" => super::compat_internal::builtin_unlock_file(args),
+        "window-at" => super::compat_internal::builtin_window_at(args),
+        "window-bottom-divider-width" => {
+            super::compat_internal::builtin_window_bottom_divider_width(args)
+        }
+        "window-bump-use-time" => super::compat_internal::builtin_window_bump_use_time(args),
+        "window-combination-limit" => super::compat_internal::builtin_window_combination_limit(args),
+        "window-left-child" => super::compat_internal::builtin_window_left_child(args),
+        "window-line-height" => super::compat_internal::builtin_window_line_height(args),
+        "window-lines-pixel-dimensions" => {
+            super::compat_internal::builtin_window_lines_pixel_dimensions(args)
+        }
+        "window-list-1" => super::compat_internal::builtin_window_list_1(args),
+        "window-new-normal" => super::compat_internal::builtin_window_new_normal(args),
+        "window-new-pixel" => super::compat_internal::builtin_window_new_pixel(args),
+        "window-new-total" => super::compat_internal::builtin_window_new_total(args),
+        "window-next-sibling" => super::compat_internal::builtin_window_next_sibling(args),
+        "window-normal-size" => super::compat_internal::builtin_window_normal_size(args),
+        "window-old-body-pixel-height" => {
+            super::compat_internal::builtin_window_old_body_pixel_height(args)
+        }
+        "window-old-body-pixel-width" => {
+            super::compat_internal::builtin_window_old_body_pixel_width(args)
+        }
+        "window-old-pixel-height" => super::compat_internal::builtin_window_old_pixel_height(args),
+        "window-old-pixel-width" => super::compat_internal::builtin_window_old_pixel_width(args),
+        "window-parent" => super::compat_internal::builtin_window_parent(args),
+        "window-pixel-left" => super::compat_internal::builtin_window_pixel_left(args),
+        "window-pixel-top" => super::compat_internal::builtin_window_pixel_top(args),
+        "window-prev-sibling" => super::compat_internal::builtin_window_prev_sibling(args),
+        "window-resize-apply" => super::compat_internal::builtin_window_resize_apply(args),
+        "window-resize-apply-total" => super::compat_internal::builtin_window_resize_apply_total(args),
+        "window-right-divider-width" => {
+            super::compat_internal::builtin_window_right_divider_width(args)
+        }
+        "window-scroll-bar-height" => {
+            super::compat_internal::builtin_window_scroll_bar_height(args)
+        }
+        "window-scroll-bar-width" => super::compat_internal::builtin_window_scroll_bar_width(args),
+        "window-tab-line-height" => super::compat_internal::builtin_window_tab_line_height(args),
+        "window-top-child" => super::compat_internal::builtin_window_top_child(args),
         "sqlite-available-p" => super::compat_internal::builtin_sqlite_available_p(args),
         "sqlite-close" => super::compat_internal::builtin_sqlite_close(args),
         "sqlite-columns" => super::compat_internal::builtin_sqlite_columns(args),
@@ -13047,6 +13087,46 @@ pub(crate) fn dispatch_builtin_pure(name: &str, args: Vec<Value>) -> Option<Eval
         "lossage-size" => super::compat_internal::builtin_lossage_size(args),
         "unlock-buffer" => super::compat_internal::builtin_unlock_buffer(args),
         "unlock-file" => super::compat_internal::builtin_unlock_file(args),
+        "window-at" => super::compat_internal::builtin_window_at(args),
+        "window-bottom-divider-width" => {
+            super::compat_internal::builtin_window_bottom_divider_width(args)
+        }
+        "window-bump-use-time" => super::compat_internal::builtin_window_bump_use_time(args),
+        "window-combination-limit" => super::compat_internal::builtin_window_combination_limit(args),
+        "window-left-child" => super::compat_internal::builtin_window_left_child(args),
+        "window-line-height" => super::compat_internal::builtin_window_line_height(args),
+        "window-lines-pixel-dimensions" => {
+            super::compat_internal::builtin_window_lines_pixel_dimensions(args)
+        }
+        "window-list-1" => super::compat_internal::builtin_window_list_1(args),
+        "window-new-normal" => super::compat_internal::builtin_window_new_normal(args),
+        "window-new-pixel" => super::compat_internal::builtin_window_new_pixel(args),
+        "window-new-total" => super::compat_internal::builtin_window_new_total(args),
+        "window-next-sibling" => super::compat_internal::builtin_window_next_sibling(args),
+        "window-normal-size" => super::compat_internal::builtin_window_normal_size(args),
+        "window-old-body-pixel-height" => {
+            super::compat_internal::builtin_window_old_body_pixel_height(args)
+        }
+        "window-old-body-pixel-width" => {
+            super::compat_internal::builtin_window_old_body_pixel_width(args)
+        }
+        "window-old-pixel-height" => super::compat_internal::builtin_window_old_pixel_height(args),
+        "window-old-pixel-width" => super::compat_internal::builtin_window_old_pixel_width(args),
+        "window-parent" => super::compat_internal::builtin_window_parent(args),
+        "window-pixel-left" => super::compat_internal::builtin_window_pixel_left(args),
+        "window-pixel-top" => super::compat_internal::builtin_window_pixel_top(args),
+        "window-prev-sibling" => super::compat_internal::builtin_window_prev_sibling(args),
+        "window-resize-apply" => super::compat_internal::builtin_window_resize_apply(args),
+        "window-resize-apply-total" => super::compat_internal::builtin_window_resize_apply_total(args),
+        "window-right-divider-width" => {
+            super::compat_internal::builtin_window_right_divider_width(args)
+        }
+        "window-scroll-bar-height" => {
+            super::compat_internal::builtin_window_scroll_bar_height(args)
+        }
+        "window-scroll-bar-width" => super::compat_internal::builtin_window_scroll_bar_width(args),
+        "window-tab-line-height" => super::compat_internal::builtin_window_tab_line_height(args),
+        "window-top-child" => super::compat_internal::builtin_window_top_child(args),
         "sqlite-available-p" => super::compat_internal::builtin_sqlite_available_p(args),
         "sqlite-close" => super::compat_internal::builtin_sqlite_close(args),
         "sqlite-columns" => super::compat_internal::builtin_sqlite_columns(args),

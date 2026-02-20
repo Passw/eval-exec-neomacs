@@ -972,6 +972,34 @@ fn subr_arity_value(name: &str) -> Value {
             arity_cons(2, Some(2))
         }
         "sqlite-select" => arity_cons(2, Some(4)),
+        "window-at" => arity_cons(2, Some(3)),
+        "window-combination-limit" => arity_cons(1, Some(1)),
+        "window-line-height"
+        | "window-normal-size"
+        | "window-resize-apply"
+        | "window-resize-apply-total" => arity_cons(0, Some(2)),
+        "window-lines-pixel-dimensions" => arity_cons(0, Some(6)),
+        "window-list-1" => arity_cons(0, Some(3)),
+        "window-bottom-divider-width"
+        | "window-bump-use-time"
+        | "window-left-child"
+        | "window-new-normal"
+        | "window-new-pixel"
+        | "window-new-total"
+        | "window-next-sibling"
+        | "window-old-body-pixel-height"
+        | "window-old-body-pixel-width"
+        | "window-old-pixel-height"
+        | "window-old-pixel-width"
+        | "window-parent"
+        | "window-pixel-left"
+        | "window-pixel-top"
+        | "window-prev-sibling"
+        | "window-right-divider-width"
+        | "window-scroll-bar-height"
+        | "window-scroll-bar-width"
+        | "window-tab-line-height"
+        | "window-top-child" => arity_cons(0, Some(1)),
         "local-variable-if-set-p" => arity_cons(1, Some(2)),
         "unlock-buffer" => arity_cons(0, Some(0)),
         "get-unicode-property-internal" => arity_cons(2, Some(2)),
@@ -2670,6 +2698,34 @@ mod tests {
         assert_subr_arity("lossage-size", 0, Some(1));
         assert_subr_arity("unlock-buffer", 0, Some(0));
         assert_subr_arity("unlock-file", 1, Some(1));
+        assert_subr_arity("window-at", 2, Some(3));
+        assert_subr_arity("window-bottom-divider-width", 0, Some(1));
+        assert_subr_arity("window-bump-use-time", 0, Some(1));
+        assert_subr_arity("window-combination-limit", 1, Some(1));
+        assert_subr_arity("window-left-child", 0, Some(1));
+        assert_subr_arity("window-line-height", 0, Some(2));
+        assert_subr_arity("window-lines-pixel-dimensions", 0, Some(6));
+        assert_subr_arity("window-list-1", 0, Some(3));
+        assert_subr_arity("window-new-normal", 0, Some(1));
+        assert_subr_arity("window-new-pixel", 0, Some(1));
+        assert_subr_arity("window-new-total", 0, Some(1));
+        assert_subr_arity("window-next-sibling", 0, Some(1));
+        assert_subr_arity("window-normal-size", 0, Some(2));
+        assert_subr_arity("window-old-body-pixel-height", 0, Some(1));
+        assert_subr_arity("window-old-body-pixel-width", 0, Some(1));
+        assert_subr_arity("window-old-pixel-height", 0, Some(1));
+        assert_subr_arity("window-old-pixel-width", 0, Some(1));
+        assert_subr_arity("window-parent", 0, Some(1));
+        assert_subr_arity("window-pixel-left", 0, Some(1));
+        assert_subr_arity("window-pixel-top", 0, Some(1));
+        assert_subr_arity("window-prev-sibling", 0, Some(1));
+        assert_subr_arity("window-resize-apply", 0, Some(2));
+        assert_subr_arity("window-resize-apply-total", 0, Some(2));
+        assert_subr_arity("window-right-divider-width", 0, Some(1));
+        assert_subr_arity("window-scroll-bar-height", 0, Some(1));
+        assert_subr_arity("window-scroll-bar-width", 0, Some(1));
+        assert_subr_arity("window-tab-line-height", 0, Some(1));
+        assert_subr_arity("window-top-child", 0, Some(1));
         assert_subr_arity("get-unicode-property-internal", 2, Some(2));
         assert_subr_arity("get-variable-watchers", 1, Some(1));
         assert_subr_arity("fillarray", 2, Some(2));

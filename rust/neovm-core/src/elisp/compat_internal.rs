@@ -184,6 +184,38 @@ fn expect_processp(value: &Value) -> Result<(), Flow> {
     }
 }
 
+fn expect_numberp(value: &Value) -> Result<(), Flow> {
+    match value {
+        Value::Int(_) | Value::Char(_) | Value::Float(_) => Ok(()),
+        other => Err(signal(
+            "wrong-type-argument",
+            vec![Value::symbol("numberp"), other.clone()],
+        )),
+    }
+}
+
+fn expect_window_live_or_nil(value: &Value) -> Result<(), Flow> {
+    if value.is_nil() || matches!(value, Value::Window(_)) {
+        Ok(())
+    } else {
+        Err(signal(
+            "wrong-type-argument",
+            vec![Value::symbol("window-live-p"), value.clone()],
+        ))
+    }
+}
+
+fn expect_window_valid_or_nil(value: &Value) -> Result<(), Flow> {
+    if value.is_nil() || matches!(value, Value::Window(_)) {
+        Ok(())
+    } else {
+        Err(signal(
+            "wrong-type-argument",
+            vec![Value::symbol("window-valid-p"), value.clone()],
+        ))
+    }
+}
+
 fn sqlite_handle_id(value: &Value) -> Option<i64> {
     let Value::Vector(items) = value else {
         return None;
@@ -1195,6 +1227,262 @@ pub(crate) fn builtin_unlock_file(args: Vec<Value>) -> EvalResult {
     Ok(Value::Nil)
 }
 
+/// `(window-at X Y &optional FRAME)` -> nil.
+pub(crate) fn builtin_window_at(args: Vec<Value>) -> EvalResult {
+    expect_range_args("window-at", &args, 2, 3)?;
+    expect_numberp(&args[0])?;
+    expect_numberp(&args[1])?;
+    Ok(Value::Nil)
+}
+
+/// `(window-bottom-divider-width &optional WINDOW)` -> 0.
+pub(crate) fn builtin_window_bottom_divider_width(args: Vec<Value>) -> EvalResult {
+    expect_range_args("window-bottom-divider-width", &args, 0, 1)?;
+    if let Some(window) = args.first() {
+        expect_window_live_or_nil(window)?;
+    }
+    Ok(Value::Int(0))
+}
+
+/// `(window-bump-use-time &optional WINDOW)` -> nil.
+pub(crate) fn builtin_window_bump_use_time(args: Vec<Value>) -> EvalResult {
+    expect_range_args("window-bump-use-time", &args, 0, 1)?;
+    if let Some(window) = args.first() {
+        expect_window_live_or_nil(window)?;
+    }
+    Ok(Value::Nil)
+}
+
+/// `(window-combination-limit WINDOW)` -> compatibility error.
+pub(crate) fn builtin_window_combination_limit(args: Vec<Value>) -> EvalResult {
+    expect_args("window-combination-limit", &args, 1)?;
+    if matches!(args[0], Value::Window(_)) {
+        return Err(signal(
+            "error",
+            vec![Value::string(
+                "Combination limit is meaningful for internal windows only",
+            )],
+        ));
+    }
+    Err(signal(
+        "wrong-type-argument",
+        vec![Value::symbol("window-valid-p"), args[0].clone()],
+    ))
+}
+
+/// `(window-left-child &optional WINDOW)` -> nil.
+pub(crate) fn builtin_window_left_child(args: Vec<Value>) -> EvalResult {
+    expect_range_args("window-left-child", &args, 0, 1)?;
+    if let Some(window) = args.first() {
+        expect_window_valid_or_nil(window)?;
+    }
+    Ok(Value::Nil)
+}
+
+/// `(window-line-height &optional LINE WINDOW)` -> nil.
+pub(crate) fn builtin_window_line_height(args: Vec<Value>) -> EvalResult {
+    expect_range_args("window-line-height", &args, 0, 2)?;
+    Ok(Value::Nil)
+}
+
+/// `(window-lines-pixel-dimensions &optional WINDOW FIRST LAST BODY INVERSE LEFT)` -> nil.
+pub(crate) fn builtin_window_lines_pixel_dimensions(args: Vec<Value>) -> EvalResult {
+    expect_range_args("window-lines-pixel-dimensions", &args, 0, 6)?;
+    if let Some(window) = args.first() {
+        expect_window_live_or_nil(window)?;
+    }
+    Ok(Value::Nil)
+}
+
+/// `(window-list-1 &optional WINDOW MINIBUF ALL-FRAMES)` -> singleton list.
+pub(crate) fn builtin_window_list_1(args: Vec<Value>) -> EvalResult {
+    expect_range_args("window-list-1", &args, 0, 3)?;
+    if let Some(window) = args.first() {
+        expect_window_live_or_nil(window)?;
+    }
+    Ok(Value::list(vec![Value::Nil]))
+}
+
+/// `(window-new-normal &optional WINDOW)` -> 0.
+pub(crate) fn builtin_window_new_normal(args: Vec<Value>) -> EvalResult {
+    expect_range_args("window-new-normal", &args, 0, 1)?;
+    if let Some(window) = args.first() {
+        expect_window_valid_or_nil(window)?;
+    }
+    Ok(Value::Int(0))
+}
+
+/// `(window-new-pixel &optional WINDOW)` -> 0.
+pub(crate) fn builtin_window_new_pixel(args: Vec<Value>) -> EvalResult {
+    expect_range_args("window-new-pixel", &args, 0, 1)?;
+    if let Some(window) = args.first() {
+        expect_window_valid_or_nil(window)?;
+    }
+    Ok(Value::Int(0))
+}
+
+/// `(window-new-total &optional WINDOW)` -> 0.
+pub(crate) fn builtin_window_new_total(args: Vec<Value>) -> EvalResult {
+    expect_range_args("window-new-total", &args, 0, 1)?;
+    if let Some(window) = args.first() {
+        expect_window_valid_or_nil(window)?;
+    }
+    Ok(Value::Int(0))
+}
+
+/// `(window-next-sibling &optional WINDOW)` -> nil.
+pub(crate) fn builtin_window_next_sibling(args: Vec<Value>) -> EvalResult {
+    expect_range_args("window-next-sibling", &args, 0, 1)?;
+    if let Some(window) = args.first() {
+        expect_window_valid_or_nil(window)?;
+    }
+    Ok(Value::Nil)
+}
+
+/// `(window-normal-size &optional WINDOW HORIZONTAL)` -> 1.0.
+pub(crate) fn builtin_window_normal_size(args: Vec<Value>) -> EvalResult {
+    expect_range_args("window-normal-size", &args, 0, 2)?;
+    if let Some(window) = args.first() {
+        expect_window_valid_or_nil(window)?;
+    }
+    Ok(Value::Float(1.0))
+}
+
+/// `(window-old-body-pixel-height &optional WINDOW)` -> 0.
+pub(crate) fn builtin_window_old_body_pixel_height(args: Vec<Value>) -> EvalResult {
+    expect_range_args("window-old-body-pixel-height", &args, 0, 1)?;
+    if let Some(window) = args.first() {
+        expect_window_live_or_nil(window)?;
+    }
+    Ok(Value::Int(0))
+}
+
+/// `(window-old-body-pixel-width &optional WINDOW)` -> 0.
+pub(crate) fn builtin_window_old_body_pixel_width(args: Vec<Value>) -> EvalResult {
+    expect_range_args("window-old-body-pixel-width", &args, 0, 1)?;
+    if let Some(window) = args.first() {
+        expect_window_live_or_nil(window)?;
+    }
+    Ok(Value::Int(0))
+}
+
+/// `(window-old-pixel-height &optional WINDOW)` -> 0.
+pub(crate) fn builtin_window_old_pixel_height(args: Vec<Value>) -> EvalResult {
+    expect_range_args("window-old-pixel-height", &args, 0, 1)?;
+    if let Some(window) = args.first() {
+        expect_window_valid_or_nil(window)?;
+    }
+    Ok(Value::Int(0))
+}
+
+/// `(window-old-pixel-width &optional WINDOW)` -> 0.
+pub(crate) fn builtin_window_old_pixel_width(args: Vec<Value>) -> EvalResult {
+    expect_range_args("window-old-pixel-width", &args, 0, 1)?;
+    if let Some(window) = args.first() {
+        expect_window_valid_or_nil(window)?;
+    }
+    Ok(Value::Int(0))
+}
+
+/// `(window-parent &optional WINDOW)` -> nil.
+pub(crate) fn builtin_window_parent(args: Vec<Value>) -> EvalResult {
+    expect_range_args("window-parent", &args, 0, 1)?;
+    if let Some(window) = args.first() {
+        expect_window_valid_or_nil(window)?;
+    }
+    Ok(Value::Nil)
+}
+
+/// `(window-pixel-left &optional WINDOW)` -> 0.
+pub(crate) fn builtin_window_pixel_left(args: Vec<Value>) -> EvalResult {
+    expect_range_args("window-pixel-left", &args, 0, 1)?;
+    if let Some(window) = args.first() {
+        expect_window_valid_or_nil(window)?;
+    }
+    Ok(Value::Int(0))
+}
+
+/// `(window-pixel-top &optional WINDOW)` -> 0.
+pub(crate) fn builtin_window_pixel_top(args: Vec<Value>) -> EvalResult {
+    expect_range_args("window-pixel-top", &args, 0, 1)?;
+    if let Some(window) = args.first() {
+        expect_window_valid_or_nil(window)?;
+    }
+    Ok(Value::Int(0))
+}
+
+/// `(window-prev-sibling &optional WINDOW)` -> nil.
+pub(crate) fn builtin_window_prev_sibling(args: Vec<Value>) -> EvalResult {
+    expect_range_args("window-prev-sibling", &args, 0, 1)?;
+    if let Some(window) = args.first() {
+        expect_window_valid_or_nil(window)?;
+    }
+    Ok(Value::Nil)
+}
+
+/// `(window-resize-apply &optional FRAME HORIZONTAL)` -> nil.
+pub(crate) fn builtin_window_resize_apply(args: Vec<Value>) -> EvalResult {
+    expect_range_args("window-resize-apply", &args, 0, 2)?;
+    if let Some(frame) = args.first() {
+        expect_frame_live_or_nil(frame)?;
+    }
+    Ok(Value::Nil)
+}
+
+/// `(window-resize-apply-total &optional FRAME HORIZONTAL)` -> t.
+pub(crate) fn builtin_window_resize_apply_total(args: Vec<Value>) -> EvalResult {
+    expect_range_args("window-resize-apply-total", &args, 0, 2)?;
+    if let Some(frame) = args.first() {
+        expect_frame_live_or_nil(frame)?;
+    }
+    Ok(Value::True)
+}
+
+/// `(window-right-divider-width &optional WINDOW)` -> 0.
+pub(crate) fn builtin_window_right_divider_width(args: Vec<Value>) -> EvalResult {
+    expect_range_args("window-right-divider-width", &args, 0, 1)?;
+    if let Some(window) = args.first() {
+        expect_window_live_or_nil(window)?;
+    }
+    Ok(Value::Int(0))
+}
+
+/// `(window-scroll-bar-height &optional WINDOW)` -> 0.
+pub(crate) fn builtin_window_scroll_bar_height(args: Vec<Value>) -> EvalResult {
+    expect_range_args("window-scroll-bar-height", &args, 0, 1)?;
+    if let Some(window) = args.first() {
+        expect_window_live_or_nil(window)?;
+    }
+    Ok(Value::Int(0))
+}
+
+/// `(window-scroll-bar-width &optional WINDOW)` -> 0.
+pub(crate) fn builtin_window_scroll_bar_width(args: Vec<Value>) -> EvalResult {
+    expect_range_args("window-scroll-bar-width", &args, 0, 1)?;
+    if let Some(window) = args.first() {
+        expect_window_live_or_nil(window)?;
+    }
+    Ok(Value::Int(0))
+}
+
+/// `(window-tab-line-height &optional WINDOW)` -> 0.
+pub(crate) fn builtin_window_tab_line_height(args: Vec<Value>) -> EvalResult {
+    expect_range_args("window-tab-line-height", &args, 0, 1)?;
+    if let Some(window) = args.first() {
+        expect_window_live_or_nil(window)?;
+    }
+    Ok(Value::Int(0))
+}
+
+/// `(window-top-child &optional WINDOW)` -> nil.
+pub(crate) fn builtin_window_top_child(args: Vec<Value>) -> EvalResult {
+    expect_range_args("window-top-child", &args, 0, 1)?;
+    if let Some(window) = args.first() {
+        expect_window_valid_or_nil(window)?;
+    }
+    Ok(Value::Nil)
+}
+
 /// `(lossage-size &optional NEW-SIZE)` -> 300.
 pub(crate) fn builtin_lossage_size(args: Vec<Value>) -> EvalResult {
     expect_range_args("lossage-size", &args, 0, 1)?;
@@ -1651,6 +1939,69 @@ mod tests {
         let err = builtin_unlock_file(vec![Value::Nil]).unwrap_err();
         match err {
             Flow::Signal(sig) => assert_eq!(sig.symbol, "wrong-type-argument"),
+            other => panic!("expected signal, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn window_at_requires_numeric_coordinates() {
+        let err = builtin_window_at(vec![Value::Nil, Value::Nil]).unwrap_err();
+        match err {
+            Flow::Signal(sig) => {
+                assert_eq!(sig.symbol, "wrong-type-argument");
+                assert_eq!(sig.data.first(), Some(&Value::symbol("numberp")));
+            }
+            other => panic!("expected signal, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn window_combination_limit_requires_window_designator() {
+        let err = builtin_window_combination_limit(vec![Value::Nil]).unwrap_err();
+        match err {
+            Flow::Signal(sig) => {
+                assert_eq!(sig.symbol, "wrong-type-argument");
+                assert_eq!(sig.data.first(), Some(&Value::symbol("window-valid-p")));
+            }
+            other => panic!("expected signal, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn window_combination_limit_signals_internal_only_for_window_object() {
+        let err = builtin_window_combination_limit(vec![Value::Window(1)]).unwrap_err();
+        match err {
+            Flow::Signal(sig) => assert_eq!(sig.symbol, "error"),
+            other => panic!("expected signal, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn window_resize_apply_rejects_non_frame_designator() {
+        let err = builtin_window_resize_apply(vec![Value::Window(1)]).unwrap_err();
+        match err {
+            Flow::Signal(sig) => {
+                assert_eq!(sig.symbol, "wrong-type-argument");
+                assert_eq!(sig.data.first(), Some(&Value::symbol("frame-live-p")));
+            }
+            other => panic!("expected signal, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn window_resize_apply_total_returns_true() {
+        let out = builtin_window_resize_apply_total(vec![]).unwrap();
+        assert_eq!(out, Value::True);
+    }
+
+    #[test]
+    fn window_bottom_divider_width_rejects_non_window_designator() {
+        let err = builtin_window_bottom_divider_width(vec![Value::Int(1)]).unwrap_err();
+        match err {
+            Flow::Signal(sig) => {
+                assert_eq!(sig.symbol, "wrong-type-argument");
+                assert_eq!(sig.data.first(), Some(&Value::symbol("window-live-p")));
+            }
             other => panic!("expected signal, got {other:?}"),
         }
     }
