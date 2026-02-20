@@ -3789,13 +3789,12 @@ pub(crate) fn builtin_shell_command_to_string(args: Vec<Value>) -> EvalResult {
     Ok(Value::string(stdout))
 }
 
-/// (getenv VARIABLE) -> string or nil
-pub(crate) fn builtin_getenv(args: Vec<Value>) -> EvalResult {
-    expect_min_args("getenv", &args, 1)?;
+fn getenv_impl(name: &str, args: &[Value]) -> EvalResult {
+    expect_min_args(name, args, 1)?;
     if args.len() > 2 {
         return Err(signal(
             "wrong-number-of-arguments",
-            vec![Value::symbol("getenv"), Value::Int(args.len() as i64)],
+            vec![Value::symbol(name), Value::Int(args.len() as i64)],
         ));
     }
     if let Some(frame) = args.get(1) {
@@ -3811,6 +3810,16 @@ pub(crate) fn builtin_getenv(args: Vec<Value>) -> EvalResult {
         Ok(val) => Ok(Value::string(val)),
         Err(_) => Ok(Value::Nil),
     }
+}
+
+/// (getenv VARIABLE) -> string or nil
+pub(crate) fn builtin_getenv(args: Vec<Value>) -> EvalResult {
+    getenv_impl("getenv", &args)
+}
+
+/// (getenv-internal VARIABLE &optional FRAME) -> string or nil
+pub(crate) fn builtin_getenv_internal(args: Vec<Value>) -> EvalResult {
+    getenv_impl("getenv-internal", &args)
 }
 
 /// (setenv VARIABLE &optional VALUE) -> string or nil

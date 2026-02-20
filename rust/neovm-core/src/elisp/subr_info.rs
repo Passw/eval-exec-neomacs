@@ -334,11 +334,15 @@ fn subr_arity_value(name: &str) -> Value {
         "locate-file" | "locate-file-internal" => arity_cons(2, Some(4)),
         "file-attributes" | "file-modes" => arity_cons(1, Some(2)),
         "file-accessible-directory-p"
+        | "file-acl"
         | "file-directory-p"
         | "file-executable-p"
         | "file-exists-p"
+        | "file-locked-p"
         | "file-readable-p"
         | "file-regular-p"
+        | "file-selinux-context"
+        | "file-system-info"
         | "file-symlink-p"
         | "file-writable-p" => arity_cons(1, Some(1)),
         "file-newer-than-file-p" | "file-equal-p" | "file-in-directory-p" => arity_cons(2, Some(2)),
@@ -364,6 +368,7 @@ fn subr_arity_value(name: &str) -> Value {
         "group-gid" | "group-real-gid" | "interactive-p" | "last-nonminibuffer-frame" => {
             arity_cons(0, Some(0))
         }
+        "group-name" => arity_cons(1, Some(1)),
         "following-char" | "garbage-collect" | "get-load-suffixes" | "byteorder" => {
             arity_cons(0, Some(0))
         }
@@ -696,7 +701,12 @@ fn subr_arity_value(name: &str) -> Value {
         "widget-put" => arity_cons(3, Some(3)),
         "widget-apply" => arity_cons(2, None),
         "where-is-internal" => arity_cons(1, Some(5)),
-        "text-char-description" | "threadp" | "y-or-n-p" | "yes-or-no-p" | "zerop" => {
+        "text-char-description"
+        | "threadp"
+        | "y-or-n-p"
+        | "yes-or-no-p"
+        | "zerop"
+        | "logcount" => {
             arity_cons(1, Some(1))
         }
         "syntax-ppss" => arity_cons(0, Some(1)),
@@ -722,6 +732,7 @@ fn subr_arity_value(name: &str) -> Value {
         "remove-images" => arity_cons(2, Some(3)),
         "replace-regexp" | "replace-string" => arity_cons(2, Some(7)),
         "save-buffer" | "scroll-down-command" | "scroll-up-command" => arity_cons(0, Some(1)),
+        "load-average" => arity_cons(0, Some(1)),
         "select-window" | "minor-mode-key-binding" => arity_cons(1, Some(2)),
         "select-frame" => arity_cons(1, Some(2)),
         "select-frame-set-input-focus" => arity_cons(1, Some(2)),
@@ -1189,7 +1200,7 @@ fn subr_arity_value(name: &str) -> Value {
         "window-adjust-process-window-size"
         | "window-adjust-process-window-size-largest"
         | "window-adjust-process-window-size-smallest" => arity_cons(2, Some(2)),
-        "getenv" => arity_cons(1, Some(2)),
+        "getenv" | "getenv-internal" => arity_cons(1, Some(2)),
         // Display/terminal query primitives
         "display-images-p"
         | "display-graphic-p"
@@ -1820,6 +1831,7 @@ mod tests {
         assert_subr_arity("get-buffer-process", 1, Some(1));
         assert_subr_arity("get-process", 1, Some(1));
         assert_subr_arity("getenv", 1, Some(2));
+        assert_subr_arity("getenv-internal", 1, Some(2));
         assert_subr_arity("internal-default-interrupt-process", 0, Some(2));
         assert_subr_arity("internal-default-process-filter", 2, Some(2));
         assert_subr_arity("internal-default-process-sentinel", 2, Some(2));
@@ -2406,6 +2418,7 @@ mod tests {
 
     #[test]
     fn subr_arity_file_stat_predicate_primitives_match_oracle() {
+        assert_subr_arity("file-acl", 1, Some(1));
         assert_subr_arity("file-attributes", 1, Some(2));
         assert_subr_arity("file-accessible-directory-p", 1, Some(1));
         assert_subr_arity("file-directory-p", 1, Some(1));
@@ -2413,10 +2426,13 @@ mod tests {
         assert_subr_arity("file-executable-p", 1, Some(1));
         assert_subr_arity("file-exists-p", 1, Some(1));
         assert_subr_arity("file-in-directory-p", 2, Some(2));
+        assert_subr_arity("file-locked-p", 1, Some(1));
         assert_subr_arity("file-modes", 1, Some(2));
         assert_subr_arity("file-newer-than-file-p", 2, Some(2));
         assert_subr_arity("file-readable-p", 1, Some(1));
         assert_subr_arity("file-regular-p", 1, Some(1));
+        assert_subr_arity("file-selinux-context", 1, Some(1));
+        assert_subr_arity("file-system-info", 1, Some(1));
         assert_subr_arity("file-symlink-p", 1, Some(1));
         assert_subr_arity("file-writable-p", 1, Some(1));
     }
@@ -3040,10 +3056,13 @@ mod tests {
         assert_subr_arity("length>", 2, Some(2));
         assert_subr_arity("ldexp", 2, Some(2));
         assert_subr_arity("logb", 1, Some(1));
+        assert_subr_arity("logcount", 1, Some(1));
         assert_subr_arity("lognot", 1, Some(1));
         assert_subr_arity("substring-no-properties", 1, Some(3));
+        assert_subr_arity("group-name", 1, Some(1));
         assert_subr_arity("group-gid", 0, Some(0));
         assert_subr_arity("group-real-gid", 0, Some(0));
+        assert_subr_arity("load-average", 0, Some(1));
         assert_subr_arity("last-nonminibuffer-frame", 0, Some(0));
         assert_subr_arity("interactive-p", 0, Some(0));
         assert_subr_arity("interpreted-function-p", 1, Some(1));

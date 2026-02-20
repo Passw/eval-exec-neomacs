@@ -9194,6 +9194,7 @@ pub(crate) fn dispatch_builtin(
         "file-exists-p" => return Some(super::fileio::builtin_file_exists_p_eval(eval, args)),
         "file-readable-p" => return Some(super::fileio::builtin_file_readable_p_eval(eval, args)),
         "file-writable-p" => return Some(super::fileio::builtin_file_writable_p_eval(eval, args)),
+        "file-acl" => return Some(super::fileio::builtin_file_acl_eval(eval, args)),
         "file-accessible-directory-p" => {
             return Some(super::fileio::builtin_file_accessible_directory_p_eval(
                 eval, args,
@@ -9202,6 +9203,11 @@ pub(crate) fn dispatch_builtin(
         "file-executable-p" => {
             return Some(super::fileio::builtin_file_executable_p_eval(eval, args))
         }
+        "file-locked-p" => return Some(super::fileio::builtin_file_locked_p_eval(eval, args)),
+        "file-selinux-context" => {
+            return Some(super::fileio::builtin_file_selinux_context_eval(eval, args))
+        }
+        "file-system-info" => return Some(super::fileio::builtin_file_system_info_eval(eval, args)),
         "file-directory-p" => {
             return Some(super::fileio::builtin_file_directory_p_eval(eval, args))
         }
@@ -10889,11 +10895,15 @@ pub(crate) fn dispatch_builtin(
         "file-name-absolute-p" => super::fileio::builtin_file_name_absolute_p(args),
         "directory-name-p" => super::fileio::builtin_directory_name_p(args),
         "substitute-in-file-name" => super::fileio::builtin_substitute_in_file_name(args),
+        "file-acl" => super::fileio::builtin_file_acl(args),
         "file-exists-p" => super::fileio::builtin_file_exists_p(args),
         "file-readable-p" => super::fileio::builtin_file_readable_p(args),
         "file-writable-p" => super::fileio::builtin_file_writable_p(args),
         "file-accessible-directory-p" => super::fileio::builtin_file_accessible_directory_p(args),
         "file-executable-p" => super::fileio::builtin_file_executable_p(args),
+        "file-locked-p" => super::fileio::builtin_file_locked_p(args),
+        "file-selinux-context" => super::fileio::builtin_file_selinux_context(args),
+        "file-system-info" => super::fileio::builtin_file_system_info(args),
         "file-directory-p" => super::fileio::builtin_file_directory_p(args),
         "file-regular-p" => super::fileio::builtin_file_regular_p(args),
         "file-symlink-p" => super::fileio::builtin_file_symlink_p(args),
@@ -10935,6 +10945,7 @@ pub(crate) fn dispatch_builtin(
         // Process (pure — no evaluator needed)
         "shell-command-to-string" => super::process::builtin_shell_command_to_string(args),
         "getenv" => super::process::builtin_getenv(args),
+        "getenv-internal" => super::process::builtin_getenv_internal(args),
         "setenv" => super::process::builtin_setenv(args),
 
         // Timer (pure — no evaluator needed)
@@ -11473,8 +11484,11 @@ pub(crate) fn dispatch_builtin(
         // Editfns (pure)
         "user-uid" => super::editfns::builtin_user_uid(args),
         "user-real-uid" => super::editfns::builtin_user_real_uid(args),
+        "group-name" => super::editfns::builtin_group_name(args),
         "group-gid" => super::editfns::builtin_group_gid(args),
         "group-real-gid" => super::editfns::builtin_group_real_gid(args),
+        "load-average" => super::editfns::builtin_load_average(args),
+        "logcount" => super::editfns::builtin_logcount(args),
 
         // Fns (pure)
         "base64-encode-string" => super::fns::builtin_base64_encode_string(args),
@@ -11605,11 +11619,15 @@ pub(crate) fn dispatch_builtin_pure(name: &str, args: Vec<Value>) -> Option<Eval
         "file-name-absolute-p" => super::fileio::builtin_file_name_absolute_p(args),
         "directory-name-p" => super::fileio::builtin_directory_name_p(args),
         "substitute-in-file-name" => super::fileio::builtin_substitute_in_file_name(args),
+        "file-acl" => super::fileio::builtin_file_acl(args),
         "file-exists-p" => super::fileio::builtin_file_exists_p(args),
         "file-readable-p" => super::fileio::builtin_file_readable_p(args),
         "file-writable-p" => super::fileio::builtin_file_writable_p(args),
         "file-accessible-directory-p" => super::fileio::builtin_file_accessible_directory_p(args),
         "file-executable-p" => super::fileio::builtin_file_executable_p(args),
+        "file-locked-p" => super::fileio::builtin_file_locked_p(args),
+        "file-selinux-context" => super::fileio::builtin_file_selinux_context(args),
+        "file-system-info" => super::fileio::builtin_file_system_info(args),
         "file-directory-p" => super::fileio::builtin_file_directory_p(args),
         "file-regular-p" => super::fileio::builtin_file_regular_p(args),
         "file-symlink-p" => super::fileio::builtin_file_symlink_p(args),
@@ -11649,7 +11667,14 @@ pub(crate) fn dispatch_builtin_pure(name: &str, args: Vec<Value>) -> Option<Eval
         // Process (pure)
         "shell-command-to-string" => super::process::builtin_shell_command_to_string(args),
         "getenv" => super::process::builtin_getenv(args),
+        "getenv-internal" => super::process::builtin_getenv_internal(args),
         "setenv" => super::process::builtin_setenv(args),
+        // Editfns (pure)
+        "group-name" => super::editfns::builtin_group_name(args),
+        "group-gid" => super::editfns::builtin_group_gid(args),
+        "group-real-gid" => super::editfns::builtin_group_real_gid(args),
+        "load-average" => super::editfns::builtin_load_average(args),
+        "logcount" => super::editfns::builtin_logcount(args),
         // Timer (pure)
         "timerp" => super::timer::builtin_timerp(args),
         "sit-for" => super::timer::builtin_sit_for(args),

@@ -10,6 +10,8 @@
 
 use super::error::{signal, EvalResult, Flow};
 use super::value::*;
+#[cfg(unix)]
+use std::ffi::CStr;
 
 // ---------------------------------------------------------------------------
 // Argument helpers
@@ -287,6 +289,79 @@ pub(crate) fn builtin_group_real_gid(args: Vec<Value>) -> EvalResult {
     Ok(Value::Int(get_gid()))
 }
 
+/// `(group-name GID)` — return the group name for numeric GID.
+pub(crate) fn builtin_group_name(args: Vec<Value>) -> EvalResult {
+    expect_args("group-name", &args, 1)?;
+    let gid = match &args[0] {
+        Value::Int(n) => *n,
+        Value::Char(c) => *c as i64,
+        _ => {
+            return Err(signal(
+                "error",
+                vec![Value::string("Invalid GID specification")],
+            ))
+        }
+    };
+    if gid < 0 || gid > u32::MAX as i64 {
+        return Err(signal(
+            "error",
+            vec![Value::string("Invalid GID specification")],
+        ));
+    }
+    let Some(name) = lookup_group_name(gid as u32) else {
+        return Err(signal(
+            "error",
+            vec![Value::string("Invalid GID specification")],
+        ));
+    };
+    Ok(Value::string(name))
+}
+
+/// `(load-average &optional USE-FLOATS)` — return load averages.
+///
+/// With USE-FLOATS non-nil, returns 3 floats.
+/// With USE-FLOATS nil/omitted, returns 3 integers scaled by 100.
+pub(crate) fn builtin_load_average(args: Vec<Value>) -> EvalResult {
+    expect_max_args("load-average", &args, 1)?;
+    let use_floats = args.first().is_some_and(|value| value.is_truthy());
+    let loads = read_load_average().unwrap_or([0.0, 0.0, 0.0]);
+    if use_floats {
+        Ok(Value::list(vec![
+            Value::Float(loads[0]),
+            Value::Float(loads[1]),
+            Value::Float(loads[2]),
+        ]))
+    } else {
+        Ok(Value::list(vec![
+            Value::Int((loads[0] * 100.0) as i64),
+            Value::Int((loads[1] * 100.0) as i64),
+            Value::Int((loads[2] * 100.0) as i64),
+        ]))
+    }
+}
+
+/// `(logcount INTEGER)` — return the number of 1 bits for nonnegative integers,
+/// or the number of 0 bits in two's-complement form for negative integers.
+pub(crate) fn builtin_logcount(args: Vec<Value>) -> EvalResult {
+    expect_args("logcount", &args, 1)?;
+    let n = match &args[0] {
+        Value::Int(v) => *v,
+        Value::Char(c) => *c as i64,
+        _ => {
+            return Err(signal(
+                "wrong-type-argument",
+                vec![Value::symbol("integerp"), args[0].clone()],
+            ))
+        }
+    };
+    let bits = if n >= 0 {
+        (n as u64).count_ones() as i64
+    } else {
+        ((!n) as u64).count_ones() as i64
+    };
+    Ok(Value::Int(bits))
+}
+
 // ---------------------------------------------------------------------------
 // OS helpers (avoid libc dependency)
 // ---------------------------------------------------------------------------
@@ -311,4 +386,38 @@ fn get_gid() -> i64 {
         .and_then(|o| String::from_utf8(o.stdout).ok())
         .and_then(|s| s.trim().parse::<i64>().ok())
         .unwrap_or(1000)
+}
+
+#[cfg(unix)]
+fn lookup_group_name(gid: u32) -> Option<String> {
+    let group = unsafe { libc::getgrgid(gid as libc::gid_t) };
+    if group.is_null() {
+        return None;
+    }
+    let name_ptr = unsafe { (*group).gr_name };
+    if name_ptr.is_null() {
+        return None;
+    }
+    Some(unsafe { CStr::from_ptr(name_ptr) }.to_string_lossy().into_owned())
+}
+
+#[cfg(not(unix))]
+fn lookup_group_name(_gid: u32) -> Option<String> {
+    None
+}
+
+#[cfg(unix)]
+fn read_load_average() -> Option<[f64; 3]> {
+    let mut values = [0.0f64; 3];
+    let result = unsafe { libc::getloadavg(values.as_mut_ptr(), 3) };
+    if result == 3 {
+        Some(values)
+    } else {
+        None
+    }
+}
+
+#[cfg(not(unix))]
+fn read_load_average() -> Option<[f64; 3]> {
+    None
 }

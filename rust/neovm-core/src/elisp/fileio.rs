@@ -456,6 +456,69 @@ pub fn file_executable_p(filename: &str) -> bool {
     }
 }
 
+/// Return true if FILENAME is currently locked by Emacs lockfiles.
+///
+/// NeoVM currently does not implement lockfile probing, so this returns nil.
+pub fn file_locked_p(_filename: &str) -> bool {
+    false
+}
+
+/// Return filesystem capacity information for PATH.
+///
+/// The tuple layout matches Emacs `file-system-info`:
+/// `(TOTAL-BYTES FREE-BYTES AVAILABLE-BYTES)`.
+fn file_system_info(path: &str) -> Result<(i64, i64, i64), Flow> {
+    #[cfg(unix)]
+    {
+        fn saturating_i64(v: u128) -> i64 {
+            if v > i64::MAX as u128 {
+                i64::MAX
+            } else {
+                v as i64
+            }
+        }
+
+        let c_path = CString::new(path.as_bytes()).map_err(|_| {
+            signal(
+                "file-error",
+                vec![
+                    Value::string("Getting file system info"),
+                    Value::string("embedded NUL in file name"),
+                    Value::string(path),
+                ],
+            )
+        })?;
+        let mut stats: libc::statvfs = unsafe { std::mem::zeroed() };
+        if unsafe { libc::statvfs(c_path.as_ptr(), &mut stats as *mut libc::statvfs) } != 0 {
+            return Err(signal_file_io_path(
+                std::io::Error::last_os_error(),
+                "Getting file system info",
+                path,
+            ));
+        }
+
+        let block_size = if stats.f_frsize > 0 {
+            stats.f_frsize as u128
+        } else {
+            stats.f_bsize as u128
+        };
+        let total = (stats.f_blocks as u128) * block_size;
+        let free = (stats.f_bfree as u128) * block_size;
+        let available = (stats.f_bavail as u128) * block_size;
+        Ok((
+            saturating_i64(total),
+            saturating_i64(free),
+            saturating_i64(available),
+        ))
+    }
+
+    #[cfg(not(unix))]
+    {
+        let _ = path;
+        Ok((0, 0, 0))
+    }
+}
+
 /// Return true if FILENAME is a directory.
 pub fn file_directory_p(filename: &str) -> bool {
     Path::new(filename).is_dir()
@@ -1650,6 +1713,81 @@ pub(crate) fn builtin_file_executable_p_eval(eval: &Evaluator, args: Vec<Value>)
     let filename = expect_string_strict(&args[0])?;
     let filename = resolve_filename_for_eval(eval, &filename);
     Ok(Value::bool(file_executable_p(&filename)))
+}
+
+/// (file-acl FILENAME) -> ACL string or nil
+pub(crate) fn builtin_file_acl(args: Vec<Value>) -> EvalResult {
+    expect_args("file-acl", &args, 1)?;
+    Ok(Value::Nil)
+}
+
+/// Evaluator-aware variant of `file-acl`.
+pub(crate) fn builtin_file_acl_eval(eval: &Evaluator, args: Vec<Value>) -> EvalResult {
+    expect_args("file-acl", &args, 1)?;
+    if let Some(filename) = args.first().and_then(|value| value.as_str()) {
+        let _ = resolve_filename_for_eval(eval, filename);
+    }
+    Ok(Value::Nil)
+}
+
+/// (file-locked-p FILENAME) -> locker info or nil
+pub(crate) fn builtin_file_locked_p(args: Vec<Value>) -> EvalResult {
+    expect_args("file-locked-p", &args, 1)?;
+    let filename = expect_string_strict(&args[0])?;
+    Ok(Value::bool(file_locked_p(&filename)))
+}
+
+/// Evaluator-aware variant of `file-locked-p` that resolves relative paths
+/// against dynamic/default `default-directory`.
+pub(crate) fn builtin_file_locked_p_eval(eval: &Evaluator, args: Vec<Value>) -> EvalResult {
+    expect_args("file-locked-p", &args, 1)?;
+    let filename = expect_string_strict(&args[0])?;
+    let filename = resolve_filename_for_eval(eval, &filename);
+    Ok(Value::bool(file_locked_p(&filename)))
+}
+
+/// (file-selinux-context FILENAME) -> (user role type range)
+pub(crate) fn builtin_file_selinux_context(args: Vec<Value>) -> EvalResult {
+    expect_args("file-selinux-context", &args, 1)?;
+    let _filename = expect_string_strict(&args[0])?;
+    Ok(Value::list(vec![Value::Nil, Value::Nil, Value::Nil, Value::Nil]))
+}
+
+/// Evaluator-aware variant of `file-selinux-context`.
+pub(crate) fn builtin_file_selinux_context_eval(
+    eval: &Evaluator,
+    args: Vec<Value>,
+) -> EvalResult {
+    expect_args("file-selinux-context", &args, 1)?;
+    let filename = expect_string_strict(&args[0])?;
+    let _filename = resolve_filename_for_eval(eval, &filename);
+    Ok(Value::list(vec![Value::Nil, Value::Nil, Value::Nil, Value::Nil]))
+}
+
+/// (file-system-info PATH) -> (total free avail) in bytes
+pub(crate) fn builtin_file_system_info(args: Vec<Value>) -> EvalResult {
+    expect_args("file-system-info", &args, 1)?;
+    let filename = expect_string_strict(&args[0])?;
+    let (total, free, avail) = file_system_info(&filename)?;
+    Ok(Value::list(vec![
+        Value::Int(total),
+        Value::Int(free),
+        Value::Int(avail),
+    ]))
+}
+
+/// Evaluator-aware variant of `file-system-info` that resolves relative paths
+/// against dynamic/default `default-directory`.
+pub(crate) fn builtin_file_system_info_eval(eval: &Evaluator, args: Vec<Value>) -> EvalResult {
+    expect_args("file-system-info", &args, 1)?;
+    let filename = expect_string_strict(&args[0])?;
+    let filename = resolve_filename_for_eval(eval, &filename);
+    let (total, free, avail) = file_system_info(&filename)?;
+    Ok(Value::list(vec![
+        Value::Int(total),
+        Value::Int(free),
+        Value::Int(avail),
+    ]))
 }
 
 /// (file-directory-p FILENAME) -> t or nil
