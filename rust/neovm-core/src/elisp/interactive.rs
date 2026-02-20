@@ -305,6 +305,7 @@ fn builtin_command_name(name: &str) -> bool {
             | "forward-char"
             | "backward-char"
             | "delete-char"
+            | "insert-char"
             | "next-line"
             | "previous-line"
             | "kill-line"
@@ -3300,6 +3301,7 @@ mod tests {
         for name in [
             "backward-char",
             "delete-char",
+            "insert-char",
             "yank",
             "yank-pop",
             "transpose-chars",

@@ -617,6 +617,13 @@ pub(crate) fn builtin_integerp(args: Vec<Value>) -> EvalResult {
     Ok(Value::bool(args[0].is_integer()))
 }
 
+pub(crate) fn builtin_integer_or_marker_p(args: Vec<Value>) -> EvalResult {
+    expect_args("integer-or-marker-p", &args, 1)?;
+    let is_integer_or_marker = matches!(args[0], Value::Int(_) | Value::Char(_))
+        || super::marker::is_marker(&args[0]);
+    Ok(Value::bool(is_integer_or_marker))
+}
+
 pub(crate) fn builtin_floatp(args: Vec<Value>) -> EvalResult {
     expect_args("floatp", &args, 1)?;
     Ok(Value::bool(args[0].is_float()))
@@ -2850,6 +2857,37 @@ pub(crate) fn builtin_boundp(eval: &mut super::eval::Evaluator, args: Vec<Value>
         )
     })?;
     Ok(Value::bool(eval.obarray().boundp(name)))
+}
+
+pub(crate) fn builtin_default_boundp(
+    eval: &mut super::eval::Evaluator,
+    args: Vec<Value>,
+) -> EvalResult {
+    expect_args("default-boundp", &args, 1)?;
+    let name = args[0].as_symbol_name().ok_or_else(|| {
+        signal(
+            "wrong-type-argument",
+            vec![Value::symbol("symbolp"), args[0].clone()],
+        )
+    })?;
+    Ok(Value::bool(eval.obarray().boundp(name)))
+}
+
+pub(crate) fn builtin_default_toplevel_value(
+    eval: &mut super::eval::Evaluator,
+    args: Vec<Value>,
+) -> EvalResult {
+    expect_args("default-toplevel-value", &args, 1)?;
+    let name = args[0].as_symbol_name().ok_or_else(|| {
+        signal(
+            "wrong-type-argument",
+            vec![Value::symbol("symbolp"), args[0].clone()],
+        )
+    })?;
+    eval.obarray()
+        .symbol_value(name)
+        .cloned()
+        .ok_or_else(|| signal("void-variable", vec![Value::symbol(name)]))
 }
 
 pub(crate) fn builtin_fboundp(eval: &mut super::eval::Evaluator, args: Vec<Value>) -> EvalResult {
@@ -5493,6 +5531,100 @@ pub(crate) fn builtin_insert(eval: &mut super::eval::Evaluator, args: Vec<Value>
     Ok(Value::Nil)
 }
 
+fn insert_char_code_from_value(value: &Value) -> Result<i64, Flow> {
+    match value {
+        Value::Char(c) => Ok(*c as i64),
+        Value::Int(n) if *n < 0 || *n > KEY_CHAR_CODE_MASK => Err(signal(
+            "wrong-type-argument",
+            vec![Value::symbol("characterp"), value.clone()],
+        )),
+        Value::Int(n) => Ok(*n),
+        other => Err(signal(
+            "wrong-type-argument",
+            vec![Value::symbol("characterp"), other.clone()],
+        )),
+    }
+}
+
+/// `(insert-char CHARACTER &optional COUNT INHERIT)` -> nil
+pub(crate) fn builtin_insert_char(
+    eval: &mut super::eval::Evaluator,
+    args: Vec<Value>,
+) -> EvalResult {
+    expect_range_args("insert-char", &args, 1, 3)?;
+    let char_code = insert_char_code_from_value(&args[0])?;
+    let Some(ch) = char::from_u32(char_code as u32) else {
+        return Ok(Value::Nil);
+    };
+    let count = if args.len() > 1 {
+        expect_fixnum(&args[1])?
+    } else {
+        1
+    };
+
+    if count <= 0 {
+        return Ok(Value::Nil);
+    }
+
+    let read_only_buffer_name = eval.buffers.current_buffer().and_then(|buf| {
+        if buffer_read_only_active(eval, buf) {
+            Some(buf.name.clone())
+        } else {
+            None
+        }
+    });
+    if let Some(name) = read_only_buffer_name {
+        return Err(signal("buffer-read-only", vec![Value::string(name)]));
+    }
+
+    let buf = eval
+        .buffers
+        .current_buffer_mut()
+        .ok_or_else(|| signal("error", vec![Value::string("No current buffer")]))?;
+    let to_insert = ch.to_string().repeat(count as usize);
+    buf.insert(&to_insert);
+    Ok(Value::Nil)
+}
+
+/// `(insert-byte BYTE COUNT &optional INHERIT)` -> nil
+pub(crate) fn builtin_insert_byte(
+    eval: &mut super::eval::Evaluator,
+    args: Vec<Value>,
+) -> EvalResult {
+    expect_range_args("insert-byte", &args, 2, 3)?;
+    let byte = expect_fixnum(&args[0])?;
+    if !(0..=255).contains(&byte) {
+        return Err(signal(
+            "args-out-of-range",
+            vec![Value::Int(byte), Value::Int(0), Value::Int(255)],
+        ));
+    }
+    let count = expect_fixnum(&args[1])?;
+    if count <= 0 {
+        return Ok(Value::Nil);
+    }
+
+    let read_only_buffer_name = eval.buffers.current_buffer().and_then(|buf| {
+        if buffer_read_only_active(eval, buf) {
+            Some(buf.name.clone())
+        } else {
+            None
+        }
+    });
+    if let Some(name) = read_only_buffer_name {
+        return Err(signal("buffer-read-only", vec![Value::string(name)]));
+    }
+
+    let ch = char::from_u32(byte as u32).expect("byte range maps to a valid codepoint");
+    let to_insert = ch.to_string().repeat(count as usize);
+    let buf = eval
+        .buffers
+        .current_buffer_mut()
+        .ok_or_else(|| signal("error", vec![Value::string("No current buffer")]))?;
+    buf.insert(&to_insert);
+    Ok(Value::Nil)
+}
+
 /// (delete-region START END) → nil
 pub(crate) fn builtin_delete_region(
     eval: &mut super::eval::Evaluator,
@@ -7936,6 +8068,8 @@ pub(crate) fn dispatch_builtin(
         "macrop" => return Some(builtin_macrop_eval(eval, args)),
         // Symbol/obarray
         "boundp" => return Some(builtin_boundp(eval, args)),
+        "default-boundp" => return Some(builtin_default_boundp(eval, args)),
+        "default-toplevel-value" => return Some(builtin_default_toplevel_value(eval, args)),
         "fboundp" => return Some(builtin_fboundp(eval, args)),
         "symbol-value" => return Some(builtin_symbol_value(eval, args)),
         "symbol-function" => return Some(builtin_symbol_function(eval, args)),
@@ -8011,6 +8145,8 @@ pub(crate) fn dispatch_builtin(
         "point-max" => return Some(builtin_point_max(eval, args)),
         "goto-char" => return Some(builtin_goto_char(eval, args)),
         "insert" => return Some(builtin_insert(eval, args)),
+        "insert-char" => return Some(builtin_insert_char(eval, args)),
+        "insert-byte" => return Some(builtin_insert_byte(eval, args)),
         "delete-region" => return Some(builtin_delete_region(eval, args)),
         "erase-buffer" => return Some(builtin_erase_buffer(eval, args)),
         "buffer-enable-undo" => return Some(builtin_buffer_enable_undo(eval, args)),
@@ -9677,6 +9813,7 @@ pub(crate) fn dispatch_builtin(
         // Type predicates (typed subset is dispatched above)
         // Type predicates (typed subset is dispatched above)
         // Type predicates (typed subset is dispatched above)
+        "integer-or-marker-p" => builtin_integer_or_marker_p(args),
 
         // Equality (typed subset is dispatched above)
 
@@ -10009,6 +10146,9 @@ pub(crate) fn dispatch_builtin(
         "remove-images" => super::image::builtin_remove_images(args),
         "image-flush" => super::image::builtin_image_flush(args),
         "clear-image-cache" => super::image::builtin_clear_image_cache(args),
+        "image-cache-size" => super::image::builtin_image_cache_size(args),
+        "image-metadata" => super::image::builtin_image_metadata(args),
+        "imagep" => super::image::builtin_imagep(args),
         "image-type" => super::image::builtin_image_type(args),
         "image-transforms-p" => super::image::builtin_image_transforms_p(args),
 

@@ -53,6 +53,17 @@ fn expect_max_args(name: &str, args: &[Value], max: usize) -> Result<(), Flow> {
     }
 }
 
+fn expect_range_args(name: &str, args: &[Value], min: usize, max: usize) -> Result<(), Flow> {
+    if args.len() < min || args.len() > max {
+        Err(signal(
+            "wrong-number-of-arguments",
+            vec![Value::symbol(name), Value::Int(args.len() as i64)],
+        ))
+    } else {
+        Ok(())
+    }
+}
+
 fn expect_frame_designator(_name: &str, value: &Value) -> Result<(), Flow> {
     match value {
         Value::Nil => Ok(()),
@@ -65,12 +76,20 @@ fn expect_frame_designator(_name: &str, value: &Value) -> Result<(), Flow> {
     }
 }
 
+fn normalized_keyword_name(value: &Value) -> Option<&str> {
+    match value {
+        Value::Keyword(name) => Some(name.strip_prefix(':').unwrap_or(name.as_str())),
+        _ => None,
+    }
+}
+
 // ---------------------------------------------------------------------------
 // Property list helpers
 // ---------------------------------------------------------------------------
 
 /// Get a value from a property list by keyword.
 /// The plist is a flat list: (:key1 val1 :key2 val2 ...).
+#[cfg(test)]
 fn plist_get(plist: &Value, key: &Value) -> Value {
     let mut cursor = plist.clone();
     loop {
@@ -103,17 +122,7 @@ fn plist_get(plist: &Value, key: &Value) -> Value {
 fn is_supported_image_type(name: &str) -> bool {
     matches!(
         name,
-        "png"
-            | "jpeg"
-            | "jpg"
-            | "gif"
-            | "svg"
-            | "webp"
-            | "xpm"
-            | "xbm"
-            | "pbm"
-            | "tiff"
-            | "bmp"
+        "png" | "jpeg" | "gif" | "svg" | "webp" | "xpm" | "xbm" | "pbm" | "tiff" | "bmp"
     )
 }
 
@@ -142,28 +151,60 @@ fn infer_image_type_from_filename(path: &str) -> Option<&'static str> {
 }
 
 /// Validate that a value looks like an image spec.
-/// An image spec is a list starting with the symbol `image` followed by
-/// property-list key/value pairs, or simply a property list with a `:type` key.
+/// Oracle-compatible shape:
+/// - list starts with symbol `image`
+/// - plist includes a supported symbolic `:type`
+/// - plist includes exactly one source key: `:file` or `:data`
+/// - source value is a string
 fn is_image_spec(value: &Value) -> bool {
-    match value {
-        Value::Cons(_) => {
-            // Check if it starts with the symbol `image`.
-            let items = match list_to_vec(value) {
-                Some(v) => v,
-                None => return false,
-            };
-            if items.is_empty() {
-                return false;
-            }
-            // Emacs image descriptors look like: (image :type png :file "x.png" ...)
-            if let Some(name) = items[0].as_symbol_name() {
-                if name == "image" {
-                    return true;
+    let items = match list_to_vec(value) {
+        Some(v) => v,
+        None => return false,
+    };
+
+    if items.is_empty() || items[0].as_symbol_name() != Some("image") {
+        return false;
+    }
+
+    let mut type_seen = false;
+    let mut type_ok = false;
+    let mut file_seen = false;
+    let mut file_ok = false;
+    let mut data_seen = false;
+    let mut data_ok = false;
+
+    let mut i = 1usize;
+    while i + 1 < items.len() {
+        if let Some(key) = normalized_keyword_name(&items[i]) {
+            let val = &items[i + 1];
+            match key {
+                "type" if !type_seen => {
+                    type_seen = true;
+                    type_ok = val
+                        .as_symbol_name()
+                        .is_some_and(is_supported_image_type);
                 }
+                "file" if !file_seen => {
+                    file_seen = true;
+                    file_ok = val.as_str().is_some();
+                }
+                "data" if !data_seen => {
+                    data_seen = true;
+                    data_ok = val.as_str().is_some();
+                }
+                _ => {}
             }
-            // Also accept a bare plist with :type.
-            !plist_get(value, &Value::Keyword("type".into())).is_nil()
         }
+        i += 2;
+    }
+
+    if !type_seen || !type_ok {
+        return false;
+    }
+
+    match (file_seen, data_seen) {
+        (true, false) => file_ok,
+        (false, true) => data_ok,
         _ => false,
     }
 }
@@ -507,6 +548,41 @@ pub(crate) fn builtin_clear_image_cache(args: Vec<Value>) -> EvalResult {
     Ok(Value::Nil)
 }
 
+/// (image-cache-size) -> integer
+///
+/// NeoVM currently has no persistent image cache, so this is always 0.
+pub(crate) fn builtin_image_cache_size(args: Vec<Value>) -> EvalResult {
+    expect_args("image-cache-size", &args, 0)?;
+    Ok(Value::Int(0))
+}
+
+/// (image-metadata SPEC &optional FRAME) -> metadata object or nil
+///
+/// Returns nil for non-image specifications. For valid image specs on
+/// non-window-system frames, this signals the same error shape as GNU Emacs.
+pub(crate) fn builtin_image_metadata(args: Vec<Value>) -> EvalResult {
+    expect_range_args("image-metadata", &args, 1, 2)?;
+
+    if !is_image_spec(&args[0]) {
+        return Ok(Value::Nil);
+    }
+
+    if let Some(frame) = args.get(1) {
+        expect_frame_designator("image-metadata", frame)?;
+    }
+
+    Err(signal(
+        "error",
+        vec![Value::string("Window system frame should be used")],
+    ))
+}
+
+/// (imagep OBJECT) -> t if OBJECT looks like an image descriptor.
+pub(crate) fn builtin_imagep(args: Vec<Value>) -> EvalResult {
+    expect_args("imagep", &args, 1)?;
+    Ok(Value::bool(is_image_spec(&args[0])))
+}
+
 /// (image-type SOURCE &optional TYPE DATA-P) -> symbol
 ///
 /// Compatibility behavior:
@@ -559,7 +635,9 @@ pub(crate) fn builtin_image_type(args: Vec<Value>) -> EvalResult {
     let Some(resolved) = resolved else {
         return Err(signal(
             "unknown-image-type",
-            vec![Value::list(vec![Value::string("Cannot determine image type")])],
+            vec![Value::list(vec![Value::string(
+                "Cannot determine image type",
+            )])],
         ));
     };
 
@@ -629,6 +707,13 @@ mod tests {
     #[test]
     fn type_available_neomacs() {
         let result = builtin_image_type_available_p(vec![Value::symbol("neomacs")]);
+        assert!(result.is_ok());
+        assert!(result.unwrap().is_nil());
+    }
+
+    #[test]
+    fn type_available_jpg_alias_is_nil() {
+        let result = builtin_image_type_available_p(vec![Value::symbol("jpg")]);
         assert!(result.is_ok());
         assert!(result.unwrap().is_nil());
     }
@@ -1104,6 +1189,70 @@ mod tests {
         assert!(result.unwrap().is_nil());
     }
 
+    #[test]
+    fn image_cache_size_is_zero() {
+        let result = builtin_image_cache_size(vec![]);
+        assert_eq!(result.unwrap(), Value::Int(0));
+    }
+
+    #[test]
+    fn imagep_matches_image_spec_shape() {
+        let spec = builtin_create_image(vec![Value::string("test.png"), Value::symbol("png")])
+            .expect("create-image should succeed");
+        assert!(builtin_imagep(vec![spec]).unwrap().is_truthy());
+        assert!(builtin_imagep(vec![Value::Int(1)]).unwrap().is_nil());
+        assert!(
+            builtin_imagep(vec![Value::list(vec![
+                Value::symbol("image"),
+                Value::Keyword("type".into()),
+                Value::symbol("png"),
+            ])])
+            .unwrap()
+            .is_nil()
+        );
+        assert!(
+            builtin_imagep(vec![Value::list(vec![
+                Value::symbol("image"),
+                Value::Keyword("file".into()),
+                Value::string("x.png"),
+            ])])
+            .unwrap()
+            .is_nil()
+        );
+    }
+
+    #[test]
+    fn image_metadata_non_spec_returns_nil() {
+        let result = builtin_image_metadata(vec![Value::Int(1)]).unwrap();
+        assert!(result.is_nil());
+    }
+
+    #[test]
+    fn image_metadata_window_system_error_shape() {
+        let spec = builtin_create_image(vec![Value::string("test.png"), Value::symbol("png")])
+            .expect("create-image should succeed");
+        let result = builtin_image_metadata(vec![spec]);
+        assert!(matches!(
+            result,
+            Err(Flow::Signal(sig))
+                if sig.symbol == "error"
+                && sig.data.first() == Some(&Value::string("Window system frame should be used"))
+        ));
+    }
+
+    #[test]
+    fn image_metadata_second_arg_validates_frame_designator() {
+        let spec = builtin_create_image(vec![Value::string("test.png"), Value::symbol("png")])
+            .expect("create-image should succeed");
+        let result = builtin_image_metadata(vec![spec, Value::True]);
+        assert!(matches!(
+            result,
+            Err(Flow::Signal(sig))
+                if sig.symbol == "wrong-type-argument"
+                && sig.data.first() == Some(&Value::symbol("frame-live-p"))
+        ));
+    }
+
     // -----------------------------------------------------------------------
     // image-type
     // -----------------------------------------------------------------------
@@ -1238,7 +1387,7 @@ mod tests {
     #[test]
     fn is_image_spec_bare_plist() {
         let spec = Value::list(vec![Value::Keyword("type".into()), Value::symbol("png")]);
-        assert!(is_image_spec(&spec));
+        assert!(!is_image_spec(&spec));
     }
 
     #[test]
@@ -1252,6 +1401,54 @@ mod tests {
     fn is_image_spec_empty_list() {
         let spec = Value::list(vec![]);
         assert!(!is_image_spec(&spec));
+    }
+
+    #[test]
+    fn is_image_spec_requires_supported_type_and_one_source() {
+        let valid_file = Value::list(vec![
+            Value::symbol("image"),
+            Value::Keyword("type".into()),
+            Value::symbol("png"),
+            Value::Keyword("file".into()),
+            Value::string("x.png"),
+        ]);
+        assert!(is_image_spec(&valid_file));
+
+        let valid_data = Value::list(vec![
+            Value::symbol("image"),
+            Value::Keyword("type".into()),
+            Value::symbol("png"),
+            Value::Keyword("data".into()),
+            Value::string("raw"),
+        ]);
+        assert!(is_image_spec(&valid_data));
+
+        let unsupported_type = Value::list(vec![
+            Value::symbol("image"),
+            Value::Keyword("type".into()),
+            Value::symbol("jpg"),
+            Value::Keyword("file".into()),
+            Value::string("x.jpg"),
+        ]);
+        assert!(!is_image_spec(&unsupported_type));
+
+        let both_sources = Value::list(vec![
+            Value::symbol("image"),
+            Value::Keyword("type".into()),
+            Value::symbol("png"),
+            Value::Keyword("file".into()),
+            Value::string("x.png"),
+            Value::Keyword("data".into()),
+            Value::string("raw"),
+        ]);
+        assert!(!is_image_spec(&both_sources));
+
+        let missing_source = Value::list(vec![
+            Value::symbol("image"),
+            Value::Keyword("type".into()),
+            Value::symbol("png"),
+        ]);
+        assert!(!is_image_spec(&missing_source));
     }
 
     #[test]

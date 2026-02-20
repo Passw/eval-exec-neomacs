@@ -404,7 +404,9 @@ fn subr_arity_value(name: &str) -> Value {
         | "closurep"
         | "compiled-function-p"
         | "custom-variable-p"
+        | "default-boundp"
         | "default-value"
+        | "default-toplevel-value"
         | "native-comp-function-p" => arity_cons(1, Some(1)),
         "char-charset" => arity_cons(1, Some(2)),
         "char-table-extra-slot" | "char-table-range" => arity_cons(2, Some(2)),
@@ -425,6 +427,7 @@ fn subr_arity_value(name: &str) -> Value {
         | "byte-code-function-p"
         | "car-safe"
         | "cdr-safe"
+        | "integer-or-marker-p"
         | "bare-symbol"
         | "bare-symbol-p" => {
             arity_cons(1, Some(1))
@@ -449,6 +452,8 @@ fn subr_arity_value(name: &str) -> Value {
         | "register-ccl-program"
         | "register-code-conversion-map" => arity_cons(2, Some(2)),
         "insert-register" | "point-to-register" => arity_cons(1, Some(2)),
+        "insert-byte" => arity_cons(2, Some(3)),
+        "insert-char" => arity_cons(1, Some(3)),
         "hash-table-p" | "clrhash" | "hash-table-count" => arity_cons(1, Some(1)),
         "gethash" => arity_cons(2, Some(3)),
         "puthash" => arity_cons(3, Some(3)),
@@ -1044,10 +1049,12 @@ fn subr_arity_value(name: &str) -> Value {
         "clear-face-cache" => arity_cons(0, Some(1)),
         "clear-font-cache" => arity_cons(0, Some(0)),
         "clear-image-cache" => arity_cons(0, Some(2)),
+        "image-cache-size" => arity_cons(0, Some(0)),
         "create-image" => arity_cons(1, None),
         "find-font" => arity_cons(1, Some(2)),
         "font-family-list" => arity_cons(0, Some(1)),
-        "image-flush" | "image-mask-p" => arity_cons(1, Some(2)),
+        "image-flush" | "image-mask-p" | "image-metadata" => arity_cons(1, Some(2)),
+        "imagep" => arity_cons(1, Some(1)),
         "image-size" | "image-type" => arity_cons(1, Some(3)),
         "image-transforms-p" => arity_cons(0, Some(1)),
         "image-type-available-p" => arity_cons(1, Some(1)),
@@ -1764,8 +1771,11 @@ mod tests {
         assert_subr_arity("create-image", 1, None);
         assert_subr_arity("find-font", 1, Some(2));
         assert_subr_arity("font-family-list", 0, Some(1));
+        assert_subr_arity("image-cache-size", 0, Some(0));
         assert_subr_arity("image-flush", 1, Some(2));
         assert_subr_arity("image-mask-p", 1, Some(2));
+        assert_subr_arity("image-metadata", 1, Some(2));
+        assert_subr_arity("imagep", 1, Some(1));
         assert_subr_arity("image-size", 1, Some(3));
         assert_subr_arity("image-transforms-p", 0, Some(1));
         assert_subr_arity("image-type", 1, Some(3));
@@ -2515,7 +2525,10 @@ mod tests {
         assert_subr_arity("compiled-function-p", 1, Some(1));
         assert_subr_arity("custom-variable-p", 1, Some(1));
         assert_subr_arity("decode-char", 2, Some(2));
+        assert_subr_arity("default-boundp", 1, Some(1));
+        assert_subr_arity("default-toplevel-value", 1, Some(1));
         assert_subr_arity("default-value", 1, Some(1));
+        assert_subr_arity("integer-or-marker-p", 1, Some(1));
         assert_subr_arity("featurep", 1, Some(2));
     }
 
@@ -2621,6 +2634,8 @@ mod tests {
 
     #[test]
     fn subr_arity_edit_state_helper_primitives_match_oracle() {
+        assert_subr_arity("insert-byte", 2, Some(3));
+        assert_subr_arity("insert-char", 1, Some(3));
         assert_subr_arity("newline", 0, Some(2));
         assert_subr_arity("next-line", 0, Some(2));
         assert_subr_arity("newline-and-indent", 0, Some(1));
