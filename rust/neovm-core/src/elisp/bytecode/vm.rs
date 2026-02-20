@@ -454,14 +454,14 @@ impl<'a> Vm<'a> {
                 Op::Nth => {
                     let list = stack.pop().unwrap_or(Value::Nil);
                     let n = stack.pop().unwrap_or(Value::Int(0));
-                    let idx = n.as_int().unwrap_or(0);
-                    stack.push(nth_value(idx, &list));
+                    let result = self.dispatch_vm_builtin("nth", vec![n, list])?;
+                    stack.push(result);
                 }
                 Op::Nthcdr => {
                     let list = stack.pop().unwrap_or(Value::Nil);
                     let n = stack.pop().unwrap_or(Value::Int(0));
-                    let idx = n.as_int().unwrap_or(0);
-                    stack.push(nthcdr_value(idx, &list));
+                    let result = self.dispatch_vm_builtin("nthcdr", vec![n, list])?;
+                    stack.push(result);
                 }
                 Op::Elt => {
                     let idx = stack.pop().unwrap_or(Value::Nil);
@@ -515,12 +515,14 @@ impl<'a> Vm<'a> {
                 Op::Memq => {
                     let list = stack.pop().unwrap_or(Value::Nil);
                     let elt = stack.pop().unwrap_or(Value::Nil);
-                    stack.push(memq(&elt, &list));
+                    let result = self.dispatch_vm_builtin("memq", vec![elt, list])?;
+                    stack.push(result);
                 }
                 Op::Assq => {
                     let alist = stack.pop().unwrap_or(Value::Nil);
                     let key = stack.pop().unwrap_or(Value::Nil);
-                    stack.push(assq(&key, &alist));
+                    let result = self.dispatch_vm_builtin("assq", vec![key, alist])?;
+                    stack.push(result);
                 }
 
                 // -- Type predicates --
@@ -1412,75 +1414,6 @@ fn length_value(val: &Value) -> EvalResult {
     }
 }
 
-fn nth_value(n: i64, list: &Value) -> Value {
-    if n < 0 {
-        return Value::Nil;
-    }
-    let mut cursor = list.clone();
-    for _ in 0..n {
-        cursor = cdr(&cursor);
-    }
-    car(&cursor)
-}
-
-fn nthcdr_value(n: i64, list: &Value) -> Value {
-    if n <= 0 {
-        return list.clone();
-    }
-    let mut cursor = list.clone();
-    for _ in 0..n {
-        cursor = cdr(&cursor);
-    }
-    cursor
-}
-
-fn memq(elt: &Value, list: &Value) -> Value {
-    let mut cursor = list.clone();
-    loop {
-        match &cursor {
-            Value::Cons(c) => {
-                let pair = c.lock().expect("poisoned");
-                if eq_value(elt, &pair.car) {
-                    drop(pair);
-                    return cursor;
-                }
-                let next = pair.cdr.clone();
-                drop(pair);
-                cursor = next;
-            }
-            _ => return Value::Nil,
-        }
-    }
-}
-
-fn assq(key: &Value, alist: &Value) -> Value {
-    let mut cursor = alist.clone();
-    loop {
-        match &cursor {
-            Value::Cons(c) => {
-                let pair = c.lock().expect("poisoned");
-                let found = if let Value::Cons(ref entry) = pair.car {
-                    let entry = entry.lock().expect("poisoned");
-                    if eq_value(key, &entry.car) {
-                        Some(pair.car.clone())
-                    } else {
-                        None
-                    }
-                } else {
-                    None
-                };
-                if let Some(found) = found {
-                    return found;
-                }
-                let next = pair.cdr.clone();
-                drop(pair);
-                cursor = next;
-            }
-            _ => return Value::Nil,
-        }
-    }
-}
-
 fn sym_name(constants: &[Value], idx: u16) -> String {
     constants
         .get(idx as usize)
@@ -1783,6 +1716,64 @@ mod tests {
             EvalError::Signal { symbol, data } => {
                 assert_eq!(symbol, "wrong-type-argument");
                 assert_eq!(data, vec![Value::symbol("stringp"), Value::Int(1)]);
+            }
+            other => panic!("unexpected error: {other:?}"),
+        }
+    }
+
+    #[test]
+    fn vm_list_lookup_type_errors_match_oracle() {
+        let nth_int_err = vm_eval("(nth 'a '(1 2 3))").expect_err("nth must type-check index");
+        match nth_int_err {
+            EvalError::Signal { symbol, data } => {
+                assert_eq!(symbol, "wrong-type-argument");
+                assert_eq!(data, vec![Value::symbol("integerp"), Value::symbol("a")]);
+            }
+            other => panic!("unexpected error: {other:?}"),
+        }
+
+        let nth_list_err = vm_eval("(nth 1 1)").expect_err("nth must type-check list");
+        match nth_list_err {
+            EvalError::Signal { symbol, data } => {
+                assert_eq!(symbol, "wrong-type-argument");
+                assert_eq!(data, vec![Value::symbol("listp"), Value::Int(1)]);
+            }
+            other => panic!("unexpected error: {other:?}"),
+        }
+
+        let nthcdr_int_err =
+            vm_eval("(nthcdr 'a '(1 2 3))").expect_err("nthcdr must type-check index");
+        match nthcdr_int_err {
+            EvalError::Signal { symbol, data } => {
+                assert_eq!(symbol, "wrong-type-argument");
+                assert_eq!(data, vec![Value::symbol("integerp"), Value::symbol("a")]);
+            }
+            other => panic!("unexpected error: {other:?}"),
+        }
+
+        let nthcdr_list_err = vm_eval("(nthcdr 1 1)").expect_err("nthcdr must type-check list");
+        match nthcdr_list_err {
+            EvalError::Signal { symbol, data } => {
+                assert_eq!(symbol, "wrong-type-argument");
+                assert_eq!(data, vec![Value::symbol("listp"), Value::Int(1)]);
+            }
+            other => panic!("unexpected error: {other:?}"),
+        }
+
+        let memq_err = vm_eval("(memq 'a 1)").expect_err("memq must type-check list");
+        match memq_err {
+            EvalError::Signal { symbol, data } => {
+                assert_eq!(symbol, "wrong-type-argument");
+                assert_eq!(data, vec![Value::symbol("listp"), Value::Int(1)]);
+            }
+            other => panic!("unexpected error: {other:?}"),
+        }
+
+        let assq_err = vm_eval("(assq 'a 1)").expect_err("assq must type-check alist");
+        match assq_err {
+            EvalError::Signal { symbol, data } => {
+                assert_eq!(symbol, "wrong-type-argument");
+                assert_eq!(data, vec![Value::symbol("listp"), Value::Int(1)]);
             }
             other => panic!("unexpected error: {other:?}"),
         }
