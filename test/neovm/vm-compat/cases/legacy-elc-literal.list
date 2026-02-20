@@ -8,3 +8,4 @@ cases/bytecode-literal-reader-semantics
 cases/bytecode-literal-exec-semantics
 cases/bytecode-literal-edge-opcodes-semantics
 cases/bytecode-literal-string-writeback-semantics
+cases/bytecode-literal-error-semantics

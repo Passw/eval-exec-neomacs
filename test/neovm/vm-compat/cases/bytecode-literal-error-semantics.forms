@@ -1,0 +1,46 @@
+; Legacy `.elc` literal execution error signaling parity.
+; Focus: type/range errors and call-path signaling payloads.
+
+(condition-case err
+    (funcall (car (read-from-string "#[(x y) \"\\10\\11\\110\\207\" [x y] 2]")) [1 2] 9)
+  (error err))
+
+(condition-case err
+    (funcall (car (read-from-string "#[(x y) \"\\10\\11\\110\\207\" [x y] 2]")) [1 2] 'a)
+  (error err))
+
+(condition-case err
+    (funcall (car (read-from-string "#[(x y z) \"\\10\\11\\12\\111\\207\" [x y z] 3]")) 1 0 9)
+  (error err))
+
+(condition-case err
+    (funcall (car (read-from-string "#[(x y z) \"\\10\\11\\12\\111\\207\" [x y z] 3]")) [1 2] 'a 9)
+  (error err))
+
+(condition-case err
+    (funcall (car (read-from-string "#[(x y z) \"\\10\\11\\12\\111\\207\" [x y z] 3]")) [1 2] 9 9)
+  (error err))
+
+(condition-case err
+    (funcall (car (read-from-string "#[(x y) \"\\10\\11\\120\\207\" [x y] 2]")) 1 "b")
+  (error err))
+
+(condition-case err
+    (funcall (car (read-from-string "#[nil \"\\300\\40\\207\" [vm-compat-bytecode-missing] 1]")))
+  (error err))
+
+(condition-case err
+    (funcall (car (read-from-string "#[nil \"\\300\\40\\207\" [7] 1]")))
+  (error err))
+
+(condition-case err
+    (funcall (car (read-from-string "#[nil \"\\300\\40\\207\" [car] 1]")))
+  (error err))
+
+(condition-case err
+    (funcall (car (read-from-string "#[(x y) \"\\302\\10\\11\\42\\207\" [x y car] 3]")) 1 2)
+  (error err))
+
+(condition-case err
+    (funcall (car (read-from-string "#[nil \"\\300\\62\\11\\0\\301\\302\\303\\42\\60\\207\" [a throw b 7] 3]")))
+  (error err))

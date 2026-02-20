@@ -568,17 +568,8 @@ impl<'a> Vm<'a> {
                     let n = *n as usize;
                     let start = stack.len().saturating_sub(n);
                     let parts: Vec<Value> = stack.drain(start..).collect();
-                    let mut result = String::new();
-                    for p in &parts {
-                        match p {
-                            Value::Str(s) => result.push_str(s),
-                            Value::Symbol(s) => result.push_str(s),
-                            Value::Nil => result.push_str("nil"),
-                            Value::True => result.push_str("t"),
-                            _ => result.push_str(&format!("{}", p)),
-                        }
-                    }
-                    stack.push(Value::string(result));
+                    let result = self.dispatch_vm_builtin("concat", parts)?;
+                    stack.push(result);
                 }
                 Op::Substring => {
                     let to = stack.pop().unwrap_or(Value::Nil);
@@ -1143,10 +1134,10 @@ impl<'a> Vm<'a> {
         // This is a bridge: builtins that don't need the evaluator work fine,
         // those that do will need the evaluator reference.
         if let Some(result) = builtins::dispatch_builtin_pure(name, args.clone()) {
-            return result;
+            return result.map_err(|flow| normalize_vm_builtin_error(name, flow));
         }
         if let Some(result) = self.dispatch_vm_builtin_eval(name, args.clone()) {
-            return result;
+            return result.map_err(|flow| normalize_vm_builtin_error(name, flow));
         }
 
         Err(signal("void-function", vec![Value::symbol(name)]))
@@ -1191,6 +1182,20 @@ fn resolve_throw_target(handlers: &mut Vec<Handler>, tag: &Value) -> Option<u32>
         }
     }
     None
+}
+
+fn normalize_vm_builtin_error(name: &str, flow: Flow) -> Flow {
+    match flow {
+        Flow::Signal(mut sig) if sig.symbol == "wrong-number-of-arguments" => {
+            if let Some(first) = sig.data.first_mut() {
+                if matches!(first, Value::Symbol(sym) if sym == name) {
+                    *first = Value::Subr(name.to_string());
+                }
+            }
+            Flow::Signal(sig)
+        }
+        other => other,
+    }
 }
 
 fn arith_add(a: &Value, b: &Value) -> EvalResult {
@@ -1741,6 +1746,27 @@ mod tests {
             EvalError::Signal { symbol, data } => {
                 assert_eq!(symbol, "wrong-type-argument");
                 assert_eq!(data, vec![Value::symbol("characterp"), Value::Nil]);
+            }
+            other => panic!("unexpected error: {other:?}"),
+        }
+    }
+
+    #[test]
+    fn vm_builtin_wrong_arity_uses_subr_payload() {
+        let zero_arity = vm_eval("(car)").expect_err("car with 0 args must signal");
+        match zero_arity {
+            EvalError::Signal { symbol, data } => {
+                assert_eq!(symbol, "wrong-number-of-arguments");
+                assert_eq!(data, vec![Value::Subr("car".to_string()), Value::Int(0)]);
+            }
+            other => panic!("unexpected error: {other:?}"),
+        }
+
+        let two_arity = vm_eval("(car 1 2)").expect_err("car with 2 args must signal");
+        match two_arity {
+            EvalError::Signal { symbol, data } => {
+                assert_eq!(symbol, "wrong-number-of-arguments");
+                assert_eq!(data, vec![Value::Subr("car".to_string()), Value::Int(2)]);
             }
             other => panic!("unexpected error: {other:?}"),
         }
