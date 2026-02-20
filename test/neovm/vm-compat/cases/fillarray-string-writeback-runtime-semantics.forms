@@ -6,5 +6,7 @@
     s))
 (let ((s (copy-sequence "abc"))) (fillarray (prog1 s) ?x) s)
 (let ((s (copy-sequence "abc"))) (fillarray (car (list s)) ?y) s)
+(let* ((s (copy-sequence "abc")) (v (vector s))) (fillarray s ?x) (aref v 0))
+(let* ((s (copy-sequence "abc")) (cell (cons s nil))) (fillarray s ?y) (car cell))
 (let ((s (copy-sequence "abc"))) (eq (fillarray s ?z) s))
 (let ((v [1 2 3])) (fillarray v 9) v)

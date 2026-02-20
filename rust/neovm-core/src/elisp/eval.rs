@@ -1,6 +1,6 @@
 //! Evaluator — special forms, function application, and dispatch.
 
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
 
 use super::abbrev::AbbrevManager;
@@ -1685,25 +1685,20 @@ impl Evaluator {
             return;
         }
 
+        let mut visited = HashSet::new();
         for frame in &mut self.lexenv {
             for value in frame.values_mut() {
-                if eq_value(value, first_arg) {
-                    *value = result.clone();
-                }
+                Self::replace_alias_refs_in_value(value, first_arg, result, &mut visited);
             }
         }
         for frame in &mut self.dynamic {
             for value in frame.values_mut() {
-                if eq_value(value, first_arg) {
-                    *value = result.clone();
-                }
+                Self::replace_alias_refs_in_value(value, first_arg, result, &mut visited);
             }
         }
         if let Some(buf) = self.buffers.current_buffer_mut() {
             for value in buf.properties.values_mut() {
-                if eq_value(value, first_arg) {
-                    *value = result.clone();
-                }
+                Self::replace_alias_refs_in_value(value, first_arg, result, &mut visited);
             }
         }
 
@@ -1715,14 +1710,55 @@ impl Evaluator {
             .collect();
         for name in symbols {
             if let Some(symbol) = self.obarray.get_mut(&name) {
-                if symbol
-                    .value
-                    .as_ref()
-                    .is_some_and(|value| eq_value(value, first_arg))
-                {
-                    symbol.value = Some(result.clone());
+                if let Some(value) = symbol.value.as_mut() {
+                    Self::replace_alias_refs_in_value(value, first_arg, result, &mut visited);
                 }
             }
+        }
+    }
+
+    fn replace_alias_refs_in_value(
+        value: &mut Value,
+        from: &Value,
+        to: &Value,
+        visited: &mut HashSet<usize>,
+    ) {
+        if eq_value(value, from) {
+            *value = to.clone();
+            return;
+        }
+
+        match value {
+            Value::Cons(cell) => {
+                let key = (std::sync::Arc::as_ptr(cell) as usize) ^ 0x1;
+                if !visited.insert(key) {
+                    return;
+                }
+                let mut pair = cell.lock().expect("poisoned");
+                Self::replace_alias_refs_in_value(&mut pair.car, from, to, visited);
+                Self::replace_alias_refs_in_value(&mut pair.cdr, from, to, visited);
+            }
+            Value::Vector(items) => {
+                let key = (std::sync::Arc::as_ptr(items) as usize) ^ 0x2;
+                if !visited.insert(key) {
+                    return;
+                }
+                let mut values = items.lock().expect("poisoned");
+                for item in values.iter_mut() {
+                    Self::replace_alias_refs_in_value(item, from, to, visited);
+                }
+            }
+            Value::HashTable(table) => {
+                let key = (std::sync::Arc::as_ptr(table) as usize) ^ 0x4;
+                if !visited.insert(key) {
+                    return;
+                }
+                let mut guard = table.lock().expect("poisoned");
+                for item in guard.data.values_mut() {
+                    Self::replace_alias_refs_in_value(item, from, to, visited);
+                }
+            }
+            _ => {}
         }
     }
 
@@ -5317,6 +5353,21 @@ mod tests {
     fn fillarray_string_writeback_updates_alias_from_list_car_expression() {
         let result =
             eval_one("(let ((s (copy-sequence \"abc\"))) (fillarray (car (list s)) ?y) s)");
+        assert_eq!(result, r#"OK "yyy""#);
+    }
+
+    #[test]
+    fn fillarray_string_writeback_updates_vector_alias_element() {
+        let result =
+            eval_one("(let* ((s (copy-sequence \"abc\")) (v (vector s))) (fillarray s ?x) (aref v 0))");
+        assert_eq!(result, r#"OK "xxx""#);
+    }
+
+    #[test]
+    fn fillarray_string_writeback_updates_cons_alias_element() {
+        let result = eval_one(
+            "(let* ((s (copy-sequence \"abc\")) (cell (cons s nil))) (fillarray s ?y) (car cell))",
+        );
         assert_eq!(result, r#"OK "yyy""#);
     }
 }
