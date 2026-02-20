@@ -22,6 +22,7 @@ const DISPATCH_BUILTIN_NAMES: &[&str] = &[
     "abbrev-expansion",
     "abbrev-mode",
     "abbrev-table-p",
+    "abort-minibuffers",
     "abort-recursive-edit",
     "abs",
     "acos",

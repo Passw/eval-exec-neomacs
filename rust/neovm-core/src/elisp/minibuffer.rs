@@ -790,6 +790,18 @@ pub(crate) fn builtin_exit_minibuffer(args: Vec<Value>) -> EvalResult {
     })
 }
 
+/// `(abort-minibuffers)` — abort active minibuffer sessions.
+///
+/// Batch/non-interactive mode has no active minibuffer, so this matches GNU
+/// Emacs by signaling a plain `error`.
+pub(crate) fn builtin_abort_minibuffers(args: Vec<Value>) -> EvalResult {
+    expect_args("abort-minibuffers", &args, 0)?;
+    Err(signal(
+        "error",
+        vec![Value::string("Not in a minibuffer")],
+    ))
+}
+
 /// `(abort-recursive-edit)` — abort the innermost recursive edit.
 ///
 /// Stub (batch/non-interactive): signals a user-error.
@@ -1461,6 +1473,26 @@ mod tests {
             result,
             Err(Flow::Throw { tag, value })
                 if matches!(tag, Value::Symbol(ref s) if s == "exit") && value.is_nil()
+        ));
+    }
+
+    #[test]
+    fn builtin_abort_minibuffers_signals_not_in_minibuffer_error() {
+        let result = builtin_abort_minibuffers(vec![]);
+        assert!(matches!(
+            result,
+            Err(Flow::Signal(sig))
+                if sig.symbol == "error"
+                    && matches!(sig.data.as_slice(), [Value::Str(s)] if &**s == "Not in a minibuffer")
+        ));
+    }
+
+    #[test]
+    fn builtin_abort_minibuffers_rejects_args() {
+        let result = builtin_abort_minibuffers(vec![Value::Nil]);
+        assert!(matches!(
+            result,
+            Err(Flow::Signal(sig)) if sig.symbol == "wrong-number-of-arguments"
         ));
     }
 

@@ -915,6 +915,7 @@ fn subr_arity_value(name: &str) -> Value {
         "recursive-edit"
         | "top-level"
         | "exit-recursive-edit"
+        | "abort-minibuffers"
         | "abort-recursive-edit"
         | "exit-minibuffer"
         | "minibuffer-depth"
@@ -1817,6 +1818,7 @@ mod tests {
         assert_subr_arity("recursive-edit", 0, Some(0));
         assert_subr_arity("top-level", 0, Some(0));
         assert_subr_arity("exit-recursive-edit", 0, Some(0));
+        assert_subr_arity("abort-minibuffers", 0, Some(0));
         assert_subr_arity("abort-recursive-edit", 0, Some(0));
         assert_subr_arity("exit-minibuffer", 0, Some(0));
         assert_subr_arity("minibuffer-depth", 0, Some(0));

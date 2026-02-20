@@ -28,6 +28,33 @@ Last updated: 2026-02-20
 
 ## Doing
 
+- Added `abort-minibuffers` builtin compatibility slice and command classification parity:
+  - runtime changes:
+    - `rust/neovm-core/src/elisp/minibuffer.rs`
+      - implemented `abort-minibuffers` (`0` args) with GNU batch-mode behavior:
+        - signals `(error "Not in a minibuffer")`
+      - added unit tests for error payload and arity rejection.
+    - `rust/neovm-core/src/elisp/builtins.rs`
+      - wired `abort-minibuffers` into evaluator-dependent dispatch.
+    - `rust/neovm-core/src/elisp/interactive.rs`
+      - classified `abort-minibuffers` as an interactive command for `commandp` parity.
+    - `rust/neovm-core/src/elisp/builtin_registry.rs`
+      - registered `abort-minibuffers` in dispatch registry.
+    - `rust/neovm-core/src/elisp/subr_info.rs`
+      - added arity metadata: `abort-minibuffers => (0 . 0)`.
+  - vm-compat corpus changes:
+    - added:
+      - `test/neovm/vm-compat/cases/abort-minibuffers-semantics.forms`
+      - `test/neovm/vm-compat/cases/abort-minibuffers-semantics.expected.tsv`
+    - wired case into:
+      - `test/neovm/vm-compat/cases/default.list`
+  - verified:
+    - `cargo test --manifest-path rust/neovm-core/Cargo.toml abort_minibuffers -- --nocapture` (pass)
+    - `make -C test/neovm/vm-compat check-one-neovm CASE=cases/abort-minibuffers-semantics` (pass, `6/6`)
+    - `make -C test/neovm/vm-compat check-builtin-registry-all` (pass; `1214` dispatch / `1213` core)
+    - `make -C test/neovm/vm-compat compat-progress` (pass; primitive-subr coverage now registry `813/621`, runtime `861/573`)
+    - `make -C test/neovm/vm-compat check-all-neovm-strict` (pass; case inventory `797`)
+
 - Aligned callable-subr/runtime parity for `autoload` and expanded lock-in coverage:
   - runtime changes:
     - `rust/neovm-core/src/elisp/autoload.rs`

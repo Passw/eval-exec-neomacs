@@ -8941,6 +8941,7 @@ pub(crate) fn dispatch_builtin(
         "abort-recursive-edit" => {
             return Some(super::minibuffer::builtin_abort_recursive_edit(args))
         }
+        "abort-minibuffers" => return Some(super::minibuffer::builtin_abort_minibuffers(args)),
 
         // Threading (evaluator-dependent)
         "make-thread" => return Some(super::threads::builtin_make_thread(eval, args)),

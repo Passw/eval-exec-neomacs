@@ -350,6 +350,7 @@ cases/reader-prompt-batch-error-semantics
 cases/minibufferp-semantics
 cases/exit-recursive-edit-semantics
 cases/recursive-top-level-arity-semantics
+cases/abort-minibuffers-semantics
 cases/minibuffer-control-subr-arity-semantics
 cases/minibuffer-contents-no-properties-semantics
 cases/transient-mark-mode-semantics
