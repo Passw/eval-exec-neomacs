@@ -2830,15 +2830,9 @@ impl Evaluator {
     }
 
     fn sf_save_window_excursion(&mut self, tail: &[Expr]) -> EvalResult {
-        let saved_window = super::window_cmds::builtin_selected_window(self, vec![]).ok();
-        let saved_buffer = self.buffers.current_buffer().map(|b| b.id);
+        let saved_configuration = super::builtins::builtin_current_window_configuration(self, vec![])?;
         let result = self.sf_progn(tail);
-        if let Some(window) = saved_window {
-            let _ = super::window_cmds::builtin_select_window(self, vec![window, Value::Nil]);
-        }
-        if let Some(buffer_id) = saved_buffer {
-            self.buffers.set_current(buffer_id);
-        }
+        let _ = super::builtins::builtin_set_window_configuration(self, vec![saved_configuration]);
         result
     }
 
@@ -5502,6 +5496,20 @@ mod tests {
         );
         assert_eq!(results[0], "OK (t t)");
         assert_eq!(results[1], "OK (error t)");
+    }
+
+    #[test]
+    fn save_window_excursion_restores_window_layout_after_split() {
+        let results = eval_all(
+            "(let ((before (length (window-list))))
+               (list
+                (save-window-excursion
+                  (split-window (selected-window))
+                  (length (window-list)))
+                (length (window-list))
+                before))",
+        );
+        assert_eq!(results[0], "OK (2 1 1)");
     }
 
     #[test]

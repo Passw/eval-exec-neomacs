@@ -10,7 +10,8 @@ use super::string_escape::{
     storage_substring,
 };
 use super::value::*;
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
+use std::sync::{Mutex, OnceLock};
 use strum::EnumString;
 
 /// Expect exactly N arguments.
@@ -5090,8 +5091,23 @@ fn expect_optional_live_window_designator(
 }
 
 const WINDOW_CONFIGURATION_TAG: &str = "window-configuration";
+const SAVE_SELECTED_WINDOW_STATE_TAG: &str = "save-selected-window--state";
 
-fn window_configuration_frame_from_value(value: &Value) -> Option<Value> {
+#[derive(Clone)]
+struct WindowConfigurationSnapshot {
+    frame_id: crate::window::FrameId,
+    root_window: crate::window::Window,
+    selected_window: crate::window::WindowId,
+    minibuffer_window: Option<crate::window::WindowId>,
+    minibuffer_leaf: Option<crate::window::Window>,
+}
+
+fn window_configuration_snapshot_store() -> &'static Mutex<HashMap<i64, WindowConfigurationSnapshot>> {
+    static STORE: OnceLock<Mutex<HashMap<i64, WindowConfigurationSnapshot>>> = OnceLock::new();
+    STORE.get_or_init(|| Mutex::new(HashMap::new()))
+}
+
+fn window_configuration_parts_from_value(value: &Value) -> Option<(Value, i64)> {
     let Value::Vector(data) = value else {
         return None;
     };
@@ -5099,16 +5115,23 @@ fn window_configuration_frame_from_value(value: &Value) -> Option<Value> {
     if items.len() != 3 || items[0].as_symbol_name() != Some(WINDOW_CONFIGURATION_TAG) {
         return None;
     }
-    match &items[1] {
-        Value::Frame(_) => Some(items[1].clone()),
+    match (&items[1], &items[2]) {
+        (Value::Frame(_), Value::Int(serial)) => Some((items[1].clone(), *serial)),
         _ => None,
     }
 }
 
-fn make_window_configuration_value(frame: Value) -> Value {
+fn window_configuration_frame_from_value(value: &Value) -> Option<Value> {
+    window_configuration_parts_from_value(value).map(|(frame, _)| frame)
+}
+
+fn next_window_configuration_serial() -> i64 {
     use std::sync::atomic::{AtomicU64, Ordering};
     static NEXT_WINDOW_CONFIGURATION_ID: AtomicU64 = AtomicU64::new(1);
-    let serial = NEXT_WINDOW_CONFIGURATION_ID.fetch_add(1, Ordering::Relaxed) as i64;
+    NEXT_WINDOW_CONFIGURATION_ID.fetch_add(1, Ordering::Relaxed) as i64
+}
+
+fn make_window_configuration_value(frame: Value, serial: i64) -> Value {
     Value::vector(vec![
         Value::symbol(WINDOW_CONFIGURATION_TAG),
         frame,
@@ -5150,7 +5173,7 @@ fn builtin_window_configuration_equal_p(args: Vec<Value>) -> EvalResult {
     Ok(Value::bool(equal_value(&args[0], &args[1], 0)))
 }
 
-fn builtin_current_window_configuration(
+pub(crate) fn builtin_current_window_configuration(
     eval: &mut super::eval::Evaluator,
     args: Vec<Value>,
 ) -> EvalResult {
@@ -5167,21 +5190,134 @@ fn builtin_current_window_configuration(
         super::window_cmds::builtin_selected_frame(eval, vec![])?
     };
 
-    Ok(make_window_configuration_value(frame))
+    let Value::Frame(frame_raw_id) = frame.clone() else {
+        return Ok(make_window_configuration_value(frame, next_window_configuration_serial()));
+    };
+    let frame_id = crate::window::FrameId(frame_raw_id);
+    if let Some(frame_state) = eval.frames.get(frame_id) {
+        let snapshot = WindowConfigurationSnapshot {
+            frame_id,
+            root_window: frame_state.root_window.clone(),
+            selected_window: frame_state.selected_window,
+            minibuffer_window: frame_state.minibuffer_window,
+            minibuffer_leaf: frame_state.minibuffer_leaf.clone(),
+        };
+        let serial = next_window_configuration_serial();
+        let mut store = window_configuration_snapshot_store()
+            .lock()
+            .expect("window-configuration snapshot store poisoned");
+        store.insert(serial, snapshot);
+        if store.len() > 4096 {
+            if let Some(oldest) = store.keys().min().copied() {
+                store.remove(&oldest);
+            }
+        }
+        return Ok(make_window_configuration_value(frame, serial));
+    }
+
+    Ok(make_window_configuration_value(frame, next_window_configuration_serial()))
 }
 
-fn builtin_set_window_configuration(
-    _eval: &mut super::eval::Evaluator,
+pub(crate) fn builtin_set_window_configuration(
+    eval: &mut super::eval::Evaluator,
     args: Vec<Value>,
 ) -> EvalResult {
     expect_range_args("set-window-configuration", &args, 1, 3)?;
-    if window_configuration_frame_from_value(&args[0]).is_none() {
+    let Some((_frame, serial)) = window_configuration_parts_from_value(&args[0]) else {
         return Err(signal(
             "wrong-type-argument",
             vec![Value::symbol("window-configuration-p"), args[0].clone()],
         ));
+    };
+
+    let snapshot = window_configuration_snapshot_store()
+        .lock()
+        .expect("window-configuration snapshot store poisoned")
+        .get(&serial)
+        .cloned();
+
+    if let Some(snapshot) = snapshot {
+        let selected_buffer = if let Some(frame) = eval.frames.get_mut(snapshot.frame_id) {
+            frame.root_window = snapshot.root_window;
+            frame.selected_window = snapshot.selected_window;
+            frame.minibuffer_window = snapshot.minibuffer_window;
+            frame.minibuffer_leaf = snapshot.minibuffer_leaf;
+            frame.find_window(frame.selected_window).and_then(|w| w.buffer_id())
+        } else {
+            None
+        };
+        if let Some(buffer_id) = selected_buffer {
+            eval.buffers.set_current(buffer_id);
+        }
     }
+
     Ok(Value::True)
+}
+
+fn save_selected_window_state_from_value(
+    value: &Value,
+) -> Option<(Value, Value, Option<crate::buffer::BufferId>)> {
+    let Value::Vector(data) = value else {
+        return None;
+    };
+    let items = data.lock().expect("poisoned");
+    if items.len() != 4 || items[0].as_symbol_name() != Some(SAVE_SELECTED_WINDOW_STATE_TAG) {
+        return None;
+    }
+    let frame = items[1].clone();
+    let window = items[2].clone();
+    let buffer_id = match items[3] {
+        Value::Buffer(id) => Some(id),
+        _ => None,
+    };
+    Some((frame, window, buffer_id))
+}
+
+fn builtin_internal_before_save_selected_window(
+    eval: &mut super::eval::Evaluator,
+    args: Vec<Value>,
+) -> EvalResult {
+    expect_args("internal--before-save-selected-window", &args, 0)?;
+    let frame = super::window_cmds::builtin_selected_frame(eval, vec![])?;
+    let window = super::window_cmds::builtin_selected_window(eval, vec![])?;
+    let buffer = eval
+        .buffers
+        .current_buffer()
+        .map(|buffer| Value::Buffer(buffer.id))
+        .unwrap_or(Value::Nil);
+    Ok(Value::vector(vec![
+        Value::symbol(SAVE_SELECTED_WINDOW_STATE_TAG),
+        frame,
+        window,
+        buffer,
+    ]))
+}
+
+fn builtin_internal_after_save_selected_window(
+    eval: &mut super::eval::Evaluator,
+    args: Vec<Value>,
+) -> EvalResult {
+    expect_args("internal--after-save-selected-window", &args, 1)?;
+    let Some((saved_frame, saved_window, saved_buffer)) =
+        save_selected_window_state_from_value(&args[0])
+    else {
+        return Err(signal(
+            "wrong-type-argument",
+            vec![
+                Value::symbol("vectorp"),
+                args.first().cloned().unwrap_or(Value::Nil),
+            ],
+        ));
+    };
+
+    let _ = super::window_cmds::builtin_select_frame(eval, vec![saved_frame, Value::Nil]);
+    let _ = super::window_cmds::builtin_select_window(eval, vec![saved_window, Value::Nil]);
+    if let Some(buffer_id) = saved_buffer {
+        if eval.buffers.get(buffer_id).is_some() {
+            eval.buffers.set_current(buffer_id);
+        }
+    }
+    Ok(Value::Nil)
 }
 
 pub(crate) fn builtin_run_window_configuration_change_hook(
@@ -13357,6 +13493,12 @@ pub(crate) fn dispatch_builtin(
         "internal--set-buffer-modified-tick" => {
             super::compat_internal::builtin_internal_set_buffer_modified_tick(args)
         }
+        "internal--before-save-selected-window" => {
+            builtin_internal_before_save_selected_window(eval, args)
+        }
+        "internal--after-save-selected-window" => {
+            builtin_internal_after_save_selected_window(eval, args)
+        }
         "internal--track-mouse" => super::compat_internal::builtin_internal_track_mouse(args),
         "internal-char-font" => super::compat_internal::builtin_internal_char_font(args),
         "internal-complete-buffer" => {
@@ -18254,6 +18396,46 @@ mod tests {
         let eval_result = builtin_message_eval(&mut eval, vec![Value::Nil])
             .expect("message eval should accept nil");
         assert!(eval_result.is_nil());
+    }
+
+    #[test]
+    fn internal_save_selected_window_helpers_restore_selected_window() {
+        let mut eval = crate::elisp::eval::Evaluator::new();
+        let selected = dispatch_builtin(&mut eval, "selected-window", vec![])
+            .expect("selected-window should resolve")
+            .expect("selected-window should evaluate");
+        let split = dispatch_builtin(&mut eval, "split-window", vec![selected.clone()])
+            .expect("split-window should resolve")
+            .expect("split-window should evaluate");
+        let state = dispatch_builtin(
+            &mut eval,
+            "internal--before-save-selected-window",
+            vec![],
+        )
+        .expect("before helper should resolve")
+        .expect("before helper should evaluate");
+
+        let _ = dispatch_builtin(&mut eval, "select-window", vec![split.clone()])
+            .expect("select-window should resolve")
+            .expect("select-window should evaluate");
+        let switched = dispatch_builtin(&mut eval, "selected-window", vec![])
+            .expect("selected-window should resolve")
+            .expect("selected-window should evaluate");
+        assert_eq!(switched, split);
+
+        let restored = dispatch_builtin(
+            &mut eval,
+            "internal--after-save-selected-window",
+            vec![state],
+        )
+        .expect("after helper should resolve")
+        .expect("after helper should evaluate");
+        assert!(restored.is_nil());
+
+        let selected_again = dispatch_builtin(&mut eval, "selected-window", vec![])
+            .expect("selected-window should resolve")
+            .expect("selected-window should evaluate");
+        assert_eq!(selected_again, selected);
     }
 
     #[test]

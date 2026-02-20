@@ -711,6 +711,8 @@ const DISPATCH_BUILTIN_NAMES: &[&str] = &[
     "internal--hash-table-buckets",
     "internal--hash-table-histogram",
     "internal--hash-table-index-size",
+    "internal--after-save-selected-window",
+    "internal--before-save-selected-window",
     "internal--define-uninitialized-variable",
     "internal--labeled-narrow-to-region",
     "internal--labeled-widen",
