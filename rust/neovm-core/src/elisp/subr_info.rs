@@ -768,6 +768,10 @@ fn subr_arity_value(name: &str) -> Value {
         "indent-rigidly" => arity_cons(3, Some(4)),
         "indent-to" | "move-to-column" => arity_cons(1, Some(2)),
         "tab-to-tab-stop" => arity_cons(0, Some(0)),
+        "backtrace--frames-from-thread" => arity_cons(1, Some(1)),
+        "backtrace--locals" => arity_cons(1, Some(2)),
+        "backtrace-debug" | "backtrace-eval" => arity_cons(2, Some(3)),
+        "backtrace-frame--internal" => arity_cons(3, Some(3)),
         "backtrace-frame" => arity_cons(1, Some(2)),
         "run-hook-with-args"
         | "run-hook-with-args-until-failure"
@@ -2158,6 +2162,11 @@ mod tests {
         assert_subr_arity("advice-member-p", 2, Some(2));
         assert_subr_arity("autoload", 2, Some(5));
         assert_subr_arity("autoload-do-load", 1, Some(3));
+        assert_subr_arity("backtrace--frames-from-thread", 1, Some(1));
+        assert_subr_arity("backtrace--locals", 1, Some(2));
+        assert_subr_arity("backtrace-debug", 2, Some(3));
+        assert_subr_arity("backtrace-eval", 2, Some(3));
+        assert_subr_arity("backtrace-frame--internal", 3, Some(3));
         assert_subr_arity("backtrace-frame", 1, Some(2));
         assert_subr_arity("run-hook-with-args", 1, None);
         assert_subr_arity("run-hook-with-args-until-failure", 1, None);

@@ -4,7 +4,7 @@
 //! - Special forms: prog2, with-temp-buffer, save-current-buffer, track-mouse, with-syntax-table
 //! - Pure builtins: copy-alist, rassoc, rassq, assoc-default, make-list, safe-length,
 //!   subst-char-in-string, string/char encoding stubs, locale-info
-//! - Eval-dependent builtins: backtrace-frame, recursion-depth
+//! - Eval-dependent builtins: backtrace-* helpers, recursion-depth
 
 use super::error::{signal, EvalResult, Flow};
 use super::expr::Expr;
@@ -627,6 +627,84 @@ pub(crate) fn builtin_backtrace_frame(
     }
 }
 
+fn expect_threadp(eval: &super::eval::Evaluator, value: &Value) -> Result<(), Flow> {
+    if eval.threads.thread_id_from_handle(value).is_some() {
+        Ok(())
+    } else {
+        Err(signal(
+            "wrong-type-argument",
+            vec![Value::symbol("threadp"), value.clone()],
+        ))
+    }
+}
+
+/// `(backtrace--frames-from-thread THREAD)` -- synthetic backtrace frame list.
+pub(crate) fn builtin_backtrace_frames_from_thread(
+    eval: &mut super::eval::Evaluator,
+    args: Vec<Value>,
+) -> EvalResult {
+    expect_args("backtrace--frames-from-thread", &args, 1)?;
+    expect_threadp(eval, &args[0])?;
+    Ok(Value::list(vec![Value::list(vec![
+        Value::True,
+        Value::symbol("backtrace--frames-from-thread"),
+        args[0].clone(),
+    ])]))
+}
+
+/// `(backtrace--locals FRAME &optional BASE)` -- batch-compatible helper.
+pub(crate) fn builtin_backtrace_locals(
+    _eval: &mut super::eval::Evaluator,
+    args: Vec<Value>,
+) -> EvalResult {
+    expect_min_args("backtrace--locals", &args, 1)?;
+    expect_max_args("backtrace--locals", &args, 2)?;
+    let frame = expect_wholenump(&args[0])?;
+    if frame == 0 {
+        return Err(signal(
+            "wrong-type-argument",
+            vec![Value::symbol("wholenump"), Value::Int(-1)],
+        ));
+    }
+    if let Some(base) = args.get(1) {
+        let _ = expect_wholenump(base)?;
+    }
+    Ok(Value::Nil)
+}
+
+/// `(backtrace-debug FRAME INDEX &optional FLAG)` -- batch-compatible helper.
+pub(crate) fn builtin_backtrace_debug(
+    _eval: &mut super::eval::Evaluator,
+    args: Vec<Value>,
+) -> EvalResult {
+    expect_min_args("backtrace-debug", &args, 2)?;
+    expect_max_args("backtrace-debug", &args, 3)?;
+    let _ = expect_wholenump(&args[0])?;
+    let _ = expect_wholenump(&args[1])?;
+    Ok(args[0].clone())
+}
+
+/// `(backtrace-eval FRAME INDEX &optional FLAG)` -- batch-compatible helper.
+pub(crate) fn builtin_backtrace_eval(
+    _eval: &mut super::eval::Evaluator,
+    args: Vec<Value>,
+) -> EvalResult {
+    expect_min_args("backtrace-eval", &args, 2)?;
+    expect_max_args("backtrace-eval", &args, 3)?;
+    let _ = expect_wholenump(&args[0])?;
+    let _ = expect_wholenump(&args[1])?;
+    Ok(Value::Nil)
+}
+
+/// `(backtrace-frame--internal FRAME BASE FULL)` -- compatibility helper.
+pub(crate) fn builtin_backtrace_frame_internal(
+    _eval: &mut super::eval::Evaluator,
+    args: Vec<Value>,
+) -> EvalResult {
+    expect_args("backtrace-frame--internal", &args, 3)?;
+    Err(signal("invalid-function", vec![args[0].clone()]))
+}
+
 /// `(recursion-depth)` -- return the current Lisp recursion depth.
 /// Uses the dynamic binding stack depth as a proxy (the true depth counter
 /// is private to the Evaluator).
@@ -1169,6 +1247,68 @@ mod tests {
             Err(Flow::Signal(sig))
                 if sig.symbol == "wrong-type-argument"
                     && sig.data == vec![Value::symbol("wholenump"), Value::Int(-1)]
+        ));
+    }
+
+    #[test]
+    fn backtrace_helper_stubs_shape_and_errors() {
+        let mut eval = super::super::eval::Evaluator::new();
+        let thread = super::super::threads::builtin_current_thread(&mut eval, vec![]).unwrap();
+        let frames = builtin_backtrace_frames_from_thread(&mut eval, vec![thread]).unwrap();
+        assert!(frames.is_list());
+        assert!(matches!(
+            builtin_backtrace_frames_from_thread(&mut eval, vec![Value::Nil]),
+            Err(Flow::Signal(sig))
+                if sig.symbol == "wrong-type-argument"
+                    && sig.data == vec![Value::symbol("threadp"), Value::Nil]
+        ));
+
+        assert!(matches!(
+            builtin_backtrace_locals(&mut eval, vec![Value::Nil]),
+            Err(Flow::Signal(sig))
+                if sig.symbol == "wrong-type-argument"
+                    && sig.data == vec![Value::symbol("wholenump"), Value::Nil]
+        ));
+        assert!(matches!(
+            builtin_backtrace_locals(&mut eval, vec![Value::Int(0)]),
+            Err(Flow::Signal(sig))
+                if sig.symbol == "wrong-type-argument"
+                    && sig.data == vec![Value::symbol("wholenump"), Value::Int(-1)]
+        ));
+        assert!(matches!(
+            builtin_backtrace_eval(&mut eval, vec![Value::Int(0), Value::Nil]),
+            Err(Flow::Signal(sig))
+                if sig.symbol == "wrong-type-argument"
+                    && sig.data == vec![Value::symbol("wholenump"), Value::Nil]
+        ));
+        assert!(matches!(
+            builtin_backtrace_frame_internal(&mut eval, vec![Value::Int(0), Value::Int(0), Value::Nil]),
+            Err(Flow::Signal(sig))
+                if sig.symbol == "invalid-function"
+                    && sig.data == vec![Value::Int(0)]
+        ));
+    }
+
+    #[test]
+    fn backtrace_helper_stubs_arity_checks() {
+        let mut eval = super::super::eval::Evaluator::new();
+        assert!(matches!(
+            builtin_backtrace_debug(&mut eval, vec![]),
+            Err(Flow::Signal(sig))
+                if sig.symbol == "wrong-number-of-arguments"
+                    && sig.data == vec![Value::symbol("backtrace-debug"), Value::Int(0)]
+        ));
+        assert!(matches!(
+            builtin_backtrace_debug(&mut eval, vec![Value::Int(0)]),
+            Err(Flow::Signal(sig))
+                if sig.symbol == "wrong-number-of-arguments"
+                    && sig.data == vec![Value::symbol("backtrace-debug"), Value::Int(1)]
+        ));
+        assert!(matches!(
+            builtin_backtrace_frame_internal(&mut eval, vec![]),
+            Err(Flow::Signal(sig))
+                if sig.symbol == "wrong-number-of-arguments"
+                    && sig.data == vec![Value::symbol("backtrace-frame--internal"), Value::Int(0)]
         ));
     }
 

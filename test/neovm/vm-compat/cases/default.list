@@ -29,6 +29,7 @@ cases/indirect-function-core
 cases/indirect-function-alias-chains
 cases/condition-case-unwind-introspection
 cases/backtrace-frame-semantics
+cases/backtrace-helper-wrapper-semantics
 cases/subr-introspection-core
 cases/macro-special-introspection-core
 cases/function-special-form-edges

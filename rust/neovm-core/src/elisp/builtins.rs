@@ -10448,6 +10448,15 @@ pub(crate) fn dispatch_builtin(
         "print" => return Some(builtin_print_eval(eval, args)),
 
         // Misc (evaluator-dependent)
+        "backtrace--frames-from-thread" => {
+            return Some(super::misc::builtin_backtrace_frames_from_thread(eval, args))
+        }
+        "backtrace--locals" => return Some(super::misc::builtin_backtrace_locals(eval, args)),
+        "backtrace-debug" => return Some(super::misc::builtin_backtrace_debug(eval, args)),
+        "backtrace-eval" => return Some(super::misc::builtin_backtrace_eval(eval, args)),
+        "backtrace-frame--internal" => {
+            return Some(super::misc::builtin_backtrace_frame_internal(eval, args))
+        }
         "backtrace-frame" => return Some(super::misc::builtin_backtrace_frame(eval, args)),
         "recursion-depth" => return Some(super::misc::builtin_recursion_depth(eval, args)),
         "top-level" => return Some(super::minibuffer::builtin_top_level(args)),
