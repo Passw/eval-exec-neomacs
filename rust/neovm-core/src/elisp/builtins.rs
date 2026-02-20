@@ -12405,14 +12405,33 @@ pub(crate) fn dispatch_builtin(
         }
         "get-variable-watchers" => super::compat_internal::builtin_get_variable_watchers(args),
         "gnutls-available-p" => super::compat_internal::builtin_gnutls_available_p(args),
+        "gnutls-asynchronous-parameters" => {
+            super::compat_internal::builtin_gnutls_asynchronous_parameters(args)
+        }
+        "gnutls-boot" => super::compat_internal::builtin_gnutls_boot(args),
+        "gnutls-bye" => super::compat_internal::builtin_gnutls_bye(args),
         "gnutls-ciphers" => super::compat_internal::builtin_gnutls_ciphers(args),
+        "gnutls-deinit" => super::compat_internal::builtin_gnutls_deinit(args),
         "gnutls-digests" => super::compat_internal::builtin_gnutls_digests(args),
         "gnutls-error-fatalp" => super::compat_internal::builtin_gnutls_error_fatalp(args),
         "gnutls-error-string" => super::compat_internal::builtin_gnutls_error_string(args),
         "gnutls-errorp" => super::compat_internal::builtin_gnutls_errorp(args),
+        "gnutls-format-certificate" => {
+            super::compat_internal::builtin_gnutls_format_certificate(args)
+        }
+        "gnutls-get-initstage" => super::compat_internal::builtin_gnutls_get_initstage(args),
+        "gnutls-hash-digest" => super::compat_internal::builtin_gnutls_hash_digest(args),
+        "gnutls-hash-mac" => super::compat_internal::builtin_gnutls_hash_mac(args),
         "gnutls-macs" => super::compat_internal::builtin_gnutls_macs(args),
+        "gnutls-peer-status" => super::compat_internal::builtin_gnutls_peer_status(args),
         "gnutls-peer-status-warning-describe" => {
             super::compat_internal::builtin_gnutls_peer_status_warning_describe(args)
+        }
+        "gnutls-symmetric-decrypt" => {
+            super::compat_internal::builtin_gnutls_symmetric_decrypt(args)
+        }
+        "gnutls-symmetric-encrypt" => {
+            super::compat_internal::builtin_gnutls_symmetric_encrypt(args)
         }
         "gpm-mouse-start" => super::compat_internal::builtin_gpm_mouse_start(args),
         "gpm-mouse-stop" => super::compat_internal::builtin_gpm_mouse_stop(args),
@@ -12954,14 +12973,33 @@ pub(crate) fn dispatch_builtin_pure(name: &str, args: Vec<Value>) -> Option<Eval
         }
         "get-variable-watchers" => super::compat_internal::builtin_get_variable_watchers(args),
         "gnutls-available-p" => super::compat_internal::builtin_gnutls_available_p(args),
+        "gnutls-asynchronous-parameters" => {
+            super::compat_internal::builtin_gnutls_asynchronous_parameters(args)
+        }
+        "gnutls-boot" => super::compat_internal::builtin_gnutls_boot(args),
+        "gnutls-bye" => super::compat_internal::builtin_gnutls_bye(args),
         "gnutls-ciphers" => super::compat_internal::builtin_gnutls_ciphers(args),
+        "gnutls-deinit" => super::compat_internal::builtin_gnutls_deinit(args),
         "gnutls-digests" => super::compat_internal::builtin_gnutls_digests(args),
         "gnutls-error-fatalp" => super::compat_internal::builtin_gnutls_error_fatalp(args),
         "gnutls-error-string" => super::compat_internal::builtin_gnutls_error_string(args),
         "gnutls-errorp" => super::compat_internal::builtin_gnutls_errorp(args),
+        "gnutls-format-certificate" => {
+            super::compat_internal::builtin_gnutls_format_certificate(args)
+        }
+        "gnutls-get-initstage" => super::compat_internal::builtin_gnutls_get_initstage(args),
+        "gnutls-hash-digest" => super::compat_internal::builtin_gnutls_hash_digest(args),
+        "gnutls-hash-mac" => super::compat_internal::builtin_gnutls_hash_mac(args),
         "gnutls-macs" => super::compat_internal::builtin_gnutls_macs(args),
+        "gnutls-peer-status" => super::compat_internal::builtin_gnutls_peer_status(args),
         "gnutls-peer-status-warning-describe" => {
             super::compat_internal::builtin_gnutls_peer_status_warning_describe(args)
+        }
+        "gnutls-symmetric-decrypt" => {
+            super::compat_internal::builtin_gnutls_symmetric_decrypt(args)
+        }
+        "gnutls-symmetric-encrypt" => {
+            super::compat_internal::builtin_gnutls_symmetric_encrypt(args)
         }
         "gpm-mouse-start" => super::compat_internal::builtin_gpm_mouse_start(args),
         "gpm-mouse-stop" => super::compat_internal::builtin_gpm_mouse_stop(args),

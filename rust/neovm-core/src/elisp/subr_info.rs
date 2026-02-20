@@ -932,12 +932,21 @@ fn subr_arity_value(name: &str) -> Value {
         | "gpm-mouse-stop"
         | "sqlite-available-p"
         | "sqlite-version" => arity_cons(0, Some(0)),
+        "gnutls-asynchronous-parameters" | "gnutls-bye" | "gnutls-hash-digest" => {
+            arity_cons(2, Some(2))
+        }
+        "gnutls-boot" | "gnutls-hash-mac" => arity_cons(3, Some(3)),
         "garbage-collect-maybe" | "get-variable-watchers" => arity_cons(1, Some(1)),
+        "gnutls-deinit" | "gnutls-format-certificate" | "gnutls-get-initstage" => {
+            arity_cons(1, Some(1))
+        }
         "gnutls-error-fatalp"
         | "gnutls-error-string"
         | "gnutls-errorp"
+        | "gnutls-peer-status"
         | "gnutls-peer-status-warning-describe"
         | "inotify-valid-p" => arity_cons(1, Some(1)),
+        "gnutls-symmetric-decrypt" | "gnutls-symmetric-encrypt" => arity_cons(4, Some(5)),
         "get-unicode-property-internal" => arity_cons(2, Some(2)),
         "define-hash-table-test" => arity_cons(3, Some(3)),
         "find-coding-systems-region-internal" => arity_cons(2, Some(3)),
@@ -2581,9 +2590,18 @@ mod tests {
         assert_subr_arity("gap-position", 0, Some(0));
         assert_subr_arity("gap-size", 0, Some(0));
         assert_subr_arity("gnutls-available-p", 0, Some(0));
+        assert_subr_arity("gnutls-asynchronous-parameters", 2, Some(2));
+        assert_subr_arity("gnutls-boot", 3, Some(3));
+        assert_subr_arity("gnutls-bye", 2, Some(2));
         assert_subr_arity("gnutls-ciphers", 0, Some(0));
+        assert_subr_arity("gnutls-deinit", 1, Some(1));
         assert_subr_arity("gnutls-digests", 0, Some(0));
+        assert_subr_arity("gnutls-format-certificate", 1, Some(1));
+        assert_subr_arity("gnutls-get-initstage", 1, Some(1));
+        assert_subr_arity("gnutls-hash-digest", 2, Some(2));
+        assert_subr_arity("gnutls-hash-mac", 3, Some(3));
         assert_subr_arity("gnutls-macs", 0, Some(0));
+        assert_subr_arity("gnutls-peer-status", 1, Some(1));
         assert_subr_arity("gpm-mouse-start", 0, Some(0));
         assert_subr_arity("gpm-mouse-stop", 0, Some(0));
         assert_subr_arity("sqlite-available-p", 0, Some(0));
@@ -2593,6 +2611,8 @@ mod tests {
         assert_subr_arity("gnutls-error-string", 1, Some(1));
         assert_subr_arity("gnutls-errorp", 1, Some(1));
         assert_subr_arity("gnutls-peer-status-warning-describe", 1, Some(1));
+        assert_subr_arity("gnutls-symmetric-decrypt", 4, Some(5));
+        assert_subr_arity("gnutls-symmetric-encrypt", 4, Some(5));
         assert_subr_arity("inotify-valid-p", 1, Some(1));
         assert_subr_arity("get-unicode-property-internal", 2, Some(2));
         assert_subr_arity("get-variable-watchers", 1, Some(1));
