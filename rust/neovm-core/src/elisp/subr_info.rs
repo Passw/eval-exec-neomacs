@@ -354,7 +354,9 @@ fn subr_arity_value(name: &str) -> Value {
         "group-gid" | "group-real-gid" | "interactive-p" | "last-nonminibuffer-frame" => {
             arity_cons(0, Some(0))
         }
-        "following-char" | "garbage-collect" | "get-load-suffixes" => arity_cons(0, Some(0)),
+        "following-char" | "garbage-collect" | "get-load-suffixes" | "byteorder" => {
+            arity_cons(0, Some(0))
+        }
         "buffer-file-name"
         | "buffer-base-buffer"
         | "buffer-last-name"
@@ -416,7 +418,13 @@ fn subr_arity_value(name: &str) -> Value {
         "expt" => arity_cons(2, Some(2)),
         "random" => arity_cons(0, Some(1)),
         "logb" | "lognot" => arity_cons(1, Some(1)),
-        "bignump" | "boundp" | "byte-code-function-p" | "car-safe" | "cdr-safe" => {
+        "bignump"
+        | "boundp"
+        | "byte-code-function-p"
+        | "car-safe"
+        | "cdr-safe"
+        | "bare-symbol"
+        | "bare-symbol-p" => {
             arity_cons(1, Some(1))
         }
         "identity" | "length" | "interpreted-function-p" | "invisible-p" | "macrop"
@@ -449,13 +457,15 @@ fn subr_arity_value(name: &str) -> Value {
         | "hash-table-rehash-threshold"
         | "hash-table-weakness" => arity_cons(1, Some(1)),
         "max" | "min" => arity_cons(1, None),
-        "assq" | "member" | "memq" | "rassoc" | "rassq" => arity_cons(2, Some(2)),
+        "assq" | "car-less-than-car" | "member" | "memq" | "rassoc" | "rassq" => {
+            arity_cons(2, Some(2))
+        }
         "mod" | "make-list" | "mapc" | "mapcan" | "mapcar" | "nth" | "nthcdr" | "remq" => {
             arity_cons(2, Some(2))
         }
         "delete" | "delq" | "elt" => arity_cons(2, Some(2)),
         "mapconcat" => arity_cons(2, Some(3)),
-        "assoc" => arity_cons(2, Some(3)),
+        "assoc" | "assoc-string" => arity_cons(2, Some(3)),
         "assoc-default" => arity_cons(2, Some(4)),
         "alist-get" => arity_cons(2, Some(5)),
         "last" | "butlast" => arity_cons(1, Some(2)),
@@ -1995,12 +2005,16 @@ mod tests {
     #[test]
     fn subr_arity_assoc_predicate_primitives_match_oracle() {
         assert_subr_arity("assoc", 2, Some(3));
+        assert_subr_arity("assoc-string", 2, Some(3));
         assert_subr_arity("assoc-default", 2, Some(4));
         assert_subr_arity("assq", 2, Some(2));
+        assert_subr_arity("car-less-than-car", 2, Some(2));
         assert_subr_arity("member", 2, Some(2));
         assert_subr_arity("memq", 2, Some(2));
         assert_subr_arity("rassoc", 2, Some(2));
         assert_subr_arity("rassq", 2, Some(2));
+        assert_subr_arity("bare-symbol", 1, Some(1));
+        assert_subr_arity("bare-symbol-p", 1, Some(1));
         assert_subr_arity("bignump", 1, Some(1));
         assert_subr_arity("boundp", 1, Some(1));
         assert_subr_arity("byte-code-function-p", 1, Some(1));
@@ -2417,6 +2431,7 @@ mod tests {
 
     #[test]
     fn subr_arity_current_state_primitives_match_oracle() {
+        assert_subr_arity("byteorder", 0, Some(0));
         assert_subr_arity("current-bidi-paragraph-direction", 0, Some(1));
         assert_subr_arity("current-case-table", 0, Some(0));
         assert_subr_arity("current-column", 0, Some(0));

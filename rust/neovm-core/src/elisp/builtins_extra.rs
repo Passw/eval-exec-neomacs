@@ -71,6 +71,68 @@ fn expect_int(val: &Value) -> Result<i64, Flow> {
     }
 }
 
+fn symbol_like_name(value: &Value) -> Option<&str> {
+    match value {
+        Value::Nil => Some("nil"),
+        Value::True => Some("t"),
+        Value::Symbol(s) => Some(s.as_str()),
+        Value::Keyword(s) => Some(s.as_str()),
+        _ => None,
+    }
+}
+
+fn expect_number_or_marker_f64(value: &Value) -> Result<f64, Flow> {
+    match value {
+        Value::Int(n) => Ok(*n as f64),
+        Value::Char(c) => Ok(*c as u32 as f64),
+        Value::Float(f) => Ok(*f),
+        other => Err(signal(
+            "wrong-type-argument",
+            vec![Value::symbol("number-or-marker-p"), other.clone()],
+        )),
+    }
+}
+
+fn list_car_or_signal(value: &Value) -> Result<Value, Flow> {
+    match value {
+        Value::Cons(cell) => Ok(cell.lock().expect("poisoned").car.clone()),
+        Value::Nil => Ok(Value::Nil),
+        other => Err(signal(
+            "wrong-type-argument",
+            vec![Value::symbol("listp"), other.clone()],
+        )),
+    }
+}
+
+fn assoc_string_key_name(value: &Value) -> Result<String, Flow> {
+    match value {
+        Value::Str(s) => Ok((**s).clone()),
+        _ => symbol_like_name(value)
+            .map(ToOwned::to_owned)
+            .ok_or_else(|| {
+                signal(
+                    "wrong-type-argument",
+                    vec![Value::symbol("stringp"), value.clone()],
+                )
+            }),
+    }
+}
+
+fn assoc_string_entry_name(value: &Value) -> Option<String> {
+    match value {
+        Value::Str(s) => Some((**s).clone()),
+        _ => symbol_like_name(value).map(ToOwned::to_owned),
+    }
+}
+
+fn assoc_string_equal(left: &str, right: &str, fold_case: bool) -> bool {
+    if fold_case {
+        left.chars().flat_map(char::to_lowercase).eq(right.chars().flat_map(char::to_lowercase))
+    } else {
+        left == right
+    }
+}
+
 fn collect_sequence_strict(val: &Value) -> Result<Vec<Value>, Flow> {
     match val {
         Value::Nil => Ok(Vec::new()),
@@ -355,6 +417,84 @@ pub(crate) fn builtin_proper_list_p(args: Vec<Value>) -> EvalResult {
 pub(crate) fn builtin_subrp(args: Vec<Value>) -> EvalResult {
     expect_args("subrp", &args, 1)?;
     Ok(Value::bool(matches!(&args[0], Value::Subr(_))))
+}
+
+/// `(bare-symbol SYMBOL-OR-SYMBOL-WITH-POS)` -> symbol.
+pub(crate) fn builtin_bare_symbol(args: Vec<Value>) -> EvalResult {
+    expect_args("bare-symbol", &args, 1)?;
+    if symbol_like_name(&args[0]).is_some() {
+        Ok(args[0].clone())
+    } else {
+        Err(signal(
+            "wrong-type-argument",
+            vec![
+                Value::list(vec![
+                    Value::symbol("symbolp"),
+                    Value::symbol("symbol-with-pos-p"),
+                ]),
+                args[0].clone(),
+            ],
+        ))
+    }
+}
+
+/// `(bare-symbol-p OBJECT)` -> t if symbol (including keyword/nil/t).
+pub(crate) fn builtin_bare_symbol_p(args: Vec<Value>) -> EvalResult {
+    expect_args("bare-symbol-p", &args, 1)?;
+    Ok(Value::bool(symbol_like_name(&args[0]).is_some()))
+}
+
+/// `(byteorder)` -> `?l` on little-endian, `?B` on big-endian.
+pub(crate) fn builtin_byteorder(args: Vec<Value>) -> EvalResult {
+    expect_args("byteorder", &args, 0)?;
+    let marker = if cfg!(target_endian = "little") {
+        'l'
+    } else {
+        'B'
+    };
+    Ok(Value::Int(marker as i64))
+}
+
+/// `(assoc-string KEY ALIST &optional CASE-FOLD)` -> first matching cell.
+pub(crate) fn builtin_assoc_string(args: Vec<Value>) -> EvalResult {
+    expect_min_args("assoc-string", &args, 2)?;
+    expect_max_args("assoc-string", &args, 3)?;
+    let needle = assoc_string_key_name(&args[0])?;
+    let fold_case = args.get(2).is_some_and(Value::is_truthy);
+
+    let mut cursor = args[1].clone();
+    loop {
+        match cursor {
+            Value::Nil => return Ok(Value::Nil),
+            Value::Cons(cell) => {
+                let pair = cell.lock().expect("poisoned");
+                let entry = pair.car.clone();
+                cursor = pair.cdr.clone();
+
+                let Value::Cons(entry_cell) = entry else {
+                    continue;
+                };
+                let entry_pair = entry_cell.lock().expect("poisoned");
+                let Some(entry_key) = assoc_string_entry_name(&entry_pair.car) else {
+                    continue;
+                };
+                if assoc_string_equal(&needle, &entry_key, fold_case) {
+                    return Ok(Value::Cons(entry_cell.clone()));
+                }
+            }
+            _ => return Ok(Value::Nil),
+        }
+    }
+}
+
+/// `(car-less-than-car A B)` -> t if `(car A) < (car B)`.
+pub(crate) fn builtin_car_less_than_car(args: Vec<Value>) -> EvalResult {
+    expect_args("car-less-than-car", &args, 2)?;
+    let left = list_car_or_signal(&args[0])?;
+    let right = list_car_or_signal(&args[1])?;
+    Ok(Value::bool(
+        expect_number_or_marker_f64(&left)? < expect_number_or_marker_f64(&right)?,
+    ))
 }
 
 /// `(byte-code-function-p OBJ)` -> t if compiled.
@@ -774,6 +914,125 @@ mod tests {
         }));
         assert!(builtin_closurep(vec![lambda]).unwrap().is_truthy());
         assert!(builtin_closurep(vec![Value::Int(1)]).unwrap().is_nil());
+    }
+
+    #[test]
+    fn bare_symbol_and_predicate_semantics() {
+        assert_eq!(
+            builtin_bare_symbol(vec![Value::symbol("alpha")]).unwrap(),
+            Value::symbol("alpha")
+        );
+        assert_eq!(
+            builtin_bare_symbol(vec![Value::keyword(":k")]).unwrap(),
+            Value::keyword(":k")
+        );
+        assert_eq!(builtin_bare_symbol(vec![Value::Nil]).unwrap(), Value::Nil);
+
+        assert!(builtin_bare_symbol_p(vec![Value::symbol("alpha")])
+            .unwrap()
+            .is_truthy());
+        assert!(builtin_bare_symbol_p(vec![Value::keyword(":k")])
+            .unwrap()
+            .is_truthy());
+        assert!(builtin_bare_symbol_p(vec![Value::Nil]).unwrap().is_truthy());
+        assert!(builtin_bare_symbol_p(vec![Value::Int(1)]).unwrap().is_nil());
+
+        let err = builtin_bare_symbol(vec![Value::Int(1)]).unwrap_err();
+        match err {
+            Flow::Signal(sig) => {
+                assert_eq!(sig.symbol, "wrong-type-argument");
+                assert_eq!(sig.data[1], Value::Int(1));
+            }
+            other => panic!("expected signal, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn byteorder_shape_and_arity() {
+        let byteorder = builtin_byteorder(vec![]).unwrap();
+        assert!(matches!(byteorder, Value::Int(108) | Value::Int(66)));
+
+        let err = builtin_byteorder(vec![Value::Nil]).unwrap_err();
+        match err {
+            Flow::Signal(sig) => assert_eq!(sig.symbol, "wrong-number-of-arguments"),
+            other => panic!("expected signal, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn assoc_string_and_car_less_than_car_semantics() {
+        let result = builtin_assoc_string(vec![
+            Value::string("A"),
+            Value::list(vec![
+                Value::cons(Value::string("a"), Value::Int(1)),
+                Value::cons(Value::string("b"), Value::Int(2)),
+            ]),
+            Value::True,
+        ])
+        .unwrap();
+        let Value::Cons(result_cell) = result else {
+            panic!("expected dotted pair result");
+        };
+        let result_pair = result_cell.lock().expect("poisoned");
+        assert_eq!(result_pair.car, Value::string("a"));
+        assert_eq!(result_pair.cdr, Value::Int(1));
+
+        let symbol_alist = Value::list(vec![
+            Value::cons(Value::symbol("foo"), Value::Int(1)),
+            Value::cons(Value::keyword(":k"), Value::Int(2)),
+        ]);
+        let symbol_hit = builtin_assoc_string(vec![Value::string("foo"), symbol_alist]).unwrap();
+        let Value::Cons(symbol_cell) = symbol_hit else {
+            panic!("expected dotted pair result");
+        };
+        let symbol_pair = symbol_cell.lock().expect("poisoned");
+        assert_eq!(symbol_pair.car, Value::symbol("foo"));
+        assert_eq!(symbol_pair.cdr, Value::Int(1));
+
+        let nil_tail = Value::cons(Value::cons(Value::string("x"), Value::Int(1)), Value::Int(2));
+        assert!(builtin_assoc_string(vec![Value::string("x"), nil_tail])
+            .unwrap()
+            .is_truthy());
+        assert!(builtin_assoc_string(vec![Value::string("y"), Value::Int(1)])
+            .unwrap()
+            .is_nil());
+
+        let key_err = builtin_assoc_string(vec![Value::Int(1), Value::Nil]).unwrap_err();
+        match key_err {
+            Flow::Signal(sig) => assert_eq!(sig.symbol, "wrong-type-argument"),
+            other => panic!("expected signal, got {other:?}"),
+        }
+
+        assert!(builtin_car_less_than_car(vec![
+            Value::cons(Value::Int(1), Value::symbol("a")),
+            Value::cons(Value::Int(2), Value::symbol("b")),
+        ])
+        .unwrap()
+        .is_truthy());
+        assert!(builtin_car_less_than_car(vec![
+            Value::cons(Value::Float(3.0), Value::symbol("a")),
+            Value::cons(Value::Int(2), Value::symbol("b")),
+        ])
+        .unwrap()
+        .is_nil());
+
+        let list_err =
+            builtin_car_less_than_car(vec![Value::Int(1), Value::cons(Value::Int(2), Value::Nil)])
+                .unwrap_err();
+        match list_err {
+            Flow::Signal(sig) => assert_eq!(sig.symbol, "wrong-type-argument"),
+            other => panic!("expected signal, got {other:?}"),
+        }
+
+        let number_err = builtin_car_less_than_car(vec![
+            Value::cons(Value::symbol("x"), Value::Nil),
+            Value::cons(Value::Int(1), Value::Nil),
+        ])
+        .unwrap_err();
+        match number_err {
+            Flow::Signal(sig) => assert_eq!(sig.symbol, "wrong-type-argument"),
+            other => panic!("expected signal, got {other:?}"),
+        }
     }
 
     #[test]

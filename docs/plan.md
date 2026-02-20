@@ -28,6 +28,53 @@ Last updated: 2026-02-20
 
 ## Doing
 
+- Added core primitive compatibility slice for `bare-symbol`, `bare-symbol-p`, `byteorder`, `assoc-string`, and `car-less-than-car`:
+  - runtime changes:
+    - `rust/neovm-core/src/elisp/builtins_extra.rs`
+      - implemented:
+        - `bare-symbol` (`1..1`)
+        - `bare-symbol-p` (`1..1`)
+        - `byteorder` (`0..0`)
+        - `assoc-string` (`2..3`)
+        - `car-less-than-car` (`2..2`)
+      - aligned key semantics:
+        - `bare-symbol` returns identity for symbol/keyword/nil/t values and signals `wrong-type-argument` for non-symbol values.
+        - `bare-symbol-p` recognizes symbol-like values (including keyword/nil/t) and returns `nil` for non-symbol inputs.
+        - `byteorder` returns host byte-order marker codepoint (`?l` on little-endian, `?B` on big-endian).
+        - `assoc-string` supports string/symbol keys, optional case-fold matching, skips non-cons/non-string-like alist elements, and preserves oracle nil behavior for non-list tails.
+        - `car-less-than-car` enforces list inputs, then compares numeric car values with `number-or-marker-p` signaling parity.
+      - added focused unit coverage:
+        - `bare_symbol_and_predicate_semantics`
+        - `byteorder_shape_and_arity`
+        - `assoc_string_and_car_less_than_car_semantics`
+    - `rust/neovm-core/src/elisp/builtins.rs`
+      - wired all five builtins into pure dispatch.
+    - `rust/neovm-core/src/elisp/builtin_registry.rs`
+      - registered:
+        - `bare-symbol`
+        - `bare-symbol-p`
+        - `byteorder`
+        - `assoc-string`
+        - `car-less-than-car`
+    - `rust/neovm-core/src/elisp/subr_info.rs`
+      - added arity metadata + assertions for all five builtins.
+  - vm-compat corpus changes:
+    - added:
+      - `test/neovm/vm-compat/cases/symbol-byteorder-assoc-string-car-less-than-car-semantics.forms`
+      - `test/neovm/vm-compat/cases/symbol-byteorder-assoc-string-car-less-than-car-semantics.expected.tsv`
+    - wired case into:
+      - `test/neovm/vm-compat/cases/default.list`
+  - verified:
+    - `cargo test --manifest-path rust/neovm-core/Cargo.toml bare_symbol_and_predicate_semantics -- --nocapture` (pass)
+    - `cargo test --manifest-path rust/neovm-core/Cargo.toml assoc_string_and_car_less_than_car_semantics -- --nocapture` (pass)
+    - `cargo test --manifest-path rust/neovm-core/Cargo.toml byteorder_shape_and_arity -- --nocapture` (pass)
+    - `cargo test --manifest-path rust/neovm-core/Cargo.toml subr_arity_assoc_predicate_primitives_match_oracle -- --nocapture` (pass)
+    - `cargo test --manifest-path rust/neovm-core/Cargo.toml subr_arity_current_state_primitives_match_oracle -- --nocapture` (pass)
+    - `make -C test/neovm/vm-compat check-one-neovm CASE=cases/symbol-byteorder-assoc-string-car-less-than-car-semantics` (pass; `28/28`)
+    - `make -C test/neovm/vm-compat check-builtin-registry-all` (pass; `1278` dispatch / `1277` core)
+    - `make -C test/neovm/vm-compat compat-progress` (pass; default list `797`, tracked `803`, oracle builtin coverage registry/runtime `877/557`)
+    - `make -C test/neovm/vm-compat check-all-neovm-strict` (pass; case inventory `803`)
+
 - Added buffer modification-tick compatibility slice for `buffer-modified-tick` / `buffer-chars-modified-tick`:
   - runtime changes:
     - `rust/neovm-core/src/buffer/buffer.rs`
