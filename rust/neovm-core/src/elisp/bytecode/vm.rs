@@ -1,6 +1,6 @@
 //! Bytecode virtual machine — stack-based interpreter.
 
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 use super::chunk::ByteCodeFunction;
 use super::opcode::Op;
@@ -217,8 +217,21 @@ impl<'a> Vm<'a> {
                     let args_start = stack.len().saturating_sub(n);
                     let args: Vec<Value> = stack.drain(args_start..).collect();
                     let func_val = stack.pop().unwrap_or(Value::Nil);
+                    let writeback_names = self.writeback_callable_names(&func_val);
+                    let writeback_args = args.clone();
                     match self.call_function(func_val, args) {
-                        Ok(result) => stack.push(result),
+                        Ok(result) => {
+                            if let Some((called_name, alias_target)) = writeback_names.as_ref() {
+                                self.maybe_writeback_mutating_first_arg(
+                                    called_name,
+                                    alias_target.as_deref(),
+                                    &writeback_args,
+                                    &result,
+                                    stack,
+                                );
+                            }
+                            stack.push(result);
+                        }
                         Err(Flow::Throw { tag, value }) => {
                             if let Some(target) = resolve_throw_target(handlers, &tag) {
                                 stack.push(value);
@@ -255,8 +268,22 @@ impl<'a> Vm<'a> {
                             let spread = list_to_vec(&last).unwrap_or_default();
                             args.extend(spread);
                         }
+                        let writeback_names = self.writeback_callable_names(&func_val);
+                        let writeback_args = args.clone();
                         match self.call_function(func_val, args) {
-                            Ok(result) => stack.push(result),
+                            Ok(result) => {
+                                if let Some((called_name, alias_target)) = writeback_names.as_ref()
+                                {
+                                    self.maybe_writeback_mutating_first_arg(
+                                        called_name,
+                                        alias_target.as_deref(),
+                                        &writeback_args,
+                                        &result,
+                                        stack,
+                                    );
+                                }
+                                stack.push(result);
+                            }
                             Err(Flow::Throw { tag, value }) => {
                                 if let Some(target) = resolve_throw_target(handlers, &tag) {
                                     stack.push(value);
@@ -588,40 +615,19 @@ impl<'a> Vm<'a> {
                 Op::Aref => {
                     let idx_val = stack.pop().unwrap_or(Value::Int(0));
                     let vec_val = stack.pop().unwrap_or(Value::Nil);
-                    let idx = idx_val.as_int().unwrap_or(0) as usize;
-                    match &vec_val {
-                        Value::Vector(v) => {
-                            let v = v.lock().expect("poisoned");
-                            stack.push(v.get(idx).cloned().unwrap_or(Value::Nil));
-                        }
-                        _ => {
-                            return Err(signal(
-                                "wrong-type-argument",
-                                vec![Value::symbol("arrayp"), vec_val],
-                            ));
-                        }
-                    }
+                    let result = builtins::builtin_aref(vec![vec_val, idx_val])?;
+                    stack.push(result);
                 }
                 Op::Aset => {
                     let val = stack.pop().unwrap_or(Value::Nil);
                     let idx_val = stack.pop().unwrap_or(Value::Int(0));
                     let vec_val = stack.pop().unwrap_or(Value::Nil);
-                    let idx = idx_val.as_int().unwrap_or(0) as usize;
-                    match &vec_val {
-                        Value::Vector(v) => {
-                            let mut v = v.lock().expect("poisoned");
-                            if idx < v.len() {
-                                v[idx] = val.clone();
-                            }
-                            stack.push(val);
-                        }
-                        _ => {
-                            return Err(signal(
-                                "wrong-type-argument",
-                                vec![Value::symbol("arrayp"), vec_val],
-                            ));
-                        }
-                    }
+                    let call_args = vec![vec_val, idx_val, val];
+                    let result = builtins::builtin_aset(call_args.clone())?;
+                    self.maybe_writeback_mutating_first_arg(
+                        "aset", None, &call_args, &result, stack,
+                    );
+                    stack.push(result);
                 }
 
                 // -- Symbol operations --
@@ -729,7 +735,15 @@ impl<'a> Vm<'a> {
                     let n = *n as usize;
                     let args_start = stack.len().saturating_sub(n);
                     let args: Vec<Value> = stack.drain(args_start..).collect();
+                    let writeback_args = args.clone();
                     let result = self.dispatch_vm_builtin(&name, args)?;
+                    self.maybe_writeback_mutating_first_arg(
+                        &name,
+                        None,
+                        &writeback_args,
+                        &result,
+                        stack,
+                    );
                     stack.push(result);
                 }
             }
@@ -740,6 +754,165 @@ impl<'a> Vm<'a> {
     }
 
     // -- Helper methods --
+
+    fn writeback_callable_names(&self, func_val: &Value) -> Option<(String, Option<String>)> {
+        match func_val {
+            Value::Subr(name) => Some((name.clone(), None)),
+            Value::Symbol(name) => {
+                let alias_target =
+                    self.obarray
+                        .symbol_function(name)
+                        .and_then(|bound| match bound {
+                            Value::Symbol(target) => Some(target.clone()),
+                            Value::Subr(target) => Some(target.clone()),
+                            _ => None,
+                        });
+                Some((name.clone(), alias_target))
+            }
+            _ => None,
+        }
+    }
+
+    fn maybe_writeback_mutating_first_arg(
+        &mut self,
+        called_name: &str,
+        alias_target: Option<&str>,
+        call_args: &[Value],
+        result: &Value,
+        stack: &mut Vec<Value>,
+    ) {
+        let mutates_fillarray =
+            called_name == "fillarray" || alias_target.is_some_and(|name| name == "fillarray");
+        let mutates_aset = called_name == "aset" || alias_target.is_some_and(|name| name == "aset");
+        if !mutates_fillarray && !mutates_aset {
+            return;
+        }
+
+        let Some(first_arg) = call_args.first() else {
+            return;
+        };
+        if !first_arg.is_string() {
+            return;
+        }
+
+        let replacement = if mutates_fillarray {
+            if !result.is_string() || eq_value(first_arg, result) {
+                return;
+            }
+            result.clone()
+        } else {
+            if call_args.len() < 3 {
+                return;
+            }
+            let Ok(updated) =
+                builtins::aset_string_replacement(first_arg, &call_args[1], &call_args[2])
+            else {
+                return;
+            };
+            if eq_value(first_arg, &updated) {
+                return;
+            }
+            updated
+        };
+
+        if first_arg.as_str() == replacement.as_str() {
+            return;
+        }
+
+        let mut visited = HashSet::new();
+        for value in stack.iter_mut() {
+            Self::replace_alias_refs_in_value(value, first_arg, &replacement, &mut visited);
+        }
+        for frame in self.lexenv.iter_mut() {
+            for value in frame.values_mut() {
+                Self::replace_alias_refs_in_value(value, first_arg, &replacement, &mut visited);
+            }
+        }
+        for frame in self.dynamic.iter_mut() {
+            for value in frame.values_mut() {
+                Self::replace_alias_refs_in_value(value, first_arg, &replacement, &mut visited);
+            }
+        }
+        if let Some(buf) = self.buffers.current_buffer_mut() {
+            for value in buf.properties.values_mut() {
+                Self::replace_alias_refs_in_value(value, first_arg, &replacement, &mut visited);
+            }
+        }
+
+        let symbols: Vec<String> = self
+            .obarray
+            .all_symbols()
+            .into_iter()
+            .map(str::to_string)
+            .collect();
+        for name in symbols {
+            if let Some(symbol) = self.obarray.get_mut(&name) {
+                if let Some(value) = symbol.value.as_mut() {
+                    Self::replace_alias_refs_in_value(value, first_arg, &replacement, &mut visited);
+                }
+            }
+        }
+    }
+
+    fn replace_alias_refs_in_value(
+        value: &mut Value,
+        from: &Value,
+        to: &Value,
+        visited: &mut HashSet<usize>,
+    ) {
+        if eq_value(value, from) {
+            *value = to.clone();
+            return;
+        }
+
+        match value {
+            Value::Cons(cell) => {
+                let key = (std::sync::Arc::as_ptr(cell) as usize) ^ 0x1;
+                if !visited.insert(key) {
+                    return;
+                }
+                let mut pair = cell.lock().expect("poisoned");
+                Self::replace_alias_refs_in_value(&mut pair.car, from, to, visited);
+                Self::replace_alias_refs_in_value(&mut pair.cdr, from, to, visited);
+            }
+            Value::Vector(items) => {
+                let key = (std::sync::Arc::as_ptr(items) as usize) ^ 0x2;
+                if !visited.insert(key) {
+                    return;
+                }
+                let mut values = items.lock().expect("poisoned");
+                for item in values.iter_mut() {
+                    Self::replace_alias_refs_in_value(item, from, to, visited);
+                }
+            }
+            Value::HashTable(table) => {
+                let key = (std::sync::Arc::as_ptr(table) as usize) ^ 0x4;
+                if !visited.insert(key) {
+                    return;
+                }
+                let mut guard = table.lock().expect("poisoned");
+                let old_ptr = match from {
+                    Value::Str(value) => Some(std::sync::Arc::as_ptr(value) as usize),
+                    _ => None,
+                };
+                let new_ptr = match to {
+                    Value::Str(value) => Some(std::sync::Arc::as_ptr(value) as usize),
+                    _ => None,
+                };
+                if matches!(guard.test, HashTableTest::Eq | HashTableTest::Eql) {
+                    if let (Some(old_ptr), Some(new_ptr)) = (old_ptr, new_ptr) {
+                        if let Some(existing) = guard.data.remove(&HashKey::Ptr(old_ptr)) {
+                            guard.data.insert(HashKey::Ptr(new_ptr), existing);
+                        }
+                    }
+                }
+                for item in guard.data.values_mut() {
+                    Self::replace_alias_refs_in_value(item, from, to, visited);
+                }
+            }
+            _ => {}
+        }
+    }
 
     fn lookup_var(&self, name: &str) -> EvalResult {
         if name == "nil" {
@@ -1512,6 +1685,65 @@ mod tests {
     fn vm_vector_ops() {
         assert_eq!(vm_eval_str("(aref [10 20 30] 1)"), "OK 20");
         assert_eq!(vm_eval_str("(length [1 2 3])"), "OK 3");
+    }
+
+    #[test]
+    fn vm_aset_string_writeback() {
+        assert_eq!(
+            vm_eval_str("(let ((s (copy-sequence \"abc\"))) (aset s 1 ?x) s)"),
+            r#"OK "axc""#
+        );
+    }
+
+    #[test]
+    fn vm_fillarray_string_writeback() {
+        assert_eq!(
+            vm_eval_str("(let ((s (copy-sequence \"abc\"))) (fillarray s ?y) s)"),
+            r#"OK "yyy""#
+        );
+    }
+
+    #[test]
+    fn vm_aref_aset_error_parity() {
+        let aref_err = vm_eval("(aref [10 20 30] -1)").expect_err("aref should reject -1");
+        match aref_err {
+            EvalError::Signal { symbol, data } => {
+                assert_eq!(symbol, "args-out-of-range");
+                assert_eq!(
+                    data,
+                    vec![
+                        Value::vector(vec![Value::Int(10), Value::Int(20), Value::Int(30)]),
+                        Value::Int(-1)
+                    ]
+                );
+            }
+            other => panic!("unexpected error: {other:?}"),
+        }
+
+        let aset_err = vm_eval("(aset [10 20 30] -1 99)").expect_err("aset should reject -1");
+        match aset_err {
+            EvalError::Signal { symbol, data } => {
+                assert_eq!(symbol, "args-out-of-range");
+                assert_eq!(
+                    data,
+                    vec![
+                        Value::vector(vec![Value::Int(10), Value::Int(20), Value::Int(30)]),
+                        Value::Int(-1)
+                    ]
+                );
+            }
+            other => panic!("unexpected error: {other:?}"),
+        }
+
+        let string_aset_err =
+            vm_eval("(aset \"abc\" 1 nil)").expect_err("aset string should validate character");
+        match string_aset_err {
+            EvalError::Signal { symbol, data } => {
+                assert_eq!(symbol, "wrong-type-argument");
+                assert_eq!(data, vec![Value::symbol("characterp"), Value::Nil]);
+            }
+            other => panic!("unexpected error: {other:?}"),
+        }
     }
 
     #[test]
