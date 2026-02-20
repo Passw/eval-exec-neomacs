@@ -329,6 +329,7 @@ fn subr_arity_value(name: &str) -> Value {
         "file-name-concat" => arity_cons(1, None),
         "file-truename" => arity_cons(1, Some(3)),
         "get-truename-buffer" | "unhandled-file-name-directory" => arity_cons(1, Some(1)),
+        "find-buffer" => arity_cons(2, Some(2)),
         "find-file" => arity_cons(1, Some(2)),
         "find-file-name-handler" => arity_cons(2, Some(2)),
         "find-file-noselect" => arity_cons(1, Some(4)),
@@ -900,7 +901,9 @@ fn subr_arity_value(name: &str) -> Value {
         "line-pixel-height" | "long-line-optimizations-p" => arity_cons(0, Some(0)),
         "recenter-top-bottom" => arity_cons(0, Some(1)),
         "recursion-depth" | "region-beginning" | "region-end" => arity_cons(0, Some(0)),
-        "delete-frame" | "delete-other-windows" => arity_cons(0, Some(2)),
+        "delete-frame" | "delete-other-windows" | "delete-other-windows-internal" => {
+            arity_cons(0, Some(2))
+        }
         "next-window" | "previous-window" | "pos-visible-in-window-p" => arity_cons(0, Some(3)),
         "coordinates-in-window-p" => arity_cons(2, Some(2)),
         "pop-to-buffer" => arity_cons(1, Some(3)),
@@ -1007,6 +1010,7 @@ fn subr_arity_value(name: &str) -> Value {
         "delete-indentation" => arity_cons(0, Some(3)),
         "delete-overlay" => arity_cons(1, Some(1)),
         "delete-window" => arity_cons(0, Some(1)),
+        "delete-window-internal" => arity_cons(1, Some(1)),
         "delete-directory" => arity_cons(1, Some(3)),
         "delete-directory-internal" => arity_cons(1, Some(1)),
         "delete-file" => arity_cons(1, Some(2)),
@@ -1279,10 +1283,21 @@ fn subr_arity_value(name: &str) -> Value {
         | "suspend-tty"
         | "resume-tty"
         | "terminal-coding-system"
+        | "frame-char-height"
+        | "frame-char-width"
         | "frame-first-window"
+        | "frame-native-height"
+        | "frame-native-width"
+        | "frame-position"
         | "frame-root-window"
         | "frame-parameters"
         | "frame-selected-window"
+        | "frame-text-cols"
+        | "frame-text-height"
+        | "frame-text-lines"
+        | "frame-text-width"
+        | "frame-total-cols"
+        | "frame-total-lines"
         | "current-window-configuration"
         | "minibuffer-window"
         | "window-buffer"
@@ -1321,6 +1336,7 @@ fn subr_arity_value(name: &str) -> Value {
         | "x-mouse-absolute-pixel-position"
         | "redraw-display"
         | "frame-list"
+        | "visible-frame-list"
         | "x-uses-old-gtk-dialog"
         | "x-win-suspend-error"
         | "selected-window"
@@ -1342,6 +1358,9 @@ fn subr_arity_value(name: &str) -> Value {
         | "x-selection-owner-p"
         | "get-buffer-window" => arity_cons(0, Some(2)),
         "window-preserve-size" | "window-size-fixed-p" => arity_cons(0, Some(3)),
+        "set-frame-height" | "set-frame-width" => arity_cons(2, Some(4)),
+        "set-frame-size" => arity_cons(3, Some(4)),
+        "set-frame-position" => arity_cons(3, Some(3)),
         "window-resizable" => arity_cons(2, Some(5)),
         "window-edges" => arity_cons(0, Some(4)),
         "window-list" | "get-buffer-window-list" => arity_cons(0, Some(3)),
@@ -2415,6 +2434,7 @@ mod tests {
         assert_subr_arity("delete-indentation", 0, Some(3));
         assert_subr_arity("delete-overlay", 1, Some(1));
         assert_subr_arity("delete-window", 0, Some(1));
+        assert_subr_arity("delete-window-internal", 1, Some(1));
     }
 
     #[test]
@@ -2445,6 +2465,7 @@ mod tests {
 
     #[test]
     fn subr_arity_file_load_primitives_match_oracle() {
+        assert_subr_arity("find-buffer", 2, Some(2));
         assert_subr_arity("find-file", 1, Some(2));
         assert_subr_arity("find-file-name-handler", 2, Some(2));
         assert_subr_arity("find-file-noselect", 1, Some(4));
@@ -2804,6 +2825,7 @@ mod tests {
     fn subr_arity_window_navigation_helpers_match_oracle() {
         assert_subr_arity("delete-frame", 0, Some(2));
         assert_subr_arity("delete-other-windows", 0, Some(2));
+        assert_subr_arity("delete-other-windows-internal", 0, Some(2));
         assert_subr_arity("next-window", 0, Some(3));
         assert_subr_arity("previous-window", 0, Some(3));
         assert_subr_arity("pop-to-buffer", 1, Some(3));
@@ -3121,17 +3143,32 @@ mod tests {
     fn subr_arity_window_frame_primitives_match_oracle() {
         assert_subr_arity("display-buffer", 1, Some(3));
         assert_subr_arity("active-minibuffer-window", 0, Some(0));
+        assert_subr_arity("frame-char-height", 0, Some(1));
+        assert_subr_arity("frame-char-width", 0, Some(1));
         assert_subr_arity("frame-first-window", 0, Some(1));
         assert_subr_arity("frame-list", 0, Some(0));
         assert_subr_arity("frame-live-p", 1, Some(1));
+        assert_subr_arity("frame-native-height", 0, Some(1));
+        assert_subr_arity("frame-native-width", 0, Some(1));
         assert_subr_arity("frame-parameter", 2, Some(2));
         assert_subr_arity("frame-parameters", 0, Some(1));
+        assert_subr_arity("frame-position", 0, Some(1));
         assert_subr_arity("frame-root-window", 0, Some(1));
         assert_subr_arity("frame-visible-p", 1, Some(1));
+        assert_subr_arity("frame-text-cols", 0, Some(1));
+        assert_subr_arity("frame-text-height", 0, Some(1));
+        assert_subr_arity("frame-text-lines", 0, Some(1));
+        assert_subr_arity("frame-text-width", 0, Some(1));
+        assert_subr_arity("frame-total-cols", 0, Some(1));
+        assert_subr_arity("frame-total-lines", 0, Some(1));
         assert_subr_arity("minibuffer-selected-window", 0, Some(0));
         assert_subr_arity("minibuffer-window-active-p", 1, Some(1));
         assert_subr_arity("minibuffer-window", 0, Some(1));
         assert_subr_arity("selected-window", 0, Some(0));
+        assert_subr_arity("set-frame-height", 2, Some(4));
+        assert_subr_arity("set-frame-width", 2, Some(4));
+        assert_subr_arity("set-frame-size", 3, Some(4));
+        assert_subr_arity("set-frame-position", 3, Some(3));
         assert_subr_arity("set-window-parameter", 3, Some(3));
         assert_subr_arity("set-window-buffer", 2, Some(3));
         assert_subr_arity("set-window-configuration", 1, Some(3));
@@ -3159,6 +3196,7 @@ mod tests {
         assert_subr_arity("window-pixel-width", 0, Some(1));
         assert_subr_arity("window-body-edges", 0, Some(1));
         assert_subr_arity("window-body-pixel-edges", 0, Some(1));
+        assert_subr_arity("visible-frame-list", 0, Some(0));
         assert_subr_arity("window-pixel-edges", 0, Some(1));
         assert_subr_arity("window-edges", 0, Some(4));
         assert_subr_arity("window-body-height", 0, Some(2));

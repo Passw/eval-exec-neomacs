@@ -811,3 +811,5 @@ cases/predicate-file-length-format-semantics
 cases/system-file-primitive-semantics
 cases/file-runtime-wrapper-semantics
 cases/internal-file-wrapper-semantics
+cases/window-internal-find-buffer-wrapper-semantics
+cases/frame-size-visibility-wrapper-semantics

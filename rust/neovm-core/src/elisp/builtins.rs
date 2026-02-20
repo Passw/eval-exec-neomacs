@@ -5552,6 +5552,59 @@ pub(crate) fn builtin_get_buffer(
     }
 }
 
+/// `(find-buffer VARIABLE VALUE)` -> buffer or nil.
+///
+/// Returns the first live buffer whose VARIABLE value is `eq` to VALUE.
+/// Buffer-local bindings take precedence; otherwise dynamic/global bindings are
+/// used as fallback. Signals `void-variable` when VARIABLE is unbound.
+pub(crate) fn builtin_find_buffer(
+    eval: &mut super::eval::Evaluator,
+    args: Vec<Value>,
+) -> EvalResult {
+    expect_args("find-buffer", &args, 2)?;
+    let name = args[0].as_symbol_name().ok_or_else(|| {
+        signal(
+            "wrong-type-argument",
+            vec![Value::symbol("symbolp"), args[0].clone()],
+        )
+    })?;
+    let target_value = args[1].clone();
+
+    let fallback_value = eval
+        .dynamic
+        .iter()
+        .rev()
+        .find_map(|frame| frame.get(name).cloned())
+        .or_else(|| eval.obarray().symbol_value(name).cloned())
+        .ok_or_else(|| signal("void-variable", vec![Value::symbol(name)]))?;
+
+    let mut scan_order = Vec::new();
+    let current_id = eval.buffers.current_buffer().map(|buf| buf.id);
+    if let Some(id) = current_id {
+        scan_order.push(id);
+    }
+    for id in eval.buffers.buffer_list() {
+        if Some(id) != current_id {
+            scan_order.push(id);
+        }
+    }
+
+    for id in scan_order {
+        let Some(buf) = eval.buffers.get(id) else {
+            continue;
+        };
+        let observed = buf
+            .get_buffer_local(name)
+            .cloned()
+            .unwrap_or_else(|| fallback_value.clone());
+        if eq_value(&observed, &target_value) {
+            return Ok(Value::Buffer(id));
+        }
+    }
+
+    Ok(Value::Nil)
+}
+
 /// `(delete-all-overlays &optional BUFFER)` -> nil
 ///
 /// Removes every overlay from BUFFER (or the current buffer when omitted/nil).
@@ -9172,6 +9225,7 @@ pub(crate) fn dispatch_builtin(
         // Buffer operations
         "get-buffer-create" => return Some(builtin_get_buffer_create(eval, args)),
         "get-buffer" => return Some(builtin_get_buffer(eval, args)),
+        "find-buffer" => return Some(builtin_find_buffer(eval, args)),
         "buffer-live-p" => return Some(builtin_buffer_live_p(eval, args)),
         "barf-if-buffer-read-only" => return Some(builtin_barf_if_buffer_read_only(eval, args)),
         "bury-buffer-internal" => return Some(builtin_bury_buffer_internal(eval, args)),
@@ -10209,8 +10263,16 @@ pub(crate) fn dispatch_builtin(
         }
         "split-window" => return Some(super::window_cmds::builtin_split_window(eval, args)),
         "delete-window" => return Some(super::window_cmds::builtin_delete_window(eval, args)),
+        "delete-window-internal" => {
+            return Some(super::window_cmds::builtin_delete_window_internal(eval, args))
+        }
         "delete-other-windows" => {
             return Some(super::window_cmds::builtin_delete_other_windows(eval, args))
+        }
+        "delete-other-windows-internal" => {
+            return Some(super::window_cmds::builtin_delete_other_windows_internal(
+                eval, args,
+            ))
         }
         "select-window" => return Some(super::window_cmds::builtin_select_window(eval, args)),
         "other-window" => return Some(super::window_cmds::builtin_other_window(eval, args)),
@@ -10241,9 +10303,37 @@ pub(crate) fn dispatch_builtin(
         "last-nonminibuffer-frame" => {
             return Some(super::window_cmds::builtin_selected_frame(eval, args))
         }
+        "visible-frame-list" => {
+            return Some(super::window_cmds::builtin_visible_frame_list(eval, args))
+        }
         "frame-list" => return Some(super::window_cmds::builtin_frame_list(eval, args)),
         "make-frame" => return Some(super::window_cmds::builtin_make_frame(eval, args)),
         "delete-frame" => return Some(super::window_cmds::builtin_delete_frame(eval, args)),
+        "frame-char-height" => return Some(super::window_cmds::builtin_frame_char_height(eval, args)),
+        "frame-char-width" => return Some(super::window_cmds::builtin_frame_char_width(eval, args)),
+        "frame-native-height" => {
+            return Some(super::window_cmds::builtin_frame_native_height(eval, args))
+        }
+        "frame-native-width" => {
+            return Some(super::window_cmds::builtin_frame_native_width(eval, args))
+        }
+        "frame-text-cols" => return Some(super::window_cmds::builtin_frame_text_cols(eval, args)),
+        "frame-text-height" => {
+            return Some(super::window_cmds::builtin_frame_text_height(eval, args))
+        }
+        "frame-text-lines" => {
+            return Some(super::window_cmds::builtin_frame_text_lines(eval, args))
+        }
+        "frame-text-width" => {
+            return Some(super::window_cmds::builtin_frame_text_width(eval, args))
+        }
+        "frame-total-cols" => {
+            return Some(super::window_cmds::builtin_frame_total_cols(eval, args))
+        }
+        "frame-total-lines" => {
+            return Some(super::window_cmds::builtin_frame_total_lines(eval, args))
+        }
+        "frame-position" => return Some(super::window_cmds::builtin_frame_position(eval, args)),
         "frame-parameter" => return Some(super::window_cmds::builtin_frame_parameter(eval, args)),
         "frame-parameters" => {
             return Some(super::window_cmds::builtin_frame_parameters(eval, args))
@@ -10252,6 +10342,12 @@ pub(crate) fn dispatch_builtin(
             return Some(super::window_cmds::builtin_modify_frame_parameters(
                 eval, args,
             ))
+        }
+        "set-frame-height" => return Some(super::window_cmds::builtin_set_frame_height(eval, args)),
+        "set-frame-width" => return Some(super::window_cmds::builtin_set_frame_width(eval, args)),
+        "set-frame-size" => return Some(super::window_cmds::builtin_set_frame_size(eval, args)),
+        "set-frame-position" => {
+            return Some(super::window_cmds::builtin_set_frame_position(eval, args))
         }
         "frame-visible-p" => return Some(super::window_cmds::builtin_frame_visible_p(eval, args)),
         "frame-live-p" => return Some(super::window_cmds::builtin_frame_live_p(eval, args)),
