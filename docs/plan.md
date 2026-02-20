@@ -28,6 +28,49 @@ Last updated: 2026-02-20
 
 ## Doing
 
+- Added base64 region builtin compatibility slice and locked oracle parity:
+  - runtime changes:
+    - `rust/neovm-core/src/elisp/fns.rs`
+      - implemented evaluator-backed region builtins:
+        - `base64-encode-region`
+        - `base64-decode-region`
+        - `base64url-encode-region`
+      - aligned region/point semantics with oracle:
+        - swapped `START`/`END` accepted
+        - return value is inserted byte length
+        - strict invalid decode signals `(error "Invalid base64 data")` without mutating buffer
+        - `NOERROR` invalid decode replaces region with empty text and returns `0`
+      - aligned argument/range error payloads:
+        - `wrong-type-argument (integer-or-marker-p ...)`
+        - `args-out-of-range` with `(BUFFER START END)` data payload
+      - added unit coverage for roundtrip, swapped bounds, `NOERROR`, and error-shape parity.
+    - `rust/neovm-core/src/elisp/builtins.rs`
+      - wired all three region builtins into evaluator dispatch.
+    - `rust/neovm-core/src/elisp/builtin_registry.rs`
+      - registered:
+        - `base64-encode-region`
+        - `base64-decode-region`
+        - `base64url-encode-region`
+    - `rust/neovm-core/src/elisp/subr_info.rs`
+      - added arity metadata + assertions:
+        - `base64-encode-region` => `(2 . 3)`
+        - `base64-decode-region` => `(2 . 4)`
+        - `base64url-encode-region` => `(2 . 3)`
+    - `rust/neovm-core/src/elisp/interactive.rs`
+      - aligned builtin `commandp` classification for all three names.
+  - vm-compat corpus changes:
+    - added:
+      - `test/neovm/vm-compat/cases/base64-region-semantics.forms`
+      - `test/neovm/vm-compat/cases/base64-region-semantics.expected.tsv`
+    - wired case into:
+      - `test/neovm/vm-compat/cases/default.list`
+  - verified:
+    - `cargo test --manifest-path rust/neovm-core/Cargo.toml base64_ -- --nocapture` (pass; `13/13`)
+    - `make -C test/neovm/vm-compat check-one-neovm CASE=cases/base64-region-semantics` (pass; `26/26`)
+    - `make -C test/neovm/vm-compat check-builtin-registry-all` (pass; `1220` dispatch / `1219` core)
+    - `make -C test/neovm/vm-compat compat-progress` (pass; default list `793`, tracked `799`, primitive-subr coverage registry `819/615`, runtime `867/567`)
+    - `make -C test/neovm/vm-compat check-all-neovm-strict` (pass; case inventory `799`)
+
 - Added bool-vector extended parity slice (`bool-vector-not`, `bool-vector-set-difference`, `bool-vector-count-consecutive`) and aligned length-error payloads:
   - runtime changes:
     - `rust/neovm-core/src/elisp/chartable.rs`

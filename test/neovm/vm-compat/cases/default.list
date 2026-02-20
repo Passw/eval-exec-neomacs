@@ -97,6 +97,7 @@ cases/hook-runtime-semantics
 cases/timeout-window-hook-semantics
 cases/startup-helper-subr-arity-semantics
 cases/encoding-bool-vector-subr-arity-semantics
+cases/base64-region-semantics
 cases/command-timer-subr-arity-semantics
 cases/command-read-subr-arity-semantics
 cases/read-core-subr-arity-semantics

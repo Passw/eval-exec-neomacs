@@ -335,6 +335,9 @@ fn builtin_command_name(name: &str) -> bool {
             | "back-to-indentation"
             | "backward-sexp"
             | "backward-word"
+            | "base64-decode-region"
+            | "base64-encode-region"
+            | "base64url-encode-region"
             | "beginning-of-buffer"
             | "bookmark-delete"
             | "bookmark-jump"
@@ -3317,6 +3320,9 @@ mod tests {
         for name in [
             "abbrev-mode",
             "bookmark-jump",
+            "base64-decode-region",
+            "base64-encode-region",
+            "base64url-encode-region",
             "describe-function",
             "display-buffer",
             "eval-buffer",

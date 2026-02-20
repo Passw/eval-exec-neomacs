@@ -720,6 +720,8 @@ fn subr_arity_value(name: &str) -> Value {
         "run-window-configuration-change-hook" | "run-window-scroll-functions" => {
             arity_cons(0, Some(1))
         }
+        "base64-decode-region" => arity_cons(2, Some(4)),
+        "base64-encode-region" | "base64url-encode-region" => arity_cons(2, Some(3)),
         "base64-decode-string" => arity_cons(1, Some(3)),
         "base64-encode-string" | "base64url-encode-string" => arity_cons(1, Some(2)),
         "md5" => arity_cons(1, Some(5)),
@@ -2080,8 +2082,11 @@ mod tests {
 
     #[test]
     fn subr_arity_encoding_bool_vector_primitives_match_oracle() {
+        assert_subr_arity("base64-decode-region", 2, Some(4));
+        assert_subr_arity("base64-encode-region", 2, Some(3));
         assert_subr_arity("base64-decode-string", 1, Some(3));
         assert_subr_arity("base64-encode-string", 1, Some(2));
+        assert_subr_arity("base64url-encode-region", 2, Some(3));
         assert_subr_arity("base64url-encode-string", 1, Some(2));
         assert_subr_arity("bool-vector-p", 1, Some(1));
         assert_subr_arity("bool-vector-count-population", 1, Some(1));

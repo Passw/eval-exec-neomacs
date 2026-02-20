@@ -7597,6 +7597,15 @@ pub(crate) fn dispatch_builtin(
         "buffer-name" => return Some(builtin_buffer_name(eval, args)),
         "buffer-file-name" => return Some(builtin_buffer_file_name(eval, args)),
         "buffer-string" => return Some(builtin_buffer_string(eval, args)),
+        "base64-encode-region" => {
+            return Some(super::fns::builtin_base64_encode_region_eval(eval, args))
+        }
+        "base64-decode-region" => {
+            return Some(super::fns::builtin_base64_decode_region_eval(eval, args))
+        }
+        "base64url-encode-region" => {
+            return Some(super::fns::builtin_base64url_encode_region_eval(eval, args))
+        }
         "md5" => return Some(super::fns::builtin_md5_eval(eval, args)),
         "secure-hash" => return Some(super::fns::builtin_secure_hash_eval(eval, args)),
         "buffer-hash" => return Some(super::fns::builtin_buffer_hash_eval(eval, args)),

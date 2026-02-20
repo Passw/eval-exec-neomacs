@@ -271,6 +271,143 @@ pub(crate) fn builtin_base64url_decode_string(args: Vec<Value>) -> EvalResult {
     }
 }
 
+fn normalize_current_buffer_region_bounds(
+    eval: &super::eval::Evaluator,
+    start_arg: &Value,
+    end_arg: &Value,
+) -> Result<(crate::buffer::BufferId, usize, usize), Flow> {
+    let buffer_id = eval
+        .buffers
+        .current_buffer()
+        .ok_or_else(|| signal("error", vec![Value::string("No current buffer")]))?
+        .id;
+
+    let buf = eval
+        .buffers
+        .get(buffer_id)
+        .ok_or_else(|| signal("error", vec![Value::string("Selecting deleted buffer")]))?;
+
+    let point_min_char = buf.text.byte_to_char(buf.point_min()) as i64 + 1;
+    let point_max_char = buf.text.byte_to_char(buf.point_max()) as i64 + 1;
+    let start_raw = require_int_or_marker(start_arg)?;
+    let end_raw = require_int_or_marker(end_arg)?;
+    if start_raw < point_min_char
+        || start_raw > point_max_char
+        || end_raw < point_min_char
+        || end_raw > point_max_char
+    {
+        return Err(signal(
+            "args-out-of-range",
+            vec![
+                Value::Buffer(buffer_id),
+                start_arg.clone(),
+                end_arg.clone(),
+            ],
+        ));
+    }
+
+    let (lo, hi) = if start_raw <= end_raw {
+        (start_raw, end_raw)
+    } else {
+        (end_raw, start_raw)
+    };
+
+    let start_byte = buf.text.char_to_byte((lo - 1) as usize);
+    let end_byte = buf.text.char_to_byte((hi - 1) as usize);
+    Ok((buffer_id, start_byte, end_byte))
+}
+
+fn read_buffer_region(
+    eval: &super::eval::Evaluator,
+    buffer_id: crate::buffer::BufferId,
+    start_byte: usize,
+    end_byte: usize,
+) -> Result<String, Flow> {
+    let buf = eval
+        .buffers
+        .get(buffer_id)
+        .ok_or_else(|| signal("error", vec![Value::string("Selecting deleted buffer")]))?;
+    Ok(buf.buffer_substring(start_byte, end_byte))
+}
+
+fn replace_buffer_region(
+    eval: &mut super::eval::Evaluator,
+    buffer_id: crate::buffer::BufferId,
+    start_byte: usize,
+    end_byte: usize,
+    replacement: &str,
+) -> Result<(), Flow> {
+    let buf = eval
+        .buffers
+        .get_mut(buffer_id)
+        .ok_or_else(|| signal("error", vec![Value::string("Selecting deleted buffer")]))?;
+    buf.goto_char(start_byte);
+    buf.delete_region(start_byte, end_byte);
+    buf.insert(replacement);
+    Ok(())
+}
+
+/// (base64-encode-region START END &optional NO-LINE-BREAK)
+pub(crate) fn builtin_base64_encode_region_eval(
+    eval: &mut super::eval::Evaluator,
+    args: Vec<Value>,
+) -> EvalResult {
+    expect_range_args("base64-encode-region", &args, 2, 3)?;
+    let (buffer_id, start_byte, end_byte) =
+        normalize_current_buffer_region_bounds(eval, &args[0], &args[1])?;
+    let source = read_buffer_region(eval, buffer_id, start_byte, end_byte)?;
+    let no_line_break = args.get(2).is_some_and(|v| v.is_truthy());
+    let encoded = base64_encode(source.as_bytes(), B64_STD, true, !no_line_break);
+    replace_buffer_region(eval, buffer_id, start_byte, end_byte, &encoded)?;
+    Ok(Value::Int(encoded.len() as i64))
+}
+
+/// (base64url-encode-region START END &optional NO-PAD)
+pub(crate) fn builtin_base64url_encode_region_eval(
+    eval: &mut super::eval::Evaluator,
+    args: Vec<Value>,
+) -> EvalResult {
+    expect_range_args("base64url-encode-region", &args, 2, 3)?;
+    let (buffer_id, start_byte, end_byte) =
+        normalize_current_buffer_region_bounds(eval, &args[0], &args[1])?;
+    let source = read_buffer_region(eval, buffer_id, start_byte, end_byte)?;
+    let no_pad = args.get(2).is_some_and(|v| v.is_truthy());
+    let encoded = base64_encode(source.as_bytes(), B64_URL, !no_pad, false);
+    replace_buffer_region(eval, buffer_id, start_byte, end_byte, &encoded)?;
+    Ok(Value::Int(encoded.len() as i64))
+}
+
+/// (base64-decode-region START END &optional BASE64URL NOERROR)
+pub(crate) fn builtin_base64_decode_region_eval(
+    eval: &mut super::eval::Evaluator,
+    args: Vec<Value>,
+) -> EvalResult {
+    expect_range_args("base64-decode-region", &args, 2, 4)?;
+    let (buffer_id, start_byte, end_byte) =
+        normalize_current_buffer_region_bounds(eval, &args[0], &args[1])?;
+    let source = read_buffer_region(eval, buffer_id, start_byte, end_byte)?;
+    let use_url = args.get(2).is_some_and(|v| v.is_truthy());
+    let noerror = args.get(3).is_some_and(|v| v.is_truthy());
+    let table = if use_url {
+        build_decode_table(B64_URL)
+    } else {
+        build_decode_table(B64_STD)
+    };
+
+    match base64_decode(&source, &table) {
+        Ok(bytes) => {
+            let decoded = String::from_utf8_lossy(&bytes).into_owned();
+            replace_buffer_region(eval, buffer_id, start_byte, end_byte, &decoded)?;
+            Ok(Value::Int(bytes.len() as i64))
+        }
+        Err(()) if noerror => {
+            replace_buffer_region(eval, buffer_id, start_byte, end_byte, "")?;
+            Ok(Value::Int(0))
+        }
+        Err(()) => Err(signal("error", vec![Value::string("Invalid base64 data")])),
+    }
+}
+
 // ---------------------------------------------------------------------------
 // Hash / digest builtins
 // ---------------------------------------------------------------------------
@@ -1227,6 +1364,141 @@ mod tests {
             !s_std.contains('_'),
             "Standard encoding should not contain '_'"
         );
+    }
+
+    #[test]
+    fn base64_region_eval_encode_decode_roundtrip() {
+        let mut eval = crate::elisp::eval::Evaluator::new();
+        {
+            let buf = eval.buffers.current_buffer_mut().expect("current buffer");
+            buf.delete_region(buf.point_min(), buf.point_max());
+            buf.insert("Hi");
+        }
+
+        let encoded =
+            builtin_base64_encode_region_eval(&mut eval, vec![Value::Int(1), Value::Int(3)])
+                .expect("encode region should succeed");
+        assert_eq!(encoded, Value::Int(4));
+        let encoded_text = eval
+            .buffers
+            .current_buffer()
+            .expect("current buffer")
+            .buffer_string();
+        assert_eq!(encoded_text, "SGk=");
+
+        let decoded =
+            builtin_base64_decode_region_eval(&mut eval, vec![Value::Int(1), Value::Int(5)])
+                .expect("decode region should succeed");
+        assert_eq!(decoded, Value::Int(2));
+        let decoded_text = eval
+            .buffers
+            .current_buffer()
+            .expect("current buffer")
+            .buffer_string();
+        assert_eq!(decoded_text, "Hi");
+    }
+
+    #[test]
+    fn base64_region_eval_swapped_bounds_and_url_encoding() {
+        let mut eval = crate::elisp::eval::Evaluator::new();
+        {
+            let buf = eval.buffers.current_buffer_mut().expect("current buffer");
+            buf.delete_region(buf.point_min(), buf.point_max());
+            buf.insert("ab");
+        }
+
+        let encoded = builtin_base64url_encode_region_eval(
+            &mut eval,
+            vec![Value::Int(3), Value::Int(1), Value::True],
+        )
+        .expect("url encode region should succeed");
+        assert_eq!(encoded, Value::Int(3));
+        let encoded_text = eval
+            .buffers
+            .current_buffer()
+            .expect("current buffer")
+            .buffer_string();
+        assert_eq!(encoded_text, "YWI");
+    }
+
+    #[test]
+    fn base64_decode_region_noerror_semantics() {
+        let mut eval = crate::elisp::eval::Evaluator::new();
+        {
+            let buf = eval.buffers.current_buffer_mut().expect("current buffer");
+            buf.delete_region(buf.point_min(), buf.point_max());
+            buf.insert("%%");
+        }
+
+        let ignored = builtin_base64_decode_region_eval(
+            &mut eval,
+            vec![Value::Int(1), Value::Int(3), Value::Nil, Value::True],
+        )
+        .expect("noerror decode should succeed");
+        assert_eq!(ignored, Value::Int(0));
+        let emptied = eval
+            .buffers
+            .current_buffer()
+            .expect("current buffer")
+            .buffer_string();
+        assert_eq!(emptied, "");
+
+        {
+            let buf = eval.buffers.current_buffer_mut().expect("current buffer");
+            buf.insert("%%");
+        }
+        let strict = builtin_base64_decode_region_eval(&mut eval, vec![Value::Int(1), Value::Int(3)]);
+        match strict {
+            Err(Flow::Signal(sig)) => {
+                assert_eq!(sig.symbol, "error");
+                assert_eq!(sig.data, vec![Value::string("Invalid base64 data")]);
+            }
+            other => panic!("expected invalid base64 signal, got {other:?}"),
+        }
+        let unchanged = eval
+            .buffers
+            .current_buffer()
+            .expect("current buffer")
+            .buffer_string();
+        assert_eq!(unchanged, "%%");
+    }
+
+    #[test]
+    fn base64_region_eval_error_shapes() {
+        let mut eval = crate::elisp::eval::Evaluator::new();
+        {
+            let buf = eval.buffers.current_buffer_mut().expect("current buffer");
+            buf.delete_region(buf.point_min(), buf.point_max());
+            buf.insert("Hi");
+        }
+
+        let type_error = builtin_base64_encode_region_eval(
+            &mut eval,
+            vec![Value::symbol("x"), Value::Int(2), Value::True],
+        );
+        match type_error {
+            Err(Flow::Signal(sig)) => {
+                assert_eq!(sig.symbol, "wrong-type-argument");
+                assert_eq!(
+                    sig.data,
+                    vec![Value::symbol("integer-or-marker-p"), Value::symbol("x")]
+                );
+            }
+            other => panic!("expected wrong-type-argument, got {other:?}"),
+        }
+
+        let range_error =
+            builtin_base64_encode_region_eval(&mut eval, vec![Value::Int(0), Value::Int(2)]);
+        match range_error {
+            Err(Flow::Signal(sig)) => {
+                assert_eq!(sig.symbol, "args-out-of-range");
+                assert_eq!(sig.data.len(), 3);
+                assert!(matches!(sig.data[0], Value::Buffer(_)));
+                assert_eq!(sig.data[1], Value::Int(0));
+                assert_eq!(sig.data[2], Value::Int(2));
+            }
+            other => panic!("expected args-out-of-range, got {other:?}"),
+        }
     }
 
     // ---- MD5 ----
