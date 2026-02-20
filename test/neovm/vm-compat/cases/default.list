@@ -36,6 +36,7 @@ cases/subr-introspection-core
 cases/macro-special-introspection-core
 cases/save-mark-and-excursion-macro-semantics
 cases/save-match-data-macro-semantics
+cases/save-excursion-save-restriction-runtime-semantics
 cases/window-quit-temp-message-macro-semantics
 cases/function-special-form-edges
 cases/autoload-macro-introspection
@@ -642,6 +643,7 @@ cases/expt-isnan-type-semantics
 cases/round-half-even-semantics
 cases/fround-negative-zero-semantics
 cases/floatfns-argument-contract-semantics
+cases/trig-rounding-and-core-predicate-runtime-semantics
 cases/ldexp-type-check-order-semantics
 cases/md5-semantics
 cases/md5-coding-semantics

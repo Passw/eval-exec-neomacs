@@ -2115,7 +2115,7 @@ pub(crate) fn builtin_format_message_eval(
 
 pub(crate) fn builtin_make_vector(args: Vec<Value>) -> EvalResult {
     expect_args("make-vector", &args, 2)?;
-    let len = expect_int(&args[0])? as usize;
+    let len = expect_wholenump(&args[0])? as usize;
     Ok(Value::vector(vec![args[1].clone(); len]))
 }
 
@@ -17581,6 +17581,30 @@ mod tests {
             .expect("builtin vector should resolve")
             .expect("builtin vector should evaluate");
         assert_eq!(result, Value::vector(vec![Value::Int(7), Value::Int(9)]));
+    }
+
+    #[test]
+    fn pure_dispatch_typed_make_vector_validates_wholenump_length() {
+        let ok = dispatch_builtin_pure("make-vector", vec![Value::Int(3), Value::symbol("x")])
+            .expect("builtin make-vector should resolve")
+            .expect("builtin make-vector should evaluate");
+        assert_eq!(
+            ok,
+            Value::vector(vec![Value::symbol("x"), Value::symbol("x"), Value::symbol("x")])
+        );
+
+        for bad_len in [Value::Int(-1), Value::Float(1.5), Value::symbol("foo")] {
+            let err = dispatch_builtin_pure("make-vector", vec![bad_len.clone(), Value::Nil])
+                .expect("builtin make-vector should resolve")
+                .expect_err("invalid lengths should signal");
+            match err {
+                Flow::Signal(sig) => {
+                    assert_eq!(sig.symbol, "wrong-type-argument");
+                    assert_eq!(sig.data, vec![Value::symbol("wholenump"), bad_len]);
+                }
+                other => panic!("expected signal flow, got {other:?}"),
+            }
+        }
     }
 
     #[test]
