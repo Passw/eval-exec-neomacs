@@ -10,6 +10,9 @@ use std::cell::RefCell;
 
 const FACE_ATTRIBUTES_VECTOR_LEN: usize = 20;
 const DEFAULT_FONTSET_NAME: &str = "-*-*-*-*-*-*-*-*-*-*-*-*-fontset-default";
+const CHAR_TABLE_DEFAULT_SLOT: usize = 1;
+const BOOL_VECTOR_SIZE_SLOT: usize = 1;
+const BOOL_VECTOR_BITS_START: usize = 2;
 
 thread_local! {
     static HASH_TABLE_TEST_ALIASES: RefCell<Vec<(String, HashTableTest)>> =
@@ -365,10 +368,7 @@ pub(crate) fn builtin_face_attributes_as_vector(args: Vec<Value>) -> EvalResult 
 pub(crate) fn builtin_font_face_attributes(args: Vec<Value>) -> EvalResult {
     expect_range_args("font-face-attributes", &args, 1, 2)?;
     if !is_font_object(&args[0]) {
-        return Err(signal(
-            "error",
-            vec![Value::string("Invalid font object")],
-        ));
+        return Err(signal("error", vec![Value::string("Invalid font object")]));
     }
     Ok(unspecified_face_attributes_vector())
 }
@@ -475,7 +475,9 @@ pub(crate) fn builtin_fontset_info(args: Vec<Value>) -> EvalResult {
     expect_range_args("fontset-info", &args, 1, 2)?;
     Err(signal(
         "error",
-        vec![Value::string("Window system is not in use or not initialized")],
+        vec![Value::string(
+            "Window system is not in use or not initialized",
+        )],
     ))
 }
 
@@ -802,7 +804,9 @@ pub(crate) fn builtin_gpm_mouse_start(args: Vec<Value>) -> EvalResult {
     expect_args("gpm-mouse-start", &args, 0)?;
     Err(signal(
         "error",
-        vec![Value::string("Gpm-mouse only works in the GNU/Linux console")],
+        vec![Value::string(
+            "Gpm-mouse only works in the GNU/Linux console",
+        )],
     ))
 }
 
@@ -1556,8 +1560,15 @@ pub(crate) fn builtin_internal_make_var_non_special(args: Vec<Value>) -> EvalRes
 }
 
 /// `(internal-set-lisp-face-attribute-from-resource)` -> nil.
-pub(crate) fn builtin_internal_set_lisp_face_attribute_from_resource(args: Vec<Value>) -> EvalResult {
-    expect_range_args("internal-set-lisp-face-attribute-from-resource", &args, 3, 4)?;
+pub(crate) fn builtin_internal_set_lisp_face_attribute_from_resource(
+    args: Vec<Value>,
+) -> EvalResult {
+    expect_range_args(
+        "internal-set-lisp-face-attribute-from-resource",
+        &args,
+        3,
+        4,
+    )?;
     Ok(Value::Nil)
 }
 
@@ -1666,7 +1677,10 @@ pub(crate) fn builtin_handler_bind_1(args: Vec<Value>) -> EvalResult {
     if args.is_empty() {
         return Err(signal(
             "wrong-number-of-arguments",
-            vec![Value::symbol("handler-bind-1"), Value::Int(args.len() as i64)],
+            vec![
+                Value::symbol("handler-bind-1"),
+                Value::Int(args.len() as i64),
+            ],
         ));
     }
     Ok(Value::Nil)
@@ -1747,7 +1761,10 @@ pub(crate) fn builtin_make_byte_code(args: Vec<Value>) -> EvalResult {
     if args.len() < 4 {
         return Err(signal(
             "wrong-number-of-arguments",
-            vec![Value::symbol("make-byte-code"), Value::Int(args.len() as i64)],
+            vec![
+                Value::symbol("make-byte-code"),
+                Value::Int(args.len() as i64),
+            ],
         ));
     }
     Ok(Value::Nil)
@@ -2946,9 +2963,34 @@ pub(crate) fn builtin_fillarray(args: Vec<Value>) -> EvalResult {
     expect_args("fillarray", &args, 2)?;
     match &args[0] {
         Value::Vector(items) => {
+            let is_bool_vector = super::chartable::is_bool_vector(&args[0]);
+            let is_char_table = !is_bool_vector && super::chartable::is_char_table(&args[0]);
             let mut guard = items.lock().expect("poisoned");
-            for item in guard.iter_mut() {
-                *item = args[1].clone();
+            if is_bool_vector {
+                let fill_bit = if args[1].is_nil() { 0 } else { 1 };
+                let logical_len = match guard.get(BOOL_VECTOR_SIZE_SLOT) {
+                    Some(Value::Int(n)) if *n > 0 => *n as usize,
+                    _ => 0,
+                };
+                let available_bits = guard.len().saturating_sub(BOOL_VECTOR_BITS_START);
+                let bit_count = logical_len.min(available_bits);
+                for bit in guard
+                    .iter_mut()
+                    .skip(BOOL_VECTOR_BITS_START)
+                    .take(bit_count)
+                {
+                    *bit = Value::Int(fill_bit);
+                }
+                return Ok(args[0].clone());
+            }
+            if is_char_table {
+                if guard.len() > CHAR_TABLE_DEFAULT_SLOT {
+                    guard[CHAR_TABLE_DEFAULT_SLOT] = args[1].clone();
+                }
+                return Ok(args[0].clone());
+            }
+            for slot in guard.iter_mut() {
+                *slot = args[1].clone();
             }
             Ok(args[0].clone())
         }
@@ -2997,6 +3039,67 @@ mod tests {
         };
         let values = values.lock().expect("poisoned");
         assert_eq!(&*values, &[Value::Int(9), Value::Int(9)]);
+    }
+
+    #[test]
+    fn fillarray_bool_vector_preserves_layout_and_sets_bits() {
+        let bv = crate::elisp::chartable::builtin_make_bool_vector(vec![Value::Int(4), Value::Nil])
+            .unwrap();
+        let out = builtin_fillarray(vec![bv.clone(), Value::symbol("non-nil")]).unwrap();
+        assert_eq!(out, bv);
+        assert_eq!(
+            crate::elisp::chartable::builtin_bool_vector_p(vec![bv.clone()]).unwrap(),
+            Value::True
+        );
+        assert_eq!(
+            crate::elisp::chartable::builtin_bool_vector_count_population(vec![bv.clone()])
+                .unwrap(),
+            Value::Int(4)
+        );
+
+        builtin_fillarray(vec![bv.clone(), Value::Nil]).unwrap();
+        assert_eq!(
+            crate::elisp::chartable::builtin_bool_vector_count_population(vec![bv]).unwrap(),
+            Value::Int(0)
+        );
+    }
+
+    #[test]
+    fn fillarray_char_table_preserves_shape_and_updates_default_slot() {
+        let table = crate::elisp::chartable::builtin_make_char_table(vec![
+            Value::symbol("syntax-table"),
+            Value::Int(0),
+        ])
+        .unwrap();
+        crate::elisp::chartable::builtin_set_char_table_range(vec![
+            table.clone(),
+            Value::Int('a' as i64),
+            Value::Int(9),
+        ])
+        .unwrap();
+
+        let out = builtin_fillarray(vec![table.clone(), Value::Int(7)]).unwrap();
+        assert_eq!(out, table);
+        assert_eq!(
+            crate::elisp::chartable::builtin_char_table_p(vec![table.clone()]).unwrap(),
+            Value::True
+        );
+        assert_eq!(
+            crate::elisp::chartable::builtin_char_table_subtype(vec![table.clone()]).unwrap(),
+            Value::symbol("syntax-table")
+        );
+        assert_eq!(
+            crate::elisp::chartable::builtin_char_table_range(vec![
+                table.clone(),
+                Value::Int('a' as i64)
+            ])
+            .unwrap(),
+            Value::Int(9)
+        );
+        assert_eq!(
+            crate::elisp::chartable::builtin_char_table_range(vec![table, Value::True]).unwrap(),
+            Value::Int(7)
+        );
     }
 
     #[test]
@@ -3335,8 +3438,8 @@ mod tests {
 
     #[test]
     fn internal_labeled_narrow_to_region_validates_arity() {
-        let err = builtin_internal_labeled_narrow_to_region(vec![Value::Nil, Value::Nil])
-            .unwrap_err();
+        let err =
+            builtin_internal_labeled_narrow_to_region(vec![Value::Nil, Value::Nil]).unwrap_err();
         match err {
             Flow::Signal(sig) => assert_eq!(sig.symbol, "wrong-number-of-arguments"),
             other => panic!("expected signal, got {other:?}"),
