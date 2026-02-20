@@ -221,6 +221,10 @@ impl Evaluator {
             "command-line-default-directory",
             Value::string(default_directory),
         );
+        let obarray_object = Value::vector(vec![Value::Nil]);
+        obarray.set_symbol_value("obarray", obarray_object.clone());
+        obarray.set_symbol_value("neovm--obarray-object", obarray_object);
+        obarray.make_special("obarray");
         obarray.set_symbol_value(
             "command-line-args",
             Value::list(vec![

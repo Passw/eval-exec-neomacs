@@ -418,6 +418,44 @@ pub fn file_writable_p(filename: &str) -> bool {
     }
 }
 
+/// Return true if FILENAME is an accessible directory.
+pub fn file_accessible_directory_p(filename: &str) -> bool {
+    let path = Path::new(filename);
+    if !path.is_dir() {
+        return false;
+    }
+
+    #[cfg(unix)]
+    {
+        let Ok(c_path) = CString::new(filename) else {
+            return false;
+        };
+        let mode = libc::R_OK | libc::X_OK;
+        return unsafe { libc::access(c_path.as_ptr(), mode) == 0 };
+    }
+
+    #[cfg(not(unix))]
+    {
+        return fs::read_dir(path).is_ok();
+    }
+}
+
+/// Return true if FILENAME is executable by the current process.
+pub fn file_executable_p(filename: &str) -> bool {
+    #[cfg(unix)]
+    {
+        let Ok(c_path) = CString::new(filename) else {
+            return false;
+        };
+        return unsafe { libc::access(c_path.as_ptr(), libc::X_OK) == 0 };
+    }
+
+    #[cfg(not(unix))]
+    {
+        return Path::new(filename).exists();
+    }
+}
+
 /// Return true if FILENAME is a directory.
 pub fn file_directory_p(filename: &str) -> bool {
     Path::new(filename).is_dir()
@@ -1577,6 +1615,41 @@ pub(crate) fn builtin_file_writable_p_eval(eval: &Evaluator, args: Vec<Value>) -
     let filename = expect_string_strict(&args[0])?;
     let filename = resolve_filename_for_eval(eval, &filename);
     Ok(Value::bool(file_writable_p(&filename)))
+}
+
+/// (file-accessible-directory-p FILENAME) -> t or nil
+pub(crate) fn builtin_file_accessible_directory_p(args: Vec<Value>) -> EvalResult {
+    expect_args("file-accessible-directory-p", &args, 1)?;
+    let filename = expect_string_strict(&args[0])?;
+    Ok(Value::bool(file_accessible_directory_p(&filename)))
+}
+
+/// Evaluator-aware variant of `file-accessible-directory-p` that resolves
+/// relative paths against dynamic/default `default-directory`.
+pub(crate) fn builtin_file_accessible_directory_p_eval(
+    eval: &Evaluator,
+    args: Vec<Value>,
+) -> EvalResult {
+    expect_args("file-accessible-directory-p", &args, 1)?;
+    let filename = expect_string_strict(&args[0])?;
+    let filename = resolve_filename_for_eval(eval, &filename);
+    Ok(Value::bool(file_accessible_directory_p(&filename)))
+}
+
+/// (file-executable-p FILENAME) -> t or nil
+pub(crate) fn builtin_file_executable_p(args: Vec<Value>) -> EvalResult {
+    expect_args("file-executable-p", &args, 1)?;
+    let filename = expect_string_strict(&args[0])?;
+    Ok(Value::bool(file_executable_p(&filename)))
+}
+
+/// Evaluator-aware variant of `file-executable-p` that resolves relative paths
+/// against dynamic/default `default-directory`.
+pub(crate) fn builtin_file_executable_p_eval(eval: &Evaluator, args: Vec<Value>) -> EvalResult {
+    expect_args("file-executable-p", &args, 1)?;
+    let filename = expect_string_strict(&args[0])?;
+    let filename = resolve_filename_for_eval(eval, &filename);
+    Ok(Value::bool(file_executable_p(&filename)))
 }
 
 /// (file-directory-p FILENAME) -> t or nil

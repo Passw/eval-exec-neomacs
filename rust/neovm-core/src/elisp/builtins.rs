@@ -624,6 +624,13 @@ pub(crate) fn builtin_integer_or_marker_p(args: Vec<Value>) -> EvalResult {
     Ok(Value::bool(is_integer_or_marker))
 }
 
+pub(crate) fn builtin_number_or_marker_p(args: Vec<Value>) -> EvalResult {
+    expect_args("number-or-marker-p", &args, 1)?;
+    let is_number_or_marker = matches!(args[0], Value::Int(_) | Value::Float(_) | Value::Char(_))
+        || super::marker::is_marker(&args[0]);
+    Ok(Value::bool(is_number_or_marker))
+}
+
 pub(crate) fn builtin_floatp(args: Vec<Value>) -> EvalResult {
     expect_args("floatp", &args, 1)?;
     Ok(Value::bool(args[0].is_float()))
@@ -637,6 +644,13 @@ pub(crate) fn builtin_stringp(args: Vec<Value>) -> EvalResult {
 pub(crate) fn builtin_vectorp(args: Vec<Value>) -> EvalResult {
     expect_args("vectorp", &args, 1)?;
     Ok(Value::bool(args[0].is_vector()))
+}
+
+pub(crate) fn builtin_vector_or_char_table_p(args: Vec<Value>) -> EvalResult {
+    expect_args("vector-or-char-table-p", &args, 1)?;
+    Ok(Value::bool(
+        args[0].is_vector() || super::chartable::is_char_table(&args[0]),
+    ))
 }
 
 pub(crate) fn builtin_characterp(args: Vec<Value>) -> EvalResult {
@@ -785,6 +799,34 @@ pub(crate) fn builtin_eql(args: Vec<Value>) -> EvalResult {
 pub(crate) fn builtin_equal(args: Vec<Value>) -> EvalResult {
     expect_args("equal", &args, 2)?;
     Ok(Value::bool(equal_value(&args[0], &args[1], 0)))
+}
+
+pub(crate) fn builtin_function_equal(args: Vec<Value>) -> EvalResult {
+    expect_args("function-equal", &args, 2)?;
+    Ok(Value::bool(eq_value(&args[0], &args[1])))
+}
+
+pub(crate) fn builtin_module_function_p(args: Vec<Value>) -> EvalResult {
+    expect_args("module-function-p", &args, 1)?;
+    Ok(Value::Nil)
+}
+
+pub(crate) fn builtin_user_ptrp(args: Vec<Value>) -> EvalResult {
+    expect_args("user-ptrp", &args, 1)?;
+    Ok(Value::Nil)
+}
+
+pub(crate) fn builtin_symbol_with_pos_p(args: Vec<Value>) -> EvalResult {
+    expect_args("symbol-with-pos-p", &args, 1)?;
+    Ok(Value::Nil)
+}
+
+pub(crate) fn builtin_symbol_with_pos_pos(args: Vec<Value>) -> EvalResult {
+    expect_args("symbol-with-pos-pos", &args, 1)?;
+    Err(signal(
+        "wrong-type-argument",
+        vec![Value::symbol("symbol-with-pos-p"), args[0].clone()],
+    ))
 }
 
 pub(crate) fn builtin_char_equal(eval: &super::eval::Evaluator, args: Vec<Value>) -> EvalResult {
@@ -1066,6 +1108,114 @@ pub(crate) fn builtin_length(args: Vec<Value>) -> EvalResult {
             vec![Value::symbol("sequencep"), args[0].clone()],
         )),
     }
+}
+
+fn sequence_length_less_than(sequence: &Value, target: i64) -> Result<bool, Flow> {
+    match sequence {
+        Value::Nil => Ok(0 < target),
+        Value::Str(s) => Ok((storage_char_len(s) as i64) < target),
+        Value::Vector(v) => Ok((v.lock().expect("poisoned").len() as i64) < target),
+        Value::Cons(_) => {
+            if target <= 0 {
+                return Ok(false);
+            }
+            let mut remaining = target;
+            let mut cursor = sequence.clone();
+            while remaining > 0 {
+                match cursor {
+                    Value::Cons(cell) => {
+                        cursor = cell.lock().expect("poisoned").cdr.clone();
+                        remaining -= 1;
+                    }
+                    _ => return Ok(true),
+                }
+            }
+            Ok(false)
+        }
+        other => Err(signal(
+            "wrong-type-argument",
+            vec![Value::symbol("sequencep"), other.clone()],
+        )),
+    }
+}
+
+fn sequence_length_equal(sequence: &Value, target: i64) -> Result<bool, Flow> {
+    match sequence {
+        Value::Nil => Ok(target == 0),
+        Value::Str(s) => Ok((storage_char_len(s) as i64) == target),
+        Value::Vector(v) => Ok((v.lock().expect("poisoned").len() as i64) == target),
+        Value::Cons(_) => {
+            if target < 0 {
+                return Ok(false);
+            }
+            let mut remaining = target;
+            let mut cursor = sequence.clone();
+            while remaining > 0 {
+                match cursor {
+                    Value::Cons(cell) => {
+                        cursor = cell.lock().expect("poisoned").cdr.clone();
+                        remaining -= 1;
+                    }
+                    _ => return Ok(false),
+                }
+            }
+            Ok(!matches!(cursor, Value::Cons(_)))
+        }
+        other => Err(signal(
+            "wrong-type-argument",
+            vec![Value::symbol("sequencep"), other.clone()],
+        )),
+    }
+}
+
+fn sequence_length_greater_than(sequence: &Value, target: i64) -> Result<bool, Flow> {
+    match sequence {
+        Value::Nil => Ok(0 > target),
+        Value::Str(s) => Ok((storage_char_len(s) as i64) > target),
+        Value::Vector(v) => Ok((v.lock().expect("poisoned").len() as i64) > target),
+        Value::Cons(_) => {
+            if target < 0 {
+                return Ok(true);
+            }
+            if target == i64::MAX {
+                return Ok(false);
+            }
+            let mut remaining = target + 1;
+            let mut cursor = sequence.clone();
+            while remaining > 0 {
+                match cursor {
+                    Value::Cons(cell) => {
+                        cursor = cell.lock().expect("poisoned").cdr.clone();
+                        remaining -= 1;
+                    }
+                    _ => return Ok(false),
+                }
+            }
+            Ok(true)
+        }
+        other => Err(signal(
+            "wrong-type-argument",
+            vec![Value::symbol("sequencep"), other.clone()],
+        )),
+    }
+}
+
+pub(crate) fn builtin_length_lt(args: Vec<Value>) -> EvalResult {
+    expect_args("length<", &args, 2)?;
+    let target = expect_fixnum(&args[1])?;
+    Ok(Value::bool(sequence_length_less_than(&args[0], target)?))
+}
+
+pub(crate) fn builtin_length_eq(args: Vec<Value>) -> EvalResult {
+    expect_args("length=", &args, 2)?;
+    let target = expect_fixnum(&args[1])?;
+    Ok(Value::bool(sequence_length_equal(&args[0], target)?))
+}
+
+pub(crate) fn builtin_length_gt(args: Vec<Value>) -> EvalResult {
+    expect_args("length>", &args, 2)?;
+    let target = expect_fixnum(&args[1])?;
+    Ok(Value::bool(sequence_length_greater_than(&args[0], target)?))
 }
 
 pub(crate) fn builtin_nth(args: Vec<Value>) -> EvalResult {
@@ -1470,9 +1620,9 @@ pub(crate) fn builtin_string_lessp(args: Vec<Value>) -> EvalResult {
     Ok(Value::bool(a < b))
 }
 
-pub(crate) fn builtin_substring(args: Vec<Value>) -> EvalResult {
-    expect_min_args("substring", &args, 1)?;
-    expect_max_args("substring", &args, 3)?;
+fn substring_impl(name: &str, args: &[Value]) -> EvalResult {
+    expect_min_args(name, args, 1)?;
+    expect_max_args(name, args, 3)?;
     let s = expect_string(&args[0])?;
     let len = storage_char_len(&s) as i64;
 
@@ -1529,6 +1679,14 @@ pub(crate) fn builtin_substring(args: Vec<Value>) -> EvalResult {
         )
     })?;
     Ok(Value::string(result))
+}
+
+pub(crate) fn builtin_substring(args: Vec<Value>) -> EvalResult {
+    substring_impl("substring", &args)
+}
+
+pub(crate) fn builtin_substring_no_properties(args: Vec<Value>) -> EvalResult {
+    substring_impl("substring-no-properties", &args)
 }
 
 pub(crate) fn builtin_concat(args: Vec<Value>) -> EvalResult {
@@ -1806,6 +1964,11 @@ pub(crate) fn builtin_format(args: Vec<Value>) -> EvalResult {
     Ok(Value::string(result))
 }
 
+pub(crate) fn builtin_format_message(args: Vec<Value>) -> EvalResult {
+    expect_min_args("format-message", &args, 1)?;
+    builtin_format(args)
+}
+
 pub(crate) fn builtin_format_eval(
     eval: &mut super::eval::Evaluator,
     args: Vec<Value>,
@@ -1877,6 +2040,14 @@ pub(crate) fn builtin_format_eval(
     }
 
     Ok(Value::string(result))
+}
+
+pub(crate) fn builtin_format_message_eval(
+    eval: &mut super::eval::Evaluator,
+    args: Vec<Value>,
+) -> EvalResult {
+    expect_min_args("format-message", &args, 1)?;
+    builtin_format_eval(eval, args)
 }
 
 // ===========================================================================
@@ -2940,6 +3111,34 @@ pub(crate) fn builtin_boundp(eval: &mut super::eval::Evaluator, args: Vec<Value>
         )
     })?;
     Ok(Value::bool(eval.obarray().boundp(name)))
+}
+
+pub(crate) fn builtin_obarrayp_eval(
+    eval: &mut super::eval::Evaluator,
+    args: Vec<Value>,
+) -> EvalResult {
+    expect_args("obarrayp", &args, 1)?;
+    let current_obarray = eval
+        .obarray()
+        .symbol_value("neovm--obarray-object")
+        .or_else(|| eval.obarray().symbol_value("obarray"));
+    Ok(Value::bool(
+        current_obarray.is_some_and(|obarray| eq_value(obarray, &args[0])),
+    ))
+}
+
+pub(crate) fn builtin_special_variable_p(
+    eval: &mut super::eval::Evaluator,
+    args: Vec<Value>,
+) -> EvalResult {
+    expect_args("special-variable-p", &args, 1)?;
+    let name = args[0].as_symbol_name().ok_or_else(|| {
+        signal(
+            "wrong-type-argument",
+            vec![Value::symbol("symbolp"), args[0].clone()],
+        )
+    })?;
+    Ok(Value::bool(eval.obarray().is_special(name)))
 }
 
 pub(crate) fn builtin_default_boundp(
@@ -8785,6 +8984,8 @@ pub(crate) fn dispatch_builtin(
         "put" => return Some(builtin_put(eval, args)),
         "symbol-plist" => return Some(builtin_symbol_plist_fn(eval, args)),
         "indirect-function" => return Some(builtin_indirect_function(eval, args)),
+        "obarrayp" => return Some(builtin_obarrayp_eval(eval, args)),
+        "special-variable-p" => return Some(builtin_special_variable_p(eval, args)),
         "intern" => return Some(builtin_intern_fn(eval, args)),
         "intern-soft" => return Some(builtin_intern_soft(eval, args)),
         // Hooks
@@ -8993,6 +9194,14 @@ pub(crate) fn dispatch_builtin(
         "file-exists-p" => return Some(super::fileio::builtin_file_exists_p_eval(eval, args)),
         "file-readable-p" => return Some(super::fileio::builtin_file_readable_p_eval(eval, args)),
         "file-writable-p" => return Some(super::fileio::builtin_file_writable_p_eval(eval, args)),
+        "file-accessible-directory-p" => {
+            return Some(super::fileio::builtin_file_accessible_directory_p_eval(
+                eval, args,
+            ))
+        }
+        "file-executable-p" => {
+            return Some(super::fileio::builtin_file_executable_p_eval(eval, args))
+        }
         "file-directory-p" => {
             return Some(super::fileio::builtin_file_directory_p_eval(eval, args))
         }
@@ -10157,6 +10366,7 @@ pub(crate) fn dispatch_builtin(
 
         // Reader/printer (evaluator-dependent)
         "format" => return Some(builtin_format_eval(eval, args)),
+        "format-message" => return Some(builtin_format_message_eval(eval, args)),
         "message" => return Some(builtin_message_eval(eval, args)),
         "error" => return Some(builtin_error_eval(eval, args)),
         "read-from-string" => return Some(super::reader::builtin_read_from_string(eval, args)),
@@ -10543,8 +10753,15 @@ pub(crate) fn dispatch_builtin(
         // Type predicates (typed subset is dispatched above)
         // Type predicates (typed subset is dispatched above)
         "integer-or-marker-p" => builtin_integer_or_marker_p(args),
+        "number-or-marker-p" => builtin_number_or_marker_p(args),
+        "vector-or-char-table-p" => builtin_vector_or_char_table_p(args),
+        "module-function-p" => builtin_module_function_p(args),
+        "user-ptrp" => builtin_user_ptrp(args),
+        "symbol-with-pos-p" => builtin_symbol_with_pos_p(args),
+        "symbol-with-pos-pos" => builtin_symbol_with_pos_pos(args),
 
         // Equality (typed subset is dispatched above)
+        "function-equal" => builtin_function_equal(args),
 
         // Cons / List
         "cons" => builtin_cons(args),
@@ -10584,6 +10801,9 @@ pub(crate) fn dispatch_builtin(
         "setcdr" => builtin_setcdr(args),
         "list" => builtin_list(args),
         "length" => builtin_length(args),
+        "length<" => builtin_length_lt(args),
+        "length=" => builtin_length_eq(args),
+        "length>" => builtin_length_gt(args),
         "nth" => builtin_nth(args),
         "nthcdr" => builtin_nthcdr(args),
         "append" => builtin_append(args),
@@ -10594,6 +10814,7 @@ pub(crate) fn dispatch_builtin(
         "assoc" => builtin_assoc(args),
         "assq" => builtin_assq(args),
         "copy-sequence" => builtin_copy_sequence(args),
+        "substring-no-properties" => builtin_substring_no_properties(args),
 
         // String (typed subset is dispatched above)
 
@@ -10620,6 +10841,7 @@ pub(crate) fn dispatch_builtin(
 
         // Output / misc
         "identity" => builtin_identity(args),
+        "format-message" => builtin_format_message(args),
         "message" => builtin_message(args),
         "current-message" => builtin_current_message(args),
         "error" => builtin_error(args),
@@ -10670,6 +10892,8 @@ pub(crate) fn dispatch_builtin(
         "file-exists-p" => super::fileio::builtin_file_exists_p(args),
         "file-readable-p" => super::fileio::builtin_file_readable_p(args),
         "file-writable-p" => super::fileio::builtin_file_writable_p(args),
+        "file-accessible-directory-p" => super::fileio::builtin_file_accessible_directory_p(args),
+        "file-executable-p" => super::fileio::builtin_file_executable_p(args),
         "file-directory-p" => super::fileio::builtin_file_directory_p(args),
         "file-regular-p" => super::fileio::builtin_file_regular_p(args),
         "file-symlink-p" => super::fileio::builtin_file_symlink_p(args),
@@ -11288,7 +11512,19 @@ pub(crate) fn dispatch_builtin_pure(name: &str, args: Vec<Value>) -> Option<Eval
     Some(match name {
         // Arithmetic (typed subset is dispatched above)
         // Type predicates and equality (typed subset is dispatched above)
+        "integer-or-marker-p" => builtin_integer_or_marker_p(args),
+        "number-or-marker-p" => builtin_number_or_marker_p(args),
+        "vector-or-char-table-p" => builtin_vector_or_char_table_p(args),
+        "function-equal" => builtin_function_equal(args),
+        "module-function-p" => builtin_module_function_p(args),
+        "user-ptrp" => builtin_user_ptrp(args),
+        "symbol-with-pos-p" => builtin_symbol_with_pos_p(args),
+        "symbol-with-pos-pos" => builtin_symbol_with_pos_pos(args),
         // Cons/List (typed subset is dispatched above)
+        "length<" => builtin_length_lt(args),
+        "length=" => builtin_length_eq(args),
+        "length>" => builtin_length_gt(args),
+        "substring-no-properties" => builtin_substring_no_properties(args),
         // String (typed subset is dispatched above)
         // Vector/hash/conversion/plist/symbol (typed subset is dispatched above)
         // Math
@@ -11327,6 +11563,7 @@ pub(crate) fn dispatch_builtin_pure(name: &str, args: Vec<Value>) -> Option<Eval
         "number-sequence" => builtin_number_sequence(args),
         // Output / misc
         "identity" => builtin_identity(args),
+        "format-message" => builtin_format_message(args),
         "message" => builtin_message(args),
         "current-message" => builtin_current_message(args),
         "error" => builtin_error(args),
@@ -11371,6 +11608,8 @@ pub(crate) fn dispatch_builtin_pure(name: &str, args: Vec<Value>) -> Option<Eval
         "file-exists-p" => super::fileio::builtin_file_exists_p(args),
         "file-readable-p" => super::fileio::builtin_file_readable_p(args),
         "file-writable-p" => super::fileio::builtin_file_writable_p(args),
+        "file-accessible-directory-p" => super::fileio::builtin_file_accessible_directory_p(args),
+        "file-executable-p" => super::fileio::builtin_file_executable_p(args),
         "file-directory-p" => super::fileio::builtin_file_directory_p(args),
         "file-regular-p" => super::fileio::builtin_file_regular_p(args),
         "file-symlink-p" => super::fileio::builtin_file_symlink_p(args),

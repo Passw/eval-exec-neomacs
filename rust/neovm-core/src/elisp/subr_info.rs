@@ -297,11 +297,11 @@ fn subr_arity_value(name: &str) -> Value {
     match name {
         // Oracle-compatible overrides for core subrs used in vm-compat.
         n if is_cxr_subr_name(n) => arity_cons(1, Some(1)),
-        "message" | "format" => arity_cons(1, None),
+        "message" | "format" | "format-message" => arity_cons(1, None),
         "/" | "<" | "<=" | "=" | ">" | ">=" | "apply" => arity_cons(1, None),
         "cons" => arity_cons(2, Some(2)),
         "1+" | "1-" | "abs" => arity_cons(1, Some(1)),
-        "%" | "/=" | "ash" => arity_cons(2, Some(2)),
+        "%" | "/=" | "ash" | "length<" | "length=" | "length>" => arity_cons(2, Some(2)),
         "copy-alist" | "copy-hash-table" | "copy-keymap" | "copy-sequence" => {
             arity_cons(1, Some(1))
         }
@@ -333,8 +333,14 @@ fn subr_arity_value(name: &str) -> Value {
         "load-file" => arity_cons(1, Some(1)),
         "locate-file" | "locate-file-internal" => arity_cons(2, Some(4)),
         "file-attributes" | "file-modes" => arity_cons(1, Some(2)),
-        "file-directory-p" | "file-exists-p" | "file-readable-p" | "file-regular-p"
-        | "file-symlink-p" | "file-writable-p" => arity_cons(1, Some(1)),
+        "file-accessible-directory-p"
+        | "file-directory-p"
+        | "file-executable-p"
+        | "file-exists-p"
+        | "file-readable-p"
+        | "file-regular-p"
+        | "file-symlink-p"
+        | "file-writable-p" => arity_cons(1, Some(1)),
         "file-newer-than-file-p" | "file-equal-p" | "file-in-directory-p" => arity_cons(2, Some(2)),
         "goto-char" => arity_cons(1, Some(1)),
         "exchange-point-and-mark" => arity_cons(0, Some(1)),
@@ -781,9 +787,9 @@ fn subr_arity_value(name: &str) -> Value {
             arity_cons(1, Some(2))
         }
         "byte-to-position" | "byte-to-string" => arity_cons(1, Some(1)),
-        "substring" => arity_cons(1, Some(3)),
-        "aref" | "char-equal" | "eq" | "eql" | "equal" | "make-vector" | "string-equal"
-        | "string-lessp" | "throw" => arity_cons(2, Some(2)),
+        "substring" | "substring-no-properties" => arity_cons(1, Some(3)),
+        "aref" | "char-equal" | "eq" | "eql" | "equal" | "function-equal" | "make-vector"
+        | "string-equal" | "string-lessp" | "throw" => arity_cons(2, Some(2)),
         "aset" => arity_cons(3, Some(3)),
         "activate-mark" | "auto-composition-mode" | "deactivate-mark" => arity_cons(0, Some(1)),
         "clear-composition-cache" => arity_cons(0, Some(0)),
@@ -923,7 +929,15 @@ fn subr_arity_value(name: &str) -> Value {
         | "ccl-program-p"
         | "check-coding-system"
         | "clear-abbrev-table"
-        | "clear-string" => arity_cons(1, Some(1)),
+        | "clear-string"
+        | "module-function-p"
+        | "number-or-marker-p"
+        | "obarrayp"
+        | "special-variable-p"
+        | "symbol-with-pos-p"
+        | "symbol-with-pos-pos"
+        | "user-ptrp"
+        | "vector-or-char-table-p" => arity_cons(1, Some(1)),
         "coding-system-aliases"
         | "coding-system-base"
         | "coding-system-eol-type"
@@ -2393,8 +2407,10 @@ mod tests {
     #[test]
     fn subr_arity_file_stat_predicate_primitives_match_oracle() {
         assert_subr_arity("file-attributes", 1, Some(2));
+        assert_subr_arity("file-accessible-directory-p", 1, Some(1));
         assert_subr_arity("file-directory-p", 1, Some(1));
         assert_subr_arity("file-equal-p", 2, Some(2));
+        assert_subr_arity("file-executable-p", 1, Some(1));
         assert_subr_arity("file-exists-p", 1, Some(1));
         assert_subr_arity("file-in-directory-p", 2, Some(2));
         assert_subr_arity("file-modes", 1, Some(2));
@@ -2429,6 +2445,7 @@ mod tests {
         assert_subr_arity("error-message-string", 1, Some(1));
         assert_subr_arity("copysign", 2, Some(2));
         assert_subr_arity("equal-including-properties", 2, Some(2));
+        assert_subr_arity("function-equal", 2, Some(2));
         assert_subr_arity("emacs-pid", 0, Some(0));
     }
 
@@ -2559,6 +2576,14 @@ mod tests {
         assert_subr_arity("default-toplevel-value", 1, Some(1));
         assert_subr_arity("default-value", 1, Some(1));
         assert_subr_arity("integer-or-marker-p", 1, Some(1));
+        assert_subr_arity("module-function-p", 1, Some(1));
+        assert_subr_arity("number-or-marker-p", 1, Some(1));
+        assert_subr_arity("obarrayp", 1, Some(1));
+        assert_subr_arity("special-variable-p", 1, Some(1));
+        assert_subr_arity("symbol-with-pos-p", 1, Some(1));
+        assert_subr_arity("symbol-with-pos-pos", 1, Some(1));
+        assert_subr_arity("user-ptrp", 1, Some(1));
+        assert_subr_arity("vector-or-char-table-p", 1, Some(1));
         assert_subr_arity("featurep", 1, Some(2));
     }
 
@@ -3007,11 +3032,16 @@ mod tests {
 
     #[test]
     fn subr_arity_misc_helper_primitives_match_oracle() {
+        assert_subr_arity("format-message", 1, None);
         assert_subr_arity("identity", 1, Some(1));
         assert_subr_arity("length", 1, Some(1));
+        assert_subr_arity("length<", 2, Some(2));
+        assert_subr_arity("length=", 2, Some(2));
+        assert_subr_arity("length>", 2, Some(2));
         assert_subr_arity("ldexp", 2, Some(2));
         assert_subr_arity("logb", 1, Some(1));
         assert_subr_arity("lognot", 1, Some(1));
+        assert_subr_arity("substring-no-properties", 1, Some(3));
         assert_subr_arity("group-gid", 0, Some(0));
         assert_subr_arity("group-real-gid", 0, Some(0));
         assert_subr_arity("last-nonminibuffer-frame", 0, Some(0));
