@@ -11,6 +11,7 @@ fboundp_check_script="$script_dir/check-builtin-registry-fboundp.sh"
 startup_stub_coverage_script="$script_dir/check-startup-doc-stub-coverage.sh"
 startup_string_coverage_script="$script_dir/check-startup-doc-string-coverage.sh"
 startup_variable_doc_count_script="$script_dir/check-startup-variable-documentation-counts.sh"
+oracle_builtin_coverage_script="$script_dir/report-oracle-builtin-coverage.sh"
 tracked_lists_file="$script_dir/cases/tracked-lists.txt"
 source "$script_dir/lib/builtin-registry.sh"
 compat_stub_index_script="$script_dir/compat-stub-index.sh"
@@ -45,6 +46,7 @@ tmp_stub_budget="$(mktemp)"
 tmp_startup_stub_check="$(mktemp)"
 tmp_startup_string_check="$(mktemp)"
 tmp_startup_variable_doc_count_check="$(mktemp)"
+tmp_oracle_builtin_coverage="$(mktemp)"
 cleanup() {
   rm -f \
     "$tmp_all" \
@@ -61,7 +63,8 @@ cleanup() {
     "$tmp_stub_budget" \
     "$tmp_startup_stub_check" \
     "$tmp_startup_string_check" \
-    "$tmp_startup_variable_doc_count_check"
+    "$tmp_startup_variable_doc_count_check" \
+    "$tmp_oracle_builtin_coverage"
 }
 trap cleanup EXIT
 
@@ -190,6 +193,11 @@ if ! "$startup_variable_doc_count_script" > "$tmp_startup_variable_doc_count_che
   sed 's/^/    /' "$tmp_startup_variable_doc_count_check"
   exit 1
 fi
+if ! "$oracle_builtin_coverage_script" > "$tmp_oracle_builtin_coverage" 2>&1; then
+  echo "  oracle builtin coverage: check failed"
+  sed 's/^/    /' "$tmp_oracle_builtin_coverage"
+  exit 1
+fi
 stub_oracle_count="$(awk -F': ' '/oracle integer-doc symbols:/ { print $2 }' "$tmp_startup_stub_check" | head -n 1)"
 stub_startup_count="$(awk -F': ' '/startup stub symbols:/ { print $2 }' "$tmp_startup_stub_check" | head -n 1)"
 stub_missing_count="$(awk -F': ' '/missing startup stubs:/ { print $2 }' "$tmp_startup_stub_check" | head -n 1)"
@@ -200,6 +208,11 @@ string_missing_count="$(awk -F': ' '/missing startup string-docs:/ { print $2 }'
 string_extra_count="$(awk -F': ' '/extra startup string-docs:/ { print $2 }' "$tmp_startup_string_check" | head -n 1)"
 startup_doc_property_summary="$(awk -F': ' '/startup variable-documentation property-count summary:/ { print $2 }' "$tmp_startup_variable_doc_count_check" | head -n 1)"
 startup_doc_runtime_resolution_summary="$(awk -F': ' '/startup variable-documentation runtime-resolution summary:/ { print $2 }' "$tmp_startup_variable_doc_count_check" | head -n 1)"
+oracle_builtin_total="$(awk -F': ' '/^oracle builtin universe entries:/ { print $2 }' "$tmp_oracle_builtin_coverage" | head -n 1)"
+oracle_builtin_covered="$(awk -F': ' '/^oracle builtin names covered by registry:/ { print $2 }' "$tmp_oracle_builtin_coverage" | head -n 1)"
+oracle_builtin_missing="$(awk -F': ' '/^oracle builtin names missing from registry:/ { print $2 }' "$tmp_oracle_builtin_coverage" | head -n 1)"
+oracle_builtin_registry_extra="$(awk -F': ' '/^registry names outside oracle builtin universe:/ { print $2 }' "$tmp_oracle_builtin_coverage" | head -n 1)"
+oracle_builtin_coverage_percent="$(awk -v covered="${oracle_builtin_covered:-0}" -v total="${oracle_builtin_total:-0}" 'BEGIN { if (total == 0) { printf "0.0" } else { printf "%.1f", (covered * 100.0) / total } }')"
 printf '  startup integer docs (oracle/startup/missing/extra): %s/%s/%s/%s\n' \
   "${stub_oracle_count:-0}" "${stub_startup_count:-0}" "${stub_missing_count:-0}" "${stub_extra_count:-0}"
 printf '  startup string docs (oracle/startup/missing/extra): %s/%s/%s/%s\n' \
@@ -234,6 +247,10 @@ printf 'builtin registry:\n'
 printf '  total dispatch entries: %s\n' "$all_builtins"
 printf '  core-compat entries: %s\n' "$core_builtins"
 printf '  neovm extension entries: %s\n' "$extension_builtins"
+printf '  oracle builtin universe entries: %s\n' "${oracle_builtin_total:-0}"
+printf '  oracle builtin coverage (covered/missing): %s/%s (%s%%)\n' \
+  "${oracle_builtin_covered:-0}" "${oracle_builtin_missing:-0}" "$oracle_builtin_coverage_percent"
+printf '  registry names outside oracle builtin universe: %s\n' "${oracle_builtin_registry_extra:-0}"
 printf '  allowed fboundp drifts: %s\n' "$allowlisted"
 printf '  fboundp current drifts: %s\n' "${fboundp_drift:-0}"
 printf '  fboundp stale allowlist entries: %s\n' "${fboundp_stale:-0}"

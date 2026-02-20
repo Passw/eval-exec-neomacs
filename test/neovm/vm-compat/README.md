@@ -21,6 +21,7 @@ results against that baseline once evaluator execution is wired in.
 - `check-startup-doc-stub-coverage.sh`: checks startup integer-doc symbol coverage of `STARTUP_VARIABLE_DOC_STUBS`
 - `check-startup-doc-string-coverage.sh`: checks startup string-doc symbol coverage of `STARTUP_VARIABLE_DOC_STRING_PROPERTIES`
 - `check-startup-variable-documentation-counts.sh`: checks startup `variable-documentation` property-count and runtime-resolution count parity (oracle vs NeoVM)
+- `report-oracle-builtin-coverage.sh`: reports oracle builtin universe size and current coverage by `builtin_registry.rs` core names
 - `cases/startup-doc-stub-extra-allowlist.txt`: allowlisted startup doc stubs intentionally beyond oracle integer-doc set
 - `bench-load-cache.sh`: runs cold/warm/post-edit `.neoc` load benchmark reporting via `load_cache_bench`
 - `cases/default.list`: default `check-all-neovm` corpus order (one case per line)
@@ -99,11 +100,19 @@ cd test/neovm/vm-compat
 make list-cases
 ```
 
-Get a compact status snapshot (case counts + explicit stub count + startup doc coverage + startup variable-doc property/runtime-resolution count parity + builtin registry counts + allowlist size):
+Get a compact status snapshot (case counts + explicit stub count + startup doc coverage + startup variable-doc property/runtime-resolution count parity + builtin registry counts + oracle builtin coverage + allowlist size):
 
 ```bash
 cd test/neovm/vm-compat
 make compat-progress
+```
+
+Report oracle builtin universe coverage directly (including a first-page preview
+of currently missing builtin names):
+
+```bash
+cd test/neovm/vm-compat
+make report-oracle-builtin-coverage
 ```
 
 List explicit comment-annotated function stubs in the Rust Elisp modules

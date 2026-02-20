@@ -17828,6 +17828,34 @@ Last updated: 2026-02-19
     - `make -C test/neovm/vm-compat check-builtin-registry-all` (pass)
     - `make -C test/neovm/vm-compat check-all-neovm-strict` (pass; inventory `794`)
 
+- Added oracle builtin-universe coverage reporting to track remaining core compatibility gap:
+  - vm-compat changes:
+    - added:
+      - `test/neovm/vm-compat/report-oracle-builtin-coverage.sh`
+        - computes GNU Emacs builtin universe (`subr` + `special-form`) at `-Q` startup.
+        - compares against core `DISPATCH_BUILTIN_NAMES` (excluding `neovm-*` extensions).
+        - reports:
+          - oracle builtin universe entries
+          - registry core entries
+          - covered/missing oracle builtin counts
+          - registry names outside oracle builtin universe
+        - prints first-page previews of missing and extra names for triage.
+    - wired:
+      - `test/neovm/vm-compat/Makefile`
+        - new target: `report-oracle-builtin-coverage`
+      - `test/neovm/vm-compat/compat-progress.sh`
+        - now includes oracle builtin coverage metrics in `compat-progress` snapshot output.
+      - `test/neovm/vm-compat/README.md`
+        - documented new reporter and updated `compat-progress` description.
+  - snapshot:
+    - oracle builtin universe entries: `5407`
+    - registry core entries: `1209`
+    - covered/missing: `1133` / `4274` (`21.0%` coverage)
+    - registry names outside oracle builtin universe: `76`
+  - verified:
+    - `make -C test/neovm/vm-compat report-oracle-builtin-coverage` (pass)
+    - `make -C test/neovm/vm-compat compat-progress` (pass)
+
 - Continue compatibility-first maintenance with small commit slices:
   - keep builtin surface and registry in lock-step
   - run oracle/parity checks after each behavior-affecting change
