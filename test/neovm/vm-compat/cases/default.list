@@ -814,3 +814,4 @@ cases/internal-file-wrapper-semantics
 cases/window-internal-find-buffer-wrapper-semantics
 cases/frame-size-visibility-wrapper-semantics
 cases/funcall-defalias-provide-require-wrapper-semantics
+cases/message-textprop-funcall-wrapper-semantics

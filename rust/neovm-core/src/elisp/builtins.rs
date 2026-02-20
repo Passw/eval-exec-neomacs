@@ -2679,6 +2679,16 @@ pub(crate) fn builtin_message(args: Vec<Value>) -> EvalResult {
     Ok(Value::string(msg))
 }
 
+pub(crate) fn builtin_message_box(args: Vec<Value>) -> EvalResult {
+    expect_min_args("message-box", &args, 1)?;
+    builtin_message(args)
+}
+
+pub(crate) fn builtin_message_or_box(args: Vec<Value>) -> EvalResult {
+    expect_min_args("message-or-box", &args, 1)?;
+    builtin_message(args)
+}
+
 pub(crate) fn builtin_message_eval(
     eval: &mut super::eval::Evaluator,
     args: Vec<Value>,
@@ -2697,6 +2707,22 @@ pub(crate) fn builtin_message_eval(
     };
     eprintln!("{}", msg);
     Ok(Value::string(msg))
+}
+
+pub(crate) fn builtin_message_box_eval(
+    eval: &mut super::eval::Evaluator,
+    args: Vec<Value>,
+) -> EvalResult {
+    expect_min_args("message-box", &args, 1)?;
+    builtin_message_eval(eval, args)
+}
+
+pub(crate) fn builtin_message_or_box_eval(
+    eval: &mut super::eval::Evaluator,
+    args: Vec<Value>,
+) -> EvalResult {
+    expect_min_args("message-or-box", &args, 1)?;
+    builtin_message_eval(eval, args)
 }
 
 pub(crate) fn builtin_current_message(args: Vec<Value>) -> EvalResult {
@@ -2869,6 +2895,82 @@ pub(crate) fn builtin_funcall(eval: &mut super::eval::Evaluator, args: Vec<Value
     let func = args[0].clone();
     let call_args = args[1..].to_vec();
     eval.apply(func, call_args)
+}
+
+pub(crate) fn builtin_funcall_interactively(
+    eval: &mut super::eval::Evaluator,
+    args: Vec<Value>,
+) -> EvalResult {
+    expect_min_args("funcall-interactively", &args, 1)?;
+    let func = args[0].clone();
+    let call_args = args[1..].to_vec();
+    eval.apply(func, call_args)
+}
+
+pub(crate) fn builtin_funcall_with_delayed_message(
+    eval: &mut super::eval::Evaluator,
+    args: Vec<Value>,
+) -> EvalResult {
+    expect_args("funcall-with-delayed-message", &args, 3)?;
+    let _delay = expect_number(&args[0])?;
+    let _message = expect_string(&args[1])?;
+    eval.apply(args[2].clone(), vec![])
+}
+
+pub(crate) fn builtin_get_pos_property(
+    eval: &mut super::eval::Evaluator,
+    args: Vec<Value>,
+) -> EvalResult {
+    expect_min_args("get-pos-property", &args, 2)?;
+    expect_max_args("get-pos-property", &args, 3)?;
+    let pos = expect_integer_or_marker(&args[0])?;
+    let Some(prop) = args[1].as_symbol_name() else {
+        return Ok(Value::Nil);
+    };
+
+    let buf_id = match args.get(2) {
+        None | Some(Value::Nil) => eval
+            .buffers
+            .current_buffer()
+            .map(|b| b.id)
+            .ok_or_else(|| signal("error", vec![Value::string("No current buffer")])),
+        Some(Value::Buffer(id)) => Ok(*id),
+        Some(Value::Str(_)) => return Ok(Value::Nil),
+        Some(other) => Err(signal(
+            "wrong-type-argument",
+            vec![Value::symbol("buffer-or-string-p"), other.clone()],
+        )),
+    }?;
+
+    let buf = eval
+        .buffers
+        .get(buf_id)
+        .ok_or_else(|| signal("error", vec![Value::string("Buffer does not exist")]))?;
+
+    let char_pos = if pos > 0 { (pos - 1) as usize } else { 0 };
+    let byte_pos = buf.text.char_to_byte(char_pos.min(buf.text.char_count()));
+    for ov_id in buf.overlays.overlays_at(byte_pos) {
+        if let Some(value) = buf.overlays.overlay_get(ov_id, prop) {
+            return Ok(value.clone());
+        }
+    }
+    Ok(Value::Nil)
+}
+
+pub(crate) fn builtin_next_char_property_change(
+    eval: &mut super::eval::Evaluator,
+    args: Vec<Value>,
+) -> EvalResult {
+    expect_min_args("next-char-property-change", &args, 1)?;
+    expect_max_args("next-char-property-change", &args, 2)?;
+    match args.len() {
+        1 => super::textprop::builtin_next_property_change(eval, args),
+        2 => super::textprop::builtin_next_property_change(
+            eval,
+            vec![args[0].clone(), Value::Nil, args[1].clone()],
+        ),
+        _ => unreachable!(),
+    }
 }
 
 pub(crate) fn builtin_defalias(
@@ -9193,6 +9295,10 @@ pub(crate) fn dispatch_builtin(
     match name {
         "apply" => return Some(builtin_apply(eval, args)),
         "funcall" => return Some(builtin_funcall(eval, args)),
+        "funcall-interactively" => return Some(builtin_funcall_interactively(eval, args)),
+        "funcall-with-delayed-message" => {
+            return Some(builtin_funcall_with_delayed_message(eval, args))
+        }
         "defalias" => return Some(builtin_defalias(eval, args)),
         "provide" => return Some(builtin_provide(eval, args)),
         "require" => return Some(builtin_require(eval, args)),
@@ -9904,6 +10010,7 @@ pub(crate) fn dispatch_builtin(
         "put-text-property" => return Some(super::textprop::builtin_put_text_property(eval, args)),
         "get-text-property" => return Some(super::textprop::builtin_get_text_property(eval, args)),
         "get-char-property" => return Some(super::textprop::builtin_get_char_property(eval, args)),
+        "get-pos-property" => return Some(builtin_get_pos_property(eval, args)),
         "add-face-text-property" => {
             return Some(super::textprop::builtin_add_face_text_property(eval, args))
         }
@@ -9929,6 +10036,7 @@ pub(crate) fn dispatch_builtin(
         "next-property-change" => {
             return Some(super::textprop::builtin_next_property_change(eval, args))
         }
+        "next-char-property-change" => return Some(builtin_next_char_property_change(eval, args)),
         "text-property-any" => return Some(super::textprop::builtin_text_property_any(eval, args)),
         "make-overlay" => return Some(super::textprop::builtin_make_overlay(eval, args)),
         "delete-overlay" => return Some(super::textprop::builtin_delete_overlay(eval, args)),
@@ -10678,6 +10786,8 @@ pub(crate) fn dispatch_builtin(
         "format" => return Some(builtin_format_eval(eval, args)),
         "format-message" => return Some(builtin_format_message_eval(eval, args)),
         "message" => return Some(builtin_message_eval(eval, args)),
+        "message-box" => return Some(builtin_message_box_eval(eval, args)),
+        "message-or-box" => return Some(builtin_message_or_box_eval(eval, args)),
         "error" => return Some(builtin_error_eval(eval, args)),
         "read-from-string" => return Some(super::reader::builtin_read_from_string(eval, args)),
         "read" => return Some(super::reader::builtin_read(eval, args)),
@@ -11162,6 +11272,8 @@ pub(crate) fn dispatch_builtin(
         "identity" => builtin_identity(args),
         "format-message" => builtin_format_message(args),
         "message" => builtin_message(args),
+        "message-box" => builtin_message_box(args),
+        "message-or-box" => builtin_message_or_box(args),
         "current-message" => builtin_current_message(args),
         "error" => builtin_error(args),
         "command-error-default-function" => builtin_command_error_default_function(args),
@@ -11904,6 +12016,8 @@ pub(crate) fn dispatch_builtin_pure(name: &str, args: Vec<Value>) -> Option<Eval
         "identity" => builtin_identity(args),
         "format-message" => builtin_format_message(args),
         "message" => builtin_message(args),
+        "message-box" => builtin_message_box(args),
+        "message-or-box" => builtin_message_or_box(args),
         "current-message" => builtin_current_message(args),
         "error" => builtin_error(args),
         "princ" => builtin_princ(args),

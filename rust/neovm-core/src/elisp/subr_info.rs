@@ -297,8 +297,13 @@ fn subr_arity_value(name: &str) -> Value {
     match name {
         // Oracle-compatible overrides for core subrs used in vm-compat.
         n if is_cxr_subr_name(n) => arity_cons(1, Some(1)),
-        "message" | "format" | "format-message" => arity_cons(1, None),
-        "/" | "<" | "<=" | "=" | ">" | ">=" | "apply" | "funcall" => arity_cons(1, None),
+        "message" | "message-box" | "message-or-box" | "format" | "format-message" => {
+            arity_cons(1, None)
+        }
+        "/" | "<" | "<=" | "=" | ">" | ">=" | "apply" | "funcall" | "funcall-interactively" => {
+            arity_cons(1, None)
+        }
+        "funcall-with-delayed-message" => arity_cons(3, Some(3)),
         "cons" => arity_cons(2, Some(2)),
         "1+" | "1-" | "abs" => arity_cons(1, Some(1)),
         "%" | "/=" | "ash" | "length<" | "length=" | "length>" => arity_cons(2, Some(2)),
@@ -540,10 +545,11 @@ fn subr_arity_value(name: &str) -> Value {
         "add-text-properties" => arity_cons(3, Some(4)),
         "put-text-property" | "text-property-any" => arity_cons(4, Some(5)),
         "remove-text-properties" | "move-overlay" => arity_cons(3, Some(4)),
-        "get-text-property" | "get-char-property" => arity_cons(2, Some(3)),
+        "get-text-property" | "get-char-property" | "get-pos-property" => arity_cons(2, Some(3)),
         "text-properties-at" | "overlays-at" => arity_cons(1, Some(2)),
         "next-single-property-change" | "previous-single-property-change" => arity_cons(2, Some(4)),
         "next-property-change" => arity_cons(1, Some(3)),
+        "next-char-property-change" => arity_cons(1, Some(2)),
         "make-overlay" => arity_cons(2, Some(5)),
         "overlay-put" => arity_cons(3, Some(3)),
         "overlay-get" | "overlays-in" => arity_cons(2, Some(2)),
@@ -1643,6 +1649,8 @@ mod tests {
     #[test]
     fn subr_arity_message_is_one_or_more() {
         assert_subr_arity("message", 1, None);
+        assert_subr_arity("message-box", 1, None);
+        assert_subr_arity("message-or-box", 1, None);
     }
 
     #[test]
@@ -2249,10 +2257,12 @@ mod tests {
         assert_subr_arity("remove-text-properties", 3, Some(4));
         assert_subr_arity("get-text-property", 2, Some(3));
         assert_subr_arity("get-char-property", 2, Some(3));
+        assert_subr_arity("get-pos-property", 2, Some(3));
         assert_subr_arity("text-properties-at", 1, Some(2));
         assert_subr_arity("next-single-property-change", 2, Some(4));
         assert_subr_arity("previous-single-property-change", 2, Some(4));
         assert_subr_arity("next-property-change", 1, Some(3));
+        assert_subr_arity("next-char-property-change", 1, Some(2));
         assert_subr_arity("text-property-any", 4, Some(5));
         assert_subr_arity("make-overlay", 2, Some(5));
         assert_subr_arity("move-overlay", 3, Some(4));
@@ -2304,6 +2314,8 @@ mod tests {
         assert_subr_arity("eql", 2, Some(2));
         assert_subr_arity("equal", 2, Some(2));
         assert_subr_arity("funcall", 1, None);
+        assert_subr_arity("funcall-interactively", 1, None);
+        assert_subr_arity("funcall-with-delayed-message", 3, Some(3));
         assert_subr_arity("float", 1, Some(1));
         assert_subr_arity("floatp", 1, Some(1));
         assert_subr_arity("floor", 1, Some(2));
