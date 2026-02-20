@@ -2870,7 +2870,10 @@ pub(crate) fn builtin_daemon_initialized(args: Vec<Value>) -> EvalResult {
 
 pub(crate) fn builtin_documentation_stringp(args: Vec<Value>) -> EvalResult {
     expect_args("documentation-stringp", &args, 1)?;
-    Ok(Value::bool(matches!(args[0], Value::Str(_) | Value::Int(_))))
+    Ok(Value::bool(matches!(
+        args[0],
+        Value::Str(_) | Value::Int(_)
+    )))
 }
 
 pub(crate) fn builtin_flush_standard_output(args: Vec<Value>) -> EvalResult {
@@ -2925,7 +2928,10 @@ pub(crate) fn builtin_invocation_name(args: Vec<Value>) -> EvalResult {
     expect_args("invocation-name", &args, 0)?;
     let name = std::env::current_exe()
         .ok()
-        .and_then(|p| p.file_name().map(|name| name.to_string_lossy().into_owned()))
+        .and_then(|p| {
+            p.file_name()
+                .map(|name| name.to_string_lossy().into_owned())
+        })
         .unwrap_or_else(|| "emacs".to_string());
     Ok(Value::string(name))
 }
@@ -3113,21 +3119,17 @@ pub(crate) fn builtin_next_char_property_change(
         .buffers
         .current_buffer()
         .ok_or_else(|| signal("error", vec![Value::string("No current buffer")]))?;
-    Ok(Value::Int(buf.text.byte_to_char(buf.point_max()) as i64 + 1))
+    Ok(Value::Int(
+        buf.text.byte_to_char(buf.point_max()) as i64 + 1,
+    ))
 }
 
-pub(crate) fn builtin_pos_bol(
-    eval: &mut super::eval::Evaluator,
-    args: Vec<Value>,
-) -> EvalResult {
+pub(crate) fn builtin_pos_bol(eval: &mut super::eval::Evaluator, args: Vec<Value>) -> EvalResult {
     expect_max_args("pos-bol", &args, 1)?;
     super::navigation::builtin_line_beginning_position(eval, args)
 }
 
-pub(crate) fn builtin_pos_eol(
-    eval: &mut super::eval::Evaluator,
-    args: Vec<Value>,
-) -> EvalResult {
+pub(crate) fn builtin_pos_eol(eval: &mut super::eval::Evaluator, args: Vec<Value>) -> EvalResult {
     expect_max_args("pos-eol", &args, 1)?;
     super::navigation::builtin_line_end_position(eval, args)
 }
@@ -3235,7 +3237,9 @@ pub(crate) fn builtin_previous_char_property_change(
         .buffers
         .current_buffer()
         .ok_or_else(|| signal("error", vec![Value::string("No current buffer")]))?;
-    Ok(Value::Int(buf.text.byte_to_char(buf.point_min()) as i64 + 1))
+    Ok(Value::Int(
+        buf.text.byte_to_char(buf.point_min()) as i64 + 1,
+    ))
 }
 
 pub(crate) fn builtin_next_single_char_property_change(
@@ -3318,10 +3322,7 @@ pub(crate) fn builtin_previous_single_char_property_change(
     Ok(Value::Int(lower))
 }
 
-pub(crate) fn builtin_defalias(
-    eval: &mut super::eval::Evaluator,
-    args: Vec<Value>,
-) -> EvalResult {
+pub(crate) fn builtin_defalias(eval: &mut super::eval::Evaluator, args: Vec<Value>) -> EvalResult {
     expect_range_args("defalias", &args, 2, 3)?;
     eval.defalias_value(args[0].clone(), args[1].clone())
 }
@@ -6695,6 +6696,211 @@ pub(crate) fn builtin_buffer_swap_text(
     Ok(Value::Nil)
 }
 
+/// `(insert-and-inherit &rest ARGS)` -> nil
+///
+/// Text properties are not modelled separately yet, so this follows `insert`.
+pub(crate) fn builtin_insert_and_inherit(
+    eval: &mut super::eval::Evaluator,
+    args: Vec<Value>,
+) -> EvalResult {
+    builtin_insert(eval, args)
+}
+
+/// `(insert-before-markers-and-inherit &rest ARGS)` -> nil
+///
+/// Text property inheritance is currently equivalent to plain insertion.
+pub(crate) fn builtin_insert_before_markers_and_inherit(
+    eval: &mut super::eval::Evaluator,
+    args: Vec<Value>,
+) -> EvalResult {
+    super::editfns::builtin_insert_before_markers(eval, args)
+}
+
+/// `(insert-buffer-substring BUFFER &optional START END)` -> nil
+pub(crate) fn builtin_insert_buffer_substring(
+    eval: &mut super::eval::Evaluator,
+    args: Vec<Value>,
+) -> EvalResult {
+    expect_range_args("insert-buffer-substring", &args, 1, 3)?;
+    let buffer_id = resolve_buffer_designator_allow_nil_current(eval, &args[0])?;
+    let default_end = buffer_id
+        .and_then(|id| {
+            eval.buffers
+                .get(id)
+                .map(|buf| buf.text.char_count() as i64 + 1)
+        })
+        .unwrap_or(1);
+    let start = if args.len() > 1 && !args[1].is_nil() {
+        expect_integer_or_marker(&args[1])?
+    } else {
+        1
+    };
+    let end = if args.len() > 2 && !args[2].is_nil() {
+        expect_integer_or_marker(&args[2])?
+    } else {
+        default_end
+    };
+
+    let text = buffer_slice_for_char_region(eval, buffer_id, start, end);
+    builtin_insert(eval, vec![Value::string(text)])
+}
+
+/// `(kill-all-local-variables &optional KILL-PERMANENT)` -> nil
+pub(crate) fn builtin_kill_all_local_variables(
+    eval: &mut super::eval::Evaluator,
+    args: Vec<Value>,
+) -> EvalResult {
+    expect_range_args("kill-all-local-variables", &args, 0, 1)?;
+    let buf = eval
+        .buffers
+        .current_buffer_mut()
+        .ok_or_else(|| signal("error", vec![Value::string("No current buffer")]))?;
+    buf.properties.clear();
+    buf.properties
+        .insert("buffer-read-only".to_string(), Value::Nil);
+    Ok(Value::Nil)
+}
+
+/// `(ntake N LIST)` -> LIST
+pub(crate) fn builtin_ntake(args: Vec<Value>) -> EvalResult {
+    expect_args("ntake", &args, 2)?;
+    let n = expect_int(&args[0])?;
+    if n <= 0 {
+        return Ok(Value::Nil);
+    }
+
+    let head = args[1].clone();
+    if matches!(head, Value::Nil) {
+        return Ok(Value::Nil);
+    }
+    if !matches!(head, Value::Cons(_)) {
+        return Err(signal(
+            "wrong-type-argument",
+            vec![Value::symbol("listp"), head],
+        ));
+    }
+
+    let mut cursor = head.clone();
+    for _ in 1..n {
+        match cursor {
+            Value::Cons(cell) => {
+                let next = cell.lock().expect("poisoned").cdr.clone();
+                match next {
+                    Value::Cons(_) => cursor = next,
+                    Value::Nil => return Ok(head),
+                    other => {
+                        return Err(signal(
+                            "wrong-type-argument",
+                            vec![Value::symbol("listp"), other],
+                        ))
+                    }
+                }
+            }
+            Value::Nil => return Ok(head),
+            other => {
+                return Err(signal(
+                    "wrong-type-argument",
+                    vec![Value::symbol("listp"), other],
+                ))
+            }
+        }
+    }
+
+    match cursor {
+        Value::Cons(cell) => {
+            cell.lock().expect("poisoned").cdr = Value::Nil;
+            Ok(head)
+        }
+        Value::Nil => Ok(head),
+        other => Err(signal(
+            "wrong-type-argument",
+            vec![Value::symbol("listp"), other],
+        )),
+    }
+}
+
+/// `(replace-buffer-contents SOURCE &optional MAX-SECS MAX-COSTS)` -> t
+pub(crate) fn builtin_replace_buffer_contents_eval(
+    eval: &mut super::eval::Evaluator,
+    args: Vec<Value>,
+) -> EvalResult {
+    expect_range_args("replace-buffer-contents", &args, 1, 3)?;
+    let source_id = resolve_buffer_designator_allow_nil_current(eval, &args[0])?;
+    let source_text = source_id
+        .and_then(|id| eval.buffers.get(id).map(|buf| buf.buffer_string()))
+        .unwrap_or_default();
+
+    let read_only_buffer_name = eval.buffers.current_buffer().and_then(|buf| {
+        if buffer_read_only_active(eval, buf) {
+            Some(buf.name.clone())
+        } else {
+            None
+        }
+    });
+    if let Some(name) = read_only_buffer_name {
+        return Err(signal("buffer-read-only", vec![Value::string(name)]));
+    }
+
+    let current_id = eval
+        .buffers
+        .current_buffer()
+        .ok_or_else(|| signal("error", vec![Value::string("No current buffer")]))?
+        .id;
+
+    if let Some(buf) = eval.buffers.get_mut(current_id) {
+        replace_buffer_contents(buf, &source_text);
+    }
+
+    Ok(Value::True)
+}
+
+/// `(set-buffer-multibyte FLAG)` -> FLAG
+pub(crate) fn builtin_set_buffer_multibyte_eval(
+    eval: &mut super::eval::Evaluator,
+    args: Vec<Value>,
+) -> EvalResult {
+    expect_args("set-buffer-multibyte", &args, 1)?;
+    let flag = args[0].is_truthy();
+    let buf = eval
+        .buffers
+        .current_buffer_mut()
+        .ok_or_else(|| signal("error", vec![Value::string("No current buffer")]))?;
+    buf.multibyte = flag;
+    Ok(args[0].clone())
+}
+
+/// `(split-window-internal WINDOW SIZE SIDE NORMALIZE)` -> window
+pub(crate) fn builtin_split_window_internal(
+    eval: &mut super::eval::Evaluator,
+    args: Vec<Value>,
+) -> EvalResult {
+    expect_args("split-window-internal", &args, 4)?;
+    if !args[0].is_nil() {
+        let windowp = super::window_cmds::builtin_windowp(eval, vec![args[0].clone()])?;
+        if windowp.is_nil() {
+            return Err(signal(
+                "wrong-type-argument",
+                vec![Value::symbol("windowp"), args[0].clone()],
+            ));
+        }
+    }
+    if !args[1].is_nil() {
+        let _ = expect_fixnum(&args[1])?;
+    }
+    if !args[2].is_nil() && !args[2].is_symbol() {
+        return Err(signal(
+            "wrong-type-argument",
+            vec![Value::symbol("symbolp"), args[2].clone()],
+        ));
+    }
+
+    // NORMALIZE is accepted for arity compatibility and ignored in this subset.
+    super::window_cmds::builtin_split_window(
+        eval,
+        vec![args[0].clone(), args[1].clone(), args[2].clone()],
+    )
+}
+
 /// `(buffer-text-pixel-size &optional BUFFER WINDOW FROM TO)` -> (WIDTH . HEIGHT)
 pub(crate) fn builtin_buffer_text_pixel_size(
     eval: &mut super::eval::Evaluator,
@@ -6881,11 +7087,11 @@ pub(crate) fn builtin_coordinates_in_window_p(
 
     expect_optional_live_window_designator(&args[1], eval)?;
     let window_arg = args[1].clone();
-    let width = match super::window_cmds::builtin_window_total_width(eval, vec![window_arg.clone()])?
-    {
-        Value::Int(n) => n as f64,
-        _ => 0.0,
-    };
+    let width =
+        match super::window_cmds::builtin_window_total_width(eval, vec![window_arg.clone()])? {
+            Value::Int(n) => n as f64,
+            _ => 0.0,
+        };
     let height = match super::window_cmds::builtin_window_total_height(eval, vec![window_arg])? {
         Value::Int(n) => n as f64,
         _ => 0.0,
@@ -6957,10 +7163,7 @@ pub(crate) fn builtin_field_beginning(
 }
 
 /// `(field-end &optional POS ESCAPE-FROM-EDGE LIMIT)` -> position
-pub(crate) fn builtin_field_end(
-    eval: &mut super::eval::Evaluator,
-    args: Vec<Value>,
-) -> EvalResult {
+pub(crate) fn builtin_field_end(eval: &mut super::eval::Evaluator, args: Vec<Value>) -> EvalResult {
     expect_max_args("field-end", &args, 3)?;
     let (_pos, _point_min, point_max) = resolve_field_position(eval, args.first())?;
     if let Some(limit_value) = args.get(2) {
@@ -9896,8 +10099,16 @@ pub(crate) fn dispatch_builtin(
         }
         "constrain-to-field" => return Some(builtin_constrain_to_field(eval, args)),
         "insert" => return Some(builtin_insert(eval, args)),
+        "insert-and-inherit" => return Some(builtin_insert_and_inherit(eval, args)),
+        "insert-before-markers-and-inherit" => {
+            return Some(builtin_insert_before_markers_and_inherit(eval, args))
+        }
+        "insert-buffer-substring" => return Some(builtin_insert_buffer_substring(eval, args)),
         "insert-char" => return Some(builtin_insert_char(eval, args)),
         "insert-byte" => return Some(builtin_insert_byte(eval, args)),
+        "replace-buffer-contents" => return Some(builtin_replace_buffer_contents_eval(eval, args)),
+        "set-buffer-multibyte" => return Some(builtin_set_buffer_multibyte_eval(eval, args)),
+        "kill-all-local-variables" => return Some(builtin_kill_all_local_variables(eval, args)),
         "buffer-swap-text" => return Some(builtin_buffer_swap_text(eval, args)),
         "delete-region" => return Some(builtin_delete_region(eval, args)),
         "delete-and-extract-region" => return Some(builtin_delete_and_extract_region(eval, args)),
@@ -9926,6 +10137,7 @@ pub(crate) fn dispatch_builtin(
         "position-bytes" => return Some(builtin_position_bytes(eval, args)),
         "get-byte" => return Some(builtin_get_byte(eval, args)),
         "buffer-local-value" => return Some(builtin_buffer_local_value(eval, args)),
+        "ntake" => return Some(builtin_ntake(args)),
         // Search / regex operations
         "search-forward" => return Some(builtin_search_forward(eval, args)),
         "search-backward" => return Some(builtin_search_backward(eval, args)),
@@ -10014,7 +10226,9 @@ pub(crate) fn dispatch_builtin(
             return Some(super::fileio::builtin_delete_directory_eval(eval, args))
         }
         "delete-directory-internal" => {
-            return Some(super::fileio::builtin_delete_directory_internal_eval(eval, args))
+            return Some(super::fileio::builtin_delete_directory_internal_eval(
+                eval, args,
+            ))
         }
         "rename-file" => return Some(super::fileio::builtin_rename_file_eval(eval, args)),
         "copy-file" => return Some(super::fileio::builtin_copy_file_eval(eval, args)),
@@ -10026,7 +10240,9 @@ pub(crate) fn dispatch_builtin(
         }
         "make-directory" => return Some(super::fileio::builtin_make_directory_eval(eval, args)),
         "make-directory-internal" => {
-            return Some(super::fileio::builtin_make_directory_internal_eval(eval, args))
+            return Some(super::fileio::builtin_make_directory_internal_eval(
+                eval, args,
+            ))
         }
         "make-temp-file" => return Some(super::fileio::builtin_make_temp_file_eval(eval, args)),
         "make-nearby-temp-file" => {
@@ -10042,7 +10258,9 @@ pub(crate) fn dispatch_builtin(
             ))
         }
         "find-file-name-handler" => {
-            return Some(super::fileio::builtin_find_file_name_handler_eval(eval, args))
+            return Some(super::fileio::builtin_find_file_name_handler_eval(
+                eval, args,
+            ))
         }
         "file-name-completion" => {
             return Some(super::dired::builtin_file_name_completion_eval(eval, args))
@@ -10069,7 +10287,9 @@ pub(crate) fn dispatch_builtin(
         "file-selinux-context" => {
             return Some(super::fileio::builtin_file_selinux_context_eval(eval, args))
         }
-        "file-system-info" => return Some(super::fileio::builtin_file_system_info_eval(eval, args)),
+        "file-system-info" => {
+            return Some(super::fileio::builtin_file_system_info_eval(eval, args))
+        }
         "file-directory-p" => {
             return Some(super::fileio::builtin_file_directory_p_eval(eval, args))
         }
@@ -10093,7 +10313,9 @@ pub(crate) fn dispatch_builtin(
         "set-file-modes" => return Some(super::fileio::builtin_set_file_modes_eval(eval, args)),
         "set-file-times" => return Some(super::fileio::builtin_set_file_times_eval(eval, args)),
         "verify-visited-file-modtime" => {
-            return Some(super::fileio::builtin_verify_visited_file_modtime(eval, args))
+            return Some(super::fileio::builtin_verify_visited_file_modtime(
+                eval, args,
+            ))
         }
         "set-visited-file-modtime" => {
             return Some(super::fileio::builtin_set_visited_file_modtime(eval, args))
@@ -10524,13 +10746,17 @@ pub(crate) fn dispatch_builtin(
             return Some(super::textprop::builtin_remove_text_properties(eval, args))
         }
         "remove-list-of-text-properties" => {
-            return Some(super::textprop::builtin_remove_list_of_text_properties(eval, args))
+            return Some(super::textprop::builtin_remove_list_of_text_properties(
+                eval, args,
+            ))
         }
         "text-properties-at" => {
             return Some(super::textprop::builtin_text_properties_at(eval, args))
         }
         "get-char-property-and-overlay" => {
-            return Some(super::textprop::builtin_get_char_property_and_overlay(eval, args))
+            return Some(super::textprop::builtin_get_char_property_and_overlay(
+                eval, args,
+            ))
         }
         "get-display-property" => {
             return Some(super::textprop::builtin_get_display_property(eval, args))
@@ -10563,7 +10789,9 @@ pub(crate) fn dispatch_builtin(
         "text-property-not-all" => {
             return Some(super::textprop::builtin_text_property_not_all(eval, args))
         }
-        "next-overlay-change" => return Some(super::textprop::builtin_next_overlay_change(eval, args)),
+        "next-overlay-change" => {
+            return Some(super::textprop::builtin_next_overlay_change(eval, args))
+        }
         "previous-overlay-change" => {
             return Some(super::textprop::builtin_previous_overlay_change(eval, args))
         }
@@ -10667,7 +10895,9 @@ pub(crate) fn dispatch_builtin(
         }
         "default-value" => return Some(super::custom::builtin_default_value(eval, args)),
         "set-default" => return Some(super::custom::builtin_set_default(eval, args)),
-        "set-default-toplevel-value" => return Some(builtin_set_default_toplevel_value(eval, args)),
+        "set-default-toplevel-value" => {
+            return Some(builtin_set_default_toplevel_value(eval, args))
+        }
 
         // Autoload (evaluator-dependent)
         "autoload" => return Some(super::autoload::builtin_autoload(eval, args)),
@@ -10931,9 +11161,12 @@ pub(crate) fn dispatch_builtin(
             ))
         }
         "split-window" => return Some(super::window_cmds::builtin_split_window(eval, args)),
+        "split-window-internal" => return Some(builtin_split_window_internal(eval, args)),
         "delete-window" => return Some(super::window_cmds::builtin_delete_window(eval, args)),
         "delete-window-internal" => {
-            return Some(super::window_cmds::builtin_delete_window_internal(eval, args))
+            return Some(super::window_cmds::builtin_delete_window_internal(
+                eval, args,
+            ))
         }
         "delete-other-windows" => {
             return Some(super::window_cmds::builtin_delete_other_windows(eval, args))
@@ -10960,7 +11193,9 @@ pub(crate) fn dispatch_builtin(
         }
         "recenter" => return Some(super::window_cmds::builtin_recenter(eval, args)),
         "other-window-for-scrolling" => {
-            return Some(super::window_cmds::builtin_other_window_for_scrolling(eval, args))
+            return Some(super::window_cmds::builtin_other_window_for_scrolling(
+                eval, args,
+            ))
         }
         "next-window" => return Some(super::window_cmds::builtin_next_window(eval, args)),
         "previous-window" => return Some(super::window_cmds::builtin_previous_window(eval, args)),
@@ -10999,8 +11234,12 @@ pub(crate) fn dispatch_builtin(
         }
         "iconify-frame" => return Some(super::window_cmds::builtin_iconify_frame(eval, args)),
         "delete-frame" => return Some(super::window_cmds::builtin_delete_frame(eval, args)),
-        "frame-char-height" => return Some(super::window_cmds::builtin_frame_char_height(eval, args)),
-        "frame-char-width" => return Some(super::window_cmds::builtin_frame_char_width(eval, args)),
+        "frame-char-height" => {
+            return Some(super::window_cmds::builtin_frame_char_height(eval, args))
+        }
+        "frame-char-width" => {
+            return Some(super::window_cmds::builtin_frame_char_width(eval, args))
+        }
         "frame-native-height" => {
             return Some(super::window_cmds::builtin_frame_native_height(eval, args))
         }
@@ -11033,7 +11272,9 @@ pub(crate) fn dispatch_builtin(
                 eval, args,
             ))
         }
-        "set-frame-height" => return Some(super::window_cmds::builtin_set_frame_height(eval, args)),
+        "set-frame-height" => {
+            return Some(super::window_cmds::builtin_set_frame_height(eval, args))
+        }
         "set-frame-width" => return Some(super::window_cmds::builtin_set_frame_width(eval, args)),
         "set-frame-size" => return Some(super::window_cmds::builtin_set_frame_size(eval, args)),
         "set-frame-position" => {
@@ -11400,7 +11641,9 @@ pub(crate) fn dispatch_builtin(
 
         // Misc (evaluator-dependent)
         "backtrace--frames-from-thread" => {
-            return Some(super::misc::builtin_backtrace_frames_from_thread(eval, args))
+            return Some(super::misc::builtin_backtrace_frames_from_thread(
+                eval, args,
+            ))
         }
         "backtrace--locals" => return Some(super::misc::builtin_backtrace_locals(eval, args)),
         "backtrace-debug" => return Some(super::misc::builtin_backtrace_debug(eval, args)),
@@ -11921,7 +12164,9 @@ pub(crate) fn dispatch_builtin(
         "make-temp-name" => super::fileio::builtin_make_temp_name(args),
         "make-nearby-temp-file" => super::fileio::builtin_make_nearby_temp_file(args),
         "next-read-file-uses-dialog-p" => super::fileio::builtin_next_read_file_uses_dialog_p(args),
-        "unhandled-file-name-directory" => super::fileio::builtin_unhandled_file_name_directory(args),
+        "unhandled-file-name-directory" => {
+            super::fileio::builtin_unhandled_file_name_directory(args)
+        }
         "get-truename-buffer" => super::fileio::builtin_get_truename_buffer(args),
         "directory-files" => super::fileio::builtin_directory_files(args),
         "find-file-name-handler" => super::fileio::builtin_find_file_name_handler(args),
@@ -12384,7 +12629,9 @@ pub(crate) fn dispatch_builtin(
         "frame-old-selected-window" => {
             super::compat_internal::builtin_frame_old_selected_window(args)
         }
-        "frame-or-buffer-changed-p" => super::compat_internal::builtin_frame_or_buffer_changed_p(args),
+        "frame-or-buffer-changed-p" => {
+            super::compat_internal::builtin_frame_or_buffer_changed_p(args)
+        }
         "frame-parent" => super::compat_internal::builtin_frame_parent(args),
         "frame-pointer-visible-p" => super::compat_internal::builtin_frame_pointer_visible_p(args),
         "frame-right-divider-width" => {
@@ -12439,21 +12686,43 @@ pub(crate) fn dispatch_builtin(
         "handle-switch-frame" => super::compat_internal::builtin_handle_switch_frame(args),
         "help--describe-vector" => super::compat_internal::builtin_help_describe_vector(args),
         "init-image-library" => super::compat_internal::builtin_init_image_library(args),
-        "internal--define-uninitialized-variable" => super::compat_internal::builtin_internal_define_uninitialized_variable(args),
-        "internal--labeled-narrow-to-region" => super::compat_internal::builtin_internal_labeled_narrow_to_region(args),
+        "internal--define-uninitialized-variable" => {
+            super::compat_internal::builtin_internal_define_uninitialized_variable(args)
+        }
+        "internal--labeled-narrow-to-region" => {
+            super::compat_internal::builtin_internal_labeled_narrow_to_region(args)
+        }
         "internal--labeled-widen" => super::compat_internal::builtin_internal_labeled_widen(args),
-        "internal--obarray-buckets" => super::compat_internal::builtin_internal_obarray_buckets(args),
-        "internal--set-buffer-modified-tick" => super::compat_internal::builtin_internal_set_buffer_modified_tick(args),
+        "internal--obarray-buckets" => {
+            super::compat_internal::builtin_internal_obarray_buckets(args)
+        }
+        "internal--set-buffer-modified-tick" => {
+            super::compat_internal::builtin_internal_set_buffer_modified_tick(args)
+        }
         "internal--track-mouse" => super::compat_internal::builtin_internal_track_mouse(args),
         "internal-char-font" => super::compat_internal::builtin_internal_char_font(args),
-        "internal-complete-buffer" => super::compat_internal::builtin_internal_complete_buffer(args),
-        "internal-describe-syntax-value" => super::compat_internal::builtin_internal_describe_syntax_value(args),
-        "internal-event-symbol-parse-modifiers" => super::compat_internal::builtin_internal_event_symbol_parse_modifiers(args),
-        "internal-handle-focus-in" => super::compat_internal::builtin_internal_handle_focus_in(args),
-        "internal-make-var-non-special" => super::compat_internal::builtin_internal_make_var_non_special(args),
-        "internal-set-lisp-face-attribute-from-resource" => super::compat_internal::builtin_internal_set_lisp_face_attribute_from_resource(args),
+        "internal-complete-buffer" => {
+            super::compat_internal::builtin_internal_complete_buffer(args)
+        }
+        "internal-describe-syntax-value" => {
+            super::compat_internal::builtin_internal_describe_syntax_value(args)
+        }
+        "internal-event-symbol-parse-modifiers" => {
+            super::compat_internal::builtin_internal_event_symbol_parse_modifiers(args)
+        }
+        "internal-handle-focus-in" => {
+            super::compat_internal::builtin_internal_handle_focus_in(args)
+        }
+        "internal-make-var-non-special" => {
+            super::compat_internal::builtin_internal_make_var_non_special(args)
+        }
+        "internal-set-lisp-face-attribute-from-resource" => {
+            super::compat_internal::builtin_internal_set_lisp_face_attribute_from_resource(args)
+        }
         "internal-stack-stats" => super::compat_internal::builtin_internal_stack_stats(args),
-        "internal-subr-documentation" => super::compat_internal::builtin_internal_subr_documentation(args),
+        "internal-subr-documentation" => {
+            super::compat_internal::builtin_internal_subr_documentation(args)
+        }
         "byte-code" => super::compat_internal::builtin_byte_code(args),
         "decode-coding-region" => super::compat_internal::builtin_decode_coding_region(args),
         "defconst-1" => super::compat_internal::builtin_defconst_1(args),
@@ -12483,7 +12752,9 @@ pub(crate) fn dispatch_builtin(
         "iso-charset" => super::compat_internal::builtin_iso_charset(args),
         "keymap--get-keyelt" => super::compat_internal::builtin_keymap_get_keyelt(args),
         "keymap-prompt" => super::compat_internal::builtin_keymap_prompt(args),
-        "kill-all-local-variables" => super::compat_internal::builtin_kill_all_local_variables(args),
+        "kill-all-local-variables" => {
+            super::compat_internal::builtin_kill_all_local_variables(args)
+        }
         "kill-emacs" => super::compat_internal::builtin_kill_emacs(args),
         "lower-frame" => super::compat_internal::builtin_lower_frame(args),
         "lread--substitute-object-in-subtree" => {
@@ -12498,7 +12769,9 @@ pub(crate) fn dispatch_builtin(
         "make-finalizer" => super::compat_internal::builtin_make_finalizer(args),
         "marker-last-position" => super::compat_internal::builtin_marker_last_position(args),
         "make-indirect-buffer" => super::compat_internal::builtin_make_indirect_buffer(args),
-        "make-interpreted-closure" => super::compat_internal::builtin_make_interpreted_closure(args),
+        "make-interpreted-closure" => {
+            super::compat_internal::builtin_make_interpreted_closure(args)
+        }
         "make-record" => super::compat_internal::builtin_make_record(args),
         "make-temp-file-internal" => super::compat_internal::builtin_make_temp_file_internal(args),
         "map-charset-chars" => super::compat_internal::builtin_map_charset_chars(args),
@@ -12521,7 +12794,9 @@ pub(crate) fn dispatch_builtin(
         "newline-cache-check" => super::compat_internal::builtin_newline_cache_check(args),
         "native-comp-available-p" => super::compat_internal::builtin_native_comp_available_p(args),
         "native-comp-unit-file" => super::compat_internal::builtin_native_comp_unit_file(args),
-        "native-comp-unit-set-file" => super::compat_internal::builtin_native_comp_unit_set_file(args),
+        "native-comp-unit-set-file" => {
+            super::compat_internal::builtin_native_comp_unit_set_file(args)
+        }
         "native-elisp-load" => super::compat_internal::builtin_native_elisp_load(args),
         "new-fontset" => super::compat_internal::builtin_new_fontset(args),
         "next-frame" => super::compat_internal::builtin_next_frame(args),
@@ -12547,7 +12822,9 @@ pub(crate) fn dispatch_builtin(
         "profiler-cpu-start" => super::compat_internal::builtin_profiler_cpu_start(args),
         "profiler-cpu-stop" => super::compat_internal::builtin_profiler_cpu_stop(args),
         "profiler-memory-log" => super::compat_internal::builtin_profiler_memory_log(args),
-        "profiler-memory-running-p" => super::compat_internal::builtin_profiler_memory_running_p(args),
+        "profiler-memory-running-p" => {
+            super::compat_internal::builtin_profiler_memory_running_p(args)
+        }
         "profiler-memory-start" => super::compat_internal::builtin_profiler_memory_start(args),
         "profiler-memory-stop" => super::compat_internal::builtin_profiler_memory_stop(args),
         "put-unicode-property-internal" => {
@@ -12556,14 +12833,18 @@ pub(crate) fn dispatch_builtin(
         "query-font" => super::compat_internal::builtin_query_font(args),
         "query-fontset" => super::compat_internal::builtin_query_fontset(args),
         "raise-frame" => super::compat_internal::builtin_raise_frame(args),
-        "read-positioning-symbols" => super::compat_internal::builtin_read_positioning_symbols(args),
+        "read-positioning-symbols" => {
+            super::compat_internal::builtin_read_positioning_symbols(args)
+        }
         "re--describe-compiled" => super::compat_internal::builtin_re_describe_compiled(args),
         "recent-auto-save-p" => super::compat_internal::builtin_recent_auto_save_p(args),
         "redisplay" => super::compat_internal::builtin_redisplay(args),
         "record" => super::compat_internal::builtin_record(args),
         "recordp" => super::compat_internal::builtin_recordp(args),
         "reconsider-frame-fonts" => super::compat_internal::builtin_reconsider_frame_fonts(args),
-        "redirect-debugging-output" => super::compat_internal::builtin_redirect_debugging_output(args),
+        "redirect-debugging-output" => {
+            super::compat_internal::builtin_redirect_debugging_output(args)
+        }
         "redirect-frame-focus" => super::compat_internal::builtin_redirect_frame_focus(args),
         "remove-pos-from-symbol" => super::compat_internal::builtin_remove_pos_from_symbol(args),
         "rename-buffer" => super::compat_internal::builtin_rename_buffer(args),
@@ -12571,7 +12852,9 @@ pub(crate) fn dispatch_builtin(
         "resize-mini-window-internal" => {
             super::compat_internal::builtin_resize_mini_window_internal(args)
         }
-        "restore-buffer-modified-p" => super::compat_internal::builtin_restore_buffer_modified_p(args),
+        "restore-buffer-modified-p" => {
+            super::compat_internal::builtin_restore_buffer_modified_p(args)
+        }
         "set--this-command-keys" => super::compat_internal::builtin_set_this_command_keys(args),
         "set-buffer-auto-saved" => super::compat_internal::builtin_set_buffer_auto_saved(args),
         "set-buffer-major-mode" => super::compat_internal::builtin_set_buffer_major_mode(args),
@@ -12579,13 +12862,17 @@ pub(crate) fn dispatch_builtin(
         "set-buffer-redisplay" => super::compat_internal::builtin_set_buffer_redisplay(args),
         "set-charset-plist" => super::compat_internal::builtin_set_charset_plist(args),
         "set-fontset-font" => super::compat_internal::builtin_set_fontset_font(args),
-        "set-frame-selected-window" => super::compat_internal::builtin_set_frame_selected_window(args),
+        "set-frame-selected-window" => {
+            super::compat_internal::builtin_set_frame_selected_window(args)
+        }
         "set-frame-window-state-change" => {
             super::compat_internal::builtin_set_frame_window_state_change(args)
         }
         "set-fringe-bitmap-face" => super::compat_internal::builtin_set_fringe_bitmap_face(args),
         "set-minibuffer-window" => super::compat_internal::builtin_set_minibuffer_window(args),
-        "set-mouse-pixel-position" => super::compat_internal::builtin_set_mouse_pixel_position(args),
+        "set-mouse-pixel-position" => {
+            super::compat_internal::builtin_set_mouse_pixel_position(args)
+        }
         "set-mouse-position" => super::compat_internal::builtin_set_mouse_position(args),
         "set-window-combination-limit" => {
             super::compat_internal::builtin_set_window_combination_limit(args)
@@ -12603,19 +12890,31 @@ pub(crate) fn dispatch_builtin(
         "subr-native-lambda-list" => super::compat_internal::builtin_subr_native_lambda_list(args),
         "subr-type" => super::compat_internal::builtin_subr_type(args),
         "suspend-emacs" => super::compat_internal::builtin_suspend_emacs(args),
-        "this-single-command-keys" => super::compat_internal::builtin_this_single_command_keys(args),
+        "this-single-command-keys" => {
+            super::compat_internal::builtin_this_single_command_keys(args)
+        }
         "this-single-command-raw-keys" => {
             super::compat_internal::builtin_this_single_command_raw_keys(args)
         }
         "thread--blocker" => super::compat_internal::builtin_thread_blocker(args),
-        "tool-bar-get-system-style" => super::compat_internal::builtin_tool_bar_get_system_style(args),
+        "tool-bar-get-system-style" => {
+            super::compat_internal::builtin_tool_bar_get_system_style(args)
+        }
         "tool-bar-pixel-width" => super::compat_internal::builtin_tool_bar_pixel_width(args),
-        "translate-region-internal" => super::compat_internal::builtin_translate_region_internal(args),
+        "translate-region-internal" => {
+            super::compat_internal::builtin_translate_region_internal(args)
+        }
         "transpose-regions" => super::compat_internal::builtin_transpose_regions(args),
         "tty--output-buffer-size" => super::compat_internal::builtin_tty_output_buffer_size(args),
-        "tty--set-output-buffer-size" => super::compat_internal::builtin_tty_set_output_buffer_size(args),
-        "tty-suppress-bold-inverse-default-colors" => super::compat_internal::builtin_tty_suppress_bold_inverse_default_colors(args),
-        "unencodable-char-position" => super::compat_internal::builtin_unencodable_char_position(args),
+        "tty--set-output-buffer-size" => {
+            super::compat_internal::builtin_tty_set_output_buffer_size(args)
+        }
+        "tty-suppress-bold-inverse-default-colors" => {
+            super::compat_internal::builtin_tty_suppress_bold_inverse_default_colors(args)
+        }
+        "unencodable-char-position" => {
+            super::compat_internal::builtin_unencodable_char_position(args)
+        }
         "unicode-property-table-internal" => {
             super::compat_internal::builtin_unicode_property_table_internal(args)
         }
@@ -12627,7 +12926,9 @@ pub(crate) fn dispatch_builtin(
         "x-begin-drag" => super::compat_internal::builtin_x_begin_drag(args),
         "x-create-frame" => super::compat_internal::builtin_x_create_frame(args),
         "x-double-buffered-p" => super::compat_internal::builtin_x_double_buffered_p(args),
-        "x-menu-bar-open-internal" => super::compat_internal::builtin_x_menu_bar_open_internal(args),
+        "x-menu-bar-open-internal" => {
+            super::compat_internal::builtin_x_menu_bar_open_internal(args)
+        }
         "xw-color-defined-p" => super::compat_internal::builtin_xw_color_defined_p(args),
         "xw-color-values" => super::compat_internal::builtin_xw_color_values(args),
         "xw-display-color-p" => super::compat_internal::builtin_xw_display_color_p(args),
@@ -12647,7 +12948,9 @@ pub(crate) fn dispatch_builtin(
             super::compat_internal::builtin_window_bottom_divider_width(args)
         }
         "window-bump-use-time" => super::compat_internal::builtin_window_bump_use_time(args),
-        "window-combination-limit" => super::compat_internal::builtin_window_combination_limit(args),
+        "window-combination-limit" => {
+            super::compat_internal::builtin_window_combination_limit(args)
+        }
         "window-left-child" => super::compat_internal::builtin_window_left_child(args),
         "window-line-height" => super::compat_internal::builtin_window_line_height(args),
         "window-lines-pixel-dimensions" => {
@@ -12672,7 +12975,9 @@ pub(crate) fn dispatch_builtin(
         "window-pixel-top" => super::compat_internal::builtin_window_pixel_top(args),
         "window-prev-sibling" => super::compat_internal::builtin_window_prev_sibling(args),
         "window-resize-apply" => super::compat_internal::builtin_window_resize_apply(args),
-        "window-resize-apply-total" => super::compat_internal::builtin_window_resize_apply_total(args),
+        "window-resize-apply-total" => {
+            super::compat_internal::builtin_window_resize_apply_total(args)
+        }
         "window-right-divider-width" => {
             super::compat_internal::builtin_window_right_divider_width(args)
         }
@@ -12683,41 +12988,77 @@ pub(crate) fn dispatch_builtin(
         "window-tab-line-height" => super::compat_internal::builtin_window_tab_line_height(args),
         "window-top-child" => super::compat_internal::builtin_window_top_child(args),
         "treesit-available-p" => super::compat_internal::builtin_treesit_available_p(args),
-        "treesit-compiled-query-p" => super::compat_internal::builtin_treesit_compiled_query_p(args),
-        "treesit-induce-sparse-tree" => super::compat_internal::builtin_treesit_induce_sparse_tree(args),
-        "treesit-language-abi-version" => super::compat_internal::builtin_treesit_language_abi_version(args),
-        "treesit-language-available-p" => super::compat_internal::builtin_treesit_language_available_p(args),
-        "treesit-library-abi-version" => super::compat_internal::builtin_treesit_library_abi_version(args),
+        "treesit-compiled-query-p" => {
+            super::compat_internal::builtin_treesit_compiled_query_p(args)
+        }
+        "treesit-induce-sparse-tree" => {
+            super::compat_internal::builtin_treesit_induce_sparse_tree(args)
+        }
+        "treesit-language-abi-version" => {
+            super::compat_internal::builtin_treesit_language_abi_version(args)
+        }
+        "treesit-language-available-p" => {
+            super::compat_internal::builtin_treesit_language_available_p(args)
+        }
+        "treesit-library-abi-version" => {
+            super::compat_internal::builtin_treesit_library_abi_version(args)
+        }
         "treesit-node-check" => super::compat_internal::builtin_treesit_node_check(args),
         "treesit-node-child" => super::compat_internal::builtin_treesit_node_child(args),
-        "treesit-node-child-by-field-name" => super::compat_internal::builtin_treesit_node_child_by_field_name(args),
-        "treesit-node-child-count" => super::compat_internal::builtin_treesit_node_child_count(args),
-        "treesit-node-descendant-for-range" => super::compat_internal::builtin_treesit_node_descendant_for_range(args),
+        "treesit-node-child-by-field-name" => {
+            super::compat_internal::builtin_treesit_node_child_by_field_name(args)
+        }
+        "treesit-node-child-count" => {
+            super::compat_internal::builtin_treesit_node_child_count(args)
+        }
+        "treesit-node-descendant-for-range" => {
+            super::compat_internal::builtin_treesit_node_descendant_for_range(args)
+        }
         "treesit-node-end" => super::compat_internal::builtin_treesit_node_end(args),
         "treesit-node-eq" => super::compat_internal::builtin_treesit_node_eq(args),
-        "treesit-node-field-name-for-child" => super::compat_internal::builtin_treesit_node_field_name_for_child(args),
-        "treesit-node-first-child-for-pos" => super::compat_internal::builtin_treesit_node_first_child_for_pos(args),
+        "treesit-node-field-name-for-child" => {
+            super::compat_internal::builtin_treesit_node_field_name_for_child(args)
+        }
+        "treesit-node-first-child-for-pos" => {
+            super::compat_internal::builtin_treesit_node_first_child_for_pos(args)
+        }
         "treesit-node-match-p" => super::compat_internal::builtin_treesit_node_match_p(args),
-        "treesit-node-next-sibling" => super::compat_internal::builtin_treesit_node_next_sibling(args),
+        "treesit-node-next-sibling" => {
+            super::compat_internal::builtin_treesit_node_next_sibling(args)
+        }
         "treesit-node-p" => super::compat_internal::builtin_treesit_node_p(args),
         "treesit-node-parent" => super::compat_internal::builtin_treesit_node_parent(args),
         "treesit-node-parser" => super::compat_internal::builtin_treesit_node_parser(args),
-        "treesit-node-prev-sibling" => super::compat_internal::builtin_treesit_node_prev_sibling(args),
+        "treesit-node-prev-sibling" => {
+            super::compat_internal::builtin_treesit_node_prev_sibling(args)
+        }
         "treesit-node-start" => super::compat_internal::builtin_treesit_node_start(args),
         "treesit-node-string" => super::compat_internal::builtin_treesit_node_string(args),
         "treesit-node-type" => super::compat_internal::builtin_treesit_node_type(args),
-        "treesit-parser-add-notifier" => super::compat_internal::builtin_treesit_parser_add_notifier(args),
+        "treesit-parser-add-notifier" => {
+            super::compat_internal::builtin_treesit_parser_add_notifier(args)
+        }
         "treesit-parser-buffer" => super::compat_internal::builtin_treesit_parser_buffer(args),
         "treesit-parser-create" => super::compat_internal::builtin_treesit_parser_create(args),
         "treesit-parser-delete" => super::compat_internal::builtin_treesit_parser_delete(args),
-        "treesit-parser-included-ranges" => super::compat_internal::builtin_treesit_parser_included_ranges(args),
+        "treesit-parser-included-ranges" => {
+            super::compat_internal::builtin_treesit_parser_included_ranges(args)
+        }
         "treesit-parser-language" => super::compat_internal::builtin_treesit_parser_language(args),
         "treesit-parser-list" => super::compat_internal::builtin_treesit_parser_list(args),
-        "treesit-parser-notifiers" => super::compat_internal::builtin_treesit_parser_notifiers(args),
+        "treesit-parser-notifiers" => {
+            super::compat_internal::builtin_treesit_parser_notifiers(args)
+        }
         "treesit-parser-p" => super::compat_internal::builtin_treesit_parser_p(args),
-        "treesit-parser-remove-notifier" => super::compat_internal::builtin_treesit_parser_remove_notifier(args),
-        "treesit-parser-root-node" => super::compat_internal::builtin_treesit_parser_root_node(args),
-        "treesit-parser-set-included-ranges" => super::compat_internal::builtin_treesit_parser_set_included_ranges(args),
+        "treesit-parser-remove-notifier" => {
+            super::compat_internal::builtin_treesit_parser_remove_notifier(args)
+        }
+        "treesit-parser-root-node" => {
+            super::compat_internal::builtin_treesit_parser_root_node(args)
+        }
+        "treesit-parser-set-included-ranges" => {
+            super::compat_internal::builtin_treesit_parser_set_included_ranges(args)
+        }
         "treesit-parser-tag" => super::compat_internal::builtin_treesit_parser_tag(args),
         "treesit-pattern-expand" => super::compat_internal::builtin_treesit_pattern_expand(args),
         "treesit-query-capture" => super::compat_internal::builtin_treesit_query_capture(args),
@@ -13152,7 +13493,9 @@ pub(crate) fn dispatch_builtin_pure(name: &str, args: Vec<Value>) -> Option<Eval
         "make-temp-name" => super::fileio::builtin_make_temp_name(args),
         "make-nearby-temp-file" => super::fileio::builtin_make_nearby_temp_file(args),
         "next-read-file-uses-dialog-p" => super::fileio::builtin_next_read_file_uses_dialog_p(args),
-        "unhandled-file-name-directory" => super::fileio::builtin_unhandled_file_name_directory(args),
+        "unhandled-file-name-directory" => {
+            super::fileio::builtin_unhandled_file_name_directory(args)
+        }
         "get-truename-buffer" => super::fileio::builtin_get_truename_buffer(args),
         "directory-files" => super::fileio::builtin_directory_files(args),
         "find-file-name-handler" => super::fileio::builtin_find_file_name_handler(args),
@@ -13259,7 +13602,9 @@ pub(crate) fn dispatch_builtin_pure(name: &str, args: Vec<Value>) -> Option<Eval
         "frame-old-selected-window" => {
             super::compat_internal::builtin_frame_old_selected_window(args)
         }
-        "frame-or-buffer-changed-p" => super::compat_internal::builtin_frame_or_buffer_changed_p(args),
+        "frame-or-buffer-changed-p" => {
+            super::compat_internal::builtin_frame_or_buffer_changed_p(args)
+        }
         "frame-parent" => super::compat_internal::builtin_frame_parent(args),
         "frame-pointer-visible-p" => super::compat_internal::builtin_frame_pointer_visible_p(args),
         "frame-right-divider-width" => {
@@ -13314,21 +13659,43 @@ pub(crate) fn dispatch_builtin_pure(name: &str, args: Vec<Value>) -> Option<Eval
         "handle-switch-frame" => super::compat_internal::builtin_handle_switch_frame(args),
         "help--describe-vector" => super::compat_internal::builtin_help_describe_vector(args),
         "init-image-library" => super::compat_internal::builtin_init_image_library(args),
-        "internal--define-uninitialized-variable" => super::compat_internal::builtin_internal_define_uninitialized_variable(args),
-        "internal--labeled-narrow-to-region" => super::compat_internal::builtin_internal_labeled_narrow_to_region(args),
+        "internal--define-uninitialized-variable" => {
+            super::compat_internal::builtin_internal_define_uninitialized_variable(args)
+        }
+        "internal--labeled-narrow-to-region" => {
+            super::compat_internal::builtin_internal_labeled_narrow_to_region(args)
+        }
         "internal--labeled-widen" => super::compat_internal::builtin_internal_labeled_widen(args),
-        "internal--obarray-buckets" => super::compat_internal::builtin_internal_obarray_buckets(args),
-        "internal--set-buffer-modified-tick" => super::compat_internal::builtin_internal_set_buffer_modified_tick(args),
+        "internal--obarray-buckets" => {
+            super::compat_internal::builtin_internal_obarray_buckets(args)
+        }
+        "internal--set-buffer-modified-tick" => {
+            super::compat_internal::builtin_internal_set_buffer_modified_tick(args)
+        }
         "internal--track-mouse" => super::compat_internal::builtin_internal_track_mouse(args),
         "internal-char-font" => super::compat_internal::builtin_internal_char_font(args),
-        "internal-complete-buffer" => super::compat_internal::builtin_internal_complete_buffer(args),
-        "internal-describe-syntax-value" => super::compat_internal::builtin_internal_describe_syntax_value(args),
-        "internal-event-symbol-parse-modifiers" => super::compat_internal::builtin_internal_event_symbol_parse_modifiers(args),
-        "internal-handle-focus-in" => super::compat_internal::builtin_internal_handle_focus_in(args),
-        "internal-make-var-non-special" => super::compat_internal::builtin_internal_make_var_non_special(args),
-        "internal-set-lisp-face-attribute-from-resource" => super::compat_internal::builtin_internal_set_lisp_face_attribute_from_resource(args),
+        "internal-complete-buffer" => {
+            super::compat_internal::builtin_internal_complete_buffer(args)
+        }
+        "internal-describe-syntax-value" => {
+            super::compat_internal::builtin_internal_describe_syntax_value(args)
+        }
+        "internal-event-symbol-parse-modifiers" => {
+            super::compat_internal::builtin_internal_event_symbol_parse_modifiers(args)
+        }
+        "internal-handle-focus-in" => {
+            super::compat_internal::builtin_internal_handle_focus_in(args)
+        }
+        "internal-make-var-non-special" => {
+            super::compat_internal::builtin_internal_make_var_non_special(args)
+        }
+        "internal-set-lisp-face-attribute-from-resource" => {
+            super::compat_internal::builtin_internal_set_lisp_face_attribute_from_resource(args)
+        }
         "internal-stack-stats" => super::compat_internal::builtin_internal_stack_stats(args),
-        "internal-subr-documentation" => super::compat_internal::builtin_internal_subr_documentation(args),
+        "internal-subr-documentation" => {
+            super::compat_internal::builtin_internal_subr_documentation(args)
+        }
         "byte-code" => super::compat_internal::builtin_byte_code(args),
         "decode-coding-region" => super::compat_internal::builtin_decode_coding_region(args),
         "defconst-1" => super::compat_internal::builtin_defconst_1(args),
@@ -13358,7 +13725,9 @@ pub(crate) fn dispatch_builtin_pure(name: &str, args: Vec<Value>) -> Option<Eval
         "iso-charset" => super::compat_internal::builtin_iso_charset(args),
         "keymap--get-keyelt" => super::compat_internal::builtin_keymap_get_keyelt(args),
         "keymap-prompt" => super::compat_internal::builtin_keymap_prompt(args),
-        "kill-all-local-variables" => super::compat_internal::builtin_kill_all_local_variables(args),
+        "kill-all-local-variables" => {
+            super::compat_internal::builtin_kill_all_local_variables(args)
+        }
         "kill-emacs" => super::compat_internal::builtin_kill_emacs(args),
         "lower-frame" => super::compat_internal::builtin_lower_frame(args),
         "lread--substitute-object-in-subtree" => {
@@ -13373,7 +13742,9 @@ pub(crate) fn dispatch_builtin_pure(name: &str, args: Vec<Value>) -> Option<Eval
         "make-finalizer" => super::compat_internal::builtin_make_finalizer(args),
         "marker-last-position" => super::compat_internal::builtin_marker_last_position(args),
         "make-indirect-buffer" => super::compat_internal::builtin_make_indirect_buffer(args),
-        "make-interpreted-closure" => super::compat_internal::builtin_make_interpreted_closure(args),
+        "make-interpreted-closure" => {
+            super::compat_internal::builtin_make_interpreted_closure(args)
+        }
         "make-record" => super::compat_internal::builtin_make_record(args),
         "make-temp-file-internal" => super::compat_internal::builtin_make_temp_file_internal(args),
         "map-charset-chars" => super::compat_internal::builtin_map_charset_chars(args),
@@ -13396,7 +13767,9 @@ pub(crate) fn dispatch_builtin_pure(name: &str, args: Vec<Value>) -> Option<Eval
         "newline-cache-check" => super::compat_internal::builtin_newline_cache_check(args),
         "native-comp-available-p" => super::compat_internal::builtin_native_comp_available_p(args),
         "native-comp-unit-file" => super::compat_internal::builtin_native_comp_unit_file(args),
-        "native-comp-unit-set-file" => super::compat_internal::builtin_native_comp_unit_set_file(args),
+        "native-comp-unit-set-file" => {
+            super::compat_internal::builtin_native_comp_unit_set_file(args)
+        }
         "native-elisp-load" => super::compat_internal::builtin_native_elisp_load(args),
         "new-fontset" => super::compat_internal::builtin_new_fontset(args),
         "next-frame" => super::compat_internal::builtin_next_frame(args),
@@ -13422,7 +13795,9 @@ pub(crate) fn dispatch_builtin_pure(name: &str, args: Vec<Value>) -> Option<Eval
         "profiler-cpu-start" => super::compat_internal::builtin_profiler_cpu_start(args),
         "profiler-cpu-stop" => super::compat_internal::builtin_profiler_cpu_stop(args),
         "profiler-memory-log" => super::compat_internal::builtin_profiler_memory_log(args),
-        "profiler-memory-running-p" => super::compat_internal::builtin_profiler_memory_running_p(args),
+        "profiler-memory-running-p" => {
+            super::compat_internal::builtin_profiler_memory_running_p(args)
+        }
         "profiler-memory-start" => super::compat_internal::builtin_profiler_memory_start(args),
         "profiler-memory-stop" => super::compat_internal::builtin_profiler_memory_stop(args),
         "put-unicode-property-internal" => {
@@ -13431,14 +13806,18 @@ pub(crate) fn dispatch_builtin_pure(name: &str, args: Vec<Value>) -> Option<Eval
         "query-font" => super::compat_internal::builtin_query_font(args),
         "query-fontset" => super::compat_internal::builtin_query_fontset(args),
         "raise-frame" => super::compat_internal::builtin_raise_frame(args),
-        "read-positioning-symbols" => super::compat_internal::builtin_read_positioning_symbols(args),
+        "read-positioning-symbols" => {
+            super::compat_internal::builtin_read_positioning_symbols(args)
+        }
         "re--describe-compiled" => super::compat_internal::builtin_re_describe_compiled(args),
         "recent-auto-save-p" => super::compat_internal::builtin_recent_auto_save_p(args),
         "redisplay" => super::compat_internal::builtin_redisplay(args),
         "record" => super::compat_internal::builtin_record(args),
         "recordp" => super::compat_internal::builtin_recordp(args),
         "reconsider-frame-fonts" => super::compat_internal::builtin_reconsider_frame_fonts(args),
-        "redirect-debugging-output" => super::compat_internal::builtin_redirect_debugging_output(args),
+        "redirect-debugging-output" => {
+            super::compat_internal::builtin_redirect_debugging_output(args)
+        }
         "redirect-frame-focus" => super::compat_internal::builtin_redirect_frame_focus(args),
         "remove-pos-from-symbol" => super::compat_internal::builtin_remove_pos_from_symbol(args),
         "rename-buffer" => super::compat_internal::builtin_rename_buffer(args),
@@ -13446,7 +13825,9 @@ pub(crate) fn dispatch_builtin_pure(name: &str, args: Vec<Value>) -> Option<Eval
         "resize-mini-window-internal" => {
             super::compat_internal::builtin_resize_mini_window_internal(args)
         }
-        "restore-buffer-modified-p" => super::compat_internal::builtin_restore_buffer_modified_p(args),
+        "restore-buffer-modified-p" => {
+            super::compat_internal::builtin_restore_buffer_modified_p(args)
+        }
         "set--this-command-keys" => super::compat_internal::builtin_set_this_command_keys(args),
         "set-buffer-auto-saved" => super::compat_internal::builtin_set_buffer_auto_saved(args),
         "set-buffer-major-mode" => super::compat_internal::builtin_set_buffer_major_mode(args),
@@ -13454,13 +13835,17 @@ pub(crate) fn dispatch_builtin_pure(name: &str, args: Vec<Value>) -> Option<Eval
         "set-buffer-redisplay" => super::compat_internal::builtin_set_buffer_redisplay(args),
         "set-charset-plist" => super::compat_internal::builtin_set_charset_plist(args),
         "set-fontset-font" => super::compat_internal::builtin_set_fontset_font(args),
-        "set-frame-selected-window" => super::compat_internal::builtin_set_frame_selected_window(args),
+        "set-frame-selected-window" => {
+            super::compat_internal::builtin_set_frame_selected_window(args)
+        }
         "set-frame-window-state-change" => {
             super::compat_internal::builtin_set_frame_window_state_change(args)
         }
         "set-fringe-bitmap-face" => super::compat_internal::builtin_set_fringe_bitmap_face(args),
         "set-minibuffer-window" => super::compat_internal::builtin_set_minibuffer_window(args),
-        "set-mouse-pixel-position" => super::compat_internal::builtin_set_mouse_pixel_position(args),
+        "set-mouse-pixel-position" => {
+            super::compat_internal::builtin_set_mouse_pixel_position(args)
+        }
         "set-mouse-position" => super::compat_internal::builtin_set_mouse_position(args),
         "set-window-combination-limit" => {
             super::compat_internal::builtin_set_window_combination_limit(args)
@@ -13478,19 +13863,31 @@ pub(crate) fn dispatch_builtin_pure(name: &str, args: Vec<Value>) -> Option<Eval
         "subr-native-lambda-list" => super::compat_internal::builtin_subr_native_lambda_list(args),
         "subr-type" => super::compat_internal::builtin_subr_type(args),
         "suspend-emacs" => super::compat_internal::builtin_suspend_emacs(args),
-        "this-single-command-keys" => super::compat_internal::builtin_this_single_command_keys(args),
+        "this-single-command-keys" => {
+            super::compat_internal::builtin_this_single_command_keys(args)
+        }
         "this-single-command-raw-keys" => {
             super::compat_internal::builtin_this_single_command_raw_keys(args)
         }
         "thread--blocker" => super::compat_internal::builtin_thread_blocker(args),
-        "tool-bar-get-system-style" => super::compat_internal::builtin_tool_bar_get_system_style(args),
+        "tool-bar-get-system-style" => {
+            super::compat_internal::builtin_tool_bar_get_system_style(args)
+        }
         "tool-bar-pixel-width" => super::compat_internal::builtin_tool_bar_pixel_width(args),
-        "translate-region-internal" => super::compat_internal::builtin_translate_region_internal(args),
+        "translate-region-internal" => {
+            super::compat_internal::builtin_translate_region_internal(args)
+        }
         "transpose-regions" => super::compat_internal::builtin_transpose_regions(args),
         "tty--output-buffer-size" => super::compat_internal::builtin_tty_output_buffer_size(args),
-        "tty--set-output-buffer-size" => super::compat_internal::builtin_tty_set_output_buffer_size(args),
-        "tty-suppress-bold-inverse-default-colors" => super::compat_internal::builtin_tty_suppress_bold_inverse_default_colors(args),
-        "unencodable-char-position" => super::compat_internal::builtin_unencodable_char_position(args),
+        "tty--set-output-buffer-size" => {
+            super::compat_internal::builtin_tty_set_output_buffer_size(args)
+        }
+        "tty-suppress-bold-inverse-default-colors" => {
+            super::compat_internal::builtin_tty_suppress_bold_inverse_default_colors(args)
+        }
+        "unencodable-char-position" => {
+            super::compat_internal::builtin_unencodable_char_position(args)
+        }
         "unicode-property-table-internal" => {
             super::compat_internal::builtin_unicode_property_table_internal(args)
         }
@@ -13502,7 +13899,9 @@ pub(crate) fn dispatch_builtin_pure(name: &str, args: Vec<Value>) -> Option<Eval
         "x-begin-drag" => super::compat_internal::builtin_x_begin_drag(args),
         "x-create-frame" => super::compat_internal::builtin_x_create_frame(args),
         "x-double-buffered-p" => super::compat_internal::builtin_x_double_buffered_p(args),
-        "x-menu-bar-open-internal" => super::compat_internal::builtin_x_menu_bar_open_internal(args),
+        "x-menu-bar-open-internal" => {
+            super::compat_internal::builtin_x_menu_bar_open_internal(args)
+        }
         "xw-color-defined-p" => super::compat_internal::builtin_xw_color_defined_p(args),
         "xw-color-values" => super::compat_internal::builtin_xw_color_values(args),
         "xw-display-color-p" => super::compat_internal::builtin_xw_display_color_p(args),
@@ -13522,7 +13921,9 @@ pub(crate) fn dispatch_builtin_pure(name: &str, args: Vec<Value>) -> Option<Eval
             super::compat_internal::builtin_window_bottom_divider_width(args)
         }
         "window-bump-use-time" => super::compat_internal::builtin_window_bump_use_time(args),
-        "window-combination-limit" => super::compat_internal::builtin_window_combination_limit(args),
+        "window-combination-limit" => {
+            super::compat_internal::builtin_window_combination_limit(args)
+        }
         "window-left-child" => super::compat_internal::builtin_window_left_child(args),
         "window-line-height" => super::compat_internal::builtin_window_line_height(args),
         "window-lines-pixel-dimensions" => {
@@ -13547,7 +13948,9 @@ pub(crate) fn dispatch_builtin_pure(name: &str, args: Vec<Value>) -> Option<Eval
         "window-pixel-top" => super::compat_internal::builtin_window_pixel_top(args),
         "window-prev-sibling" => super::compat_internal::builtin_window_prev_sibling(args),
         "window-resize-apply" => super::compat_internal::builtin_window_resize_apply(args),
-        "window-resize-apply-total" => super::compat_internal::builtin_window_resize_apply_total(args),
+        "window-resize-apply-total" => {
+            super::compat_internal::builtin_window_resize_apply_total(args)
+        }
         "window-right-divider-width" => {
             super::compat_internal::builtin_window_right_divider_width(args)
         }
@@ -13558,41 +13961,77 @@ pub(crate) fn dispatch_builtin_pure(name: &str, args: Vec<Value>) -> Option<Eval
         "window-tab-line-height" => super::compat_internal::builtin_window_tab_line_height(args),
         "window-top-child" => super::compat_internal::builtin_window_top_child(args),
         "treesit-available-p" => super::compat_internal::builtin_treesit_available_p(args),
-        "treesit-compiled-query-p" => super::compat_internal::builtin_treesit_compiled_query_p(args),
-        "treesit-induce-sparse-tree" => super::compat_internal::builtin_treesit_induce_sparse_tree(args),
-        "treesit-language-abi-version" => super::compat_internal::builtin_treesit_language_abi_version(args),
-        "treesit-language-available-p" => super::compat_internal::builtin_treesit_language_available_p(args),
-        "treesit-library-abi-version" => super::compat_internal::builtin_treesit_library_abi_version(args),
+        "treesit-compiled-query-p" => {
+            super::compat_internal::builtin_treesit_compiled_query_p(args)
+        }
+        "treesit-induce-sparse-tree" => {
+            super::compat_internal::builtin_treesit_induce_sparse_tree(args)
+        }
+        "treesit-language-abi-version" => {
+            super::compat_internal::builtin_treesit_language_abi_version(args)
+        }
+        "treesit-language-available-p" => {
+            super::compat_internal::builtin_treesit_language_available_p(args)
+        }
+        "treesit-library-abi-version" => {
+            super::compat_internal::builtin_treesit_library_abi_version(args)
+        }
         "treesit-node-check" => super::compat_internal::builtin_treesit_node_check(args),
         "treesit-node-child" => super::compat_internal::builtin_treesit_node_child(args),
-        "treesit-node-child-by-field-name" => super::compat_internal::builtin_treesit_node_child_by_field_name(args),
-        "treesit-node-child-count" => super::compat_internal::builtin_treesit_node_child_count(args),
-        "treesit-node-descendant-for-range" => super::compat_internal::builtin_treesit_node_descendant_for_range(args),
+        "treesit-node-child-by-field-name" => {
+            super::compat_internal::builtin_treesit_node_child_by_field_name(args)
+        }
+        "treesit-node-child-count" => {
+            super::compat_internal::builtin_treesit_node_child_count(args)
+        }
+        "treesit-node-descendant-for-range" => {
+            super::compat_internal::builtin_treesit_node_descendant_for_range(args)
+        }
         "treesit-node-end" => super::compat_internal::builtin_treesit_node_end(args),
         "treesit-node-eq" => super::compat_internal::builtin_treesit_node_eq(args),
-        "treesit-node-field-name-for-child" => super::compat_internal::builtin_treesit_node_field_name_for_child(args),
-        "treesit-node-first-child-for-pos" => super::compat_internal::builtin_treesit_node_first_child_for_pos(args),
+        "treesit-node-field-name-for-child" => {
+            super::compat_internal::builtin_treesit_node_field_name_for_child(args)
+        }
+        "treesit-node-first-child-for-pos" => {
+            super::compat_internal::builtin_treesit_node_first_child_for_pos(args)
+        }
         "treesit-node-match-p" => super::compat_internal::builtin_treesit_node_match_p(args),
-        "treesit-node-next-sibling" => super::compat_internal::builtin_treesit_node_next_sibling(args),
+        "treesit-node-next-sibling" => {
+            super::compat_internal::builtin_treesit_node_next_sibling(args)
+        }
         "treesit-node-p" => super::compat_internal::builtin_treesit_node_p(args),
         "treesit-node-parent" => super::compat_internal::builtin_treesit_node_parent(args),
         "treesit-node-parser" => super::compat_internal::builtin_treesit_node_parser(args),
-        "treesit-node-prev-sibling" => super::compat_internal::builtin_treesit_node_prev_sibling(args),
+        "treesit-node-prev-sibling" => {
+            super::compat_internal::builtin_treesit_node_prev_sibling(args)
+        }
         "treesit-node-start" => super::compat_internal::builtin_treesit_node_start(args),
         "treesit-node-string" => super::compat_internal::builtin_treesit_node_string(args),
         "treesit-node-type" => super::compat_internal::builtin_treesit_node_type(args),
-        "treesit-parser-add-notifier" => super::compat_internal::builtin_treesit_parser_add_notifier(args),
+        "treesit-parser-add-notifier" => {
+            super::compat_internal::builtin_treesit_parser_add_notifier(args)
+        }
         "treesit-parser-buffer" => super::compat_internal::builtin_treesit_parser_buffer(args),
         "treesit-parser-create" => super::compat_internal::builtin_treesit_parser_create(args),
         "treesit-parser-delete" => super::compat_internal::builtin_treesit_parser_delete(args),
-        "treesit-parser-included-ranges" => super::compat_internal::builtin_treesit_parser_included_ranges(args),
+        "treesit-parser-included-ranges" => {
+            super::compat_internal::builtin_treesit_parser_included_ranges(args)
+        }
         "treesit-parser-language" => super::compat_internal::builtin_treesit_parser_language(args),
         "treesit-parser-list" => super::compat_internal::builtin_treesit_parser_list(args),
-        "treesit-parser-notifiers" => super::compat_internal::builtin_treesit_parser_notifiers(args),
+        "treesit-parser-notifiers" => {
+            super::compat_internal::builtin_treesit_parser_notifiers(args)
+        }
         "treesit-parser-p" => super::compat_internal::builtin_treesit_parser_p(args),
-        "treesit-parser-remove-notifier" => super::compat_internal::builtin_treesit_parser_remove_notifier(args),
-        "treesit-parser-root-node" => super::compat_internal::builtin_treesit_parser_root_node(args),
-        "treesit-parser-set-included-ranges" => super::compat_internal::builtin_treesit_parser_set_included_ranges(args),
+        "treesit-parser-remove-notifier" => {
+            super::compat_internal::builtin_treesit_parser_remove_notifier(args)
+        }
+        "treesit-parser-root-node" => {
+            super::compat_internal::builtin_treesit_parser_root_node(args)
+        }
+        "treesit-parser-set-included-ranges" => {
+            super::compat_internal::builtin_treesit_parser_set_included_ranges(args)
+        }
         "treesit-parser-tag" => super::compat_internal::builtin_treesit_parser_tag(args),
         "treesit-pattern-expand" => super::compat_internal::builtin_treesit_pattern_expand(args),
         "treesit-query-capture" => super::compat_internal::builtin_treesit_query_capture(args),
@@ -15454,6 +15893,257 @@ mod tests {
     }
 
     #[test]
+    fn insert_inherit_variants_reuse_insert_semantics() {
+        let mut eval = super::super::eval::Evaluator::new();
+        assert_eq!(
+            builtin_insert_and_inherit(
+                &mut eval,
+                vec![Value::string("a"), Value::Char('b'), Value::Int('c' as i64)],
+            )
+            .unwrap(),
+            Value::Nil
+        );
+        assert_eq!(
+            builtin_insert_before_markers_and_inherit(&mut eval, vec![Value::string("d")]).unwrap(),
+            Value::Nil
+        );
+        assert_eq!(
+            builtin_buffer_string(&mut eval, vec![]).unwrap(),
+            Value::string("abcd")
+        );
+
+        let type_error =
+            builtin_insert_and_inherit(&mut eval, vec![Value::list(vec![Value::Int(1)])])
+                .expect_err("insert-and-inherit should reject non char/string values");
+        match type_error {
+            Flow::Signal(sig) => {
+                assert_eq!(sig.symbol, "wrong-type-argument");
+                assert_eq!(
+                    sig.data,
+                    vec![
+                        Value::symbol("char-or-string-p"),
+                        Value::list(vec![Value::Int(1)])
+                    ]
+                );
+            }
+            other => panic!("unexpected flow: {other:?}"),
+        }
+    }
+
+    #[test]
+    fn insert_buffer_substring_inserts_source_region() {
+        let mut eval = super::super::eval::Evaluator::new();
+        let source_id = eval.buffers.create_buffer("*ibs-source*");
+        eval.buffers.set_current(source_id);
+        builtin_insert(&mut eval, vec![Value::string("abcdef")]).unwrap();
+
+        let dest_id = eval.buffers.create_buffer("*ibs-dest*");
+        eval.buffers.set_current(dest_id);
+        builtin_insert(&mut eval, vec![Value::string("start:")]).unwrap();
+
+        assert_eq!(
+            builtin_insert_buffer_substring(
+                &mut eval,
+                vec![Value::Buffer(source_id), Value::Int(2), Value::Int(5)],
+            )
+            .unwrap(),
+            Value::Nil
+        );
+        assert_eq!(
+            eval.buffers
+                .get(dest_id)
+                .expect("destination buffer should exist")
+                .buffer_string(),
+            "start:bcd"
+        );
+
+        let bad_designator = builtin_insert_buffer_substring(&mut eval, vec![Value::Int(9)])
+            .expect_err("insert-buffer-substring should reject non-buffer designators");
+        match bad_designator {
+            Flow::Signal(sig) => {
+                assert_eq!(sig.symbol, "wrong-type-argument");
+                assert_eq!(sig.data, vec![Value::symbol("stringp"), Value::Int(9)]);
+            }
+            other => panic!("unexpected flow: {other:?}"),
+        }
+
+        let bad_start = builtin_insert_buffer_substring(
+            &mut eval,
+            vec![Value::Buffer(source_id), Value::string("x")],
+        )
+        .expect_err("insert-buffer-substring should reject non integer-or-marker START");
+        match bad_start {
+            Flow::Signal(sig) => {
+                assert_eq!(sig.symbol, "wrong-type-argument");
+                assert_eq!(
+                    sig.data,
+                    vec![Value::symbol("integer-or-marker-p"), Value::string("x")]
+                );
+            }
+            other => panic!("unexpected flow: {other:?}"),
+        }
+    }
+
+    #[test]
+    fn kill_all_local_variables_clears_buffer_locals() {
+        let mut eval = super::super::eval::Evaluator::new();
+        {
+            let buf = eval.buffers.current_buffer_mut().unwrap();
+            buf.set_buffer_local("tab-width", Value::Int(8));
+            buf.set_buffer_local("fill-column", Value::Int(80));
+        }
+
+        assert_eq!(
+            builtin_kill_all_local_variables(&mut eval, vec![]).unwrap(),
+            Value::Nil
+        );
+
+        let buf = eval.buffers.current_buffer().unwrap();
+        assert!(buf.get_buffer_local("tab-width").is_none());
+        assert!(buf.get_buffer_local("fill-column").is_none());
+        assert_eq!(buf.get_buffer_local("buffer-read-only"), Some(&Value::Nil));
+    }
+
+    #[test]
+    fn ntake_destructively_truncates_lists() {
+        let list = Value::list(vec![
+            Value::Int(1),
+            Value::Int(2),
+            Value::Int(3),
+            Value::Int(4),
+        ]);
+        let kept = builtin_ntake(vec![Value::Int(2), list.clone()]).unwrap();
+        assert_eq!(kept, Value::list(vec![Value::Int(1), Value::Int(2)]));
+        assert_eq!(
+            list_to_vec(&list).expect("list should stay proper after ntake"),
+            vec![Value::Int(1), Value::Int(2)]
+        );
+
+        let unchanged = Value::list(vec![Value::Int(5), Value::Int(6)]);
+        assert_eq!(
+            builtin_ntake(vec![Value::Int(10), unchanged.clone()]).unwrap(),
+            unchanged
+        );
+        assert_eq!(
+            builtin_ntake(vec![Value::Int(0), list.clone()]).unwrap(),
+            Value::Nil
+        );
+
+        let type_error = builtin_ntake(vec![Value::Int(1), Value::Int(3)])
+            .expect_err("ntake should reject non-list arguments");
+        match type_error {
+            Flow::Signal(sig) => {
+                assert_eq!(sig.symbol, "wrong-type-argument");
+                assert_eq!(sig.data, vec![Value::symbol("listp"), Value::Int(3)]);
+            }
+            other => panic!("unexpected flow: {other:?}"),
+        }
+    }
+
+    #[test]
+    fn replace_buffer_contents_and_set_buffer_multibyte_runtime_semantics() {
+        let mut eval = super::super::eval::Evaluator::new();
+        let source_id = eval.buffers.create_buffer("*rbc-source*");
+        eval.buffers.set_current(source_id);
+        builtin_insert(&mut eval, vec![Value::string("source-text")]).unwrap();
+
+        let dest_id = eval.buffers.create_buffer("*rbc-dest*");
+        eval.buffers.set_current(dest_id);
+        builtin_insert(&mut eval, vec![Value::string("dest-text")]).unwrap();
+
+        assert_eq!(
+            builtin_replace_buffer_contents_eval(&mut eval, vec![Value::Buffer(source_id)])
+                .unwrap(),
+            Value::True
+        );
+        assert_eq!(
+            eval.buffers
+                .get(dest_id)
+                .expect("destination buffer should exist")
+                .buffer_string(),
+            "source-text"
+        );
+
+        assert_eq!(
+            builtin_set_buffer_multibyte_eval(&mut eval, vec![Value::Nil]).unwrap(),
+            Value::Nil
+        );
+        assert!(!eval.buffers.current_buffer().unwrap().multibyte);
+
+        assert_eq!(
+            builtin_set_buffer_multibyte_eval(&mut eval, vec![Value::symbol("foo")]).unwrap(),
+            Value::symbol("foo")
+        );
+        assert!(eval.buffers.current_buffer().unwrap().multibyte);
+    }
+
+    #[test]
+    fn split_window_internal_validates_core_argument_types() {
+        let mut eval = super::super::eval::Evaluator::new();
+        let split = builtin_split_window_internal(
+            &mut eval,
+            vec![Value::Nil, Value::Nil, Value::symbol("below"), Value::Nil],
+        )
+        .unwrap();
+        assert!(matches!(split, Value::Window(_)));
+
+        let window_type = builtin_split_window_internal(
+            &mut eval,
+            vec![
+                Value::symbol("not-a-window"),
+                Value::Nil,
+                Value::symbol("below"),
+                Value::Nil,
+            ],
+        )
+        .expect_err("split-window-internal should reject non-window objects");
+        match window_type {
+            Flow::Signal(sig) => {
+                assert_eq!(sig.symbol, "wrong-type-argument");
+                assert_eq!(
+                    sig.data,
+                    vec![Value::symbol("windowp"), Value::symbol("not-a-window")]
+                );
+            }
+            other => panic!("unexpected flow: {other:?}"),
+        }
+
+        let size_type = builtin_split_window_internal(
+            &mut eval,
+            vec![
+                Value::Nil,
+                Value::string("bad"),
+                Value::symbol("below"),
+                Value::Nil,
+            ],
+        )
+        .expect_err("split-window-internal should reject non-fixnum sizes");
+        match size_type {
+            Flow::Signal(sig) => {
+                assert_eq!(sig.symbol, "wrong-type-argument");
+                assert_eq!(
+                    sig.data,
+                    vec![Value::symbol("fixnump"), Value::string("bad")]
+                );
+            }
+            other => panic!("unexpected flow: {other:?}"),
+        }
+
+        let side_type = builtin_split_window_internal(
+            &mut eval,
+            vec![Value::Nil, Value::Nil, Value::Int(9), Value::Nil],
+        )
+        .expect_err("split-window-internal should reject non-symbol SIDE");
+        match side_type {
+            Flow::Signal(sig) => {
+                assert_eq!(sig.symbol, "wrong-type-argument");
+                assert_eq!(sig.data, vec![Value::symbol("symbolp"), Value::Int(9)]);
+            }
+            other => panic!("unexpected flow: {other:?}"),
+        }
+    }
+
+    #[test]
     fn barf_bury_char_equal_cl_type_and_cancel_semantics() {
         let mut eval = super::super::eval::Evaluator::new();
 
@@ -17144,10 +17834,16 @@ mod tests {
                 .unwrap_or_else(|_| panic!("fmakunbound should accept {name}"));
             let bound = builtin_fboundp(&mut eval, vec![Value::symbol(name)])
                 .unwrap_or_else(|_| panic!("fboundp should accept {name}"));
-            assert!(bound.is_nil(), "expected {name} to be unbound after fmakunbound");
+            assert!(
+                bound.is_nil(),
+                "expected {name} to be unbound after fmakunbound"
+            );
             let fn_cell = builtin_symbol_function(&mut eval, vec![Value::symbol(name)])
                 .unwrap_or_else(|_| panic!("symbol-function should accept {name}"));
-            assert!(fn_cell.is_nil(), "expected symbol-function {name} to be nil");
+            assert!(
+                fn_cell.is_nil(),
+                "expected symbol-function {name} to be nil"
+            );
             let functionp = builtin_functionp_eval(&mut eval, vec![Value::symbol(name)])
                 .unwrap_or_else(|_| panic!("functionp should accept {name}"));
             assert!(
