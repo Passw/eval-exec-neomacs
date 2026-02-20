@@ -45,10 +45,17 @@
 45	(length< (make-char-table nil nil) 100)	OK nil
 46	(length= (make-char-table nil nil) 4194303)	OK t
 47	(length> (make-char-table nil nil) 4194302)	OK t
-48	(condition-case err (length< 1 2) (error err))	OK (wrong-type-argument sequencep 1)
-49	(condition-case err (length< '(1 2) "2") (error err))	OK (wrong-type-argument fixnump "2")
-50	(substring-no-properties "abcdef" 1 4)	OK "bcd"
-51	(condition-case err (substring-no-properties) (error err))	OK (wrong-number-of-arguments substring-no-properties 0)
-52	(format-message "a=%s" 1)	OK "a=1"
-53	(condition-case err (format-message) (error err))	OK (wrong-number-of-arguments format-message 0)
-54	(condition-case err (format-message 1) (error err))	OK (wrong-type-argument stringp 1)
+48	(aref (make-char-table nil nil) 0)	OK nil
+49	(elt (make-char-table nil nil) 0)	OK nil
+50	(let ((ct (make-char-table nil nil))) (aset ct 4194303 9) (list (aref ct 4194303) (elt ct 4194303)))	OK (9 9)
+51	(condition-case err (aref (make-char-table nil nil) -1) (error err))	OK (wrong-type-argument characterp -1)
+52	(condition-case err (aref (make-char-table nil nil) 4194304) (error err))	OK (wrong-type-argument characterp 4194304)
+53	(condition-case err (aset (make-char-table nil nil) -1 9) (error err))	OK (wrong-type-argument characterp -1)
+54	(condition-case err (aset (make-char-table nil nil) 4194304 9) (error err))	OK (wrong-type-argument characterp 4194304)
+55	(condition-case err (length< 1 2) (error err))	OK (wrong-type-argument sequencep 1)
+56	(condition-case err (length< '(1 2) "2") (error err))	OK (wrong-type-argument fixnump "2")
+57	(substring-no-properties "abcdef" 1 4)	OK "bcd"
+58	(condition-case err (substring-no-properties) (error err))	OK (wrong-number-of-arguments substring-no-properties 0)
+59	(format-message "a=%s" 1)	OK "a=1"
+60	(condition-case err (format-message) (error err))	OK (wrong-number-of-arguments format-message 0)
+61	(condition-case err (format-message 1) (error err))	OK (wrong-type-argument stringp 1)

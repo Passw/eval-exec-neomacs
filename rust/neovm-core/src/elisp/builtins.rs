@@ -83,6 +83,17 @@ fn expect_fixnum(value: &Value) -> Result<i64, Flow> {
     }
 }
 
+fn expect_char_table_index(value: &Value) -> Result<i64, Flow> {
+    let idx = expect_fixnum(value)?;
+    if !(0..=0x3F_FFFF).contains(&idx) {
+        return Err(signal(
+            "wrong-type-argument",
+            vec![Value::symbol("characterp"), value.clone()],
+        ));
+    }
+    Ok(idx)
+}
+
 fn expect_char_equal_code(value: &Value) -> Result<i64, Flow> {
     match value {
         Value::Int(n) if (0..=KEY_CHAR_CODE_MASK).contains(n) => Ok(*n),
@@ -2113,9 +2124,14 @@ pub(crate) fn builtin_vector(args: Vec<Value>) -> EvalResult {
 
 pub(crate) fn builtin_aref(args: Vec<Value>) -> EvalResult {
     expect_args("aref", &args, 2)?;
-    let idx = expect_fixnum(&args[1])? as usize;
+    let idx_fixnum = expect_fixnum(&args[1])?;
     match &args[0] {
+        Value::Vector(_) if super::chartable::is_char_table(&args[0]) => {
+            let ch = expect_char_table_index(&args[1])?;
+            super::chartable::builtin_char_table_range(vec![args[0].clone(), Value::Int(ch)])
+        }
         Value::Vector(v) => {
+            let idx = idx_fixnum as usize;
             let items = v.lock().expect("poisoned");
             let is_bool_vector =
                 items.len() >= 2 && matches!(&items[0], Value::Symbol(s) if s == "--bool-vector--");
@@ -2151,6 +2167,7 @@ pub(crate) fn builtin_aref(args: Vec<Value>) -> EvalResult {
                 .ok_or_else(|| signal("args-out-of-range", vec![args[0].clone(), args[1].clone()]))
         }
         Value::Str(s) => {
+            let idx = idx_fixnum as usize;
             let codes = decode_storage_char_codes(s);
             codes
                 .get(idx)
@@ -2206,9 +2223,17 @@ pub(crate) fn aset_string_replacement(
 
 pub(crate) fn builtin_aset(args: Vec<Value>) -> EvalResult {
     expect_args("aset", &args, 3)?;
-    let idx = expect_fixnum(&args[1])? as usize;
     match &args[0] {
+        Value::Vector(_) if super::chartable::is_char_table(&args[0]) => {
+            let ch = expect_char_table_index(&args[1])?;
+            super::chartable::builtin_set_char_table_range(vec![
+                args[0].clone(),
+                Value::Int(ch),
+                args[2].clone(),
+            ])
+        }
         Value::Vector(v) => {
+            let idx = expect_fixnum(&args[1])? as usize;
             let mut items = v.lock().expect("poisoned");
             let is_bool_vector =
                 items.len() >= 2 && matches!(&items[0], Value::Symbol(s) if s == "--bool-vector--");
@@ -17261,6 +17286,66 @@ mod tests {
             .expect("builtin aref should resolve")
             .expect("builtin aref should evaluate");
         assert!(updated.is_truthy());
+    }
+
+    #[test]
+    fn pure_dispatch_typed_aref_aset_char_table_uses_character_index_semantics() {
+        let ct = Value::vector(vec![
+            Value::symbol("--char-table--"),
+            Value::Nil,
+            Value::Nil,
+            Value::symbol("syntax-table"),
+            Value::Int(0),
+            Value::Int(i64::MIN + 1),
+            Value::Nil,
+        ]);
+
+        let initial = dispatch_builtin_pure("aref", vec![ct.clone(), Value::Int(0)])
+            .expect("builtin aref should resolve")
+            .expect("builtin aref should evaluate");
+        assert_eq!(initial, Value::Nil);
+
+        let _ = dispatch_builtin_pure("aset", vec![ct.clone(), Value::Int(0x3F_FFFF), Value::Int(9)])
+            .expect("builtin aset should resolve")
+            .expect("builtin aset should evaluate");
+
+        let edge = dispatch_builtin_pure("aref", vec![ct.clone(), Value::Int(0x3F_FFFF)])
+            .expect("builtin aref should resolve")
+            .expect("builtin aref should evaluate");
+        assert_eq!(edge, Value::Int(9));
+
+        let elt = dispatch_builtin_pure("elt", vec![ct.clone(), Value::Int(0x3F_FFFF)])
+            .expect("builtin elt should resolve")
+            .expect("builtin elt should evaluate");
+        assert_eq!(elt, Value::Int(9));
+
+        let negative = dispatch_builtin_pure("aref", vec![ct.clone(), Value::Int(-1)])
+            .expect("builtin aref should resolve")
+            .expect_err("negative char-table index should fail");
+        match negative {
+            Flow::Signal(sig) => {
+                assert_eq!(sig.symbol, "wrong-type-argument");
+                assert_eq!(
+                    sig.data,
+                    vec![Value::symbol("characterp"), Value::Int(-1)],
+                );
+            }
+            other => panic!("unexpected flow: {other:?}"),
+        }
+
+        let too_large = dispatch_builtin_pure("aset", vec![ct, Value::Int(0x40_0000), Value::Int(1)])
+            .expect("builtin aset should resolve")
+            .expect_err("out-of-range char-table index should fail");
+        match too_large {
+            Flow::Signal(sig) => {
+                assert_eq!(sig.symbol, "wrong-type-argument");
+                assert_eq!(
+                    sig.data,
+                    vec![Value::symbol("characterp"), Value::Int(0x40_0000)],
+                );
+            }
+            other => panic!("unexpected flow: {other:?}"),
+        }
     }
 
     #[test]
