@@ -239,6 +239,26 @@ fn decode_char_codepoint_arg(value: &Value) -> Result<i64, Flow> {
     }
 }
 
+fn expect_wholenump(value: &Value) -> Result<i64, Flow> {
+    match value {
+        Value::Int(n) if *n >= 0 => Ok(*n),
+        other => Err(signal(
+            "wrong-type-argument",
+            vec![Value::symbol("wholenump"), other.clone()],
+        )),
+    }
+}
+
+fn expect_fixnump(value: &Value) -> Result<i64, Flow> {
+    match value {
+        Value::Int(n) => Ok(*n),
+        other => Err(signal(
+            "wrong-type-argument",
+            vec![Value::symbol("fixnump"), other.clone()],
+        )),
+    }
+}
+
 fn encode_char_input(value: &Value) -> Result<i64, Flow> {
     match value {
         Value::Char(c) => Ok(*c as i64),
@@ -482,6 +502,66 @@ pub(crate) fn builtin_find_charset_region_eval(
     Ok(Value::list(
         charsets.into_iter().map(Value::symbol).collect::<Vec<_>>(),
     ))
+}
+
+/// `(encode-big5-char CH)` -- encode character CH in BIG5 space.
+pub(crate) fn builtin_encode_big5_char(args: Vec<Value>) -> EvalResult {
+    expect_args("encode-big5-char", &args, 1)?;
+    let ch = encode_char_input(&args[0])?;
+    Ok(Value::Int(ch))
+}
+
+/// `(decode-big5-char CODE)` -- decode BIG5 code to Emacs character code.
+pub(crate) fn builtin_decode_big5_char(args: Vec<Value>) -> EvalResult {
+    expect_args("decode-big5-char", &args, 1)?;
+    let code = expect_wholenump(&args[0])?;
+    Ok(Value::Int(code))
+}
+
+/// `(encode-sjis-char CH)` -- encode character CH in Shift-JIS space.
+pub(crate) fn builtin_encode_sjis_char(args: Vec<Value>) -> EvalResult {
+    expect_args("encode-sjis-char", &args, 1)?;
+    let ch = encode_char_input(&args[0])?;
+    Ok(Value::Int(ch))
+}
+
+/// `(decode-sjis-char CODE)` -- decode Shift-JIS code to Emacs character code.
+pub(crate) fn builtin_decode_sjis_char(args: Vec<Value>) -> EvalResult {
+    expect_args("decode-sjis-char", &args, 1)?;
+    let code = expect_wholenump(&args[0])?;
+    Ok(Value::Int(code))
+}
+
+/// `(get-unused-iso-final-char DIMENSION CHARS)` -- return an available ISO
+/// final-char code for the requested DIMENSION/CHARS class.
+pub(crate) fn builtin_get_unused_iso_final_char(args: Vec<Value>) -> EvalResult {
+    expect_args("get-unused-iso-final-char", &args, 2)?;
+    let dimension = expect_fixnump(&args[0])?;
+    let chars = expect_fixnump(&args[1])?;
+    if !matches!(dimension, 1..=3) {
+        return Err(signal(
+            "error",
+            vec![Value::string(format!(
+                "Invalid DIMENSION {dimension}, it should be 1, 2, or 3"
+            ))],
+        ));
+    }
+    if !matches!(chars, 94 | 96) {
+        return Err(signal(
+            "error",
+            vec![Value::string(format!(
+                "Invalid CHARS {chars}, it should be 94 or 96"
+            ))],
+        ));
+    }
+    let final_char = match (dimension, chars) {
+        (1, 94) => 54,
+        (1, 96) => 51,
+        (2, 94) => 50,
+        (2, 96) | (3, 94) | (3, 96) => 48,
+        _ => 48,
+    };
+    Ok(Value::Int(final_char))
 }
 
 /// `(find-charset-string STR &optional TABLE)` -- returns a list of charsets
@@ -1318,6 +1398,66 @@ mod tests {
     #[test]
     fn encode_char_wrong_arg_count() {
         assert!(builtin_encode_char(vec![Value::Int(65)]).is_err());
+    }
+
+    #[test]
+    fn encode_decode_big5_sjis_basic_identity() {
+        assert_eq!(
+            builtin_encode_big5_char(vec![Value::Int(65)]).expect("encode-big5-char"),
+            Value::Int(65)
+        );
+        assert_eq!(
+            builtin_decode_big5_char(vec![Value::Int(65)]).expect("decode-big5-char"),
+            Value::Int(65)
+        );
+        assert_eq!(
+            builtin_encode_sjis_char(vec![Value::Int(65)]).expect("encode-sjis-char"),
+            Value::Int(65)
+        );
+        assert_eq!(
+            builtin_decode_sjis_char(vec![Value::Int(65)]).expect("decode-sjis-char"),
+            Value::Int(65)
+        );
+    }
+
+    #[test]
+    fn get_unused_iso_final_char_known_values() {
+        assert_eq!(
+            builtin_get_unused_iso_final_char(vec![Value::Int(1), Value::Int(94)])
+                .expect("1/94"),
+            Value::Int(54)
+        );
+        assert_eq!(
+            builtin_get_unused_iso_final_char(vec![Value::Int(1), Value::Int(96)])
+                .expect("1/96"),
+            Value::Int(51)
+        );
+        assert_eq!(
+            builtin_get_unused_iso_final_char(vec![Value::Int(2), Value::Int(94)])
+                .expect("2/94"),
+            Value::Int(50)
+        );
+        assert_eq!(
+            builtin_get_unused_iso_final_char(vec![Value::Int(2), Value::Int(96)])
+                .expect("2/96"),
+            Value::Int(48)
+        );
+        assert_eq!(
+            builtin_get_unused_iso_final_char(vec![Value::Int(3), Value::Int(94)])
+                .expect("3/94"),
+            Value::Int(48)
+        );
+    }
+
+    #[test]
+    fn get_unused_iso_final_char_validates_dimension_and_chars() {
+        let bad_dimension = builtin_get_unused_iso_final_char(vec![Value::Int(0), Value::Int(94)])
+            .expect_err("dimension 0 should error");
+        assert!(matches!(bad_dimension, Flow::Signal(_)));
+
+        let bad_chars = builtin_get_unused_iso_final_char(vec![Value::Int(1), Value::Int(0)])
+            .expect_err("chars 0 should error");
+        assert!(matches!(bad_chars, Flow::Signal(_)));
     }
 
     // -----------------------------------------------------------------------

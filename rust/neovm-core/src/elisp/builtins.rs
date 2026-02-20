@@ -12291,8 +12291,13 @@ pub(crate) fn dispatch_builtin(
         "define-charset-internal" => super::charset::builtin_define_charset_internal(args),
         "find-charset-region" => super::charset::builtin_find_charset_region(args),
         "find-charset-string" => super::charset::builtin_find_charset_string(args),
+        "decode-big5-char" => super::charset::builtin_decode_big5_char(args),
         "decode-char" => super::charset::builtin_decode_char(args),
+        "decode-sjis-char" => super::charset::builtin_decode_sjis_char(args),
+        "encode-big5-char" => super::charset::builtin_encode_big5_char(args),
         "encode-char" => super::charset::builtin_encode_char(args),
+        "encode-sjis-char" => super::charset::builtin_encode_sjis_char(args),
+        "get-unused-iso-final-char" => super::charset::builtin_get_unused_iso_final_char(args),
         "clear-charset-maps" => super::charset::builtin_clear_charset_maps(args),
         "charset-after" => super::charset::builtin_charset_after(args),
 
