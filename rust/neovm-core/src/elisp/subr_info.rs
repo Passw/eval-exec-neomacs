@@ -935,7 +935,7 @@ fn subr_arity_value(name: &str) -> Value {
         "gnutls-asynchronous-parameters" | "gnutls-bye" | "gnutls-hash-digest" => {
             arity_cons(2, Some(2))
         }
-        "gnutls-boot" | "gnutls-hash-mac" => arity_cons(3, Some(3)),
+        "gnutls-boot" | "gnutls-hash-mac" | "inotify-add-watch" => arity_cons(3, Some(3)),
         "garbage-collect-maybe" | "get-variable-watchers" => arity_cons(1, Some(1)),
         "gnutls-deinit" | "gnutls-format-certificate" | "gnutls-get-initstage" => {
             arity_cons(1, Some(1))
@@ -945,16 +945,35 @@ fn subr_arity_value(name: &str) -> Value {
         | "gnutls-errorp"
         | "gnutls-peer-status"
         | "gnutls-peer-status-warning-describe"
+        | "inotify-rm-watch"
         | "inotify-valid-p" => arity_cons(1, Some(1)),
         "gnutls-symmetric-decrypt" | "gnutls-symmetric-encrypt" => arity_cons(4, Some(5)),
         "handle-save-session"
         | "handle-switch-frame"
         | "init-image-library"
         | "interactive-form"
-        | "lock-file" => arity_cons(1, Some(1)),
+        | "lock-file"
+        | "sqlite-close"
+        | "sqlite-columns"
+        | "sqlite-commit"
+        | "sqlite-finalize"
+        | "sqlite-more-p"
+        | "sqlite-next"
+        | "sqlite-rollback"
+        | "sqlite-transaction"
+        | "sqlitep"
+        | "unlock-file" => arity_cons(1, Some(1)),
         "help--describe-vector" => arity_cons(7, Some(7)),
-        "innermost-minibuffer-p" | "lock-buffer" | "lossage-size" => arity_cons(0, Some(1)),
+        "innermost-minibuffer-p" | "lock-buffer" | "lossage-size" | "sqlite-open" => {
+            arity_cons(0, Some(1))
+        }
+        "sqlite-execute" => arity_cons(2, Some(3)),
+        "sqlite-execute-batch" | "sqlite-load-extension" | "sqlite-pragma" => {
+            arity_cons(2, Some(2))
+        }
+        "sqlite-select" => arity_cons(2, Some(4)),
         "local-variable-if-set-p" => arity_cons(1, Some(2)),
+        "unlock-buffer" => arity_cons(0, Some(0)),
         "get-unicode-property-internal" => arity_cons(2, Some(2)),
         "define-hash-table-test" => arity_cons(3, Some(3)),
         "find-coding-systems-region-internal" => arity_cons(2, Some(3)),
@@ -2612,8 +2631,23 @@ mod tests {
         assert_subr_arity("gnutls-peer-status", 1, Some(1));
         assert_subr_arity("gpm-mouse-start", 0, Some(0));
         assert_subr_arity("gpm-mouse-stop", 0, Some(0));
+        assert_subr_arity("sqlite-close", 1, Some(1));
+        assert_subr_arity("sqlite-columns", 1, Some(1));
+        assert_subr_arity("sqlite-commit", 1, Some(1));
+        assert_subr_arity("sqlite-execute", 2, Some(3));
+        assert_subr_arity("sqlite-execute-batch", 2, Some(2));
+        assert_subr_arity("sqlite-finalize", 1, Some(1));
+        assert_subr_arity("sqlite-load-extension", 2, Some(2));
+        assert_subr_arity("sqlite-more-p", 1, Some(1));
+        assert_subr_arity("sqlite-next", 1, Some(1));
+        assert_subr_arity("sqlite-open", 0, Some(1));
+        assert_subr_arity("sqlite-pragma", 2, Some(2));
+        assert_subr_arity("sqlite-rollback", 1, Some(1));
+        assert_subr_arity("sqlite-select", 2, Some(4));
+        assert_subr_arity("sqlite-transaction", 1, Some(1));
         assert_subr_arity("sqlite-available-p", 0, Some(0));
         assert_subr_arity("sqlite-version", 0, Some(0));
+        assert_subr_arity("sqlitep", 1, Some(1));
         assert_subr_arity("garbage-collect-maybe", 1, Some(1));
         assert_subr_arity("gnutls-error-fatalp", 1, Some(1));
         assert_subr_arity("gnutls-error-string", 1, Some(1));
@@ -2625,6 +2659,8 @@ mod tests {
         assert_subr_arity("handle-switch-frame", 1, Some(1));
         assert_subr_arity("help--describe-vector", 7, Some(7));
         assert_subr_arity("init-image-library", 1, Some(1));
+        assert_subr_arity("inotify-add-watch", 3, Some(3));
+        assert_subr_arity("inotify-rm-watch", 1, Some(1));
         assert_subr_arity("inotify-valid-p", 1, Some(1));
         assert_subr_arity("innermost-minibuffer-p", 0, Some(1));
         assert_subr_arity("interactive-form", 1, Some(1));
@@ -2632,6 +2668,8 @@ mod tests {
         assert_subr_arity("lock-buffer", 0, Some(1));
         assert_subr_arity("lock-file", 1, Some(1));
         assert_subr_arity("lossage-size", 0, Some(1));
+        assert_subr_arity("unlock-buffer", 0, Some(0));
+        assert_subr_arity("unlock-file", 1, Some(1));
         assert_subr_arity("get-unicode-property-internal", 2, Some(2));
         assert_subr_arity("get-variable-watchers", 1, Some(1));
         assert_subr_arity("fillarray", 2, Some(2));

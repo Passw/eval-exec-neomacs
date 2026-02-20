@@ -832,3 +832,4 @@ cases/internal-gnutls-system-compat-semantics
 cases/internal-gnutls-runtime-compat-semantics
 cases/internal-runtime-misc-compat-semantics
 cases/internal-session-minibuffer-compat-semantics
+cases/internal-sqlite-inotify-unlock-compat-semantics
