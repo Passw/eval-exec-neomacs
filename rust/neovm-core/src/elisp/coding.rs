@@ -583,6 +583,139 @@ pub(crate) fn builtin_coding_system_get(mgr: &CodingSystemManager, args: Vec<Val
     ))
 }
 
+fn plist_push(plist: &mut Vec<Value>, key: &str, value: Value) {
+    if key.starts_with(':') {
+        plist.push(Value::keyword(key));
+    } else {
+        plist.push(Value::symbol(key));
+    }
+    plist.push(value);
+}
+
+fn plist_contains_key(plist: &[Value], key: &str) -> bool {
+    let needle = key.trim_start_matches(':');
+    let mut idx = 0;
+    while idx + 1 < plist.len() {
+        if plist[idx]
+            .as_symbol_name()
+            .is_some_and(|name| name.trim_start_matches(':') == needle)
+        {
+            return true;
+        }
+        idx += 2;
+    }
+    false
+}
+
+fn coding_category_for_base(base: &str) -> &'static str {
+    match base {
+        "utf-8" | "utf-8-emacs" | "utf-8-auto" | "emacs-internal" => "coding-category-utf-8",
+        "latin-1" | "ascii" => "coding-category-charset",
+        "raw-text" | "binary" | "no-conversion" => "coding-category-raw-text",
+        "undecided" | "prefer-utf-8" => "coding-category-undecided",
+        _ => "coding-category-undecided",
+    }
+}
+
+fn coding_docstring_for_base(base: &str) -> Option<&'static str> {
+    match base {
+        "utf-8" | "utf-8-emacs" | "utf-8-auto" | "emacs-internal" => {
+            Some("UTF-8 (no signature (BOM))")
+        }
+        "latin-1" => Some("ISO 2022 based 8-bit encoding for Latin-1 (MIME:ISO-8859-1)."),
+        "ascii" => Some("ASCII encoding."),
+        "no-conversion" | "binary" | "raw-text" => Some("Do no conversion."),
+        "undecided" => Some("Automatic conversion on decode."),
+        _ => None,
+    }
+}
+
+fn coding_charset_list_for_base(base: &str) -> Option<Vec<Value>> {
+    match base {
+        "utf-8" | "utf-8-emacs" | "utf-8-auto" | "emacs-internal" => {
+            Some(vec![Value::symbol("unicode")])
+        }
+        "latin-1" => Some(vec![Value::symbol("iso-8859-1")]),
+        "ascii" => Some(vec![Value::symbol("ascii")]),
+        _ => None,
+    }
+}
+
+fn coding_mime_charset_for_base(base: &str) -> Option<&'static str> {
+    match base {
+        "utf-8" | "utf-8-emacs" | "utf-8-auto" | "emacs-internal" => Some("utf-8"),
+        "latin-1" => Some("iso-8859-1"),
+        "ascii" => Some("us-ascii"),
+        _ => None,
+    }
+}
+
+/// `(coding-system-plist CODING-SYSTEM)` -- return a plist describing
+/// CODING-SYSTEM metadata.
+pub(crate) fn builtin_coding_system_plist(
+    mgr: &CodingSystemManager,
+    args: Vec<Value>,
+) -> EvalResult {
+    expect_args("coding-system-plist", &args, 1)?;
+    if matches!(args[0], Value::Str(_)) {
+        return Err(signal(
+            "wrong-type-argument",
+            vec![Value::symbol("symbolp"), args[0].clone()],
+        ));
+    }
+
+    let coding_name = coding_symbol_name(&args[0])?;
+    let resolved_name = resolve_runtime_name(mgr, &coding_name)
+        .ok_or_else(|| signal("coding-system-error", vec![args[0].clone()]))?;
+    let bucket = runtime_bucket_name(mgr, &resolved_name)
+        .ok_or_else(|| signal("coding-system-error", vec![args[0].clone()]))?;
+    let info = mgr
+        .get(&bucket)
+        .ok_or_else(|| signal("coding-system-error", vec![args[0].clone()]))?;
+
+    let base = strip_eol_suffix(&resolved_name);
+    let display_name = display_base_name(base);
+    let coding_type = coding_type_for_base(base).unwrap_or(info.coding_type.as_str());
+    let mnemonic = default_mnemonic_for_base(base).unwrap_or(info.mnemonic as i64);
+
+    let mut plist = Vec::new();
+    plist_push(&mut plist, ":ascii-compatible-p", Value::True);
+    plist_push(
+        &mut plist,
+        ":category",
+        Value::symbol(coding_category_for_base(base)),
+    );
+    plist_push(&mut plist, ":name", Value::symbol(display_name));
+    if let Some(doc) = coding_docstring_for_base(base) {
+        plist_push(&mut plist, ":docstring", Value::string(doc));
+    }
+    plist_push(&mut plist, ":coding-type", Value::symbol(coding_type));
+    plist_push(&mut plist, ":mnemonic", Value::Int(mnemonic));
+    if let Some(charset_list) = coding_charset_list_for_base(base) {
+        plist_push(&mut plist, ":charset-list", Value::list(charset_list));
+    }
+    if let Some(mime_charset) = coding_mime_charset_for_base(base) {
+        plist_push(&mut plist, ":mime-charset", Value::symbol(mime_charset));
+    }
+    if matches!(base, "no-conversion" | "binary" | "raw-text") {
+        plist_push(&mut plist, ":default-char", Value::Int(0));
+        plist_push(&mut plist, ":for-unibyte", Value::True);
+    }
+
+    // Preserve caller-provided custom properties from coding-system-put.
+    let mut custom_keys: Vec<String> = info.properties.keys().cloned().collect();
+    custom_keys.sort();
+    for key in custom_keys {
+        if !plist_contains_key(&plist, &key) {
+            if let Some(value) = info.properties.get(&key) {
+                plist_push(&mut plist, &key, value.clone());
+            }
+        }
+    }
+
+    Ok(Value::list(plist))
+}
+
 /// `(coding-system-put CODING-SYSTEM PROP VAL)` -- set a property of a coding system.
 pub(crate) fn builtin_coding_system_put(
     mgr: &mut CodingSystemManager,
@@ -1400,6 +1533,22 @@ mod tests {
         CodingSystemManager::new()
     }
 
+    fn plist_get(value: &Value, key: &str) -> Option<Value> {
+        let needle = key.trim_start_matches(':');
+        let items = list_to_vec(value)?;
+        let mut idx = 0;
+        while idx + 1 < items.len() {
+            if items[idx]
+                .as_symbol_name()
+                .is_some_and(|name| name.trim_start_matches(':') == needle)
+            {
+                return Some(items[idx + 1].clone());
+            }
+            idx += 2;
+        }
+        None
+    }
+
     // ----- CodingSystemManager construction -----
 
     #[test]
@@ -1587,6 +1736,80 @@ mod tests {
         let result =
             builtin_coding_system_get(&m, vec![Value::symbol("bogus"), Value::symbol(":name")]);
         assert!(result.is_err());
+    }
+
+    // ----- coding-system-plist -----
+
+    #[test]
+    fn coding_system_plist_utf8_core_fields() {
+        let m = mgr();
+        let plist = builtin_coding_system_plist(&m, vec![Value::symbol("utf-8")]).unwrap();
+        assert_eq!(plist_get(&plist, ":name"), Some(Value::symbol("utf-8")));
+        assert_eq!(plist_get(&plist, ":coding-type"), Some(Value::symbol("utf-8")));
+        assert_eq!(plist_get(&plist, ":mnemonic"), Some(Value::Int('U' as i64)));
+    }
+
+    #[test]
+    fn coding_system_plist_keyword_keys_work_with_builtin_plist_get() {
+        let m = mgr();
+        let plist = builtin_coding_system_plist(&m, vec![Value::symbol("utf-8")]).unwrap();
+
+        let name = crate::elisp::builtins::builtin_plist_get(vec![
+            plist.clone(),
+            Value::keyword(":name"),
+        ])
+        .unwrap();
+        assert_eq!(name, Value::symbol("utf-8"));
+
+        let mnemonic =
+            crate::elisp::builtins::builtin_plist_get(vec![plist, Value::keyword(":mnemonic")])
+                .unwrap();
+        assert_eq!(mnemonic, Value::Int('U' as i64));
+    }
+
+    #[test]
+    fn coding_system_plist_normalizes_alias_and_eol_variant_name() {
+        let m = mgr();
+        let latin = builtin_coding_system_plist(&m, vec![Value::symbol("latin-1")]).unwrap();
+        assert_eq!(plist_get(&latin, ":name"), Some(Value::symbol("iso-latin-1")));
+
+        let utf8_unix =
+            builtin_coding_system_plist(&m, vec![Value::symbol("utf-8-unix")]).unwrap();
+        assert_eq!(plist_get(&utf8_unix, ":name"), Some(Value::symbol("utf-8")));
+    }
+
+    #[test]
+    fn coding_system_plist_nil_maps_to_no_conversion() {
+        let m = mgr();
+        let plist = builtin_coding_system_plist(&m, vec![Value::Nil]).unwrap();
+        assert_eq!(plist_get(&plist, ":name"), Some(Value::symbol("no-conversion")));
+        assert_eq!(
+            plist_get(&plist, ":coding-type"),
+            Some(Value::symbol("raw-text"))
+        );
+    }
+
+    #[test]
+    fn coding_system_plist_type_and_unknown_errors() {
+        let m = mgr();
+        let type_err = builtin_coding_system_plist(&m, vec![Value::string("utf-8")]);
+        assert!(type_err.is_err());
+
+        let unknown = builtin_coding_system_plist(&m, vec![Value::symbol("bogus")]);
+        assert!(unknown.is_err());
+    }
+
+    #[test]
+    fn coding_system_plist_includes_custom_properties_from_put() {
+        let mut m = mgr();
+        builtin_coding_system_put(
+            &mut m,
+            vec![Value::symbol("utf-8"), Value::symbol(":foo"), Value::Int(42)],
+        )
+        .unwrap();
+
+        let plist = builtin_coding_system_plist(&m, vec![Value::symbol("utf-8")]).unwrap();
+        assert_eq!(plist_get(&plist, ":foo"), Some(Value::Int(42)));
     }
 
     // ----- coding-system-put -----

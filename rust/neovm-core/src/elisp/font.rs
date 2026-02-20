@@ -1846,6 +1846,62 @@ pub(crate) fn builtin_color_supported_p(args: Vec<Value>) -> EvalResult {
     Ok(Value::bool(parse_color_16bit_any(&color).is_some()))
 }
 
+fn expect_optional_color_distance_frame_arg(args: &[Value], idx: usize) -> Result<(), Flow> {
+    if let Some(frame) = args.get(idx) {
+        if !frame.is_nil() && !matches!(frame, Value::Frame(_)) {
+            return Err(signal(
+                "wrong-type-argument",
+                vec![Value::symbol("frame-live-p"), frame.clone()],
+            ));
+        }
+    }
+    Ok(())
+}
+
+fn invalid_color_error(value: &Value) -> Flow {
+    signal(
+        "error",
+        vec![Value::string("Invalid color"), value.clone()],
+    )
+}
+
+fn parse_color_distance_input(value: &Value) -> Result<(i64, i64, i64), Flow> {
+    let Value::Str(color) = value else {
+        return Err(invalid_color_error(value));
+    };
+    let Some(rgb) = parse_color_16bit_any(color).map(approximate_tty_color) else {
+        return Err(invalid_color_error(value));
+    };
+    Ok(rgb)
+}
+
+fn color_distance_metric(lhs: (i64, i64, i64), rhs: (i64, i64, i64)) -> i64 {
+    // Emacs-compatible perceptual approximation (redmean) over 8-bit channels.
+    let r1 = lhs.0 / 257;
+    let g1 = lhs.1 / 257;
+    let b1 = lhs.2 / 257;
+    let r2 = rhs.0 / 257;
+    let g2 = rhs.1 / 257;
+    let b2 = rhs.2 / 257;
+
+    let dr = r1 - r2;
+    let dg = g1 - g2;
+    let db = b1 - b2;
+    let rmean = (r1 + r2) / 2;
+    (((512 + rmean) * dr * dr) >> 8) + 4 * dg * dg + (((767 - rmean) * db * db) >> 8)
+}
+
+/// `(color-distance COLOR1 COLOR2 &optional FRAME METRIC-FN)` -- return a
+/// perceptual distance between colors.
+pub(crate) fn builtin_color_distance(args: Vec<Value>) -> EvalResult {
+    expect_min_args("color-distance", &args, 2)?;
+    expect_max_args("color-distance", &args, 4)?;
+    expect_optional_color_distance_frame_arg(&args, 2)?;
+    let lhs = parse_color_distance_input(&args[0])?;
+    let rhs = parse_color_distance_input(&args[1])?;
+    Ok(Value::Int(color_distance_metric(lhs, rhs)))
+}
+
 fn parse_hex_color_16bit(hex: &str) -> Option<(i64, i64, i64)> {
     match hex.len() {
         3 => {
@@ -3283,6 +3339,61 @@ mod tests {
             Flow::Signal(sig) => {
                 assert_eq!(sig.symbol, "wrong-type-argument");
                 assert_eq!(sig.data, vec![Value::symbol("framep"), Value::Int(1)]);
+            }
+            other => panic!("unexpected flow: {other:?}"),
+        }
+    }
+
+    #[test]
+    fn color_distance_semantics() {
+        let black_white = builtin_color_distance(vec![Value::string("#000"), Value::string("#fff")])
+            .expect("color-distance should evaluate");
+        match black_white {
+            Value::Int(n) => assert!(n > 0),
+            other => panic!("expected integer distance, got {other:?}"),
+        }
+
+        assert_eq!(
+            builtin_color_distance(vec![Value::string("#000"), Value::string("#000")]).unwrap(),
+            Value::Int(0)
+        );
+
+        // Both colors collapse to black in tty-approx mode.
+        assert_eq!(
+            builtin_color_distance(vec![Value::string("#000"), Value::string("#111")]).unwrap(),
+            Value::Int(0)
+        );
+    }
+
+    #[test]
+    fn color_distance_errors_match_oracle_shape() {
+        let invalid_left =
+            builtin_color_distance(vec![Value::string("#00"), Value::string("#fff")]).unwrap_err();
+        match invalid_left {
+            Flow::Signal(sig) => {
+                assert_eq!(sig.symbol, "error");
+                assert_eq!(sig.data, vec![Value::string("Invalid color"), Value::string("#00")]);
+            }
+            other => panic!("unexpected flow: {other:?}"),
+        }
+
+        let invalid_type = builtin_color_distance(vec![Value::Int(1), Value::string("#fff")])
+            .expect_err("color-distance should signal invalid color for non-string args");
+        match invalid_type {
+            Flow::Signal(sig) => {
+                assert_eq!(sig.symbol, "error");
+                assert_eq!(sig.data, vec![Value::string("Invalid color"), Value::Int(1)]);
+            }
+            other => panic!("unexpected flow: {other:?}"),
+        }
+
+        let frame_err =
+            builtin_color_distance(vec![Value::string("#000"), Value::string("#fff"), Value::True])
+                .expect_err("color-distance should validate optional FRAME");
+        match frame_err {
+            Flow::Signal(sig) => {
+                assert_eq!(sig.symbol, "wrong-type-argument");
+                assert_eq!(sig.data, vec![Value::symbol("frame-live-p"), Value::True]);
             }
             other => panic!("unexpected flow: {other:?}"),
         }

@@ -6101,7 +6101,7 @@ pub(crate) fn builtin_buffer_local_value(
 // ===========================================================================
 // Keymap builtins
 // ===========================================================================
-use super::keymap::{decode_keymap_handle, encode_keymap_handle, KeyBinding, KeyEvent};
+use super::keymap::{decode_keymap_handle, encode_keymap_handle, KeyBinding, KeyEvent, KeymapManager};
 
 /// Extract a keymap id from a Value, signaling wrong-type-argument if invalid.
 fn expect_keymap_id(eval: &super::eval::Evaluator, value: &Value) -> Result<u64, Flow> {
@@ -6153,6 +6153,134 @@ fn value_to_key_binding(eval: &super::eval::Evaluator, value: &Value) -> KeyBind
         }
         other => KeyBinding::LispValue(other.clone()),
     }
+}
+
+fn key_event_to_value(event: &KeyEvent) -> Value {
+    match event {
+        KeyEvent::Char {
+            code,
+            ctrl,
+            meta,
+            shift,
+            super_,
+        } if !ctrl && !meta && !shift && !super_ => Value::Int(*code as i64),
+        _ => Value::symbol(KeymapManager::format_key_event(event)),
+    }
+}
+
+fn key_sequence_to_value(seq: &[KeyEvent]) -> Value {
+    Value::vector(seq.iter().map(key_event_to_value).collect())
+}
+
+fn collect_accessible_keymap_paths(
+    eval: &super::eval::Evaluator,
+    map_id: u64,
+    prefix: &mut Vec<KeyEvent>,
+    out: &mut Vec<Value>,
+    seen: &mut HashSet<u64>,
+    filter: Option<&[KeyEvent]>,
+) {
+    let include_current = match filter {
+        None => true,
+        Some(filter_seq) => filter_seq.is_empty() || prefix.starts_with(filter_seq),
+    };
+    let should_descend = match filter {
+        None => true,
+        Some(filter_seq) => {
+            filter_seq.is_empty()
+                || filter_seq.starts_with(prefix.as_slice())
+                || prefix.starts_with(filter_seq)
+        }
+    };
+    if !should_descend {
+        return;
+    }
+
+    if include_current {
+        out.push(Value::cons(
+            key_sequence_to_value(prefix),
+            Value::Int(encode_keymap_handle(map_id)),
+        ));
+    }
+
+    if !seen.insert(map_id) {
+        return;
+    }
+
+    let Some(map) = eval.keymaps.get(map_id) else {
+        return;
+    };
+    let mut prefixes: Vec<(String, KeyEvent, u64)> = map
+        .bindings
+        .iter()
+        .filter_map(|(event, binding)| match binding {
+            KeyBinding::Prefix(child_id) => {
+                Some((KeymapManager::format_key_event(event), event.clone(), *child_id))
+            }
+            _ => None,
+        })
+        .collect();
+    prefixes.sort_by(|a, b| a.0.cmp(&b.0));
+
+    for (_, event, child_id) in prefixes {
+        prefix.push(event);
+        collect_accessible_keymap_paths(eval, child_id, prefix, out, seen, filter);
+        prefix.pop();
+    }
+}
+
+/// `(accessible-keymaps KEYMAP &optional PREFIXES)` -> list of accessible keymaps.
+fn builtin_accessible_keymaps(eval: &mut super::eval::Evaluator, args: Vec<Value>) -> EvalResult {
+    expect_min_args("accessible-keymaps", &args, 1)?;
+    expect_max_args("accessible-keymaps", &args, 2)?;
+    let map_id = expect_keymap_id(eval, &args[0])?;
+
+    let filter = match args.get(1) {
+        None | Some(Value::Nil) => None,
+        Some(value) if value.is_vector() => {
+            let is_empty = match value {
+                Value::Vector(vec) => vec.lock().expect("poisoned").is_empty(),
+                _ => false,
+            };
+            if is_empty {
+                Some(Vec::new())
+            } else {
+                Some(expect_key_description(value)?)
+            }
+        }
+        Some(value @ Value::Str(s)) => {
+            if s.is_empty() {
+                Some(Vec::new())
+            } else {
+                Some(expect_key_description(value)?)
+            }
+        }
+        Some(value) if value.is_list() => {
+            return Err(signal(
+                "wrong-type-argument",
+                vec![Value::symbol("arrayp"), value.clone()],
+            ))
+        }
+        Some(value) => {
+            return Err(signal(
+                "wrong-type-argument",
+                vec![Value::symbol("sequencep"), value.clone()],
+            ))
+        }
+    };
+
+    let mut out = Vec::new();
+    let mut prefix = Vec::new();
+    let mut seen = HashSet::new();
+    collect_accessible_keymap_paths(
+        eval,
+        map_id,
+        &mut prefix,
+        &mut out,
+        &mut seen,
+        filter.as_deref(),
+    );
+    Ok(Value::list(out))
 }
 
 /// Parse a key description from a Value (must be a string).
@@ -8057,6 +8185,7 @@ pub(crate) fn dispatch_builtin(
         "keymap-parent" => return Some(builtin_keymap_parent(eval, args)),
         "set-keymap-parent" => return Some(builtin_set_keymap_parent(eval, args)),
         "keymapp" => return Some(builtin_keymapp(eval, args)),
+        "accessible-keymaps" => return Some(builtin_accessible_keymaps(eval, args)),
         // Process operations (evaluator-dependent)
         "backquote-delay-process" => {
             return Some(super::process::builtin_backquote_delay_process(eval, args))
@@ -8441,6 +8570,9 @@ pub(crate) fn dispatch_builtin(
         "put-text-property" => return Some(super::textprop::builtin_put_text_property(eval, args)),
         "get-text-property" => return Some(super::textprop::builtin_get_text_property(eval, args)),
         "get-char-property" => return Some(super::textprop::builtin_get_char_property(eval, args)),
+        "add-face-text-property" => {
+            return Some(super::textprop::builtin_add_face_text_property(eval, args))
+        }
         "add-text-properties" => {
             return Some(super::textprop::builtin_add_text_properties(eval, args))
         }
@@ -9332,6 +9464,12 @@ pub(crate) fn dispatch_builtin(
                 args,
             ))
         }
+        "coding-system-plist" => {
+            return Some(super::coding::builtin_coding_system_plist(
+                &eval.coding_systems,
+                args,
+            ))
+        }
         "coding-system-put" => {
             return Some(super::coding::builtin_coding_system_put(
                 &mut eval.coding_systems,
@@ -9985,6 +10123,7 @@ pub(crate) fn dispatch_builtin(
         "color-defined-p" => super::font::builtin_color_defined_p(args),
         "color-gray-p" => super::font::builtin_color_gray_p(args),
         "color-supported-p" => super::font::builtin_color_supported_p(args),
+        "color-distance" => super::font::builtin_color_distance(args),
         "color-values" => super::font::builtin_color_values(args),
         "color-values-from-color-spec" => super::font::builtin_color_values_from_color_spec(args),
         "defined-colors" => super::font::builtin_defined_colors(args),
@@ -10021,6 +10160,10 @@ pub(crate) fn dispatch_builtin(
         "lookup-image-map" => super::xdisp::builtin_lookup_image_map(args),
         "current-bidi-paragraph-direction" => {
             super::xdisp::builtin_current_bidi_paragraph_direction(args)
+        }
+        "bidi-resolved-levels" => super::xdisp::builtin_bidi_resolved_levels(args),
+        "bidi-find-overridden-directionality" => {
+            super::xdisp::builtin_bidi_find_overridden_directionality(args)
         }
         "move-to-window-line" => super::xdisp::builtin_move_to_window_line(args),
         "tool-bar-height" => super::xdisp::builtin_tool_bar_height(args),
@@ -11539,6 +11682,87 @@ mod tests {
             builtin_keymapp(&mut eval, vec![Value::Int(999_999)]).unwrap(),
             Value::Nil
         );
+    }
+
+    #[test]
+    fn accessible_keymaps_reports_root_and_prefix_paths() {
+        let mut eval = super::super::eval::Evaluator::new();
+        let root = builtin_make_sparse_keymap(&mut eval, vec![]).unwrap();
+        let child = builtin_make_sparse_keymap(&mut eval, vec![]).unwrap();
+        builtin_define_key(
+            &mut eval,
+            vec![root.clone(), Value::string("C-x"), child.clone()],
+        )
+        .unwrap();
+
+        let all = builtin_accessible_keymaps(&mut eval, vec![root.clone()]).unwrap();
+        let all_items = list_to_vec(&all).expect("accessible-keymaps should return list");
+        assert_eq!(all_items.len(), 2);
+
+        let first = match &all_items[0] {
+            Value::Cons(cell) => cell.lock().expect("poisoned").clone(),
+            other => panic!("expected cons cell, got {other:?}"),
+        };
+        assert_eq!(first.car, Value::vector(vec![]));
+        assert_eq!(
+            builtin_keymapp(&mut eval, vec![first.cdr.clone()]).unwrap(),
+            Value::True
+        );
+
+        let filtered = builtin_accessible_keymaps(
+            &mut eval,
+            vec![root.clone(), Value::vector(vec![Value::Int(24)])],
+        )
+        .unwrap();
+        let filtered_items = list_to_vec(&filtered).expect("filtered accessible-keymaps list");
+        assert_eq!(filtered_items.len(), 1);
+        let only = match &filtered_items[0] {
+            Value::Cons(cell) => cell.lock().expect("poisoned").clone(),
+            other => panic!("expected cons cell, got {other:?}"),
+        };
+        assert_eq!(only.car, Value::vector(vec![Value::Int(24)]));
+
+        let no_match = builtin_accessible_keymaps(
+            &mut eval,
+            vec![root, Value::vector(vec![Value::Int(97)])],
+        )
+        .unwrap();
+        assert!(no_match.is_nil());
+    }
+
+    #[test]
+    fn accessible_keymaps_prefix_type_errors_match_oracle_shape() {
+        let mut eval = super::super::eval::Evaluator::new();
+        let map = builtin_make_sparse_keymap(&mut eval, vec![]).unwrap();
+
+        let sequence_err =
+            builtin_accessible_keymaps(&mut eval, vec![map.clone(), Value::True]).unwrap_err();
+        match sequence_err {
+            Flow::Signal(sig) => {
+                assert_eq!(sig.symbol, "wrong-type-argument");
+                assert_eq!(sig.data, vec![Value::symbol("sequencep"), Value::True]);
+            }
+            other => panic!("unexpected flow: {other:?}"),
+        }
+
+        let array_err = builtin_accessible_keymaps(
+            &mut eval,
+            vec![map, Value::list(vec![Value::symbol("a")])],
+        )
+        .unwrap_err();
+        match array_err {
+            Flow::Signal(sig) => {
+                assert_eq!(sig.symbol, "wrong-type-argument");
+                assert_eq!(
+                    sig.data,
+                    vec![
+                        Value::symbol("arrayp"),
+                        Value::list(vec![Value::symbol("a")])
+                    ]
+                );
+            }
+            other => panic!("unexpected flow: {other:?}"),
+        }
     }
 
     #[test]

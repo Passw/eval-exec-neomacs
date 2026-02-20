@@ -290,6 +290,44 @@ pub(crate) fn builtin_current_bidi_paragraph_direction(args: Vec<Value>) -> Eval
     Ok(Value::symbol("left-to-right"))
 }
 
+/// `(bidi-resolved-levels &optional PARAGRAPH-DIRECTION)` -> nil
+///
+/// Batch compatibility: this currently returns nil and only enforces the
+/// `fixnump` argument contract when PARAGRAPH-DIRECTION is non-nil.
+pub(crate) fn builtin_bidi_resolved_levels(args: Vec<Value>) -> EvalResult {
+    expect_args_range("bidi-resolved-levels", &args, 0, 1)?;
+    if let Some(direction) = args.first() {
+        if !direction.is_nil() {
+            expect_fixnum_arg("fixnump", direction)?;
+        }
+    }
+    Ok(Value::Nil)
+}
+
+/// `(bidi-find-overridden-directionality STRING/START END/START STRING/END
+/// &optional DIRECTION)` -> nil
+///
+/// Batch compatibility mirrors oracle argument guards:
+/// - when arg3 is a string, this path accepts arg1/arg2 without additional
+///   type checks and returns nil;
+/// - when arg3 is nil, arg1 and arg2 must satisfy `integer-or-marker-p`.
+pub(crate) fn builtin_bidi_find_overridden_directionality(args: Vec<Value>) -> EvalResult {
+    expect_args_range("bidi-find-overridden-directionality", &args, 3, 4)?;
+    let third = &args[2];
+    if third.is_nil() {
+        expect_integer_or_marker(&args[0])?;
+        expect_integer_or_marker(&args[1])?;
+        return Ok(Value::Nil);
+    }
+    if !matches!(third, Value::Str(_)) {
+        return Err(signal(
+            "wrong-type-argument",
+            vec![Value::symbol("stringp"), third.clone()],
+        ));
+    }
+    Ok(Value::Nil)
+}
+
 /// (move-to-window-line ARG) -> integer or nil
 ///
 /// Batch semantics: in non-window contexts this command errors with the
@@ -791,6 +829,84 @@ mod tests {
     }
 
     #[test]
+    fn test_bidi_resolved_levels() {
+        assert!(builtin_bidi_resolved_levels(vec![]).unwrap().is_nil());
+        assert!(builtin_bidi_resolved_levels(vec![Value::Nil]).unwrap().is_nil());
+        assert!(builtin_bidi_resolved_levels(vec![Value::Int(0)]).unwrap().is_nil());
+
+        let err = builtin_bidi_resolved_levels(vec![Value::True]).unwrap_err();
+        match err {
+            Flow::Signal(sig) => {
+                assert_eq!(sig.symbol, "wrong-type-argument");
+                assert_eq!(sig.data, vec![Value::symbol("fixnump"), Value::True]);
+            }
+            other => panic!("expected wrong-type-argument, got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn test_bidi_find_overridden_directionality() {
+        assert!(
+            builtin_bidi_find_overridden_directionality(vec![
+                Value::string("abc"),
+                Value::Int(0),
+                Value::string("x"),
+            ])
+            .unwrap()
+            .is_nil()
+        );
+        assert!(
+            builtin_bidi_find_overridden_directionality(vec![
+                Value::Nil,
+                Value::Int(0),
+                Value::string("x"),
+            ])
+            .unwrap()
+            .is_nil()
+        );
+        assert!(
+            builtin_bidi_find_overridden_directionality(vec![
+                Value::Int(1),
+                Value::Int(2),
+                Value::Nil,
+            ])
+            .unwrap()
+            .is_nil()
+        );
+
+        let third_arg_err = builtin_bidi_find_overridden_directionality(vec![
+            Value::string("abc"),
+            Value::Int(0),
+            Value::Int(3),
+        ])
+        .unwrap_err();
+        match third_arg_err {
+            Flow::Signal(sig) => {
+                assert_eq!(sig.symbol, "wrong-type-argument");
+                assert_eq!(sig.data, vec![Value::symbol("stringp"), Value::Int(3)]);
+            }
+            other => panic!("expected wrong-type-argument, got {:?}", other),
+        }
+
+        let region_arg_err = builtin_bidi_find_overridden_directionality(vec![
+            Value::Nil,
+            Value::Int(2),
+            Value::Nil,
+        ])
+        .unwrap_err();
+        match region_arg_err {
+            Flow::Signal(sig) => {
+                assert_eq!(sig.symbol, "wrong-type-argument");
+                assert_eq!(
+                    sig.data,
+                    vec![Value::symbol("integer-or-marker-p"), Value::Nil]
+                );
+            }
+            other => panic!("expected wrong-type-argument, got {:?}", other),
+        }
+    }
+
+    #[test]
     fn test_move_to_window_line() {
         for arg in [Value::Int(1), Value::Int(0), Value::symbol("left")] {
             let err = builtin_move_to_window_line(vec![arg]).unwrap_err();
@@ -799,7 +915,9 @@ mod tests {
                     assert_eq!(sig.symbol, "error");
                     assert_eq!(
                         sig.data,
-                        vec![Value::string("move-to-window-line called from unrelated buffer")]
+                        vec![Value::string(
+                            "move-to-window-line called from unrelated buffer"
+                        )]
                     );
                 }
                 other => panic!("expected error signal, got {:?}", other),

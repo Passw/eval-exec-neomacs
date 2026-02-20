@@ -508,6 +508,7 @@ fn subr_arity_value(name: &str) -> Value {
         }
         "add-hook" => arity_cons(2, Some(4)),
         "add-name-to-file" => arity_cons(2, Some(3)),
+        "add-face-text-property" => arity_cons(3, Some(5)),
         "add-text-properties" => arity_cons(3, Some(4)),
         "put-text-property" | "text-property-any" => arity_cons(4, Some(5)),
         "remove-text-properties" | "move-overlay" => arity_cons(3, Some(4)),
@@ -820,6 +821,7 @@ fn subr_arity_value(name: &str) -> Value {
         "kbd" | "key-valid-p" | "keymap-parent" | "keymapp" | "listify-key-sequence" => {
             arity_cons(1, Some(1))
         }
+        "accessible-keymaps" => arity_cons(1, Some(2)),
         "global-key-binding" | "local-key-binding" | "key-description" => arity_cons(1, Some(2)),
         "lookup-key" => arity_cons(2, Some(3)),
         "global-set-key" | "local-set-key" => arity_cons(2, Some(2)),
@@ -828,7 +830,8 @@ fn subr_arity_value(name: &str) -> Value {
         "keyboard-coding-system" => arity_cons(0, Some(1)),
         "keyboard-quit" => arity_cons(0, Some(0)),
         "make-keymap" | "make-sparse-keymap" => arity_cons(0, Some(1)),
-        "current-bidi-paragraph-direction" => arity_cons(0, Some(1)),
+        "current-bidi-paragraph-direction" | "bidi-resolved-levels" => arity_cons(0, Some(1)),
+        "bidi-find-overridden-directionality" => arity_cons(3, Some(4)),
         "current-case-table"
         | "current-column"
         | "current-global-map"
@@ -920,9 +923,11 @@ fn subr_arity_value(name: &str) -> Value {
         | "coding-system-change-text-conversion"
         | "coding-system-get" => arity_cons(2, Some(2)),
         "check-coding-systems-region" => arity_cons(3, Some(3)),
+        "coding-system-plist" => arity_cons(1, Some(1)),
         "coding-system-put" => arity_cons(3, Some(3)),
         "coding-system-list" | "coding-system-priority-list" => arity_cons(0, Some(1)),
         "defined-colors" => arity_cons(0, Some(1)),
+        "color-distance" => arity_cons(2, Some(4)),
         "color-defined-p" | "color-values" => arity_cons(1, Some(2)),
         "color-gray-p" => arity_cons(1, Some(2)),
         "color-supported-p" => arity_cons(1, Some(3)),
@@ -2081,6 +2086,7 @@ mod tests {
 
     #[test]
     fn subr_arity_hook_advice_primitives_match_oracle() {
+        assert_subr_arity("add-face-text-property", 3, Some(5));
         assert_subr_arity("add-hook", 2, Some(4));
         assert_subr_arity("add-name-to-file", 2, Some(3));
         assert_subr_arity("add-text-properties", 3, Some(4));
@@ -2303,6 +2309,7 @@ mod tests {
         assert_subr_arity("local-set-key", 2, Some(2));
         assert_subr_arity("keymap-parent", 1, Some(1));
         assert_subr_arity("keymapp", 1, Some(1));
+        assert_subr_arity("accessible-keymaps", 1, Some(2));
         assert_subr_arity("keyboard-coding-system", 0, Some(1));
         assert_subr_arity("keyboard-quit", 0, Some(0));
         assert_subr_arity("listify-key-sequence", 1, Some(1));
@@ -2437,6 +2444,7 @@ mod tests {
         assert_subr_arity("coding-system-get", 2, Some(2));
         assert_subr_arity("coding-system-list", 0, Some(1));
         assert_subr_arity("coding-system-p", 1, Some(1));
+        assert_subr_arity("coding-system-plist", 1, Some(1));
         assert_subr_arity("coding-system-priority-list", 0, Some(1));
         assert_subr_arity("coding-system-put", 3, Some(3));
         assert_subr_arity("coding-system-type", 1, Some(1));
@@ -2445,6 +2453,7 @@ mod tests {
     #[test]
     fn subr_arity_color_primitives_match_oracle() {
         assert_subr_arity("defined-colors", 0, Some(1));
+        assert_subr_arity("color-distance", 2, Some(4));
         assert_subr_arity("color-defined-p", 1, Some(2));
         assert_subr_arity("color-gray-p", 1, Some(2));
         assert_subr_arity("color-supported-p", 1, Some(3));
@@ -2472,6 +2481,8 @@ mod tests {
         assert_subr_arity("byteorder", 0, Some(0));
         assert_subr_arity("clear-buffer-auto-save-failure", 0, Some(0));
         assert_subr_arity("cl-type-of", 1, Some(1));
+        assert_subr_arity("bidi-find-overridden-directionality", 3, Some(4));
+        assert_subr_arity("bidi-resolved-levels", 0, Some(1));
         assert_subr_arity("current-bidi-paragraph-direction", 0, Some(1));
         assert_subr_arity("current-case-table", 0, Some(0));
         assert_subr_arity("current-column", 0, Some(0));

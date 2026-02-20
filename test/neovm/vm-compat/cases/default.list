@@ -799,3 +799,4 @@ cases/thread-last-error-semantics
 cases/thread-last-error-clear-flag
 cases/condition-variable-mutex-ownership
 cases/condition-variable-name-mutex-semantics
+cases/keymap-coding-textprop-bidi-color-semantics

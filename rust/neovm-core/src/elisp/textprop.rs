@@ -55,6 +55,17 @@ fn expect_int(value: &Value) -> Result<i64, Flow> {
     }
 }
 
+fn expect_integer_or_marker(value: &Value) -> Result<i64, Flow> {
+    match value {
+        Value::Int(n) => Ok(*n),
+        Value::Char(c) => Ok(*c as i64),
+        other => Err(signal(
+            "wrong-type-argument",
+            vec![Value::symbol("integer-or-marker-p"), other.clone()],
+        )),
+    }
+}
+
 /// Extract a symbol name (for property names).
 fn expect_symbol_name(value: &Value) -> Result<String, Flow> {
     match value.as_symbol_name() {
@@ -226,6 +237,67 @@ pub(crate) fn builtin_add_text_properties(
     }
     // In Emacs, returns t if any property was actually changed; we simplify.
     Ok(Value::True)
+}
+
+fn merge_face_property(existing: Option<Value>, new_face: Value, append: bool) -> Value {
+    let Some(existing_value) = existing else {
+        return new_face;
+    };
+    if existing_value.is_nil() {
+        return new_face;
+    }
+
+    if let Some(mut items) = list_to_vec(&existing_value) {
+        if append {
+            items.push(new_face);
+        } else {
+            items.insert(0, new_face);
+        }
+        Value::list(items)
+    } else if append {
+        Value::list(vec![existing_value, new_face])
+    } else {
+        Value::list(vec![new_face, existing_value])
+    }
+}
+
+/// `(add-face-text-property START END FACE &optional APPENDP OBJECT)`
+pub(crate) fn builtin_add_face_text_property(
+    eval: &mut super::eval::Evaluator,
+    args: Vec<Value>,
+) -> EvalResult {
+    expect_min_args("add-face-text-property", &args, 3)?;
+    expect_max_args("add-face-text-property", &args, 5)?;
+    let beg = expect_integer_or_marker(&args[0])?;
+    let end = expect_integer_or_marker(&args[1])?;
+    let new_face = args[2].clone();
+    let append = args.get(3).is_some_and(Value::is_truthy);
+
+    let object = args.get(4);
+    let buf_id = match object {
+        None | Some(Value::Nil) => eval
+            .buffers
+            .current_buffer()
+            .map(|b| b.id)
+            .ok_or_else(|| signal("error", vec![Value::string("No current buffer")])),
+        Some(Value::Buffer(id)) => Ok(*id),
+        Some(Value::Str(_)) => return Ok(Value::Nil),
+        Some(other) => Err(signal(
+            "wrong-type-argument",
+            vec![Value::symbol("buffer-or-string-p"), other.clone()],
+        )),
+    }?;
+
+    let buf = eval
+        .buffers
+        .get_mut(buf_id)
+        .ok_or_else(|| signal("error", vec![Value::string("Buffer does not exist")]))?;
+    let byte_beg = elisp_pos_to_byte(buf, beg);
+    let byte_end = elisp_pos_to_byte(buf, end);
+    let existing = buf.text_props.get_property(byte_beg, "face").cloned();
+    let merged = merge_face_property(existing, new_face, append);
+    buf.text_props.put_property(byte_beg, byte_end, "face", merged);
+    Ok(Value::Nil)
 }
 
 /// (remove-text-properties BEG END PROPS &optional OBJECT)
@@ -935,6 +1007,134 @@ mod tests {
         let result =
             builtin_add_text_properties(&mut eval, vec![Value::Int(1), Value::Int(3), props]);
         assert!(result.is_err());
+    }
+
+    #[test]
+    fn add_face_text_property_basic_and_merge_order() {
+        let mut eval = eval_with_text("abc");
+        builtin_add_face_text_property(
+            &mut eval,
+            vec![Value::Int(1), Value::Int(3), Value::symbol("bold")],
+        )
+        .unwrap();
+        let face =
+            builtin_get_text_property(&mut eval, vec![Value::Int(2), Value::symbol("face")])
+                .unwrap();
+        assert_eq!(face, Value::symbol("bold"));
+
+        let mut eval = eval_with_text("abc");
+        builtin_put_text_property(
+            &mut eval,
+            vec![
+                Value::Int(1),
+                Value::Int(2),
+                Value::symbol("face"),
+                Value::symbol("italic"),
+            ],
+        )
+        .unwrap();
+        builtin_add_face_text_property(
+            &mut eval,
+            vec![
+                Value::Int(1),
+                Value::Int(2),
+                Value::symbol("bold"),
+                Value::True,
+            ],
+        )
+        .unwrap();
+        let appended =
+            builtin_get_text_property(&mut eval, vec![Value::Int(1), Value::symbol("face")])
+                .unwrap();
+        assert_eq!(
+            appended,
+            Value::list(vec![Value::symbol("italic"), Value::symbol("bold")])
+        );
+
+        let mut eval = eval_with_text("abc");
+        builtin_put_text_property(
+            &mut eval,
+            vec![
+                Value::Int(1),
+                Value::Int(2),
+                Value::symbol("face"),
+                Value::symbol("italic"),
+            ],
+        )
+        .unwrap();
+        builtin_add_face_text_property(
+            &mut eval,
+            vec![
+                Value::Int(1),
+                Value::Int(2),
+                Value::symbol("bold"),
+                Value::Nil,
+            ],
+        )
+        .unwrap();
+        let prepended =
+            builtin_get_text_property(&mut eval, vec![Value::Int(1), Value::symbol("face")])
+                .unwrap();
+        assert_eq!(
+            prepended,
+            Value::list(vec![Value::symbol("bold"), Value::symbol("italic")])
+        );
+    }
+
+    #[test]
+    fn add_face_text_property_argument_contracts() {
+        let mut eval = eval_with_text("abc");
+
+        let begin_err = builtin_add_face_text_property(
+            &mut eval,
+            vec![Value::string("1"), Value::Int(2), Value::symbol("bold")],
+        )
+        .unwrap_err();
+        match begin_err {
+            Flow::Signal(sig) => {
+                assert_eq!(sig.symbol, "wrong-type-argument");
+                assert_eq!(
+                    sig.data,
+                    vec![Value::symbol("integer-or-marker-p"), Value::string("1")]
+                );
+            }
+            other => panic!("unexpected flow: {other:?}"),
+        }
+
+        let object_err = builtin_add_face_text_property(
+            &mut eval,
+            vec![
+                Value::Int(1),
+                Value::Int(2),
+                Value::symbol("bold"),
+                Value::Nil,
+                Value::True,
+            ],
+        )
+        .unwrap_err();
+        match object_err {
+            Flow::Signal(sig) => {
+                assert_eq!(sig.symbol, "wrong-type-argument");
+                assert_eq!(
+                    sig.data,
+                    vec![Value::symbol("buffer-or-string-p"), Value::True]
+                );
+            }
+            other => panic!("unexpected flow: {other:?}"),
+        }
+
+        let string_obj = builtin_add_face_text_property(
+            &mut eval,
+            vec![
+                Value::Int(1),
+                Value::Int(2),
+                Value::symbol("bold"),
+                Value::Nil,
+                Value::string("abc"),
+            ],
+        )
+        .unwrap();
+        assert!(string_obj.is_nil());
     }
 
     // -----------------------------------------------------------------------
