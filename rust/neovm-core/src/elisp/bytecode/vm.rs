@@ -8,6 +8,7 @@ use crate::buffer::BufferManager;
 use crate::elisp::builtins;
 use crate::elisp::error::*;
 use crate::elisp::regex::MatchData;
+use crate::elisp::string_escape::{storage_char_len, storage_substring};
 use crate::elisp::symbol::Obarray;
 use crate::elisp::value::*;
 
@@ -576,13 +577,8 @@ impl<'a> Vm<'a> {
                 Op::Substring => {
                     let to = stack.pop().unwrap_or(Value::Nil);
                     let from = stack.pop().unwrap_or(Value::Int(0));
-                    let string = stack.pop().unwrap_or(Value::Nil);
-                    let args = if to.is_nil() {
-                        vec![string, from]
-                    } else {
-                        vec![string, from, to]
-                    };
-                    let result = self.dispatch_vm_builtin("substring", args)?;
+                    let array = stack.pop().unwrap_or(Value::Nil);
+                    let result = substring_value(&array, &from, &to)?;
                     stack.push(result);
                 }
                 Op::StringEqual => {
@@ -620,55 +616,38 @@ impl<'a> Vm<'a> {
                 // -- Symbol operations --
                 Op::SymbolValue => {
                     let sym = stack.pop().unwrap_or(Value::Nil);
-                    let name = sym.as_symbol_name().unwrap_or("nil");
-                    match self.obarray.symbol_value(name) {
-                        Some(val) => stack.push(val.clone()),
-                        None => return Err(signal("void-variable", vec![sym])),
-                    }
+                    let result = self.dispatch_vm_builtin("symbol-value", vec![sym])?;
+                    stack.push(result);
                 }
                 Op::SymbolFunction => {
                     let sym = stack.pop().unwrap_or(Value::Nil);
-                    let name = sym.as_symbol_name().unwrap_or("nil");
-                    match self.obarray.symbol_function(name) {
-                        Some(val) => stack.push(val.clone()),
-                        None => return Err(signal("void-function", vec![sym])),
-                    }
+                    let result = self.dispatch_vm_builtin("symbol-function", vec![sym])?;
+                    stack.push(result);
                 }
                 Op::Set => {
                     let val = stack.pop().unwrap_or(Value::Nil);
                     let sym = stack.pop().unwrap_or(Value::Nil);
-                    let name = sym.as_symbol_name().unwrap_or("nil").to_string();
-                    self.obarray.set_symbol_value(&name, val.clone());
-                    stack.push(val);
+                    let result = self.dispatch_vm_builtin("set", vec![sym, val])?;
+                    stack.push(result);
                 }
                 Op::Fset => {
                     let val = stack.pop().unwrap_or(Value::Nil);
                     let sym = stack.pop().unwrap_or(Value::Nil);
-                    let name = sym.as_symbol_name().unwrap_or("nil").to_string();
-                    self.obarray.set_symbol_function(&name, val.clone());
-                    stack.push(val);
+                    let result = self.dispatch_vm_builtin("fset", vec![sym, val])?;
+                    stack.push(result);
                 }
                 Op::Get => {
                     let prop = stack.pop().unwrap_or(Value::Nil);
                     let sym = stack.pop().unwrap_or(Value::Nil);
-                    let sym_name = sym.as_symbol_name().unwrap_or("nil");
-                    let prop_name = prop.as_symbol_name().unwrap_or("nil");
-                    let val = self
-                        .obarray
-                        .get_property(sym_name, prop_name)
-                        .cloned()
-                        .unwrap_or(Value::Nil);
-                    stack.push(val);
+                    let result = self.dispatch_vm_builtin("get", vec![sym, prop])?;
+                    stack.push(result);
                 }
                 Op::Put => {
                     let val = stack.pop().unwrap_or(Value::Nil);
                     let prop = stack.pop().unwrap_or(Value::Nil);
                     let sym = stack.pop().unwrap_or(Value::Nil);
-                    let sym_name = sym.as_symbol_name().unwrap_or("nil").to_string();
-                    let prop_name = prop.as_symbol_name().unwrap_or("nil").to_string();
-                    self.obarray
-                        .put_property(&sym_name, &prop_name, val.clone());
-                    stack.push(val);
+                    let result = self.dispatch_vm_builtin("put", vec![sym, prop, val])?;
+                    stack.push(result);
                 }
 
                 // -- Error handling --
@@ -1406,11 +1385,98 @@ fn length_value(val: &Value) -> EvalResult {
         Value::Nil => Ok(Value::Int(0)),
         Value::Str(s) => Ok(Value::Int(s.chars().count() as i64)),
         Value::Vector(v) => Ok(Value::Int(v.lock().expect("poisoned").len() as i64)),
-        Value::Cons(_) => Ok(Value::Int(list_to_vec(val).map_or(0, |v| v.len()) as i64)),
+        Value::Cons(_) => {
+            let mut len: i64 = 0;
+            let mut cursor = val.clone();
+            loop {
+                match cursor {
+                    Value::Cons(cell) => {
+                        len += 1;
+                        cursor = cell.lock().expect("poisoned").cdr.clone();
+                    }
+                    Value::Nil => return Ok(Value::Int(len)),
+                    tail => {
+                        return Err(signal(
+                            "wrong-type-argument",
+                            vec![Value::symbol("listp"), tail],
+                        ))
+                    }
+                }
+            }
+        }
         _ => Err(signal(
             "wrong-type-argument",
             vec![Value::symbol("sequencep"), val.clone()],
         )),
+    }
+}
+
+fn substring_value(array: &Value, from: &Value, to: &Value) -> EvalResult {
+    let len = match array {
+        Value::Str(s) => storage_char_len(s) as i64,
+        Value::Vector(v) => v.lock().expect("poisoned").len() as i64,
+        _ => {
+            return Err(signal(
+                "wrong-type-argument",
+                vec![Value::symbol("arrayp"), array.clone()],
+            ))
+        }
+    };
+
+    let normalize_index = |value: &Value, default: i64| -> Result<i64, Flow> {
+        let raw = if value.is_nil() {
+            default
+        } else {
+            match value {
+                Value::Int(i) => *i,
+                _ => {
+                    return Err(signal(
+                        "wrong-type-argument",
+                        vec![Value::symbol("integerp"), value.clone()],
+                    ))
+                }
+            }
+        };
+        let idx = if raw < 0 { len + raw } else { raw };
+        if idx < 0 || idx > len {
+            return Err(signal(
+                "args-out-of-range",
+                vec![array.clone(), from.clone(), to.clone()],
+            ));
+        }
+        Ok(idx)
+    };
+
+    let start = normalize_index(from, 0)? as usize;
+    let end = normalize_index(to, len)? as usize;
+    if start > end {
+        return Err(signal(
+            "args-out-of-range",
+            vec![array.clone(), from.clone(), to.clone()],
+        ));
+    }
+
+    match array {
+        Value::Str(s) => {
+            let result = storage_substring(s, start, end).ok_or_else(|| {
+                signal(
+                    "args-out-of-range",
+                    vec![array.clone(), from.clone(), to.clone()],
+                )
+            })?;
+            Ok(Value::string(result))
+        }
+        Value::Vector(v) => {
+            let data = v.lock().expect("poisoned");
+            if end > data.len() {
+                return Err(signal(
+                    "args-out-of-range",
+                    vec![array.clone(), from.clone(), to.clone()],
+                ));
+            }
+            Ok(Value::vector(data[start..end].to_vec()))
+        }
+        _ => unreachable!(),
     }
 }
 
@@ -1721,6 +1787,46 @@ mod tests {
         }
     }
 
+    #[cfg(feature = "legacy-elc-literal")]
+    #[test]
+    fn vm_substring_array_semantics_match_oracle() {
+        let vector_slice = vm_eval(
+            "(funcall
+               (car (read-from-string \"#[(x y z) \\\"\\\\10\\\\11\\\\12\\\\117\\\\207\\\" [x y z] 3]\"))
+               [1 2 3] 1 nil)",
+        )
+        .expect("substring opcode should slice vectors");
+        assert_eq!(vector_slice, Value::vector(vec![Value::Int(2), Value::Int(3)]));
+
+        let array_type_err = vm_eval(
+            "(funcall
+               (car (read-from-string \"#[(x y z) \\\"\\\\10\\\\11\\\\12\\\\117\\\\207\\\" [x y z] 3]\"))
+               1 0 nil)",
+        )
+        .expect_err("substring opcode must require array");
+        match array_type_err {
+            EvalError::Signal { symbol, data } => {
+                assert_eq!(symbol, "wrong-type-argument");
+                assert_eq!(data, vec![Value::symbol("arrayp"), Value::Int(1)]);
+            }
+            other => panic!("unexpected error: {other:?}"),
+        }
+
+        let index_type_err = vm_eval(
+            "(funcall
+               (car (read-from-string \"#[(x y z) \\\"\\\\10\\\\11\\\\12\\\\117\\\\207\\\" [x y z] 3]\"))
+               \"abcd\" 'a nil)",
+        )
+        .expect_err("substring opcode must type-check index");
+        match index_type_err {
+            EvalError::Signal { symbol, data } => {
+                assert_eq!(symbol, "wrong-type-argument");
+                assert_eq!(data, vec![Value::symbol("integerp"), Value::symbol("a")]);
+            }
+            other => panic!("unexpected error: {other:?}"),
+        }
+    }
+
     #[test]
     fn vm_list_lookup_type_errors_match_oracle() {
         let nth_int_err = vm_eval("(nth 'a '(1 2 3))").expect_err("nth must type-check index");
@@ -1774,6 +1880,78 @@ mod tests {
             EvalError::Signal { symbol, data } => {
                 assert_eq!(symbol, "wrong-type-argument");
                 assert_eq!(data, vec![Value::symbol("listp"), Value::Int(1)]);
+            }
+            other => panic!("unexpected error: {other:?}"),
+        }
+    }
+
+    #[test]
+    fn vm_length_and_symbol_access_type_errors_match_oracle() {
+        let dotted_length_err =
+            vm_eval("(length '(1 . 2))").expect_err("length must reject dotted lists");
+        match dotted_length_err {
+            EvalError::Signal { symbol, data } => {
+                assert_eq!(symbol, "wrong-type-argument");
+                assert_eq!(data, vec![Value::symbol("listp"), Value::Int(2)]);
+            }
+            other => panic!("unexpected error: {other:?}"),
+        }
+
+        let symbol_value_err =
+            vm_eval("(symbol-value 1)").expect_err("symbol-value must type-check symbols");
+        match symbol_value_err {
+            EvalError::Signal { symbol, data } => {
+                assert_eq!(symbol, "wrong-type-argument");
+                assert_eq!(data, vec![Value::symbol("symbolp"), Value::Int(1)]);
+            }
+            other => panic!("unexpected error: {other:?}"),
+        }
+
+        let symbol_function_err =
+            vm_eval("(symbol-function 1)").expect_err("symbol-function must type-check symbols");
+        match symbol_function_err {
+            EvalError::Signal { symbol, data } => {
+                assert_eq!(symbol, "wrong-type-argument");
+                assert_eq!(data, vec![Value::symbol("symbolp"), Value::Int(1)]);
+            }
+            other => panic!("unexpected error: {other:?}"),
+        }
+    }
+
+    #[test]
+    fn vm_symbol_mutator_type_errors_match_oracle() {
+        let set_err = vm_eval("(set 1 2)").expect_err("set must type-check symbols");
+        match set_err {
+            EvalError::Signal { symbol, data } => {
+                assert_eq!(symbol, "wrong-type-argument");
+                assert_eq!(data, vec![Value::symbol("symbolp"), Value::Int(1)]);
+            }
+            other => panic!("unexpected error: {other:?}"),
+        }
+
+        let fset_err = vm_eval("(fset 1 2)").expect_err("fset must type-check symbols");
+        match fset_err {
+            EvalError::Signal { symbol, data } => {
+                assert_eq!(symbol, "wrong-type-argument");
+                assert_eq!(data, vec![Value::symbol("symbolp"), Value::Int(1)]);
+            }
+            other => panic!("unexpected error: {other:?}"),
+        }
+
+        let get_err = vm_eval("(get 1 'p)").expect_err("get must type-check symbols");
+        match get_err {
+            EvalError::Signal { symbol, data } => {
+                assert_eq!(symbol, "wrong-type-argument");
+                assert_eq!(data, vec![Value::symbol("symbolp"), Value::Int(1)]);
+            }
+            other => panic!("unexpected error: {other:?}"),
+        }
+
+        let put_err = vm_eval("(put 1 'p 2)").expect_err("put must type-check first argument");
+        match put_err {
+            EvalError::Signal { symbol, data } => {
+                assert_eq!(symbol, "wrong-type-argument");
+                assert_eq!(data, vec![Value::symbol("symbolp"), Value::Int(1)]);
             }
             other => panic!("unexpected error: {other:?}"),
         }

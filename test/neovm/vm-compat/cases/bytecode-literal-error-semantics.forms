@@ -66,6 +66,34 @@
   (error err))
 
 (condition-case err
+    (funcall (car (read-from-string "#[(x) \"\\10\\107\\207\" [x] 1]")) '(1 . 2))
+  (error err))
+
+(condition-case err
+    (funcall (car (read-from-string "#[nil \"\\300\\112\\207\" [1] 1]")))
+  (error err))
+
+(condition-case err
+    (funcall (car (read-from-string "#[nil \"\\300\\113\\207\" [1] 1]")))
+  (error err))
+
+(condition-case err
+    (funcall (car (read-from-string "#[(x y) \"\\10\\11\\114\\207\" [x y] 2]")) 1 2)
+  (error err))
+
+(condition-case err
+    (funcall (car (read-from-string "#[(x y) \"\\10\\11\\115\\207\" [x y] 2]")) 1 2)
+  (error err))
+
+(condition-case err
+    (funcall (car (read-from-string "#[(x y) \"\\10\\11\\116\\207\" [x y] 2]")) 1 'p)
+  (error err))
+
+(condition-case err
+    (funcall (car (read-from-string "#[(x y z) \"\\10\\11\\12\\117\\207\" [x y z] 3]")) 1 'p 2)
+  (error err))
+
+(condition-case err
     (funcall (car (read-from-string "#[nil \"\\300\\40\\207\" [vm-compat-bytecode-missing] 1]")))
   (error err))
 
