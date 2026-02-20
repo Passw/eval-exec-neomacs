@@ -628,6 +628,31 @@ fn subr_arity_value(name: &str) -> Value {
         "internal-set-lisp-face-attribute-from-resource" => arity_cons(3, Some(4)),
         "internal-stack-stats" => arity_cons(0, Some(0)),
         "internal-subr-documentation" => arity_cons(1, Some(1)),
+        "malloc-info" => arity_cons(0, Some(0)),
+        "malloc-trim" => arity_cons(0, Some(1)),
+        "memory-info" => arity_cons(0, Some(0)),
+        "module-load" => arity_cons(1, Some(1)),
+        "native-comp-available-p" => arity_cons(0, Some(0)),
+        "native-comp-unit-file" => arity_cons(1, Some(1)),
+        "native-comp-unit-set-file" => arity_cons(2, Some(2)),
+        "native-elisp-load" => arity_cons(1, Some(2)),
+        "pdumper-stats" => arity_cons(0, Some(0)),
+        "profiler-cpu-log" => arity_cons(0, Some(0)),
+        "profiler-cpu-running-p" => arity_cons(0, Some(0)),
+        "profiler-cpu-start" => arity_cons(1, Some(1)),
+        "profiler-cpu-stop" => arity_cons(0, Some(0)),
+        "profiler-memory-log" => arity_cons(0, Some(0)),
+        "profiler-memory-running-p" => arity_cons(0, Some(0)),
+        "profiler-memory-start" => arity_cons(0, Some(0)),
+        "profiler-memory-stop" => arity_cons(0, Some(0)),
+        "record" => arity_cons(1, None),
+        "recordp" => arity_cons(1, Some(1)),
+        "subr-native-comp-unit" => arity_cons(1, Some(1)),
+        "subr-native-lambda-list" => arity_cons(1, Some(1)),
+        "subr-type" => arity_cons(1, Some(1)),
+        "tty--output-buffer-size" => arity_cons(0, Some(1)),
+        "tty--set-output-buffer-size" => arity_cons(1, Some(2)),
+        "tty-suppress-bold-inverse-default-colors" => arity_cons(1, Some(1)),
         "merge-face-attribute" => arity_cons(3, Some(3)),
         "put-image" => arity_cons(2, Some(4)),
         "insert-image" => arity_cons(1, Some(5)),
@@ -2848,6 +2873,31 @@ mod tests {
         assert_subr_arity("internal-set-lisp-face-attribute-from-resource", 3, Some(4));
         assert_subr_arity("internal-stack-stats", 0, Some(0));
         assert_subr_arity("internal-subr-documentation", 1, Some(1));
+        assert_subr_arity("malloc-info", 0, Some(0));
+        assert_subr_arity("malloc-trim", 0, Some(1));
+        assert_subr_arity("memory-info", 0, Some(0));
+        assert_subr_arity("module-load", 1, Some(1));
+        assert_subr_arity("native-comp-available-p", 0, Some(0));
+        assert_subr_arity("native-comp-unit-file", 1, Some(1));
+        assert_subr_arity("native-comp-unit-set-file", 2, Some(2));
+        assert_subr_arity("native-elisp-load", 1, Some(2));
+        assert_subr_arity("pdumper-stats", 0, Some(0));
+        assert_subr_arity("profiler-cpu-log", 0, Some(0));
+        assert_subr_arity("profiler-cpu-running-p", 0, Some(0));
+        assert_subr_arity("profiler-cpu-start", 1, Some(1));
+        assert_subr_arity("profiler-cpu-stop", 0, Some(0));
+        assert_subr_arity("profiler-memory-log", 0, Some(0));
+        assert_subr_arity("profiler-memory-running-p", 0, Some(0));
+        assert_subr_arity("profiler-memory-start", 0, Some(0));
+        assert_subr_arity("profiler-memory-stop", 0, Some(0));
+        assert_subr_arity("record", 1, None);
+        assert_subr_arity("recordp", 1, Some(1));
+        assert_subr_arity("subr-native-comp-unit", 1, Some(1));
+        assert_subr_arity("subr-native-lambda-list", 1, Some(1));
+        assert_subr_arity("subr-type", 1, Some(1));
+        assert_subr_arity("tty--output-buffer-size", 0, Some(1));
+        assert_subr_arity("tty--set-output-buffer-size", 1, Some(2));
+        assert_subr_arity("tty-suppress-bold-inverse-default-colors", 1, Some(1));
         assert_subr_arity("get-unicode-property-internal", 2, Some(2));
         assert_subr_arity("get-variable-watchers", 1, Some(1));
         assert_subr_arity("fillarray", 2, Some(2));

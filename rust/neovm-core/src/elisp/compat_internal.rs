@@ -1573,6 +1573,161 @@ pub(crate) fn builtin_internal_subr_documentation(args: Vec<Value>) -> EvalResul
     Ok(Value::Nil)
 }
 
+/// `(malloc-info)` -> nil.
+pub(crate) fn builtin_malloc_info(args: Vec<Value>) -> EvalResult {
+    expect_args("malloc-info", &args, 0)?;
+    Ok(Value::Nil)
+}
+
+/// `(malloc-trim &optional LEAVE-PADDING)` -> nil.
+pub(crate) fn builtin_malloc_trim(args: Vec<Value>) -> EvalResult {
+    expect_range_args("malloc-trim", &args, 0, 1)?;
+    Ok(Value::Nil)
+}
+
+/// `(memory-info)` -> nil.
+pub(crate) fn builtin_memory_info(args: Vec<Value>) -> EvalResult {
+    expect_args("memory-info", &args, 0)?;
+    Ok(Value::Nil)
+}
+
+/// `(module-load FILE)` -> nil.
+pub(crate) fn builtin_module_load(args: Vec<Value>) -> EvalResult {
+    expect_args("module-load", &args, 1)?;
+    Ok(Value::Nil)
+}
+
+/// `(native-comp-available-p)` -> nil.
+pub(crate) fn builtin_native_comp_available_p(args: Vec<Value>) -> EvalResult {
+    expect_args("native-comp-available-p", &args, 0)?;
+    Ok(Value::Nil)
+}
+
+/// `(native-comp-unit-file SUBR)` -> nil.
+pub(crate) fn builtin_native_comp_unit_file(args: Vec<Value>) -> EvalResult {
+    expect_args("native-comp-unit-file", &args, 1)?;
+    Ok(Value::Nil)
+}
+
+/// `(native-comp-unit-set-file SUBR FILE)` -> nil.
+pub(crate) fn builtin_native_comp_unit_set_file(args: Vec<Value>) -> EvalResult {
+    expect_args("native-comp-unit-set-file", &args, 2)?;
+    Ok(Value::Nil)
+}
+
+/// `(native-elisp-load FILE &optional NOERROR)` -> nil.
+pub(crate) fn builtin_native_elisp_load(args: Vec<Value>) -> EvalResult {
+    expect_range_args("native-elisp-load", &args, 1, 2)?;
+    Ok(Value::Nil)
+}
+
+/// `(pdumper-stats)` -> nil.
+pub(crate) fn builtin_pdumper_stats(args: Vec<Value>) -> EvalResult {
+    expect_args("pdumper-stats", &args, 0)?;
+    Ok(Value::Nil)
+}
+
+/// `(profiler-cpu-log)` -> nil.
+pub(crate) fn builtin_profiler_cpu_log(args: Vec<Value>) -> EvalResult {
+    expect_args("profiler-cpu-log", &args, 0)?;
+    Ok(Value::Nil)
+}
+
+/// `(profiler-cpu-running-p)` -> nil.
+pub(crate) fn builtin_profiler_cpu_running_p(args: Vec<Value>) -> EvalResult {
+    expect_args("profiler-cpu-running-p", &args, 0)?;
+    Ok(Value::Nil)
+}
+
+/// `(profiler-cpu-start SAMPLING-INTERVAL)` -> nil.
+pub(crate) fn builtin_profiler_cpu_start(args: Vec<Value>) -> EvalResult {
+    expect_args("profiler-cpu-start", &args, 1)?;
+    Ok(Value::Nil)
+}
+
+/// `(profiler-cpu-stop)` -> nil.
+pub(crate) fn builtin_profiler_cpu_stop(args: Vec<Value>) -> EvalResult {
+    expect_args("profiler-cpu-stop", &args, 0)?;
+    Ok(Value::Nil)
+}
+
+/// `(profiler-memory-log)` -> nil.
+pub(crate) fn builtin_profiler_memory_log(args: Vec<Value>) -> EvalResult {
+    expect_args("profiler-memory-log", &args, 0)?;
+    Ok(Value::Nil)
+}
+
+/// `(profiler-memory-running-p)` -> nil.
+pub(crate) fn builtin_profiler_memory_running_p(args: Vec<Value>) -> EvalResult {
+    expect_args("profiler-memory-running-p", &args, 0)?;
+    Ok(Value::Nil)
+}
+
+/// `(profiler-memory-start)` -> nil.
+pub(crate) fn builtin_profiler_memory_start(args: Vec<Value>) -> EvalResult {
+    expect_args("profiler-memory-start", &args, 0)?;
+    Ok(Value::Nil)
+}
+
+/// `(profiler-memory-stop)` -> nil.
+pub(crate) fn builtin_profiler_memory_stop(args: Vec<Value>) -> EvalResult {
+    expect_args("profiler-memory-stop", &args, 0)?;
+    Ok(Value::Nil)
+}
+
+/// `(record &rest SLOTS)` -> nil.
+pub(crate) fn builtin_record(args: Vec<Value>) -> EvalResult {
+    if args.is_empty() {
+        return Err(signal(
+            "wrong-number-of-arguments",
+            vec![Value::symbol("record"), Value::Int(0)],
+        ));
+    }
+    Ok(Value::Nil)
+}
+
+/// `(recordp OBJECT)` -> nil.
+pub(crate) fn builtin_recordp(args: Vec<Value>) -> EvalResult {
+    expect_args("recordp", &args, 1)?;
+    Ok(Value::Nil)
+}
+
+/// `(subr-native-comp-unit SUBR)` -> nil.
+pub(crate) fn builtin_subr_native_comp_unit(args: Vec<Value>) -> EvalResult {
+    expect_args("subr-native-comp-unit", &args, 1)?;
+    Ok(Value::Nil)
+}
+
+/// `(subr-native-lambda-list SUBR)` -> nil.
+pub(crate) fn builtin_subr_native_lambda_list(args: Vec<Value>) -> EvalResult {
+    expect_args("subr-native-lambda-list", &args, 1)?;
+    Ok(Value::Nil)
+}
+
+/// `(subr-type SUBR)` -> nil.
+pub(crate) fn builtin_subr_type(args: Vec<Value>) -> EvalResult {
+    expect_args("subr-type", &args, 1)?;
+    Ok(Value::Nil)
+}
+
+/// `(tty--output-buffer-size &optional TERMINAL)` -> 0.
+pub(crate) fn builtin_tty_output_buffer_size(args: Vec<Value>) -> EvalResult {
+    expect_range_args("tty--output-buffer-size", &args, 0, 1)?;
+    Ok(Value::Int(0))
+}
+
+/// `(tty--set-output-buffer-size SIZE &optional TERMINAL)` -> nil.
+pub(crate) fn builtin_tty_set_output_buffer_size(args: Vec<Value>) -> EvalResult {
+    expect_range_args("tty--set-output-buffer-size", &args, 1, 2)?;
+    Ok(Value::Nil)
+}
+
+/// `(tty-suppress-bold-inverse-default-colors TERMINAL)` -> nil.
+pub(crate) fn builtin_tty_suppress_bold_inverse_default_colors(args: Vec<Value>) -> EvalResult {
+    expect_args("tty-suppress-bold-inverse-default-colors", &args, 1)?;
+    Ok(Value::Nil)
+}
+
 /// `(treesit-available-p)` -> nil.
 pub(crate) fn builtin_treesit_available_p(args: Vec<Value>) -> EvalResult {
     expect_args("treesit-available-p", &args, 0)?;
