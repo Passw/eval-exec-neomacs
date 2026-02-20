@@ -10212,11 +10212,23 @@ pub(crate) fn dispatch_builtin(
         "add-text-properties" => {
             return Some(super::textprop::builtin_add_text_properties(eval, args))
         }
+        "set-text-properties" => {
+            return Some(super::textprop::builtin_set_text_properties(eval, args))
+        }
         "remove-text-properties" => {
             return Some(super::textprop::builtin_remove_text_properties(eval, args))
         }
+        "remove-list-of-text-properties" => {
+            return Some(super::textprop::builtin_remove_list_of_text_properties(eval, args))
+        }
         "text-properties-at" => {
             return Some(super::textprop::builtin_text_properties_at(eval, args))
+        }
+        "get-char-property-and-overlay" => {
+            return Some(super::textprop::builtin_get_char_property_and_overlay(eval, args))
+        }
+        "get-display-property" => {
+            return Some(super::textprop::builtin_get_display_property(eval, args))
         }
         "next-single-property-change" => {
             return Some(super::textprop::builtin_next_single_property_change(
@@ -10243,6 +10255,13 @@ pub(crate) fn dispatch_builtin(
             return Some(builtin_previous_char_property_change(eval, args))
         }
         "text-property-any" => return Some(super::textprop::builtin_text_property_any(eval, args)),
+        "text-property-not-all" => {
+            return Some(super::textprop::builtin_text_property_not_all(eval, args))
+        }
+        "next-overlay-change" => return Some(super::textprop::builtin_next_overlay_change(eval, args)),
+        "previous-overlay-change" => {
+            return Some(super::textprop::builtin_previous_overlay_change(eval, args))
+        }
         "make-overlay" => return Some(super::textprop::builtin_make_overlay(eval, args)),
         "delete-overlay" => return Some(super::textprop::builtin_delete_overlay(eval, args)),
         "overlay-put" => return Some(super::textprop::builtin_overlay_put(eval, args)),

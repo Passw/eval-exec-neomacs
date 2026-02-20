@@ -542,10 +542,16 @@ fn subr_arity_value(name: &str) -> Value {
         "add-hook" => arity_cons(2, Some(4)),
         "add-name-to-file" => arity_cons(2, Some(3)),
         "add-face-text-property" => arity_cons(3, Some(5)),
-        "add-text-properties" => arity_cons(3, Some(4)),
-        "put-text-property" | "text-property-any" => arity_cons(4, Some(5)),
-        "remove-text-properties" | "move-overlay" => arity_cons(3, Some(4)),
+        "add-text-properties" | "set-text-properties" => arity_cons(3, Some(4)),
+        "put-text-property" | "text-property-any" | "text-property-not-all" => {
+            arity_cons(4, Some(5))
+        }
+        "remove-text-properties" | "remove-list-of-text-properties" | "move-overlay" => {
+            arity_cons(3, Some(4))
+        }
         "get-text-property" | "get-char-property" | "get-pos-property" => arity_cons(2, Some(3)),
+        "get-char-property-and-overlay" => arity_cons(2, Some(3)),
+        "get-display-property" => arity_cons(2, Some(4)),
         "text-properties-at" | "overlays-at" => arity_cons(1, Some(2)),
         "next-single-property-change"
         | "next-single-char-property-change"
@@ -560,6 +566,7 @@ fn subr_arity_value(name: &str) -> Value {
         "overlay-start" | "overlay-end" | "overlay-buffer" | "overlay-properties" | "overlayp" => {
             arity_cons(1, Some(1))
         }
+        "next-overlay-change" | "previous-overlay-change" => arity_cons(1, Some(1)),
         "remove-overlays" => arity_cons(0, Some(4)),
         "primitive-undo" => arity_cons(2, Some(2)),
         "prin1" | "prin1-to-string" => arity_cons(1, Some(3)),
@@ -2258,9 +2265,13 @@ mod tests {
     #[test]
     fn subr_arity_text_property_overlay_primitives_match_oracle() {
         assert_subr_arity("put-text-property", 4, Some(5));
+        assert_subr_arity("set-text-properties", 3, Some(4));
         assert_subr_arity("remove-text-properties", 3, Some(4));
+        assert_subr_arity("remove-list-of-text-properties", 3, Some(4));
         assert_subr_arity("get-text-property", 2, Some(3));
         assert_subr_arity("get-char-property", 2, Some(3));
+        assert_subr_arity("get-char-property-and-overlay", 2, Some(3));
+        assert_subr_arity("get-display-property", 2, Some(4));
         assert_subr_arity("get-pos-property", 2, Some(3));
         assert_subr_arity("text-properties-at", 1, Some(2));
         assert_subr_arity("next-single-property-change", 2, Some(4));
@@ -2272,10 +2283,13 @@ mod tests {
         assert_subr_arity("next-char-property-change", 1, Some(2));
         assert_subr_arity("previous-char-property-change", 1, Some(2));
         assert_subr_arity("text-property-any", 4, Some(5));
+        assert_subr_arity("text-property-not-all", 4, Some(5));
         assert_subr_arity("make-overlay", 2, Some(5));
         assert_subr_arity("move-overlay", 3, Some(4));
         assert_subr_arity("overlay-put", 3, Some(3));
         assert_subr_arity("overlay-get", 2, Some(2));
+        assert_subr_arity("next-overlay-change", 1, Some(1));
+        assert_subr_arity("previous-overlay-change", 1, Some(1));
         assert_subr_arity("overlay-start", 1, Some(1));
         assert_subr_arity("overlay-end", 1, Some(1));
         assert_subr_arity("overlay-buffer", 1, Some(1));
