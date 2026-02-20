@@ -17856,6 +17856,33 @@ Last updated: 2026-02-19
     - `make -C test/neovm/vm-compat report-oracle-builtin-coverage` (pass)
     - `make -C test/neovm/vm-compat compat-progress` (pass)
 
+- Refined oracle builtin coverage reporting to runtime-first primitive coverage:
+  - vm-compat changes:
+    - `test/neovm/vm-compat/report-oracle-builtin-coverage.sh`
+      - switched default universe from broad startup surface to primitive builtin surface:
+        - default mode: `primitive-subr` (`subr-primitive-p` and not special forms)
+      - added selectable universe modes:
+        - `primitive-subr`
+        - `primitive-any`
+        - `subr-or-special`
+      - added NeoVM runtime coverage by evaluating `fboundp` for the full oracle builtin universe.
+      - now reports:
+        - registry coverage against oracle builtin universe
+        - runtime coverage against oracle builtin universe
+        - runtime-covered oracle builtins not currently present in registry
+    - `test/neovm/vm-compat/compat-progress.sh`
+      - includes mode + both registry/runtime coverage percentages in `compat-progress`.
+    - `test/neovm/vm-compat/README.md`
+      - updated coverage semantics, runtime+registry framing, and mode-selection docs.
+  - snapshot (`primitive-subr`):
+    - oracle builtin universe entries: `1434`
+    - registry coverage: `809` covered / `625` missing (`56.4%`)
+    - runtime coverage: `857` covered / `577` missing (`59.8%`)
+    - runtime-covered oracle builtins outside registry: `48`
+  - verified:
+    - `make -C test/neovm/vm-compat report-oracle-builtin-coverage` (pass)
+    - `make -C test/neovm/vm-compat compat-progress` (pass)
+
 - Continue compatibility-first maintenance with small commit slices:
   - keep builtin surface and registry in lock-step
   - run oracle/parity checks after each behavior-affecting change

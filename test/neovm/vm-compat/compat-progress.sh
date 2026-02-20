@@ -209,10 +209,15 @@ string_extra_count="$(awk -F': ' '/extra startup string-docs:/ { print $2 }' "$t
 startup_doc_property_summary="$(awk -F': ' '/startup variable-documentation property-count summary:/ { print $2 }' "$tmp_startup_variable_doc_count_check" | head -n 1)"
 startup_doc_runtime_resolution_summary="$(awk -F': ' '/startup variable-documentation runtime-resolution summary:/ { print $2 }' "$tmp_startup_variable_doc_count_check" | head -n 1)"
 oracle_builtin_total="$(awk -F': ' '/^oracle builtin universe entries:/ { print $2 }' "$tmp_oracle_builtin_coverage" | head -n 1)"
+oracle_builtin_mode="$(awk -F': ' '/^oracle builtin universe mode:/ { print $2 }' "$tmp_oracle_builtin_coverage" | head -n 1)"
 oracle_builtin_covered="$(awk -F': ' '/^oracle builtin names covered by registry:/ { print $2 }' "$tmp_oracle_builtin_coverage" | head -n 1)"
 oracle_builtin_missing="$(awk -F': ' '/^oracle builtin names missing from registry:/ { print $2 }' "$tmp_oracle_builtin_coverage" | head -n 1)"
 oracle_builtin_registry_extra="$(awk -F': ' '/^registry names outside oracle builtin universe:/ { print $2 }' "$tmp_oracle_builtin_coverage" | head -n 1)"
 oracle_builtin_coverage_percent="$(awk -v covered="${oracle_builtin_covered:-0}" -v total="${oracle_builtin_total:-0}" 'BEGIN { if (total == 0) { printf "0.0" } else { printf "%.1f", (covered * 100.0) / total } }')"
+oracle_builtin_runtime_covered="$(awk -F': ' '/^neovm runtime covered oracle builtin names:/ { print $2 }' "$tmp_oracle_builtin_coverage" | head -n 1)"
+oracle_builtin_runtime_missing="$(awk -F': ' '/^oracle builtin names missing in neovm runtime:/ { print $2 }' "$tmp_oracle_builtin_coverage" | head -n 1)"
+oracle_builtin_runtime_outside_registry="$(awk -F': ' '/^neovm runtime covered oracle builtins outside registry:/ { print $2 }' "$tmp_oracle_builtin_coverage" | head -n 1)"
+oracle_builtin_runtime_coverage_percent="$(awk -v covered="${oracle_builtin_runtime_covered:-0}" -v total="${oracle_builtin_total:-0}" 'BEGIN { if (total == 0) { printf "0.0" } else { printf "%.1f", (covered * 100.0) / total } }')"
 printf '  startup integer docs (oracle/startup/missing/extra): %s/%s/%s/%s\n' \
   "${stub_oracle_count:-0}" "${stub_startup_count:-0}" "${stub_missing_count:-0}" "${stub_extra_count:-0}"
 printf '  startup string docs (oracle/startup/missing/extra): %s/%s/%s/%s\n' \
@@ -248,9 +253,13 @@ printf '  total dispatch entries: %s\n' "$all_builtins"
 printf '  core-compat entries: %s\n' "$core_builtins"
 printf '  neovm extension entries: %s\n' "$extension_builtins"
 printf '  oracle builtin universe entries: %s\n' "${oracle_builtin_total:-0}"
-printf '  oracle builtin coverage (covered/missing): %s/%s (%s%%)\n' \
+printf '  oracle builtin universe mode: %s\n' "${oracle_builtin_mode:-primitive-subr}"
+printf '  oracle builtin registry coverage (covered/missing): %s/%s (%s%%)\n' \
   "${oracle_builtin_covered:-0}" "${oracle_builtin_missing:-0}" "$oracle_builtin_coverage_percent"
+printf '  oracle builtin runtime coverage (covered/missing): %s/%s (%s%%)\n' \
+  "${oracle_builtin_runtime_covered:-0}" "${oracle_builtin_runtime_missing:-0}" "$oracle_builtin_runtime_coverage_percent"
 printf '  registry names outside oracle builtin universe: %s\n' "${oracle_builtin_registry_extra:-0}"
+printf '  runtime-covered oracle builtins outside registry: %s\n' "${oracle_builtin_runtime_outside_registry:-0}"
 printf '  allowed fboundp drifts: %s\n' "$allowlisted"
 printf '  fboundp current drifts: %s\n' "${fboundp_drift:-0}"
 printf '  fboundp stale allowlist entries: %s\n' "${fboundp_stale:-0}"

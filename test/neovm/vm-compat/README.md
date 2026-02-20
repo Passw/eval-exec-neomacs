@@ -21,7 +21,7 @@ results against that baseline once evaluator execution is wired in.
 - `check-startup-doc-stub-coverage.sh`: checks startup integer-doc symbol coverage of `STARTUP_VARIABLE_DOC_STUBS`
 - `check-startup-doc-string-coverage.sh`: checks startup string-doc symbol coverage of `STARTUP_VARIABLE_DOC_STRING_PROPERTIES`
 - `check-startup-variable-documentation-counts.sh`: checks startup `variable-documentation` property-count and runtime-resolution count parity (oracle vs NeoVM)
-- `report-oracle-builtin-coverage.sh`: reports oracle builtin universe size and current coverage by `builtin_registry.rs` core names
+- `report-oracle-builtin-coverage.sh`: reports oracle builtin universe size (default: primitive subrs) and current coverage by both NeoVM runtime and `builtin_registry.rs` core names
 - `cases/startup-doc-stub-extra-allowlist.txt`: allowlisted startup doc stubs intentionally beyond oracle integer-doc set
 - `bench-load-cache.sh`: runs cold/warm/post-edit `.neoc` load benchmark reporting via `load_cache_bench`
 - `cases/default.list`: default `check-all-neovm` corpus order (one case per line)
@@ -100,20 +100,26 @@ cd test/neovm/vm-compat
 make list-cases
 ```
 
-Get a compact status snapshot (case counts + explicit stub count + startup doc coverage + startup variable-doc property/runtime-resolution count parity + builtin registry counts + oracle builtin coverage + allowlist size):
+Get a compact status snapshot (case counts + explicit stub count + startup doc coverage + startup variable-doc property/runtime-resolution count parity + builtin registry counts + oracle builtin coverage (registry + runtime) + allowlist size):
 
 ```bash
 cd test/neovm/vm-compat
 make compat-progress
 ```
 
-Report oracle builtin universe coverage directly (including a first-page preview
-of currently missing builtin names):
+Report oracle builtin universe coverage directly (including first-page previews
+for registry and runtime gaps):
 
 ```bash
 cd test/neovm/vm-compat
 make report-oracle-builtin-coverage
 ```
+
+Select the oracle builtin universe mode when needed:
+
+- `ORACLE_BUILTIN_UNIVERSE=primitive-subr` (default): primitive subrs only (`subr-primitive-p` and not special forms)
+- `ORACLE_BUILTIN_UNIVERSE=primitive-any`: primitive subrs + primitive special forms
+- `ORACLE_BUILTIN_UNIVERSE=subr-or-special`: broad startup surface (`subr` or `special-form`)
 
 List explicit comment-annotated function stubs in the Rust Elisp modules
 for quick daily progress tracking:
