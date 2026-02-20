@@ -1754,6 +1754,21 @@ impl Evaluator {
                     return;
                 }
                 let mut guard = table.lock().expect("poisoned");
+                let old_ptr = match from {
+                    Value::Str(value) => Some(std::sync::Arc::as_ptr(value) as usize),
+                    _ => None,
+                };
+                let new_ptr = match to {
+                    Value::Str(value) => Some(std::sync::Arc::as_ptr(value) as usize),
+                    _ => None,
+                };
+                if matches!(guard.test, HashTableTest::Eq | HashTableTest::Eql) {
+                    if let (Some(old_ptr), Some(new_ptr)) = (old_ptr, new_ptr) {
+                        if let Some(existing) = guard.data.remove(&HashKey::Ptr(old_ptr)) {
+                            guard.data.insert(HashKey::Ptr(new_ptr), existing);
+                        }
+                    }
+                }
                 for item in guard.data.values_mut() {
                     Self::replace_alias_refs_in_value(item, from, to, visited);
                 }
@@ -5369,5 +5384,38 @@ mod tests {
             "(let* ((s (copy-sequence \"abc\")) (cell (cons s nil))) (fillarray s ?y) (car cell))",
         );
         assert_eq!(result, r#"OK "yyy""#);
+    }
+
+    #[test]
+    fn fillarray_string_writeback_preserves_eq_hash_key_lookup() {
+        let result = eval_one(
+            "(let* ((s (copy-sequence \"abc\")) (ht (make-hash-table :test 'eq)))
+               (puthash s 'v ht)
+               (fillarray s ?x)
+               (gethash s ht))",
+        );
+        assert_eq!(result, "OK v");
+    }
+
+    #[test]
+    fn fillarray_string_writeback_preserves_eql_hash_key_lookup() {
+        let result = eval_one(
+            "(let* ((s (copy-sequence \"abc\")) (ht (make-hash-table :test 'eql)))
+               (puthash s 'v ht)
+               (fillarray s ?y)
+               (gethash s ht))",
+        );
+        assert_eq!(result, "OK v");
+    }
+
+    #[test]
+    fn fillarray_string_writeback_equal_hash_key_lookup_stays_nil() {
+        let result = eval_one(
+            "(let* ((s (copy-sequence \"abc\")) (ht (make-hash-table :test 'equal)))
+               (puthash s 'v ht)
+               (fillarray s ?z)
+               (gethash s ht))",
+        );
+        assert_eq!(result, "OK nil");
     }
 }
