@@ -29,7 +29,7 @@ ERT_ALLOWLIST ?= cases/ert-allowlist-smoke.txt
 ERT_EXPECTED ?= cases/ert-allowlist-smoke.expected.tsv
 ERT_LOAD_FILES ?= cases/ert-allowlist-fixtures/smoke-tests.el
 
-.PHONY: oracle neovm record check compare check-neovm record-all check-all check-all-neovm check-all-neovm-only check-all-neovm-strict check-legacy-elc-neovm check-introspection-neovm check-thread-neovm check-startup-doc-neovm check-runner-feature-stamp check-builtin-registry-all check-builtin-registry-sync check-builtin-registry-fboundp check-builtin-registry-function-cell check-builtin-registry-func-arity check-builtin-registry-autoload-metadata check-builtin-registry-function-kind check-builtin-registry-commandp check-builtin-registry-extension-policy check-oracle-default-path check-case-line-filter check-tracked-lists check-list-integrity list-cases record-list check-list check-neovm-list check-one-neovm validate-case-lists case-inventory ert-oracle record-ert-allowlist check-ert-allowlist bench-load-cache compat-progress report-oracle-builtin-coverage compat-stub-index compat-stub-index-json check-stub-budget check-startup-doc-stub-coverage check-startup-doc-string-coverage check-startup-variable-documentation-counts show-function-kind-drifts
+.PHONY: oracle neovm record check compare check-neovm record-all check-all check-all-neovm check-all-neovm-only check-all-neovm-strict check-legacy-elc-neovm check-introspection-neovm check-thread-neovm check-startup-doc-neovm check-runner-feature-stamp check-builtin-registry-all check-builtin-registry-sync check-builtin-registry-fboundp check-builtin-registry-function-cell check-builtin-registry-func-arity check-builtin-registry-autoload-metadata check-builtin-registry-function-kind check-builtin-registry-commandp check-builtin-registry-primitive-any-coverage check-builtin-registry-extension-policy check-oracle-default-path check-case-line-filter check-tracked-lists check-list-integrity list-cases record-list check-list check-neovm-list check-one-neovm validate-case-lists case-inventory ert-oracle record-ert-allowlist check-ert-allowlist bench-load-cache compat-progress report-oracle-builtin-coverage compat-stub-index compat-stub-index-json check-stub-budget check-startup-doc-stub-coverage check-startup-doc-string-coverage check-startup-variable-documentation-counts show-function-kind-drifts
 
 oracle:
 	./run-oracle.sh $(FORMS)
@@ -166,6 +166,7 @@ check-builtin-registry-all:
 	$(MAKE) --no-print-directory check-builtin-registry-autoload-metadata; \
 	$(MAKE) --no-print-directory check-builtin-registry-function-kind; \
 	$(MAKE) --no-print-directory check-builtin-registry-commandp; \
+	$(MAKE) --no-print-directory check-builtin-registry-primitive-any-coverage; \
 	$(MAKE) --no-print-directory check-builtin-registry-extension-policy
 
 check-builtin-registry-sync:
@@ -191,6 +192,9 @@ show-function-kind-drifts:
 
 check-builtin-registry-commandp:
 	./check-builtin-registry-commandp.sh
+
+check-builtin-registry-primitive-any-coverage:
+	./check-builtin-registry-primitive-any-coverage.sh
 
 check-builtin-registry-extension-policy:
 	./check-builtin-registry-extension-policy.sh

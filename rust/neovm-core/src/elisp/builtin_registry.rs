@@ -1782,6 +1782,29 @@ const DISPATCH_BUILTIN_NAMES: &[&str] = &[
     "split-window-internal",
     "suspend-emacs",
     "vertical-motion",
+    // Runtime-covered primitive core special forms tracked for registry parity.
+    "and",
+    "catch",
+    "cond",
+    "condition-case",
+    "defconst",
+    "defvar",
+    "function",
+    "if",
+    "inline",
+    "interactive",
+    "let",
+    "let*",
+    "or",
+    "prog1",
+    "progn",
+    "quote",
+    "save-current-buffer",
+    "save-excursion",
+    "save-restriction",
+    "setq",
+    "unwind-protect",
+    "while",
     // Runtime-covered primitive core builtins tracked for registry parity.
     "aref",
     "arrayp",
@@ -1857,6 +1880,10 @@ mod tests {
         assert!(is_dispatch_builtin_name("load"));
         assert!(is_dispatch_builtin_name("symbol-value"));
         assert!(is_dispatch_builtin_name("+"));
+        assert!(is_dispatch_builtin_name("if"));
+        assert!(is_dispatch_builtin_name("let"));
+        assert!(is_dispatch_builtin_name("setq"));
+        assert!(is_dispatch_builtin_name("unwind-protect"));
         assert!(is_dispatch_builtin_name("read-key"));
         assert!(is_dispatch_builtin_name("read-char-exclusive"));
         assert!(is_dispatch_builtin_name("input-pending-p"));

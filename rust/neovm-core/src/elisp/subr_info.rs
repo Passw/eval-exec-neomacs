@@ -286,6 +286,10 @@ fn arity_cons(min: usize, max: Option<usize>) -> Value {
     Value::cons(min_val, max_val)
 }
 
+fn arity_unevalled(min: usize) -> Value {
+    Value::cons(Value::Int(min as i64), Value::symbol("unevalled"))
+}
+
 fn is_cxr_subr_name(name: &str) -> bool {
     let Some(inner) = name.strip_prefix('c').and_then(|s| s.strip_suffix('r')) else {
         return false;
@@ -443,9 +447,7 @@ fn subr_arity_value(name: &str) -> Value {
         "char-table-extra-slot"
         | "char-table-range"
         | "define-charset-alias"
-        | "get-unused-iso-final-char" => {
-            arity_cons(2, Some(2))
-        }
+        | "get-unused-iso-final-char" => arity_cons(2, Some(2)),
         "declare-equiv-charset" => arity_cons(4, Some(4)),
         "decode-char" => arity_cons(2, Some(2)),
         "fceiling" | "ffloor" | "frexp" | "fround" | "framep" | "ftruncate" | "fixnump" => {
@@ -959,12 +961,7 @@ fn subr_arity_value(name: &str) -> Value {
         "widget-put" => arity_cons(3, Some(3)),
         "widget-apply" => arity_cons(2, None),
         "where-is-internal" => arity_cons(1, Some(5)),
-        "text-char-description"
-        | "threadp"
-        | "y-or-n-p"
-        | "yes-or-no-p"
-        | "zerop"
-        | "logcount" => {
+        "text-char-description" | "threadp" | "y-or-n-p" | "yes-or-no-p" | "zerop" | "logcount" => {
             arity_cons(1, Some(1))
         }
         "syntax-ppss" => arity_cons(0, Some(1)),
@@ -991,9 +988,11 @@ fn subr_arity_value(name: &str) -> Value {
         "remove" | "remove-variable-watcher" | "narrow-to-region" => arity_cons(2, Some(2)),
         "remove-images" => arity_cons(2, Some(3)),
         "replace-regexp" | "replace-string" => arity_cons(2, Some(7)),
-        "save-buffer" | "scroll-down" | "scroll-down-command" | "scroll-up" | "scroll-up-command" => {
-            arity_cons(0, Some(1))
-        }
+        "save-buffer"
+        | "scroll-down"
+        | "scroll-down-command"
+        | "scroll-up"
+        | "scroll-up-command" => arity_cons(0, Some(1)),
         "load-average" => arity_cons(0, Some(1)),
         "select-window" | "minor-mode-key-binding" => arity_cons(1, Some(2)),
         "select-frame" => arity_cons(1, Some(2)),
@@ -1112,9 +1111,7 @@ fn subr_arity_value(name: &str) -> Value {
             arity_cons(0, Some(0))
         }
         "font-has-char-p" | "fontset-font" => arity_cons(2, Some(3)),
-        "font-match-p" | "font-shape-gstring" | "font-variation-glyphs" => {
-            arity_cons(2, Some(2))
-        }
+        "font-match-p" | "font-shape-gstring" | "font-variation-glyphs" => arity_cons(2, Some(2)),
         "frame--set-was-invisible" | "frame-after-make-frame" | "frame-ancestor-p" => {
             arity_cons(2, Some(2))
         }
@@ -1136,14 +1133,10 @@ fn subr_arity_value(name: &str) -> Value {
         | "frame-right-divider-width" => arity_cons(0, Some(1)),
         "fringe-bitmaps-at-pos" => arity_cons(0, Some(2)),
         "gap-position" | "gap-size" => arity_cons(0, Some(0)),
-        "gnutls-available-p"
-        | "gnutls-ciphers"
-        | "gnutls-digests"
-        | "gnutls-macs"
-        | "gpm-mouse-start"
-        | "gpm-mouse-stop"
-        | "sqlite-available-p"
-        | "sqlite-version" => arity_cons(0, Some(0)),
+        "gnutls-available-p" | "gnutls-ciphers" | "gnutls-digests" | "gnutls-macs"
+        | "gpm-mouse-start" | "gpm-mouse-stop" | "sqlite-available-p" | "sqlite-version" => {
+            arity_cons(0, Some(0))
+        }
         "gnutls-asynchronous-parameters" | "gnutls-bye" | "gnutls-hash-digest" => {
             arity_cons(2, Some(2))
         }
@@ -1300,9 +1293,7 @@ fn subr_arity_value(name: &str) -> Value {
         | "line-end-position"
         | "line-number-display-width"
         | "pos-bol"
-        | "pos-eol" => {
-            arity_cons(0, Some(1))
-        }
+        | "pos-eol" => arity_cons(0, Some(1)),
         "line-number-at-pos" => arity_cons(0, Some(2)),
         "line-pixel-height" | "long-line-optimizations-p" => arity_cons(0, Some(0)),
         "scroll-left" | "scroll-right" => arity_cons(0, Some(2)),
@@ -1403,7 +1394,26 @@ fn subr_arity_value(name: &str) -> Value {
         "define-abbrev-table" => arity_cons(2, None),
         "expand-abbrev" => arity_cons(0, Some(0)),
         "insert-abbrev-table-description" => arity_cons(1, Some(2)),
-        "if" => Value::cons(Value::Int(2), Value::symbol("unevalled")),
+        "and"
+        | "cond"
+        | "inline"
+        | "interactive"
+        | "or"
+        | "progn"
+        | "save-current-buffer"
+        | "save-excursion"
+        | "save-restriction"
+        | "setq" => arity_unevalled(0),
+        "catch"
+        | "defvar"
+        | "function"
+        | "let"
+        | "let*"
+        | "prog1"
+        | "quote"
+        | "unwind-protect"
+        | "while" => arity_unevalled(1),
+        "condition-case" | "defconst" | "if" => arity_unevalled(2),
         "defining-kbd-macro" => arity_cons(1, Some(2)),
         "start-kbd-macro" => arity_cons(1, Some(2)),
         "cancel-kbd-macro-events" => arity_cons(0, Some(0)),
@@ -2063,6 +2073,29 @@ mod tests {
             assert_eq!(pair.cdr.as_symbol_name(), Some("unevalled"));
         } else {
             panic!("expected cons cell");
+        }
+    }
+
+    #[test]
+    fn subr_arity_core_special_forms_match_oracle_unevalled_shapes() {
+        for (name, min) in [
+            ("and", 0),
+            ("setq", 0),
+            ("let", 1),
+            ("quote", 1),
+            ("catch", 1),
+            ("defconst", 2),
+            ("condition-case", 2),
+            ("unwind-protect", 1),
+        ] {
+            let result = builtin_subr_arity(vec![Value::Subr(name.into())]).unwrap();
+            if let Value::Cons(cell) = &result {
+                let pair = cell.lock().unwrap();
+                assert_eq!(pair.car.as_int(), Some(min));
+                assert_eq!(pair.cdr.as_symbol_name(), Some("unevalled"));
+            } else {
+                panic!("expected cons cell for {name}");
+            }
         }
     }
 

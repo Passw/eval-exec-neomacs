@@ -18,6 +18,7 @@ results against that baseline once evaluator execution is wired in.
 - `check-builtin-registry-fboundp.sh`: checks `fboundp` parity for all names in `builtin_registry.rs`
 - `check-builtin-registry-func-arity.sh`: checks `func-arity` parity for all core names in `builtin_registry.rs`
 - `check-builtin-registry-autoload-metadata.sh`: checks startup autoload metadata tuple parity (`fboundp`, autoload file, autoload docstring first line, autoload interactive slot, autoload type slot) for all core names in `builtin_registry.rs`
+- `check-builtin-registry-primitive-any-coverage.sh`: checks oracle `primitive-any` builtin universe coverage is fully represented by both NeoVM runtime and `builtin_registry.rs`
 - `check-startup-doc-stub-coverage.sh`: checks startup integer-doc symbol coverage of `STARTUP_VARIABLE_DOC_STUBS`
 - `check-startup-doc-string-coverage.sh`: checks startup string-doc symbol coverage of `STARTUP_VARIABLE_DOC_STRING_PROPERTIES`
 - `check-startup-variable-documentation-counts.sh`: checks startup `variable-documentation` property-count and runtime-resolution count parity (oracle vs NeoVM)
@@ -263,11 +264,18 @@ cd test/neovm/vm-compat
 make check-builtin-registry-autoload-metadata
 ```
 
-Run the full builtin registry gate bundle (dispatch/registry sync + fboundp/function-cell/func-arity/autoload-metadata/function-kind/commandp/extension-policy checks):
+Run the full builtin registry gate bundle (dispatch/registry sync + fboundp/function-cell/func-arity/autoload-metadata/function-kind/commandp/primitive-any-coverage/extension-policy checks):
 
 ```bash
 cd test/neovm/vm-compat
 make check-builtin-registry-all
+```
+
+Run the builtin registry primitive-any coverage gate (primitive subrs + primitive special forms, oracle vs NeoVM runtime/registry):
+
+```bash
+cd test/neovm/vm-compat
+make check-builtin-registry-primitive-any-coverage
 ```
 
 Run only the dispatch/registry sync gate (uses `cases/builtin-registry-sync-allowlist.txt` for intentional startup-policy exclusions):

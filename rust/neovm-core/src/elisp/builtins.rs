@@ -4002,6 +4002,10 @@ pub(crate) fn builtin_symbol_function(
         return Ok(function);
     }
 
+    if name == "inline" {
+        return Ok(Value::symbol("inline"));
+    }
+
     if super::subr_info::is_special_form(name)
         || super::subr_info::is_evaluator_callable_name(name)
         || super::builtin_registry::is_dispatch_builtin_name(name)
@@ -4025,6 +4029,9 @@ pub(crate) fn builtin_func_arity_eval(
                 return Err(signal("void-function", vec![Value::symbol(name)]));
             }
             maybe_materialize_thingatpt_word_symbol(eval, name, &function);
+            if super::subr_info::is_special_form(name) {
+                return super::subr_info::builtin_func_arity(vec![Value::Subr(name.to_string())]);
+            }
             if let Some(arity) = dispatch_symbol_func_arity_override(eval, name, &function) {
                 return Ok(arity);
             }
@@ -18429,6 +18436,10 @@ mod tests {
             .expect("symbol-function should resolve declare as a macro");
         assert!(matches!(declare_macro, Value::Macro(_)));
 
+        let inline_symbol = builtin_symbol_function(&mut eval, vec![Value::symbol("inline")])
+            .expect("symbol-function should resolve inline as a symbol marker");
+        assert_eq!(inline_symbol, Value::symbol("inline"));
+
         let unresolved =
             builtin_symbol_function(&mut eval, vec![Value::symbol("definitely-not-a-function")])
                 .expect("symbol-function should return nil for unresolved symbols");
@@ -18547,6 +18558,17 @@ mod tests {
                 let pair = cell.lock().expect("poisoned");
                 assert_eq!(pair.car, Value::Int(1));
                 assert_eq!(pair.cdr, Value::symbol("many"));
+            }
+            other => panic!("expected cons arity pair, got {other:?}"),
+        }
+
+        let inline_arity = builtin_func_arity_eval(&mut eval, vec![Value::symbol("inline")])
+            .expect("func-arity should resolve inline special-form symbol");
+        match &inline_arity {
+            Value::Cons(cell) => {
+                let pair = cell.lock().expect("poisoned");
+                assert_eq!(pair.car, Value::Int(0));
+                assert_eq!(pair.cdr, Value::symbol("unevalled"));
             }
             other => panic!("expected cons arity pair, got {other:?}"),
         }
