@@ -2155,6 +2155,46 @@ pub(crate) fn builtin_aref(args: Vec<Value>) -> EvalResult {
     }
 }
 
+pub(crate) fn aset_string_replacement(
+    array: &Value,
+    index: &Value,
+    new_element: &Value,
+) -> Result<Value, Flow> {
+    let Value::Str(original) = array else {
+        return Err(signal(
+            "wrong-type-argument",
+            vec![Value::symbol("stringp"), array.clone()],
+        ));
+    };
+
+    let idx = expect_fixnum(index)? as usize;
+    let mut codes = decode_storage_char_codes(original);
+    if idx >= codes.len() {
+        return Err(signal(
+            "args-out-of-range",
+            vec![array.clone(), index.clone()],
+        ));
+    }
+
+    let replacement_code = insert_char_code_from_value(new_element)? as u32;
+    codes[idx] = replacement_code;
+
+    let mut rebuilt = String::new();
+    for code in codes {
+        if let Some(ch) = char::from_u32(code) {
+            rebuilt.push(ch);
+        } else if let Some(encoded) = encode_nonunicode_char_for_storage(code) {
+            rebuilt.push_str(&encoded);
+        } else {
+            return Err(signal(
+                "wrong-type-argument",
+                vec![Value::symbol("characterp"), new_element.clone()],
+            ));
+        }
+    }
+    Ok(Value::string(rebuilt))
+}
+
 pub(crate) fn builtin_aset(args: Vec<Value>) -> EvalResult {
     expect_args("aset", &args, 3)?;
     let idx = expect_fixnum(&args[1])? as usize;
@@ -2196,6 +2236,10 @@ pub(crate) fn builtin_aset(args: Vec<Value>) -> EvalResult {
                 ));
             }
             items[idx] = args[2].clone();
+            Ok(args[2].clone())
+        }
+        Value::Str(_) => {
+            let _updated = aset_string_replacement(&args[0], &args[1], &args[2])?;
             Ok(args[2].clone())
         }
         _ => Err(signal(
@@ -17208,6 +17252,53 @@ mod tests {
             .expect("builtin aref should resolve")
             .expect("builtin aref should evaluate");
         assert!(updated.is_truthy());
+    }
+
+    #[test]
+    fn pure_dispatch_typed_aset_string_returns_new_element_and_computes_replacement() {
+        let result = dispatch_builtin_pure(
+            "aset",
+            vec![Value::string("abc"), Value::Int(1), Value::Int(120)],
+        )
+        .expect("builtin aset should resolve")
+        .expect("builtin aset should evaluate");
+        assert_eq!(result, Value::Int(120));
+
+        let replacement =
+            aset_string_replacement(&Value::string("abc"), &Value::Int(1), &Value::Int(120))
+                .expect("string replacement should succeed");
+        assert_eq!(replacement, Value::string("axc"));
+    }
+
+    #[test]
+    fn pure_dispatch_typed_aset_string_errors_match_oracle() {
+        let out_of_range = dispatch_builtin_pure(
+            "aset",
+            vec![Value::string("abc"), Value::Int(-1), Value::Int(120)],
+        )
+        .expect("builtin aset should resolve")
+        .expect_err("aset should reject negative index");
+        match out_of_range {
+            Flow::Signal(sig) => {
+                assert_eq!(sig.symbol, "args-out-of-range");
+                assert_eq!(sig.data, vec![Value::string("abc"), Value::Int(-1)]);
+            }
+            other => panic!("unexpected flow: {other:?}"),
+        }
+
+        let wrong_type = dispatch_builtin_pure(
+            "aset",
+            vec![Value::string("abc"), Value::Int(1), Value::Nil],
+        )
+        .expect("builtin aset should resolve")
+        .expect_err("aset should validate replacement character");
+        match wrong_type {
+            Flow::Signal(sig) => {
+                assert_eq!(sig.symbol, "wrong-type-argument");
+                assert_eq!(sig.data, vec![Value::symbol("characterp"), Value::Nil]);
+            }
+            other => panic!("unexpected flow: {other:?}"),
+        }
     }
 
     #[test]

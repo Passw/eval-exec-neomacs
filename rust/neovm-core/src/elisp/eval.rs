@@ -1575,14 +1575,14 @@ impl Evaluator {
                     args.push(self.eval(expr)?);
                 }
                 if super::autoload::is_autoload_value(&func) {
-                    let first_arg = args.first().cloned();
+                    let writeback_args = args.clone();
                     let result =
                         self.apply_named_callable(name, args, Value::Subr(name.clone()), false);
                     if let Ok(value) = &result {
                         self.maybe_writeback_mutating_first_arg(
                             name,
                             None,
-                            first_arg.as_ref(),
+                            &writeback_args,
                             value,
                         );
                     }
@@ -1598,7 +1598,7 @@ impl Evaluator {
                     Value::Subr(bound_name) => Some(bound_name.clone()),
                     _ => None,
                 };
-                let first_arg = args.first().cloned();
+                let writeback_args = args.clone();
                 let result = match self.apply(func.clone(), args) {
                     Err(Flow::Signal(sig))
                         if sig.symbol == "invalid-function" && !function_is_callable =>
@@ -1615,7 +1615,7 @@ impl Evaluator {
                     self.maybe_writeback_mutating_first_arg(
                         name,
                         alias_target.as_deref(),
-                        first_arg.as_ref(),
+                        &writeback_args,
                         value,
                     );
                 }
@@ -1641,10 +1641,10 @@ impl Evaluator {
                 args.push(self.eval(expr)?);
             }
 
-            let first_arg = args.first().cloned();
+            let writeback_args = args.clone();
             let result = self.apply_named_callable(name, args, Value::Subr(name.clone()), false);
             if let Ok(value) = &result {
-                self.maybe_writeback_mutating_first_arg(name, None, first_arg.as_ref(), value);
+                self.maybe_writeback_mutating_first_arg(name, None, &writeback_args, value);
             }
             return result;
         }
@@ -1670,35 +1670,61 @@ impl Evaluator {
         &mut self,
         called_name: &str,
         alias_target: Option<&str>,
-        first_arg: Option<&Value>,
+        call_args: &[Value],
         result: &Value,
     ) {
-        let mutates_first_argument =
+        let mutates_fillarray =
             called_name == "fillarray" || alias_target.is_some_and(|name| name == "fillarray");
-        if !mutates_first_argument {
+        let mutates_aset =
+            called_name == "aset" || alias_target.is_some_and(|name| name == "aset");
+        if !mutates_fillarray && !mutates_aset {
             return;
         }
-        let Some(first_arg) = first_arg else {
+        let Some(first_arg) = call_args.first() else {
             return;
         };
-        if !first_arg.is_string() || !result.is_string() || eq_value(first_arg, result) {
+        if !first_arg.is_string() {
+            return;
+        }
+
+        let replacement = if mutates_fillarray {
+            if !result.is_string() || eq_value(first_arg, result) {
+                return;
+            }
+            result.clone()
+        } else {
+            if call_args.len() < 3 {
+                return;
+            }
+            let Ok(updated) =
+                super::builtins::aset_string_replacement(first_arg, &call_args[1], &call_args[2])
+            else {
+                return;
+            };
+            if eq_value(first_arg, &updated) {
+                return;
+            }
+            updated
+        };
+
+        if first_arg.as_str() == replacement.as_str() {
             return;
         }
 
         let mut visited = HashSet::new();
         for frame in &mut self.lexenv {
             for value in frame.values_mut() {
-                Self::replace_alias_refs_in_value(value, first_arg, result, &mut visited);
+                Self::replace_alias_refs_in_value(value, first_arg, &replacement, &mut visited);
             }
         }
         for frame in &mut self.dynamic {
             for value in frame.values_mut() {
-                Self::replace_alias_refs_in_value(value, first_arg, result, &mut visited);
+                Self::replace_alias_refs_in_value(value, first_arg, &replacement, &mut visited);
             }
         }
         if let Some(buf) = self.buffers.current_buffer_mut() {
             for value in buf.properties.values_mut() {
-                Self::replace_alias_refs_in_value(value, first_arg, result, &mut visited);
+                Self::replace_alias_refs_in_value(value, first_arg, &replacement, &mut visited);
             }
         }
 
@@ -1711,7 +1737,7 @@ impl Evaluator {
         for name in symbols {
             if let Some(symbol) = self.obarray.get_mut(&name) {
                 if let Some(value) = symbol.value.as_mut() {
-                    Self::replace_alias_refs_in_value(value, first_arg, result, &mut visited);
+                    Self::replace_alias_refs_in_value(value, first_arg, &replacement, &mut visited);
                 }
             }
         }
@@ -5414,6 +5440,83 @@ mod tests {
             "(let* ((s (copy-sequence \"abc\")) (ht (make-hash-table :test 'equal)))
                (puthash s 'v ht)
                (fillarray s ?z)
+               (gethash s ht))",
+        );
+        assert_eq!(result, "OK nil");
+    }
+
+    #[test]
+    fn aset_string_writeback_updates_symbol_binding() {
+        let result = eval_one("(let ((s (copy-sequence \"abc\"))) (aset s 1 ?x) s)");
+        assert_eq!(result, r#"OK "axc""#);
+    }
+
+    #[test]
+    fn aset_alias_string_writeback_updates_symbol_binding() {
+        let result = eval_one(
+            "(progn
+                (defalias 'vm-aset-alias 'aset)
+                (let ((s (copy-sequence \"abc\")))
+                  (vm-aset-alias s 1 ?y)
+                  s))",
+        );
+        assert_eq!(result, r#"OK "ayc""#);
+    }
+
+    #[test]
+    fn aset_string_writeback_updates_alias_from_prog1_expression() {
+        let result = eval_one("(let ((s (copy-sequence \"abc\"))) (aset (prog1 s) 1 ?x) s)");
+        assert_eq!(result, r#"OK "axc""#);
+    }
+
+    #[test]
+    fn aset_string_writeback_updates_alias_from_list_car_expression() {
+        let result = eval_one("(let ((s (copy-sequence \"abc\"))) (aset (car (list s)) 1 ?y) s)");
+        assert_eq!(result, r#"OK "ayc""#);
+    }
+
+    #[test]
+    fn aset_string_writeback_updates_vector_alias_element() {
+        let result =
+            eval_one("(let* ((s (copy-sequence \"abc\")) (v (vector s))) (aset s 1 ?x) (aref v 0))");
+        assert_eq!(result, r#"OK "axc""#);
+    }
+
+    #[test]
+    fn aset_string_writeback_updates_cons_alias_element() {
+        let result =
+            eval_one("(let* ((s (copy-sequence \"abc\")) (cell (cons s nil))) (aset s 1 ?y) (car cell))");
+        assert_eq!(result, r#"OK "ayc""#);
+    }
+
+    #[test]
+    fn aset_string_writeback_preserves_eq_hash_key_lookup() {
+        let result = eval_one(
+            "(let* ((s (copy-sequence \"abc\")) (ht (make-hash-table :test 'eq)))
+               (puthash s 'v ht)
+               (aset s 1 ?x)
+               (gethash s ht))",
+        );
+        assert_eq!(result, "OK v");
+    }
+
+    #[test]
+    fn aset_string_writeback_preserves_eql_hash_key_lookup() {
+        let result = eval_one(
+            "(let* ((s (copy-sequence \"abc\")) (ht (make-hash-table :test 'eql)))
+               (puthash s 'v ht)
+               (aset s 1 ?y)
+               (gethash s ht))",
+        );
+        assert_eq!(result, "OK v");
+    }
+
+    #[test]
+    fn aset_string_writeback_equal_hash_key_lookup_stays_nil() {
+        let result = eval_one(
+            "(let* ((s (copy-sequence \"abc\")) (ht (make-hash-table :test 'equal)))
+               (puthash s 'v ht)
+               (aset s 1 ?z)
                (gethash s ht))",
         );
         assert_eq!(result, "OK nil");
