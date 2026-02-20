@@ -2549,6 +2549,68 @@ pub(crate) fn builtin_daemon_initialized(args: Vec<Value>) -> EvalResult {
     ))
 }
 
+pub(crate) fn builtin_documentation_stringp(args: Vec<Value>) -> EvalResult {
+    expect_args("documentation-stringp", &args, 1)?;
+    Ok(Value::bool(matches!(args[0], Value::Str(_) | Value::Int(_))))
+}
+
+pub(crate) fn builtin_flush_standard_output(args: Vec<Value>) -> EvalResult {
+    expect_args("flush-standard-output", &args, 0)?;
+    Ok(Value::Nil)
+}
+
+pub(crate) fn builtin_force_mode_line_update(args: Vec<Value>) -> EvalResult {
+    expect_max_args("force-mode-line-update", &args, 1)?;
+    Ok(args.first().cloned().unwrap_or(Value::Nil))
+}
+
+pub(crate) fn builtin_force_window_update(args: Vec<Value>) -> EvalResult {
+    expect_max_args("force-window-update", &args, 1)?;
+    if args.first().is_some_and(|v| !v.is_nil()) {
+        Ok(Value::Nil)
+    } else {
+        Ok(Value::True)
+    }
+}
+
+pub(crate) fn builtin_get_internal_run_time(args: Vec<Value>) -> EvalResult {
+    expect_args("get-internal-run-time", &args, 0)?;
+    use std::time::{SystemTime, UNIX_EPOCH};
+    let dur = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .unwrap_or_default();
+    let secs = dur.as_secs() as i64;
+    let usecs = dur.subsec_micros() as i64;
+    Ok(Value::list(vec![
+        Value::Int(secs >> 16),
+        Value::Int(secs & 0xFFFF),
+        Value::Int(usecs),
+        Value::Int(0),
+    ]))
+}
+
+pub(crate) fn builtin_invocation_directory(args: Vec<Value>) -> EvalResult {
+    expect_args("invocation-directory", &args, 0)?;
+    let mut dir = std::env::current_exe()
+        .ok()
+        .and_then(|p| p.parent().map(|parent| parent.to_path_buf()))
+        .map(|p| p.to_string_lossy().into_owned())
+        .unwrap_or_else(|| "/".to_string());
+    if !dir.ends_with('/') {
+        dir.push('/');
+    }
+    Ok(Value::string(dir))
+}
+
+pub(crate) fn builtin_invocation_name(args: Vec<Value>) -> EvalResult {
+    expect_args("invocation-name", &args, 0)?;
+    let name = std::env::current_exe()
+        .ok()
+        .and_then(|p| p.file_name().map(|name| name.to_string_lossy().into_owned()))
+        .unwrap_or_else(|| "emacs".to_string());
+    Ok(Value::string(name))
+}
+
 pub(crate) fn builtin_error(args: Vec<Value>) -> EvalResult {
     expect_min_args("error", &args, 1)?;
     let msg = match builtin_format(args)? {
@@ -10368,6 +10430,7 @@ pub(crate) fn dispatch_builtin(
         "documentation" => return Some(super::doc::builtin_documentation(eval, args)),
         "describe-function" => return Some(super::doc::builtin_describe_function(eval, args)),
         "describe-variable" => return Some(super::doc::builtin_describe_variable(eval, args)),
+        "documentation-stringp" => return Some(builtin_documentation_stringp(args)),
         "documentation-property" => {
             return Some(super::doc::builtin_documentation_property_eval(eval, args))
         }
@@ -10580,9 +10643,15 @@ pub(crate) fn dispatch_builtin(
         "current-time" => builtin_current_time(args),
         "current-cpu-time" => builtin_current_cpu_time(args),
         "current-idle-time" => builtin_current_idle_time(args),
+        "get-internal-run-time" => builtin_get_internal_run_time(args),
         "float-time" => builtin_float_time(args),
         "daemonp" => builtin_daemonp(args),
         "daemon-initialized" => builtin_daemon_initialized(args),
+        "flush-standard-output" => builtin_flush_standard_output(args),
+        "force-mode-line-update" => builtin_force_mode_line_update(args),
+        "force-window-update" => builtin_force_window_update(args),
+        "invocation-directory" => builtin_invocation_directory(args),
+        "invocation-name" => builtin_invocation_name(args),
 
         // File I/O (pure)
         "access-file" => super::fileio::builtin_access_file(args),
@@ -11277,9 +11346,15 @@ pub(crate) fn dispatch_builtin_pure(name: &str, args: Vec<Value>) -> Option<Eval
         "current-time" => builtin_current_time(args),
         "current-cpu-time" => builtin_current_cpu_time(args),
         "current-idle-time" => builtin_current_idle_time(args),
+        "get-internal-run-time" => builtin_get_internal_run_time(args),
         "float-time" => builtin_float_time(args),
         "daemonp" => builtin_daemonp(args),
         "daemon-initialized" => builtin_daemon_initialized(args),
+        "flush-standard-output" => builtin_flush_standard_output(args),
+        "force-mode-line-update" => builtin_force_mode_line_update(args),
+        "force-window-update" => builtin_force_window_update(args),
+        "invocation-directory" => builtin_invocation_directory(args),
+        "invocation-name" => builtin_invocation_name(args),
         // File I/O (pure)
         "expand-file-name" => super::fileio::builtin_expand_file_name(args),
         "file-truename" => super::fileio::builtin_file_truename(args),

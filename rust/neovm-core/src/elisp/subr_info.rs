@@ -730,6 +730,7 @@ fn subr_arity_value(name: &str) -> Value {
         "Snarf-documentation" => arity_cons(1, Some(1)),
         "substitute-command-keys" => arity_cons(1, Some(3)),
         "documentation" => arity_cons(1, Some(2)),
+        "documentation-stringp" => arity_cons(1, Some(1)),
         "documentation-property" => arity_cons(2, Some(3)),
         "help-function-arglist" => arity_cons(1, Some(2)),
         "decode-coding-string" | "encode-coding-string" => arity_cons(2, Some(4)),
@@ -895,6 +896,7 @@ fn subr_arity_value(name: &str) -> Value {
         "forward-sexp" => arity_cons(0, Some(2)),
         "file-attributes-lessp" => arity_cons(2, Some(2)),
         "called-interactively-p" | "float-time" => arity_cons(0, Some(1)),
+        "force-mode-line-update" | "force-window-update" => arity_cons(0, Some(1)),
         "featurep" => arity_cons(1, Some(2)),
         "commandp" => arity_cons(1, Some(2)),
         "command-modes" => arity_cons(1, Some(1)),
@@ -903,7 +905,13 @@ fn subr_arity_value(name: &str) -> Value {
         "run-at-time" | "run-with-timer" | "run-with-idle-timer" => arity_cons(3, None),
         "timer-activate" => arity_cons(1, Some(3)),
         "sleep-for" | "sit-for" => arity_cons(1, Some(2)),
-        "current-cpu-time" | "current-idle-time" | "current-time" => arity_cons(0, Some(0)),
+        "current-cpu-time"
+        | "current-idle-time"
+        | "current-time"
+        | "flush-standard-output"
+        | "get-internal-run-time"
+        | "invocation-directory"
+        | "invocation-name" => arity_cons(0, Some(0)),
         "daemon-initialized" | "daemonp" => arity_cons(0, Some(0)),
         "category-table" | "clear-buffer-auto-save-failure" | "clear-charset-maps" => {
             arity_cons(0, Some(0))
@@ -2127,6 +2135,7 @@ mod tests {
         assert_subr_arity("Snarf-documentation", 1, Some(1));
         assert_subr_arity("substitute-command-keys", 1, Some(3));
         assert_subr_arity("documentation", 1, Some(2));
+        assert_subr_arity("documentation-stringp", 1, Some(1));
         assert_subr_arity("documentation-property", 2, Some(3));
         assert_subr_arity("help-function-arglist", 1, Some(2));
     }
@@ -2261,6 +2270,10 @@ mod tests {
         assert_subr_arity("current-cpu-time", 0, Some(0));
         assert_subr_arity("current-idle-time", 0, Some(0));
         assert_subr_arity("current-time", 0, Some(0));
+        assert_subr_arity("flush-standard-output", 0, Some(0));
+        assert_subr_arity("force-mode-line-update", 0, Some(1));
+        assert_subr_arity("force-window-update", 0, Some(1));
+        assert_subr_arity("get-internal-run-time", 0, Some(0));
         assert_subr_arity("float-time", 0, Some(1));
     }
 
@@ -2517,6 +2530,8 @@ mod tests {
         assert_subr_arity("current-window-configuration", 0, Some(1));
         assert_subr_arity("daemon-initialized", 0, Some(0));
         assert_subr_arity("daemonp", 0, Some(0));
+        assert_subr_arity("invocation-directory", 0, Some(0));
+        assert_subr_arity("invocation-name", 0, Some(0));
         assert_subr_arity("system-name", 0, Some(0));
         assert_subr_arity("emacs-version", 0, Some(1));
     }
