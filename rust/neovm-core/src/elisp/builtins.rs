@@ -2863,6 +2863,9 @@ pub(crate) fn builtin_ignore(_args: Vec<Value>) -> EvalResult {
 
 pub(crate) fn builtin_message(args: Vec<Value>) -> EvalResult {
     expect_min_args("message", &args, 1)?;
+    if args.len() == 1 && args[0].is_nil() {
+        return Ok(Value::Nil);
+    }
     let msg = if args.len() == 1 {
         match &args[0] {
             Value::Str(s) => (**s).clone(),
@@ -2894,6 +2897,9 @@ pub(crate) fn builtin_message_eval(
     args: Vec<Value>,
 ) -> EvalResult {
     expect_min_args("message", &args, 1)?;
+    if args.len() == 1 && args[0].is_nil() {
+        return Ok(Value::Nil);
+    }
     let msg = if args.len() == 1 {
         match &args[0] {
             Value::Str(s) => (**s).clone(),
@@ -4420,6 +4426,131 @@ fn macroexpand_known_fallback_macro(name: &str, args: &[Value]) -> Result<Option
             Ok(Some(Value::list(vec![
                 Value::symbol("let"),
                 Value::list(vec![binding]),
+                Value::list(vec![Value::symbol("unwind-protect"), protected, restore]),
+            ])))
+        }
+        "save-window-excursion" => {
+            let saved = Value::symbol("wconfig");
+            let binding = Value::list(vec![
+                saved.clone(),
+                Value::list(vec![Value::symbol("current-window-configuration")]),
+            ]);
+            let mut protected_forms = Vec::with_capacity(args.len() + 1);
+            protected_forms.push(Value::symbol("progn"));
+            protected_forms.extend_from_slice(args);
+            let protected = Value::list(protected_forms);
+            let restore = Value::list(vec![Value::symbol("set-window-configuration"), saved]);
+            Ok(Some(Value::list(vec![
+                Value::symbol("let"),
+                Value::list(vec![binding]),
+                Value::list(vec![Value::symbol("unwind-protect"), protected, restore]),
+            ])))
+        }
+        "save-selected-window" => {
+            let saved = Value::symbol("save-selected-window--state");
+            let binding = Value::list(vec![
+                saved.clone(),
+                Value::list(vec![Value::symbol("internal--before-save-selected-window")]),
+            ]);
+            let mut protected_forms = Vec::with_capacity(args.len() + 1);
+            protected_forms.push(Value::symbol("progn"));
+            protected_forms.extend_from_slice(args);
+            let protected = Value::list(protected_forms);
+            let restore = Value::list(vec![
+                Value::symbol("internal--after-save-selected-window"),
+                saved,
+            ]);
+            let unwind = Value::list(vec![Value::symbol("unwind-protect"), protected, restore]);
+            Ok(Some(Value::list(vec![
+                Value::symbol("let"),
+                Value::list(vec![binding]),
+                Value::list(vec![Value::symbol("save-current-buffer"), unwind]),
+            ])))
+        }
+        "with-local-quit" => {
+            let binding = Value::list(vec![Value::symbol("inhibit-quit"), Value::Nil]);
+            let mut let_forms = Vec::with_capacity(args.len() + 2);
+            let_forms.push(Value::symbol("let"));
+            let_forms.push(Value::list(vec![binding]));
+            let_forms.extend_from_slice(args);
+            let body = Value::list(let_forms);
+            let handler = Value::list(vec![
+                Value::symbol("quit"),
+                Value::list(vec![
+                    Value::symbol("setq"),
+                    Value::symbol("quit-flag"),
+                    Value::True,
+                ]),
+                Value::list(vec![
+                    Value::symbol("eval"),
+                    Value::list(vec![
+                        Value::symbol("quote"),
+                        Value::list(vec![Value::symbol("ignore"), Value::Nil]),
+                    ]),
+                    Value::True,
+                ]),
+            ]);
+            Ok(Some(Value::list(vec![
+                Value::symbol("condition-case"),
+                Value::Nil,
+                body,
+                handler,
+            ])))
+        }
+        "with-temp-message" => {
+            if args.is_empty() {
+                return Err(signal(
+                    "wrong-number-of-arguments",
+                    vec![Value::cons(Value::Int(1), Value::symbol("many")), Value::Int(0)],
+                ));
+            }
+
+            let temp = Value::symbol("with-temp-message");
+            let current = Value::symbol("current-message");
+            let bindings = Value::list(vec![
+                Value::list(vec![temp.clone(), args[0].clone()]),
+                Value::list(vec![current.clone()]),
+            ]);
+
+            let when_form = Value::list(vec![
+                Value::symbol("when"),
+                temp.clone(),
+                Value::list(vec![
+                    Value::symbol("setq"),
+                    current.clone(),
+                    Value::list(vec![Value::symbol("current-message")]),
+                ]),
+                Value::list(vec![
+                    Value::symbol("message"),
+                    Value::string("%s"),
+                    temp.clone(),
+                ]),
+            ]);
+
+            let mut protected_forms = Vec::with_capacity(args.len() + 1);
+            protected_forms.push(Value::symbol("progn"));
+            protected_forms.push(when_form);
+            protected_forms.extend_from_slice(&args[1..]);
+            let protected = Value::list(protected_forms);
+
+            let restore = Value::list(vec![
+                Value::symbol("and"),
+                temp,
+                Value::list(vec![
+                    Value::symbol("if"),
+                    current.clone(),
+                    Value::list(vec![
+                        Value::symbol("message"),
+                        Value::string("%s"),
+                        current,
+                    ]),
+                    Value::list(vec![Value::symbol("message"), Value::Nil]),
+                ]),
+            ]);
+
+            Ok(Some(Value::list(vec![
+                Value::symbol("let"),
+                bindings,
                 Value::list(vec![Value::symbol("unwind-protect"), protected, restore]),
             ])))
         }
@@ -18114,6 +18245,18 @@ mod tests {
     }
 
     #[test]
+    fn message_nil_returns_nil() {
+        let mut eval = crate::elisp::eval::Evaluator::new();
+
+        let raw = builtin_message(vec![Value::Nil]).expect("message should accept nil");
+        assert!(raw.is_nil());
+
+        let eval_result = builtin_message_eval(&mut eval, vec![Value::Nil])
+            .expect("message eval should accept nil");
+        assert!(eval_result.is_nil());
+    }
+
+    #[test]
     fn fboundp_recognizes_dispatch_and_typed_builtin_names() {
         let mut eval = crate::elisp::eval::Evaluator::new();
 
@@ -18161,6 +18304,21 @@ mod tests {
             builtin_fboundp(&mut eval, vec![Value::symbol("save-mark-and-excursion")])
                 .expect("fboundp should succeed for save-mark-and-excursion");
         assert!(save_mark_and_excursion.is_truthy());
+        let save_window_excursion =
+            builtin_fboundp(&mut eval, vec![Value::symbol("save-window-excursion")])
+                .expect("fboundp should succeed for save-window-excursion");
+        assert!(save_window_excursion.is_truthy());
+        let save_selected_window =
+            builtin_fboundp(&mut eval, vec![Value::symbol("save-selected-window")])
+                .expect("fboundp should succeed for save-selected-window");
+        assert!(save_selected_window.is_truthy());
+        let with_local_quit = builtin_fboundp(&mut eval, vec![Value::symbol("with-local-quit")])
+            .expect("fboundp should succeed for with-local-quit");
+        assert!(with_local_quit.is_truthy());
+        let with_temp_message =
+            builtin_fboundp(&mut eval, vec![Value::symbol("with-temp-message")])
+                .expect("fboundp should succeed for with-temp-message");
+        assert!(with_temp_message.is_truthy());
 
         let with_temp_buffer = builtin_fboundp(&mut eval, vec![Value::symbol("with-temp-buffer")])
             .expect("fboundp should succeed for with-temp-buffer");
@@ -18231,6 +18389,22 @@ mod tests {
             builtin_functionp_eval(&mut eval, vec![Value::symbol("save-mark-and-excursion")])
                 .expect("functionp should reject save-mark-and-excursion macro symbol");
         assert!(save_mark_and_excursion_symbol.is_nil());
+        let save_window_excursion_symbol =
+            builtin_functionp_eval(&mut eval, vec![Value::symbol("save-window-excursion")])
+                .expect("functionp should reject save-window-excursion macro symbol");
+        assert!(save_window_excursion_symbol.is_nil());
+        let save_selected_window_symbol =
+            builtin_functionp_eval(&mut eval, vec![Value::symbol("save-selected-window")])
+                .expect("functionp should reject save-selected-window macro symbol");
+        assert!(save_selected_window_symbol.is_nil());
+        let with_local_quit_symbol =
+            builtin_functionp_eval(&mut eval, vec![Value::symbol("with-local-quit")])
+                .expect("functionp should reject with-local-quit macro symbol");
+        assert!(with_local_quit_symbol.is_nil());
+        let with_temp_message_symbol =
+            builtin_functionp_eval(&mut eval, vec![Value::symbol("with-temp-message")])
+                .expect("functionp should reject with-temp-message macro symbol");
+        assert!(with_temp_message_symbol.is_nil());
         let declare_symbol = builtin_functionp_eval(&mut eval, vec![Value::symbol("declare")])
             .expect("functionp should reject declare symbol");
         assert!(declare_symbol.is_nil());
@@ -18495,6 +18669,22 @@ mod tests {
             builtin_symbol_function(&mut eval, vec![Value::symbol("save-mark-and-excursion")])
                 .expect("symbol-function should resolve save-mark-and-excursion as a macro");
         assert!(matches!(save_mark_and_excursion_macro, Value::Macro(_)));
+        let save_window_excursion_macro =
+            builtin_symbol_function(&mut eval, vec![Value::symbol("save-window-excursion")])
+                .expect("symbol-function should resolve save-window-excursion as a macro");
+        assert!(matches!(save_window_excursion_macro, Value::Macro(_)));
+        let save_selected_window_macro =
+            builtin_symbol_function(&mut eval, vec![Value::symbol("save-selected-window")])
+                .expect("symbol-function should resolve save-selected-window as a macro");
+        assert!(matches!(save_selected_window_macro, Value::Macro(_)));
+        let with_local_quit_macro =
+            builtin_symbol_function(&mut eval, vec![Value::symbol("with-local-quit")])
+                .expect("symbol-function should resolve with-local-quit as a macro");
+        assert!(matches!(with_local_quit_macro, Value::Macro(_)));
+        let with_temp_message_macro =
+            builtin_symbol_function(&mut eval, vec![Value::symbol("with-temp-message")])
+                .expect("symbol-function should resolve with-temp-message as a macro");
+        assert!(matches!(with_temp_message_macro, Value::Macro(_)));
 
         let declare_macro = builtin_symbol_function(&mut eval, vec![Value::symbol("declare")])
             .expect("symbol-function should resolve declare as a macro");
@@ -18647,6 +18837,50 @@ mod tests {
             }
             other => panic!("expected cons arity pair, got {other:?}"),
         }
+        let save_window_excursion_arity =
+            builtin_func_arity_eval(&mut eval, vec![Value::symbol("save-window-excursion")])
+                .expect("func-arity should resolve save-window-excursion macro symbol");
+        match &save_window_excursion_arity {
+            Value::Cons(cell) => {
+                let pair = cell.lock().expect("poisoned");
+                assert_eq!(pair.car, Value::Int(0));
+                assert_eq!(pair.cdr, Value::symbol("many"));
+            }
+            other => panic!("expected cons arity pair, got {other:?}"),
+        }
+        let save_selected_window_arity =
+            builtin_func_arity_eval(&mut eval, vec![Value::symbol("save-selected-window")])
+                .expect("func-arity should resolve save-selected-window macro symbol");
+        match &save_selected_window_arity {
+            Value::Cons(cell) => {
+                let pair = cell.lock().expect("poisoned");
+                assert_eq!(pair.car, Value::Int(0));
+                assert_eq!(pair.cdr, Value::symbol("many"));
+            }
+            other => panic!("expected cons arity pair, got {other:?}"),
+        }
+        let with_local_quit_arity =
+            builtin_func_arity_eval(&mut eval, vec![Value::symbol("with-local-quit")])
+                .expect("func-arity should resolve with-local-quit macro symbol");
+        match &with_local_quit_arity {
+            Value::Cons(cell) => {
+                let pair = cell.lock().expect("poisoned");
+                assert_eq!(pair.car, Value::Int(0));
+                assert_eq!(pair.cdr, Value::symbol("many"));
+            }
+            other => panic!("expected cons arity pair, got {other:?}"),
+        }
+        let with_temp_message_arity =
+            builtin_func_arity_eval(&mut eval, vec![Value::symbol("with-temp-message")])
+                .expect("func-arity should resolve with-temp-message macro symbol");
+        match &with_temp_message_arity {
+            Value::Cons(cell) => {
+                let pair = cell.lock().expect("poisoned");
+                assert_eq!(pair.car, Value::Int(1));
+                assert_eq!(pair.cdr, Value::symbol("many"));
+            }
+            other => panic!("expected cons arity pair, got {other:?}"),
+        }
 
         let inline_arity = builtin_func_arity_eval(&mut eval, vec![Value::symbol("inline")])
             .expect("func-arity should resolve inline special-form symbol");
@@ -18778,6 +19012,22 @@ mod tests {
             builtin_indirect_function(&mut eval, vec![Value::symbol("save-mark-and-excursion")])
                 .expect("indirect-function should resolve save-mark-and-excursion as a macro");
         assert!(matches!(save_mark_and_excursion_macro, Value::Macro(_)));
+        let save_window_excursion_macro =
+            builtin_indirect_function(&mut eval, vec![Value::symbol("save-window-excursion")])
+                .expect("indirect-function should resolve save-window-excursion as a macro");
+        assert!(matches!(save_window_excursion_macro, Value::Macro(_)));
+        let save_selected_window_macro =
+            builtin_indirect_function(&mut eval, vec![Value::symbol("save-selected-window")])
+                .expect("indirect-function should resolve save-selected-window as a macro");
+        assert!(matches!(save_selected_window_macro, Value::Macro(_)));
+        let with_local_quit_macro =
+            builtin_indirect_function(&mut eval, vec![Value::symbol("with-local-quit")])
+                .expect("indirect-function should resolve with-local-quit as a macro");
+        assert!(matches!(with_local_quit_macro, Value::Macro(_)));
+        let with_temp_message_macro =
+            builtin_indirect_function(&mut eval, vec![Value::symbol("with-temp-message")])
+                .expect("indirect-function should resolve with-temp-message as a macro");
+        assert!(matches!(with_temp_message_macro, Value::Macro(_)));
 
         eval.obarray_mut()
             .set_symbol_function("alias-car", Value::symbol("car"));
@@ -18842,6 +19092,22 @@ mod tests {
             builtin_macrop_eval(&mut eval, vec![Value::symbol("save-mark-and-excursion")])
                 .expect("macrop should handle save-mark-and-excursion symbol input");
         assert!(save_mark_and_excursion_symbol.is_truthy());
+        let save_window_excursion_symbol =
+            builtin_macrop_eval(&mut eval, vec![Value::symbol("save-window-excursion")])
+                .expect("macrop should handle save-window-excursion symbol input");
+        assert!(save_window_excursion_symbol.is_truthy());
+        let save_selected_window_symbol =
+            builtin_macrop_eval(&mut eval, vec![Value::symbol("save-selected-window")])
+                .expect("macrop should handle save-selected-window symbol input");
+        assert!(save_selected_window_symbol.is_truthy());
+        let with_local_quit_symbol =
+            builtin_macrop_eval(&mut eval, vec![Value::symbol("with-local-quit")])
+                .expect("macrop should handle with-local-quit symbol input");
+        assert!(with_local_quit_symbol.is_truthy());
+        let with_temp_message_symbol =
+            builtin_macrop_eval(&mut eval, vec![Value::symbol("with-temp-message")])
+                .expect("macrop should handle with-temp-message symbol input");
+        assert!(with_temp_message_symbol.is_truthy());
 
         let plain_symbol = builtin_macrop_eval(&mut eval, vec![Value::symbol("if")])
             .expect("macrop should handle non-macro symbols");
@@ -18984,6 +19250,164 @@ mod tests {
                     Value::list(vec![
                         Value::symbol("save-mark-and-excursion--restore"),
                         Value::symbol("saved-marker"),
+                    ]),
+                ]),
+            ])
+        );
+
+        let save_window_excursion = builtin_macroexpand_eval(
+            &mut eval,
+            vec![Value::list(vec![
+                Value::symbol("save-window-excursion"),
+                Value::list(vec![Value::symbol("selected-window")]),
+            ])],
+        )
+        .expect("macroexpand should expand save-window-excursion");
+        assert_eq!(
+            save_window_excursion,
+            Value::list(vec![
+                Value::symbol("let"),
+                Value::list(vec![Value::list(vec![
+                    Value::symbol("wconfig"),
+                    Value::list(vec![Value::symbol("current-window-configuration")]),
+                ])]),
+                Value::list(vec![
+                    Value::symbol("unwind-protect"),
+                    Value::list(vec![
+                        Value::symbol("progn"),
+                        Value::list(vec![Value::symbol("selected-window")]),
+                    ]),
+                    Value::list(vec![
+                        Value::symbol("set-window-configuration"),
+                        Value::symbol("wconfig"),
+                    ]),
+                ]),
+            ])
+        );
+
+        let save_selected_window = builtin_macroexpand_eval(
+            &mut eval,
+            vec![Value::list(vec![
+                Value::symbol("save-selected-window"),
+                Value::list(vec![Value::symbol("selected-window")]),
+            ])],
+        )
+        .expect("macroexpand should expand save-selected-window");
+        assert_eq!(
+            save_selected_window,
+            Value::list(vec![
+                Value::symbol("let"),
+                Value::list(vec![Value::list(vec![
+                    Value::symbol("save-selected-window--state"),
+                    Value::list(vec![Value::symbol("internal--before-save-selected-window")]),
+                ])]),
+                Value::list(vec![
+                    Value::symbol("save-current-buffer"),
+                    Value::list(vec![
+                        Value::symbol("unwind-protect"),
+                        Value::list(vec![
+                            Value::symbol("progn"),
+                            Value::list(vec![Value::symbol("selected-window")]),
+                        ]),
+                        Value::list(vec![
+                            Value::symbol("internal--after-save-selected-window"),
+                            Value::symbol("save-selected-window--state"),
+                        ]),
+                    ]),
+                ]),
+            ])
+        );
+
+        let with_local_quit = builtin_macroexpand_eval(
+            &mut eval,
+            vec![Value::list(vec![
+                Value::symbol("with-local-quit"),
+                Value::list(vec![Value::symbol("selected-window")]),
+            ])],
+        )
+        .expect("macroexpand should expand with-local-quit");
+        assert_eq!(
+            with_local_quit,
+            Value::list(vec![
+                Value::symbol("condition-case"),
+                Value::Nil,
+                Value::list(vec![
+                    Value::symbol("let"),
+                    Value::list(vec![Value::list(vec![
+                        Value::symbol("inhibit-quit"),
+                        Value::Nil,
+                    ])]),
+                    Value::list(vec![Value::symbol("selected-window")]),
+                ]),
+                Value::list(vec![
+                    Value::symbol("quit"),
+                    Value::list(vec![
+                        Value::symbol("setq"),
+                        Value::symbol("quit-flag"),
+                        Value::True,
+                    ]),
+                    Value::list(vec![
+                        Value::symbol("eval"),
+                        Value::list(vec![
+                            Value::symbol("quote"),
+                            Value::list(vec![Value::symbol("ignore"), Value::Nil]),
+                        ]),
+                        Value::True,
+                    ]),
+                ]),
+            ])
+        );
+
+        let with_temp_message = builtin_macroexpand_eval(
+            &mut eval,
+            vec![Value::list(vec![
+                Value::symbol("with-temp-message"),
+                Value::string("x"),
+                Value::list(vec![Value::symbol("selected-window")]),
+            ])],
+        )
+        .expect("macroexpand should expand with-temp-message");
+        assert_eq!(
+            with_temp_message,
+            Value::list(vec![
+                Value::symbol("let"),
+                Value::list(vec![
+                    Value::list(vec![Value::symbol("with-temp-message"), Value::string("x")]),
+                    Value::list(vec![Value::symbol("current-message")]),
+                ]),
+                Value::list(vec![
+                    Value::symbol("unwind-protect"),
+                    Value::list(vec![
+                        Value::symbol("progn"),
+                        Value::list(vec![
+                            Value::symbol("when"),
+                            Value::symbol("with-temp-message"),
+                            Value::list(vec![
+                                Value::symbol("setq"),
+                                Value::symbol("current-message"),
+                                Value::list(vec![Value::symbol("current-message")]),
+                            ]),
+                            Value::list(vec![
+                                Value::symbol("message"),
+                                Value::string("%s"),
+                                Value::symbol("with-temp-message"),
+                            ]),
+                        ]),
+                        Value::list(vec![Value::symbol("selected-window")]),
+                    ]),
+                    Value::list(vec![
+                        Value::symbol("and"),
+                        Value::symbol("with-temp-message"),
+                        Value::list(vec![
+                            Value::symbol("if"),
+                            Value::symbol("current-message"),
+                            Value::list(vec![
+                                Value::symbol("message"),
+                                Value::string("%s"),
+                                Value::symbol("current-message"),
+                            ]),
+                            Value::list(vec![Value::symbol("message"), Value::Nil]),
+                        ]),
                     ]),
                 ]),
             ])

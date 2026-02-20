@@ -78,9 +78,13 @@ fn is_evaluator_special_form_name(name: &str) -> bool {
             | "provide"
             | "require"
             | "save-excursion"
+            | "save-window-excursion"
+            | "save-selected-window"
             | "save-mark-and-excursion"
             | "save-restriction"
             | "save-match-data"
+            | "with-local-quit"
+            | "with-temp-message"
             | "with-current-buffer"
             | "ignore-errors"
             | "dotimes"
@@ -220,11 +224,15 @@ fn fallback_macro_spec(name: &str) -> Option<FallbackMacroSpec> {
         | "with-temp-buffer"
         | "with-output-to-string"
         | "track-mouse"
+        | "save-window-excursion"
+        | "save-selected-window"
         | "save-mark-and-excursion"
         | "save-match-data"
+        | "with-local-quit"
         | "declare"
         | "eval-when-compile"
         | "eval-and-compile" => Some(FallbackMacroSpec { min: 0, max: None }),
+        "with-temp-message" => Some(FallbackMacroSpec { min: 1, max: None }),
         "defvar-local" => Some(FallbackMacroSpec {
             min: 2,
             max: Some(3),
@@ -4415,6 +4423,61 @@ mod tests {
         if let Value::Cons(cell) = &result {
             let pair = cell.lock().unwrap();
             assert_eq!(pair.car.as_int(), Some(0));
+            assert_eq!(pair.cdr.as_symbol_name(), Some("many"));
+        } else {
+            panic!("expected cons cell");
+        }
+    }
+
+    #[test]
+    fn fallback_macro_save_window_excursion_is_zero_or_many() {
+        let macro_value =
+            fallback_macro_value("save-window-excursion").expect("fallback macro exists");
+        let result = builtin_func_arity(vec![macro_value]).unwrap();
+        if let Value::Cons(cell) = &result {
+            let pair = cell.lock().unwrap();
+            assert_eq!(pair.car.as_int(), Some(0));
+            assert_eq!(pair.cdr.as_symbol_name(), Some("many"));
+        } else {
+            panic!("expected cons cell");
+        }
+    }
+
+    #[test]
+    fn fallback_macro_save_selected_window_is_zero_or_many() {
+        let macro_value =
+            fallback_macro_value("save-selected-window").expect("fallback macro exists");
+        let result = builtin_func_arity(vec![macro_value]).unwrap();
+        if let Value::Cons(cell) = &result {
+            let pair = cell.lock().unwrap();
+            assert_eq!(pair.car.as_int(), Some(0));
+            assert_eq!(pair.cdr.as_symbol_name(), Some("many"));
+        } else {
+            panic!("expected cons cell");
+        }
+    }
+
+    #[test]
+    fn fallback_macro_with_local_quit_is_zero_or_many() {
+        let macro_value = fallback_macro_value("with-local-quit").expect("fallback macro exists");
+        let result = builtin_func_arity(vec![macro_value]).unwrap();
+        if let Value::Cons(cell) = &result {
+            let pair = cell.lock().unwrap();
+            assert_eq!(pair.car.as_int(), Some(0));
+            assert_eq!(pair.cdr.as_symbol_name(), Some("many"));
+        } else {
+            panic!("expected cons cell");
+        }
+    }
+
+    #[test]
+    fn fallback_macro_with_temp_message_is_one_or_many() {
+        let macro_value =
+            fallback_macro_value("with-temp-message").expect("fallback macro exists");
+        let result = builtin_func_arity(vec![macro_value]).unwrap();
+        if let Value::Cons(cell) = &result {
+            let pair = cell.lock().unwrap();
+            assert_eq!(pair.car.as_int(), Some(1));
             assert_eq!(pair.cdr.as_symbol_name(), Some("many"));
         } else {
             panic!("expected cons cell");

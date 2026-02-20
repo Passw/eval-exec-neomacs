@@ -1841,9 +1841,13 @@ impl Evaluator {
             "provide" => self.sf_provide(tail),
             "require" => self.sf_require(tail),
             "save-excursion" => self.sf_save_excursion(tail),
+            "save-window-excursion" => self.sf_save_window_excursion(tail),
+            "save-selected-window" => self.sf_save_selected_window(tail),
             "save-mark-and-excursion" => self.sf_save_mark_and_excursion(tail),
             "save-restriction" => self.sf_save_restriction(tail),
             "save-match-data" => self.sf_save_match_data(tail),
+            "with-local-quit" => self.sf_with_local_quit(tail),
+            "with-temp-message" => self.sf_with_temp_message(tail),
             "with-current-buffer" => self.sf_with_current_buffer(tail),
             "ignore-errors" => self.sf_ignore_errors(tail),
             "dotimes" => self.sf_dotimes(tail),
@@ -2825,6 +2829,32 @@ impl Evaluator {
         result
     }
 
+    fn sf_save_window_excursion(&mut self, tail: &[Expr]) -> EvalResult {
+        let saved_window = super::window_cmds::builtin_selected_window(self, vec![]).ok();
+        let saved_buffer = self.buffers.current_buffer().map(|b| b.id);
+        let result = self.sf_progn(tail);
+        if let Some(window) = saved_window {
+            let _ = super::window_cmds::builtin_select_window(self, vec![window, Value::Nil]);
+        }
+        if let Some(buffer_id) = saved_buffer {
+            self.buffers.set_current(buffer_id);
+        }
+        result
+    }
+
+    fn sf_save_selected_window(&mut self, tail: &[Expr]) -> EvalResult {
+        let saved_window = super::window_cmds::builtin_selected_window(self, vec![]).ok();
+        let saved_buffer = self.buffers.current_buffer().map(|b| b.id);
+        let result = self.sf_progn(tail);
+        if let Some(window) = saved_window {
+            let _ = super::window_cmds::builtin_select_window(self, vec![window, Value::Nil]);
+        }
+        if let Some(buffer_id) = saved_buffer {
+            self.buffers.set_current(buffer_id);
+        }
+        result
+    }
+
     fn sf_save_mark_and_excursion(&mut self, tail: &[Expr]) -> EvalResult {
         // Save mark-active dynamic/global state in addition to save-excursion state.
         let saved_mark_active = match self.eval_symbol("mark-active") {
@@ -2857,6 +2887,59 @@ impl Evaluator {
         let saved_match_data = self.match_data.clone();
         let result = self.sf_progn(tail);
         self.match_data = saved_match_data;
+        result
+    }
+
+    fn sf_with_local_quit(&mut self, tail: &[Expr]) -> EvalResult {
+        let mut frame = HashMap::new();
+        frame.insert("inhibit-quit".to_string(), Value::Nil);
+        self.dynamic.push(frame);
+        let result = self.sf_progn(tail);
+        self.dynamic.pop();
+
+        match result {
+            Err(Flow::Signal(sig)) if sig.symbol == "quit" => {
+                self.assign("quit-flag", Value::True);
+                Ok(Value::Nil)
+            }
+            other => other,
+        }
+    }
+
+    fn sf_with_temp_message(&mut self, tail: &[Expr]) -> EvalResult {
+        if tail.is_empty() {
+            return Err(signal(
+                "wrong-number-of-arguments",
+                vec![Value::symbol("with-temp-message"), Value::Int(0)],
+            ));
+        }
+
+        let message_value = self.eval(&tail[0])?;
+        let current_message = if message_value.is_truthy() {
+            super::builtins::builtin_current_message(vec![])?
+        } else {
+            Value::Nil
+        };
+        if message_value.is_truthy() {
+            let _ = super::builtins::builtin_message_eval(
+                self,
+                vec![Value::string("%s"), message_value.clone()],
+            );
+        }
+
+        let result = self.sf_progn(&tail[1..]);
+
+        if message_value.is_truthy() {
+            if current_message.is_truthy() {
+                let _ = super::builtins::builtin_message_eval(
+                    self,
+                    vec![Value::string("%s"), current_message],
+                );
+            } else {
+                let _ = super::builtins::builtin_message_eval(self, vec![Value::Nil]);
+            }
+        }
+
         result
     }
 
@@ -5391,6 +5474,101 @@ mod tests {
                    (list before (point) (mark) mark-active))))",
         );
         assert_eq!(results[0], "OK ((2 5 nil) 2 5 nil)");
+    }
+
+    #[test]
+    fn save_window_excursion_restores_selected_window_on_success_and_error() {
+        let results = eval_all(
+            "(let ((w1 (selected-window))
+                   (w2 (split-window (selected-window))))
+               (prog1
+                   (list
+                    (save-window-excursion
+                      (select-window w2)
+                      (eq (selected-window) w2))
+                    (eq (selected-window) w1))
+                 (ignore-errors (delete-window w2))))
+             (let ((w1 (selected-window))
+                   (w2 (split-window (selected-window))))
+               (prog1
+                   (list
+                    (condition-case err
+                        (save-window-excursion
+                          (select-window w2)
+                          (error \"boom\"))
+                      (error (car err)))
+                    (eq (selected-window) w1))
+                 (ignore-errors (delete-window w2))))",
+        );
+        assert_eq!(results[0], "OK (t t)");
+        assert_eq!(results[1], "OK (error t)");
+    }
+
+    #[test]
+    fn save_selected_window_restores_selected_window_on_success_and_error() {
+        let results = eval_all(
+            "(let ((w1 (selected-window))
+                   (w2 (split-window (selected-window))))
+               (prog1
+                   (list
+                    (save-selected-window
+                      (select-window w2)
+                      (eq (selected-window) w2))
+                    (eq (selected-window) w1))
+                 (ignore-errors (delete-window w2))))
+             (let ((w1 (selected-window))
+                   (w2 (split-window (selected-window))))
+               (prog1
+                   (list
+                    (condition-case err
+                        (save-selected-window
+                          (select-window w2)
+                          (error \"boom\"))
+                      (error (car err)))
+                    (eq (selected-window) w1))
+                 (ignore-errors (delete-window w2))))",
+        );
+        assert_eq!(results[0], "OK (t t)");
+        assert_eq!(results[1], "OK (error t)");
+    }
+
+    #[test]
+    fn with_local_quit_catches_quit_and_sets_quit_flag() {
+        let results = eval_all(
+            "(setq quit-flag nil)
+             (with-local-quit
+               (keyboard-quit)
+               'after)
+             quit-flag
+             (setq quit-flag nil)
+             (condition-case err
+                 (with-local-quit (error \"boom\"))
+               (error (car err)))
+             quit-flag
+             (let ((inhibit-quit t)
+                   (quit-flag nil))
+               (with-local-quit (keyboard-quit))
+               (list inhibit-quit quit-flag))",
+        );
+        assert_eq!(results[1], "OK nil");
+        assert_eq!(results[2], "OK t");
+        assert_eq!(results[4], "OK error");
+        assert_eq!(results[5], "OK nil");
+        assert_eq!(results[6], "OK (t t)");
+    }
+
+    #[test]
+    fn with_temp_message_accepts_min_arity_and_runs_body() {
+        let results = eval_all(
+            "(with-temp-message nil 42)
+             (with-temp-message \"tmp\" 7)
+             (condition-case err
+                 (with-temp-message)
+               (error (car err)))",
+        );
+        assert_eq!(results[0], "OK 42");
+        assert_eq!(results[1], "OK 7");
+        assert_eq!(results[2], "OK wrong-number-of-arguments");
     }
 
     #[test]

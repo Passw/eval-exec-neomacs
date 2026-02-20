@@ -18,6 +18,7 @@ cases/subr-introspection-core
 cases/macro-special-introspection-core
 cases/save-mark-and-excursion-macro-semantics
 cases/save-match-data-macro-semantics
+cases/window-quit-temp-message-macro-semantics
 cases/function-special-form-edges
 cases/autoload-macro-introspection
 cases/symbol-file-semantics
