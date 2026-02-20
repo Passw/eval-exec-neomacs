@@ -17,7 +17,7 @@ results against that baseline once evaluator execution is wired in.
 - `check-builtin-registry-sync.sh`: checks `builtin_registry.rs` exactly matches names dispatched by `builtins.rs`
 - `check-builtin-registry-fboundp.sh`: checks `fboundp` parity for all names in `builtin_registry.rs`
 - `check-builtin-registry-func-arity.sh`: checks `func-arity` parity for all core names in `builtin_registry.rs`
-- `check-builtin-registry-autoload-metadata.sh`: checks startup autoload metadata tuple parity (`fboundp`, autoload file, autoload interactive slot, autoload type slot) for all core names in `builtin_registry.rs`
+- `check-builtin-registry-autoload-metadata.sh`: checks startup autoload metadata tuple parity (`fboundp`, autoload file, autoload docstring first line, autoload interactive slot, autoload type slot) for all core names in `builtin_registry.rs`
 - `check-startup-doc-stub-coverage.sh`: checks startup integer-doc symbol coverage of `STARTUP_VARIABLE_DOC_STUBS`
 - `check-startup-doc-string-coverage.sh`: checks startup string-doc symbol coverage of `STARTUP_VARIABLE_DOC_STRING_PROPERTIES`
 - `check-startup-variable-documentation-counts.sh`: checks startup `variable-documentation` property-count and runtime-resolution count parity (oracle vs NeoVM)

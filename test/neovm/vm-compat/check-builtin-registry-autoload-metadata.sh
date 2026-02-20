@@ -65,7 +65,7 @@ awk '
   {
     gsub(/\\/, "\\\\", $0)
     gsub(/"/, "\\\"", $0)
-    printf "(let* ((sym (intern \"%s\")) (ok (fboundp sym)) (fn (and ok (symbol-function sym)))) (list ok (if (and (consp fn) (eq (car fn) (quote autoload))) (list :autoload (nth 1 fn) (nth 3 fn) (nth 4 fn)) :nonautoload)))\n", $0
+    printf "(let* ((sym (intern \"%s\")) (ok (fboundp sym)) (fn (and ok (symbol-function sym))) (autoloadp (and (consp fn) (eq (car fn) (quote autoload)))) (doc (and autoloadp (nth 2 fn))) (doc-first-line (if (stringp doc) (car (split-string doc (string 10))) doc))) (list ok (if autoloadp (list :autoload (nth 1 fn) doc-first-line (nth 3 fn) (nth 4 fn)) :nonautoload)))\n", $0
   }
 ' "$tmp_core_names" > "$tmp_forms"
 

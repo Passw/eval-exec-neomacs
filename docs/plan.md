@@ -17799,6 +17799,35 @@ Last updated: 2026-02-19
     - `make -C test/neovm/vm-compat check-builtin-registry-all` (pass)
     - `make -C test/neovm/vm-compat check-all-neovm-strict` (pass; inventory `793`)
 
+- Aligned startup autoload first-line docstring parity and extended strict metadata coverage:
+  - runtime changes:
+    - `rust/neovm-core/src/elisp/eval.rs`
+      - aligned startup autoload first-line docs with GNU Emacs for startup wrappers in bookmark/rect/help-fns/macros/subr-x/thingatpt/time/auth-source clusters:
+        - examples: `clear-rectangle`, `delete-extract-rectangle`, `describe-function`, `insert-kbd-macro`, `string-rectangle`, `yank-rectangle`, `format-seconds`, `read-passwd`, `thing-at-point`.
+      - kept non-interactive metadata overrides for `thingatpt`/`subr-x`/`rect`/time/auth-source helpers while updating first-line doc payloads.
+  - vm-compat changes:
+    - added and wired:
+      - `test/neovm/vm-compat/cases/autoload-startup-docstring-semantics.forms`
+      - `test/neovm/vm-compat/cases/autoload-startup-docstring-semantics.expected.tsv`
+      - `test/neovm/vm-compat/cases/default.list`
+    - strengthened:
+      - `test/neovm/vm-compat/check-builtin-registry-autoload-metadata.sh`
+        - now compares autoload metadata tuple:
+          - `fboundp`
+          - autoload file
+          - autoload docstring first line (newline-safe normalization)
+          - autoload interactive slot
+          - autoload type slot
+      - `test/neovm/vm-compat/cases/builtin-registry-autoload-metadata-allowlist.txt`
+      - `test/neovm/vm-compat/README.md`
+  - verified:
+    - `make -C test/neovm/vm-compat record FORMS=cases/autoload-startup-docstring-semantics.forms EXPECTED=cases/autoload-startup-docstring-semantics.expected.tsv` (pass)
+    - `make -C test/neovm/vm-compat check-one-neovm CASE=cases/autoload-startup-docstring-semantics` (pass, `34/34`)
+    - `make -C test/neovm/vm-compat check-one-neovm CASE=cases/autoload-startup-metadata-noninteractive-semantics` (pass, `13/13`)
+    - `make -C test/neovm/vm-compat check-builtin-registry-autoload-metadata` (pass; drifts `0`)
+    - `make -C test/neovm/vm-compat check-builtin-registry-all` (pass)
+    - `make -C test/neovm/vm-compat check-all-neovm-strict` (pass; inventory `794`)
+
 - Continue compatibility-first maintenance with small commit slices:
   - keep builtin surface and registry in lock-step
   - run oracle/parity checks after each behavior-affecting change

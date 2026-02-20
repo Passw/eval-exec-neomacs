@@ -242,6 +242,7 @@ cases/def-special-form-errors
 cases/func-arity-fallback-macros
 cases/func-arity-dispatch-symbol-wrapper-semantics
 cases/autoload-startup-metadata-noninteractive-semantics
+cases/autoload-startup-docstring-semantics
 cases/misc-special-forms-semantics
 cases/recursion-depth-semantics
 cases/printing

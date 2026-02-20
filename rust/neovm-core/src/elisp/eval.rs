@@ -939,42 +939,42 @@ impl Evaluator {
         seed_autoload(
             "clear-rectangle",
             "rect",
-            "Blank out the region-rectangle with spaces.",
+            "Blank out the region-rectangle.",
         );
         seed_autoload(
             "delete-extract-rectangle",
             "rect",
-            "Delete the rectangle with corners START and END and return it as a list of strings.",
+            "Delete the contents of the rectangle with corners at START and END.",
         );
         seed_autoload(
             "delete-rectangle",
             "rect",
-            "Delete the rectangle with corners START and END.",
+            "Delete (don't save) text in the region-rectangle.",
         );
         seed_autoload(
             "describe-function",
             "help-fns",
-            "Display the full documentation of FUNCTION in a help buffer.",
+            "Display the full documentation of FUNCTION (a symbol).",
         );
         seed_autoload(
             "describe-variable",
             "help-fns",
-            "Display the full documentation of VARIABLE in a help buffer.",
+            "Display the full documentation of VARIABLE (a symbol).",
         );
         seed_autoload(
             "extract-rectangle",
             "rect",
-            "Return rectangle corners START and END as a list of strings.",
+            "Return the contents of the rectangle with corners at START and END.",
         );
         seed_autoload(
             "insert-kbd-macro",
             "macros",
-            "Insert in buffer a keyboard macro's definition as Lisp code.",
+            "Insert in buffer the definition of kbd macro MACRONAME, as Lisp code.",
         );
         seed_autoload(
             "insert-rectangle",
             "rect",
-            "Insert lines of RECTANGLE with upper left corner at point.",
+            "Insert text of RECTANGLE with upper left corner at point.",
         );
         seed_autoload(
             "kbd-macro-query",
@@ -984,27 +984,27 @@ impl Evaluator {
         seed_autoload(
             "kill-rectangle",
             "rect",
-            "Delete the region-rectangle and save it as the last killed rectangle.",
+            "Delete the region-rectangle and save it as the last killed one.",
         );
         seed_autoload(
             "open-rectangle",
             "rect",
-            "Blank out the specified rectangle with spaces for later insertion.",
+            "Blank out the region-rectangle, shifting text right.",
         );
         seed_autoload(
             "string-pixel-width",
             "subr-x",
-            "Return the width in pixels of STRING.",
+            "Return the width of STRING in pixels.",
         );
         seed_autoload(
             "string-rectangle",
             "rect",
-            "Replace rectangle contents with STRING.",
+            "Replace rectangle contents with STRING on each line.",
         );
         seed_autoload(
             "yank-rectangle",
             "rect",
-            "Insert the last killed rectangle with its upper left corner at point.",
+            "Yank the last killed rectangle with upper left corner at point.",
         );
         drop(seed_autoload);
         let mut seed_autoload_noninteractive = |name: &str, file: &str, doc: &str| {
@@ -1055,17 +1055,17 @@ impl Evaluator {
         seed_autoload_noninteractive(
             "delete-extract-rectangle",
             "rect",
-            "Delete the rectangle with corners START and END and return it as a list of strings.",
+            "Delete the contents of the rectangle with corners at START and END.",
         );
         seed_autoload_noninteractive(
             "extract-rectangle",
             "rect",
-            "Return rectangle corners START and END as a list of strings.",
+            "Return the contents of the rectangle with corners at START and END.",
         );
         seed_autoload_noninteractive(
             "insert-rectangle",
             "rect",
-            "Insert lines of RECTANGLE with upper left corner at point.",
+            "Insert text of RECTANGLE with upper left corner at point.",
         );
         seed_autoload_noninteractive(
             "string-clean-whitespace",
@@ -1080,7 +1080,7 @@ impl Evaluator {
         seed_autoload_noninteractive(
             "string-pixel-width",
             "subr-x",
-            "Return the width in pixels of STRING.",
+            "Return the width of STRING in pixels.",
         );
         // Keep these as non-interactive autoload wrappers to match GNU Emacs
         // `symbol-function` shape while preserving runtime callability through
