@@ -835,3 +835,4 @@ cases/internal-session-minibuffer-compat-semantics
 cases/internal-sqlite-inotify-unlock-compat-semantics
 cases/internal-window-geometry-compat-semantics
 cases/internal-treesit-compat-semantics
+cases/internal-runtime-core-compat-semantics

@@ -1483,6 +1483,96 @@ pub(crate) fn builtin_window_top_child(args: Vec<Value>) -> EvalResult {
     Ok(Value::Nil)
 }
 
+/// `(internal--define-uninitialized-variable)` -> nil.
+pub(crate) fn builtin_internal_define_uninitialized_variable(args: Vec<Value>) -> EvalResult {
+    expect_range_args("internal--define-uninitialized-variable", &args, 1, 2)?;
+    Ok(Value::Nil)
+}
+
+/// `(internal--labeled-narrow-to-region)` -> nil.
+pub(crate) fn builtin_internal_labeled_narrow_to_region(args: Vec<Value>) -> EvalResult {
+    expect_args("internal--labeled-narrow-to-region", &args, 3)?;
+    Ok(Value::Nil)
+}
+
+/// `(internal--labeled-widen)` -> nil.
+pub(crate) fn builtin_internal_labeled_widen(args: Vec<Value>) -> EvalResult {
+    expect_args("internal--labeled-widen", &args, 1)?;
+    Ok(Value::Nil)
+}
+
+/// `(internal--obarray-buckets)` -> nil.
+pub(crate) fn builtin_internal_obarray_buckets(args: Vec<Value>) -> EvalResult {
+    expect_args("internal--obarray-buckets", &args, 1)?;
+    Ok(Value::Nil)
+}
+
+/// `(internal--set-buffer-modified-tick)` -> nil.
+pub(crate) fn builtin_internal_set_buffer_modified_tick(args: Vec<Value>) -> EvalResult {
+    expect_range_args("internal--set-buffer-modified-tick", &args, 1, 2)?;
+    Ok(Value::Nil)
+}
+
+/// `(internal--track-mouse)` -> nil.
+pub(crate) fn builtin_internal_track_mouse(args: Vec<Value>) -> EvalResult {
+    expect_args("internal--track-mouse", &args, 1)?;
+    Ok(Value::Nil)
+}
+
+/// `(internal-char-font)` -> nil.
+pub(crate) fn builtin_internal_char_font(args: Vec<Value>) -> EvalResult {
+    expect_range_args("internal-char-font", &args, 1, 2)?;
+    Ok(Value::Nil)
+}
+
+/// `(internal-complete-buffer)` -> nil.
+pub(crate) fn builtin_internal_complete_buffer(args: Vec<Value>) -> EvalResult {
+    expect_args("internal-complete-buffer", &args, 3)?;
+    Ok(Value::Nil)
+}
+
+/// `(internal-describe-syntax-value)` -> nil.
+pub(crate) fn builtin_internal_describe_syntax_value(args: Vec<Value>) -> EvalResult {
+    expect_args("internal-describe-syntax-value", &args, 1)?;
+    Ok(Value::Nil)
+}
+
+/// `(internal-event-symbol-parse-modifiers)` -> nil.
+pub(crate) fn builtin_internal_event_symbol_parse_modifiers(args: Vec<Value>) -> EvalResult {
+    expect_args("internal-event-symbol-parse-modifiers", &args, 1)?;
+    Ok(Value::Nil)
+}
+
+/// `(internal-handle-focus-in)` -> nil.
+pub(crate) fn builtin_internal_handle_focus_in(args: Vec<Value>) -> EvalResult {
+    expect_args("internal-handle-focus-in", &args, 1)?;
+    Ok(Value::Nil)
+}
+
+/// `(internal-make-var-non-special)` -> nil.
+pub(crate) fn builtin_internal_make_var_non_special(args: Vec<Value>) -> EvalResult {
+    expect_args("internal-make-var-non-special", &args, 1)?;
+    Ok(Value::Nil)
+}
+
+/// `(internal-set-lisp-face-attribute-from-resource)` -> nil.
+pub(crate) fn builtin_internal_set_lisp_face_attribute_from_resource(args: Vec<Value>) -> EvalResult {
+    expect_range_args("internal-set-lisp-face-attribute-from-resource", &args, 3, 4)?;
+    Ok(Value::Nil)
+}
+
+/// `(internal-stack-stats)` -> nil.
+pub(crate) fn builtin_internal_stack_stats(args: Vec<Value>) -> EvalResult {
+    expect_args("internal-stack-stats", &args, 0)?;
+    Ok(Value::Nil)
+}
+
+/// `(internal-subr-documentation)` -> nil.
+pub(crate) fn builtin_internal_subr_documentation(args: Vec<Value>) -> EvalResult {
+    expect_args("internal-subr-documentation", &args, 1)?;
+    Ok(Value::Nil)
+}
+
 /// `(treesit-available-p)` -> nil.
 pub(crate) fn builtin_treesit_available_p(args: Vec<Value>) -> EvalResult {
     expect_args("treesit-available-p", &args, 0)?;
@@ -2291,6 +2381,22 @@ mod tests {
     #[test]
     fn treesit_query_compile_validates_arity() {
         let err = builtin_treesit_query_compile(vec![Value::Nil]).unwrap_err();
+        match err {
+            Flow::Signal(sig) => assert_eq!(sig.symbol, "wrong-number-of-arguments"),
+            other => panic!("expected signal, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn internal_stack_stats_returns_nil() {
+        let out = builtin_internal_stack_stats(vec![]).unwrap();
+        assert_eq!(out, Value::Nil);
+    }
+
+    #[test]
+    fn internal_labeled_narrow_to_region_validates_arity() {
+        let err = builtin_internal_labeled_narrow_to_region(vec![Value::Nil, Value::Nil])
+            .unwrap_err();
         match err {
             Flow::Signal(sig) => assert_eq!(sig.symbol, "wrong-number-of-arguments"),
             other => panic!("expected signal, got {other:?}"),

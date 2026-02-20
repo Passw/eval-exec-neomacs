@@ -613,6 +613,21 @@ fn subr_arity_value(name: &str) -> Value {
         | "internal-set-alternative-font-registry-alist"
         | "internal-set-font-selection-order" => arity_cons(1, Some(1)),
         "internal-set-lisp-face-attribute" => arity_cons(3, Some(4)),
+        "internal--define-uninitialized-variable" => arity_cons(1, Some(2)),
+        "internal--labeled-narrow-to-region" => arity_cons(3, Some(3)),
+        "internal--labeled-widen" => arity_cons(1, Some(1)),
+        "internal--obarray-buckets" => arity_cons(1, Some(1)),
+        "internal--set-buffer-modified-tick" => arity_cons(1, Some(2)),
+        "internal--track-mouse" => arity_cons(1, Some(1)),
+        "internal-char-font" => arity_cons(1, Some(2)),
+        "internal-complete-buffer" => arity_cons(3, Some(3)),
+        "internal-describe-syntax-value" => arity_cons(1, Some(1)),
+        "internal-event-symbol-parse-modifiers" => arity_cons(1, Some(1)),
+        "internal-handle-focus-in" => arity_cons(1, Some(1)),
+        "internal-make-var-non-special" => arity_cons(1, Some(1)),
+        "internal-set-lisp-face-attribute-from-resource" => arity_cons(3, Some(4)),
+        "internal-stack-stats" => arity_cons(0, Some(0)),
+        "internal-subr-documentation" => arity_cons(1, Some(1)),
         "merge-face-attribute" => arity_cons(3, Some(3)),
         "put-image" => arity_cons(2, Some(4)),
         "insert-image" => arity_cons(1, Some(5)),
@@ -2818,6 +2833,21 @@ mod tests {
         assert_subr_arity("treesit-search-forward", 2, Some(4));
         assert_subr_arity("treesit-search-subtree", 2, Some(5));
         assert_subr_arity("treesit-subtree-stat", 1, Some(1));
+        assert_subr_arity("internal--define-uninitialized-variable", 1, Some(2));
+        assert_subr_arity("internal--labeled-narrow-to-region", 3, Some(3));
+        assert_subr_arity("internal--labeled-widen", 1, Some(1));
+        assert_subr_arity("internal--obarray-buckets", 1, Some(1));
+        assert_subr_arity("internal--set-buffer-modified-tick", 1, Some(2));
+        assert_subr_arity("internal--track-mouse", 1, Some(1));
+        assert_subr_arity("internal-char-font", 1, Some(2));
+        assert_subr_arity("internal-complete-buffer", 3, Some(3));
+        assert_subr_arity("internal-describe-syntax-value", 1, Some(1));
+        assert_subr_arity("internal-event-symbol-parse-modifiers", 1, Some(1));
+        assert_subr_arity("internal-handle-focus-in", 1, Some(1));
+        assert_subr_arity("internal-make-var-non-special", 1, Some(1));
+        assert_subr_arity("internal-set-lisp-face-attribute-from-resource", 3, Some(4));
+        assert_subr_arity("internal-stack-stats", 0, Some(0));
+        assert_subr_arity("internal-subr-documentation", 1, Some(1));
         assert_subr_arity("get-unicode-property-internal", 2, Some(2));
         assert_subr_arity("get-variable-watchers", 1, Some(1));
         assert_subr_arity("fillarray", 2, Some(2));
