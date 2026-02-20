@@ -817,3 +817,4 @@ cases/funcall-defalias-provide-require-wrapper-semantics
 cases/message-textprop-funcall-wrapper-semantics
 cases/previous-char-single-property-wrapper-semantics
 cases/textprop-overlay-change-wrapper-semantics
+cases/pos-prefix-position-bytes-ngettext-terpri-memql-semantics

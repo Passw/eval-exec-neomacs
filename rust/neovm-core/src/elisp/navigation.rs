@@ -252,13 +252,31 @@ pub(crate) fn builtin_line_end_position(
     };
     let buf = eval.buffers.current_buffer().ok_or_else(no_buffer)?;
     let text = buffer_text(buf);
-    let mut pos = buf.pt;
-    if n != 1 {
-        let delta = n - 1;
-        let (new_pos, _) = move_by_lines(&text, pos, delta);
-        pos = new_pos;
+    let point = buf.pt.min(text.len());
+    let current_line = count_newlines(&text, 0, point) as i64 + 1;
+    let total_lines = count_newlines(&text, 0, text.len()) as i64 + 1;
+    let target_line = current_line + (n - 1);
+
+    if target_line < 1 {
+        return Ok(Value::Int(1));
     }
-    let eol = line_end_byte(&text, pos);
+    if target_line > total_lines {
+        return Ok(Value::Int(byte_to_char_pos(buf, text.len())));
+    }
+
+    let mut line_start = 0usize;
+    for _ in 1..(target_line as usize) {
+        match text[line_start..].find('\n') {
+            Some(offset) => {
+                line_start += offset + 1;
+            }
+            None => {
+                line_start = text.len();
+                break;
+            }
+        }
+    }
+    let eol = line_end_byte(&text, line_start);
     Ok(Value::Int(byte_to_char_pos(buf, eol)))
 }
 

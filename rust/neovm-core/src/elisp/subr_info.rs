@@ -462,7 +462,8 @@ fn subr_arity_value(name: &str) -> Value {
         | "interpreted-function-p"
         | "invisible-p"
         | "macrop"
-        | "functionp" => arity_cons(1, Some(1)),
+        | "functionp"
+        | "prefix-numeric-value" => arity_cons(1, Some(1)),
         "gensym" => arity_cons(0, Some(1)),
         "fboundp" | "func-arity" | "symbol-function" | "symbol-value" | "fmakunbound"
         | "makunbound" => arity_cons(1, Some(1)),
@@ -492,7 +493,7 @@ fn subr_arity_value(name: &str) -> Value {
         | "hash-table-rehash-threshold"
         | "hash-table-weakness" => arity_cons(1, Some(1)),
         "max" | "min" => arity_cons(1, None),
-        "assq" | "car-less-than-car" | "member" | "memq" | "rassoc" | "rassq" => {
+        "assq" | "car-less-than-car" | "member" | "memq" | "memql" | "rassoc" | "rassq" => {
             arity_cons(2, Some(2))
         }
         "mod" | "make-list" | "mapc" | "mapcan" | "mapcar" | "nth" | "nthcdr" | "remq" => {
@@ -517,7 +518,7 @@ fn subr_arity_value(name: &str) -> Value {
         | "downcase-word"
         | "kill-local-variable"
         | "kill-word" => arity_cons(1, Some(1)),
-        "newline" | "next-line" => arity_cons(0, Some(2)),
+        "newline" | "next-line" | "terpri" => arity_cons(0, Some(2)),
         "reindent-then-newline-and-indent" => arity_cons(0, Some(0)),
         "previous-line" => arity_cons(0, Some(2)),
         "newline-and-indent" => arity_cons(0, Some(1)),
@@ -826,7 +827,7 @@ fn subr_arity_value(name: &str) -> Value {
         "ceiling" | "characterp" | "floor" | "round" | "string-to-number" | "truncate" => {
             arity_cons(1, Some(2))
         }
-        "byte-to-position" | "byte-to-string" => arity_cons(1, Some(1)),
+        "byte-to-position" | "byte-to-string" | "position-bytes" => arity_cons(1, Some(1)),
         "substring" | "substring-no-properties" => arity_cons(1, Some(3)),
         "aref" | "char-equal" | "eq" | "eql" | "equal" | "function-equal" | "make-vector"
         | "string-equal" | "string-lessp" | "throw" => arity_cons(2, Some(2)),
@@ -841,7 +842,7 @@ fn subr_arity_value(name: &str) -> Value {
         "find-composition-internal" => arity_cons(4, Some(4)),
         "call-interactively" => arity_cons(1, Some(3)),
         "command-execute" => arity_cons(1, Some(4)),
-        "command-error-default-function" => arity_cons(3, Some(3)),
+        "command-error-default-function" | "ngettext" => arity_cons(3, Some(3)),
         "compare-strings" => arity_cons(6, Some(7)),
         "compare-buffer-substrings" => arity_cons(6, Some(6)),
         "completing-read" => arity_cons(2, Some(8)),
@@ -914,7 +915,11 @@ fn subr_arity_value(name: &str) -> Value {
         "user-real-login-name" | "user-real-uid" | "user-uid" => arity_cons(0, Some(0)),
         "user-full-name" | "user-login-name" => arity_cons(0, Some(1)),
         "emacs-version" => arity_cons(0, Some(1)),
-        "line-beginning-position" | "line-end-position" | "line-number-display-width" => {
+        "line-beginning-position"
+        | "line-end-position"
+        | "line-number-display-width"
+        | "pos-bol"
+        | "pos-eol" => {
             arity_cons(0, Some(1))
         }
         "line-number-at-pos" => arity_cons(0, Some(2)),
@@ -2073,6 +2078,7 @@ mod tests {
         assert_subr_arity("field-string", 0, Some(1));
         assert_subr_arity("field-string-no-properties", 0, Some(1));
         assert_subr_arity("byte-to-position", 1, Some(1));
+        assert_subr_arity("position-bytes", 1, Some(1));
     }
 
     #[test]
@@ -2157,6 +2163,7 @@ mod tests {
         assert_subr_arity("car-less-than-car", 2, Some(2));
         assert_subr_arity("member", 2, Some(2));
         assert_subr_arity("memq", 2, Some(2));
+        assert_subr_arity("memql", 2, Some(2));
         assert_subr_arity("rassoc", 2, Some(2));
         assert_subr_arity("rassq", 2, Some(2));
         assert_subr_arity("bare-symbol", 1, Some(1));
@@ -2781,6 +2788,8 @@ mod tests {
     fn subr_arity_line_position_primitives_match_oracle() {
         assert_subr_arity("line-beginning-position", 0, Some(1));
         assert_subr_arity("line-end-position", 0, Some(1));
+        assert_subr_arity("pos-bol", 0, Some(1));
+        assert_subr_arity("pos-eol", 0, Some(1));
         assert_subr_arity("line-number-at-pos", 0, Some(2));
         assert_subr_arity("line-number-display-width", 0, Some(1));
         assert_subr_arity("line-pixel-height", 0, Some(0));
@@ -2855,6 +2864,7 @@ mod tests {
         assert_subr_arity("prin1-to-string", 1, Some(3));
         assert_subr_arity("princ", 1, Some(2));
         assert_subr_arity("print", 1, Some(2));
+        assert_subr_arity("terpri", 0, Some(2));
         assert_subr_arity("propertize", 1, None);
         assert_subr_arity("put-image", 2, Some(4));
         assert_subr_arity("query-replace", 2, Some(7));
@@ -3159,6 +3169,7 @@ mod tests {
     fn subr_arity_misc_helper_primitives_match_oracle() {
         assert_subr_arity("format-message", 1, None);
         assert_subr_arity("identity", 1, Some(1));
+        assert_subr_arity("prefix-numeric-value", 1, Some(1));
         assert_subr_arity("length", 1, Some(1));
         assert_subr_arity("length<", 2, Some(2));
         assert_subr_arity("length=", 2, Some(2));
@@ -3167,6 +3178,7 @@ mod tests {
         assert_subr_arity("logb", 1, Some(1));
         assert_subr_arity("logcount", 1, Some(1));
         assert_subr_arity("lognot", 1, Some(1));
+        assert_subr_arity("ngettext", 3, Some(3));
         assert_subr_arity("substring-no-properties", 1, Some(3));
         assert_subr_arity("group-name", 1, Some(1));
         assert_subr_arity("group-gid", 0, Some(0));

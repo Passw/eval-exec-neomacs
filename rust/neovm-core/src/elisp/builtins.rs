@@ -1468,6 +1468,32 @@ pub(crate) fn builtin_memq(args: Vec<Value>) -> EvalResult {
     }
 }
 
+pub(crate) fn builtin_memql(args: Vec<Value>) -> EvalResult {
+    expect_args("memql", &args, 2)?;
+    let target = &args[0];
+    let list = args[1].clone();
+    let mut cursor = list.clone();
+    loop {
+        match cursor {
+            Value::Nil => return Ok(Value::Nil),
+            Value::Cons(cell) => {
+                let pair = cell.lock().expect("poisoned");
+                if eql_value(target, &pair.car) {
+                    drop(pair);
+                    return Ok(Value::Cons(cell));
+                }
+                cursor = pair.cdr.clone();
+            }
+            _ => {
+                return Err(signal(
+                    "wrong-type-argument",
+                    vec![Value::symbol("listp"), list],
+                ))
+            }
+        }
+    }
+}
+
 pub(crate) fn builtin_assoc(args: Vec<Value>) -> EvalResult {
     expect_args("assoc", &args, 2)?;
     let key = &args[0];
@@ -1967,6 +1993,18 @@ pub(crate) fn builtin_format(args: Vec<Value>) -> EvalResult {
 pub(crate) fn builtin_format_message(args: Vec<Value>) -> EvalResult {
     expect_min_args("format-message", &args, 1)?;
     builtin_format(args)
+}
+
+pub(crate) fn builtin_ngettext(args: Vec<Value>) -> EvalResult {
+    expect_args("ngettext", &args, 3)?;
+    let singular = expect_strict_string(&args[0])?;
+    let plural = expect_strict_string(&args[1])?;
+    let count = expect_int(&args[2])?;
+    if count == 1 {
+        Ok(Value::string(singular))
+    } else {
+        Ok(Value::string(plural))
+    }
 }
 
 pub(crate) fn builtin_format_eval(
@@ -2657,6 +2695,19 @@ pub(crate) fn builtin_identity(args: Vec<Value>) -> EvalResult {
     Ok(args[0].clone())
 }
 
+pub(crate) fn builtin_prefix_numeric_value(args: Vec<Value>) -> EvalResult {
+    expect_args("prefix-numeric-value", &args, 1)?;
+    let numeric = match &args[0] {
+        Value::Nil => 1,
+        Value::Symbol(name) if name == "-" => -1,
+        Value::Int(n) => *n,
+        Value::Char(c) => *c as i64,
+        Value::Cons(cell) => cell.lock().expect("poisoned").car.as_int().unwrap_or(1),
+        _ => 1,
+    };
+    Ok(Value::Int(numeric))
+}
+
 pub(crate) fn builtin_ignore(_args: Vec<Value>) -> EvalResult {
     Ok(Value::Nil)
 }
@@ -2980,6 +3031,22 @@ pub(crate) fn builtin_next_char_property_change(
         .current_buffer()
         .ok_or_else(|| signal("error", vec![Value::string("No current buffer")]))?;
     Ok(Value::Int(buf.text.byte_to_char(buf.point_max()) as i64 + 1))
+}
+
+pub(crate) fn builtin_pos_bol(
+    eval: &mut super::eval::Evaluator,
+    args: Vec<Value>,
+) -> EvalResult {
+    expect_max_args("pos-bol", &args, 1)?;
+    super::navigation::builtin_line_beginning_position(eval, args)
+}
+
+pub(crate) fn builtin_pos_eol(
+    eval: &mut super::eval::Evaluator,
+    args: Vec<Value>,
+) -> EvalResult {
+    expect_max_args("pos-eol", &args, 1)?;
+    super::navigation::builtin_line_end_position(eval, args)
 }
 
 pub(crate) fn builtin_previous_property_change(
@@ -5569,6 +5636,42 @@ fn write_print_output(
     }
 }
 
+fn write_terpri_output(eval: &mut super::eval::Evaluator, target: Value) -> Result<(), Flow> {
+    match target {
+        Value::True | Value::Nil => Ok(()),
+        Value::Buffer(id) => {
+            let Some(buf) = eval.buffers.get_mut(id) else {
+                return Err(signal(
+                    "error",
+                    vec![Value::string("Output buffer no longer exists")],
+                ));
+            };
+            buf.insert("\n");
+            Ok(())
+        }
+        Value::Str(name) => {
+            let Some(id) = eval.buffers.find_buffer_by_name(&name) else {
+                return Err(signal(
+                    "error",
+                    vec![Value::string(format!("No buffer named {name}"))],
+                ));
+            };
+            let Some(buf) = eval.buffers.get_mut(id) else {
+                return Err(signal(
+                    "error",
+                    vec![Value::string("Output buffer no longer exists")],
+                ));
+            };
+            buf.insert("\n");
+            Ok(())
+        }
+        other => {
+            eval.apply(other, vec![Value::Int('\n' as i64)])?;
+            Ok(())
+        }
+    }
+}
+
 fn print_threading_handle(eval: &super::eval::Evaluator, value: &Value) -> Option<String> {
     if let Some(handle) = super::display::print_terminal_handle(value) {
         return Some(handle);
@@ -5680,6 +5783,11 @@ pub(crate) fn builtin_print(args: Vec<Value>) -> EvalResult {
     Ok(args[0].clone())
 }
 
+pub(crate) fn builtin_terpri(args: Vec<Value>) -> EvalResult {
+    expect_max_args("terpri", &args, 2)?;
+    Ok(Value::True)
+}
+
 pub(crate) fn builtin_print_eval(
     eval: &mut super::eval::Evaluator,
     args: Vec<Value>,
@@ -5691,6 +5799,16 @@ pub(crate) fn builtin_print_eval(
     text.push('\n');
     write_print_output(eval, args.get(1), &text)?;
     Ok(args[0].clone())
+}
+
+pub(crate) fn builtin_terpri_eval(
+    eval: &mut super::eval::Evaluator,
+    args: Vec<Value>,
+) -> EvalResult {
+    expect_max_args("terpri", &args, 2)?;
+    let target = resolve_print_target(eval, args.first());
+    write_terpri_output(eval, target)?;
+    Ok(Value::True)
 }
 
 pub(crate) fn builtin_propertize(args: Vec<Value>) -> EvalResult {
@@ -7450,6 +7568,28 @@ pub(crate) fn builtin_byte_to_position(
     }
 
     Ok(Value::Int(buf.text.byte_to_char(boundary) as i64 + 1))
+}
+
+/// `(position-bytes POSITION)` -- map a 1-based char position to a 1-based byte position.
+pub(crate) fn builtin_position_bytes(
+    eval: &mut super::eval::Evaluator,
+    args: Vec<Value>,
+) -> EvalResult {
+    expect_args("position-bytes", &args, 1)?;
+    let pos = expect_integer_or_marker(&args[0])?;
+
+    let buf = eval
+        .buffers
+        .current_buffer()
+        .ok_or_else(|| signal("error", vec![Value::string("No current buffer")]))?;
+
+    let max_char_pos = buf.text.char_count() as i64 + 1;
+    if pos <= 0 || pos > max_char_pos {
+        return Ok(Value::Nil);
+    }
+
+    let byte_pos = buf.text.char_to_byte((pos - 1) as usize);
+    Ok(Value::Int(byte_pos as i64 + 1))
 }
 
 /// `(get-byte &optional POSITION STRING)` -- return a byte value at point or in STRING.
@@ -9623,6 +9763,7 @@ pub(crate) fn dispatch_builtin(
         "char-after" => return Some(builtin_char_after(eval, args)),
         "char-before" => return Some(builtin_char_before(eval, args)),
         "byte-to-position" => return Some(builtin_byte_to_position(eval, args)),
+        "position-bytes" => return Some(builtin_position_bytes(eval, args)),
         "get-byte" => return Some(builtin_get_byte(eval, args)),
         "buffer-local-value" => return Some(builtin_buffer_local_value(eval, args)),
         // Search / regex operations
@@ -10288,9 +10429,11 @@ pub(crate) fn dispatch_builtin(
                 eval, args,
             ))
         }
+        "pos-bol" => return Some(builtin_pos_bol(eval, args)),
         "line-end-position" => {
             return Some(super::navigation::builtin_line_end_position(eval, args))
         }
+        "pos-eol" => return Some(builtin_pos_eol(eval, args)),
         "line-number-at-pos" => {
             return Some(super::navigation::builtin_line_number_at_pos(eval, args))
         }
@@ -11066,6 +11209,7 @@ pub(crate) fn dispatch_builtin(
         "prin1" => return Some(builtin_prin1_eval(eval, args)),
         "prin1-to-string" => return Some(builtin_prin1_to_string_eval(eval, args)),
         "print" => return Some(builtin_print_eval(eval, args)),
+        "terpri" => return Some(builtin_terpri_eval(eval, args)),
 
         // Misc (evaluator-dependent)
         "backtrace--frames-from-thread" => {
@@ -11464,6 +11608,7 @@ pub(crate) fn dispatch_builtin(
         "nreverse" => builtin_nreverse(args),
         "member" => builtin_member(args),
         "memq" => builtin_memq(args),
+        "memql" => builtin_memql(args),
         "assoc" => builtin_assoc(args),
         "assq" => builtin_assq(args),
         "copy-sequence" => builtin_copy_sequence(args),
@@ -11499,7 +11644,9 @@ pub(crate) fn dispatch_builtin(
         "message-box" => builtin_message_box(args),
         "message-or-box" => builtin_message_or_box(args),
         "current-message" => builtin_current_message(args),
+        "ngettext" => builtin_ngettext(args),
         "error" => builtin_error(args),
+        "prefix-numeric-value" => builtin_prefix_numeric_value(args),
         "command-error-default-function" => builtin_command_error_default_function(args),
         "compute-motion" => builtin_compute_motion(args),
         "clear-string" => builtin_clear_string(args),
@@ -11508,6 +11655,7 @@ pub(crate) fn dispatch_builtin(
         "prin1" => builtin_prin1(args),
         "prin1-to-string" => builtin_prin1_to_string(args),
         "print" => builtin_print(args),
+        "terpri" => builtin_terpri(args),
         "propertize" => builtin_propertize(args),
         "gensym" => builtin_gensym(args),
         "string-to-syntax" => builtin_string_to_syntax(args),
@@ -12233,6 +12381,7 @@ pub(crate) fn dispatch_builtin_pure(name: &str, args: Vec<Value>) -> Option<Eval
         "delete" => builtin_delete(args),
         "delq" => builtin_delq(args),
         "elt" => builtin_elt(args),
+        "memql" => builtin_memql(args),
         "nconc" => builtin_nconc(args),
         "alist-get" => builtin_alist_get(args),
         "number-sequence" => builtin_number_sequence(args),
@@ -12243,11 +12392,14 @@ pub(crate) fn dispatch_builtin_pure(name: &str, args: Vec<Value>) -> Option<Eval
         "message-box" => builtin_message_box(args),
         "message-or-box" => builtin_message_or_box(args),
         "current-message" => builtin_current_message(args),
+        "ngettext" => builtin_ngettext(args),
         "error" => builtin_error(args),
+        "prefix-numeric-value" => builtin_prefix_numeric_value(args),
         "princ" => builtin_princ(args),
         "prin1" => builtin_prin1(args),
         "prin1-to-string" => builtin_prin1_to_string(args),
         "print" => builtin_print(args),
+        "terpri" => builtin_terpri(args),
         "propertize" => builtin_propertize(args),
         "gensym" => builtin_gensym(args),
         "string-to-syntax" => builtin_string_to_syntax(args),
