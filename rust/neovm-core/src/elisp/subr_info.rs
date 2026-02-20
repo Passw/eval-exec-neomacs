@@ -747,6 +747,7 @@ fn subr_arity_value(name: &str) -> Value {
         "bool-vector-not" => arity_cons(1, Some(2)),
         "bool-vector-subsetp" => arity_cons(2, Some(2)),
         "make-bool-vector" => arity_cons(2, Some(2)),
+        "bitmap-spec-p" => arity_cons(1, Some(1)),
         "bool-vector-exclusive-or"
         | "bool-vector-intersection"
         | "bool-vector-set-difference"
@@ -779,6 +780,7 @@ fn subr_arity_value(name: &str) -> Value {
         "ceiling" | "characterp" | "floor" | "round" | "string-to-number" | "truncate" => {
             arity_cons(1, Some(2))
         }
+        "byte-to-position" | "byte-to-string" => arity_cons(1, Some(1)),
         "substring" => arity_cons(1, Some(3)),
         "aref" | "char-equal" | "eq" | "eql" | "equal" | "make-vector" | "string-equal"
         | "string-lessp" | "throw" => {
@@ -891,7 +893,9 @@ fn subr_arity_value(name: &str) -> Value {
         "timer-activate" => arity_cons(1, Some(3)),
         "sleep-for" | "sit-for" => arity_cons(1, Some(2)),
         "current-time" => arity_cons(0, Some(0)),
-        "category-table" | "clear-charset-maps" => arity_cons(0, Some(0)),
+        "category-table"
+        | "clear-buffer-auto-save-failure"
+        | "clear-charset-maps" => arity_cons(0, Some(0)),
         "find-charset-region" => arity_cons(2, Some(3)),
         "find-charset-string" => arity_cons(1, Some(2)),
         "case-table-p"
@@ -1019,6 +1023,7 @@ fn subr_arity_value(name: &str) -> Value {
         "x-show-tip" | "x-window-property" | "x-translate-coordinates" => arity_cons(1, Some(6)),
         "internal-show-cursor" => arity_cons(2, Some(2)),
         "display-buffer" => arity_cons(1, Some(3)),
+        "clear-face-cache" => arity_cons(0, Some(1)),
         "clear-font-cache" => arity_cons(0, Some(0)),
         "clear-image-cache" => arity_cons(0, Some(2)),
         "create-image" => arity_cons(1, None),
@@ -1735,6 +1740,7 @@ mod tests {
 
     #[test]
     fn subr_arity_image_font_primitives_match_oracle() {
+        assert_subr_arity("clear-face-cache", 0, Some(1));
         assert_subr_arity("clear-font-cache", 0, Some(0));
         assert_subr_arity("clear-image-cache", 0, Some(2));
         assert_subr_arity("create-image", 1, None);
@@ -1934,6 +1940,7 @@ mod tests {
         assert_subr_arity("buffer-local-value", 2, Some(2));
         assert_subr_arity("buffer-substring", 2, Some(2));
         assert_subr_arity("buffer-substring-no-properties", 2, Some(2));
+        assert_subr_arity("byte-to-position", 1, Some(1));
     }
 
     #[test]
@@ -2439,7 +2446,10 @@ mod tests {
 
     #[test]
     fn subr_arity_current_state_primitives_match_oracle() {
+        assert_subr_arity("bitmap-spec-p", 1, Some(1));
+        assert_subr_arity("byte-to-string", 1, Some(1));
         assert_subr_arity("byteorder", 0, Some(0));
+        assert_subr_arity("clear-buffer-auto-save-failure", 0, Some(0));
         assert_subr_arity("cl-type-of", 1, Some(1));
         assert_subr_arity("current-bidi-paragraph-direction", 0, Some(1));
         assert_subr_arity("current-case-table", 0, Some(0));

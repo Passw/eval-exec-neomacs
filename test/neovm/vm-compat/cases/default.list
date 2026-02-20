@@ -317,6 +317,7 @@ cases/buffer-modified-tick-semantics
 cases/buffer-live-p-semantics
 cases/buffer-read-only-default-semantics
 cases/barf-bury-char-equal-cl-type-cancel-semantics
+cases/byte-position-string-clear-bitmap-semantics
 cases/delete-indentation-read-only-variable-semantics
 cases/edit-read-only-variable-semantics
 cases/kill-word-read-only-variable-semantics

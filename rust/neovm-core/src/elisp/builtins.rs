@@ -4216,6 +4216,30 @@ pub(crate) fn builtin_unibyte_string(args: Vec<Value>) -> EvalResult {
     Ok(Value::string(bytes_to_unibyte_storage_string(&bytes)))
 }
 
+pub(crate) fn builtin_byte_to_string(args: Vec<Value>) -> EvalResult {
+    expect_args("byte-to-string", &args, 1)?;
+    let byte = expect_fixnum(&args[0])?;
+    if !(0..=255).contains(&byte) {
+        return Err(signal("error", vec![Value::string("Invalid byte")]));
+    }
+    Ok(Value::string(bytes_to_unibyte_storage_string(&[byte as u8])))
+}
+
+pub(crate) fn builtin_bitmap_spec_p(args: Vec<Value>) -> EvalResult {
+    expect_args("bitmap-spec-p", &args, 1)?;
+    Ok(Value::Nil)
+}
+
+pub(crate) fn builtin_clear_face_cache(args: Vec<Value>) -> EvalResult {
+    expect_max_args("clear-face-cache", &args, 1)?;
+    Ok(Value::Nil)
+}
+
+pub(crate) fn builtin_clear_buffer_auto_save_failure(args: Vec<Value>) -> EvalResult {
+    expect_args("clear-buffer-auto-save-failure", &args, 0)?;
+    Ok(Value::Nil)
+}
+
 pub(crate) fn builtin_string_to_list(args: Vec<Value>) -> EvalResult {
     expect_args("string-to-list", &args, 1)?;
     let s = expect_string(&args[0])?;
@@ -5921,6 +5945,41 @@ fn get_byte_from_multibyte_char_code(code: u32) -> EvalResult {
     ))
 }
 
+/// `(byte-to-position BYTEPOS)` -- map a 1-based byte position to 1-based char position.
+pub(crate) fn builtin_byte_to_position(
+    eval: &mut super::eval::Evaluator,
+    args: Vec<Value>,
+) -> EvalResult {
+    expect_args("byte-to-position", &args, 1)?;
+    let byte_pos = expect_fixnum(&args[0])?;
+    if byte_pos <= 0 {
+        return Ok(Value::Nil);
+    }
+
+    let buf = eval
+        .buffers
+        .current_buffer()
+        .ok_or_else(|| signal("error", vec![Value::string("No current buffer")]))?;
+
+    let byte_len = buf.text.len();
+    let byte_pos0 = (byte_pos - 1) as usize;
+    if byte_pos0 > byte_len {
+        return Ok(Value::Nil);
+    }
+
+    // Emacs maps interior UTF-8 continuation bytes to the containing character.
+    let mut boundary = byte_pos0;
+    while boundary > 0 && boundary < byte_len {
+        let b = buf.text.byte_at(boundary);
+        if (b & 0b1100_0000) != 0b1000_0000 {
+            break;
+        }
+        boundary -= 1;
+    }
+
+    Ok(Value::Int(buf.text.byte_to_char(boundary) as i64 + 1))
+}
+
 /// `(get-byte &optional POSITION STRING)` -- return a byte value at point or in STRING.
 pub(crate) fn builtin_get_byte(eval: &mut super::eval::Evaluator, args: Vec<Value>) -> EvalResult {
     expect_max_args("get-byte", &args, 2)?;
@@ -7551,6 +7610,14 @@ enum PureBuiltinId {
     AlistGet,
     #[strum(serialize = "number-sequence")]
     NumberSequence,
+    #[strum(serialize = "bitmap-spec-p")]
+    BitmapSpecP,
+    #[strum(serialize = "byte-to-string")]
+    ByteToString,
+    #[strum(serialize = "clear-buffer-auto-save-failure")]
+    ClearBufferAutoSaveFailure,
+    #[strum(serialize = "clear-face-cache")]
+    ClearFaceCache,
 }
 
 fn dispatch_builtin_id_pure(id: PureBuiltinId, args: Vec<Value>) -> EvalResult {
@@ -7711,6 +7778,10 @@ fn dispatch_builtin_id_pure(id: PureBuiltinId, args: Vec<Value>) -> EvalResult {
         PureBuiltinId::Nconc => builtin_nconc(args),
         PureBuiltinId::AlistGet => builtin_alist_get(args),
         PureBuiltinId::NumberSequence => builtin_number_sequence(args),
+        PureBuiltinId::BitmapSpecP => builtin_bitmap_spec_p(args),
+        PureBuiltinId::ByteToString => builtin_byte_to_string(args),
+        PureBuiltinId::ClearBufferAutoSaveFailure => builtin_clear_buffer_auto_save_failure(args),
+        PureBuiltinId::ClearFaceCache => builtin_clear_face_cache(args),
     }
 }
 
@@ -7825,6 +7896,7 @@ pub(crate) fn dispatch_builtin(
         "generate-new-buffer" => return Some(builtin_generate_new_buffer(eval, args)),
         "char-after" => return Some(builtin_char_after(eval, args)),
         "char-before" => return Some(builtin_char_before(eval, args)),
+        "byte-to-position" => return Some(builtin_byte_to_position(eval, args)),
         "get-byte" => return Some(builtin_get_byte(eval, args)),
         "buffer-local-value" => return Some(builtin_buffer_local_value(eval, args)),
         // Search / regex operations
@@ -12179,6 +12251,145 @@ mod tests {
                 assert_eq!(
                     sig.data,
                     vec![Value::symbol("bury-buffer-internal"), Value::Int(0)]
+                );
+            }
+            other => panic!("unexpected flow: {other:?}"),
+        }
+    }
+
+    #[test]
+    fn byte_position_and_clear_bitmap_semantics() {
+        let mut eval = super::super::eval::Evaluator::new();
+
+        assert_eq!(
+            builtin_byte_to_position(&mut eval, vec![Value::Int(1)]).unwrap(),
+            Value::Int(1)
+        );
+        assert_eq!(
+            builtin_byte_to_position(&mut eval, vec![Value::Int(2)]).unwrap(),
+            Value::Nil
+        );
+
+        builtin_erase_buffer(&mut eval, vec![]).unwrap();
+        builtin_insert(&mut eval, vec![Value::string("a\u{00E9}")]).unwrap();
+
+        assert_eq!(
+            builtin_byte_to_position(&mut eval, vec![Value::Int(1)]).unwrap(),
+            Value::Int(1)
+        );
+        assert_eq!(
+            builtin_byte_to_position(&mut eval, vec![Value::Int(2)]).unwrap(),
+            Value::Int(2)
+        );
+        assert_eq!(
+            builtin_byte_to_position(&mut eval, vec![Value::Int(3)]).unwrap(),
+            Value::Int(2)
+        );
+        assert_eq!(
+            builtin_byte_to_position(&mut eval, vec![Value::Int(4)]).unwrap(),
+            Value::Int(3)
+        );
+        assert_eq!(
+            builtin_byte_to_position(&mut eval, vec![Value::Int(5)]).unwrap(),
+            Value::Nil
+        );
+        assert_eq!(
+            builtin_byte_to_position(&mut eval, vec![Value::Int(0)]).unwrap(),
+            Value::Nil
+        );
+        assert_eq!(
+            builtin_byte_to_position(&mut eval, vec![Value::Int(-1)]).unwrap(),
+            Value::Nil
+        );
+
+        let byte_to_position_type = builtin_byte_to_position(&mut eval, vec![Value::string("x")])
+            .expect_err("byte-to-position should enforce fixnum input");
+        match byte_to_position_type {
+            Flow::Signal(sig) => {
+                assert_eq!(sig.symbol, "wrong-type-argument");
+                assert_eq!(sig.data, vec![Value::symbol("fixnump"), Value::string("x")]);
+            }
+            other => panic!("unexpected flow: {other:?}"),
+        }
+
+        let byte_to_position_arity =
+            builtin_byte_to_position(&mut eval, vec![Value::Int(1), Value::Int(2)])
+                .expect_err("byte-to-position should reject wrong arity");
+        match byte_to_position_arity {
+            Flow::Signal(sig) => {
+                assert_eq!(sig.symbol, "wrong-number-of-arguments");
+                assert_eq!(sig.data, vec![Value::symbol("byte-to-position"), Value::Int(2)]);
+            }
+            other => panic!("unexpected flow: {other:?}"),
+        }
+
+        let byte_to_string = builtin_byte_to_string(vec![Value::Int(255)]).unwrap();
+        assert_eq!(
+            builtin_get_byte(&mut eval, vec![Value::Int(0), byte_to_string]).unwrap(),
+            Value::Int(255)
+        );
+
+        let byte_to_string_type = builtin_byte_to_string(vec![Value::symbol("x")])
+            .expect_err("byte-to-string should enforce fixnum input");
+        match byte_to_string_type {
+            Flow::Signal(sig) => {
+                assert_eq!(sig.symbol, "wrong-type-argument");
+                assert_eq!(sig.data, vec![Value::symbol("fixnump"), Value::symbol("x")]);
+            }
+            other => panic!("unexpected flow: {other:?}"),
+        }
+
+        let byte_to_string_range = builtin_byte_to_string(vec![Value::Int(256)])
+            .expect_err("byte-to-string should reject bytes above 255");
+        match byte_to_string_range {
+            Flow::Signal(sig) => {
+                assert_eq!(sig.symbol, "error");
+                assert_eq!(sig.data, vec![Value::string("Invalid byte")]);
+            }
+            other => panic!("unexpected flow: {other:?}"),
+        }
+
+        assert_eq!(builtin_bitmap_spec_p(vec![Value::Nil]).unwrap(), Value::Nil);
+        let bitmap_arity = builtin_bitmap_spec_p(vec![])
+            .expect_err("bitmap-spec-p should reject wrong arity");
+        match bitmap_arity {
+            Flow::Signal(sig) => {
+                assert_eq!(sig.symbol, "wrong-number-of-arguments");
+                assert_eq!(sig.data, vec![Value::symbol("bitmap-spec-p"), Value::Int(0)]);
+            }
+            other => panic!("unexpected flow: {other:?}"),
+        }
+
+        assert_eq!(builtin_clear_face_cache(vec![]).unwrap(), Value::Nil);
+        assert_eq!(
+            builtin_clear_face_cache(vec![Value::symbol("all")]).unwrap(),
+            Value::Nil
+        );
+        let clear_face_arity = builtin_clear_face_cache(vec![Value::Nil, Value::Nil])
+            .expect_err("clear-face-cache should reject >1 args");
+        match clear_face_arity {
+            Flow::Signal(sig) => {
+                assert_eq!(sig.symbol, "wrong-number-of-arguments");
+                assert_eq!(sig.data, vec![Value::symbol("clear-face-cache"), Value::Int(2)]);
+            }
+            other => panic!("unexpected flow: {other:?}"),
+        }
+
+        assert_eq!(
+            builtin_clear_buffer_auto_save_failure(vec![]).unwrap(),
+            Value::Nil
+        );
+        let clear_auto_save_arity = builtin_clear_buffer_auto_save_failure(vec![Value::Nil])
+            .expect_err("clear-buffer-auto-save-failure should reject args");
+        match clear_auto_save_arity {
+            Flow::Signal(sig) => {
+                assert_eq!(sig.symbol, "wrong-number-of-arguments");
+                assert_eq!(
+                    sig.data,
+                    vec![
+                        Value::symbol("clear-buffer-auto-save-failure"),
+                        Value::Int(1)
+                    ]
                 );
             }
             other => panic!("unexpected flow: {other:?}"),

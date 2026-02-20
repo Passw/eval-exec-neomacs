@@ -28,6 +28,55 @@ Last updated: 2026-02-20
 
 ## Doing
 
+- Added compatibility slice for `byte-to-position`, `byte-to-string`, `bitmap-spec-p`, `clear-face-cache`, and `clear-buffer-auto-save-failure`:
+  - runtime changes:
+    - `rust/neovm-core/src/elisp/builtins.rs`
+      - implemented:
+        - `byte-to-position` (`1..1`)
+        - `byte-to-string` (`1..1`)
+        - `bitmap-spec-p` (`1..1`)
+        - `clear-face-cache` (`0..1`)
+        - `clear-buffer-auto-save-failure` (`0..0`)
+      - aligned key semantics:
+        - `byte-to-position` is evaluator-backed and maps interior UTF-8 continuation bytes to the containing character position, with `nil` for non-positive/out-of-range byte positions.
+        - `byte-to-string` enforces `fixnump`, accepts `0..255`, and signals `(error \"Invalid byte\")` for out-of-range values.
+        - `bitmap-spec-p` currently returns `nil` for the oracle probes and enforces arity.
+        - `clear-face-cache` accepts optional argument and returns `nil`.
+        - `clear-buffer-auto-save-failure` returns `nil` and enforces zero arity.
+      - wired:
+        - evaluator dispatch for `byte-to-position`
+        - pure typed dispatch for the other four builtins.
+      - added focused unit coverage in `byte_position_and_clear_bitmap_semantics`.
+    - `rust/neovm-core/src/elisp/builtin_registry.rs`
+      - registered:
+        - `byte-to-position`
+        - `byte-to-string`
+        - `bitmap-spec-p`
+        - `clear-face-cache`
+        - `clear-buffer-auto-save-failure`
+    - `rust/neovm-core/src/elisp/subr_info.rs`
+      - added arity metadata + assertion coverage:
+        - `byte-to-position` => `(1 . 1)`
+        - `byte-to-string` => `(1 . 1)`
+        - `bitmap-spec-p` => `(1 . 1)`
+        - `clear-face-cache` => `(0 . 1)`
+        - `clear-buffer-auto-save-failure` => `(0 . 0)`
+  - vm-compat corpus changes:
+    - added:
+      - `test/neovm/vm-compat/cases/byte-position-string-clear-bitmap-semantics.forms`
+      - `test/neovm/vm-compat/cases/byte-position-string-clear-bitmap-semantics.expected.tsv`
+    - wired case into:
+      - `test/neovm/vm-compat/cases/default.list`
+  - verified:
+    - `cargo test --manifest-path rust/neovm-core/Cargo.toml byte_position_and_clear_bitmap_semantics -- --nocapture` (pass)
+    - `cargo test --manifest-path rust/neovm-core/Cargo.toml subr_arity_buffer_point_primitives_match_oracle -- --nocapture` (pass)
+    - `cargo test --manifest-path rust/neovm-core/Cargo.toml subr_arity_current_state_primitives_match_oracle -- --nocapture` (pass)
+    - `cargo test --manifest-path rust/neovm-core/Cargo.toml subr_arity_image_font_primitives_match_oracle -- --nocapture` (pass)
+    - `make -C test/neovm/vm-compat check-one-neovm CASE=cases/byte-position-string-clear-bitmap-semantics` (pass; `28/28`)
+    - `make -C test/neovm/vm-compat check-builtin-registry-all` (pass; `1288` dispatch / `1287` core)
+    - `make -C test/neovm/vm-compat compat-progress` (pass; default list `799`, tracked `805`, oracle builtin coverage registry/runtime `887/547`)
+    - `make -C test/neovm/vm-compat check-all-neovm-strict` (pass; strict suite green)
+
 - Added compatibility slice for `barf-if-buffer-read-only`, `bury-buffer-internal`, `char-equal`, `cl-type-of`, and `cancel-kbd-macro-events`:
   - runtime changes:
     - `rust/neovm-core/src/elisp/builtins.rs`
