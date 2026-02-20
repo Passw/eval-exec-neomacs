@@ -4217,6 +4217,172 @@ pub(crate) fn builtin_setplist_eval(
     Ok(plist)
 }
 
+fn macroexpand_environment_binding(env: &Value, name: &str) -> Option<Value> {
+    let mut cursor = env.clone();
+    loop {
+        match cursor {
+            Value::Nil => return None,
+            Value::Cons(cell) => {
+                let pair = cell.lock().expect("poisoned");
+                let entry = pair.car.clone();
+                cursor = pair.cdr.clone();
+                drop(pair);
+                let Value::Cons(entry_cell) = entry else {
+                    continue;
+                };
+                let entry_pair = entry_cell.lock().expect("poisoned");
+                if entry_pair.car.as_symbol_name() == Some(name) {
+                    return Some(entry_pair.cdr.clone());
+                }
+            }
+            _ => return None,
+        }
+    }
+}
+
+fn macroexpand_environment_callable(
+    eval: &mut super::eval::Evaluator,
+    binding: &Value,
+) -> Result<Value, Flow> {
+    if is_lambda_form_list(binding) {
+        let expr = super::eval::value_to_expr_pub(binding);
+        return eval.eval(&expr);
+    }
+    Ok(binding.clone())
+}
+
+fn macroexpand_known_fallback_macro(name: &str, args: &[Value]) -> Result<Option<Value>, Flow> {
+    match name {
+        "when" => {
+            if args.is_empty() {
+                return Err(signal(
+                    "wrong-number-of-arguments",
+                    vec![Value::cons(Value::Int(1), Value::Int(1)), Value::Int(0)],
+                ));
+            }
+            if args.len() == 1 {
+                return Ok(Some(Value::list(vec![
+                    Value::symbol("progn"),
+                    args[0].clone(),
+                    Value::Nil,
+                ])));
+            }
+            let mut then_forms = Vec::with_capacity(args.len());
+            then_forms.push(Value::symbol("progn"));
+            then_forms.extend_from_slice(&args[1..]);
+            Ok(Some(Value::list(vec![
+                Value::symbol("if"),
+                args[0].clone(),
+                Value::list(then_forms),
+            ])))
+        }
+        "unless" => {
+            if args.is_empty() {
+                return Err(signal(
+                    "wrong-number-of-arguments",
+                    vec![Value::cons(Value::Int(1), Value::Int(1)), Value::Int(0)],
+                ));
+            }
+            if args.len() == 1 {
+                return Ok(Some(Value::list(vec![
+                    Value::symbol("progn"),
+                    args[0].clone(),
+                    Value::Nil,
+                ])));
+            }
+            let mut forms = Vec::with_capacity(args.len() + 2);
+            forms.push(Value::symbol("if"));
+            forms.push(args[0].clone());
+            forms.push(Value::Nil);
+            forms.extend_from_slice(&args[1..]);
+            Ok(Some(Value::list(forms)))
+        }
+        _ => Ok(None),
+    }
+}
+
+fn macroexpand_once_with_environment(
+    eval: &mut super::eval::Evaluator,
+    form: Value,
+    environment: Option<&Value>,
+) -> Result<(Value, bool), Flow> {
+    let Value::Cons(form_cell) = form.clone() else {
+        return Ok((form, false));
+    };
+    let form_pair = form_cell.lock().expect("poisoned");
+    let head = form_pair.car.clone();
+    let tail = form_pair.cdr.clone();
+    drop(form_pair);
+    let Some(head_name) = head.as_symbol_name() else {
+        return Ok((form, false));
+    };
+
+    let mut env_bound = false;
+    let mut function = None;
+    if let Some(env) = environment {
+        if !env.is_list() {
+            return Err(signal(
+                "wrong-type-argument",
+                vec![Value::symbol("listp"), env.clone()],
+            ));
+        }
+        if let Some(binding) = macroexpand_environment_binding(env, head_name) {
+            env_bound = true;
+            if !binding.is_nil() {
+                function = Some(macroexpand_environment_callable(eval, &binding)?);
+            }
+        }
+    }
+    if env_bound && function.is_none() {
+        return Ok((form, false));
+    }
+    let mut resolved_name = head_name.to_string();
+    let mut fallback_placeholder = false;
+    if function.is_none() {
+        if let Some((resolved, global)) = resolve_indirect_symbol_with_name(eval, head_name) {
+            if matches!(global, Value::Macro(_)) {
+                fallback_placeholder = super::subr_info::has_fallback_macro(&resolved)
+                    && eval.obarray().symbol_function(&resolved).is_none();
+                resolved_name = resolved;
+                function = Some(global);
+            }
+        }
+    }
+    let Some(function) = function else {
+        return Ok((form, false));
+    };
+    let args = list_to_vec(&tail).ok_or_else(|| {
+        signal(
+            "wrong-type-argument",
+            vec![Value::symbol("listp"), tail.clone()],
+        )
+    })?;
+    if fallback_placeholder {
+        if let Some(expanded) = macroexpand_known_fallback_macro(&resolved_name, &args)? {
+            return Ok((expanded, true));
+        }
+        return Ok((form, false));
+    }
+    let expanded = eval.apply(function, args)?;
+    Ok((expanded, true))
+}
+
+pub(crate) fn builtin_macroexpand_eval(
+    eval: &mut super::eval::Evaluator,
+    args: Vec<Value>,
+) -> EvalResult {
+    expect_range_args("macroexpand", &args, 1, 2)?;
+    let mut form = args[0].clone();
+    let environment = args.get(1);
+    loop {
+        let (expanded, did_expand) = macroexpand_once_with_environment(eval, form, environment)?;
+        if !did_expand {
+            return Ok(expanded);
+        }
+        form = expanded;
+    }
+}
+
 pub(crate) fn builtin_indirect_function(
     eval: &mut super::eval::Evaluator,
     args: Vec<Value>,
@@ -4234,7 +4400,10 @@ pub(crate) fn builtin_indirect_function(
     Ok(args[0].clone())
 }
 
-fn resolve_indirect_symbol(eval: &super::eval::Evaluator, name: &str) -> Option<Value> {
+fn resolve_indirect_symbol_with_name(
+    eval: &super::eval::Evaluator,
+    name: &str,
+) -> Option<(String, Value)> {
     let mut current = name.to_string();
     let mut seen = HashSet::new();
 
@@ -4250,16 +4419,16 @@ fn resolve_indirect_symbol(eval: &super::eval::Evaluator, name: &str) -> Option<
         if let Some(function) = eval.obarray().symbol_function(&current) {
             if let Some(next) = function.as_symbol_name() {
                 if next == "nil" {
-                    return Some(Value::Nil);
+                    return Some(("nil".to_string(), Value::Nil));
                 }
                 current = next.to_string();
                 continue;
             }
-            return Some(function.clone());
+            return Some((current, function.clone()));
         }
 
         if let Some(function) = super::subr_info::fallback_macro_value(&current) {
-            return Some(function);
+            return Some((current, function));
         }
 
         if super::subr_info::is_special_form(&current)
@@ -4267,11 +4436,15 @@ fn resolve_indirect_symbol(eval: &super::eval::Evaluator, name: &str) -> Option<
             || super::builtin_registry::is_dispatch_builtin_name(&current)
             || current.parse::<PureBuiltinId>().is_ok()
         {
-            return Some(Value::Subr(current));
+            return Some((current.clone(), Value::Subr(current)));
         }
 
         return None;
     }
+}
+
+fn resolve_indirect_symbol(eval: &super::eval::Evaluator, name: &str) -> Option<Value> {
+    resolve_indirect_symbol_with_name(eval, name).map(|(_, value)| value)
 }
 
 pub(crate) fn builtin_macrop_eval(
@@ -10244,6 +10417,7 @@ pub(crate) fn dispatch_builtin(
         "fset" => return Some(builtin_fset(eval, args)),
         "makunbound" => return Some(builtin_makunbound(eval, args)),
         "fmakunbound" => return Some(builtin_fmakunbound(eval, args)),
+        "macroexpand" => return Some(builtin_macroexpand_eval(eval, args)),
         "get" => return Some(builtin_get(eval, args)),
         "put" => return Some(builtin_put(eval, args)),
         "setplist" => return Some(builtin_setplist_eval(eval, args)),
@@ -18324,6 +18498,192 @@ mod tests {
 
         builtin_fset(&mut eval, vec![keyword, orig_keyword])
             .expect("restore keyword function cell");
+    }
+
+    #[test]
+    fn macroexpand_runtime_expands_global_and_nested_macros() {
+        let mut eval = crate::elisp::eval::Evaluator::new();
+
+        let expanded = builtin_macroexpand_eval(
+            &mut eval,
+            vec![Value::list(vec![
+                Value::symbol("when"),
+                Value::True,
+                Value::Int(1),
+            ])],
+        )
+        .expect("macroexpand should expand top-level when");
+        assert_eq!(
+            expanded,
+            Value::list(vec![
+                Value::symbol("if"),
+                Value::True,
+                Value::list(vec![Value::symbol("progn"), Value::Int(1)]),
+            ])
+        );
+
+        let nested = builtin_macroexpand_eval(
+            &mut eval,
+            vec![Value::list(vec![
+                Value::symbol("when"),
+                Value::True,
+                Value::list(vec![Value::symbol("when"), Value::True, Value::Int(1)]),
+            ])],
+        )
+        .expect("macroexpand should not recursively walk nested bodies");
+        assert_eq!(
+            nested,
+            Value::list(vec![
+                Value::symbol("if"),
+                Value::True,
+                Value::list(vec![
+                    Value::symbol("progn"),
+                    Value::list(vec![Value::symbol("when"), Value::True, Value::Int(1)]),
+                ]),
+            ])
+        );
+
+        let passthrough = builtin_macroexpand_eval(
+            &mut eval,
+            vec![Value::list(vec![Value::symbol("+"), Value::Int(1)])],
+        )
+        .expect("macroexpand should leave non-macro heads unchanged");
+        assert_eq!(
+            passthrough,
+            Value::list(vec![Value::symbol("+"), Value::Int(1)])
+        );
+    }
+
+    #[test]
+    fn macroexpand_runtime_environment_overrides_and_shadows_global_macros() {
+        let mut eval = crate::elisp::eval::Evaluator::new();
+
+        let env_lambda = Value::list(vec![Value::list(vec![
+            Value::symbol("vm-env"),
+            Value::symbol("lambda"),
+            Value::list(vec![Value::symbol("x")]),
+            Value::list(vec![
+                Value::symbol("list"),
+                Value::list(vec![Value::symbol("quote"), Value::symbol("when")]),
+                Value::symbol("x"),
+                Value::Int(1),
+            ]),
+        ])]);
+        let expanded = builtin_macroexpand_eval(
+            &mut eval,
+            vec![
+                Value::list(vec![Value::symbol("vm-env"), Value::True]),
+                env_lambda,
+            ],
+        )
+        .expect("macroexpand should apply lambda environment expanders");
+        assert_eq!(
+            expanded,
+            Value::list(vec![
+                Value::symbol("if"),
+                Value::True,
+                Value::list(vec![Value::symbol("progn"), Value::Int(1)]),
+            ])
+        );
+
+        let shadow = builtin_macroexpand_eval(
+            &mut eval,
+            vec![
+                Value::list(vec![Value::symbol("when"), Value::True, Value::Int(1)]),
+                Value::list(vec![Value::list(vec![Value::symbol("when")])]),
+            ],
+        )
+        .expect("environment shadow entries should suppress global macro expansion");
+        assert_eq!(
+            shadow,
+            Value::list(vec![Value::symbol("when"), Value::True, Value::Int(1)])
+        );
+    }
+
+    #[test]
+    fn macroexpand_runtime_environment_type_and_payload_edges_match_oracle() {
+        let mut eval = crate::elisp::eval::Evaluator::new();
+
+        let atom_ignores_bad_env =
+            builtin_macroexpand_eval(&mut eval, vec![Value::symbol("x"), Value::Int(1)])
+                .expect("non-list forms should ignore non-list environments");
+        assert_eq!(atom_ignores_bad_env, Value::symbol("x"));
+
+        let nonsymbol_head_ignores_bad_env = builtin_macroexpand_eval(
+            &mut eval,
+            vec![
+                Value::list(vec![
+                    Value::list(vec![Value::symbol("lambda")]),
+                    Value::Int(1),
+                ]),
+                Value::Int(1),
+            ],
+        )
+        .expect("list forms without symbol heads should ignore non-list env");
+        assert_eq!(
+            nonsymbol_head_ignores_bad_env,
+            Value::list(vec![
+                Value::list(vec![Value::symbol("lambda")]),
+                Value::Int(1)
+            ])
+        );
+
+        let env_type_err = builtin_macroexpand_eval(
+            &mut eval,
+            vec![
+                Value::list(vec![Value::symbol("foo"), Value::Int(1)]),
+                Value::Int(1),
+            ],
+        )
+        .expect_err("symbol-headed forms should validate environment list-ness");
+        match env_type_err {
+            Flow::Signal(sig) => {
+                assert_eq!(sig.symbol, "wrong-type-argument");
+                assert_eq!(sig.data, vec![Value::symbol("listp"), Value::Int(1)]);
+            }
+            other => panic!("unexpected flow: {other:?}"),
+        }
+
+        let invalid_env_function = builtin_macroexpand_eval(
+            &mut eval,
+            vec![
+                Value::list(vec![Value::symbol("vm-f"), Value::Int(1)]),
+                Value::list(vec![Value::cons(Value::symbol("vm-f"), Value::Int(42))]),
+            ],
+        )
+        .expect_err("environment entries with non-callables should surface invalid-function");
+        match invalid_env_function {
+            Flow::Signal(sig) => {
+                assert_eq!(sig.symbol, "invalid-function");
+                assert_eq!(sig.data, vec![Value::Int(42)]);
+            }
+            other => panic!("unexpected flow: {other:?}"),
+        }
+    }
+
+    #[test]
+    fn macroexpand_runtime_improper_lists_match_oracle_error_behavior() {
+        let mut eval = crate::elisp::eval::Evaluator::new();
+
+        let not_macro = builtin_macroexpand_eval(
+            &mut eval,
+            vec![Value::cons(Value::symbol("foo"), Value::Int(1))],
+        )
+        .expect("non-macro improper forms should pass through unchanged");
+        assert_eq!(not_macro, Value::cons(Value::symbol("foo"), Value::Int(1)));
+
+        let improper_macro = builtin_macroexpand_eval(
+            &mut eval,
+            vec![Value::cons(Value::symbol("when"), Value::Int(1))],
+        )
+        .expect_err("macro expansion should reject improper argument lists");
+        match improper_macro {
+            Flow::Signal(sig) => {
+                assert_eq!(sig.symbol, "wrong-type-argument");
+                assert_eq!(sig.data, vec![Value::symbol("listp"), Value::Int(1)]);
+            }
+            other => panic!("unexpected flow: {other:?}"),
+        }
     }
 
     #[test]
