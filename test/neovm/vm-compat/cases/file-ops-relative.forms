@@ -1,8 +1,10 @@
 ; Relative file mutators should honor eval-time default-directory.
-(setq vm-fo-base
-      (let* ((forms-file (getenv "NEOVM_FORMS_FILE"))
-             (base (if forms-file (file-name-directory forms-file) default-directory)))
-        (expand-file-name "directory-files-fixtures" base)))
+(progn
+  (setq vm-fo-base
+        (let* ((forms-file (getenv "NEOVM_FORMS_FILE"))
+               (base (if forms-file (file-name-directory forms-file) default-directory)))
+          (expand-file-name "directory-files-fixtures" base)))
+  (file-name-nondirectory vm-fo-base))
 (condition-case err
     (let* ((default-directory vm-fo-base)
            (a "vm-fileops-a.tmp")

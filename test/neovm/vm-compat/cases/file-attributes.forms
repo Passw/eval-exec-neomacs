@@ -1,8 +1,10 @@
 ; file-attributes payload shape and id-format behavior.
-(setq vm-fa-file
-      (let* ((forms-file (getenv "NEOVM_FORMS_FILE"))
-             (base (if forms-file (file-name-directory forms-file) default-directory)))
-        (expand-file-name "directory-files-fixtures/alpha.txt" base)))
+(progn
+  (setq vm-fa-file
+        (let* ((forms-file (getenv "NEOVM_FORMS_FILE"))
+               (base (if forms-file (file-name-directory forms-file) default-directory)))
+          (expand-file-name "directory-files-fixtures/alpha.txt" base)))
+  (file-name-nondirectory vm-fa-file))
 (let ((a (file-attributes vm-fa-file)))
   (list (length a)
         (listp (nth 4 a)) (length (nth 4 a))

@@ -1,6 +1,6 @@
-1	(setq vm-df-dir (let* ((forms-file (getenv "NEOVM_FORMS_FILE")) (base (if forms-file (file-name-directory forms-file) default-directory))) (expand-file-name "directory-files-fixtures" base)))	OK "/home/exec/Projects/github.com/eval-exec/neomacs/test/neovm/vm-compat/cases/directory-files-fixtures"
+1	(progn (setq vm-df-dir (let* ((forms-file (getenv "NEOVM_FORMS_FILE")) (base (if forms-file (file-name-directory forms-file) default-directory))) (expand-file-name "directory-files-fixtures" base))) (file-name-nondirectory vm-df-dir))	OK "directory-files-fixtures"
 2	(directory-files vm-df-dir)	OK ("." ".." ".hidden" "alpha.txt" "beta.el" "z")
-3	(directory-files vm-df-dir t)	OK ("/home/exec/Projects/github.com/eval-exec/neomacs/test/neovm/vm-compat/cases/directory-files-fixtures/." "/home/exec/Projects/github.com/eval-exec/neomacs/test/neovm/vm-compat/cases/directory-files-fixtures/.." "/home/exec/Projects/github.com/eval-exec/neomacs/test/neovm/vm-compat/cases/directory-files-fixtures/.hidden" "/home/exec/Projects/github.com/eval-exec/neomacs/test/neovm/vm-compat/cases/directory-files-fixtures/alpha.txt" "/home/exec/Projects/github.com/eval-exec/neomacs/test/neovm/vm-compat/cases/directory-files-fixtures/beta.el" "/home/exec/Projects/github.com/eval-exec/neomacs/test/neovm/vm-compat/cases/directory-files-fixtures/z")
+3	(mapcar #'file-name-nondirectory (directory-files vm-df-dir t))	OK ("." ".." ".hidden" "alpha.txt" "beta.el" "z")
 4	(directory-files vm-df-dir nil "\\.el$")	OK ("beta.el")
 5	(directory-files vm-df-dir nil "^[^.]")	OK ("alpha.txt" "beta.el" "z")
 6	(sort (copy-sequence (directory-files vm-df-dir nil nil t)) #'string<)	OK ("." ".." ".hidden" "alpha.txt" "beta.el" "z")

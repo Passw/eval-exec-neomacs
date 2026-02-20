@@ -1,8 +1,10 @@
 ; file-name-completion and file-name-all-completions semantics.
-(setq vm-fnc-dir
-      (let* ((forms-file (getenv "NEOVM_FORMS_FILE"))
-             (base (if forms-file (file-name-directory forms-file) default-directory)))
-        (expand-file-name "file-name-completion-fixtures" base)))
+(progn
+  (setq vm-fnc-dir
+        (let* ((forms-file (getenv "NEOVM_FORMS_FILE"))
+               (base (if forms-file (file-name-directory forms-file) default-directory)))
+          (expand-file-name "file-name-completion-fixtures" base)))
+  (file-name-nondirectory vm-fnc-dir))
 (file-name-completion "a" vm-fnc-dir)
 (file-name-completion "alpha.txt" vm-fnc-dir)
 (file-name-completion "al" vm-fnc-dir)

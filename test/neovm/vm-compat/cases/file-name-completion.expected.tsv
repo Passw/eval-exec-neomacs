@@ -1,4 +1,4 @@
-1	(setq vm-fnc-dir (let* ((forms-file (getenv "NEOVM_FORMS_FILE")) (base (if forms-file (file-name-directory forms-file) default-directory))) (expand-file-name "file-name-completion-fixtures" base)))	OK "/home/exec/Projects/github.com/eval-exec/neomacs/test/neovm/vm-compat/cases/file-name-completion-fixtures"
+1	(progn (setq vm-fnc-dir (let* ((forms-file (getenv "NEOVM_FORMS_FILE")) (base (if forms-file (file-name-directory forms-file) default-directory))) (expand-file-name "file-name-completion-fixtures" base))) (file-name-nondirectory vm-fnc-dir))	OK "file-name-completion-fixtures"
 2	(file-name-completion "a" vm-fnc-dir)	OK "alpha.txt"
 3	(file-name-completion "alpha.txt" vm-fnc-dir)	OK t
 4	(file-name-completion "al" vm-fnc-dir)	OK "alpha.txt"

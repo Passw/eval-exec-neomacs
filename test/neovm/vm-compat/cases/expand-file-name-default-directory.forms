@@ -1,11 +1,16 @@
 ; expand-file-name should use eval-time default-directory when omitted/nil.
-(setq vm-expand-base
-      (let* ((forms-file (getenv "NEOVM_FORMS_FILE"))
-             (base (if forms-file (file-name-directory forms-file) default-directory)))
-        (expand-file-name "directory-files-fixtures/" base)))
+(progn
+  (setq vm-expand-base
+        (let* ((forms-file (getenv "NEOVM_FORMS_FILE"))
+               (base (if forms-file (file-name-directory forms-file) default-directory)))
+          (expand-file-name "directory-files-fixtures/" base)))
+  (file-name-nondirectory (directory-file-name vm-expand-base)))
 (let ((default-directory vm-expand-base))
-  (expand-file-name "alpha.txt"))
+  (equal (expand-file-name "alpha.txt")
+         (expand-file-name "alpha.txt" vm-expand-base)))
 (let ((default-directory vm-expand-base))
-  (expand-file-name "beta.txt" nil))
+  (equal (expand-file-name "beta.txt" nil)
+         (expand-file-name "beta.txt" vm-expand-base)))
 (let ((default-directory vm-expand-base))
-  (expand-file-name ""))
+  (equal (expand-file-name "")
+         (directory-file-name vm-expand-base)))

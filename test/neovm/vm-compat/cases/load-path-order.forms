@@ -5,7 +5,7 @@
   (setq vm-order-d2 (expand-file-name "d2" vm-order-root))
   'ok)
 
-(setq load-path (list vm-order-d1 vm-order-d2))
+(mapcar #'file-name-nondirectory (setq load-path (list vm-order-d1 vm-order-d2)))
 (setq vm-order-choice nil)
 (load "vm-order-choice" nil nil nil nil)
 vm-order-choice
@@ -18,7 +18,7 @@ vm-order-choice
 (load "vm-order-choice" nil nil nil t)
 vm-order-choice
 
-(setq load-path (list vm-order-d2 vm-order-d1))
+(mapcar #'file-name-nondirectory (setq load-path (list vm-order-d2 vm-order-d1)))
 (setq vm-order-choice nil)
 (load "vm-order-choice" nil nil nil nil)
 vm-order-choice

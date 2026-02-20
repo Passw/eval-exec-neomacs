@@ -1,10 +1,12 @@
 ; directory-files-and-attributes semantics: names, ordering/count, id-format and count typing.
-(setq vm-dfa-dir
-      (let* ((forms-file (getenv "NEOVM_FORMS_FILE"))
-             (base (if forms-file (file-name-directory forms-file) default-directory)))
-        (expand-file-name "directory-files-fixtures" base)))
+(progn
+  (setq vm-dfa-dir
+        (let* ((forms-file (getenv "NEOVM_FORMS_FILE"))
+               (base (if forms-file (file-name-directory forms-file) default-directory)))
+          (expand-file-name "directory-files-fixtures" base)))
+  (file-name-nondirectory vm-dfa-dir))
 (mapcar #'car (directory-files-and-attributes vm-dfa-dir))
-(mapcar #'car (directory-files-and-attributes vm-dfa-dir t))
+(mapcar #'file-name-nondirectory (mapcar #'car (directory-files-and-attributes vm-dfa-dir t)))
 (mapcar #'car (directory-files-and-attributes vm-dfa-dir nil "\\.el$"))
 (sort (copy-sequence (mapcar #'car (directory-files-and-attributes vm-dfa-dir nil nil t))) #'string<)
 (mapcar #'car (directory-files-and-attributes vm-dfa-dir nil nil t nil 2))
