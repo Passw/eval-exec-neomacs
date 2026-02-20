@@ -28,6 +28,32 @@ Last updated: 2026-02-20
 
 ## Doing
 
+- Added `bool-vector` constructor compatibility slice and closed missing runtime/registry exposure:
+  - runtime changes:
+    - `rust/neovm-core/src/elisp/chartable.rs`
+      - implemented `bool-vector` constructor (`&rest OBJECTS`) using object truthiness parity (`nil` => `0`, non-`nil` => `1` bits).
+      - added unit coverage for constructor rest-arg semantics (including empty constructor).
+    - `rust/neovm-core/src/elisp/builtins.rs`
+      - wired `"bool-vector"` into pure builtin dispatch.
+    - `rust/neovm-core/src/elisp/builtin_registry.rs`
+      - registered `bool-vector` in `DISPATCH_BUILTIN_NAMES`.
+    - `rust/neovm-core/src/elisp/subr_info.rs`
+      - added arity metadata + assertion:
+        - `bool-vector` => `(0 . many)`.
+  - vm-compat corpus changes:
+    - added:
+      - `test/neovm/vm-compat/cases/bool-vector-constructor-semantics.forms`
+      - `test/neovm/vm-compat/cases/bool-vector-constructor-semantics.expected.tsv`
+    - wired case into:
+      - `test/neovm/vm-compat/cases/default.list`
+  - verified:
+    - `cargo test --manifest-path rust/neovm-core/Cargo.toml bool_vector_ -- --nocapture` (pass; `24/24`)
+    - `cargo test --manifest-path rust/neovm-core/Cargo.toml subr_arity_encoding_bool_vector_primitives_match_oracle -- --nocapture` (pass)
+    - `make -C test/neovm/vm-compat check-one-neovm CASE=cases/bool-vector-constructor-semantics` (pass; `8/8`)
+    - `make -C test/neovm/vm-compat check-builtin-registry-all` (pass; `1221` dispatch / `1220` core)
+    - `make -C test/neovm/vm-compat compat-progress` (pass; default list `794`, tracked `800`, primitive-subr coverage registry `820/614`, runtime `868/566`)
+    - `make -C test/neovm/vm-compat check-all-neovm-strict` (pass; case inventory `800`)
+
 - Added base64 region builtin compatibility slice and locked oracle parity:
   - runtime changes:
     - `rust/neovm-core/src/elisp/fns.rs`

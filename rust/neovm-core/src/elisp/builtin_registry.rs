@@ -79,6 +79,7 @@ const DISPATCH_BUILTIN_NAMES: &[&str] = &[
     "bookmark-rename",
     "bookmark-save",
     "bookmark-set",
+    "bool-vector",
     "bool-vector-count-consecutive",
     "bool-vector-count-population",
     "bool-vector-exclusive-or",

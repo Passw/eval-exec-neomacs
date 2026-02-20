@@ -725,6 +725,7 @@ fn subr_arity_value(name: &str) -> Value {
         "base64-decode-string" => arity_cons(1, Some(3)),
         "base64-encode-string" | "base64url-encode-string" => arity_cons(1, Some(2)),
         "md5" => arity_cons(1, Some(5)),
+        "bool-vector" => arity_cons(0, None),
         "bool-vector-p" | "bool-vector-count-population" => arity_cons(1, Some(1)),
         "bool-vector-count-consecutive" => arity_cons(3, Some(3)),
         "bool-vector-not" => arity_cons(1, Some(2)),
@@ -2082,6 +2083,7 @@ mod tests {
 
     #[test]
     fn subr_arity_encoding_bool_vector_primitives_match_oracle() {
+        assert_subr_arity("bool-vector", 0, None);
         assert_subr_arity("base64-decode-region", 2, Some(4));
         assert_subr_arity("base64-encode-region", 2, Some(3));
         assert_subr_arity("base64-decode-string", 1, Some(3));

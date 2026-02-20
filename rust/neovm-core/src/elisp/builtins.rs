@@ -9881,6 +9881,7 @@ pub(crate) fn dispatch_builtin(
         "char-table-extra-slot" => super::chartable::builtin_char_table_extra_slot(args),
         "set-char-table-extra-slot" => super::chartable::builtin_set_char_table_extra_slot(args),
         "char-table-subtype" => super::chartable::builtin_char_table_subtype(args),
+        "bool-vector" => super::chartable::builtin_bool_vector(args),
         "make-bool-vector" => super::chartable::builtin_make_bool_vector(args),
         "bool-vector-p" => super::chartable::builtin_bool_vector_p(args),
         "bool-vector-count-population" => {

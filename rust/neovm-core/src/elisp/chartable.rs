@@ -506,6 +506,13 @@ pub(crate) fn builtin_make_bool_vector(args: Vec<Value>) -> EvalResult {
     Ok(Value::vector(vec))
 }
 
+/// `(bool-vector &rest OBJECTS)` -- create a bool-vector from OBJECTS
+/// truthiness.
+pub(crate) fn builtin_bool_vector(args: Vec<Value>) -> EvalResult {
+    let bits: Vec<bool> = args.into_iter().map(|v| v.is_truthy()).collect();
+    Ok(bv_from_bits(&bits))
+}
+
 /// `(bool-vector-p OBJ)` -- return t if OBJ is a bool-vector.
 pub(crate) fn builtin_bool_vector_p(args: Vec<Value>) -> EvalResult {
     expect_args("bool-vector-p", &args, 1)?;
@@ -996,6 +1003,23 @@ mod tests {
         let bv = builtin_make_bool_vector(vec![Value::Int(5), Value::Nil]).unwrap();
         assert!(is_bool_vector(&bv));
         assert!(!is_char_table(&bv));
+    }
+
+    #[test]
+    fn bool_vector_constructor_from_rest_args() {
+        let bv = builtin_bool_vector(vec![
+            Value::True,
+            Value::Nil,
+            Value::Int(0),
+            Value::symbol("x"),
+        ])
+        .unwrap();
+        assert!(is_bool_vector(&bv));
+        assert_bv_bits(&bv, &[true, false, true, true]);
+
+        let empty = builtin_bool_vector(vec![]).unwrap();
+        assert!(is_bool_vector(&empty));
+        assert_bv_bits(&empty, &[]);
     }
 
     #[test]
