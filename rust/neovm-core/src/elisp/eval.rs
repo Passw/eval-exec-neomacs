@@ -1575,7 +1575,12 @@ impl Evaluator {
                     args.push(self.eval(expr)?);
                 }
                 if super::autoload::is_autoload_value(&func) {
-                    return self.apply_named_callable(name, args, Value::Subr(name.clone()), false);
+                    let result =
+                        self.apply_named_callable(name, args, Value::Subr(name.clone()), false);
+                    if let Ok(value) = &result {
+                        self.maybe_writeback_mutating_first_arg(name, None, tail, value);
+                    }
+                    return result;
                 }
                 let function_is_callable = match &func {
                     Value::Lambda(_) | Value::ByteCode(_) | Value::Macro(_) => true,
@@ -1599,6 +1604,14 @@ impl Evaluator {
                     }
                     other => other,
                 };
+                if let Ok(value) = &result {
+                    self.maybe_writeback_mutating_first_arg(
+                        name,
+                        alias_target.as_deref(),
+                        tail,
+                        value,
+                    );
+                }
                 return if let Some(target) = alias_target {
                     result.map_err(|flow| {
                         rewrite_wrong_arity_alias_function_object(flow, name, &target)
@@ -1621,7 +1634,11 @@ impl Evaluator {
                 args.push(self.eval(expr)?);
             }
 
-            return self.apply_named_callable(name, args, Value::Subr(name.clone()), false);
+            let result = self.apply_named_callable(name, args, Value::Subr(name.clone()), false);
+            if let Ok(value) = &result {
+                self.maybe_writeback_mutating_first_arg(name, None, tail, value);
+            }
+            return result;
         }
 
         // Head is a list (possibly a lambda expression)
@@ -1639,6 +1656,27 @@ impl Evaluator {
         }
 
         Err(signal("invalid-function", vec![quote_to_value(head)]))
+    }
+
+    fn maybe_writeback_mutating_first_arg(
+        &mut self,
+        called_name: &str,
+        alias_target: Option<&str>,
+        args_exprs: &[Expr],
+        result: &Value,
+    ) {
+        let mutates_first_argument =
+            called_name == "fillarray" || alias_target.is_some_and(|name| name == "fillarray");
+        if !mutates_first_argument {
+            return;
+        }
+        let Some(Expr::Symbol(name)) = args_exprs.first() else {
+            return;
+        };
+        if name == "nil" || name == "t" {
+            return;
+        }
+        self.assign(name, result.clone());
     }
 
     // -----------------------------------------------------------------------
@@ -5202,5 +5240,23 @@ mod tests {
         );
         assert_eq!(results[0], r#"OK "test""#);
         assert_eq!(results[1], r#"OK "test<2>""#);
+    }
+
+    #[test]
+    fn fillarray_string_writeback_updates_symbol_binding() {
+        let result = eval_one("(let ((s (copy-sequence \"abc\"))) (fillarray s ?x) s)");
+        assert_eq!(result, r#"OK "xxx""#);
+    }
+
+    #[test]
+    fn fillarray_alias_string_writeback_updates_symbol_binding() {
+        let result = eval_one(
+            "(progn
+                (defalias 'vm-fillarray-alias 'fillarray)
+                (let ((s (copy-sequence \"abc\")))
+                  (vm-fillarray-alias s ?y)
+                  s))",
+        );
+        assert_eq!(result, r#"OK "yyy""#);
     }
 }
