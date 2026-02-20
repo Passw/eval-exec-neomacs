@@ -2265,7 +2265,10 @@ impl Evaluator {
 
     fn sf_funcall(&mut self, tail: &[Expr]) -> EvalResult {
         if tail.is_empty() {
-            return Err(signal("wrong-number-of-arguments", vec![]));
+            return Err(signal(
+                "wrong-number-of-arguments",
+                vec![Value::symbol("funcall"), Value::Int(tail.len() as i64)],
+            ));
         }
         let function = self.eval(&tail[0])?;
         let mut args = Vec::with_capacity(tail.len().saturating_sub(1));
@@ -2455,8 +2458,52 @@ impl Evaluator {
             ));
         }
         let sym = self.eval(&tail[0])?;
-        let def =
-            super::compiled_literal::maybe_coerce_compiled_literal_function(self.eval(&tail[1])?);
+        let def = self.eval(&tail[1])?;
+        if tail.len() > 2 {
+            let _ = self.eval(&tail[2])?;
+        }
+        self.defalias_value(sym, def)
+    }
+
+    fn sf_provide(&mut self, tail: &[Expr]) -> EvalResult {
+        if !(1..=2).contains(&tail.len()) {
+            return Err(signal(
+                "wrong-number-of-arguments",
+                vec![Value::symbol("provide"), Value::Int(tail.len() as i64)],
+            ));
+        }
+        let feature = self.eval(&tail[0])?;
+        let subfeatures = if tail.len() > 1 {
+            Some(self.eval(&tail[1])?)
+        } else {
+            None
+        };
+        self.provide_value(feature, subfeatures)
+    }
+
+    fn sf_require(&mut self, tail: &[Expr]) -> EvalResult {
+        if !(1..=3).contains(&tail.len()) {
+            return Err(signal(
+                "wrong-number-of-arguments",
+                vec![Value::symbol("require"), Value::Int(tail.len() as i64)],
+            ));
+        }
+        let feature = self.eval(&tail[0])?;
+        let filename = if tail.len() > 1 {
+            Some(self.eval(&tail[1])?)
+        } else {
+            None
+        };
+        let noerror = if tail.len() > 2 {
+            Some(self.eval(&tail[2])?)
+        } else {
+            None
+        };
+        self.require_value(feature, filename, noerror)
+    }
+
+    pub(crate) fn defalias_value(&mut self, sym: Value, def: Value) -> EvalResult {
+        let def = super::compiled_literal::maybe_coerce_compiled_literal_function(def);
         let name = sym.as_symbol_name().map(str::to_string).ok_or_else(|| {
             signal(
                 "wrong-type-argument",
@@ -2476,11 +2523,11 @@ impl Evaluator {
         Ok(sym)
     }
 
-    fn sf_provide(&mut self, tail: &[Expr]) -> EvalResult {
-        if tail.is_empty() {
-            return Err(signal("wrong-number-of-arguments", vec![]));
-        }
-        let feature = self.eval(&tail[0])?;
+    pub(crate) fn provide_value(
+        &mut self,
+        feature: Value,
+        subfeatures: Option<Value>,
+    ) -> EvalResult {
         let name = match &feature {
             Value::Symbol(s) => s.clone(),
             _ => {
@@ -2490,15 +2537,20 @@ impl Evaluator {
                 ))
             }
         };
+        if let Some(value) = subfeatures {
+            self.obarray
+                .put_property(&name, "subfeatures", value.clone());
+        }
         self.add_feature(&name);
         Ok(feature)
     }
 
-    fn sf_require(&mut self, tail: &[Expr]) -> EvalResult {
-        if tail.is_empty() {
-            return Err(signal("wrong-number-of-arguments", vec![]));
-        }
-        let feature = self.eval(&tail[0])?;
+    pub(crate) fn require_value(
+        &mut self,
+        feature: Value,
+        filename: Option<Value>,
+        noerror: Option<Value>,
+    ) -> EvalResult {
         let name = match &feature {
             Value::Symbol(s) => s.clone(),
             _ => {
@@ -2523,22 +2575,16 @@ impl Evaluator {
         }
         self.require_stack.push(name.clone());
 
-        // Try to find and load the file
         let result = (|| -> EvalResult {
-            let filename = if tail.len() > 1 {
-                match &self.eval(&tail[1])? {
-                    Value::Str(s) => (**s).clone(),
-                    _ => name.clone(),
-                }
-            } else {
-                name.clone()
+            let filename = match filename {
+                Some(Value::Str(s)) => (*s).clone(),
+                Some(_) | None => name.clone(),
             };
 
             let load_path = super::load::get_load_path(&self.obarray);
             match super::load::find_file_in_load_path(&filename, &load_path) {
                 Some(path) => {
                     self.load_file_internal(&path)?;
-                    // After loading, check if feature was provided
                     if self.has_feature(&name) {
                         Ok(Value::symbol(name))
                     } else {
@@ -2552,12 +2598,8 @@ impl Evaluator {
                     }
                 }
                 None => {
-                    // Check if no-error flag is set (3rd argument)
-                    if tail.len() > 2 {
-                        let noerror = self.eval(&tail[2])?;
-                        if noerror.is_truthy() {
-                            return Ok(Value::Nil);
-                        }
+                    if noerror.is_some_and(|value| value.is_truthy()) {
+                        return Ok(Value::Nil);
                     }
                     Err(signal(
                         "file-missing",

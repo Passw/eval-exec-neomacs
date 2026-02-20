@@ -2864,6 +2864,31 @@ pub(crate) fn builtin_apply(eval: &mut super::eval::Evaluator, args: Vec<Value>)
     eval.apply(func, call_args)
 }
 
+pub(crate) fn builtin_funcall(eval: &mut super::eval::Evaluator, args: Vec<Value>) -> EvalResult {
+    expect_min_args("funcall", &args, 1)?;
+    let func = args[0].clone();
+    let call_args = args[1..].to_vec();
+    eval.apply(func, call_args)
+}
+
+pub(crate) fn builtin_defalias(
+    eval: &mut super::eval::Evaluator,
+    args: Vec<Value>,
+) -> EvalResult {
+    expect_range_args("defalias", &args, 2, 3)?;
+    eval.defalias_value(args[0].clone(), args[1].clone())
+}
+
+pub(crate) fn builtin_provide(eval: &mut super::eval::Evaluator, args: Vec<Value>) -> EvalResult {
+    expect_range_args("provide", &args, 1, 2)?;
+    eval.provide_value(args[0].clone(), args.get(1).cloned())
+}
+
+pub(crate) fn builtin_require(eval: &mut super::eval::Evaluator, args: Vec<Value>) -> EvalResult {
+    expect_range_args("require", &args, 1, 3)?;
+    eval.require_value(args[0].clone(), args.get(1).cloned(), args.get(2).cloned())
+}
+
 // ===========================================================================
 // Higher-order
 // ===========================================================================
@@ -9167,6 +9192,10 @@ pub(crate) fn dispatch_builtin(
     // Functions that need the evaluator (higher-order / obarray access)
     match name {
         "apply" => return Some(builtin_apply(eval, args)),
+        "funcall" => return Some(builtin_funcall(eval, args)),
+        "defalias" => return Some(builtin_defalias(eval, args)),
+        "provide" => return Some(builtin_provide(eval, args)),
+        "require" => return Some(builtin_require(eval, args)),
         "mapcan" => return Some(builtin_mapcan(eval, args)),
         "mapcar" => return Some(builtin_mapcar(eval, args)),
         "mapc" => return Some(builtin_mapc(eval, args)),
@@ -15130,6 +15159,11 @@ mod tests {
         let throw_fn = builtin_fboundp(&mut eval, vec![Value::symbol("throw")])
             .expect("fboundp should succeed for throw");
         assert!(throw_fn.is_truthy());
+        for name in ["funcall", "defalias", "provide", "require"] {
+            let result = builtin_fboundp(&mut eval, vec![Value::symbol(name)])
+                .unwrap_or_else(|_| panic!("fboundp should succeed for {name}"));
+            assert!(result.is_truthy(), "expected {name} to be fboundp");
+        }
     }
 
     #[test]
@@ -15180,6 +15214,11 @@ mod tests {
         let throw_symbol = builtin_functionp_eval(&mut eval, vec![Value::symbol("throw")])
             .expect("functionp should accept throw symbol");
         assert!(throw_symbol.is_truthy());
+        for name in ["funcall", "defalias", "provide", "require"] {
+            let result = builtin_functionp_eval(&mut eval, vec![Value::symbol(name)])
+                .unwrap_or_else(|_| panic!("functionp should accept {name} symbol"));
+            assert!(result.is_truthy(), "expected {name} to satisfy functionp");
+        }
         let macro_marker_cons = builtin_functionp_eval(
             &mut eval,
             vec![Value::cons(Value::symbol("macro"), Value::True)],
@@ -15413,6 +15452,11 @@ mod tests {
         let throw_fn = builtin_symbol_function(&mut eval, vec![Value::symbol("throw")])
             .expect("symbol-function should resolve throw as callable subr");
         assert_eq!(throw_fn, Value::Subr("throw".to_string()));
+        for name in ["funcall", "defalias", "provide", "require"] {
+            let result = builtin_symbol_function(&mut eval, vec![Value::symbol(name)])
+                .unwrap_or_else(|_| panic!("symbol-function should resolve {name}"));
+            assert_eq!(result, Value::Subr(name.to_string()));
+        }
 
         let when_macro = builtin_symbol_function(&mut eval, vec![Value::symbol("when")])
             .expect("symbol-function should resolve when as a macro");
@@ -15472,6 +15516,22 @@ mod tests {
         let throw_functionp = builtin_functionp_eval(&mut eval, vec![Value::symbol("throw")])
             .expect("functionp should accept symbol");
         assert!(throw_functionp.is_nil());
+        for name in ["funcall", "defalias", "provide", "require"] {
+            builtin_fmakunbound(&mut eval, vec![Value::symbol(name)])
+                .unwrap_or_else(|_| panic!("fmakunbound should accept {name}"));
+            let bound = builtin_fboundp(&mut eval, vec![Value::symbol(name)])
+                .unwrap_or_else(|_| panic!("fboundp should accept {name}"));
+            assert!(bound.is_nil(), "expected {name} to be unbound after fmakunbound");
+            let fn_cell = builtin_symbol_function(&mut eval, vec![Value::symbol(name)])
+                .unwrap_or_else(|_| panic!("symbol-function should accept {name}"));
+            assert!(fn_cell.is_nil(), "expected symbol-function {name} to be nil");
+            let functionp = builtin_functionp_eval(&mut eval, vec![Value::symbol(name)])
+                .unwrap_or_else(|_| panic!("functionp should accept {name}"));
+            assert!(
+                functionp.is_nil(),
+                "expected functionp {name} to be nil after fmakunbound"
+            );
+        }
     }
 
     #[test]

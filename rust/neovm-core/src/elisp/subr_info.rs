@@ -298,7 +298,7 @@ fn subr_arity_value(name: &str) -> Value {
         // Oracle-compatible overrides for core subrs used in vm-compat.
         n if is_cxr_subr_name(n) => arity_cons(1, Some(1)),
         "message" | "format" | "format-message" => arity_cons(1, None),
-        "/" | "<" | "<=" | "=" | ">" | ">=" | "apply" => arity_cons(1, None),
+        "/" | "<" | "<=" | "=" | ">" | ">=" | "apply" | "funcall" => arity_cons(1, None),
         "cons" => arity_cons(2, Some(2)),
         "1+" | "1-" | "abs" => arity_cons(1, Some(1)),
         "%" | "/=" | "ash" | "length<" | "length=" | "length>" => arity_cons(2, Some(2)),
@@ -335,6 +335,8 @@ fn subr_arity_value(name: &str) -> Value {
         "find-file-noselect" => arity_cons(1, Some(4)),
         "insert-file-contents" => arity_cons(1, Some(5)),
         "load" => arity_cons(1, Some(5)),
+        "provide" => arity_cons(1, Some(2)),
+        "require" => arity_cons(1, Some(3)),
         "load-file" => arity_cons(1, Some(1)),
         "locate-file" | "locate-file-internal" => arity_cons(2, Some(4)),
         "file-attributes" | "file-modes" => arity_cons(1, Some(2)),
@@ -463,6 +465,7 @@ fn subr_arity_value(name: &str) -> Value {
         "intern" | "intern-soft" | "indirect-function" | "unintern" => arity_cons(1, Some(2)),
         "symbol-file" => arity_cons(1, Some(3)),
         "fset" | "set" | "get" | "set-marker-insertion-type" => arity_cons(2, Some(2)),
+        "defalias" => arity_cons(2, Some(3)),
         "put" => arity_cons(3, Some(3)),
         "set-mark" | "set-mark-command" => arity_cons(1, Some(1)),
         "set-marker" => arity_cons(2, Some(3)),
@@ -2300,6 +2303,7 @@ mod tests {
         assert_subr_arity("eq", 2, Some(2));
         assert_subr_arity("eql", 2, Some(2));
         assert_subr_arity("equal", 2, Some(2));
+        assert_subr_arity("funcall", 1, None);
         assert_subr_arity("float", 1, Some(1));
         assert_subr_arity("floatp", 1, Some(1));
         assert_subr_arity("floor", 1, Some(2));
@@ -2311,6 +2315,9 @@ mod tests {
         assert_subr_arity("null", 1, Some(1));
         assert_subr_arity("number-to-string", 1, Some(1));
         assert_subr_arity("numberp", 1, Some(1));
+        assert_subr_arity("defalias", 2, Some(3));
+        assert_subr_arity("provide", 1, Some(2));
+        assert_subr_arity("require", 1, Some(3));
         assert_subr_arity("round", 1, Some(2));
         assert_subr_arity("sequencep", 1, Some(1));
         assert_subr_arity("string-equal", 2, Some(2));
