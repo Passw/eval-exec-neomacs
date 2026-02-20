@@ -314,6 +314,7 @@ fn subr_arity_value(name: &str) -> Value {
         "make-directory" => arity_cons(1, Some(2)),
         "make-directory-internal" => arity_cons(1, Some(1)),
         "make-temp-file" => arity_cons(1, Some(4)),
+        "make-temp-name" => arity_cons(1, Some(1)),
         "make-nearby-temp-file" => arity_cons(1, Some(3)),
         "make-symbolic-link" | "rename-file" => arity_cons(2, Some(3)),
         "file-name-absolute-p"
@@ -327,6 +328,7 @@ fn subr_arity_value(name: &str) -> Value {
         "file-name-extension" => arity_cons(1, Some(2)),
         "file-name-concat" => arity_cons(1, None),
         "file-truename" => arity_cons(1, Some(3)),
+        "get-truename-buffer" | "unhandled-file-name-directory" => arity_cons(1, Some(1)),
         "find-file" => arity_cons(1, Some(2)),
         "find-file-name-handler" => arity_cons(2, Some(2)),
         "find-file-noselect" => arity_cons(1, Some(4)),
@@ -869,9 +871,12 @@ fn subr_arity_value(name: &str) -> Value {
         "set-char-table-parent" => arity_cons(2, Some(2)),
         "set-char-table-extra-slot" | "set-char-table-range" => arity_cons(3, Some(3)),
         "set-file-modes" => arity_cons(2, Some(3)),
+        "set-file-acl" | "set-file-selinux-context" => arity_cons(2, Some(2)),
         "set-file-times" => arity_cons(1, Some(3)),
         "set-keyboard-coding-system" | "set-match-data" => arity_cons(1, Some(2)),
         "set-terminal-coding-system" => arity_cons(1, Some(3)),
+        "set-visited-file-modtime" | "verify-visited-file-modtime" => arity_cons(0, Some(1)),
+        "visited-file-modtime" => arity_cons(0, Some(0)),
         "scan-lists" => arity_cons(3, Some(3)),
         "scan-sexps" => arity_cons(2, Some(2)),
         "current-kill" => arity_cons(1, Some(2)),
@@ -1030,6 +1035,7 @@ fn subr_arity_value(name: &str) -> Value {
         "set-output-flow-control" => arity_cons(1, Some(2)),
         "waiting-for-user-input-p" => arity_cons(0, Some(0)),
         "minibufferp" => arity_cons(0, Some(2)),
+        "next-read-file-uses-dialog-p" => arity_cons(0, Some(0)),
         "recursive-edit"
         | "top-level"
         | "exit-recursive-edit"
@@ -1181,6 +1187,7 @@ fn subr_arity_value(name: &str) -> Value {
         "process-send-string" => arity_cons(2, Some(2)),
         "process-tty-name" => arity_cons(1, Some(2)),
         "set-process-coding-system" => arity_cons(1, Some(3)),
+        "set-binary-mode" => arity_cons(2, Some(2)),
         "set-process-filter"
         | "set-process-buffer"
         | "set-process-datagram-address"
@@ -1909,6 +1916,7 @@ mod tests {
         assert_subr_arity("set-process-thread", 2, Some(2));
         assert_subr_arity("set-process-window-size", 3, Some(3));
         assert_subr_arity("set-buffer-process-coding-system", 2, Some(2));
+        assert_subr_arity("set-binary-mode", 2, Some(2));
         assert_subr_arity("set-network-process-option", 3, Some(4));
         assert_subr_arity("serial-process-configure", 0, None);
         assert_subr_arity("setenv", 1, Some(3));
@@ -1952,6 +1960,7 @@ mod tests {
         assert_subr_arity("exit-minibuffer", 0, Some(0));
         assert_subr_arity("minibuffer-depth", 0, Some(0));
         assert_subr_arity("minibufferp", 0, Some(2));
+        assert_subr_arity("next-read-file-uses-dialog-p", 0, Some(0));
         assert_subr_arity("minibuffer-prompt", 0, Some(0));
         assert_subr_arity("minibuffer-contents", 0, Some(0));
         assert_subr_arity("minibuffer-contents-no-properties", 0, Some(0));
@@ -2406,6 +2415,7 @@ mod tests {
         assert_subr_arity("make-directory", 1, Some(2));
         assert_subr_arity("make-directory-internal", 1, Some(1));
         assert_subr_arity("make-temp-file", 1, Some(4));
+        assert_subr_arity("make-temp-name", 1, Some(1));
         assert_subr_arity("make-nearby-temp-file", 1, Some(3));
         assert_subr_arity("make-symbolic-link", 2, Some(3));
         assert_subr_arity("rename-file", 2, Some(3));
@@ -2458,6 +2468,8 @@ mod tests {
         assert_subr_arity("file-name-nondirectory", 1, Some(1));
         assert_subr_arity("file-name-sans-extension", 1, Some(1));
         assert_subr_arity("file-truename", 1, Some(3));
+        assert_subr_arity("get-truename-buffer", 1, Some(1));
+        assert_subr_arity("unhandled-file-name-directory", 1, Some(1));
     }
 
     #[test]
@@ -2840,7 +2852,9 @@ mod tests {
         assert_subr_arity("set-char-table-range", 3, Some(3));
         assert_subr_arity("set-default", 2, Some(2));
         assert_subr_arity("set-default-file-modes", 1, Some(1));
+        assert_subr_arity("set-file-acl", 2, Some(2));
         assert_subr_arity("set-file-modes", 2, Some(3));
+        assert_subr_arity("set-file-selinux-context", 2, Some(2));
         assert_subr_arity("set-file-times", 1, Some(3));
         assert_subr_arity("set-keyboard-coding-system", 1, Some(2));
         assert_subr_arity("set-keymap-parent", 2, Some(2));
@@ -2849,9 +2863,12 @@ mod tests {
         assert_subr_arity("set-syntax-table", 1, Some(1));
         assert_subr_arity("set-terminal-coding-system", 1, Some(3));
         assert_subr_arity("set-time-zone-rule", 1, Some(1));
+        assert_subr_arity("set-visited-file-modtime", 0, Some(1));
         assert_subr_arity("set-window-dedicated-p", 2, Some(2));
         assert_subr_arity("setcar", 2, Some(2));
         assert_subr_arity("setcdr", 2, Some(2));
+        assert_subr_arity("verify-visited-file-modtime", 0, Some(1));
+        assert_subr_arity("visited-file-modtime", 0, Some(0));
         assert_subr_arity("scan-lists", 3, Some(3));
         assert_subr_arity("scan-sexps", 2, Some(2));
     }

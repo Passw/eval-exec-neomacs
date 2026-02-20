@@ -9242,6 +9242,12 @@ pub(crate) fn dispatch_builtin(
         "file-modes" => return Some(super::fileio::builtin_file_modes_eval(eval, args)),
         "set-file-modes" => return Some(super::fileio::builtin_set_file_modes_eval(eval, args)),
         "set-file-times" => return Some(super::fileio::builtin_set_file_times_eval(eval, args)),
+        "verify-visited-file-modtime" => {
+            return Some(super::fileio::builtin_verify_visited_file_modtime(eval, args))
+        }
+        "set-visited-file-modtime" => {
+            return Some(super::fileio::builtin_set_visited_file_modtime(eval, args))
+        }
         "default-file-modes" => return Some(super::fileio::builtin_default_file_modes(args)),
         "set-default-file-modes" => {
             return Some(super::fileio::builtin_set_default_file_modes(args))
@@ -10926,6 +10932,9 @@ pub(crate) fn dispatch_builtin(
         "file-modes" => super::fileio::builtin_file_modes(args),
         "set-file-modes" => super::fileio::builtin_set_file_modes(args),
         "set-file-times" => super::fileio::builtin_set_file_times(args),
+        "set-file-acl" => super::fileio::builtin_set_file_acl(args),
+        "set-file-selinux-context" => super::fileio::builtin_set_file_selinux_context(args),
+        "visited-file-modtime" => super::fileio::builtin_visited_file_modtime(args),
         "default-file-modes" => super::fileio::builtin_default_file_modes(args),
         "set-default-file-modes" => super::fileio::builtin_set_default_file_modes(args),
         "delete-file" => super::fileio::builtin_delete_file(args),
@@ -10939,7 +10948,11 @@ pub(crate) fn dispatch_builtin(
         "make-directory" => super::fileio::builtin_make_directory(args),
         "make-directory-internal" => super::fileio::builtin_make_directory_internal(args),
         "make-temp-file" => super::fileio::builtin_make_temp_file(args),
+        "make-temp-name" => super::fileio::builtin_make_temp_name(args),
         "make-nearby-temp-file" => super::fileio::builtin_make_nearby_temp_file(args),
+        "next-read-file-uses-dialog-p" => super::fileio::builtin_next_read_file_uses_dialog_p(args),
+        "unhandled-file-name-directory" => super::fileio::builtin_unhandled_file_name_directory(args),
+        "get-truename-buffer" => super::fileio::builtin_get_truename_buffer(args),
         "directory-files" => super::fileio::builtin_directory_files(args),
         "find-file-name-handler" => super::fileio::builtin_find_file_name_handler(args),
         "file-attributes" => super::dired::builtin_file_attributes(args),
@@ -10963,6 +10976,7 @@ pub(crate) fn dispatch_builtin(
         "getenv" => super::process::builtin_getenv(args),
         "getenv-internal" => super::process::builtin_getenv_internal(args),
         "setenv" => super::process::builtin_setenv(args),
+        "set-binary-mode" => super::process::builtin_set_binary_mode(args),
 
         // Timer (pure — no evaluator needed)
         "timerp" => super::timer::builtin_timerp(args),
@@ -11654,6 +11668,9 @@ pub(crate) fn dispatch_builtin_pure(name: &str, args: Vec<Value>) -> Option<Eval
         "file-modes" => super::fileio::builtin_file_modes(args),
         "set-file-modes" => super::fileio::builtin_set_file_modes(args),
         "set-file-times" => super::fileio::builtin_set_file_times(args),
+        "set-file-acl" => super::fileio::builtin_set_file_acl(args),
+        "set-file-selinux-context" => super::fileio::builtin_set_file_selinux_context(args),
+        "visited-file-modtime" => super::fileio::builtin_visited_file_modtime(args),
         "default-file-modes" => super::fileio::builtin_default_file_modes(args),
         "set-default-file-modes" => super::fileio::builtin_set_default_file_modes(args),
         "delete-file" => super::fileio::builtin_delete_file(args),
@@ -11667,7 +11684,11 @@ pub(crate) fn dispatch_builtin_pure(name: &str, args: Vec<Value>) -> Option<Eval
         "make-directory" => super::fileio::builtin_make_directory(args),
         "make-directory-internal" => super::fileio::builtin_make_directory_internal(args),
         "make-temp-file" => super::fileio::builtin_make_temp_file(args),
+        "make-temp-name" => super::fileio::builtin_make_temp_name(args),
         "make-nearby-temp-file" => super::fileio::builtin_make_nearby_temp_file(args),
+        "next-read-file-uses-dialog-p" => super::fileio::builtin_next_read_file_uses_dialog_p(args),
+        "unhandled-file-name-directory" => super::fileio::builtin_unhandled_file_name_directory(args),
+        "get-truename-buffer" => super::fileio::builtin_get_truename_buffer(args),
         "directory-files" => super::fileio::builtin_directory_files(args),
         "find-file-name-handler" => super::fileio::builtin_find_file_name_handler(args),
         "file-attributes" => super::dired::builtin_file_attributes(args),
@@ -11689,6 +11710,7 @@ pub(crate) fn dispatch_builtin_pure(name: &str, args: Vec<Value>) -> Option<Eval
         "getenv" => super::process::builtin_getenv(args),
         "getenv-internal" => super::process::builtin_getenv_internal(args),
         "setenv" => super::process::builtin_setenv(args),
+        "set-binary-mode" => super::process::builtin_set_binary_mode(args),
         // Editfns (pure)
         "group-name" => super::editfns::builtin_group_name(args),
         "group-gid" => super::editfns::builtin_group_gid(args),

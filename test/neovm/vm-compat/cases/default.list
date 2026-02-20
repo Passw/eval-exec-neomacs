@@ -807,4 +807,5 @@ cases/current-daemon-window-config-semantics
 cases/documentation-flush-force-invocation-time-semantics
 cases/predicate-file-length-format-semantics
 cases/system-file-primitive-semantics
+cases/file-runtime-wrapper-semantics
 cases/internal-file-wrapper-semantics

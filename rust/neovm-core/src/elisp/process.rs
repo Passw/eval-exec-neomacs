@@ -3858,6 +3858,20 @@ pub(crate) fn builtin_setenv(args: Vec<Value>) -> EvalResult {
     }
 }
 
+/// (set-binary-mode STREAM MODE) -> t
+///
+/// Batch-compatible stub. Validates STREAM as a symbol and returns t.
+pub(crate) fn builtin_set_binary_mode(args: Vec<Value>) -> EvalResult {
+    expect_args("set-binary-mode", &args, 2)?;
+    if args[0].as_symbol_name().is_none() {
+        return Err(signal(
+            "wrong-type-argument",
+            vec![Value::symbol("symbolp"), args[0].clone()],
+        ));
+    }
+    Ok(Value::True)
+}
+
 // ---------------------------------------------------------------------------
 // Tests
 // ---------------------------------------------------------------------------

@@ -909,6 +909,17 @@ fn expect_min_args(name: &str, args: &[Value], min: usize) -> Result<(), Flow> {
     }
 }
 
+fn expect_max_args(name: &str, args: &[Value], max: usize) -> Result<(), Flow> {
+    if args.len() > max {
+        Err(signal(
+            "wrong-number-of-arguments",
+            vec![Value::symbol(name), Value::Int(args.len() as i64)],
+        ))
+    } else {
+        Ok(())
+    }
+}
+
 fn expect_string(value: &Value) -> Result<String, Flow> {
     match value {
         Value::Str(s) => Ok((**s).clone()),
@@ -1139,6 +1150,23 @@ fn split_nearby_temp_prefix(prefix: &str) -> Option<(String, String)> {
     Some((parent.to_string_lossy().into_owned(), file_name))
 }
 
+fn make_temp_name_suffix() -> String {
+    const ALPHABET: &[u8] = b"abcdefghijklmnopqrstuvwxyz0123456789";
+    let nonce = TEMP_FILE_COUNTER.fetch_add(1, Ordering::Relaxed);
+    let now = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_nanos() as u64;
+    let mut value = now ^ nonce.rotate_left(7);
+    let mut out = [b'a'; 6];
+    for slot in &mut out {
+        let idx = (value % ALPHABET.len() as u64) as usize;
+        *slot = ALPHABET[idx];
+        value = value / ALPHABET.len() as u64 + 1;
+    }
+    String::from_utf8_lossy(&out).into_owned()
+}
+
 /// (expand-file-name NAME &optional DEFAULT-DIRECTORY) -> string
 pub(crate) fn builtin_expand_file_name(args: Vec<Value>) -> EvalResult {
     expect_min_args("expand-file-name", &args, 1)?;
@@ -1227,6 +1255,33 @@ pub(crate) fn builtin_make_temp_file(args: Vec<Value>) -> EvalResult {
 
     let path = make_temp_file_impl(&temp_dir, &prefix, dir_flag, &suffix, text.as_deref())?;
     Ok(Value::string(path))
+}
+
+/// (make-temp-name PREFIX) -> string
+pub(crate) fn builtin_make_temp_name(args: Vec<Value>) -> EvalResult {
+    expect_args("make-temp-name", &args, 1)?;
+    let prefix = expect_string_strict(&args[0])?;
+    Ok(Value::string(format!("{prefix}{}", make_temp_name_suffix())))
+}
+
+/// (next-read-file-uses-dialog-p) -> nil
+pub(crate) fn builtin_next_read_file_uses_dialog_p(args: Vec<Value>) -> EvalResult {
+    expect_args("next-read-file-uses-dialog-p", &args, 0)?;
+    Ok(Value::Nil)
+}
+
+/// (unhandled-file-name-directory FILENAME) -> directory string
+pub(crate) fn builtin_unhandled_file_name_directory(args: Vec<Value>) -> EvalResult {
+    expect_args("unhandled-file-name-directory", &args, 1)?;
+    let filename = expect_string_strict(&args[0])?;
+    Ok(Value::string(file_name_as_directory(&filename)))
+}
+
+/// (get-truename-buffer FILENAME) -> buffer or nil
+pub(crate) fn builtin_get_truename_buffer(args: Vec<Value>) -> EvalResult {
+    expect_args("get-truename-buffer", &args, 1)?;
+    let _filename = &args[0];
+    Ok(Value::Nil)
 }
 
 /// Evaluator-aware variant of `make-temp-file` that honors dynamic
@@ -1730,6 +1785,14 @@ pub(crate) fn builtin_file_acl_eval(eval: &Evaluator, args: Vec<Value>) -> EvalR
     Ok(Value::Nil)
 }
 
+/// (set-file-acl FILENAME ACL) -> nil
+pub(crate) fn builtin_set_file_acl(args: Vec<Value>) -> EvalResult {
+    expect_args("set-file-acl", &args, 2)?;
+    let _filename = &args[0];
+    let _acl = &args[1];
+    Ok(Value::Nil)
+}
+
 /// (file-locked-p FILENAME) -> locker info or nil
 pub(crate) fn builtin_file_locked_p(args: Vec<Value>) -> EvalResult {
     expect_args("file-locked-p", &args, 1)?;
@@ -1762,6 +1825,14 @@ pub(crate) fn builtin_file_selinux_context_eval(
     let filename = expect_string_strict(&args[0])?;
     let _filename = resolve_filename_for_eval(eval, &filename);
     Ok(Value::list(vec![Value::Nil, Value::Nil, Value::Nil, Value::Nil]))
+}
+
+/// (set-file-selinux-context FILENAME CONTEXT) -> nil
+pub(crate) fn builtin_set_file_selinux_context(args: Vec<Value>) -> EvalResult {
+    expect_args("set-file-selinux-context", &args, 2)?;
+    let _filename = expect_string_strict(&args[0])?;
+    let _context = &args[1];
+    Ok(Value::Nil)
 }
 
 /// (file-system-info PATH) -> (total free avail) in bytes
@@ -2082,6 +2153,90 @@ pub(crate) fn builtin_set_file_times_eval(eval: &Evaluator, args: Vec<Value>) ->
     let nofollow = args.get(2).is_some_and(|flag| !flag.is_nil());
     set_file_times_compat(&filename, timestamp, nofollow)?;
     Ok(Value::True)
+}
+
+fn validate_optional_buffer_arg(eval: &Evaluator, arg: Option<&Value>) -> Result<(), Flow> {
+    if let Some(bufferish) = arg {
+        match bufferish {
+            Value::Nil => Ok(()),
+            Value::Buffer(id) => {
+                if eval.buffers.get(*id).is_some() {
+                    Ok(())
+                } else {
+                    Err(signal(
+                        "wrong-type-argument",
+                        vec![Value::symbol("bufferp"), bufferish.clone()],
+                    ))
+                }
+            }
+            _ => Err(signal(
+                "wrong-type-argument",
+                vec![Value::symbol("bufferp"), bufferish.clone()],
+            )),
+        }?
+    }
+    Ok(())
+}
+
+fn validate_set_visited_file_modtime_arg(arg: &Value) -> Result<(), Flow> {
+    match arg {
+        Value::Int(_) | Value::Char(_) => Err(signal(
+            "args-out-of-range",
+            vec![arg.clone(), Value::Int(-1), Value::Int(0)],
+        )),
+        Value::Str(_) => Err(signal(
+            "error",
+            vec![Value::string("Invalid time specification")],
+        )),
+        Value::Float(_) | Value::Cons(_) => Ok(()),
+        _ => Err(signal(
+            "error",
+            vec![Value::string("Invalid time specification")],
+        )),
+    }
+}
+
+/// (visited-file-modtime) -> 0
+pub(crate) fn builtin_visited_file_modtime(args: Vec<Value>) -> EvalResult {
+    expect_args("visited-file-modtime", &args, 0)?;
+    Ok(Value::Int(0))
+}
+
+/// (verify-visited-file-modtime &optional BUFFER) -> t
+pub(crate) fn builtin_verify_visited_file_modtime(
+    eval: &mut Evaluator,
+    args: Vec<Value>,
+) -> EvalResult {
+    expect_max_args("verify-visited-file-modtime", &args, 1)?;
+    validate_optional_buffer_arg(eval, args.first())?;
+    Ok(Value::True)
+}
+
+/// (set-visited-file-modtime &optional TIME-LIST) -> nil
+pub(crate) fn builtin_set_visited_file_modtime(
+    eval: &mut Evaluator,
+    args: Vec<Value>,
+) -> EvalResult {
+    expect_max_args("set-visited-file-modtime", &args, 1)?;
+    if let Some(arg) = args.first() {
+        if !arg.is_nil() {
+            validate_set_visited_file_modtime_arg(arg)?;
+            return Ok(Value::Nil);
+        }
+    }
+
+    let file_name = eval
+        .buffers
+        .current_buffer()
+        .and_then(|buf| buf.file_name.clone());
+    if file_name.is_none() {
+        return Err(signal(
+            "wrong-type-argument",
+            vec![Value::symbol("stringp"), Value::Nil],
+        ));
+    }
+
+    Ok(Value::Nil)
 }
 
 /// (set-default-file-modes MODE) -> nil
