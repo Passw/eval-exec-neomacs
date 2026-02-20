@@ -581,6 +581,101 @@ pub(crate) fn builtin_get_variable_watchers(args: Vec<Value>) -> EvalResult {
     Ok(Value::Nil)
 }
 
+/// `(gnutls-available-p)` -> capability list.
+pub(crate) fn builtin_gnutls_available_p(args: Vec<Value>) -> EvalResult {
+    expect_args("gnutls-available-p", &args, 0)?;
+    Ok(Value::list(vec![Value::symbol("gnutls")]))
+}
+
+/// `(gnutls-ciphers)` -> non-empty cipher descriptor list.
+pub(crate) fn builtin_gnutls_ciphers(args: Vec<Value>) -> EvalResult {
+    expect_args("gnutls-ciphers", &args, 0)?;
+    Ok(Value::list(vec![Value::symbol("AES-256-GCM")]))
+}
+
+/// `(gnutls-digests)` -> non-empty digest descriptor list.
+pub(crate) fn builtin_gnutls_digests(args: Vec<Value>) -> EvalResult {
+    expect_args("gnutls-digests", &args, 0)?;
+    Ok(Value::list(vec![Value::symbol("SHA256")]))
+}
+
+/// `(gnutls-macs)` -> non-empty MAC descriptor list.
+pub(crate) fn builtin_gnutls_macs(args: Vec<Value>) -> EvalResult {
+    expect_args("gnutls-macs", &args, 0)?;
+    Ok(Value::list(vec![Value::symbol("AEAD")]))
+}
+
+/// `(gnutls-errorp CODE)` -> t.
+pub(crate) fn builtin_gnutls_errorp(args: Vec<Value>) -> EvalResult {
+    expect_args("gnutls-errorp", &args, 1)?;
+    Ok(Value::True)
+}
+
+/// `(gnutls-error-string CODE)` -> compatibility message string.
+pub(crate) fn builtin_gnutls_error_string(args: Vec<Value>) -> EvalResult {
+    expect_args("gnutls-error-string", &args, 1)?;
+    match args[0] {
+        Value::Int(0) => Ok(Value::string("Success.")),
+        Value::Nil => Ok(Value::string("Symbol has no numeric gnutls-code property")),
+        _ => Ok(Value::string("Unknown TLS error")),
+    }
+}
+
+/// `(gnutls-error-fatalp CODE)` -> nil for numeric codes.
+pub(crate) fn builtin_gnutls_error_fatalp(args: Vec<Value>) -> EvalResult {
+    expect_args("gnutls-error-fatalp", &args, 1)?;
+    if args[0].is_nil() {
+        return Err(signal(
+            "error",
+            vec![Value::string("Symbol has no numeric gnutls-code property")],
+        ));
+    }
+    Ok(Value::Nil)
+}
+
+/// `(gnutls-peer-status-warning-describe WARNING)` -> nil.
+pub(crate) fn builtin_gnutls_peer_status_warning_describe(args: Vec<Value>) -> EvalResult {
+    expect_args("gnutls-peer-status-warning-describe", &args, 1)?;
+    if args[0].is_nil() {
+        return Ok(Value::Nil);
+    }
+    expect_symbolp(&args[0])?;
+    Ok(Value::Nil)
+}
+
+/// `(gpm-mouse-start)` -> compatibility error.
+pub(crate) fn builtin_gpm_mouse_start(args: Vec<Value>) -> EvalResult {
+    expect_args("gpm-mouse-start", &args, 0)?;
+    Err(signal(
+        "error",
+        vec![Value::string("Gpm-mouse only works in the GNU/Linux console")],
+    ))
+}
+
+/// `(gpm-mouse-stop)` -> nil.
+pub(crate) fn builtin_gpm_mouse_stop(args: Vec<Value>) -> EvalResult {
+    expect_args("gpm-mouse-stop", &args, 0)?;
+    Ok(Value::Nil)
+}
+
+/// `(sqlite-available-p)` -> t.
+pub(crate) fn builtin_sqlite_available_p(args: Vec<Value>) -> EvalResult {
+    expect_args("sqlite-available-p", &args, 0)?;
+    Ok(Value::True)
+}
+
+/// `(sqlite-version)` -> compatibility version string.
+pub(crate) fn builtin_sqlite_version(args: Vec<Value>) -> EvalResult {
+    expect_args("sqlite-version", &args, 0)?;
+    Ok(Value::string("3.50.4"))
+}
+
+/// `(inotify-valid-p WATCH-DESCRIPTOR)` -> nil.
+pub(crate) fn builtin_inotify_valid_p(args: Vec<Value>) -> EvalResult {
+    expect_args("inotify-valid-p", &args, 1)?;
+    Ok(Value::Nil)
+}
+
 /// `(define-fringe-bitmap NAME BITS &optional HEIGHT WIDTH ALIGN)` -> NAME.
 pub(crate) fn builtin_define_fringe_bitmap(args: Vec<Value>) -> EvalResult {
     expect_range_args("define-fringe-bitmap", &args, 2, 5)?;
@@ -867,5 +962,41 @@ mod tests {
             Flow::Signal(sig) => assert_eq!(sig.symbol, "wrong-type-argument"),
             other => panic!("expected signal, got {other:?}"),
         }
+    }
+
+    #[test]
+    fn gnutls_error_string_zero_is_success() {
+        let out = builtin_gnutls_error_string(vec![Value::Int(0)]).unwrap();
+        assert_eq!(out, Value::string("Success."));
+    }
+
+    #[test]
+    fn gnutls_peer_status_warning_describe_rejects_non_symbol() {
+        let err = builtin_gnutls_peer_status_warning_describe(vec![Value::Int(0)]).unwrap_err();
+        match err {
+            Flow::Signal(sig) => assert_eq!(sig.symbol, "wrong-type-argument"),
+            other => panic!("expected signal, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn gpm_mouse_start_signals_console_only_error() {
+        let err = builtin_gpm_mouse_start(vec![]).unwrap_err();
+        match err {
+            Flow::Signal(sig) => assert_eq!(sig.symbol, "error"),
+            other => panic!("expected signal, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn sqlite_version_returns_string() {
+        let out = builtin_sqlite_version(vec![]).unwrap();
+        assert!(matches!(out, Value::Str(_)));
+    }
+
+    #[test]
+    fn inotify_valid_p_returns_nil() {
+        let out = builtin_inotify_valid_p(vec![Value::Int(0)]).unwrap();
+        assert_eq!(out, Value::Nil);
     }
 }

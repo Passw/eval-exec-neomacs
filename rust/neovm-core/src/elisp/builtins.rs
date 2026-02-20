@@ -12404,6 +12404,21 @@ pub(crate) fn dispatch_builtin(
             super::compat_internal::builtin_get_unicode_property_internal(args)
         }
         "get-variable-watchers" => super::compat_internal::builtin_get_variable_watchers(args),
+        "gnutls-available-p" => super::compat_internal::builtin_gnutls_available_p(args),
+        "gnutls-ciphers" => super::compat_internal::builtin_gnutls_ciphers(args),
+        "gnutls-digests" => super::compat_internal::builtin_gnutls_digests(args),
+        "gnutls-error-fatalp" => super::compat_internal::builtin_gnutls_error_fatalp(args),
+        "gnutls-error-string" => super::compat_internal::builtin_gnutls_error_string(args),
+        "gnutls-errorp" => super::compat_internal::builtin_gnutls_errorp(args),
+        "gnutls-macs" => super::compat_internal::builtin_gnutls_macs(args),
+        "gnutls-peer-status-warning-describe" => {
+            super::compat_internal::builtin_gnutls_peer_status_warning_describe(args)
+        }
+        "gpm-mouse-start" => super::compat_internal::builtin_gpm_mouse_start(args),
+        "gpm-mouse-stop" => super::compat_internal::builtin_gpm_mouse_stop(args),
+        "inotify-valid-p" => super::compat_internal::builtin_inotify_valid_p(args),
+        "sqlite-available-p" => super::compat_internal::builtin_sqlite_available_p(args),
+        "sqlite-version" => super::compat_internal::builtin_sqlite_version(args),
         "fillarray" => super::compat_internal::builtin_fillarray(args),
         "define-hash-table-test" => super::compat_internal::builtin_define_hash_table_test(args),
         "find-coding-systems-region-internal" => {
@@ -12938,6 +12953,21 @@ pub(crate) fn dispatch_builtin_pure(name: &str, args: Vec<Value>) -> Option<Eval
             super::compat_internal::builtin_get_unicode_property_internal(args)
         }
         "get-variable-watchers" => super::compat_internal::builtin_get_variable_watchers(args),
+        "gnutls-available-p" => super::compat_internal::builtin_gnutls_available_p(args),
+        "gnutls-ciphers" => super::compat_internal::builtin_gnutls_ciphers(args),
+        "gnutls-digests" => super::compat_internal::builtin_gnutls_digests(args),
+        "gnutls-error-fatalp" => super::compat_internal::builtin_gnutls_error_fatalp(args),
+        "gnutls-error-string" => super::compat_internal::builtin_gnutls_error_string(args),
+        "gnutls-errorp" => super::compat_internal::builtin_gnutls_errorp(args),
+        "gnutls-macs" => super::compat_internal::builtin_gnutls_macs(args),
+        "gnutls-peer-status-warning-describe" => {
+            super::compat_internal::builtin_gnutls_peer_status_warning_describe(args)
+        }
+        "gpm-mouse-start" => super::compat_internal::builtin_gpm_mouse_start(args),
+        "gpm-mouse-stop" => super::compat_internal::builtin_gpm_mouse_stop(args),
+        "inotify-valid-p" => super::compat_internal::builtin_inotify_valid_p(args),
+        "sqlite-available-p" => super::compat_internal::builtin_sqlite_available_p(args),
+        "sqlite-version" => super::compat_internal::builtin_sqlite_version(args),
         "fillarray" => super::compat_internal::builtin_fillarray(args),
         "define-hash-table-test" => super::compat_internal::builtin_define_hash_table_test(args),
         "find-coding-systems-region-internal" => {

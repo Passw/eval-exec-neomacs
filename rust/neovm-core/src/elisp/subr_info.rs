@@ -924,7 +924,20 @@ fn subr_arity_value(name: &str) -> Value {
         | "frame-right-divider-width" => arity_cons(0, Some(1)),
         "fringe-bitmaps-at-pos" => arity_cons(0, Some(2)),
         "gap-position" | "gap-size" => arity_cons(0, Some(0)),
+        "gnutls-available-p"
+        | "gnutls-ciphers"
+        | "gnutls-digests"
+        | "gnutls-macs"
+        | "gpm-mouse-start"
+        | "gpm-mouse-stop"
+        | "sqlite-available-p"
+        | "sqlite-version" => arity_cons(0, Some(0)),
         "garbage-collect-maybe" | "get-variable-watchers" => arity_cons(1, Some(1)),
+        "gnutls-error-fatalp"
+        | "gnutls-error-string"
+        | "gnutls-errorp"
+        | "gnutls-peer-status-warning-describe"
+        | "inotify-valid-p" => arity_cons(1, Some(1)),
         "get-unicode-property-internal" => arity_cons(2, Some(2)),
         "define-hash-table-test" => arity_cons(3, Some(3)),
         "find-coding-systems-region-internal" => arity_cons(2, Some(3)),
@@ -2567,7 +2580,20 @@ mod tests {
         assert_subr_arity("fringe-bitmaps-at-pos", 0, Some(2));
         assert_subr_arity("gap-position", 0, Some(0));
         assert_subr_arity("gap-size", 0, Some(0));
+        assert_subr_arity("gnutls-available-p", 0, Some(0));
+        assert_subr_arity("gnutls-ciphers", 0, Some(0));
+        assert_subr_arity("gnutls-digests", 0, Some(0));
+        assert_subr_arity("gnutls-macs", 0, Some(0));
+        assert_subr_arity("gpm-mouse-start", 0, Some(0));
+        assert_subr_arity("gpm-mouse-stop", 0, Some(0));
+        assert_subr_arity("sqlite-available-p", 0, Some(0));
+        assert_subr_arity("sqlite-version", 0, Some(0));
         assert_subr_arity("garbage-collect-maybe", 1, Some(1));
+        assert_subr_arity("gnutls-error-fatalp", 1, Some(1));
+        assert_subr_arity("gnutls-error-string", 1, Some(1));
+        assert_subr_arity("gnutls-errorp", 1, Some(1));
+        assert_subr_arity("gnutls-peer-status-warning-describe", 1, Some(1));
+        assert_subr_arity("inotify-valid-p", 1, Some(1));
         assert_subr_arity("get-unicode-property-internal", 2, Some(2));
         assert_subr_arity("get-variable-watchers", 1, Some(1));
         assert_subr_arity("fillarray", 2, Some(2));
