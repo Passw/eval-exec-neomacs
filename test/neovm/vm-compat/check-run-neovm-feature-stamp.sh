@@ -1,22 +1,27 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-forms_file="${1:-cases/bytecode-literal-reader-semantics.forms}"
+script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+forms_arg="${1:-cases/bytecode-literal-reader-semantics.forms}"
+forms_file="$forms_arg"
+if [[ ! -f "$forms_file" && -f "$script_dir/$forms_arg" ]]; then
+  forms_file="$script_dir/$forms_arg"
+fi
 if [[ ! -f "$forms_file" ]]; then
-  echo "forms file not found: $forms_file" >&2
+  echo "forms file not found: $forms_arg" >&2
   exit 2
 fi
 
-repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)"
+repo_root="$(cd "$script_dir/../../.." && pwd)"
 stamp_file="$repo_root/rust/neovm-worker/target/debug/examples/elisp_compat_runner.features"
 
 run_and_capture() {
   local features="$1"
   local out_file="$2"
   if [[ -n "$features" ]]; then
-    NEOVM_WORKER_CARGO_FEATURES="$features" ./run-neovm.sh "$forms_file" >"$out_file"
+    NEOVM_WORKER_CARGO_FEATURES="$features" "$script_dir/run-neovm.sh" "$forms_file" >"$out_file"
   else
-    NEOVM_WORKER_CARGO_FEATURES= ./run-neovm.sh "$forms_file" >"$out_file"
+    NEOVM_WORKER_CARGO_FEATURES= "$script_dir/run-neovm.sh" "$forms_file" >"$out_file"
   fi
 }
 

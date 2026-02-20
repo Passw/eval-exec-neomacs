@@ -2,12 +2,14 @@
 
 set -euo pipefail
 
+script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
 tmp="$(mktemp)"
 trap 'rm -f "$tmp"' EXIT
 
 max_budget="${NEOVM_STUB_BUDGET:-0}"
 
-./compat-stub-index.sh --text > "$tmp"
+"$script_dir/compat-stub-index.sh" --text > "$tmp"
 
 stub_count="$(awk '/^explicitly annotated function stubs:/ { print $5; exit }' "$tmp")"
 if [ -z "${stub_count}" ]; then
