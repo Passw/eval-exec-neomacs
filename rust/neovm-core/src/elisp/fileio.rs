@@ -2873,11 +2873,21 @@ pub(crate) fn builtin_write_region(
         // Write entire buffer
         buf.buffer_string()
     } else {
-        let start = expect_int(&args[0])? as usize;
-        let end = expect_int(&args[1])? as usize;
-        // Convert 1-based Emacs positions to 0-based
-        let char_start = if start > 0 { start - 1 } else { 0 };
-        let char_end = if end > 0 { end - 1 } else { 0 };
+        let start = expect_int(&args[0])?;
+        let end = expect_int(&args[1])?;
+        let point_min = buf.text.byte_to_char(buf.point_min()) as i64 + 1;
+        let point_max = buf.text.byte_to_char(buf.point_max()) as i64 + 1;
+        if start < point_min || start > point_max || end < point_min || end > point_max {
+            return Err(signal(
+                "args-out-of-range",
+                vec![Value::Buffer(buf.id), Value::Int(start), Value::Int(end)],
+            ));
+        }
+        let (char_start, char_end) = if start <= end {
+            (start as usize - 1, end as usize - 1)
+        } else {
+            (end as usize - 1, start as usize - 1)
+        };
         let byte_start = buf.text.char_to_byte(char_start.min(buf.text.char_count()));
         let byte_end = buf.text.char_to_byte(char_end.min(buf.text.char_count()));
         buf.buffer_substring(byte_start, byte_end)
@@ -5016,6 +5026,49 @@ mod tests {
         let fbuf = eval_find.buffers.get(buf_id).unwrap();
         assert_eq!(fbuf.buffer_string(), "alpha\n");
         assert_eq!(fbuf.file_name.as_deref(), Some(alpha_str.as_str()));
+
+        let _ = fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn test_write_region_bounds_and_order_semantics() {
+        use super::super::eval::Evaluator;
+
+        let dir = std::env::temp_dir().join("neovm_eval_write_region_bounds");
+        let _ = fs::remove_dir_all(&dir);
+        fs::create_dir_all(&dir).unwrap();
+
+        let out_path = dir.join("out.txt");
+        let out_str = out_path.to_string_lossy().to_string();
+
+        let mut eval = Evaluator::new();
+        eval.buffers.current_buffer_mut().unwrap().insert("abc");
+        let current = Value::Buffer(eval.buffers.current_buffer().unwrap().id);
+
+        builtin_write_region(
+            &mut eval,
+            vec![Value::Int(3), Value::Int(1), Value::string(&out_str)],
+        )
+        .expect("write-region should accept reversed in-range bounds");
+        assert_eq!(read_file_contents(&out_str).unwrap(), "ab");
+
+        for (start, end) in [(-1, 2), (1, -1), (1, 9)] {
+            let err = builtin_write_region(
+                &mut eval,
+                vec![Value::Int(start), Value::Int(end), Value::string(&out_str)],
+            )
+            .expect_err("out-of-range bounds should signal");
+            match err {
+                Flow::Signal(sig) => {
+                    assert_eq!(sig.symbol, "args-out-of-range");
+                    assert_eq!(
+                        sig.data,
+                        vec![current.clone(), Value::Int(start), Value::Int(end)]
+                    );
+                }
+                other => panic!("unexpected flow: {other:?}"),
+            }
+        }
 
         let _ = fs::remove_dir_all(&dir);
     }
