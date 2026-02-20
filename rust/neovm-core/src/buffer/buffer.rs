@@ -70,6 +70,10 @@ pub struct Buffer {
     pub zv: usize,
     /// Whether the buffer has been modified since last save.
     pub modified: bool,
+    /// Monotonic buffer modification tick.
+    pub modified_tick: i64,
+    /// Monotonic character-content modification tick.
+    pub chars_modified_tick: i64,
     /// If true, insertions/deletions are forbidden.
     pub read_only: bool,
     /// Multi-byte encoding flag.  Always `true` for now.
@@ -107,6 +111,8 @@ impl Buffer {
             begv: 0,
             zv: 0,
             modified: false,
+            modified_tick: 1,
+            chars_modified_tick: 1,
             read_only: false,
             multibyte: true,
             file_name: None,
@@ -196,6 +202,8 @@ impl Buffer {
         self.overlays.adjust_for_insert(insert_pos, len);
 
         self.modified = true;
+        self.modified_tick += 1;
+        self.chars_modified_tick += 1;
     }
 
     /// Delete the byte range `[start, end)`.
@@ -250,6 +258,8 @@ impl Buffer {
         self.overlays.adjust_for_delete(start, end);
 
         self.modified = true;
+        self.modified_tick += 1;
+        self.chars_modified_tick += 1;
     }
 
     // -- Text queries --------------------------------------------------------
@@ -845,6 +855,25 @@ mod tests {
         assert!(buf.is_modified());
         buf.set_modified(false);
         assert!(!buf.is_modified());
+    }
+
+    #[test]
+    fn modification_ticks_track_content_changes() {
+        let mut buf = Buffer::new(BufferId(1), "test".into());
+        assert_eq!(buf.modified_tick, 1);
+        assert_eq!(buf.chars_modified_tick, 1);
+
+        buf.insert("x");
+        assert_eq!(buf.modified_tick, 2);
+        assert_eq!(buf.chars_modified_tick, 2);
+
+        buf.set_modified(false);
+        assert_eq!(buf.modified_tick, 2);
+        assert_eq!(buf.chars_modified_tick, 2);
+
+        buf.delete_region(0, 1);
+        assert_eq!(buf.modified_tick, 3);
+        assert_eq!(buf.chars_modified_tick, 3);
     }
 
     // -----------------------------------------------------------------------

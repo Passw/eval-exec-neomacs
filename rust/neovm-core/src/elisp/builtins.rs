@@ -5622,6 +5622,47 @@ pub(crate) fn builtin_set_buffer_modified_p(
     Ok(args[0].clone())
 }
 
+fn optional_buffer_tick_target(
+    eval: &super::eval::Evaluator,
+    name: &str,
+    args: &[Value],
+) -> Result<Option<BufferId>, Flow> {
+    expect_max_args(name, args, 1)?;
+    if args.is_empty() || matches!(args[0], Value::Nil) {
+        Ok(eval.buffers.current_buffer().map(|buf| buf.id))
+    } else {
+        Ok(Some(expect_buffer_id(&args[0])?))
+    }
+}
+
+/// (buffer-modified-tick &optional BUFFER) → integer
+pub(crate) fn builtin_buffer_modified_tick(
+    eval: &mut super::eval::Evaluator,
+    args: Vec<Value>,
+) -> EvalResult {
+    let target = optional_buffer_tick_target(eval, "buffer-modified-tick", &args)?;
+    if let Some(id) = target {
+        if let Some(buf) = eval.buffers.get(id) {
+            return Ok(Value::Int(buf.modified_tick));
+        }
+    }
+    Ok(Value::Int(1))
+}
+
+/// (buffer-chars-modified-tick &optional BUFFER) → integer
+pub(crate) fn builtin_buffer_chars_modified_tick(
+    eval: &mut super::eval::Evaluator,
+    args: Vec<Value>,
+) -> EvalResult {
+    let target = optional_buffer_tick_target(eval, "buffer-chars-modified-tick", &args)?;
+    if let Some(id) = target {
+        if let Some(buf) = eval.buffers.get(id) {
+            return Ok(Value::Int(buf.chars_modified_tick));
+        }
+    }
+    Ok(Value::Int(1))
+}
+
 /// (buffer-list) → list of buffers
 pub(crate) fn builtin_buffer_list(
     eval: &mut super::eval::Evaluator,
@@ -7675,6 +7716,8 @@ pub(crate) fn dispatch_builtin(
         // set-mark and mark are now in navigation module (below)
         "buffer-modified-p" => return Some(builtin_buffer_modified_p(eval, args)),
         "set-buffer-modified-p" => return Some(builtin_set_buffer_modified_p(eval, args)),
+        "buffer-modified-tick" => return Some(builtin_buffer_modified_tick(eval, args)),
+        "buffer-chars-modified-tick" => return Some(builtin_buffer_chars_modified_tick(eval, args)),
         "buffer-list" => return Some(builtin_buffer_list(eval, args)),
         "other-buffer" => return Some(builtin_other_buffer(eval, args)),
         "generate-new-buffer-name" => return Some(builtin_generate_new_buffer_name(eval, args)),
@@ -11781,6 +11824,87 @@ mod tests {
             Value::Nil
         );
         assert_eq!(builtin_buffer_last_name(&mut eval, vec![dead]).unwrap(), live_name);
+    }
+
+    #[test]
+    fn buffer_modified_tick_semantics() {
+        let mut eval = super::super::eval::Evaluator::new();
+
+        assert_eq!(
+            builtin_buffer_modified_tick(&mut eval, vec![]).unwrap(),
+            Value::Int(1)
+        );
+        assert_eq!(
+            builtin_buffer_chars_modified_tick(&mut eval, vec![]).unwrap(),
+            Value::Int(1)
+        );
+
+        builtin_insert(&mut eval, vec![Value::string("x")]).unwrap();
+        assert_eq!(
+            builtin_buffer_modified_tick(&mut eval, vec![]).unwrap(),
+            Value::Int(2)
+        );
+        assert_eq!(
+            builtin_buffer_chars_modified_tick(&mut eval, vec![]).unwrap(),
+            Value::Int(2)
+        );
+
+        builtin_set_buffer_modified_p(&mut eval, vec![Value::Nil]).unwrap();
+        assert_eq!(
+            builtin_buffer_modified_tick(&mut eval, vec![]).unwrap(),
+            Value::Int(2)
+        );
+        assert_eq!(
+            builtin_buffer_chars_modified_tick(&mut eval, vec![]).unwrap(),
+            Value::Int(2)
+        );
+
+        builtin_delete_region(&mut eval, vec![Value::Int(1), Value::Int(2)]).unwrap();
+        assert_eq!(
+            builtin_buffer_modified_tick(&mut eval, vec![]).unwrap(),
+            Value::Int(3)
+        );
+        assert_eq!(
+            builtin_buffer_chars_modified_tick(&mut eval, vec![]).unwrap(),
+            Value::Int(3)
+        );
+
+        let dead = builtin_generate_new_buffer(&mut eval, vec![Value::string("*ticks-dead*")]).unwrap();
+        let _ = builtin_kill_buffer(&mut eval, vec![dead.clone()]).unwrap();
+        assert_eq!(
+            builtin_buffer_modified_tick(&mut eval, vec![dead.clone()]).unwrap(),
+            Value::Int(1)
+        );
+        assert_eq!(
+            builtin_buffer_chars_modified_tick(&mut eval, vec![dead]).unwrap(),
+            Value::Int(1)
+        );
+
+        let type_error = builtin_buffer_modified_tick(&mut eval, vec![Value::symbol("x")])
+            .expect_err("buffer-modified-tick should reject non-buffer optional arg");
+        match type_error {
+            Flow::Signal(sig) => {
+                assert_eq!(sig.symbol, "wrong-type-argument");
+                assert_eq!(sig.data, vec![Value::symbol("bufferp"), Value::symbol("x")]);
+            }
+            other => panic!("unexpected flow: {other:?}"),
+        }
+
+        let arity_error = builtin_buffer_chars_modified_tick(
+            &mut eval,
+            vec![Value::Nil, Value::Nil],
+        )
+        .expect_err("buffer-chars-modified-tick should reject >1 args");
+        match arity_error {
+            Flow::Signal(sig) => {
+                assert_eq!(sig.symbol, "wrong-number-of-arguments");
+                assert_eq!(
+                    sig.data,
+                    vec![Value::symbol("buffer-chars-modified-tick"), Value::Int(2)]
+                );
+            }
+            other => panic!("unexpected flow: {other:?}"),
+        }
     }
 
     #[test]

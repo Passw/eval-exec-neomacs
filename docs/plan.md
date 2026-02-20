@@ -28,6 +28,45 @@ Last updated: 2026-02-20
 
 ## Doing
 
+- Added buffer modification-tick compatibility slice for `buffer-modified-tick` / `buffer-chars-modified-tick`:
+  - runtime changes:
+    - `rust/neovm-core/src/buffer/buffer.rs`
+      - added monotonic `modified_tick` and `chars_modified_tick` fields to `Buffer`, initialized at `1`.
+      - increment both ticks on buffer content mutation paths (`insert`, `delete_region`).
+      - added unit test `modification_ticks_track_content_changes`.
+    - `rust/neovm-core/src/elisp/builtins.rs`
+      - implemented evaluator-backed:
+        - `buffer-modified-tick` (`0..1` args)
+        - `buffer-chars-modified-tick` (`0..1` args)
+      - aligned optional-arg and dead-buffer behavior:
+        - omitted/`nil` optional arg resolves current buffer
+        - dead buffers return `1`
+        - non-buffer non-`nil` signals `wrong-type-argument (bufferp ...)`
+        - arity > 1 signals `wrong-number-of-arguments`
+      - wired both names into evaluator dispatch and added unit test `buffer_modified_tick_semantics`.
+    - `rust/neovm-core/src/elisp/builtin_registry.rs`
+      - registered:
+        - `buffer-modified-tick`
+        - `buffer-chars-modified-tick`
+    - `rust/neovm-core/src/elisp/subr_info.rs`
+      - added arity metadata + lock-in assertions:
+        - `buffer-modified-tick` => `(0 . 1)`
+        - `buffer-chars-modified-tick` => `(0 . 1)`
+  - vm-compat corpus changes:
+    - added:
+      - `test/neovm/vm-compat/cases/buffer-modified-tick-semantics.forms`
+      - `test/neovm/vm-compat/cases/buffer-modified-tick-semantics.expected.tsv`
+    - wired case into:
+      - `test/neovm/vm-compat/cases/default.list`
+  - verified:
+    - `cargo test --manifest-path rust/neovm-core/Cargo.toml modification_ticks_track_content_changes -- --nocapture` (pass)
+    - `cargo test --manifest-path rust/neovm-core/Cargo.toml buffer_modified_tick_semantics -- --nocapture` (pass)
+    - `cargo test --manifest-path rust/neovm-core/Cargo.toml subr_arity_buffer_point_primitives_match_oracle -- --nocapture` (pass)
+    - `make -C test/neovm/vm-compat check-one-neovm CASE=cases/buffer-modified-tick-semantics` (pass; `13/13`)
+    - `make -C test/neovm/vm-compat check-builtin-registry-all` (pass; `1273` dispatch / `1272` core)
+    - `make -C test/neovm/vm-compat compat-progress` (pass; default list `796`, tracked `802`, oracle builtin coverage registry/runtime `872/562`)
+    - `make -C test/neovm/vm-compat check-all-neovm-strict` (pass; case inventory `802`)
+
 - Added buffer metadata compatibility slice for `buffer-base-buffer` / `buffer-last-name`:
   - runtime changes:
     - `rust/neovm-core/src/buffer/buffer.rs`

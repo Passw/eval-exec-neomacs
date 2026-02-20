@@ -360,7 +360,9 @@ fn subr_arity_value(name: &str) -> Value {
         | "buffer-last-name"
         | "buffer-name"
         | "buffer-size"
+        | "buffer-chars-modified-tick"
         | "buffer-modified-p"
+        | "buffer-modified-tick"
         | "buffer-list"
         | "buffer-disable-undo"
         | "buffer-enable-undo"
@@ -1903,7 +1905,9 @@ mod tests {
         assert_subr_arity("buffer-last-name", 0, Some(1));
         assert_subr_arity("buffer-name", 0, Some(1));
         assert_subr_arity("buffer-size", 0, Some(1));
+        assert_subr_arity("buffer-chars-modified-tick", 0, Some(1));
         assert_subr_arity("buffer-modified-p", 0, Some(1));
+        assert_subr_arity("buffer-modified-tick", 0, Some(1));
         assert_subr_arity("buffer-list", 0, Some(1));
         assert_subr_arity("other-buffer", 0, Some(3));
         assert_subr_arity("buffer-disable-undo", 0, Some(1));
