@@ -360,7 +360,10 @@ pub(crate) fn builtin_bookmark_jump(
     if args.is_empty() || args.len() > 2 {
         return Err(signal(
             "wrong-number-of-arguments",
-            vec![Value::symbol("bookmark-jump"), Value::Int(args.len() as i64)],
+            vec![
+                Value::symbol("bookmark-jump"),
+                Value::Int(args.len() as i64),
+            ],
         ));
     }
 
@@ -408,7 +411,10 @@ pub(crate) fn builtin_bookmark_delete(
     if args.is_empty() || args.len() > 2 {
         return Err(signal(
             "wrong-number-of-arguments",
-            vec![Value::symbol("bookmark-delete"), Value::Int(args.len() as i64)],
+            vec![
+                Value::symbol("bookmark-delete"),
+                Value::Int(args.len() as i64),
+            ],
         ));
     }
 
@@ -428,7 +434,10 @@ pub(crate) fn builtin_bookmark_rename(
     if args.is_empty() || args.len() > 2 {
         return Err(signal(
             "wrong-number-of-arguments",
-            vec![Value::symbol("bookmark-rename"), Value::Int(args.len() as i64)],
+            vec![
+                Value::symbol("bookmark-rename"),
+                Value::Int(args.len() as i64),
+            ],
         ));
     }
 
@@ -681,7 +690,10 @@ pub(crate) fn builtin_bookmark_save(
     if args.len() > 3 {
         return Err(signal(
             "wrong-number-of-arguments",
-            vec![Value::symbol("bookmark-save"), Value::Int(args.len() as i64)],
+            vec![
+                Value::symbol("bookmark-save"),
+                Value::Int(args.len() as i64),
+            ],
         ));
     }
 
@@ -759,7 +771,10 @@ pub(crate) fn builtin_bookmark_load(
     if args.is_empty() || args.len() > 4 {
         return Err(signal(
             "wrong-number-of-arguments",
-            vec![Value::symbol("bookmark-load"), Value::Int(args.len() as i64)],
+            vec![
+                Value::symbol("bookmark-load"),
+                Value::Int(args.len() as i64),
+            ],
         ));
     }
 
@@ -785,7 +800,8 @@ pub(crate) fn builtin_bookmark_load(
 
     eval.bookmarks.load_from_string(&data);
 
-    let current_default = bookmark_timestamp_file(eval).unwrap_or_else(|| active_bookmark_default_file(eval));
+    let current_default =
+        bookmark_timestamp_file(eval).unwrap_or_else(|| active_bookmark_default_file(eval));
     let set_default = args.get(3).is_some_and(|v| !v.is_nil()) || file == current_default;
     if set_default {
         set_bookmark_timestamp(eval, &file);
@@ -795,7 +811,9 @@ pub(crate) fn builtin_bookmark_load(
     if no_msg {
         return Ok(Value::Nil);
     }
-    Ok(Value::string(format!("Loading bookmarks from {file}...done")))
+    Ok(Value::string(format!(
+        "Loading bookmarks from {file}...done"
+    )))
 }
 
 // ===========================================================================
@@ -1183,7 +1201,10 @@ mod tests {
         // Cons/list old payloads with string NEW error on invalid bookmark designator.
         let list_str = builtin_bookmark_rename(
             &mut eval,
-            vec![Value::list(vec![Value::symbol("a")]), Value::string("new-name")],
+            vec![
+                Value::list(vec![Value::symbol("a")]),
+                Value::string("new-name"),
+            ],
         );
         assert!(list_str.is_err());
 

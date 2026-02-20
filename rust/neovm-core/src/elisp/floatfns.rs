@@ -408,7 +408,10 @@ mod tests {
         match err {
             Flow::Signal(sig) => {
                 assert_eq!(sig.symbol, "wrong-type-argument");
-                assert_eq!(sig.data, vec![Value::symbol("numberp"), Value::symbol("sym")]);
+                assert_eq!(
+                    sig.data,
+                    vec![Value::symbol("numberp"), Value::symbol("sym")]
+                );
             }
             other => panic!("unexpected flow: {other:?}"),
         }

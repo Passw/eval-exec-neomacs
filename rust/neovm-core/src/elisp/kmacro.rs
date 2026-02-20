@@ -1071,7 +1071,10 @@ mod tests {
             Value::Nil
         );
         assert!(builtin_start_kbd_macro(&mut eval, vec![Value::Nil, Value::Nil]).is_err());
-        assert_eq!(builtin_end_kbd_macro(&mut eval, vec![]).unwrap(), Value::Nil);
+        assert_eq!(
+            builtin_end_kbd_macro(&mut eval, vec![]).unwrap(),
+            Value::Nil
+        );
         assert!(
             builtin_start_kbd_macro(&mut eval, vec![Value::Nil, Value::Nil, Value::Nil]).is_err()
         );

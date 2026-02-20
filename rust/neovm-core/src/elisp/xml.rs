@@ -215,7 +215,10 @@ mod tests {
     #[test]
     fn libxml_parse_xml_region_arity_and_type_subset() {
         assert_eq!(builtin_libxml_parse_xml_region(vec![]).unwrap(), Value::Nil);
-        assert_eq!(builtin_libxml_parse_xml_region(vec![Value::Nil]).unwrap(), Value::Nil);
+        assert_eq!(
+            builtin_libxml_parse_xml_region(vec![Value::Nil]).unwrap(),
+            Value::Nil
+        );
         assert_eq!(
             builtin_libxml_parse_xml_region(vec![Value::Int(1), Value::Int(1)]).unwrap(),
             Value::Nil

@@ -94,7 +94,17 @@ fn format_symbol_name(name: &str) -> String {
     for (idx, ch) in name.chars().enumerate() {
         let needs_escape = matches!(
             ch,
-            ' ' | '\t' | '\n' | '\r' | '\u{0c}' | '(' | ')' | '[' | ']' | '"' | '\\' | ';'
+            ' ' | '\t'
+                | '\n'
+                | '\r'
+                | '\u{0c}'
+                | '('
+                | ')'
+                | '['
+                | ']'
+                | '"'
+                | '\\'
+                | ';'
                 | '#'
                 | '\''
                 | '`'

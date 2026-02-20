@@ -340,7 +340,9 @@ impl Frame {
             Rect::new(0.0, height as f32, width as f32, 16.0),
         );
         if let Window::Leaf {
-            window_start, point, ..
+            window_start,
+            point,
+            ..
         } = &mut minibuffer_leaf
         {
             *window_start = 1;

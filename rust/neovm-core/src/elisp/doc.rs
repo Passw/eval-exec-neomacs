@@ -140,7 +140,9 @@ Lisp concepts such as cdr, car, cons cell and list.\n\
             Some("Apply FUNCTION to each element of SEQUENCE, and make a list of the results.")
         }
         "assoc" => Some("Return non-nil if KEY is equal to the car of an element of ALIST."),
-        "member" => Some("Return non-nil if ELT is an element of LIST.  Comparison done with ‘equal’."),
+        "member" => {
+            Some("Return non-nil if ELT is an element of LIST.  Comparison done with ‘equal’.")
+        }
         "symbol-name" => Some("Return SYMBOL’s name, a string."),
         "if" => Some(
             "If COND yields non-nil, do THEN, else do ELSE...\n\
@@ -282,7 +284,10 @@ pub(crate) static STARTUP_VARIABLE_DOC_STUBS: &[(&str, &str)] = &[
         "auto-composition-mode",
         "Non-nil if Auto-Composition mode is enabled.",
     ),
-    ("auto-fill-function", "Function called (if non-nil) to perform auto-fill."),
+    (
+        "auto-fill-function",
+        "Function called (if non-nil) to perform auto-fill.",
+    ),
     (
         "auto-fill-chars",
         "A char-table for characters which invoke auto-filling.",
@@ -311,13 +316,22 @@ pub(crate) static STARTUP_VARIABLE_DOC_STUBS: &[(&str, &str)] = &[
         "auto-save-include-big-deletions",
         "If non-nil, auto-save even if a large part of the text is deleted.",
     ),
-    ("auto-save-interval", "Number of input events between auto-saves."),
+    (
+        "auto-save-interval",
+        "Number of input events between auto-saves.",
+    ),
     (
         "auto-save-list-file-name",
         "File name in which to write a list of all auto save file names.",
     ),
-    ("auto-save-no-message", "Non-nil means do not print any message when auto-saving."),
-    ("auto-save-timeout", "Number of seconds idle time before auto-save."),
+    (
+        "auto-save-no-message",
+        "Non-nil means do not print any message when auto-saving.",
+    ),
+    (
+        "auto-save-timeout",
+        "Number of seconds idle time before auto-save.",
+    ),
     (
         "auto-save-visited-file-name",
         "Non-nil says auto-save a buffer in the file it is visiting, when practical.",
@@ -383,8 +397,14 @@ pub(crate) static STARTUP_VARIABLE_DOC_STUBS: &[(&str, &str)] = &[
         "buffer-auto-save-file-format",
         "Format in which to write auto-save files.",
     ),
-    ("buffer-auto-save-file-name", "Name of file for auto-saving current buffer."),
-    ("buffer-backed-up", "Non-nil if this buffer's file has been backed up."),
+    (
+        "buffer-auto-save-file-name",
+        "Name of file for auto-saving current buffer.",
+    ),
+    (
+        "buffer-backed-up",
+        "Non-nil if this buffer's file has been backed up.",
+    ),
     (
         "buffer-display-count",
         "A number incremented each time this buffer is displayed in a window.",
@@ -413,8 +433,14 @@ pub(crate) static STARTUP_VARIABLE_DOC_STUBS: &[(&str, &str)] = &[
         "buffer-file-truename",
         "Abbreviated truename of file visited in current buffer, or nil if none.",
     ),
-    ("buffer-invisibility-spec", "Invisibility spec of this buffer."),
-    ("buffer-list-update-hook", "Hook run when the buffer list changes."),
+    (
+        "buffer-invisibility-spec",
+        "Invisibility spec of this buffer.",
+    ),
+    (
+        "buffer-list-update-hook",
+        "Hook run when the buffer list changes.",
+    ),
     ("buffer-read-only", "Non-nil if this buffer is read-only."),
     (
         "buffer-saved-size",
@@ -432,7 +458,10 @@ pub(crate) static STARTUP_VARIABLE_DOC_STUBS: &[(&str, &str)] = &[
         "bytecomp-version-regexp",
         "Regular expression matching safe to load compiled Lisp files.",
     ),
-    ("buffer-undo-list", "List of undo entries in current buffer."),
+    (
+        "buffer-undo-list",
+        "List of undo entries in current buffer.",
+    ),
     (
         "cache-long-scans",
         "Non-nil means that Emacs should use caches in attempt to speedup buffer scans.",
@@ -442,7 +471,10 @@ pub(crate) static STARTUP_VARIABLE_DOC_STUBS: &[(&str, &str)] = &[
         "cannot-suspend",
         "Non-nil means to always spawn a subshell instead of suspending.",
     ),
-    ("case-fold-search", "Non-nil if searches and matches should ignore case."),
+    (
+        "case-fold-search",
+        "Non-nil if searches and matches should ignore case.",
+    ),
     (
         "case-symbols-as-words",
         "If non-nil, case functions treat symbol syntax as part of words.",
@@ -514,7 +546,10 @@ pub(crate) static STARTUP_VARIABLE_DOC_STUBS: &[(&str, &str)] = &[
         "comp-deferred-pending-h",
         "Hash table symbol-name -> function-value.",
     ),
-    ("comp-eln-to-el-h", "Hash table eln-filename -> el-filename."),
+    (
+        "comp-eln-to-el-h",
+        "Hash table eln-filename -> el-filename.",
+    ),
     (
         "comp-file-preloaded-p",
         "When non-nil, assume the file being compiled to be preloaded.",
@@ -584,7 +619,10 @@ pub(crate) static STARTUP_VARIABLE_DOC_STUBS: &[(&str, &str)] = &[
         "command-debug-status",
         "Debugging status of current interactive command.",
     ),
-    ("command-error-function", "Function to output error messages."),
+    (
+        "command-error-function",
+        "Function to output error messages.",
+    ),
     (
         "command-history",
         "List of recent commands that read arguments from terminal.",
@@ -690,10 +728,7 @@ pub(crate) static STARTUP_VARIABLE_DOC_STUBS: &[(&str, &str)] = &[
         "debug-ignored-errors",
         "List of errors for which the debugger should not be called.",
     ),
-    (
-        "debug-on-event",
-        "Enter debugger on this event.",
-    ),
+    ("debug-on-event", "Enter debugger on this event."),
     (
         "debug-on-message",
         "If non-nil, debug if a message matching this regexp is displayed.",
@@ -714,10 +749,7 @@ pub(crate) static STARTUP_VARIABLE_DOC_STUBS: &[(&str, &str)] = &[
         "debug-on-signal",
         "Non-nil means call the debugger regardless of condition handlers.",
     ),
-    (
-        "debugger",
-        "Function to call to invoke debugger.",
-    ),
+    ("debugger", "Function to call to invoke debugger."),
     (
         "debugger-may-continue",
         "Non-nil means debugger may continue execution.",
@@ -895,10 +927,7 @@ pub(crate) static STARTUP_VARIABLE_DOC_STUBS: &[(&str, &str)] = &[
         "emacs-copyright",
         "Short copyright string for this version of Emacs.",
     ),
-    (
-        "emacs-version",
-        "Version numbers of this version of Emacs.",
-    ),
+    ("emacs-version", "Version numbers of this version of Emacs."),
     (
         "emacsclient-program-name",
         "Name of the `emacsclient` program distributed with Emacs.",
@@ -947,7 +976,10 @@ pub(crate) static STARTUP_VARIABLE_DOC_STUBS: &[(&str, &str)] = &[
         "eval-buffer-list",
         "List of buffers being read from by calls to `eval-buffer` and `eval-region`.",
     ),
-    ("exec-directory", "Directory for executables for Emacs to invoke."),
+    (
+        "exec-directory",
+        "Directory for executables for Emacs to invoke.",
+    ),
     (
         "executing-kbd-macro",
         "Currently executing keyboard macro (string or vector).",
@@ -956,8 +988,14 @@ pub(crate) static STARTUP_VARIABLE_DOC_STUBS: &[(&str, &str)] = &[
         "executing-kbd-macro-index",
         "Index in currently executing keyboard macro; undefined if none executing.",
     ),
-    ("exec-path", "List of directories to search programs to run in subprocesses."),
-    ("exec-suffixes", "List of suffixes to try to find executable file names."),
+    (
+        "exec-path",
+        "List of directories to search programs to run in subprocesses.",
+    ),
+    (
+        "exec-suffixes",
+        "List of suffixes to try to find executable file names.",
+    ),
     (
         "extra-keyboard-modifiers",
         "A mask of additional modifier keys to use with every keyboard character.",
@@ -996,7 +1034,10 @@ pub(crate) static STARTUP_VARIABLE_DOC_STUBS: &[(&str, &str)] = &[
         "fast-read-process-output",
         "Non-nil to optimize the insertion of process output.",
     ),
-    ("features", "A list of symbols which are the features of the executing Emacs."),
+    (
+        "features",
+        "A list of symbols which are the features of the executing Emacs.",
+    ),
     (
         "file-coding-system-alist",
         "Alist to decide a coding system to use for a file I/O operation.",
@@ -1057,10 +1098,7 @@ pub(crate) static STARTUP_VARIABLE_DOC_STUBS: &[(&str, &str)] = &[
         "font-use-system-font",
         "Non-nil means to apply the system defined font dynamically.",
     ),
-    (
-        "font-weight-table",
-        "Vector of valid font weight values.",
-    ),
+    ("font-weight-table", "Vector of valid font weight values."),
     (
         "font-width-table",
         "Alist of font width symbols vs the corresponding numeric values.",
@@ -1093,18 +1131,12 @@ pub(crate) static STARTUP_VARIABLE_DOC_STUBS: &[(&str, &str)] = &[
         "frame-resize-pixelwise",
         "Non-nil means resize frames pixelwise.",
     ),
-    (
-        "frame-size-history",
-        "History of frame size adjustments.",
-    ),
+    ("frame-size-history", "History of frame size adjustments."),
     (
         "frame-title-format",
         "Template for displaying the title bar of visible frames.",
     ),
-    (
-        "fringe-bitmaps",
-        "List of fringe bitmap symbols.",
-    ),
+    ("fringe-bitmaps", "List of fringe bitmap symbols."),
     (
         "fringe-cursor-alist",
         "Mapping from logical to physical fringe cursor bitmaps.",
@@ -1165,10 +1197,7 @@ pub(crate) static STARTUP_VARIABLE_DOC_STUBS: &[(&str, &str)] = &[
         "header-line-format",
         "Analogous to `mode-line-format', but controls the header line.",
     ),
-    (
-        "help-char",
-        "Character to recognize as meaning Help.",
-    ),
+    ("help-char", "Character to recognize as meaning Help."),
     (
         "help-event-list",
         "List of input events to recognize as meaning Help.",
@@ -1233,10 +1262,7 @@ pub(crate) static STARTUP_VARIABLE_DOC_STUBS: &[(&str, &str)] = &[
         "image-scaling-factor",
         "When displaying images, apply this scaling factor before displaying.",
     ),
-    (
-        "image-types",
-        "List of potentially supported image types.",
-    ),
+    ("image-types", "List of potentially supported image types."),
     (
         "indent-tabs-mode",
         "Indentation can insert tabs if this is non-nil.",
@@ -1261,10 +1287,7 @@ pub(crate) static STARTUP_VARIABLE_DOC_STUBS: &[(&str, &str)] = &[
         "inhibit-bidi-mirroring",
         "Non-nil means don't mirror characters even when bidi context requires that.",
     ),
-    (
-        "inhibit-changing-match-data",
-        "Internal use only.",
-    ),
+    ("inhibit-changing-match-data", "Internal use only."),
     (
         "inhibit-compacting-font-caches",
         "If non-nil, don't compact font caches during GC.",
@@ -1445,10 +1468,7 @@ pub(crate) static STARTUP_VARIABLE_DOC_STUBS: &[(&str, &str)] = &[
         "kill-buffer-query-functions",
         "List of functions called with no args to query before killing a buffer.",
     ),
-    (
-        "kill-emacs-hook",
-        "Hook run when `kill-emacs' is called.",
-    ),
+    ("kill-emacs-hook", "Hook run when `kill-emacs' is called."),
     (
         "large-hscroll-threshold",
         "Horizontal scroll of truncated lines above which to use redisplay shortcuts.",
@@ -1473,10 +1493,7 @@ pub(crate) static STARTUP_VARIABLE_DOC_STUBS: &[(&str, &str)] = &[
         "last-event-frame",
         "The frame in which the most recently read event occurred.",
     ),
-    (
-        "last-input-event",
-        "Last input event.",
-    ),
+    ("last-input-event", "Last input event."),
     (
         "last-kbd-macro",
         "Last kbd macro defined, as a string or vector; nil if none defined.",
@@ -1549,10 +1566,7 @@ pub(crate) static STARTUP_VARIABLE_DOC_STUBS: &[(&str, &str)] = &[
         "load-force-doc-strings",
         "Non-nil means `load' should force-load all dynamic doc strings.",
     ),
-    (
-        "load-in-progress",
-        "Non-nil if inside of `load'.",
-    ),
+    ("load-in-progress", "Non-nil if inside of `load'."),
     (
         "load-no-native",
         "Non-nil means not to load native code unless explicitly requested.",
@@ -1613,10 +1627,7 @@ pub(crate) static STARTUP_VARIABLE_DOC_STUBS: &[(&str, &str)] = &[
         "macroexp--dynvars",
         "List of variables declared dynamic in the current scope.",
     ),
-    (
-        "main-thread",
-        "The main thread of Emacs.",
-    ),
+    ("main-thread", "The main thread of Emacs."),
     (
         "make-cursor-line-fully-visible",
         "Whether to scroll the window if the cursor line is not fully visible.",
@@ -1637,10 +1648,7 @@ pub(crate) static STARTUP_VARIABLE_DOC_STUBS: &[(&str, &str)] = &[
         "mark-even-if-inactive",
         "Non-nil means you can use the mark even when inactive.",
     ),
-    (
-        "max-image-size",
-        "Maximum size of images.",
-    ),
+    ("max-image-size", "Maximum size of images."),
     (
         "max-lisp-eval-depth",
         "Limit on depth in `eval', `apply' and `funcall' before error.",
@@ -1669,10 +1677,7 @@ pub(crate) static STARTUP_VARIABLE_DOC_STUBS: &[(&str, &str)] = &[
         "menu-bar-final-items",
         "List of menu bar items to move to the end of the menu bar.",
     ),
-    (
-        "menu-bar-mode",
-        "Non-nil if Menu-Bar mode is enabled.",
-    ),
+    ("menu-bar-mode", "Non-nil if Menu-Bar mode is enabled."),
     (
         "menu-bar-update-hook",
         "Normal hook run to update the menu bar definitions.",
@@ -1701,10 +1706,7 @@ pub(crate) static STARTUP_VARIABLE_DOC_STUBS: &[(&str, &str)] = &[
         "messages-buffer-name",
         "The name of the buffer where messages are logged.",
     ),
-    (
-        "meta-prefix-char",
-        "Meta-prefix character code.",
-    ),
+    ("meta-prefix-char", "Meta-prefix character code."),
     (
         "minibuffer-allow-text-properties",
         "Non-nil means `read-from-minibuffer' should not discard text properties.",
@@ -1785,10 +1787,7 @@ pub(crate) static STARTUP_VARIABLE_DOC_STUBS: &[(&str, &str)] = &[
         "mode-line-in-non-selected-windows",
         "Non-nil means to use `mode-line-inactive' face in non-selected windows.",
     ),
-    (
-        "mode-name",
-        "Pretty name of current buffer's major mode.",
-    ),
+    ("mode-name", "Pretty name of current buffer's major mode."),
     (
         "module-file-suffix",
         "Suffix of loadable module file, or nil if modules are not supported.",
@@ -1885,10 +1884,7 @@ pub(crate) static STARTUP_VARIABLE_DOC_STUBS: &[(&str, &str)] = &[
         "num-nonmacro-input-events",
         "Number of input events read from the keyboard so far.",
     ),
-    (
-        "obarray",
-        "Symbol table for use by ‘intern’ and ‘read’.",
-    ),
+    ("obarray", "Symbol table for use by ‘intern’ and ‘read’."),
     (
         "open-paren-in-column-0-is-defun-start",
         "Non-nil means an open paren in column 0 denotes the start of a defun.",
@@ -2165,10 +2161,7 @@ pub(crate) static STARTUP_VARIABLE_DOC_STUBS: &[(&str, &str)] = &[
         "recenter-redisplay",
         "Non-nil means ‘recenter’ redraws entire frame.",
     ),
-    (
-        "record-all-keys",
-        "Non-nil means record all keys you type.",
-    ),
+    ("record-all-keys", "Non-nil means record all keys you type."),
     (
         "redisplay--all-windows-cause",
         "Code of the cause for redisplaying all windows.",
@@ -2233,10 +2226,7 @@ pub(crate) static STARTUP_VARIABLE_DOC_STUBS: &[(&str, &str)] = &[
         "saved-region-selection",
         "Contents of active region prior to buffer modification.",
     ),
-    (
-        "scalable-fonts-allowed",
-        "Allowed scalable fonts.",
-    ),
+    ("scalable-fonts-allowed", "Allowed scalable fonts."),
     (
         "script-representative-chars",
         "Alist of scripts vs the representative characters.",
@@ -2297,10 +2287,7 @@ pub(crate) static STARTUP_VARIABLE_DOC_STUBS: &[(&str, &str)] = &[
         "selection-inhibit-update-commands",
         "List of commands which should not update the selection.",
     ),
-    (
-        "selective-display",
-        "Non-nil enables selective display.",
-    ),
+    ("selective-display", "Non-nil enables selective display."),
     (
         "selective-display-ellipses",
         "Non-nil means display ... on previous line when a line is invisible.",
@@ -2345,10 +2332,7 @@ pub(crate) static STARTUP_VARIABLE_DOC_STUBS: &[(&str, &str)] = &[
         "standard-display-table",
         "Display table to use for buffers that specify none.",
     ),
-    (
-        "standard-input",
-        "Stream for read to get input from.",
-    ),
+    ("standard-input", "Stream for read to get input from."),
     (
         "standard-translation-table-for-decode",
         "Table for translating characters while decoding.",
@@ -2397,18 +2381,12 @@ pub(crate) static STARTUP_VARIABLE_DOC_STUBS: &[(&str, &str)] = &[
         "system-key-alist",
         "Alist of system-specific X windows key symbols.",
     ),
-    (
-        "system-messages-locale",
-        "System locale for messages.",
-    ),
+    ("system-messages-locale", "System locale for messages."),
     (
         "system-name",
         "The host name of the machine Emacs is running on.",
     ),
-    (
-        "system-time-locale",
-        "System locale for time.",
-    ),
+    ("system-time-locale", "System locale for time."),
     (
         "system-type",
         "The value is a symbol indicating the type of operating system you are using.",
@@ -2421,10 +2399,7 @@ pub(crate) static STARTUP_VARIABLE_DOC_STUBS: &[(&str, &str)] = &[
         "tab-bar--dragging-in-progress",
         "Non-nil when maybe dragging tab bar item.",
     ),
-    (
-        "tab-bar-border",
-        "Border below tab-bar in pixels.",
-    ),
+    ("tab-bar-border", "Border below tab-bar in pixels."),
     (
         "tab-bar-button-margin",
         "Margin around tab-bar buttons in pixels.",
@@ -2501,10 +2476,7 @@ pub(crate) static STARTUP_VARIABLE_DOC_STUBS: &[(&str, &str)] = &[
         "timer-list",
         "List of active absolute time timers in order of increasing time.",
     ),
-    (
-        "tool-bar-border",
-        "Border below tool-bar in pixels.",
-    ),
+    ("tool-bar-border", "Border below tool-bar in pixels."),
     (
         "tool-bar-button-margin",
         "Margin around tool-bar buttons in pixels.",
@@ -2521,18 +2493,12 @@ pub(crate) static STARTUP_VARIABLE_DOC_STUBS: &[(&str, &str)] = &[
         "tool-bar-separator-image-expression",
         "Expression evaluating to the image spec for a tool-bar separator.",
     ),
-    (
-        "tool-bar-style",
-        "Tool bar style to use.",
-    ),
+    ("tool-bar-style", "Tool bar style to use."),
     (
         "tooltip-reuse-hidden-frame",
         "Non-nil means reuse hidden tooltip frames.",
     ),
-    (
-        "top-level",
-        "Form to evaluate when Emacs starts up.",
-    ),
+    ("top-level", "Form to evaluate when Emacs starts up."),
     (
         "track-mouse",
         "Non-nil means generate motion events for mouse motion.",
@@ -2561,10 +2527,7 @@ pub(crate) static STARTUP_VARIABLE_DOC_STUBS: &[(&str, &str)] = &[
         "treesit-load-name-override-list",
         "An override list for unconventional tree-sitter libraries.",
     ),
-    (
-        "treesit-thing-settings",
-        "A list defining things.",
-    ),
+    ("treesit-thing-settings", "A list defining things."),
     (
         "truncate-partial-width-windows",
         "Non-nil means truncate lines in windows narrower than the frame.",
@@ -2825,10 +2788,7 @@ pub(crate) static STARTUP_VARIABLE_DOC_STUBS: &[(&str, &str)] = &[
         "x-dnd-preserve-selection-data",
         "Preserve selection data after ‘x-begin-drag’ returns.",
     ),
-    (
-        "x-dnd-targets-list",
-        "List of drag-and-drop targets.",
-    ),
+    ("x-dnd-targets-list", "List of drag-and-drop targets."),
     (
         "x-dnd-unsupported-drop-function",
         "Function called when trying to drop on an unsupported window.",
@@ -2909,10 +2869,7 @@ pub(crate) static STARTUP_VARIABLE_DOC_STUBS: &[(&str, &str)] = &[
         "x-lost-selection-functions",
         "A list of functions to be called when Emacs loses an X selection.",
     ),
-    (
-        "x-max-tooltip-size",
-        "Maximum size for tooltips.",
-    ),
+    ("x-max-tooltip-size", "Maximum size for tooltips."),
     (
         "x-meta-keysym",
         "Which modifier value Emacs reports when Meta is depressed.",
@@ -3021,10 +2978,7 @@ pub(crate) static STARTUP_VARIABLE_DOC_STUBS: &[(&str, &str)] = &[
         "x-use-underline-position-properties",
         "Non-nil means make use of UNDERLINE_POSITION font properties.",
     ),
-    (
-        "x-wait-for-event-timeout",
-        "How long to wait for X events.",
-    ),
+    ("x-wait-for-event-timeout", "How long to wait for X events."),
     (
         "x-window-bottom-edge-cursor",
         "Pointer shape indicating a bottom x-window edge can be dragged.",
@@ -3069,16 +3023,16 @@ pub(crate) static STARTUP_VARIABLE_DOC_STUBS: &[(&str, &str)] = &[
         "xft-ignore-color-fonts",
         "Non-nil means don’t query fontconfig for color fonts, since they often",
     ),
-    (
-        "xft-settings",
-        "Font settings applied to Xft.",
-    ),
+    ("xft-settings", "Font settings applied to Xft."),
     (
         "yes-or-no-prompt",
         "String to append when ‘yes-or-no-p’ asks a question.",
     ),
     ("last-command", "The last command executed."),
-    ("lexical-binding", "Whether to use lexical binding when evaluating code."),
+    (
+        "lexical-binding",
+        "Whether to use lexical binding when evaluating code.",
+    ),
     (
         "load-file-name",
         "Full name of file being loaded by `load'.",
@@ -3123,10 +3077,7 @@ and without trailing slashes.",
         "select-active-regions",
         "If non-nil, any active region automatically sets the primary selection.",
     ),
-    (
-        "shell-file-name",
-        "File name to load inferior shells from.",
-    ),
+    ("shell-file-name", "File name to load inferior shells from."),
     (
         "standard-output",
         "Output stream `print' uses by default for outputting a character.",
@@ -10891,7 +10842,8 @@ pub(crate) fn builtin_describe_function(
 
     // Reuse symbol-function resolution so builtins and wrapper-backed callables
     // are visible here even when not explicitly interned in the function cell.
-    let func_val = super::builtins::builtin_symbol_function(eval, vec![Value::symbol(name.clone())])?;
+    let func_val =
+        super::builtins::builtin_symbol_function(eval, vec![Value::symbol(name.clone())])?;
     if func_val.is_nil() {
         return Err(signal("void-function", vec![Value::symbol(&name)]));
     }
@@ -11025,7 +10977,11 @@ pub(crate) fn builtin_describe_variable(
                 if !eval.obarray.boundp(&sym) {
                     return Err(signal("void-variable", vec![Value::symbol(sym)]));
                 }
-                let sym_value = eval.obarray.symbol_value(&sym).cloned().unwrap_or(Value::Nil);
+                let sym_value = eval
+                    .obarray
+                    .symbol_value(&sym)
+                    .cloned()
+                    .unwrap_or(Value::Nil);
                 return match sym_value {
                     Value::Str(s) => Ok(Value::string(format!("{value_text}{s}\n"))),
                     Value::Int(_) => Ok(Value::string(value_text)),
@@ -11180,7 +11136,10 @@ fn snarf_doc_path_invalid(filename: &str) -> bool {
         return true;
     }
 
-    let mut segments = filename.split('/').filter(|segment| !segment.is_empty()).peekable();
+    let mut segments = filename
+        .split('/')
+        .filter(|segment| !segment.is_empty())
+        .peekable();
     if segments.peek().is_none() {
         return true;
     }
@@ -11352,8 +11311,7 @@ pub(crate) fn builtin_help_function_arglist_eval(
     let preserve_names = args.get(1).is_some_and(Value::is_truthy);
 
     if let Some(name) = args[0].as_symbol_name() {
-        let resolved =
-            super::builtins::builtin_indirect_function(eval, vec![Value::symbol(name)])?;
+        let resolved = super::builtins::builtin_indirect_function(eval, vec![Value::symbol(name)])?;
         if let Some(result) = help_arglist_from_quoted_designator(&resolved) {
             return result;
         }
@@ -12382,35 +12340,31 @@ mod tests {
             builtin_help_function_arglist_eval(&mut evaluator, vec![Value::symbol("cdr")]).unwrap();
         assert_eq!(arglist_names(&cdr), vec!["arg1".to_string()]);
 
-        let list =
-            builtin_help_function_arglist_eval(&mut evaluator, vec![Value::symbol("list")]).unwrap();
+        let list = builtin_help_function_arglist_eval(&mut evaluator, vec![Value::symbol("list")])
+            .unwrap();
         assert_eq!(
             arglist_names(&list),
             vec!["&rest".to_string(), "rest".to_string()]
         );
 
-        let read =
-            builtin_help_function_arglist_eval(&mut evaluator, vec![Value::symbol("read")]).unwrap();
+        let read = builtin_help_function_arglist_eval(&mut evaluator, vec![Value::symbol("read")])
+            .unwrap();
         assert_eq!(
             arglist_names(&read),
             vec!["&optional".to_string(), "arg1".to_string()]
         );
 
-        let equal = builtin_help_function_arglist_eval(
-            &mut evaluator,
-            vec![Value::symbol("equal")],
-        )
-        .unwrap();
+        let equal =
+            builtin_help_function_arglist_eval(&mut evaluator, vec![Value::symbol("equal")])
+                .unwrap();
         assert_eq!(
             arglist_names(&equal),
             vec!["arg1".to_string(), "arg2".to_string()]
         );
 
-        let substring = builtin_help_function_arglist_eval(
-            &mut evaluator,
-            vec![Value::symbol("substring")],
-        )
-        .unwrap();
+        let substring =
+            builtin_help_function_arglist_eval(&mut evaluator, vec![Value::symbol("substring")])
+                .unwrap();
         assert_eq!(
             arglist_names(&substring),
             vec![
@@ -12421,18 +12375,12 @@ mod tests {
             ]
         );
 
-        let funcall = builtin_help_function_arglist_eval(
-            &mut evaluator,
-            vec![Value::symbol("funcall")],
-        )
-        .unwrap();
+        let funcall =
+            builtin_help_function_arglist_eval(&mut evaluator, vec![Value::symbol("funcall")])
+                .unwrap();
         assert_eq!(
             arglist_names(&funcall),
-            vec![
-                "arg1".to_string(),
-                "&rest".to_string(),
-                "rest".to_string()
-            ]
+            vec!["arg1".to_string(), "&rest".to_string(), "rest".to_string()]
         );
     }
 
@@ -12452,7 +12400,10 @@ mod tests {
             vec![Value::symbol("cons"), Value::True],
         )
         .unwrap();
-        assert_eq!(arglist_names(&cons), vec!["car".to_string(), "cdr".to_string()]);
+        assert_eq!(
+            arglist_names(&cons),
+            vec!["car".to_string(), "cdr".to_string()]
+        );
 
         let list = builtin_help_function_arglist_eval(
             &mut evaluator,
@@ -12764,7 +12715,10 @@ mod tests {
                 "equal",
                 "Return t if two Lisp objects have similar structure and contents.",
             ),
-            ("length", "Return the length of vector, list or string SEQUENCE."),
+            (
+                "length",
+                "Return the length of vector, list or string SEQUENCE.",
+            ),
             (
                 "append",
                 "Concatenate all the arguments and make the result a list.",
@@ -12807,8 +12761,8 @@ mod tests {
             .obarray
             .set_symbol_function("alias-builtin", Value::symbol("car"));
 
-        let result = builtin_documentation(&mut evaluator, vec![Value::symbol("alias-builtin")])
-            .unwrap();
+        let result =
+            builtin_documentation(&mut evaluator, vec![Value::symbol("alias-builtin")]).unwrap();
         let text = result
             .as_str()
             .expect("documentation alias to car should return a string");
@@ -12961,7 +12915,8 @@ mod tests {
     fn documentation_vector_designator_returns_keyboard_macro_doc() {
         let mut evaluator = super::super::eval::Evaluator::new();
         let result =
-            builtin_documentation(&mut evaluator, vec![Value::vector(vec![Value::Int(1)])]).unwrap();
+            builtin_documentation(&mut evaluator, vec![Value::vector(vec![Value::Int(1)])])
+                .unwrap();
         assert_eq!(result.as_str(), Some("Keyboard macro."));
     }
 
@@ -13049,12 +13004,10 @@ mod tests {
 
         let result = builtin_describe_function(&mut evaluator, vec![Value::symbol("my-fn")]);
         assert!(result.is_ok());
-        assert!(
-            result
-                .unwrap()
-                .as_str()
-                .is_some_and(|s| s.contains("my-fn is a interpreted-function"))
-        );
+        assert!(result
+            .unwrap()
+            .as_str()
+            .is_some_and(|s| s.contains("my-fn is a interpreted-function")));
     }
 
     #[test]
@@ -13066,12 +13019,10 @@ mod tests {
 
         let result = builtin_describe_function(&mut evaluator, vec![Value::symbol("plus")]);
         assert!(result.is_ok());
-        assert!(
-            result
-                .unwrap()
-                .as_str()
-                .is_some_and(|s| s.contains("plus is a primitive-function in ‘C source code’"))
-        );
+        assert!(result
+            .unwrap()
+            .as_str()
+            .is_some_and(|s| s.contains("plus is a primitive-function in ‘C source code’")));
     }
 
     #[test]
@@ -13079,12 +13030,10 @@ mod tests {
         let mut evaluator = super::super::eval::Evaluator::new();
         let result = builtin_describe_function(&mut evaluator, vec![Value::symbol("car")]);
         assert!(result.is_ok());
-        assert!(
-            result
-                .unwrap()
-                .as_str()
-                .is_some_and(|s| s.contains("car is a primitive-function in ‘C source code’"))
-        );
+        assert!(result
+            .unwrap()
+            .as_str()
+            .is_some_and(|s| s.contains("car is a primitive-function in ‘C source code’")));
     }
 
     #[test]
@@ -13092,12 +13041,10 @@ mod tests {
         let mut evaluator = super::super::eval::Evaluator::new();
         let result = builtin_describe_function(&mut evaluator, vec![Value::symbol("if")]);
         assert!(result.is_ok());
-        assert!(
-            result
-                .unwrap()
-                .as_str()
-                .is_some_and(|s| s.contains("if is a special-form in ‘C source code’"))
-        );
+        assert!(result
+            .unwrap()
+            .as_str()
+            .is_some_and(|s| s.contains("if is a special-form in ‘C source code’")));
     }
 
     #[test]
@@ -13110,12 +13057,10 @@ mod tests {
         let result =
             builtin_describe_function(&mut evaluator, vec![Value::symbol("vm-kmacro-string")]);
         assert!(result.is_ok());
-        assert!(
-            result
-                .unwrap()
-                .as_str()
-                .is_some_and(|s| s.contains("vm-kmacro-string is a keyboard macro"))
-        );
+        assert!(result
+            .unwrap()
+            .as_str()
+            .is_some_and(|s| s.contains("vm-kmacro-string is a keyboard macro")));
     }
 
     #[test]
@@ -13129,12 +13074,10 @@ mod tests {
         let result =
             builtin_describe_function(&mut evaluator, vec![Value::symbol("vm-kmacro-vector")]);
         assert!(result.is_ok());
-        assert!(
-            result
-                .unwrap()
-                .as_str()
-                .is_some_and(|s| s.contains("vm-kmacro-vector is a keyboard macro"))
-        );
+        assert!(result
+            .unwrap()
+            .as_str()
+            .is_some_and(|s| s.contains("vm-kmacro-vector is a keyboard macro")));
     }
 
     #[test]
@@ -13151,12 +13094,10 @@ mod tests {
         let result =
             builtin_describe_function(&mut evaluator, vec![Value::symbol("vm-macro-marker")]);
         assert!(result.is_ok());
-        assert!(
-            result
-                .unwrap()
-                .as_str()
-                .is_some_and(|s| s.contains("vm-macro-marker is a Lisp macro"))
-        );
+        assert!(result
+            .unwrap()
+            .as_str()
+            .is_some_and(|s| s.contains("vm-macro-marker is a Lisp macro")));
     }
 
     #[test]
@@ -13166,8 +13107,7 @@ mod tests {
             .obarray
             .set_symbol_function("vm-alias-car", Value::symbol("car"));
 
-        let result =
-            builtin_describe_function(&mut evaluator, vec![Value::symbol("vm-alias-car")]);
+        let result = builtin_describe_function(&mut evaluator, vec![Value::symbol("vm-alias-car")]);
         assert!(result.is_ok());
         assert_eq!(
             result.unwrap().as_str(),
@@ -13208,14 +13148,9 @@ mod tests {
         let result =
             builtin_describe_function(&mut evaluator, vec![Value::symbol("vm-autoload-macro")]);
         assert!(result.is_ok());
-        assert!(
-            result
-                .unwrap()
-                .as_str()
-                .is_some_and(
-                    |s| s.contains("vm-autoload-macro is an autoloaded Lisp macro in ‘files.el’")
-                )
-        );
+        assert!(result.unwrap().as_str().is_some_and(
+            |s| s.contains("vm-autoload-macro is an autoloaded Lisp macro in ‘files.el’")
+        ));
     }
 
     #[test]
@@ -13280,54 +13215,44 @@ mod tests {
         let empty =
             builtin_describe_function(&mut evaluator, vec![Value::symbol("vm-autoload-empty")]);
         assert!(empty.is_ok());
-        assert!(
-            empty.unwrap()
-                .as_str()
-                .is_some_and(|s| {
-                    s.contains("autoloaded Lisp function.")
-                        && !s.contains(" in ‘")
-                        && !s.contains("image.el")
-                })
-        );
+        assert!(empty.unwrap().as_str().is_some_and(|s| {
+            s.contains("autoloaded Lisp function.")
+                && !s.contains(" in ‘")
+                && !s.contains("image.el")
+        }));
 
         let bare =
             builtin_describe_function(&mut evaluator, vec![Value::symbol("vm-autoload-bare")]);
         assert!(bare.is_ok());
-        assert!(
-            bare.unwrap()
-                .as_str()
-                .is_some_and(|s| s.contains("autoloaded Lisp function in ‘files.el’"))
-        );
+        assert!(bare
+            .unwrap()
+            .as_str()
+            .is_some_and(|s| s.contains("autoloaded Lisp function in ‘files.el’")));
 
         let el = builtin_describe_function(&mut evaluator, vec![Value::symbol("vm-autoload-el")]);
         assert!(el.is_ok());
-        assert!(
-            el.unwrap().as_str().is_some_and(
-                |s| s.contains("autoloaded Lisp function.") && !s.contains(" in ‘files.el’")
-            )
-        );
+        assert!(el.unwrap().as_str().is_some_and(
+            |s| s.contains("autoloaded Lisp function.") && !s.contains(" in ‘files.el’")
+        ));
 
-        let elc =
-            builtin_describe_function(&mut evaluator, vec![Value::symbol("vm-autoload-elc")]);
+        let elc = builtin_describe_function(&mut evaluator, vec![Value::symbol("vm-autoload-elc")]);
         assert!(elc.is_ok());
-        assert!(
-            elc.unwrap().as_str().is_some_and(
-                |s| s.contains("autoloaded Lisp function.")
-                    && !s.contains("files.elc")
-                    && !s.contains("files.elc.el")
-            )
-        );
+        assert!(elc
+            .unwrap()
+            .as_str()
+            .is_some_and(|s| s.contains("autoloaded Lisp function.")
+                && !s.contains("files.elc")
+                && !s.contains("files.elc.el")));
 
         let path =
             builtin_describe_function(&mut evaluator, vec![Value::symbol("vm-autoload-path")]);
         assert!(path.is_ok());
-        assert!(
-            path.unwrap().as_str().is_some_and(
-                |s| s.contains("autoloaded Lisp function.")
-                    && !s.contains("/tmp/files")
-                    && !s.contains("/tmp/files.el")
-            )
-        );
+        assert!(path
+            .unwrap()
+            .as_str()
+            .is_some_and(|s| s.contains("autoloaded Lisp function.")
+                && !s.contains("/tmp/files")
+                && !s.contains("/tmp/files.el")));
     }
 
     #[test]
@@ -13367,37 +13292,38 @@ mod tests {
             .obarray
             .set_symbol_function("vm-autoload-macro-other", autoload_macro_other);
 
-        let macro_t = builtin_describe_function(
-            &mut evaluator,
-            vec![Value::symbol("vm-autoload-macro-t")],
-        );
+        let macro_t =
+            builtin_describe_function(&mut evaluator, vec![Value::symbol("vm-autoload-macro-t")]);
         assert!(macro_t.is_ok());
-        assert!(macro_t.unwrap().as_str().is_some_and(
-            |s| s.contains("autoloaded Lisp macro")
+        assert!(macro_t
+            .unwrap()
+            .as_str()
+            .is_some_and(|s| s.contains("autoloaded Lisp macro")
                 && !s.contains("autoloaded Lisp function")
                 && !s.contains("files.elc")
-                && !s.contains("files.elc.el")
-        ));
+                && !s.contains("files.elc.el")));
 
         let keymap =
             builtin_describe_function(&mut evaluator, vec![Value::symbol("vm-autoload-keymap")]);
         assert!(keymap.is_ok());
-        assert!(keymap.unwrap().as_str().is_some_and(
-            |s| s.contains("autoloaded keymap")
+        assert!(keymap
+            .unwrap()
+            .as_str()
+            .is_some_and(|s| s.contains("autoloaded keymap")
                 && !s.contains("autoloaded Lisp function")
-                && s.contains(" in ‘files.el’")
-        ));
+                && s.contains(" in ‘files.el’")));
 
         let macro_other = builtin_describe_function(
             &mut evaluator,
             vec![Value::symbol("vm-autoload-macro-other")],
         );
         assert!(macro_other.is_ok());
-        assert!(macro_other.unwrap().as_str().is_some_and(
-            |s| s.contains("autoloaded Lisp macro")
+        assert!(macro_other
+            .unwrap()
+            .as_str()
+            .is_some_and(|s| s.contains("autoloaded Lisp macro")
                 && !s.contains("autoloaded Lisp function")
-                && !s.contains("autoloaded keymap")
-        ));
+                && !s.contains("autoloaded keymap")));
     }
 
     #[test]
@@ -13483,12 +13409,10 @@ mod tests {
 
         let result = builtin_describe_variable(&mut evaluator, vec![Value::symbol("my-var")]);
         assert!(result.is_ok());
-        assert!(
-            result
-                .unwrap()
-                .as_str()
-                .is_some_and(|s| s.contains("doc") && s.contains("value is"))
-        );
+        assert!(result
+            .unwrap()
+            .as_str()
+            .is_some_and(|s| s.contains("doc") && s.contains("value is")));
     }
 
     #[test]
@@ -13501,12 +13425,10 @@ mod tests {
 
         let result = builtin_describe_variable(&mut evaluator, vec![Value::symbol("my-var")]);
         assert!(result.is_ok());
-        assert!(
-            result
-                .unwrap()
-                .as_str()
-                .is_some_and(|s| s.contains("value is"))
-        );
+        assert!(result
+            .unwrap()
+            .as_str()
+            .is_some_and(|s| s.contains("value is")));
     }
 
     #[test]
@@ -13516,20 +13438,16 @@ mod tests {
         evaluator
             .obarray
             .set_symbol_value("my-doc", Value::string("Doc from indirection."));
-        evaluator.obarray.put_property(
-            "my-var",
-            "variable-documentation",
-            Value::symbol("my-doc"),
-        );
+        evaluator
+            .obarray
+            .put_property("my-var", "variable-documentation", Value::symbol("my-doc"));
 
         let result = builtin_describe_variable(&mut evaluator, vec![Value::symbol("my-var")]);
         assert!(result.is_ok());
-        assert!(
-            result
-                .unwrap()
-                .as_str()
-                .is_some_and(|s| s.contains("Doc from indirection.") && s.contains("value is"))
-        );
+        assert!(result
+            .unwrap()
+            .as_str()
+            .is_some_and(|s| s.contains("Doc from indirection.") && s.contains("value is")));
     }
 
     #[test]
@@ -13554,11 +13472,9 @@ mod tests {
         let mut evaluator = super::super::eval::Evaluator::new();
         evaluator.obarray.set_symbol_value("my-var", Value::Int(42));
         evaluator.obarray.set_symbol_value("my-doc", Value::True);
-        evaluator.obarray.put_property(
-            "my-var",
-            "variable-documentation",
-            Value::symbol("my-doc"),
-        );
+        evaluator
+            .obarray
+            .put_property("my-var", "variable-documentation", Value::symbol("my-doc"));
 
         let result = builtin_describe_variable(&mut evaluator, vec![Value::symbol("my-var")]);
         match result {
@@ -13581,11 +13497,9 @@ mod tests {
             "my-doc",
             Value::list(vec![Value::symbol("identity"), Value::string("doc")]),
         );
-        evaluator.obarray.put_property(
-            "my-var",
-            "variable-documentation",
-            Value::symbol("my-doc"),
-        );
+        evaluator
+            .obarray
+            .put_property("my-var", "variable-documentation", Value::symbol("my-doc"));
 
         let result = builtin_describe_variable(&mut evaluator, vec![Value::symbol("my-var")]);
         match result {
@@ -13632,7 +13546,9 @@ mod tests {
         evaluator.obarray.set_symbol_value("x", Value::Int(10));
 
         let result = builtin_describe_variable(&mut evaluator, vec![Value::symbol("x")]).unwrap();
-        let text = result.as_str().expect("describe-variable must return a string");
+        let text = result
+            .as_str()
+            .expect("describe-variable must return a string");
         assert!(text.ends_with('\n'));
         assert!(text.contains("x\u{2019}s value is"));
     }
@@ -13642,12 +13558,10 @@ mod tests {
         let mut evaluator = super::super::eval::Evaluator::new();
         let result = builtin_describe_variable(&mut evaluator, vec![Value::symbol("nonexistent")]);
         assert!(result.is_ok());
-        assert!(
-            result
-                .unwrap()
-                .as_str()
-                .is_some_and(|s| s.contains("void as a variable"))
-        );
+        assert!(result
+            .unwrap()
+            .as_str()
+            .is_some_and(|s| s.contains("void as a variable")));
     }
 
     #[test]
@@ -13655,12 +13569,7 @@ mod tests {
         let mut evaluator = super::super::eval::Evaluator::new();
         let result = builtin_describe_variable(&mut evaluator, vec![Value::symbol("nonexistent")]);
         assert!(result.is_ok());
-        assert!(
-            result
-                .unwrap()
-                .as_str()
-                .is_some_and(|s| s.ends_with('\n'))
-        );
+        assert!(result.unwrap().as_str().is_some_and(|s| s.ends_with('\n')));
     }
 
     #[test]
@@ -13674,7 +13583,9 @@ mod tests {
     fn describe_variable_keyword_is_self_bound() {
         let mut evaluator = super::super::eval::Evaluator::new();
         let result = builtin_describe_variable(&mut evaluator, vec![Value::keyword(":x")]).unwrap();
-        let text = result.as_str().expect("describe-variable must return a string");
+        let text = result
+            .as_str()
+            .expect("describe-variable must return a string");
         assert!(text.contains("value is"));
         assert!(text.contains(":x"));
     }
@@ -13763,11 +13674,9 @@ mod tests {
             ],
         )
         .unwrap();
-        assert!(
-            result
-                .as_str()
-                .is_some_and(|s| s.contains("List of directories to search for files to load"))
-        );
+        assert!(result
+            .as_str()
+            .is_some_and(|s| s.contains("List of directories to search for files to load")));
     }
 
     #[test]
@@ -13847,11 +13756,9 @@ mod tests {
             ],
         )
         .unwrap();
-        assert!(
-            result
-                .as_str()
-                .is_some_and(|s| s.contains("searches and matches should ignore case"))
-        );
+        assert!(result
+            .as_str()
+            .is_some_and(|s| s.contains("searches and matches should ignore case")));
     }
 
     #[test]
@@ -13865,11 +13772,9 @@ mod tests {
             ],
         )
         .unwrap();
-        assert!(
-            result
-                .as_str()
-                .is_some_and(|s| s.contains("events to be read as the command input"))
-        );
+        assert!(result
+            .as_str()
+            .is_some_and(|s| s.contains("events to be read as the command input")));
     }
 
     #[test]
@@ -13883,11 +13788,9 @@ mod tests {
             ],
         )
         .unwrap();
-        assert!(
-            result
-                .as_str()
-                .is_some_and(|s| s.contains("automatic horizontal scrolling of windows"))
-        );
+        assert!(result
+            .as_str()
+            .is_some_and(|s| s.contains("automatic horizontal scrolling of windows")));
     }
 
     #[test]
@@ -13901,11 +13804,9 @@ mod tests {
             ],
         )
         .unwrap();
-        assert!(
-            result
-                .as_str()
-                .is_some_and(|s| s.contains("Auto-Composition mode is enabled"))
-        );
+        assert!(result
+            .as_str()
+            .is_some_and(|s| s.contains("Auto-Composition mode is enabled")));
     }
 
     #[test]
@@ -13919,11 +13820,9 @@ mod tests {
             ],
         )
         .unwrap();
-        assert!(
-            result
-                .as_str()
-                .is_some_and(|s| s.contains("Alist of coding system names"))
-        );
+        assert!(result
+            .as_str()
+            .is_some_and(|s| s.contains("Alist of coding system names")));
     }
 
     #[test]
@@ -13937,11 +13836,9 @@ mod tests {
             ],
         )
         .unwrap();
-        assert!(
-            result
-                .as_str()
-                .is_some_and(|s| s.contains("debug if a message matching this regexp is displayed"))
-        );
+        assert!(result
+            .as_str()
+            .is_some_and(|s| s.contains("debug if a message matching this regexp is displayed")));
     }
 
     #[test]
@@ -13955,11 +13852,9 @@ mod tests {
             ],
         )
         .unwrap();
-        assert!(
-            result
-                .as_str()
-                .is_some_and(|s| s.contains("show an hourglass pointer"))
-        );
+        assert!(result
+            .as_str()
+            .is_some_and(|s| s.contains("show an hourglass pointer")));
     }
 
     #[test]
@@ -13973,11 +13868,9 @@ mod tests {
             ],
         )
         .unwrap();
-        assert!(
-            result
-                .as_str()
-                .is_some_and(|s| s.contains("Directory for executables for Emacs to invoke"))
-        );
+        assert!(result
+            .as_str()
+            .is_some_and(|s| s.contains("Directory for executables for Emacs to invoke")));
     }
 
     #[test]
@@ -13992,9 +13885,9 @@ mod tests {
         )
         .unwrap();
         assert!(
-            result
-                .as_str()
-                .is_some_and(|s| s.contains("Template for displaying the title bar of visible frames"))
+            result.as_str().is_some_and(
+                |s| s.contains("Template for displaying the title bar of visible frames")
+            )
         );
     }
 
@@ -14009,11 +13902,9 @@ mod tests {
             ],
         )
         .unwrap();
-        assert!(
-            result
-                .as_str()
-                .is_some_and(|s| s.contains("controls the header line"))
-        );
+        assert!(result
+            .as_str()
+            .is_some_and(|s| s.contains("controls the header line")));
     }
 
     #[test]
@@ -14027,11 +13918,9 @@ mod tests {
             ],
         )
         .unwrap();
-        assert!(
-            result
-                .as_str()
-                .is_some_and(|s| s.contains("implements the current input method"))
-        );
+        assert!(result
+            .as_str()
+            .is_some_and(|s| s.contains("implements the current input method")));
     }
 
     #[test]
@@ -14045,11 +13934,9 @@ mod tests {
             ],
         )
         .unwrap();
-        assert!(
-            result
-                .as_str()
-                .is_some_and(|s| s.contains("suffixes for Emacs Lisp files and dynamic modules"))
-        );
+        assert!(result
+            .as_str()
+            .is_some_and(|s| s.contains("suffixes for Emacs Lisp files and dynamic modules")));
     }
 
     #[test]
@@ -14063,11 +13950,9 @@ mod tests {
             ],
         )
         .unwrap();
-        assert!(
-            result
-                .as_str()
-                .is_some_and(|s| s.contains("natively-compiled *.eln files"))
-        );
+        assert!(result
+            .as_str()
+            .is_some_and(|s| s.contains("natively-compiled *.eln files")));
     }
 
     #[test]
@@ -14081,11 +13966,9 @@ mod tests {
             ],
         )
         .unwrap();
-        assert!(
-            result
-                .as_str()
-                .is_some_and(|s| s.contains("environment variables for subprocesses"))
-        );
+        assert!(result
+            .as_str()
+            .is_some_and(|s| s.contains("environment variables for subprocesses")));
     }
 
     #[test]
@@ -14099,15 +13982,14 @@ mod tests {
             ],
         )
         .unwrap();
-        assert!(
-            result
-                .as_str()
-                .is_some_and(|s| s.contains("margin at the top and bottom"))
-        );
+        assert!(result
+            .as_str()
+            .is_some_and(|s| s.contains("margin at the top and bottom")));
     }
 
     #[test]
-    fn documentation_property_eval_truncate_partial_width_windows_integer_property_returns_string() {
+    fn documentation_property_eval_truncate_partial_width_windows_integer_property_returns_string()
+    {
         let mut evaluator = super::super::eval::Evaluator::new();
         let result = builtin_documentation_property_eval(
             &mut evaluator,
@@ -14117,11 +13999,9 @@ mod tests {
             ],
         )
         .unwrap();
-        assert!(
-            result
-                .as_str()
-                .is_some_and(|s| s.contains("windows narrower than the frame"))
-        );
+        assert!(result
+            .as_str()
+            .is_some_and(|s| s.contains("windows narrower than the frame")));
     }
 
     #[test]
@@ -14149,11 +14029,9 @@ mod tests {
             ],
         )
         .unwrap();
-        assert!(
-            result
-                .as_str()
-                .is_some_and(|s| s.contains("Non-nil means enter debugger if an error is signaled"))
-        );
+        assert!(result
+            .as_str()
+            .is_some_and(|s| s.contains("Non-nil means enter debugger if an error is signaled")));
     }
 
     #[test]

@@ -445,9 +445,7 @@ impl<'a> Parser<'a> {
                     Err(self.error("#s"))
                 }
             }
-            _ => {
-                Err(self.error(&format!("#{}", ch)))
-            }
+            _ => Err(self.error(&format!("#{}", ch))),
         }
     }
 
@@ -689,7 +687,10 @@ fn parse_emacs_special_float(token: &str) -> Option<f64> {
             if body.starts_with('.') {
                 payload = NAN_LEADING_DOT_PAYLOAD;
             } else {
-                let integer_part = body.split_once('.').map(|(int_part, _)| int_part).unwrap_or(body);
+                let integer_part = body
+                    .split_once('.')
+                    .map(|(int_part, _)| int_part)
+                    .unwrap_or(body);
                 let mut any_nonzero = false;
                 for digit in integer_part.bytes() {
                     if !digit.is_ascii_digit() {

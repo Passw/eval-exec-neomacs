@@ -307,7 +307,7 @@ fn subr_arity_value(name: &str) -> Value {
         "cons" => arity_cons(2, Some(2)),
         "1+" | "1-" | "abs" => arity_cons(1, Some(1)),
         "%" | "/=" | "ash" | "length<" | "length=" | "length>" => arity_cons(2, Some(2)),
-        "copy-alist" | "copy-hash-table" | "copy-keymap" | "copy-sequence" => {
+        "copy-alist" | "copy-hash-table" | "copy-keymap" | "copy-sequence" | "purecopy" => {
             arity_cons(1, Some(1))
         }
         "copy-marker" => arity_cons(0, Some(2)),
@@ -600,13 +600,13 @@ fn subr_arity_value(name: &str) -> Value {
         "lookup-image-map" => arity_cons(3, Some(3)),
         "query-replace" | "query-replace-regexp" => arity_cons(2, Some(7)),
         "quoted-insert" => arity_cons(1, Some(1)),
-        "looking-at" => arity_cons(1, Some(2)),
+        "looking-at" | "posix-looking-at" => arity_cons(1, Some(2)),
         "match-beginning" | "match-end" => arity_cons(1, Some(1)),
         "match-data" => arity_cons(0, Some(3)),
         "match-string" => arity_cons(1, Some(2)),
         "replace-match" => arity_cons(1, Some(5)),
         "replace-regexp-in-string" => arity_cons(3, Some(7)),
-        "string-match" => arity_cons(2, Some(4)),
+        "string-match" | "posix-string-match" => arity_cons(2, Some(4)),
         "string-as-multibyte"
         | "string-as-unibyte"
         | "string-bytes"
@@ -706,6 +706,7 @@ fn subr_arity_value(name: &str) -> Value {
         "subr-arity" | "subr-name" | "subrp" => arity_cons(1, Some(1)),
         "signal" | "take" => arity_cons(2, Some(2)),
         "secure-hash" => arity_cons(2, Some(5)),
+        "secure-hash-algorithms" => arity_cons(0, Some(0)),
         "split-window" => arity_cons(0, Some(4)),
         "switch-to-buffer" => arity_cons(1, Some(3)),
         "combine-after-change-execute"
@@ -745,6 +746,8 @@ fn subr_arity_value(name: &str) -> Value {
         "zlib-decompress-region" => arity_cons(2, Some(3)),
         "search-forward"
         | "search-backward"
+        | "search-forward-regexp"
+        | "search-backward-regexp"
         | "re-search-forward"
         | "re-search-backward"
         | "posix-search-forward"
@@ -764,6 +767,7 @@ fn subr_arity_value(name: &str) -> Value {
         "select-frame-set-input-focus" => arity_cons(1, Some(2)),
         "selected-frame" => arity_cons(0, Some(0)),
         "set-charset-priority" => arity_cons(1, None),
+        "write-char" => arity_cons(1, Some(2)),
         "write-region" => arity_cons(3, Some(7)),
         "isearch-backward" | "isearch-forward" => arity_cons(0, Some(2)),
         "advice-add" => arity_cons(3, Some(4)),
@@ -893,7 +897,11 @@ fn subr_arity_value(name: &str) -> Value {
         | "set-standard-case-table"
         | "set-syntax-table"
         | "set-time-zone-rule" => arity_cons(1, Some(1)),
-        "set-default" | "set-window-dedicated-p" | "setcar" | "setcdr" => arity_cons(2, Some(2)),
+        "set-default"
+        | "set-default-toplevel-value"
+        | "set-window-dedicated-p"
+        | "setcar"
+        | "setcdr" => arity_cons(2, Some(2)),
         "set-char-table-parent" => arity_cons(2, Some(2)),
         "set-char-table-extra-slot" | "set-char-table-range" => arity_cons(3, Some(3)),
         "set-file-modes" => arity_cons(2, Some(3)),
@@ -944,7 +952,7 @@ fn subr_arity_value(name: &str) -> Value {
         "make-category-table" | "preceding-char" => arity_cons(0, Some(0)),
         "make-char-table" => arity_cons(1, Some(2)),
         "modify-category-entry" => arity_cons(2, Some(4)),
-        "modify-syntax-entry" | "plist-get" => arity_cons(2, Some(3)),
+        "modify-syntax-entry" | "plist-get" | "plist-member" => arity_cons(2, Some(3)),
         "plist-put" => arity_cons(3, Some(4)),
         "constrain-to-field" => arity_cons(2, Some(5)),
         "field-beginning" | "field-end" => arity_cons(0, Some(3)),
@@ -2645,6 +2653,7 @@ mod tests {
         assert_subr_arity("copy-marker", 0, Some(2));
         assert_subr_arity("copy-region-as-kill", 2, Some(3));
         assert_subr_arity("copy-sequence", 1, Some(1));
+        assert_subr_arity("purecopy", 1, Some(1));
         assert_subr_arity("copy-syntax-table", 0, Some(1));
         assert_subr_arity("copy-to-register", 3, Some(5));
     }
@@ -2798,6 +2807,7 @@ mod tests {
     #[test]
     fn subr_arity_search_match_primitives_match_oracle() {
         assert_subr_arity("looking-at", 1, Some(2));
+        assert_subr_arity("posix-looking-at", 1, Some(2));
         assert_subr_arity("match-beginning", 1, Some(1));
         assert_subr_arity("match-end", 1, Some(1));
         assert_subr_arity("match-data", 0, Some(3));
@@ -2805,8 +2815,11 @@ mod tests {
         assert_subr_arity("replace-match", 1, Some(5));
         assert_subr_arity("replace-regexp-in-string", 3, Some(7));
         assert_subr_arity("string-match", 2, Some(4));
+        assert_subr_arity("posix-string-match", 2, Some(4));
         assert_subr_arity("search-forward", 1, Some(4));
         assert_subr_arity("search-backward", 1, Some(4));
+        assert_subr_arity("search-forward-regexp", 1, Some(4));
+        assert_subr_arity("search-backward-regexp", 1, Some(4));
         assert_subr_arity("re-search-forward", 1, Some(4));
         assert_subr_arity("re-search-backward", 1, Some(4));
         assert_subr_arity("posix-search-forward", 1, Some(4));
@@ -2865,6 +2878,7 @@ mod tests {
         assert_subr_arity("princ", 1, Some(2));
         assert_subr_arity("print", 1, Some(2));
         assert_subr_arity("terpri", 0, Some(2));
+        assert_subr_arity("write-char", 1, Some(2));
         assert_subr_arity("propertize", 1, None);
         assert_subr_arity("put-image", 2, Some(4));
         assert_subr_arity("query-replace", 2, Some(7));
@@ -2929,6 +2943,7 @@ mod tests {
         assert_subr_arity("modify-syntax-entry", 2, Some(3));
         assert_subr_arity("parse-partial-sexp", 2, Some(6));
         assert_subr_arity("plist-get", 2, Some(3));
+        assert_subr_arity("plist-member", 2, Some(3));
         assert_subr_arity("plist-put", 3, Some(4));
         assert_subr_arity("natnump", 1, Some(1));
         assert_subr_arity("preceding-char", 0, Some(0));
@@ -2946,6 +2961,7 @@ mod tests {
         assert_subr_arity("set-char-table-range", 3, Some(3));
         assert_subr_arity("set-default", 2, Some(2));
         assert_subr_arity("set-default-file-modes", 1, Some(1));
+        assert_subr_arity("set-default-toplevel-value", 2, Some(2));
         assert_subr_arity("set-file-acl", 2, Some(2));
         assert_subr_arity("set-file-modes", 2, Some(3));
         assert_subr_arity("set-file-selinux-context", 2, Some(2));
@@ -3118,6 +3134,7 @@ mod tests {
         assert_subr_arity("multibyte-char-to-unibyte", 1, Some(1));
         assert_subr_arity("multibyte-string-p", 1, Some(1));
         assert_subr_arity("secure-hash", 2, Some(5));
+        assert_subr_arity("secure-hash-algorithms", 0, Some(0));
     }
 
     #[test]

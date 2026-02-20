@@ -2424,7 +2424,8 @@ mod tests {
         let mut ev = Evaluator::new();
         ev.obarray
             .set_symbol_value("unread-command-events", Value::list(vec![Value::Int(97)]));
-        let result = builtin_read_char(&mut ev, vec![Value::Nil, Value::Nil, Value::Int(0)]).unwrap();
+        let result =
+            builtin_read_char(&mut ev, vec![Value::Nil, Value::Nil, Value::Int(0)]).unwrap();
         assert_eq!(result.as_int(), Some(97));
         assert_eq!(ev.read_command_keys(), &[]);
     }
@@ -2445,7 +2446,8 @@ mod tests {
         ev.set_read_command_keys(vec![Value::Int(97)]);
         ev.obarray
             .set_symbol_value("unread-command-events", Value::list(vec![Value::Int(98)]));
-        let result = builtin_read_char(&mut ev, vec![Value::Nil, Value::Nil, Value::Int(0)]).unwrap();
+        let result =
+            builtin_read_char(&mut ev, vec![Value::Nil, Value::Nil, Value::Int(0)]).unwrap();
         assert_eq!(result.as_int(), Some(98));
         assert_eq!(ev.read_command_keys(), &[Value::Int(97)]);
     }

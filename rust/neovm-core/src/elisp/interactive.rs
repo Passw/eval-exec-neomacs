@@ -457,6 +457,8 @@ fn builtin_command_name(name: &str) -> bool {
             | "query-replace-regexp"
             | "re-search-backward"
             | "re-search-forward"
+            | "search-backward-regexp"
+            | "search-forward-regexp"
             | "recursive-edit"
             | "reindent-then-newline-and-indent"
             | "remove-hook"

@@ -2686,12 +2686,74 @@ pub(crate) fn builtin_plist_put(args: Vec<Value>) -> EvalResult {
     }
 }
 
+pub(crate) fn builtin_plist_member(
+    eval: &mut super::eval::Evaluator,
+    args: Vec<Value>,
+) -> EvalResult {
+    expect_range_args("plist-member", &args, 2, 3)?;
+    let plist = args[0].clone();
+    let prop = args[1].clone();
+    let predicate = args.get(2).and_then(|value| {
+        if value.is_nil() {
+            None
+        } else {
+            Some(value.clone())
+        }
+    });
+
+    let mut cursor = plist.clone();
+    loop {
+        match cursor {
+            Value::Cons(key_cell) => {
+                let (entry_key, entry_rest) = {
+                    let pair = key_cell.lock().expect("poisoned");
+                    (pair.car.clone(), pair.cdr.clone())
+                };
+
+                let matches = if let Some(predicate) = &predicate {
+                    eval.apply(predicate.clone(), vec![entry_key.clone(), prop.clone()])?
+                        .is_truthy()
+                } else {
+                    eq_value(&entry_key, &prop)
+                };
+                if matches {
+                    return Ok(Value::Cons(key_cell));
+                }
+
+                match entry_rest {
+                    Value::Cons(value_cell) => {
+                        cursor = value_cell.lock().expect("poisoned").cdr.clone();
+                    }
+                    _ => {
+                        return Err(signal(
+                            "wrong-type-argument",
+                            vec![Value::symbol("plistp"), plist],
+                        ))
+                    }
+                }
+            }
+            Value::Nil => return Ok(Value::Nil),
+            _ => {
+                return Err(signal(
+                    "wrong-type-argument",
+                    vec![Value::symbol("plistp"), plist],
+                ))
+            }
+        }
+    }
+}
+
 // ===========================================================================
 // Misc
 // ===========================================================================
 
 pub(crate) fn builtin_identity(args: Vec<Value>) -> EvalResult {
     expect_args("identity", &args, 1)?;
+    Ok(args[0].clone())
+}
+
+pub(crate) fn builtin_purecopy(args: Vec<Value>) -> EvalResult {
+    expect_args("purecopy", &args, 1)?;
     Ok(args[0].clone())
 }
 
@@ -2878,6 +2940,18 @@ pub(crate) fn builtin_error_eval(
         _ => "error".to_string(),
     };
     Err(signal("error", vec![Value::string(msg)]))
+}
+
+pub(crate) fn builtin_secure_hash_algorithms(args: Vec<Value>) -> EvalResult {
+    expect_args("secure-hash-algorithms", &args, 0)?;
+    Ok(Value::list(vec![
+        Value::symbol("md5"),
+        Value::symbol("sha1"),
+        Value::symbol("sha224"),
+        Value::symbol("sha256"),
+        Value::symbol("sha384"),
+        Value::symbol("sha512"),
+    ]))
 }
 
 pub(crate) fn builtin_symbol_name(args: Vec<Value>) -> EvalResult {
@@ -3559,6 +3633,21 @@ pub(crate) fn builtin_default_toplevel_value(
         .symbol_value(name)
         .cloned()
         .ok_or_else(|| signal("void-variable", vec![Value::symbol(name)]))
+}
+
+pub(crate) fn builtin_set_default_toplevel_value(
+    eval: &mut super::eval::Evaluator,
+    args: Vec<Value>,
+) -> EvalResult {
+    expect_args("set-default-toplevel-value", &args, 2)?;
+    let name = args[0].as_symbol_name().ok_or_else(|| {
+        signal(
+            "wrong-type-argument",
+            vec![Value::symbol("symbolp"), args[0].clone()],
+        )
+    })?;
+    eval.obarray.set_symbol_value(name, args[1].clone());
+    Ok(Value::Nil)
 }
 
 pub(crate) fn builtin_fboundp(eval: &mut super::eval::Evaluator, args: Vec<Value>) -> EvalResult {
@@ -5809,6 +5898,68 @@ pub(crate) fn builtin_terpri_eval(
     let target = resolve_print_target(eval, args.first());
     write_terpri_output(eval, target)?;
     Ok(Value::True)
+}
+
+fn write_char_rendered_text(char_code: i64) -> Option<String> {
+    if !(0..=u32::MAX as i64).contains(&char_code) {
+        return None;
+    }
+    let code = char_code as u32;
+    char::from_u32(code)
+        .map(|ch| ch.to_string())
+        .or_else(|| encode_nonunicode_char_for_storage(code))
+}
+
+pub(crate) fn builtin_write_char(args: Vec<Value>) -> EvalResult {
+    expect_range_args("write-char", &args, 1, 2)?;
+    let char_code = expect_fixnum(&args[0])?;
+    Ok(Value::Int(char_code))
+}
+
+pub(crate) fn builtin_write_char_eval(
+    eval: &mut super::eval::Evaluator,
+    args: Vec<Value>,
+) -> EvalResult {
+    expect_range_args("write-char", &args, 1, 2)?;
+    let char_code = expect_fixnum(&args[0])?;
+    let target = resolve_print_target(eval, args.get(1));
+
+    match target {
+        Value::True | Value::Nil => {}
+        Value::Buffer(id) => {
+            if let Some(text) = write_char_rendered_text(char_code) {
+                let Some(buf) = eval.buffers.get_mut(id) else {
+                    return Err(signal(
+                        "error",
+                        vec![Value::string("Output buffer no longer exists")],
+                    ));
+                };
+                buf.insert(&text);
+            }
+        }
+        Value::Str(name) => {
+            if let Some(text) = write_char_rendered_text(char_code) {
+                let Some(id) = eval.buffers.find_buffer_by_name(&name) else {
+                    return Err(signal(
+                        "error",
+                        vec![Value::string(format!("No buffer named {name}"))],
+                    ));
+                };
+                let Some(buf) = eval.buffers.get_mut(id) else {
+                    return Err(signal(
+                        "error",
+                        vec![Value::string("Output buffer no longer exists")],
+                    ));
+                };
+                buf.insert(&text);
+            }
+        }
+        other => {
+            eval.apply(other, vec![Value::Int(char_code)])?;
+        }
+    }
+
+    Ok(Value::Int(char_code))
 }
 
 pub(crate) fn builtin_propertize(args: Vec<Value>) -> EvalResult {
@@ -9771,12 +9922,16 @@ pub(crate) fn dispatch_builtin(
         "search-backward" => return Some(builtin_search_backward(eval, args)),
         "re-search-forward" => return Some(builtin_re_search_forward(eval, args)),
         "re-search-backward" => return Some(builtin_re_search_backward(eval, args)),
+        "search-forward-regexp" => return Some(builtin_search_forward_regexp(eval, args)),
+        "search-backward-regexp" => return Some(builtin_search_backward_regexp(eval, args)),
         "isearch-forward" => return Some(super::isearch::builtin_isearch_forward(args)),
         "isearch-backward" => return Some(super::isearch::builtin_isearch_backward(args)),
         "looking-at" => return Some(builtin_looking_at(eval, args)),
         "looking-at-p" => return Some(builtin_looking_at_p(eval, args)),
+        "posix-looking-at" => return Some(builtin_posix_looking_at(eval, args)),
         "string-match" => return Some(builtin_string_match_eval(eval, args)),
         "string-match-p" => return Some(builtin_string_match_p_eval(eval, args)),
+        "posix-string-match" => return Some(builtin_posix_string_match(eval, args)),
         "match-string" => return Some(builtin_match_string(eval, args)),
         "match-beginning" => return Some(builtin_match_beginning(eval, args)),
         "match-end" => return Some(builtin_match_end(eval, args)),
@@ -10503,6 +10658,7 @@ pub(crate) fn dispatch_builtin(
         }
         "default-value" => return Some(super::custom::builtin_default_value(eval, args)),
         "set-default" => return Some(super::custom::builtin_set_default(eval, args)),
+        "set-default-toplevel-value" => return Some(builtin_set_default_toplevel_value(eval, args)),
 
         // Autoload (evaluator-dependent)
         "autoload" => return Some(super::autoload::builtin_autoload(eval, args)),
@@ -11210,6 +11366,7 @@ pub(crate) fn dispatch_builtin(
         "prin1-to-string" => return Some(builtin_prin1_to_string_eval(eval, args)),
         "print" => return Some(builtin_print_eval(eval, args)),
         "terpri" => return Some(builtin_terpri_eval(eval, args)),
+        "write-char" => return Some(builtin_write_char_eval(eval, args)),
 
         // Misc (evaluator-dependent)
         "backtrace--frames-from-thread" => {
@@ -11430,6 +11587,7 @@ pub(crate) fn dispatch_builtin(
         "seq-sort" => return Some(super::cl_lib::builtin_seq_sort(eval, args)),
         "assoc" => return Some(builtin_assoc_eval(eval, args)),
         "alist-get" => return Some(builtin_alist_get_eval(eval, args)),
+        "plist-member" => return Some(builtin_plist_member(eval, args)),
         "json-parse-buffer" => return Some(super::json::builtin_json_parse_buffer(eval, args)),
         "json-insert" => return Some(super::json::builtin_json_insert(eval, args)),
 
@@ -11612,6 +11770,7 @@ pub(crate) fn dispatch_builtin(
         "assoc" => builtin_assoc(args),
         "assq" => builtin_assq(args),
         "copy-sequence" => builtin_copy_sequence(args),
+        "purecopy" => builtin_purecopy(args),
         "substring-no-properties" => builtin_substring_no_properties(args),
 
         // String (typed subset is dispatched above)
@@ -11645,6 +11804,7 @@ pub(crate) fn dispatch_builtin(
         "message-or-box" => builtin_message_or_box(args),
         "current-message" => builtin_current_message(args),
         "ngettext" => builtin_ngettext(args),
+        "secure-hash-algorithms" => builtin_secure_hash_algorithms(args),
         "error" => builtin_error(args),
         "prefix-numeric-value" => builtin_prefix_numeric_value(args),
         "command-error-default-function" => builtin_command_error_default_function(args),
@@ -11656,6 +11816,7 @@ pub(crate) fn dispatch_builtin(
         "prin1-to-string" => builtin_prin1_to_string(args),
         "print" => builtin_print(args),
         "terpri" => builtin_terpri(args),
+        "write-char" => builtin_write_char(args),
         "propertize" => builtin_propertize(args),
         "gensym" => builtin_gensym(args),
         "string-to-syntax" => builtin_string_to_syntax(args),
@@ -12324,7 +12485,7 @@ pub(crate) fn dispatch_builtin(
 /// Used by the bytecode VM.
 pub(crate) fn dispatch_builtin_pure(name: &str, args: Vec<Value>) -> Option<EvalResult> {
     match name {
-        "assoc" | "alist-get" => return None,
+        "assoc" | "alist-get" | "plist-member" => return None,
         _ => {}
     }
 
@@ -12387,12 +12548,14 @@ pub(crate) fn dispatch_builtin_pure(name: &str, args: Vec<Value>) -> Option<Eval
         "number-sequence" => builtin_number_sequence(args),
         // Output / misc
         "identity" => builtin_identity(args),
+        "purecopy" => builtin_purecopy(args),
         "format-message" => builtin_format_message(args),
         "message" => builtin_message(args),
         "message-box" => builtin_message_box(args),
         "message-or-box" => builtin_message_or_box(args),
         "current-message" => builtin_current_message(args),
         "ngettext" => builtin_ngettext(args),
+        "secure-hash-algorithms" => builtin_secure_hash_algorithms(args),
         "error" => builtin_error(args),
         "prefix-numeric-value" => builtin_prefix_numeric_value(args),
         "princ" => builtin_princ(args),
@@ -12400,6 +12563,7 @@ pub(crate) fn dispatch_builtin_pure(name: &str, args: Vec<Value>) -> Option<Eval
         "prin1-to-string" => builtin_prin1_to_string(args),
         "print" => builtin_print(args),
         "terpri" => builtin_terpri(args),
+        "write-char" => builtin_write_char(args),
         "propertize" => builtin_propertize(args),
         "gensym" => builtin_gensym(args),
         "string-to-syntax" => builtin_string_to_syntax(args),
@@ -12941,6 +13105,22 @@ pub(crate) fn builtin_re_search_backward(
     Ok(Value::Int(buf.text.byte_to_char(end) as i64 + 1))
 }
 
+pub(crate) fn builtin_search_forward_regexp(
+    eval: &mut super::eval::Evaluator,
+    args: Vec<Value>,
+) -> EvalResult {
+    expect_range_args("search-forward-regexp", &args, 1, 4)?;
+    builtin_re_search_forward(eval, args)
+}
+
+pub(crate) fn builtin_search_backward_regexp(
+    eval: &mut super::eval::Evaluator,
+    args: Vec<Value>,
+) -> EvalResult {
+    expect_range_args("search-backward-regexp", &args, 1, 4)?;
+    builtin_re_search_backward(eval, args)
+}
+
 pub(crate) fn builtin_looking_at(
     eval: &mut super::eval::Evaluator,
     args: Vec<Value>,
@@ -12990,6 +13170,14 @@ pub(crate) fn builtin_looking_at_p(
         Ok(matched) => Ok(Value::bool(matched)),
         Err(msg) => Err(signal("invalid-regexp", vec![Value::string(msg)])),
     }
+}
+
+pub(crate) fn builtin_posix_looking_at(
+    eval: &mut super::eval::Evaluator,
+    args: Vec<Value>,
+) -> EvalResult {
+    expect_range_args("posix-looking-at", &args, 1, 2)?;
+    builtin_looking_at(eval, args)
 }
 
 /// Evaluator-dependent `string-match`: updates match data on the evaluator.
@@ -13042,6 +13230,14 @@ pub(crate) fn builtin_string_match_p_eval(
         Ok(None) => Ok(Value::Nil),
         Err(msg) => Err(signal("invalid-regexp", vec![Value::string(msg)])),
     }
+}
+
+pub(crate) fn builtin_posix_string_match(
+    eval: &mut super::eval::Evaluator,
+    args: Vec<Value>,
+) -> EvalResult {
+    expect_range_args("posix-string-match", &args, 2, 4)?;
+    builtin_string_match_eval(eval, args)
 }
 
 pub(crate) fn builtin_match_string(
