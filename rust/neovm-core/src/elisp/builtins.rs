@@ -619,8 +619,8 @@ pub(crate) fn builtin_integerp(args: Vec<Value>) -> EvalResult {
 
 pub(crate) fn builtin_integer_or_marker_p(args: Vec<Value>) -> EvalResult {
     expect_args("integer-or-marker-p", &args, 1)?;
-    let is_integer_or_marker = matches!(args[0], Value::Int(_) | Value::Char(_))
-        || super::marker::is_marker(&args[0]);
+    let is_integer_or_marker =
+        matches!(args[0], Value::Int(_) | Value::Char(_)) || super::marker::is_marker(&args[0]);
     Ok(Value::bool(is_integer_or_marker))
 }
 
@@ -4260,7 +4260,9 @@ pub(crate) fn builtin_byte_to_string(args: Vec<Value>) -> EvalResult {
     if !(0..=255).contains(&byte) {
         return Err(signal("error", vec![Value::string("Invalid byte")]));
     }
-    Ok(Value::string(bytes_to_unibyte_storage_string(&[byte as u8])))
+    Ok(Value::string(bytes_to_unibyte_storage_string(
+        &[byte as u8],
+    )))
 }
 
 pub(crate) fn builtin_bitmap_spec_p(args: Vec<Value>) -> EvalResult {
@@ -5440,6 +5442,357 @@ pub(crate) fn builtin_buffer_substring(
     Ok(Value::string(buf.buffer_substring(byte_start, byte_end)))
 }
 
+fn resolve_buffer_designator_allow_nil_current(
+    eval: &mut super::eval::Evaluator,
+    arg: &Value,
+) -> Result<Option<BufferId>, Flow> {
+    match arg {
+        Value::Nil => eval
+            .buffers
+            .current_buffer()
+            .map(|buf| Some(buf.id))
+            .ok_or_else(|| signal("error", vec![Value::string("No current buffer")])),
+        Value::Buffer(id) => Ok(eval.buffers.get(*id).map(|_| *id)),
+        Value::Str(name) => eval
+            .buffers
+            .find_buffer_by_name(name)
+            .map(Some)
+            .ok_or_else(|| {
+                signal(
+                    "error",
+                    vec![Value::string(format!("No buffer named {name}"))],
+                )
+            }),
+        other => Err(signal(
+            "wrong-type-argument",
+            vec![Value::symbol("stringp"), other.clone()],
+        )),
+    }
+}
+
+fn buffer_slice_for_char_region(
+    eval: &super::eval::Evaluator,
+    buffer_id: Option<BufferId>,
+    start: i64,
+    end: i64,
+) -> String {
+    let Some(buffer_id) = buffer_id else {
+        return String::new();
+    };
+    let Some(buf) = eval.buffers.get(buffer_id) else {
+        return String::new();
+    };
+
+    let (from, to) = if start <= end {
+        (start, end)
+    } else {
+        (end, start)
+    };
+    let from_char = if from > 0 { from as usize - 1 } else { 0 };
+    let to_char = if to > 0 { to as usize - 1 } else { 0 };
+    let char_count = buf.text.char_count();
+    let from_byte = buf.text.char_to_byte(from_char.min(char_count));
+    let to_byte = buf.text.char_to_byte(to_char.min(char_count));
+    buf.buffer_substring(from_byte, to_byte)
+}
+
+fn compare_buffer_substring_strings(left: &str, right: &str) -> i64 {
+    let mut pos = 1i64;
+    let mut left_iter = left.chars();
+    let mut right_iter = right.chars();
+
+    loop {
+        match (left_iter.next(), right_iter.next()) {
+            (Some(a), Some(b)) => {
+                if a != b {
+                    return if a < b { -pos } else { pos };
+                }
+                pos += 1;
+            }
+            (Some(_), None) => return pos,
+            (None, Some(_)) => return -pos,
+            (None, None) => return 0,
+        }
+    }
+}
+
+/// `(buffer-line-statistics &optional BUFFER-OR-NAME)` -> (LINES MAX-LEN AVG-LEN)
+pub(crate) fn builtin_buffer_line_statistics(
+    eval: &mut super::eval::Evaluator,
+    args: Vec<Value>,
+) -> EvalResult {
+    expect_max_args("buffer-line-statistics", &args, 1)?;
+    let buffer_id = if args.is_empty() {
+        resolve_buffer_designator_allow_nil_current(eval, &Value::Nil)?
+    } else {
+        resolve_buffer_designator_allow_nil_current(eval, &args[0])?
+    };
+
+    let text = buffer_id
+        .and_then(|id| eval.buffers.get(id).map(|buf| buf.buffer_string()))
+        .unwrap_or_default();
+
+    if text.is_empty() {
+        return Ok(Value::list(vec![
+            Value::Int(0),
+            Value::Int(0),
+            Value::Float(0.0),
+        ]));
+    }
+
+    let mut line_count = 0usize;
+    let mut max_len = 0usize;
+    let mut total_len = 0usize;
+    for line in text.lines() {
+        line_count += 1;
+        let width = line.chars().count();
+        max_len = max_len.max(width);
+        total_len += width;
+    }
+
+    if line_count == 0 {
+        return Ok(Value::list(vec![
+            Value::Int(0),
+            Value::Int(0),
+            Value::Float(0.0),
+        ]));
+    }
+
+    Ok(Value::list(vec![
+        Value::Int(line_count as i64),
+        Value::Int(max_len as i64),
+        Value::Float(total_len as f64 / line_count as f64),
+    ]))
+}
+
+fn replace_buffer_contents(buf: &mut crate::buffer::Buffer, text: &str) {
+    let len = buf.text.len();
+    if len > 0 {
+        buf.delete_region(0, len);
+    }
+    buf.widen();
+    buf.goto_char(0);
+    if !text.is_empty() {
+        buf.insert(text);
+        buf.goto_char(0);
+    }
+}
+
+/// `(buffer-swap-text OTHER-BUFFER)` -> nil
+pub(crate) fn builtin_buffer_swap_text(
+    eval: &mut super::eval::Evaluator,
+    args: Vec<Value>,
+) -> EvalResult {
+    expect_args("buffer-swap-text", &args, 1)?;
+    let other_id = expect_buffer_id(&args[0])?;
+    if eval.buffers.get(other_id).is_none() {
+        return Ok(Value::Nil);
+    }
+
+    let current_id = eval
+        .buffers
+        .current_buffer()
+        .ok_or_else(|| signal("error", vec![Value::string("No current buffer")]))?
+        .id;
+
+    if current_id == other_id {
+        return Ok(Value::Nil);
+    }
+
+    let current_text = eval
+        .buffers
+        .get(current_id)
+        .map(|buf| buf.buffer_string())
+        .unwrap_or_default();
+    let other_text = eval
+        .buffers
+        .get(other_id)
+        .map(|buf| buf.buffer_string())
+        .unwrap_or_default();
+
+    if let Some(buf) = eval.buffers.get_mut(current_id) {
+        replace_buffer_contents(buf, &other_text);
+    }
+    if let Some(buf) = eval.buffers.get_mut(other_id) {
+        replace_buffer_contents(buf, &current_text);
+    }
+
+    Ok(Value::Nil)
+}
+
+/// `(buffer-text-pixel-size &optional BUFFER WINDOW FROM TO)` -> (WIDTH . HEIGHT)
+pub(crate) fn builtin_buffer_text_pixel_size(
+    eval: &mut super::eval::Evaluator,
+    args: Vec<Value>,
+) -> EvalResult {
+    expect_range_args("buffer-text-pixel-size", &args, 0, 4)?;
+
+    let buffer_id = if args.is_empty() {
+        resolve_buffer_designator_allow_nil_current(eval, &Value::Nil)?
+    } else {
+        resolve_buffer_designator_allow_nil_current(eval, &args[0])?
+    };
+
+    if args.len() > 1 {
+        let window = &args[1];
+        if !window.is_nil() && !matches!(window, Value::Window(_)) {
+            return Err(signal(
+                "wrong-type-argument",
+                vec![Value::symbol("window-live-p"), window.clone()],
+            ));
+        }
+    }
+
+    let from = if args.len() > 2 && !args[2].is_nil() {
+        Some(expect_integer_or_marker(&args[2])?)
+    } else {
+        None
+    };
+    let to = if args.len() > 3 && !args[3].is_nil() {
+        Some(expect_integer_or_marker(&args[3])?)
+    } else {
+        None
+    };
+
+    let text = if let Some(id) = buffer_id {
+        if let Some(buf) = eval.buffers.get(id) {
+            let default_from = 1i64;
+            let default_to = buf.text.char_count() as i64 + 1;
+            let from_pos = from.unwrap_or(default_from);
+            let to_pos = to.unwrap_or(default_to);
+            buffer_slice_for_char_region(eval, Some(id), from_pos, to_pos)
+        } else {
+            String::new()
+        }
+    } else {
+        String::new()
+    };
+
+    if text.is_empty() {
+        return Ok(Value::cons(Value::Int(0), Value::Int(0)));
+    }
+
+    let mut height = 0usize;
+    let mut width = 0usize;
+    for line in text.lines() {
+        height += 1;
+        width = width.max(line.chars().count());
+    }
+
+    if height == 0 {
+        return Ok(Value::cons(Value::Int(0), Value::Int(0)));
+    }
+    Ok(Value::cons(
+        Value::Int(width as i64),
+        Value::Int(height as i64),
+    ))
+}
+
+/// `(compare-buffer-substrings BUF1 START1 END1 BUF2 START2 END2)` -> integer
+pub(crate) fn builtin_compare_buffer_substrings(
+    eval: &mut super::eval::Evaluator,
+    args: Vec<Value>,
+) -> EvalResult {
+    expect_args("compare-buffer-substrings", &args, 6)?;
+
+    let left_buffer = resolve_buffer_designator_allow_nil_current(eval, &args[0])?;
+    let left_start = expect_integer_or_marker(&args[1])?;
+    let left_end = expect_integer_or_marker(&args[2])?;
+    let right_buffer = resolve_buffer_designator_allow_nil_current(eval, &args[3])?;
+    let right_start = expect_integer_or_marker(&args[4])?;
+    let right_end = expect_integer_or_marker(&args[5])?;
+
+    let left = buffer_slice_for_char_region(eval, left_buffer, left_start, left_end);
+    let right = buffer_slice_for_char_region(eval, right_buffer, right_start, right_end);
+    Ok(Value::Int(compare_buffer_substring_strings(&left, &right)))
+}
+
+/// `(compute-motion FROM FROMPOS TO TOPOS WIDTH OFFSETS WINDOW)` -> motion tuple
+pub(crate) fn builtin_compute_motion(args: Vec<Value>) -> EvalResult {
+    expect_args("compute-motion", &args, 7)?;
+
+    let from = expect_integer_or_marker(&args[0])?;
+    if !matches!(&args[1], Value::Cons(_)) {
+        return Err(signal(
+            "wrong-type-argument",
+            vec![Value::symbol("consp"), args[1].clone()],
+        ));
+    }
+    let to = expect_integer_or_marker(&args[2])?;
+    if !args[3].is_nil() && !matches!(&args[3], Value::Cons(_)) {
+        return Err(signal(
+            "wrong-type-argument",
+            vec![Value::symbol("consp"), args[3].clone()],
+        ));
+    }
+    if !args[4].is_nil() {
+        let _ = expect_fixnum(&args[4])?;
+    }
+    if !args[5].is_nil() && !matches!(&args[5], Value::Cons(_)) {
+        return Err(signal(
+            "wrong-type-argument",
+            vec![Value::symbol("consp"), args[5].clone()],
+        ));
+    }
+    if !args[6].is_nil() && !matches!(&args[6], Value::Window(_)) {
+        return Err(signal(
+            "wrong-type-argument",
+            vec![Value::symbol("window-live-p"), args[6].clone()],
+        ));
+    }
+
+    let result = if args[3].is_nil() {
+        vec![
+            Value::Int(to),
+            Value::Int(1),
+            Value::Int(0),
+            Value::Int(1),
+            Value::Nil,
+        ]
+    } else {
+        vec![
+            Value::Int(from),
+            Value::Int(0),
+            Value::Int(0),
+            Value::Int(0),
+            Value::Nil,
+        ]
+    };
+    Ok(Value::list(result))
+}
+
+/// `(constrain-to-field NEW-POS OLD-POS &optional ESCAPE-FROM-EDGE ONLY-IN-LINE INHIBIT-CAPTURE-PROPERTY)`
+pub(crate) fn builtin_constrain_to_field(
+    eval: &mut super::eval::Evaluator,
+    args: Vec<Value>,
+) -> EvalResult {
+    expect_range_args("constrain-to-field", &args, 2, 5)?;
+    let new_pos = if args[0].is_nil() {
+        let current = eval
+            .buffers
+            .current_buffer()
+            .ok_or_else(|| signal("error", vec![Value::string("No current buffer")]))?;
+        current.point_char() as i64 + 1
+    } else {
+        expect_integer_or_marker(&args[0])?
+    };
+    let _ = expect_integer_or_marker(&args[1])?;
+    Ok(Value::Int(new_pos))
+}
+
+/// `(clear-string STRING)` -> nil
+pub(crate) fn builtin_clear_string(args: Vec<Value>) -> EvalResult {
+    expect_args("clear-string", &args, 1)?;
+    let _ = expect_string(&args[0])?;
+    Ok(Value::Nil)
+}
+
+/// `(command-error-default-function DATA CONTEXT CALLER)` -> nil
+pub(crate) fn builtin_command_error_default_function(args: Vec<Value>) -> EvalResult {
+    expect_args("command-error-default-function", &args, 3)?;
+    Ok(Value::Nil)
+}
+
 /// (point) → integer
 pub(crate) fn builtin_point(eval: &mut super::eval::Evaluator, args: Vec<Value>) -> EvalResult {
     expect_args("point", &args, 0)?;
@@ -6233,7 +6586,9 @@ pub(crate) fn builtin_buffer_local_value(
 // ===========================================================================
 // Keymap builtins
 // ===========================================================================
-use super::keymap::{decode_keymap_handle, encode_keymap_handle, KeyBinding, KeyEvent, KeymapManager};
+use super::keymap::{
+    decode_keymap_handle, encode_keymap_handle, KeyBinding, KeyEvent, KeymapManager,
+};
 
 /// Extract a keymap id from a Value, signaling wrong-type-argument if invalid.
 fn expect_keymap_id(eval: &super::eval::Evaluator, value: &Value) -> Result<u64, Flow> {
@@ -6346,9 +6701,11 @@ fn collect_accessible_keymap_paths(
         .bindings
         .iter()
         .filter_map(|(event, binding)| match binding {
-            KeyBinding::Prefix(child_id) => {
-                Some((KeymapManager::format_key_event(event), event.clone(), *child_id))
-            }
+            KeyBinding::Prefix(child_id) => Some((
+                KeymapManager::format_key_event(event),
+                event.clone(),
+                *child_id,
+            )),
             _ => None,
         })
         .collect();
@@ -8127,6 +8484,8 @@ pub(crate) fn dispatch_builtin(
         "buffer-base-buffer" => return Some(builtin_buffer_base_buffer(eval, args)),
         "buffer-last-name" => return Some(builtin_buffer_last_name(eval, args)),
         "buffer-string" => return Some(builtin_buffer_string(eval, args)),
+        "buffer-line-statistics" => return Some(builtin_buffer_line_statistics(eval, args)),
+        "buffer-text-pixel-size" => return Some(builtin_buffer_text_pixel_size(eval, args)),
         "base64-encode-region" => {
             return Some(super::fns::builtin_base64_encode_region_eval(eval, args))
         }
@@ -8140,13 +8499,16 @@ pub(crate) fn dispatch_builtin(
         "secure-hash" => return Some(super::fns::builtin_secure_hash_eval(eval, args)),
         "buffer-hash" => return Some(super::fns::builtin_buffer_hash_eval(eval, args)),
         "buffer-substring" => return Some(builtin_buffer_substring(eval, args)),
+        "compare-buffer-substrings" => return Some(builtin_compare_buffer_substrings(eval, args)),
         "point" => return Some(builtin_point(eval, args)),
         "point-min" => return Some(builtin_point_min(eval, args)),
         "point-max" => return Some(builtin_point_max(eval, args)),
         "goto-char" => return Some(builtin_goto_char(eval, args)),
+        "constrain-to-field" => return Some(builtin_constrain_to_field(eval, args)),
         "insert" => return Some(builtin_insert(eval, args)),
         "insert-char" => return Some(builtin_insert_char(eval, args)),
         "insert-byte" => return Some(builtin_insert_byte(eval, args)),
+        "buffer-swap-text" => return Some(builtin_buffer_swap_text(eval, args)),
         "delete-region" => return Some(builtin_delete_region(eval, args)),
         "erase-buffer" => return Some(builtin_erase_buffer(eval, args)),
         "buffer-enable-undo" => return Some(builtin_buffer_enable_undo(eval, args)),
@@ -8158,7 +8520,9 @@ pub(crate) fn dispatch_builtin(
         "buffer-modified-p" => return Some(builtin_buffer_modified_p(eval, args)),
         "set-buffer-modified-p" => return Some(builtin_set_buffer_modified_p(eval, args)),
         "buffer-modified-tick" => return Some(builtin_buffer_modified_tick(eval, args)),
-        "buffer-chars-modified-tick" => return Some(builtin_buffer_chars_modified_tick(eval, args)),
+        "buffer-chars-modified-tick" => {
+            return Some(builtin_buffer_chars_modified_tick(eval, args))
+        }
         "buffer-list" => return Some(builtin_buffer_list(eval, args)),
         "other-buffer" => return Some(builtin_other_buffer(eval, args)),
         "generate-new-buffer-name" => return Some(builtin_generate_new_buffer_name(eval, args)),
@@ -8391,16 +8755,12 @@ pub(crate) fn dispatch_builtin(
         }
         "window-adjust-process-window-size-largest" => {
             return Some(
-                super::process::builtin_window_adjust_process_window_size_largest(
-                    eval, args,
-                ),
+                super::process::builtin_window_adjust_process_window_size_largest(eval, args),
             )
         }
         "window-adjust-process-window-size-smallest" => {
             return Some(
-                super::process::builtin_window_adjust_process_window_size_smallest(
-                    eval, args,
-                ),
+                super::process::builtin_window_adjust_process_window_size_smallest(eval, args),
             )
         }
         "format-network-address" => {
@@ -8451,7 +8811,9 @@ pub(crate) fn dispatch_builtin(
                 eval, args,
             ))
         }
-        "start-file-process" => return Some(super::process::builtin_start_file_process(eval, args)),
+        "start-file-process" => {
+            return Some(super::process::builtin_start_file_process(eval, args))
+        }
         "start-file-process-shell-command" => {
             return Some(super::process::builtin_start_file_process_shell_command(
                 eval, args,
@@ -8480,8 +8842,12 @@ pub(crate) fn dispatch_builtin(
         "signal-process" => return Some(super::process::builtin_signal_process(eval, args)),
         "stop-process" => return Some(super::process::builtin_stop_process(eval, args)),
         "get-process" => return Some(super::process::builtin_get_process(eval, args)),
-        "get-buffer-process" => return Some(super::process::builtin_get_buffer_process(eval, args)),
-        "process-attributes" => return Some(super::process::builtin_process_attributes(eval, args)),
+        "get-buffer-process" => {
+            return Some(super::process::builtin_get_buffer_process(eval, args))
+        }
+        "process-attributes" => {
+            return Some(super::process::builtin_process_attributes(eval, args))
+        }
         "process-live-p" => return Some(super::process::builtin_process_live_p(eval, args)),
         "processp" => return Some(super::process::builtin_processp(eval, args)),
         "process-id" => return Some(super::process::builtin_process_id(eval, args)),
@@ -8516,9 +8882,13 @@ pub(crate) fn dispatch_builtin(
                 eval, args,
             ))
         }
-        "set-process-buffer" => return Some(super::process::builtin_set_process_buffer(eval, args)),
+        "set-process-buffer" => {
+            return Some(super::process::builtin_set_process_buffer(eval, args))
+        }
         "set-process-coding-system" => {
-            return Some(super::process::builtin_set_process_coding_system(eval, args))
+            return Some(super::process::builtin_set_process_coding_system(
+                eval, args,
+            ))
         }
         "set-process-datagram-address" => {
             return Some(super::process::builtin_set_process_datagram_address(
@@ -8526,11 +8896,11 @@ pub(crate) fn dispatch_builtin(
             ))
         }
         "set-process-inherit-coding-system-flag" => {
-            return Some(super::process::builtin_set_process_inherit_coding_system_flag(
-                eval, args,
-            ))
+            return Some(super::process::builtin_set_process_inherit_coding_system_flag(eval, args))
         }
-        "set-process-thread" => return Some(super::process::builtin_set_process_thread(eval, args)),
+        "set-process-thread" => {
+            return Some(super::process::builtin_set_process_thread(eval, args))
+        }
         "set-process-window-size" => {
             return Some(super::process::builtin_set_process_window_size(eval, args))
         }
@@ -8672,7 +9042,7 @@ pub(crate) fn dispatch_builtin(
                 "neovm--kmacro-autoload-promoted",
                 Value::True,
             );
-            return Some(super::kmacro::builtin_kmacro_name_last_macro(eval, args))
+            return Some(super::kmacro::builtin_kmacro_name_last_macro(eval, args));
         }
         "insert-kbd-macro" => return Some(super::kmacro::builtin_insert_kbd_macro(eval, args)),
         "kbd-macro-query" => return Some(super::kmacro::builtin_kbd_macro_query(eval, args)),
@@ -9893,6 +10263,9 @@ pub(crate) fn dispatch_builtin(
         "identity" => builtin_identity(args),
         "message" => builtin_message(args),
         "error" => builtin_error(args),
+        "command-error-default-function" => builtin_command_error_default_function(args),
+        "compute-motion" => builtin_compute_motion(args),
+        "clear-string" => builtin_clear_string(args),
         "combine-after-change-execute" => builtin_combine_after_change_execute(args),
         "princ" => builtin_princ(args),
         "prin1" => builtin_prin1(args),
@@ -11862,11 +12235,9 @@ mod tests {
         };
         assert_eq!(only.car, Value::vector(vec![Value::Int(24)]));
 
-        let no_match = builtin_accessible_keymaps(
-            &mut eval,
-            vec![root, Value::vector(vec![Value::Int(97)])],
-        )
-        .unwrap();
+        let no_match =
+            builtin_accessible_keymaps(&mut eval, vec![root, Value::vector(vec![Value::Int(97)])])
+                .unwrap();
         assert!(no_match.is_nil());
     }
 
@@ -11885,11 +12256,9 @@ mod tests {
             other => panic!("unexpected flow: {other:?}"),
         }
 
-        let array_err = builtin_accessible_keymaps(
-            &mut eval,
-            vec![map, Value::list(vec![Value::symbol("a")])],
-        )
-        .unwrap_err();
+        let array_err =
+            builtin_accessible_keymaps(&mut eval, vec![map, Value::list(vec![Value::symbol("a")])])
+                .unwrap_err();
         match array_err {
             Flow::Signal(sig) => {
                 assert_eq!(sig.symbol, "wrong-type-argument");
@@ -12337,10 +12706,8 @@ mod tests {
             Value::Nil
         );
 
-        let base_type =
-            builtin_buffer_base_buffer(&mut eval, vec![Value::symbol("x")]).expect_err(
-                "buffer-base-buffer should reject non-buffer, non-nil optional arg",
-            );
+        let base_type = builtin_buffer_base_buffer(&mut eval, vec![Value::symbol("x")])
+            .expect_err("buffer-base-buffer should reject non-buffer, non-nil optional arg");
         match base_type {
             Flow::Signal(sig) => {
                 assert_eq!(sig.symbol, "wrong-type-argument");
@@ -12349,10 +12716,8 @@ mod tests {
             other => panic!("unexpected flow: {other:?}"),
         }
 
-        let last_type =
-            builtin_buffer_last_name(&mut eval, vec![Value::symbol("x")]).expect_err(
-                "buffer-last-name should reject non-buffer, non-nil optional arg",
-            );
+        let last_type = builtin_buffer_last_name(&mut eval, vec![Value::symbol("x")])
+            .expect_err("buffer-last-name should reject non-buffer, non-nil optional arg");
         match last_type {
             Flow::Signal(sig) => {
                 assert_eq!(sig.symbol, "wrong-type-argument");
@@ -12366,7 +12731,10 @@ mod tests {
         match base_arity {
             Flow::Signal(sig) => {
                 assert_eq!(sig.symbol, "wrong-number-of-arguments");
-                assert_eq!(sig.data, vec![Value::symbol("buffer-base-buffer"), Value::Int(2)]);
+                assert_eq!(
+                    sig.data,
+                    vec![Value::symbol("buffer-base-buffer"), Value::Int(2)]
+                );
             }
             other => panic!("unexpected flow: {other:?}"),
         }
@@ -12376,7 +12744,10 @@ mod tests {
         match last_arity {
             Flow::Signal(sig) => {
                 assert_eq!(sig.symbol, "wrong-number-of-arguments");
-                assert_eq!(sig.data, vec![Value::symbol("buffer-last-name"), Value::Int(2)]);
+                assert_eq!(
+                    sig.data,
+                    vec![Value::symbol("buffer-last-name"), Value::Int(2)]
+                );
             }
             other => panic!("unexpected flow: {other:?}"),
         }
@@ -12390,7 +12761,10 @@ mod tests {
             builtin_buffer_base_buffer(&mut eval, vec![dead.clone()]).unwrap(),
             Value::Nil
         );
-        assert_eq!(builtin_buffer_last_name(&mut eval, vec![dead]).unwrap(), live_name);
+        assert_eq!(
+            builtin_buffer_last_name(&mut eval, vec![dead]).unwrap(),
+            live_name
+        );
     }
 
     #[test]
@@ -12436,7 +12810,8 @@ mod tests {
             Value::Int(3)
         );
 
-        let dead = builtin_generate_new_buffer(&mut eval, vec![Value::string("*ticks-dead*")]).unwrap();
+        let dead =
+            builtin_generate_new_buffer(&mut eval, vec![Value::string("*ticks-dead*")]).unwrap();
         let _ = builtin_kill_buffer(&mut eval, vec![dead.clone()]).unwrap();
         assert_eq!(
             builtin_buffer_modified_tick(&mut eval, vec![dead.clone()]).unwrap(),
@@ -12457,11 +12832,9 @@ mod tests {
             other => panic!("unexpected flow: {other:?}"),
         }
 
-        let arity_error = builtin_buffer_chars_modified_tick(
-            &mut eval,
-            vec![Value::Nil, Value::Nil],
-        )
-        .expect_err("buffer-chars-modified-tick should reject >1 args");
+        let arity_error =
+            builtin_buffer_chars_modified_tick(&mut eval, vec![Value::Nil, Value::Nil])
+                .expect_err("buffer-chars-modified-tick should reject >1 args");
         match arity_error {
             Flow::Signal(sig) => {
                 assert_eq!(sig.symbol, "wrong-number-of-arguments");
@@ -12478,26 +12851,38 @@ mod tests {
     fn barf_bury_char_equal_cl_type_and_cancel_semantics() {
         let mut eval = super::super::eval::Evaluator::new();
 
-        assert!(builtin_char_equal(&eval, vec![Value::Int(97), Value::Int(65)])
-            .unwrap()
-            .is_truthy());
-        eval.obarray.set_symbol_value("case-fold-search", Value::Nil);
-        assert!(builtin_char_equal(&eval, vec![Value::Int(97), Value::Int(65)])
-            .unwrap()
-            .is_nil());
-        eval.obarray.set_symbol_value("case-fold-search", Value::True);
+        assert!(
+            builtin_char_equal(&eval, vec![Value::Int(97), Value::Int(65)])
+                .unwrap()
+                .is_truthy()
+        );
+        eval.obarray
+            .set_symbol_value("case-fold-search", Value::Nil);
+        assert!(
+            builtin_char_equal(&eval, vec![Value::Int(97), Value::Int(65)])
+                .unwrap()
+                .is_nil()
+        );
+        eval.obarray
+            .set_symbol_value("case-fold-search", Value::True);
 
         let char_type = builtin_char_equal(&eval, vec![Value::Int(1), Value::string("a")])
             .expect_err("char-equal should reject non-character args");
         match char_type {
             Flow::Signal(sig) => {
                 assert_eq!(sig.symbol, "wrong-type-argument");
-                assert_eq!(sig.data, vec![Value::symbol("characterp"), Value::string("a")]);
+                assert_eq!(
+                    sig.data,
+                    vec![Value::symbol("characterp"), Value::string("a")]
+                );
             }
             other => panic!("unexpected flow: {other:?}"),
         }
 
-        assert_eq!(builtin_cl_type_of(vec![Value::Nil]).unwrap(), Value::symbol("null"));
+        assert_eq!(
+            builtin_cl_type_of(vec![Value::Nil]).unwrap(),
+            Value::symbol("null")
+        );
         assert_eq!(
             builtin_cl_type_of(vec![Value::True]).unwrap(),
             Value::symbol("boolean")
@@ -12702,7 +13087,10 @@ mod tests {
         match byte_to_position_arity {
             Flow::Signal(sig) => {
                 assert_eq!(sig.symbol, "wrong-number-of-arguments");
-                assert_eq!(sig.data, vec![Value::symbol("byte-to-position"), Value::Int(2)]);
+                assert_eq!(
+                    sig.data,
+                    vec![Value::symbol("byte-to-position"), Value::Int(2)]
+                );
             }
             other => panic!("unexpected flow: {other:?}"),
         }
@@ -12734,12 +13122,15 @@ mod tests {
         }
 
         assert_eq!(builtin_bitmap_spec_p(vec![Value::Nil]).unwrap(), Value::Nil);
-        let bitmap_arity = builtin_bitmap_spec_p(vec![])
-            .expect_err("bitmap-spec-p should reject wrong arity");
+        let bitmap_arity =
+            builtin_bitmap_spec_p(vec![]).expect_err("bitmap-spec-p should reject wrong arity");
         match bitmap_arity {
             Flow::Signal(sig) => {
                 assert_eq!(sig.symbol, "wrong-number-of-arguments");
-                assert_eq!(sig.data, vec![Value::symbol("bitmap-spec-p"), Value::Int(0)]);
+                assert_eq!(
+                    sig.data,
+                    vec![Value::symbol("bitmap-spec-p"), Value::Int(0)]
+                );
             }
             other => panic!("unexpected flow: {other:?}"),
         }
@@ -12754,7 +13145,10 @@ mod tests {
         match clear_face_arity {
             Flow::Signal(sig) => {
                 assert_eq!(sig.symbol, "wrong-number-of-arguments");
-                assert_eq!(sig.data, vec![Value::symbol("clear-face-cache"), Value::Int(2)]);
+                assert_eq!(
+                    sig.data,
+                    vec![Value::symbol("clear-face-cache"), Value::Int(2)]
+                );
             }
             other => panic!("unexpected flow: {other:?}"),
         }

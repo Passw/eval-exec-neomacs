@@ -801,3 +801,4 @@ cases/condition-variable-mutex-ownership
 cases/condition-variable-name-mutex-semantics
 cases/keymap-coding-textprop-bidi-color-semantics
 cases/default-image-insert-marker-semantics
+cases/buffer-motion-clear-compat-semantics
