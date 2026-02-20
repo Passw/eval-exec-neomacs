@@ -689,6 +689,7 @@ fn subr_arity_value(name: &str) -> Value {
         "isearch-backward" | "isearch-forward" => arity_cons(0, Some(2)),
         "advice-add" => arity_cons(3, Some(4)),
         "advice-remove" | "advice-member-p" => arity_cons(2, Some(2)),
+        "autoload" => arity_cons(2, Some(5)),
         "autoload-do-load" => arity_cons(1, Some(3)),
         "Snarf-documentation" => arity_cons(1, Some(1)),
         "substitute-command-keys" => arity_cons(1, Some(3)),
@@ -1227,6 +1228,8 @@ fn subr_arity_value(name: &str) -> Value {
         | "mutex-lock"
         | "mutex-unlock"
         | "condition-variable-p"
+        | "condition-name"
+        | "condition-mutex"
         | "condition-wait" => arity_cons(1, Some(1)),
         "thread-yield" | "current-thread" | "all-threads" => arity_cons(0, Some(0)),
         "thread-signal" => arity_cons(3, Some(3)),
@@ -1543,6 +1546,8 @@ mod tests {
         assert_subr_arity("mutex-unlock", 1, Some(1));
         assert_subr_arity("make-condition-variable", 1, Some(2));
         assert_subr_arity("condition-variable-p", 1, Some(1));
+        assert_subr_arity("condition-name", 1, Some(1));
+        assert_subr_arity("condition-mutex", 1, Some(1));
         assert_subr_arity("condition-wait", 1, Some(1));
         assert_subr_arity("condition-notify", 1, Some(2));
         assert_subr_arity("current-thread", 0, Some(0));
@@ -1995,6 +2000,7 @@ mod tests {
         assert_subr_arity("advice-add", 3, Some(4));
         assert_subr_arity("advice-remove", 2, Some(2));
         assert_subr_arity("advice-member-p", 2, Some(2));
+        assert_subr_arity("autoload", 2, Some(5));
         assert_subr_arity("autoload-do-load", 1, Some(3));
         assert_subr_arity("backtrace-frame", 1, Some(2));
         assert_subr_arity("run-hook-with-args", 1, None);

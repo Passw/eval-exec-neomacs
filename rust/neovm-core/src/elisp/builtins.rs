@@ -8282,6 +8282,7 @@ pub(crate) fn dispatch_builtin(
         "set-default" => return Some(super::custom::builtin_set_default(eval, args)),
 
         // Autoload (evaluator-dependent)
+        "autoload" => return Some(super::autoload::builtin_autoload(eval, args)),
         "autoload-do-load" => return Some(super::autoload::builtin_autoload_do_load(eval, args)),
 
         // Kill ring / text editing (evaluator-dependent — buffer access)
@@ -8963,6 +8964,8 @@ pub(crate) fn dispatch_builtin(
         "condition-variable-p" => {
             return Some(super::threads::builtin_condition_variable_p(eval, args))
         }
+        "condition-name" => return Some(super::threads::builtin_condition_name(eval, args)),
+        "condition-mutex" => return Some(super::threads::builtin_condition_mutex(eval, args)),
         "condition-wait" => return Some(super::threads::builtin_condition_wait(eval, args)),
         "condition-notify" => return Some(super::threads::builtin_condition_notify(eval, args)),
 

@@ -893,6 +893,54 @@ pub(crate) fn builtin_condition_variable_p(
     ))
 }
 
+/// `(condition-name COND)` -- return COND's name string, or nil when unnamed.
+pub(crate) fn builtin_condition_name(
+    eval: &mut super::eval::Evaluator,
+    args: Vec<Value>,
+) -> EvalResult {
+    expect_args("condition-name", &args, 1)?;
+    let id = expect_cv_id(&eval.threads, &args[0])?;
+    if !eval.threads.is_condition_variable(id) {
+        return Err(signal(
+            "wrong-type-argument",
+            vec![Value::symbol("condition-variable-p"), args[0].clone()],
+        ));
+    }
+    match eval.threads.condition_variable_name(id) {
+        Some(name) => Ok(Value::string(name)),
+        None => Ok(Value::Nil),
+    }
+}
+
+/// `(condition-mutex COND)` -- return COND's associated mutex object.
+pub(crate) fn builtin_condition_mutex(
+    eval: &mut super::eval::Evaluator,
+    args: Vec<Value>,
+) -> EvalResult {
+    expect_args("condition-mutex", &args, 1)?;
+    let id = expect_cv_id(&eval.threads, &args[0])?;
+    if !eval.threads.is_condition_variable(id) {
+        return Err(signal(
+            "wrong-type-argument",
+            vec![Value::symbol("condition-variable-p"), args[0].clone()],
+        ));
+    }
+    let Some(mutex_id) = eval.threads.condition_variable_mutex(id) else {
+        return Err(signal(
+            "wrong-type-argument",
+            vec![Value::symbol("condition-variable-p"), args[0].clone()],
+        ));
+    };
+    eval.threads
+        .mutex_handle(mutex_id)
+        .ok_or_else(|| {
+            signal(
+                "wrong-type-argument",
+                vec![Value::symbol("condition-variable-p"), args[0].clone()],
+            )
+        })
+}
+
 /// `(condition-wait COND)` -- wait on a condition variable.
 ///
 /// In single-threaded mode this is a no-op.
@@ -1452,6 +1500,65 @@ mod tests {
         let r = builtin_condition_variable_p(&mut eval, vec![forged]);
         assert!(r.is_ok());
         assert!(r.unwrap().is_nil());
+    }
+
+    #[test]
+    fn test_builtin_condition_name() {
+        let mut eval = Evaluator::new();
+        let mx = builtin_make_mutex(&mut eval, vec![]).unwrap();
+        let unnamed = builtin_make_condition_variable(&mut eval, vec![mx.clone()]).unwrap();
+        let named = builtin_make_condition_variable(
+            &mut eval,
+            vec![mx, Value::string("cv-compat-name")],
+        )
+        .unwrap();
+
+        let unnamed_name = builtin_condition_name(&mut eval, vec![unnamed]).unwrap();
+        assert!(unnamed_name.is_nil());
+
+        let named_name = builtin_condition_name(&mut eval, vec![named]).unwrap();
+        assert_eq!(named_name, Value::string("cv-compat-name"));
+    }
+
+    #[test]
+    fn test_builtin_condition_mutex() {
+        let mut eval = Evaluator::new();
+        let mx = builtin_make_mutex(&mut eval, vec![]).unwrap();
+        let cv = builtin_make_condition_variable(&mut eval, vec![mx.clone()]).unwrap();
+        let result = builtin_condition_mutex(&mut eval, vec![cv]).unwrap();
+        assert!(eq_value(&result, &mx));
+    }
+
+    #[test]
+    fn test_builtin_condition_name_wrong_type_argument() {
+        let mut eval = Evaluator::new();
+        let result = builtin_condition_name(&mut eval, vec![Value::Nil]);
+        match result {
+            Err(Flow::Signal(sig)) => {
+                assert_eq!(sig.symbol, "wrong-type-argument");
+                assert_eq!(
+                    sig.data,
+                    vec![Value::symbol("condition-variable-p"), Value::Nil]
+                );
+            }
+            other => panic!("expected wrong-type-argument signal, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn test_builtin_condition_mutex_wrong_type_argument() {
+        let mut eval = Evaluator::new();
+        let result = builtin_condition_mutex(&mut eval, vec![Value::Int(1)]);
+        match result {
+            Err(Flow::Signal(sig)) => {
+                assert_eq!(sig.symbol, "wrong-type-argument");
+                assert_eq!(
+                    sig.data,
+                    vec![Value::symbol("condition-variable-p"), Value::Int(1)]
+                );
+            }
+            other => panic!("expected wrong-type-argument signal, got {other:?}"),
+        }
     }
 
     #[test]

@@ -23,6 +23,7 @@ cases/subr-primitive-wrapper-semantics
 cases/subr-primitive-edge-semantics
 cases/subr-native-elisp-alias-semantics
 cases/autoload-funcall-error-semantics
+cases/autoload-callable-subr-semantics
 cases/symbol-function-error-paths
 cases/indirect-function-core
 cases/indirect-function-alias-chains
@@ -786,3 +787,4 @@ cases/thread-last-error-publication
 cases/thread-last-error-semantics
 cases/thread-last-error-clear-flag
 cases/condition-variable-mutex-ownership
+cases/condition-variable-name-mutex-semantics

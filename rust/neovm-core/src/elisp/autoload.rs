@@ -272,6 +272,76 @@ pub(crate) fn builtin_autoload_do_load(
     Ok(Value::Nil)
 }
 
+fn register_autoload(eval: &mut super::eval::Evaluator, args: &[Value]) -> EvalResult {
+    if args.len() < 2 || args.len() > 5 {
+        return Err(signal(
+            "wrong-number-of-arguments",
+            vec![Value::symbol("autoload"), Value::Int(args.len() as i64)],
+        ));
+    }
+
+    let func_val = args[0].clone();
+    let name = match &func_val {
+        Value::Symbol(s) => s.clone(),
+        _ => {
+            return Err(signal(
+                "wrong-type-argument",
+                vec![Value::symbol("symbolp"), func_val],
+            ));
+        }
+    };
+
+    let file_val = args[1].clone();
+    let file = match &file_val {
+        Value::Str(s) => (**s).clone(),
+        _ => {
+            return Err(signal(
+                "wrong-type-argument",
+                vec![Value::symbol("stringp"), file_val],
+            ));
+        }
+    };
+
+    let docstring_val = args.get(2).cloned().unwrap_or(Value::Nil);
+    let docstring = match &docstring_val {
+        Value::Str(s) => Some((**s).clone()),
+        _ => None,
+    };
+
+    let interactive_val = args.get(3).cloned().unwrap_or(Value::Nil);
+    let interactive = !matches!(interactive_val, Value::Nil);
+
+    let type_val = args.get(4).cloned().unwrap_or(Value::Nil);
+    let autoload_type = AutoloadType::from_value(&type_val);
+
+    let autoload_form = Value::list(vec![
+        Value::symbol("autoload"),
+        Value::string(file.clone()),
+        docstring_val,
+        interactive_val,
+        type_val,
+    ]);
+
+    eval.obarray.set_symbol_function(&name, autoload_form);
+    eval.autoloads.register(AutoloadEntry {
+        name: name.clone(),
+        file,
+        docstring,
+        interactive,
+        autoload_type,
+    });
+
+    Ok(Value::Symbol(name))
+}
+
+/// `(autoload FUNCTION FILE &optional DOCSTRING INTERACTIVE TYPE)`
+///
+/// Callable builtin form used by `funcall`/`apply` and direct function calls.
+/// Arguments are already evaluated.
+pub(crate) fn builtin_autoload(eval: &mut super::eval::Evaluator, args: Vec<Value>) -> EvalResult {
+    register_autoload(eval, &args)
+}
+
 /// `(symbol-file SYMBOL &optional TYPE)` — return the file that defined SYMBOL.
 /// Stub: always returns nil for now.
 pub(crate) fn builtin_symbol_file(args: Vec<Value>) -> EvalResult {
@@ -348,86 +418,11 @@ pub(crate) fn sf_autoload(
     eval: &mut super::eval::Evaluator,
     tail: &[super::expr::Expr],
 ) -> super::error::EvalResult {
-    if tail.len() < 2 {
-        return Err(signal(
-            "wrong-number-of-arguments",
-            vec![Value::symbol("autoload"), Value::Int(tail.len() as i64)],
-        ));
+    let mut args = Vec::with_capacity(tail.len());
+    for expr in tail {
+        args.push(eval.eval(expr)?);
     }
-
-    // FUNCTION is evaluated (typically a quoted symbol)
-    let func_val = eval.eval(&tail[0])?;
-    let name = match &func_val {
-        Value::Symbol(s) => s.clone(),
-        _ => {
-            return Err(signal(
-                "wrong-type-argument",
-                vec![Value::symbol("symbolp"), func_val],
-            ));
-        }
-    };
-
-    // FILE is evaluated (should be a string)
-    let file_val = eval.eval(&tail[1])?;
-    let file = match &file_val {
-        Value::Str(s) => (**s).clone(),
-        _ => {
-            return Err(signal(
-                "wrong-type-argument",
-                vec![Value::symbol("stringp"), file_val],
-            ));
-        }
-    };
-
-    // Optional: DOCSTRING (index 2)
-    let docstring_val = if tail.len() > 2 {
-        eval.eval(&tail[2])?
-    } else {
-        Value::Nil
-    };
-    let docstring = match &docstring_val {
-        Value::Str(s) => Some((**s).clone()),
-        _ => None,
-    };
-
-    // Optional: INTERACTIVE (index 3)
-    let interactive_val = if tail.len() > 3 {
-        eval.eval(&tail[3])?
-    } else {
-        Value::Nil
-    };
-    let interactive = !matches!(interactive_val, Value::Nil);
-
-    // Optional: TYPE (index 4)
-    let type_val = if tail.len() > 4 {
-        eval.eval(&tail[4])?
-    } else {
-        Value::Nil
-    };
-    let autoload_type = AutoloadType::from_value(&type_val);
-
-    // Build the autoload form: (autoload FILE DOCSTRING INTERACTIVE TYPE)
-    let autoload_form = Value::list(vec![
-        Value::symbol("autoload"),
-        Value::string(file.clone()),
-        docstring_val,
-        interactive_val,
-        type_val,
-    ]);
-
-    // Set function cell
-    eval.obarray.set_symbol_function(&name, autoload_form);
-
-    // Register in autoload manager
-    eval.autoloads.register(AutoloadEntry {
-        name: name.clone(),
-        file,
-        docstring,
-        interactive,
-        autoload_type,
-    });
-
-    Ok(Value::Symbol(name))
+    register_autoload(eval, &args)
 }
 
 /// `(eval-when-compile &rest BODY)`
@@ -954,6 +949,46 @@ mod tests {
         );
         assert_eq!(results[0], "OK my-macro");
         assert_eq!(results[1], "OK t");
+    }
+
+    #[test]
+    fn autoload_is_callable_subr_surface() {
+        let results = eval_all(
+            r#"(fboundp 'autoload)
+               (special-form-p 'autoload)
+               (subrp (symbol-function 'autoload))
+               (subr-arity (symbol-function 'autoload))
+               (func-arity 'autoload)
+               (funcall 'autoload 'my-funcall-fn "my-funcall-file")
+               (autoloadp (symbol-function 'my-funcall-fn))"#,
+        );
+        assert_eq!(results[0], "OK t");
+        assert_eq!(results[1], "OK nil");
+        assert_eq!(results[2], "OK t");
+        assert_eq!(results[3], "OK (2 . 5)");
+        assert_eq!(results[4], "OK (2 . 5)");
+        assert_eq!(results[5], "OK my-funcall-fn");
+        assert_eq!(results[6], "OK t");
+    }
+
+    #[test]
+    fn autoload_rejects_too_many_arguments() {
+        let result = eval_one(
+            r#"(condition-case err
+                  (autoload 'too-many "x" nil nil nil nil)
+                (error (list (car err) (cdr err))))"#,
+        );
+        assert_eq!(result, "OK (wrong-number-of-arguments (autoload 6))");
+    }
+
+    #[test]
+    fn autoload_funcall_type_checks_first_argument() {
+        let result = eval_one(
+            r#"(condition-case err
+                  (funcall 'autoload 1 "x")
+                (error (list (car err) (cdr err))))"#,
+        );
+        assert_eq!(result, "OK (wrong-type-argument (symbolp 1))");
     }
 
     #[test]

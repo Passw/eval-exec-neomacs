@@ -1,6 +1,6 @@
 # NeoVM / Neomacs Plan
 
-Last updated: 2026-02-19
+Last updated: 2026-02-20
 
 ## Execution Queue (next 20)
 
@@ -27,6 +27,52 @@ Last updated: 2026-02-19
 21. [x] Add periodic `make compat-progress` output diff check in PR review templates.
 
 ## Doing
+
+- Aligned callable-subr/runtime parity for `autoload` and expanded lock-in coverage:
+  - runtime changes:
+    - `rust/neovm-core/src/elisp/autoload.rs`
+      - added evaluator-backed callable builtin path for `autoload` (`funcall`/`apply`/direct call), reusing shared registration logic with special-form path.
+      - tightened argument-count/type behavior for callable path to match oracle.
+      - added unit tests for callable-surface and error-path parity.
+    - `rust/neovm-core/src/elisp/builtins.rs`
+      - wired `autoload` into evaluator-dependent dispatch.
+    - `rust/neovm-core/src/elisp/builtin_registry.rs`
+      - added `autoload` to dispatch registry surface.
+    - `rust/neovm-core/src/elisp/subr_info.rs`
+      - added `autoload` arity mapping `(2 . 5)` and lock-in assertion.
+  - vm-compat corpus changes:
+    - added:
+      - `test/neovm/vm-compat/cases/autoload-callable-subr-semantics.forms`
+      - `test/neovm/vm-compat/cases/autoload-callable-subr-semantics.expected.tsv`
+    - wired case into:
+      - `test/neovm/vm-compat/cases/default.list`
+  - verified:
+    - `cargo test --manifest-path rust/neovm-core/Cargo.toml autoload_` (pass)
+    - `make -C test/neovm/vm-compat check-one-neovm CASE=cases/autoload-callable-subr-semantics` (pass, `13/13`)
+
+- Added missing condition-variable introspection builtins and oracle lock-ins:
+  - runtime changes:
+    - `rust/neovm-core/src/elisp/threads.rs`
+      - implemented `condition-name` and `condition-mutex` with oracle-compatible `wrong-type-argument` payloads via canonical condition-variable handle checks.
+      - added unit tests for success and wrong-type paths.
+    - `rust/neovm-core/src/elisp/builtins.rs`
+      - wired `condition-name` and `condition-mutex` into evaluator-dependent dispatch.
+    - `rust/neovm-core/src/elisp/builtin_registry.rs`
+      - registered both names in dispatch registry.
+    - `rust/neovm-core/src/elisp/subr_info.rs`
+      - added arity metadata for both names: `(1 . 1)`.
+  - vm-compat corpus changes:
+    - added:
+      - `test/neovm/vm-compat/cases/condition-variable-name-mutex-semantics.forms`
+      - `test/neovm/vm-compat/cases/condition-variable-name-mutex-semantics.expected.tsv`
+    - wired case into:
+      - `test/neovm/vm-compat/cases/default.list`
+  - verified:
+    - `cargo test --manifest-path rust/neovm-core/Cargo.toml test_builtin_condition_ -- --nocapture` (pass)
+    - `make -C test/neovm/vm-compat check-one-neovm CASE=cases/condition-variable-name-mutex-semantics` (pass, `14/14`)
+    - `make -C test/neovm/vm-compat check-builtin-registry-all` (pass; `1213` dispatch / `1212` core)
+    - `make -C test/neovm/vm-compat compat-progress` (pass; primitive-subr coverage now registry `812/622`, runtime `860/574`)
+    - `make -C test/neovm/vm-compat check-all-neovm-strict` (pass; case inventory `796`)
 
 - Aligned thing-at-point lazy bootstrap behavior with explicit `fmakunbound` masking:
   - runtime changes:
