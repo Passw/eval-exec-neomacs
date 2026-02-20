@@ -1575,10 +1575,16 @@ impl Evaluator {
                     args.push(self.eval(expr)?);
                 }
                 if super::autoload::is_autoload_value(&func) {
+                    let first_arg = args.first().cloned();
                     let result =
                         self.apply_named_callable(name, args, Value::Subr(name.clone()), false);
                     if let Ok(value) = &result {
-                        self.maybe_writeback_mutating_first_arg(name, None, tail, value);
+                        self.maybe_writeback_mutating_first_arg(
+                            name,
+                            None,
+                            first_arg.as_ref(),
+                            value,
+                        );
                     }
                     return result;
                 }
@@ -1592,6 +1598,7 @@ impl Evaluator {
                     Value::Subr(bound_name) => Some(bound_name.clone()),
                     _ => None,
                 };
+                let first_arg = args.first().cloned();
                 let result = match self.apply(func.clone(), args) {
                     Err(Flow::Signal(sig))
                         if sig.symbol == "invalid-function" && !function_is_callable =>
@@ -1608,7 +1615,7 @@ impl Evaluator {
                     self.maybe_writeback_mutating_first_arg(
                         name,
                         alias_target.as_deref(),
-                        tail,
+                        first_arg.as_ref(),
                         value,
                     );
                 }
@@ -1634,9 +1641,10 @@ impl Evaluator {
                 args.push(self.eval(expr)?);
             }
 
+            let first_arg = args.first().cloned();
             let result = self.apply_named_callable(name, args, Value::Subr(name.clone()), false);
             if let Ok(value) = &result {
-                self.maybe_writeback_mutating_first_arg(name, None, tail, value);
+                self.maybe_writeback_mutating_first_arg(name, None, first_arg.as_ref(), value);
             }
             return result;
         }
@@ -1662,7 +1670,7 @@ impl Evaluator {
         &mut self,
         called_name: &str,
         alias_target: Option<&str>,
-        args_exprs: &[Expr],
+        first_arg: Option<&Value>,
         result: &Value,
     ) {
         let mutates_first_argument =
@@ -1670,13 +1678,52 @@ impl Evaluator {
         if !mutates_first_argument {
             return;
         }
-        let Some(Expr::Symbol(name)) = args_exprs.first() else {
+        let Some(first_arg) = first_arg else {
             return;
         };
-        if name == "nil" || name == "t" {
+        if !first_arg.is_string() || !result.is_string() || eq_value(first_arg, result) {
             return;
         }
-        self.assign(name, result.clone());
+
+        for frame in &mut self.lexenv {
+            for value in frame.values_mut() {
+                if eq_value(value, first_arg) {
+                    *value = result.clone();
+                }
+            }
+        }
+        for frame in &mut self.dynamic {
+            for value in frame.values_mut() {
+                if eq_value(value, first_arg) {
+                    *value = result.clone();
+                }
+            }
+        }
+        if let Some(buf) = self.buffers.current_buffer_mut() {
+            for value in buf.properties.values_mut() {
+                if eq_value(value, first_arg) {
+                    *value = result.clone();
+                }
+            }
+        }
+
+        let symbols: Vec<String> = self
+            .obarray
+            .all_symbols()
+            .into_iter()
+            .map(str::to_string)
+            .collect();
+        for name in symbols {
+            if let Some(symbol) = self.obarray.get_mut(&name) {
+                if symbol
+                    .value
+                    .as_ref()
+                    .is_some_and(|value| eq_value(value, first_arg))
+                {
+                    symbol.value = Some(result.clone());
+                }
+            }
+        }
     }
 
     // -----------------------------------------------------------------------
@@ -5257,6 +5304,19 @@ mod tests {
                   (vm-fillarray-alias s ?y)
                   s))",
         );
+        assert_eq!(result, r#"OK "yyy""#);
+    }
+
+    #[test]
+    fn fillarray_string_writeback_updates_alias_from_prog1_expression() {
+        let result = eval_one("(let ((s (copy-sequence \"abc\"))) (fillarray (prog1 s) ?x) s)");
+        assert_eq!(result, r#"OK "xxx""#);
+    }
+
+    #[test]
+    fn fillarray_string_writeback_updates_alias_from_list_car_expression() {
+        let result =
+            eval_one("(let ((s (copy-sequence \"abc\"))) (fillarray (car (list s)) ?y) s)");
         assert_eq!(result, r#"OK "yyy""#);
     }
 }

@@ -4,5 +4,7 @@
   (let ((s (copy-sequence "abc")))
     (vm-fillarray-alias s ?y)
     s))
+(let ((s (copy-sequence "abc"))) (fillarray (prog1 s) ?x) s)
+(let ((s (copy-sequence "abc"))) (fillarray (car (list s)) ?y) s)
 (let ((s (copy-sequence "abc"))) (eq (fillarray s ?z) s))
 (let ((v [1 2 3])) (fillarray v 9) v)
