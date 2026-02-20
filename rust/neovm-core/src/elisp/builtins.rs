@@ -83,6 +83,21 @@ fn expect_fixnum(value: &Value) -> Result<i64, Flow> {
     }
 }
 
+fn expect_char_equal_code(value: &Value) -> Result<i64, Flow> {
+    match value {
+        Value::Int(n) if (0..=KEY_CHAR_CODE_MASK).contains(n) => Ok(*n),
+        Value::Char(c) => Ok(*c as i64),
+        other => Err(signal(
+            "wrong-type-argument",
+            vec![Value::symbol("characterp"), other.clone()],
+        )),
+    }
+}
+
+fn char_equal_folded(code: i64) -> Option<String> {
+    char::from_u32(code as u32).map(|ch| ch.to_lowercase().collect())
+}
+
 /// Extract an integer/marker-ish position value.
 ///
 /// NeoVM does not expose marker values yet, so this currently accepts
@@ -711,6 +726,29 @@ pub(crate) fn builtin_type_of(args: Vec<Value>) -> EvalResult {
     Ok(Value::symbol(args[0].type_name()))
 }
 
+pub(crate) fn builtin_cl_type_of(args: Vec<Value>) -> EvalResult {
+    expect_args("cl-type-of", &args, 1)?;
+    let name = match &args[0] {
+        Value::Nil => "null",
+        Value::True => "boolean",
+        Value::Int(_) | Value::Char(_) => "fixnum",
+        Value::Float(_) => "float",
+        Value::Str(_) => "string",
+        Value::Symbol(_) | Value::Keyword(_) => "symbol",
+        Value::Cons(_) => "cons",
+        Value::Vector(_) => "vector",
+        Value::HashTable(_) => "hash-table",
+        Value::Subr(_) => "primitive-function",
+        Value::Lambda(_) | Value::Macro(_) => "interpreted-function",
+        Value::ByteCode(_) => "byte-code-function",
+        Value::Buffer(_) => "buffer",
+        Value::Window(_) => "window",
+        Value::Frame(_) => "frame",
+        Value::Timer(_) => "timer",
+    };
+    Ok(Value::symbol(name))
+}
+
 pub(crate) fn builtin_sequencep(args: Vec<Value>) -> EvalResult {
     expect_args("sequencep", &args, 1)?;
     let is_seq = args[0].is_list() || args[0].is_vector() || args[0].is_string();
@@ -740,6 +778,22 @@ pub(crate) fn builtin_eql(args: Vec<Value>) -> EvalResult {
 pub(crate) fn builtin_equal(args: Vec<Value>) -> EvalResult {
     expect_args("equal", &args, 2)?;
     Ok(Value::bool(equal_value(&args[0], &args[1], 0)))
+}
+
+pub(crate) fn builtin_char_equal(eval: &super::eval::Evaluator, args: Vec<Value>) -> EvalResult {
+    expect_args("char-equal", &args, 2)?;
+    let left = expect_char_equal_code(&args[0])?;
+    let right = expect_char_equal_code(&args[1])?;
+    let case_fold = dynamic_or_global_symbol_value(eval, "case-fold-search")
+        .map(|v| !v.is_nil())
+        .unwrap_or(true);
+    if !case_fold {
+        return Ok(Value::bool(left == right));
+    }
+    match (char_equal_folded(left), char_equal_folded(right)) {
+        (Some(a), Some(b)) => Ok(Value::bool(a == b)),
+        _ => Ok(Value::bool(left == right)),
+    }
 }
 
 pub(crate) fn builtin_not(args: Vec<Value>) -> EvalResult {
@@ -4657,6 +4711,51 @@ fn buffer_read_only_active(eval: &super::eval::Evaluator, buf: &crate::buffer::B
         .is_some_and(|value| value.is_truthy())
 }
 
+pub(crate) fn builtin_barf_if_buffer_read_only(
+    eval: &mut super::eval::Evaluator,
+    args: Vec<Value>,
+) -> EvalResult {
+    expect_max_args("barf-if-buffer-read-only", &args, 1)?;
+    let position = match args.first() {
+        None | Some(Value::Nil) => None,
+        Some(value) => Some(expect_fixnum(value)?),
+    };
+
+    let Some(buf) = eval.buffers.current_buffer() else {
+        return Ok(Value::Nil);
+    };
+    let point_min = buf.text.byte_to_char(buf.point_min()) as i64 + 1;
+    let read_only = buffer_read_only_active(eval, buf);
+    let buffer_name = buf.name.clone();
+    if !read_only {
+        return Ok(Value::Nil);
+    }
+    if let Some(pos) = position {
+        if pos < point_min {
+            return Err(signal(
+                "args-out-of-range",
+                vec![Value::Int(pos), Value::Int(pos)],
+            ));
+        }
+    }
+    Err(signal("buffer-read-only", vec![Value::string(buffer_name)]))
+}
+
+pub(crate) fn builtin_bury_buffer_internal(
+    eval: &mut super::eval::Evaluator,
+    args: Vec<Value>,
+) -> EvalResult {
+    expect_args("bury-buffer-internal", &args, 1)?;
+    let id = expect_buffer_id(&args[0])?;
+    let _ = eval.buffers.get(id);
+    Ok(Value::Nil)
+}
+
+pub(crate) fn builtin_cancel_kbd_macro_events(args: Vec<Value>) -> EvalResult {
+    expect_args("cancel-kbd-macro-events", &args, 0)?;
+    Ok(Value::Nil)
+}
+
 fn resolve_print_target(eval: &super::eval::Evaluator, printcharfun: Option<&Value>) -> Value {
     match printcharfun {
         Some(dest) if !dest.is_nil() => dest.clone(),
@@ -7679,6 +7778,8 @@ pub(crate) fn dispatch_builtin(
         "get-buffer-create" => return Some(builtin_get_buffer_create(eval, args)),
         "get-buffer" => return Some(builtin_get_buffer(eval, args)),
         "buffer-live-p" => return Some(builtin_buffer_live_p(eval, args)),
+        "barf-if-buffer-read-only" => return Some(builtin_barf_if_buffer_read_only(eval, args)),
+        "bury-buffer-internal" => return Some(builtin_bury_buffer_internal(eval, args)),
         "get-file-buffer" => return Some(builtin_get_file_buffer(eval, args)),
         "kill-buffer" => return Some(builtin_kill_buffer(eval, args)),
         "set-buffer" => return Some(builtin_set_buffer(eval, args)),
@@ -8211,6 +8312,7 @@ pub(crate) fn dispatch_builtin(
         "get-register" => return Some(super::register::builtin_get_register(eval, args)),
         "set-register" => return Some(super::register::builtin_set_register(eval, args)),
         // Keyboard macro operations (evaluator-dependent)
+        "cancel-kbd-macro-events" => return Some(builtin_cancel_kbd_macro_events(args)),
         "defining-kbd-macro" => return Some(super::kmacro::builtin_defining_kbd_macro(eval, args)),
         "start-kbd-macro" => return Some(super::kmacro::builtin_start_kbd_macro(eval, args)),
         "end-kbd-macro" => return Some(super::kmacro::builtin_end_kbd_macro(eval, args)),
@@ -9272,6 +9374,7 @@ pub(crate) fn dispatch_builtin(
         }
 
         // Case/char (evaluator-dependent)
+        "char-equal" => return Some(builtin_char_equal(eval, args)),
         "upcase-initials-region" => {
             return Some(super::kill_ring::builtin_upcase_initials_region(eval, args))
         }
@@ -9420,6 +9523,7 @@ pub(crate) fn dispatch_builtin(
         "plist-put" => builtin_plist_put(args),
 
         // Symbol (pure)
+        "cl-type-of" => builtin_cl_type_of(args),
         "symbol-name" => builtin_symbol_name(args),
         "make-symbol" => builtin_make_symbol(args),
 
@@ -11065,6 +11169,8 @@ pub(crate) fn builtin_replace_match(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::elisp::value::{LambdaData, LambdaParams};
+    use std::sync::Arc;
 
     #[test]
     fn pure_dispatch_typed_add_still_works() {
@@ -11906,6 +12012,173 @@ mod tests {
                 assert_eq!(
                     sig.data,
                     vec![Value::symbol("buffer-chars-modified-tick"), Value::Int(2)]
+                );
+            }
+            other => panic!("unexpected flow: {other:?}"),
+        }
+    }
+
+    #[test]
+    fn barf_bury_char_equal_cl_type_and_cancel_semantics() {
+        let mut eval = super::super::eval::Evaluator::new();
+
+        assert!(builtin_char_equal(&eval, vec![Value::Int(97), Value::Int(65)])
+            .unwrap()
+            .is_truthy());
+        eval.obarray.set_symbol_value("case-fold-search", Value::Nil);
+        assert!(builtin_char_equal(&eval, vec![Value::Int(97), Value::Int(65)])
+            .unwrap()
+            .is_nil());
+        eval.obarray.set_symbol_value("case-fold-search", Value::True);
+
+        let char_type = builtin_char_equal(&eval, vec![Value::Int(1), Value::string("a")])
+            .expect_err("char-equal should reject non-character args");
+        match char_type {
+            Flow::Signal(sig) => {
+                assert_eq!(sig.symbol, "wrong-type-argument");
+                assert_eq!(sig.data, vec![Value::symbol("characterp"), Value::string("a")]);
+            }
+            other => panic!("unexpected flow: {other:?}"),
+        }
+
+        assert_eq!(builtin_cl_type_of(vec![Value::Nil]).unwrap(), Value::symbol("null"));
+        assert_eq!(
+            builtin_cl_type_of(vec![Value::True]).unwrap(),
+            Value::symbol("boolean")
+        );
+        assert_eq!(
+            builtin_cl_type_of(vec![Value::Int(1)]).unwrap(),
+            Value::symbol("fixnum")
+        );
+        assert_eq!(
+            builtin_cl_type_of(vec![Value::Float(1.0)]).unwrap(),
+            Value::symbol("float")
+        );
+        assert_eq!(
+            builtin_cl_type_of(vec![Value::string("x")]).unwrap(),
+            Value::symbol("string")
+        );
+        assert_eq!(
+            builtin_cl_type_of(vec![Value::symbol("foo")]).unwrap(),
+            Value::symbol("symbol")
+        );
+        assert_eq!(
+            builtin_cl_type_of(vec![Value::cons(Value::Int(1), Value::Int(2))]).unwrap(),
+            Value::symbol("cons")
+        );
+        assert_eq!(
+            builtin_cl_type_of(vec![Value::vector(vec![Value::Int(1)])]).unwrap(),
+            Value::symbol("vector")
+        );
+        assert_eq!(
+            builtin_cl_type_of(vec![Value::hash_table(HashTableTest::Equal)]).unwrap(),
+            Value::symbol("hash-table")
+        );
+        assert_eq!(
+            builtin_cl_type_of(vec![Value::Subr("car".to_string())]).unwrap(),
+            Value::symbol("primitive-function")
+        );
+        let lambda = Value::Lambda(Arc::new(LambdaData {
+            params: LambdaParams::simple(vec!["x".to_string()]),
+            body: Vec::new(),
+            env: None,
+            docstring: None,
+        }));
+        assert_eq!(
+            builtin_cl_type_of(vec![lambda]).unwrap(),
+            Value::symbol("interpreted-function")
+        );
+
+        assert_eq!(builtin_cancel_kbd_macro_events(vec![]).unwrap(), Value::Nil);
+        let cancel_arity = builtin_cancel_kbd_macro_events(vec![Value::Nil])
+            .expect_err("cancel-kbd-macro-events should reject args");
+        match cancel_arity {
+            Flow::Signal(sig) => {
+                assert_eq!(sig.symbol, "wrong-number-of-arguments");
+                assert_eq!(
+                    sig.data,
+                    vec![Value::symbol("cancel-kbd-macro-events"), Value::Int(1)]
+                );
+            }
+            other => panic!("unexpected flow: {other:?}"),
+        }
+
+        let barf_buffer = builtin_get_buffer_create(&mut eval, vec![Value::string("*barf*")])
+            .expect("create buffer for barf-if-buffer-read-only tests");
+        let _ = builtin_set_buffer(&mut eval, vec![barf_buffer]).expect("select barf test buffer");
+
+        assert_eq!(
+            builtin_barf_if_buffer_read_only(&mut eval, vec![Value::Int(0)]).unwrap(),
+            Value::Nil
+        );
+        if let Some(buf) = eval.buffers.current_buffer_mut() {
+            buf.set_buffer_local("buffer-read-only", Value::True);
+        }
+        let barf_read_only = builtin_barf_if_buffer_read_only(&mut eval, vec![])
+            .expect_err("barf-if-buffer-read-only should signal on read-only buffers");
+        match barf_read_only {
+            Flow::Signal(sig) => assert_eq!(sig.symbol, "buffer-read-only"),
+            other => panic!("unexpected flow: {other:?}"),
+        }
+
+        let barf_range = builtin_barf_if_buffer_read_only(&mut eval, vec![Value::Int(0)])
+            .expect_err("barf-if-buffer-read-only should check lower-bound positions");
+        match barf_range {
+            Flow::Signal(sig) => {
+                assert_eq!(sig.symbol, "args-out-of-range");
+                assert_eq!(sig.data, vec![Value::Int(0), Value::Int(0)]);
+            }
+            other => panic!("unexpected flow: {other:?}"),
+        }
+
+        let barf_type = builtin_barf_if_buffer_read_only(&mut eval, vec![Value::string("x")])
+            .expect_err("barf-if-buffer-read-only should reject non-fixnum positions");
+        match barf_type {
+            Flow::Signal(sig) => {
+                assert_eq!(sig.symbol, "wrong-type-argument");
+                assert_eq!(sig.data, vec![Value::symbol("fixnump"), Value::string("x")]);
+            }
+            other => panic!("unexpected flow: {other:?}"),
+        }
+
+        let barf_arity = builtin_barf_if_buffer_read_only(&mut eval, vec![Value::Nil, Value::Nil])
+            .expect_err("barf-if-buffer-read-only should reject >1 args");
+        match barf_arity {
+            Flow::Signal(sig) => {
+                assert_eq!(sig.symbol, "wrong-number-of-arguments");
+                assert_eq!(
+                    sig.data,
+                    vec![Value::symbol("barf-if-buffer-read-only"), Value::Int(2)]
+                );
+            }
+            other => panic!("unexpected flow: {other:?}"),
+        }
+        if let Some(buf) = eval.buffers.current_buffer_mut() {
+            buf.set_buffer_local("buffer-read-only", Value::Nil);
+        }
+
+        let buffer = builtin_generate_new_buffer(&mut eval, vec![Value::string("*bury*")]).unwrap();
+        assert_eq!(
+            builtin_bury_buffer_internal(&mut eval, vec![buffer]).unwrap(),
+            Value::Nil
+        );
+        let bury_type = builtin_bury_buffer_internal(&mut eval, vec![Value::symbol("x")])
+            .expect_err("bury-buffer-internal should reject non-buffer values");
+        match bury_type {
+            Flow::Signal(sig) => {
+                assert_eq!(sig.symbol, "wrong-type-argument");
+                assert_eq!(sig.data, vec![Value::symbol("bufferp"), Value::symbol("x")]);
+            }
+            other => panic!("unexpected flow: {other:?}"),
+        }
+        let bury_arity = builtin_bury_buffer_internal(&mut eval, vec![])
+            .expect_err("bury-buffer-internal should reject wrong arity");
+        match bury_arity {
+            Flow::Signal(sig) => {
+                assert_eq!(sig.symbol, "wrong-number-of-arguments");
+                assert_eq!(
+                    sig.data,
+                    vec![Value::symbol("bury-buffer-internal"), Value::Int(0)]
                 );
             }
             other => panic!("unexpected flow: {other:?}"),

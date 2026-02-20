@@ -28,6 +28,53 @@ Last updated: 2026-02-20
 
 ## Doing
 
+- Added compatibility slice for `barf-if-buffer-read-only`, `bury-buffer-internal`, `char-equal`, `cl-type-of`, and `cancel-kbd-macro-events`:
+  - runtime changes:
+    - `rust/neovm-core/src/elisp/builtins.rs`
+      - implemented:
+        - `barf-if-buffer-read-only` (`0..1`)
+        - `bury-buffer-internal` (`1..1`)
+        - `char-equal` (`2..2`)
+        - `cl-type-of` (`1..1`)
+        - `cancel-kbd-macro-events` (`0..0`)
+      - aligned oracle behavior:
+        - `char-equal` honors dynamic/global `case-fold-search` and enforces `characterp` type errors.
+        - `cl-type-of` returns CL-oriented runtime tags (`null`, `boolean`, `fixnum`, `primitive-function`, `interpreted-function`, etc.).
+        - `barf-if-buffer-read-only` enforces read-only and positional error paths (`buffer-read-only`, `args-out-of-range`, `fixnump` type checks).
+        - `bury-buffer-internal` validates buffer designators and returns `nil`.
+        - `cancel-kbd-macro-events` enforces zero-arity and returns `nil`.
+      - wired all five builtins into dispatch and added focused unit coverage in `barf_bury_char_equal_cl_type_and_cancel_semantics`.
+    - `rust/neovm-core/src/elisp/builtin_registry.rs`
+      - registered:
+        - `barf-if-buffer-read-only`
+        - `bury-buffer-internal`
+        - `char-equal`
+        - `cl-type-of`
+        - `cancel-kbd-macro-events`
+    - `rust/neovm-core/src/elisp/subr_info.rs`
+      - added arity metadata + assertion coverage:
+        - `barf-if-buffer-read-only` => `(0 . 1)`
+        - `bury-buffer-internal` => `(1 . 1)`
+        - `char-equal` => `(2 . 2)`
+        - `cl-type-of` => `(1 . 1)`
+        - `cancel-kbd-macro-events` => `(0 . 0)`
+  - vm-compat corpus changes:
+    - added:
+      - `test/neovm/vm-compat/cases/barf-bury-char-equal-cl-type-cancel-semantics.forms`
+      - `test/neovm/vm-compat/cases/barf-bury-char-equal-cl-type-cancel-semantics.expected.tsv`
+    - wired case into:
+      - `test/neovm/vm-compat/cases/default.list`
+  - verified:
+    - `cargo test --manifest-path rust/neovm-core/Cargo.toml barf_bury_char_equal_cl_type_and_cancel_semantics -- --nocapture` (pass)
+    - `cargo test --manifest-path rust/neovm-core/Cargo.toml subr_arity_buffer_point_primitives_match_oracle -- --nocapture` (pass)
+    - `cargo test --manifest-path rust/neovm-core/Cargo.toml subr_arity_char_charset_primitives_match_oracle -- --nocapture` (pass)
+    - `cargo test --manifest-path rust/neovm-core/Cargo.toml subr_arity_kmacro_command_primitives_match_oracle -- --nocapture` (pass)
+    - `cargo test --manifest-path rust/neovm-core/Cargo.toml subr_arity_current_state_primitives_match_oracle -- --nocapture` (pass)
+    - `make -C test/neovm/vm-compat check-one-neovm CASE=cases/barf-bury-char-equal-cl-type-cancel-semantics` (pass; `31/31`)
+    - `make -C test/neovm/vm-compat check-builtin-registry-all` (pass; `1283` dispatch / `1282` core)
+    - `make -C test/neovm/vm-compat compat-progress` (pass; default list `798`, tracked `804`, oracle builtin coverage registry/runtime `882/552`)
+    - `make -C test/neovm/vm-compat check-all-neovm-strict` (pass; case inventory `804`)
+
 - Added core primitive compatibility slice for `bare-symbol`, `bare-symbol-p`, `byteorder`, `assoc-string`, and `car-less-than-car`:
   - runtime changes:
     - `rust/neovm-core/src/elisp/builtins_extra.rs`

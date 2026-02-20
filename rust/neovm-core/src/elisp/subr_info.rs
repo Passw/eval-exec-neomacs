@@ -346,6 +346,7 @@ fn subr_arity_value(name: &str) -> Value {
         | "forward-line" => arity_cons(0, Some(1)),
         "current-buffer" | "buffer-string" | "point" | "point-max" | "point-min" | "bobp"
         | "eobp" | "bolp" | "eolp" | "erase-buffer" | "widen" => arity_cons(0, Some(0)),
+        "barf-if-buffer-read-only" => arity_cons(0, Some(1)),
         "mark-marker" | "point-marker" | "point-max-marker" | "point-min-marker" | "pop-mark" => {
             arity_cons(0, Some(0))
         }
@@ -371,6 +372,7 @@ fn subr_arity_value(name: &str) -> Value {
         | "buffer-hash"
         | "buffer-local-variables" => arity_cons(0, Some(1)),
         "other-buffer" => arity_cons(0, Some(3)),
+        "bury-buffer-internal" => arity_cons(1, Some(1)),
         "marker-buffer" | "marker-insertion-type" | "marker-position" | "markerp" => {
             arity_cons(1, Some(1))
         }
@@ -771,14 +773,15 @@ fn subr_arity_value(name: &str) -> Value {
         | "stringp"
         | "symbolp"
         | "type-of"
+        | "cl-type-of"
         | "upcase"
         | "vectorp" => arity_cons(1, Some(1)),
         "ceiling" | "characterp" | "floor" | "round" | "string-to-number" | "truncate" => {
             arity_cons(1, Some(2))
         }
         "substring" => arity_cons(1, Some(3)),
-        "aref" | "eq" | "eql" | "equal" | "make-vector" | "string-equal" | "string-lessp"
-        | "throw" => {
+        "aref" | "char-equal" | "eq" | "eql" | "equal" | "make-vector" | "string-equal"
+        | "string-lessp" | "throw" => {
             arity_cons(2, Some(2))
         }
         "aset" => arity_cons(3, Some(3)),
@@ -921,6 +924,7 @@ fn subr_arity_value(name: &str) -> Value {
         "if" => Value::cons(Value::Int(2), Value::symbol("unevalled")),
         "defining-kbd-macro" => arity_cons(1, Some(2)),
         "start-kbd-macro" => arity_cons(1, Some(2)),
+        "cancel-kbd-macro-events" => arity_cons(0, Some(0)),
         "name-last-kbd-macro" | "kmacro-name-last-macro" => arity_cons(1, Some(1)),
         "end-kbd-macro" | "call-last-kbd-macro" => arity_cons(0, Some(2)),
         "execute-kbd-macro" | "execute-extended-command" => arity_cons(1, Some(3)),
@@ -1910,6 +1914,7 @@ mod tests {
         assert_subr_arity("point-max", 0, Some(0));
         assert_subr_arity("erase-buffer", 0, Some(0));
         assert_subr_arity("widen", 0, Some(0));
+        assert_subr_arity("barf-if-buffer-read-only", 0, Some(1));
         assert_subr_arity("buffer-file-name", 0, Some(1));
         assert_subr_arity("buffer-base-buffer", 0, Some(1));
         assert_subr_arity("buffer-last-name", 0, Some(1));
@@ -1920,6 +1925,7 @@ mod tests {
         assert_subr_arity("buffer-modified-tick", 0, Some(1));
         assert_subr_arity("buffer-list", 0, Some(1));
         assert_subr_arity("other-buffer", 0, Some(3));
+        assert_subr_arity("bury-buffer-internal", 1, Some(1));
         assert_subr_arity("buffer-disable-undo", 0, Some(1));
         assert_subr_arity("buffer-enable-undo", 0, Some(1));
         assert_subr_arity("buffer-hash", 0, Some(1));
@@ -1987,6 +1993,7 @@ mod tests {
         assert_subr_arity("char-before", 0, Some(1));
         assert_subr_arity("char-category-set", 1, Some(1));
         assert_subr_arity("char-charset", 1, Some(2));
+        assert_subr_arity("char-equal", 2, Some(2));
         assert_subr_arity("char-or-string-p", 1, Some(1));
         assert_subr_arity("char-resolve-modifiers", 1, Some(1));
         assert_subr_arity("char-syntax", 1, Some(1));
@@ -2253,6 +2260,7 @@ mod tests {
     #[test]
     fn subr_arity_kmacro_command_primitives_match_oracle() {
         assert_subr_arity("start-kbd-macro", 1, Some(2));
+        assert_subr_arity("cancel-kbd-macro-events", 0, Some(0));
         assert_subr_arity("end-kbd-macro", 0, Some(2));
         assert_subr_arity("call-last-kbd-macro", 0, Some(2));
         assert_subr_arity("execute-kbd-macro", 1, Some(3));
@@ -2432,6 +2440,7 @@ mod tests {
     #[test]
     fn subr_arity_current_state_primitives_match_oracle() {
         assert_subr_arity("byteorder", 0, Some(0));
+        assert_subr_arity("cl-type-of", 1, Some(1));
         assert_subr_arity("current-bidi-paragraph-direction", 0, Some(1));
         assert_subr_arity("current-case-table", 0, Some(0));
         assert_subr_arity("current-column", 0, Some(0));
