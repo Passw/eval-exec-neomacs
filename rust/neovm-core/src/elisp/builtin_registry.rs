@@ -1801,6 +1801,7 @@ const DISPATCH_BUILTIN_NAMES: &[&str] = &[
     "quote",
     "save-current-buffer",
     "save-excursion",
+    "save-match-data",
     "save-restriction",
     "setq",
     "unwind-protect",

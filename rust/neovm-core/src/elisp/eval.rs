@@ -1842,6 +1842,7 @@ impl Evaluator {
             "require" => self.sf_require(tail),
             "save-excursion" => self.sf_save_excursion(tail),
             "save-restriction" => self.sf_save_restriction(tail),
+            "save-match-data" => self.sf_save_match_data(tail),
             "with-current-buffer" => self.sf_with_current_buffer(tail),
             "ignore-errors" => self.sf_ignore_errors(tail),
             "dotimes" => self.sf_dotimes(tail),
@@ -2835,6 +2836,14 @@ impl Evaluator {
             buf.zv = saved_zv;
             buf.pt = buf.pt.clamp(buf.begv, buf.zv);
         }
+        result
+    }
+
+    fn sf_save_match_data(&mut self, tail: &[Expr]) -> EvalResult {
+        // Save global match data; restore after body (including non-local exits).
+        let saved_match_data = self.match_data.clone();
+        let result = self.sf_progn(tail);
+        self.match_data = saved_match_data;
         result
     }
 
@@ -5329,6 +5338,25 @@ mod tests {
         );
         // save-excursion restores point to 3
         assert_eq!(results[5], "OK 3");
+    }
+
+    #[test]
+    fn save_match_data_restores_after_success_and_error() {
+        let results = eval_all(
+            "(set-match-data '(1 2))
+             (save-match-data (set-match-data '(3 4)) (match-data))
+             (match-data)
+             (condition-case err
+                 (save-match-data
+                   (set-match-data '(5 6))
+                   (error \"boom\"))
+               (error (car err)))
+             (match-data)",
+        );
+        assert_eq!(results[1], "OK (3 4)");
+        assert_eq!(results[2], "OK (1 2)");
+        assert_eq!(results[3], "OK error");
+        assert_eq!(results[4], "OK (1 2)");
     }
 
     #[test]

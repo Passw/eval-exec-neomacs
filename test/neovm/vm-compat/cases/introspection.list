@@ -16,6 +16,7 @@ cases/indirect-function-alias-chains
 cases/condition-case-unwind-introspection
 cases/subr-introspection-core
 cases/macro-special-introspection-core
+cases/save-match-data-macro-semantics
 cases/function-special-form-edges
 cases/autoload-macro-introspection
 cases/symbol-file-semantics

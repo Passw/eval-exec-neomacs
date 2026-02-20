@@ -4382,6 +4382,27 @@ fn macroexpand_known_fallback_macro(name: &str, args: &[Value]) -> Result<Option
             forms.extend_from_slice(&args[1..]);
             Ok(Some(Value::list(forms)))
         }
+        "save-match-data" => {
+            let saved = Value::symbol("saved-match-data");
+            let binding = Value::list(vec![
+                saved.clone(),
+                Value::list(vec![Value::symbol("match-data")]),
+            ]);
+            let mut protected_forms = Vec::with_capacity(args.len() + 1);
+            protected_forms.push(Value::symbol("progn"));
+            protected_forms.extend_from_slice(args);
+            let protected = Value::list(protected_forms);
+            let restore = Value::list(vec![
+                Value::symbol("set-match-data"),
+                saved,
+                Value::True,
+            ]);
+            Ok(Some(Value::list(vec![
+                Value::symbol("let"),
+                Value::list(vec![binding]),
+                Value::list(vec![Value::symbol("unwind-protect"), protected, restore]),
+            ])))
+        }
         _ => Ok(None),
     }
 }
@@ -18113,6 +18134,9 @@ mod tests {
         let when_macro = builtin_fboundp(&mut eval, vec![Value::symbol("when")])
             .expect("fboundp should succeed for when");
         assert!(when_macro.is_truthy());
+        let save_match_data = builtin_fboundp(&mut eval, vec![Value::symbol("save-match-data")])
+            .expect("fboundp should succeed for save-match-data");
+        assert!(save_match_data.is_truthy());
 
         let with_temp_buffer = builtin_fboundp(&mut eval, vec![Value::symbol("with-temp-buffer")])
             .expect("fboundp should succeed for with-temp-buffer");
@@ -18175,6 +18199,10 @@ mod tests {
         let macro_symbol = builtin_functionp_eval(&mut eval, vec![Value::symbol("when")])
             .expect("functionp should reject macro symbols");
         assert!(macro_symbol.is_nil());
+        let save_match_data_symbol =
+            builtin_functionp_eval(&mut eval, vec![Value::symbol("save-match-data")])
+                .expect("functionp should reject save-match-data macro symbol");
+        assert!(save_match_data_symbol.is_nil());
         let declare_symbol = builtin_functionp_eval(&mut eval, vec![Value::symbol("declare")])
             .expect("functionp should reject declare symbol");
         assert!(declare_symbol.is_nil());
@@ -18431,6 +18459,10 @@ mod tests {
         let when_macro = builtin_symbol_function(&mut eval, vec![Value::symbol("when")])
             .expect("symbol-function should resolve when as a macro");
         assert!(matches!(when_macro, Value::Macro(_)));
+        let save_match_data_macro =
+            builtin_symbol_function(&mut eval, vec![Value::symbol("save-match-data")])
+                .expect("symbol-function should resolve save-match-data as a macro");
+        assert!(matches!(save_match_data_macro, Value::Macro(_)));
 
         let declare_macro = builtin_symbol_function(&mut eval, vec![Value::symbol("declare")])
             .expect("symbol-function should resolve declare as a macro");
@@ -18561,6 +18593,17 @@ mod tests {
             }
             other => panic!("expected cons arity pair, got {other:?}"),
         }
+        let save_match_data_arity =
+            builtin_func_arity_eval(&mut eval, vec![Value::symbol("save-match-data")])
+                .expect("func-arity should resolve save-match-data macro symbol");
+        match &save_match_data_arity {
+            Value::Cons(cell) => {
+                let pair = cell.lock().expect("poisoned");
+                assert_eq!(pair.car, Value::Int(0));
+                assert_eq!(pair.cdr, Value::symbol("many"));
+            }
+            other => panic!("expected cons arity pair, got {other:?}"),
+        }
 
         let inline_arity = builtin_func_arity_eval(&mut eval, vec![Value::symbol("inline")])
             .expect("func-arity should resolve inline special-form symbol");
@@ -18684,6 +18727,10 @@ mod tests {
         let when_macro = builtin_indirect_function(&mut eval, vec![Value::symbol("when")])
             .expect("indirect-function should resolve when as a macro");
         assert!(matches!(when_macro, Value::Macro(_)));
+        let save_match_data_macro =
+            builtin_indirect_function(&mut eval, vec![Value::symbol("save-match-data")])
+                .expect("indirect-function should resolve save-match-data as a macro");
+        assert!(matches!(save_match_data_macro, Value::Macro(_)));
 
         eval.obarray_mut()
             .set_symbol_function("alias-car", Value::symbol("car"));
@@ -18740,6 +18787,10 @@ mod tests {
         let when_symbol = builtin_macrop_eval(&mut eval, vec![Value::symbol("when")])
             .expect("macrop should handle symbol input");
         assert!(when_symbol.is_truthy());
+        let save_match_data_symbol =
+            builtin_macrop_eval(&mut eval, vec![Value::symbol("save-match-data")])
+                .expect("macrop should handle save-match-data symbol input");
+        assert!(save_match_data_symbol.is_truthy());
 
         let plain_symbol = builtin_macrop_eval(&mut eval, vec![Value::symbol("if")])
             .expect("macrop should handle non-macro symbols");
@@ -18810,6 +18861,45 @@ mod tests {
                 Value::list(vec![
                     Value::symbol("progn"),
                     Value::list(vec![Value::symbol("when"), Value::True, Value::Int(1)]),
+                ]),
+            ])
+        );
+
+        let save_match_data = builtin_macroexpand_eval(
+            &mut eval,
+            vec![Value::list(vec![
+                Value::symbol("save-match-data"),
+                Value::list(vec![
+                    Value::symbol("string-match"),
+                    Value::string("a"),
+                    Value::string("a"),
+                ]),
+            ])],
+        )
+        .expect("macroexpand should expand save-match-data");
+        assert_eq!(
+            save_match_data,
+            Value::list(vec![
+                Value::symbol("let"),
+                Value::list(vec![Value::list(vec![
+                    Value::symbol("saved-match-data"),
+                    Value::list(vec![Value::symbol("match-data")]),
+                ])]),
+                Value::list(vec![
+                    Value::symbol("unwind-protect"),
+                    Value::list(vec![
+                        Value::symbol("progn"),
+                        Value::list(vec![
+                            Value::symbol("string-match"),
+                            Value::string("a"),
+                            Value::string("a"),
+                        ]),
+                    ]),
+                    Value::list(vec![
+                        Value::symbol("set-match-data"),
+                        Value::symbol("saved-match-data"),
+                        Value::True,
+                    ]),
                 ]),
             ])
         );

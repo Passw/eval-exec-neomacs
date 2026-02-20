@@ -34,6 +34,7 @@ cases/backtrace-helper-wrapper-semantics
 cases/field-delete-wrapper-semantics
 cases/subr-introspection-core
 cases/macro-special-introspection-core
+cases/save-match-data-macro-semantics
 cases/function-special-form-edges
 cases/autoload-macro-introspection
 cases/macroexpand-runtime-semantics
