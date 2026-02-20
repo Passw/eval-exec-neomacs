@@ -2812,6 +2812,17 @@ fn expect_int(value: &Value) -> Result<i64, Flow> {
     }
 }
 
+fn expect_file_offset(value: &Value) -> Result<i64, Flow> {
+    let offset = expect_int(value)?;
+    if offset < 0 {
+        return Err(signal(
+            "wrong-type-argument",
+            vec![Value::symbol("file-offset"), value.clone()],
+        ));
+    }
+    Ok(offset)
+}
+
 /// (insert-file-contents FILENAME &optional VISIT BEG END REPLACE) -> (FILENAME LENGTH)
 ///
 /// Read file FILENAME and insert its contents into the current buffer at point.
@@ -2826,8 +2837,40 @@ pub(crate) fn builtin_insert_file_contents(
     let visit = args.get(1).is_some_and(|v| v.is_truthy());
 
     // Read file contents
-    let contents = read_file_contents(&resolved)
-        .map_err(|e| signal_file_io_path(e, "Opening input file", &resolved))?;
+    let contents_bytes =
+        fs::read(&resolved).map_err(|e| signal_file_io_path(e, "Opening input file", &resolved))?;
+    let file_len = contents_bytes.len() as i64;
+
+    let begin = if args.get(2).is_some_and(|v| !v.is_nil()) {
+        expect_file_offset(args.get(2).expect("checked above"))?
+    } else {
+        0
+    };
+    let mut end = if args.get(3).is_some_and(|v| !v.is_nil()) {
+        expect_file_offset(args.get(3).expect("checked above"))?
+    } else {
+        file_len
+    };
+
+    if begin > file_len {
+        return Err(signal(
+            "file-error",
+            vec![
+                Value::string("Read error"),
+                Value::string("Bad address"),
+                Value::string(resolved),
+            ],
+        ));
+    }
+    if end > file_len {
+        end = file_len;
+    }
+    if end < begin {
+        end = begin;
+    }
+
+    let slice = &contents_bytes[begin as usize..end as usize];
+    let contents = String::from_utf8_lossy(slice).to_string();
 
     let char_count = contents.chars().count() as i64;
 
@@ -4968,6 +5011,72 @@ mod tests {
         assert_eq!(written, "hello from file");
 
         // Clean up
+        let _ = fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn test_insert_file_contents_beg_end_semantics() {
+        use super::super::eval::Evaluator;
+
+        let dir = std::env::temp_dir().join("neovm_eval_insert_file_contents_beg_end");
+        let _ = fs::remove_dir_all(&dir);
+        fs::create_dir_all(&dir).unwrap();
+        let path = dir.join("slice.txt");
+        let path_str = path.to_string_lossy().to_string();
+        write_string_to_file("abcdef", &path_str, false).unwrap();
+
+        let mut eval_slice = Evaluator::new();
+        let inserted = builtin_insert_file_contents(
+            &mut eval_slice,
+            vec![Value::string(&path_str), Value::Nil, Value::Int(2), Value::Int(4)],
+        )
+        .expect("insert-file-contents 2..4 should succeed");
+        assert_eq!(
+            list_to_vec(&inserted).unwrap()[1],
+            Value::Int(2),
+            "inserted char count should match slice length"
+        );
+        assert_eq!(
+            eval_slice.buffers.current_buffer().unwrap().buffer_string(),
+            "cd",
+            "slice 2..4 should insert 'cd'"
+        );
+
+        let mut eval_empty = Evaluator::new();
+        let inserted_zero = builtin_insert_file_contents(
+            &mut eval_empty,
+            vec![Value::string(&path_str), Value::Nil, Value::Int(4), Value::Int(2)],
+        )
+        .expect("insert-file-contents start>end should succeed with empty insertion");
+        assert_eq!(list_to_vec(&inserted_zero).unwrap()[1], Value::Int(0));
+        assert_eq!(eval_empty.buffers.current_buffer().unwrap().buffer_string(), "");
+
+        let mut eval_tail = Evaluator::new();
+        let inserted_tail = builtin_insert_file_contents(
+            &mut eval_tail,
+            vec![Value::string(&path_str), Value::Nil, Value::Int(2), Value::Int(99)],
+        )
+        .expect("insert-file-contents end beyond file should clamp");
+        assert_eq!(list_to_vec(&inserted_tail).unwrap()[1], Value::Int(4));
+        assert_eq!(eval_tail.buffers.current_buffer().unwrap().buffer_string(), "cdef");
+
+        let mut eval_bad = Evaluator::new();
+        let bad_offset = builtin_insert_file_contents(
+            &mut eval_bad,
+            vec![Value::string(&path_str), Value::Nil, Value::Int(-1), Value::Int(2)],
+        )
+        .expect_err("negative BEG should reject with file-offset predicate");
+        match bad_offset {
+            Flow::Signal(sig) => {
+                assert_eq!(sig.symbol, "wrong-type-argument");
+                assert_eq!(
+                    sig.data,
+                    vec![Value::symbol("file-offset"), Value::Int(-1)]
+                );
+            }
+            other => panic!("unexpected flow: {other:?}"),
+        }
+
         let _ = fs::remove_dir_all(&dir);
     }
 
