@@ -425,6 +425,29 @@ pub(crate) fn builtin_make_category_table(args: Vec<Value>) -> EvalResult {
     make_category_table_object()
 }
 
+/// `(copy-category-table &optional TABLE)`
+///
+/// Return a fresh copy of TABLE.  When TABLE is omitted or nil, copy the
+/// process-wide standard category table.
+pub(crate) fn builtin_copy_category_table(args: Vec<Value>) -> EvalResult {
+    expect_max_args("copy-category-table", &args, 1)?;
+
+    let source = match args.first() {
+        None | Some(Value::Nil) => ensure_standard_category_table()?,
+        Some(table) => {
+            if !is_category_table_value(table)? {
+                return Err(signal(
+                    "wrong-type-argument",
+                    vec![Value::symbol("category-table-p"), table.clone()],
+                ));
+            }
+            table.clone()
+        }
+    };
+
+    clone_char_table_object(&source)
+}
+
 /// `(set-category-table TABLE)`
 ///
 /// Pure-mode fallback: validate TABLE and return it.

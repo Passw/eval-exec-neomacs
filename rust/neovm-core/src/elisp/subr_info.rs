@@ -302,8 +302,11 @@ fn subr_arity_value(name: &str) -> Value {
         "cons" => arity_cons(2, Some(2)),
         "1+" | "1-" | "abs" => arity_cons(1, Some(1)),
         "%" | "/=" | "ash" => arity_cons(2, Some(2)),
-        "copy-alist" | "copy-hash-table" | "copy-sequence" => arity_cons(1, Some(1)),
+        "copy-alist" | "copy-hash-table" | "copy-keymap" | "copy-sequence" => {
+            arity_cons(1, Some(1))
+        }
         "copy-marker" => arity_cons(0, Some(2)),
+        "copy-category-table" => arity_cons(0, Some(1)),
         "copy-syntax-table" => arity_cons(0, Some(1)),
         "copy-file" => arity_cons(2, Some(6)),
         "copy-region-as-kill" => arity_cons(2, Some(3)),
@@ -824,13 +827,16 @@ fn subr_arity_value(name: &str) -> Value {
         "keyboard-coding-system" => arity_cons(0, Some(1)),
         "keyboard-quit" => arity_cons(0, Some(0)),
         "make-keymap" | "make-sparse-keymap" => arity_cons(0, Some(1)),
+        "current-active-maps" => arity_cons(0, Some(2)),
         "current-bidi-paragraph-direction" | "bidi-resolved-levels" => arity_cons(0, Some(1)),
         "bidi-find-overridden-directionality" => arity_cons(3, Some(4)),
         "current-case-table"
         | "current-column"
         | "current-global-map"
         | "current-indentation"
-        | "current-local-map" => arity_cons(0, Some(0)),
+        | "current-local-map"
+        | "current-message"
+        | "current-minor-mode-maps" => arity_cons(0, Some(0)),
         "set-buffer"
         | "set-buffer-modified-p"
         | "set-case-table"
@@ -867,6 +873,7 @@ fn subr_arity_value(name: &str) -> Value {
         "recursion-depth" | "region-beginning" | "region-end" => arity_cons(0, Some(0)),
         "delete-frame" | "delete-other-windows" => arity_cons(0, Some(2)),
         "next-window" | "previous-window" | "pos-visible-in-window-p" => arity_cons(0, Some(3)),
+        "coordinates-in-window-p" => arity_cons(2, Some(2)),
         "pop-to-buffer" => arity_cons(1, Some(3)),
         "move-to-window-line" | "move-point-visually" => arity_cons(1, Some(1)),
         "modify-frame-parameters" => arity_cons(2, Some(2)),
@@ -896,7 +903,8 @@ fn subr_arity_value(name: &str) -> Value {
         "run-at-time" | "run-with-timer" | "run-with-idle-timer" => arity_cons(3, None),
         "timer-activate" => arity_cons(1, Some(3)),
         "sleep-for" | "sit-for" => arity_cons(1, Some(2)),
-        "current-time" => arity_cons(0, Some(0)),
+        "current-cpu-time" | "current-idle-time" | "current-time" => arity_cons(0, Some(0)),
+        "daemon-initialized" | "daemonp" => arity_cons(0, Some(0)),
         "category-table" | "clear-buffer-auto-save-failure" | "clear-charset-maps" => {
             arity_cons(0, Some(0))
         }
@@ -1059,6 +1067,7 @@ fn subr_arity_value(name: &str) -> Value {
         | "set-window-start"
         | "set-window-group-start"
         | "set-window-margins" => arity_cons(2, Some(3)),
+        "set-window-configuration" => arity_cons(1, Some(3)),
         "set-window-vscroll" => arity_cons(2, Some(4)),
         "set-window-fringes" => arity_cons(2, Some(5)),
         "set-window-scroll-bars" => arity_cons(1, Some(6)),
@@ -1221,6 +1230,7 @@ fn subr_arity_value(name: &str) -> Value {
         | "frame-root-window"
         | "frame-parameters"
         | "frame-selected-window"
+        | "current-window-configuration"
         | "minibuffer-window"
         | "window-buffer"
         | "window-cursor-type"
@@ -1286,9 +1296,12 @@ fn subr_arity_value(name: &str) -> Value {
         | "frame-live-p"
         | "frame-visible-p"
         | "window-live-p"
+        | "window-configuration-p"
         | "window-valid-p"
         | "windowp"
         | "minibuffer-window-active-p" => arity_cons(1, Some(1)),
+        "window-configuration-equal-p" => arity_cons(2, Some(2)),
+        "window-configuration-frame" => arity_cons(1, Some(1)),
         "window-parameter" => arity_cons(2, Some(2)),
         "set-window-parameter" => arity_cons(3, Some(3)),
         "terminal-parameter" => arity_cons(2, Some(2)),
@@ -2245,6 +2258,8 @@ mod tests {
         assert_subr_arity("timer-activate", 1, Some(3));
         assert_subr_arity("sleep-for", 1, Some(2));
         assert_subr_arity("sit-for", 1, Some(2));
+        assert_subr_arity("current-cpu-time", 0, Some(0));
+        assert_subr_arity("current-idle-time", 0, Some(0));
         assert_subr_arity("current-time", 0, Some(0));
         assert_subr_arity("float-time", 0, Some(1));
     }
@@ -2467,8 +2482,10 @@ mod tests {
     fn subr_arity_copy_cons_primitives_match_oracle() {
         assert_subr_arity("cons", 2, Some(2));
         assert_subr_arity("copy-alist", 1, Some(1));
+        assert_subr_arity("copy-category-table", 0, Some(1));
         assert_subr_arity("copy-file", 2, Some(6));
         assert_subr_arity("copy-hash-table", 1, Some(1));
+        assert_subr_arity("copy-keymap", 1, Some(1));
         assert_subr_arity("copy-marker", 0, Some(2));
         assert_subr_arity("copy-region-as-kill", 2, Some(3));
         assert_subr_arity("copy-sequence", 1, Some(1));
@@ -2485,6 +2502,7 @@ mod tests {
         assert_subr_arity("cl-type-of", 1, Some(1));
         assert_subr_arity("bidi-find-overridden-directionality", 3, Some(4));
         assert_subr_arity("bidi-resolved-levels", 0, Some(1));
+        assert_subr_arity("current-active-maps", 0, Some(2));
         assert_subr_arity("current-bidi-paragraph-direction", 0, Some(1));
         assert_subr_arity("current-case-table", 0, Some(0));
         assert_subr_arity("current-column", 0, Some(0));
@@ -2492,8 +2510,13 @@ mod tests {
         assert_subr_arity("current-indentation", 0, Some(0));
         assert_subr_arity("current-kill", 1, Some(2));
         assert_subr_arity("current-local-map", 0, Some(0));
+        assert_subr_arity("current-message", 0, Some(0));
+        assert_subr_arity("current-minor-mode-maps", 0, Some(0));
         assert_subr_arity("current-time-string", 0, Some(2));
         assert_subr_arity("current-time-zone", 0, Some(2));
+        assert_subr_arity("current-window-configuration", 0, Some(1));
+        assert_subr_arity("daemon-initialized", 0, Some(0));
+        assert_subr_arity("daemonp", 0, Some(0));
         assert_subr_arity("system-name", 0, Some(0));
         assert_subr_arity("emacs-version", 0, Some(1));
     }
@@ -2687,6 +2710,7 @@ mod tests {
         assert_subr_arity("next-window", 0, Some(3));
         assert_subr_arity("previous-window", 0, Some(3));
         assert_subr_arity("pop-to-buffer", 1, Some(3));
+        assert_subr_arity("coordinates-in-window-p", 2, Some(2));
         assert_subr_arity("pos-visible-in-window-p", 0, Some(3));
         assert_subr_arity("move-to-window-line", 1, Some(1));
         assert_subr_arity("move-point-visually", 1, Some(1));
@@ -3000,6 +3024,7 @@ mod tests {
         assert_subr_arity("selected-window", 0, Some(0));
         assert_subr_arity("set-window-parameter", 3, Some(3));
         assert_subr_arity("set-window-buffer", 2, Some(3));
+        assert_subr_arity("set-window-configuration", 1, Some(3));
         assert_subr_arity("set-window-hscroll", 2, Some(2));
         assert_subr_arity("set-window-display-table", 2, Some(2));
         assert_subr_arity("set-window-cursor-type", 2, Some(2));
@@ -3031,6 +3056,9 @@ mod tests {
         assert_subr_arity("window-text-height", 0, Some(2));
         assert_subr_arity("window-text-width", 0, Some(2));
         assert_subr_arity("window-buffer", 0, Some(1));
+        assert_subr_arity("window-configuration-equal-p", 2, Some(2));
+        assert_subr_arity("window-configuration-frame", 1, Some(1));
+        assert_subr_arity("window-configuration-p", 1, Some(1));
         assert_subr_arity("window-cursor-type", 0, Some(1));
         assert_subr_arity("window-display-table", 0, Some(1));
         assert_subr_arity("window-dedicated-p", 0, Some(1));

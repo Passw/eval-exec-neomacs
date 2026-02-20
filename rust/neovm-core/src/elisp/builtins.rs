@@ -2528,6 +2528,27 @@ pub(crate) fn builtin_message_eval(
     Ok(Value::string(msg))
 }
 
+pub(crate) fn builtin_current_message(args: Vec<Value>) -> EvalResult {
+    expect_args("current-message", &args, 0)?;
+    // Batch mode keeps message display side effects out-of-band.
+    Ok(Value::Nil)
+}
+
+pub(crate) fn builtin_daemonp(args: Vec<Value>) -> EvalResult {
+    expect_args("daemonp", &args, 0)?;
+    Ok(Value::Nil)
+}
+
+pub(crate) fn builtin_daemon_initialized(args: Vec<Value>) -> EvalResult {
+    expect_args("daemon-initialized", &args, 0)?;
+    Err(signal(
+        "error",
+        vec![Value::string(
+            "This function can only be called if emacs is run as a daemon",
+        )],
+    ))
+}
+
 pub(crate) fn builtin_error(args: Vec<Value>) -> EvalResult {
     expect_min_args("error", &args, 1)?;
     let msg = match builtin_format(args)? {
@@ -3663,6 +3684,101 @@ fn expect_optional_live_window_designator(
         "wrong-type-argument",
         vec![Value::symbol("window-live-p"), value.clone()],
     ))
+}
+
+const WINDOW_CONFIGURATION_TAG: &str = "window-configuration";
+
+fn window_configuration_frame_from_value(value: &Value) -> Option<Value> {
+    let Value::Vector(data) = value else {
+        return None;
+    };
+    let items = data.lock().expect("poisoned");
+    if items.len() != 3 || items[0].as_symbol_name() != Some(WINDOW_CONFIGURATION_TAG) {
+        return None;
+    }
+    match &items[1] {
+        Value::Frame(_) => Some(items[1].clone()),
+        _ => None,
+    }
+}
+
+fn make_window_configuration_value(frame: Value) -> Value {
+    use std::sync::atomic::{AtomicU64, Ordering};
+    static NEXT_WINDOW_CONFIGURATION_ID: AtomicU64 = AtomicU64::new(1);
+    let serial = NEXT_WINDOW_CONFIGURATION_ID.fetch_add(1, Ordering::Relaxed) as i64;
+    Value::vector(vec![
+        Value::symbol(WINDOW_CONFIGURATION_TAG),
+        frame,
+        Value::Int(serial),
+    ])
+}
+
+fn builtin_window_configuration_p(args: Vec<Value>) -> EvalResult {
+    expect_args("window-configuration-p", &args, 1)?;
+    Ok(Value::bool(
+        window_configuration_frame_from_value(&args[0]).is_some(),
+    ))
+}
+
+fn builtin_window_configuration_frame(args: Vec<Value>) -> EvalResult {
+    expect_args("window-configuration-frame", &args, 1)?;
+    window_configuration_frame_from_value(&args[0]).ok_or_else(|| {
+        signal(
+            "wrong-type-argument",
+            vec![Value::symbol("window-configuration-p"), args[0].clone()],
+        )
+    })
+}
+
+fn builtin_window_configuration_equal_p(args: Vec<Value>) -> EvalResult {
+    expect_args("window-configuration-equal-p", &args, 2)?;
+    if window_configuration_frame_from_value(&args[0]).is_none() {
+        return Err(signal(
+            "wrong-type-argument",
+            vec![Value::symbol("window-configuration-p"), args[0].clone()],
+        ));
+    }
+    if window_configuration_frame_from_value(&args[1]).is_none() {
+        return Err(signal(
+            "wrong-type-argument",
+            vec![Value::symbol("window-configuration-p"), args[1].clone()],
+        ));
+    }
+    Ok(Value::bool(equal_value(&args[0], &args[1], 0)))
+}
+
+fn builtin_current_window_configuration(
+    eval: &mut super::eval::Evaluator,
+    args: Vec<Value>,
+) -> EvalResult {
+    expect_max_args("current-window-configuration", &args, 1)?;
+
+    let frame = if let Some(frame) = args.first() {
+        expect_optional_live_frame_designator(frame, eval)?;
+        if frame.is_nil() {
+            super::window_cmds::builtin_selected_frame(eval, vec![])?
+        } else {
+            frame.clone()
+        }
+    } else {
+        super::window_cmds::builtin_selected_frame(eval, vec![])?
+    };
+
+    Ok(make_window_configuration_value(frame))
+}
+
+fn builtin_set_window_configuration(
+    _eval: &mut super::eval::Evaluator,
+    args: Vec<Value>,
+) -> EvalResult {
+    expect_range_args("set-window-configuration", &args, 1, 3)?;
+    if window_configuration_frame_from_value(&args[0]).is_none() {
+        return Err(signal(
+            "wrong-type-argument",
+            vec![Value::symbol("window-configuration-p"), args[0].clone()],
+        ));
+    }
+    Ok(Value::True)
 }
 
 pub(crate) fn builtin_run_window_configuration_change_hook(
@@ -5051,6 +5167,22 @@ pub(crate) fn builtin_current_time(args: Vec<Value>) -> EvalResult {
     ]))
 }
 
+pub(crate) fn builtin_current_cpu_time(args: Vec<Value>) -> EvalResult {
+    expect_args("current-cpu-time", &args, 0)?;
+    use std::sync::OnceLock;
+    use std::time::Instant;
+    static CPU_TIME_START: OnceLock<Instant> = OnceLock::new();
+    let start = CPU_TIME_START.get_or_init(Instant::now);
+    let ticks = start.elapsed().as_micros() as i64;
+    Ok(Value::cons(Value::Int(ticks), Value::Int(1_000_000)))
+}
+
+pub(crate) fn builtin_current_idle_time(args: Vec<Value>) -> EvalResult {
+    expect_args("current-idle-time", &args, 0)?;
+    // Batch mode does not track UI idle duration; Oracle returns nil here.
+    Ok(Value::Nil)
+}
+
 fn number_or_marker_to_f64(value: NumberOrMarker) -> f64 {
     match value {
         NumberOrMarker::Int(n) => n as f64,
@@ -5759,6 +5891,68 @@ pub(crate) fn builtin_compute_motion(args: Vec<Value>) -> EvalResult {
         ]
     };
     Ok(Value::list(result))
+}
+
+/// `(coordinates-in-window-p COORDINATES WINDOW)` -> COORDINATES or nil.
+///
+/// Batch compatibility: returns the coordinate pair when it's inside WINDOW's
+/// current character bounds, otherwise nil.
+pub(crate) fn builtin_coordinates_in_window_p(
+    eval: &mut super::eval::Evaluator,
+    args: Vec<Value>,
+) -> EvalResult {
+    expect_args("coordinates-in-window-p", &args, 2)?;
+
+    let (x, y) = match &args[0] {
+        Value::Cons(cell) => {
+            let pair = cell.lock().expect("poisoned");
+            let x = match &pair.car {
+                Value::Int(n) => *n as f64,
+                Value::Float(f) => *f,
+                other => {
+                    return Err(signal(
+                        "wrong-type-argument",
+                        vec![Value::symbol("numberp"), other.clone()],
+                    ))
+                }
+            };
+            let y = match &pair.cdr {
+                Value::Int(n) => *n as f64,
+                Value::Float(f) => *f,
+                other => {
+                    return Err(signal(
+                        "wrong-type-argument",
+                        vec![Value::symbol("numberp"), other.clone()],
+                    ))
+                }
+            };
+            (x, y)
+        }
+        other => {
+            return Err(signal(
+                "wrong-type-argument",
+                vec![Value::symbol("consp"), other.clone()],
+            ))
+        }
+    };
+
+    expect_optional_live_window_designator(&args[1], eval)?;
+    let window_arg = args[1].clone();
+    let width = match super::window_cmds::builtin_window_total_width(eval, vec![window_arg.clone()])?
+    {
+        Value::Int(n) => n as f64,
+        _ => 0.0,
+    };
+    let height = match super::window_cmds::builtin_window_total_height(eval, vec![window_arg])? {
+        Value::Int(n) => n as f64,
+        _ => 0.0,
+    };
+
+    if x >= 0.0 && y >= 0.0 && x < width && y < height {
+        Ok(args[0].clone())
+    } else {
+        Ok(Value::Nil)
+    }
 }
 
 /// `(constrain-to-field NEW-POS OLD-POS &optional ESCAPE-FROM-EDGE ONLY-IN-LINE INHIBIT-CAPTURE-PROPERTY)`
@@ -6845,6 +7039,70 @@ fn builtin_make_sparse_keymap(eval: &mut super::eval::Evaluator, args: Vec<Value
     Ok(Value::Int(encode_keymap_handle(id)))
 }
 
+fn clone_keymap_tree(
+    eval: &mut super::eval::Evaluator,
+    source_id: u64,
+    seen: &mut std::collections::HashMap<u64, u64>,
+) -> Result<u64, Flow> {
+    if let Some(existing) = seen.get(&source_id) {
+        return Ok(*existing);
+    }
+
+    let source = eval.keymaps.get(source_id).cloned().ok_or_else(|| {
+        signal(
+            "wrong-type-argument",
+            vec![
+                Value::symbol("keymapp"),
+                Value::Int(encode_keymap_handle(source_id)),
+            ],
+        )
+    })?;
+
+    let clone_id = eval.keymaps.make_sparse_keymap(source.name.clone());
+    seen.insert(source_id, clone_id);
+
+    let mut cloned_bindings = std::collections::HashMap::with_capacity(source.bindings.len());
+    for (event, binding) in &source.bindings {
+        let copied = match binding {
+            KeyBinding::Prefix(child_id) => {
+                KeyBinding::Prefix(clone_keymap_tree(eval, *child_id, seen)?)
+            }
+            _ => binding.clone(),
+        };
+        cloned_bindings.insert(event.clone(), copied);
+    }
+
+    let cloned_default = source
+        .default_binding
+        .as_ref()
+        .map(|binding| match binding.as_ref() {
+            KeyBinding::Prefix(child_id) => {
+                clone_keymap_tree(eval, *child_id, seen).map(KeyBinding::Prefix)
+            }
+            _ => Ok(binding.as_ref().clone()),
+        })
+        .transpose()?
+        .map(Box::new);
+
+    if let Some(target) = eval.keymaps.get_mut(clone_id) {
+        // Oracle keeps parent links shared instead of recursively cloning
+        // parent chains; only nested prefix maps are copied.
+        target.parent = source.parent;
+        target.bindings = cloned_bindings;
+        target.default_binding = cloned_default;
+    }
+    Ok(clone_id)
+}
+
+/// `(copy-keymap KEYMAP)` -> keymap copy.
+fn builtin_copy_keymap(eval: &mut super::eval::Evaluator, args: Vec<Value>) -> EvalResult {
+    expect_args("copy-keymap", &args, 1)?;
+    let keymap_id = expect_keymap_id(eval, &args[0])?;
+    let mut seen = std::collections::HashMap::new();
+    let copied = clone_keymap_tree(eval, keymap_id, &mut seen)?;
+    Ok(Value::Int(encode_keymap_handle(copied)))
+}
+
 /// (define-key KEYMAP KEY DEF &optional REMOVE) -> DEF
 fn builtin_define_key(eval: &mut super::eval::Evaluator, args: Vec<Value>) -> EvalResult {
     expect_min_args("define-key", &args, 3)?;
@@ -6980,6 +7238,33 @@ fn builtin_current_global_map(eval: &mut super::eval::Evaluator, args: Vec<Value
         }
     };
     Ok(Value::Int(encode_keymap_handle(id)))
+}
+
+/// `(current-active-maps &optional OLP POSITION)` -> list of active keymaps.
+fn builtin_current_active_maps(eval: &mut super::eval::Evaluator, args: Vec<Value>) -> EvalResult {
+    expect_max_args("current-active-maps", &args, 2)?;
+
+    let mut maps = Vec::new();
+    if let Some(id) = eval.current_local_map {
+        maps.push(Value::Int(encode_keymap_handle(id)));
+    }
+
+    let global_id = match eval.keymaps.global_map() {
+        Some(id) => id,
+        None => {
+            let id = eval.keymaps.make_keymap();
+            eval.keymaps.set_global_map(id);
+            id
+        }
+    };
+    maps.push(Value::Int(encode_keymap_handle(global_id)));
+
+    Ok(Value::list(maps))
+}
+
+fn builtin_current_minor_mode_maps(args: Vec<Value>) -> EvalResult {
+    expect_args("current-minor-mode-maps", &args, 0)?;
+    Ok(Value::Nil)
 }
 
 /// (keymap-parent KEYMAP) -> keymap-id or nil
@@ -8589,6 +8874,7 @@ pub(crate) fn dispatch_builtin(
                 eval, args,
             ))
         }
+        "coordinates-in-window-p" => return Some(builtin_coordinates_in_window_p(eval, args)),
         "tool-bar-height" => return Some(super::xdisp::builtin_tool_bar_height_eval(eval, args)),
         "tab-bar-height" => return Some(super::xdisp::builtin_tab_bar_height_eval(eval, args)),
 
@@ -8674,6 +8960,7 @@ pub(crate) fn dispatch_builtin(
         // Keymap operations
         "make-keymap" => return Some(builtin_make_keymap(eval, args)),
         "make-sparse-keymap" => return Some(builtin_make_sparse_keymap(eval, args)),
+        "copy-keymap" => return Some(builtin_copy_keymap(eval, args)),
         "define-key" => return Some(builtin_define_key(eval, args)),
         "lookup-key" => return Some(builtin_lookup_key(eval, args)),
         "global-set-key" => return Some(builtin_global_set_key(eval, args)),
@@ -8682,6 +8969,8 @@ pub(crate) fn dispatch_builtin(
         "use-global-map" => return Some(builtin_use_global_map(eval, args)),
         "current-local-map" => return Some(builtin_current_local_map(eval, args)),
         "current-global-map" => return Some(builtin_current_global_map(eval, args)),
+        "current-active-maps" => return Some(builtin_current_active_maps(eval, args)),
+        "current-minor-mode-maps" => return Some(builtin_current_minor_mode_maps(args)),
         "keymap-parent" => return Some(builtin_keymap_parent(eval, args)),
         "set-keymap-parent" => return Some(builtin_set_keymap_parent(eval, args)),
         "keymapp" => return Some(builtin_keymapp(eval, args)),
@@ -9479,6 +9768,13 @@ pub(crate) fn dispatch_builtin(
         }
         "display-buffer" => return Some(super::window_cmds::builtin_display_buffer(eval, args)),
         "pop-to-buffer" => return Some(super::window_cmds::builtin_pop_to_buffer(eval, args)),
+        "current-window-configuration" => {
+            return Some(builtin_current_window_configuration(eval, args))
+        }
+        "set-window-configuration" => return Some(builtin_set_window_configuration(eval, args)),
+        "window-configuration-p" => return Some(builtin_window_configuration_p(args)),
+        "window-configuration-frame" => return Some(builtin_window_configuration_frame(args)),
+        "window-configuration-equal-p" => return Some(builtin_window_configuration_equal_p(args)),
         "selected-frame" => return Some(super::window_cmds::builtin_selected_frame(eval, args)),
         "select-frame" => return Some(super::window_cmds::builtin_select_frame(eval, args)),
         "select-frame-set-input-focus" => {
@@ -10262,6 +10558,7 @@ pub(crate) fn dispatch_builtin(
         // Output / misc
         "identity" => builtin_identity(args),
         "message" => builtin_message(args),
+        "current-message" => builtin_current_message(args),
         "error" => builtin_error(args),
         "command-error-default-function" => builtin_command_error_default_function(args),
         "compute-motion" => builtin_compute_motion(args),
@@ -10281,7 +10578,11 @@ pub(crate) fn dispatch_builtin(
         "syntax-table-p" => super::syntax::builtin_syntax_table_p(args),
         "standard-syntax-table" => super::syntax::builtin_standard_syntax_table(args),
         "current-time" => builtin_current_time(args),
+        "current-cpu-time" => builtin_current_cpu_time(args),
+        "current-idle-time" => builtin_current_idle_time(args),
         "float-time" => builtin_float_time(args),
+        "daemonp" => builtin_daemonp(args),
+        "daemon-initialized" => builtin_daemon_initialized(args),
 
         // File I/O (pure)
         "access-file" => super::fileio::builtin_access_file(args),
@@ -10365,6 +10666,7 @@ pub(crate) fn dispatch_builtin(
         "define-category" => super::category::builtin_define_category(args),
         "category-docstring" => super::category::builtin_category_docstring(args),
         "get-unused-category" => super::category::builtin_get_unused_category(args),
+        "copy-category-table" => super::category::builtin_copy_category_table(args),
         "category-table-p" => super::category::builtin_category_table_p(args),
         "category-table" => super::category::builtin_category_table(args),
         "standard-category-table" => super::category::builtin_standard_category_table(args),
@@ -10957,6 +11259,7 @@ pub(crate) fn dispatch_builtin_pure(name: &str, args: Vec<Value>) -> Option<Eval
         // Output / misc
         "identity" => builtin_identity(args),
         "message" => builtin_message(args),
+        "current-message" => builtin_current_message(args),
         "error" => builtin_error(args),
         "princ" => builtin_princ(args),
         "prin1" => builtin_prin1(args),
@@ -10972,7 +11275,11 @@ pub(crate) fn dispatch_builtin_pure(name: &str, args: Vec<Value>) -> Option<Eval
         "syntax-table-p" => super::syntax::builtin_syntax_table_p(args),
         "standard-syntax-table" => super::syntax::builtin_standard_syntax_table(args),
         "current-time" => builtin_current_time(args),
+        "current-cpu-time" => builtin_current_cpu_time(args),
+        "current-idle-time" => builtin_current_idle_time(args),
         "float-time" => builtin_float_time(args),
+        "daemonp" => builtin_daemonp(args),
+        "daemon-initialized" => builtin_daemon_initialized(args),
         // File I/O (pure)
         "expand-file-name" => super::fileio::builtin_expand_file_name(args),
         "file-truename" => super::fileio::builtin_file_truename(args),
