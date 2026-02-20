@@ -4403,6 +4403,26 @@ fn macroexpand_known_fallback_macro(name: &str, args: &[Value]) -> Result<Option
                 Value::list(vec![Value::symbol("unwind-protect"), protected, restore]),
             ])))
         }
+        "save-mark-and-excursion" => {
+            let saved = Value::symbol("saved-marker");
+            let binding = Value::list(vec![
+                saved.clone(),
+                Value::list(vec![Value::symbol("save-mark-and-excursion--save")]),
+            ]);
+            let mut protected_forms = Vec::with_capacity(args.len() + 1);
+            protected_forms.push(Value::symbol("save-excursion"));
+            protected_forms.extend_from_slice(args);
+            let protected = Value::list(protected_forms);
+            let restore = Value::list(vec![
+                Value::symbol("save-mark-and-excursion--restore"),
+                saved,
+            ]);
+            Ok(Some(Value::list(vec![
+                Value::symbol("let"),
+                Value::list(vec![binding]),
+                Value::list(vec![Value::symbol("unwind-protect"), protected, restore]),
+            ])))
+        }
         _ => Ok(None),
     }
 }
@@ -18137,6 +18157,10 @@ mod tests {
         let save_match_data = builtin_fboundp(&mut eval, vec![Value::symbol("save-match-data")])
             .expect("fboundp should succeed for save-match-data");
         assert!(save_match_data.is_truthy());
+        let save_mark_and_excursion =
+            builtin_fboundp(&mut eval, vec![Value::symbol("save-mark-and-excursion")])
+                .expect("fboundp should succeed for save-mark-and-excursion");
+        assert!(save_mark_and_excursion.is_truthy());
 
         let with_temp_buffer = builtin_fboundp(&mut eval, vec![Value::symbol("with-temp-buffer")])
             .expect("fboundp should succeed for with-temp-buffer");
@@ -18203,6 +18227,10 @@ mod tests {
             builtin_functionp_eval(&mut eval, vec![Value::symbol("save-match-data")])
                 .expect("functionp should reject save-match-data macro symbol");
         assert!(save_match_data_symbol.is_nil());
+        let save_mark_and_excursion_symbol =
+            builtin_functionp_eval(&mut eval, vec![Value::symbol("save-mark-and-excursion")])
+                .expect("functionp should reject save-mark-and-excursion macro symbol");
+        assert!(save_mark_and_excursion_symbol.is_nil());
         let declare_symbol = builtin_functionp_eval(&mut eval, vec![Value::symbol("declare")])
             .expect("functionp should reject declare symbol");
         assert!(declare_symbol.is_nil());
@@ -18463,6 +18491,10 @@ mod tests {
             builtin_symbol_function(&mut eval, vec![Value::symbol("save-match-data")])
                 .expect("symbol-function should resolve save-match-data as a macro");
         assert!(matches!(save_match_data_macro, Value::Macro(_)));
+        let save_mark_and_excursion_macro =
+            builtin_symbol_function(&mut eval, vec![Value::symbol("save-mark-and-excursion")])
+                .expect("symbol-function should resolve save-mark-and-excursion as a macro");
+        assert!(matches!(save_mark_and_excursion_macro, Value::Macro(_)));
 
         let declare_macro = builtin_symbol_function(&mut eval, vec![Value::symbol("declare")])
             .expect("symbol-function should resolve declare as a macro");
@@ -18604,6 +18636,17 @@ mod tests {
             }
             other => panic!("expected cons arity pair, got {other:?}"),
         }
+        let save_mark_and_excursion_arity =
+            builtin_func_arity_eval(&mut eval, vec![Value::symbol("save-mark-and-excursion")])
+                .expect("func-arity should resolve save-mark-and-excursion macro symbol");
+        match &save_mark_and_excursion_arity {
+            Value::Cons(cell) => {
+                let pair = cell.lock().expect("poisoned");
+                assert_eq!(pair.car, Value::Int(0));
+                assert_eq!(pair.cdr, Value::symbol("many"));
+            }
+            other => panic!("expected cons arity pair, got {other:?}"),
+        }
 
         let inline_arity = builtin_func_arity_eval(&mut eval, vec![Value::symbol("inline")])
             .expect("func-arity should resolve inline special-form symbol");
@@ -18731,6 +18774,10 @@ mod tests {
             builtin_indirect_function(&mut eval, vec![Value::symbol("save-match-data")])
                 .expect("indirect-function should resolve save-match-data as a macro");
         assert!(matches!(save_match_data_macro, Value::Macro(_)));
+        let save_mark_and_excursion_macro =
+            builtin_indirect_function(&mut eval, vec![Value::symbol("save-mark-and-excursion")])
+                .expect("indirect-function should resolve save-mark-and-excursion as a macro");
+        assert!(matches!(save_mark_and_excursion_macro, Value::Macro(_)));
 
         eval.obarray_mut()
             .set_symbol_function("alias-car", Value::symbol("car"));
@@ -18791,6 +18838,10 @@ mod tests {
             builtin_macrop_eval(&mut eval, vec![Value::symbol("save-match-data")])
                 .expect("macrop should handle save-match-data symbol input");
         assert!(save_match_data_symbol.is_truthy());
+        let save_mark_and_excursion_symbol =
+            builtin_macrop_eval(&mut eval, vec![Value::symbol("save-mark-and-excursion")])
+                .expect("macrop should handle save-mark-and-excursion symbol input");
+        assert!(save_mark_and_excursion_symbol.is_truthy());
 
         let plain_symbol = builtin_macrop_eval(&mut eval, vec![Value::symbol("if")])
             .expect("macrop should handle non-macro symbols");
@@ -18899,6 +18950,40 @@ mod tests {
                         Value::symbol("set-match-data"),
                         Value::symbol("saved-match-data"),
                         Value::True,
+                    ]),
+                ]),
+            ])
+        );
+
+        let save_mark_and_excursion = builtin_macroexpand_eval(
+            &mut eval,
+            vec![Value::list(vec![
+                Value::symbol("save-mark-and-excursion"),
+                Value::list(vec![Value::symbol("setq"), Value::symbol("x"), Value::Int(1)]),
+            ])],
+        )
+        .expect("macroexpand should expand save-mark-and-excursion");
+        assert_eq!(
+            save_mark_and_excursion,
+            Value::list(vec![
+                Value::symbol("let"),
+                Value::list(vec![Value::list(vec![
+                    Value::symbol("saved-marker"),
+                    Value::list(vec![Value::symbol("save-mark-and-excursion--save")]),
+                ])]),
+                Value::list(vec![
+                    Value::symbol("unwind-protect"),
+                    Value::list(vec![
+                        Value::symbol("save-excursion"),
+                        Value::list(vec![
+                            Value::symbol("setq"),
+                            Value::symbol("x"),
+                            Value::Int(1),
+                        ]),
+                    ]),
+                    Value::list(vec![
+                        Value::symbol("save-mark-and-excursion--restore"),
+                        Value::symbol("saved-marker"),
                     ]),
                 ]),
             ])

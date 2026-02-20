@@ -1841,6 +1841,7 @@ impl Evaluator {
             "provide" => self.sf_provide(tail),
             "require" => self.sf_require(tail),
             "save-excursion" => self.sf_save_excursion(tail),
+            "save-mark-and-excursion" => self.sf_save_mark_and_excursion(tail),
             "save-restriction" => self.sf_save_restriction(tail),
             "save-match-data" => self.sf_save_match_data(tail),
             "with-current-buffer" => self.sf_with_current_buffer(tail),
@@ -2821,6 +2822,18 @@ impl Evaluator {
                 buf.mark = saved_mark;
             }
         }
+        result
+    }
+
+    fn sf_save_mark_and_excursion(&mut self, tail: &[Expr]) -> EvalResult {
+        // Save mark-active dynamic/global state in addition to save-excursion state.
+        let saved_mark_active = match self.eval_symbol("mark-active") {
+            Ok(value) => value,
+            Err(Flow::Signal(sig)) if sig.symbol == "void-variable" => Value::Nil,
+            Err(flow) => return Err(flow),
+        };
+        let result = self.sf_save_excursion(tail);
+        self.assign("mark-active", saved_mark_active);
         result
     }
 
@@ -5357,6 +5370,27 @@ mod tests {
         assert_eq!(results[2], "OK (1 2)");
         assert_eq!(results[3], "OK error");
         assert_eq!(results[4], "OK (1 2)");
+    }
+
+    #[test]
+    fn save_mark_and_excursion_restores_mark_and_mark_active() {
+        let results = eval_all(
+            "(save-current-buffer
+               (let ((b (get-buffer-create \"smx-eval\")))
+                 (set-buffer b)
+                 (erase-buffer)
+                 (insert \"abcdef\")
+                 (goto-char 2)
+                 (set-mark 5)
+                 (setq mark-active nil)
+                 (let ((before (list (point) (mark) mark-active)))
+                   (save-mark-and-excursion
+                     (goto-char 4)
+                     (set-mark 3)
+                     (setq mark-active t))
+                   (list before (point) (mark) mark-active))))",
+        );
+        assert_eq!(results[0], "OK ((2 5 nil) 2 5 nil)");
     }
 
     #[test]

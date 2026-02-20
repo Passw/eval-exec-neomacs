@@ -78,6 +78,7 @@ fn is_evaluator_special_form_name(name: &str) -> bool {
             | "provide"
             | "require"
             | "save-excursion"
+            | "save-mark-and-excursion"
             | "save-restriction"
             | "save-match-data"
             | "with-current-buffer"
@@ -219,6 +220,7 @@ fn fallback_macro_spec(name: &str) -> Option<FallbackMacroSpec> {
         | "with-temp-buffer"
         | "with-output-to-string"
         | "track-mouse"
+        | "save-mark-and-excursion"
         | "save-match-data"
         | "declare"
         | "eval-when-compile"
@@ -4395,6 +4397,20 @@ mod tests {
     #[test]
     fn fallback_macro_save_match_data_is_zero_or_many() {
         let macro_value = fallback_macro_value("save-match-data").expect("fallback macro exists");
+        let result = builtin_func_arity(vec![macro_value]).unwrap();
+        if let Value::Cons(cell) = &result {
+            let pair = cell.lock().unwrap();
+            assert_eq!(pair.car.as_int(), Some(0));
+            assert_eq!(pair.cdr.as_symbol_name(), Some("many"));
+        } else {
+            panic!("expected cons cell");
+        }
+    }
+
+    #[test]
+    fn fallback_macro_save_mark_and_excursion_is_zero_or_many() {
+        let macro_value =
+            fallback_macro_value("save-mark-and-excursion").expect("fallback macro exists");
         let result = builtin_func_arity(vec![macro_value]).unwrap();
         if let Value::Cons(cell) = &result {
             let pair = cell.lock().unwrap();
