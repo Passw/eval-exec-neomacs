@@ -53,6 +53,10 @@
 (length< '(1 . 2) 2)
 (length= '(1 . 2) 1)
 (length> [1 2 3] 2)
+(length (make-char-table nil nil))
+(length< (make-char-table nil nil) 100)
+(length= (make-char-table nil nil) 4194303)
+(length> (make-char-table nil nil) 4194302)
 (condition-case err (length< 1 2) (error err))
 (condition-case err (length< '(1 2) "2") (error err))
 

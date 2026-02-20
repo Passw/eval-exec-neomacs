@@ -1115,6 +1115,7 @@ fn vector_sequence_length(
     vector: &std::sync::Arc<std::sync::Mutex<Vec<Value>>>,
 ) -> i64 {
     super::chartable::bool_vector_length(sequence)
+        .or_else(|| super::chartable::char_table_length(sequence))
         .unwrap_or_else(|| vector.lock().expect("poisoned").len() as i64)
 }
 
@@ -17288,6 +17289,39 @@ mod tests {
         assert_eq!(eq, Value::True);
 
         let gt = dispatch_builtin_pure("length>", vec![bv, Value::Int(2)])
+            .expect("builtin length> should resolve")
+            .expect("builtin length> should evaluate");
+        assert_eq!(gt, Value::True);
+    }
+
+    #[test]
+    fn pure_dispatch_typed_length_family_uses_char_table_logical_length() {
+        let ct = Value::vector(vec![
+            Value::symbol("--char-table--"),
+            Value::Nil,
+            Value::Nil,
+            Value::symbol("syntax-table"),
+            Value::Int(0),
+            Value::Int(i64::MIN + 1),
+            Value::Nil,
+        ]);
+
+        let len = dispatch_builtin_pure("length", vec![ct.clone()])
+            .expect("builtin length should resolve")
+            .expect("builtin length should evaluate");
+        assert_eq!(len, Value::Int(0x3F_FFFF));
+
+        let lt = dispatch_builtin_pure("length<", vec![ct.clone(), Value::Int(100)])
+            .expect("builtin length< should resolve")
+            .expect("builtin length< should evaluate");
+        assert_eq!(lt, Value::Nil);
+
+        let eq = dispatch_builtin_pure("length=", vec![ct.clone(), Value::Int(0x3F_FFFF)])
+            .expect("builtin length= should resolve")
+            .expect("builtin length= should evaluate");
+        assert_eq!(eq, Value::True);
+
+        let gt = dispatch_builtin_pure("length>", vec![ct, Value::Int(0)])
             .expect("builtin length> should resolve")
             .expect("builtin length> should evaluate");
         assert_eq!(gt, Value::True);

@@ -41,10 +41,14 @@
 41	(length< '(1 . 2) 2)	OK t
 42	(length= '(1 . 2) 1)	OK t
 43	(length> [1 2 3] 2)	OK t
-44	(condition-case err (length< 1 2) (error err))	OK (wrong-type-argument sequencep 1)
-45	(condition-case err (length< '(1 2) "2") (error err))	OK (wrong-type-argument fixnump "2")
-46	(substring-no-properties "abcdef" 1 4)	OK "bcd"
-47	(condition-case err (substring-no-properties) (error err))	OK (wrong-number-of-arguments substring-no-properties 0)
-48	(format-message "a=%s" 1)	OK "a=1"
-49	(condition-case err (format-message) (error err))	OK (wrong-number-of-arguments format-message 0)
-50	(condition-case err (format-message 1) (error err))	OK (wrong-type-argument stringp 1)
+44	(length (make-char-table nil nil))	OK 4194303
+45	(length< (make-char-table nil nil) 100)	OK nil
+46	(length= (make-char-table nil nil) 4194303)	OK t
+47	(length> (make-char-table nil nil) 4194302)	OK t
+48	(condition-case err (length< 1 2) (error err))	OK (wrong-type-argument sequencep 1)
+49	(condition-case err (length< '(1 2) "2") (error err))	OK (wrong-type-argument fixnump "2")
+50	(substring-no-properties "abcdef" 1 4)	OK "bcd"
+51	(condition-case err (substring-no-properties) (error err))	OK (wrong-number-of-arguments substring-no-properties 0)
+52	(format-message "a=%s" 1)	OK "a=1"
+53	(condition-case err (format-message) (error err))	OK (wrong-number-of-arguments format-message 0)
+54	(condition-case err (format-message 1) (error err))	OK (wrong-type-argument stringp 1)

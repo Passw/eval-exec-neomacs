@@ -35,6 +35,7 @@ const CT_EXTRA_COUNT: usize = 4; // Value::Int — number of extra slots
 const CT_EXTRA_START: usize = 5; // first extra slot (if any)
 const CT_ALL_CHARS_SENTINEL: i64 = i64::MIN; // wildcard range set via RANGE=t
 const CT_BASE_FALLBACK_SENTINEL: i64 = i64::MIN + 1; // initial/default char fallback
+const CT_LOGICAL_LENGTH: i64 = 0x3F_FFFF;
 
 // Bool-vector fixed-layout indices:
 const BV_SIZE: usize = 1; // Value::Int — logical length
@@ -76,6 +77,19 @@ pub(crate) fn bool_vector_length(v: &Value) -> Option<i64> {
         Value::Int(n) => *n,
         _ => 0,
     })
+}
+
+/// Return the logical sequence length if `v` is a char-table.
+pub(crate) fn char_table_length(v: &Value) -> Option<i64> {
+    let Value::Vector(arc) = v else {
+        return None;
+    };
+    let vec = arc.lock().expect("poisoned");
+    if vec.len() >= CT_EXTRA_START && matches!(&vec[0], Value::Symbol(s) if s == CHAR_TABLE_TAG) {
+        Some(CT_LOGICAL_LENGTH)
+    } else {
+        None
+    }
 }
 
 // ---------------------------------------------------------------------------
