@@ -9877,7 +9877,12 @@ pub(crate) fn dispatch_builtin(
         "bool-vector-count-population" => {
             super::chartable::builtin_bool_vector_count_population(args)
         }
+        "bool-vector-count-consecutive" => {
+            super::chartable::builtin_bool_vector_count_consecutive(args)
+        }
         "bool-vector-intersection" => super::chartable::builtin_bool_vector_intersection(args),
+        "bool-vector-not" => super::chartable::builtin_bool_vector_not(args),
+        "bool-vector-set-difference" => super::chartable::builtin_bool_vector_set_difference(args),
         "bool-vector-union" => super::chartable::builtin_bool_vector_union(args),
         "bool-vector-exclusive-or" => super::chartable::builtin_bool_vector_exclusive_or(args),
         "bool-vector-subsetp" => super::chartable::builtin_bool_vector_subsetp(args),

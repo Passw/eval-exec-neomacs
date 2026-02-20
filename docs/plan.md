@@ -28,6 +28,41 @@ Last updated: 2026-02-20
 
 ## Doing
 
+- Added bool-vector extended parity slice (`bool-vector-not`, `bool-vector-set-difference`, `bool-vector-count-consecutive`) and aligned length-error payloads:
+  - runtime changes:
+    - `rust/neovm-core/src/elisp/chartable.rs`
+      - implemented:
+        - `bool-vector-not` (`(1 . 2)`)
+        - `bool-vector-set-difference` (`(2 . 3)`)
+        - `bool-vector-count-consecutive` (`(3 . 3)`)
+      - aligned bool-vector length mismatch payload shapes to oracle for:
+        - `bool-vector-intersection`
+        - `bool-vector-union`
+        - `bool-vector-exclusive-or`
+        - `bool-vector-subsetp`
+      - added unit coverage for the new operations and count semantics.
+    - `rust/neovm-core/src/elisp/builtins.rs`
+      - wired all three bool-vector builtins into dispatch.
+    - `rust/neovm-core/src/elisp/builtin_registry.rs`
+      - registered:
+        - `bool-vector-not`
+        - `bool-vector-set-difference`
+        - `bool-vector-count-consecutive`
+    - `rust/neovm-core/src/elisp/subr_info.rs`
+      - added arity metadata + assertions for the three builtins above.
+  - vm-compat corpus changes:
+    - added:
+      - `test/neovm/vm-compat/cases/bool-vector-extended-semantics.forms`
+      - `test/neovm/vm-compat/cases/bool-vector-extended-semantics.expected.tsv`
+    - wired case into:
+      - `test/neovm/vm-compat/cases/default.list`
+  - verified:
+    - `cargo test --manifest-path rust/neovm-core/Cargo.toml bool_vector_ -- --nocapture` (pass)
+    - `make -C test/neovm/vm-compat check-one-neovm CASE=cases/bool-vector-extended-semantics` (pass, `27/27`)
+    - `make -C test/neovm/vm-compat check-builtin-registry-all` (pass; `1217` dispatch / `1216` core)
+    - `make -C test/neovm/vm-compat compat-progress` (pass; primitive-subr coverage now registry `816/618`, runtime `864/570`)
+    - `make -C test/neovm/vm-compat check-all-neovm-strict` (pass; case inventory `798`)
+
 - Added `abort-minibuffers` builtin compatibility slice and command classification parity:
   - runtime changes:
     - `rust/neovm-core/src/elisp/minibuffer.rs`

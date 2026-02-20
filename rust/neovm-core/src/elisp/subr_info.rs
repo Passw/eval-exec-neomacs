@@ -724,9 +724,14 @@ fn subr_arity_value(name: &str) -> Value {
         "base64-encode-string" | "base64url-encode-string" => arity_cons(1, Some(2)),
         "md5" => arity_cons(1, Some(5)),
         "bool-vector-p" | "bool-vector-count-population" => arity_cons(1, Some(1)),
+        "bool-vector-count-consecutive" => arity_cons(3, Some(3)),
+        "bool-vector-not" => arity_cons(1, Some(2)),
         "bool-vector-subsetp" => arity_cons(2, Some(2)),
         "make-bool-vector" => arity_cons(2, Some(2)),
-        "bool-vector-exclusive-or" | "bool-vector-intersection" | "bool-vector-union" => {
+        "bool-vector-exclusive-or"
+        | "bool-vector-intersection"
+        | "bool-vector-set-difference"
+        | "bool-vector-union" => {
             arity_cons(2, Some(3))
         }
         "activate-mark" | "auto-composition-mode" | "deactivate-mark" => arity_cons(0, Some(1)),
@@ -2080,9 +2085,12 @@ mod tests {
         assert_subr_arity("base64url-encode-string", 1, Some(2));
         assert_subr_arity("bool-vector-p", 1, Some(1));
         assert_subr_arity("bool-vector-count-population", 1, Some(1));
+        assert_subr_arity("bool-vector-count-consecutive", 3, Some(3));
+        assert_subr_arity("bool-vector-not", 1, Some(2));
         assert_subr_arity("bool-vector-subsetp", 2, Some(2));
         assert_subr_arity("bool-vector-exclusive-or", 2, Some(3));
         assert_subr_arity("bool-vector-intersection", 2, Some(3));
+        assert_subr_arity("bool-vector-set-difference", 2, Some(3));
         assert_subr_arity("bool-vector-union", 2, Some(3));
     }
 

@@ -118,6 +118,28 @@ fn expect_int(value: &Value) -> Result<i64, Flow> {
     }
 }
 
+/// Extract a non-negative integer (for index-like args), signaling with
+/// `wholenump` on any mismatch.
+fn expect_wholenump(value: &Value) -> Result<i64, Flow> {
+    let n = match value {
+        Value::Int(n) => *n,
+        Value::Char(c) => *c as i64,
+        _ => {
+            return Err(signal(
+                "wrong-type-argument",
+                vec![Value::symbol("wholenump"), value.clone()],
+            ))
+        }
+    };
+    if n < 0 {
+        return Err(signal(
+            "wrong-type-argument",
+            vec![Value::symbol("wholenump"), value.clone()],
+        ));
+    }
+    Ok(n)
+}
+
 /// Data-pairs region start index for a char-table vector.
 fn ct_data_start(vec: &[Value]) -> usize {
     let extra_count = match &vec[CT_EXTRA_COUNT] {
@@ -512,40 +534,20 @@ fn bv_bits(vec: &[Value]) -> Vec<bool> {
 /// `(bool-vector-count-population BV)` -- count the number of true values.
 pub(crate) fn builtin_bool_vector_count_population(args: Vec<Value>) -> EvalResult {
     expect_args("bool-vector-count-population", &args, 1)?;
-    let bv = &args[0];
-    let arc = match bv {
-        Value::Vector(a) if is_bool_vector(bv) => a,
-        _ => return Err(wrong_type("bool-vector-p", bv)),
-    };
-    let vec = arc.lock().expect("poisoned");
-    let bits = bv_bits(&vec);
+    let (bits, _len) = extract_bv_bits(&args[0])?;
     let count = bits.iter().filter(|&&b| b).count();
     Ok(Value::Int(count as i64))
 }
 
-/// Helper to extract two bool-vectors of equal length, returning their bits.
-fn extract_bv_pair(name: &str, a: &Value, b: &Value) -> Result<(Vec<bool>, Vec<bool>, i64), Flow> {
-    let arc_a = match a {
-        Value::Vector(arc) if is_bool_vector(a) => arc,
-        _ => return Err(wrong_type("bool-vector-p", a)),
+fn extract_bv_bits(value: &Value) -> Result<(Vec<bool>, i64), Flow> {
+    let arc = match value {
+        Value::Vector(arc) if is_bool_vector(value) => arc,
+        _ => return Err(wrong_type("bool-vector-p", value)),
     };
-    let arc_b = match b {
-        Value::Vector(arc) if is_bool_vector(b) => arc,
-        _ => return Err(wrong_type("bool-vector-p", b)),
-    };
-    let vec_a = arc_a.lock().expect("poisoned");
-    let vec_b = arc_b.lock().expect("poisoned");
-    let len_a = bv_length(&vec_a);
-    let len_b = bv_length(&vec_b);
-    if len_a != len_b {
-        return Err(signal(
-            "wrong-length-argument",
-            vec![Value::symbol(name), Value::Int(len_a), Value::Int(len_b)],
-        ));
-    }
-    let bits_a = bv_bits(&vec_a);
-    let bits_b = bv_bits(&vec_b);
-    Ok((bits_a, bits_b, len_a))
+    let vec = arc.lock().expect("poisoned");
+    let len = bv_length(&vec);
+    let bits = bv_bits(&vec);
+    Ok((bits, len))
 }
 
 /// Build a bool-vector `Value` from a slice of bools.
@@ -566,7 +568,14 @@ fn bv_from_bits(bits: &[bool]) -> Value {
 pub(crate) fn builtin_bool_vector_intersection(args: Vec<Value>) -> EvalResult {
     expect_min_args("bool-vector-intersection", &args, 2)?;
     expect_max_args("bool-vector-intersection", &args, 3)?;
-    let (bits_a, bits_b, _len) = extract_bv_pair("bool-vector-intersection", &args[0], &args[1])?;
+    let (bits_a, len_a) = extract_bv_bits(&args[0])?;
+    let (bits_b, len_b) = extract_bv_bits(&args[1])?;
+    if len_a != len_b {
+        return Err(signal(
+            "wrong-length-argument",
+            vec![Value::Int(len_a), Value::Int(len_b)],
+        ));
+    }
     let result_bits: Vec<bool> = bits_a
         .iter()
         .zip(bits_b.iter())
@@ -574,7 +583,7 @@ pub(crate) fn builtin_bool_vector_intersection(args: Vec<Value>) -> EvalResult {
         .collect();
 
     if args.len() == 3 {
-        store_bv_result(&args[2], &result_bits)?;
+        store_bv_result_with_expected_lengths(&args[2], &result_bits, &[len_a, len_b])?;
         Ok(args[2].clone())
     } else {
         Ok(bv_from_bits(&result_bits))
@@ -585,7 +594,14 @@ pub(crate) fn builtin_bool_vector_intersection(args: Vec<Value>) -> EvalResult {
 pub(crate) fn builtin_bool_vector_union(args: Vec<Value>) -> EvalResult {
     expect_min_args("bool-vector-union", &args, 2)?;
     expect_max_args("bool-vector-union", &args, 3)?;
-    let (bits_a, bits_b, _len) = extract_bv_pair("bool-vector-union", &args[0], &args[1])?;
+    let (bits_a, len_a) = extract_bv_bits(&args[0])?;
+    let (bits_b, len_b) = extract_bv_bits(&args[1])?;
+    if len_a != len_b {
+        return Err(signal(
+            "wrong-length-argument",
+            vec![Value::Int(len_a), Value::Int(len_b)],
+        ));
+    }
     let result_bits: Vec<bool> = bits_a
         .iter()
         .zip(bits_b.iter())
@@ -593,7 +609,7 @@ pub(crate) fn builtin_bool_vector_union(args: Vec<Value>) -> EvalResult {
         .collect();
 
     if args.len() == 3 {
-        store_bv_result(&args[2], &result_bits)?;
+        store_bv_result_with_expected_lengths(&args[2], &result_bits, &[len_a, len_b])?;
         Ok(args[2].clone())
     } else {
         Ok(bv_from_bits(&result_bits))
@@ -604,7 +620,14 @@ pub(crate) fn builtin_bool_vector_union(args: Vec<Value>) -> EvalResult {
 pub(crate) fn builtin_bool_vector_exclusive_or(args: Vec<Value>) -> EvalResult {
     expect_min_args("bool-vector-exclusive-or", &args, 2)?;
     expect_max_args("bool-vector-exclusive-or", &args, 3)?;
-    let (bits_a, bits_b, _len) = extract_bv_pair("bool-vector-exclusive-or", &args[0], &args[1])?;
+    let (bits_a, len_a) = extract_bv_bits(&args[0])?;
+    let (bits_b, len_b) = extract_bv_bits(&args[1])?;
+    if len_a != len_b {
+        return Err(signal(
+            "wrong-length-argument",
+            vec![Value::Int(len_a), Value::Int(len_b)],
+        ));
+    }
     let result_bits: Vec<bool> = bits_a
         .iter()
         .zip(bits_b.iter())
@@ -612,48 +635,100 @@ pub(crate) fn builtin_bool_vector_exclusive_or(args: Vec<Value>) -> EvalResult {
         .collect();
 
     if args.len() == 3 {
-        store_bv_result(&args[2], &result_bits)?;
+        store_bv_result_with_expected_lengths(&args[2], &result_bits, &[len_a, len_b])?;
         Ok(args[2].clone())
     } else {
         Ok(bv_from_bits(&result_bits))
     }
 }
 
-/// `(bool-vector-complement A &optional B)` -- bitwise NOT.
+/// `(bool-vector-not A &optional B)` -- bitwise NOT.
 ///
 /// If B is provided, store result in B and return B; otherwise return a new
 /// bool-vector.
-#[cfg(test)]
-pub(crate) fn builtin_bool_vector_complement(args: Vec<Value>) -> EvalResult {
-    expect_min_args("bool-vector-complement", &args, 1)?;
-    expect_max_args("bool-vector-complement", &args, 2)?;
-    let arc = match &args[0] {
-        Value::Vector(arc) if is_bool_vector(&args[0]) => arc,
-        _ => return Err(wrong_type("bool-vector-p", &args[0])),
-    };
-    let vec = arc.lock().expect("poisoned");
-    let bits = bv_bits(&vec);
-    drop(vec);
+pub(crate) fn builtin_bool_vector_not(args: Vec<Value>) -> EvalResult {
+    expect_min_args("bool-vector-not", &args, 1)?;
+    expect_max_args("bool-vector-not", &args, 2)?;
+    let (bits, len_a) = extract_bv_bits(&args[0])?;
     let result_bits: Vec<bool> = bits.into_iter().map(|b| !b).collect();
     if args.len() == 2 {
-        store_bv_result(&args[1], &result_bits)?;
+        store_bv_result_with_expected_lengths(&args[1], &result_bits, &[len_a])?;
         Ok(args[1].clone())
     } else {
         Ok(bv_from_bits(&result_bits))
     }
 }
 
+/// `(bool-vector-set-difference A B &optional C)` -- `A & (not B)`.
+pub(crate) fn builtin_bool_vector_set_difference(args: Vec<Value>) -> EvalResult {
+    expect_min_args("bool-vector-set-difference", &args, 2)?;
+    expect_max_args("bool-vector-set-difference", &args, 3)?;
+    let (bits_a, len_a) = extract_bv_bits(&args[0])?;
+    let (bits_b, len_b) = extract_bv_bits(&args[1])?;
+    if len_a != len_b {
+        return Err(signal(
+            "wrong-length-argument",
+            vec![Value::Int(len_a), Value::Int(len_b)],
+        ));
+    }
+    let result_bits: Vec<bool> = bits_a
+        .iter()
+        .zip(bits_b.iter())
+        .map(|(&a, &b)| a && !b)
+        .collect();
+    if args.len() == 3 {
+        store_bv_result_with_expected_lengths(&args[2], &result_bits, &[len_a, len_b])?;
+        Ok(args[2].clone())
+    } else {
+        Ok(bv_from_bits(&result_bits))
+    }
+}
+
+/// `(bool-vector-count-consecutive BV BOOL START)` -- count matching bits from
+/// START until the first non-matching bit or the end.
+pub(crate) fn builtin_bool_vector_count_consecutive(args: Vec<Value>) -> EvalResult {
+    expect_args("bool-vector-count-consecutive", &args, 3)?;
+    let (bits, len) = extract_bv_bits(&args[0])?;
+    let target = args[1].is_truthy();
+    let start = expect_wholenump(&args[2])?;
+    if start > len {
+        return Err(signal(
+            "args-out-of-range",
+            vec![args[0].clone(), Value::Int(start)],
+        ));
+    }
+    let mut count = 0usize;
+    for bit in bits.iter().skip(start as usize) {
+        if *bit != target {
+            break;
+        }
+        count += 1;
+    }
+    Ok(Value::Int(count as i64))
+}
+
 /// `(bool-vector-subsetp A B)` -- return t if every true bit in A is also true
 /// in B.
 pub(crate) fn builtin_bool_vector_subsetp(args: Vec<Value>) -> EvalResult {
     expect_args("bool-vector-subsetp", &args, 2)?;
-    let (bits_a, bits_b, _len) = extract_bv_pair("bool-vector-subsetp", &args[0], &args[1])?;
+    let (bits_a, len_a) = extract_bv_bits(&args[0])?;
+    let (bits_b, len_b) = extract_bv_bits(&args[1])?;
+    if len_a != len_b {
+        return Err(signal(
+            "wrong-length-argument",
+            vec![Value::Int(len_a), Value::Int(len_b), Value::Int(len_b)],
+        ));
+    }
     let is_subset = bits_a.iter().zip(bits_b.iter()).all(|(&a, &b)| !a || b);
     Ok(Value::bool(is_subset))
 }
 
 /// Store bits into an existing bool-vector (for the optional dest argument).
-fn store_bv_result(dest: &Value, bits: &[bool]) -> Result<(), Flow> {
+fn store_bv_result_with_expected_lengths(
+    dest: &Value,
+    bits: &[bool],
+    expected_lengths: &[i64],
+) -> Result<(), Flow> {
     let arc = match dest {
         Value::Vector(a) if is_bool_vector(dest) => a,
         _ => return Err(wrong_type("bool-vector-p", dest)),
@@ -661,10 +736,9 @@ fn store_bv_result(dest: &Value, bits: &[bool]) -> Result<(), Flow> {
     let mut vec = arc.lock().expect("poisoned");
     let len = bv_length(&vec) as usize;
     if len != bits.len() {
-        return Err(signal(
-            "wrong-length-argument",
-            vec![Value::Int(len as i64), Value::Int(bits.len() as i64)],
-        ));
+        let mut payload: Vec<Value> = expected_lengths.iter().copied().map(Value::Int).collect();
+        payload.push(Value::Int(len as i64));
+        return Err(signal("wrong-length-argument", payload));
     }
     for (i, &b) in bits.iter().enumerate() {
         vec[2 + i] = Value::Int(if b { 1 } else { 0 });
@@ -977,19 +1051,53 @@ mod tests {
     }
 
     #[test]
-    fn bool_vector_complement() {
+    fn bool_vector_not() {
         let a = make_bv(&[true, false, true, false]);
-        let result = builtin_bool_vector_complement(vec![a]).unwrap();
+        let result = builtin_bool_vector_not(vec![a]).unwrap();
         assert_bv_bits(&result, &[false, true, false, true]);
     }
 
     #[test]
-    fn bool_vector_complement_into_dest() {
+    fn bool_vector_not_into_dest() {
         let a = make_bv(&[false, false, true]);
         let dest = make_bv(&[false, false, false]);
-        let result = builtin_bool_vector_complement(vec![a, dest.clone()]).unwrap();
+        let result = builtin_bool_vector_not(vec![a, dest.clone()]).unwrap();
         assert_eq!(result, dest);
         assert_bv_bits(&dest, &[true, true, false]);
+    }
+
+    #[test]
+    fn bool_vector_set_difference() {
+        let a = make_bv(&[true, true, false, true]);
+        let b = make_bv(&[false, true, true, false]);
+        let result = builtin_bool_vector_set_difference(vec![a, b]).unwrap();
+        assert_bv_bits(&result, &[true, false, false, true]);
+    }
+
+    #[test]
+    fn bool_vector_count_consecutive() {
+        let bv = make_bv(&[true, true, false, false, true, true]);
+        let count_true_start = builtin_bool_vector_count_consecutive(vec![
+            bv.clone(),
+            Value::True,
+            Value::Int(0),
+        ])
+        .unwrap();
+        let count_false_middle = builtin_bool_vector_count_consecutive(vec![
+            bv.clone(),
+            Value::Nil,
+            Value::Int(2),
+        ])
+        .unwrap();
+        let count_true_mismatch = builtin_bool_vector_count_consecutive(vec![
+            bv.clone(),
+            Value::True,
+            Value::Int(2),
+        ])
+        .unwrap();
+        assert!(matches!(count_true_start, Value::Int(2)));
+        assert!(matches!(count_false_middle, Value::Int(2)));
+        assert!(matches!(count_true_mismatch, Value::Int(0)));
     }
 
     #[test]
@@ -1082,8 +1190,8 @@ mod tests {
         assert!(builtin_make_bool_vector(vec![]).is_err());
         assert!(builtin_bool_vector_p(vec![]).is_err());
         assert!(builtin_bool_vector_subsetp(vec![Value::Nil]).is_err());
-        assert!(builtin_bool_vector_complement(vec![]).is_err());
-        assert!(builtin_bool_vector_complement(vec![Value::Nil, Value::Nil, Value::Nil]).is_err());
+        assert!(builtin_bool_vector_not(vec![]).is_err());
+        assert!(builtin_bool_vector_not(vec![Value::Nil, Value::Nil, Value::Nil]).is_err());
     }
 
     #[test]
