@@ -737,6 +737,37 @@ fn subr_arity_value(name: &str) -> Value {
         | "bool-vector-union" => {
             arity_cons(2, Some(3))
         }
+        "arrayp"
+        | "atom"
+        | "bufferp"
+        | "char-to-string"
+        | "consp"
+        | "downcase"
+        | "float"
+        | "floatp"
+        | "integerp"
+        | "keywordp"
+        | "listp"
+        | "nlistp"
+        | "null"
+        | "number-to-string"
+        | "numberp"
+        | "sequencep"
+        | "string-to-char"
+        | "stringp"
+        | "symbolp"
+        | "type-of"
+        | "upcase"
+        | "vectorp" => arity_cons(1, Some(1)),
+        "ceiling" | "characterp" | "floor" | "round" | "string-to-number" | "truncate" => {
+            arity_cons(1, Some(2))
+        }
+        "substring" => arity_cons(1, Some(3)),
+        "aref" | "eq" | "eql" | "equal" | "make-vector" | "string-equal" | "string-lessp"
+        | "throw" => {
+            arity_cons(2, Some(2))
+        }
+        "aset" => arity_cons(3, Some(3)),
         "activate-mark" | "auto-composition-mode" | "deactivate-mark" => arity_cons(0, Some(1)),
         "clear-composition-cache" => arity_cons(0, Some(0)),
         "composition-sort-rules" => arity_cons(1, Some(1)),
@@ -2099,6 +2130,48 @@ mod tests {
         assert_subr_arity("bool-vector-intersection", 2, Some(3));
         assert_subr_arity("bool-vector-set-difference", 2, Some(3));
         assert_subr_arity("bool-vector-union", 2, Some(3));
+    }
+
+    #[test]
+    fn subr_arity_runtime_covered_primitives_match_oracle() {
+        assert_subr_arity("aref", 2, Some(2));
+        assert_subr_arity("arrayp", 1, Some(1));
+        assert_subr_arity("aset", 3, Some(3));
+        assert_subr_arity("atom", 1, Some(1));
+        assert_subr_arity("bufferp", 1, Some(1));
+        assert_subr_arity("ceiling", 1, Some(2));
+        assert_subr_arity("char-to-string", 1, Some(1));
+        assert_subr_arity("characterp", 1, Some(2));
+        assert_subr_arity("consp", 1, Some(1));
+        assert_subr_arity("downcase", 1, Some(1));
+        assert_subr_arity("eq", 2, Some(2));
+        assert_subr_arity("eql", 2, Some(2));
+        assert_subr_arity("equal", 2, Some(2));
+        assert_subr_arity("float", 1, Some(1));
+        assert_subr_arity("floatp", 1, Some(1));
+        assert_subr_arity("floor", 1, Some(2));
+        assert_subr_arity("integerp", 1, Some(1));
+        assert_subr_arity("keywordp", 1, Some(1));
+        assert_subr_arity("listp", 1, Some(1));
+        assert_subr_arity("make-vector", 2, Some(2));
+        assert_subr_arity("nlistp", 1, Some(1));
+        assert_subr_arity("null", 1, Some(1));
+        assert_subr_arity("number-to-string", 1, Some(1));
+        assert_subr_arity("numberp", 1, Some(1));
+        assert_subr_arity("round", 1, Some(2));
+        assert_subr_arity("sequencep", 1, Some(1));
+        assert_subr_arity("string-equal", 2, Some(2));
+        assert_subr_arity("string-lessp", 2, Some(2));
+        assert_subr_arity("string-to-char", 1, Some(1));
+        assert_subr_arity("string-to-number", 1, Some(2));
+        assert_subr_arity("stringp", 1, Some(1));
+        assert_subr_arity("substring", 1, Some(3));
+        assert_subr_arity("symbolp", 1, Some(1));
+        assert_subr_arity("throw", 2, Some(2));
+        assert_subr_arity("truncate", 1, Some(2));
+        assert_subr_arity("type-of", 1, Some(1));
+        assert_subr_arity("upcase", 1, Some(1));
+        assert_subr_arity("vectorp", 1, Some(1));
     }
 
     #[test]

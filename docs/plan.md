@@ -28,6 +28,19 @@ Last updated: 2026-02-20
 
 ## Doing
 
+- Expanded builtin registry core primitive coverage to close runtime-covered/oracle drift:
+  - runtime/registry changes:
+    - `rust/neovm-core/src/elisp/builtin_registry.rs`
+      - added 48 runtime-covered primitive core names into `DISPATCH_BUILTIN_NAMES` (including predicate/array/hash/string/vector primitives), eliminating `runtime-covered oracle builtins outside registry`.
+    - `rust/neovm-core/src/elisp/subr_info.rs`
+      - added oracle-aligned `subr-arity` metadata for newly surfaced fixed-arity primitives (predicates, arithmetic coercion helpers, comparison primitives, and array/string accessors).
+      - added regression assertions in `subr_arity_runtime_covered_primitives_match_oracle`.
+  - verified:
+    - `cargo test --manifest-path rust/neovm-core/Cargo.toml subr_arity_runtime_covered_primitives_match_oracle -- --nocapture` (pass)
+    - `make -C test/neovm/vm-compat check-builtin-registry-all` (pass; `1269` dispatch / `1268` core)
+    - `make -C test/neovm/vm-compat compat-progress` (pass; oracle builtin coverage now registry `868/566` and runtime `868/566`, outside-registry runtime coverage `0`)
+    - `make -C test/neovm/vm-compat check-all-neovm-strict` (pass; case inventory `800`)
+
 - Added `bool-vector` constructor compatibility slice and closed missing runtime/registry exposure:
   - runtime changes:
     - `rust/neovm-core/src/elisp/chartable.rs`
