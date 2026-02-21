@@ -50,10 +50,6 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 static int been_here = -1;
 #endif
 
-#ifdef USE_X_TOOLKIT
-#include "../lwlib/lwlib.h"
-#endif
-
 #include "cm.h"
 #include "menu.h"
 
@@ -4317,18 +4313,9 @@ dissociate_if_controlling_tty (int fd)
    system policy (and the required libraries are usually not
    available.)  */
 
-#ifdef HAVE_ANDROID
-_Noreturn
-#endif
-
 struct terminal *
 init_tty (const char *name, const char *terminal_type, bool must_succeed)
 {
-#ifdef HAVE_ANDROID
-  maybe_fatal (must_succeed, 0, "Text terminals are not supported"
-	       " under Android", "Text terminals are not supported"
-	       " under Android");
-#else
   struct tty_display_info *tty = NULL;
   struct terminal *terminal = NULL;
 #ifndef DOS_NT
@@ -4838,7 +4825,6 @@ use the Bourne shell command 'TERM=...; export TERM' (C-shell:\n\
   init_sys_modes (tty);
 
   return terminal;
-#endif /* !HAVE_ANDROID */
 }
 
 

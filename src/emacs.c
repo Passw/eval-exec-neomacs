@@ -34,15 +34,9 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 #include "lisp.h"
 #include "sysstdio.h"
 
-#ifdef HAVE_ANDROID
-#include "androidterm.h"
-#endif
 
 #include "neomacsterm.h"
 
-#if defined HAVE_ANDROID && !defined ANDROID_STUBIFY
-#include "sfntfont.h"
-#endif
 
 #ifdef WINDOWSNT
 #include <fcntl.h>
@@ -142,9 +136,6 @@ extern char etext;
 #include <sys/resource.h>
 #endif
 
-#if defined HAVE_ANDROID && !defined ANDROID_STUBIFY
-#include "android.h"
-#endif
 
 /* We don't guard this with HAVE_TREE_SITTER because treesit.o is
    always compiled (to provide treesit-available-p).  */
@@ -421,15 +412,7 @@ using_utf8 (void)
      the result is known in advance anyway...  */
 #if defined HAVE_WCHAR_H && !defined WINDOWSNT
   wchar_t wc;
-#ifndef HAVE_ANDROID
   mbstate_t mbs = { 0 };
-#else
-  mbstate_t mbs;
-
-  /* Not sure how mbstate works on Android, but this seems to be
-     required.  */
-  memset (&mbs, 0, sizeof mbs);
-#endif
   return mbrtowc (&wc, "\xc4\x80", 2, &mbs) == 2 && wc == 0x100;
 #else
   return false;
@@ -939,29 +922,6 @@ dump_error_to_string (int result)
 static char *
 load_pdump (int argc, char **argv, char *dump_file)
 {
-#if defined HAVE_ANDROID && !defined ANDROID_STUBIFY
-  int skip_args = 0, result;
-
-  while (skip_args < argc - 1)
-    {
-      if (argmatch (argv, argc, "-dump-file", "--dump-file",
-		    6, &dump_file, &skip_args)
-	  || argmatch (argv, argc, "--", NULL, 2, NULL,
-		       &skip_args))
-	break;
-      skip_args++;
-    }
-
-  if (!dump_file)
-    return argv[0];
-
-  result = pdumper_load (dump_file, argv[0]);
-
-  if (result != PDUMPER_LOAD_SUCCESS)
-    fatal ("could not load dump file \"%s\": %s",
-	   dump_file, dump_error_to_string (result));
-  return argv[0];
-#else
 
 #ifdef MSDOS
   const char *const suffix = ".dmp";
@@ -1057,8 +1017,6 @@ load_pdump (int argc, char **argv, char *dump_file)
   /* On MS-Windows, PATH_EXEC normally starts with a literal
      "%emacs_dir%", so it will never work without some tweaking.  */
   path_exec = w32_relocate (path_exec);
-#elif defined (HAVE_NS)
-  path_exec = ns_relocate (path_exec);
 #endif
 
   /* Look for "emacs-FINGERPRINT.pdmp" in PATH_EXEC.  We hardcode
@@ -1151,7 +1109,6 @@ load_pdump (int argc, char **argv, char *dump_file)
   xfree (dump_file);
 
   return emacs_executable;
-#endif
 }
 #endif /* HAVE_PDUMPER */
 
@@ -1430,10 +1387,6 @@ android_emacs_init (int argc, char **argv, char *dump_file)
   w32_init_main_thread ();
 #endif
 
-#ifdef HAVE_NS
-  /* Initialize the Obj C autorelease pool.  */
-  ns_init_pool ();
-#endif
 
 #ifdef HAVE_PDUMPER
   if (attempt_load_pdump)
@@ -2054,35 +2007,6 @@ Using an Emacs configured with --with-x-toolkit=lucid does not have this problem
   init_module_assertions (module_assertions);
 #endif
 
-#ifdef HAVE_NS
-  if (!noninteractive)
-    {
-#ifdef NS_IMPL_COCOA
-      /* Started from GUI? */
-      bool go_home = (!ch_to_dir && !inhibit_window_system
-		      && !isatty (STDIN_FILENO));
-      if (skip_args < argc)
-        {
-          if (!strncmp (argv[skip_args], "-psn", 4))
-            {
-              skip_args += 1;
-	      go_home |= !ch_to_dir;
-            }
-          else if (skip_args+1 < argc && !strncmp (argv[skip_args+1], "-psn", 4))
-            {
-              skip_args += 2;
-	      go_home |= !ch_to_dir;
-            }
-        }
-      if (go_home)
-	{
-	  char const *home = get_homedir ();
-	  if (*home && chdir (home) == 0)
-	    emacs_wd = emacs_get_current_dir_name ();
-	}
-#endif  /* COCOA */
-    }
-#endif /* HAVE_NS */
 
   /* Stupid kludge to catch command-line display spec.  We can't
      handle this argument entirely in window system dependent code
@@ -2368,19 +2292,6 @@ Using an Emacs configured with --with-x-toolkit=lucid does not have this problem
 # endif
 #endif	/* HAVE_NTGUI */
 #endif /* HAVE_WINDOW_SYSTEM */
-#ifdef HAVE_X_WINDOWS
-      syms_of_xterm ();
-      syms_of_xfns ();
-      syms_of_xmenu ();
-      syms_of_fontset ();
-      syms_of_xsettings ();
-#ifdef HAVE_X_SM
-      syms_of_xsmfns ();
-#endif
-#ifdef HAVE_X11
-      syms_of_xselect ();
-#endif
-#endif /* HAVE_X_WINDOWS */
 
       syms_of_xml ();
 
@@ -2416,13 +2327,6 @@ Using an Emacs configured with --with-x-toolkit=lucid does not have this problem
       syms_of_win16select ();
 #endif	/* MSDOS */
 
-#ifdef HAVE_NS
-      syms_of_nsterm ();
-      syms_of_nsfns ();
-      syms_of_nsmenu ();
-      syms_of_nsselect ();
-      syms_of_fontset ();
-#endif /* HAVE_NS */
 
 #ifdef HAVE_PGTK
       syms_of_pgtkterm ();
@@ -2447,19 +2351,6 @@ Using an Emacs configured with --with-x-toolkit=lucid does not have this problem
 #endif
       syms_of_fontset ();
 #endif /* HAVE_HAIKU */
-#ifdef HAVE_ANDROID
-      syms_of_androidterm ();
-      syms_of_androidfns ();
-      syms_of_androidmenu ();
-      syms_of_fontset ();
-#if !defined ANDROID_STUBIFY
-      syms_of_androidfont ();
-      syms_of_androidselect ();
-      syms_of_androidvfs ();
-      syms_of_sfntfont ();
-      syms_of_sfntfont_android ();
-#endif /* !ANDROID_STUBIFY */
-#endif /* HAVE_ANDROID */
 
       syms_of_gnutls ();
 
@@ -2534,9 +2425,6 @@ Using an Emacs configured with --with-x-toolkit=lucid does not have this problem
   init_dbusbind ();
 #endif
 
-#ifdef HAVE_X_WINDOWS
-  init_xterm ();
-#endif
 
   /* This can create a thread that may call getenv, so it must follow
      all calls to putenv and setenv.  Also, this sets up
@@ -2557,16 +2445,7 @@ Using an Emacs configured with --with-x-toolkit=lucid does not have this problem
   init_window ();
   init_font ();
 
-#ifdef HAVE_ANDROID
-  init_androidmenu ();
-#endif
 
-#if defined HAVE_ANDROID && !defined ANDROID_STUBIFY
-  init_androidfont ();
-  init_androidselect ();
-  init_sfntfont ();
-  init_sfntfont_android ();
-#endif
 
   if (!initialized)
     {
@@ -2622,15 +2501,6 @@ Using an Emacs configured with --with-x-toolkit=lucid does not have this problem
   safe_run_hooks (Qafter_pdump_load_hook);
 #endif
 
-#if defined HAVE_ANDROID && !defined ANDROID_STUBIFY && 0
-  /* This comes very late in the startup process because it requires
-     most of lisp/international to be loaded.  This approach doesn't
-     work because normal-top-level runs and creates the initial frame
-     before fonts are initialized.  So this is done in
-     normal-top-level instead.  */
-  Vtop_level = list3 (Qprogn, Vtop_level,
-		      list1 (Qandroid_enumerate_fonts));
-#endif
 
   /* Enter editor command loop.  This never returns.  */
   set_initial_minibuffer_mode ();
@@ -2735,14 +2605,6 @@ static const struct standard_args standard_args[] =
 #if SECCOMP_USABLE
   { "-seccomp", "--seccomp", 1, 1 },
 #endif
-#ifdef HAVE_NS
-  { "-NSAutoLaunch", 0, 5, 1 },
-  { "-NXAutoLaunch", 0, 5, 1 },
-  { "-_NSMachLaunch", 0, 85, 1 },
-  { "-MachLaunch", 0, 85, 1 },
-  { "-macosx", 0, 85, 0 },
-  { "-NSHost", 0, 85, 1 },
-#endif
   /* These have the same priority as ordinary file name args,
      so they are not reordered with respect to those.  */
   { "-L", "--directory", 0, 1 },
@@ -2762,13 +2624,6 @@ static const struct standard_args standard_args[] =
   { "-visit", "--visit", 0, 1 },
   { "-file", "--file", 0, 1 },
   { "-insert", "--insert", 0, 1 },
-#ifdef HAVE_NS
-  { "-NXOpen", 0, 0, 1 },
-  { "-NXOpenTemp", 0, 0, 1 },
-  { "-NSOpen", 0, 0, 1 },
-  { "-NSOpenTemp", 0, 0, 1 },
-  { "-GSFilePath", 0, 0, 1 },
-#endif
   /* This should be processed after ordinary file name args and the like.  */
   { "-kill", "--kill", -10, 0 },
 };
@@ -3005,12 +2860,6 @@ killed.  */
   /* Do some checking before shutting down Emacs, because errors
      can't be meaningfully reported afterwards.  */
   if (!NILP (restart)
-      /* Don't perform the following checks when Emacs is running as
-	 an Android GUI application, because there the system is
-	 relied on to restart Emacs.  */
-#if defined HAVE_ANDROID && !defined ANDROID_STUBIFY
-      && !android_init_gui
-#endif
       )
     {
       /* This is very unlikely, but it's possible to execute a binary
@@ -3045,10 +2894,6 @@ killed.  */
 	calln (Qrun_hook_query_error_with_timeout, Qkill_emacs_hook);
     }
 
-#ifdef HAVE_X_WINDOWS
-  /* Transfer any clipboards we own to the clipboard manager.  */
-  x_clipboard_manager_save_all ();
-#endif
 
   shut_down_emacs (0, (STRINGP (arg) && !feof (stdin)) ? arg : Qnil);
 
@@ -3065,36 +2910,10 @@ killed.  */
 #ifdef HAVE_NATIVE_COMP
   eln_load_path_final_clean_up ();
 #endif
-#if defined HAVE_ANDROID && !defined ANDROID_STUBIFY
-  if (android_init_gui)
-    {
-      struct sigaction sa;
-
-      /* Calls to exit may be followed by invalid accesses from
-	 toolkit-managed threads as the thread group is destroyed, which
-	 are inconsequential when the process is being terminated, but
-	 which must be suppressed to inhibit reporting of superfluous
-	 crashes by the system.
-
-         Execution won't return to Emacs whatever the value of RESTART,
-         as `android_restart_emacs' will only ever abort or succeed.  */
-      sigemptyset (&sa.sa_mask);
-      sa.sa_handler = _exit;
-      sigaction (SIGSEGV, &sa, NULL);
-      sigaction (SIGBUS, &sa, NULL);
-    }
-#endif /* HAVE_ANDROID && !ANDROID_STUBIFY */
 
   if (!NILP (restart))
     {
       turn_on_atimers (false);
-#if defined HAVE_ANDROID && !defined ANDROID_STUBIFY
-      /* Re-executing the Emacs process created by the system doesn't
-	 work.  Instead, schedule a restart for a few hundered
-	 milliseconds and exit Emacs.  */
-      if (android_init_gui)
-	android_restart_emacs ();
-#endif
 #ifdef WINDOWSNT
       if (w32_reexec_emacs (initial_cmdline, initial_wd) < 0)
 #else
@@ -3199,9 +3018,6 @@ shut_down_emacs (int sig, Lisp_Object stuff)
   dos_cleanup ();
 #endif
 
-#ifdef HAVE_NS
-  ns_term_shutdown (sig);
-#endif
 
 #ifdef HAVE_LIBXML2
   xml_cleanup_parser ();

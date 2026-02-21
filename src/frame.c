@@ -49,9 +49,6 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 #include "msdos.h"
 #include "dosfns.h"
 #endif
-#ifdef USE_X_TOOLKIT
-#include "widget.h"
-#endif
 #include "pdumper.h"
 
 #define NLOG_MODULE "frame"
@@ -486,16 +483,7 @@ frame_redisplay_p (struct frame *f)
       return q == r;
     }
   else
-#ifndef HAVE_X_WINDOWS
     return FRAME_VISIBLE_P (f);
-#else
-  /* Under X, frames can continue to be displayed to the user by the
-     compositing manager even if they are invisible, so this also
-     checks whether or not the frame is reported visible by the X
-     server.  */
-  return (FRAME_VISIBLE_P (f)
-	  || (FRAME_X_P (f) && FRAME_X_VISIBLE (f)));
-#endif
 }
 
 /* Placeholder used by temacs -nw before window.el is loaded.  */
@@ -1761,10 +1749,6 @@ Note that changing the size of one terminal frame automatically
 affects all frames on the same terminal device.  */)
   (Lisp_Object parms)
 {
-#ifdef HAVE_ANDROID
-  error ("Text terminals are not supported on this platform");
-  return Qnil;
-#else
   struct terminal *t = NULL;
   struct frame *sf = SELECTED_FRAME ();
 
@@ -1909,7 +1893,6 @@ affects all frames on the same terminal device.  */)
   f->after_make_frame = true;
 
   return frame;
-#endif
 }
 
 
@@ -2568,10 +2551,6 @@ other_frames (struct frame *f, bool invisible, bool force)
 #if 0
 	  /* Verify that we can still talk to the frame's X window, and
 	     note any recent change in visibility.  */
-#ifdef HAVE_X_WINDOWS
-	  if (FRAME_WINDOW_P (f1))
-	    x_sync (f1);
-#endif
 #endif
 
 	  if (!FRAME_TOOLTIP_P (f1)
@@ -2615,9 +2594,6 @@ delete_frame (Lisp_Object frame, Lisp_Object force)
   int is_tooltip_frame;
   bool nochild = !FRAME_PARENT_FRAME (f);
   Lisp_Object minibuffer_child_frame = Qnil;
-#ifdef HAVE_X_WINDOWS
-  specpdl_ref ref;
-#endif
 
   if (!FRAME_LIVE_P (f))
     return Qnil;
@@ -2630,15 +2606,6 @@ delete_frame (Lisp_Object frame, Lisp_Object force)
     }
   else if (IS_DAEMON && FRAME_INITIAL_P (f) && NILP (force))
     error ("Attempt to delete daemon's initial frame");
-#ifdef HAVE_X_WINDOWS
-  else if ((x_dnd_in_progress && f == x_dnd_frame)
-	   || (x_dnd_waiting_for_finish && f == x_dnd_finish_frame))
-    error ("Attempt to delete the drop source frame");
-#endif
-#ifdef HAVE_HAIKU
-  else if (f == haiku_dnd_frame)
-    error ("Attempt to delete the drop source frame");
-#endif
 
   XSETFRAME (frame, f);
 
@@ -2724,10 +2691,6 @@ delete_frame (Lisp_Object frame, Lisp_Object force)
 	       pending_funcalls);
   else
     {
-#ifdef HAVE_X_WINDOWS
-      /* Also, save clipboard to the clipboard manager.  */
-      x_clipboard_manager_save_frame (frame);
-#endif
 
       safe_calln (Qrun_hook_with_args, Qdelete_frame_functions, frame);
     }
@@ -2822,32 +2785,7 @@ delete_frame (Lisp_Object frame, Lisp_Object force)
     echo_area_window = sf->minibuffer_window;
 
   /* Clear any X selections for this frame.  */
-#ifdef HAVE_X_WINDOWS
-  if (FRAME_X_P (f))
-    {
-      /* Don't preserve selections when a display is going away, since
-	 that sends stuff down the wire.  */
 
-      ref = SPECPDL_INDEX ();
-
-      if (EQ (force, Qnoelisp))
-	specbind (Qx_auto_preserve_selections, Qnil);
-
-      x_clear_frame_selections (f);
-      unbind_to (ref, Qnil);
-    }
-#endif
-
-#ifdef HAVE_PGTK
-  if (FRAME_PGTK_P (f))
-    {
-      /* Do special selection events now, in case the window gets
-	 destroyed by this deletion.  Does this run Lisp code?  */
-      swallow_events (false);
-
-      pgtk_clear_frame_selections (f);
-    }
-#endif
 
   /* Free glyphs.
      This function must be called before the window tree of the
@@ -2898,12 +2836,6 @@ delete_frame (Lisp_Object frame, Lisp_Object force)
   /* Remember if this was a GUI child frame, so we can
      process pending window system events after destruction.  */
   bool was_gui_child_frame = FRAME_WINDOW_P (f) && FRAME_PARENT_FRAME (f);
-#ifdef HAVE_X_WINDOWS
-  /* Save the X display before the frame is destroyed, so we can
-     sync with the X server afterwards.  */
-  Display *child_frame_display = (was_gui_child_frame && FRAME_X_P (f)
-				  ? FRAME_X_DISPLAY (f) : NULL);
-#endif
   {
     struct terminal *terminal;
     block_input ();
@@ -2920,14 +2852,6 @@ delete_frame (Lisp_Object frame, Lisp_Object force)
        have been received, then process them to ensure subsequent
        operations like `recenter' see up-to-date window state.
        (Bug#76186)  */
-#ifdef HAVE_X_WINDOWS
-    if (child_frame_display)
-      {
-	block_input ();
-	XSync (child_frame_display, False);
-	unblock_input ();
-      }
-#endif
     if (was_gui_child_frame)
       swallow_events (false);
 
@@ -4175,10 +4099,6 @@ If FRAME is nil, describe the currently selected frame.  */)
       else if (EQ (parameter, Qfont) && FRAME_X_P (f))
 	value = FRAME_FONT (f)->props[FONT_NAME_INDEX];
 #endif /* HAVE_WINDOW_SYSTEM */
-#ifdef HAVE_X_WINDOWS
-      else if (EQ (parameter, Qdisplay) && FRAME_X_P (f))
-	value = XCAR (FRAME_DISPLAY_INFO (f)->name_list_element);
-#endif /* HAVE_X_WINDOWS */
       else if (EQ (parameter, Qbackground_color)
 	       || EQ (parameter, Qforeground_color))
 	{
@@ -4850,9 +4770,6 @@ static const struct frame_parm_table frame_parms[] =
   {"borders-respect-alpha-background",
 				SYMBOL_INDEX (Qborders_respect_alpha_background)},
   {"use-frame-synchronization",	SYMBOL_INDEX (Quse_frame_synchronization)},
-#ifdef HAVE_X_WINDOWS
-  {"shaded",			SYMBOL_INDEX (Qshaded)},
-#endif
 #ifdef NS_IMPL_COCOA
   {"ns-appearance",		SYMBOL_INDEX (Qns_appearance)},
   {"ns-transparent-titlebar",	SYMBOL_INDEX (Qns_transparent_titlebar)},
@@ -5103,9 +5020,6 @@ gui_set_frame_parameters_1 (struct frame *f, Lisp_Object alist,
   Lisp_Object *values;
   ptrdiff_t i, j, size;
   bool left_no_change = 0, top_no_change = 0;
-#ifdef HAVE_X_WINDOWS
-  bool icon_left_no_change = 0, icon_top_no_change = 0;
-#endif
   int parent_done = -1, outer_done = -1;
 
   XSETFRAME (frame, f);
@@ -5240,18 +5154,12 @@ gui_set_frame_parameters_1 (struct frame *f, Lisp_Object alist,
   /* If one of the icon positions was not set, preserve or default it.  */
   if (! TYPE_RANGED_FIXNUMP (int, icon_left))
     {
-#ifdef HAVE_X_WINDOWS
-      icon_left_no_change = 1;
-#endif
       icon_left = Fcdr (Fassq (Qicon_left, f->param_alist));
       if (NILP (icon_left))
 	XSETINT (icon_left, 0);
     }
   if (! TYPE_RANGED_FIXNUMP (int, icon_top))
     {
-#ifdef HAVE_X_WINDOWS
-      icon_top_no_change = 1;
-#endif
       icon_top = Fcdr (Fassq (Qicon_top, f->param_alist));
       if (NILP (icon_top))
 	XSETINT (icon_top, 0);
@@ -5357,11 +5265,6 @@ gui_set_frame_parameters_1 (struct frame *f, Lisp_Object alist,
     }
 
 
-#ifdef HAVE_X_WINDOWS
-  if ((!NILP (icon_left) || !NILP (icon_top))
-      && ! (icon_left_no_change && icon_top_no_change))
-    x_wm_set_icon_position (f, XFIXNUM (icon_left), XFIXNUM (icon_top));
-#endif /* HAVE_X_WINDOWS */
 
   SAFE_FREE ();
 }
@@ -5434,15 +5337,6 @@ gui_report_frame_params (struct frame *f, Lisp_Object *alistptr)
   w = (uintptr_t) FRAME_NATIVE_WINDOW (f);
   store_in_alist (alistptr, Qwindow_id,
 		  make_formatted_string ("%"PRIuMAX, w));
-#ifdef HAVE_X_WINDOWS
-#ifdef USE_X_TOOLKIT
-  /* Tooltip frame may not have this widget.  */
-  if (FRAME_X_OUTPUT (f)->widget)
-#endif
-    w = (uintptr_t) FRAME_OUTER_WINDOW (f);
-  store_in_alist (alistptr, Qouter_window_id,
-		  make_formatted_string ("%"PRIuMAX, w));
-#endif
   store_in_alist (alistptr, Qicon_name, f->icon_name);
   store_in_alist (alistptr, Qvisibility,
 		  (FRAME_VISIBLE_P (f) ? Qt
@@ -6271,7 +6165,6 @@ gui_display_get_resource (Display_Info *dpyinfo, Lisp_Object attribute,
   *nz++ = '.';
   lispstpcpy (nz, attribute);
 
-#ifndef HAVE_ANDROID
   const char *value
     = dpyinfo->terminal->get_string_resource_hook (&dpyinfo->rdb,
 						   name_key,
@@ -6283,11 +6176,6 @@ gui_display_get_resource (Display_Info *dpyinfo, Lisp_Object attribute,
     return build_string (value);
   else
     return Qnil;
-#else
-
-  SAFE_FREE ();
-  return Qnil;
-#endif
 }
 
 
@@ -6310,32 +6198,6 @@ and the class is `Emacs.CLASS.SUBCLASS'.  */)
                                    attribute, class, component, subclass);
 }
 
-#if defined HAVE_X_WINDOWS && !defined USE_X_TOOLKIT && !defined USE_GTK
-/* Used when C code wants a resource value.  */
-/* Called from oldXMenu/Create.c.  */
-const char *
-x_get_resource_string (const char *attribute, const char *class)
-{
-  const char *result;
-  struct frame *sf = SELECTED_FRAME ();
-  ptrdiff_t invocation_namelen = SBYTES (Vinvocation_name);
-  USE_SAFE_ALLOCA;
-
-  /* Allocate space for the components, the dots which separate them,
-     and the final '\0'.  */
-  ptrdiff_t name_keysize = invocation_namelen + strlen (attribute) + 2;
-  ptrdiff_t class_keysize = sizeof (EMACS_CLASS) - 1 + strlen (class) + 2;
-  char *name_key = SAFE_ALLOCA (name_keysize + class_keysize);
-  char *class_key = name_key + name_keysize;
-  esprintf (name_key, "%s.%s", SSDATA (Vinvocation_name), attribute);
-  sprintf (class_key, "%s.%s", EMACS_CLASS, class);
-
-  result = x_get_string_resource (&FRAME_DISPLAY_INFO (sf)->rdb,
-				  name_key, class_key);
-  SAFE_FREE ();
-  return result;
-}
-#endif
 
 /* Return the value of parameter PARAM.
 
@@ -6406,9 +6268,6 @@ gui_display_get_arg (Display_Info *dpyinfo, Lisp_Object alist, Lisp_Object param
 	    case RES_TYPE_BOOLEAN:
 	      tem = Fdowncase (tem);
 	      if (!strcmp (SSDATA (tem), "on")
-#ifdef HAVE_NS
-                  || !strcmp (SSDATA (tem), "yes")
-#endif
 		  || !strcmp (SSDATA (tem), "true"))
 		return Qt;
 	      else
@@ -6424,15 +6283,9 @@ gui_display_get_arg (Display_Info *dpyinfo, Lisp_Object alist, Lisp_Object param
 		Lisp_Object lower;
 		lower = Fdowncase (tem);
 		if (!strcmp (SSDATA (lower), "on")
-#ifdef HAVE_NS
-                    || !strcmp (SSDATA (lower), "yes")
-#endif
 		    || !strcmp (SSDATA (lower), "true"))
 		  return Qt;
 		else if (!strcmp (SSDATA (lower), "off")
-#ifdef HAVE_NS
-                      || !strcmp (SSDATA (lower), "no")
-#endif
 		      || !strcmp (SSDATA (lower), "false"))
 		  return Qnil;
 		else
@@ -6626,10 +6479,6 @@ On Nextstep, this just calls `ns-parse-geometry'.  */)
 
   CHECK_STRING (string);
 
-#ifdef HAVE_NS
-  if (strchr (SSDATA (string), ' ') != NULL)
-    return calln (Qns_parse_geometry, string);
-#endif
   int geometry = XParseGeometry (SSDATA (string),
 				 &x, &y, &width, &height);
   Lisp_Object result = Qnil;
@@ -7218,9 +7067,6 @@ syms_of_frame (void)
   DEFSYM (Quser_position, "user-position");
   DEFSYM (Quser_size, "user-size");
   DEFSYM (Qwindow_id, "window-id");
-#ifdef HAVE_X_WINDOWS
-  DEFSYM (Qouter_window_id, "outer-window-id");
-#endif
   DEFSYM (Qparent_id, "parent-id");
   DEFSYM (Qx, "x");
   DEFSYM (Qw32, "w32");
@@ -7283,9 +7129,6 @@ syms_of_frame (void)
   DEFSYM (Qtip_frame, "tip_frame");
   DEFSYM (Qterminal_frame, "terminal_frame");
 
-#ifdef HAVE_NS
-  DEFSYM (Qns_parse_geometry, "ns-parse-geometry");
-#endif
 #ifdef NS_IMPL_COCOA
   DEFSYM (Qns_appearance, "ns-appearance");
   DEFSYM (Qns_transparent_titlebar, "ns-transparent-titlebar");
@@ -7733,11 +7576,7 @@ allow `make-frame' to show the current buffer even if its hidden.  */);
 
   DEFVAR_LISP ("frame-internal-parameters", frame_internal_parameters,
 	       doc: /* Frame parameters specific to every frame.  */);
-#ifdef HAVE_X_WINDOWS
-  frame_internal_parameters = list4 (Qname, Qparent_id, Qwindow_id, Qouter_window_id);
-#else
   frame_internal_parameters = list3 (Qname, Qparent_id, Qwindow_id);
-#endif
   frame_internal_parameters = Fcons (Qframe_id, frame_internal_parameters);
   frame_internal_parameters = Fcons (Qcloned_from, frame_internal_parameters);
   frame_internal_parameters = Fcons (Qundeleted, frame_internal_parameters);
