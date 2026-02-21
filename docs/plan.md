@@ -28,6 +28,17 @@ Last updated: 2026-02-21
 
 ## Doing
 
+- Added lock-in coverage for `error-message-string` handle payload rendering of mutex/condition-variable objects:
+  - vm-compat corpus changes:
+    - added:
+      - `test/neovm/vm-compat/cases/error-message-string-handle-printing-semantics.forms`
+      - `test/neovm/vm-compat/cases/error-message-string-handle-printing-semantics.expected.tsv`
+    - wired case into:
+      - `test/neovm/vm-compat/cases/default.list`
+  - verified:
+    - `make -C test/neovm/vm-compat check-one-neovm CASE=cases/error-message-string-handle-printing-semantics` (pass; `5/5`)
+    - `make -C test/neovm/vm-compat check-all-neovm-strict` (pass)
+
 - Aligned `error-message-string` buffer-handle rendering with Oracle and added dedicated stale/live lock-ins:
   - runtime changes:
     - `rust/neovm-core/src/elisp/errors.rs`

@@ -1,0 +1,15 @@
+(fboundp 'error-message-string)
+(fboundp 'make-mutex)
+(fboundp 'make-condition-variable)
+
+(let ((msg (condition-case e
+               (progn (error "%S" (make-mutex)) "")
+             (error (error-message-string e)))))
+  (string-prefix-p "#<mutex" msg))
+
+(let* ((m (make-mutex))
+       (cv (make-condition-variable m))
+       (msg (condition-case e
+                (progn (error "%S" cv) "")
+              (error (error-message-string e)))))
+  (string-prefix-p "#<condvar" msg))
