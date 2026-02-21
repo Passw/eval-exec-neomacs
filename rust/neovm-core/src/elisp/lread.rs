@@ -725,6 +725,43 @@ mod tests {
     }
 
     #[test]
+    fn eval_region_accepts_shebang_reader_prefix() {
+        let mut ev = Evaluator::new();
+        {
+            let buf = ev.buffers.current_buffer_mut().expect("current buffer");
+            buf.insert("#!/usr/bin/env emacs --script\n(setq lread-er-shebang 'ok)\n");
+        }
+        let end = {
+            let buf = ev.buffers.current_buffer().expect("current buffer");
+            Value::Int(buf.text.char_count() as i64 + 1)
+        };
+        let result = builtin_eval_region(&mut ev, vec![Value::Int(1), end]).unwrap();
+        assert!(result.is_nil());
+        assert_eq!(
+            ev.obarray.symbol_value("lread-er-shebang").cloned(),
+            Some(Value::symbol("ok"))
+        );
+    }
+
+    #[test]
+    fn eval_region_preserves_utf8_bom_reader_error_shape() {
+        let mut ev = Evaluator::new();
+        {
+            let buf = ev.buffers.current_buffer_mut().expect("current buffer");
+            buf.insert("\u{feff}(setq lread-er-bom 'ok)\n");
+        }
+        let end = {
+            let buf = ev.buffers.current_buffer().expect("current buffer");
+            Value::Int(buf.text.char_count() as i64 + 1)
+        };
+        let result = builtin_eval_region(&mut ev, vec![Value::Int(1), end]);
+        assert!(matches!(
+            result,
+            Err(Flow::Signal(sig)) if sig.symbol == "void-variable" && sig.data.len() == 1
+        ));
+    }
+
+    #[test]
     fn read_event_returns_nil() {
         let mut ev = Evaluator::new();
         let result = builtin_read_event(&mut ev, vec![]).unwrap();
