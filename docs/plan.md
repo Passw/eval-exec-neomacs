@@ -28,6 +28,25 @@ Last updated: 2026-02-21
 
 ## Doing
 
+- Aligned `error-message-string` buffer-handle rendering with Oracle and added dedicated stale/live lock-ins:
+  - runtime changes:
+    - `rust/neovm-core/src/elisp/errors.rs`
+      - `error-message-string` argument formatting now uses eval-context-aware value printing.
+      - live buffer payloads now render as `#<buffer NAME>` instead of opaque buffer ids.
+      - dead buffer payloads render as `#<killed buffer>`.
+      - added unit coverage:
+        - `builtin_error_message_string_formats_buffer_handles_with_names`
+  - vm-compat corpus changes:
+    - added:
+      - `test/neovm/vm-compat/cases/killed-buffer-error-message-string-semantics.forms`
+      - `test/neovm/vm-compat/cases/killed-buffer-error-message-string-semantics.expected.tsv`
+    - wired case into:
+      - `test/neovm/vm-compat/cases/default.list`
+  - verified:
+    - `cargo test --manifest-path rust/neovm-core/Cargo.toml builtin_error_message_string_formats_buffer_handles_with_names -- --nocapture` (pass)
+    - `make -C test/neovm/vm-compat check-one-neovm CASE=cases/killed-buffer-error-message-string-semantics` (pass; `7/7`)
+    - `make -C test/neovm/vm-compat check-all-neovm-strict` (pass)
+
 - Added filtered case preview support for vm-compat list workflows:
   - vm-compat changes:
     - `test/neovm/vm-compat/Makefile`

@@ -211,6 +211,7 @@ cases/key-binding-default-self-insert-semantics
 cases/key-binding-command-remap-semantics
 cases/key-binding-position-semantics
 cases/key-binding-minor-mode-precedence-semantics
+cases/killed-buffer-error-message-string-semantics
 cases/killed-buffer-handle-printing-semantics
 cases/minor-mode-key-binding-semantics
 cases/minor-mode-key-binding-emulation-alist-iteration-semantics

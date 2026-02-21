@@ -528,7 +528,10 @@ pub(crate) fn builtin_error_message_string(
         if data.is_empty() {
             return Ok(Value::string("peculiar error"));
         }
-        let data_strs: Vec<String> = data.iter().map(|v| format_error_arg(v, true)).collect();
+        let data_strs: Vec<String> = data
+            .iter()
+            .map(|v| format_error_arg(eval, v, true))
+            .collect();
         return Ok(Value::string(format!(
             "peculiar error: {}",
             data_strs.join(", ")
@@ -552,13 +555,19 @@ pub(crate) fn builtin_error_message_string(
             if rest.is_empty() {
                 return Ok(Value::string(first_str));
             }
-            let rest_strs: Vec<String> = rest.iter().map(|v| format_error_arg(v, false)).collect();
+            let rest_strs: Vec<String> = rest
+                .iter()
+                .map(|v| format_error_arg(eval, v, false))
+                .collect();
             return Ok(Value::string(format!(
                 "{first_str}, {}",
                 rest_strs.join(", ")
             )));
         }
-        let data_strs: Vec<String> = data.iter().map(|v| format_error_arg(v, false)).collect();
+        let data_strs: Vec<String> = data
+            .iter()
+            .map(|v| format_error_arg(eval, v, false))
+            .collect();
         return Ok(Value::string(data_strs.join(", ")));
     }
 
@@ -568,7 +577,10 @@ pub(crate) fn builtin_error_message_string(
     // `file-locked` is an oddball in Emacs: it always reports "peculiar error"
     // with all payload elements, even if the first datum is a string.
     if is_file_locked {
-        let data_strs: Vec<String> = data.iter().map(|v| format_error_arg(v, true)).collect();
+        let data_strs: Vec<String> = data
+            .iter()
+            .map(|v| format_error_arg(eval, v, true))
+            .collect();
         return Ok(Value::string(format!(
             "peculiar error: {}",
             data_strs.join(", ")
@@ -586,7 +598,7 @@ pub(crate) fn builtin_error_message_string(
             let quote_strings = sym_name == "error";
             let rest_strs: Vec<String> = rest
                 .iter()
-                .map(|v| format_error_arg(v, quote_strings))
+                .map(|v| format_error_arg(eval, v, quote_strings))
                 .collect();
             return Ok(Value::string(format!(
                 "{first_str}: {}",
@@ -600,7 +612,7 @@ pub(crate) fn builtin_error_message_string(
         if data.len() > 1 {
             let detail: Vec<String> = data[1..]
                 .iter()
-                .map(|v| format_error_arg(v, true))
+                .map(|v| format_error_arg(eval, v, true))
                 .collect();
             return Ok(Value::string(format!(
                 "peculiar error: {}",
@@ -613,7 +625,7 @@ pub(crate) fn builtin_error_message_string(
     let quote_strings = sym_name != "end-of-file";
     let data_strs: Vec<String> = data
         .iter()
-        .map(|v| format_error_arg(v, quote_strings))
+        .map(|v| format_error_arg(eval, v, quote_strings))
         .collect();
     Ok(Value::string(format!(
         "{}: {}",
@@ -622,13 +634,13 @@ pub(crate) fn builtin_error_message_string(
     )))
 }
 
-fn format_error_arg(value: &Value, quote_strings: bool) -> String {
+fn format_error_arg(eval: &super::eval::Evaluator, value: &Value, quote_strings: bool) -> String {
     if !quote_strings {
         if let Some(s) = value.as_str() {
             return s.to_string();
         }
     }
-    super::print::print_value(value)
+    super::error::print_value_with_eval(eval, value)
 }
 
 // ---------------------------------------------------------------------------
@@ -1556,6 +1568,39 @@ mod tests {
         assert_eq!(
             result.unwrap().as_str(),
             Some("Args out of range: \"abc\", 9")
+        );
+    }
+
+    #[test]
+    fn builtin_error_message_string_formats_buffer_handles_with_names() {
+        let mut evaluator = super::super::eval::Evaluator::new();
+        init_standard_errors(&mut evaluator.obarray);
+
+        let live_id = evaluator.buffers.create_buffer("*ems-live*");
+        let live_err = Value::list(vec![
+            Value::symbol("args-out-of-range"),
+            Value::Buffer(live_id),
+            Value::Int(0),
+        ]);
+        let live_result = builtin_error_message_string(&evaluator, vec![live_err]);
+        assert!(live_result.is_ok());
+        assert_eq!(
+            live_result.unwrap().as_str(),
+            Some("Args out of range: #<buffer *ems-live*>, 0")
+        );
+
+        let dead_id = evaluator.buffers.create_buffer("*ems-dead*");
+        assert!(evaluator.buffers.kill_buffer(dead_id));
+        let dead_err = Value::list(vec![
+            Value::symbol("args-out-of-range"),
+            Value::Buffer(dead_id),
+            Value::Int(0),
+        ]);
+        let dead_result = builtin_error_message_string(&evaluator, vec![dead_err]);
+        assert!(dead_result.is_ok());
+        assert_eq!(
+            dead_result.unwrap().as_str(),
+            Some("Args out of range: #<killed buffer>, 0")
         );
     }
 
