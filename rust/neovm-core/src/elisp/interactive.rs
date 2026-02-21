@@ -1605,24 +1605,20 @@ pub(crate) fn builtin_key_binding(eval: &mut Evaluator, args: Vec<Value>) -> Eva
         return Ok(Value::list(maps));
     }
 
-    // Try local map first, then global
+    if let Some(value) = key_binding_lookup_in_minor_mode_maps(eval, &events) {
+        return Ok(value);
+    }
+
+    // Try local map first, then global.
     if let Some(local_id) = eval.current_local_map {
-        if events.len() == 1 {
-            if let Some(binding) = eval.keymaps.lookup_key(local_id, &events[0]) {
-                return Ok(key_binding_to_value(binding));
-            }
-        } else if let Some(binding) = eval.keymaps.lookup_key_sequence(local_id, &events) {
-            return Ok(key_binding_to_value(binding));
+        if let Some(value) = key_binding_lookup_in_keymap_id(eval, local_id, &events) {
+            return Ok(value);
         }
     }
 
     if let Some(global_id) = eval.keymaps.global_map() {
-        if events.len() == 1 {
-            if let Some(binding) = eval.keymaps.lookup_key(global_id, &events[0]) {
-                return Ok(key_binding_to_value(binding));
-            }
-        } else if let Some(binding) = eval.keymaps.lookup_key_sequence(global_id, &events) {
-            return Ok(key_binding_to_value(binding));
+        if let Some(value) = key_binding_lookup_in_keymap_id(eval, global_id, &events) {
+            return Ok(value);
         }
     }
     if eval.keymaps.global_map().is_none()
@@ -1727,6 +1723,79 @@ fn resolve_minor_mode_keymap_id(eval: &Evaluator, map_value: &Value) -> Result<O
         Value::Int(_) => expect_keymap_id(eval, map_value).map(Some),
         _ => Ok(None),
     }
+}
+
+fn key_binding_lookup_in_keymap_id(
+    eval: &Evaluator,
+    map_id: u64,
+    events: &[KeyEvent],
+) -> Option<Value> {
+    if events.len() == 1 {
+        return eval
+            .keymaps
+            .lookup_key(map_id, &events[0])
+            .map(key_binding_to_value);
+    }
+    eval.keymaps
+        .lookup_key_sequence(map_id, events)
+        .map(key_binding_to_value)
+}
+
+fn key_binding_lookup_in_minor_mode_alist(
+    eval: &Evaluator,
+    events: &[KeyEvent],
+    alist_value: &Value,
+) -> Option<Value> {
+    let entries = list_to_vec(alist_value)?;
+    for entry in entries {
+        let Some((mode_name, map_value)) = minor_mode_map_entry(&entry) else {
+            continue;
+        };
+        if !dynamic_or_global_symbol_value(eval, &mode_name).is_some_and(|v| v.is_truthy()) {
+            continue;
+        }
+
+        let map_id = match map_value {
+            Value::Int(n) => decode_keymap_handle(n).filter(|id| eval.keymaps.is_keymap(*id)),
+            _ => None,
+        };
+        let Some(map_id) = map_id else {
+            continue;
+        };
+
+        if let Some(binding) = key_binding_lookup_in_keymap_id(eval, map_id, events) {
+            return Some(binding);
+        }
+    }
+    None
+}
+
+fn key_binding_lookup_in_minor_mode_maps(eval: &Evaluator, events: &[KeyEvent]) -> Option<Value> {
+    if let Some(emulation_raw) = dynamic_or_global_symbol_value(eval, "emulation-mode-map-alists") {
+        if let Some(emulation_entries) = list_to_vec(&emulation_raw) {
+            for emulation_entry in emulation_entries {
+                let alist_value = match emulation_entry.as_symbol_name() {
+                    Some(name) => dynamic_or_global_symbol_value(eval, name).unwrap_or(Value::Nil),
+                    None => emulation_entry,
+                };
+                if let Some(value) =
+                    key_binding_lookup_in_minor_mode_alist(eval, events, &alist_value)
+                {
+                    return Some(value);
+                }
+            }
+        }
+    }
+
+    for alist_name in ["minor-mode-overriding-map-alist", "minor-mode-map-alist"] {
+        let Some(alist_value) = dynamic_or_global_symbol_value(eval, alist_name) else {
+            continue;
+        };
+        if let Some(value) = key_binding_lookup_in_minor_mode_alist(eval, events, &alist_value) {
+            return Some(value);
+        }
+    }
+    None
 }
 
 fn lookup_minor_mode_binding_in_alist(
@@ -4043,6 +4112,70 @@ mod tests {
 
         let result = builtin_key_binding(&mut ev, vec![Value::string("C-f")]).unwrap();
         assert_eq!(result.as_symbol_name(), Some("forward-char"));
+    }
+
+    #[test]
+    fn key_binding_prefers_minor_and_emulation_mode_maps() {
+        assert_eq!(
+            eval_one(
+                r#"(let ((g (make-sparse-keymap))
+                         (l (make-sparse-keymap))
+                         (m (make-sparse-keymap))
+                         (minor-mode-map-alist nil)
+                         (demo-mode t))
+                     (use-global-map g)
+                     (use-local-map l)
+                     (define-key m (kbd "C-a") 'forward-char)
+                     (define-key l (kbd "C-a") 'self-insert-command)
+                     (setq minor-mode-map-alist (list (cons 'demo-mode m)))
+                     (key-binding (kbd "C-a")))"#
+            ),
+            "OK forward-char"
+        );
+        assert_eq!(
+            eval_one(
+                r#"(let ((g (make-sparse-keymap))
+                         (m-minor (make-sparse-keymap))
+                         (m-emu (make-sparse-keymap))
+                         (minor-mode-map-alist nil)
+                         (emulation-mode-map-alists nil)
+                         (minor-mode t)
+                         (emu-mode t))
+                     (use-global-map g)
+                     (define-key m-minor (kbd "C-a") 'self-insert-command)
+                     (define-key m-emu (kbd "C-a") 'forward-char)
+                     (setq minor-mode-map-alist (list (cons 'minor-mode m-minor)))
+                     (setq emulation-mode-map-alists (list (list (cons 'emu-mode m-emu))))
+                     (key-binding (kbd "C-a")))"#
+            ),
+            "OK forward-char"
+        );
+    }
+
+    #[test]
+    fn key_binding_ignores_invalid_active_minor_emulation_entries() {
+        assert_eq!(
+            eval_one(
+                r#"(let ((g (make-sparse-keymap))
+                         (minor-mode-map-alist '((demo-mode . 999999)))
+                         (demo-mode t))
+                     (use-global-map g)
+                     (define-key g (kbd "C-a") 'self-insert-command)
+                     (key-binding (kbd "C-a")))"#
+            ),
+            "OK self-insert-command"
+        );
+        assert_eq!(
+            eval_one(
+                r#"(let ((g (make-sparse-keymap))
+                         (emulation-mode-map-alists (list (list (cons 'demo-mode 999999))))
+                         (demo-mode t))
+                     (use-global-map g)
+                     (define-key g (kbd "C-a") 'self-insert-command)
+                     (key-binding (kbd "C-a")))"#
+            ),
+            "OK self-insert-command"
+        );
     }
 
     #[test]

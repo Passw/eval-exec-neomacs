@@ -18647,6 +18647,25 @@ Last updated: 2026-02-21
     - `make -C test/neovm/vm-compat report-oracle-builtin-coverage` (pass)
     - `make -C test/neovm/vm-compat compat-progress` (pass)
 
+- Aligned `key-binding` minor/emulation precedence semantics with oracle and locked in runtime parity:
+  - runtime changes:
+    - `rust/neovm-core/src/elisp/interactive.rs`
+      - `key-binding` now checks active emulation/minor keymaps before local/global maps.
+      - added `key-binding` lookup helpers for map-id lookup and minor/emulation alist traversal.
+      - aligned fallback behavior with oracle by ignoring invalid active minor/emulation keymap handles for `key-binding` lookups.
+      - added evaluator tests:
+        - `key_binding_prefers_minor_and_emulation_mode_maps`
+        - `key_binding_ignores_invalid_active_minor_emulation_entries`
+  - corpus changes:
+    - added and wired:
+      - `test/neovm/vm-compat/cases/key-binding-minor-mode-precedence-semantics.forms`
+      - `test/neovm/vm-compat/cases/key-binding-minor-mode-precedence-semantics.expected.tsv`
+      - `test/neovm/vm-compat/cases/default.list`
+  - verified:
+    - `cargo test --manifest-path rust/neovm-core/Cargo.toml key_binding_ -- --nocapture` (pass)
+    - `make -C test/neovm/vm-compat check-one-neovm CASE=cases/key-binding-minor-mode-precedence-semantics` (pass, `9/9`)
+    - `make -C test/neovm/vm-compat check-all-neovm-strict` (pass; inventory `880`)
+
 - Continue compatibility-first maintenance with small commit slices:
   - keep builtin surface and registry in lock-step
   - run oracle/parity checks after each behavior-affecting change
