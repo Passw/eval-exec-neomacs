@@ -42,13 +42,16 @@ Last updated: 2026-02-21
     - `rust/neovm-core/src/elisp/error.rs`
       - added eval-context printer coverage:
         - `eval_context_printer_renders_condvar_handles_consistently`
+        - `eval_context_printer_renders_frame_window_handles_consistently`
       - test locks parity between string and bytes printer paths for condition-variable handles.
+      - test also locks parity between string and bytes printer paths for frame/window handles.
   - verified:
     - `cargo test --manifest-path rust/neovm-core/Cargo.toml builtin_error_message_string_formats_mutex_and_condvar_handles -- --nocapture` (pass)
     - `cargo test --manifest-path rust/neovm-core/Cargo.toml builtin_error_message_string_formats_thread_handles -- --nocapture` (pass)
     - `cargo test --manifest-path rust/neovm-core/Cargo.toml builtin_error_message_string_formats_terminal_handles -- --nocapture` (pass)
     - `cargo test --manifest-path rust/neovm-core/Cargo.toml builtin_error_message_string_formats_frame_and_window_handles -- --nocapture` (pass)
     - `cargo test --manifest-path rust/neovm-core/Cargo.toml eval_context_printer_renders_condvar_handles_consistently -- --nocapture` (pass)
+    - `cargo test --manifest-path rust/neovm-core/Cargo.toml eval_context_printer_renders_frame_window_handles_consistently -- --nocapture` (pass)
 
 - Added lock-in coverage for `error-message-string` handle payload rendering of mutex/condition-variable/terminal/thread/frame/window objects:
   - vm-compat corpus changes:
