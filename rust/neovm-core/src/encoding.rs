@@ -4,11 +4,17 @@
 //! character classification, width calculation, and encoding conversion
 //! APIs.
 
-use crate::elisp::string_escape::storage_byte_len;
+use crate::elisp::string_escape::{
+    bytes_to_unibyte_storage_string, encode_nonunicode_char_for_storage, storage_byte_len,
+};
 use crate::elisp::value::Value;
 
 const MAX_CHAR_CODE: i64 = 0x3F_FFFF;
+const RAW_BYTE_SENTINEL_BASE: u32 = 0xE000;
+const RAW_BYTE_SENTINEL_MIN: u32 = 0xE080;
+const RAW_BYTE_SENTINEL_MAX: u32 = 0xE0FF;
 const UNIBYTE_BYTE_SENTINEL_MIN: u32 = 0xE300;
+const UNIBYTE_BYTE_SENTINEL_BASE: u32 = 0xE300;
 const UNIBYTE_BYTE_SENTINEL_MAX: u32 = 0xE3FF;
 
 // ---------------------------------------------------------------------------
@@ -164,6 +170,46 @@ pub fn decode_bytes(bytes: &[u8], coding_system: &str) -> String {
     }
 }
 
+fn storage_string_to_bytes(s: &str) -> Vec<u8> {
+    let mut bytes = Vec::with_capacity(s.len());
+    for ch in s.chars() {
+        let cp = ch as u32;
+        if cp <= 0x7F {
+            bytes.push(cp as u8);
+            continue;
+        }
+        if (RAW_BYTE_SENTINEL_MIN..=RAW_BYTE_SENTINEL_MAX).contains(&cp) {
+            bytes.push((cp - RAW_BYTE_SENTINEL_BASE) as u8);
+            continue;
+        }
+        if (UNIBYTE_BYTE_SENTINEL_MIN..=UNIBYTE_BYTE_SENTINEL_MAX).contains(&cp) {
+            bytes.push((cp - UNIBYTE_BYTE_SENTINEL_BASE) as u8);
+            continue;
+        }
+
+        let mut utf8 = [0u8; 4];
+        let encoded = ch.encode_utf8(&mut utf8);
+        bytes.extend_from_slice(encoded.as_bytes());
+    }
+    bytes
+}
+
+fn bytes_to_multibyte_raw_string(bytes: &[u8]) -> String {
+    let mut out = String::with_capacity(bytes.len());
+    for b in bytes {
+        if *b <= 0x7F {
+            out.push(*b as char);
+            continue;
+        }
+        if let Some(encoded) = encode_nonunicode_char_for_storage(0x3FFF00 + (*b as u32)) {
+            out.push_str(&encoded);
+            continue;
+        }
+        out.push('\u{FFFD}');
+    }
+    out
+}
+
 // ---------------------------------------------------------------------------
 // Byte/char position conversion
 // ---------------------------------------------------------------------------
@@ -308,8 +354,8 @@ pub(crate) fn builtin_encode_coding_string(args: Vec<Value>) -> EvalResult {
     }
     let s = expect_string(&args[0])?;
     let coding = match &args[1] {
+        Value::Nil => return Ok(Value::string(s)),
         Value::Symbol(s) => s.clone(),
-        Value::Str(s) => (**s).clone(),
         other => {
             return Err(signal(
                 "wrong-type-argument",
@@ -317,10 +363,16 @@ pub(crate) fn builtin_encode_coding_string(args: Vec<Value>) -> EvalResult {
             ))
         }
     };
+    if matches!(
+        coding.as_str(),
+        "utf-8" | "utf-8-unix" | "utf-8-dos" | "utf-8-mac"
+    ) {
+        return Ok(Value::string(bytes_to_unibyte_storage_string(
+            &storage_string_to_bytes(&s),
+        )));
+    }
     let bytes = encode_string(&s, &coding);
-    // Return as unibyte string (for now, just convert back)
-    let result: String = bytes.iter().map(|&b| b as char).collect();
-    Ok(Value::string(result))
+    Ok(Value::string(bytes_to_unibyte_storage_string(&bytes)))
 }
 
 /// `(decode-coding-string STRING CODING-SYSTEM)` -> string
@@ -337,8 +389,8 @@ pub(crate) fn builtin_decode_coding_string(args: Vec<Value>) -> EvalResult {
     }
     let s = expect_string(&args[0])?;
     let coding = match &args[1] {
+        Value::Nil => return Ok(Value::string(s)),
         Value::Symbol(s) => s.clone(),
-        Value::Str(s) => (**s).clone(),
         other => {
             return Err(signal(
                 "wrong-type-argument",
@@ -346,9 +398,17 @@ pub(crate) fn builtin_decode_coding_string(args: Vec<Value>) -> EvalResult {
             ))
         }
     };
-    let bytes: Vec<u8> = s.chars().map(|c| c as u8).collect();
-    let result = decode_bytes(&bytes, &coding);
-    Ok(Value::string(result))
+    let bytes = storage_string_to_bytes(&s);
+    if matches!(
+        coding.as_str(),
+        "utf-8" | "utf-8-unix" | "utf-8-dos" | "utf-8-mac"
+    ) {
+        return match String::from_utf8(bytes.clone()) {
+            Ok(text) => Ok(Value::string(text)),
+            Err(_) => Ok(Value::string(bytes_to_multibyte_raw_string(&bytes))),
+        };
+    }
+    Ok(Value::string(decode_bytes(&bytes, &coding)))
 }
 
 /// `(char-or-string-p OBJ)` -> t or nil
@@ -620,6 +680,71 @@ mod tests {
             }
             other => panic!("expected signal, got: {other:?}"),
         }
+    }
+
+    #[test]
+    fn builtin_coding_string_helpers_runtime_match_oracle_core_cases() {
+        use crate::elisp::string_escape::decode_storage_char_codes;
+
+        let encoded = builtin_encode_coding_string(vec![Value::string("é"), Value::symbol("utf-8")])
+            .expect("encode-coding-string should evaluate");
+        let encoded_text = encoded
+            .as_str()
+            .expect("encode-coding-string should return a string");
+        assert_eq!(decode_storage_char_codes(encoded_text), vec![0xC3, 0xA9]);
+
+        let decode_utf8 =
+            builtin_decode_coding_string(vec![Value::string("é"), Value::symbol("utf-8")])
+                .expect("decode-coding-string should evaluate");
+        assert_eq!(decode_utf8, Value::string("é"));
+
+        let nil_encode =
+            builtin_encode_coding_string(vec![Value::string("é"), Value::Nil]).expect("nil coding");
+        assert_eq!(nil_encode, Value::string("é"));
+
+        let nil_decode =
+            builtin_decode_coding_string(vec![Value::string("é"), Value::Nil]).expect("nil coding");
+        assert_eq!(nil_decode, Value::string("é"));
+
+        let coding_string = builtin_encode_coding_string(vec![
+            Value::string("a"),
+            Value::string("utf-8"),
+        ])
+        .expect_err("string coding-system should signal symbolp");
+        match coding_string {
+            Flow::Signal(sig) => {
+                assert_eq!(sig.symbol, "wrong-type-argument");
+                assert_eq!(
+                    sig.data,
+                    vec![Value::symbol("symbolp"), Value::string("utf-8")]
+                );
+            }
+            other => panic!("expected signal, got: {other:?}"),
+        }
+
+        let unibyte = bytes_to_unibyte_storage_string(&[0xE9]);
+        let decoded_unibyte = builtin_decode_coding_string(vec![
+            Value::string(unibyte.clone()),
+            Value::symbol("utf-8"),
+        ])
+        .expect("decode-coding-string should preserve invalid bytes");
+        let decoded_unibyte_text = decoded_unibyte
+            .as_str()
+            .expect("decode-coding-string should return string");
+        assert_eq!(
+            decode_storage_char_codes(decoded_unibyte_text),
+            vec![0x3FFF00 + 0xE9]
+        );
+
+        let encoded_unibyte = builtin_encode_coding_string(vec![
+            Value::string(unibyte),
+            Value::symbol("utf-8"),
+        ])
+        .expect("encode-coding-string should preserve unibyte bytes");
+        let encoded_unibyte_text = encoded_unibyte
+            .as_str()
+            .expect("encode-coding-string should return string");
+        assert_eq!(decode_storage_char_codes(encoded_unibyte_text), vec![0xE9]);
     }
 
     #[test]
