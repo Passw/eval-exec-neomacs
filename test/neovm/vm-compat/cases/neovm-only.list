@@ -1,4 +1,5 @@
 cases/neovm-precompile-function-cell-semantics
 cases/neovm-precompile-arg-errors-semantics
+cases/neovm-precompile-compiled-artifact-rejection
 cases/precompile
 cases/bytecode-literal-default-policy
