@@ -43,3 +43,12 @@
 (max-char t)
 (max-char 'foo)
 (condition-case err (max-char 1 2) (error err))
+
+(multibyte-string-p "abc")
+(multibyte-string-p "é")
+(multibyte-string-p (string 65))
+(multibyte-string-p (string-as-unibyte "abc"))
+(multibyte-string-p (string-as-unibyte "é"))
+(multibyte-string-p (unibyte-string 65 66 67))
+(multibyte-string-p (unibyte-string 233))
+(multibyte-string-p 1)

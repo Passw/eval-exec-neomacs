@@ -8,6 +8,8 @@ use crate::elisp::string_escape::storage_byte_len;
 use crate::elisp::value::Value;
 
 const MAX_CHAR_CODE: i64 = 0x3F_FFFF;
+const UNIBYTE_BYTE_SENTINEL_MIN: u32 = 0xE300;
+const UNIBYTE_BYTE_SENTINEL_MAX: u32 = 0xE3FF;
 
 // ---------------------------------------------------------------------------
 // Character classification
@@ -119,7 +121,10 @@ pub fn is_ascii_string(s: &str) -> bool {
 
 /// Whether a string is multibyte (contains non-ASCII).
 pub fn is_multibyte_string(s: &str) -> bool {
-    !is_ascii_string(s)
+    s.chars().any(|ch| {
+        let cp = ch as u32;
+        cp > 0x7f && !(UNIBYTE_BYTE_SENTINEL_MIN..=UNIBYTE_BYTE_SENTINEL_MAX).contains(&cp)
+    })
 }
 
 // ---------------------------------------------------------------------------
@@ -275,8 +280,10 @@ pub(crate) fn builtin_string_bytes(args: Vec<Value>) -> EvalResult {
 /// `(multibyte-string-p STRING)` -> t or nil
 pub(crate) fn builtin_multibyte_string_p(args: Vec<Value>) -> EvalResult {
     expect_args("multibyte-string-p", &args, 1)?;
-    let s = expect_string(&args[0])?;
-    Ok(Value::bool(is_multibyte_string(&s)))
+    match &args[0] {
+        Value::Str(s) => Ok(Value::bool(is_multibyte_string(s))),
+        _ => Ok(Value::Nil),
+    }
 }
 
 /// `(unibyte-string-p STRING)` -> t or nil
@@ -593,6 +600,39 @@ mod tests {
         assert!(!is_multibyte_string("hello"));
         assert!(is_multibyte_string("héllo"));
         assert!(is_multibyte_string("中文"));
+    }
+
+    #[test]
+    fn multibyte_detection_treats_unibyte_storage_as_unibyte() {
+        let unibyte_ascii = crate::elisp::string_escape::bytes_to_unibyte_storage_string(b"abc");
+        assert!(!is_multibyte_string(&unibyte_ascii));
+
+        let unibyte_utf8 =
+            crate::elisp::string_escape::bytes_to_unibyte_storage_string(&[0xC3, 0xA9]);
+        assert!(!is_multibyte_string(&unibyte_utf8));
+    }
+
+    #[test]
+    fn builtin_multibyte_string_p_matches_oracle_non_string_and_unibyte_storage() {
+        assert_eq!(
+            builtin_multibyte_string_p(vec![Value::string("abc")]).unwrap(),
+            Value::Nil
+        );
+        assert_eq!(
+            builtin_multibyte_string_p(vec![Value::string("é")]).unwrap(),
+            Value::True
+        );
+
+        let unibyte_ascii = crate::elisp::string_escape::bytes_to_unibyte_storage_string(b"abc");
+        assert_eq!(
+            builtin_multibyte_string_p(vec![Value::string(unibyte_ascii)]).unwrap(),
+            Value::Nil
+        );
+
+        assert_eq!(
+            builtin_multibyte_string_p(vec![Value::Int(1)]).unwrap(),
+            Value::Nil
+        );
     }
 
     #[test]

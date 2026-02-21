@@ -40,3 +40,11 @@
 40	(max-char t)	OK 1114111
 41	(max-char 'foo)	OK 1114111
 42	(condition-case err (max-char 1 2) (error err))	OK (wrong-number-of-arguments max-char 2)
+43	(multibyte-string-p "abc")	OK nil
+44	(multibyte-string-p "é")	OK t
+45	(multibyte-string-p (string 65))	OK nil
+46	(multibyte-string-p (string-as-unibyte "abc"))	OK nil
+47	(multibyte-string-p (string-as-unibyte "é"))	OK nil
+48	(multibyte-string-p (unibyte-string 65 66 67))	OK nil
+49	(multibyte-string-p (unibyte-string 233))	OK nil
+50	(multibyte-string-p 1)	OK nil
