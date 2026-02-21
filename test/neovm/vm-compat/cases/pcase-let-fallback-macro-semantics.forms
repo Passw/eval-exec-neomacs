@@ -61,3 +61,7 @@
 (condition-case err (macroexpand '(pcase-let (((x y . z) a . b) (w 1)) q)) (error err))
 (condition-case err (macroexpand '(pcase-let* ((`(,a ,b) (foo bar) . baz)) q)) (error err))
 (condition-case err (macroexpand '(pcase-let ((`(,a ,b) (foo bar) baz)) q)) (error err))
+(condition-case err (pcase-let (((pred numberp) "x")) 'ok) (error err))
+(condition-case err (pcase-let ((`(,a ,b) 1)) (list a b)) (error err))
+(condition-case err (pcase-let* (((pred numberp) "x")) 'ok) (error err))
+(condition-case err (pcase-let* ((`(,a ,b) 1)) (list a b)) (error err))

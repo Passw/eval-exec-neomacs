@@ -53,3 +53,7 @@
 53	(condition-case err (macroexpand '(pcase-let (((x y . z) a . b) (w 1)) q)) (error err))	OK (let ((x0 a . b) (w 1)) (pcase-let* (((x y . z) x0)) q))
 54	(condition-case err (macroexpand '(pcase-let* ((`(,a ,b) (foo bar) . baz)) q)) (error err))	OK (let* ((val (foo bar))) (progn (ignore (consp val)) (let* ((x29 (car-safe val)) (x30 (cdr-safe val))) (progn (ignore (consp x30)) (let* ((x31 (car-safe x30)) (x32 (cdr-safe x30))) (progn (ignore (null x32)) (let ((a x29) (b x31)) q)))))))
 55	(condition-case err (macroexpand '(pcase-let ((`(,a ,b) (foo bar) baz)) q)) (error err))	OK (let* ((val (foo bar))) (progn (ignore (consp val)) (let* ((x33 (car-safe val)) (x34 (cdr-safe val))) (progn (ignore (consp x34)) (let* ((x35 (car-safe x34)) (x36 (cdr-safe x34))) (progn (ignore (null x36)) (let ((a x33) (b x35)) q)))))))
+56	(condition-case err (pcase-let (((pred numberp) "x")) 'ok) (error err))	OK ok
+57	(condition-case err (pcase-let ((`(,a ,b) 1)) (list a b)) (error err))	OK (nil nil)
+58	(condition-case err (pcase-let* (((pred numberp) "x")) 'ok) (error err))	OK ok
+59	(condition-case err (pcase-let* ((`(,a ,b) 1)) (list a b)) (error err))	OK (nil nil)

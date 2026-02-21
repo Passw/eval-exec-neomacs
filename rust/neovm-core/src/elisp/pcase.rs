@@ -620,6 +620,16 @@ fn collect_pattern_binding_names(pattern: &Pattern, names: &mut Vec<String>) {
     }
 }
 
+fn fallback_nil_bindings_for_pattern(pattern: &Pattern) -> HashMap<String, Value> {
+    let mut names = Vec::new();
+    collect_pattern_binding_names(pattern, &mut names);
+    let mut fallback = HashMap::with_capacity(names.len());
+    for name in names {
+        fallback.insert(name, Value::Nil);
+    }
+    fallback
+}
+
 // ---------------------------------------------------------------------------
 // Special form implementations
 // ---------------------------------------------------------------------------
@@ -714,15 +724,11 @@ pub(crate) fn sf_pcase_let(eval: &mut Evaluator, tail: &[Expr]) -> EvalResult {
     // Phase 2: match all patterns and collect bindings.
     let mut combined = HashMap::new();
     for (pat, val) in &pairs {
-        match match_pattern(eval, pat, val)? {
-            Some(bindings) => combined.extend(bindings),
-            None => {
-                return Err(signal(
-                    "error",
-                    vec![Value::string("pcase-let pattern match failed")],
-                ));
-            }
-        }
+        let bindings = match match_pattern(eval, pat, val)? {
+            Some(bindings) => bindings,
+            None => fallback_nil_bindings_for_pattern(pat),
+        };
+        combined.extend(bindings);
     }
 
     // Phase 3: evaluate body with bindings.
@@ -820,19 +826,7 @@ pub(crate) fn sf_pcase_let_star(eval: &mut Evaluator, tail: &[Expr]) -> EvalResu
 
         let bindings = match match_pattern(eval, &pat, &val) {
             Ok(Some(b)) => b,
-            Ok(None) => {
-                for _ in 0..frames_pushed {
-                    if use_lexical {
-                        eval.lexenv.pop();
-                    } else {
-                        eval.dynamic.pop();
-                    }
-                }
-                return Err(signal(
-                    "error",
-                    vec![Value::string("pcase-let* pattern match failed")],
-                ));
-            }
+            Ok(None) => fallback_nil_bindings_for_pattern(&pat),
             Err(e) => {
                 for _ in 0..frames_pushed {
                     if use_lexical {
@@ -1296,6 +1290,16 @@ mod tests {
         assert_eq!(eval_last("(pcase-let ((x 10) (y 20)) (+ x y))"), "OK 30");
     }
 
+    #[test]
+    fn pcase_let_mismatch_binds_pattern_vars_to_nil() {
+        assert_eq!(eval_last("(pcase-let ((`(,a ,b) 1)) (list a b))"), "OK (nil nil)");
+    }
+
+    #[test]
+    fn pcase_let_predicate_mismatch_still_evaluates_body() {
+        assert_eq!(eval_last("(pcase-let (((pred numberp) \"x\")) 'ok)"), "OK ok");
+    }
+
     // =======================================================================
     // 19. pcase-let* sequential binding
     // =======================================================================
@@ -1311,6 +1315,19 @@ mod tests {
             eval_last("(pcase-let* ((`(,a ,b) '(3 4)) (c (+ a b))) c)"),
             "OK 7"
         );
+    }
+
+    #[test]
+    fn pcase_let_star_mismatch_binds_pattern_vars_to_nil() {
+        assert_eq!(
+            eval_last("(pcase-let* ((`(,a ,b) 1)) (list a b))"),
+            "OK (nil nil)"
+        );
+    }
+
+    #[test]
+    fn pcase_let_star_predicate_mismatch_still_evaluates_body() {
+        assert_eq!(eval_last("(pcase-let* (((pred numberp) \"x\")) 'ok)"), "OK ok");
     }
 
     // =======================================================================
