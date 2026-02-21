@@ -4090,7 +4090,7 @@ fn startup_virtual_autoload_function_cell(
                 Value::symbol("autoload"),
                 Value::string("pcase"),
                 Value::string(
-                    "Eval BODY once for each set of bindings defined by PATTERN and LIST elements.",
+                    "Eval BODY once for each set of bindings defined by PATTERN and LIST elements.\nPATTERN should be a `pcase' pattern describing the structure of\nLIST elements, and LIST is a list of objects that match PATTERN,\ni.e. have a structure that is compatible with PATTERN.\nFor each element of LIST, this macro binds the variables in\nPATTERN to the corresponding subfields of the LIST element, and\nthen evaluates BODY with these bindings in effect.  The\ndestructuring bindings of variables in PATTERN to the subfields\nof the elements of LIST is performed as if by `pcase-let'.\n\n(fn (PATTERN LIST) BODY...)",
                 ),
                 Value::Nil,
                 Value::True,
