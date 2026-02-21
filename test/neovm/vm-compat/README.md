@@ -116,7 +116,9 @@ cd test/neovm/vm-compat
 make report-oracle-builtin-coverage
 ```
 
-Select the oracle builtin universe mode when needed:
+Select the oracle builtin universe mode when needed (use either
+`ORACLE_BUILTIN_UNIVERSE` or `ORACLE_BUILTIN_UNIVERSE_MODE`; if both are set,
+`ORACLE_BUILTIN_UNIVERSE` takes precedence):
 
 - `ORACLE_BUILTIN_UNIVERSE=primitive-subr` (default): primitive subrs only (`subr-primitive-p` and not special forms)
 - `ORACLE_BUILTIN_UNIVERSE=primitive-any`: primitive subrs + primitive special forms

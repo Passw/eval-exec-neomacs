@@ -12,11 +12,25 @@ if [[ ! -f "$registry_file" ]]; then
   exit 2
 fi
 
-universe_mode="${ORACLE_BUILTIN_UNIVERSE:-primitive-subr}"
+universe_mode_primary="${ORACLE_BUILTIN_UNIVERSE:-}"
+universe_mode_alias="${ORACLE_BUILTIN_UNIVERSE_MODE:-}"
+if [[ -n "$universe_mode_primary" ]]; then
+  universe_mode="$universe_mode_primary"
+elif [[ -n "$universe_mode_alias" ]]; then
+  universe_mode="$universe_mode_alias"
+else
+  universe_mode="primitive-subr"
+fi
+
+if [[ -n "$universe_mode_primary" && -n "$universe_mode_alias" && "$universe_mode_primary" != "$universe_mode_alias" ]]; then
+  echo "conflicting builtin universe modes: ORACLE_BUILTIN_UNIVERSE=$universe_mode_primary vs ORACLE_BUILTIN_UNIVERSE_MODE=$universe_mode_alias" >&2
+  exit 2
+fi
+
 case "$universe_mode" in
   primitive-subr|primitive-any|subr-or-special) ;;
   *)
-    echo "unsupported ORACLE_BUILTIN_UNIVERSE mode: $universe_mode" >&2
+    echo "unsupported builtin universe mode: $universe_mode" >&2
     echo "supported modes: primitive-subr, primitive-any, subr-or-special" >&2
     exit 2
     ;;

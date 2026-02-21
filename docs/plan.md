@@ -18666,6 +18666,23 @@ Last updated: 2026-02-21
     - `make -C test/neovm/vm-compat check-one-neovm CASE=cases/key-binding-minor-mode-precedence-semantics` (pass, `9/9`)
     - `make -C test/neovm/vm-compat check-all-neovm-strict` (pass; inventory `880`)
 
+- Reduced vm-compat coverage reporter friction by accepting both builtin-universe env var spellings:
+  - vm-compat changes:
+    - `test/neovm/vm-compat/report-oracle-builtin-coverage.sh`
+      - added dual env-var support for universe selection:
+        - primary: `ORACLE_BUILTIN_UNIVERSE`
+        - alias: `ORACLE_BUILTIN_UNIVERSE_MODE`
+      - if both are set and disagree, exits with a clear conflict error.
+      - retained supported universe modes:
+        - `primitive-subr`
+        - `primitive-any`
+        - `subr-or-special`
+    - `test/neovm/vm-compat/README.md`
+      - documented dual-variable support and precedence.
+  - verified:
+    - `ORACLE_BUILTIN_UNIVERSE_MODE=primitive-any make -C test/neovm/vm-compat report-oracle-builtin-coverage` (pass; mode reflected as `primitive-any`)
+    - `ORACLE_BUILTIN_UNIVERSE=primitive-subr ORACLE_BUILTIN_UNIVERSE_MODE=primitive-any ./test/neovm/vm-compat/report-oracle-builtin-coverage.sh` (fails as expected with conflict error)
+
 - Continue compatibility-first maintenance with small commit slices:
   - keep builtin surface and registry in lock-step
   - run oracle/parity checks after each behavior-affecting change
