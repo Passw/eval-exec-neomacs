@@ -3,6 +3,8 @@
 (fboundp 'make-condition-variable)
 (fboundp 'terminal-list)
 (fboundp 'current-thread)
+(fboundp 'selected-frame)
+(fboundp 'selected-window)
 
 (let ((msg (condition-case e
                (progn (error "%S" (make-mutex)) "")
@@ -26,3 +28,13 @@
                (progn (error "%S" (current-thread)) "")
              (error (error-message-string e)))))
   (string-prefix-p "#<thread" msg))
+
+(let ((msg (condition-case e
+               (progn (error "%S" (selected-frame)) "")
+             (error (error-message-string e)))))
+  (string-prefix-p "#<frame" msg))
+
+(let ((msg (condition-case e
+               (progn (error "%S" (selected-window)) "")
+             (error (error-message-string e)))))
+  (string-prefix-p "#<window" msg))
