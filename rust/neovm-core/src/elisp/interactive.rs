@@ -1579,6 +1579,7 @@ pub(crate) fn builtin_key_binding(eval: &mut Evaluator, args: Vec<Value>) -> Eva
     expect_min_args("key-binding", &args, 1)?;
     expect_max_args("key-binding", &args, 4)?;
     let string_designator = args[0].is_string();
+    let no_remap = args.get(2).is_some_and(|v| v.is_truthy());
 
     let events = match super::kbd::key_events_from_designator(&args[0]) {
         Ok(events) => events,
@@ -1606,19 +1607,19 @@ pub(crate) fn builtin_key_binding(eval: &mut Evaluator, args: Vec<Value>) -> Eva
     }
 
     if let Some(value) = key_binding_lookup_in_minor_mode_maps(eval, &events) {
-        return Ok(value);
+        return Ok(key_binding_apply_remap(eval, value, no_remap));
     }
 
     // Try local map first, then global.
     if let Some(local_id) = eval.current_local_map {
         if let Some(value) = key_binding_lookup_in_keymap_id(eval, local_id, &events) {
-            return Ok(value);
+            return Ok(key_binding_apply_remap(eval, value, no_remap));
         }
     }
 
     if let Some(global_id) = eval.keymaps.global_map() {
         if let Some(value) = key_binding_lookup_in_keymap_id(eval, global_id, &events) {
-            return Ok(value);
+            return Ok(key_binding_apply_remap(eval, value, no_remap));
         }
     }
     if eval.keymaps.global_map().is_none()
@@ -1739,6 +1740,19 @@ fn key_binding_lookup_in_keymap_id(
     eval.keymaps
         .lookup_key_sequence(map_id, events)
         .map(key_binding_to_value)
+}
+
+fn key_binding_apply_remap(eval: &Evaluator, binding: Value, no_remap: bool) -> Value {
+    if no_remap {
+        return binding;
+    }
+    let Some(command_name) = binding.as_symbol_name().map(ToString::to_string) else {
+        return binding;
+    };
+    match command_remapping_lookup_in_active_keymaps(eval, &command_name) {
+        Some(remapped) if !remapped.is_nil() => remapped,
+        _ => binding,
+    }
 }
 
 fn key_binding_lookup_in_minor_mode_alist(
@@ -4173,6 +4187,32 @@ mod tests {
                      (use-global-map g)
                      (define-key g (kbd "C-a") 'self-insert-command)
                      (key-binding (kbd "C-a")))"#
+            ),
+            "OK self-insert-command"
+        );
+    }
+
+    #[test]
+    fn key_binding_applies_command_remapping_unless_no_remap() {
+        assert_eq!(
+            eval_one(
+                r#"(let ((g (make-sparse-keymap)))
+                     (use-global-map g)
+                     (define-key g (kbd "a") 'self-insert-command)
+                     (define-key g [remap self-insert-command] 'forward-char)
+                     (list (key-binding (kbd "a"))
+                           (key-binding (kbd "a") t nil)
+                           (key-binding (kbd "a") t t)))"#
+            ),
+            "OK (forward-char forward-char self-insert-command)"
+        );
+        assert_eq!(
+            eval_one(
+                r#"(let ((g (make-sparse-keymap)))
+                     (use-global-map g)
+                     (define-key g (kbd "a") 'self-insert-command)
+                     (define-key g [remap self-insert-command] t)
+                     (key-binding (kbd "a")))"#
             ),
             "OK self-insert-command"
         );

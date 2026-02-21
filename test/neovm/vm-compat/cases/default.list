@@ -208,6 +208,7 @@ cases/key-binding-partial-semantics
 cases/key-binding-empty-designator-semantics
 cases/key-binding-arity-semantics
 cases/key-binding-default-self-insert-semantics
+cases/key-binding-command-remap-semantics
 cases/key-binding-minor-mode-precedence-semantics
 cases/minor-mode-key-binding-semantics
 cases/minor-mode-key-binding-emulation-alist-iteration-semantics

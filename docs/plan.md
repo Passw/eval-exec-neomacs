@@ -18705,6 +18705,24 @@ Last updated: 2026-02-21
     - `make -C test/neovm/vm-compat compat-progress-json` (pass)
     - `./test/neovm/vm-compat/compat-progress.sh --json` (pass)
 
+- Aligned `key-binding` command-remapping behavior with oracle and added dedicated lock-ins:
+  - runtime changes:
+    - `rust/neovm-core/src/elisp/interactive.rs`
+      - `key-binding` now applies command remapping for resolved command bindings when `NO-REMAP` is nil.
+      - `key-binding` now honors `NO-REMAP` (third optional arg): truthy values bypass remapping.
+      - remap normalization now preserves original binding when remap target resolves to `nil`/`t`/integer (`no-remap` behavior), matching oracle.
+      - added evaluator test:
+        - `key_binding_applies_command_remapping_unless_no_remap`
+  - corpus changes:
+    - added and wired:
+      - `test/neovm/vm-compat/cases/key-binding-command-remap-semantics.forms`
+      - `test/neovm/vm-compat/cases/key-binding-command-remap-semantics.expected.tsv`
+      - `test/neovm/vm-compat/cases/default.list`
+  - verified:
+    - `cargo test --manifest-path rust/neovm-core/Cargo.toml key_binding_ -- --nocapture` (pass)
+    - `make -C test/neovm/vm-compat check-one-neovm CASE=cases/key-binding-command-remap-semantics` (pass, `8/8`)
+    - `make -C test/neovm/vm-compat check-all-neovm-strict` (pass; inventory `881`)
+
 - Continue compatibility-first maintenance with small commit slices:
   - keep builtin surface and registry in lock-step
   - run oracle/parity checks after each behavior-affecting change
