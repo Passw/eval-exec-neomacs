@@ -28,6 +28,17 @@ Last updated: 2026-02-21
 
 ## Doing
 
+- Added regex-filtered baseline recording for vm-compat list workflows:
+  - vm-compat changes:
+    - `test/neovm/vm-compat/Makefile`
+      - added `record-list-filter` target.
+      - `record-list-filter` records Oracle baselines only for list entries in `LIST` whose case path matches `PATTERN`.
+      - mirrors `check-neovm-filter` UX and error behavior (missing pattern / zero matches).
+    - `test/neovm/vm-compat/README.md`
+      - documented `record-list-filter` usage alongside filtered check workflow.
+  - verified:
+    - `make -C test/neovm/vm-compat record-list-filter LIST=cases/default.list PATTERN='killed-buffer-handle-printing-semantics|command-remapping-position-semantics'` (pass; `2` cases)
+
 - Reduced vm-compat iteration friction with regex-filtered list runs:
   - vm-compat changes:
     - `test/neovm/vm-compat/Makefile`
