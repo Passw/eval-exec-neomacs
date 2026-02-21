@@ -2,6 +2,7 @@
 (fboundp 'make-mutex)
 (fboundp 'make-condition-variable)
 (fboundp 'terminal-list)
+(fboundp 'current-thread)
 
 (let ((msg (condition-case e
                (progn (error "%S" (make-mutex)) "")
@@ -20,3 +21,8 @@
                 (progn (error "%S" term) "")
               (error (error-message-string e)))))
   (string-prefix-p "#<terminal" msg))
+
+(let ((msg (condition-case e
+               (progn (error "%S" (current-thread)) "")
+             (error (error-message-string e)))))
+  (string-prefix-p "#<thread" msg))
