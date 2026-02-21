@@ -18127,6 +18127,23 @@ Last updated: 2026-02-21
 
 ## Doing
 
+- Added `command-remapping` emulation-map precedence lock-in coverage (no runtime behavior change required):
+  - runtime notes:
+    - existing runtime precedence in `rust/neovm-core/src/elisp/interactive.rs` already matches oracle for active `emulation-mode-map-alists` remap resolution ahead of other map tiers.
+    - this slice is corpus-only to prevent regressions in that precedence contract.
+  - vm-compat corpus changes:
+    - added and wired:
+      - `test/neovm/vm-compat/cases/command-remapping-emulation-precedence-semantics.forms`
+      - `test/neovm/vm-compat/cases/command-remapping-emulation-precedence-semantics.expected.tsv`
+      - `test/neovm/vm-compat/cases/default.list`
+    - lock-ins cover:
+      - active emulation map remap precedence over regular minor-mode/local/global map remaps,
+      - fallback behavior when emulation entries are absent.
+  - verified:
+    - `make -C test/neovm/vm-compat record FORMS=cases/command-remapping-emulation-precedence-semantics.forms EXPECTED=cases/command-remapping-emulation-precedence-semantics.expected.tsv` (pass)
+    - `make -C test/neovm/vm-compat check-one-neovm CASE=cases/command-remapping-emulation-precedence-semantics` (pass; `4/4`)
+    - `make -C test/neovm/vm-compat check-all-neovm-strict` (pass; case inventory `877`)
+
 - Fixed `command-remapping` minor-mode map coverage and precedence for omitted/`nil` `KEYMAP`:
   - runtime changes:
     - `rust/neovm-core/src/elisp/interactive.rs`
