@@ -1859,10 +1859,7 @@ fn expect_optional_color_distance_frame_arg(args: &[Value], idx: usize) -> Resul
 }
 
 fn invalid_color_error(value: &Value) -> Flow {
-    signal(
-        "error",
-        vec![Value::string("Invalid color"), value.clone()],
-    )
+    signal("error", vec![Value::string("Invalid color"), value.clone()])
 }
 
 fn parse_color_distance_input(value: &Value) -> Result<(i64, i64, i64), Flow> {
@@ -2477,7 +2474,9 @@ mod tests {
     fn close_font_accepts_tagged_font_object_and_checks_arity() {
         let font_obj = Value::vector(vec![Value::keyword("font-object"), Value::Int(1)]);
         assert!(builtin_close_font(vec![font_obj.clone()]).unwrap().is_nil());
-        assert!(builtin_close_font(vec![font_obj, Value::Nil]).unwrap().is_nil());
+        assert!(builtin_close_font(vec![font_obj, Value::Nil])
+            .unwrap()
+            .is_nil());
 
         assert!(builtin_close_font(vec![]).is_err());
         assert!(builtin_close_font(vec![Value::Nil, Value::Nil, Value::Nil]).is_err());
@@ -3230,10 +3229,7 @@ mod tests {
             &builtin_color_values_from_color_spec(vec![Value::string("#000")]).unwrap(),
         )
         .unwrap();
-        assert_eq!(
-            rgb_short,
-            vec![Value::Int(0), Value::Int(0), Value::Int(0)]
-        );
+        assert_eq!(rgb_short, vec![Value::Int(0), Value::Int(0), Value::Int(0)]);
 
         let rgb_12 = list_to_vec(
             &builtin_color_values_from_color_spec(vec![Value::string("#111122223333")]).unwrap(),
@@ -3244,12 +3240,16 @@ mod tests {
             vec![Value::Int(4369), Value::Int(8738), Value::Int(13107)]
         );
 
-        assert!(builtin_color_values_from_color_spec(vec![Value::string("#abcd")])
-            .unwrap()
-            .is_nil());
-        assert!(builtin_color_values_from_color_spec(vec![Value::string("bogus")])
-            .unwrap()
-            .is_nil());
+        assert!(
+            builtin_color_values_from_color_spec(vec![Value::string("#abcd")])
+                .unwrap()
+                .is_nil()
+        );
+        assert!(
+            builtin_color_values_from_color_spec(vec![Value::string("bogus")])
+                .unwrap()
+                .is_nil()
+        );
 
         let type_err = builtin_color_values_from_color_spec(vec![Value::Int(1)])
             .expect_err("color-values-from-color-spec should enforce stringp");
@@ -3264,21 +3264,15 @@ mod tests {
 
     #[test]
     fn color_gray_and_supported_semantics() {
-        assert!(
-            builtin_color_gray_p(vec![Value::string("#000000")])
-                .unwrap()
-                .is_truthy()
-        );
-        assert!(
-            builtin_color_gray_p(vec![Value::string("#808080")])
-                .unwrap()
-                .is_truthy()
-        );
-        assert!(
-            builtin_color_gray_p(vec![Value::string("#ff0000")])
-                .unwrap()
-                .is_nil()
-        );
+        assert!(builtin_color_gray_p(vec![Value::string("#000000")])
+            .unwrap()
+            .is_truthy());
+        assert!(builtin_color_gray_p(vec![Value::string("#808080")])
+            .unwrap()
+            .is_truthy());
+        assert!(builtin_color_gray_p(vec![Value::string("#ff0000")])
+            .unwrap()
+            .is_nil());
         assert!(
             builtin_color_gray_p(vec![Value::string("#fff"), Value::Nil])
                 .unwrap()
@@ -3295,9 +3289,8 @@ mod tests {
             other => panic!("unexpected flow: {other:?}"),
         }
 
-        let gray_frame_type =
-            builtin_color_gray_p(vec![Value::string("#fff"), Value::Int(0)])
-                .expect_err("color-gray-p should validate FRAME");
+        let gray_frame_type = builtin_color_gray_p(vec![Value::string("#fff"), Value::Int(0)])
+            .expect_err("color-gray-p should validate FRAME");
         match gray_frame_type {
             Flow::Signal(sig) => {
                 assert_eq!(sig.symbol, "wrong-type-argument");
@@ -3306,11 +3299,9 @@ mod tests {
             other => panic!("unexpected flow: {other:?}"),
         }
 
-        assert!(
-            builtin_color_supported_p(vec![Value::string("#123456")])
-                .unwrap()
-                .is_truthy()
-        );
+        assert!(builtin_color_supported_p(vec![Value::string("#123456")])
+            .unwrap()
+            .is_truthy());
         assert!(
             builtin_color_supported_p(vec![Value::string("#fff"), Value::Nil, Value::True])
                 .unwrap()
@@ -3346,8 +3337,9 @@ mod tests {
 
     #[test]
     fn color_distance_semantics() {
-        let black_white = builtin_color_distance(vec![Value::string("#000"), Value::string("#fff")])
-            .expect("color-distance should evaluate");
+        let black_white =
+            builtin_color_distance(vec![Value::string("#000"), Value::string("#fff")])
+                .expect("color-distance should evaluate");
         match black_white {
             Value::Int(n) => assert!(n > 0),
             other => panic!("expected integer distance, got {other:?}"),
@@ -3372,7 +3364,10 @@ mod tests {
         match invalid_left {
             Flow::Signal(sig) => {
                 assert_eq!(sig.symbol, "error");
-                assert_eq!(sig.data, vec![Value::string("Invalid color"), Value::string("#00")]);
+                assert_eq!(
+                    sig.data,
+                    vec![Value::string("Invalid color"), Value::string("#00")]
+                );
             }
             other => panic!("unexpected flow: {other:?}"),
         }
@@ -3382,14 +3377,20 @@ mod tests {
         match invalid_type {
             Flow::Signal(sig) => {
                 assert_eq!(sig.symbol, "error");
-                assert_eq!(sig.data, vec![Value::string("Invalid color"), Value::Int(1)]);
+                assert_eq!(
+                    sig.data,
+                    vec![Value::string("Invalid color"), Value::Int(1)]
+                );
             }
             other => panic!("unexpected flow: {other:?}"),
         }
 
-        let frame_err =
-            builtin_color_distance(vec![Value::string("#000"), Value::string("#fff"), Value::True])
-                .expect_err("color-distance should validate optional FRAME");
+        let frame_err = builtin_color_distance(vec![
+            Value::string("#000"),
+            Value::string("#fff"),
+            Value::True,
+        ])
+        .expect_err("color-distance should validate optional FRAME");
         match frame_err {
             Flow::Signal(sig) => {
                 assert_eq!(sig.symbol, "wrong-type-argument");

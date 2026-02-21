@@ -202,7 +202,10 @@ fn internal_hash_table_nonempty_buckets(table: &LispHashTable) -> Vec<Vec<(Value
     for bucket in &mut buckets {
         bucket.sort_by_key(|(key, value)| (print_value(key), print_value(value)));
     }
-    buckets.into_iter().filter(|bucket| !bucket.is_empty()).collect()
+    buckets
+        .into_iter()
+        .filter(|bucket| !bucket.is_empty())
+        .collect()
 }
 
 // ---------------------------------------------------------------------------
@@ -380,8 +383,7 @@ pub(crate) fn builtin_internal_hash_table_index_size(args: Vec<Value>) -> EvalRe
         Value::HashTable(ht) => {
             let table = ht.lock().expect("poisoned");
             Ok(Value::Int(
-                internal_hash_table_index_size(&table)
-                    .min(i64::MAX as usize) as i64,
+                internal_hash_table_index_size(&table).min(i64::MAX as usize) as i64,
             ))
         }
         other => Err(signal(

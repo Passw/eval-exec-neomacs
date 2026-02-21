@@ -298,11 +298,7 @@ fn normalize_current_buffer_region_bounds(
     {
         return Err(signal(
             "args-out-of-range",
-            vec![
-                Value::Buffer(buffer_id),
-                start_arg.clone(),
-                end_arg.clone(),
-            ],
+            vec![Value::Buffer(buffer_id), start_arg.clone(), end_arg.clone()],
         ));
     }
 
@@ -1447,7 +1443,8 @@ mod tests {
             let buf = eval.buffers.current_buffer_mut().expect("current buffer");
             buf.insert("%%");
         }
-        let strict = builtin_base64_decode_region_eval(&mut eval, vec![Value::Int(1), Value::Int(3)]);
+        let strict =
+            builtin_base64_decode_region_eval(&mut eval, vec![Value::Int(1), Value::Int(3)]);
         match strict {
             Err(Flow::Signal(sig)) => {
                 assert_eq!(sig.symbol, "error");

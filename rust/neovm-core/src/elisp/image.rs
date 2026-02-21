@@ -180,9 +180,7 @@ fn is_image_spec(value: &Value) -> bool {
             match key {
                 "type" if !type_seen => {
                     type_seen = true;
-                    type_ok = val
-                        .as_symbol_name()
-                        .is_some_and(is_supported_image_type);
+                    type_ok = val.as_symbol_name().is_some_and(is_supported_image_type);
                 }
                 "file" if !file_seen => {
                     file_seen = true;
@@ -1201,24 +1199,20 @@ mod tests {
             .expect("create-image should succeed");
         assert!(builtin_imagep(vec![spec]).unwrap().is_truthy());
         assert!(builtin_imagep(vec![Value::Int(1)]).unwrap().is_nil());
-        assert!(
-            builtin_imagep(vec![Value::list(vec![
-                Value::symbol("image"),
-                Value::Keyword("type".into()),
-                Value::symbol("png"),
-            ])])
-            .unwrap()
-            .is_nil()
-        );
-        assert!(
-            builtin_imagep(vec![Value::list(vec![
-                Value::symbol("image"),
-                Value::Keyword("file".into()),
-                Value::string("x.png"),
-            ])])
-            .unwrap()
-            .is_nil()
-        );
+        assert!(builtin_imagep(vec![Value::list(vec![
+            Value::symbol("image"),
+            Value::Keyword("type".into()),
+            Value::symbol("png"),
+        ])])
+        .unwrap()
+        .is_nil());
+        assert!(builtin_imagep(vec![Value::list(vec![
+            Value::symbol("image"),
+            Value::Keyword("file".into()),
+            Value::string("x.png"),
+        ])])
+        .unwrap()
+        .is_nil());
     }
 
     #[test]

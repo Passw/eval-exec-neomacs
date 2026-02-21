@@ -1476,28 +1476,23 @@ mod tests {
     #[test]
     fn get_unused_iso_final_char_known_values() {
         assert_eq!(
-            builtin_get_unused_iso_final_char(vec![Value::Int(1), Value::Int(94)])
-                .expect("1/94"),
+            builtin_get_unused_iso_final_char(vec![Value::Int(1), Value::Int(94)]).expect("1/94"),
             Value::Int(54)
         );
         assert_eq!(
-            builtin_get_unused_iso_final_char(vec![Value::Int(1), Value::Int(96)])
-                .expect("1/96"),
+            builtin_get_unused_iso_final_char(vec![Value::Int(1), Value::Int(96)]).expect("1/96"),
             Value::Int(51)
         );
         assert_eq!(
-            builtin_get_unused_iso_final_char(vec![Value::Int(2), Value::Int(94)])
-                .expect("2/94"),
+            builtin_get_unused_iso_final_char(vec![Value::Int(2), Value::Int(94)]).expect("2/94"),
             Value::Int(50)
         );
         assert_eq!(
-            builtin_get_unused_iso_final_char(vec![Value::Int(2), Value::Int(96)])
-                .expect("2/96"),
+            builtin_get_unused_iso_final_char(vec![Value::Int(2), Value::Int(96)]).expect("2/96"),
             Value::Int(48)
         );
         assert_eq!(
-            builtin_get_unused_iso_final_char(vec![Value::Int(3), Value::Int(94)])
-                .expect("3/94"),
+            builtin_get_unused_iso_final_char(vec![Value::Int(3), Value::Int(94)]).expect("3/94"),
             Value::Int(48)
         );
     }

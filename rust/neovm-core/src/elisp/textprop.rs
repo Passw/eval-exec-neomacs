@@ -296,7 +296,8 @@ pub(crate) fn builtin_add_face_text_property(
     let byte_end = elisp_pos_to_byte(buf, end);
     let existing = buf.text_props.get_property(byte_beg, "face").cloned();
     let merged = merge_face_property(existing, new_face, append);
-    buf.text_props.put_property(byte_beg, byte_end, "face", merged);
+    buf.text_props
+        .put_property(byte_beg, byte_end, "face", merged);
     Ok(Value::Nil)
 }
 
@@ -1271,7 +1272,12 @@ mod tests {
 
         let display = builtin_get_display_property(
             &mut eval,
-            vec![Value::Int(2), Value::symbol("display"), Value::Nil, Value::Nil],
+            vec![
+                Value::Int(2),
+                Value::symbol("display"),
+                Value::Nil,
+                Value::Nil,
+            ],
         )
         .unwrap();
         assert!(matches!(display, Value::Symbol(s) if s == "dv"));
@@ -1321,9 +1327,8 @@ mod tests {
             vec![Value::Int(1), Value::Int(3), Value::symbol("bold")],
         )
         .unwrap();
-        let face =
-            builtin_get_text_property(&mut eval, vec![Value::Int(2), Value::symbol("face")])
-                .unwrap();
+        let face = builtin_get_text_property(&mut eval, vec![Value::Int(2), Value::symbol("face")])
+            .unwrap();
         assert_eq!(face, Value::symbol("bold"));
 
         let mut eval = eval_with_text("abc");
@@ -1493,10 +1498,10 @@ mod tests {
         .unwrap();
         assert!(matches!(result, Value::True));
 
-        let q = builtin_get_text_property(&mut eval, vec![Value::Int(2), Value::symbol("q")])
-            .unwrap();
-        let p = builtin_get_text_property(&mut eval, vec![Value::Int(2), Value::symbol("p")])
-            .unwrap();
+        let q =
+            builtin_get_text_property(&mut eval, vec![Value::Int(2), Value::symbol("q")]).unwrap();
+        let p =
+            builtin_get_text_property(&mut eval, vec![Value::Int(2), Value::symbol("p")]).unwrap();
         assert!(matches!(q, Value::Symbol(s) if s == "z"));
         assert!(p.is_nil());
     }
@@ -1904,10 +1909,8 @@ mod tests {
         builtin_make_overlay(&mut eval, vec![Value::Int(2), Value::Int(4)]).unwrap();
         let next_from_1 = builtin_next_overlay_change(&mut eval, vec![Value::Int(1)]).unwrap();
         let next_from_2 = builtin_next_overlay_change(&mut eval, vec![Value::Int(2)]).unwrap();
-        let prev_from_4 =
-            builtin_previous_overlay_change(&mut eval, vec![Value::Int(4)]).unwrap();
-        let prev_from_2 =
-            builtin_previous_overlay_change(&mut eval, vec![Value::Int(2)]).unwrap();
+        let prev_from_4 = builtin_previous_overlay_change(&mut eval, vec![Value::Int(4)]).unwrap();
+        let prev_from_2 = builtin_previous_overlay_change(&mut eval, vec![Value::Int(2)]).unwrap();
         assert!(matches!(next_from_1, Value::Int(2)));
         assert!(matches!(next_from_2, Value::Int(4)));
         assert!(matches!(prev_from_4, Value::Int(2)));

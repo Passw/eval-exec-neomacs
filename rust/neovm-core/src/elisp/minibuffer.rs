@@ -796,10 +796,7 @@ pub(crate) fn builtin_exit_minibuffer(args: Vec<Value>) -> EvalResult {
 /// Emacs by signaling a plain `error`.
 pub(crate) fn builtin_abort_minibuffers(args: Vec<Value>) -> EvalResult {
     expect_args("abort-minibuffers", &args, 0)?;
-    Err(signal(
-        "error",
-        vec![Value::string("Not in a minibuffer")],
-    ))
+    Err(signal("error", vec![Value::string("Not in a minibuffer")]))
 }
 
 /// `(abort-recursive-edit)` — abort the innermost recursive edit.

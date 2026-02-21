@@ -940,11 +940,7 @@ impl Evaluator {
             "auth-source",
             "Read a password, prompting with PROMPT, and return password as a string.",
         );
-        seed_autoload(
-            "clear-rectangle",
-            "rect",
-            "Blank out the region-rectangle.",
-        );
+        seed_autoload("clear-rectangle", "rect", "Blank out the region-rectangle.");
         seed_autoload(
             "delete-extract-rectangle",
             "rect",

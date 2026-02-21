@@ -2947,10 +2947,7 @@ pub(crate) fn builtin_recenter_top_bottom(
 }
 
 /// `(recenter &optional ARG REDISPLAY)` -> signal no-window error in batch mode.
-pub(crate) fn builtin_recenter(
-    _eval: &mut super::eval::Evaluator,
-    args: Vec<Value>,
-) -> EvalResult {
+pub(crate) fn builtin_recenter(_eval: &mut super::eval::Evaluator, args: Vec<Value>) -> EvalResult {
     expect_max_args("recenter", &args, 2)?;
     Err(recenter_missing_display_error())
 }

@@ -127,7 +127,9 @@ fn assoc_string_entry_name(value: &Value) -> Option<String> {
 
 fn assoc_string_equal(left: &str, right: &str, fold_case: bool) -> bool {
     if fold_case {
-        left.chars().flat_map(char::to_lowercase).eq(right.chars().flat_map(char::to_lowercase))
+        left.chars()
+            .flat_map(char::to_lowercase)
+            .eq(right.chars().flat_map(char::to_lowercase))
     } else {
         left == right
     }
@@ -989,13 +991,18 @@ mod tests {
         assert_eq!(symbol_pair.car, Value::symbol("foo"));
         assert_eq!(symbol_pair.cdr, Value::Int(1));
 
-        let nil_tail = Value::cons(Value::cons(Value::string("x"), Value::Int(1)), Value::Int(2));
+        let nil_tail = Value::cons(
+            Value::cons(Value::string("x"), Value::Int(1)),
+            Value::Int(2),
+        );
         assert!(builtin_assoc_string(vec![Value::string("x"), nil_tail])
             .unwrap()
             .is_truthy());
-        assert!(builtin_assoc_string(vec![Value::string("y"), Value::Int(1)])
-            .unwrap()
-            .is_nil());
+        assert!(
+            builtin_assoc_string(vec![Value::string("y"), Value::Int(1)])
+                .unwrap()
+                .is_nil()
+        );
 
         let key_err = builtin_assoc_string(vec![Value::Int(1), Value::Nil]).unwrap_err();
         match key_err {

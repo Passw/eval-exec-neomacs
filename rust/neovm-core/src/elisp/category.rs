@@ -1177,7 +1177,10 @@ mod tests {
         match short_err {
             Flow::Signal(sig) => {
                 assert_eq!(sig.symbol, "wrong-type-argument");
-                assert_eq!(sig.data, vec![Value::symbol("categorysetp"), non_category_set]);
+                assert_eq!(
+                    sig.data,
+                    vec![Value::symbol("categorysetp"), non_category_set]
+                );
             }
             other => panic!("expected wrong-type-argument, got {other:?}"),
         }

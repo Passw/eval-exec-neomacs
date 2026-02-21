@@ -1795,7 +1795,10 @@ mod tests {
         let m = mgr();
         let plist = builtin_coding_system_plist(&m, vec![Value::symbol("utf-8")]).unwrap();
         assert_eq!(plist_get(&plist, ":name"), Some(Value::symbol("utf-8")));
-        assert_eq!(plist_get(&plist, ":coding-type"), Some(Value::symbol("utf-8")));
+        assert_eq!(
+            plist_get(&plist, ":coding-type"),
+            Some(Value::symbol("utf-8"))
+        );
         assert_eq!(plist_get(&plist, ":mnemonic"), Some(Value::Int('U' as i64)));
     }
 
@@ -1804,11 +1807,9 @@ mod tests {
         let m = mgr();
         let plist = builtin_coding_system_plist(&m, vec![Value::symbol("utf-8")]).unwrap();
 
-        let name = crate::elisp::builtins::builtin_plist_get(vec![
-            plist.clone(),
-            Value::keyword(":name"),
-        ])
-        .unwrap();
+        let name =
+            crate::elisp::builtins::builtin_plist_get(vec![plist.clone(), Value::keyword(":name")])
+                .unwrap();
         assert_eq!(name, Value::symbol("utf-8"));
 
         let mnemonic =
@@ -1821,10 +1822,12 @@ mod tests {
     fn coding_system_plist_normalizes_alias_and_eol_variant_name() {
         let m = mgr();
         let latin = builtin_coding_system_plist(&m, vec![Value::symbol("latin-1")]).unwrap();
-        assert_eq!(plist_get(&latin, ":name"), Some(Value::symbol("iso-latin-1")));
+        assert_eq!(
+            plist_get(&latin, ":name"),
+            Some(Value::symbol("iso-latin-1"))
+        );
 
-        let utf8_unix =
-            builtin_coding_system_plist(&m, vec![Value::symbol("utf-8-unix")]).unwrap();
+        let utf8_unix = builtin_coding_system_plist(&m, vec![Value::symbol("utf-8-unix")]).unwrap();
         assert_eq!(plist_get(&utf8_unix, ":name"), Some(Value::symbol("utf-8")));
     }
 
@@ -1832,7 +1835,10 @@ mod tests {
     fn coding_system_plist_nil_maps_to_no_conversion() {
         let m = mgr();
         let plist = builtin_coding_system_plist(&m, vec![Value::Nil]).unwrap();
-        assert_eq!(plist_get(&plist, ":name"), Some(Value::symbol("no-conversion")));
+        assert_eq!(
+            plist_get(&plist, ":name"),
+            Some(Value::symbol("no-conversion"))
+        );
         assert_eq!(
             plist_get(&plist, ":coding-type"),
             Some(Value::symbol("raw-text"))
@@ -1854,7 +1860,11 @@ mod tests {
         let mut m = mgr();
         builtin_coding_system_put(
             &mut m,
-            vec![Value::symbol("utf-8"), Value::symbol(":foo"), Value::Int(42)],
+            vec![
+                Value::symbol("utf-8"),
+                Value::symbol(":foo"),
+                Value::Int(42),
+            ],
         )
         .unwrap();
 
@@ -2501,22 +2511,22 @@ mod tests {
     #[test]
     fn check_coding_systems_region_semantics() {
         let m = mgr();
-        assert!(
-            builtin_check_coding_systems_region(
-                &m,
-                vec![Value::Int(1), Value::Int(1), Value::list(vec![Value::symbol("utf-8")])]
-            )
-            .unwrap()
-            .is_nil()
-        );
-        assert!(
-            builtin_check_coding_systems_region(
-                &m,
-                vec![Value::string("x"), Value::Int(1), Value::symbol("utf-8")]
-            )
-            .unwrap()
-            .is_nil()
-        );
+        assert!(builtin_check_coding_systems_region(
+            &m,
+            vec![
+                Value::Int(1),
+                Value::Int(1),
+                Value::list(vec![Value::symbol("utf-8")])
+            ]
+        )
+        .unwrap()
+        .is_nil());
+        assert!(builtin_check_coding_systems_region(
+            &m,
+            vec![Value::string("x"), Value::Int(1), Value::symbol("utf-8")]
+        )
+        .unwrap()
+        .is_nil());
 
         let type_err = builtin_check_coding_systems_region(
             &m,
@@ -2651,14 +2661,19 @@ mod tests {
                 .unwrap(),
             Value::Nil
         );
-        assert!(builtin_set_keyboard_coding_system_internal(&mut m, vec![Value::symbol("foo")])
-            .is_err());
-        assert!(builtin_set_terminal_coding_system_internal(&mut m, vec![Value::symbol("foo")])
-            .is_err());
         assert!(
-            builtin_set_safe_terminal_coding_system_internal(&mut m, vec![Value::symbol("foo")])
+            builtin_set_keyboard_coding_system_internal(&mut m, vec![Value::symbol("foo")])
                 .is_err()
         );
+        assert!(
+            builtin_set_terminal_coding_system_internal(&mut m, vec![Value::symbol("foo")])
+                .is_err()
+        );
+        assert!(builtin_set_safe_terminal_coding_system_internal(
+            &mut m,
+            vec![Value::symbol("foo")]
+        )
+        .is_err());
     }
 
     #[test]

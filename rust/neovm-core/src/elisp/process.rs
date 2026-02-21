@@ -10,9 +10,9 @@ use std::collections::HashMap;
 use std::ffi::CStr;
 use std::ffi::CString;
 use std::fs::OpenOptions;
+use std::process::{Command, Stdio};
 #[cfg(target_os = "linux")]
 use std::ptr;
-use std::process::{Command, Stdio};
 
 use super::error::{signal, EvalResult, Flow};
 use super::value::{list_to_vec, Value};
@@ -844,20 +844,18 @@ fn resolve_buffer_name_for_process_lookup(
     value: &Value,
 ) -> Result<Option<String>, Flow> {
     match value {
-        Value::Nil => Ok(
-            eval.frames
-                .selected_frame()
-                .and_then(|frame| frame.selected_window())
-                .and_then(|window| window.buffer_id())
-                .and_then(|id| eval.buffers.get(id))
-                .map(|buf| buf.name.clone()),
-        ),
-        Value::Str(name) => Ok(
-            eval.buffers
-                .find_buffer_by_name(name)
-                .and_then(|id| eval.buffers.get(id))
-                .map(|buf| buf.name.clone()),
-        ),
+        Value::Nil => Ok(eval
+            .frames
+            .selected_frame()
+            .and_then(|frame| frame.selected_window())
+            .and_then(|window| window.buffer_id())
+            .and_then(|id| eval.buffers.get(id))
+            .map(|buf| buf.name.clone())),
+        Value::Str(name) => Ok(eval
+            .buffers
+            .find_buffer_by_name(name)
+            .and_then(|id| eval.buffers.get(id))
+            .map(|buf| buf.name.clone())),
         Value::Buffer(id) => Ok(eval.buffers.get(*id).map(|buf| buf.name.clone())),
         other => Err(signal_wrong_type_string(other.clone())),
     }
@@ -913,7 +911,10 @@ fn resolve_optional_process_or_current_buffer(
         .ok_or_else(|| {
             signal(
                 "error",
-                vec![Value::string(format!("Buffer {} has no process", current_buffer_name))],
+                vec![Value::string(format!(
+                    "Buffer {} has no process",
+                    current_buffer_name
+                ))],
             )
         })
 }
@@ -941,17 +942,11 @@ fn process_tty_stream_selector_p(value: &Value) -> bool {
 }
 
 fn signal_wrong_type_bufferp(value: Value) -> Flow {
-    signal(
-        "wrong-type-argument",
-        vec![Value::symbol("bufferp"), value],
-    )
+    signal("wrong-type-argument", vec![Value::symbol("bufferp"), value])
 }
 
 fn signal_wrong_type_threadp(value: Value) -> Flow {
-    signal(
-        "wrong-type-argument",
-        vec![Value::symbol("threadp"), value],
-    )
+    signal("wrong-type-argument", vec![Value::symbol("threadp"), value])
 }
 
 fn signal_wrong_type_integerp(value: Value) -> Flow {
@@ -962,10 +957,7 @@ fn signal_wrong_type_integerp(value: Value) -> Flow {
 }
 
 fn signal_wrong_type_numberp(value: Value) -> Flow {
-    signal(
-        "wrong-type-argument",
-        vec![Value::symbol("numberp"), value],
-    )
+    signal("wrong-type-argument", vec![Value::symbol("numberp"), value])
 }
 
 fn signal_undefined_signal_name(name: &str) -> Flow {
@@ -1259,9 +1251,7 @@ fn interface_flags(flags: libc::c_uint) -> Value {
     Value::list(out)
 }
 
-fn parse_network_sockaddr(
-    addr: *const libc::sockaddr,
-) -> Option<(NetworkAddressFamily, Value)> {
+fn parse_network_sockaddr(addr: *const libc::sockaddr) -> Option<(NetworkAddressFamily, Value)> {
     if addr.is_null() {
         return None;
     }
@@ -1489,8 +1479,8 @@ fn host_interface_snapshot() -> Option<Vec<HostInterfaceEntry>> {
                         .unwrap_or_else(|| zero_network_address(family));
                     let raw_broadcast =
                         parse_network_sockaddr(ifa.ifa_ifu as *const libc::sockaddr)
-                        .and_then(|(bc_family, bc)| (bc_family == family).then_some(bc))
-                        .unwrap_or_else(|| zero_network_address(family));
+                            .and_then(|(bc_family, bc)| (bc_family == family).then_some(bc))
+                            .unwrap_or_else(|| zero_network_address(family));
                     let list_broadcast = derive_network_interface_list_broadcast(
                         family,
                         &address,
@@ -1550,12 +1540,7 @@ fn interface_entry(name: &str, address: Value, full: bool) -> Value {
         _ => (loopback_ipv4_broadcast(), loopback_ipv4_netmask()),
     };
 
-    Value::list(vec![
-        Value::string(name),
-        address,
-        broadcast,
-        netmask,
-    ])
+    Value::list(vec![Value::string(name), address, broadcast, netmask])
 }
 
 fn format_ipv4_network_address(items: &[i64], omit_port: bool) -> Option<String> {
@@ -1619,7 +1604,10 @@ pub(crate) fn builtin_backquote_process(
     if args.len() > 2 {
         return Err(signal(
             "wrong-number-of-arguments",
-            vec![Value::symbol("backquote-process"), Value::Int(args.len() as i64)],
+            vec![
+                Value::symbol("backquote-process"),
+                Value::Int(args.len() as i64),
+            ],
         ));
     }
     Ok(Value::list(vec![Value::Int(0)]))
@@ -1634,7 +1622,10 @@ pub(crate) fn builtin_clone_process(
     if args.len() > 2 {
         return Err(signal(
             "wrong-number-of-arguments",
-            vec![Value::symbol("clone-process"), Value::Int(args.len() as i64)],
+            vec![
+                Value::symbol("clone-process"),
+                Value::Int(args.len() as i64),
+            ],
         ));
     }
     let id = resolve_live_process_or_wrong_type(eval, &args[0])?;
@@ -1946,7 +1937,10 @@ pub(crate) fn builtin_network_interface_info(
     let ifname = ifname_raw.split('\0').next().unwrap_or_default();
     // Emacs applies IFNAMSIZ-style byte limits, not character counts.
     if ifname.len() >= 16 {
-        return Err(signal("error", vec![Value::string("interface name too long")]));
+        return Err(signal(
+            "error",
+            vec![Value::string("interface name too long")],
+        ));
     }
 
     if let Some(host_entries) = host_interface_snapshot() {
@@ -2036,69 +2030,13 @@ pub(crate) fn builtin_signal_names(
 ) -> EvalResult {
     expect_args("signal-names", &args, 0)?;
     let names = vec![
-        "RTMAX",
-        "RTMAX-1",
-        "RTMAX-2",
-        "RTMAX-3",
-        "RTMAX-4",
-        "RTMAX-5",
-        "RTMAX-6",
-        "RTMAX-7",
-        "RTMAX-8",
-        "RTMAX-9",
-        "RTMAX-10",
-        "RTMAX-11",
-        "RTMAX-12",
-        "RTMAX-13",
-        "RTMAX-14",
-        "RTMIN+15",
-        "RTMIN+14",
-        "RTMIN+13",
-        "RTMIN+12",
-        "RTMIN+11",
-        "RTMIN+10",
-        "RTMIN+9",
-        "RTMIN+8",
-        "RTMIN+7",
-        "RTMIN+6",
-        "RTMIN+5",
-        "RTMIN+4",
-        "RTMIN+3",
-        "RTMIN+2",
-        "RTMIN+1",
-        "RTMIN",
-        "SYS",
-        "PWR",
-        "POLL",
-        "WINCH",
-        "PROF",
-        "VTALRM",
-        "XFSZ",
-        "XCPU",
-        "URG",
-        "TTOU",
-        "TTIN",
-        "TSTP",
-        "STOP",
-        "CONT",
-        "CHLD",
-        "STKFLT",
-        "TERM",
-        "ALRM",
-        "PIPE",
-        "USR2",
-        "SEGV",
-        "USR1",
-        "KILL",
-        "FPE",
-        "BUS",
-        "ABRT",
-        "TRAP",
-        "ILL",
-        "QUIT",
-        "INT",
-        "HUP",
-        "EXIT",
+        "RTMAX", "RTMAX-1", "RTMAX-2", "RTMAX-3", "RTMAX-4", "RTMAX-5", "RTMAX-6", "RTMAX-7",
+        "RTMAX-8", "RTMAX-9", "RTMAX-10", "RTMAX-11", "RTMAX-12", "RTMAX-13", "RTMAX-14",
+        "RTMIN+15", "RTMIN+14", "RTMIN+13", "RTMIN+12", "RTMIN+11", "RTMIN+10", "RTMIN+9",
+        "RTMIN+8", "RTMIN+7", "RTMIN+6", "RTMIN+5", "RTMIN+4", "RTMIN+3", "RTMIN+2", "RTMIN+1",
+        "RTMIN", "SYS", "PWR", "POLL", "WINCH", "PROF", "VTALRM", "XFSZ", "XCPU", "URG", "TTOU",
+        "TTIN", "TSTP", "STOP", "CONT", "CHLD", "STKFLT", "TERM", "ALRM", "PIPE", "USR2", "SEGV",
+        "USR1", "KILL", "FPE", "BUS", "ABRT", "TRAP", "ILL", "QUIT", "INT", "HUP", "EXIT",
     ];
     Ok(Value::list(
         names.into_iter().map(Value::string).collect::<Vec<_>>(),
@@ -2130,7 +2068,10 @@ pub(crate) fn builtin_num_processors(
     if args.len() > 1 {
         return Err(signal(
             "wrong-number-of-arguments",
-            vec![Value::symbol("num-processors"), Value::Int(args.len() as i64)],
+            vec![
+                Value::symbol("num-processors"),
+                Value::Int(args.len() as i64),
+            ],
         ));
     }
     let count = std::thread::available_parallelism()
@@ -2147,7 +2088,10 @@ pub(crate) fn builtin_list_processes(
     if args.len() > 2 {
         return Err(signal(
             "wrong-number-of-arguments",
-            vec![Value::symbol("list-processes"), Value::Int(args.len() as i64)],
+            vec![
+                Value::symbol("list-processes"),
+                Value::Int(args.len() as i64),
+            ],
         ));
     }
     Ok(Value::Nil)
@@ -2753,7 +2697,10 @@ pub(crate) fn builtin_delete_process(
     if args.len() > 1 {
         return Err(signal(
             "wrong-number-of-arguments",
-            vec![Value::symbol("delete-process"), Value::Int(args.len() as i64)],
+            vec![
+                Value::symbol("delete-process"),
+                Value::Int(args.len() as i64),
+            ],
         ));
     }
     let id = resolve_optional_process_or_current_buffer(eval, args.first())?;
@@ -2769,7 +2716,10 @@ pub(crate) fn builtin_continue_process(
     if args.len() > 2 {
         return Err(signal(
             "wrong-number-of-arguments",
-            vec![Value::symbol("continue-process"), Value::Int(args.len() as i64)],
+            vec![
+                Value::symbol("continue-process"),
+                Value::Int(args.len() as i64),
+            ],
         ));
     }
     let (id, ret) = resolve_optional_process_with_explicit_return(eval, args.first())?;
@@ -2787,7 +2737,10 @@ pub(crate) fn builtin_interrupt_process(
     if args.len() > 2 {
         return Err(signal(
             "wrong-number-of-arguments",
-            vec![Value::symbol("interrupt-process"), Value::Int(args.len() as i64)],
+            vec![
+                Value::symbol("interrupt-process"),
+                Value::Int(args.len() as i64),
+            ],
         ));
     }
     let (id, ret) = resolve_optional_process_with_explicit_return(eval, args.first())?;
@@ -2824,7 +2777,10 @@ pub(crate) fn builtin_signal_process(
     if args.len() > 3 {
         return Err(signal(
             "wrong-number-of-arguments",
-            vec![Value::symbol("signal-process"), Value::Int(args.len() as i64)],
+            vec![
+                Value::symbol("signal-process"),
+                Value::Int(args.len() as i64),
+            ],
         ));
     }
 
@@ -5097,7 +5053,8 @@ mod tests {
         let loopback_v6 = int_vector(&[0, 0, 0, 0, 0, 0, 0, 1, 0]);
 
         let v4_any = resolve_network_lookup_addresses("127.0.0.1", None);
-        let v4_only = resolve_network_lookup_addresses("127.0.0.1", Some(NetworkAddressFamily::Ipv4));
+        let v4_only =
+            resolve_network_lookup_addresses("127.0.0.1", Some(NetworkAddressFamily::Ipv4));
         let v4_rejected =
             resolve_network_lookup_addresses("127.0.0.1", Some(NetworkAddressFamily::Ipv6));
         assert!(!v4_any.is_empty());
@@ -5107,8 +5064,7 @@ mod tests {
 
         let v6_any = resolve_network_lookup_addresses("::1", None);
         let v6_only = resolve_network_lookup_addresses("::1", Some(NetworkAddressFamily::Ipv6));
-        let v6_rejected =
-            resolve_network_lookup_addresses("::1", Some(NetworkAddressFamily::Ipv4));
+        let v6_rejected = resolve_network_lookup_addresses("::1", Some(NetworkAddressFamily::Ipv4));
         assert_eq!(v6_any, v6_only);
         if let Some(first) = v6_any.first() {
             assert_eq!(first, &loopback_v6);

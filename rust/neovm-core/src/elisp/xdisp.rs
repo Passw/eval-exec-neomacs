@@ -831,8 +831,12 @@ mod tests {
     #[test]
     fn test_bidi_resolved_levels() {
         assert!(builtin_bidi_resolved_levels(vec![]).unwrap().is_nil());
-        assert!(builtin_bidi_resolved_levels(vec![Value::Nil]).unwrap().is_nil());
-        assert!(builtin_bidi_resolved_levels(vec![Value::Int(0)]).unwrap().is_nil());
+        assert!(builtin_bidi_resolved_levels(vec![Value::Nil])
+            .unwrap()
+            .is_nil());
+        assert!(builtin_bidi_resolved_levels(vec![Value::Int(0)])
+            .unwrap()
+            .is_nil());
 
         let err = builtin_bidi_resolved_levels(vec![Value::True]).unwrap_err();
         match err {
@@ -846,33 +850,27 @@ mod tests {
 
     #[test]
     fn test_bidi_find_overridden_directionality() {
-        assert!(
-            builtin_bidi_find_overridden_directionality(vec![
-                Value::string("abc"),
-                Value::Int(0),
-                Value::string("x"),
-            ])
-            .unwrap()
-            .is_nil()
-        );
-        assert!(
-            builtin_bidi_find_overridden_directionality(vec![
-                Value::Nil,
-                Value::Int(0),
-                Value::string("x"),
-            ])
-            .unwrap()
-            .is_nil()
-        );
-        assert!(
-            builtin_bidi_find_overridden_directionality(vec![
-                Value::Int(1),
-                Value::Int(2),
-                Value::Nil,
-            ])
-            .unwrap()
-            .is_nil()
-        );
+        assert!(builtin_bidi_find_overridden_directionality(vec![
+            Value::string("abc"),
+            Value::Int(0),
+            Value::string("x"),
+        ])
+        .unwrap()
+        .is_nil());
+        assert!(builtin_bidi_find_overridden_directionality(vec![
+            Value::Nil,
+            Value::Int(0),
+            Value::string("x"),
+        ])
+        .unwrap()
+        .is_nil());
+        assert!(builtin_bidi_find_overridden_directionality(vec![
+            Value::Int(1),
+            Value::Int(2),
+            Value::Nil,
+        ])
+        .unwrap()
+        .is_nil());
 
         let third_arg_err = builtin_bidi_find_overridden_directionality(vec![
             Value::string("abc"),

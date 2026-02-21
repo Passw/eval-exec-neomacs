@@ -1261,7 +1261,10 @@ pub(crate) fn builtin_make_temp_file(args: Vec<Value>) -> EvalResult {
 pub(crate) fn builtin_make_temp_name(args: Vec<Value>) -> EvalResult {
     expect_args("make-temp-name", &args, 1)?;
     let prefix = expect_string_strict(&args[0])?;
-    Ok(Value::string(format!("{prefix}{}", make_temp_name_suffix())))
+    Ok(Value::string(format!(
+        "{prefix}{}",
+        make_temp_name_suffix()
+    )))
 }
 
 /// (next-read-file-uses-dialog-p) -> nil
@@ -1813,18 +1816,25 @@ pub(crate) fn builtin_file_locked_p_eval(eval: &Evaluator, args: Vec<Value>) -> 
 pub(crate) fn builtin_file_selinux_context(args: Vec<Value>) -> EvalResult {
     expect_args("file-selinux-context", &args, 1)?;
     let _filename = expect_string_strict(&args[0])?;
-    Ok(Value::list(vec![Value::Nil, Value::Nil, Value::Nil, Value::Nil]))
+    Ok(Value::list(vec![
+        Value::Nil,
+        Value::Nil,
+        Value::Nil,
+        Value::Nil,
+    ]))
 }
 
 /// Evaluator-aware variant of `file-selinux-context`.
-pub(crate) fn builtin_file_selinux_context_eval(
-    eval: &Evaluator,
-    args: Vec<Value>,
-) -> EvalResult {
+pub(crate) fn builtin_file_selinux_context_eval(eval: &Evaluator, args: Vec<Value>) -> EvalResult {
     expect_args("file-selinux-context", &args, 1)?;
     let filename = expect_string_strict(&args[0])?;
     let _filename = resolve_filename_for_eval(eval, &filename);
-    Ok(Value::list(vec![Value::Nil, Value::Nil, Value::Nil, Value::Nil]))
+    Ok(Value::list(vec![
+        Value::Nil,
+        Value::Nil,
+        Value::Nil,
+        Value::Nil,
+    ]))
 }
 
 /// (set-file-selinux-context FILENAME CONTEXT) -> nil

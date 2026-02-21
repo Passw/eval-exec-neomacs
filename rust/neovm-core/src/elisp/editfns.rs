@@ -398,7 +398,11 @@ fn lookup_group_name(gid: u32) -> Option<String> {
     if name_ptr.is_null() {
         return None;
     }
-    Some(unsafe { CStr::from_ptr(name_ptr) }.to_string_lossy().into_owned())
+    Some(
+        unsafe { CStr::from_ptr(name_ptr) }
+            .to_string_lossy()
+            .into_owned(),
+    )
 }
 
 #[cfg(not(unix))]

@@ -931,14 +931,12 @@ pub(crate) fn builtin_condition_mutex(
             vec![Value::symbol("condition-variable-p"), args[0].clone()],
         ));
     };
-    eval.threads
-        .mutex_handle(mutex_id)
-        .ok_or_else(|| {
-            signal(
-                "wrong-type-argument",
-                vec![Value::symbol("condition-variable-p"), args[0].clone()],
-            )
-        })
+    eval.threads.mutex_handle(mutex_id).ok_or_else(|| {
+        signal(
+            "wrong-type-argument",
+            vec![Value::symbol("condition-variable-p"), args[0].clone()],
+        )
+    })
 }
 
 /// `(condition-wait COND)` -- wait on a condition variable.
@@ -1507,11 +1505,9 @@ mod tests {
         let mut eval = Evaluator::new();
         let mx = builtin_make_mutex(&mut eval, vec![]).unwrap();
         let unnamed = builtin_make_condition_variable(&mut eval, vec![mx.clone()]).unwrap();
-        let named = builtin_make_condition_variable(
-            &mut eval,
-            vec![mx, Value::string("cv-compat-name")],
-        )
-        .unwrap();
+        let named =
+            builtin_make_condition_variable(&mut eval, vec![mx, Value::string("cv-compat-name")])
+                .unwrap();
 
         let unnamed_name = builtin_condition_name(&mut eval, vec![unnamed]).unwrap();
         assert!(unnamed_name.is_nil());

@@ -18,7 +18,12 @@ fn expect_args(name: &str, args: &[Value], n: usize) -> Result<(), Flow> {
     }
 }
 
-fn expect_range_args(name: &str, args: &[Value], min: usize, max: Option<usize>) -> Result<(), Flow> {
+fn expect_range_args(
+    name: &str,
+    args: &[Value],
+    min: usize,
+    max: Option<usize>,
+) -> Result<(), Flow> {
     let out_of_range = match max {
         Some(max) => args.len() < min || args.len() > max,
         None => args.len() < min,
