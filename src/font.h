@@ -260,11 +260,6 @@ struct font_entity
 {
   union vectorlike_header header;
   Lisp_Object props[FONT_ENTITY_MAX];
-
-#if defined HAVE_ANDROID && !defined ANDROID_STUBIFY
-  /* Whether or not this is an Android font entity.  */
-  bool is_android;
-#endif
 };
 
 /* A value which may appear in the member `encoding' of struct font
@@ -558,14 +553,8 @@ CHECK_FONT_GET_OBJECT (Lisp_Object x)
   return XFONT_OBJECT (x);
 }
 
-#ifndef HAVE_ANDROID
 /* Number of pt per inch (from the TeXbook).  */
 #define PT_PER_INCH 72.27
-#else
-/* Android uses this value instead to compensate for different device
-   dimensions.  */
-#define PT_PER_INCH 160.00
-#endif
 
 /* Return a pixel size (integer) corresponding to POINT size (double)
    on resolution DPI.  */
@@ -840,9 +829,6 @@ extern Lisp_Object copy_font_spec (Lisp_Object);
 extern Lisp_Object merge_font_spec (Lisp_Object, Lisp_Object);
 
 extern Lisp_Object font_make_entity (void);
-#ifdef HAVE_ANDROID
-extern Lisp_Object font_make_entity_android (int);
-#endif
 extern Lisp_Object font_make_object (int, Lisp_Object, int);
 #if defined (HAVE_XFT) || defined (HAVE_FREETYPE) || defined (HAVE_NS)
 extern Lisp_Object font_build_object (int, Lisp_Object, Lisp_Object, double);
@@ -956,36 +942,6 @@ extern hb_font_t *fthbfont_begin_hb_font (struct font *, double *);
 #endif	/* HAVE_HARFBUZZ */
 extern void syms_of_ftfont (void);
 #endif	/* HAVE_FREETYPE */
-#ifdef HAVE_X_WINDOWS
-extern struct font_driver const xfont_driver;
-extern Lisp_Object xfont_get_cache (struct frame *);
-extern void syms_of_xfont (void);
-#ifdef HAVE_XFT
-extern struct font_driver const xftfont_driver;
-#ifdef HAVE_HARFBUZZ
-extern struct font_driver xfthbfont_driver;
-#endif	/* HAVE_HARFBUZZ */
-#endif
-#if defined HAVE_FREETYPE || defined HAVE_XFT
-extern void syms_of_xftfont (void);
-#endif
-#ifdef HAVE_BDFFONT
-extern void syms_of_bdffont (void);
-#endif	/* HAVE_BDFFONT */
-#endif	/* HAVE_X_WINDOWS */
-#ifdef HAVE_NTGUI
-extern struct font_driver w32font_driver;
-extern struct font_driver uniscribe_font_driver;
-#ifdef HAVE_HARFBUZZ
-extern struct font_driver harfbuzz_font_driver;
-#endif
-extern void syms_of_w32font (void);
-#endif	/* HAVE_NTGUI */
-#ifdef HAVE_NS
-extern struct font_driver const nsfont_driver;
-extern void syms_of_nsfont (void);
-extern void syms_of_macfont (void);
-#endif	/* HAVE_NS */
 #if defined (USE_CAIRO) || defined (USE_BE_CAIRO)
 extern struct font_driver const ftcrfont_driver;
 #ifdef HAVE_HARFBUZZ

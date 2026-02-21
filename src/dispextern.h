@@ -24,27 +24,6 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 
 #include "character.h"
 
-#ifdef HAVE_X_WINDOWS
-
-#include <X11/Xlib.h>
-#ifdef USE_X_TOOLKIT
-#include <X11/Intrinsic.h>
-#endif /* USE_X_TOOLKIT */
-
-#ifdef HAVE_XRENDER
-# include <X11/extensions/Xrender.h>
-#endif
-
-typedef XColor Emacs_Color;
-typedef Cursor Emacs_Cursor;
-#define No_Cursor (None)
-#ifndef USE_CAIRO
-typedef Pixmap Emacs_Pixmap;
-#endif
-typedef XRectangle Emacs_Rectangle;
-typedef XGCValues Emacs_GC;
-#else /* !HAVE_X_WINDOWS */
-
 /* XColor-like struct used by non-X code.  */
 
 typedef struct
@@ -53,14 +32,8 @@ typedef struct
   unsigned short red, green, blue;
 } Emacs_Color;
 
-#ifndef HAVE_ANDROID
 /* Accommodate X's usage of None as a null resource ID.  */
 #define No_Cursor (NULL)
-#else
-#define No_Cursor 0
-#endif
-
-#ifndef HAVE_ANDROID
 
 /* XRectangle-like struct used by non-X GUI code.  */
 typedef struct
@@ -82,25 +55,6 @@ typedef struct
 #define GCForeground 0x01
 #define GCBackground 0x02
 
-#else
-
-typedef struct android_rectangle Emacs_Rectangle;
-typedef struct android_gc_values Emacs_GC;
-
-#define GCForeground		ANDROID_GC_FOREGROUND
-#define GCBackground		ANDROID_GC_BACKGROUND
-#define GCFillStyle		ANDROID_GC_FILL_STYLE
-#define GCStipple		ANDROID_GC_STIPPLE
-#define FillOpaqueStippled	ANDROID_FILL_OPAQUE_STIPPLED
-
-#endif
-
-#endif /* HAVE_X_WINDOWS */
-
-#ifdef MSDOS
-#include "msdos.h"
-#endif
-
 INLINE_HEADER_BEGIN
 
 #include <c-strcase.h>
@@ -110,15 +64,6 @@ xstrcasecmp (char const *a, char const *b)
   return c_strcasecmp (a, b);
 }
 
-#ifdef HAVE_X_WINDOWS
-#include <X11/Xresource.h> /* for XrmDatabase */
-typedef struct x_display_info Display_Info;
-#ifndef USE_CAIRO
-typedef XImage *Emacs_Pix_Container;
-typedef XImage *Emacs_Pix_Context;
-#endif	/* !USE_CAIRO */
-#define NativeRectangle XRectangle
-#endif
 
 #ifdef USE_CAIRO
 /* Minimal version of XImage.  */
@@ -133,28 +78,8 @@ typedef Emacs_Pix_Container Emacs_Pixmap;
 typedef Emacs_Pix_Container Emacs_Pix_Context;
 #endif
 
-#ifdef HAVE_NTGUI
-#include "w32gui.h"
-typedef struct w32_display_info Display_Info;
-typedef XImage *Emacs_Pix_Container;
-typedef HDC Emacs_Pix_Context;
-#endif
 
-#ifdef HAVE_NS
-#include "nsgui.h"
-/* Following typedef needed to accommodate the MSDOS port, believe it or not.  */
-typedef struct ns_display_info Display_Info;
-typedef Emacs_Pixmap Emacs_Pix_Container;
-typedef Emacs_Pixmap Emacs_Pix_Context;
-#endif
 
-#ifdef HAVE_PGTK
-#include "pgtkgui.h"
-/* Following typedef needed to accommodate the MSDOS port, believe it or not.  */
-typedef struct pgtk_display_info Display_Info;
-typedef Emacs_Pixmap XImagePtr;
-typedef XImagePtr XImagePtr_or_DC;
-#endif /* HAVE_PGTK */
 
 #include "neomacsgui.h"
 /* Following typedef needed to accommodate the MSDOS port, believe it or not.  */
@@ -163,19 +88,7 @@ typedef Emacs_Pixmap XImagePtr;
 typedef XImagePtr XImagePtr_or_DC;
 /* Emacs_Pix_Container and Emacs_Pix_Context are already defined by USE_CAIRO above */
 
-#ifdef HAVE_HAIKU
-#include "haikugui.h"
-typedef struct haiku_display_info Display_Info;
-typedef Emacs_Pixmap Emacs_Pix_Container;
-typedef Emacs_Pixmap Emacs_Pix_Context;
-#endif
 
-#ifdef HAVE_ANDROID
-#include "androidgui.h"
-typedef struct android_display_info Display_Info;
-typedef struct android_image *Emacs_Pix_Container;
-typedef struct android_image *Emacs_Pix_Context;
-#endif
 
 #ifdef HAVE_WINDOW_SYSTEM
 # include <time.h>
@@ -253,11 +166,7 @@ enum window_part
 
 /* Macros to include code only if GLYPH_DEBUG is defined.  */
 
-#ifdef GLYPH_DEBUG
-#define IF_DEBUG(X)	((void) (X))
-#else
 #define IF_DEBUG(X)	((void) 0)
-#endif
 
 /***********************************************************************
 			    Text positions
@@ -1451,18 +1360,6 @@ struct glyph_string
   bool_bf padding_p : 1;
 
   /* The GC to use for drawing this glyph string.  */
-#if defined (HAVE_X_WINDOWS)
-  GC gc;
-#elif defined HAVE_ANDROID
-  struct android_gc *gc;
-#endif
-#if defined (HAVE_NTGUI)
-  Emacs_GC *gc;
-  HDC hdc;
-#endif
-#if defined (HAVE_PGTK)
-  Emacs_GC xgcv;
-#endif
   Emacs_GC *gc;
 
   /* A pointer to the first glyph in the string.  This glyph
@@ -1768,13 +1665,7 @@ struct face
 
   /* If non-zero, this is a GC that we can use without modification for
      drawing the characters in this face.  */
-# ifdef HAVE_X_WINDOWS
-  GC gc;
-# elif defined HAVE_ANDROID
-  struct android_gc *gc;
-# else
   Emacs_GC *gc;
-# endif
   /* Background stipple or bitmap used for this face.  This is
      an id as returned from load_pixmap.  */
   ptrdiff_t stipple;
@@ -1885,12 +1776,6 @@ struct face
   /* If non-zero, use overstrike (to simulate bold-face).  */
   bool_bf overstrike : 1;
 
-/* NOTE: this is not used yet, but eventually this impl should be done
-         similarly to overstrike */
-#ifdef HAVE_NS
-  /* If non-zero, use geometric rotation (to simulate italic).  */
-  bool_bf synth_ital : 1;
-#endif
 
   /* The hash value of this face.  */
   uintptr_t hash;
@@ -3223,44 +3108,6 @@ struct image
 #ifdef USE_CAIRO
   void *cr_data;
 #endif
-#ifdef HAVE_X_WINDOWS
-  /* X images of the image, corresponding to the above Pixmaps.
-     Non-NULL means it and its Pixmap counterpart may be out of sync
-     and the latter is outdated.  NULL means the X image has been
-     synchronized to Pixmap.  */
-  XImage *ximg, *mask_img;
-
-# if !defined USE_CAIRO && defined HAVE_XRENDER
-  /* Picture versions of pixmap and mask for compositing.  */
-  Picture picture, mask_picture;
-
-  /* We need to store the original image dimensions in case we have to
-     call XGetImage.  */
-  int original_width, original_height;
-# endif
-#endif	/* HAVE_X_WINDOWS */
-#ifdef HAVE_ANDROID
-  /* Android images of the image, corresponding to the above Pixmaps.
-     Non-NULL means it and its Pixmap counterpart may be out of sync
-     and the latter is outdated.  NULL means the X image has been
-     synchronized to Pixmap.  */
-  struct android_image *ximg, *mask_img;
-#endif /* HAVE_ANDROID */
-#ifdef HAVE_NTGUI
-  XFORM xform;
-  bool smoothing;
-#endif
-#ifdef HAVE_HAIKU
-  /* The affine transformation to apply to this image.  */
-  double transform[3][3];
-
-  /* The original width and height of the image.  */
-  int original_width, original_height;
-
-  /* Whether or not bilinear filtering should be used to "smooth" the
-     image.  */
-  bool use_bilinear_filtering;
-#endif
 
   /* Colors allocated for this image, if any.  Allocated via xmalloc.  */
   unsigned long *colors;
@@ -3687,11 +3534,9 @@ extern void gui_clear_window_mouse_face (struct window *);
 extern void cancel_mouse_face (struct frame *);
 extern bool clear_mouse_face (Mouse_HLInfo *);
 extern bool cursor_in_mouse_face_p (struct window *w);
-#ifndef HAVE_ANDROID
 extern void tty_draw_row_with_mouse_face (struct window *, struct glyph_row *,
 					  int, int, enum draw_glyphs_face);
 extern void display_tty_menu_item (const char *, int, int, int, int, bool);
-#endif
 int lookup_fringe_bitmap (Lisp_Object);
 void draw_fringe_bitmap (struct window *, struct glyph_row *, int);
 void draw_row_fringe_bitmaps (struct window *, struct glyph_row *);
@@ -3703,9 +3548,6 @@ void gui_init_fringe (struct redisplay_interface *);
 extern int max_used_fringe_bitmap;
 void gui_define_fringe_bitmap (struct frame *, int);
 
-#ifdef HAVE_NTGUI
-void w32_reset_fringes (void);
-#endif
 
 extern unsigned row_hash (struct glyph_row *);
 
@@ -3723,19 +3565,10 @@ extern void image_reference_bitmap (struct frame *, ptrdiff_t);
 extern ptrdiff_t image_create_bitmap_from_data (struct frame *, char *,
                                                 unsigned int, unsigned int);
 extern ptrdiff_t image_create_bitmap_from_file (struct frame *, Lisp_Object);
-#if defined HAVE_XPM && defined HAVE_X_WINDOWS && !defined USE_GTK
-extern ptrdiff_t x_create_bitmap_from_xpm_data (struct frame *, const char **);
-#endif
 #ifndef image_destroy_bitmap
 extern void image_destroy_bitmap (struct frame *, ptrdiff_t);
 #endif
 extern void image_destroy_all_bitmaps (Display_Info *);
-#ifdef HAVE_X_WINDOWS
-extern void x_create_bitmap_mask (struct frame *, ptrdiff_t);
-#ifndef USE_CAIRO
-extern void x_kill_gs_process (Pixmap, struct frame *);
-#endif	/* !USE_CAIRO */
-#endif
 extern Lisp_Object image_find_image_file (Lisp_Object);
 
 struct image_cache *make_image_cache (void);
@@ -3753,9 +3586,6 @@ Lisp_Object image_spec_value (Lisp_Object, Lisp_Object, bool *);
 #define RGB_PIXEL_COLOR unsigned long
 #endif
 
-#ifdef HAVE_NTGUI
-#define RGB_PIXEL_COLOR COLORREF
-#endif
 
 RGB_PIXEL_COLOR image_background (struct image *, struct frame *,
                                   Emacs_Pix_Context img);
@@ -3786,10 +3616,6 @@ bool parse_color_spec (const char *,
 
 Lisp_Object tty_color_name (struct frame *, int);
 void clear_face_cache (bool);
-#ifdef MSDOS
-unsigned long load_color (struct frame *, struct face *, Lisp_Object,
-                          enum lface_attribute_index);
-#endif
 char *choose_face_font (struct frame *, Lisp_Object *, Lisp_Object,
                         int *);
 #ifdef HAVE_WINDOW_SYSTEM
@@ -3822,18 +3648,6 @@ extern char unspecified_fg[], unspecified_bg[];
 
 /* Defined in xfns.c.  */
 
-#ifdef HAVE_X_WINDOWS
-void gamma_correct (struct frame *, XColor *);
-#endif
-#ifdef HAVE_NTGUI
-void gamma_correct (struct frame *, COLORREF *);
-#endif
-#ifdef HAVE_HAIKU
-void gamma_correct (struct frame *, Emacs_Color *);
-#endif
-#ifdef HAVE_ANDROID
-extern void gamma_correct (struct frame *, Emacs_Color *);
-#endif
 
 #ifdef HAVE_WINDOW_SYSTEM
 

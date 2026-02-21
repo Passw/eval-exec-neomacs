@@ -53,9 +53,6 @@ enum fullscreen_type
   FULLSCREEN_HEIGHT    = 0x2,
   FULLSCREEN_BOTH      = 0x3, /* Not a typo but means "width and height".  */
   FULLSCREEN_MAXIMIZED = 0x4,
-#ifdef HAVE_NTGUI
-  FULLSCREEN_WAIT      = 0x8
-#endif
 };
 
 enum z_group
@@ -66,14 +63,6 @@ enum z_group
   z_group_above_suspended,
 };
 
-#ifdef NS_IMPL_COCOA
-enum ns_appearance_type
-  {
-    ns_appearance_system_default,
-    ns_appearance_aqua,
-    ns_appearance_vibrant_dark
-  };
-#endif
 #endif /* HAVE_WINDOW_SYSTEM */
 
 #ifdef HAVE_TEXT_CONVERSION
@@ -306,18 +295,6 @@ struct frame
   /* Number of elements in `menu_bar_vector' that have meaningful data.  */
   int menu_bar_items_used;
 
-#if defined (USE_X_TOOLKIT) || defined (HAVE_NTGUI)
-  /* A buffer to hold the frame's name.  Since this is used by the
-     window system toolkit, we can't use the Lisp string's pointer
-     (`name', above) because it might get relocated.  */
-  char *namebuf;
-#endif
-
-#ifdef USE_X_TOOLKIT
-  /* Used to pass geometry parameters to toolkit functions.  */
-  char *shell_position;
-#endif
-
   /* Glyph pool and matrix.  */
   struct glyph_pool *current_pool;
   struct glyph_pool *desired_pool;
@@ -466,10 +443,8 @@ struct frame
   /* Nonzero if we should actually display horizontal scroll bars on this frame.  */
   bool_bf horizontal_scroll_bars : 1;
 
-# ifndef HAVE_NTGUI
   /* True if this is an override_redirect frame.  */
   bool_bf override_redirect : 1;
-#endif
 
   /* Nonzero if this frame's icon should not appear on its display's taskbar.  */
   bool_bf skip_taskbar : 1;
@@ -666,12 +641,6 @@ struct frame
   /* List of font-drivers available on the frame.  */
   struct font_driver_list *font_driver_list;
 
-#if defined HAVE_X_WINDOWS || defined HAVE_ANDROID
-  /* Used by x_wait_for_event when watching for an X event on this
-     frame.  */
-  int wait_event_type;
-#endif
-
   /* What kind of text cursor should we draw in the future?
      This should always be filled_box_cursor or bar_cursor.  */
   enum text_cursor_kinds desired_cursor;
@@ -732,12 +701,6 @@ struct frame
   /* All display backends seem to need these two pixel values.  */
   unsigned long background_pixel;
   unsigned long foreground_pixel;
-
-#ifdef NS_IMPL_COCOA
-  /* NSAppearance theme used on this frame.  */
-  enum ns_appearance_type ns_appearance;
-  bool_bf ns_transparent_titlebar;
-#endif
 
 #ifdef HAVE_TEXT_CONVERSION
   /* Text conversion state used by certain input methods.  */
@@ -933,58 +896,20 @@ default_pixels_per_inch_y (void)
 #define FRAME_INITIAL_P(f) ((f)->output_method == output_initial)
 #define FRAME_TERMCAP_P(f) ((f)->output_method == output_termcap)
 #define FRAME_X_P(f) ((f)->output_method == output_x_window)
-#ifndef HAVE_NTGUI
 #define FRAME_W32_P(f) false
-#else
-#define FRAME_W32_P(f) ((f)->output_method == output_w32)
-#endif
 #ifndef MSDOS
 #define FRAME_MSDOS_P(f) false
 #else
 #define FRAME_MSDOS_P(f) ((f)->output_method == output_msdos_raw)
 #endif
-#ifndef HAVE_NS
 #define FRAME_NS_P(f) false
-#else
-#define FRAME_NS_P(f) ((f)->output_method == output_ns)
-#endif
-#ifndef HAVE_PGTK
 #define FRAME_PGTK_P(f) false
-#else
-#define FRAME_PGTK_P(f) ((f)->output_method == output_pgtk)
-#endif
-#ifndef HAVE_HAIKU
 #define FRAME_HAIKU_P(f) false
-#else
-#define FRAME_HAIKU_P(f) ((f)->output_method == output_haiku)
-#endif
-#ifndef HAVE_ANDROID
 #define FRAME_ANDROID_P(f) false
-#else
-#define FRAME_ANDROID_P(f) ((f)->output_method == output_android)
-#endif
 #define FRAME_NEOMACS_P(f) ((f)->output_method == output_neomacs)
 
 /* FRAME_WINDOW_P tests whether the frame is a graphical window system
    frame.  */
-#ifdef HAVE_X_WINDOWS
-#define FRAME_WINDOW_P(f) FRAME_X_P (f)
-#endif
-#ifdef HAVE_NTGUI
-#define FRAME_WINDOW_P(f) FRAME_W32_P (f)
-#endif
-#ifdef HAVE_NS
-#define FRAME_WINDOW_P(f) FRAME_NS_P(f)
-#endif
-#ifdef HAVE_PGTK
-#define FRAME_WINDOW_P(f) FRAME_PGTK_P(f)
-#endif
-#ifdef HAVE_HAIKU
-#define FRAME_WINDOW_P(f) FRAME_HAIKU_P (f)
-#endif
-#ifdef HAVE_ANDROID
-#define FRAME_WINDOW_P(f) FRAME_ANDROID_P (f)
-#endif
 #define FRAME_WINDOW_P(f) FRAME_NEOMACS_P(f)
 #ifndef FRAME_WINDOW_P
 #define FRAME_WINDOW_P(f) ((void) (f), false)
@@ -999,18 +924,7 @@ default_pixels_per_inch_y (void)
 #define FRAME_RES_Y(f)						\
   (eassert (FRAME_WINDOW_P (f)), FRAME_DISPLAY_INFO (f)->resy)
 
-#ifdef HAVE_ANDROID
-
-/* Android systems use a font scaling factor independent from the
-   display DPI.  */
-
-#define FRAME_RES(f)						\
-  (eassert (FRAME_WINDOW_P (f)),				\
-   FRAME_DISPLAY_INFO (f)->font_resolution)
-
-#else /* !HAVE_ANDROID */
 #define FRAME_RES(f) FRAME_RES_Y (f)
-#endif /* HAVE_ANDROID */
 
 #else /* !HAVE_WINDOW_SYSTEM */
 
@@ -1027,16 +941,10 @@ default_pixels_per_inch_y (void)
    frame F.  We need to define two versions because a TTY-only build
    does not have FRAME_DISPLAY_INFO.  */
 #ifdef HAVE_WINDOW_SYSTEM
-#ifndef HAVE_ANDROID
 #   define MOUSE_HL_INFO(F)					\
   (FRAME_WINDOW_P (F)						\
    ? &FRAME_DISPLAY_INFO (F)->mouse_highlight			\
    : &(F)->output_data.tty->display_info->mouse_highlight)
-#else
-/* There is no "struct tty_output" on Android at all.  */
-# define MOUSE_HL_INFO(F)					\
-  (&FRAME_DISPLAY_INFO(F)->mouse_highlight)
-#endif
 #else
 # define MOUSE_HL_INFO(F)					\
   (&(F)->output_data.tty->display_info->mouse_highlight)
@@ -1056,13 +964,7 @@ default_pixels_per_inch_y (void)
    && XFRAME (XWINDOW (f->minibuffer_window)->frame) == f)
 
 /* Scale factor of frame F.  */
-#if defined HAVE_NS
-# define FRAME_SCALE_FACTOR(f) (FRAME_NS_P (f) ? ns_frame_scale_factor (f) : 1)
-#elif defined HAVE_PGTK
-# define FRAME_SCALE_FACTOR(f) (FRAME_PGTK_P (f) ? pgtk_frame_scale_factor (f) : 1)
-#else
 # define FRAME_SCALE_FACTOR(f) 1
-#endif
 
 /* Native width and height of frame F, in pixels and frame
    columns/lines.  */
@@ -1242,11 +1144,7 @@ FRAME_PARENT_FRAME (struct frame *f)
 #define FRAME_UNDECORATED(f) ((f)->undecorated)
 
 #if defined (HAVE_WINDOW_SYSTEM)
-#ifdef HAVE_NTGUI
-#define FRAME_OVERRIDE_REDIRECT(f) ((void) (f), 0)
-#else
 #define FRAME_OVERRIDE_REDIRECT(f) ((f)->override_redirect)
-#endif
 #define FRAME_SKIP_TASKBAR(f) ((f)->skip_taskbar)
 #define FRAME_NO_FOCUS_ON_MAP(f) ((f)->no_focus_on_map)
 #define FRAME_NO_ACCEPT_FOCUS(f) ((f)->no_accept_focus)
@@ -1257,10 +1155,6 @@ FRAME_PARENT_FRAME (struct frame *f)
   ((f)->z_group == z_group_above_suspended)
 #define FRAME_Z_GROUP_BELOW(f) ((f)->z_group == z_group_below)
 #define FRAME_TOOLTIP_P(f) ((f)->tooltip)
-#ifdef NS_IMPL_COCOA
-#define FRAME_NS_APPEARANCE(f) ((f)->ns_appearance)
-#define FRAME_NS_TRANSPARENT_TITLEBAR(f) ((f)->ns_transparent_titlebar)
-#endif
 #else /* not HAVE_WINDOW_SYSTEM */
 #define FRAME_OVERRIDE_REDIRECT(f) ((void) (f), 0)
 #define FRAME_SKIP_TASKBAR(f) ((void) (f), 0)
@@ -1517,10 +1411,6 @@ extern Lisp_Object mouse_position (bool);
 extern void frame_size_history_plain (struct frame *, Lisp_Object);
 extern void frame_size_history_extra (struct frame *, Lisp_Object,
 				      int, int, int, int, int, int);
-#ifdef NS_IMPL_COCOA
-/* Implemented in nsfns.m.  */
-extern void ns_make_frame_key_window (struct frame *);
-#endif
 extern Lisp_Object Vframe_list;
 
 /* Value is a pointer to the selected frame.  If the selected frame
@@ -1885,15 +1775,6 @@ extern void set_frame_menubar (struct frame *f, bool deep_p);
 extern void frame_set_mouse_pixel_position (struct frame *f, int pix_x, int pix_y);
 extern void free_frame_menubar (struct frame *);
 
-#if defined HAVE_X_WINDOWS
-extern void x_wm_set_icon_position (struct frame *, int, int);
-#if !defined USE_X_TOOLKIT
-extern const char *x_get_resource_string (const char *, const char *);
-#endif
-#endif /* HAVE_X_WINDOWS */
-
-#if !defined (HAVE_NS) && !defined (HAVE_PGTK)
-
 /* Set F's bitmap icon, if specified among F's parameters.  */
 
 INLINE void
@@ -1905,8 +1786,6 @@ gui_set_bitmap_icon (struct frame *f)
       && FRAME_TERMINAL (f)->set_bitmap_icon_hook)
     FRAME_TERMINAL (f)->set_bitmap_icon_hook (f, XCDR (obj));
 }
-
-#endif /* !HAVE_NS */
 #endif /* HAVE_WINDOW_SYSTEM */
 
 extern enum internal_border_part frame_internal_border_part (struct frame *f,
@@ -1932,9 +1811,6 @@ struct MonitorInfo {
   Emacs_Rectangle geom, work;
   int mm_width, mm_height;
   char *name;
-#ifdef HAVE_PGTK
-  double scale_factor;
-#endif
 };
 
 extern void free_monitors (struct MonitorInfo *monitors, int n_monitors);

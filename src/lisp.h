@@ -3894,9 +3894,6 @@ struct handler
   int poll_suppress_count;
   int interrupt_input_blocked;
 
-#ifdef HAVE_X_WINDOWS
-  int x_error_handler_depth;
-#endif
 };
 
 extern Lisp_Object memory_signal_data;
@@ -3956,17 +3953,8 @@ extern int staticidx;
 struct window;
 struct frame;
 
-/* Define if the windowing system provides a menu bar.  */
-#if defined (USE_X_TOOLKIT) || defined (HAVE_NTGUI) \
-  || defined (HAVE_NS) || defined (USE_GTK) || defined (HAVE_HAIKU)
-#define HAVE_EXT_MENU_BAR true
-#endif
 /* Neomacs uses Emacs-internal (text-rendered) menu bar, not a toolkit widget. */
 
-/* Define if the windowing system provides a tool-bar.  */
-#if defined (USE_GTK) || defined (HAVE_NS)
-#define HAVE_EXT_TOOL_BAR true
-#endif
 /* Neomacs uses Emacs-internal (text-rendered) tool bar, not a toolkit widget. */
 
 /* Return the address of vector A's element at index I.  */
@@ -5158,9 +5146,6 @@ extern int initial_argc;
 #endif
 extern char *initial_argv0;
 extern char const *emacs_wd;
-#if defined (HAVE_X_WINDOWS) || defined (HAVE_PGTK) || defined (HAVE_NS)
-extern bool display_arg;
-#endif
 extern Lisp_Object decode_env_path (const char *, const char *, bool);
 extern Lisp_Object empty_unibyte_string, empty_multibyte_string;
 extern AVOID terminate_due_to_signal (int, int);
@@ -5334,18 +5319,12 @@ extern int emacs_fstatat (int, char const *, void *, int);
 extern int sys_fstat (int, struct stat *);
 #endif
 extern int sys_faccessat (int, const char *, int, int);
-#if !(defined HAVE_ANDROID && !defined ANDROID_STUBIFY)
 extern int emacs_openat (int, char const *, int, int);
-#endif
 extern int emacs_open (const char *, int, int);
 extern int emacs_open_noquit (const char *, int, int);
 extern int emacs_pipe (int[2]);
 extern int emacs_close (int);
-#if !(defined HAVE_ANDROID && !defined ANDROID_STUBIFY)
 # define emacs_fclose fclose
-#else
-extern int emacs_fclose (FILE *);
-#endif
 extern FILE *emacs_fdopen (int, const char *)
   ATTRIBUTE_MALLOC ATTRIBUTE_DEALLOC (emacs_fclose, 1);
 extern FILE *emacs_fopen (char const *, char const *)
@@ -5364,9 +5343,6 @@ extern ptrdiff_t emacs_write (int, void const *, ptrdiff_t);
 extern ptrdiff_t emacs_write_sig (int, void const *, ptrdiff_t);
 extern ptrdiff_t emacs_write_quit (int, void const *, ptrdiff_t);
 extern void emacs_perror (char const *);
-#ifdef HAVE_ANDROID
-extern int renameat_noreplace (int, char const *, int, char const *);
-#endif
 extern int str_collate (Lisp_Object, Lisp_Object, Lisp_Object, Lisp_Object);
 extern void syms_of_sysdep (void);
 
@@ -5393,9 +5369,7 @@ extern Lisp_Object directory_files_internal (Lisp_Object, Lisp_Object,
                                              bool, Lisp_Object, Lisp_Object);
 
 /* Defined in term.c.  */
-#ifndef HAVE_ANDROID
 extern int *char_ins_del_vector;
-#endif
 extern void syms_of_term (void);
 extern AVOID fatal (const char *msgid, ...) ATTRIBUTE_FORMAT_PRINTF (1, 2);
 
@@ -5434,31 +5408,11 @@ extern void syms_of_gfilenotify (void);
 extern void syms_of_w32notify (void);
 #endif
 
-#if defined HAVE_NTGUI || defined CYGWIN
-/* Defined in w32cygwinx.c.  */
-extern void syms_of_w32cygwinx (void);
-#endif
-
 /* Defined in xfaces.c.  */
 extern Lisp_Object Vface_alternative_font_family_alist;
 extern Lisp_Object Vface_alternative_font_registry_alist;
 extern void syms_of_xfaces (void);
 extern void init_xfaces (void);
-
-#ifdef HAVE_X_WINDOWS
-/* Defined in xfns.c.  */
-extern void syms_of_xfns (void);
-
-/* Defined in xsmfns.c.  */
-extern void syms_of_xsmfns (void);
-
-/* Defined in xselect.c.  */
-extern void syms_of_xselect (void);
-
-/* Defined in xterm.c.  */
-extern void init_xterm (void);
-extern void syms_of_xterm (void);
-#endif /* HAVE_X_WINDOWS */
 
 #ifdef HAVE_WINDOW_SYSTEM
 /* Defined in xterm.c, nsterm.m, w32term.c.  */

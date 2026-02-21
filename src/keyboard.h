@@ -23,14 +23,6 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 #include "coding.h"             /* for ENCODE_UTF_8 and ENCODE_SYSTEM */
 #include "termhooks.h"
 
-#ifdef HAVE_X11
-# include "xterm.h"		/* for struct selection_input_event */
-#endif
-
-#ifdef HAVE_PGTK
-#include "pgtkterm.h"		/* for struct selection_input_event */
-#endif
-
 INLINE_HEADER_BEGIN
 
 /* Most code should use this macro to access Lisp fields in struct kboard.  */
@@ -388,17 +380,7 @@ extern void unuse_menu_items (void);
    isn't defined.  The use of HAVE_MULTILINGUAL_MENU could probably be
    confined to an extended version of this with sections of code below
    using it unconditionally.  */
-#ifndef HAVE_NTGUI
-#if defined (USE_GTK) || defined (HAVE_NS)
-# define ENCODE_MENU_STRING(str) ENCODE_UTF_8 (str)
-#elif defined HAVE_X_I18N
-#define ENCODE_MENU_STRING(str) ENCODE_SYSTEM (str)
-#else
 #define ENCODE_MENU_STRING(str) string_make_unibyte (str)
-#endif /* USE_GTK  */
-#else /* HAVE_NTGUI */
-#define ENCODE_MENU_STRING(str) (str)
-#endif
 
 /* Macros for dealing with lispy events.  */
 
@@ -520,10 +502,6 @@ extern void add_user_signal (int, const char *);
 extern int tty_read_avail_input (struct terminal *, struct input_event *);
 extern struct timespec timer_check (void);
 extern void mark_kboards (void);
-
-#if defined HAVE_NTGUI || defined HAVE_X_WINDOWS || defined HAVE_PGTK
-extern const char *const lispy_function_keys[];
-#endif
 
 /* Terminal device used by Emacs for terminal I/O.  */
 extern char *dev_tty;
