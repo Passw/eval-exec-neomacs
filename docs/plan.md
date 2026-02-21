@@ -28,6 +28,22 @@ Last updated: 2026-02-21
 
 ## Doing
 
+- Extended `message-box` / `message-or-box` handle matrix with mutex/condition-variable `%S`/`%s` lock-ins:
+  - vm-compat corpus changes:
+    - updated:
+      - `test/neovm/vm-compat/cases/message-box-or-box-handle-semantics.forms`
+      - `test/neovm/vm-compat/cases/message-box-or-box-handle-semantics.expected.tsv`
+    - added `%S`/`%s` rows for `make-mutex` and `make-condition-variable` across both wrapper builtins.
+  - runtime changes:
+    - `rust/neovm-core/src/elisp/builtins.rs`
+      - extended evaluator coverage:
+        - `message_box_wrappers_render_opaque_handles_in_eval_dispatch`
+      - test now asserts Oracle-shaped `#<mutex...>` / `#<condvar...>` rendering for both wrappers and both format specifiers.
+  - verified:
+    - `cargo test --manifest-path rust/neovm-core/Cargo.toml message_box_wrappers_render_opaque_handles_in_eval_dispatch -- --nocapture` (pass)
+    - `make -C test/neovm/vm-compat check-one-neovm CASE=cases/message-box-or-box-handle-semantics` (pass; `34/34`)
+    - `make -C test/neovm/vm-compat check-neovm-filter-strict LIST=cases/default.list PATTERN='message-box-or-box-handle-semantics'` (pass; strict filtered gates green)
+
 - Added vm-compat lock-in and runtime evaluator coverage for `message-box` / `message-or-box` opaque-handle rendering:
   - vm-compat corpus changes:
     - added:

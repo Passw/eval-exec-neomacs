@@ -18964,6 +18964,16 @@ mod tests {
         let window = dispatch_builtin(&mut eval, "selected-window", vec![])
             .expect("selected-window should resolve")
             .expect("selected-window should evaluate");
+        let mutex = dispatch_builtin(&mut eval, "make-mutex", vec![])
+            .expect("make-mutex should resolve")
+            .expect("make-mutex should evaluate");
+        let condvar = dispatch_builtin(
+            &mut eval,
+            "make-condition-variable",
+            vec![mutex.clone()],
+        )
+        .expect("make-condition-variable should resolve")
+        .expect("make-condition-variable should evaluate");
 
         let mut assert_prefix = |builtin: &str, spec: &str, value: Value, prefix: &str| {
             let rendered = dispatch_builtin(&mut eval, builtin, vec![Value::string(spec), value])
@@ -18980,6 +18990,10 @@ mod tests {
             assert_prefix(builtin, "%s", thread.clone(), "#<thread");
             assert_prefix(builtin, "%S", terminal.clone(), "#<terminal");
             assert_prefix(builtin, "%s", terminal.clone(), "#<terminal");
+            assert_prefix(builtin, "%S", mutex.clone(), "#<mutex");
+            assert_prefix(builtin, "%s", mutex.clone(), "#<mutex");
+            assert_prefix(builtin, "%S", condvar.clone(), "#<condvar");
+            assert_prefix(builtin, "%s", condvar.clone(), "#<condvar");
             assert_prefix(builtin, "%S", frame.clone(), "#<frame");
             assert_prefix(builtin, "%S", window.clone(), "#<window");
         }
