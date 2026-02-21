@@ -61,7 +61,18 @@ fn expect_string(value: &Value) -> Result<String, Flow> {
 // Eval-dependent builtins
 // ---------------------------------------------------------------------------
 
+fn strip_reader_prefix(source: &str) -> &str {
+    if !source.starts_with("#!") {
+        return source;
+    }
+    match source.find('\n') {
+        Some(index) => &source[index + 1..],
+        None => "",
+    }
+}
+
 fn eval_forms_from_source(eval: &mut super::eval::Evaluator, source: &str) -> EvalResult {
+    let source = strip_reader_prefix(source);
     if source.is_empty() {
         return Ok(Value::Nil);
     }
@@ -484,6 +495,35 @@ mod tests {
             ev.obarray.symbol_value("lread-eb-b").cloned(),
             Some(Value::Int(12))
         );
+    }
+
+    #[test]
+    fn eval_buffer_accepts_shebang_reader_prefix() {
+        let mut ev = Evaluator::new();
+        {
+            let buf = ev.buffers.current_buffer_mut().expect("current buffer");
+            buf.insert("#!/usr/bin/env emacs --script\n(setq lread-eb-shebang 'ok)\n");
+        }
+        let result = builtin_eval_buffer(&mut ev, vec![]).unwrap();
+        assert!(result.is_nil());
+        assert_eq!(
+            ev.obarray.symbol_value("lread-eb-shebang").cloned(),
+            Some(Value::symbol("ok"))
+        );
+    }
+
+    #[test]
+    fn eval_buffer_preserves_utf8_bom_reader_error_shape() {
+        let mut ev = Evaluator::new();
+        {
+            let buf = ev.buffers.current_buffer_mut().expect("current buffer");
+            buf.insert("\u{feff}(setq lread-eb-bom 'ok)\n");
+        }
+        let result = builtin_eval_buffer(&mut ev, vec![]);
+        assert!(matches!(
+            result,
+            Err(Flow::Signal(sig)) if sig.symbol == "void-variable" && sig.data.len() == 1
+        ));
     }
 
     #[test]
