@@ -4073,17 +4073,29 @@ pub(crate) fn builtin_symbol_value(
         .ok_or_else(|| signal("void-variable", vec![Value::symbol(name)]))
 }
 
-fn startup_virtual_autoload_function_cell(name: &str) -> Option<Value> {
+fn startup_virtual_autoload_function_cell(
+    eval: &super::eval::Evaluator,
+    name: &str,
+) -> Option<Value> {
     match name {
-        "pcase-dolist" => Some(Value::list(vec![
-            Value::symbol("autoload"),
-            Value::string("pcase"),
-            Value::string(
-                "Eval BODY once for each set of bindings defined by PATTERN and LIST elements.",
-            ),
-            Value::Nil,
-            Value::True,
-        ])),
+        "pcase-dolist" => {
+            if eval
+                .obarray()
+                .get_property("pcase-dolist", "neovm--pcase-dolist-materialized")
+                .is_some()
+            {
+                return None;
+            }
+            Some(Value::list(vec![
+                Value::symbol("autoload"),
+                Value::string("pcase"),
+                Value::string(
+                    "Eval BODY once for each set of bindings defined by PATTERN and LIST elements.",
+                ),
+                Value::Nil,
+                Value::True,
+            ]))
+        }
         _ => None,
     }
 }
@@ -4124,7 +4136,7 @@ pub(crate) fn builtin_symbol_function(
         return Ok(function.clone());
     }
 
-    if let Some(function) = startup_virtual_autoload_function_cell(name) {
+    if let Some(function) = startup_virtual_autoload_function_cell(eval, name) {
         return Ok(function);
     }
 
@@ -4159,6 +4171,7 @@ pub(crate) fn builtin_func_arity_eval(
                 return Err(signal("void-function", vec![Value::symbol(name)]));
             }
             maybe_materialize_thingatpt_word_symbol(eval, name, &function);
+            maybe_mark_pcase_dolist_materialized(eval, name, &function);
             if super::subr_info::is_special_form(name) {
                 return super::subr_info::builtin_func_arity(vec![Value::Subr(name.to_string())]);
             }
@@ -4199,6 +4212,27 @@ fn maybe_materialize_thingatpt_word_symbol(
         return;
     }
     eval.set_function("word-at-point", Value::Subr("word-at-point".to_string()));
+}
+
+fn maybe_mark_pcase_dolist_materialized(
+    eval: &mut super::eval::Evaluator,
+    name: &str,
+    function: &Value,
+) {
+    if name != "pcase-dolist" || !matches!(function, Value::Macro(_)) {
+        return;
+    }
+    if eval.obarray().is_function_unbound(name) {
+        return;
+    }
+    let _ = builtin_put(
+        eval,
+        vec![
+            Value::symbol("pcase-dolist"),
+            Value::symbol("neovm--pcase-dolist-materialized"),
+            Value::True,
+        ],
+    );
 }
 
 fn has_startup_subr_wrapper(eval: &super::eval::Evaluator, name: &str) -> bool {
@@ -4903,7 +4937,7 @@ pub(crate) fn builtin_indirect_function(
     let _noerror = args.get(1).is_some_and(|value| value.is_truthy());
 
     if let Some(name) = args[0].as_symbol_name() {
-        if let Some(function) = startup_virtual_autoload_function_cell(name) {
+        if let Some(function) = startup_virtual_autoload_function_cell(eval, name) {
             return Ok(function);
         }
         if let Some(function) = resolve_indirect_symbol(eval, name) {
@@ -4968,7 +5002,7 @@ pub(crate) fn builtin_macrop_eval(
 ) -> EvalResult {
     expect_args("macrop", &args, 1)?;
     if let Some(name) = args[0].as_symbol_name() {
-        if let Some(function) = startup_virtual_autoload_function_cell(name) {
+        if let Some(function) = startup_virtual_autoload_function_cell(eval, name) {
             return super::subr_info::builtin_macrop(vec![function]);
         }
         if let Some(function) = resolve_indirect_symbol(eval, name) {
@@ -20656,6 +20690,40 @@ mod tests {
             }
             other => panic!("unexpected flow: {other:?}"),
         }
+    }
+
+    #[test]
+    fn func_arity_eval_pcase_dolist_followup_indirect_arity_matches_oracle() {
+        let mut eval = crate::elisp::eval::Evaluator::new();
+
+        let startup_indirect =
+            builtin_indirect_function(&mut eval, vec![Value::symbol("pcase-dolist")])
+                .expect("indirect-function should resolve pcase-dolist startup shape");
+        assert!(crate::elisp::autoload::is_autoload_value(&startup_indirect));
+        let startup_indirect_arity = builtin_func_arity_eval(&mut eval, vec![startup_indirect])
+            .expect_err("startup indirect pcase-dolist should not satisfy func-arity");
+        match startup_indirect_arity {
+            Flow::Signal(sig) => {
+                assert_eq!(sig.symbol, "wrong-type-argument");
+                assert_eq!(sig.data[0], Value::symbol("symbolp"));
+            }
+            other => panic!("unexpected flow: {other:?}"),
+        }
+
+        let symbol_arity = builtin_func_arity_eval(&mut eval, vec![Value::symbol("pcase-dolist")])
+            .expect("func-arity should resolve pcase-dolist symbol");
+        assert_eq!(symbol_arity, Value::cons(Value::Int(1), Value::symbol("many")));
+
+        let materialized_indirect =
+            builtin_indirect_function(&mut eval, vec![Value::symbol("pcase-dolist")])
+                .expect("indirect-function should resolve pcase-dolist after func-arity");
+        assert!(
+            !crate::elisp::autoload::is_autoload_value(&materialized_indirect),
+            "indirect-function should stop returning startup autoload after func-arity symbol"
+        );
+        let followup_arity = builtin_func_arity_eval(&mut eval, vec![materialized_indirect])
+            .expect("materialized indirect pcase-dolist should satisfy func-arity");
+        assert_eq!(followup_arity, Value::cons(Value::Int(1), Value::symbol("many")));
     }
 
     #[test]
