@@ -9718,10 +9718,15 @@ fn describe_int_key(code: i64) -> Result<String, Flow> {
 
     let mut out = String::new();
 
-    if let Some(name) = named_char_name(base) {
-        push_prefixes(&mut out, ctrl);
-        out.push_str(name);
-        return Ok(out);
+    // Emacs renders M-TAB style integer events through control notation (`C-M-i`),
+    // while plain/shift/super/alt TAB keeps named `TAB` rendering.
+    let tab_meta_control_notation = base == 9 && meta;
+    if !tab_meta_control_notation {
+        if let Some(name) = named_char_name(base) {
+            push_prefixes(&mut out, ctrl);
+            out.push_str(name);
+            return Ok(out);
+        }
     }
 
     if let Some(sfx) = control_char_suffix(base) {
@@ -16385,6 +16390,21 @@ mod tests {
                 .expect("single-key-description should succeed"),
             Value::string("A-C-H-M-S-s-a")
         );
+        assert_eq!(
+            builtin_single_key_description(vec![Value::Int(134_217_737)])
+                .expect("single-key-description should succeed"),
+            Value::string("C-M-i")
+        );
+        assert_eq!(
+            builtin_single_key_description(vec![Value::Int(138_412_041)])
+                .expect("single-key-description should succeed"),
+            Value::string("A-C-M-i")
+        );
+        assert_eq!(
+            builtin_single_key_description(vec![Value::Int(201_326_601)])
+                .expect("single-key-description should succeed"),
+            Value::string("C-M-i")
+        );
 
         let single_nonunicode = builtin_single_key_description(vec![Value::Int(0x11_0000)])
             .expect("single-key-description should support nonunicode char code");
@@ -16412,6 +16432,16 @@ mod tests {
             builtin_key_description(vec![Value::vector(vec![Value::Int(0x40_0000)])])
                 .expect("key-description should succeed"),
             Value::string("A-C-@")
+        );
+        assert_eq!(
+            builtin_key_description(vec![Value::vector(vec![Value::Int(134_217_737)])])
+                .expect("key-description should succeed"),
+            Value::string("C-M-i")
+        );
+        assert_eq!(
+            builtin_key_description(vec![Value::vector(vec![Value::Int(201_326_601)])])
+                .expect("key-description should succeed"),
+            Value::string("C-M-i")
         );
     }
 
