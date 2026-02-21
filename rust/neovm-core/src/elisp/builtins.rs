@@ -2045,10 +2045,7 @@ pub(crate) fn builtin_format_eval(
                 match spec {
                     's' => {
                         if arg_idx < args.len() {
-                            match &args[arg_idx] {
-                                Value::Str(s) => result.push_str(s),
-                                other => result.push_str(&print_value_eval(eval, other)),
-                            }
+                            result.push_str(&format_percent_s_eval(eval, &args[arg_idx]));
                             arg_idx += 1;
                         }
                     }
@@ -2099,6 +2096,22 @@ pub(crate) fn builtin_format_eval(
     }
 
     Ok(Value::string(result))
+}
+
+fn format_percent_s_eval(eval: &super::eval::Evaluator, value: &Value) -> String {
+    match value {
+        Value::Str(s) => (**s).clone(),
+        Value::Buffer(id) => {
+            if let Some(buf) = eval.buffers.get(*id) {
+                return buf.name.clone();
+            }
+            if eval.buffers.dead_buffer_last_name(*id).is_some() {
+                return "#<killed buffer>".to_string();
+            }
+            print_value_eval(eval, value)
+        }
+        _ => print_value_eval(eval, value),
+    }
 }
 
 pub(crate) fn builtin_format_message_eval(
@@ -18622,6 +18635,33 @@ mod tests {
                 .is_some_and(|s| s.starts_with("#<buffer *format-live-buffer")),
             "expected live buffer name in message output: {message:?}"
         );
+    }
+
+    #[test]
+    fn format_and_message_percent_s_render_live_buffer_names_in_eval_dispatch() {
+        let mut eval = crate::elisp::eval::Evaluator::new();
+        let expected = "*format-live-s-buffer*";
+        let buffer = dispatch_builtin(
+            &mut eval,
+            "generate-new-buffer",
+            vec![Value::string(expected)],
+        )
+        .expect("generate-new-buffer should resolve")
+        .expect("generate-new-buffer should evaluate");
+
+        let formatted = dispatch_builtin(
+            &mut eval,
+            "format",
+            vec![Value::string("%s"), buffer.clone()],
+        )
+        .expect("format should resolve")
+        .expect("format should evaluate");
+        assert_eq!(formatted, Value::string(expected));
+
+        let message = dispatch_builtin(&mut eval, "message", vec![Value::string("%s"), buffer])
+            .expect("message should resolve")
+            .expect("message should evaluate");
+        assert_eq!(message, Value::string(expected));
     }
 
     #[test]

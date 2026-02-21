@@ -36,7 +36,7 @@ Last updated: 2026-02-21
     - wired case into:
       - `test/neovm/vm-compat/cases/default.list`
   - verified:
-    - `make -C test/neovm/vm-compat check-one-neovm CASE=cases/format-message-killed-buffer-handle-semantics` (pass; `9/9`)
+    - `make -C test/neovm/vm-compat check-one-neovm CASE=cases/format-message-killed-buffer-handle-semantics` (pass; `11/11`)
 
 - Hardened runtime coverage for `error-message-string` opaque handle payload formatting:
   - runtime changes:
@@ -60,9 +60,11 @@ Last updated: 2026-02-21
     - `rust/neovm-core/src/elisp/builtins.rs`
       - `print_threading_handle` now resolves buffer handles through evaluator state.
       - dead buffer handles now render as `#<killed buffer>` in eval-dispatch `%S` printing paths (`format`, `message`).
+      - eval-dispatch `%s` now renders live buffers as bare names while preserving killed-buffer rendering (`#<killed buffer>`).
       - added evaluator coverage:
         - `format_and_message_render_killed_buffer_handles_in_eval_dispatch`
         - `format_and_message_render_live_buffer_handles_in_eval_dispatch`
+        - `format_and_message_percent_s_render_live_buffer_names_in_eval_dispatch`
   - verified:
     - `cargo test --manifest-path rust/neovm-core/Cargo.toml builtin_error_message_string_formats_mutex_and_condvar_handles -- --nocapture` (pass)
     - `cargo test --manifest-path rust/neovm-core/Cargo.toml builtin_error_message_string_formats_thread_handles -- --nocapture` (pass)
@@ -70,6 +72,7 @@ Last updated: 2026-02-21
     - `cargo test --manifest-path rust/neovm-core/Cargo.toml builtin_error_message_string_formats_frame_and_window_handles -- --nocapture` (pass)
     - `cargo test --manifest-path rust/neovm-core/Cargo.toml format_and_message_render_killed_buffer_handles_in_eval_dispatch -- --nocapture` (pass)
     - `cargo test --manifest-path rust/neovm-core/Cargo.toml format_and_message_render_live_buffer_handles_in_eval_dispatch -- --nocapture` (pass)
+    - `cargo test --manifest-path rust/neovm-core/Cargo.toml format_and_message_percent_s_render_live_buffer_names_in_eval_dispatch -- --nocapture` (pass)
     - `cargo test --manifest-path rust/neovm-core/Cargo.toml eval_context_printer_renders_condvar_handles_consistently -- --nocapture` (pass)
     - `cargo test --manifest-path rust/neovm-core/Cargo.toml eval_context_printer_renders_frame_window_handles_consistently -- --nocapture` (pass)
     - `cargo test --manifest-path rust/neovm-core/Cargo.toml eval_context_printer_renders_terminal_thread_handles_consistently -- --nocapture` (pass)

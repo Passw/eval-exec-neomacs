@@ -24,3 +24,13 @@
   (prog1
       (string-prefix-p "#<buffer msg-live-vm" (message "%S" b))
     (kill-buffer b)))
+
+(let* ((b (generate-new-buffer "fmt-live-vm-lower")))
+  (prog1
+      (string= "fmt-live-vm-lower" (format "%s" b))
+    (kill-buffer b)))
+
+(let* ((b (generate-new-buffer "msg-live-vm-lower")))
+  (prog1
+      (string= "msg-live-vm-lower" (message "%s" b))
+    (kill-buffer b)))
