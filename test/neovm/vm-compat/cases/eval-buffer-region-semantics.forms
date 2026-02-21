@@ -109,3 +109,15 @@
         (eval-region 1 (point-max))
         neovm-er-bom-probe)
     (error (list 'error (car err)))))
+
+(with-temp-buffer
+  (insert "#!/usr/bin/env emacs --script")
+  (condition-case err
+      (eval-buffer)
+    (error (list 'error (car err)))))
+
+(with-temp-buffer
+  (insert "#!/usr/bin/env emacs --script")
+  (condition-case err
+      (eval-region 1 (point-max))
+    (error (list 'error (car err)))))

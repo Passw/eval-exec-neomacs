@@ -293,15 +293,15 @@ fn strip_utf8_bom(source: &str) -> &str {
     source.strip_prefix('\u{feff}').unwrap_or(source)
 }
 
-fn strip_reader_prefix(source: &str) -> &str {
+fn strip_reader_prefix(source: &str) -> (&str, bool) {
     let without_bom = strip_utf8_bom(source);
     if !without_bom.starts_with("#!") {
-        return without_bom;
+        return (without_bom, false);
     }
 
     match without_bom.find('\n') {
-        Some(index) => &without_bom[index + 1..],
-        None => "",
+        Some(index) => (&without_bom[index + 1..], false),
+        None => ("", true),
     }
 }
 
@@ -343,7 +343,13 @@ fn lexical_binding_enabled_for_source(source: &str) -> bool {
 }
 
 fn parse_source_forms(source_path: &Path, source: &str) -> Result<Vec<Expr>, EvalError> {
-    let source_for_reader = strip_reader_prefix(source);
+    let (source_for_reader, shebang_only_line) = strip_reader_prefix(source);
+    if shebang_only_line {
+        return Err(EvalError::Signal {
+            symbol: "end-of-file".to_string(),
+            data: vec![],
+        });
+    }
     super::parser::parse_forms(source_for_reader).map_err(|e| EvalError::Signal {
         symbol: "invalid-read-syntax".to_string(),
         data: vec![Value::string(format!(
@@ -514,27 +520,27 @@ mod tests {
         let source = "#!/usr/bin/env emacs --script\n(setq vm-shebang-strip 1)\n";
         assert_eq!(
             strip_reader_prefix(source),
-            "(setq vm-shebang-strip 1)\n",
+            ("(setq vm-shebang-strip 1)\n", false),
             "shebang-prefixed source should drop the first line before parsing",
         );
         assert_eq!(
             strip_reader_prefix("#!/usr/bin/env emacs --script"),
-            "",
-            "single-line shebang files should parse as empty payload",
+            ("", true),
+            "single-line shebang files should preserve end-of-file signaling",
         );
         assert_eq!(
             strip_reader_prefix("(setq vm-shebang-strip 2)\n"),
-            "(setq vm-shebang-strip 2)\n",
+            ("(setq vm-shebang-strip 2)\n", false),
             "non-shebang source should remain unchanged",
         );
         assert_eq!(
             strip_reader_prefix("\u{feff}(setq vm-bom-strip 3)\n"),
-            "(setq vm-bom-strip 3)\n",
+            ("(setq vm-bom-strip 3)\n", false),
             "utf-8 bom should be removed before parsing",
         );
         assert_eq!(
             strip_reader_prefix("\u{feff}#!/usr/bin/env emacs --script\n(setq vm-bom-shebang 4)\n"),
-            "(setq vm-bom-shebang 4)\n",
+            ("(setq vm-bom-shebang 4)\n", false),
             "utf-8 bom should not block shebang stripping",
         );
     }
@@ -902,6 +908,30 @@ mod tests {
             eval.obarray().symbol_value("vm-load-bom-flag").cloned(),
             Some(Value::True)
         );
+
+        let _ = fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn load_file_single_line_shebang_signals_end_of_file() {
+        let unique = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .expect("clock before epoch")
+            .as_nanos();
+        let dir = std::env::temp_dir().join(format!("neovm-load-shebang-eof-{unique}"));
+        fs::create_dir_all(&dir).expect("create temp fixture dir");
+        let file = dir.join("probe.el");
+        fs::write(&file, "#!/usr/bin/env emacs --script").expect("write shebang-only fixture");
+
+        let mut eval = super::super::eval::Evaluator::new();
+        let err = load_file(&mut eval, &file).expect_err("shebang-only source should signal EOF");
+        match err {
+            EvalError::Signal { symbol, data } => {
+                assert_eq!(symbol, "end-of-file");
+                assert!(data.is_empty());
+            }
+            other => panic!("unexpected error: {other:?}"),
+        }
 
         let _ = fs::remove_dir_all(&dir);
     }

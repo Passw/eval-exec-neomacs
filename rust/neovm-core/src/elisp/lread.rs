@@ -61,18 +61,21 @@ fn expect_string(value: &Value) -> Result<String, Flow> {
 // Eval-dependent builtins
 // ---------------------------------------------------------------------------
 
-fn strip_reader_prefix(source: &str) -> &str {
+fn strip_reader_prefix(source: &str) -> (&str, bool) {
     if !source.starts_with("#!") {
-        return source;
+        return (source, false);
     }
     match source.find('\n') {
-        Some(index) => &source[index + 1..],
-        None => "",
+        Some(index) => (&source[index + 1..], false),
+        None => ("", true),
     }
 }
 
 fn eval_forms_from_source(eval: &mut super::eval::Evaluator, source: &str) -> EvalResult {
-    let source = strip_reader_prefix(source);
+    let (source, shebang_only_line) = strip_reader_prefix(source);
+    if shebang_only_line {
+        return Err(signal("end-of-file", vec![]));
+    }
     if source.is_empty() {
         return Ok(Value::Nil);
     }
@@ -513,6 +516,20 @@ mod tests {
     }
 
     #[test]
+    fn eval_buffer_single_line_shebang_signals_end_of_file() {
+        let mut ev = Evaluator::new();
+        {
+            let buf = ev.buffers.current_buffer_mut().expect("current buffer");
+            buf.insert("#!/usr/bin/env emacs --script");
+        }
+        let result = builtin_eval_buffer(&mut ev, vec![]);
+        assert!(matches!(
+            result,
+            Err(Flow::Signal(sig)) if sig.symbol == "end-of-file" && sig.data.is_empty()
+        ));
+    }
+
+    #[test]
     fn eval_buffer_preserves_utf8_bom_reader_error_shape() {
         let mut ev = Evaluator::new();
         {
@@ -741,6 +758,24 @@ mod tests {
             ev.obarray.symbol_value("lread-er-shebang").cloned(),
             Some(Value::symbol("ok"))
         );
+    }
+
+    #[test]
+    fn eval_region_single_line_shebang_signals_end_of_file() {
+        let mut ev = Evaluator::new();
+        {
+            let buf = ev.buffers.current_buffer_mut().expect("current buffer");
+            buf.insert("#!/usr/bin/env emacs --script");
+        }
+        let end = {
+            let buf = ev.buffers.current_buffer().expect("current buffer");
+            Value::Int(buf.text.char_count() as i64 + 1)
+        };
+        let result = builtin_eval_region(&mut ev, vec![Value::Int(1), end]);
+        assert!(matches!(
+            result,
+            Err(Flow::Signal(sig)) if sig.symbol == "end-of-file" && sig.data.is_empty()
+        ));
     }
 
     #[test]
