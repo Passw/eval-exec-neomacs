@@ -101,6 +101,18 @@
   (wrong-type-argument (list 'insert-char-high (car err) (cdr err))))
 
 (with-temp-buffer
+  (insert 1114112)
+  (string-to-list (buffer-string)))
+
+(with-temp-buffer
+  (insert 2097152 2097152)
+  (string-to-list (buffer-string)))
+
+(condition-case err
+    (insert 4194304)
+  (wrong-type-argument (list 'insert-high (car err) (cdr err))))
+
+(with-temp-buffer
   (insert-byte 65 3)
   (buffer-string))
 

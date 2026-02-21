@@ -8205,9 +8205,22 @@ pub(crate) fn builtin_insert(eval: &mut super::eval::Evaluator, args: Vec<Value>
                 buf.insert(c.encode_utf8(&mut tmp));
             }
             Value::Int(n) => {
+                if !(0..=KEY_CHAR_CODE_MASK).contains(n) {
+                    return Err(signal(
+                        "wrong-type-argument",
+                        vec![Value::symbol("char-or-string-p"), Value::Int(*n)],
+                    ));
+                }
                 if let Some(c) = char::from_u32(*n as u32) {
                     let mut tmp = [0u8; 4];
                     buf.insert(c.encode_utf8(&mut tmp));
+                } else if let Some(encoded) = encode_nonunicode_char_for_storage(*n as u32) {
+                    buf.insert(&encoded);
+                } else {
+                    return Err(signal(
+                        "wrong-type-argument",
+                        vec![Value::symbol("char-or-string-p"), Value::Int(*n)],
+                    ));
                 }
             }
             other => {
@@ -19432,6 +19445,44 @@ mod tests {
                 assert_eq!(
                     sig.data,
                     vec![Value::symbol("characterp"), Value::Int(0x40_0000)]
+                );
+            }
+            other => panic!("expected signal, got: {other:?}"),
+        }
+    }
+
+    #[test]
+    fn insert_nonunicode_integer_arguments_match_oracle() {
+        let mut eval = crate::elisp::eval::Evaluator::new();
+
+        builtin_erase_buffer(&mut eval, vec![]).expect("erase-buffer should succeed");
+        builtin_insert(&mut eval, vec![Value::Int(0x11_0000)])
+            .expect("insert should accept nonunicode integer char code");
+        let first = builtin_buffer_string(&mut eval, vec![])
+            .expect("buffer-string should evaluate")
+            .as_str()
+            .expect("buffer-string should return text")
+            .to_string();
+        assert_eq!(decode_storage_char_codes(&first), vec![0x11_0000]);
+
+        builtin_erase_buffer(&mut eval, vec![]).expect("erase-buffer should succeed");
+        builtin_insert(&mut eval, vec![Value::Int(0x20_0000), Value::Int(0x20_0000)])
+            .expect("insert should repeat nonunicode integer char codes");
+        let second = builtin_buffer_string(&mut eval, vec![])
+            .expect("buffer-string should evaluate")
+            .as_str()
+            .expect("buffer-string should return text")
+            .to_string();
+        assert_eq!(decode_storage_char_codes(&second), vec![0x20_0000, 0x20_0000]);
+
+        let overflow = builtin_insert(&mut eval, vec![Value::Int(0x40_0000)])
+            .expect_err("insert should reject out-of-range integer char code");
+        match overflow {
+            Flow::Signal(sig) => {
+                assert_eq!(sig.symbol, "wrong-type-argument");
+                assert_eq!(
+                    sig.data,
+                    vec![Value::symbol("char-or-string-p"), Value::Int(0x40_0000)]
                 );
             }
             other => panic!("expected signal, got: {other:?}"),

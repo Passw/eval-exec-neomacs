@@ -40,11 +40,14 @@
 40	(with-temp-buffer (insert-char 1114112 1) (string-to-list (buffer-string)))	OK (1114112)
 41	(with-temp-buffer (insert-char 2097152 2) (string-to-list (buffer-string)))	OK (2097152 2097152)
 42	(condition-case err (insert-char 4194304 1) (wrong-type-argument (list 'insert-char-high (car err) (cdr err))))	OK (insert-char-high wrong-type-argument (characterp 4194304))
-43	(with-temp-buffer (insert-byte 65 3) (buffer-string))	OK "AAA"
-44	(with-temp-buffer (insert-byte 65 0) (buffer-string))	OK ""
-45	(with-temp-buffer (insert-byte 255 1) (string-bytes (buffer-string)))	OK 2
-46	(condition-case err (insert-byte 256 1) (args-out-of-range (list 'insert-byte-high (car err) (cdr err))))	OK (insert-byte-high args-out-of-range (256 0 255))
-47	(condition-case err (insert-byte -1 1) (args-out-of-range (list 'insert-byte-low (car err) (cdr err))))	OK (insert-byte-low args-out-of-range (-1 0 255))
-48	(condition-case err (insert-byte "x" 1) (wrong-type-argument (list 'insert-byte-type (car err) (cdr err))))	OK (insert-byte-type wrong-type-argument (fixnump "x"))
-49	(condition-case err (insert-byte 65 'x) (wrong-type-argument (list 'insert-byte-count (car err) (cdr err))))	OK (insert-byte-count wrong-type-argument (fixnump x))
-50	(with-temp-buffer (insert-byte 67 2 t) (buffer-string))	OK "CC"
+43	(with-temp-buffer (insert 1114112) (string-to-list (buffer-string)))	OK (1114112)
+44	(with-temp-buffer (insert 2097152 2097152) (string-to-list (buffer-string)))	OK (2097152 2097152)
+45	(condition-case err (insert 4194304) (wrong-type-argument (list 'insert-high (car err) (cdr err))))	OK (insert-high wrong-type-argument (char-or-string-p 4194304))
+46	(with-temp-buffer (insert-byte 65 3) (buffer-string))	OK "AAA"
+47	(with-temp-buffer (insert-byte 65 0) (buffer-string))	OK ""
+48	(with-temp-buffer (insert-byte 255 1) (string-bytes (buffer-string)))	OK 2
+49	(condition-case err (insert-byte 256 1) (args-out-of-range (list 'insert-byte-high (car err) (cdr err))))	OK (insert-byte-high args-out-of-range (256 0 255))
+50	(condition-case err (insert-byte -1 1) (args-out-of-range (list 'insert-byte-low (car err) (cdr err))))	OK (insert-byte-low args-out-of-range (-1 0 255))
+51	(condition-case err (insert-byte "x" 1) (wrong-type-argument (list 'insert-byte-type (car err) (cdr err))))	OK (insert-byte-type wrong-type-argument (fixnump "x"))
+52	(condition-case err (insert-byte 65 'x) (wrong-type-argument (list 'insert-byte-count (car err) (cdr err))))	OK (insert-byte-count wrong-type-argument (fixnump x))
+53	(with-temp-buffer (insert-byte 67 2 t) (buffer-string))	OK "CC"
