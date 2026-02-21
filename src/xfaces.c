@@ -232,29 +232,14 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 #include <Xm/XmStrDefs.h>
 #endif /* USE_MOTIF */
 
-#ifdef MSDOS
-#include "dosfns.h"
-#endif
 
 #ifdef HAVE_WINDOW_SYSTEM
 #include TERM_HEADER
 #include "fontset.h"
-#ifdef HAVE_NTGUI
-#define GCGraphicsExposures 0
-#endif /* HAVE_NTGUI */
 
 
-#ifdef HAVE_PGTK
-#define GCGraphicsExposures 0
-#endif /* HAVE_PGTK */
 
-#ifdef HAVE_HAIKU
-#define GCGraphicsExposures 0
-#endif /* HAVE_HAIKU */
 
-#ifdef HAVE_ANDROID
-#define GCGraphicsExposures 0
-#endif /* HAVE_ANDROID */
 #endif /* HAVE_WINDOW_SYSTEM */
 
 #include "buffer.h"
@@ -372,90 +357,9 @@ static struct face *realize_non_ascii_face (struct frame *, Lisp_Object,
  ***********************************************************************/
 
 
-#ifdef HAVE_NTGUI
-/* W32 emulation of GCs */
-
-static Emacs_GC *
-x_create_gc (struct frame *f, unsigned long mask, Emacs_GC *egc)
-{
-  Emacs_GC *gc;
-  block_input ();
-  gc = XCreateGC (NULL, FRAME_W32_WINDOW (f), mask, egc);
-  unblock_input ();
-  IF_DEBUG (++ngcs);
-  return gc;
-}
 
 
-/* Free GC which was used on frame F.  */
 
-static void
-x_free_gc (struct frame *f, Emacs_GC *gc)
-{
-  IF_DEBUG ((--ngcs, eassert (ngcs >= 0)));
-  xfree (gc);
-}
-
-#endif  /* HAVE_NTGUI */
-
-#if defined (HAVE_NS) || defined (HAVE_HAIKU)
-/* NS and Haiku emulation of GCs */
-
-static Emacs_GC *
-x_create_gc (struct frame *f,
-	     unsigned long mask,
-	     Emacs_GC *egc)
-{
-  Emacs_GC *gc = xmalloc (sizeof *gc);
-  *gc = *egc;
-  return gc;
-}
-
-static void
-x_free_gc (struct frame *f, Emacs_GC *gc)
-{
-  xfree (gc);
-}
-#endif  /* HAVE_NS */
-
-#ifdef HAVE_PGTK
-/* PGTK emulation of GCs */
-
-static Emacs_GC *
-x_create_gc (struct frame *f,
-	     unsigned long mask,
-	     Emacs_GC *xgcv)
-{
-  Emacs_GC *gc = xmalloc (sizeof *gc);
-  *gc = *xgcv;
-  return gc;
-}
-
-static void
-x_free_gc (struct frame *f, Emacs_GC *gc)
-{
-  xfree (gc);
-}
-#endif  /* HAVE_NS */
-
-#ifdef HAVE_ANDROID
-
-/* Android real GCs.  */
-
-static struct android_gc *
-x_create_gc (struct frame *f, unsigned long value_mask,
-	     Emacs_GC *xgcv)
-{
-  return android_create_gc (value_mask, xgcv);
-}
-
-static void
-x_free_gc (struct frame *f, struct android_gc *gc)
-{
-  android_free_gc (gc);
-}
-
-#endif
 
 /* Neomacs emulation of GCs */
 
@@ -1032,12 +936,6 @@ tty_color_name (struct frame *f, int idx)
       if (!NILP (coldesc))
 	return XCAR (coldesc);
     }
-#ifdef MSDOS
-  /* We can have an MS-DOS frame under -nw for a short window of
-     opportunity before internal_terminal_init is called.  DTRT.  */
-  if (FRAME_MSDOS_P (f) && !inhibit_window_system)
-    return msdos_stdcolor_name (idx);
-#endif
 
   if (idx == FACE_TTY_DEFAULT_FG_COLOR)
     return build_string (unspecified_fg);
@@ -1200,9 +1098,7 @@ load_color2 (struct frame *f, struct face *face, Lisp_Object name,
    record that fact in flags of the face so that we don't try to free
    these colors.  */
 
-#ifndef MSDOS
 static
-#endif
 unsigned long
 load_color (struct frame *f, struct face *face, Lisp_Object name,
 	    enum lface_attribute_index target_index)
@@ -3481,7 +3377,6 @@ FRAME 0 means change the face on all frames, and change the default
 	    param = Qbackground_color;
 	}
 #ifdef HAVE_WINDOW_SYSTEM
-#ifndef HAVE_NTGUI
       else if (EQ (face, Qscroll_bar))
 	{
 	  /* Changing the colors of `scroll-bar' sets frame parameters
@@ -3491,7 +3386,6 @@ FRAME 0 means change the face on all frames, and change the default
 	  else if (EQ (attr, QCbackground))
 	    param = Qscroll_bar_background;
 	}
-#endif /* not HAVE_NTGUI */
       else if (EQ (face, Qborder))
 	{
 	  /* Changing background color of `border' sets frame parameter
@@ -6175,10 +6069,6 @@ map_tty_color (struct frame *f, struct face *face, Lisp_Object color,
   unsigned long default_pixel =
     foreground_p ? FACE_TTY_DEFAULT_FG_COLOR : FACE_TTY_DEFAULT_BG_COLOR;
   unsigned long pixel = default_pixel;
-#ifdef MSDOS
-  unsigned long default_other_pixel =
-    foreground_p ? FACE_TTY_DEFAULT_BG_COLOR : FACE_TTY_DEFAULT_FG_COLOR;
-#endif
 
   eassert (idx == LFACE_FOREGROUND_INDEX
            || idx == LFACE_BACKGROUND_INDEX
@@ -6201,32 +6091,6 @@ map_tty_color (struct frame *f, struct face *face, Lisp_Object color,
     {
       pixel = load_color (f, face, color, idx);
 
-#ifdef MSDOS
-      /* If the foreground of the default face is the default color,
-	 use the foreground color defined by the frame.  */
-      if (FRAME_MSDOS_P (f))
-	{
-	  if (pixel == default_pixel
-	      || pixel == FACE_TTY_DEFAULT_COLOR)
-	    {
-	      if (foreground_p)
-		pixel = FRAME_FOREGROUND_PIXEL (f);
-	      else
-		pixel = FRAME_BACKGROUND_PIXEL (f);
-	      face->lface[idx] = tty_color_name (f, pixel);
-	      *defaulted = true;
-	    }
-	  else if (pixel == default_other_pixel)
-	    {
-	      if (foreground_p)
-		pixel = FRAME_BACKGROUND_PIXEL (f);
-	      else
-		pixel = FRAME_FOREGROUND_PIXEL (f);
-	      face->lface[idx] = tty_color_name (f, pixel);
-	      *defaulted = true;
-	    }
-	}
-#endif /* MSDOS */
     }
 
   switch (idx)
@@ -6813,7 +6677,6 @@ merge_face_ref_from (struct window *w, Lisp_Object face_ref, int base_face_id)
 
 
 
-#ifndef HAVE_X_WINDOWS
 DEFUN ("x-load-color-file", Fx_load_color_file,
        Sx_load_color_file, 1, 1, 0,
        doc: /* Create an alist of color entries from an external file.
@@ -6842,11 +6705,7 @@ where R,G,B are numbers between 0 and 255 and name is an arbitrary string.  */)
 	{
 	  if (sscanf (buf, "%d %d %d %n", &red, &green, &blue, &num) == 3)
 	    {
-#ifdef HAVE_NTGUI
-	      int color = RGB (red, green, blue);
-#else
 	      int color = (red << 16) | (green << 8) | blue;
-#endif
 	      char *name = buf + num;
 	      ptrdiff_t len = strlen (name);
 	      len -= 0 < len && name[len - 1] == '\n';
@@ -6859,7 +6718,6 @@ where R,G,B are numbers between 0 and 255 and name is an arbitrary string.  */)
   unblock_input ();
   return cmap;
 }
-#endif
 
 
 /***********************************************************************
@@ -7082,9 +6940,7 @@ syms_of_xfaces (void)
 #endif
   defsubr (&Scolor_gray_p);
   defsubr (&Scolor_supported_p);
-#ifndef HAVE_X_WINDOWS
   defsubr (&Sx_load_color_file);
-#endif
   defsubr (&Sface_attribute_relative_p);
   defsubr (&Smerge_face_attribute);
   defsubr (&Sinternal_get_lisp_face_attribute);

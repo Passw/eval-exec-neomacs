@@ -62,7 +62,6 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 #endif /* HAVE_WINDOW_SYSTEM */
 
 
-#if defined(USE_CAIRO) || defined(HAVE_NS)
 #define RGB_TO_ULONG(r, g, b) (((r) << 16) | ((g) << 8) | (b))
 #define ARGB_TO_ULONG(a, r, g, b) (((a) << 24) | ((r) << 16) | ((g) << 8) | (b))
 #define RED_FROM_ULONG(color)	(((color) >> 16) & 0xff)
@@ -71,7 +70,6 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 #define RED16_FROM_ULONG(color)		(RED_FROM_ULONG (color) * 0x101)
 #define GREEN16_FROM_ULONG(color)	(GREEN_FROM_ULONG (color) * 0x101)
 #define BLUE16_FROM_ULONG(color)	(BLUE_FROM_ULONG (color) * 0x101)
-#endif
 
 #ifdef USE_CAIRO
 #define GET_PIXEL image_pix_context_get_pixel
@@ -85,14 +83,6 @@ static unsigned long image_alloc_image_color (struct frame *, struct image *,
 					      Lisp_Object, unsigned long);
 #endif	/* USE_CAIRO */
 
-#if defined HAVE_PGTK && defined HAVE_IMAGEMAGICK
-/* In pgtk, we don't want to create scaled image.  If we create scaled
- * image on scale=2.0 environment, the created image is half size and
- * Gdk scales it back, and the result is blurry.  To avoid this, we
- * hold original size image as far as we can, and let Gdk to scale it
- * when it is shown.  */
-# define DONT_CREATE_TRANSFORMED_IMAGEMAGICK_IMAGE
-#endif
 
 
 #define XBM_BIT_SHUFFLE(b) (b)
@@ -276,13 +266,10 @@ image_create_bitmap_from_data (struct frame *f, char *bits,
 
 typedef int image_fd;
 
-#if defined HAVE_HAIKU || defined HAVE_NS || defined HAVE_PGTK	\
-  || defined HAVE_ANDROID || defined HAVE_NTGUI || defined HAVE_NEOMACS
 static char *slurp_file (image_fd, ptrdiff_t *);
 static Lisp_Object image_find_image_fd (Lisp_Object, image_fd *);
 static bool xbm_read_bitmap_data (struct frame *, char *, char *,
 				  int *, int *, char **, bool);
-#endif
 
 /* Create bitmap from file FILE for frame F.  */
 
@@ -435,13 +422,6 @@ struct image_type
 
   /* Free such resources of image IMG as are used on frame F.  */
   void (*free_img) (struct frame *f, struct image *img);
-
-#ifdef WINDOWSNT
-  /* Initialization function (used for dynamic loading of image
-     libraries on Windows), or NULL if none.  */
-  bool (*init) (void);
-  /* An initializer for the init field.  */
-#endif
 };
 
 /* Forward function prototypes.  */
@@ -695,7 +675,7 @@ parse_image_spec (Lisp_Object spec, struct image_keyword *keywords,
 	}
 
       if (EQ (key, QCtype)
-	  && !(EQ (type, value) || EQ (type, Qnative_image)))
+	  && !EQ (type, value))
 	return false;
 
     maybe_done:
@@ -876,21 +856,6 @@ free_image (struct frame *f, struct image *img)
 
       c->images[img->id] = NULL;
 
-#if !defined USE_CAIRO && defined HAVE_XRENDER
-      /* FRAME_X_DISPLAY (f) could be NULL if this is being called from
-	 the display IO error handler.*/
-
-      if (FRAME_X_DISPLAY (f))
-	{
-	  if (img->picture)
-	    XRenderFreePicture (FRAME_X_DISPLAY (f),
-				img->picture);
-	  if (img->mask_picture)
-	    XRenderFreePicture (FRAME_X_DISPLAY (f),
-				img->mask_picture);
-	}
-#endif /* !USE_CAIRO && HAVE_XRENDER */
-
 	/* Free resources, then free IMG.  */
 	img->type->free_img (f, img);
 
@@ -942,7 +907,6 @@ prepare_image_for_display (struct frame *f, struct image *img)
   if (img->pixmap == NO_PIXMAP && !img->load_failed_p)
     img->load_failed_p = ! img->type->load_img (f, img);
 
-#ifdef USE_CAIRO
   if (!img->load_failed_p)
     {
       block_input ();
@@ -958,14 +922,6 @@ prepare_image_for_display (struct frame *f, struct image *img)
 	}
       unblock_input ();
     }
-#elif defined HAVE_X_WINDOWS || defined HAVE_ANDROID
-  if (!img->load_failed_p)
-    {
-      block_input ();
-      image_sync_to_pixmaps (f, img);
-      unblock_input ();
-    }
-#endif
 }
 
 
@@ -1152,17 +1108,8 @@ image_clear_image_1 (struct frame *f, struct image *img, int flags)
 	{
 	  FRAME_TERMINAL (f)->free_pixmap (f, img->pixmap);
 	  img->pixmap = NO_PIXMAP;
-	  /* NOTE (HAVE_NS): background color is NOT an indexed color! */
 	  img->background_valid = 0;
 	}
-#if (defined HAVE_X_WINDOWS || defined HAVE_ANDROID) && !defined USE_CAIRO
-      if (img->ximg)
-	{
-	  image_destroy_x_image (img->ximg);
-	  img->ximg = NULL;
-	  img->background_valid = 0;
-	}
-#endif
     }
 
   if (flags & CLEAR_IMAGE_MASK)
@@ -1173,34 +1120,20 @@ image_clear_image_1 (struct frame *f, struct image *img, int flags)
 	  img->mask = NO_PIXMAP;
 	  img->background_transparent_valid = 0;
 	}
-#if (defined HAVE_X_WINDOWS || defined HAVE_ANDROID) && !defined USE_CAIRO
-      if (img->mask_img)
-	{
-	  image_destroy_x_image (img->mask_img);
-	  img->mask_img = NULL;
-	  img->background_transparent_valid = 0;
-	}
-#endif
     }
 
   if ((flags & CLEAR_IMAGE_COLORS) && img->ncolors)
     {
-      /* W32_TODO: color table support.  */
-#if defined HAVE_X_WINDOWS && !defined USE_CAIRO
-      x_free_colors (f, img->colors, img->ncolors);
-#endif /* HAVE_X_WINDOWS && !USE_CAIRO */
       xfree (img->colors);
       img->colors = NULL;
       img->ncolors = 0;
     }
 
-#ifdef USE_CAIRO
   if (img->cr_data)
     {
       cairo_pattern_destroy (img->cr_data);
       img->cr_data = NULL;
     }
-#endif	/* USE_CAIRO */
 }
 
 /* Free X resources of image IMG which is used on frame F.  */
@@ -1541,45 +1474,12 @@ image_size_in_bytes (struct image *img)
 {
   intptr_t size = 0;
 
-#if defined USE_CAIRO
   Emacs_Pixmap pm = img->pixmap;
   if (pm)
     size += pm->height * pm->bytes_per_line;
   Emacs_Pixmap msk = img->mask;
   if (msk)
     size += msk->height * msk->bytes_per_line;
-
-#elif defined HAVE_X_WINDOWS || defined HAVE_ANDROID
-  /* Use a nominal depth of 24 and a bpp of 32 for pixmap and 1 bpp
-     for mask, to avoid having to query the server. */
-  if (img->pixmap != NO_PIXMAP)
-    size += img->width * img->height * 4;
-  if (img->mask != NO_PIXMAP)
-    size += img->width * img->height / 8;
-
-  if (img->ximg && img->ximg->data)
-    size += img->ximg->bytes_per_line * img->ximg->height;
-  if (img->mask_img && img->mask_img->data)
-    size += img->mask_img->bytes_per_line * img->mask_img->height;
-
-#elif defined HAVE_NS
-  if (img->pixmap)
-    size += ns_image_size_in_bytes (img->pixmap);
-  if (img->mask)
-    size += ns_image_size_in_bytes (img->mask);
-
-#elif defined HAVE_NTGUI
-  if (img->pixmap)
-    size += w32_image_size (img->pixmap);
-  if (img->mask)
-    size += w32_image_size (img->mask);
-
-#elif defined HAVE_HAIKU
-  if (img->pixmap)
-    size += BBitmap_bytes_length (img->pixmap);
-  if (img->mask)
-    size += BBitmap_bytes_length (img->mask);
-#endif
 
   return size;
 }
@@ -1972,13 +1872,7 @@ mark_image_cache (struct image_cache *c)
 static bool
 image_check_image_size (Emacs_Pix_Container ximg, int width, int height)
 {
-#if (defined HAVE_X_WINDOWS || defined HAVE_ANDROID) && !defined USE_CAIRO
-  return x_check_image_size (ximg, width, height);
-#else
-  /* FIXME: Implement this check for the HAVE_NS and HAVE_NTGUI cases.
-     For now, assume that every image size is allowed on these systems.  */
   return 1;
-#endif
 }
 
 /* Create an Emacs_Pix_Container and a pixmap of size WIDTH x
@@ -1996,7 +1890,6 @@ image_create_x_image_and_pixmap_1 (struct frame *f, int width, int height, int d
                                    Emacs_Pix_Container *pimg,
                                    Emacs_Pixmap *pixmap, Picture *picture)
 {
-#ifdef USE_CAIRO
   eassert (input_blocked_p ());
 
   /* Allocate a pixmap of the same size.  */
@@ -2010,15 +1903,6 @@ image_create_x_image_and_pixmap_1 (struct frame *f, int width, int height, int d
 
   *pimg = *pixmap;
   return 1;
-#elif defined HAVE_X_WINDOWS || defined HAVE_ANDROID
-  if (!x_create_x_image_and_pixmap (f, width, height, depth, pimg, pixmap))
-    return 0;
-
-  return 1;
-#endif /* HAVE_X_WINDOWS */
-
-
-
 }
 
 
@@ -2027,19 +1911,13 @@ image_create_x_image_and_pixmap_1 (struct frame *f, int width, int height, int d
 static void
 image_destroy_x_image (Emacs_Pix_Container pimg)
 {
-#if (defined HAVE_X_WINDOWS || defined HAVE_ANDROID) && !defined USE_CAIRO
-  x_destroy_x_image (pimg);
-#else
   eassert (input_blocked_p ());
   if (pimg)
     {
-#if defined USE_CAIRO || defined HAVE_HAIKU || defined HAVE_NS
-      /* On these systems, Emacs_Pix_Containers always point to the same
+      /* On Cairo, Emacs_Pix_Containers always point to the same
 	 data as pixmaps in `struct image', and therefore must never be
 	 freed separately.  */
-#endif	/* USE_CAIRO || HAVE_HAIKU || HAVE_NS */
     }
-#endif
 }
 
 
@@ -2051,19 +1929,7 @@ static void
 gui_put_x_image (struct frame *f, Emacs_Pix_Container pimg,
                  Emacs_Pixmap pixmap, int width, int height)
 {
-#if defined USE_CAIRO || defined HAVE_HAIKU || defined HAVE_NS
   eassert (pimg == pixmap);
-#elif defined HAVE_X_WINDOWS
-  GC gc;
-
-  eassert (input_blocked_p ());
-  gc = XCreateGC (FRAME_X_DISPLAY (f), pixmap, 0, NULL);
-  XPutImage (FRAME_X_DISPLAY (f), pixmap, gc, pimg, 0, 0, 0, 0,
-             pimg->width, pimg->height);
-  XFreeGC (FRAME_X_DISPLAY (f), gc);
-#elif defined HAVE_ANDROID
-  android_put_image (pixmap, pimg);
-#endif /* HAVE_ANDROID */
 }
 
 /* Thin wrapper for image_create_x_image_and_pixmap_1, so that it matches
@@ -2077,9 +1943,6 @@ image_create_x_image_and_pixmap (struct frame *f, struct image *img,
   eassert ((!mask_p ? img->pixmap : img->mask) == NO_PIXMAP);
 
   Picture *picture = NULL;
-#if !defined USE_CAIRO && defined HAVE_XRENDER
-  picture = !mask_p ? &img->picture : &img->mask_picture;
-#endif
   return image_create_x_image_and_pixmap_1 (f, width, height, depth, ximg,
                                             !mask_p ? &img->pixmap : &img->mask,
                                             picture);
@@ -2095,45 +1958,10 @@ static void
 image_put_x_image (struct frame *f, struct image *img, Emacs_Pix_Container ximg,
 		   bool mask_p)
 {
-#if (defined HAVE_X_WINDOWS || defined HAVE_ANDROID) && !defined USE_CAIRO
-  if (!mask_p)
-    {
-      eassert (img->ximg == NULL);
-      img->ximg = ximg;
-    }
-  else
-    {
-      eassert (img->mask_img == NULL);
-      img->mask_img = ximg;
-    }
-#else
   gui_put_x_image (f, ximg, !mask_p ? img->pixmap : img->mask,
                    img->width, img->height);
   image_destroy_x_image (ximg);
-#endif
 }
-
-#if (defined HAVE_X_WINDOWS || defined HAVE_ANDROID) && !defined USE_CAIRO
-/* Put the X images recorded in IMG on frame F into pixmaps, then free
-   the X images and their buffers.  */
-
-static void
-image_sync_to_pixmaps (struct frame *f, struct image *img)
-{
-  if (img->ximg)
-    {
-      gui_put_x_image (f, img->ximg, img->pixmap, img->width, img->height);
-      image_destroy_x_image (img->ximg);
-      img->ximg = NULL;
-    }
-  if (img->mask_img)
-    {
-      gui_put_x_image (f, img->mask_img, img->mask, img->width, img->height);
-      image_destroy_x_image (img->mask_img);
-      img->mask_img = NULL;
-    }
-}
-#endif
 
 /* Get the X image for IMG on frame F.  The resulting X image data
    should be treated as read-only at least on X.  */
@@ -2141,38 +1969,12 @@ image_sync_to_pixmaps (struct frame *f, struct image *img)
 static Emacs_Pix_Container
 image_get_x_image (struct frame *f, struct image *img, bool mask_p)
 {
-#if defined USE_CAIRO || defined (HAVE_HAIKU)
   return !mask_p ? img->pixmap : img->mask;
-#elif defined HAVE_X_WINDOWS || defined HAVE_ANDROID
-  XImage *ximg_in_img = !mask_p ? img->ximg : img->mask_img;
-
-  if (ximg_in_img)
-    return ximg_in_img;
-  else
-    return XGetImage (FRAME_X_DISPLAY (f), !mask_p ? img->pixmap : img->mask,
-		      0, 0, img->width, img->height, ~0, ZPixmap);
-#elif defined (HAVE_NS)
-  Emacs_Pix_Container pixmap = !mask_p ? img->pixmap : img->mask;
-
-  ns_retain_object (pixmap);
-  return pixmap;
-#endif
 }
 
 static void
 image_unget_x_image (struct image *img, bool mask_p, Emacs_Pix_Container ximg)
 {
-#ifdef USE_CAIRO
-#elif defined HAVE_X_WINDOWS || defined HAVE_ANDROID
-  XImage *ximg_in_img = !mask_p ? img->ximg : img->mask_img;
-
-  if (ximg_in_img)
-    eassert (ximg == ximg_in_img);
-  else
-    XDestroyImage (ximg);
-#elif defined (HAVE_NS)
-  ns_release_object (ximg);
-#endif
 }
 
 
@@ -2620,7 +2422,6 @@ Create_Pixmap_From_Bitmap_Data (struct frame *f, struct image *img, char *data,
 				RGB_PIXEL_COLOR fg, RGB_PIXEL_COLOR bg,
 				bool non_default_colors)
 {
-#ifdef USE_CAIRO
   if (FRAME_TERMINAL (f)->query_colors)
     {
       Emacs_Color fgbg[] = {{.pixel = fg}, {.pixel = bg}};
@@ -2633,53 +2434,6 @@ Create_Pixmap_From_Bitmap_Data (struct frame *f, struct image *img, char *data,
   img->pixmap
     = image_pix_container_create_from_bitmap_data (data, img->width,
 						   img->height, fg, bg);
-#elif defined HAVE_X_WINDOWS
-  img->pixmap
-    = XCreatePixmapFromBitmapData (FRAME_X_DISPLAY (f),
-				   FRAME_X_DRAWABLE (f),
-				   data,
-				   img->width, img->height,
-				   fg, bg,
-				   FRAME_DISPLAY_INFO (f)->n_planes);
-# if !defined USE_CAIRO && defined HAVE_XRENDER
-  if (img->pixmap)
-    img->picture = x_create_xrender_picture (f, img->pixmap, 0);
-# endif
-
-#elif defined HAVE_ANDROID
-#ifndef ANDROID_STUBIFY
-  img->pixmap
-    = android_create_pixmap_from_bitmap_data (data, img->width, img->height,
-					      fg, bg,
-					      FRAME_DISPLAY_INFO (f)->n_planes);
-#else
-  emacs_abort ();
-#endif
-#elif defined HAVE_NTGUI
-  img->pixmap
-    = w32_create_pixmap_from_bitmap_data (img->width, img->height, data);
-
-  /* If colors were specified, transfer the bitmap to a color one.  */
-  if (non_default_colors)
-    convert_mono_to_color_image (f, img, fg, bg);
-#elif defined HAVE_NS
-  img->pixmap = ns_image_from_XBM (data, img->width, img->height, fg, bg);
-#elif defined HAVE_HAIKU
-  img->pixmap = BBitmap_new (img->width, img->height, 0);
-
-  if (img->pixmap)
-    {
-      int bytes_per_line = (img->width + 7) / 8;
-
-      for (int y = 0; y < img->height; y++)
-	{
-	  for (int x = 0; x < img->width; x++)
-	    PUT_PIXEL (img->pixmap, x, y,
-		       (data[x / 8] >> (x % 8)) & 1 ? fg : bg);
-	  data += bytes_per_line;
-	}
-    }
-#endif
 }
 
 
@@ -3085,17 +2839,6 @@ enum xpm_keyword_index
 };
 
 
-#if defined HAVE_X_WINDOWS && !defined USE_CAIRO
-
-/* Define ALLOC_XPM_COLORS if we can use Emacs's own color allocation
-   functions for allocating image colors.  Our own functions handle
-   color allocation failures more gracefully than the ones on the XPM
-   lib.  */
-
-#if defined XpmAllocColor && defined XpmFreeColors && defined XpmColorClosure
-#define ALLOC_XPM_COLORS
-#endif
-#endif /* HAVE_X_WINDOWS && !USE_CAIRO */
 
 #ifdef ALLOC_XPM_COLORS
 
@@ -3265,47 +3008,6 @@ xpm_free_colors (Display *dpy, Colormap cmap, Pixel *pixels, int npixels, void *
 #endif /* ALLOC_XPM_COLORS */
 
 
-#ifdef WINDOWSNT
-
-/* XPM library details.  */
-
-DEF_DLL_FN (void, XpmFreeAttributes, (XpmAttributes *));
-DEF_DLL_FN (int, XpmCreateImageFromBuffer,
-	    (Display *, char *, xpm_XImage **,
-	     xpm_XImage **, XpmAttributes *));
-DEF_DLL_FN (int, XpmReadFileToImage,
-	    (Display *, char *, xpm_XImage **,
-	     xpm_XImage **, XpmAttributes *));
-DEF_DLL_FN (void, XImageFree, (xpm_XImage *));
-
-static bool
-init_xpm_functions (void)
-{
-  HMODULE library;
-
-  if (!(library = w32_delayed_load (Qxpm)))
-    return 0;
-
-  LOAD_DLL_FN (library, XpmFreeAttributes);
-  LOAD_DLL_FN (library, XpmCreateImageFromBuffer);
-  LOAD_DLL_FN (library, XpmReadFileToImage);
-  LOAD_DLL_FN (library, XImageFree);
-  return 1;
-}
-
-# undef XImageFree
-# undef XpmCreateImageFromBuffer
-# undef XpmFreeAttributes
-# undef XpmReadFileToImage
-
-# define XImageFree fn_XImageFree
-# define XpmCreateImageFromBuffer fn_XpmCreateImageFromBuffer
-# define XpmFreeAttributes fn_XpmFreeAttributes
-# define XpmReadFileToImage fn_XpmReadFileToImage
-
-#endif /* WINDOWSNT */
-
-
 #endif /* HAVE_XPM || USE_CAIRO || HAVE_NS || HAVE_HAIKU || HAVE_ANDROID */
 
 
@@ -3313,494 +3015,6 @@ init_xpm_functions (void)
    true if successful.  */
 
 
-#if (defined USE_CAIRO && defined HAVE_XPM)	\
-  || (defined HAVE_NS && !defined HAVE_XPM)	\
-  || (defined HAVE_HAIKU && !defined HAVE_XPM)  \
-  || (defined HAVE_PGTK && !defined HAVE_XPM)	\
-  || (defined HAVE_ANDROID && !defined HAVE_XPM)
-
-/* XPM support functions for NS, Haiku and Android where libxpm is not
-   available, and for Cairo.  Only XPM version 3 (without any
-   extensions) is supported.  */
-
-static void xpm_put_color_table_v (Lisp_Object, const char *,
-                                   int, Lisp_Object);
-static Lisp_Object xpm_get_color_table_v (Lisp_Object, const char *, int);
-static void xpm_put_color_table_h (Lisp_Object, const char *,
-                                   int, Lisp_Object);
-static Lisp_Object xpm_get_color_table_h (Lisp_Object, const char *, int);
-
-/* Tokens returned from xpm_scan.  */
-
-enum xpm_token
-{
-  XPM_TK_IDENT = 256,
-  XPM_TK_STRING,
-  XPM_TK_EOF
-};
-
-/* Scan an XPM data and return a character (< 256) or a token defined
-   by enum xpm_token above.  *S and END are the start (inclusive) and
-   the end (exclusive) addresses of the data, respectively.  Advance
-   *S while scanning.  If token is either XPM_TK_IDENT or
-   XPM_TK_STRING, *BEG and *LEN are set to the start address and the
-   length of the corresponding token, respectively.  */
-
-static int
-xpm_scan (const char **s, const char *end, const char **beg, ptrdiff_t *len)
-{
-  unsigned char c;
-
-  while (*s < end)
-    {
-      /* Skip white-space.  */
-      do
-	c = *(*s)++;
-      while (c_isspace (c) && *s < end);
-
-      /* gnus-pointer.xpm uses '-' in its identifier.
-	 sb-dir-plus.xpm uses '+' in its identifier.  */
-      if (c_isalpha (c) || c == '_' || c == '-' || c == '+')
-	{
-	  *beg = *s - 1;
-	  while (*s < end
-		 && (c = **s, c_isalnum (c)
-		     || c == '_' || c == '-' || c == '+'))
-	      ++*s;
-	  *len = *s - *beg;
-	  return XPM_TK_IDENT;
-	}
-      else if (c == '"')
-	{
-	  *beg = *s;
-	  while (*s < end && **s != '"')
-	    ++*s;
-	  *len = *s - *beg;
-	  if (*s < end)
-	    ++*s;
-	  return XPM_TK_STRING;
-	}
-      else if (c == '/')
-	{
-	  if (*s < end && **s == '*')
-	    {
-	      /* C-style comment.  */
-	      ++*s;
-	      do
-		{
-		  while (*s < end && *(*s)++ != '*')
-		    ;
-		}
-	      while (*s < end && **s != '/');
-	      if (*s < end)
-		++*s;
-	    }
-	  else
-	    return c;
-	}
-      else
-	return c;
-    }
-
-  return XPM_TK_EOF;
-}
-
-/* Functions for color table lookup in XPM data.  A key is a string
-   specifying the color of each pixel in XPM data.  A value is either
-   an integer that specifies a pixel color, Qt that specifies
-   transparency, or Qnil for the unspecified color.  If the length of
-   the key string is one, a vector is used as a table.  Otherwise, a
-   hash table is used.  */
-
-static Lisp_Object
-xpm_make_color_table_v (void (**put_func) (Lisp_Object, const char *, int,
-                                           Lisp_Object),
-                        Lisp_Object (**get_func) (Lisp_Object, const char *,
-                                                  int))
-{
-  *put_func = xpm_put_color_table_v;
-  *get_func = xpm_get_color_table_v;
-  return make_nil_vector (256);
-}
-
-static void
-xpm_put_color_table_v (Lisp_Object color_table,
-                       const char *chars_start,
-                       int chars_len,
-                       Lisp_Object color)
-{
-  unsigned char uc = *chars_start;
-  ASET (color_table, uc, color);
-}
-
-static Lisp_Object
-xpm_get_color_table_v (Lisp_Object color_table,
-                       const char *chars_start,
-                       int chars_len)
-{
-  unsigned char uc = *chars_start;
-  return AREF (color_table, uc);
-}
-
-static Lisp_Object
-xpm_make_color_table_h (void (**put_func) (Lisp_Object, const char *, int,
-                                           Lisp_Object),
-                        Lisp_Object (**get_func) (Lisp_Object, const char *,
-                                                  int))
-{
-  *put_func = xpm_put_color_table_h;
-  *get_func = xpm_get_color_table_h;
-  return make_hash_table (&hashtest_equal, DEFAULT_HASH_SIZE, Weak_None);
-}
-
-static void
-xpm_put_color_table_h (Lisp_Object color_table,
-                       const char *chars_start,
-                       int chars_len,
-                       Lisp_Object color)
-{
-  struct Lisp_Hash_Table *table = XHASH_TABLE (color_table);
-  Lisp_Object chars = make_unibyte_string (chars_start, chars_len);
-
-  hash_hash_t hash_code;
-  hash_find_get_hash (table, chars, &hash_code);
-  hash_put (table, chars, color, hash_code);
-}
-
-static Lisp_Object
-xpm_get_color_table_h (Lisp_Object color_table,
-                       const char *chars_start,
-                       int chars_len)
-{
-  struct Lisp_Hash_Table *table = XHASH_TABLE (color_table);
-  ptrdiff_t i =
-    hash_find (table, make_unibyte_string (chars_start, chars_len));
-
-  return i >= 0 ? HASH_VALUE (table, i) : Qnil;
-}
-
-enum xpm_color_key {
-  XPM_COLOR_KEY_S,
-  XPM_COLOR_KEY_M,
-  XPM_COLOR_KEY_G4,
-  XPM_COLOR_KEY_G,
-  XPM_COLOR_KEY_C
-};
-
-static const char xpm_color_key_strings[][4] = {"s", "m", "g4", "g", "c"};
-
-static int
-xpm_str_to_color_key (const char *s)
-{
-  for (int i = 0; i < ARRAYELTS (xpm_color_key_strings); i++)
-    if (strcmp (xpm_color_key_strings[i], s) == 0)
-      return i;
-  return -1;
-}
-
-static int
-xpm_str_to_int (char **buf)
-{
-  char *p;
-
-  errno = 0;
-  long result = strtol (*buf, &p, 10);
-  if (errno || p == *buf || result < INT_MIN || result > INT_MAX)
-    return -1;
-
-  /* Error out if we see something like "12x3xyz".  */
-  if (!c_isspace (*p) && *p != '\0')
-    return -1;
-
-  /* Update position to read next integer.  */
-  *buf = p;
-
-  return result;
-}
-
-static bool
-xpm_load_image (struct frame *f,
-                struct image *img,
-                const char *contents,
-                const char *end)
-{
-  const char *s = contents, *beg, *str;
-  char buffer[BUFSIZ];
-  int width, height, x, y;
-  int num_colors, chars_per_pixel;
-  ptrdiff_t len;
-  int LA1;
-  void (*put_color_table) (Lisp_Object, const char *, int, Lisp_Object);
-  Lisp_Object (*get_color_table) (Lisp_Object, const char *, int);
-  Lisp_Object frame, color_symbols, color_table;
-  int best_key;
-  bool have_mask = false;
-  Emacs_Pix_Container ximg = NULL, mask_img = NULL;
-
-#define match() \
-     LA1 = xpm_scan (&s, end, &beg, &len)
-
-#define expect(TOKEN)		\
-  do				\
-    {				\
-      if (LA1 != (TOKEN)) 	\
-	goto failure;		\
-      match ();			\
-    }				\
-  while (0)
-
-#define expect_ident(IDENT)					\
-     if (LA1 == XPM_TK_IDENT \
-         && strlen (IDENT) == len && memcmp (IDENT, beg, len) == 0)	\
-       match ();						\
-     else							\
-       goto failure
-
-  if (!(end - s >= 9 && memcmp (s, "/* XPM */", 9) == 0))
-    goto failure;
-  s += 9;
-  match ();
-  expect_ident ("static");
-  expect_ident ("char");
-  expect ('*');
-  expect (XPM_TK_IDENT);
-  expect ('[');
-  expect (']');
-  expect ('=');
-  expect ('{');
-  expect (XPM_TK_STRING);
-  if (len >= BUFSIZ)
-    goto failure;
-  memcpy (buffer, beg, len);
-  buffer[len] = '\0';
-  char *next_int = buffer;
-  if ((width = xpm_str_to_int (&next_int)) <= 0)
-    goto failure;
-  if ((height = xpm_str_to_int (&next_int)) <= 0)
-    goto failure;
-  if ((num_colors = xpm_str_to_int (&next_int)) <= 0)
-    goto failure;
-  if ((chars_per_pixel = xpm_str_to_int (&next_int)) <= 0)
-    goto failure;
-
-  if (!check_image_size (f, width, height))
-    {
-      image_size_error ();
-      goto failure;
-    }
-
-  if (!image_create_x_image_and_pixmap (f, img, width, height, 0, &ximg, 0)
-      || !image_create_x_image_and_pixmap (f, img, width, height, 1,
-					   &mask_img, 1)
-      )
-    {
-      image_error ("Image too large");
-      goto failure;
-    }
-
-  expect (',');
-
-  XSETFRAME (frame, f);
-
-  if (!NILP (Fxw_display_color_p (frame)))
-    best_key = XPM_COLOR_KEY_C;
-  else if (!NILP (Fx_display_grayscale_p (frame)))
-    best_key = (XFIXNAT (Fx_display_planes (frame)) > 2
-		? XPM_COLOR_KEY_G : XPM_COLOR_KEY_G4);
-  else
-    best_key = XPM_COLOR_KEY_M;
-
-  color_symbols = image_spec_value (img->spec, QCcolor_symbols, NULL);
-  if (chars_per_pixel == 1)
-    color_table = xpm_make_color_table_v (&put_color_table,
-					  &get_color_table);
-  else
-    color_table = xpm_make_color_table_h (&put_color_table,
-					  &get_color_table);
-
-  while (num_colors-- > 0)
-    {
-      char *color, *max_color = NULL;
-      int key, next_key, max_key = 0;
-      Lisp_Object symbol_color = Qnil, color_val;
-      Emacs_Color cdef;
-
-      expect (XPM_TK_STRING);
-      if (len <= chars_per_pixel || len >= BUFSIZ + chars_per_pixel)
-	goto failure;
-      memcpy (buffer, beg + chars_per_pixel, len - chars_per_pixel);
-      buffer[len - chars_per_pixel] = '\0';
-
-      str = strtok (buffer, " \t");
-      if (str == NULL)
-	goto failure;
-      key = xpm_str_to_color_key (str);
-      if (key < 0)
-	goto failure;
-      do
-	{
-	  color = strtok (NULL, " \t");
-	  if (color == NULL)
-	    goto failure;
-
-	  while ((str = strtok (NULL, " \t")) != NULL)
-	    {
-	      next_key = xpm_str_to_color_key (str);
-	      if (next_key >= 0)
-		break;
-	      color[strlen (color)] = ' ';
-	    }
-
-	  if (key == XPM_COLOR_KEY_S)
-	    {
-	      if (NILP (symbol_color))
-		symbol_color = build_string (color);
-	    }
-	  else if (max_key < key && key <= best_key)
-	    {
-	      max_key = key;
-	      max_color = color;
-	    }
-	  key = next_key;
-	}
-      while (str);
-
-      color_val = Qnil;
-      if (!NILP (color_symbols) && !NILP (symbol_color))
-	{
-	  Lisp_Object specified_color = Fassoc (symbol_color, color_symbols, Qnil);
-
-	  if (CONSP (specified_color) && STRINGP (XCDR (specified_color)))
-	    {
-	      if (xstrcasecmp (SSDATA (XCDR (specified_color)), "None") == 0)
-		color_val = Qt;
-	      else if (FRAME_TERMINAL (f)->defined_color_hook
-                       (f, SSDATA (XCDR (specified_color)), &cdef, false, false))
-		color_val
-		  = make_fixnum (lookup_rgb_color (f, cdef.red, cdef.green,
-						   cdef.blue));
-	    }
-	}
-      if (NILP (color_val) && max_color)
-	{
-	  if (xstrcasecmp (max_color, "None") == 0)
-	    color_val = Qt;
-	  else if (FRAME_TERMINAL (f)->defined_color_hook
-                   (f, max_color, &cdef, false, false))
-	    color_val = make_fixnum (lookup_rgb_color (f, cdef.red, cdef.green,
-						       cdef.blue));
-	}
-      if (!NILP (color_val))
-	(*put_color_table) (color_table, beg, chars_per_pixel, color_val);
-
-      expect (',');
-    }
-
-  unsigned long frame_fg = FRAME_FOREGROUND_PIXEL (f);
-#ifdef USE_CAIRO
-  {
-    Emacs_Color color = {.pixel = frame_fg};
-    FRAME_TERMINAL (f)->query_colors (f, &color, 1);
-    frame_fg = lookup_rgb_color (f, color.red, color.green, color.blue);
-  }
-#endif
-  for (y = 0; y < height; y++)
-    {
-      expect (XPM_TK_STRING);
-      str = beg;
-      if (len < width * chars_per_pixel)
-	goto failure;
-      for (x = 0; x < width; x++, str += chars_per_pixel)
-	{
-	  Lisp_Object color_val =
-	    (*get_color_table) (color_table, str, chars_per_pixel);
-
-	  PUT_PIXEL (ximg, x, y,
-		     FIXNUMP (color_val) ? XFIXNUM (color_val) : frame_fg);
-	  PUT_PIXEL (mask_img, x, y,
-		     (!EQ (color_val, Qt) ? PIX_MASK_DRAW
-		      : (have_mask = true, PIX_MASK_RETAIN)));
-	}
-      if (y + 1 < height)
-	expect (',');
-    }
-
-  img->width = width;
-  img->height = height;
-
-  /* Maybe fill in the background field while we have ximg handy. */
-  if (NILP (image_spec_value (img->spec, QCbackground, NULL)))
-    IMAGE_BACKGROUND (img, f, ximg);
-
-  image_put_x_image (f, img, ximg, 0);
-  if (have_mask)
-    {
-      /* Fill in the background_transparent field while we have the
-	 mask handy.  */
-      image_background_transparent (img, f, mask_img);
-
-      image_put_x_image (f, img, mask_img, 1);
-    }
-  else
-    {
-      image_destroy_x_image (mask_img);
-      image_clear_image_1 (f, img, CLEAR_IMAGE_MASK);
-    }
-  return 1;
-
- failure:
-  image_error ("Invalid XPM3 file (%s)", img->spec);
-  if (ximg)
-    {
-      image_destroy_x_image (ximg);
-      if (mask_img)
-	image_destroy_x_image (mask_img);
-      image_clear_image (f, img);
-    }
-  return 0;
-
-#undef match
-#undef expect
-#undef expect_ident
-}
-
-static bool
-xpm_load (struct frame *f,
-          struct image *img)
-{
-  bool success_p = 0;
-  Lisp_Object file_name;
-
-  /* If IMG->spec specifies a file name, create a non-file spec from it.  */
-  file_name = image_spec_value (img->spec, QCfile, NULL);
-  if (STRINGP (file_name))
-    {
-      ptrdiff_t size;
-      char *contents = slurp_image (file_name, &size, "XPM");
-      if (contents == NULL)
-	return false;
-
-      success_p = xpm_load_image (f, img, contents, contents + size);
-      xfree (contents);
-    }
-  else
-    {
-      Lisp_Object data;
-
-      data = image_spec_value (img->spec, QCdata, NULL);
-      if (!STRINGP (data))
-	{
-	  image_invalid_data_error (data);
-	  return false;
-	}
-      success_p = xpm_load_image (f, img, SSDATA (data),
-				  SSDATA (data) + SBYTES (data));
-    }
-
-  return success_p;
-}
-
-#endif /* HAVE_NS && !HAVE_XPM */
 
 
 
@@ -4276,15 +3490,11 @@ image_edge_detection (struct frame *f, struct image *img,
 }
 
 
-#if defined HAVE_X_WINDOWS || defined USE_CAIRO || defined HAVE_HAIKU	\
-  || defined HAVE_ANDROID
-
 static void
 image_pixmap_draw_cross (struct frame *f, Emacs_Pixmap pixmap,
 			 int x, int y, unsigned int width, unsigned int height,
 			 unsigned long color)
 {
-#ifdef USE_CAIRO
   cairo_surface_t *surface
     = cairo_image_surface_create_for_data ((unsigned char *) pixmap->data,
 					   (pixmap->bits_per_pixel == 32
@@ -4304,32 +3514,7 @@ image_pixmap_draw_cross (struct frame *f, Emacs_Pixmap pixmap,
   cairo_set_line_width (cr, 1);
   cairo_stroke (cr);
   cairo_destroy (cr);
-#elif HAVE_X_WINDOWS
-  Display *dpy = FRAME_X_DISPLAY (f);
-  GC gc = XCreateGC (dpy, pixmap, 0, NULL);
-
-  XSetForeground (dpy, gc, color);
-  XDrawLine (dpy, pixmap, gc, x, y, x + width - 1, y + height - 1);
-  XDrawLine (dpy, pixmap, gc, x, y + height - 1, x + width - 1, y);
-  XFreeGC (dpy, gc);
-#elif HAVE_HAIKU
-  be_draw_cross_on_pixmap (pixmap, x, y, width, height, color);
-#elif HAVE_ANDROID
-#ifndef ANDROID_STUBIFY
-  struct android_gc *gc;
-
-  gc = android_create_gc (0, NULL);
-  android_set_foreground (gc, color);
-  android_draw_line (pixmap, gc, x, y, x + width - 1, y + height - 1);
-  android_draw_line (pixmap, gc, x, y + height - 1, x + width - 1, y);
-  android_free_gc (gc);
-#else
-  emacs_abort ();
-#endif
-#endif
 }
-
-#endif	/* HAVE_X_WINDOWS || USE_CAIRO || HAVE_HAIKU */
 
 /* Transform image IMG on frame F so that it looks disabled.  */
 
@@ -4365,25 +3550,14 @@ image_disable_image (struct frame *f, struct image *img)
      should.  */
   if (n_planes < 2 || cross_disabled_images)
     {
-#ifndef HAVE_NS  /* TODO: NS support, however this not needed for toolbars */
-
-#if !defined USE_CAIRO && !defined HAVE_HAIKU && !defined HAVE_ANDROID
-#define CrossForeground(f) BLACK_PIX_DEFAULT (f)
-#define MaskForeground(f)  WHITE_PIX_DEFAULT (f)
-#else  /* USE_CAIRO || HAVE_HAIKU */
 #define CrossForeground(f) 0
 #define MaskForeground(f)  PIX_MASK_DRAW
-#endif	/* USE_CAIRO || HAVE_HAIKU */
 
-#if !defined USE_CAIRO && !defined HAVE_HAIKU
-      image_sync_to_pixmaps (f, img);
-#endif	/* !USE_CAIRO && !HAVE_HAIKU */
       image_pixmap_draw_cross (f, img->pixmap, 0, 0, img->width, img->height,
 			       CrossForeground (f));
       if (img->mask)
 	image_pixmap_draw_cross (f, img->mask, 0, 0, img->width, img->height,
 				 MaskForeground (f));
-#endif /* !HAVE_NS */
     }
 }
 
@@ -4846,79 +4020,6 @@ pbm_load (struct frame *f, struct image *img)
 			    NATIVE IMAGE HANDLING
  ***********************************************************************/
 
-#if HAVE_NATIVE_IMAGE_API
-static bool
-image_can_use_native_api (Lisp_Object type)
-{
-  return false;
-}
-
-/*
- * These functions are actually defined in the OS-native implementation file.
- * Currently, for Windows GDI+ interface, w32image.c, and nsimage.m for macOS.
- */
-
-/* Indices of image specification fields in native format, below.  */
-enum native_image_keyword_index
-{
-  NATIVE_IMAGE_TYPE,
-  NATIVE_IMAGE_DATA,
-  NATIVE_IMAGE_FILE,
-  NATIVE_IMAGE_ASCENT,
-  NATIVE_IMAGE_MARGIN,
-  NATIVE_IMAGE_RELIEF,
-  NATIVE_IMAGE_ALGORITHM,
-  NATIVE_IMAGE_HEURISTIC_MASK,
-  NATIVE_IMAGE_MASK,
-  NATIVE_IMAGE_BACKGROUND,
-  NATIVE_IMAGE_INDEX,
-  NATIVE_IMAGE_LAST
-};
-
-/* Vector of image_keyword structures describing the format
-   of valid user-defined image specifications.  */
-static const struct image_keyword native_image_format[NATIVE_IMAGE_LAST] =
-{
-  {":type",		IMAGE_SYMBOL_VALUE,			1},
-  {":data",		IMAGE_STRING_VALUE,			0},
-  {":file",		IMAGE_STRING_VALUE,			0},
-  {":ascent",		IMAGE_ASCENT_VALUE,			0},
-  {":margin",		IMAGE_NON_NEGATIVE_INTEGER_VALUE_OR_PAIR, 0},
-  {":relief",		IMAGE_INTEGER_VALUE,			0},
-  {":conversion",	IMAGE_DONT_CHECK_VALUE_TYPE,		0},
-  {":heuristic-mask",	IMAGE_DONT_CHECK_VALUE_TYPE,		0},
-  {":mask",		IMAGE_DONT_CHECK_VALUE_TYPE,		0},
-  {":background",	IMAGE_STRING_OR_NIL_VALUE,		0},
-  {":index",		IMAGE_NON_NEGATIVE_INTEGER_VALUE,	0}
-};
-
-/* Return true if OBJECT is a valid native API image specification.  */
-
-static bool
-native_image_p (Lisp_Object object)
-{
-  struct image_keyword fmt[NATIVE_IMAGE_LAST];
-  memcpy (fmt, native_image_format, sizeof fmt);
-
-  if (!parse_image_spec (object, fmt, NATIVE_IMAGE_LAST, Qnative_image))
-    return false;
-
-  /* Must specify either the :data or :file keyword.  */
-  return fmt[NATIVE_IMAGE_FILE].count + fmt[NATIVE_IMAGE_DATA].count == 1;
-}
-
-static bool
-native_image_load (struct frame *f, struct image *img)
-{
-  Lisp_Object image_file = image_spec_value (img->spec, QCfile, NULL);
-
-  if (STRINGP (image_file))
-    image_file = image_find_image_file (image_file);
-
-  return 0;
-}
-
-#endif	/* HAVE_NATIVE_IMAGE_API */
 
 
 /***********************************************************************
@@ -5131,9 +4232,6 @@ gif_image_p (Lisp_Object object)
 				Ghostscript
  ***********************************************************************/
 
-#if defined HAVE_X_WINDOWS && !defined USE_CAIRO
-#define HAVE_GHOSTSCRIPT 1
-#endif /* HAVE_X_WINDOWS && !USE_CAIRO */
 
 #ifdef HAVE_GHOSTSCRIPT
 
@@ -5403,28 +4501,6 @@ the library file(s) specified by `dynamic-library-alist'.  */)
 static bool
 initialize_image_type (struct image_type const *type)
 {
-#ifdef WINDOWSNT
-  Lisp_Object typesym = builtin_lisp_symbol (type->type);
-
-# if HAVE_NATIVE_IMAGE_API
-  if (image_can_use_native_api (typesym))
-    return true;
-# endif
-
-  Lisp_Object tested = Fassq (typesym, Vlibrary_cache);
-  /* If we failed to load the library before, don't try again.  */
-  if (CONSP (tested))
-    return !NILP (XCDR (tested));
-
-  bool (*init) (void) = type->init;
-  if (init)
-    {
-      bool type_valid = init ();
-      Vlibrary_cache = Fcons (Fcons (typesym, type_valid ? Qt : Qnil),
-			      Vlibrary_cache);
-      return type_valid;
-    }
-#endif
   return true;
 }
 
@@ -5751,11 +4827,6 @@ static struct image_type const image_types[] =
  { SYMBOL_INDEX (Qpbm), pbm_image_p, pbm_load, image_clear_image },
 };
 
-#if HAVE_NATIVE_IMAGE_API
-static struct image_type native_image_type =
-  { SYMBOL_INDEX (Qnative_image), native_image_p, native_image_load,
-    image_clear_image };
-#endif
 
 /* Look up image TYPE, and return a pointer to its image_type structure.
    Return a null pointer if TYPE is not a known image type.  */
@@ -5763,11 +4834,6 @@ static struct image_type native_image_type =
 static struct image_type const *
 lookup_image_type (Lisp_Object type)
 {
-#if HAVE_NATIVE_IMAGE_API
-  if (image_can_use_native_api (type))
-    return &native_image_type;
-#endif
-
   for (int i = 0; i < ARRAYELTS (image_types); i++)
     {
       struct image_type const *r = &image_types[i];
@@ -5854,24 +4920,6 @@ non-numeric, there is no explicit limit on the size of images.  */);
   DEFSYM (Qgs_load_image, "gs-load-image");
 #endif /* HAVE_GHOSTSCRIPT */
 
-#ifdef WINDOWSNT
-  /* Versions of libpng, libgif, and libjpeg that we were compiled with,
-     or -1 if no PNG/GIF support was compiled in.  This is tested by
-     w32-win.el to correctly set up the alist used to search for the
-     respective image libraries.  */
-  DEFSYM (Qlibpng_version, "libpng-version");
-  Fset (Qlibpng_version,
-	make_fixnum (-1)
-	);
-  DEFSYM (Qlibgif_version, "libgif-version");
-  Fset (Qlibgif_version,
-	make_fixnum (-1)
-        );
-  DEFSYM (Qlibjpeg_version, "libjpeg-version");
-  Fset (Qlibjpeg_version,
-	make_fixnum (-1)
-	);
-#endif
 
   DEFSYM (Qpbm, "pbm");
   add_image_type (Qpbm);
@@ -5891,13 +4939,8 @@ non-numeric, there is no explicit limit on the size of images.  */);
   DEFSYM (Qtiff, "tiff"); add_image_type (Qtiff);
   DEFSYM (Qwebp, "webp"); add_image_type (Qwebp);
   DEFSYM (Qsvg, "svg");   add_image_type (Qsvg);
+  DEFSYM (Qxpm, "xpm");   add_image_type (Qxpm);
 
-#if defined (HAVE_XPM) || defined (HAVE_NS) \
-  || defined (HAVE_HAIKU) || defined (HAVE_PGTK) \
-  || defined (HAVE_ANDROID)
-  DEFSYM (Qxpm, "xpm");
-  add_image_type (Qxpm);
-#endif
 
 
 
@@ -5910,38 +4953,9 @@ non-numeric, there is no explicit limit on the size of images.  */);
   DEFSYM (Qwebpdemux, "webpdemux");
 #endif
 
-#if defined (HAVE_IMAGEMAGICK)
-  DEFSYM (Qimagemagick, "imagemagick");
-  add_image_type (Qimagemagick);
-#endif
-
-#if defined (HAVE_RSVG)
-  DEFSYM (Qsvg, "svg");
-  DEFSYM (QCbase_uri, ":base-uri");
-  DEFSYM (QCcss, ":css");
-  add_image_type (Qsvg);
-#elif defined HAVE_NATIVE_IMAGE_API			\
-  && (defined HAVE_NS || defined HAVE_HAIKU)
-  DEFSYM (Qsvg, "svg");
-
-  /* On Haiku, the SVG translator may not be installed.  On GNUstep, SVG
-     support is provided by ImageMagick so not guaranteed.  Furthermore,
-     some distros (e.g., Debian) ship ImageMagick's SVG module in a
-     separate binary package which may not be installed.  */
-  if (image_can_use_native_api (Qsvg))
-    add_image_type (Qsvg);
-#endif
 
 
-#if HAVE_NATIVE_IMAGE_API
-  DEFSYM (Qnative_image, "native-image");
 
-# if defined HAVE_NTGUI || defined HAVE_HAIKU
-  DEFSYM (Qbmp, "bmp");
-  add_image_type (Qbmp);
-# endif
-
-#endif
 
   defsubr (&Sinit_image_library);
   defsubr (&Sclear_image_cache);

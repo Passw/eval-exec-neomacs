@@ -45,10 +45,6 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 #include "fontset.h"
 #endif
 #include "cm.h"
-#ifdef MSDOS
-#include "msdos.h"
-#include "dosfns.h"
-#endif
 #include "pdumper.h"
 
 #define NLOG_MODULE "frame"
@@ -203,9 +199,6 @@ frame_inhibit_resize (struct frame *f, bool horizontal, Lisp_Object parameter)
 
   return (EQ (frame_inhibit_implied_resize, Qforce)
 	  || (f->after_make_frame
-#ifdef USE_GTK
-	      && f->tool_bar_resized
-#endif
 	      && (EQ (frame_inhibit_implied_resize, Qt)
 		  || (CONSP (frame_inhibit_implied_resize)
 		      && !NILP (Fmemq (parameter, frame_inhibit_implied_resize)))
@@ -1022,20 +1015,6 @@ adjust_frame_size (struct frame *f, int new_text_width, int new_text_height,
 
   block_input ();
 
-#ifdef MSDOS
-  if (!FRAME_PARENT_FRAME (f))
-    {
-      /* We only can set screen dimensions to certain values supported
-	 by our video hardware.  Try to find the smallest size greater
-	 or equal to the requested dimensions, while accounting for the
-	 fact that the menu-bar lines are not counted in the frame
-	 height.  */
-      int dos_new_text_lines = new_text_lines + FRAME_TOP_MARGIN (f);
-
-      dos_set_window_size (&dos_new_text_lines, &new_text_cols);
-      new_text_lines = dos_new_text_lines - FRAME_TOP_MARGIN (f);
-    }
-#endif
 
   if (new_inner_width != old_inner_width)
     {
@@ -1185,9 +1164,7 @@ make_frame (bool mini_p)
   f->horizontal_scroll_bars = false;
   f->want_fullscreen = FULLSCREEN_NONE;
   f->undecorated = false;
-#ifndef HAVE_NTGUI
   f->override_redirect = false;
-#endif
   f->skip_taskbar = false;
   f->no_focus_on_map = false;
   f->no_accept_focus = false;
@@ -1201,10 +1178,6 @@ make_frame (bool mini_p)
 #ifndef HAVE_EXT_TOOL_BAR
   f->last_tool_bar_item = -1;
   f->tool_bar_wraps_p = false;
-#endif
-#ifdef NS_IMPL_COCOA
-  f->ns_appearance = ns_appearance_system_default;
-  f->ns_transparent_titlebar = false;
 #endif
 #endif
   f->select_mini_window_flag = false;
@@ -1470,7 +1443,6 @@ make_initial_frame (void)
   return f;
 }
 
-#ifndef HAVE_ANDROID
 
 static struct frame *
 make_terminal_frame (struct terminal *terminal, Lisp_Object parent,
@@ -1562,21 +1534,10 @@ make_terminal_frame (struct terminal *terminal, Lisp_Object parent,
 
   f->terminal = terminal;
   f->terminal->reference_count++;
-#ifdef MSDOS
-  f->output_data.tty = &the_only_tty_output;
-  f->output_data.tty->display_info = &the_only_display_info;
-  if (!inhibit_window_system
-      && (!FRAMEP (selected_frame) || !FRAME_LIVE_P (XFRAME (selected_frame))
-	  || XFRAME (selected_frame)->output_method == output_msdos_raw))
-    f->output_method = output_msdos_raw;
-  else
-    f->output_method = output_termcap;
-#else /* not MSDOS */
   f->output_method = output_termcap;
   create_tty_output (f);
   FRAME_FOREGROUND_PIXEL (f) = FACE_TTY_DEFAULT_FG_COLOR;
   FRAME_BACKGROUND_PIXEL (f) = FACE_TTY_DEFAULT_BG_COLOR;
-#endif /* not MSDOS */
 
   struct tty_display_info *tty = terminal->display_info.tty;
 
@@ -1636,7 +1597,6 @@ get_future_frame_param (Lisp_Object parameter,
   return result;
 }
 
-#endif
 
 int
 tty_child_pos_param (struct frame *f, Lisp_Object key,
@@ -1716,7 +1676,6 @@ tty_child_size_param (struct frame *child, Lisp_Object key,
   return dflt;
 }
 
-#ifndef HAVE_ANDROID
 
 static void
 tty_child_frame_rect (struct frame *f, Lisp_Object params,
@@ -1728,7 +1687,6 @@ tty_child_frame_rect (struct frame *f, Lisp_Object params,
   *y = tty_child_pos_param (f, Qtop, params, 0, *h);
 }
 
-#endif /* !HAVE_ANDROID */
 
 DEFUN ("make-terminal-frame", Fmake_terminal_frame, Smake_terminal_frame,
        1, 1, 0,
@@ -1752,17 +1710,7 @@ affects all frames on the same terminal device.  */)
   struct terminal *t = NULL;
   struct frame *sf = SELECTED_FRAME ();
 
-#ifdef MSDOS
-  if (sf->output_method != output_msdos_raw
-      && sf->output_method != output_termcap)
-    emacs_abort ();
-#else /* not MSDOS */
 
-#ifdef WINDOWSNT                           /* This should work now! */
-  if (sf->output_method != output_termcap)
-    error ("Not using an ASCII terminal now; cannot make a new ASCII frame");
-#endif
-#endif /* not MSDOS */
 
   {
     Lisp_Object terminal;
@@ -1773,13 +1721,6 @@ affects all frames on the same terminal device.  */)
         terminal = XCDR (terminal);
         t = decode_live_terminal (terminal);
       }
-#ifdef MSDOS
-    if (t && t != the_only_display_info.terminal)
-      /* msdos.c assumes a single tty_display_info object.  */
-      error ("Multiple terminals are not supported on this platform");
-    if (!t)
-      t = the_only_display_info.terminal;
-# endif
   }
 
   if (!t)
@@ -2758,18 +2699,6 @@ delete_frame (Lisp_Object frame, Lisp_Object force)
 		    }
 		}
 	    }
-#ifdef NS_IMPL_COCOA
-	  else
-	    {
-	      /* Under NS, there is no system mechanism for choosing a new
-		 window to get focus -- it is left to application code.
-		 So the portion of THIS application interfacing with NS
-		 needs to make the frame we switch to the key window.  */
-	      struct frame *f1 = XFRAME (frame1);
-	      if (FRAME_NS_P (f1))
-		ns_make_frame_key_window (f1);
-	    }
-#endif
 
 	  do_switch_frame (frame1, 0, 1, Qnil);
 	  sf = SELECTED_FRAME ();
@@ -2818,9 +2747,6 @@ delete_frame (Lisp_Object frame, Lisp_Object force)
   fset_buried_buffer_list (f, Qnil);
 
   free_font_driver_list (f);
-#if defined (USE_X_TOOLKIT) || defined (HAVE_NTGUI)
-  xfree (f->namebuf);
-#endif
   xfree (f->decode_mode_spec_buffer);
   xfree (FRAME_INSERT_COST (f));
   xfree (FRAME_DELETEN_COST (f));
@@ -2865,19 +2791,6 @@ delete_frame (Lisp_Object frame, Lisp_Object force)
     /* If needed, delete the terminal that this frame was on.
        (This must be done after the frame is killed.)  */
     terminal->reference_count--;
-#if defined (USE_X_TOOLKIT) || defined (USE_GTK)
-    /* FIXME: Deleting the terminal crashes emacs because of a GTK
-       bug.
-       https://lists.gnu.org/r/emacs-devel/2011-10/msg00363.html */
-
-    /* Since a similar behavior was observed on the Lucid and Motif
-       builds (see Bug#5802, Bug#21509, Bug#23499, Bug#27816), we now
-       don't delete the terminal for these builds either.  */
-    if (terminal->reference_count == 0
-	&& (terminal->type == output_x_window
-	    || terminal->type == output_pgtk))
-      terminal->reference_count = 1;
-#endif /* USE_X_TOOLKIT || USE_GTK */
 
     if (terminal->reference_count == 0)
       {
@@ -3330,13 +3243,6 @@ before calling this function on it, like this.
       frame_set_mouse_position (XFRAME (frame), xval, yval);
 #endif /* HAVE_WINDOW_SYSTEM */
     }
-#ifdef MSDOS
-  else if (FRAME_MSDOS_P (XFRAME (frame)))
-    {
-      Fselect_frame (frame, Qnil);
-      mouse_moveto (xval, yval);
-    }
-#endif /* MSDOS */
   else
     {
       Fselect_frame (frame, Qnil);
@@ -3375,13 +3281,6 @@ before calling this function on it, like this.
       frame_set_mouse_pixel_position (XFRAME (frame), xval, yval);
 #endif /* HAVE_WINDOW_SYSTEM */
     }
-#ifdef MSDOS
-  else if (FRAME_MSDOS_P (XFRAME (frame)))
-    {
-      Fselect_frame (frame, Qnil);
-      mouse_moveto (xval, yval);
-    }
-#endif /* MSDOS */
   else
     {
       Fselect_frame (frame, Qnil);
@@ -4156,11 +4055,6 @@ list, but are otherwise ignored.  */)
     gui_set_frame_parameters (f, alist);
   else
 #endif
-#ifdef MSDOS
-  if (FRAME_MSDOS_P (f))
-    IT_set_frame_parameters (f, alist);
-  else
-#endif
 
     {
       EMACS_INT length = list_length (alist);
@@ -4770,10 +4664,6 @@ static const struct frame_parm_table frame_parms[] =
   {"borders-respect-alpha-background",
 				SYMBOL_INDEX (Qborders_respect_alpha_background)},
   {"use-frame-synchronization",	SYMBOL_INDEX (Quse_frame_synchronization)},
-#ifdef NS_IMPL_COCOA
-  {"ns-appearance",		SYMBOL_INDEX (Qns_appearance)},
-  {"ns-transparent-titlebar",	SYMBOL_INDEX (Qns_transparent_titlebar)},
-#endif
 };
 
 #ifdef HAVE_WINDOW_SYSTEM
@@ -6981,10 +6871,6 @@ make_monitor_attribute_list (struct MonitorInfo *monitors,
 
       attributes = Fcons (Fcons (Qframes, AREF (monitor_frames, i)),
 			  attributes);
-#ifdef HAVE_PGTK
-      attributes = Fcons (Fcons (Qscale_factor, make_float (mi->scale_factor)),
-			  attributes);
-#endif
       attributes = Fcons (Fcons (Qmm_size,
                                  list2i (mi->mm_width, mi->mm_height)),
                           attributes);
@@ -7098,9 +6984,6 @@ syms_of_frame (void)
 
   DEFSYM (Qworkarea, "workarea");
   DEFSYM (Qmm_size, "mm-size");
-#ifdef HAVE_PGTK
-  DEFSYM (Qscale_factor, "scale-factor");
-#endif
   DEFSYM (Qframes, "frames");
   DEFSYM (Qsource, "source");
 
@@ -7129,10 +7012,6 @@ syms_of_frame (void)
   DEFSYM (Qtip_frame, "tip_frame");
   DEFSYM (Qterminal_frame, "terminal_frame");
 
-#ifdef NS_IMPL_COCOA
-  DEFSYM (Qns_appearance, "ns-appearance");
-  DEFSYM (Qns_transparent_titlebar, "ns-transparent-titlebar");
-#endif
 
   DEFSYM (Qalpha, "alpha");
   DEFSYM (Qalpha_background, "alpha-background");
@@ -7265,17 +7144,7 @@ Setting this variable does not affect existing frames, only new ones.  */);
 
   DEFVAR_LISP ("default-frame-scroll-bars", Vdefault_frame_scroll_bars,
 	       doc: /* Default position of vertical scroll bars on this window-system.  */);
-#if defined HAVE_WINDOW_SYSTEM && !defined HAVE_ANDROID
-#if defined (HAVE_NTGUI) || defined (NS_IMPL_COCOA) || (defined (USE_GTK) && defined (USE_TOOLKIT_SCROLL_BARS))
-  /* MS-Windows, macOS, and GTK have scroll bars on the right by
-     default.  */
-  Vdefault_frame_scroll_bars = Qright;
-#else
   Vdefault_frame_scroll_bars = Qleft;
-#endif
-#else /* !HAVE_WINDOW_SYSTEM || HAVE_ANDROID */
-  Vdefault_frame_scroll_bars = Qnil;
-#endif /* HAVE_WINDOW_SYSTEM && !HAVE_ANDROID */
 
   DEFVAR_BOOL ("scroll-bar-adjust-thumb-portion",
                scroll_bar_adjust_thumb_portion_p,
@@ -7495,15 +7364,7 @@ fullheight frames and the width of fullwidth frames never change
 implicitly.  Note also that when a frame is not large enough to
 accommodate a change of any of the parameters listed above, Emacs may
 try to enlarge the frame even if this option is non-nil.  */);
-#if defined (HAVE_WINDOW_SYSTEM) && !defined (HAVE_ANDROID)
-#if defined (USE_GTK) || defined (HAVE_NS)
-  frame_inhibit_implied_resize = list1 (Qtab_bar_lines);
-#else
   frame_inhibit_implied_resize = list2 (Qtab_bar_lines, Qtool_bar_lines);
-#endif
-#else
-  frame_inhibit_implied_resize = Qt;
-#endif
 
   DEFVAR_LISP ("frame-size-history", frame_size_history,
                doc: /* History of frame size adjustments.
@@ -7598,11 +7459,7 @@ parameter of a frame.  The following values are provided:
 
 The default is \\+`inhibit' in NS builds and nil everywhere else.  */);
 
-#if defined (NS_IMPL_COCOA)
-  alter_fullscreen_frames = Qinhibit;
-#else
   alter_fullscreen_frames = Qnil;
-#endif
 
   defsubr (&Sframe_id);
   defsubr (&Sframep);

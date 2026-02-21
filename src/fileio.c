@@ -61,36 +61,8 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 # include <linux/fs.h>
 #endif
 
-#ifdef WINDOWSNT
-#define NOMINMAX 1
-#include <windows.h>
-/* The redundant #ifdef is to avoid compiler warning about unused macro.  */
-#ifdef NOMINMAX
-#undef NOMINMAX
-#endif
-#include <sys/file.h>
-#include "w32.h"
-#endif /* not WINDOWSNT */
 
-#ifdef MSDOS
-#include "msdos.h"
-#include <sys/param.h>
-#endif
 
-#ifdef DOS_NT
-/* On Windows, drive letters must be alphabetic - on DOS, the Netware
-   redirector allows the six letters between 'Z' and 'a' as well.  */
-#ifdef MSDOS
-#define IS_DRIVE(x) ((x) >= 'A' && (x) <= 'z')
-#endif
-#ifdef WINDOWSNT
-#define IS_DRIVE(x) c_isalpha (x)
-#endif
-/* Need to lower-case the drive letter, or else expanded
-   filenames will sometimes compare unequal, because
-   `expand-file-name' doesn't always down-case the drive letter.  */
-#define DRIVE_LETTER(x) c_tolower (x)
-#endif
 
 #include "systime.h"
 #include <acl.h>
@@ -112,7 +84,6 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 #define NLOG_MODULE "fileio"
 #include "neomacs_log.h"
 
-#if !defined HAVE_ANDROID || defined ANDROID_STUBIFY
 
 /* Type describing a file descriptor used by functions such as
    `insert-file-contents'.  */
@@ -128,25 +99,8 @@ typedef int emacs_fd;
 #define emacs_fd_fstat		sys_fstat
 #define emacs_fd_valid_p(fd)	((fd) >= 0)
 
-/* This is not used on MS Windows.  */
-
-#ifndef WINDOWSNT
 #define emacs_fd_to_int(fds)	(fds)
-#endif /* WINDOWSNT */
 
-#else /* HAVE_ANDROID && !defined ANDROID_STUBIFY */
-
-typedef struct android_fd_or_asset emacs_fd;
-
-#define emacs_fd_open		android_open_asset
-#define emacs_fd_close		android_close_asset
-#define emacs_fd_read		android_asset_read_quit
-#define emacs_fd_lseek		android_asset_lseek
-#define emacs_fd_fstat		android_asset_fstat
-#define emacs_fd_valid_p(fd)	((fd).asset != ((void *) -1))
-#define emacs_fd_to_int(fds)	((fds).asset ? -1 : (fds).fd)
-
-#endif /* !defined HAVE_ANDROID || defined ANDROID_STUBIFY */
 
 /* True during writing of auto-save files.  */
 static bool auto_saving;
@@ -188,15 +142,6 @@ static bool e_write (int, Lisp_Object, ptrdiff_t, ptrdiff_t,
 static void
 check_vfs_filename (Lisp_Object encoded, const char *reason)
 {
-#if defined HAVE_ANDROID && !defined ANDROID_STUBIFY
-  const char *name;
-
-  name = SSDATA (encoded);
-
-  if (android_is_special_directory (name, "/assets")
-      || android_is_special_directory (name, "/content"))
-    xsignal2 (Qfile_error, build_string (reason), encoded);
-#endif /* defined HAVE_ANDROID && !defined ANDROID_STUBIFY */
 }
 
 #ifdef HAVE_LIBSELINUX
@@ -209,10 +154,6 @@ static bool
 selinux_enabled_p (const char *file)
 {
   return (is_selinux_enabled ()
-#if defined HAVE_ANDROID && !defined ANDROID_STUBIFY
-	  && !android_is_special_directory (file, "/assets")
-	  && !android_is_special_directory (file, "/content")
-#endif /* defined HAVE_ANDROID && !defined ANDROID_STUBIFY */
 	  );
 }
 
@@ -225,30 +166,10 @@ selinux_enabled_p (const char *file)
 bool
 file_access_p (char const *file, int amode)
 {
-#ifdef MSDOS
-  if (amode & W_OK)
-    {
-      /* FIXME: The MS-DOS faccessat implementation should handle this.  */
-      struct stat st;
-      if (stat (file, &st) != 0)
-	return false;
-      errno = EPERM;
-      return st.st_mode & S_IWRITE || S_ISDIR (st.st_mode);
-    }
-#endif
 
   if (sys_faccessat (AT_FDCWD, file, amode, AT_EACCESS) == 0)
     return true;
 
-#ifdef CYGWIN
-  /* Return success if faccessat failed because Cygwin couldn't
-     determine the file's UID or GID.  */
-  int err = errno;
-  struct stat st;
-  if (stat (file, &st) == 0 && (st.st_uid == -1 || st.st_gid == -1))
-    return true;
-  errno = err;
-#endif
 
   return false;
 }
@@ -438,72 +359,11 @@ file_name_directory (Lisp_Object filename)
   char const *p = beg + SBYTES (filename);
 
   while (p != beg && !IS_DIRECTORY_SEP (p[-1])
-#ifdef DOS_NT
-	 /* only recognize drive specifier at the beginning */
-	 && !(p[-1] == ':'
-	      /* handle the "/:d:foo" and "/:foo" cases correctly  */
-	      && ((p == beg + 2 && !IS_DIRECTORY_SEP (*beg))
-		  || (p == beg + 4 && IS_DIRECTORY_SEP (*beg))))
-#endif
 	 ) p--;
 
   if (p == beg)
     return Qnil;
-#ifdef DOS_NT
-  /* Expansion of "c:" to drive and default directory.  */
-  Lisp_Object tem_fn;
-  USE_SAFE_ALLOCA;
-  SAFE_ALLOCA_STRING (beg, filename);
-  p = beg + (p - SSDATA (filename));
-
-  if (p[-1] == ':')
-    {
-      /* MAXPATHLEN+1 is guaranteed to be enough space for getdefdir.  */
-      char *res = alloca (MAXPATHLEN + 1);
-      char *r = res;
-
-      if (p == beg + 4 && IS_DIRECTORY_SEP (*beg) && beg[1] == ':')
-	{
-	  memcpy (res, beg, 2);
-	  beg += 2;
-	  r += 2;
-	}
-
-      if (getdefdir (c_toupper (*beg) - 'A' + 1, r))
-	{
-	  size_t l = strlen (res);
-
-	  if (l > 3 || !IS_DIRECTORY_SEP (res[l - 1]))
-	    strcat (res, "/");
-	  beg = res;
-	  p = beg + strlen (beg);
-	  dostounix_filename (beg);
-	  tem_fn = make_specified_string (beg, -1, p - beg,
-					  STRING_MULTIBYTE (filename));
-	}
-      else
-	tem_fn = make_specified_string (beg - 2, -1, p - beg + 2,
-					STRING_MULTIBYTE (filename));
-    }
-  else if (STRING_MULTIBYTE (filename))
-    {
-      tem_fn = make_specified_string (beg, -1, p - beg, 1);
-      dostounix_filename (SSDATA (tem_fn));
-#ifdef WINDOWSNT
-      if (!NILP (Vw32_downcase_file_names))
-	tem_fn = Fdowncase (tem_fn);
-#endif
-    }
-  else
-    {
-      dostounix_filename (beg);
-      tem_fn = make_unibyte_string (beg, p - beg);
-    }
-  SAFE_FREE ();
-  return tem_fn;
-#else  /* DOS_NT */
   return make_specified_string (beg, -1, p - beg, STRING_MULTIBYTE (filename));
-#endif	/* DOS_NT */
 }
 
 DEFUN ("file-name-directory", Ffile_name_directory, Sfile_name_directory,
@@ -560,12 +420,6 @@ or the entire name if it contains no slash.  */)
   end = p = beg + SBYTES (filename);
 
   while (p != beg && !IS_DIRECTORY_SEP (p[-1])
-#ifdef DOS_NT
-	 /* only recognize drive specifier at beginning */
-	 && !(p[-1] == ':'
-	      /* handle the "/:d:foo" case correctly  */
-	      && (p == beg + 2 || (p == beg + 4 && IS_DIRECTORY_SEP (*beg))))
-#endif
 	 )
     p--;
 
@@ -625,9 +479,6 @@ file_name_as_directory (char *dst, const char *src, ptrdiff_t srclen,
   if (!IS_DIRECTORY_SEP (dst[srclen - 1]))
     dst[srclen++] = DIRECTORY_SEP;
   dst[srclen] = 0;
-#ifdef DOS_NT
-  dostounix_filename (dst);
-#endif
   return srclen;
 }
 
@@ -661,10 +512,6 @@ is already present.  */)
       error ("Invalid handler in `file-name-handler-alist'");
     }
 
-#ifdef WINDOWSNT
-  if (!NILP (Vw32_downcase_file_names))
-    file = Fdowncase (file);
-#endif
   buf = SAFE_ALLOCA (SBYTES (file) + file_name_as_directory_slop + 1);
   length = file_name_as_directory (buf, SSDATA (file), SBYTES (file),
 				   STRING_MULTIBYTE (file));
@@ -686,17 +533,11 @@ directory_file_name (char *dst, char *src, ptrdiff_t srclen, bool multibyte)
      and longer as if they were "/".  */
   if (! (srclen == 2 && IS_DIRECTORY_SEP (src[0])))
     while (srclen > 1
-#ifdef DOS_NT
-	   && !(srclen > 2 && IS_DEVICE_SEP (src[srclen - 2]))
-#endif
 	   && IS_DIRECTORY_SEP (src[srclen - 1]))
       srclen--;
 
   memcpy (dst, src, srclen);
   dst[srclen] = 0;
-#ifdef DOS_NT
-  dostounix_filename (dst);
-#endif
   return srclen;
 }
 
@@ -752,10 +593,6 @@ In Unix-syntax, this function just removes the final slash.  */)
       error ("Invalid handler in `file-name-handler-alist'");
     }
 
-#ifdef WINDOWSNT
-  if (!NILP (Vw32_downcase_file_names))
-    directory = Fdowncase (directory);
-#endif
   buf = SAFE_ALLOCA (SBYTES (directory) + 1);
   length = directory_file_name (buf, SSDATA (directory), SBYTES (directory),
 				STRING_MULTIBYTE (directory));
@@ -979,10 +816,6 @@ user_homedir (char const *name)
   p[length] = 0;
   struct passwd *pw = getpwnam (p);
   SAFE_FREE ();
-#if defined HAVE_ANDROID && !defined ANDROID_STUBIFY
-  if (pw && !pw->pw_dir && pw->pw_uid == getuid ())
-    return (char *) android_get_home_directory ();
-#endif
   if (!pw || (pw->pw_dir && !IS_ABSOLUTE_FILE_NAME (pw->pw_dir)))
     return NULL;
   return pw->pw_dir;
@@ -1032,11 +865,6 @@ the root directory.  */)
   char *target;
 
   ptrdiff_t tlen;
-#ifdef DOS_NT
-  int drive = 0;
-  bool collapse_newdir = true;
-  bool is_escaped = 0;
-#endif /* DOS_NT */
   ptrdiff_t length, nbytes;
   Lisp_Object handler, result, handled_name;
   bool multibyte;
@@ -1061,19 +889,7 @@ the root directory.  */)
   /* As a last resort, we may have to use the root as
      default_directory below.  */
   Lisp_Object root;
-#ifdef DOS_NT
-      /* "/" is not considered a root directory on DOS_NT, so using it
-	 as default_directory causes an infinite recursion in, e.g.,
-	 the following:
-
-            (let (default-directory)
-	      (expand-file-name "a"))
-
-	 To avoid this, we use the root of the current drive.  */
-      root = build_string (emacs_root_dir ());
-#else
       root = build_string ("/");
-#endif
 
   /* Use the buffer's default-directory if DEFAULT_DIRECTORY is omitted.  */
   if (NILP (default_directory))
@@ -1137,24 +953,9 @@ the root directory.  */)
 	/* Save time in some common cases - as long as default_directory
 	   is not relative, it can be canonicalized with name below (if it
 	   is needed at all) without requiring it to be expanded now.  */
-#ifdef DOS_NT
-	/* Detect MSDOS file names with drive specifiers.  */
-	&& ! (IS_DRIVE (o[0]) && IS_DEVICE_SEP (o[1])
-	      && IS_DIRECTORY_SEP (o[2]))
-	/* Detect escaped file names without drive spec after "/:".
-	   These should not be recursively expanded, to avoid
-	   including the default directory twice in the expanded
-	   result.  */
-	&& ! (o[0] == '/' && o[1] == ':')
-#ifdef WINDOWSNT
-	/* Detect Windows file names in UNC format.  */
-	&& ! (IS_DIRECTORY_SEP (o[0]) && IS_DIRECTORY_SEP (o[1]))
-#endif
-#else /* not DOS_NT */
       /* Detect Unix absolute file names (/... alone is not absolute on
 	 DOS or Windows).  */
 	&& ! (IS_DIRECTORY_SEP (o[0]))
-#endif /* not DOS_NT */
 	)
       {
 	default_directory = Fexpand_file_name (default_directory, Qnil);
@@ -1252,57 +1053,17 @@ the root directory.  */)
 	}
     }
 
-#ifdef WINDOWSNT
-  if (!NILP (Vw32_downcase_file_names))
-    default_directory = Fdowncase (default_directory);
-#endif
 
   /* Make a local copy of NAME to protect it from GC in DECODE_FILE below.  */
   SAFE_ALLOCA_STRING (nm, name);
   nmlim = nm + SBYTES (name);
 
-#ifdef DOS_NT
-  /* Note if special escape prefix is present, but remove for now.  */
-  if (nm[0] == '/' && nm[1] == ':')
-    {
-      is_escaped = 1;
-      nm += 2;
-    }
-
-  /* Find and remove drive specifier if present; this makes nm absolute
-     even if the rest of the name appears to be relative.  Only look for
-     drive specifier at the beginning.  */
-  if (IS_DRIVE (nm[0]) && IS_DEVICE_SEP (nm[1]))
-    {
-      drive = (unsigned char) nm[0];
-      nm += 2;
-    }
-
-#ifdef WINDOWSNT
-  /* If we see "c://somedir", we want to strip the first slash after the
-     colon when stripping the drive letter.  Otherwise, this expands to
-     "//somedir".  */
-  if (drive && IS_DIRECTORY_SEP (nm[0]) && IS_DIRECTORY_SEP (nm[1]))
-    nm++;
-
-  /* Discard any previous drive specifier if nm is now in UNC format.  */
-  if (IS_DIRECTORY_SEP (nm[0]) && IS_DIRECTORY_SEP (nm[1])
-      && !IS_DIRECTORY_SEP (nm[2]))
-    drive = 0;
-#endif /* WINDOWSNT */
-#endif /* DOS_NT */
 
   /* If nm is absolute, look for `/./' or `/../' or `//''sequences; if
      none are found, we can probably return right away.  We will avoid
      allocating a new string if name is already fully expanded.  */
   if (
       IS_DIRECTORY_SEP (nm[0])
-#ifdef MSDOS
-      && drive && !is_escaped
-#endif
-#ifdef WINDOWSNT
-      && (drive || IS_DIRECTORY_SEP (nm[1])) && !is_escaped
-#endif
       )
     {
       /* If it turns out that the filename we want to return is just a
@@ -1336,34 +1097,8 @@ the root directory.  */)
 	}
       if (!lose)
 	{
-#ifdef DOS_NT
-	  /* Make sure directories are all separated with /, but
-	     avoid allocation of a new string when not required. */
-	  dostounix_filename (nm);
-#ifdef WINDOWSNT
-	  if (IS_DIRECTORY_SEP (nm[1]))
-	    {
-	      if (strcmp (nm, SSDATA (name)) != 0)
-		name = make_specified_string (nm, -1, nmlim - nm, multibyte);
-	    }
-	  else
-#endif
-	  /* Drive must be set, so this is okay.  */
-	  if (strcmp (nm - 2, SSDATA (name)) != 0)
-	    {
-	      name = make_specified_string (nm, -1, p - nm, multibyte);
-	      char temp[] = { DRIVE_LETTER (drive), ':', 0 };
-	      AUTO_STRING_WITH_LEN (drive_prefix, temp, 2);
-	      name = concat2 (drive_prefix, name);
-	    }
-#ifdef WINDOWSNT
-	  if (!NILP (Vw32_downcase_file_names))
-	    name = Fdowncase (name);
-#endif
-#else /* not DOS_NT */
 	  if (strcmp (nm, SSDATA (name)) != 0)
 	    name = make_specified_string (nm, -1, nmlim - nm, multibyte);
-#endif /* not DOS_NT */
 	  SAFE_FREE ();
 	  return name;
 	}
@@ -1388,9 +1123,6 @@ the root directory.  */)
   newdir = newdirlim = 0;
 
   if (nm[0] == '~'		/* prefix ~ */
-#ifdef DOS_NT
-    && !is_escaped		/* don't expand ~ in escaped file names */
-#endif
       )
     {
       if (IS_DIRECTORY_SEP (nm[1])
@@ -1412,9 +1144,6 @@ the root directory.  */)
 	    }
 	  else if (!multibyte && STRING_MULTIBYTE (tem))
 	    multibyte = 1;
-#ifdef DOS_NT
-	  collapse_newdir = false;
-#endif
 	}
       else			/* ~user/filename */
 	{
@@ -1434,9 +1163,6 @@ the root directory.  */)
 
 	      while (*++nm && !IS_DIRECTORY_SEP (*nm))
 		continue;
-#ifdef DOS_NT
-	      collapse_newdir = false;
-#endif
 	    }
 
 	  /* If we don't find a user of that name, leave the name
@@ -1444,164 +1170,19 @@ the root directory.  */)
 	}
     }
 
-#ifdef DOS_NT
-  /* On DOS and Windows, nm is absolute if a drive name was specified;
-     use the drive's current directory as the prefix if needed.  */
-  if (!newdir && drive)
-    {
-      /* Get default directory if needed to make nm absolute.  */
-      char *adir = NULL;
-      if (!IS_DIRECTORY_SEP (nm[0]))
-	{
-	  adir = SAFE_ALLOCA (MAXPATHLEN + 1);
-	  if (!getdefdir (c_toupper (drive) - 'A' + 1, adir))
-	    adir = NULL;
-	  else if (multibyte)
-	    {
-	      Lisp_Object tem = build_string (adir);
-
-	      tem = DECODE_FILE (tem);
-	      newdirlim = adir + SBYTES (tem);
-	      memcpy (adir, SSDATA (tem), SBYTES (tem) + 1);
-	    }
-	  else
-	    newdirlim = adir + strlen (adir);
-	}
-      if (!adir)
-	{
-	  /* Either nm starts with /, or drive isn't mounted.  */
-	  adir = SAFE_ALLOCA (4);
-	  adir[0] = DRIVE_LETTER (drive);
-	  adir[1] = ':';
-	  adir[2] = '/';
-	  adir[3] = 0;
-	  newdirlim = adir + 3;
-	}
-      newdir = adir;
-    }
-#endif /* DOS_NT */
 
   /* Finally, if no prefix has been specified and nm is not absolute,
      then it must be expanded relative to default_directory.  */
 
   if (1
-#ifndef DOS_NT
       /* /... alone is not absolute on DOS and Windows.  */
       && !IS_DIRECTORY_SEP (nm[0])
-#endif
-#ifdef WINDOWSNT
-      && !(IS_DIRECTORY_SEP (nm[0]) && IS_DIRECTORY_SEP (nm[1])
-	   && !IS_DIRECTORY_SEP (nm[2]))
-#endif
       && !newdir)
     {
       newdir = SSDATA (default_directory);
       newdirlim = newdir + SBYTES (default_directory);
-#ifdef DOS_NT
-      /* Note if special escape prefix is present, but remove for now.  */
-      if (newdir[0] == '/' && newdir[1] == ':')
-	{
-	  is_escaped = 1;
-	  newdir += 2;
-	}
-#endif
     }
 
-#ifdef DOS_NT
-  if (newdir)
-    {
-      /* First ensure newdir is an absolute name.  */
-      if (
-	  /* Detect MSDOS file names with drive specifiers.  */
-	  ! (IS_DRIVE (newdir[0])
-	     && IS_DEVICE_SEP (newdir[1]) && IS_DIRECTORY_SEP (newdir[2]))
-#ifdef WINDOWSNT
-	  /* Detect Windows file names in UNC format.  */
-	  && ! (IS_DIRECTORY_SEP (newdir[0]) && IS_DIRECTORY_SEP (newdir[1])
-		&& !IS_DIRECTORY_SEP (newdir[2]))
-#endif
-	  )
-	{
-	  /* Effectively, let newdir be (expand-file-name newdir cwd).
-	     Because of the admonition against calling expand-file-name
-	     when we have pointers into lisp strings, we accomplish this
-	     indirectly by prepending newdir to nm if necessary, and using
-	     cwd (or the wd of newdir's drive) as the new newdir.  */
-	  char *adir;
-#ifdef WINDOWSNT
-	  const int adir_size = MAX_UTF8_PATH;
-#else
-	  const int adir_size = MAXPATHLEN + 1;
-#endif
-
-	  if (IS_DRIVE (newdir[0]) && IS_DEVICE_SEP (newdir[1]))
-	    {
-	      drive = (unsigned char) newdir[0];
-	      newdir += 2;
-	    }
-	  if (!IS_DIRECTORY_SEP (nm[0]))
-	    {
-	      ptrdiff_t nmlen = nmlim - nm;
-	      ptrdiff_t newdirlen = newdirlim - newdir;
-	      char *tmp = SAFE_ALLOCA (newdirlen + file_name_as_directory_slop
-				  + nmlen + 1);
-	      ptrdiff_t dlen = file_name_as_directory (tmp, newdir, newdirlen,
-						       multibyte);
-	      memcpy (tmp + dlen, nm, nmlen + 1);
-	      nm = tmp;
-	      nmlim = nm + dlen + nmlen;
-	    }
-	  adir = SAFE_ALLOCA (adir_size);
-	  if (drive)
-	    {
-	      if (!getdefdir (c_toupper (drive) - 'A' + 1, adir))
-		strcpy (adir, "/");
-	    }
-	  else
-	    getcwd (adir, adir_size);
-	  if (multibyte)
-	    {
-	      Lisp_Object tem = build_string (adir);
-
-	      tem = DECODE_FILE (tem);
-	      newdirlim = adir + SBYTES (tem);
-	      memcpy (adir, SSDATA (tem), SBYTES (tem) + 1);
-	    }
-	  else
-	    newdirlim = adir + strlen (adir);
-	  newdir = adir;
-	}
-
-      /* Strip off drive name from prefix, if present.  */
-      if (IS_DRIVE (newdir[0]) && IS_DEVICE_SEP (newdir[1]))
-	{
-	  drive = newdir[0];
-	  newdir += 2;
-	}
-
-      /* Keep only a prefix from newdir if nm starts with slash
-         (//server/share for UNC, nothing otherwise).  */
-      if (IS_DIRECTORY_SEP (nm[0]) && collapse_newdir)
-	{
-#ifdef WINDOWSNT
-	  if (IS_DIRECTORY_SEP (newdir[0]) && IS_DIRECTORY_SEP (newdir[1])
-	      && !IS_DIRECTORY_SEP (newdir[2]))
-	    {
-	      char *adir = strcpy (SAFE_ALLOCA (newdirlim - newdir + 1), newdir);
-	      char *p = adir + 2;
-	      while (*p && !IS_DIRECTORY_SEP (*p)) p++;
-	      p++;
-	      while (*p && !IS_DIRECTORY_SEP (*p)) p++;
-	      *p = 0;
-	      newdir = adir;
-	      newdirlim = newdir + strlen (adir);
-	    }
-	  else
-#endif
-	    newdir = newdirlim = "";
-	}
-    }
-#endif /* DOS_NT */
 
   /* Ignore any slash at the end of newdir, unless newdir is
      just "/" or "//".  */
@@ -1613,15 +1194,7 @@ the root directory.  */)
   /* Now concatenate the directory and name to new space in the stack frame.  */
   tlen = length + file_name_as_directory_slop + (nmlim - nm) + 1;
   eassert (tlen >= file_name_as_directory_slop + 1);
-#ifdef DOS_NT
-  /* Reserve space for drive specifier and escape prefix, since either
-     or both may need to be inserted.  (The Microsoft x86 compiler
-     produces incorrect code if the following two lines are combined.)  */
-  target = SAFE_ALLOCA (tlen + 4);
-  target += 4;
-#else  /* not DOS_NT */
   target = SAFE_ALLOCA (tlen);
-#endif /* not DOS_NT */
   *target = 0;
   nbytes = 0;
 
@@ -1629,15 +1202,6 @@ the root directory.  */)
     {
       if (nm[0] == 0 || IS_DIRECTORY_SEP (nm[0]))
 	{
-#ifdef DOS_NT
-	  /* If newdir is effectively "C:/", then the drive letter will have
-	     been stripped and newdir will be "/".  Concatenating with an
-	     absolute directory in nm produces "//", which will then be
-	     incorrectly treated as a network share.  Ignore newdir in
-	     this case (keeping the drive letter).  */
-	  if (!(drive && nm[0] && IS_DIRECTORY_SEP (newdir[0])
-		&& newdir[1] == '\0'))
-#endif
 	    {
 	      memcpy (target, newdir, length);
 	      target[length] = 0;
@@ -1680,23 +1244,11 @@ the root directory.  */)
 		    functions of the underlying OS.  (To reproduce, try a
 		    long series of "../../" in default_directory, longer
 		    than the number of levels from the root.)  */
-#ifndef DOS_NT
 		 && o != target
-#endif
 		 && (IS_DIRECTORY_SEP (p[3]) || p[3] == 0))
 	  {
-#ifdef WINDOWSNT
-	    char *prev_o = o;
-#endif
 	    while (o != target && (--o, !IS_DIRECTORY_SEP (*o)))
 	      continue;
-#ifdef WINDOWSNT
-	    /* Don't go below server level in UNC filenames.  */
-	    if (o == target + 1 && IS_DIRECTORY_SEP (*o)
-		&& IS_DIRECTORY_SEP (*target))
-	      o = prev_o;
-	    else
-#endif
 	    /* Keep initial / only if this is the whole name.  */
 	    if (o == target && IS_ANY_SEP (*o) && p[3] == 0)
 	      ++o;
@@ -1712,34 +1264,7 @@ the root directory.  */)
 	  }
       }
 
-#ifdef DOS_NT
-    /* At last, set drive name.  */
-#ifdef WINDOWSNT
-    /* Except for network file name.  */
-    if (!(IS_DIRECTORY_SEP (target[0]) && IS_DIRECTORY_SEP (target[1])))
-#endif /* WINDOWSNT */
-      {
-	if (!drive) emacs_abort ();
-	target -= 2;
-	target[0] = DRIVE_LETTER (drive);
-	target[1] = ':';
-      }
-    /* Reinsert the escape prefix if required.  */
-    if (is_escaped)
-      {
-	target -= 2;
-	target[0] = '/';
-	target[1] = ':';
-      }
     result = make_specified_string (target, -1, o - target, multibyte);
-    dostounix_filename (SSDATA (result));
-#ifdef WINDOWSNT
-    if (!NILP (Vw32_downcase_file_names))
-      result = Fdowncase (result);
-#endif
-#else  /* !DOS_NT */
-    result = make_specified_string (target, -1, o - target, multibyte);
-#endif /* !DOS_NT */
   }
 
   /* Again look to see if the file name has special constructs in it
@@ -1943,17 +1468,6 @@ get_homedir (void)
 {
   char const *home = egetenv ("HOME");
 
-#ifdef WINDOWSNT
-  /* getpw* functions return UTF-8 encoded file names, whereas egetenv
-     returns strings in locale encoding, so we need to convert for
-     consistency.  */
-  static char homedir_utf8[MAX_UTF8_PATH];
-  if (home)
-    {
-      filename_from_ansi (home, homedir_utf8);
-      home = homedir_utf8;
-    }
-#endif
 
   if (!home)
     {
@@ -1974,41 +1488,9 @@ get_homedir (void)
       if (pw)
 	home = pw->pw_dir;
 
-#if defined HAVE_ANDROID && !defined ANDROID_STUBIFY
-      if (!home && pw && pw->pw_uid == getuid ())
-	return android_get_home_directory ();
-#endif
       if (!home)
 	return "";
     }
-#ifdef DOS_NT
-  /* If home is a drive-relative directory, expand it.  */
-  if (IS_DRIVE (*home)
-      && IS_DEVICE_SEP (home[1])
-      && !IS_DIRECTORY_SEP (home[2]))
-    {
-# ifdef WINDOWSNT
-      static char hdir[MAX_UTF8_PATH];
-# else
-      static char hdir[MAXPATHLEN];
-# endif
-      if (!getdefdir (c_toupper (*home) - 'A' + 1, hdir))
-	{
-	  hdir[0] = c_toupper (*home);
-	  hdir[1] = ':';
-	  hdir[2] = '/';
-	  hdir[3] = '\0';
-	}
-      if (home[2])
-	{
-	  size_t homelen = strlen (hdir);
-	  if (!IS_DIRECTORY_SEP (hdir[homelen - 1]))
-	    strcat (hdir, "/");
-	  strcat (hdir, home + 2);
-	}
-      home = hdir;
-    }
-#endif
   if (IS_ABSOLUTE_FILE_NAME (home))
     return home;
   if (!emacs_wd)
@@ -2086,10 +1568,6 @@ is discarded.  */)
   USE_SAFE_ALLOCA;
   SAFE_ALLOCA_STRING (nm, filename);
 
-#ifdef DOS_NT
-  dostounix_filename (nm);
-  substituted = (memcmp (nm, SDATA (filename), SBYTES (filename)) != 0);
-#endif
   endp = nm + SBYTES (filename);
 
   /* If /~ or // appears, discard everything through first slash.  */
@@ -2122,10 +1600,6 @@ is discarded.  */)
 
   if (!substituted)
     {
-#ifdef WINDOWSNT
-      if (!NILP (Vw32_downcase_file_names))
-	filename = Fdowncase (filename);
-#endif
       SAFE_FREE ();
       return filename;
     }
@@ -2140,15 +1614,6 @@ is discarded.  */)
        need to quote some $ to $$ first.  */
     xnm = p;
 
-#ifdef WINDOWSNT
-  if (!NILP (Vw32_downcase_file_names))
-    {
-      Lisp_Object xname = make_specified_string (xnm, -1, x - xnm, multibyte);
-
-      filename = Fdowncase (xname);
-    }
-  else
-#endif
   if (xnm != SSDATA (filename))
     filename = make_specified_string (xnm, -1, x - xnm, multibyte);
   SAFE_FREE ();
@@ -2234,7 +1699,6 @@ emacs_full_read (emacs_fd fd, void *buf, ptrdiff_t bufsize)
   return r < 0 ? r : nread;
 }
 
-#ifndef WINDOWSNT
 /* Copy data to DEST from SOURCE if possible.  Return true if OK.  */
 static bool
 clone_file (int dest, int source)
@@ -2244,7 +1708,6 @@ clone_file (int dest, int source)
 #endif
   return false;
 }
-#endif
 
 DEFUN ("copy-file", Fcopy_file, Scopy_file, 2, 6,
        "fCopy file: \nGCopy %s to file: \np\nP",
@@ -2288,15 +1751,11 @@ permissions.  */)
   char *con;
   int conlength = 0;
 #endif
-#ifdef WINDOWSNT
-  int result;
-#else
   bool already_exists = false;
   mode_t new_mask;
   emacs_fd ifd;
   int ofd;
   struct stat st;
-#endif
 
   file = Fexpand_file_name (file, Qnil);
   newname = expand_cp_target (file, newname);
@@ -2315,28 +1774,6 @@ permissions.  */)
   encoded_file = ENCODE_FILE (file);
   encoded_newname = ENCODE_FILE (newname);
 
-#ifdef WINDOWSNT
-  if (NILP (ok_if_already_exists)
-      || FIXNUMP (ok_if_already_exists))
-    barf_or_query_if_file_exists (newname, false, "copy to it",
-				  FIXNUMP (ok_if_already_exists), false);
-
-  result = w32_copy_file (SSDATA (encoded_file), SSDATA (encoded_newname),
-			  !NILP (keep_time), !NILP (preserve_uid_gid),
-			  !NILP (preserve_permissions));
-  switch (result)
-    {
-    case -1:
-      report_file_error ("Copying file", list2 (file, newname));
-    case -2:
-      report_file_error ("Copying permissions from", file);
-    case -3:
-      xsignal2 (Qfile_date_error,
-		build_string ("Cannot set file date"), newname);
-    case -4:
-      report_file_error ("Copying permissions to", newname);
-    }
-#else /* not WINDOWSNT */
   ifd = emacs_fd_open (SSDATA (encoded_file), O_RDONLY | O_NONBLOCK, 0);
 
   if (!emacs_fd_valid_p (ifd))
@@ -2369,11 +1806,7 @@ permissions.  */)
     report_file_errno ("Non-regular file", file,
 		       S_ISDIR (st.st_mode) ? EISDIR : EINVAL);
 
-#ifndef MSDOS
   new_mask = st.st_mode & (!NILP (preserve_uid_gid) ? 0700 : 0777);
-#else
-  new_mask = S_IREAD | S_IWRITE;
-#endif
 
   ofd = emacs_open (SSDATA (encoded_newname), O_WRONLY | O_CREAT | O_EXCL,
 		    new_mask);
@@ -2407,7 +1840,6 @@ permissions.  */)
     {
       MAYBE_UNUSED off_t newsize = 0;
 
-#ifndef MSDOS
       if (emacs_fd_to_int (ifd) != -1)
 	{
 	  for (ssize_t copied; ; newsize += copied)
@@ -2423,7 +1855,6 @@ permissions.  */)
 	      maybe_quit ();
 	    }
 	}
-#endif /* MSDOS */
 
       /* Follow up with read+write regardless of any copy_file_range failure.
 	 Many copy_file_range implementations fail for no good reason,
@@ -2445,7 +1876,6 @@ permissions.  */)
 	}
     }
 
-#ifndef MSDOS
   /* Preserve the original file permissions, and if requested, also its
      owner and group.  */
   {
@@ -2491,7 +1921,6 @@ permissions.  */)
       case -1: report_file_error ("Copying permissions to", newname);
       }
   }
-#endif	/* not MSDOS */
 
 #if HAVE_LIBSELINUX
   if (conlength > 0)
@@ -2502,12 +1931,6 @@ permissions.  */)
 
       /* See https://debbugs.gnu.org/11245 for ENOTSUP.  */
       if (fail
-#if defined HAVE_ANDROID && !defined ANDROID_STUBIFY
-	  /* Treat SELinux errors copying files leniently on Android,
-	     since the system usually forbids user programs from
-	     changing file contexts.  */
-	  && errno != EACCES
-#endif /* defined HAVE_ANDROID && !defined ANDROID_STUBIFY */
 	  && errno != ENOTSUP)
 	report_file_error ("Doing fsetfilecon", newname);
     }
@@ -2518,17 +1941,7 @@ permissions.  */)
       struct timespec ts[2];
       ts[0] = get_stat_atime (&st);
       ts[1] = get_stat_mtime (&st);
-      if (futimens (ofd, ts) != 0
-	  /* Various versions of the Android C library are missing
-	     futimens, prompting Gnulib to install a fallback that
-	     uses fdutimens instead.  However, fdutimens is not
-	     supported on many Android kernels, so just silently fail
-	     if errno is ENOTSUP or ENOSYS.  */
-#if defined HAVE_ANDROID && !defined ANDROID_STUBIFY
-	  && errno != ENOTSUP
-	  && errno != ENOSYS
-#endif
-	  )
+      if (futimens (ofd, ts) != 0)
 	xsignal2 (Qfile_date_error,
 		  build_string ("Cannot set file date"), newname);
     }
@@ -2540,15 +1953,6 @@ permissions.  */)
      discarded at the end of this function.  */
   emacs_fd_close (ifd);
 
-#ifdef MSDOS
-  /* In DJGPP v2.0 and later, fstat usually returns true file mode bits,
-     and if it can't, it tells so.  Otherwise, under MSDOS we usually
-     get only the READ bit, which will make the copied file read-only,
-     so it's better not to chmod at all.  */
-  if ((_djstat_flags & _STFAIL_WRITEBIT) == 0)
-    chmod (SDATA (encoded_newname), st.st_mode & 07777);
-#endif /* MSDOS */
-#endif /* not WINDOWSNT */
 
   /* Discard the unwind protects.  */
   specpdl_ptr = specpdl_ref_to_ptr (count);
@@ -2614,28 +2018,6 @@ If file has multiple names, it continues to exist with the other names. */)
   return Qnil;
 }
 
-#if defined HAVE_NATIVE_COMP && defined WINDOWSNT
-
-static Lisp_Object
-internal_delete_file_1 (Lisp_Object ignore)
-{
-  return Qt;
-}
-
-/* Delete file FILENAME, returning true if successful.
-   This ignores `delete-by-moving-to-trash'.  */
-
-bool
-internal_delete_file (Lisp_Object filename)
-{
-  Lisp_Object tem;
-
-  tem = internal_condition_case_1 (Fdelete_file_internal, filename,
-				   Qt, internal_delete_file_1);
-  return NILP (tem);
-}
-
-#endif
 
 /* Return -1 if FILE is a case-insensitive file name, 0 if not,
    and 1 if the result cannot be determined.  */
@@ -2675,11 +2057,7 @@ file_name_case_insensitive_err (Lisp_Object file)
     return 1;
 #endif
 
-#if defined CYGWIN || defined DOS_NT
-  return -1;
-#else
   return 0;
-#endif
 }
 
 DEFUN ("file-name-case-insensitive-p", Ffile_name_case_insensitive_p,
@@ -2742,14 +2120,6 @@ This is what happens in interactive use with M-x.  */)
      not worry whether NEWNAME exists or whether it is a directory, as
      it is already another name for FILE.  */
   bool case_only_rename = false;
-#if defined CYGWIN || defined DOS_NT
-  if (!NILP (Ffile_name_case_insensitive_p (file)))
-    {
-      newname = Fexpand_file_name (newname, Qnil);
-      case_only_rename = !NILP (Fstring_equal (Fdowncase (file),
-					       Fdowncase (newname)));
-    }
-#endif
 
   if (!case_only_rename)
     newname = expand_cp_target (Fdirectory_file_name (file), newname);
@@ -3057,19 +2427,9 @@ DEFUN ("file-writable-p", Ffile_writable_p, Sfile_writable_p, 1, 1, 0,
 
   dir = file_name_directory (absname);
   eassert (!NILP (dir));
-#ifdef MSDOS
-  dir = Fdirectory_file_name (dir);
-#endif /* MSDOS */
 
   encoded = ENCODE_FILE (dir);
-#ifdef WINDOWSNT
-  /* The read-only attribute of the parent directory doesn't affect
-     whether a file or directory can be created within it.  Some day we
-     should check ACLs though, which do affect this.  */
-  return file_directory_p (encoded) ? Qt : Qnil;
-#else
   return file_access_p (SSDATA (encoded), W_OK | X_OK) ? Qt : Qnil;
-#endif
 }
 
 DEFUN ("access-file", Faccess_file, Saccess_file, 2, 2, 0,
@@ -3119,11 +2479,7 @@ emacs_readlinkat (int fd, char const *filename)
 
   buf = careadlinkat (fd, filename, readlink_buf, sizeof readlink_buf,
 		      &emacs_norealloc_allocator,
-#if defined HAVE_ANDROID && !defined ANDROID_STUBIFY
-		      android_readlinkat
-#else /* !HAVE_ANDROID || ANDROID_STUBIFY */
 		      readlinkat
-#endif /* HAVE_ANDROID && !ANDROID_STUBIFY */
 		      );
   if (!buf)
     return Qnil;
@@ -3146,11 +2502,6 @@ check_emacs_readlinkat (int fd, Lisp_Object file, char const *encoded_file)
     {
       if (errno == EINVAL)
 	return val;
-#ifdef CYGWIN
-      /* Work around Cygwin bugs.  */
-      if (errno == EIO || errno == EACCES)
-	return val;
-#endif
       return file_metadata_errno ("Reading symbolic link", file, errno);
     }
   return val;
@@ -3208,15 +2559,7 @@ See `file-symlink-p' to distinguish symlinks.  */)
 bool
 file_directory_p (Lisp_Object file)
 {
-#ifdef DOS_NT
-  /* This is cheaper than 'stat'.  */
-  bool retval = sys_faccessat (AT_FDCWD, SSDATA (file),
-			       D_OK, AT_EACCESS) == 0;
-  if (!retval && errno == EACCES)
-    errno = ENOTDIR;	/* like the non-DOS_NT branch below does */
-  return retval;
-#else
-# if defined O_PATH && !(defined HAVE_ANDROID && !defined ANDROID_STUBIFY)
+# if defined O_PATH
   /* Use O_PATH if available, as it avoids races and EOVERFLOW issues.  */
   int fd = emacs_openat (AT_FDCWD, SSDATA (file),
 			 O_PATH | O_CLOEXEC | O_DIRECTORY, 0);
@@ -3246,7 +2589,6 @@ file_directory_p (Lisp_Object file)
     return true;
   errno = ENOTDIR;
   return false;
-#endif
 }
 
 DEFUN ("file-accessible-directory-p", Ffile_accessible_directory_p,
@@ -3300,19 +2642,6 @@ predicate must return true.  */)
 bool
 file_accessible_directory_p (Lisp_Object file)
 {
-#ifdef DOS_NT
-# ifdef WINDOWSNT
-  /* We need a special-purpose test because (a) NTFS security data is
-     not reflected in Posix-style mode bits, and (b) the trick with
-     accessing "DIR/.", used below on Posix hosts, doesn't work on
-     Windows, because "DIR/." is normalized to just "DIR" before
-     hitting the disk.  */
-  return (SBYTES (file) == 0
-	  || w32_accessible_directory_p (SSDATA (file), SBYTES (file)));
-# else	/* MSDOS */
-  return file_directory_p (file);
-# endif	 /* MSDOS */
-#else	 /* !DOS_NT */
   /* On POSIXish platforms, use just one system call; this avoids a
      race and is typically faster.  */
   const char *data = SSDATA (file);
@@ -3350,7 +2679,6 @@ file_accessible_directory_p (Lisp_Object file)
   ok = file_access_p (dir, F_OK);
   SAFE_FREE ();
   return ok;
-#endif	/* !DOS_NT */
 }
 
 DEFUN ("file-regular-p", Ffile_regular_p, Sfile_regular_p, 1, 1, 0,
@@ -3371,17 +2699,9 @@ See `file-symlink-p' to distinguish symlinks.  */)
   if (!NILP (handler))
     return calln (handler, Qfile_regular_p, absname);
 
-#ifdef WINDOWSNT
-  /* Tell stat to use expensive method to get accurate info.  */
-  Lisp_Object true_attributes = Vw32_get_true_file_attributes;
-  Vw32_get_true_file_attributes = Qt;
-#endif
 
   int stat_result = emacs_fstatat (AT_FDCWD, SSDATA (absname), &st, 0);
 
-#ifdef WINDOWSNT
-  Vw32_get_true_file_attributes = true_attributes;
-#endif
 
   return stat_result == 0 && S_ISREG (st.st_mode) ? Qt : Qnil;
 }
@@ -3765,11 +3085,6 @@ TIMESTAMP is in the format of `current-time'. */)
 
   if (utimensat (AT_FDCWD, SSDATA (encoded_absname), ts, nofollow) != 0)
     {
-#ifdef MSDOS
-      /* Setting times on a directory always fails.  */
-      if (file_directory_p (encoded_absname))
-	return Qnil;
-#endif
       report_file_error ("Setting file times", absname);
     }
 
@@ -5638,11 +4953,7 @@ write_region (Lisp_Object start, Lisp_Object end, Lisp_Object filename,
     offset = file_offset (append);
   else if (!NILP (append))
     open_flags |= O_APPEND;
-#ifdef DOS_NT
-  mode = S_IREAD | S_IWRITE;
-#else
   mode = auto_saving ? auto_save_mode_bits : 0666;
-#endif
 
   if (open_and_close_file)
     {
@@ -5705,9 +5016,6 @@ write_region (Lisp_Object start, Lisp_Object end, Lisp_Object filename,
 	if (errno != EINTR)
 	  {
 	    if (errno != EINVAL
-#ifdef WINDOWSNT
-		&& errno != EBADF
-#endif
 		)
 	      ok = 0, save_errno = errno;
 	    break;
@@ -5762,12 +5070,6 @@ write_region (Lisp_Object start, Lisp_Object end, Lisp_Object filename,
       if (emacs_fstatat (AT_FDCWD, fn, &st1, 0) == 0
 	  && st.st_dev == st1.st_dev
 	  && (st.st_ino == st1.st_ino
-#if defined HAVE_ANDROID && !defined ANDROID_STUBIFY
-	      /* `st1.st_ino' == 0 indicates that the inode number
-		 cannot be extracted from this document file, despite
-		 `st' potentially being backed by a real file.  */
-	      || st1.st_ino == 0
-#endif /* defined HAVE_ANDROID && !defined ANDROID_STUBIFY */
 	      ))
 	{
 	  /* Use the heuristic if it appears to be valid.  With neither
@@ -6559,14 +5861,6 @@ The return value is only relevant for a call to `read-file-name' that happens
 before any other event (mouse or keypress) is handled.  */)
   (void)
 {
-#if (defined USE_GTK || defined USE_MOTIF \
-     || defined HAVE_NS || defined HAVE_NTGUI || defined HAVE_HAIKU)
-  if ((NILP (last_nonmenu_event) || CONSP (last_nonmenu_event))
-      && use_dialog_box
-      && use_file_dialog
-      && window_system_available (SELECTED_FRAME ()))
-    return Qt;
-#endif
   return Qnil;
 }
 
@@ -6612,7 +5906,6 @@ effect except for flushing STREAM's data.  */)
   return (set_binary_mode (fileno (fp), binmode) == O_BINARY) ? Qt : Qnil;
 }
 
-#ifndef DOS_NT
 
 #if defined STAT_STATFS2_BSIZE || defined STAT_STATFS2_FRSIZE	\
   || defined STAT_STATFS2_FSIZE || defined STAT_STATFS3_OSF1	\
@@ -6666,12 +5959,6 @@ If the underlying system call fails, value is nil.  */)
 
   name = SSDATA (ENCODE_FILE (filename));
 
-#if defined HAVE_ANDROID && !defined ANDROID_STUBIFY
-  /* With special directories, this information is unavailable.  */
-  if (android_is_special_directory (name, "/assets")
-      || android_is_special_directory (name, "/content"))
-    return Qnil;
-#endif /* defined HAVE_ANDROID && !defined ANDROID_STUBIFY */
 
   if (get_fs_usage (name, NULL, &u) != 0)
     return errno == ENOSYS ? Qnil : file_attribute_errno (filename, errno);
@@ -6684,7 +5971,6 @@ If the underlying system call fails, value is nil.  */)
 #endif
 }
 
-#endif /* !DOS_NT */
 
 void
 init_fileio (void)
@@ -7047,9 +6333,7 @@ This includes interactive calls to `delete-file' and
 
   defsubr (&Sset_binary_mode);
 
-#ifndef DOS_NT
   defsubr (&Sfile_system_info);
-#endif /* DOS_NT */
 
 #ifdef HAVE_SYNC
   defsubr (&Sunix_sync);

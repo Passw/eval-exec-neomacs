@@ -45,20 +45,12 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 #include "blockinput.h"
 #include "syssignal.h"
 #include "sysstdio.h"
-#ifdef MSDOS
-#include "msdos.h"
-static int been_here = -1;
-#endif
 
 #include "cm.h"
 #include "menu.h"
 
 /* The name of the default console device.  */
-#ifdef WINDOWSNT
-#include "w32term.h"
-#endif
 
-#ifndef HAVE_ANDROID
 
 static void tty_set_scroll_region (struct frame *f, int start, int stop);
 static void turn_on_face (struct frame *f, struct face *face);
@@ -70,14 +62,12 @@ static void set_tty_hooks (struct terminal *terminal);
 static void dissociate_if_controlling_tty (int fd);
 static void delete_tty (struct terminal *);
 
-#endif /* !HAVE_ANDROID */
 
 static AVOID maybe_fatal (bool, struct terminal *, const char *, const char *,
 			  ...)
   ATTRIBUTE_FORMAT_PRINTF (3, 5) ATTRIBUTE_FORMAT_PRINTF (4, 5);
 static AVOID vfatal (const char *, va_list) ATTRIBUTE_FORMAT_PRINTF (1, 0);
 
-#ifndef HAVE_ANDROID
 
 #define OUTPUT(tty, a)                                          \
   emacs_tputs (tty, a,                                        \
@@ -96,7 +86,6 @@ static AVOID vfatal (const char *, va_list) ATTRIBUTE_FORMAT_PRINTF (1, 0);
 #define OUTPUT1_IF(tty, a) \
   do { if (a) emacs_tputs (tty, a, 1, cmputc); } while (0)
 
-#endif
 
 /* Display space properties.  */
 
@@ -120,13 +109,11 @@ enum no_color_bit
 
 /* internal state */
 
-#ifndef HAVE_ANDROID
 
 /* The largest frame width in any call to calculate_costs.  */
 
 static int max_frame_cols;
 
-#endif
 
 
 
@@ -141,7 +128,6 @@ static Lisp_Object last_mouse_frame;
 static int last_mouse_x, last_mouse_y;
 #endif /* HAVE_GPM */
 
-#ifndef HAVE_ANDROID
 
 /* Ring the bell on a tty. */
 
@@ -343,11 +329,7 @@ tty_hide_cursor (struct tty_display_info *tty)
   if (tty->cursor_hidden == 0)
     {
       tty->cursor_hidden = 1;
-#ifdef WINDOWSNT
-      w32con_hide_cursor ();
-#else
       OUTPUT_IF (tty, tty->TS_cursor_invisible);
-#endif
     }
 }
 
@@ -360,13 +342,9 @@ tty_show_cursor (struct tty_display_info *tty)
   if (tty->cursor_hidden)
     {
       tty->cursor_hidden = 0;
-#ifdef WINDOWSNT
-      w32con_show_cursor ();
-#else
       OUTPUT_IF (tty, tty->TS_cursor_normal);
       if (visible_cursor)
         OUTPUT_IF (tty, tty->TS_cursor_visible);
-#endif
     }
 }
 
@@ -734,20 +712,7 @@ encode_terminal_code (struct glyph *src, int src_len,
   return (encode_terminal_dst);
 }
 
-#else /* !HAVE_ANDROID */
 
-unsigned char *
-encode_terminal_code (struct glyph *src, int src_len,
-		      struct coding_system *coding)
-{
-  /* Text terminals are simply not supported on Android.  */
-  coding->produced = 0;
-  return NULL;
-}
-
-#endif /* HAVE_ANDROID */
-
-#ifndef HAVE_ANDROID
 
 /* An implementation of write_glyphs for termcap frames. */
 
@@ -812,7 +777,6 @@ tty_write_glyphs_1 (struct frame *f, struct glyph *string, int len)
   cmcheckmagic (tty);
 }
 
-#ifndef DOS_NT
 
 static void
 tty_write_glyphs_with_face (struct frame *f, struct glyph *string,
@@ -870,7 +834,6 @@ tty_write_glyphs_with_face (struct frame *f, struct glyph *string,
   cmcheckmagic (tty);
 }
 
-#endif
 
 /* An implementation of insert_glyphs for termcap frames. */
 
@@ -1105,10 +1068,8 @@ int
 string_cost (const char *str)
 {
   cost = 0;
-#ifndef HAVE_ANDROID
   if (str)
     tputs (str, 0, evalcost);
-#endif
   return cost;
 }
 
@@ -1119,10 +1080,8 @@ static int
 string_cost_one_line (const char *str)
 {
   cost = 0;
-#ifndef HAVE_ANDROID
   if (str)
     tputs (str, 1, evalcost);
-#endif
   return cost;
 }
 
@@ -1133,13 +1092,11 @@ int
 per_line_cost (const char *str)
 {
   cost = 0;
-#ifndef HAVE_ANDROID
   if (str)
     tputs (str, 0, evalcost);
   cost = - cost;
   if (str)
     tputs (str, 10, evalcost);
-#endif
   return cost;
 }
 
@@ -1212,14 +1169,12 @@ calculate_ins_del_char_costs (struct frame *f)
     *p++ = (ins_startup_cost += ins_cost_per_char);
 }
 
-#endif
 
 void
 calculate_costs (struct frame *frame)
 {
   FRAME_COST_BAUD_RATE (frame) = baud_rate;
 
-#ifndef HAVE_ANDROID
   if (FRAME_TERMCAP_P (frame))
     {
       struct tty_display_info *tty = FRAME_TTY (frame);
@@ -1274,7 +1229,6 @@ calculate_costs (struct frame *frame)
 
       cmcostinit (FRAME_TTY (frame)); /* set up cursor motion costs */
     }
-#endif
 }
 
 struct fkey_table
@@ -1282,7 +1236,6 @@ struct fkey_table
   const char *cap, *name;
 };
 
-#if !defined DOS_NT && !defined HAVE_ANDROID
   /* Termcap capability names that correspond directly to X keysyms.
      Some of these (marked "terminfo") aren't supplied by old-style
      (Berkeley) termcap entries.  They're listed in X keysym order;
@@ -1510,7 +1463,6 @@ term_get_fkeys_1 (void)
 
   return Qnil;
 }
-#endif /* not DOS_NT */
 
 
 
@@ -1996,7 +1948,6 @@ produce_glyphless_glyph (struct it *it, Lisp_Object acronym)
 }
 
 
-#ifndef HAVE_ANDROID
 /***********************************************************************
 				TTY Faces
  ***********************************************************************/
@@ -2134,7 +2085,6 @@ turn_off_face (struct frame *f, struct face *face)
     OUTPUT1_IF (tty, tty->TS_orig_pair);
 }
 
-#endif /* !HAVE_ANDROID */
 
 /* Return true if the terminal on frame F supports all of the
    capabilities in CAPS simultaneously.  */
@@ -2142,7 +2092,6 @@ turn_off_face (struct frame *f, struct face *face)
 bool
 tty_capable_p (struct tty_display_info *tty, unsigned int caps)
 {
-#ifndef HAVE_ANDROID
 #define TTY_CAPABLE_P_TRY(tty, cap, TS, NC_bit)				\
   if ((caps & (cap)) && (!(TS) || !MAY_USE_WITH_COLORS_P (tty, NC_bit)))	\
     return 0;
@@ -2167,9 +2116,6 @@ tty_capable_p (struct tty_display_info *tty, unsigned int caps)
 
   /* We can do it!  */
   return 1;
-#else
-  return false;
-#endif
 }
 
 /* Return non-zero if the terminal is capable to display colors.  */
@@ -2203,7 +2149,6 @@ TERMINAL does not refer to a text terminal.  */)
   return make_fixnum (t ? t->display_info.tty->TN_max_colors : 0);
 }
 
-#if !defined DOS_NT && !defined HAVE_ANDROID
 
 /* Declare here rather than in the function, as in the rest of Emacs,
    to work around an HPUX compiler bug (?). See
@@ -2262,13 +2207,8 @@ tty_setup_colors (struct tty_display_info *tty, int mode)
 	break;
       case 8:	/* 8 standard ANSI colors */
 	tty->TS_orig_pair = "\033[0m";
-#ifdef TERMINFO
 	tty->TS_set_foreground = "\033[3%p1%dm";
 	tty->TS_set_background = "\033[4%p1%dm";
-#else
-	tty->TS_set_foreground = "\033[3%dm";
-	tty->TS_set_background = "\033[4%dm";
-#endif
 	tty->TN_max_colors = 8;
 	tty->TN_no_color_video = 0;
 	break;
@@ -2308,7 +2248,6 @@ set_tty_color_mode (struct tty_display_info *tty, struct frame *f)
     }
 }
 
-#endif /* !DOS_NT && !HAVE_ANDROID */
 
 char *
 tty_type_name (Lisp_Object terminal)
@@ -2400,7 +2339,6 @@ suspended.
 A suspended tty may be resumed by calling `resume-tty' on it.  */)
   (Lisp_Object tty)
 {
-#ifndef HAVE_ANDROID
   struct terminal *t = decode_tty_terminal (tty);
   FILE *f;
 
@@ -2421,11 +2359,9 @@ A suspended tty may be resumed by calling `resume-tty' on it.  */)
       reset_sys_modes (t->display_info.tty);
       delete_keyboard_wait_descriptor (fileno (f));
 
-#ifndef MSDOS
       if (f != t->display_info.tty->output)
         emacs_fclose (t->display_info.tty->output);
       emacs_fclose (f);
-#endif /* !MSDOS */
 
       t->display_info.tty->input = 0;
       t->display_info.tty->output = 0;
@@ -2439,11 +2375,6 @@ A suspended tty may be resumed by calling `resume-tty' on it.  */)
 
   /* Clear display hooks to prevent further output.  */
   clear_tty_hooks (t);
-#else /* HAVE_ANDROID */
-  /* Android doesn't support TTY terminal devices, so unconditionally
-     signal.  */
-  error ("Attempt to suspend a non-text terminal device");
-#endif /* !HAVE_ANDROID */
 
   return Qnil;
 }
@@ -2467,7 +2398,6 @@ TTY may be a terminal object, a frame, or nil (meaning the selected
 frame's terminal). */)
   (Lisp_Object tty)
 {
-#ifndef HAVE_ANDROID
   struct terminal *t;
   int fd;
 
@@ -2481,10 +2411,6 @@ frame's terminal). */)
       if (get_named_terminal (t->display_info.tty->name))
         error ("Cannot resume display while another display is active on the same device");
 
-#ifdef MSDOS
-      t->display_info.tty->output = stdout;
-      t->display_info.tty->input  = stdin;
-#else  /* !MSDOS */
       fd = emacs_open (t->display_info.tty->name, O_RDWR | O_NOCTTY, 0);
       t->display_info.tty->input = t->display_info.tty->output
 	= fd < 0 ? 0 : emacs_fdopen (fd, "w+");
@@ -2500,7 +2426,6 @@ frame's terminal). */)
 
       if (!O_IGNORE_CTTY && strcmp (t->display_info.tty->name, dev_tty) != 0)
         dissociate_if_controlling_tty (fd);
-#endif /* MSDOS */
 
       add_keyboard_wait_descriptor (fd);
 
@@ -2530,16 +2455,10 @@ frame's terminal). */)
     }
 
   set_tty_hooks (t);
-#else /* HAVE_ANDROID */
-  /* Android doesn't support TTY terminal devices, so unconditionally
-     signal.  */
-  error ("Attempt to suspend a non-text terminal device");
-#endif /* !HAVE_ANDROID */
 
   return Qnil;
 }
 
-#ifndef HAVE_ANDROID
 
 DEFUN ("tty--set-output-buffer-size", Ftty__set_output_buffer_size,
        Stty__set_output_buffer_size, 1, 2, 0, doc:
@@ -2579,14 +2498,12 @@ A value of zero means TTY uses the system's default value.  */)
   error ("Not a tty terminal");
 }
 
-#endif /* !HAVE_ANDROID */
 
 
 /***********************************************************************
 			       Mouse
  ***********************************************************************/
 
-#if !defined DOS_NT && !defined HAVE_ANDROID
 
 /* Implementation of draw_row_with_mouse_face for TTY/GPM and macOS.  */
 
@@ -2675,12 +2592,10 @@ tty_draw_row_with_mouse_face (struct window *w, struct glyph_row *window_row,
   cursor_to (f, save_y, save_x);
 }
 
-#endif
 
 static Lisp_Object
 tty_frame_at (int x, int y, int *cx, int *cy)
 {
-#ifndef HAVE_ANDROID
   for (Lisp_Object frames = Ftty_frame_list_z_order (Qnil);
        !NILP (frames);
        frames = Fcdr (frames))
@@ -2753,7 +2668,6 @@ tty_frame_at (int x, int y, int *cx, int *cy)
 	  return frame;
 	}
     }
-#endif /* !HAVE_ANDROID */
 
   return Qnil;
 }
@@ -3029,7 +2943,6 @@ DEFUN ("gpm-mouse-stop", Fgpm_mouse_stop, Sgpm_mouse_stop,
 			       Menus
  ***********************************************************************/
 
-#if !defined (MSDOS) && !defined HAVE_ANDROID
 
 /* TTY menu implementation and main ideas are borrowed from msdos.c.
 
@@ -4043,20 +3956,6 @@ tty_menu_show (struct frame *f, int x, int y, int menuflags,
   if (ulx < 0) x -= ulx;
   if (uly < 0) y -= uly;
 
-#if 0
-  /* This code doesn't make sense on a TTY, since it can easily annul
-     the adjustments above that carefully avoid truncation of the menu
-     items.  I think it was written to fix some problem that only
-     happens on X11.  */
-  if (! for_click)
-    {
-      /* If position was not given by a mouse click, adjust so upper left
-         corner of the menu as a whole ends up at given coordinates.  This
-         is what x-popup-menu says in its documentation.  */
-      x += width / 2;
-      y += 1.5 * height / (maxlines + 2);
-    }
-#endif
 
   pane = selidx = 0;
 
@@ -4139,11 +4038,9 @@ tty_menu_show (struct frame *f, int x, int y, int menuflags,
   return SAFE_FREE_UNBIND_TO (specpdl_count, entry);
 }
 
-#endif	/* !MSDOS && !defined HAVE_ANDROID */
 
 
 
-#if !defined MSDOS && !defined HAVE_ANDROID
 
 /***********************************************************************
 			    Initialization
@@ -4180,26 +4077,9 @@ tty_free_frame_resources (struct frame *f)
     SET_FRAME_GARBAGED (root_frame (f));
 }
 
-#elif defined MSDOS
-
-/* Delete frame F's face cache.  */
-
-static void
-tty_free_frame_resources (struct frame *f)
-{
-  eassert (FRAME_TERMCAP_P (f) || FRAME_MSDOS_P (f));
-  free_frame_faces (f);
-  /* Deleting a child frame means we have to thoroughly redisplay its
-     root frame to make sure the child disappears from the display.  */
-  if (FRAME_PARENT_FRAME (f))
-    SET_FRAME_GARBAGED (root_frame (f));
-}
-
-#endif
 
 
 
-#ifndef HAVE_ANDROID
 
 /* Reset the hooks in TERMINAL.  */
 
@@ -4262,11 +4142,7 @@ set_tty_hooks (struct terminal *terminal)
   terminal->reset_terminal_modes_hook = &tty_reset_terminal_modes;
   terminal->set_terminal_modes_hook = &tty_set_terminal_modes;
   terminal->update_end_hook = &tty_update_end;
-#ifdef MSDOS
-  terminal->menu_show_hook = &x_menu_show;
-#else
   terminal->menu_show_hook = &tty_menu_show;
-#endif
   terminal->set_terminal_window_hook = &tty_set_terminal_window;
   terminal->defined_color_hook = &tty_defined_color; /* xfaces.c */
   terminal->read_socket_hook = &tty_read_avail_input; /* keyboard.c */
@@ -4297,7 +4173,6 @@ dissociate_if_controlling_tty (int fd)
     }
 }
 
-#endif /* !HAVE_ANDROID */
 
 /* Create a termcap display on the tty device with the given name and
    type.
@@ -4318,13 +4193,11 @@ init_tty (const char *name, const char *terminal_type, bool must_succeed)
 {
   struct tty_display_info *tty = NULL;
   struct terminal *terminal = NULL;
-#ifndef DOS_NT
   char *area;
   char **address = &area;
   int status;
   sigset_t oldset;
   bool ctty = false;  /* True if asked to open controlling tty.  */
-#endif
 
   if (!terminal_type)
     maybe_fatal (must_succeed, 0,
@@ -4333,10 +4206,8 @@ init_tty (const char *name, const char *terminal_type, bool must_succeed)
 
   if (name == NULL)
     name = dev_tty;
-#ifndef DOS_NT
   if (!strcmp (name, dev_tty))
     ctty = 1;
-#endif
 
   /* If we already have a terminal on the given device, use that.  If
      all such terminals are suspended, create a new one instead.  */
@@ -4348,15 +4219,7 @@ init_tty (const char *name, const char *terminal_type, bool must_succeed)
     return terminal;
 
   terminal = create_terminal (output_termcap, NULL);
-#ifdef MSDOS
-  if (been_here > 0)
-    maybe_fatal (0, 0, "Attempt to create another terminal %s", "",
-		 name, "");
-  been_here = 1;
-  tty = &the_only_display_info;
-#else
   tty = xzalloc (sizeof *tty);
-#endif
   tty->top_frame = Qnil;
   tty->next = tty_list;
   tty_list = tty;
@@ -4371,7 +4234,6 @@ init_tty (const char *name, const char *terminal_type, bool must_succeed)
   encode_terminal_dst_size = 0;
 
 
-#ifndef DOS_NT
   set_tty_hooks (terminal);
 
   {
@@ -4423,15 +4285,9 @@ init_tty (const char *name, const char *terminal_type, bool must_succeed)
 
   if (status < 0)
     {
-#ifdef TERMINFO
       maybe_fatal (must_succeed, terminal,
                    "Cannot open terminfo database file",
                    "Cannot open terminfo database file");
-#else
-      maybe_fatal (must_succeed, terminal,
-                   "Cannot open termcap database file",
-                   "Cannot open termcap database file");
-#endif
     }
   if (status == 0)
     {
@@ -4441,11 +4297,7 @@ init_tty (const char *name, const char *terminal_type, bool must_succeed)
 If that is not the actual type of terminal you have,\n\
 use the Bourne shell command 'TERM=...; export TERM' (C-shell:\n\
 'setenv TERM ...') to specify the correct type.  It may be necessary\n"
-#ifdef TERMINFO
 "to do 'unset TERMINFO' (C-shell: 'unsetenv TERMINFO') as well.",
-#else
-"to do 'unset TERMCAP' (C-shell: 'unsetenv TERMCAP') as well.",
-#endif
                    terminal_type);
     }
 
@@ -4513,15 +4365,9 @@ use the Bourne shell command 'TERM=...; export TERM' (C-shell:\n\
   tty->TS_enter_alt_charset_mode = tgetstr ("as", address);
   tty->TS_exit_alt_charset_mode = tgetstr ("ae", address);
   tty->TS_exit_attribute_mode = tgetstr ("me", address);
-#ifdef TERMINFO
   tty->TS_enter_strike_through_mode = tigetstr ("smxx");
   if (tty->TS_enter_strike_through_mode == (char *) (intptr_t) -1)
     tty->TS_enter_strike_through_mode = NULL;
-#else
-  /* FIXME: Is calling tgetstr here for non-terminfo case correct,
-     even though "smxx" is more than 2 characters?  */
-  tty->TS_enter_strike_through_mode = tgetstr ("smxx", address);
-#endif
 
   MultiUp (tty) = tgetstr ("UP", address);
   MultiDown (tty) = tgetstr ("DO", address);
@@ -4545,7 +4391,6 @@ use the Bourne shell command 'TERM=...; export TERM' (C-shell:\n\
 
       tty->TN_max_colors = tgetnum ("Co");
 
-#ifdef TERMINFO
       {
 	const char *fg = tigetstr ("setf24");
 	const char *bg = tigetstr ("setb24");
@@ -4578,7 +4423,6 @@ use the Bourne shell command 'TERM=...; export TERM' (C-shell:\n\
 	    tty->TN_max_colors = 16777216;
 	  }
       }
-#endif
 
       tty->TN_no_color_video = tgetnum ("NC");
       if (tty->TN_no_color_video == -1)
@@ -4603,13 +4447,9 @@ use the Bourne shell command 'TERM=...; export TERM' (C-shell:\n\
   /* Styled underlines.  Support for this is provided either by the
      escape sequence in Smulx or the Su flag.  The latter results in a
      common default escape sequence and is not recommended.  */
-#ifdef TERMINFO
   tty->TF_set_underline_style = tigetstr ("Smulx");
   if (tty->TF_set_underline_style == (char *) (intptr_t) -1)
     tty->TF_set_underline_style = NULL;
-#else
-  tty->TF_set_underline_style = tgetstr ("Smulx", address);
-#endif
   if (!tty->TF_set_underline_style && tgetflag ("Su"))
     /* Default to the kitty escape sequence.  See
        https://sw.kovidgoyal.net/kitty/underlines/.  */
@@ -4620,61 +4460,6 @@ use the Bourne shell command 'TERM=...; export TERM' (C-shell:\n\
        Requires a single parameter, the color index.  */
     tty->TF_set_underline_color = "\x1b[58:2::%p1%{65536}%/%d:%p1%{256}%/%{255}%&%d:%p1%{255}%&%dm";
 
-#else /* DOS_NT */
-#ifdef WINDOWSNT
-  {
-    struct frame *f = XFRAME (selected_frame);
-    int height, width;
-
-    initialize_w32_display (terminal, &width, &height);
-
-    FrameRows (tty) = height;
-    FrameCols (tty) = width;
-    tty->specified_window = height;
-
-    FRAME_VERTICAL_SCROLL_BAR_TYPE (f) = vertical_scroll_bar_none;
-    FRAME_HAS_HORIZONTAL_SCROLL_BARS (f) = 0;
-    tty->char_ins_del_ok = 1;
-    baud_rate = 19200;
-  }
-#else  /* MSDOS */
-  {
-    int height, width;
-    if (strcmp (terminal_type, "internal") == 0)
-      terminal->type = output_msdos_raw;
-    initialize_msdos_display (terminal);
-
-    get_tty_size (fileno (tty->input), &width, &height);
-    FrameCols (tty) = width;
-    FrameRows (tty) = height;
-    tty->char_ins_del_ok = 0;
-    init_baud_rate (fileno (tty->input));
-  }
-#endif	/* MSDOS */
-  tty->output = stdout;
-  tty->input = stdin;
-  /* The following two are inaccessible from w32console.c.  */
-  terminal->delete_frame_hook = &tty_free_frame_resources;
-  terminal->delete_terminal_hook = &delete_tty;
-
-  tty->name = xstrdup (name);
-  terminal->name = xstrdup (name);
-  tty->type = xstrdup (terminal_type);
-
-  add_keyboard_wait_descriptor (0);
-
-  tty->delete_in_insert_mode = 1;
-
-  UseTabs (tty) = 0;
-  tty->scroll_region_ok = 0;
-
-  /* Seems to insert lines when it's not supposed to, messing up the
-     display.  In doing a trace, it didn't seem to be called much, so I
-     don't think we're losing anything by turning it off.  */
-  tty->line_ins_del_ok = 0;
-
-  tty->TN_max_colors = 16;  /* Must be non-zero for tty-display-color-p.  */
-#endif	/* DOS_NT */
 
 #ifdef HAVE_GPM
   terminal->mouse_position_hook = term_mouse_position;
@@ -4688,7 +4473,6 @@ use the Bourne shell command 'TERM=...; export TERM' (C-shell:\n\
      prompt in the mini-buffer.  */
   if (current_kboard == initial_kboard)
     current_kboard = terminal->kboard;
-#ifndef DOS_NT
   term_get_fkeys (address, terminal->kboard);
 
   /* Get frame size from system, or else from termcap.  */
@@ -4783,11 +4567,7 @@ It lacks the ability to position the cursor.\n\
 If that is not the actual type of terminal you have,\n\
 use the Bourne shell command 'TERM=...; export TERM' (C-shell:\n\
 'setenv TERM ...') to specify the correct type.  It may be necessary\n"
-# ifdef TERMINFO
 "to do 'unset TERMINFO' (C-shell: 'unsetenv TERMINFO') as well.",
-# else /* TERMCAP */
-"to do 'unset TERMCAP' (C-shell: 'unsetenv TERMCAP') as well.",
-# endif /* TERMINFO */
                    terminal_type);
     }
 
@@ -4819,7 +4599,6 @@ use the Bourne shell command 'TERM=...; export TERM' (C-shell:\n\
 
   init_baud_rate (fileno (tty->input));
 
-#endif /* not DOS_NT */
 
   /* Init system terminal modes (RAW or CBREAK, etc.).  */
   init_sys_modes (tty);
@@ -4850,12 +4629,8 @@ maybe_fatal (bool must_succeed, struct terminal *terminal,
   va_list ap;
   va_start (ap, str2);
 
-#ifndef HAVE_ANDROID
   if (terminal)
     delete_tty (terminal);
-#else
-  eassert (terminal == NULL);
-#endif
 
   if (must_succeed)
     vfatal (str2, ap);
@@ -4873,7 +4648,6 @@ fatal (const char *str, ...)
 
 
 
-#ifndef HAVE_ANDROID
 
 /* Delete the given tty terminal, closing all frames on it.  */
 
@@ -4932,7 +4706,6 @@ delete_tty (struct terminal *terminal)
   xfree (tty);
 }
 
-#endif
 
 /* Return geometric attributes of FRAME.  According to the value of
    ATTRIBUTES return the outer edges of FRAME (Qouter_edges), the
@@ -5125,11 +4898,7 @@ syms_of_term (void)
   DEFVAR_BOOL ("system-uses-terminfo", system_uses_terminfo,
     doc: /* Non-nil means the system uses terminfo rather than termcap.
 This variable can be used by terminal emulator packages.  */);
-#if defined TERMINFO || (defined HAVE_ANDROID && !defined ANDROID_STUBIFY)
   system_uses_terminfo = 1;
-#else
-  system_uses_terminfo = 0;
-#endif
 
   DEFVAR_LISP ("suspend-tty-functions", Vsuspend_tty_functions,
     doc: /* Functions run after suspending a tty.
@@ -5175,10 +4944,8 @@ non-nil to enable this optimization.  */);
   defsubr (&Stty_top_frame);
   defsubr (&Ssuspend_tty);
   defsubr (&Sresume_tty);
-#ifndef HAVE_ANDROID
   defsubr (&Stty__set_output_buffer_size);
   defsubr (&Stty__output_buffer_size);
-#endif /* !HAVE_ANDROID */
   defsubr (&Stty_frame_at);
 #ifdef HAVE_GPM
   defsubr (&Sgpm_mouse_start);
@@ -5193,21 +4960,16 @@ non-nil to enable this optimization.  */);
   defsubr (&Stty_display_pixel_width);
   defsubr (&Stty_display_pixel_height);
 
-#if !defined DOS_NT && !defined HAVE_ANDROID
   default_orig_pair = NULL;
   default_set_foreground = NULL;
   default_set_background = NULL;
-#endif /* !DOS_NT && !HAVE_ANDROID */
 
-#ifndef HAVE_ANDROID
   encode_terminal_src = NULL;
   encode_terminal_dst = NULL;
-#endif
 
   DEFSYM (Qtty_mode_set_strings, "tty-mode-set-strings");
   DEFSYM (Qtty_mode_reset_strings, "tty-mode-reset-strings");
 
-#ifndef MSDOS
   DEFSYM (Qtty_menu_next_item, "tty-menu-next-item");
   DEFSYM (Qtty_menu_prev_item, "tty-menu-prev-item");
   DEFSYM (Qtty_menu_next_menu, "tty-menu-next-menu");
@@ -5217,7 +4979,6 @@ non-nil to enable this optimization.  */);
   DEFSYM (Qtty_menu_exit, "tty-menu-exit");
   DEFSYM (Qtty_menu_mouse_movement, "tty-menu-mouse-movement");
   DEFSYM (Qtty_menu_navigation_map, "tty-menu-navigation-map");
-#endif
   DEFSYM (Qf0, "f0");
   DEFSYM (Qf10, "f10");
   DEFSYM (Qtty_set_up_initial_frame_faces,

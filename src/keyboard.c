@@ -55,12 +55,7 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 #ifdef HAVE_PTHREAD
 #include <pthread.h>
 #endif
-#ifdef MSDOS
-#include "msdos.h"
-#include <time.h>
-#else /* not MSDOS */
 #include <sys/ioctl.h>
-#endif /* not MSDOS */
 
 #if defined USABLE_FIONREAD && defined USG5_4
 # include <sys/filio.h>
@@ -68,7 +63,7 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 
 #include "syssignal.h"
 
-#if defined HAVE_STACK_OVERFLOW_HANDLING && !defined WINDOWSNT
+#ifdef HAVE_STACK_OVERFLOW_HANDLING
 #include <setjmp.h>
 #endif
 
@@ -88,11 +83,7 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 #define NLOG_MODULE "keyboard"
 #include "neomacs_log.h"
 
-#ifdef WINDOWSNT
-char const DEV_TTY[] = "CONOUT$";
-#else
 char const DEV_TTY[] = "/dev/tty";
-#endif
 char *dev_tty;	/* set by init_keyboard */
 
 /* Variables for blockinput.h:  */
@@ -1118,9 +1109,6 @@ command_loop (void)
     {
       /* Comes here from handle_sigsegv (see sysdep.c) and
 	 stack_overflow_handler (see w32fns.c).  */
-#ifdef WINDOWSNT
-      w32_reset_stack_overflow_guard ();
-#endif
       init_eval ();
       Vinternal__top_level_message = recover_top_level_message;
     }
@@ -2026,16 +2014,6 @@ static struct atimer *poll_timer;
 /* The poll period that constructed this timer.  */
 static Lisp_Object poll_timer_time;
 
-#if defined CYGWIN || defined DOS_NT
-/* Poll for input, so that we catch a C-g if it comes in.  */
-void
-poll_for_input_1 (void)
-{
-  if (! input_blocked_p ()
-      && !waiting_for_input)
-    gobble_input ();
-}
-#endif
 
 /* Timer callback function for poll_timer.  TIMER is equal to
    poll_timer.  */
@@ -2088,22 +2066,6 @@ start_polling (void)
 #endif
 }
 
-#if defined CYGWIN || defined DOS_NT
-/* True if we are using polling to handle input asynchronously.  */
-
-bool
-input_polling_used (void)
-{
-# ifdef POLL_FOR_INPUT
-  /* XXX This condition was (read_socket_hook && !interrupt_input),
-     but read_socket_hook is not global anymore.  Let's pretend that
-     it's always set.  */
-  return !interrupt_input;
-# else
-  return false;
-# endif
-}
-#endif
 
 /* Turn off polling.  */
 
@@ -2399,23 +2361,14 @@ read_decoded_event_from_main_queue (struct timespec *end_time,
                                     Lisp_Object prev_event,
                                     bool *used_mouse_menu)
 {
-#ifndef WINDOWSNT
 #define MAX_ENCODED_BYTES 16
   Lisp_Object events[MAX_ENCODED_BYTES];
   int n = 0;
-#endif
   while (true)
     {
       Lisp_Object nextevt
         = read_event_from_main_queue (end_time, local_getcjmp,
                                       used_mouse_menu);
-#ifdef WINDOWSNT
-      /* w32_console already returns decoded events.  It either reads
-	 Unicode characters from the Windows keyboard input, or
-	 converts characters encoded in the current codepage into
-	 Unicode.  See w32inevt.c:key_event, near its end.  */
-      return nextevt;
-#else
       struct frame *frame = XFRAME (selected_frame);
       struct terminal *terminal = frame->terminal;
       if (!((FRAME_TERMCAP_P (frame) || FRAME_MSDOS_P (frame))
@@ -2502,7 +2455,6 @@ read_decoded_event_from_main_queue (struct timespec *end_time,
 	      = Fcons (events[--n], Vunread_command_events);
 	  return events[0];
 	}
-#endif
     }
 }
 
@@ -4142,44 +4094,14 @@ kbd_buffer_get_event (KBOARD **kbp,
 	 We return nil for them.  */
       switch (event->kind)
       {
-#ifndef HAVE_HAIKU
       case SELECTION_REQUEST_EVENT:
       case SELECTION_CLEAR_EVENT:
 	{
-#if defined HAVE_X11 || HAVE_PGTK
-	  /* Remove it from the buffer before processing it,
-	     since otherwise swallow_events will see it
-	     and process it again.  */
-	  struct selection_input_event copy = event->sie;
-	  kbd_fetch_ptr = next_kbd_event (event);
-	  input_pending = readable_events (0);
-
-#ifdef HAVE_X11
-	  x_handle_selection_event (&copy);
-#else
-	  pgtk_handle_selection_event (&copy);
-#endif
-#else
 	  /* We're getting selection request events, but we don't have
              a window system.  */
 	  emacs_abort ();
-#endif
 	}
         break;
-#else
-      case SELECTION_REQUEST_EVENT:
-	emacs_abort ();
-
-      case SELECTION_CLEAR_EVENT:
-	{
-	  struct input_event copy = event->ie;
-
-	  kbd_fetch_ptr = next_kbd_event (event);
-	  input_pending = readable_events (0);
-	  haiku_handle_selection_clear (&copy);
-	}
-	break;
-#endif
 
       case MONITORS_CHANGED_EVENT:
 	{
@@ -4216,10 +4138,6 @@ kbd_buffer_get_event (KBOARD **kbp,
         break;
 #endif
       case PREEDIT_TEXT_EVENT:
-#ifdef HAVE_NTGUI
-      case END_SESSION_EVENT:
-      case LANGUAGE_CHANGE_EVENT:
-#endif
 #ifdef HAVE_WINDOW_SYSTEM
       case DELETE_WINDOW_EVENT:
       case ICONIFY_EVENT:
@@ -4493,14 +4411,6 @@ static void
 process_special_events (void)
 {
   union buffered_input_event *event;
-#if defined HAVE_X11 || defined HAVE_PGTK || defined HAVE_HAIKU
-#ifndef HAVE_HAIKU
-  struct selection_input_event copy;
-#else
-  struct input_event copy;
-#endif
-  int moved_events;
-#endif
 
   for (event = kbd_fetch_ptr;  event != kbd_store_ptr;
        event = next_kbd_event (event))
@@ -4509,62 +4419,9 @@ process_special_events (void)
       if (event->kind == SELECTION_REQUEST_EVENT
 	  || event->kind == SELECTION_CLEAR_EVENT)
 	{
-#if defined HAVE_X11 || defined HAVE_PGTK
-
-	  /* Remove the event from the fifo buffer before processing;
-	     otherwise swallow_events called recursively could see it
-	     and process it again.  To do this, we move the events
-	     between kbd_fetch_ptr and EVENT one slot to the right,
-	     cyclically.  */
-
-	  copy = event->sie;
-
-	  if (event < kbd_fetch_ptr)
-	    {
-	      memmove (kbd_buffer + 1, kbd_buffer,
-		       (event - kbd_buffer) * sizeof *kbd_buffer);
-	      kbd_buffer[0] = kbd_buffer[KBD_BUFFER_SIZE - 1];
-	      moved_events = kbd_buffer + KBD_BUFFER_SIZE - 1 - kbd_fetch_ptr;
-	    }
-	  else
-	    moved_events = event - kbd_fetch_ptr;
-
-	  memmove (kbd_fetch_ptr + 1, kbd_fetch_ptr,
-		   moved_events * sizeof *kbd_fetch_ptr);
-	  kbd_fetch_ptr = next_kbd_event (kbd_fetch_ptr);
-	  input_pending = readable_events (0);
-
-#ifdef HAVE_X11
-	  x_handle_selection_event (&copy);
-#else
-	  pgtk_handle_selection_event (&copy);
-#endif
-#elif defined HAVE_HAIKU
-	  if (event->ie.kind != SELECTION_CLEAR_EVENT)
-	    emacs_abort ();
-
-	  copy = event->ie;
-
-	  if (event < kbd_fetch_ptr)
-	    {
-	      memmove (kbd_buffer + 1, kbd_buffer,
-		       (event - kbd_buffer) * sizeof *kbd_buffer);
-	      kbd_buffer[0] = kbd_buffer[KBD_BUFFER_SIZE - 1];
-	      moved_events = kbd_buffer + KBD_BUFFER_SIZE - 1 - kbd_fetch_ptr;
-	    }
-	  else
-	    moved_events = event - kbd_fetch_ptr;
-
-	  memmove (kbd_fetch_ptr + 1, kbd_fetch_ptr,
-		   moved_events * sizeof *kbd_fetch_ptr);
-	  kbd_fetch_ptr = next_kbd_event (kbd_fetch_ptr);
-	  input_pending = readable_events (0);
-	  haiku_handle_selection_clear (&copy);
-#else
 	  /* We're getting selection request events, but we don't have
              a window system.  */
 	  emacs_abort ();
-#endif
 	}
     }
 }
@@ -5942,37 +5799,12 @@ make_lispy_event (struct input_event *event)
 				  0, &KVAR (current_kboard, system_key_syms),
 				  PTRDIFF_MAX);
 
-#ifdef HAVE_NTGUI
-    case END_SESSION_EVENT:
-      /* Make an event (end-session).  */
-      return list1 (Qend_session);
-
-    case LANGUAGE_CHANGE_EVENT:
-      /* Make an event (language-change FRAME CODEPAGE LANGUAGE-ID).  */
-      return list4 (Qlanguage_change,
-		    event->frame_or_window,
-		    make_fixnum (event->code),
-		    make_fixnum (event->modifiers));
-
-    case MULTIMEDIA_KEY_EVENT:
-      if (event->code < ARRAYELTS (lispy_multimedia_keys)
-          && event->code > 0 && lispy_multimedia_keys[event->code])
-        {
-          return modify_event_symbol (event->code, event->modifiers,
-                                      Qfunction_key, Qnil,
-                                      lispy_multimedia_keys, &func_key_syms,
-                                      ARRAYELTS (lispy_multimedia_keys));
-        }
-      return Qnil;
-#endif
 
       /* A mouse click.  Figure out where it is, decide whether it's
          a press, click or drag, and build the appropriate structure.  */
     case MOUSE_CLICK_EVENT:
-#ifndef USE_TOOLKIT_SCROLL_BARS
     case SCROLL_BAR_CLICK_EVENT:
     case HORIZONTAL_SCROLL_BAR_CLICK_EVENT:
-#endif
       {
 	int button = event->code;
 	bool is_double;
@@ -6078,11 +5910,9 @@ make_lispy_event (struct input_event *event)
 	    if (CONSP (event->arg) && EQ (XCAR (event->arg), Qtab_bar))
 	      position = nconc2 (position, Fcons (XCDR (event->arg), Qnil));
 	  }
-#ifndef USE_TOOLKIT_SCROLL_BARS
 	else
 	  /* It's a scrollbar click.  */
 	  position = make_scroll_bar_position (event, Qvertical_scroll_bar);
-#endif /* not USE_TOOLKIT_SCROLL_BARS */
 
 	if (button >= ASIZE (button_down_location))
 	  {
@@ -7632,9 +7462,7 @@ tty_read_avail_input (struct terminal *terminal,
      the kbd_buffer can really hold.  That may prevent loss
      of characters on some systems when input is stuffed at us.  */
   unsigned char cbuf[KBD_BUFFER_SIZE - 1];
-#ifndef WINDOWSNT
   int n_to_read;
-#endif
   int i;
   struct tty_display_info *tty = terminal->display_info.tty;
   int nread = 0;
@@ -7654,26 +7482,12 @@ tty_read_avail_input (struct terminal *terminal,
 
   /* XXX I think the following code should be moved to separate hook
      functions in system-dependent files.  */
-#ifdef WINDOWSNT
-  /* FIXME: AFAIK, tty_read_avail_input is not used under w32 since the non-GUI
-     code sets read_socket_hook to w32_console_read_socket instead!  */
-  return 0;
-#else /* not WINDOWSNT */
   if (! tty->term_initted)      /* In case we get called during bootstrap.  */
     return 0;
 
   if (! tty->input)
     return 0;                   /* The terminal is suspended.  */
 
-#ifdef MSDOS
-  n_to_read = dos_keysns ();
-  if (n_to_read == 0)
-    return 0;
-
-  cbuf[0] = dos_keyread ();
-  nread = 1;
-
-#else /* not MSDOS */
 #ifdef HAVE_GPM
   if (gpm_tty == tty)
   {
@@ -7753,8 +7567,6 @@ tty_read_avail_input (struct terminal *terminal,
   if (nread <= 0)
     return nread;
 
-#endif /* not MSDOS */
-#endif /* not WINDOWSNT */
 
   for (i = 0; i < nread; i++)
     {
@@ -7804,7 +7616,6 @@ static void
 handle_async_input (void)
 {
 
-#ifndef DOS_NT
   while (1)
     {
       int nread = gobble_input ();
@@ -7814,7 +7625,6 @@ handle_async_input (void)
       if (nread <= 0)
 	break;
     }
-#endif
 }
 
 void
@@ -11565,9 +11375,6 @@ Only 'input_event' slots KIND and ARG are set.  */)
      : EQ (XCAR (event), Qfile_notify) ? FILE_NOTIFY_EVENT
 #endif /* USE_FILE_NOTIFY */
      : EQ (XCAR (event), Qconfig_changed_event) ? CONFIG_CHANGED_EVENT
-#if defined (WINDOWSNT)
-     : EQ (XCAR (event), Qlanguage_change) ? LANGUAGE_CHANGE_EVENT
-#endif
      : EQ (XCAR (event), Qfocus_in) ? FOCUS_IN_EVENT
      : EQ (XCAR (event), Qfocus_out) ? FOCUS_OUT_EVENT
      : EQ (XCAR (event), Qmove_frame) ? MOVE_FRAME_EVENT
@@ -12085,11 +11892,6 @@ handle_interrupt (bool in_signal_handler)
 		    " on this operating system;\n"
 		    "you can continue or abort.\n");
 #endif /* not SIGTSTP */
-#ifdef MSDOS
-      /* We must remain inside the screen area when the internal terminal
-	 is used.  Note that [Enter] is not echoed by dos.  */
-      cursor_to (SELECTED_FRAME (), 0, 0);
-#endif
 
       write_stdout ("Emacs is resuming after an emergency escape.\n");
 
@@ -12102,11 +11904,7 @@ handle_interrupt (bool in_signal_handler)
 	  if (c == 'y' || c == 'Y')
 	    {
 	      Fdo_auto_save (Qt, Qnil);
-#ifdef MSDOS
-	      write_stdout ("\r\nAuto-save done");
-#else
 	      write_stdout ("Auto-save done\n");
-#endif
 	    }
 	  while (c != '\n')
 	    c = read_stdin ();
@@ -12117,29 +11915,18 @@ handle_interrupt (bool in_signal_handler)
 	  Vinhibit_quit = Qnil;
 	  write_stdout
 	    (
-#ifdef MSDOS
-	     "\r\n"
-#endif
 	     "Garbage collection in progress; cannot auto-save now\r\n"
 	     "but will instead do a real quit"
 	     " after garbage collection ends\r\n");
 	}
 
-#ifdef MSDOS
-      write_stdout ("\r\nAbort?  (y or n) ");
-#else
       write_stdout ("Abort (and dump core)? (y or n) ");
-#endif
       c = read_stdin ();
       if (c == 'y' || c == 'Y')
 	emacs_abort ();
       while (c != '\n')
 	c = read_stdin ();
-#ifdef MSDOS
-      write_stdout ("\r\nContinuing...\r\n");
-#else /* not MSDOS */
       write_stdout ("Continuing...\n");
-#endif /* not MSDOS */
       init_all_sys_modes ();
     }
   else
@@ -12161,7 +11948,6 @@ handle_interrupt (bool in_signal_handler)
          to ns_select there (needed because otherwise events aren't picked up
          outside of polling since we don't get SIGIO like X and we don't have a
          separate event loop thread like W32.  */
-#ifndef HAVE_NS
 #ifdef THREADS_ENABLED
   /* If we were called from a signal handler, we must be in the main
      thread, see deliver_process_signal.  So we must make sure the
@@ -12179,7 +11965,6 @@ handle_interrupt (bool in_signal_handler)
 #endif
   if (waiting_for_input && !echoing)
     quit_throw_to_read_char (in_signal_handler);
-#endif
 }
 
 /* Handle a C-g by making read_char return C-g.  */
@@ -12227,14 +12012,10 @@ See also `current-input-mode'.  */)
 #ifdef POLL_FOR_INPUT
       stop_polling ();
 #endif
-#ifndef DOS_NT
       /* this causes startup screen to be restored and messes with the mouse */
       reset_all_sys_modes ();
       interrupt_input = new_interrupt_input;
       init_all_sys_modes ();
-#else
-      interrupt_input = new_interrupt_input;
-#endif
 
 #ifdef POLL_FOR_INPUT
       poll_suppress_count = 1;
@@ -12264,16 +12045,12 @@ See also `current-input-mode'.  */)
 
   if (tty->flow_control != !NILP (flow))
     {
-#ifndef DOS_NT
       /* This causes startup screen to be restored and messes with the mouse.  */
       reset_sys_modes (tty);
-#endif
 
       tty->flow_control = !NILP (flow);
 
-#ifndef DOS_NT
       init_sys_modes (tty);
-#endif
     }
   return Qnil;
 }
@@ -12320,16 +12097,12 @@ See also `current-input-mode'.  */)
 
   if (tty->meta_key != new_meta)
     {
-#ifndef DOS_NT
       /* this causes startup screen to be restored and messes with the mouse */
       reset_sys_modes (tty);
-#endif
 
       tty->meta_key = new_meta;
 
-#ifndef DOS_NT
       init_sys_modes (tty);
-#endif
     }
   return Qnil;
 }
@@ -12354,18 +12127,14 @@ See also `current-input-mode'.  */)
   if (NILP (quit) || !FIXNUMP (quit) || XFIXNUM (quit) < 0 || XFIXNUM (quit) > 0400)
     error ("QUIT must be an ASCII character");
 
-#ifndef DOS_NT
   /* This causes startup screen to be restored and messes with the
      mouse.  */
   reset_sys_modes (tty);
-#endif
 
   /* Don't let this value be out of range.  */
   quit_char = XFIXNUM (quit) & (tty->meta_key == 0 ? 0177 : 0377);
 
-#ifndef DOS_NT
   init_sys_modes (tty);
-#endif
 
   return Qnil;
 }
@@ -12669,11 +12438,9 @@ init_keyboard (void)
       struct sigaction action;
       emacs_sigaction_init (&action, deliver_interrupt_signal);
       sigaction (SIGINT, &action, 0);
-#ifndef DOS_NT
       /* For systems with SysV TERMIO, C-g is set up for both SIGINT and
 	 SIGQUIT and we can't tell which one it will give us.  */
       sigaction (SIGQUIT, &action, 0);
-#endif /* not DOS_NT */
     }
 #if defined (USABLE_SIGIO) || defined (USABLE_SIGPOLL)
   if (!noninteractive)
@@ -12889,10 +12656,6 @@ syms_of_keyboard (void)
   /* Menu and tool bar item parts.  */
   DEFSYM (Qmenu_enable, "menu-enable");
 
-#ifdef HAVE_NTGUI
-  DEFSYM (Qlanguage_change, "language-change");
-  DEFSYM (Qend_session, "end-session");
-#endif
 
 #ifdef HAVE_DBUS
   DEFSYM (Qdbus_event, "dbus-event");
@@ -13934,10 +13697,6 @@ keys_of_keyboard (void)
 {
   initial_define_lispy_key (Vspecial_event_map, "delete-frame",
 			    "handle-delete-frame");
-#ifdef HAVE_NTGUI
-  initial_define_lispy_key (Vspecial_event_map, "end-session",
-			    "kill-emacs");
-#endif
   /* Here we used to use `ignore-event' which would simple set prefix-arg to
      current-prefix-arg, as is done in `handle-switch-frame'.
      But `handle-switch-frame is not run from the special-map.
@@ -13992,10 +13751,6 @@ keys_of_keyboard (void)
 
   initial_define_lispy_key (Vspecial_event_map, "config-changed-event",
 			    "ignore");
-#if defined (WINDOWSNT)
-  initial_define_lispy_key (Vspecial_event_map, "language-change",
-			    "ignore");
-#endif
   initial_define_lispy_key (Vspecial_event_map, "focus-in",
 			    "handle-focus-in");
   initial_define_lispy_key (Vspecial_event_map, "focus-out",
@@ -14041,9 +13796,7 @@ mark_kboards (void)
     {
       /* These two special event types have no Lisp_Objects to mark.  */
       if (event->kind != SELECTION_REQUEST_EVENT
-#ifndef HAVE_HAIKU
 	  && event->kind != SELECTION_CLEAR_EVENT
-#endif
 	  )
 	{
 	  mark_object (event->ie.x);

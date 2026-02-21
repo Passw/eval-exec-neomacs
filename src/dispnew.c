@@ -45,9 +45,6 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 #include "disptab.h"
 #include "cm.h"
 
-#ifdef HAVE_ANDROID
-#include "android.h"
-#endif
 
 #ifdef HAVE_WINDOW_SYSTEM
 #include TERM_HEADER
@@ -57,9 +54,6 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 
 #include <fpending.h>
 
-#ifdef WINDOWSNT
-#include "w32.h"
-#endif
 
 /* Structure to pass dimensions around.  Used for character bounding
    boxes, glyph matrix dimensions and alike.  */
@@ -2756,7 +2750,6 @@ struct rect
   int x, y, w, h;
 };
 
-#ifndef HAVE_ANDROID
 
 /* Compute the intersection of R1 and R2 in R.  Value is true if R1 and
    R2 intersect, false otherwise.  */
@@ -2813,7 +2806,6 @@ frame_rect_abs (struct frame *f)
   return (struct rect) { x, y, f->total_cols, f->total_lines };
 }
 
-#endif /* !HAVE_ANDROID */
 
 int
 max_child_z_order (struct frame *parent)
@@ -2982,7 +2974,6 @@ is_tty_root_frame_with_visible_child (struct frame *f)
 
 
 
-#ifndef HAVE_ANDROID
 
 /* Prepare ROOT's desired row at index Y for copying child frame
    contents to it.  Value is the prepared desired row or NULL if we
@@ -3276,7 +3267,6 @@ copy_child_glyphs (struct frame *root, struct frame *child)
     }
 }
 
-#endif /* !HAVE_ANDROID */
 
 /***********************************************************************
 			     Frame Update
@@ -3370,7 +3360,6 @@ update_tty_frame (struct frame *f)
   build_frame_matrix (f);
 }
 
-#ifndef HAVE_ANDROID
 
 /* Return the cursor position of the selected window of frame F, in
    absolute coordinates in *X and *Y.  Note that if F is a child frame,
@@ -3509,7 +3498,6 @@ combine_updates_for_frame (struct frame *f, bool inhibit_scrolling)
   /* TTY-only function, stubbed out for Neomacs.  */
 }
 
-#endif /* !HAVE_ANDROID */
 
 /* Update on the screen all root frames ROOTS.  Called from
    redisplay_internal as the last step of redisplaying.  */
@@ -5487,9 +5475,7 @@ init_display_interactive (void)
 	 the GUI frame is created.)  */
       if (dumped_with_pdumper_p ())
         init_faces_initial ();
-#ifndef WINDOWSNT
       return;
-#endif
     }
 
   /* If the user wants to use a window system, we shouldn't bother
@@ -5501,66 +5487,10 @@ init_display_interactive (void)
      try to use X, and if that fails output a line to stderr
      reporting that -nw will be simulated.  */
 
-#ifdef HAVE_X_WINDOWS
-  if (! inhibit_window_system && ! display_arg)
-    {
-      char *display;
-      display = getenv ("DISPLAY");
-      display_arg = (display != 0 && *display != 0);
 
-      if (display_arg && !x_display_ok (display))
-	{
-	  fprintf (stderr, "Display %s unavailable, simulating -nw\n",
-		   display);
-	  inhibit_window_system = 1;
-	}
-    }
 
-  if (!inhibit_window_system && display_arg)
-    {
-      Vinitial_window_system = Qx;
-#ifdef USE_NCURSES
-      /* In some versions of ncurses,
-	 tputs crashes if we have not called tgetent.
-	 So call tgetent.  */
-      { char b[2044]; tgetent (b, "xterm");}
-#endif
-      return;
-    }
-#endif /* HAVE_X_WINDOWS */
 
-#ifdef HAVE_ANDROID
-  if (!inhibit_window_system && android_init_gui)
-    {
-      Vinitial_window_system = Qandroid;
-      android_term_init ();
-      return;
-    }
-#endif
 
-#ifdef HAVE_NTGUI
-  if (!inhibit_window_system)
-    {
-      Vinitial_window_system = Qw32;
-      return;
-    }
-#endif /* HAVE_NTGUI */
-
-#ifdef HAVE_NS
-  if (!inhibit_window_system && !will_dump_p ())
-    {
-      Vinitial_window_system = Qns;
-      return;
-    }
-#endif
-
-#ifdef HAVE_PGTK
-  if (!inhibit_window_system && !will_dump_p ())
-    {
-      Vinitial_window_system = Qpgtk;
-      return;
-    }
-#endif
 
   if (!inhibit_window_system && !will_dump_p ())
     {
@@ -5568,23 +5498,12 @@ init_display_interactive (void)
       return;
     }
 
-#ifdef HAVE_HAIKU
-  if (!inhibit_window_system && !will_dump_p ())
-    {
-      Vinitial_window_system = Qhaiku;
-      return;
-    }
-#endif
 
   /* If no window system has been specified, try to use the terminal.  */
   if (! isatty (STDIN_FILENO))
     fatal ("standard input is not a tty");
 
-#ifdef WINDOWSNT
-  terminal_type = (char *)"w32console";
-#else
   terminal_type = getenv ("TERM");
-#endif
   if (!terminal_type)
     {
       char const *msg
@@ -5598,7 +5517,6 @@ init_display_interactive (void)
       exit (1);
     }
 
-#ifndef HAVE_ANDROID
   {
     struct terminal *t;
     struct frame *f = XFRAME (selected_frame);
@@ -5615,13 +5533,8 @@ init_display_interactive (void)
     f->terminal = t;
 
     t->reference_count++;
-#ifdef MSDOS
-    f->output_data.tty = &the_only_tty_output;
-    f->output_data.tty->display_info = &the_only_display_info;
-#else
     if (f->output_method == output_termcap)
       create_tty_output (f);
-#endif
     t->display_info.tty->top_frame = selected_frame;
     change_frame_size (XFRAME (selected_frame),
                        FrameCols (t->display_info.tty),
@@ -5641,11 +5554,6 @@ init_display_interactive (void)
 				    : Qnil));
     Fmodify_frame_parameters (selected_frame, tty_arg);
   }
-#else
-  fatal ("Could not establish a connection to the Android application.\n"
-	 "Emacs does not work on text terminals when built to run as"
-	 " part of an Android application package.");
-#endif
 
   {
     struct frame *sf = SELECTED_FRAME ();

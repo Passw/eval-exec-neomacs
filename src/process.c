@@ -119,10 +119,6 @@ static struct rlimit nofile_limit;
 #include "gnutls.h"
 #endif
 
-#ifdef HAVE_ANDROID
-#include "android.h"
-#include "androidterm.h"
-#endif
 
 #ifdef HAVE_WINDOW_SYSTEM
 #include TERM_HEADER
@@ -133,9 +129,7 @@ static struct rlimit nofile_limit;
 
 #ifdef HAVE_GLIB
 #include "xgselect.h"
-#ifndef WINDOWSNT
 #include <glib.h>
-#endif
 #endif
 
 #if defined HAVE_GETADDRINFO_A || defined HAVE_GNUTLS
@@ -143,10 +137,6 @@ static struct rlimit nofile_limit;
 #define ASYNC_RETRY_NSEC 100000000
 #endif
 
-#ifdef WINDOWSNT
-extern int sys_select (int, fd_set *, fd_set *, fd_set *,
-                       const struct timespec *, const sigset_t *);
-#endif
 
 /* Work around GCC 4.3.0 bug with strict overflow checking; see
    <https://gcc.gnu.org/bugzilla/show_bug.cgi?id=52904>.
@@ -300,9 +290,7 @@ static int child_signal_read_fd = -1;
    descriptor to notify `wait_reading_process_output' of process
    status changes.  */
 static int child_signal_write_fd = -1;
-#ifndef WINDOWSNT
 static void child_signal_read (int, void *);
-#endif
 static void child_signal_notify (void);
 
 /* Indexed by descriptor, gives the process (if any) for that descriptor.  */
@@ -2246,10 +2234,8 @@ create_process (Lisp_Object process, char **new_argv, Lisp_Object current_dir)
   if (FD_SETSIZE <= inchannel || FD_SETSIZE <= outchannel)
     report_file_errno ("Creating pipe", Qnil, EMFILE);
 
-#ifndef WINDOWSNT
   if (emacs_pipe (p->open_fd + READ_FROM_EXEC_MONITOR) != 0)
     report_file_error ("Creating pipe", Qnil);
-#endif
 
   fcntl (inchannel, F_SETFL, O_NONBLOCK);
   fcntl (outchannel, F_SETFL, O_NONBLOCK);
@@ -2317,13 +2303,9 @@ create_process (Lisp_Object process, char **new_argv, Lisp_Object current_dir)
       close_process_fd (&p->open_fd[SUBPROCESS_STDIN]);
       close_process_fd (&p->open_fd[SUBPROCESS_STDOUT]);
 
-#ifdef WINDOWSNT
-      register_child (pid, inchannel);
-#endif /* WINDOWSNT */
 
       pset_tty_name (p, lisp_pty_name);
 
-#ifndef WINDOWSNT
       /* Wait for child_setup to complete in case that vfork is
 	 actually defined as fork.  The descriptor
 	 XPROCESS (proc)->open_fd[EXEC_MONITOR_OUTPUT]
@@ -2336,7 +2318,6 @@ create_process (Lisp_Object process, char **new_argv, Lisp_Object current_dir)
 	emacs_read (p->open_fd[READ_FROM_EXEC_MONITOR], &dummy, 1);
 	close_process_fd (&p->open_fd[READ_FROM_EXEC_MONITOR]);
       }
-#endif
       if (!NILP (p->stderrproc))
 	{
 	  struct Lisp_Process *pp = XPROCESS (p->stderrproc);
@@ -2471,9 +2452,6 @@ usage:  (make-pipe-process &rest ARGS)  */)
   fcntl (inchannel, F_SETFL, O_NONBLOCK);
   fcntl (outchannel, F_SETFL, O_NONBLOCK);
 
-#ifdef WINDOWSNT
-  register_aux_fd (inchannel);
-#endif
 
   /* Record this as an active process, with its channels.  */
   eassert (0 <= inchannel && inchannel < FD_SETSIZE);
@@ -3460,9 +3438,6 @@ connect_network_socket (Lisp_Object proc, Lisp_Object addrinfos,
       int protocol = XFIXNUM (XCAR (addrinfo));
       Lisp_Object ip_address = XCDR (addrinfo);
 
-#ifdef WINDOWSNT
-    retry_connect:
-#endif
 
       addrlen = get_lisp_to_sockaddr_size (ip_address, &family);
       sa = xrealloc (sa, addrlen);
@@ -3601,7 +3576,6 @@ connect_network_socket (Lisp_Object proc, Lisp_Object addrinfos,
       if (p->is_non_blocking_client && xerrno == EINPROGRESS)
 	break;
 
-#ifndef WINDOWSNT
       if (xerrno == EINTR)
 	{
 	  /* Unlike most other syscalls connect() cannot be called
@@ -3633,7 +3607,6 @@ connect_network_socket (Lisp_Object proc, Lisp_Object addrinfos,
 	  if (NILP (addrinfos))
 	    report_file_errno ("Failed connect", Qnil, xerrno);
 	}
-#endif /* !WINDOWSNT */
 
       /* Discard the unwind protect closing S.  */
       specpdl_ptr = specpdl_ref_to_ptr (count1);
@@ -3642,10 +3615,6 @@ connect_network_socket (Lisp_Object proc, Lisp_Object addrinfos,
       if (0 <= socket_to_use)
 	break;
 
-#ifdef WINDOWSNT
-      if (xerrno == EINTR)
-	goto retry_connect;
-#endif
     }
 
   if (s >= 0)
@@ -3997,10 +3966,6 @@ usage: (make-network-process &rest ARGS)  */)
   /* Save arguments for process-contact and clone-process.  */
   contact = Flist (nargs, args);
 
-#ifdef WINDOWSNT
-  /* Ensure socket support is loaded if available.  */
-  init_winsock (TRUE);
-#endif
 
   /* :type TYPE  (nil: stream, datagram */
   tem = plist_get (contact, QCtype);
@@ -4439,12 +4404,7 @@ static const struct ifflag_def ifflag_table[] = {
   { IFF_PROMISC,	"promisc" },
 #endif
 #ifdef IFF_NOTRAILERS
-#ifdef NS_IMPL_COCOA
-  /* Really means smart, notrailers is obsolete.  */
-  { IFF_NOTRAILERS,	"smart" },
-#else
   { IFF_NOTRAILERS,	"notrailers" },
-#endif
 #endif
 #ifdef IFF_ALLMULTI
   { IFF_ALLMULTI,	"allmulti" },
@@ -4711,10 +4671,6 @@ network_lookup_address_info_1 (Lisp_Object host, const char *service,
     error ("Non-ASCII hostname %s detected, please use `puny-encode-domain'",
            SSDATA (host));
 
-#ifdef WINDOWSNT
-  /* Ensure socket support is loaded if available.  */
-  init_winsock (TRUE);
-#endif
 
   ret = getaddrinfo (SSDATA (host), service, hints, res);
   if (ret)
@@ -5274,26 +5230,6 @@ wait_reading_process_output_1 (void)
 {
 }
 
-#if defined HAVE_ANDROID && !defined ANDROID_STUBIFY	\
-  && defined THREADS_ENABLED
-
-/* Wrapper around `android_select' that exposes a calling interface with
-   an extra argument for compatibility with `thread_pselect'.  */
-
-static int
-android_select_wrapper (int nfds, fd_set *readfds, fd_set *writefds,
-			fd_set *exceptfds, const struct timespec *timeout,
-			const sigset_t *sigmask)
-{
-  /* sigmask is not supported.  */
-  if (sigmask)
-    emacs_abort ();
-
-  return android_select (nfds, readfds, writefds, exceptfds,
-			 (struct timespec *) timeout);
-}
-
-#endif /* HAVE_ANDROID && !ANDROID_STUBIFY && THREADS_ENABLED */
 
 /* Read and dispose of subprocess output while waiting for timeout to
    elapse and/or keyboard input to be available.
@@ -5769,7 +5705,7 @@ wait_reading_process_output (intmax_t time_limit, int nsecs, int read_kbd,
 	    timeout = make_timespec (0, 0);
 #endif
 
-#if !defined USABLE_SIGIO && !defined WINDOWSNT
+#ifndef USABLE_SIGIO
 	  /* If we're polling for input, don't get stuck in select for
 	     more than 25 msec. */
 	  struct timespec short_timeout = make_timespec (0, 25000000);
@@ -5778,30 +5714,11 @@ wait_reading_process_output (intmax_t time_limit, int nsecs, int read_kbd,
 	    timeout = short_timeout;
 #endif
 
-	  /* Android requires using a replacement for pselect in
-	     android.c to poll for events.  */
-#if defined HAVE_ANDROID && !defined ANDROID_STUBIFY
-#ifndef THREADS_ENABLED
-	  nfds = android_select (max_desc + 1,
-				 &Available, (check_write ? &Writeok : 0),
-				 NULL, &timeout);
-#else /* THREADS_ENABLED */
-	  nfds = thread_select (android_select_wrapper,
-				max_desc + 1,
-				&Available, (check_write ? &Writeok : 0),
-				NULL, &timeout, NULL);
-#endif /* THREADS_ENABLED */
-#else
 
 	  /* Non-macOS HAVE_GLIB builds call thread_select in
 	     xgselect.c.  */
-#if defined HAVE_GLIB && !defined HAVE_NS
+#ifdef HAVE_GLIB
 	  nfds = xg_select (max_desc + 1,
-			    &Available, (check_write ? &Writeok : 0),
-			    NULL, &timeout, NULL);
-#elif defined HAVE_NS
-          /* And NS builds call thread_select in ns_select. */
-          nfds = ns_select (max_desc + 1,
 			    &Available, (check_write ? &Writeok : 0),
 			    NULL, &timeout, NULL);
 #else  /* !HAVE_GLIB */
@@ -5810,7 +5727,6 @@ wait_reading_process_output (intmax_t time_limit, int nsecs, int read_kbd,
 				(check_write ? &Writeok : 0),
 				NULL, &timeout, NULL);
 #endif	/* !HAVE_GLIB */
-#endif /* HAVE_ANDROID && !ANDROID_STUBIFY */
 
 #ifdef HAVE_GNUTLS
 	  /* Merge tls_available into Available. */
@@ -6071,11 +5987,7 @@ wait_reading_process_output (intmax_t time_limit, int nsecs, int read_kbd,
 		 process gone just because its pipe is closed.  */
 	      else if (nread == 0 && !NETCONN_P (proc) && !SERIALCONN_P (proc)
 		       && !PIPECONN_P (proc))
-#ifdef WINDOWSNT
-		;
-#else
 		delete_read_fd (channel);
-#endif
 	      else if (nread == 0 && PIPECONN_P (proc))
 		{
 		  /* Preserve status of processes already terminated.  */
@@ -6111,32 +6023,11 @@ wait_reading_process_output (intmax_t time_limit, int nsecs, int read_kbd,
 
 	      p = XPROCESS (proc);
 
-#ifndef WINDOWSNT
 	      {
 		socklen_t xlen = sizeof (xerrno);
 		if (getsockopt (channel, SOL_SOCKET, SO_ERROR, &xerrno, &xlen))
 		  xerrno = errno;
 	      }
-#else
-	      /* On MS-Windows, getsockopt clears the error for the
-		 entire process, which may not be the right thing; see
-		 w32.c.  Use getpeername instead.  */
-	      {
-		struct sockaddr pname;
-		socklen_t pnamelen = sizeof (pname);
-
-		/* If connection failed, getpeername will fail.  */
-		xerrno = 0;
-		if (getpeername (channel, &pname, &pnamelen) < 0)
-		  {
-		    /* Obtain connect failure code through error slippage.  */
-		    char dummy;
-		    xerrno = errno;
-		    if (errno == ENOTCONN && read (channel, &dummy, 1) < 0)
-		      xerrno = errno;
-		  }
-	      }
-#endif
 	      if (xerrno)
 		{
 		  Lisp_Object addrinfos
@@ -7310,12 +7201,7 @@ traffic.  */)
 	  && (!EQ (p->filter, Qt) || EQ (p->status, Qlisten)))
 	{
 	  add_process_read_fd (p->infd);
-#ifdef WINDOWSNT
-	  if (fd_info[ p->infd ].flags & FILE_SERIAL)
-	    PurgeComm (fd_info[ p->infd ].hnd, PURGE_RXABORT | PURGE_RXCLEAR);
-#else /* not WINDOWSNT */
 	  tcflush (p->infd, TCIFLUSH);
-#endif /* not WINDOWSNT */
 	}
       pset_command (p, Qnil);
       return process;
@@ -7471,11 +7357,10 @@ process has been transmitted to the serial port.  */)
     send_process (proc, "\004", 1, Qnil);
   else if (EQ (XPROCESS (proc)->type, Qserial))
     {
-#if !defined WINDOWSNT && defined HAVE_TCDRAIN
+#ifdef HAVE_TCDRAIN
       if (tcdrain (XPROCESS (proc)->outfd) != 0)
 	report_file_error ("Failed tcdrain", Qnil);
-#endif /* not WINDOWSNT && not TCDRAIN */
-      /* Do nothing on Windows because writes are blocking.  */
+#endif
     }
   else
     {
@@ -7571,7 +7456,6 @@ child_signal_init (void)
   /* Either both are initialized, or both are uninitialized.  */
   eassert ((child_signal_read_fd < 0) == (child_signal_write_fd < 0));
 
-#ifndef WINDOWSNT
   if (0 <= child_signal_read_fd)
     return; /* already done */
 
@@ -7600,10 +7484,8 @@ child_signal_init (void)
   fd_callback_info[fds[0]].flags &= ~KEYBOARD_FD;
   child_signal_read_fd = fds[0];
   child_signal_write_fd = fds[1];
-#endif	/* !WINDOWSNT */
 }
 
-#ifndef WINDOWSNT
 /* Consume a process status change.  */
 
 static void
@@ -7615,7 +7497,6 @@ child_signal_read (int fd, void *data)
   if (emacs_read (fd, &dummy, 1) < 0 && errno != EAGAIN)
     emacs_perror ("reading from child signal FD");
 }
-#endif	/* !WINDOWSNT */
 
 /* Notify `wait_reading_process_output' of a process status
    change.  */
@@ -7623,7 +7504,6 @@ child_signal_read (int fd, void *data)
 static void
 child_signal_notify (void)
 {
-#ifndef WINDOWSNT
   int fd = child_signal_write_fd;
   eassert (0 <= fd);
   char dummy = 0;
@@ -7652,7 +7532,6 @@ child_signal_notify (void)
 
      So we no longer check errors of emacs_write here.  */
   emacs_write (fd, &dummy, 1);
-#endif
 }
 
 /* LIB_CHILD_HANDLER is a SIGCHLD handler that Emacs calls while doing
@@ -7768,11 +7647,6 @@ handle_child_signal (int sig)
     child_signal_notify ();
 
   lib_child_handler (sig);
-#ifdef NS_IMPL_GNUSTEP
-  /* NSTask in GNUstep sets its child handler each time it is called.
-     So we must re-set ours.  */
-  catch_child_signal ();
-#endif
 }
 
 static void
@@ -8602,20 +8476,15 @@ If optional argument QUERY is `current', ignore OMP_NUM_THREADS.
 If QUERY is `all', also count processors not available.  */)
   (Lisp_Object query)
 {
-#ifndef MSDOS
   return make_uint (num_processors (EQ (query, Qall) ? NPROC_ALL
 				    : EQ (query, Qcurrent) ? NPROC_CURRENT
 				    : NPROC_CURRENT_OVERRIDABLE));
-#else
-  return make_fixnum (1);
-#endif
 }
 
 DEFUN ("signal-names", Fsignal_names, Ssignal_names, 0, 0, 0,
        doc: /* Return a list of known signal names on this system.  */)
   (void)
 {
-#ifndef MSDOS
   int i;
   char name[SIG2STR_MAX];
   Lisp_Object names = Qnil;
@@ -8627,9 +8496,6 @@ DEFUN ("signal-names", Fsignal_names, Ssignal_names, 0, 0, 0,
     }
 
   return names;
-#else
-  return Qnil;
-#endif
 }
 
 #ifdef subprocesses
@@ -8674,15 +8540,10 @@ open_channel_for_module (Lisp_Object process)
 {
   CHECK_PROCESS (process);
   CHECK_TYPE (PIPECONN_P (process), Qpipe_process_p, process);
-#ifndef MSDOS
   int fd = dup (XPROCESS (process)->open_fd[SUBPROCESS_STDOUT]);
   if (fd == -1)
     report_file_error ("Cannot duplicate file descriptor", Qnil);
   return fd;
-#else
-  /* PIPECONN_P returning true shouldn't be possible on MSDOS.  */
-  emacs_abort ();
-#endif
 }
 
 
@@ -8696,7 +8557,7 @@ init_process_emacs (int sockfd)
 
   inhibit_sentinels = 0;
 
-#if defined HAVE_GLIB && !defined WINDOWSNT
+#ifdef HAVE_GLIB
   /* Tickle Glib's child-handling code.  Ask Glib to install a
      watch source for Emacs itself which will initialize glib's
      private SIGCHLD handler, allowing catch_child_signal to copy

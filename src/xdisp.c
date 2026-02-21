@@ -910,12 +910,7 @@ This function may be passed to `add-variable-watcher'.  */)
    If Emacs was compiled with GLYPH_DEBUG defined, the variable
    trace_redisplay_p can be set to a non-zero value in debugging
    sessions to activate traces.  */
-#ifdef GLYPH_DEBUG
-extern bool trace_redisplay_p EXTERNALLY_VISIBLE;
-bool trace_redisplay_p;
-#else
 enum { trace_redisplay_p = false };
-#endif
 static void ATTRIBUTE_FORMAT_PRINTF (1, 2)
 redisplay_trace (char const *fmt, ...)
 {
@@ -2984,12 +2979,6 @@ remember_mouse_glyph (struct frame *f, int gx, int gy, NativeRectangle *rect)
     }
   STORE_NATIVE_RECT (*rect, gx, gy, width, height);
 
-  /* Visible feedback for debugging.  */
-#if false && defined HAVE_X_WINDOWS
-  XDrawRectangle (FRAME_X_DISPLAY (f), FRAME_X_DRAWABLE (f),
-		  f->output_data.x->normal_gc,
-		  gx, gy, width, height);
-#endif
 }
 
 DEFUN ("remember-mouse-glyph", Fremember_mouse_glyph, Sremember_mouse_glyph,
@@ -3174,16 +3163,6 @@ CHECK_IT (struct it *it)
 static void
 CHECK_WINDOW_END (struct window *w)
 {
-#if defined GLYPH_DEBUG && defined ENABLE_CHECKING
-  if (!MINI_WINDOW_P (w) && w->window_end_valid)
-    {
-      struct glyph_row *row;
-      eassert ((row = MATRIX_ROW (w->current_matrix, w->window_end_vpos),
-		!row->enabled_p
-		|| MATRIX_ROW_DISPLAYS_TEXT_P (row)
-		|| MATRIX_ROW_VPOS (row, w->current_matrix) == 0));
-    }
-#endif
 }
 
 /***********************************************************************
@@ -10167,11 +10146,6 @@ move_it_in_display_line_to (struct it *it,
   bool line_number_pending = false;
   int this_line_subject_to_line_prefix = 0;
 
-#ifdef GLYPH_DEBUG
-  /* atx_flag, atpos_flag and wrap_flag are assigned but never used;
-     these hold information useful while debugging.  */
-  int atx_flag, atpos_flag, wrap_flag;
-#endif /* GLYPH_DEBUG */
 
   /* Don't produce glyphs in produce_glyphs.  */
   saved_glyph_row = it->glyph_row;
@@ -10290,9 +10264,6 @@ move_it_in_display_line_to (struct it *it,
 		 a word that is wrapped.  So, save the iterator in
 		 atpos_it and continue to see if wrapping happens.  */
 	      SAVE_IT (atpos_it, *it, atpos_data);
-#ifdef GLYPH_DEBUG
-	      atpos_flag = this_line_subject_to_line_prefix;
-#endif /* GLYPH_DEBUG */
 	    }
 	}
 
@@ -10355,9 +10326,6 @@ move_it_in_display_line_to (struct it *it,
 		    }
 		  /* Otherwise, we can wrap here.  */
 		  SAVE_IT (wrap_it, *it, wrap_data);
-#ifdef GLYPH_DEBUG
-		  wrap_flag = this_line_subject_to_line_prefix;
-#endif /* GLYPH_DEBUG */
 		}
               /* Update may_wrap for the next iteration.  */
               may_wrap = next_may_wrap;
@@ -10436,9 +10404,6 @@ move_it_in_display_line_to (struct it *it,
 			{
 			  SAVE_IT (atpos_it, *it, atpos_data);
 			  IT_RESET_X_ASCENT_DESCENT (&atpos_it);
-#ifdef GLYPH_DEBUG
-			  atpos_flag = this_line_subject_to_line_prefix;
-#endif /* GLYPH_DEBUG */
 			}
 		    }
 		  else
@@ -10453,9 +10418,6 @@ move_it_in_display_line_to (struct it *it,
 			{
 			  SAVE_IT (atx_it, *it, atx_data);
 			  IT_RESET_X_ASCENT_DESCENT (&atx_it);
-#ifdef GLYPH_DEBUG
-			  atx_flag = this_line_subject_to_line_prefix;
-#endif /* GLYPH_DEBUG */
 			}
 		    }
 		}
@@ -10551,9 +10513,6 @@ move_it_in_display_line_to (struct it *it,
 				  SAVE_IT (atpos_it, *it, atpos_data);
 				  atpos_it.current_x = x_before_this_char;
 				  atpos_it.hpos = hpos_before_this_char;
-#ifdef GLYPH_DEBUG
-				  atpos_flag = this_line_subject_to_line_prefix;
-#endif /* GLYPH_DEBUG */
 				}
 			    }
 
@@ -10662,9 +10621,6 @@ move_it_in_display_line_to (struct it *it,
 		  if (it->line_wrap == WORD_WRAP && atpos_it.sp < 0)
 		    {
 		      SAVE_IT (atpos_it, *it, atpos_data);
-#ifdef GLYPH_DEBUG
-		      atpos_flag = this_line_subject_to_line_prefix;
-#endif /* GLYPH_DEBUG */
 		      IT_RESET_X_ASCENT_DESCENT (&atpos_it);
 		    }
 		}
@@ -10865,23 +10821,14 @@ move_it_in_display_line_to (struct it *it,
       && ((atpos_it.sp >= 0 && wrap_it.current_x < atpos_it.current_x)
 	  || (atx_it.sp >= 0 && wrap_it.current_x < atx_it.current_x)))
     {
-#ifdef GLYPH_DEBUG
-      this_line_subject_to_line_prefix = wrap_flag;
-#endif /* GLYPH_DEBUG */
       RESTORE_IT (it, &wrap_it, wrap_data);
     }
   else if (atpos_it.sp >= 0)
     {
-#ifdef GLYPH_DEBUG
-      this_line_subject_to_line_prefix = atpos_flag;
-#endif /* GLYPH_DEBUG */
       RESTORE_IT (it, &atpos_it, atpos_data);
     }
   else if (atx_it.sp >= 0)
     {
-#ifdef GLYPH_DEBUG
-      this_line_subject_to_line_prefix = atx_flag;
-#endif /* GLYPH_DEBUG */
       RESTORE_IT (it, &atx_it, atx_data);
     }
 
@@ -14437,11 +14384,6 @@ update_menu_bar (struct frame *f, bool save_match_data, bool hooks_run, struct w
 #ifdef HAVE_EXT_MENU_BAR
 	  if (FRAME_WINDOW_P (f))
             {
-#if defined (HAVE_NS)
-              /* All frames on Mac OS share the same menubar.  So only
-                 the selected frame should be allowed to set it.  */
-              if (f == SELECTED_FRAME ())
-#endif
 		set_frame_menubar (f, false);
 	    }
 	  else
@@ -14654,41 +14596,8 @@ display_tab_bar (struct window *w)
   int i;
 
   /* Don't do all this for graphical frames.  */
-#ifdef HAVE_NTGUI
-  if (FRAME_W32_P (f))
-    return;
-#endif
-#if defined (USE_X_TOOLKIT) || defined (USE_GTK)
-  if (FRAME_X_P (f))
-    return;
-#endif
 
-#ifdef HAVE_NS
-  if (FRAME_NS_P (f))
-    return;
-#endif /* HAVE_NS */
 
-#if defined (USE_X_TOOLKIT) || defined (USE_GTK)
-  eassert (!FRAME_WINDOW_P (f));
-  init_iterator (&it, w, -1, -1, f->desired_matrix->rows
-                 + (FRAME_MENU_BAR_LINES (f) > 0 ? 1 : 0),
-                 TAB_BAR_FACE_ID);
-  it.first_visible_x = 0;
-  it.last_visible_x = FRAME_PIXEL_WIDTH (f);
-#elif defined (HAVE_X_WINDOWS) /* X without toolkit.  */
-  if (FRAME_WINDOW_P (f))
-    {
-      /* Tab bar lines are displayed in the desired matrix of the
-	 dummy window tab_bar_window.  */
-      struct window *tab_w;
-      tab_w = XWINDOW (f->tab_bar_window);
-      init_iterator (&it, tab_w, -1, -1, tab_w->desired_matrix->rows,
-		     TAB_BAR_FACE_ID);
-      it.first_visible_x = 0;
-      it.last_visible_x = FRAME_PIXEL_WIDTH (f);
-    }
-  else
-#endif /* not USE_X_TOOLKIT and not USE_GTK */
     {
       /* This is a TTY frame, i.e. character hpos/vpos are used as
 	 pixel x/y.  */
@@ -16885,49 +16794,6 @@ hscroll_windows (Lisp_Object window)
 				Redisplay
  ************************************************************************/
 
-/* Variables holding some state of redisplay if GLYPH_DEBUG is defined.
-   This is sometimes handy to have in a debugger session.  */
-
-#ifdef GLYPH_DEBUG
-
-/* Append a string to W->desired_matrix->method.  FMT is a printf
-   format string.  If trace_redisplay_p is true also printf the
-   resulting string to stderr.  */
-
-static void debug_method_add (struct window *, char const *, ...)
-  ATTRIBUTE_FORMAT_PRINTF (2, 3);
-
-static void
-debug_method_add (struct window *w, char const *fmt, ...)
-{
-  void *ptr = w;
-  char *method = w->desired_matrix->method;
-  int len = strlen (method);
-  int size = sizeof w->desired_matrix->method;
-  int remaining = size - len - 1;
-  va_list ap;
-
-  if (len && remaining)
-    {
-      method[len] = '|';
-      --remaining, ++len;
-    }
-
-  va_start (ap, fmt);
-  vsnprintf (method + len, remaining + 1, fmt, ap);
-  va_end (ap);
-
-  if (trace_redisplay_p)
-    fprintf (stderr, "%p (%s): %s\n",
-	     ptr,
-	     ((BUFFERP (w->contents)
-	       && STRINGP (BVAR (XBUFFER (w->contents), name)))
-	      ? SSDATA (BVAR (XBUFFER (w->contents), name))
-	      : "no buffer"),
-	     method + len);
-}
-
-#endif /* GLYPH_DEBUG */
 
 
 /* Value is true if all changes in window W, which displays
@@ -17341,15 +17207,7 @@ redisplay_internal (void)
   if (!fr->glyphs_initialized_p)
     return;
 
-#if defined (USE_X_TOOLKIT) || defined (USE_GTK) || defined (HAVE_NS)
-  if (popup_activated ())
-    return;
-#endif
 
-#if defined (HAVE_HAIKU)
-  if (popup_activated_p)
-    return;
-#endif
 
   redisplay_counter++;
 
@@ -17395,9 +17253,7 @@ redisplay_internal (void)
 	     area, displaying a different frame means redisplay the
 	     whole thing.  */
 	  SET_FRAME_GARBAGED (sf);
-#if !defined DOS_NT && !defined HAVE_ANDROID
 	  set_tty_color_mode (FRAME_TTY (sf), sf);
-#endif
 	}
       FRAME_TTY (sf)->previous_frame = sf;
     }
@@ -17919,9 +17775,6 @@ redisplay_internal (void)
 #endif /* HAVE_WINDOW_SYSTEM */
 
  end_of_redisplay:
-#ifdef HAVE_NS
-  ns_set_doc_edited ();
-#endif
   if (interrupt_input && interrupts_deferred)
     request_sigio ();
 
@@ -20976,40 +20829,10 @@ display_menu_bar (struct window *w)
   Lisp_Object items;
   int i;
 
-  /* Don't do all this for graphical frames.  */
-#ifdef HAVE_NTGUI
-  if (FRAME_W32_P (f))
-    return;
-#endif
-#if defined (HAVE_PGTK)
-  if (FRAME_PGTK_P (f))
-    return;
-#endif
   /* Neomacs uses text-rendered menu bar (not external toolkit), so
      do NOT return early — fall through to populate the menu bar
      window's desired_matrix.  */
 
-#if defined (USE_X_TOOLKIT) || defined (USE_GTK)
-  if (FRAME_X_P (f))
-    return;
-#endif
-
-#ifdef HAVE_NS
-  if (FRAME_NS_P (f))
-    return;
-#endif /* HAVE_NS */
-
-#ifdef HAVE_HAIKU
-  if (FRAME_HAIKU_P (f))
-    return;
-#endif /* HAVE_HAIKU */
-
-#if defined (USE_X_TOOLKIT) || defined (USE_GTK)
-  eassert (!FRAME_WINDOW_P (f));
-  init_iterator (&it, w, -1, -1, f->desired_matrix->rows, MENU_FACE_ID);
-  it.first_visible_x = 0;
-  it.last_visible_x = FRAME_PIXEL_WIDTH (f);
-#elif defined (HAVE_X_WINDOWS) || defined (HAVE_ANDROID) || defined (HAVE_NEOMACS)
   struct window *menu_window = NULL;
   struct face *face = FACE_FROM_ID (f, MENU_FACE_ID);
 
@@ -21023,7 +20846,6 @@ display_menu_bar (struct window *w)
 		     MENU_FACE_ID);
     }
   else
-#endif /* not USE_X_TOOLKIT and not USE_GTK */
     {
       /* This is a TTY frame, i.e. character hpos/vpos are used as
 	 pixel x/y.  */
@@ -21140,10 +20962,6 @@ neomacs_display_menu_and_tool_bar (struct frame *f)
     redisplay_tool_bar (f);
 }
 
-/* This code is never used on Android where there are only GUI and
-   initial frames.  */
-
-#ifndef HAVE_ANDROID
 
 /* Deep copy of a glyph row, including the glyphs.  */
 static void
@@ -21318,7 +21136,6 @@ display_tty_menu_item (const char *item_text, int width, int face_id,
   row->reversed_p = saved_reversed;
 }
 
-#endif
 
 
 /***********************************************************************
@@ -22926,9 +22743,7 @@ decode_mode_spec (struct window *w, register int c, int field_width,
       obj = Fget_buffer_process (Fcurrent_buffer ());
       if (NILP (obj))
 	return "no process";
-#ifndef MSDOS
       obj = Fsymbol_name (Fprocess_status (obj));
-#endif
       break;
 
     case '@':
@@ -23790,27 +23605,6 @@ get_font_ascent_descent (struct font *font, int *ascent, int *descent)
 
 #ifdef HAVE_WINDOW_SYSTEM
 
-#ifdef GLYPH_DEBUG
-
-extern void dump_glyph_string (struct glyph_string *) EXTERNALLY_VISIBLE;
-void
-dump_glyph_string (struct glyph_string *s)
-{
-  fputs ("glyph string\n", stderr);
-  fprintf (stderr, "  x, y, w, h = %d, %d, %d, %d\n",
-	   s->x, s->y, s->width, s->height);
-  fprintf (stderr, "  ybase = %d\n", s->ybase);
-  fprintf (stderr, "  hl = %u\n", s->hl);
-  fprintf (stderr, "  left overhang = %d, right = %d\n",
-	   s->left_overhang, s->right_overhang);
-  fprintf (stderr, "  nchars = %d\n", s->nchars);
-  fprintf (stderr, "  extends to end of line = %d\n",
-	   s->extends_to_end_of_line_p);
-  fprintf (stderr, "  font height = %d\n", FONT_HEIGHT (s->font));
-  fprintf (stderr, "  bg width = %d\n", s->background_width);
-}
-
-#endif /* GLYPH_DEBUG */
 
 /* Initialize glyph string S.  CHAR2B is a suitably allocated vector
    of 2-byte unsigned integers for S; it can't be allocated in
@@ -23820,38 +23614,17 @@ dump_glyph_string (struct glyph_string *s)
    index of the first glyph structure covered by S.  HL is a
    face-override for drawing S.  */
 
-#ifdef HAVE_NTGUI
-/* We set inhibit-quit here due to paranoia: get_frame_dc acquires the
-   critical section, and we cannot QUIT while we hold the critical
-   section.  If any of the code run by callers of ALLOCATE_HDC happens
-   to call Lisp (might be possible due to all the hooks lying around),
-   we must prevent it from quitting.  */
-# define ALLOCATE_HDC(hdc, f)			\
-  Lisp_Object prev_quit = Vinhibit_quit;	\
-  Vinhibit_quit = Qt;				\
-  HDC hdc = get_frame_dc (f)
-# define RELEASE_HDC(hdc, f)			\
-  release_frame_dc (f, hdc);			\
-  Vinhibit_quit = prev_quit
-#else
 # define ALLOCATE_HDC(hdc, f)
 # define RELEASE_HDC(hdc, f)
-#endif
 
 static void
 init_glyph_string (struct glyph_string *s,
-#ifdef HAVE_NTGUI
-		   HDC hdc,
-#endif
 		   unsigned *char2b, struct window *w, struct glyph_row *row,
 		   enum glyph_row_area area, int start, enum draw_glyphs_face hl)
 {
   memset (s, 0, sizeof *s);
   s->w = w;
   s->f = XFRAME (w->frame);
-#ifdef HAVE_NTGUI
-  s->hdc = hdc;
-#endif
   s->char2b = char2b;
   s->hl = hl;
   s->row = row;
@@ -23938,9 +23711,6 @@ get_char_face_and_encoding (struct frame *f, int c, int face_id,
   *char2b = code & 0xFFFF;
 
   /* Make sure X resources of the face are allocated.  */
-#ifdef HAVE_X_WINDOWS
-  if (display_p)
-#endif
     {
       eassert (face != NULL);
       prepare_face_for_display (f, face);
@@ -24819,15 +24589,8 @@ compute_overhangs_and_x (struct glyph_string *s, int x, bool backward_p)
    as well as the following local variables:
      `s', `f', and `hdc' (in W32)  */
 
-#ifdef HAVE_NTGUI
-/* On W32, silently add local `hdc' variable to argument list of
-   init_glyph_string.  */
-#define INIT_GLYPH_STRING(s, char2b, w, row, area, start, hl) \
-  init_glyph_string (s, hdc, char2b, w, row, area, start, hl)
-#else
 #define INIT_GLYPH_STRING(s, char2b, w, row, area, start, hl) \
   init_glyph_string (s, char2b, w, row, area, start, hl)
-#endif
 
 /* Add a glyph string for a stretch glyph to the list of strings
    between HEAD and TAIL.  START is the index of the stretch glyph in
@@ -25338,25 +25101,6 @@ draw_glyphs (struct window *w, int x, struct glyph_row *row,
 	  }
     }
 
-#ifdef HAVE_RSVG
-  /* Update SVG image glyphs with mouse face features.  FIXME: it
-     should be possible to have this behavior with transparent
-     background PNG.  */
-  if (hl == DRAW_MOUSE_FACE)
-    {
-      Mouse_HLInfo *hlinfo = MOUSE_HL_INFO (f);
-      for (s = head; s; s = s->next)
-	if (s->first_glyph->type == IMAGE_GLYPH)
-	  if (s->img
-	      && (EQ (image_spec_value (s->img->spec, QCtype, NULL), Qsvg)))
-	    {
-	      ptrdiff_t id;
-	      id = lookup_image (f, s->img->spec, hlinfo->mouse_face_face_id);
-	      s->img = IMAGE_FROM_ID (f, id);
-	      prepare_image_for_display (f, s->img);
-	    }
-    }
-#endif
 
   /* Draw all strings.  */
   for (s = head; s; s = s->next)
@@ -28633,9 +28377,7 @@ draw_row_with_mouse_face (struct window *w, int start_x, struct glyph_row *row,
     }
 #endif
 
-#ifndef HAVE_ANDROID
   tty_draw_row_with_mouse_face (w, row, start_hpos, end_hpos, draw);
-#endif
 }
 
 /* Display the active region described by mouse_face_* according to DRAW.  */
@@ -29753,10 +29495,6 @@ define_frame_cursor1 (struct frame *f, Emacs_Cursor cursor, Lisp_Object pointer)
 	cursor = FRAME_OUTPUT_DATA (f)->horizontal_drag_cursor;
       else if (EQ (pointer, Qnhdrag))
 	cursor = FRAME_OUTPUT_DATA (f)->vertical_drag_cursor;
-# ifdef HAVE_X_WINDOWS
-      else if (EQ (pointer, Qvdrag))
-	cursor = FRAME_DISPLAY_INFO (f)->vertical_scroll_bar_cursor;
-# endif
       else if (EQ (pointer, Qhourglass))
 	cursor = FRAME_OUTPUT_DATA (f)->hourglass_cursor;
       else if (EQ (pointer, Qmodeline))
@@ -30124,16 +29862,7 @@ note_fringe_highlight (struct frame *f, Lisp_Object window, int x, int y,
     return;
 
   /* When a menu is active, don't highlight because this looks odd.  */
-#if defined (HAVE_X_WINDOWS) || defined (HAVE_NS) || defined (MSDOS) \
-  || defined (HAVE_ANDROID)
-  if (popup_activated ())
-    return;
-#endif /* HAVE_X_WINDOWS || HAVE_NS || MSDOS || HAVE_ANDROID */
 
-#if defined HAVE_HAIKU
-  if (popup_activated_p)
-    return;
-#endif /* HAVE_HAIKU */
 
   /* Find a message to display through the help-echo mechanism whenever
      the mouse hovers over a fringe indicator.  Both text properties and
@@ -30211,16 +29940,7 @@ note_mouse_highlight (struct frame *f, int x, int y)
   struct buffer *b;
 
   /* When a menu is active, don't highlight because this looks odd.  */
-#if defined (HAVE_X_WINDOWS) || defined (HAVE_NS) || defined (MSDOS) \
-  || defined (HAVE_ANDROID)
-  if (popup_activated ())
-    return;
-#endif
 
-#if defined (HAVE_HAIKU)
-  if (popup_activated_p)
-    return;
-#endif
 
   if (!f->glyphs_initialized_p
       || f->pointer_invisible)
@@ -31494,57 +31214,6 @@ gui_intersect_rectangles (const Emacs_Rectangle *r1, const Emacs_Rectangle *r2,
   return intersection_p;
 }
 
-# if HAVE_ANDROID
-
-/* EXPORT:
-   Determine the union of the rectangles A and B.  Return the smallest
-   rectangle encompassing both the bounds of A and B in *RESULT.  It
-   is safe for all three arguments to point to each other.  */
-
-void
-gui_union_rectangles (const Emacs_Rectangle *a, const Emacs_Rectangle *b,
-		      Emacs_Rectangle *result)
-{
-  struct gui_box a_box, b_box, result_box;
-
-  /* Handle special cases where one of the rectangles is empty.  */
-
-  if (!a->width || !a->height)
-    {
-      *result = *b;
-      return;
-    }
-  else if (!b->width || !b->height)
-    {
-      *result = *a;
-      return;
-    }
-
-  /* Convert A and B to boxes.  */
-  a_box.x1 = a->x;
-  a_box.y1 = a->y;
-  a_box.x2 = a->x + a->width;
-  a_box.y2 = a->y + a->height;
-
-  b_box.x1 = b->x;
-  b_box.y1 = b->y;
-  b_box.x2 = b->x + b->width;
-  b_box.y2 = b->y + b->height;
-
-  /* Compute the union of the boxes.  */
-  result_box.x1 = min (a_box.x1, b_box.x1);
-  result_box.y1 = min (a_box.y1, b_box.y1);
-  result_box.x2 = max (a_box.x2, b_box.x2);
-  result_box.y2 = max (a_box.y2, b_box.y2);
-
-  /* Convert result_box to an XRectangle and put the result in
-     RESULT.  */
-  result->x = result_box.x1;
-  result->y = result_box.y1;
-  result->width = result_box.x2 - result_box.x1;
-  result->height = result_box.y2 - result_box.y1;
-}
-# endif
 
 #endif /* HAVE_WINDOW_SYSTEM */
 
@@ -31592,15 +31261,6 @@ be let-bound around code that needs to disable messages temporarily. */);
   staticpro (&message_dolog_marker3);
 
   defsubr (&Sset_buffer_redisplay);
-#ifdef GLYPH_DEBUG
-  defsubr (&Sdump_frame_glyph_matrix);
-  defsubr (&Sdump_glyph_matrix);
-  defsubr (&Sdump_glyph_row);
-  defsubr (&Sdump_tab_bar_row);
-  defsubr (&Sdump_tool_bar_row);
-  defsubr (&Strace_redisplay);
-  defsubr (&Strace_to_stderr);
-#endif
 #ifdef HAVE_WINDOW_SYSTEM
   defsubr (&Sremember_mouse_glyph);
   defsubr (&Stab_bar_height);
@@ -31916,9 +31576,6 @@ variable are ignored and the default 0.25 is used instead.  */);
 Value is a number or a cons (WIDTH-DPI . HEIGHT-DPI).  */);
   Vdisplay_pixels_per_inch = make_float (72.0);
 
-#ifdef GLYPH_DEBUG
-  DEFVAR_INT ("debug-end-pos", debug_end_pos, doc: /* Don't ask.  */);
-#endif
 
   DEFVAR_LISP ("truncate-partial-width-windows",
 	       Vtruncate_partial_width_windows,
@@ -32434,19 +32091,6 @@ other bracket characters whose `paired-bracket' Unicode property is
 non-nil, see `get-char-code-property'.  */);
   bidi_inhibit_bpa = false;
 
-#ifdef GLYPH_DEBUG
-  DEFVAR_BOOL ("inhibit-try-window-id", inhibit_try_window_id,
-	       doc: /* Inhibit try_window_id display optimization.  */);
-  inhibit_try_window_id = false;
-
-  DEFVAR_BOOL ("inhibit-try-window-reusing", inhibit_try_window_reusing,
-	       doc: /* Inhibit try_window_reusing display optimization.  */);
-  inhibit_try_window_reusing = false;
-
-  DEFVAR_BOOL ("inhibit-try-cursor-movement", inhibit_try_cursor_movement,
-	       doc: /* Inhibit try_cursor_movement display optimization.  */);
-  inhibit_try_cursor_movement = false;
-#endif /* GLYPH_DEBUG */
 
   DEFVAR_INT ("overline-margin", overline_margin,
 	       doc: /* Space between overline and text, in pixels.
@@ -32801,11 +32445,6 @@ cancel_hourglass (void)
 	  if (FRAME_LIVE_P (f) && FRAME_WINDOW_P (f)
 	      && FRAME_RIF (f)->hide_hourglass)
 	    FRAME_RIF (f)->hide_hourglass (f);
-#ifdef HAVE_NTGUI
-	  /* No cursors on non GUI frames - restore to stock arrow cursor.  */
-	  else if (!FRAME_W32_P (f))
-	    w32_arrow_cursor ();
-#endif
 	}
 
       hourglass_shown_p = false;
