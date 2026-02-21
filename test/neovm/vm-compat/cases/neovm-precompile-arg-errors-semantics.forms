@@ -1,0 +1,6 @@
+; NeoVM extension: argument and error contract checks for `neovm-precompile-file`.
+
+(condition-case err (neovm-precompile-file) (error err))
+(condition-case err (neovm-precompile-file "a" "b") (error err))
+(condition-case err (neovm-precompile-file 42) (error err))
+(condition-case err (neovm-precompile-file "/tmp/neovm-precompile-missing-source.el") (error (car err)))

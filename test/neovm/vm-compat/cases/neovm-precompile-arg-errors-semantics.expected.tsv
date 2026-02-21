@@ -1,0 +1,4 @@
+1	(condition-case err (neovm-precompile-file) (error err))	OK (wrong-number-of-arguments neovm-precompile-file 0)
+2	(condition-case err (neovm-precompile-file "a" "b") (error err))	OK (wrong-number-of-arguments neovm-precompile-file 2)
+3	(condition-case err (neovm-precompile-file 42) (error err))	OK (wrong-type-argument stringp 42)
+4	(condition-case err (neovm-precompile-file "/tmp/neovm-precompile-missing-source.el") (error (car err)))	OK file-error
