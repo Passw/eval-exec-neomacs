@@ -5089,11 +5089,14 @@ fn macroexpand_known_fallback_macro(
                 return Ok(Some(Value::Nil));
             }
             if name == "pcase-let" && args.len() == 1 {
-                if list_to_vec(&args[0]).is_some() {
+                if let Some(bindings) = list_to_vec(&args[0]) {
+                    if bindings.len() <= 1 {
+                        return Ok(Some(Value::Nil));
+                    }
+                } else {
+                    let _ = collect_pcase_fallback_bindings(&args[0])?;
                     return Ok(Some(Value::Nil));
                 }
-                let _ = collect_pcase_fallback_bindings(&args[0])?;
-                return Ok(Some(Value::Nil));
             }
 
             let bindings_src = collect_pcase_fallback_bindings(&args[0])?;
@@ -22329,6 +22332,43 @@ mod tests {
         )
         .expect("macroexpand should ignore no-body pcase-let binding element shape");
         assert_eq!(pcase_let_no_body_nonbinding, Value::Nil);
+        let pcase_let_no_body_multi_binding = builtin_macroexpand_eval(
+            &mut eval,
+            vec![Value::list(vec![
+                Value::symbol("pcase-let"),
+                Value::list(vec![
+                    Value::cons(Value::symbol("x"), Value::symbol("y")),
+                    Value::cons(Value::symbol("z"), Value::symbol("w")),
+                ]),
+            ])],
+        )
+        .expect("macroexpand should still lower no-body pcase-let forms with multiple bindings");
+        assert_eq!(
+            pcase_let_no_body_multi_binding,
+            Value::list(vec![
+                Value::symbol("let"),
+                Value::list(vec![
+                    Value::cons(Value::symbol("x"), Value::symbol("y")),
+                    Value::cons(Value::symbol("z"), Value::symbol("w")),
+                ]),
+                Value::list(vec![Value::symbol("pcase-let*"), Value::Nil]),
+            ])
+        );
+        let bad_pcase_let_no_body_multi_binding = builtin_macroexpand_eval(
+            &mut eval,
+            vec![Value::list(vec![
+                Value::symbol("pcase-let"),
+                Value::list(vec![Value::cons(Value::symbol("x"), Value::symbol("y")), Value::symbol("z")]),
+            ])],
+        )
+        .expect_err("macroexpand should validate no-body pcase-let tail elements once multiple bindings exist");
+        match bad_pcase_let_no_body_multi_binding {
+            Flow::Signal(sig) => {
+                assert_eq!(sig.symbol, "wrong-type-argument");
+                assert_eq!(sig.data, vec![Value::symbol("listp"), Value::symbol("z")]);
+            }
+            other => panic!("unexpected flow: {other:?}"),
+        }
         let bad_pcase_let_no_body_improper = builtin_macroexpand_eval(
             &mut eval,
             vec![Value::list(vec![

@@ -31,6 +31,8 @@
 (macroexpand '(pcase-let ((x 1))))
 (macroexpand '(pcase-let ((`(,a ,b) '(1 2)))))
 (macroexpand '(pcase-let (x)))
+(macroexpand '(pcase-let ((x . y) (z . w))))
+(condition-case err (macroexpand '(pcase-let ((x . y) z))) (error err))
 (macroexpand '(pcase-let* ((x 1))))
 (macroexpand '(pcase-let* ((`(,a ,b) '(1 2)))))
 (condition-case err (macroexpand '(pcase-let* x)) (error err))
