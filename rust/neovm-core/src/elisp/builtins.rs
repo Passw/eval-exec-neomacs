@@ -18589,6 +18589,42 @@ mod tests {
     }
 
     #[test]
+    fn format_and_message_render_live_buffer_handles_in_eval_dispatch() {
+        let mut eval = crate::elisp::eval::Evaluator::new();
+        let buffer = dispatch_builtin(
+            &mut eval,
+            "generate-new-buffer",
+            vec![Value::string("*format-live-buffer*")],
+        )
+        .expect("generate-new-buffer should resolve")
+        .expect("generate-new-buffer should evaluate");
+
+        let formatted = dispatch_builtin(
+            &mut eval,
+            "format",
+            vec![Value::string("%S"), buffer.clone()],
+        )
+        .expect("format should resolve")
+        .expect("format should evaluate");
+        assert!(
+            formatted
+                .as_str()
+                .is_some_and(|s| s.starts_with("#<buffer *format-live-buffer")),
+            "expected live buffer name in format output: {formatted:?}"
+        );
+
+        let message = dispatch_builtin(&mut eval, "message", vec![Value::string("%S"), buffer])
+            .expect("message should resolve")
+            .expect("message should evaluate");
+        assert!(
+            message
+                .as_str()
+                .is_some_and(|s| s.starts_with("#<buffer *format-live-buffer")),
+            "expected live buffer name in message output: {message:?}"
+        );
+    }
+
+    #[test]
     fn message_nil_returns_nil() {
         let mut eval = crate::elisp::eval::Evaluator::new();
 

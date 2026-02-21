@@ -62,12 +62,14 @@ Last updated: 2026-02-21
       - dead buffer handles now render as `#<killed buffer>` in eval-dispatch `%S` printing paths (`format`, `message`).
       - added evaluator coverage:
         - `format_and_message_render_killed_buffer_handles_in_eval_dispatch`
+        - `format_and_message_render_live_buffer_handles_in_eval_dispatch`
   - verified:
     - `cargo test --manifest-path rust/neovm-core/Cargo.toml builtin_error_message_string_formats_mutex_and_condvar_handles -- --nocapture` (pass)
     - `cargo test --manifest-path rust/neovm-core/Cargo.toml builtin_error_message_string_formats_thread_handles -- --nocapture` (pass)
     - `cargo test --manifest-path rust/neovm-core/Cargo.toml builtin_error_message_string_formats_terminal_handles -- --nocapture` (pass)
     - `cargo test --manifest-path rust/neovm-core/Cargo.toml builtin_error_message_string_formats_frame_and_window_handles -- --nocapture` (pass)
     - `cargo test --manifest-path rust/neovm-core/Cargo.toml format_and_message_render_killed_buffer_handles_in_eval_dispatch -- --nocapture` (pass)
+    - `cargo test --manifest-path rust/neovm-core/Cargo.toml format_and_message_render_live_buffer_handles_in_eval_dispatch -- --nocapture` (pass)
     - `cargo test --manifest-path rust/neovm-core/Cargo.toml eval_context_printer_renders_condvar_handles_consistently -- --nocapture` (pass)
     - `cargo test --manifest-path rust/neovm-core/Cargo.toml eval_context_printer_renders_frame_window_handles_consistently -- --nocapture` (pass)
     - `cargo test --manifest-path rust/neovm-core/Cargo.toml eval_context_printer_renders_terminal_thread_handles_consistently -- --nocapture` (pass)
