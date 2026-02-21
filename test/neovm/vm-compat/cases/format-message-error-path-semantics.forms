@@ -1,0 +1,27 @@
+(fboundp 'format)
+(fboundp 'message)
+(fboundp 'format-message)
+
+(condition-case err (format 1) (error err))
+
+(condition-case err (format nil) (error err))
+
+(condition-case err (format 'foo) (error err))
+
+(condition-case err (format "%s %s" 1) (error err))
+
+(condition-case err (message 1) (error err))
+
+(condition-case err (message 'foo) (error err))
+
+(eq (message nil) nil)
+
+(condition-case err (message "%s %s" 1) (error err))
+
+(condition-case err (format-message 1) (error err))
+
+(condition-case err (format-message nil) (error err))
+
+(condition-case err (format-message 'foo) (error err))
+
+(condition-case err (format-message "%s %s" 1) (error err))

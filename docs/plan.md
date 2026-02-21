@@ -28,6 +28,26 @@ Last updated: 2026-02-21
 
 ## Doing
 
+- Aligned core `format` / `format-message` / `message` string-format error behavior with oracle:
+  - runtime changes:
+    - `rust/neovm-core/src/elisp/builtins.rs`
+      - `format` and `format-message` now use strict string format parsing (`stringp` required) and signal:
+        - `(error "Not enough arguments for format string")` when placeholders exceed arguments.
+      - `message` now keeps `nil` special-case but otherwise enforces string format for single-argument calls.
+      - extended evaluator coverage:
+        - `format_message_and_message_signal_strict_format_errors`
+      - test asserts wrong-type and missing-format-arg signal payload parity for all three builtins.
+  - vm-compat corpus changes:
+    - added:
+      - `test/neovm/vm-compat/cases/format-message-error-path-semantics.forms`
+      - `test/neovm/vm-compat/cases/format-message-error-path-semantics.expected.tsv`
+    - wired case into:
+      - `test/neovm/vm-compat/cases/default.list`
+  - verified:
+    - `cargo test --manifest-path rust/neovm-core/Cargo.toml format_message_and_message_signal_strict_format_errors -- --nocapture` (pass)
+    - `make -C test/neovm/vm-compat check-one-neovm CASE=cases/format-message-error-path-semantics` (pass; `15/15`)
+    - `make -C test/neovm/vm-compat check-neovm-filter-strict LIST=cases/default.list PATTERN='format-message-error-path-semantics'` (pass; strict filtered gates green)
+
 - Aligned `message-box` / `message-or-box` error paths with oracle format semantics:
   - runtime changes:
     - `rust/neovm-core/src/elisp/builtins.rs`

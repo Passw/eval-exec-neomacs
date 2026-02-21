@@ -1,0 +1,15 @@
+1	(fboundp 'format)	OK t
+2	(fboundp 'message)	OK t
+3	(fboundp 'format-message)	OK t
+4	(condition-case err (format 1) (error err))	OK (wrong-type-argument stringp 1)
+5	(condition-case err (format nil) (error err))	OK (wrong-type-argument stringp nil)
+6	(condition-case err (format 'foo) (error err))	OK (wrong-type-argument stringp foo)
+7	(condition-case err (format "%s %s" 1) (error err))	OK (error "Not enough arguments for format string")
+8	(condition-case err (message 1) (error err))	OK (wrong-type-argument stringp 1)
+9	(condition-case err (message 'foo) (error err))	OK (wrong-type-argument stringp foo)
+10	(eq (message nil) nil)	OK t
+11	(condition-case err (message "%s %s" 1) (error err))	OK (error "Not enough arguments for format string")
+12	(condition-case err (format-message 1) (error err))	OK (wrong-type-argument stringp 1)
+13	(condition-case err (format-message nil) (error err))	OK (wrong-type-argument stringp nil)
+14	(condition-case err (format-message 'foo) (error err))	OK (wrong-type-argument stringp foo)
+15	(condition-case err (format-message "%s %s" 1) (error err))	OK (error "Not enough arguments for format string")
