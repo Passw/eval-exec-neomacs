@@ -5037,6 +5037,9 @@ fn macroexpand_known_fallback_macro(
                     vec![Value::cons(Value::Int(1), Value::Int(1)), Value::Int(0)],
                 ));
             }
+            if name == "pcase-let*" && args.len() == 1 {
+                return Ok(Some(Value::Nil));
+            }
 
             let bindings_src = list_to_vec(&args[0]).ok_or_else(|| {
                 signal(
@@ -22204,6 +22207,45 @@ mod tests {
             pcase_let_star_vector_pattern_expanded,
             pcase_let_star_vector_pattern_expected
         );
+        let pcase_let_star_no_body_symbol = builtin_macroexpand_eval(
+            &mut eval,
+            vec![Value::list(vec![
+                Value::symbol("pcase-let*"),
+                Value::list(vec![Value::list(vec![Value::symbol("x"), Value::Int(1)])]),
+            ])],
+        )
+        .expect("macroexpand should collapse no-body pcase-let* symbol bindings to nil");
+        assert_eq!(pcase_let_star_no_body_symbol, Value::Nil);
+        let pcase_let_star_no_body_pattern = builtin_macroexpand_eval(
+            &mut eval,
+            vec![Value::list(vec![
+                Value::symbol("pcase-let*"),
+                Value::list(vec![Value::list(vec![
+                    Value::list(vec![
+                        Value::symbol("\\`"),
+                        Value::list(vec![
+                            Value::list(vec![Value::symbol("\\,"), Value::symbol("a")]),
+                            Value::list(vec![Value::symbol("\\,"), Value::symbol("b")]),
+                        ]),
+                    ]),
+                    Value::list(vec![
+                        Value::symbol("quote"),
+                        Value::list(vec![Value::Int(1), Value::Int(2)]),
+                    ]),
+                ])]),
+            ])],
+        )
+        .expect("macroexpand should collapse no-body pcase-let* pattern bindings to nil");
+        assert_eq!(pcase_let_star_no_body_pattern, Value::Nil);
+        let pcase_let_star_no_body_nonlist = builtin_macroexpand_eval(
+            &mut eval,
+            vec![Value::list(vec![
+                Value::symbol("pcase-let*"),
+                Value::symbol("x"),
+            ])],
+        )
+        .expect("macroexpand should collapse no-body pcase-let* non-list bindings to nil");
+        assert_eq!(pcase_let_star_no_body_nonlist, Value::Nil);
         let bad_pcase_let = builtin_macroexpand_eval(
             &mut eval,
             vec![Value::list(vec![
