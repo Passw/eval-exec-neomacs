@@ -397,7 +397,9 @@ Current NeoVM-only policy cases include source-only loading behavior (`.elc`
 rejection and `.neoc` fallback safety) plus NeoVM extension behavior
 (`neovm-precompile-file` cache warming, argument/error contracts, and compiled
 artifact rejection, parse-error/no-cache semantics, and stable return-path
-semantics), and default-build `#[...]` literal non-callability policy
+semantics), plus load-cache-write-disable runner policy semantics
+(`load-file` no `.neoc` writes while explicit precompile still writes), and
+default-build `#[...]` literal non-callability policy
 (`cases/bytecode-literal-default-policy`).
 
 ### Extension policy note: `neovm-precompile-file`
