@@ -1987,6 +1987,12 @@ pub(crate) fn builtin_commandp(args: Vec<Value>) -> EvalResult {
 /// and subrs (returns `(0 . many)` as a conservative default).
 pub(crate) fn builtin_func_arity(args: Vec<Value>) -> EvalResult {
     expect_args("func-arity", &args, 1)?;
+    if super::autoload::is_autoload_value(&args[0]) {
+        return Err(signal(
+            "wrong-type-argument",
+            vec![Value::symbol("symbolp"), args[0].clone()],
+        ));
+    }
     match &args[0] {
         Value::Lambda(l) => {
             let min = l.params.min_arity();
@@ -4550,6 +4556,26 @@ mod tests {
     fn func_arity_error_for_non_callable() {
         let result = builtin_func_arity(vec![Value::Int(42)]);
         assert!(result.is_err());
+    }
+
+    #[test]
+    fn func_arity_autoload_object_signals_wrong_type_argument_symbolp() {
+        let autoload_fn = Value::list(vec![
+            Value::symbol("autoload"),
+            Value::string("vm-auto-file"),
+            Value::Nil,
+            Value::True,
+            Value::Nil,
+        ]);
+        let result = builtin_func_arity(vec![autoload_fn.clone()])
+            .expect_err("autoload forms should not satisfy func-arity");
+        match result {
+            Flow::Signal(sig) => {
+                assert_eq!(sig.symbol, "wrong-type-argument");
+                assert_eq!(sig.data, vec![Value::symbol("symbolp"), autoload_fn]);
+            }
+            other => panic!("unexpected flow: {other:?}"),
+        }
     }
 
     // -- wrong arg count --

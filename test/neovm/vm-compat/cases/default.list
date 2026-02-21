@@ -40,6 +40,7 @@ cases/save-excursion-save-restriction-runtime-semantics
 cases/window-quit-temp-message-macro-semantics
 cases/function-special-form-edges
 cases/autoload-macro-introspection
+cases/func-arity-autoload-object-semantics
 cases/macroexpand-runtime-semantics
 cases/bound-and-true-p-semantics
 cases/with-demoted-errors-semantics
