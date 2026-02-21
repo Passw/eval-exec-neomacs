@@ -21981,6 +21981,31 @@ mod tests {
             pcase_let_star_mixed_dotted_expanded,
             pcase_let_star_mixed_dotted_expected
         );
+        let pcase_let_star_mixed_dotted_multi_forms = crate::elisp::parser::parse_forms(
+            r#"(pcase-let* ((`(,a ,b \, rest) '(1 2 3 4))) (list a b rest))"#,
+        )
+        .expect("multi-head dotted pcase-let* form should parse");
+        let pcase_let_star_mixed_dotted_multi = crate::elisp::eval::quote_to_value(
+            pcase_let_star_mixed_dotted_multi_forms
+                .first()
+                .expect("multi-head dotted pcase-let* parse should yield one form"),
+        );
+        let pcase_let_star_mixed_dotted_multi_expanded =
+            builtin_macroexpand_eval(&mut eval, vec![pcase_let_star_mixed_dotted_multi])
+                .expect("macroexpand should lower multi-head dotted pcase-let* bindings");
+        let pcase_let_star_mixed_dotted_multi_expected_forms = crate::elisp::parser::parse_forms(
+            r#"(progn (ignore (consp '(1 2 3 4))) (let* ((x10 (car-safe '(1 2 3 4))) (x11 (cdr-safe '(1 2 3 4)))) (progn (ignore (consp x11)) (let* ((x12 (car-safe x11)) (x13 (cdr-safe x11))) (let ((a x10) (b x12) (rest x13)) (list a b rest))))))"#,
+        )
+        .expect("multi-head dotted pcase-let* expected expansion should parse");
+        let pcase_let_star_mixed_dotted_multi_expected = crate::elisp::eval::quote_to_value(
+            pcase_let_star_mixed_dotted_multi_expected_forms
+                .first()
+                .expect("multi-head dotted pcase-let* expected parse should yield one form"),
+        );
+        assert_eq!(
+            pcase_let_star_mixed_dotted_multi_expanded,
+            pcase_let_star_mixed_dotted_multi_expected
+        );
         let bad_pcase_let = builtin_macroexpand_eval(
             &mut eval,
             vec![Value::list(vec![
