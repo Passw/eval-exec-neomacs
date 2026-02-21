@@ -6462,6 +6462,29 @@ Last updated: 2026-02-20
 
 ## Done
 
+- Expanded batch prompt/input queue-edge lock-ins for stale/invalid tails:
+  - vm-compat changes:
+    - added and wired:
+      - `test/neovm/vm-compat/cases/prompt-input-invalid-stale-tail-semantics.forms`
+      - `test/neovm/vm-compat/cases/prompt-input-invalid-stale-tail-semantics.expected.tsv`
+      - `test/neovm/vm-compat/cases/default.list`
+    - added oracle-backed matrix coverage across mixed queue shapes
+      (`(97 . foo)`, `(foo . 97)`, `((mouse-1) . foo)`, list/vector tails)
+      for:
+      - prompt readers: `read-string`, `read-number`, `read-from-minibuffer`,
+        `completing-read`, `read-command`, `read-variable`, `read-buffer`,
+        `read-file-name`
+      - yes/no readers: `y-or-n-p`, `yes-or-no-p`
+      - coding readers: `read-coding-system`, `read-non-nil-coding-system`
+    - each probe now locks:
+      - error kind parity (batch EOF/type behavior)
+      - unread queue preservation across stale/invalid tails
+      - no `recent-keys` publication for these prompt/input paths
+  - verified:
+    - `make -C test/neovm/vm-compat record FORMS=cases/prompt-input-invalid-stale-tail-semantics.forms EXPECTED=cases/prompt-input-invalid-stale-tail-semantics.expected.tsv` (pass)
+    - `make -C test/neovm/vm-compat check-one-neovm CASE=cases/prompt-input-invalid-stale-tail-semantics` (pass, `4/4`)
+    - `make -C test/neovm/vm-compat check-all-neovm-strict` (pass; inventory `868`)
+
 - Aligned `documentation` builtin-doc text for core `subr`/special-form symbols (`car`, `cdr`, `if`) with GNU Emacs text shape:
   - runtime changes:
     - `rust/neovm-core/src/elisp/doc.rs`
