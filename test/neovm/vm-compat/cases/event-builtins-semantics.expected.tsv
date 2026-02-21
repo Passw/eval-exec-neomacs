@@ -57,3 +57,16 @@
 57	(condition-case err (text-char-description 'f1) (error (car err)))	OK wrong-type-argument
 58	(condition-case err (text-char-description) (error (car err)))	OK wrong-number-of-arguments
 59	(condition-case err (text-char-description 97 nil) (error (car err)))	OK wrong-number-of-arguments
+60	(fboundp 'char-displayable-p)	OK t
+61	(char-displayable-p 97)	OK t
+62	(char-displayable-p 10)	OK t
+63	(char-displayable-p 9)	OK t
+64	(char-displayable-p 27)	OK t
+65	(char-displayable-p 233)	OK unicode
+66	(char-displayable-p 128512)	OK unicode
+67	(char-displayable-p 1114112)	OK nil
+68	(char-displayable-p 2097152)	OK nil
+69	(condition-case err (char-displayable-p 4194304) (error err))	OK (wrong-type-argument characterp 4194304)
+70	(condition-case err (char-displayable-p 'x) (error err))	OK (wrong-type-argument number-or-marker-p x)
+71	(condition-case err (char-displayable-p) (error err))	OK (wrong-number-of-arguments char-displayable-p 0)
+72	(condition-case err (char-displayable-p 97 nil) (error err))	OK (wrong-number-of-arguments char-displayable-p 2)

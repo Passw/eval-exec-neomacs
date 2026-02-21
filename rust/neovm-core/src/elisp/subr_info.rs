@@ -446,6 +446,7 @@ fn subr_arity_value(name: &str) -> Value {
         | "charset-id-internal"
         | "charset-priority-list" => arity_cons(0, Some(1)),
         "char-category-set"
+        | "char-displayable-p"
         | "char-or-string-p"
         | "char-resolve-modifiers"
         | "char-syntax"
@@ -2582,6 +2583,7 @@ mod tests {
         assert_subr_arity("char-before", 0, Some(1));
         assert_subr_arity("char-category-set", 1, Some(1));
         assert_subr_arity("char-charset", 1, Some(2));
+        assert_subr_arity("char-displayable-p", 1, Some(1));
         assert_subr_arity("char-equal", 2, Some(2));
         assert_subr_arity("char-or-string-p", 1, Some(1));
         assert_subr_arity("char-resolve-modifiers", 1, Some(1));

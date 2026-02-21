@@ -2,6 +2,7 @@
 (subr-arity (symbol-function 'char-before))
 (subr-arity (symbol-function 'char-category-set))
 (subr-arity (symbol-function 'char-charset))
+(subr-arity (symbol-function 'char-displayable-p))
 (subr-arity (symbol-function 'char-or-string-p))
 (subr-arity (symbol-function 'char-resolve-modifiers))
 (subr-arity (symbol-function 'char-syntax))

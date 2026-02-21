@@ -189,6 +189,7 @@ const DISPATCH_BUILTIN_NAMES: &[&str] = &[
     "char-before",
     "char-category-set",
     "char-charset",
+    "char-displayable-p",
     "char-equal",
     "char-or-string-p",
     "char-resolve-modifiers",

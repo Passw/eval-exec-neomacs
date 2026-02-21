@@ -13355,6 +13355,7 @@ pub(crate) fn dispatch_builtin(
 
         // Character encoding
         "char-width" => crate::encoding::builtin_char_width(args),
+        "char-displayable-p" => crate::encoding::builtin_char_displayable_p(args),
         "string-bytes" => crate::encoding::builtin_string_bytes(args),
         "multibyte-string-p" => crate::encoding::builtin_multibyte_string_p(args),
         "encode-coding-string" => crate::encoding::builtin_encode_coding_string(args),
@@ -14517,6 +14518,7 @@ pub(crate) fn dispatch_builtin_pure(name: &str, args: Vec<Value>) -> Option<Eval
         // Keyboard macro (pure)
         // Character encoding (pure)
         "char-width" => crate::encoding::builtin_char_width(args),
+        "char-displayable-p" => crate::encoding::builtin_char_displayable_p(args),
         "string-bytes" => crate::encoding::builtin_string_bytes(args),
         "multibyte-string-p" => crate::encoding::builtin_multibyte_string_p(args),
         "encode-coding-string" => crate::encoding::builtin_encode_coding_string(args),

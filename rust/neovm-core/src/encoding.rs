@@ -7,6 +7,8 @@
 use crate::elisp::string_escape::storage_byte_len;
 use crate::elisp::value::Value;
 
+const MAX_CHAR_CODE: i64 = 0x3F_FFFF;
+
 // ---------------------------------------------------------------------------
 // Character classification
 // ---------------------------------------------------------------------------
@@ -316,6 +318,34 @@ pub(crate) fn builtin_char_or_string_p(args: Vec<Value>) -> EvalResult {
     )))
 }
 
+/// `(char-displayable-p CHAR)` -> t, nil, or `unicode`
+pub(crate) fn builtin_char_displayable_p(args: Vec<Value>) -> EvalResult {
+    expect_args("char-displayable-p", &args, 1)?;
+    let code = match &args[0] {
+        Value::Char(c) => *c as i64,
+        Value::Int(n) => *n,
+        other => {
+            return Err(signal(
+                "wrong-type-argument",
+                vec![Value::symbol("number-or-marker-p"), other.clone()],
+            ))
+        }
+    };
+    if !(0..=MAX_CHAR_CODE).contains(&code) {
+        return Err(signal(
+            "wrong-type-argument",
+            vec![Value::symbol("characterp"), Value::Int(code)],
+        ));
+    }
+    if code <= 0x7F {
+        return Ok(Value::True);
+    }
+    if code <= 0x10_FFFF {
+        return Ok(Value::symbol("unicode"));
+    }
+    Ok(Value::Nil)
+}
+
 /// `(max-char)` -> integer
 pub(crate) fn builtin_max_char(args: Vec<Value>) -> EvalResult {
     let _ = args; // 0 args
@@ -329,6 +359,7 @@ pub(crate) fn builtin_max_char(args: Vec<Value>) -> EvalResult {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::elisp::error::Flow;
 
     #[test]
     fn ascii_width() {
@@ -363,6 +394,48 @@ mod tests {
     fn builtin_string_bytes_counts_utf8_length() {
         let result = builtin_string_bytes(vec![Value::string("Aé中")]).unwrap();
         assert_eq!(result, Value::Int(6));
+    }
+
+    #[test]
+    fn builtin_char_displayable_p_matches_oracle_bounds_and_types() {
+        assert_eq!(
+            builtin_char_displayable_p(vec![Value::Int('a' as i64)]).unwrap(),
+            Value::True
+        );
+        assert_eq!(
+            builtin_char_displayable_p(vec![Value::Int(0x00E9)]).unwrap(),
+            Value::symbol("unicode")
+        );
+        assert_eq!(
+            builtin_char_displayable_p(vec![Value::Int(0x11_0000)]).unwrap(),
+            Value::Nil
+        );
+
+        let overflow = builtin_char_displayable_p(vec![Value::Int(0x40_0000)])
+            .expect_err("overflow char code should signal wrong-type-argument characterp");
+        match overflow {
+            Flow::Signal(sig) => {
+                assert_eq!(sig.symbol, "wrong-type-argument");
+                assert_eq!(
+                    sig.data,
+                    vec![Value::symbol("characterp"), Value::Int(0x40_0000)]
+                );
+            }
+            other => panic!("expected signal, got: {other:?}"),
+        }
+
+        let non_number = builtin_char_displayable_p(vec![Value::symbol("x")])
+            .expect_err("non-number should signal number-or-marker-p");
+        match non_number {
+            Flow::Signal(sig) => {
+                assert_eq!(sig.symbol, "wrong-type-argument");
+                assert_eq!(
+                    sig.data,
+                    vec![Value::symbol("number-or-marker-p"), Value::symbol("x")]
+                );
+            }
+            other => panic!("expected signal, got: {other:?}"),
+        }
     }
 
     #[test]
