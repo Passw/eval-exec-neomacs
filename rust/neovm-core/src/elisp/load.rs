@@ -269,14 +269,7 @@ fn parse_source_with_cache(
         return Ok(forms);
     }
 
-    let forms = super::parser::parse_forms(source).map_err(|e| EvalError::Signal {
-        symbol: "invalid-read-syntax".to_string(),
-        data: vec![Value::string(format!(
-            "Parse error in {}: {:?}",
-            source_path.display(),
-            e
-        ))],
-    })?;
+    let forms = parse_source_forms(source_path, source)?;
     // Cache persistence failures must not affect `load` semantics.
     if load_cache_writes_enabled() {
         let _ = write_forms_cache(source_path, source, lexical_binding, &forms);
@@ -296,11 +289,43 @@ fn load_cache_writes_enabled() -> bool {
     }
 }
 
+fn strip_shebang_line(source: &str) -> &str {
+    if !source.starts_with("#!") {
+        return source;
+    }
+
+    match source.find('\n') {
+        Some(index) => &source[index + 1..],
+        None => "",
+    }
+}
+
 fn lexical_binding_enabled_for_source(source: &str) -> bool {
-    source
-        .lines()
-        .next()
-        .is_some_and(|line| line.contains("lexical-binding: t"))
+    let mut lines = source.lines();
+    let first_line = lines.next();
+    if first_line.is_some_and(|line| line.contains("lexical-binding: t")) {
+        return true;
+    }
+
+    if first_line.is_some_and(|line| line.starts_with("#!")) {
+        return lines
+            .next()
+            .is_some_and(|line| line.contains("lexical-binding: t"));
+    }
+
+    false
+}
+
+fn parse_source_forms(source_path: &Path, source: &str) -> Result<Vec<Expr>, EvalError> {
+    let source_for_reader = strip_shebang_line(source);
+    super::parser::parse_forms(source_for_reader).map_err(|e| EvalError::Signal {
+        symbol: "invalid-read-syntax".to_string(),
+        data: vec![Value::string(format!(
+            "Parse error in {}: {:?}",
+            source_path.display(),
+            e
+        ))],
+    })
 }
 
 fn is_unsupported_compiled_path(path: &Path) -> bool {
@@ -335,14 +360,7 @@ pub fn precompile_source_file(source_path: &Path) -> Result<PathBuf, EvalError> 
     })?;
 
     let lexical_binding = lexical_binding_enabled_for_source(&content);
-    let forms = super::parser::parse_forms(&content).map_err(|e| EvalError::Signal {
-        symbol: "invalid-read-syntax".to_string(),
-        data: vec![Value::string(format!(
-            "Parse error in {}: {:?}",
-            source_path.display(),
-            e
-        ))],
-    })?;
+    let forms = parse_source_forms(source_path, &content)?;
 
     write_forms_cache(source_path, &content, lexical_binding, &forms).map_err(|e| {
         EvalError::Signal {
@@ -463,6 +481,42 @@ mod tests {
                 "expected '{value}' to leave load cache writes enabled",
             );
         }
+    }
+
+    #[test]
+    fn strip_shebang_line_only_removes_leading_script_line() {
+        let source = "#!/usr/bin/env emacs --script\n(setq vm-shebang-strip 1)\n";
+        assert_eq!(
+            strip_shebang_line(source),
+            "(setq vm-shebang-strip 1)\n",
+            "shebang-prefixed source should drop the first line before parsing",
+        );
+        assert_eq!(
+            strip_shebang_line("#!/usr/bin/env emacs --script"),
+            "",
+            "single-line shebang files should parse as empty payload",
+        );
+        assert_eq!(
+            strip_shebang_line("(setq vm-shebang-strip 2)\n"),
+            "(setq vm-shebang-strip 2)\n",
+            "non-shebang source should remain unchanged",
+        );
+    }
+
+    #[test]
+    fn lexical_binding_detects_second_line_cookie_after_shebang() {
+        assert!(
+            lexical_binding_enabled_for_source(
+                "#!/usr/bin/env emacs --script\n;; -*- lexical-binding: t; -*-\n(setq vm-lb 1)\n",
+            ),
+            "second-line lexical-binding cookie should be honored for shebang scripts",
+        );
+        assert!(
+            !lexical_binding_enabled_for_source(
+                ";; no cookie on first line\n;; -*- lexical-binding: t; -*-\n",
+            ),
+            "second-line cookie should not activate lexical binding without shebang",
+        );
     }
 
     #[test]
@@ -677,6 +731,47 @@ mod tests {
             eval.obarray().symbol_value("load-file-name").cloned(),
             Some(Value::Nil),
             "load-file-name should be restored after top-level load",
+        );
+
+        let _ = fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn load_file_accepts_shebang_and_honors_second_line_lexical_binding_cookie() {
+        let unique = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .expect("clock before epoch")
+            .as_nanos();
+        let dir = std::env::temp_dir().join(format!("neovm-load-shebang-{unique}"));
+        fs::create_dir_all(&dir).expect("create temp fixture dir");
+        let file = dir.join("probe.el");
+        fs::write(
+            &file,
+            "#!/usr/bin/env emacs --script\n\
+             ;; -*- lexical-binding: t; -*-\n\
+             (setq vm-load-shebang-probe lexical-binding)\n\
+             (setq vm-load-shebang-fn (let ((x 41)) (lambda () (+ x 1))))\n",
+        )
+        .expect("write shebang fixture");
+
+        let mut eval = super::super::eval::Evaluator::new();
+        let loaded = load_file(&mut eval, &file).expect("load shebang fixture");
+        assert_eq!(loaded, Value::True);
+        assert_eq!(
+            eval.obarray().symbol_value("vm-load-shebang-probe").cloned(),
+            Some(Value::True),
+            "second-line lexical-binding cookie should set lexical-binding to t during load",
+        );
+
+        let call = super::super::parser::parse_forms(
+            "(let ((lexical-binding nil)) (funcall vm-load-shebang-fn))",
+        )
+        .expect("parse call fixture");
+        let value = eval.eval_expr(&call[0]).expect("evaluate closure");
+        assert_eq!(
+            value.as_int(),
+            Some(42),
+            "closure should capture lexical scope from loaded file",
         );
 
         let _ = fs::remove_dir_all(&dir);

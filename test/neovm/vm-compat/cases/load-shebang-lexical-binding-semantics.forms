@@ -1,0 +1,25 @@
+; shebang-prefixed source should load, and second-line lexical-binding cookie must apply.
+(progn
+  (setq vm-load-shebang-source "/tmp/neovm-load-shebang-lexical-binding-semantics.el")
+  'ok)
+(let ((orig (current-buffer))
+      (buf (get-buffer-create " *vm-load-shebang-src*")))
+  (unwind-protect
+      (progn
+        (set-buffer buf)
+        (erase-buffer)
+        (insert "#!/usr/bin/env emacs --script")
+        (insert (char-to-string 10))
+        (insert ";; -*- lexical-binding: t; -*-")
+        (insert (char-to-string 10))
+        (insert "(setq vm-load-shebang-probe lexical-binding)")
+        (insert (char-to-string 10))
+        (insert "(setq vm-load-shebang-fn (let ((x 41)) (lambda () (+ x 1))))")
+        (insert (char-to-string 10))
+        (write-region nil nil vm-load-shebang-source nil nil))
+    (set-buffer orig)
+    (kill-buffer buf)))
+(load vm-load-shebang-source nil t)
+vm-load-shebang-probe
+(let ((lexical-binding nil)) (funcall vm-load-shebang-fn))
+(ignore-errors (delete-file vm-load-shebang-source))
