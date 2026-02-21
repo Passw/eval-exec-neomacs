@@ -138,10 +138,14 @@ fn compile_list_pattern(items: &[Expr]) -> Result<Pattern, Flow> {
 
         // (let PATTERN EXPR)
         Expr::Symbol(s) if s == "let" => {
-            if items.len() != 3 {
+            let provided = items.len().saturating_sub(1);
+            if provided != 2 {
                 return Err(signal(
-                    "error",
-                    vec![Value::string("let pattern requires exactly two arguments")],
+                    "wrong-number-of-arguments",
+                    vec![
+                        Value::Subr("let--pcase-macroexpander".to_string()),
+                        Value::Int(provided as i64),
+                    ],
                 ));
             }
             let sub = compile_pattern(&items[1])?;
@@ -189,13 +193,14 @@ fn compile_list_pattern(items: &[Expr]) -> Result<Pattern, Flow> {
         // Treat as a quoted literal (for e.g. `(1 2 3)` which should match
         // the list literally).  This matches Emacs behaviour where unknown
         // list patterns signal an error.
-        _ => Err(signal(
-            "error",
-            vec![Value::string(format!(
-                "unknown pcase pattern: {}",
-                super::expr::print_expr(&Expr::List(items.to_vec()))
-            ))],
-        )),
+        _ => {
+            let rendered = super::expr::print_expr(&Expr::List(items.to_vec()));
+            let message = match head {
+                Expr::Symbol(name) => format!("Unknown {name} pattern: {rendered}"),
+                _ => format!("unknown pcase pattern: {rendered}"),
+            };
+            Err(signal("error", vec![Value::string(message)]))
+        }
     }
 }
 
@@ -1259,6 +1264,38 @@ mod tests {
     fn pcase_let_pattern() {
         // (let PATTERN EXPR) — match EXPR against PATTERN
         assert_eq!(eval_last("(pcase 42 ((let x (+ 1 2)) x))"), "OK 3");
+    }
+
+    #[test]
+    fn pcase_let_pattern_arity_errors_match_oracle() {
+        assert_eq!(
+            eval_last("(condition-case err (pcase 1 ((let) 'x) (_ 'y)) (error err))"),
+            "OK (wrong-number-of-arguments #<subr let--pcase-macroexpander> 0)"
+        );
+        assert_eq!(
+            eval_last("(condition-case err (pcase 1 ((let x) 'x) (_ 'y)) (error err))"),
+            "OK (wrong-number-of-arguments #<subr let--pcase-macroexpander> 1)"
+        );
+        assert_eq!(
+            eval_last("(condition-case err (pcase 1 ((let x 2 3) x) (_ 'y)) (error err))"),
+            "OK (wrong-number-of-arguments #<subr let--pcase-macroexpander> 3)"
+        );
+    }
+
+    #[test]
+    fn pcase_unknown_symbol_pattern_error_shape_matches_oracle() {
+        assert_eq!(
+            eval_last("(condition-case err (pcase 1 ((foo bar) 'x) (_ 'y)) (error err))"),
+            "OK (error \"Unknown foo pattern: (foo bar)\")"
+        );
+        assert_eq!(
+            eval_last("(condition-case err (pcase-let (((foo bar) 1)) 'ok) (error err))"),
+            "OK (error \"Unknown foo pattern: (foo bar)\")"
+        );
+        assert_eq!(
+            eval_last("(condition-case err (pcase-let* (((foo bar) 1)) 'ok) (error err))"),
+            "OK (error \"Unknown foo pattern: (foo bar)\")"
+        );
     }
 
     // =======================================================================
