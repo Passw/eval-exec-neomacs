@@ -18127,6 +18127,26 @@ Last updated: 2026-02-21
 
 ## Doing
 
+- Aligned `command-remapping` Lisp keymap remap semantics with oracle and added lock-ins:
+  - runtime changes:
+    - `rust/neovm-core/src/elisp/interactive.rs`
+      - `command-remapping` now resolves `(remap keymap ...)` bindings when optional `KEYMAP` is provided as a Lisp keymap cons object (not only keymap-handle integer IDs).
+      - refactored remap target normalization into a shared helper so Lisp-keymap remap targets follow the same oracle shaping as keymap-handle remap targets:
+        - integer / `t` remap targets normalize to `nil`,
+        - well-formed `(menu-item ... COMMAND ...)` remap targets unwrap to `COMMAND`.
+      - added unit coverage:
+        - `command_remapping_resolves_remap_bindings_on_lisp_keymaps`.
+  - vm-compat corpus changes:
+    - added and wired:
+      - `test/neovm/vm-compat/cases/command-remapping-lisp-keymap-semantics.forms`
+      - `test/neovm/vm-compat/cases/command-remapping-lisp-keymap-semantics.expected.tsv`
+      - `test/neovm/vm-compat/cases/default.list`
+  - verified:
+    - `cargo test --manifest-path rust/neovm-core/Cargo.toml command_remapping_resolves_remap_bindings_on_lisp_keymaps -- --nocapture` (pass)
+    - `make -C test/neovm/vm-compat check-one-neovm CASE=cases/command-remapping-lisp-keymap-semantics` (pass; `12/12`)
+    - `make -C test/neovm/vm-compat check-one-neovm CASE=cases/command-remapping-remap-lookup-semantics` (pass; `14/14`)
+    - `make -C test/neovm/vm-compat check-all-neovm-strict` (pass; case inventory `873`)
+
 - Implemented real `[remap COMMAND]` lookup in `command-remapping` for keymap-handle inputs and locked oracle behavior:
   - runtime changes:
     - `rust/neovm-core/src/elisp/interactive.rs`

@@ -295,22 +295,24 @@ pub(crate) fn builtin_command_remapping(eval: &mut Evaluator, args: Vec<Value>) 
             ));
         }
     }
+    let Some(command_name) = command_remapping_command_name(&args[0]) else {
+        return Ok(Value::Nil);
+    };
+    if let Some(Value::Cons(keymap)) = args.get(2) {
+        let keymap_value = Value::Cons(keymap.clone());
+        if let Some(target) = command_remapping_lookup_in_lisp_keymap(&keymap_value, &command_name)
+        {
+            return Ok(command_remapping_normalize_target(target));
+        }
+        return Ok(Value::Nil);
+    }
     let Some(map_id) = command_remapping_lookup_keymap_id(eval, args.get(2)) else {
         return Ok(Value::Nil);
     };
-    let Some(command_event) = command_remapping_command_event(&args[0]) else {
-        return Ok(Value::Nil);
-    };
-    let remap_event = KeyEvent::Function {
-        name: "remap".to_string(),
-        ctrl: false,
-        meta: false,
-        shift: false,
-        super_: false,
-    };
+    let command_event = command_remapping_command_event(&command_name);
     if let Some(binding) = eval
         .keymaps
-        .lookup_key_sequence(map_id, &[remap_event, command_event])
+        .lookup_key_sequence(map_id, &[remap_event(), command_event])
     {
         return Ok(command_remapping_binding_value(binding));
     }
@@ -2544,20 +2546,114 @@ fn command_remapping_lookup_keymap_id(eval: &Evaluator, keymap: Option<&Value>) 
     }
 }
 
-fn command_remapping_command_event(command: &Value) -> Option<KeyEvent> {
-    let name = match command {
+fn command_remapping_command_name(command: &Value) -> Option<String> {
+    Some(match command {
         Value::Nil => "nil".to_string(),
         Value::True => "t".to_string(),
         Value::Symbol(s) => s.clone(),
         _ => return None,
-    };
-    Some(KeyEvent::Function {
-        name,
+    })
+}
+
+fn command_remapping_command_event(command_name: &str) -> KeyEvent {
+    KeyEvent::Function {
+        name: command_name.to_string(),
         ctrl: false,
         meta: false,
         shift: false,
         super_: false,
-    })
+    }
+}
+
+fn remap_event() -> KeyEvent {
+    KeyEvent::Function {
+        name: "remap".to_string(),
+        ctrl: false,
+        meta: false,
+        shift: false,
+        super_: false,
+    }
+}
+
+fn command_remapping_list_tail(value: &Value, n: usize) -> Option<Value> {
+    let mut cursor = value.clone();
+    for _ in 0..n {
+        match cursor {
+            Value::Cons(cell) => {
+                cursor = {
+                    let pair = cell.lock().expect("poisoned");
+                    pair.cdr.clone()
+                };
+            }
+            _ => return None,
+        }
+    }
+    Some(cursor)
+}
+
+fn command_remapping_nth_list_element(value: &Value, index: usize) -> Option<Value> {
+    let tail = command_remapping_list_tail(value, index)?;
+    match tail {
+        Value::Cons(cell) => {
+            let pair = cell.lock().expect("poisoned");
+            Some(pair.car.clone())
+        }
+        _ => None,
+    }
+}
+
+fn command_remapping_lookup_in_lisp_remap_entry(
+    entry: &Value,
+    command_name: &str,
+) -> Option<Value> {
+    if command_remapping_nth_list_element(entry, 0)?.as_symbol_name() != Some("remap") {
+        return None;
+    }
+    if command_remapping_nth_list_element(entry, 1)?.as_symbol_name() != Some("keymap") {
+        return None;
+    }
+
+    let mut bindings = command_remapping_list_tail(entry, 2)?;
+    while let Value::Cons(cell) = bindings {
+        let (binding_entry, rest) = {
+            let pair = cell.lock().expect("poisoned");
+            (pair.car.clone(), pair.cdr.clone())
+        };
+        if let Value::Cons(binding_pair) = binding_entry {
+            let (binding_key, binding_target) = {
+                let pair = binding_pair.lock().expect("poisoned");
+                (pair.car.clone(), pair.cdr.clone())
+            };
+            if binding_key.as_symbol_name() == Some(command_name) {
+                return Some(binding_target);
+            }
+        }
+        bindings = rest;
+    }
+    None
+}
+
+fn command_remapping_lookup_in_lisp_keymap(keymap: &Value, command_name: &str) -> Option<Value> {
+    let mut cursor = keymap.clone();
+    let mut first = true;
+    while let Value::Cons(cell) = cursor {
+        let (car, cdr) = {
+            let pair = cell.lock().expect("poisoned");
+            (pair.car.clone(), pair.cdr.clone())
+        };
+        if first {
+            if car.as_symbol_name() != Some("keymap") {
+                return None;
+            }
+            first = false;
+        } else if let Some(target) =
+            command_remapping_lookup_in_lisp_remap_entry(&car, command_name)
+        {
+            return Some(target);
+        }
+        cursor = cdr;
+    }
+    None
 }
 
 fn command_remapping_menu_item_target(value: &Value) -> Option<Value> {
@@ -2580,13 +2676,7 @@ fn command_remapping_menu_item_target(value: &Value) -> Option<Value> {
     None
 }
 
-fn command_remapping_binding_value(binding: &KeyBinding) -> Value {
-    let raw = match binding {
-        KeyBinding::Command(name) => Value::symbol(name.clone()),
-        KeyBinding::LispValue(value) => value.clone(),
-        KeyBinding::Prefix(id) => Value::Int(encode_keymap_handle(*id)),
-    };
-
+fn command_remapping_normalize_target(raw: Value) -> Value {
     if let Some(menu_target) = command_remapping_menu_item_target(&raw) {
         // Oracle unwraps well-formed menu-item bindings for command remapping.
         // Integer payloads in command slot still collapse to nil.
@@ -2603,6 +2693,15 @@ fn command_remapping_binding_value(binding: &KeyBinding) -> Value {
     } else {
         raw
     }
+}
+
+fn command_remapping_binding_value(binding: &KeyBinding) -> Value {
+    let raw = match binding {
+        KeyBinding::Command(name) => Value::symbol(name.clone()),
+        KeyBinding::LispValue(value) => value.clone(),
+        KeyBinding::Prefix(id) => Value::Int(encode_keymap_handle(*id)),
+    };
+    command_remapping_normalize_target(raw)
 }
 
 fn expect_keymap_id(eval: &Evaluator, value: &Value) -> Result<u64, Flow> {
@@ -5783,7 +5882,10 @@ K")
                               (stringp (cadr r))
                               (string-prefix-p "Invalid control letter" (cadr r))))))"#,
         );
-        assert_eq!(results[0], "OK ((error t) (error t) (error t nil) (error t))");
+        assert_eq!(
+            results[0],
+            "OK ((error t) (error t) (error t nil) (error t))"
+        );
     }
 
     #[test]
@@ -6362,7 +6464,10 @@ K")
             "OK nil"
         );
         assert_eq!(eval_one("(command-remapping 'ignore nil '(foo))"), "OK nil");
-        assert_eq!(eval_one("(command-remapping 'ignore nil '(foo bar))"), "OK nil");
+        assert_eq!(
+            eval_one("(command-remapping 'ignore nil '(foo bar))"),
+            "OK nil"
+        );
         assert_eq!(eval_one("(command-remapping nil)"), "OK nil");
         assert_eq!(eval_one("(command-remapping 0)"), "OK nil");
         assert_eq!(eval_one("(command-remapping \"ignore\")"), "OK nil");
@@ -6513,6 +6618,54 @@ K")
                      (command-remapping 'ignore))"#
             ),
             "OK self-insert-command"
+        );
+    }
+
+    #[test]
+    fn command_remapping_resolves_remap_bindings_on_lisp_keymaps() {
+        assert_eq!(
+            eval_one(
+                "(command-remapping 'ignore nil '(keymap (remap keymap (ignore . self-insert-command))))"
+            ),
+            "OK self-insert-command"
+        );
+        assert_eq!(
+            eval_one(
+                "(command-remapping 'ignore nil '(keymap (remap keymap (ignore menu-item \"x\" ignore))))"
+            ),
+            "OK ignore"
+        );
+        assert_eq!(
+            eval_one("(command-remapping 'ignore nil '(keymap (remap keymap (ignore . 1))))"),
+            "OK nil"
+        );
+        assert_eq!(
+            eval_one("(command-remapping 'ignore nil '(keymap (remap keymap (ignore . t))))"),
+            "OK nil"
+        );
+        assert_eq!(
+            eval_one("(command-remapping 'ignore nil '(keymap (remap keymap (ignore))))"),
+            "OK nil"
+        );
+        assert_eq!(
+            eval_one("(command-remapping 'ignore nil '(keymap (remap keymap (ignore . [x]))))"),
+            "OK [x]"
+        );
+        assert_eq!(
+            eval_one("(command-remapping 'ignore nil '(keymap (remap keymap (ignore . \"x\"))))"),
+            "OK \"x\""
+        );
+        assert_eq!(
+            eval_one(
+                "(command-remapping 'not-bound nil '(keymap (remap keymap (not-bound . self-insert-command))))"
+            ),
+            "OK self-insert-command"
+        );
+        assert_eq!(
+            eval_one(
+                "(command-remapping 'ignore nil '(keymap (remap keymap (foo . self-insert-command))))"
+            ),
+            "OK nil"
         );
     }
 
