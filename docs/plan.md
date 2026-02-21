@@ -28,6 +28,18 @@ Last updated: 2026-02-21
 
 ## Doing
 
+- Added strict filtered NeoVM checks for vm-compat list workflows:
+  - vm-compat changes:
+    - `test/neovm/vm-compat/Makefile`
+      - added `check-neovm-filter-strict` target.
+      - target runs filtered NeoVM checks (`check-neovm-filter`) and then executes strict gates:
+        - `check-builtin-registry-all`
+        - `check-oracle-default-path`
+    - `test/neovm/vm-compat/README.md`
+      - documented `check-neovm-filter-strict` usage alongside other filtered list targets.
+  - verified:
+    - `make -C test/neovm/vm-compat check-neovm-filter-strict LIST=cases/default.list PATTERN='killed-buffer-handle-printing-semantics|command-remapping-position-semantics'` (pass; `2` cases + strict gates)
+
 - Added regex-filtered Oracle baseline checks for vm-compat list workflows:
   - vm-compat changes:
     - `test/neovm/vm-compat/Makefile`
