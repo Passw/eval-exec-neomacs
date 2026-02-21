@@ -300,17 +300,38 @@ fn strip_shebang_line(source: &str) -> &str {
     }
 }
 
+fn lexical_binding_enabled_in_file_local_cookie_line(line: &str) -> bool {
+    let Some(start) = line.find("-*-") else {
+        return false;
+    };
+    let rest = &line[start + 3..];
+    let Some(end_rel) = rest.find("-*-") else {
+        return false;
+    };
+    let cookie = &rest[..end_rel];
+
+    for entry in cookie.split(';') {
+        let Some((name, value)) = entry.split_once(':') else {
+            continue;
+        };
+        if name.trim() == "lexical-binding" {
+            return value.trim() == "t";
+        }
+    }
+    false
+}
+
 fn lexical_binding_enabled_for_source(source: &str) -> bool {
     let mut lines = source.lines();
     let first_line = lines.next();
-    if first_line.is_some_and(|line| line.contains("lexical-binding: t")) {
+    if first_line.is_some_and(lexical_binding_enabled_in_file_local_cookie_line) {
         return true;
     }
 
     if first_line.is_some_and(|line| line.starts_with("#!")) {
         return lines
             .next()
-            .is_some_and(|line| line.contains("lexical-binding: t"));
+            .is_some_and(lexical_binding_enabled_in_file_local_cookie_line);
     }
 
     false
@@ -505,6 +526,24 @@ mod tests {
 
     #[test]
     fn lexical_binding_detects_second_line_cookie_after_shebang() {
+        assert!(
+            lexical_binding_enabled_in_file_local_cookie_line(
+                ";; -*- mode: emacs-lisp; lexical-binding: t; -*-",
+            ),
+            "lexical-binding cookie should be parsed from -*- metadata block",
+        );
+        assert!(
+            !lexical_binding_enabled_in_file_local_cookie_line(
+                "(setq vm-lb-false \"lexical-binding: t\")",
+            ),
+            "plain source text must not be treated as file-local cookie metadata",
+        );
+        assert!(
+            !lexical_binding_enabled_in_file_local_cookie_line(
+                ";; -*- Lexical-Binding: t; -*-",
+            ),
+            "cookie keys are case-sensitive in oracle behavior",
+        );
         assert!(
             lexical_binding_enabled_for_source(
                 "#!/usr/bin/env emacs --script\n;; -*- lexical-binding: t; -*-\n(setq vm-lb 1)\n",
@@ -772,6 +811,50 @@ mod tests {
             value.as_int(),
             Some(42),
             "closure should capture lexical scope from loaded file",
+        );
+
+        let _ = fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn load_file_does_not_enable_lexical_binding_from_non_cookie_second_line_text() {
+        let unique = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .expect("clock before epoch")
+            .as_nanos();
+        let dir = std::env::temp_dir().join(format!("neovm-load-shebang-noncookie-{unique}"));
+        fs::create_dir_all(&dir).expect("create temp fixture dir");
+        let file = dir.join("probe.el");
+        fs::write(
+            &file,
+            "#!/usr/bin/env emacs --script\n\
+             (setq vm-load-shebang-false-string \"lexical-binding: t\")\n\
+             (setq vm-load-shebang-false-probe lexical-binding)\n\
+             (setq vm-load-shebang-false-fn (let ((x 41)) (lambda () (+ x 1))))\n",
+        )
+        .expect("write shebang non-cookie fixture");
+
+        let mut eval = super::super::eval::Evaluator::new();
+        let loaded = load_file(&mut eval, &file).expect("load shebang non-cookie fixture");
+        assert_eq!(loaded, Value::True);
+        assert_eq!(
+            eval.obarray()
+                .symbol_value("vm-load-shebang-false-probe")
+                .cloned(),
+            Some(Value::Nil),
+            "non-cookie second-line text must not flip lexical-binding to t",
+        );
+
+        let call = super::super::parser::parse_forms(
+            "(condition-case err (let ((lexical-binding nil)) (funcall vm-load-shebang-false-fn)) (error (list 'error (car err))))",
+        )
+        .expect("parse call fixture");
+        let value = eval.eval_expr(&call[0]).expect("evaluate closure failure probe");
+        let payload = super::super::value::list_to_vec(&value).expect("expected error payload list");
+        assert_eq!(
+            payload,
+            vec![Value::symbol("error"), Value::symbol("void-variable")],
+            "without lexical-binding cookie, closure must not capture lexical locals",
         );
 
         let _ = fs::remove_dir_all(&dir);
