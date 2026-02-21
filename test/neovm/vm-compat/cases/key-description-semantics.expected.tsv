@@ -16,27 +16,36 @@
 16	(single-key-description '(foo) t)	OK "foo"
 17	(single-key-description nil t)	OK "nil"
 18	(single-key-description "a")	OK "a"
-19	(condition-case err (single-key-description [97]) (error (car err)))	OK error
-20	(condition-case err (single-key-description '(foo bar)) (error (car err)))	OK error
-21	(condition-case err (single-key-description) (error (car err)))	OK wrong-number-of-arguments
-22	(condition-case err (single-key-description 97 nil nil) (error (car err)))	OK wrong-number-of-arguments
-23	(key-description (string 1))	OK "C-a"
-24	(key-description [10])	OK "C-j"
-25	(key-description [134217729])	OK "C-M-a"
-26	(key-description '(S-return))	OK "S-<return>"
-27	(key-description '(C-return))	OK "C-<return>"
-28	(key-description [8388705])	OK "s-a"
-29	(key-description '(f1 97 1))	OK "<f1> a C-a"
-30	(key-description "abc")	OK "a b c"
-31	(key-description [97 98 99])	OK "a b c"
-32	(key-description '(97 98))	OK "a b"
-33	(key-description '(f1 97 1))	OK "<f1> a C-a"
-34	(key-description [])	OK ""
-35	(key-description nil)	OK ""
-36	(key-description "a" nil)	OK "a"
-37	(key-description [97] [24])	OK "C-x a"
-38	(key-description '(97) '(24))	OK "C-x a"
-39	(condition-case err (key-description) (error (car err)))	OK wrong-number-of-arguments
-40	(condition-case err (key-description 1) (error (car err)))	OK wrong-type-argument
-41	(condition-case err (key-description "a" 1) (error (car err)))	OK wrong-type-argument
-42	(condition-case err (key-description "a" nil nil) (error (car err)))	OK wrong-number-of-arguments
+19	(let ((s (single-key-description 1114112))) (and (= (length s) 1) (equal (string-to-list s) '(1114112))))	OK t
+20	(let ((s (single-key-description 2097152))) (and (= (length s) 1) (equal (string-to-list s) '(2097152))))	OK t
+21	(single-key-description 4194304)	OK "A-C-@"
+22	(single-key-description 58720257)	OK "C-H-S-s-a"
+23	(single-key-description 264241249)	OK "A-C-H-M-S-s-a"
+24	(condition-case err (single-key-description [97]) (error (car err)))	OK error
+25	(condition-case err (single-key-description '(foo bar)) (error (car err)))	OK error
+26	(condition-case err (single-key-description) (error (car err)))	OK wrong-number-of-arguments
+27	(condition-case err (single-key-description 97 nil nil) (error (car err)))	OK wrong-number-of-arguments
+28	(key-description (string 1))	OK "C-a"
+29	(key-description [10])	OK "C-j"
+30	(key-description [134217729])	OK "C-M-a"
+31	(key-description '(S-return))	OK "S-<return>"
+32	(key-description '(C-return))	OK "C-<return>"
+33	(key-description [8388705])	OK "s-a"
+34	(key-description '(f1 97 1))	OK "<f1> a C-a"
+35	(key-description "abc")	OK "a b c"
+36	(key-description [97 98 99])	OK "a b c"
+37	(key-description '(97 98))	OK "a b"
+38	(key-description '(f1 97 1))	OK "<f1> a C-a"
+39	(key-description [])	OK ""
+40	(key-description nil)	OK ""
+41	(key-description "a" nil)	OK "a"
+42	(key-description [97] [24])	OK "C-x a"
+43	(key-description '(97) '(24))	OK "C-x a"
+44	(let ((s (key-description [1114112]))) (and (= (length s) 1) (equal (string-to-list s) '(1114112))))	OK t
+45	(let ((s (key-description [2097152]))) (and (= (length s) 1) (equal (string-to-list s) '(2097152))))	OK t
+46	(key-description [4194304])	OK "A-C-@"
+47	(key-description [264241249])	OK "A-C-H-M-S-s-a"
+48	(condition-case err (key-description) (error (car err)))	OK wrong-number-of-arguments
+49	(condition-case err (key-description 1) (error (car err)))	OK wrong-type-argument
+50	(condition-case err (key-description "a" 1) (error (car err)))	OK wrong-type-argument
+51	(condition-case err (key-description "a" nil nil) (error (car err)))	OK wrong-number-of-arguments

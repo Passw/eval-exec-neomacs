@@ -9686,7 +9686,7 @@ fn describe_symbol_key(name: &str, no_angles: bool) -> String {
 fn describe_int_key(code: i64) -> Result<String, Flow> {
     let mods = code & KEY_CHAR_MOD_MASK;
     let base = code & !KEY_CHAR_MOD_MASK;
-    if !(0..=0x10FFFF).contains(&base) {
+    if !(0..=KEY_CHAR_CODE_MASK).contains(&base) {
         return Err(invalid_single_key_error());
     }
 
@@ -9696,8 +9696,14 @@ fn describe_int_key(code: i64) -> Result<String, Flow> {
     let super_ = (mods & KEY_CHAR_SUPER) != 0;
 
     let push_prefixes = |out: &mut String, with_ctrl: bool| {
+        if (mods & KEY_CHAR_ALT) != 0 {
+            out.push_str("A-");
+        }
         if with_ctrl {
             out.push_str("C-");
+        }
+        if (mods & KEY_CHAR_HYPER) != 0 {
+            out.push_str("H-");
         }
         if meta {
             out.push_str("M-");
@@ -9707,12 +9713,6 @@ fn describe_int_key(code: i64) -> Result<String, Flow> {
         }
         if super_ {
             out.push_str("s-");
-        }
-        if (mods & KEY_CHAR_HYPER) != 0 {
-            out.push_str("H-");
-        }
-        if (mods & KEY_CHAR_ALT) != 0 {
-            out.push_str("A-");
         }
     };
 
@@ -9730,11 +9730,14 @@ fn describe_int_key(code: i64) -> Result<String, Flow> {
         return Ok(out);
     }
 
-    let Some(ch) = char::from_u32(base as u32) else {
-        return Err(invalid_single_key_error());
-    };
     push_prefixes(&mut out, ctrl);
-    out.push(ch);
+    if let Some(ch) = char::from_u32(base as u32) {
+        out.push(ch);
+    } else if let Some(encoded) = encode_nonunicode_char_for_storage(base as u32) {
+        out.push_str(&encoded);
+    } else {
+        return Err(invalid_single_key_error());
+    }
     Ok(out)
 }
 
@@ -16362,6 +16365,53 @@ mod tests {
             builtin_key_description(vec![Value::vector(vec![Value::symbol("C-s-f1")])])
                 .expect("key-description should succeed"),
             Value::string("C-s-<f1>")
+        );
+    }
+
+    #[test]
+    fn key_description_integer_modifier_and_nonunicode_edges_match_emacs() {
+        assert_eq!(
+            builtin_single_key_description(vec![Value::Int(0x40_0000)])
+                .expect("single-key-description should succeed"),
+            Value::string("A-C-@")
+        );
+        assert_eq!(
+            builtin_single_key_description(vec![Value::Int(58_720_257)])
+                .expect("single-key-description should succeed"),
+            Value::string("C-H-S-s-a")
+        );
+        assert_eq!(
+            builtin_single_key_description(vec![Value::Int(264_241_249)])
+                .expect("single-key-description should succeed"),
+            Value::string("A-C-H-M-S-s-a")
+        );
+
+        let single_nonunicode = builtin_single_key_description(vec![Value::Int(0x11_0000)])
+            .expect("single-key-description should support nonunicode char code");
+        assert_eq!(
+            decode_storage_char_codes(
+                single_nonunicode
+                    .as_str()
+                    .expect("single-key-description should return string")
+            ),
+            vec![0x11_0000]
+        );
+
+        let key_nonunicode = builtin_key_description(vec![Value::vector(vec![Value::Int(0x20_0000)])])
+            .expect("key-description should support nonunicode char code");
+        assert_eq!(
+            decode_storage_char_codes(
+                key_nonunicode
+                    .as_str()
+                    .expect("key-description should return string")
+            ),
+            vec![0x20_0000]
+        );
+
+        assert_eq!(
+            builtin_key_description(vec![Value::vector(vec![Value::Int(0x40_0000)])])
+                .expect("key-description should succeed"),
+            Value::string("A-C-@")
         );
     }
 
