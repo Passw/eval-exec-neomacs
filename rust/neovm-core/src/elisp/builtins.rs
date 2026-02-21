@@ -18573,6 +18573,33 @@ mod tests {
     }
 
     #[test]
+    fn format_and_message_render_terminal_handles_in_eval_dispatch() {
+        let mut eval = crate::elisp::eval::Evaluator::new();
+        let terminals = dispatch_builtin(&mut eval, "terminal-list", vec![])
+            .expect("terminal-list should resolve")
+            .expect("terminal-list should evaluate");
+        let terminal = list_to_vec(&terminals)
+            .and_then(|items| items.into_iter().next())
+            .expect("terminal-list should return at least one terminal");
+
+        let mut assert_prefix = |builtin: &str, spec: &str| {
+            let rendered =
+                dispatch_builtin(&mut eval, builtin, vec![Value::string(spec), terminal.clone()])
+                    .expect("builtin should resolve")
+                    .expect("builtin should evaluate");
+            assert!(
+                rendered.as_str().is_some_and(|s| s.starts_with("#<terminal")),
+                "expected {builtin} {spec} output to start with #<terminal, got: {rendered:?}"
+            );
+        };
+
+        assert_prefix("format", "%s");
+        assert_prefix("message", "%s");
+        assert_prefix("format", "%S");
+        assert_prefix("message", "%S");
+    }
+
+    #[test]
     fn format_and_message_render_killed_buffer_handles_in_eval_dispatch() {
         let mut eval = crate::elisp::eval::Evaluator::new();
         let buffer = dispatch_builtin(

@@ -16,13 +16,17 @@
 16	(let* ((b (generate-new-buffer "msg-live-vm-lower"))) (prog1 (string= "msg-live-vm-lower" (message "%s" b)) (kill-buffer b)))	OK t
 17	(string-prefix-p "#<thread" (format "%s" (current-thread)))	OK t
 18	(string-prefix-p "#<thread" (message "%s" (current-thread)))	OK t
-19	(let ((term (car (terminal-list)))) (string-prefix-p "#<terminal" (format "%s" term)))	OK t
-20	(let ((term (car (terminal-list)))) (string-prefix-p "#<terminal" (message "%s" term)))	OK t
-21	(string-prefix-p "#<frame" (format "%S" (selected-frame)))	OK t
-22	(string-prefix-p "#<frame" (message "%S" (selected-frame)))	OK t
-23	(string-prefix-p "#<frame" (format "%s" (selected-frame)))	OK t
-24	(string-prefix-p "#<frame" (message "%s" (selected-frame)))	OK t
-25	(string-prefix-p "#<window" (format "%S" (selected-window)))	OK t
-26	(string-prefix-p "#<window" (message "%S" (selected-window)))	OK t
-27	(string-prefix-p "#<window" (format "%s" (selected-window)))	OK t
-28	(string-prefix-p "#<window" (message "%s" (selected-window)))	OK t
+19	(string-prefix-p "#<thread" (format "%S" (current-thread)))	OK t
+20	(string-prefix-p "#<thread" (message "%S" (current-thread)))	OK t
+21	(let ((term (car (terminal-list)))) (string-prefix-p "#<terminal" (format "%s" term)))	OK t
+22	(let ((term (car (terminal-list)))) (string-prefix-p "#<terminal" (message "%s" term)))	OK t
+23	(let ((term (car (terminal-list)))) (string-prefix-p "#<terminal" (format "%S" term)))	OK t
+24	(let ((term (car (terminal-list)))) (string-prefix-p "#<terminal" (message "%S" term)))	OK t
+25	(string-prefix-p "#<frame" (format "%S" (selected-frame)))	OK t
+26	(string-prefix-p "#<frame" (message "%S" (selected-frame)))	OK t
+27	(string-prefix-p "#<frame" (format "%s" (selected-frame)))	OK t
+28	(string-prefix-p "#<frame" (message "%s" (selected-frame)))	OK t
+29	(string-prefix-p "#<window" (format "%S" (selected-window)))	OK t
+30	(string-prefix-p "#<window" (message "%S" (selected-window)))	OK t
+31	(string-prefix-p "#<window" (format "%s" (selected-window)))	OK t
+32	(string-prefix-p "#<window" (message "%s" (selected-window)))	OK t

@@ -47,11 +47,21 @@
 
 (string-prefix-p "#<thread" (message "%s" (current-thread)))
 
+(string-prefix-p "#<thread" (format "%S" (current-thread)))
+
+(string-prefix-p "#<thread" (message "%S" (current-thread)))
+
 (let ((term (car (terminal-list))))
   (string-prefix-p "#<terminal" (format "%s" term)))
 
 (let ((term (car (terminal-list))))
   (string-prefix-p "#<terminal" (message "%s" term)))
+
+(let ((term (car (terminal-list))))
+  (string-prefix-p "#<terminal" (format "%S" term)))
+
+(let ((term (car (terminal-list))))
+  (string-prefix-p "#<terminal" (message "%S" term)))
 
 (string-prefix-p "#<frame" (format "%S" (selected-frame)))
 

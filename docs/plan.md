@@ -28,6 +28,21 @@ Last updated: 2026-02-21
 
 ## Doing
 
+- Extended vm-compat and runtime lock-in for eval-dispatch thread/terminal `%S` opaque-handle rendering:
+  - vm-compat corpus changes:
+    - updated:
+      - `test/neovm/vm-compat/cases/format-message-killed-buffer-handle-semantics.forms`
+      - `test/neovm/vm-compat/cases/format-message-killed-buffer-handle-semantics.expected.tsv`
+    - added `%S` assertions for `current-thread` and terminal handles for both `format` and `message`.
+  - runtime changes:
+    - `rust/neovm-core/src/elisp/builtins.rs`
+      - added evaluator coverage:
+        - `format_and_message_render_terminal_handles_in_eval_dispatch`
+      - test asserts `format`/`message` both render terminal handles with Oracle-shaped `#<terminal...>` output for `%s` and `%S`.
+  - verified:
+    - `make -C test/neovm/vm-compat check-one-neovm CASE=cases/format-message-killed-buffer-handle-semantics` (pass; `32/32`)
+    - `cargo test --manifest-path rust/neovm-core/Cargo.toml format_and_message_render_terminal_handles_in_eval_dispatch -- --nocapture` (pass)
+
 - Added runtime evaluator lock-in for frame/window `%S` and `%s` handle rendering in eval-dispatch `format`/`message` paths:
   - runtime changes:
     - `rust/neovm-core/src/elisp/builtins.rs`
