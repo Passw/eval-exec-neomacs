@@ -14,6 +14,14 @@
 
 (eq (message-or-box nil) nil)
 
+(condition-case err (message-box 1) (error err))
+
+(condition-case err (message-or-box 1) (error err))
+
+(condition-case err (message-box "%s %s" 1) (error err))
+
+(condition-case err (message-or-box "%s %s" 1) (error err))
+
 (eq (progn (message-box "mbox-current-message") (current-message)) nil)
 
 (eq (progn (message-or-box "morbox-current-message") (current-message)) nil)

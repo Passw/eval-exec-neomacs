@@ -28,6 +28,29 @@ Last updated: 2026-02-21
 
 ## Doing
 
+- Aligned `message-box` / `message-or-box` error paths with oracle format semantics:
+  - runtime changes:
+    - `rust/neovm-core/src/elisp/builtins.rs`
+      - `message-box` / `message-or-box` now enforce string format arguments (except single `nil` short-circuit).
+      - wrappers now signal `(error "Not enough arguments for format string")` when `%` placeholders outnumber provided arguments.
+      - added wrapper-local strict format helpers used by both pure and eval dispatch paths:
+        - `builtin_format_wrapper_strict`
+        - `builtin_format_wrapper_strict_eval`
+      - extended evaluator coverage:
+        - `message_box_wrappers_render_opaque_handles_in_eval_dispatch`
+        - now asserts wrong-type and missing-argument signal payload parity.
+  - vm-compat corpus changes:
+    - updated:
+      - `test/neovm/vm-compat/cases/message-box-or-box-handle-semantics.forms`
+      - `test/neovm/vm-compat/cases/message-box-or-box-handle-semantics.expected.tsv`
+    - added wrapper error-path rows for:
+      - `(message-box 1)` / `(message-or-box 1)` => `(wrong-type-argument stringp 1)`
+      - `(message-box "%s %s" 1)` / `(message-or-box "%s %s" 1)` => `(error "Not enough arguments for format string")`
+  - verified:
+    - `cargo test --manifest-path rust/neovm-core/Cargo.toml message_box_wrappers_render_opaque_handles_in_eval_dispatch -- --nocapture` (pass)
+    - `make -C test/neovm/vm-compat check-one-neovm CASE=cases/message-box-or-box-handle-semantics` (pass; `51/51`)
+    - `make -C test/neovm/vm-compat check-neovm-filter-strict LIST=cases/default.list PATTERN='message-box-or-box-handle-semantics'` (pass; strict filtered gates green)
+
 - Added `current-message` wrapper lock-ins after `message-box` / `message-or-box` calls:
   - vm-compat corpus changes:
     - updated:

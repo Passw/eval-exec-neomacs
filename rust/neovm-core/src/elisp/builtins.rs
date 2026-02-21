@@ -2114,6 +2114,163 @@ fn format_percent_s_eval(eval: &super::eval::Evaluator, value: &Value) -> String
     }
 }
 
+fn format_not_enough_args_error() -> Flow {
+    signal(
+        "error",
+        vec![Value::string("Not enough arguments for format string")],
+    )
+}
+
+fn builtin_format_wrapper_strict(args: Vec<Value>) -> EvalResult {
+    expect_min_args("format", &args, 1)?;
+    let fmt_str = expect_strict_string(&args[0])?;
+    let mut result = String::new();
+    let mut arg_idx = 1;
+    let mut chars = fmt_str.chars().peekable();
+
+    while let Some(ch) = chars.next() {
+        if ch == '%' {
+            if let Some(&spec) = chars.peek() {
+                chars.next();
+                match spec {
+                    's' => {
+                        if arg_idx >= args.len() {
+                            return Err(format_not_enough_args_error());
+                        }
+                        match &args[arg_idx] {
+                            Value::Str(s) => result.push_str(s),
+                            other => result.push_str(&super::print::print_value(other)),
+                        }
+                        arg_idx += 1;
+                    }
+                    'S' => {
+                        if arg_idx >= args.len() {
+                            return Err(format_not_enough_args_error());
+                        }
+                        result.push_str(&super::print::print_value(&args[arg_idx]));
+                        arg_idx += 1;
+                    }
+                    'd' => {
+                        if arg_idx >= args.len() {
+                            return Err(format_not_enough_args_error());
+                        }
+                        if let Ok(n) = expect_int(&args[arg_idx]) {
+                            result.push_str(&n.to_string());
+                        }
+                        arg_idx += 1;
+                    }
+                    'f' => {
+                        if arg_idx >= args.len() {
+                            return Err(format_not_enough_args_error());
+                        }
+                        if let Ok(f) = expect_number(&args[arg_idx]) {
+                            result.push_str(&format!("{:.6}", f));
+                        }
+                        arg_idx += 1;
+                    }
+                    'c' => {
+                        if arg_idx >= args.len() {
+                            return Err(format_not_enough_args_error());
+                        }
+                        if let Ok(n) = expect_int(&args[arg_idx]) {
+                            if let Some(c) = char::from_u32(n as u32) {
+                                result.push(c);
+                            }
+                        }
+                        arg_idx += 1;
+                    }
+                    '%' => result.push('%'),
+                    _ => {
+                        result.push('%');
+                        result.push(spec);
+                    }
+                }
+            } else {
+                result.push('%');
+            }
+        } else {
+            result.push(ch);
+        }
+    }
+
+    Ok(Value::string(result))
+}
+
+fn builtin_format_wrapper_strict_eval(
+    eval: &mut super::eval::Evaluator,
+    args: Vec<Value>,
+) -> EvalResult {
+    expect_min_args("format", &args, 1)?;
+    let fmt_str = expect_strict_string(&args[0])?;
+    let mut result = String::new();
+    let mut arg_idx = 1;
+    let mut chars = fmt_str.chars().peekable();
+
+    while let Some(ch) = chars.next() {
+        if ch == '%' {
+            if let Some(&spec) = chars.peek() {
+                chars.next();
+                match spec {
+                    's' => {
+                        if arg_idx >= args.len() {
+                            return Err(format_not_enough_args_error());
+                        }
+                        result.push_str(&format_percent_s_eval(eval, &args[arg_idx]));
+                        arg_idx += 1;
+                    }
+                    'S' => {
+                        if arg_idx >= args.len() {
+                            return Err(format_not_enough_args_error());
+                        }
+                        result.push_str(&print_value_eval(eval, &args[arg_idx]));
+                        arg_idx += 1;
+                    }
+                    'd' => {
+                        if arg_idx >= args.len() {
+                            return Err(format_not_enough_args_error());
+                        }
+                        if let Ok(n) = expect_int(&args[arg_idx]) {
+                            result.push_str(&n.to_string());
+                        }
+                        arg_idx += 1;
+                    }
+                    'f' => {
+                        if arg_idx >= args.len() {
+                            return Err(format_not_enough_args_error());
+                        }
+                        if let Ok(f) = expect_number(&args[arg_idx]) {
+                            result.push_str(&format!("{:.6}", f));
+                        }
+                        arg_idx += 1;
+                    }
+                    'c' => {
+                        if arg_idx >= args.len() {
+                            return Err(format_not_enough_args_error());
+                        }
+                        if let Ok(n) = expect_int(&args[arg_idx]) {
+                            if let Some(c) = char::from_u32(n as u32) {
+                                result.push(c);
+                            }
+                        }
+                        arg_idx += 1;
+                    }
+                    '%' => result.push('%'),
+                    _ => {
+                        result.push('%');
+                        result.push(spec);
+                    }
+                }
+            } else {
+                result.push('%');
+            }
+        } else {
+            result.push(ch);
+        }
+    }
+
+    Ok(Value::string(result))
+}
+
 pub(crate) fn builtin_format_message_eval(
     eval: &mut super::eval::Evaluator,
     args: Vec<Value>,
@@ -2898,12 +3055,36 @@ pub(crate) fn builtin_message(args: Vec<Value>) -> EvalResult {
 
 pub(crate) fn builtin_message_box(args: Vec<Value>) -> EvalResult {
     expect_min_args("message-box", &args, 1)?;
-    builtin_message(args)
+    if args.len() == 1 && args[0].is_nil() {
+        return Ok(Value::Nil);
+    }
+    let msg = if args.len() == 1 {
+        expect_strict_string(&args[0])?
+    } else {
+        match builtin_format_wrapper_strict(args.clone())? {
+            Value::Str(s) => (*s).clone(),
+            _ => String::new(),
+        }
+    };
+    eprintln!("{}", msg);
+    Ok(Value::string(msg))
 }
 
 pub(crate) fn builtin_message_or_box(args: Vec<Value>) -> EvalResult {
     expect_min_args("message-or-box", &args, 1)?;
-    builtin_message(args)
+    if args.len() == 1 && args[0].is_nil() {
+        return Ok(Value::Nil);
+    }
+    let msg = if args.len() == 1 {
+        expect_strict_string(&args[0])?
+    } else {
+        match builtin_format_wrapper_strict(args.clone())? {
+            Value::Str(s) => (*s).clone(),
+            _ => String::new(),
+        }
+    };
+    eprintln!("{}", msg);
+    Ok(Value::string(msg))
 }
 
 pub(crate) fn builtin_message_eval(
@@ -2934,7 +3115,19 @@ pub(crate) fn builtin_message_box_eval(
     args: Vec<Value>,
 ) -> EvalResult {
     expect_min_args("message-box", &args, 1)?;
-    builtin_message_eval(eval, args)
+    if args.len() == 1 && args[0].is_nil() {
+        return Ok(Value::Nil);
+    }
+    let msg = if args.len() == 1 {
+        expect_strict_string(&args[0])?
+    } else {
+        match builtin_format_wrapper_strict_eval(eval, args.clone())? {
+            Value::Str(s) => (*s).clone(),
+            _ => String::new(),
+        }
+    };
+    eprintln!("{}", msg);
+    Ok(Value::string(msg))
 }
 
 pub(crate) fn builtin_message_or_box_eval(
@@ -2942,7 +3135,19 @@ pub(crate) fn builtin_message_or_box_eval(
     args: Vec<Value>,
 ) -> EvalResult {
     expect_min_args("message-or-box", &args, 1)?;
-    builtin_message_eval(eval, args)
+    if args.len() == 1 && args[0].is_nil() {
+        return Ok(Value::Nil);
+    }
+    let msg = if args.len() == 1 {
+        expect_strict_string(&args[0])?
+    } else {
+        match builtin_format_wrapper_strict_eval(eval, args.clone())? {
+            Value::Str(s) => (*s).clone(),
+            _ => String::new(),
+        }
+    };
+    eprintln!("{}", msg);
+    Ok(Value::string(msg))
 }
 
 pub(crate) fn builtin_current_message(args: Vec<Value>) -> EvalResult {
@@ -18957,6 +19162,38 @@ mod tests {
             .expect("message-or-box should resolve")
             .expect("message-or-box should evaluate");
         assert!(message_or_box_nil.is_nil());
+
+        for builtin in ["message-box", "message-or-box"] {
+            let wrong_type = dispatch_builtin(&mut eval, builtin, vec![Value::Int(1)])
+                .expect("wrapper should resolve")
+                .expect_err("wrapper should signal for non-string format");
+            match wrong_type {
+                Flow::Signal(sig) => {
+                    assert_eq!(sig.symbol, "wrong-type-argument");
+                    assert_eq!(sig.data, vec![Value::symbol("stringp"), Value::Int(1)]);
+                }
+                other => panic!("expected signal, got: {other:?}"),
+            }
+
+            let missing = dispatch_builtin(
+                &mut eval,
+                builtin,
+                vec![Value::string("%s %s"), Value::Int(1)],
+            )
+            .expect("wrapper should resolve")
+            .expect_err("wrapper should signal when format args are missing");
+            match missing {
+                Flow::Signal(sig) => {
+                    assert_eq!(sig.symbol, "error");
+                    assert_eq!(
+                        sig.data,
+                        vec![Value::string("Not enough arguments for format string")]
+                    );
+                }
+                other => panic!("expected signal, got: {other:?}"),
+            }
+        }
+
         let _ = dispatch_builtin(&mut eval, "message-box", vec![Value::string("mbox-current")])
             .expect("message-box should resolve")
             .expect("message-box should evaluate");
