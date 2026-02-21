@@ -16,3 +16,13 @@
 16	(condition-case err (multibyte-char-to-unibyte -1) (error err))	OK (wrong-type-argument characterp -1)
 17	(condition-case err (multibyte-char-to-unibyte 4194304) (error err))	OK (wrong-type-argument characterp 4194304)
 18	(condition-case err (multibyte-char-to-unibyte 3.14) (error err))	OK (wrong-type-argument characterp 3.14)
+19	(char-width 0)	OK 2
+20	(char-width 9)	OK 8
+21	(char-width 10)	OK 0
+22	(char-width 127)	OK 2
+23	(char-width 128)	OK 4
+24	(char-width 159)	OK 4
+25	(char-width 1114112)	OK 1
+26	(char-width 2097152)	OK 1
+27	(condition-case err (char-width -1) (error err))	OK (wrong-type-argument characterp -1)
+28	(condition-case err (char-width 4194304) (error err))	OK (wrong-type-argument characterp 4194304)

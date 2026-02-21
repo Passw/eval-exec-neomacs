@@ -16,12 +16,18 @@ const MAX_CHAR_CODE: i64 = 0x3F_FFFF;
 /// Character width for display purposes (East Asian width).
 pub fn char_width(c: char) -> usize {
     let cp = c as u32;
-    if cp == 0 {
-        return 0;
+    // Control characters with dedicated rendering widths.
+    if cp == 0x09 {
+        return 8; // TAB advances to tab stop
     }
-    // Control characters
-    if cp < 0x20 || (0x7f..=0x9f).contains(&cp) {
-        return if cp == 0x09 { 8 } else { 2 }; // ^X notation = 2 cols
+    if cp == 0x0a {
+        return 0; // NEWLINE has zero display width
+    }
+    if cp < 0x20 || cp == 0x7f {
+        return 2; // ^X notation
+    }
+    if (0x80..=0x9f).contains(&cp) {
+        return 4; // octal escaped control bytes
     }
     // Non-spacing marks
     if is_zero_width(c) {
@@ -235,9 +241,9 @@ fn expect_string(val: &Value) -> Result<String, crate::elisp::error::Flow> {
 /// `(char-width CHAR)` -> integer
 pub(crate) fn builtin_char_width(args: Vec<Value>) -> EvalResult {
     expect_args("char-width", &args, 1)?;
-    let c = match &args[0] {
-        Value::Char(c) => *c,
-        Value::Int(n) => char::from_u32(*n as u32).unwrap_or('?'),
+    let code = match &args[0] {
+        Value::Char(c) => *c as i64,
+        Value::Int(n) => *n,
         other => {
             return Err(signal(
                 "wrong-type-argument",
@@ -245,7 +251,18 @@ pub(crate) fn builtin_char_width(args: Vec<Value>) -> EvalResult {
             ))
         }
     };
-    Ok(Value::Int(char_width(c) as i64))
+    if !(0..=MAX_CHAR_CODE).contains(&code) {
+        return Err(signal(
+            "wrong-type-argument",
+            vec![Value::symbol("characterp"), Value::Int(code)],
+        ));
+    }
+    // Non-Unicode char codes still have width 1 in Emacs.
+    if code > 0x10_FFFF {
+        return Ok(Value::Int(1));
+    }
+    let width = char::from_u32(code as u32).map(char_width).unwrap_or(1);
+    Ok(Value::Int(width as i64))
 }
 
 /// `(string-bytes STRING)` -> integer byte length of STRING.
@@ -378,9 +395,12 @@ mod tests {
 
     #[test]
     fn control_char_width() {
-        assert_eq!(char_width('\0'), 0);
+        assert_eq!(char_width('\0'), 2);
         assert_eq!(char_width('\x01'), 2); // ^A
+        assert_eq!(char_width('\n'), 0);
         assert_eq!(char_width('\x7f'), 2); // ^?
+        assert_eq!(char_width('\u{0080}'), 4);
+        assert_eq!(char_width('\u{009f}'), 4);
     }
 
     #[test]
@@ -432,6 +452,41 @@ mod tests {
                 assert_eq!(
                     sig.data,
                     vec![Value::symbol("number-or-marker-p"), Value::symbol("x")]
+                );
+            }
+            other => panic!("expected signal, got: {other:?}"),
+        }
+    }
+
+    #[test]
+    fn builtin_char_width_matches_oracle_control_and_bounds() {
+        assert_eq!(builtin_char_width(vec![Value::Int(0)]).unwrap(), Value::Int(2));
+        assert_eq!(builtin_char_width(vec![Value::Int(9)]).unwrap(), Value::Int(8));
+        assert_eq!(builtin_char_width(vec![Value::Int(10)]).unwrap(), Value::Int(0));
+        assert_eq!(builtin_char_width(vec![Value::Int(0x80)]).unwrap(), Value::Int(4));
+        assert_eq!(
+            builtin_char_width(vec![Value::Int(0x11_0000)]).unwrap(),
+            Value::Int(1)
+        );
+
+        let negative = builtin_char_width(vec![Value::Int(-1)])
+            .expect_err("negative character code should signal");
+        match negative {
+            Flow::Signal(sig) => {
+                assert_eq!(sig.symbol, "wrong-type-argument");
+                assert_eq!(sig.data, vec![Value::symbol("characterp"), Value::Int(-1)]);
+            }
+            other => panic!("expected signal, got: {other:?}"),
+        }
+
+        let overflow = builtin_char_width(vec![Value::Int(0x40_0000)])
+            .expect_err("overflow character code should signal");
+        match overflow {
+            Flow::Signal(sig) => {
+                assert_eq!(sig.symbol, "wrong-type-argument");
+                assert_eq!(
+                    sig.data,
+                    vec![Value::symbol("characterp"), Value::Int(0x40_0000)]
                 );
             }
             other => panic!("expected signal, got: {other:?}"),
