@@ -19,9 +19,10 @@
 19	(macroexpand '(pcase-let* ((x 1) (y x)) (list x y)))	OK (let* ((x 1) (y x)) (list x y))
 20	(macroexpand '(pcase-let ((x 1) (`(,a ,b) '(2 3))) (list x a b)))	OK (let ((x 1) (x1 '(2 3))) (pcase-let* ((`(,a ,b) x1)) (list x a b)))
 21	(macroexpand '(pcase-let ((`(,a ,b) '(1 2)) (`(,c ,d) '(3 4))) (list a b c d)))	OK (let ((x0 '(1 2)) (x1 '(3 4))) (pcase-let* ((`(,c ,d) x1) (`(,a ,b) x0)) (list a b c d)))
-22	(condition-case err (macroexpand '(pcase-let)) (error err))	OK (wrong-number-of-arguments (1 . 1) 0)
-23	(condition-case err (macroexpand '(pcase-let*)) (error err))	OK (wrong-number-of-arguments (1 . 1) 0)
-24	(condition-case err (macroexpand '(pcase-let x x)) (error err))	OK (wrong-type-argument listp x)
-25	(condition-case err (macroexpand '(pcase-let* x x)) (error err))	OK (wrong-type-argument listp x)
-26	(pcase-let ((x 10) (y 20)) (+ x y))	OK 30
-27	(pcase-let* ((x 10) (y (+ x 5))) y)	OK 15
+22	(macroexpand '(pcase-let* ((`(,a ,b) '(1 2)) (z (+ a b))) (list z a b)))	OK (progn (ignore (consp '(1 2))) (let* ((x0 (car-safe '(1 2))) (x1 (cdr-safe '(1 2)))) (progn (ignore (consp x1)) (let* ((x2 (car-safe x1)) (x3 (cdr-safe x1))) (progn (ignore (null x3)) (let ((a x0) (b x2)) (let* ((z (+ a b))) (list z a b))))))))
+23	(condition-case err (macroexpand '(pcase-let)) (error err))	OK (wrong-number-of-arguments (1 . 1) 0)
+24	(condition-case err (macroexpand '(pcase-let*)) (error err))	OK (wrong-number-of-arguments (1 . 1) 0)
+25	(condition-case err (macroexpand '(pcase-let x x)) (error err))	OK (wrong-type-argument listp x)
+26	(condition-case err (macroexpand '(pcase-let* x x)) (error err))	OK (wrong-type-argument listp x)
+27	(pcase-let ((x 10) (y 20)) (+ x y))	OK 30
+28	(pcase-let* ((x 10) (y (+ x 5))) y)	OK 15
