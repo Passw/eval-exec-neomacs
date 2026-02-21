@@ -65,8 +65,8 @@
 65	(condition-case err (comp-libgccjit-version) (error err))	OK (14 3 0)
 66	(condition-case err (comp-native-compiler-options-effective-p) (error err))	OK t
 67	(condition-case err (comp-native-driver-options-effective-p) (error err))	OK t
-68	(let ((res (condition-case err (comp-el-to-eln-filename "foo.el") (error err)))) (and (eq (car res) 'file-missing) (string-match-p "test/neovm/vm-compat/foo\\.el\\'" (nth 1 res))))	OK 42
-69	(let ((res (condition-case err (comp-el-to-eln-rel-filename "foo.el") (error err)))) (and (eq (car res) 'file-missing) (string-match-p "test/neovm/vm-compat/foo\\.el\\'" (nth 1 res))))	OK 42
+68	(let ((res (condition-case err (comp-el-to-eln-filename "foo.el") (error err)))) (and (eq (car res) 'file-missing) (string-match-p "test/neovm/vm-compat/foo\\.el\\'" (nth 1 res))))	OK 49
+69	(let ((res (condition-case err (comp-el-to-eln-rel-filename "foo.el") (error err)))) (and (eq (car res) 'file-missing) (string-match-p "test/neovm/vm-compat/foo\\.el\\'" (nth 1 res))))	OK 49
 70	(condition-case err (comp--subr-signature '+) (error err))	OK (wrong-type-argument subrp +)
 71	(condition-case err (comp--release-ctxt) (error err))	OK t
 72	(condition-case err (comp--init-ctxt) (error err))	OK t
