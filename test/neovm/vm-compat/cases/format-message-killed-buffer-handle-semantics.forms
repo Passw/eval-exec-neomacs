@@ -1,5 +1,6 @@
 (fboundp 'format)
 (fboundp 'message)
+(fboundp 'format-message)
 (fboundp 'generate-new-buffer)
 (fboundp 'kill-buffer)
 (fboundp 'current-thread)
@@ -104,3 +105,30 @@
 (string-prefix-p "#<window" (format "%s" (selected-window)))
 
 (string-prefix-p "#<window" (message "%s" (selected-window)))
+
+(string-prefix-p "#<thread" (format-message "%S" (current-thread)))
+
+(let ((term (car (terminal-list))))
+  (string-prefix-p "#<terminal" (format-message "%S" term)))
+
+(string-prefix-p "#<frame" (format-message "%S" (selected-frame)))
+
+(string-prefix-p "#<window" (format-message "%S" (selected-window)))
+
+(let* ((b (generate-new-buffer "fmtmsg-live-vm")))
+  (prog1
+      (string-prefix-p "#<buffer fmtmsg-live-vm" (format-message "%S" b))
+    (kill-buffer b)))
+
+(let* ((b (generate-new-buffer "fmtmsg-live-vm-s")))
+  (prog1
+      (string= "fmtmsg-live-vm-s" (format-message "%s" b))
+    (kill-buffer b)))
+
+(let* ((b (generate-new-buffer "fmtmsg-killed-vm")))
+  (kill-buffer b)
+  (string= (format-message "%S" b) "#<killed buffer>"))
+
+(let* ((b (generate-new-buffer "fmtmsg-killed-vm-s")))
+  (kill-buffer b)
+  (string= (format-message "%s" b) "#<killed buffer>"))

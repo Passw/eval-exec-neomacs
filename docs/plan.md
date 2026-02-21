@@ -28,6 +28,21 @@ Last updated: 2026-02-21
 
 ## Doing
 
+- Extended vm-compat and runtime lock-in for eval-dispatch `format-message` opaque-handle rendering:
+  - vm-compat corpus changes:
+    - updated:
+      - `test/neovm/vm-compat/cases/format-message-killed-buffer-handle-semantics.forms`
+      - `test/neovm/vm-compat/cases/format-message-killed-buffer-handle-semantics.expected.tsv`
+    - added `format-message` rows for thread/terminal/frame/window and live/killed buffer `%S`/`%s` paths.
+  - runtime changes:
+    - `rust/neovm-core/src/elisp/builtins.rs`
+      - added evaluator coverage:
+        - `format_message_renders_opaque_handles_in_eval_dispatch`
+      - test asserts Oracle-shaped handle prefixes and live/killed buffer `%S`/`%s` semantics for `format-message`.
+  - verified:
+    - `cargo test --manifest-path rust/neovm-core/Cargo.toml format_message_renders_opaque_handles_in_eval_dispatch -- --nocapture` (pass)
+    - `make -C test/neovm/vm-compat check-one-neovm CASE=cases/format-message-killed-buffer-handle-semantics` (pass; `51/51`)
+
 - Extended vm-compat and runtime lock-in for eval-dispatch mutex/condition-variable `%s`/`%S` handle rendering:
   - vm-compat corpus changes:
     - updated:
