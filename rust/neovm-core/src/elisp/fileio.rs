@@ -2964,6 +2964,7 @@ pub(crate) fn builtin_find_file_noselect(
     args: Vec<Value>,
 ) -> EvalResult {
     expect_min_args("find-file-noselect", &args, 1)?;
+    expect_max_args("find-file-noselect", &args, 4)?;
     let filename = expect_string(&args[0])?;
     let abs_path = resolve_filename_for_eval(eval, &filename);
 
@@ -5171,6 +5172,57 @@ mod tests {
             Flow::Signal(sig) => {
                 assert_eq!(sig.symbol, "wrong-number-of-arguments");
                 assert_eq!(sig.data, vec![Value::symbol("write-region"), Value::Int(8)]);
+            }
+            other => panic!("unexpected flow: {other:?}"),
+        }
+
+        let _ = fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn test_find_file_noselect_arity_bounds() {
+        use super::super::eval::Evaluator;
+
+        let dir = std::env::temp_dir().join("neovm_eval_find_file_noselect_arity");
+        let _ = fs::remove_dir_all(&dir);
+        fs::create_dir_all(&dir).unwrap();
+
+        let file_path = dir.join("arity.txt");
+        let file_str = file_path.to_string_lossy().to_string();
+        write_string_to_file("", &file_str, false).unwrap();
+
+        let mut eval_ok = Evaluator::new();
+        let ok = builtin_find_file_noselect(
+            &mut eval_ok,
+            vec![
+                Value::string(&file_str),
+                Value::Nil,
+                Value::Nil,
+                Value::Nil,
+            ],
+        )
+        .expect("4-arg find-file-noselect should succeed");
+        assert!(matches!(ok, Value::Buffer(_)));
+
+        let mut eval_bad = Evaluator::new();
+        let bad = builtin_find_file_noselect(
+            &mut eval_bad,
+            vec![
+                Value::string(&file_str),
+                Value::Nil,
+                Value::Nil,
+                Value::Nil,
+                Value::Nil,
+            ],
+        )
+        .expect_err("5-arg find-file-noselect should fail");
+        match bad {
+            Flow::Signal(sig) => {
+                assert_eq!(sig.symbol, "wrong-number-of-arguments");
+                assert_eq!(
+                    sig.data,
+                    vec![Value::symbol("find-file-noselect"), Value::Int(5)]
+                );
             }
             other => panic!("unexpected flow: {other:?}"),
         }
