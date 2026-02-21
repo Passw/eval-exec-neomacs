@@ -48,3 +48,5 @@
 48	(multibyte-string-p (unibyte-string 65 66 67))	OK nil
 49	(multibyte-string-p (unibyte-string 233))	OK nil
 50	(multibyte-string-p 1)	OK nil
+51	(condition-case err (encode-coding-string "a" 'utf-8 nil nil nil) (error err))	OK (wrong-number-of-arguments encode-coding-string 5)
+52	(condition-case err (decode-coding-string "a" 'utf-8 nil nil nil) (error err))	OK (wrong-number-of-arguments decode-coding-string 5)

@@ -52,3 +52,6 @@
 (multibyte-string-p (unibyte-string 65 66 67))
 (multibyte-string-p (unibyte-string 233))
 (multibyte-string-p 1)
+
+(condition-case err (encode-coding-string "a" 'utf-8 nil nil nil) (error err))
+(condition-case err (decode-coding-string "a" 'utf-8 nil nil nil) (error err))

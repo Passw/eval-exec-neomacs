@@ -297,6 +297,15 @@ pub(crate) fn builtin_unibyte_string_p(args: Vec<Value>) -> EvalResult {
 /// `(encode-coding-string STRING CODING-SYSTEM)` -> string
 pub(crate) fn builtin_encode_coding_string(args: Vec<Value>) -> EvalResult {
     expect_min_args("encode-coding-string", &args, 2)?;
+    if args.len() > 4 {
+        return Err(signal(
+            "wrong-number-of-arguments",
+            vec![
+                Value::symbol("encode-coding-string"),
+                Value::Int(args.len() as i64),
+            ],
+        ));
+    }
     let s = expect_string(&args[0])?;
     let coding = match &args[1] {
         Value::Symbol(s) => s.clone(),
@@ -317,6 +326,15 @@ pub(crate) fn builtin_encode_coding_string(args: Vec<Value>) -> EvalResult {
 /// `(decode-coding-string STRING CODING-SYSTEM)` -> string
 pub(crate) fn builtin_decode_coding_string(args: Vec<Value>) -> EvalResult {
     expect_min_args("decode-coding-string", &args, 2)?;
+    if args.len() > 4 {
+        return Err(signal(
+            "wrong-number-of-arguments",
+            vec![
+                Value::symbol("decode-coding-string"),
+                Value::Int(args.len() as i64),
+            ],
+        ));
+    }
     let s = expect_string(&args[0])?;
     let coding = match &args[1] {
         Value::Symbol(s) => s.clone(),
@@ -558,6 +576,47 @@ mod tests {
             Flow::Signal(sig) => {
                 assert_eq!(sig.symbol, "wrong-number-of-arguments");
                 assert_eq!(sig.data, vec![Value::symbol("max-char"), Value::Int(2)]);
+            }
+            other => panic!("expected signal, got: {other:?}"),
+        }
+    }
+
+    #[test]
+    fn builtin_coding_string_helpers_enforce_max_arity() {
+        let encode_over = builtin_encode_coding_string(vec![
+            Value::string("a"),
+            Value::symbol("utf-8"),
+            Value::Nil,
+            Value::Nil,
+            Value::Nil,
+        ])
+        .expect_err("encode-coding-string should reject more than four arguments");
+        match encode_over {
+            Flow::Signal(sig) => {
+                assert_eq!(sig.symbol, "wrong-number-of-arguments");
+                assert_eq!(
+                    sig.data,
+                    vec![Value::symbol("encode-coding-string"), Value::Int(5)]
+                );
+            }
+            other => panic!("expected signal, got: {other:?}"),
+        }
+
+        let decode_over = builtin_decode_coding_string(vec![
+            Value::string("a"),
+            Value::symbol("utf-8"),
+            Value::Nil,
+            Value::Nil,
+            Value::Nil,
+        ])
+        .expect_err("decode-coding-string should reject more than four arguments");
+        match decode_over {
+            Flow::Signal(sig) => {
+                assert_eq!(sig.symbol, "wrong-number-of-arguments");
+                assert_eq!(
+                    sig.data,
+                    vec![Value::symbol("decode-coding-string"), Value::Int(5)]
+                );
             }
             other => panic!("expected signal, got: {other:?}"),
         }
