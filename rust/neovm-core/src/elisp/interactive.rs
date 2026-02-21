@@ -288,8 +288,11 @@ pub(crate) fn builtin_command_remapping(eval: &mut Evaluator, args: Vec<Value>) 
     expect_min_args("command-remapping", &args, 1)?;
     expect_max_args("command-remapping", &args, 3)?;
     if let Some(keymap) = args.get(2) {
-        if !keymap.is_nil() {
-            let _ = expect_keymap_id(eval, keymap)?;
+        if !keymap.is_nil() && !command_remapping_keymap_arg_valid(eval, keymap) {
+            return Err(signal(
+                "wrong-type-argument",
+                vec![Value::symbol("keymapp"), keymap.clone()],
+            ));
         }
     }
     Ok(Value::Nil)
@@ -2501,6 +2504,15 @@ fn ensure_global_keymap(eval: &mut Evaluator) -> u64 {
         let id = eval.keymaps.make_keymap();
         eval.keymaps.set_global_map(id);
         id
+    }
+}
+
+fn command_remapping_keymap_arg_valid(eval: &Evaluator, value: &Value) -> bool {
+    match value {
+        Value::Int(n) => decode_keymap_handle(*n).is_some_and(|id| eval.keymaps.is_keymap(id)),
+        // Oracle accepts cons/list keymap-like objects in this slot.
+        Value::Cons(_) => true,
+        _ => false,
     }
 }
 
@@ -6221,6 +6233,14 @@ K")
     #[test]
     fn command_modes_returns_nil_with_arity_checks() {
         assert_eq!(eval_one("(command-modes 'ignore)"), "OK nil");
+        assert_eq!(eval_one("(command-modes nil)"), "OK nil");
+        assert_eq!(eval_one("(command-modes 0)"), "OK nil");
+        assert_eq!(eval_one("(command-modes \"ignore\")"), "OK nil");
+        assert_eq!(
+            eval_one("(command-modes '(lambda () (interactive)))"),
+            "OK nil"
+        );
+        assert_eq!(eval_one("(command-modes '(lambda (x) x))"), "OK nil");
         assert_eq!(
             eval_one(
                 r#"(condition-case err
@@ -6244,6 +6264,33 @@ K")
         assert_eq!(eval_one("(command-remapping 'ignore)"), "OK nil");
         assert_eq!(eval_one("(command-remapping 'ignore nil)"), "OK nil");
         assert_eq!(eval_one("(command-remapping 'ignore nil nil)"), "OK nil");
+        assert_eq!(
+            eval_one("(command-remapping 'ignore nil (list 'keymap))"),
+            "OK nil"
+        );
+        assert_eq!(
+            eval_one("(command-remapping 'ignore nil '(1 2 3))"),
+            "OK nil"
+        );
+        assert_eq!(eval_one("(command-remapping 'ignore nil '(foo))"), "OK nil");
+        assert_eq!(eval_one("(command-remapping 'ignore nil '(foo bar))"), "OK nil");
+        assert_eq!(eval_one("(command-remapping nil)"), "OK nil");
+        assert_eq!(eval_one("(command-remapping 0)"), "OK nil");
+        assert_eq!(eval_one("(command-remapping \"ignore\")"), "OK nil");
+        assert_eq!(
+            eval_one("(command-remapping '(lambda () (interactive)))"),
+            "OK nil"
+        );
+        assert_eq!(eval_one("(command-remapping '(lambda (x) x))"), "OK nil");
+        assert_eq!(eval_one("(command-remapping 'ignore '(x) nil)"), "OK nil");
+        assert_eq!(
+            eval_one("(command-remapping 'ignore '(x) (make-sparse-keymap))"),
+            "OK nil"
+        );
+        assert_eq!(
+            eval_one("(command-remapping 'ignore [x] (make-sparse-keymap))"),
+            "OK nil"
+        );
 
         assert_eq!(
             eval_one(
@@ -6252,6 +6299,38 @@ K")
                      (wrong-type-argument (list (car err) (cdr err))))"#
             ),
             "OK (wrong-type-argument (keymapp t))"
+        );
+        assert_eq!(
+            eval_one(
+                r#"(condition-case err
+                       (command-remapping 'ignore nil [1])
+                     (wrong-type-argument (list (car err) (cdr err))))"#
+            ),
+            "OK (wrong-type-argument (keymapp [1]))"
+        );
+        assert_eq!(
+            eval_one(
+                r#"(condition-case err
+                       (command-remapping 'ignore nil "x")
+                     (wrong-type-argument (list (car err) (cdr err))))"#
+            ),
+            "OK (wrong-type-argument (keymapp \"x\"))"
+        );
+        assert_eq!(
+            eval_one(
+                r#"(condition-case err
+                       (command-remapping 'ignore nil 1)
+                     (wrong-type-argument (list (car err) (cdr err))))"#
+            ),
+            "OK (wrong-type-argument (keymapp 1))"
+        );
+        assert_eq!(
+            eval_one(
+                r#"(condition-case err
+                       (command-remapping 'ignore nil 'foo)
+                     (wrong-type-argument (list (car err) (cdr err))))"#
+            ),
+            "OK (wrong-type-argument (keymapp foo))"
         );
 
         assert_eq!(

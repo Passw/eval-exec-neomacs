@@ -18127,6 +18127,25 @@ Last updated: 2026-02-21
 
 ## Doing
 
+- Aligned `command-remapping` optional `KEYMAP` boundary semantics with oracle and added dedicated lock-ins:
+  - runtime changes:
+    - `rust/neovm-core/src/elisp/interactive.rs`
+      - `command-remapping` now accepts cons/list keymap designators in optional `KEYMAP` (oracle-compatible), while retaining tagged keymap-handle integer validation and existing `wrong-type-argument (keymapp ...)` payload shape for invalid non-cons/non-nil values.
+      - expanded command tests:
+        - `command_modes_returns_nil_with_arity_checks` now locks command-designator tolerance (`symbol`/`nil`/integer/string/lambda forms).
+        - `command_remapping_nil_and_keymap_type_checks` now locks cons/list acceptance plus invalid vector/string/int/symbol type errors.
+  - vm-compat corpus changes:
+    - added and wired:
+      - `test/neovm/vm-compat/cases/command-remapping-modes-boundary-semantics.forms`
+      - `test/neovm/vm-compat/cases/command-remapping-modes-boundary-semantics.expected.tsv`
+      - `test/neovm/vm-compat/cases/default.list`
+  - verified:
+    - `cargo test --manifest-path rust/neovm-core/Cargo.toml command_modes_returns_nil_with_arity_checks -- --nocapture` (pass)
+    - `cargo test --manifest-path rust/neovm-core/Cargo.toml command_remapping_nil_and_keymap_type_checks -- --nocapture` (pass)
+    - `make -C test/neovm/vm-compat check-one-neovm CASE=cases/command-remapping-modes-boundary-semantics` (pass; `34/34`)
+    - `make -C test/neovm/vm-compat check-one-neovm CASE=cases/category-coding-command-font-semantics` (pass; `36/36`)
+    - `make -C test/neovm/vm-compat check-all-neovm-strict` (pass; case inventory `871`)
+
 - Added process helper-wrapper compatibility slice and locked oracle parity:
   - runtime changes:
     - `rust/neovm-core/src/elisp/process.rs`
