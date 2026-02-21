@@ -28,6 +28,19 @@ Last updated: 2026-02-21
 
 ## Doing
 
+- Hardened eval-context opaque handle rendering by unifying string/bytes formatting paths and adding regression coverage:
+  - runtime changes:
+    - `rust/neovm-core/src/elisp/error.rs`
+      - introduced shared `format_opaque_handle_with_eval` helper used by both:
+        - `print_value_with_eval`
+        - `print_value_bytes_with_eval`
+      - keeps terminal/thread/mutex/condvar/buffer handle rendering in one path to prevent future formatting drift between text and byte outputs.
+      - added evaluator coverage:
+        - `eval_context_printer_renders_mutex_handles_consistently`
+  - verified:
+    - `cargo test --manifest-path rust/neovm-core/Cargo.toml eval_context_printer_renders_ -- --nocapture` (pass)
+    - `make -C test/neovm/vm-compat check-all-neovm-strict` (pass)
+
 - Aligned killed-buffer handle printing in eval-context error payloads with Oracle and added lock-in coverage:
   - runtime changes:
     - `rust/neovm-core/src/elisp/error.rs`

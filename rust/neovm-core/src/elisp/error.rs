@@ -132,26 +132,33 @@ pub fn print_value_with_eval(eval: &super::eval::Evaluator, value: &Value) -> St
     format_value_with_eval(eval, value)
 }
 
-fn format_value_with_eval(eval: &super::eval::Evaluator, value: &Value) -> String {
+fn format_opaque_handle_with_eval(eval: &super::eval::Evaluator, value: &Value) -> Option<String> {
     if let Some(handle) = super::display::print_terminal_handle(value) {
-        return handle;
+        return Some(handle);
     }
     if let Some(id) = eval.threads.thread_id_from_handle(value) {
-        return format!("#<thread {id}>");
+        return Some(format!("#<thread {id}>"));
     }
     if let Some(id) = eval.threads.mutex_id_from_handle(value) {
-        return format!("#<mutex {id}>");
+        return Some(format!("#<mutex {id}>"));
     }
     if let Some(id) = eval.threads.condition_variable_id_from_handle(value) {
-        return format!("#<condvar {id}>");
+        return Some(format!("#<condvar {id}>"));
     }
     if let Value::Buffer(id) = value {
         if let Some(buf) = eval.buffers.get(*id) {
-            return format!("#<buffer {}>", buf.name);
+            return Some(format!("#<buffer {}>", buf.name));
         }
         if eval.buffers.dead_buffer_last_name(*id).is_some() {
-            return "#<killed buffer>".to_string();
+            return Some("#<killed buffer>".to_string());
         }
+    }
+    None
+}
+
+fn format_value_with_eval(eval: &super::eval::Evaluator, value: &Value) -> String {
+    if let Some(handle) = format_opaque_handle_with_eval(eval, value) {
+        return handle;
     }
     match value {
         super::value::Value::Cons(_) | super::value::Value::Vector(_) => {
@@ -244,25 +251,8 @@ fn format_cons_with_eval(eval: &super::eval::Evaluator, value: &Value, out: &mut
 
 /// Render a value as bytes with evaluator-context-aware opaque handle formatting.
 pub fn print_value_bytes_with_eval(eval: &super::eval::Evaluator, value: &Value) -> Vec<u8> {
-    if let Some(handle) = super::display::print_terminal_handle(value) {
+    if let Some(handle) = format_opaque_handle_with_eval(eval, value) {
         return handle.into_bytes();
-    }
-    if let Some(id) = eval.threads.thread_id_from_handle(value) {
-        return format!("#<thread {id}>").into_bytes();
-    }
-    if let Some(id) = eval.threads.mutex_id_from_handle(value) {
-        return format!("#<mutex {id}>").into_bytes();
-    }
-    if let Some(id) = eval.threads.condition_variable_id_from_handle(value) {
-        return format!("#<condvar {id}>").into_bytes();
-    }
-    if let Value::Buffer(id) = value {
-        if let Some(buf) = eval.buffers.get(*id) {
-            return format!("#<buffer {}>", buf.name).into_bytes();
-        }
-        if eval.buffers.dead_buffer_last_name(*id).is_some() {
-            return b"#<killed buffer>".to_vec();
-        }
     }
     format_value_bytes_with_eval(eval, value)
 }
@@ -525,6 +515,28 @@ mod tests {
         assert_eq!(
             String::from_utf8(print_value_bytes_with_eval(&eval, &value)).unwrap(),
             "(args-out-of-range #<killed buffer> 0)"
+        );
+
+        Ok(())
+    }
+
+    #[test]
+    fn eval_context_printer_renders_mutex_handles_consistently() -> Result<(), EvalError> {
+        let forms = parse_forms("(make-mutex \"error-printer-mutex\")").map_err(|err| {
+            EvalError::Signal {
+                symbol: "parse-error".to_string(),
+                data: vec![Value::string(err.to_string())],
+            }
+        })?;
+
+        let mut eval = Evaluator::new();
+        let value = eval.eval_expr(&forms[0])?;
+        let printed = print_value_with_eval(&eval, &value);
+
+        assert!(printed.starts_with("#<mutex "));
+        assert_eq!(
+            String::from_utf8(print_value_bytes_with_eval(&eval, &value)).unwrap(),
+            printed
         );
 
         Ok(())
