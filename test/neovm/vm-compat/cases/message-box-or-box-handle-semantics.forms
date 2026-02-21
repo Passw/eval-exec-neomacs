@@ -9,6 +9,10 @@
 (fboundp 'make-mutex)
 (fboundp 'make-condition-variable)
 
+(eq (message-box nil) nil)
+
+(eq (message-or-box nil) nil)
+
 (string-prefix-p "#<thread" (message-box "%S" (current-thread)))
 
 (string-prefix-p "#<thread" (message-box "%s" (current-thread)))

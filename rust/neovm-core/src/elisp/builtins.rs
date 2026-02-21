@@ -18949,6 +18949,15 @@ mod tests {
     #[test]
     fn message_box_wrappers_render_opaque_handles_in_eval_dispatch() {
         let mut eval = crate::elisp::eval::Evaluator::new();
+        let message_box_nil = dispatch_builtin(&mut eval, "message-box", vec![Value::Nil])
+            .expect("message-box should resolve")
+            .expect("message-box should evaluate");
+        assert!(message_box_nil.is_nil());
+        let message_or_box_nil = dispatch_builtin(&mut eval, "message-or-box", vec![Value::Nil])
+            .expect("message-or-box should resolve")
+            .expect("message-or-box should evaluate");
+        assert!(message_or_box_nil.is_nil());
+
         let thread = dispatch_builtin(&mut eval, "current-thread", vec![])
             .expect("current-thread should resolve")
             .expect("current-thread should evaluate");

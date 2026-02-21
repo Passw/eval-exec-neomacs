@@ -8,35 +8,37 @@
 8	(fboundp 'kill-buffer)	OK t
 9	(fboundp 'make-mutex)	OK t
 10	(fboundp 'make-condition-variable)	OK t
-11	(string-prefix-p "#<thread" (message-box "%S" (current-thread)))	OK t
-12	(string-prefix-p "#<thread" (message-box "%s" (current-thread)))	OK t
-13	(string-prefix-p "#<thread" (message-or-box "%S" (current-thread)))	OK t
-14	(string-prefix-p "#<thread" (message-or-box "%s" (current-thread)))	OK t
-15	(let ((term (car (terminal-list)))) (string-prefix-p "#<terminal" (message-box "%S" term)))	OK t
-16	(let ((term (car (terminal-list)))) (string-prefix-p "#<terminal" (message-box "%s" term)))	OK t
-17	(let ((term (car (terminal-list)))) (string-prefix-p "#<terminal" (message-or-box "%S" term)))	OK t
-18	(let ((term (car (terminal-list)))) (string-prefix-p "#<terminal" (message-or-box "%s" term)))	OK t
-19	(string-prefix-p "#<mutex" (message-box "%S" (make-mutex)))	OK t
-20	(string-prefix-p "#<mutex" (message-box "%s" (make-mutex)))	OK t
-21	(string-prefix-p "#<mutex" (message-or-box "%S" (make-mutex)))	OK t
-22	(string-prefix-p "#<mutex" (message-or-box "%s" (make-mutex)))	OK t
-23	(let* ((m (make-mutex)) (cv (make-condition-variable m))) (string-prefix-p "#<condvar" (message-box "%S" cv)))	OK t
-24	(let* ((m (make-mutex)) (cv (make-condition-variable m))) (string-prefix-p "#<condvar" (message-box "%s" cv)))	OK t
-25	(let* ((m (make-mutex)) (cv (make-condition-variable m))) (string-prefix-p "#<condvar" (message-or-box "%S" cv)))	OK t
-26	(let* ((m (make-mutex)) (cv (make-condition-variable m))) (string-prefix-p "#<condvar" (message-or-box "%s" cv)))	OK t
-27	(string-prefix-p "#<frame" (message-box "%S" (selected-frame)))	OK t
-28	(string-prefix-p "#<frame" (message-box "%s" (selected-frame)))	OK t
-29	(string-prefix-p "#<frame" (message-or-box "%S" (selected-frame)))	OK t
-30	(string-prefix-p "#<frame" (message-or-box "%s" (selected-frame)))	OK t
-31	(string-prefix-p "#<window" (message-box "%S" (selected-window)))	OK t
-32	(string-prefix-p "#<window" (message-box "%s" (selected-window)))	OK t
-33	(string-prefix-p "#<window" (message-or-box "%S" (selected-window)))	OK t
-34	(string-prefix-p "#<window" (message-or-box "%s" (selected-window)))	OK t
-35	(let* ((b (generate-new-buffer "mbox-live-vm"))) (prog1 (string-prefix-p "#<buffer mbox-live-vm" (message-box "%S" b)) (kill-buffer b)))	OK t
-36	(let* ((b (generate-new-buffer "mbox-live-vm-lower"))) (prog1 (string= "mbox-live-vm-lower" (message-box "%s" b)) (kill-buffer b)))	OK t
-37	(let* ((b (generate-new-buffer "morbox-live-vm-upper"))) (prog1 (string-prefix-p "#<buffer morbox-live-vm-upper" (message-or-box "%S" b)) (kill-buffer b)))	OK t
-38	(let* ((b (generate-new-buffer "morbox-live-vm"))) (prog1 (string= "morbox-live-vm" (message-or-box "%s" b)) (kill-buffer b)))	OK t
-39	(let* ((b (generate-new-buffer "mbox-killed-vm"))) (kill-buffer b) (string= (message-box "%S" b) "#<killed buffer>"))	OK t
-40	(let* ((b (generate-new-buffer "mbox-killed-vm-lower"))) (kill-buffer b) (string= (message-box "%s" b) "#<killed buffer>"))	OK t
-41	(let* ((b (generate-new-buffer "morbox-killed-vm-upper"))) (kill-buffer b) (string= (message-or-box "%S" b) "#<killed buffer>"))	OK t
-42	(let* ((b (generate-new-buffer "morbox-killed-vm"))) (kill-buffer b) (string= (message-or-box "%s" b) "#<killed buffer>"))	OK t
+11	(eq (message-box nil) nil)	OK t
+12	(eq (message-or-box nil) nil)	OK t
+13	(string-prefix-p "#<thread" (message-box "%S" (current-thread)))	OK t
+14	(string-prefix-p "#<thread" (message-box "%s" (current-thread)))	OK t
+15	(string-prefix-p "#<thread" (message-or-box "%S" (current-thread)))	OK t
+16	(string-prefix-p "#<thread" (message-or-box "%s" (current-thread)))	OK t
+17	(let ((term (car (terminal-list)))) (string-prefix-p "#<terminal" (message-box "%S" term)))	OK t
+18	(let ((term (car (terminal-list)))) (string-prefix-p "#<terminal" (message-box "%s" term)))	OK t
+19	(let ((term (car (terminal-list)))) (string-prefix-p "#<terminal" (message-or-box "%S" term)))	OK t
+20	(let ((term (car (terminal-list)))) (string-prefix-p "#<terminal" (message-or-box "%s" term)))	OK t
+21	(string-prefix-p "#<mutex" (message-box "%S" (make-mutex)))	OK t
+22	(string-prefix-p "#<mutex" (message-box "%s" (make-mutex)))	OK t
+23	(string-prefix-p "#<mutex" (message-or-box "%S" (make-mutex)))	OK t
+24	(string-prefix-p "#<mutex" (message-or-box "%s" (make-mutex)))	OK t
+25	(let* ((m (make-mutex)) (cv (make-condition-variable m))) (string-prefix-p "#<condvar" (message-box "%S" cv)))	OK t
+26	(let* ((m (make-mutex)) (cv (make-condition-variable m))) (string-prefix-p "#<condvar" (message-box "%s" cv)))	OK t
+27	(let* ((m (make-mutex)) (cv (make-condition-variable m))) (string-prefix-p "#<condvar" (message-or-box "%S" cv)))	OK t
+28	(let* ((m (make-mutex)) (cv (make-condition-variable m))) (string-prefix-p "#<condvar" (message-or-box "%s" cv)))	OK t
+29	(string-prefix-p "#<frame" (message-box "%S" (selected-frame)))	OK t
+30	(string-prefix-p "#<frame" (message-box "%s" (selected-frame)))	OK t
+31	(string-prefix-p "#<frame" (message-or-box "%S" (selected-frame)))	OK t
+32	(string-prefix-p "#<frame" (message-or-box "%s" (selected-frame)))	OK t
+33	(string-prefix-p "#<window" (message-box "%S" (selected-window)))	OK t
+34	(string-prefix-p "#<window" (message-box "%s" (selected-window)))	OK t
+35	(string-prefix-p "#<window" (message-or-box "%S" (selected-window)))	OK t
+36	(string-prefix-p "#<window" (message-or-box "%s" (selected-window)))	OK t
+37	(let* ((b (generate-new-buffer "mbox-live-vm"))) (prog1 (string-prefix-p "#<buffer mbox-live-vm" (message-box "%S" b)) (kill-buffer b)))	OK t
+38	(let* ((b (generate-new-buffer "mbox-live-vm-lower"))) (prog1 (string= "mbox-live-vm-lower" (message-box "%s" b)) (kill-buffer b)))	OK t
+39	(let* ((b (generate-new-buffer "morbox-live-vm-upper"))) (prog1 (string-prefix-p "#<buffer morbox-live-vm-upper" (message-or-box "%S" b)) (kill-buffer b)))	OK t
+40	(let* ((b (generate-new-buffer "morbox-live-vm"))) (prog1 (string= "morbox-live-vm" (message-or-box "%s" b)) (kill-buffer b)))	OK t
+41	(let* ((b (generate-new-buffer "mbox-killed-vm"))) (kill-buffer b) (string= (message-box "%S" b) "#<killed buffer>"))	OK t
+42	(let* ((b (generate-new-buffer "mbox-killed-vm-lower"))) (kill-buffer b) (string= (message-box "%s" b) "#<killed buffer>"))	OK t
+43	(let* ((b (generate-new-buffer "morbox-killed-vm-upper"))) (kill-buffer b) (string= (message-or-box "%S" b) "#<killed buffer>"))	OK t
+44	(let* ((b (generate-new-buffer "morbox-killed-vm"))) (kill-buffer b) (string= (message-or-box "%s" b) "#<killed buffer>"))	OK t

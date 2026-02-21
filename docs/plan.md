@@ -28,6 +28,24 @@ Last updated: 2026-02-21
 
 ## Doing
 
+- Locked `message-box` / `message-or-box` nil-format semantics alongside handle matrix coverage:
+  - vm-compat corpus changes:
+    - updated:
+      - `test/neovm/vm-compat/cases/message-box-or-box-handle-semantics.forms`
+      - `test/neovm/vm-compat/cases/message-box-or-box-handle-semantics.expected.tsv`
+    - added explicit `nil` format assertions:
+      - `(eq (message-box nil) nil)`
+      - `(eq (message-or-box nil) nil)`
+  - runtime changes:
+    - `rust/neovm-core/src/elisp/builtins.rs`
+      - extended evaluator coverage:
+        - `message_box_wrappers_render_opaque_handles_in_eval_dispatch`
+      - test now asserts wrapper `nil` format returns `nil` while preserving existing opaque-handle matrix assertions.
+  - verified:
+    - `cargo test --manifest-path rust/neovm-core/Cargo.toml message_box_wrappers_render_opaque_handles_in_eval_dispatch -- --nocapture` (pass)
+    - `make -C test/neovm/vm-compat check-one-neovm CASE=cases/message-box-or-box-handle-semantics` (pass; `44/44`)
+    - `make -C test/neovm/vm-compat check-neovm-filter-strict LIST=cases/default.list PATTERN='message-box-or-box-handle-semantics'` (pass; strict filtered gates green)
+
 - Completed `message-box` / `message-or-box` live/killed buffer `%S`/`%s` matrix coverage:
   - vm-compat corpus changes:
     - updated:
