@@ -184,23 +184,12 @@ fn decode_extended_sequence_span(s: &str, start: usize) -> Option<(usize, u32)> 
     Some((start + end_rel, cp))
 }
 
-fn encode_emacs_mule_raw_byte(byte: u8, out: &mut Vec<u8>) {
-    if byte < 0x80 {
-        out.push(byte);
-    } else if byte < 0xC0 {
-        out.push(0xC0);
-        out.push(0x80 + (byte - 0x80));
-    } else {
-        out.push(0xC1);
-        out.push(0x80 + (byte - 0xC0));
-    }
-}
-
 fn push_unibyte_literal_byte(out: &mut Vec<u8>, byte: u8) {
     match byte {
         b'"' => out.extend_from_slice(br#"\""#),
         b'\\' => out.extend_from_slice(br#"\\"#),
-        b => encode_emacs_mule_raw_byte(b, out),
+        b if b >= 0x80 => push_octal_escape(out, b),
+        b => out.push(b),
     }
 }
 
@@ -526,8 +515,8 @@ mod tests {
         assert_eq!(
             format_lisp_string_bytes(&encoded),
             vec![
-                b'"', 0x06, b'\\', b'"', b'\\', b'\\', b'\n', 0x7F, 0xC0, 0x80, 0xC0, 0xA9, 0xC1,
-                0xBF, b'"'
+                b'"', 0x06, b'\\', b'"', b'\\', b'\\', b'\n', 0x7F, b'\\', b'2', b'0', b'0',
+                b'\\', b'2', b'5', b'1', b'\\', b'3', b'7', b'7', b'"'
             ]
         );
         assert_eq!(

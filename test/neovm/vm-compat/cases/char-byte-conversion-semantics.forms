@@ -16,6 +16,8 @@
 (condition-case err (multibyte-char-to-unibyte -1) (error err))
 (condition-case err (multibyte-char-to-unibyte 4194304) (error err))
 (condition-case err (multibyte-char-to-unibyte 3.14) (error err))
+(unibyte-string 233)
+(string-as-unibyte "é")
 
 (char-width 0)
 (char-width 9)
