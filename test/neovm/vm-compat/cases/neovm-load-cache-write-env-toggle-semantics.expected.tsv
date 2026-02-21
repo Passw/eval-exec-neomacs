@@ -1,0 +1,26 @@
+1	(setq vm-load-cache-toggle-dir "/tmp/neovm-load-cache-write-toggle/")	OK "/tmp/neovm-load-cache-write-toggle/"
+2	(progn (ignore-errors (delete-directory vm-load-cache-toggle-dir t)) (make-directory vm-load-cache-toggle-dir t) 'ok)	OK ok
+3	(setq vm-load-cache-toggle-source (concat vm-load-cache-toggle-dir "probe.el"))	OK "/tmp/neovm-load-cache-write-toggle/probe.el"
+4	(setq vm-load-cache-toggle-cache (concat vm-load-cache-toggle-dir "probe.neoc"))	OK "/tmp/neovm-load-cache-write-toggle/probe.neoc"
+5	(let ((orig (current-buffer)) (buf (get-buffer-create " *vm-load-cache-toggle-src*"))) (unwind-protect (progn (set-buffer buf) (erase-buffer) (insert "(setq vm-load-cache-toggle-probe 'loaded)") (insert (char-to-string 10)) (write-region nil nil vm-load-cache-toggle-source nil nil)) (set-buffer orig) (kill-buffer buf)))	OK nil
+6	(setenv "NEOVM_DISABLE_LOAD_CACHE_WRITE" "1")	OK "1"
+7	(load-file vm-load-cache-toggle-source)	OK t
+8	(eq vm-load-cache-toggle-probe 'loaded)	OK t
+9	(file-exists-p vm-load-cache-toggle-cache)	OK nil
+10	(setenv "NEOVM_DISABLE_LOAD_CACHE_WRITE" nil)	OK nil
+11	(delete-file vm-load-cache-toggle-cache)	OK nil
+12	(file-exists-p vm-load-cache-toggle-cache)	OK nil
+13	(load-file vm-load-cache-toggle-source)	OK t
+14	(eq vm-load-cache-toggle-probe 'loaded)	OK t
+15	(file-exists-p vm-load-cache-toggle-cache)	OK t
+16	(setenv "NEOVM_DISABLE_LOAD_CACHE_WRITE" "true")	OK "true"
+17	(delete-file vm-load-cache-toggle-cache)	OK nil
+18	(load-file vm-load-cache-toggle-source)	OK t
+19	(file-exists-p vm-load-cache-toggle-cache)	OK nil
+20	(setenv "NEOVM_DISABLE_LOAD_CACHE_WRITE" "0")	OK "0"
+21	(load-file vm-load-cache-toggle-source)	OK t
+22	(file-exists-p vm-load-cache-toggle-cache)	OK t
+23	(delete-file vm-load-cache-toggle-source)	OK nil
+24	(delete-file vm-load-cache-toggle-cache)	OK nil
+25	(delete-directory vm-load-cache-toggle-dir t)	OK nil
+26	(setenv "NEOVM_DISABLE_LOAD_CACHE_WRITE" nil)	OK nil

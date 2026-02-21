@@ -402,6 +402,7 @@ only on `load-file`), and cache-rewrite semantics when source/lexical mode
 changes,
 plus load-cache-write-disable runner policy semantics
 (`load-file` no `.neoc` writes while explicit precompile still writes), and
+runtime env-toggle semantics for `NEOVM_DISABLE_LOAD_CACHE_WRITE`, and
 default-build `#[...]` literal non-callability policy
 (`cases/bytecode-literal-default-policy`).
 
