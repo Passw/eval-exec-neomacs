@@ -1605,6 +1605,54 @@ mod tests {
     }
 
     #[test]
+    fn builtin_error_message_string_formats_mutex_and_condvar_handles() {
+        let mut evaluator = super::super::eval::Evaluator::new();
+        init_standard_errors(&mut evaluator.obarray);
+
+        let mutex = super::super::threads::builtin_make_mutex(
+            &mut evaluator,
+            vec![Value::string("ems-mutex")],
+        )
+        .expect("make-mutex should succeed");
+
+        let mutex_err = Value::list(vec![
+            Value::symbol("args-out-of-range"),
+            mutex.clone(),
+            Value::Int(0),
+        ]);
+        let mutex_result = builtin_error_message_string(&evaluator, vec![mutex_err]);
+        assert!(mutex_result.is_ok());
+        let mutex_text = mutex_result
+            .unwrap()
+            .as_str()
+            .expect("error-message-string must return a string")
+            .to_string();
+        assert!(mutex_text.starts_with("Args out of range: #<mutex"));
+        assert!(mutex_text.ends_with(", 0"));
+
+        let condvar = super::super::threads::builtin_make_condition_variable(
+            &mut evaluator,
+            vec![mutex, Value::string("ems-condvar")],
+        )
+        .expect("make-condition-variable should succeed");
+
+        let condvar_err = Value::list(vec![
+            Value::symbol("args-out-of-range"),
+            condvar,
+            Value::Int(0),
+        ]);
+        let condvar_result = builtin_error_message_string(&evaluator, vec![condvar_err]);
+        assert!(condvar_result.is_ok());
+        let condvar_text = condvar_result
+            .unwrap()
+            .as_str()
+            .expect("error-message-string must return a string")
+            .to_string();
+        assert!(condvar_text.starts_with("Args out of range: #<condvar"));
+        assert!(condvar_text.ends_with(", 0"));
+    }
+
+    #[test]
     fn builtin_error_message_string_not_cons() {
         let evaluator = super::super::eval::Evaluator::new();
 
