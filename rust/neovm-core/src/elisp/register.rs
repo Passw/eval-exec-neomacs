@@ -166,6 +166,17 @@ fn expect_min_args(name: &str, args: &[Value], min: usize) -> Result<(), Flow> {
     }
 }
 
+fn expect_max_args(name: &str, args: &[Value], max: usize) -> Result<(), Flow> {
+    if args.len() > max {
+        Err(signal(
+            "wrong-number-of-arguments",
+            vec![Value::symbol(name), Value::Int(args.len() as i64)],
+        ))
+    } else {
+        Ok(())
+    }
+}
+
 fn expect_string(value: &Value) -> Result<String, Flow> {
     match value {
         Value::Str(s) => Ok((**s).clone()),
@@ -239,6 +250,7 @@ pub(crate) fn builtin_copy_to_register(
     args: Vec<Value>,
 ) -> EvalResult {
     expect_min_args("copy-to-register", &args, 2)?;
+    expect_max_args("copy-to-register", &args, 5)?;
     let reg = expect_register(&args[0])?;
     let text = expect_string(&args[1])?;
     eval.registers.set(reg, RegisterContent::Text(text));
@@ -255,6 +267,7 @@ pub(crate) fn builtin_insert_register(
     args: Vec<Value>,
 ) -> EvalResult {
     expect_min_args("insert-register", &args, 1)?;
+    expect_max_args("insert-register", &args, 2)?;
     let reg = expect_register(&args[0])?;
     match eval.registers.get(reg) {
         Some(RegisterContent::Text(s)) => Ok(Value::string(s.clone())),

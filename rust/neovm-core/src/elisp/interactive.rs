@@ -2027,6 +2027,7 @@ fn maybe_materialize_word_at_point(eval: &mut Evaluator) {
 pub(crate) fn builtin_thing_at_point(eval: &mut Evaluator, args: Vec<Value>) -> EvalResult {
     maybe_materialize_word_at_point(eval);
     expect_min_args("thing-at-point", &args, 1)?;
+    expect_max_args("thing-at-point", &args, 2)?;
 
     let thing = match args[0].as_symbol_name() {
         Some(s) => s.to_string(),

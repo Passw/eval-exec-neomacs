@@ -296,6 +296,7 @@ pub(crate) fn builtin_rassq(args: Vec<Value>) -> EvalResult {
 /// TEST defaults to `equal`; only `eq` and `equal` are accepted in pure mode.
 pub(crate) fn builtin_assoc_default(args: Vec<Value>) -> EvalResult {
     expect_min_args("assoc-default", &args, 2)?;
+    expect_max_args("assoc-default", &args, 4)?;
     let key = &args[0];
     let alist = &args[1];
     if !alist.is_list() {
@@ -426,6 +427,7 @@ pub(crate) fn builtin_safe_length(args: Vec<Value>) -> EvalResult {
 /// INPLACE is ignored (we always return a new string).
 pub(crate) fn builtin_subst_char_in_string(args: Vec<Value>) -> EvalResult {
     expect_min_args("subst-char-in-string", &args, 3)?;
+    expect_max_args("subst-char-in-string", &args, 4)?;
     let from_char = expect_char(&args[0])?;
     let to_char = expect_char(&args[1])?;
     let s = expect_string(&args[2])?;

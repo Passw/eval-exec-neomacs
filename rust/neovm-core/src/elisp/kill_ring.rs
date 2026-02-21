@@ -740,6 +740,7 @@ fn sync_kill_ring_binding(eval: &mut super::eval::Evaluator) {
 /// If REPLACE is non-nil, replace the most recent entry instead.
 pub(crate) fn builtin_kill_new(eval: &mut super::eval::Evaluator, args: Vec<Value>) -> EvalResult {
     expect_min_args("kill-new", &args, 1)?;
+    expect_max_args("kill-new", &args, 2)?;
     sync_kill_ring_from_binding(eval);
     let text = expect_string(&args[0])?;
     let replace = args.get(1).map_or(false, |v| v.is_truthy());
@@ -775,6 +776,7 @@ pub(crate) fn builtin_current_kill(
     args: Vec<Value>,
 ) -> EvalResult {
     expect_min_args("current-kill", &args, 1)?;
+    expect_max_args("current-kill", &args, 2)?;
     sync_kill_ring_from_binding_strict(eval)?;
     let n = expect_int(&args[0])?;
     let do_not_move = args.get(1).map_or(false, |v| v.is_truthy());
@@ -799,6 +801,7 @@ pub(crate) fn builtin_kill_region(
     args: Vec<Value>,
 ) -> EvalResult {
     expect_min_args("kill-region", &args, 2)?;
+    expect_max_args("kill-region", &args, 3)?;
     sync_kill_ring_from_binding(eval);
     let beg_val = expect_int(&args[0])?;
     let end_val = expect_int(&args[1])?;
@@ -837,6 +840,7 @@ pub(crate) fn builtin_kill_ring_save(
     args: Vec<Value>,
 ) -> EvalResult {
     expect_min_args("kill-ring-save", &args, 2)?;
+    expect_max_args("kill-ring-save", &args, 3)?;
     sync_kill_ring_from_binding(eval);
     let beg_val = expect_int(&args[0])?;
     let end_val = expect_int(&args[1])?;

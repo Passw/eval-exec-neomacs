@@ -284,6 +284,18 @@ fn expect_min_args(name: &str, args: &[Value], min: usize) -> Result<(), Flow> {
     }
 }
 
+/// Expect no more than N arguments.
+fn expect_max_args(name: &str, args: &[Value], max: usize) -> Result<(), Flow> {
+    if args.len() > max {
+        Err(signal(
+            "wrong-number-of-arguments",
+            vec![Value::symbol(name), Value::Int(args.len() as i64)],
+        ))
+    } else {
+        Ok(())
+    }
+}
+
 /// Expect exactly N arguments.
 fn expect_args(name: &str, args: &[Value], n: usize) -> Result<(), Flow> {
     if args.len() != n {
@@ -318,6 +330,7 @@ pub(crate) fn builtin_advice_add(
     args: Vec<Value>,
 ) -> EvalResult {
     expect_min_args("advice-add", &args, 3)?;
+    expect_max_args("advice-add", &args, 4)?;
 
     let target = expect_symbol_name(&args[0])?;
 
