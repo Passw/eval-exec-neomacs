@@ -851,11 +851,6 @@ struct glyph_matrix
      line.  */
   bool_bf header_line_p : 1;
 
-#ifdef GLYPH_DEBUG
-  /* A string identifying the method used to display the matrix.  */
-  char method[512];
-#endif
-
   /* The buffer this matrix displays.  Set in
      mark_window_display_accurate_1.  */
   struct buffer *buffer;
@@ -869,12 +864,7 @@ struct glyph_matrix
 /* Check that glyph pointers stored in glyph rows of MATRIX are okay.
    This aborts if any pointer is found twice.  */
 
-#ifdef GLYPH_DEBUG
-void check_matrix_pointer_lossage (struct glyph_matrix *);
-#define CHECK_MATRIX(MATRIX) check_matrix_pointer_lossage (MATRIX)
-#else
 #define CHECK_MATRIX(MATRIX) ((void) 0)
-#endif
 
 
 
@@ -1161,16 +1151,9 @@ struct glyph_row
 };
 
 
-/* Get a pointer to row number ROW in matrix MATRIX.  If GLYPH_DEBUG
-   is defined, the function matrix_row checks that we don't try to
-   access rows that are out of bounds.  */
+/* Get a pointer to row number ROW in matrix MATRIX.  */
 
-#ifdef GLYPH_DEBUG
-struct glyph_row *matrix_row (struct glyph_matrix *, int);
-#define MATRIX_ROW(MATRIX, ROW)   matrix_row (MATRIX, ROW)
-#else
 #define MATRIX_ROW(MATRIX, ROW)	  ((MATRIX)->rows + (ROW))
-#endif
 
 /* Return a pointer to the row reserved for the mode line in MATRIX.
    Row MATRIX->nrows - 1 is always reserved for the mode line.  */
@@ -3794,11 +3777,6 @@ void init_sigio (int);
 
 /* Defined in xfaces.c.  */
 
-#ifdef HAVE_X_WINDOWS
-void unload_color (struct frame *, unsigned long);
-void x_free_colors (struct frame *, unsigned long *, int);
-#endif
-
 void update_face_from_frame_parameter (struct frame *, Lisp_Object,
                                        Lisp_Object);
 extern bool tty_defined_color (struct frame *, const char *, Emacs_Color *,
@@ -3976,13 +3954,10 @@ enum { SCROLL_INFINITY = 1000000 };
 
 /* Defined in scroll.c */
 
-extern int scrolling_max_lines_saved (int, int, unsigned *, unsigned *, int *);
 extern void do_line_insertion_deletion_costs (struct frame *, const char *,
                                               const char *, const char *,
 					      const char *, const char *,
 					      const char *, int);
-void scrolling_1 (struct frame *, int, int, int, int *, int *, unsigned *,
-                  unsigned *, int);
 
 /* Defined in frame.c */
 
