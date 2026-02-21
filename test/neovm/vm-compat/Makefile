@@ -30,7 +30,7 @@ ERT_ALLOWLIST ?= cases/ert-allowlist-smoke.txt
 ERT_EXPECTED ?= cases/ert-allowlist-smoke.expected.tsv
 ERT_LOAD_FILES ?= cases/ert-allowlist-fixtures/smoke-tests.el
 
-.PHONY: oracle neovm record check compare check-neovm record-all record-all-neovm-only check-all check-all-neovm check-all-neovm-only check-all-neovm-strict check-legacy-elc-neovm check-introspection-neovm check-thread-neovm check-startup-doc-neovm check-runner-feature-stamp check-builtin-registry-all check-builtin-registry-sync check-builtin-registry-fboundp check-builtin-registry-function-cell check-builtin-registry-func-arity check-builtin-registry-autoload-metadata check-builtin-registry-function-kind check-builtin-registry-commandp check-builtin-registry-primitive-any-coverage check-builtin-registry-extension-policy check-oracle-default-path check-case-line-filter check-tracked-lists check-list-integrity list-cases list-cases-filter record-list record-list-filter check-list check-list-filter check-neovm-list check-neovm-filter check-neovm-filter-strict check-one-neovm validate-case-lists case-inventory ert-oracle record-ert-allowlist check-ert-allowlist bench-load-cache compat-progress compat-progress-json report-oracle-builtin-coverage compat-stub-index compat-stub-index-json check-stub-budget check-startup-doc-stub-coverage check-startup-doc-string-coverage check-startup-variable-documentation-counts show-function-kind-drifts
+.PHONY: oracle neovm record check compare check-neovm record-all record-all-neovm-only record-one-neovm check-all check-all-neovm check-all-neovm-only check-all-neovm-strict check-legacy-elc-neovm check-introspection-neovm check-thread-neovm check-startup-doc-neovm check-runner-feature-stamp check-builtin-registry-all check-builtin-registry-sync check-builtin-registry-fboundp check-builtin-registry-function-cell check-builtin-registry-func-arity check-builtin-registry-autoload-metadata check-builtin-registry-function-kind check-builtin-registry-commandp check-builtin-registry-primitive-any-coverage check-builtin-registry-extension-policy check-oracle-default-path check-case-line-filter check-tracked-lists check-list-integrity list-cases list-cases-filter record-list record-list-filter check-list check-list-filter check-neovm-list check-neovm-filter check-neovm-filter-strict check-one-neovm validate-case-lists case-inventory ert-oracle record-ert-allowlist check-ert-allowlist bench-load-cache compat-progress compat-progress-json report-oracle-builtin-coverage compat-stub-index compat-stub-index-json check-stub-budget check-startup-doc-stub-coverage check-startup-doc-string-coverage check-startup-variable-documentation-counts show-function-kind-drifts
 
 oracle:
 	./run-oracle.sh $(FORMS)
@@ -75,6 +75,18 @@ record-all-neovm-only:
 		./run-neovm.sh "$$case.forms" > "$$case.expected.tsv"; \
 		echo "recorded neovm-only baseline: $$case.expected.tsv"; \
 	done
+
+record-one-neovm:
+	@if [ -z "$(CASE)" ]; then \
+		echo "usage: make record-one-neovm CASE=cases/<name>"; \
+		exit 2; \
+	fi
+	@case_path="$(CASE)"; \
+	if [ "$${case_path#cases/}" = "$$case_path" ]; then \
+		case_path="cases/$$case_path"; \
+	fi; \
+	./run-neovm.sh "$$case_path.forms" > "$$case_path.expected.tsv"; \
+	echo "recorded neovm baseline: $$case_path.expected.tsv"
 
 check-all:
 	@set -e; \

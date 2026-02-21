@@ -383,6 +383,16 @@ cd test/neovm/vm-compat
 make record-all-neovm-only
 ```
 
+To refresh one case from NeoVM output:
+
+```bash
+cd test/neovm/vm-compat
+make record-one-neovm CASE=cases/neovm-precompile-arg-errors-semantics
+```
+
+Use `record-one-neovm` only when you intentionally want NeoVM output to become
+the expected baseline for that case.
+
 Current NeoVM-only policy cases include source-only loading behavior (`.elc`
 rejection and `.neoc` fallback safety) plus NeoVM extension behavior
 (`neovm-precompile-file` cache warming and argument/error contracts), and
