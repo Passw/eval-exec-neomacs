@@ -26,3 +26,6 @@
 (condition-case err (pcase 1 ((foo bar) 'x) (_ 'y)) (error err))
 (condition-case err (pcase-let (((foo bar) 1)) 'ok) (error err))
 (condition-case err (pcase-let* (((foo bar) 1)) 'ok) (error err))
+(condition-case err (pcase 1 (((1 2) 3) 'x) (_ 'y)) (error err))
+(condition-case err (pcase-let ((((1 2) 3) 1)) 'ok) (error err))
+(condition-case err (pcase-let* ((((1 2) 3) 1)) 'ok) (error err))

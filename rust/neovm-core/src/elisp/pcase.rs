@@ -195,11 +195,16 @@ fn compile_list_pattern(items: &[Expr]) -> Result<Pattern, Flow> {
         // list patterns signal an error.
         _ => {
             let rendered = super::expr::print_expr(&Expr::List(items.to_vec()));
-            let message = match head {
-                Expr::Symbol(name) => format!("Unknown {name} pattern: {rendered}"),
-                _ => format!("unknown pcase pattern: {rendered}"),
-            };
-            Err(signal("error", vec![Value::string(message)]))
+            match head {
+                Expr::Symbol(name) => {
+                    let message = format!("Unknown {name} pattern: {rendered}");
+                    Err(signal("error", vec![Value::string(message)]))
+                }
+                other => Err(signal(
+                    "wrong-type-argument",
+                    vec![Value::symbol("symbolp"), quote_to_value(other)],
+                )),
+            }
         }
     }
 }
@@ -1295,6 +1300,22 @@ mod tests {
         assert_eq!(
             eval_last("(condition-case err (pcase-let* (((foo bar) 1)) 'ok) (error err))"),
             "OK (error \"Unknown foo pattern: (foo bar)\")"
+        );
+    }
+
+    #[test]
+    fn pcase_non_symbol_pattern_head_signals_symbol_type_error() {
+        assert_eq!(
+            eval_last("(condition-case err (pcase 1 (((1 2) 3) 'x) (_ 'y)) (error err))"),
+            "OK (wrong-type-argument symbolp (1 2))"
+        );
+        assert_eq!(
+            eval_last("(condition-case err (pcase-let ((((1 2) 3) 1)) 'ok) (error err))"),
+            "OK (wrong-type-argument symbolp (1 2))"
+        );
+        assert_eq!(
+            eval_last("(condition-case err (pcase-let* ((((1 2) 3) 1)) 'ok) (error err))"),
+            "OK (wrong-type-argument symbolp (1 2))"
         );
     }
 
