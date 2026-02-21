@@ -188,26 +188,6 @@ font_make_entity (void)
   return font_entity;
 }
 
-#ifdef HAVE_ANDROID
-
-Lisp_Object
-font_make_entity_android (int size)
-{
-  Lisp_Object font_entity;
-  struct font_entity *entity
-    = ((struct font_entity *)
-       allocate_pseudovector (size, FONT_ENTITY_MAX, FONT_ENTITY_MAX,
-			      PVEC_FONT));
-
-#if defined HAVE_ANDROID && !defined ANDROID_STUBIFY
-  entity->is_android = true;
-#endif
-
-  XSETFONT (font_entity, entity);
-  return font_entity;
-}
-
-#endif
 
 /* Create a font-object whose structure size is SIZE.  If ENTITY is
    not nil, copy properties from ENTITY to the font-object.  If
@@ -1647,19 +1627,6 @@ font_parse_fcname (char *name, ptrdiff_t len, Lisp_Object font)
 	  bool decimal = 0, size_found = 1;
 	  for (q = p + 1; *q && *q != ':'; q++)
 	    {
-#ifdef HAVE_NTGUI
-	      /* MS-Windows has several CJK fonts whose name ends in
-                 "-ExtB".  It also has fonts whose names end in "-R" or
-                 "-B", and one font whose name ends in "-SB".  */
-	      if (q == p + 1 && (strncmp (q, "ExtB", 4) == 0
-				 || strncmp (q, "R", 1) == 0
-				 || strncmp (q, "B", 1) == 0
-				 || strncmp (q, "SB", 2) == 0))
-		{
-		  size_found = 0;
-		  break;
-		}
-#endif
 	      if (! c_isdigit (*q))
 		{
 		  if (*q != '.' || decimal)
@@ -2034,15 +2001,6 @@ font_parse_family_registry (Lisp_Object family, Lisp_Object registry, Lisp_Objec
       len = SBYTES (family);
       p0 = SSDATA (family);
       p1 = strchr (p0, '-');
-#ifdef HAVE_NTGUI
-      /* MS-Windows has fonts whose family name ends in "-ExtB" and
-         other suffixes which include a hyphen.  */
-      if (p1 && (strcmp (p1, "-ExtB") == 0
-		 || strcmp (p1, "-R") == 0
-		 || strcmp (p1, "-B") == 0
-		 || strcmp (p1, "-SB") == 0))
-	p1 = NULL;
-#endif
       if (p1)
 	{
 	  if ((*p0 != '*' && p1 - p0 > 0)
@@ -2747,22 +2705,7 @@ font_delete_unmatched (Lisp_Object vec, Lisp_Object spec, int size)
 		  int required = XFIXNUM (AREF (spec, prop)) >> 8;
 		  int candidate = XFIXNUM (AREF (entity, prop)) >> 8;
 
-		  if (candidate != required
-#ifdef HAVE_NTGUI
-		      /* A kludge for w32 font search, where listing a
-			 family returns only 4 standard weights: regular,
-			 italic, bold, bold-italic.  For other values one
-			 must specify the font, not just the family in the
-			 :family attribute of the face.  But specifying
-			 :family in the face attributes looks for regular
-			 weight, so if we require exact match, the
-			 non-regular font will be rejected.  So we relax
-			 the accuracy of the match here, and let
-			 font_sort_entities find the best match.  */
-		      && (prop != FONT_WEIGHT_INDEX
-			  || eabs (candidate - required) > 100)
-#endif
-		      )
+		  if (candidate != required)
 		    prop = FONT_SPEC_MAX;
 		}
 	    }
@@ -3415,15 +3358,6 @@ font_open_for_lface (struct frame *f, Lisp_Object entity, Lisp_Object *attrs, Li
 
 	  pt /= 10;
 	  size = POINT_TO_PIXEL (pt, FRAME_RES (f));
-#ifdef HAVE_NS
-	  if (size == 0)
-	    {
-	      Lisp_Object ffsize = get_frame_param (f, Qfontsize);
-	      size = (NUMBERP (ffsize)
-		      ? POINT_TO_PIXEL (XFLOATINT (ffsize), FRAME_RES (f))
-		      : 0);
-	    }
-#endif
 	}
       size *= font_rescale_ratio (entity);
     }
@@ -3528,11 +3462,7 @@ font_open_by_spec (struct frame *f, Lisp_Object spec)
   attrs[LFACE_FAMILY_INDEX] = attrs[LFACE_FOUNDRY_INDEX] = Qnil;
   attrs[LFACE_SWIDTH_INDEX] = attrs[LFACE_WEIGHT_INDEX]
     = attrs[LFACE_SLANT_INDEX] = Qnormal;
-#ifndef HAVE_NS
   attrs[LFACE_HEIGHT_INDEX] = make_fixnum (120);
-#else
-  attrs[LFACE_HEIGHT_INDEX] = make_fixnum (0);
-#endif
   attrs[LFACE_FONT_INDEX] = Qnil;
 
   return font_load_for_lface (f, attrs, spec);
@@ -6079,9 +6009,6 @@ match.  */);
 #ifdef HAVE_BDFFONT
   syms_of_bdffont ();
 #endif	/* HAVE_BDFFONT */
-#ifdef HAVE_NTGUI
-  syms_of_w32font ();
-#endif	/* HAVE_NTGUI */
 #ifdef USE_BE_CAIRO
   syms_of_ftcrfont ();
 #endif

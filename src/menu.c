@@ -37,9 +37,6 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 #include TERM_HEADER
 #endif /* HAVE_WINDOW_SYSTEM */
 
-#ifdef HAVE_NTGUI
-extern AppendMenuW_Proc unicode_append_menu;
-#endif /* HAVE_NTGUI  */
 
 #include "menu.h"
 
@@ -675,30 +672,6 @@ digest_single_submenu (int start, int end, bool top_level_items)
 	     will encode the strings as appropriate.  */
 	  if (!FRAME_TERMCAP_P (f))
 	    {
-#ifdef HAVE_NTGUI
-	      if (STRINGP (pane_name))
-		{
-		  if (unicode_append_menu)
-		    /* Encode as UTF-8 for now.  */
-		    pane_name = ENCODE_UTF_8 (pane_name);
-		  else if (STRING_MULTIBYTE (pane_name))
-		    pane_name = ENCODE_SYSTEM (pane_name);
-
-		  ASET (menu_items, i + MENU_ITEMS_PANE_NAME, pane_name);
-		}
-#elif defined (USE_LUCID) && (defined USE_CAIRO || defined HAVE_XFT)
-	      if (STRINGP (pane_name))
-		{
-		  pane_name = ENCODE_UTF_8 (pane_name);
-		  ASET (menu_items, i + MENU_ITEMS_PANE_NAME, pane_name);
-		}
-#elif !defined (HAVE_MULTILINGUAL_MENU)
-	      if (STRINGP (pane_name) && STRING_MULTIBYTE (pane_name))
-		{
-		  pane_name = ENCODE_MENU_STRING (pane_name);
-		  ASET (menu_items, i + MENU_ITEMS_PANE_NAME, pane_name);
-		}
-#endif
 	    }
 
 	  pane_string = (NILP (pane_name)
@@ -751,47 +724,6 @@ digest_single_submenu (int start, int end, bool top_level_items)
 	     tty_write_glyphs.  */
 	  if (!FRAME_TERMCAP_P (f))
 	    {
-#ifdef HAVE_NTGUI
-	      if (STRINGP (item_name))
-		{
-		  if (unicode_append_menu)
-		    item_name = ENCODE_UTF_8 (item_name);
-		  else if (STRING_MULTIBYTE (item_name))
-		    item_name = ENCODE_SYSTEM (item_name);
-
-		  ASET (menu_items, i + MENU_ITEMS_ITEM_NAME, item_name);
-		}
-
-	      if (STRINGP (descrip) && STRING_MULTIBYTE (descrip))
-		{
-		  descrip = ENCODE_SYSTEM (descrip);
-		  ASET (menu_items, i + MENU_ITEMS_ITEM_EQUIV_KEY, descrip);
-		}
-#elif USE_LUCID
-	      if (STRINGP (item_name))
-		{
-		  item_name = ENCODE_UTF_8 (item_name);
-		  ASET (menu_items, i + MENU_ITEMS_ITEM_NAME, item_name);
-		}
-
-	      if (STRINGP (descrip))
-		{
-		  descrip = ENCODE_UTF_8 (descrip);
-		  ASET (menu_items, i + MENU_ITEMS_ITEM_EQUIV_KEY, descrip);
-		}
-#elif !defined (HAVE_MULTILINGUAL_MENU)
-	      if (STRING_MULTIBYTE (item_name))
-		{
-		  item_name = ENCODE_MENU_STRING (item_name);
-		  ASET (menu_items, i + MENU_ITEMS_ITEM_NAME, item_name);
-		}
-
-	      if (STRINGP (descrip) && STRING_MULTIBYTE (descrip))
-		{
-		  descrip = ENCODE_MENU_STRING (descrip);
-		  ASET (menu_items, i + MENU_ITEMS_ITEM_EQUIV_KEY, descrip);
-		}
-#endif
 	    }
 
 	  wv = make_widget_value (NULL, NULL, !NILP (enable),
@@ -965,72 +897,6 @@ find_and_call_menu_selection (struct frame *f, int menu_bar_items_used,
 
 #endif /* USE_X_TOOLKIT || USE_GTK || HAVE_NS || HAVE_NTGUI || HAVE_HAIKU */
 
-#ifdef HAVE_NS
-/* As above, but return the menu selection instead of storing in kb buffer.
-   If KEYMAPS, return full prefixes to selection. */
-Lisp_Object
-find_and_return_menu_selection (struct frame *f, bool keymaps, void *client_data)
-{
-  Lisp_Object prefix, entry;
-  int i;
-  Lisp_Object *subprefix_stack;
-  int submenu_depth = 0;
-  USE_SAFE_ALLOCA;
-
-  prefix = entry = Qnil;
-  i = 0;
-  SAFE_ALLOCA_LISP (subprefix_stack, menu_items_used);
-
-  while (i < menu_items_used)
-    {
-      if (NILP (AREF (menu_items, i)))
-        {
-          subprefix_stack[submenu_depth++] = prefix;
-          prefix = entry;
-          i++;
-        }
-      else if (EQ (AREF (menu_items, i), Qlambda))
-        {
-          prefix = subprefix_stack[--submenu_depth];
-          i++;
-        }
-      else if (EQ (AREF (menu_items, i), Qt))
-        {
-          prefix
-            = AREF (menu_items, i + MENU_ITEMS_PANE_PREFIX);
-          i += MENU_ITEMS_PANE_LENGTH;
-        }
-      /* Ignore a nil in the item list.
-         It's meaningful only for dialog boxes.  */
-      else if (EQ (AREF (menu_items, i), Qquote))
-        i += 1;
-      else
-        {
-          entry
-            = AREF (menu_items, i + MENU_ITEMS_ITEM_VALUE);
-          if (aref_addr (menu_items, i) == client_data)
-            {
-              if (keymaps)
-                {
-                  int j;
-
-                  entry = list1 (entry);
-                  if (!NILP (prefix))
-                    entry = Fcons (prefix, entry);
-                  for (j = submenu_depth - 1; j >= 0; j--)
-                    if (!NILP (subprefix_stack[j]))
-                      entry = Fcons (subprefix_stack[j], entry);
-                }
-	      SAFE_FREE ();
-              return entry;
-            }
-          i += MENU_ITEMS_ITEM_LENGTH;
-        }
-    }
-  SAFE_FREE ();
-  return Qnil;
-}
-#endif  /* HAVE_NS */
 
 ptrdiff_t
 menu_item_width (const unsigned char *str)
@@ -1191,24 +1057,6 @@ x_popup_menu_1 (Lisp_Object position, Lisp_Object menu)
 
 	XSETFASTINT (x, 0);
 	XSETFASTINT (y, 0);
-#ifdef HAVE_X_WINDOWS
-	if (FRAME_X_P (new_f))
-	  {
-	    /* Can't use mouse_position_hook for X since it returns
-	       coordinates relative to the window the mouse is in,
-	       we need coordinates relative to the edit widget always.  */
-	    if (new_f != 0)
-	      {
-		int cur_x, cur_y;
-
-		x_relative_mouse_position (new_f, &cur_x, &cur_y);
-		/* cur_x/y may be negative, so use make_fixnum.  */
-		x = make_fixnum (cur_x);
-		y = make_fixnum (cur_y);
-	      }
-	  }
-	else
-#endif /* HAVE_X_WINDOWS */
 	  {
 	    Lisp_Object bar_window;
 	    enum scroll_bar_part part;
@@ -1375,19 +1223,6 @@ x_popup_menu_1 (Lisp_Object position, Lisp_Object menu)
     Fx_hide_tip ();
 #endif
 
-#ifdef HAVE_NTGUI     /* FIXME: Is it really w32-specific?  --Stef  */
-  /* If resources from a previous popup menu still exist, does nothing
-     until the `menu_free_timer' has freed them (see w32fns.c). This
-     can occur if you press ESC or click outside a menu without selecting
-     a menu item.
-  */
-  if (current_popup_menu && FRAME_W32_P (f))
-    {
-      discard_menu_items ();
-      FRAME_DISPLAY_INFO (f)->grabbed = 0;
-      return Qnil;
-    }
-#endif
 
   record_unwind_protect_void (discard_menu_items);
 
@@ -1418,14 +1253,6 @@ x_popup_menu_1 (Lisp_Object position, Lisp_Object menu)
 
   unbind_to (specpdl_count, Qnil);
 
-#ifdef HAVE_NTGUI     /* W32 specific because other terminals clear
-			 the grab inside their `menu_show_hook's if
-			 it's actually required (i.e. there isn't a
-			 way to query the buttons currently held down
-			 after XMenuActivate). */
-  if (FRAME_W32_P (f))
-    FRAME_DISPLAY_INFO (f)->grabbed = 0;
-#endif
 
   if (error_name) error ("%s", error_name);
   return selection;
@@ -1598,13 +1425,6 @@ for instance using the window manager, then this produces a quit and
     {
       Lisp_Object selection
 	= FRAME_TERMINAL (f)->popup_dialog_hook (f, header, contents);
-#ifdef HAVE_NTGUI
-      /* NTGUI on Windows versions before Vista supports only simple
-	 dialogs with Yes/No choices.  For other dialogs, it returns the
-	 symbol 'unsupported--w32-dialog', as a signal for the caller to
-	 fall back to the emulation code.  */
-      if (!EQ (selection, Qunsupported__w32_dialog))
-#endif
 	return selection;
     }
   /* ... or emulate it with a menu.  */

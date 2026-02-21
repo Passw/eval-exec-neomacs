@@ -116,22 +116,12 @@ xg_select (int fds_lim, fd_set *rfds, fd_set *wfds, fd_set *efds,
   int n_gfds, retval = 0, our_fds = 0, max_fds = fds_lim - 1;
   int i, nfds, tmo_in_millisec, must_free = 0;
   bool need_to_dispatch;
-#ifdef USE_GTK
-  bool already_has_events;
-#endif
 
   if (xg_select_suppress_count)
     return pselect (fds_lim, rfds, wfds, efds, timeout, sigmask);
 
   context = g_main_context_default ();
   acquire_select_lock (context);
-
-#ifdef USE_GTK
-  already_has_events = g_main_context_pending (context);
-#ifndef HAVE_PGTK
-  already_has_events = already_has_events && x_gtk_use_native_input;
-#endif
-#endif
 
   if (rfds) all_rfds = *rfds;
   else FD_ZERO (&all_rfds);
@@ -248,11 +238,7 @@ xg_select (int fds_lim, fd_set *rfds, fd_set *wfds, fd_set *efds,
 
   /* If Gtk+ is in use eventually gtk_main_iteration will be called,
      unless retval is zero.  */
-#ifdef USE_GTK
-  need_to_dispatch = retval == 0;
-#else
   need_to_dispatch = true;
-#endif
 
   /* xwidgets make heavy use of GLib subprocesses, which add their own
      SIGCHLD handler at arbitrary locations.  That doesn't play well

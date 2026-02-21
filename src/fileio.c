@@ -56,10 +56,6 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 #include "region-cache.h"
 #include "frame.h"
 
-#ifdef HAVE_ANDROID
-#include "android.h"
-#endif /* HAVE_ANDROID */
-
 #ifdef HAVE_LINUX_FS_H
 # include <sys/ioctl.h>
 # include <linux/fs.h>

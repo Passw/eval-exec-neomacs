@@ -30,9 +30,6 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 #include "termhooks.h"
 #include "pdumper.h"
 
-#ifdef HAVE_PGTK
-# include "pgtkterm.h"
-#endif
 
 /* Fringe bitmaps are represented in three different ways:
 
@@ -1430,103 +1427,12 @@ If BITMAP overrides a standard fringe bitmap, the original bitmap is restored.  
    On W32 and MAC (little endian), there's no need to do this.
 */
 
-#if defined (HAVE_X_WINDOWS) || defined (HAVE_PGTK) || defined (HAVE_ANDROID)
-static const unsigned char swap_nibble[16] =
-  {
-    0x0, 0x8, 0x4, 0xc,           /* 0000 1000 0100 1100 */
-    0x2, 0xa, 0x6, 0xe,           /* 0010 1010 0110 1110 */
-    0x1, 0x9, 0x5, 0xd,           /* 0001 1001 0101 1101 */
-    0x3, 0xb, 0x7, 0xf,           /* 0011 1011 0111 1111 */
-  };
-#endif
 
 static void
 init_fringe_bitmap (int which, struct fringe_bitmap *fb, int once_p)
 {
   if (once_p || fb->dynamic)
     {
-#if defined (HAVE_X_WINDOWS) || defined (HAVE_ANDROID)
-      unsigned short *bits = fb->bits;
-      int j;
-
-#ifdef USE_CAIRO
-      for (j = 0; j < fb->height; j++)
-	{
-	  unsigned short b = *bits;
-#ifdef WORDS_BIGENDIAN
-	  *bits++ = (b << (16 - fb->width));
-#else
-	  b = (unsigned short)((swap_nibble[b & 0xf] << 12)
-			       | (swap_nibble[(b>>4) & 0xf] << 8)
-			       | (swap_nibble[(b>>8) & 0xf] << 4)
-			       | (swap_nibble[(b>>12) & 0xf]));
-	  *bits++ = (b >> (16 - fb->width));
-#endif
-	}
-#else  /* not USE_CAIRO */
-      if (fb->width <= 8)
-	{
-	  unsigned char *cbits = (unsigned char *)fb->bits;
-	  for (j = 0; j < fb->height; j++)
-	    {
-	      unsigned short b = *bits++;
-	      unsigned char c;
-	      c = (unsigned char)((swap_nibble[b & 0xf] << 4)
-				  | (swap_nibble[(b>>4) & 0xf]));
-	      *cbits++ = (c >> (8 - fb->width));
-	    }
-	}
-      else
-	{
-	  for (j = 0; j < fb->height; j++)
-	    {
-	      unsigned short b = *bits;
-	      b = (unsigned short)((swap_nibble[b & 0xf] << 12)
-				   | (swap_nibble[(b>>4) & 0xf] << 8)
-				   | (swap_nibble[(b>>8) & 0xf] << 4)
-				   | (swap_nibble[(b>>12) & 0xf]));
-	      b >>= (16 - fb->width);
-#ifdef WORDS_BIGENDIAN
-	      b = bswap_16 (b);
-#endif
-	      *bits++ = b;
-	    }
-	}
-#endif /* not USE_CAIRO */
-#endif /* HAVE_X_WINDOWS || HAVE_ANDROID */
-
-#if !defined(HAVE_X_WINDOWS) && defined (HAVE_PGTK)
-      unsigned short *bits = fb->bits;
-      int j;
-
-      for (j = 0; j < fb->height; j++)
-	{
-	  unsigned short b = *bits;
-#ifdef WORDS_BIGENDIAN
-	  *bits++ = (b << (16 - fb->width));
-#else
-	  b = (unsigned short)((swap_nibble[b & 0xf] << 12)
-			       | (swap_nibble[(b>>4) & 0xf] << 8)
-			       | (swap_nibble[(b>>8) & 0xf] << 4)
-			       | (swap_nibble[(b>>12) & 0xf]));
-	  *bits++ = (b >> (16 - fb->width));
-#endif
-	}
-#endif /* !HAVE_X_WINDOWS && HAVE_PGTK */
-
-#ifdef HAVE_NTGUI
-      unsigned short *bits = fb->bits;
-      int j;
-      for (j = 0; j < fb->height; j++)
-	{
-	  unsigned short b = *bits;
-	  b <<= (16 - fb->width);
-	  /* Windows is little-endian, so the next line is always
-	     needed.  */
-	  b = ((b >> 8) | (b << 8));
-	  *bits++ = b;
-	}
-#endif
     }
 
   if (!once_p)
@@ -1904,20 +1810,3 @@ gui_define_fringe_bitmap (struct frame *f, int n)
   if (fb)
     rif->define_fringe_bitmap (n, fb->bits, fb->height, fb->width);
 }
-
-#ifdef HAVE_NTGUI
-void
-w32_reset_fringes (void)
-{
-  /* Destroy row bitmaps.  */
-  int bt;
-  struct redisplay_interface *rif = FRAME_RIF (SELECTED_FRAME ());
-
-  if (!rif || !rif->destroy_fringe_bitmap)
-    return;
-
-  for (bt = NO_FRINGE_BITMAP + 1; bt < max_used_fringe_bitmap; bt++)
-    rif->destroy_fringe_bitmap (bt);
-}
-
-#endif /* HAVE_NTGUI */

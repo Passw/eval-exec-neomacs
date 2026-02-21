@@ -139,9 +139,6 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 #include <unistd.h>
 #include <fcntl.h>
 
-#ifdef USE_GTK
-# include "gtkutil.h"
-#endif
 #ifdef WINDOWSNT
 #include "w32.h"
 #include "w32heap.h"	/* for sbrk */
@@ -5873,37 +5870,11 @@ garbage_collect (void)
   mark_charset ();
   mark_composite ();
   mark_profiler ();
-#ifdef HAVE_PGTK
-  mark_pgtkterm ();
-#endif
-
-#ifdef USE_GTK
-  xg_mark_data ();
-#endif
-
-#ifdef HAVE_HAIKU
-  mark_haiku_display ();
-#endif
 
 #ifdef HAVE_WINDOW_SYSTEM
   mark_fringe_data ();
 #endif
 
-#ifdef HAVE_X_WINDOWS
-  mark_xterm ();
-  mark_xselect ();
-#endif
-
-#ifdef HAVE_ANDROID
-  mark_androidterm ();
-#ifndef ANDROID_STUBIFY
-  mark_sfntfont ();
-#endif
-#endif
-
-#ifdef HAVE_NS
-  mark_nsterm ();
-#endif
   mark_fns ();
 
   /* Everything is now marked, except for the data in font caches,
@@ -7564,17 +7535,9 @@ N should be nonnegative.  */);
 /* The below is for being able to do platform-specific stuff in .gdbinit
    without risking error messages from GDB about missing types and
    variables on other platforms.  */
-#ifdef HAVE_X_WINDOWS
-enum defined_HAVE_X_WINDOWS { defined_HAVE_X_WINDOWS = true };
-#else
 enum defined_HAVE_X_WINDOWS { defined_HAVE_X_WINDOWS = false };
-#endif
 
-#ifdef HAVE_PGTK
-enum defined_HAVE_PGTK { defined_HAVE_PGTK = true };
-#else
 enum defined_HAVE_PGTK { defined_HAVE_PGTK = false };
-#endif
 
 #ifdef WINDOWSNT
 enum defined_WINDOWSNT { defined_WINDOWSNT = true };
