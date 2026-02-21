@@ -6,6 +6,7 @@ cases/neovm-precompile-parse-error-semantics
 cases/neovm-precompile-return-path-semantics
 cases/neovm-precompile-no-eval-semantics
 cases/neovm-precompile-cache-rewrite-semantics
+cases/neovm-precompile-reader-prefix-semantics
 cases/neovm-load-cache-write-policy-semantics
 cases/neovm-load-cache-write-env-toggle-semantics
 cases/precompile
