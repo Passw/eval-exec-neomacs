@@ -28,6 +28,7 @@
 (macroexpand '(pcase-let ((x 1) (`(,a ,b) '(2 3))) (list x a b)))
 (macroexpand '(pcase-let ((`(,a ,b) '(1 2)) (`(,c ,d) '(3 4))) (list a b c d)))
 (macroexpand '(pcase-let* ((`(,a ,b) '(1 2)) (z (+ a b))) (list z a b)))
+(macroexpand '(pcase-let* ((x 1) (`(,a ,b) '(1 2)) (z (+ a b))) (list x z a b)))
 (condition-case err (macroexpand '(pcase-let)) (error err))
 (condition-case err (macroexpand '(pcase-let*)) (error err))
 (condition-case err (macroexpand '(pcase-let x x)) (error err))

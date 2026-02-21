@@ -4565,6 +4565,7 @@ fn parse_simple_backquote_list_unquotes(pattern: &Value) -> Option<Vec<Value>> {
 }
 
 fn expand_simple_backquote_list_pcase_let_star(
+    eval: &mut super::eval::Evaluator,
     value_expr: &Value,
     vars: &[Value],
     body_forms: &[Value],
@@ -4575,9 +4576,9 @@ fn expand_simple_backquote_list_pcase_let_star(
 
     let mut steps = Vec::with_capacity(vars.len());
     let mut source = value_expr.clone();
-    for i in 0..vars.len() {
-        let head = Value::symbol(format!("x{}", i * 2));
-        let tail = Value::symbol(format!("x{}", i * 2 + 1));
+    for _ in vars {
+        let head = eval.next_pcase_macroexpand_temp_symbol();
+        let tail = eval.next_pcase_macroexpand_temp_symbol();
         steps.push((source.clone(), head, tail.clone()));
         source = tail;
     }
@@ -4628,7 +4629,11 @@ fn expand_simple_backquote_list_pcase_let_star(
     Some(expanded)
 }
 
-fn macroexpand_known_fallback_macro(name: &str, args: &[Value]) -> Result<Option<Value>, Flow> {
+fn macroexpand_known_fallback_macro(
+    eval: &mut super::eval::Evaluator,
+    name: &str,
+    args: &[Value],
+) -> Result<Option<Value>, Flow> {
     match name {
         "when" => {
             if args.is_empty() {
@@ -4962,6 +4967,7 @@ fn macroexpand_known_fallback_macro(name: &str, args: &[Value]) -> Result<Option
                     };
 
                     let mut expanded = match expand_simple_backquote_list_pcase_let_star(
+                        eval,
                         &value_expr,
                         &pattern_vars,
                         &destructure_body,
@@ -5170,7 +5176,7 @@ fn macroexpand_once_with_environment(
         )
     })?;
     if fallback_placeholder {
-        if let Some(expanded) = macroexpand_known_fallback_macro(&resolved_name, &args)? {
+        if let Some(expanded) = macroexpand_known_fallback_macro(eval, &resolved_name, &args)? {
             return Ok((expanded, true));
         }
         return Ok((form, false));
@@ -21881,6 +21887,31 @@ mod tests {
                 .expect("mixed pcase-let* expected parse should yield one form"),
         );
         assert_eq!(pcase_let_star_mixed_expanded, pcase_let_star_mixed_expected);
+        let pcase_let_star_mixed_prefix_forms = crate::elisp::parser::parse_forms(
+            r#"(pcase-let* ((x 1) (`(,a ,b) '(1 2)) (z (+ a b))) (list x z a b))"#,
+        )
+        .expect("mixed pcase-let* prefix form should parse");
+        let pcase_let_star_mixed_prefix = crate::elisp::eval::quote_to_value(
+            pcase_let_star_mixed_prefix_forms
+                .first()
+                .expect("mixed pcase-let* prefix parse should yield one form"),
+        );
+        let pcase_let_star_mixed_prefix_expanded =
+            builtin_macroexpand_eval(&mut eval, vec![pcase_let_star_mixed_prefix])
+                .expect("macroexpand should preserve prefix symbol bindings in pcase-let*");
+        let pcase_let_star_mixed_prefix_expected_forms = crate::elisp::parser::parse_forms(
+            r#"(let* ((x 1)) (progn (ignore (consp '(1 2))) (let* ((x4 (car-safe '(1 2))) (x5 (cdr-safe '(1 2)))) (progn (ignore (consp x5)) (let* ((x6 (car-safe x5)) (x7 (cdr-safe x5))) (progn (ignore (null x7)) (let ((a x4) (b x6)) (let* ((z (+ a b))) (list x z a b)))))))))"#,
+        )
+        .expect("mixed pcase-let* prefix expected expansion should parse");
+        let pcase_let_star_mixed_prefix_expected = crate::elisp::eval::quote_to_value(
+            pcase_let_star_mixed_prefix_expected_forms
+                .first()
+                .expect("mixed pcase-let* prefix expected parse should yield one form"),
+        );
+        assert_eq!(
+            pcase_let_star_mixed_prefix_expanded,
+            pcase_let_star_mixed_prefix_expected
+        );
         let bad_pcase_let = builtin_macroexpand_eval(
             &mut eval,
             vec![Value::list(vec![

@@ -120,6 +120,9 @@ pub struct Evaluator {
     max_depth: usize,
     /// Single-entry hot cache for named callable resolution in `funcall`/`apply`.
     named_call_cache: Option<NamedCallCache>,
+    /// Monotonic `xN` counter used by macroexpand fallback paths that mirror
+    /// Oracle pcase temp-symbol naming.
+    pcase_macroexpand_temp_counter: usize,
 }
 
 impl Default for Evaluator {
@@ -1274,6 +1277,7 @@ impl Evaluator {
             depth: 0,
             max_depth: 200,
             named_call_cache: None,
+            pcase_macroexpand_temp_counter: 0,
         }
     }
 
@@ -1294,6 +1298,13 @@ impl Evaluator {
 
     pub(crate) fn record_nonmenu_input_event(&mut self, event: Value) {
         self.assign("last-nonmenu-event", event);
+    }
+
+    pub(crate) fn next_pcase_macroexpand_temp_symbol(&mut self) -> Value {
+        let n = self.pcase_macroexpand_temp_counter;
+        self.pcase_macroexpand_temp_counter =
+            self.pcase_macroexpand_temp_counter.saturating_add(1);
+        Value::symbol(format!("x{n}"))
     }
 
     pub(crate) fn recent_input_events(&self) -> &[Value] {
