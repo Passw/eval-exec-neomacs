@@ -28,6 +28,21 @@ Last updated: 2026-02-21
 
 ## Doing
 
+- Extended vm-compat and runtime lock-in for eval-dispatch mutex/condition-variable `%s`/`%S` handle rendering:
+  - vm-compat corpus changes:
+    - updated:
+      - `test/neovm/vm-compat/cases/format-message-killed-buffer-handle-semantics.forms`
+      - `test/neovm/vm-compat/cases/format-message-killed-buffer-handle-semantics.expected.tsv`
+    - added `%s`/`%S` assertions for `make-mutex` and `make-condition-variable` in both `format` and `message`.
+  - runtime changes:
+    - `rust/neovm-core/src/elisp/builtins.rs`
+      - added evaluator coverage:
+        - `format_and_message_render_mutex_condvar_handles_in_eval_dispatch`
+      - test asserts Oracle-shaped `#<mutex...>` / `#<condvar...>` rendering for both format specifiers and both builtins.
+  - verified:
+    - `cargo test --manifest-path rust/neovm-core/Cargo.toml format_and_message_render_mutex_condvar_handles_in_eval_dispatch -- --nocapture` (pass)
+    - `make -C test/neovm/vm-compat check-one-neovm CASE=cases/format-message-killed-buffer-handle-semantics` (pass; `42/42`)
+
 - Extended vm-compat and runtime lock-in for eval-dispatch thread/terminal `%S` opaque-handle rendering:
   - vm-compat corpus changes:
     - updated:

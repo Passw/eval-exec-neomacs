@@ -18600,6 +18600,41 @@ mod tests {
     }
 
     #[test]
+    fn format_and_message_render_mutex_condvar_handles_in_eval_dispatch() {
+        let mut eval = crate::elisp::eval::Evaluator::new();
+        let mutex = dispatch_builtin(&mut eval, "make-mutex", vec![])
+            .expect("make-mutex should resolve")
+            .expect("make-mutex should evaluate");
+        let condvar = dispatch_builtin(
+            &mut eval,
+            "make-condition-variable",
+            vec![mutex.clone()],
+        )
+        .expect("make-condition-variable should resolve")
+        .expect("make-condition-variable should evaluate");
+
+        let mut assert_prefix = |builtin: &str, spec: &str, value: Value, prefix: &str| {
+            let rendered = dispatch_builtin(&mut eval, builtin, vec![Value::string(spec), value])
+                .expect("builtin should resolve")
+                .expect("builtin should evaluate");
+            assert!(
+                rendered.as_str().is_some_and(|s| s.starts_with(prefix)),
+                "expected {builtin} {spec} output to start with {prefix}, got: {rendered:?}"
+            );
+        };
+
+        assert_prefix("format", "%s", mutex.clone(), "#<mutex");
+        assert_prefix("message", "%s", mutex.clone(), "#<mutex");
+        assert_prefix("format", "%S", mutex.clone(), "#<mutex");
+        assert_prefix("message", "%S", mutex, "#<mutex");
+
+        assert_prefix("format", "%s", condvar.clone(), "#<condvar");
+        assert_prefix("message", "%s", condvar.clone(), "#<condvar");
+        assert_prefix("format", "%S", condvar.clone(), "#<condvar");
+        assert_prefix("message", "%S", condvar, "#<condvar");
+    }
+
+    #[test]
     fn format_and_message_render_killed_buffer_handles_in_eval_dispatch() {
         let mut eval = crate::elisp::eval::Evaluator::new();
         let buffer = dispatch_builtin(
