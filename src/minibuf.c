@@ -34,9 +34,6 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 #include "systty.h"
 #include "pdumper.h"
 
-#ifdef HAVE_NTGUI
-#include "w32term.h"
-#endif
 
 /* List of buffers for use as minibuffers.
    The first element of the list is used for the outermost minibuffer
@@ -918,17 +915,7 @@ read_minibuf (Lisp_Object map, Lisp_Object initial, Lisp_Object prompt,
       if (is_tty_frame (sf))
 	combine_updates_for_frame (sf, true);
 
-#ifndef HAVE_NTGUI
       flush_frame (XFRAME (XWINDOW (minibuf_window)->frame));
-#else
-      /* The reason this function isn't `flush_display' in the RIF is
-	 that `flush_frame' is also called in many other circumstances
-	 when some code wants X requests to be sent to the X server,
-	 but there is no corresponding "flush" concept on MS Windows,
-	 and flipping buffers every time `flush_frame' is called
-	 causes flicker.  */
-      w32_flip_buffers_if_dirty (XFRAME (XWINDOW (minibuf_window)->frame));
-#endif
     }
 
   /* Make minibuffer contents into a string.  */

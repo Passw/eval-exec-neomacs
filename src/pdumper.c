@@ -4144,12 +4144,10 @@ types.  */)
 {
   eassert (initialized);
 
-#ifndef HAVE_ANDROID
   if (! noninteractive)
     error ("Dumping Emacs currently works only in batch mode.  "
            "If you'd like it to work interactively, please consider "
            "contributing a patch to Emacs.");
-#endif
 
   if (!main_thread_p (current_thread))
     error ("This function can be called only in the main thread");
@@ -4249,16 +4247,6 @@ types.  */)
 
     char *filename_1;
     SAFE_ALLOCA_STRING (filename_1, filename);
-#ifdef MSDOS
-    /* Rewrite references to .pdmp to refer to .dmp files on DOS.  */
-    size_t len = strlen (filename_1);
-    if (len >= 5
-	&& !strcmp (filename_1 + len - 5, ".pdmp"))
-      {
-	strcpy (filename_1 + len - 5, ".dmp");
-	filename = DECODE_FILE (build_unibyte_string (filename_1));
-      }
-#endif /* MSDOS */
     ctx->fd = emacs_open (filename_1, O_RDWR | O_TRUNC | O_CREAT, 0666);
     SAFE_FREE ();
   }
@@ -4959,12 +4947,7 @@ dump_mmap_release_vm (struct dump_memory_map *map)
 static bool
 needs_mmap_retry_p (void)
 {
-#if defined CYGWIN || VM_SUPPORTED == VM_MS_WINDOWS \
-  || defined _AIX
-  return true;
-#else /* !CYGWIN && VM_SUPPORTED != VM_MS_WINDOWS && !_AIX */
   return false;
-#endif /* !CYGWIN && VM_SUPPORTED != VM_MS_WINDOWS && !_AIX */
 }
 
 static bool
@@ -5021,11 +5004,7 @@ dump_mmap_contiguous_vm (struct dump_memory_map *maps, int nr_maps,
 					  spec.size, spec.protection);
           mem += spec.size;
 	  if (need_retry && map->mapping == NULL
-	      && (errno == EBUSY
-#ifdef CYGWIN
-		  || errno == EINVAL
-#endif
-		  ))
+	      && (errno == EBUSY))
             {
               retry = true;
               continue;
@@ -5649,17 +5628,6 @@ pdumper_set_emacs_execdir (char *emacs_executable)
     --p;
   eassert (p > emacs_executable);
 
-#if HAVE_NS && !NS_SELF_CONTAINED
-  if (strcmp (p, "Emacs") == 0)
-    {
-      /* This is the Emacs executable from the non-self-contained app
-	 bundle which can be anywhere on the system.  Fortunately, the
-	 location of the Lisp resources is known.  */
-      emacs_execdir = (char *) BINDIR;
-      execdir_len = strlen (BINDIR);
-    }
-  else
-#endif
     {
       emacs_execdir = xpalloc (emacs_execdir, &execdir_size,
 			       p - emacs_executable + 1 - execdir_size, -1, 1);
@@ -5916,15 +5884,7 @@ Value is nil if this session was not started using a dump file.*/)
     return Qnil;
 
   Lisp_Object dump_fn;
-#ifdef WINDOWSNT
-  char dump_fn_utf8[MAX_UTF8_PATH];
-  if (filename_from_ansi (dump_private.dump_filename, dump_fn_utf8) == 0)
-    dump_fn = DECODE_FILE (build_unibyte_string (dump_fn_utf8));
-  else
-    dump_fn = build_unibyte_string (dump_private.dump_filename);
-#else
   dump_fn = DECODE_FILE (build_unibyte_string (dump_private.dump_filename));
-#endif
 
   dump_fn = Fexpand_file_name (dump_fn, Qnil);
 

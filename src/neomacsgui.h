@@ -64,14 +64,12 @@ typedef void *Display;
 typedef void *XrmDatabase;
 
 
-/* Rectangle similar to XRectangle - only define if not using X11 */
-#ifndef HAVE_X_WINDOWS
+/* Rectangle similar to XRectangle.  */
 typedef struct
 {
   int x, y;
   unsigned width, height;
 } XRectangle;
-#endif
 
 /* Gravity constants for frame positioning */
 #define ForgetGravity		0

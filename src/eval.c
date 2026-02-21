@@ -1412,12 +1412,6 @@ unwind_to_catch (struct handler *catch, enum nonlocal_exit type,
   set_poll_suppress_count (catch->poll_suppress_count);
   unblock_input_to (catch->interrupt_input_blocked);
 
-#ifdef HAVE_X_WINDOWS
-  /* Restore the X error handler stack.  This is important because
-     otherwise a display disconnect won't unwind the stack of error
-     traps to the right depth.  */
-  x_unwind_errors_to (catch->x_error_handler_depth);
-#endif
 
   do
     {
@@ -1836,9 +1830,6 @@ push_handler_nosignal (Lisp_Object tag_ch_val, enum handlertype handlertype)
   c->act_rec = get_act_rec (current_thread);
   c->poll_suppress_count = poll_suppress_count;
   c->interrupt_input_blocked = interrupt_input_blocked;
-#ifdef HAVE_X_WINDOWS
-  c->x_error_handler_depth = x_error_message_count;
-#endif
   handlerlist = c;
   return c;
 }

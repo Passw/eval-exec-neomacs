@@ -40,28 +40,9 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 #include "buffer.h"
 #include "coding.h"
 
-#ifdef MSDOS
-#include "msdos.h"	/* for fstatat */
-#endif
-
-#if !(defined HAVE_ANDROID && !defined ANDROID_STUBIFY)
 typedef DIR emacs_dir;
 #define emacs_readdir readdir
 #define emacs_closedir closedir
-#else
-
-#include "android.h"
-
-/* The Android emulation of dirent stuff is required to be able to
-   list the /assets special directory.  */
-typedef struct android_vdir emacs_dir;
-#define emacs_readdir android_readdir
-#define emacs_closedir android_closedir
-#endif
-
-#ifdef WINDOWSNT
-extern int is_slow_fs (const char *);
-#endif
 
 static ptrdiff_t scmp (const char *, const char *, ptrdiff_t);
 static Lisp_Object file_attributes (int, char const *, Lisp_Object,
@@ -110,41 +91,6 @@ open_directory (Lisp_Object dirname, Lisp_Object encoded_dirname, int *fdp)
   emacs_dir *d;
   int fd, opendir_errno;
 
-#if defined DOS_NT || (defined HAVE_ANDROID && !defined ANDROID_STUBIFY)
-  /* On DOS_NT, directories cannot be opened.  The emulation assumes
-     that any file descriptor other than AT_FDCWD corresponds to the
-     most recently opened directory.  This hack is good enough for
-     Emacs.
-
-     This code is also used on Android for a different reason: a
-     special `assets' directory outside the normal file system is used
-     to open assets inside the Android application package, and must
-     be listed using the opendir-like interface provided in
-     android.h.  */
-  fd = 0;
-#ifndef HAVE_ANDROID
-  d = opendir (name);
-#else
-  /* `android_opendir' can return EINTR if DIRNAME designates a file
-     within a slow-to-respond document provider.  */
-
- again:
-  d = android_opendir (name);
-
-  if (d)
-    fd = android_dirfd (d);
-  else if (errno == EINTR)
-    {
-      maybe_quit ();
-
-      /* Reload the address of DIRNAME's data, as it might have been
-	 relocated by GC.  */
-      name = SSDATA (dirname);
-      goto again;
-    }
-#endif
-  opendir_errno = errno;
-#else
   fd = emacs_open (name, O_RDONLY | O_DIRECTORY, 0);
   if (fd < 0)
     {
@@ -158,21 +104,12 @@ open_directory (Lisp_Object dirname, Lisp_Object encoded_dirname, int *fdp)
       if (! d)
 	emacs_close (fd);
     }
-#endif
 
   if (!d)
     report_file_errno ("Opening directory", dirname, opendir_errno);
   *fdp = fd;
   return d;
 }
-
-#ifdef WINDOWSNT
-static void
-directory_files_internal_w32_unwind (Lisp_Object arg)
-{
-  Vw32_get_true_file_attributes = arg;
-}
-#endif
 
 static void
 directory_files_internal_unwind (void *d)
@@ -194,17 +131,7 @@ read_dirent (emacs_dir *dir, Lisp_Object dirname)
       if (dp || errno == 0)
 	return dp;
       if (! (errno == EAGAIN || errno == EINTR))
-	{
-#ifdef WINDOWSNT
-	  /* The MS-Windows implementation of 'opendir' doesn't
-	     actually open a directory until the first call to
-	     'readdir'.  If 'readdir' fails to open the directory, it
-	     sets errno to ENOENT or EACCES, see w32.c.  */
-	  if (errno == ENOENT || errno == EACCES)
-	    report_file_error ("Opening directory", dirname);
-#endif
 	  report_file_error ("Reading directory", dirname);
-	}
       maybe_quit ();
     }
 }
@@ -253,27 +180,6 @@ directory_files_internal (Lisp_Object directory, Lisp_Object full,
   specpdl_ref count = SPECPDL_INDEX ();
   record_unwind_protect_ptr (directory_files_internal_unwind, d);
 
-#ifdef WINDOWSNT
-  Lisp_Object w32_save = Qnil;
-  if (attrs)
-    {
-      /* Do this only once to avoid doing it (in w32.c:stat) for each
-	 file in the directory, when we call file_attributes below.  */
-      record_unwind_protect (directory_files_internal_w32_unwind,
-			     Vw32_get_true_file_attributes);
-      w32_save = Vw32_get_true_file_attributes;
-      if (EQ (Vw32_get_true_file_attributes, Qlocal))
-	{
-	  /* w32.c:stat will notice these bindings and avoid calling
-	     GetDriveType for each file.  */
-	  if (is_slow_fs (SSDATA (encoded_dirfilename)))
-	    Vw32_get_true_file_attributes = Qnil;
-	  else
-	    Vw32_get_true_file_attributes = Qt;
-	}
-    }
-#endif
-
   if (!NILP (full) && !STRING_MULTIBYTE (directory))
     { /* We will be concatenating 'directory' with local file name.
          We always decode local file names, so in order to safely concatenate
@@ -288,11 +194,7 @@ directory_files_internal (Lisp_Object directory, Lisp_Object full,
   bool needsep = (directory_nbytes == 0
 		  || !IS_ANY_SEP (SREF (directory, directory_nbytes - 1)));
 
-  /* Windows users want case-insensitive wildcards.  */
   Lisp_Object case_table = Qnil;
-#ifdef WINDOWSNT
-  case_table = BVAR (&buffer_defaults, case_canon_table);
-#endif
 
   /* Read directory entries and accumulate them into LIST.  */
   Lisp_Object list = Qnil;
@@ -356,10 +258,6 @@ directory_files_internal (Lisp_Object directory, Lisp_Object full,
     }
 
   emacs_closedir (d);
-#ifdef WINDOWSNT
-  if (attrs)
-    Vw32_get_true_file_attributes = w32_save;
-#endif
 
   /* Discard the unwind protect.  */
   specpdl_ptr = specpdl_ref_to_ptr (count);
@@ -923,31 +821,23 @@ file_name_completion_dirp (int fd, struct dirent *dp, ptrdiff_t len)
 static char *
 stat_uname (struct stat *st)
 {
-#ifdef WINDOWSNT
-  return st->st_uname;
-#else
   struct passwd *pw = getpwuid (st->st_uid);
 
   if (pw)
     return pw->pw_name;
   else
     return NULL;
-#endif
 }
 
 static char *
 stat_gname (struct stat *st)
 {
-#ifdef WINDOWSNT
-  return st->st_gname;
-#else
   struct group *gr = getgrgid (st->st_gid);
 
   if (gr)
     return gr->gr_name;
   else
     return NULL;
-#endif
 }
 
 DEFUN ("file-attributes", Ffile_attributes, Sfile_attributes, 1, 2, 0,
@@ -1039,8 +929,7 @@ file_attributes (int fd, char const *name,
 
   int err = EINVAL;
 
-#if defined O_PATH && !defined HAVE_CYGWIN_O_PATH_BUG	\
-  && !(defined HAVE_ANDROID && !defined ANDROID_STUBIFY)
+#if defined O_PATH
   int namefd = emacs_openat (fd, name, O_PATH | O_CLOEXEC | O_NOFOLLOW, 0);
   if (namefd < 0)
     err = errno;
@@ -1067,17 +956,7 @@ file_attributes (int fd, char const *name,
 
   if (err == EINVAL)
     {
-#ifdef WINDOWSNT
-      /* We usually don't request accurate owner and group info,
-	 because it can be expensive on Windows to get that, and most
-	 callers of 'lstat' don't need that.  But here we do want that
-	 information to be accurate.  */
-      w32_stat_get_owner_group = 1;
-#endif
       err = emacs_fstatat (fd, name, &s, AT_SYMLINK_NOFOLLOW) == 0 ? 0 : errno;
-#ifdef WINDOWSNT
-      w32_stat_get_owner_group = 0;
-#endif
     }
 
   if (err != 0)

@@ -44,18 +44,6 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 #include "lisp.h"
 #include "buffer.h"
 #include "coding.h"
-#ifdef WINDOWSNT
-#include <share.h>
-#include <sys/socket.h>	/* for fcntl */
-#include "w32common.h"
-#endif
-
-#ifndef MSDOS
-
-#ifdef HAVE_ANDROID
-#include "android.h" /* For `android_is_special_directory'.  */
-#endif /* HAVE_ANDROID */
-
 /* Normally use a symbolic link to represent a lock.
    The strategy: to lock a file FN, create a symlink .#FN in FN's
    directory, with link data USER@HOST.PID:BOOT.  This avoids a single
@@ -158,9 +146,6 @@ enum { LINKS_MIGHT_NOT_WORK = EPERM };
 static int
 rename_lock_file (char const *old, char const *new, bool force)
 {
-#ifdef WINDOWSNT
-  return sys_rename_replace (old, new, force);
-#else
   if (! force)
     {
       struct stat st;
@@ -191,7 +176,6 @@ rename_lock_file (char const *old, char const *new, bool force)
     }
 
   return emacs_rename (old, new);
-#endif
 }
 
 /* Create the lock file LFNAME with contents LOCK_INFO_STR.  Return 0 if
@@ -201,15 +185,7 @@ rename_lock_file (char const *old, char const *new, bool force)
 static int
 create_lock_file (char *lfname, char *lock_info_str, bool force)
 {
-#ifdef WINDOWSNT
-  /* Symlinks are supported only by later versions of Windows, and
-     creating them is a privileged operation that often triggers
-     User Account Control elevation prompts.  Avoid the problem by
-     pretending that 'symlink' does not work.  */
-  int err = ENOSYS;
-#else
   int err = emacs_symlink (lock_info_str, lfname) == 0 ? 0 : errno;
-#endif
 
   if (err == EEXIST && force)
     {
@@ -537,23 +513,8 @@ static Lisp_Object
 make_lock_file_name (Lisp_Object fn)
 {
   Lisp_Object lock_file_name;
-#if defined HAVE_ANDROID && !defined ANDROID_STUBIFY
-  char *name;
-#endif
 
   fn = Fexpand_file_name (fn, Qnil);
-
-#if defined HAVE_ANDROID && !defined ANDROID_STUBIFY
-  /* Files in /assets and /contents can't have lock files on Android
-     as these directories are fabrications of android.c, and backed by
-     read only data.  */
-
-  name = SSDATA (fn);
-
-  if (android_is_special_directory (name, "/assets")
-      || android_is_special_directory (name, "/content"))
-  return Qnil;
-#endif /* defined HAVE_ANDROID && !defined ANDROID_STUBIFY */
 
   lock_file_name = calln (Qmake_lock_file_name, fn);
 
@@ -657,8 +618,6 @@ unlock_file_handle_error (Lisp_Object err)
   return Qnil;
 }
 
-#endif	/* MSDOS */
-
 void
 unlock_all_files (void)
 {
@@ -682,7 +641,6 @@ outside of the current Emacs session, and if so, asks the user
 whether to modify FILE.  */)
   (Lisp_Object file)
 {
-#ifndef MSDOS
   CHECK_STRING (file);
 
   /* If the file name has special constructs in it,
@@ -693,7 +651,6 @@ whether to modify FILE.  */)
     return calln (handler, Qlock_file, file);
 
   lock_file (file);
-#endif	/* MSDOS */
   return Qnil;
 }
 
@@ -701,7 +658,6 @@ DEFUN ("unlock-file", Funlock_file, Sunlock_file, 1, 1, 0,
        doc: /* Unlock FILE.  */)
   (Lisp_Object file)
 {
-#ifndef MSDOS
   CHECK_STRING (file);
 
   /* If the file name has special constructs in it,
@@ -718,7 +674,6 @@ DEFUN ("unlock-file", Funlock_file, Sunlock_file, 1, 1, 0,
 			     file,
 			     list1 (Qfile_error),
 			     unlock_file_handle_error);
-#endif	/* MSDOS */
   return Qnil;
 }
 
@@ -773,9 +728,6 @@ The value is nil if the FILENAME is not locked,
 t if it is locked by you, else a string saying which user has locked it.  */)
   (Lisp_Object filename)
 {
-#ifdef MSDOS
-  return Qnil;
-#else
   Lisp_Object ret;
   int owner;
   lock_info_type locker;
@@ -805,7 +757,6 @@ t if it is locked by you, else a string saying which user has locked it.  */)
     }
 
   return ret;
-#endif
 }
 
 void

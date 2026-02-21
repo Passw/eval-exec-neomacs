@@ -5984,9 +5984,6 @@ coding_inherit_eol_type (Lisp_Object coding_system, Lisp_Object parent)
 	 This has an effect only for external encoding (i.e., for output to
 	 file and process), not for in-buffer or Lisp string encoding.  */
       Lisp_Object system_eol_type = Qunix;
-      #ifdef DOS_NT
-       system_eol_type = Qdos;
-      #endif
 
       Lisp_Object parent_eol_type = system_eol_type;
       if (! NILP (parent))
@@ -8526,69 +8523,6 @@ preferred_coding_system (void)
   return CODING_ID_NAME (id);
 }
 
-#if defined (WINDOWSNT) || defined (CYGWIN) || defined HAVE_ANDROID
-
-Lisp_Object
-from_unicode (Lisp_Object str)
-{
-  CHECK_STRING (str);
-  if (!STRING_MULTIBYTE (str) &&
-      SBYTES (str) & 1)
-    {
-      str = Fsubstring (str, make_fixnum (0), make_fixnum (-1));
-    }
-
-  return code_convert_string_norecord (str, Qutf_16le, 0);
-}
-
-Lisp_Object
-from_unicode_buffer (const wchar_t *wstr)
-{
-#if defined WINDOWSNT || defined CYGWIN
-  /* We get one of the two final null bytes for free.  */
-  ptrdiff_t len = 1 + sizeof (wchar_t) * wcslen (wstr);
-  AUTO_STRING_WITH_LEN (str, (char *) wstr, len);
-  return from_unicode (str);
-#else
-  /* This code is used only on Android, where little endian UTF-16
-     strings are extended to 32-bit wchar_t.  */
-
-  uint16_t *words;
-  size_t length, i;
-
-  length = wcslen (wstr) + 1;
-
-  USE_SAFE_ALLOCA;
-  SAFE_NALLOCA (words, sizeof *words, length);
-
-  for (i = 0; i < length - 1; ++i)
-    words[i] = wstr[i];
-
-  words[i] = '\0';
-  AUTO_STRING_WITH_LEN (str, (char *) words,
-			(length - 1) * sizeof *words);
-  return unbind_to (sa_count, from_unicode (str));
-#endif
-}
-
-wchar_t *
-to_unicode (Lisp_Object str, Lisp_Object *buf)
-{
-  *buf = code_convert_string_norecord (str, Qutf_16le, 1);
-  /* We need to make another copy (in addition to the one made by
-     code_convert_string_norecord) to ensure that the final string is
-     _doubly_ zero terminated --- that is, that the string is
-     terminated by two zero bytes and one utf-16le null character.
-     Because strings are already terminated with a single zero byte,
-     we just add one additional zero. */
-  str = make_uninit_string (SBYTES (*buf) + 1);
-  memcpy (SDATA (str), SDATA (*buf), SBYTES (*buf));
-  SDATA (str) [SBYTES (*buf)] = '\0';
-  *buf = str;
-  return WCSDATA (*buf);
-}
-
-#endif /* WINDOWSNT || CYGWIN || HAVE_ANDROID */
 
 
 /*** 8. Emacs Lisp library functions ***/
@@ -10431,21 +10365,12 @@ convert_string_nocopy (Lisp_Object string, Lisp_Object coding_system,
 Lisp_Object
 decode_file_name (Lisp_Object fname)
 {
-#ifdef WINDOWSNT
-  /* The w32 build pretends to use UTF-8 for file-name encoding, and
-     converts the file names either to UTF-16LE or to the system ANSI
-     codepage internally, depending on the underlying OS; see w32.c.  */
-  if (! NILP (Fcoding_system_p (Qutf_8)))
-    return convert_string_nocopy (fname, Qutf_8, 0);
-  return fname;
-#else  /* !WINDOWSNT */
   if (! NILP (Vfile_name_coding_system))
     return convert_string_nocopy (fname, Vfile_name_coding_system, 0);
   else if (! NILP (Vdefault_file_name_coding_system))
     return convert_string_nocopy (fname, Vdefault_file_name_coding_system, 0);
   else
     return fname;
-#endif
 }
 
 static Lisp_Object
@@ -10457,21 +10382,12 @@ encode_file_name_1 (Lisp_Object fname)
      try to encode them.  */
   if (!STRING_MULTIBYTE (fname))
     return fname;
-#ifdef WINDOWSNT
-  /* The w32 build pretends to use UTF-8 for file-name encoding, and
-     converts the file names either to UTF-16LE or to the system ANSI
-     codepage internally, depending on the underlying OS; see w32.c.  */
-  if (! NILP (Fcoding_system_p (Qutf_8)))
-    return convert_string_nocopy (fname, Qutf_8, 1);
-  return fname;
-#else  /* !WINDOWSNT */
   if (! NILP (Vfile_name_coding_system))
     return convert_string_nocopy (fname, Vfile_name_coding_system, 1);
   else if (! NILP (Vdefault_file_name_coding_system))
     return convert_string_nocopy (fname, Vdefault_file_name_coding_system, 1);
   else
     return fname;
-#endif
 }
 
 Lisp_Object
@@ -11800,11 +11716,6 @@ syms_of_coding (void)
   DEFSYM (Qutf_8, "utf-8");
   DEFSYM (Qutf_8_unix, "utf-8-unix");
   DEFSYM (Qutf_8_emacs, "utf-8-emacs");
-
-#if defined (WINDOWSNT) || defined (CYGWIN) || defined HAVE_ANDROID
-  /* No, not utf-16-le: that one has a BOM.  */
-  DEFSYM (Qutf_16le, "utf-16le");
-#endif
 
   DEFSYM (Qutf_16, "utf-16");
   DEFSYM (Qbig, "big");

@@ -109,10 +109,6 @@ To add a new module function, proceed as follows:
 
 /* Feature tests.  */
 
-#ifdef WINDOWSNT
-#include <windows.h>
-#include "w32term.h"
-#endif
 
 /* Function prototype for the module init function.  */
 typedef int (*emacs_init_function) (struct emacs_runtime *);

@@ -43,9 +43,6 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 # include <ieee754.h>
 #endif
 
-#ifdef WINDOWSNT
-# include <sys/socket.h> /* for F_DUPFD_CLOEXEC */
-#endif
 
 #ifdef HAVE_TREE_SITTER
 #include "treesit.h"
@@ -261,12 +258,6 @@ printchar_to_stream (unsigned int ch, FILE *stream)
       if (ASCII_CHAR_P (ch))
 	{
 	  putc (ch, stream);
-#ifdef WINDOWSNT
-	  /* Send the output to a debugger (nothing happens if there
-	     isn't one).  */
-	  if (print_output_debug_flag && stream == stderr)
-	    OutputDebugString ((char []) {ch, '\0'});
-#endif
 	}
       else
 	{
@@ -279,10 +270,6 @@ printchar_to_stream (unsigned int ch, FILE *stream)
 	    encoded_ch = code_convert_string_norecord (encoded_ch,
 						       coding_system, true);
 	  fwrite (SSDATA (encoded_ch), 1, SBYTES (encoded_ch), stream);
-#ifdef WINDOWSNT
-	  if (print_output_debug_flag && stream == stderr)
-	    OutputDebugString (SSDATA (encoded_ch));
-#endif
 	}
 
       i++;
@@ -1842,15 +1829,9 @@ print_vectorlike_unreadable (Lisp_Object obj, Lisp_Object printcharfun,
 	  print_c_string ("#<killed xwidget>", printcharfun);
 	else
 	  {
-#ifdef USE_GTK
-	    int len = sprintf (buf, "#<xwidget %u %p>",
-			       XXWIDGET (obj)->xwidget_id,
-			       XXWIDGET (obj)->widget_osr);
-#else
 	    int len = sprintf (buf, "#<xwidget %u %p>",
 			       XXWIDGET (obj)->xwidget_id,
 			       XXWIDGET (obj)->xwWidget);
-#endif
 	    strout (buf, len, len, printcharfun);
 	  }
 	return;

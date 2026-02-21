@@ -47,19 +47,10 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 #include <c-ctype.h>
 #include <vla.h>
 
-#ifdef MSDOS
-#include "msdos.h"
-#endif
 
-#ifdef HAVE_NS
-#include "nsterm.h"
-#endif
 
 #include <unistd.h>
 #include <fcntl.h>
-
-#if !defined HAVE_ANDROID || defined ANDROID_STUBIFY	\
-  || (__ANDROID_API__ < 9)
 
 #define lread_fd	int
 #define lread_fd_cmp(n) (fd == (n))
@@ -82,79 +73,6 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 #else
 #define file_offset long
 #define file_tell ftell
-#endif
-
-#else
-
-#include "android.h"
-
-/* Use an Android file descriptor under Android instead, as this
-   allows loading directly from asset files without loading each asset
-   into memory and creating a separate file descriptor every time.
-
-   Note that `struct android_fd_or_asset' as used here is different
-   from that returned from `android_open_asset'; if fd.asset is NULL,
-   then fd.fd is either a valid file descriptor or -1, meaning that
-   the file descriptor is invalid.
-
-   However, lread requires the ability to seek inside asset files,
-   which is not provided under Android 2.2.  So when building for that
-   particular system, fall back to the usual file descriptor-based
-   code.  */
-
-#define lread_fd	struct android_fd_or_asset
-#define lread_fd_cmp(n)	(!fd.asset && fd.fd == (n))
-#define lread_fd_p	(fd.asset || fd.fd >= 0)
-#define lread_close	android_close_asset
-#define lread_fstat	android_asset_fstat
-#define lread_read_quit	android_asset_read_quit
-#define lread_lseek	android_asset_lseek
-
-/* The invalid file stream.  */
-
-static struct android_fd_or_asset invalid_file_stream =
-  {
-    -1,
-    NULL,
-  };
-
-#define file_stream		struct android_fd_or_asset
-#define file_offset		off_t
-#define file_tell(n)		android_asset_lseek (n, 0, SEEK_CUR)
-#define file_seek		android_asset_lseek
-#define file_stream_valid_p(p)	((p).asset || (p).fd >= 0)
-#define file_stream_close	android_close_asset
-#define file_stream_invalid	invalid_file_stream
-
-/* Return a single character from the file input stream STREAM.
-   Value and errors are the same as getc.  */
-
-static int
-file_get_char (file_stream stream)
-{
-  int c;
-  char byte;
-  ssize_t rc;
-
- retry:
-  rc = android_asset_read (stream, &byte, 1);
-
-  if (rc == 0)
-    c = EOF;
-  else if (rc == -1)
-    {
-      if (errno == EINTR)
-	goto retry;
-      else
-	c = EOF;
-    }
-  else
-    c = (unsigned char) byte;
-
-  return c;
-}
-
-#define USE_ANDROID_ASSETS
 #endif
 
 #if IEEE_FLOATING_POINT
@@ -1428,22 +1346,7 @@ Return t if the file exists and loads successfully.  */)
     }
   else if (!is_module && !is_native_elisp)
     {
-#ifdef WINDOWSNT
-      emacs_close (fd);
-      clear_unwind_protect (fd_index);
-      efound = ENCODE_FILE (found);
-      stream = emacs_fopen (SSDATA (efound), fmode);
-#else
-#if !defined USE_ANDROID_ASSETS
       stream = emacs_fdopen (fd, fmode);
-#else
-      /* Android systems use special file descriptors which can point
-	 into compressed data and double as file streams.  FMODE is
-	 unused.  */
-      ((void) fmode);
-      stream = fd;
-#endif
-#endif
     }
 
   /* Declare here rather than inside the else-part because the storage
@@ -1931,15 +1834,6 @@ openp (Lisp_Object path, Lisp_Object str, Lisp_Object suffixes,
 	      }
 	    else
 	      {
-                /*  In some systems (like Windows) finding out if a
-                    file exists is cheaper to do than actually opening
-                    it.  Only open the file when we are sure that it
-                    exists.  */
-#ifdef WINDOWSNT
-                if (sys_faccessat (AT_FDCWD, pfn, R_OK, AT_EACCESS))
-                  fd = -1;
-                else
-#endif
 		  {
 #if !defined USE_ANDROID_ASSETS
 		    fd = emacs_open (pfn, O_RDONLY, 0);
@@ -5636,15 +5530,11 @@ to the specified file name if a suffix is allowed or required.  */);
   DEFVAR_LISP ("dynamic-library-suffixes", Vdynamic_library_suffixes,
 	       doc: /* A list of suffixes for loadable dynamic libraries.  */);
 
-#ifndef MSDOS
   Vdynamic_library_suffixes
     = Fcons (build_string (DYNAMIC_LIB_SECONDARY_SUFFIX), Qnil);
   Vdynamic_library_suffixes
     = Fcons (build_string (DYNAMIC_LIB_SUFFIX),
 	     Vdynamic_library_suffixes);
-#else
-  Vdynamic_library_suffixes = Qnil;
-#endif
 
   DEFVAR_LISP ("load-file-rep-suffixes", Vload_file_rep_suffixes,
 	       doc: /* List of suffixes that indicate representations of \

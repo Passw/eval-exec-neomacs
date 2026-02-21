@@ -47,9 +47,6 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 #define NLOG_MODULE "buffer"
 #include "neomacs_log.h"
 
-#ifdef WINDOWSNT
-#include "w32heap.h"		/* for mmap_* */
-#endif
 
 #ifdef HAVE_TREE_SITTER
 #include "treesit.h"
@@ -4227,8 +4224,7 @@ call_overlay_mod_hooks (Lisp_Object list, Lisp_Object overlay, bool after,
 			 Allocation with mmap
  ***********************************************************************/
 
-/* Note: WINDOWSNT implements this stuff on w32heap.c.  */
-#if defined USE_MMAP_FOR_BUFFERS && !defined WINDOWSNT
+#if defined USE_MMAP_FOR_BUFFERS
 
 #include <sys/mman.h>
 

@@ -27,42 +27,6 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 #include "composite.h"
 #include "md5.h"
 
-#ifdef WINDOWSNT
-# include <windows.h>
-# include "w32common.h"
-# include "w32.h"
-
-DEF_DLL_FN (int, inflateInit2_,
-	    (z_streamp strm, int windowBits, const char *version,
-	     int stream_size));
-DEF_DLL_FN (int, inflate, (z_streamp strm, int flush));
-DEF_DLL_FN (int, inflateEnd, (z_streamp strm));
-
-static bool zlib_initialized;
-
-static bool
-init_zlib_functions (void)
-{
-  HMODULE library = w32_delayed_load (Qzlib);
-
-  if (!library)
-    return false;
-
-  LOAD_DLL_FN (library, inflateInit2_);
-  LOAD_DLL_FN (library, inflate);
-  LOAD_DLL_FN (library, inflateEnd);
-  return true;
-}
-
-# undef inflate
-# undef inflateEnd
-# undef inflateInit2_
-
-# define inflate fn_inflate
-# define inflateEnd fn_inflateEnd
-# define inflateInit2_ fn_inflateInit2_
-
-#endif	/* WINDOWSNT */
 
 
 #ifdef HAVE_NATIVE_COMP
@@ -105,15 +69,6 @@ md5_gz_stream (FILE *source, void *resblock)
   unsigned char in[MD5_BLOCKSIZE];
   unsigned char out[MD5_BLOCKSIZE];
 
-# ifdef WINDOWSNT
-  if (!zlib_initialized)
-    zlib_initialized = init_zlib_functions ();
-  if (!zlib_initialized)
-    {
-      message1 ("zlib library not found");
-      return -1;
-    }
-# endif
 
   eassert (!acc_size);
 
@@ -203,21 +158,7 @@ DEFUN ("zlib-available-p", Fzlib_available_p, Szlib_available_p, 0, 0, 0,
        doc: /* Return t if zlib decompression is available in this instance of Emacs.  */)
      (void)
 {
-#ifdef WINDOWSNT
-  Lisp_Object found = Fassq (Qzlib, Vlibrary_cache);
-  if (CONSP (found))
-    return XCDR (found);
-  else
-    {
-      Lisp_Object status;
-      zlib_initialized = init_zlib_functions ();
-      status = zlib_initialized ? Qt : Qnil;
-      Vlibrary_cache = Fcons (Fcons (Qzlib, status), Vlibrary_cache);
-      return status;
-    }
-#else
   return Qt;
-#endif
 }
 
 DEFUN ("zlib-decompress-region", Fzlib_decompress_region,
@@ -246,15 +187,6 @@ This function can be called only in unibyte buffers.  */)
   if (! NILP (BVAR (current_buffer, enable_multibyte_characters)))
     error ("This function can be called only in unibyte buffers");
 
-#ifdef WINDOWSNT
-  if (!zlib_initialized)
-    zlib_initialized = init_zlib_functions ();
-  if (!zlib_initialized)
-    {
-      message1 ("zlib library not found");
-      return Qnil;
-    }
-#endif
 
   /* This is a unibyte buffer, so character positions and bytes are
      the same.  */

@@ -560,29 +560,6 @@ esprintf (char *buf, char const *format, ...)
   return nbytes;
 }
 
-#if defined HAVE_X_WINDOWS && defined USE_X_TOOLKIT
-
-/* Format to buffer *BUF of positive size *BUFSIZE, reallocating *BUF
-   and updating *BUFSIZE if the buffer is too small, and otherwise
-   behaving line esprintf.  When reallocating, free *BUF unless it is
-   equal to NONHEAPBUF, and if BUFSIZE_MAX is nonnegative then signal
-   memory exhaustion instead of growing the buffer size past
-   BUFSIZE_MAX.  */
-ptrdiff_t
-exprintf (char **buf, ptrdiff_t *bufsize,
-	  char *nonheapbuf, ptrdiff_t bufsize_max,
-	  char const *format, ...)
-{
-  ptrdiff_t nbytes;
-  va_list ap;
-  va_start (ap, format);
-  nbytes = evxprintf (buf, bufsize, nonheapbuf, bufsize_max, format, ap);
-  va_end (ap);
-  return nbytes;
-}
-
-#endif
-
 /* Act like exprintf, except take a va_list.  */
 ptrdiff_t
 evxprintf (char **buf, ptrdiff_t *bufsize,

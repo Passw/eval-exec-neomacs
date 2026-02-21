@@ -40,9 +40,6 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 #include <stdio.h>
 #include <stdlib.h>
 
-#ifdef WINDOWSNT
-extern clock_t sys_clock (void);
-#endif
 
 #ifdef HAVE_TIMEZONE_T
 # include <sys/param.h>
@@ -201,16 +198,6 @@ static timezone_t const utc_tz = 0;
 static struct tm *
 emacs_localtime_rz (timezone_t tz, time_t const *t, struct tm *tm)
 {
-#ifdef WINDOWSNT
-  /* The Windows CRT functions are "optimized for speed", so they don't
-     check for timezone and DST changes if they were last called less
-     than 1 minute ago (see http://support.microsoft.com/kb/821231).
-     So all Emacs features that repeatedly call time functions (e.g.,
-     display-time) are in real danger of missing timezone and DST
-     changes.  Calling tzset before each localtime call fixes that.  */
-  tzset ();
-  w32_fix_tzset ();
-#endif
   tm = localtime_rz (tz, t, tm);
   if (!tm && errno == ENOMEM)
     memory_full (SIZE_MAX);
@@ -327,9 +314,6 @@ tzlookup (Lisp_Object zone, bool settz)
       block_input ();
       emacs_setenv_TZ (zone_string);
       tzset ();
-#ifdef WINDOWSNT
-      w32_fix_tzset ();
-#endif
       timezone_t old_tz = local_tz;
       local_tz = new_tz;
       tzfree (old_tz);
@@ -1983,24 +1967,16 @@ former.  */)
   return Qnil;
 }
 
-#ifndef MSDOS
-
 /* A buffer holding a string of the form "TZ=value", intended
    to be part of the environment.  If TZ is supposed to be unset,
    the buffer string is "tZ=".  */
  static char *tzvalbuf;
 
-#endif /* !MSDOS */
-
 /* Get the local time zone rule.  */
 char *
 emacs_getenv_TZ (void)
 {
-#ifndef MSDOS
   return tzvalbuf[0] == 'T' ? tzvalbuf + tzeqlen : 0;
-#else /* MSDOS */
-  return getenv ("TZ");
-#endif /* MSDOS */
 }
 
 /* Set the local time zone rule to TZSTRING, which can be null to
@@ -2014,7 +1990,6 @@ emacs_getenv_TZ (void)
 int
 emacs_setenv_TZ (const char *tzstring)
 {
-#ifndef MSDOS
   static ptrdiff_t tzvalbufsize;
   ptrdiff_t tzstringlen = tzstring ? strlen (tzstring) : 0;
   char *tzval = tzvalbuf;
@@ -2050,40 +2025,15 @@ emacs_setenv_TZ (const char *tzstring)
     }
 
 
-#ifndef WINDOWSNT
   /* Modifying *TZVAL merely requires calling tzset (which is the
      caller's responsibility).  However, modifying TZVAL requires
      calling putenv; although this is not thread-safe, in practice this
      runs only on startup when there is only one thread.  */
   bool need_putenv = new_tzvalbuf;
-#else
-  /* MS-Windows 'putenv' copies the argument string into a block it
-     allocates, so modifying *TZVAL will not change the environment.
-     However, the other threads run by Emacs on MS-Windows never call
-     'xputenv' or 'putenv' or 'unsetenv', so the original cause for the
-     dicey in-place modification technique doesn't exist there in the
-     first place.  */
-  bool need_putenv = true;
-#endif
   if (need_putenv)
     xputenv (tzval);
 
   return 0;
-#else /* MSDOS */
-  /* Happily, there are no threads on MS-DOS that might be contending
-     with Emacs for access to TZ.  Call putenv to modify TZ: the code
-     above is not only unnecessary but results in modifications being
-     omitted in consequence of an internal environment counter
-     remaining unchanged despite DJGPP being all too ready to reuse
-     preexisting environment storage.  */
-  USE_SAFE_ALLOCA;
-  char *buf = SAFE_ALLOCA (tzeqlen + strlen (tzstring) + 1);
-  strcpy (buf, "TZ=");
-  strcpy (buf + tzeqlen, tzstring);
-  xputenv (buf);
-  SAFE_FREE ();
-  return 0;
-#endif /* MSDOS */
 }
 
 #ifdef NEED_ZTRILLION_INIT

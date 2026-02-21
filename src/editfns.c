@@ -33,9 +33,6 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 #include <sys/utsname.h>
 #endif
 
-#ifdef HAVE_ANDROID
-#include "android.h"
-#endif
 
 #include "lisp.h"
 
@@ -56,9 +53,6 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 #include "blockinput.h"
 #include "coding.h"
 
-#ifdef WINDOWSNT
-# include "w32common.h"
-#endif
 
 #ifdef HAVE_TREE_SITTER
 #include "treesit.h"
@@ -90,24 +84,13 @@ init_editfns (void)
   init_and_cache_system_name ();
 
   pw = getpwuid (getuid ());
-#ifdef MSDOS
-  /* We let the real user name default to "root" because that's quite
-     accurate on MS-DOS and because it lets Emacs find the init file.
-     (The DVX libraries override the Djgpp libraries here.)  */
-  Vuser_real_login_name = build_string (pw ? pw->pw_name : "root");
-#else
   Vuser_real_login_name = build_string (pw ? pw->pw_name : "unknown");
-#endif
 
   /* Get the effective user name, by consulting environment variables,
      or the effective uid if those are unset.  */
   user_name = getenv ("LOGNAME");
   if (!user_name)
-#ifdef WINDOWSNT
-    user_name = getenv ("USERNAME");	/* it's USERNAME on NT */
-#else  /* WINDOWSNT */
     user_name = getenv ("USER");
-#endif /* WINDOWSNT */
   if (!user_name)
     {
       pw = getpwuid (geteuid ());

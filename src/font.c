@@ -181,10 +181,6 @@ font_make_entity (void)
 			      FONT_ENTITY_MAX, FONT_ENTITY_MAX, PVEC_FONT));
   XSETFONT (font_entity, entity);
 
-#if defined HAVE_ANDROID && !defined ANDROID_STUBIFY
-  entity->is_android = false;
-#endif
-
   return font_entity;
 }
 
@@ -5962,13 +5958,7 @@ this variable non-nil.
 Disabling compaction of font caches might enlarge the Emacs memory
 footprint in sessions that use lots of different fonts.  */);
 
-#ifdef WINDOWSNT
-  /* Compacting font caches causes slow redisplay on Windows with many
-     large fonts, so we disable it by default.  */
-  inhibit_compacting_font_caches = 1;
-#else
   inhibit_compacting_font_caches = 0;
-#endif
 
   DEFVAR_BOOL ("xft-ignore-color-fonts",
 	       xft_ignore_color_fonts,
@@ -5987,25 +5977,10 @@ match.  */);
 #ifdef HAVE_WINDOW_SYSTEM
 #ifdef HAVE_FREETYPE
   syms_of_ftfont ();
-#ifdef HAVE_X_WINDOWS
-  syms_of_xfont ();
-#ifdef USE_CAIRO
-  syms_of_ftcrfont ();
-#else
-#ifdef HAVE_XFT
-  syms_of_xftfont ();
-#endif  /* HAVE_XFT */
-#endif  /* not USE_CAIRO */
-#else	/* not HAVE_X_WINDOWS */
 #ifdef USE_CAIRO
   syms_of_ftcrfont ();
 #endif
-#endif	/* not HAVE_X_WINDOWS */
-#else	/* not HAVE_FREETYPE */
-#ifdef HAVE_X_WINDOWS
-  syms_of_xfont ();
-#endif	/* HAVE_X_WINDOWS */
-#endif	/* not HAVE_FREETYPE */
+#endif	/* HAVE_FREETYPE */
 #ifdef HAVE_BDFFONT
   syms_of_bdffont ();
 #endif	/* HAVE_BDFFONT */

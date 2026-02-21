@@ -44,11 +44,8 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 static bool
 have_boxes (void)
 {
-#if defined (USE_X_TOOLKIT) || defined (USE_GTK) || defined (HAVE_NTGUI) || defined (HAVE_NS) \
-  || defined (HAVE_HAIKU) || defined (HAVE_ANDROID)
   if (FRAME_WINDOW_P (XFRAME (Vmenu_updating_frame)))
     return 1;
-#endif
   return 0;
 }
 
@@ -164,7 +161,7 @@ ensure_menu_items (int items)
     }
 }
 
-#if defined HAVE_EXT_MENU_BAR || defined HAVE_ANDROID
+#ifdef HAVE_EXT_MENU_BAR
 
 /* Begin a submenu.  */
 
@@ -188,7 +185,7 @@ push_submenu_end (void)
   menu_items_submenu_depth--;
 }
 
-#endif /* HAVE_EXT_MENU_BAR || HAVE_ANDROID */
+#endif /* HAVE_EXT_MENU_BAR */
 
 /* Indicate boundary between left and right.  */
 
@@ -417,18 +414,6 @@ single_menu_item (Lisp_Object key, Lisp_Object item, Lisp_Object dummy, void *sk
 		  AREF (item_properties, ITEM_PROPERTY_SELECTED),
 		  AREF (item_properties, ITEM_PROPERTY_HELP));
 
-#if defined (USE_X_TOOLKIT) || defined (USE_GTK) || defined (HAVE_NS)	\
-  || defined (HAVE_NTGUI) || defined (HAVE_HAIKU) || defined (HAVE_PGTK) \
-  || defined (HAVE_ANDROID)
-  /* Display a submenu using the toolkit.  */
-  if (FRAME_WINDOW_P (XFRAME (Vmenu_updating_frame))
-      && ! (NILP (map) || NILP (enabled)))
-    {
-      push_submenu_start ();
-      single_keymap_panes (map, Qnil, key, skp->maxdepth - 1);
-      push_submenu_end ();
-    }
-#endif
 }
 
 /* Look through KEYMAPS, a vector of keymaps that is NMAPS long,
@@ -561,341 +546,6 @@ parse_single_submenu (Lisp_Object item_key, Lisp_Object item_name,
 }
 
 
-#if defined (USE_X_TOOLKIT) || defined (USE_GTK) || defined (HAVE_NS) || defined (HAVE_NTGUI)
-
-/* Allocate and basically initialize widget_value, blocking input.  */
-
-widget_value *
-make_widget_value (const char *name, char *value,
-		   bool enabled, Lisp_Object help)
-{
-  widget_value *wv;
-
-  block_input ();
-  wv = xzalloc (sizeof (widget_value));
-  unblock_input ();
-
-  wv->name = (char *) name;
-  wv->value = value;
-  wv->enabled = enabled;
-  wv->help = help;
-  return wv;
-}
-
-/* This recursively calls xfree on the tree of widgets.
-   It must free all data that was malloc'ed for these widget_values.
-   In Emacs, many slots are pointers into the data of Lisp_Strings, and
-   must be left alone.  */
-
-void
-free_menubar_widget_value_tree (widget_value *wv)
-{
-  if (! wv) return;
-
-  wv->name = wv->value = wv->key = (char *) 0xDEADBEEF;
-
-  if (wv->contents && (wv->contents != (widget_value *) 1))
-    {
-      free_menubar_widget_value_tree (wv->contents);
-      wv->contents = (widget_value *) 0xDEADBEEF;
-    }
-  if (wv->next)
-    {
-      free_menubar_widget_value_tree (wv->next);
-      wv->next = (widget_value *) 0xDEADBEEF;
-    }
-  block_input ();
-  xfree (wv);
-  unblock_input ();
-}
-
-/* Create a tree of widget_value objects
-   representing the panes and items
-   in menu_items starting at index START, up to index END.  */
-
-widget_value *
-digest_single_submenu (int start, int end, bool top_level_items)
-{
-  widget_value *wv, *prev_wv, *save_wv, *first_wv;
-  int i;
-  int submenu_depth = 0;
-  widget_value **submenu_stack;
-  bool panes_seen = 0;
-  struct frame *f = XFRAME (Vmenu_updating_frame);
-  USE_SAFE_ALLOCA;
-
-  SAFE_NALLOCA (submenu_stack, 1, menu_items_used);
-  wv = make_widget_value ("menu", NULL, true, Qnil);
-  wv->button_type = BUTTON_TYPE_NONE;
-  first_wv = wv;
-  save_wv = 0;
-  prev_wv = 0;
-
-  /* Loop over all panes and items made by the preceding call
-     to parse_single_submenu and construct a tree of widget_value objects.
-     Ignore the panes and items used by previous calls to
-     digest_single_submenu, even though those are also in menu_items.  */
-  i = start;
-  while (i < end)
-    {
-      if (NILP (AREF (menu_items, i)))
-	{
-	  submenu_stack[submenu_depth++] = save_wv;
-	  save_wv = prev_wv;
-	  prev_wv = 0;
-	  i++;
-	}
-      else if (EQ (AREF (menu_items, i), Qlambda))
-	{
-	  prev_wv = save_wv;
-	  save_wv = submenu_stack[--submenu_depth];
-	  i++;
-	}
-      else if (EQ (AREF (menu_items, i), Qt)
-	       && submenu_depth != 0)
-	i += MENU_ITEMS_PANE_LENGTH;
-      /* Ignore a nil in the item list.
-	 It's meaningful only for dialog boxes.  */
-      else if (EQ (AREF (menu_items, i), Qquote))
-	i += 1;
-      else if (EQ (AREF (menu_items, i), Qt))
-	{
-	  /* Create a new pane.  */
-	  Lisp_Object pane_name;
-	  const char *pane_string;
-
-	  panes_seen = 1;
-
-	  pane_name = AREF (menu_items, i + MENU_ITEMS_PANE_NAME);
-
-	  /* TTY menus display menu items via tty_write_glyphs, which
-	     will encode the strings as appropriate.  */
-	  if (!FRAME_TERMCAP_P (f))
-	    {
-	    }
-
-	  pane_string = (NILP (pane_name)
-			 ? "" : SSDATA (pane_name));
-	  /* If there is just one top-level pane, put all its items directly
-	     under the top-level menu.  */
-	  if (menu_items_n_panes == 1)
-	    pane_string = "";
-
-	  /* If the pane has a meaningful name,
-	     make the pane a top-level menu item
-	     with its items as a submenu beneath it.  */
-	  if (strcmp (pane_string, ""))
-	    {
-	      /* Set value to 1 so update_submenu_strings can handle '@'.  */
-	      wv = make_widget_value (NULL, (char *) 1, true, Qnil);
-	      if (save_wv)
-		save_wv->next = wv;
-	      else
-		first_wv->contents = wv;
-	      wv->lname = pane_name;
-	      wv->button_type = BUTTON_TYPE_NONE;
-	      save_wv = wv;
-	    }
-	  else
-	    save_wv = first_wv;
-
-	  prev_wv = 0;
-	  i += MENU_ITEMS_PANE_LENGTH;
-	}
-      else
-	{
-	  /* Create a new item within current pane.  */
-	  Lisp_Object item_name, enable, descrip, def, type, selected;
-	  Lisp_Object help;
-
-	  /* All items should be contained in panes.  */
-	  if (! panes_seen)
-	    emacs_abort ();
-
-	  item_name = AREF (menu_items, i + MENU_ITEMS_ITEM_NAME);
-	  enable = AREF (menu_items, i + MENU_ITEMS_ITEM_ENABLE);
-	  descrip = AREF (menu_items, i + MENU_ITEMS_ITEM_EQUIV_KEY);
-	  def = AREF (menu_items, i + MENU_ITEMS_ITEM_DEFINITION);
-	  type = AREF (menu_items, i + MENU_ITEMS_ITEM_TYPE);
-	  selected = AREF (menu_items, i + MENU_ITEMS_ITEM_SELECTED);
-	  help = AREF (menu_items, i + MENU_ITEMS_ITEM_HELP);
-
-	  /* TTY menu items and their descriptions will be encoded by
-	     tty_write_glyphs.  */
-	  if (!FRAME_TERMCAP_P (f))
-	    {
-	    }
-
-	  wv = make_widget_value (NULL, NULL, !NILP (enable),
-				  STRINGP (help) ? help : Qnil);
-	  if (prev_wv)
-	    prev_wv->next = wv;
-	  else
-	    save_wv->contents = wv;
-
-	  wv->lname = item_name;
-	  if (!NILP (descrip))
-	    wv->lkey = descrip;
-	  /* The intptr_t cast avoids a warning.  There's no problem
-	     as long as pointers have enough bits to hold small integers.  */
-	  wv->call_data = (!NILP (def) ? (void *) (intptr_t) i : 0);
-
-	  if (NILP (type))
-	    wv->button_type = BUTTON_TYPE_NONE;
-	  else if (EQ (type, QCradio))
-	    wv->button_type = BUTTON_TYPE_RADIO;
-	  else if (EQ (type, QCtoggle))
-	    wv->button_type = BUTTON_TYPE_TOGGLE;
-	  else
-	    emacs_abort ();
-
-	  wv->selected = !NILP (selected);
-
-	  prev_wv = wv;
-
-	  i += MENU_ITEMS_ITEM_LENGTH;
-	}
-    }
-
-  /* If we have just one "menu item"
-     that was originally a button, return it by itself.  */
-  if (top_level_items && first_wv->contents && first_wv->contents->next == 0)
-    {
-      wv = first_wv;
-      first_wv = first_wv->contents;
-      xfree (wv);
-    }
-
-  SAFE_FREE ();
-  return first_wv;
-}
-
-/* Walk through the widget_value tree starting at FIRST_WV and update
-   the char * pointers from the corresponding lisp values.
-   We do this after building the whole tree, since GC may happen while the
-   tree is constructed, and small strings are relocated.  So we must wait
-   until no GC can happen before storing pointers into lisp values.  */
-void
-update_submenu_strings (widget_value *first_wv)
-{
-  widget_value *wv;
-
-  for (wv = first_wv; wv; wv = wv->next)
-    {
-      if (STRINGP (wv->lname))
-        {
-          wv->name = SSDATA (wv->lname);
-
-          /* Ignore the @ that means "separate pane".
-             This is a kludge, but this isn't worth more time.  */
-          if (wv->value == (char *)1)
-            {
-              if (wv->name[0] == '@')
-		wv->name++;
-              wv->value = 0;
-            }
-        }
-
-      if (STRINGP (wv->lkey))
-        wv->key = SSDATA (wv->lkey);
-
-      if (wv->contents)
-        update_submenu_strings (wv->contents);
-    }
-}
-
-#endif /* USE_X_TOOLKIT || USE_GTK || HAVE_NS || HAVE_NTGUI */
-#if defined (USE_X_TOOLKIT) || defined (USE_GTK) || defined (HAVE_NS) \
-  || defined (HAVE_NTGUI) || defined (HAVE_HAIKU)
-
-/* Find the menu selection and store it in the keyboard buffer.
-   F is the frame the menu is on.
-   MENU_BAR_ITEMS_USED is the length of VECTOR.
-   VECTOR is an array of menu events for the whole menu.  */
-
-void
-find_and_call_menu_selection (struct frame *f, int menu_bar_items_used,
-			      Lisp_Object vector, void *client_data)
-{
-  Lisp_Object prefix, entry;
-  Lisp_Object *subprefix_stack;
-  int submenu_depth = 0;
-  int i;
-  USE_SAFE_ALLOCA;
-
-  entry = Qnil;
-  SAFE_NALLOCA (subprefix_stack, 1, menu_bar_items_used);
-  prefix = Qnil;
-  i = 0;
-
-  while (i < menu_bar_items_used)
-    {
-      if (NILP (AREF (vector, i)))
-	{
-	  subprefix_stack[submenu_depth++] = prefix;
-	  prefix = entry;
-	  i++;
-	}
-      else if (EQ (AREF (vector, i), Qlambda))
-	{
-	  prefix = subprefix_stack[--submenu_depth];
-	  i++;
-	}
-      else if (EQ (AREF (vector, i), Qt))
-	{
-	  prefix = AREF (vector, i + MENU_ITEMS_PANE_PREFIX);
-	  i += MENU_ITEMS_PANE_LENGTH;
-	}
-      else
-	{
-	  entry = AREF (vector, i + MENU_ITEMS_ITEM_VALUE);
-	  /* Treat the pointer as an integer.  There's no problem
-	     as long as pointers have enough bits to hold small integers.  */
-	  if ((intptr_t) client_data == i)
-	    {
-	      int j;
-	      struct input_event buf;
-	      Lisp_Object frame;
-	      EVENT_INIT (buf);
-
-	      XSETFRAME (frame, f);
-	      buf.kind = MENU_BAR_EVENT;
-	      buf.frame_or_window = frame;
-	      buf.arg = frame;
-	      kbd_buffer_store_event (&buf);
-
-	      for (j = 0; j < submenu_depth; j++)
-		if (!NILP (subprefix_stack[j]))
-		  {
-		    buf.kind = MENU_BAR_EVENT;
-		    buf.frame_or_window = frame;
-		    buf.arg = subprefix_stack[j];
-		    kbd_buffer_store_event (&buf);
-		  }
-
-	      if (!NILP (prefix))
-		{
-		  buf.kind = MENU_BAR_EVENT;
-		  buf.frame_or_window = frame;
-		  buf.arg = prefix;
-		  kbd_buffer_store_event (&buf);
-		}
-
-	      buf.kind = MENU_BAR_EVENT;
-	      buf.frame_or_window = frame;
-	      buf.arg = entry;
-	      kbd_buffer_store_event (&buf);
-
-	      break;
-	    }
-	  i += MENU_ITEMS_ITEM_LENGTH;
-	}
-    }
-
-  SAFE_FREE ();
-}
-
-#endif /* USE_X_TOOLKIT || USE_GTK || HAVE_NS || HAVE_NTGUI || HAVE_HAIKU */
 
 
 ptrdiff_t
@@ -1153,13 +803,6 @@ x_popup_menu_1 (Lisp_Object position, Lisp_Object menu)
 	 That string is the title of the menu.  */
       prompt = Fkeymap_prompt (keymap);
 
-#if defined (USE_GTK) || defined (HAVE_NS)
-      if (STRINGP (prompt)
-	  && SCHARS (prompt) > 0
-	  && !NILP (Fget_text_property (make_fixnum (0), Qhide, prompt)))
-	title = Qnil;
-      else
-#endif
       if (!NILP (prompt))
 	title = prompt;
 

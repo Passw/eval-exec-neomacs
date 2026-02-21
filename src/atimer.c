@@ -18,10 +18,6 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 
 #include <config.h>
 
-#ifdef WINDOWSNT
-#define raise(s) w32_raise(s)
-#endif
-
 #include "lisp.h"
 #include "keyboard.h"
 #include "syssignal.h"
@@ -32,14 +28,8 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 #ifdef HAVE_TIMERFD
 #include <errno.h>
 #include <sys/timerfd.h>
-# ifdef CYGWIN
-# include <sys/utsname.h>
-# endif
 #endif
 
-#ifdef MSDOS
-#include "msdos.h"
-#endif
 
 /* Free-list of atimer structures.  */
 
@@ -312,16 +302,6 @@ set_alarm (void)
 	      && timer_settime (alarm_timer, TIMER_ABSTIME, &ispec, 0) == 0)
 	    exit = true;
 
-	  /* Don't start both timerfd and POSIX timers on Cygwin; this
-	     causes a slowdown (bug#51734).  Prefer POSIX timers
-	     because the timerfd notifications aren't delivered while
-	     Emacs is busy, which prevents things like the hourglass
-	     pointer from being displayed reliably (bug#19776). */
-# ifdef CYGWIN
-	  if (exit)
-	    return;
-# endif
-
 # ifdef HAVE_TIMERFD
 	  if (0 <= timerfd
 	      && timerfd_settime (timerfd, TFD_TIMER_ABSTIME, &ispec, 0) == 0)
@@ -583,12 +563,7 @@ Return t if all self-tests are passed, nil otherwise.  */)
 static bool
 have_buggy_timerfd (void)
 {
-# ifdef CYGWIN
-  struct utsname name;
-  return uname (&name) < 0 || strverscmp (name.release, "3.0.2") < 0;
-# else
   return false;
-# endif
 }
 #endif
 

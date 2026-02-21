@@ -221,9 +221,6 @@ union buffered_input_event
 {
   ENUM_BF (event_kind) kind : EVENT_KIND_WIDTH;
   struct input_event ie;
-#if defined HAVE_X11 || defined HAVE_PGTK
-  struct selection_input_event sie;
-#endif
 };
 
 /* Temporarily used before a frame has been opened. */

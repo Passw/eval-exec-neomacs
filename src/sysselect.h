@@ -19,16 +19,10 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 #ifndef SYSSELECT_H
 #define SYSSELECT_H 1
 
-#ifndef DOS_NT
 #include <sys/select.h>
-#endif
 
 #include "lisp.h"
 
-/* The w32 build defines select stuff in w32.h, which is included
-   where w32 needs it, but not where sysselect.h is included.  The w32
-   definitions in w32.h are incompatible with the below.  */
-#ifndef WINDOWSNT
 #ifdef FD_SET
 #ifndef FD_SETSIZE
 #define FD_SETSIZE 64
@@ -43,22 +37,11 @@ typedef int fd_set;
 #define FD_ISSET(n, p) (*(p) & (1 << (n)))
 #define FD_ZERO(p) (*(p) = 0)
 #endif /* no FD_SET */
-#endif /* not WINDOWSNT */
 
 #if !defined (HAVE_SELECT)
 #define select sys_select
 #endif
 
-#ifdef MSDOS
-/* The above #define for 'select' gets in the way because sysselect.h
-   is included in thread.h, which is included everywhere, and 'select'
-   declared in DJGPP system headers has a signature incompatible with
-   'pselect', which we emulate in msdos.c.  */
-#undef select
-#define pselect sys_select
-#endif
-
-#ifndef WINDOWSNT
 INLINE_HEADER_BEGIN
 
 /* Check for out-of-range errors if ENABLE_CHECKING is defined.  */
@@ -92,7 +75,5 @@ fd_SET (int fd, fd_set *set)
 #define FD_SET(fd, set) fd_SET (fd, set)
 
 INLINE_HEADER_END
-
-#endif	/* !WINDOWSNT */
 
 #endif

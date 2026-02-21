@@ -55,10 +55,6 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 #define NLOG_MODULE "alloc"
 #include "neomacs_log.h"
 
-#if defined HAVE_ANDROID && !defined ANDROID_STUBIFY
-#include "sfntfont.h"
-#endif
-
 #ifdef HAVE_TREE_SITTER
 #include "treesit.h"
 #endif
@@ -69,10 +65,6 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 
 #ifdef HAVE_LINUX_SYSINFO
 #include <sys/sysinfo.h>
-#endif
-
-#ifdef MSDOS
-#include "dosfns.h"		/* For dos_memory_info.  */
 #endif
 
 #if (defined ENABLE_CHECKING \
@@ -138,11 +130,6 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 
 #include <unistd.h>
 #include <fcntl.h>
-
-#ifdef WINDOWSNT
-#include "w32.h"
-#include "w32heap.h"	/* for sbrk */
-#endif
 
 /* A type with alignment at least as large as any object that Emacs
    allocates.  This is not max_align_t because some platforms (e.g.,
@@ -3112,14 +3099,6 @@ cleanup_vector (struct Lisp_Vector *vector)
 	      }
 	  }
 
-#if defined HAVE_ANDROID && !defined ANDROID_STUBIFY
-	/* The Android font driver needs the ability to associate extra
-	   information with font entities.  */
-	if (((vector->header.size & PSEUDOVECTOR_SIZE_MASK)
-	     == FONT_ENTITY_MAX)
-	    && PSEUDOVEC_STRUCT (vector, font_entity)->is_android)
-	  android_finalize_font_entity (PSEUDOVEC_STRUCT (vector, font_entity));
-#endif
       }
       break;
     case PVEC_THREAD:
@@ -5263,10 +5242,6 @@ flush_stack_call_func1 (void (*func) (void *arg), void *arg)
 static int
 valid_pointer_p (void *p)
 {
-#ifdef WINDOWSNT
-  return w32_valid_pointer_p (p, 16);
-#else
-
   if (ADDRESS_SANITIZER)
     return p ? -1 : 0;
 
@@ -5292,7 +5267,6 @@ valid_pointer_p (void *p)
     }
 
   return -1;
-#endif
 }
 
 /* Return 2 if OBJ is a killed or special buffer object, 1 if OBJ is a
@@ -5576,28 +5550,6 @@ compact_undo_list (Lisp_Object list)
   return list;
 }
 
-#if defined HAVE_ANDROID && !defined (__clang__)
-
-/* The Android gcc is broken and needs the following version of
-   make_lisp_symbol.  Otherwise a mysterious ICE pops up.  */
-
-#define make_lisp_symbol android_make_lisp_symbol
-
-static Lisp_Object
-android_make_lisp_symbol (struct Lisp_Symbol *sym)
-{
-  intptr_t symoffset;
-
-  symoffset = (intptr_t) sym;
-  ckd_sub (&symoffset, symoffset, (intptr_t) &lispsym);
-
-  {
-    Lisp_Object a = TAG_PTR_INITIALLY (Lisp_Symbol, symoffset);
-    return a;
-  }
-}
-
-#endif
 
 static void
 visit_vectorlike_root (struct gc_root_visitor visitor,
@@ -7121,30 +7073,10 @@ respective remote host.  */)
 		 (uintmax_t) si.freeram * units / 1024,
 		 (uintmax_t) si.totalswap * units / 1024,
 		 (uintmax_t) si.freeswap * units / 1024);
-#elif defined WINDOWSNT
-  unsigned long long totalram, freeram, totalswap, freeswap;
-
-  if (w32_memory_info (&totalram, &freeram, &totalswap, &freeswap) == 0)
-    return list4i ((uintmax_t) totalram / 1024,
-		   (uintmax_t) freeram / 1024,
-		   (uintmax_t) totalswap / 1024,
-		   (uintmax_t) freeswap / 1024);
-  else
-    return Qnil;
-#elif defined MSDOS
-  unsigned long totalram, freeram, totalswap, freeswap;
-
-  if (dos_memory_info (&totalram, &freeram, &totalswap, &freeswap) == 0)
-    return list4i ((uintmax_t) totalram / 1024,
-		   (uintmax_t) freeram / 1024,
-		   (uintmax_t) totalswap / 1024,
-		   (uintmax_t) freeswap / 1024);
-  else
-    return Qnil;
-#else /* not HAVE_LINUX_SYSINFO, not WINDOWSNT, not MSDOS */
+#else /* not HAVE_LINUX_SYSINFO */
   /* FIXME: add more systems.  */
   return Qnil;
-#endif /* HAVE_LINUX_SYSINFO, not WINDOWSNT, not MSDOS */
+#endif /* HAVE_LINUX_SYSINFO */
 }
 
 /* Debugging aids.  */
@@ -7539,11 +7471,7 @@ enum defined_HAVE_X_WINDOWS { defined_HAVE_X_WINDOWS = false };
 
 enum defined_HAVE_PGTK { defined_HAVE_PGTK = false };
 
-#ifdef WINDOWSNT
-enum defined_WINDOWSNT { defined_WINDOWSNT = true };
-#else
 enum defined_WINDOWSNT { defined_WINDOWSNT = false };
-#endif
 
 /* When compiled with GCC, GDB might say "No enum type named
    pvec_type" if we don't have at least one symbol with that type, and

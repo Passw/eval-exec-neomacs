@@ -42,9 +42,6 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 #ifdef HAVE_WINDOW_SYSTEM
 #include TERM_HEADER
 #endif /* HAVE_WINDOW_SYSTEM */
-#ifdef MSDOS
-#include "msdos.h"
-#endif
 #include "pdumper.h"
 
 #define NLOG_MODULE "window"
@@ -2788,18 +2785,7 @@ candidate_window_p (Lisp_Object window, Lisp_Object owindow,
     }
   else if (FIXNUMP (all_frames) && XFIXNUM (all_frames) == 0)
     {
-      candidate_p = (FRAME_VISIBLE_P (f) || FRAME_ICONIFIED_P (f)
-#ifdef HAVE_X_WINDOWS
-		     /* Yuck!!  If we've just created the frame and the
-			window-manager requested the user to place it
-			manually, the window may still not be considered
-			`visible'.  I'd argue it should be at least
-			something like `iconified', but don't know how to do
-			that yet.  --Stef  */
-		     || (FRAME_X_P (f) && f->output_data.x->asked_for_visible
-			 && !f->output_data.x->has_been_visible)
-#endif
-		     )
+      candidate_p = (FRAME_VISIBLE_P (f) || FRAME_ICONIFIED_P (f))
 	&& (FRAME_TERMINAL (XFRAME (w->frame))
 	    == FRAME_TERMINAL (XFRAME (selected_frame)));
     }

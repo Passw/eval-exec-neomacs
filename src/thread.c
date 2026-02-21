@@ -28,7 +28,7 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 #include "pdumper.h"
 #include "keyboard.h"
 
-#if defined HAVE_GLIB && ! defined (HAVE_NS)
+#ifdef HAVE_GLIB
 #include <xgselect.h>
 #else
 #define release_select_lock() do { } while (0)
@@ -102,12 +102,6 @@ post_acquire_global_lock (struct thread_state *self)
 {
   struct thread_state *prev_thread = current_thread;
 
-  /* Switch the JNI interface pointer to the environment assigned to the
-     current thread.  */
-#if defined HAVE_ANDROID && !defined ANDROID_STUBIFY
-  android_java_env = self->java_env;
-#endif /* defined HAVE_ANDROID && !defined ANDROID_STUBIFY */
-
   /* Do this early on, so that code below could signal errors (e.g.,
      unbind_for_thread_switch might) correctly, because we are already
      running in the context of the thread pointed by SELF.  */
@@ -127,12 +121,6 @@ post_acquire_global_lock (struct thread_state *self)
 	  because of thread-local bindings.  */
       set_buffer_internal_2 (current_buffer);
     }
-
-#if defined HAVE_ANDROID && !defined ANDROID_STUBIFY
-  /* This step is performed in android_select when built without
-     threads.  */
-  android_check_query ();
-#endif /* defined HAVE_ANDROID && !defined ANDROID_STUBIFY */
 
    /* We could have been signaled while waiting to grab the global lock
       for the first time since this thread was created, in which case
@@ -649,9 +637,6 @@ thread_select (select_func *func, int max_fds, fd_set *rfds,
   sa.efds = efds;
   sa.timeout = timeout;
   sa.sigmask = sigmask;
-#if defined HAVE_ANDROID && !defined ANDROID_STUBIFY
-  android_before_select ();
-#endif /* HAVE_ANDROID && !defined ANDROID_STUBIFY */
   flush_stack_call_func (really_call_select, &sa);
   return sa.result;
 }
@@ -1209,10 +1194,6 @@ init_threads (void)
   sys_mutex_init (&global_lock);
   sys_mutex_lock (&global_lock);
   current_thread = &main_thread.s;
-#if defined HAVE_ANDROID && !defined ANDROID_STUBIFY
-  current_thread->java_env = android_java_env;
-#endif /* defined HAVE_ANDROID && !defined ANDROID_STUBIFY */
-
   main_thread.s.thread_id = sys_thread_self ();
   main_thread.s.buffer_disposition = Qnil;
   init_bc_thread (&main_thread.s.bc);

@@ -897,11 +897,7 @@ default_pixels_per_inch_y (void)
 #define FRAME_TERMCAP_P(f) ((f)->output_method == output_termcap)
 #define FRAME_X_P(f) ((f)->output_method == output_x_window)
 #define FRAME_W32_P(f) false
-#ifndef MSDOS
 #define FRAME_MSDOS_P(f) false
-#else
-#define FRAME_MSDOS_P(f) ((f)->output_method == output_msdos_raw)
-#endif
 #define FRAME_NS_P(f) false
 #define FRAME_PGTK_P(f) false
 #define FRAME_HAIKU_P(f) false

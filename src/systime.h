@@ -24,14 +24,7 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 
 INLINE_HEADER_BEGIN
 
-#ifdef HAVE_X_WINDOWS
-# include <X11/X.h>
-#elif defined HAVE_HAIKU
-# include <support/SupportDefs.h>
-typedef int64 Time;
-#else
 typedef unsigned long Time;
-#endif
 
 /* On some configurations (hpux8.0, X11R4), sys/time.h and X11/Xos.h
    disagree about the name of the guard symbol.  */

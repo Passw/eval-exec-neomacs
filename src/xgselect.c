@@ -169,45 +169,10 @@ xg_select (int fds_lim, fd_set *rfds, fd_set *wfds, fd_set *efds,
 	tmop = &tmo;
     }
 
-#ifndef USE_GTK
   fds_lim = max_fds + 1;
   nfds = thread_select (pselect, fds_lim,
 			&all_rfds, have_wfds ? &all_wfds : NULL, efds,
 			tmop, sigmask);
-#else
-  /* On PGTK, when you type a key, the key press event are received,
-     and one more key press event seems to be received internally.
-
-     The same can happen with GTK native input, which makes input
-     slow.
-
-     The second event is not sent via the display connection, so the
-     following is the case:
-
-       - socket read buffer is empty
-       - a key press event is pending
-
-     In that case, we should not sleep in pselect, and dispatch the
-     event immediately.  (Bug#52761) */
-  if (!already_has_events)
-    {
-      fds_lim = max_fds + 1;
-      nfds = thread_select (pselect, fds_lim,
-			    &all_rfds, have_wfds ? &all_wfds : NULL, efds,
-			    tmop, sigmask);
-    }
-  else
-    {
-      /* Emulate return values */
-      nfds = 1;
-      FD_ZERO (&all_rfds);
-      if (have_wfds)
-	FD_ZERO (&all_wfds);
-      if (efds)
-	FD_ZERO (efds);
-      our_fds++;
-    }
-#endif
 
   if (nfds < 0)
     retval = nfds;

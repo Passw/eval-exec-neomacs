@@ -6250,7 +6250,7 @@ gui_default_parameter (struct frame *f, Lisp_Object alist, Lisp_Object prop,
 }
 
 
-#if !defined (HAVE_X_WINDOWS) && defined (NoValue)
+#ifdef NoValue
 
 /*
  *    XParseGeometry parses strings of the form
@@ -6338,7 +6338,7 @@ XParseGeometry (char *string,
   return mask;
 }
 
-#endif /* !defined (HAVE_X_WINDOWS) && defined (NoValue) */
+#endif /* NoValue */
 
 
 /* NS used to define x-parse-geometry in ns-win.el, but that confused
@@ -7546,9 +7546,9 @@ The default is \\+`inhibit' in NS builds and nil everywhere else.  */);
      causes menu-bar.el to provide `tool-bar-position' as a user
      option.  */
 
-#if !defined HAVE_EXT_TOOL_BAR || defined USE_GTK
+#ifndef HAVE_EXT_TOOL_BAR
   Fprovide (Qmove_toolbar, Qnil);
-#endif /* !HAVE_EXT_TOOL_BAR || USE_GTK */
+#endif /* !HAVE_EXT_TOOL_BAR */
 #endif /* HAVE_WINDOW_SYSTEM */
 
   DEFVAR_LISP ("toolkit-theme", Vtoolkit_theme,

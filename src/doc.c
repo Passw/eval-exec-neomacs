@@ -39,34 +39,11 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 
 
 
-#if !defined HAVE_ANDROID || defined ANDROID_STUBIFY	\
-  || (__ANDROID_API__ < 9)
 #define doc_fd		int
 #define doc_fd_p(fd)	((fd) >= 0)
 #define doc_open	emacs_open
 #define doc_read_quit	emacs_read_quit
 #define doc_lseek	lseek
-#else /* HAVE_ANDROID && !defined ANDROID_STUBIFY
-	 && __ANDROID_API__ >= 9 */
-
-#include "android.h"
-
-/* Use an Android file descriptor under Android instead, as this
-   allows loading directly from asset files without loading each asset
-   into memory and creating a separate file descriptor every time.
-
-   However, lread requires the ability to seek inside asset files,
-   which is not provided under Android 2.2.  So when building for that
-   particular system, fall back to the usual file descriptor-based
-   code.  */
-
-#define doc_fd		struct android_fd_or_asset
-#define doc_fd_p(fd)	((fd).asset != (void *) -1)
-#define doc_open	android_open_asset
-#define doc_read_quit	android_asset_read_quit
-#define doc_lseek	android_asset_lseek
-#define USE_ANDROID_ASSETS
-#endif /* !HAVE_ANDROID || ANDROID_STUBIFY || __ANDROID_API__ < 9 */
 
 
 

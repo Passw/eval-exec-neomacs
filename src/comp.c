@@ -45,425 +45,11 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 /* Dynamic loading of libgccjit */
 /********************************/
 
-#ifdef WINDOWSNT
-# include "w32common.h"
-
-#undef gcc_jit_block_add_assignment
-#undef gcc_jit_block_add_comment
-#undef gcc_jit_block_add_eval
-#undef gcc_jit_block_end_with_conditional
-#undef gcc_jit_block_end_with_jump
-#undef gcc_jit_block_end_with_return
-#undef gcc_jit_block_end_with_void_return
-#undef gcc_jit_context_acquire
-#undef gcc_jit_context_add_command_line_option
-#undef gcc_jit_context_add_driver_option
-#undef gcc_jit_context_compile_to_file
-#undef gcc_jit_context_dump_reproducer_to_file
-#undef gcc_jit_context_dump_to_file
-#undef gcc_jit_context_get_builtin_function
-#undef gcc_jit_context_get_first_error
-#undef gcc_jit_context_get_int_type
-#undef gcc_jit_context_get_type
-#undef gcc_jit_context_new_array_access
-#undef gcc_jit_context_new_array_type
-#undef gcc_jit_context_new_bitcast
-#undef gcc_jit_context_new_binary_op
-#undef gcc_jit_context_new_call
-#undef gcc_jit_context_new_call_through_ptr
-#undef gcc_jit_context_new_cast
-#undef gcc_jit_context_new_comparison
-#undef gcc_jit_context_new_field
-#undef gcc_jit_context_new_function
-#undef gcc_jit_context_new_function_ptr_type
-#undef gcc_jit_context_new_global
-#undef gcc_jit_context_new_opaque_struct
-#undef gcc_jit_context_new_param
-#undef gcc_jit_context_new_rvalue_from_int
-#undef gcc_jit_context_new_rvalue_from_long
-#undef gcc_jit_context_new_rvalue_from_ptr
-#undef gcc_jit_context_new_string_literal
-#undef gcc_jit_context_new_struct_type
-#undef gcc_jit_context_new_unary_op
-#undef gcc_jit_context_new_union_type
-#undef gcc_jit_context_release
-#undef gcc_jit_context_set_bool_option
-#undef gcc_jit_context_set_int_option
-#undef gcc_jit_context_set_logfile
-#undef gcc_jit_context_set_str_option
-#undef gcc_jit_function_get_param
-#undef gcc_jit_function_new_block
-#undef gcc_jit_function_new_local
-#undef gcc_jit_global_set_initializer
-#undef gcc_jit_lvalue_access_field
-#undef gcc_jit_lvalue_as_rvalue
-#undef gcc_jit_lvalue_get_address
-#undef gcc_jit_param_as_lvalue
-#undef gcc_jit_param_as_rvalue
-#undef gcc_jit_rvalue_access_field
-#undef gcc_jit_rvalue_dereference
-#undef gcc_jit_rvalue_dereference_field
-#undef gcc_jit_rvalue_get_type
-#undef gcc_jit_struct_as_type
-#undef gcc_jit_struct_set_fields
-#undef gcc_jit_type_get_const
-#undef gcc_jit_type_get_pointer
-#undef gcc_jit_type_is_pointer
-#undef gcc_jit_version_major
-#undef gcc_jit_version_minor
-#undef gcc_jit_version_patchlevel
-
-/* In alphabetical order */
-DEF_DLL_FN (gcc_jit_rvalue *, gcc_jit_context_new_rvalue_from_int,
-            (gcc_jit_context *ctxt, gcc_jit_type *numeric_type, int value));
-DEF_DLL_FN (gcc_jit_rvalue *, gcc_jit_lvalue_as_rvalue,
-            (gcc_jit_lvalue *lvalue));
-DEF_DLL_FN (gcc_jit_rvalue *, gcc_jit_rvalue_access_field,
-            (gcc_jit_rvalue *struct_or_union, gcc_jit_location *loc,
-             gcc_jit_field *field));
-DEF_DLL_FN (void, gcc_jit_block_add_comment,
-            (gcc_jit_block *block, gcc_jit_location *loc, const char *text));
-DEF_DLL_FN (void, gcc_jit_context_release, (gcc_jit_context *ctxt));
-DEF_DLL_FN (const char *, gcc_jit_context_get_first_error,
-            (gcc_jit_context *ctxt));
-DEF_DLL_FN (gcc_jit_block *, gcc_jit_function_new_block,
-            (gcc_jit_function *func, const char *name));
-DEF_DLL_FN (gcc_jit_context *, gcc_jit_context_acquire, (void));
-DEF_DLL_FN (void, gcc_jit_context_add_command_line_option,
-            (gcc_jit_context *ctxt, const char *optname));
-DEF_DLL_FN (void, gcc_jit_context_add_driver_option,
-            (gcc_jit_context *ctxt, const char *optname));
-DEF_DLL_FN (gcc_jit_field *, gcc_jit_context_new_field,
-            (gcc_jit_context *ctxt, gcc_jit_location *loc, gcc_jit_type *type,
-             const char *name));
-DEF_DLL_FN (gcc_jit_function *, gcc_jit_context_get_builtin_function,
-            (gcc_jit_context *ctxt, const char *name));
-DEF_DLL_FN (gcc_jit_function *, gcc_jit_context_new_function,
-            (gcc_jit_context *ctxt, gcc_jit_location *loc,
-             enum gcc_jit_function_kind kind, gcc_jit_type *return_type,
-             const char *name, int num_params, gcc_jit_param **params,
-             int is_variadic));
-DEF_DLL_FN (gcc_jit_lvalue *, gcc_jit_context_new_array_access,
-            (gcc_jit_context *ctxt, gcc_jit_location *loc, gcc_jit_rvalue *ptr,
-             gcc_jit_rvalue *index));
-DEF_DLL_FN (gcc_jit_lvalue *, gcc_jit_context_new_global,
-            (gcc_jit_context *ctxt, gcc_jit_location *loc,
-             enum gcc_jit_global_kind kind, gcc_jit_type *type,
-             const char *name));
-DEF_DLL_FN (gcc_jit_lvalue *, gcc_jit_function_new_local,
-            (gcc_jit_function *func, gcc_jit_location *loc, gcc_jit_type *type,
-             const char *name));
-#if defined (LIBGCCJIT_HAVE_gcc_jit_global_set_initializer)
-DEF_DLL_FN (gcc_jit_lvalue *, gcc_jit_global_set_initializer,
-	    (gcc_jit_lvalue *global, const void *blob, size_t num_bytes));
-#endif
-DEF_DLL_FN (gcc_jit_lvalue *, gcc_jit_lvalue_access_field,
-            (gcc_jit_lvalue *struct_or_union, gcc_jit_location *loc,
-             gcc_jit_field *field));
-DEF_DLL_FN (gcc_jit_lvalue *, gcc_jit_param_as_lvalue, (gcc_jit_param *param));
-DEF_DLL_FN (gcc_jit_lvalue *, gcc_jit_rvalue_dereference,
-            (gcc_jit_rvalue *rvalue, gcc_jit_location *loc));
-DEF_DLL_FN (gcc_jit_lvalue *, gcc_jit_rvalue_dereference_field,
-            (gcc_jit_rvalue *ptr, gcc_jit_location *loc, gcc_jit_field *field));
-DEF_DLL_FN (gcc_jit_param *, gcc_jit_context_new_param,
-            (gcc_jit_context *ctxt, gcc_jit_location *loc, gcc_jit_type *type,
-             const char *name));
-DEF_DLL_FN (gcc_jit_param *, gcc_jit_function_get_param,
-            (gcc_jit_function *func, int index));
-DEF_DLL_FN (gcc_jit_rvalue *, gcc_jit_context_new_binary_op,
-            (gcc_jit_context *ctxt, gcc_jit_location *loc,
-             enum gcc_jit_binary_op op, gcc_jit_type *result_type,
-             gcc_jit_rvalue *a, gcc_jit_rvalue *b));
-DEF_DLL_FN (gcc_jit_rvalue *, gcc_jit_context_new_call,
-            (gcc_jit_context *ctxt, gcc_jit_location *loc,
-             gcc_jit_function *func, int numargs , gcc_jit_rvalue **args));
-DEF_DLL_FN (gcc_jit_rvalue *, gcc_jit_context_new_call_through_ptr,
-            (gcc_jit_context *ctxt, gcc_jit_location *loc,
-             gcc_jit_rvalue *fn_ptr, int numargs, gcc_jit_rvalue **args));
-DEF_DLL_FN (gcc_jit_rvalue *, gcc_jit_context_new_cast,
-            (gcc_jit_context * ctxt, gcc_jit_location *loc,
-             gcc_jit_rvalue *rvalue, gcc_jit_type *type));
-#ifdef LIBGCCJIT_HAVE_gcc_jit_context_new_bitcast
-DEF_DLL_FN (gcc_jit_rvalue *, gcc_jit_context_new_bitcast,
-            (gcc_jit_context *ctxt, gcc_jit_location *loc,
-             gcc_jit_rvalue *rvalue, gcc_jit_type *type));
-#endif
-DEF_DLL_FN (gcc_jit_rvalue *, gcc_jit_context_new_comparison,
-            (gcc_jit_context *ctxt, gcc_jit_location *loc,
-             enum gcc_jit_comparison op, gcc_jit_rvalue *a, gcc_jit_rvalue *b));
-DEF_DLL_FN (gcc_jit_rvalue *, gcc_jit_context_new_rvalue_from_long,
-            (gcc_jit_context *ctxt, gcc_jit_type *numeric_type, long value));
-#if LISP_WORDS_ARE_POINTERS
-DEF_DLL_FN (gcc_jit_rvalue *, gcc_jit_context_new_rvalue_from_ptr,
-            (gcc_jit_context *ctxt, gcc_jit_type *pointer_type, void *value));
-#endif
-DEF_DLL_FN (gcc_jit_rvalue *, gcc_jit_context_new_string_literal,
-            (gcc_jit_context *ctxt, const char *value));
-DEF_DLL_FN (gcc_jit_rvalue *, gcc_jit_context_new_unary_op,
-            (gcc_jit_context *ctxt, gcc_jit_location *loc,
-             enum gcc_jit_unary_op op, gcc_jit_type *result_type,
-             gcc_jit_rvalue *rvalue));
-DEF_DLL_FN (gcc_jit_rvalue *, gcc_jit_lvalue_get_address,
-            (gcc_jit_lvalue *lvalue, gcc_jit_location *loc));
-DEF_DLL_FN (gcc_jit_rvalue *, gcc_jit_param_as_rvalue, (gcc_jit_param *param));
-DEF_DLL_FN (gcc_jit_struct *, gcc_jit_context_new_opaque_struct,
-            (gcc_jit_context *ctxt, gcc_jit_location *loc, const char *name));
-DEF_DLL_FN (gcc_jit_struct *, gcc_jit_context_new_struct_type,
-            (gcc_jit_context *ctxt, gcc_jit_location *loc, const char *name,
-             int num_fields, gcc_jit_field **fields));
-DEF_DLL_FN (gcc_jit_type *, gcc_jit_context_get_int_type,
-            (gcc_jit_context *ctxt, int num_bytes, int is_signed));
-DEF_DLL_FN (gcc_jit_type *, gcc_jit_context_get_type,
-            (gcc_jit_context *ctxt, enum gcc_jit_types type_));
-DEF_DLL_FN (gcc_jit_type *, gcc_jit_context_new_array_type,
-            (gcc_jit_context *ctxt, gcc_jit_location *loc,
-             gcc_jit_type *element_type, int num_elements));
-DEF_DLL_FN (gcc_jit_type *, gcc_jit_context_new_function_ptr_type,
-            (gcc_jit_context *ctxt, gcc_jit_location *loc,
-             gcc_jit_type *return_type, int num_params,
-             gcc_jit_type **param_types, int is_variadic));
-DEF_DLL_FN (gcc_jit_type *, gcc_jit_context_new_union_type,
-            (gcc_jit_context *ctxt, gcc_jit_location *loc, const char *name,
-             int num_fields, gcc_jit_field **fields));
-DEF_DLL_FN (gcc_jit_type *, gcc_jit_rvalue_get_type, (gcc_jit_rvalue *rvalue));
-DEF_DLL_FN (gcc_jit_type *, gcc_jit_struct_as_type,
-            (gcc_jit_struct *struct_type));
-DEF_DLL_FN (gcc_jit_type *, gcc_jit_type_get_const, (gcc_jit_type *type));
-DEF_DLL_FN (gcc_jit_type *, gcc_jit_type_get_pointer, (gcc_jit_type *type));
-#ifdef LIBGCCJIT_HAVE_REFLECTION
-DEF_DLL_FN (gcc_jit_type *, gcc_jit_type_is_pointer, (gcc_jit_type *type));
-#endif
-DEF_DLL_FN (void, gcc_jit_block_add_assignment,
-            (gcc_jit_block *block, gcc_jit_location *loc, gcc_jit_lvalue *lvalue,
-             gcc_jit_rvalue *rvalue));
-DEF_DLL_FN (void, gcc_jit_block_add_eval,
-            (gcc_jit_block *block, gcc_jit_location *loc,
-             gcc_jit_rvalue *rvalue));
-DEF_DLL_FN (void, gcc_jit_block_end_with_conditional,
-            (gcc_jit_block *block, gcc_jit_location *loc,
-             gcc_jit_rvalue *boolval, gcc_jit_block *on_true,
-             gcc_jit_block *on_false));
-DEF_DLL_FN (void, gcc_jit_block_end_with_jump,
-            (gcc_jit_block *block, gcc_jit_location *loc,
-             gcc_jit_block *target));
-DEF_DLL_FN (void, gcc_jit_block_end_with_return,
-            (gcc_jit_block *block, gcc_jit_location *loc,
-             gcc_jit_rvalue *rvalue));
-DEF_DLL_FN (void, gcc_jit_block_end_with_void_return,
-            (gcc_jit_block *block, gcc_jit_location *loc));
-DEF_DLL_FN (void, gcc_jit_context_compile_to_file,
-            (gcc_jit_context *ctxt, enum gcc_jit_output_kind output_kind,
-             const char *output_path));
-DEF_DLL_FN (void, gcc_jit_context_dump_reproducer_to_file,
-            (gcc_jit_context *ctxt, const char *path));
-DEF_DLL_FN (void, gcc_jit_context_dump_to_file,
-            (gcc_jit_context *ctxt, const char *path, int update_locations));
-DEF_DLL_FN (void, gcc_jit_context_set_bool_option,
-            (gcc_jit_context *ctxt, enum gcc_jit_bool_option opt, int value));
-DEF_DLL_FN (void, gcc_jit_context_set_int_option,
-            (gcc_jit_context *ctxt, enum gcc_jit_int_option opt, int value));
-DEF_DLL_FN (void, gcc_jit_context_set_logfile,
-            (gcc_jit_context *ctxt, FILE *logfile, int flags, int verbosity));
-DEF_DLL_FN (void, gcc_jit_context_set_str_option,
-	    (gcc_jit_context *ctxt, enum gcc_jit_str_option opt,
-	     const char *value));
-DEF_DLL_FN (void, gcc_jit_struct_set_fields,
-            (gcc_jit_struct *struct_type, gcc_jit_location *loc, int num_fields,
-             gcc_jit_field **fields));
-#if defined (LIBGCCJIT_HAVE_gcc_jit_version)
-DEF_DLL_FN (int, gcc_jit_version_major, (void));
-DEF_DLL_FN (int, gcc_jit_version_minor, (void));
-DEF_DLL_FN (int, gcc_jit_version_patchlevel, (void));
-#endif
-
-static bool
-init_gccjit_functions (void)
-{
-  HMODULE library = w32_delayed_load (Qgccjit);
-
-  if (!library)
-    return false;
-
-  /* In alphabetical order */
-  LOAD_DLL_FN (library, gcc_jit_block_add_assignment);
-  LOAD_DLL_FN (library, gcc_jit_block_add_comment);
-  LOAD_DLL_FN (library, gcc_jit_block_add_eval);
-  LOAD_DLL_FN (library, gcc_jit_block_end_with_conditional);
-  LOAD_DLL_FN (library, gcc_jit_block_end_with_jump);
-  LOAD_DLL_FN (library, gcc_jit_block_end_with_return);
-  LOAD_DLL_FN (library, gcc_jit_block_end_with_void_return);
-  LOAD_DLL_FN (library, gcc_jit_context_acquire);
-  LOAD_DLL_FN (library, gcc_jit_context_compile_to_file);
-  LOAD_DLL_FN (library, gcc_jit_context_dump_reproducer_to_file);
-  LOAD_DLL_FN (library, gcc_jit_context_dump_to_file);
-  LOAD_DLL_FN (library, gcc_jit_context_get_builtin_function);
-  LOAD_DLL_FN (library, gcc_jit_context_get_first_error);
-  LOAD_DLL_FN (library, gcc_jit_context_get_int_type);
-  LOAD_DLL_FN (library, gcc_jit_context_get_type);
-  LOAD_DLL_FN (library, gcc_jit_context_new_array_access);
-  LOAD_DLL_FN (library, gcc_jit_context_new_array_type);
-#ifdef LIBGCCJIT_HAVE_gcc_jit_context_new_bitcast
-  LOAD_DLL_FN (library, gcc_jit_context_new_bitcast);
-#endif
-  LOAD_DLL_FN (library, gcc_jit_context_new_binary_op);
-  LOAD_DLL_FN (library, gcc_jit_context_new_call);
-  LOAD_DLL_FN (library, gcc_jit_context_new_call_through_ptr);
-  LOAD_DLL_FN (library, gcc_jit_context_new_cast);
-  LOAD_DLL_FN (library, gcc_jit_context_new_comparison);
-  LOAD_DLL_FN (library, gcc_jit_context_new_field);
-  LOAD_DLL_FN (library, gcc_jit_context_new_function);
-  LOAD_DLL_FN (library, gcc_jit_context_new_function_ptr_type);
-  LOAD_DLL_FN (library, gcc_jit_context_new_global);
-  LOAD_DLL_FN (library, gcc_jit_context_new_opaque_struct);
-  LOAD_DLL_FN (library, gcc_jit_context_new_param);
-  LOAD_DLL_FN (library, gcc_jit_context_new_rvalue_from_int);
-  LOAD_DLL_FN (library, gcc_jit_context_new_rvalue_from_long);
-#if LISP_WORDS_ARE_POINTERS
-  LOAD_DLL_FN (library, gcc_jit_context_new_rvalue_from_ptr);
-#endif
-  LOAD_DLL_FN (library, gcc_jit_context_new_string_literal);
-  LOAD_DLL_FN (library, gcc_jit_context_new_struct_type);
-  LOAD_DLL_FN (library, gcc_jit_context_new_unary_op);
-  LOAD_DLL_FN (library, gcc_jit_context_new_union_type);
-  LOAD_DLL_FN (library, gcc_jit_context_release);
-  LOAD_DLL_FN (library, gcc_jit_context_set_bool_option);
-  LOAD_DLL_FN (library, gcc_jit_context_set_int_option);
-  LOAD_DLL_FN (library, gcc_jit_context_set_logfile);
-  LOAD_DLL_FN (library, gcc_jit_context_set_str_option);
-  LOAD_DLL_FN (library, gcc_jit_function_get_param);
-  LOAD_DLL_FN (library, gcc_jit_function_new_block);
-  LOAD_DLL_FN (library, gcc_jit_function_new_local);
-  LOAD_DLL_FN (library, gcc_jit_lvalue_access_field);
-  LOAD_DLL_FN (library, gcc_jit_lvalue_as_rvalue);
-  LOAD_DLL_FN (library, gcc_jit_lvalue_get_address);
-  LOAD_DLL_FN (library, gcc_jit_param_as_lvalue);
-  LOAD_DLL_FN (library, gcc_jit_param_as_rvalue);
-  LOAD_DLL_FN (library, gcc_jit_rvalue_access_field);
-  LOAD_DLL_FN (library, gcc_jit_rvalue_dereference);
-  LOAD_DLL_FN (library, gcc_jit_rvalue_dereference_field);
-  LOAD_DLL_FN (library, gcc_jit_rvalue_get_type);
-  LOAD_DLL_FN (library, gcc_jit_struct_as_type);
-  LOAD_DLL_FN (library, gcc_jit_struct_set_fields);
-  LOAD_DLL_FN (library, gcc_jit_type_get_const);
-  LOAD_DLL_FN (library, gcc_jit_type_get_pointer);
-#ifdef LIBGCCJIT_HAVE_REFLECTION
-  LOAD_DLL_FN (library, gcc_jit_type_is_pointer);
-#endif
-  LOAD_DLL_FN_OPT (library, gcc_jit_context_add_command_line_option);
-  LOAD_DLL_FN_OPT (library, gcc_jit_context_add_driver_option);
-#if defined (LIBGCCJIT_HAVE_gcc_jit_global_set_initializer)
-  LOAD_DLL_FN_OPT (library, gcc_jit_global_set_initializer);
-#endif
-#if defined (LIBGCCJIT_HAVE_gcc_jit_version)
-  LOAD_DLL_FN_OPT (library, gcc_jit_version_major);
-  LOAD_DLL_FN_OPT (library, gcc_jit_version_minor);
-  LOAD_DLL_FN_OPT (library, gcc_jit_version_patchlevel);
-#endif
-
-  return true;
-}
-
-/* In alphabetical order */
-#define gcc_jit_block_add_assignment fn_gcc_jit_block_add_assignment
-#define gcc_jit_block_add_comment fn_gcc_jit_block_add_comment
-#define gcc_jit_block_add_eval fn_gcc_jit_block_add_eval
-#define gcc_jit_block_end_with_conditional fn_gcc_jit_block_end_with_conditional
-#define gcc_jit_block_end_with_jump fn_gcc_jit_block_end_with_jump
-#define gcc_jit_block_end_with_return fn_gcc_jit_block_end_with_return
-#define gcc_jit_block_end_with_void_return fn_gcc_jit_block_end_with_void_return
-#define gcc_jit_context_acquire fn_gcc_jit_context_acquire
-#define gcc_jit_context_add_command_line_option fn_gcc_jit_context_add_command_line_option
-#define gcc_jit_context_add_driver_option fn_gcc_jit_context_add_driver_option
-#define gcc_jit_context_compile_to_file fn_gcc_jit_context_compile_to_file
-#define gcc_jit_context_dump_reproducer_to_file fn_gcc_jit_context_dump_reproducer_to_file
-#define gcc_jit_context_dump_to_file fn_gcc_jit_context_dump_to_file
-#define gcc_jit_context_get_builtin_function fn_gcc_jit_context_get_builtin_function
-#define gcc_jit_context_get_first_error fn_gcc_jit_context_get_first_error
-#define gcc_jit_context_get_int_type fn_gcc_jit_context_get_int_type
-#define gcc_jit_context_get_type fn_gcc_jit_context_get_type
-#define gcc_jit_context_new_array_access fn_gcc_jit_context_new_array_access
-#define gcc_jit_context_new_array_type fn_gcc_jit_context_new_array_type
-#ifdef LIBGCCJIT_HAVE_gcc_jit_context_new_bitcast
-# define gcc_jit_context_new_bitcast fn_gcc_jit_context_new_bitcast
-#endif
-#define gcc_jit_context_new_binary_op fn_gcc_jit_context_new_binary_op
-#define gcc_jit_context_new_call fn_gcc_jit_context_new_call
-#define gcc_jit_context_new_call_through_ptr fn_gcc_jit_context_new_call_through_ptr
-#define gcc_jit_context_new_cast fn_gcc_jit_context_new_cast
-#define gcc_jit_context_new_comparison fn_gcc_jit_context_new_comparison
-#define gcc_jit_context_new_field fn_gcc_jit_context_new_field
-#define gcc_jit_context_new_function fn_gcc_jit_context_new_function
-#define gcc_jit_context_new_function_ptr_type fn_gcc_jit_context_new_function_ptr_type
-#define gcc_jit_context_new_global fn_gcc_jit_context_new_global
-#define gcc_jit_context_new_opaque_struct fn_gcc_jit_context_new_opaque_struct
-#define gcc_jit_context_new_param fn_gcc_jit_context_new_param
-#define gcc_jit_context_new_rvalue_from_int fn_gcc_jit_context_new_rvalue_from_int
-#define gcc_jit_context_new_rvalue_from_long fn_gcc_jit_context_new_rvalue_from_long
-#if LISP_WORDS_ARE_POINTERS
-# define gcc_jit_context_new_rvalue_from_ptr fn_gcc_jit_context_new_rvalue_from_ptr
-#endif
-#define gcc_jit_context_new_string_literal fn_gcc_jit_context_new_string_literal
-#define gcc_jit_context_new_struct_type fn_gcc_jit_context_new_struct_type
-#define gcc_jit_context_new_unary_op fn_gcc_jit_context_new_unary_op
-#define gcc_jit_context_new_union_type fn_gcc_jit_context_new_union_type
-#define gcc_jit_context_release fn_gcc_jit_context_release
-#define gcc_jit_context_set_bool_option fn_gcc_jit_context_set_bool_option
-#define gcc_jit_context_set_int_option fn_gcc_jit_context_set_int_option
-#define gcc_jit_context_set_logfile fn_gcc_jit_context_set_logfile
-#define gcc_jit_context_set_str_option fn_gcc_jit_context_set_str_option
-#define gcc_jit_function_get_param fn_gcc_jit_function_get_param
-#define gcc_jit_function_new_block fn_gcc_jit_function_new_block
-#define gcc_jit_function_new_local fn_gcc_jit_function_new_local
-#if defined (LIBGCCJIT_HAVE_gcc_jit_global_set_initializer)
- #define gcc_jit_global_set_initializer fn_gcc_jit_global_set_initializer
-#endif
-#define gcc_jit_lvalue_access_field fn_gcc_jit_lvalue_access_field
-#define gcc_jit_lvalue_as_rvalue fn_gcc_jit_lvalue_as_rvalue
-#define gcc_jit_lvalue_get_address fn_gcc_jit_lvalue_get_address
-#define gcc_jit_param_as_lvalue fn_gcc_jit_param_as_lvalue
-#define gcc_jit_param_as_rvalue fn_gcc_jit_param_as_rvalue
-#define gcc_jit_rvalue_access_field fn_gcc_jit_rvalue_access_field
-#define gcc_jit_rvalue_dereference fn_gcc_jit_rvalue_dereference
-#define gcc_jit_rvalue_dereference_field fn_gcc_jit_rvalue_dereference_field
-#define gcc_jit_rvalue_get_type fn_gcc_jit_rvalue_get_type
-#define gcc_jit_struct_as_type fn_gcc_jit_struct_as_type
-#define gcc_jit_struct_set_fields fn_gcc_jit_struct_set_fields
-#ifdef LIBGCCJIT_HAVE_REFLECTION
-# define gcc_jit_type_is_pointer fn_gcc_jit_type_is_pointer
-#endif
-#define gcc_jit_type_get_const fn_gcc_jit_type_get_const
-#define gcc_jit_type_get_pointer fn_gcc_jit_type_get_pointer
-#if defined (LIBGCCJIT_HAVE_gcc_jit_version)
- #define gcc_jit_version_major fn_gcc_jit_version_major
- #define gcc_jit_version_minor fn_gcc_jit_version_minor
- #define gcc_jit_version_patchlevel fn_gcc_jit_version_patchlevel
-#endif
-
-#endif
 
 static bool
 load_gccjit_if_necessary (bool mandatory)
 {
-#ifdef WINDOWSNT
-  static bool tried_to_initialize_once;
-  static bool gccjit_initialized;
-
-  if (!tried_to_initialize_once)
-    {
-      tried_to_initialize_once = true;
-      Lisp_Object status;
-      gccjit_initialized = init_gccjit_functions ();
-      status = gccjit_initialized ? Qt : Qnil;
-      Vlibrary_cache = Fcons (Fcons (Qgccjit, status), Vlibrary_cache);
-    }
-
-  if (mandatory && !gccjit_initialized)
-    xsignal1 (Qnative_compiler_error, build_string ("libgccjit not found"));
-
-  return gccjit_initialized;
-#else
   return true;
-#endif
 }
 
 
@@ -506,16 +92,11 @@ load_gccjit_if_necessary (bool mandatory)
   gcc_jit_block *(name) =				\
     gcc_jit_function_new_block (func, STR (name))
 
-#ifndef WINDOWSNT
 # ifdef HAVE__SETJMP
 #  define SETJMP _setjmp
 # else
 #  define SETJMP setjmp
 # endif
-#else
-/* snippet from MINGW-64 setjmp.h */
-# define SETJMP _setjmp
-#endif
 #define SETJMP_NAME SETJMP
 
 /* Max number function importable by native-compiled code.  */
@@ -2143,7 +1724,6 @@ emit_limple_call_ref (Lisp_Object insn, bool direct)
 static gcc_jit_rvalue *
 emit_setjmp (gcc_jit_rvalue *buf)
 {
-#ifndef WINDOWSNT
   gcc_jit_rvalue *args[] = {buf};
   gcc_jit_param *params[] =
   {
@@ -2158,35 +1738,6 @@ emit_setjmp (gcc_jit_rvalue *buf)
 				  false);
 
   return gcc_jit_context_new_call (comp.ctxt, NULL, f, 1, args);
-#else
-  /* _setjmp (buf, __builtin_frame_address (0)) */
-  gcc_jit_param *params[] =
-  {
-    gcc_jit_context_new_param (comp.ctxt, NULL, comp.void_ptr_type, "buf"),
-    gcc_jit_context_new_param (comp.ctxt, NULL, comp.void_ptr_type, "frame"),
-  };
-  gcc_jit_rvalue *args[2];
-
-  args[0] =
-    gcc_jit_context_new_rvalue_from_int (comp.ctxt, comp.unsigned_type, 0);
-
-  args[1] =
-    gcc_jit_context_new_call (
-      comp.ctxt,
-      NULL,
-      gcc_jit_context_get_builtin_function (comp.ctxt,
-					    "__builtin_frame_address"),
-      1, args);
-  args[0] = buf;
-  gcc_jit_function *f =
-    gcc_jit_context_new_function (comp.ctxt, NULL,
-				  GCC_JIT_FUNCTION_IMPORTED,
-				  comp.int_type, STR (SETJMP_NAME),
-				  ARRAYELTS (params), params,
-				  false);
-
-  return gcc_jit_context_new_call (comp.ctxt, NULL, f, 2, args);
-#endif
 }
 
 /* Register an handler for a non local exit.  */
@@ -4316,10 +3867,6 @@ one for the file name and another for its contents, followed by .eln.  */)
   if (NILP (Ffile_exists_p (filename)))
     xsignal1 (Qfile_missing, filename);
 
-#ifdef WINDOWSNT
-  filename = Fw32_long_file_name (filename);
-#endif
-
   Lisp_Object content_hash = comp_hash_source_file (filename);
 
   if (suffix_p (filename, ".gz"))
@@ -4353,9 +3900,6 @@ one for the file name and another for its contents, followed by .eln.  */)
 		 Fregexp_quote (build_string ("/" PATH_REL_LOADSEARCH "/")));
       Lisp_Object dump_load_search =
 	Fexpand_file_name (build_string (PATH_DUMPLOADSEARCH "/"), Qnil);
-#ifdef WINDOWSNT
-      dump_load_search = Fw32_long_file_name (dump_load_search);
-#endif
       loadsearch_re_list = list2 (sys_re, Fregexp_quote (dump_load_search));
     }
 
@@ -4775,32 +4319,6 @@ DEFUN ("comp--compile-ctxt-to-file0", Fcomp__compile_ctxt_to_file0,
 
   comp.func_relocs_local = NULL;
 
-#ifdef WINDOWSNT
-  ebase_name = ansi_encode_filename (ebase_name);
-  /* Tell libgccjit the actual file name of the loaded DLL, otherwise
-     it will use 'libgccjit.so', which is not useful.  */
-  Lisp_Object libgccjit_loaded_from = Fget (Qgccjit, QCloaded_from);
-  Lisp_Object libgccjit_fname;
-
-  if (CONSP (libgccjit_loaded_from))
-    {
-      /* Use the absolute file name if available, otherwise the name
-	 we looked for in w32_delayed_load.  */
-      libgccjit_fname = XCDR (libgccjit_loaded_from);
-      if (NILP (libgccjit_fname))
-	libgccjit_fname = XCAR (libgccjit_loaded_from);
-      /* Must encode to ANSI, as libgccjit will not be able to handle
-	 UTF-8 encoded file names.  */
-      libgccjit_fname = ENCODE_FILE (libgccjit_fname);
-      libgccjit_fname = ansi_encode_filename (libgccjit_fname);
-      gcc_jit_context_set_str_option (comp.ctxt, GCC_JIT_STR_OPTION_PROGNAME,
-				      SSDATA (libgccjit_fname));
-    }
-  else	/* this should never happen */
-    gcc_jit_context_set_str_option (comp.ctxt, GCC_JIT_STR_OPTION_PROGNAME,
-				    "libgccjit-0.dll");
-#endif
-
   comp.speed = XFIXNUM (CALLNI (comp-ctxt-speed, Vcomp_ctxt));
   eassert (comp.speed < INT_MAX);
   comp.debug = XFIXNUM (CALLNI (comp-ctxt-debug, Vcomp_ctxt));
@@ -4893,9 +4411,6 @@ DEFUN ("comp--compile-ctxt-to-file0", Fcomp__compile_ctxt_to_file0,
     CALLNI (make-temp-file, base_name, Qnil, build_string (".eln.tmp"), Qnil);
 
   Lisp_Object encoded_tmp_file = ENCODE_FILE (tmp_file);
-#ifdef WINDOWSNT
-  encoded_tmp_file = ansi_encode_filename (encoded_tmp_file);
-#endif
   gcc_jit_context_compile_to_file (comp.ctxt,
 				   GCC_JIT_OUTPUT_KIND_DYNAMIC_LIBRARY,
 				   SSDATA (encoded_tmp_file));
@@ -4997,46 +4512,9 @@ helper_sanitizer_assert (Lisp_Object val, Lisp_Object type)
 }
 
 
-/* `native-comp-eln-load-path' clean-up support code.  */
-
-#ifdef WINDOWSNT
-static Lisp_Object
-return_nil (Lisp_Object arg)
-{
-  return Qnil;
-}
-
-static Lisp_Object
-directory_files_matching (Lisp_Object name, Lisp_Object match)
-{
-  return Fdirectory_files (name, Qt, match, Qnil, Qnil);
-}
-#endif
-
-/* Windows does not let us delete a .eln file that is currently loaded
-   by a process.  The strategy is to rename .eln files into .old.eln
-   instead of removing them when this is not possible and clean-up
-   `native-comp-eln-load-path' when exiting.
-
-   Any error is ignored because it may be due to the file being loaded
-   in another Emacs instance.  */
 void
 eln_load_path_final_clean_up (void)
 {
-#ifdef WINDOWSNT
-  Lisp_Object dir_tail = Vnative_comp_eln_load_path;
-  FOR_EACH_TAIL (dir_tail)
-    {
-      Lisp_Object files_in_dir =
-	internal_condition_case_2 (directory_files_matching,
-				   Fexpand_file_name (Vcomp_native_version_dir,
-						      XCAR (dir_tail)),
-				   build_string ("\\.eln\\.old\\'"),
-				   Qt, return_nil);
-      FOR_EACH_TAIL (files_in_dir)
-	internal_delete_file (XCAR (files_in_dir));
-    }
-#endif
 }
 
 /* This function puts the compilation unit in the
