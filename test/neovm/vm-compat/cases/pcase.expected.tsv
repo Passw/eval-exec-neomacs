@@ -8,3 +8,9 @@
 8	(condition-case err (pcase-let (([a b] [1 2])) (list a b)) (error err))	OK (error "Unknown pattern ‘[a b]’")
 9	(condition-case err (pcase-let* (([a b] [1 2])) (list a b)) (error err))	OK (error "Unknown pattern ‘[a b]’")
 10	(condition-case err (pcase [1 2 3] (`[,a ,b ,c] (+ a b c))) (error err))	OK 6
+11	(condition-case err (pcase 1 ((quote) 'x) (_ 'y)) (error err))	OK y
+12	(condition-case err (pcase 1 ((quote 1 2 3) 'x) (_ 'y)) (error err))	OK x
+13	(condition-case err (pcase 1 ((pred) 'x) (_ 'y)) (error err))	OK (void-function nil)
+14	(condition-case err (pcase 1 ((pred integerp 2) 'x) (_ 'y)) (error err))	OK x
+15	(condition-case err (pcase 1 ((guard) 'x) (_ 'y)) (error err))	OK y
+16	(condition-case err (pcase 1 ((guard t 2) 'x) (_ 'y)) (error err))	OK x

@@ -114,35 +114,26 @@ fn compile_list_pattern(items: &[Expr]) -> Result<Pattern, Flow> {
     match head {
         // (quote LITERAL) or 'LITERAL
         Expr::Symbol(s) if s == "quote" => {
-            if items.len() != 2 {
-                return Err(signal(
-                    "error",
-                    vec![Value::string("quote pattern requires exactly one argument")],
-                ));
-            }
-            Ok(Pattern::Literal(quote_to_value(&items[1])))
+            let literal = items.get(1).map(quote_to_value).unwrap_or(Value::Nil);
+            Ok(Pattern::Literal(literal))
         }
 
         // (pred FUNC)
         Expr::Symbol(s) if s == "pred" => {
-            if items.len() != 2 {
-                return Err(signal(
-                    "error",
-                    vec![Value::string("pred pattern requires exactly one argument")],
-                ));
-            }
-            Ok(Pattern::Pred(items[1].clone()))
+            let predicate = items
+                .get(1)
+                .cloned()
+                .unwrap_or_else(|| Expr::Symbol("nil".to_string()));
+            Ok(Pattern::Pred(predicate))
         }
 
         // (guard EXPR)
         Expr::Symbol(s) if s == "guard" => {
-            if items.len() != 2 {
-                return Err(signal(
-                    "error",
-                    vec![Value::string("guard pattern requires exactly one argument")],
-                ));
-            }
-            Ok(Pattern::Guard(items[1].clone()))
+            let guard_expr = items
+                .get(1)
+                .cloned()
+                .unwrap_or_else(|| Expr::Symbol("nil".to_string()));
+            Ok(Pattern::Guard(guard_expr))
         }
 
         // (let PATTERN EXPR)
@@ -1098,6 +1089,22 @@ mod tests {
         );
     }
 
+    #[test]
+    fn pcase_quote_pattern_missing_arg_defaults_to_nil() {
+        assert_eq!(
+            eval_last("(pcase 1 ((quote) 'x) (_ 'y))"),
+            "OK y"
+        );
+    }
+
+    #[test]
+    fn pcase_quote_pattern_ignores_extra_args() {
+        assert_eq!(
+            eval_last("(pcase 1 ((quote 1 2 3) 'x) (_ 'y))"),
+            "OK x"
+        );
+    }
+
     // =======================================================================
     // 4. Integer literal pattern
     // =======================================================================
@@ -1192,6 +1199,22 @@ mod tests {
         );
     }
 
+    #[test]
+    fn pcase_pred_pattern_missing_arg_uses_nil_callable() {
+        assert_eq!(
+            eval_last("(condition-case err (pcase 1 ((pred) 'x) (_ 'y)) (error err))"),
+            "OK (void-function nil)"
+        );
+    }
+
+    #[test]
+    fn pcase_pred_pattern_ignores_extra_args() {
+        assert_eq!(
+            eval_last("(pcase 1 ((pred integerp 2) 'x) (_ 'y))"),
+            "OK x"
+        );
+    }
+
     // =======================================================================
     // 9. guard pattern
     // =======================================================================
@@ -1209,6 +1232,22 @@ mod tests {
         assert_eq!(
             eval_last("(pcase 42 ((guard (< 10 5)) 'yes) (_ 'no))"),
             "OK no"
+        );
+    }
+
+    #[test]
+    fn pcase_guard_pattern_missing_arg_defaults_to_nil() {
+        assert_eq!(
+            eval_last("(pcase 1 ((guard) 'x) (_ 'y))"),
+            "OK y"
+        );
+    }
+
+    #[test]
+    fn pcase_guard_pattern_ignores_extra_args() {
+        assert_eq!(
+            eval_last("(pcase 1 ((guard t 2) 'x) (_ 'y))"),
+            "OK x"
         );
     }
 
