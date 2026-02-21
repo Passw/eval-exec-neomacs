@@ -4534,12 +4534,24 @@ fn macroexpand_environment_callable(
     Ok(binding.clone())
 }
 
-fn parse_simple_backquote_list_unquotes(pattern: &Value) -> Option<Vec<Value>> {
+enum SimpleBackquoteListPattern {
+    Proper(Vec<Value>),
+    Dotted { heads: Vec<Value>, tail: Value },
+}
+
+fn parse_simple_backquote_list_unquotes(pattern: &Value) -> Option<SimpleBackquoteListPattern> {
     fn is_backquote_symbol(value: &Value) -> bool {
         matches!(value.as_symbol_name(), Some("`" | "\\`"))
     }
-    fn is_unquote_symbol(value: &Value) -> bool {
-        matches!(value.as_symbol_name(), Some("," | "\\,"))
+    fn parse_unquoted_symbol(item: &Value) -> Option<Value> {
+        let unquote = list_to_vec(item)?;
+        if unquote.len() != 2 || !matches!(unquote[0].as_symbol_name(), Some("," | "\\,")) {
+            return None;
+        }
+        if unquote[1].as_symbol_name().is_none() {
+            return None;
+        }
+        Some(unquote[1].clone())
     }
 
     let outer = list_to_vec(pattern)?;
@@ -4550,57 +4562,86 @@ fn parse_simple_backquote_list_unquotes(pattern: &Value) -> Option<Vec<Value>> {
     if items.is_empty() {
         return None;
     }
-    let mut vars = Vec::with_capacity(items.len());
-    for item in items {
-        let unquote = list_to_vec(&item)?;
-        if unquote.len() != 2 || !is_unquote_symbol(&unquote[0]) {
+
+    if let Some(dot_idx) = items
+        .iter()
+        .position(|item| {
+            item.as_symbol_name()
+                .is_some_and(|name| name == "," || name == "\\,")
+        })
+    {
+        if dot_idx == 0 || dot_idx + 2 != items.len() {
             return None;
         }
-        if unquote[1].as_symbol_name().is_none() {
+        let mut heads = Vec::with_capacity(dot_idx);
+        for item in &items[..dot_idx] {
+            heads.push(parse_unquoted_symbol(item)?);
+        }
+        if heads.is_empty() {
             return None;
         }
-        vars.push(unquote[1].clone());
+        let tail = items[dot_idx + 1].clone();
+        if tail.as_symbol_name().is_none() {
+            return None;
+        }
+        return Some(SimpleBackquoteListPattern::Dotted { heads, tail });
     }
-    Some(vars)
+
+    let mut vars = Vec::with_capacity(items.len());
+    for item in &items {
+        vars.push(parse_unquoted_symbol(item)?);
+    }
+    Some(SimpleBackquoteListPattern::Proper(vars))
 }
 
 fn expand_simple_backquote_list_pcase_let_star(
     eval: &mut super::eval::Evaluator,
     value_expr: &Value,
-    vars: &[Value],
+    pattern: &SimpleBackquoteListPattern,
     body_forms: &[Value],
 ) -> Option<Value> {
-    if vars.is_empty() {
+    let (head_vars, tail_var) = match pattern {
+        SimpleBackquoteListPattern::Proper(vars) => (vars.as_slice(), None),
+        SimpleBackquoteListPattern::Dotted { heads, tail } => (heads.as_slice(), Some(tail)),
+    };
+    if head_vars.is_empty() {
         return None;
     }
 
-    let mut steps = Vec::with_capacity(vars.len());
+    let mut steps = Vec::with_capacity(head_vars.len());
     let mut source = value_expr.clone();
-    for _ in vars {
+    for _ in head_vars {
         let head = eval.next_pcase_macroexpand_temp_symbol();
         let tail = eval.next_pcase_macroexpand_temp_symbol();
         steps.push((source.clone(), head, tail.clone()));
         source = tail;
     }
 
-    let mut var_bindings = Vec::with_capacity(vars.len());
-    for (var, (_, head, _)) in vars.iter().zip(steps.iter()) {
+    let mut var_bindings = Vec::with_capacity(head_vars.len() + usize::from(tail_var.is_some()));
+    for (var, (_, head, _)) in head_vars.iter().zip(steps.iter()) {
         var_bindings.push(Value::list(vec![var.clone(), head.clone()]));
+    }
+    let (_, _, last_tail) = steps.last()?;
+    if let Some(tail_name) = tail_var {
+        var_bindings.push(Value::list(vec![(*tail_name).clone(), last_tail.clone()]));
     }
     let mut let_forms = Vec::with_capacity(body_forms.len() + 2);
     let_forms.push(Value::symbol("let"));
     let_forms.push(Value::list(var_bindings));
     let_forms.extend_from_slice(body_forms);
 
-    let (_, _, last_tail) = steps.last()?;
-    let mut expanded = Value::list(vec![
-        Value::symbol("progn"),
+    let mut expanded = if tail_var.is_some() {
+        Value::list(let_forms)
+    } else {
         Value::list(vec![
-            Value::symbol("ignore"),
-            Value::list(vec![Value::symbol("null"), last_tail.clone()]),
-        ]),
-        Value::list(let_forms),
-    ]);
+            Value::symbol("progn"),
+            Value::list(vec![
+                Value::symbol("ignore"),
+                Value::list(vec![Value::symbol("null"), last_tail.clone()]),
+            ]),
+            Value::list(let_forms),
+        ])
+    };
 
     for (source_expr, head, tail) in steps.into_iter().rev() {
         expanded = Value::list(vec![
@@ -4923,7 +4964,7 @@ fn macroexpand_known_fallback_macro(
                 let mut prefix_bindings = Vec::with_capacity(bindings_src.len());
                 let mut suffix_bindings = Vec::new();
                 let mut pattern_value_expr: Option<Value> = None;
-                let mut pattern_vars = Vec::new();
+                let mut pattern_spec: Option<SimpleBackquoteListPattern> = None;
 
                 for binding in &bindings_src {
                     let pair = list_to_vec(binding).ok_or_else(|| {
@@ -4952,10 +4993,13 @@ fn macroexpand_known_fallback_macro(
                         return Ok(None);
                     };
                     pattern_value_expr = Some(pair[1].clone());
-                    pattern_vars = vars;
+                    pattern_spec = Some(vars);
                 }
 
                 if let Some(value_expr) = pattern_value_expr {
+                    let Some(pattern_spec) = pattern_spec.as_ref() else {
+                        return Ok(None);
+                    };
                     let destructure_body = if suffix_bindings.is_empty() {
                         args[1..].to_vec()
                     } else {
@@ -4969,7 +5013,7 @@ fn macroexpand_known_fallback_macro(
                     let mut expanded = match expand_simple_backquote_list_pcase_let_star(
                         eval,
                         &value_expr,
-                        &pattern_vars,
+                        pattern_spec,
                         &destructure_body,
                     ) {
                         Some(form) => form,
@@ -21911,6 +21955,31 @@ mod tests {
         assert_eq!(
             pcase_let_star_mixed_prefix_expanded,
             pcase_let_star_mixed_prefix_expected
+        );
+        let pcase_let_star_mixed_dotted_forms = crate::elisp::parser::parse_forms(
+            r#"(pcase-let* ((`(,a . ,b) '(1 2 3))) (list a b))"#,
+        )
+        .expect("mixed dotted pcase-let* form should parse");
+        let pcase_let_star_mixed_dotted = crate::elisp::eval::quote_to_value(
+            pcase_let_star_mixed_dotted_forms
+                .first()
+                .expect("mixed dotted pcase-let* parse should yield one form"),
+        );
+        let pcase_let_star_mixed_dotted_expanded =
+            builtin_macroexpand_eval(&mut eval, vec![pcase_let_star_mixed_dotted])
+                .expect("macroexpand should lower simple dotted pcase-let* bindings");
+        let pcase_let_star_mixed_dotted_expected_forms = crate::elisp::parser::parse_forms(
+            r#"(progn (ignore (consp '(1 2 3))) (let* ((x8 (car-safe '(1 2 3))) (x9 (cdr-safe '(1 2 3)))) (let ((a x8) (b x9)) (list a b))))"#,
+        )
+        .expect("mixed dotted pcase-let* expected expansion should parse");
+        let pcase_let_star_mixed_dotted_expected = crate::elisp::eval::quote_to_value(
+            pcase_let_star_mixed_dotted_expected_forms
+                .first()
+                .expect("mixed dotted pcase-let* expected parse should yield one form"),
+        );
+        assert_eq!(
+            pcase_let_star_mixed_dotted_expanded,
+            pcase_let_star_mixed_dotted_expected
         );
         let bad_pcase_let = builtin_macroexpand_eval(
             &mut eval,
