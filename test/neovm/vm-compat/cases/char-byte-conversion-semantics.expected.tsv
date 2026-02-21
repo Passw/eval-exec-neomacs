@@ -35,3 +35,8 @@
 35	(char-or-string-p 4194304)	OK nil
 36	(char-or-string-p nil)	OK nil
 37	(char-or-string-p 'x)	OK nil
+38	(max-char)	OK 4194303
+39	(max-char nil)	OK 4194303
+40	(max-char t)	OK 1114111
+41	(max-char 'foo)	OK 1114111
+42	(condition-case err (max-char 1 2) (error err))	OK (wrong-number-of-arguments max-char 2)

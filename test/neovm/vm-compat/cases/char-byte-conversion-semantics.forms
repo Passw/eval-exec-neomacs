@@ -37,3 +37,9 @@
 (char-or-string-p 4194304)
 (char-or-string-p nil)
 (char-or-string-p 'x)
+
+(max-char)
+(max-char nil)
+(max-char t)
+(max-char 'foo)
+(condition-case err (max-char 1 2) (error err))

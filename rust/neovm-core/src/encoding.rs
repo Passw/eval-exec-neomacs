@@ -367,8 +367,18 @@ pub(crate) fn builtin_char_displayable_p(args: Vec<Value>) -> EvalResult {
 
 /// `(max-char)` -> integer
 pub(crate) fn builtin_max_char(args: Vec<Value>) -> EvalResult {
-    let _ = args; // 0 args
-    Ok(Value::Int(0x10FFFF))
+    if args.len() > 1 {
+        return Err(signal(
+            "wrong-number-of-arguments",
+            vec![Value::symbol("max-char"), Value::Int(args.len() as i64)],
+        ));
+    }
+    let unicode_only = args.first().is_some_and(|v| !v.is_nil());
+    Ok(Value::Int(if unicode_only {
+        0x10_FFFF
+    } else {
+        MAX_CHAR_CODE
+    }))
 }
 
 // ===========================================================================
@@ -517,6 +527,33 @@ mod tests {
             builtin_char_or_string_p(vec![Value::symbol("x")]).unwrap(),
             Value::Nil
         );
+    }
+
+    #[test]
+    fn builtin_max_char_optional_unicode_matches_oracle() {
+        assert_eq!(builtin_max_char(vec![]).unwrap(), Value::Int(0x3F_FFFF));
+        assert_eq!(
+            builtin_max_char(vec![Value::Nil]).unwrap(),
+            Value::Int(0x3F_FFFF)
+        );
+        assert_eq!(
+            builtin_max_char(vec![Value::True]).unwrap(),
+            Value::Int(0x10_FFFF)
+        );
+        assert_eq!(
+            builtin_max_char(vec![Value::symbol("foo")]).unwrap(),
+            Value::Int(0x10_FFFF)
+        );
+
+        let wrong_arity = builtin_max_char(vec![Value::Int(1), Value::Int(2)])
+            .expect_err("max-char should reject more than one argument");
+        match wrong_arity {
+            Flow::Signal(sig) => {
+                assert_eq!(sig.symbol, "wrong-number-of-arguments");
+                assert_eq!(sig.data, vec![Value::symbol("max-char"), Value::Int(2)]);
+            }
+            other => panic!("expected signal, got: {other:?}"),
+        }
     }
 
     #[test]
