@@ -586,6 +586,40 @@ fn with_bindings(
     }
 }
 
+fn collect_pattern_binding_names(pattern: &Pattern, names: &mut Vec<String>) {
+    match pattern {
+        Pattern::Bind(name) => {
+            if !names.contains(name) {
+                names.push(name.clone());
+            }
+        }
+        Pattern::Let(inner, _) | Pattern::App(_, inner) => {
+            collect_pattern_binding_names(inner, names);
+        }
+        Pattern::And(items) | Pattern::Or(items) | Pattern::Vector(items) => {
+            for item in items {
+                collect_pattern_binding_names(item, names);
+            }
+        }
+        Pattern::BackquoteList(items) => {
+            for item in items {
+                if let BqElement::Unquote(inner) = item {
+                    collect_pattern_binding_names(inner, names);
+                }
+            }
+        }
+        Pattern::BackquoteDotted(items, tail) => {
+            for item in items {
+                if let BqElement::Unquote(inner) = item {
+                    collect_pattern_binding_names(inner, names);
+                }
+            }
+            collect_pattern_binding_names(tail, names);
+        }
+        Pattern::Wildcard | Pattern::Literal(_) | Pattern::Pred(_) | Pattern::Guard(_) => {}
+    }
+}
+
 // ---------------------------------------------------------------------------
 // Special form implementations
 // ---------------------------------------------------------------------------
@@ -871,6 +905,8 @@ pub(crate) fn sf_pcase_dolist(eval: &mut Evaluator, tail: &[Expr]) -> EvalResult
     }
 
     let pattern = compile_pattern(&spec[0])?;
+    let mut fallback_binding_names = Vec::new();
+    collect_pattern_binding_names(&pattern, &mut fallback_binding_names);
     let mut list_val = eval.eval(&spec[1])?;
     let body = &tail[1..];
 
@@ -886,9 +922,17 @@ pub(crate) fn sf_pcase_dolist(eval: &mut Evaluator, tail: &[Expr]) -> EvalResult
         let next = pair.cdr.clone();
         drop(pair);
 
-        if let Some(bindings) = match_pattern(eval, &pattern, &item)? {
-            with_bindings(eval, bindings, body)?;
-        }
+        let bindings = match match_pattern(eval, &pattern, &item)? {
+            Some(bindings) => bindings,
+            None => {
+                let mut fallback = HashMap::with_capacity(fallback_binding_names.len());
+                for name in &fallback_binding_names {
+                    fallback.insert(name.clone(), Value::Nil);
+                }
+                fallback
+            }
+        };
+        with_bindings(eval, bindings, body)?;
         list_val = next;
     }
 
@@ -1464,6 +1508,26 @@ mod tests {
                 "OK (wrong-type-argument listp 1)",
                 "OK (wrong-type-argument listp 2)",
             ]
+        );
+    }
+
+    #[test]
+    fn pcase_dolist_mismatch_still_executes_body_with_nil_bindings() {
+        assert_eq!(
+            eval_last(
+                "(let ((vals nil))
+                   (pcase-dolist (`(,a ,b) '(1 (2 3)) vals)
+                     (setq vals (cons (list a b) vals))))"
+            ),
+            "OK ((2 3) (nil nil))"
+        );
+    }
+
+    #[test]
+    fn pcase_dolist_predicate_mismatch_still_executes_body() {
+        assert_eq!(
+            eval_last("(let ((n 0)) (pcase-dolist ((pred numberp) '(a 1) n) (setq n (1+ n))))"),
+            "OK 2"
         );
     }
 
