@@ -284,15 +284,14 @@ fn parse_source_with_cache(
     Ok(forms)
 }
 
+fn cache_write_disabled_env_value(value: &str) -> bool {
+    let normalized = value.trim().to_ascii_lowercase();
+    matches!(normalized.as_str(), "1" | "true" | "yes" | "on")
+}
+
 fn load_cache_writes_enabled() -> bool {
     match std::env::var("NEOVM_DISABLE_LOAD_CACHE_WRITE") {
-        Ok(value) => {
-            let normalized = value.trim().to_ascii_lowercase();
-            !(normalized == "1"
-                || normalized == "true"
-                || normalized == "yes"
-                || normalized == "on")
-        }
+        Ok(value) => !cache_write_disabled_env_value(&value),
         Err(_) => true,
     }
 }
@@ -446,6 +445,23 @@ mod tests {
     impl Drop for CacheWriteFailGuard {
         fn drop(&mut self) {
             clear_cache_write_fail_phase_for_test();
+        }
+    }
+
+    #[test]
+    fn cache_write_disable_env_value_matrix() {
+        for value in ["1", "true", "TRUE", " yes ", "On", "\tyEs\n"] {
+            assert!(
+                cache_write_disabled_env_value(value),
+                "expected '{value}' to disable load cache writes",
+            );
+        }
+
+        for value in ["0", "false", "FALSE", "no", "off", "", "   ", "maybe"] {
+            assert!(
+                !cache_write_disabled_env_value(value),
+                "expected '{value}' to leave load cache writes enabled",
+            );
         }
     }
 
