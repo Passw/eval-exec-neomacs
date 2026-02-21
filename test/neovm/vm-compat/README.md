@@ -108,6 +108,13 @@ cd test/neovm/vm-compat
 make compat-progress
 ```
 
+Emit the same snapshot in JSON (useful for scripts/dashboards):
+
+```bash
+cd test/neovm/vm-compat
+make compat-progress-json
+```
+
 Report oracle builtin universe coverage directly (including first-page previews
 for registry and runtime gaps):
 

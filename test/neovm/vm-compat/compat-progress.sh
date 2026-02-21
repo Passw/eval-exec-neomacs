@@ -1,6 +1,34 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+usage() {
+  cat <<'EOF'
+usage: compat-progress.sh [--json]
+EOF
+}
+
+output_format="text"
+if [[ $# -gt 1 ]]; then
+  usage >&2
+  exit 2
+fi
+if [[ $# -eq 1 ]]; then
+  case "$1" in
+    --json)
+      output_format="json"
+      ;;
+    -h|--help)
+      usage
+      exit 0
+      ;;
+    *)
+      echo "unknown option: $1" >&2
+      usage >&2
+      exit 2
+      ;;
+  esac
+fi
+
 script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 repo_root="$(cd "$script_dir/../../.." && pwd)"
 registry_file="$repo_root/rust/neovm-core/src/elisp/builtin_registry.rs"
@@ -75,6 +103,19 @@ count_lines() {
     return
   fi
   awk 'NF && $1 !~ /^#/ { count++ } END { print count+0 }' "$file"
+}
+
+int_or_zero() {
+  local value="$1"
+  if [[ "$value" =~ ^[0-9]+$ ]]; then
+    echo "$value"
+  else
+    echo 0
+  fi
+}
+
+json_escape() {
+  printf '%s' "$1" | sed -e 's/\\/\\\\/g' -e 's/"/\\"/g'
 }
 
 list_label() {
@@ -152,13 +193,6 @@ function_kind_drift="$(awk '/oracle\/neovm function-kind drifts:/ { print $4 }' 
 fboundp_drift="$(awk '/oracle\/neovm fboundp drifts:/ { print $4 }' "$tmp_fboundp_check" | head -n 1)"
 function_kind_stale="$(awk '/stale allowlist entries with no current drift:/ { stale=1; next } stale==1 && /^[^ ]/ { print $0 }' "$tmp_function_kind_check" | wc -l | tr -d ' ')"
 fboundp_stale="$(awk '/stale allowlist entries with no current drift:/ { stale=1; next } stale==1 && /^[^ ]/ { print $0 }' "$tmp_fboundp_check" | wc -l | tr -d ' ')"
-
-printf 'compat progress snapshot\n'
-printf 'case lists (entries):\n'
-for list_file in "${list_files[@]}"; do
-  printf '  %s: %s\n' "$(list_label "$list_file")" "$(count_lines "$list_file")"
-done
-printf '  total unique tracked: %s\n' "$tracked_unique"
 forms_count=0
 while IFS= read -r path; do
   [[ -f "$path" ]] && forms_count=$((forms_count + 1))
@@ -168,34 +202,60 @@ expected_count=0
 while IFS= read -r path; do
   [[ -f "$path" ]] && expected_count=$((expected_count + 1))
 done < "$tmp_tracker_expected"
-printf '  tracked .forms artifacts: %s\n' "$forms_count"
-printf '  tracked expected artifacts: %s\n' "$expected_count"
 stub_count="$("$compat_stub_index_script" 2>/dev/null | awk '/^explicitly annotated function stubs:/ { print $5 }')"
-printf '  explicit function stubs: %s\n' "${stub_count:-0}"
 if ! "$script_dir/check-stub-budget.sh" > "$tmp_stub_budget" 2>&1; then
-  echo "  explicit stub budget: budget check failed"
-  sed 's/^/    /' "$tmp_stub_budget"
+  if [[ "$output_format" == "json" ]]; then
+    printf '{\n'
+    printf '  "error": "%s"\n' "$(json_escape "explicit stub budget check failed")"
+    printf '}\n'
+  else
+    echo "  explicit stub budget: budget check failed"
+    sed 's/^/    /' "$tmp_stub_budget"
+  fi
   exit 1
 fi
-printf '  explicit stub budget: %s\n' "$(sed -n '1p' "$tmp_stub_budget")"
 if ! "$startup_stub_coverage_script" > "$tmp_startup_stub_check" 2>&1; then
-  echo "  startup integer-doc coverage: check failed"
-  sed 's/^/    /' "$tmp_startup_stub_check"
+  if [[ "$output_format" == "json" ]]; then
+    printf '{\n'
+    printf '  "error": "%s"\n' "$(json_escape "startup integer-doc coverage check failed")"
+    printf '}\n'
+  else
+    echo "  startup integer-doc coverage: check failed"
+    sed 's/^/    /' "$tmp_startup_stub_check"
+  fi
   exit 1
 fi
 if ! "$startup_string_coverage_script" > "$tmp_startup_string_check" 2>&1; then
-  echo "  startup string-doc coverage: check failed"
-  sed 's/^/    /' "$tmp_startup_string_check"
+  if [[ "$output_format" == "json" ]]; then
+    printf '{\n'
+    printf '  "error": "%s"\n' "$(json_escape "startup string-doc coverage check failed")"
+    printf '}\n'
+  else
+    echo "  startup string-doc coverage: check failed"
+    sed 's/^/    /' "$tmp_startup_string_check"
+  fi
   exit 1
 fi
 if ! "$startup_variable_doc_count_script" > "$tmp_startup_variable_doc_count_check" 2>&1; then
-  echo "  startup variable-doc count parity: check failed"
-  sed 's/^/    /' "$tmp_startup_variable_doc_count_check"
+  if [[ "$output_format" == "json" ]]; then
+    printf '{\n'
+    printf '  "error": "%s"\n' "$(json_escape "startup variable-doc count parity check failed")"
+    printf '}\n'
+  else
+    echo "  startup variable-doc count parity: check failed"
+    sed 's/^/    /' "$tmp_startup_variable_doc_count_check"
+  fi
   exit 1
 fi
 if ! "$oracle_builtin_coverage_script" > "$tmp_oracle_builtin_coverage" 2>&1; then
-  echo "  oracle builtin coverage: check failed"
-  sed 's/^/    /' "$tmp_oracle_builtin_coverage"
+  if [[ "$output_format" == "json" ]]; then
+    printf '{\n'
+    printf '  "error": "%s"\n' "$(json_escape "oracle builtin coverage check failed")"
+    printf '}\n'
+  else
+    echo "  oracle builtin coverage: check failed"
+    sed 's/^/    /' "$tmp_oracle_builtin_coverage"
+  fi
   exit 1
 fi
 stub_oracle_count="$(awk -F': ' '/oracle integer-doc symbols:/ { print $2 }' "$tmp_startup_stub_check" | head -n 1)"
@@ -218,6 +278,90 @@ oracle_builtin_runtime_covered="$(awk -F': ' '/^neovm runtime covered oracle bui
 oracle_builtin_runtime_missing="$(awk -F': ' '/^oracle builtin names missing in neovm runtime:/ { print $2 }' "$tmp_oracle_builtin_coverage" | head -n 1)"
 oracle_builtin_runtime_outside_registry="$(awk -F': ' '/^neovm runtime covered oracle builtins outside registry:/ { print $2 }' "$tmp_oracle_builtin_coverage" | head -n 1)"
 oracle_builtin_runtime_coverage_percent="$(awk -v covered="${oracle_builtin_runtime_covered:-0}" -v total="${oracle_builtin_total:-0}" 'BEGIN { if (total == 0) { printf "0.0" } else { printf "%.1f", (covered * 100.0) / total } }')"
+stub_budget_summary="$(sed -n '1p' "$tmp_stub_budget")"
+
+forms_delta=$((expected_count - forms_count))
+if [[ "$forms_delta" -lt 0 ]]; then
+  forms_delta_abs=$(( -forms_delta ))
+else
+  forms_delta_abs="$forms_delta"
+fi
+
+stub_count_n="$(int_or_zero "${stub_count:-0}")"
+oracle_builtin_missing_n="$(int_or_zero "${oracle_builtin_missing:-0}")"
+oracle_builtin_runtime_missing_n="$(int_or_zero "${oracle_builtin_runtime_missing:-0}")"
+fboundp_drift_n="$(int_or_zero "${fboundp_drift:-0}")"
+function_kind_drift_n="$(int_or_zero "${function_kind_drift:-0}")"
+
+remaining_total=$(( \
+  forms_delta_abs \
+  + stub_count_n \
+  + oracle_builtin_missing_n \
+  + oracle_builtin_runtime_missing_n \
+  + fboundp_drift_n \
+  + function_kind_drift_n \
+))
+
+if [[ "$output_format" == "json" ]]; then
+  printf '{\n'
+  printf '  "tracked_case_lists": %s,\n' "${#list_files[@]}"
+  printf '  "tracked_cases_total": %s,\n' "$tracked_unique"
+  printf '  "tracked_forms_artifacts": %s,\n' "$forms_count"
+  printf '  "tracked_expected_artifacts": %s,\n' "$expected_count"
+  printf '  "case_artifact_delta": %s,\n' "$forms_delta"
+  printf '  "explicit_function_stubs": %s,\n' "$stub_count_n"
+  printf '  "explicit_stub_budget_summary": "%s",\n' "$(json_escape "$stub_budget_summary")"
+  printf '  "startup_integer_docs": {\n'
+  printf '    "oracle": %s,\n' "$(int_or_zero "${stub_oracle_count:-0}")"
+  printf '    "startup": %s,\n' "$(int_or_zero "${stub_startup_count:-0}")"
+  printf '    "missing": %s,\n' "$(int_or_zero "${stub_missing_count:-0}")"
+  printf '    "extra": %s\n' "$(int_or_zero "${stub_extra_count:-0}")"
+  printf '  },\n'
+  printf '  "startup_string_docs": {\n'
+  printf '    "oracle": %s,\n' "$(int_or_zero "${string_oracle_count:-0}")"
+  printf '    "startup": %s,\n' "$(int_or_zero "${string_startup_count:-0}")"
+  printf '    "missing": %s,\n' "$(int_or_zero "${string_missing_count:-0}")"
+  printf '    "extra": %s\n' "$(int_or_zero "${string_extra_count:-0}")"
+  printf '  },\n'
+  printf '  "startup_variable_doc_property_counts": "%s",\n' "$(json_escape "${startup_doc_property_summary:-0/0|0/0|0/0}")"
+  printf '  "startup_variable_doc_runtime_resolution_counts": "%s",\n' "$(json_escape "${startup_doc_runtime_resolution_summary:-0/0|0/0|0/0}")"
+  printf '  "builtin_registry": {\n'
+  printf '    "total_dispatch_entries": %s,\n' "$all_builtins"
+  printf '    "core_compat_entries": %s,\n' "$core_builtins"
+  printf '    "neovm_extension_entries": %s,\n' "$extension_builtins"
+  printf '    "oracle_builtin_universe_entries": %s,\n' "$(int_or_zero "${oracle_builtin_total:-0}")"
+  printf '    "oracle_builtin_universe_mode": "%s",\n' "$(json_escape "${oracle_builtin_mode:-primitive-subr}")"
+  printf '    "registry_covered": %s,\n' "$(int_or_zero "${oracle_builtin_covered:-0}")"
+  printf '    "registry_missing": %s,\n' "$oracle_builtin_missing_n"
+  printf '    "runtime_covered": %s,\n' "$(int_or_zero "${oracle_builtin_runtime_covered:-0}")"
+  printf '    "runtime_missing": %s,\n' "$oracle_builtin_runtime_missing_n"
+  printf '    "registry_extra": %s,\n' "$(int_or_zero "${oracle_builtin_registry_extra:-0}")"
+  printf '    "runtime_outside_registry": %s\n' "$(int_or_zero "${oracle_builtin_runtime_outside_registry:-0}")"
+  printf '  },\n'
+  printf '  "allowlists": {\n'
+  printf '    "fboundp_allowlisted_drifts": %s,\n' "$allowlisted"
+  printf '    "fboundp_current_drifts": %s,\n' "$fboundp_drift_n"
+  printf '    "fboundp_stale_entries": %s,\n' "$(int_or_zero "${fboundp_stale:-0}")"
+  printf '    "function_kind_allowlisted_drifts": %s,\n' "$function_kind_allowlisted"
+  printf '    "function_kind_current_drifts": %s,\n' "$function_kind_drift_n"
+  printf '    "function_kind_stale_entries": %s\n' "$(int_or_zero "${function_kind_stale:-0}")"
+  printf '  },\n'
+  printf '  "remaining_total": %s,\n' "$remaining_total"
+  printf '  "status": "%s"\n' "$( [[ "$remaining_total" -eq 0 ]] && echo done || echo in_progress )"
+  printf '}\n'
+  exit 0
+fi
+
+printf 'compat progress snapshot\n'
+printf 'case lists (entries):\n'
+for list_file in "${list_files[@]}"; do
+  printf '  %s: %s\n' "$(list_label "$list_file")" "$(count_lines "$list_file")"
+done
+printf '  total unique tracked: %s\n' "$tracked_unique"
+printf '  tracked .forms artifacts: %s\n' "$forms_count"
+printf '  tracked expected artifacts: %s\n' "$expected_count"
+printf '  explicit function stubs: %s\n' "${stub_count:-0}"
+printf '  explicit stub budget: %s\n' "$stub_budget_summary"
 printf '  startup integer docs (oracle/startup/missing/extra): %s/%s/%s/%s\n' \
   "${stub_oracle_count:-0}" "${stub_startup_count:-0}" "${stub_missing_count:-0}" "${stub_extra_count:-0}"
 printf '  startup string docs (oracle/startup/missing/extra): %s/%s/%s/%s\n' \
@@ -227,7 +371,7 @@ printf '  startup variable-doc property-counts (expected|oracle|neovm integer/st
 printf '  startup variable-doc runtime-resolution counts (expected|oracle|neovm integer/string): %s\n' \
   "${startup_doc_runtime_resolution_summary:-0/0|0/0|0/0}"
 if [[ "$expected_count" -ne "$forms_count" ]]; then
-  printf '  corpus artifact delta (expected - forms): %+d\n' "$((expected_count - forms_count))"
+  printf '  corpus artifact delta (expected - forms): %+d\n' "$forms_delta"
   while IFS= read -r path; do
     printf '%s\n' "$(basename "$path" .forms)"
   done < <(while IFS= read -r p; do [[ -f "$p" ]] && echo "$p"; done < "$tmp_tracker_forms") \
@@ -266,5 +410,6 @@ printf '  fboundp stale allowlist entries: %s\n' "${fboundp_stale:-0}"
 printf '  function-kind allowlisted drifts: %s\n' "$function_kind_allowlisted"
 printf '  function-kind current drifts: %s\n' "${function_kind_drift:-0}"
 printf '  function-kind stale allowlist entries: %s\n' "${function_kind_stale:-0}"
+printf '  remaining composite signals: %s\n' "$remaining_total"
 
 echo "done"

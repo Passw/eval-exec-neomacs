@@ -18683,6 +18683,28 @@ Last updated: 2026-02-21
     - `ORACLE_BUILTIN_UNIVERSE_MODE=primitive-any make -C test/neovm/vm-compat report-oracle-builtin-coverage` (pass; mode reflected as `primitive-any`)
     - `ORACLE_BUILTIN_UNIVERSE=primitive-subr ORACLE_BUILTIN_UNIVERSE_MODE=primitive-any ./test/neovm/vm-compat/report-oracle-builtin-coverage.sh` (fails as expected with conflict error)
 
+- Added machine-readable vm-compat progress snapshots (`compat-progress --json`) and make target wiring:
+  - vm-compat changes:
+    - `test/neovm/vm-compat/compat-progress.sh`
+      - added CLI support:
+        - `compat-progress.sh --json`
+        - `compat-progress.sh --help`
+      - emits structured JSON with:
+        - tracked case/list artifact counts
+        - startup doc coverage counts
+        - builtin registry/runtime coverage counts
+        - allowlist drift counts
+        - `remaining_total` + status (`done`/`in_progress`) composite signal.
+      - kept existing text output unchanged for interactive terminal use.
+    - `test/neovm/vm-compat/Makefile`
+      - added `compat-progress-json` target.
+    - `test/neovm/vm-compat/README.md`
+      - documented `make compat-progress-json` usage.
+  - verified:
+    - `make -C test/neovm/vm-compat compat-progress` (pass)
+    - `make -C test/neovm/vm-compat compat-progress-json` (pass)
+    - `./test/neovm/vm-compat/compat-progress.sh --json` (pass)
+
 - Continue compatibility-first maintenance with small commit slices:
   - keep builtin surface and registry in lock-step
   - run oracle/parity checks after each behavior-affecting change
