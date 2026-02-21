@@ -18694,6 +18694,37 @@ mod tests {
     }
 
     #[test]
+    fn format_and_message_render_frame_window_handles_in_eval_dispatch() {
+        let mut eval = crate::elisp::eval::Evaluator::new();
+        let frame = dispatch_builtin(&mut eval, "selected-frame", vec![])
+            .expect("selected-frame should resolve")
+            .expect("selected-frame should evaluate");
+        let window = dispatch_builtin(&mut eval, "selected-window", vec![])
+            .expect("selected-window should resolve")
+            .expect("selected-window should evaluate");
+
+        let mut assert_prefix = |builtin: &str, spec: &str, value: Value, prefix: &str| {
+            let rendered = dispatch_builtin(&mut eval, builtin, vec![Value::string(spec), value])
+                .expect("builtin should resolve")
+                .expect("builtin should evaluate");
+            assert!(
+                rendered.as_str().is_some_and(|s| s.starts_with(prefix)),
+                "expected {builtin} {spec} output to start with {prefix}, got: {rendered:?}"
+            );
+        };
+
+        assert_prefix("format", "%S", frame.clone(), "#<frame");
+        assert_prefix("message", "%S", frame.clone(), "#<frame");
+        assert_prefix("format", "%s", frame.clone(), "#<frame");
+        assert_prefix("message", "%s", frame, "#<frame");
+
+        assert_prefix("format", "%S", window.clone(), "#<window");
+        assert_prefix("message", "%S", window.clone(), "#<window");
+        assert_prefix("format", "%s", window.clone(), "#<window");
+        assert_prefix("message", "%s", window, "#<window");
+    }
+
+    #[test]
     fn message_nil_returns_nil() {
         let mut eval = crate::elisp::eval::Evaluator::new();
 

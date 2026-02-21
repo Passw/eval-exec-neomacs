@@ -28,6 +28,16 @@ Last updated: 2026-02-21
 
 ## Doing
 
+- Added runtime evaluator lock-in for frame/window `%S` and `%s` handle rendering in eval-dispatch `format`/`message` paths:
+  - runtime changes:
+    - `rust/neovm-core/src/elisp/builtins.rs`
+      - added evaluator coverage:
+        - `format_and_message_render_frame_window_handles_in_eval_dispatch`
+      - test asserts `format` and `message` both preserve Oracle-shaped `#<frame...>` / `#<window...>` rendering for `%S` and `%s`.
+  - verified:
+    - `cargo test --manifest-path rust/neovm-core/Cargo.toml format_and_message_render_frame_window_handles_in_eval_dispatch -- --nocapture` (pass)
+    - `make -C test/neovm/vm-compat check-one-neovm CASE=cases/format-message-killed-buffer-handle-semantics` (pass; `28/28`)
+
 - Extended vm-compat lock-in for eval-dispatch `format`/`message` opaque-handle rendering with frame/window `%S` and `%s` coverage:
   - vm-compat corpus changes:
     - updated:
