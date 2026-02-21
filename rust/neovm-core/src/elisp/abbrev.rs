@@ -13,7 +13,7 @@
 use std::collections::HashMap;
 
 use super::error::{signal, EvalResult, Flow};
-use super::value::Value;
+use super::value::{list_to_vec, Value};
 
 // ---------------------------------------------------------------------------
 // Abbrev types
@@ -377,7 +377,7 @@ pub(crate) fn builtin_abbrev_mode(
     }
 }
 
-/// (define-abbrev-table NAME DEFS &rest PROPS) -> nil
+/// (define-abbrev-table NAME DEFS &optional DOCSTRING &rest PROPS) -> nil
 ///
 /// Create a new abbrev table with the given NAME.
 ///
@@ -397,6 +397,79 @@ pub(crate) fn builtin_define_abbrev_table(
     }) {
         tbl.parent = Some(parent);
     }
+
+    // GNU Emacs compatibility:
+    // - Third arg is optional docstring.
+    // - If non-nil symbol and PROPS exists, treat it as first property key.
+    let mut props = if args.len() > 3 {
+        args[3..].to_vec()
+    } else {
+        Vec::new()
+    };
+    if let Some(docstring) = args.get(2) {
+        let symbolp_non_nil = !docstring.is_nil()
+            && matches!(
+                docstring,
+                Value::Symbol(_) | Value::Keyword(_) | Value::True
+            );
+        if symbolp_non_nil && !props.is_empty() {
+            props.insert(0, docstring.clone());
+        }
+    }
+
+    let mut idx = 0usize;
+    while idx < props.len() {
+        if idx + 1 >= props.len() {
+            return Err(signal(
+                "error",
+                vec![Value::string(format!(
+                    "Missing value for property {}",
+                    props[idx]
+                ))],
+            ));
+        }
+
+        if let Some(prop_name) = match &props[idx] {
+            Value::Symbol(s) => Some(s.as_str()),
+            Value::Keyword(s) => Some(s.as_str()),
+            Value::True => Some("t"),
+            Value::Nil => Some("nil"),
+            _ => None,
+        } {
+            match prop_name {
+                ":case-fixed" => {
+                    tbl.case_fixed = props[idx + 1].is_truthy();
+                }
+                ":parents" => {
+                    let parent = match &props[idx + 1] {
+                        Value::Str(s) => Some((**s).clone()),
+                        Value::Symbol(s) => Some(s.clone()),
+                        Value::Keyword(s) => Some(s.clone()),
+                        Value::True => Some("t".to_string()),
+                        Value::Nil => Some("nil".to_string()),
+                        Value::Cons(_) => list_to_vec(&props[idx + 1]).and_then(|parents| {
+                            parents.first().and_then(|first| match first {
+                                Value::Str(s) => Some((**s).clone()),
+                                Value::Symbol(s) => Some(s.clone()),
+                                Value::Keyword(s) => Some(s.clone()),
+                                Value::True => Some("t".to_string()),
+                                Value::Nil => Some("nil".to_string()),
+                                _ => None,
+                            })
+                        }),
+                        _ => None,
+                    };
+                    if let Some(parent) = parent {
+                        tbl.parent = Some(parent);
+                    }
+                }
+                _ => {}
+            }
+        }
+
+        idx += 2;
+    }
+
     Ok(Value::Nil)
 }
 
@@ -789,6 +862,41 @@ mod tests {
         );
         assert!(result.is_ok());
         assert!(eval.abbrevs.get_table("defs-table").is_some());
+
+        // Symbol docstring + trailing arg should be treated as property list
+        // head and therefore remain accepted.
+        let result = builtin_define_abbrev_table(
+            &mut eval,
+            vec![
+                Value::string("props-table"),
+                Value::Nil,
+                Value::symbol(":foo"),
+                Value::True,
+            ],
+        );
+        assert!(result.is_ok());
+
+        // Nil docstring with one trailing property key must signal like GNU Emacs.
+        let result = builtin_define_abbrev_table(
+            &mut eval,
+            vec![
+                Value::string("missing-prop-value-table"),
+                Value::Nil,
+                Value::Nil,
+                Value::Nil,
+            ],
+        )
+        .expect_err("define-abbrev-table should reject missing property values");
+        match result {
+            Flow::Signal(sig) => {
+                assert_eq!(sig.symbol, "error");
+                assert_eq!(
+                    sig.data,
+                    vec![Value::string("Missing value for property nil")]
+                );
+            }
+            other => panic!("unexpected flow: {other:?}"),
+        }
     }
 
     #[test]

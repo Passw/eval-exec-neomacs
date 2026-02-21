@@ -54,3 +54,15 @@
           (progn (advice-add 'car :before fn nil nil) 'ok)
         (error (car err)))
     (ignore-errors (advice-remove 'car fn))))
+
+; Additional runtime overflow checks for command/introspection/abbrev paths.
+(condition-case err (commandp 'ignore nil nil) (error (car err)))
+(condition-case err (indirect-function 'ignore nil nil) (error (car err)))
+(condition-case err (execute-extended-command nil nil nil nil) (error (car err)))
+(condition-case err (define-abbrev-table 'scan-abbrev '() nil nil) (error (car err)))
+
+; Max accepted arities and adjacent behavior stay intact.
+(commandp 'ignore nil)
+(indirect-function 'ignore nil)
+(condition-case err (execute-extended-command nil) (error (car err)))
+(define-abbrev-table 'scan-abbrev-ok '() nil)

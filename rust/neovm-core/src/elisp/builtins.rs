@@ -4646,6 +4646,7 @@ pub(crate) fn builtin_indirect_function(
     args: Vec<Value>,
 ) -> EvalResult {
     expect_min_args("indirect-function", &args, 1)?;
+    expect_max_args("indirect-function", &args, 2)?;
     let _noerror = args.get(1).is_some_and(|value| value.is_truthy());
 
     if let Some(name) = args[0].as_symbol_name() {
@@ -19936,6 +19937,20 @@ mod tests {
         let passthrough = builtin_indirect_function(&mut eval, vec![Value::Int(42)])
             .expect("non-symbol should be returned as-is");
         assert_eq!(passthrough, Value::Int(42));
+    }
+
+    #[test]
+    fn indirect_function_rejects_overflow_arity() {
+        let mut eval = crate::elisp::eval::Evaluator::new();
+        let err = builtin_indirect_function(
+            &mut eval,
+            vec![Value::symbol("ignore"), Value::Nil, Value::Nil],
+        )
+        .expect_err("indirect-function should reject more than two arguments");
+        match err {
+            Flow::Signal(sig) => assert_eq!(sig.symbol, "wrong-number-of-arguments"),
+            other => panic!("unexpected flow: {other:?}"),
+        }
     }
 
     #[test]

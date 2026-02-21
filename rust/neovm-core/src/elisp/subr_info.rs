@@ -36,6 +36,17 @@ fn expect_min_args(name: &str, args: &[Value], min: usize) -> Result<(), Flow> {
     }
 }
 
+fn expect_max_args(name: &str, args: &[Value], max: usize) -> Result<(), Flow> {
+    if args.len() > max {
+        Err(signal(
+            "wrong-number-of-arguments",
+            vec![Value::symbol(name), Value::Int(args.len() as i64)],
+        ))
+    } else {
+        Ok(())
+    }
+}
+
 // ---------------------------------------------------------------------------
 // Evaluator/public callable classification
 // ---------------------------------------------------------------------------
@@ -1958,6 +1969,7 @@ pub(crate) fn builtin_macrop(args: Vec<Value>) -> EvalResult {
 /// check for an `interactive` declaration.
 pub(crate) fn builtin_commandp(args: Vec<Value>) -> EvalResult {
     expect_min_args("commandp", &args, 1)?;
+    expect_max_args("commandp", &args, 2)?;
     Ok(Value::bool(args[0].is_function()))
 }
 
@@ -4291,6 +4303,16 @@ mod tests {
     fn commandp_false_for_nil() {
         let result = builtin_commandp(vec![Value::Nil]).unwrap();
         assert!(result.is_nil());
+    }
+
+    #[test]
+    fn commandp_rejects_overflow_arity() {
+        let err = builtin_commandp(vec![Value::symbol("car"), Value::Nil, Value::Nil])
+            .expect_err("commandp should reject more than two arguments");
+        match err {
+            Flow::Signal(sig) => assert_eq!(sig.symbol, "wrong-number-of-arguments"),
+            other => panic!("unexpected flow: {other:?}"),
+        }
     }
 
     // -- func-arity --

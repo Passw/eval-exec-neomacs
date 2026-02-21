@@ -266,6 +266,7 @@ pub(crate) fn builtin_called_interactively_p(eval: &mut Evaluator, args: Vec<Val
 /// Return non-nil if FUNCTION is a command (i.e., can be called interactively).
 pub(crate) fn builtin_commandp_interactive(eval: &mut Evaluator, args: Vec<Value>) -> EvalResult {
     expect_min_args("commandp", &args, 1)?;
+    expect_max_args("commandp", &args, 2)?;
     let is_command = command_designator_p(eval, &args[0]);
     Ok(Value::bool(is_command))
 }
@@ -1497,6 +1498,7 @@ pub(crate) fn builtin_execute_extended_command(
     args: Vec<Value>,
 ) -> EvalResult {
     expect_min_args("execute-extended-command", &args, 1)?;
+    expect_max_args("execute-extended-command", &args, 3)?;
 
     // Batch mode prompt path: M-x reads from stdin and hits EOF.
     if args.len() < 2 {
@@ -3441,6 +3443,20 @@ mod tests {
         let mut ev = Evaluator::new();
         let result = builtin_commandp_interactive(&mut ev, vec![Value::symbol("car")]);
         assert!(result.unwrap().is_nil());
+    }
+
+    #[test]
+    fn commandp_rejects_overflow_arity() {
+        let mut ev = Evaluator::new();
+        let result = builtin_commandp_interactive(
+            &mut ev,
+            vec![Value::symbol("ignore"), Value::Nil, Value::Nil],
+        )
+        .expect_err("commandp should reject more than two arguments");
+        match result {
+            Flow::Signal(sig) => assert_eq!(sig.symbol, "wrong-number-of-arguments"),
+            other => panic!("unexpected flow: {other:?}"),
+        }
     }
 
     #[test]
@@ -6063,6 +6079,20 @@ K")
                     )]
                 );
             }
+            other => panic!("unexpected flow: {other:?}"),
+        }
+    }
+
+    #[test]
+    fn execute_extended_command_rejects_overflow_arity() {
+        let mut ev = Evaluator::new();
+        let result = builtin_execute_extended_command(
+            &mut ev,
+            vec![Value::Nil, Value::Nil, Value::Nil, Value::Nil],
+        )
+        .expect_err("execute-extended-command should reject more than three arguments");
+        match result {
+            Flow::Signal(sig) => assert_eq!(sig.symbol, "wrong-number-of-arguments"),
             other => panic!("unexpected flow: {other:?}"),
         }
     }
