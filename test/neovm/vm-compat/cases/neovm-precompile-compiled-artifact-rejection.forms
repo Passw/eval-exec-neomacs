@@ -6,6 +6,9 @@
 (setq vm-precompile-bad-elc (concat vm-precompile-bad-dir "probe.elc"))
 (setq vm-precompile-bad-elc-gz (concat vm-precompile-bad-dir "probe.elc.gz"))
 (setq vm-precompile-bad-cache (concat vm-precompile-bad-dir "probe.neoc"))
+(setq vm-precompile-bad-cache-gz (concat vm-precompile-bad-dir "probe.elc.neoc"))
+(setq vm-precompile-bad-cache-tmp (concat vm-precompile-bad-dir "probe.neoc.tmp"))
+(setq vm-precompile-bad-cache-gz-tmp (concat vm-precompile-bad-dir "probe.elc.neoc.tmp"))
 
 (let ((orig (current-buffer))
       (buf (get-buffer-create " *vm-precompile-bad-elc*")))
@@ -44,6 +47,9 @@
    (not (null (string-match-p "compiled artifacts" (cadr err))))
    (not (null (string-match-p "probe\\.elc\\.gz" (cadr err))))))
 (file-exists-p vm-precompile-bad-cache)
+(file-exists-p vm-precompile-bad-cache-gz)
+(file-exists-p vm-precompile-bad-cache-tmp)
+(file-exists-p vm-precompile-bad-cache-gz-tmp)
 
 (delete-file vm-precompile-bad-elc)
 (delete-file vm-precompile-bad-elc-gz)

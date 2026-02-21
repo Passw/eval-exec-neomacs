@@ -6,6 +6,7 @@
 
 (setq vm-precompile-parse-source (concat vm-precompile-parse-dir "broken.el"))
 (setq vm-precompile-parse-cache (concat vm-precompile-parse-dir "broken.neoc"))
+(setq vm-precompile-parse-cache-tmp (concat vm-precompile-parse-dir "broken.neoc.tmp"))
 
 (let ((orig (current-buffer))
       (buf (get-buffer-create " *vm-precompile-parse*")))
@@ -29,6 +30,7 @@
    (not (null (string-match-p "Parse error in" (cadr err))))
    (not (null (string-match-p "broken\\.el" (cadr err))))))
 (file-exists-p vm-precompile-parse-cache)
+(file-exists-p vm-precompile-parse-cache-tmp)
 
 (delete-file vm-precompile-parse-source)
 (delete-directory vm-precompile-parse-dir t)
