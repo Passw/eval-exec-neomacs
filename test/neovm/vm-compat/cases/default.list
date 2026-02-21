@@ -636,6 +636,7 @@ cases/features-sync
 cases/featurep-optional-subfeature-semantics
 cases/pcase
 cases/pcase-dolist-fallback-macro-semantics
+cases/pcase-let-fallback-macro-semantics
 cases/json-semantics
 cases/json-buffer-semantics
 cases/json-keyword-errors

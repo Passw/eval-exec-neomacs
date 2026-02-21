@@ -226,7 +226,14 @@ struct FallbackMacroSpec {
 
 fn fallback_macro_spec(name: &str) -> Option<FallbackMacroSpec> {
     match name {
-        "when" | "unless" | "dotimes" | "dolist" | "pcase-dolist" | "with-mutex" => {
+        "when"
+        | "unless"
+        | "dotimes"
+        | "dolist"
+        | "pcase-let"
+        | "pcase-let*"
+        | "pcase-dolist"
+        | "with-mutex" => {
             Some(FallbackMacroSpec { min: 1, max: None })
         }
         "with-current-buffer" | "with-syntax-table" | "with-eval-after-load" => {
@@ -4564,6 +4571,32 @@ mod tests {
     #[test]
     fn fallback_macro_pcase_dolist_is_one_or_many() {
         let macro_value = fallback_macro_value("pcase-dolist").expect("fallback macro exists");
+        let result = builtin_func_arity(vec![macro_value]).unwrap();
+        if let Value::Cons(cell) = &result {
+            let pair = cell.lock().unwrap();
+            assert_eq!(pair.car.as_int(), Some(1));
+            assert_eq!(pair.cdr.as_symbol_name(), Some("many"));
+        } else {
+            panic!("expected cons cell");
+        }
+    }
+
+    #[test]
+    fn fallback_macro_pcase_let_is_one_or_many() {
+        let macro_value = fallback_macro_value("pcase-let").expect("fallback macro exists");
+        let result = builtin_func_arity(vec![macro_value]).unwrap();
+        if let Value::Cons(cell) = &result {
+            let pair = cell.lock().unwrap();
+            assert_eq!(pair.car.as_int(), Some(1));
+            assert_eq!(pair.cdr.as_symbol_name(), Some("many"));
+        } else {
+            panic!("expected cons cell");
+        }
+    }
+
+    #[test]
+    fn fallback_macro_pcase_let_star_is_one_or_many() {
+        let macro_value = fallback_macro_value("pcase-let*").expect("fallback macro exists");
         let result = builtin_func_arity(vec![macro_value]).unwrap();
         if let Value::Cons(cell) = &result {
             let pair = cell.lock().unwrap();

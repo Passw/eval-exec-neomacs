@@ -1,0 +1,23 @@
+1	(fboundp 'pcase-let)	OK t
+2	(fboundp 'pcase-let*)	OK t
+3	(macrop 'pcase-let)	OK (t)
+4	(macrop 'pcase-let*)	OK (t)
+5	(functionp 'pcase-let)	OK nil
+6	(functionp 'pcase-let*)	OK nil
+7	(autoloadp (symbol-function 'pcase-let))	OK t
+8	(autoloadp (indirect-function 'pcase-let))	OK t
+9	(let ((f (symbol-function 'pcase-let))) (list (car f) (nth 1 f) (nth 3 f) (nth 4 f)))	OK (autoload "pcase" nil t)
+10	(let ((d (nth 2 (symbol-function 'pcase-let)))) (list (stringp d) (string-match-p "Like `let'" d)))	OK (t 0)
+11	(autoloadp (symbol-function 'pcase-let*))	OK t
+12	(autoloadp (indirect-function 'pcase-let*))	OK t
+13	(func-arity 'pcase-let)	OK (1 . many)
+14	(func-arity 'pcase-let*)	OK (1 . many)
+15	(macroexpand '(pcase-let ((x 1)) x))	OK (let* ((x 1)) x)
+16	(macroexpand '(pcase-let ((x 1) (y x)) (list x y)))	OK (let ((x 1) (y x)) (pcase-let* nil (list x y)))
+17	(macroexpand '(pcase-let* ((x 1) (y x)) (list x y)))	OK (let* ((x 1) (y x)) (list x y))
+18	(condition-case err (macroexpand '(pcase-let)) (error err))	OK (wrong-number-of-arguments (1 . 1) 0)
+19	(condition-case err (macroexpand '(pcase-let*)) (error err))	OK (wrong-number-of-arguments (1 . 1) 0)
+20	(condition-case err (macroexpand '(pcase-let x x)) (error err))	OK (wrong-type-argument listp x)
+21	(condition-case err (macroexpand '(pcase-let* x x)) (error err))	OK (wrong-type-argument listp x)
+22	(pcase-let ((x 10) (y 20)) (+ x y))	OK 30
+23	(pcase-let* ((x 10) (y (+ x 5))) y)	OK 15
