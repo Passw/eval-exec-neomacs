@@ -376,6 +376,13 @@ cd test/neovm/vm-compat
 make check-all-neovm-only
 ```
 
+To refresh NeoVM-only expected baselines from NeoVM output directly:
+
+```bash
+cd test/neovm/vm-compat
+make record-all-neovm-only
+```
+
 Current NeoVM-only policy cases include source-only loading behavior (`.elc`
 rejection and `.neoc` fallback safety) plus NeoVM extension behavior
 (`neovm-precompile-file` cache warming and argument/error contracts), and
