@@ -556,6 +556,7 @@ cases/default-directory
 cases/expand-file-name-default-directory
 cases/write-region-bounds-runtime-semantics
 cases/insert-file-contents-beg-end-runtime-semantics
+cases/fileio-arity-bounds-runtime-semantics
 cases/directory-file-name
 cases/directory-files
 cases/directory-files-and-attributes

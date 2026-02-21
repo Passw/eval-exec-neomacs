@@ -2832,6 +2832,7 @@ pub(crate) fn builtin_insert_file_contents(
     args: Vec<Value>,
 ) -> EvalResult {
     expect_min_args("insert-file-contents", &args, 1)?;
+    expect_max_args("insert-file-contents", &args, 5)?;
     let filename = expect_string(&args[0])?;
     let resolved = resolve_filename_for_eval(eval, &filename);
     let visit = args.get(1).is_some_and(|v| v.is_truthy());
@@ -2901,6 +2902,7 @@ pub(crate) fn builtin_write_region(
     args: Vec<Value>,
 ) -> EvalResult {
     expect_min_args("write-region", &args, 3)?;
+    expect_max_args("write-region", &args, 7)?;
     let filename = expect_string(&args[2])?;
     let resolved = resolve_filename_for_eval(eval, &filename);
     let append = args.get(3).is_some_and(|v| v.is_truthy());
@@ -5073,6 +5075,102 @@ mod tests {
                     sig.data,
                     vec![Value::symbol("file-offset"), Value::Int(-1)]
                 );
+            }
+            other => panic!("unexpected flow: {other:?}"),
+        }
+
+        let _ = fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn test_insert_file_contents_and_write_region_arity_bounds() {
+        use super::super::eval::Evaluator;
+
+        let dir = std::env::temp_dir().join("neovm_eval_fileio_arity_bounds");
+        let _ = fs::remove_dir_all(&dir);
+        fs::create_dir_all(&dir).unwrap();
+
+        let file_path = dir.join("arity.txt");
+        let file_str = file_path.to_string_lossy().to_string();
+        write_string_to_file("", &file_str, false).unwrap();
+
+        let mut eval_insert_ok = Evaluator::new();
+        let insert_ok = builtin_insert_file_contents(
+            &mut eval_insert_ok,
+            vec![
+                Value::string(&file_str),
+                Value::Nil,
+                Value::Nil,
+                Value::Nil,
+                Value::Nil,
+            ],
+        )
+        .expect("5-arg insert-file-contents should succeed");
+        assert_eq!(list_to_vec(&insert_ok).unwrap()[1], Value::Int(0));
+
+        let mut eval_insert_bad = Evaluator::new();
+        let insert_bad = builtin_insert_file_contents(
+            &mut eval_insert_bad,
+            vec![
+                Value::string(&file_str),
+                Value::Nil,
+                Value::Nil,
+                Value::Nil,
+                Value::Nil,
+                Value::Nil,
+            ],
+        )
+        .expect_err("6-arg insert-file-contents should fail");
+        match insert_bad {
+            Flow::Signal(sig) => {
+                assert_eq!(sig.symbol, "wrong-number-of-arguments");
+                assert_eq!(
+                    sig.data,
+                    vec![Value::symbol("insert-file-contents"), Value::Int(6)]
+                );
+            }
+            other => panic!("unexpected flow: {other:?}"),
+        }
+
+        let out_path = dir.join("arity-out.txt");
+        let out_str = out_path.to_string_lossy().to_string();
+
+        let mut eval_write_ok = Evaluator::new();
+        eval_write_ok.buffers.current_buffer_mut().unwrap().insert("x");
+        builtin_write_region(
+            &mut eval_write_ok,
+            vec![
+                Value::Nil,
+                Value::Nil,
+                Value::string(&out_str),
+                Value::Nil,
+                Value::Nil,
+                Value::Nil,
+                Value::Nil,
+            ],
+        )
+        .expect("7-arg write-region should succeed");
+
+        let mut eval_write_bad = Evaluator::new();
+        eval_write_bad.buffers.current_buffer_mut().unwrap().insert("x");
+        let write_bad = builtin_write_region(
+            &mut eval_write_bad,
+            vec![
+                Value::Nil,
+                Value::Nil,
+                Value::string(&out_str),
+                Value::Nil,
+                Value::Nil,
+                Value::Nil,
+                Value::Nil,
+                Value::Nil,
+            ],
+        )
+        .expect_err("8-arg write-region should fail");
+        match write_bad {
+            Flow::Signal(sig) => {
+                assert_eq!(sig.symbol, "wrong-number-of-arguments");
+                assert_eq!(sig.data, vec![Value::symbol("write-region"), Value::Int(8)]);
             }
             other => panic!("unexpected flow: {other:?}"),
         }
