@@ -2566,10 +2566,76 @@ fn command_remapping_lookup_in_keymap_id(
         .map(command_remapping_binding_value)
 }
 
+fn command_remapping_lookup_in_minor_mode_alist(
+    eval: &Evaluator,
+    command_name: &str,
+    alist_value: &Value,
+) -> Option<Value> {
+    let entries = list_to_vec(alist_value)?;
+    for entry in entries {
+        let Some((mode_name, map_value)) = minor_mode_map_entry(&entry) else {
+            continue;
+        };
+        if !dynamic_or_global_symbol_value(eval, &mode_name).is_some_and(|v| v.is_truthy()) {
+            continue;
+        }
+
+        let map_id = match map_value {
+            Value::Int(n) => decode_keymap_handle(n).filter(|id| eval.keymaps.is_keymap(*id)),
+            _ => None,
+        };
+        let Some(map_id) = map_id else {
+            continue;
+        };
+
+        if let Some(value) = command_remapping_lookup_in_keymap_id(eval, map_id, command_name) {
+            return Some(value);
+        }
+    }
+    None
+}
+
+fn command_remapping_lookup_in_minor_mode_maps(
+    eval: &Evaluator,
+    command_name: &str,
+) -> Option<Value> {
+    if let Some(emulation_raw) = dynamic_or_global_symbol_value(eval, "emulation-mode-map-alists") {
+        if let Some(emulation_entries) = list_to_vec(&emulation_raw) {
+            for emulation_entry in emulation_entries {
+                let alist_value = match emulation_entry.as_symbol_name() {
+                    Some(name) => dynamic_or_global_symbol_value(eval, name).unwrap_or(Value::Nil),
+                    None => emulation_entry,
+                };
+                if let Some(value) =
+                    command_remapping_lookup_in_minor_mode_alist(eval, command_name, &alist_value)
+                {
+                    return Some(value);
+                }
+            }
+        }
+    }
+
+    for alist_name in ["minor-mode-overriding-map-alist", "minor-mode-map-alist"] {
+        let Some(alist_value) = dynamic_or_global_symbol_value(eval, alist_name) else {
+            continue;
+        };
+        if let Some(value) =
+            command_remapping_lookup_in_minor_mode_alist(eval, command_name, &alist_value)
+        {
+            return Some(value);
+        }
+    }
+
+    None
+}
+
 fn command_remapping_lookup_in_active_keymaps(
     eval: &Evaluator,
     command_name: &str,
 ) -> Option<Value> {
+    if let Some(value) = command_remapping_lookup_in_minor_mode_maps(eval, command_name) {
+        return Some(value);
+    }
     if let Some(local_id) = eval.current_local_map {
         if let Some(value) = command_remapping_lookup_in_keymap_id(eval, local_id, command_name) {
             return Some(value);
@@ -6712,6 +6778,65 @@ K")
                        (command-remapping 'ignore (point-min))))"#
             ),
             "OK self-insert-command"
+        );
+    }
+
+    #[test]
+    fn command_remapping_checks_minor_mode_maps_before_local_and_global() {
+        assert_eq!(
+            eval_one(
+                r#"(let ((g (make-sparse-keymap))
+                         (m (make-sparse-keymap))
+                         (minor-mode-map-alist nil)
+                         (demo-mode t))
+                     (use-global-map g)
+                     (define-key m [remap ignore] 'self-insert-command)
+                     (setq minor-mode-map-alist (list (cons 'demo-mode m)))
+                     (command-remapping 'ignore))"#
+            ),
+            "OK self-insert-command"
+        );
+        assert_eq!(
+            eval_one(
+                r#"(let ((g (make-sparse-keymap))
+                         (l (make-sparse-keymap))
+                         (m (make-sparse-keymap))
+                         (minor-mode-map-alist nil)
+                         (demo-mode t))
+                     (use-global-map g)
+                     (use-local-map l)
+                     (define-key m [remap ignore] 'forward-char)
+                     (define-key l [remap ignore] 'self-insert-command)
+                     (setq minor-mode-map-alist (list (cons 'demo-mode m)))
+                     (command-remapping 'ignore))"#
+            ),
+            "OK forward-char"
+        );
+        assert_eq!(
+            eval_one(
+                r#"(let ((g (make-sparse-keymap))
+                         (l (make-sparse-keymap))
+                         (m (make-sparse-keymap))
+                         (minor-mode-overriding-map-alist nil)
+                         (minor-mode-map-alist nil)
+                         (demo-mode t))
+                     (use-global-map g)
+                     (use-local-map l)
+                     (define-key m [remap ignore] 'forward-char)
+                     (define-key l [remap ignore] 'self-insert-command)
+                     (setq minor-mode-overriding-map-alist (list (cons 'demo-mode m)))
+                     (setq minor-mode-map-alist (list (cons 'demo-mode l)))
+                     (command-remapping 'ignore))"#
+            ),
+            "OK forward-char"
+        );
+        assert_eq!(
+            eval_one(
+                r#"(let ((minor-mode-map-alist '((demo-mode . 999999)))
+                         (demo-mode t))
+                     (command-remapping 'ignore))"#
+            ),
+            "OK nil"
         );
     }
 

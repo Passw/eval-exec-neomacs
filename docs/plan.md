@@ -18127,6 +18127,34 @@ Last updated: 2026-02-21
 
 ## Doing
 
+- Fixed `command-remapping` minor-mode map coverage and precedence for omitted/`nil` `KEYMAP`:
+  - runtime changes:
+    - `rust/neovm-core/src/elisp/interactive.rs`
+      - active-map remap lookup now includes minor-mode maps before local/global maps:
+        - `emulation-mode-map-alists`,
+        - `minor-mode-overriding-map-alist`,
+        - `minor-mode-map-alist`,
+        - then local map, then global map.
+      - invalid/non-keymap minor-mode map entries are ignored for remap lookup (oracle-compatible).
+      - added unit coverage:
+        - `command_remapping_checks_minor_mode_maps_before_local_and_global`.
+  - vm-compat corpus changes:
+    - added and wired:
+      - `test/neovm/vm-compat/cases/command-remapping-minor-mode-map-semantics.forms`
+      - `test/neovm/vm-compat/cases/command-remapping-minor-mode-map-semantics.expected.tsv`
+      - `test/neovm/vm-compat/cases/default.list`
+    - lock-ins cover:
+      - remap resolution through active minor-mode maps,
+      - minor-mode precedence over local/global remaps,
+      - overriding-map precedence over regular minor-mode map alist,
+      - inactive mode entries ignored,
+      - invalid minor-mode map entries ignored without signaling.
+  - verified:
+    - `cargo test --manifest-path rust/neovm-core/Cargo.toml command_remapping_checks_minor_mode_maps_before_local_and_global -- --nocapture` (pass)
+    - `make -C test/neovm/vm-compat record FORMS=cases/command-remapping-minor-mode-map-semantics.forms EXPECTED=cases/command-remapping-minor-mode-map-semantics.expected.tsv` (pass)
+    - `make -C test/neovm/vm-compat check-one-neovm CASE=cases/command-remapping-minor-mode-map-semantics` (pass; `7/7`)
+    - `make -C test/neovm/vm-compat check-all-neovm-strict` (pass; case inventory `876`)
+
 - Fixed `command-remapping` active-map semantics when optional `KEYMAP` is omitted/`nil`:
   - runtime changes:
     - `rust/neovm-core/src/elisp/interactive.rs`
