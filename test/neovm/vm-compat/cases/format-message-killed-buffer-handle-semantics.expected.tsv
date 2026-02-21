@@ -5,3 +5,5 @@
 5	(let* ((b (generate-new-buffer "fmt-killed-vm"))) (kill-buffer b) (string= (format "%S" b) "#<killed buffer>"))	OK t
 6	(let* ((b (generate-new-buffer "fmt-killed-vm-lower"))) (kill-buffer b) (string= (format "%s" b) "#<killed buffer>"))	OK t
 7	(let* ((b (generate-new-buffer "msg-killed-vm"))) (kill-buffer b) (string= (message "%S" b) "#<killed buffer>"))	OK t
+8	(let* ((b (generate-new-buffer "fmt-live-vm"))) (prog1 (string-prefix-p "#<buffer fmt-live-vm" (format "%S" b)) (kill-buffer b)))	OK t
+9	(let* ((b (generate-new-buffer "msg-live-vm"))) (prog1 (string-prefix-p "#<buffer msg-live-vm" (message "%S" b)) (kill-buffer b)))	OK t
