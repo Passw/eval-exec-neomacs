@@ -40,3 +40,9 @@
 40	(condition-case err (macroexpand '(pcase-let* x x)) (error err))	OK (wrong-type-argument listp x)
 41	(pcase-let ((x 10) (y 20)) (+ x y))	OK 30
 42	(pcase-let* ((x 10) (y (+ x 5))) y)	OK 15
+43	(condition-case err (macroexpand '(pcase-let (x . y) x)) (error err))	OK (wrong-type-argument listp x)
+44	(condition-case err (macroexpand '(pcase-let (x . y))) (error err))	OK (wrong-type-argument listp x)
+45	(condition-case err (macroexpand '(pcase-let ((x . y) z) q)) (error err))	OK (wrong-type-argument listp z)
+46	(condition-case err (macroexpand '(pcase-let* (((x . y) 1) q) r)) (error err))	OK (wrong-type-argument listp q)
+47	(condition-case err (macroexpand '(pcase-let* (((x . y) 1) (z 2)) z)) (error err))	OK (error "Unknown x pattern: (x . y)")
+48	(macroexpand '(pcase-let ((x 1 2)) q))	OK (let* ((x 1 2)) q)

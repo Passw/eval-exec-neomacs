@@ -4261,11 +4261,7 @@ fn maybe_mark_pcase_fallback_materialized(
     }
     let _ = builtin_put(
         eval,
-        vec![
-            Value::symbol(name),
-            Value::symbol(property),
-            Value::True,
-        ],
+        vec![Value::symbol(name), Value::symbol(property), Value::True],
     );
 }
 
@@ -4578,13 +4574,10 @@ fn parse_simple_backquote_list_unquotes(pattern: &Value) -> Option<SimpleBackquo
         return None;
     }
 
-    if let Some(dot_idx) = items
-        .iter()
-        .position(|item| {
-            item.as_symbol_name()
-                .is_some_and(|name| name == "," || name == "\\,")
-        })
-    {
+    if let Some(dot_idx) = items.iter().position(|item| {
+        item.as_symbol_name()
+            .is_some_and(|name| name == "," || name == "\\,")
+    }) {
         if dot_idx == 0 || dot_idx + 2 != items.len() {
             return None;
         }
@@ -4755,13 +4748,50 @@ fn collapse_macroexpand_body_forms(body_forms: &[Value]) -> Value {
     }
 }
 
-fn ensure_proper_list_shape(value: &Value) -> Result<(), Flow> {
-    let mut cursor = value.clone();
+#[derive(Clone)]
+struct PcaseFallbackBinding {
+    original: Value,
+    pattern: Value,
+    value_expr: Value,
+}
+
+fn parse_pcase_fallback_binding(binding: &Value) -> Result<PcaseFallbackBinding, Flow> {
+    let Value::Cons(cell) = binding.clone() else {
+        return Err(signal(
+            "wrong-type-argument",
+            vec![Value::symbol("listp"), binding.clone()],
+        ));
+    };
+    let pair = cell.lock().expect("poisoned");
+    let pattern = pair.car.clone();
+    let cdr = pair.cdr.clone();
+    drop(pair);
+
+    let value_expr = match cdr {
+        Value::Nil => Value::Nil,
+        Value::Cons(cdr_cell) => cdr_cell.lock().expect("poisoned").car.clone(),
+        other => other,
+    };
+
+    Ok(PcaseFallbackBinding {
+        original: binding.clone(),
+        pattern,
+        value_expr,
+    })
+}
+
+fn collect_pcase_fallback_bindings(bindings: &Value) -> Result<Vec<PcaseFallbackBinding>, Flow> {
+    let mut cursor = bindings.clone();
+    let mut parsed = Vec::new();
     loop {
         match cursor {
-            Value::Nil => return Ok(()),
+            Value::Nil => return Ok(parsed),
             Value::Cons(cell) => {
-                cursor = cell.lock().expect("poisoned").cdr.clone();
+                let pair = cell.lock().expect("poisoned");
+                let binding = pair.car.clone();
+                cursor = pair.cdr.clone();
+                drop(pair);
+                parsed.push(parse_pcase_fallback_binding(&binding)?);
             }
             other => {
                 return Err(signal(
@@ -5059,16 +5089,14 @@ fn macroexpand_known_fallback_macro(
                 return Ok(Some(Value::Nil));
             }
             if name == "pcase-let" && args.len() == 1 {
-                ensure_proper_list_shape(&args[0])?;
+                if list_to_vec(&args[0]).is_some() {
+                    return Ok(Some(Value::Nil));
+                }
+                let _ = collect_pcase_fallback_bindings(&args[0])?;
                 return Ok(Some(Value::Nil));
             }
 
-            let bindings_src = list_to_vec(&args[0]).ok_or_else(|| {
-                signal(
-                    "wrong-type-argument",
-                    vec![Value::symbol("listp"), args[0].clone()],
-                )
-            })?;
+            let bindings_src = collect_pcase_fallback_bindings(&args[0])?;
 
             if name == "pcase-let*" {
                 enum ParsedPcaseLetStarBinding {
@@ -5081,33 +5109,32 @@ fn macroexpand_known_fallback_macro(
 
                 let mut parsed = Vec::with_capacity(bindings_src.len());
                 let mut has_pattern = false;
+                let mut unknown_pattern = None;
 
                 for binding in &bindings_src {
-                    let pair = list_to_vec(binding).ok_or_else(|| {
-                        signal(
-                            "wrong-type-argument",
-                            vec![Value::symbol("listp"), binding.clone()],
-                        )
-                    })?;
-                    if pair.len() != 2 {
-                        return Ok(None);
-                    }
-                    if pair[0].as_symbol_name().is_some() {
-                        parsed.push(ParsedPcaseLetStarBinding::Symbol(Value::list(vec![
-                            pair[0].clone(),
-                            pair[1].clone(),
-                        ])));
+                    if binding.pattern.as_symbol_name().is_some() {
+                        parsed.push(ParsedPcaseLetStarBinding::Symbol(binding.original.clone()));
                         continue;
                     }
 
-                    let Some(spec) = parse_simple_backquote_list_unquotes(&pair[0]) else {
-                        return Ok(None);
+                    let Some(spec) = parse_simple_backquote_list_unquotes(&binding.pattern) else {
+                        if unknown_pattern.is_none() {
+                            unknown_pattern = Some(binding.pattern.clone());
+                        }
+                        continue;
                     };
                     has_pattern = true;
                     parsed.push(ParsedPcaseLetStarBinding::Pattern {
                         spec,
-                        value_expr: pair[1].clone(),
+                        value_expr: binding.value_expr.clone(),
                     });
+                }
+
+                if let Some(pattern) = unknown_pattern {
+                    return Err(signal(
+                        "error",
+                        vec![Value::string(format!("Unknown x pattern: {pattern}"))],
+                    ));
                 }
 
                 let mut expanded = collapse_macroexpand_body_forms(&args[1..]);
@@ -5174,22 +5201,13 @@ fn macroexpand_known_fallback_macro(
             let mut symbol_bindings = Vec::with_capacity(bindings_src.len());
             let mut pattern_bindings = Vec::new();
             for binding in &bindings_src {
-                let pair = list_to_vec(binding).ok_or_else(|| {
-                    signal(
-                        "wrong-type-argument",
-                        vec![Value::symbol("listp"), binding.clone()],
-                    )
-                })?;
-                if pair.len() != 2 {
-                    return Ok(None);
-                }
-                if pair[0].as_symbol_name().is_some() {
-                    symbol_bindings.push(Value::list(vec![pair[0].clone(), pair[1].clone()]));
+                if binding.pattern.as_symbol_name().is_some() {
+                    symbol_bindings.push(binding.original.clone());
                     continue;
                 }
                 let temp = Value::symbol(format!("x{}", symbol_bindings.len()));
-                symbol_bindings.push(Value::list(vec![temp.clone(), pair[1].clone()]));
-                pattern_bindings.push(Value::list(vec![pair[0].clone(), temp]));
+                symbol_bindings.push(Value::list(vec![temp.clone(), binding.value_expr.clone()]));
+                pattern_bindings.push(Value::list(vec![binding.pattern.clone(), temp]));
             }
 
             if !pattern_bindings.is_empty() {
@@ -20900,7 +20918,9 @@ mod tests {
         let pcase_dolist_macro =
             builtin_symbol_function(&mut eval, vec![Value::symbol("pcase-dolist")])
                 .expect("symbol-function should resolve pcase-dolist startup autoload");
-        assert!(crate::elisp::autoload::is_autoload_value(&pcase_dolist_macro));
+        assert!(crate::elisp::autoload::is_autoload_value(
+            &pcase_dolist_macro
+        ));
         let pcase_dolist_items =
             list_to_vec(&pcase_dolist_macro).expect("pcase-dolist should remain a proper list");
         assert_eq!(pcase_dolist_items.len(), 5);
@@ -20923,7 +20943,9 @@ mod tests {
         let pcase_let_star_macro =
             builtin_symbol_function(&mut eval, vec![Value::symbol("pcase-let*")])
                 .expect("symbol-function should resolve pcase-let* startup autoload");
-        assert!(crate::elisp::autoload::is_autoload_value(&pcase_let_star_macro));
+        assert!(crate::elisp::autoload::is_autoload_value(
+            &pcase_let_star_macro
+        ));
         let pcase_let_star_items =
             list_to_vec(&pcase_let_star_macro).expect("pcase-let* should remain a proper list");
         assert_eq!(pcase_let_star_items.len(), 5);
@@ -21225,7 +21247,10 @@ mod tests {
 
         let symbol_arity = builtin_func_arity_eval(&mut eval, vec![Value::symbol("pcase-dolist")])
             .expect("func-arity should resolve pcase-dolist symbol");
-        assert_eq!(symbol_arity, Value::cons(Value::Int(1), Value::symbol("many")));
+        assert_eq!(
+            symbol_arity,
+            Value::cons(Value::Int(1), Value::symbol("many"))
+        );
 
         let materialized_indirect =
             builtin_indirect_function(&mut eval, vec![Value::symbol("pcase-dolist")])
@@ -21236,7 +21261,10 @@ mod tests {
         );
         let followup_arity = builtin_func_arity_eval(&mut eval, vec![materialized_indirect])
             .expect("materialized indirect pcase-dolist should satisfy func-arity");
-        assert_eq!(followup_arity, Value::cons(Value::Int(1), Value::symbol("many")));
+        assert_eq!(
+            followup_arity,
+            Value::cons(Value::Int(1), Value::symbol("many"))
+        );
     }
 
     #[test]
@@ -21245,7 +21273,9 @@ mod tests {
 
         for name in ["pcase-let", "pcase-let*"] {
             let startup_indirect = builtin_indirect_function(&mut eval, vec![Value::symbol(name)])
-                .unwrap_or_else(|_| panic!("indirect-function should resolve {name} startup shape"));
+                .unwrap_or_else(|_| {
+                    panic!("indirect-function should resolve {name} startup shape")
+                });
             assert!(
                 crate::elisp::autoload::is_autoload_value(&startup_indirect),
                 "expected {name} startup indirect-function to be autoload-shaped"
@@ -21262,20 +21292,27 @@ mod tests {
 
             let symbol_arity = builtin_func_arity_eval(&mut eval, vec![Value::symbol(name)])
                 .unwrap_or_else(|_| panic!("func-arity should resolve {name} symbol"));
-            assert_eq!(symbol_arity, Value::cons(Value::Int(1), Value::symbol("many")));
+            assert_eq!(
+                symbol_arity,
+                Value::cons(Value::Int(1), Value::symbol("many"))
+            );
 
             let materialized_indirect =
-                builtin_indirect_function(&mut eval, vec![Value::symbol(name)])
-                    .unwrap_or_else(|_| {
-                        panic!("indirect-function should resolve {name} after func-arity")
-                    });
+                builtin_indirect_function(&mut eval, vec![Value::symbol(name)]).unwrap_or_else(
+                    |_| panic!("indirect-function should resolve {name} after func-arity"),
+                );
             assert!(
                 !crate::elisp::autoload::is_autoload_value(&materialized_indirect),
                 "indirect-function should stop returning startup autoload for {name} after func-arity symbol"
             );
             let followup_arity = builtin_func_arity_eval(&mut eval, vec![materialized_indirect])
-                .unwrap_or_else(|_| panic!("materialized indirect {name} should satisfy func-arity"));
-            assert_eq!(followup_arity, Value::cons(Value::Int(1), Value::symbol("many")));
+                .unwrap_or_else(|_| {
+                    panic!("materialized indirect {name} should satisfy func-arity")
+                });
+            assert_eq!(
+                followup_arity,
+                Value::cons(Value::Int(1), Value::symbol("many"))
+            );
         }
     }
 
@@ -21403,7 +21440,9 @@ mod tests {
         let pcase_dolist_macro =
             builtin_indirect_function(&mut eval, vec![Value::symbol("pcase-dolist")])
                 .expect("indirect-function should resolve pcase-dolist startup autoload");
-        assert!(crate::elisp::autoload::is_autoload_value(&pcase_dolist_macro));
+        assert!(crate::elisp::autoload::is_autoload_value(
+            &pcase_dolist_macro
+        ));
         let pcase_dolist_items =
             list_to_vec(&pcase_dolist_macro).expect("pcase-dolist should remain a proper list");
         assert_eq!(pcase_dolist_items.len(), 5);
@@ -21427,7 +21466,9 @@ mod tests {
         let pcase_let_star_macro =
             builtin_indirect_function(&mut eval, vec![Value::symbol("pcase-let*")])
                 .expect("indirect-function should resolve pcase-let* startup autoload");
-        assert!(crate::elisp::autoload::is_autoload_value(&pcase_let_star_macro));
+        assert!(crate::elisp::autoload::is_autoload_value(
+            &pcase_let_star_macro
+        ));
         let pcase_let_star_items =
             list_to_vec(&pcase_let_star_macro).expect("pcase-let* should remain a proper list");
         assert_eq!(pcase_let_star_items.len(), 5);
@@ -22095,10 +22136,9 @@ mod tests {
             pcase_let_star_mixed_prefix_expanded,
             pcase_let_star_mixed_prefix_expected
         );
-        let pcase_let_star_mixed_dotted_forms = crate::elisp::parser::parse_forms(
-            r#"(pcase-let* ((`(,a . ,b) '(1 2 3))) (list a b))"#,
-        )
-        .expect("mixed dotted pcase-let* form should parse");
+        let pcase_let_star_mixed_dotted_forms =
+            crate::elisp::parser::parse_forms(r#"(pcase-let* ((`(,a . ,b) '(1 2 3))) (list a b))"#)
+                .expect("mixed dotted pcase-let* form should parse");
         let pcase_let_star_mixed_dotted = crate::elisp::eval::quote_to_value(
             pcase_let_star_mixed_dotted_forms
                 .first()
@@ -22177,7 +22217,11 @@ mod tests {
         .expect("macroexpand should collapse multi-body empty pcase-let bindings");
         assert_eq!(
             pcase_let_empty_multi,
-            Value::list(vec![Value::symbol("progn"), Value::symbol("a"), Value::symbol("b"),])
+            Value::list(vec![
+                Value::symbol("progn"),
+                Value::symbol("a"),
+                Value::symbol("b"),
+            ])
         );
         let pcase_let_star_multi_pattern_forms = crate::elisp::parser::parse_forms(
             r#"(pcase-let* ((`(,a ,b) '(1 2)) (`(,c ,d) '(3 4))) (list a b c d))"#,
@@ -22204,10 +22248,9 @@ mod tests {
             pcase_let_star_multi_pattern_expanded,
             pcase_let_star_multi_pattern_expected
         );
-        let pcase_let_star_vector_pattern_forms = crate::elisp::parser::parse_forms(
-            r#"(pcase-let* ((`[,a ,b] [1 2])) (list a b))"#,
-        )
-        .expect("vector-pattern pcase-let* form should parse");
+        let pcase_let_star_vector_pattern_forms =
+            crate::elisp::parser::parse_forms(r#"(pcase-let* ((`[,a ,b] [1 2])) (list a b))"#)
+                .expect("vector-pattern pcase-let* form should parse");
         let pcase_let_star_vector_pattern = crate::elisp::eval::quote_to_value(
             pcase_let_star_vector_pattern_forms
                 .first()
@@ -22286,6 +22329,106 @@ mod tests {
         )
         .expect("macroexpand should ignore no-body pcase-let binding element shape");
         assert_eq!(pcase_let_no_body_nonbinding, Value::Nil);
+        let bad_pcase_let_no_body_improper = builtin_macroexpand_eval(
+            &mut eval,
+            vec![Value::list(vec![
+                Value::symbol("pcase-let"),
+                Value::cons(Value::symbol("x"), Value::symbol("y")),
+            ])],
+        )
+        .expect_err("macroexpand should reject no-body improper pcase-let binding lists");
+        match bad_pcase_let_no_body_improper {
+            Flow::Signal(sig) => {
+                assert_eq!(sig.symbol, "wrong-type-argument");
+                assert_eq!(sig.data, vec![Value::symbol("listp"), Value::symbol("x")]);
+            }
+            other => panic!("unexpected flow: {other:?}"),
+        }
+        let bad_pcase_let_binding_tail = builtin_macroexpand_eval(
+            &mut eval,
+            vec![Value::list(vec![
+                Value::symbol("pcase-let"),
+                Value::list(vec![
+                    Value::cons(Value::symbol("x"), Value::symbol("y")),
+                    Value::symbol("z"),
+                ]),
+                Value::symbol("q"),
+            ])],
+        )
+        .expect_err("macroexpand should reject malformed top-level pcase-let binding tails");
+        match bad_pcase_let_binding_tail {
+            Flow::Signal(sig) => {
+                assert_eq!(sig.symbol, "wrong-type-argument");
+                assert_eq!(sig.data, vec![Value::symbol("listp"), Value::symbol("z")]);
+            }
+            other => panic!("unexpected flow: {other:?}"),
+        }
+        let pcase_let_symbol_extra_forms = builtin_macroexpand_eval(
+            &mut eval,
+            vec![Value::list(vec![
+                Value::symbol("pcase-let"),
+                Value::list(vec![Value::list(vec![
+                    Value::symbol("x"),
+                    Value::Int(1),
+                    Value::Int(2),
+                ])]),
+                Value::symbol("q"),
+            ])],
+        )
+        .expect("macroexpand should preserve let-style symbol binding forms");
+        assert_eq!(
+            pcase_let_symbol_extra_forms,
+            Value::list(vec![
+                Value::symbol("let*"),
+                Value::list(vec![Value::list(vec![
+                    Value::symbol("x"),
+                    Value::Int(1),
+                    Value::Int(2),
+                ])]),
+                Value::symbol("q"),
+            ])
+        );
+        let bad_pcase_let_star_unknown_pattern = builtin_macroexpand_eval(
+            &mut eval,
+            vec![Value::list(vec![
+                Value::symbol("pcase-let*"),
+                Value::list(vec![
+                    Value::list(vec![
+                        Value::cons(Value::symbol("x"), Value::symbol("y")),
+                        Value::Int(1),
+                    ]),
+                    Value::list(vec![Value::symbol("z"), Value::Int(2)]),
+                ]),
+                Value::symbol("z"),
+            ])],
+        )
+        .expect_err("macroexpand should surface unsupported pcase-let* fallback patterns");
+        match bad_pcase_let_star_unknown_pattern {
+            Flow::Signal(sig) => {
+                assert_eq!(sig.symbol, "error");
+                assert_eq!(sig.data, vec![Value::string("Unknown x pattern: (x . y)")]);
+            }
+            other => panic!("unexpected flow: {other:?}"),
+        }
+        let bad_pcase_let_star_unknown_pattern_tail = builtin_macroexpand_eval(
+            &mut eval,
+            vec![Value::list(vec![
+                Value::symbol("pcase-let*"),
+                Value::list(vec![
+                    Value::list(vec![Value::cons(Value::symbol("x"), Value::symbol("y")), Value::Int(1)]),
+                    Value::symbol("q"),
+                ]),
+                Value::symbol("r"),
+            ])],
+        )
+        .expect_err("macroexpand should preserve malformed-binding payloads ahead of unknown pattern errors");
+        match bad_pcase_let_star_unknown_pattern_tail {
+            Flow::Signal(sig) => {
+                assert_eq!(sig.symbol, "wrong-type-argument");
+                assert_eq!(sig.data, vec![Value::symbol("listp"), Value::symbol("q")]);
+            }
+            other => panic!("unexpected flow: {other:?}"),
+        }
         let bad_pcase_let = builtin_macroexpand_eval(
             &mut eval,
             vec![Value::list(vec![
