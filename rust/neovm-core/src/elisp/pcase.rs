@@ -162,10 +162,10 @@ fn compile_list_pattern(items: &[Expr]) -> Result<Pattern, Flow> {
 
         // (app FUN PAT)
         Expr::Symbol(s) if s == "app" => {
-            if items.len() != 3 {
+            if items.len() < 3 {
                 return Err(signal(
                     "error",
-                    vec![Value::string("app pattern requires exactly two arguments")],
+                    vec![Value::string("Unknown pattern ‘nil’")],
                 ));
             }
             let sub = compile_pattern(&items[2])?;
@@ -1328,6 +1328,26 @@ mod tests {
         assert_eq!(
             eval_last("(pcase '(1 2 3) ((app length 3) 'three) (_ 'other))"),
             "OK three"
+        );
+    }
+
+    #[test]
+    fn pcase_app_pattern_missing_args_reports_unknown_nil_pattern() {
+        assert_eq!(
+            eval_last("(condition-case err (pcase 1 ((app) 'x) (_ 'y)) (error err))"),
+            "OK (error \"Unknown pattern ‘nil’\")"
+        );
+        assert_eq!(
+            eval_last("(condition-case err (pcase 1 ((app car) 'x) (_ 'y)) (error err))"),
+            "OK (error \"Unknown pattern ‘nil’\")"
+        );
+    }
+
+    #[test]
+    fn pcase_app_pattern_ignores_extra_args() {
+        assert_eq!(
+            eval_last("(condition-case err (pcase 1 ((app car x y) 'x) (_ 'y)) (error err))"),
+            "OK (wrong-type-argument listp 1)"
         );
     }
 

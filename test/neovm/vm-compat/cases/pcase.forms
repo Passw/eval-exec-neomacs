@@ -17,3 +17,6 @@
 (condition-case err (pcase 1 ((pred integerp 2) 'x) (_ 'y)) (error err))
 (condition-case err (pcase 1 ((guard) 'x) (_ 'y)) (error err))
 (condition-case err (pcase 1 ((guard t 2) 'x) (_ 'y)) (error err))
+(condition-case err (pcase 1 ((app) 'x) (_ 'y)) (error err))
+(condition-case err (pcase 1 ((app car) 'x) (_ 'y)) (error err))
+(condition-case err (pcase 1 ((app car x y) 'x) (_ 'y)) (error err))
