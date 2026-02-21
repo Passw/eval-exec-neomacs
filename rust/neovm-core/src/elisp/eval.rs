@@ -1845,6 +1845,7 @@ impl Evaluator {
             "save-match-data" => self.sf_save_match_data(tail),
             "with-local-quit" => self.sf_with_local_quit(tail),
             "with-temp-message" => self.sf_with_temp_message(tail),
+            "with-demoted-errors" => self.sf_with_demoted_errors(tail),
             "with-current-buffer" => self.sf_with_current_buffer(tail),
             "ignore-errors" => self.sf_ignore_errors(tail),
             "dotimes" => self.sf_dotimes(tail),
@@ -2961,6 +2962,38 @@ impl Evaluator {
         }
 
         result
+    }
+
+    fn sf_with_demoted_errors(&mut self, tail: &[Expr]) -> EvalResult {
+        if tail.is_empty() {
+            return Err(signal(
+                "wrong-number-of-arguments",
+                vec![Value::cons(Value::Int(1), Value::Int(1)), Value::Int(0)],
+            ));
+        }
+
+        let (format, body) = match &tail[0] {
+            Expr::Str(message) => {
+                if tail.len() == 1 {
+                    (message.clone(), tail)
+                } else {
+                    (message.clone(), &tail[1..])
+                }
+            }
+            _ => ("Error: %S".to_string(), tail),
+        };
+
+        match self.sf_progn(body) {
+            Ok(value) => Ok(value),
+            Err(Flow::Signal(sig)) => {
+                let _ = super::builtins::builtin_message_eval(
+                    self,
+                    vec![Value::string(format), make_signal_binding_value(&sig)],
+                );
+                Ok(Value::Nil)
+            }
+            Err(flow) => Err(flow),
+        }
     }
 
     fn sf_ignore_errors(&mut self, tail: &[Expr]) -> EvalResult {
@@ -5624,6 +5657,32 @@ mod tests {
         assert_eq!(results[0], "OK 42");
         assert_eq!(results[1], "OK 7");
         assert_eq!(results[2], "OK wrong-number-of-arguments");
+    }
+
+    #[test]
+    fn with_demoted_errors_runtime_semantics() {
+        let results = eval_all(
+            "(fboundp 'with-demoted-errors)
+             (macrop 'with-demoted-errors)
+             (with-demoted-errors \"DM %S\" (+ 1 2))
+             (condition-case err
+                 (with-demoted-errors \"DM %S\" (/ 1 0))
+               (error (list :error (car err) (cdr err))))
+             (condition-case err
+                 (with-demoted-errors 1 (/ 1 0))
+               (error (list :error (car err) (cdr err))))
+             (with-demoted-errors \"DM %S\")
+             (condition-case err
+                 (with-demoted-errors)
+               (error err))",
+        );
+        assert_eq!(results[0], "OK t");
+        assert_eq!(results[1], "OK t");
+        assert_eq!(results[2], "OK 3");
+        assert_eq!(results[3], "OK nil");
+        assert_eq!(results[4], "OK nil");
+        assert_eq!(results[5], r#"OK "DM %S""#);
+        assert_eq!(results[6], "OK (wrong-number-of-arguments (1 . 1) 0)");
     }
 
     #[test]

@@ -4657,6 +4657,48 @@ fn macroexpand_known_fallback_macro(name: &str, args: &[Value]) -> Result<Option
                 Value::list(vec![Value::symbol("unwind-protect"), protected, restore]),
             ])))
         }
+        "with-demoted-errors" => {
+            if args.is_empty() {
+                return Err(signal(
+                    "wrong-number-of-arguments",
+                    vec![Value::cons(Value::Int(1), Value::Int(1)), Value::Int(0)],
+                ));
+            }
+
+            let (format, body_forms): (Value, Vec<Value>) = if args[0].is_string() {
+                if args.len() == 1 {
+                    (args[0].clone(), vec![args[0].clone()])
+                } else {
+                    (args[0].clone(), args[1..].to_vec())
+                }
+            } else {
+                (Value::string("Error: %S"), args.to_vec())
+            };
+
+            let body = if body_forms.len() == 1 {
+                body_forms[0].clone()
+            } else {
+                let mut forms = Vec::with_capacity(body_forms.len() + 1);
+                forms.push(Value::symbol("progn"));
+                forms.extend(body_forms);
+                Value::list(forms)
+            };
+
+            Ok(Some(Value::list(vec![
+                Value::symbol("condition-case"),
+                Value::symbol("err"),
+                body,
+                Value::list(vec![
+                    Value::list(vec![Value::symbol("debug"), Value::symbol("error")]),
+                    Value::list(vec![
+                        Value::symbol("message"),
+                        format,
+                        Value::symbol("err"),
+                    ]),
+                    Value::Nil,
+                ]),
+            ])))
+        }
         "bound-and-true-p" => {
             if args.len() != 1 {
                 return Err(signal(
@@ -19829,6 +19871,10 @@ mod tests {
             builtin_fboundp(&mut eval, vec![Value::symbol("with-temp-message")])
                 .expect("fboundp should succeed for with-temp-message");
         assert!(with_temp_message.is_truthy());
+        let with_demoted_errors =
+            builtin_fboundp(&mut eval, vec![Value::symbol("with-demoted-errors")])
+                .expect("fboundp should succeed for with-demoted-errors");
+        assert!(with_demoted_errors.is_truthy());
         let bound_and_true_p = builtin_fboundp(&mut eval, vec![Value::symbol("bound-and-true-p")])
             .expect("fboundp should succeed for bound-and-true-p");
         assert!(bound_and_true_p.is_truthy());
@@ -19918,6 +19964,10 @@ mod tests {
             builtin_functionp_eval(&mut eval, vec![Value::symbol("with-temp-message")])
                 .expect("functionp should reject with-temp-message macro symbol");
         assert!(with_temp_message_symbol.is_nil());
+        let with_demoted_errors_symbol =
+            builtin_functionp_eval(&mut eval, vec![Value::symbol("with-demoted-errors")])
+                .expect("functionp should reject with-demoted-errors macro symbol");
+        assert!(with_demoted_errors_symbol.is_nil());
         let bound_and_true_p_symbol =
             builtin_functionp_eval(&mut eval, vec![Value::symbol("bound-and-true-p")])
                 .expect("functionp should reject bound-and-true-p macro symbol");
@@ -20202,6 +20252,10 @@ mod tests {
             builtin_symbol_function(&mut eval, vec![Value::symbol("with-temp-message")])
                 .expect("symbol-function should resolve with-temp-message as a macro");
         assert!(matches!(with_temp_message_macro, Value::Macro(_)));
+        let with_demoted_errors_macro =
+            builtin_symbol_function(&mut eval, vec![Value::symbol("with-demoted-errors")])
+                .expect("symbol-function should resolve with-demoted-errors as a macro");
+        assert!(matches!(with_demoted_errors_macro, Value::Macro(_)));
         let bound_and_true_p_macro =
             builtin_symbol_function(&mut eval, vec![Value::symbol("bound-and-true-p")])
                 .expect("symbol-function should resolve bound-and-true-p as a macro");
@@ -20402,6 +20456,17 @@ mod tests {
             }
             other => panic!("expected cons arity pair, got {other:?}"),
         }
+        let with_demoted_errors_arity =
+            builtin_func_arity_eval(&mut eval, vec![Value::symbol("with-demoted-errors")])
+                .expect("func-arity should resolve with-demoted-errors macro symbol");
+        match &with_demoted_errors_arity {
+            Value::Cons(cell) => {
+                let pair = cell.lock().expect("poisoned");
+                assert_eq!(pair.car, Value::Int(1));
+                assert_eq!(pair.cdr, Value::symbol("many"));
+            }
+            other => panic!("expected cons arity pair, got {other:?}"),
+        }
 
         let inline_arity = builtin_func_arity_eval(&mut eval, vec![Value::symbol("inline")])
             .expect("func-arity should resolve inline special-form symbol");
@@ -20549,6 +20614,10 @@ mod tests {
             builtin_indirect_function(&mut eval, vec![Value::symbol("with-temp-message")])
                 .expect("indirect-function should resolve with-temp-message as a macro");
         assert!(matches!(with_temp_message_macro, Value::Macro(_)));
+        let with_demoted_errors_macro =
+            builtin_indirect_function(&mut eval, vec![Value::symbol("with-demoted-errors")])
+                .expect("indirect-function should resolve with-demoted-errors as a macro");
+        assert!(matches!(with_demoted_errors_macro, Value::Macro(_)));
         let bound_and_true_p_macro =
             builtin_indirect_function(&mut eval, vec![Value::symbol("bound-and-true-p")])
                 .expect("indirect-function should resolve bound-and-true-p as a macro");
@@ -20633,6 +20702,10 @@ mod tests {
             builtin_macrop_eval(&mut eval, vec![Value::symbol("with-temp-message")])
                 .expect("macrop should handle with-temp-message symbol input");
         assert!(with_temp_message_symbol.is_truthy());
+        let with_demoted_errors_symbol =
+            builtin_macrop_eval(&mut eval, vec![Value::symbol("with-demoted-errors")])
+                .expect("macrop should handle with-demoted-errors symbol input");
+        assert!(with_demoted_errors_symbol.is_truthy());
         let bound_and_true_p_symbol =
             builtin_macrop_eval(&mut eval, vec![Value::symbol("bound-and-true-p")])
                 .expect("macrop should handle bound-and-true-p symbol input");
@@ -20938,6 +21011,64 @@ mod tests {
                             Value::list(vec![Value::symbol("message"), Value::Nil]),
                         ]),
                     ]),
+                ]),
+            ])
+        );
+
+        let with_demoted_errors = builtin_macroexpand_eval(
+            &mut eval,
+            vec![Value::list(vec![
+                Value::symbol("with-demoted-errors"),
+                Value::string("DM %S"),
+                Value::list(vec![Value::symbol("/"), Value::Int(1), Value::Int(0)]),
+            ])],
+        )
+        .expect("macroexpand should expand with-demoted-errors");
+        assert_eq!(
+            with_demoted_errors,
+            Value::list(vec![
+                Value::symbol("condition-case"),
+                Value::symbol("err"),
+                Value::list(vec![Value::symbol("/"), Value::Int(1), Value::Int(0)]),
+                Value::list(vec![
+                    Value::list(vec![Value::symbol("debug"), Value::symbol("error")]),
+                    Value::list(vec![
+                        Value::symbol("message"),
+                        Value::string("DM %S"),
+                        Value::symbol("err"),
+                    ]),
+                    Value::Nil,
+                ]),
+            ])
+        );
+
+        let with_demoted_errors_default_format = builtin_macroexpand_eval(
+            &mut eval,
+            vec![Value::list(vec![
+                Value::symbol("with-demoted-errors"),
+                Value::Int(1),
+                Value::list(vec![Value::symbol("/"), Value::Int(1), Value::Int(0)]),
+            ])],
+        )
+        .expect("macroexpand should apply default format for non-string with-demoted-errors");
+        assert_eq!(
+            with_demoted_errors_default_format,
+            Value::list(vec![
+                Value::symbol("condition-case"),
+                Value::symbol("err"),
+                Value::list(vec![
+                    Value::symbol("progn"),
+                    Value::Int(1),
+                    Value::list(vec![Value::symbol("/"), Value::Int(1), Value::Int(0)]),
+                ]),
+                Value::list(vec![
+                    Value::list(vec![Value::symbol("debug"), Value::symbol("error")]),
+                    Value::list(vec![
+                        Value::symbol("message"),
+                        Value::string("Error: %S"),
+                        Value::symbol("err"),
+                    ]),
+                    Value::Nil,
                 ]),
             ])
         );
