@@ -7485,7 +7485,7 @@ tty_read_avail_input (struct terminal *terminal,
     return 0;
   if (n_to_read > sizeof cbuf)
     n_to_read = sizeof cbuf;
-#elif defined USG || defined CYGWIN
+#elif defined USG
   /* Read some input if available, but don't wait.  */
   n_to_read = sizeof cbuf;
   fcntl (fileno (tty->input), F_SETFL, O_NONBLOCK);
@@ -7519,9 +7519,9 @@ tty_read_avail_input (struct terminal *terminal,
 #endif
 
 #ifndef USABLE_FIONREAD
-#if defined (USG) || defined (CYGWIN)
+#ifdef USG
   fcntl (fileno (tty->input), F_SETFL, 0);
-#endif /* USG or CYGWIN */
+#endif /* USG */
 #endif /* no FIONREAD */
 
   if (nread <= 0)

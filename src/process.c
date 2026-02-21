@@ -4616,7 +4616,7 @@ See also `network-interface-info', which is limited to IPv4 only.
 If the information is not available, return nil.  */)
   (Lisp_Object full, Lisp_Object family)
 {
-#if defined HAVE_GETIFADDRS || defined WINDOWSNT
+#ifdef HAVE_GETIFADDRS
   unsigned short match;
   bool full_info = false;
 
@@ -4650,10 +4650,9 @@ Data that is unavailable is returned as nil.  Only returns IPv4 layer 3
 addresses, for IPv6 use `network-interface-list'.  */)
   (Lisp_Object ifname)
 {
-#if ((defined HAVE_NET_IF_H			       \
+#if (defined HAVE_NET_IF_H			       \
       && (defined SIOCGIFADDR || defined SIOCGIFHWADDR \
-	  || defined SIOCGIFFLAGS))		       \
-     || defined WINDOWSNT)
+	  || defined SIOCGIFFLAGS))
   return network_interface_info (ifname);
 #else
   return Qnil;

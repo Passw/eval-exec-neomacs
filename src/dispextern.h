@@ -1788,7 +1788,7 @@ struct face
      attributes except the font.  */
   struct face *ascii_face;
 
-#if defined HAVE_XFT || defined HAVE_FREETYPE
+#ifdef HAVE_FREETYPE
 /* Extra member that a font-driver uses privately.  */
   void *extra;
 #endif

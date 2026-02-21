@@ -259,7 +259,7 @@ struct frame
      Except with GTK, the only supported position is `top'.  */
   Lisp_Object tool_bar_position;
 
-#if defined (HAVE_XFT) || defined (HAVE_FREETYPE)
+#ifdef HAVE_FREETYPE
   /* List of data specific to font-driver and frame, but common to faces.  */
   Lisp_Object font_data;
 #endif

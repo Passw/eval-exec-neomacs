@@ -627,7 +627,7 @@ locale environments or at all).  Then, this functions falls back to
 case-sensitive `string-lessp' and IGNORE-CASE argument is ignored.  */)
   (Lisp_Object s1, Lisp_Object s2, Lisp_Object locale, Lisp_Object ignore_case)
 {
-#if defined __STDC_ISO_10646__ || defined WINDOWSNT
+#ifdef __STDC_ISO_10646__
   /* Check parameters.  */
   if (SYMBOLP (s1))
     s1 = SYMBOL_NAME (s1);
@@ -640,9 +640,9 @@ case-sensitive `string-lessp' and IGNORE-CASE argument is ignored.  */)
 
   return (str_collate (s1, s2, locale, ignore_case) < 0) ? Qt : Qnil;
 
-#else  /* !__STDC_ISO_10646__, !WINDOWSNT */
+#else  /* !__STDC_ISO_10646__ */
   return Fstring_lessp (s1, s2);
-#endif /* !__STDC_ISO_10646__, !WINDOWSNT */
+#endif /* !__STDC_ISO_10646__ */
 }
 
 DEFUN ("string-collate-equalp", Fstring_collate_equalp, Sstring_collate_equalp, 2, 4, 0,
@@ -676,7 +676,7 @@ is ignored.
 Do NOT use this function to compare file names for equality.  */)
   (Lisp_Object s1, Lisp_Object s2, Lisp_Object locale, Lisp_Object ignore_case)
 {
-#if defined __STDC_ISO_10646__ || defined WINDOWSNT
+#ifdef __STDC_ISO_10646__
   /* Check parameters.  */
   if (SYMBOLP (s1))
     s1 = SYMBOL_NAME (s1);
@@ -689,9 +689,9 @@ Do NOT use this function to compare file names for equality.  */)
 
   return (str_collate (s1, s2, locale, ignore_case) == 0) ? Qt : Qnil;
 
-#else  /* !__STDC_ISO_10646__, !WINDOWSNT */
+#else  /* !__STDC_ISO_10646__ */
   return Fstring_equal (s1, s2);
-#endif /* !__STDC_ISO_10646__, !WINDOWSNT */
+#endif /* !__STDC_ISO_10646__ */
 }
 
 static Lisp_Object concat_to_list (ptrdiff_t nargs, Lisp_Object *args,

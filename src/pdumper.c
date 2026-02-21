@@ -86,13 +86,6 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 # elif !defined (MAP_POPULATE)
 #  define MAP_POPULATE 0
 # endif
-#elif defined (WINDOWSNT)
-  /* Use a float infinity, to avoid compiler warnings in comparing vs
-     candidates' score.  */
-# undef INFINITY
-# define INFINITY __builtin_inff ()
-# include <windows.h>
-# define VM_SUPPORTED VM_MS_WINDOWS
 #else
 # define VM_SUPPORTED 0
 #endif
@@ -4780,10 +4773,6 @@ dump_unmap_file (void *addr, size_t size)
   (void) addr;
   (void) size;
   emacs_abort ();
-#elif defined (WINDOWSNT)
-  (void) size;
-  if (!UnmapViewOfFile (addr))
-    emacs_abort ();
 #else
   if (munmap (addr, size) < 0)
     emacs_abort ();

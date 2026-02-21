@@ -30,22 +30,6 @@ struct window;
 
 #ifdef HAVE_XWIDGETS
 
-#if defined (USE_GTK)
-#include <gtk/gtk.h>
-#ifndef HAVE_PGTK
-#include <X11/Xlib.h>
-#include "xterm.h"
-#else
-#include "pgtkterm.h"
-#endif
-#elif defined (NS_IMPL_COCOA) && defined (__OBJC__)
-#import <AppKit/NSView.h>
-#import "nsxwidget.h"
-#endif
-
-#ifdef HAVE_XINPUT2
-#include <X11/extensions/XInput2.h>
-#endif
 
 struct xwidget
 {
@@ -72,28 +56,6 @@ struct xwidget
   uint32_t xwidget_id;
   char *find_text;
 
-#if defined (USE_GTK)
-  /* For offscreen widgets, unused if not osr.  */
-  GtkWidget *widget_osr;
-  GtkWidget *widgetwindow_osr;
-  struct frame *embedder;
-  struct xwidget_view *embedder_view;
-  guint hit_result;
-#elif defined (NS_IMPL_COCOA)
-# ifdef __OBJC__
-  /* For offscreen widgets, unused if not osr.  */
-  NSView *xwWidget;
-  XwWindow *xwWindow;
-
-  /* Used only for xwidget types (such as webkit2) enforcing 1 to 1
-     relationship between model and view.  */
-  struct xwidget_view *xv;
-# else
-  void *xwWidget;
-  void *xwWindow;
-  struct xwidget_view *xv;
-# endif
-#endif
 
   /* Kill silently if Emacs is exited.  */
   bool_bf kill_without_query : 1;
@@ -114,35 +76,6 @@ struct xwidget_view
 
   enum glyph_row_area area;
 
-#if defined (USE_GTK)
-#ifndef HAVE_PGTK
-  Display *dpy;
-  Window wdesc;
-
-  GdkWindow *last_crossing_window;
-  guint last_crossing_cursor_signal;
-  GtkWidget *passive_grab;
-  guint passive_grab_destruction_signal;
-  guint passive_grab_drag_signal;
-#else
-  struct pgtk_display_info *dpyinfo;
-  GtkWidget *widget;
-#endif
-  Emacs_Cursor cursor;
-  struct frame *frame;
-
-  cairo_surface_t *cr_surface;
-  cairo_t *cr_context;
-  int just_resized;
-#elif defined (NS_IMPL_COCOA)
-# ifdef __OBJC__
-  XvWindow *xvWindow;
-  NSView *emacswindow;
-# else
-  void *xvWindow;
-  void *emacswindow;
-# endif
-#endif
 
   int x;
   int y;
@@ -205,29 +138,7 @@ void store_xwidget_js_callback_event (struct xwidget *xw,
 
 extern struct xwidget *xwidget_from_id (uint32_t id);
 
-#ifdef HAVE_X_WINDOWS
-struct xwidget_view *xwidget_view_from_window (Window wdesc);
-void xwidget_expose (struct xwidget_view *xv);
-extern void lower_frame_xwidget_views (struct frame *f);
-#endif
-#ifndef NS_IMPL_COCOA
 extern void kill_frame_xwidget_views (struct frame *f);
-#endif
-#ifdef HAVE_X_WINDOWS
-extern void xwidget_button (struct xwidget_view *, bool, int,
-			    int, int, int, Time);
-extern void xwidget_motion_or_crossing (struct xwidget_view *,
-					const XEvent *);
-#ifdef HAVE_XINPUT2
-extern void xwidget_motion_notify (struct xwidget_view *, double,
-				   double, double, double, uint, Time);
-extern void xwidget_scroll (struct xwidget_view *, double, double,
-                            double, double, uint, Time, bool);
-#ifdef HAVE_XINPUT2_4
-extern void xwidget_pinch (struct xwidget_view *, XIGesturePinchEvent *);
-#endif
-#endif
-#endif
 #else
 INLINE_HEADER_BEGIN
 INLINE void syms_of_xwidget (void) {}

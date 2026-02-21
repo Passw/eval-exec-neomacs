@@ -122,8 +122,6 @@ init_editfns (void)
     uname (&uts);
     Voperating_system_release = build_string (uts.release);
   }
-#elif defined WINDOWSNT
-  Voperating_system_release = build_string (w32_version_string ());
 #else
   Voperating_system_release = Qnil;
 #endif

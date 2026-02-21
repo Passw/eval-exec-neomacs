@@ -23,13 +23,9 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 #include <fontconfig/fontconfig.h>
 #include <fontconfig/fcfreetype.h>
 
-/* These two blocks are here because this file is built when using XFT
-   and when using Cairo, so struct font_info in ftfont.h needs access
-   to the appropriate types.  */
-#ifdef HAVE_XFT
-# include <X11/Xlib.h>
-# include <X11/Xft/Xft.h>
-#endif
+/* This block is here because this file is built when using Cairo,
+   so struct font_info in ftfont.h needs access to the appropriate
+   types.  */
 #ifdef USE_CAIRO
 # include <cairo-ft.h>
 #endif
@@ -657,33 +653,6 @@ ftfont_get_open_type_spec (Lisp_Object otf_spec)
   return spec;
 }
 
-#if defined HAVE_XFT && defined FC_COLOR
-#if (XFT_MAJOR < 2						\
-    || (XFT_MAJOR == 2 && (XFT_MINOR < 3			\
-			   || (XFT_MINOR == 3			\
-			       && XFT_REVISION < 6))))
-
-static bool
-xft_color_font_whitelisted_p (const char *family)
-{
-  Lisp_Object tem, name;
-
-  tem = Vxft_color_font_whitelist;
-
-  FOR_EACH_TAIL_SAFE (tem)
-    {
-      name = XCAR (tem);
-
-      if (STRINGP (name) && !strcmp (family, SSDATA (name)))
-	return true;
-    }
-
-  return false;
-}
-
-#endif /* Xft < 2.3.6 */
-#endif /* HAVE_XFT && FC_COLOR */
-
 static FcPattern *
 ftfont_spec_pattern (Lisp_Object spec, char *otlayout,
 		     struct OpenTypeSpec **otspec, const char **langname)
@@ -821,21 +790,6 @@ ftfont_spec_pattern (Lisp_Object spec, char *otlayout,
   if (scalable >= 0
       && ! FcPatternAddBool (pattern, FC_SCALABLE, scalable ? FcTrue : FcFalse))
     goto err;
-#if defined HAVE_XFT && defined FC_COLOR
-#if (XFT_MAJOR < 2						\
-     || (XFT_MAJOR == 2 && (XFT_MINOR < 3			\
-			    || (XFT_MINOR == 3			\
-				&& XFT_REVISION < 6))))
-  /* We really don't like color fonts, they cause Xft crashes with
-     releases older than 2.3.6.  See Bug#30874.  */
-  if (xft_ignore_color_fonts
-      && (NILP (AREF (spec, FONT_FAMILY_INDEX))
-	  || NILP (Vxft_color_font_whitelist))
-      && ! FcPatternAddBool (pattern, FC_COLOR, FcFalse))
-    goto err;
-#endif /* Xft < 2.3.6 */
-#endif /* HAVE_XFT && FC_COLOR */
-
   goto finish;
 
  err:
@@ -925,9 +879,6 @@ ftfont_list (struct frame *f, Lisp_Object spec)
 #ifdef FC_FONTFORMAT
 			     FC_FONTFORMAT,
 #endif
-#if defined HAVE_XFT && defined FC_COLOR
-                             FC_COLOR,
-#endif
 #ifdef FC_VARIABLE
 			     FC_VARIABLE,
 #endif	/* FC_VARIABLE */
@@ -970,29 +921,6 @@ ftfont_list (struct frame *f, Lisp_Object spec)
   for (i = 0; i < fontset->nfont; i++)
     {
       Lisp_Object entity;
-#if defined HAVE_XFT && defined FC_COLOR
-#if (XFT_MAJOR < 2						\
-     || (XFT_MAJOR == 2 && (XFT_MINOR < 3			\
-			    || (XFT_MINOR == 3			\
-				&& XFT_REVISION < 6))))
-      {
-        /* Some fonts, notably NotoColorEmoji, have an FC_COLOR value
-           that's neither FcTrue nor FcFalse, which means FcFontList
-           returns them even when it shouldn't really do so, so we
-           need to manually skip them here (Bug#37786).  */
-        FcBool b;
-	FcChar8 *str;
-
-        if (xft_ignore_color_fonts
-	    && (FcPatternGetString (fontset->fonts[i], FC_FAMILY,
-				    0, &str) != FcResultMatch
-		|| !xft_color_font_whitelisted_p ((char *) str))
-            && FcPatternGetBool (fontset->fonts[i], FC_COLOR, 0, &b)
-            == FcResultMatch && b != FcFalse)
-            continue;
-      }
-#endif /* Xft < 2.3.6 */
-#endif /* HAVE_XFT && FC_COLOR */
       if (spacing >= 0)
 	{
 	  int this;

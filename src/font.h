@@ -901,10 +901,10 @@ extern Lisp_Object hbfont_shape (Lisp_Object, Lisp_Object);
 extern Lisp_Object hbfont_combining_capability (struct font *);
 #endif
 
-#if defined (HAVE_XFT) || defined (HAVE_FREETYPE)
+#ifdef HAVE_FREETYPE
 extern void font_put_frame_data (struct frame *, Lisp_Object, void *);
 extern void *font_get_frame_data (struct frame *f, Lisp_Object);
-#endif /* HAVE_XFT || HAVE_FREETYPE */
+#endif /* HAVE_FREETYPE */
 
 extern void font_filter_properties (Lisp_Object font,
 				    Lisp_Object alist,
