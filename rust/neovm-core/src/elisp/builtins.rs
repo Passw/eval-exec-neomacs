@@ -18665,6 +18665,35 @@ mod tests {
     }
 
     #[test]
+    fn format_and_message_percent_s_render_killed_buffer_handles_in_eval_dispatch() {
+        let mut eval = crate::elisp::eval::Evaluator::new();
+        let buffer = dispatch_builtin(
+            &mut eval,
+            "generate-new-buffer",
+            vec![Value::string("*format-killed-s-buffer*")],
+        )
+        .expect("generate-new-buffer should resolve")
+        .expect("generate-new-buffer should evaluate");
+        let _ = dispatch_builtin(&mut eval, "kill-buffer", vec![buffer.clone()])
+            .expect("kill-buffer should resolve")
+            .expect("kill-buffer should evaluate");
+
+        let formatted = dispatch_builtin(
+            &mut eval,
+            "format",
+            vec![Value::string("%s"), buffer.clone()],
+        )
+        .expect("format should resolve")
+        .expect("format should evaluate");
+        assert_eq!(formatted, Value::string("#<killed buffer>"));
+
+        let message = dispatch_builtin(&mut eval, "message", vec![Value::string("%s"), buffer])
+            .expect("message should resolve")
+            .expect("message should evaluate");
+        assert_eq!(message, Value::string("#<killed buffer>"));
+    }
+
+    #[test]
     fn message_nil_returns_nil() {
         let mut eval = crate::elisp::eval::Evaluator::new();
 
