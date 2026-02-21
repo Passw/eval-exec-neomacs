@@ -841,36 +841,59 @@ pub(crate) fn sf_pcase_dolist(eval: &mut Evaluator, tail: &[Expr]) -> EvalResult
     if tail.is_empty() {
         return Err(signal(
             "wrong-number-of-arguments",
-            vec![Value::symbol("pcase-dolist"), Value::Int(tail.len() as i64)],
+            vec![Value::cons(Value::Int(1), Value::Int(1)), Value::Int(0)],
         ));
     }
 
-    let Expr::List(spec) = &tail[0] else {
-        return Err(signal(
-            "wrong-type-argument",
-            vec![Value::string(
-                "pcase-dolist spec must be a list (PATTERN LIST)",
-            )],
-        ));
+    let spec = match &tail[0] {
+        Expr::List(spec) => spec,
+        Expr::DottedList(_, last) => {
+            return Err(signal(
+                "wrong-type-argument",
+                vec![Value::symbol("listp"), quote_to_value(last)],
+            ))
+        }
+        other => {
+            return Err(signal(
+                "wrong-type-argument",
+                vec![Value::symbol("listp"), quote_to_value(other)],
+            ))
+        }
     };
-    if spec.len() < 2 {
+    if !(2..=3).contains(&spec.len()) {
         return Err(signal(
             "wrong-number-of-arguments",
-            vec![Value::symbol("pcase-dolist"), Value::Int(spec.len() as i64)],
+            vec![
+                Value::cons(Value::Int(2), Value::Int(3)),
+                Value::Int(spec.len() as i64),
+            ],
         ));
     }
 
     let pattern = compile_pattern(&spec[0])?;
-    let list_val = eval.eval(&spec[1])?;
-    let items = list_to_vec(&list_val).unwrap_or_default();
-
+    let mut list_val = eval.eval(&spec[1])?;
     let body = &tail[1..];
-    for item in &items {
-        if let Some(bindings) = match_pattern(eval, &pattern, item)? {
+
+    while list_val.is_truthy() {
+        let Value::Cons(cell) = list_val.clone() else {
+            return Err(signal(
+                "wrong-type-argument",
+                vec![Value::symbol("listp"), list_val],
+            ));
+        };
+        let pair = cell.lock().expect("poisoned");
+        let item = pair.car.clone();
+        let next = pair.cdr.clone();
+        drop(pair);
+
+        if let Some(bindings) = match_pattern(eval, &pattern, &item)? {
             with_bindings(eval, bindings, body)?;
         }
-        // If pattern does not match, the element is silently skipped
-        // (consistent with Emacs behavior).
+        list_val = next;
+    }
+
+    if spec.len() == 3 {
+        return eval.eval(&spec[2]);
     }
 
     Ok(Value::Nil)
@@ -1409,6 +1432,39 @@ mod tests {
     #[test]
     fn pcase_dolist_returns_nil() {
         assert_eq!(eval_last("(pcase-dolist (x '(1 2 3)) x)"), "OK nil");
+    }
+
+    #[test]
+    fn pcase_dolist_returns_result_expression() {
+        assert_eq!(
+            eval_last(
+                "(let ((acc nil))
+                   (pcase-dolist (x '(1 2) (nreverse acc))
+                     (setq acc (cons x acc))))"
+            ),
+            "OK (1 2)"
+        );
+    }
+
+    #[test]
+    fn pcase_dolist_runtime_errors_match_oracle_edges() {
+        let results = eval_all(
+            "(condition-case err (pcase-dolist (x) x) (error err))
+             (condition-case err (pcase-dolist (x '(1 2) :r :extra) x) (error err))
+             (condition-case err (pcase-dolist (x '(1) . z) x) (error err))
+             (condition-case err (pcase-dolist (x 1) x) (error err))
+             (condition-case err (pcase-dolist (x '(1 . 2)) x) (error err))",
+        );
+        assert_eq!(
+            results,
+            vec![
+                "OK (wrong-number-of-arguments (2 . 3) 1)",
+                "OK (wrong-number-of-arguments (2 . 3) 4)",
+                "OK (wrong-type-argument listp z)",
+                "OK (wrong-type-argument listp 1)",
+                "OK (wrong-type-argument listp 2)",
+            ]
+        );
     }
 
     // =======================================================================

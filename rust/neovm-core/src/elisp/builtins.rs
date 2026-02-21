@@ -5303,12 +5303,19 @@ fn macroexpand_known_fallback_macro(
                 ));
             }
 
-            let spec = list_to_vec(&args[0]).ok_or_else(|| {
-                signal(
-                    "wrong-type-argument",
-                    vec![Value::symbol("listp"), args[0].clone()],
-                )
-            })?;
+            let spec = match list_to_vec(&args[0]) {
+                Some(spec) => spec,
+                None => {
+                    let mut cursor = args[0].clone();
+                    while let Value::Cons(cell) = cursor {
+                        cursor = cell.lock().expect("poisoned").cdr.clone();
+                    }
+                    return Err(signal(
+                        "wrong-type-argument",
+                        vec![Value::symbol("listp"), cursor],
+                    ));
+                }
+            };
             if !(2..=3).contains(&spec.len()) {
                 return Err(signal(
                     "wrong-number-of-arguments",
@@ -5321,6 +5328,11 @@ fn macroexpand_known_fallback_macro(
 
             let pattern = spec[0].clone();
             let sequence = spec[1].clone();
+            let result_expr = if spec.len() == 3 {
+                Some(spec[2].clone())
+            } else {
+                None
+            };
             let tail_var = Value::symbol("tail");
             let binding = Value::list(vec![tail_var.clone(), sequence]);
             let step = Value::list(vec![
@@ -5360,11 +5372,14 @@ fn macroexpand_known_fallback_macro(
 
             let loop_form = Value::list(vec![Value::symbol("while"), tail_var.clone(), inner]);
 
-            Ok(Some(Value::list(vec![
-                Value::symbol("let"),
-                Value::list(vec![binding]),
-                loop_form,
-            ])))
+            let mut forms = Vec::with_capacity(4);
+            forms.push(Value::symbol("let"));
+            forms.push(Value::list(vec![binding]));
+            forms.push(loop_form);
+            if let Some(result) = result_expr {
+                forms.push(result);
+            }
+            Ok(Some(Value::list(forms)))
         }
         _ => Ok(None),
     }
