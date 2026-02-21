@@ -18127,6 +18127,22 @@ Last updated: 2026-02-21
 
 ## Doing
 
+- Extended `command-remapping` Lisp-keymap lock-ins for remap ordering and target normalization edge paths:
+  - vm-compat corpus changes:
+    - added and wired:
+      - `test/neovm/vm-compat/cases/command-remapping-lisp-keymap-remap-order-semantics.forms`
+      - `test/neovm/vm-compat/cases/command-remapping-lisp-keymap-remap-order-semantics.expected.tsv`
+      - `test/neovm/vm-compat/cases/default.list`
+    - lock-ins cover:
+      - remap entry ordering (first matching remap wins),
+      - fallback to later remap entries when earlier entries do not match target command,
+      - keymap dotted-tail tolerance for remap lookup paths,
+      - remap `menu-item` target shaping parity for symbol/int/`t`/malformed payloads.
+  - verified:
+    - `make -C test/neovm/vm-compat record FORMS=cases/command-remapping-lisp-keymap-remap-order-semantics.forms EXPECTED=cases/command-remapping-lisp-keymap-remap-order-semantics.expected.tsv` (pass)
+    - `make -C test/neovm/vm-compat check-one-neovm CASE=cases/command-remapping-lisp-keymap-remap-order-semantics` (pass; `11/11`)
+    - `make -C test/neovm/vm-compat check-all-neovm-strict` (pass; case inventory `874`)
+
 - Aligned `command-remapping` Lisp keymap remap semantics with oracle and added lock-ins:
   - runtime changes:
     - `rust/neovm-core/src/elisp/interactive.rs`

@@ -212,6 +212,7 @@ cases/minor-mode-key-binding-semantics
 cases/command-remapping-modes-boundary-semantics
 cases/command-remapping-remap-lookup-semantics
 cases/command-remapping-lisp-keymap-semantics
+cases/command-remapping-lisp-keymap-remap-order-semantics
 cases/command-dispatch-default-arg-semantics
 cases/call-interactively-prefix-numeric-arg-semantics
 cases/call-interactively-word-prefix-arg-semantics
