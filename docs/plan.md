@@ -28,6 +28,24 @@ Last updated: 2026-02-21
 
 ## Doing
 
+- Added vm-compat lock-in and runtime evaluator coverage for `message-box` / `message-or-box` opaque-handle rendering:
+  - vm-compat corpus changes:
+    - added:
+      - `test/neovm/vm-compat/cases/message-box-or-box-handle-semantics.forms`
+      - `test/neovm/vm-compat/cases/message-box-or-box-handle-semantics.expected.tsv`
+    - wired case into:
+      - `test/neovm/vm-compat/cases/default.list`
+    - case locks `%S`/`%s` handle rendering for thread/terminal/frame/window and live/killed buffers via both wrapper builtins.
+  - runtime changes:
+    - `rust/neovm-core/src/elisp/builtins.rs`
+      - added evaluator coverage:
+        - `message_box_wrappers_render_opaque_handles_in_eval_dispatch`
+      - test asserts both wrappers preserve Oracle-shaped opaque-handle rendering and live/killed buffer semantics.
+  - verified:
+    - `cargo test --manifest-path rust/neovm-core/Cargo.toml message_box_wrappers_render_opaque_handles_in_eval_dispatch -- --nocapture` (pass)
+    - `make -C test/neovm/vm-compat check-one-neovm CASE=cases/message-box-or-box-handle-semantics` (pass; `24/24`)
+    - `make -C test/neovm/vm-compat check-neovm-filter-strict LIST=cases/default.list PATTERN='message-box-or-box-handle-semantics'` (pass; strict filtered gates green)
+
 - Extended vm-compat and runtime lock-in for `error-message-string` `%s` opaque-handle rendering paths:
   - vm-compat corpus changes:
     - updated:

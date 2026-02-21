@@ -1,0 +1,54 @@
+(fboundp 'message-box)
+(fboundp 'message-or-box)
+(fboundp 'current-thread)
+(fboundp 'terminal-list)
+(fboundp 'selected-frame)
+(fboundp 'selected-window)
+(fboundp 'generate-new-buffer)
+(fboundp 'kill-buffer)
+
+(string-prefix-p "#<thread" (message-box "%S" (current-thread)))
+
+(string-prefix-p "#<thread" (message-box "%s" (current-thread)))
+
+(string-prefix-p "#<thread" (message-or-box "%S" (current-thread)))
+
+(string-prefix-p "#<thread" (message-or-box "%s" (current-thread)))
+
+(let ((term (car (terminal-list))))
+  (string-prefix-p "#<terminal" (message-box "%S" term)))
+
+(let ((term (car (terminal-list))))
+  (string-prefix-p "#<terminal" (message-box "%s" term)))
+
+(let ((term (car (terminal-list))))
+  (string-prefix-p "#<terminal" (message-or-box "%S" term)))
+
+(let ((term (car (terminal-list))))
+  (string-prefix-p "#<terminal" (message-or-box "%s" term)))
+
+(string-prefix-p "#<frame" (message-box "%S" (selected-frame)))
+
+(string-prefix-p "#<frame" (message-or-box "%S" (selected-frame)))
+
+(string-prefix-p "#<window" (message-box "%S" (selected-window)))
+
+(string-prefix-p "#<window" (message-or-box "%S" (selected-window)))
+
+(let* ((b (generate-new-buffer "mbox-live-vm")))
+  (prog1
+      (string-prefix-p "#<buffer mbox-live-vm" (message-box "%S" b))
+    (kill-buffer b)))
+
+(let* ((b (generate-new-buffer "morbox-live-vm")))
+  (prog1
+      (string= "morbox-live-vm" (message-or-box "%s" b))
+    (kill-buffer b)))
+
+(let* ((b (generate-new-buffer "mbox-killed-vm")))
+  (kill-buffer b)
+  (string= (message-box "%S" b) "#<killed buffer>"))
+
+(let* ((b (generate-new-buffer "morbox-killed-vm")))
+  (kill-buffer b)
+  (string= (message-or-box "%s" b) "#<killed buffer>"))

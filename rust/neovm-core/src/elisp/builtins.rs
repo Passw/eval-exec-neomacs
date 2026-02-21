@@ -18947,6 +18947,105 @@ mod tests {
     }
 
     #[test]
+    fn message_box_wrappers_render_opaque_handles_in_eval_dispatch() {
+        let mut eval = crate::elisp::eval::Evaluator::new();
+        let thread = dispatch_builtin(&mut eval, "current-thread", vec![])
+            .expect("current-thread should resolve")
+            .expect("current-thread should evaluate");
+        let terminals = dispatch_builtin(&mut eval, "terminal-list", vec![])
+            .expect("terminal-list should resolve")
+            .expect("terminal-list should evaluate");
+        let terminal = list_to_vec(&terminals)
+            .and_then(|items| items.into_iter().next())
+            .expect("terminal-list should return at least one terminal");
+        let frame = dispatch_builtin(&mut eval, "selected-frame", vec![])
+            .expect("selected-frame should resolve")
+            .expect("selected-frame should evaluate");
+        let window = dispatch_builtin(&mut eval, "selected-window", vec![])
+            .expect("selected-window should resolve")
+            .expect("selected-window should evaluate");
+
+        let mut assert_prefix = |builtin: &str, spec: &str, value: Value, prefix: &str| {
+            let rendered = dispatch_builtin(&mut eval, builtin, vec![Value::string(spec), value])
+                .expect("builtin should resolve")
+                .expect("builtin should evaluate");
+            assert!(
+                rendered.as_str().is_some_and(|s| s.starts_with(prefix)),
+                "expected {builtin} {spec} output to start with {prefix}, got: {rendered:?}"
+            );
+        };
+
+        for builtin in ["message-box", "message-or-box"] {
+            assert_prefix(builtin, "%S", thread.clone(), "#<thread");
+            assert_prefix(builtin, "%s", thread.clone(), "#<thread");
+            assert_prefix(builtin, "%S", terminal.clone(), "#<terminal");
+            assert_prefix(builtin, "%s", terminal.clone(), "#<terminal");
+            assert_prefix(builtin, "%S", frame.clone(), "#<frame");
+            assert_prefix(builtin, "%S", window.clone(), "#<window");
+        }
+
+        let live_name = "*message-box-live-buffer*";
+        let live_buffer = dispatch_builtin(
+            &mut eval,
+            "generate-new-buffer",
+            vec![Value::string(live_name)],
+        )
+        .expect("generate-new-buffer should resolve")
+        .expect("generate-new-buffer should evaluate");
+        let live_upper = dispatch_builtin(
+            &mut eval,
+            "message-box",
+            vec![Value::string("%S"), live_buffer.clone()],
+        )
+        .expect("message-box should resolve")
+        .expect("message-box should evaluate");
+        assert!(
+            live_upper
+                .as_str()
+                .is_some_and(|s| s.starts_with("#<buffer *message-box-live-buffer")),
+            "expected live buffer in message-box %S output: {live_upper:?}"
+        );
+        let live_lower = dispatch_builtin(
+            &mut eval,
+            "message-or-box",
+            vec![Value::string("%s"), live_buffer.clone()],
+        )
+        .expect("message-or-box should resolve")
+        .expect("message-or-box should evaluate");
+        assert_eq!(live_lower, Value::string(live_name));
+        let _ = dispatch_builtin(&mut eval, "kill-buffer", vec![live_buffer])
+            .expect("kill-buffer should resolve")
+            .expect("kill-buffer should evaluate");
+
+        let killed_buffer = dispatch_builtin(
+            &mut eval,
+            "generate-new-buffer",
+            vec![Value::string("*message-box-killed-buffer*")],
+        )
+        .expect("generate-new-buffer should resolve")
+        .expect("generate-new-buffer should evaluate");
+        let _ = dispatch_builtin(&mut eval, "kill-buffer", vec![killed_buffer.clone()])
+            .expect("kill-buffer should resolve")
+            .expect("kill-buffer should evaluate");
+        let killed_upper = dispatch_builtin(
+            &mut eval,
+            "message-box",
+            vec![Value::string("%S"), killed_buffer.clone()],
+        )
+        .expect("message-box should resolve")
+        .expect("message-box should evaluate");
+        assert_eq!(killed_upper, Value::string("#<killed buffer>"));
+        let killed_lower = dispatch_builtin(
+            &mut eval,
+            "message-or-box",
+            vec![Value::string("%s"), killed_buffer],
+        )
+        .expect("message-or-box should resolve")
+        .expect("message-or-box should evaluate");
+        assert_eq!(killed_lower, Value::string("#<killed buffer>"));
+    }
+
+    #[test]
     fn message_nil_returns_nil() {
         let mut eval = crate::elisp::eval::Evaluator::new();
 
