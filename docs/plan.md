@@ -47,16 +47,22 @@ Last updated: 2026-02-21
       - test locks parity between string and bytes printer paths for condition-variable handles.
       - test also locks parity between string and bytes printer paths for frame/window handles.
       - test also locks parity between string and bytes printer paths for terminal/thread handles.
+    - `rust/neovm-core/src/elisp/builtins.rs`
+      - `print_threading_handle` now resolves buffer handles through evaluator state.
+      - dead buffer handles now render as `#<killed buffer>` in eval-dispatch `%S` printing paths (`format`, `message`).
+      - added evaluator coverage:
+        - `format_and_message_render_killed_buffer_handles_in_eval_dispatch`
   - verified:
     - `cargo test --manifest-path rust/neovm-core/Cargo.toml builtin_error_message_string_formats_mutex_and_condvar_handles -- --nocapture` (pass)
     - `cargo test --manifest-path rust/neovm-core/Cargo.toml builtin_error_message_string_formats_thread_handles -- --nocapture` (pass)
     - `cargo test --manifest-path rust/neovm-core/Cargo.toml builtin_error_message_string_formats_terminal_handles -- --nocapture` (pass)
     - `cargo test --manifest-path rust/neovm-core/Cargo.toml builtin_error_message_string_formats_frame_and_window_handles -- --nocapture` (pass)
+    - `cargo test --manifest-path rust/neovm-core/Cargo.toml format_and_message_render_killed_buffer_handles_in_eval_dispatch -- --nocapture` (pass)
     - `cargo test --manifest-path rust/neovm-core/Cargo.toml eval_context_printer_renders_condvar_handles_consistently -- --nocapture` (pass)
     - `cargo test --manifest-path rust/neovm-core/Cargo.toml eval_context_printer_renders_frame_window_handles_consistently -- --nocapture` (pass)
     - `cargo test --manifest-path rust/neovm-core/Cargo.toml eval_context_printer_renders_terminal_thread_handles_consistently -- --nocapture` (pass)
 
-- Added lock-in coverage for `error-message-string` handle payload rendering of mutex/condition-variable/terminal/thread/frame/window objects:
+- Added lock-in coverage for `error-message-string` handle payload rendering of mutex/condition-variable/terminal/thread/frame/window/live-buffer/killed-buffer objects:
   - vm-compat corpus changes:
     - added:
       - `test/neovm/vm-compat/cases/error-message-string-handle-printing-semantics.forms`
@@ -64,7 +70,7 @@ Last updated: 2026-02-21
     - wired case into:
       - `test/neovm/vm-compat/cases/default.list`
   - verified:
-    - `make -C test/neovm/vm-compat check-one-neovm CASE=cases/error-message-string-handle-printing-semantics` (pass; `13/13`)
+    - `make -C test/neovm/vm-compat check-one-neovm CASE=cases/error-message-string-handle-printing-semantics` (pass; `17/17`)
     - `make -C test/neovm/vm-compat check-all-neovm-strict` (pass)
 
 - Aligned `error-message-string` buffer-handle rendering with Oracle and added dedicated stale/live lock-ins:

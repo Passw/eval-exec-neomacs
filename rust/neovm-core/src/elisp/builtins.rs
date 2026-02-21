@@ -6575,6 +6575,14 @@ fn print_threading_handle(eval: &super::eval::Evaluator, value: &Value) -> Optio
     if let Some(id) = eval.threads.condition_variable_id_from_handle(value) {
         return Some(format!("#<condvar {id}>"));
     }
+    if let Value::Buffer(id) = value {
+        if let Some(buf) = eval.buffers.get(*id) {
+            return Some(format!("#<buffer {}>", buf.name));
+        }
+        if eval.buffers.dead_buffer_last_name(*id).is_some() {
+            return Some("#<killed buffer>".to_string());
+        }
+    }
     None
 }
 
@@ -18549,6 +18557,35 @@ mod tests {
             .expect("message should resolve")
             .expect("message should evaluate");
         assert!(message.as_str().is_some_and(|s| s.starts_with("#<thread")));
+    }
+
+    #[test]
+    fn format_and_message_render_killed_buffer_handles_in_eval_dispatch() {
+        let mut eval = crate::elisp::eval::Evaluator::new();
+        let buffer = dispatch_builtin(
+            &mut eval,
+            "generate-new-buffer",
+            vec![Value::string("*format-killed-buffer*")],
+        )
+        .expect("generate-new-buffer should resolve")
+        .expect("generate-new-buffer should evaluate");
+        let _ = dispatch_builtin(&mut eval, "kill-buffer", vec![buffer.clone()])
+            .expect("kill-buffer should resolve")
+            .expect("kill-buffer should evaluate");
+
+        let formatted = dispatch_builtin(
+            &mut eval,
+            "format",
+            vec![Value::string("%S"), buffer.clone()],
+        )
+        .expect("format should resolve")
+        .expect("format should evaluate");
+        assert_eq!(formatted, Value::string("#<killed buffer>"));
+
+        let message = dispatch_builtin(&mut eval, "message", vec![Value::string("%S"), buffer])
+            .expect("message should resolve")
+            .expect("message should evaluate");
+        assert_eq!(message, Value::string("#<killed buffer>"));
     }
 
     #[test]

@@ -5,9 +5,13 @@
 5	(fboundp 'current-thread)	OK t
 6	(fboundp 'selected-frame)	OK t
 7	(fboundp 'selected-window)	OK t
-8	(let ((msg (condition-case e (progn (error "%S" (make-mutex)) "") (error (error-message-string e))))) (string-prefix-p "#<mutex" msg))	OK t
-9	(let* ((m (make-mutex)) (cv (make-condition-variable m)) (msg (condition-case e (progn (error "%S" cv) "") (error (error-message-string e))))) (string-prefix-p "#<condvar" msg))	OK t
-10	(let* ((term (car (terminal-list))) (msg (condition-case e (progn (error "%S" term) "") (error (error-message-string e))))) (string-prefix-p "#<terminal" msg))	OK t
-11	(let ((msg (condition-case e (progn (error "%S" (current-thread)) "") (error (error-message-string e))))) (string-prefix-p "#<thread" msg))	OK t
-12	(let ((msg (condition-case e (progn (error "%S" (selected-frame)) "") (error (error-message-string e))))) (string-prefix-p "#<frame" msg))	OK t
-13	(let ((msg (condition-case e (progn (error "%S" (selected-window)) "") (error (error-message-string e))))) (string-prefix-p "#<window" msg))	OK t
+8	(fboundp 'generate-new-buffer)	OK t
+9	(fboundp 'kill-buffer)	OK t
+10	(let ((msg (condition-case e (progn (error "%S" (make-mutex)) "") (error (error-message-string e))))) (string-prefix-p "#<mutex" msg))	OK t
+11	(let* ((m (make-mutex)) (cv (make-condition-variable m)) (msg (condition-case e (progn (error "%S" cv) "") (error (error-message-string e))))) (string-prefix-p "#<condvar" msg))	OK t
+12	(let* ((term (car (terminal-list))) (msg (condition-case e (progn (error "%S" term) "") (error (error-message-string e))))) (string-prefix-p "#<terminal" msg))	OK t
+13	(let ((msg (condition-case e (progn (error "%S" (current-thread)) "") (error (error-message-string e))))) (string-prefix-p "#<thread" msg))	OK t
+14	(let ((msg (condition-case e (progn (error "%S" (selected-frame)) "") (error (error-message-string e))))) (string-prefix-p "#<frame" msg))	OK t
+15	(let ((msg (condition-case e (progn (error "%S" (selected-window)) "") (error (error-message-string e))))) (string-prefix-p "#<window" msg))	OK t
+16	(let* ((b (generate-new-buffer "ems-handle-live")) (msg (condition-case e (progn (error "%S" b) "") (error (error-message-string e))))) (prog1 (string-prefix-p "#<buffer " msg) (kill-buffer b)))	OK t
+17	(let* ((b (generate-new-buffer "ems-handle-dead"))) (kill-buffer b) (let ((msg (condition-case e (progn (error "%S" b) "") (error (error-message-string e))))) (string-prefix-p "#<killed buffer" msg)))	OK t
