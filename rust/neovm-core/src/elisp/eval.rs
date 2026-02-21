@@ -1964,12 +1964,19 @@ impl Evaluator {
         let mut lexical_bindings = HashMap::new();
         let mut dynamic_bindings = HashMap::new();
         let use_lexical = self.lexical_binding();
+        let mut constant_binding_error: Option<String> = None;
 
         match &tail[0] {
             Expr::List(entries) => {
                 for binding in entries {
                     match binding {
                         Expr::Symbol(name) => {
+                            if name == "nil" || name == "t" {
+                                if constant_binding_error.is_none() {
+                                    constant_binding_error = Some(name.clone());
+                                }
+                                continue;
+                            }
                             if use_lexical && !self.obarray.is_special(name) {
                                 lexical_bindings.insert(name.clone(), Value::Nil);
                             } else {
@@ -1988,6 +1995,12 @@ impl Evaluator {
                             } else {
                                 Value::Nil
                             };
+                            if name == "nil" || name == "t" {
+                                if constant_binding_error.is_none() {
+                                    constant_binding_error = Some(name.clone());
+                                }
+                                continue;
+                            }
                             if use_lexical && !self.obarray.is_special(name) {
                                 lexical_bindings.insert(name.clone(), value);
                             } else {
@@ -2011,6 +2024,9 @@ impl Evaluator {
                     vec![Value::symbol("listp"), quote_to_value(other)],
                 ))
             }
+        }
+        if let Some(name) = constant_binding_error {
+            return Err(signal("setting-constant", vec![Value::symbol(name)]));
         }
 
         let pushed_lex = !lexical_bindings.is_empty();
@@ -2065,58 +2081,55 @@ impl Evaluator {
             self.lexenv.push(HashMap::new());
         }
 
-        for binding in &entries {
-            match binding {
-                Expr::Symbol(name) => {
-                    if use_lexical && !self.obarray.is_special(name) {
-                        if let Some(frame) = self.lexenv.last_mut() {
+        let init_result: Result<(), Flow> = (|| {
+            for binding in &entries {
+                match binding {
+                    Expr::Symbol(name) => {
+                        if name == "nil" || name == "t" {
+                            return Err(signal("setting-constant", vec![Value::symbol(name)]));
+                        }
+                        if use_lexical && !self.obarray.is_special(name) {
+                            if let Some(frame) = self.lexenv.last_mut() {
+                                frame.insert(name.clone(), Value::Nil);
+                            }
+                        } else if let Some(frame) = self.dynamic.last_mut() {
                             frame.insert(name.clone(), Value::Nil);
                         }
-                    } else if let Some(frame) = self.dynamic.last_mut() {
-                        frame.insert(name.clone(), Value::Nil);
                     }
-                }
-                Expr::List(pair) if !pair.is_empty() => {
-                    let Expr::Symbol(name) = &pair[0] else {
-                        if pushed_lex {
-                            self.lexenv.pop();
+                    Expr::List(pair) if !pair.is_empty() => {
+                        let Expr::Symbol(name) = &pair[0] else {
+                            return Err(signal(
+                                "wrong-type-argument",
+                                vec![Value::symbol("symbolp"), quote_to_value(&pair[0])],
+                            ));
+                        };
+                        let value = if pair.len() > 1 {
+                            self.eval(&pair[1])?
+                        } else {
+                            Value::Nil
+                        };
+                        if name == "nil" || name == "t" {
+                            return Err(signal("setting-constant", vec![Value::symbol(name)]));
                         }
-                        self.dynamic.pop();
-                        return Err(signal(
-                            "wrong-type-argument",
-                            vec![Value::symbol("symbolp"), quote_to_value(&pair[0])],
-                        ));
-                    };
-                    let value = if pair.len() > 1 {
-                        match self.eval(&pair[1]) {
-                            Ok(v) => v,
-                            Err(e) => {
-                                if pushed_lex {
-                                    self.lexenv.pop();
-                                }
-                                self.dynamic.pop();
-                                return Err(e);
+                        if use_lexical && !self.obarray.is_special(name) {
+                            if let Some(frame) = self.lexenv.last_mut() {
+                                frame.insert(name.clone(), value);
                             }
-                        }
-                    } else {
-                        Value::Nil
-                    };
-                    if use_lexical && !self.obarray.is_special(name) {
-                        if let Some(frame) = self.lexenv.last_mut() {
+                        } else if let Some(frame) = self.dynamic.last_mut() {
                             frame.insert(name.clone(), value);
                         }
-                    } else if let Some(frame) = self.dynamic.last_mut() {
-                        frame.insert(name.clone(), value);
                     }
-                }
-                _ => {
-                    if pushed_lex {
-                        self.lexenv.pop();
-                    }
-                    self.dynamic.pop();
-                    return Err(signal("wrong-type-argument", vec![]));
+                    _ => return Err(signal("wrong-type-argument", vec![])),
                 }
             }
+            Ok(())
+        })();
+        if let Err(error) = init_result {
+            if pushed_lex {
+                self.lexenv.pop();
+            }
+            self.dynamic.pop();
+            return Err(error);
         }
 
         let result = self.sf_progn(&tail[1..]);
@@ -4025,6 +4038,38 @@ mod tests {
             eval_one("(condition-case err (let* ((x 1) . 2) x) (error err))"),
             "OK (wrong-type-argument listp 2)"
         );
+    }
+
+    #[test]
+    fn let_and_let_star_binding_constants_signal_setting_constant() {
+        let results = eval_all(
+            "(setq vm-let-a 0 vm-let-b 0)
+             (condition-case err
+                 (let ((t (setq vm-let-a 1))
+                       (x (setq vm-let-b 1)))
+                   x)
+               (error (list :error (car err) (cdr err))))
+             (list vm-let-a vm-let-b)
+             (setq vm-let-a 0 vm-let-b 0)
+             (condition-case err
+                 (let* ((t (setq vm-let-a 1))
+                        (x (setq vm-let-b 1)))
+                   x)
+               (error (list :error (car err) (cdr err))))
+             (list vm-let-a vm-let-b)
+             (condition-case err (let ((nil 1)) nil) (error (list :error (car err) (cdr err))))
+             (condition-case err (let* ((nil 1)) nil) (error (list :error (car err) (cdr err))))
+             (condition-case err (let (t) t) (error (list :error (car err) (cdr err))))
+             (condition-case err (let* (t) t) (error (list :error (car err) (cdr err))))",
+        );
+        assert_eq!(results[1], "OK (:error setting-constant (t))");
+        assert_eq!(results[2], "OK (1 1)");
+        assert_eq!(results[4], "OK (:error setting-constant (t))");
+        assert_eq!(results[5], "OK (1 0)");
+        assert_eq!(results[6], "OK (:error setting-constant (nil))");
+        assert_eq!(results[7], "OK (:error setting-constant (nil))");
+        assert_eq!(results[8], "OK (:error setting-constant (t))");
+        assert_eq!(results[9], "OK (:error setting-constant (t))");
     }
 
     #[test]
