@@ -10,3 +10,4 @@
 10	(make-string 1 4194048)	OK "ø¿¼€"
 11	(prin1-to-string (make-string 1 4194048))	OK "\"ø¿¼€\""
 12	(with-output-to-string (princ (make-string 1 4194048)))	OK "ø¿¼€"
+13	(condition-case err (make-string 1 4194304) (error err))	OK (wrong-type-argument characterp 4194304)

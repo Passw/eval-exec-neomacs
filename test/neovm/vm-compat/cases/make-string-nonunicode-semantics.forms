@@ -10,3 +10,4 @@
 (make-string 1 4194048)
 (prin1-to-string (make-string 1 4194048))
 (with-output-to-string (princ (make-string 1 4194048)))
+(condition-case err (make-string 1 4194304) (error err))

@@ -5931,11 +5931,9 @@ pub(crate) fn builtin_make_string(args: Vec<Value>) -> EvalResult {
                     if let Some(encoded) = encode_nonunicode_char_for_storage(*c as u32) {
                         return Ok(Value::string(encoded.repeat(count)));
                     }
-                    // Emacs accepts broader internal character codes. When these
-                    // cannot be represented as Unicode scalar values in Rust, emit
-                    // replacement characters to keep observable oracle parity.
-                    return Ok(Value::string(
-                        "\u{FFFD}\u{FFFD}\u{FFFD}\u{FFFD}".repeat(count),
+                    return Err(signal(
+                        "wrong-type-argument",
+                        vec![Value::symbol("characterp"), args[1].clone()],
                     ));
                 }
             }
@@ -19321,6 +19319,37 @@ mod tests {
         let eval_result = builtin_message_eval(&mut eval, vec![Value::Nil])
             .expect("message eval should accept nil");
         assert!(eval_result.is_nil());
+    }
+
+    #[test]
+    fn make_string_nonunicode_char_code_bounds_match_oracle() {
+        let overflow = dispatch_builtin_pure("make-string", vec![Value::Int(1), Value::Int(0x40_0000)])
+            .expect("make-string should resolve")
+            .expect_err("make-string should reject out-of-range character code");
+        match overflow {
+            Flow::Signal(sig) => {
+                assert_eq!(sig.symbol, "wrong-type-argument");
+                assert_eq!(
+                    sig.data,
+                    vec![Value::symbol("characterp"), Value::Int(0x40_0000)]
+                );
+            }
+            other => panic!("expected signal, got: {other:?}"),
+        }
+
+        let repeated = dispatch_builtin_pure("make-string", vec![Value::Int(2), Value::Int(0x11_0000)])
+            .expect("make-string should resolve")
+            .expect("make-string should evaluate");
+        let repeated_text = repeated
+            .as_str()
+            .expect("make-string should return string output");
+        assert_eq!(decode_storage_char_codes(repeated_text), vec![0x11_0000, 0x11_0000]);
+
+        let high = dispatch_builtin_pure("make-string", vec![Value::Int(1), Value::Int(0x20_0000)])
+            .expect("make-string should resolve")
+            .expect("make-string should evaluate");
+        let high_text = high.as_str().expect("make-string should return string output");
+        assert_eq!(decode_storage_char_codes(high_text), vec![0x20_0000]);
     }
 
     #[test]
