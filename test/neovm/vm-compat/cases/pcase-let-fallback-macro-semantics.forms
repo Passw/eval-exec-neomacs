@@ -65,3 +65,7 @@
 (condition-case err (pcase-let ((`(,a ,b) 1)) (list a b)) (error err))
 (condition-case err (pcase-let* (((pred numberp) "x")) 'ok) (error err))
 (condition-case err (pcase-let* ((`(,a ,b) 1)) (list a b)) (error err))
+(condition-case err (pcase-let ((`(,a ,b) '(1 . 2))) (list a b)) (error err))
+(condition-case err (pcase-let* ((`(,a ,b) '(1 . 2))) (list a b)) (error err))
+(condition-case err (pcase-let ((`(,a ,b ,c) '(1 2))) (list a b c)) (error err))
+(condition-case err (pcase-let* ((`(,a ,b ,c) '(1 2))) (list a b c)) (error err))

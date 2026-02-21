@@ -57,3 +57,7 @@
 57	(condition-case err (pcase-let ((`(,a ,b) 1)) (list a b)) (error err))	OK (nil nil)
 58	(condition-case err (pcase-let* (((pred numberp) "x")) 'ok) (error err))	OK ok
 59	(condition-case err (pcase-let* ((`(,a ,b) 1)) (list a b)) (error err))	OK (nil nil)
+60	(condition-case err (pcase-let ((`(,a ,b) '(1 . 2))) (list a b)) (error err))	OK (1 nil)
+61	(condition-case err (pcase-let* ((`(,a ,b) '(1 . 2))) (list a b)) (error err))	OK (1 nil)
+62	(condition-case err (pcase-let ((`(,a ,b ,c) '(1 2))) (list a b c)) (error err))	OK (1 2 nil)
+63	(condition-case err (pcase-let* ((`(,a ,b ,c) '(1 2))) (list a b c)) (error err))	OK (1 2 nil)

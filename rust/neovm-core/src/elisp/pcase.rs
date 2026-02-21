@@ -630,6 +630,96 @@ fn fallback_nil_bindings_for_pattern(pattern: &Pattern) -> HashMap<String, Value
     fallback
 }
 
+fn fallback_fill_pattern_bindings(
+    pattern: &Pattern,
+    value: &Value,
+    bindings: &mut HashMap<String, Value>,
+) {
+    match pattern {
+        Pattern::Bind(name) => {
+            bindings.insert(name.clone(), value.clone());
+        }
+        Pattern::And(items) => {
+            for item in items {
+                fallback_fill_pattern_bindings(item, value, bindings);
+            }
+        }
+        Pattern::Or(items) => {
+            if let Some(first) = items.first() {
+                fallback_fill_pattern_bindings(first, value, bindings);
+            }
+        }
+        Pattern::BackquoteList(items) => {
+            let mut cursor = value.clone();
+            for item in items {
+                let current = match cursor.clone() {
+                    Value::Cons(cell) => {
+                        let pair = cell.lock().expect("poisoned");
+                        let car = pair.car.clone();
+                        cursor = pair.cdr.clone();
+                        car
+                    }
+                    _ => {
+                        cursor = Value::Nil;
+                        Value::Nil
+                    }
+                };
+                if let BqElement::Unquote(inner) = item {
+                    fallback_fill_pattern_bindings(inner, &current, bindings);
+                }
+            }
+        }
+        Pattern::BackquoteDotted(items, tail) => {
+            let mut cursor = value.clone();
+            for item in items {
+                let current = match cursor.clone() {
+                    Value::Cons(cell) => {
+                        let pair = cell.lock().expect("poisoned");
+                        let car = pair.car.clone();
+                        cursor = pair.cdr.clone();
+                        car
+                    }
+                    _ => {
+                        cursor = Value::Nil;
+                        Value::Nil
+                    }
+                };
+                if let BqElement::Unquote(inner) = item {
+                    fallback_fill_pattern_bindings(inner, &current, bindings);
+                }
+            }
+            fallback_fill_pattern_bindings(tail, &cursor, bindings);
+        }
+        Pattern::Vector(items) => {
+            let vector_items = if let Value::Vector(values) = value {
+                Some(values.lock().expect("poisoned").clone())
+            } else {
+                None
+            };
+            for (idx, item) in items.iter().enumerate() {
+                let current = vector_items
+                    .as_ref()
+                    .and_then(|vals| vals.get(idx))
+                    .cloned()
+                    .unwrap_or(Value::Nil);
+                fallback_fill_pattern_bindings(item, &current, bindings);
+            }
+        }
+        Pattern::Wildcard
+        | Pattern::Literal(_)
+        | Pattern::Pred(_)
+        | Pattern::Guard(_)
+        | Pattern::Let(_, _)
+        | Pattern::App(_, _) => {}
+    }
+}
+
+fn fallback_bindings_for_pattern(pattern: &Pattern, value: &Value) -> HashMap<String, Value> {
+    let mut bindings = fallback_nil_bindings_for_pattern(pattern);
+    fallback_fill_pattern_bindings(pattern, value, &mut bindings);
+    bindings
+}
+
 // ---------------------------------------------------------------------------
 // Special form implementations
 // ---------------------------------------------------------------------------
@@ -726,7 +816,7 @@ pub(crate) fn sf_pcase_let(eval: &mut Evaluator, tail: &[Expr]) -> EvalResult {
     for (pat, val) in &pairs {
         let bindings = match match_pattern(eval, pat, val)? {
             Some(bindings) => bindings,
-            None => fallback_nil_bindings_for_pattern(pat),
+            None => fallback_bindings_for_pattern(pat, val),
         };
         combined.extend(bindings);
     }
@@ -826,7 +916,7 @@ pub(crate) fn sf_pcase_let_star(eval: &mut Evaluator, tail: &[Expr]) -> EvalResu
 
         let bindings = match match_pattern(eval, &pat, &val) {
             Ok(Some(b)) => b,
-            Ok(None) => fallback_nil_bindings_for_pattern(&pat),
+            Ok(None) => fallback_bindings_for_pattern(&pat, &val),
             Err(e) => {
                 for _ in 0..frames_pushed {
                     if use_lexical {
@@ -899,8 +989,6 @@ pub(crate) fn sf_pcase_dolist(eval: &mut Evaluator, tail: &[Expr]) -> EvalResult
     }
 
     let pattern = compile_pattern(&spec[0])?;
-    let mut fallback_binding_names = Vec::new();
-    collect_pattern_binding_names(&pattern, &mut fallback_binding_names);
     let mut list_val = eval.eval(&spec[1])?;
     let body = &tail[1..];
 
@@ -918,13 +1006,7 @@ pub(crate) fn sf_pcase_dolist(eval: &mut Evaluator, tail: &[Expr]) -> EvalResult
 
         let bindings = match match_pattern(eval, &pattern, &item)? {
             Some(bindings) => bindings,
-            None => {
-                let mut fallback = HashMap::with_capacity(fallback_binding_names.len());
-                for name in &fallback_binding_names {
-                    fallback.insert(name.clone(), Value::Nil);
-                }
-                fallback
-            }
+            None => fallback_bindings_for_pattern(&pattern, &item),
         };
         with_bindings(eval, bindings, body)?;
         list_val = next;
@@ -1296,6 +1378,14 @@ mod tests {
     }
 
     #[test]
+    fn pcase_let_partial_mismatch_preserves_available_bindings() {
+        assert_eq!(
+            eval_last("(pcase-let ((`(,a ,b) '(1 . 2))) (list a b))"),
+            "OK (1 nil)"
+        );
+    }
+
+    #[test]
     fn pcase_let_predicate_mismatch_still_evaluates_body() {
         assert_eq!(eval_last("(pcase-let (((pred numberp) \"x\")) 'ok)"), "OK ok");
     }
@@ -1322,6 +1412,14 @@ mod tests {
         assert_eq!(
             eval_last("(pcase-let* ((`(,a ,b) 1)) (list a b))"),
             "OK (nil nil)"
+        );
+    }
+
+    #[test]
+    fn pcase_let_star_partial_mismatch_preserves_available_bindings() {
+        assert_eq!(
+            eval_last("(pcase-let* ((`(,a ,b) '(1 . 2))) (list a b))"),
+            "OK (1 nil)"
         );
     }
 
@@ -1537,6 +1635,18 @@ mod tests {
                      (setq vals (cons (list a b) vals))))"
             ),
             "OK ((2 3) (nil nil))"
+        );
+    }
+
+    #[test]
+    fn pcase_dolist_partial_mismatch_preserves_available_bindings() {
+        assert_eq!(
+            eval_last(
+                "(let ((vals nil))
+                   (pcase-dolist (`(,a ,b) '((1 . 2)) vals)
+                     (setq vals (cons (list a b) vals))))"
+            ),
+            "OK ((1 nil))"
         );
     }
 

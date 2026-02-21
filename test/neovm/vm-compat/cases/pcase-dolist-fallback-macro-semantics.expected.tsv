@@ -24,4 +24,5 @@
 24	(condition-case err (pcase-dolist (x 1) x) (error err))	OK (wrong-type-argument listp 1)
 25	(condition-case err (pcase-dolist (x '(1 . 2)) x) (error err))	OK (wrong-type-argument listp 2)
 26	(let ((vals nil)) (pcase-dolist (`(,a ,b) '(1 (2 3)) vals) (setq vals (cons (list a b) vals))))	OK ((2 3) (nil nil))
-27	(let ((n 0)) (pcase-dolist ((pred numberp) '(a 1) n) (setq n (1+ n))))	OK 2
+27	(let ((vals nil)) (pcase-dolist (`(,a ,b) '((1 . 2)) vals) (setq vals (cons (list a b) vals))))	OK ((1 nil))
+28	(let ((n 0)) (pcase-dolist ((pred numberp) '(a 1) n) (setq n (1+ n))))	OK 2
