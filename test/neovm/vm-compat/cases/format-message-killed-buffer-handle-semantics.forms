@@ -4,6 +4,8 @@
 (fboundp 'kill-buffer)
 (fboundp 'current-thread)
 (fboundp 'terminal-list)
+(fboundp 'selected-frame)
+(fboundp 'selected-window)
 
 (let* ((b (generate-new-buffer "fmt-killed-vm")))
   (kill-buffer b)
@@ -50,3 +52,19 @@
 
 (let ((term (car (terminal-list))))
   (string-prefix-p "#<terminal" (message "%s" term)))
+
+(string-prefix-p "#<frame" (format "%S" (selected-frame)))
+
+(string-prefix-p "#<frame" (message "%S" (selected-frame)))
+
+(string-prefix-p "#<frame" (format "%s" (selected-frame)))
+
+(string-prefix-p "#<frame" (message "%s" (selected-frame)))
+
+(string-prefix-p "#<window" (format "%S" (selected-window)))
+
+(string-prefix-p "#<window" (message "%S" (selected-window)))
+
+(string-prefix-p "#<window" (format "%s" (selected-window)))
+
+(string-prefix-p "#<window" (message "%s" (selected-window)))

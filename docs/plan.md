@@ -28,6 +28,15 @@ Last updated: 2026-02-21
 
 ## Doing
 
+- Extended vm-compat lock-in for eval-dispatch `format`/`message` opaque-handle rendering with frame/window `%S` and `%s` coverage:
+  - vm-compat corpus changes:
+    - updated:
+      - `test/neovm/vm-compat/cases/format-message-killed-buffer-handle-semantics.forms`
+      - `test/neovm/vm-compat/cases/format-message-killed-buffer-handle-semantics.expected.tsv`
+  - verified:
+    - `make -C test/neovm/vm-compat check-one-neovm CASE=cases/format-message-killed-buffer-handle-semantics` (pass; `28/28`)
+    - `make -C test/neovm/vm-compat check-neovm-filter-strict LIST=cases/default.list PATTERN='format-message-killed-buffer-handle-semantics'` (pass; strict filtered gates green)
+
 - Added vm-compat lock-in for eval-dispatch `format`/`message` live-buffer, killed-buffer, thread, and terminal handle rendering:
   - vm-compat corpus changes:
     - added:

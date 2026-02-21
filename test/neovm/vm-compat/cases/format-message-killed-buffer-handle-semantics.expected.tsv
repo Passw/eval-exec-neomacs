@@ -4,15 +4,25 @@
 4	(fboundp 'kill-buffer)	OK t
 5	(fboundp 'current-thread)	OK t
 6	(fboundp 'terminal-list)	OK t
-7	(let* ((b (generate-new-buffer "fmt-killed-vm"))) (kill-buffer b) (string= (format "%S" b) "#<killed buffer>"))	OK t
-8	(let* ((b (generate-new-buffer "fmt-killed-vm-lower"))) (kill-buffer b) (string= (format "%s" b) "#<killed buffer>"))	OK t
-9	(let* ((b (generate-new-buffer "msg-killed-vm"))) (kill-buffer b) (string= (message "%S" b) "#<killed buffer>"))	OK t
-10	(let* ((b (generate-new-buffer "msg-killed-vm-lower"))) (kill-buffer b) (string= (message "%s" b) "#<killed buffer>"))	OK t
-11	(let* ((b (generate-new-buffer "fmt-live-vm"))) (prog1 (string-prefix-p "#<buffer fmt-live-vm" (format "%S" b)) (kill-buffer b)))	OK t
-12	(let* ((b (generate-new-buffer "msg-live-vm"))) (prog1 (string-prefix-p "#<buffer msg-live-vm" (message "%S" b)) (kill-buffer b)))	OK t
-13	(let* ((b (generate-new-buffer "fmt-live-vm-lower"))) (prog1 (string= "fmt-live-vm-lower" (format "%s" b)) (kill-buffer b)))	OK t
-14	(let* ((b (generate-new-buffer "msg-live-vm-lower"))) (prog1 (string= "msg-live-vm-lower" (message "%s" b)) (kill-buffer b)))	OK t
-15	(string-prefix-p "#<thread" (format "%s" (current-thread)))	OK t
-16	(string-prefix-p "#<thread" (message "%s" (current-thread)))	OK t
-17	(let ((term (car (terminal-list)))) (string-prefix-p "#<terminal" (format "%s" term)))	OK t
-18	(let ((term (car (terminal-list)))) (string-prefix-p "#<terminal" (message "%s" term)))	OK t
+7	(fboundp 'selected-frame)	OK t
+8	(fboundp 'selected-window)	OK t
+9	(let* ((b (generate-new-buffer "fmt-killed-vm"))) (kill-buffer b) (string= (format "%S" b) "#<killed buffer>"))	OK t
+10	(let* ((b (generate-new-buffer "fmt-killed-vm-lower"))) (kill-buffer b) (string= (format "%s" b) "#<killed buffer>"))	OK t
+11	(let* ((b (generate-new-buffer "msg-killed-vm"))) (kill-buffer b) (string= (message "%S" b) "#<killed buffer>"))	OK t
+12	(let* ((b (generate-new-buffer "msg-killed-vm-lower"))) (kill-buffer b) (string= (message "%s" b) "#<killed buffer>"))	OK t
+13	(let* ((b (generate-new-buffer "fmt-live-vm"))) (prog1 (string-prefix-p "#<buffer fmt-live-vm" (format "%S" b)) (kill-buffer b)))	OK t
+14	(let* ((b (generate-new-buffer "msg-live-vm"))) (prog1 (string-prefix-p "#<buffer msg-live-vm" (message "%S" b)) (kill-buffer b)))	OK t
+15	(let* ((b (generate-new-buffer "fmt-live-vm-lower"))) (prog1 (string= "fmt-live-vm-lower" (format "%s" b)) (kill-buffer b)))	OK t
+16	(let* ((b (generate-new-buffer "msg-live-vm-lower"))) (prog1 (string= "msg-live-vm-lower" (message "%s" b)) (kill-buffer b)))	OK t
+17	(string-prefix-p "#<thread" (format "%s" (current-thread)))	OK t
+18	(string-prefix-p "#<thread" (message "%s" (current-thread)))	OK t
+19	(let ((term (car (terminal-list)))) (string-prefix-p "#<terminal" (format "%s" term)))	OK t
+20	(let ((term (car (terminal-list)))) (string-prefix-p "#<terminal" (message "%s" term)))	OK t
+21	(string-prefix-p "#<frame" (format "%S" (selected-frame)))	OK t
+22	(string-prefix-p "#<frame" (message "%S" (selected-frame)))	OK t
+23	(string-prefix-p "#<frame" (format "%s" (selected-frame)))	OK t
+24	(string-prefix-p "#<frame" (message "%s" (selected-frame)))	OK t
+25	(string-prefix-p "#<window" (format "%S" (selected-window)))	OK t
+26	(string-prefix-p "#<window" (message "%S" (selected-window)))	OK t
+27	(string-prefix-p "#<window" (format "%s" (selected-window)))	OK t
+28	(string-prefix-p "#<window" (message "%s" (selected-window)))	OK t
