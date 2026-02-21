@@ -4608,6 +4608,19 @@ fn expand_simple_backquote_list_pcase_let_star(
     pattern: &SimpleBackquoteListPattern,
     body_forms: &[Value],
 ) -> Option<Value> {
+    let should_wrap_source = match value_expr {
+        Value::Cons(cell) => {
+            let head = cell.lock().expect("poisoned").car.clone();
+            !matches!(head.as_symbol_name(), Some("quote" | "function"))
+        }
+        _ => false,
+    };
+    let source_expr = if should_wrap_source {
+        Value::symbol("val")
+    } else {
+        value_expr.clone()
+    };
+
     let (head_vars, tail_var) = match pattern {
         SimpleBackquoteListPattern::Proper(vars) => (vars.as_slice(), None),
         SimpleBackquoteListPattern::Dotted { heads, tail } => (heads.as_slice(), Some(tail)),
@@ -4625,7 +4638,7 @@ fn expand_simple_backquote_list_pcase_let_star(
                     temp.clone(),
                     Value::list(vec![
                         Value::symbol("aref"),
-                        value_expr.clone(),
+                        source_expr.clone(),
                         Value::Int(idx as i64),
                     ]),
                 ]));
@@ -4637,17 +4650,17 @@ fn expand_simple_backquote_list_pcase_let_star(
             let_body.push(Value::list(var_bindings));
             let_body.extend_from_slice(body_forms);
 
-            return Some(Value::list(vec![
+            let mut expanded = Value::list(vec![
                 Value::symbol("progn"),
                 Value::list(vec![
                     Value::symbol("ignore"),
-                    Value::list(vec![Value::symbol("vectorp"), value_expr.clone()]),
+                    Value::list(vec![Value::symbol("vectorp"), source_expr.clone()]),
                 ]),
                 Value::list(vec![
                     Value::symbol("let*"),
                     Value::list(vec![Value::list(vec![
                         length_sym.clone(),
-                        Value::list(vec![Value::symbol("length"), value_expr.clone()]),
+                        Value::list(vec![Value::symbol("length"), source_expr.clone()]),
                     ])]),
                     Value::list(vec![
                         Value::symbol("progn"),
@@ -4666,7 +4679,18 @@ fn expand_simple_backquote_list_pcase_let_star(
                         ]),
                     ]),
                 ]),
-            ]));
+            ]);
+            if should_wrap_source {
+                expanded = Value::list(vec![
+                    Value::symbol("let*"),
+                    Value::list(vec![Value::list(vec![
+                        Value::symbol("val"),
+                        value_expr.clone(),
+                    ])]),
+                    expanded,
+                ]);
+            }
+            return Some(expanded);
         }
     };
     if head_vars.is_empty() {
@@ -4674,7 +4698,7 @@ fn expand_simple_backquote_list_pcase_let_star(
     }
 
     let mut steps = Vec::with_capacity(head_vars.len());
-    let mut source = value_expr.clone();
+    let mut source = source_expr;
     for _ in head_vars {
         let head = eval.next_pcase_macroexpand_temp_symbol();
         let tail = eval.next_pcase_macroexpand_temp_symbol();
@@ -4732,6 +4756,17 @@ fn expand_simple_backquote_list_pcase_let_star(
         ]);
     }
 
+    if should_wrap_source {
+        expanded = Value::list(vec![
+            Value::symbol("let*"),
+            Value::list(vec![Value::list(vec![
+                Value::symbol("val"),
+                value_expr.clone(),
+            ])]),
+            expanded,
+        ]);
+    }
+
     Some(expanded)
 }
 
@@ -4771,14 +4806,7 @@ fn parse_pcase_fallback_binding(binding: &Value) -> Result<PcaseFallbackBinding,
 
     let value_expr = match cdr {
         Value::Nil => Value::Nil,
-        Value::Cons(cdr_cell) => {
-            let cdr_pair = cdr_cell.lock().expect("poisoned");
-            if cdr_pair.cdr.is_nil() {
-                cdr_pair.car.clone()
-            } else {
-                Value::Cons(cdr_cell.clone())
-            }
-        }
+        Value::Cons(cdr_cell) => cdr_cell.lock().expect("poisoned").car.clone(),
         other => other,
     };
 
@@ -22109,12 +22137,11 @@ mod tests {
                 .first()
                 .expect("dotted-value-tail pcase-let parse should yield one form"),
         );
-        let pcase_let_pattern_with_dotted_value_tail_expanded =
-            builtin_macroexpand_eval(
-                &mut eval_single_pattern,
-                vec![pcase_let_pattern_with_dotted_value_tail],
-            )
-                .expect("pcase-let should preserve dotted value tails for pattern temporaries");
+        let pcase_let_pattern_with_dotted_value_tail_expanded = builtin_macroexpand_eval(
+            &mut eval_single_pattern,
+            vec![pcase_let_pattern_with_dotted_value_tail],
+        )
+        .expect("pcase-let should preserve dotted value tails for pattern temporaries");
         let pcase_let_pattern_with_dotted_value_tail_expected_forms =
             crate::elisp::parser::parse_forms(
                 r#"(let ((x0 a . b) (w 1)) (pcase-let* (((x y . z) x0)) q))"#,
@@ -22128,6 +22155,33 @@ mod tests {
         assert_eq!(
             pcase_let_pattern_with_dotted_value_tail_expanded,
             pcase_let_pattern_with_dotted_value_tail_expected
+        );
+        let mut eval_pattern_value_head = crate::elisp::eval::Evaluator::new();
+        let pcase_let_star_dotted_tail_pattern_forms =
+            crate::elisp::parser::parse_forms(r#"(pcase-let* ((`(,a ,b) (foo bar) . baz)) q)"#)
+                .expect("dotted-tail pcase-let* pattern form should parse");
+        let pcase_let_star_dotted_tail_pattern = crate::elisp::eval::quote_to_value(
+            pcase_let_star_dotted_tail_pattern_forms
+                .first()
+                .expect("dotted-tail pcase-let* pattern parse should yield one form"),
+        );
+        let pcase_let_star_dotted_tail_pattern_expanded = builtin_macroexpand_eval(
+            &mut eval_pattern_value_head,
+            vec![pcase_let_star_dotted_tail_pattern],
+        )
+        .expect("pcase-let* simple patterns should consume only the first binding value form");
+        let pcase_let_star_dotted_tail_pattern_expected_forms = crate::elisp::parser::parse_forms(
+            r#"(let* ((val (foo bar))) (progn (ignore (consp val)) (let* ((x0 (car-safe val)) (x1 (cdr-safe val))) (progn (ignore (consp x1)) (let* ((x2 (car-safe x1)) (x3 (cdr-safe x1))) (progn (ignore (null x3)) (let ((a x0) (b x2)) q)))))))"#,
+        )
+        .expect("dotted-tail pcase-let* expected expansion should parse");
+        let pcase_let_star_dotted_tail_pattern_expected = crate::elisp::eval::quote_to_value(
+            pcase_let_star_dotted_tail_pattern_expected_forms
+                .first()
+                .expect("dotted-tail pcase-let* expected parse should yield one form"),
+        );
+        assert_eq!(
+            pcase_let_star_dotted_tail_pattern_expanded,
+            pcase_let_star_dotted_tail_pattern_expected
         );
         let pcase_let_multi_pattern_forms = crate::elisp::parser::parse_forms(
             r#"(pcase-let ((`(,a ,b) '(1 2)) (`(,c ,d) '(3 4))) (list a b c d))"#,
