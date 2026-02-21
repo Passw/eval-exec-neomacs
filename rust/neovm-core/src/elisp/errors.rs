@@ -1703,6 +1703,46 @@ mod tests {
     }
 
     #[test]
+    fn builtin_error_message_string_formats_frame_and_window_handles() {
+        let mut evaluator = super::super::eval::Evaluator::new();
+        init_standard_errors(&mut evaluator.obarray);
+
+        let frame = super::super::window_cmds::builtin_selected_frame(&mut evaluator, vec![])
+            .expect("selected-frame should succeed");
+        let frame_err = Value::list(vec![
+            Value::symbol("args-out-of-range"),
+            frame,
+            Value::Int(0),
+        ]);
+        let frame_result = builtin_error_message_string(&evaluator, vec![frame_err]);
+        assert!(frame_result.is_ok());
+        let frame_text = frame_result
+            .unwrap()
+            .as_str()
+            .expect("error-message-string must return a string")
+            .to_string();
+        assert!(frame_text.starts_with("Args out of range: #<frame"));
+        assert!(frame_text.ends_with(", 0"));
+
+        let window = super::super::window_cmds::builtin_selected_window(&mut evaluator, vec![])
+            .expect("selected-window should succeed");
+        let window_err = Value::list(vec![
+            Value::symbol("args-out-of-range"),
+            window,
+            Value::Int(0),
+        ]);
+        let window_result = builtin_error_message_string(&evaluator, vec![window_err]);
+        assert!(window_result.is_ok());
+        let window_text = window_result
+            .unwrap()
+            .as_str()
+            .expect("error-message-string must return a string")
+            .to_string();
+        assert!(window_text.starts_with("Args out of range: #<window"));
+        assert!(window_text.ends_with(", 0"));
+    }
+
+    #[test]
     fn builtin_error_message_string_not_cons() {
         let evaluator = super::super::eval::Evaluator::new();
 
