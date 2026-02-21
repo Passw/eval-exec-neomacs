@@ -91,3 +91,21 @@
         (eval-buffer)
         neovm-eb-bom-probe)
     (error (car err))))
+
+(with-temp-buffer
+  (insert "#!/usr/bin/env emacs --script")
+  (insert (char-to-string 10))
+  (insert "(setq neovm-er-shebang-probe 'ok)")
+  (insert (char-to-string 10))
+  (eval-region 1 (point-max))
+  neovm-er-shebang-probe)
+
+(with-temp-buffer
+  (insert (char-to-string 65279))
+  (insert "(setq neovm-er-bom-probe 'ok)")
+  (insert (char-to-string 10))
+  (condition-case err
+      (progn
+        (eval-region 1 (point-max))
+        neovm-er-bom-probe)
+    (error (list 'error (car err)))))

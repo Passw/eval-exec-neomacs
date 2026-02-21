@@ -17,3 +17,5 @@
 17	(with-temp-buffer (insert "(+ 1 2)") (condition-case err (eval-region 1 (point-max) nil nil nil) (error err)))	OK (wrong-number-of-arguments eval-region 5)
 18	(with-temp-buffer (insert "#!/usr/bin/env emacs --script") (insert (char-to-string 10)) (insert "(setq neovm-eb-shebang-probe 'ok)") (insert (char-to-string 10)) (eval-buffer) neovm-eb-shebang-probe)	OK ok
 19	(with-temp-buffer (insert (char-to-string 65279)) (insert "(setq neovm-eb-bom-probe 'ok)") (insert (char-to-string 10)) (condition-case err (progn (eval-buffer) neovm-eb-bom-probe) (error (car err))))	OK void-variable
+20	(with-temp-buffer (insert "#!/usr/bin/env emacs --script") (insert (char-to-string 10)) (insert "(setq neovm-er-shebang-probe 'ok)") (insert (char-to-string 10)) (eval-region 1 (point-max)) neovm-er-shebang-probe)	OK ok
+21	(with-temp-buffer (insert (char-to-string 65279)) (insert "(setq neovm-er-bom-probe 'ok)") (insert (char-to-string 10)) (condition-case err (progn (eval-region 1 (point-max)) neovm-er-bom-probe) (error (list 'error (car err)))))	OK (error void-variable)
