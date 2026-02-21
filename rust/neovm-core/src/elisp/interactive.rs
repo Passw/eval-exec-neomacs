@@ -1589,6 +1589,9 @@ pub(crate) fn builtin_key_binding(eval: &mut Evaluator, args: Vec<Value>) -> Eva
     expect_max_args("key-binding", &args, 4)?;
     let string_designator = args[0].is_string();
     let no_remap = args.get(2).is_some_and(|v| v.is_truthy());
+    if let Some(position) = args.get(3) {
+        key_binding_validate_position_arg(eval, position)?;
+    }
 
     let events = match super::kbd::key_events_from_designator(&args[0]) {
         Ok(events) => events,
@@ -1639,6 +1642,24 @@ pub(crate) fn builtin_key_binding(eval: &mut Evaluator, args: Vec<Value>) -> Eva
     }
 
     Ok(Value::Nil)
+}
+
+fn key_binding_validate_position_arg(eval: &Evaluator, position: &Value) -> Result<(), Flow> {
+    let Value::Int(pos) = position else {
+        return Ok(());
+    };
+    let Some(buf) = eval.buffers.current_buffer() else {
+        return Ok(());
+    };
+    let point_min = buf.text.byte_to_char(buf.point_min()) as i64 + 1;
+    let point_max = buf.text.byte_to_char(buf.point_max()) as i64 + 1;
+    if *pos < point_min || *pos > point_max {
+        return Err(signal(
+            "args-out-of-range",
+            vec![Value::Buffer(buf.id), Value::Int(*pos)],
+        ));
+    }
+    Ok(())
 }
 
 /// `(local-key-binding KEY &optional ACCEPT-DEFAULTS)`
@@ -4268,6 +4289,58 @@ mod tests {
             ],
         );
         assert!(result.is_err());
+    }
+
+    #[test]
+    fn key_binding_integer_position_out_of_range_signals_args_out_of_range() {
+        assert_eq!(
+            eval_one(
+                r#"(with-temp-buffer
+                     (let ((g (make-sparse-keymap)))
+                       (use-global-map g)
+                       (define-key g (kbd "a") 'forward-char)
+                       (let ((err (condition-case e
+                                      (key-binding (kbd "a") t nil 0)
+                                    (error e))))
+                         (list (car err) (bufferp (cadr err)) (caddr err)))))"#
+            ),
+            "OK (args-out-of-range t 0)"
+        );
+        assert_eq!(
+            eval_one(
+                r#"(with-temp-buffer
+                     (let ((g (make-sparse-keymap)))
+                       (use-global-map g)
+                       (define-key g (kbd "a") 'forward-char)
+                       (let ((err (condition-case e
+                                      (key-binding (kbd "a") t nil 2)
+                                    (error e))))
+                         (list (car err) (bufferp (cadr err)) (caddr err)))))"#
+            ),
+            "OK (args-out-of-range t 2)"
+        );
+    }
+
+    #[test]
+    fn key_binding_non_integer_position_is_accepted_and_ignored() {
+        assert_eq!(
+            eval_one(
+                r#"(with-temp-buffer
+                     (let ((g (make-sparse-keymap)))
+                       (use-global-map g)
+                       (define-key g (kbd "a") 'forward-char)
+                       (list
+                        (key-binding (kbd "a") t nil 1)
+                        (key-binding (kbd "a") t nil t)
+                        (key-binding (kbd "a") t nil 'foo)
+                        (key-binding (kbd "a") t nil "x")
+                        (key-binding (kbd "a") t nil [1])
+                        (key-binding (kbd "a") t nil '(1))
+                        (key-binding (kbd "a") t nil 1.5)
+                        (key-binding (kbd "a") t nil (copy-marker (point))))))"#
+            ),
+            "OK (forward-char forward-char forward-char forward-char forward-char forward-char forward-char forward-char)"
+        );
     }
 
     #[test]

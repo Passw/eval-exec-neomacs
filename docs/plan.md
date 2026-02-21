@@ -28,6 +28,26 @@ Last updated: 2026-02-21
 
 ## Doing
 
+- Aligned `key-binding` optional `POSITION` integer bounds to Oracle and added lock-in coverage:
+  - runtime changes:
+    - `rust/neovm-core/src/elisp/interactive.rs`
+      - `key-binding` now validates integer `POSITION` against current buffer `point-min..point-max`.
+      - out-of-range integers now signal `args-out-of-range` with `(current-buffer POSITION)` payload.
+      - non-integer `POSITION` values remain accepted/ignored.
+      - added evaluator coverage:
+        - `key_binding_integer_position_out_of_range_signals_args_out_of_range`
+        - `key_binding_non_integer_position_is_accepted_and_ignored`
+  - vm-compat corpus changes:
+    - added:
+      - `test/neovm/vm-compat/cases/key-binding-position-semantics.forms`
+      - `test/neovm/vm-compat/cases/key-binding-position-semantics.expected.tsv`
+    - wired case into:
+      - `test/neovm/vm-compat/cases/default.list`
+  - verified:
+    - `cargo test --manifest-path rust/neovm-core/Cargo.toml key_binding_ -- --nocapture` (pass)
+    - `make -C test/neovm/vm-compat check-one-neovm CASE=cases/key-binding-position-semantics` (pass; `6/6`)
+    - `make -C test/neovm/vm-compat check-all-neovm-strict` (pass)
+
 - Aligned invalid lambda `interactive` control-letter handling with Oracle and added lock-ins:
   - runtime changes:
     - `rust/neovm-core/src/elisp/interactive.rs`
