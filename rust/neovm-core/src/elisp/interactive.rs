@@ -295,6 +295,25 @@ pub(crate) fn builtin_command_remapping(eval: &mut Evaluator, args: Vec<Value>) 
             ));
         }
     }
+    let Some(map_id) = command_remapping_lookup_keymap_id(eval, args.get(2)) else {
+        return Ok(Value::Nil);
+    };
+    let Some(command_event) = command_remapping_command_event(&args[0]) else {
+        return Ok(Value::Nil);
+    };
+    let remap_event = KeyEvent::Function {
+        name: "remap".to_string(),
+        ctrl: false,
+        meta: false,
+        shift: false,
+        super_: false,
+    };
+    if let Some(binding) = eval
+        .keymaps
+        .lookup_key_sequence(map_id, &[remap_event, command_event])
+    {
+        return Ok(command_remapping_binding_value(binding));
+    }
     Ok(Value::Nil)
 }
 
@@ -2513,6 +2532,76 @@ fn command_remapping_keymap_arg_valid(eval: &Evaluator, value: &Value) -> bool {
         // Oracle accepts cons/list keymap-like objects in this slot.
         Value::Cons(_) => true,
         _ => false,
+    }
+}
+
+fn command_remapping_lookup_keymap_id(eval: &Evaluator, keymap: Option<&Value>) -> Option<u64> {
+    match keymap {
+        None | Some(Value::Nil) => eval.keymaps.global_map(),
+        Some(Value::Int(n)) => decode_keymap_handle(*n).filter(|id| eval.keymaps.is_keymap(*id)),
+        Some(Value::Cons(_)) => None,
+        Some(_) => None,
+    }
+}
+
+fn command_remapping_command_event(command: &Value) -> Option<KeyEvent> {
+    let name = match command {
+        Value::Nil => "nil".to_string(),
+        Value::True => "t".to_string(),
+        Value::Symbol(s) => s.clone(),
+        _ => return None,
+    };
+    Some(KeyEvent::Function {
+        name,
+        ctrl: false,
+        meta: false,
+        shift: false,
+        super_: false,
+    })
+}
+
+fn command_remapping_menu_item_target(value: &Value) -> Option<Value> {
+    let mut current = value.clone();
+    let mut index = 0usize;
+    let mut head_is_menu_item = false;
+    while let Value::Cons(cell) = current {
+        let (car, cdr) = {
+            let pair = cell.lock().expect("poisoned");
+            (pair.car.clone(), pair.cdr.clone())
+        };
+        if index == 0 {
+            head_is_menu_item = car.as_symbol_name() == Some("menu-item");
+        } else if index == 2 {
+            return head_is_menu_item.then_some(car);
+        }
+        current = cdr;
+        index += 1;
+    }
+    None
+}
+
+fn command_remapping_binding_value(binding: &KeyBinding) -> Value {
+    let raw = match binding {
+        KeyBinding::Command(name) => Value::symbol(name.clone()),
+        KeyBinding::LispValue(value) => value.clone(),
+        KeyBinding::Prefix(id) => Value::Int(encode_keymap_handle(*id)),
+    };
+
+    if let Some(menu_target) = command_remapping_menu_item_target(&raw) {
+        // Oracle unwraps well-formed menu-item bindings for command remapping.
+        // Integer payloads in command slot still collapse to nil.
+        return if menu_target.is_integer() {
+            Value::Nil
+        } else {
+            menu_target
+        };
+    }
+
+    // Oracle treats plain integer and `t` remap targets as no-remap.
+    if matches!(raw, Value::Int(_) | Value::True) {
+        Value::Nil
+    } else {
+        raw
     }
 }
 
@@ -6348,6 +6437,82 @@ K")
                      (wrong-number-of-arguments (car err)))"#
             ),
             "OK wrong-number-of-arguments"
+        );
+    }
+
+    #[test]
+    fn command_remapping_resolves_remap_bindings_on_keymap_handles() {
+        assert_eq!(
+            eval_one(
+                r#"(let ((m (make-sparse-keymap)))
+                     (define-key m [remap ignore] 'self-insert-command)
+                     (command-remapping 'ignore nil m))"#
+            ),
+            "OK self-insert-command"
+        );
+        assert_eq!(
+            eval_one(
+                r#"(let ((m (make-sparse-keymap)))
+                     (define-key m [remap ignore] [x])
+                     (command-remapping 'ignore nil m))"#
+            ),
+            "OK [x]"
+        );
+        assert_eq!(
+            eval_one(
+                r#"(let ((m (make-sparse-keymap)))
+                     (define-key m [remap ignore] 1)
+                     (command-remapping 'ignore nil m))"#
+            ),
+            "OK nil"
+        );
+        assert_eq!(
+            eval_one(
+                r#"(let ((m (make-sparse-keymap)))
+                     (define-key m [remap ignore] t)
+                     (command-remapping 'ignore nil m))"#
+            ),
+            "OK nil"
+        );
+        assert_eq!(
+            eval_one(
+                r#"(let ((m (make-sparse-keymap)))
+                     (define-key m [remap ignore] '(menu-item "x" ignore))
+                     (command-remapping 'ignore nil m))"#
+            ),
+            "OK ignore"
+        );
+        assert_eq!(
+            eval_one(
+                r#"(let ((m (make-sparse-keymap)))
+                     (define-key m [remap ignore] '(menu-item "x" 1))
+                     (command-remapping 'ignore nil m))"#
+            ),
+            "OK nil"
+        );
+        assert_eq!(
+            eval_one(
+                r#"(let ((m (make-sparse-keymap)))
+                     (define-key m [remap ignore] '(menu-item))
+                     (command-remapping 'ignore nil m))"#
+            ),
+            "OK (menu-item)"
+        );
+        assert_eq!(
+            eval_one(
+                r#"(let ((m (make-sparse-keymap)))
+                     (define-key m [remap ignore] 'self-insert-command)
+                     (command-remapping 0 nil m))"#
+            ),
+            "OK nil"
+        );
+        assert_eq!(
+            eval_one(
+                r#"(let ((m (make-sparse-keymap)))
+                     (define-key (current-global-map) [remap ignore] 'self-insert-command)
+                     (command-remapping 'ignore))"#
+            ),
+            "OK self-insert-command"
         );
     }
 

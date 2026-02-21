@@ -18127,6 +18127,33 @@ Last updated: 2026-02-21
 
 ## Doing
 
+- Implemented real `[remap COMMAND]` lookup in `command-remapping` for keymap-handle inputs and locked oracle behavior:
+  - runtime changes:
+    - `rust/neovm-core/src/elisp/interactive.rs`
+      - `command-remapping` now resolves remaps from:
+        - explicit keymap-handle `KEYMAP`,
+        - global map when `KEYMAP` is omitted/`nil`.
+      - keeps current optional `KEYMAP` type contract:
+        - keymap-handle integers and cons/list keymap objects are accepted,
+        - non-`nil` invalid types still signal `wrong-type-argument (keymapp ...)`.
+      - aligned result shaping to oracle for remap targets:
+        - plain integer / `t` remap targets collapse to `nil`,
+        - well-formed `(menu-item ... COMMAND ...)` remaps unwrap to `COMMAND` (with integer command slot collapsing to `nil`),
+        - malformed short `(menu-item)` payload remains unchanged.
+      - added unit coverage:
+        - `command_remapping_resolves_remap_bindings_on_keymap_handles`.
+  - vm-compat corpus changes:
+    - added and wired:
+      - `test/neovm/vm-compat/cases/command-remapping-remap-lookup-semantics.forms`
+      - `test/neovm/vm-compat/cases/command-remapping-remap-lookup-semantics.expected.tsv`
+      - `test/neovm/vm-compat/cases/default.list`
+  - verified:
+    - `cargo test --manifest-path rust/neovm-core/Cargo.toml command_remapping_resolves_remap_bindings_on_keymap_handles -- --nocapture` (pass)
+    - `make -C test/neovm/vm-compat check-one-neovm CASE=cases/command-remapping-remap-lookup-semantics` (pass; `14/14`)
+    - `make -C test/neovm/vm-compat check-one-neovm CASE=cases/command-remapping-modes-boundary-semantics` (pass; `34/34`)
+    - `make -C test/neovm/vm-compat check-one-neovm CASE=cases/category-coding-command-font-semantics` (pass; `36/36`)
+    - `make -C test/neovm/vm-compat check-all-neovm-strict` (pass; case inventory `872`)
+
 - Aligned `command-remapping` optional `KEYMAP` boundary semantics with oracle and added dedicated lock-ins:
   - runtime changes:
     - `rust/neovm-core/src/elisp/interactive.rs`

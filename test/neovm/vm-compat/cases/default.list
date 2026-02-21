@@ -210,6 +210,7 @@ cases/key-binding-arity-semantics
 cases/key-binding-default-self-insert-semantics
 cases/minor-mode-key-binding-semantics
 cases/command-remapping-modes-boundary-semantics
+cases/command-remapping-remap-lookup-semantics
 cases/command-dispatch-default-arg-semantics
 cases/call-interactively-prefix-numeric-arg-semantics
 cases/call-interactively-word-prefix-arg-semantics
