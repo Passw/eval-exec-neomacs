@@ -3588,7 +3588,6 @@ void resize_echo_area_exactly (void);
 bool resize_mini_window (struct window *, bool);
 void set_vertical_scroll_bar (struct window *);
 void set_horizontal_scroll_bar (struct window *);
-int try_window (Lisp_Object, struct text_pos, int);
 void window_box (struct window *, enum glyph_row_area,
 		 int *, int *, int *, int *);
 int window_box_height (struct window *);
@@ -3710,10 +3709,6 @@ extern void tty_draw_row_with_mouse_face (struct window *, struct glyph_row *,
 					  int, int, enum draw_glyphs_face);
 extern void display_tty_menu_item (const char *, int, int, int, int, bool);
 #endif
-/* Flags passed to try_window.  */
-#define TRY_WINDOW_CHECK_MARGINS	(1 << 0)
-#define TRY_WINDOW_IGNORE_FONTS_CHANGE	(1 << 1)
-
 int lookup_fringe_bitmap (Lisp_Object);
 void draw_fringe_bitmap (struct window *, struct glyph_row *, int);
 void draw_row_fringe_bitmaps (struct window *, struct glyph_row *);
