@@ -28,6 +28,23 @@ Last updated: 2026-02-21
 
 ## Doing
 
+- Extended strict format-spec/type mismatch parity for `format` / `format-message` / `message` (`%d`/`%f`/`%c`):
+  - runtime changes:
+    - `rust/neovm-core/src/elisp/builtins.rs`
+      - strict format paths now signal `(error "Format specifier doesn’t match argument type")` when `%d`/`%f`/`%c` receive incompatible arguments.
+      - extended evaluator coverage:
+        - `format_message_and_message_signal_strict_format_errors`
+      - test now asserts spec/type mismatch signal payload parity across all three builtins.
+  - vm-compat corpus changes:
+    - updated:
+      - `test/neovm/vm-compat/cases/format-message-error-path-semantics.forms`
+      - `test/neovm/vm-compat/cases/format-message-error-path-semantics.expected.tsv`
+    - added `%d`/`%f`/`%c` mismatch rows for all three builtins.
+  - verified:
+    - `cargo test --manifest-path rust/neovm-core/Cargo.toml format_message_and_message_signal_strict_format_errors -- --nocapture` (pass)
+    - `make -C test/neovm/vm-compat check-one-neovm CASE=cases/format-message-error-path-semantics` (pass; `24/24`)
+    - `make -C test/neovm/vm-compat check-neovm-filter-strict LIST=cases/default.list PATTERN='format-message-error-path-semantics'` (pass; strict filtered gates green)
+
 - Aligned core `format` / `format-message` / `message` string-format error behavior with oracle:
   - runtime changes:
     - `rust/neovm-core/src/elisp/builtins.rs`

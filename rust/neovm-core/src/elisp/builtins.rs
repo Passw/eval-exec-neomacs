@@ -1992,6 +1992,13 @@ fn format_not_enough_args_error() -> Flow {
     )
 }
 
+fn format_spec_type_mismatch_error() -> Flow {
+    signal(
+        "error",
+        vec![Value::string("Format specifier doesn’t match argument type")],
+    )
+}
+
 fn builtin_format_wrapper_strict(args: Vec<Value>) -> EvalResult {
     expect_min_args("format", &args, 1)?;
     let fmt_str = expect_strict_string(&args[0])?;
@@ -2025,28 +2032,28 @@ fn builtin_format_wrapper_strict(args: Vec<Value>) -> EvalResult {
                         if arg_idx >= args.len() {
                             return Err(format_not_enough_args_error());
                         }
-                        if let Ok(n) = expect_int(&args[arg_idx]) {
-                            result.push_str(&n.to_string());
-                        }
+                        let n =
+                            expect_int(&args[arg_idx]).map_err(|_| format_spec_type_mismatch_error())?;
+                        result.push_str(&n.to_string());
                         arg_idx += 1;
                     }
                     'f' => {
                         if arg_idx >= args.len() {
                             return Err(format_not_enough_args_error());
                         }
-                        if let Ok(f) = expect_number(&args[arg_idx]) {
-                            result.push_str(&format!("{:.6}", f));
-                        }
+                        let f = expect_number(&args[arg_idx])
+                            .map_err(|_| format_spec_type_mismatch_error())?;
+                        result.push_str(&format!("{:.6}", f));
                         arg_idx += 1;
                     }
                     'c' => {
                         if arg_idx >= args.len() {
                             return Err(format_not_enough_args_error());
                         }
-                        if let Ok(n) = expect_int(&args[arg_idx]) {
-                            if let Some(c) = char::from_u32(n as u32) {
-                                result.push(c);
-                            }
+                        let n =
+                            expect_int(&args[arg_idx]).map_err(|_| format_spec_type_mismatch_error())?;
+                        if let Some(c) = char::from_u32(n as u32) {
+                            result.push(c);
                         }
                         arg_idx += 1;
                     }
@@ -2100,28 +2107,28 @@ fn builtin_format_wrapper_strict_eval(
                         if arg_idx >= args.len() {
                             return Err(format_not_enough_args_error());
                         }
-                        if let Ok(n) = expect_int(&args[arg_idx]) {
-                            result.push_str(&n.to_string());
-                        }
+                        let n =
+                            expect_int(&args[arg_idx]).map_err(|_| format_spec_type_mismatch_error())?;
+                        result.push_str(&n.to_string());
                         arg_idx += 1;
                     }
                     'f' => {
                         if arg_idx >= args.len() {
                             return Err(format_not_enough_args_error());
                         }
-                        if let Ok(f) = expect_number(&args[arg_idx]) {
-                            result.push_str(&format!("{:.6}", f));
-                        }
+                        let f = expect_number(&args[arg_idx])
+                            .map_err(|_| format_spec_type_mismatch_error())?;
+                        result.push_str(&format!("{:.6}", f));
                         arg_idx += 1;
                     }
                     'c' => {
                         if arg_idx >= args.len() {
                             return Err(format_not_enough_args_error());
                         }
-                        if let Ok(n) = expect_int(&args[arg_idx]) {
-                            if let Some(c) = char::from_u32(n as u32) {
-                                result.push(c);
-                            }
+                        let n =
+                            expect_int(&args[arg_idx]).map_err(|_| format_spec_type_mismatch_error())?;
+                        if let Some(c) = char::from_u32(n as u32) {
+                            result.push(c);
                         }
                         arg_idx += 1;
                     }
@@ -19288,6 +19295,28 @@ mod tests {
                     );
                 }
                 other => panic!("expected signal, got: {other:?}"),
+            }
+        }
+
+        for builtin in ["format", "format-message", "message"] {
+            for spec in ["%d", "%f", "%c"] {
+                let err = dispatch_builtin(
+                    &mut eval,
+                    builtin,
+                    vec![Value::string(spec), Value::string("x")],
+                )
+                .expect("builtin should resolve")
+                .expect_err("builtin should signal on spec/type mismatch");
+                match err {
+                    Flow::Signal(sig) => {
+                        assert_eq!(sig.symbol, "error");
+                        assert_eq!(
+                            sig.data,
+                            vec![Value::string("Format specifier doesn’t match argument type")]
+                        );
+                    }
+                    other => panic!("expected signal, got: {other:?}"),
+                }
             }
         }
     }
