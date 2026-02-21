@@ -28,6 +28,24 @@ Last updated: 2026-02-21
 
 ## Doing
 
+- Aligned killed-buffer handle printing in eval-context error payloads with Oracle and added lock-in coverage:
+  - runtime changes:
+    - `rust/neovm-core/src/elisp/error.rs`
+      - eval-context printers now render stale buffer handles as `#<killed buffer>` when the buffer id is dead but tracked in `dead_buffer_last_name`.
+      - preserves live-buffer formatting (`#<buffer NAME>`) and existing fallback behavior for non-buffer values.
+      - added evaluator coverage:
+        - `eval_context_printer_renders_killed_buffer_handles`
+  - vm-compat corpus changes:
+    - added:
+      - `test/neovm/vm-compat/cases/killed-buffer-handle-printing-semantics.forms`
+      - `test/neovm/vm-compat/cases/killed-buffer-handle-printing-semantics.expected.tsv`
+    - wired case into:
+      - `test/neovm/vm-compat/cases/default.list`
+  - verified:
+    - `cargo test --manifest-path rust/neovm-core/Cargo.toml eval_context_printer_renders_killed_buffer_handles -- --nocapture` (pass)
+    - `make -C test/neovm/vm-compat check-one-neovm CASE=cases/killed-buffer-handle-printing-semantics` (pass; `4/4`)
+    - `make -C test/neovm/vm-compat check-all-neovm-strict` (pass)
+
 - Aligned `command-remapping` optional `POSITION` integer range handling with Oracle and added lock-in coverage:
   - runtime changes:
     - `rust/neovm-core/src/elisp/interactive.rs`

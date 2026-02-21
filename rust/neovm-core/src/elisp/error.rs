@@ -149,6 +149,9 @@ fn format_value_with_eval(eval: &super::eval::Evaluator, value: &Value) -> Strin
         if let Some(buf) = eval.buffers.get(*id) {
             return format!("#<buffer {}>", buf.name);
         }
+        if eval.buffers.dead_buffer_last_name(*id).is_some() {
+            return "#<killed buffer>".to_string();
+        }
     }
     match value {
         super::value::Value::Cons(_) | super::value::Value::Vector(_) => {
@@ -256,6 +259,9 @@ pub fn print_value_bytes_with_eval(eval: &super::eval::Evaluator, value: &Value)
     if let Value::Buffer(id) = value {
         if let Some(buf) = eval.buffers.get(*id) {
             return format!("#<buffer {}>", buf.name).into_bytes();
+        }
+        if eval.buffers.dead_buffer_last_name(*id).is_some() {
+            return b"#<killed buffer>".to_vec();
         }
     }
     format_value_bytes_with_eval(eval, value)
@@ -491,6 +497,34 @@ mod tests {
         assert_eq!(
             String::from_utf8(print_value_bytes_with_eval(&eval, &value)).unwrap(),
             "(#<buffer *scratch*> 1 1)"
+        );
+
+        Ok(())
+    }
+
+    #[test]
+    fn eval_context_printer_renders_killed_buffer_handles() -> Result<(), EvalError> {
+        let forms = parse_forms(
+            "(with-temp-buffer
+               (condition-case err
+                   (key-binding 1 nil nil 0)
+                 (error err)))",
+        )
+        .map_err(|err| EvalError::Signal {
+            symbol: "parse-error".to_string(),
+            data: vec![Value::string(err.to_string())],
+        })?;
+
+        let mut eval = Evaluator::new();
+        let value = eval.eval_expr(&forms[0])?;
+
+        assert_eq!(
+            print_value_with_eval(&eval, &value),
+            "(args-out-of-range #<killed buffer> 0)"
+        );
+        assert_eq!(
+            String::from_utf8(print_value_bytes_with_eval(&eval, &value)).unwrap(),
+            "(args-out-of-range #<killed buffer> 0)"
         );
 
         Ok(())
