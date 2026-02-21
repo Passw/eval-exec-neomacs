@@ -161,31 +161,6 @@ ensure_menu_items (int items)
     }
 }
 
-#ifdef HAVE_EXT_MENU_BAR
-
-/* Begin a submenu.  */
-
-static void
-push_submenu_start (void)
-{
-  ensure_menu_items (1);
-  ASET (menu_items, menu_items_used, Qnil);
-  menu_items_used++;
-  menu_items_submenu_depth++;
-}
-
-/* End a submenu.  */
-
-static void
-push_submenu_end (void)
-{
-  ensure_menu_items (1);
-  ASET (menu_items, menu_items_used, Qlambda);
-  menu_items_used++;
-  menu_items_submenu_depth--;
-}
-
-#endif /* HAVE_EXT_MENU_BAR */
 
 /* Indicate boundary between left and right.  */
 

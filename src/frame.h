@@ -232,9 +232,8 @@ struct frame
      most recently buried buffer is first.  For last-buffer.  */
   Lisp_Object buried_buffer_list;
 
-#if defined HAVE_WINDOW_SYSTEM && !defined HAVE_EXT_MENU_BAR
-  /* A dummy window used to display menu bars under X when no X
-     toolkit support is available.  */
+#ifdef HAVE_WINDOW_SYSTEM
+  /* A window used to display the menu bar.  */
   Lisp_Object menu_bar_window;
 #endif
 
@@ -247,7 +246,7 @@ struct frame
   Lisp_Object current_tab_bar_string;
 #endif
 
-#if defined (HAVE_WINDOW_SYSTEM) && ! defined (HAVE_EXT_TOOL_BAR)
+#ifdef HAVE_WINDOW_SYSTEM
   /* A window used to display the tool-bar of a frame.  */
   Lisp_Object tool_bar_window;
 
@@ -287,7 +286,7 @@ struct frame
   /* Tab-bar item index of the item on which a mouse button was pressed.  */
   int last_tab_bar_item;
 
-#if defined (HAVE_WINDOW_SYSTEM) && ! defined (HAVE_EXT_TOOL_BAR)
+#ifdef HAVE_WINDOW_SYSTEM
   /* Tool-bar item index of the item on which a mouse button was pressed.  */
   int last_tool_bar_item;
 #endif
@@ -329,7 +328,7 @@ struct frame
   bool_bf minimize_tab_bar_window_p : 1;
 #endif
 
-#if defined (HAVE_WINDOW_SYSTEM) && ! defined (HAVE_EXT_TOOL_BAR)
+#ifdef HAVE_WINDOW_SYSTEM
   /* Set to true to minimize tool-bar height even when
      auto-resize-tool-bar is set to grow-only.  */
   bool_bf minimize_tool_bar_window_p : 1;
@@ -339,10 +338,6 @@ struct frame
   bool_bf tool_bar_wraps_p : 1;
 #endif
 
-#ifdef HAVE_EXT_TOOL_BAR
-  /* True means using a tool bar that comes from the toolkit.  */
-  bool_bf external_tool_bar : 1;
-#endif
 
   /* True means that fonts have been loaded since the last glyph
      matrix adjustments.  */
@@ -354,10 +349,6 @@ struct frame
   /* True if it needs to be redisplayed.  */
   bool_bf redisplay : 1;
 
-#ifdef HAVE_EXT_MENU_BAR
-  /* True means using a menu bar that comes from the toolkit.  */
-  bool_bf external_menu_bar : 1;
-#endif
 
   /* Next two bitfields are mutually exclusive.  They might both be
      zero if the frame has been made invisible without an icon.  */
@@ -760,7 +751,7 @@ fset_menu_bar_vector (struct frame *f, Lisp_Object val)
 {
   f->menu_bar_vector = val;
 }
-#if defined HAVE_WINDOW_SYSTEM && !defined HAVE_EXT_MENU_BAR
+#ifdef HAVE_WINDOW_SYSTEM
 INLINE void
 fset_menu_bar_window (struct frame *f, Lisp_Object val)
 {
@@ -830,7 +821,7 @@ fset_tool_bar_items (struct frame *f, Lisp_Object val)
   f->tool_bar_items = val;
 }
 
-#if defined (HAVE_WINDOW_SYSTEM) && ! defined (HAVE_EXT_TOOL_BAR)
+#ifdef HAVE_WINDOW_SYSTEM
 
 INLINE void
 fset_tool_bar_window (struct frame *f, Lisp_Object val)
@@ -848,7 +839,7 @@ fset_desired_tool_bar_string (struct frame *f, Lisp_Object val)
   f->desired_tool_bar_string = val;
 }
 
-#endif /* HAVE_WINDOW_SYSTEM && !HAVE_EXT_TOOL_BAR */
+#endif /* HAVE_WINDOW_SYSTEM */
 
 INLINE void
 fset_tool_bar_position (struct frame *f, Lisp_Object val)
@@ -977,11 +968,7 @@ default_pixels_per_inch_y (void)
 #define FRAME_LINES(f) ((f)->text_lines)
 
 /* True if this frame should display an external menu bar.  */
-#ifdef HAVE_EXT_MENU_BAR
-#define FRAME_EXTERNAL_MENU_BAR(f) (f)->external_menu_bar
-#else
 #define FRAME_EXTERNAL_MENU_BAR(f) false
-#endif
 
 /* Size of frame F's internal menu bar in frame lines and pixels.  */
 #define FRAME_MENU_BAR_LINES(f) (f)->menu_bar_lines
@@ -992,11 +979,7 @@ default_pixels_per_inch_y (void)
 #define FRAME_TAB_BAR_HEIGHT(f) (f)->tab_bar_height
 
 /* True if this frame should display an external tool bar.  */
-#ifdef HAVE_EXT_TOOL_BAR
-#define FRAME_EXTERNAL_TOOL_BAR(f) (f)->external_tool_bar
-#else
 #define FRAME_EXTERNAL_TOOL_BAR(f) false
-#endif
 
 /* Position of F's tool bar; one of Qtop, Qleft, Qright, or
    Qbottom.
@@ -1354,9 +1337,7 @@ extern Lisp_Object old_selected_frame;
 
 extern int frame_default_tab_bar_height;
 
-#ifndef HAVE_EXT_TOOL_BAR
 extern int frame_default_tool_bar_height;
-#endif
 
 #ifdef HAVE_WINDOW_SYSTEM
 # define WINDOW_SYSTEM_RETURN

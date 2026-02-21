@@ -2405,7 +2405,7 @@ x_y_to_hpos_vpos (struct window *w, int x, int y, int *hpos, int *vpos,
   return glyph;
 }
 
-#if defined HAVE_WINDOW_SYSTEM && !defined HAVE_EXT_MENU_BAR
+#ifdef HAVE_WINDOW_SYSTEM
 
 /* Find the glyph under window-relative coordinates X/Y in window W.
    Consider only glyphs from buffer text, i.e. no glyphs from overlay
@@ -14329,14 +14329,7 @@ update_menu_bar (struct frame *f, bool save_match_data, bool hooks_run, struct w
   if (inhibit_menubar_update)
     return hooks_run;
 
-  if (FRAME_WINDOW_P (f)
-      ?
-#ifdef HAVE_EXT_MENU_BAR
-      FRAME_EXTERNAL_MENU_BAR (f)
-#else
-      FRAME_MENU_BAR_LINES (f) > 0
-#endif
-      : FRAME_MENU_BAR_LINES (f) > 0)
+  if (FRAME_MENU_BAR_LINES (f) > 0)
     {
       /* If the user has switched buffers or windows, we need to
 	 recompute to reflect the new bindings.  But we'll
@@ -14380,21 +14373,10 @@ update_menu_bar (struct frame *f, bool save_match_data, bool hooks_run, struct w
 	  XSETFRAME (Vmenu_updating_frame, f);
 	  fset_menu_bar_items (f, menu_bar_items (FRAME_MENU_BAR_ITEMS (f)));
 
-	  /* Redisplay the menu bar in case we changed it.  */
-#ifdef HAVE_EXT_MENU_BAR
-	  if (FRAME_WINDOW_P (f))
-            {
-		set_frame_menubar (f, false);
-	    }
-	  else
-	    /* On a terminal screen, the menu bar is an ordinary screen
-	       line, and this makes it get updated.  */
-	    w->update_mode_line = true;
-#else /* ! (HAVE_EXT_MENU_BAR) */
-	  /* In the non-toolkit version, the menu bar is an ordinary screen
+	  /* Redisplay the menu bar in case we changed it.
+	     In the non-toolkit version, the menu bar is an ordinary screen
 	     line, and this makes it get updated.  */
 	  w->update_mode_line = true;
-#endif /* HAVE_EXT_MENU_BAR */
 
 	  unbind_to (count, Qnil);
 	  set_buffer_internal_1 (prev);
@@ -15526,12 +15508,8 @@ tty_handle_tab_bar_click (struct frame *f, int x, int y, bool down_p,
 static void
 update_tool_bar (struct frame *f, bool save_match_data)
 {
-#ifdef HAVE_EXT_TOOL_BAR
-  bool do_update = FRAME_EXTERNAL_TOOL_BAR (f);
-#else
   bool do_update = (WINDOWP (f->tool_bar_window)
 		    && WINDOW_TOTAL_LINES (XWINDOW (f->tool_bar_window)) > 0);
-#endif
 
   if (do_update)
     {
@@ -15611,8 +15589,6 @@ update_tool_bar (struct frame *f, bool save_match_data)
 	}
     }
 }
-
-#ifndef HAVE_EXT_TOOL_BAR
 
 /* Set F->desired_tool_bar_string to a Lisp string representing frame
    F's desired tool-bar contents.  F->tool_bar_items must have
@@ -15995,8 +15971,6 @@ tool_bar_height (struct frame *f, int *n_rows, bool pixelwise)
     return (it.current_y + FRAME_LINE_HEIGHT (f) - 1) / FRAME_LINE_HEIGHT (f);
 }
 
-#endif /* ! (HAVE_EXT_TOOL_BAR) */
-
 DEFUN ("tool-bar-height", Ftool_bar_height, Stool_bar_height,
        0, 2, 0,
        doc: /* Return the number of lines occupied by the tool bar of FRAME.
@@ -16006,7 +15980,6 @@ PIXELWISE non-nil means return the height of the tool bar in pixels.  */)
 {
   int height = 0;
 
-#ifndef HAVE_EXT_TOOL_BAR
   struct frame *f = decode_any_frame (frame);
 
   if (WINDOWP (f->tool_bar_window)
@@ -16019,12 +15992,9 @@ PIXELWISE non-nil means return the height of the tool bar in pixels.  */)
 	  height = tool_bar_height (f, NULL, !NILP (pixelwise));
 	}
     }
-#endif
 
   return make_fixnum (height);
 }
-
-#ifndef HAVE_EXT_TOOL_BAR
 
 /* Display the internal tool-bar of frame F.  Value is true if
    tool-bar's height should be changed.  */
@@ -16461,8 +16431,6 @@ note_tool_bar_highlight (struct frame *f, int x, int y)
   if (NILP (help_echo_string))
     help_echo_string = AREF (f->tool_bar_items, prop_idx + TOOL_BAR_ITEM_CAPTION);
 }
-
-#endif /* ! (HAVE_EXT_TOOL_BAR) */
 
 #endif /* HAVE_WINDOW_SYSTEM */
 
@@ -18991,10 +18959,8 @@ extend_face_to_end_of_line (struct it *it)
       if (!(it->glyph_row->mode_line_p
 	    || (WINDOWP (f->tab_bar_window)
 		&& it->w == XWINDOW (f->tab_bar_window))
-#ifndef HAVE_EXT_TOOL_BAR
 	    || (WINDOWP (f->tool_bar_window)
 		&& it->w == XWINDOW (f->tool_bar_window))
-#endif
 	    ))
 	{
 	  if (WINDOW_LEFT_MARGIN_WIDTH (it->w) > 0
@@ -20905,7 +20871,7 @@ display_menu_bar (struct window *w)
      system that uses the no toolkit menu bar.  Oh well.  At least
      there will be an error, meaning he will correct the ifdef inside
      which `face' is defined.  */
-#if defined HAVE_WINDOW_SYSTEM && !defined HAVE_EXT_MENU_BAR
+#ifdef HAVE_WINDOW_SYSTEM
   /* Make a 3D menu bar have a shadow at its right end.  */
   extend_face_to_end_of_line (&it);
   if (face->box != FACE_NO_BOX)
@@ -28529,9 +28495,7 @@ show_mouse_face (Mouse_HLInfo *hlinfo, enum draw_glyphs_face draw,
   if (FRAME_WINDOW_P (f) && NILP (track_mouse) && define_mouse_cursor)
     {
       if (draw == DRAW_NORMAL_TEXT
-#ifndef HAVE_EXT_TOOL_BAR
 	  && !EQ (hlinfo->mouse_face_window, f->tool_bar_window)
-#endif
 	  && !EQ (hlinfo->mouse_face_window, f->tab_bar_window))
 	FRAME_RIF (f)->define_frame_cursor (f, FRAME_OUTPUT_DATA (f)->text_cursor);
       else if (draw == DRAW_MOUSE_FACE)
@@ -30053,7 +30017,7 @@ note_mouse_highlight (struct frame *f, int x, int y)
   w = XWINDOW (window);
   frame_to_window_pixel_xy (w, &x, &y);
 
-#if defined (HAVE_WINDOW_SYSTEM) && ! defined (HAVE_EXT_MENU_BAR)
+#ifdef HAVE_WINDOW_SYSTEM
   /* Handle menu-bar window differently since it doesn't display a
      buffer.  */
   if (EQ (window, f->menu_bar_window))
@@ -30085,7 +30049,7 @@ note_mouse_highlight (struct frame *f, int x, int y)
     }
 #endif
 
-#if defined (HAVE_WINDOW_SYSTEM) && ! defined (HAVE_EXT_TOOL_BAR)
+#ifdef HAVE_WINDOW_SYSTEM
   /* Handle tool-bar window differently since it doesn't display a
      buffer.  */
   if (EQ (window, f->tool_bar_window))
@@ -31120,13 +31084,11 @@ expose_frame (struct frame *f, int x, int y, int w, int h)
     mouse_face_overwritten_p
       |= expose_window (XWINDOW (f->tab_bar_window), &r);
 
-#ifndef HAVE_EXT_TOOL_BAR
   if (WINDOWP (f->tool_bar_window))
     mouse_face_overwritten_p
       |= expose_window (XWINDOW (f->tool_bar_window), &r);
-#endif
 
-#if defined HAVE_WINDOW_SYSTEM && !defined HAVE_EXT_MENU_BAR
+#ifdef HAVE_WINDOW_SYSTEM
   if (WINDOWP (f->menu_bar_window))
     mouse_face_overwritten_p
       |= expose_window (XWINDOW (f->menu_bar_window), &r);

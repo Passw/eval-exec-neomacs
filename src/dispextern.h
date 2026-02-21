@@ -3522,9 +3522,7 @@ extern void gui_union_rectangles (const Emacs_Rectangle *,
 				  const Emacs_Rectangle *,
 				  Emacs_Rectangle *);
 extern void gui_consider_frame_title (Lisp_Object);
-# ifndef HAVE_EXT_MENU_BAR
 extern void x_y_to_column_row (struct window *, int, int, int *, int *);
-# endif
 #endif	/* HAVE_WINDOW_SYSTEM */
 
 extern void note_mouse_highlight (struct frame *, int, int);

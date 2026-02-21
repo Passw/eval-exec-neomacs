@@ -68,11 +68,7 @@ bool frame_garbaged;
 int frame_default_tab_bar_height;
 
 /* The default tool bar height for future frames.  */
-#ifdef HAVE_EXT_TOOL_BAR
-enum { frame_default_tool_bar_height = 0 };
-#else
 int frame_default_tool_bar_height;
-#endif
 
 #ifdef HAVE_WINDOW_SYSTEM
 static void gui_report_frame_params (struct frame *, Lisp_Object *);
@@ -1035,7 +1031,7 @@ adjust_frame_size (struct frame *f, int new_text_width, int new_text_height,
 	}
 #endif
 
-#if defined (HAVE_WINDOW_SYSTEM) && ! defined (HAVE_EXT_TOOL_BAR)
+#ifdef HAVE_WINDOW_SYSTEM
       if (WINDOWP (f->tool_bar_window))
 	{
 	  XWINDOW (f->tool_bar_window)->pixel_width = new_inner_width;
@@ -1175,10 +1171,8 @@ make_frame (bool mini_p)
   f->face_cache = NULL;
   f->image_cache = NULL;
   f->last_tab_bar_item = -1;
-#ifndef HAVE_EXT_TOOL_BAR
   f->last_tool_bar_item = -1;
   f->tool_bar_wraps_p = false;
-#endif
 #endif
   f->select_mini_window_flag = false;
   /* This one should never be zero.  */
@@ -7544,9 +7538,7 @@ The default is \\+`inhibit' in NS builds and nil everywhere else.  */);
      causes menu-bar.el to provide `tool-bar-position' as a user
      option.  */
 
-#ifndef HAVE_EXT_TOOL_BAR
   Fprovide (Qmove_toolbar, Qnil);
-#endif /* !HAVE_EXT_TOOL_BAR */
 #endif /* HAVE_WINDOW_SYSTEM */
 
   DEFVAR_LISP ("toolkit-theme", Vtoolkit_theme,

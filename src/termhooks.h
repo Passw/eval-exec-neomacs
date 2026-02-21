@@ -678,10 +678,6 @@ struct terminal
   Lisp_Object (*menu_show_hook) (struct frame *f, int x, int y, int menuflags,
 				 Lisp_Object title, const char **error_name);
 
-#ifdef HAVE_EXT_MENU_BAR
-  /* This hook is called to activate the menu bar.  */
-  void (*activate_menubar_hook) (struct frame *f);
-#endif
 
   /* This hook is called to display popup dialog.  */
   Lisp_Object (*popup_dialog_hook) (struct frame *f, Lisp_Object header,

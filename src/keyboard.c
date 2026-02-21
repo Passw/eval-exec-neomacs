@@ -4125,18 +4125,6 @@ kbd_buffer_get_event (KBOARD **kbp,
 	       event->ie.arg);
 	break;
 
-#ifdef HAVE_EXT_MENU_BAR
-      case MENU_BAR_ACTIVATE_EVENT:
-	{
-          struct frame *f;
-	  kbd_fetch_ptr = next_kbd_event (event);
-	  input_pending = readable_events (0);
-          f = (XFRAME (event->ie.frame_or_window));
-	  if (FRAME_LIVE_P (f) && FRAME_TERMINAL (f)->activate_menubar_hook)
-	    FRAME_TERMINAL (f)->activate_menubar_hook (f);
-	}
-        break;
-#endif
       case PREEDIT_TEXT_EVENT:
 #ifdef HAVE_WINDOW_SYSTEM
       case DELETE_WINDOW_EVENT:
@@ -4315,19 +4303,6 @@ kbd_buffer_get_event (KBOARD **kbp,
 
 	      obj = make_lispy_event (&event->ie);
 
-#ifdef HAVE_EXT_MENU_BAR
-	      /* If this was a menu selection, then set the flag to inhibit
-		 writing to last_nonmenu_event.  Don't do this if the event
-		 we're returning is (menu-bar), though; that indicates the
-		 beginning of the menu sequence, and we might as well leave
-		 that as the `event with parameters' for this selection.  */
-	      if (used_mouse_menu
-		  && !EQ (event->ie.frame_or_window, event->ie.arg)
-		  && (event->kind == MENU_BAR_EVENT
-		      || event->kind == TAB_BAR_EVENT
-		      || event->kind == TOOL_BAR_EVENT))
-		*used_mouse_menu = true;
-#endif
 
 	      if (event->kind != MULTIBYTE_CHAR_KEYSTROKE_EVENT
 		  || !CONSP (event->ie.arg)
@@ -5199,10 +5174,8 @@ make_lispy_position (struct frame *f, Lisp_Object x, Lisp_Object y,
      tool bar.  */
   if (f && ((WINDOWP (f->tab_bar_window)
 	     && EQ (window_or_frame, f->tab_bar_window))
-#ifndef HAVE_EXT_TOOL_BAR
 	    || (WINDOWP (f->tool_bar_window)
 		&& EQ (window_or_frame, f->tool_bar_window))
-#endif
 	    ))
     {
       /* While 'track-mouse' is neither nil nor t, do not report this
@@ -5498,11 +5471,7 @@ make_lispy_position (struct frame *f, Lisp_Object x, Lisp_Object y,
 static bool
 toolkit_menubar_in_use (struct frame *f)
 {
-#ifdef HAVE_EXT_MENU_BAR
-  return !(!FRAME_WINDOW_P (f));
-#else
   return false;
-#endif
 }
 
 /* Build the part of Lisp event which represents scroll bar state from
@@ -5516,7 +5485,7 @@ make_scroll_bar_position (struct input_event *ev, Lisp_Object type)
 		builtin_lisp_symbol (scroll_bar_parts[ev->part]));
 }
 
-#if defined HAVE_WINDOW_SYSTEM && !defined HAVE_EXT_MENU_BAR
+#ifdef HAVE_WINDOW_SYSTEM
 
 /* Return whether or not the coordinates X and Y are inside the
    box of the menu-bar window of frame F.  */
@@ -5831,7 +5800,7 @@ make_lispy_event (struct input_event *event)
 	       which are then used to determine whether this click is
 	       in a menu (non-toolkit version).  */
 	    if (!toolkit_menubar_in_use (f)
-#if defined HAVE_WINDOW_SYSTEM && !defined HAVE_EXT_MENU_BAR
+#ifdef HAVE_WINDOW_SYSTEM
 		/* Don't process events for menu bars if they are not
 		   in the menu bar window.  */
 		&& (!FRAME_WINDOW_P (f)
@@ -5840,7 +5809,7 @@ make_lispy_event (struct input_event *event)
 #endif
 		)
 	      {
-#if defined HAVE_WINDOW_SYSTEM && !defined HAVE_EXT_MENU_BAR
+#ifdef HAVE_WINDOW_SYSTEM
 		if (FRAME_WINDOW_P (f))
 		  {
 		    struct window *menu_w = XWINDOW (f->menu_bar_window);
@@ -6257,7 +6226,7 @@ make_lispy_event (struct input_event *event)
 	x = event->x;
 	y = event->y;
 
-#if defined HAVE_WINDOW_SYSTEM && !defined HAVE_EXT_MENU_BAR
+#ifdef HAVE_WINDOW_SYSTEM
 	if (coords_in_menu_bar_window (f, XFIXNUM (x), XFIXNUM (y)))
 	  {
 	    /* If the tap began in the menu bar window, then save the
@@ -6265,7 +6234,7 @@ make_lispy_event (struct input_event *event)
 	    menu_bar_touch_id = id;
 	    return Qnil;
 	  }
-#endif /* defined HAVE_WINDOW_SYSTEM && !defined HAVE_EXT_MENU_BAR */
+#endif /* HAVE_WINDOW_SYSTEM */
 
 	position = make_lispy_position (f, x, y, event->timestamp);
 
@@ -6320,9 +6289,9 @@ make_lispy_event (struct input_event *event)
       {
 	Lisp_Object x, y, id, position;
 	struct frame *f = XFRAME (event->frame_or_window);
-#if defined HAVE_WINDOW_SYSTEM && !defined HAVE_EXT_MENU_BAR
+#ifdef HAVE_WINDOW_SYSTEM
 	int column, row;
-#endif /* defined HAVE_WINDOW_SYSTEM && !defined HAVE_EXT_MENU_BAR */
+#endif /* HAVE_WINDOW_SYSTEM */
 #ifdef HAVE_WINDOW_SYSTEM
 	int tab_bar_item;
 	bool close;
@@ -6335,7 +6304,7 @@ make_lispy_event (struct input_event *event)
 	x = event->x;
 	y = event->y;
 
-#if defined HAVE_WINDOW_SYSTEM && !defined HAVE_EXT_MENU_BAR
+#ifdef HAVE_WINDOW_SYSTEM
 	if (EQ (menu_bar_touch_id, id))
 	  {
 	    /* This touch should activate the menu bar.  Generate the
@@ -6388,7 +6357,7 @@ make_lispy_event (struct input_event *event)
 
 	    return Qnil;
 	  }
-#endif /* defined HAVE_WINDOW_SYSTEM && !defined HAVE_EXT_MENU_BAR */
+#endif /* HAVE_WINDOW_SYSTEM */
 
 	position = make_lispy_position (f, x, y, event->timestamp);
 
@@ -6515,15 +6484,6 @@ make_lispy_event (struct input_event *event)
 	return list3 (head, position, files);
       }
 
-#ifdef HAVE_EXT_MENU_BAR
-    case MENU_BAR_EVENT:
-      if (EQ (event->arg, event->frame_or_window))
-	/* This is the prefix key.  We translate this to
-	   `(menu_bar)' because the code in keyboard.c for menu
-	   events, which we use, relies on this.  */
-	return list1 (Qmenu_bar);
-      return event->arg;
-#endif
 
     case SELECT_WINDOW_EVENT:
       /* Make an event (select-window (WINDOW)).  */
@@ -9026,14 +8986,10 @@ parse_tool_bar_item (Lisp_Object key, Lisp_Object item)
   Lisp_Object caption;
   int i;
   bool have_label;
-#ifndef HAVE_EXT_TOOL_BAR
   bool is_wrap;
-#endif /* HAVE_EXT_TOOL_BAR */
 
   have_label = false;
-#ifndef HAVE_EXT_TOOL_BAR
   is_wrap = false;
-#endif /* HAVE_EXT_TOOL_BAR */
 
   /* Definition looks like `(menu-item CAPTION BINDING PROPS...)'.
      Rule out items that aren't lists, don't start with
@@ -9083,7 +9039,6 @@ parse_tool_bar_item (Lisp_Object key, Lisp_Object item)
       if (menu_separator_name_p (SSDATA (caption)))
 	{
 	  set_prop (TOOL_BAR_ITEM_TYPE, Qt);
-#ifndef HAVE_EXT_TOOL_BAR
 	  /* If we use build_desired_tool_bar_string to render the
 	     tool bar, the separator is rendered as an image.  */
 	  set_prop (TOOL_BAR_ITEM_IMAGES,
@@ -9092,7 +9047,6 @@ parse_tool_bar_item (Lisp_Object key, Lisp_Object item)
 	  set_prop (TOOL_BAR_ITEM_ENABLED_P, Qnil);
 	  set_prop (TOOL_BAR_ITEM_SELECTED_P, Qnil);
 	  set_prop (TOOL_BAR_ITEM_CAPTION, Qnil);
-#endif
 	  return 1;
 	}
       return 0;
@@ -9171,17 +9125,11 @@ parse_tool_bar_item (Lisp_Object key, Lisp_Object item)
 	set_prop (TOOL_BAR_ITEM_RTL_IMAGE, value);
       else if (EQ (ikey, QCwrap))
 	{
-#ifndef HAVE_EXT_TOOL_BAR
 	  /* This specifies whether the tool bar item should be hidden
 	     but cause subsequent items to be displayed on a new
 	     line.  */
 	  set_prop (TOOL_BAR_ITEM_WRAP, value);
 	  is_wrap = !NILP (value);
-#else /* HAVE_EXT_TOOL_BAR */
-	  /* Line wrapping isn't supported on builds utilizing
-	     external tool bars.  */
-	  return false;
-#endif /* !HAVE_EXT_TOOL_BAR */
 	}
     }
 
@@ -9244,13 +9192,11 @@ parse_tool_bar_item (Lisp_Object key, Lisp_Object item)
     return 0;
 
 
-#ifndef HAVE_EXT_TOOL_BAR
   /* If the menu item is actually a line wrap, make sure it isn't
      visible or enabled.  */
 
   if (is_wrap)
     set_prop (TOOL_BAR_ITEM_ENABLED_P, Qnil);
-#endif /* !HAVE_EXT_TOOL_BAR */
 
   /* If there is a key binding, add it to the help, which will be
      displayed as a tooltip for this entry. */

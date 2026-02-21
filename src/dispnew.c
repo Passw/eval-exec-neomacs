@@ -657,10 +657,8 @@ clear_current_matrices (register struct frame *f)
   if (f->current_matrix)
     clear_glyph_matrix (f->current_matrix);
 
-#if defined HAVE_WINDOW_SYSTEM && !defined HAVE_EXT_MENU_BAR
-  /* Clear the matrix of the menu bar window, if such a window exists.
-     The menu bar window is currently used to display menus on X when
-     no toolkit support is compiled in.  */
+#ifdef HAVE_WINDOW_SYSTEM
+  /* Clear the matrix of the menu bar window, if such a window exists.  */
   if (WINDOWP (f->menu_bar_window))
     clear_glyph_matrix (XWINDOW (f->menu_bar_window)->current_matrix);
 #endif
@@ -671,7 +669,7 @@ clear_current_matrices (register struct frame *f)
     clear_glyph_matrix (XWINDOW (f->tab_bar_window)->current_matrix);
 #endif
 
-#if defined (HAVE_WINDOW_SYSTEM) && ! defined (HAVE_EXT_TOOL_BAR)
+#ifdef HAVE_WINDOW_SYSTEM
   /* Clear the matrix of the tool-bar window, if any.  */
   if (WINDOWP (f->tool_bar_window))
     clear_glyph_matrix (XWINDOW (f->tool_bar_window)->current_matrix);
@@ -691,7 +689,7 @@ clear_desired_matrices (register struct frame *f)
   if (f->desired_matrix)
     clear_glyph_matrix (f->desired_matrix);
 
-#if defined HAVE_WINDOW_SYSTEM && !defined HAVE_EXT_MENU_BAR
+#ifdef HAVE_WINDOW_SYSTEM
   if (WINDOWP (f->menu_bar_window))
     clear_glyph_matrix (XWINDOW (f->menu_bar_window)->desired_matrix);
 #endif
@@ -701,7 +699,7 @@ clear_desired_matrices (register struct frame *f)
     clear_glyph_matrix (XWINDOW (f->tab_bar_window)->desired_matrix);
 #endif
 
-#if defined (HAVE_WINDOW_SYSTEM) && ! defined (HAVE_EXT_TOOL_BAR)
+#ifdef HAVE_WINDOW_SYSTEM
   if (WINDOWP (f->tool_bar_window))
     clear_glyph_matrix (XWINDOW (f->tool_bar_window)->desired_matrix);
 #endif
@@ -1713,11 +1711,9 @@ adjust_frame_glyphs_for_window_redisplay (struct frame *f)
   /* Allocate/reallocate window matrices.  */
   allocate_matrices_for_window_redisplay (XWINDOW (FRAME_ROOT_WINDOW (f)));
 
-#if defined HAVE_WINDOW_SYSTEM && !defined HAVE_EXT_MENU_BAR
-  /* Allocate/ reallocate matrices of the dummy window used to display
-     the menu bar under X when no X toolkit support is available.  */
+#ifdef HAVE_WINDOW_SYSTEM
+  /* Allocate/ reallocate matrices of the menu bar window.  */
   {
-    /* Allocate a dummy window if not already done.  */
     struct window *w;
     if (NILP (f->menu_bar_window))
       {
@@ -1784,7 +1780,7 @@ adjust_frame_glyphs_for_window_redisplay (struct frame *f)
   }
 #endif
 
-#if defined (HAVE_WINDOW_SYSTEM) && ! defined (HAVE_EXT_TOOL_BAR)
+#ifdef HAVE_WINDOW_SYSTEM
   {
     /* Allocate/ reallocate matrices of the tool bar window.  If we
        don't have a tool bar window yet, make one.  */
@@ -1874,9 +1870,8 @@ free_glyphs (struct frame *f)
       if (!NILP (f->root_window))
         free_window_matrices (XWINDOW (f->root_window));
 
-#if defined HAVE_WINDOW_SYSTEM && !defined HAVE_EXT_MENU_BAR
-      /* Free the dummy window for menu bars without X toolkit and its
-	 glyph matrices.  */
+#ifdef HAVE_WINDOW_SYSTEM
+      /* Free the menu bar window and its glyph matrices.  */
       if (!NILP (f->menu_bar_window))
 	{
 	  struct window *w = XWINDOW (f->menu_bar_window);
@@ -1899,7 +1894,7 @@ free_glyphs (struct frame *f)
 	}
 #endif
 
-#if defined (HAVE_WINDOW_SYSTEM) && ! defined (HAVE_EXT_TOOL_BAR)
+#ifdef HAVE_WINDOW_SYSTEM
       /* Free the tool bar window and its glyph matrices.  */
       if (!NILP (f->tool_bar_window))
 	{
@@ -3278,7 +3273,7 @@ copy_child_glyphs (struct frame *root, struct frame *child)
 static void
 update_menu_bar (struct frame *f)
 {
-#if defined HAVE_WINDOW_SYSTEM && !defined HAVE_EXT_MENU_BAR
+#ifdef HAVE_WINDOW_SYSTEM
   if (WINDOWP (f->menu_bar_window))
     update_window (XWINDOW (f->menu_bar_window));
 #endif
@@ -3318,7 +3313,7 @@ update_tab_bar (struct frame *f)
 static void
 update_tool_bar (struct frame *f)
 {
-#if defined(HAVE_WINDOW_SYSTEM) && !defined(HAVE_EXT_TOOL_BAR)
+#ifdef HAVE_WINDOW_SYSTEM
   update_bar_window (f->tool_bar_window, &f->current_tool_bar_string,
 		     &f->desired_tool_bar_string);
 #endif
