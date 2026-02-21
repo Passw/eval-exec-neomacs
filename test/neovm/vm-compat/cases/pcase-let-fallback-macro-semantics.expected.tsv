@@ -12,12 +12,14 @@
 12	(autoloadp (indirect-function 'pcase-let*))	OK t
 13	(func-arity 'pcase-let)	OK (1 . many)
 14	(func-arity 'pcase-let*)	OK (1 . many)
-15	(macroexpand '(pcase-let ((x 1)) x))	OK (let* ((x 1)) x)
-16	(macroexpand '(pcase-let ((x 1) (y x)) (list x y)))	OK (let ((x 1) (y x)) (pcase-let* nil (list x y)))
-17	(macroexpand '(pcase-let* ((x 1) (y x)) (list x y)))	OK (let* ((x 1) (y x)) (list x y))
-18	(condition-case err (macroexpand '(pcase-let)) (error err))	OK (wrong-number-of-arguments (1 . 1) 0)
-19	(condition-case err (macroexpand '(pcase-let*)) (error err))	OK (wrong-number-of-arguments (1 . 1) 0)
-20	(condition-case err (macroexpand '(pcase-let x x)) (error err))	OK (wrong-type-argument listp x)
-21	(condition-case err (macroexpand '(pcase-let* x x)) (error err))	OK (wrong-type-argument listp x)
-22	(pcase-let ((x 10) (y 20)) (+ x y))	OK 30
-23	(pcase-let* ((x 10) (y (+ x 5))) y)	OK 15
+15	(let ((a (func-arity 'pcase-let)) (b (condition-case err (func-arity (indirect-function 'pcase-let)) (error err))) (c (autoloadp (indirect-function 'pcase-let)))) (list a b c))	OK ((1 . many) (1 . many) nil)
+16	(let ((a (func-arity 'pcase-let*)) (b (condition-case err (func-arity (indirect-function 'pcase-let*)) (error err))) (c (autoloadp (indirect-function 'pcase-let*)))) (list a b c))	OK ((1 . many) (1 . many) nil)
+17	(macroexpand '(pcase-let ((x 1)) x))	OK (let* ((x 1)) x)
+18	(macroexpand '(pcase-let ((x 1) (y x)) (list x y)))	OK (let ((x 1) (y x)) (pcase-let* nil (list x y)))
+19	(macroexpand '(pcase-let* ((x 1) (y x)) (list x y)))	OK (let* ((x 1) (y x)) (list x y))
+20	(condition-case err (macroexpand '(pcase-let)) (error err))	OK (wrong-number-of-arguments (1 . 1) 0)
+21	(condition-case err (macroexpand '(pcase-let*)) (error err))	OK (wrong-number-of-arguments (1 . 1) 0)
+22	(condition-case err (macroexpand '(pcase-let x x)) (error err))	OK (wrong-type-argument listp x)
+23	(condition-case err (macroexpand '(pcase-let* x x)) (error err))	OK (wrong-type-argument listp x)
+24	(pcase-let ((x 10) (y 20)) (+ x y))	OK 30
+25	(pcase-let* ((x 10) (y (+ x 5))) y)	OK 15
