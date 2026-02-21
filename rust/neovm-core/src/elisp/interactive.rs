@@ -896,25 +896,6 @@ fn interactive_next_event_with_parameters_from_keys(
     None
 }
 
-fn interactive_first_unread_event_with_parameters(eval: &Evaluator) -> Option<Value> {
-    let mut unread_events = dynamic_or_global_symbol_value(eval, "unread-command-events")?;
-    loop {
-        match unread_events {
-            Value::Cons(cell) => {
-                let pair = cell.lock().expect("poisoned");
-                let head = pair.car.clone();
-                let tail = pair.cdr.clone();
-                drop(pair);
-                if interactive_event_with_parameters_p(&head) {
-                    return Some(head);
-                }
-                unread_events = tail;
-            }
-            _ => return None,
-        }
-    }
-}
-
 fn interactive_last_input_event_with_parameters(eval: &Evaluator) -> Option<Value> {
     let event = dynamic_or_global_symbol_value(eval, "last-input-event")?;
     interactive_event_with_parameters_p(&event).then_some(event)
@@ -927,8 +908,7 @@ fn interactive_next_event_with_parameters(
     if context.has_command_keys_context {
         return interactive_next_event_with_parameters_from_keys(context);
     }
-    interactive_first_unread_event_with_parameters(eval)
-        .or_else(|| interactive_last_input_event_with_parameters(eval))
+    interactive_last_input_event_with_parameters(eval)
 }
 
 fn parse_interactive_spec(expr: &Expr) -> Option<ParsedInteractiveSpec> {
@@ -5777,7 +5757,7 @@ K")
     }
 
     #[test]
-    fn interactive_lambda_e_spec_falls_back_to_unread_queue_and_last_input_event() {
+    fn interactive_lambda_e_spec_uses_command_key_context_for_event_dispatch() {
         let mut ev = Evaluator::new();
         let results = eval_all_with(
             &mut ev,
@@ -5804,6 +5784,47 @@ K")
         assert_eq!(
             results[0],
             "OK (((mouse-1) (mouse-1)) ((mouse-1) (mouse-1)) (97 (mouse-1) ((mouse-1))) (97 (mouse-1) ((mouse-1))))"
+        );
+    }
+
+    #[test]
+    fn interactive_lambda_e_spec_does_not_use_unread_queue_without_command_key_context() {
+        let mut ev = Evaluator::new();
+        let results = eval_all_with(
+            &mut ev,
+            r#"(list
+                 (let ((start (length (recent-keys))))
+                   (let ((unread-command-events (list '(mouse-1))))
+                     (condition-case err
+                         (call-interactively (lambda (x) (interactive "e") x))
+                       (error (list (car err)
+                                    unread-command-events
+                                    (append (nthcdr start (append (recent-keys) nil)) nil))))))
+                 (let ((start (length (recent-keys))))
+                   (let ((unread-command-events (list '(mouse-1))))
+                     (condition-case err
+                         (command-execute (lambda (x) (interactive "e") x))
+                       (error (list (car err)
+                                    unread-command-events
+                                    (append (nthcdr start (append (recent-keys) nil)) nil))))))
+                 (let ((start (length (recent-keys))))
+                   (let ((unread-command-events (list 97 '(mouse-1))))
+                     (condition-case err
+                         (call-interactively (lambda (x) (interactive "e") x))
+                       (error (list (car err)
+                                    unread-command-events
+                                    (append (nthcdr start (append (recent-keys) nil)) nil))))))
+                 (let ((start (length (recent-keys))))
+                   (let ((unread-command-events (list 97 '(mouse-1))))
+                     (condition-case err
+                         (command-execute (lambda (x) (interactive "e") x))
+                       (error (list (car err)
+                                    unread-command-events
+                                    (append (nthcdr start (append (recent-keys) nil)) nil)))))))"#,
+        );
+        assert_eq!(
+            results[0],
+            "OK ((error ((mouse-1)) nil) (error ((mouse-1)) nil) (error (97 (mouse-1)) nil) (error (97 (mouse-1)) nil))"
         );
     }
 

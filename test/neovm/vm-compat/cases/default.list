@@ -216,6 +216,7 @@ cases/call-interactively-line-motion-prefix-boundary-semantics
 cases/interactive-lambda-spec-semantics
 cases/interactive-lambda-spec-extended-semantics
 cases/interactive-lambda-e-context-semantics
+cases/interactive-lambda-e-unread-queue-boundary-semantics
 cases/case-region-optional-arg-semantics
 cases/case-region-read-only-semantics
 cases/case-word-semantics

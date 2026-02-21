@@ -1,6 +1,6 @@
 # NeoVM / Neomacs Plan
 
-Last updated: 2026-02-20
+Last updated: 2026-02-21
 
 ## Execution Queue (next 20)
 
@@ -27,6 +27,24 @@ Last updated: 2026-02-20
 21. [x] Add periodic `make compat-progress` output diff check in PR review templates.
 
 ## Doing
+
+- Tightened lambda `interactive "e"` no-context behavior to match Oracle and added corpus lock-in:
+  - runtime changes:
+    - `rust/neovm-core/src/elisp/interactive.rs`
+      - `interactive "e"` no longer falls back to `unread-command-events` when command-key context is empty.
+      - fallback now uses only `last-input-event` when no command-key context exists.
+      - added evaluator coverage for no-context unread-queue rejection:
+        - `interactive_lambda_e_spec_does_not_use_unread_queue_without_command_key_context`
+  - vm-compat corpus changes:
+    - added:
+      - `test/neovm/vm-compat/cases/interactive-lambda-e-unread-queue-boundary-semantics.forms`
+      - `test/neovm/vm-compat/cases/interactive-lambda-e-unread-queue-boundary-semantics.expected.tsv`
+    - wired case into:
+      - `test/neovm/vm-compat/cases/default.list`
+  - verified:
+    - `cargo test --manifest-path rust/neovm-core/Cargo.toml interactive_lambda_e_spec_ -- --nocapture` (pass)
+    - `make -C test/neovm/vm-compat check-one-neovm CASE=cases/interactive-lambda-e-context-semantics` (pass; `12/12`)
+    - `make -C test/neovm/vm-compat check-one-neovm CASE=cases/interactive-lambda-e-unread-queue-boundary-semantics` (pass; `1/1`)
 
 - Added compatibility slice for `category-set-mnemonics`, `check-coding-systems-region`, `command-remapping`, `command-modes`, and `close-font`:
   - runtime changes:
