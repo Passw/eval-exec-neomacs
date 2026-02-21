@@ -803,6 +803,7 @@ cases/load-flags
 cases/load-relative
 cases/load-history
 cases/load-file-name
+cases/load-bom-prefix-semantics
 cases/load-shebang-lexical-binding-semantics
 cases/load-path-nil
 cases/load-path-order

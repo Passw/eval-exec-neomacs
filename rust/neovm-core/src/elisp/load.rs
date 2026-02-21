@@ -289,13 +289,18 @@ fn load_cache_writes_enabled() -> bool {
     }
 }
 
-fn strip_shebang_line(source: &str) -> &str {
-    if !source.starts_with("#!") {
-        return source;
+fn strip_utf8_bom(source: &str) -> &str {
+    source.strip_prefix('\u{feff}').unwrap_or(source)
+}
+
+fn strip_reader_prefix(source: &str) -> &str {
+    let without_bom = strip_utf8_bom(source);
+    if !without_bom.starts_with("#!") {
+        return without_bom;
     }
 
-    match source.find('\n') {
-        Some(index) => &source[index + 1..],
+    match without_bom.find('\n') {
+        Some(index) => &without_bom[index + 1..],
         None => "",
     }
 }
@@ -322,7 +327,7 @@ fn lexical_binding_enabled_in_file_local_cookie_line(line: &str) -> bool {
 }
 
 fn lexical_binding_enabled_for_source(source: &str) -> bool {
-    let mut lines = source.lines();
+    let mut lines = strip_utf8_bom(source).lines();
     let first_line = lines.next();
     if first_line.is_some_and(lexical_binding_enabled_in_file_local_cookie_line) {
         return true;
@@ -338,7 +343,7 @@ fn lexical_binding_enabled_for_source(source: &str) -> bool {
 }
 
 fn parse_source_forms(source_path: &Path, source: &str) -> Result<Vec<Expr>, EvalError> {
-    let source_for_reader = strip_shebang_line(source);
+    let source_for_reader = strip_reader_prefix(source);
     super::parser::parse_forms(source_for_reader).map_err(|e| EvalError::Signal {
         symbol: "invalid-read-syntax".to_string(),
         data: vec![Value::string(format!(
@@ -505,22 +510,32 @@ mod tests {
     }
 
     #[test]
-    fn strip_shebang_line_only_removes_leading_script_line() {
+    fn strip_reader_prefix_handles_bom_and_shebang() {
         let source = "#!/usr/bin/env emacs --script\n(setq vm-shebang-strip 1)\n";
         assert_eq!(
-            strip_shebang_line(source),
+            strip_reader_prefix(source),
             "(setq vm-shebang-strip 1)\n",
             "shebang-prefixed source should drop the first line before parsing",
         );
         assert_eq!(
-            strip_shebang_line("#!/usr/bin/env emacs --script"),
+            strip_reader_prefix("#!/usr/bin/env emacs --script"),
             "",
             "single-line shebang files should parse as empty payload",
         );
         assert_eq!(
-            strip_shebang_line("(setq vm-shebang-strip 2)\n"),
+            strip_reader_prefix("(setq vm-shebang-strip 2)\n"),
             "(setq vm-shebang-strip 2)\n",
             "non-shebang source should remain unchanged",
+        );
+        assert_eq!(
+            strip_reader_prefix("\u{feff}(setq vm-bom-strip 3)\n"),
+            "(setq vm-bom-strip 3)\n",
+            "utf-8 bom should be removed before parsing",
+        );
+        assert_eq!(
+            strip_reader_prefix("\u{feff}#!/usr/bin/env emacs --script\n(setq vm-bom-shebang 4)\n"),
+            "(setq vm-bom-shebang 4)\n",
+            "utf-8 bom should not block shebang stripping",
         );
     }
 
@@ -855,6 +870,37 @@ mod tests {
             payload,
             vec![Value::symbol("error"), Value::symbol("void-variable")],
             "without lexical-binding cookie, closure must not capture lexical locals",
+        );
+
+        let _ = fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn load_file_accepts_utf8_bom_prefixed_source() {
+        let unique = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .expect("clock before epoch")
+            .as_nanos();
+        let dir = std::env::temp_dir().join(format!("neovm-load-bom-{unique}"));
+        fs::create_dir_all(&dir).expect("create temp fixture dir");
+        let file = dir.join("probe.el");
+        fs::write(
+            &file,
+            "\u{feff}(setq vm-load-bom-probe 'ok)\n(setq vm-load-bom-flag t)\n",
+        )
+        .expect("write bom fixture");
+
+        let mut eval = super::super::eval::Evaluator::new();
+        let loaded = load_file(&mut eval, &file).expect("load bom fixture");
+        assert_eq!(loaded, Value::True);
+        assert_eq!(
+            eval.obarray().symbol_value("vm-load-bom-probe").cloned(),
+            Some(Value::symbol("ok")),
+            "utf-8 bom should be ignored by reader before first form",
+        );
+        assert_eq!(
+            eval.obarray().symbol_value("vm-load-bom-flag").cloned(),
+            Some(Value::True)
         );
 
         let _ = fs::remove_dir_all(&dir);
