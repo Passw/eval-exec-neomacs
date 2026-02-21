@@ -35,6 +35,7 @@
 (macroexpand '(pcase-let* ((`(,a \, b) '(1 2 3))) (list a b)))
 (macroexpand '(pcase-let* ((`(,a ,b \, rest) '(1 2 3 4))) (list a b rest)))
 (macroexpand '(pcase-let* ((`(,a ,b) '(1 2)) (`(,c ,d) '(3 4))) (list a b c d)))
+(macroexpand '(pcase-let* ((`[,a ,b] [1 2])) (list a b)))
 (condition-case err (macroexpand '(pcase-let)) (error err))
 (condition-case err (macroexpand '(pcase-let*)) (error err))
 (condition-case err (macroexpand '(pcase-let x x)) (error err))

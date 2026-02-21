@@ -4537,6 +4537,7 @@ fn macroexpand_environment_callable(
 enum SimpleBackquoteListPattern {
     Proper(Vec<Value>),
     Dotted { heads: Vec<Value>, tail: Value },
+    Vector(Vec<Value>),
 }
 
 fn parse_simple_backquote_list_unquotes(pattern: &Value) -> Option<SimpleBackquoteListPattern> {
@@ -4558,7 +4559,21 @@ fn parse_simple_backquote_list_unquotes(pattern: &Value) -> Option<SimpleBackquo
     if outer.len() != 2 || !is_backquote_symbol(&outer[0]) {
         return None;
     }
-    let items = list_to_vec(&outer[1])?;
+    let items = if let Some(items) = list_to_vec(&outer[1]) {
+        items
+    } else if let Value::Vector(items) = &outer[1] {
+        let items = items.lock().expect("poisoned").clone();
+        if items.is_empty() {
+            return None;
+        }
+        let mut vars = Vec::with_capacity(items.len());
+        for item in &items {
+            vars.push(parse_unquoted_symbol(item)?);
+        }
+        return Some(SimpleBackquoteListPattern::Vector(vars));
+    } else {
+        return None;
+    };
     if items.is_empty() {
         return None;
     }
@@ -4603,6 +4618,63 @@ fn expand_simple_backquote_list_pcase_let_star(
     let (head_vars, tail_var) = match pattern {
         SimpleBackquoteListPattern::Proper(vars) => (vars.as_slice(), None),
         SimpleBackquoteListPattern::Dotted { heads, tail } => (heads.as_slice(), Some(tail)),
+        SimpleBackquoteListPattern::Vector(vars) => {
+            if vars.is_empty() {
+                return None;
+            }
+
+            let length_sym = eval.next_pcase_macroexpand_temp_symbol();
+            let mut elem_bindings = Vec::with_capacity(vars.len());
+            let mut var_bindings = Vec::with_capacity(vars.len());
+            for (idx, var) in vars.iter().enumerate() {
+                let temp = eval.next_pcase_macroexpand_temp_symbol();
+                elem_bindings.push(Value::list(vec![
+                    temp.clone(),
+                    Value::list(vec![
+                        Value::symbol("aref"),
+                        value_expr.clone(),
+                        Value::Int(idx as i64),
+                    ]),
+                ]));
+                var_bindings.push(Value::list(vec![var.clone(), temp]));
+            }
+
+            let mut let_body = Vec::with_capacity(body_forms.len() + 2);
+            let_body.push(Value::symbol("let"));
+            let_body.push(Value::list(var_bindings));
+            let_body.extend_from_slice(body_forms);
+
+            return Some(Value::list(vec![
+                Value::symbol("progn"),
+                Value::list(vec![
+                    Value::symbol("ignore"),
+                    Value::list(vec![Value::symbol("vectorp"), value_expr.clone()]),
+                ]),
+                Value::list(vec![
+                    Value::symbol("let*"),
+                    Value::list(vec![Value::list(vec![
+                        length_sym.clone(),
+                        Value::list(vec![Value::symbol("length"), value_expr.clone()]),
+                    ])]),
+                    Value::list(vec![
+                        Value::symbol("progn"),
+                        Value::list(vec![
+                            Value::symbol("ignore"),
+                            Value::list(vec![
+                                Value::symbol("eql"),
+                                length_sym,
+                                Value::Int(vars.len() as i64),
+                            ]),
+                        ]),
+                        Value::list(vec![
+                            Value::symbol("let*"),
+                            Value::list(elem_bindings),
+                            Value::list(let_body),
+                        ]),
+                    ]),
+                ]),
+            ]));
+        }
     };
     if head_vars.is_empty() {
         return None;
@@ -22106,6 +22178,31 @@ mod tests {
         assert_eq!(
             pcase_let_star_multi_pattern_expanded,
             pcase_let_star_multi_pattern_expected
+        );
+        let pcase_let_star_vector_pattern_forms = crate::elisp::parser::parse_forms(
+            r#"(pcase-let* ((`[,a ,b] [1 2])) (list a b))"#,
+        )
+        .expect("vector-pattern pcase-let* form should parse");
+        let pcase_let_star_vector_pattern = crate::elisp::eval::quote_to_value(
+            pcase_let_star_vector_pattern_forms
+                .first()
+                .expect("vector-pattern pcase-let* parse should yield one form"),
+        );
+        let pcase_let_star_vector_pattern_expanded =
+            builtin_macroexpand_eval(&mut eval, vec![pcase_let_star_vector_pattern])
+                .expect("macroexpand should lower simple vector pcase-let* patterns");
+        let pcase_let_star_vector_pattern_expected_forms = crate::elisp::parser::parse_forms(
+            r#"(progn (ignore (vectorp [1 2])) (let* ((x22 (length [1 2]))) (progn (ignore (eql x22 2)) (let* ((x23 (aref [1 2] 0)) (x24 (aref [1 2] 1))) (let ((a x23) (b x24)) (list a b))))))"#,
+        )
+        .expect("vector-pattern pcase-let* expected expansion should parse");
+        let pcase_let_star_vector_pattern_expected = crate::elisp::eval::quote_to_value(
+            pcase_let_star_vector_pattern_expected_forms
+                .first()
+                .expect("vector-pattern pcase-let* expected parse should yield one form"),
+        );
+        assert_eq!(
+            pcase_let_star_vector_pattern_expanded,
+            pcase_let_star_vector_pattern_expected
         );
         let bad_pcase_let = builtin_macroexpand_eval(
             &mut eval,
