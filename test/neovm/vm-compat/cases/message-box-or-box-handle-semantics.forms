@@ -74,6 +74,16 @@
       (string-prefix-p "#<buffer mbox-live-vm" (message-box "%S" b))
     (kill-buffer b)))
 
+(let* ((b (generate-new-buffer "mbox-live-vm-lower")))
+  (prog1
+      (string= "mbox-live-vm-lower" (message-box "%s" b))
+    (kill-buffer b)))
+
+(let* ((b (generate-new-buffer "morbox-live-vm-upper")))
+  (prog1
+      (string-prefix-p "#<buffer morbox-live-vm-upper" (message-or-box "%S" b))
+    (kill-buffer b)))
+
 (let* ((b (generate-new-buffer "morbox-live-vm")))
   (prog1
       (string= "morbox-live-vm" (message-or-box "%s" b))
@@ -82,6 +92,14 @@
 (let* ((b (generate-new-buffer "mbox-killed-vm")))
   (kill-buffer b)
   (string= (message-box "%S" b) "#<killed buffer>"))
+
+(let* ((b (generate-new-buffer "mbox-killed-vm-lower")))
+  (kill-buffer b)
+  (string= (message-box "%s" b) "#<killed buffer>"))
+
+(let* ((b (generate-new-buffer "morbox-killed-vm-upper")))
+  (kill-buffer b)
+  (string= (message-or-box "%S" b) "#<killed buffer>"))
 
 (let* ((b (generate-new-buffer "morbox-killed-vm")))
   (kill-buffer b)

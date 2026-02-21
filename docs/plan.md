@@ -28,6 +28,24 @@ Last updated: 2026-02-21
 
 ## Doing
 
+- Completed `message-box` / `message-or-box` live/killed buffer `%S`/`%s` matrix coverage:
+  - vm-compat corpus changes:
+    - updated:
+      - `test/neovm/vm-compat/cases/message-box-or-box-handle-semantics.forms`
+      - `test/neovm/vm-compat/cases/message-box-or-box-handle-semantics.expected.tsv`
+    - added the remaining wrapper/buffer combinations:
+      - live buffer: `message-box "%s"` and `message-or-box "%S"`
+      - killed buffer: `message-box "%s"` and `message-or-box "%S"`
+  - runtime changes:
+    - `rust/neovm-core/src/elisp/builtins.rs`
+      - extended evaluator coverage:
+        - `message_box_wrappers_render_opaque_handles_in_eval_dispatch`
+      - test now asserts full live/killed buffer `%S`/`%s` matrix across both wrappers.
+  - verified:
+    - `cargo test --manifest-path rust/neovm-core/Cargo.toml message_box_wrappers_render_opaque_handles_in_eval_dispatch -- --nocapture` (pass)
+    - `make -C test/neovm/vm-compat check-one-neovm CASE=cases/message-box-or-box-handle-semantics` (pass; `42/42`)
+    - `make -C test/neovm/vm-compat check-neovm-filter-strict LIST=cases/default.list PATTERN='message-box-or-box-handle-semantics'` (pass; strict filtered gates green)
+
 - Extended `message-box` / `message-or-box` frame/window coverage with `%s` lock-ins:
   - vm-compat corpus changes:
     - updated:

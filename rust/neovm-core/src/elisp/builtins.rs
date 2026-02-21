@@ -19021,6 +19021,27 @@ mod tests {
                 .is_some_and(|s| s.starts_with("#<buffer *message-box-live-buffer")),
             "expected live buffer in message-box %S output: {live_upper:?}"
         );
+        let live_box_lower = dispatch_builtin(
+            &mut eval,
+            "message-box",
+            vec![Value::string("%s"), live_buffer.clone()],
+        )
+        .expect("message-box should resolve")
+        .expect("message-box should evaluate");
+        assert_eq!(live_box_lower, Value::string(live_name));
+        let live_or_upper = dispatch_builtin(
+            &mut eval,
+            "message-or-box",
+            vec![Value::string("%S"), live_buffer.clone()],
+        )
+        .expect("message-or-box should resolve")
+        .expect("message-or-box should evaluate");
+        assert!(
+            live_or_upper
+                .as_str()
+                .is_some_and(|s| s.starts_with("#<buffer *message-box-live-buffer")),
+            "expected live buffer in message-or-box %S output: {live_or_upper:?}"
+        );
         let live_lower = dispatch_builtin(
             &mut eval,
             "message-or-box",
@@ -19051,6 +19072,22 @@ mod tests {
         .expect("message-box should resolve")
         .expect("message-box should evaluate");
         assert_eq!(killed_upper, Value::string("#<killed buffer>"));
+        let killed_box_lower = dispatch_builtin(
+            &mut eval,
+            "message-box",
+            vec![Value::string("%s"), killed_buffer.clone()],
+        )
+        .expect("message-box should resolve")
+        .expect("message-box should evaluate");
+        assert_eq!(killed_box_lower, Value::string("#<killed buffer>"));
+        let killed_or_upper = dispatch_builtin(
+            &mut eval,
+            "message-or-box",
+            vec![Value::string("%S"), killed_buffer.clone()],
+        )
+        .expect("message-or-box should resolve")
+        .expect("message-or-box should evaluate");
+        assert_eq!(killed_or_upper, Value::string("#<killed buffer>"));
         let killed_lower = dispatch_builtin(
             &mut eval,
             "message-or-box",
