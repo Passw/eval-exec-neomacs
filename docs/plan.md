@@ -36,7 +36,7 @@ Last updated: 2026-02-21
     - wired case into:
       - `test/neovm/vm-compat/cases/default.list`
   - verified:
-    - `make -C test/neovm/vm-compat check-one-neovm CASE=cases/format-message-killed-buffer-handle-semantics` (pass; `11/11`)
+    - `make -C test/neovm/vm-compat check-one-neovm CASE=cases/format-message-killed-buffer-handle-semantics` (pass; `12/12`)
 
 - Hardened runtime coverage for `error-message-string` opaque handle payload formatting:
   - runtime changes:

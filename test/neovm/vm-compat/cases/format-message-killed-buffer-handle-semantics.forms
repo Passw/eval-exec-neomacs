@@ -15,6 +15,10 @@
   (kill-buffer b)
   (string= (message "%S" b) "#<killed buffer>"))
 
+(let* ((b (generate-new-buffer "msg-killed-vm-lower")))
+  (kill-buffer b)
+  (string= (message "%s" b) "#<killed buffer>"))
+
 (let* ((b (generate-new-buffer "fmt-live-vm")))
   (prog1
       (string-prefix-p "#<buffer fmt-live-vm" (format "%S" b))
