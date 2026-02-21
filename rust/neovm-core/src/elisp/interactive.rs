@@ -282,8 +282,7 @@ pub(crate) fn builtin_command_modes(args: Vec<Value>) -> EvalResult {
 /// `(command-remapping COMMAND &optional POSITION KEYMAP)` -- return remapped
 /// command for COMMAND.
 ///
-/// Current compatibility behavior returns nil while preserving oracle-visible
-/// arity and KEYMAP type validation.
+/// Respects local/global keymaps when KEYMAP is omitted or nil.
 pub(crate) fn builtin_command_remapping(eval: &mut Evaluator, args: Vec<Value>) -> EvalResult {
     expect_min_args("command-remapping", &args, 1)?;
     expect_max_args("command-remapping", &args, 3)?;
@@ -298,25 +297,36 @@ pub(crate) fn builtin_command_remapping(eval: &mut Evaluator, args: Vec<Value>) 
     let Some(command_name) = command_remapping_command_name(&args[0]) else {
         return Ok(Value::Nil);
     };
-    if let Some(Value::Cons(keymap)) = args.get(2) {
-        let keymap_value = Value::Cons(keymap.clone());
-        if let Some(target) = command_remapping_lookup_in_lisp_keymap(&keymap_value, &command_name)
-        {
-            return Ok(command_remapping_normalize_target(target));
+    if let Some(keymap_arg) = args.get(2) {
+        match keymap_arg {
+            Value::Cons(keymap) => {
+                let keymap_value = Value::Cons(keymap.clone());
+                if let Some(target) =
+                    command_remapping_lookup_in_lisp_keymap(&keymap_value, &command_name)
+                {
+                    return Ok(command_remapping_normalize_target(target));
+                }
+                return Ok(Value::Nil);
+            }
+            Value::Nil => {
+                return Ok(
+                    command_remapping_lookup_in_active_keymaps(eval, &command_name)
+                        .unwrap_or(Value::Nil),
+                );
+            }
+            _ => {
+                let Some(map_id) = command_remapping_lookup_keymap_id(eval, Some(keymap_arg))
+                else {
+                    return Ok(Value::Nil);
+                };
+                return Ok(
+                    command_remapping_lookup_in_keymap_id(eval, map_id, &command_name)
+                        .unwrap_or(Value::Nil),
+                );
+            }
         }
-        return Ok(Value::Nil);
     }
-    let Some(map_id) = command_remapping_lookup_keymap_id(eval, args.get(2)) else {
-        return Ok(Value::Nil);
-    };
-    let command_event = command_remapping_command_event(&command_name);
-    if let Some(binding) = eval
-        .keymaps
-        .lookup_key_sequence(map_id, &[remap_event(), command_event])
-    {
-        return Ok(command_remapping_binding_value(binding));
-    }
-    Ok(Value::Nil)
+    Ok(command_remapping_lookup_in_active_keymaps(eval, &command_name).unwrap_or(Value::Nil))
 }
 
 fn builtin_command_name(name: &str) -> bool {
@@ -2539,11 +2549,34 @@ fn command_remapping_keymap_arg_valid(eval: &Evaluator, value: &Value) -> bool {
 
 fn command_remapping_lookup_keymap_id(eval: &Evaluator, keymap: Option<&Value>) -> Option<u64> {
     match keymap {
-        None | Some(Value::Nil) => eval.keymaps.global_map(),
         Some(Value::Int(n)) => decode_keymap_handle(*n).filter(|id| eval.keymaps.is_keymap(*id)),
-        Some(Value::Cons(_)) => None,
         Some(_) => None,
+        None => None,
     }
+}
+
+fn command_remapping_lookup_in_keymap_id(
+    eval: &Evaluator,
+    map_id: u64,
+    command_name: &str,
+) -> Option<Value> {
+    let command_event = command_remapping_command_event(command_name);
+    eval.keymaps
+        .lookup_key_sequence(map_id, &[remap_event(), command_event])
+        .map(command_remapping_binding_value)
+}
+
+fn command_remapping_lookup_in_active_keymaps(
+    eval: &Evaluator,
+    command_name: &str,
+) -> Option<Value> {
+    if let Some(local_id) = eval.current_local_map {
+        if let Some(value) = command_remapping_lookup_in_keymap_id(eval, local_id, command_name) {
+            return Some(value);
+        }
+    }
+    let global_id = eval.keymaps.global_map()?;
+    command_remapping_lookup_in_keymap_id(eval, global_id, command_name)
 }
 
 fn command_remapping_command_name(command: &Value) -> Option<String> {
@@ -6616,6 +6649,67 @@ K")
                 r#"(let ((m (make-sparse-keymap)))
                      (define-key (current-global-map) [remap ignore] 'self-insert-command)
                      (command-remapping 'ignore))"#
+            ),
+            "OK self-insert-command"
+        );
+    }
+
+    #[test]
+    fn command_remapping_prefers_local_map_when_keymap_omitted_or_nil() {
+        assert_eq!(
+            eval_one(
+                r#"(let ((g (make-sparse-keymap))
+                         (l (make-sparse-keymap)))
+                     (use-global-map g)
+                     (use-local-map l)
+                     (define-key l [remap ignore] 'self-insert-command)
+                     (command-remapping 'ignore))"#
+            ),
+            "OK self-insert-command"
+        );
+        assert_eq!(
+            eval_one(
+                r#"(let ((g (make-sparse-keymap))
+                         (l (make-sparse-keymap)))
+                     (use-global-map g)
+                     (use-local-map l)
+                     (define-key l [remap ignore] 'self-insert-command)
+                     (command-remapping 'ignore nil nil))"#
+            ),
+            "OK self-insert-command"
+        );
+        assert_eq!(
+            eval_one(
+                r#"(let ((g (make-sparse-keymap))
+                         (l (make-sparse-keymap)))
+                     (use-global-map g)
+                     (use-local-map l)
+                     (define-key g [remap ignore] 'forward-char)
+                     (define-key l [remap ignore] 'self-insert-command)
+                     (command-remapping 'ignore))"#
+            ),
+            "OK self-insert-command"
+        );
+        assert_eq!(
+            eval_one(
+                r#"(let ((g (make-sparse-keymap))
+                         (l (make-sparse-keymap)))
+                     (use-global-map g)
+                     (use-local-map l)
+                     (define-key g [remap ignore] 'self-insert-command)
+                     (command-remapping 'ignore))"#
+            ),
+            "OK self-insert-command"
+        );
+        assert_eq!(
+            eval_one(
+                r#"(with-temp-buffer
+                     (let ((g (make-sparse-keymap))
+                           (l (make-sparse-keymap)))
+                       (use-global-map g)
+                       (use-local-map l)
+                       (define-key l [remap ignore] 'self-insert-command)
+                       (command-remapping 'ignore (point-min))))"#
             ),
             "OK self-insert-command"
         );

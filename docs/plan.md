@@ -18127,6 +18127,32 @@ Last updated: 2026-02-21
 
 ## Doing
 
+- Fixed `command-remapping` active-map semantics when optional `KEYMAP` is omitted/`nil`:
+  - runtime changes:
+    - `rust/neovm-core/src/elisp/interactive.rs`
+      - `command-remapping` now checks active maps (local first, then global) when `KEYMAP` is omitted or explicitly `nil`, matching oracle behavior.
+      - explicit `KEYMAP` handling remains:
+        - Lisp keymap cons objects are resolved via Lisp remap-entry walker,
+        - keymap-handle integers are resolved directly against the referenced map.
+      - added unit coverage:
+        - `command_remapping_prefers_local_map_when_keymap_omitted_or_nil`.
+  - vm-compat corpus changes:
+    - added and wired:
+      - `test/neovm/vm-compat/cases/command-remapping-active-map-semantics.forms`
+      - `test/neovm/vm-compat/cases/command-remapping-active-map-semantics.expected.tsv`
+      - `test/neovm/vm-compat/cases/default.list`
+    - lock-ins cover:
+      - local remap resolution with omitted `KEYMAP`,
+      - local remap resolution with explicit `KEYMAP=nil`,
+      - local-over-global precedence,
+      - global fallback when local map has no remap,
+      - explicit keymap argument overriding active-map lookup.
+  - verified:
+    - `cargo test --manifest-path rust/neovm-core/Cargo.toml command_remapping_prefers_local_map_when_keymap_omitted_or_nil -- --nocapture` (pass)
+    - `make -C test/neovm/vm-compat record FORMS=cases/command-remapping-active-map-semantics.forms EXPECTED=cases/command-remapping-active-map-semantics.expected.tsv` (pass)
+    - `make -C test/neovm/vm-compat check-one-neovm CASE=cases/command-remapping-active-map-semantics` (pass; `8/8`)
+    - `make -C test/neovm/vm-compat check-all-neovm-strict` (pass; case inventory `875`)
+
 - Extended `command-remapping` Lisp-keymap lock-ins for remap ordering and target normalization edge paths:
   - vm-compat corpus changes:
     - added and wired:
