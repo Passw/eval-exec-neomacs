@@ -98,11 +98,22 @@ fn compile_pattern(expr: &Expr) -> Result<Pattern, Flow> {
         // Empty list = nil literal
         Expr::List(_) => Ok(Pattern::Literal(Value::Nil)),
 
-        // Dotted list — not expected in patterns normally
-        Expr::DottedList(_, _) => Err(signal(
-            "error",
-            vec![Value::string("dotted list not supported in pcase pattern")],
-        )),
+        Expr::DottedList(items, _) => {
+            let rendered = print_expr(expr);
+            let Some(head) = items.first() else {
+                return Err(signal("error", vec![Value::string("Unknown pattern ‘nil’")]));
+            };
+            match head {
+                Expr::Symbol(name) => Err(signal(
+                    "error",
+                    vec![Value::string(format!("Unknown {name} pattern: {rendered}"))],
+                )),
+                other => Err(signal(
+                    "wrong-type-argument",
+                    vec![Value::symbol("symbolp"), quote_to_value(other)],
+                )),
+            }
+        }
     }
 }
 
@@ -160,6 +171,9 @@ fn compile_list_pattern(items: &[Expr]) -> Result<Pattern, Flow> {
 
         // (or PAT...)
         Expr::Symbol(s) if s == "or" => {
+            if items.len() <= 2 {
+                return Err(signal("error", vec![Value::string("Please avoid it")]));
+            }
             let pats: Result<Vec<Pattern>, Flow> = items[1..].iter().map(compile_pattern).collect();
             Ok(Pattern::Or(pats?))
         }
@@ -1319,6 +1333,32 @@ mod tests {
         );
     }
 
+    #[test]
+    fn pcase_dotted_symbol_head_pattern_error_shape_matches_oracle() {
+        assert_eq!(
+            eval_last("(condition-case err (pcase '(1 . 2) ((a . b) (list a b)) (_ 'no)) (error err))"),
+            "OK (error \"Unknown a pattern: (a . b)\")"
+        );
+        assert_eq!(
+            eval_last("(condition-case err (pcase-let (((a . b) '(1 . 2))) (list a b)) (error err))"),
+            "OK (error \"Unknown a pattern: (a . b)\")"
+        );
+        assert_eq!(
+            eval_last("(condition-case err (pcase-let* (((a . b) '(1 . 2))) (list a b)) (error err))"),
+            "OK (error \"Unknown a pattern: (a . b)\")"
+        );
+    }
+
+    #[test]
+    fn pcase_dotted_non_symbol_head_signals_symbol_type_error() {
+        assert_eq!(
+            eval_last(
+                "(condition-case err (pcase '(1 . 2) (((1 2) . 3) 'x) (_ 'y)) (error err))"
+            ),
+            "OK (wrong-type-argument symbolp (1 2))"
+        );
+    }
+
     // =======================================================================
     // 11. and pattern
     // =======================================================================
@@ -1361,6 +1401,18 @@ mod tests {
         assert_eq!(
             eval_last("(pcase 5 ((or 1 2 3) 'found) (_ 'nope))"),
             "OK nope"
+        );
+    }
+
+    #[test]
+    fn pcase_or_pattern_requires_at_least_two_alternatives() {
+        assert_eq!(
+            eval_last("(condition-case err (pcase 1 ((or) 'x) (_ 'y)) (error err))"),
+            "OK (error \"Please avoid it\")"
+        );
+        assert_eq!(
+            eval_last("(condition-case err (pcase 1 ((or 1) 'x) (_ 'y)) (error err))"),
+            "OK (error \"Please avoid it\")"
         );
     }
 

@@ -29,3 +29,12 @@
 (condition-case err (pcase 1 (((1 2) 3) 'x) (_ 'y)) (error err))
 (condition-case err (pcase-let ((((1 2) 3) 1)) 'ok) (error err))
 (condition-case err (pcase-let* ((((1 2) 3) 1)) 'ok) (error err))
+
+; dotted-list pattern head behavior
+(condition-case err (pcase '(1 . 2) ((a . b) (list a b)) (_ 'no)) (error err))
+(condition-case err (pcase-let (((a . b) '(1 . 2))) (list a b)) (error err))
+(condition-case err (pcase-let* (((a . b) '(1 . 2))) (list a b)) (error err))
+
+; (or) requires at least two alternatives
+(condition-case err (pcase 1 ((or) 'x) (_ 'y)) (error err))
+(condition-case err (pcase 1 ((or 1) 'x) (_ 'y)) (error err))
