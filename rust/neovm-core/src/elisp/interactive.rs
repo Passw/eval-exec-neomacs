@@ -297,6 +297,9 @@ pub(crate) fn builtin_command_remapping(eval: &mut Evaluator, args: Vec<Value>) 
     let Some(command_name) = command_remapping_command_name(&args[0]) else {
         return Ok(Value::Nil);
     };
+    if let Some(position) = args.get(1) {
+        interactive_validate_integer_position_arg(eval, position)?;
+    }
     if let Some(keymap_arg) = args.get(2) {
         match keymap_arg {
             Value::Cons(keymap) => {
@@ -1590,7 +1593,7 @@ pub(crate) fn builtin_key_binding(eval: &mut Evaluator, args: Vec<Value>) -> Eva
     let string_designator = args[0].is_string();
     let no_remap = args.get(2).is_some_and(|v| v.is_truthy());
     if let Some(position) = args.get(3) {
-        key_binding_validate_position_arg(eval, position)?;
+        interactive_validate_integer_position_arg(eval, position)?;
     }
 
     let events = match super::kbd::key_events_from_designator(&args[0]) {
@@ -1644,7 +1647,7 @@ pub(crate) fn builtin_key_binding(eval: &mut Evaluator, args: Vec<Value>) -> Eva
     Ok(Value::Nil)
 }
 
-fn key_binding_validate_position_arg(eval: &Evaluator, position: &Value) -> Result<(), Flow> {
+fn interactive_validate_integer_position_arg(eval: &Evaluator, position: &Value) -> Result<(), Flow> {
     let Value::Int(pos) = position else {
         return Ok(());
     };
@@ -6949,6 +6952,77 @@ K")
             ),
             "OK wrong-number-of-arguments"
         );
+    }
+
+    #[test]
+    fn command_remapping_integer_position_range_and_ordering_semantics() {
+        assert_eq!(
+            eval_one(
+                r#"(with-temp-buffer
+                     (let ((err (condition-case e
+                                    (command-remapping 'ignore 0)
+                                  (error e))))
+                       (list (car err) (bufferp (cadr err)) (caddr err))))"#
+            ),
+            "OK (args-out-of-range t 0)"
+        );
+        assert_eq!(
+            eval_one(
+                r#"(with-temp-buffer
+                     (let ((err (condition-case e
+                                    (command-remapping 'ignore -1)
+                                  (error e))))
+                       (list (car err) (bufferp (cadr err)) (caddr err))))"#
+            ),
+            "OK (args-out-of-range t -1)"
+        );
+        assert_eq!(
+            eval_one(
+                r#"(with-temp-buffer
+                     (let ((err (condition-case e
+                                    (command-remapping 'ignore 2)
+                                  (error e))))
+                       (list (car err) (bufferp (cadr err)) (caddr err))))"#
+            ),
+            "OK (args-out-of-range t 2)"
+        );
+        assert_eq!(
+            eval_one(
+                r#"(with-temp-buffer
+                     (let ((m (make-sparse-keymap)))
+                       (define-key m [remap ignore] 'self-insert-command)
+                       (list
+                        (command-remapping 'ignore 1 m)
+                        (command-remapping 'ignore t m)
+                        (command-remapping 'ignore 'foo m)
+                        (command-remapping 'ignore "x" m)
+                        (command-remapping 'ignore [1] m)
+                        (command-remapping 'ignore '(1) m)
+                        (command-remapping 'ignore 1.5 m)
+                        (command-remapping 'ignore (copy-marker (point)) m))))"#
+            ),
+            "OK (self-insert-command self-insert-command self-insert-command self-insert-command self-insert-command self-insert-command self-insert-command self-insert-command)"
+        );
+        assert_eq!(
+            eval_one(
+                r#"(with-temp-buffer
+                     (let ((err (condition-case e
+                                    (command-remapping nil 0)
+                                  (error e))))
+                       (list (car err) (bufferp (cadr err)) (caddr err))))"#
+            ),
+            "OK (args-out-of-range t 0)"
+        );
+        assert_eq!(
+            eval_one(
+                r#"(with-temp-buffer
+                     (condition-case e
+                         (command-remapping 'ignore 0 t)
+                       (error e)))"#
+            ),
+            "OK (wrong-type-argument keymapp t)"
+        );
+        assert_eq!(eval_one("(with-temp-buffer (command-remapping 0 0))"), "OK nil");
     }
 
     #[test]

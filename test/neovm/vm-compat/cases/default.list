@@ -214,6 +214,7 @@ cases/key-binding-minor-mode-precedence-semantics
 cases/minor-mode-key-binding-semantics
 cases/minor-mode-key-binding-emulation-alist-iteration-semantics
 cases/command-remapping-modes-boundary-semantics
+cases/command-remapping-position-semantics
 cases/command-remapping-remap-lookup-semantics
 cases/command-remapping-lisp-keymap-semantics
 cases/command-remapping-lisp-keymap-remap-order-semantics

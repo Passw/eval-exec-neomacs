@@ -28,6 +28,26 @@ Last updated: 2026-02-21
 
 ## Doing
 
+- Aligned `command-remapping` optional `POSITION` integer range handling with Oracle and added lock-in coverage:
+  - runtime changes:
+    - `rust/neovm-core/src/elisp/interactive.rs`
+      - `command-remapping` now validates integer `POSITION` against current buffer `point-min..point-max`.
+      - out-of-range integers now signal `args-out-of-range` with `(current-buffer POSITION)` payload.
+      - preserves Oracle check ordering: KEYMAP type-check first, then command-name resolution, then integer POSITION bounds.
+      - non-integer `POSITION` values remain accepted/ignored.
+      - added evaluator coverage:
+        - `command_remapping_integer_position_range_and_ordering_semantics`
+  - vm-compat corpus changes:
+    - added:
+      - `test/neovm/vm-compat/cases/command-remapping-position-semantics.forms`
+      - `test/neovm/vm-compat/cases/command-remapping-position-semantics.expected.tsv`
+    - wired case into:
+      - `test/neovm/vm-compat/cases/default.list`
+  - verified:
+    - `cargo test --manifest-path rust/neovm-core/Cargo.toml command_remapping_ -- --nocapture` (pass)
+    - `make -C test/neovm/vm-compat check-one-neovm CASE=cases/command-remapping-position-semantics` (pass; `9/9`)
+    - `make -C test/neovm/vm-compat check-all-neovm-strict` (pass)
+
 - Aligned `key-binding` optional `POSITION` integer bounds to Oracle and added lock-in coverage:
   - runtime changes:
     - `rust/neovm-core/src/elisp/interactive.rs`
