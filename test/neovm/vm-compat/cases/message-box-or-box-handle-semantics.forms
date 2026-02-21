@@ -55,11 +55,19 @@
 
 (string-prefix-p "#<frame" (message-box "%S" (selected-frame)))
 
+(string-prefix-p "#<frame" (message-box "%s" (selected-frame)))
+
 (string-prefix-p "#<frame" (message-or-box "%S" (selected-frame)))
+
+(string-prefix-p "#<frame" (message-or-box "%s" (selected-frame)))
 
 (string-prefix-p "#<window" (message-box "%S" (selected-window)))
 
+(string-prefix-p "#<window" (message-box "%s" (selected-window)))
+
 (string-prefix-p "#<window" (message-or-box "%S" (selected-window)))
+
+(string-prefix-p "#<window" (message-or-box "%s" (selected-window)))
 
 (let* ((b (generate-new-buffer "mbox-live-vm")))
   (prog1

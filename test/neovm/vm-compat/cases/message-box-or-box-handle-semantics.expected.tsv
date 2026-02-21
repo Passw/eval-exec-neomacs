@@ -25,10 +25,14 @@
 25	(let* ((m (make-mutex)) (cv (make-condition-variable m))) (string-prefix-p "#<condvar" (message-or-box "%S" cv)))	OK t
 26	(let* ((m (make-mutex)) (cv (make-condition-variable m))) (string-prefix-p "#<condvar" (message-or-box "%s" cv)))	OK t
 27	(string-prefix-p "#<frame" (message-box "%S" (selected-frame)))	OK t
-28	(string-prefix-p "#<frame" (message-or-box "%S" (selected-frame)))	OK t
-29	(string-prefix-p "#<window" (message-box "%S" (selected-window)))	OK t
-30	(string-prefix-p "#<window" (message-or-box "%S" (selected-window)))	OK t
-31	(let* ((b (generate-new-buffer "mbox-live-vm"))) (prog1 (string-prefix-p "#<buffer mbox-live-vm" (message-box "%S" b)) (kill-buffer b)))	OK t
-32	(let* ((b (generate-new-buffer "morbox-live-vm"))) (prog1 (string= "morbox-live-vm" (message-or-box "%s" b)) (kill-buffer b)))	OK t
-33	(let* ((b (generate-new-buffer "mbox-killed-vm"))) (kill-buffer b) (string= (message-box "%S" b) "#<killed buffer>"))	OK t
-34	(let* ((b (generate-new-buffer "morbox-killed-vm"))) (kill-buffer b) (string= (message-or-box "%s" b) "#<killed buffer>"))	OK t
+28	(string-prefix-p "#<frame" (message-box "%s" (selected-frame)))	OK t
+29	(string-prefix-p "#<frame" (message-or-box "%S" (selected-frame)))	OK t
+30	(string-prefix-p "#<frame" (message-or-box "%s" (selected-frame)))	OK t
+31	(string-prefix-p "#<window" (message-box "%S" (selected-window)))	OK t
+32	(string-prefix-p "#<window" (message-box "%s" (selected-window)))	OK t
+33	(string-prefix-p "#<window" (message-or-box "%S" (selected-window)))	OK t
+34	(string-prefix-p "#<window" (message-or-box "%s" (selected-window)))	OK t
+35	(let* ((b (generate-new-buffer "mbox-live-vm"))) (prog1 (string-prefix-p "#<buffer mbox-live-vm" (message-box "%S" b)) (kill-buffer b)))	OK t
+36	(let* ((b (generate-new-buffer "morbox-live-vm"))) (prog1 (string= "morbox-live-vm" (message-or-box "%s" b)) (kill-buffer b)))	OK t
+37	(let* ((b (generate-new-buffer "mbox-killed-vm"))) (kill-buffer b) (string= (message-box "%S" b) "#<killed buffer>"))	OK t
+38	(let* ((b (generate-new-buffer "morbox-killed-vm"))) (kill-buffer b) (string= (message-or-box "%s" b) "#<killed buffer>"))	OK t

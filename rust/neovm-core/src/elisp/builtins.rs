@@ -18995,7 +18995,9 @@ mod tests {
             assert_prefix(builtin, "%S", condvar.clone(), "#<condvar");
             assert_prefix(builtin, "%s", condvar.clone(), "#<condvar");
             assert_prefix(builtin, "%S", frame.clone(), "#<frame");
+            assert_prefix(builtin, "%s", frame.clone(), "#<frame");
             assert_prefix(builtin, "%S", window.clone(), "#<window");
+            assert_prefix(builtin, "%s", window.clone(), "#<window");
         }
 
         let live_name = "*message-box-live-buffer*";

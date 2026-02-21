@@ -28,6 +28,22 @@ Last updated: 2026-02-21
 
 ## Doing
 
+- Extended `message-box` / `message-or-box` frame/window coverage with `%s` lock-ins:
+  - vm-compat corpus changes:
+    - updated:
+      - `test/neovm/vm-compat/cases/message-box-or-box-handle-semantics.forms`
+      - `test/neovm/vm-compat/cases/message-box-or-box-handle-semantics.expected.tsv`
+    - added `%s` assertions for frame and window handles across both wrapper builtins.
+  - runtime changes:
+    - `rust/neovm-core/src/elisp/builtins.rs`
+      - extended evaluator coverage:
+        - `message_box_wrappers_render_opaque_handles_in_eval_dispatch`
+      - test now locks `%s` rendering parity for frame/window handles in both wrappers.
+  - verified:
+    - `cargo test --manifest-path rust/neovm-core/Cargo.toml message_box_wrappers_render_opaque_handles_in_eval_dispatch -- --nocapture` (pass)
+    - `make -C test/neovm/vm-compat check-one-neovm CASE=cases/message-box-or-box-handle-semantics` (pass; `38/38`)
+    - `make -C test/neovm/vm-compat check-neovm-filter-strict LIST=cases/default.list PATTERN='message-box-or-box-handle-semantics'` (pass; strict filtered gates green)
+
 - Extended `message-box` / `message-or-box` handle matrix with mutex/condition-variable `%S`/`%s` lock-ins:
   - vm-compat corpus changes:
     - updated:
