@@ -1676,6 +1676,33 @@ mod tests {
     }
 
     #[test]
+    fn builtin_error_message_string_formats_terminal_handles() {
+        let mut evaluator = super::super::eval::Evaluator::new();
+        init_standard_errors(&mut evaluator.obarray);
+
+        let terminals = super::super::display::builtin_terminal_list(vec![])
+            .expect("terminal-list should succeed");
+        let terminal = super::super::value::list_to_vec(&terminals)
+            .and_then(|values| values.into_iter().next())
+            .expect("terminal-list should return one terminal handle");
+
+        let terminal_err = Value::list(vec![
+            Value::symbol("args-out-of-range"),
+            terminal,
+            Value::Int(0),
+        ]);
+        let terminal_result = builtin_error_message_string(&evaluator, vec![terminal_err]);
+        assert!(terminal_result.is_ok());
+        let terminal_text = terminal_result
+            .unwrap()
+            .as_str()
+            .expect("error-message-string must return a string")
+            .to_string();
+        assert!(terminal_text.starts_with("Args out of range: #<terminal"));
+        assert!(terminal_text.ends_with(", 0"));
+    }
+
+    #[test]
     fn builtin_error_message_string_not_cons() {
         let evaluator = super::super::eval::Evaluator::new();
 
