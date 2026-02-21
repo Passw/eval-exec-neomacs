@@ -1999,6 +1999,22 @@ fn format_spec_type_mismatch_error() -> Flow {
     )
 }
 
+fn format_char_argument(n: i64) -> Result<String, Flow> {
+    if !(0..=KEY_CHAR_CODE_MASK).contains(&n) {
+        return Err(signal(
+            "wrong-type-argument",
+            vec![Value::symbol("characterp"), Value::Int(n)],
+        ));
+    }
+
+    write_char_rendered_text(n).ok_or_else(|| {
+        signal(
+            "wrong-type-argument",
+            vec![Value::symbol("characterp"), Value::Int(n)],
+        )
+    })
+}
+
 fn builtin_format_wrapper_strict(args: Vec<Value>) -> EvalResult {
     expect_min_args("format", &args, 1)?;
     let fmt_str = expect_strict_string(&args[0])?;
@@ -2052,9 +2068,7 @@ fn builtin_format_wrapper_strict(args: Vec<Value>) -> EvalResult {
                         }
                         let n =
                             expect_int(&args[arg_idx]).map_err(|_| format_spec_type_mismatch_error())?;
-                        if let Some(c) = char::from_u32(n as u32) {
-                            result.push(c);
-                        }
+                        result.push_str(&format_char_argument(n)?);
                         arg_idx += 1;
                     }
                     '%' => result.push('%'),
@@ -2127,9 +2141,7 @@ fn builtin_format_wrapper_strict_eval(
                         }
                         let n =
                             expect_int(&args[arg_idx]).map_err(|_| format_spec_type_mismatch_error())?;
-                        if let Some(c) = char::from_u32(n as u32) {
-                            result.push(c);
-                        }
+                        result.push_str(&format_char_argument(n)?);
                         arg_idx += 1;
                     }
                     '%' => result.push('%'),
@@ -19334,6 +19346,40 @@ mod tests {
                     other => panic!("expected signal, got: {other:?}"),
                 }
             }
+        }
+
+        for builtin in ["format", "format-message", "message"] {
+            let err = dispatch_builtin(
+                &mut eval,
+                builtin,
+                vec![Value::string("%c"), Value::Int(-1)],
+            )
+            .expect("builtin should resolve")
+            .expect_err("builtin should reject negative character code");
+            match err {
+                Flow::Signal(sig) => {
+                    assert_eq!(sig.symbol, "wrong-type-argument");
+                    assert_eq!(sig.data, vec![Value::symbol("characterp"), Value::Int(-1)]);
+                }
+                other => panic!("expected signal, got: {other:?}"),
+            }
+        }
+
+        let high_chars = [
+            ("format", 0x11_0000_i64),
+            ("message", 0x11_0000_i64),
+            ("format-message", 0x20_0000_i64),
+        ];
+        for (builtin, value) in high_chars {
+            let rendered = dispatch_builtin(
+                &mut eval,
+                builtin,
+                vec![Value::string("%c"), Value::Int(value)],
+            )
+            .expect("builtin should resolve")
+            .expect("builtin should evaluate");
+            let text = rendered.as_str().expect("builtin should return a string");
+            assert_eq!(decode_storage_char_codes(text), vec![value as u32]);
         }
     }
 

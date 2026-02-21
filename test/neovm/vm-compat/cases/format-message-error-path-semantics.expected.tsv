@@ -22,3 +22,9 @@
 22	(condition-case err (format-message "%d" "x") (error err))	OK (error "Format specifier doesn’t match argument type")
 23	(condition-case err (format-message "%f" "x") (error err))	OK (error "Format specifier doesn’t match argument type")
 24	(condition-case err (format-message "%c" "x") (error err))	OK (error "Format specifier doesn’t match argument type")
+25	(condition-case err (format "%c" -1) (error err))	OK (wrong-type-argument characterp -1)
+26	(condition-case err (message "%c" -1) (error err))	OK (wrong-type-argument characterp -1)
+27	(condition-case err (format-message "%c" -1) (error err))	OK (wrong-type-argument characterp -1)
+28	(let ((s (format "%c" 1114112))) (and (= (length s) 1) (equal (string-to-list s) '(1114112))))	OK t
+29	(let ((s (message "%c" 1114112))) (and (= (length s) 1) (equal (string-to-list s) '(1114112))))	OK t
+30	(let ((s (format-message "%c" 2097152))) (and (= (length s) 1) (equal (string-to-list s) '(2097152))))	OK t
