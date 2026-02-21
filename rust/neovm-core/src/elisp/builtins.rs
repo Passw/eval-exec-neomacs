@@ -4752,6 +4752,7 @@ fn collapse_macroexpand_body_forms(body_forms: &[Value]) -> Value {
 struct PcaseFallbackBinding {
     original: Value,
     pattern: Value,
+    value_tail: Value,
     value_expr: Value,
 }
 
@@ -4766,16 +4767,25 @@ fn parse_pcase_fallback_binding(binding: &Value) -> Result<PcaseFallbackBinding,
     let pattern = pair.car.clone();
     let cdr = pair.cdr.clone();
     drop(pair);
+    let value_tail = cdr.clone();
 
     let value_expr = match cdr {
         Value::Nil => Value::Nil,
-        Value::Cons(cdr_cell) => cdr_cell.lock().expect("poisoned").car.clone(),
+        Value::Cons(cdr_cell) => {
+            let cdr_pair = cdr_cell.lock().expect("poisoned");
+            if cdr_pair.cdr.is_nil() {
+                cdr_pair.car.clone()
+            } else {
+                Value::Cons(cdr_cell.clone())
+            }
+        }
         other => other,
     };
 
     Ok(PcaseFallbackBinding {
         original: binding.clone(),
         pattern,
+        value_tail,
         value_expr,
     })
 }
@@ -5100,6 +5110,15 @@ fn macroexpand_known_fallback_macro(
             }
 
             let bindings_src = collect_pcase_fallback_bindings(&args[0])?;
+            if name == "pcase-let"
+                && bindings_src.len() == 1
+                && bindings_src[0].pattern.as_symbol_name().is_none()
+            {
+                let mut star_args = Vec::with_capacity(args.len());
+                star_args.push(Value::list(vec![bindings_src[0].original.clone()]));
+                star_args.extend_from_slice(&args[1..]);
+                return macroexpand_known_fallback_macro(eval, "pcase-let*", &star_args);
+            }
 
             if name == "pcase-let*" {
                 enum ParsedPcaseLetStarBinding {
@@ -5209,7 +5228,7 @@ fn macroexpand_known_fallback_macro(
                     continue;
                 }
                 let temp = Value::symbol(format!("x{}", symbol_bindings.len()));
-                symbol_bindings.push(Value::list(vec![temp.clone(), binding.value_expr.clone()]));
+                symbol_bindings.push(Value::cons(temp.clone(), binding.value_tail.clone()));
                 pattern_bindings.push(Value::list(vec![binding.pattern.clone(), temp]));
             }
 
@@ -22038,6 +22057,78 @@ mod tests {
                 .expect("mixed pcase-let expected parse should yield one form"),
         );
         assert_eq!(pcase_let_mixed_expanded, pcase_let_mixed_expected);
+        let mut eval_single_pattern = crate::elisp::eval::Evaluator::new();
+        let pcase_let_single_pattern_forms =
+            crate::elisp::parser::parse_forms(r#"(pcase-let ((`(,a ,b) '(1 2))) r)"#)
+                .expect("single-pattern pcase-let form should parse");
+        let pcase_let_single_pattern = crate::elisp::eval::quote_to_value(
+            pcase_let_single_pattern_forms
+                .first()
+                .expect("single-pattern pcase-let parse should yield one form"),
+        );
+        let pcase_let_single_pattern_expanded =
+            builtin_macroexpand_eval(&mut eval_single_pattern, vec![pcase_let_single_pattern])
+                .expect("macroexpand should fully lower single-pattern pcase-let");
+        let pcase_let_single_pattern_expected_forms = crate::elisp::parser::parse_forms(
+            r#"(progn (ignore (consp '(1 2))) (let* ((x0 (car-safe '(1 2))) (x1 (cdr-safe '(1 2)))) (progn (ignore (consp x1)) (let* ((x2 (car-safe x1)) (x3 (cdr-safe x1))) (progn (ignore (null x3)) (let ((a x0) (b x2)) r))))))"#,
+        )
+        .expect("single-pattern pcase-let expected expansion should parse");
+        let pcase_let_single_pattern_expected = crate::elisp::eval::quote_to_value(
+            pcase_let_single_pattern_expected_forms
+                .first()
+                .expect("single-pattern pcase-let expected parse should yield one form"),
+        );
+        assert_eq!(
+            pcase_let_single_pattern_expanded,
+            pcase_let_single_pattern_expected
+        );
+        let bad_single_pattern_pcase_let = builtin_macroexpand_eval(
+            &mut eval_single_pattern,
+            vec![Value::list(vec![
+                Value::symbol("pcase-let"),
+                Value::list(vec![Value::list(vec![
+                    Value::cons(Value::symbol("x"), Value::symbol("y")),
+                    Value::Int(1),
+                ])]),
+                Value::symbol("q"),
+            ])],
+        )
+        .expect_err("single-pattern pcase-let should surface unknown fallback patterns");
+        match bad_single_pattern_pcase_let {
+            Flow::Signal(sig) => {
+                assert_eq!(sig.symbol, "error");
+                assert_eq!(sig.data, vec![Value::string("Unknown x pattern: (x . y)")]);
+            }
+            other => panic!("unexpected flow: {other:?}"),
+        }
+        let pcase_let_pattern_with_dotted_value_tail_forms =
+            crate::elisp::parser::parse_forms(r#"(pcase-let (((x y . z) a . b) (w 1)) q)"#)
+                .expect("dotted-value-tail pcase-let form should parse");
+        let pcase_let_pattern_with_dotted_value_tail = crate::elisp::eval::quote_to_value(
+            pcase_let_pattern_with_dotted_value_tail_forms
+                .first()
+                .expect("dotted-value-tail pcase-let parse should yield one form"),
+        );
+        let pcase_let_pattern_with_dotted_value_tail_expanded =
+            builtin_macroexpand_eval(
+                &mut eval_single_pattern,
+                vec![pcase_let_pattern_with_dotted_value_tail],
+            )
+                .expect("pcase-let should preserve dotted value tails for pattern temporaries");
+        let pcase_let_pattern_with_dotted_value_tail_expected_forms =
+            crate::elisp::parser::parse_forms(
+                r#"(let ((x0 a . b) (w 1)) (pcase-let* (((x y . z) x0)) q))"#,
+            )
+            .expect("dotted-value-tail pcase-let expected expansion should parse");
+        let pcase_let_pattern_with_dotted_value_tail_expected = crate::elisp::eval::quote_to_value(
+            pcase_let_pattern_with_dotted_value_tail_expected_forms
+                .first()
+                .expect("dotted-value-tail pcase-let expected parse should yield one form"),
+        );
+        assert_eq!(
+            pcase_let_pattern_with_dotted_value_tail_expanded,
+            pcase_let_pattern_with_dotted_value_tail_expected
+        );
         let pcase_let_multi_pattern_forms = crate::elisp::parser::parse_forms(
             r#"(pcase-let ((`(,a ,b) '(1 2)) (`(,c ,d) '(3 4))) (list a b c d))"#,
         )

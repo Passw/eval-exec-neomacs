@@ -48,3 +48,6 @@
 48	(condition-case err (macroexpand '(pcase-let* (((x . y) 1) q) r)) (error err))	OK (wrong-type-argument listp q)
 49	(condition-case err (macroexpand '(pcase-let* (((x . y) 1) (z 2)) z)) (error err))	OK (error "Unknown x pattern: (x . y)")
 50	(macroexpand '(pcase-let ((x 1 2)) q))	OK (let* ((x 1 2)) q)
+51	(macroexpand '(pcase-let ((`(,a ,b) '(1 2))) r))	OK (progn (ignore (consp '(1 2))) (let* ((x25 (car-safe '(1 2))) (x26 (cdr-safe '(1 2)))) (progn (ignore (consp x26)) (let* ((x27 (car-safe x26)) (x28 (cdr-safe x26))) (progn (ignore (null x28)) (let ((a x25) (b x27)) r))))))
+52	(condition-case err (macroexpand '(pcase-let (((x . y) 1)) q)) (error err))	OK (error "Unknown x pattern: (x . y)")
+53	(condition-case err (macroexpand '(pcase-let (((x y . z) a . b) (w 1)) q)) (error err))	OK (let ((x0 a . b) (w 1)) (pcase-let* (((x y . z) x0)) q))
