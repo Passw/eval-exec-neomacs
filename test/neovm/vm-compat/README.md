@@ -210,6 +210,13 @@ make check-list LIST=cases/introspection.list
 make record-list LIST=cases/default.list
 ```
 
+Run a regex-filtered subset from a list (fast iteration without editing list files):
+
+```bash
+cd test/neovm/vm-compat
+make check-neovm-filter LIST=cases/default.list PATTERN='command-remapping|key-binding'
+```
+
 Run one specific case:
 
 ```bash

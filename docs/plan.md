@@ -28,6 +28,17 @@ Last updated: 2026-02-21
 
 ## Doing
 
+- Reduced vm-compat iteration friction with regex-filtered list runs:
+  - vm-compat changes:
+    - `test/neovm/vm-compat/Makefile`
+      - added `PATTERN` variable and `check-neovm-filter` target.
+      - `check-neovm-filter` runs `check-neovm` for list entries in `LIST` whose case path matches the provided regex pattern.
+      - returns a clear usage error when `PATTERN` is missing and fails if no cases match.
+    - `test/neovm/vm-compat/README.md`
+      - documented `check-neovm-filter` usage for fast subset runs.
+  - verified:
+    - `make -C test/neovm/vm-compat check-neovm-filter LIST=cases/default.list PATTERN='killed-buffer-handle-printing-semantics|command-remapping-position-semantics'` (pass; `2` cases)
+
 - Hardened eval-context opaque handle rendering by unifying string/bytes formatting paths and adding regression coverage:
   - runtime changes:
     - `rust/neovm-core/src/elisp/error.rs`
