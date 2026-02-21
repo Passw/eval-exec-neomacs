@@ -1,7 +1,11 @@
 1	(fboundp 'pcase-dolist)	OK t
-2	(not (null (macrop 'pcase-dolist)))	OK t
+2	(macrop 'pcase-dolist)	OK (t)
 3	(functionp 'pcase-dolist)	OK nil
-4	(not (null (symbol-function 'pcase-dolist)))	OK t
-5	(not (null (indirect-function 'pcase-dolist)))	OK t
-6	(not (equal (macroexpand '(pcase-dolist (x '(1 2)) x)) '(pcase-dolist (x '(1 2)) x)))	OK t
-7	(let ((acc nil)) (pcase-dolist (x '(1 2 3)) (setq acc (cons x acc))) (nreverse acc))	OK (1 2 3)
+4	(autoloadp (symbol-function 'pcase-dolist))	OK t
+5	(autoloadp (indirect-function 'pcase-dolist))	OK t
+6	(let ((f (symbol-function 'pcase-dolist))) (list (car f) (nth 1 f) (nth 3 f) (nth 4 f)))	OK (autoload "pcase" nil t)
+7	(let ((f (indirect-function 'pcase-dolist))) (list (car f) (nth 1 f) (nth 3 f) (nth 4 f)))	OK (autoload "pcase" nil t)
+8	(func-arity 'pcase-dolist)	OK (1 . many)
+9	(macroexpand '(pcase-dolist (x '(1 2 3)) x))	OK (let ((tail '(1 2 3))) (while tail (let ((x (car tail))) x (setq tail (cdr tail)))))
+10	(macroexpand '(pcase-dolist (`(,k ,v) '((a 1) (b 2))) (list k v)))	OK (let ((tail '((a 1) (b 2)))) (while tail (let ((x0 (car tail))) (pcase-let* ((`(,k ,v) x0)) (list k v)) (setq tail (cdr tail)))))
+11	(let ((acc nil)) (pcase-dolist (x '(1 2 3)) (setq acc (cons x acc))) (nreverse acc))	OK (1 2 3)

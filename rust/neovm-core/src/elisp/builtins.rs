@@ -4073,6 +4073,21 @@ pub(crate) fn builtin_symbol_value(
         .ok_or_else(|| signal("void-variable", vec![Value::symbol(name)]))
 }
 
+fn startup_virtual_autoload_function_cell(name: &str) -> Option<Value> {
+    match name {
+        "pcase-dolist" => Some(Value::list(vec![
+            Value::symbol("autoload"),
+            Value::string("pcase"),
+            Value::string(
+                "Eval BODY once for each set of bindings defined by PATTERN and LIST elements.",
+            ),
+            Value::Nil,
+            Value::True,
+        ])),
+        _ => None,
+    }
+}
+
 pub(crate) fn builtin_symbol_function(
     eval: &mut super::eval::Evaluator,
     args: Vec<Value>,
@@ -4107,6 +4122,10 @@ pub(crate) fn builtin_symbol_function(
             ]));
         }
         return Ok(function.clone());
+    }
+
+    if let Some(function) = startup_virtual_autoload_function_cell(name) {
+        return Ok(function);
     }
 
     if let Some(function) = super::subr_info::fallback_macro_value(name) {
@@ -4722,55 +4741,66 @@ fn macroexpand_known_fallback_macro(name: &str, args: &[Value]) -> Result<Option
             if args.is_empty() {
                 return Err(signal(
                     "wrong-number-of-arguments",
-                    vec![
-                        Value::cons(Value::Int(1), Value::symbol("many")),
-                        Value::Int(0),
-                    ],
+                    vec![Value::cons(Value::Int(1), Value::Int(1)), Value::Int(0)],
                 ));
             }
 
             let spec = list_to_vec(&args[0]).ok_or_else(|| {
                 signal(
                     "wrong-type-argument",
-                    vec![Value::string(
-                        "pcase-dolist spec must be a list (PATTERN LIST)",
-                    )],
+                    vec![Value::symbol("listp"), args[0].clone()],
                 )
             })?;
-            if spec.len() < 2 {
+            if !(2..=3).contains(&spec.len()) {
                 return Err(signal(
                     "wrong-number-of-arguments",
-                    vec![Value::symbol("pcase-dolist"), Value::Int(spec.len() as i64)],
+                    vec![
+                        Value::cons(Value::Int(2), Value::Int(3)),
+                        Value::Int(spec.len() as i64),
+                    ],
                 ));
             }
 
             let pattern = spec[0].clone();
             let sequence = spec[1].clone();
-            let tail_var = Value::symbol("--pcase-dolist-tail--");
+            let tail_var = Value::symbol("tail");
             let binding = Value::list(vec![tail_var.clone(), sequence]);
-
-            let pcase_binding = Value::list(vec![
-                pattern,
-                Value::list(vec![Value::symbol("car"), tail_var.clone()]),
-            ]);
-            let mut pcase_let_forms = Vec::with_capacity(args.len() + 1);
-            pcase_let_forms.push(Value::symbol("pcase-let"));
-            pcase_let_forms.push(Value::list(vec![pcase_binding]));
-            pcase_let_forms.extend_from_slice(&args[1..]);
-            let pcase_let = Value::list(pcase_let_forms);
-
             let step = Value::list(vec![
                 Value::symbol("setq"),
                 tail_var.clone(),
                 Value::list(vec![Value::symbol("cdr"), tail_var.clone()]),
             ]);
+            let inner = if pattern.as_symbol_name().is_some_and(|name| name != "_") {
+                let value_binding = Value::list(vec![
+                    pattern,
+                    Value::list(vec![Value::symbol("car"), tail_var.clone()]),
+                ]);
+                let mut forms = Vec::with_capacity(args.len() + 3);
+                forms.push(Value::symbol("let"));
+                forms.push(Value::list(vec![value_binding]));
+                forms.extend_from_slice(&args[1..]);
+                forms.push(step);
+                Value::list(forms)
+            } else {
+                let car_binding = Value::list(vec![
+                    Value::symbol("x0"),
+                    Value::list(vec![Value::symbol("car"), tail_var.clone()]),
+                ]);
+                let pcase_binding = Value::list(vec![pattern, Value::symbol("x0")]);
+                let mut pcase_let_star_forms = Vec::with_capacity(args.len() + 1);
+                pcase_let_star_forms.push(Value::symbol("pcase-let*"));
+                pcase_let_star_forms.push(Value::list(vec![pcase_binding]));
+                pcase_let_star_forms.extend_from_slice(&args[1..]);
+                let pcase_let_star = Value::list(pcase_let_star_forms);
+                Value::list(vec![
+                    Value::symbol("let"),
+                    Value::list(vec![car_binding]),
+                    pcase_let_star,
+                    step,
+                ])
+            };
 
-            let loop_form = Value::list(vec![
-                Value::symbol("while"),
-                tail_var.clone(),
-                pcase_let,
-                step,
-            ]);
+            let loop_form = Value::list(vec![Value::symbol("while"), tail_var.clone(), inner]);
 
             Ok(Some(Value::list(vec![
                 Value::symbol("let"),
@@ -4873,6 +4903,9 @@ pub(crate) fn builtin_indirect_function(
     let _noerror = args.get(1).is_some_and(|value| value.is_truthy());
 
     if let Some(name) = args[0].as_symbol_name() {
+        if let Some(function) = startup_virtual_autoload_function_cell(name) {
+            return Ok(function);
+        }
         if let Some(function) = resolve_indirect_symbol(eval, name) {
             return Ok(function);
         }
@@ -4935,6 +4968,9 @@ pub(crate) fn builtin_macrop_eval(
 ) -> EvalResult {
     expect_args("macrop", &args, 1)?;
     if let Some(name) = args[0].as_symbol_name() {
+        if let Some(function) = startup_virtual_autoload_function_cell(name) {
+            return super::subr_info::builtin_macrop(vec![function]);
+        }
         if let Some(function) = resolve_indirect_symbol(eval, name) {
             return super::subr_info::builtin_macrop(vec![function]);
         }
@@ -20360,8 +20396,16 @@ mod tests {
         assert!(matches!(bound_and_true_p_macro, Value::Macro(_)));
         let pcase_dolist_macro =
             builtin_symbol_function(&mut eval, vec![Value::symbol("pcase-dolist")])
-                .expect("symbol-function should resolve pcase-dolist as a macro");
-        assert!(matches!(pcase_dolist_macro, Value::Macro(_)));
+                .expect("symbol-function should resolve pcase-dolist startup autoload");
+        assert!(crate::elisp::autoload::is_autoload_value(&pcase_dolist_macro));
+        let pcase_dolist_items =
+            list_to_vec(&pcase_dolist_macro).expect("pcase-dolist should remain a proper list");
+        assert_eq!(pcase_dolist_items.len(), 5);
+        assert_eq!(pcase_dolist_items[0], Value::symbol("autoload"));
+        assert_eq!(pcase_dolist_items[1], Value::string("pcase"));
+        assert!(pcase_dolist_items[2].is_string());
+        assert_eq!(pcase_dolist_items[3], Value::Nil);
+        assert_eq!(pcase_dolist_items[4], Value::True);
 
         let declare_macro = builtin_symbol_function(&mut eval, vec![Value::symbol("declare")])
             .expect("symbol-function should resolve declare as a macro");
@@ -20737,8 +20781,16 @@ mod tests {
         assert!(matches!(bound_and_true_p_macro, Value::Macro(_)));
         let pcase_dolist_macro =
             builtin_indirect_function(&mut eval, vec![Value::symbol("pcase-dolist")])
-                .expect("indirect-function should resolve pcase-dolist as a macro");
-        assert!(matches!(pcase_dolist_macro, Value::Macro(_)));
+                .expect("indirect-function should resolve pcase-dolist startup autoload");
+        assert!(crate::elisp::autoload::is_autoload_value(&pcase_dolist_macro));
+        let pcase_dolist_items =
+            list_to_vec(&pcase_dolist_macro).expect("pcase-dolist should remain a proper list");
+        assert_eq!(pcase_dolist_items.len(), 5);
+        assert_eq!(pcase_dolist_items[0], Value::symbol("autoload"));
+        assert_eq!(pcase_dolist_items[1], Value::string("pcase"));
+        assert!(pcase_dolist_items[2].is_string());
+        assert_eq!(pcase_dolist_items[3], Value::Nil);
+        assert_eq!(pcase_dolist_items[4], Value::True);
 
         eval.obarray_mut()
             .set_symbol_function("alias-car", Value::symbol("car"));

@@ -1865,6 +1865,10 @@ fn autoload_macro_marker(value: &Value) -> Option<Value> {
     let autoload_type = items.get(4)?;
     if autoload_type.as_symbol_name() == Some("macro") {
         Some(Value::list(vec![Value::symbol("macro"), Value::True]))
+    } else if matches!(autoload_type, Value::True) {
+        // GNU Emacs uses `t` as a legacy macro marker for some startup
+        // autoloads (notably `pcase-dolist`), and `macrop` returns `(t)`.
+        Some(Value::list(vec![Value::True]))
     } else {
         None
     }
@@ -4284,6 +4288,19 @@ mod tests {
         ]);
         let result = builtin_macrop(vec![autoload_function]).unwrap();
         assert!(result.is_nil());
+    }
+
+    #[test]
+    fn macrop_autoload_t_marker_returns_single_t_list() {
+        let autoload_t_marker = Value::list(vec![
+            Value::symbol("autoload"),
+            Value::string("dummy-file"),
+            Value::Nil,
+            Value::Nil,
+            Value::True,
+        ]);
+        let result = builtin_macrop(vec![autoload_t_marker]).unwrap();
+        assert_eq!(result, Value::list(vec![Value::True]));
     }
 
     // -- commandp --
