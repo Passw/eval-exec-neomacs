@@ -777,7 +777,6 @@ neomacs_create_frame_widgets (struct frame *f)
 
   output->widget = NULL;
   output->drawing_area = NULL;
-  output->use_gpu_widget = 1;
 
   /* Initialize cursor types for mouse-highlight.
      Values match Rust CursorIcon mapping:

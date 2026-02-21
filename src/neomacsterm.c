@@ -1020,489 +1020,6 @@ neomacs_send_face (void *handle, struct frame *f, struct face *face)
                             ul_position, ul_thickness);
 }
 
-/* Callback for foreach_window: extract all visible glyphs from a window's
-   current_matrix and send them to the Rust display engine via FFI. */
-static bool
-neomacs_extract_window_glyphs (struct window *w, void *user_data)
-{
-  struct frame *f = XFRAME (w->frame);
-  struct neomacs_display_info *dpyinfo = FRAME_NEOMACS_DISPLAY_INFO (f);
-  if (!dpyinfo)
-    return true;
-  void *handle = dpyinfo->display_handle;
-  struct glyph_matrix *matrix = w->current_matrix;
-
-  if (!matrix || !handle)
-    return true;  /* continue iterating */
-
-  /* Add this window to the scene */
-  int win_x = WINDOW_LEFT_EDGE_X (w);
-  int win_y = WINDOW_TOP_EDGE_Y (w);
-  int win_w = WINDOW_PIXEL_WIDTH (w);
-  int win_h = WINDOW_PIXEL_HEIGHT (w);
-  unsigned long bg = FRAME_BACKGROUND_PIXEL (f);
-  int selected = (w == XWINDOW (f->selected_window)) ? 1 : 0;
-
-  neomacs_display_add_window (handle,
-                              (intptr_t) w,
-                              (float) win_x, (float) win_y,
-                              (float) win_w, (float) win_h,
-                              (uint32_t) bg, selected);
-
-  /* Per-window metadata for animation detection */
-  {
-    uintptr_t buf_id = 0;
-    ptrdiff_t win_start = 0;
-    ptrdiff_t win_end = 0;
-    ptrdiff_t buf_size = 0;
-    if (BUFFERP (w->contents))
-      {
-        struct buffer *buf = XBUFFER (w->contents);
-        buf_id = (uintptr_t) buf;
-        if (MARKERP (w->start))
-          win_start = marker_position (w->start);
-        win_end = w->window_end_pos;
-        buf_size = BUF_Z (buf);
-      }
-    int is_mini = MINI_WINDOW_P (w) ? 1 : 0;
-    /* Get window-specific char height (respects text-scale-adjust) */
-    float w_char_height = (float) FRAME_LINE_HEIGHT (f);
-    {
-      int def_face_id = lookup_basic_face (w, f, DEFAULT_FACE_ID);
-      struct face *wface = FACE_FROM_ID_OR_NULL (f, def_face_id);
-      if (wface && wface->font)
-        {
-          int asc, desc;
-          get_font_ascent_descent (wface->font, &asc, &desc);
-          w_char_height = (float) (asc + desc);
-        }
-    }
-    const char *buf_fname = NULL;
-    int buf_modified = 0;
-    if (BUFFERP (w->contents))
-      {
-        struct buffer *b = XBUFFER (w->contents);
-        Lisp_Object fn = BVAR (b, filename);
-        if (STRINGP (fn))
-          buf_fname = SSDATA (fn);
-        buf_modified = (BUF_SAVE_MODIFF (b) < BUF_MODIFF (b)) ? 1 : 0;
-      }
-    neomacs_display_add_window_info (
-        handle,
-        (int64_t)(intptr_t) w,
-        (uint64_t) buf_id,
-        (int64_t) win_start,
-        (int64_t) win_end,
-        (int64_t) buf_size,
-        (float) win_x, (float) win_y,
-        (float) win_w, (float) win_h,
-        (float) WINDOW_MODE_LINE_HEIGHT (w),
-        (float) WINDOW_HEADER_LINE_HEIGHT (w),
-        (float) WINDOW_TAB_LINE_HEIGHT (w),
-        selected, is_mini, w_char_height,
-        buf_fname, buf_modified);
-  }
-
-  /* Check mouse-face highlight for this window */
-  Mouse_HLInfo *hlinfo = MOUSE_HL_INFO (f);
-  bool has_mouse_face = false;
-  int mf_beg_row = -1, mf_beg_col = -1;
-  int mf_end_row = -1, mf_end_col = -1;
-  int mf_face_id = 0;
-
-  if (!NILP (hlinfo->mouse_face_window)
-      && XWINDOW (hlinfo->mouse_face_window) == w
-      && hlinfo->mouse_face_beg_row >= 0
-      && !hlinfo->mouse_face_hidden)
-    {
-      has_mouse_face = true;
-      mf_beg_row = hlinfo->mouse_face_beg_row;
-      mf_beg_col = hlinfo->mouse_face_beg_col;
-      mf_end_row = hlinfo->mouse_face_end_row;
-      mf_end_col = hlinfo->mouse_face_end_col;
-      mf_face_id = hlinfo->mouse_face_face_id;
-    }
-
-  /* Walk all rows in current_matrix */
-  for (int row_idx = 0; row_idx < matrix->nrows; row_idx++)
-    {
-      struct glyph_row *row = &matrix->rows[row_idx];
-      if (!row->enabled_p)
-        continue;
-
-      /* Convert window-relative Y to frame-absolute Y */
-      int frame_y = WINDOW_TO_FRAME_PIXEL_Y (w, row->y);
-      int is_mode_line = row->mode_line_p;
-      int is_tab_line = row->tab_line_p;
-      int last_face_id = -1;
-
-      /* Walk glyphs in all 3 areas: LEFT_MARGIN, TEXT, RIGHT_MARGIN */
-      for (int area = LEFT_MARGIN_AREA; area < LAST_AREA; area++)
-        {
-          struct glyph *glyph = row->glyphs[area];
-          struct glyph *end = glyph + row->used[area];
-          int glyph_x;
-          int text_col = 0;  /* Column index within TEXT_AREA */
-
-          /* Calculate starting X for this area */
-          if (area == TEXT_AREA)
-            glyph_x = window_box_left (w, TEXT_AREA);
-          else if (area == LEFT_MARGIN_AREA)
-            glyph_x = window_box_left (w, LEFT_MARGIN_AREA);
-          else
-            glyph_x = window_box_left (w, RIGHT_MARGIN_AREA);
-
-          while (glyph < end)
-            {
-              /* Check if this glyph is in the mouse-face highlight region.
-                 Mouse-face beg/end col are relative to TEXT_AREA glyphs. */
-              bool in_mouse_face = false;
-              if (has_mouse_face && area == TEXT_AREA && !is_mode_line)
-                {
-                  if (row_idx > mf_beg_row && row_idx < mf_end_row)
-                    in_mouse_face = true;
-                  else if (row_idx == mf_beg_row && row_idx == mf_end_row)
-                    in_mouse_face = (text_col >= mf_beg_col
-                                     && text_col < mf_end_col);
-                  else if (row_idx == mf_beg_row)
-                    in_mouse_face = (text_col >= mf_beg_col);
-                  else if (row_idx == mf_end_row)
-                    in_mouse_face = (text_col < mf_end_col);
-                }
-
-              /* Determine effective face: mouse-face overrides normal */
-              int effective_face_id = in_mouse_face
-                ? mf_face_id : (int) glyph->face_id;
-              struct face *face
-                = FACE_FROM_ID_OR_NULL (f, effective_face_id);
-              if (!face)
-                face = FACE_FROM_ID_OR_NULL (f, DEFAULT_FACE_ID);
-
-              /* Send face if it changed */
-              if (face && effective_face_id != last_face_id)
-                {
-                  neomacs_send_face (handle, f, face);
-                  last_face_id = effective_face_id;
-                }
-
-              /* Set up row context via begin_row */
-              neomacs_display_begin_row (handle,
-                                         frame_y,
-                                         glyph_x,
-                                         row->height,
-                                         row->ascent,
-                                         is_mode_line || is_tab_line ? 1 : 0,
-                                         0);
-
-              switch (glyph->type)
-                {
-                case CHAR_GLYPH:
-                  {
-                    unsigned int charcode = glyph->u.ch;
-                    int ascent_val = face && face->font ? FONT_BASE (face->font) : row->ascent;
-                    int descent_val = face && face->font ? FONT_DESCENT (face->font) : 0;
-                    neomacs_display_add_char_glyph (handle, charcode,
-                                                    glyph->face_id,
-                                                    glyph->pixel_width,
-                                                    ascent_val, descent_val);
-                  }
-                  break;
-
-                case COMPOSITE_GLYPH:
-                  {
-                    /* For automatic compositions (e.g. emoji, combining chars),
-                       iterate through all sub-glyphs and apply positioning
-                       offsets from the lgstring (grapheme cluster string). */
-                    if (glyph->u.cmp.automatic)
-                      {
-                        int cmp_id = glyph->u.cmp.id;
-                        int cmp_from = glyph->slice.cmp.from;
-                        int cmp_to = glyph->slice.cmp.to;
-                        Lisp_Object gstring = composition_gstring_from_id (cmp_id);
-
-                        if (!NILP (gstring))
-                          {
-                            int total_width = glyph->pixel_width;
-                            int width_used = 0;
-
-                            for (int gi = cmp_from; gi < cmp_to; gi++)
-                              {
-                                Lisp_Object glyph_obj = LGSTRING_GLYPH (gstring, gi);
-                                if (NILP (glyph_obj))
-                                  break;
-
-                                unsigned int charcode = LGLYPH_CHAR (glyph_obj);
-
-                                /* Resolve correct font face for this character
-                                   (e.g. emoji font via fontset fallback). */
-                                int char_face_id = face_for_char (f, face, charcode, -1, Qnil);
-                                struct face *char_face = FACE_FROM_ID_OR_NULL (f, char_face_id);
-                                if (!char_face)
-                                  char_face = face;
-
-                                if (char_face_id != last_face_id)
-                                  {
-                                    neomacs_send_face (handle, f, char_face);
-                                    last_face_id = char_face_id;
-                                  }
-
-                                int ascent_val = char_face->font ? FONT_BASE (char_face->font) : row->ascent;
-                                int descent_val = char_face->font ? FONT_DESCENT (char_face->font) : 0;
-
-                                /* Check for positioning adjustments (xoff, yoff, wadjust).
-                                   Combining characters have offsets relative to the base. */
-                                int glyph_width;
-                                if (!NILP (LGLYPH_ADJUSTMENT (glyph_obj)))
-                                  {
-                                    /* Glyph has explicit positioning — render as
-                                       zero-width so the renderer positions it
-                                       using its own shaping.  The character is
-                                       sent with the total composition width only
-                                       for the first sub-glyph. */
-                                    glyph_width = LGLYPH_WADJUST (glyph_obj);
-                                  }
-                                else
-                                  {
-                                    glyph_width = LGLYPH_WIDTH (glyph_obj);
-                                  }
-
-                                /* For the first glyph, use remaining total width
-                                   if this is the only glyph.  For multi-glyph
-                                   compositions, use the individual glyph widths. */
-                                int effective_width;
-                                if (gi == cmp_from && cmp_to - cmp_from == 1)
-                                  effective_width = total_width;
-                                else
-                                  effective_width = glyph_width;
-
-                                neomacs_display_add_char_glyph (handle, charcode,
-                                                                (uint32_t) char_face_id,
-                                                                effective_width,
-                                                                ascent_val, descent_val);
-                                width_used += effective_width;
-                              }
-                          }
-                      }
-                    else
-                      {
-                        /* Non-automatic (static) composition - use composition table.
-                           Render all glyphs in the composition with their offsets. */
-                        int cmp_id = glyph->u.cmp.id;
-                        struct composition *cmp = composition_table[cmp_id];
-                        if (cmp && cmp->glyph_len > 0)
-                          {
-                            int total_width = glyph->pixel_width;
-
-                            for (int gi = 0; gi < cmp->glyph_len; gi++)
-                              {
-                                unsigned int charcode = COMPOSITION_GLYPH (cmp, gi);
-
-                                int char_face_id = face_for_char (f, face, charcode, -1, Qnil);
-                                struct face *char_face = FACE_FROM_ID_OR_NULL (f, char_face_id);
-                                if (!char_face)
-                                  char_face = face;
-
-                                if (char_face_id != last_face_id)
-                                  {
-                                    neomacs_send_face (handle, f, char_face);
-                                    last_face_id = char_face_id;
-                                  }
-
-                                int ascent_val = char_face->font ? FONT_BASE (char_face->font) : row->ascent;
-                                int descent_val = char_face->font ? FONT_DESCENT (char_face->font) : 0;
-
-                                /* First glyph gets total width, subsequent are
-                                   zero-width (rendered atop the first). */
-                                int effective_width = (gi == 0) ? total_width : 0;
-
-                                neomacs_display_add_char_glyph (handle, charcode,
-                                                                (uint32_t) char_face_id,
-                                                                effective_width,
-                                                                ascent_val, descent_val);
-                              }
-                          }
-                      }
-                  }
-                  break;
-
-                case GLYPHLESS_GLYPH:
-                  {
-                    enum glyphless_display_method method
-                      = glyph->u.glyphless.method;
-                    unsigned int ch = glyph->u.glyphless.ch;
-                    int gw = glyph->pixel_width;
-
-                    if (method == GLYPHLESS_DISPLAY_THIN_SPACE)
-                      {
-                        /* Just emit a thin space.  */
-                        neomacs_display_add_char_glyph (handle, ' ',
-                                                        glyph->face_id,
-                                                        gw,
-                                                        row->ascent, 0);
-                      }
-                    else
-                      {
-                        /* For HEX_CODE, ACRONYM, EMPTY_BOX: draw a box
-                           border and the text (if any) inside it.  */
-                        unsigned long fg_pixel = face
-                          ? face->foreground : 0;
-                        uint32_t fg_rgb
-                          = (uint32_t) (fg_pixel & 0xFFFFFF);
-
-                        /* Draw box outline (1px border).  */
-                        int bx = glyph_x + WINDOW_LEFT_EDGE_X (w);
-                        int by = frame_y;
-                        int bw = gw;
-                        int bh = glyph->ascent + glyph->descent;
-                        if (bh <= 0)
-                          bh = row->height;
-
-                        /* Top edge */
-                        neomacs_display_draw_border (handle,
-                                                     bx, by, bw, 1,
-                                                     fg_rgb);
-                        /* Bottom edge */
-                        neomacs_display_draw_border (handle,
-                                                     bx, by + bh - 1,
-                                                     bw, 1, fg_rgb);
-                        /* Left edge */
-                        neomacs_display_draw_border (handle,
-                                                     bx, by, 1, bh,
-                                                     fg_rgb);
-                        /* Right edge */
-                        neomacs_display_draw_border (handle,
-                                                     bx + bw - 1, by,
-                                                     1, bh, fg_rgb);
-
-                        if (method == GLYPHLESS_DISPLAY_HEX_CODE)
-                          {
-                            /* Emit hex digits as characters.  */
-                            char buf[7];
-                            sprintf (buf, "%0*X",
-                                     ch < 0x10000 ? 4 : 6, ch);
-                            int len = strlen (buf);
-                            int char_w = gw / (len > 0 ? len : 1);
-
-                            for (int k = 0; k < len; k++)
-                              neomacs_display_add_char_glyph (
-                                handle, (unsigned int) buf[k],
-                                glyph->face_id, char_w,
-                                row->ascent, 0);
-                          }
-                        else if (method == GLYPHLESS_DISPLAY_ACRONYM)
-                          {
-                            /* Look up acronym from char table.  */
-                            const char *str = NULL;
-                            if (CHAR_TABLE_P (Vglyphless_char_display)
-                                && (CHAR_TABLE_EXTRA_SLOTS (
-                                      XCHAR_TABLE (
-                                        Vglyphless_char_display))
-                                    >= 1))
-                              {
-                                Lisp_Object acronym
-                                  = (!glyph->u.glyphless.for_no_font
-                                     ? CHAR_TABLE_REF (
-                                         Vglyphless_char_display, ch)
-                                     : XCHAR_TABLE (
-                                         Vglyphless_char_display)
-                                         ->extras[0]);
-                                if (CONSP (acronym))
-                                  acronym = XCAR (acronym);
-                                if (STRINGP (acronym))
-                                  str = SSDATA (acronym);
-                              }
-                            if (str)
-                              {
-                                int len = strlen (str);
-                                int char_w
-                                  = gw / (len > 0 ? len : 1);
-                                for (int k = 0; k < len; k++)
-                                  neomacs_display_add_char_glyph (
-                                    handle,
-                                    (unsigned int) (unsigned char) str[k],
-                                    glyph->face_id, char_w,
-                                    row->ascent, 0);
-                              }
-                            else
-                              {
-                                /* Fallback: empty box.  */
-                                neomacs_display_add_char_glyph (
-                                  handle, ' ', glyph->face_id,
-                                  gw, row->ascent, 0);
-                              }
-                          }
-                        else
-                          {
-                            /* EMPTY_BOX: just the box, no text.  */
-                            neomacs_display_add_char_glyph (
-                              handle, ' ', glyph->face_id,
-                              gw, row->ascent, 0);
-                          }
-                      }
-                  }
-                  break;
-
-                case STRETCH_GLYPH:
-                  neomacs_display_add_stretch_glyph (handle,
-                                                      glyph->pixel_width,
-                                                      row->height,
-                                                      glyph->face_id);
-                  break;
-
-                case IMAGE_GLYPH:
-                  {
-                    /* Look up the image and get its GPU ID */
-                    struct image *img = IMAGE_FROM_ID (f, glyph->u.img_id);
-                    if (img)
-                      {
-                        uint32_t gpu_id = neomacs_load_image (img);
-                        if (gpu_id != 0)
-                          {
-                            int img_w = img->width > 0 ? img->width : glyph->pixel_width;
-                            int img_h = img->height > 0 ? img->height : (glyph->ascent + glyph->descent);
-                            neomacs_display_add_image_glyph (handle, gpu_id,
-                                                              img_w, img_h);
-                          }
-                      }
-                  }
-                  break;
-
-                case VIDEO_GLYPH:
-                  {
-                    int glyph_height = glyph->ascent + glyph->descent;
-                    neomacs_display_add_video_glyph (handle,
-                                                      glyph->u.video_id,
-                                                      glyph->pixel_width,
-                                                      glyph_height > 0 ? glyph_height : row->height);
-                  }
-                  break;
-
-                case WEBKIT_GLYPH:
-                  {
-                    int glyph_height = glyph->ascent + glyph->descent;
-                    neomacs_display_add_wpe_glyph (handle,
-                                                    glyph->u.webkit_id,
-                                                    glyph->pixel_width,
-                                                    glyph_height > 0 ? glyph_height : row->height);
-                  }
-                  break;
-
-                default:
-                  /* XWIDGET_GLYPH etc. - skip */
-                  break;
-                }
-
-              glyph_x += glyph->pixel_width;
-              if (area == TEXT_AREA)
-                text_col++;
-              glyph++;
-            }
-        }
-    }
-
-  return true;  /* continue iterating to next window */
-}
-
 /* ============================================================================
  * Rust Layout Engine FFI Helpers
  * ============================================================================
@@ -7061,44 +6578,26 @@ neomacs_free_pixmap (struct frame *f, Emacs_Pixmap pixmap)
  * Cairo Helpers for Font Drivers
  * ============================================================================ */
 
-/* Begin Cairo drawing with clipping */
+/* Begin Cairo drawing with clipping.
+   No-op: Neomacs uses GPU rendering, not Cairo.
+   Kept for ftcrfont.c compile compatibility.  */
 cairo_t *
 neomacs_begin_cr_clip (struct frame *f)
 {
-  struct neomacs_output *output = FRAME_NEOMACS_OUTPUT (f);
-
-  if (!output || !output->cr_context)
-    return NULL;
-
-  cairo_save (output->cr_context);
-  return output->cr_context;
+  return NULL;
 }
 
-/* End Cairo drawing */
+/* End Cairo drawing — no-op.  */
 void
 neomacs_end_cr_clip (struct frame *f)
 {
-  struct neomacs_output *output = FRAME_NEOMACS_OUTPUT (f);
-
-  if (output && output->cr_context)
-    cairo_restore (output->cr_context);
 }
 
-/* Set Cairo source color */
+/* Set Cairo source color — no-op.  */
 void
 neomacs_set_cr_source_with_color (struct frame *f, unsigned long color,
 				  bool stipple_p)
 {
-  struct neomacs_output *output = FRAME_NEOMACS_OUTPUT (f);
-
-  if (!output || !output->cr_context)
-    return;
-
-  double r = RED_FROM_ULONG (color) / 255.0;
-  double g = GREEN_FROM_ULONG (color) / 255.0;
-  double b = BLUE_FROM_ULONG (color) / 255.0;
-
-  cairo_set_source_rgb (output->cr_context, r, g, b);
 }
 
 
@@ -7113,17 +6612,13 @@ neomacs_draw_glyph_string (struct glyph_string *s)
   struct frame *f = s->f;
   struct neomacs_output *output = FRAME_NEOMACS_OUTPUT (f);
   struct neomacs_display_info *dpyinfo = FRAME_DISPLAY_INFO (f);
-  cairo_t *cr;
 
   if (!output)
     return;
 
-  /* For GPU widget mode, we don't need Cairo context - just forward to Rust */
-  if (output->use_gpu_widget)
+  /* Forward glyph data to Rust scene graph */
+  if (dpyinfo && dpyinfo->display_handle && s->first_glyph && s->row)
     {
-      /* Forward glyph data to Rust scene graph */
-      if (dpyinfo && dpyinfo->display_handle && s->first_glyph && s->row)
-        {
           /* s->y is already frame-relative (set via WINDOW_TO_FRAME_PIXEL_Y in xdisp.c),
              so we use it directly without adding window_top again */
           int glyph_y = s->y;
@@ -7243,213 +6738,7 @@ neomacs_draw_glyph_string (struct glyph_string *s)
               break;
             }
         }
-      return;  /* Don't do Cairo drawing for GPU widget */
     }
-
-  /* For Cairo mode, we need the context */
-  if (!output->cr_context)
-    return;
-
-  cr = output->cr_context;
-
-  /* Forward glyph data to Rust scene graph if available */
-  if (dpyinfo && dpyinfo->display_handle && s->first_glyph && s->row)
-    {
-      /* Calculate absolute Y position: window top edge + row Y within window */
-      struct window *w = XWINDOW (s->f->selected_window);
-      if (s->w)
-        w = s->w;  /* Use the actual window from glyph_string if available */
-      int window_top = WINDOW_TOP_EDGE_Y (w);
-      int row_y = window_top + s->row->y;
-
-      neomacs_display_begin_row (dpyinfo->display_handle,
-                                 row_y,
-                                 s->x,  /* Starting X position for this glyph string */
-                                 s->row->height,
-                                 s->row->ascent,
-                                 s->row->mode_line_p ? 1 : 0,
-                                 0);  /* header_line not in glyph_row */
-
-      /* Add glyphs to Rust scene graph */
-      int face_id = s->face ? s->face->id : 0;
-
-      switch (s->first_glyph->type)
-        {
-        case CHAR_GLYPH:
-          /* Forward character glyphs - get character from glyph->u.ch */
-          {
-            struct glyph *glyph = s->first_glyph;
-            for (int i = 0; i < s->nchars && glyph; i++, glyph++)
-              {
-                /* Get the actual Unicode character from the glyph */
-                unsigned int charcode = glyph->u.ch;
-                int char_width = glyph->pixel_width;
-                neomacs_display_add_char_glyph (dpyinfo->display_handle,
-                                                charcode,
-                                                face_id,
-                                                char_width,
-                                                s->font ? FONT_BASE (s->font) : s->height,
-                                                s->font ? FONT_DESCENT (s->font) : 0);
-              }
-          }
-          break;
-
-        case COMPOSITE_GLYPH:
-        case GLYPHLESS_GLYPH:
-          /* For composite/glyphless, use char2b if available */
-          if (s->char2b)
-            {
-              for (int i = 0; i < s->nchars; i++)
-                {
-                  unsigned int charcode = s->char2b[i];
-                  int char_width = s->width / (s->nchars > 0 ? s->nchars : 1);
-                  neomacs_display_add_char_glyph (dpyinfo->display_handle,
-                                                  charcode,
-                                                  face_id,
-                                                  char_width,
-                                                  s->font ? FONT_BASE (s->font) : s->height,
-                                                  s->font ? FONT_DESCENT (s->font) : 0);
-                }
-            }
-          break;
-
-        case STRETCH_GLYPH:
-          neomacs_display_add_stretch_glyph (dpyinfo->display_handle,
-                                             s->width,
-                                             s->height,
-                                             face_id);
-          break;
-
-        case IMAGE_GLYPH:
-          /* Forward image glyph to Rust scene graph */
-          if (s->img)
-            {
-              uint32_t gpu_id = neomacs_load_image (s->img);
-              if (gpu_id != 0)
-                neomacs_display_add_image_glyph (dpyinfo->display_handle,
-                                                  gpu_id,
-                                                  s->slice.width > 0 ? s->slice.width : s->img->width,
-                                                  s->slice.height > 0 ? s->slice.height : s->img->height);
-            }
-          break;
-
-        case VIDEO_GLYPH:
-          /* Handle video glyphs */
-          neomacs_display_add_video_glyph (dpyinfo->display_handle,
-                                           s->first_glyph->u.video_id,
-                                           s->first_glyph->pixel_width,
-                                           s->row->height);
-          break;
-
-        case WEBKIT_GLYPH:
-          /* Handle WebKit glyphs */
-          neomacs_display_add_wpe_glyph (dpyinfo->display_handle,
-                                          s->first_glyph->u.webkit_id,
-                                          s->first_glyph->pixel_width,
-                                          s->row->height);
-          break;
-
-        default:
-          break;
-        }
-    }
-
-  /* Continue with Cairo rendering (keeping existing behavior) */
-
-  /* Get face colors */
-  unsigned long fg = s->face->foreground;
-  unsigned long bg = s->face->background;
-
-  /* Draw background if needed */
-  if (!s->background_filled_p)
-    {
-      double r = RED_FROM_ULONG (bg) / 255.0;
-      double g = GREEN_FROM_ULONG (bg) / 255.0;
-      double b = BLUE_FROM_ULONG (bg) / 255.0;
-
-      cairo_set_source_rgb (cr, r, g, b);
-      cairo_rectangle (cr, s->x, s->y, s->background_width, s->height);
-      cairo_fill (cr);
-      s->background_filled_p = true;
-    }
-
-  /* Draw the foreground (text) */
-  switch (s->first_glyph->type)
-    {
-    case CHAR_GLYPH:
-    case COMPOSITE_GLYPH:
-    case GLYPHLESS_GLYPH:
-      {
-	/* Set foreground color */
-	double r = RED_FROM_ULONG (fg) / 255.0;
-	double g = GREEN_FROM_ULONG (fg) / 255.0;
-	double b = BLUE_FROM_ULONG (fg) / 255.0;
-	cairo_set_source_rgb (cr, r, g, b);
-
-	/* Draw using the font */
-	if (s->font && s->nchars > 0 && s->char2b)
-	  {
-	    /* Use font's draw method if available */
-	    struct font *font = s->font;
-
-	    if (font->driver && font->driver->draw)
-	      {
-		font->driver->draw (s, 0, s->nchars, s->x, s->ybase, false);
-	      }
-	    else
-	      {
-		/* Fallback: Draw using Cairo text rendering */
-		/* Convert char2b to string */
-		char buf[256];
-		int len = 0;
-		for (int i = 0; i < s->nchars && len < 255; i++)
-		  {
-		    unsigned int c = s->char2b[i];
-		    if (c < 128)
-		      buf[len++] = (char) c;
-		    else if (c < 0x800 && len < 254)
-		      {
-			buf[len++] = 0xC0 | (c >> 6);
-			buf[len++] = 0x80 | (c & 0x3F);
-		      }
-		    /* Skip other multibyte for now */
-		  }
-		buf[len] = '\0';
-
-		if (len > 0)
-		  {
-		    cairo_select_font_face (cr, "monospace",
-					   CAIRO_FONT_SLANT_NORMAL,
-					   CAIRO_FONT_WEIGHT_NORMAL);
-		    cairo_set_font_size (cr, FRAME_LINE_HEIGHT (f) * 0.8);
-		    cairo_move_to (cr, s->x, s->ybase);
-		    cairo_show_text (cr, buf);
-		  }
-	      }
-	  }
-      }
-      break;
-
-    case STRETCH_GLYPH:
-      /* Stretch glyphs are just background - already drawn above */
-      break;
-
-    case IMAGE_GLYPH:
-      /* Image glyph rendering is handled by Rust GPU pipeline */
-      break;
-
-    case VIDEO_GLYPH:
-      /* Video glyph rendering is handled by Rust - no Cairo fallback needed */
-      break;
-
-    case WEBKIT_GLYPH:
-      /* WebKit glyph rendering is handled by Rust - no Cairo fallback needed */
-      break;
-
-    default:
-      break;
-    }
-}
 
 /* Called after updating a window line */
 static void
@@ -7507,33 +6796,10 @@ neomacs_clear_frame (struct frame *f)
 void
 neomacs_clear_frame_area (struct frame *f, int x, int y, int width, int height)
 {
-  struct neomacs_output *output = FRAME_NEOMACS_OUTPUT (f);
   struct neomacs_display_info *dpyinfo = FRAME_NEOMACS_DISPLAY_INFO (f);
 
-  /* For GPU widget mode, clear the region in the glyph buffer */
-  if (output && output->use_gpu_widget && dpyinfo && dpyinfo->display_handle)
-    {
-      neomacs_display_clear_area (dpyinfo->display_handle, x, y, width, height);
-      return;
-    }
-
-  /* Cairo path for non-GPU widget mode */
-  cairo_t *cr;
-
-  if (!output || !output->cr_context)
-    return;
-
-  cr = output->cr_context;
-
-  /* Get background color */
-  unsigned long bg = output->background_pixel;
-  double r = RED_FROM_ULONG (bg) / 255.0;
-  double g = GREEN_FROM_ULONG (bg) / 255.0;
-  double b = BLUE_FROM_ULONG (bg) / 255.0;
-
-  cairo_set_source_rgb (cr, r, g, b);
-  cairo_rectangle (cr, x, y, width, height);
-  cairo_fill (cr);
+  if (dpyinfo && dpyinfo->display_handle)
+    neomacs_display_clear_area (dpyinfo->display_handle, x, y, width, height);
 }
 
 /* Clear under internal border — draws the internal border face background
@@ -7735,24 +7001,11 @@ neomacs_draw_vertical_window_border (struct window *w, int x, int y0, int y1)
   else
     fg = 0;  /* Black */
 
-  /* Use GPU path if available */
   if (dpyinfo && dpyinfo->display_handle)
     {
-      /* Convert to ARGB format with full opacity */
       uint32_t color = (0xFF << 24) | (fg & 0xFFFFFF);
       neomacs_display_draw_border (dpyinfo->display_handle,
                                    x, y0, 1, y1 - y0, color);
-    }
-  else if (output->cr_context)
-    {
-      /* Fallback to Cairo */
-      cairo_t *cr = output->cr_context;
-      double r = RED_FROM_ULONG (fg) / 255.0;
-      double g = GREEN_FROM_ULONG (fg) / 255.0;
-      double b = BLUE_FROM_ULONG (fg) / 255.0;
-      cairo_set_source_rgb (cr, r, g, b);
-      cairo_rectangle (cr, x, y0, 1, y1 - y0);
-      cairo_fill (cr);
     }
 }
 
@@ -7816,17 +7069,6 @@ neomacs_draw_window_divider (struct window *w, int x0, int x1, int y0, int y1)
           neomacs_display_draw_border (dpyinfo->display_handle,
                                        x0, y0, x1 - x0, y1 - y0, c);
         }
-    }
-  else if (output->cr_context)
-    {
-      /* Fallback to Cairo */
-      cairo_t *cr = output->cr_context;
-      double r = RED_FROM_ULONG (color) / 255.0;
-      double g = GREEN_FROM_ULONG (color) / 255.0;
-      double b = BLUE_FROM_ULONG (color) / 255.0;
-      cairo_set_source_rgb (cr, r, g, b);
-      cairo_rectangle (cr, x0, y0, x1 - x0, y1 - y0);
-      cairo_fill (cr);
     }
 }
 
@@ -8021,50 +7263,6 @@ neomacs_draw_window_cursor (struct window *w, struct glyph_row *row,
         }
 
       neomacs_display_reset_cursor_blink (dpyinfo->display_handle);
-      return;
-    }
-
-  /* Fallback to Cairo */
-  cairo_t *cr = output->cr_context;
-  if (!cr)
-    return;
-
-  double r = RED_FROM_ULONG (cursor_color) / 255.0;
-  double g = GREEN_FROM_ULONG (cursor_color) / 255.0;
-  double b = BLUE_FROM_ULONG (cursor_color) / 255.0;
-
-  cairo_set_source_rgb (cr, r, g, b);
-
-  switch (cursor_type)
-    {
-    case DEFAULT_CURSOR:
-    case FILLED_BOX_CURSOR:
-      /* Filled box cursor */
-      cairo_rectangle (cr, x, y, cursor_w, cursor_h);
-      cairo_fill (cr);
-      break;
-
-    case BAR_CURSOR:
-      /* Vertical bar cursor */
-      cairo_rectangle (cr, x, y, 2, cursor_h);
-      cairo_fill (cr);
-      break;
-
-    case HBAR_CURSOR:
-      /* Horizontal bar cursor */
-      cairo_rectangle (cr, x, y + cursor_h - 2, cursor_w, 2);
-      cairo_fill (cr);
-      break;
-
-    case HOLLOW_BOX_CURSOR:
-      /* Hollow box cursor */
-      cairo_set_line_width (cr, 1.0);
-      cairo_rectangle (cr, x + 0.5, y + 0.5, cursor_w - 1, cursor_h - 1);
-      cairo_stroke (cr);
-      break;
-
-    case NO_CURSOR:
-      break;
     }
 }
 
@@ -8141,8 +7339,7 @@ neomacs_scroll_run (struct window *w, struct run *run)
      longer needed.  The entire frame is rebuilt each update.  However, we
      still send the command for compatibility (it's a no-op on the render
      thread). */
-  if (output && output->use_gpu_widget)
-    {
+  {
       /* Get frame-relative bounding box of the text display area of W,
          without mode lines.  Include in this box the left and right
          fringe of W. */
@@ -9736,15 +8933,6 @@ To update an existing webkit view, use `neomacs-webkit-load-uri' with the ID.  *
 /* ============================================================================
  * Rust Display Engine API
  * ============================================================================ */
-
-DEFUN ("neomacs-set-rust-display", Fneomacs_set_rust_display, Sneomacs_set_rust_display, 1, 1, 0,
-       doc: /* No-op: the Rust layout engine is always active.
-Kept for backward compatibility with existing Lisp code.  */)
-  (Lisp_Object enable)
-{
-  (void) enable;
-  return Qt;
-}
 
 /* ============================================================================
  * Animation API
@@ -16893,7 +16081,6 @@ keyboard input forwarding.  Set to nil to clear. */);
   Vx_super_keysym = Qnil;
 
   /* Rust display engine toggle */
-  defsubr (&Sneomacs_set_rust_display);
 
   /* Tell Emacs about this window system */
   Fprovide (Qneomacs, Qnil);
