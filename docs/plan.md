@@ -28,6 +28,17 @@ Last updated: 2026-02-21
 
 ## Doing
 
+- Added filtered case preview support for vm-compat list workflows:
+  - vm-compat changes:
+    - `test/neovm/vm-compat/Makefile`
+      - added `list-cases-filter` target.
+      - prints case entries in `LIST` that match `PATTERN`, with explicit errors for missing pattern and zero matches.
+      - intended as a dry-run helper before filtered check/record commands.
+    - `test/neovm/vm-compat/README.md`
+      - documented `list-cases-filter` usage in the filtered workflow section.
+  - verified:
+    - `make -C test/neovm/vm-compat list-cases-filter LIST=cases/default.list PATTERN='killed-buffer-handle-printing-semantics|command-remapping-position-semantics'` (pass; `2` matches)
+
 - Added strict filtered NeoVM checks for vm-compat list workflows:
   - vm-compat changes:
     - `test/neovm/vm-compat/Makefile`

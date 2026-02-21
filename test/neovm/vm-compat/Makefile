@@ -30,7 +30,7 @@ ERT_ALLOWLIST ?= cases/ert-allowlist-smoke.txt
 ERT_EXPECTED ?= cases/ert-allowlist-smoke.expected.tsv
 ERT_LOAD_FILES ?= cases/ert-allowlist-fixtures/smoke-tests.el
 
-.PHONY: oracle neovm record check compare check-neovm record-all check-all check-all-neovm check-all-neovm-only check-all-neovm-strict check-legacy-elc-neovm check-introspection-neovm check-thread-neovm check-startup-doc-neovm check-runner-feature-stamp check-builtin-registry-all check-builtin-registry-sync check-builtin-registry-fboundp check-builtin-registry-function-cell check-builtin-registry-func-arity check-builtin-registry-autoload-metadata check-builtin-registry-function-kind check-builtin-registry-commandp check-builtin-registry-primitive-any-coverage check-builtin-registry-extension-policy check-oracle-default-path check-case-line-filter check-tracked-lists check-list-integrity list-cases record-list record-list-filter check-list check-list-filter check-neovm-list check-neovm-filter check-neovm-filter-strict check-one-neovm validate-case-lists case-inventory ert-oracle record-ert-allowlist check-ert-allowlist bench-load-cache compat-progress compat-progress-json report-oracle-builtin-coverage compat-stub-index compat-stub-index-json check-stub-budget check-startup-doc-stub-coverage check-startup-doc-string-coverage check-startup-variable-documentation-counts show-function-kind-drifts
+.PHONY: oracle neovm record check compare check-neovm record-all check-all check-all-neovm check-all-neovm-only check-all-neovm-strict check-legacy-elc-neovm check-introspection-neovm check-thread-neovm check-startup-doc-neovm check-runner-feature-stamp check-builtin-registry-all check-builtin-registry-sync check-builtin-registry-fboundp check-builtin-registry-function-cell check-builtin-registry-func-arity check-builtin-registry-autoload-metadata check-builtin-registry-function-kind check-builtin-registry-commandp check-builtin-registry-primitive-any-coverage check-builtin-registry-extension-policy check-oracle-default-path check-case-line-filter check-tracked-lists check-list-integrity list-cases list-cases-filter record-list record-list-filter check-list check-list-filter check-neovm-list check-neovm-filter check-neovm-filter-strict check-one-neovm validate-case-lists case-inventory ert-oracle record-ert-allowlist check-ert-allowlist bench-load-cache compat-progress compat-progress-json report-oracle-builtin-coverage compat-stub-index compat-stub-index-json check-stub-budget check-startup-doc-stub-coverage check-startup-doc-string-coverage check-startup-variable-documentation-counts show-function-kind-drifts
 
 oracle:
 	./run-oracle.sh $(FORMS)
@@ -221,6 +221,29 @@ list-cases:
 	@for case in $(CASES); do \
 		printf '%s\n' "$$case" || exit 0; \
 	done
+
+list-cases-filter:
+	@set -e; \
+	if [ ! -f "$(LIST)" ]; then \
+		echo "missing list file: $(LIST)"; \
+		exit 1; \
+	fi; \
+	if [ -z "$(PATTERN)" ]; then \
+		echo "usage: make list-cases-filter LIST=cases/<name>.list PATTERN='<regex>'"; \
+		exit 2; \
+	fi; \
+	matched=0; \
+	for case in $(call read_case_list,$(LIST)); do \
+		if printf '%s\n' "$$case" | grep -Eq -- "$(PATTERN)"; then \
+			printf '%s\n' "$$case"; \
+			matched=$$((matched + 1)); \
+		fi; \
+	done; \
+	if [ "$$matched" -eq 0 ]; then \
+		echo "no cases matched PATTERN='$(PATTERN)' in $(LIST)"; \
+		exit 1; \
+	fi; \
+	echo "matched $$matched cases from $(LIST) with PATTERN='$(PATTERN)'"
 
 record-list:
 	@set -e; \

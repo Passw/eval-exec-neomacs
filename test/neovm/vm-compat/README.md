@@ -214,6 +214,7 @@ Run a regex-filtered subset from a list (fast iteration without editing list fil
 
 ```bash
 cd test/neovm/vm-compat
+make list-cases-filter LIST=cases/default.list PATTERN='command-remapping|key-binding'
 make check-list-filter LIST=cases/default.list PATTERN='command-remapping|key-binding'
 make check-neovm-filter LIST=cases/default.list PATTERN='command-remapping|key-binding'
 make check-neovm-filter-strict LIST=cases/default.list PATTERN='command-remapping|key-binding'
