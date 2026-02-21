@@ -4852,6 +4852,7 @@ fn macroexpand_known_fallback_macro(name: &str, args: &[Value]) -> Result<Option
             }
 
             if !pattern_bindings.is_empty() {
+                pattern_bindings.reverse();
                 let mut pcase_let_star_forms = Vec::with_capacity(args.len() + 1);
                 pcase_let_star_forms.push(Value::symbol("pcase-let*"));
                 pcase_let_star_forms.push(Value::list(pattern_bindings));
@@ -21648,6 +21649,31 @@ mod tests {
                 .expect("mixed pcase-let expected parse should yield one form"),
         );
         assert_eq!(pcase_let_mixed_expanded, pcase_let_mixed_expected);
+        let pcase_let_multi_pattern_forms = crate::elisp::parser::parse_forms(
+            r#"(pcase-let ((`(,a ,b) '(1 2)) (`(,c ,d) '(3 4))) (list a b c d))"#,
+        )
+        .expect("multi-pattern pcase-let form should parse");
+        let pcase_let_multi_pattern = crate::elisp::eval::quote_to_value(
+            pcase_let_multi_pattern_forms
+                .first()
+                .expect("multi-pattern pcase-let parse should yield one form"),
+        );
+        let pcase_let_multi_pattern_expanded =
+            builtin_macroexpand_eval(&mut eval, vec![pcase_let_multi_pattern])
+                .expect("macroexpand should preserve oracle pcase-let* pattern order");
+        let pcase_let_multi_pattern_expected_forms = crate::elisp::parser::parse_forms(
+            r#"(let ((x0 '(1 2)) (x1 '(3 4))) (pcase-let* ((`(,c ,d) x1) (`(,a ,b) x0)) (list a b c d)))"#,
+        )
+        .expect("multi-pattern pcase-let expected expansion should parse");
+        let pcase_let_multi_pattern_expected = crate::elisp::eval::quote_to_value(
+            pcase_let_multi_pattern_expected_forms
+                .first()
+                .expect("multi-pattern pcase-let expected parse should yield one form"),
+        );
+        assert_eq!(
+            pcase_let_multi_pattern_expanded,
+            pcase_let_multi_pattern_expected
+        );
         let pcase_let_star = Value::list(vec![
             Value::symbol("pcase-let*"),
             Value::list(vec![

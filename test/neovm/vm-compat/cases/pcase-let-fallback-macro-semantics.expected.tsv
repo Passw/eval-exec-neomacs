@@ -18,9 +18,10 @@
 18	(macroexpand '(pcase-let ((x 1) (y x)) (list x y)))	OK (let ((x 1) (y x)) (pcase-let* nil (list x y)))
 19	(macroexpand '(pcase-let* ((x 1) (y x)) (list x y)))	OK (let* ((x 1) (y x)) (list x y))
 20	(macroexpand '(pcase-let ((x 1) (`(,a ,b) '(2 3))) (list x a b)))	OK (let ((x 1) (x1 '(2 3))) (pcase-let* ((`(,a ,b) x1)) (list x a b)))
-21	(condition-case err (macroexpand '(pcase-let)) (error err))	OK (wrong-number-of-arguments (1 . 1) 0)
-22	(condition-case err (macroexpand '(pcase-let*)) (error err))	OK (wrong-number-of-arguments (1 . 1) 0)
-23	(condition-case err (macroexpand '(pcase-let x x)) (error err))	OK (wrong-type-argument listp x)
-24	(condition-case err (macroexpand '(pcase-let* x x)) (error err))	OK (wrong-type-argument listp x)
-25	(pcase-let ((x 10) (y 20)) (+ x y))	OK 30
-26	(pcase-let* ((x 10) (y (+ x 5))) y)	OK 15
+21	(macroexpand '(pcase-let ((`(,a ,b) '(1 2)) (`(,c ,d) '(3 4))) (list a b c d)))	OK (let ((x0 '(1 2)) (x1 '(3 4))) (pcase-let* ((`(,c ,d) x1) (`(,a ,b) x0)) (list a b c d)))
+22	(condition-case err (macroexpand '(pcase-let)) (error err))	OK (wrong-number-of-arguments (1 . 1) 0)
+23	(condition-case err (macroexpand '(pcase-let*)) (error err))	OK (wrong-number-of-arguments (1 . 1) 0)
+24	(condition-case err (macroexpand '(pcase-let x x)) (error err))	OK (wrong-type-argument listp x)
+25	(condition-case err (macroexpand '(pcase-let* x x)) (error err))	OK (wrong-type-argument listp x)
+26	(pcase-let ((x 10) (y 20)) (+ x y))	OK 30
+27	(pcase-let* ((x 10) (y (+ x 5))) y)	OK 15
