@@ -9,10 +9,15 @@
 9	(file-exists-p vm-precompile-no-eval-cache)	OK t
 10	(boundp 'vm-precompile-no-eval-probe)	OK nil
 11	(condition-case err vm-precompile-no-eval-probe (error (car err)))	OK void-variable
-12	(load-file vm-precompile-no-eval-source)	OK t
-13	(boundp 'vm-precompile-no-eval-probe)	OK t
-14	(eq vm-precompile-no-eval-probe 'from-source)	OK t
-15	(delete-file vm-precompile-no-eval-source)	OK nil
-16	(delete-file vm-precompile-no-eval-cache)	OK nil
-17	(delete-directory vm-precompile-no-eval-dir t)	OK nil
-18	(makunbound 'vm-precompile-no-eval-probe)	OK vm-precompile-no-eval-probe
+12	(setq vm-precompile-no-eval-probe 'seed)	OK seed
+13	(eq vm-precompile-no-eval-probe 'seed)	OK t
+14	(string= (neovm-precompile-file vm-precompile-no-eval-source) vm-precompile-no-eval-cache)	OK t
+15	(file-exists-p vm-precompile-no-eval-cache)	OK t
+16	(eq vm-precompile-no-eval-probe 'seed)	OK t
+17	(load-file vm-precompile-no-eval-source)	OK t
+18	(boundp 'vm-precompile-no-eval-probe)	OK t
+19	(eq vm-precompile-no-eval-probe 'from-source)	OK t
+20	(delete-file vm-precompile-no-eval-source)	OK nil
+21	(delete-file vm-precompile-no-eval-cache)	OK nil
+22	(delete-directory vm-precompile-no-eval-dir t)	OK nil
+23	(makunbound 'vm-precompile-no-eval-probe)	OK vm-precompile-no-eval-probe

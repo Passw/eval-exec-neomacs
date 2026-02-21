@@ -27,6 +27,12 @@
 (boundp 'vm-precompile-no-eval-probe)
 (condition-case err vm-precompile-no-eval-probe (error (car err)))
 
+(setq vm-precompile-no-eval-probe 'seed)
+(eq vm-precompile-no-eval-probe 'seed)
+(string= (neovm-precompile-file vm-precompile-no-eval-source) vm-precompile-no-eval-cache)
+(file-exists-p vm-precompile-no-eval-cache)
+(eq vm-precompile-no-eval-probe 'seed)
+
 (load-file vm-precompile-no-eval-source)
 (boundp 'vm-precompile-no-eval-probe)
 (eq vm-precompile-no-eval-probe 'from-source)
