@@ -8243,9 +8243,6 @@ pub(crate) fn builtin_insert_char(
 ) -> EvalResult {
     expect_range_args("insert-char", &args, 1, 3)?;
     let char_code = insert_char_code_from_value(&args[0])?;
-    let Some(ch) = char::from_u32(char_code as u32) else {
-        return Ok(Value::Nil);
-    };
     let count = if args.len() > 1 {
         expect_fixnum(&args[1])?
     } else {
@@ -8271,7 +8268,16 @@ pub(crate) fn builtin_insert_char(
         .buffers
         .current_buffer_mut()
         .ok_or_else(|| signal("error", vec![Value::string("No current buffer")]))?;
-    let to_insert = ch.to_string().repeat(count as usize);
+    let to_insert = if let Some(ch) = char::from_u32(char_code as u32) {
+        ch.to_string().repeat(count as usize)
+    } else if let Some(encoded) = encode_nonunicode_char_for_storage(char_code as u32) {
+        encoded.repeat(count as usize)
+    } else {
+        return Err(signal(
+            "wrong-type-argument",
+            vec![Value::symbol("characterp"), args[0].clone()],
+        ));
+    };
     buf.insert(&to_insert);
     Ok(Value::Nil)
 }
@@ -19382,6 +19388,44 @@ mod tests {
         let overflow = dispatch_builtin_pure("text-char-description", vec![Value::Int(0x40_0000)])
             .expect("text-char-description should resolve")
             .expect_err("text-char-description should reject out-of-range character code");
+        match overflow {
+            Flow::Signal(sig) => {
+                assert_eq!(sig.symbol, "wrong-type-argument");
+                assert_eq!(
+                    sig.data,
+                    vec![Value::symbol("characterp"), Value::Int(0x40_0000)]
+                );
+            }
+            other => panic!("expected signal, got: {other:?}"),
+        }
+    }
+
+    #[test]
+    fn insert_char_nonunicode_char_code_bounds_match_oracle() {
+        let mut eval = crate::elisp::eval::Evaluator::new();
+
+        builtin_erase_buffer(&mut eval, vec![]).expect("erase-buffer should succeed");
+        builtin_insert_char(&mut eval, vec![Value::Int(0x11_0000), Value::Int(1)])
+            .expect("insert-char should accept nonunicode char code");
+        let first = builtin_buffer_string(&mut eval, vec![])
+            .expect("buffer-string should evaluate")
+            .as_str()
+            .expect("buffer-string should return text")
+            .to_string();
+        assert_eq!(decode_storage_char_codes(&first), vec![0x11_0000]);
+
+        builtin_erase_buffer(&mut eval, vec![]).expect("erase-buffer should succeed");
+        builtin_insert_char(&mut eval, vec![Value::Int(0x20_0000), Value::Int(2)])
+            .expect("insert-char should repeat nonunicode char code");
+        let second = builtin_buffer_string(&mut eval, vec![])
+            .expect("buffer-string should evaluate")
+            .as_str()
+            .expect("buffer-string should return text")
+            .to_string();
+        assert_eq!(decode_storage_char_codes(&second), vec![0x20_0000, 0x20_0000]);
+
+        let overflow = builtin_insert_char(&mut eval, vec![Value::Int(0x40_0000), Value::Int(1)])
+            .expect_err("insert-char should reject out-of-range character code");
         match overflow {
             Flow::Signal(sig) => {
                 assert_eq!(sig.symbol, "wrong-type-argument");

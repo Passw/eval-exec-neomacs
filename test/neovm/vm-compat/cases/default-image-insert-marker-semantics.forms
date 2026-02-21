@@ -89,6 +89,18 @@
   (buffer-string))
 
 (with-temp-buffer
+  (insert-char 1114112 1)
+  (string-to-list (buffer-string)))
+
+(with-temp-buffer
+  (insert-char 2097152 2)
+  (string-to-list (buffer-string)))
+
+(condition-case err
+    (insert-char 4194304 1)
+  (wrong-type-argument (list 'insert-char-high (car err) (cdr err))))
+
+(with-temp-buffer
   (insert-byte 65 3)
   (buffer-string))
 
