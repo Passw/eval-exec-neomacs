@@ -36,6 +36,24 @@
 (load-file vm-load-cache-toggle-source)
 (file-exists-p vm-load-cache-toggle-cache)
 
+(setenv "NEOVM_DISABLE_LOAD_CACHE_WRITE" " yes ")
+(delete-file vm-load-cache-toggle-cache)
+(load-file vm-load-cache-toggle-source)
+(file-exists-p vm-load-cache-toggle-cache)
+
+(setenv "NEOVM_DISABLE_LOAD_CACHE_WRITE" "On")
+(delete-file vm-load-cache-toggle-cache)
+(load-file vm-load-cache-toggle-source)
+(file-exists-p vm-load-cache-toggle-cache)
+
+(setenv "NEOVM_DISABLE_LOAD_CACHE_WRITE" "off")
+(load-file vm-load-cache-toggle-source)
+(file-exists-p vm-load-cache-toggle-cache)
+
+(setenv "NEOVM_DISABLE_LOAD_CACHE_WRITE" "maybe")
+(load-file vm-load-cache-toggle-source)
+(file-exists-p vm-load-cache-toggle-cache)
+
 (setenv "NEOVM_DISABLE_LOAD_CACHE_WRITE" "0")
 (load-file vm-load-cache-toggle-source)
 (file-exists-p vm-load-cache-toggle-cache)

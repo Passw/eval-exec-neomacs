@@ -17,10 +17,24 @@
 17	(delete-file vm-load-cache-toggle-cache)	OK nil
 18	(load-file vm-load-cache-toggle-source)	OK t
 19	(file-exists-p vm-load-cache-toggle-cache)	OK nil
-20	(setenv "NEOVM_DISABLE_LOAD_CACHE_WRITE" "0")	OK "0"
-21	(load-file vm-load-cache-toggle-source)	OK t
-22	(file-exists-p vm-load-cache-toggle-cache)	OK t
-23	(delete-file vm-load-cache-toggle-source)	OK nil
-24	(delete-file vm-load-cache-toggle-cache)	OK nil
-25	(delete-directory vm-load-cache-toggle-dir t)	OK nil
-26	(setenv "NEOVM_DISABLE_LOAD_CACHE_WRITE" nil)	OK nil
+20	(setenv "NEOVM_DISABLE_LOAD_CACHE_WRITE" " yes ")	OK " yes "
+21	(delete-file vm-load-cache-toggle-cache)	OK nil
+22	(load-file vm-load-cache-toggle-source)	OK t
+23	(file-exists-p vm-load-cache-toggle-cache)	OK nil
+24	(setenv "NEOVM_DISABLE_LOAD_CACHE_WRITE" "On")	OK "On"
+25	(delete-file vm-load-cache-toggle-cache)	OK nil
+26	(load-file vm-load-cache-toggle-source)	OK t
+27	(file-exists-p vm-load-cache-toggle-cache)	OK nil
+28	(setenv "NEOVM_DISABLE_LOAD_CACHE_WRITE" "off")	OK "off"
+29	(load-file vm-load-cache-toggle-source)	OK t
+30	(file-exists-p vm-load-cache-toggle-cache)	OK t
+31	(setenv "NEOVM_DISABLE_LOAD_CACHE_WRITE" "maybe")	OK "maybe"
+32	(load-file vm-load-cache-toggle-source)	OK t
+33	(file-exists-p vm-load-cache-toggle-cache)	OK t
+34	(setenv "NEOVM_DISABLE_LOAD_CACHE_WRITE" "0")	OK "0"
+35	(load-file vm-load-cache-toggle-source)	OK t
+36	(file-exists-p vm-load-cache-toggle-cache)	OK t
+37	(delete-file vm-load-cache-toggle-source)	OK nil
+38	(delete-file vm-load-cache-toggle-cache)	OK nil
+39	(delete-directory vm-load-cache-toggle-dir t)	OK nil
+40	(setenv "NEOVM_DISABLE_LOAD_CACHE_WRITE" nil)	OK nil
