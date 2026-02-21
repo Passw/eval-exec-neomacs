@@ -18127,6 +18127,25 @@ Last updated: 2026-02-21
 
 ## Doing
 
+- Added `command-remapping` emulation-alist iteration lock-ins (ordering + fallback semantics):
+  - runtime notes:
+    - no runtime code change needed; existing emulation alist traversal behavior matches oracle.
+  - vm-compat corpus changes:
+    - added and wired:
+      - `test/neovm/vm-compat/cases/command-remapping-emulation-alist-iteration-semantics.forms`
+      - `test/neovm/vm-compat/cases/command-remapping-emulation-alist-iteration-semantics.expected.tsv`
+      - `test/neovm/vm-compat/cases/default.list`
+    - lock-ins cover:
+      - emulation alist list ordering precedence (earlier alist wins),
+      - fallback to later alists when earlier modes are inactive,
+      - intra-alist pair ordering precedence,
+      - symbol-indirected alist entry resolution in `emulation-mode-map-alists`,
+      - skip behavior for missing symbol entries and invalid keymap-handle entries.
+  - verified:
+    - `make -C test/neovm/vm-compat record FORMS=cases/command-remapping-emulation-alist-iteration-semantics.forms EXPECTED=cases/command-remapping-emulation-alist-iteration-semantics.expected.tsv` (pass)
+    - `make -C test/neovm/vm-compat check-one-neovm CASE=cases/command-remapping-emulation-alist-iteration-semantics` (pass; `8/8`)
+    - `make -C test/neovm/vm-compat check-all-neovm-strict` (pass; case inventory `878`)
+
 - Added `command-remapping` emulation-map precedence lock-in coverage (no runtime behavior change required):
   - runtime notes:
     - existing runtime precedence in `rust/neovm-core/src/elisp/interactive.rs` already matches oracle for active `emulation-mode-map-alists` remap resolution ahead of other map tiers.
