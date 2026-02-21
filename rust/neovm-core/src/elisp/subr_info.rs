@@ -85,6 +85,7 @@ fn is_evaluator_special_form_name(name: &str) -> bool {
             | "declare"
             | "when"
             | "unless"
+            | "bound-and-true-p"
             | "defalias"
             | "provide"
             | "require"
@@ -244,6 +245,10 @@ fn fallback_macro_spec(name: &str) -> Option<FallbackMacroSpec> {
         | "eval-when-compile"
         | "eval-and-compile" => Some(FallbackMacroSpec { min: 0, max: None }),
         "with-temp-message" => Some(FallbackMacroSpec { min: 1, max: None }),
+        "bound-and-true-p" => Some(FallbackMacroSpec {
+            min: 1,
+            max: Some(1),
+        }),
         "defvar-local" => Some(FallbackMacroSpec {
             min: 2,
             max: Some(3),
@@ -4507,6 +4512,19 @@ mod tests {
             let pair = cell.lock().unwrap();
             assert_eq!(pair.car.as_int(), Some(1));
             assert_eq!(pair.cdr.as_symbol_name(), Some("many"));
+        } else {
+            panic!("expected cons cell");
+        }
+    }
+
+    #[test]
+    fn fallback_macro_bound_and_true_p_is_one_required() {
+        let macro_value = fallback_macro_value("bound-and-true-p").expect("fallback macro exists");
+        let result = builtin_func_arity(vec![macro_value]).unwrap();
+        if let Value::Cons(cell) = &result {
+            let pair = cell.lock().unwrap();
+            assert_eq!(pair.car.as_int(), Some(1));
+            assert_eq!(pair.cdr.as_int(), Some(1));
         } else {
             panic!("expected cons cell");
         }

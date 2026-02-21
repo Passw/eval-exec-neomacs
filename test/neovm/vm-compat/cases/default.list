@@ -41,6 +41,7 @@ cases/window-quit-temp-message-macro-semantics
 cases/function-special-form-edges
 cases/autoload-macro-introspection
 cases/macroexpand-runtime-semantics
+cases/bound-and-true-p-semantics
 cases/fillarray-bool-char-table-runtime-semantics
 cases/char-table-range-nil-t-runtime-semantics
 cases/fillarray-string-writeback-runtime-semantics

@@ -1833,6 +1833,7 @@ impl Evaluator {
             "declare" => Ok(Value::Nil),     // Stub: ignored for now
             "when" => self.sf_when(tail),
             "unless" => self.sf_unless(tail),
+            "bound-and-true-p" => self.sf_bound_and_true_p(tail),
             "defalias" => self.sf_defalias(tail),
             "provide" => self.sf_provide(tail),
             "require" => self.sf_require(tail),
@@ -2318,6 +2319,35 @@ impl Evaluator {
             self.sf_progn(&tail[1..])
         } else {
             Ok(Value::Nil)
+        }
+    }
+
+    fn sf_bound_and_true_p(&mut self, tail: &[Expr]) -> EvalResult {
+        if tail.len() != 1 {
+            return Err(signal(
+                "wrong-number-of-arguments",
+                vec![
+                    Value::cons(Value::Int(1), Value::Int(1)),
+                    Value::Int(tail.len() as i64),
+                ],
+            ));
+        }
+        let Expr::Symbol(name) = &tail[0] else {
+            return Err(signal(
+                "wrong-type-argument",
+                vec![Value::symbol("symbolp"), quote_to_value(&tail[0])],
+            ));
+        };
+        match self.eval_symbol(name) {
+            Ok(value) => {
+                if value.is_truthy() {
+                    Ok(value)
+                } else {
+                    Ok(Value::Nil)
+                }
+            }
+            Err(Flow::Signal(sig)) if sig.symbol == "void-variable" => Ok(Value::Nil),
+            Err(other) => Err(other),
         }
     }
 
@@ -3789,6 +3819,27 @@ mod tests {
         assert_eq!(eval_one("(when nil 1 2 3)"), "OK nil");
         assert_eq!(eval_one("(unless nil 1 2 3)"), "OK 3");
         assert_eq!(eval_one("(unless t 1 2 3)"), "OK nil");
+    }
+
+    #[test]
+    fn bound_and_true_p_runtime_semantics() {
+        assert_eq!(eval_one("(fboundp 'bound-and-true-p)"), "OK t");
+        assert_eq!(eval_one("(macrop 'bound-and-true-p)"), "OK t");
+        assert_eq!(eval_one("(let ((vm-batp t)) (bound-and-true-p vm-batp))"), "OK t");
+        assert_eq!(eval_one("(let ((vm-batp nil)) (bound-and-true-p vm-batp))"), "OK nil");
+        assert_eq!(eval_one("(bound-and-true-p vm-batp-unbound)"), "OK nil");
+        assert_eq!(
+            eval_one("(condition-case err (bound-and-true-p) (error err))"),
+            "OK (wrong-number-of-arguments (1 . 1) 0)"
+        );
+        assert_eq!(
+            eval_one("(condition-case err (bound-and-true-p a b) (error err))"),
+            "OK (wrong-number-of-arguments (1 . 1) 2)"
+        );
+        assert_eq!(
+            eval_one("(condition-case err (bound-and-true-p 1) (error err))"),
+            "OK (wrong-type-argument symbolp 1)"
+        );
     }
 
     #[test]

@@ -4657,6 +4657,32 @@ fn macroexpand_known_fallback_macro(name: &str, args: &[Value]) -> Result<Option
                 Value::list(vec![Value::symbol("unwind-protect"), protected, restore]),
             ])))
         }
+        "bound-and-true-p" => {
+            if args.len() != 1 {
+                return Err(signal(
+                    "wrong-number-of-arguments",
+                    vec![
+                        Value::cons(Value::Int(1), Value::Int(1)),
+                        Value::Int(args.len() as i64),
+                    ],
+                ));
+            }
+            if args[0].as_symbol_name().is_none() {
+                return Err(signal(
+                    "wrong-type-argument",
+                    vec![Value::symbol("symbolp"), args[0].clone()],
+                ));
+            }
+            let var = args[0].clone();
+            Ok(Some(Value::list(vec![
+                Value::symbol("and"),
+                Value::list(vec![
+                    Value::symbol("boundp"),
+                    Value::list(vec![Value::symbol("quote"), var.clone()]),
+                ]),
+                var,
+            ])))
+        }
         _ => Ok(None),
     }
 }
@@ -19803,6 +19829,9 @@ mod tests {
             builtin_fboundp(&mut eval, vec![Value::symbol("with-temp-message")])
                 .expect("fboundp should succeed for with-temp-message");
         assert!(with_temp_message.is_truthy());
+        let bound_and_true_p = builtin_fboundp(&mut eval, vec![Value::symbol("bound-and-true-p")])
+            .expect("fboundp should succeed for bound-and-true-p");
+        assert!(bound_and_true_p.is_truthy());
 
         let with_temp_buffer = builtin_fboundp(&mut eval, vec![Value::symbol("with-temp-buffer")])
             .expect("fboundp should succeed for with-temp-buffer");
@@ -19889,6 +19918,10 @@ mod tests {
             builtin_functionp_eval(&mut eval, vec![Value::symbol("with-temp-message")])
                 .expect("functionp should reject with-temp-message macro symbol");
         assert!(with_temp_message_symbol.is_nil());
+        let bound_and_true_p_symbol =
+            builtin_functionp_eval(&mut eval, vec![Value::symbol("bound-and-true-p")])
+                .expect("functionp should reject bound-and-true-p macro symbol");
+        assert!(bound_and_true_p_symbol.is_nil());
         let declare_symbol = builtin_functionp_eval(&mut eval, vec![Value::symbol("declare")])
             .expect("functionp should reject declare symbol");
         assert!(declare_symbol.is_nil());
@@ -20169,6 +20202,10 @@ mod tests {
             builtin_symbol_function(&mut eval, vec![Value::symbol("with-temp-message")])
                 .expect("symbol-function should resolve with-temp-message as a macro");
         assert!(matches!(with_temp_message_macro, Value::Macro(_)));
+        let bound_and_true_p_macro =
+            builtin_symbol_function(&mut eval, vec![Value::symbol("bound-and-true-p")])
+                .expect("symbol-function should resolve bound-and-true-p as a macro");
+        assert!(matches!(bound_and_true_p_macro, Value::Macro(_)));
 
         let declare_macro = builtin_symbol_function(&mut eval, vec![Value::symbol("declare")])
             .expect("symbol-function should resolve declare as a macro");
@@ -20512,6 +20549,10 @@ mod tests {
             builtin_indirect_function(&mut eval, vec![Value::symbol("with-temp-message")])
                 .expect("indirect-function should resolve with-temp-message as a macro");
         assert!(matches!(with_temp_message_macro, Value::Macro(_)));
+        let bound_and_true_p_macro =
+            builtin_indirect_function(&mut eval, vec![Value::symbol("bound-and-true-p")])
+                .expect("indirect-function should resolve bound-and-true-p as a macro");
+        assert!(matches!(bound_and_true_p_macro, Value::Macro(_)));
 
         eval.obarray_mut()
             .set_symbol_function("alias-car", Value::symbol("car"));
@@ -20592,6 +20633,10 @@ mod tests {
             builtin_macrop_eval(&mut eval, vec![Value::symbol("with-temp-message")])
                 .expect("macrop should handle with-temp-message symbol input");
         assert!(with_temp_message_symbol.is_truthy());
+        let bound_and_true_p_symbol =
+            builtin_macrop_eval(&mut eval, vec![Value::symbol("bound-and-true-p")])
+                .expect("macrop should handle bound-and-true-p symbol input");
+        assert!(bound_and_true_p_symbol.is_truthy());
 
         let plain_symbol = builtin_macrop_eval(&mut eval, vec![Value::symbol("if")])
             .expect("macrop should handle non-macro symbols");
@@ -20896,6 +20941,41 @@ mod tests {
                 ]),
             ])
         );
+
+        let bound_and_true_p = builtin_macroexpand_eval(
+            &mut eval,
+            vec![Value::list(vec![
+                Value::symbol("bound-and-true-p"),
+                Value::symbol("vm-bound"),
+            ])],
+        )
+        .expect("macroexpand should expand bound-and-true-p");
+        assert_eq!(
+            bound_and_true_p,
+            Value::list(vec![
+                Value::symbol("and"),
+                Value::list(vec![
+                    Value::symbol("boundp"),
+                    Value::list(vec![Value::symbol("quote"), Value::symbol("vm-bound")]),
+                ]),
+                Value::symbol("vm-bound"),
+            ])
+        );
+        let bad_bound_and_true_p = builtin_macroexpand_eval(
+            &mut eval,
+            vec![Value::list(vec![
+                Value::symbol("bound-and-true-p"),
+                Value::Int(1),
+            ])],
+        )
+        .expect_err("macroexpand should reject non-symbol bound-and-true-p arguments");
+        match bad_bound_and_true_p {
+            Flow::Signal(sig) => {
+                assert_eq!(sig.symbol, "wrong-type-argument");
+                assert_eq!(sig.data, vec![Value::symbol("symbolp"), Value::Int(1)]);
+            }
+            other => panic!("unexpected flow: {other:?}"),
+        }
 
         let passthrough = builtin_macroexpand_eval(
             &mut eval,
