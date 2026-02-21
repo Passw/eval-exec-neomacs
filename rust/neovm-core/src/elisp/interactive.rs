@@ -1554,7 +1554,16 @@ pub(crate) fn builtin_execute_extended_command(
         ));
     }
 
-    builtin_command_execute(eval, vec![command_designator])
+    // Oracle M-x path invokes COMMAND interactively, with CURRENT-PREFIX-ARG
+    // seeded from PREFIXARG and PREFIX-ARG reset for the command body.
+    let mut frame = HashMap::new();
+    frame.insert("current-prefix-arg".to_string(), args[0].clone());
+    frame.insert("prefix-arg".to_string(), Value::Nil);
+    eval.dynamic.push(frame);
+    let result = builtin_call_interactively(eval, vec![command_designator]);
+    eval.dynamic.pop();
+    result?;
+    Ok(Value::Nil)
 }
 
 fn command_name_display(value: &Value) -> String {
@@ -6555,6 +6564,58 @@ K")
             builtin_execute_extended_command(&mut ev, vec![Value::Nil, Value::string("ignore")])
                 .expect("execute-extended-command should run command names");
         assert!(result.is_nil());
+    }
+
+    #[test]
+    fn execute_extended_command_returns_nil_and_seeds_current_prefix_arg() {
+        let mut ev = Evaluator::new();
+        let results = eval_all_with(
+            &mut ev,
+            r#"(progn
+                 (setq neo-eec-seen-vars :unset)
+                 (defun neo-eec-vars ()
+                   (interactive)
+                   (setq neo-eec-seen-vars (list current-prefix-arg prefix-arg))
+                   'neo-eec-vars-ret)
+                 (list
+                  (execute-extended-command nil "neo-eec-vars")
+                  neo-eec-seen-vars
+                  (let ((prefix-arg '(5))
+                        (current-prefix-arg '(6)))
+                    (execute-extended-command 7 "neo-eec-vars")
+                    neo-eec-seen-vars)))"#,
+        );
+        assert_eq!(results[0], "OK (nil (nil nil) (7 nil))");
+    }
+
+    #[test]
+    fn execute_extended_command_applies_prefix_arg_for_p_and_p_specs() {
+        let mut ev = Evaluator::new();
+        let results = eval_all_with(
+            &mut ev,
+            r#"(progn
+                 (setq neo-eec-seen-p :unset)
+                 (setq neo-eec-seen-P :unset)
+                 (defun neo-eec-p (arg)
+                   (interactive "p")
+                   (setq neo-eec-seen-p arg)
+                   'neo-eec-p-ret)
+                 (defun neo-eec-P (arg)
+                   (interactive "P")
+                   (setq neo-eec-seen-P arg)
+                   'neo-eec-P-ret)
+                 (list
+                  (list (execute-extended-command 7 "neo-eec-p") neo-eec-seen-p)
+                  (list (execute-extended-command '(4) "neo-eec-p") neo-eec-seen-p)
+                  (list (execute-extended-command '- "neo-eec-p") neo-eec-seen-p)
+                  (list (execute-extended-command 7 "neo-eec-P") neo-eec-seen-P)
+                  (list (execute-extended-command '(4) "neo-eec-P") neo-eec-seen-P)
+                  (list (execute-extended-command '- "neo-eec-P") neo-eec-seen-P)))"#,
+        );
+        assert_eq!(
+            results[0],
+            "OK ((nil 7) (nil 4) (nil -1) (nil 7) (nil (4)) (nil -))"
+        );
     }
 
     #[test]

@@ -18723,6 +18723,26 @@ Last updated: 2026-02-21
     - `make -C test/neovm/vm-compat check-one-neovm CASE=cases/key-binding-command-remap-semantics` (pass, `8/8`)
     - `make -C test/neovm/vm-compat check-all-neovm-strict` (pass; inventory `881`)
 
+- Aligned `execute-extended-command` return/prefix semantics with oracle and added dedicated lock-ins:
+  - runtime changes:
+    - `rust/neovm-core/src/elisp/interactive.rs`
+      - `execute-extended-command` now executes via interactive invocation semantics (`call-interactively`) instead of `command-execute`.
+      - seeds `current-prefix-arg` from `PREFIXARG` for the invoked command.
+      - resets `prefix-arg` to `nil` inside command body during M-x dispatch.
+      - always returns `nil` after command execution (command return values no longer leak through), matching oracle.
+      - added evaluator tests:
+        - `execute_extended_command_returns_nil_and_seeds_current_prefix_arg`
+        - `execute_extended_command_applies_prefix_arg_for_p_and_p_specs`
+  - corpus changes:
+    - added and wired:
+      - `test/neovm/vm-compat/cases/execute-extended-command-prefix-return-semantics.forms`
+      - `test/neovm/vm-compat/cases/execute-extended-command-prefix-return-semantics.expected.tsv`
+      - `test/neovm/vm-compat/cases/default.list`
+  - verified:
+    - `cargo test --manifest-path rust/neovm-core/Cargo.toml execute_extended_command_ -- --nocapture` (pass)
+    - `make -C test/neovm/vm-compat check-one-neovm CASE=cases/execute-extended-command-prefix-return-semantics` (pass, `19/19`)
+    - `make -C test/neovm/vm-compat check-all-neovm-strict` (pass; inventory `882`)
+
 - Continue compatibility-first maintenance with small commit slices:
   - keep builtin surface and registry in lock-step
   - run oracle/parity checks after each behavior-affecting change
