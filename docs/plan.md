@@ -33,13 +33,16 @@ Last updated: 2026-02-21
     - `rust/neovm-core/src/elisp/errors.rs`
       - added evaluator unit test:
         - `builtin_error_message_string_formats_mutex_and_condvar_handles`
+        - `builtin_error_message_string_formats_thread_handles`
       - test asserts `error-message-string` renders mutex and condition-variable payloads with Oracle-shaped handle prefixes (`#<mutex...>`, `#<condvar...>`).
+      - test also asserts thread payload formatting uses Oracle-shaped `#<thread...>` handles.
     - `rust/neovm-core/src/elisp/error.rs`
       - added eval-context printer coverage:
         - `eval_context_printer_renders_condvar_handles_consistently`
       - test locks parity between string and bytes printer paths for condition-variable handles.
   - verified:
     - `cargo test --manifest-path rust/neovm-core/Cargo.toml builtin_error_message_string_formats_mutex_and_condvar_handles -- --nocapture` (pass)
+    - `cargo test --manifest-path rust/neovm-core/Cargo.toml builtin_error_message_string_formats_thread_handles -- --nocapture` (pass)
     - `cargo test --manifest-path rust/neovm-core/Cargo.toml eval_context_printer_renders_condvar_handles_consistently -- --nocapture` (pass)
 
 - Added lock-in coverage for `error-message-string` handle payload rendering of mutex/condition-variable objects:

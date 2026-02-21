@@ -1653,6 +1653,29 @@ mod tests {
     }
 
     #[test]
+    fn builtin_error_message_string_formats_thread_handles() {
+        let mut evaluator = super::super::eval::Evaluator::new();
+        init_standard_errors(&mut evaluator.obarray);
+
+        let thread = super::super::threads::builtin_current_thread(&mut evaluator, vec![])
+            .expect("current-thread should succeed");
+        let thread_err = Value::list(vec![
+            Value::symbol("args-out-of-range"),
+            thread,
+            Value::Int(0),
+        ]);
+        let thread_result = builtin_error_message_string(&evaluator, vec![thread_err]);
+        assert!(thread_result.is_ok());
+        let thread_text = thread_result
+            .unwrap()
+            .as_str()
+            .expect("error-message-string must return a string")
+            .to_string();
+        assert!(thread_text.starts_with("Args out of range: #<thread"));
+        assert!(thread_text.ends_with(", 0"));
+    }
+
+    #[test]
     fn builtin_error_message_string_not_cons() {
         let evaluator = super::super::eval::Evaluator::new();
 
