@@ -28,7 +28,7 @@ Last updated: 2026-02-21
 
 ## Doing
 
-- Added vm-compat lock-in for eval-dispatch `format`/`message` live-buffer and killed-buffer handle rendering:
+- Added vm-compat lock-in for eval-dispatch `format`/`message` live-buffer, killed-buffer, thread, and terminal handle rendering:
   - vm-compat corpus changes:
     - added:
       - `test/neovm/vm-compat/cases/format-message-killed-buffer-handle-semantics.forms`
@@ -36,7 +36,7 @@ Last updated: 2026-02-21
     - wired case into:
       - `test/neovm/vm-compat/cases/default.list`
   - verified:
-    - `make -C test/neovm/vm-compat check-one-neovm CASE=cases/format-message-killed-buffer-handle-semantics` (pass; `12/12`)
+    - `make -C test/neovm/vm-compat check-one-neovm CASE=cases/format-message-killed-buffer-handle-semantics` (pass; `18/18`)
 
 - Hardened runtime coverage for `error-message-string` opaque handle payload formatting:
   - runtime changes:

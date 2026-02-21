@@ -2,6 +2,8 @@
 (fboundp 'message)
 (fboundp 'generate-new-buffer)
 (fboundp 'kill-buffer)
+(fboundp 'current-thread)
+(fboundp 'terminal-list)
 
 (let* ((b (generate-new-buffer "fmt-killed-vm")))
   (kill-buffer b)
@@ -38,3 +40,13 @@
   (prog1
       (string= "msg-live-vm-lower" (message "%s" b))
     (kill-buffer b)))
+
+(string-prefix-p "#<thread" (format "%s" (current-thread)))
+
+(string-prefix-p "#<thread" (message "%s" (current-thread)))
+
+(let ((term (car (terminal-list))))
+  (string-prefix-p "#<terminal" (format "%s" term)))
+
+(let ((term (car (terminal-list))))
+  (string-prefix-p "#<terminal" (message "%s" term)))
