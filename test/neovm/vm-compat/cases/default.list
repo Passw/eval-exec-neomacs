@@ -603,6 +603,7 @@ cases/fileio-relative
 cases/file-error-conditions
 cases/error-message-string-formatting
 cases/error-message-string-handle-printing-semantics
+cases/format-message-killed-buffer-handle-semantics
 cases/process-error-conditions
 cases/process-basics
 cases/process-subr-arity-semantics

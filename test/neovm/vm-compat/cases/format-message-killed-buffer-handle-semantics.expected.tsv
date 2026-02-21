@@ -1,0 +1,7 @@
+1	(fboundp 'format)	OK t
+2	(fboundp 'message)	OK t
+3	(fboundp 'generate-new-buffer)	OK t
+4	(fboundp 'kill-buffer)	OK t
+5	(let* ((b (generate-new-buffer "fmt-killed-vm"))) (kill-buffer b) (string= (format "%S" b) "#<killed buffer>"))	OK t
+6	(let* ((b (generate-new-buffer "fmt-killed-vm-lower"))) (kill-buffer b) (string= (format "%s" b) "#<killed buffer>"))	OK t
+7	(let* ((b (generate-new-buffer "msg-killed-vm"))) (kill-buffer b) (string= (message "%S" b) "#<killed buffer>"))	OK t

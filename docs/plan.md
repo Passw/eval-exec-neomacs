@@ -28,6 +28,16 @@ Last updated: 2026-02-21
 
 ## Doing
 
+- Added vm-compat lock-in for eval-dispatch `format`/`message` killed-buffer handle rendering:
+  - vm-compat corpus changes:
+    - added:
+      - `test/neovm/vm-compat/cases/format-message-killed-buffer-handle-semantics.forms`
+      - `test/neovm/vm-compat/cases/format-message-killed-buffer-handle-semantics.expected.tsv`
+    - wired case into:
+      - `test/neovm/vm-compat/cases/default.list`
+  - verified:
+    - `make -C test/neovm/vm-compat check-one-neovm CASE=cases/format-message-killed-buffer-handle-semantics` (pass; `7/7`)
+
 - Hardened runtime coverage for `error-message-string` opaque handle payload formatting:
   - runtime changes:
     - `rust/neovm-core/src/elisp/errors.rs`
