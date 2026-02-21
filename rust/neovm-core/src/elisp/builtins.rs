@@ -9986,7 +9986,16 @@ fn builtin_text_char_description(args: Vec<Value>) -> EvalResult {
         127 => "^?".to_string(),
         _ => match char::from_u32(code as u32) {
             Some(ch) => ch.to_string(),
-            None => "\u{FFFD}\u{FFFD}\u{FFFD}\u{FFFD}".to_string(),
+            None => {
+                if let Some(encoded) = encode_nonunicode_char_for_storage(code as u32) {
+                    encoded
+                } else {
+                    return Err(signal(
+                        "wrong-type-argument",
+                        vec![Value::symbol("characterp"), args[0].clone()],
+                    ));
+                }
+            }
         },
     };
     Ok(Value::string(rendered))
@@ -19350,6 +19359,39 @@ mod tests {
             .expect("make-string should evaluate");
         let high_text = high.as_str().expect("make-string should return string output");
         assert_eq!(decode_storage_char_codes(high_text), vec![0x20_0000]);
+    }
+
+    #[test]
+    fn text_char_description_nonunicode_char_code_bounds_match_oracle() {
+        let high = dispatch_builtin_pure("text-char-description", vec![Value::Int(0x11_0000)])
+            .expect("text-char-description should resolve")
+            .expect("text-char-description should evaluate");
+        let high_text = high
+            .as_str()
+            .expect("text-char-description should return string output");
+        assert_eq!(decode_storage_char_codes(high_text), vec![0x11_0000]);
+
+        let higher = dispatch_builtin_pure("text-char-description", vec![Value::Int(0x20_0000)])
+            .expect("text-char-description should resolve")
+            .expect("text-char-description should evaluate");
+        let higher_text = higher
+            .as_str()
+            .expect("text-char-description should return string output");
+        assert_eq!(decode_storage_char_codes(higher_text), vec![0x20_0000]);
+
+        let overflow = dispatch_builtin_pure("text-char-description", vec![Value::Int(0x40_0000)])
+            .expect("text-char-description should resolve")
+            .expect_err("text-char-description should reject out-of-range character code");
+        match overflow {
+            Flow::Signal(sig) => {
+                assert_eq!(sig.symbol, "wrong-type-argument");
+                assert_eq!(
+                    sig.data,
+                    vec![Value::symbol("characterp"), Value::Int(0x40_0000)]
+                );
+            }
+            other => panic!("expected signal, got: {other:?}"),
+        }
     }
 
     #[test]

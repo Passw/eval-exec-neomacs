@@ -49,8 +49,11 @@
 49	(text-char-description 32)	OK " "
 50	(text-char-description 1)	OK "^A"
 51	(text-char-description 127)	OK "^?"
-52	(condition-case err (text-char-description 134217729) (error (car err)))	OK wrong-type-argument
-53	(condition-case err (text-char-description nil) (error (car err)))	OK wrong-type-argument
-54	(condition-case err (text-char-description 'f1) (error (car err)))	OK wrong-type-argument
-55	(condition-case err (text-char-description) (error (car err)))	OK wrong-number-of-arguments
-56	(condition-case err (text-char-description 97 nil) (error (car err)))	OK wrong-number-of-arguments
+52	(let ((s (text-char-description 1114112))) (and (= (length s) 1) (equal (string-to-list s) '(1114112))))	OK t
+53	(let ((s (text-char-description 2097152))) (and (= (length s) 1) (equal (string-to-list s) '(2097152))))	OK t
+54	(condition-case err (text-char-description 4194304) (error err))	OK (wrong-type-argument characterp 4194304)
+55	(condition-case err (text-char-description 134217729) (error (car err)))	OK wrong-type-argument
+56	(condition-case err (text-char-description nil) (error (car err)))	OK wrong-type-argument
+57	(condition-case err (text-char-description 'f1) (error (car err)))	OK wrong-type-argument
+58	(condition-case err (text-char-description) (error (car err)))	OK wrong-number-of-arguments
+59	(condition-case err (text-char-description 97 nil) (error (car err)))	OK wrong-number-of-arguments
