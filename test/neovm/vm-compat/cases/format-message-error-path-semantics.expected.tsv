@@ -28,3 +28,6 @@
 28	(let ((s (format "%c" 1114112))) (and (= (length s) 1) (equal (string-to-list s) '(1114112))))	OK t
 29	(let ((s (message "%c" 1114112))) (and (= (length s) 1) (equal (string-to-list s) '(1114112))))	OK t
 30	(let ((s (format-message "%c" 2097152))) (and (= (length s) 1) (equal (string-to-list s) '(2097152))))	OK t
+31	(condition-case err (format "%c" 4194304) (error err))	OK (wrong-type-argument characterp 4194304)
+32	(condition-case err (message "%c" 4194304) (error err))	OK (wrong-type-argument characterp 4194304)
+33	(condition-case err (format-message "%c" 4194304) (error err))	OK (wrong-type-argument characterp 4194304)

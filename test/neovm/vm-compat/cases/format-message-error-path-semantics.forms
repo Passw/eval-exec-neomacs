@@ -61,3 +61,9 @@
 (let ((s (format-message "%c" 2097152)))
   (and (= (length s) 1)
        (equal (string-to-list s) '(2097152))))
+
+(condition-case err (format "%c" 4194304) (error err))
+
+(condition-case err (message "%c" 4194304) (error err))
+
+(condition-case err (format-message "%c" 4194304) (error err))

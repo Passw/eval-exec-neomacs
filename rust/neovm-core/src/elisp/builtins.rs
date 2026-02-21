@@ -19365,6 +19365,26 @@ mod tests {
             }
         }
 
+        for builtin in ["format", "format-message", "message"] {
+            let err = dispatch_builtin(
+                &mut eval,
+                builtin,
+                vec![Value::string("%c"), Value::Int(0x40_0000)],
+            )
+            .expect("builtin should resolve")
+            .expect_err("builtin should reject out-of-range character code");
+            match err {
+                Flow::Signal(sig) => {
+                    assert_eq!(sig.symbol, "wrong-type-argument");
+                    assert_eq!(
+                        sig.data,
+                        vec![Value::symbol("characterp"), Value::Int(0x40_0000)]
+                    );
+                }
+                other => panic!("expected signal, got: {other:?}"),
+            }
+        }
+
         let high_chars = [
             ("format", 0x11_0000_i64),
             ("message", 0x11_0000_i64),
