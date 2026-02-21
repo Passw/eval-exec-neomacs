@@ -19092,6 +19092,55 @@ mod tests {
                 }
                 other => panic!("expected signal, got: {other:?}"),
             }
+
+            let negative_char = dispatch_builtin(
+                &mut eval,
+                builtin,
+                vec![Value::string("%c"), Value::Int(-1)],
+            )
+            .expect("wrapper should resolve")
+            .expect_err("wrapper should reject negative character code");
+            match negative_char {
+                Flow::Signal(sig) => {
+                    assert_eq!(sig.symbol, "wrong-type-argument");
+                    assert_eq!(sig.data, vec![Value::symbol("characterp"), Value::Int(-1)]);
+                }
+                other => panic!("expected signal, got: {other:?}"),
+            }
+
+            let overflow_char = dispatch_builtin(
+                &mut eval,
+                builtin,
+                vec![Value::string("%c"), Value::Int(0x40_0000)],
+            )
+            .expect("wrapper should resolve")
+            .expect_err("wrapper should reject out-of-range character code");
+            match overflow_char {
+                Flow::Signal(sig) => {
+                    assert_eq!(sig.symbol, "wrong-type-argument");
+                    assert_eq!(
+                        sig.data,
+                        vec![Value::symbol("characterp"), Value::Int(0x40_0000)]
+                    );
+                }
+                other => panic!("expected signal, got: {other:?}"),
+            }
+        }
+
+        let high_chars = [
+            ("message-box", 0x11_0000_i64),
+            ("message-or-box", 0x20_0000_i64),
+        ];
+        for (builtin, value) in high_chars {
+            let rendered = dispatch_builtin(
+                &mut eval,
+                builtin,
+                vec![Value::string("%c"), Value::Int(value)],
+            )
+            .expect("wrapper should resolve")
+            .expect("wrapper should evaluate");
+            let text = rendered.as_str().expect("wrapper should return a string");
+            assert_eq!(decode_storage_char_codes(text), vec![value as u32]);
         }
 
         let _ = dispatch_builtin(&mut eval, "message-box", vec![Value::string("mbox-current")])

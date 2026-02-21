@@ -125,3 +125,19 @@
 (let* ((b (generate-new-buffer "morbox-killed-vm")))
   (kill-buffer b)
   (string= (message-or-box "%s" b) "#<killed buffer>"))
+
+(condition-case err (message-box "%c" -1) (error err))
+
+(condition-case err (message-or-box "%c" -1) (error err))
+
+(condition-case err (message-box "%c" 4194304) (error err))
+
+(condition-case err (message-or-box "%c" 4194304) (error err))
+
+(let ((s (message-box "%c" 1114112)))
+  (and (= (length s) 1)
+       (equal (string-to-list s) '(1114112))))
+
+(let ((s (message-or-box "%c" 2097152)))
+  (and (= (length s) 1)
+       (equal (string-to-list s) '(2097152))))
