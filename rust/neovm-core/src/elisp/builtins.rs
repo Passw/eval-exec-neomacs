@@ -4820,6 +4820,7 @@ fn macroexpand_known_fallback_macro(name: &str, args: &[Value]) -> Result<Option
                 )
             })?;
             let mut symbol_bindings = Vec::with_capacity(bindings_src.len());
+            let mut pattern_bindings = Vec::new();
             for binding in &bindings_src {
                 let pair = list_to_vec(binding).ok_or_else(|| {
                     signal(
@@ -4830,10 +4831,16 @@ fn macroexpand_known_fallback_macro(name: &str, args: &[Value]) -> Result<Option
                 if pair.len() != 2 {
                     return Ok(None);
                 }
-                if pair[0].as_symbol_name().is_none() {
+                if pair[0].as_symbol_name().is_some() {
+                    symbol_bindings.push(Value::list(vec![pair[0].clone(), pair[1].clone()]));
+                    continue;
+                }
+                if name == "pcase-let*" {
                     return Ok(None);
                 }
-                symbol_bindings.push(Value::list(vec![pair[0].clone(), pair[1].clone()]));
+                let temp = Value::symbol(format!("x{}", symbol_bindings.len()));
+                symbol_bindings.push(Value::list(vec![temp.clone(), pair[1].clone()]));
+                pattern_bindings.push(Value::list(vec![pair[0].clone(), temp]));
             }
 
             if name == "pcase-let*" {
@@ -4842,6 +4849,18 @@ fn macroexpand_known_fallback_macro(name: &str, args: &[Value]) -> Result<Option
                 forms.push(Value::list(symbol_bindings));
                 forms.extend_from_slice(&args[1..]);
                 return Ok(Some(Value::list(forms)));
+            }
+
+            if !pattern_bindings.is_empty() {
+                let mut pcase_let_star_forms = Vec::with_capacity(args.len() + 1);
+                pcase_let_star_forms.push(Value::symbol("pcase-let*"));
+                pcase_let_star_forms.push(Value::list(pattern_bindings));
+                pcase_let_star_forms.extend_from_slice(&args[1..]);
+                return Ok(Some(Value::list(vec![
+                    Value::symbol("let"),
+                    Value::list(symbol_bindings),
+                    Value::list(pcase_let_star_forms),
+                ])));
             }
 
             if symbol_bindings.len() <= 1 {
@@ -21608,6 +21627,27 @@ mod tests {
                 ]),
             ])
         );
+        let pcase_let_mixed_forms = crate::elisp::parser::parse_forms(
+            r#"(pcase-let ((x 1) (`(,a ,b) '(2 3))) (list x a b))"#,
+        )
+        .expect("mixed pcase-let form should parse");
+        let pcase_let_mixed = crate::elisp::eval::quote_to_value(
+            pcase_let_mixed_forms
+                .first()
+                .expect("mixed pcase-let parse should yield one form"),
+        );
+        let pcase_let_mixed_expanded = builtin_macroexpand_eval(&mut eval, vec![pcase_let_mixed])
+            .expect("macroexpand should lower mixed pcase-let bindings");
+        let pcase_let_mixed_expected_forms = crate::elisp::parser::parse_forms(
+            r#"(let ((x 1) (x1 '(2 3))) (pcase-let* ((`(,a ,b) x1)) (list x a b)))"#,
+        )
+        .expect("mixed pcase-let expected expansion should parse");
+        let pcase_let_mixed_expected = crate::elisp::eval::quote_to_value(
+            pcase_let_mixed_expected_forms
+                .first()
+                .expect("mixed pcase-let expected parse should yield one form"),
+        );
+        assert_eq!(pcase_let_mixed_expanded, pcase_let_mixed_expected);
         let pcase_let_star = Value::list(vec![
             Value::symbol("pcase-let*"),
             Value::list(vec![
