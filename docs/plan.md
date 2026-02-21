@@ -18127,6 +18127,27 @@ Last updated: 2026-02-21
 
 ## Doing
 
+- Added `minor-mode-key-binding` emulation-alist iteration lock-ins:
+  - runtime notes:
+    - no runtime change needed; current emulation alist traversal/error behavior already matches oracle.
+  - vm-compat corpus changes:
+    - added and wired:
+      - `test/neovm/vm-compat/cases/minor-mode-key-binding-emulation-alist-iteration-semantics.forms`
+      - `test/neovm/vm-compat/cases/minor-mode-key-binding-emulation-alist-iteration-semantics.expected.tsv`
+      - `test/neovm/vm-compat/cases/default.list`
+    - lock-ins cover:
+      - emulation alist list ordering precedence,
+      - fallback when earlier alists are inactive,
+      - intra-alist pair ordering precedence,
+      - symbol-indirected emulation alist entries,
+      - missing-symbol fallback,
+      - invalid active keymap-handle entry signaling behavior,
+      - invalid inactive keymap-handle entry skip behavior.
+  - verified:
+    - `make -C test/neovm/vm-compat record FORMS=cases/minor-mode-key-binding-emulation-alist-iteration-semantics.forms EXPECTED=cases/minor-mode-key-binding-emulation-alist-iteration-semantics.expected.tsv` (pass)
+    - `make -C test/neovm/vm-compat check-one-neovm CASE=cases/minor-mode-key-binding-emulation-alist-iteration-semantics` (pass; `9/9`)
+    - `make -C test/neovm/vm-compat check-all-neovm-strict` (pass; case inventory `879`)
+
 - Added `command-remapping` emulation-alist iteration lock-ins (ordering + fallback semantics):
   - runtime notes:
     - no runtime code change needed; existing emulation alist traversal behavior matches oracle.

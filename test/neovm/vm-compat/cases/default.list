@@ -209,6 +209,7 @@ cases/key-binding-empty-designator-semantics
 cases/key-binding-arity-semantics
 cases/key-binding-default-self-insert-semantics
 cases/minor-mode-key-binding-semantics
+cases/minor-mode-key-binding-emulation-alist-iteration-semantics
 cases/command-remapping-modes-boundary-semantics
 cases/command-remapping-remap-lookup-semantics
 cases/command-remapping-lisp-keymap-semantics
