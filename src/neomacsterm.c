@@ -111,8 +111,7 @@ static Lisp_Object neomacs_get_focus_frame (struct frame *frame);
 static void neomacs_buffer_flipping_unblocked (struct frame *f);
 static void neomacs_set_frame_alpha (struct frame *f);
 static bool neomacs_bitmap_icon (struct frame *f, Lisp_Object file);
-static uint32_t neomacs_get_or_load_image (struct neomacs_display_info *dpyinfo,
-                                           struct image *img);
+static uint32_t neomacs_load_image (struct image *img);
 
 /* Event queue for buffering input events from render thread callbacks */
 struct neomacs_event_queue_t
@@ -1456,7 +1455,7 @@ neomacs_extract_window_glyphs (struct window *w, void *user_data)
                     struct image *img = IMAGE_FROM_ID (f, glyph->u.img_id);
                     if (img)
                       {
-                        uint32_t gpu_id = neomacs_get_or_load_image (dpyinfo, img);
+                        uint32_t gpu_id = neomacs_load_image (img);
                         if (gpu_id != 0)
                           {
                             int img_w = img->width > 0 ? img->width : glyph->pixel_width;
@@ -3119,7 +3118,7 @@ neomacs_layout_status_line_text_1 (struct window *w, struct frame *f,
                         {
                           prepare_image_for_display (f, img);
                           uint32_t gpu_id
-                            = neomacs_get_or_load_image (dpyinfo, img);
+                            = neomacs_load_image (img);
 
                           ptrdiff_t boff
                             = string_char_to_byte (result, dcharpos);
@@ -3454,7 +3453,7 @@ resolve_display_image (struct frame *f, struct window *w,
     return false;
 
   prepare_image_for_display (f, img);
-  uint32_t gpu_id = neomacs_get_or_load_image (dpyinfo, img);
+  uint32_t gpu_id = neomacs_load_image (img);
   if (gpu_id == 0)
     return false;
 
@@ -4906,7 +4905,7 @@ extract_margin_spec (struct frame *f, struct window *w,
                     {
                       prepare_image_for_display (f, img);
                       uint32_t gpu_id
-                        = neomacs_get_or_load_image (dpyinfo, img);
+                        = neomacs_load_image (img);
                       if (gpu_id != 0)
                         {
                           if (is_left)
@@ -7194,7 +7193,7 @@ neomacs_draw_glyph_string (struct glyph_string *s)
               /* Handle image glyphs via GPU rendering */
               if (s->img)
                 {
-                  uint32_t gpu_id = neomacs_get_or_load_image (dpyinfo, s->img);
+                  uint32_t gpu_id = neomacs_load_image (s->img);
                   if (gpu_id != 0)
                     {
                       /* Calculate image position and dimensions */
@@ -7325,7 +7324,7 @@ neomacs_draw_glyph_string (struct glyph_string *s)
           /* Forward image glyph to Rust scene graph */
           if (s->img)
             {
-              uint32_t gpu_id = neomacs_get_or_load_image (dpyinfo, s->img);
+              uint32_t gpu_id = neomacs_load_image (s->img);
               if (gpu_id != 0)
                 neomacs_display_add_image_glyph (dpyinfo->display_handle,
                                                   gpu_id,
@@ -7631,169 +7630,89 @@ neomacs_compute_glyph_string_overhangs (struct glyph_string *s)
     }
 }
 
-/* Get GPU image ID for an Emacs image, loading it if necessary.
-   GPU ID is stored directly on struct image (img->neomacs_gpu_id),
-   eliminating the separate cache that caused dangling pointer bugs
-   when Emacs freed and reallocated image structs.  */
-static uint32_t
-neomacs_get_or_load_image (struct neomacs_display_info *dpyinfo, struct image *img)
+/* Extract image loading info from struct image into a flat C struct.
+   This is a thin extractor — all loading decisions happen in Rust
+   (neomacs_rust_load_image).  */
+static void
+neomacs_extract_image_load_info (struct image *img,
+                                  struct NeomacsImageLoadInfo *info)
 {
-  if (!dpyinfo || !dpyinfo->display_handle || !img)
-    return 0;
+  memset (info, 0, sizeof (*info));
+  info->existing_gpu_id = img->neomacs_gpu_id;
+  info->scale = 1.0;
 
-  /* Already uploaded to GPU? */
-  if (img->neomacs_gpu_id != 0)
-    {
-      /* If dimensions aren't set yet, try to get them now (async load may have completed) */
-      if (img->width == 0 || img->height == 0)
-        {
-          int actual_w, actual_h;
-          if (neomacs_display_get_image_size (dpyinfo->display_handle,
-                                               img->neomacs_gpu_id,
-                                               &actual_w, &actual_h) == 0)
-            {
-              img->width = actual_w;
-              img->height = actual_h;
-            }
-        }
-      return img->neomacs_gpu_id;
-    }
-
-  /* Not yet on GPU - load the image */
-  uint32_t gpu_id = 0;
-
-  /* Try to load from pixmap data if available (Emacs decoded it).
-     Skip the sentinel pixmap (1) set by neomacs_load to prevent
-     prepare_image_for_display from re-calling load.  */
+  /* Pixmap path — Emacs Cairo decoded the image.
+     Skip the sentinel pixmap (1) set by neomacs_load.  */
   if (img->pixmap && img->pixmap != (Emacs_Pixmap) 1 && img->pixmap->data)
     {
-      /* Emacs Cairo uses ARGB32 or RGB24 format */
-      int width = img->pixmap->width;
-      int height = img->pixmap->height;
-      int stride = img->pixmap->bytes_per_line;
-      unsigned char *data = (unsigned char *) img->pixmap->data;
-      int bpp = img->pixmap->bits_per_pixel;
-
-      /* Check if image has alpha (mask or ARGB32 bits_per_pixel) */
-      if (img->mask || bpp == 32)
-        {
-          gpu_id = neomacs_display_load_image_argb32 (dpyinfo->display_handle,
-                                                       data, width, height, stride);
-        }
-      else
-        {
-          gpu_id = neomacs_display_load_image_rgb24 (dpyinfo->display_handle,
-                                                      data, width, height, stride);
-        }
+      info->pixmap_data = (const unsigned char *) img->pixmap->data;
+      info->pixmap_width = img->pixmap->width;
+      info->pixmap_height = img->pixmap->height;
+      info->pixmap_stride = img->pixmap->bytes_per_line;
+      info->pixmap_bpp = img->pixmap->bits_per_pixel;
+      info->pixmap_has_mask = (img->mask != 0) ? 1 : 0;
     }
-  else if (CONSP (img->spec))
-    {
-      /* Pixmap not available - Emacs couldn't decode (missing libpng/libjpeg etc.)
-         or this is a neomacs image type. Try to load via gdk-pixbuf.
-         Image spec format: (image :type TYPE :file PATH :width W :height H ...) */
 
-      /* First check for :neomacs-id (pre-loaded by neomacs-insert-image) */
-      Lisp_Object neomacs_id_sym = intern (":neomacs-id");
-      Lisp_Object neomacs_id = plist_get (XCDR (img->spec), neomacs_id_sym);
+  /* Spec-based properties */
+  if (CONSP (img->spec))
+    {
+      Lisp_Object plist = XCDR (img->spec);
+
+      Lisp_Object neomacs_id = plist_get (plist, intern (":neomacs-id"));
       if (FIXNUMP (neomacs_id))
+        info->neomacs_id = (uint32_t) XFIXNUM (neomacs_id);
+
+      Lisp_Object file = plist_get (plist, QCfile);
+      if (STRINGP (file))
+        info->file_path = SSDATA (file);
+
+      Lisp_Object data = plist_get (plist, QCdata);
+      if (STRINGP (data))
         {
-          /* Image was already loaded by neomacs-insert-image */
-          gpu_id = (uint32_t) XFIXNUM (neomacs_id);
+          info->encoded_data = (const unsigned char *) SDATA (data);
+          info->encoded_data_len = SBYTES (data);
         }
-      else
-        {
-          /* Try to load from :file or :data */
-          Lisp_Object file = plist_get (XCDR (img->spec), QCfile);
-          Lisp_Object data = plist_get (XCDR (img->spec), QCdata);
 
-          /* Check for dimension constraints */
-          Lisp_Object max_width = plist_get (XCDR (img->spec), QCmax_width);
-          Lisp_Object max_height = plist_get (XCDR (img->spec), QCmax_height);
-          Lisp_Object width = plist_get (XCDR (img->spec), QCwidth);
-          Lisp_Object height = plist_get (XCDR (img->spec), QCheight);
-          Lisp_Object scale = plist_get (XCDR (img->spec), QCscale);
+      Lisp_Object mw = plist_get (plist, QCmax_width);
+      if (FIXNUMP (mw)) info->max_width = XFIXNUM (mw);
 
-          int mw = FIXNUMP (max_width) ? XFIXNUM (max_width) : 0;
-          int mh = FIXNUMP (max_height) ? XFIXNUM (max_height) : 0;
-          int tw = FIXNUMP (width) ? XFIXNUM (width) : 0;  /* target width */
-          int th = FIXNUMP (height) ? XFIXNUM (height) : 0; /* target height */
-          double sc = NUMBERP (scale) ? XFLOATINT (scale) : 1.0;
+      Lisp_Object mh = plist_get (plist, QCmax_height);
+      if (FIXNUMP (mh)) info->max_height = XFIXNUM (mh);
 
-          if (STRINGP (file))
-            {
-              const char *path = SSDATA (file);
+      Lisp_Object w = plist_get (plist, QCwidth);
+      if (FIXNUMP (w)) info->target_width = XFIXNUM (w);
 
-              if (mw > 0 || mh > 0)
-                gpu_id = neomacs_display_load_image_file_scaled (dpyinfo->display_handle,
-                                                                  path, mw, mh);
-              else
-                gpu_id = neomacs_display_load_image_file (dpyinfo->display_handle, path);
-            }
-          else if (STRINGP (data))
-            {
-              /* Inline image data */
-              const unsigned char *bytes = (const unsigned char *) SDATA (data);
-              ptrdiff_t len = SBYTES (data);
+      Lisp_Object h = plist_get (plist, QCheight);
+      if (FIXNUMP (h)) info->target_height = XFIXNUM (h);
 
-              if (mw > 0 || mh > 0)
-                gpu_id = neomacs_display_load_image_data_scaled (dpyinfo->display_handle,
-                                                                  bytes, len, mw, mh);
-              else
-                gpu_id = neomacs_display_load_image_data (dpyinfo->display_handle, bytes, len);
-            }
-
-          if (gpu_id != 0)
-            {
-              /* Get actual dimensions from GPU cache */
-              int actual_w, actual_h;
-              if (neomacs_display_get_image_size (dpyinfo->display_handle, gpu_id,
-                                                   &actual_w, &actual_h) == 0)
-                {
-                  /* Apply :scale if specified */
-                  if (sc != 1.0 && sc > 0)
-                    {
-                      actual_w = (int)(actual_w * sc);
-                      actual_h = (int)(actual_h * sc);
-                    }
-
-                  /* Compute final dimensions respecting :width/:height with aspect ratio */
-                  if (tw > 0 && th > 0)
-                    {
-                      img->width = tw;
-                      img->height = th;
-                    }
-                  else if (tw > 0)
-                    {
-                      img->width = tw;
-                      img->height = (int)((double)tw * actual_h / actual_w);
-                    }
-                  else if (th > 0)
-                    {
-                      img->height = th;
-                      img->width = (int)((double)th * actual_w / actual_h);
-                    }
-                  else
-                    {
-                      img->width = actual_w;
-                      img->height = actual_h;
-                    }
-                }
-            }
-        }  /* end else (load from file/data) */
+      Lisp_Object sc = plist_get (plist, QCscale);
+      if (NUMBERP (sc)) info->scale = XFLOATINT (sc);
     }
 
-  if (gpu_id == 0)
+  info->img_width = img->width;
+  info->img_height = img->height;
+}
+
+/* Load an image via Rust, updating img fields.
+   Thin wrapper around neomacs_extract_image_load_info + neomacs_rust_load_image.  */
+static uint32_t
+neomacs_load_image (struct image *img)
+{
+  if (!img)
+    return 0;
+
+  struct NeomacsImageLoadInfo info;
+  neomacs_extract_image_load_info (img, &info);
+  struct NeomacsImageLoadResult result = neomacs_rust_load_image (&info);
+  if (result.gpu_id != 0)
     {
-      /* Only warn if we actually tried to load something */
-      if (img->width > 0 && img->height > 0)
-        nlog_warn ("Failed to load image %dx%d", img->width, img->height);
-      return 0;
+      img->neomacs_gpu_id = result.gpu_id;
+      if (result.width > 0)
+        img->width = result.width;
+      if (result.height > 0)
+        img->height = result.height;
     }
-
-  /* Store GPU ID directly on the image struct */
-  img->neomacs_gpu_id = gpu_id;
-
-  return gpu_id;
+  return result.gpu_id;
 }
 
 /* Draw vertical window border - used for horizontal splits (C-x 3) */

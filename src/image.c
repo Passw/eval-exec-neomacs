@@ -13083,12 +13083,12 @@ neomacs_load (struct frame *f, struct image *img)
     }
   else if (STRINGP (data))
     {
-      /* Inline image data - query dimensions synchronously first,
-         then trigger async GPU loading.  */
+      /* Inline image data — load via Rust and store GPU ID to avoid
+         double-loading in neomacs_load_image later.  */
       const unsigned char *bytes = (const unsigned char *) SDATA (data);
       ptrdiff_t len = SBYTES (data);
 
-      /* Get dimensions synchronously (reads header only, no GPU) */
+      /* Query dimensions synchronously (reads header only, no GPU) */
       neomacs_display_query_image_data_size (dpyinfo->display_handle,
                                               bytes, len,
                                               &actual_w, &actual_h);
@@ -13109,13 +13109,19 @@ neomacs_load (struct frame *f, struct image *img)
             }
         }
 
-      /* Trigger async GPU loading (dimensions already known) */
-      if (mw > 0 || mh > 0)
-        neomacs_display_load_image_data_scaled (dpyinfo->display_handle,
-                                                 bytes, len, mw, mh);
-      else
-        neomacs_display_load_image_data (dpyinfo->display_handle,
-                                          bytes, len);
+      /* Load via Rust and store GPU ID on the image struct */
+      struct NeomacsImageLoadInfo load_info;
+      memset (&load_info, 0, sizeof (load_info));
+      load_info.encoded_data = bytes;
+      load_info.encoded_data_len = len;
+      load_info.max_width = mw;
+      load_info.max_height = mh;
+      load_info.scale = 1.0;
+      load_info.img_width = actual_w;
+      load_info.img_height = actual_h;
+      struct NeomacsImageLoadResult result = neomacs_rust_load_image (&load_info);
+      if (result.gpu_id != 0)
+        img->neomacs_gpu_id = result.gpu_id;
     }
 
   if (actual_w > 0 && actual_h > 0)

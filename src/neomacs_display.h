@@ -472,6 +472,44 @@ int neomacs_display_query_image_data_size(struct NeomacsDisplay *handle,
 int neomacs_display_free_image(struct NeomacsDisplay *handle, uint32_t imageId);
 
 /**
+ * Image loading info extracted from struct image fields.
+ * C fills this, Rust decides how to load.
+ */
+struct NeomacsImageLoadInfo {
+    uint32_t existing_gpu_id;
+    const unsigned char *pixmap_data;
+    int pixmap_width;
+    int pixmap_height;
+    int pixmap_stride;
+    int pixmap_bpp;
+    int pixmap_has_mask;
+    const char *file_path;
+    const unsigned char *encoded_data;
+    ptrdiff_t encoded_data_len;
+    uint32_t neomacs_id;
+    int max_width;
+    int max_height;
+    int target_width;
+    int target_height;
+    double scale;
+    int img_width;
+    int img_height;
+};
+
+struct NeomacsImageLoadResult {
+    uint32_t gpu_id;
+    int width;
+    int height;
+};
+
+/**
+ * Centralized image loading — replaces neomacs_get_or_load_image().
+ * C extracts struct image fields into NeomacsImageLoadInfo,
+ * Rust decides loading path and returns GPU ID + dimensions.
+ */
+struct NeomacsImageLoadResult neomacs_rust_load_image(const struct NeomacsImageLoadInfo *info);
+
+/**
  * Set a floating video at a specific screen position
  */
 void neomacs_display_set_floating_video(struct NeomacsDisplay *handle,

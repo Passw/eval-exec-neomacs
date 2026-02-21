@@ -5,6 +5,215 @@
 use super::*;
 
 // ============================================================================
+// Centralized Image Loading (replaces C-side neomacs_get_or_load_image)
+// ============================================================================
+
+/// Image loading info extracted from C `struct image` fields.
+/// C fills this via `neomacs_extract_image_load_info()`, Rust decides how to load.
+#[repr(C)]
+pub struct NeomacsImageLoadInfo {
+    /// Existing GPU ID from img->neomacs_gpu_id (0 if not yet loaded)
+    pub existing_gpu_id: u32,
+
+    // === Pixmap source (Emacs Cairo decoded) ===
+    pub pixmap_data: *const u8,    // NULL if no pixmap
+    pub pixmap_width: c_int,
+    pub pixmap_height: c_int,
+    pub pixmap_stride: c_int,
+    pub pixmap_bpp: c_int,         // 24 or 32
+    pub pixmap_has_mask: c_int,    // 1 if img->mask != 0
+
+    // === File source ===
+    pub file_path: *const c_char,  // NULL if not file-based
+
+    // === Encoded data source ===
+    pub encoded_data: *const u8,   // NULL if not data-based
+    pub encoded_data_len: isize,
+
+    // === Pre-loaded ID from :neomacs-id ===
+    pub neomacs_id: u32,           // 0 if not pre-loaded
+
+    // === Dimension constraints from spec ===
+    pub max_width: c_int,
+    pub max_height: c_int,
+    pub target_width: c_int,
+    pub target_height: c_int,
+    pub scale: c_double,           // 1.0 = no scaling
+
+    // === Current image dimensions ===
+    pub img_width: c_int,
+    pub img_height: c_int,
+}
+
+/// Result of image loading — GPU ID and final display dimensions.
+#[repr(C)]
+pub struct NeomacsImageLoadResult {
+    pub gpu_id: u32,     // 0 on failure
+    pub width: c_int,    // Final display width
+    pub height: c_int,   // Final display height
+}
+
+/// Apply :scale, :width, :height constraints to actual image dimensions.
+fn apply_dimension_constraints(
+    actual_w: u32,
+    actual_h: u32,
+    scale: f64,
+    target_w: c_int,
+    target_h: c_int,
+) -> (u32, u32) {
+    let mut w = actual_w as f64;
+    let mut h = actual_h as f64;
+
+    if scale != 1.0 && scale > 0.0 {
+        w *= scale;
+        h *= scale;
+    }
+
+    if target_w > 0 && target_h > 0 {
+        (target_w as u32, target_h as u32)
+    } else if target_w > 0 {
+        let tw = target_w as f64;
+        if w > 0.0 {
+            (target_w as u32, (tw * h / w) as u32)
+        } else {
+            (target_w as u32, target_w as u32)
+        }
+    } else if target_h > 0 {
+        let th = target_h as f64;
+        if h > 0.0 {
+            ((th * w / h) as u32, target_h as u32)
+        } else {
+            (target_h as u32, target_h as u32)
+        }
+    } else {
+        (w as u32, h as u32)
+    }
+}
+
+/// Centralized image loading function called from C.
+/// Replaces the ~170-line `neomacs_get_or_load_image()` in neomacsterm.c.
+#[no_mangle]
+pub unsafe extern "C" fn neomacs_rust_load_image(
+    info: *const NeomacsImageLoadInfo,
+) -> NeomacsImageLoadResult {
+    let info = &*info;
+    let mut result = NeomacsImageLoadResult {
+        gpu_id: 0,
+        width: info.img_width,
+        height: info.img_height,
+    };
+
+    // Path 0: Already loaded — just query dimensions if missing
+    if info.existing_gpu_id != 0 {
+        result.gpu_id = info.existing_gpu_id;
+        if result.width == 0 || result.height == 0 {
+            if let Some(ref state) = THREADED_STATE {
+                if let Ok(dims) = state.image_dimensions.lock() {
+                    if let Some(&(w, h)) = dims.get(&result.gpu_id) {
+                        result.width = w as c_int;
+                        result.height = h as c_int;
+                    }
+                }
+            }
+        }
+        return result;
+    }
+
+    let state = match THREADED_STATE.as_ref() {
+        Some(s) => s,
+        None => return result,
+    };
+
+    let mut gpu_id: u32 = 0;
+
+    // Path 1: Pre-loaded neomacs-id
+    if info.neomacs_id != 0 {
+        gpu_id = info.neomacs_id;
+    }
+    // Path 2: Pixmap (Emacs Cairo decoded)
+    else if !info.pixmap_data.is_null() && info.pixmap_width > 0 && info.pixmap_height > 0 {
+        let data_len = match (info.pixmap_stride as usize).checked_mul(info.pixmap_height as usize)
+        {
+            Some(len) => len,
+            None => return result,
+        };
+        let data = std::slice::from_raw_parts(info.pixmap_data, data_len);
+        let id = IMAGE_ID_COUNTER.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+
+        let cmd = if info.pixmap_has_mask != 0 || info.pixmap_bpp == 32 {
+            RenderCommand::ImageLoadArgb32 {
+                id,
+                data: data.to_vec(),
+                width: info.pixmap_width as u32,
+                height: info.pixmap_height as u32,
+                stride: info.pixmap_stride as u32,
+            }
+        } else {
+            RenderCommand::ImageLoadRgb24 {
+                id,
+                data: data.to_vec(),
+                width: info.pixmap_width as u32,
+                height: info.pixmap_height as u32,
+                stride: info.pixmap_stride as u32,
+            }
+        };
+        let _ = state.emacs_comms.cmd_tx.try_send(cmd);
+        gpu_id = id;
+    }
+    // Path 3: File
+    else if !info.file_path.is_null() {
+        let path = std::ffi::CStr::from_ptr(info.file_path).to_string_lossy();
+        let id = IMAGE_ID_COUNTER.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+        let cmd = RenderCommand::ImageLoadFile {
+            id,
+            path: path.into_owned(),
+            max_width: info.max_width.max(0) as u32,
+            max_height: info.max_height.max(0) as u32,
+        };
+        let _ = state.emacs_comms.cmd_tx.try_send(cmd);
+        gpu_id = id;
+    }
+    // Path 4: Encoded data
+    else if !info.encoded_data.is_null() && info.encoded_data_len > 0 {
+        let data =
+            std::slice::from_raw_parts(info.encoded_data, info.encoded_data_len as usize);
+        let id = IMAGE_ID_COUNTER.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+        let cmd = RenderCommand::ImageLoadData {
+            id,
+            data: data.to_vec(),
+            max_width: info.max_width.max(0) as u32,
+            max_height: info.max_height.max(0) as u32,
+        };
+        let _ = state.emacs_comms.cmd_tx.try_send(cmd);
+        gpu_id = id;
+    }
+
+    if gpu_id == 0 {
+        return result;
+    }
+
+    result.gpu_id = gpu_id;
+
+    // Try to get actual dimensions from shared map (for file/data paths
+    // where the render thread may have already loaded the image)
+    if let Ok(dims) = state.image_dimensions.lock() {
+        if let Some(&(actual_w, actual_h)) = dims.get(&gpu_id) {
+            let (aw, ah) = apply_dimension_constraints(
+                actual_w,
+                actual_h,
+                info.scale,
+                info.target_width,
+                info.target_height,
+            );
+            result.width = aw as c_int;
+            result.height = ah as c_int;
+        }
+    }
+
+    result
+}
+
+// ============================================================================
 // Image Management (stubs - no GTK4 backend)
 // ============================================================================
 

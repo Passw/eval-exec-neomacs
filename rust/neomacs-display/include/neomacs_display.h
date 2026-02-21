@@ -255,6 +255,43 @@
 typedef void (*ResizeCallbackFn)(void *user_data, int width, int height);
 
 /**
+ * Result of image loading — GPU ID and final display dimensions.
+ */
+typedef struct NeomacsImageLoadResult {
+  uint32_t gpuId;
+  int width;
+  int height;
+} NeomacsImageLoadResult;
+
+/**
+ * Image loading info extracted from C `struct image` fields.
+ * C fills this via `neomacs_extract_image_load_info()`, Rust decides how to load.
+ */
+typedef struct NeomacsImageLoadInfo {
+  /**
+   * Existing GPU ID from img->neomacs_gpu_id (0 if not yet loaded)
+   */
+  uint32_t existingGpuId;
+  const uint8_t *pixmapData;
+  int pixmapWidth;
+  int pixmapHeight;
+  int pixmapStride;
+  int pixmapBpp;
+  int pixmapHasMask;
+  const char *filePath;
+  const uint8_t *encodedData;
+  intptr_t encodedDataLen;
+  uint32_t neomacsId;
+  int maxWidth;
+  int maxHeight;
+  int targetWidth;
+  int targetHeight;
+  double scale;
+  int imgWidth;
+  int imgHeight;
+} NeomacsImageLoadInfo;
+
+/**
  * Popup menu item passed from C.
  */
 typedef struct CPopupMenuItem {
@@ -1081,6 +1118,12 @@ void neomacs_display_set_background(struct NeomacsDisplay *handle, uint32_t colo
  * alpha is 0.0 (fully transparent) to 1.0 (fully opaque).
  */
 void neomacs_display_set_background_alpha(struct NeomacsDisplay *handle, float alpha);
+
+/**
+ * Centralized image loading function called from C.
+ * Replaces the ~170-line `neomacs_get_or_load_image()` in neomacsterm.c.
+ */
+struct NeomacsImageLoadResult neomacs_rust_load_image(const struct NeomacsImageLoadInfo *info);
 
 /**
  * Add a video glyph to the current row
