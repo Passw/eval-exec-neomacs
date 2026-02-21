@@ -1,6 +1,7 @@
 (fboundp 'error-message-string)
 (fboundp 'make-mutex)
 (fboundp 'make-condition-variable)
+(fboundp 'terminal-list)
 
 (let ((msg (condition-case e
                (progn (error "%S" (make-mutex)) "")
@@ -13,3 +14,9 @@
                 (progn (error "%S" cv) "")
               (error (error-message-string e)))))
   (string-prefix-p "#<condvar" msg))
+
+(let* ((term (car (terminal-list)))
+       (msg (condition-case e
+                (progn (error "%S" term) "")
+              (error (error-message-string e)))))
+  (string-prefix-p "#<terminal" msg))

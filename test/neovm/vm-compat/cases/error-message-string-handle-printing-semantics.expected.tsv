@@ -1,5 +1,7 @@
 1	(fboundp 'error-message-string)	OK t
 2	(fboundp 'make-mutex)	OK t
 3	(fboundp 'make-condition-variable)	OK t
-4	(let ((msg (condition-case e (progn (error "%S" (make-mutex)) "") (error (error-message-string e))))) (string-prefix-p "#<mutex" msg))	OK t
-5	(let* ((m (make-mutex)) (cv (make-condition-variable m)) (msg (condition-case e (progn (error "%S" cv) "") (error (error-message-string e))))) (string-prefix-p "#<condvar" msg))	OK t
+4	(fboundp 'terminal-list)	OK t
+5	(let ((msg (condition-case e (progn (error "%S" (make-mutex)) "") (error (error-message-string e))))) (string-prefix-p "#<mutex" msg))	OK t
+6	(let* ((m (make-mutex)) (cv (make-condition-variable m)) (msg (condition-case e (progn (error "%S" cv) "") (error (error-message-string e))))) (string-prefix-p "#<condvar" msg))	OK t
+7	(let* ((term (car (terminal-list))) (msg (condition-case e (progn (error "%S" term) "") (error (error-message-string e))))) (string-prefix-p "#<terminal" msg))	OK t

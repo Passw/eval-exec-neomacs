@@ -47,7 +47,7 @@ Last updated: 2026-02-21
     - `cargo test --manifest-path rust/neovm-core/Cargo.toml builtin_error_message_string_formats_terminal_handles -- --nocapture` (pass)
     - `cargo test --manifest-path rust/neovm-core/Cargo.toml eval_context_printer_renders_condvar_handles_consistently -- --nocapture` (pass)
 
-- Added lock-in coverage for `error-message-string` handle payload rendering of mutex/condition-variable objects:
+- Added lock-in coverage for `error-message-string` handle payload rendering of mutex/condition-variable/terminal objects:
   - vm-compat corpus changes:
     - added:
       - `test/neovm/vm-compat/cases/error-message-string-handle-printing-semantics.forms`
@@ -55,7 +55,7 @@ Last updated: 2026-02-21
     - wired case into:
       - `test/neovm/vm-compat/cases/default.list`
   - verified:
-    - `make -C test/neovm/vm-compat check-one-neovm CASE=cases/error-message-string-handle-printing-semantics` (pass; `5/5`)
+    - `make -C test/neovm/vm-compat check-one-neovm CASE=cases/error-message-string-handle-printing-semantics` (pass; `7/7`)
     - `make -C test/neovm/vm-compat check-all-neovm-strict` (pass)
 
 - Aligned `error-message-string` buffer-handle rendering with Oracle and added dedicated stale/live lock-ins:
