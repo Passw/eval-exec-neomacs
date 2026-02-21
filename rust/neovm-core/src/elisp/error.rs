@@ -590,6 +590,31 @@ mod tests {
     }
 
     #[test]
+    fn eval_context_printer_renders_terminal_thread_handles_consistently() -> Result<(), EvalError>
+    {
+        let forms =
+            parse_forms("(list (car (terminal-list)) (current-thread))").map_err(|err| {
+                EvalError::Signal {
+                    symbol: "parse-error".to_string(),
+                    data: vec![Value::string(err.to_string())],
+                }
+            })?;
+
+        let mut eval = Evaluator::new();
+        let value = eval.eval_expr(&forms[0])?;
+        let printed = print_value_with_eval(&eval, &value);
+
+        assert!(printed.starts_with("(#<terminal"));
+        assert!(printed.contains("#<thread"));
+        assert_eq!(
+            String::from_utf8(print_value_bytes_with_eval(&eval, &value)).unwrap(),
+            printed
+        );
+
+        Ok(())
+    }
+
+    #[test]
     fn eval_context_printer_renders_hash_s_literal_shorthand() {
         let eval = Evaluator::new();
         let literal = Value::list(vec![
