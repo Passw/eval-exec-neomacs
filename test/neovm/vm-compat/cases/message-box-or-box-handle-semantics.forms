@@ -10,6 +10,10 @@
 (fboundp 'make-condition-variable)
 (fboundp 'current-message)
 
+(condition-case err (message-box) (error err))
+
+(condition-case err (message-or-box) (error err))
+
 (eq (message-box nil) nil)
 
 (eq (message-or-box nil) nil)

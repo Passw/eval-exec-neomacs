@@ -19026,6 +19026,22 @@ mod tests {
     #[test]
     fn message_box_wrappers_render_opaque_handles_in_eval_dispatch() {
         let mut eval = crate::elisp::eval::Evaluator::new();
+        for (builtin, symbol) in [
+            ("message-box", "message-box"),
+            ("message-or-box", "message-or-box"),
+        ] {
+            let err = dispatch_builtin(&mut eval, builtin, vec![])
+                .expect("wrapper should resolve")
+                .expect_err("wrapper should signal on missing format argument");
+            match err {
+                Flow::Signal(sig) => {
+                    assert_eq!(sig.symbol, "wrong-number-of-arguments");
+                    assert_eq!(sig.data, vec![Value::symbol(symbol), Value::Int(0)]);
+                }
+                other => panic!("expected signal, got: {other:?}"),
+            }
+        }
+
         let message_box_nil = dispatch_builtin(&mut eval, "message-box", vec![Value::Nil])
             .expect("message-box should resolve")
             .expect("message-box should evaluate");

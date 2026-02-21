@@ -28,6 +28,25 @@ Last updated: 2026-02-21
 
 ## Doing
 
+- Added explicit zero-arity error lock-ins for `message-box` / `message-or-box`:
+  - vm-compat corpus changes:
+    - updated:
+      - `test/neovm/vm-compat/cases/message-box-or-box-handle-semantics.forms`
+      - `test/neovm/vm-compat/cases/message-box-or-box-handle-semantics.expected.tsv`
+    - added rows asserting:
+      - `(condition-case err (message-box) (error err))`
+      - `(condition-case err (message-or-box) (error err))`
+      - both return `(wrong-number-of-arguments ... 0)` payloads.
+  - runtime changes:
+    - `rust/neovm-core/src/elisp/builtins.rs`
+      - extended evaluator coverage:
+        - `message_box_wrappers_render_opaque_handles_in_eval_dispatch`
+      - test now asserts both wrappers signal `wrong-number-of-arguments` on missing format arg.
+  - verified:
+    - `cargo test --manifest-path rust/neovm-core/Cargo.toml message_box_wrappers_render_opaque_handles_in_eval_dispatch -- --nocapture` (pass)
+    - `make -C test/neovm/vm-compat check-one-neovm CASE=cases/message-box-or-box-handle-semantics` (pass; `53/53`)
+    - `make -C test/neovm/vm-compat check-neovm-filter-strict LIST=cases/default.list PATTERN='message-box-or-box-handle-semantics'` (pass; strict filtered gates green)
+
 - Extended strict format-spec/type mismatch parity for `format` / `format-message` / `message` (`%d`/`%f`/`%c`):
   - runtime changes:
     - `rust/neovm-core/src/elisp/builtins.rs`
