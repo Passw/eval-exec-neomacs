@@ -19,8 +19,6 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 #ifndef MENU_H
 #define MENU_H
 
-#include "../lwlib/lwlib-widget.h"
-
 /* Bit fields used by terminal-specific menu_show_hook.  */
 
 enum {
@@ -35,14 +33,6 @@ extern void discard_menu_items (void);
 extern void save_menu_items (void);
 extern bool parse_single_submenu (Lisp_Object, Lisp_Object, Lisp_Object);
 extern void list_of_panes (Lisp_Object);
-#ifdef HAVE_EXT_MENU_BAR
-extern void free_menubar_widget_value_tree (widget_value *);
-extern void update_submenu_strings (widget_value *);
-extern void find_and_call_menu_selection (struct frame *, int,
-                                          Lisp_Object, void *);
-extern widget_value *make_widget_value (const char *, char *, bool, Lisp_Object);
-extern widget_value *digest_single_submenu (int, int, bool);
-#endif
 
 
 extern Lisp_Object tty_menu_show (struct frame *, int, int, int,

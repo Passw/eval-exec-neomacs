@@ -28,6 +28,27 @@ Last updated: 2026-02-21
 
 ## Doing
 
+- Aligned invalid lambda `interactive` control-letter handling with Oracle and added lock-ins:
+  - runtime changes:
+    - `rust/neovm-core/src/elisp/interactive.rs`
+      - invalid interactive control letters now signal `error` with the Oracle-shaped
+        "Invalid control letter ..." payload instead of falling through to default command invocation.
+      - this applies to both `call-interactively` and `command-execute`.
+      - added evaluator coverage:
+        - `interactive_lambda_invalid_control_letter_signals_error`
+      - added a no-side-effect guard that confirms bodies are not invoked when interactive code is invalid.
+  - vm-compat corpus changes:
+    - added:
+      - `test/neovm/vm-compat/cases/interactive-lambda-invalid-control-letter-semantics.forms`
+      - `test/neovm/vm-compat/cases/interactive-lambda-invalid-control-letter-semantics.expected.tsv`
+    - wired case into:
+      - `test/neovm/vm-compat/cases/default.list`
+  - verified:
+    - `cargo test --manifest-path rust/neovm-core/Cargo.toml interactive_lambda_invalid_control_letter_signals_error -- --nocapture` (pass)
+    - `make -C test/neovm/vm-compat check-one-neovm CASE=cases/interactive-lambda-invalid-control-letter-semantics` (pass; `4/4`)
+    - `make -C test/neovm/vm-compat check-one-neovm CASE=cases/interactive-lambda-spec-extended-semantics` (pass; `61/61`)
+    - `make -C test/neovm/vm-compat check-all-neovm-strict` (pass)
+
 - Tightened lambda `interactive "e"` no-context behavior to match Oracle and added corpus lock-in:
   - runtime changes:
     - `rust/neovm-core/src/elisp/interactive.rs`

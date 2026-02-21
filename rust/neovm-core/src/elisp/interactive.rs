@@ -984,6 +984,16 @@ fn parse_interactive_code_entries(code: &str) -> ParsedInteractiveStringCode {
     parsed
 }
 
+fn invalid_interactive_control_letter_error(letter: char) -> Flow {
+    let codepoint = letter as u32;
+    signal(
+        "error",
+        vec![Value::string(format!(
+            "Invalid control letter \u{2018}{letter}\u{2019} (#o{codepoint:o}, #x{codepoint:04x}) in interactive calling string"
+        ))],
+    )
+}
+
 fn interactive_args_from_string_code(
     eval: &mut Evaluator,
     code: &str,
@@ -1106,7 +1116,7 @@ fn interactive_args_from_string_code(
                 Value::string(prompt),
             ])?),
             'Z' => args.push(interactive_read_coding_system_optional_arg(prompt)?),
-            _ => return Ok(None),
+            _ => return Err(invalid_interactive_control_letter_error(letter)),
         }
     }
 
@@ -5632,6 +5642,47 @@ K")
             results[0],
             "OK ((end-of-file \"Error reading from stdin\") (end-of-file \"Error reading from stdin\") (nil (97)) (nil (97)) ((error \"command must be bound to an event with parameters\") (97)) ((error \"command must be bound to an event with parameters\") (97)))"
         );
+    }
+
+    #[test]
+    fn interactive_lambda_invalid_control_letter_signals_error() {
+        let mut ev = Evaluator::new();
+        let results = eval_all_with(
+            &mut ev,
+            r#"(list
+                 (let ((r (condition-case err
+                              (call-interactively (lambda (x) (interactive "q") x))
+                            (error err))))
+                   (list (if (consp r) (car r) 'non-error)
+                         (and (consp r)
+                              (stringp (cadr r))
+                              (string-prefix-p "Invalid control letter" (cadr r)))))
+                 (let ((r (condition-case err
+                              (command-execute (lambda (x) (interactive "q") x))
+                            (error err))))
+                   (list (if (consp r) (car r) 'non-error)
+                         (and (consp r)
+                              (stringp (cadr r))
+                              (string-prefix-p "Invalid control letter" (cadr r)))))
+                 (let ((called nil)
+                       (r nil))
+                   (setq r (condition-case err
+                               (call-interactively (lambda () (interactive "q") (setq called t)))
+                             (error err)))
+                   (list (if (consp r) (car r) 'non-error)
+                         (and (consp r)
+                              (stringp (cadr r))
+                              (string-prefix-p "Invalid control letter" (cadr r)))
+                         called))
+                 (let ((r (condition-case err
+                              (call-interactively (lambda (x) (interactive "*q") x))
+                            (error err))))
+                   (list (if (consp r) (car r) 'non-error)
+                         (and (consp r)
+                              (stringp (cadr r))
+                              (string-prefix-p "Invalid control letter" (cadr r))))))"#,
+        );
+        assert_eq!(results[0], "OK ((error t) (error t) (error t nil) (error t))");
     }
 
     #[test]
