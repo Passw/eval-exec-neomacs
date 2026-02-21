@@ -218,7 +218,7 @@ font_make_object (int size, Lisp_Object entity, int pixelsize)
   return font_object;
 }
 
-#if defined (HAVE_XFT) || defined (HAVE_FREETYPE) || defined (HAVE_NS)
+#ifdef HAVE_FREETYPE
 
 static int font_unparse_fcname (Lisp_Object, int, char *, int);
 
@@ -254,7 +254,7 @@ font_build_object (int vectorsize, Lisp_Object type,
   return font_object;
 }
 
-#endif /* HAVE_XFT || HAVE_FREETYPE || HAVE_NS */
+#endif /* HAVE_FREETYPE */
 
 static int font_pixel_size (struct frame *f, Lisp_Object);
 static Lisp_Object font_open_entity (struct frame *, Lisp_Object, int);
@@ -1837,7 +1837,7 @@ font_parse_fcname (char *name, ptrdiff_t len, Lisp_Object font)
   return 0;
 }
 
-#if defined HAVE_XFT || defined HAVE_FREETYPE || defined HAVE_NS
+#ifdef HAVE_FREETYPE
 
 /* Store fontconfig's font name of FONT (font-spec or font-entity) in
    NAME (NBYTES length), and return the name length.  If

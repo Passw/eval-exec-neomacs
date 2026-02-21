@@ -2817,8 +2817,7 @@ xbm_load (struct frame *f, struct image *img)
 
 
 
-#if defined HAVE_XPM || defined USE_CAIRO || defined HAVE_NS	\
-  || defined HAVE_HAIKU || defined HAVE_ANDROID
+#ifdef USE_CAIRO
 
 /* Indices of image specification fields in xpm_format, below.  */
 
@@ -3008,7 +3007,7 @@ xpm_free_colors (Display *dpy, Colormap cmap, Pixel *pixels, int npixels, void *
 #endif /* ALLOC_XPM_COLORS */
 
 
-#endif /* HAVE_XPM || USE_CAIRO || HAVE_NS || HAVE_HAIKU || HAVE_ANDROID */
+#endif /* USE_CAIRO */
 
 
 /* Load image IMG which will be displayed on frame F.  Value is

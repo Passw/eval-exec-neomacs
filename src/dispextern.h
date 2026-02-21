@@ -3086,9 +3086,7 @@ struct redisplay_interface
 
 #ifdef HAVE_WINDOW_SYSTEM
 
-# if (defined USE_CAIRO || defined HAVE_XRENDER				\
-      || defined HAVE_NS || defined HAVE_NTGUI || defined HAVE_HAIKU	\
-      || defined HAVE_ANDROID)
+# ifdef USE_CAIRO
 #  define HAVE_NATIVE_TRANSFORMS
 # endif
 
@@ -3581,8 +3579,7 @@ void prepare_image_for_display (struct frame *, struct image *);
 ptrdiff_t lookup_image (struct frame *, Lisp_Object, int);
 Lisp_Object image_spec_value (Lisp_Object, Lisp_Object, bool *);
 
-#if defined HAVE_X_WINDOWS || defined USE_CAIRO || defined HAVE_NS \
-  || defined HAVE_HAIKU || defined HAVE_ANDROID
+#ifdef USE_CAIRO
 #define RGB_PIXEL_COLOR unsigned long
 #endif
 

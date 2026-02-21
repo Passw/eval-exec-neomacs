@@ -5797,8 +5797,7 @@ gui_set_scroll_bar_height (struct frame *f, Lisp_Object arg, Lisp_Object oldval)
 #endif
 }
 
-#if (defined HAVE_PGTK || defined HAVE_NTGUI \
-     || defined HAVE_HAIKU || defined HAVE_NS || defined HAVE_NEOMACS)
+#ifdef HAVE_NEOMACS
 void
 gui_set_alpha (struct frame *f, Lisp_Object arg, Lisp_Object oldval)
 {
@@ -6830,8 +6829,7 @@ have changed.  */)
 
 #ifdef HAVE_WINDOW_SYSTEM
 
-# if (defined USE_GTK || defined HAVE_PGTK || defined HAVE_NS || defined HAVE_XINERAMA \
-      || defined HAVE_XRANDR || defined HAVE_NEOMACS)
+# ifdef HAVE_NEOMACS
 void
 free_monitors (struct MonitorInfo *monitors, int n_monitors)
 {
