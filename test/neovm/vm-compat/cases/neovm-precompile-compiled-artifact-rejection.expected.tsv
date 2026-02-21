@@ -7,7 +7,9 @@
 7	(let ((orig (current-buffer)) (buf (get-buffer-create " *vm-precompile-bad-elc-gz*"))) (unwind-protect (progn (set-buffer buf) (erase-buffer) (insert "compiled-artifact-gz") (write-region nil nil vm-precompile-bad-elc-gz nil nil)) (set-buffer orig) (kill-buffer buf)))	OK nil
 8	(condition-case err (neovm-precompile-file vm-precompile-bad-elc) (error (car err)))	OK file-error
 9	(condition-case err (neovm-precompile-file vm-precompile-bad-elc-gz) (error (car err)))	OK file-error
-10	(file-exists-p vm-precompile-bad-cache)	OK nil
-11	(delete-file vm-precompile-bad-elc)	OK nil
-12	(delete-file vm-precompile-bad-elc-gz)	OK nil
-13	(delete-directory vm-precompile-bad-dir t)	OK nil
+10	(let ((err (condition-case err (neovm-precompile-file vm-precompile-bad-elc) (error err)))) (and (eq (car err) 'file-error) (stringp (cadr err)) (not (null (string-match-p "compiled artifacts" (cadr err)))) (not (null (string-match-p "probe\\.elc" (cadr err))))))	OK t
+11	(let ((err (condition-case err (neovm-precompile-file vm-precompile-bad-elc-gz) (error err)))) (and (eq (car err) 'file-error) (stringp (cadr err)) (not (null (string-match-p "compiled artifacts" (cadr err)))) (not (null (string-match-p "probe\\.elc\\.gz" (cadr err))))))	OK t
+12	(file-exists-p vm-precompile-bad-cache)	OK nil
+13	(delete-file vm-precompile-bad-elc)	OK nil
+14	(delete-file vm-precompile-bad-elc-gz)	OK nil
+15	(delete-directory vm-precompile-bad-dir t)	OK nil

@@ -31,6 +31,18 @@
 
 (condition-case err (neovm-precompile-file vm-precompile-bad-elc) (error (car err)))
 (condition-case err (neovm-precompile-file vm-precompile-bad-elc-gz) (error (car err)))
+(let ((err (condition-case err (neovm-precompile-file vm-precompile-bad-elc) (error err))))
+  (and
+   (eq (car err) 'file-error)
+   (stringp (cadr err))
+   (not (null (string-match-p "compiled artifacts" (cadr err))))
+   (not (null (string-match-p "probe\\.elc" (cadr err))))))
+(let ((err (condition-case err (neovm-precompile-file vm-precompile-bad-elc-gz) (error err))))
+  (and
+   (eq (car err) 'file-error)
+   (stringp (cadr err))
+   (not (null (string-match-p "compiled artifacts" (cadr err))))
+   (not (null (string-match-p "probe\\.elc\\.gz" (cadr err))))))
 (file-exists-p vm-precompile-bad-cache)
 
 (delete-file vm-precompile-bad-elc)
