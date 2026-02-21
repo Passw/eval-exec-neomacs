@@ -18957,6 +18957,24 @@ mod tests {
             .expect("message-or-box should resolve")
             .expect("message-or-box should evaluate");
         assert!(message_or_box_nil.is_nil());
+        let _ = dispatch_builtin(&mut eval, "message-box", vec![Value::string("mbox-current")])
+            .expect("message-box should resolve")
+            .expect("message-box should evaluate");
+        let current_after_box = dispatch_builtin(&mut eval, "current-message", vec![])
+            .expect("current-message should resolve")
+            .expect("current-message should evaluate");
+        assert!(current_after_box.is_nil());
+        let _ = dispatch_builtin(
+            &mut eval,
+            "message-or-box",
+            vec![Value::string("morbox-current")],
+        )
+        .expect("message-or-box should resolve")
+        .expect("message-or-box should evaluate");
+        let current_after_or_box = dispatch_builtin(&mut eval, "current-message", vec![])
+            .expect("current-message should resolve")
+            .expect("current-message should evaluate");
+        assert!(current_after_or_box.is_nil());
 
         let thread = dispatch_builtin(&mut eval, "current-thread", vec![])
             .expect("current-thread should resolve")

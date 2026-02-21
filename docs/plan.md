@@ -28,6 +28,24 @@ Last updated: 2026-02-21
 
 ## Doing
 
+- Added `current-message` wrapper lock-ins after `message-box` / `message-or-box` calls:
+  - vm-compat corpus changes:
+    - updated:
+      - `test/neovm/vm-compat/cases/message-box-or-box-handle-semantics.forms`
+      - `test/neovm/vm-compat/cases/message-box-or-box-handle-semantics.expected.tsv`
+    - added assertions:
+      - `(eq (progn (message-box "…") (current-message)) nil)`
+      - `(eq (progn (message-or-box "…") (current-message)) nil)`
+  - runtime changes:
+    - `rust/neovm-core/src/elisp/builtins.rs`
+      - extended evaluator coverage:
+        - `message_box_wrappers_render_opaque_handles_in_eval_dispatch`
+      - test now asserts `current-message` remains `nil` after each wrapper call in batch mode.
+  - verified:
+    - `cargo test --manifest-path rust/neovm-core/Cargo.toml message_box_wrappers_render_opaque_handles_in_eval_dispatch -- --nocapture` (pass)
+    - `make -C test/neovm/vm-compat check-one-neovm CASE=cases/message-box-or-box-handle-semantics` (pass; `47/47`)
+    - `make -C test/neovm/vm-compat check-neovm-filter-strict LIST=cases/default.list PATTERN='message-box-or-box-handle-semantics'` (pass; strict filtered gates green)
+
 - Locked `message-box` / `message-or-box` nil-format semantics alongside handle matrix coverage:
   - vm-compat corpus changes:
     - updated:

@@ -8,10 +8,15 @@
 (fboundp 'kill-buffer)
 (fboundp 'make-mutex)
 (fboundp 'make-condition-variable)
+(fboundp 'current-message)
 
 (eq (message-box nil) nil)
 
 (eq (message-or-box nil) nil)
+
+(eq (progn (message-box "mbox-current-message") (current-message)) nil)
+
+(eq (progn (message-or-box "morbox-current-message") (current-message)) nil)
 
 (string-prefix-p "#<thread" (message-box "%S" (current-thread)))
 
