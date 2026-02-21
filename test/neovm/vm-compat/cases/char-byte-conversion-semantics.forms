@@ -27,3 +27,13 @@
 (char-width 2097152)
 (condition-case err (char-width -1) (error err))
 (condition-case err (char-width 4194304) (error err))
+
+(char-or-string-p ?a)
+(char-or-string-p "a")
+(char-or-string-p 0)
+(char-or-string-p 1114112)
+(char-or-string-p 4194303)
+(char-or-string-p -1)
+(char-or-string-p 4194304)
+(char-or-string-p nil)
+(char-or-string-p 'x)

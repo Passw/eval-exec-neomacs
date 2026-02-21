@@ -26,3 +26,12 @@
 26	(char-width 2097152)	OK 1
 27	(condition-case err (char-width -1) (error err))	OK (wrong-type-argument characterp -1)
 28	(condition-case err (char-width 4194304) (error err))	OK (wrong-type-argument characterp 4194304)
+29	(char-or-string-p 97)	OK t
+30	(char-or-string-p "a")	OK t
+31	(char-or-string-p 0)	OK t
+32	(char-or-string-p 1114112)	OK t
+33	(char-or-string-p 4194303)	OK t
+34	(char-or-string-p -1)	OK nil
+35	(char-or-string-p 4194304)	OK nil
+36	(char-or-string-p nil)	OK nil
+37	(char-or-string-p 'x)	OK nil

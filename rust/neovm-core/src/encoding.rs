@@ -329,10 +329,12 @@ pub(crate) fn builtin_decode_coding_string(args: Vec<Value>) -> EvalResult {
 /// `(char-or-string-p OBJ)` -> t or nil
 pub(crate) fn builtin_char_or_string_p(args: Vec<Value>) -> EvalResult {
     expect_args("char-or-string-p", &args, 1)?;
-    Ok(Value::bool(matches!(
-        &args[0],
-        Value::Char(_) | Value::Str(_) | Value::Int(_)
-    )))
+    let is_char_or_string = match &args[0] {
+        Value::Char(_) | Value::Str(_) => true,
+        Value::Int(n) => (0..=MAX_CHAR_CODE).contains(n),
+        _ => false,
+    };
+    Ok(Value::bool(is_char_or_string))
 }
 
 /// `(char-displayable-p CHAR)` -> t, nil, or `unicode`
@@ -491,6 +493,30 @@ mod tests {
             }
             other => panic!("expected signal, got: {other:?}"),
         }
+    }
+
+    #[test]
+    fn builtin_char_or_string_p_respects_character_bounds() {
+        assert_eq!(
+            builtin_char_or_string_p(vec![Value::Int(0)]).unwrap(),
+            Value::True
+        );
+        assert_eq!(
+            builtin_char_or_string_p(vec![Value::Int(0x3F_FFFF)]).unwrap(),
+            Value::True
+        );
+        assert_eq!(
+            builtin_char_or_string_p(vec![Value::Int(-1)]).unwrap(),
+            Value::Nil
+        );
+        assert_eq!(
+            builtin_char_or_string_p(vec![Value::Int(0x40_0000)]).unwrap(),
+            Value::Nil
+        );
+        assert_eq!(
+            builtin_char_or_string_p(vec![Value::symbol("x")]).unwrap(),
+            Value::Nil
+        );
     }
 
     #[test]
