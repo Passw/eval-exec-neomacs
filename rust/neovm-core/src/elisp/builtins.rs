@@ -1995,7 +1995,9 @@ fn format_not_enough_args_error() -> Flow {
 fn format_spec_type_mismatch_error() -> Flow {
     signal(
         "error",
-        vec![Value::string("Format specifier doesn’t match argument type")],
+        vec![Value::string(
+            "Format specifier doesn’t match argument type",
+        )],
     )
 }
 
@@ -2048,8 +2050,8 @@ fn builtin_format_wrapper_strict(args: Vec<Value>) -> EvalResult {
                         if arg_idx >= args.len() {
                             return Err(format_not_enough_args_error());
                         }
-                        let n =
-                            expect_int(&args[arg_idx]).map_err(|_| format_spec_type_mismatch_error())?;
+                        let n = expect_int(&args[arg_idx])
+                            .map_err(|_| format_spec_type_mismatch_error())?;
                         result.push_str(&n.to_string());
                         arg_idx += 1;
                     }
@@ -2066,8 +2068,8 @@ fn builtin_format_wrapper_strict(args: Vec<Value>) -> EvalResult {
                         if arg_idx >= args.len() {
                             return Err(format_not_enough_args_error());
                         }
-                        let n =
-                            expect_int(&args[arg_idx]).map_err(|_| format_spec_type_mismatch_error())?;
+                        let n = expect_int(&args[arg_idx])
+                            .map_err(|_| format_spec_type_mismatch_error())?;
                         result.push_str(&format_char_argument(n)?);
                         arg_idx += 1;
                     }
@@ -2121,8 +2123,8 @@ fn builtin_format_wrapper_strict_eval(
                         if arg_idx >= args.len() {
                             return Err(format_not_enough_args_error());
                         }
-                        let n =
-                            expect_int(&args[arg_idx]).map_err(|_| format_spec_type_mismatch_error())?;
+                        let n = expect_int(&args[arg_idx])
+                            .map_err(|_| format_spec_type_mismatch_error())?;
                         result.push_str(&n.to_string());
                         arg_idx += 1;
                     }
@@ -2139,8 +2141,8 @@ fn builtin_format_wrapper_strict_eval(
                         if arg_idx >= args.len() {
                             return Err(format_not_enough_args_error());
                         }
-                        let n =
-                            expect_int(&args[arg_idx]).map_err(|_| format_spec_type_mismatch_error())?;
+                        let n = expect_int(&args[arg_idx])
+                            .map_err(|_| format_spec_type_mismatch_error())?;
                         result.push_str(&format_char_argument(n)?);
                         arg_idx += 1;
                     }
@@ -4501,11 +4503,7 @@ fn macroexpand_known_fallback_macro(name: &str, args: &[Value]) -> Result<Option
             protected_forms.push(Value::symbol("progn"));
             protected_forms.extend_from_slice(args);
             let protected = Value::list(protected_forms);
-            let restore = Value::list(vec![
-                Value::symbol("set-match-data"),
-                saved,
-                Value::True,
-            ]);
+            let restore = Value::list(vec![Value::symbol("set-match-data"), saved, Value::True]);
             Ok(Some(Value::list(vec![
                 Value::symbol("let"),
                 Value::list(vec![binding]),
@@ -4604,7 +4602,10 @@ fn macroexpand_known_fallback_macro(name: &str, args: &[Value]) -> Result<Option
             if args.is_empty() {
                 return Err(signal(
                     "wrong-number-of-arguments",
-                    vec![Value::cons(Value::Int(1), Value::symbol("many")), Value::Int(0)],
+                    vec![
+                        Value::cons(Value::Int(1), Value::symbol("many")),
+                        Value::Int(0),
+                    ],
                 ));
             }
 
@@ -4642,11 +4643,7 @@ fn macroexpand_known_fallback_macro(name: &str, args: &[Value]) -> Result<Option
                 Value::list(vec![
                     Value::symbol("if"),
                     current.clone(),
-                    Value::list(vec![
-                        Value::symbol("message"),
-                        Value::string("%s"),
-                        current,
-                    ]),
+                    Value::list(vec![Value::symbol("message"), Value::string("%s"), current]),
                     Value::list(vec![Value::symbol("message"), Value::Nil]),
                 ]),
             ]);
@@ -4690,11 +4687,7 @@ fn macroexpand_known_fallback_macro(name: &str, args: &[Value]) -> Result<Option
                 body,
                 Value::list(vec![
                     Value::list(vec![Value::symbol("debug"), Value::symbol("error")]),
-                    Value::list(vec![
-                        Value::symbol("message"),
-                        format,
-                        Value::symbol("err"),
-                    ]),
+                    Value::list(vec![Value::symbol("message"), format, Value::symbol("err")]),
                     Value::Nil,
                 ]),
             ])))
@@ -4723,6 +4716,66 @@ fn macroexpand_known_fallback_macro(name: &str, args: &[Value]) -> Result<Option
                     Value::list(vec![Value::symbol("quote"), var.clone()]),
                 ]),
                 var,
+            ])))
+        }
+        "pcase-dolist" => {
+            if args.is_empty() {
+                return Err(signal(
+                    "wrong-number-of-arguments",
+                    vec![
+                        Value::cons(Value::Int(1), Value::symbol("many")),
+                        Value::Int(0),
+                    ],
+                ));
+            }
+
+            let spec = list_to_vec(&args[0]).ok_or_else(|| {
+                signal(
+                    "wrong-type-argument",
+                    vec![Value::string(
+                        "pcase-dolist spec must be a list (PATTERN LIST)",
+                    )],
+                )
+            })?;
+            if spec.len() < 2 {
+                return Err(signal(
+                    "wrong-number-of-arguments",
+                    vec![Value::symbol("pcase-dolist"), Value::Int(spec.len() as i64)],
+                ));
+            }
+
+            let pattern = spec[0].clone();
+            let sequence = spec[1].clone();
+            let tail_var = Value::symbol("--pcase-dolist-tail--");
+            let binding = Value::list(vec![tail_var.clone(), sequence]);
+
+            let pcase_binding = Value::list(vec![
+                pattern,
+                Value::list(vec![Value::symbol("car"), tail_var.clone()]),
+            ]);
+            let mut pcase_let_forms = Vec::with_capacity(args.len() + 1);
+            pcase_let_forms.push(Value::symbol("pcase-let"));
+            pcase_let_forms.push(Value::list(vec![pcase_binding]));
+            pcase_let_forms.extend_from_slice(&args[1..]);
+            let pcase_let = Value::list(pcase_let_forms);
+
+            let step = Value::list(vec![
+                Value::symbol("setq"),
+                tail_var.clone(),
+                Value::list(vec![Value::symbol("cdr"), tail_var.clone()]),
+            ]);
+
+            let loop_form = Value::list(vec![
+                Value::symbol("while"),
+                tail_var.clone(),
+                pcase_let,
+                step,
+            ]);
+
+            Ok(Some(Value::list(vec![
+                Value::symbol("let"),
+                Value::list(vec![binding]),
+                loop_form,
             ])))
         }
         _ => Ok(None),
@@ -5273,7 +5326,8 @@ struct WindowConfigurationSnapshot {
     minibuffer_leaf: Option<crate::window::Window>,
 }
 
-fn window_configuration_snapshot_store() -> &'static Mutex<HashMap<i64, WindowConfigurationSnapshot>> {
+fn window_configuration_snapshot_store() -> &'static Mutex<HashMap<i64, WindowConfigurationSnapshot>>
+{
     static STORE: OnceLock<Mutex<HashMap<i64, WindowConfigurationSnapshot>>> = OnceLock::new();
     STORE.get_or_init(|| Mutex::new(HashMap::new()))
 }
@@ -5362,7 +5416,10 @@ pub(crate) fn builtin_current_window_configuration(
     };
 
     let Value::Frame(frame_raw_id) = frame.clone() else {
-        return Ok(make_window_configuration_value(frame, next_window_configuration_serial()));
+        return Ok(make_window_configuration_value(
+            frame,
+            next_window_configuration_serial(),
+        ));
     };
     let frame_id = crate::window::FrameId(frame_raw_id);
     if let Some(frame_state) = eval.frames.get(frame_id) {
@@ -5386,7 +5443,10 @@ pub(crate) fn builtin_current_window_configuration(
         return Ok(make_window_configuration_value(frame, serial));
     }
 
-    Ok(make_window_configuration_value(frame, next_window_configuration_serial()))
+    Ok(make_window_configuration_value(
+        frame,
+        next_window_configuration_serial(),
+    ))
 }
 
 pub(crate) fn builtin_set_window_configuration(
@@ -5413,7 +5473,9 @@ pub(crate) fn builtin_set_window_configuration(
             frame.selected_window = snapshot.selected_window;
             frame.minibuffer_window = snapshot.minibuffer_window;
             frame.minibuffer_leaf = snapshot.minibuffer_leaf;
-            frame.find_window(frame.selected_window).and_then(|w| w.buffer_id())
+            frame
+                .find_window(frame.selected_window)
+                .and_then(|w| w.buffer_id())
         } else {
             None
         };
@@ -16487,8 +16549,9 @@ mod tests {
             vec![0x11_0000]
         );
 
-        let key_nonunicode = builtin_key_description(vec![Value::vector(vec![Value::Int(0x20_0000)])])
-            .expect("key-description should support nonunicode char code");
+        let key_nonunicode =
+            builtin_key_description(vec![Value::vector(vec![Value::Int(0x20_0000)])])
+                .expect("key-description should support nonunicode char code");
         assert_eq!(
             decode_storage_char_codes(
                 key_nonunicode
@@ -17936,7 +17999,11 @@ mod tests {
             .expect("builtin make-vector should evaluate");
         assert_eq!(
             ok,
-            Value::vector(vec![Value::symbol("x"), Value::symbol("x"), Value::symbol("x")])
+            Value::vector(vec![
+                Value::symbol("x"),
+                Value::symbol("x"),
+                Value::symbol("x")
+            ])
         );
 
         for bad_len in [Value::Int(-1), Value::Float(1.5), Value::symbol("foo")] {
@@ -17996,9 +18063,12 @@ mod tests {
             .expect("builtin aref should evaluate");
         assert_eq!(initial, Value::Nil);
 
-        let _ = dispatch_builtin_pure("aset", vec![ct.clone(), Value::Int(0x3F_FFFF), Value::Int(9)])
-            .expect("builtin aset should resolve")
-            .expect("builtin aset should evaluate");
+        let _ = dispatch_builtin_pure(
+            "aset",
+            vec![ct.clone(), Value::Int(0x3F_FFFF), Value::Int(9)],
+        )
+        .expect("builtin aset should resolve")
+        .expect("builtin aset should evaluate");
 
         let edge = dispatch_builtin_pure("aref", vec![ct.clone(), Value::Int(0x3F_FFFF)])
             .expect("builtin aref should resolve")
@@ -18016,17 +18086,15 @@ mod tests {
         match negative {
             Flow::Signal(sig) => {
                 assert_eq!(sig.symbol, "wrong-type-argument");
-                assert_eq!(
-                    sig.data,
-                    vec![Value::symbol("characterp"), Value::Int(-1)],
-                );
+                assert_eq!(sig.data, vec![Value::symbol("characterp"), Value::Int(-1)],);
             }
             other => panic!("unexpected flow: {other:?}"),
         }
 
-        let too_large = dispatch_builtin_pure("aset", vec![ct, Value::Int(0x40_0000), Value::Int(1)])
-            .expect("builtin aset should resolve")
-            .expect_err("out-of-range char-table index should fail");
+        let too_large =
+            dispatch_builtin_pure("aset", vec![ct, Value::Int(0x40_0000), Value::Int(1)])
+                .expect("builtin aset should resolve")
+                .expect_err("out-of-range char-table index should fail");
         match too_large {
             Flow::Signal(sig) => {
                 assert_eq!(sig.symbol, "wrong-type-argument");
@@ -18436,14 +18504,19 @@ mod tests {
     fn buffer_region_negative_bounds_signal_without_panicking() {
         let mut eval = crate::elisp::eval::Evaluator::new();
         builtin_insert(&mut eval, vec![Value::string("abc")]).expect("insert should succeed");
-        let current = builtin_current_buffer(&mut eval, vec![]).expect("current-buffer should work");
+        let current =
+            builtin_current_buffer(&mut eval, vec![]).expect("current-buffer should work");
 
-        let substring_err = builtin_buffer_substring(&mut eval, vec![Value::Int(-1), Value::Int(2)])
-            .expect_err("negative start should signal");
+        let substring_err =
+            builtin_buffer_substring(&mut eval, vec![Value::Int(-1), Value::Int(2)])
+                .expect_err("negative start should signal");
         match substring_err {
             Flow::Signal(sig) => {
                 assert_eq!(sig.symbol, "args-out-of-range");
-                assert_eq!(sig.data, vec![current.clone(), Value::Int(-1), Value::Int(2)]);
+                assert_eq!(
+                    sig.data,
+                    vec![current.clone(), Value::Int(-1), Value::Int(2)]
+                );
             }
             other => panic!("unexpected flow: {other:?}"),
         }
@@ -18473,7 +18546,8 @@ mod tests {
             Value::Nil
         );
         assert_eq!(
-            builtin_char_before(&mut eval, vec![Value::Int(0)]).expect("char-before should succeed"),
+            builtin_char_before(&mut eval, vec![Value::Int(0)])
+                .expect("char-before should succeed"),
             Value::Nil
         );
     }
@@ -18848,12 +18922,17 @@ mod tests {
             .expect("terminal-list should return at least one terminal");
 
         let mut assert_prefix = |builtin: &str, spec: &str| {
-            let rendered =
-                dispatch_builtin(&mut eval, builtin, vec![Value::string(spec), terminal.clone()])
-                    .expect("builtin should resolve")
-                    .expect("builtin should evaluate");
+            let rendered = dispatch_builtin(
+                &mut eval,
+                builtin,
+                vec![Value::string(spec), terminal.clone()],
+            )
+            .expect("builtin should resolve")
+            .expect("builtin should evaluate");
             assert!(
-                rendered.as_str().is_some_and(|s| s.starts_with("#<terminal")),
+                rendered
+                    .as_str()
+                    .is_some_and(|s| s.starts_with("#<terminal")),
                 "expected {builtin} {spec} output to start with #<terminal, got: {rendered:?}"
             );
         };
@@ -18870,13 +18949,9 @@ mod tests {
         let mutex = dispatch_builtin(&mut eval, "make-mutex", vec![])
             .expect("make-mutex should resolve")
             .expect("make-mutex should evaluate");
-        let condvar = dispatch_builtin(
-            &mut eval,
-            "make-condition-variable",
-            vec![mutex.clone()],
-        )
-        .expect("make-condition-variable should resolve")
-        .expect("make-condition-variable should evaluate");
+        let condvar = dispatch_builtin(&mut eval, "make-condition-variable", vec![mutex.clone()])
+            .expect("make-condition-variable should resolve")
+            .expect("make-condition-variable should evaluate");
 
         let mut assert_prefix = |builtin: &str, spec: &str, value: Value, prefix: &str| {
             let rendered = dispatch_builtin(&mut eval, builtin, vec![Value::string(spec), value])
@@ -19072,10 +19147,13 @@ mod tests {
             .expect("selected-window should evaluate");
 
         let mut assert_prefix = |spec: &str, value: Value, prefix: &str| {
-            let rendered =
-                dispatch_builtin(&mut eval, "format-message", vec![Value::string(spec), value])
-                    .expect("format-message should resolve")
-                    .expect("format-message should evaluate");
+            let rendered = dispatch_builtin(
+                &mut eval,
+                "format-message",
+                vec![Value::string(spec), value],
+            )
+            .expect("format-message should resolve")
+            .expect("format-message should evaluate");
             assert!(
                 rendered.as_str().is_some_and(|s| s.starts_with(prefix)),
                 "expected format-message {spec} output to start with {prefix}, got: {rendered:?}"
@@ -19204,10 +19282,9 @@ mod tests {
             .expect("make-mutex should resolve")
             .expect("make-mutex should evaluate");
         assert!(render_error_message(&mut eval, "%s", mutex.clone()).starts_with("#<mutex"));
-        let condvar =
-            dispatch_builtin(&mut eval, "make-condition-variable", vec![mutex.clone()])
-                .expect("make-condition-variable should resolve")
-                .expect("make-condition-variable should evaluate");
+        let condvar = dispatch_builtin(&mut eval, "make-condition-variable", vec![mutex.clone()])
+            .expect("make-condition-variable should resolve")
+            .expect("make-condition-variable should evaluate");
         assert!(render_error_message(&mut eval, "%s", condvar).starts_with("#<condvar"));
     }
 
@@ -19319,9 +19396,13 @@ mod tests {
             assert_eq!(decode_storage_char_codes(text), vec![value as u32]);
         }
 
-        let _ = dispatch_builtin(&mut eval, "message-box", vec![Value::string("mbox-current")])
-            .expect("message-box should resolve")
-            .expect("message-box should evaluate");
+        let _ = dispatch_builtin(
+            &mut eval,
+            "message-box",
+            vec![Value::string("mbox-current")],
+        )
+        .expect("message-box should resolve")
+        .expect("message-box should evaluate");
         let current_after_box = dispatch_builtin(&mut eval, "current-message", vec![])
             .expect("current-message should resolve")
             .expect("current-message should evaluate");
@@ -19356,13 +19437,9 @@ mod tests {
         let mutex = dispatch_builtin(&mut eval, "make-mutex", vec![])
             .expect("make-mutex should resolve")
             .expect("make-mutex should evaluate");
-        let condvar = dispatch_builtin(
-            &mut eval,
-            "make-condition-variable",
-            vec![mutex.clone()],
-        )
-        .expect("make-condition-variable should resolve")
-        .expect("make-condition-variable should evaluate");
+        let condvar = dispatch_builtin(&mut eval, "make-condition-variable", vec![mutex.clone()])
+            .expect("make-condition-variable should resolve")
+            .expect("make-condition-variable should evaluate");
 
         let mut assert_prefix = |builtin: &str, spec: &str, value: Value, prefix: &str| {
             let rendered = dispatch_builtin(&mut eval, builtin, vec![Value::string(spec), value])
@@ -19501,9 +19578,10 @@ mod tests {
 
     #[test]
     fn make_string_nonunicode_char_code_bounds_match_oracle() {
-        let overflow = dispatch_builtin_pure("make-string", vec![Value::Int(1), Value::Int(0x40_0000)])
-            .expect("make-string should resolve")
-            .expect_err("make-string should reject out-of-range character code");
+        let overflow =
+            dispatch_builtin_pure("make-string", vec![Value::Int(1), Value::Int(0x40_0000)])
+                .expect("make-string should resolve")
+                .expect_err("make-string should reject out-of-range character code");
         match overflow {
             Flow::Signal(sig) => {
                 assert_eq!(sig.symbol, "wrong-type-argument");
@@ -19515,18 +19593,24 @@ mod tests {
             other => panic!("expected signal, got: {other:?}"),
         }
 
-        let repeated = dispatch_builtin_pure("make-string", vec![Value::Int(2), Value::Int(0x11_0000)])
-            .expect("make-string should resolve")
-            .expect("make-string should evaluate");
+        let repeated =
+            dispatch_builtin_pure("make-string", vec![Value::Int(2), Value::Int(0x11_0000)])
+                .expect("make-string should resolve")
+                .expect("make-string should evaluate");
         let repeated_text = repeated
             .as_str()
             .expect("make-string should return string output");
-        assert_eq!(decode_storage_char_codes(repeated_text), vec![0x11_0000, 0x11_0000]);
+        assert_eq!(
+            decode_storage_char_codes(repeated_text),
+            vec![0x11_0000, 0x11_0000]
+        );
 
         let high = dispatch_builtin_pure("make-string", vec![Value::Int(1), Value::Int(0x20_0000)])
             .expect("make-string should resolve")
             .expect("make-string should evaluate");
-        let high_text = high.as_str().expect("make-string should return string output");
+        let high_text = high
+            .as_str()
+            .expect("make-string should return string output");
         assert_eq!(decode_storage_char_codes(high_text), vec![0x20_0000]);
     }
 
@@ -19585,7 +19669,10 @@ mod tests {
             .as_str()
             .expect("buffer-string should return text")
             .to_string();
-        assert_eq!(decode_storage_char_codes(&second), vec![0x20_0000, 0x20_0000]);
+        assert_eq!(
+            decode_storage_char_codes(&second),
+            vec![0x20_0000, 0x20_0000]
+        );
 
         let overflow = builtin_insert_char(&mut eval, vec![Value::Int(0x40_0000), Value::Int(1)])
             .expect_err("insert-char should reject out-of-range character code");
@@ -19616,14 +19703,20 @@ mod tests {
         assert_eq!(decode_storage_char_codes(&first), vec![0x11_0000]);
 
         builtin_erase_buffer(&mut eval, vec![]).expect("erase-buffer should succeed");
-        builtin_insert(&mut eval, vec![Value::Int(0x20_0000), Value::Int(0x20_0000)])
-            .expect("insert should repeat nonunicode integer char codes");
+        builtin_insert(
+            &mut eval,
+            vec![Value::Int(0x20_0000), Value::Int(0x20_0000)],
+        )
+        .expect("insert should repeat nonunicode integer char codes");
         let second = builtin_buffer_string(&mut eval, vec![])
             .expect("buffer-string should evaluate")
             .as_str()
             .expect("buffer-string should return text")
             .to_string();
-        assert_eq!(decode_storage_char_codes(&second), vec![0x20_0000, 0x20_0000]);
+        assert_eq!(
+            decode_storage_char_codes(&second),
+            vec![0x20_0000, 0x20_0000]
+        );
 
         let overflow = builtin_insert(&mut eval, vec![Value::Int(0x40_0000)])
             .expect_err("insert should reject out-of-range integer char code");
@@ -19705,7 +19798,9 @@ mod tests {
                         assert_eq!(sig.symbol, "error");
                         assert_eq!(
                             sig.data,
-                            vec![Value::string("Format specifier doesn’t match argument type")]
+                            vec![Value::string(
+                                "Format specifier doesn’t match argument type"
+                            )]
                         );
                     }
                     other => panic!("expected signal, got: {other:?}"),
@@ -19777,13 +19872,9 @@ mod tests {
         let split = dispatch_builtin(&mut eval, "split-window", vec![selected.clone()])
             .expect("split-window should resolve")
             .expect("split-window should evaluate");
-        let state = dispatch_builtin(
-            &mut eval,
-            "internal--before-save-selected-window",
-            vec![],
-        )
-        .expect("before helper should resolve")
-        .expect("before helper should evaluate");
+        let state = dispatch_builtin(&mut eval, "internal--before-save-selected-window", vec![])
+            .expect("before helper should resolve")
+            .expect("before helper should evaluate");
 
         let _ = dispatch_builtin(&mut eval, "select-window", vec![split.clone()])
             .expect("select-window should resolve")
@@ -19878,6 +19969,9 @@ mod tests {
         let bound_and_true_p = builtin_fboundp(&mut eval, vec![Value::symbol("bound-and-true-p")])
             .expect("fboundp should succeed for bound-and-true-p");
         assert!(bound_and_true_p.is_truthy());
+        let pcase_dolist = builtin_fboundp(&mut eval, vec![Value::symbol("pcase-dolist")])
+            .expect("fboundp should succeed for pcase-dolist");
+        assert!(pcase_dolist.is_truthy());
 
         let with_temp_buffer = builtin_fboundp(&mut eval, vec![Value::symbol("with-temp-buffer")])
             .expect("fboundp should succeed for with-temp-buffer");
@@ -19972,6 +20066,10 @@ mod tests {
             builtin_functionp_eval(&mut eval, vec![Value::symbol("bound-and-true-p")])
                 .expect("functionp should reject bound-and-true-p macro symbol");
         assert!(bound_and_true_p_symbol.is_nil());
+        let pcase_dolist_symbol =
+            builtin_functionp_eval(&mut eval, vec![Value::symbol("pcase-dolist")])
+                .expect("functionp should reject pcase-dolist macro symbol");
+        assert!(pcase_dolist_symbol.is_nil());
         let declare_symbol = builtin_functionp_eval(&mut eval, vec![Value::symbol("declare")])
             .expect("functionp should reject declare symbol");
         assert!(declare_symbol.is_nil());
@@ -20260,6 +20358,10 @@ mod tests {
             builtin_symbol_function(&mut eval, vec![Value::symbol("bound-and-true-p")])
                 .expect("symbol-function should resolve bound-and-true-p as a macro");
         assert!(matches!(bound_and_true_p_macro, Value::Macro(_)));
+        let pcase_dolist_macro =
+            builtin_symbol_function(&mut eval, vec![Value::symbol("pcase-dolist")])
+                .expect("symbol-function should resolve pcase-dolist as a macro");
+        assert!(matches!(pcase_dolist_macro, Value::Macro(_)));
 
         let declare_macro = builtin_symbol_function(&mut eval, vec![Value::symbol("declare")])
             .expect("symbol-function should resolve declare as a macro");
@@ -20467,6 +20569,17 @@ mod tests {
             }
             other => panic!("expected cons arity pair, got {other:?}"),
         }
+        let pcase_dolist_arity =
+            builtin_func_arity_eval(&mut eval, vec![Value::symbol("pcase-dolist")])
+                .expect("func-arity should resolve pcase-dolist macro symbol");
+        match &pcase_dolist_arity {
+            Value::Cons(cell) => {
+                let pair = cell.lock().expect("poisoned");
+                assert_eq!(pair.car, Value::Int(1));
+                assert_eq!(pair.cdr, Value::symbol("many"));
+            }
+            other => panic!("expected cons arity pair, got {other:?}"),
+        }
 
         let inline_arity = builtin_func_arity_eval(&mut eval, vec![Value::symbol("inline")])
             .expect("func-arity should resolve inline special-form symbol");
@@ -20622,6 +20735,10 @@ mod tests {
             builtin_indirect_function(&mut eval, vec![Value::symbol("bound-and-true-p")])
                 .expect("indirect-function should resolve bound-and-true-p as a macro");
         assert!(matches!(bound_and_true_p_macro, Value::Macro(_)));
+        let pcase_dolist_macro =
+            builtin_indirect_function(&mut eval, vec![Value::symbol("pcase-dolist")])
+                .expect("indirect-function should resolve pcase-dolist as a macro");
+        assert!(matches!(pcase_dolist_macro, Value::Macro(_)));
 
         eval.obarray_mut()
             .set_symbol_function("alias-car", Value::symbol("car"));
@@ -20710,6 +20827,10 @@ mod tests {
             builtin_macrop_eval(&mut eval, vec![Value::symbol("bound-and-true-p")])
                 .expect("macrop should handle bound-and-true-p symbol input");
         assert!(bound_and_true_p_symbol.is_truthy());
+        let pcase_dolist_symbol =
+            builtin_macrop_eval(&mut eval, vec![Value::symbol("pcase-dolist")])
+                .expect("macrop should handle pcase-dolist symbol input");
+        assert!(pcase_dolist_symbol.is_truthy());
 
         let plain_symbol = builtin_macrop_eval(&mut eval, vec![Value::symbol("if")])
             .expect("macrop should handle non-macro symbols");
@@ -20827,7 +20948,11 @@ mod tests {
             &mut eval,
             vec![Value::list(vec![
                 Value::symbol("save-mark-and-excursion"),
-                Value::list(vec![Value::symbol("setq"), Value::symbol("x"), Value::Int(1)]),
+                Value::list(vec![
+                    Value::symbol("setq"),
+                    Value::symbol("x"),
+                    Value::Int(1),
+                ]),
             ])],
         )
         .expect("macroexpand should expand save-mark-and-excursion");
@@ -21092,6 +21217,25 @@ mod tests {
                 Value::symbol("vm-bound"),
             ])
         );
+        let pcase_dolist = Value::list(vec![
+            Value::symbol("pcase-dolist"),
+            Value::list(vec![
+                Value::symbol("x"),
+                Value::list(vec![
+                    Value::symbol("quote"),
+                    Value::list(vec![Value::Int(1), Value::Int(2), Value::Int(3)]),
+                ]),
+            ]),
+            Value::symbol("x"),
+        ]);
+        let pcase_dolist_expanded = builtin_macroexpand_eval(&mut eval, vec![pcase_dolist.clone()])
+            .expect("macroexpand should expand pcase-dolist");
+        assert_ne!(pcase_dolist_expanded, pcase_dolist);
+        let Value::Cons(pcase_dolist_pair) = pcase_dolist_expanded else {
+            panic!("macroexpand pcase-dolist should produce a list");
+        };
+        let pcase_dolist_head = pcase_dolist_pair.lock().expect("poisoned").car.clone();
+        assert_eq!(pcase_dolist_head, Value::symbol("let"));
         let bad_bound_and_true_p = builtin_macroexpand_eval(
             &mut eval,
             vec![Value::list(vec![

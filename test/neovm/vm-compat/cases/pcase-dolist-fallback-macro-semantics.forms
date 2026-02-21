@@ -1,0 +1,12 @@
+; pcase-dolist fallback macro introspection, expansion, and runtime parity.
+(fboundp 'pcase-dolist)
+(not (null (macrop 'pcase-dolist)))
+(functionp 'pcase-dolist)
+(not (null (symbol-function 'pcase-dolist)))
+(not (null (indirect-function 'pcase-dolist)))
+(not (equal (macroexpand '(pcase-dolist (x '(1 2)) x))
+            '(pcase-dolist (x '(1 2)) x)))
+(let ((acc nil))
+  (pcase-dolist (x '(1 2 3))
+    (setq acc (cons x acc)))
+  (nreverse acc))

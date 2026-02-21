@@ -1,0 +1,7 @@
+1	(fboundp 'pcase-dolist)	OK t
+2	(not (null (macrop 'pcase-dolist)))	OK t
+3	(functionp 'pcase-dolist)	OK nil
+4	(not (null (symbol-function 'pcase-dolist)))	OK t
+5	(not (null (indirect-function 'pcase-dolist)))	OK t
+6	(not (equal (macroexpand '(pcase-dolist (x '(1 2)) x)) '(pcase-dolist (x '(1 2)) x)))	OK t
+7	(let ((acc nil)) (pcase-dolist (x '(1 2 3)) (setq acc (cons x acc))) (nreverse acc))	OK (1 2 3)
