@@ -7,3 +7,7 @@
 (pcase-let (((pred numberp) 42)) (+ 1 2))
 (pcase-let (((and x (pred numberp)) 9)) x)
 (pcase-let* (((pred numberp) 5) ((pred numberp) 6)) (+ 7 8))
+(condition-case err (pcase [1 2 3] ([a b c] (+ a b c))) (error err))
+(condition-case err (pcase-let (([a b] [1 2])) (list a b)) (error err))
+(condition-case err (pcase-let* (([a b] [1 2])) (list a b)) (error err))
+(condition-case err (pcase [1 2 3] (`[,a ,b ,c] (+ a b c))) (error err))

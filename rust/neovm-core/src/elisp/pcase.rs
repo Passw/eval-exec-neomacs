@@ -11,7 +11,7 @@ use std::collections::HashMap;
 
 use super::error::{signal, EvalResult, Flow};
 use super::eval::{quote_to_value, Evaluator};
-use super::expr::Expr;
+use super::expr::{print_expr, Expr};
 use super::value::*;
 
 // ---------------------------------------------------------------------------
@@ -85,11 +85,12 @@ fn compile_pattern(expr: &Expr) -> Result<Pattern, Flow> {
         Expr::Bool(true) => Ok(Pattern::Literal(Value::True)),
         Expr::Bool(false) => Ok(Pattern::Literal(Value::Nil)),
 
-        // Vector pattern — [PAT1 PAT2 ...]
-        Expr::Vector(items) => {
-            let pats: Result<Vec<Pattern>, Flow> = items.iter().map(compile_pattern).collect();
-            Ok(Pattern::Vector(pats?))
-        }
+        // Bare vectors are not valid pcase patterns; vector destructuring
+        // must use backquote syntax like ``[,a ,b]`.
+        Expr::Vector(_) => Err(signal(
+            "error",
+            vec![Value::string(format!("Unknown pattern ‘{}’", print_expr(expr)))],
+        )),
 
         // List forms: quote, pred, guard, let, and, or, app, backquote
         Expr::List(items) if !items.is_empty() => compile_list_pattern(items),
@@ -1324,14 +1325,24 @@ mod tests {
 
     #[test]
     fn pcase_vector_match() {
-        assert_eq!(eval_last("(pcase [1 2 3] ([a b c] (+ a b c)))"), "OK 6");
+        assert_eq!(eval_last("(pcase [1 2 3] (`[,a ,b ,c] (+ a b c)))"), "OK 6");
     }
 
     #[test]
     fn pcase_vector_wrong_length() {
         assert_eq!(
-            eval_last("(pcase [1 2] ([a b c] 'three) (_ 'other))"),
+            eval_last("(pcase [1 2] (`[,a ,b ,c] 'three) (_ 'other))"),
             "OK other"
+        );
+    }
+
+    #[test]
+    fn pcase_bare_vector_pattern_is_unknown() {
+        assert_eq!(
+            eval_last(
+                "(condition-case err (pcase [1 2 3] ([a b c] (+ a b c))) (error err))"
+            ),
+            "OK (error \"Unknown pattern ‘[a b c]’\")"
         );
     }
 
@@ -1721,7 +1732,7 @@ mod tests {
     #[test]
     fn pcase_let_vector_destructure() {
         assert_eq!(
-            eval_last("(pcase-let (([a b c] [10 20 30])) (+ a b c))"),
+            eval_last("(pcase-let ((`[,a ,b ,c] [10 20 30])) (+ a b c))"),
             "OK 60"
         );
     }

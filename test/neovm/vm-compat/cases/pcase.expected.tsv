@@ -4,3 +4,7 @@
 4	(pcase-let (((pred numberp) 42)) (+ 1 2))	OK 3
 5	(pcase-let (((and x (pred numberp)) 9)) x)	OK 9
 6	(pcase-let* (((pred numberp) 5) ((pred numberp) 6)) (+ 7 8))	OK 15
+7	(condition-case err (pcase [1 2 3] ([a b c] (+ a b c))) (error err))	OK (error "Unknown pattern ‘[a b c]’")
+8	(condition-case err (pcase-let (([a b] [1 2])) (list a b)) (error err))	OK (error "Unknown pattern ‘[a b]’")
+9	(condition-case err (pcase-let* (([a b] [1 2])) (list a b)) (error err))	OK (error "Unknown pattern ‘[a b]’")
+10	(condition-case err (pcase [1 2 3] (`[,a ,b ,c] (+ a b c))) (error err))	OK 6
