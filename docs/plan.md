@@ -28,6 +28,22 @@ Last updated: 2026-02-21
 
 ## Doing
 
+- Extended vm-compat and runtime lock-in for `error-message-string` `%s` opaque-handle rendering paths:
+  - vm-compat corpus changes:
+    - updated:
+      - `test/neovm/vm-compat/cases/error-message-string-handle-printing-semantics.forms`
+      - `test/neovm/vm-compat/cases/error-message-string-handle-printing-semantics.expected.tsv`
+    - added `%s` rows for mutex, condition-variable, terminal, thread, frame, window, and live/killed buffers.
+  - runtime changes:
+    - `rust/neovm-core/src/elisp/builtins.rs`
+      - added evaluator coverage:
+        - `error_message_string_preserves_percent_s_handle_semantics`
+      - test drives `error("%s" VALUE)` signal payloads through `error-message-string` and locks handle/buffer formatting behavior.
+  - verified:
+    - `cargo test --manifest-path rust/neovm-core/Cargo.toml error_message_string_preserves_percent_s_handle_semantics -- --nocapture` (pass)
+    - `make -C test/neovm/vm-compat check-one-neovm CASE=cases/error-message-string-handle-printing-semantics` (pass; `25/25`)
+    - `make -C test/neovm/vm-compat check-neovm-filter-strict LIST=cases/default.list PATTERN='error-message-string-handle-printing-semantics'` (pass; strict filtered gates green)
+
 - Extended vm-compat and runtime lock-in for eval-dispatch `format-message` opaque-handle rendering:
   - vm-compat corpus changes:
     - updated:

@@ -18885,6 +18885,68 @@ mod tests {
     }
 
     #[test]
+    fn error_message_string_preserves_percent_s_handle_semantics() {
+        let mut eval = crate::elisp::eval::Evaluator::new();
+
+        let render_error_message =
+            |eval: &mut crate::elisp::eval::Evaluator, spec: &str, value: Value| -> String {
+                let signaled = dispatch_builtin(eval, "error", vec![Value::string(spec), value])
+                    .expect("error should resolve")
+                    .expect_err("error should signal");
+                let (symbol, data) = match signaled {
+                    Flow::Signal(sig) => (sig.symbol, sig.data),
+                    other => panic!("expected signal flow, got: {other:?}"),
+                };
+                let mut err_data = Vec::with_capacity(data.len() + 1);
+                err_data.push(Value::symbol(&symbol));
+                err_data.extend(data);
+                let rendered =
+                    dispatch_builtin(eval, "error-message-string", vec![Value::list(err_data)])
+                        .expect("error-message-string should resolve")
+                        .expect("error-message-string should evaluate");
+                rendered
+                    .as_str()
+                    .expect("error-message-string should return a string")
+                    .to_string()
+            };
+
+        let live_name = "*ems-live-lower*";
+        let live_buffer = dispatch_builtin(
+            &mut eval,
+            "generate-new-buffer",
+            vec![Value::string(live_name)],
+        )
+        .expect("generate-new-buffer should resolve")
+        .expect("generate-new-buffer should evaluate");
+        assert_eq!(
+            render_error_message(&mut eval, "%s", live_buffer.clone()),
+            live_name
+        );
+        let _ = dispatch_builtin(&mut eval, "kill-buffer", vec![live_buffer.clone()])
+            .expect("kill-buffer should resolve")
+            .expect("kill-buffer should evaluate");
+        assert_eq!(
+            render_error_message(&mut eval, "%s", live_buffer),
+            "#<killed buffer>".to_string()
+        );
+
+        let thread = dispatch_builtin(&mut eval, "current-thread", vec![])
+            .expect("current-thread should resolve")
+            .expect("current-thread should evaluate");
+        assert!(render_error_message(&mut eval, "%s", thread).starts_with("#<thread"));
+
+        let mutex = dispatch_builtin(&mut eval, "make-mutex", vec![])
+            .expect("make-mutex should resolve")
+            .expect("make-mutex should evaluate");
+        assert!(render_error_message(&mut eval, "%s", mutex.clone()).starts_with("#<mutex"));
+        let condvar =
+            dispatch_builtin(&mut eval, "make-condition-variable", vec![mutex.clone()])
+                .expect("make-condition-variable should resolve")
+                .expect("make-condition-variable should evaluate");
+        assert!(render_error_message(&mut eval, "%s", condvar).starts_with("#<condvar"));
+    }
+
+    #[test]
     fn message_nil_returns_nil() {
         let mut eval = crate::elisp::eval::Evaluator::new();
 
