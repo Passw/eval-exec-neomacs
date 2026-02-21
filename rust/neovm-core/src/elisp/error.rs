@@ -543,6 +543,30 @@ mod tests {
     }
 
     #[test]
+    fn eval_context_printer_renders_condvar_handles_consistently() -> Result<(), EvalError> {
+        let forms = parse_forms(
+            "(let ((m (make-mutex \"error-printer-mutex\")))
+               (make-condition-variable m \"error-printer-condvar\"))",
+        )
+        .map_err(|err| EvalError::Signal {
+            symbol: "parse-error".to_string(),
+            data: vec![Value::string(err.to_string())],
+        })?;
+
+        let mut eval = Evaluator::new();
+        let value = eval.eval_expr(&forms[0])?;
+        let printed = print_value_with_eval(&eval, &value);
+
+        assert!(printed.starts_with("#<condvar "));
+        assert_eq!(
+            String::from_utf8(print_value_bytes_with_eval(&eval, &value)).unwrap(),
+            printed
+        );
+
+        Ok(())
+    }
+
+    #[test]
     fn eval_context_printer_renders_hash_s_literal_shorthand() {
         let eval = Evaluator::new();
         let literal = Value::list(vec![
