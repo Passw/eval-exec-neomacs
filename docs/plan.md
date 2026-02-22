@@ -19309,6 +19309,23 @@ Last updated: 2026-02-21
     - `make -C test/neovm/vm-compat check-one-neovm CASE=cases/terminal-parameter-default-semantics` (pass; `8/8`)
     - `make -C test/neovm/vm-compat check-neovm-filter-strict LIST=cases/default.list PATTERN='(terminal-parameter-(semantics|default-semantics|storage-semantics|storage-edge-semantics|state-semantics|funcall-apply-semantics|error-payload-semantics)|display-x-terminal-compat-surface-semantics)'` (pass; strict filtered gates green)
 
+- Aligned window-handle payload rendering in terminal/frame type errors with oracle (`#<window N on *scratch*>` in evaluator context):
+  - runtime changes:
+    - `rust/neovm-core/src/elisp/error.rs`
+      - evaluator-aware printer now renders live window handles with buffer/frame context:
+        - `#<window N on BUFFER>`
+      - this now propagates through vm-compat result formatting for:
+        - `frame-terminal` wrong-type payloads on window designators
+        - `tty-type` wrong-type payloads on window designators
+        - `terminal-name` wrong-type payloads on window designators
+      - added evaluator test coverage:
+        - `eval_context_printer_renders_window_handles_with_buffer_names`
+  - vm-compat corpus changes:
+    - added and wired:
+      - `test/neovm/vm-compat/cases/terminal-window-error-payload-semantics.forms`
+      - `test/neovm/vm-compat/cases/terminal-window-error-payload-semantics.expected.tsv`
+      - `test/neovm/vm-compat/cases/default.list`
+
 - Continue compatibility-first maintenance with small commit slices:
   - keep builtin surface and registry in lock-step
   - run oracle/parity checks after each behavior-affecting change

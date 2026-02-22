@@ -4,6 +4,7 @@ use std::error::Error;
 use std::fmt::{self, Display, Formatter};
 
 use super::value::Value;
+use crate::window::WindowId;
 
 /// Public-facing evaluation error.
 #[derive(Clone, Debug)]
@@ -136,6 +137,9 @@ fn format_opaque_handle_with_eval(eval: &super::eval::Evaluator, value: &Value) 
     if let Some(handle) = super::display::print_terminal_handle(value) {
         return Some(handle);
     }
+    if let Value::Window(id) = value {
+        return Some(format_window_handle_with_eval(eval, *id));
+    }
     if let Some(id) = eval.threads.thread_id_from_handle(value) {
         return Some(format!("#<thread {id}>"));
     }
@@ -154,6 +158,23 @@ fn format_opaque_handle_with_eval(eval: &super::eval::Evaluator, value: &Value) 
         }
     }
     None
+}
+
+fn format_window_handle_with_eval(eval: &super::eval::Evaluator, id: u64) -> String {
+    let window_id = WindowId(id);
+    if let Some(frame_id) = eval.frames.find_window_frame_id(window_id) {
+        if let Some(frame) = eval.frames.get(frame_id) {
+            if let Some(window) = frame.find_window(window_id) {
+                if let Some(buffer_id) = window.buffer_id() {
+                    if let Some(buffer) = eval.buffers.get(buffer_id) {
+                        return format!("#<window {id} on {}>", buffer.name);
+                    }
+                }
+                return format!("#<window {id} on {}>", frame.name);
+            }
+        }
+    }
+    format!("#<window {id}>")
 }
 
 fn format_value_with_eval(eval: &super::eval::Evaluator, value: &Value) -> String {
@@ -581,6 +602,32 @@ mod tests {
 
         assert!(printed.starts_with("(#<frame"));
         assert!(printed.contains("#<window"));
+        assert_eq!(
+            String::from_utf8(print_value_bytes_with_eval(&eval, &value)).unwrap(),
+            printed
+        );
+
+        Ok(())
+    }
+
+    #[test]
+    fn eval_context_printer_renders_window_handles_with_buffer_names() -> Result<(), EvalError> {
+        let forms = parse_forms(
+            "(list (selected-window)
+                   (condition-case err (frame-terminal (selected-window)) (error err))
+                   (condition-case err (tty-type (selected-window)) (error err))
+                   (condition-case err (terminal-name (selected-window)) (error err)))",
+        )
+        .map_err(|err| EvalError::Signal {
+            symbol: "parse-error".to_string(),
+            data: vec![Value::string(err.to_string())],
+        })?;
+
+        let mut eval = Evaluator::new();
+        let value = eval.eval_expr(&forms[0])?;
+        let printed = print_value_with_eval(&eval, &value);
+
+        assert!(printed.contains("on *scratch*>"));
         assert_eq!(
             String::from_utf8(print_value_bytes_with_eval(&eval, &value)).unwrap(),
             printed
