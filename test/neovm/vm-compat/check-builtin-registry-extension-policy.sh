@@ -54,7 +54,7 @@ if [[ ! -s "$tmp_names" ]]; then
   exit 1
 fi
 
-collect_extension_dispatch_builtin_names "$tmp_names" "$tmp_extensions"
+collect_extension_dispatch_builtin_names "$tmp_names" "$tmp_extensions" "$policy_file"
 awk 'NF && $1 !~ /^#/ { print $1 }' "$policy_file" | sort -u > "$tmp_policy"
 
 comm -23 "$tmp_extensions" "$tmp_policy" > "$tmp_unexpected"

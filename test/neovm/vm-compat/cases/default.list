@@ -332,7 +332,6 @@ cases/kbd-macro-query-semantics
 cases/kbd-string-encoding-semantics
 cases/cl-helper-availability
 cases/residual-helper-availability
-cases/subr-x-string-helper-availability
 cases/bindings
 cases/mark-semantics
 cases/marker-accessor-arity-semantics

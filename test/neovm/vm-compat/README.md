@@ -406,13 +406,21 @@ runtime env-toggle semantics for `NEOVM_DISABLE_LOAD_CACHE_WRITE`, and
 default-build `#[...]` literal non-callability policy
 (`cases/bytecode-literal-default-policy`).
 
-### Extension policy note: `neovm-precompile-file`
+### Extension policy notes
 
-`neovm-precompile-file` is an intentional NeoVM extension symbol, not part of
-GNU Emacs core compatibility.
+The extension policy currently includes:
 
-- Oracle expectation: `(fboundp 'neovm-precompile-file)` is `nil`
-- NeoVM expectation: `(fboundp 'neovm-precompile-file)` is `t`
+- `neovm-precompile-file`
+- `string-chop-newline`
+- `string-fill`
+- `string-limit`
+- `string-pad`
+
+These symbols are intentional NeoVM extension symbols, not part of GNU Emacs
+core compatibility.
+
+- Oracle expectation: `(fboundp '<symbol>)` is `nil`
+- NeoVM expectation: `(fboundp '<symbol>)` is `t`
 
 The policy is enforced by:
 
@@ -458,7 +466,7 @@ Post-freeze updates:
 
 - Added builtin registry `fboundp` parity gate:
   - `make check-builtin-registry-fboundp`
-  - core-only parity (`neovm-*` extension names are excluded)
+  - core-only parity (policy-declared extension names are excluded)
   - allowlist file for remaining core drifts: `cases/builtin-registry-fboundp-allowlist.txt`
 - Added CI gate step for builtin registry parity in `.github/workflows/vm-compat.yml`.
 - Added `cases/input-batch-readers` corpus and wired it into default `check-all-neovm` coverage.

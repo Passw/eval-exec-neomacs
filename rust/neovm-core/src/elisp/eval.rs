@@ -941,7 +941,7 @@ impl Evaluator {
         seed_autoload(
             "read-passwd",
             "auth-source",
-            "Read a password, prompting with PROMPT, and return password as a string.",
+            "Read a password, prompting with PROMPT, and return it.",
         );
         seed_autoload("clear-rectangle", "rect", "Blank out the region-rectangle.");
         seed_autoload(
@@ -1048,7 +1048,7 @@ impl Evaluator {
         seed_autoload_noninteractive(
             "read-passwd",
             "auth-source",
-            "Read a password, prompting with PROMPT, and return password as a string.",
+            "Read a password, prompting with PROMPT, and return it.",
         );
         seed_autoload_noninteractive(
             "safe-date-to-time",

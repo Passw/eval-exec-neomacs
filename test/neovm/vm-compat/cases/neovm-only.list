@@ -11,3 +11,4 @@ cases/neovm-load-cache-write-policy-semantics
 cases/neovm-load-cache-write-env-toggle-semantics
 cases/precompile
 cases/bytecode-literal-default-policy
+cases/subr-x-string-helper-availability
