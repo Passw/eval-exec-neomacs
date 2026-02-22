@@ -5957,6 +5957,61 @@ pub(crate) fn builtin_set_buffer_auto_saved(args: Vec<Value>) -> EvalResult {
     Ok(Value::Nil)
 }
 
+pub(crate) fn builtin_set_charset_plist(args: Vec<Value>) -> EvalResult {
+    expect_args("set-charset-plist", &args, 2)?;
+    Ok(Value::Nil)
+}
+
+pub(crate) fn builtin_set_fontset_font(args: Vec<Value>) -> EvalResult {
+    expect_range_args("set-fontset-font", &args, 3, 5)?;
+    Ok(Value::Nil)
+}
+
+pub(crate) fn builtin_set_frame_window_state_change(args: Vec<Value>) -> EvalResult {
+    expect_range_args("set-frame-window-state-change", &args, 0, 2)?;
+    Ok(Value::Nil)
+}
+
+pub(crate) fn builtin_set_fringe_bitmap_face(args: Vec<Value>) -> EvalResult {
+    expect_range_args("set-fringe-bitmap-face", &args, 1, 2)?;
+    Ok(Value::Nil)
+}
+
+pub(crate) fn builtin_set_minibuffer_window(args: Vec<Value>) -> EvalResult {
+    expect_args("set-minibuffer-window", &args, 1)?;
+    Ok(Value::Nil)
+}
+
+pub(crate) fn builtin_set_mouse_pixel_position(args: Vec<Value>) -> EvalResult {
+    expect_args("set-mouse-pixel-position", &args, 3)?;
+    Ok(Value::Nil)
+}
+
+pub(crate) fn builtin_set_mouse_position(args: Vec<Value>) -> EvalResult {
+    expect_args("set-mouse-position", &args, 3)?;
+    Ok(Value::Nil)
+}
+
+pub(crate) fn builtin_set_window_combination_limit(args: Vec<Value>) -> EvalResult {
+    expect_args("set-window-combination-limit", &args, 2)?;
+    Ok(Value::Nil)
+}
+
+pub(crate) fn builtin_set_window_new_normal(args: Vec<Value>) -> EvalResult {
+    expect_range_args("set-window-new-normal", &args, 1, 2)?;
+    Ok(Value::Nil)
+}
+
+pub(crate) fn builtin_set_window_new_pixel(args: Vec<Value>) -> EvalResult {
+    expect_range_args("set-window-new-pixel", &args, 2, 3)?;
+    Ok(Value::Nil)
+}
+
+pub(crate) fn builtin_set_window_new_total(args: Vec<Value>) -> EvalResult {
+    expect_range_args("set-window-new-total", &args, 2, 3)?;
+    Ok(Value::Nil)
+}
+
 // ===========================================================================
 // Hook system (need evaluator)
 // ===========================================================================
@@ -14931,23 +14986,17 @@ pub(crate) fn dispatch_builtin(
         "set-buffer-auto-saved" => builtin_set_buffer_auto_saved(args),
         "set-buffer-major-mode" => builtin_set_buffer_major_mode(args),
         "set-buffer-redisplay" => builtin_set_buffer_redisplay(args),
-        "set-charset-plist" => super::compat_internal::builtin_set_charset_plist(args),
-        "set-fontset-font" => super::compat_internal::builtin_set_fontset_font(args),
-        "set-frame-window-state-change" => {
-            super::compat_internal::builtin_set_frame_window_state_change(args)
-        }
-        "set-fringe-bitmap-face" => super::compat_internal::builtin_set_fringe_bitmap_face(args),
-        "set-minibuffer-window" => super::compat_internal::builtin_set_minibuffer_window(args),
-        "set-mouse-pixel-position" => {
-            super::compat_internal::builtin_set_mouse_pixel_position(args)
-        }
-        "set-mouse-position" => super::compat_internal::builtin_set_mouse_position(args),
-        "set-window-combination-limit" => {
-            super::compat_internal::builtin_set_window_combination_limit(args)
-        }
-        "set-window-new-normal" => super::compat_internal::builtin_set_window_new_normal(args),
-        "set-window-new-pixel" => super::compat_internal::builtin_set_window_new_pixel(args),
-        "set-window-new-total" => super::compat_internal::builtin_set_window_new_total(args),
+        "set-charset-plist" => builtin_set_charset_plist(args),
+        "set-fontset-font" => builtin_set_fontset_font(args),
+        "set-frame-window-state-change" => builtin_set_frame_window_state_change(args),
+        "set-fringe-bitmap-face" => builtin_set_fringe_bitmap_face(args),
+        "set-minibuffer-window" => builtin_set_minibuffer_window(args),
+        "set-mouse-pixel-position" => builtin_set_mouse_pixel_position(args),
+        "set-mouse-position" => builtin_set_mouse_position(args),
+        "set-window-combination-limit" => builtin_set_window_combination_limit(args),
+        "set-window-new-normal" => builtin_set_window_new_normal(args),
+        "set-window-new-pixel" => builtin_set_window_new_pixel(args),
+        "set-window-new-total" => builtin_set_window_new_total(args),
         "sort-charsets" => super::compat_internal::builtin_sort_charsets(args),
         "split-char" => super::compat_internal::builtin_split_char(args),
         "string-distance" => super::compat_internal::builtin_string_distance(args),
@@ -15886,23 +15935,17 @@ pub(crate) fn dispatch_builtin_pure(name: &str, args: Vec<Value>) -> Option<Eval
         "set-buffer-auto-saved" => builtin_set_buffer_auto_saved(args),
         "set-buffer-major-mode" => builtin_set_buffer_major_mode(args),
         "set-buffer-redisplay" => builtin_set_buffer_redisplay(args),
-        "set-charset-plist" => super::compat_internal::builtin_set_charset_plist(args),
-        "set-fontset-font" => super::compat_internal::builtin_set_fontset_font(args),
-        "set-frame-window-state-change" => {
-            super::compat_internal::builtin_set_frame_window_state_change(args)
-        }
-        "set-fringe-bitmap-face" => super::compat_internal::builtin_set_fringe_bitmap_face(args),
-        "set-minibuffer-window" => super::compat_internal::builtin_set_minibuffer_window(args),
-        "set-mouse-pixel-position" => {
-            super::compat_internal::builtin_set_mouse_pixel_position(args)
-        }
-        "set-mouse-position" => super::compat_internal::builtin_set_mouse_position(args),
-        "set-window-combination-limit" => {
-            super::compat_internal::builtin_set_window_combination_limit(args)
-        }
-        "set-window-new-normal" => super::compat_internal::builtin_set_window_new_normal(args),
-        "set-window-new-pixel" => super::compat_internal::builtin_set_window_new_pixel(args),
-        "set-window-new-total" => super::compat_internal::builtin_set_window_new_total(args),
+        "set-charset-plist" => builtin_set_charset_plist(args),
+        "set-fontset-font" => builtin_set_fontset_font(args),
+        "set-frame-window-state-change" => builtin_set_frame_window_state_change(args),
+        "set-fringe-bitmap-face" => builtin_set_fringe_bitmap_face(args),
+        "set-minibuffer-window" => builtin_set_minibuffer_window(args),
+        "set-mouse-pixel-position" => builtin_set_mouse_pixel_position(args),
+        "set-mouse-position" => builtin_set_mouse_position(args),
+        "set-window-combination-limit" => builtin_set_window_combination_limit(args),
+        "set-window-new-normal" => builtin_set_window_new_normal(args),
+        "set-window-new-pixel" => builtin_set_window_new_pixel(args),
+        "set-window-new-total" => builtin_set_window_new_total(args),
         "sort-charsets" => super::compat_internal::builtin_sort_charsets(args),
         "split-char" => super::compat_internal::builtin_split_char(args),
         "string-distance" => super::compat_internal::builtin_string_distance(args),
@@ -19838,6 +19881,83 @@ mod tests {
             .expect("builtin set-buffer-auto-saved should resolve")
             .expect("builtin set-buffer-auto-saved should evaluate");
         assert!(set_auto_saved.is_nil());
+    }
+
+    #[test]
+    fn pure_dispatch_set_window_placeholder_cluster_matches_compat_contracts() {
+        let set_charset = dispatch_builtin_pure(
+            "set-charset-plist",
+            vec![Value::symbol("charset"), Value::list(vec![])],
+        )
+        .expect("builtin set-charset-plist should resolve")
+        .expect("builtin set-charset-plist should evaluate");
+        assert!(set_charset.is_nil());
+
+        let set_fontset = dispatch_builtin_pure(
+            "set-fontset-font",
+            vec![Value::symbol("name"), Value::symbol("target"), Value::Nil],
+        )
+        .expect("builtin set-fontset-font should resolve")
+        .expect("builtin set-fontset-font should evaluate");
+        assert!(set_fontset.is_nil());
+
+        let set_state = dispatch_builtin_pure("set-frame-window-state-change", vec![])
+            .expect("builtin set-frame-window-state-change should resolve")
+            .expect("builtin set-frame-window-state-change should evaluate");
+        assert!(set_state.is_nil());
+
+        let set_fringe = dispatch_builtin_pure("set-fringe-bitmap-face", vec![Value::Nil])
+            .expect("builtin set-fringe-bitmap-face should resolve")
+            .expect("builtin set-fringe-bitmap-face should evaluate");
+        assert!(set_fringe.is_nil());
+
+        let set_mini = dispatch_builtin_pure("set-minibuffer-window", vec![Value::Nil])
+            .expect("builtin set-minibuffer-window should resolve")
+            .expect("builtin set-minibuffer-window should evaluate");
+        assert!(set_mini.is_nil());
+
+        let set_mouse_pixel = dispatch_builtin_pure(
+            "set-mouse-pixel-position",
+            vec![Value::Nil, Value::Int(0), Value::Int(0)],
+        )
+        .expect("builtin set-mouse-pixel-position should resolve")
+        .expect("builtin set-mouse-pixel-position should evaluate");
+        assert!(set_mouse_pixel.is_nil());
+
+        let set_mouse = dispatch_builtin_pure(
+            "set-mouse-position",
+            vec![Value::Nil, Value::Int(0), Value::Int(0)],
+        )
+        .expect("builtin set-mouse-position should resolve")
+        .expect("builtin set-mouse-position should evaluate");
+        assert!(set_mouse.is_nil());
+
+        let set_combination =
+            dispatch_builtin_pure("set-window-combination-limit", vec![Value::Nil, Value::Nil])
+                .expect("builtin set-window-combination-limit should resolve")
+                .expect("builtin set-window-combination-limit should evaluate");
+        assert!(set_combination.is_nil());
+
+        let set_new_normal = dispatch_builtin_pure("set-window-new-normal", vec![Value::Nil])
+            .expect("builtin set-window-new-normal should resolve")
+            .expect("builtin set-window-new-normal should evaluate");
+        assert!(set_new_normal.is_nil());
+
+        let set_new_pixel = dispatch_builtin_pure(
+            "set-window-new-pixel",
+            vec![Value::Nil, Value::Int(1), Value::Int(2)],
+        )
+        .expect("builtin set-window-new-pixel should resolve")
+        .expect("builtin set-window-new-pixel should evaluate");
+        assert!(set_new_pixel.is_nil());
+
+        let set_new_total = dispatch_builtin_pure(
+            "set-window-new-total",
+            vec![Value::Nil, Value::Int(1), Value::Int(2)],
+        )
+        .expect("builtin set-window-new-total should resolve")
+        .expect("builtin set-window-new-total should evaluate");
+        assert!(set_new_total.is_nil());
     }
 
     #[test]
