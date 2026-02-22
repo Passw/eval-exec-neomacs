@@ -472,6 +472,7 @@ cases/x-display-query-window-error-structure-semantics
 cases/x-display-query-dead-window-error-payload-semantics
 cases/x-display-set-last-user-time-arg-payload-semantics
 cases/x-display-set-last-user-time-arity-payload-semantics
+cases/x-display-set-last-user-time-user-time-display-query-message-semantics
 cases/x-display-set-last-user-time-user-time-type-matrix-semantics
 cases/x-display-set-last-user-time-display-designator-nil-user-time-semantics
 cases/x-display-set-last-user-time-display-designator-non-nil-user-time-semantics

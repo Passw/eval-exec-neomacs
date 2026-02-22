@@ -2006,13 +2006,24 @@ pub(crate) fn builtin_x_server_vendor_eval(
 /// (x-display-set-last-user-time DISPLAY USER-TIME) -> error in batch/no-X context.
 pub(crate) fn builtin_x_display_set_last_user_time(args: Vec<Value>) -> EvalResult {
     expect_range_args("x-display-set-last-user-time", &args, 1, 2)?;
-    if args.len() == 1 || args[1].is_nil() {
-        return Err(x_windows_not_initialized_error());
+    if matches!(args.get(1), Some(Value::Frame(_))) {
+        return Err(x_window_system_frame_error());
     }
-    Err(signal(
-        "wrong-type-argument",
-        vec![Value::symbol("frame-live-p"), args[1].clone()],
-    ))
+    let query_args: Vec<Value> = args.get(1).cloned().into_iter().collect();
+    x_optional_display_query_error("x-display-set-last-user-time", &query_args)
+}
+
+/// Evaluator-aware variant of `x-display-set-last-user-time`.
+///
+/// In batch/no-X context, payload class follows USER-TIME argument designator
+/// semantics, including live-frame and terminal handle message mapping.
+pub(crate) fn builtin_x_display_set_last_user_time_eval(
+    eval: &mut super::eval::Evaluator,
+    args: Vec<Value>,
+) -> EvalResult {
+    expect_range_args("x-display-set-last-user-time", &args, 1, 2)?;
+    let query_args: Vec<Value> = args.get(1).cloned().into_iter().collect();
+    x_optional_display_query_error_eval(eval, "x-display-set-last-user-time", query_args)
 }
 
 /// (x-open-connection DISPLAY &optional XRM-STRING MUST-SUCCEED) -> nil
@@ -3511,6 +3522,25 @@ mod tests {
             other => panic!("expected error signal, got {other:?}"),
         }
 
+        match builtin_x_display_set_last_user_time(vec![Value::Nil, Value::string("x")]) {
+            Err(Flow::Signal(sig)) => {
+                assert_eq!(sig.symbol, "error");
+                assert_eq!(sig.data, vec![Value::string("Display x can’t be opened")]);
+            }
+            other => panic!("expected error signal, got {other:?}"),
+        }
+
+        match builtin_x_display_set_last_user_time(vec![Value::Nil, terminal_handle_value()]) {
+            Err(Flow::Signal(sig)) => {
+                assert_eq!(sig.symbol, "error");
+                assert_eq!(
+                    sig.data,
+                    vec![Value::string("Terminal 0 is not an X display")]
+                );
+            }
+            other => panic!("expected error signal, got {other:?}"),
+        }
+
         match builtin_x_display_set_last_user_time(vec![Value::Nil, Value::Int(1)]) {
             Err(Flow::Signal(sig)) => {
                 assert_eq!(sig.symbol, "wrong-type-argument");
@@ -3527,6 +3557,61 @@ mod tests {
         match builtin_x_display_set_last_user_time(vec![Value::Nil, Value::Int(1), Value::Nil]) {
             Err(Flow::Signal(sig)) => assert_eq!(sig.symbol, "wrong-number-of-arguments"),
             other => panic!("expected wrong-number-of-arguments signal, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn x_display_set_last_user_time_eval_uses_user_time_designator_payloads() {
+        let term = terminal_handle_value();
+        let mut eval = crate::elisp::Evaluator::new();
+        let frame_id = crate::elisp::window_cmds::ensure_selected_frame_id(&mut eval).0 as i64;
+
+        for display in [
+            Value::Nil,
+            Value::string("display"),
+            Value::Int(1),
+            Value::symbol("foo"),
+            Value::Int(frame_id),
+            term.clone(),
+        ] {
+            match builtin_x_display_set_last_user_time_eval(
+                &mut eval,
+                vec![display.clone(), Value::string("x")],
+            ) {
+                Err(Flow::Signal(sig)) => {
+                    assert_eq!(sig.symbol, "error");
+                    assert_eq!(sig.data, vec![Value::string("Display x can’t be opened")]);
+                }
+                other => panic!("expected error signal, got {other:?}"),
+            }
+
+            match builtin_x_display_set_last_user_time_eval(
+                &mut eval,
+                vec![display.clone(), Value::Int(frame_id)],
+            ) {
+                Err(Flow::Signal(sig)) => {
+                    assert_eq!(sig.symbol, "error");
+                    assert_eq!(
+                        sig.data,
+                        vec![Value::string("Window system frame should be used")]
+                    );
+                }
+                other => panic!("expected error signal, got {other:?}"),
+            }
+
+            match builtin_x_display_set_last_user_time_eval(
+                &mut eval,
+                vec![display.clone(), term.clone()],
+            ) {
+                Err(Flow::Signal(sig)) => {
+                    assert_eq!(sig.symbol, "error");
+                    assert_eq!(
+                        sig.data,
+                        vec![Value::string("Terminal 0 is not an X display")]
+                    );
+                }
+                other => panic!("expected error signal, got {other:?}"),
+            }
         }
     }
 

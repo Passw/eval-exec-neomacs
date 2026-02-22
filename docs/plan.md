@@ -19750,6 +19750,30 @@ Last updated: 2026-02-21
       - `3` args -> `(wrong-number-of-arguments x-display-set-last-user-time 3)`
       - `4` args -> `(wrong-number-of-arguments x-display-set-last-user-time 4)`
 
+- Aligned `x-display-set-last-user-time` USER-TIME display-query message payloads and added lock-ins:
+  - runtime changes:
+    - `rust/neovm-core/src/elisp/display.rs`
+      - `x-display-set-last-user-time` now routes through optional-display query semantics using `USER-TIME` as the payload designator:
+        - `USER-TIME=\"x\"` -> `(error "Display x can’t be opened")`
+        - `USER-TIME=<frame>` -> `(error "Window system frame should be used")`
+        - `USER-TIME=<terminal>` -> `(error "Terminal 0 is not an X display")`
+      - added evaluator-aware variant:
+        - `builtin_x_display_set_last_user_time_eval`
+      - wired evaluator dispatch in:
+        - `rust/neovm-core/src/elisp/builtins.rs`
+      - extended unit coverage:
+        - `x_display_set_last_user_time_batch_semantics`
+        - `x_display_set_last_user_time_eval_uses_user_time_designator_payloads`
+  - vm-compat corpus changes:
+    - added:
+      - `test/neovm/vm-compat/cases/x-display-set-last-user-time-user-time-display-query-message-semantics.forms`
+      - `test/neovm/vm-compat/cases/x-display-set-last-user-time-user-time-display-query-message-semantics.expected.tsv`
+    - wired case into:
+      - `test/neovm/vm-compat/cases/default.list`
+    - lock-ins assert these message payloads are DISPLAY-designator invariant across:
+      - `nil`, string, integer, symbol, vector, list, cons
+      - live frame, terminal, live window, dead window
+
 - Continue compatibility-first maintenance with small commit slices:
   - keep builtin surface and registry in lock-step
   - run oracle/parity checks after each behavior-affecting change

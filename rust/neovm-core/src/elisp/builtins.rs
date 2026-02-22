@@ -15898,6 +15898,11 @@ pub(crate) fn dispatch_builtin(
         "x-display-screens" => {
             return Some(super::display::builtin_x_display_screens_eval(eval, args))
         }
+        "x-display-set-last-user-time" => {
+            return Some(super::display::builtin_x_display_set_last_user_time_eval(
+                eval, args,
+            ))
+        }
         "x-display-visual-class" => {
             return Some(super::display::builtin_x_display_visual_class_eval(
                 eval, args,
