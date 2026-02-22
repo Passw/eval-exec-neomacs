@@ -543,6 +543,7 @@ cases/fit-window-to-buffer-designator-semantics
 cases/other-window-arity-semantics
 cases/window-accessor-arity-semantics
 cases/next-previous-window-arity-semantics
+cases/next-previous-window-callable-path-semantics
 cases/frame-ops-arity-semantics
 cases/frame-window-list-funcall-apply-semantics
 cases/frame-visible-p-semantics
