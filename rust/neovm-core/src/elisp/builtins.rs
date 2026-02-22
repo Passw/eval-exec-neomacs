@@ -15068,6 +15068,7 @@ pub(crate) fn dispatch_builtin_pure(name: &str, args: Vec<Value>) -> Option<Eval
         | "error"
         | "copy-file"
         | "delete-file"
+        | "display-color-p"
         | "indirect-variable"
         | "make-directory"
         | "make-temp-file"
@@ -15279,7 +15280,6 @@ pub(crate) fn dispatch_builtin_pure(name: &str, args: Vec<Value>) -> Option<Eval
         "max-char" => crate::encoding::builtin_max_char(args),
         // Display/terminal (pure)
         "display-graphic-p" => super::display::builtin_display_graphic_p(args),
-        "display-color-p" => super::display::builtin_display_color_p(args),
         "display-pixel-width" => super::display::builtin_display_pixel_width(args),
         "display-pixel-height" => super::display::builtin_display_pixel_height(args),
         // Internal compatibility surface (pure)
@@ -19408,6 +19408,7 @@ mod tests {
         assert!(dispatch_builtin_pure("functionp", vec![]).is_none());
         assert!(dispatch_builtin_pure("copy-file", vec![]).is_none());
         assert!(dispatch_builtin_pure("delete-file", vec![]).is_none());
+        assert!(dispatch_builtin_pure("display-color-p", vec![]).is_none());
         assert!(dispatch_builtin_pure("format", vec![]).is_none());
         assert!(dispatch_builtin_pure("format-message", vec![]).is_none());
         assert!(dispatch_builtin_pure("indirect-variable", vec![]).is_none());
