@@ -31,3 +31,6 @@
 31	(condition-case err (pcase-let* (((a . b) '(1 . 2))) (list a b)) (error err))	OK (error "Unknown a pattern: (a . b)")
 32	(condition-case err (pcase 1 ((or) 'x) (_ 'y)) (error err))	OK (error "Please avoid it")
 33	(condition-case err (pcase 1 ((or 1) 'x) (_ 'y)) (error err))	OK (error "Please avoid it")
+34	(condition-case err (pcase '(1 . 2) (((1 2) . 3) 'x) (_ 'y)) (error err))	OK (wrong-type-argument symbolp (1 2))
+35	(condition-case err (pcase-let ((((1 2) . 3) '(1 . 2))) 'ok) (error err))	OK (wrong-type-argument symbolp (1 2))
+36	(condition-case err (pcase-let* ((((1 2) . 3) '(1 . 2))) 'ok) (error err))	OK (wrong-type-argument symbolp (1 2))

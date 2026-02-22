@@ -1357,6 +1357,18 @@ mod tests {
             ),
             "OK (wrong-type-argument symbolp (1 2))"
         );
+        assert_eq!(
+            eval_last(
+                "(condition-case err (pcase-let ((((1 2) . 3) '(1 . 2))) 'ok) (error err))"
+            ),
+            "OK (wrong-type-argument symbolp (1 2))"
+        );
+        assert_eq!(
+            eval_last(
+                "(condition-case err (pcase-let* ((((1 2) . 3) '(1 . 2))) 'ok) (error err))"
+            ),
+            "OK (wrong-type-argument symbolp (1 2))"
+        );
     }
 
     // =======================================================================

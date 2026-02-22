@@ -38,3 +38,8 @@
 ; (or) requires at least two alternatives
 (condition-case err (pcase 1 ((or) 'x) (_ 'y)) (error err))
 (condition-case err (pcase 1 ((or 1) 'x) (_ 'y)) (error err))
+
+; dotted-list patterns with non-symbol heads
+(condition-case err (pcase '(1 . 2) (((1 2) . 3) 'x) (_ 'y)) (error err))
+(condition-case err (pcase-let ((((1 2) . 3) '(1 . 2))) 'ok) (error err))
+(condition-case err (pcase-let* ((((1 2) . 3) '(1 . 2))) 'ok) (error err))
