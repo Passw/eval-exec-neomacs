@@ -5917,6 +5917,46 @@ pub(crate) fn builtin_recent_auto_save_p(args: Vec<Value>) -> EvalResult {
     Ok(Value::Nil)
 }
 
+pub(crate) fn builtin_reconsider_frame_fonts(args: Vec<Value>) -> EvalResult {
+    expect_args("reconsider-frame-fonts", &args, 1)?;
+    Ok(Value::Nil)
+}
+
+pub(crate) fn builtin_redirect_debugging_output(args: Vec<Value>) -> EvalResult {
+    expect_range_args("redirect-debugging-output", &args, 1, 2)?;
+    Ok(Value::Nil)
+}
+
+pub(crate) fn builtin_redirect_frame_focus(args: Vec<Value>) -> EvalResult {
+    expect_range_args("redirect-frame-focus", &args, 1, 2)?;
+    Ok(Value::Nil)
+}
+
+pub(crate) fn builtin_remove_pos_from_symbol(args: Vec<Value>) -> EvalResult {
+    expect_args("remove-pos-from-symbol", &args, 1)?;
+    Ok(Value::Nil)
+}
+
+pub(crate) fn builtin_resize_mini_window_internal(args: Vec<Value>) -> EvalResult {
+    expect_args("resize-mini-window-internal", &args, 1)?;
+    Ok(Value::Nil)
+}
+
+pub(crate) fn builtin_restore_buffer_modified_p(args: Vec<Value>) -> EvalResult {
+    expect_args("restore-buffer-modified-p", &args, 1)?;
+    Ok(Value::Nil)
+}
+
+pub(crate) fn builtin_set_this_command_keys(args: Vec<Value>) -> EvalResult {
+    expect_args("set--this-command-keys", &args, 1)?;
+    Ok(Value::Nil)
+}
+
+pub(crate) fn builtin_set_buffer_auto_saved(args: Vec<Value>) -> EvalResult {
+    expect_args("set-buffer-auto-saved", &args, 0)?;
+    Ok(Value::Nil)
+}
+
 // ===========================================================================
 // Hook system (need evaluator)
 // ===========================================================================
@@ -14880,21 +14920,15 @@ pub(crate) fn dispatch_builtin(
         "redisplay" => builtin_redisplay(args),
         "record" => builtin_record(args),
         "recordp" => builtin_recordp(args),
-        "reconsider-frame-fonts" => super::compat_internal::builtin_reconsider_frame_fonts(args),
-        "redirect-debugging-output" => {
-            super::compat_internal::builtin_redirect_debugging_output(args)
-        }
-        "redirect-frame-focus" => super::compat_internal::builtin_redirect_frame_focus(args),
-        "remove-pos-from-symbol" => super::compat_internal::builtin_remove_pos_from_symbol(args),
+        "reconsider-frame-fonts" => builtin_reconsider_frame_fonts(args),
+        "redirect-debugging-output" => builtin_redirect_debugging_output(args),
+        "redirect-frame-focus" => builtin_redirect_frame_focus(args),
+        "remove-pos-from-symbol" => builtin_remove_pos_from_symbol(args),
         "rename-buffer" => builtin_rename_buffer(args),
-        "resize-mini-window-internal" => {
-            super::compat_internal::builtin_resize_mini_window_internal(args)
-        }
-        "restore-buffer-modified-p" => {
-            super::compat_internal::builtin_restore_buffer_modified_p(args)
-        }
-        "set--this-command-keys" => super::compat_internal::builtin_set_this_command_keys(args),
-        "set-buffer-auto-saved" => super::compat_internal::builtin_set_buffer_auto_saved(args),
+        "resize-mini-window-internal" => builtin_resize_mini_window_internal(args),
+        "restore-buffer-modified-p" => builtin_restore_buffer_modified_p(args),
+        "set--this-command-keys" => builtin_set_this_command_keys(args),
+        "set-buffer-auto-saved" => builtin_set_buffer_auto_saved(args),
         "set-buffer-major-mode" => builtin_set_buffer_major_mode(args),
         "set-buffer-redisplay" => builtin_set_buffer_redisplay(args),
         "set-charset-plist" => super::compat_internal::builtin_set_charset_plist(args),
@@ -15841,21 +15875,15 @@ pub(crate) fn dispatch_builtin_pure(name: &str, args: Vec<Value>) -> Option<Eval
         "redisplay" => builtin_redisplay(args),
         "record" => builtin_record(args),
         "recordp" => builtin_recordp(args),
-        "reconsider-frame-fonts" => super::compat_internal::builtin_reconsider_frame_fonts(args),
-        "redirect-debugging-output" => {
-            super::compat_internal::builtin_redirect_debugging_output(args)
-        }
-        "redirect-frame-focus" => super::compat_internal::builtin_redirect_frame_focus(args),
-        "remove-pos-from-symbol" => super::compat_internal::builtin_remove_pos_from_symbol(args),
+        "reconsider-frame-fonts" => builtin_reconsider_frame_fonts(args),
+        "redirect-debugging-output" => builtin_redirect_debugging_output(args),
+        "redirect-frame-focus" => builtin_redirect_frame_focus(args),
+        "remove-pos-from-symbol" => builtin_remove_pos_from_symbol(args),
         "rename-buffer" => builtin_rename_buffer(args),
-        "resize-mini-window-internal" => {
-            super::compat_internal::builtin_resize_mini_window_internal(args)
-        }
-        "restore-buffer-modified-p" => {
-            super::compat_internal::builtin_restore_buffer_modified_p(args)
-        }
-        "set--this-command-keys" => super::compat_internal::builtin_set_this_command_keys(args),
-        "set-buffer-auto-saved" => super::compat_internal::builtin_set_buffer_auto_saved(args),
+        "resize-mini-window-internal" => builtin_resize_mini_window_internal(args),
+        "restore-buffer-modified-p" => builtin_restore_buffer_modified_p(args),
+        "set--this-command-keys" => builtin_set_this_command_keys(args),
+        "set-buffer-auto-saved" => builtin_set_buffer_auto_saved(args),
         "set-buffer-major-mode" => builtin_set_buffer_major_mode(args),
         "set-buffer-redisplay" => builtin_set_buffer_redisplay(args),
         "set-charset-plist" => super::compat_internal::builtin_set_charset_plist(args),
@@ -19766,6 +19794,50 @@ mod tests {
             .expect("builtin recent-auto-save-p should resolve")
             .expect("builtin recent-auto-save-p should evaluate");
         assert!(recent_auto_save.is_nil());
+    }
+
+    #[test]
+    fn pure_dispatch_reconsider_redirect_placeholders_match_compat_contracts() {
+        let reconsider = dispatch_builtin_pure("reconsider-frame-fonts", vec![Value::Nil])
+            .expect("builtin reconsider-frame-fonts should resolve")
+            .expect("builtin reconsider-frame-fonts should evaluate");
+        assert!(reconsider.is_nil());
+
+        let redirect_dbg = dispatch_builtin_pure("redirect-debugging-output", vec![Value::Nil])
+            .expect("builtin redirect-debugging-output should resolve")
+            .expect("builtin redirect-debugging-output should evaluate");
+        assert!(redirect_dbg.is_nil());
+
+        let redirect_focus = dispatch_builtin_pure("redirect-frame-focus", vec![Value::Nil])
+            .expect("builtin redirect-frame-focus should resolve")
+            .expect("builtin redirect-frame-focus should evaluate");
+        assert!(redirect_focus.is_nil());
+
+        let remove_pos = dispatch_builtin_pure("remove-pos-from-symbol", vec![Value::symbol("x")])
+            .expect("builtin remove-pos-from-symbol should resolve")
+            .expect("builtin remove-pos-from-symbol should evaluate");
+        assert!(remove_pos.is_nil());
+
+        let resize_mini = dispatch_builtin_pure("resize-mini-window-internal", vec![Value::Nil])
+            .expect("builtin resize-mini-window-internal should resolve")
+            .expect("builtin resize-mini-window-internal should evaluate");
+        assert!(resize_mini.is_nil());
+
+        let restore_modified = dispatch_builtin_pure("restore-buffer-modified-p", vec![Value::Nil])
+            .expect("builtin restore-buffer-modified-p should resolve")
+            .expect("builtin restore-buffer-modified-p should evaluate");
+        assert!(restore_modified.is_nil());
+
+        let set_command_keys =
+            dispatch_builtin_pure("set--this-command-keys", vec![Value::string("x")])
+                .expect("builtin set--this-command-keys should resolve")
+                .expect("builtin set--this-command-keys should evaluate");
+        assert!(set_command_keys.is_nil());
+
+        let set_auto_saved = dispatch_builtin_pure("set-buffer-auto-saved", vec![])
+            .expect("builtin set-buffer-auto-saved should resolve")
+            .expect("builtin set-buffer-auto-saved should evaluate");
+        assert!(set_auto_saved.is_nil());
     }
 
     #[test]

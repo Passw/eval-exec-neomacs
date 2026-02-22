@@ -1738,54 +1738,6 @@ pub(crate) fn builtin_dump_emacs_portable_sort_predicate_copied(args: Vec<Value>
     Ok(Value::Nil)
 }
 
-/// `(reconsider-frame-fonts FRAME)` -> nil.
-pub(crate) fn builtin_reconsider_frame_fonts(args: Vec<Value>) -> EvalResult {
-    expect_args("reconsider-frame-fonts", &args, 1)?;
-    Ok(Value::Nil)
-}
-
-/// `(redirect-debugging-output FILE &optional APPEND)` -> nil.
-pub(crate) fn builtin_redirect_debugging_output(args: Vec<Value>) -> EvalResult {
-    expect_range_args("redirect-debugging-output", &args, 1, 2)?;
-    Ok(Value::Nil)
-}
-
-/// `(redirect-frame-focus FRAME FOCUS-FRAME)` -> nil.
-pub(crate) fn builtin_redirect_frame_focus(args: Vec<Value>) -> EvalResult {
-    expect_range_args("redirect-frame-focus", &args, 1, 2)?;
-    Ok(Value::Nil)
-}
-
-/// `(remove-pos-from-symbol SYMBOL)` -> nil.
-pub(crate) fn builtin_remove_pos_from_symbol(args: Vec<Value>) -> EvalResult {
-    expect_args("remove-pos-from-symbol", &args, 1)?;
-    Ok(Value::Nil)
-}
-
-/// `(resize-mini-window-internal WINDOW)` -> nil.
-pub(crate) fn builtin_resize_mini_window_internal(args: Vec<Value>) -> EvalResult {
-    expect_args("resize-mini-window-internal", &args, 1)?;
-    Ok(Value::Nil)
-}
-
-/// `(restore-buffer-modified-p FLAG)` -> nil.
-pub(crate) fn builtin_restore_buffer_modified_p(args: Vec<Value>) -> EvalResult {
-    expect_args("restore-buffer-modified-p", &args, 1)?;
-    Ok(Value::Nil)
-}
-
-/// `(set--this-command-keys KEYS)` -> nil.
-pub(crate) fn builtin_set_this_command_keys(args: Vec<Value>) -> EvalResult {
-    expect_args("set--this-command-keys", &args, 1)?;
-    Ok(Value::Nil)
-}
-
-/// `(set-buffer-auto-saved)` -> nil.
-pub(crate) fn builtin_set_buffer_auto_saved(args: Vec<Value>) -> EvalResult {
-    expect_args("set-buffer-auto-saved", &args, 0)?;
-    Ok(Value::Nil)
-}
-
 /// `(set-charset-plist CHARSET PLIST)` -> nil.
 pub(crate) fn builtin_set_charset_plist(args: Vec<Value>) -> EvalResult {
     expect_args("set-charset-plist", &args, 2)?;
