@@ -1122,6 +1122,48 @@ mod tests {
     }
 
     #[test]
+    fn internal_hash_table_buckets_match_oracle_float_special_hashes() {
+        fn collect_hashes(table: Value) -> Vec<i64> {
+            let buckets = builtin_internal_hash_table_buckets(vec![table]).expect("bucket alists");
+            let outer = list_to_vec(&buckets).expect("outer list");
+            let mut seen = Vec::new();
+            for bucket in outer {
+                let entries = list_to_vec(&bucket).expect("bucket alist");
+                for entry in entries {
+                    let Value::Cons(cell) = entry else {
+                        panic!("expected alist cons entry");
+                    };
+                    let pair = cell.lock().expect("poisoned");
+                    let hash = pair.cdr.as_int().expect("diagnostic hash integer");
+                    seen.push(hash);
+                }
+            }
+            seen.sort_unstable();
+            seen
+        }
+
+        let expected = vec![0_i64, 2_146_959_360_i64, 2_147_483_648_i64];
+        for test_name in ["eql", "equal"] {
+            let table = builtin_make_hash_table(vec![
+                Value::keyword(":test"),
+                Value::symbol(test_name),
+                Value::keyword(":size"),
+                Value::Int(5),
+            ])
+            .expect("hash table");
+            let _ = builtin_puthash(vec![Value::Float(-0.0), Value::symbol("neg"), table.clone()])
+                .expect("puthash -0.0");
+            let _ = builtin_puthash(vec![Value::Float(0.0), Value::symbol("pos"), table.clone()])
+                .expect("puthash 0.0");
+            let _ = builtin_puthash(
+                vec![Value::Float(f64::NAN), Value::symbol("nan"), table.clone()],
+            )
+            .expect("puthash nan");
+            assert_eq!(collect_hashes(table), expected);
+        }
+    }
+
+    #[test]
     fn internal_hash_table_introspection_type_errors() {
         assert!(builtin_internal_hash_table_buckets(vec![Value::Nil]).is_err());
         assert!(builtin_internal_hash_table_histogram(vec![Value::Nil]).is_err());

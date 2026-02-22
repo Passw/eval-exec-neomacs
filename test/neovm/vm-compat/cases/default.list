@@ -868,6 +868,7 @@ cases/hash-sxhash-float-edge-semantics
 cases/hash-sxhash-exact-small-values-semantics
 cases/hash-sxhash-float-exact-semantics
 cases/hash-table-buckets-diagnostic-semantics
+cases/hash-table-buckets-float-special-semantics
 cases/hash-table-index-size-growth-semantics
 cases/hash-table-test-alias-preservation-semantics
 cases/hash-table-test-alias-redefinition-existing-table-semantics
