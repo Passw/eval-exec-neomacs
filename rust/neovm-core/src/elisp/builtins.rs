@@ -7573,6 +7573,50 @@ pub(crate) fn builtin_gnutls_symmetric_encrypt(args: Vec<Value>) -> EvalResult {
     Ok(Value::Nil)
 }
 
+const DEFAULT_FONTSET_NAME: &str = "-*-*-*-*-*-*-*-*-*-*-*-*-fontset-default";
+
+pub(crate) fn builtin_font_get_system_font(args: Vec<Value>) -> EvalResult {
+    expect_args("font-get-system-font", &args, 0)?;
+    Ok(Value::Nil)
+}
+
+pub(crate) fn builtin_font_get_system_normal_font(args: Vec<Value>) -> EvalResult {
+    expect_args("font-get-system-normal-font", &args, 0)?;
+    Ok(Value::Nil)
+}
+
+fn expect_characterp_from_int(value: &Value) -> Result<char, Flow> {
+    match value {
+        Value::Int(n) if *n >= 0 => Ok((*n as u8) as char),
+        Value::Char(c) => Ok(*c),
+        other => Err(signal(
+            "wrong-type-argument",
+            vec![Value::symbol("characterp"), other.clone()],
+        )),
+    }
+}
+
+pub(crate) fn builtin_fontset_font(args: Vec<Value>) -> EvalResult {
+    expect_range_args("fontset-font", &args, 2, 3)?;
+    let _ = expect_characterp_from_int(&args[1])?;
+    Ok(Value::Nil)
+}
+
+pub(crate) fn builtin_fontset_info(args: Vec<Value>) -> EvalResult {
+    expect_range_args("fontset-info", &args, 1, 2)?;
+    Err(signal(
+        "error",
+        vec![Value::string(
+            "Window system is not in use or not initialized",
+        )],
+    ))
+}
+
+pub(crate) fn builtin_fontset_list(args: Vec<Value>) -> EvalResult {
+    expect_args("fontset-list", &args, 0)?;
+    Ok(Value::list(vec![Value::string(DEFAULT_FONTSET_NAME)]))
+}
+
 fn expect_window_live_or_nil(value: &Value) -> Result<(), Flow> {
     if value.is_nil() || matches!(value, Value::Window(_)) {
         Ok(())
@@ -16627,18 +16671,16 @@ pub(crate) fn dispatch_builtin(
         "font-at" => super::compat_internal::builtin_font_at(args),
         "font-face-attributes" => super::compat_internal::builtin_font_face_attributes(args),
         "font-get-glyphs" => super::compat_internal::builtin_font_get_glyphs(args),
-        "font-get-system-font" => super::compat_internal::builtin_font_get_system_font(args),
-        "font-get-system-normal-font" => {
-            super::compat_internal::builtin_font_get_system_normal_font(args)
-        }
+        "font-get-system-font" => builtin_font_get_system_font(args),
+        "font-get-system-normal-font" => builtin_font_get_system_normal_font(args),
         "font-has-char-p" => super::compat_internal::builtin_font_has_char_p(args),
         "font-info" => super::compat_internal::builtin_font_info(args),
         "font-match-p" => super::compat_internal::builtin_font_match_p(args),
         "font-shape-gstring" => super::compat_internal::builtin_font_shape_gstring(args),
         "font-variation-glyphs" => super::compat_internal::builtin_font_variation_glyphs(args),
-        "fontset-font" => super::compat_internal::builtin_fontset_font(args),
-        "fontset-info" => super::compat_internal::builtin_fontset_info(args),
-        "fontset-list" => super::compat_internal::builtin_fontset_list(args),
+        "fontset-font" => builtin_fontset_font(args),
+        "fontset-info" => builtin_fontset_info(args),
+        "fontset-list" => builtin_fontset_list(args),
         "frame--set-was-invisible" => builtin_frame_set_was_invisible(args),
         "frame-after-make-frame" => builtin_frame_after_make_frame(args),
         "frame-ancestor-p" => builtin_frame_ancestor_p(args),
@@ -17454,18 +17496,16 @@ pub(crate) fn dispatch_builtin_pure(name: &str, args: Vec<Value>) -> Option<Eval
         "font-at" => super::compat_internal::builtin_font_at(args),
         "font-face-attributes" => super::compat_internal::builtin_font_face_attributes(args),
         "font-get-glyphs" => super::compat_internal::builtin_font_get_glyphs(args),
-        "font-get-system-font" => super::compat_internal::builtin_font_get_system_font(args),
-        "font-get-system-normal-font" => {
-            super::compat_internal::builtin_font_get_system_normal_font(args)
-        }
+        "font-get-system-font" => builtin_font_get_system_font(args),
+        "font-get-system-normal-font" => builtin_font_get_system_normal_font(args),
         "font-has-char-p" => super::compat_internal::builtin_font_has_char_p(args),
         "font-info" => super::compat_internal::builtin_font_info(args),
         "font-match-p" => super::compat_internal::builtin_font_match_p(args),
         "font-shape-gstring" => super::compat_internal::builtin_font_shape_gstring(args),
         "font-variation-glyphs" => super::compat_internal::builtin_font_variation_glyphs(args),
-        "fontset-font" => super::compat_internal::builtin_fontset_font(args),
-        "fontset-info" => super::compat_internal::builtin_fontset_info(args),
-        "fontset-list" => super::compat_internal::builtin_fontset_list(args),
+        "fontset-font" => builtin_fontset_font(args),
+        "fontset-info" => builtin_fontset_info(args),
+        "fontset-list" => builtin_fontset_list(args),
         "frame--set-was-invisible" => builtin_frame_set_was_invisible(args),
         "frame-after-make-frame" => builtin_frame_after_make_frame(args),
         "frame-ancestor-p" => builtin_frame_ancestor_p(args),
@@ -23226,6 +23266,56 @@ mod tests {
         .expect("gnutls-symmetric-encrypt should resolve")
         .expect("gnutls-symmetric-encrypt should evaluate");
         assert_eq!(enc, Value::Nil);
+    }
+
+    #[test]
+    fn dispatch_builtin_pure_handles_fontset_placeholders() {
+        let system = dispatch_builtin_pure("font-get-system-font", vec![])
+            .expect("font-get-system-font should resolve")
+            .expect("font-get-system-font should evaluate");
+        assert_eq!(system, Value::Nil);
+
+        let normal = dispatch_builtin_pure("font-get-system-normal-font", vec![])
+            .expect("font-get-system-normal-font should resolve")
+            .expect("font-get-system-normal-font should evaluate");
+        assert_eq!(normal, Value::Nil);
+
+        let fontset = dispatch_builtin_pure(
+            "fontset-font",
+            vec![Value::symbol("fontset-default"), Value::Int('a' as i64)],
+        )
+        .expect("fontset-font should resolve")
+        .expect("fontset-font should evaluate");
+        assert_eq!(fontset, Value::Nil);
+
+        let info_err = dispatch_builtin_pure("fontset-info", vec![Value::symbol("fontset-default")])
+            .expect("fontset-info should resolve")
+            .unwrap_err();
+        match info_err {
+            Flow::Signal(sig) => assert_eq!(sig.symbol, "error"),
+            other => panic!("expected signal, got {other:?}"),
+        }
+
+        let list = dispatch_builtin_pure("fontset-list", vec![])
+            .expect("fontset-list should resolve")
+            .expect("fontset-list should evaluate");
+        assert_eq!(
+            list,
+            Value::list(vec![Value::string(
+                "-*-*-*-*-*-*-*-*-*-*-*-*-fontset-default"
+            )])
+        );
+
+        let fontset_err = dispatch_builtin_pure(
+            "fontset-font",
+            vec![Value::symbol("fontset-default"), Value::Nil],
+        )
+        .expect("fontset-font should resolve")
+        .unwrap_err();
+        match fontset_err {
+            Flow::Signal(sig) => assert_eq!(sig.symbol, "wrong-type-argument"),
+            other => panic!("expected signal, got {other:?}"),
+        }
     }
 
     #[test]

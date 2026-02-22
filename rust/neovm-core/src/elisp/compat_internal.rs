@@ -9,8 +9,6 @@ use super::value::{HashTableTest, Value};
 use std::cell::RefCell;
 
 const FACE_ATTRIBUTES_VECTOR_LEN: usize = 20;
-const DEFAULT_FONTSET_NAME: &str = "-*-*-*-*-*-*-*-*-*-*-*-*-fontset-default";
-
 thread_local! {
     static HASH_TABLE_TEST_ALIASES: RefCell<Vec<(String, HashTableTest)>> =
         const { RefCell::new(Vec::new()) };
@@ -169,18 +167,6 @@ pub(crate) fn builtin_font_get_glyphs(args: Vec<Value>) -> EvalResult {
     Ok(Value::Nil)
 }
 
-/// `(font-get-system-font)` -> nil.
-pub(crate) fn builtin_font_get_system_font(args: Vec<Value>) -> EvalResult {
-    expect_args("font-get-system-font", &args, 0)?;
-    Ok(Value::Nil)
-}
-
-/// `(font-get-system-normal-font)` -> nil.
-pub(crate) fn builtin_font_get_system_normal_font(args: Vec<Value>) -> EvalResult {
-    expect_args("font-get-system-normal-font", &args, 0)?;
-    Ok(Value::Nil)
-}
-
 /// `(font-has-char-p FONT CHAR &optional SCRIPT)` -> nil.
 pub(crate) fn builtin_font_has_char_p(args: Vec<Value>) -> EvalResult {
     expect_range_args("font-has-char-p", &args, 2, 3)?;
@@ -243,30 +229,6 @@ pub(crate) fn builtin_font_variation_glyphs(args: Vec<Value>) -> EvalResult {
     }
     let _ = expect_characterp_from_int(&args[1])?;
     Ok(Value::Nil)
-}
-
-/// `(fontset-font FONTSET CHAR &optional FRAME)` -> nil.
-pub(crate) fn builtin_fontset_font(args: Vec<Value>) -> EvalResult {
-    expect_range_args("fontset-font", &args, 2, 3)?;
-    let _ = expect_characterp_from_int(&args[1])?;
-    Ok(Value::Nil)
-}
-
-/// `(fontset-info FONTSET &optional FRAME)` -> error in batch compatibility.
-pub(crate) fn builtin_fontset_info(args: Vec<Value>) -> EvalResult {
-    expect_range_args("fontset-info", &args, 1, 2)?;
-    Err(signal(
-        "error",
-        vec![Value::string(
-            "Window system is not in use or not initialized",
-        )],
-    ))
-}
-
-/// `(fontset-list)` -> list containing default fontset name.
-pub(crate) fn builtin_fontset_list(args: Vec<Value>) -> EvalResult {
-    expect_args("fontset-list", &args, 0)?;
-    Ok(Value::list(vec![Value::string(DEFAULT_FONTSET_NAME)]))
 }
 
 /// `(font-at POS &optional WINDOW STRING)` -> nil or compatibility error.
