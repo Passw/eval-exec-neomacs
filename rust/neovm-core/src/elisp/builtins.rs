@@ -106,6 +106,17 @@ fn expect_char_equal_code(value: &Value) -> Result<i64, Flow> {
     }
 }
 
+fn expect_character_code(value: &Value) -> Result<i64, Flow> {
+    match value {
+        Value::Char(c) => Ok(*c as i64),
+        Value::Int(n) if (0..=0x3FFFFF).contains(n) => Ok(*n),
+        other => Err(signal(
+            "wrong-type-argument",
+            vec![Value::symbol("characterp"), other.clone()],
+        )),
+    }
+}
+
 fn char_equal_folded(code: i64) -> Option<String> {
     char::from_u32(code as u32).map(|ch| ch.to_lowercase().collect())
 }
@@ -701,6 +712,12 @@ pub(crate) fn builtin_vector_or_char_table_p(args: Vec<Value>) -> EvalResult {
 pub(crate) fn builtin_characterp(args: Vec<Value>) -> EvalResult {
     expect_args("characterp", &args, 1)?;
     Ok(Value::bool(args[0].is_char()))
+}
+
+pub(crate) fn builtin_char_uppercase_p(args: Vec<Value>) -> EvalResult {
+    expect_args("char-uppercase-p", &args, 1)?;
+    let code = expect_character_code(&args[0])?;
+    Ok(Value::bool(downcase_char_code_emacs_compat(code) != code))
 }
 
 pub(crate) fn builtin_functionp(args: Vec<Value>) -> EvalResult {
@@ -14183,6 +14200,8 @@ enum PureBuiltinId {
     Vectorp,
     #[strum(serialize = "characterp")]
     Characterp,
+    #[strum(serialize = "char-uppercase-p")]
+    CharUppercasep,
     #[strum(serialize = "functionp")]
     Functionp,
     #[strum(serialize = "keywordp")]
@@ -14476,6 +14495,7 @@ fn dispatch_builtin_id_pure(id: PureBuiltinId, args: Vec<Value>) -> EvalResult {
         PureBuiltinId::Stringp => builtin_stringp(args),
         PureBuiltinId::Vectorp => builtin_vectorp(args),
         PureBuiltinId::Characterp => builtin_characterp(args),
+        PureBuiltinId::CharUppercasep => builtin_char_uppercase_p(args),
         PureBuiltinId::Functionp => builtin_functionp(args),
         PureBuiltinId::Keywordp => builtin_keywordp(args),
         PureBuiltinId::HashTablep => builtin_hash_table_p(args),

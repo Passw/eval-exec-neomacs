@@ -1819,6 +1819,7 @@ const DISPATCH_BUILTIN_NAMES: &[&str] = &[
     "bufferp",
     "ceiling",
     "char-to-string",
+    "char-uppercase-p",
     "characterp",
     "clrhash",
     "concat",

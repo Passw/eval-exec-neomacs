@@ -1096,11 +1096,11 @@ fn subr_arity_value(name: &str) -> Value {
         | "bool-vector-intersection"
         | "bool-vector-set-difference"
         | "bool-vector-union" => arity_cons(2, Some(3)),
-        "arrayp" | "atom" | "booleanp" | "bufferp" | "char-to-string" | "consp" | "downcase"
-        | "float" | "floatp" | "integer-or-null-p" | "integerp" | "keywordp" | "listp"
-        | "list-of-strings-p" | "nlistp" | "null" | "number-to-string" | "numberp"
-        | "sequencep" | "string-to-char" | "stringp" | "symbolp" | "type-of" | "cl-type-of"
-        | "upcase" | "vectorp" => {
+        "arrayp" | "atom" | "booleanp" | "bufferp" | "char-to-string" | "char-uppercase-p"
+        | "consp" | "downcase" | "float" | "floatp" | "integer-or-null-p" | "integerp"
+        | "keywordp" | "listp" | "list-of-strings-p" | "nlistp" | "null"
+        | "number-to-string" | "numberp" | "sequencep" | "string-to-char" | "stringp"
+        | "symbolp" | "type-of" | "cl-type-of" | "upcase" | "vectorp" => {
             arity_cons(1, Some(1))
         }
         "ceiling" | "characterp" | "floor" | "round" | "string-to-number" | "truncate" => {
@@ -2812,6 +2812,7 @@ mod tests {
         assert_subr_arity("bufferp", 1, Some(1));
         assert_subr_arity("ceiling", 1, Some(2));
         assert_subr_arity("char-to-string", 1, Some(1));
+        assert_subr_arity("char-uppercase-p", 1, Some(1));
         assert_subr_arity("characterp", 1, Some(2));
         assert_subr_arity("consp", 1, Some(1));
         assert_subr_arity("downcase", 1, Some(1));
