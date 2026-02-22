@@ -89,26 +89,6 @@ fn expect_fixnum(value: &Value) -> Result<i64, Flow> {
     }
 }
 
-fn expect_sequencep(value: &Value) -> Result<(), Flow> {
-    match value {
-        Value::Nil | Value::Cons(_) | Value::Vector(_) | Value::Str(_) => Ok(()),
-        other => Err(signal(
-            "wrong-type-argument",
-            vec![Value::symbol("sequencep"), other.clone()],
-        )),
-    }
-}
-
-fn expect_vector_or_char_table_p(value: &Value) -> Result<(), Flow> {
-    match value {
-        Value::Vector(_) => Ok(()),
-        other => Err(signal(
-            "wrong-type-argument",
-            vec![Value::symbol("vector-or-char-table-p"), other.clone()],
-        )),
-    }
-}
-
 fn is_font_object(value: &Value) -> bool {
     match value {
         Value::Vector(items) => {
@@ -145,16 +125,6 @@ fn expect_stringp(value: &Value) -> Result<(), Flow> {
         other => Err(signal(
             "wrong-type-argument",
             vec![Value::symbol("stringp"), other.clone()],
-        )),
-    }
-}
-
-fn expect_bufferp(value: &Value) -> Result<(), Flow> {
-    match value {
-        Value::Buffer(_) => Ok(()),
-        other => Err(signal(
-            "wrong-type-argument",
-            vec![Value::symbol("bufferp"), other.clone()],
         )),
     }
 }
@@ -545,46 +515,6 @@ pub(crate) fn builtin_gnutls_symmetric_decrypt(args: Vec<Value>) -> EvalResult {
 pub(crate) fn builtin_gnutls_symmetric_encrypt(args: Vec<Value>) -> EvalResult {
     expect_range_args("gnutls-symmetric-encrypt", &args, 4, 5)?;
     Ok(Value::Nil)
-}
-
-/// `(describe-buffer-bindings BUFFER &optional PREFIXES MENUS)` -> nil.
-pub(crate) fn builtin_describe_buffer_bindings(args: Vec<Value>) -> EvalResult {
-    expect_range_args("describe-buffer-bindings", &args, 1, 3)?;
-    expect_bufferp(&args[0])?;
-    if let Some(prefixes) = args.get(1) {
-        if !prefixes.is_nil() {
-            expect_sequencep(prefixes)?;
-        }
-    }
-    Ok(Value::Nil)
-}
-
-/// `(describe-vector VECTOR &optional OUTPUT)` -> nil.
-pub(crate) fn builtin_describe_vector(args: Vec<Value>) -> EvalResult {
-    expect_range_args("describe-vector", &args, 1, 2)?;
-    expect_vector_or_char_table_p(&args[0])?;
-    if let Some(output) = args.get(1) {
-        if !output.is_nil() {
-            if let Some(name) = output.as_symbol_name() {
-                return Err(signal("void-function", vec![Value::symbol(name)]));
-            }
-        }
-    }
-    Ok(Value::Nil)
-}
-
-/// `(delete-terminal &optional TERMINAL FORCE)` -> nil or error.
-pub(crate) fn builtin_delete_terminal(args: Vec<Value>) -> EvalResult {
-    expect_range_args("delete-terminal", &args, 0, 2)?;
-    if args.first().is_some_and(|term| !term.is_nil()) {
-        return Ok(Value::Nil);
-    }
-    Err(signal(
-        "error",
-        vec![Value::string(
-            "Attempt to delete the sole active display terminal",
-        )],
-    ))
 }
 
 /// `(font-at POS &optional WINDOW STRING)` -> nil or compatibility error.

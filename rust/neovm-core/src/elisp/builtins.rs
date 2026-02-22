@@ -7137,6 +7137,61 @@ pub(crate) fn builtin_init_image_library(args: Vec<Value>) -> EvalResult {
     Ok(Value::Nil)
 }
 
+pub(crate) fn builtin_describe_buffer_bindings(args: Vec<Value>) -> EvalResult {
+    expect_range_args("describe-buffer-bindings", &args, 1, 3)?;
+    if !matches!(args[0], Value::Buffer(_)) {
+        return Err(signal(
+            "wrong-type-argument",
+            vec![Value::symbol("bufferp"), args[0].clone()],
+        ));
+    }
+    if let Some(prefixes) = args.get(1) {
+        if !prefixes.is_nil()
+            && !matches!(
+                prefixes,
+                Value::Cons(_) | Value::Vector(_) | Value::Str(_) | Value::Nil
+            )
+        {
+            return Err(signal(
+                "wrong-type-argument",
+                vec![Value::symbol("sequencep"), prefixes.clone()],
+            ));
+        }
+    }
+    Ok(Value::Nil)
+}
+
+pub(crate) fn builtin_describe_vector(args: Vec<Value>) -> EvalResult {
+    expect_range_args("describe-vector", &args, 1, 2)?;
+    if !matches!(args[0], Value::Vector(_)) {
+        return Err(signal(
+            "wrong-type-argument",
+            vec![Value::symbol("vector-or-char-table-p"), args[0].clone()],
+        ));
+    }
+    if let Some(output) = args.get(1) {
+        if !output.is_nil() {
+            if let Some(name) = output.as_symbol_name() {
+                return Err(signal("void-function", vec![Value::symbol(name)]));
+            }
+        }
+    }
+    Ok(Value::Nil)
+}
+
+pub(crate) fn builtin_delete_terminal(args: Vec<Value>) -> EvalResult {
+    expect_range_args("delete-terminal", &args, 0, 2)?;
+    if args.first().is_some_and(|term| !term.is_nil()) {
+        return Ok(Value::Nil);
+    }
+    Err(signal(
+        "error",
+        vec![Value::string(
+            "Attempt to delete the sole active display terminal",
+        )],
+    ))
+}
+
 pub(crate) fn builtin_frame_face_hash_table(args: Vec<Value>) -> EvalResult {
     expect_range_args("frame--face-hash-table", &args, 0, 1)?;
     if let Some(frame) = args.first() {
@@ -16335,11 +16390,9 @@ pub(crate) fn dispatch_builtin(
         "display--update-for-mouse-movement" => builtin_display_update_for_mouse_movement(args),
         "do-auto-save" => builtin_do_auto_save(args),
         "external-debugging-output" => builtin_external_debugging_output(args),
-        "describe-buffer-bindings" => {
-            super::compat_internal::builtin_describe_buffer_bindings(args)
-        }
-        "describe-vector" => super::compat_internal::builtin_describe_vector(args),
-        "delete-terminal" => super::compat_internal::builtin_delete_terminal(args),
+        "describe-buffer-bindings" => builtin_describe_buffer_bindings(args),
+        "describe-vector" => builtin_describe_vector(args),
+        "delete-terminal" => builtin_delete_terminal(args),
         "face-attributes-as-vector" => {
             super::compat_internal::builtin_face_attributes_as_vector(args)
         }
@@ -17176,11 +17229,9 @@ pub(crate) fn dispatch_builtin_pure(name: &str, args: Vec<Value>) -> Option<Eval
         "display--update-for-mouse-movement" => builtin_display_update_for_mouse_movement(args),
         "do-auto-save" => builtin_do_auto_save(args),
         "external-debugging-output" => builtin_external_debugging_output(args),
-        "describe-buffer-bindings" => {
-            super::compat_internal::builtin_describe_buffer_bindings(args)
-        }
-        "describe-vector" => super::compat_internal::builtin_describe_vector(args),
-        "delete-terminal" => super::compat_internal::builtin_delete_terminal(args),
+        "describe-buffer-bindings" => builtin_describe_buffer_bindings(args),
+        "describe-vector" => builtin_describe_vector(args),
+        "delete-terminal" => builtin_delete_terminal(args),
         "face-attributes-as-vector" => {
             super::compat_internal::builtin_face_attributes_as_vector(args)
         }
@@ -22784,6 +22835,52 @@ mod tests {
             Flow::Signal(sig) => assert_eq!(sig.symbol, "wrong-type-argument"),
             other => panic!("expected signal, got {other:?}"),
         }
+    }
+
+    #[test]
+    fn dispatch_builtin_pure_handles_describe_and_delete_terminal_placeholders() {
+        let bindings = dispatch_builtin_pure(
+            "describe-buffer-bindings",
+            vec![Value::Buffer(crate::buffer::BufferId(0))],
+        )
+        .expect("describe-buffer-bindings should resolve")
+        .expect("describe-buffer-bindings should evaluate");
+        assert_eq!(bindings, Value::Nil);
+
+        let seq_err = dispatch_builtin_pure(
+            "describe-buffer-bindings",
+            vec![Value::Buffer(crate::buffer::BufferId(0)), Value::Int(1)],
+        )
+        .expect("describe-buffer-bindings should resolve")
+        .unwrap_err();
+        match seq_err {
+            Flow::Signal(sig) => assert_eq!(sig.symbol, "wrong-type-argument"),
+            other => panic!("expected signal, got {other:?}"),
+        }
+
+        let vec_err = dispatch_builtin_pure(
+            "describe-vector",
+            vec![Value::vector(vec![Value::Int(1)]), Value::symbol("display-buffer")],
+        )
+        .expect("describe-vector should resolve")
+        .unwrap_err();
+        match vec_err {
+            Flow::Signal(sig) => assert_eq!(sig.symbol, "void-function"),
+            other => panic!("expected signal, got {other:?}"),
+        }
+
+        let delete_err = dispatch_builtin_pure("delete-terminal", vec![])
+            .expect("delete-terminal should resolve")
+            .unwrap_err();
+        match delete_err {
+            Flow::Signal(sig) => assert_eq!(sig.symbol, "error"),
+            other => panic!("expected signal, got {other:?}"),
+        }
+
+        let deleted = dispatch_builtin_pure("delete-terminal", vec![Value::symbol("tty")])
+            .expect("delete-terminal should resolve")
+            .expect("delete-terminal should evaluate");
+        assert_eq!(deleted, Value::Nil);
     }
 
     #[test]
