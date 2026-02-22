@@ -1638,6 +1638,12 @@ mod tests {
     }
 
     #[test]
+    fn test_parse_colon_file_names_handles_crlf_lines() {
+        let parsed = parse_colon_file_names("first:x:0:0\r\nsecond:x:0:0\r\n");
+        assert_eq!(parsed, vec!["second".to_string(), "first".to_string()]);
+    }
+
+    #[test]
     fn test_read_colon_file_names_reads_file() {
         let dir = std::env::temp_dir();
         let path = dir.join("neovm_dired_users.txt");
