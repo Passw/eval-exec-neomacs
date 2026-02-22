@@ -59,6 +59,7 @@ const DISPATCH_BUILTIN_NAMES: &[&str] = &[
     "autoload",
     "autoload-do-load",
     "autoloadp",
+    "auto-save-file-name-p",
     "back-to-indentation",
     "backquote-delay-process",
     "backquote-process",

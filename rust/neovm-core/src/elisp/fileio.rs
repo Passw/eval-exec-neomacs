@@ -274,6 +274,17 @@ pub fn backup_file_name_p(filename: &str) -> Option<i64> {
     }
 }
 
+/// Return 0 when FILENAME is an auto-save file name, else nil-like None.
+///
+/// Emacs `auto-save-file-name-p` returns 0 for names like `#foo#`.
+pub fn auto_save_file_name_p(filename: &str) -> Option<i64> {
+    if filename.len() > 1 && filename.starts_with('#') && filename.ends_with('#') {
+        Some(0)
+    } else {
+        None
+    }
+}
+
 /// Return true if NAME is a directory name (ends with a directory separator).
 pub fn directory_name_p(name: &str) -> bool {
     name.ends_with('/')
@@ -1598,6 +1609,16 @@ pub(crate) fn builtin_backup_file_name_p(args: Vec<Value>) -> EvalResult {
     expect_args("backup-file-name-p", &args, 1)?;
     let file = expect_string_strict(&args[0])?;
     Ok(match backup_file_name_p(&file) {
+        Some(idx) => Value::Int(idx),
+        None => Value::Nil,
+    })
+}
+
+/// (auto-save-file-name-p FILE) -> integer index or nil
+pub(crate) fn builtin_auto_save_file_name_p(args: Vec<Value>) -> EvalResult {
+    expect_args("auto-save-file-name-p", &args, 1)?;
+    let file = expect_string_strict(&args[0])?;
+    Ok(match auto_save_file_name_p(&file) {
         Some(idx) => Value::Int(idx),
         None => Value::Nil,
     })
@@ -4655,6 +4676,12 @@ mod tests {
 
         let no_backup = builtin_backup_file_name_p(vec![Value::string("foo.txt")]);
         assert_eq!(no_backup.unwrap(), Value::Nil);
+
+        let auto_save = builtin_auto_save_file_name_p(vec![Value::string("#foo#")]);
+        assert_eq!(auto_save.unwrap(), Value::Int(0));
+
+        let not_auto_save = builtin_auto_save_file_name_p(vec![Value::string("foo.txt")]);
+        assert_eq!(not_auto_save.unwrap(), Value::Nil);
     }
 
     #[test]
@@ -4669,6 +4696,7 @@ mod tests {
         assert!(builtin_file_name_as_directory(vec![Value::symbol("x")]).is_err());
         assert!(builtin_directory_file_name(vec![Value::symbol("x")]).is_err());
         assert!(builtin_backup_file_name_p(vec![Value::symbol("x")]).is_err());
+        assert!(builtin_auto_save_file_name_p(vec![Value::symbol("x")]).is_err());
     }
 
     #[test]
