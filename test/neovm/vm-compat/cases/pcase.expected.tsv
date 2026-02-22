@@ -40,3 +40,15 @@
 40	(condition-case err (pcase 1 ((pred integerp 2 3) 'x) (_ 'y)) (error err))	OK x
 41	(condition-case err (pcase 1 ((or 1 2) 'x) (_ 'y)) (error err))	OK x
 42	(condition-case err (pcase 3 ((or 1 2) 'x) (_ 'y)) (error err))	OK y
+43	(condition-case err (pcase-let (((or) 1)) 'ok) (error err))	OK (error "Please avoid it")
+44	(condition-case err (pcase-let (((or 1) 1)) 'ok) (error err))	OK (error "Please avoid it")
+45	(condition-case err (pcase-let (((or 1 2) 1)) 'ok) (error err))	OK ok
+46	(condition-case err (pcase-let* (((or) 1)) 'ok) (error err))	OK (error "Please avoid it")
+47	(condition-case err (pcase-let* (((or 1) 1)) 'ok) (error err))	OK (error "Please avoid it")
+48	(condition-case err (pcase-let* (((or 1 2) 1)) 'ok) (error err))	OK ok
+49	(condition-case err (pcase-let (((and) 1)) 'ok) (error err))	OK ok
+50	(condition-case err (pcase-let* (((and) 1)) 'ok) (error err))	OK ok
+51	(condition-case err (let ((acc nil)) (pcase-dolist ((or) '(1 2)) (push 1 acc)) (nreverse acc)) (error err))	OK (error "Please avoid it")
+52	(condition-case err (let ((acc nil)) (pcase-dolist ((or 1) '(1 2)) (push 1 acc)) (nreverse acc)) (error err))	OK (error "Please avoid it")
+53	(condition-case err (let ((acc nil)) (pcase-dolist ((or 1 2) '(1 2 3)) (push 1 acc)) (nreverse acc)) (error err))	OK (1 1 1)
+54	(condition-case err (let ((acc nil)) (pcase-dolist ((and) '(1 2)) (push 1 acc)) (nreverse acc)) (error err))	OK (1 1)

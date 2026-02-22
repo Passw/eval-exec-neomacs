@@ -53,3 +53,17 @@
 (condition-case err (pcase 1 ((pred integerp 2 3) 'x) (_ 'y)) (error err))
 (condition-case err (pcase 1 ((or 1 2) 'x) (_ 'y)) (error err))
 (condition-case err (pcase 3 ((or 1 2) 'x) (_ 'y)) (error err))
+
+; pcase-let/pcase-dolist arity propagation and empty/singleton behavior
+(condition-case err (pcase-let (((or) 1)) 'ok) (error err))
+(condition-case err (pcase-let (((or 1) 1)) 'ok) (error err))
+(condition-case err (pcase-let (((or 1 2) 1)) 'ok) (error err))
+(condition-case err (pcase-let* (((or) 1)) 'ok) (error err))
+(condition-case err (pcase-let* (((or 1) 1)) 'ok) (error err))
+(condition-case err (pcase-let* (((or 1 2) 1)) 'ok) (error err))
+(condition-case err (pcase-let (((and) 1)) 'ok) (error err))
+(condition-case err (pcase-let* (((and) 1)) 'ok) (error err))
+(condition-case err (let ((acc nil)) (pcase-dolist ((or) '(1 2)) (push 1 acc)) (nreverse acc)) (error err))
+(condition-case err (let ((acc nil)) (pcase-dolist ((or 1) '(1 2)) (push 1 acc)) (nreverse acc)) (error err))
+(condition-case err (let ((acc nil)) (pcase-dolist ((or 1 2) '(1 2 3)) (push 1 acc)) (nreverse acc)) (error err))
+(condition-case err (let ((acc nil)) (pcase-dolist ((and) '(1 2)) (push 1 acc)) (nreverse acc)) (error err))

@@ -1464,6 +1464,70 @@ mod tests {
         );
     }
 
+    #[test]
+    fn pcase_or_arity_errors_propagate_to_let_and_dolist() {
+        assert_eq!(
+            eval_last("(condition-case err (pcase-let (((or) 1)) 'ok) (error err))"),
+            "OK (error \"Please avoid it\")"
+        );
+        assert_eq!(
+            eval_last("(condition-case err (pcase-let (((or 1) 1)) 'ok) (error err))"),
+            "OK (error \"Please avoid it\")"
+        );
+        assert_eq!(
+            eval_last("(condition-case err (pcase-let* (((or) 1)) 'ok) (error err))"),
+            "OK (error \"Please avoid it\")"
+        );
+        assert_eq!(
+            eval_last("(condition-case err (pcase-let* (((or 1) 1)) 'ok) (error err))"),
+            "OK (error \"Please avoid it\")"
+        );
+        assert_eq!(
+            eval_last(
+                "(condition-case err (let ((acc nil)) (pcase-dolist ((or) '(1 2)) (push 1 acc)) (nreverse acc)) (error err))"
+            ),
+            "OK (error \"Please avoid it\")"
+        );
+        assert_eq!(
+            eval_last(
+                "(condition-case err (let ((acc nil)) (pcase-dolist ((or 1) '(1 2)) (push 1 acc)) (nreverse acc)) (error err))"
+            ),
+            "OK (error \"Please avoid it\")"
+        );
+    }
+
+    #[test]
+    fn pcase_or_and_empty_patterns_work_in_let_and_dolist() {
+        assert_eq!(
+            eval_last("(condition-case err (pcase-let (((or 1 2) 1)) 'ok) (error err))"),
+            "OK ok"
+        );
+        assert_eq!(
+            eval_last("(condition-case err (pcase-let* (((or 1 2) 1)) 'ok) (error err))"),
+            "OK ok"
+        );
+        assert_eq!(
+            eval_last("(condition-case err (pcase-let (((and) 1)) 'ok) (error err))"),
+            "OK ok"
+        );
+        assert_eq!(
+            eval_last("(condition-case err (pcase-let* (((and) 1)) 'ok) (error err))"),
+            "OK ok"
+        );
+        assert_eq!(
+            eval_last(
+                "(condition-case err (let ((acc nil)) (pcase-dolist ((or 1 2) '(1 2 3)) (push 1 acc)) (nreverse acc)) (error err))"
+            ),
+            "OK (1 1 1)"
+        );
+        assert_eq!(
+            eval_last(
+                "(condition-case err (let ((acc nil)) (pcase-dolist ((and) '(1 2)) (push 1 acc)) (nreverse acc)) (error err))"
+            ),
+            "OK (1 1)"
+        );
+    }
+
     // =======================================================================
     // 13. app pattern
     // =======================================================================
