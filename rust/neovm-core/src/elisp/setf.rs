@@ -229,7 +229,8 @@ fn setf_place(eval: &mut super::eval::Evaluator, place: &Expr, value: Value) -> 
                         Value::HashTable(ht) => {
                             let mut ht = ht.lock().expect("poisoned");
                             let hk = key.to_hash_key(&ht.test);
-                            ht.data.insert(hk, value.clone());
+                            ht.data.insert(hk.clone(), value.clone());
+                            ht.key_snapshots.insert(hk, key);
                             Ok(value)
                         }
                         _ => Err(signal(
@@ -1401,6 +1402,47 @@ mod tests {
         let check = parse_forms(r#"(gethash "key" ht)"#).unwrap();
         let result = ev.eval_expr(&check[0]).unwrap();
         assert_eq!(format!("{}", result), "42");
+    }
+
+    #[test]
+    fn setf_gethash_eq_pointer_preserves_bucket_keys() {
+        let mut ev = make_ev();
+        let setup = parse_forms(
+            r#"(setq ht (make-hash-table :test 'eq :size 5))
+               (setq a (copy-sequence "x"))
+               (setq b (copy-sequence "x"))"#,
+        )
+        .unwrap();
+        for form in &setup {
+            ev.eval_expr(form).unwrap();
+        }
+
+        let writes = parse_forms(
+            r#"(setf (gethash a ht) 'a)
+               (setf (gethash b ht) 'b)"#,
+        )
+        .unwrap();
+        for form in &writes {
+            let Expr::List(items) = form else {
+                panic!()
+            };
+            sf_setf(&mut ev, &items[1..]).unwrap();
+        }
+
+        let check = parse_forms(
+            r#"(let* ((entries (apply #'append (internal--hash-table-buckets ht)))
+                      (keys (mapcar #'car entries))
+                      (hashes (mapcar #'cdr entries)))
+                 (list (hash-table-count ht)
+                       (length entries)
+                       (not (memq nil keys))
+                       (not (= (car hashes) (cadr hashes)))
+                       (gethash a ht 'miss)
+                       (gethash b ht 'miss)))"#,
+        )
+        .unwrap();
+        let result = ev.eval_expr(&check[0]).unwrap();
+        assert_eq!(format!("{}", result), "(2 2 t t a b)");
     }
 
     // -----------------------------------------------------------------------

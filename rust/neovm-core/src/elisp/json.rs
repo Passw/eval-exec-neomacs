@@ -877,7 +877,9 @@ impl<'a> JsonParser<'a> {
 
                 {
                     let mut table = table_arc.lock().expect("poisoned");
-                    table.data.insert(HashKey::Str(key), val);
+                    let hash_key = HashKey::Str(key.clone());
+                    table.data.insert(hash_key.clone(), val);
+                    table.key_snapshots.insert(hash_key, Value::string(key));
                 }
 
                 self.skip_ws();
@@ -1412,6 +1414,7 @@ mod tests {
             Value::HashTable(ht) => {
                 let table = ht.lock().unwrap();
                 assert_eq!(table.data.len(), 2);
+                assert_eq!(table.key_snapshots.len(), 2);
                 assert!(matches!(
                     table.data.get(&HashKey::Str("a".to_string())),
                     Some(Value::Int(1))
@@ -1419,6 +1422,14 @@ mod tests {
                 assert!(matches!(
                     table.data.get(&HashKey::Str("b".to_string())),
                     Some(Value::Int(2))
+                ));
+                assert!(matches!(
+                    table.key_snapshots.get(&HashKey::Str("a".to_string())),
+                    Some(key) if key.as_str() == Some("a")
+                ));
+                assert!(matches!(
+                    table.key_snapshots.get(&HashKey::Str("b".to_string())),
+                    Some(key) if key.as_str() == Some("b")
                 ));
             }
             other => panic!("expected hash-table, got {:?}", other),
