@@ -96,6 +96,9 @@ Last updated: 2026-02-22
     - `rust/neovm-core/src/elisp/builtins.rs`
       - `downcase` string path now preserves Kelvin sign (`\u{212A}`) while keeping full lowercase expansion for other characters.
       - `upcase` string path now preserves dotless i (`\u{0131}`) while keeping full uppercase expansion for other characters (e.g. `"ß" -> "SS"`).
+      - string paths now also preserve oracle edge payload families where Rust full tables drift:
+        - `downcase`: `7305`, `42955|42956|42958|42962|42964|42970|42972`, `68944..=68965`, `93856..=93880`
+        - `upcase`: `411`, `612`, `7306`, `42957|42959|42963|42965|42971`, `68976..=68997`, `93883..=93907`
       - extended Unicode edge tests:
         - `pure_dispatch_typed_downcase_unicode_edge_payloads_match_oracle`
         - `pure_dispatch_typed_upcase_unicode_edge_payloads_match_oracle`

@@ -1991,7 +1991,8 @@ fn preserve_emacs_upcase_payload(code: i64) -> bool {
 fn upcase_string_emacs_compat(s: &str) -> String {
     let mut out = String::with_capacity(s.len());
     for ch in s.chars() {
-        if ch == '\u{0131}' {
+        let code = ch as i64;
+        if ch == '\u{0131}' || preserve_emacs_upcase_string_payload(code) {
             out.push(ch);
             continue;
         }
@@ -2018,6 +2019,22 @@ fn upcase_char_code_emacs_compat(code: i64) -> i64 {
             }
         }
     }
+}
+
+fn preserve_emacs_upcase_string_payload(code: i64) -> bool {
+    matches!(
+        code,
+        411
+            | 612
+            | 7306
+            | 42957
+            | 42959
+            | 42963
+            | 42965
+            | 42971
+            | 68976..=68997
+            | 93883..=93907
+    )
 }
 
 fn preserve_emacs_downcase_payload(code: i64) -> bool {
@@ -2081,7 +2098,8 @@ pub(crate) fn builtin_downcase(args: Vec<Value>) -> EvalResult {
 fn downcase_string_emacs_compat(s: &str) -> String {
     let mut out = String::with_capacity(s.len());
     for ch in s.chars() {
-        if ch == '\u{212A}' {
+        let code = ch as i64;
+        if ch == '\u{212A}' || preserve_emacs_downcase_string_payload(code) {
             out.push(ch);
             continue;
         }
@@ -2090,6 +2108,22 @@ fn downcase_string_emacs_compat(s: &str) -> String {
         }
     }
     out
+}
+
+fn preserve_emacs_downcase_string_payload(code: i64) -> bool {
+    matches!(
+        code,
+        7305
+            | 42955
+            | 42956
+            | 42958
+            | 42962
+            | 42964
+            | 42970
+            | 42972
+            | 68944..=68965
+            | 93856..=93880
+    )
 }
 
 pub(crate) fn builtin_format(args: Vec<Value>) -> EvalResult {
@@ -19551,6 +19585,21 @@ mod tests {
             .expect("builtin downcase should evaluate");
         assert_eq!(dotted_i_string, Value::string("i\u{307}"));
 
+        let preserve_latin = dispatch_builtin_pure("downcase", vec![Value::string("\u{A7CB}")])
+            .expect("builtin downcase should resolve")
+            .expect("builtin downcase should evaluate");
+        assert_eq!(preserve_latin, Value::string("\u{A7CB}"));
+
+        let preserve_cyrillic_sup = dispatch_builtin_pure("downcase", vec![Value::string("\u{10D50}")])
+            .expect("builtin downcase should resolve")
+            .expect("builtin downcase should evaluate");
+        assert_eq!(preserve_cyrillic_sup, Value::string("\u{10D50}"));
+
+        let preserve_adlam = dispatch_builtin_pure("downcase", vec![Value::string("\u{16EA0}")])
+            .expect("builtin downcase should resolve")
+            .expect("builtin downcase should evaluate");
+        assert_eq!(preserve_adlam, Value::string("\u{16EA0}"));
+
         let negative = dispatch_builtin_pure("downcase", vec![Value::Int(-1)])
             .expect("builtin downcase should resolve")
             .expect_err("builtin downcase should reject negative integer designators");
@@ -19614,6 +19663,21 @@ mod tests {
             .expect("builtin upcase should resolve")
             .expect("builtin upcase should evaluate");
         assert_eq!(dotless_i_string, Value::string("\u{0131}"));
+
+        let preserve_latin = dispatch_builtin_pure("upcase", vec![Value::string("\u{019B}")])
+            .expect("builtin upcase should resolve")
+            .expect("builtin upcase should evaluate");
+        assert_eq!(preserve_latin, Value::string("\u{019B}"));
+
+        let preserve_cyrillic_sup = dispatch_builtin_pure("upcase", vec![Value::string("\u{10D70}")])
+            .expect("builtin upcase should resolve")
+            .expect("builtin upcase should evaluate");
+        assert_eq!(preserve_cyrillic_sup, Value::string("\u{10D70}"));
+
+        let preserve_adlam = dispatch_builtin_pure("upcase", vec![Value::string("\u{16EBB}")])
+            .expect("builtin upcase should resolve")
+            .expect("builtin upcase should evaluate");
+        assert_eq!(preserve_adlam, Value::string("\u{16EBB}"));
 
         let negative = dispatch_builtin_pure("upcase", vec![Value::Int(-1)])
             .expect("builtin upcase should resolve")
