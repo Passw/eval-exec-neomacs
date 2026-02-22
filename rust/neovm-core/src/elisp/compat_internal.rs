@@ -1738,48 +1738,6 @@ pub(crate) fn builtin_dump_emacs_portable_sort_predicate_copied(args: Vec<Value>
     Ok(Value::Nil)
 }
 
-/// `(sort-charsets LIST)` -> nil.
-pub(crate) fn builtin_sort_charsets(args: Vec<Value>) -> EvalResult {
-    expect_args("sort-charsets", &args, 1)?;
-    Ok(Value::Nil)
-}
-
-/// `(split-char CHARACTER)` -> nil.
-pub(crate) fn builtin_split_char(args: Vec<Value>) -> EvalResult {
-    expect_args("split-char", &args, 1)?;
-    Ok(Value::Nil)
-}
-
-/// `(string-distance STRING1 STRING2 &optional BYTECOMPARE)` -> 0.
-pub(crate) fn builtin_string_distance(args: Vec<Value>) -> EvalResult {
-    expect_range_args("string-distance", &args, 2, 3)?;
-    Ok(Value::Int(0))
-}
-
-/// `(subst-char-in-region START END FROMCHAR TOCHAR &optional NOUNDO)` -> nil.
-pub(crate) fn builtin_subst_char_in_region(args: Vec<Value>) -> EvalResult {
-    expect_range_args("subst-char-in-region", &args, 4, 5)?;
-    Ok(Value::Nil)
-}
-
-/// `(subr-native-comp-unit SUBR)` -> nil.
-pub(crate) fn builtin_subr_native_comp_unit(args: Vec<Value>) -> EvalResult {
-    expect_args("subr-native-comp-unit", &args, 1)?;
-    Ok(Value::Nil)
-}
-
-/// `(subr-native-lambda-list SUBR)` -> nil.
-pub(crate) fn builtin_subr_native_lambda_list(args: Vec<Value>) -> EvalResult {
-    expect_args("subr-native-lambda-list", &args, 1)?;
-    Ok(Value::Nil)
-}
-
-/// `(subr-type SUBR)` -> nil.
-pub(crate) fn builtin_subr_type(args: Vec<Value>) -> EvalResult {
-    expect_args("subr-type", &args, 1)?;
-    Ok(Value::Nil)
-}
-
 /// `(tty--output-buffer-size &optional TERMINAL)` -> 0.
 pub(crate) fn builtin_tty_output_buffer_size(args: Vec<Value>) -> EvalResult {
     expect_range_args("tty--output-buffer-size", &args, 0, 1)?;
@@ -1808,18 +1766,6 @@ pub(crate) fn builtin_tool_bar_get_system_style(args: Vec<Value>) -> EvalResult 
 pub(crate) fn builtin_tool_bar_pixel_width(args: Vec<Value>) -> EvalResult {
     expect_range_args("tool-bar-pixel-width", &args, 0, 1)?;
     Ok(Value::Int(0))
-}
-
-/// `(this-single-command-keys)` -> nil.
-pub(crate) fn builtin_this_single_command_keys(args: Vec<Value>) -> EvalResult {
-    expect_args("this-single-command-keys", &args, 0)?;
-    Ok(Value::Nil)
-}
-
-/// `(this-single-command-raw-keys)` -> nil.
-pub(crate) fn builtin_this_single_command_raw_keys(args: Vec<Value>) -> EvalResult {
-    expect_args("this-single-command-raw-keys", &args, 0)?;
-    Ok(Value::Nil)
 }
 
 /// `(thread--blocker THREAD)` -> nil.

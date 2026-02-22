@@ -6012,6 +6012,51 @@ pub(crate) fn builtin_set_window_new_total(args: Vec<Value>) -> EvalResult {
     Ok(Value::Nil)
 }
 
+pub(crate) fn builtin_sort_charsets(args: Vec<Value>) -> EvalResult {
+    expect_args("sort-charsets", &args, 1)?;
+    Ok(Value::Nil)
+}
+
+pub(crate) fn builtin_split_char(args: Vec<Value>) -> EvalResult {
+    expect_args("split-char", &args, 1)?;
+    Ok(Value::Nil)
+}
+
+pub(crate) fn builtin_string_distance(args: Vec<Value>) -> EvalResult {
+    expect_range_args("string-distance", &args, 2, 3)?;
+    Ok(Value::Int(0))
+}
+
+pub(crate) fn builtin_subst_char_in_region(args: Vec<Value>) -> EvalResult {
+    expect_range_args("subst-char-in-region", &args, 4, 5)?;
+    Ok(Value::Nil)
+}
+
+pub(crate) fn builtin_subr_native_comp_unit(args: Vec<Value>) -> EvalResult {
+    expect_args("subr-native-comp-unit", &args, 1)?;
+    Ok(Value::Nil)
+}
+
+pub(crate) fn builtin_subr_native_lambda_list(args: Vec<Value>) -> EvalResult {
+    expect_args("subr-native-lambda-list", &args, 1)?;
+    Ok(Value::Nil)
+}
+
+pub(crate) fn builtin_subr_type(args: Vec<Value>) -> EvalResult {
+    expect_args("subr-type", &args, 1)?;
+    Ok(Value::Nil)
+}
+
+pub(crate) fn builtin_this_single_command_keys(args: Vec<Value>) -> EvalResult {
+    expect_args("this-single-command-keys", &args, 0)?;
+    Ok(Value::Nil)
+}
+
+pub(crate) fn builtin_this_single_command_raw_keys(args: Vec<Value>) -> EvalResult {
+    expect_args("this-single-command-raw-keys", &args, 0)?;
+    Ok(Value::Nil)
+}
+
 // ===========================================================================
 // Hook system (need evaluator)
 // ===========================================================================
@@ -14997,20 +15042,16 @@ pub(crate) fn dispatch_builtin(
         "set-window-new-normal" => builtin_set_window_new_normal(args),
         "set-window-new-pixel" => builtin_set_window_new_pixel(args),
         "set-window-new-total" => builtin_set_window_new_total(args),
-        "sort-charsets" => super::compat_internal::builtin_sort_charsets(args),
-        "split-char" => super::compat_internal::builtin_split_char(args),
-        "string-distance" => super::compat_internal::builtin_string_distance(args),
-        "subst-char-in-region" => super::compat_internal::builtin_subst_char_in_region(args),
-        "subr-native-comp-unit" => super::compat_internal::builtin_subr_native_comp_unit(args),
-        "subr-native-lambda-list" => super::compat_internal::builtin_subr_native_lambda_list(args),
-        "subr-type" => super::compat_internal::builtin_subr_type(args),
+        "sort-charsets" => builtin_sort_charsets(args),
+        "split-char" => builtin_split_char(args),
+        "string-distance" => builtin_string_distance(args),
+        "subst-char-in-region" => builtin_subst_char_in_region(args),
+        "subr-native-comp-unit" => builtin_subr_native_comp_unit(args),
+        "subr-native-lambda-list" => builtin_subr_native_lambda_list(args),
+        "subr-type" => builtin_subr_type(args),
         "suspend-emacs" => builtin_suspend_emacs(args),
-        "this-single-command-keys" => {
-            super::compat_internal::builtin_this_single_command_keys(args)
-        }
-        "this-single-command-raw-keys" => {
-            super::compat_internal::builtin_this_single_command_raw_keys(args)
-        }
+        "this-single-command-keys" => builtin_this_single_command_keys(args),
+        "this-single-command-raw-keys" => builtin_this_single_command_raw_keys(args),
         "thread--blocker" => super::compat_internal::builtin_thread_blocker(args),
         "tool-bar-get-system-style" => {
             super::compat_internal::builtin_tool_bar_get_system_style(args)
@@ -15946,20 +15987,16 @@ pub(crate) fn dispatch_builtin_pure(name: &str, args: Vec<Value>) -> Option<Eval
         "set-window-new-normal" => builtin_set_window_new_normal(args),
         "set-window-new-pixel" => builtin_set_window_new_pixel(args),
         "set-window-new-total" => builtin_set_window_new_total(args),
-        "sort-charsets" => super::compat_internal::builtin_sort_charsets(args),
-        "split-char" => super::compat_internal::builtin_split_char(args),
-        "string-distance" => super::compat_internal::builtin_string_distance(args),
-        "subst-char-in-region" => super::compat_internal::builtin_subst_char_in_region(args),
-        "subr-native-comp-unit" => super::compat_internal::builtin_subr_native_comp_unit(args),
-        "subr-native-lambda-list" => super::compat_internal::builtin_subr_native_lambda_list(args),
-        "subr-type" => super::compat_internal::builtin_subr_type(args),
+        "sort-charsets" => builtin_sort_charsets(args),
+        "split-char" => builtin_split_char(args),
+        "string-distance" => builtin_string_distance(args),
+        "subst-char-in-region" => builtin_subst_char_in_region(args),
+        "subr-native-comp-unit" => builtin_subr_native_comp_unit(args),
+        "subr-native-lambda-list" => builtin_subr_native_lambda_list(args),
+        "subr-type" => builtin_subr_type(args),
         "suspend-emacs" => builtin_suspend_emacs(args),
-        "this-single-command-keys" => {
-            super::compat_internal::builtin_this_single_command_keys(args)
-        }
-        "this-single-command-raw-keys" => {
-            super::compat_internal::builtin_this_single_command_raw_keys(args)
-        }
+        "this-single-command-keys" => builtin_this_single_command_keys(args),
+        "this-single-command-raw-keys" => builtin_this_single_command_raw_keys(args),
         "thread--blocker" => super::compat_internal::builtin_thread_blocker(args),
         "tool-bar-get-system-style" => {
             super::compat_internal::builtin_tool_bar_get_system_style(args)
@@ -19958,6 +19995,66 @@ mod tests {
         .expect("builtin set-window-new-total should resolve")
         .expect("builtin set-window-new-total should evaluate");
         assert!(set_new_total.is_nil());
+    }
+
+    #[test]
+    fn pure_dispatch_sort_subr_placeholder_cluster_matches_compat_contracts() {
+        let sort_charsets = dispatch_builtin_pure("sort-charsets", vec![Value::list(vec![])])
+            .expect("builtin sort-charsets should resolve")
+            .expect("builtin sort-charsets should evaluate");
+        assert!(sort_charsets.is_nil());
+
+        let split_char = dispatch_builtin_pure("split-char", vec![Value::Int(65)])
+            .expect("builtin split-char should resolve")
+            .expect("builtin split-char should evaluate");
+        assert!(split_char.is_nil());
+
+        let string_distance = dispatch_builtin_pure(
+            "string-distance",
+            vec![Value::string("a"), Value::string("b")],
+        )
+        .expect("builtin string-distance should resolve")
+        .expect("builtin string-distance should evaluate");
+        assert_eq!(string_distance, Value::Int(0));
+
+        let subst = dispatch_builtin_pure(
+            "subst-char-in-region",
+            vec![
+                Value::Int(1),
+                Value::Int(2),
+                Value::Int(97),
+                Value::Int(98),
+                Value::Nil,
+            ],
+        )
+        .expect("builtin subst-char-in-region should resolve")
+        .expect("builtin subst-char-in-region should evaluate");
+        assert!(subst.is_nil());
+
+        let subr_unit = dispatch_builtin_pure("subr-native-comp-unit", vec![Value::Nil])
+            .expect("builtin subr-native-comp-unit should resolve")
+            .expect("builtin subr-native-comp-unit should evaluate");
+        assert!(subr_unit.is_nil());
+
+        let subr_lambda_list = dispatch_builtin_pure("subr-native-lambda-list", vec![Value::Nil])
+            .expect("builtin subr-native-lambda-list should resolve")
+            .expect("builtin subr-native-lambda-list should evaluate");
+        assert!(subr_lambda_list.is_nil());
+
+        let subr_type = dispatch_builtin_pure("subr-type", vec![Value::Nil])
+            .expect("builtin subr-type should resolve")
+            .expect("builtin subr-type should evaluate");
+        assert!(subr_type.is_nil());
+
+        let single_keys = dispatch_builtin_pure("this-single-command-keys", vec![])
+            .expect("builtin this-single-command-keys should resolve")
+            .expect("builtin this-single-command-keys should evaluate");
+        assert!(single_keys.is_nil());
+
+        let single_raw_keys = dispatch_builtin_pure("this-single-command-raw-keys", vec![])
+            .expect("builtin this-single-command-raw-keys should resolve")
+            .expect("builtin this-single-command-raw-keys should evaluate");
+        assert!(single_raw_keys.is_nil());
     }
 
     #[test]
