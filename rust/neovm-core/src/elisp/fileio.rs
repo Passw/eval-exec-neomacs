@@ -254,6 +254,62 @@ pub fn file_name_sans_versions(filename: &str, keep_backup_version: bool) -> Str
     filename[..len - 1].to_string()
 }
 
+fn relative_directory_from_current_dir(target_dir: &str) -> String {
+    let cwd = std::env::current_dir().unwrap_or_else(|_| PathBuf::from("/"));
+    let cwd_norm = expand_file_name(&cwd.to_string_lossy(), None);
+    let target_norm = expand_file_name(target_dir, None);
+
+    if target_norm == cwd_norm {
+        return "./".to_string();
+    }
+
+    let cwd_parts: Vec<&str> = cwd_norm.split('/').filter(|part| !part.is_empty()).collect();
+    let target_parts: Vec<&str> = target_norm
+        .split('/')
+        .filter(|part| !part.is_empty())
+        .collect();
+
+    let mut shared_prefix = 0usize;
+    while shared_prefix < cwd_parts.len()
+        && shared_prefix < target_parts.len()
+        && cwd_parts[shared_prefix] == target_parts[shared_prefix]
+    {
+        shared_prefix += 1;
+    }
+
+    let mut rel_parts = Vec::new();
+    for _ in shared_prefix..cwd_parts.len() {
+        rel_parts.push("..");
+    }
+    rel_parts.extend_from_slice(&target_parts[shared_prefix..]);
+
+    if rel_parts.is_empty() {
+        "./".to_string()
+    } else {
+        format!("{}/", rel_parts.join("/"))
+    }
+}
+
+/// Return the parent directory name of FILENAME, or nil-like None at root.
+///
+/// Like Emacs `file-name-parent-directory`: relative names are interpreted
+/// relative to the current/default directory and the result stays relative.
+pub fn file_name_parent_directory(filename: &str) -> Option<String> {
+    let expanded_filename = if filename.starts_with("//") && !filename.starts_with("///") {
+        filename.to_string()
+    } else {
+        expand_file_name(filename, None)
+    };
+    let parent = file_name_directory(&directory_file_name(&expanded_filename))?;
+    if parent == expanded_filename {
+        return None;
+    }
+    if !file_name_absolute_p(filename) {
+        return Some(relative_directory_from_current_dir(&parent));
+    }
+    Some(parent)
+}
+
 /// Return FILENAME as a directory name (must end in `/`).
 /// Like Emacs `file-name-as-directory`.
 pub fn file_name_as_directory(filename: &str) -> String {
@@ -1657,6 +1713,16 @@ pub(crate) fn builtin_file_name_sans_versions(args: Vec<Value>) -> EvalResult {
         &filename,
         keep_backup,
     )))
+}
+
+/// (file-name-parent-directory FILENAME) -> string or nil
+pub(crate) fn builtin_file_name_parent_directory(args: Vec<Value>) -> EvalResult {
+    expect_args("file-name-parent-directory", &args, 1)?;
+    let filename = expect_string_strict(&args[0])?;
+    Ok(match file_name_parent_directory(&filename) {
+        Some(parent) => Value::string(parent),
+        None => Value::Nil,
+    })
 }
 
 /// (file-name-as-directory FILENAME) -> string
@@ -4810,6 +4876,24 @@ mod tests {
             builtin_file_name_sans_versions(vec![Value::string("foo.~12~"), Value::True]);
         assert_eq!(result.unwrap().as_str(), Some("foo.~12~"));
 
+        let result = builtin_file_name_parent_directory(vec![Value::string("/foo/bar")]);
+        assert_eq!(result.unwrap().as_str(), Some("/foo/"));
+
+        let result = builtin_file_name_parent_directory(vec![Value::string("/foo/")]);
+        assert_eq!(result.unwrap().as_str(), Some("/"));
+
+        let result = builtin_file_name_parent_directory(vec![Value::string("/")]);
+        assert_eq!(result.unwrap(), Value::Nil);
+
+        let result = builtin_file_name_parent_directory(vec![Value::string("foo/bar")]);
+        assert_eq!(result.unwrap().as_str(), Some("foo/"));
+
+        let result = builtin_file_name_parent_directory(vec![Value::string("foo")]);
+        assert_eq!(result.unwrap().as_str(), Some("./"));
+
+        let result = builtin_file_name_parent_directory(vec![Value::string("//usr")]);
+        assert_eq!(result.unwrap().as_str(), Some("//"));
+
         let malformed =
             builtin_file_name_with_extension(vec![Value::string("foo"), Value::string("")])
                 .expect_err("empty extension should be rejected");
@@ -4892,6 +4976,9 @@ mod tests {
         assert!(builtin_file_name_sans_versions(vec![Value::symbol("x")]).is_err());
         assert!(builtin_file_name_sans_versions(vec![]).is_err());
         assert!(builtin_file_name_sans_versions(vec![Value::string("x"), Value::Nil, Value::Nil]).is_err());
+        assert!(builtin_file_name_parent_directory(vec![Value::symbol("x")]).is_err());
+        assert!(builtin_file_name_parent_directory(vec![]).is_err());
+        assert!(builtin_file_name_parent_directory(vec![Value::string("x"), Value::Nil]).is_err());
         assert!(builtin_file_name_as_directory(vec![Value::symbol("x")]).is_err());
         assert!(builtin_directory_file_name(vec![Value::symbol("x")]).is_err());
         assert!(builtin_backup_file_name_p(vec![Value::symbol("x")]).is_err());
