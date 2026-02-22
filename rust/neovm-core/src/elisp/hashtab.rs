@@ -89,6 +89,14 @@ fn hash_key_to_value(key: &HashKey) -> Value {
     }
 }
 
+fn hash_key_to_visible_value(table: &LispHashTable, key: &HashKey) -> Value {
+    table
+        .key_snapshots
+        .get(key)
+        .cloned()
+        .unwrap_or_else(|| hash_key_to_value(key))
+}
+
 fn sxhash_combine(x: u64, y: u64) -> u64 {
     x.rotate_left(4).wrapping_add(y)
 }
@@ -394,7 +402,7 @@ fn internal_hash_table_nonempty_buckets(table: &LispHashTable) -> Vec<Vec<(Value
     for key in table.data.keys() {
         let hash = internal_hash_table_diagnostic_hash(key, test.clone());
         let index = knuth_hash_index(hash, index_bits);
-        buckets[index].push((hash_key_to_value(key), hash as i64));
+        buckets[index].push((hash_key_to_visible_value(table, key), hash as i64));
     }
     for bucket in &mut buckets {
         bucket.sort_by_key(|(key, hash)| (print_value(key), *hash));
@@ -524,7 +532,11 @@ pub(crate) fn builtin_hash_table_keys(args: Vec<Value>) -> EvalResult {
     match &args[0] {
         Value::HashTable(ht) => {
             let table = ht.lock().expect("poisoned");
-            let keys: Vec<Value> = table.data.keys().map(hash_key_to_value).collect();
+            let keys: Vec<Value> = table
+                .data
+                .keys()
+                .map(|key| hash_key_to_visible_value(&table, key))
+                .collect();
             Ok(Value::list(keys))
         }
         other => Err(signal(
@@ -666,7 +678,7 @@ pub(crate) fn builtin_maphash(eval: &mut super::eval::Evaluator, args: Vec<Value
             table
                 .data
                 .iter()
-                .map(|(k, v)| (hash_key_to_value(k), v.clone()))
+                .map(|(k, v)| (hash_key_to_visible_value(&table, k), v.clone()))
                 .collect()
         }
         other => {
@@ -1275,6 +1287,7 @@ mod tests {
         let buckets = builtin_internal_hash_table_buckets(vec![table]).expect("bucket alists");
         let outer = list_to_vec(&buckets).expect("outer list");
         let mut hashes = Vec::new();
+        let mut keys = Vec::new();
         for bucket in outer {
             let entries = list_to_vec(&bucket).expect("bucket alist");
             for entry in entries {
@@ -1282,9 +1295,12 @@ mod tests {
                     panic!("expected alist cons entry");
                 };
                 let pair = cell.lock().expect("poisoned");
+                keys.push(pair.car.clone());
                 hashes.push(pair.cdr.as_int().expect("diagnostic hash integer"));
             }
         }
+        assert_eq!(keys.len(), 2);
+        assert!(keys.iter().all(|key| key.as_str().is_some()));
         hashes.sort_unstable();
         assert_eq!(hashes.len(), 2);
         assert_ne!(hashes[0], hashes[1]);

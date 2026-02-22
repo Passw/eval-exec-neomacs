@@ -2658,7 +2658,8 @@ pub(crate) fn builtin_puthash(args: Vec<Value>) -> EvalResult {
             let key = args[0].to_hash_key(&ht.test);
             let inserting_new_key = !ht.data.contains_key(&key);
             maybe_resize_hash_table_for_insert(&mut ht, inserting_new_key);
-            ht.data.insert(key, args[1].clone());
+            ht.data.insert(key.clone(), args[1].clone());
+            ht.key_snapshots.insert(key, args[0].clone());
             Ok(args[1].clone())
         }
         _ => Err(signal(
@@ -2675,6 +2676,7 @@ pub(crate) fn builtin_remhash(args: Vec<Value>) -> EvalResult {
             let mut ht = ht.lock().expect("poisoned");
             let key = args[0].to_hash_key(&ht.test);
             ht.data.remove(&key);
+            ht.key_snapshots.remove(&key);
             Ok(Value::Nil)
         }
         _ => Err(signal(
@@ -2688,7 +2690,9 @@ pub(crate) fn builtin_clrhash(args: Vec<Value>) -> EvalResult {
     expect_args("clrhash", &args, 1)?;
     match &args[0] {
         Value::HashTable(ht) => {
-            ht.lock().expect("poisoned").data.clear();
+            let mut ht = ht.lock().expect("poisoned");
+            ht.data.clear();
+            ht.key_snapshots.clear();
             Ok(Value::Nil)
         }
         _ => Err(signal(

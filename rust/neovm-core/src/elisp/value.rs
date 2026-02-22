@@ -129,6 +129,9 @@ pub struct LispHashTable {
     pub rehash_size: f64,
     pub rehash_threshold: f64,
     pub data: HashMap<HashKey, Value>,
+    /// Original key objects for diagnostics/iteration where pointer-identity
+    /// keys cannot be reconstructed from `HashKey`.
+    pub key_snapshots: HashMap<HashKey, Value>,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -184,6 +187,7 @@ impl LispHashTable {
             rehash_size,
             rehash_threshold,
             data: HashMap::with_capacity(size.max(0) as usize),
+            key_snapshots: HashMap::with_capacity(size.max(0) as usize),
         }
     }
 }
