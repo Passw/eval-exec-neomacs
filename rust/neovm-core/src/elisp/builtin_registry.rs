@@ -1856,6 +1856,7 @@ const DISPATCH_BUILTIN_NAMES: &[&str] = &[
     "string-equal",
     "string-greaterp",
     "string-lessp",
+    "string-or-null-p",
     "string-to-char",
     "string-to-number",
     "stringp",

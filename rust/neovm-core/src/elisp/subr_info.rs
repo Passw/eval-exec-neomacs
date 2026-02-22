@@ -1100,8 +1100,9 @@ fn subr_arity_value(name: &str) -> Value {
         "arrayp" | "atom" | "booleanp" | "bufferp" | "char-to-string" | "char-uppercase-p"
         | "consp" | "downcase" | "float" | "floatp" | "integer-or-null-p" | "integerp"
         | "keywordp" | "listp" | "list-of-strings-p" | "nlistp" | "null"
-        | "number-to-string" | "numberp" | "sequencep" | "string-to-char" | "stringp"
-        | "symbolp" | "type-of" | "cl-type-of" | "upcase" | "vectorp" => {
+        | "number-to-string" | "numberp" | "sequencep" | "string-or-null-p"
+        | "string-to-char" | "stringp" | "symbolp" | "type-of" | "cl-type-of" | "upcase"
+        | "vectorp" => {
             arity_cons(1, Some(1))
         }
         "ceiling" | "characterp" | "floor" | "round" | "string-to-number" | "truncate" => {
@@ -2848,6 +2849,7 @@ mod tests {
         assert_subr_arity("string-lessp", 2, Some(2));
         assert_subr_arity("string-greaterp", 2, Some(2));
         assert_subr_arity("string>", 2, Some(2));
+        assert_subr_arity("string-or-null-p", 1, Some(1));
         assert_subr_arity("string-to-char", 1, Some(1));
         assert_subr_arity("string-to-number", 1, Some(2));
         assert_subr_arity("stringp", 1, Some(1));

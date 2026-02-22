@@ -673,6 +673,11 @@ pub(crate) fn builtin_integer_or_null_p(args: Vec<Value>) -> EvalResult {
     Ok(Value::bool(args[0].is_nil() || args[0].is_integer()))
 }
 
+pub(crate) fn builtin_string_or_null_p(args: Vec<Value>) -> EvalResult {
+    expect_args("string-or-null-p", &args, 1)?;
+    Ok(Value::bool(args[0].is_nil() || args[0].is_string()))
+}
+
 pub(crate) fn builtin_integer_or_marker_p(args: Vec<Value>) -> EvalResult {
     expect_args("integer-or-marker-p", &args, 1)?;
     let is_integer_or_marker =
@@ -14197,6 +14202,8 @@ enum PureBuiltinId {
     Integerp,
     #[strum(serialize = "integer-or-null-p")]
     IntegerOrNullp,
+    #[strum(serialize = "string-or-null-p")]
+    StringOrNullp,
     #[strum(serialize = "floatp")]
     Floatp,
     #[strum(serialize = "stringp")]
@@ -14496,6 +14503,7 @@ fn dispatch_builtin_id_pure(id: PureBuiltinId, args: Vec<Value>) -> EvalResult {
         PureBuiltinId::Numberp => builtin_numberp(args),
         PureBuiltinId::Integerp => builtin_integerp(args),
         PureBuiltinId::IntegerOrNullp => builtin_integer_or_null_p(args),
+        PureBuiltinId::StringOrNullp => builtin_string_or_null_p(args),
         PureBuiltinId::Floatp => builtin_floatp(args),
         PureBuiltinId::Stringp => builtin_stringp(args),
         PureBuiltinId::Vectorp => builtin_vectorp(args),
