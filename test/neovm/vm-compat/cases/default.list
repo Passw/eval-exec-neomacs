@@ -550,6 +550,7 @@ cases/next-previous-window-callable-path-semantics
 cases/frame-ops-arity-semantics
 cases/frame-window-list-funcall-apply-semantics
 cases/frame-visible-p-semantics
+cases/frame-live-p-callable-path-semantics
 cases/frame-introspection-callable-path-semantics
 cases/frame-designator-errors-semantics
 cases/frame-terminal-designator-semantics
