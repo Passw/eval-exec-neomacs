@@ -284,6 +284,7 @@ const DISPATCH_BUILTIN_NAMES: &[&str] = &[
     "controlling-tty-p",
     "cos",
     "continue-process",
+    "convert-standard-filename",
     "coordinates-in-window-p",
     "copy-alist",
     "copy-category-table",

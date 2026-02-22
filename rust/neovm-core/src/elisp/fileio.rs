@@ -280,6 +280,17 @@ pub fn file_name_concat(parts: &[&str]) -> String {
     out
 }
 
+/// Convert FILENAME to system-standard form.
+///
+/// On Unix this is a no-op for strings. Non-strings are returned unchanged,
+/// matching GNU Emacs `convert-standard-filename`.
+pub fn convert_standard_filename(value: Value) -> Value {
+    match value {
+        Value::Str(s) => Value::string((*s).clone()),
+        other => other,
+    }
+}
+
 /// Return true if FILENAME is an absolute file name.
 /// On Unix this means it starts with `/` or `~`.
 pub fn file_name_absolute_p(filename: &str) -> bool {
@@ -1650,6 +1661,12 @@ pub(crate) fn builtin_file_name_concat(args: Vec<Value>) -> EvalResult {
 
     let refs: Vec<&str> = parts.iter().map(String::as_str).collect();
     Ok(Value::string(file_name_concat(&refs)))
+}
+
+/// (convert-standard-filename FILENAME) -> standardized filename
+pub(crate) fn builtin_convert_standard_filename(args: Vec<Value>) -> EvalResult {
+    expect_args("convert-standard-filename", &args, 1)?;
+    Ok(convert_standard_filename(args[0].clone()))
 }
 
 /// (file-name-absolute-p FILENAME) -> t or nil
@@ -4799,6 +4816,15 @@ mod tests {
                 builtin_abbreviate_file_name(vec![Value::string(format!("{home}/project"))]);
             assert_eq!(under_home.unwrap(), Value::string("~/project"));
         }
+
+        let converted = builtin_convert_standard_filename(vec![Value::string("/tmp/x")]);
+        assert_eq!(converted.unwrap(), Value::string("/tmp/x"));
+
+        let converted_symbol = builtin_convert_standard_filename(vec![Value::symbol("x")]);
+        assert_eq!(converted_symbol.unwrap(), Value::symbol("x"));
+
+        let converted_int = builtin_convert_standard_filename(vec![Value::Int(42)]);
+        assert_eq!(converted_int.unwrap(), Value::Int(42));
     }
 
     #[test]
@@ -4819,6 +4845,8 @@ mod tests {
         assert!(builtin_backup_file_name_p(vec![Value::symbol("x")]).is_err());
         assert!(builtin_auto_save_file_name_p(vec![Value::symbol("x")]).is_err());
         assert!(builtin_abbreviate_file_name(vec![Value::symbol("x")]).is_err());
+        assert!(builtin_convert_standard_filename(vec![]).is_err());
+        assert!(builtin_convert_standard_filename(vec![Value::Nil, Value::Nil]).is_err());
     }
 
     #[test]

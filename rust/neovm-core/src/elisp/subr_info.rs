@@ -366,6 +366,7 @@ fn subr_arity_value(name: &str) -> Value {
         "make-symbolic-link" | "rename-file" => arity_cons(2, Some(3)),
         "auto-save-file-name-p" => arity_cons(1, Some(1)),
         "abbreviate-file-name" => arity_cons(1, Some(1)),
+        "convert-standard-filename" => arity_cons(1, Some(1)),
         "file-name-absolute-p"
         | "backup-file-name-p"
         | "file-name-as-directory"
@@ -3411,6 +3412,7 @@ mod tests {
 
     #[test]
     fn subr_arity_file_name_primitives_match_oracle() {
+        assert_subr_arity("convert-standard-filename", 1, Some(1));
         assert_subr_arity("file-name-absolute-p", 1, Some(1));
         assert_subr_arity("file-name-base", 0, Some(1));
         assert_subr_arity("backup-file-name-p", 1, Some(1));
