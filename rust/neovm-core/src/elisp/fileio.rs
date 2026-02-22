@@ -285,6 +285,25 @@ pub fn auto_save_file_name_p(filename: &str) -> Option<i64> {
     }
 }
 
+/// Abbreviate FILENAME with `~` when it is under `$HOME`.
+pub fn abbreviate_file_name(filename: &str) -> String {
+    let Some(home) = std::env::var("HOME").ok() else {
+        return filename.to_string();
+    };
+
+    if filename == home {
+        return "~".to_string();
+    }
+
+    if let Some(rest) = filename.strip_prefix(&home) {
+        if rest.starts_with('/') {
+            return format!("~{rest}");
+        }
+    }
+
+    filename.to_string()
+}
+
 /// Return true if NAME is a directory name (ends with a directory separator).
 pub fn directory_name_p(name: &str) -> bool {
     name.ends_with('/')
@@ -1622,6 +1641,13 @@ pub(crate) fn builtin_auto_save_file_name_p(args: Vec<Value>) -> EvalResult {
         Some(idx) => Value::Int(idx),
         None => Value::Nil,
     })
+}
+
+/// (abbreviate-file-name FILENAME) -> abbreviated string
+pub(crate) fn builtin_abbreviate_file_name(args: Vec<Value>) -> EvalResult {
+    expect_args("abbreviate-file-name", &args, 1)?;
+    let file = expect_string_strict(&args[0])?;
+    Ok(Value::string(abbreviate_file_name(&file)))
 }
 
 /// (directory-empty-p NAME) -> t or nil
@@ -4682,6 +4708,18 @@ mod tests {
 
         let not_auto_save = builtin_auto_save_file_name_p(vec![Value::string("foo.txt")]);
         assert_eq!(not_auto_save.unwrap(), Value::Nil);
+
+        let unchanged = builtin_abbreviate_file_name(vec![Value::string("/tmp/x")]);
+        assert_eq!(unchanged.unwrap(), Value::string("/tmp/x"));
+
+        if let Ok(home) = std::env::var("HOME") {
+            let home_only = builtin_abbreviate_file_name(vec![Value::string(&home)]);
+            assert_eq!(home_only.unwrap(), Value::string("~"));
+
+            let under_home =
+                builtin_abbreviate_file_name(vec![Value::string(format!("{home}/project"))]);
+            assert_eq!(under_home.unwrap(), Value::string("~/project"));
+        }
     }
 
     #[test]
@@ -4697,6 +4735,7 @@ mod tests {
         assert!(builtin_directory_file_name(vec![Value::symbol("x")]).is_err());
         assert!(builtin_backup_file_name_p(vec![Value::symbol("x")]).is_err());
         assert!(builtin_auto_save_file_name_p(vec![Value::symbol("x")]).is_err());
+        assert!(builtin_abbreviate_file_name(vec![Value::symbol("x")]).is_err());
     }
 
     #[test]
