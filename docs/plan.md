@@ -19726,6 +19726,18 @@ Last updated: 2026-02-21
       - `x-display-visual-class`, `x-server-input-extension-version`, `x-server-vendor`
       - all preserve `(error "Window system frame should be used")` payload shape.
 
+- Added dedicated `x-display-set-last-user-time` DISPLAY-designator lock-ins for non-`nil` `USER-TIME`:
+  - vm-compat corpus changes:
+    - added:
+      - `test/neovm/vm-compat/cases/x-display-set-last-user-time-display-designator-non-nil-user-time-semantics.forms`
+      - `test/neovm/vm-compat/cases/x-display-set-last-user-time-display-designator-non-nil-user-time-semantics.expected.tsv`
+    - wired case into:
+      - `test/neovm/vm-compat/cases/default.list`
+    - lock-ins assert DISPLAY-agnostic payload structure when `USER-TIME` is non-`nil` across:
+      - `nil`, string, integer, symbol, vector, list, cons
+      - live frame, terminal, live window, dead window
+      - all preserve `(wrong-type-argument frame-live-p USER-TIME)` with explicit USER-TIME passthrough.
+
 - Continue compatibility-first maintenance with small commit slices:
   - keep builtin surface and registry in lock-step
   - run oracle/parity checks after each behavior-affecting change
