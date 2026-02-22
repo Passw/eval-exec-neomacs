@@ -10,7 +10,6 @@ use super::string_escape::{
     storage_substring,
 };
 use super::value::*;
-use std::cell::RefCell;
 use std::collections::{HashMap, HashSet};
 use std::sync::{Mutex, OnceLock};
 use strum::EnumString;
@@ -2391,9 +2390,9 @@ pub(crate) fn builtin_vconcat(args: Vec<Value>) -> EvalResult {
 // Hash table operations
 // ===========================================================================
 
-thread_local! {
-    static HASH_TABLE_TEST_ALIASES: RefCell<Vec<(String, HashTableTest)>> =
-        const { RefCell::new(Vec::new()) };
+fn hash_table_test_aliases() -> &'static Mutex<Vec<(String, HashTableTest)>> {
+    static HASH_TABLE_TEST_ALIASES: OnceLock<Mutex<Vec<(String, HashTableTest)>>> = OnceLock::new();
+    HASH_TABLE_TEST_ALIASES.get_or_init(|| Mutex::new(Vec::new()))
 }
 
 fn invalid_hash_table_argument_list(arg: Value) -> Flow {
@@ -2411,22 +2410,20 @@ fn hash_test_from_designator(value: &Value) -> Option<HashTableTest> {
 }
 
 fn register_hash_table_test_alias(name: &str, test: HashTableTest) {
-    HASH_TABLE_TEST_ALIASES.with(|slot| {
-        let mut aliases = slot.borrow_mut();
-        if let Some((_, existing)) = aliases.iter_mut().find(|(alias, _)| alias == name) {
-            *existing = test;
-        } else {
-            aliases.push((name.to_string(), test));
-        }
-    });
+    let mut aliases = hash_table_test_aliases().lock().expect("poisoned");
+    if let Some((_, existing)) = aliases.iter_mut().find(|(alias, _)| alias == name) {
+        *existing = test;
+    } else {
+        aliases.push((name.to_string(), test));
+    }
 }
 
 fn lookup_hash_table_test_alias(name: &str) -> Option<HashTableTest> {
-    HASH_TABLE_TEST_ALIASES.with(|slot| {
-        slot.borrow()
-            .iter()
-            .find_map(|(alias, test)| (alias == name).then_some(test.clone()))
-    })
+    hash_table_test_aliases()
+        .lock()
+        .expect("poisoned")
+        .iter()
+        .find_map(|(alias, test)| (alias == name).then_some(test.clone()))
 }
 
 pub(crate) fn builtin_define_hash_table_test(args: Vec<Value>) -> EvalResult {
@@ -21117,6 +21114,35 @@ mod tests {
         let table = dispatch_builtin_pure("make-hash-table", vec![Value::keyword(":test"), alias])
             .expect("make-hash-table should resolve")
             .expect("make-hash-table should evaluate");
+        let Value::HashTable(table) = table else {
+            panic!("expected hash table");
+        };
+        assert!(matches!(
+            table.lock().expect("poisoned").test,
+            HashTableTest::Eq
+        ));
+    }
+
+    #[test]
+    fn define_hash_table_test_alias_is_process_global() {
+        let alias_name = "neovm--cross-thread-eq-test-alias";
+        std::thread::spawn(move || {
+            let _ = builtin_define_hash_table_test(vec![
+                Value::symbol(alias_name),
+                Value::symbol("eq"),
+                Value::symbol("sxhash-eq"),
+            ])
+            .expect("define-hash-table-test should evaluate in worker thread");
+        })
+        .join()
+        .expect("worker thread should complete");
+
+        let table = dispatch_builtin_pure(
+            "make-hash-table",
+            vec![Value::keyword(":test"), Value::symbol(alias_name)],
+        )
+        .expect("make-hash-table should resolve")
+        .expect("make-hash-table should evaluate");
         let Value::HashTable(table) = table else {
             panic!("expected hash table");
         };
