@@ -5662,6 +5662,21 @@ pub(crate) fn builtin_vertical_motion(args: Vec<Value>) -> EvalResult {
     Ok(Value::Int(0))
 }
 
+pub(crate) fn builtin_rename_buffer(args: Vec<Value>) -> EvalResult {
+    expect_range_args("rename-buffer", &args, 1, 2)?;
+    Ok(Value::Nil)
+}
+
+pub(crate) fn builtin_set_buffer_major_mode(args: Vec<Value>) -> EvalResult {
+    expect_args("set-buffer-major-mode", &args, 1)?;
+    Ok(Value::Nil)
+}
+
+pub(crate) fn builtin_set_buffer_redisplay(args: Vec<Value>) -> EvalResult {
+    expect_args("set-buffer-redisplay", &args, 4)?;
+    Ok(Value::Nil)
+}
+
 // ===========================================================================
 // Hook system (need evaluator)
 // ===========================================================================
@@ -14639,7 +14654,7 @@ pub(crate) fn dispatch_builtin(
         }
         "redirect-frame-focus" => super::compat_internal::builtin_redirect_frame_focus(args),
         "remove-pos-from-symbol" => super::compat_internal::builtin_remove_pos_from_symbol(args),
-        "rename-buffer" => super::compat_internal::builtin_rename_buffer(args),
+        "rename-buffer" => builtin_rename_buffer(args),
         "resize-mini-window-internal" => {
             super::compat_internal::builtin_resize_mini_window_internal(args)
         }
@@ -14648,8 +14663,8 @@ pub(crate) fn dispatch_builtin(
         }
         "set--this-command-keys" => super::compat_internal::builtin_set_this_command_keys(args),
         "set-buffer-auto-saved" => super::compat_internal::builtin_set_buffer_auto_saved(args),
-        "set-buffer-major-mode" => super::compat_internal::builtin_set_buffer_major_mode(args),
-        "set-buffer-redisplay" => super::compat_internal::builtin_set_buffer_redisplay(args),
+        "set-buffer-major-mode" => builtin_set_buffer_major_mode(args),
+        "set-buffer-redisplay" => builtin_set_buffer_redisplay(args),
         "set-charset-plist" => super::compat_internal::builtin_set_charset_plist(args),
         "set-fontset-font" => super::compat_internal::builtin_set_fontset_font(args),
         "set-frame-window-state-change" => {
@@ -15608,7 +15623,7 @@ pub(crate) fn dispatch_builtin_pure(name: &str, args: Vec<Value>) -> Option<Eval
         }
         "redirect-frame-focus" => super::compat_internal::builtin_redirect_frame_focus(args),
         "remove-pos-from-symbol" => super::compat_internal::builtin_remove_pos_from_symbol(args),
-        "rename-buffer" => super::compat_internal::builtin_rename_buffer(args),
+        "rename-buffer" => builtin_rename_buffer(args),
         "resize-mini-window-internal" => {
             super::compat_internal::builtin_resize_mini_window_internal(args)
         }
@@ -15617,8 +15632,8 @@ pub(crate) fn dispatch_builtin_pure(name: &str, args: Vec<Value>) -> Option<Eval
         }
         "set--this-command-keys" => super::compat_internal::builtin_set_this_command_keys(args),
         "set-buffer-auto-saved" => super::compat_internal::builtin_set_buffer_auto_saved(args),
-        "set-buffer-major-mode" => super::compat_internal::builtin_set_buffer_major_mode(args),
-        "set-buffer-redisplay" => super::compat_internal::builtin_set_buffer_redisplay(args),
+        "set-buffer-major-mode" => builtin_set_buffer_major_mode(args),
+        "set-buffer-redisplay" => builtin_set_buffer_redisplay(args),
         "set-charset-plist" => super::compat_internal::builtin_set_charset_plist(args),
         "set-fontset-font" => super::compat_internal::builtin_set_fontset_font(args),
         "set-frame-window-state-change" => {
@@ -19195,6 +19210,35 @@ mod tests {
             .expect("builtin vertical-motion should resolve")
             .expect("builtin vertical-motion should evaluate");
         assert_eq!(vertical_motion, Value::Int(0));
+    }
+
+    #[test]
+    fn pure_dispatch_buffer_placeholder_mutators_match_compat_contracts() {
+        let renamed = dispatch_builtin_pure("rename-buffer", vec![Value::string("x")])
+            .expect("builtin rename-buffer should resolve")
+            .expect("builtin rename-buffer should evaluate");
+        assert!(renamed.is_nil());
+
+        let renamed_unique = dispatch_builtin_pure(
+            "rename-buffer",
+            vec![Value::string("x"), Value::symbol("unique")],
+        )
+        .expect("builtin rename-buffer should resolve with optional arg")
+        .expect("builtin rename-buffer should evaluate with optional arg");
+        assert!(renamed_unique.is_nil());
+
+        let major_mode = dispatch_builtin_pure("set-buffer-major-mode", vec![Value::Nil])
+            .expect("builtin set-buffer-major-mode should resolve")
+            .expect("builtin set-buffer-major-mode should evaluate");
+        assert!(major_mode.is_nil());
+
+        let redisplay = dispatch_builtin_pure(
+            "set-buffer-redisplay",
+            vec![Value::Nil, Value::Int(1), Value::Int(1), Value::Int(0)],
+        )
+        .expect("builtin set-buffer-redisplay should resolve")
+        .expect("builtin set-buffer-redisplay should evaluate");
+        assert!(redisplay.is_nil());
     }
 
     #[test]

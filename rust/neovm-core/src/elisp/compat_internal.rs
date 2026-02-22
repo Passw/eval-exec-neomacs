@@ -1762,18 +1762,6 @@ pub(crate) fn builtin_re_describe_compiled(args: Vec<Value>) -> EvalResult {
     Ok(Value::Nil)
 }
 
-/// `(rename-buffer NEWNAME &optional UNIQUE)` -> nil.
-pub(crate) fn builtin_rename_buffer(args: Vec<Value>) -> EvalResult {
-    expect_range_args("rename-buffer", &args, 1, 2)?;
-    Ok(Value::Nil)
-}
-
-/// `(set-buffer-major-mode BUFFER)` -> nil.
-pub(crate) fn builtin_set_buffer_major_mode(args: Vec<Value>) -> EvalResult {
-    expect_args("set-buffer-major-mode", &args, 1)?;
-    Ok(Value::Nil)
-}
-
 /// `(dump-emacs-portable FILE &optional TRACK-REFERRERS)` -> nil.
 pub(crate) fn builtin_dump_emacs_portable(args: Vec<Value>) -> EvalResult {
     expect_range_args("dump-emacs-portable", &args, 1, 2)?;
@@ -2082,12 +2070,6 @@ pub(crate) fn builtin_set_this_command_keys(args: Vec<Value>) -> EvalResult {
 /// `(set-buffer-auto-saved)` -> nil.
 pub(crate) fn builtin_set_buffer_auto_saved(args: Vec<Value>) -> EvalResult {
     expect_args("set-buffer-auto-saved", &args, 0)?;
-    Ok(Value::Nil)
-}
-
-/// `(set-buffer-redisplay BUFFER START END BYTE-BEG)` -> nil.
-pub(crate) fn builtin_set_buffer_redisplay(args: Vec<Value>) -> EvalResult {
-    expect_args("set-buffer-redisplay", &args, 4)?;
     Ok(Value::Nil)
 }
 
