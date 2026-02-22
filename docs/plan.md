@@ -19340,6 +19340,23 @@ Last updated: 2026-02-21
     - added lock-in for:
       - `(x-display-color-p 1)` payload string shape
 
+- Aligned frame handle printing with oracle `F`-prefix shape across result and format paths:
+  - runtime changes:
+    - `rust/neovm-core/src/elisp/print.rs`
+      - frame handles now print as `#<frame FN>` when frame ids are in the runtime frame-id domain (`FRAME_ID_BASE` and above).
+      - legacy/non-frame-domain ids retain numeric fallback (`#<frame N>`).
+      - added unit coverage:
+        - `print_frame_handles_use_oracle_style_f_prefix`
+    - this also improves evaluator-context result printing for values containing frame handles.
+  - vm-compat corpus changes:
+    - added and wired:
+      - `test/neovm/vm-compat/cases/frame-handle-f-prefix-semantics.forms`
+      - `test/neovm/vm-compat/cases/frame-handle-f-prefix-semantics.expected.tsv`
+      - `test/neovm/vm-compat/cases/default.list`
+    - lock-ins cover:
+      - `(format \"%S\" (selected-frame))` frame-handle prefix shape
+      - frame-handle prefix shape in `display-monitor-attributes-list` / `frame-monitor-attributes` frame lists
+
 - Continue compatibility-first maintenance with small commit slices:
   - keep builtin surface and registry in lock-step
   - run oracle/parity checks after each behavior-affecting change

@@ -8,6 +8,15 @@ fn print_special_handle(value: &Value) -> Option<String> {
     super::display::print_terminal_handle(value)
 }
 
+fn format_frame_handle(id: u64) -> String {
+    if id >= crate::window::FRAME_ID_BASE {
+        let ordinal = id - crate::window::FRAME_ID_BASE + 1;
+        format!("#<frame F{}>", ordinal)
+    } else {
+        format!("#<frame {}>", id)
+    }
+}
+
 /// Print a `Value` as a Lisp string.
 pub fn print_value(value: &Value) -> String {
     if let Some(handle) = print_special_handle(value) {
@@ -69,7 +78,7 @@ pub fn print_value(value: &Value) -> String {
         }
         Value::Buffer(id) => format!("#<buffer {}>", id.0),
         Value::Window(id) => format!("#<window {}>", id),
-        Value::Frame(id) => format!("#<frame {}>", id),
+        Value::Frame(id) => format_frame_handle(*id),
         Value::Timer(id) => format!("#<timer {}>", id),
     }
 }
@@ -152,7 +161,7 @@ fn append_print_value_bytes(value: &Value, out: &mut Vec<u8>) {
         }
         Value::Buffer(id) => out.extend_from_slice(format!("#<buffer {}>", id.0).as_bytes()),
         Value::Window(id) => out.extend_from_slice(format!("#<window {}>", id).as_bytes()),
-        Value::Frame(id) => out.extend_from_slice(format!("#<frame {}>", id).as_bytes()),
+        Value::Frame(id) => out.extend_from_slice(format_frame_handle(*id).as_bytes()),
         Value::Timer(id) => out.extend_from_slice(format!("#<timer {}>", id).as_bytes()),
     }
 }
@@ -533,5 +542,18 @@ mod tests {
         let printed = print_value(handle);
         assert!(printed.starts_with("#<terminal "));
         assert!(printed.contains("on initial_terminal>"));
+    }
+
+    #[test]
+    fn print_frame_handles_use_oracle_style_f_prefix() {
+        let f1 = Value::Frame(crate::window::FRAME_ID_BASE);
+        let f2 = Value::Frame(crate::window::FRAME_ID_BASE + 1);
+        let legacy = Value::Frame(7);
+
+        assert_eq!(print_value(&f1), "#<frame F1>");
+        assert_eq!(print_value_bytes(&f1), b"#<frame F1>");
+        assert_eq!(print_value(&f2), "#<frame F2>");
+        assert_eq!(print_value_bytes(&f2), b"#<frame F2>");
+        assert_eq!(print_value(&legacy), "#<frame 7>");
     }
 }

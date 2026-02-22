@@ -653,6 +653,7 @@ cases/error-message-string-formatting
 cases/error-message-string-handle-printing-semantics
 cases/format-message-error-path-semantics
 cases/format-message-killed-buffer-handle-semantics
+cases/frame-handle-f-prefix-semantics
 cases/message-box-or-box-handle-semantics
 cases/process-error-conditions
 cases/process-basics
