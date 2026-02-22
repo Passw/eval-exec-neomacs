@@ -511,6 +511,7 @@ cases/terminal-parameter-storage-edge-semantics
 cases/terminal-parameter-state-semantics
 cases/terminal-live-p-designator-semantics
 cases/terminal-handle-printing
+cases/terminal-list-funcall-apply-semantics
 cases/terminal-name-designator-payload-semantics
 cases/terminal-name-live-p-funcall-apply-semantics
 cases/terminal-parameter-funcall-apply-semantics
