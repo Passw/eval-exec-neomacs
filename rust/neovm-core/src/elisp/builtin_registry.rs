@@ -1834,6 +1834,7 @@ const DISPATCH_BUILTIN_NAMES: &[&str] = &[
     "hash-table-count",
     "hash-table-p",
     "integer-or-marker-p",
+    "integer-or-null-p",
     "integerp",
     "keywordp",
     "listp",

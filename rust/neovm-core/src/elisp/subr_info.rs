@@ -1097,9 +1097,11 @@ fn subr_arity_value(name: &str) -> Value {
         | "bool-vector-set-difference"
         | "bool-vector-union" => arity_cons(2, Some(3)),
         "arrayp" | "atom" | "booleanp" | "bufferp" | "char-to-string" | "consp" | "downcase"
-        | "float" | "floatp" | "integerp" | "keywordp" | "listp" | "nlistp" | "null"
-        | "number-to-string" | "numberp" | "sequencep" | "string-to-char" | "stringp"
-        | "symbolp" | "type-of" | "cl-type-of" | "upcase" | "vectorp" => arity_cons(1, Some(1)),
+        | "float" | "floatp" | "integer-or-null-p" | "integerp" | "keywordp" | "listp"
+        | "nlistp" | "null" | "number-to-string" | "numberp" | "sequencep" | "string-to-char"
+        | "stringp" | "symbolp" | "type-of" | "cl-type-of" | "upcase" | "vectorp" => {
+            arity_cons(1, Some(1))
+        }
         "ceiling" | "characterp" | "floor" | "round" | "string-to-number" | "truncate" => {
             arity_cons(1, Some(2))
         }
@@ -2821,6 +2823,7 @@ mod tests {
         assert_subr_arity("float", 1, Some(1));
         assert_subr_arity("floatp", 1, Some(1));
         assert_subr_arity("floor", 1, Some(2));
+        assert_subr_arity("integer-or-null-p", 1, Some(1));
         assert_subr_arity("integerp", 1, Some(1));
         assert_subr_arity("keywordp", 1, Some(1));
         assert_subr_arity("listp", 1, Some(1));
