@@ -13021,6 +13021,11 @@ pub(crate) fn dispatch_builtin(
                 eval, args,
             ))
         }
+        "frame-old-selected-window" => {
+            return Some(super::window_cmds::builtin_frame_old_selected_window(
+                eval, args,
+            ))
+        }
         "set-frame-selected-window" => {
             return Some(super::window_cmds::builtin_set_frame_selected_window(
                 eval, args,
@@ -15084,6 +15089,7 @@ pub(crate) fn dispatch_builtin_pure(name: &str, args: Vec<Value>) -> Option<Eval
         | "window-list-1"
         | "window-bump-use-time"
         | "old-selected-window"
+        | "frame-old-selected-window"
         | "set-frame-selected-window"
         | "window-at" => return None,
         _ => {}

@@ -560,6 +560,7 @@ cases/frame-terminal-error-payload-semantics
 cases/frame-terminal-funcall-apply-semantics
 cases/frame-window-callable-path-semantics
 cases/frame-selected-window-semantics
+cases/frame-old-selected-window-semantics
 cases/old-selected-window-semantics
 cases/window-frame-semantics
 cases/select-frame-semantics

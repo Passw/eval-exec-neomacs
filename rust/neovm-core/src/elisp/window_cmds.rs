@@ -764,6 +764,20 @@ pub(crate) fn builtin_frame_selected_window(
     Ok(window_value(frame.selected_window))
 }
 
+/// `(frame-old-selected-window &optional FRAME)` -> nil.
+///
+/// Batch GNU Emacs reports nil for this accessor throughout startup and
+/// selection operations; keep frame designator validation aligned with
+/// `frame-live-p` semantics.
+pub(crate) fn builtin_frame_old_selected_window(
+    eval: &mut super::eval::Evaluator,
+    args: Vec<Value>,
+) -> EvalResult {
+    expect_max_args("frame-old-selected-window", &args, 1)?;
+    let _ = resolve_frame_id(eval, args.first(), "frame-live-p")?;
+    Ok(Value::Nil)
+}
+
 /// `(set-frame-selected-window FRAME WINDOW &optional NORECORD)` -> WINDOW.
 pub(crate) fn builtin_set_frame_selected_window(
     eval: &mut super::eval::Evaluator,
@@ -5993,6 +6007,52 @@ mod tests {
         assert_eq!(
             out[3],
             "OK (wrong-number-of-arguments t t wrong-number-of-arguments wrong-number-of-arguments)"
+        );
+    }
+
+    #[test]
+    fn frame_old_selected_window_matches_batch_and_arity_semantics() {
+        let forms = parse_forms(
+            "(condition-case err (frame-old-selected-window 999999) (error err))
+             (condition-case err (frame-old-selected-window 'foo) (error err))
+             (condition-case err (frame-old-selected-window nil nil) (error (car err)))
+             (let ((f (selected-frame)))
+               (list (frame-old-selected-window)
+                     (frame-old-selected-window nil)
+                     (frame-old-selected-window f)
+                     (frame-old-selected-window (window-frame (selected-window)))))
+             (let* ((w1 (selected-window))
+                    (w2 (split-window)))
+               (prog1
+                   (list (eq (frame-old-selected-window) nil)
+                         (progn (select-window w2) (eq (frame-old-selected-window) nil))
+                         (progn (other-window 1) (eq (frame-old-selected-window) nil))
+                         (progn (set-frame-selected-window nil w2) (eq (frame-old-selected-window) nil))
+                         (progn (set-frame-selected-window nil w1) (eq (frame-old-selected-window) nil))
+                         (progn (set-frame-selected-window nil w2 t) (eq (frame-old-selected-window) nil))
+                         (progn (set-frame-selected-window nil w1 t) (eq (frame-old-selected-window) nil)))
+                 (select-window w1)
+                 (delete-window w2)))
+             (list (condition-case err (funcall #'frame-old-selected-window nil nil) (error err))
+                   (condition-case err (apply #'frame-old-selected-window '(nil nil)) (error err))
+                   (eq (funcall #'frame-old-selected-window) (frame-old-selected-window))
+                   (eq (apply #'frame-old-selected-window nil) (frame-old-selected-window)))",
+        )
+        .expect("parse");
+        let mut ev = Evaluator::new();
+        let out = ev
+            .eval_forms(&forms)
+            .iter()
+            .map(format_eval_result)
+            .collect::<Vec<_>>();
+        assert_eq!(out[0], "OK (wrong-type-argument frame-live-p 999999)");
+        assert_eq!(out[1], "OK (wrong-type-argument frame-live-p foo)");
+        assert_eq!(out[2], "OK wrong-number-of-arguments");
+        assert_eq!(out[3], "OK (nil nil nil nil)");
+        assert_eq!(out[4], "OK (t t t t t t t)");
+        assert_eq!(
+            out[5],
+            "OK ((wrong-number-of-arguments #<subr frame-old-selected-window> 2) (wrong-number-of-arguments #<subr frame-old-selected-window> 2) t t)"
         );
     }
 
