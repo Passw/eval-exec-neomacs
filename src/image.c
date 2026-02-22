@@ -3232,8 +3232,11 @@ colors_in_color_table (int *n)
 static unsigned long
 lookup_rgb_color (struct frame *f, int r, int g, int b)
 {
-  xsignal1 (Qfile_error,
-	    build_string ("This Emacs mishandles this image file type"));
+  /* Neomacs uses direct 0x00RRGGBB pixel values — no color table needed.
+     r, g, b are 16-bit values (0–65535); pack into 8-bit per channel.  */
+  return (((unsigned long)(r >> 8) << 16)
+          | ((unsigned long)(g >> 8) << 8)
+          | (unsigned long)(b >> 8));
 }
 
 static void

@@ -5116,19 +5116,62 @@ neomacs_update_end (struct frame *f)
             }
         }
 
-      neomacs_rust_layout_frame (
-          dpyinfo->display_handle,
-          (void *) f,
-          (float) FRAME_PIXEL_WIDTH (f),
-          (float) FRAME_PIXEL_HEIGHT (f),
-          (float) FRAME_COLUMN_WIDTH (f),
-          (float) FRAME_LINE_HEIGHT (f),
-          FRAME_FONT (f) ? (float) FRAME_FONT (f)->pixel_size : 14.0f,
-          bg_rgb,
-          vb_rgb,
-          rdw, bdw,
-          div_fg, div_first_fg, div_last_fg);
+      /* Wrap the layout call in a Lisp error handler.  The Rust layout
+         engine calls C FFI callbacks that invoke Lisp (fontification,
+         property queries, mode-line formatting).  If any Lisp code
+         signals an error, the longjmp would otherwise skip through
+         the Rust stack frames — we must catch it here so that we
+         always reach end_frame_window and send the frame.  */
+      {
+        struct handler *c = push_handler_nosignal (Qt, CATCHER_ALL);
+        if (c && sys_setjmp (c->jmp) != 0)
+          {
+            /* Lisp error caught — log and continue to end_frame.  */
+            static int layout_err_count = 0;
+            if (++layout_err_count <= 3)
+              {
+                Lisp_Object err_msg = Fprin1_to_string (c->val, Qnil, Qnil);
+                message ("neomacs: layout error: %s",
+                         STRINGP (err_msg) ? SSDATA (err_msg) : "?");
+              }
+            handlerlist = c->next;
+            goto after_layout;
+          }
+        if (c)
+          {
+            neomacs_rust_layout_frame (
+                dpyinfo->display_handle,
+                (void *) f,
+                (float) FRAME_PIXEL_WIDTH (f),
+                (float) FRAME_PIXEL_HEIGHT (f),
+                (float) FRAME_COLUMN_WIDTH (f),
+                (float) FRAME_LINE_HEIGHT (f),
+                FRAME_FONT (f) ? (float) FRAME_FONT (f)->pixel_size : 14.0f,
+                bg_rgb,
+                vb_rgb,
+                rdw, bdw,
+                div_fg, div_first_fg, div_last_fg);
+            handlerlist = c->next;
+          }
+        else
+          {
+            /* Out of memory for handler — run unprotected as fallback. */
+            neomacs_rust_layout_frame (
+                dpyinfo->display_handle,
+                (void *) f,
+                (float) FRAME_PIXEL_WIDTH (f),
+                (float) FRAME_PIXEL_HEIGHT (f),
+                (float) FRAME_COLUMN_WIDTH (f),
+                (float) FRAME_LINE_HEIGHT (f),
+                FRAME_FONT (f) ? (float) FRAME_FONT (f)->pixel_size : 14.0f,
+                bg_rgb,
+                vb_rgb,
+                rdw, bdw,
+                div_fg, div_first_fg, div_last_fg);
+          }
+      }
 
+    after_layout:
       /* Restore mini window's buffer after Rust layout. */
       if (mini_buffer_swapped)
         {
