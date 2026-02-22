@@ -554,7 +554,8 @@ fn subr_arity_value(name: &str) -> Value {
         | "hash-table-rehash-threshold"
         | "hash-table-weakness" => arity_cons(1, Some(1)),
         "max" | "min" => arity_cons(1, None),
-        "assq" | "car-less-than-car" | "member" | "memq" | "memql" | "rassoc" | "rassq" => {
+        "assq" | "assq-delete-all" | "car-less-than-car" | "member" | "memq" | "memql"
+        | "rassoc" | "rassq" => {
             arity_cons(2, Some(2))
         }
         "mod" | "make-list" | "mapc" | "mapcan" | "mapcar" | "nth" | "nthcdr" | "remq" => {
@@ -2645,6 +2646,7 @@ mod tests {
         assert_subr_arity("assoc-string", 2, Some(3));
         assert_subr_arity("assoc-default", 2, Some(4));
         assert_subr_arity("assq", 2, Some(2));
+        assert_subr_arity("assq-delete-all", 2, Some(2));
         assert_subr_arity("car-less-than-car", 2, Some(2));
         assert_subr_arity("member", 2, Some(2));
         assert_subr_arity("memq", 2, Some(2));

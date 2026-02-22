@@ -1670,6 +1670,18 @@ pub(crate) fn builtin_assq(args: Vec<Value>) -> EvalResult {
     }
 }
 
+pub(crate) fn builtin_assq_delete_all(args: Vec<Value>) -> EvalResult {
+    expect_args("assq-delete-all", &args, 2)?;
+    let key = args[0].clone();
+    delete_from_list_in_place(&args[1], |entry| match entry {
+        Value::Cons(cell) => {
+            let pair = cell.lock().expect("poisoned");
+            eq_value(&key, &pair.car)
+        }
+        _ => false,
+    })
+}
+
 pub(crate) fn builtin_copy_sequence(args: Vec<Value>) -> EvalResult {
     expect_args("copy-sequence", &args, 1)?;
     match &args[0] {
@@ -16746,6 +16758,7 @@ pub(crate) fn dispatch_builtin(
         "memq" => builtin_memq(args),
         "memql" => builtin_memql(args),
         "assq" => builtin_assq(args),
+        "assq-delete-all" => builtin_assq_delete_all(args),
         "copy-sequence" => builtin_copy_sequence(args),
         "purecopy" => builtin_purecopy(args),
         "substring-no-properties" => builtin_substring_no_properties(args),
@@ -17980,6 +17993,7 @@ pub(crate) fn dispatch_builtin_pure(name: &str, args: Vec<Value>) -> Option<Eval
         "delq" => builtin_delq(args),
         "elt" => builtin_elt(args),
         "memql" => builtin_memql(args),
+        "assq-delete-all" => builtin_assq_delete_all(args),
         "nconc" => builtin_nconc(args),
         "number-sequence" => builtin_number_sequence(args),
         // Output / misc
@@ -25393,6 +25407,33 @@ mod tests {
         .expect("always should resolve")
         .expect("always should evaluate");
         assert_eq!(many, Value::True);
+    }
+
+    #[test]
+    fn assq_delete_all_removes_matching_pairs_and_ignores_atoms() {
+        let entry_foo_1 = Value::cons(Value::symbol("foo"), Value::Int(1));
+        let entry_bar = Value::cons(Value::symbol("bar"), Value::Int(2));
+        let entry_foo_3 = Value::cons(Value::symbol("foo"), Value::Int(3));
+        let alist = Value::list(vec![
+            entry_foo_1,
+            Value::symbol("ignored-atom"),
+            entry_bar.clone(),
+            entry_foo_3,
+        ]);
+
+        let result = dispatch_builtin_pure("assq-delete-all", vec![Value::symbol("foo"), alist])
+            .expect("assq-delete-all should resolve")
+            .expect("assq-delete-all should evaluate");
+        let expected = Value::list(vec![Value::symbol("ignored-atom"), entry_bar]);
+        assert_eq!(result, expected);
+
+        let err = dispatch_builtin_pure("assq-delete-all", vec![Value::symbol("foo"), Value::Int(7)])
+            .expect("assq-delete-all should resolve")
+            .expect_err("assq-delete-all should reject non-lists");
+        match err {
+            Flow::Signal(sig) => assert_eq!(sig.symbol, "wrong-type-argument"),
+            other => panic!("expected signal, got {other:?}"),
+        }
     }
 
     #[test]

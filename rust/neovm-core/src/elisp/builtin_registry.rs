@@ -53,6 +53,7 @@ const DISPATCH_BUILTIN_NAMES: &[&str] = &[
     "assoc-default",
     "assoc-string",
     "assq",
+    "assq-delete-all",
     "auto-composition-mode",
     "autoload",
     "autoload-do-load",
