@@ -498,6 +498,7 @@ const DISPATCH_BUILTIN_NAMES: &[&str] = &[
     "file-name-parent-directory",
     "file-name-split",
     "file-name-with-extension",
+    "file-local-name",
     "file-newer-than-file-p",
     "file-readable-p",
     "file-regular-p",
