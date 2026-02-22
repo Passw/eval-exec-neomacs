@@ -1913,7 +1913,7 @@ pub(crate) fn builtin_number_to_string(args: Vec<Value>) -> EvalResult {
 pub(crate) fn builtin_upcase(args: Vec<Value>) -> EvalResult {
     expect_args("upcase", &args, 1)?;
     match &args[0] {
-        Value::Str(s) => Ok(Value::string(s.to_uppercase())),
+        Value::Str(s) => Ok(Value::string(upcase_string_emacs_compat(s))),
         Value::Char(c) => {
             let mapped = upcase_char_code_emacs_compat(*c as i64);
             if let Some(ch) = u32::try_from(mapped).ok().and_then(char::from_u32) {
@@ -1988,6 +1988,20 @@ fn preserve_emacs_upcase_payload(code: i64) -> bool {
     )
 }
 
+fn upcase_string_emacs_compat(s: &str) -> String {
+    let mut out = String::with_capacity(s.len());
+    for ch in s.chars() {
+        if ch == '\u{0131}' {
+            out.push(ch);
+            continue;
+        }
+        for up in ch.to_uppercase() {
+            out.push(up);
+        }
+    }
+    out
+}
+
 fn upcase_char_code_emacs_compat(code: i64) -> i64 {
     if preserve_emacs_upcase_payload(code) {
         return code;
@@ -2038,7 +2052,7 @@ fn downcase_char_code_emacs_compat(code: i64) -> i64 {
 pub(crate) fn builtin_downcase(args: Vec<Value>) -> EvalResult {
     expect_args("downcase", &args, 1)?;
     match &args[0] {
-        Value::Str(s) => Ok(Value::string(s.to_lowercase())),
+        Value::Str(s) => Ok(Value::string(downcase_string_emacs_compat(s))),
         Value::Char(c) => {
             let mapped = downcase_char_code_emacs_compat(*c as i64);
             if let Some(ch) = u32::try_from(mapped).ok().and_then(char::from_u32) {
@@ -2062,6 +2076,20 @@ pub(crate) fn builtin_downcase(args: Vec<Value>) -> EvalResult {
             vec![Value::symbol("char-or-string-p"), other.clone()],
         )),
     }
+}
+
+fn downcase_string_emacs_compat(s: &str) -> String {
+    let mut out = String::with_capacity(s.len());
+    for ch in s.chars() {
+        if ch == '\u{212A}' {
+            out.push(ch);
+            continue;
+        }
+        for low in ch.to_lowercase() {
+            out.push(low);
+        }
+    }
+    out
 }
 
 pub(crate) fn builtin_format(args: Vec<Value>) -> EvalResult {
@@ -19513,6 +19541,16 @@ mod tests {
             .expect("builtin downcase should evaluate");
         assert_eq!(dotted_i, Value::Char('\u{0130}'));
 
+        let kelvin = dispatch_builtin_pure("downcase", vec![Value::string("\u{212A}")])
+            .expect("builtin downcase should resolve")
+            .expect("builtin downcase should evaluate");
+        assert_eq!(kelvin, Value::string("\u{212A}"));
+
+        let dotted_i_string = dispatch_builtin_pure("downcase", vec![Value::string("\u{0130}")])
+            .expect("builtin downcase should resolve")
+            .expect("builtin downcase should evaluate");
+        assert_eq!(dotted_i_string, Value::string("i\u{307}"));
+
         let negative = dispatch_builtin_pure("downcase", vec![Value::Int(-1)])
             .expect("builtin downcase should resolve")
             .expect_err("builtin downcase should reject negative integer designators");
@@ -19566,6 +19604,16 @@ mod tests {
             .expect("builtin upcase should resolve")
             .expect("builtin upcase should evaluate");
         assert_eq!(sharp_s, Value::Char('\u{1E9E}'));
+
+        let sharp_s_string = dispatch_builtin_pure("upcase", vec![Value::string("ß")])
+            .expect("builtin upcase should resolve")
+            .expect("builtin upcase should evaluate");
+        assert_eq!(sharp_s_string, Value::string("SS"));
+
+        let dotless_i_string = dispatch_builtin_pure("upcase", vec![Value::string("\u{0131}")])
+            .expect("builtin upcase should resolve")
+            .expect("builtin upcase should evaluate");
+        assert_eq!(dotless_i_string, Value::string("\u{0131}"));
 
         let negative = dispatch_builtin_pure("upcase", vec![Value::Int(-1)])
             .expect("builtin upcase should resolve")

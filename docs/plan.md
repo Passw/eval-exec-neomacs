@@ -28,6 +28,24 @@ Last updated: 2026-02-22
 
 ## Doing
 
+- Aligned Unicode edge behavior for string `upcase` / `downcase`:
+  - runtime changes:
+    - `rust/neovm-core/src/elisp/builtins.rs`
+      - `downcase` string path now preserves Kelvin sign (`\u{212A}`) while keeping full lowercase expansion for other characters.
+      - `upcase` string path now preserves dotless i (`\u{0131}`) while keeping full uppercase expansion for other characters (e.g. `"ß" -> "SS"`).
+      - extended Unicode edge tests:
+        - `pure_dispatch_typed_downcase_unicode_edge_payloads_match_oracle`
+        - `pure_dispatch_typed_upcase_unicode_edge_payloads_match_oracle`
+  - vm-compat corpus changes:
+    - added and wired:
+      - `test/neovm/vm-compat/cases/case-string-unicode-edge-semantics.forms`
+      - `test/neovm/vm-compat/cases/case-string-unicode-edge-semantics.expected.tsv`
+      - `test/neovm/vm-compat/cases/default.list`
+  - verified:
+    - `cargo test --manifest-path rust/neovm-core/Cargo.toml unicode_edge_payloads_match_oracle -- --nocapture` (pass)
+    - `make -C test/neovm/vm-compat record FORMS=cases/case-string-unicode-edge-semantics.forms EXPECTED=cases/case-string-unicode-edge-semantics.expected.tsv` (pass)
+    - `make -C test/neovm/vm-compat check-one-neovm CASE=cases/case-string-unicode-edge-semantics` (pass)
+
 - Aligned core `upcase` Unicode edge behavior with oracle simple-mapping semantics:
   - runtime changes:
     - `rust/neovm-core/src/elisp/builtins.rs`
