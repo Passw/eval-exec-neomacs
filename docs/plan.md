@@ -19701,6 +19701,18 @@ Last updated: 2026-02-21
       - two-argument behavior invariance across DISPLAY shapes (`nil`, string, frame, terminal)
       - live-window payload structure and dead-window compact-handle message shape (`#<window N>`, no ` on ` context)
 
+- Added dedicated `x-display-set-last-user-time` DISPLAY-designator lock-ins for `USER-TIME=nil`:
+  - vm-compat corpus changes:
+    - added:
+      - `test/neovm/vm-compat/cases/x-display-set-last-user-time-display-designator-nil-user-time-semantics.forms`
+      - `test/neovm/vm-compat/cases/x-display-set-last-user-time-display-designator-nil-user-time-semantics.expected.tsv`
+    - wired case into:
+      - `test/neovm/vm-compat/cases/default.list`
+    - lock-ins assert DISPLAY-agnostic payload shape when `USER-TIME=nil` across:
+      - `nil`, string, integer, symbol, vector, list, cons
+      - live frame, terminal, live window, dead window
+      - all return `(error "X windows are not in use or not initialized")`
+
 - Continue compatibility-first maintenance with small commit slices:
   - keep builtin surface and registry in lock-step
   - run oracle/parity checks after each behavior-affecting change
