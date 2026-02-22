@@ -6386,6 +6386,49 @@ pub(crate) fn builtin_lread_substitute_object_in_subtree(args: Vec<Value>) -> Ev
     Ok(Value::Nil)
 }
 
+pub(crate) fn builtin_make_byte_code(args: Vec<Value>) -> EvalResult {
+    if args.len() < 4 {
+        return Err(signal(
+            "wrong-number-of-arguments",
+            vec![
+                Value::symbol("make-byte-code"),
+                Value::Int(args.len() as i64),
+            ],
+        ));
+    }
+    Ok(Value::Nil)
+}
+
+pub(crate) fn builtin_make_char(args: Vec<Value>) -> EvalResult {
+    expect_range_args("make-char", &args, 1, 5)?;
+    Ok(Value::Nil)
+}
+
+pub(crate) fn builtin_make_closure(args: Vec<Value>) -> EvalResult {
+    if args.is_empty() {
+        return Err(signal(
+            "wrong-number-of-arguments",
+            vec![Value::symbol("make-closure"), Value::Int(args.len() as i64)],
+        ));
+    }
+    Ok(Value::Nil)
+}
+
+pub(crate) fn builtin_make_finalizer(args: Vec<Value>) -> EvalResult {
+    expect_args("make-finalizer", &args, 1)?;
+    Ok(Value::Nil)
+}
+
+pub(crate) fn builtin_make_indirect_buffer(args: Vec<Value>) -> EvalResult {
+    expect_range_args("make-indirect-buffer", &args, 2, 4)?;
+    Ok(Value::Nil)
+}
+
+pub(crate) fn builtin_make_interpreted_closure(args: Vec<Value>) -> EvalResult {
+    expect_range_args("make-interpreted-closure", &args, 3, 5)?;
+    Ok(Value::Nil)
+}
+
 // ===========================================================================
 // Hook system (need evaluator)
 // ===========================================================================
@@ -15266,15 +15309,13 @@ pub(crate) fn dispatch_builtin(
         "lread--substitute-object-in-subtree" => builtin_lread_substitute_object_in_subtree(args),
         "malloc-info" => builtin_malloc_info(args),
         "malloc-trim" => builtin_malloc_trim(args),
-        "make-byte-code" => super::compat_internal::builtin_make_byte_code(args),
-        "make-char" => super::compat_internal::builtin_make_char(args),
-        "make-closure" => super::compat_internal::builtin_make_closure(args),
-        "make-finalizer" => super::compat_internal::builtin_make_finalizer(args),
+        "make-byte-code" => builtin_make_byte_code(args),
+        "make-char" => builtin_make_char(args),
+        "make-closure" => builtin_make_closure(args),
+        "make-finalizer" => builtin_make_finalizer(args),
         "marker-last-position" => builtin_marker_last_position(args),
-        "make-indirect-buffer" => super::compat_internal::builtin_make_indirect_buffer(args),
-        "make-interpreted-closure" => {
-            super::compat_internal::builtin_make_interpreted_closure(args)
-        }
+        "make-indirect-buffer" => builtin_make_indirect_buffer(args),
+        "make-interpreted-closure" => builtin_make_interpreted_closure(args),
         "make-record" => builtin_make_record(args),
         "make-temp-file-internal" => builtin_make_temp_file_internal(args),
         "map-charset-chars" => builtin_map_charset_chars(args),
@@ -16183,15 +16224,13 @@ pub(crate) fn dispatch_builtin_pure(name: &str, args: Vec<Value>) -> Option<Eval
         "lread--substitute-object-in-subtree" => builtin_lread_substitute_object_in_subtree(args),
         "malloc-info" => builtin_malloc_info(args),
         "malloc-trim" => builtin_malloc_trim(args),
-        "make-byte-code" => super::compat_internal::builtin_make_byte_code(args),
-        "make-char" => super::compat_internal::builtin_make_char(args),
-        "make-closure" => super::compat_internal::builtin_make_closure(args),
-        "make-finalizer" => super::compat_internal::builtin_make_finalizer(args),
+        "make-byte-code" => builtin_make_byte_code(args),
+        "make-char" => builtin_make_char(args),
+        "make-closure" => builtin_make_closure(args),
+        "make-finalizer" => builtin_make_finalizer(args),
         "marker-last-position" => builtin_marker_last_position(args),
-        "make-indirect-buffer" => super::compat_internal::builtin_make_indirect_buffer(args),
-        "make-interpreted-closure" => {
-            super::compat_internal::builtin_make_interpreted_closure(args)
-        }
+        "make-indirect-buffer" => builtin_make_indirect_buffer(args),
+        "make-interpreted-closure" => builtin_make_interpreted_closure(args),
         "make-record" => builtin_make_record(args),
         "make-temp-file-internal" => builtin_make_temp_file_internal(args),
         "map-charset-chars" => builtin_map_charset_chars(args),
@@ -20740,6 +20779,53 @@ mod tests {
         .expect("builtin lread--substitute-object-in-subtree should resolve")
         .expect("builtin lread--substitute-object-in-subtree should evaluate");
         assert!(lread_substitute.is_nil());
+    }
+
+    #[test]
+    fn pure_dispatch_make_placeholder_cluster_matches_compat_contracts() {
+        let make_byte_code = dispatch_builtin_pure(
+            "make-byte-code",
+            vec![
+                Value::Int(0),
+                Value::string(""),
+                Value::vector(vec![]),
+                Value::Int(0),
+            ],
+        )
+        .expect("builtin make-byte-code should resolve")
+        .expect("builtin make-byte-code should evaluate");
+        assert!(make_byte_code.is_nil());
+
+        let make_char = dispatch_builtin_pure("make-char", vec![Value::Int(1)])
+            .expect("builtin make-char should resolve")
+            .expect("builtin make-char should evaluate");
+        assert!(make_char.is_nil());
+
+        let make_closure = dispatch_builtin_pure("make-closure", vec![Value::Nil])
+            .expect("builtin make-closure should resolve")
+            .expect("builtin make-closure should evaluate");
+        assert!(make_closure.is_nil());
+
+        let make_finalizer = dispatch_builtin_pure("make-finalizer", vec![Value::symbol("ignore")])
+            .expect("builtin make-finalizer should resolve")
+            .expect("builtin make-finalizer should evaluate");
+        assert!(make_finalizer.is_nil());
+
+        let make_indirect = dispatch_builtin_pure(
+            "make-indirect-buffer",
+            vec![Value::symbol("buf"), Value::string("name")],
+        )
+        .expect("builtin make-indirect-buffer should resolve")
+        .expect("builtin make-indirect-buffer should evaluate");
+        assert!(make_indirect.is_nil());
+
+        let make_interpreted = dispatch_builtin_pure(
+            "make-interpreted-closure",
+            vec![Value::list(vec![]), Value::list(vec![]), Value::Nil],
+        )
+        .expect("builtin make-interpreted-closure should resolve")
+        .expect("builtin make-interpreted-closure should evaluate");
+        assert!(make_interpreted.is_nil());
     }
 
     #[test]

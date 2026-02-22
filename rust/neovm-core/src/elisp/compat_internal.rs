@@ -1438,55 +1438,6 @@ pub(crate) fn builtin_define_coding_system_internal(args: Vec<Value>) -> EvalRes
     Ok(Value::Nil)
 }
 
-/// `(make-byte-code ARGDESC BYTE-CODE CONSTANTS DEPTH &rest EXTRA)` -> nil.
-pub(crate) fn builtin_make_byte_code(args: Vec<Value>) -> EvalResult {
-    if args.len() < 4 {
-        return Err(signal(
-            "wrong-number-of-arguments",
-            vec![
-                Value::symbol("make-byte-code"),
-                Value::Int(args.len() as i64),
-            ],
-        ));
-    }
-    Ok(Value::Nil)
-}
-
-/// `(make-char CHARSET CODE1 &optional CODE2 CODE3 CODE4)` -> nil.
-pub(crate) fn builtin_make_char(args: Vec<Value>) -> EvalResult {
-    expect_range_args("make-char", &args, 1, 5)?;
-    Ok(Value::Nil)
-}
-
-/// `(make-closure PROTO &rest CLOSURE-VARS)` -> nil.
-pub(crate) fn builtin_make_closure(args: Vec<Value>) -> EvalResult {
-    if args.is_empty() {
-        return Err(signal(
-            "wrong-number-of-arguments",
-            vec![Value::symbol("make-closure"), Value::Int(args.len() as i64)],
-        ));
-    }
-    Ok(Value::Nil)
-}
-
-/// `(make-finalizer FUNCTION)` -> nil.
-pub(crate) fn builtin_make_finalizer(args: Vec<Value>) -> EvalResult {
-    expect_args("make-finalizer", &args, 1)?;
-    Ok(Value::Nil)
-}
-
-/// `(make-indirect-buffer BUFFER NAME CLONE &optional INHIBIT-BUFFER-HOOKS)` -> nil.
-pub(crate) fn builtin_make_indirect_buffer(args: Vec<Value>) -> EvalResult {
-    expect_range_args("make-indirect-buffer", &args, 2, 4)?;
-    Ok(Value::Nil)
-}
-
-/// `(make-interpreted-closure ARGLIST BODY &optional ENV DOCSTRING IFORM)` -> nil.
-pub(crate) fn builtin_make_interpreted_closure(args: Vec<Value>) -> EvalResult {
-    expect_range_args("make-interpreted-closure", &args, 3, 5)?;
-    Ok(Value::Nil)
-}
-
 /// `(treesit-available-p)` -> nil.
 pub(crate) fn builtin_treesit_available_p(args: Vec<Value>) -> EvalResult {
     expect_args("treesit-available-p", &args, 0)?;
