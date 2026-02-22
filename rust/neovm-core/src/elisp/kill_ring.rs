@@ -1368,6 +1368,13 @@ fn upcase_case_string_emacs_compat(text: &str) -> String {
     out
 }
 
+fn titlecase_initial_emacs_compat(ch: char) -> String {
+    if ch == 'ß' {
+        return "Ss".to_string();
+    }
+    ch.to_uppercase().collect()
+}
+
 /// `(downcase-region BEG END &optional REGION-NONCONTIGUOUS-P)` — convert the
 /// region to lower case.
 pub(crate) fn builtin_downcase_region(
@@ -1503,7 +1510,7 @@ fn capitalize_words_preserving_boundaries(text: &str) -> String {
     for ch in text.chars() {
         if ch.is_alphanumeric() {
             if !in_word {
-                for c in ch.to_uppercase() {
+                for c in titlecase_initial_emacs_compat(ch).chars() {
                     result.push(c);
                 }
                 in_word = true;
@@ -1572,7 +1579,7 @@ pub(crate) fn builtin_upcase_initials_region(
     for ch in text.chars() {
         if ch.is_alphanumeric() {
             if !in_word {
-                for c in ch.to_uppercase() {
+                for c in titlecase_initial_emacs_compat(ch).chars() {
                     result.push(c);
                 }
                 in_word = true;
@@ -3591,6 +3598,26 @@ mod tests {
                (buffer-string)"#,
         );
         assert_eq!(results[2], r#"OK "HELLo WORLD""#);
+    }
+
+    #[test]
+    fn capitalize_region_unicode_sharp_s_titlecase() {
+        let results = eval_all(
+            r#"(insert "ß")
+               (capitalize-region 1 2)
+               (buffer-string)"#,
+        );
+        assert_eq!(results[2], r#"OK "Ss""#);
+    }
+
+    #[test]
+    fn upcase_initials_region_unicode_sharp_s_titlecase() {
+        let results = eval_all(
+            r#"(insert "ß")
+               (upcase-initials-region 1 2)
+               (buffer-string)"#,
+        );
+        assert_eq!(results[2], r#"OK "Ss""#);
     }
 
     #[test]

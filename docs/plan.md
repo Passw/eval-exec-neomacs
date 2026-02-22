@@ -33,11 +33,14 @@ Last updated: 2026-02-22
     - `rust/neovm-core/src/elisp/kill_ring.rs`
       - `downcase-region` / `downcase-word` now preserve Kelvin sign (`\u{212A}`) during lowercase transforms.
       - `upcase-region` / `upcase-word` now preserve dotless i (`\u{0131}`) during uppercase transforms.
+      - `capitalize-region` / `upcase-initials-region` now titlecase `"ß"` as `"Ss"` on word starts.
       - added unit coverage:
         - `downcase_region_unicode_kelvin_preserved`
         - `upcase_region_unicode_dotless_i_preserved`
         - `downcase_word_unicode_kelvin_preserved`
         - `upcase_word_unicode_dotless_i_preserved`
+        - `capitalize_region_unicode_sharp_s_titlecase`
+        - `upcase_initials_region_unicode_sharp_s_titlecase`
   - vm-compat corpus changes:
     - added and wired:
       - `test/neovm/vm-compat/cases/case-region-word-unicode-edge-semantics.forms`
@@ -45,6 +48,7 @@ Last updated: 2026-02-22
       - `test/neovm/vm-compat/cases/default.list`
   - verified:
     - `cargo test --manifest-path rust/neovm-core/Cargo.toml unicode_ -- --nocapture` (pass)
+    - `cargo test --manifest-path rust/neovm-core/Cargo.toml unicode_sharp_s_titlecase -- --nocapture` (pass)
     - `make -C test/neovm/vm-compat record FORMS=cases/case-region-word-unicode-edge-semantics.forms EXPECTED=cases/case-region-word-unicode-edge-semantics.expected.tsv` (pass)
     - `make -C test/neovm/vm-compat check-one-neovm CASE=cases/case-region-word-unicode-edge-semantics` (pass)
 
