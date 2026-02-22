@@ -212,6 +212,24 @@ pub fn file_name_base(filename: &str) -> String {
     file_name_sans_extension(&nondirectory)
 }
 
+/// Return FILENAME with EXTENSION replacing any existing final extension.
+pub fn file_name_with_extension(filename: &str, extension: &str) -> Result<String, String> {
+    if filename.ends_with('/') {
+        return Err(format!("Filename is a directory: {filename}"));
+    }
+
+    let normalized_extension = extension.strip_prefix('.').unwrap_or(extension);
+    if normalized_extension.is_empty() {
+        return Err(format!("Malformed extension: {extension}"));
+    }
+
+    Ok(format!(
+        "{}.{}",
+        file_name_sans_extension(filename),
+        normalized_extension
+    ))
+}
+
 /// Return FILENAME as a directory name (must end in `/`).
 /// Like Emacs `file-name-as-directory`.
 pub fn file_name_as_directory(filename: &str) -> String {
@@ -1581,6 +1599,17 @@ pub(crate) fn builtin_file_name_base(args: Vec<Value>) -> EvalResult {
     let filename = args.first().cloned().unwrap_or(Value::Nil);
     let filename = expect_string_strict(&filename)?;
     Ok(Value::string(file_name_base(&filename)))
+}
+
+/// (file-name-with-extension FILENAME EXTENSION) -> string
+pub(crate) fn builtin_file_name_with_extension(args: Vec<Value>) -> EvalResult {
+    expect_args("file-name-with-extension", &args, 2)?;
+    let filename = expect_string_strict(&args[0])?;
+    let extension = expect_string_strict(&args[1])?;
+    match file_name_with_extension(&filename, &extension) {
+        Ok(path) => Ok(Value::string(path)),
+        Err(message) => Err(signal("error", vec![Value::string(message)])),
+    }
 }
 
 /// (file-name-as-directory FILENAME) -> string
@@ -4703,6 +4732,36 @@ mod tests {
         let result = builtin_file_name_base(vec![Value::string("/tmp/dir/")]);
         assert_eq!(result.unwrap().as_str(), Some(""));
 
+        let result =
+            builtin_file_name_with_extension(vec![Value::string("foo"), Value::string("el")]);
+        assert_eq!(result.unwrap().as_str(), Some("foo.el"));
+
+        let result =
+            builtin_file_name_with_extension(vec![Value::string("foo.el"), Value::string("txt")]);
+        assert_eq!(result.unwrap().as_str(), Some("foo.txt"));
+
+        let result =
+            builtin_file_name_with_extension(vec![Value::string("foo"), Value::string(".el")]);
+        assert_eq!(result.unwrap().as_str(), Some("foo.el"));
+
+        let malformed =
+            builtin_file_name_with_extension(vec![Value::string("foo"), Value::string("")])
+                .expect_err("empty extension should be rejected");
+        match malformed {
+            Flow::Signal(sig) => assert_eq!(sig.symbol, "error"),
+            other => panic!("unexpected flow: {other:?}"),
+        }
+
+        let directory_target = builtin_file_name_with_extension(vec![
+            Value::string("/tmp/dir/"),
+            Value::string("el"),
+        ])
+        .expect_err("directory filenames should be rejected");
+        match directory_target {
+            Flow::Signal(sig) => assert_eq!(sig.symbol, "error"),
+            other => panic!("unexpected flow: {other:?}"),
+        }
+
         let result = builtin_file_name_as_directory(vec![Value::string("/home/user")]);
         assert_eq!(result.unwrap().as_str(), Some("/home/user/"));
 
@@ -4753,6 +4812,8 @@ mod tests {
         assert!(builtin_file_name_sans_extension(vec![Value::symbol("x")]).is_err());
         assert!(builtin_file_name_base(vec![Value::symbol("x")]).is_err());
         assert!(builtin_file_name_base(vec![]).is_err());
+        assert!(builtin_file_name_with_extension(vec![Value::symbol("x"), Value::string("el")]).is_err());
+        assert!(builtin_file_name_with_extension(vec![Value::string("x"), Value::symbol("el")]).is_err());
         assert!(builtin_file_name_as_directory(vec![Value::symbol("x")]).is_err());
         assert!(builtin_directory_file_name(vec![Value::symbol("x")]).is_err());
         assert!(builtin_backup_file_name_p(vec![Value::symbol("x")]).is_err());
