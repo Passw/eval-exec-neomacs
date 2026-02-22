@@ -19525,6 +19525,17 @@ Last updated: 2026-02-21
       - `x-display-pixel-width`, `x-display-pixel-height`, `x-close-connection` type-error path (`frame-live-p`)
       - all payloads keep compact `#<window N>` rendering and explicitly avoid live-window buffer context (` on `)
 
+- Added dedicated `x-server` dead-window payload lock-ins for type-error paths:
+  - vm-compat corpus changes:
+    - added:
+      - `test/neovm/vm-compat/cases/x-server-dead-window-error-payload-semantics.forms`
+      - `test/neovm/vm-compat/cases/x-server-dead-window-error-payload-semantics.expected.tsv`
+    - wired case into:
+      - `test/neovm/vm-compat/cases/default.list`
+    - lock-ins cover dead-window designators for:
+      - `x-server-version`, `x-server-max-request-size`, `x-display-grayscale-p`
+      - all payloads keep `wrong-type-argument` + `frame-live-p` message shape with compact `#<window N>` and no live-window buffer context (` on `)
+
 - Continue compatibility-first maintenance with small commit slices:
   - keep builtin surface and registry in lock-step
   - run oracle/parity checks after each behavior-affecting change
