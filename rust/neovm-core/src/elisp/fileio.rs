@@ -262,6 +262,18 @@ pub fn file_name_absolute_p(filename: &str) -> bool {
     filename.starts_with('/') || filename.starts_with('~')
 }
 
+/// Return the index of backup suffix marker, or nil-like None if not backup.
+///
+/// Emacs `backup-file-name-p` returns the char position of the final `~`
+/// in backup names, and nil otherwise.
+pub fn backup_file_name_p(filename: &str) -> Option<i64> {
+    if filename.ends_with('~') {
+        Some(filename.chars().count().saturating_sub(1) as i64)
+    } else {
+        None
+    }
+}
+
 /// Return true if NAME is a directory name (ends with a directory separator).
 pub fn directory_name_p(name: &str) -> bool {
     name.ends_with('/')
@@ -1579,6 +1591,16 @@ pub(crate) fn builtin_directory_name_p(args: Vec<Value>) -> EvalResult {
     expect_args("directory-name-p", &args, 1)?;
     let name = expect_string_strict(&args[0])?;
     Ok(Value::bool(directory_name_p(&name)))
+}
+
+/// (backup-file-name-p FILE) -> integer index or nil
+pub(crate) fn builtin_backup_file_name_p(args: Vec<Value>) -> EvalResult {
+    expect_args("backup-file-name-p", &args, 1)?;
+    let file = expect_string_strict(&args[0])?;
+    Ok(match backup_file_name_p(&file) {
+        Some(idx) => Value::Int(idx),
+        None => Value::Nil,
+    })
 }
 
 /// (directory-empty-p NAME) -> t or nil
@@ -4627,6 +4649,12 @@ mod tests {
             Value::string("bar"),
         ]);
         assert_eq!(result.unwrap().as_str(), Some("foo/bar"));
+
+        let backup = builtin_backup_file_name_p(vec![Value::string("foo.~12~")]);
+        assert_eq!(backup.unwrap(), Value::Int(7));
+
+        let no_backup = builtin_backup_file_name_p(vec![Value::string("foo.txt")]);
+        assert_eq!(no_backup.unwrap(), Value::Nil);
     }
 
     #[test]
@@ -4640,6 +4668,7 @@ mod tests {
         assert!(builtin_file_name_sans_extension(vec![Value::symbol("x")]).is_err());
         assert!(builtin_file_name_as_directory(vec![Value::symbol("x")]).is_err());
         assert!(builtin_directory_file_name(vec![Value::symbol("x")]).is_err());
+        assert!(builtin_backup_file_name_p(vec![Value::symbol("x")]).is_err());
     }
 
     #[test]

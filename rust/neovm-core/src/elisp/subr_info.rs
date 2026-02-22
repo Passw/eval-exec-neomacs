@@ -365,6 +365,7 @@ fn subr_arity_value(name: &str) -> Value {
         "make-nearby-temp-file" => arity_cons(1, Some(3)),
         "make-symbolic-link" | "rename-file" => arity_cons(2, Some(3)),
         "file-name-absolute-p"
+        | "backup-file-name-p"
         | "file-name-as-directory"
         | "file-name-directory"
         | "file-name-nondirectory"
@@ -3408,6 +3409,7 @@ mod tests {
     #[test]
     fn subr_arity_file_name_primitives_match_oracle() {
         assert_subr_arity("file-name-absolute-p", 1, Some(1));
+        assert_subr_arity("backup-file-name-p", 1, Some(1));
         assert_subr_arity("file-name-all-completions", 2, Some(2));
         assert_subr_arity("file-name-as-directory", 1, Some(1));
         assert_subr_arity("file-name-case-insensitive-p", 1, Some(1));

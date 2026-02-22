@@ -73,6 +73,7 @@ const DISPATCH_BUILTIN_NAMES: &[&str] = &[
     "backward-prefix-chars",
     "backward-sexp",
     "backward-word",
+    "backup-file-name-p",
     "base64-decode-region",
     "base64-decode-string",
     "base64-encode-region",
