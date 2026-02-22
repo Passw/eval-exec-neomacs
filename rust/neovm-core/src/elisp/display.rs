@@ -69,6 +69,53 @@ fn expect_symbol_key(value: &Value) -> Result<Value, Flow> {
     }
 }
 
+fn terminal_parameter_default_value(key: &Value) -> Option<Value> {
+    match key.as_symbol_name() {
+        Some("normal-erase-is-backspace") => Some(Value::Int(0)),
+        Some("keyboard-coding-saved-meta-mode") => Some(Value::list(vec![Value::True])),
+        _ => None,
+    }
+}
+
+fn terminal_parameter_default_entries() -> Vec<(Value, Value)> {
+    vec![
+        (Value::symbol("normal-erase-is-backspace"), Value::Int(0)),
+        (
+            Value::symbol("keyboard-coding-saved-meta-mode"),
+            Value::list(vec![Value::True]),
+        ),
+    ]
+}
+
+fn lookup_terminal_parameter_value(params: &[(Value, Value)], key: &Value) -> Value {
+    params
+        .iter()
+        .find_map(|(stored_key, stored_value)| {
+            if eq_value(stored_key, key) {
+                Some(stored_value.clone())
+            } else {
+                None
+            }
+        })
+        .or_else(|| terminal_parameter_default_value(key))
+        .unwrap_or(Value::Nil)
+}
+
+fn terminal_parameters_with_defaults(params: &[(Value, Value)]) -> Vec<(Value, Value)> {
+    let mut merged = terminal_parameter_default_entries();
+    for (key, value) in params {
+        if let Some((_, existing_value)) = merged
+            .iter_mut()
+            .find(|(existing_key, _)| eq_value(existing_key, key))
+        {
+            *existing_value = value.clone();
+        } else {
+            merged.push((key.clone(), value.clone()));
+        }
+    }
+    merged
+}
+
 fn invalid_get_device_terminal_error(value: &Value) -> Flow {
     signal(
         "error",
@@ -2255,19 +2302,7 @@ pub(crate) fn builtin_terminal_parameter(args: Vec<Value>) -> EvalResult {
     expect_args("terminal-parameter", &args, 2)?;
     expect_terminal_designator(&args[0])?;
     let key = expect_symbol_key(&args[1])?;
-    TERMINAL_PARAMS.with(|slot| {
-        Ok(slot
-            .borrow()
-            .iter()
-            .find_map(|(stored_key, stored_value)| {
-                if eq_value(stored_key, &key) {
-                    Some(stored_value.clone())
-                } else {
-                    None
-                }
-            })
-            .unwrap_or(Value::Nil))
-    })
+    TERMINAL_PARAMS.with(|slot| Ok(lookup_terminal_parameter_value(&slot.borrow(), &key)))
 }
 
 /// Evaluator-aware variant of `terminal-parameter`.
@@ -2280,19 +2315,7 @@ pub(crate) fn builtin_terminal_parameter_eval(
     expect_args("terminal-parameter", &args, 2)?;
     expect_terminal_designator_eval(eval, &args[0])?;
     let key = expect_symbol_key(&args[1])?;
-    TERMINAL_PARAMS.with(|slot| {
-        Ok(slot
-            .borrow()
-            .iter()
-            .find_map(|(stored_key, stored_value)| {
-                if eq_value(stored_key, &key) {
-                    Some(stored_value.clone())
-                } else {
-                    None
-                }
-            })
-            .unwrap_or(Value::Nil))
-    })
+    TERMINAL_PARAMS.with(|slot| Ok(lookup_terminal_parameter_value(&slot.borrow(), &key)))
 }
 
 /// (terminal-parameters &optional TERMINAL) -> alist of terminal parameters
@@ -2303,7 +2326,10 @@ pub(crate) fn builtin_terminal_parameters(args: Vec<Value>) -> EvalResult {
             expect_terminal_designator(term)?;
         }
     }
-    TERMINAL_PARAMS.with(|slot| Ok(make_alist(slot.borrow().clone())))
+    TERMINAL_PARAMS.with(|slot| {
+        let merged = terminal_parameters_with_defaults(&slot.borrow());
+        Ok(make_alist(merged))
+    })
 }
 
 /// Evaluator-aware variant of `terminal-parameters`.
@@ -2319,7 +2345,10 @@ pub(crate) fn builtin_terminal_parameters_eval(
             expect_terminal_designator_eval(eval, term)?;
         }
     }
-    TERMINAL_PARAMS.with(|slot| Ok(make_alist(slot.borrow().clone())))
+    TERMINAL_PARAMS.with(|slot| {
+        let merged = terminal_parameters_with_defaults(&slot.borrow());
+        Ok(make_alist(merged))
+    })
 }
 
 /// (set-terminal-parameter TERMINAL PARAMETER VALUE) -> previous value
@@ -2341,8 +2370,9 @@ pub(crate) fn builtin_set_terminal_parameter(args: Vec<Value>) -> EvalResult {
             return Ok(previous);
         }
 
+        let previous = terminal_parameter_default_value(&key).unwrap_or(Value::Nil);
         params.push((key, args[2].clone()));
-        Ok(Value::Nil)
+        Ok(previous)
     })
 }
 
@@ -2370,8 +2400,9 @@ pub(crate) fn builtin_set_terminal_parameter_eval(
             return Ok(previous);
         }
 
+        let previous = terminal_parameter_default_value(&key).unwrap_or(Value::Nil);
         params.push((key, args[2].clone()));
-        Ok(Value::Nil)
+        Ok(previous)
     })
 }
 
@@ -2688,10 +2719,25 @@ mod tests {
     }
 
     #[test]
-    fn terminal_parameter_defaults_to_nil() {
+    fn terminal_parameter_exposes_oracle_defaults() {
         clear_terminal_parameters();
-        let result = builtin_terminal_parameter(vec![Value::Nil, Value::symbol("neovm-param")]);
-        assert!(result.unwrap().is_nil());
+        let normal = builtin_terminal_parameter(vec![
+            Value::Nil,
+            Value::symbol("normal-erase-is-backspace"),
+        ])
+        .unwrap();
+        assert_eq!(normal, Value::Int(0));
+
+        let keyboard = builtin_terminal_parameter(vec![
+            Value::Nil,
+            Value::symbol("keyboard-coding-saved-meta-mode"),
+        ])
+        .unwrap();
+        assert_eq!(keyboard, Value::list(vec![Value::True]));
+
+        let missing =
+            builtin_terminal_parameter(vec![Value::Nil, Value::symbol("neovm-param")]).unwrap();
+        assert!(missing.is_nil());
     }
 
     #[test]
@@ -2708,6 +2754,26 @@ mod tests {
         let get_result =
             builtin_terminal_parameter(vec![Value::Nil, Value::symbol("neovm-param")]).unwrap();
         assert_eq!(get_result, Value::Int(42));
+    }
+
+    #[test]
+    fn set_terminal_parameter_returns_previous_default_values() {
+        clear_terminal_parameters();
+        let previous_normal = builtin_set_terminal_parameter(vec![
+            Value::Nil,
+            Value::symbol("normal-erase-is-backspace"),
+            Value::Int(9),
+        ])
+        .unwrap();
+        assert_eq!(previous_normal, Value::Int(0));
+
+        let previous_keyboard = builtin_set_terminal_parameter(vec![
+            Value::Nil,
+            Value::symbol("keyboard-coding-saved-meta-mode"),
+            Value::Nil,
+        ])
+        .unwrap();
+        assert_eq!(previous_keyboard, Value::list(vec![Value::True]));
     }
 
     #[test]
@@ -2779,7 +2845,20 @@ mod tests {
 
         let params = builtin_terminal_parameters(vec![Value::Nil]).unwrap();
         let entries = list_to_vec(&params).expect("parameter alist");
-        assert_eq!(entries.len(), 2);
+        assert!(entries.len() >= 4);
+        assert!(entries
+            .iter()
+            .any(|entry| matches!(entry, Value::Cons(cell) if {
+                let pair = cell.lock().expect("poisoned");
+                pair.car == Value::symbol("normal-erase-is-backspace") && pair.cdr == Value::Int(0)
+            })));
+        assert!(entries
+            .iter()
+            .any(|entry| matches!(entry, Value::Cons(cell) if {
+                let pair = cell.lock().expect("poisoned");
+                pair.car == Value::symbol("keyboard-coding-saved-meta-mode")
+                    && pair.cdr == Value::list(vec![Value::True])
+            })));
         assert!(entries
             .iter()
             .any(|entry| matches!(entry, Value::Cons(cell) if {
@@ -2798,7 +2877,7 @@ mod tests {
         let via_frame = builtin_terminal_parameters_eval(&mut eval, vec![Value::Int(frame_id)])
             .expect("eval terminal-parameters");
         let eval_entries = list_to_vec(&via_frame).expect("parameter alist");
-        assert_eq!(eval_entries.len(), 2);
+        assert!(eval_entries.len() >= 4);
     }
 
     #[test]

@@ -19286,6 +19286,29 @@ Last updated: 2026-02-21
     - `make -C test/neovm/vm-compat check-one-neovm CASE=cases/other-window-arity-semantics` (pass; `6/6`)
     - `make -C test/neovm/vm-compat check-neovm-filter-strict LIST=cases/default.list PATTERN='(other-window-arity-semantics|select-other-window-callable-path-semantics|other-window-current-buffer-semantics)'` (pass; strict filtered gates green)
 
+- Aligned terminal default parameter behavior with oracle (`terminal-parameter` / `terminal-parameters` / `set-terminal-parameter`):
+  - runtime changes:
+    - `rust/neovm-core/src/elisp/display.rs`
+      - added built-in terminal defaults:
+        - `normal-erase-is-backspace => 0`
+        - `keyboard-coding-saved-meta-mode => (t)`
+      - `terminal-parameter` now falls back to defaults when no override exists.
+      - `terminal-parameters` now returns merged default + override alist.
+      - `set-terminal-parameter` now returns the previous default value when first overriding a default key.
+      - extended evaluator coverage:
+        - `terminal_parameter_exposes_oracle_defaults`
+        - `set_terminal_parameter_returns_previous_default_values`
+        - updated terminal-parameter alist test coverage for merged defaults.
+  - vm-compat corpus changes:
+    - added and wired:
+      - `test/neovm/vm-compat/cases/terminal-parameter-default-semantics.forms`
+      - `test/neovm/vm-compat/cases/terminal-parameter-default-semantics.expected.tsv`
+      - `test/neovm/vm-compat/cases/default.list`
+  - verified:
+    - `cargo test --manifest-path rust/neovm-core/Cargo.toml terminal_parameter_ -- --nocapture` (pass)
+    - `make -C test/neovm/vm-compat check-one-neovm CASE=cases/terminal-parameter-default-semantics` (pass; `8/8`)
+    - `make -C test/neovm/vm-compat check-neovm-filter-strict LIST=cases/default.list PATTERN='(terminal-parameter-(semantics|default-semantics|storage-semantics|storage-edge-semantics|state-semantics|funcall-apply-semantics|error-payload-semantics)|display-x-terminal-compat-surface-semantics)'` (pass; strict filtered gates green)
+
 - Continue compatibility-first maintenance with small commit slices:
   - keep builtin surface and registry in lock-step
   - run oracle/parity checks after each behavior-affecting change

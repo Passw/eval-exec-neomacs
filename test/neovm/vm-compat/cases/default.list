@@ -507,6 +507,7 @@ cases/internal-merge-in-global-face-semantics
 cases/internal-set-lisp-face-attribute-semantics
 cases/internal-make-copy-lisp-face-semantics
 cases/terminal-parameter-semantics
+cases/terminal-parameter-default-semantics
 cases/terminal-parameter-storage-semantics
 cases/terminal-parameter-storage-edge-semantics
 cases/terminal-parameter-state-semantics
