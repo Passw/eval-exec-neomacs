@@ -507,6 +507,7 @@ const DISPATCH_BUILTIN_NAMES: &[&str] = &[
     "file-selinux-context",
     "file-symlink-p",
     "file-system-info",
+    "file-size-human-readable-iec",
     "file-truename",
     "file-writable-p",
     "fillarray",

@@ -382,6 +382,7 @@ fn subr_arity_value(name: &str) -> Value {
         "file-name-extension" | "file-name-sans-versions" => arity_cons(1, Some(2)),
         "file-local-name" => arity_cons(1, Some(1)),
         "file-nlinks" => arity_cons(1, Some(1)),
+        "file-size-human-readable-iec" => arity_cons(1, Some(1)),
         "file-name-concat" => arity_cons(1, None),
         "file-remote-p" => arity_cons(1, Some(3)),
         "file-truename" => arity_cons(1, Some(3)),
@@ -3439,6 +3440,7 @@ mod tests {
         assert_subr_arity("file-name-nondirectory", 1, Some(1));
         assert_subr_arity("file-local-name", 1, Some(1));
         assert_subr_arity("file-nlinks", 1, Some(1));
+        assert_subr_arity("file-size-human-readable-iec", 1, Some(1));
         assert_subr_arity("file-remote-p", 1, Some(3));
         assert_subr_arity("file-name-sans-extension", 1, Some(1));
         assert_subr_arity("file-name-with-extension", 2, Some(2));

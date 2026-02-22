@@ -3533,6 +3533,44 @@ pub(crate) fn builtin_user_error_eval(
     Err(signal("user-error", vec![Value::string(msg)]))
 }
 
+fn format_human_readable_iec_number(value: f64, decimals: usize) -> String {
+    let mut text = format!("{value:.decimals$}");
+    if text.ends_with(".0") {
+        text.truncate(text.len() - 2);
+    }
+    text
+}
+
+fn format_file_size_human_readable_iec(size: f64) -> String {
+    const IEC_UNITS: &[&str] = &["B", "KiB", "MiB", "GiB", "TiB", "PiB", "EiB"];
+
+    if size.is_sign_negative() {
+        let decimals = if size.fract() == 0.0 { 0 } else { 1 };
+        return format!("{} B", format_human_readable_iec_number(size, decimals));
+    }
+
+    let mut scaled = size;
+    let mut unit_idx = 0usize;
+    while scaled >= 1024.0 && unit_idx < IEC_UNITS.len() - 1 {
+        scaled /= 1024.0;
+        unit_idx += 1;
+    }
+
+    let decimals = if scaled < 10.0 && scaled.fract() != 0.0 {
+        1
+    } else {
+        0
+    };
+    let rendered = format_human_readable_iec_number(scaled, decimals);
+    format!("{rendered} {}", IEC_UNITS[unit_idx])
+}
+
+pub(crate) fn builtin_file_size_human_readable_iec(args: Vec<Value>) -> EvalResult {
+    expect_args("file-size-human-readable-iec", &args, 1)?;
+    let size = expect_number_or_marker_f64(&args[0])?;
+    Ok(Value::string(format_file_size_human_readable_iec(size)))
+}
+
 pub(crate) fn builtin_secure_hash_algorithms(args: Vec<Value>) -> EvalResult {
     expect_args("secure-hash-algorithms", &args, 0)?;
     Ok(Value::list(vec![
@@ -16861,6 +16899,7 @@ pub(crate) fn dispatch_builtin(
         "message-or-box" => builtin_message_or_box(args),
         "current-message" => builtin_current_message(args),
         "ngettext" => builtin_ngettext(args),
+        "file-size-human-readable-iec" => builtin_file_size_human_readable_iec(args),
         "secure-hash-algorithms" => builtin_secure_hash_algorithms(args),
         "error" => builtin_error(args),
         "user-error" => builtin_user_error(args),
@@ -18084,6 +18123,7 @@ pub(crate) fn dispatch_builtin_pure(name: &str, args: Vec<Value>) -> Option<Eval
         "purecopy" => builtin_purecopy(args),
         "current-message" => builtin_current_message(args),
         "ngettext" => builtin_ngettext(args),
+        "file-size-human-readable-iec" => builtin_file_size_human_readable_iec(args),
         "secure-hash-algorithms" => builtin_secure_hash_algorithms(args),
         "prefix-numeric-value" => builtin_prefix_numeric_value(args),
         "propertize" => builtin_propertize(args),
@@ -25828,6 +25868,53 @@ mod tests {
             Flow::Signal(sig) => {
                 assert_eq!(sig.symbol, "wrong-number-of-arguments");
                 assert_eq!(sig.data, vec![Value::symbol("user-error"), Value::Int(0)]);
+            }
+            other => panic!("expected signal, got: {other:?}"),
+        }
+    }
+
+    #[test]
+    fn file_size_human_readable_iec_formats_common_values() {
+        let mut eval = crate::elisp::eval::Evaluator::new();
+        let cases = [
+            (Value::Int(0), "0 B"),
+            (Value::Int(1024), "1 KiB"),
+            (Value::Int(1536), "1.5 KiB"),
+            (Value::Float(1023.9), "1024 B"),
+            (Value::Float(-1536.5), "-1536.5 B"),
+            (Value::Int(15728640), "15 MiB"),
+        ];
+
+        for (input, expected) in cases {
+            let value = dispatch_builtin(
+                &mut eval,
+                "file-size-human-readable-iec",
+                vec![input.clone()],
+            )
+            .expect("file-size-human-readable-iec should resolve")
+            .expect("file-size-human-readable-iec should evaluate");
+            assert_eq!(value, Value::string(expected));
+        }
+    }
+
+    #[test]
+    fn file_size_human_readable_iec_rejects_non_numbers() {
+        let mut eval = crate::elisp::eval::Evaluator::new();
+        let err = dispatch_builtin(
+            &mut eval,
+            "file-size-human-readable-iec",
+            vec![Value::string("x")],
+        )
+        .expect("file-size-human-readable-iec should resolve")
+        .expect_err("file-size-human-readable-iec should reject non-number values");
+
+        match err {
+            Flow::Signal(sig) => {
+                assert_eq!(sig.symbol, "wrong-type-argument");
+                assert_eq!(
+                    sig.data,
+                    vec![Value::symbol("number-or-marker-p"), Value::string("x")]
+                );
             }
             other => panic!("expected signal, got: {other:?}"),
         }
