@@ -1625,6 +1625,12 @@ mod tests {
     }
 
     #[test]
+    fn test_parse_colon_file_names_repels_malformed_entries() {
+        let parsed = parse_colon_file_names("nocolon\n:empty\nvalid:x:1000\n");
+        assert_eq!(parsed, vec!["valid".to_string()]);
+    }
+
+    #[test]
     fn test_read_colon_file_names_reads_file() {
         let dir = std::env::temp_dir();
         let path = dir.join("neovm_dired_users.txt");
