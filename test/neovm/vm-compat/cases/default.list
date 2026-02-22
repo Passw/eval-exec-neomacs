@@ -542,6 +542,7 @@ cases/delete-window-arity-semantics
 cases/split-window-arity-semantics
 cases/split-delete-window-callable-path-semantics
 cases/fit-window-to-buffer-designator-semantics
+cases/fit-window-to-buffer-callable-path-semantics
 cases/other-window-arity-semantics
 cases/window-accessor-arity-semantics
 cases/next-previous-window-arity-semantics
