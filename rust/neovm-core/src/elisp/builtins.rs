@@ -6097,6 +6097,36 @@ pub(crate) fn builtin_tty_suppress_bold_inverse_default_colors(args: Vec<Value>)
     Ok(Value::Nil)
 }
 
+pub(crate) fn builtin_unencodable_char_position(args: Vec<Value>) -> EvalResult {
+    expect_range_args("unencodable-char-position", &args, 3, 5)?;
+    Ok(Value::Nil)
+}
+
+pub(crate) fn builtin_unicode_property_table_internal(args: Vec<Value>) -> EvalResult {
+    expect_args("unicode-property-table-internal", &args, 1)?;
+    Ok(Value::Nil)
+}
+
+pub(crate) fn builtin_unify_charset(args: Vec<Value>) -> EvalResult {
+    expect_range_args("unify-charset", &args, 1, 3)?;
+    Ok(Value::Nil)
+}
+
+pub(crate) fn builtin_unix_sync(args: Vec<Value>) -> EvalResult {
+    expect_args("unix-sync", &args, 0)?;
+    Ok(Value::Nil)
+}
+
+pub(crate) fn builtin_value_lt(args: Vec<Value>) -> EvalResult {
+    expect_args("value<", &args, 2)?;
+    Ok(Value::Nil)
+}
+
+pub(crate) fn builtin_variable_binding_locus(args: Vec<Value>) -> EvalResult {
+    expect_args("variable-binding-locus", &args, 1)?;
+    Ok(Value::Nil)
+}
+
 // ===========================================================================
 // Hook system (need evaluator)
 // ===========================================================================
@@ -15102,16 +15132,12 @@ pub(crate) fn dispatch_builtin(
         "tty-suppress-bold-inverse-default-colors" => {
             builtin_tty_suppress_bold_inverse_default_colors(args)
         }
-        "unencodable-char-position" => {
-            super::compat_internal::builtin_unencodable_char_position(args)
-        }
-        "unicode-property-table-internal" => {
-            super::compat_internal::builtin_unicode_property_table_internal(args)
-        }
-        "unify-charset" => super::compat_internal::builtin_unify_charset(args),
-        "unix-sync" => super::compat_internal::builtin_unix_sync(args),
-        "value<" => super::compat_internal::builtin_value_lt(args),
-        "variable-binding-locus" => super::compat_internal::builtin_variable_binding_locus(args),
+        "unencodable-char-position" => builtin_unencodable_char_position(args),
+        "unicode-property-table-internal" => builtin_unicode_property_table_internal(args),
+        "unify-charset" => builtin_unify_charset(args),
+        "unix-sync" => builtin_unix_sync(args),
+        "value<" => builtin_value_lt(args),
+        "variable-binding-locus" => builtin_variable_binding_locus(args),
         "vertical-motion" => builtin_vertical_motion(args),
         "x-begin-drag" => super::compat_internal::builtin_x_begin_drag(args),
         "x-create-frame" => super::compat_internal::builtin_x_create_frame(args),
@@ -16041,16 +16067,12 @@ pub(crate) fn dispatch_builtin_pure(name: &str, args: Vec<Value>) -> Option<Eval
         "tty-suppress-bold-inverse-default-colors" => {
             builtin_tty_suppress_bold_inverse_default_colors(args)
         }
-        "unencodable-char-position" => {
-            super::compat_internal::builtin_unencodable_char_position(args)
-        }
-        "unicode-property-table-internal" => {
-            super::compat_internal::builtin_unicode_property_table_internal(args)
-        }
-        "unify-charset" => super::compat_internal::builtin_unify_charset(args),
-        "unix-sync" => super::compat_internal::builtin_unix_sync(args),
-        "value<" => super::compat_internal::builtin_value_lt(args),
-        "variable-binding-locus" => super::compat_internal::builtin_variable_binding_locus(args),
+        "unencodable-char-position" => builtin_unencodable_char_position(args),
+        "unicode-property-table-internal" => builtin_unicode_property_table_internal(args),
+        "unify-charset" => builtin_unify_charset(args),
+        "unix-sync" => builtin_unix_sync(args),
+        "value<" => builtin_value_lt(args),
+        "variable-binding-locus" => builtin_variable_binding_locus(args),
         "vertical-motion" => builtin_vertical_motion(args),
         "x-begin-drag" => super::compat_internal::builtin_x_begin_drag(args),
         "x-create-frame" => super::compat_internal::builtin_x_create_frame(args),
@@ -20139,6 +20161,49 @@ mod tests {
                 .expect("builtin tty-suppress-bold-inverse-default-colors should resolve")
                 .expect("builtin tty-suppress-bold-inverse-default-colors should evaluate");
         assert!(tty_suppress.is_nil());
+    }
+
+    #[test]
+    fn pure_dispatch_unicode_value_placeholder_cluster_matches_compat_contracts() {
+        let unencodable = dispatch_builtin_pure(
+            "unencodable-char-position",
+            vec![Value::Int(1), Value::Int(2), Value::symbol("utf-8")],
+        )
+        .expect("builtin unencodable-char-position should resolve")
+        .expect("builtin unencodable-char-position should evaluate");
+        assert!(unencodable.is_nil());
+
+        let unicode_table = dispatch_builtin_pure(
+            "unicode-property-table-internal",
+            vec![Value::symbol("foo")],
+        )
+        .expect("builtin unicode-property-table-internal should resolve")
+        .expect("builtin unicode-property-table-internal should evaluate");
+        assert!(unicode_table.is_nil());
+
+        let unify = dispatch_builtin_pure(
+            "unify-charset",
+            vec![Value::symbol("from"), Value::symbol("to"), Value::Nil],
+        )
+        .expect("builtin unify-charset should resolve")
+        .expect("builtin unify-charset should evaluate");
+        assert!(unify.is_nil());
+
+        let unix_sync = dispatch_builtin_pure("unix-sync", vec![])
+            .expect("builtin unix-sync should resolve")
+            .expect("builtin unix-sync should evaluate");
+        assert!(unix_sync.is_nil());
+
+        let value_lt = dispatch_builtin_pure("value<", vec![Value::Int(1), Value::Int(2)])
+            .expect("builtin value< should resolve")
+            .expect("builtin value< should evaluate");
+        assert!(value_lt.is_nil());
+
+        let binding_locus =
+            dispatch_builtin_pure("variable-binding-locus", vec![Value::symbol("x")])
+                .expect("builtin variable-binding-locus should resolve")
+                .expect("builtin variable-binding-locus should evaluate");
+        assert!(binding_locus.is_nil());
     }
 
     #[test]

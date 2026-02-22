@@ -1930,42 +1930,6 @@ pub(crate) fn builtin_xw_display_color_p(args: Vec<Value>) -> EvalResult {
     Ok(Value::Nil)
 }
 
-/// `(unencodable-char-position START END CODING-SYSTEM &optional COUNT STRING)` -> nil.
-pub(crate) fn builtin_unencodable_char_position(args: Vec<Value>) -> EvalResult {
-    expect_range_args("unencodable-char-position", &args, 3, 5)?;
-    Ok(Value::Nil)
-}
-
-/// `(unicode-property-table-internal PROP)` -> nil.
-pub(crate) fn builtin_unicode_property_table_internal(args: Vec<Value>) -> EvalResult {
-    expect_args("unicode-property-table-internal", &args, 1)?;
-    Ok(Value::Nil)
-}
-
-/// `(unify-charset FROM TO &optional TABLE)` -> nil.
-pub(crate) fn builtin_unify_charset(args: Vec<Value>) -> EvalResult {
-    expect_range_args("unify-charset", &args, 1, 3)?;
-    Ok(Value::Nil)
-}
-
-/// `(unix-sync)` -> nil.
-pub(crate) fn builtin_unix_sync(args: Vec<Value>) -> EvalResult {
-    expect_args("unix-sync", &args, 0)?;
-    Ok(Value::Nil)
-}
-
-/// `(value< A B)` -> nil.
-pub(crate) fn builtin_value_lt(args: Vec<Value>) -> EvalResult {
-    expect_args("value<", &args, 2)?;
-    Ok(Value::Nil)
-}
-
-/// `(variable-binding-locus SYMBOL)` -> nil.
-pub(crate) fn builtin_variable_binding_locus(args: Vec<Value>) -> EvalResult {
-    expect_args("variable-binding-locus", &args, 1)?;
-    Ok(Value::Nil)
-}
-
 /// `(treesit-parser-buffer ...)` -> nil.
 pub(crate) fn builtin_treesit_parser_buffer(args: Vec<Value>) -> EvalResult {
     expect_args("treesit-parser-buffer", &args, 1)?;
