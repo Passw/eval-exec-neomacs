@@ -175,16 +175,44 @@ fn sxhash_for(value: &Value, test: HashTableTest) -> i64 {
     (hasher.finish() & (i64::MAX as u64)) as i64
 }
 
+fn next_pow2_saturating(value: usize) -> usize {
+    value.checked_next_power_of_two().unwrap_or(usize::MAX)
+}
+
 fn internal_hash_table_index_size(table: &LispHashTable) -> usize {
-    let requested = if table.size <= 0 {
-        1_u64
+    let entries = table.data.len();
+    let declared = table.size.max(0) as usize;
+
+    // Emacs keeps empty default hash tables at index-size 1, then grows on demand.
+    if entries == 0 {
+        return if declared == 0 {
+            1
+        } else {
+            next_pow2_saturating(declared.saturating_add(1))
+        };
+    }
+
+    // Default-size tables jump to a practical minimum index on first insert.
+    let mut index_size = if declared == 0 {
+        8_usize
     } else {
-        (table.size as u64).saturating_add(1)
+        next_pow2_saturating(declared.saturating_add(1))
     };
-    let from_entries = (table.data.len() as u64).saturating_add(1);
-    let needed = requested.max(from_entries);
-    let pow2 = needed.next_power_of_two();
-    pow2.min(usize::MAX as u64) as usize
+
+    // Initial resize threshold follows declared size, with default tables using 6.
+    let mut threshold = if declared == 0 { 6_usize } else { declared };
+    if entries > threshold {
+        index_size = index_size.saturating_mul(4).max(32);
+        threshold = index_size.saturating_mul(13) / 16; // 0.8125
+    }
+
+    // Subsequent growth tracks the default 0.8125 load threshold.
+    while entries > threshold {
+        index_size = index_size.saturating_mul(4);
+        threshold = index_size.saturating_mul(13) / 16;
+    }
+
+    index_size.max(1)
 }
 
 fn internal_hash_table_diagnostic_hash(key: &HashKey) -> i64 {
@@ -531,7 +559,7 @@ pub(crate) fn builtin_unintern(eval: &mut super::eval::Evaluator, args: Vec<Valu
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::elisp::builtins::builtin_make_hash_table;
+    use crate::elisp::builtins::{builtin_make_hash_table, builtin_puthash};
 
     #[test]
     fn hash_table_keys_values_basics() {
@@ -675,6 +703,50 @@ mod tests {
             .expect("size 37 table");
         assert_eq!(
             builtin_internal_hash_table_index_size(vec![table_mid]).unwrap(),
+            Value::Int(64)
+        );
+    }
+
+    #[test]
+    fn internal_hash_table_index_size_tracks_growth_boundaries() {
+        let tiny = builtin_make_hash_table(vec![Value::keyword(":size"), Value::Int(1)])
+            .expect("size 1 table");
+        let _ = builtin_puthash(vec![Value::Int(1), Value::symbol("x"), tiny.clone()])
+            .expect("puthash for first tiny entry");
+        assert_eq!(
+            builtin_internal_hash_table_index_size(vec![tiny.clone()]).unwrap(),
+            Value::Int(2)
+        );
+        let _ = builtin_puthash(vec![Value::Int(2), Value::symbol("y"), tiny.clone()])
+            .expect("puthash for second tiny entry");
+        assert_eq!(
+            builtin_internal_hash_table_index_size(vec![tiny]).unwrap(),
+            Value::Int(32)
+        );
+
+        let default_table = builtin_make_hash_table(vec![]).expect("default table");
+        let _ = builtin_puthash(vec![Value::Int(1), Value::symbol("x"), default_table.clone()])
+            .expect("puthash for default table");
+        assert_eq!(
+            builtin_internal_hash_table_index_size(vec![default_table]).unwrap(),
+            Value::Int(8)
+        );
+
+        let mid = builtin_make_hash_table(vec![Value::keyword(":size"), Value::Int(10)])
+            .expect("size 10 table");
+        for i in 0..10 {
+            let i = i as i64;
+            let _ = builtin_puthash(vec![Value::Int(i), Value::Int(i), mid.clone()])
+                .expect("puthash while filling size 10 table");
+        }
+        assert_eq!(
+            builtin_internal_hash_table_index_size(vec![mid.clone()]).unwrap(),
+            Value::Int(16)
+        );
+        let _ = builtin_puthash(vec![Value::Int(10), Value::Int(10), mid.clone()])
+            .expect("puthash crossing size 10 threshold");
+        assert_eq!(
+            builtin_internal_hash_table_index_size(vec![mid]).unwrap(),
             Value::Int(64)
         );
     }

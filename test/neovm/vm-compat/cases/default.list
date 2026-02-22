@@ -865,6 +865,7 @@ cases/hash-basics
 cases/hash-make-table-options-semantics
 cases/hash-rehash-copy-semantics
 cases/hash-table-buckets-diagnostic-semantics
+cases/hash-table-index-size-growth-semantics
 cases/hash-table-test-alias-preservation-semantics
 cases/hash-table-test-alias-redefinition-existing-table-semantics
 cases/hash-table-subr-arity-semantics
