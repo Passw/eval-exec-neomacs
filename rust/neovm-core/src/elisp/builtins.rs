@@ -15068,6 +15068,15 @@ pub(crate) fn dispatch_builtin_pure(name: &str, args: Vec<Value>) -> Option<Eval
         "functionp"
         | "format"
         | "format-message"
+        | "message"
+        | "message-box"
+        | "message-or-box"
+        | "princ"
+        | "prin1"
+        | "prin1-to-string"
+        | "print"
+        | "terpri"
+        | "write-char"
         | "assoc"
         | "alist-get"
         | "plist-member"
@@ -15141,20 +15150,11 @@ pub(crate) fn dispatch_builtin_pure(name: &str, args: Vec<Value>) -> Option<Eval
         // Output / misc
         "identity" => builtin_identity(args),
         "purecopy" => builtin_purecopy(args),
-        "message" => builtin_message(args),
-        "message-box" => builtin_message_box(args),
-        "message-or-box" => builtin_message_or_box(args),
         "current-message" => builtin_current_message(args),
         "ngettext" => builtin_ngettext(args),
         "secure-hash-algorithms" => builtin_secure_hash_algorithms(args),
         "error" => builtin_error(args),
         "prefix-numeric-value" => builtin_prefix_numeric_value(args),
-        "princ" => builtin_princ(args),
-        "prin1" => builtin_prin1(args),
-        "prin1-to-string" => builtin_prin1_to_string(args),
-        "print" => builtin_print(args),
-        "terpri" => builtin_terpri(args),
-        "write-char" => builtin_write_char(args),
         "propertize" => builtin_propertize(args),
         "gensym" => builtin_gensym(args),
         "string-to-syntax" => builtin_string_to_syntax(args),
@@ -19411,6 +19411,15 @@ mod tests {
         assert!(dispatch_builtin_pure("functionp", vec![]).is_none());
         assert!(dispatch_builtin_pure("format", vec![]).is_none());
         assert!(dispatch_builtin_pure("format-message", vec![]).is_none());
+        assert!(dispatch_builtin_pure("message", vec![]).is_none());
+        assert!(dispatch_builtin_pure("message-box", vec![]).is_none());
+        assert!(dispatch_builtin_pure("message-or-box", vec![]).is_none());
+        assert!(dispatch_builtin_pure("princ", vec![]).is_none());
+        assert!(dispatch_builtin_pure("prin1", vec![]).is_none());
+        assert!(dispatch_builtin_pure("prin1-to-string", vec![]).is_none());
+        assert!(dispatch_builtin_pure("print", vec![]).is_none());
+        assert!(dispatch_builtin_pure("terpri", vec![]).is_none());
+        assert!(dispatch_builtin_pure("write-char", vec![]).is_none());
         assert!(dispatch_builtin_pure("assoc", vec![]).is_none());
         assert!(dispatch_builtin_pure("alist-get", vec![]).is_none());
         assert!(dispatch_builtin_pure("plist-member", vec![]).is_none());
