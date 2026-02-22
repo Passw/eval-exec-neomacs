@@ -702,7 +702,9 @@ pub(crate) fn builtin_unintern(eval: &mut super::eval::Evaluator, args: Vec<Valu
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::elisp::builtins::{builtin_gethash, builtin_make_hash_table, builtin_puthash};
+    use crate::elisp::builtins::{
+        builtin_gethash, builtin_hash_table_count, builtin_make_hash_table, builtin_puthash,
+    };
 
     #[test]
     fn hash_table_keys_values_basics() {
@@ -896,6 +898,70 @@ mod tests {
                     .expect("gethash nan"),
                 Value::symbol("nan")
             );
+        }
+    }
+
+    #[test]
+    fn hash_table_nan_payloads_remain_distinct_for_eql_and_equal() {
+        let nan_a = Value::Float(f64::from_bits(0x7ff8_0000_0000_0000));
+        let nan_b = Value::Float(f64::from_bits(0x7ff8_0000_0000_0001));
+        assert_eq!(
+            builtin_sxhash_eql(vec![nan_a.clone()]).unwrap(),
+            builtin_sxhash_equal(vec![nan_a.clone()]).unwrap()
+        );
+        assert_eq!(
+            builtin_sxhash_eql(vec![nan_b.clone()]).unwrap(),
+            builtin_sxhash_equal(vec![nan_b.clone()]).unwrap()
+        );
+        assert_ne!(
+            builtin_sxhash_eql(vec![nan_a.clone()]).unwrap(),
+            builtin_sxhash_eql(vec![nan_b.clone()]).unwrap()
+        );
+
+        for test_name in ["eql", "equal"] {
+            let table = builtin_make_hash_table(vec![
+                Value::keyword(":test"),
+                Value::symbol(test_name),
+                Value::keyword(":size"),
+                Value::Int(5),
+            ])
+            .expect("hash table");
+            let _ = builtin_puthash(vec![nan_a.clone(), Value::symbol("a"), table.clone()])
+                .expect("puthash nan-a");
+            let _ = builtin_puthash(vec![nan_b.clone(), Value::symbol("b"), table.clone()])
+                .expect("puthash nan-b");
+            assert_eq!(
+                builtin_hash_table_count(vec![table.clone()]).expect("hash-table-count"),
+                Value::Int(2)
+            );
+            assert_eq!(
+                builtin_gethash(vec![nan_a.clone(), table.clone(), Value::symbol("miss")])
+                    .expect("gethash nan-a"),
+                Value::symbol("a")
+            );
+            assert_eq!(
+                builtin_gethash(vec![nan_b.clone(), table.clone(), Value::symbol("miss")])
+                    .expect("gethash nan-b"),
+                Value::symbol("b")
+            );
+
+            let buckets =
+                builtin_internal_hash_table_buckets(vec![table]).expect("bucket diagnostics");
+            let outer = list_to_vec(&buckets).expect("outer list");
+            let mut hashes = Vec::new();
+            for bucket in outer {
+                let entries = list_to_vec(&bucket).expect("bucket alist");
+                for entry in entries {
+                    let Value::Cons(cell) = entry else {
+                        panic!("expected alist cons entry");
+                    };
+                    let pair = cell.lock().expect("poisoned");
+                    hashes.push(pair.cdr.as_int().expect("diagnostic hash integer"));
+                }
+            }
+            hashes.sort_unstable();
+            assert_eq!(hashes.len(), 2);
+            assert_ne!(hashes[0], hashes[1]);
         }
     }
 
