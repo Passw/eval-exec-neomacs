@@ -6672,6 +6672,91 @@ pub(crate) fn builtin_treesit_subtree_stat(args: Vec<Value>) -> EvalResult {
     Ok(Value::Nil)
 }
 
+fn inotify_next_watch_id_store() -> &'static Mutex<i64> {
+    static NEXT: OnceLock<Mutex<i64>> = OnceLock::new();
+    NEXT.get_or_init(|| Mutex::new(0))
+}
+
+fn inotify_active_watches_store() -> &'static Mutex<Vec<(i64, i64)>> {
+    static STORE: OnceLock<Mutex<Vec<(i64, i64)>>> = OnceLock::new();
+    STORE.get_or_init(|| Mutex::new(Vec::new()))
+}
+
+fn inotify_watch_descriptor_parts(value: &Value) -> Option<(i64, i64)> {
+    let Value::Cons(cell) = value else {
+        return None;
+    };
+    let pair = cell.lock().expect("poisoned");
+    let fd = pair.car.as_int()?;
+    let wd = pair.cdr.as_int()?;
+    Some((fd, wd))
+}
+
+fn inotify_register_watch() -> (i64, i64) {
+    let watch_id = {
+        let mut next = inotify_next_watch_id_store().lock().expect("poisoned");
+        let id = *next;
+        *next += 1;
+        id
+    };
+    let descriptor = (1, watch_id);
+    inotify_active_watches_store()
+        .lock()
+        .expect("poisoned")
+        .push(descriptor);
+    descriptor
+}
+
+fn inotify_watch_is_active(value: &Value) -> bool {
+    let Some(descriptor) = inotify_watch_descriptor_parts(value) else {
+        return false;
+    };
+    inotify_active_watches_store()
+        .lock()
+        .expect("poisoned")
+        .contains(&descriptor)
+}
+
+fn inotify_remove_watch(value: &Value) -> bool {
+    let Some(descriptor) = inotify_watch_descriptor_parts(value) else {
+        return false;
+    };
+    let mut watches = inotify_active_watches_store().lock().expect("poisoned");
+    if let Some(pos) = watches.iter().position(|&active| active == descriptor) {
+        watches.remove(pos);
+        true
+    } else {
+        false
+    }
+}
+
+pub(crate) fn builtin_inotify_valid_p(args: Vec<Value>) -> EvalResult {
+    expect_args("inotify-valid-p", &args, 1)?;
+    Ok(Value::bool(inotify_watch_is_active(&args[0])))
+}
+
+pub(crate) fn builtin_inotify_add_watch(args: Vec<Value>) -> EvalResult {
+    expect_args("inotify-add-watch", &args, 3)?;
+    let _ = expect_string(&args[0])?;
+    let (fd, wd) = inotify_register_watch();
+    Ok(Value::cons(Value::Int(fd), Value::Int(wd)))
+}
+
+pub(crate) fn builtin_inotify_rm_watch(args: Vec<Value>) -> EvalResult {
+    expect_args("inotify-rm-watch", &args, 1)?;
+    if inotify_remove_watch(&args[0]) {
+        return Ok(Value::True);
+    }
+    let mut payload = vec![
+        Value::string("Invalid descriptor "),
+        Value::string("No such file or directory"),
+    ];
+    if !args[0].is_nil() {
+        payload.push(args[0].clone());
+    }
+    Err(signal("file-notify-error", payload))
+}
+
 // ===========================================================================
 // Hook system (need evaluator)
 // ===========================================================================
@@ -15673,9 +15758,9 @@ pub(crate) fn dispatch_builtin(
         "xw-display-color-p" => builtin_xw_display_color_p(args),
         "innermost-minibuffer-p" => builtin_innermost_minibuffer_p(args),
         "interactive-form" => builtin_interactive_form(args),
-        "inotify-add-watch" => super::compat_internal::builtin_inotify_add_watch(args),
-        "inotify-rm-watch" => super::compat_internal::builtin_inotify_rm_watch(args),
-        "inotify-valid-p" => super::compat_internal::builtin_inotify_valid_p(args),
+        "inotify-add-watch" => builtin_inotify_add_watch(args),
+        "inotify-rm-watch" => builtin_inotify_rm_watch(args),
+        "inotify-valid-p" => builtin_inotify_valid_p(args),
         "local-variable-if-set-p" => builtin_local_variable_if_set_p(args),
         "lock-buffer" => builtin_lock_buffer(args),
         "lock-file" => builtin_lock_file(args),
@@ -16550,9 +16635,9 @@ pub(crate) fn dispatch_builtin_pure(name: &str, args: Vec<Value>) -> Option<Eval
         "xw-display-color-p" => builtin_xw_display_color_p(args),
         "innermost-minibuffer-p" => builtin_innermost_minibuffer_p(args),
         "interactive-form" => builtin_interactive_form(args),
-        "inotify-add-watch" => super::compat_internal::builtin_inotify_add_watch(args),
-        "inotify-rm-watch" => super::compat_internal::builtin_inotify_rm_watch(args),
-        "inotify-valid-p" => super::compat_internal::builtin_inotify_valid_p(args),
+        "inotify-add-watch" => builtin_inotify_add_watch(args),
+        "inotify-rm-watch" => builtin_inotify_rm_watch(args),
+        "inotify-valid-p" => builtin_inotify_valid_p(args),
         "local-variable-if-set-p" => builtin_local_variable_if_set_p(args),
         "lock-buffer" => builtin_lock_buffer(args),
         "lock-file" => builtin_lock_file(args),
@@ -21627,6 +21712,30 @@ mod tests {
             Flow::Signal(sig) => assert_eq!(sig.symbol, "wrong-number-of-arguments"),
             other => panic!("expected signal, got {other:?}"),
         }
+    }
+
+    #[test]
+    fn dispatch_builtin_pure_handles_inotify_watch_lifecycle() {
+        let watch = dispatch_builtin_pure(
+            "inotify-add-watch",
+            vec![Value::string("/tmp"), Value::Nil, Value::symbol("ignore")],
+        )
+        .expect("inotify-add-watch should resolve")
+        .expect("inotify-add-watch should evaluate");
+        let active = dispatch_builtin_pure("inotify-valid-p", vec![watch.clone()])
+            .expect("inotify-valid-p should resolve")
+            .expect("inotify-valid-p should evaluate");
+        assert_eq!(active, Value::True);
+
+        let removed = dispatch_builtin_pure("inotify-rm-watch", vec![watch.clone()])
+            .expect("inotify-rm-watch should resolve")
+            .expect("inotify-rm-watch should evaluate");
+        assert_eq!(removed, Value::True);
+
+        let inactive = dispatch_builtin_pure("inotify-valid-p", vec![watch])
+            .expect("inotify-valid-p should resolve")
+            .expect("inotify-valid-p should evaluate");
+        assert_eq!(inactive, Value::Nil);
     }
 
     #[test]

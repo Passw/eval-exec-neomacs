@@ -19,8 +19,6 @@ thread_local! {
         const { RefCell::new(Vec::new()) };
     static SQLITE_NEXT_HANDLE_ID: RefCell<i64> = const { RefCell::new(0) };
     static SQLITE_OPEN_HANDLES: RefCell<Vec<i64>> = const { RefCell::new(Vec::new()) };
-    static INOTIFY_NEXT_WATCH_ID: RefCell<i64> = const { RefCell::new(0) };
-    static INOTIFY_ACTIVE_WATCHES: RefCell<Vec<(i64, i64)>> = const { RefCell::new(Vec::new()) };
 }
 
 fn expect_args(name: &str, args: &[Value], n: usize) -> Result<(), Flow> {
@@ -257,52 +255,6 @@ fn expect_sqlitep(value: &Value) -> Result<i64, Flow> {
             vec![Value::symbol("sqlitep"), value.clone()],
         ))
     }
-}
-
-fn inotify_watch_descriptor_parts(value: &Value) -> Option<(i64, i64)> {
-    let Value::Cons(cell) = value else {
-        return None;
-    };
-    let pair = cell.lock().expect("poisoned");
-    let fd = pair.car.as_int()?;
-    let wd = pair.cdr.as_int()?;
-    Some((fd, wd))
-}
-
-fn inotify_register_watch() -> (i64, i64) {
-    let watch_id = INOTIFY_NEXT_WATCH_ID.with(|slot| {
-        let mut next = slot.borrow_mut();
-        let id = *next;
-        *next += 1;
-        id
-    });
-    let descriptor = (1, watch_id);
-    INOTIFY_ACTIVE_WATCHES.with(|slot| {
-        slot.borrow_mut().push(descriptor);
-    });
-    descriptor
-}
-
-fn inotify_watch_is_active(value: &Value) -> bool {
-    let Some(descriptor) = inotify_watch_descriptor_parts(value) else {
-        return false;
-    };
-    INOTIFY_ACTIVE_WATCHES.with(|slot| slot.borrow().contains(&descriptor))
-}
-
-fn inotify_remove_watch(value: &Value) -> bool {
-    let Some(descriptor) = inotify_watch_descriptor_parts(value) else {
-        return false;
-    };
-    INOTIFY_ACTIVE_WATCHES.with(|slot| {
-        let mut watches = slot.borrow_mut();
-        if let Some(pos) = watches.iter().position(|&active| active == descriptor) {
-            watches.remove(pos);
-            true
-        } else {
-            false
-        }
-    })
 }
 
 fn expect_integer_or_marker_p(value: &Value) -> Result<(), Flow> {
@@ -1012,36 +964,6 @@ pub(crate) fn builtin_sqlite_load_extension(args: Vec<Value>) -> EvalResult {
         "sqlite-error",
         vec![Value::string("load-extension failed")],
     ))
-}
-
-/// `(inotify-valid-p WATCH-DESCRIPTOR)` -> nil.
-pub(crate) fn builtin_inotify_valid_p(args: Vec<Value>) -> EvalResult {
-    expect_args("inotify-valid-p", &args, 1)?;
-    Ok(Value::bool(inotify_watch_is_active(&args[0])))
-}
-
-/// `(inotify-add-watch FILE ASPECTS CALLBACK)` -> watch descriptor.
-pub(crate) fn builtin_inotify_add_watch(args: Vec<Value>) -> EvalResult {
-    expect_args("inotify-add-watch", &args, 3)?;
-    expect_stringp(&args[0])?;
-    let (fd, wd) = inotify_register_watch();
-    Ok(Value::cons(Value::Int(fd), Value::Int(wd)))
-}
-
-/// `(inotify-rm-watch WATCH-DESCRIPTOR)` -> t or file-notify-error.
-pub(crate) fn builtin_inotify_rm_watch(args: Vec<Value>) -> EvalResult {
-    expect_args("inotify-rm-watch", &args, 1)?;
-    if inotify_remove_watch(&args[0]) {
-        return Ok(Value::True);
-    }
-    let mut payload = vec![
-        Value::string("Invalid descriptor "),
-        Value::string("No such file or directory"),
-    ];
-    if !args[0].is_nil() {
-        payload.push(args[0].clone());
-    }
-    Err(signal("file-notify-error", payload))
 }
 
 /// `(gnutls-asynchronous-parameters PROC ENABLE)` -> nil.
@@ -1830,7 +1752,7 @@ mod tests {
 
     #[test]
     fn inotify_valid_p_returns_nil() {
-        let out = builtin_inotify_valid_p(vec![Value::Int(0)]).unwrap();
+        let out = crate::elisp::builtins::builtin_inotify_valid_p(vec![Value::Int(0)]).unwrap();
         assert_eq!(out, Value::Nil);
     }
 
@@ -1854,23 +1776,25 @@ mod tests {
 
     #[test]
     fn inotify_watch_lifecycle() {
-        let watch = builtin_inotify_add_watch(vec![
+        let watch = crate::elisp::builtins::builtin_inotify_add_watch(vec![
             Value::string("/tmp"),
             Value::Nil,
             Value::symbol("ignore"),
         ])
         .unwrap();
-        let active = builtin_inotify_valid_p(vec![watch.clone()]).unwrap();
+        let active = crate::elisp::builtins::builtin_inotify_valid_p(vec![watch.clone()]).unwrap();
         assert_eq!(active, Value::True);
-        let removed = builtin_inotify_rm_watch(vec![watch.clone()]).unwrap();
+        let removed =
+            crate::elisp::builtins::builtin_inotify_rm_watch(vec![watch.clone()]).unwrap();
         assert_eq!(removed, Value::True);
-        let inactive = builtin_inotify_valid_p(vec![watch]).unwrap();
+        let inactive = crate::elisp::builtins::builtin_inotify_valid_p(vec![watch]).unwrap();
         assert_eq!(inactive, Value::Nil);
     }
 
     #[test]
     fn inotify_rm_watch_invalid_descriptor_signals() {
-        let err = builtin_inotify_rm_watch(vec![Value::Int(1)]).unwrap_err();
+        let err =
+            crate::elisp::builtins::builtin_inotify_rm_watch(vec![Value::Int(1)]).unwrap_err();
         match err {
             Flow::Signal(sig) => assert_eq!(sig.symbol, "file-notify-error"),
             other => panic!("expected signal, got {other:?}"),
