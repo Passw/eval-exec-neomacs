@@ -1738,42 +1738,6 @@ pub(crate) fn builtin_dump_emacs_portable_sort_predicate_copied(args: Vec<Value>
     Ok(Value::Nil)
 }
 
-/// `(make-frame-invisible &optional FRAME FORCE)` -> nil.
-pub(crate) fn builtin_make_frame_invisible(args: Vec<Value>) -> EvalResult {
-    expect_range_args("make-frame-invisible", &args, 0, 2)?;
-    Ok(Value::Nil)
-}
-
-/// `(make-terminal-frame TERMINAL)` -> nil.
-pub(crate) fn builtin_make_terminal_frame(args: Vec<Value>) -> EvalResult {
-    expect_args("make-terminal-frame", &args, 1)?;
-    Ok(Value::Nil)
-}
-
-/// `(menu-bar-menu-at-x-y X Y &optional POPUP)` -> nil.
-pub(crate) fn builtin_menu_bar_menu_at_x_y(args: Vec<Value>) -> EvalResult {
-    expect_range_args("menu-bar-menu-at-x-y", &args, 2, 3)?;
-    Ok(Value::Nil)
-}
-
-/// `(menu-or-popup-active-p)` -> nil.
-pub(crate) fn builtin_menu_or_popup_active_p(args: Vec<Value>) -> EvalResult {
-    expect_args("menu-or-popup-active-p", &args, 0)?;
-    Ok(Value::Nil)
-}
-
-/// `(mouse-pixel-position)` -> nil.
-pub(crate) fn builtin_mouse_pixel_position(args: Vec<Value>) -> EvalResult {
-    expect_args("mouse-pixel-position", &args, 0)?;
-    Ok(Value::Nil)
-}
-
-/// `(mouse-position)` -> nil.
-pub(crate) fn builtin_mouse_position(args: Vec<Value>) -> EvalResult {
-    expect_args("mouse-position", &args, 0)?;
-    Ok(Value::Nil)
-}
-
 /// `(native-comp-available-p)` -> nil.
 pub(crate) fn builtin_native_comp_available_p(args: Vec<Value>) -> EvalResult {
     expect_args("native-comp-available-p", &args, 0)?;

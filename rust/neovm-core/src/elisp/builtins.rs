@@ -5732,6 +5732,36 @@ pub(crate) fn builtin_old_selected_frame(args: Vec<Value>) -> EvalResult {
     Ok(Value::Nil)
 }
 
+pub(crate) fn builtin_make_frame_invisible(args: Vec<Value>) -> EvalResult {
+    expect_range_args("make-frame-invisible", &args, 0, 2)?;
+    Ok(Value::Nil)
+}
+
+pub(crate) fn builtin_make_terminal_frame(args: Vec<Value>) -> EvalResult {
+    expect_args("make-terminal-frame", &args, 1)?;
+    Ok(Value::Nil)
+}
+
+pub(crate) fn builtin_menu_bar_menu_at_x_y(args: Vec<Value>) -> EvalResult {
+    expect_range_args("menu-bar-menu-at-x-y", &args, 2, 3)?;
+    Ok(Value::Nil)
+}
+
+pub(crate) fn builtin_menu_or_popup_active_p(args: Vec<Value>) -> EvalResult {
+    expect_args("menu-or-popup-active-p", &args, 0)?;
+    Ok(Value::Nil)
+}
+
+pub(crate) fn builtin_mouse_pixel_position(args: Vec<Value>) -> EvalResult {
+    expect_args("mouse-pixel-position", &args, 0)?;
+    Ok(Value::Nil)
+}
+
+pub(crate) fn builtin_mouse_position(args: Vec<Value>) -> EvalResult {
+    expect_args("mouse-position", &args, 0)?;
+    Ok(Value::Nil)
+}
+
 // ===========================================================================
 // Hook system (need evaluator)
 // ===========================================================================
@@ -14645,15 +14675,15 @@ pub(crate) fn dispatch_builtin(
         "mapbacktrace" => builtin_mapbacktrace(args),
         "match-data--translate" => builtin_match_data_translate(args),
         "memory-info" => super::compat_internal::builtin_memory_info(args),
-        "make-frame-invisible" => super::compat_internal::builtin_make_frame_invisible(args),
-        "make-terminal-frame" => super::compat_internal::builtin_make_terminal_frame(args),
-        "menu-bar-menu-at-x-y" => super::compat_internal::builtin_menu_bar_menu_at_x_y(args),
-        "menu-or-popup-active-p" => super::compat_internal::builtin_menu_or_popup_active_p(args),
+        "make-frame-invisible" => builtin_make_frame_invisible(args),
+        "make-terminal-frame" => builtin_make_terminal_frame(args),
+        "menu-bar-menu-at-x-y" => builtin_menu_bar_menu_at_x_y(args),
+        "menu-or-popup-active-p" => builtin_menu_or_popup_active_p(args),
         "minibuffer-innermost-command-loop-p" => builtin_minibuffer_innermost_command_loop_p(args),
         "minibuffer-prompt-end" => builtin_minibuffer_prompt_end(args),
         "module-load" => super::compat_internal::builtin_module_load(args),
-        "mouse-pixel-position" => super::compat_internal::builtin_mouse_pixel_position(args),
-        "mouse-position" => super::compat_internal::builtin_mouse_position(args),
+        "mouse-pixel-position" => builtin_mouse_pixel_position(args),
+        "mouse-position" => builtin_mouse_position(args),
         "newline-cache-check" => builtin_newline_cache_check(args),
         "native-comp-available-p" => super::compat_internal::builtin_native_comp_available_p(args),
         "native-comp-unit-file" => super::compat_internal::builtin_native_comp_unit_file(args),
@@ -15612,15 +15642,15 @@ pub(crate) fn dispatch_builtin_pure(name: &str, args: Vec<Value>) -> Option<Eval
         "mapbacktrace" => builtin_mapbacktrace(args),
         "match-data--translate" => builtin_match_data_translate(args),
         "memory-info" => super::compat_internal::builtin_memory_info(args),
-        "make-frame-invisible" => super::compat_internal::builtin_make_frame_invisible(args),
-        "make-terminal-frame" => super::compat_internal::builtin_make_terminal_frame(args),
-        "menu-bar-menu-at-x-y" => super::compat_internal::builtin_menu_bar_menu_at_x_y(args),
-        "menu-or-popup-active-p" => super::compat_internal::builtin_menu_or_popup_active_p(args),
+        "make-frame-invisible" => builtin_make_frame_invisible(args),
+        "make-terminal-frame" => builtin_make_terminal_frame(args),
+        "menu-bar-menu-at-x-y" => builtin_menu_bar_menu_at_x_y(args),
+        "menu-or-popup-active-p" => builtin_menu_or_popup_active_p(args),
         "minibuffer-innermost-command-loop-p" => builtin_minibuffer_innermost_command_loop_p(args),
         "minibuffer-prompt-end" => builtin_minibuffer_prompt_end(args),
         "module-load" => super::compat_internal::builtin_module_load(args),
-        "mouse-pixel-position" => super::compat_internal::builtin_mouse_pixel_position(args),
-        "mouse-position" => super::compat_internal::builtin_mouse_position(args),
+        "mouse-pixel-position" => builtin_mouse_pixel_position(args),
+        "mouse-position" => builtin_mouse_position(args),
         "newline-cache-check" => builtin_newline_cache_check(args),
         "native-comp-available-p" => super::compat_internal::builtin_native_comp_available_p(args),
         "native-comp-unit-file" => super::compat_internal::builtin_native_comp_unit_file(args),
@@ -19372,6 +19402,42 @@ mod tests {
             .expect("builtin old-selected-frame should resolve")
             .expect("builtin old-selected-frame should evaluate");
         assert!(old_selected_frame.is_nil());
+    }
+
+    #[test]
+    fn pure_dispatch_frame_menu_mouse_placeholders_match_compat_contracts() {
+        let frame_invisible = dispatch_builtin_pure("make-frame-invisible", vec![])
+            .expect("builtin make-frame-invisible should resolve")
+            .expect("builtin make-frame-invisible should evaluate");
+        assert!(frame_invisible.is_nil());
+
+        let terminal_frame = dispatch_builtin_pure("make-terminal-frame", vec![Value::Nil])
+            .expect("builtin make-terminal-frame should resolve")
+            .expect("builtin make-terminal-frame should evaluate");
+        assert!(terminal_frame.is_nil());
+
+        let menu_at = dispatch_builtin_pure(
+            "menu-bar-menu-at-x-y",
+            vec![Value::Int(0), Value::Int(0), Value::Nil],
+        )
+        .expect("builtin menu-bar-menu-at-x-y should resolve")
+        .expect("builtin menu-bar-menu-at-x-y should evaluate");
+        assert!(menu_at.is_nil());
+
+        let menu_active = dispatch_builtin_pure("menu-or-popup-active-p", vec![])
+            .expect("builtin menu-or-popup-active-p should resolve")
+            .expect("builtin menu-or-popup-active-p should evaluate");
+        assert!(menu_active.is_nil());
+
+        let mouse_pixel = dispatch_builtin_pure("mouse-pixel-position", vec![])
+            .expect("builtin mouse-pixel-position should resolve")
+            .expect("builtin mouse-pixel-position should evaluate");
+        assert!(mouse_pixel.is_nil());
+
+        let mouse_position = dispatch_builtin_pure("mouse-position", vec![])
+            .expect("builtin mouse-position should resolve")
+            .expect("builtin mouse-position should evaluate");
+        assert!(mouse_position.is_nil());
     }
 
     #[test]
