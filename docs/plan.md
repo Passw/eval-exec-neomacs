@@ -19738,6 +19738,18 @@ Last updated: 2026-02-21
       - live frame, terminal, live window, dead window
       - all preserve `(wrong-type-argument frame-live-p USER-TIME)` with explicit USER-TIME passthrough.
 
+- Added dedicated `x-display-set-last-user-time` arity payload lock-ins:
+  - vm-compat corpus changes:
+    - added:
+      - `test/neovm/vm-compat/cases/x-display-set-last-user-time-arity-payload-semantics.forms`
+      - `test/neovm/vm-compat/cases/x-display-set-last-user-time-arity-payload-semantics.expected.tsv`
+    - wired case into:
+      - `test/neovm/vm-compat/cases/default.list`
+    - lock-ins assert exact `wrong-number-of-arguments` payload shapes for:
+      - `0` args -> `(wrong-number-of-arguments x-display-set-last-user-time 0)`
+      - `3` args -> `(wrong-number-of-arguments x-display-set-last-user-time 3)`
+      - `4` args -> `(wrong-number-of-arguments x-display-set-last-user-time 4)`
+
 - Continue compatibility-first maintenance with small commit slices:
   - keep builtin surface and registry in lock-step
   - run oracle/parity checks after each behavior-affecting change
