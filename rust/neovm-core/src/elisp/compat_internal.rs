@@ -1424,138 +1424,6 @@ pub(crate) fn builtin_internal_set_buffer_modified_tick(args: Vec<Value>) -> Eva
     Ok(Value::Nil)
 }
 
-/// `(treesit-parser-add-notifier ...)` -> nil.
-pub(crate) fn builtin_treesit_parser_add_notifier(args: Vec<Value>) -> EvalResult {
-    expect_args("treesit-parser-add-notifier", &args, 2)?;
-    Ok(Value::Nil)
-}
-
-/// `(treesit-parser-buffer ...)` -> nil.
-pub(crate) fn builtin_treesit_parser_buffer(args: Vec<Value>) -> EvalResult {
-    expect_args("treesit-parser-buffer", &args, 1)?;
-    Ok(Value::Nil)
-}
-
-/// `(treesit-parser-create ...)` -> nil.
-pub(crate) fn builtin_treesit_parser_create(args: Vec<Value>) -> EvalResult {
-    expect_range_args("treesit-parser-create", &args, 1, 4)?;
-    Ok(Value::Nil)
-}
-
-/// `(treesit-parser-delete ...)` -> nil.
-pub(crate) fn builtin_treesit_parser_delete(args: Vec<Value>) -> EvalResult {
-    expect_args("treesit-parser-delete", &args, 1)?;
-    Ok(Value::Nil)
-}
-
-/// `(treesit-parser-included-ranges ...)` -> nil.
-pub(crate) fn builtin_treesit_parser_included_ranges(args: Vec<Value>) -> EvalResult {
-    expect_args("treesit-parser-included-ranges", &args, 1)?;
-    Ok(Value::Nil)
-}
-
-/// `(treesit-parser-language ...)` -> nil.
-pub(crate) fn builtin_treesit_parser_language(args: Vec<Value>) -> EvalResult {
-    expect_args("treesit-parser-language", &args, 1)?;
-    Ok(Value::Nil)
-}
-
-/// `(treesit-parser-list ...)` -> nil.
-pub(crate) fn builtin_treesit_parser_list(args: Vec<Value>) -> EvalResult {
-    expect_range_args("treesit-parser-list", &args, 0, 3)?;
-    Ok(Value::Nil)
-}
-
-/// `(treesit-parser-notifiers ...)` -> nil.
-pub(crate) fn builtin_treesit_parser_notifiers(args: Vec<Value>) -> EvalResult {
-    expect_args("treesit-parser-notifiers", &args, 1)?;
-    Ok(Value::Nil)
-}
-
-/// `(treesit-parser-p ...)` -> nil.
-pub(crate) fn builtin_treesit_parser_p(args: Vec<Value>) -> EvalResult {
-    expect_args("treesit-parser-p", &args, 1)?;
-    Ok(Value::Nil)
-}
-
-/// `(treesit-parser-remove-notifier ...)` -> nil.
-pub(crate) fn builtin_treesit_parser_remove_notifier(args: Vec<Value>) -> EvalResult {
-    expect_args("treesit-parser-remove-notifier", &args, 2)?;
-    Ok(Value::Nil)
-}
-
-/// `(treesit-parser-root-node ...)` -> nil.
-pub(crate) fn builtin_treesit_parser_root_node(args: Vec<Value>) -> EvalResult {
-    expect_args("treesit-parser-root-node", &args, 1)?;
-    Ok(Value::Nil)
-}
-
-/// `(treesit-parser-set-included-ranges ...)` -> nil.
-pub(crate) fn builtin_treesit_parser_set_included_ranges(args: Vec<Value>) -> EvalResult {
-    expect_args("treesit-parser-set-included-ranges", &args, 2)?;
-    Ok(Value::Nil)
-}
-
-/// `(treesit-parser-tag ...)` -> nil.
-pub(crate) fn builtin_treesit_parser_tag(args: Vec<Value>) -> EvalResult {
-    expect_args("treesit-parser-tag", &args, 1)?;
-    Ok(Value::Nil)
-}
-
-/// `(treesit-pattern-expand ...)` -> nil.
-pub(crate) fn builtin_treesit_pattern_expand(args: Vec<Value>) -> EvalResult {
-    expect_args("treesit-pattern-expand", &args, 1)?;
-    Ok(Value::Nil)
-}
-
-/// `(treesit-query-capture ...)` -> nil.
-pub(crate) fn builtin_treesit_query_capture(args: Vec<Value>) -> EvalResult {
-    expect_range_args("treesit-query-capture", &args, 2, 5)?;
-    Ok(Value::Nil)
-}
-
-/// `(treesit-query-compile ...)` -> nil.
-pub(crate) fn builtin_treesit_query_compile(args: Vec<Value>) -> EvalResult {
-    expect_range_args("treesit-query-compile", &args, 2, 3)?;
-    Ok(Value::Nil)
-}
-
-/// `(treesit-query-expand ...)` -> nil.
-pub(crate) fn builtin_treesit_query_expand(args: Vec<Value>) -> EvalResult {
-    expect_args("treesit-query-expand", &args, 1)?;
-    Ok(Value::Nil)
-}
-
-/// `(treesit-query-language ...)` -> nil.
-pub(crate) fn builtin_treesit_query_language(args: Vec<Value>) -> EvalResult {
-    expect_args("treesit-query-language", &args, 1)?;
-    Ok(Value::Nil)
-}
-
-/// `(treesit-query-p ...)` -> nil.
-pub(crate) fn builtin_treesit_query_p(args: Vec<Value>) -> EvalResult {
-    expect_args("treesit-query-p", &args, 1)?;
-    Ok(Value::Nil)
-}
-
-/// `(treesit-search-forward ...)` -> nil.
-pub(crate) fn builtin_treesit_search_forward(args: Vec<Value>) -> EvalResult {
-    expect_range_args("treesit-search-forward", &args, 2, 4)?;
-    Ok(Value::Nil)
-}
-
-/// `(treesit-search-subtree ...)` -> nil.
-pub(crate) fn builtin_treesit_search_subtree(args: Vec<Value>) -> EvalResult {
-    expect_range_args("treesit-search-subtree", &args, 2, 5)?;
-    Ok(Value::Nil)
-}
-
-/// `(treesit-subtree-stat ...)` -> nil.
-pub(crate) fn builtin_treesit_subtree_stat(args: Vec<Value>) -> EvalResult {
-    expect_args("treesit-subtree-stat", &args, 1)?;
-    Ok(Value::Nil)
-}
-
 /// `(define-fringe-bitmap NAME BITS &optional HEIGHT WIDTH ALIGN)` -> NAME.
 pub(crate) fn builtin_define_fringe_bitmap(args: Vec<Value>) -> EvalResult {
     expect_range_args("define-fringe-bitmap", &args, 2, 5)?;
@@ -2156,7 +2024,8 @@ mod tests {
 
     #[test]
     fn treesit_query_compile_validates_arity() {
-        let err = builtin_treesit_query_compile(vec![Value::Nil]).unwrap_err();
+        let err =
+            crate::elisp::builtins::builtin_treesit_query_compile(vec![Value::Nil]).unwrap_err();
         match err {
             Flow::Signal(sig) => assert_eq!(sig.symbol, "wrong-number-of-arguments"),
             other => panic!("expected signal, got {other:?}"),

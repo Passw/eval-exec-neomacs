@@ -6562,6 +6562,116 @@ pub(crate) fn builtin_treesit_node_type(args: Vec<Value>) -> EvalResult {
     Ok(Value::Nil)
 }
 
+pub(crate) fn builtin_treesit_parser_add_notifier(args: Vec<Value>) -> EvalResult {
+    expect_args("treesit-parser-add-notifier", &args, 2)?;
+    Ok(Value::Nil)
+}
+
+pub(crate) fn builtin_treesit_parser_buffer(args: Vec<Value>) -> EvalResult {
+    expect_args("treesit-parser-buffer", &args, 1)?;
+    Ok(Value::Nil)
+}
+
+pub(crate) fn builtin_treesit_parser_create(args: Vec<Value>) -> EvalResult {
+    expect_range_args("treesit-parser-create", &args, 1, 4)?;
+    Ok(Value::Nil)
+}
+
+pub(crate) fn builtin_treesit_parser_delete(args: Vec<Value>) -> EvalResult {
+    expect_args("treesit-parser-delete", &args, 1)?;
+    Ok(Value::Nil)
+}
+
+pub(crate) fn builtin_treesit_parser_included_ranges(args: Vec<Value>) -> EvalResult {
+    expect_args("treesit-parser-included-ranges", &args, 1)?;
+    Ok(Value::Nil)
+}
+
+pub(crate) fn builtin_treesit_parser_language(args: Vec<Value>) -> EvalResult {
+    expect_args("treesit-parser-language", &args, 1)?;
+    Ok(Value::Nil)
+}
+
+pub(crate) fn builtin_treesit_parser_list(args: Vec<Value>) -> EvalResult {
+    expect_range_args("treesit-parser-list", &args, 0, 3)?;
+    Ok(Value::Nil)
+}
+
+pub(crate) fn builtin_treesit_parser_notifiers(args: Vec<Value>) -> EvalResult {
+    expect_args("treesit-parser-notifiers", &args, 1)?;
+    Ok(Value::Nil)
+}
+
+pub(crate) fn builtin_treesit_parser_p(args: Vec<Value>) -> EvalResult {
+    expect_args("treesit-parser-p", &args, 1)?;
+    Ok(Value::Nil)
+}
+
+pub(crate) fn builtin_treesit_parser_remove_notifier(args: Vec<Value>) -> EvalResult {
+    expect_args("treesit-parser-remove-notifier", &args, 2)?;
+    Ok(Value::Nil)
+}
+
+pub(crate) fn builtin_treesit_parser_root_node(args: Vec<Value>) -> EvalResult {
+    expect_args("treesit-parser-root-node", &args, 1)?;
+    Ok(Value::Nil)
+}
+
+pub(crate) fn builtin_treesit_parser_set_included_ranges(args: Vec<Value>) -> EvalResult {
+    expect_args("treesit-parser-set-included-ranges", &args, 2)?;
+    Ok(Value::Nil)
+}
+
+pub(crate) fn builtin_treesit_parser_tag(args: Vec<Value>) -> EvalResult {
+    expect_args("treesit-parser-tag", &args, 1)?;
+    Ok(Value::Nil)
+}
+
+pub(crate) fn builtin_treesit_pattern_expand(args: Vec<Value>) -> EvalResult {
+    expect_args("treesit-pattern-expand", &args, 1)?;
+    Ok(Value::Nil)
+}
+
+pub(crate) fn builtin_treesit_query_capture(args: Vec<Value>) -> EvalResult {
+    expect_range_args("treesit-query-capture", &args, 2, 5)?;
+    Ok(Value::Nil)
+}
+
+pub(crate) fn builtin_treesit_query_compile(args: Vec<Value>) -> EvalResult {
+    expect_range_args("treesit-query-compile", &args, 2, 3)?;
+    Ok(Value::Nil)
+}
+
+pub(crate) fn builtin_treesit_query_expand(args: Vec<Value>) -> EvalResult {
+    expect_args("treesit-query-expand", &args, 1)?;
+    Ok(Value::Nil)
+}
+
+pub(crate) fn builtin_treesit_query_language(args: Vec<Value>) -> EvalResult {
+    expect_args("treesit-query-language", &args, 1)?;
+    Ok(Value::Nil)
+}
+
+pub(crate) fn builtin_treesit_query_p(args: Vec<Value>) -> EvalResult {
+    expect_args("treesit-query-p", &args, 1)?;
+    Ok(Value::Nil)
+}
+
+pub(crate) fn builtin_treesit_search_forward(args: Vec<Value>) -> EvalResult {
+    expect_range_args("treesit-search-forward", &args, 2, 4)?;
+    Ok(Value::Nil)
+}
+
+pub(crate) fn builtin_treesit_search_subtree(args: Vec<Value>) -> EvalResult {
+    expect_range_args("treesit-search-subtree", &args, 2, 5)?;
+    Ok(Value::Nil)
+}
+
+pub(crate) fn builtin_treesit_subtree_stat(args: Vec<Value>) -> EvalResult {
+    expect_args("treesit-subtree-stat", &args, 1)?;
+    Ok(Value::Nil)
+}
+
 // ===========================================================================
 // Hook system (need evaluator)
 // ===========================================================================
@@ -15637,40 +15747,28 @@ pub(crate) fn dispatch_builtin(
         "treesit-node-start" => builtin_treesit_node_start(args),
         "treesit-node-string" => builtin_treesit_node_string(args),
         "treesit-node-type" => builtin_treesit_node_type(args),
-        "treesit-parser-add-notifier" => {
-            super::compat_internal::builtin_treesit_parser_add_notifier(args)
-        }
-        "treesit-parser-buffer" => super::compat_internal::builtin_treesit_parser_buffer(args),
-        "treesit-parser-create" => super::compat_internal::builtin_treesit_parser_create(args),
-        "treesit-parser-delete" => super::compat_internal::builtin_treesit_parser_delete(args),
-        "treesit-parser-included-ranges" => {
-            super::compat_internal::builtin_treesit_parser_included_ranges(args)
-        }
-        "treesit-parser-language" => super::compat_internal::builtin_treesit_parser_language(args),
-        "treesit-parser-list" => super::compat_internal::builtin_treesit_parser_list(args),
-        "treesit-parser-notifiers" => {
-            super::compat_internal::builtin_treesit_parser_notifiers(args)
-        }
-        "treesit-parser-p" => super::compat_internal::builtin_treesit_parser_p(args),
-        "treesit-parser-remove-notifier" => {
-            super::compat_internal::builtin_treesit_parser_remove_notifier(args)
-        }
-        "treesit-parser-root-node" => {
-            super::compat_internal::builtin_treesit_parser_root_node(args)
-        }
-        "treesit-parser-set-included-ranges" => {
-            super::compat_internal::builtin_treesit_parser_set_included_ranges(args)
-        }
-        "treesit-parser-tag" => super::compat_internal::builtin_treesit_parser_tag(args),
-        "treesit-pattern-expand" => super::compat_internal::builtin_treesit_pattern_expand(args),
-        "treesit-query-capture" => super::compat_internal::builtin_treesit_query_capture(args),
-        "treesit-query-compile" => super::compat_internal::builtin_treesit_query_compile(args),
-        "treesit-query-expand" => super::compat_internal::builtin_treesit_query_expand(args),
-        "treesit-query-language" => super::compat_internal::builtin_treesit_query_language(args),
-        "treesit-query-p" => super::compat_internal::builtin_treesit_query_p(args),
-        "treesit-search-forward" => super::compat_internal::builtin_treesit_search_forward(args),
-        "treesit-search-subtree" => super::compat_internal::builtin_treesit_search_subtree(args),
-        "treesit-subtree-stat" => super::compat_internal::builtin_treesit_subtree_stat(args),
+        "treesit-parser-add-notifier" => builtin_treesit_parser_add_notifier(args),
+        "treesit-parser-buffer" => builtin_treesit_parser_buffer(args),
+        "treesit-parser-create" => builtin_treesit_parser_create(args),
+        "treesit-parser-delete" => builtin_treesit_parser_delete(args),
+        "treesit-parser-included-ranges" => builtin_treesit_parser_included_ranges(args),
+        "treesit-parser-language" => builtin_treesit_parser_language(args),
+        "treesit-parser-list" => builtin_treesit_parser_list(args),
+        "treesit-parser-notifiers" => builtin_treesit_parser_notifiers(args),
+        "treesit-parser-p" => builtin_treesit_parser_p(args),
+        "treesit-parser-remove-notifier" => builtin_treesit_parser_remove_notifier(args),
+        "treesit-parser-root-node" => builtin_treesit_parser_root_node(args),
+        "treesit-parser-set-included-ranges" => builtin_treesit_parser_set_included_ranges(args),
+        "treesit-parser-tag" => builtin_treesit_parser_tag(args),
+        "treesit-pattern-expand" => builtin_treesit_pattern_expand(args),
+        "treesit-query-capture" => builtin_treesit_query_capture(args),
+        "treesit-query-compile" => builtin_treesit_query_compile(args),
+        "treesit-query-expand" => builtin_treesit_query_expand(args),
+        "treesit-query-language" => builtin_treesit_query_language(args),
+        "treesit-query-p" => builtin_treesit_query_p(args),
+        "treesit-search-forward" => builtin_treesit_search_forward(args),
+        "treesit-search-subtree" => builtin_treesit_search_subtree(args),
+        "treesit-subtree-stat" => builtin_treesit_subtree_stat(args),
         "sqlite-available-p" => super::compat_internal::builtin_sqlite_available_p(args),
         "sqlite-close" => super::compat_internal::builtin_sqlite_close(args),
         "sqlite-columns" => super::compat_internal::builtin_sqlite_columns(args),
@@ -16526,40 +16624,28 @@ pub(crate) fn dispatch_builtin_pure(name: &str, args: Vec<Value>) -> Option<Eval
         "treesit-node-start" => builtin_treesit_node_start(args),
         "treesit-node-string" => builtin_treesit_node_string(args),
         "treesit-node-type" => builtin_treesit_node_type(args),
-        "treesit-parser-add-notifier" => {
-            super::compat_internal::builtin_treesit_parser_add_notifier(args)
-        }
-        "treesit-parser-buffer" => super::compat_internal::builtin_treesit_parser_buffer(args),
-        "treesit-parser-create" => super::compat_internal::builtin_treesit_parser_create(args),
-        "treesit-parser-delete" => super::compat_internal::builtin_treesit_parser_delete(args),
-        "treesit-parser-included-ranges" => {
-            super::compat_internal::builtin_treesit_parser_included_ranges(args)
-        }
-        "treesit-parser-language" => super::compat_internal::builtin_treesit_parser_language(args),
-        "treesit-parser-list" => super::compat_internal::builtin_treesit_parser_list(args),
-        "treesit-parser-notifiers" => {
-            super::compat_internal::builtin_treesit_parser_notifiers(args)
-        }
-        "treesit-parser-p" => super::compat_internal::builtin_treesit_parser_p(args),
-        "treesit-parser-remove-notifier" => {
-            super::compat_internal::builtin_treesit_parser_remove_notifier(args)
-        }
-        "treesit-parser-root-node" => {
-            super::compat_internal::builtin_treesit_parser_root_node(args)
-        }
-        "treesit-parser-set-included-ranges" => {
-            super::compat_internal::builtin_treesit_parser_set_included_ranges(args)
-        }
-        "treesit-parser-tag" => super::compat_internal::builtin_treesit_parser_tag(args),
-        "treesit-pattern-expand" => super::compat_internal::builtin_treesit_pattern_expand(args),
-        "treesit-query-capture" => super::compat_internal::builtin_treesit_query_capture(args),
-        "treesit-query-compile" => super::compat_internal::builtin_treesit_query_compile(args),
-        "treesit-query-expand" => super::compat_internal::builtin_treesit_query_expand(args),
-        "treesit-query-language" => super::compat_internal::builtin_treesit_query_language(args),
-        "treesit-query-p" => super::compat_internal::builtin_treesit_query_p(args),
-        "treesit-search-forward" => super::compat_internal::builtin_treesit_search_forward(args),
-        "treesit-search-subtree" => super::compat_internal::builtin_treesit_search_subtree(args),
-        "treesit-subtree-stat" => super::compat_internal::builtin_treesit_subtree_stat(args),
+        "treesit-parser-add-notifier" => builtin_treesit_parser_add_notifier(args),
+        "treesit-parser-buffer" => builtin_treesit_parser_buffer(args),
+        "treesit-parser-create" => builtin_treesit_parser_create(args),
+        "treesit-parser-delete" => builtin_treesit_parser_delete(args),
+        "treesit-parser-included-ranges" => builtin_treesit_parser_included_ranges(args),
+        "treesit-parser-language" => builtin_treesit_parser_language(args),
+        "treesit-parser-list" => builtin_treesit_parser_list(args),
+        "treesit-parser-notifiers" => builtin_treesit_parser_notifiers(args),
+        "treesit-parser-p" => builtin_treesit_parser_p(args),
+        "treesit-parser-remove-notifier" => builtin_treesit_parser_remove_notifier(args),
+        "treesit-parser-root-node" => builtin_treesit_parser_root_node(args),
+        "treesit-parser-set-included-ranges" => builtin_treesit_parser_set_included_ranges(args),
+        "treesit-parser-tag" => builtin_treesit_parser_tag(args),
+        "treesit-pattern-expand" => builtin_treesit_pattern_expand(args),
+        "treesit-query-capture" => builtin_treesit_query_capture(args),
+        "treesit-query-compile" => builtin_treesit_query_compile(args),
+        "treesit-query-expand" => builtin_treesit_query_expand(args),
+        "treesit-query-language" => builtin_treesit_query_language(args),
+        "treesit-query-p" => builtin_treesit_query_p(args),
+        "treesit-search-forward" => builtin_treesit_search_forward(args),
+        "treesit-search-subtree" => builtin_treesit_search_subtree(args),
+        "treesit-subtree-stat" => builtin_treesit_subtree_stat(args),
         "sqlite-available-p" => super::compat_internal::builtin_sqlite_available_p(args),
         "sqlite-close" => super::compat_internal::builtin_sqlite_close(args),
         "sqlite-columns" => super::compat_internal::builtin_sqlite_columns(args),
@@ -21517,6 +21603,30 @@ mod tests {
         assert!(dispatch_builtin_pure("window-at", vec![]).is_none());
         assert!(dispatch_builtin_pure("window-bump-use-time", vec![]).is_none());
         assert!(dispatch_builtin_pure("window-list-1", vec![]).is_none());
+    }
+
+    #[test]
+    fn dispatch_builtin_pure_handles_treesit_parser_query_and_search_placeholders() {
+        let parser = dispatch_builtin_pure("treesit-parser-buffer", vec![Value::Nil])
+            .expect("treesit-parser-buffer should resolve")
+            .expect("treesit-parser-buffer should evaluate");
+        assert_eq!(parser, Value::Nil);
+
+        let search = dispatch_builtin_pure(
+            "treesit-search-forward",
+            vec![Value::Nil, Value::Nil, Value::Nil, Value::Nil],
+        )
+        .expect("treesit-search-forward should resolve")
+        .expect("treesit-search-forward should evaluate");
+        assert_eq!(search, Value::Nil);
+
+        let err = dispatch_builtin_pure("treesit-query-compile", vec![Value::Nil])
+            .expect("treesit-query-compile should resolve")
+            .unwrap_err();
+        match err {
+            Flow::Signal(sig) => assert_eq!(sig.symbol, "wrong-number-of-arguments"),
+            other => panic!("expected signal, got {other:?}"),
+        }
     }
 
     #[test]
