@@ -1682,6 +1682,40 @@ pub(crate) fn builtin_assq_delete_all(args: Vec<Value>) -> EvalResult {
     })
 }
 
+pub(crate) fn builtin_assoc_delete_all(args: Vec<Value>) -> EvalResult {
+    expect_args("assoc-delete-all", &args, 2)?;
+    let key = args[0].clone();
+    delete_from_list_in_place(&args[1], |entry| match entry {
+        Value::Cons(cell) => {
+            let pair = cell.lock().expect("poisoned");
+            equal_value(&key, &pair.car, 0)
+        }
+        _ => false,
+    })
+}
+
+pub(crate) fn builtin_assoc_delete_all_eval(
+    eval: &mut super::eval::Evaluator,
+    args: Vec<Value>,
+) -> EvalResult {
+    expect_range_args("assoc-delete-all", &args, 2, 3)?;
+    if args.len() < 3 || args[2].is_nil() {
+        return builtin_assoc_delete_all(vec![args[0].clone(), args[1].clone()]);
+    }
+
+    let key = args[0].clone();
+    let test_fn = args[2].clone();
+    delete_from_list_in_place_result(&args[1], |entry| match entry {
+        Value::Cons(cell) => {
+            let pair = cell.lock().expect("poisoned");
+            Ok(eval
+                .apply(test_fn.clone(), vec![key.clone(), pair.car.clone()])?
+                .is_truthy())
+        }
+        _ => Ok(false),
+    })
+}
+
 pub(crate) fn builtin_copy_sequence(args: Vec<Value>) -> EvalResult {
     expect_args("copy-sequence", &args, 1)?;
     match &args[0] {
@@ -9830,9 +9864,9 @@ pub(crate) fn builtin_butlast(args: Vec<Value>) -> EvalResult {
     }
 }
 
-fn delete_from_list_in_place<F>(seq: &Value, should_delete: F) -> Result<Value, Flow>
+fn delete_from_list_in_place_result<F>(seq: &Value, mut should_delete: F) -> Result<Value, Flow>
 where
-    F: Fn(&Value) -> bool,
+    F: FnMut(&Value) -> Result<bool, Flow>,
 {
     let mut probe = seq.clone();
     loop {
@@ -9857,7 +9891,7 @@ where
             Value::Cons(cell) => {
                 let remove = {
                     let pair = cell.lock().expect("poisoned");
-                    should_delete(&pair.car)
+                    should_delete(&pair.car)?
                 };
                 if remove {
                     head = cell.lock().expect("poisoned").cdr.clone();
@@ -9882,7 +9916,7 @@ where
             Value::Cons(next_cell) => {
                 let remove = {
                     let pair = next_cell.lock().expect("poisoned");
-                    should_delete(&pair.car)
+                    should_delete(&pair.car)?
                 };
                 if remove {
                     let after = next_cell.lock().expect("poisoned").cdr.clone();
@@ -9896,6 +9930,13 @@ where
     }
 
     Ok(head)
+}
+
+fn delete_from_list_in_place<F>(seq: &Value, should_delete: F) -> Result<Value, Flow>
+where
+    F: Fn(&Value) -> bool,
+{
+    delete_from_list_in_place_result(seq, |value| Ok(should_delete(value)))
 }
 
 pub(crate) fn builtin_delete(args: Vec<Value>) -> EvalResult {
@@ -16576,6 +16617,7 @@ pub(crate) fn dispatch_builtin(
         "seq-every-p" => return Some(super::cl_lib::builtin_seq_every_p(eval, args)),
         "seq-sort" => return Some(super::cl_lib::builtin_seq_sort(eval, args)),
         "assoc" => return Some(builtin_assoc_eval(eval, args)),
+        "assoc-delete-all" => return Some(builtin_assoc_delete_all_eval(eval, args)),
         "alist-get" => return Some(builtin_alist_get_eval(eval, args)),
         "plist-member" => return Some(builtin_plist_member(eval, args)),
         "json-parse-buffer" => return Some(super::json::builtin_json_parse_buffer(eval, args)),
@@ -17924,6 +17966,7 @@ pub(crate) fn dispatch_builtin_pure(name: &str, args: Vec<Value>) -> Option<Eval
         | "undo-boundary"
         | "write-char"
         | "assoc"
+        | "assoc-delete-all"
         | "alist-get"
         | "plist-member"
         | "window-list-1"
@@ -25432,6 +25475,56 @@ mod tests {
             .expect_err("assq-delete-all should reject non-lists");
         match err {
             Flow::Signal(sig) => assert_eq!(sig.symbol, "wrong-type-argument"),
+            other => panic!("expected signal, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn assoc_delete_all_supports_default_equal_and_optional_test() {
+        let mut eval = crate::elisp::eval::Evaluator::new();
+
+        let entry_foo_1 = Value::cons(Value::string("foo"), Value::Int(1));
+        let entry_bar = Value::cons(Value::string("bar"), Value::Int(2));
+        let entry_foo_3 = Value::cons(Value::string("foo"), Value::Int(3));
+        let alist_default = Value::list(vec![
+            entry_foo_1,
+            Value::symbol("ignored-atom"),
+            entry_bar.clone(),
+            entry_foo_3,
+        ]);
+        let removed_default = dispatch_builtin(
+            &mut eval,
+            "assoc-delete-all",
+            vec![Value::string("foo"), alist_default],
+        )
+        .expect("assoc-delete-all should resolve")
+        .expect("assoc-delete-all should evaluate");
+        let expected_default = Value::list(vec![Value::symbol("ignored-atom"), entry_bar]);
+        assert_eq!(removed_default, expected_default);
+
+        let eq_key = Value::string("foo");
+        let entry_same_key = Value::cons(eq_key.clone(), Value::Int(9));
+        let entry_equal_only = Value::cons(Value::string("foo"), Value::Int(10));
+        let alist_eq = Value::list(vec![entry_same_key, entry_equal_only.clone()]);
+        let removed_eq = dispatch_builtin(
+            &mut eval,
+            "assoc-delete-all",
+            vec![eq_key, alist_eq, Value::symbol("eq")],
+        )
+        .expect("assoc-delete-all should resolve")
+        .expect("assoc-delete-all should evaluate");
+        let expected_eq = Value::list(vec![entry_equal_only]);
+        assert_eq!(removed_eq, expected_eq);
+
+        let arity = dispatch_builtin(
+            &mut eval,
+            "assoc-delete-all",
+            vec![Value::Nil, Value::Nil, Value::Nil, Value::Nil],
+        )
+        .expect("assoc-delete-all should resolve")
+        .expect_err("assoc-delete-all should enforce arity");
+        match arity {
+            Flow::Signal(sig) => assert_eq!(sig.symbol, "wrong-number-of-arguments"),
             other => panic!("expected signal, got {other:?}"),
         }
     }

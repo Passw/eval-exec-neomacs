@@ -50,6 +50,7 @@ const DISPATCH_BUILTIN_NAMES: &[&str] = &[
     "asin",
     "atan",
     "assoc",
+    "assoc-delete-all",
     "assoc-default",
     "assoc-string",
     "assq",

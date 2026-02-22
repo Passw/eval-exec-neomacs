@@ -563,7 +563,7 @@ fn subr_arity_value(name: &str) -> Value {
         }
         "delete" | "delq" | "elt" => arity_cons(2, Some(2)),
         "mapconcat" => arity_cons(2, Some(3)),
-        "assoc" | "assoc-string" => arity_cons(2, Some(3)),
+        "assoc" | "assoc-delete-all" | "assoc-string" => arity_cons(2, Some(3)),
         "assoc-default" => arity_cons(2, Some(4)),
         "alist-get" => arity_cons(2, Some(5)),
         "last" | "butlast" => arity_cons(1, Some(2)),
@@ -2643,6 +2643,7 @@ mod tests {
     #[test]
     fn subr_arity_assoc_predicate_primitives_match_oracle() {
         assert_subr_arity("assoc", 2, Some(3));
+        assert_subr_arity("assoc-delete-all", 2, Some(3));
         assert_subr_arity("assoc-string", 2, Some(3));
         assert_subr_arity("assoc-default", 2, Some(4));
         assert_subr_arity("assq", 2, Some(2));
