@@ -735,6 +735,60 @@ pub(crate) fn builtin_frame_selected_window(
     Ok(window_value(frame.selected_window))
 }
 
+/// `(set-frame-selected-window FRAME WINDOW &optional NORECORD)` -> WINDOW.
+pub(crate) fn builtin_set_frame_selected_window(
+    eval: &mut super::eval::Evaluator,
+    args: Vec<Value>,
+) -> EvalResult {
+    expect_min_args("set-frame-selected-window", &args, 2)?;
+    expect_max_args("set-frame-selected-window", &args, 3)?;
+    let fid = resolve_frame_id(eval, args.first(), "frame-live-p")?;
+    let wid = match window_id_from_designator(&args[1]) {
+        Some(wid) => {
+            if eval.frames.find_window_frame_id(wid).is_none() {
+                return Err(signal(
+                    "wrong-type-argument",
+                    vec![Value::symbol("window-live-p"), args[1].clone()],
+                ));
+            }
+            wid
+        }
+        None => {
+            return Err(signal(
+                "wrong-type-argument",
+                vec![Value::symbol("window-live-p"), args[1].clone()],
+            ))
+        }
+    };
+    let window_fid = eval
+        .frames
+        .find_window_frame_id(wid)
+        .ok_or_else(|| signal("error", vec![Value::string("Frame not found")]))?;
+    if window_fid != fid {
+        return Err(signal(
+            "error",
+            vec![Value::string(
+                "In `set-frame-selected-window', WINDOW is not on FRAME",
+            )],
+        ));
+    }
+    let selected_fid = ensure_selected_frame_id(eval);
+    if fid == selected_fid {
+        let mut select_args = vec![window_value(wid)];
+        if let Some(norecord) = args.get(2) {
+            select_args.push(norecord.clone());
+        }
+        return builtin_select_window(eval, select_args);
+    }
+
+    let frame = eval
+        .frames
+        .get_mut(fid)
+        .ok_or_else(|| signal("error", vec![Value::string("Frame not found")]))?;
+    frame.selected_window = wid;
+    Ok(window_value(wid))
+}
+
 /// `(frame-first-window &optional FRAME-OR-WINDOW)` -> first window on frame.
 pub(crate) fn builtin_frame_first_window(
     eval: &mut super::eval::Evaluator,
@@ -5695,6 +5749,81 @@ mod tests {
         assert_eq!(out[2], "OK (wrong-type-argument frame-live-p \"x\")");
         assert_eq!(out[3], "OK (wrong-type-argument frame-live-p 999999)");
         assert_eq!(out[4], "OK (nil t)");
+    }
+
+    #[test]
+    fn set_frame_selected_window_matches_selection_and_error_semantics() {
+        let forms = parse_forms(
+            "(condition-case err (set-frame-selected-window) (error (car err)))
+             (condition-case err (set-frame-selected-window nil nil) (error err))
+             (condition-case err (set-frame-selected-window nil 999999) (error err))
+             (let* ((w1 (selected-window))
+                    (w2 (split-window)))
+               (prog1
+                   (list (eq (set-frame-selected-window nil w2) w2)
+                         (eq (selected-window) w2))
+                 (select-window w1)
+                 (delete-window w2)))
+             (let* ((w1 (selected-window))
+                    (w2 (split-window))
+                    (t1 (window-use-time w1))
+                    (t2 (window-use-time w2)))
+               (prog1
+                   (list (eq (set-frame-selected-window nil w2 t) w2)
+                         (= (window-use-time w1) t1)
+                         (= (window-use-time w2) t2)
+                         (eq (selected-window) w2))
+                 (select-window w1)
+                 (delete-window w2)))
+             (let* ((f1 (selected-frame))
+                    (f2 (make-frame))
+                    (w2 (progn (select-frame f2) (split-window))))
+               (select-frame f1)
+               (prog1
+                   (list (eq (set-frame-selected-window f2 w2) w2)
+                         (eq (selected-frame) f1)
+                         (eq (frame-selected-window f2) w2))
+                 (select-frame f2)
+                 (delete-window w2)
+                 (select-frame f1)
+                 (delete-frame f2)))
+             (let* ((f2 (make-frame))
+                    (w1 (selected-window)))
+               (prog1
+                   (condition-case err (set-frame-selected-window f2 w1) (error err))
+                 (delete-frame f2)))
+             (let* ((w1 (selected-window))
+                    (w2 (split-window)))
+               (prog1
+                   (list (eq (funcall #'set-frame-selected-window nil w2) w2)
+                         (eq (apply #'set-frame-selected-window (list nil w1)) w1))
+                 (select-window w1)
+                 (delete-window w2)))
+             (list (condition-case err (funcall #'set-frame-selected-window nil (selected-window) nil nil) (error err))
+                   (condition-case err (apply #'set-frame-selected-window '(nil)) (error err)))",
+        )
+        .expect("parse");
+        let mut ev = Evaluator::new();
+        let out = ev
+            .eval_forms(&forms)
+            .iter()
+            .map(format_eval_result)
+            .collect::<Vec<_>>();
+        assert_eq!(out[0], "OK wrong-number-of-arguments");
+        assert_eq!(out[1], "OK (wrong-type-argument window-live-p nil)");
+        assert_eq!(out[2], "OK (wrong-type-argument window-live-p 999999)");
+        assert_eq!(out[3], "OK (t t)");
+        assert_eq!(out[4], "OK (t t t t)");
+        assert_eq!(out[5], "OK (t t t)");
+        assert_eq!(
+            out[6],
+            "OK (error \"In `set-frame-selected-window', WINDOW is not on FRAME\")"
+        );
+        assert_eq!(out[7], "OK (t t)");
+        assert_eq!(
+            out[8],
+            "OK ((wrong-number-of-arguments #<subr set-frame-selected-window> 4) (wrong-number-of-arguments #<subr set-frame-selected-window> 1))"
+        );
     }
 
     #[test]

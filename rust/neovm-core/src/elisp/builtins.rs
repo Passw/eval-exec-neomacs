@@ -13017,6 +13017,11 @@ pub(crate) fn dispatch_builtin(
                 eval, args,
             ))
         }
+        "set-frame-selected-window" => {
+            return Some(super::window_cmds::builtin_set_frame_selected_window(
+                eval, args,
+            ))
+        }
         "display-graphic-p" => {
             return Some(super::display::builtin_display_graphic_p_eval(eval, args))
         }
@@ -15069,7 +15074,12 @@ pub(crate) fn dispatch_builtin(
 /// Used by the bytecode VM.
 pub(crate) fn dispatch_builtin_pure(name: &str, args: Vec<Value>) -> Option<EvalResult> {
     match name {
-        "assoc" | "alist-get" | "plist-member" | "window-list-1" | "window-bump-use-time" => {
+        "assoc"
+        | "alist-get"
+        | "plist-member"
+        | "window-list-1"
+        | "window-bump-use-time"
+        | "set-frame-selected-window" => {
             return None
         }
         _ => {}

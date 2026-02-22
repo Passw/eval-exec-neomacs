@@ -564,6 +564,7 @@ cases/window-frame-semantics
 cases/select-frame-semantics
 cases/frame-selection-callable-path-semantics
 cases/select-frame-set-input-focus-semantics
+cases/set-frame-selected-window-semantics
 cases/window-designator-bootstrap-semantics
 cases/window-predicate-callable-path-semantics
 cases/window-tree-navigation-callable-path-semantics
