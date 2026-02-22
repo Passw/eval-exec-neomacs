@@ -1,5 +1,6 @@
 ; string-join default separator and arg/type validation
 (string-join '("a" "b"))
 (string-join '("a" "b") ",")
-(condition-case err (string-join '("a" 1)) (error (car err)))
+(string-join '("a" [98] (99)) "-")
+(condition-case err (string-join '("a" 1)) (error err))
 (condition-case err (string-join '("a") "," nil) (error (car err)))

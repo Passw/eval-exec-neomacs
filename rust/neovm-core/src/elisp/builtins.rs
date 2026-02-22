@@ -9056,7 +9056,16 @@ pub(crate) fn builtin_string_join(args: Vec<Value>) -> EvalResult {
         None | Some(Value::Nil) => "".to_string(),
         Some(other) => expect_string(other)?,
     };
-    let parts: Result<Vec<String>, _> = strs.iter().map(expect_string).collect();
+    let parts: Result<Vec<String>, Flow> = strs
+        .iter()
+        .map(|value| {
+            let rendered = builtin_concat(vec![value.clone()])?;
+            let Value::Str(s) = rendered else {
+                unreachable!("concat should always return a string");
+            };
+            Ok((*s).clone())
+        })
+        .collect();
     Ok(Value::string(parts?.join(&sep)))
 }
 
