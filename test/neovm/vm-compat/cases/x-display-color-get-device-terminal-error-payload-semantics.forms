@@ -8,5 +8,8 @@
     (x-display-color-p 42)
   (error (cadr err)))
 (condition-case err
+    (x-display-color-p 1)
+  (error (cadr err)))
+(condition-case err
     (x-display-color-p (selected-frame))
   (error err))

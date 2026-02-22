@@ -1,4 +1,5 @@
 1	(condition-case err (x-display-color-p (selected-window)) (error (car err)))	OK error
 2	(condition-case err (x-display-color-p (selected-window)) (error (cadr err)))	OK "Invalid argument #<window 1 on *scratch*> in ‘get-device-terminal’"
 3	(condition-case err (x-display-color-p 42) (error (cadr err)))	OK "Invalid argument 42 in ‘get-device-terminal’"
-4	(condition-case err (x-display-color-p (selected-frame)) (error err))	OK nil
+4	(condition-case err (x-display-color-p 1) (error (cadr err)))	OK "Invalid argument 1 in ‘get-device-terminal’"
+5	(condition-case err (x-display-color-p (selected-frame)) (error err))	OK nil

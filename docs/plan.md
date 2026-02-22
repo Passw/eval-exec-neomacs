@@ -19326,6 +19326,20 @@ Last updated: 2026-02-21
       - `test/neovm/vm-compat/cases/terminal-window-error-payload-semantics.expected.tsv`
       - `test/neovm/vm-compat/cases/default.list`
 
+- Fixed `x-display-color-p` integer payload rendering drift in evaluator path (`get-device-terminal` errors):
+  - runtime changes:
+    - `rust/neovm-core/src/elisp/display.rs`
+      - `format_get_device_terminal_arg_eval` now renders window context only for true window objects (`Value::Window`), not plain integer literals.
+      - this preserves oracle payloads for integer arguments that happen to match a live window id (`1` prints as `1`, not `#<window ...>`).
+      - added unit coverage:
+        - `get_device_terminal_formatter_keeps_integer_literals`
+  - vm-compat corpus changes:
+    - updated:
+      - `test/neovm/vm-compat/cases/x-display-color-get-device-terminal-error-payload-semantics.forms`
+      - `test/neovm/vm-compat/cases/x-display-color-get-device-terminal-error-payload-semantics.expected.tsv`
+    - added lock-in for:
+      - `(x-display-color-p 1)` payload string shape
+
 - Continue compatibility-first maintenance with small commit slices:
   - keep builtin surface and registry in lock-step
   - run oracle/parity checks after each behavior-affecting change

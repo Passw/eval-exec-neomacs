@@ -136,7 +136,6 @@ fn display_does_not_exist_error(display: &str) -> Flow {
 fn format_get_device_terminal_arg_eval(eval: &super::eval::Evaluator, value: &Value) -> String {
     let window_id = match value {
         Value::Window(id) => Some(WindowId(*id)),
-        Value::Int(id) if *id >= 0 => Some(WindowId(*id as u64)),
         _ => None,
     };
 
@@ -5266,6 +5265,20 @@ mod tests {
                 other => panic!("expected signal, got {other:?}"),
             }
         }
+    }
+
+    #[test]
+    fn get_device_terminal_formatter_keeps_integer_literals() {
+        let mut eval = crate::elisp::Evaluator::new();
+        let _ = crate::elisp::window_cmds::ensure_selected_frame_id(&mut eval);
+        let window = crate::elisp::window_cmds::builtin_selected_window(&mut eval, vec![]).unwrap();
+
+        let rendered_window = format_get_device_terminal_arg_eval(&eval, &window);
+        assert!(rendered_window.contains("#<window"));
+        assert!(rendered_window.contains("*scratch*"));
+
+        let rendered_integer = format_get_device_terminal_arg_eval(&eval, &Value::Int(1));
+        assert_eq!(rendered_integer, "1");
     }
 
     #[test]
