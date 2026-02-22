@@ -3510,6 +3510,38 @@ impl ApplicationHandler for RenderApp {
         };
         event_loop.set_control_flow(ControlFlow::WaitUntil(next_wake));
     }
+
+    fn exiting(&mut self, _event_loop: &ActiveEventLoop) {
+        // Explicitly drop wgpu resources while the Wayland connection is still alive.
+        // Without this, RenderApp's implicit drop happens AFTER the event loop's
+        // Wayland display is torn down, causing SEGV in eglTerminate → dri2_teardown_wayland.
+        //
+        // Drop order matters: renderer uses device/queue, surface depends on instance.
+        log::info!("Event loop exiting, cleaning up GPU resources");
+
+        // 0. Drop WebKit views and WPE backend (hold EGL contexts)
+        #[cfg(feature = "wpe-webkit")]
+        {
+            self.webkit_views.clear();
+            self.wpe_backend = None;
+        }
+        // 1. Drop renderer first (holds device/queue references, textures, pipelines)
+        drop(self.renderer.take());
+        // 2. Drop glyph atlas (holds device reference)
+        drop(self.glyph_atlas.take());
+        // 3. Drop surface (holds wl_surface proxy if on Wayland)
+        drop(self.surface.take());
+        self.surface_config = None;
+        // 4. Drop device and queue
+        drop(self.device.take());
+        drop(self.queue.take());
+        // 5. Drop multi-window state (secondary surfaces)
+        self.multi_windows.destroy_all();
+        // 6. Drop adapter last (triggers eglTerminate for the GLES/EGL fallback backend)
+        drop(self.adapter.take());
+
+        log::info!("GPU resources cleaned up");
+    }
 }
 
 /// Run the render loop (called on render thread)

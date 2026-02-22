@@ -207,6 +207,15 @@ impl MultiWindowManager {
         }
     }
 
+    /// Drop all windows and their wgpu surfaces (for clean shutdown).
+    pub fn destroy_all(&mut self) {
+        self.pending_creates.clear();
+        self.pending_destroys.clear();
+        self.winit_to_emacs.clear();
+        // Drop all window states (surfaces, etc.)
+        self.windows.clear();
+    }
+
     /// Look up the Emacs frame_id for a winit WindowId.
     pub fn emacs_frame_for_winit(&self, winit_id: WindowId) -> Option<u64> {
         self.winit_to_emacs.get(&winit_id).copied()
