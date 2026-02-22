@@ -19937,6 +19937,20 @@ Last updated: 2026-02-21
       - over-arity payload:
         - `(wrong-number-of-arguments x-clipboard-yank 1)`
 
+- Added dedicated `x-get-clipboard` arity/kill-ring lock-ins:
+  - vm-compat corpus changes:
+    - added:
+      - `test/neovm/vm-compat/cases/x-get-clipboard-arity-kill-ring-semantics.forms`
+      - `test/neovm/vm-compat/cases/x-get-clipboard-arity-kill-ring-semantics.expected.tsv`
+    - wired case into:
+      - `test/neovm/vm-compat/cases/default.list`
+    - lock-ins assert:
+      - zero-arg call remains `nil`
+      - return is invariant across mixed `kill-ring` states (including non-list payloads)
+      - over-arity payloads remain exact:
+        - `(wrong-number-of-arguments x-get-clipboard 1)`
+        - `(wrong-number-of-arguments x-get-clipboard 2)`
+
 - Continue compatibility-first maintenance with small commit slices:
   - keep builtin surface and registry in lock-step
   - run oracle/parity checks after each behavior-affecting change
