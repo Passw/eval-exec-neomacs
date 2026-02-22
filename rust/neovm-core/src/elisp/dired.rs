@@ -1624,6 +1624,35 @@ mod tests {
         assert_eq!(parsed, vec!["user2".to_string(), "user1".to_string()]);
     }
 
+    #[test]
+    fn test_read_colon_file_names_reads_file() {
+        let dir = std::env::temp_dir();
+        let path = dir.join("neovm_dired_users.txt");
+        let _ = fs::remove_file(&path);
+        fs::write(
+            &path,
+            "alpha:x:1000:1000::/home/alpha:/bin/sh\nbeta:x:1001:1001::/home/beta:/bin/sh\n",
+        )
+        .unwrap();
+
+        let names = read_colon_file_names(&path.to_string_lossy());
+        assert_eq!(
+            names,
+            vec!["beta".to_string(), "alpha".to_string()]
+        );
+
+        let _ = fs::remove_file(&path);
+    }
+
+    #[test]
+    fn test_read_colon_file_names_missing_file_returns_empty() {
+        let dir = std::env::temp_dir();
+        let path = dir.join("neovm_dired_missing.txt");
+        let _ = fs::remove_file(&path);
+        let names = read_colon_file_names(&path.to_string_lossy());
+        assert!(names.is_empty());
+    }
+
     // -----------------------------------------------------------------------
     // Argument validation
     // -----------------------------------------------------------------------
