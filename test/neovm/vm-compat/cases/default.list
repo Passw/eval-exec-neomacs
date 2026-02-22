@@ -470,6 +470,7 @@ cases/x-server-dead-window-error-payload-semantics
 cases/x-server-message-payload-semantics
 cases/x-open-close-window-error-structure-semantics
 cases/x-open-close-dead-window-error-payload-semantics
+cases/x-open-close-designator-type-matrix-semantics
 cases/x-open-close-message-payload-semantics
 cases/x-open-close-arity-type-payload-semantics
 cases/x-open-close-terminal-handle-shape-semantics

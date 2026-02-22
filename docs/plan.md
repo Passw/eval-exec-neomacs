@@ -19548,6 +19548,18 @@ Last updated: 2026-02-21
       - `x-close-connection` (`wrong-type-argument` + `frame-live-p`)
       - both payloads keep compact `#<window N>` rendering and explicitly avoid live-window buffer context (` on `)
 
+- Added `x-open`/`x-close` non-string designator type matrix lock-ins:
+  - vm-compat corpus changes:
+    - added:
+      - `test/neovm/vm-compat/cases/x-open-close-designator-type-matrix-semantics.forms`
+      - `test/neovm/vm-compat/cases/x-open-close-designator-type-matrix-semantics.expected.tsv`
+    - wired case into:
+      - `test/neovm/vm-compat/cases/default.list`
+    - matrix locks strict type predicates across non-string designators:
+      - symbol (`'foo`), vector (`[foo]`), list (`'(foo)`), cons (`'(foo . bar)`)
+      - `x-open-connection` keeps `(wrong-type-argument stringp VALUE)`
+      - `x-close-connection` keeps `(wrong-type-argument frame-live-p VALUE)`
+
 - Continue compatibility-first maintenance with small commit slices:
   - keep builtin surface and registry in lock-step
   - run oracle/parity checks after each behavior-affecting change
