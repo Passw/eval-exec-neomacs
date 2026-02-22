@@ -19390,6 +19390,16 @@ Last updated: 2026-02-21
       - `(format \"%S\" (selected-frame))` matches `^#<frame F[0-9]+ 0x[0-9a-f]+>$`
       - same shape for frame values extracted from monitor alists
 
+- Expanded monitor window-designator error lock-ins to cover integer-literal payload shape:
+  - vm-compat corpus changes:
+    - updated:
+      - `test/neovm/vm-compat/cases/display-monitor-window-designator-errors-semantics.forms`
+      - `test/neovm/vm-compat/cases/display-monitor-window-designator-errors-semantics.expected.tsv`
+    - added lock-ins for:
+      - `(display-monitor-attributes-list 1)` error payload mentions literal `1`
+      - `(frame-monitor-attributes 1)` error payload mentions literal `1`
+      - both integer-literal payloads explicitly avoid `#<window ...>` rendering
+
 - Continue compatibility-first maintenance with small commit slices:
   - keep builtin surface and registry in lock-step
   - run oracle/parity checks after each behavior-affecting change
