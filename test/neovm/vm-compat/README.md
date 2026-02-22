@@ -284,7 +284,7 @@ cd test/neovm/vm-compat
 make check-builtin-registry-autoload-metadata
 ```
 
-Run the full builtin registry gate bundle (dispatch/registry sync + fboundp/function-cell/func-arity/autoload-metadata/function-kind/commandp/primitive-any-coverage/extension-policy checks):
+Run the full builtin registry gate bundle (dispatch/registry sync + fboundp/function-cell/func-arity/autoload-metadata/function-kind/commandp/primitive-any-coverage/extension-policy checks + extension policy case-coverage checks):
 
 ```bash
 cd test/neovm/vm-compat
@@ -426,6 +426,7 @@ The policy is enforced by:
 
 - `cases/builtin-registry-extension-policy.txt` (declared extension set)
 - `check-builtin-registry-extension-policy.sh` (oracle-vs-neovm `fboundp` gate)
+- `check-builtin-registry-extension-case-coverage.sh` (policy symbols must be exercised by `cases/neovm-only.list` forms)
 - `cases/neovm-precompile-function-cell-semantics` (function-cell shape lock-in)
 - `cases/precompile` (runtime extension behavior lock-in)
 
