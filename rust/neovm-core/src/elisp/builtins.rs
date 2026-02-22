@@ -6162,6 +6162,57 @@ pub(crate) fn builtin_xw_display_color_p(args: Vec<Value>) -> EvalResult {
     Ok(Value::Nil)
 }
 
+pub(crate) fn builtin_innermost_minibuffer_p(args: Vec<Value>) -> EvalResult {
+    expect_range_args("innermost-minibuffer-p", &args, 0, 1)?;
+    Ok(Value::Nil)
+}
+
+pub(crate) fn builtin_interactive_form(args: Vec<Value>) -> EvalResult {
+    expect_args("interactive-form", &args, 1)?;
+    if args[0].as_symbol_name() == Some("ignore") {
+        return Ok(Value::list(vec![Value::symbol("interactive"), Value::Nil]));
+    }
+    Ok(Value::Nil)
+}
+
+pub(crate) fn builtin_local_variable_if_set_p(args: Vec<Value>) -> EvalResult {
+    expect_range_args("local-variable-if-set-p", &args, 1, 2)?;
+    if args[0].as_symbol_name().is_none() {
+        return Err(signal(
+            "wrong-type-argument",
+            vec![Value::symbol("symbolp"), args[0].clone()],
+        ));
+    }
+    Ok(Value::Nil)
+}
+
+pub(crate) fn builtin_lock_buffer(args: Vec<Value>) -> EvalResult {
+    expect_range_args("lock-buffer", &args, 0, 1)?;
+    Ok(Value::Nil)
+}
+
+pub(crate) fn builtin_lock_file(args: Vec<Value>) -> EvalResult {
+    expect_args("lock-file", &args, 1)?;
+    let _ = expect_string(&args[0])?;
+    Ok(Value::Nil)
+}
+
+pub(crate) fn builtin_lossage_size(args: Vec<Value>) -> EvalResult {
+    expect_range_args("lossage-size", &args, 0, 1)?;
+    Ok(Value::Int(300))
+}
+
+pub(crate) fn builtin_unlock_buffer(args: Vec<Value>) -> EvalResult {
+    expect_args("unlock-buffer", &args, 0)?;
+    Ok(Value::Nil)
+}
+
+pub(crate) fn builtin_unlock_file(args: Vec<Value>) -> EvalResult {
+    expect_args("unlock-file", &args, 1)?;
+    let _ = expect_string(&args[0])?;
+    Ok(Value::Nil)
+}
+
 // ===========================================================================
 // Hook system (need evaluator)
 // ===========================================================================
@@ -15181,17 +15232,17 @@ pub(crate) fn dispatch_builtin(
         "xw-color-defined-p" => builtin_xw_color_defined_p(args),
         "xw-color-values" => builtin_xw_color_values(args),
         "xw-display-color-p" => builtin_xw_display_color_p(args),
-        "innermost-minibuffer-p" => super::compat_internal::builtin_innermost_minibuffer_p(args),
-        "interactive-form" => super::compat_internal::builtin_interactive_form(args),
+        "innermost-minibuffer-p" => builtin_innermost_minibuffer_p(args),
+        "interactive-form" => builtin_interactive_form(args),
         "inotify-add-watch" => super::compat_internal::builtin_inotify_add_watch(args),
         "inotify-rm-watch" => super::compat_internal::builtin_inotify_rm_watch(args),
         "inotify-valid-p" => super::compat_internal::builtin_inotify_valid_p(args),
-        "local-variable-if-set-p" => super::compat_internal::builtin_local_variable_if_set_p(args),
-        "lock-buffer" => super::compat_internal::builtin_lock_buffer(args),
-        "lock-file" => super::compat_internal::builtin_lock_file(args),
-        "lossage-size" => super::compat_internal::builtin_lossage_size(args),
-        "unlock-buffer" => super::compat_internal::builtin_unlock_buffer(args),
-        "unlock-file" => super::compat_internal::builtin_unlock_file(args),
+        "local-variable-if-set-p" => builtin_local_variable_if_set_p(args),
+        "lock-buffer" => builtin_lock_buffer(args),
+        "lock-file" => builtin_lock_file(args),
+        "lossage-size" => builtin_lossage_size(args),
+        "unlock-buffer" => builtin_unlock_buffer(args),
+        "unlock-file" => builtin_unlock_file(args),
         "window-bottom-divider-width" => {
             super::compat_internal::builtin_window_bottom_divider_width(args)
         }
@@ -16114,17 +16165,17 @@ pub(crate) fn dispatch_builtin_pure(name: &str, args: Vec<Value>) -> Option<Eval
         "xw-color-defined-p" => builtin_xw_color_defined_p(args),
         "xw-color-values" => builtin_xw_color_values(args),
         "xw-display-color-p" => builtin_xw_display_color_p(args),
-        "innermost-minibuffer-p" => super::compat_internal::builtin_innermost_minibuffer_p(args),
-        "interactive-form" => super::compat_internal::builtin_interactive_form(args),
+        "innermost-minibuffer-p" => builtin_innermost_minibuffer_p(args),
+        "interactive-form" => builtin_interactive_form(args),
         "inotify-add-watch" => super::compat_internal::builtin_inotify_add_watch(args),
         "inotify-rm-watch" => super::compat_internal::builtin_inotify_rm_watch(args),
         "inotify-valid-p" => super::compat_internal::builtin_inotify_valid_p(args),
-        "local-variable-if-set-p" => super::compat_internal::builtin_local_variable_if_set_p(args),
-        "lock-buffer" => super::compat_internal::builtin_lock_buffer(args),
-        "lock-file" => super::compat_internal::builtin_lock_file(args),
-        "lossage-size" => super::compat_internal::builtin_lossage_size(args),
-        "unlock-buffer" => super::compat_internal::builtin_unlock_buffer(args),
-        "unlock-file" => super::compat_internal::builtin_unlock_file(args),
+        "local-variable-if-set-p" => builtin_local_variable_if_set_p(args),
+        "lock-buffer" => builtin_lock_buffer(args),
+        "lock-file" => builtin_lock_file(args),
+        "lossage-size" => builtin_lossage_size(args),
+        "unlock-buffer" => builtin_unlock_buffer(args),
+        "unlock-file" => builtin_unlock_file(args),
         "window-bottom-divider-width" => {
             super::compat_internal::builtin_window_bottom_divider_width(args)
         }
@@ -20276,6 +20327,54 @@ mod tests {
             .expect("builtin xw-display-color-p should resolve")
             .expect("builtin xw-display-color-p should evaluate");
         assert!(xw_display_color.is_nil());
+    }
+
+    #[test]
+    fn pure_dispatch_minibuffer_lock_placeholder_cluster_matches_compat_contracts() {
+        let innermost = dispatch_builtin_pure("innermost-minibuffer-p", vec![])
+            .expect("builtin innermost-minibuffer-p should resolve")
+            .expect("builtin innermost-minibuffer-p should evaluate");
+        assert!(innermost.is_nil());
+
+        let interactive_ignore =
+            dispatch_builtin_pure("interactive-form", vec![Value::symbol("ignore")])
+                .expect("builtin interactive-form should resolve")
+                .expect("builtin interactive-form should evaluate");
+        assert_eq!(
+            interactive_ignore,
+            Value::list(vec![Value::symbol("interactive"), Value::Nil])
+        );
+
+        let local_if_set =
+            dispatch_builtin_pure("local-variable-if-set-p", vec![Value::symbol("x")])
+                .expect("builtin local-variable-if-set-p should resolve")
+                .expect("builtin local-variable-if-set-p should evaluate");
+        assert!(local_if_set.is_nil());
+
+        let lock_buffer = dispatch_builtin_pure("lock-buffer", vec![])
+            .expect("builtin lock-buffer should resolve")
+            .expect("builtin lock-buffer should evaluate");
+        assert!(lock_buffer.is_nil());
+
+        let lock_file = dispatch_builtin_pure("lock-file", vec![Value::string("/tmp/x")])
+            .expect("builtin lock-file should resolve")
+            .expect("builtin lock-file should evaluate");
+        assert!(lock_file.is_nil());
+
+        let lossage_size = dispatch_builtin_pure("lossage-size", vec![])
+            .expect("builtin lossage-size should resolve")
+            .expect("builtin lossage-size should evaluate");
+        assert_eq!(lossage_size, Value::Int(300));
+
+        let unlock_buffer = dispatch_builtin_pure("unlock-buffer", vec![])
+            .expect("builtin unlock-buffer should resolve")
+            .expect("builtin unlock-buffer should evaluate");
+        assert!(unlock_buffer.is_nil());
+
+        let unlock_file = dispatch_builtin_pure("unlock-file", vec![Value::string("/tmp/x")])
+            .expect("builtin unlock-file should resolve")
+            .expect("builtin unlock-file should evaluate");
+        assert!(unlock_file.is_nil());
     }
 
     #[test]

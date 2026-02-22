@@ -1164,54 +1164,6 @@ pub(crate) fn builtin_init_image_library(args: Vec<Value>) -> EvalResult {
     Ok(Value::Nil)
 }
 
-/// `(innermost-minibuffer-p &optional BUFFER)` -> nil.
-pub(crate) fn builtin_innermost_minibuffer_p(args: Vec<Value>) -> EvalResult {
-    expect_range_args("innermost-minibuffer-p", &args, 0, 1)?;
-    Ok(Value::Nil)
-}
-
-/// `(interactive-form FUNCTION)` -> interactive spec form or nil.
-pub(crate) fn builtin_interactive_form(args: Vec<Value>) -> EvalResult {
-    expect_args("interactive-form", &args, 1)?;
-    if args[0].as_symbol_name() == Some("ignore") {
-        return Ok(Value::list(vec![Value::symbol("interactive"), Value::Nil]));
-    }
-    Ok(Value::Nil)
-}
-
-/// `(local-variable-if-set-p SYMBOL &optional BUFFER)` -> nil.
-pub(crate) fn builtin_local_variable_if_set_p(args: Vec<Value>) -> EvalResult {
-    expect_range_args("local-variable-if-set-p", &args, 1, 2)?;
-    expect_symbolp(&args[0])?;
-    Ok(Value::Nil)
-}
-
-/// `(lock-buffer &optional BUFFER)` -> nil.
-pub(crate) fn builtin_lock_buffer(args: Vec<Value>) -> EvalResult {
-    expect_range_args("lock-buffer", &args, 0, 1)?;
-    Ok(Value::Nil)
-}
-
-/// `(lock-file FILE)` -> nil.
-pub(crate) fn builtin_lock_file(args: Vec<Value>) -> EvalResult {
-    expect_args("lock-file", &args, 1)?;
-    expect_stringp(&args[0])?;
-    Ok(Value::Nil)
-}
-
-/// `(unlock-buffer)` -> nil.
-pub(crate) fn builtin_unlock_buffer(args: Vec<Value>) -> EvalResult {
-    expect_args("unlock-buffer", &args, 0)?;
-    Ok(Value::Nil)
-}
-
-/// `(unlock-file FILE)` -> nil.
-pub(crate) fn builtin_unlock_file(args: Vec<Value>) -> EvalResult {
-    expect_args("unlock-file", &args, 1)?;
-    expect_stringp(&args[0])?;
-    Ok(Value::Nil)
-}
-
 /// `(window-bottom-divider-width &optional WINDOW)` -> 0.
 pub(crate) fn builtin_window_bottom_divider_width(args: Vec<Value>) -> EvalResult {
     expect_range_args("window-bottom-divider-width", &args, 0, 1)?;
@@ -2014,12 +1966,6 @@ pub(crate) fn builtin_treesit_subtree_stat(args: Vec<Value>) -> EvalResult {
     Ok(Value::Nil)
 }
 
-/// `(lossage-size &optional NEW-SIZE)` -> 300.
-pub(crate) fn builtin_lossage_size(args: Vec<Value>) -> EvalResult {
-    expect_range_args("lossage-size", &args, 0, 1)?;
-    Ok(Value::Int(300))
-}
-
 /// `(define-fringe-bitmap NAME BITS &optional HEIGHT WIDTH ALIGN)` -> NAME.
 pub(crate) fn builtin_define_fringe_bitmap(args: Vec<Value>) -> EvalResult {
     expect_range_args("define-fringe-bitmap", &args, 2, 5)?;
@@ -2535,7 +2481,8 @@ mod tests {
 
     #[test]
     fn interactive_form_for_ignore_returns_interactive_list() {
-        let out = builtin_interactive_form(vec![Value::symbol("ignore")]).unwrap();
+        let out = crate::elisp::builtins::builtin_interactive_form(vec![Value::symbol("ignore")])
+            .unwrap();
         assert_eq!(
             out,
             Value::list(vec![Value::symbol("interactive"), Value::Nil])
@@ -2544,7 +2491,7 @@ mod tests {
 
     #[test]
     fn lock_file_requires_string_argument() {
-        let err = builtin_lock_file(vec![Value::Nil]).unwrap_err();
+        let err = crate::elisp::builtins::builtin_lock_file(vec![Value::Nil]).unwrap_err();
         match err {
             Flow::Signal(sig) => assert_eq!(sig.symbol, "wrong-type-argument"),
             other => panic!("expected signal, got {other:?}"),
@@ -2553,7 +2500,7 @@ mod tests {
 
     #[test]
     fn unlock_file_requires_string_argument() {
-        let err = builtin_unlock_file(vec![Value::Nil]).unwrap_err();
+        let err = crate::elisp::builtins::builtin_unlock_file(vec![Value::Nil]).unwrap_err();
         match err {
             Flow::Signal(sig) => assert_eq!(sig.symbol, "wrong-type-argument"),
             other => panic!("expected signal, got {other:?}"),
@@ -2644,7 +2591,7 @@ mod tests {
 
     #[test]
     fn lossage_size_defaults_to_three_hundred() {
-        let out = builtin_lossage_size(vec![]).unwrap();
+        let out = crate::elisp::builtins::builtin_lossage_size(vec![]).unwrap();
         assert_eq!(out, Value::Int(300));
     }
 }
