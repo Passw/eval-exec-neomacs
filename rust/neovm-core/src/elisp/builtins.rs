@@ -14460,7 +14460,6 @@ pub(crate) fn dispatch_builtin(
             super::compat_internal::builtin_define_coding_system_internal(args)
         }
         "defvar-1" => super::compat_internal::builtin_defvar_1(args),
-        "defvaralias" => super::compat_internal::builtin_defvaralias(args),
         "dump-emacs-portable" => super::compat_internal::builtin_dump_emacs_portable(args),
         "dump-emacs-portable--sort-predicate" => {
             super::compat_internal::builtin_dump_emacs_portable_sort_predicate(args)
@@ -15062,6 +15061,7 @@ pub(crate) fn dispatch_builtin_pure(name: &str, args: Vec<Value>) -> Option<Eval
         | "format-message"
         | "error"
         | "copy-file"
+        | "defvaralias"
         | "delete-file"
         | "display-color-p"
         | "indirect-variable"
@@ -15435,7 +15435,6 @@ pub(crate) fn dispatch_builtin_pure(name: &str, args: Vec<Value>) -> Option<Eval
             super::compat_internal::builtin_define_coding_system_internal(args)
         }
         "defvar-1" => super::compat_internal::builtin_defvar_1(args),
-        "defvaralias" => super::compat_internal::builtin_defvaralias(args),
         "dump-emacs-portable" => super::compat_internal::builtin_dump_emacs_portable(args),
         "dump-emacs-portable--sort-predicate" => {
             super::compat_internal::builtin_dump_emacs_portable_sort_predicate(args)
@@ -19402,6 +19401,7 @@ mod tests {
     fn dispatch_builtin_pure_defers_evaluator_window_accessors_and_mutators() {
         assert!(dispatch_builtin_pure("functionp", vec![]).is_none());
         assert!(dispatch_builtin_pure("copy-file", vec![]).is_none());
+        assert!(dispatch_builtin_pure("defvaralias", vec![]).is_none());
         assert!(dispatch_builtin_pure("delete-file", vec![]).is_none());
         assert!(dispatch_builtin_pure("display-color-p", vec![]).is_none());
         assert!(dispatch_builtin_pure("format", vec![]).is_none());

@@ -1601,12 +1601,6 @@ pub(crate) fn builtin_defvar_1(args: Vec<Value>) -> EvalResult {
     Ok(Value::Nil)
 }
 
-/// `(defvaralias NEWBASE OLD-BASE &optional DOCSTRING)` -> nil.
-pub(crate) fn builtin_defvaralias(args: Vec<Value>) -> EvalResult {
-    expect_range_args("defvaralias", &args, 2, 3)?;
-    Ok(Value::Nil)
-}
-
 /// `(encode-coding-region START END CODING &optional DESTINATION)` -> nil.
 pub(crate) fn builtin_encode_coding_region(args: Vec<Value>) -> EvalResult {
     expect_range_args("encode-coding-region", &args, 3, 4)?;
