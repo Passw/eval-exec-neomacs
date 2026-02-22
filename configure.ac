@@ -4017,10 +4017,8 @@ if test "$window_system" = "neomacs"; then
   PKG_CHECK_MODULES([WPEBACKEND], [wpebackend-fdo-1.0], [], [AC_MSG_WARN([wpebackend-fdo not found])])
   dnl Wayland-server is needed for wl_shm_buffer functions (SHM fallback mode)
   PKG_CHECK_MODULES([WAYLAND_SERVER], [wayland-server], [], [AC_MSG_WARN([wayland-server not found])])
-  dnl xkbcommon for key name resolution
-  PKG_CHECK_MODULES([XKBCOMMON], [xkbcommon], [], [AC_MSG_ERROR([xkbcommon required for Neomacs])])
-  NEOMACS_CFLAGS="$GSTREAMER_CFLAGS $CAIRO_CFLAGS $GLIB_CFLAGS $EGL_CFLAGS $XKBCOMMON_CFLAGS"
-  NEOMACS_LIBS="$NEOMACS_LIBS $GSTREAMER_LIBS $CAIRO_LIBS $GLIB_LIBS $EGL_LIBS $XKBCOMMON_LIBS -lpthread -lm -ldl"
+  NEOMACS_CFLAGS="$GSTREAMER_CFLAGS $CAIRO_CFLAGS $GLIB_CFLAGS $EGL_CFLAGS"
+  NEOMACS_LIBS="$NEOMACS_LIBS $GSTREAMER_LIBS $CAIRO_LIBS $GLIB_LIBS $EGL_LIBS -lpthread -lm -ldl"
   if test "$HAVE_NEOMACS_WEBKIT" = yes; then
     NEOMACS_CFLAGS="$NEOMACS_CFLAGS $WPEWEBKIT_CFLAGS $WPEBACKEND_CFLAGS $WAYLAND_SERVER_CFLAGS"
     NEOMACS_LIBS="$NEOMACS_LIBS $WPEWEBKIT_LIBS $WPEBACKEND_LIBS $WAYLAND_SERVER_LIBS"

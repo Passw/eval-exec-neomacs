@@ -25,8 +25,6 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 #include <string.h>
 #include <stdint.h>
 #include <signal.h>
-#include <xkbcommon/xkbcommon.h>
-
 #include "lisp.h"
 #include "blockinput.h"
 #include "sysselect.h"
@@ -14892,8 +14890,35 @@ char *
 get_keysym_name (int keysym)
 {
   static char name_buf[64];
-  if (xkb_keysym_get_name (keysym, name_buf, sizeof name_buf) > 0)
-    return name_buf;
+  /* Static table for the keysyms produced by translate_key().  */
+  static const struct { int sym; const char *name; } table[] = {
+    { 0xff08, "BackSpace" }, { 0xff09, "Tab" },
+    { 0xff0d, "Return" },   { 0xff13, "Pause" },
+    { 0xff14, "Scroll_Lock" },
+    { 0xff1b, "Escape" },
+    { 0xff50, "Home" },     { 0xff51, "Left" },
+    { 0xff52, "Up" },       { 0xff53, "Right" },
+    { 0xff54, "Down" },     { 0xff55, "Prior" },
+    { 0xff56, "Next" },     { 0xff57, "End" },
+    { 0xff61, "Print" },    { 0xff63, "Insert" },
+    { 0xffbe, "F1" },  { 0xffbf, "F2" },
+    { 0xffc0, "F3" },  { 0xffc1, "F4" },
+    { 0xffc2, "F5" },  { 0xffc3, "F6" },
+    { 0xffc4, "F7" },  { 0xffc5, "F8" },
+    { 0xffc6, "F9" },  { 0xffc7, "F10" },
+    { 0xffc8, "F11" }, { 0xffc9, "F12" },
+    { 0xffff, "Delete" },
+  };
+  for (int i = 0; i < sizeof table / sizeof table[0]; i++)
+    if (table[i].sym == keysym)
+      return (char *) table[i].name;
+  /* For printable characters, return the character itself.  */
+  if (keysym >= 0x20 && keysym <= 0x7e)
+    {
+      name_buf[0] = keysym;
+      name_buf[1] = 0;
+      return name_buf;
+    }
   return NULL;
 }
 
