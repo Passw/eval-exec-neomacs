@@ -48,10 +48,16 @@ fn code_to_char(code: i64) -> Option<char> {
 
 /// Uppercase a single character code, returning the new code.
 fn upcase_char(code: i64) -> i64 {
+    if preserve_casefiddle_upcase_payload(code) {
+        return code;
+    }
     match code {
-        // Emacs integer/char case conversion uses simple/title mappings here.
         223 => return 7838,
-        7306 => return 7306,
+        452 | 497 => return code + 1,
+        454 | 457 | 460 | 499 => return code - 1,
+        455 | 458 => return code + 1,
+        8064..=8071 | 8080..=8087 | 8096..=8103 => return code + 8,
+        8115 | 8131 | 8179 => return code + 9,
         _ => {}
     }
     match code_to_char(code) {
@@ -65,11 +71,68 @@ fn upcase_char(code: i64) -> i64 {
     }
 }
 
+fn preserve_casefiddle_upcase_payload(code: i64) -> bool {
+    matches!(
+        code,
+        329
+            | 411
+            | 453
+            | 456
+            | 459
+            | 496
+            | 498
+            | 612
+            | 912
+            | 944
+            | 1415
+            | 4304..=4346
+            | 4349..=4351
+            | 7306
+            | 7830..=7834
+            | 8016
+            | 8018
+            | 8020
+            | 8022
+            | 8072..=8079
+            | 8088..=8095
+            | 8104..=8111
+            | 8114
+            | 8116
+            | 8118..=8119
+            | 8124
+            | 8130
+            | 8132
+            | 8134..=8135
+            | 8140
+            | 8146..=8147
+            | 8150..=8151
+            | 8162..=8164
+            | 8166..=8167
+            | 8178
+            | 8180
+            | 8182..=8183
+            | 8188
+            | 42957
+            | 42959
+            | 42963
+            | 42965
+            | 42971
+            | 64256..=64262
+            | 64275..=64279
+            | 68976..=68997
+            | 93883..=93907
+    )
+}
+
 fn titlecase_word_initial(c: char) -> String {
     if c == 'ß' {
         return "Ss".to_string();
     }
-    c.to_uppercase().collect()
+    if let Some(mapped) = code_to_char(upcase_char(c as i64)) {
+        mapped.to_string()
+    } else {
+        c.to_uppercase().collect()
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -317,6 +380,12 @@ mod tests {
         let int_mod_i = builtin_capitalize(vec![Value::Int(7306)]).unwrap();
         assert_eq!(int_mod_i.as_int(), Some(7306));
 
+        let int_dz_small = builtin_capitalize(vec![Value::Int(452)]).unwrap();
+        assert_eq!(int_dz_small.as_int(), Some(453));
+
+        let int_georgian_an = builtin_capitalize(vec![Value::Int(4304)]).unwrap();
+        assert_eq!(int_georgian_an.as_int(), Some(4304));
+
         let string_sharp_s = builtin_capitalize(vec![Value::string("ß")]).unwrap();
         assert_eq!(string_sharp_s.as_str(), Some("Ss"));
     }
@@ -328,6 +397,12 @@ mod tests {
 
         let int_mod_i = builtin_upcase_initials(vec![Value::Int(7306)]).unwrap();
         assert_eq!(int_mod_i.as_int(), Some(7306));
+
+        let int_dz_small = builtin_upcase_initials(vec![Value::Int(454)]).unwrap();
+        assert_eq!(int_dz_small.as_int(), Some(453));
+
+        let int_georgian_an = builtin_upcase_initials(vec![Value::Int(4304)]).unwrap();
+        assert_eq!(int_georgian_an.as_int(), Some(4304));
 
         let string_sharp_s = builtin_upcase_initials(vec![Value::string("ß")]).unwrap();
         assert_eq!(string_sharp_s.as_str(), Some("Ss"));

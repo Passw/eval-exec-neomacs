@@ -31,9 +31,19 @@ Last updated: 2026-02-22
 - Aligned Unicode edge behavior for `capitalize` / `upcase-initials` (`casefiddle`):
   - runtime changes:
     - `rust/neovm-core/src/elisp/casefiddle.rs`
-      - integer/char upcase helper now mirrors oracle on key edge points:
-        - `223 -> 7838`
-        - `7306 -> 7306` (preserved)
+      - integer/char upcase helper now mirrors oracle across representative remap and preserve families:
+        - remaps:
+          - `223 -> 7838`
+          - digraph title mappings around `452..460` and `497..499`
+          - Greek composite mappings:
+            - `8064..=8071 -> +8`
+            - `8080..=8087 -> +8`
+            - `8096..=8103 -> +8`
+            - `8115|8131|8179 -> +9`
+        - preserves:
+          - Georgian mkhedruli block samples (`4304`, `4346`, `4349`, `4351`)
+          - extended Unicode edge ranges (`68976..=68997`, `93883..=93907`)
+          - modifier/special singleton samples (`7306`, `42957`, `42959`, `42963`, `42965`, `42971`)
       - word-initial titlecase now emits `"Ss"` for `"ß"` in string paths.
       - added unit coverage:
         - `capitalize_unicode_edge_semantics`
