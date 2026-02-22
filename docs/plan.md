@@ -19774,6 +19774,17 @@ Last updated: 2026-02-21
       - `nil`, string, integer, symbol, vector, list, cons
       - live frame, terminal, live window, dead window
 
+- Added dedicated `x-open-connection`/`x-close-connection` frame-message payload lock-ins:
+  - vm-compat corpus changes:
+    - added:
+      - `test/neovm/vm-compat/cases/x-open-close-frame-message-payload-semantics.forms`
+      - `test/neovm/vm-compat/cases/x-open-close-frame-message-payload-semantics.expected.tsv`
+    - wired case into:
+      - `test/neovm/vm-compat/cases/default.list`
+    - lock-ins assert selected-frame payload split stays oracle-aligned:
+      - `x-open-connection` keeps `(wrong-type-argument stringp FRAME)`
+      - `x-close-connection` keeps `(error "Window system frame should be used")`
+
 - Continue compatibility-first maintenance with small commit slices:
   - keep builtin surface and registry in lock-step
   - run oracle/parity checks after each behavior-affecting change
