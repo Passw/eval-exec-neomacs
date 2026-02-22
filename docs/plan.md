@@ -19676,9 +19676,30 @@ Last updated: 2026-02-21
       - strict max-arity payloads for two-argument calls (`wrong-number-of-arguments`)
       - covered functions:
         - `x-server-version`, `x-server-max-request-size`, `x-display-grayscale-p`
-        - `x-display-backing-store`, `x-display-color-cells`, `x-display-mm-height`, `x-display-mm-width`
-        - `x-display-monitor-attributes-list`, `x-display-planes`, `x-display-save-under`, `x-display-screens`
-        - `x-display-visual-class`, `x-server-input-extension-version`, `x-server-vendor`
+      - `x-display-backing-store`, `x-display-color-cells`, `x-display-mm-height`, `x-display-mm-width`
+      - `x-display-monitor-attributes-list`, `x-display-planes`, `x-display-save-under`, `x-display-screens`
+      - `x-display-visual-class`, `x-server-input-extension-version`, `x-server-vendor`
+
+- Added dedicated `x-display-set-last-user-time` USER-TIME type matrix lock-ins:
+  - runtime changes:
+    - `rust/neovm-core/src/elisp/display.rs`
+      - aligned `x-display-set-last-user-time` so two-arg calls with `USER-TIME=nil` signal batch/no-X payload:
+        - `(error "X windows are not in use or not initialized")`
+      - retained existing `wrong-type-argument` + `frame-live-p` payload shape for non-`nil` USER-TIME values.
+      - extended unit coverage:
+        - `x_display_set_last_user_time_batch_semantics`
+        - now asserts `USER-TIME=nil` behavior for both `DISPLAY=nil` and `DISPLAY=\"x\"`.
+  - vm-compat corpus changes:
+    - added:
+      - `test/neovm/vm-compat/cases/x-display-set-last-user-time-user-time-type-matrix-semantics.forms`
+      - `test/neovm/vm-compat/cases/x-display-set-last-user-time-user-time-type-matrix-semantics.expected.tsv`
+    - wired case into:
+      - `test/neovm/vm-compat/cases/default.list`
+    - matrix locks:
+      - `USER-TIME=nil` payload as batch/no-X initialization error
+      - strict `wrong-type-argument` + `frame-live-p` payloads for non-`nil` USER-TIME values (symbol, vector, list, cons)
+      - two-argument behavior invariance across DISPLAY shapes (`nil`, string, frame, terminal)
+      - live-window payload structure and dead-window compact-handle message shape (`#<window N>`, no ` on ` context)
 
 - Continue compatibility-first maintenance with small commit slices:
   - keep builtin surface and registry in lock-step

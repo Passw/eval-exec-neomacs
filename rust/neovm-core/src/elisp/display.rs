@@ -2006,7 +2006,7 @@ pub(crate) fn builtin_x_server_vendor_eval(
 /// (x-display-set-last-user-time DISPLAY USER-TIME) -> error in batch/no-X context.
 pub(crate) fn builtin_x_display_set_last_user_time(args: Vec<Value>) -> EvalResult {
     expect_range_args("x-display-set-last-user-time", &args, 1, 2)?;
-    if args.len() == 1 {
+    if args.len() == 1 || args[1].is_nil() {
         return Err(x_windows_not_initialized_error());
     }
     Err(signal(
@@ -3479,6 +3479,28 @@ mod tests {
     #[test]
     fn x_display_set_last_user_time_batch_semantics() {
         match builtin_x_display_set_last_user_time(vec![Value::Nil]) {
+            Err(Flow::Signal(sig)) => {
+                assert_eq!(sig.symbol, "error");
+                assert_eq!(
+                    sig.data,
+                    vec![Value::string("X windows are not in use or not initialized")]
+                );
+            }
+            other => panic!("expected error signal, got {other:?}"),
+        }
+
+        match builtin_x_display_set_last_user_time(vec![Value::Nil, Value::Nil]) {
+            Err(Flow::Signal(sig)) => {
+                assert_eq!(sig.symbol, "error");
+                assert_eq!(
+                    sig.data,
+                    vec![Value::string("X windows are not in use or not initialized")]
+                );
+            }
+            other => panic!("expected error signal, got {other:?}"),
+        }
+
+        match builtin_x_display_set_last_user_time(vec![Value::string("x"), Value::Nil]) {
             Err(Flow::Signal(sig)) => {
                 assert_eq!(sig.symbol, "error");
                 assert_eq!(
