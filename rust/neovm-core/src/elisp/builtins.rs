@@ -14584,7 +14584,6 @@ pub(crate) fn dispatch_builtin(
         "set--this-command-keys" => super::compat_internal::builtin_set_this_command_keys(args),
         "set-buffer-auto-saved" => super::compat_internal::builtin_set_buffer_auto_saved(args),
         "set-buffer-major-mode" => super::compat_internal::builtin_set_buffer_major_mode(args),
-        "set-buffer-multibyte" => super::compat_internal::builtin_set_buffer_multibyte(args),
         "set-buffer-redisplay" => super::compat_internal::builtin_set_buffer_redisplay(args),
         "set-charset-plist" => super::compat_internal::builtin_set_charset_plist(args),
         "set-fontset-font" => super::compat_internal::builtin_set_fontset_font(args),
@@ -15081,6 +15080,7 @@ pub(crate) fn dispatch_builtin_pure(name: &str, args: Vec<Value>) -> Option<Eval
         | "print"
         | "rename-file"
         | "replace-buffer-contents"
+        | "set-buffer-multibyte"
         | "setplist"
         | "terminal-live-p"
         | "terminal-name"
@@ -15559,7 +15559,6 @@ pub(crate) fn dispatch_builtin_pure(name: &str, args: Vec<Value>) -> Option<Eval
         "set--this-command-keys" => super::compat_internal::builtin_set_this_command_keys(args),
         "set-buffer-auto-saved" => super::compat_internal::builtin_set_buffer_auto_saved(args),
         "set-buffer-major-mode" => super::compat_internal::builtin_set_buffer_major_mode(args),
-        "set-buffer-multibyte" => super::compat_internal::builtin_set_buffer_multibyte(args),
         "set-buffer-redisplay" => super::compat_internal::builtin_set_buffer_redisplay(args),
         "set-charset-plist" => super::compat_internal::builtin_set_charset_plist(args),
         "set-fontset-font" => super::compat_internal::builtin_set_fontset_font(args),
@@ -19424,6 +19423,7 @@ mod tests {
         assert!(dispatch_builtin_pure("print", vec![]).is_none());
         assert!(dispatch_builtin_pure("rename-file", vec![]).is_none());
         assert!(dispatch_builtin_pure("replace-buffer-contents", vec![]).is_none());
+        assert!(dispatch_builtin_pure("set-buffer-multibyte", vec![]).is_none());
         assert!(dispatch_builtin_pure("setplist", vec![]).is_none());
         assert!(dispatch_builtin_pure("terminal-live-p", vec![]).is_none());
         assert!(dispatch_builtin_pure("terminal-name", vec![]).is_none());

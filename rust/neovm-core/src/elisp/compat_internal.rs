@@ -1862,12 +1862,6 @@ pub(crate) fn builtin_set_buffer_major_mode(args: Vec<Value>) -> EvalResult {
     Ok(Value::Nil)
 }
 
-/// `(set-buffer-multibyte FLAG)` -> nil.
-pub(crate) fn builtin_set_buffer_multibyte(args: Vec<Value>) -> EvalResult {
-    expect_args("set-buffer-multibyte", &args, 1)?;
-    Ok(Value::Nil)
-}
-
 /// `(split-window-internal WINDOW SIZE SIDE NORMALIZE)` -> nil.
 pub(crate) fn builtin_split_window_internal(args: Vec<Value>) -> EvalResult {
     expect_args("split-window-internal", &args, 4)?;
