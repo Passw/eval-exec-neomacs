@@ -28,6 +28,25 @@ Last updated: 2026-02-22
 
 ## Doing
 
+- Aligned core `downcase` Unicode edge behavior with oracle simple-mapping semantics:
+  - runtime changes:
+    - `rust/neovm-core/src/elisp/builtins.rs`
+      - `downcase` now preserves oracle identity payloads for Unicode edge ranges where Rust full lowercase expansion diverges:
+        - singleton code points: `304`, `7305`, `8490`, `42955`, `42956`, `42958`, `42962`, `42964`, `42970`, `42972`
+        - supplemental ranges: `68944..=68965`, `93856..=93880`
+      - `downcase` now signals `(wrong-type-argument char-or-string-p -1)` for negative integer inputs.
+      - added unit coverage:
+        - `pure_dispatch_typed_downcase_unicode_edge_payloads_match_oracle`
+  - vm-compat corpus changes:
+    - added and wired:
+      - `test/neovm/vm-compat/cases/downcase-unicode-edge-semantics.forms`
+      - `test/neovm/vm-compat/cases/downcase-unicode-edge-semantics.expected.tsv`
+      - `test/neovm/vm-compat/cases/default.list`
+  - verified:
+    - `cargo test --manifest-path rust/neovm-core/Cargo.toml pure_dispatch_typed_downcase_unicode_edge_payloads_match_oracle -- --nocapture` (pass)
+    - `make -C test/neovm/vm-compat record FORMS=cases/downcase-unicode-edge-semantics.forms EXPECTED=cases/downcase-unicode-edge-semantics.expected.tsv` (pass)
+    - `make -C test/neovm/vm-compat check-one-neovm CASE=cases/downcase-unicode-edge-semantics` (pass)
+
 - Aligned `x-get-input-coding-system` wrong-type payload folding for character-code inputs:
   - runtime changes:
     - `rust/neovm-core/src/elisp/display.rs`

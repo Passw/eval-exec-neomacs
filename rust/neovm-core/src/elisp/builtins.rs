@@ -1929,16 +1929,55 @@ pub(crate) fn builtin_upcase(args: Vec<Value>) -> EvalResult {
     }
 }
 
+fn preserve_emacs_downcase_payload(code: i64) -> bool {
+    matches!(
+        code,
+        304
+            | 7305
+            | 8490
+            | 42955
+            | 42956
+            | 42958
+            | 42962
+            | 42964
+            | 42970
+            | 42972
+            | 68944..=68965
+            | 93856..=93880
+    )
+}
+
+fn downcase_char_code_emacs_compat(code: i64) -> i64 {
+    if preserve_emacs_downcase_payload(code) {
+        return code;
+    }
+    if let Some(c) = u32::try_from(code).ok().and_then(char::from_u32) {
+        c.to_lowercase().next().unwrap_or(c) as i64
+    } else {
+        code
+    }
+}
+
 pub(crate) fn builtin_downcase(args: Vec<Value>) -> EvalResult {
     expect_args("downcase", &args, 1)?;
     match &args[0] {
         Value::Str(s) => Ok(Value::string(s.to_lowercase())),
-        Value::Char(c) => Ok(Value::Char(c.to_lowercase().next().unwrap_or(*c))),
-        Value::Int(n) => {
-            if let Some(c) = char::from_u32(*n as u32) {
-                Ok(Value::Int(c.to_lowercase().next().unwrap_or(c) as i64))
+        Value::Char(c) => {
+            let mapped = downcase_char_code_emacs_compat(*c as i64);
+            if let Some(ch) = u32::try_from(mapped).ok().and_then(char::from_u32) {
+                Ok(Value::Char(ch))
             } else {
-                Ok(Value::Int(*n))
+                Ok(Value::Char(*c))
+            }
+        }
+        Value::Int(n) => {
+            if *n < 0 {
+                Err(signal(
+                    "wrong-type-argument",
+                    vec![Value::symbol("char-or-string-p"), Value::Int(*n)],
+                ))
+            } else {
+                Ok(Value::Int(downcase_char_code_emacs_compat(*n)))
             }
         }
         other => Err(signal(
@@ -19355,6 +19394,57 @@ mod tests {
                 assert_eq!(
                     sig.data,
                     vec![Value::symbol("stringp"), Value::Int(7)],
+                );
+            }
+            other => panic!("unexpected flow: {other:?}"),
+        }
+    }
+
+    #[test]
+    fn pure_dispatch_typed_downcase_unicode_edge_payloads_match_oracle() {
+        let cases = [
+            (304, 304),
+            (7305, 7305),
+            (8490, 8490),
+            (42955, 42955),
+            (42956, 42956),
+            (42958, 42958),
+            (42962, 42962),
+            (42964, 42964),
+            (42970, 42970),
+            (42972, 42972),
+            (68944, 68944),
+            (68965, 68965),
+            (93856, 93856),
+            (93880, 93880),
+            (66560, 66600),
+        ];
+
+        for (input, expected) in cases {
+            let result = dispatch_builtin_pure("downcase", vec![Value::Int(input)])
+                .expect("builtin downcase should resolve")
+                .expect("builtin downcase should evaluate");
+            assert_eq!(
+                result,
+                Value::Int(expected),
+                "downcase({input}) should equal {expected}"
+            );
+        }
+
+        let dotted_i = dispatch_builtin_pure("downcase", vec![Value::Char('\u{0130}')])
+            .expect("builtin downcase should resolve")
+            .expect("builtin downcase should evaluate");
+        assert_eq!(dotted_i, Value::Char('\u{0130}'));
+
+        let negative = dispatch_builtin_pure("downcase", vec![Value::Int(-1)])
+            .expect("builtin downcase should resolve")
+            .expect_err("builtin downcase should reject negative integer designators");
+        match negative {
+            Flow::Signal(sig) => {
+                assert_eq!(sig.symbol, "wrong-type-argument");
+                assert_eq!(
+                    sig.data,
+                    vec![Value::symbol("char-or-string-p"), Value::Int(-1)]
                 );
             }
             other => panic!("unexpected flow: {other:?}"),
