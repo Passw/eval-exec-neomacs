@@ -2390,9 +2390,10 @@ pub(crate) fn builtin_vconcat(args: Vec<Value>) -> EvalResult {
 // Hash table operations
 // ===========================================================================
 
-fn hash_table_test_aliases() -> &'static Mutex<Vec<(String, HashTableTest)>> {
-    static HASH_TABLE_TEST_ALIASES: OnceLock<Mutex<Vec<(String, HashTableTest)>>> = OnceLock::new();
-    HASH_TABLE_TEST_ALIASES.get_or_init(|| Mutex::new(Vec::new()))
+fn hash_table_test_aliases() -> &'static Mutex<HashMap<String, HashTableTest>> {
+    static HASH_TABLE_TEST_ALIASES: OnceLock<Mutex<HashMap<String, HashTableTest>>> =
+        OnceLock::new();
+    HASH_TABLE_TEST_ALIASES.get_or_init(|| Mutex::new(HashMap::new()))
 }
 
 fn invalid_hash_table_argument_list(arg: Value) -> Flow {
@@ -2411,19 +2412,15 @@ fn hash_test_from_designator(value: &Value) -> Option<HashTableTest> {
 
 fn register_hash_table_test_alias(name: &str, test: HashTableTest) {
     let mut aliases = hash_table_test_aliases().lock().expect("poisoned");
-    if let Some((_, existing)) = aliases.iter_mut().find(|(alias, _)| alias == name) {
-        *existing = test;
-    } else {
-        aliases.push((name.to_string(), test));
-    }
+    aliases.insert(name.to_string(), test);
 }
 
 fn lookup_hash_table_test_alias(name: &str) -> Option<HashTableTest> {
     hash_table_test_aliases()
         .lock()
         .expect("poisoned")
-        .iter()
-        .find_map(|(alias, test)| (alias == name).then_some(test.clone()))
+        .get(name)
+        .cloned()
 }
 
 pub(crate) fn builtin_define_hash_table_test(args: Vec<Value>) -> EvalResult {
@@ -21149,6 +21146,51 @@ mod tests {
         assert!(matches!(
             table.lock().expect("poisoned").test,
             HashTableTest::Eq
+        ));
+    }
+
+    #[test]
+    fn define_hash_table_test_alias_redefinition_updates_mapping() {
+        let alias_name = "neovm--eq-test-alias-redefined";
+
+        builtin_define_hash_table_test(vec![
+            Value::symbol(alias_name),
+            Value::symbol("eq"),
+            Value::symbol("sxhash-eq"),
+        ])
+        .expect("initial define-hash-table-test should evaluate");
+        let first = dispatch_builtin_pure(
+            "make-hash-table",
+            vec![Value::keyword(":test"), Value::symbol(alias_name)],
+        )
+        .expect("make-hash-table should resolve")
+        .expect("make-hash-table should evaluate");
+        let Value::HashTable(first) = first else {
+            panic!("expected hash table");
+        };
+        assert!(matches!(
+            first.lock().expect("poisoned").test,
+            HashTableTest::Eq
+        ));
+
+        builtin_define_hash_table_test(vec![
+            Value::symbol(alias_name),
+            Value::symbol("equal"),
+            Value::symbol("sxhash-equal"),
+        ])
+        .expect("redefined hash-table test should evaluate");
+        let second = dispatch_builtin_pure(
+            "make-hash-table",
+            vec![Value::keyword(":test"), Value::symbol(alias_name)],
+        )
+        .expect("make-hash-table should resolve after alias redefinition")
+        .expect("make-hash-table should evaluate after alias redefinition");
+        let Value::HashTable(second) = second else {
+            panic!("expected hash table");
+        };
+        assert!(matches!(
+            second.lock().expect("poisoned").test,
+            HashTableTest::Equal
         ));
     }
 
