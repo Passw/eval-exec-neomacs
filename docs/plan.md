@@ -19785,6 +19785,18 @@ Last updated: 2026-02-21
       - `x-open-connection` keeps `(wrong-type-argument stringp FRAME)`
       - `x-close-connection` keeps `(error "Window system frame should be used")`
 
+- Added dedicated `x-display-list` arity/payload lock-ins:
+  - vm-compat corpus changes:
+    - added:
+      - `test/neovm/vm-compat/cases/x-display-list-arity-payload-semantics.forms`
+      - `test/neovm/vm-compat/cases/x-display-list-arity-payload-semantics.expected.tsv`
+    - wired case into:
+      - `test/neovm/vm-compat/cases/default.list`
+    - lock-ins assert:
+      - zero-arg batch return remains `nil`
+      - one/two/three-arg over-arity payloads stay exact:
+        - `(wrong-number-of-arguments x-display-list N)`
+
 - Continue compatibility-first maintenance with small commit slices:
   - keep builtin surface and registry in lock-step
   - run oracle/parity checks after each behavior-affecting change

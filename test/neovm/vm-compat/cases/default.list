@@ -459,6 +459,7 @@ cases/frame-window-predicate-callable-path-semantics
 cases/window-frame-subr-arity-semantics
 cases/window-alias-introspection-semantics
 cases/x-display-batch-semantics
+cases/x-display-list-arity-payload-semantics
 cases/x-display-terminal-designator-semantics
 cases/x-display-color-get-device-terminal-error-payload-semantics
 cases/x-display-color-alias-error-payload-semantics
