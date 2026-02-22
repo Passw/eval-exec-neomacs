@@ -14525,7 +14525,7 @@ pub(crate) fn dispatch_builtin(
         "native-elisp-load" => super::compat_internal::builtin_native_elisp_load(args),
         "new-fontset" => super::compat_internal::builtin_new_fontset(args),
         "next-frame" => super::compat_internal::builtin_next_frame(args),
-        "ntake" => super::compat_internal::builtin_ntake(args),
+        "ntake" => builtin_ntake(args),
         "obarray-clear" => super::compat_internal::builtin_obarray_clear(args),
         "obarray-make" => super::compat_internal::builtin_obarray_make(args),
         "object-intervals" => super::compat_internal::builtin_object_intervals(args),
@@ -15500,7 +15500,7 @@ pub(crate) fn dispatch_builtin_pure(name: &str, args: Vec<Value>) -> Option<Eval
         "native-elisp-load" => super::compat_internal::builtin_native_elisp_load(args),
         "new-fontset" => super::compat_internal::builtin_new_fontset(args),
         "next-frame" => super::compat_internal::builtin_next_frame(args),
-        "ntake" => super::compat_internal::builtin_ntake(args),
+        "ntake" => builtin_ntake(args),
         "obarray-clear" => super::compat_internal::builtin_obarray_clear(args),
         "obarray-make" => super::compat_internal::builtin_obarray_make(args),
         "object-intervals" => super::compat_internal::builtin_object_intervals(args),
@@ -19004,6 +19004,17 @@ mod tests {
             .expect("builtin last should resolve")
             .expect("builtin last should evaluate");
         assert_eq!(last, Value::list(vec![Value::Int(4)]));
+
+        let truncated = dispatch_builtin_pure(
+            "ntake",
+            vec![
+                Value::Int(2),
+                Value::list(vec![Value::Int(7), Value::Int(8), Value::Int(9)]),
+            ],
+        )
+        .expect("builtin ntake should resolve")
+        .expect("builtin ntake should evaluate");
+        assert_eq!(truncated, Value::list(vec![Value::Int(7), Value::Int(8)]));
     }
 
     #[test]

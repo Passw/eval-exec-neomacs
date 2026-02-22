@@ -1785,12 +1785,6 @@ pub(crate) fn builtin_next_frame(args: Vec<Value>) -> EvalResult {
     Ok(Value::Nil)
 }
 
-/// `(ntake N LIST)` -> nil.
-pub(crate) fn builtin_ntake(args: Vec<Value>) -> EvalResult {
-    expect_args("ntake", &args, 2)?;
-    Ok(Value::Nil)
-}
-
 /// `(obarray-clear OBARRAY)` -> nil.
 pub(crate) fn builtin_obarray_clear(args: Vec<Value>) -> EvalResult {
     expect_args("obarray-clear", &args, 1)?;
