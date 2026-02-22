@@ -4978,10 +4978,6 @@ pub(crate) static STARTUP_VARIABLE_DOC_STRING_PROPERTIES: &[(&str, &str)] = &[
         "If non-nil, allow duplication of `before' newlines.",
     ),
     (
-        "electric-layout-allow-in-comment-or-string",
-        "If non-nil, allow inserting newlines inside a comment or string.",
-    ),
-    (
         "electric-layout-local-mode-hook",
         "Hook run after entering or leaving `electric-layout-local-mode'.",
     ),
@@ -10076,10 +10072,6 @@ pub(crate) static STARTUP_VARIABLE_DOC_STRING_PROPERTIES: &[(&str, &str)] = &[
     (
         "trash-directory",
         "Directory for `move-file-to-trash' to move files and directories to.",
-    ),
-    (
-        "trusted-content",
-        "List of files and directories whose content we trust.",
     ),
     (
         "tty-color-mode-alist",
