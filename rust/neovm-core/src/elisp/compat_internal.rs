@@ -1705,12 +1705,6 @@ pub(crate) fn builtin_lread_substitute_object_in_subtree(args: Vec<Value>) -> Ev
     Ok(Value::Nil)
 }
 
-/// `(macroexpand FORM &optional ENVIRONMENT)` -> FORM.
-pub(crate) fn builtin_macroexpand(args: Vec<Value>) -> EvalResult {
-    expect_range_args("macroexpand", &args, 1, 2)?;
-    Ok(args[0].clone())
-}
-
 /// `(make-byte-code ARGDESC BYTE-CODE CONSTANTS DEPTH &rest EXTRA)` -> nil.
 pub(crate) fn builtin_make_byte_code(args: Vec<Value>) -> EvalResult {
     if args.len() < 4 {

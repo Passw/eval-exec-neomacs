@@ -14490,7 +14490,6 @@ pub(crate) fn dispatch_builtin(
         "lread--substitute-object-in-subtree" => {
             super::compat_internal::builtin_lread_substitute_object_in_subtree(args)
         }
-        "macroexpand" => super::compat_internal::builtin_macroexpand(args),
         "malloc-info" => super::compat_internal::builtin_malloc_info(args),
         "malloc-trim" => super::compat_internal::builtin_malloc_trim(args),
         "make-byte-code" => super::compat_internal::builtin_make_byte_code(args),
@@ -15068,6 +15067,7 @@ pub(crate) fn dispatch_builtin_pure(name: &str, args: Vec<Value>) -> Option<Eval
         "functionp"
         | "format"
         | "format-message"
+        | "macroexpand"
         | "message"
         | "message-box"
         | "message-or-box"
@@ -15465,7 +15465,6 @@ pub(crate) fn dispatch_builtin_pure(name: &str, args: Vec<Value>) -> Option<Eval
         "lread--substitute-object-in-subtree" => {
             super::compat_internal::builtin_lread_substitute_object_in_subtree(args)
         }
-        "macroexpand" => super::compat_internal::builtin_macroexpand(args),
         "malloc-info" => super::compat_internal::builtin_malloc_info(args),
         "malloc-trim" => super::compat_internal::builtin_malloc_trim(args),
         "make-byte-code" => super::compat_internal::builtin_make_byte_code(args),
@@ -19411,6 +19410,7 @@ mod tests {
         assert!(dispatch_builtin_pure("functionp", vec![]).is_none());
         assert!(dispatch_builtin_pure("format", vec![]).is_none());
         assert!(dispatch_builtin_pure("format-message", vec![]).is_none());
+        assert!(dispatch_builtin_pure("macroexpand", vec![]).is_none());
         assert!(dispatch_builtin_pure("message", vec![]).is_none());
         assert!(dispatch_builtin_pure("message-box", vec![]).is_none());
         assert!(dispatch_builtin_pure("message-or-box", vec![]).is_none());
