@@ -1574,6 +1574,7 @@ const DISPATCH_BUILTIN_NAMES: &[&str] = &[
     "user-full-name",
     "user-login-name",
     "user-real-login-name",
+    "file-user-uid",
     "user-real-uid",
     "user-uid",
     "user-ptrp",

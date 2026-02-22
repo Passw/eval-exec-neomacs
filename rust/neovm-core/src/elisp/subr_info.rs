@@ -1347,7 +1347,9 @@ fn subr_arity_value(name: &str) -> Value {
         "system-name" => arity_cons(0, Some(0)),
         "system-groups" | "system-users" => arity_cons(0, Some(0)),
         "tab-bar-height" | "tool-bar-height" => arity_cons(0, Some(2)),
-        "user-real-login-name" | "user-real-uid" | "user-uid" => arity_cons(0, Some(0)),
+        "file-user-uid" | "user-real-login-name" | "user-real-uid" | "user-uid" => {
+            arity_cons(0, Some(0))
+        }
         "user-full-name" | "user-login-name" => arity_cons(0, Some(1)),
         "emacs-version" => arity_cons(0, Some(1)),
         "line-beginning-position"
@@ -3908,6 +3910,7 @@ mod tests {
         assert_subr_arity("text-char-description", 1, Some(1));
         assert_subr_arity("tool-bar-height", 0, Some(2));
         assert_subr_arity("user-full-name", 0, Some(1));
+        assert_subr_arity("file-user-uid", 0, Some(0));
         assert_subr_arity("user-login-name", 0, Some(1));
         assert_subr_arity("user-real-login-name", 0, Some(0));
         assert_subr_arity("user-real-uid", 0, Some(0));

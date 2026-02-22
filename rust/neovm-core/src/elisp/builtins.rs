@@ -17914,6 +17914,7 @@ pub(crate) fn dispatch_builtin(
 
         // Editfns (pure)
         "user-uid" => super::editfns::builtin_user_uid(args),
+        "file-user-uid" => super::editfns::builtin_file_user_uid(args),
         "user-real-uid" => super::editfns::builtin_user_real_uid(args),
         "group-name" => super::editfns::builtin_group_name(args),
         "group-gid" => super::editfns::builtin_group_gid(args),

@@ -271,6 +271,12 @@ pub(crate) fn builtin_user_uid(args: Vec<Value>) -> EvalResult {
     Ok(Value::Int(get_uid()))
 }
 
+/// `(file-user-uid)` — return the UID used for file ownership.
+pub(crate) fn builtin_file_user_uid(args: Vec<Value>) -> EvalResult {
+    expect_args("file-user-uid", &args, 0)?;
+    Ok(Value::Int(get_uid()))
+}
+
 /// `(user-real-uid)` — return real user ID.
 pub(crate) fn builtin_user_real_uid(args: Vec<Value>) -> EvalResult {
     expect_args("user-real-uid", &args, 0)?;
@@ -424,4 +430,22 @@ fn read_load_average() -> Option<[f64; 3]> {
 #[cfg(not(unix))]
 fn read_load_average() -> Option<[f64; 3]> {
     None
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn file_user_uid_matches_user_uid() {
+        let user_uid = builtin_user_uid(vec![]).expect("user-uid should succeed");
+        let file_user_uid = builtin_file_user_uid(vec![]).expect("file-user-uid should succeed");
+        assert_eq!(file_user_uid, user_uid);
+        assert!(matches!(file_user_uid, Value::Int(_)));
+    }
+
+    #[test]
+    fn file_user_uid_arity_errors() {
+        assert!(builtin_file_user_uid(vec![Value::Nil]).is_err());
+    }
 }
