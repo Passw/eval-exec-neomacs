@@ -15085,6 +15085,7 @@ pub(crate) fn dispatch_builtin_pure(name: &str, args: Vec<Value>) -> Option<Eval
         | "terminal-live-p"
         | "terminal-name"
         | "terpri"
+        | "undo-boundary"
         | "write-char"
         | "assoc"
         | "alist-get"
@@ -15266,7 +15267,6 @@ pub(crate) fn dispatch_builtin_pure(name: &str, args: Vec<Value>) -> Option<Eval
         "timerp" => super::timer::builtin_timerp(args),
         "sit-for" => super::timer::builtin_sit_for(args),
         // Undo system (pure)
-        "undo-boundary" => super::undo::builtin_undo_boundary(args),
         "primitive-undo" => super::undo::builtin_primitive_undo(args),
         // Keyboard macro (pure)
         // Character encoding (pure)
@@ -19428,6 +19428,7 @@ mod tests {
         assert!(dispatch_builtin_pure("terminal-live-p", vec![]).is_none());
         assert!(dispatch_builtin_pure("terminal-name", vec![]).is_none());
         assert!(dispatch_builtin_pure("terpri", vec![]).is_none());
+        assert!(dispatch_builtin_pure("undo-boundary", vec![]).is_none());
         assert!(dispatch_builtin_pure("write-char", vec![]).is_none());
         assert!(dispatch_builtin_pure("assoc", vec![]).is_none());
         assert!(dispatch_builtin_pure("alist-get", vec![]).is_none());
