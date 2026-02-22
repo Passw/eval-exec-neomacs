@@ -16,7 +16,9 @@ use std::hash::{Hash, Hasher};
 const SXHASH_MAX_DEPTH: usize = 3;
 const SXHASH_MAX_LEN: usize = 7;
 const SXHASH_FIXNUM_SHIFT: u32 = 2;
-const SXHASH_INTMASK: u64 = (1_u64 << 61) - 1;
+const SXHASH_FIXNUM_BITS: u32 = 62;
+const SXHASH_INTMASK: u64 = (1_u64 << SXHASH_FIXNUM_BITS) - 1;
+const SXHASH_FALLBACK_NONNEG_MASK: u64 = (1_u64 << (SXHASH_FIXNUM_BITS - 1)) - 1;
 const KNUTH_ALPHA: u32 = 2_654_435_769;
 
 // ---------------------------------------------------------------------------
@@ -147,7 +149,9 @@ fn fallback_sxhash_emacs_uint(value: &Value, test: HashTableTest) -> u64 {
         HashTableTest::Equal => hash_value_for_equal(value, &mut hasher, 0),
         _ => value.to_hash_key(&test).hash(&mut hasher),
     }
-    hasher.finish()
+    // Keep fallback hashes in the non-negative fixnum lane. Exact Emacs
+    // parity is only guaranteed for covered immediate/sequence fast paths.
+    hasher.finish() & SXHASH_FALLBACK_NONNEG_MASK
 }
 
 fn emacs_sxhash_obj_with_fallback(value: &Value, depth: usize) -> u64 {
@@ -191,6 +195,7 @@ fn emacs_sxhash_obj(value: &Value, depth: usize) -> Option<u64> {
     match value {
         Value::Int(n) => Some(*n as u64),
         Value::Char(c) => Some((*c as u32) as u64),
+        Value::Float(f) => Some(f.to_bits()),
         Value::Str(s) => Some(emacs_hash_char_array(s.as_bytes())),
         Value::Cons(_) => Some(emacs_sxhash_list(value, depth)),
         Value::Vector(vec) => Some(emacs_sxhash_vector(vec, depth)),
@@ -199,7 +204,13 @@ fn emacs_sxhash_obj(value: &Value, depth: usize) -> Option<u64> {
 }
 
 fn reduce_emacs_uint_to_fixnum(x: u64) -> i64 {
-    ((x ^ (x >> SXHASH_FIXNUM_SHIFT)) & SXHASH_INTMASK) as i64
+    let reduced = (x ^ (x >> SXHASH_FIXNUM_SHIFT)) & SXHASH_INTMASK;
+    let sign_bit = 1_u64 << (SXHASH_FIXNUM_BITS - 1);
+    if (reduced & sign_bit) != 0 {
+        (reduced as i64) - ((1_i64) << SXHASH_FIXNUM_BITS)
+    } else {
+        reduced as i64
+    }
 }
 
 fn reduce_emacs_uint_to_hash_hash(x: u64) -> u32 {
@@ -306,6 +317,7 @@ fn sxhash_emacs_uint_for(value: &Value, test: HashTableTest) -> u64 {
         HashTableTest::Eq | HashTableTest::Eql => match value {
             Value::Int(n) => *n as u64,
             Value::Char(c) => (*c as u32) as u64,
+            Value::Float(f) if matches!(test, HashTableTest::Eql) => f.to_bits(),
             _ => fallback_sxhash_emacs_uint(value, test),
         },
     }
@@ -329,6 +341,8 @@ fn internal_hash_table_index_size(table: &LispHashTable) -> usize {
 
 fn internal_hash_table_diagnostic_hash(key: &HashKey, test: HashTableTest) -> u32 {
     match (test, key) {
+        (HashTableTest::Eql, HashKey::Float(bits))
+        | (HashTableTest::Equal, HashKey::Float(bits)) => reduce_emacs_uint_to_hash_hash(*bits),
         (HashTableTest::Equal, HashKey::Int(n)) => reduce_emacs_uint_to_hash_hash(*n as u64),
         (HashTableTest::Equal, HashKey::Char(c)) => {
             reduce_emacs_uint_to_hash_hash((*c as u32) as u64)
@@ -821,6 +835,26 @@ mod tests {
     }
 
     #[test]
+    fn sxhash_float_matches_oracle_fixnum_values() {
+        assert_eq!(
+            builtin_sxhash_eql(vec![Value::Float(1.0)]).unwrap(),
+            Value::Int(-1_149_543_804_886_319_104)
+        );
+        assert_eq!(
+            builtin_sxhash_eql(vec![Value::Float(2.0)]).unwrap(),
+            Value::Int(1_152_921_504_606_846_976)
+        );
+        assert_eq!(
+            builtin_sxhash_equal(vec![Value::Float(1.0)]).unwrap(),
+            Value::Int(-1_149_543_804_886_319_104)
+        );
+        assert_eq!(
+            builtin_sxhash_equal(vec![Value::Float(2.0)]).unwrap(),
+            Value::Int(1_152_921_504_606_846_976)
+        );
+    }
+
+    #[test]
     fn internal_hash_table_introspection_empty_defaults() {
         let table = builtin_make_hash_table(vec![]).unwrap();
         assert_eq!(
@@ -997,6 +1031,49 @@ mod tests {
                 Value::list(vec![Value::cons(Value::string("a"), Value::Int(113))]),
             ])
         );
+    }
+
+    #[test]
+    fn internal_hash_table_buckets_match_oracle_small_float_hashes() {
+        fn collect_float_hashes(table: Value) -> std::collections::BTreeMap<u64, i64> {
+            let buckets = builtin_internal_hash_table_buckets(vec![table]).expect("bucket alists");
+            let outer = list_to_vec(&buckets).expect("outer list");
+            let mut seen = std::collections::BTreeMap::new();
+            for bucket in outer {
+                let entries = list_to_vec(&bucket).expect("bucket alist");
+                for entry in entries {
+                    let Value::Cons(cell) = entry else {
+                        panic!("expected alist cons entry");
+                    };
+                    let pair = cell.lock().expect("poisoned");
+                    let key_bits = pair.car.as_float().expect("float key").to_bits();
+                    let hash = pair.cdr.as_int().expect("diagnostic hash integer");
+                    seen.insert(key_bits, hash);
+                }
+            }
+            seen
+        }
+
+        let expected = std::collections::BTreeMap::from([
+            (1.0_f64.to_bits(), 1_072_693_248_i64),
+            (2.0_f64.to_bits(), 1_073_741_824_i64),
+        ]);
+
+        for test_name in ["eql", "equal"] {
+            let table = builtin_make_hash_table(vec![
+                Value::keyword(":test"),
+                Value::symbol(test_name),
+                Value::keyword(":size"),
+                Value::Int(3),
+            ])
+            .expect("hash table");
+            let _ = builtin_puthash(vec![Value::Float(1.0), Value::Int(1), table.clone()])
+                .expect("puthash 1.0");
+            let _ = builtin_puthash(vec![Value::Float(2.0), Value::Int(2), table.clone()])
+                .expect("puthash 2.0");
+
+            assert_eq!(collect_float_hashes(table), expected);
+        }
     }
 
     #[test]
