@@ -1914,18 +1914,95 @@ pub(crate) fn builtin_upcase(args: Vec<Value>) -> EvalResult {
     expect_args("upcase", &args, 1)?;
     match &args[0] {
         Value::Str(s) => Ok(Value::string(s.to_uppercase())),
-        Value::Char(c) => Ok(Value::Char(c.to_uppercase().next().unwrap_or(*c))),
-        Value::Int(n) => {
-            if let Some(c) = char::from_u32(*n as u32) {
-                Ok(Value::Int(c.to_uppercase().next().unwrap_or(c) as i64))
+        Value::Char(c) => {
+            let mapped = upcase_char_code_emacs_compat(*c as i64);
+            if let Some(ch) = u32::try_from(mapped).ok().and_then(char::from_u32) {
+                Ok(Value::Char(ch))
             } else {
-                Ok(Value::Int(*n))
+                Ok(Value::Char(*c))
+            }
+        }
+        Value::Int(n) => {
+            if *n < 0 {
+                Err(signal(
+                    "wrong-type-argument",
+                    vec![Value::symbol("char-or-string-p"), Value::Int(*n)],
+                ))
+            } else {
+                Ok(Value::Int(upcase_char_code_emacs_compat(*n)))
             }
         }
         other => Err(signal(
             "wrong-type-argument",
             vec![Value::symbol("char-or-string-p"), other.clone()],
         )),
+    }
+}
+
+fn preserve_emacs_upcase_payload(code: i64) -> bool {
+    matches!(
+        code,
+        305
+            | 329
+            | 383
+            | 411
+            | 496
+            | 612
+            | 912
+            | 944
+            | 1415
+            | 7306
+            | 7830..=7834
+            | 8016
+            | 8018
+            | 8020
+            | 8022
+            | 8072..=8079
+            | 8088..=8095
+            | 8104..=8111
+            | 8114
+            | 8116
+            | 8118..=8119
+            | 8124
+            | 8130
+            | 8132
+            | 8134..=8135
+            | 8140
+            | 8146..=8147
+            | 8150..=8151
+            | 8162..=8164
+            | 8166..=8167
+            | 8178
+            | 8180
+            | 8182..=8183
+            | 8188
+            | 42957
+            | 42959
+            | 42963
+            | 42965
+            | 42971
+            | 64256..=64262
+            | 64275..=64279
+            | 68976..=68997
+            | 93883..=93907
+    )
+}
+
+fn upcase_char_code_emacs_compat(code: i64) -> i64 {
+    if preserve_emacs_upcase_payload(code) {
+        return code;
+    }
+    match code {
+        223 => 7838,
+        8064..=8071 | 8080..=8087 | 8096..=8103 => code + 8,
+        8115 | 8131 | 8179 => code + 9,
+        _ => {
+            if let Some(c) = u32::try_from(code).ok().and_then(char::from_u32) {
+                c.to_uppercase().next().unwrap_or(c) as i64
+            } else {
+                code
+            }
+        }
     }
 }
 
@@ -19439,6 +19516,60 @@ mod tests {
         let negative = dispatch_builtin_pure("downcase", vec![Value::Int(-1)])
             .expect("builtin downcase should resolve")
             .expect_err("builtin downcase should reject negative integer designators");
+        match negative {
+            Flow::Signal(sig) => {
+                assert_eq!(sig.symbol, "wrong-type-argument");
+                assert_eq!(
+                    sig.data,
+                    vec![Value::symbol("char-or-string-p"), Value::Int(-1)]
+                );
+            }
+            other => panic!("unexpected flow: {other:?}"),
+        }
+    }
+
+    #[test]
+    fn pure_dispatch_typed_upcase_unicode_edge_payloads_match_oracle() {
+        let cases = [
+            (223, 7838),
+            (305, 305),
+            (7306, 7306),
+            (8064, 8072),
+            (8071, 8079),
+            (8080, 8088),
+            (8087, 8095),
+            (8096, 8104),
+            (8103, 8111),
+            (8115, 8124),
+            (8131, 8140),
+            (8179, 8188),
+            (42957, 42957),
+            (68976, 68976),
+            (68997, 68997),
+            (93883, 93883),
+            (93907, 93907),
+            (97, 65),
+        ];
+
+        for (input, expected) in cases {
+            let result = dispatch_builtin_pure("upcase", vec![Value::Int(input)])
+                .expect("builtin upcase should resolve")
+                .expect("builtin upcase should evaluate");
+            assert_eq!(
+                result,
+                Value::Int(expected),
+                "upcase({input}) should equal {expected}"
+            );
+        }
+
+        let sharp_s = dispatch_builtin_pure("upcase", vec![Value::Char('ß')])
+            .expect("builtin upcase should resolve")
+            .expect("builtin upcase should evaluate");
+        assert_eq!(sharp_s, Value::Char('\u{1E9E}'));
+
+        let negative = dispatch_builtin_pure("upcase", vec![Value::Int(-1)])
+            .expect("builtin upcase should resolve")
+            .expect_err("builtin upcase should reject negative integer designators");
         match negative {
             Flow::Signal(sig) => {
                 assert_eq!(sig.symbol, "wrong-type-argument");

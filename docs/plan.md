@@ -28,6 +28,29 @@ Last updated: 2026-02-22
 
 ## Doing
 
+- Aligned core `upcase` Unicode edge behavior with oracle simple-mapping semantics:
+  - runtime changes:
+    - `rust/neovm-core/src/elisp/builtins.rs`
+      - `upcase` now preserves oracle identity payloads for Unicode edge ranges where Rust full-uppercase expansion diverges.
+      - `upcase` now applies oracle remaps for:
+        - `223 -> 7838`
+        - `8064..=8071 -> +8`
+        - `8080..=8087 -> +8`
+        - `8096..=8103 -> +8`
+        - `8115|8131|8179 -> +9`
+      - `upcase` now signals `(wrong-type-argument char-or-string-p -1)` for negative integer inputs.
+      - added unit coverage:
+        - `pure_dispatch_typed_upcase_unicode_edge_payloads_match_oracle`
+  - vm-compat corpus changes:
+    - added and wired:
+      - `test/neovm/vm-compat/cases/upcase-unicode-edge-semantics.forms`
+      - `test/neovm/vm-compat/cases/upcase-unicode-edge-semantics.expected.tsv`
+      - `test/neovm/vm-compat/cases/default.list`
+  - verified:
+    - `cargo test --manifest-path rust/neovm-core/Cargo.toml pure_dispatch_typed_upcase_unicode_edge_payloads_match_oracle -- --nocapture` (pass)
+    - `make -C test/neovm/vm-compat record FORMS=cases/upcase-unicode-edge-semantics.forms EXPECTED=cases/upcase-unicode-edge-semantics.expected.tsv` (pass)
+    - `make -C test/neovm/vm-compat check-one-neovm CASE=cases/upcase-unicode-edge-semantics` (pass)
+
 - Aligned core `downcase` Unicode edge behavior with oracle simple-mapping semantics:
   - runtime changes:
     - `rust/neovm-core/src/elisp/builtins.rs`
