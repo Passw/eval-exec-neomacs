@@ -34,3 +34,6 @@
 34	(condition-case err (pcase '(1 . 2) (((1 2) . 3) 'x) (_ 'y)) (error err))	OK (wrong-type-argument symbolp (1 2))
 35	(condition-case err (pcase-let ((((1 2) . 3) '(1 . 2))) 'ok) (error err))	OK (wrong-type-argument symbolp (1 2))
 36	(condition-case err (pcase-let* ((((1 2) . 3) '(1 . 2))) 'ok) (error err))	OK (wrong-type-argument symbolp (1 2))
+37	(condition-case err (pcase 1 ((and) 'x) (_ 'y)) (error err))	OK x
+38	(condition-case err (pcase 1 ((and 1) 'x) (_ 'y)) (error err))	OK x
+39	(condition-case err (pcase 1 ((and 1 2) 'x) (_ 'y)) (error err))	OK y

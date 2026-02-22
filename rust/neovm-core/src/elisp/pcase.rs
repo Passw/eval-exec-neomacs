@@ -1388,6 +1388,22 @@ mod tests {
         );
     }
 
+    #[test]
+    fn pcase_and_pattern_empty_and_singleton_behavior_matches_oracle() {
+        assert_eq!(
+            eval_last("(condition-case err (pcase 1 ((and) 'x) (_ 'y)) (error err))"),
+            "OK x"
+        );
+        assert_eq!(
+            eval_last("(condition-case err (pcase 1 ((and 1) 'x) (_ 'y)) (error err))"),
+            "OK x"
+        );
+        assert_eq!(
+            eval_last("(condition-case err (pcase 1 ((and 1 2) 'x) (_ 'y)) (error err))"),
+            "OK y"
+        );
+    }
+
     // =======================================================================
     // 12. or pattern
     // =======================================================================

@@ -43,3 +43,8 @@
 (condition-case err (pcase '(1 . 2) (((1 2) . 3) 'x) (_ 'y)) (error err))
 (condition-case err (pcase-let ((((1 2) . 3) '(1 . 2))) 'ok) (error err))
 (condition-case err (pcase-let* ((((1 2) . 3) '(1 . 2))) 'ok) (error err))
+
+; (and) empty/singleton behavior
+(condition-case err (pcase 1 ((and) 'x) (_ 'y)) (error err))
+(condition-case err (pcase 1 ((and 1) 'x) (_ 'y)) (error err))
+(condition-case err (pcase 1 ((and 1 2) 'x) (_ 'y)) (error err))
