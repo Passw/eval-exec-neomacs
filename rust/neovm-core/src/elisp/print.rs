@@ -37,7 +37,7 @@ pub fn print_value(value: &Value) -> String {
             let parts: Vec<String> = items.iter().map(print_value).collect();
             format!("[{}]", parts.join(" "))
         }
-        Value::HashTable(_) => "#<hash-table>".to_string(),
+        Value::HashTable(_) => "#s(hash-table)".to_string(),
         Value::Lambda(lambda) => {
             let params = format_params(&lambda.params);
             let body = lambda
@@ -117,7 +117,7 @@ fn append_print_value_bytes(value: &Value, out: &mut Vec<u8>) {
             }
             out.push(b']');
         }
-        Value::HashTable(_) => out.extend_from_slice(b"#<hash-table>"),
+        Value::HashTable(_) => out.extend_from_slice(b"#s(hash-table)"),
         Value::Lambda(lambda) => {
             let params = format_params(&lambda.params);
             let body = lambda
@@ -381,7 +381,7 @@ fn print_cons_bytes(value: &Value, out: &mut Vec<u8>) {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::elisp::value::{LambdaData, LambdaParams};
+    use crate::elisp::value::{HashTableTest, LambdaData, LambdaParams};
     use std::sync::Arc;
 
     #[test]
@@ -468,6 +468,13 @@ mod tests {
         ]);
         assert_eq!(print_value(&literal), "#s(x)");
         assert_eq!(print_value_bytes(&literal), b"#s(x)");
+    }
+
+    #[test]
+    fn print_hash_table_object_uses_readable_hash_s_shape() {
+        let table = Value::hash_table(HashTableTest::Equal);
+        assert_eq!(print_value(&table), "#s(hash-table)");
+        assert_eq!(print_value_bytes(&table), b"#s(hash-table)");
     }
 
     #[test]

@@ -858,6 +858,7 @@ cases/load-policy
 cases/load-suffixes
 cases/reader-hash
 cases/read-from-string-edges
+cases/read-hash-table-literal-semantics
 cases/read-stream-semantics
 cases/completion-subr-surface-semantics
 cases/eval-buffer-region-semantics

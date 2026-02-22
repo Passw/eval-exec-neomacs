@@ -221,6 +221,8 @@ pub(crate) fn builtin_read_from_string(
             .unwrap_or(Value::Nil)
     } else if let Some(bytecode) = first_form_byte_code_literal_value(&forms[0]) {
         bytecode
+    } else if let Some(hash_table) = first_form_hash_table_literal_value(&forms[0]) {
+        hash_table
     } else {
         super::eval::quote_to_value(&forms[0])
     };
@@ -252,6 +254,111 @@ fn first_form_byte_code_literal_value(expr: &Expr) -> Option<Value> {
     };
     let values = values.iter().map(super::eval::quote_to_value).collect();
     Some(super::compiled_literal::maybe_coerce_compiled_literal_function(Value::vector(values)))
+}
+
+fn first_form_hash_table_literal_value(expr: &Expr) -> Option<Value> {
+    let Expr::List(items) = expr else {
+        return None;
+    };
+    if items.len() != 2 {
+        return None;
+    }
+    let Expr::Symbol(name) = &items[0] else {
+        return None;
+    };
+    if name != "make-hash-table-from-literal" {
+        return None;
+    }
+    let Expr::List(quoted) = &items[1] else {
+        return None;
+    };
+    if quoted.len() != 2 {
+        return None;
+    }
+    if !matches!(&quoted[0], Expr::Symbol(sym) if sym == "quote") {
+        return None;
+    }
+    let Expr::List(spec) = &quoted[1] else {
+        return None;
+    };
+    if !matches!(spec.first(), Some(Expr::Symbol(sym)) if sym == "hash-table") {
+        return None;
+    }
+
+    let mut test = HashTableTest::Eql;
+    let mut test_name: Option<String> = None;
+    let mut size = 0_i64;
+    let mut weakness: Option<HashTableWeakness> = None;
+    let mut rehash_size = 1.5_f64;
+    let mut rehash_threshold = 0.8125_f64;
+    let mut data_expr: Option<&Expr> = None;
+
+    let mut i = 1_usize;
+    while i + 1 < spec.len() {
+        let Expr::Symbol(key) = &spec[i] else {
+            i += 1;
+            continue;
+        };
+        let value = super::eval::quote_to_value(&spec[i + 1]);
+        match key.as_str() {
+            "size" => {
+                size = value.as_int()?;
+            }
+            "test" => {
+                let name = value.as_symbol_name()?;
+                test = match name {
+                    "eq" => HashTableTest::Eq,
+                    "eql" => HashTableTest::Eql,
+                    "equal" => HashTableTest::Equal,
+                    _ => return None,
+                };
+                test_name = Some(name.to_string());
+            }
+            "weakness" => {
+                weakness = match value.as_symbol_name() {
+                    Some("key") => Some(HashTableWeakness::Key),
+                    Some("value") => Some(HashTableWeakness::Value),
+                    Some("key-or-value") => Some(HashTableWeakness::KeyOrValue),
+                    Some("key-and-value") => Some(HashTableWeakness::KeyAndValue),
+                    Some("nil") | None => None,
+                    _ => return None,
+                };
+            }
+            "rehash-size" => {
+                rehash_size = value.as_float().unwrap_or(value.as_int()? as f64);
+            }
+            "rehash-threshold" => {
+                rehash_threshold = value.as_float().unwrap_or(value.as_int()? as f64);
+            }
+            "data" => {
+                data_expr = Some(&spec[i + 1]);
+            }
+            _ => {}
+        }
+        i += 2;
+    }
+
+    let table_value =
+        Value::hash_table_with_options(test, size, weakness, rehash_size, rehash_threshold);
+    if let Value::HashTable(table_ref) = &table_value {
+        let mut table = table_ref.lock().expect("poisoned");
+        table.test_name = test_name;
+        if let Some(Expr::List(data_items)) = data_expr {
+            let mut idx = 0_usize;
+            while idx + 1 < data_items.len() {
+                let key_value = super::eval::quote_to_value(&data_items[idx]);
+                let val_value = super::eval::quote_to_value(&data_items[idx + 1]);
+                let key = key_value.to_hash_key(&table.test);
+                let inserting_new_key = !table.data.contains_key(&key);
+                table.data.insert(key.clone(), val_value);
+                if inserting_new_key {
+                    table.key_snapshots.insert(key, key_value);
+                }
+                idx += 2;
+            }
+        }
+    }
+    Some(table_value)
 }
 
 fn consumed_represents_hash_dollar(input: &str) -> bool {
@@ -702,7 +809,13 @@ pub(crate) fn builtin_read(eval: &mut super::eval::Evaluator, args: Vec<Value>) 
                     vec![Value::string("End of file during parsing")],
                 ));
             }
-            let value = super::eval::quote_to_value(&forms[0]);
+            let value = if let Some(bytecode) = first_form_byte_code_literal_value(&forms[0]) {
+                bytecode
+            } else if let Some(hash_table) = first_form_hash_table_literal_value(&forms[0]) {
+                hash_table
+            } else {
+                super::eval::quote_to_value(&forms[0])
+            };
             // Advance point past the read form
             let end_offset = compute_read_end_position(substring);
             let new_pt = pt + end_offset;
@@ -3131,6 +3244,60 @@ mod tests {
             }
             _ => panic!("Expected cons"),
         }
+    }
+
+    #[test]
+    fn read_from_string_hash_table_literal_returns_hash_table() {
+        let mut ev = Evaluator::new();
+        let input = "#s(hash-table size 3 test equal data (\"a\" 1 \"b\" 2))";
+        let result = builtin_read_from_string(&mut ev, vec![Value::string(input)]).unwrap();
+        let Value::Cons(cell) = result else {
+            panic!("Expected cons");
+        };
+        let pair = cell.lock().expect("poisoned");
+        let Value::HashTable(table_ref) = &pair.car else {
+            panic!("expected hash table object");
+        };
+        let table = table_ref.lock().expect("poisoned");
+        assert!(matches!(table.test, HashTableTest::Equal));
+        assert_eq!(table.size, 3);
+        assert_eq!(table.data.len(), 2);
+        assert_eq!(table.key_snapshots.len(), 2);
+        assert!(matches!(
+            table.data.get(&HashKey::Str("a".to_string())),
+            Some(Value::Int(1))
+        ));
+        assert!(matches!(
+            table.data.get(&HashKey::Str("b".to_string())),
+            Some(Value::Int(2))
+        ));
+    }
+
+    #[test]
+    fn read_buffer_hash_table_literal_returns_hash_table() {
+        let mut ev = Evaluator::new();
+        let buf_id = ev.buffers.create_buffer(" *reader-hash-table*");
+        {
+            let buf = ev.buffers.get_mut(buf_id).expect("buffer");
+            buf.insert("#s(hash-table size 3 test equal data (\"a\" 1 \"b\" 2))");
+            buf.pt = 0;
+        }
+        let value = builtin_read(&mut ev, vec![Value::Buffer(buf_id)]).expect("read from buffer");
+        let Value::HashTable(table_ref) = value else {
+            panic!("expected hash table object");
+        };
+        let table = table_ref.lock().expect("poisoned");
+        assert!(matches!(table.test, HashTableTest::Equal));
+        assert_eq!(table.size, 3);
+        assert_eq!(table.data.len(), 2);
+        assert!(matches!(
+            table.data.get(&HashKey::Str("a".to_string())),
+            Some(Value::Int(1))
+        ));
+        assert!(matches!(
+            table.data.get(&HashKey::Str("b".to_string())),
+            Some(Value::Int(2))
+        ));
     }
 
     #[cfg(feature = "legacy-elc-literal")]
