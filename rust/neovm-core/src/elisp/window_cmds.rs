@@ -111,6 +111,29 @@ fn parse_integer_or_marker_arg(value: &Value) -> Result<IntegerOrMarkerArg, Flow
     }
 }
 
+fn expect_number_or_marker_count(value: &Value) -> Result<i64, Flow> {
+    match value {
+        Value::Int(n) => Ok(*n),
+        Value::Char(c) => Ok(*c as i64),
+        Value::Float(n) => Ok(n.floor() as i64),
+        marker if super::marker::is_marker(marker) => match parse_integer_or_marker_arg(marker)? {
+            IntegerOrMarkerArg::Marker {
+                position: Some(pos),
+                ..
+            } => Ok(pos),
+            IntegerOrMarkerArg::Marker { position: None, .. } => Err(signal(
+                "error",
+                vec![Value::string("Marker does not point anywhere")],
+            )),
+            IntegerOrMarkerArg::Int(pos) => Ok(pos),
+        },
+        other => Err(signal(
+            "wrong-type-argument",
+            vec![Value::symbol("number-or-marker-p"), other.clone()],
+        )),
+    }
+}
+
 fn clamped_window_position(
     eval: &super::eval::Evaluator,
     fid: FrameId,
@@ -2752,12 +2775,9 @@ pub(crate) fn builtin_other_window(
     eval: &mut super::eval::Evaluator,
     args: Vec<Value>,
 ) -> EvalResult {
+    expect_min_args("other-window", &args, 1)?;
     expect_max_args("other-window", &args, 3)?;
-    let count = if args.is_empty() || args[0].is_nil() {
-        1
-    } else {
-        expect_int(&args[0])?
-    };
+    let count = expect_number_or_marker_count(&args[0])?;
     let Some(fid) = eval.frames.selected_frame().map(|f| f.id) else {
         return Ok(Value::Nil);
     };
@@ -4952,14 +4972,42 @@ mod tests {
     }
 
     #[test]
-    fn other_window_defaults_count_to_one() {
-        let results = eval_with_frame(
-            "(let ((w1 (selected-window)))
-               (split-window)
-               (other-window)
-               (not (eq (selected-window) w1)))",
+    fn other_window_requires_count_and_enforces_number_or_marker_p() {
+        let forms = parse_forms(
+            "(condition-case err (other-window) (error (car err)))
+             (condition-case err (other-window nil) (error err))
+             (condition-case err (other-window \"x\") (error err))",
+        )
+        .expect("parse");
+        let mut ev = Evaluator::new();
+        let out = ev
+            .eval_forms(&forms)
+            .iter()
+            .map(format_eval_result)
+            .collect::<Vec<_>>();
+        assert_eq!(out[0], "OK wrong-number-of-arguments");
+        assert_eq!(
+            out[1],
+            "OK (wrong-type-argument number-or-marker-p nil)"
         );
-        assert_eq!(results[0], "OK t");
+        assert_eq!(
+            out[2],
+            "OK (wrong-type-argument number-or-marker-p \"x\")"
+        );
+    }
+
+    #[test]
+    fn other_window_accepts_float_counts_with_floor_semantics() {
+        let results = eval_with_frame(
+            "(let* ((w1 (progn (delete-other-windows) (selected-window)))
+                    (w2 (split-window)))
+               (list
+                 (progn (other-window 1.5) (eq (selected-window) w2))
+                 (progn (select-window w1) (other-window 0.4) (eq (selected-window) w1))
+                 (progn (select-window w1) (other-window -0.4) (eq (selected-window) w2))
+                 (progn (select-window w1) (other-window -1.2) (eq (selected-window) w1))))",
+        );
+        assert_eq!(results[0], "OK (t t t t)");
     }
 
     #[test]
@@ -4986,7 +5034,7 @@ mod tests {
 
     #[test]
     fn other_window_without_selected_frame_returns_nil() {
-        let forms = parse_forms("(other-window)").expect("parse");
+        let forms = parse_forms("(other-window 1)").expect("parse");
         let mut ev = Evaluator::new();
         let results = ev.eval_forms(&forms);
         assert_eq!(format_eval_result(&results[0]), "OK nil");

@@ -19262,6 +19262,30 @@ Last updated: 2026-02-21
     - `make -C test/neovm/vm-compat check-one-neovm CASE=cases/window-sibling-minibuffer-semantics` (pass; `14/14`)
     - `make -C test/neovm/vm-compat check-neovm-filter-strict LIST=cases/default.list PATTERN='window-(tree-navigation-callable-path-semantics|sibling-minibuffer-semantics)'` (pass; strict filtered gates green)
 
+- Aligned `other-window` argument contract with oracle (required COUNT, `number-or-marker-p` type checks, float floor coercion):
+  - runtime changes:
+    - `rust/neovm-core/src/elisp/window_cmds.rs`
+      - `other-window` now requires at least one argument (`COUNT`), matching oracle `wrong-number-of-arguments` behavior on zero args.
+      - `COUNT` now enforces `number-or-marker-p` typing (rejects `nil`/strings with oracle-shaped payloads).
+      - marker counts now signal `(error \"Marker does not point anywhere\")` when unset.
+      - float counts now use floor coercion for movement, matching oracle negative/positive fractional behavior.
+      - extended evaluator coverage:
+        - `other_window_requires_count_and_enforces_number_or_marker_p`
+        - `other_window_accepts_float_counts_with_floor_semantics`
+        - updated `other_window_without_selected_frame_returns_nil` to pass an explicit count.
+  - vm-compat corpus changes:
+    - updated:
+      - `test/neovm/vm-compat/cases/other-window-arity-semantics.forms`
+      - `test/neovm/vm-compat/cases/other-window-arity-semantics.expected.tsv`
+    - added lock-ins for:
+      - zero-arg `other-window` arity error
+      - `nil`/string/empty-marker count error payloads
+      - float/negative float count movement semantics
+  - verified:
+    - `cargo test --manifest-path rust/neovm-core/Cargo.toml other_window_ -- --nocapture` (pass)
+    - `make -C test/neovm/vm-compat check-one-neovm CASE=cases/other-window-arity-semantics` (pass; `6/6`)
+    - `make -C test/neovm/vm-compat check-neovm-filter-strict LIST=cases/default.list PATTERN='(other-window-arity-semantics|select-other-window-callable-path-semantics|other-window-current-buffer-semantics)'` (pass; strict filtered gates green)
+
 - Continue compatibility-first maintenance with small commit slices:
   - keep builtin surface and registry in lock-step
   - run oracle/parity checks after each behavior-affecting change
