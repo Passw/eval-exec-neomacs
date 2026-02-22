@@ -441,6 +441,7 @@ cases/display-x-terminal-compat-surface-semantics
 cases/display-query-string-designator-error-semantics
 cases/display-query-symbol-designator-error-semantics
 cases/display-query-vector-designator-error-semantics
+cases/display-query-list-designator-error-semantics
 cases/display-images-face-support-semantics
 cases/display-frame-designator-semantics
 cases/display-frame-designator-edge-semantics
