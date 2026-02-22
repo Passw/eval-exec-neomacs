@@ -1092,6 +1092,7 @@ pub fn add_name_to_file(oldname: &str, newname: &str) -> std::io::Result<()> {
 #[derive(Debug, Clone)]
 pub struct FileAttributes {
     pub size: u64,
+    pub nlinks: u64,
     pub is_dir: bool,
     pub is_symlink: bool,
     pub modified: Option<f64>, // seconds since epoch
@@ -1121,13 +1122,27 @@ pub fn file_attributes(filename: &str) -> Option<FileAttributes> {
         0o644
     };
 
+    #[cfg(unix)]
+    let nlinks = {
+        use std::os::unix::fs::MetadataExt;
+        meta.nlink()
+    };
+    #[cfg(not(unix))]
+    let nlinks = 1;
+
     Some(FileAttributes {
         size: meta.len(),
+        nlinks,
         is_dir: meta.is_dir(),
         is_symlink: symlink_meta.map_or(false, |m| m.file_type().is_symlink()),
         modified,
         modes,
     })
+}
+
+/// Return number of hard links for FILENAME, or nil-like None.
+pub fn file_nlinks(filename: &str) -> Option<i64> {
+    file_attributes(filename).map(|attrs| attrs.nlinks as i64)
 }
 
 fn file_modes(filename: &str) -> Option<u32> {
@@ -1882,6 +1897,18 @@ pub(crate) fn builtin_file_local_name(args: Vec<Value>) -> EvalResult {
     expect_args("file-local-name", &args, 1)?;
     let file = expect_string_strict(&args[0])?;
     Ok(Value::string(file_local_name(&file)))
+}
+
+/// (file-nlinks FILE) -> integer or nil
+pub(crate) fn builtin_file_nlinks(args: Vec<Value>) -> EvalResult {
+    expect_args("file-nlinks", &args, 1)?;
+    let Value::Str(file) = &args[0] else {
+        return Ok(Value::Nil);
+    };
+    Ok(match file_nlinks(file) {
+        Some(links) => Value::Int(links),
+        None => Value::Nil,
+    })
 }
 
 /// (file-remote-p FILE &optional IDENTIFICATION CONNECTED) -> remote component or nil
@@ -5114,8 +5141,17 @@ mod tests {
         assert_eq!(result.unwrap(), Value::Nil);
         fs::remove_file(&file).unwrap();
 
+        let result = builtin_file_nlinks(vec![Value::string(file.to_string_lossy())]);
+        assert_eq!(result.unwrap(), Value::Nil);
+
         let result = builtin_directory_empty_p(vec![Value::string(base.to_string_lossy())]);
         assert_eq!(result.unwrap(), Value::True);
+
+        fs::write(&file, "x").unwrap();
+        let result = builtin_file_nlinks(vec![Value::string(file.to_string_lossy())]);
+        assert_eq!(result.unwrap(), Value::Int(1));
+
+        fs::remove_file(&file).unwrap();
         fs::remove_dir_all(&base).unwrap();
 
         let result = builtin_file_remote_p(vec![Value::string("/tmp/local")]);
@@ -5184,6 +5220,21 @@ mod tests {
         assert!(result.is_err());
 
         let result = builtin_file_local_name(vec![Value::Nil]);
+        assert!(result.is_err());
+
+        let result = builtin_file_nlinks(vec![Value::Nil]);
+        assert_eq!(result.unwrap(), Value::Nil);
+
+        let result = builtin_file_nlinks(vec![Value::Int(1)]);
+        assert_eq!(result.unwrap(), Value::Nil);
+
+        let result = builtin_file_nlinks(vec![Value::symbol("x")]);
+        assert_eq!(result.unwrap(), Value::Nil);
+
+        let result = builtin_file_nlinks(vec![]);
+        assert!(result.is_err());
+
+        let result = builtin_file_nlinks(vec![Value::string("/tmp"), Value::Nil]);
         assert!(result.is_err());
     }
 
