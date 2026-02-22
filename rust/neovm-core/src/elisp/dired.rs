@@ -1616,6 +1616,14 @@ mod tests {
         assert_eq!(parsed, vec!["exec".to_string(), "root".to_string()]);
     }
 
+    #[test]
+    fn test_parse_colon_file_names_skips_comments_and_blanks() {
+        let parsed = parse_colon_file_names(
+            "\n# comment\nuser1:x:1000\n\nuser2:x:1001\n",
+        );
+        assert_eq!(parsed, vec!["user2".to_string(), "user1".to_string()]);
+    }
+
     // -----------------------------------------------------------------------
     // Argument validation
     // -----------------------------------------------------------------------
