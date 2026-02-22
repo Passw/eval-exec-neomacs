@@ -1847,6 +1847,7 @@ const DISPATCH_BUILTIN_NAMES: &[&str] = &[
     "round",
     "sequencep",
     "string-equal",
+    "string-greaterp",
     "string-lessp",
     "string-to-char",
     "string-to-number",
