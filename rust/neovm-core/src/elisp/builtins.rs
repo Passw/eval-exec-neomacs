@@ -14575,7 +14575,6 @@ pub(crate) fn dispatch_builtin(
         "redirect-frame-focus" => super::compat_internal::builtin_redirect_frame_focus(args),
         "remove-pos-from-symbol" => super::compat_internal::builtin_remove_pos_from_symbol(args),
         "rename-buffer" => super::compat_internal::builtin_rename_buffer(args),
-        "replace-buffer-contents" => super::compat_internal::builtin_replace_buffer_contents(args),
         "resize-mini-window-internal" => {
             super::compat_internal::builtin_resize_mini_window_internal(args)
         }
@@ -15081,6 +15080,7 @@ pub(crate) fn dispatch_builtin_pure(name: &str, args: Vec<Value>) -> Option<Eval
         | "prin1-to-string"
         | "print"
         | "rename-file"
+        | "replace-buffer-contents"
         | "setplist"
         | "terminal-live-p"
         | "terminal-name"
@@ -15550,7 +15550,6 @@ pub(crate) fn dispatch_builtin_pure(name: &str, args: Vec<Value>) -> Option<Eval
         "redirect-frame-focus" => super::compat_internal::builtin_redirect_frame_focus(args),
         "remove-pos-from-symbol" => super::compat_internal::builtin_remove_pos_from_symbol(args),
         "rename-buffer" => super::compat_internal::builtin_rename_buffer(args),
-        "replace-buffer-contents" => super::compat_internal::builtin_replace_buffer_contents(args),
         "resize-mini-window-internal" => {
             super::compat_internal::builtin_resize_mini_window_internal(args)
         }
@@ -19424,6 +19423,7 @@ mod tests {
         assert!(dispatch_builtin_pure("prin1-to-string", vec![]).is_none());
         assert!(dispatch_builtin_pure("print", vec![]).is_none());
         assert!(dispatch_builtin_pure("rename-file", vec![]).is_none());
+        assert!(dispatch_builtin_pure("replace-buffer-contents", vec![]).is_none());
         assert!(dispatch_builtin_pure("setplist", vec![]).is_none());
         assert!(dispatch_builtin_pure("terminal-live-p", vec![]).is_none());
         assert!(dispatch_builtin_pure("terminal-name", vec![]).is_none());

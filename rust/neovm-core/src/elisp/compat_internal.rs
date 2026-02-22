@@ -1856,12 +1856,6 @@ pub(crate) fn builtin_rename_buffer(args: Vec<Value>) -> EvalResult {
     Ok(Value::Nil)
 }
 
-/// `(replace-buffer-contents SOURCE &optional MAX-SECS MAX-COSTS)` -> nil.
-pub(crate) fn builtin_replace_buffer_contents(args: Vec<Value>) -> EvalResult {
-    expect_range_args("replace-buffer-contents", &args, 1, 3)?;
-    Ok(Value::Nil)
-}
-
 /// `(set-buffer-major-mode BUFFER)` -> nil.
 pub(crate) fn builtin_set_buffer_major_mode(args: Vec<Value>) -> EvalResult {
     expect_args("set-buffer-major-mode", &args, 1)?;
