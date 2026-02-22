@@ -19664,6 +19664,22 @@ Last updated: 2026-02-21
       - two-argument path payload structure (`wrong-type-argument` + `frame-live-p`) with second-argument passthrough across symbol/vector/list/cons values
       - live-window third-argument structure and dead-window compact-handle payload shape (`#<window N>`, no ` on ` context)
 
+- Added `x-display` optional-query arity/type payload lock-ins:
+  - vm-compat corpus changes:
+    - added:
+      - `test/neovm/vm-compat/cases/x-display-query-arity-type-payload-semantics.forms`
+      - `test/neovm/vm-compat/cases/x-display-query-arity-type-payload-semantics.expected.tsv`
+    - wired case into:
+      - `test/neovm/vm-compat/cases/default.list`
+    - lock-ins cover the shared optional-display helper family:
+      - no-arg and `nil` argument payload shape in batch/no-X context
+      - strict max-arity payloads for two-argument calls (`wrong-number-of-arguments`)
+      - covered functions:
+        - `x-server-version`, `x-server-max-request-size`, `x-display-grayscale-p`
+        - `x-display-backing-store`, `x-display-color-cells`, `x-display-mm-height`, `x-display-mm-width`
+        - `x-display-monitor-attributes-list`, `x-display-planes`, `x-display-save-under`, `x-display-screens`
+        - `x-display-visual-class`, `x-server-input-extension-version`, `x-server-vendor`
+
 - Continue compatibility-first maintenance with small commit slices:
   - keep builtin surface and registry in lock-step
   - run oracle/parity checks after each behavior-affecting change
