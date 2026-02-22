@@ -128,6 +128,12 @@ fn titlecase_word_initial(c: char) -> String {
     if c == 'ß' {
         return "Ss".to_string();
     }
+    if c == '\u{0149}' {
+        return "\u{02BC}N".to_string();
+    }
+    if c == '\u{01F0}' {
+        return "J\u{030C}".to_string();
+    }
     if let Some(mapped) = code_to_char(upcase_char(c as i64)) {
         mapped.to_string()
     } else {
@@ -388,6 +394,12 @@ mod tests {
 
         let string_sharp_s = builtin_capitalize(vec![Value::string("ß")]).unwrap();
         assert_eq!(string_sharp_s.as_str(), Some("Ss"));
+
+        let string_n_preceded = builtin_capitalize(vec![Value::string("\u{0149}")]).unwrap();
+        assert_eq!(string_n_preceded.as_str(), Some("\u{02BC}N"));
+
+        let string_j_caron = builtin_capitalize(vec![Value::string("\u{01F0}")]).unwrap();
+        assert_eq!(string_j_caron.as_str(), Some("J\u{030C}"));
     }
 
     #[test]
@@ -406,5 +418,11 @@ mod tests {
 
         let string_sharp_s = builtin_upcase_initials(vec![Value::string("ß")]).unwrap();
         assert_eq!(string_sharp_s.as_str(), Some("Ss"));
+
+        let string_n_preceded = builtin_upcase_initials(vec![Value::string("\u{0149}")]).unwrap();
+        assert_eq!(string_n_preceded.as_str(), Some("\u{02BC}N"));
+
+        let string_j_caron = builtin_upcase_initials(vec![Value::string("\u{01F0}")]).unwrap();
+        assert_eq!(string_j_caron.as_str(), Some("J\u{030C}"));
     }
 }

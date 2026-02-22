@@ -68,7 +68,10 @@ Last updated: 2026-02-22
           - Georgian mkhedruli block samples (`4304`, `4346`, `4349`, `4351`)
           - extended Unicode edge ranges (`68976..=68997`, `93883..=93907`)
           - modifier/special singleton samples (`7306`, `42957`, `42959`, `42963`, `42965`, `42971`)
-      - word-initial titlecase now emits `"Ss"` for `"ß"` in string paths.
+      - word-initial titlecase now emits oracle multi-char expansions in string paths:
+        - `"ß" -> "Ss"`
+        - `"\u{0149}" -> "\u{02BC}N"`
+        - `"\u{01F0}" -> "J\u{030C}"`
       - added unit coverage:
         - `capitalize_unicode_edge_semantics`
         - `upcase_initials_unicode_edge_semantics`
