@@ -19420,6 +19420,15 @@ Last updated: 2026-02-21
       - `(x-display-color-p "foo")` keeps the oracle `Display foo does not exist` path
       - both symbol/string payload paths explicitly avoid accidental `#<window ...>` rendering
 
+- Expanded `display-color-p`/`x-display-color-p` alias error lock-ins for symbol designators:
+  - vm-compat corpus changes:
+    - updated:
+      - `test/neovm/vm-compat/cases/x-display-color-alias-error-payload-semantics.forms`
+      - `test/neovm/vm-compat/cases/x-display-color-alias-error-payload-semantics.expected.tsv`
+    - added lock-ins for:
+      - `(display-color-p 'foo)` keeps the oracle `Invalid argument foo in 'get-device-terminal'` path
+      - `(x-display-color-p 'foo)` keeps the same oracle-invalid-argument payload
+
 - Continue compatibility-first maintenance with small commit slices:
   - keep builtin surface and registry in lock-step
   - run oracle/parity checks after each behavior-affecting change
