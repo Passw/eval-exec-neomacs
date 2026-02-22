@@ -7114,6 +7114,29 @@ pub(crate) fn builtin_handle_switch_frame(args: Vec<Value>) -> EvalResult {
     Ok(Value::Nil)
 }
 
+pub(crate) fn builtin_gpm_mouse_start(args: Vec<Value>) -> EvalResult {
+    expect_args("gpm-mouse-start", &args, 0)?;
+    Err(signal(
+        "error",
+        vec![Value::string("Gpm-mouse only works in the GNU/Linux console")],
+    ))
+}
+
+pub(crate) fn builtin_gpm_mouse_stop(args: Vec<Value>) -> EvalResult {
+    expect_args("gpm-mouse-stop", &args, 0)?;
+    Ok(Value::Nil)
+}
+
+pub(crate) fn builtin_help_describe_vector(args: Vec<Value>) -> EvalResult {
+    expect_args("help--describe-vector", &args, 7)?;
+    Ok(Value::Nil)
+}
+
+pub(crate) fn builtin_init_image_library(args: Vec<Value>) -> EvalResult {
+    expect_args("init-image-library", &args, 1)?;
+    Ok(Value::Nil)
+}
+
 fn expect_window_live_or_nil(value: &Value) -> Result<(), Flow> {
     if value.is_nil() || matches!(value, Value::Window(_)) {
         Ok(())
@@ -16249,12 +16272,12 @@ pub(crate) fn dispatch_builtin(
         "gnutls-symmetric-encrypt" => {
             super::compat_internal::builtin_gnutls_symmetric_encrypt(args)
         }
-        "gpm-mouse-start" => super::compat_internal::builtin_gpm_mouse_start(args),
-        "gpm-mouse-stop" => super::compat_internal::builtin_gpm_mouse_stop(args),
+        "gpm-mouse-start" => builtin_gpm_mouse_start(args),
+        "gpm-mouse-stop" => builtin_gpm_mouse_stop(args),
         "handle-save-session" => builtin_handle_save_session(args),
         "handle-switch-frame" => builtin_handle_switch_frame(args),
-        "help--describe-vector" => super::compat_internal::builtin_help_describe_vector(args),
-        "init-image-library" => super::compat_internal::builtin_init_image_library(args),
+        "help--describe-vector" => builtin_help_describe_vector(args),
+        "init-image-library" => builtin_init_image_library(args),
         "internal--define-uninitialized-variable" => {
             builtin_internal_define_uninitialized_variable(args)
         }
@@ -17102,12 +17125,12 @@ pub(crate) fn dispatch_builtin_pure(name: &str, args: Vec<Value>) -> Option<Eval
         "gnutls-symmetric-encrypt" => {
             super::compat_internal::builtin_gnutls_symmetric_encrypt(args)
         }
-        "gpm-mouse-start" => super::compat_internal::builtin_gpm_mouse_start(args),
-        "gpm-mouse-stop" => super::compat_internal::builtin_gpm_mouse_stop(args),
+        "gpm-mouse-start" => builtin_gpm_mouse_start(args),
+        "gpm-mouse-stop" => builtin_gpm_mouse_stop(args),
         "handle-save-session" => builtin_handle_save_session(args),
         "handle-switch-frame" => builtin_handle_switch_frame(args),
-        "help--describe-vector" => super::compat_internal::builtin_help_describe_vector(args),
-        "init-image-library" => super::compat_internal::builtin_init_image_library(args),
+        "help--describe-vector" => builtin_help_describe_vector(args),
+        "init-image-library" => builtin_init_image_library(args),
         "internal--define-uninitialized-variable" => {
             builtin_internal_define_uninitialized_variable(args)
         }
@@ -22545,6 +22568,43 @@ mod tests {
             Flow::Signal(sig) => assert_eq!(sig.symbol, "wrong-type-argument"),
             other => panic!("expected signal, got {other:?}"),
         }
+    }
+
+    #[test]
+    fn dispatch_builtin_pure_handles_gpm_help_and_init_image_placeholders() {
+        let err = dispatch_builtin_pure("gpm-mouse-start", vec![])
+            .expect("gpm-mouse-start should resolve")
+            .unwrap_err();
+        match err {
+            Flow::Signal(sig) => assert_eq!(sig.symbol, "error"),
+            other => panic!("expected signal, got {other:?}"),
+        }
+
+        let stop = dispatch_builtin_pure("gpm-mouse-stop", vec![])
+            .expect("gpm-mouse-stop should resolve")
+            .expect("gpm-mouse-stop should evaluate");
+        assert_eq!(stop, Value::Nil);
+
+        let help = dispatch_builtin_pure(
+            "help--describe-vector",
+            vec![
+                Value::Nil,
+                Value::Nil,
+                Value::Nil,
+                Value::Nil,
+                Value::Nil,
+                Value::Nil,
+                Value::Nil,
+            ],
+        )
+        .expect("help--describe-vector should resolve")
+        .expect("help--describe-vector should evaluate");
+        assert_eq!(help, Value::Nil);
+
+        let init = dispatch_builtin_pure("init-image-library", vec![Value::symbol("png")])
+            .expect("init-image-library should resolve")
+            .expect("init-image-library should evaluate");
+        assert_eq!(init, Value::Nil);
     }
 
     #[test]

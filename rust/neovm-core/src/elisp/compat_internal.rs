@@ -634,23 +634,6 @@ pub(crate) fn builtin_gnutls_peer_status_warning_describe(args: Vec<Value>) -> E
     Ok(Value::Nil)
 }
 
-/// `(gpm-mouse-start)` -> compatibility error.
-pub(crate) fn builtin_gpm_mouse_start(args: Vec<Value>) -> EvalResult {
-    expect_args("gpm-mouse-start", &args, 0)?;
-    Err(signal(
-        "error",
-        vec![Value::string(
-            "Gpm-mouse only works in the GNU/Linux console",
-        )],
-    ))
-}
-
-/// `(gpm-mouse-stop)` -> nil.
-pub(crate) fn builtin_gpm_mouse_stop(args: Vec<Value>) -> EvalResult {
-    expect_args("gpm-mouse-stop", &args, 0)?;
-    Ok(Value::Nil)
-}
-
 /// `(gnutls-asynchronous-parameters PROC ENABLE)` -> nil.
 pub(crate) fn builtin_gnutls_asynchronous_parameters(args: Vec<Value>) -> EvalResult {
     expect_args("gnutls-asynchronous-parameters", &args, 2)?;
@@ -743,18 +726,6 @@ pub(crate) fn builtin_gnutls_symmetric_decrypt(args: Vec<Value>) -> EvalResult {
 /// `(gnutls-symmetric-encrypt CIPHER KEY IV DATA &optional AAD)` -> nil.
 pub(crate) fn builtin_gnutls_symmetric_encrypt(args: Vec<Value>) -> EvalResult {
     expect_range_args("gnutls-symmetric-encrypt", &args, 4, 5)?;
-    Ok(Value::Nil)
-}
-
-/// `(help--describe-vector A B C D E F G)` -> nil.
-pub(crate) fn builtin_help_describe_vector(args: Vec<Value>) -> EvalResult {
-    expect_args("help--describe-vector", &args, 7)?;
-    Ok(Value::Nil)
-}
-
-/// `(init-image-library LIBRARY)` -> nil.
-pub(crate) fn builtin_init_image_library(args: Vec<Value>) -> EvalResult {
-    expect_args("init-image-library", &args, 1)?;
     Ok(Value::Nil)
 }
 
@@ -1034,7 +1005,7 @@ mod tests {
 
     #[test]
     fn gpm_mouse_start_signals_console_only_error() {
-        let err = builtin_gpm_mouse_start(vec![]).unwrap_err();
+        let err = crate::elisp::builtins::builtin_gpm_mouse_start(vec![]).unwrap_err();
         match err {
             Flow::Signal(sig) => assert_eq!(sig.symbol, "error"),
             other => panic!("expected signal, got {other:?}"),
