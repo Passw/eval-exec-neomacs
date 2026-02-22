@@ -3533,36 +3533,132 @@ pub(crate) fn builtin_user_error_eval(
     Err(signal("user-error", vec![Value::string(msg)]))
 }
 
-fn format_human_readable_iec_number(value: f64, decimals: usize) -> String {
+fn format_human_readable_number(value: f64, decimals: usize) -> String {
     let mut text = format!("{value:.decimals$}");
-    if text.ends_with(".0") {
-        text.truncate(text.len() - 2);
+    if text.contains('.') {
+        while text.ends_with('0') {
+            text.pop();
+        }
+        if text.ends_with('.') {
+            text.pop();
+        }
     }
     text
 }
 
-fn format_file_size_human_readable_iec(size: f64) -> String {
-    const IEC_UNITS: &[&str] = &["B", "KiB", "MiB", "GiB", "TiB", "PiB", "EiB"];
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+enum HumanReadableSizeFlavor {
+    Binary,
+    Si,
+    Iec,
+}
 
-    if size.is_sign_negative() {
+fn parse_human_readable_size_flavor(value: Option<&Value>) -> HumanReadableSizeFlavor {
+    match value {
+        Some(Value::Symbol(sym)) if sym == "si" => HumanReadableSizeFlavor::Si,
+        Some(Value::Symbol(sym)) if sym == "iec" => HumanReadableSizeFlavor::Iec,
+        _ => HumanReadableSizeFlavor::Binary,
+    }
+}
+
+fn human_readable_size_base(flavor: HumanReadableSizeFlavor) -> f64 {
+    match flavor {
+        HumanReadableSizeFlavor::Si => 1000.0,
+        HumanReadableSizeFlavor::Binary | HumanReadableSizeFlavor::Iec => 1024.0,
+    }
+}
+
+fn human_readable_size_prefixes(flavor: HumanReadableSizeFlavor) -> &'static [&'static str] {
+    const SI_PREFIXES: &[&str] = &["", "k", "M", "G", "T", "P", "E"];
+    const IEC_PREFIXES: &[&str] = &["", "Ki", "Mi", "Gi", "Ti", "Pi", "Ei"];
+
+    match flavor {
+        HumanReadableSizeFlavor::Binary | HumanReadableSizeFlavor::Si => SI_PREFIXES,
+        HumanReadableSizeFlavor::Iec => IEC_PREFIXES,
+    }
+}
+
+fn coerce_file_size_human_readable_space(value: Option<&Value>) -> String {
+    match value {
+        None | Some(Value::Nil) => String::new(),
+        Some(Value::Str(s)) => (**s).clone(),
+        Some(other) => super::print::print_value(other),
+    }
+}
+
+fn coerce_file_size_human_readable_unit(
+    value: Option<&Value>,
+    default_unit: &str,
+) -> Result<String, Flow> {
+    match value {
+        None | Some(Value::Nil) => Ok(default_unit.to_string()),
+        Some(other) => match builtin_concat(vec![other.clone()])? {
+            Value::Str(s) => Ok((*s).clone()),
+            _ => unreachable!("concat should produce a string"),
+        },
+    }
+}
+
+fn format_file_size_human_readable_with_style(
+    size: f64,
+    flavor: HumanReadableSizeFlavor,
+    space: &str,
+    unit: &str,
+) -> String {
+    let prefixes = human_readable_size_prefixes(flavor);
+    let base = human_readable_size_base(flavor);
+
+    let (rendered, prefix) = if size.is_sign_negative() {
         let decimals = if size.fract() == 0.0 { 0 } else { 1 };
-        return format!("{} B", format_human_readable_iec_number(size, decimals));
-    }
-
-    let mut scaled = size;
-    let mut unit_idx = 0usize;
-    while scaled >= 1024.0 && unit_idx < IEC_UNITS.len() - 1 {
-        scaled /= 1024.0;
-        unit_idx += 1;
-    }
-
-    let decimals = if scaled < 10.0 && scaled.fract() != 0.0 {
-        1
+        (format_human_readable_number(size, decimals), prefixes[0])
     } else {
-        0
+        let mut scaled = size;
+        let mut prefix_idx = 0usize;
+        while scaled >= base && prefix_idx < prefixes.len() - 1 {
+            scaled /= base;
+            prefix_idx += 1;
+        }
+
+        let decimals = if scaled < 10.0 && scaled.fract() != 0.0 {
+            1
+        } else {
+            0
+        };
+        (
+            format_human_readable_number(scaled, decimals),
+            prefixes[prefix_idx],
+        )
     };
-    let rendered = format_human_readable_iec_number(scaled, decimals);
-    format!("{rendered} {}", IEC_UNITS[unit_idx])
+
+    let suffix = format!("{prefix}{unit}");
+    if suffix.is_empty() {
+        rendered
+    } else if space.is_empty() {
+        format!("{rendered}{suffix}")
+    } else {
+        format!("{rendered}{space}{suffix}")
+    }
+}
+
+pub(crate) fn builtin_file_size_human_readable(args: Vec<Value>) -> EvalResult {
+    expect_min_args("file-size-human-readable", &args, 1)?;
+    expect_max_args("file-size-human-readable", &args, 4)?;
+    let size = expect_number_or_marker_f64(&args[0])?;
+    let flavor = parse_human_readable_size_flavor(args.get(1));
+    let default_unit = if flavor == HumanReadableSizeFlavor::Iec {
+        "B"
+    } else {
+        ""
+    };
+    let space = coerce_file_size_human_readable_space(args.get(2));
+    let unit = coerce_file_size_human_readable_unit(args.get(3), default_unit)?;
+    Ok(Value::string(format_file_size_human_readable_with_style(
+        size, flavor, &space, &unit,
+    )))
+}
+
+fn format_file_size_human_readable_iec(size: f64) -> String {
+    format_file_size_human_readable_with_style(size, HumanReadableSizeFlavor::Iec, " ", "B")
 }
 
 pub(crate) fn builtin_file_size_human_readable_iec(args: Vec<Value>) -> EvalResult {
@@ -16899,6 +16995,7 @@ pub(crate) fn dispatch_builtin(
         "message-or-box" => builtin_message_or_box(args),
         "current-message" => builtin_current_message(args),
         "ngettext" => builtin_ngettext(args),
+        "file-size-human-readable" => builtin_file_size_human_readable(args),
         "file-size-human-readable-iec" => builtin_file_size_human_readable_iec(args),
         "secure-hash-algorithms" => builtin_secure_hash_algorithms(args),
         "error" => builtin_error(args),
@@ -18123,6 +18220,7 @@ pub(crate) fn dispatch_builtin_pure(name: &str, args: Vec<Value>) -> Option<Eval
         "purecopy" => builtin_purecopy(args),
         "current-message" => builtin_current_message(args),
         "ngettext" => builtin_ngettext(args),
+        "file-size-human-readable" => builtin_file_size_human_readable(args),
         "file-size-human-readable-iec" => builtin_file_size_human_readable_iec(args),
         "secure-hash-algorithms" => builtin_secure_hash_algorithms(args),
         "prefix-numeric-value" => builtin_prefix_numeric_value(args),
@@ -25868,6 +25966,83 @@ mod tests {
             Flow::Signal(sig) => {
                 assert_eq!(sig.symbol, "wrong-number-of-arguments");
                 assert_eq!(sig.data, vec![Value::symbol("user-error"), Value::Int(0)]);
+            }
+            other => panic!("expected signal, got: {other:?}"),
+        }
+    }
+
+    #[test]
+    fn file_size_human_readable_formats_defaults_and_flavors() {
+        let mut eval = crate::elisp::eval::Evaluator::new();
+        let cases = [
+            (vec![Value::Int(0)], "0"),
+            (vec![Value::Int(1536)], "1.5k"),
+            (vec![Value::Int(1572864)], "1.5M"),
+            (vec![Value::Int(1572864), Value::symbol("si")], "1.6M"),
+            (vec![Value::Int(1572864), Value::symbol("iec")], "1.5MiB"),
+            (vec![Value::Int(1572864), Value::symbol("foo")], "1.5M"),
+            (vec![Value::Int(-1536)], "-1536"),
+            (vec![Value::Int(-1536), Value::symbol("iec")], "-1536B"),
+        ];
+
+        for (args, expected) in cases {
+            let value = dispatch_builtin(&mut eval, "file-size-human-readable", args.clone())
+                .expect("file-size-human-readable should resolve")
+                .expect("file-size-human-readable should evaluate");
+            assert_eq!(value, Value::string(expected));
+        }
+    }
+
+    #[test]
+    fn file_size_human_readable_coerces_space_and_unit_arguments() {
+        let mut eval = crate::elisp::eval::Evaluator::new();
+        let value = dispatch_builtin(
+            &mut eval,
+            "file-size-human-readable",
+            vec![Value::Int(1536), Value::Nil, Value::Int(1), Value::string("B")],
+        )
+        .expect("file-size-human-readable should resolve")
+        .expect("file-size-human-readable should evaluate");
+        assert_eq!(value, Value::string("1.51kB"));
+    }
+
+    #[test]
+    fn file_size_human_readable_rejects_invalid_unit_values() {
+        let mut eval = crate::elisp::eval::Evaluator::new();
+        let err = dispatch_builtin(
+            &mut eval,
+            "file-size-human-readable",
+            vec![Value::Int(1), Value::Nil, Value::Nil, Value::Int(1)],
+        )
+        .expect("file-size-human-readable should resolve")
+        .expect_err("file-size-human-readable should reject non-sequence unit");
+        match err {
+            Flow::Signal(sig) => {
+                assert_eq!(sig.symbol, "wrong-type-argument");
+                assert_eq!(sig.data, vec![Value::symbol("sequencep"), Value::Int(1)]);
+            }
+            other => panic!("expected signal, got: {other:?}"),
+        }
+
+        let err = dispatch_builtin(
+            &mut eval,
+            "file-size-human-readable",
+            vec![
+                Value::Int(1),
+                Value::Nil,
+                Value::Nil,
+                Value::list(vec![Value::string("B")]),
+            ],
+        )
+        .expect("file-size-human-readable should resolve")
+        .expect_err("file-size-human-readable should reject list unit with non-character element");
+        match err {
+            Flow::Signal(sig) => {
+                assert_eq!(sig.symbol, "wrong-type-argument");
+                assert_eq!(
+                    sig.data,
+                    vec![Value::symbol("characterp"), Value::string("B")]
+                );
             }
             other => panic!("expected signal, got: {other:?}"),
         }
