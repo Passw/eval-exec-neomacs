@@ -5787,6 +5787,36 @@ pub(crate) fn builtin_new_fontset(args: Vec<Value>) -> EvalResult {
     Ok(Value::Nil)
 }
 
+pub(crate) fn builtin_open_font(args: Vec<Value>) -> EvalResult {
+    expect_range_args("open-font", &args, 1, 3)?;
+    Ok(Value::Nil)
+}
+
+pub(crate) fn builtin_open_dribble_file(args: Vec<Value>) -> EvalResult {
+    expect_args("open-dribble-file", &args, 1)?;
+    Ok(Value::Nil)
+}
+
+pub(crate) fn builtin_object_intervals(args: Vec<Value>) -> EvalResult {
+    expect_args("object-intervals", &args, 1)?;
+    Ok(Value::Nil)
+}
+
+pub(crate) fn builtin_optimize_char_table(args: Vec<Value>) -> EvalResult {
+    expect_range_args("optimize-char-table", &args, 1, 2)?;
+    Ok(Value::Nil)
+}
+
+pub(crate) fn builtin_overlay_lists(args: Vec<Value>) -> EvalResult {
+    expect_args("overlay-lists", &args, 0)?;
+    Ok(Value::Nil)
+}
+
+pub(crate) fn builtin_overlay_recenter(args: Vec<Value>) -> EvalResult {
+    expect_args("overlay-recenter", &args, 1)?;
+    Ok(Value::Nil)
+}
+
 // ===========================================================================
 // Hook system (need evaluator)
 // ===========================================================================
@@ -14719,13 +14749,13 @@ pub(crate) fn dispatch_builtin(
         "ntake" => builtin_ntake(args),
         "obarray-clear" => builtin_obarray_clear(args),
         "obarray-make" => builtin_obarray_make(args),
-        "object-intervals" => super::compat_internal::builtin_object_intervals(args),
+        "object-intervals" => builtin_object_intervals(args),
         "old-selected-frame" => builtin_old_selected_frame(args),
-        "open-dribble-file" => super::compat_internal::builtin_open_dribble_file(args),
-        "open-font" => super::compat_internal::builtin_open_font(args),
-        "optimize-char-table" => super::compat_internal::builtin_optimize_char_table(args),
-        "overlay-lists" => super::compat_internal::builtin_overlay_lists(args),
-        "overlay-recenter" => super::compat_internal::builtin_overlay_recenter(args),
+        "open-dribble-file" => builtin_open_dribble_file(args),
+        "open-font" => builtin_open_font(args),
+        "optimize-char-table" => builtin_optimize_char_table(args),
+        "overlay-lists" => builtin_overlay_lists(args),
+        "overlay-recenter" => builtin_overlay_recenter(args),
         "pdumper-stats" => super::compat_internal::builtin_pdumper_stats(args),
         "play-sound-internal" => super::compat_internal::builtin_play_sound_internal(args),
         "position-symbol" => super::compat_internal::builtin_position_symbol(args),
@@ -15684,13 +15714,13 @@ pub(crate) fn dispatch_builtin_pure(name: &str, args: Vec<Value>) -> Option<Eval
         "ntake" => builtin_ntake(args),
         "obarray-clear" => builtin_obarray_clear(args),
         "obarray-make" => builtin_obarray_make(args),
-        "object-intervals" => super::compat_internal::builtin_object_intervals(args),
+        "object-intervals" => builtin_object_intervals(args),
         "old-selected-frame" => builtin_old_selected_frame(args),
-        "open-dribble-file" => super::compat_internal::builtin_open_dribble_file(args),
-        "open-font" => super::compat_internal::builtin_open_font(args),
-        "optimize-char-table" => super::compat_internal::builtin_optimize_char_table(args),
-        "overlay-lists" => super::compat_internal::builtin_overlay_lists(args),
-        "overlay-recenter" => super::compat_internal::builtin_overlay_recenter(args),
+        "open-dribble-file" => builtin_open_dribble_file(args),
+        "open-font" => builtin_open_font(args),
+        "optimize-char-table" => builtin_optimize_char_table(args),
+        "overlay-lists" => builtin_overlay_lists(args),
+        "overlay-recenter" => builtin_overlay_recenter(args),
         "pdumper-stats" => super::compat_internal::builtin_pdumper_stats(args),
         "play-sound-internal" => super::compat_internal::builtin_play_sound_internal(args),
         "position-symbol" => super::compat_internal::builtin_position_symbol(args),
@@ -19492,6 +19522,42 @@ mod tests {
                 .expect("builtin new-fontset should resolve")
                 .expect("builtin new-fontset should evaluate");
         assert!(new_fontset.is_nil());
+    }
+
+    #[test]
+    fn pure_dispatch_open_overlay_placeholders_match_compat_contracts() {
+        let open_font = dispatch_builtin_pure("open-font", vec![Value::Nil])
+            .expect("builtin open-font should resolve")
+            .expect("builtin open-font should evaluate");
+        assert!(open_font.is_nil());
+
+        let open_dribble = dispatch_builtin_pure("open-dribble-file", vec![Value::string("x.log")])
+            .expect("builtin open-dribble-file should resolve")
+            .expect("builtin open-dribble-file should evaluate");
+        assert!(open_dribble.is_nil());
+
+        let intervals = dispatch_builtin_pure("object-intervals", vec![Value::Nil])
+            .expect("builtin object-intervals should resolve")
+            .expect("builtin object-intervals should evaluate");
+        assert!(intervals.is_nil());
+
+        let optimized = dispatch_builtin_pure(
+            "optimize-char-table",
+            vec![Value::Nil, Value::symbol("test-only")],
+        )
+        .expect("builtin optimize-char-table should resolve")
+        .expect("builtin optimize-char-table should evaluate");
+        assert!(optimized.is_nil());
+
+        let overlays = dispatch_builtin_pure("overlay-lists", vec![])
+            .expect("builtin overlay-lists should resolve")
+            .expect("builtin overlay-lists should evaluate");
+        assert!(overlays.is_nil());
+
+        let recentered = dispatch_builtin_pure("overlay-recenter", vec![Value::Int(0)])
+            .expect("builtin overlay-recenter should resolve")
+            .expect("builtin overlay-recenter should evaluate");
+        assert!(recentered.is_nil());
     }
 
     #[test]

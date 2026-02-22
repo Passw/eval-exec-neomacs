@@ -1738,42 +1738,6 @@ pub(crate) fn builtin_dump_emacs_portable_sort_predicate_copied(args: Vec<Value>
     Ok(Value::Nil)
 }
 
-/// `(open-font FONT-ENTITY &optional PIXEL-SIZE FRAME)` -> nil.
-pub(crate) fn builtin_open_font(args: Vec<Value>) -> EvalResult {
-    expect_range_args("open-font", &args, 1, 3)?;
-    Ok(Value::Nil)
-}
-
-/// `(open-dribble-file FILE)` -> nil.
-pub(crate) fn builtin_open_dribble_file(args: Vec<Value>) -> EvalResult {
-    expect_args("open-dribble-file", &args, 1)?;
-    Ok(Value::Nil)
-}
-
-/// `(object-intervals OBJECT)` -> nil.
-pub(crate) fn builtin_object_intervals(args: Vec<Value>) -> EvalResult {
-    expect_args("object-intervals", &args, 1)?;
-    Ok(Value::Nil)
-}
-
-/// `(optimize-char-table CHAR-TABLE &optional TEST-ONLY)` -> nil.
-pub(crate) fn builtin_optimize_char_table(args: Vec<Value>) -> EvalResult {
-    expect_range_args("optimize-char-table", &args, 1, 2)?;
-    Ok(Value::Nil)
-}
-
-/// `(overlay-lists)` -> nil.
-pub(crate) fn builtin_overlay_lists(args: Vec<Value>) -> EvalResult {
-    expect_args("overlay-lists", &args, 0)?;
-    Ok(Value::Nil)
-}
-
-/// `(overlay-recenter POS)` -> nil.
-pub(crate) fn builtin_overlay_recenter(args: Vec<Value>) -> EvalResult {
-    expect_args("overlay-recenter", &args, 1)?;
-    Ok(Value::Nil)
-}
-
 /// `(pdumper-stats)` -> nil.
 pub(crate) fn builtin_pdumper_stats(args: Vec<Value>) -> EvalResult {
     expect_args("pdumper-stats", &args, 0)?;
