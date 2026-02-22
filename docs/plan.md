@@ -1,6 +1,6 @@
 # NeoVM / Neomacs Plan
 
-Last updated: 2026-02-21
+Last updated: 2026-02-22
 
 ## Execution Queue (next 20)
 
@@ -27,6 +27,23 @@ Last updated: 2026-02-21
 21. [x] Add periodic `make compat-progress` output diff check in PR review templates.
 
 ## Doing
+
+- Aligned `x-get-input-coding-system` wrong-type payload folding for character-code inputs:
+  - runtime changes:
+    - `rust/neovm-core/src/elisp/display.rs`
+      - now downcases character-code payloads for `Value::Int`/`Value::Char` error arguments before signaling `(wrong-type-argument stringp ...)`.
+      - added unit assertions in `x_clipboard_input_context_batch_semantics` for:
+        - `65/?A -> 97`
+        - `90/?Z -> 122`
+  - vm-compat corpus changes:
+    - added and wired:
+      - `test/neovm/vm-compat/cases/x-get-input-coding-system-char-fold-payload-semantics.forms`
+      - `test/neovm/vm-compat/cases/x-get-input-coding-system-char-fold-payload-semantics.expected.tsv`
+      - `test/neovm/vm-compat/cases/default.list`
+  - verified:
+    - `cargo test --manifest-path rust/neovm-core/Cargo.toml x_clipboard_input_context_batch_semantics -- --nocapture` (pass)
+    - `make -C test/neovm/vm-compat record FORMS=cases/x-get-input-coding-system-char-fold-payload-semantics.forms EXPECTED=cases/x-get-input-coding-system-char-fold-payload-semantics.expected.tsv` (pass)
+    - `make -C test/neovm/vm-compat check-one-neovm CASE=cases/x-get-input-coding-system-char-fold-payload-semantics` (pass)
 
 - Added explicit zero-arity error lock-ins for `message-box` / `message-or-box`:
   - vm-compat corpus changes:

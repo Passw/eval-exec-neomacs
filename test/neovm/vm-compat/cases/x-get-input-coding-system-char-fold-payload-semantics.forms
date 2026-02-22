@@ -1,0 +1,17 @@
+;; Lock-in: `x-get-input-coding-system` downcases character-code payloads
+;; in `(wrong-type-argument stringp <arg>)` signals.
+(let ((probe (lambda (arg)
+               (condition-case err
+                   (list 'ok (x-get-input-coding-system arg))
+                 (error (list (car err) (nth 1 err) (nth 2 err)))))))
+  (list
+   (list 'int-65 (funcall probe 65))
+   (list 'char-A (funcall probe ?A))
+   (list 'int-90 (funcall probe 90))
+   (list 'char-Z (funcall probe ?Z))
+   (list 'int-97 (funcall probe 97))
+   (list 'char-a (funcall probe ?a))
+   (list 'int-49 (funcall probe 49))
+   (list 'char-1 (funcall probe ?1))
+   (list 'negative (funcall probe -1))
+   (list 'too-large (funcall probe 1114112))))

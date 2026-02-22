@@ -86,6 +86,14 @@ fn terminal_parameter_default_value(key: &Value) -> Option<Value> {
     }
 }
 
+fn downcase_char_code(code: i64) -> i64 {
+    if let Some(c) = u32::try_from(code).ok().and_then(char::from_u32) {
+        c.to_lowercase().next().unwrap_or(c) as i64
+    } else {
+        code
+    }
+}
+
 fn terminal_parameter_default_entries() -> Vec<(Value, Value)> {
     vec![
         (Value::symbol("normal-erase-is-backspace"), Value::Int(0)),
@@ -1493,9 +1501,22 @@ pub(crate) fn builtin_x_get_input_coding_system(args: Vec<Value>) -> EvalResult 
     expect_args("x-get-input-coding-system", &args, 1)?;
     match &args[0] {
         Value::Str(_) => Ok(Value::Nil),
-        Value::Int(_) => Err(signal(
+        Value::Int(code) => {
+            if *code < 0 {
+                Err(signal(
+                    "wrong-type-argument",
+                    vec![Value::symbol("char-or-string-p"), Value::Int(*code)],
+                ))
+            } else {
+                Err(signal(
+                    "wrong-type-argument",
+                    vec![Value::symbol("stringp"), Value::Int(downcase_char_code(*code))],
+                ))
+            }
+        }
+        Value::Char(code) => Err(signal(
             "wrong-type-argument",
-            vec![Value::symbol("stringp"), args[0].clone()],
+            vec![Value::symbol("stringp"), Value::Int(downcase_char_code(*code as i64))],
         )),
         other => Err(signal(
             "wrong-type-argument",
@@ -4510,6 +4531,31 @@ mod tests {
             builtin_x_get_input_coding_system(vec![Value::Int(1)]),
             "stringp",
             Value::Int(1),
+        );
+        assert_wrong_type(
+            builtin_x_get_input_coding_system(vec![Value::Int(-1)]),
+            "char-or-string-p",
+            Value::Int(-1),
+        );
+        assert_wrong_type(
+            builtin_x_get_input_coding_system(vec![Value::Int(65)]),
+            "stringp",
+            Value::Int(97),
+        );
+        assert_wrong_type(
+            builtin_x_get_input_coding_system(vec![Value::Int(90)]),
+            "stringp",
+            Value::Int(122),
+        );
+        assert_wrong_type(
+            builtin_x_get_input_coding_system(vec![Value::Char('A')]),
+            "stringp",
+            Value::Int(97),
+        );
+        assert_wrong_type(
+            builtin_x_get_input_coding_system(vec![Value::Char('Z')]),
+            "stringp",
+            Value::Int(122),
         );
         assert!(builtin_x_get_input_coding_system(vec![Value::string("x")])
             .unwrap()
