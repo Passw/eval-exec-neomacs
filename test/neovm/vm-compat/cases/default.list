@@ -680,6 +680,7 @@ cases/file-newer-than-file-p-semantics
 cases/file-equal-p-semantics
 cases/file-in-directory-p-semantics
 cases/file-modes-semantics
+cases/file-size-human-readable-semantics
 cases/lockfile-inotify-string-contract-semantics
 cases/default-file-modes-semantics
 cases/set-file-modes-semantics

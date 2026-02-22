@@ -3555,9 +3555,10 @@ enum HumanReadableSizeFlavor {
 
 fn parse_human_readable_size_flavor(value: Option<&Value>) -> HumanReadableSizeFlavor {
     match value {
+        None | Some(Value::Nil) => HumanReadableSizeFlavor::Binary,
         Some(Value::Symbol(sym)) if sym == "si" => HumanReadableSizeFlavor::Si,
         Some(Value::Symbol(sym)) if sym == "iec" => HumanReadableSizeFlavor::Iec,
-        _ => HumanReadableSizeFlavor::Binary,
+        Some(_) => HumanReadableSizeFlavor::Si,
     }
 }
 
@@ -25980,7 +25981,7 @@ mod tests {
             (vec![Value::Int(1572864)], "1.5M"),
             (vec![Value::Int(1572864), Value::symbol("si")], "1.6M"),
             (vec![Value::Int(1572864), Value::symbol("iec")], "1.5MiB"),
-            (vec![Value::Int(1572864), Value::symbol("foo")], "1.5M"),
+            (vec![Value::Int(1572864), Value::symbol("foo")], "1.6M"),
             (vec![Value::Int(-1536)], "-1536"),
             (vec![Value::Int(-1536), Value::symbol("iec")], "-1536B"),
         ];
