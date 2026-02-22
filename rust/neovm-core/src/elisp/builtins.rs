@@ -14063,7 +14063,6 @@ pub(crate) fn dispatch_builtin(
             super::display::builtin_display_monitor_attributes_list(args)
         }
         "frame-monitor-attributes" => super::display::builtin_frame_monitor_attributes(args),
-        "window-system" => super::display::builtin_window_system(args),
         "frame-edges" => super::display::builtin_frame_edges(args),
         "display-images-p" => super::display::builtin_display_images_p(args),
         "display-supports-face-attributes-p" => {
@@ -15080,6 +15079,7 @@ pub(crate) fn dispatch_builtin_pure(name: &str, args: Vec<Value>) -> Option<Eval
         | "old-selected-window"
         | "frame-old-selected-window"
         | "set-frame-selected-window"
+        | "window-system"
         | "window-at" => return None,
         _ => {}
     }
@@ -19417,6 +19417,7 @@ mod tests {
         assert!(dispatch_builtin_pure("old-selected-window", vec![]).is_none());
         assert!(dispatch_builtin_pure("frame-old-selected-window", vec![]).is_none());
         assert!(dispatch_builtin_pure("set-frame-selected-window", vec![]).is_none());
+        assert!(dispatch_builtin_pure("window-system", vec![]).is_none());
         assert!(dispatch_builtin_pure("window-at", vec![]).is_none());
         assert!(dispatch_builtin_pure("window-bump-use-time", vec![]).is_none());
         assert!(dispatch_builtin_pure("window-list-1", vec![]).is_none());

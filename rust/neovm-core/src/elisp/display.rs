@@ -1031,20 +1031,6 @@ pub(crate) fn builtin_display_selections_p_eval(
     Ok(Value::Nil)
 }
 
-/// (window-system &optional FRAME) -> nil in batch-style vm context.
-pub(crate) fn builtin_window_system(args: Vec<Value>) -> EvalResult {
-    expect_max_args("window-system", &args, 1)?;
-    if let Some(frame) = args.first() {
-        if !frame.is_nil() {
-            return Err(signal(
-                "wrong-type-argument",
-                vec![Value::symbol("framep"), frame.clone()],
-            ));
-        }
-    }
-    Ok(Value::Nil)
-}
-
 /// Evaluator-aware variant of `window-system`.
 pub(crate) fn builtin_window_system_eval(
     eval: &mut super::eval::Evaluator,
