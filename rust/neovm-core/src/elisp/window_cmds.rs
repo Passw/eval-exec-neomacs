@@ -10,6 +10,7 @@ use super::error::{signal, EvalResult, Flow};
 use super::value::{list_to_vec, Value};
 use crate::buffer::BufferId;
 use crate::window::{FrameId, FrameManager, SplitDirection, Window, WindowId};
+use std::collections::HashSet;
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -2082,21 +2083,79 @@ pub(crate) fn builtin_window_list_1(
         }
     };
 
-    let frame = eval
-        .frames
-        .get(fid)
-        .ok_or_else(|| signal("error", vec![Value::string("Frame not found")]))?;
-
-    // GNU Emacs starts traversal at WINDOW when it appears in the returned list.
-    let mut window_ids = frame.window_list();
-    if let Some(start_index) = window_ids.iter().position(|wid| *wid == start_wid) {
-        window_ids.rotate_left(start_index);
+    // ALL-FRAMES matches GNU Emacs: nil/default => WINDOW's frame; t => all
+    // frames; 'visible and 0 => visible/iconified frames (we only model
+    // visibility); a frame object => that frame; anything else => WINDOW's frame.
+    let mut frame_ids: Vec<FrameId> = match args.get(2) {
+        None | Some(Value::Nil) => vec![fid],
+        Some(Value::True) => {
+            let mut ids = eval.frames.frame_list();
+            ids.sort_by_key(|f| f.0);
+            ids
+        }
+        Some(Value::Symbol(sym)) if sym == "visible" => {
+            let mut ids = eval.frames.frame_list();
+            ids.sort_by_key(|f| f.0);
+            ids.into_iter()
+                .filter(|frame_id| eval.frames.get(*frame_id).is_some_and(|frame| frame.visible))
+                .collect()
+        }
+        Some(Value::Int(0)) => {
+            let mut ids = eval.frames.frame_list();
+            ids.sort_by_key(|f| f.0);
+            ids.into_iter()
+                .filter(|frame_id| eval.frames.get(*frame_id).is_some_and(|frame| frame.visible))
+                .collect()
+        }
+        Some(Value::Frame(frame_raw_id)) => {
+            let frame_id = FrameId(*frame_raw_id);
+            if eval.frames.get(frame_id).is_none() {
+                return Err(signal(
+                    "wrong-type-argument",
+                    vec![Value::symbol("frame-live-p"), args[2].clone()],
+                ));
+            }
+            vec![frame_id]
+        }
+        Some(_) => vec![fid],
+    };
+    if frame_ids.is_empty() {
+        frame_ids.push(fid);
     }
 
-    let mut windows: Vec<Value> = window_ids.into_iter().map(window_value).collect();
-    if matches!(args.get(1), Some(Value::True)) {
-        if let Some(minibuffer_wid) = frame.minibuffer_window {
-            windows.push(window_value(minibuffer_wid));
+    if let Some(start_pos) = frame_ids.iter().position(|frame_id| *frame_id == fid) {
+        frame_ids.rotate_left(start_pos);
+    }
+
+    let include_minibuffer = matches!(args.get(1), Some(Value::True));
+    let mut seen_window_ids: HashSet<u64> = HashSet::new();
+    let mut windows: Vec<Value> = Vec::new();
+
+    for frame_id in frame_ids {
+        let Some(frame) = eval.frames.get(frame_id) else {
+            continue;
+        };
+
+        // GNU Emacs starts traversal at WINDOW when it appears in the returned list.
+        let mut window_ids = frame.window_list();
+        if frame_id == fid {
+            if let Some(start_index) = window_ids.iter().position(|wid| *wid == start_wid) {
+                window_ids.rotate_left(start_index);
+            }
+        }
+
+        for window_id in window_ids {
+            if seen_window_ids.insert(window_id.0) {
+                windows.push(window_value(window_id));
+            }
+        }
+
+        if include_minibuffer {
+            if let Some(minibuffer_wid) = frame.minibuffer_window {
+                if seen_window_ids.insert(minibuffer_wid.0) {
+                    windows.push(window_value(minibuffer_wid));
+                }
+            }
         }
     }
 
@@ -4279,6 +4338,26 @@ mod tests {
                      (condition-case err (apply #'window-list-1 (list w nil)) (error (car err)))))",
         );
         assert_eq!(r, "OK (wrong-type-argument wrong-type-argument wrong-type-argument)");
+    }
+
+    #[test]
+    fn window_list_1_all_frames_includes_other_frame_windows() {
+        let r = eval_one_with_frame(
+            "(let ((f1 (selected-frame))
+                  (f2 (make-frame)))
+               (let ((w1 (progn (select-frame f1) (selected-window)))
+                     (w2 (progn (select-frame f2) (selected-window))))
+                 (prog1
+                     (list (null (memq w2 (window-list-1 w1 nil nil)))
+                           (not (null (memq w2 (window-list-1 w1 nil t))))
+                           (not (null (memq w2 (window-list-1 w1 nil 'visible))))
+                           (not (null (memq w2 (window-list-1 w1 nil 0))))
+                           (not (null (memq w2 (window-list-1 w1 nil f2))))
+                           (null (memq w2 (window-list-1 w1 nil :bad))))
+                   (select-frame f1)
+                   (delete-frame f2))))",
+        );
+        assert_eq!(r, "OK (t t t t t t)");
     }
 
     #[test]
