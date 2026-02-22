@@ -19,7 +19,7 @@ if [[ -n "$universe_mode_primary" ]]; then
 elif [[ -n "$universe_mode_alias" ]]; then
   universe_mode="$universe_mode_alias"
 else
-  universe_mode="primitive-subr"
+  universe_mode="primitive-any"
 fi
 
 if [[ -n "$universe_mode_primary" && -n "$universe_mode_alias" && "$universe_mode_primary" != "$universe_mode_alias" ]]; then

@@ -127,8 +127,8 @@ Select the oracle builtin universe mode when needed (use either
 `ORACLE_BUILTIN_UNIVERSE` or `ORACLE_BUILTIN_UNIVERSE_MODE`; if both are set,
 `ORACLE_BUILTIN_UNIVERSE` takes precedence):
 
-- `ORACLE_BUILTIN_UNIVERSE=primitive-subr` (default): primitive subrs only (`subr-primitive-p` and not special forms)
-- `ORACLE_BUILTIN_UNIVERSE=primitive-any`: primitive subrs + primitive special forms
+- `ORACLE_BUILTIN_UNIVERSE=primitive-any` (default): primitive subrs + primitive special forms
+- `ORACLE_BUILTIN_UNIVERSE=primitive-subr`: primitive subrs only (`subr-primitive-p` and not special forms)
 - `ORACLE_BUILTIN_UNIVERSE=subr-or-special`: broad startup surface (`subr` or `special-form`)
 
 List explicit comment-annotated function stubs in the Rust Elisp modules

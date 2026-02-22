@@ -330,7 +330,7 @@ if [[ "$output_format" == "json" ]]; then
   printf '    "core_compat_entries": %s,\n' "$core_builtins"
   printf '    "neovm_extension_entries": %s,\n' "$extension_builtins"
   printf '    "oracle_builtin_universe_entries": %s,\n' "$(int_or_zero "${oracle_builtin_total:-0}")"
-  printf '    "oracle_builtin_universe_mode": "%s",\n' "$(json_escape "${oracle_builtin_mode:-primitive-subr}")"
+  printf '    "oracle_builtin_universe_mode": "%s",\n' "$(json_escape "${oracle_builtin_mode:-primitive-any}")"
   printf '    "registry_covered": %s,\n' "$(int_or_zero "${oracle_builtin_covered:-0}")"
   printf '    "registry_missing": %s,\n' "$oracle_builtin_missing_n"
   printf '    "runtime_covered": %s,\n' "$(int_or_zero "${oracle_builtin_runtime_covered:-0}")"
@@ -397,7 +397,7 @@ printf '  total dispatch entries: %s\n' "$all_builtins"
 printf '  core-compat entries: %s\n' "$core_builtins"
 printf '  neovm extension entries: %s\n' "$extension_builtins"
 printf '  oracle builtin universe entries: %s\n' "${oracle_builtin_total:-0}"
-printf '  oracle builtin universe mode: %s\n' "${oracle_builtin_mode:-primitive-subr}"
+printf '  oracle builtin universe mode: %s\n' "${oracle_builtin_mode:-primitive-any}"
 printf '  oracle builtin registry coverage (covered/missing): %s/%s (%s%%)\n' \
   "${oracle_builtin_covered:-0}" "${oracle_builtin_missing:-0}" "$oracle_builtin_coverage_percent"
 printf '  oracle builtin runtime coverage (covered/missing): %s/%s (%s%%)\n' \
