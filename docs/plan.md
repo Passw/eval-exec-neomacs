@@ -34,6 +34,10 @@ Last updated: 2026-02-22
       - `downcase-region` / `downcase-word` now preserve Kelvin sign (`\u{212A}`) during lowercase transforms.
       - `upcase-region` / `upcase-word` now preserve dotless i (`\u{0131}`) during uppercase transforms.
       - `capitalize-region` / `upcase-initials-region` now titlecase `"ß"` as `"Ss"` on word starts.
+      - region/word string-case paths now preserve oracle edge payload families:
+        - `downcase-region` / `downcase-word`: `7305`, `42955|42956|42958|42962|42964|42970|42972`, `68944..=68965`, `93856..=93880`
+        - `upcase-region` / `upcase-word`: `411`, `612`, `7306`, `42957|42959|42963|42965|42971`, `68976..=68997`, `93883..=93907`
+      - `capitalize-region` / `upcase-initials-region` / `capitalize-word` now follow oracle titlecase expansions for ligature and Greek iota-subscript edge forms (e.g. `1415`, `64256`, `8114`).
       - added unit coverage:
         - `downcase_region_unicode_kelvin_preserved`
         - `upcase_region_unicode_dotless_i_preserved`
@@ -41,14 +45,20 @@ Last updated: 2026-02-22
         - `upcase_word_unicode_dotless_i_preserved`
         - `capitalize_region_unicode_sharp_s_titlecase`
         - `upcase_initials_region_unicode_sharp_s_titlecase`
+        - `downcase_region_unicode_edge_preserved`
+        - `upcase_region_unicode_edge_preserved`
+        - `capitalize_region_unicode_ligature_titlecase`
+        - `upcase_initials_region_unicode_armenian_titlecase`
+        - `downcase_word_unicode_extended_preserved`
+        - `upcase_word_unicode_extended_preserved`
+        - `capitalize_word_unicode_greek_iota_subscript_titlecase`
   - vm-compat corpus changes:
     - added and wired:
       - `test/neovm/vm-compat/cases/case-region-word-unicode-edge-semantics.forms`
       - `test/neovm/vm-compat/cases/case-region-word-unicode-edge-semantics.expected.tsv`
       - `test/neovm/vm-compat/cases/default.list`
   - verified:
-    - `cargo test --manifest-path rust/neovm-core/Cargo.toml unicode_ -- --nocapture` (pass)
-    - `cargo test --manifest-path rust/neovm-core/Cargo.toml unicode_sharp_s_titlecase -- --nocapture` (pass)
+    - `cargo test --manifest-path rust/neovm-core/Cargo.toml kill_ring::tests:: -- --nocapture` (pass)
     - `make -C test/neovm/vm-compat record FORMS=cases/case-region-word-unicode-edge-semantics.forms EXPECTED=cases/case-region-word-unicode-edge-semantics.expected.tsv` (pass)
     - `make -C test/neovm/vm-compat check-one-neovm CASE=cases/case-region-word-unicode-edge-semantics` (pass)
 

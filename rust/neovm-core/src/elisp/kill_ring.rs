@@ -1343,7 +1343,8 @@ pub(crate) fn builtin_yank_pop(eval: &mut super::eval::Evaluator, args: Vec<Valu
 fn downcase_case_string_emacs_compat(text: &str) -> String {
     let mut out = String::with_capacity(text.len());
     for ch in text.chars() {
-        if ch == '\u{212A}' {
+        let code = ch as i64;
+        if ch == '\u{212A}' || preserve_downcase_case_string_payload(code) {
             out.push(ch);
             continue;
         }
@@ -1357,7 +1358,8 @@ fn downcase_case_string_emacs_compat(text: &str) -> String {
 fn upcase_case_string_emacs_compat(text: &str) -> String {
     let mut out = String::with_capacity(text.len());
     for ch in text.chars() {
-        if ch == '\u{0131}' {
+        let code = ch as i64;
+        if ch == '\u{0131}' || preserve_upcase_case_string_payload(code) {
             out.push(ch);
             continue;
         }
@@ -1369,10 +1371,182 @@ fn upcase_case_string_emacs_compat(text: &str) -> String {
 }
 
 fn titlecase_initial_emacs_compat(ch: char) -> String {
-    if ch == 'ß' {
-        return "Ss".to_string();
+    let code = ch as i64;
+    if let Some(explicit) = titlecase_combining_iota_override(code) {
+        return explicit.to_string();
     }
-    ch.to_uppercase().collect()
+
+    let expansion: Vec<char> = ch.to_uppercase().collect();
+    if expansion.len() > 1 && !titlecase_uses_precomposed_upcase(code) {
+        return titlecase_from_uppercase_expansion(&expansion);
+    }
+
+    if let Some(mapped) = u32::try_from(upcase_titlecase_char_code_emacs_compat(code))
+        .ok()
+        .and_then(char::from_u32)
+    {
+        mapped.to_string()
+    } else {
+        ch.to_uppercase().collect()
+    }
+}
+
+fn preserve_downcase_case_string_payload(code: i64) -> bool {
+    matches!(
+        code,
+        7305
+            | 42955
+            | 42956
+            | 42958
+            | 42962
+            | 42964
+            | 42970
+            | 42972
+            | 68944..=68965
+            | 93856..=93880
+    )
+}
+
+fn preserve_upcase_case_string_payload(code: i64) -> bool {
+    matches!(
+        code,
+        411
+            | 612
+            | 7306
+            | 42957
+            | 42959
+            | 42963
+            | 42965
+            | 42971
+            | 68976..=68997
+            | 93883..=93907
+    )
+}
+
+fn preserve_titlecase_upcase_payload(code: i64) -> bool {
+    matches!(
+        code,
+        329
+            | 411
+            | 453
+            | 456
+            | 459
+            | 496
+            | 498
+            | 612
+            | 912
+            | 944
+            | 1415
+            | 4304..=4346
+            | 4349..=4351
+            | 7306
+            | 7830..=7834
+            | 8016
+            | 8018
+            | 8020
+            | 8022
+            | 8072..=8079
+            | 8088..=8095
+            | 8104..=8111
+            | 8114
+            | 8116
+            | 8118..=8119
+            | 8124
+            | 8130
+            | 8132
+            | 8134..=8135
+            | 8140
+            | 8146..=8147
+            | 8150..=8151
+            | 8162..=8164
+            | 8166..=8167
+            | 8178
+            | 8180
+            | 8182..=8183
+            | 8188
+            | 42957
+            | 42959
+            | 42963
+            | 42965
+            | 42971
+            | 64256..=64262
+            | 64275..=64279
+            | 68976..=68997
+            | 93883..=93907
+    )
+}
+
+fn upcase_titlecase_char_code_emacs_compat(code: i64) -> i64 {
+    if preserve_titlecase_upcase_payload(code) {
+        return code;
+    }
+    match code {
+        223 => 7838,
+        452 | 497 => code + 1,
+        454 | 457 | 460 | 499 => code - 1,
+        455 | 458 => code + 1,
+        8064..=8071 | 8080..=8087 | 8096..=8103 => code + 8,
+        8115 | 8131 | 8179 => code + 9,
+        _ => {
+            if let Some(ch) = u32::try_from(code).ok().and_then(char::from_u32) {
+                ch.to_uppercase().next().unwrap_or(ch) as i64
+            } else {
+                code
+            }
+        }
+    }
+}
+
+fn titlecase_from_uppercase_expansion(expansion: &[char]) -> String {
+    let mut result = String::new();
+    let mut seen_cased = false;
+    for uc in expansion {
+        let is_cased = uc.is_uppercase() || uc.is_lowercase();
+        if !seen_cased {
+            result.push(*uc);
+            if is_cased {
+                seen_cased = true;
+            }
+            continue;
+        }
+
+        if is_cased {
+            for lc in uc.to_lowercase() {
+                result.push(lc);
+            }
+        } else {
+            result.push(*uc);
+        }
+    }
+    result
+}
+
+fn titlecase_combining_iota_override(code: i64) -> Option<&'static str> {
+    match code {
+        8114 => Some("\u{1FBA}\u{0345}"),
+        8116 => Some("\u{0386}\u{0345}"),
+        8119 => Some("\u{0391}\u{0342}\u{0345}"),
+        8130 => Some("\u{1FCA}\u{0345}"),
+        8132 => Some("\u{0389}\u{0345}"),
+        8135 => Some("\u{0397}\u{0342}\u{0345}"),
+        8178 => Some("\u{1FFA}\u{0345}"),
+        8180 => Some("\u{038F}\u{0345}"),
+        8183 => Some("\u{03A9}\u{0342}\u{0345}"),
+        _ => None,
+    }
+}
+
+fn titlecase_uses_precomposed_upcase(code: i64) -> bool {
+    matches!(
+        code,
+        8072..=8111
+            | 8115
+            | 8124
+            | 8131
+            | 8140
+            | 8179
+            | 8188
+    )
 }
 
 /// `(downcase-region BEG END &optional REGION-NONCONTIGUOUS-P)` — convert the
@@ -3578,6 +3752,26 @@ mod tests {
         assert_eq!(results[2], r#"OK "ı""#);
     }
 
+    #[test]
+    fn downcase_region_unicode_edge_preserved() {
+        let results = eval_all(
+            r#"(insert (char-to-string 42955))
+               (downcase-region 1 2)
+               (buffer-string)"#,
+        );
+        assert_eq!(results[2], r#"OK "Ɤ""#);
+    }
+
+    #[test]
+    fn upcase_region_unicode_edge_preserved() {
+        let results = eval_all(
+            r#"(insert (char-to-string 42957))
+               (upcase-region 1 2)
+               (buffer-string)"#,
+        );
+        assert_eq!(results[2], r#"OK "ꟍ""#);
+    }
+
     // -- capitalize-region tests --
 
     #[test]
@@ -3618,6 +3812,26 @@ mod tests {
                (buffer-string)"#,
         );
         assert_eq!(results[2], r#"OK "Ss""#);
+    }
+
+    #[test]
+    fn capitalize_region_unicode_ligature_titlecase() {
+        let results = eval_all(
+            r#"(insert (char-to-string 64256))
+               (capitalize-region 1 2)
+               (buffer-string)"#,
+        );
+        assert_eq!(results[2], r#"OK "Ff""#);
+    }
+
+    #[test]
+    fn upcase_initials_region_unicode_armenian_titlecase() {
+        let results = eval_all(
+            r#"(insert (char-to-string 1415))
+               (upcase-initials-region 1 2)
+               (buffer-string)"#,
+        );
+        assert_eq!(results[2], r#"OK "Եւ""#);
     }
 
     #[test]
@@ -3666,6 +3880,17 @@ mod tests {
         assert_eq!(results[3], r#"OK "K""#);
     }
 
+    #[test]
+    fn downcase_word_unicode_extended_preserved() {
+        let results = eval_all(
+            r#"(insert (char-to-string 68944))
+               (goto-char 0)
+               (downcase-word 1)
+               (buffer-string)"#,
+        );
+        assert_eq!(results[3], r#"OK "𐵐""#);
+    }
+
     // -- upcase-word tests --
 
     #[test]
@@ -3690,6 +3915,17 @@ mod tests {
         assert_eq!(results[3], r#"OK "ı""#);
     }
 
+    #[test]
+    fn upcase_word_unicode_extended_preserved() {
+        let results = eval_all(
+            r#"(insert (char-to-string 68976))
+               (goto-char 0)
+               (upcase-word 1)
+               (buffer-string)"#,
+        );
+        assert_eq!(results[3], r#"OK "𐵰""#);
+    }
+
     // -- capitalize-word tests --
 
     #[test]
@@ -3712,6 +3948,17 @@ mod tests {
                (buffer-string)"#,
         );
         assert_eq!(results[3], r#"OK "Hello world""#);
+    }
+
+    #[test]
+    fn capitalize_word_unicode_greek_iota_subscript_titlecase() {
+        let results = eval_all(
+            r#"(insert (char-to-string 8114))
+               (goto-char 0)
+               (capitalize-word 1)
+               (buffer-string)"#,
+        );
+        assert_eq!(results[3], r#"OK "Ὰͅ""#);
     }
 
     // -- transpose-chars tests --
