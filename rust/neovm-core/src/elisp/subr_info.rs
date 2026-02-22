@@ -1477,7 +1477,9 @@ fn subr_arity_value(name: &str) -> Value {
         "delete-file-internal" => arity_cons(1, Some(1)),
         "access-file" => arity_cons(2, Some(2)),
         "default-file-modes" => arity_cons(0, Some(0)),
-        "directory-file-name" | "directory-name-p" => arity_cons(1, Some(1)),
+        "directory-file-name" | "directory-empty-p" | "directory-name-p" => {
+            arity_cons(1, Some(1))
+        }
         "directory-files" => arity_cons(1, Some(5)),
         "directory-files-and-attributes" => arity_cons(1, Some(6)),
         "define-category" => arity_cons(2, Some(3)),
@@ -3338,6 +3340,7 @@ mod tests {
         assert_subr_arity("delete-file", 1, Some(2));
         assert_subr_arity("delete-file-internal", 1, Some(1));
         assert_subr_arity("directory-file-name", 1, Some(1));
+        assert_subr_arity("directory-empty-p", 1, Some(1));
         assert_subr_arity("directory-files", 1, Some(5));
         assert_subr_arity("directory-files-and-attributes", 1, Some(6));
         assert_subr_arity("directory-name-p", 1, Some(1));

@@ -267,6 +267,14 @@ pub fn directory_name_p(name: &str) -> bool {
     name.ends_with('/')
 }
 
+/// Return true if NAME exists, is a directory, and has no entries.
+pub fn directory_empty_p(name: &str) -> bool {
+    match fs::read_dir(name) {
+        Ok(mut entries) => entries.next().is_none(),
+        Err(_) => false,
+    }
+}
+
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 struct RemoteFileNameParts<'a> {
     prefix: &'a str,
@@ -1571,6 +1579,13 @@ pub(crate) fn builtin_directory_name_p(args: Vec<Value>) -> EvalResult {
     expect_args("directory-name-p", &args, 1)?;
     let name = expect_string_strict(&args[0])?;
     Ok(Value::bool(directory_name_p(&name)))
+}
+
+/// (directory-empty-p NAME) -> t or nil
+pub(crate) fn builtin_directory_empty_p(args: Vec<Value>) -> EvalResult {
+    expect_args("directory-empty-p", &args, 1)?;
+    let name = expect_string_strict(&args[0])?;
+    Ok(Value::bool(directory_empty_p(&name)))
 }
 
 /// (file-remote-p FILE &optional IDENTIFICATION CONNECTED) -> remote component or nil
@@ -3317,6 +3332,23 @@ mod tests {
     }
 
     #[test]
+    fn test_directory_empty_p() {
+        let dir = std::env::temp_dir().join("neovm-directory-empty-p");
+        let _ = fs::remove_dir_all(&dir);
+        fs::create_dir_all(&dir).unwrap();
+
+        assert!(directory_empty_p(dir.to_string_lossy().as_ref()));
+
+        let file = dir.join("entry.txt");
+        fs::write(&file, "x").unwrap();
+        assert!(!directory_empty_p(dir.to_string_lossy().as_ref()));
+        assert!(!directory_empty_p(file.to_string_lossy().as_ref()));
+
+        fs::remove_file(file).unwrap();
+        fs::remove_dir_all(dir).unwrap();
+    }
+
+    #[test]
     fn test_parse_remote_file_name() {
         assert_eq!(parse_remote_file_name("/tmp/file"), None);
         assert_eq!(parse_remote_file_name("ssh:host:/tmp/file"), None);
@@ -4633,6 +4665,20 @@ mod tests {
         let result = builtin_directory_name_p(vec![Value::string("foo")]);
         assert_eq!(result.unwrap(), Value::Nil);
 
+        let base = std::env::temp_dir().join("neovm_builtin_directory_empty_p");
+        let _ = fs::remove_dir_all(&base);
+        fs::create_dir_all(&base).unwrap();
+        let file = base.join("entry");
+        fs::write(&file, "x").unwrap();
+
+        let result = builtin_directory_empty_p(vec![Value::string(base.to_string_lossy())]);
+        assert_eq!(result.unwrap(), Value::Nil);
+        fs::remove_file(&file).unwrap();
+
+        let result = builtin_directory_empty_p(vec![Value::string(base.to_string_lossy())]);
+        assert_eq!(result.unwrap(), Value::True);
+        fs::remove_dir_all(&base).unwrap();
+
         let result = builtin_file_remote_p(vec![Value::string("/tmp/local")]);
         assert_eq!(result.unwrap(), Value::Nil);
 
@@ -4683,6 +4729,9 @@ mod tests {
         assert!(result.is_err());
 
         let result = builtin_directory_name_p(vec![Value::Nil]);
+        assert!(result.is_err());
+
+        let result = builtin_directory_empty_p(vec![Value::Nil]);
         assert!(result.is_err());
 
         let result = builtin_file_remote_p(vec![Value::Nil]);

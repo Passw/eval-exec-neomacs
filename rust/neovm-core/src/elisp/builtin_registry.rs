@@ -377,6 +377,7 @@ const DISPATCH_BUILTIN_NAMES: &[&str] = &[
     "directory-file-name",
     "directory-files",
     "directory-files-and-attributes",
+    "directory-empty-p",
     "directory-name-p",
     "ding",
     "display--line-is-continued-p",
