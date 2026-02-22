@@ -1127,6 +1127,7 @@ const DISPATCH_BUILTIN_NAMES: &[&str] = &[
     "recordp",
     "recursion-depth",
     "regexp-quote",
+    "region-active-p",
     "region-beginning",
     "region-end",
     "register-ccl-program",

@@ -834,6 +834,27 @@ pub(crate) fn builtin_use_region_p(
     ))
 }
 
+/// (region-active-p) -> t or nil
+pub(crate) fn builtin_region_active_p(
+    eval: &mut super::eval::Evaluator,
+    args: Vec<Value>,
+) -> EvalResult {
+    expect_args("region-active-p", &args, 0)?;
+    let buf = eval.buffers.current_buffer().ok_or_else(no_buffer)?;
+    let mark_active = match dynamic_or_global_symbol_value(eval, "mark-active") {
+        Some(v) => v.is_truthy(),
+        None => buf
+            .properties
+            .get("mark-active")
+            .is_some_and(|v| v.is_truthy()),
+    };
+    let transient_mark_mode =
+        dynamic_or_global_symbol_value(eval, "transient-mark-mode").is_some_and(|v| v.is_truthy());
+    Ok(Value::bool(
+        mark_active && transient_mark_mode && buf.mark().is_some(),
+    ))
+}
+
 /// (deactivate-mark &optional FORCE)
 pub(crate) fn builtin_deactivate_mark(
     eval: &mut super::eval::Evaluator,
@@ -1374,6 +1395,40 @@ mod tests {
         eval_str(&mut ev, "(push-mark 3)"); // not activated
         let active = eval_str(&mut ev, "(use-region-p)");
         assert!(active.is_nil());
+    }
+
+    #[test]
+    fn test_region_active_p_true_for_active_empty_region() {
+        let mut ev = eval_with_text("hello");
+        let active = eval_str(
+            &mut ev,
+            "(let ((transient-mark-mode t))
+               (push-mark (point) nil t)
+               (region-active-p))",
+        );
+        assert!(active.is_truthy());
+    }
+
+    #[test]
+    fn test_region_active_p_requires_mark() {
+        let mut ev = eval_with_text("hello");
+        let active = eval_str(
+            &mut ev,
+            "(let ((transient-mark-mode t)
+                   (mark-active t))
+               (region-active-p))",
+        );
+        assert!(active.is_nil());
+    }
+
+    #[test]
+    fn test_region_active_p_over_arity() {
+        let mut ev = eval_with_text("hello");
+        let result = eval_str(
+            &mut ev,
+            "(condition-case err (region-active-p nil) (error (car err)))",
+        );
+        assert_eq!(result, Value::symbol("wrong-number-of-arguments"));
     }
 
     #[test]

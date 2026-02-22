@@ -940,6 +940,7 @@ fn subr_arity_value(name: &str) -> Value {
         "combine-after-change-execute"
         | "this-command-keys"
         | "this-command-keys-vector"
+        | "region-active-p"
         | "undo-boundary"
         | "universal-argument"
         | "use-region-p" => arity_cons(0, Some(0)),
@@ -3928,6 +3929,7 @@ mod tests {
         assert_subr_arity("upcase-word", 1, Some(1));
         assert_subr_arity("use-global-map", 1, Some(1));
         assert_subr_arity("use-local-map", 1, Some(1));
+        assert_subr_arity("region-active-p", 0, Some(0));
         assert_subr_arity("use-region-p", 0, Some(0));
         assert_subr_arity("view-register", 1, Some(1));
         assert_subr_arity("where-is-internal", 1, Some(5));
