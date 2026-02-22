@@ -99,12 +99,16 @@
 (string-prefix-p "#<frame" (message "%s" (selected-frame)))
 
 (string-prefix-p "#<window" (format "%S" (selected-window)))
+(string-match-p "on \\*scratch\\*>" (format "%S" (selected-window)))
 
 (string-prefix-p "#<window" (message "%S" (selected-window)))
+(string-match-p "on \\*scratch\\*>" (message "%S" (selected-window)))
 
 (string-prefix-p "#<window" (format "%s" (selected-window)))
+(string-match-p "on \\*scratch\\*>" (format "%s" (selected-window)))
 
 (string-prefix-p "#<window" (message "%s" (selected-window)))
+(string-match-p "on \\*scratch\\*>" (message "%s" (selected-window)))
 
 (string-prefix-p "#<thread" (format-message "%S" (current-thread)))
 
@@ -114,6 +118,7 @@
 (string-prefix-p "#<frame" (format-message "%S" (selected-frame)))
 
 (string-prefix-p "#<window" (format-message "%S" (selected-window)))
+(string-match-p "on \\*scratch\\*>" (format-message "%S" (selected-window)))
 
 (let* ((b (generate-new-buffer "fmtmsg-live-vm")))
   (prog1

@@ -38,14 +38,19 @@
 38	(string-prefix-p "#<frame" (format "%s" (selected-frame)))	OK t
 39	(string-prefix-p "#<frame" (message "%s" (selected-frame)))	OK t
 40	(string-prefix-p "#<window" (format "%S" (selected-window)))	OK t
-41	(string-prefix-p "#<window" (message "%S" (selected-window)))	OK t
-42	(string-prefix-p "#<window" (format "%s" (selected-window)))	OK t
-43	(string-prefix-p "#<window" (message "%s" (selected-window)))	OK t
-44	(string-prefix-p "#<thread" (format-message "%S" (current-thread)))	OK t
-45	(let ((term (car (terminal-list)))) (string-prefix-p "#<terminal" (format-message "%S" term)))	OK t
-46	(string-prefix-p "#<frame" (format-message "%S" (selected-frame)))	OK t
-47	(string-prefix-p "#<window" (format-message "%S" (selected-window)))	OK t
-48	(let* ((b (generate-new-buffer "fmtmsg-live-vm"))) (prog1 (string-prefix-p "#<buffer fmtmsg-live-vm" (format-message "%S" b)) (kill-buffer b)))	OK t
-49	(let* ((b (generate-new-buffer "fmtmsg-live-vm-s"))) (prog1 (string= "fmtmsg-live-vm-s" (format-message "%s" b)) (kill-buffer b)))	OK t
-50	(let* ((b (generate-new-buffer "fmtmsg-killed-vm"))) (kill-buffer b) (string= (format-message "%S" b) "#<killed buffer>"))	OK t
-51	(let* ((b (generate-new-buffer "fmtmsg-killed-vm-s"))) (kill-buffer b) (string= (format-message "%s" b) "#<killed buffer>"))	OK t
+41	(string-match-p "on \\*scratch\\*>" (format "%S" (selected-window)))	OK 11
+42	(string-prefix-p "#<window" (message "%S" (selected-window)))	OK t
+43	(string-match-p "on \\*scratch\\*>" (message "%S" (selected-window)))	OK 11
+44	(string-prefix-p "#<window" (format "%s" (selected-window)))	OK t
+45	(string-match-p "on \\*scratch\\*>" (format "%s" (selected-window)))	OK 11
+46	(string-prefix-p "#<window" (message "%s" (selected-window)))	OK t
+47	(string-match-p "on \\*scratch\\*>" (message "%s" (selected-window)))	OK 11
+48	(string-prefix-p "#<thread" (format-message "%S" (current-thread)))	OK t
+49	(let ((term (car (terminal-list)))) (string-prefix-p "#<terminal" (format-message "%S" term)))	OK t
+50	(string-prefix-p "#<frame" (format-message "%S" (selected-frame)))	OK t
+51	(string-prefix-p "#<window" (format-message "%S" (selected-window)))	OK t
+52	(string-match-p "on \\*scratch\\*>" (format-message "%S" (selected-window)))	OK 11
+53	(let* ((b (generate-new-buffer "fmtmsg-live-vm"))) (prog1 (string-prefix-p "#<buffer fmtmsg-live-vm" (format-message "%S" b)) (kill-buffer b)))	OK t
+54	(let* ((b (generate-new-buffer "fmtmsg-live-vm-s"))) (prog1 (string= "fmtmsg-live-vm-s" (format-message "%s" b)) (kill-buffer b)))	OK t
+55	(let* ((b (generate-new-buffer "fmtmsg-killed-vm"))) (kill-buffer b) (string= (format-message "%S" b) "#<killed buffer>"))	OK t
+56	(let* ((b (generate-new-buffer "fmtmsg-killed-vm-s"))) (kill-buffer b) (string= (format-message "%s" b) "#<killed buffer>"))	OK t

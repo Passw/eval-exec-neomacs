@@ -19357,6 +19357,24 @@ Last updated: 2026-02-21
       - `(format \"%S\" (selected-frame))` frame-handle prefix shape
       - frame-handle prefix shape in `display-monitor-attributes-list` / `frame-monitor-attributes` frame lists
 
+- Aligned `%S`/`%s` window handle formatting with oracle buffer-context shape in eval paths:
+  - runtime changes:
+    - `rust/neovm-core/src/elisp/builtins.rs`
+      - `print_threading_handle` now renders live window handles as:
+        - `#<window N on BUFFER>`
+      - fallback remains `#<window N>` when a stale window object has no live frame context.
+      - extended eval-dispatch coverage:
+        - `format_and_message_render_frame_window_handles_in_eval_dispatch`
+        - `format_message_renders_opaque_handles_in_eval_dispatch`
+  - vm-compat corpus changes:
+    - updated:
+      - `test/neovm/vm-compat/cases/format-message-killed-buffer-handle-semantics.forms`
+      - `test/neovm/vm-compat/cases/format-message-killed-buffer-handle-semantics.expected.tsv`
+    - added lock-ins for:
+      - `(format \"%S\" (selected-window))` contains `on *scratch*>`
+      - `(message \"%s\" (selected-window))` contains `on *scratch*>`
+      - `(format-message \"%S\" (selected-window))` contains `on *scratch*>`
+
 - Continue compatibility-first maintenance with small commit slices:
   - keep builtin surface and registry in lock-step
   - run oracle/parity checks after each behavior-affecting change

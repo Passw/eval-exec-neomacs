@@ -10063,6 +10063,22 @@ fn print_threading_handle(eval: &super::eval::Evaluator, value: &Value) -> Optio
     if let Some(handle) = super::display::print_terminal_handle(value) {
         return Some(handle);
     }
+    if let Value::Window(id) = value {
+        let window_id = crate::window::WindowId(*id);
+        if let Some(frame_id) = eval.frames.find_window_frame_id(window_id) {
+            if let Some(frame) = eval.frames.get(frame_id) {
+                if let Some(window) = frame.find_window(window_id) {
+                    if let Some(buffer_id) = window.buffer_id() {
+                        if let Some(buffer) = eval.buffers.get(buffer_id) {
+                            return Some(format!("#<window {} on {}>", id, buffer.name));
+                        }
+                    }
+                    return Some(format!("#<window {} on {}>", id, frame.name));
+                }
+            }
+        }
+        return Some(format!("#<window {}>", id));
+    }
     if let Some(id) = eval.threads.thread_id_from_handle(value) {
         return Some(format!("#<thread {id}>"));
     }
@@ -24312,25 +24328,42 @@ mod tests {
             .expect("selected-window should resolve")
             .expect("selected-window should evaluate");
 
-        let mut assert_prefix = |builtin: &str, spec: &str, value: Value, prefix: &str| {
-            let rendered = dispatch_builtin(&mut eval, builtin, vec![Value::string(spec), value])
-                .expect("builtin should resolve")
-                .expect("builtin should evaluate");
-            assert!(
-                rendered.as_str().is_some_and(|s| s.starts_with(prefix)),
-                "expected {builtin} {spec} output to start with {prefix}, got: {rendered:?}"
-            );
-        };
+        {
+            let mut assert_prefix = |builtin: &str, spec: &str, value: Value, prefix: &str| {
+                let rendered =
+                    dispatch_builtin(&mut eval, builtin, vec![Value::string(spec), value])
+                        .expect("builtin should resolve")
+                        .expect("builtin should evaluate");
+                assert!(
+                    rendered.as_str().is_some_and(|s| s.starts_with(prefix)),
+                    "expected {builtin} {spec} output to start with {prefix}, got: {rendered:?}"
+                );
+            };
 
-        assert_prefix("format", "%S", frame.clone(), "#<frame");
-        assert_prefix("message", "%S", frame.clone(), "#<frame");
-        assert_prefix("format", "%s", frame.clone(), "#<frame");
-        assert_prefix("message", "%s", frame, "#<frame");
+            assert_prefix("format", "%S", frame.clone(), "#<frame");
+            assert_prefix("message", "%S", frame.clone(), "#<frame");
+            assert_prefix("format", "%s", frame.clone(), "#<frame");
+            assert_prefix("message", "%s", frame, "#<frame");
+        }
 
-        assert_prefix("format", "%S", window.clone(), "#<window");
-        assert_prefix("message", "%S", window.clone(), "#<window");
-        assert_prefix("format", "%s", window.clone(), "#<window");
-        assert_prefix("message", "%s", window, "#<window");
+        {
+            let mut assert_contains =
+                |builtin: &str, spec: &str, value: Value, snippet: &str| {
+                    let rendered =
+                        dispatch_builtin(&mut eval, builtin, vec![Value::string(spec), value])
+                            .expect("builtin should resolve")
+                            .expect("builtin should evaluate");
+                    assert!(
+                        rendered.as_str().is_some_and(|s| s.contains(snippet)),
+                        "expected {builtin} {spec} output to contain {snippet}, got: {rendered:?}"
+                    );
+                };
+
+            assert_contains("format", "%S", window.clone(), "on *scratch*>");
+            assert_contains("message", "%S", window.clone(), "on *scratch*>");
+            assert_contains("format", "%s", window.clone(), "on *scratch*>");
+            assert_contains("message", "%s", window, "on *scratch*>");
+        }
     }
 
     #[test]
@@ -24371,7 +24404,19 @@ mod tests {
         assert_prefix("%s", thread, "#<thread");
         assert_prefix("%S", terminal, "#<terminal");
         assert_prefix("%S", frame, "#<frame");
-        assert_prefix("%S", window, "#<window");
+        assert_prefix("%S", window.clone(), "#<window");
+        assert!(
+            dispatch_builtin(
+                &mut eval,
+                "format-message",
+                vec![Value::string("%S"), window]
+            )
+            .expect("format-message should resolve")
+            .expect("format-message should evaluate")
+            .as_str()
+            .is_some_and(|s| s.contains("on *scratch*>")),
+            "expected format-message window output to include buffer context"
+        );
 
         let live_name = "*format-message-live-buffer*";
         let live_buffer = dispatch_builtin(
