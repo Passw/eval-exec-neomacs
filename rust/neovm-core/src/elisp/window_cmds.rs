@@ -734,6 +734,22 @@ pub(crate) fn builtin_selected_window(
     Ok(window_value(frame.selected_window))
 }
 
+/// `(old-selected-window)` -> previous selected window.
+pub(crate) fn builtin_old_selected_window(
+    eval: &mut super::eval::Evaluator,
+    args: Vec<Value>,
+) -> EvalResult {
+    expect_args("old-selected-window", &args, 0)?;
+    let fid = ensure_selected_frame_id(eval);
+    let selected_wid = eval
+        .frames
+        .get(fid)
+        .map(|frame| frame.selected_window)
+        .ok_or_else(|| signal("error", vec![Value::string("No selected frame")]))?;
+    let old_wid = eval.frames.old_selected_window().unwrap_or(selected_wid);
+    Ok(window_value(old_wid))
+}
+
 /// `(frame-selected-window &optional FRAME)` -> selected window of FRAME.
 pub(crate) fn builtin_frame_selected_window(
     eval: &mut super::eval::Evaluator,
@@ -1442,10 +1458,12 @@ pub(crate) fn builtin_window_bump_use_time(
             ))
         }
     };
-    Ok(match eval.frames.bump_window_use_time(selected_wid, target_wid) {
-        Some(use_time) => Value::Int(use_time),
-        None => Value::Nil,
-    })
+    Ok(
+        match eval.frames.bump_window_use_time(selected_wid, target_wid) {
+            Some(use_time) => Value::Int(use_time),
+            None => Value::Nil,
+        },
+    )
 }
 
 /// `(window-old-point &optional WINDOW)` -> integer.
@@ -2197,14 +2215,22 @@ pub(crate) fn builtin_window_list_1(
             let mut ids = eval.frames.frame_list();
             ids.sort_by_key(|f| f.0);
             ids.into_iter()
-                .filter(|frame_id| eval.frames.get(*frame_id).is_some_and(|frame| frame.visible))
+                .filter(|frame_id| {
+                    eval.frames
+                        .get(*frame_id)
+                        .is_some_and(|frame| frame.visible)
+                })
                 .collect()
         }
         Some(Value::Int(0)) => {
             let mut ids = eval.frames.frame_list();
             ids.sort_by_key(|f| f.0);
             ids.into_iter()
-                .filter(|frame_id| eval.frames.get(*frame_id).is_some_and(|frame| frame.visible))
+                .filter(|frame_id| {
+                    eval.frames
+                        .get(*frame_id)
+                        .is_some_and(|frame| frame.visible)
+                })
                 .collect()
         }
         Some(Value::Frame(frame_raw_id)) => {
@@ -2473,10 +2499,7 @@ pub(crate) fn builtin_window_live_p(
 }
 
 /// `(window-at X Y &optional FRAME)` -> window object or nil.
-pub(crate) fn builtin_window_at(
-    eval: &mut super::eval::Evaluator,
-    args: Vec<Value>,
-) -> EvalResult {
+pub(crate) fn builtin_window_at(eval: &mut super::eval::Evaluator, args: Vec<Value>) -> EvalResult {
     expect_min_args("window-at", &args, 2)?;
     expect_max_args("window-at", &args, 3)?;
     let x = expect_number(&args[0])?;
@@ -2738,7 +2761,10 @@ pub(crate) fn builtin_other_window(
     let new_wid = list[new_idx as usize];
     let (selected_buffer, switched) = if let Some(frame) = eval.frames.get_mut(fid) {
         let switched = frame.select_window(new_wid);
-        (frame.find_window(new_wid).and_then(|w| w.buffer_id()), switched)
+        (
+            frame.find_window(new_wid).and_then(|w| w.buffer_id()),
+            switched,
+        )
     } else {
         (None, false)
     };
@@ -4536,7 +4562,10 @@ mod tests {
                      (condition-case err (funcall #'window-list-1 w nil) (error (car err)))
                      (condition-case err (apply #'window-list-1 (list w nil)) (error (car err)))))",
         );
-        assert_eq!(r, "OK (wrong-type-argument wrong-type-argument wrong-type-argument)");
+        assert_eq!(
+            r,
+            "OK (wrong-type-argument wrong-type-argument wrong-type-argument)"
+        );
     }
 
     #[test]
@@ -5918,6 +5947,52 @@ mod tests {
         assert_eq!(
             out[8],
             "OK ((wrong-number-of-arguments #<subr set-frame-selected-window> 4) (wrong-number-of-arguments #<subr set-frame-selected-window> 1))"
+        );
+    }
+
+    #[test]
+    fn old_selected_window_matches_stable_and_stale_window_semantics() {
+        let forms = parse_forms(
+            "(windowp (old-selected-window))
+             (let* ((w1 (selected-window))
+                    (w2 (split-window)))
+               (prog1
+                   (list (eq (old-selected-window) w1)
+                         (progn (select-window w2) (eq (old-selected-window) w1))
+                         (progn (select-window w1) (eq (old-selected-window) w1))
+                         (progn (other-window 1) (eq (old-selected-window) w1))
+                         (progn (other-window 1) (eq (old-selected-window) w1))
+                         (progn (select-window w2 t) (eq (old-selected-window) w1))
+                         (progn (select-window w1 t) (eq (old-selected-window) w1)))
+                 (select-window w1)
+                 (delete-window w2)))
+             (let* ((w1 (selected-window))
+                    (w2 (split-window)))
+               (prog1
+                   (list (progn (select-window w2) (eq (old-selected-window) w1))
+                         (progn (delete-window w1) (windowp (old-selected-window)))
+                         (window-live-p (old-selected-window))
+                         (eq (old-selected-window) w2))
+                 (delete-other-windows w2)))
+             (list (condition-case err (old-selected-window nil) (error (car err)))
+                   (eq (funcall #'old-selected-window) (old-selected-window))
+                   (eq (apply #'old-selected-window nil) (old-selected-window))
+                   (condition-case err (funcall #'old-selected-window nil) (error (car err)))
+                   (condition-case err (apply #'old-selected-window '(nil)) (error (car err))))",
+        )
+        .expect("parse");
+        let mut ev = Evaluator::new();
+        let out = ev
+            .eval_forms(&forms)
+            .iter()
+            .map(format_eval_result)
+            .collect::<Vec<_>>();
+        assert_eq!(out[0], "OK t");
+        assert_eq!(out[1], "OK (t t t t t t t)");
+        assert_eq!(out[2], "OK (t t nil nil)");
+        assert_eq!(
+            out[3],
+            "OK (wrong-number-of-arguments t t wrong-number-of-arguments wrong-number-of-arguments)"
         );
     }
 

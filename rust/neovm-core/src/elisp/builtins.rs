@@ -12689,6 +12689,9 @@ pub(crate) fn dispatch_builtin(
 
         // Window/frame operations (evaluator-dependent)
         "selected-window" => return Some(super::window_cmds::builtin_selected_window(eval, args)),
+        "old-selected-window" => {
+            return Some(super::window_cmds::builtin_old_selected_window(eval, args))
+        }
         "active-minibuffer-window" => {
             return Some(super::window_cmds::builtin_active_minibuffer_window(args))
         }
@@ -15080,10 +15083,9 @@ pub(crate) fn dispatch_builtin_pure(name: &str, args: Vec<Value>) -> Option<Eval
         | "plist-member"
         | "window-list-1"
         | "window-bump-use-time"
+        | "old-selected-window"
         | "set-frame-selected-window"
-        | "window-at" => {
-            return None
-        }
+        | "window-at" => return None,
         _ => {}
     }
 

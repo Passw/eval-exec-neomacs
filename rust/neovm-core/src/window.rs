@@ -466,6 +466,7 @@ pub struct FrameManager {
     selected: Option<FrameId>,
     next_frame_id: u64,
     next_window_id: u64,
+    old_selected_window: Option<WindowId>,
     deleted_windows: HashSet<WindowId>,
     window_parameters: HashMap<WindowId, Vec<(Value, Value)>>,
     window_display_tables: HashMap<WindowId, Value>,
@@ -484,6 +485,7 @@ impl FrameManager {
             selected: None,
             next_frame_id: FRAME_ID_BASE,
             next_window_id: 1,
+            old_selected_window: None,
             deleted_windows: HashSet::new(),
             window_parameters: HashMap::new(),
             window_display_tables: HashMap::new(),
@@ -526,6 +528,7 @@ impl FrameManager {
 
         if self.selected.is_none() {
             self.selected = Some(frame_id);
+            self.old_selected_window = Some(selected_wid);
         }
 
         frame_id
@@ -818,6 +821,11 @@ impl FrameManager {
         self.window_use_times
             .insert(selected_window_id, self.window_select_count);
         Some(bumped_use_time)
+    }
+
+    /// Return the old selected window, when tracked.
+    pub fn old_selected_window(&self) -> Option<WindowId> {
+        self.old_selected_window
     }
 
     /// Return saved window state (window-start, point) for BUFFER-ID in WINDOW-ID.
