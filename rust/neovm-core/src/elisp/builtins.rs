@@ -15076,6 +15076,8 @@ pub(crate) fn dispatch_builtin_pure(name: &str, args: Vec<Value>) -> Option<Eval
         | "print"
         | "rename-file"
         | "setplist"
+        | "terminal-live-p"
+        | "terminal-name"
         | "terpri"
         | "write-char"
         | "assoc"
@@ -15280,8 +15282,6 @@ pub(crate) fn dispatch_builtin_pure(name: &str, args: Vec<Value>) -> Option<Eval
         "display-color-p" => super::display::builtin_display_color_p(args),
         "display-pixel-width" => super::display::builtin_display_pixel_width(args),
         "display-pixel-height" => super::display::builtin_display_pixel_height(args),
-        "terminal-name" => super::display::builtin_terminal_name(args),
-        "terminal-live-p" => super::display::builtin_terminal_live_p(args),
         // Internal compatibility surface (pure)
         "define-fringe-bitmap" => super::compat_internal::builtin_define_fringe_bitmap(args),
         "destroy-fringe-bitmap" => super::compat_internal::builtin_destroy_fringe_bitmap(args),
@@ -19424,6 +19424,8 @@ mod tests {
         assert!(dispatch_builtin_pure("print", vec![]).is_none());
         assert!(dispatch_builtin_pure("rename-file", vec![]).is_none());
         assert!(dispatch_builtin_pure("setplist", vec![]).is_none());
+        assert!(dispatch_builtin_pure("terminal-live-p", vec![]).is_none());
+        assert!(dispatch_builtin_pure("terminal-name", vec![]).is_none());
         assert!(dispatch_builtin_pure("terpri", vec![]).is_none());
         assert!(dispatch_builtin_pure("write-char", vec![]).is_none());
         assert!(dispatch_builtin_pure("assoc", vec![]).is_none());
