@@ -19895,6 +19895,22 @@ Last updated: 2026-02-21
         - `(wrong-number-of-arguments x-win-suspend-error 1)`
         - `(wrong-number-of-arguments x-win-suspend-error 2)`
 
+- Added dedicated `x-device-class` designator/structure lock-ins:
+  - vm-compat corpus changes:
+    - added:
+      - `test/neovm/vm-compat/cases/x-device-class-designator-structure-semantics.forms`
+      - `test/neovm/vm-compat/cases/x-device-class-designator-structure-semantics.expected.tsv`
+    - wired case into:
+      - `test/neovm/vm-compat/cases/default.list`
+    - lock-ins assert:
+      - `nil` and string display designators preserve `nil` return
+      - integer/character inputs preserve `wrong-type-argument` + `stringp`
+      - non-string structured designators preserve `wrong-type-argument` + `char-or-string-p`
+      - frame/terminal/window/dead-window payload structures remain stable via predicate checks
+      - arity payloads remain exact:
+        - `(wrong-number-of-arguments x-device-class 0)`
+        - `(wrong-number-of-arguments x-device-class 2)`
+
 - Continue compatibility-first maintenance with small commit slices:
   - keep builtin surface and registry in lock-step
   - run oracle/parity checks after each behavior-affecting change
