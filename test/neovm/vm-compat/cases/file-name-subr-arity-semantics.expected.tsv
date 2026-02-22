@@ -8,4 +8,6 @@
 8	(subr-arity (symbol-function 'file-name-extension))	OK (1 . 2)
 9	(subr-arity (symbol-function 'file-name-nondirectory))	OK (1 . 1)
 10	(subr-arity (symbol-function 'file-name-sans-extension))	OK (1 . 1)
-11	(subr-arity (symbol-function 'file-truename))	OK (1 . 3)
+11	(subr-arity (symbol-function 'file-size-human-readable))	OK (1 . 4)
+12	(subr-arity (symbol-function 'file-size-human-readable-iec))	OK (1 . 1)
+13	(subr-arity (symbol-function 'file-truename))	OK (1 . 3)

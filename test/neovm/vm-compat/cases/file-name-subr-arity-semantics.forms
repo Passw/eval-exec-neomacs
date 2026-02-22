@@ -8,4 +8,6 @@
 (subr-arity (symbol-function 'file-name-extension))
 (subr-arity (symbol-function 'file-name-nondirectory))
 (subr-arity (symbol-function 'file-name-sans-extension))
+(subr-arity (symbol-function 'file-size-human-readable))
+(subr-arity (symbol-function 'file-size-human-readable-iec))
 (subr-arity (symbol-function 'file-truename))
