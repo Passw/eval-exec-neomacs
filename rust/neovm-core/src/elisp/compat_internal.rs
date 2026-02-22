@@ -4,81 +4,10 @@
 //! code paths. NeoVM provides compatibility implementations that preserve
 //! observable arity and error contracts for compatibility tests.
 
-use super::error::{signal, EvalResult, Flow};
-use super::value::{HashTableTest, Value};
-use std::cell::RefCell;
-
-thread_local! {
-    static HASH_TABLE_TEST_ALIASES: RefCell<Vec<(String, HashTableTest)>> =
-        const { RefCell::new(Vec::new()) };
-}
-
-fn expect_args(name: &str, args: &[Value], n: usize) -> Result<(), Flow> {
-    if args.len() != n {
-        Err(signal(
-            "wrong-number-of-arguments",
-            vec![Value::symbol(name), Value::Int(args.len() as i64)],
-        ))
-    } else {
-        Ok(())
-    }
-}
-
-fn expect_symbolp(value: &Value) -> Result<(), Flow> {
-    if value.as_symbol_name().is_some() {
-        Ok(())
-    } else {
-        Err(signal(
-            "wrong-type-argument",
-            vec![Value::symbol("symbolp"), value.clone()],
-        ))
-    }
-}
-
-fn hash_test_from_designator(value: &Value) -> Option<HashTableTest> {
-    let name = value.as_symbol_name()?;
-    match name {
-        "eq" => Some(HashTableTest::Eq),
-        "eql" => Some(HashTableTest::Eql),
-        "equal" => Some(HashTableTest::Equal),
-        _ => None,
-    }
-}
-
-fn register_hash_table_test_alias(name: &str, test: HashTableTest) {
-    HASH_TABLE_TEST_ALIASES.with(|slot| {
-        let mut aliases = slot.borrow_mut();
-        if let Some((_, existing)) = aliases.iter_mut().find(|(alias, _)| alias == name) {
-            *existing = test;
-        } else {
-            aliases.push((name.to_string(), test));
-        }
-    });
-}
-
-pub(crate) fn lookup_hash_table_test_alias(name: &str) -> Option<HashTableTest> {
-    HASH_TABLE_TEST_ALIASES.with(|slot| {
-        slot.borrow()
-            .iter()
-            .find_map(|(alias, test)| (alias == name).then_some(test.clone()))
-    })
-}
-
-/// `(define-hash-table-test SYMBOL TEST HASH)` -> (TEST HASH).
-pub(crate) fn builtin_define_hash_table_test(args: Vec<Value>) -> EvalResult {
-    expect_args("define-hash-table-test", &args, 3)?;
-    expect_symbolp(&args[0])?;
-    if let Some(alias_name) = args[0].as_symbol_name() {
-        if let Some(test) = hash_test_from_designator(&args[1]) {
-            register_hash_table_test_alias(alias_name, test);
-        }
-    }
-    Ok(Value::list(vec![args[1].clone(), args[2].clone()]))
-}
-
 #[cfg(test)]
 mod tests {
-    use super::*;
+    use crate::elisp::error::Flow;
+    use crate::elisp::value::{HashTableTest, Value};
 
     #[test]
     fn fillarray_vector_is_in_place() {
@@ -169,7 +98,7 @@ mod tests {
 
     #[test]
     fn define_hash_table_test_requires_symbol_name() {
-        let err = builtin_define_hash_table_test(vec![
+        let err = crate::elisp::builtins::builtin_define_hash_table_test(vec![
             Value::Int(1),
             Value::symbol("eq"),
             Value::symbol("sxhash-eq"),

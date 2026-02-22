@@ -10,6 +10,7 @@ use super::string_escape::{
     storage_substring,
 };
 use super::value::*;
+use std::cell::RefCell;
 use std::collections::{HashMap, HashSet};
 use std::sync::{Mutex, OnceLock};
 use strum::EnumString;
@@ -2390,8 +2391,56 @@ pub(crate) fn builtin_vconcat(args: Vec<Value>) -> EvalResult {
 // Hash table operations
 // ===========================================================================
 
+thread_local! {
+    static HASH_TABLE_TEST_ALIASES: RefCell<Vec<(String, HashTableTest)>> =
+        const { RefCell::new(Vec::new()) };
+}
+
 fn invalid_hash_table_argument_list(arg: Value) -> Flow {
     signal("error", vec![Value::string("Invalid argument list"), arg])
+}
+
+fn hash_test_from_designator(value: &Value) -> Option<HashTableTest> {
+    let name = value.as_symbol_name()?;
+    match name {
+        "eq" => Some(HashTableTest::Eq),
+        "eql" => Some(HashTableTest::Eql),
+        "equal" => Some(HashTableTest::Equal),
+        _ => None,
+    }
+}
+
+fn register_hash_table_test_alias(name: &str, test: HashTableTest) {
+    HASH_TABLE_TEST_ALIASES.with(|slot| {
+        let mut aliases = slot.borrow_mut();
+        if let Some((_, existing)) = aliases.iter_mut().find(|(alias, _)| alias == name) {
+            *existing = test;
+        } else {
+            aliases.push((name.to_string(), test));
+        }
+    });
+}
+
+fn lookup_hash_table_test_alias(name: &str) -> Option<HashTableTest> {
+    HASH_TABLE_TEST_ALIASES.with(|slot| {
+        slot.borrow()
+            .iter()
+            .find_map(|(alias, test)| (alias == name).then_some(test.clone()))
+    })
+}
+
+pub(crate) fn builtin_define_hash_table_test(args: Vec<Value>) -> EvalResult {
+    expect_args("define-hash-table-test", &args, 3)?;
+    let Some(alias_name) = args[0].as_symbol_name() else {
+        return Err(signal(
+            "wrong-type-argument",
+            vec![Value::symbol("symbolp"), args[0].clone()],
+        ));
+    };
+    if let Some(test) = hash_test_from_designator(&args[1]) {
+        register_hash_table_test_alias(alias_name, test);
+    }
+    Ok(Value::list(vec![args[1].clone(), args[2].clone()]))
 }
 
 pub(crate) fn builtin_make_hash_table(args: Vec<Value>) -> EvalResult {
@@ -2438,9 +2487,7 @@ pub(crate) fn builtin_make_hash_table(args: Vec<Value>) -> EvalResult {
                             "eql" => HashTableTest::Eql,
                             "equal" => HashTableTest::Equal,
                             _ => {
-                                if let Some(alias_test) =
-                                    super::compat_internal::lookup_hash_table_test_alias(name)
-                                {
+                                if let Some(alias_test) = lookup_hash_table_test_alias(name) {
                                     alias_test
                                 } else {
                                     return Err(signal(
@@ -17150,7 +17197,7 @@ pub(crate) fn dispatch_builtin(
         "sqlite-version" => builtin_sqlite_version(args),
         "sqlitep" => builtin_sqlitep(args),
         "fillarray" => builtin_fillarray(args),
-        "define-hash-table-test" => super::compat_internal::builtin_define_hash_table_test(args),
+        "define-hash-table-test" => builtin_define_hash_table_test(args),
         "find-coding-systems-region-internal" => builtin_find_coding_systems_region_internal(args),
 
         // Native compilation compatibility (pure)
@@ -17967,7 +18014,7 @@ pub(crate) fn dispatch_builtin_pure(name: &str, args: Vec<Value>) -> Option<Eval
         "sqlite-version" => builtin_sqlite_version(args),
         "sqlitep" => builtin_sqlitep(args),
         "fillarray" => builtin_fillarray(args),
-        "define-hash-table-test" => super::compat_internal::builtin_define_hash_table_test(args),
+        "define-hash-table-test" => builtin_define_hash_table_test(args),
         "find-coding-systems-region-internal" => builtin_find_coding_systems_region_internal(args),
         _ => return None,
     })
@@ -21046,6 +21093,37 @@ mod tests {
             .expect("builtin hash-table-count should resolve")
             .expect("builtin hash-table-count should evaluate");
         assert_eq!(count, Value::Int(1));
+    }
+
+    #[test]
+    fn pure_dispatch_typed_define_hash_table_test_registers_alias() {
+        let alias = Value::symbol("neovm--eq-test-alias");
+
+        let defined = dispatch_builtin_pure(
+            "define-hash-table-test",
+            vec![
+                alias.clone(),
+                Value::symbol("eq"),
+                Value::symbol("sxhash-eq"),
+            ],
+        )
+        .expect("define-hash-table-test should resolve")
+        .expect("define-hash-table-test should evaluate");
+        assert_eq!(
+            defined,
+            Value::list(vec![Value::symbol("eq"), Value::symbol("sxhash-eq")])
+        );
+
+        let table = dispatch_builtin_pure("make-hash-table", vec![Value::keyword(":test"), alias])
+            .expect("make-hash-table should resolve")
+            .expect("make-hash-table should evaluate");
+        let Value::HashTable(table) = table else {
+            panic!("expected hash table");
+        };
+        assert!(matches!(
+            table.lock().expect("poisoned").test,
+            HashTableTest::Eq
+        ));
     }
 
     #[test]
