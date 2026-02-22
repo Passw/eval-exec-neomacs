@@ -1641,12 +1641,6 @@ pub(crate) fn builtin_handler_bind_1(args: Vec<Value>) -> EvalResult {
     Ok(Value::Nil)
 }
 
-/// `(indirect-variable VARIABLE)` -> nil.
-pub(crate) fn builtin_indirect_variable(args: Vec<Value>) -> EvalResult {
-    expect_args("indirect-variable", &args, 1)?;
-    Ok(Value::Nil)
-}
-
 /// `(insert-and-inherit &rest ARGS)` -> nil.
 pub(crate) fn builtin_insert_and_inherit(_args: Vec<Value>) -> EvalResult {
     Ok(Value::Nil)
@@ -1878,12 +1872,6 @@ pub(crate) fn builtin_set_buffer_major_mode(args: Vec<Value>) -> EvalResult {
 pub(crate) fn builtin_set_buffer_multibyte(args: Vec<Value>) -> EvalResult {
     expect_args("set-buffer-multibyte", &args, 1)?;
     Ok(Value::Nil)
-}
-
-/// `(setplist SYMBOL PLIST)` -> PLIST.
-pub(crate) fn builtin_setplist(args: Vec<Value>) -> EvalResult {
-    expect_args("setplist", &args, 2)?;
-    Ok(args[1].clone())
 }
 
 /// `(split-window-internal WINDOW SIZE SIDE NORMALIZE)` -> nil.

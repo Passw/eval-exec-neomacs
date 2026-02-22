@@ -14473,7 +14473,6 @@ pub(crate) fn dispatch_builtin(
             super::compat_internal::builtin_find_operation_coding_system(args)
         }
         "handler-bind-1" => super::compat_internal::builtin_handler_bind_1(args),
-        "indirect-variable" => super::compat_internal::builtin_indirect_variable(args),
         "insert-and-inherit" => super::compat_internal::builtin_insert_and_inherit(args),
         "insert-before-markers-and-inherit" => {
             super::compat_internal::builtin_insert_before_markers_and_inherit(args)
@@ -14605,7 +14604,6 @@ pub(crate) fn dispatch_builtin(
         "set-window-new-normal" => super::compat_internal::builtin_set_window_new_normal(args),
         "set-window-new-pixel" => super::compat_internal::builtin_set_window_new_pixel(args),
         "set-window-new-total" => super::compat_internal::builtin_set_window_new_total(args),
-        "setplist" => super::compat_internal::builtin_setplist(args),
         "sort-charsets" => super::compat_internal::builtin_sort_charsets(args),
         "split-char" => super::compat_internal::builtin_split_char(args),
         "split-window-internal" => super::compat_internal::builtin_split_window_internal(args),
@@ -15067,6 +15065,7 @@ pub(crate) fn dispatch_builtin_pure(name: &str, args: Vec<Value>) -> Option<Eval
         "functionp"
         | "format"
         | "format-message"
+        | "indirect-variable"
         | "macroexpand"
         | "message"
         | "message-box"
@@ -15075,6 +15074,7 @@ pub(crate) fn dispatch_builtin_pure(name: &str, args: Vec<Value>) -> Option<Eval
         | "prin1"
         | "prin1-to-string"
         | "print"
+        | "setplist"
         | "terpri"
         | "write-char"
         | "assoc"
@@ -15448,7 +15448,6 @@ pub(crate) fn dispatch_builtin_pure(name: &str, args: Vec<Value>) -> Option<Eval
             super::compat_internal::builtin_find_operation_coding_system(args)
         }
         "handler-bind-1" => super::compat_internal::builtin_handler_bind_1(args),
-        "indirect-variable" => super::compat_internal::builtin_indirect_variable(args),
         "insert-and-inherit" => super::compat_internal::builtin_insert_and_inherit(args),
         "insert-before-markers-and-inherit" => {
             super::compat_internal::builtin_insert_before_markers_and_inherit(args)
@@ -15580,7 +15579,6 @@ pub(crate) fn dispatch_builtin_pure(name: &str, args: Vec<Value>) -> Option<Eval
         "set-window-new-normal" => super::compat_internal::builtin_set_window_new_normal(args),
         "set-window-new-pixel" => super::compat_internal::builtin_set_window_new_pixel(args),
         "set-window-new-total" => super::compat_internal::builtin_set_window_new_total(args),
-        "setplist" => super::compat_internal::builtin_setplist(args),
         "sort-charsets" => super::compat_internal::builtin_sort_charsets(args),
         "split-char" => super::compat_internal::builtin_split_char(args),
         "split-window-internal" => super::compat_internal::builtin_split_window_internal(args),
@@ -19410,6 +19408,7 @@ mod tests {
         assert!(dispatch_builtin_pure("functionp", vec![]).is_none());
         assert!(dispatch_builtin_pure("format", vec![]).is_none());
         assert!(dispatch_builtin_pure("format-message", vec![]).is_none());
+        assert!(dispatch_builtin_pure("indirect-variable", vec![]).is_none());
         assert!(dispatch_builtin_pure("macroexpand", vec![]).is_none());
         assert!(dispatch_builtin_pure("message", vec![]).is_none());
         assert!(dispatch_builtin_pure("message-box", vec![]).is_none());
@@ -19418,6 +19417,7 @@ mod tests {
         assert!(dispatch_builtin_pure("prin1", vec![]).is_none());
         assert!(dispatch_builtin_pure("prin1-to-string", vec![]).is_none());
         assert!(dispatch_builtin_pure("print", vec![]).is_none());
+        assert!(dispatch_builtin_pure("setplist", vec![]).is_none());
         assert!(dispatch_builtin_pure("terpri", vec![]).is_none());
         assert!(dispatch_builtin_pure("write-char", vec![]).is_none());
         assert!(dispatch_builtin_pure("assoc", vec![]).is_none());
