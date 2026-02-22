@@ -354,14 +354,22 @@ fn internal_hash_table_index_size(table: &LispHashTable) -> usize {
 
 fn internal_hash_table_diagnostic_hash(key: &HashKey, test: HashTableTest) -> u32 {
     match test {
-        HashTableTest::Eq => {
-            let value = hash_key_to_value(key);
-            reduce_emacs_uint_to_hash_hash(sxhash_emacs_uint_for(&value, HashTableTest::Eq))
-        }
-        HashTableTest::Eql => {
-            let value = hash_key_to_value(key);
-            reduce_emacs_uint_to_hash_hash(sxhash_emacs_uint_for(&value, HashTableTest::Eql))
-        }
+        HashTableTest::Eq => match key {
+            // Eq tables carry pointer-identity keys; preserve that identity in
+            // diagnostic hash output instead of collapsing through `nil`.
+            HashKey::Ptr(ptr) => reduce_emacs_uint_to_hash_hash(*ptr as u64),
+            _ => {
+                let value = hash_key_to_value(key);
+                reduce_emacs_uint_to_hash_hash(sxhash_emacs_uint_for(&value, HashTableTest::Eq))
+            }
+        },
+        HashTableTest::Eql => match key {
+            HashKey::Ptr(ptr) => reduce_emacs_uint_to_hash_hash(*ptr as u64),
+            _ => {
+                let value = hash_key_to_value(key);
+                reduce_emacs_uint_to_hash_hash(sxhash_emacs_uint_for(&value, HashTableTest::Eql))
+            }
+        },
         HashTableTest::Equal => match key {
             HashKey::Float(bits) => reduce_emacs_uint_to_hash_hash(*bits),
             HashKey::Int(n) => reduce_emacs_uint_to_hash_hash(*n as u64),
@@ -1234,6 +1242,52 @@ mod tests {
                 Value::Int(65)
             )])])
         );
+    }
+
+    #[test]
+    fn internal_hash_table_buckets_eq_pointer_keys_keep_distinct_hashes() {
+        let table = builtin_make_hash_table(vec![
+            Value::keyword(":test"),
+            Value::symbol("eq"),
+            Value::keyword(":size"),
+            Value::Int(5),
+        ])
+        .expect("hash table");
+        let key_a = Value::string("x");
+        let key_b = Value::string("x");
+        let _ = builtin_puthash(vec![key_a.clone(), Value::symbol("a"), table.clone()])
+            .expect("puthash key-a");
+        let _ = builtin_puthash(vec![key_b.clone(), Value::symbol("b"), table.clone()])
+            .expect("puthash key-b");
+        assert_eq!(
+            builtin_hash_table_count(vec![table.clone()]).expect("hash-table-count"),
+            Value::Int(2)
+        );
+        assert_eq!(
+            builtin_gethash(vec![key_a, table.clone(), Value::symbol("miss")]).expect("gethash a"),
+            Value::symbol("a")
+        );
+        assert_eq!(
+            builtin_gethash(vec![key_b, table.clone(), Value::symbol("miss")]).expect("gethash b"),
+            Value::symbol("b")
+        );
+
+        let buckets = builtin_internal_hash_table_buckets(vec![table]).expect("bucket alists");
+        let outer = list_to_vec(&buckets).expect("outer list");
+        let mut hashes = Vec::new();
+        for bucket in outer {
+            let entries = list_to_vec(&bucket).expect("bucket alist");
+            for entry in entries {
+                let Value::Cons(cell) = entry else {
+                    panic!("expected alist cons entry");
+                };
+                let pair = cell.lock().expect("poisoned");
+                hashes.push(pair.cdr.as_int().expect("diagnostic hash integer"));
+            }
+        }
+        hashes.sort_unstable();
+        assert_eq!(hashes.len(), 2);
+        assert_ne!(hashes[0], hashes[1]);
     }
 
     #[test]
