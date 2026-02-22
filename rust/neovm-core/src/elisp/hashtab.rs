@@ -180,39 +180,11 @@ fn next_pow2_saturating(value: usize) -> usize {
 }
 
 fn internal_hash_table_index_size(table: &LispHashTable) -> usize {
-    let entries = table.data.len();
-    let declared = table.size.max(0) as usize;
-
-    // Emacs keeps empty default hash tables at index-size 1, then grows on demand.
-    if entries == 0 {
-        return if declared == 0 {
-            1
-        } else {
-            next_pow2_saturating(declared.saturating_add(1))
-        };
-    }
-
-    // Default-size tables jump to a practical minimum index on first insert.
-    let mut index_size = if declared == 0 {
-        8_usize
+    if table.size <= 0 {
+        1
     } else {
-        next_pow2_saturating(declared.saturating_add(1))
-    };
-
-    // Initial resize threshold follows declared size, with default tables using 6.
-    let mut threshold = if declared == 0 { 6_usize } else { declared };
-    if entries > threshold {
-        index_size = index_size.saturating_mul(4).max(32);
-        threshold = index_size.saturating_mul(13) / 16; // 0.8125
+        next_pow2_saturating((table.size as usize).saturating_add(1)).max(1)
     }
-
-    // Subsequent growth tracks the default 0.8125 load threshold.
-    while entries > threshold {
-        index_size = index_size.saturating_mul(4);
-        threshold = index_size.saturating_mul(13) / 16;
-    }
-
-    index_size.max(1)
 }
 
 fn internal_hash_table_diagnostic_hash(key: &HashKey) -> i64 {
@@ -749,6 +721,39 @@ mod tests {
             builtin_internal_hash_table_index_size(vec![mid]).unwrap(),
             Value::Int(64)
         );
+    }
+
+    #[test]
+    fn hash_table_size_tracks_growth_boundaries() {
+        let tiny = builtin_make_hash_table(vec![Value::keyword(":size"), Value::Int(1)])
+            .expect("size 1 table");
+        let _ = builtin_puthash(vec![Value::Int(1), Value::symbol("x"), tiny.clone()])
+            .expect("puthash for first tiny entry");
+        assert_eq!(builtin_hash_table_size(vec![tiny.clone()]).unwrap(), Value::Int(1));
+        let _ = builtin_puthash(vec![Value::Int(2), Value::symbol("y"), tiny.clone()])
+            .expect("puthash for second tiny entry");
+        assert_eq!(builtin_hash_table_size(vec![tiny]).unwrap(), Value::Int(24));
+
+        let default_table = builtin_make_hash_table(vec![]).expect("default table");
+        let _ = builtin_puthash(vec![
+            Value::Int(1),
+            Value::symbol("default-value"),
+            default_table.clone(),
+        ])
+        .expect("puthash for default table");
+        assert_eq!(
+            builtin_hash_table_size(vec![default_table]).unwrap(),
+            Value::Int(6)
+        );
+
+        let mid = builtin_make_hash_table(vec![Value::keyword(":size"), Value::Int(10)])
+            .expect("size 10 table");
+        for i in 0..11 {
+            let i = i as i64;
+            let _ = builtin_puthash(vec![Value::Int(i), Value::Int(i), mid.clone()])
+                .expect("puthash while filling size 10 table");
+        }
+        assert_eq!(builtin_hash_table_size(vec![mid]).unwrap(), Value::Int(40));
     }
 
     #[test]

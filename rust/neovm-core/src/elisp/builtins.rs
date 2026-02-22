@@ -2423,6 +2423,29 @@ fn lookup_hash_table_test_alias(name: &str) -> Option<HashTableTest> {
         .cloned()
 }
 
+fn maybe_resize_hash_table_for_insert(table: &mut LispHashTable, inserting_new_key: bool) {
+    if !inserting_new_key {
+        return;
+    }
+    let current_size = usize::try_from(table.size.max(0)).unwrap_or(usize::MAX);
+    if table.data.len() < current_size {
+        return;
+    }
+
+    // Match Emacs growth policy: zero-sized tables grow to 6 slots on first
+    // insertion; small tables then grow by 4x (up to size 64), larger tables
+    // grow by 2x.
+    let min_size = 6_i64;
+    let base = table.size.max(min_size).min(i64::MAX / 2);
+    table.size = if table.size == 0 {
+        min_size
+    } else if base <= 64 {
+        base.saturating_mul(4)
+    } else {
+        base.saturating_mul(2)
+    };
+}
+
 pub(crate) fn builtin_define_hash_table_test(args: Vec<Value>) -> EvalResult {
     expect_args("define-hash-table-test", &args, 3)?;
     let Some(alias_name) = args[0].as_symbol_name() else {
@@ -2633,6 +2656,8 @@ pub(crate) fn builtin_puthash(args: Vec<Value>) -> EvalResult {
         Value::HashTable(ht) => {
             let mut ht = ht.lock().expect("poisoned");
             let key = args[0].to_hash_key(&ht.test);
+            let inserting_new_key = !ht.data.contains_key(&key);
+            maybe_resize_hash_table_for_insert(&mut ht, inserting_new_key);
             ht.data.insert(key, args[1].clone());
             Ok(args[1].clone())
         }
