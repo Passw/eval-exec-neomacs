@@ -19429,6 +19429,20 @@ Last updated: 2026-02-21
       - `(display-color-p 'foo)` keeps the oracle `Invalid argument foo in 'get-device-terminal'` path
       - `(x-display-color-p 'foo)` keeps the same oracle-invalid-argument payload
 
+- Added dedicated display-query symbol-designator lock-ins for the full query surface:
+  - vm-compat corpus changes:
+    - added:
+      - `test/neovm/vm-compat/cases/display-query-symbol-designator-error-semantics.forms`
+      - `test/neovm/vm-compat/cases/display-query-symbol-designator-error-semantics.expected.tsv`
+    - wired case into:
+      - `test/neovm/vm-compat/cases/default.list`
+    - lock-ins cover symbol designators for:
+      - `display-graphic-p`, `display-color-p`, `display-pixel-width`, `display-pixel-height`
+      - `display-mm-width`, `display-mm-height`, `display-screens`
+      - `display-color-cells`, `display-planes`, `display-visual-class`
+      - `display-backing-store`, `display-images-p`
+      - all paths keep oracle invalid-argument payload shape (`Invalid argument x in 'get-device-terminal'`)
+
 - Continue compatibility-first maintenance with small commit slices:
   - keep builtin surface and registry in lock-step
   - run oracle/parity checks after each behavior-affecting change
