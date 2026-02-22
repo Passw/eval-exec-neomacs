@@ -1653,12 +1653,6 @@ pub(crate) fn builtin_keymap_prompt(args: Vec<Value>) -> EvalResult {
     Ok(Value::Nil)
 }
 
-/// `(kill-all-local-variables &optional KILL-PERMANENT)` -> nil.
-pub(crate) fn builtin_kill_all_local_variables(args: Vec<Value>) -> EvalResult {
-    expect_range_args("kill-all-local-variables", &args, 0, 1)?;
-    Ok(Value::Nil)
-}
-
 /// `(kill-emacs &optional ARG RESTART)` -> nil.
 pub(crate) fn builtin_kill_emacs(args: Vec<Value>) -> EvalResult {
     expect_range_args("kill-emacs", &args, 0, 2)?;

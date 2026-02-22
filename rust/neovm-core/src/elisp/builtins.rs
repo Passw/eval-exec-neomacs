@@ -14475,9 +14475,6 @@ pub(crate) fn dispatch_builtin(
         "iso-charset" => super::compat_internal::builtin_iso_charset(args),
         "keymap--get-keyelt" => super::compat_internal::builtin_keymap_get_keyelt(args),
         "keymap-prompt" => super::compat_internal::builtin_keymap_prompt(args),
-        "kill-all-local-variables" => {
-            super::compat_internal::builtin_kill_all_local_variables(args)
-        }
         "kill-emacs" => super::compat_internal::builtin_kill_emacs(args),
         "lower-frame" => super::compat_internal::builtin_lower_frame(args),
         "lread--substitute-object-in-subtree" => {
@@ -15065,6 +15062,7 @@ pub(crate) fn dispatch_builtin_pure(name: &str, args: Vec<Value>) -> Option<Eval
         | "insert-and-inherit"
         | "insert-before-markers-and-inherit"
         | "insert-buffer-substring"
+        | "kill-all-local-variables"
         | "make-directory"
         | "make-temp-file"
         | "macroexpand"
@@ -15448,9 +15446,6 @@ pub(crate) fn dispatch_builtin_pure(name: &str, args: Vec<Value>) -> Option<Eval
         "iso-charset" => super::compat_internal::builtin_iso_charset(args),
         "keymap--get-keyelt" => super::compat_internal::builtin_keymap_get_keyelt(args),
         "keymap-prompt" => super::compat_internal::builtin_keymap_prompt(args),
-        "kill-all-local-variables" => {
-            super::compat_internal::builtin_kill_all_local_variables(args)
-        }
         "kill-emacs" => super::compat_internal::builtin_kill_emacs(args),
         "lower-frame" => super::compat_internal::builtin_lower_frame(args),
         "lread--substitute-object-in-subtree" => {
@@ -19416,6 +19411,7 @@ mod tests {
         assert!(dispatch_builtin_pure("insert-and-inherit", vec![]).is_none());
         assert!(dispatch_builtin_pure("insert-before-markers-and-inherit", vec![]).is_none());
         assert!(dispatch_builtin_pure("insert-buffer-substring", vec![]).is_none());
+        assert!(dispatch_builtin_pure("kill-all-local-variables", vec![]).is_none());
         assert!(dispatch_builtin_pure("make-directory", vec![]).is_none());
         assert!(dispatch_builtin_pure("make-temp-file", vec![]).is_none());
         assert!(dispatch_builtin_pure("macroexpand", vec![]).is_none());
