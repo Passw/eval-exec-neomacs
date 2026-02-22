@@ -1438,24 +1438,6 @@ pub(crate) fn builtin_define_coding_system_internal(args: Vec<Value>) -> EvalRes
     Ok(Value::Nil)
 }
 
-/// `(kill-emacs &optional ARG RESTART)` -> nil.
-pub(crate) fn builtin_kill_emacs(args: Vec<Value>) -> EvalResult {
-    expect_range_args("kill-emacs", &args, 0, 2)?;
-    Ok(Value::Nil)
-}
-
-/// `(lower-frame &optional FRAME)` -> nil.
-pub(crate) fn builtin_lower_frame(args: Vec<Value>) -> EvalResult {
-    expect_range_args("lower-frame", &args, 0, 1)?;
-    Ok(Value::Nil)
-}
-
-/// `(lread--substitute-object-in-subtree NEW OLD TREE)` -> nil.
-pub(crate) fn builtin_lread_substitute_object_in_subtree(args: Vec<Value>) -> EvalResult {
-    expect_args("lread--substitute-object-in-subtree", &args, 3)?;
-    Ok(Value::Nil)
-}
-
 /// `(make-byte-code ARGDESC BYTE-CODE CONSTANTS DEPTH &rest EXTRA)` -> nil.
 pub(crate) fn builtin_make_byte_code(args: Vec<Value>) -> EvalResult {
     if args.len() < 4 {

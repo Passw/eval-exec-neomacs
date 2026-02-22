@@ -6371,6 +6371,21 @@ pub(crate) fn builtin_keymap_prompt(args: Vec<Value>) -> EvalResult {
     Ok(Value::Nil)
 }
 
+pub(crate) fn builtin_kill_emacs(args: Vec<Value>) -> EvalResult {
+    expect_range_args("kill-emacs", &args, 0, 2)?;
+    Ok(Value::Nil)
+}
+
+pub(crate) fn builtin_lower_frame(args: Vec<Value>) -> EvalResult {
+    expect_range_args("lower-frame", &args, 0, 1)?;
+    Ok(Value::Nil)
+}
+
+pub(crate) fn builtin_lread_substitute_object_in_subtree(args: Vec<Value>) -> EvalResult {
+    expect_args("lread--substitute-object-in-subtree", &args, 3)?;
+    Ok(Value::Nil)
+}
+
 // ===========================================================================
 // Hook system (need evaluator)
 // ===========================================================================
@@ -15246,11 +15261,9 @@ pub(crate) fn dispatch_builtin(
         "iso-charset" => builtin_iso_charset(args),
         "keymap--get-keyelt" => builtin_keymap_get_keyelt(args),
         "keymap-prompt" => builtin_keymap_prompt(args),
-        "kill-emacs" => super::compat_internal::builtin_kill_emacs(args),
-        "lower-frame" => super::compat_internal::builtin_lower_frame(args),
-        "lread--substitute-object-in-subtree" => {
-            super::compat_internal::builtin_lread_substitute_object_in_subtree(args)
-        }
+        "kill-emacs" => builtin_kill_emacs(args),
+        "lower-frame" => builtin_lower_frame(args),
+        "lread--substitute-object-in-subtree" => builtin_lread_substitute_object_in_subtree(args),
         "malloc-info" => builtin_malloc_info(args),
         "malloc-trim" => builtin_malloc_trim(args),
         "make-byte-code" => super::compat_internal::builtin_make_byte_code(args),
@@ -16165,11 +16178,9 @@ pub(crate) fn dispatch_builtin_pure(name: &str, args: Vec<Value>) -> Option<Eval
         "iso-charset" => builtin_iso_charset(args),
         "keymap--get-keyelt" => builtin_keymap_get_keyelt(args),
         "keymap-prompt" => builtin_keymap_prompt(args),
-        "kill-emacs" => super::compat_internal::builtin_kill_emacs(args),
-        "lower-frame" => super::compat_internal::builtin_lower_frame(args),
-        "lread--substitute-object-in-subtree" => {
-            super::compat_internal::builtin_lread_substitute_object_in_subtree(args)
-        }
+        "kill-emacs" => builtin_kill_emacs(args),
+        "lower-frame" => builtin_lower_frame(args),
+        "lread--substitute-object-in-subtree" => builtin_lread_substitute_object_in_subtree(args),
         "malloc-info" => builtin_malloc_info(args),
         "malloc-trim" => builtin_malloc_trim(args),
         "make-byte-code" => super::compat_internal::builtin_make_byte_code(args),
@@ -20708,6 +20719,27 @@ mod tests {
             .expect("builtin keymap-prompt should resolve")
             .expect("builtin keymap-prompt should evaluate");
         assert!(keymap_prompt.is_nil());
+    }
+
+    #[test]
+    fn pure_dispatch_process_placeholder_cluster_matches_compat_contracts() {
+        let kill_emacs = dispatch_builtin_pure("kill-emacs", vec![])
+            .expect("builtin kill-emacs should resolve")
+            .expect("builtin kill-emacs should evaluate");
+        assert!(kill_emacs.is_nil());
+
+        let lower_frame = dispatch_builtin_pure("lower-frame", vec![])
+            .expect("builtin lower-frame should resolve")
+            .expect("builtin lower-frame should evaluate");
+        assert!(lower_frame.is_nil());
+
+        let lread_substitute = dispatch_builtin_pure(
+            "lread--substitute-object-in-subtree",
+            vec![Value::Int(1), Value::Int(2), Value::Int(3)],
+        )
+        .expect("builtin lread--substitute-object-in-subtree should resolve")
+        .expect("builtin lread--substitute-object-in-subtree should evaluate");
+        assert!(lread_substitute.is_nil());
     }
 
     #[test]
