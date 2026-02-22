@@ -19838,6 +19838,21 @@ Last updated: 2026-02-21
         - `(wrong-number-of-arguments x-get-atom-name 0)`
         - `(wrong-number-of-arguments x-get-atom-name 3)`
 
+- Added dedicated `x-get-resource` arity/payload lock-ins:
+  - vm-compat corpus changes:
+    - added:
+      - `test/neovm/vm-compat/cases/x-get-resource-arity-payload-semantics.forms`
+      - `test/neovm/vm-compat/cases/x-get-resource-arity-payload-semantics.expected.tsv`
+    - wired case into:
+      - `test/neovm/vm-compat/cases/default.list`
+    - lock-ins assert:
+      - accepted 2..4 argument calls preserve:
+        - `(error "Window system is not in use or not initialized")`
+      - over/under-arity payloads remain exact:
+        - `(wrong-number-of-arguments x-get-resource 0)`
+        - `(wrong-number-of-arguments x-get-resource 1)`
+        - `(wrong-number-of-arguments x-get-resource 5)`
+
 - Continue compatibility-first maintenance with small commit slices:
   - keep builtin surface and registry in lock-step
   - run oracle/parity checks after each behavior-affecting change
