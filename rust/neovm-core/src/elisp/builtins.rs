@@ -14604,7 +14604,6 @@ pub(crate) fn dispatch_builtin(
         "set-window-new-total" => super::compat_internal::builtin_set_window_new_total(args),
         "sort-charsets" => super::compat_internal::builtin_sort_charsets(args),
         "split-char" => super::compat_internal::builtin_split_char(args),
-        "split-window-internal" => super::compat_internal::builtin_split_window_internal(args),
         "string-distance" => super::compat_internal::builtin_string_distance(args),
         "subst-char-in-region" => super::compat_internal::builtin_subst_char_in_region(args),
         "subr-native-comp-unit" => super::compat_internal::builtin_subr_native_comp_unit(args),
@@ -15081,6 +15080,7 @@ pub(crate) fn dispatch_builtin_pure(name: &str, args: Vec<Value>) -> Option<Eval
         | "rename-file"
         | "replace-buffer-contents"
         | "set-buffer-multibyte"
+        | "split-window-internal"
         | "setplist"
         | "terminal-live-p"
         | "terminal-name"
@@ -15579,7 +15579,6 @@ pub(crate) fn dispatch_builtin_pure(name: &str, args: Vec<Value>) -> Option<Eval
         "set-window-new-total" => super::compat_internal::builtin_set_window_new_total(args),
         "sort-charsets" => super::compat_internal::builtin_sort_charsets(args),
         "split-char" => super::compat_internal::builtin_split_char(args),
-        "split-window-internal" => super::compat_internal::builtin_split_window_internal(args),
         "string-distance" => super::compat_internal::builtin_string_distance(args),
         "subst-char-in-region" => super::compat_internal::builtin_subst_char_in_region(args),
         "subr-native-comp-unit" => super::compat_internal::builtin_subr_native_comp_unit(args),
@@ -19424,6 +19423,7 @@ mod tests {
         assert!(dispatch_builtin_pure("rename-file", vec![]).is_none());
         assert!(dispatch_builtin_pure("replace-buffer-contents", vec![]).is_none());
         assert!(dispatch_builtin_pure("set-buffer-multibyte", vec![]).is_none());
+        assert!(dispatch_builtin_pure("split-window-internal", vec![]).is_none());
         assert!(dispatch_builtin_pure("setplist", vec![]).is_none());
         assert!(dispatch_builtin_pure("terminal-live-p", vec![]).is_none());
         assert!(dispatch_builtin_pure("terminal-name", vec![]).is_none());
