@@ -6270,6 +6270,26 @@ pub(crate) fn builtin_internal_subr_documentation(args: Vec<Value>) -> EvalResul
     Ok(Value::Nil)
 }
 
+pub(crate) fn builtin_malloc_info(args: Vec<Value>) -> EvalResult {
+    expect_args("malloc-info", &args, 0)?;
+    Ok(Value::Nil)
+}
+
+pub(crate) fn builtin_malloc_trim(args: Vec<Value>) -> EvalResult {
+    expect_range_args("malloc-trim", &args, 0, 1)?;
+    Ok(Value::Nil)
+}
+
+pub(crate) fn builtin_memory_info(args: Vec<Value>) -> EvalResult {
+    expect_args("memory-info", &args, 0)?;
+    Ok(Value::Nil)
+}
+
+pub(crate) fn builtin_module_load(args: Vec<Value>) -> EvalResult {
+    expect_args("module-load", &args, 1)?;
+    Ok(Value::Nil)
+}
+
 // ===========================================================================
 // Hook system (need evaluator)
 // ===========================================================================
@@ -15154,8 +15174,8 @@ pub(crate) fn dispatch_builtin(
         "lread--substitute-object-in-subtree" => {
             super::compat_internal::builtin_lread_substitute_object_in_subtree(args)
         }
-        "malloc-info" => super::compat_internal::builtin_malloc_info(args),
-        "malloc-trim" => super::compat_internal::builtin_malloc_trim(args),
+        "malloc-info" => builtin_malloc_info(args),
+        "malloc-trim" => builtin_malloc_trim(args),
         "make-byte-code" => super::compat_internal::builtin_make_byte_code(args),
         "make-char" => super::compat_internal::builtin_make_char(args),
         "make-closure" => super::compat_internal::builtin_make_closure(args),
@@ -15172,14 +15192,14 @@ pub(crate) fn dispatch_builtin(
         "map-keymap-internal" => builtin_map_keymap_internal(args),
         "mapbacktrace" => builtin_mapbacktrace(args),
         "match-data--translate" => builtin_match_data_translate(args),
-        "memory-info" => super::compat_internal::builtin_memory_info(args),
+        "memory-info" => builtin_memory_info(args),
         "make-frame-invisible" => builtin_make_frame_invisible(args),
         "make-terminal-frame" => builtin_make_terminal_frame(args),
         "menu-bar-menu-at-x-y" => builtin_menu_bar_menu_at_x_y(args),
         "menu-or-popup-active-p" => builtin_menu_or_popup_active_p(args),
         "minibuffer-innermost-command-loop-p" => builtin_minibuffer_innermost_command_loop_p(args),
         "minibuffer-prompt-end" => builtin_minibuffer_prompt_end(args),
-        "module-load" => super::compat_internal::builtin_module_load(args),
+        "module-load" => builtin_module_load(args),
         "mouse-pixel-position" => builtin_mouse_pixel_position(args),
         "mouse-position" => builtin_mouse_position(args),
         "newline-cache-check" => builtin_newline_cache_check(args),
@@ -16077,8 +16097,8 @@ pub(crate) fn dispatch_builtin_pure(name: &str, args: Vec<Value>) -> Option<Eval
         "lread--substitute-object-in-subtree" => {
             super::compat_internal::builtin_lread_substitute_object_in_subtree(args)
         }
-        "malloc-info" => super::compat_internal::builtin_malloc_info(args),
-        "malloc-trim" => super::compat_internal::builtin_malloc_trim(args),
+        "malloc-info" => builtin_malloc_info(args),
+        "malloc-trim" => builtin_malloc_trim(args),
         "make-byte-code" => super::compat_internal::builtin_make_byte_code(args),
         "make-char" => super::compat_internal::builtin_make_char(args),
         "make-closure" => super::compat_internal::builtin_make_closure(args),
@@ -16095,14 +16115,14 @@ pub(crate) fn dispatch_builtin_pure(name: &str, args: Vec<Value>) -> Option<Eval
         "map-keymap-internal" => builtin_map_keymap_internal(args),
         "mapbacktrace" => builtin_mapbacktrace(args),
         "match-data--translate" => builtin_match_data_translate(args),
-        "memory-info" => super::compat_internal::builtin_memory_info(args),
+        "memory-info" => builtin_memory_info(args),
         "make-frame-invisible" => builtin_make_frame_invisible(args),
         "make-terminal-frame" => builtin_make_terminal_frame(args),
         "menu-bar-menu-at-x-y" => builtin_menu_bar_menu_at_x_y(args),
         "menu-or-popup-active-p" => builtin_menu_or_popup_active_p(args),
         "minibuffer-innermost-command-loop-p" => builtin_minibuffer_innermost_command_loop_p(args),
         "minibuffer-prompt-end" => builtin_minibuffer_prompt_end(args),
-        "module-load" => super::compat_internal::builtin_module_load(args),
+        "module-load" => builtin_module_load(args),
         "mouse-pixel-position" => builtin_mouse_pixel_position(args),
         "mouse-position" => builtin_mouse_position(args),
         "newline-cache-check" => builtin_newline_cache_check(args),
@@ -20480,6 +20500,29 @@ mod tests {
             .expect("builtin internal-subr-documentation should resolve")
             .expect("builtin internal-subr-documentation should evaluate");
         assert!(subr_doc.is_nil());
+    }
+
+    #[test]
+    fn pure_dispatch_memory_module_placeholder_cluster_matches_compat_contracts() {
+        let malloc_info = dispatch_builtin_pure("malloc-info", vec![])
+            .expect("builtin malloc-info should resolve")
+            .expect("builtin malloc-info should evaluate");
+        assert!(malloc_info.is_nil());
+
+        let malloc_trim = dispatch_builtin_pure("malloc-trim", vec![])
+            .expect("builtin malloc-trim should resolve")
+            .expect("builtin malloc-trim should evaluate");
+        assert!(malloc_trim.is_nil());
+
+        let memory_info = dispatch_builtin_pure("memory-info", vec![])
+            .expect("builtin memory-info should resolve")
+            .expect("builtin memory-info should evaluate");
+        assert!(memory_info.is_nil());
+
+        let module_load = dispatch_builtin_pure("module-load", vec![Value::string("x.so")])
+            .expect("builtin module-load should resolve")
+            .expect("builtin module-load should evaluate");
+        assert!(module_load.is_nil());
     }
 
     #[test]

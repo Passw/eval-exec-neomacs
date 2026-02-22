@@ -1424,30 +1424,6 @@ pub(crate) fn builtin_internal_set_buffer_modified_tick(args: Vec<Value>) -> Eva
     Ok(Value::Nil)
 }
 
-/// `(malloc-info)` -> nil.
-pub(crate) fn builtin_malloc_info(args: Vec<Value>) -> EvalResult {
-    expect_args("malloc-info", &args, 0)?;
-    Ok(Value::Nil)
-}
-
-/// `(malloc-trim &optional LEAVE-PADDING)` -> nil.
-pub(crate) fn builtin_malloc_trim(args: Vec<Value>) -> EvalResult {
-    expect_range_args("malloc-trim", &args, 0, 1)?;
-    Ok(Value::Nil)
-}
-
-/// `(memory-info)` -> nil.
-pub(crate) fn builtin_memory_info(args: Vec<Value>) -> EvalResult {
-    expect_args("memory-info", &args, 0)?;
-    Ok(Value::Nil)
-}
-
-/// `(module-load FILE)` -> nil.
-pub(crate) fn builtin_module_load(args: Vec<Value>) -> EvalResult {
-    expect_args("module-load", &args, 1)?;
-    Ok(Value::Nil)
-}
-
 /// `(byte-code BYTE-STR VECTOR MAXDEPTH)` -> nil.
 pub(crate) fn builtin_byte_code(args: Vec<Value>) -> EvalResult {
     expect_args("byte-code", &args, 3)?;
