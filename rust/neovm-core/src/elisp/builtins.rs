@@ -6127,6 +6127,41 @@ pub(crate) fn builtin_variable_binding_locus(args: Vec<Value>) -> EvalResult {
     Ok(Value::Nil)
 }
 
+pub(crate) fn builtin_x_begin_drag(args: Vec<Value>) -> EvalResult {
+    expect_range_args("x-begin-drag", &args, 1, 6)?;
+    Ok(Value::Nil)
+}
+
+pub(crate) fn builtin_x_create_frame(args: Vec<Value>) -> EvalResult {
+    expect_args("x-create-frame", &args, 1)?;
+    Ok(Value::Nil)
+}
+
+pub(crate) fn builtin_x_double_buffered_p(args: Vec<Value>) -> EvalResult {
+    expect_range_args("x-double-buffered-p", &args, 0, 1)?;
+    Ok(Value::Nil)
+}
+
+pub(crate) fn builtin_x_menu_bar_open_internal(args: Vec<Value>) -> EvalResult {
+    expect_range_args("x-menu-bar-open-internal", &args, 0, 1)?;
+    Ok(Value::Nil)
+}
+
+pub(crate) fn builtin_xw_color_defined_p(args: Vec<Value>) -> EvalResult {
+    expect_range_args("xw-color-defined-p", &args, 1, 2)?;
+    Ok(Value::Nil)
+}
+
+pub(crate) fn builtin_xw_color_values(args: Vec<Value>) -> EvalResult {
+    expect_range_args("xw-color-values", &args, 1, 2)?;
+    Ok(Value::Nil)
+}
+
+pub(crate) fn builtin_xw_display_color_p(args: Vec<Value>) -> EvalResult {
+    expect_range_args("xw-display-color-p", &args, 0, 1)?;
+    Ok(Value::Nil)
+}
+
 // ===========================================================================
 // Hook system (need evaluator)
 // ===========================================================================
@@ -15139,15 +15174,13 @@ pub(crate) fn dispatch_builtin(
         "value<" => builtin_value_lt(args),
         "variable-binding-locus" => builtin_variable_binding_locus(args),
         "vertical-motion" => builtin_vertical_motion(args),
-        "x-begin-drag" => super::compat_internal::builtin_x_begin_drag(args),
-        "x-create-frame" => super::compat_internal::builtin_x_create_frame(args),
-        "x-double-buffered-p" => super::compat_internal::builtin_x_double_buffered_p(args),
-        "x-menu-bar-open-internal" => {
-            super::compat_internal::builtin_x_menu_bar_open_internal(args)
-        }
-        "xw-color-defined-p" => super::compat_internal::builtin_xw_color_defined_p(args),
-        "xw-color-values" => super::compat_internal::builtin_xw_color_values(args),
-        "xw-display-color-p" => super::compat_internal::builtin_xw_display_color_p(args),
+        "x-begin-drag" => builtin_x_begin_drag(args),
+        "x-create-frame" => builtin_x_create_frame(args),
+        "x-double-buffered-p" => builtin_x_double_buffered_p(args),
+        "x-menu-bar-open-internal" => builtin_x_menu_bar_open_internal(args),
+        "xw-color-defined-p" => builtin_xw_color_defined_p(args),
+        "xw-color-values" => builtin_xw_color_values(args),
+        "xw-display-color-p" => builtin_xw_display_color_p(args),
         "innermost-minibuffer-p" => super::compat_internal::builtin_innermost_minibuffer_p(args),
         "interactive-form" => super::compat_internal::builtin_interactive_form(args),
         "inotify-add-watch" => super::compat_internal::builtin_inotify_add_watch(args),
@@ -16074,15 +16107,13 @@ pub(crate) fn dispatch_builtin_pure(name: &str, args: Vec<Value>) -> Option<Eval
         "value<" => builtin_value_lt(args),
         "variable-binding-locus" => builtin_variable_binding_locus(args),
         "vertical-motion" => builtin_vertical_motion(args),
-        "x-begin-drag" => super::compat_internal::builtin_x_begin_drag(args),
-        "x-create-frame" => super::compat_internal::builtin_x_create_frame(args),
-        "x-double-buffered-p" => super::compat_internal::builtin_x_double_buffered_p(args),
-        "x-menu-bar-open-internal" => {
-            super::compat_internal::builtin_x_menu_bar_open_internal(args)
-        }
-        "xw-color-defined-p" => super::compat_internal::builtin_xw_color_defined_p(args),
-        "xw-color-values" => super::compat_internal::builtin_xw_color_values(args),
-        "xw-display-color-p" => super::compat_internal::builtin_xw_display_color_p(args),
+        "x-begin-drag" => builtin_x_begin_drag(args),
+        "x-create-frame" => builtin_x_create_frame(args),
+        "x-double-buffered-p" => builtin_x_double_buffered_p(args),
+        "x-menu-bar-open-internal" => builtin_x_menu_bar_open_internal(args),
+        "xw-color-defined-p" => builtin_xw_color_defined_p(args),
+        "xw-color-values" => builtin_xw_color_values(args),
+        "xw-display-color-p" => builtin_xw_display_color_p(args),
         "innermost-minibuffer-p" => super::compat_internal::builtin_innermost_minibuffer_p(args),
         "interactive-form" => super::compat_internal::builtin_interactive_form(args),
         "inotify-add-watch" => super::compat_internal::builtin_inotify_add_watch(args),
@@ -20204,6 +20235,47 @@ mod tests {
                 .expect("builtin variable-binding-locus should resolve")
                 .expect("builtin variable-binding-locus should evaluate");
         assert!(binding_locus.is_nil());
+    }
+
+    #[test]
+    fn pure_dispatch_x_display_placeholder_cluster_matches_compat_contracts() {
+        let x_begin_drag = dispatch_builtin_pure("x-begin-drag", vec![Value::Nil])
+            .expect("builtin x-begin-drag should resolve")
+            .expect("builtin x-begin-drag should evaluate");
+        assert!(x_begin_drag.is_nil());
+
+        let x_create_frame = dispatch_builtin_pure("x-create-frame", vec![Value::list(vec![])])
+            .expect("builtin x-create-frame should resolve")
+            .expect("builtin x-create-frame should evaluate");
+        assert!(x_create_frame.is_nil());
+
+        let x_double_buffered = dispatch_builtin_pure("x-double-buffered-p", vec![])
+            .expect("builtin x-double-buffered-p should resolve")
+            .expect("builtin x-double-buffered-p should evaluate");
+        assert!(x_double_buffered.is_nil());
+
+        let x_menu_open = dispatch_builtin_pure("x-menu-bar-open-internal", vec![])
+            .expect("builtin x-menu-bar-open-internal should resolve")
+            .expect("builtin x-menu-bar-open-internal should evaluate");
+        assert!(x_menu_open.is_nil());
+
+        let xw_defined = dispatch_builtin_pure(
+            "xw-color-defined-p",
+            vec![Value::string("black"), Value::Nil],
+        )
+        .expect("builtin xw-color-defined-p should resolve")
+        .expect("builtin xw-color-defined-p should evaluate");
+        assert!(xw_defined.is_nil());
+
+        let xw_values = dispatch_builtin_pure("xw-color-values", vec![Value::string("black")])
+            .expect("builtin xw-color-values should resolve")
+            .expect("builtin xw-color-values should evaluate");
+        assert!(xw_values.is_nil());
+
+        let xw_display_color = dispatch_builtin_pure("xw-display-color-p", vec![])
+            .expect("builtin xw-display-color-p should resolve")
+            .expect("builtin xw-display-color-p should evaluate");
+        assert!(xw_display_color.is_nil());
     }
 
     #[test]

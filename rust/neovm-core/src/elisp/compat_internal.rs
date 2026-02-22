@@ -1888,48 +1888,6 @@ pub(crate) fn builtin_treesit_parser_add_notifier(args: Vec<Value>) -> EvalResul
     Ok(Value::Nil)
 }
 
-/// `(x-begin-drag OBJECT &optional START-EVENT TRACKING-FRAME ALLOW-EXTERNAL RETURN-FRAME ALLOW-SCROLL-BARS)` -> nil.
-pub(crate) fn builtin_x_begin_drag(args: Vec<Value>) -> EvalResult {
-    expect_range_args("x-begin-drag", &args, 1, 6)?;
-    Ok(Value::Nil)
-}
-
-/// `(x-create-frame PARAMS)` -> nil.
-pub(crate) fn builtin_x_create_frame(args: Vec<Value>) -> EvalResult {
-    expect_args("x-create-frame", &args, 1)?;
-    Ok(Value::Nil)
-}
-
-/// `(x-double-buffered-p &optional FRAME)` -> nil.
-pub(crate) fn builtin_x_double_buffered_p(args: Vec<Value>) -> EvalResult {
-    expect_range_args("x-double-buffered-p", &args, 0, 1)?;
-    Ok(Value::Nil)
-}
-
-/// `(x-menu-bar-open-internal &optional FRAME)` -> nil.
-pub(crate) fn builtin_x_menu_bar_open_internal(args: Vec<Value>) -> EvalResult {
-    expect_range_args("x-menu-bar-open-internal", &args, 0, 1)?;
-    Ok(Value::Nil)
-}
-
-/// `(xw-color-defined-p COLOR &optional FRAME)` -> nil.
-pub(crate) fn builtin_xw_color_defined_p(args: Vec<Value>) -> EvalResult {
-    expect_range_args("xw-color-defined-p", &args, 1, 2)?;
-    Ok(Value::Nil)
-}
-
-/// `(xw-color-values COLOR &optional FRAME)` -> nil.
-pub(crate) fn builtin_xw_color_values(args: Vec<Value>) -> EvalResult {
-    expect_range_args("xw-color-values", &args, 1, 2)?;
-    Ok(Value::Nil)
-}
-
-/// `(xw-display-color-p &optional FRAME)` -> nil.
-pub(crate) fn builtin_xw_display_color_p(args: Vec<Value>) -> EvalResult {
-    expect_range_args("xw-display-color-p", &args, 0, 1)?;
-    Ok(Value::Nil)
-}
-
 /// `(treesit-parser-buffer ...)` -> nil.
 pub(crate) fn builtin_treesit_parser_buffer(args: Vec<Value>) -> EvalResult {
     expect_args("treesit-parser-buffer", &args, 1)?;
