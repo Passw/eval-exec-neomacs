@@ -563,6 +563,7 @@ cases/window-display-table-semantics
 cases/window-fringes-scroll-bars-setter-semantics
 cases/window-group-prev-next-state-semantics
 cases/window-hscroll-margins-setter-semantics
+cases/window-hscroll-margins-callable-path-semantics
 cases/window-old-state-semantics
 cases/window-parameter-semantics
 cases/window-parameter-callable-path-semantics
