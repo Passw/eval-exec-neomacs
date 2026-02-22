@@ -694,6 +694,7 @@ cases/file-ops-relative
 cases/fileio-relative
 cases/file-error-conditions
 cases/error-message-string-formatting
+cases/user-error-call-semantics
 cases/error-message-string-handle-printing-semantics
 cases/format-message-error-path-semantics
 cases/format-message-killed-buffer-handle-semantics
