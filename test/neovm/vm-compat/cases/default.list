@@ -572,6 +572,7 @@ cases/window-preserve-size-resizable-semantics
 cases/window-start-point-callable-path-semantics
 cases/window-set-start-point-marker-semantics
 cases/window-vscroll-semantics
+cases/window-vscroll-geometry-callable-path-semantics
 cases/window-edge-geometry-semantics
 cases/window-minibuffer-frame-first-window-semantics
 cases/window-root-valid-minibuffer-active-semantics
