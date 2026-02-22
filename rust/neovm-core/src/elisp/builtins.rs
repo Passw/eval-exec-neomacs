@@ -7098,6 +7098,77 @@ pub(crate) fn builtin_internal_set_buffer_modified_tick(args: Vec<Value>) -> Eva
     Ok(Value::Nil)
 }
 
+pub(crate) fn builtin_handle_save_session(args: Vec<Value>) -> EvalResult {
+    expect_args("handle-save-session", &args, 1)?;
+    Ok(Value::Nil)
+}
+
+pub(crate) fn builtin_handle_switch_frame(args: Vec<Value>) -> EvalResult {
+    expect_args("handle-switch-frame", &args, 1)?;
+    if !matches!(args[0], Value::Frame(_)) {
+        return Err(signal(
+            "wrong-type-argument",
+            vec![Value::symbol("framep"), args[0].clone()],
+        ));
+    }
+    Ok(Value::Nil)
+}
+
+pub(crate) fn builtin_window_bottom_divider_width(args: Vec<Value>) -> EvalResult {
+    expect_range_args("window-bottom-divider-width", &args, 0, 1)?;
+    if let Some(window) = args.first() {
+        if !window.is_nil() && !matches!(window, Value::Window(_)) {
+            return Err(signal(
+                "wrong-type-argument",
+                vec![Value::symbol("window-live-p"), window.clone()],
+            ));
+        }
+    }
+    Ok(Value::Int(0))
+}
+
+pub(crate) fn builtin_window_combination_limit(args: Vec<Value>) -> EvalResult {
+    expect_args("window-combination-limit", &args, 1)?;
+    if matches!(args[0], Value::Window(_)) {
+        return Err(signal(
+            "error",
+            vec![Value::string(
+                "Combination limit is meaningful for internal windows only",
+            )],
+        ));
+    }
+    Err(signal(
+        "wrong-type-argument",
+        vec![Value::symbol("window-valid-p"), args[0].clone()],
+    ))
+}
+
+pub(crate) fn builtin_window_resize_apply(args: Vec<Value>) -> EvalResult {
+    expect_range_args("window-resize-apply", &args, 0, 2)?;
+    if let Some(frame) = args.first() {
+        if !frame.is_nil() && !matches!(frame, Value::Frame(_)) {
+            return Err(signal(
+                "wrong-type-argument",
+                vec![Value::symbol("frame-live-p"), frame.clone()],
+            ));
+        }
+    }
+    Ok(Value::Nil)
+}
+
+pub(crate) fn builtin_window_resize_apply_total(args: Vec<Value>) -> EvalResult {
+    expect_range_args("window-resize-apply-total", &args, 0, 2)?;
+    if let Some(frame) = args.first() {
+        if !frame.is_nil() && !matches!(frame, Value::Frame(_)) {
+            return Err(signal(
+                "wrong-type-argument",
+                vec![Value::symbol("frame-live-p"), frame.clone()],
+            ));
+        }
+    }
+    Ok(Value::True)
+}
+
 fn inotify_next_watch_id_store() -> &'static Mutex<i64> {
     static NEXT: OnceLock<Mutex<i64>> = OnceLock::new();
     NEXT.get_or_init(|| Mutex::new(0))
@@ -15997,8 +16068,8 @@ pub(crate) fn dispatch_builtin(
         }
         "gpm-mouse-start" => super::compat_internal::builtin_gpm_mouse_start(args),
         "gpm-mouse-stop" => super::compat_internal::builtin_gpm_mouse_stop(args),
-        "handle-save-session" => super::compat_internal::builtin_handle_save_session(args),
-        "handle-switch-frame" => super::compat_internal::builtin_handle_switch_frame(args),
+        "handle-save-session" => builtin_handle_save_session(args),
+        "handle-switch-frame" => builtin_handle_switch_frame(args),
         "help--describe-vector" => super::compat_internal::builtin_help_describe_vector(args),
         "init-image-library" => super::compat_internal::builtin_init_image_library(args),
         "internal--define-uninitialized-variable" => {
@@ -16181,12 +16252,8 @@ pub(crate) fn dispatch_builtin(
         "lossage-size" => builtin_lossage_size(args),
         "unlock-buffer" => builtin_unlock_buffer(args),
         "unlock-file" => builtin_unlock_file(args),
-        "window-bottom-divider-width" => {
-            super::compat_internal::builtin_window_bottom_divider_width(args)
-        }
-        "window-combination-limit" => {
-            super::compat_internal::builtin_window_combination_limit(args)
-        }
+        "window-bottom-divider-width" => builtin_window_bottom_divider_width(args),
+        "window-combination-limit" => builtin_window_combination_limit(args),
         "window-left-child" => super::compat_internal::builtin_window_left_child(args),
         "window-line-height" => super::compat_internal::builtin_window_line_height(args),
         "window-lines-pixel-dimensions" => {
@@ -16209,10 +16276,8 @@ pub(crate) fn dispatch_builtin(
         "window-pixel-left" => super::compat_internal::builtin_window_pixel_left(args),
         "window-pixel-top" => super::compat_internal::builtin_window_pixel_top(args),
         "window-prev-sibling" => super::compat_internal::builtin_window_prev_sibling(args),
-        "window-resize-apply" => super::compat_internal::builtin_window_resize_apply(args),
-        "window-resize-apply-total" => {
-            super::compat_internal::builtin_window_resize_apply_total(args)
-        }
+        "window-resize-apply" => builtin_window_resize_apply(args),
+        "window-resize-apply-total" => builtin_window_resize_apply_total(args),
         "window-right-divider-width" => {
             super::compat_internal::builtin_window_right_divider_width(args)
         }
@@ -16866,8 +16931,8 @@ pub(crate) fn dispatch_builtin_pure(name: &str, args: Vec<Value>) -> Option<Eval
         }
         "gpm-mouse-start" => super::compat_internal::builtin_gpm_mouse_start(args),
         "gpm-mouse-stop" => super::compat_internal::builtin_gpm_mouse_stop(args),
-        "handle-save-session" => super::compat_internal::builtin_handle_save_session(args),
-        "handle-switch-frame" => super::compat_internal::builtin_handle_switch_frame(args),
+        "handle-save-session" => builtin_handle_save_session(args),
+        "handle-switch-frame" => builtin_handle_switch_frame(args),
         "help--describe-vector" => super::compat_internal::builtin_help_describe_vector(args),
         "init-image-library" => super::compat_internal::builtin_init_image_library(args),
         "internal--define-uninitialized-variable" => {
@@ -17044,12 +17109,8 @@ pub(crate) fn dispatch_builtin_pure(name: &str, args: Vec<Value>) -> Option<Eval
         "lossage-size" => builtin_lossage_size(args),
         "unlock-buffer" => builtin_unlock_buffer(args),
         "unlock-file" => builtin_unlock_file(args),
-        "window-bottom-divider-width" => {
-            super::compat_internal::builtin_window_bottom_divider_width(args)
-        }
-        "window-combination-limit" => {
-            super::compat_internal::builtin_window_combination_limit(args)
-        }
+        "window-bottom-divider-width" => builtin_window_bottom_divider_width(args),
+        "window-combination-limit" => builtin_window_combination_limit(args),
         "window-left-child" => super::compat_internal::builtin_window_left_child(args),
         "window-line-height" => super::compat_internal::builtin_window_line_height(args),
         "window-lines-pixel-dimensions" => {
@@ -17072,10 +17133,8 @@ pub(crate) fn dispatch_builtin_pure(name: &str, args: Vec<Value>) -> Option<Eval
         "window-pixel-left" => super::compat_internal::builtin_window_pixel_left(args),
         "window-pixel-top" => super::compat_internal::builtin_window_pixel_top(args),
         "window-prev-sibling" => super::compat_internal::builtin_window_prev_sibling(args),
-        "window-resize-apply" => super::compat_internal::builtin_window_resize_apply(args),
-        "window-resize-apply-total" => {
-            super::compat_internal::builtin_window_resize_apply_total(args)
-        }
+        "window-resize-apply" => builtin_window_resize_apply(args),
+        "window-resize-apply-total" => builtin_window_resize_apply_total(args),
         "window-right-divider-width" => {
             super::compat_internal::builtin_window_right_divider_width(args)
         }
@@ -22261,6 +22320,29 @@ mod tests {
         .expect("internal--set-buffer-modified-tick should resolve")
         .expect("internal--set-buffer-modified-tick should evaluate");
         assert_eq!(tick, Value::Nil);
+    }
+
+    #[test]
+    fn dispatch_builtin_pure_handles_window_resize_and_frame_switch_placeholders() {
+        let save = dispatch_builtin_pure("handle-save-session", vec![Value::symbol("event")])
+            .expect("handle-save-session should resolve")
+            .expect("handle-save-session should evaluate");
+        assert_eq!(save, Value::Nil);
+
+        let frame = dispatch_builtin_pure("handle-switch-frame", vec![Value::Frame(1)])
+            .expect("handle-switch-frame should resolve")
+            .expect("handle-switch-frame should evaluate");
+        assert_eq!(frame, Value::Nil);
+
+        let divider = dispatch_builtin_pure("window-bottom-divider-width", vec![])
+            .expect("window-bottom-divider-width should resolve")
+            .expect("window-bottom-divider-width should evaluate");
+        assert_eq!(divider, Value::Int(0));
+
+        let resize = dispatch_builtin_pure("window-resize-apply-total", vec![])
+            .expect("window-resize-apply-total should resolve")
+            .expect("window-resize-apply-total should evaluate");
+        assert_eq!(resize, Value::True);
     }
 
     #[test]

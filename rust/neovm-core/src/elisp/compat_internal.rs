@@ -224,17 +224,6 @@ fn expect_frame_live_or_nil(value: &Value) -> Result<(), Flow> {
     }
 }
 
-fn expect_framep(value: &Value) -> Result<(), Flow> {
-    if matches!(value, Value::Frame(_)) {
-        Ok(())
-    } else {
-        Err(signal(
-            "wrong-type-argument",
-            vec![Value::symbol("framep"), value.clone()],
-        ))
-    }
-}
-
 /// `(face-attributes-as-vector FACE)` -> FACE attribute vector.
 pub(crate) fn builtin_face_attributes_as_vector(args: Vec<Value>) -> EvalResult {
     expect_args("face-attributes-as-vector", &args, 1)?;
@@ -779,19 +768,6 @@ pub(crate) fn builtin_gnutls_symmetric_encrypt(args: Vec<Value>) -> EvalResult {
     Ok(Value::Nil)
 }
 
-/// `(handle-save-session EVENT)` -> nil.
-pub(crate) fn builtin_handle_save_session(args: Vec<Value>) -> EvalResult {
-    expect_args("handle-save-session", &args, 1)?;
-    Ok(Value::Nil)
-}
-
-/// `(handle-switch-frame FRAME)` -> nil.
-pub(crate) fn builtin_handle_switch_frame(args: Vec<Value>) -> EvalResult {
-    expect_args("handle-switch-frame", &args, 1)?;
-    expect_framep(&args[0])?;
-    Ok(Value::Nil)
-}
-
 /// `(help--describe-vector A B C D E F G)` -> nil.
 pub(crate) fn builtin_help_describe_vector(args: Vec<Value>) -> EvalResult {
     expect_args("help--describe-vector", &args, 7)?;
@@ -802,32 +778,6 @@ pub(crate) fn builtin_help_describe_vector(args: Vec<Value>) -> EvalResult {
 pub(crate) fn builtin_init_image_library(args: Vec<Value>) -> EvalResult {
     expect_args("init-image-library", &args, 1)?;
     Ok(Value::Nil)
-}
-
-/// `(window-bottom-divider-width &optional WINDOW)` -> 0.
-pub(crate) fn builtin_window_bottom_divider_width(args: Vec<Value>) -> EvalResult {
-    expect_range_args("window-bottom-divider-width", &args, 0, 1)?;
-    if let Some(window) = args.first() {
-        expect_window_live_or_nil(window)?;
-    }
-    Ok(Value::Int(0))
-}
-
-/// `(window-combination-limit WINDOW)` -> compatibility error.
-pub(crate) fn builtin_window_combination_limit(args: Vec<Value>) -> EvalResult {
-    expect_args("window-combination-limit", &args, 1)?;
-    if matches!(args[0], Value::Window(_)) {
-        return Err(signal(
-            "error",
-            vec![Value::string(
-                "Combination limit is meaningful for internal windows only",
-            )],
-        ));
-    }
-    Err(signal(
-        "wrong-type-argument",
-        vec![Value::symbol("window-valid-p"), args[0].clone()],
-    ))
 }
 
 /// `(window-left-child &optional WINDOW)` -> nil.
@@ -969,24 +919,6 @@ pub(crate) fn builtin_window_prev_sibling(args: Vec<Value>) -> EvalResult {
         expect_window_valid_or_nil(window)?;
     }
     Ok(Value::Nil)
-}
-
-/// `(window-resize-apply &optional FRAME HORIZONTAL)` -> nil.
-pub(crate) fn builtin_window_resize_apply(args: Vec<Value>) -> EvalResult {
-    expect_range_args("window-resize-apply", &args, 0, 2)?;
-    if let Some(frame) = args.first() {
-        expect_frame_live_or_nil(frame)?;
-    }
-    Ok(Value::Nil)
-}
-
-/// `(window-resize-apply-total &optional FRAME HORIZONTAL)` -> t.
-pub(crate) fn builtin_window_resize_apply_total(args: Vec<Value>) -> EvalResult {
-    expect_range_args("window-resize-apply-total", &args, 0, 2)?;
-    if let Some(frame) = args.first() {
-        expect_frame_live_or_nil(frame)?;
-    }
-    Ok(Value::True)
 }
 
 /// `(window-right-divider-width &optional WINDOW)` -> 0.
@@ -1431,7 +1363,7 @@ mod tests {
 
     #[test]
     fn handle_switch_frame_requires_frame_object() {
-        let err = builtin_handle_switch_frame(vec![Value::Nil]).unwrap_err();
+        let err = crate::elisp::builtins::builtin_handle_switch_frame(vec![Value::Nil]).unwrap_err();
         match err {
             Flow::Signal(sig) => assert_eq!(sig.symbol, "wrong-type-argument"),
             other => panic!("expected signal, got {other:?}"),
@@ -1468,7 +1400,8 @@ mod tests {
 
     #[test]
     fn window_combination_limit_requires_window_designator() {
-        let err = builtin_window_combination_limit(vec![Value::Nil]).unwrap_err();
+        let err = crate::elisp::builtins::builtin_window_combination_limit(vec![Value::Nil])
+            .unwrap_err();
         match err {
             Flow::Signal(sig) => {
                 assert_eq!(sig.symbol, "wrong-type-argument");
@@ -1480,7 +1413,9 @@ mod tests {
 
     #[test]
     fn window_combination_limit_signals_internal_only_for_window_object() {
-        let err = builtin_window_combination_limit(vec![Value::Window(1)]).unwrap_err();
+        let err =
+            crate::elisp::builtins::builtin_window_combination_limit(vec![Value::Window(1)])
+                .unwrap_err();
         match err {
             Flow::Signal(sig) => assert_eq!(sig.symbol, "error"),
             other => panic!("expected signal, got {other:?}"),
@@ -1489,7 +1424,8 @@ mod tests {
 
     #[test]
     fn window_resize_apply_rejects_non_frame_designator() {
-        let err = builtin_window_resize_apply(vec![Value::Window(1)]).unwrap_err();
+        let err =
+            crate::elisp::builtins::builtin_window_resize_apply(vec![Value::Window(1)]).unwrap_err();
         match err {
             Flow::Signal(sig) => {
                 assert_eq!(sig.symbol, "wrong-type-argument");
@@ -1501,13 +1437,14 @@ mod tests {
 
     #[test]
     fn window_resize_apply_total_returns_true() {
-        let out = builtin_window_resize_apply_total(vec![]).unwrap();
+        let out = crate::elisp::builtins::builtin_window_resize_apply_total(vec![]).unwrap();
         assert_eq!(out, Value::True);
     }
 
     #[test]
     fn window_bottom_divider_width_rejects_non_window_designator() {
-        let err = builtin_window_bottom_divider_width(vec![Value::Int(1)]).unwrap_err();
+        let err = crate::elisp::builtins::builtin_window_bottom_divider_width(vec![Value::Int(1)])
+            .unwrap_err();
         match err {
             Flow::Signal(sig) => {
                 assert_eq!(sig.symbol, "wrong-type-argument");
