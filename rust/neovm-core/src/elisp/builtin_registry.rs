@@ -120,6 +120,7 @@ const DISPATCH_BUILTIN_NAMES: &[&str] = &[
     "buffer-line-statistics",
     "buffer-list",
     "buffer-live-p",
+    "buffer-local-boundp",
     "buffer-local-value",
     "buffer-local-variables",
     "buffer-chars-modified-tick",

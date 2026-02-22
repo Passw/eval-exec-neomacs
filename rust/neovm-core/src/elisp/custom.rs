@@ -326,6 +326,45 @@ pub(crate) fn builtin_local_variable_p(
     }
 }
 
+/// `(buffer-local-boundp SYMBOL BUFFER)` -- test if SYMBOL is bound in BUFFER.
+pub(crate) fn builtin_buffer_local_bound_p(
+    eval: &mut super::eval::Evaluator,
+    args: Vec<Value>,
+) -> EvalResult {
+    expect_args("buffer-local-boundp", &args, 2)?;
+    let name = match &args[0] {
+        Value::Symbol(s) => s.clone(),
+        Value::Nil => "nil".to_string(),
+        Value::True => "t".to_string(),
+        other => {
+            return Err(signal(
+                "wrong-type-argument",
+                vec![Value::symbol("symbolp"), other.clone()],
+            ))
+        }
+    };
+
+    let buffer_id = match args[1] {
+        Value::Buffer(id) => id,
+        ref other => {
+            return Err(signal(
+                "wrong-type-argument",
+                vec![Value::symbol("bufferp"), other.clone()],
+            ))
+        }
+    };
+
+    let Some(buf) = eval.buffers.get(buffer_id) else {
+        return Ok(Value::Nil);
+    };
+
+    if buf.get_buffer_local(&name).is_some() {
+        return Ok(Value::True);
+    }
+
+    Ok(Value::bool(eval.obarray().boundp(&name)))
+}
+
 /// `(buffer-local-variables &optional BUFFER)` -- list all local variables.
 pub(crate) fn builtin_buffer_local_variables(
     eval: &mut super::eval::Evaluator,
@@ -1020,6 +1059,36 @@ mod tests {
                (local-variable-p 'nonexistent)"#,
         );
         assert_eq!(results[2], "OK nil");
+    }
+
+    #[test]
+    fn buffer_local_bound_p_matches_emacs_shape() {
+        let results = eval_all(
+            r#"(defvar neomacs-buffer-local-boundp-global 1)
+               (let ((buf (get-buffer-create "test-buf")))
+                 (buffer-local-boundp 'neomacs-buffer-local-boundp-global buf))
+               (let ((buf (get-buffer-create "test-buf")))
+                 (buffer-local-boundp 'neomacs-buffer-local-boundp-missing buf))
+               (let ((buf (get-buffer-create "test-buf-local")))
+                 (set-buffer buf)
+                 (make-local-variable 'neomacs-buffer-local-boundp-local)
+                 (setq neomacs-buffer-local-boundp-local 7)
+                 (buffer-local-boundp 'neomacs-buffer-local-boundp-local buf))
+               (let ((buf (generate-new-buffer "dead-buf")))
+                 (kill-buffer buf)
+                 (buffer-local-boundp 'neomacs-buffer-local-boundp-global buf))
+               (condition-case err (buffer-local-boundp 1 (current-buffer)) (error (car err)))
+               (condition-case err (buffer-local-boundp 'x nil) (error (car err)))
+               (condition-case err (buffer-local-boundp 'x (current-buffer) nil)
+                 (error (car err)))"#,
+        );
+        assert_eq!(results[1], "OK t");
+        assert_eq!(results[2], "OK nil");
+        assert_eq!(results[3], "OK t");
+        assert_eq!(results[4], "OK nil");
+        assert_eq!(results[5], "OK wrong-type-argument");
+        assert_eq!(results[6], "OK wrong-type-argument");
+        assert_eq!(results[7], "OK wrong-number-of-arguments");
     }
 
     // -- buffer-local-variables builtin ------------------------------------

@@ -588,6 +588,7 @@ fn subr_arity_value(name: &str) -> Value {
         "other-window" | "goto-line" => arity_cons(1, Some(3)),
         "flush-lines" | "keep-lines" | "how-many" => arity_cons(1, Some(4)),
         "local-variable-p" => arity_cons(1, Some(2)),
+        "buffer-local-boundp" => arity_cons(2, Some(2)),
         "locale-info" => arity_cons(1, Some(1)),
         "max-char" => arity_cons(0, Some(1)),
         "memory-use-counts" | "make-marker" => arity_cons(0, Some(0)),
@@ -3695,6 +3696,7 @@ mod tests {
         assert_subr_arity("keep-lines", 1, Some(4));
         assert_subr_arity("how-many", 1, Some(4));
         assert_subr_arity("local-variable-p", 1, Some(2));
+        assert_subr_arity("buffer-local-boundp", 2, Some(2));
         assert_subr_arity("locale-info", 1, Some(1));
         assert_subr_arity("max-char", 0, Some(1));
         assert_subr_arity("memory-use-counts", 0, Some(0));

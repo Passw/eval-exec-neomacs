@@ -15615,6 +15615,9 @@ pub(crate) fn dispatch_builtin(
             return Some(super::custom::builtin_make_local_variable(eval, args))
         }
         "local-variable-p" => return Some(super::custom::builtin_local_variable_p(eval, args)),
+        "buffer-local-boundp" => {
+            return Some(super::custom::builtin_buffer_local_bound_p(eval, args))
+        }
         "buffer-local-variables" => {
             return Some(super::custom::builtin_buffer_local_variables(eval, args))
         }
