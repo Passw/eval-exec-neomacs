@@ -5653,10 +5653,14 @@ pub(crate) fn builtin_intern_soft(
     }
     let name = match &args[0] {
         Value::Str(s) => (**s).clone(),
-        // Oracle treats symbol designators (including t, nil, and keywords)
-        // as already interned in the current obarray.
-        Value::Nil | Value::True | Value::Symbol(_) | Value::Keyword(_) => {
-            return Ok(args[0].clone());
+        Value::Nil => return Ok(Value::Nil),
+        Value::True => return Ok(Value::True),
+        Value::Keyword(_) => return Ok(args[0].clone()),
+        Value::Symbol(name) => {
+            if eval.obarray().intern_soft(name).is_some() {
+                return Ok(args[0].clone());
+            }
+            return Ok(Value::Nil);
         }
         other => {
             return Err(signal(

@@ -3516,29 +3516,42 @@ impl ApplicationHandler for RenderApp {
         // Without this, RenderApp's implicit drop happens AFTER the event loop's
         // Wayland display is torn down, causing SEGV in eglTerminate → dri2_teardown_wayland.
         //
-        // Drop order matters: renderer uses device/queue, surface depends on instance.
+        // wgpu uses internal Arc reference counting: the Adapter holds Arc<Instance>,
+        // and Device/Surface/Texture objects hold indirect Arc references back to it.
+        // Even after .take()'ing all Option fields, other RenderApp fields (transition
+        // textures, child frames, etc.) may still hold transitive Arc references that
+        // keep the EGL Instance alive until the final implicit drop of RenderApp —
+        // at which point the Wayland connection is already torn down.
+        //
+        // Solution: leak the adapter to prevent eglTerminate from ever running.
+        // The OS reclaims all GPU resources on process exit anyway.
         log::info!("Event loop exiting, cleaning up GPU resources");
 
-        // 0. Drop WebKit views and WPE backend (hold EGL contexts)
+        // Drop WebKit views and WPE backend (hold EGL contexts)
         #[cfg(feature = "wpe-webkit")]
         {
             self.webkit_views.clear();
             self.wpe_backend = None;
         }
-        // 1. Drop renderer first (holds device/queue references, textures, pipelines)
+        // Drop renderer (holds device/queue references, textures, pipelines)
         drop(self.renderer.take());
-        // 2. Drop glyph atlas (holds device reference)
+        // Drop glyph atlas (holds device reference)
         drop(self.glyph_atlas.take());
-        // 3. Drop surface (holds wl_surface proxy if on Wayland)
+        // Drop surface (holds wl_surface proxy if on Wayland)
         drop(self.surface.take());
         self.surface_config = None;
-        // 4. Drop device and queue
+        // Drop device and queue
         drop(self.device.take());
         drop(self.queue.take());
-        // 5. Drop multi-window state (secondary surfaces)
+        // Drop multi-window state (secondary surfaces)
         self.multi_windows.destroy_all();
-        // 6. Drop adapter last (triggers eglTerminate for the GLES/EGL fallback backend)
-        drop(self.adapter.take());
+        // Leak the adapter to prevent eglTerminate crash on Wayland.
+        // The adapter's Drop triggers eglTerminate → dri2_teardown_wayland which
+        // SEGVs if the Wayland connection is already gone. Since we're exiting,
+        // the OS will reclaim all GPU/EGL resources.
+        if let Some(adapter) = self.adapter.take() {
+            std::mem::forget(adapter);
+        }
 
         log::info!("GPU resources cleaned up");
     }
