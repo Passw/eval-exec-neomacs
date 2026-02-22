@@ -570,6 +570,7 @@ cases/window-tree-navigation-callable-path-semantics
 cases/window-size-query-semantics
 cases/window-size-preserve-callable-path-semantics
 cases/window-geometry-helper-semantics
+cases/window-line-column-callable-path-semantics
 cases/window-cursor-type-semantics
 cases/window-display-table-semantics
 cases/window-cursor-display-table-callable-path-semantics
