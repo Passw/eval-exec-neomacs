@@ -37,3 +37,6 @@
 37	(condition-case err (pcase 1 ((and) 'x) (_ 'y)) (error err))	OK x
 38	(condition-case err (pcase 1 ((and 1) 'x) (_ 'y)) (error err))	OK x
 39	(condition-case err (pcase 1 ((and 1 2) 'x) (_ 'y)) (error err))	OK y
+40	(condition-case err (pcase 1 ((pred integerp 2 3) 'x) (_ 'y)) (error err))	OK x
+41	(condition-case err (pcase 1 ((or 1 2) 'x) (_ 'y)) (error err))	OK x
+42	(condition-case err (pcase 3 ((or 1 2) 'x) (_ 'y)) (error err))	OK y

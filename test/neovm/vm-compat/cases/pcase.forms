@@ -48,3 +48,8 @@
 (condition-case err (pcase 1 ((and) 'x) (_ 'y)) (error err))
 (condition-case err (pcase 1 ((and 1) 'x) (_ 'y)) (error err))
 (condition-case err (pcase 1 ((and 1 2) 'x) (_ 'y)) (error err))
+
+; pred/or argument edge behavior
+(condition-case err (pcase 1 ((pred integerp 2 3) 'x) (_ 'y)) (error err))
+(condition-case err (pcase 1 ((or 1 2) 'x) (_ 'y)) (error err))
+(condition-case err (pcase 3 ((or 1 2) 'x) (_ 'y)) (error err))

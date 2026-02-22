@@ -1239,6 +1239,14 @@ mod tests {
         );
     }
 
+    #[test]
+    fn pcase_pred_pattern_ignores_multiple_extra_args() {
+        assert_eq!(
+            eval_last("(pcase 1 ((pred integerp 2 3) 'x) (_ 'y))"),
+            "OK x"
+        );
+    }
+
     // =======================================================================
     // 9. guard pattern
     // =======================================================================
@@ -1441,6 +1449,18 @@ mod tests {
         assert_eq!(
             eval_last("(condition-case err (pcase 1 ((or 1) 'x) (_ 'y)) (error err))"),
             "OK (error \"Please avoid it\")"
+        );
+    }
+
+    #[test]
+    fn pcase_or_two_alternatives_behavior_matches_oracle() {
+        assert_eq!(
+            eval_last("(condition-case err (pcase 1 ((or 1 2) 'x) (_ 'y)) (error err))"),
+            "OK x"
+        );
+        assert_eq!(
+            eval_last("(condition-case err (pcase 3 ((or 1 2) 'x) (_ 'y)) (error err))"),
+            "OK y"
         );
     }
 
