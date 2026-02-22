@@ -3616,11 +3616,16 @@ fn run_render_loop(
         shared_terminals,
     );
 
-    if let Err(e) = event_loop.run_app(&mut app) {
+    let result = event_loop.run_app(&mut app);
+    if let Err(ref e) = result {
         log::error!("Event loop error: {:?}", e);
     }
 
-    log::info!("Render thread exiting");
+    // Notify Emacs that the render thread is exiting so it can shut down gracefully.
+    // This handles cases like Wayland connection loss (ExitFailure(1)) where the
+    // window disappears without an explicit close request.
+    log::info!("Render thread exiting, sending WindowClose to Emacs");
+    app.comms.send_input(InputEvent::WindowClose { emacs_frame_id: 0 });
 }
 
 #[cfg(test)]

@@ -399,7 +399,20 @@ pub unsafe extern "C" fn neomacs_display_drain_input(
                 }
                 count += 1;
             }
-            Err(_) => break,
+            Err(crossbeam_channel::TryRecvError::Empty) => break,
+            Err(crossbeam_channel::TryRecvError::Disconnected) => {
+                // Render thread has exited — synthesize a close event so Emacs
+                // shuts down gracefully instead of hanging with no window.
+                if count < max_events {
+                    log::error!("Render thread disconnected, synthesizing WindowClose");
+                    let out = &mut *events.add(count as usize);
+                    *out = NeomacsInputEvent::default();
+                    out.kind = NEOMACS_EVENT_CLOSE;
+                    out.target_frame_id = 0;
+                    count += 1;
+                }
+                break;
+            }
         }
     }
 
