@@ -7114,15 +7114,43 @@ pub(crate) fn builtin_handle_switch_frame(args: Vec<Value>) -> EvalResult {
     Ok(Value::Nil)
 }
 
+fn expect_window_live_or_nil(value: &Value) -> Result<(), Flow> {
+    if value.is_nil() || matches!(value, Value::Window(_)) {
+        Ok(())
+    } else {
+        Err(signal(
+            "wrong-type-argument",
+            vec![Value::symbol("window-live-p"), value.clone()],
+        ))
+    }
+}
+
+fn expect_window_valid_or_nil(value: &Value) -> Result<(), Flow> {
+    if value.is_nil() || matches!(value, Value::Window(_)) {
+        Ok(())
+    } else {
+        Err(signal(
+            "wrong-type-argument",
+            vec![Value::symbol("window-valid-p"), value.clone()],
+        ))
+    }
+}
+
+fn expect_frame_live_or_nil(value: &Value) -> Result<(), Flow> {
+    if value.is_nil() || matches!(value, Value::Frame(_)) {
+        Ok(())
+    } else {
+        Err(signal(
+            "wrong-type-argument",
+            vec![Value::symbol("frame-live-p"), value.clone()],
+        ))
+    }
+}
+
 pub(crate) fn builtin_window_bottom_divider_width(args: Vec<Value>) -> EvalResult {
     expect_range_args("window-bottom-divider-width", &args, 0, 1)?;
     if let Some(window) = args.first() {
-        if !window.is_nil() && !matches!(window, Value::Window(_)) {
-            return Err(signal(
-                "wrong-type-argument",
-                vec![Value::symbol("window-live-p"), window.clone()],
-            ));
-        }
+        expect_window_live_or_nil(window)?;
     }
     Ok(Value::Int(0))
 }
@@ -7143,15 +7171,135 @@ pub(crate) fn builtin_window_combination_limit(args: Vec<Value>) -> EvalResult {
     ))
 }
 
+pub(crate) fn builtin_window_left_child(args: Vec<Value>) -> EvalResult {
+    expect_range_args("window-left-child", &args, 0, 1)?;
+    if let Some(window) = args.first() {
+        expect_window_valid_or_nil(window)?;
+    }
+    Ok(Value::Nil)
+}
+
+pub(crate) fn builtin_window_line_height(args: Vec<Value>) -> EvalResult {
+    expect_range_args("window-line-height", &args, 0, 2)?;
+    Ok(Value::Nil)
+}
+
+pub(crate) fn builtin_window_lines_pixel_dimensions(args: Vec<Value>) -> EvalResult {
+    expect_range_args("window-lines-pixel-dimensions", &args, 0, 6)?;
+    if let Some(window) = args.first() {
+        expect_window_live_or_nil(window)?;
+    }
+    Ok(Value::Nil)
+}
+
+pub(crate) fn builtin_window_new_normal(args: Vec<Value>) -> EvalResult {
+    expect_range_args("window-new-normal", &args, 0, 1)?;
+    if let Some(window) = args.first() {
+        expect_window_valid_or_nil(window)?;
+    }
+    Ok(Value::Int(0))
+}
+
+pub(crate) fn builtin_window_new_pixel(args: Vec<Value>) -> EvalResult {
+    expect_range_args("window-new-pixel", &args, 0, 1)?;
+    if let Some(window) = args.first() {
+        expect_window_valid_or_nil(window)?;
+    }
+    Ok(Value::Int(0))
+}
+
+pub(crate) fn builtin_window_new_total(args: Vec<Value>) -> EvalResult {
+    expect_range_args("window-new-total", &args, 0, 1)?;
+    if let Some(window) = args.first() {
+        expect_window_valid_or_nil(window)?;
+    }
+    Ok(Value::Int(0))
+}
+
+pub(crate) fn builtin_window_next_sibling(args: Vec<Value>) -> EvalResult {
+    expect_range_args("window-next-sibling", &args, 0, 1)?;
+    if let Some(window) = args.first() {
+        expect_window_valid_or_nil(window)?;
+    }
+    Ok(Value::Nil)
+}
+
+pub(crate) fn builtin_window_normal_size(args: Vec<Value>) -> EvalResult {
+    expect_range_args("window-normal-size", &args, 0, 2)?;
+    if let Some(window) = args.first() {
+        expect_window_valid_or_nil(window)?;
+    }
+    Ok(Value::Float(1.0))
+}
+
+pub(crate) fn builtin_window_old_body_pixel_height(args: Vec<Value>) -> EvalResult {
+    expect_range_args("window-old-body-pixel-height", &args, 0, 1)?;
+    if let Some(window) = args.first() {
+        expect_window_live_or_nil(window)?;
+    }
+    Ok(Value::Int(0))
+}
+
+pub(crate) fn builtin_window_old_body_pixel_width(args: Vec<Value>) -> EvalResult {
+    expect_range_args("window-old-body-pixel-width", &args, 0, 1)?;
+    if let Some(window) = args.first() {
+        expect_window_live_or_nil(window)?;
+    }
+    Ok(Value::Int(0))
+}
+
+pub(crate) fn builtin_window_old_pixel_height(args: Vec<Value>) -> EvalResult {
+    expect_range_args("window-old-pixel-height", &args, 0, 1)?;
+    if let Some(window) = args.first() {
+        expect_window_valid_or_nil(window)?;
+    }
+    Ok(Value::Int(0))
+}
+
+pub(crate) fn builtin_window_old_pixel_width(args: Vec<Value>) -> EvalResult {
+    expect_range_args("window-old-pixel-width", &args, 0, 1)?;
+    if let Some(window) = args.first() {
+        expect_window_valid_or_nil(window)?;
+    }
+    Ok(Value::Int(0))
+}
+
+pub(crate) fn builtin_window_parent(args: Vec<Value>) -> EvalResult {
+    expect_range_args("window-parent", &args, 0, 1)?;
+    if let Some(window) = args.first() {
+        expect_window_valid_or_nil(window)?;
+    }
+    Ok(Value::Nil)
+}
+
+pub(crate) fn builtin_window_pixel_left(args: Vec<Value>) -> EvalResult {
+    expect_range_args("window-pixel-left", &args, 0, 1)?;
+    if let Some(window) = args.first() {
+        expect_window_valid_or_nil(window)?;
+    }
+    Ok(Value::Int(0))
+}
+
+pub(crate) fn builtin_window_pixel_top(args: Vec<Value>) -> EvalResult {
+    expect_range_args("window-pixel-top", &args, 0, 1)?;
+    if let Some(window) = args.first() {
+        expect_window_valid_or_nil(window)?;
+    }
+    Ok(Value::Int(0))
+}
+
+pub(crate) fn builtin_window_prev_sibling(args: Vec<Value>) -> EvalResult {
+    expect_range_args("window-prev-sibling", &args, 0, 1)?;
+    if let Some(window) = args.first() {
+        expect_window_valid_or_nil(window)?;
+    }
+    Ok(Value::Nil)
+}
+
 pub(crate) fn builtin_window_resize_apply(args: Vec<Value>) -> EvalResult {
     expect_range_args("window-resize-apply", &args, 0, 2)?;
     if let Some(frame) = args.first() {
-        if !frame.is_nil() && !matches!(frame, Value::Frame(_)) {
-            return Err(signal(
-                "wrong-type-argument",
-                vec![Value::symbol("frame-live-p"), frame.clone()],
-            ));
-        }
+        expect_frame_live_or_nil(frame)?;
     }
     Ok(Value::Nil)
 }
@@ -7159,14 +7307,49 @@ pub(crate) fn builtin_window_resize_apply(args: Vec<Value>) -> EvalResult {
 pub(crate) fn builtin_window_resize_apply_total(args: Vec<Value>) -> EvalResult {
     expect_range_args("window-resize-apply-total", &args, 0, 2)?;
     if let Some(frame) = args.first() {
-        if !frame.is_nil() && !matches!(frame, Value::Frame(_)) {
-            return Err(signal(
-                "wrong-type-argument",
-                vec![Value::symbol("frame-live-p"), frame.clone()],
-            ));
-        }
+        expect_frame_live_or_nil(frame)?;
     }
     Ok(Value::True)
+}
+
+pub(crate) fn builtin_window_right_divider_width(args: Vec<Value>) -> EvalResult {
+    expect_range_args("window-right-divider-width", &args, 0, 1)?;
+    if let Some(window) = args.first() {
+        expect_window_live_or_nil(window)?;
+    }
+    Ok(Value::Int(0))
+}
+
+pub(crate) fn builtin_window_scroll_bar_height(args: Vec<Value>) -> EvalResult {
+    expect_range_args("window-scroll-bar-height", &args, 0, 1)?;
+    if let Some(window) = args.first() {
+        expect_window_live_or_nil(window)?;
+    }
+    Ok(Value::Int(0))
+}
+
+pub(crate) fn builtin_window_scroll_bar_width(args: Vec<Value>) -> EvalResult {
+    expect_range_args("window-scroll-bar-width", &args, 0, 1)?;
+    if let Some(window) = args.first() {
+        expect_window_live_or_nil(window)?;
+    }
+    Ok(Value::Int(0))
+}
+
+pub(crate) fn builtin_window_tab_line_height(args: Vec<Value>) -> EvalResult {
+    expect_range_args("window-tab-line-height", &args, 0, 1)?;
+    if let Some(window) = args.first() {
+        expect_window_live_or_nil(window)?;
+    }
+    Ok(Value::Int(0))
+}
+
+pub(crate) fn builtin_window_top_child(args: Vec<Value>) -> EvalResult {
+    expect_range_args("window-top-child", &args, 0, 1)?;
+    if let Some(window) = args.first() {
+        expect_window_valid_or_nil(window)?;
+    }
+    Ok(Value::Nil)
 }
 
 fn inotify_next_watch_id_store() -> &'static Mutex<i64> {
@@ -16254,39 +16437,29 @@ pub(crate) fn dispatch_builtin(
         "unlock-file" => builtin_unlock_file(args),
         "window-bottom-divider-width" => builtin_window_bottom_divider_width(args),
         "window-combination-limit" => builtin_window_combination_limit(args),
-        "window-left-child" => super::compat_internal::builtin_window_left_child(args),
-        "window-line-height" => super::compat_internal::builtin_window_line_height(args),
-        "window-lines-pixel-dimensions" => {
-            super::compat_internal::builtin_window_lines_pixel_dimensions(args)
-        }
-        "window-new-normal" => super::compat_internal::builtin_window_new_normal(args),
-        "window-new-pixel" => super::compat_internal::builtin_window_new_pixel(args),
-        "window-new-total" => super::compat_internal::builtin_window_new_total(args),
-        "window-next-sibling" => super::compat_internal::builtin_window_next_sibling(args),
-        "window-normal-size" => super::compat_internal::builtin_window_normal_size(args),
-        "window-old-body-pixel-height" => {
-            super::compat_internal::builtin_window_old_body_pixel_height(args)
-        }
-        "window-old-body-pixel-width" => {
-            super::compat_internal::builtin_window_old_body_pixel_width(args)
-        }
-        "window-old-pixel-height" => super::compat_internal::builtin_window_old_pixel_height(args),
-        "window-old-pixel-width" => super::compat_internal::builtin_window_old_pixel_width(args),
-        "window-parent" => super::compat_internal::builtin_window_parent(args),
-        "window-pixel-left" => super::compat_internal::builtin_window_pixel_left(args),
-        "window-pixel-top" => super::compat_internal::builtin_window_pixel_top(args),
-        "window-prev-sibling" => super::compat_internal::builtin_window_prev_sibling(args),
+        "window-left-child" => builtin_window_left_child(args),
+        "window-line-height" => builtin_window_line_height(args),
+        "window-lines-pixel-dimensions" => builtin_window_lines_pixel_dimensions(args),
+        "window-new-normal" => builtin_window_new_normal(args),
+        "window-new-pixel" => builtin_window_new_pixel(args),
+        "window-new-total" => builtin_window_new_total(args),
+        "window-next-sibling" => builtin_window_next_sibling(args),
+        "window-normal-size" => builtin_window_normal_size(args),
+        "window-old-body-pixel-height" => builtin_window_old_body_pixel_height(args),
+        "window-old-body-pixel-width" => builtin_window_old_body_pixel_width(args),
+        "window-old-pixel-height" => builtin_window_old_pixel_height(args),
+        "window-old-pixel-width" => builtin_window_old_pixel_width(args),
+        "window-parent" => builtin_window_parent(args),
+        "window-pixel-left" => builtin_window_pixel_left(args),
+        "window-pixel-top" => builtin_window_pixel_top(args),
+        "window-prev-sibling" => builtin_window_prev_sibling(args),
         "window-resize-apply" => builtin_window_resize_apply(args),
         "window-resize-apply-total" => builtin_window_resize_apply_total(args),
-        "window-right-divider-width" => {
-            super::compat_internal::builtin_window_right_divider_width(args)
-        }
-        "window-scroll-bar-height" => {
-            super::compat_internal::builtin_window_scroll_bar_height(args)
-        }
-        "window-scroll-bar-width" => super::compat_internal::builtin_window_scroll_bar_width(args),
-        "window-tab-line-height" => super::compat_internal::builtin_window_tab_line_height(args),
-        "window-top-child" => super::compat_internal::builtin_window_top_child(args),
+        "window-right-divider-width" => builtin_window_right_divider_width(args),
+        "window-scroll-bar-height" => builtin_window_scroll_bar_height(args),
+        "window-scroll-bar-width" => builtin_window_scroll_bar_width(args),
+        "window-tab-line-height" => builtin_window_tab_line_height(args),
+        "window-top-child" => builtin_window_top_child(args),
         "treesit-available-p" => builtin_treesit_available_p(args),
         "treesit-compiled-query-p" => builtin_treesit_compiled_query_p(args),
         "treesit-induce-sparse-tree" => builtin_treesit_induce_sparse_tree(args),
@@ -17111,39 +17284,29 @@ pub(crate) fn dispatch_builtin_pure(name: &str, args: Vec<Value>) -> Option<Eval
         "unlock-file" => builtin_unlock_file(args),
         "window-bottom-divider-width" => builtin_window_bottom_divider_width(args),
         "window-combination-limit" => builtin_window_combination_limit(args),
-        "window-left-child" => super::compat_internal::builtin_window_left_child(args),
-        "window-line-height" => super::compat_internal::builtin_window_line_height(args),
-        "window-lines-pixel-dimensions" => {
-            super::compat_internal::builtin_window_lines_pixel_dimensions(args)
-        }
-        "window-new-normal" => super::compat_internal::builtin_window_new_normal(args),
-        "window-new-pixel" => super::compat_internal::builtin_window_new_pixel(args),
-        "window-new-total" => super::compat_internal::builtin_window_new_total(args),
-        "window-next-sibling" => super::compat_internal::builtin_window_next_sibling(args),
-        "window-normal-size" => super::compat_internal::builtin_window_normal_size(args),
-        "window-old-body-pixel-height" => {
-            super::compat_internal::builtin_window_old_body_pixel_height(args)
-        }
-        "window-old-body-pixel-width" => {
-            super::compat_internal::builtin_window_old_body_pixel_width(args)
-        }
-        "window-old-pixel-height" => super::compat_internal::builtin_window_old_pixel_height(args),
-        "window-old-pixel-width" => super::compat_internal::builtin_window_old_pixel_width(args),
-        "window-parent" => super::compat_internal::builtin_window_parent(args),
-        "window-pixel-left" => super::compat_internal::builtin_window_pixel_left(args),
-        "window-pixel-top" => super::compat_internal::builtin_window_pixel_top(args),
-        "window-prev-sibling" => super::compat_internal::builtin_window_prev_sibling(args),
+        "window-left-child" => builtin_window_left_child(args),
+        "window-line-height" => builtin_window_line_height(args),
+        "window-lines-pixel-dimensions" => builtin_window_lines_pixel_dimensions(args),
+        "window-new-normal" => builtin_window_new_normal(args),
+        "window-new-pixel" => builtin_window_new_pixel(args),
+        "window-new-total" => builtin_window_new_total(args),
+        "window-next-sibling" => builtin_window_next_sibling(args),
+        "window-normal-size" => builtin_window_normal_size(args),
+        "window-old-body-pixel-height" => builtin_window_old_body_pixel_height(args),
+        "window-old-body-pixel-width" => builtin_window_old_body_pixel_width(args),
+        "window-old-pixel-height" => builtin_window_old_pixel_height(args),
+        "window-old-pixel-width" => builtin_window_old_pixel_width(args),
+        "window-parent" => builtin_window_parent(args),
+        "window-pixel-left" => builtin_window_pixel_left(args),
+        "window-pixel-top" => builtin_window_pixel_top(args),
+        "window-prev-sibling" => builtin_window_prev_sibling(args),
         "window-resize-apply" => builtin_window_resize_apply(args),
         "window-resize-apply-total" => builtin_window_resize_apply_total(args),
-        "window-right-divider-width" => {
-            super::compat_internal::builtin_window_right_divider_width(args)
-        }
-        "window-scroll-bar-height" => {
-            super::compat_internal::builtin_window_scroll_bar_height(args)
-        }
-        "window-scroll-bar-width" => super::compat_internal::builtin_window_scroll_bar_width(args),
-        "window-tab-line-height" => super::compat_internal::builtin_window_tab_line_height(args),
-        "window-top-child" => super::compat_internal::builtin_window_top_child(args),
+        "window-right-divider-width" => builtin_window_right_divider_width(args),
+        "window-scroll-bar-height" => builtin_window_scroll_bar_height(args),
+        "window-scroll-bar-width" => builtin_window_scroll_bar_width(args),
+        "window-tab-line-height" => builtin_window_tab_line_height(args),
+        "window-top-child" => builtin_window_top_child(args),
         "treesit-available-p" => builtin_treesit_available_p(args),
         "treesit-compiled-query-p" => builtin_treesit_compiled_query_p(args),
         "treesit-induce-sparse-tree" => builtin_treesit_induce_sparse_tree(args),
@@ -22343,6 +22506,45 @@ mod tests {
             .expect("window-resize-apply-total should resolve")
             .expect("window-resize-apply-total should evaluate");
         assert_eq!(resize, Value::True);
+    }
+
+    #[test]
+    fn dispatch_builtin_pure_handles_window_placeholder_accessors() {
+        let left = dispatch_builtin_pure("window-left-child", vec![Value::Nil])
+            .expect("window-left-child should resolve")
+            .expect("window-left-child should evaluate");
+        assert_eq!(left, Value::Nil);
+
+        let line_height = dispatch_builtin_pure(
+            "window-line-height",
+            vec![Value::Int(0), Value::symbol("window")],
+        )
+        .expect("window-line-height should resolve")
+        .expect("window-line-height should evaluate");
+        assert_eq!(line_height, Value::Nil);
+
+        let normal = dispatch_builtin_pure("window-normal-size", vec![])
+            .expect("window-normal-size should resolve")
+            .expect("window-normal-size should evaluate");
+        assert_eq!(normal, Value::Float(1.0));
+
+        let old_body = dispatch_builtin_pure("window-old-body-pixel-height", vec![])
+            .expect("window-old-body-pixel-height should resolve")
+            .expect("window-old-body-pixel-height should evaluate");
+        assert_eq!(old_body, Value::Int(0));
+
+        let tab = dispatch_builtin_pure("window-tab-line-height", vec![])
+            .expect("window-tab-line-height should resolve")
+            .expect("window-tab-line-height should evaluate");
+        assert_eq!(tab, Value::Int(0));
+
+        let err = dispatch_builtin_pure("window-right-divider-width", vec![Value::Int(1)])
+            .expect("window-right-divider-width should resolve")
+            .unwrap_err();
+        match err {
+            Flow::Signal(sig) => assert_eq!(sig.symbol, "wrong-type-argument"),
+            other => panic!("expected signal, got {other:?}"),
+        }
     }
 
     #[test]
