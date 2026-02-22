@@ -1750,18 +1750,6 @@ pub(crate) fn builtin_mapbacktrace(args: Vec<Value>) -> EvalResult {
     Ok(Value::Nil)
 }
 
-/// `(put-unicode-property-internal TABLE INDEX VALUE)` -> nil.
-pub(crate) fn builtin_put_unicode_property_internal(args: Vec<Value>) -> EvalResult {
-    expect_args("put-unicode-property-internal", &args, 3)?;
-    Ok(Value::Nil)
-}
-
-/// `(re--describe-compiled OBJECT &optional INDENT)` -> nil.
-pub(crate) fn builtin_re_describe_compiled(args: Vec<Value>) -> EvalResult {
-    expect_range_args("re--describe-compiled", &args, 1, 2)?;
-    Ok(Value::Nil)
-}
-
 /// `(dump-emacs-portable FILE &optional TRACK-REFERRERS)` -> nil.
 pub(crate) fn builtin_dump_emacs_portable(args: Vec<Value>) -> EvalResult {
     expect_range_args("dump-emacs-portable", &args, 1, 2)?;

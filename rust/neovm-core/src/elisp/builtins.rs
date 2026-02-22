@@ -5677,6 +5677,16 @@ pub(crate) fn builtin_set_buffer_redisplay(args: Vec<Value>) -> EvalResult {
     Ok(Value::Nil)
 }
 
+pub(crate) fn builtin_put_unicode_property_internal(args: Vec<Value>) -> EvalResult {
+    expect_args("put-unicode-property-internal", &args, 3)?;
+    Ok(Value::Nil)
+}
+
+pub(crate) fn builtin_re_describe_compiled(args: Vec<Value>) -> EvalResult {
+    expect_range_args("re--describe-compiled", &args, 1, 2)?;
+    Ok(Value::Nil)
+}
+
 // ===========================================================================
 // Hook system (need evaluator)
 // ===========================================================================
@@ -14634,16 +14644,14 @@ pub(crate) fn dispatch_builtin(
         }
         "profiler-memory-start" => super::compat_internal::builtin_profiler_memory_start(args),
         "profiler-memory-stop" => super::compat_internal::builtin_profiler_memory_stop(args),
-        "put-unicode-property-internal" => {
-            super::compat_internal::builtin_put_unicode_property_internal(args)
-        }
+        "put-unicode-property-internal" => builtin_put_unicode_property_internal(args),
         "query-font" => super::compat_internal::builtin_query_font(args),
         "query-fontset" => super::compat_internal::builtin_query_fontset(args),
         "raise-frame" => builtin_raise_frame(args),
         "read-positioning-symbols" => {
             super::compat_internal::builtin_read_positioning_symbols(args)
         }
-        "re--describe-compiled" => super::compat_internal::builtin_re_describe_compiled(args),
+        "re--describe-compiled" => builtin_re_describe_compiled(args),
         "recent-auto-save-p" => super::compat_internal::builtin_recent_auto_save_p(args),
         "redisplay" => builtin_redisplay(args),
         "record" => super::compat_internal::builtin_record(args),
@@ -15603,16 +15611,14 @@ pub(crate) fn dispatch_builtin_pure(name: &str, args: Vec<Value>) -> Option<Eval
         }
         "profiler-memory-start" => super::compat_internal::builtin_profiler_memory_start(args),
         "profiler-memory-stop" => super::compat_internal::builtin_profiler_memory_stop(args),
-        "put-unicode-property-internal" => {
-            super::compat_internal::builtin_put_unicode_property_internal(args)
-        }
+        "put-unicode-property-internal" => builtin_put_unicode_property_internal(args),
         "query-font" => super::compat_internal::builtin_query_font(args),
         "query-fontset" => super::compat_internal::builtin_query_fontset(args),
         "raise-frame" => builtin_raise_frame(args),
         "read-positioning-symbols" => {
             super::compat_internal::builtin_read_positioning_symbols(args)
         }
-        "re--describe-compiled" => super::compat_internal::builtin_re_describe_compiled(args),
+        "re--describe-compiled" => builtin_re_describe_compiled(args),
         "recent-auto-save-p" => super::compat_internal::builtin_recent_auto_save_p(args),
         "redisplay" => builtin_redisplay(args),
         "record" => super::compat_internal::builtin_record(args),
@@ -19239,6 +19245,30 @@ mod tests {
         .expect("builtin set-buffer-redisplay should resolve")
         .expect("builtin set-buffer-redisplay should evaluate");
         assert!(redisplay.is_nil());
+    }
+
+    #[test]
+    fn pure_dispatch_unicode_and_re_placeholders_match_compat_contracts() {
+        let unicode = dispatch_builtin_pure(
+            "put-unicode-property-internal",
+            vec![Value::Nil, Value::Int(0), Value::Int(1)],
+        )
+        .expect("builtin put-unicode-property-internal should resolve")
+        .expect("builtin put-unicode-property-internal should evaluate");
+        assert!(unicode.is_nil());
+
+        let re_default = dispatch_builtin_pure("re--describe-compiled", vec![Value::string("x")])
+            .expect("builtin re--describe-compiled should resolve")
+            .expect("builtin re--describe-compiled should evaluate");
+        assert!(re_default.is_nil());
+
+        let re_indent = dispatch_builtin_pure(
+            "re--describe-compiled",
+            vec![Value::string("x"), Value::Int(2)],
+        )
+        .expect("builtin re--describe-compiled should resolve with indent")
+        .expect("builtin re--describe-compiled should evaluate with indent");
+        assert!(re_indent.is_nil());
     }
 
     #[test]
