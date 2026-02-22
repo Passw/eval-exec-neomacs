@@ -19651,6 +19651,19 @@ Last updated: 2026-02-21
         - `x-display-monitor-attributes-list`, `x-display-planes`, `x-display-save-under`, `x-display-screens`
         - `x-display-visual-class`, `x-server-input-extension-version`, `x-server-vendor`
 
+- Added dedicated `x-display-set-last-user-time` argument/payload lock-ins:
+  - vm-compat corpus changes:
+    - added:
+      - `test/neovm/vm-compat/cases/x-display-set-last-user-time-arg-payload-semantics.forms`
+      - `test/neovm/vm-compat/cases/x-display-set-last-user-time-arg-payload-semantics.expected.tsv`
+    - wired case into:
+      - `test/neovm/vm-compat/cases/default.list`
+    - lock-ins cover:
+      - arity boundaries (`0` args and `3` args => `wrong-number-of-arguments`)
+      - one-argument path payload (`error` + `"X windows are not in use or not initialized"`) across mixed display designator shapes
+      - two-argument path payload structure (`wrong-type-argument` + `frame-live-p`) with second-argument passthrough across symbol/vector/list/cons values
+      - live-window third-argument structure and dead-window compact-handle payload shape (`#<window N>`, no ` on ` context)
+
 - Continue compatibility-first maintenance with small commit slices:
   - keep builtin surface and registry in lock-step
   - run oracle/parity checks after each behavior-affecting change

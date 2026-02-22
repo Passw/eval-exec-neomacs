@@ -468,6 +468,7 @@ cases/x-display-query-designator-type-matrix-semantics
 cases/x-display-query-message-payload-semantics
 cases/x-display-query-window-error-structure-semantics
 cases/x-display-query-dead-window-error-payload-semantics
+cases/x-display-set-last-user-time-arg-payload-semantics
 cases/x-display-funcall-apply-semantics
 cases/x-display-pixel-window-error-structure-semantics
 cases/x-display-dead-window-error-payload-semantics
