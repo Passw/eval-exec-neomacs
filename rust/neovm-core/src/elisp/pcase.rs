@@ -798,8 +798,9 @@ pub(crate) fn sf_pcase_let(eval: &mut Evaluator, tail: &[Expr]) -> EvalResult {
         other => return Err(signal("wrong-type-argument", vec![Value::symbol("listp"), quote_to_value(other)])),
     };
 
-    // Phase 1: evaluate all values.
-    let mut pairs: Vec<(Pattern, Value)> = Vec::with_capacity(bindings_expr.len());
+    // Validate binding entry shapes first. Oracle reports list-shape errors
+    // before evaluating patterns/values, even if an earlier pattern would fail.
+    let mut binding_pairs: Vec<Vec<Expr>> = Vec::with_capacity(bindings_expr.len());
     for entry in &bindings_expr {
         let Expr::List(pair) = entry else {
             return Err(signal(
@@ -815,6 +816,18 @@ pub(crate) fn sf_pcase_let(eval: &mut Evaluator, tail: &[Expr]) -> EvalResult {
                 )],
             ));
         }
+        binding_pairs.push(pair.clone());
+    }
+
+    // Oracle shortcut: with no body forms, `pcase-let` returns nil after
+    // structural validation, without evaluating binding patterns/values.
+    if tail.len() == 1 {
+        return Ok(Value::Nil);
+    }
+
+    // Phase 1: evaluate all values.
+    let mut pairs: Vec<(Pattern, Value)> = Vec::with_capacity(binding_pairs.len());
+    for pair in &binding_pairs {
         let pat = compile_pattern(&pair[0])?;
         let val = eval.eval(&pair[1])?;
         pairs.push((pat, val));
@@ -847,39 +860,27 @@ pub(crate) fn sf_pcase_let_star(eval: &mut Evaluator, tail: &[Expr]) -> EvalResu
         ));
     }
 
+    // Oracle shortcut: with no body forms, `pcase-let*` returns nil and does
+    // not validate/evaluate bindings.
+    if tail.len() == 1 {
+        return Ok(Value::Nil);
+    }
+
     let bindings_expr = match &tail[0] {
         Expr::List(entries) => entries.clone(),
         Expr::Symbol(s) if s == "nil" => Vec::new(),
         other => return Err(signal("wrong-type-argument", vec![Value::symbol("listp"), quote_to_value(other)])),
     };
 
-    // Process each binding sequentially, pushing one env frame per binding.
-    let mut frames_pushed = 0usize;
-    let use_lexical = eval.lexical_binding();
-
+    let mut binding_pairs: Vec<Vec<Expr>> = Vec::with_capacity(bindings_expr.len());
     for entry in &bindings_expr {
         let Expr::List(pair) = entry else {
-            // Unwind frames on error.
-            for _ in 0..frames_pushed {
-                if use_lexical {
-                    eval.lexenv.pop();
-                } else {
-                    eval.dynamic.pop();
-                }
-            }
             return Err(signal(
                 "wrong-type-argument",
                 vec![Value::symbol("listp"), quote_to_value(entry)],
             ));
         };
         if pair.len() < 2 {
-            for _ in 0..frames_pushed {
-                if use_lexical {
-                    eval.lexenv.pop();
-                } else {
-                    eval.dynamic.pop();
-                }
-            }
             return Err(signal(
                 "error",
                 vec![Value::string(
@@ -887,7 +888,14 @@ pub(crate) fn sf_pcase_let_star(eval: &mut Evaluator, tail: &[Expr]) -> EvalResu
                 )],
             ));
         }
+        binding_pairs.push(pair.clone());
+    }
 
+    // Process each binding sequentially, pushing one env frame per binding.
+    let mut frames_pushed = 0usize;
+    let use_lexical = eval.lexical_binding();
+
+    for pair in &binding_pairs {
         let pat = match compile_pattern(&pair[0]) {
             Ok(p) => p,
             Err(e) => {
@@ -1762,6 +1770,22 @@ mod tests {
         );
     }
 
+    #[test]
+    fn pcase_let_no_body_skips_binding_pattern_evaluation() {
+        assert_eq!(
+            eval_last("(condition-case err (pcase-let (((pred) 1))) (error err))"),
+            "OK nil"
+        );
+        assert_eq!(
+            eval_last("(condition-case err (pcase-let (((guard) 1))) (error err))"),
+            "OK nil"
+        );
+        assert_eq!(
+            eval_last("(condition-case err (pcase-let ((x 1) y)) (error err))"),
+            "OK (wrong-type-argument listp y)"
+        );
+    }
+
     // =======================================================================
     // 19. pcase-let* sequential binding
     // =======================================================================
@@ -1825,6 +1849,38 @@ mod tests {
         assert_eq!(
             eval_last("(condition-case err (pcase-let* nil 'ok) (error err))"),
             "OK ok"
+        );
+    }
+
+    #[test]
+    fn pcase_let_star_no_body_ignores_bindings_and_returns_nil() {
+        assert_eq!(
+            eval_last("(condition-case err (pcase-let* 1) (error err))"),
+            "OK nil"
+        );
+        assert_eq!(
+            eval_last("(condition-case err (pcase-let* t) (error err))"),
+            "OK nil"
+        );
+        assert_eq!(
+            eval_last("(condition-case err (pcase-let* (x)) (error err))"),
+            "OK nil"
+        );
+        assert_eq!(
+            eval_last("(condition-case err (pcase-let* (((pred) 1))) (error err))"),
+            "OK nil"
+        );
+        assert_eq!(
+            eval_last("(condition-case err (pcase-let* (((pred) 1) y)) (error err))"),
+            "OK nil"
+        );
+    }
+
+    #[test]
+    fn pcase_let_star_body_validates_binding_shape_before_matching() {
+        assert_eq!(
+            eval_last("(condition-case err (pcase-let* (((pred) 1) y) y) (error err))"),
+            "OK (wrong-type-argument listp y)"
         );
     }
 

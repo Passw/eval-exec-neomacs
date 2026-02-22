@@ -74,3 +74,12 @@
 74	(condition-case err (pcase-let* t 'ok) (error err))	OK (wrong-type-argument listp t)
 75	(condition-case err (pcase-let nil 'ok) (error err))	OK ok
 76	(condition-case err (pcase-let* nil 'ok) (error err))	OK ok
+77	(condition-case err (pcase-let ((x 1) y)) (error err))	OK (wrong-type-argument listp y)
+78	(condition-case err (pcase-let (((pred) 1))) (error err))	OK nil
+79	(condition-case err (pcase-let (((guard) 1))) (error err))	OK nil
+80	(condition-case err (pcase-let* 1) (error err))	OK nil
+81	(condition-case err (pcase-let* t) (error err))	OK nil
+82	(condition-case err (pcase-let* (x)) (error err))	OK nil
+83	(condition-case err (pcase-let* (((pred) 1))) (error err))	OK nil
+84	(condition-case err (pcase-let* (((pred) 1) y)) (error err))	OK nil
+85	(condition-case err (pcase-let* (((pred) 1) y) y) (error err))	OK (wrong-type-argument listp y)

@@ -95,3 +95,14 @@
 (condition-case err (pcase-let* t 'ok) (error err))
 (condition-case err (pcase-let nil 'ok) (error err))
 (condition-case err (pcase-let* nil 'ok) (error err))
+
+; no-body pcase-let/pcase-let* behavior
+(condition-case err (pcase-let ((x 1) y)) (error err))
+(condition-case err (pcase-let (((pred) 1))) (error err))
+(condition-case err (pcase-let (((guard) 1))) (error err))
+(condition-case err (pcase-let* 1) (error err))
+(condition-case err (pcase-let* t) (error err))
+(condition-case err (pcase-let* (x)) (error err))
+(condition-case err (pcase-let* (((pred) 1))) (error err))
+(condition-case err (pcase-let* (((pred) 1) y)) (error err))
+(condition-case err (pcase-let* (((pred) 1) y) y) (error err))
