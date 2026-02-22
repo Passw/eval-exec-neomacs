@@ -7999,12 +7999,29 @@ pub(crate) fn builtin_window_new_total(args: Vec<Value>) -> EvalResult {
     Ok(Value::Int(0))
 }
 
+fn compatibility_window_sibling_placeholder(window: Option<&Value>, next: bool) -> Value {
+    let root_window_id = 1_u64;
+    let minibuffer_window_id =
+        crate::window::MINIBUFFER_WINDOW_ID_BASE + crate::window::FRAME_ID_BASE;
+    let current_window_id = match window {
+        None | Some(Value::Nil) => root_window_id,
+        Some(Value::Window(id)) => *id,
+        Some(_) => return Value::Nil,
+    };
+
+    match (current_window_id, next) {
+        (id, true) if id == root_window_id => Value::Window(minibuffer_window_id),
+        (id, false) if id == minibuffer_window_id => Value::Window(root_window_id),
+        _ => Value::Nil,
+    }
+}
+
 pub(crate) fn builtin_window_next_sibling(args: Vec<Value>) -> EvalResult {
     expect_range_args("window-next-sibling", &args, 0, 1)?;
     if let Some(window) = args.first() {
         expect_window_valid_or_nil(window)?;
     }
-    Ok(Value::Nil)
+    Ok(compatibility_window_sibling_placeholder(args.first(), true))
 }
 
 pub(crate) fn builtin_window_normal_size(args: Vec<Value>) -> EvalResult {
@@ -8076,7 +8093,10 @@ pub(crate) fn builtin_window_prev_sibling(args: Vec<Value>) -> EvalResult {
     if let Some(window) = args.first() {
         expect_window_valid_or_nil(window)?;
     }
-    Ok(Value::Nil)
+    Ok(compatibility_window_sibling_placeholder(
+        args.first(),
+        false,
+    ))
 }
 
 pub(crate) fn builtin_window_resize_apply(args: Vec<Value>) -> EvalResult {
@@ -23524,10 +23544,39 @@ mod tests {
 
     #[test]
     fn dispatch_builtin_pure_handles_window_placeholder_accessors() {
+        let root_window_id = 1_u64;
+        let minibuffer_window_id =
+            crate::window::MINIBUFFER_WINDOW_ID_BASE + crate::window::FRAME_ID_BASE;
+
         let left = dispatch_builtin_pure("window-left-child", vec![Value::Nil])
             .expect("window-left-child should resolve")
             .expect("window-left-child should evaluate");
         assert_eq!(left, Value::Nil);
+
+        let next = dispatch_builtin_pure("window-next-sibling", vec![])
+            .expect("window-next-sibling should resolve")
+            .expect("window-next-sibling should evaluate");
+        assert_eq!(next, Value::Window(minibuffer_window_id));
+
+        let next_root =
+            dispatch_builtin_pure("window-next-sibling", vec![Value::Window(root_window_id)])
+                .expect("window-next-sibling should resolve")
+                .expect("window-next-sibling should evaluate");
+        assert_eq!(next_root, Value::Window(minibuffer_window_id));
+
+        let prev_minibuf = dispatch_builtin_pure(
+            "window-prev-sibling",
+            vec![Value::Window(minibuffer_window_id)],
+        )
+        .expect("window-prev-sibling should resolve")
+        .expect("window-prev-sibling should evaluate");
+        assert_eq!(prev_minibuf, Value::Window(root_window_id));
+
+        let prev_root =
+            dispatch_builtin_pure("window-prev-sibling", vec![Value::Window(root_window_id)])
+                .expect("window-prev-sibling should resolve")
+                .expect("window-prev-sibling should evaluate");
+        assert_eq!(prev_root, Value::Nil);
 
         let line_height = dispatch_builtin_pure(
             "window-line-height",

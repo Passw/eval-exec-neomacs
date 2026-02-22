@@ -19244,6 +19244,24 @@ Last updated: 2026-02-21
     - `make -C test/neovm/vm-compat check-one-neovm CASE=cases/execute-extended-command-prefix-return-semantics` (pass, `19/19`)
     - `make -C test/neovm/vm-compat check-all-neovm-strict` (pass; inventory `882`)
 
+- Aligned `window-next-sibling` / `window-prev-sibling` batch startup sibling behavior with oracle root/minibuffer topology:
+  - runtime changes:
+    - `rust/neovm-core/src/elisp/builtins.rs`
+      - `window-next-sibling` now returns the minibuffer window when called for the default root/selected window.
+      - `window-prev-sibling` now returns the root/selected window when called for the minibuffer window.
+      - kept existing argument guards (`window-valid-p`) unchanged.
+      - extended pure dispatch coverage:
+        - `dispatch_builtin_pure_handles_window_placeholder_accessors`
+  - vm-compat corpus changes:
+    - added and wired:
+      - `test/neovm/vm-compat/cases/window-sibling-minibuffer-semantics.forms`
+      - `test/neovm/vm-compat/cases/window-sibling-minibuffer-semantics.expected.tsv`
+      - `test/neovm/vm-compat/cases/default.list`
+  - verified:
+    - `cargo test --manifest-path rust/neovm-core/Cargo.toml dispatch_builtin_pure_handles_window_placeholder_accessors -- --nocapture` (pass)
+    - `make -C test/neovm/vm-compat check-one-neovm CASE=cases/window-sibling-minibuffer-semantics` (pass; `14/14`)
+    - `make -C test/neovm/vm-compat check-neovm-filter-strict LIST=cases/default.list PATTERN='window-(tree-navigation-callable-path-semantics|sibling-minibuffer-semantics)'` (pass; strict filtered gates green)
+
 - Continue compatibility-first maintenance with small commit slices:
   - keep builtin surface and registry in lock-step
   - run oracle/parity checks after each behavior-affecting change
