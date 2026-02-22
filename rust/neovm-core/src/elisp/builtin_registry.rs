@@ -479,6 +479,7 @@ const DISPATCH_BUILTIN_NAMES: &[&str] = &[
     "file-equal-p",
     "file-executable-p",
     "file-exists-p",
+    "file-group-gid",
     "file-in-directory-p",
     "file-locked-p",
     "file-name-absolute-p",

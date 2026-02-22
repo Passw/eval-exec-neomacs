@@ -289,6 +289,12 @@ pub(crate) fn builtin_group_gid(args: Vec<Value>) -> EvalResult {
     Ok(Value::Int(get_gid()))
 }
 
+/// `(file-group-gid)` — return the GID used for file ownership.
+pub(crate) fn builtin_file_group_gid(args: Vec<Value>) -> EvalResult {
+    expect_args("file-group-gid", &args, 0)?;
+    Ok(Value::Int(get_gid()))
+}
+
 /// `(group-real-gid)` — return the real group ID.
 pub(crate) fn builtin_group_real_gid(args: Vec<Value>) -> EvalResult {
     expect_args("group-real-gid", &args, 0)?;
@@ -447,5 +453,19 @@ mod tests {
     #[test]
     fn file_user_uid_arity_errors() {
         assert!(builtin_file_user_uid(vec![Value::Nil]).is_err());
+    }
+
+    #[test]
+    fn file_group_gid_matches_group_gid() {
+        let group_gid = builtin_group_gid(vec![]).expect("group-gid should succeed");
+        let file_group_gid =
+            builtin_file_group_gid(vec![]).expect("file-group-gid should succeed");
+        assert_eq!(file_group_gid, group_gid);
+        assert!(matches!(file_group_gid, Value::Int(_)));
+    }
+
+    #[test]
+    fn file_group_gid_arity_errors() {
+        assert!(builtin_file_group_gid(vec![Value::Nil]).is_err());
     }
 }

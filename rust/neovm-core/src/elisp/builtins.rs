@@ -17918,6 +17918,7 @@ pub(crate) fn dispatch_builtin(
         "user-real-uid" => super::editfns::builtin_user_real_uid(args),
         "group-name" => super::editfns::builtin_group_name(args),
         "group-gid" => super::editfns::builtin_group_gid(args),
+        "file-group-gid" => super::editfns::builtin_file_group_gid(args),
         "group-real-gid" => super::editfns::builtin_group_real_gid(args),
         "load-average" => super::editfns::builtin_load_average(args),
         "logcount" => super::editfns::builtin_logcount(args),
@@ -18173,6 +18174,7 @@ pub(crate) fn dispatch_builtin_pure(name: &str, args: Vec<Value>) -> Option<Eval
         // Editfns (pure)
         "group-name" => super::editfns::builtin_group_name(args),
         "group-gid" => super::editfns::builtin_group_gid(args),
+        "file-group-gid" => super::editfns::builtin_file_group_gid(args),
         "group-real-gid" => super::editfns::builtin_group_real_gid(args),
         "load-average" => super::editfns::builtin_load_average(args),
         "logcount" => super::editfns::builtin_logcount(args),

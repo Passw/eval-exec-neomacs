@@ -428,7 +428,8 @@ fn subr_arity_value(name: &str) -> Value {
         }
         "mark" => arity_cons(0, Some(1)),
         "push-mark" => arity_cons(0, Some(3)),
-        "group-gid" | "group-real-gid" | "interactive-p" | "last-nonminibuffer-frame" => {
+        "file-group-gid" | "group-gid" | "group-real-gid" | "interactive-p"
+        | "last-nonminibuffer-frame" => {
             arity_cons(0, Some(0))
         }
         "group-name" => arity_cons(1, Some(1)),
@@ -4098,6 +4099,7 @@ mod tests {
         assert_subr_arity("ngettext", 3, Some(3));
         assert_subr_arity("substring-no-properties", 1, Some(3));
         assert_subr_arity("group-name", 1, Some(1));
+        assert_subr_arity("file-group-gid", 0, Some(0));
         assert_subr_arity("group-gid", 0, Some(0));
         assert_subr_arity("group-real-gid", 0, Some(0));
         assert_subr_arity("load-average", 0, Some(1));
