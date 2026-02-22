@@ -596,6 +596,7 @@ cases/window-minibuffer-root-callable-path-semantics
 cases/window-list-frame-designator-semantics
 cases/window-list-minibuf-all-frames-semantics
 cases/window-list-options-callable-path-semantics
+cases/window-list-1-callable-path-semantics
 cases/window-object-return-semantics
 cases/window-list-minibuffer-window-accessor-semantics
 cases/window-minibuffer-accessor-callable-path-semantics

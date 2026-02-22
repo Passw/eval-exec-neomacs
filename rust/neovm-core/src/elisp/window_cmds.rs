@@ -2054,6 +2054,55 @@ pub(crate) fn builtin_window_list(
     Ok(Value::list(ids))
 }
 
+/// `(window-list-1 &optional WINDOW MINIBUF ALL-FRAMES)` -> list of live windows.
+pub(crate) fn builtin_window_list_1(
+    eval: &mut super::eval::Evaluator,
+    args: Vec<Value>,
+) -> EvalResult {
+    expect_max_args("window-list-1", &args, 3)?;
+    let _ = ensure_selected_frame_id(eval);
+    let (fid, start_wid) = match args.first() {
+        None | Some(Value::Nil) => resolve_window_id_with_pred(eval, None, "window-live-p")?,
+        Some(Value::Window(id)) => {
+            let wid = WindowId(*id);
+            if let Some(fid) = eval.frames.find_window_frame_id(wid) {
+                (fid, wid)
+            } else {
+                return Err(signal(
+                    "wrong-type-argument",
+                    vec![Value::symbol("window-live-p"), args[0].clone()],
+                ));
+            }
+        }
+        Some(other) => {
+            return Err(signal(
+                "wrong-type-argument",
+                vec![Value::symbol("window-live-p"), other.clone()],
+            ))
+        }
+    };
+
+    let frame = eval
+        .frames
+        .get(fid)
+        .ok_or_else(|| signal("error", vec![Value::string("Frame not found")]))?;
+
+    // GNU Emacs starts traversal at WINDOW when it appears in the returned list.
+    let mut window_ids = frame.window_list();
+    if let Some(start_index) = window_ids.iter().position(|wid| *wid == start_wid) {
+        window_ids.rotate_left(start_index);
+    }
+
+    let mut windows: Vec<Value> = window_ids.into_iter().map(window_value).collect();
+    if matches!(args.get(1), Some(Value::True)) {
+        if let Some(minibuffer_wid) = frame.minibuffer_window {
+            windows.push(window_value(minibuffer_wid));
+        }
+    }
+
+    Ok(Value::list(windows))
+}
+
 /// `(get-buffer-window &optional BUFFER-OR-NAME ALL-FRAMES)` -> window or nil.
 ///
 /// Batch-compatible behavior: search the selected frame for a window showing
@@ -4202,6 +4251,34 @@ mod tests {
         assert_eq!(results[0], "OK error");
         assert_eq!(results[1], "OK error");
         assert_eq!(results[2], "OK error");
+    }
+
+    #[test]
+    fn window_list_1_callable_paths_return_live_windows() {
+        let r = eval_one_with_frame(
+            "(let* ((fn (indirect-function 'window-list-1))
+                    (a (funcall #'window-list-1 nil nil))
+                    (b (apply #'window-list-1 '(nil nil)))
+                    (c (funcall fn nil nil)))
+               (list (listp a)
+                     (consp a)
+                     (equal a b)
+                     (equal a c)
+                     (null (memq nil (mapcar #'windowp a)))))",
+        );
+        assert_eq!(r, "OK (t t t t t)");
+    }
+
+    #[test]
+    fn window_list_1_stale_window_signals_wrong_type_argument() {
+        let r = eval_one_with_frame(
+            "(let ((w (split-window)))
+               (delete-window w)
+               (list (condition-case err (window-list-1 w nil) (error (car err)))
+                     (condition-case err (funcall #'window-list-1 w nil) (error (car err)))
+                     (condition-case err (apply #'window-list-1 (list w nil)) (error (car err)))))",
+        );
+        assert_eq!(r, "OK (wrong-type-argument wrong-type-argument wrong-type-argument)");
     }
 
     #[test]

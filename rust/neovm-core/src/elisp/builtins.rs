@@ -12805,6 +12805,7 @@ pub(crate) fn dispatch_builtin(
             return Some(super::window_cmds::builtin_window_total_width(eval, args))
         }
         "window-list" => return Some(super::window_cmds::builtin_window_list(eval, args)),
+        "window-list-1" => return Some(super::window_cmds::builtin_window_list_1(eval, args)),
         "get-buffer-window" => {
             return Some(super::window_cmds::builtin_get_buffer_window(eval, args))
         }
@@ -15065,7 +15066,7 @@ pub(crate) fn dispatch_builtin(
 /// Used by the bytecode VM.
 pub(crate) fn dispatch_builtin_pure(name: &str, args: Vec<Value>) -> Option<EvalResult> {
     match name {
-        "assoc" | "alist-get" | "plist-member" => return None,
+        "assoc" | "alist-get" | "plist-member" | "window-list-1" => return None,
         _ => {}
     }
 
