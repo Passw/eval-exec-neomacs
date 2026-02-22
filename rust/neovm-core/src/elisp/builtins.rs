@@ -18013,6 +18013,25 @@ pub(crate) fn dispatch_builtin_pure(name: &str, args: Vec<Value>) -> Option<Eval
         "sqlitep" => builtin_sqlitep(args),
         "fillarray" => builtin_fillarray(args),
         "define-hash-table-test" => builtin_define_hash_table_test(args),
+        "hash-table-test" => super::hashtab::builtin_hash_table_test(args),
+        "hash-table-size" => super::hashtab::builtin_hash_table_size(args),
+        "hash-table-rehash-size" => super::hashtab::builtin_hash_table_rehash_size(args),
+        "hash-table-rehash-threshold" => super::hashtab::builtin_hash_table_rehash_threshold(args),
+        "hash-table-weakness" => super::hashtab::builtin_hash_table_weakness(args),
+        "copy-hash-table" => super::hashtab::builtin_copy_hash_table(args),
+        "sxhash-eq" => super::hashtab::builtin_sxhash_eq(args),
+        "sxhash-eql" => super::hashtab::builtin_sxhash_eql(args),
+        "sxhash-equal" => super::hashtab::builtin_sxhash_equal(args),
+        "sxhash-equal-including-properties" => {
+            super::hashtab::builtin_sxhash_equal_including_properties(args)
+        }
+        "internal--hash-table-buckets" => super::hashtab::builtin_internal_hash_table_buckets(args),
+        "internal--hash-table-histogram" => {
+            super::hashtab::builtin_internal_hash_table_histogram(args)
+        }
+        "internal--hash-table-index-size" => {
+            super::hashtab::builtin_internal_hash_table_index_size(args)
+        }
         "find-coding-systems-region-internal" => builtin_find_coding_systems_region_internal(args),
         _ => return None,
     })
@@ -21091,6 +21110,98 @@ mod tests {
             .expect("builtin hash-table-count should resolve")
             .expect("builtin hash-table-count should evaluate");
         assert_eq!(count, Value::Int(1));
+    }
+
+    #[test]
+    fn pure_dispatch_typed_hash_table_extended_builtins_round_trip() {
+        let alias = Value::symbol("neovm--pure-dispatch-eq-test-alias");
+        dispatch_builtin_pure(
+            "define-hash-table-test",
+            vec![
+                alias.clone(),
+                Value::symbol("eq"),
+                Value::symbol("sxhash-eq"),
+            ],
+        )
+        .expect("define-hash-table-test should resolve")
+        .expect("define-hash-table-test should evaluate");
+
+        let table = dispatch_builtin_pure(
+            "make-hash-table",
+            vec![Value::keyword(":test"), alias.clone()],
+        )
+        .expect("make-hash-table should resolve")
+        .expect("make-hash-table should evaluate");
+
+        let test_name = dispatch_builtin_pure("hash-table-test", vec![table.clone()])
+            .expect("hash-table-test should resolve")
+            .expect("hash-table-test should evaluate");
+        assert_eq!(test_name, alias.clone());
+
+        let size = dispatch_builtin_pure("hash-table-size", vec![table.clone()])
+            .expect("hash-table-size should resolve")
+            .expect("hash-table-size should evaluate");
+        assert_eq!(size, Value::Int(0));
+
+        let weakness = dispatch_builtin_pure("hash-table-weakness", vec![table.clone()])
+            .expect("hash-table-weakness should resolve")
+            .expect("hash-table-weakness should evaluate");
+        assert_eq!(weakness, Value::Nil);
+
+        let rehash_size = dispatch_builtin_pure("hash-table-rehash-size", vec![table.clone()])
+            .expect("hash-table-rehash-size should resolve")
+            .expect("hash-table-rehash-size should evaluate");
+        assert_eq!(rehash_size, Value::Float(1.5));
+
+        let rehash_threshold =
+            dispatch_builtin_pure("hash-table-rehash-threshold", vec![table.clone()])
+                .expect("hash-table-rehash-threshold should resolve")
+                .expect("hash-table-rehash-threshold should evaluate");
+        assert_eq!(rehash_threshold, Value::Float(0.8125));
+
+        let sxhash = dispatch_builtin_pure("sxhash-eq", vec![Value::symbol("k")])
+            .expect("sxhash-eq should resolve")
+            .expect("sxhash-eq should evaluate");
+        assert!(matches!(sxhash, Value::Int(_)));
+
+        let buckets_before =
+            dispatch_builtin_pure("internal--hash-table-buckets", vec![table.clone()])
+                .expect("internal--hash-table-buckets should resolve")
+                .expect("internal--hash-table-buckets should evaluate");
+        assert_eq!(buckets_before, Value::Nil);
+
+        let _ = dispatch_builtin_pure(
+            "puthash",
+            vec![Value::symbol("k"), Value::Int(1), table.clone()],
+        )
+        .expect("puthash should resolve")
+        .expect("puthash should evaluate");
+
+        let buckets_after =
+            dispatch_builtin_pure("internal--hash-table-buckets", vec![table.clone()])
+                .expect("internal--hash-table-buckets should resolve")
+                .expect("internal--hash-table-buckets should evaluate");
+        assert!(!buckets_after.is_nil());
+
+        let histogram =
+            dispatch_builtin_pure("internal--hash-table-histogram", vec![table.clone()])
+                .expect("internal--hash-table-histogram should resolve")
+                .expect("internal--hash-table-histogram should evaluate");
+        assert!(!histogram.is_nil());
+
+        let index_size =
+            dispatch_builtin_pure("internal--hash-table-index-size", vec![table.clone()])
+                .expect("internal--hash-table-index-size should resolve")
+                .expect("internal--hash-table-index-size should evaluate");
+        assert!(matches!(index_size, Value::Int(n) if n >= 1));
+
+        let copied = dispatch_builtin_pure("copy-hash-table", vec![table.clone()])
+            .expect("copy-hash-table should resolve")
+            .expect("copy-hash-table should evaluate");
+        let copied_test = dispatch_builtin_pure("hash-table-test", vec![copied])
+            .expect("hash-table-test should resolve for copied table")
+            .expect("hash-table-test should evaluate for copied table");
+        assert_eq!(copied_test, alias);
     }
 
     #[test]
