@@ -494,6 +494,7 @@ const DISPATCH_BUILTIN_NAMES: &[&str] = &[
     "file-name-nondirectory",
     "file-remote-p",
     "file-name-sans-extension",
+    "file-name-sans-versions",
     "file-name-with-extension",
     "file-newer-than-file-p",
     "file-readable-p",

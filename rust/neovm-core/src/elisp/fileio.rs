@@ -230,6 +230,30 @@ pub fn file_name_with_extension(filename: &str, extension: &str) -> Result<Strin
     ))
 }
 
+/// Return FILENAME without trailing backup version markers.
+///
+/// With KEEP_BACKUP_VERSION non-nil, returns FILENAME unchanged.
+pub fn file_name_sans_versions(filename: &str, keep_backup_version: bool) -> String {
+    if keep_backup_version {
+        return filename.to_string();
+    }
+
+    if !filename.ends_with('~') {
+        return filename.to_string();
+    }
+
+    let len = filename.len();
+    if let Some(version_start) = filename.rfind(".~") {
+        // Recognize version-like `.~...~` suffixes with at least one char.
+        if version_start + 2 < len - 1 {
+            return filename[..version_start].to_string();
+        }
+    }
+
+    // Fall back to dropping a single trailing backup `~`.
+    filename[..len - 1].to_string()
+}
+
 /// Return FILENAME as a directory name (must end in `/`).
 /// Like Emacs `file-name-as-directory`.
 pub fn file_name_as_directory(filename: &str) -> String {
@@ -1621,6 +1645,18 @@ pub(crate) fn builtin_file_name_with_extension(args: Vec<Value>) -> EvalResult {
         Ok(path) => Ok(Value::string(path)),
         Err(message) => Err(signal("error", vec![Value::string(message)])),
     }
+}
+
+/// (file-name-sans-versions FILENAME &optional KEEP-BACKUP-VERSION) -> string
+pub(crate) fn builtin_file_name_sans_versions(args: Vec<Value>) -> EvalResult {
+    expect_min_args("file-name-sans-versions", &args, 1)?;
+    expect_max_args("file-name-sans-versions", &args, 2)?;
+    let filename = expect_string_strict(&args[0])?;
+    let keep_backup = args.get(1).is_some_and(Value::is_truthy);
+    Ok(Value::string(file_name_sans_versions(
+        &filename,
+        keep_backup,
+    )))
 }
 
 /// (file-name-as-directory FILENAME) -> string
@@ -4761,6 +4797,19 @@ mod tests {
             builtin_file_name_with_extension(vec![Value::string("foo"), Value::string(".el")]);
         assert_eq!(result.unwrap().as_str(), Some("foo.el"));
 
+        let result = builtin_file_name_sans_versions(vec![Value::string("foo.~12~")]);
+        assert_eq!(result.unwrap().as_str(), Some("foo"));
+
+        let result = builtin_file_name_sans_versions(vec![Value::string("foo.~12~.~3~")]);
+        assert_eq!(result.unwrap().as_str(), Some("foo.~12~"));
+
+        let result = builtin_file_name_sans_versions(vec![Value::string("foo.~~")]);
+        assert_eq!(result.unwrap().as_str(), Some("foo.~"));
+
+        let result =
+            builtin_file_name_sans_versions(vec![Value::string("foo.~12~"), Value::True]);
+        assert_eq!(result.unwrap().as_str(), Some("foo.~12~"));
+
         let malformed =
             builtin_file_name_with_extension(vec![Value::string("foo"), Value::string("")])
                 .expect_err("empty extension should be rejected");
@@ -4840,6 +4889,9 @@ mod tests {
         assert!(builtin_file_name_base(vec![]).is_err());
         assert!(builtin_file_name_with_extension(vec![Value::symbol("x"), Value::string("el")]).is_err());
         assert!(builtin_file_name_with_extension(vec![Value::string("x"), Value::symbol("el")]).is_err());
+        assert!(builtin_file_name_sans_versions(vec![Value::symbol("x")]).is_err());
+        assert!(builtin_file_name_sans_versions(vec![]).is_err());
+        assert!(builtin_file_name_sans_versions(vec![Value::string("x"), Value::Nil, Value::Nil]).is_err());
         assert!(builtin_file_name_as_directory(vec![Value::symbol("x")]).is_err());
         assert!(builtin_directory_file_name(vec![Value::symbol("x")]).is_err());
         assert!(builtin_backup_file_name_p(vec![Value::symbol("x")]).is_err());
