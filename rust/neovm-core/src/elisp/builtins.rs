@@ -14472,9 +14472,6 @@ pub(crate) fn dispatch_builtin(
             super::compat_internal::builtin_find_operation_coding_system(args)
         }
         "handler-bind-1" => super::compat_internal::builtin_handler_bind_1(args),
-        "insert-before-markers-and-inherit" => {
-            super::compat_internal::builtin_insert_before_markers_and_inherit(args)
-        }
         "iso-charset" => super::compat_internal::builtin_iso_charset(args),
         "keymap--get-keyelt" => super::compat_internal::builtin_keymap_get_keyelt(args),
         "keymap-prompt" => super::compat_internal::builtin_keymap_prompt(args),
@@ -15066,6 +15063,7 @@ pub(crate) fn dispatch_builtin_pure(name: &str, args: Vec<Value>) -> Option<Eval
         | "display-color-p"
         | "indirect-variable"
         | "insert-and-inherit"
+        | "insert-before-markers-and-inherit"
         | "insert-buffer-substring"
         | "make-directory"
         | "make-temp-file"
@@ -15447,9 +15445,6 @@ pub(crate) fn dispatch_builtin_pure(name: &str, args: Vec<Value>) -> Option<Eval
             super::compat_internal::builtin_find_operation_coding_system(args)
         }
         "handler-bind-1" => super::compat_internal::builtin_handler_bind_1(args),
-        "insert-before-markers-and-inherit" => {
-            super::compat_internal::builtin_insert_before_markers_and_inherit(args)
-        }
         "iso-charset" => super::compat_internal::builtin_iso_charset(args),
         "keymap--get-keyelt" => super::compat_internal::builtin_keymap_get_keyelt(args),
         "keymap-prompt" => super::compat_internal::builtin_keymap_prompt(args),
@@ -19419,6 +19414,7 @@ mod tests {
         assert!(dispatch_builtin_pure("format-message", vec![]).is_none());
         assert!(dispatch_builtin_pure("indirect-variable", vec![]).is_none());
         assert!(dispatch_builtin_pure("insert-and-inherit", vec![]).is_none());
+        assert!(dispatch_builtin_pure("insert-before-markers-and-inherit", vec![]).is_none());
         assert!(dispatch_builtin_pure("insert-buffer-substring", vec![]).is_none());
         assert!(dispatch_builtin_pure("make-directory", vec![]).is_none());
         assert!(dispatch_builtin_pure("make-temp-file", vec![]).is_none());

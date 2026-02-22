@@ -1635,11 +1635,6 @@ pub(crate) fn builtin_handler_bind_1(args: Vec<Value>) -> EvalResult {
     Ok(Value::Nil)
 }
 
-/// `(insert-before-markers-and-inherit &rest ARGS)` -> nil.
-pub(crate) fn builtin_insert_before_markers_and_inherit(_args: Vec<Value>) -> EvalResult {
-    Ok(Value::Nil)
-}
-
 /// `(iso-charset DIMENSION CHARS FINAL-CHAR)` -> nil.
 pub(crate) fn builtin_iso_charset(args: Vec<Value>) -> EvalResult {
     expect_args("iso-charset", &args, 3)?;
