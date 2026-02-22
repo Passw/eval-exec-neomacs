@@ -702,7 +702,7 @@ pub(crate) fn builtin_unintern(eval: &mut super::eval::Evaluator, args: Vec<Valu
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::elisp::builtins::{builtin_make_hash_table, builtin_puthash};
+    use crate::elisp::builtins::{builtin_gethash, builtin_make_hash_table, builtin_puthash};
 
     #[test]
     fn hash_table_keys_values_basics() {
@@ -852,6 +852,51 @@ mod tests {
             builtin_sxhash_equal(vec![Value::Float(2.0)]).unwrap(),
             Value::Int(1_152_921_504_606_846_976)
         );
+    }
+
+    #[test]
+    fn sxhash_float_signed_zero_and_nan_semantics_match_oracle() {
+        assert_eq!(builtin_sxhash_eql(vec![Value::Float(0.0)]).unwrap(), Value::Int(0));
+        assert_eq!(
+            builtin_sxhash_eql(vec![Value::Float(-0.0)]).unwrap(),
+            Value::Int(-2_305_843_009_213_693_952)
+        );
+        assert_eq!(
+            builtin_sxhash_equal(vec![Value::Float(0.0)]).unwrap(),
+            Value::Int(0)
+        );
+        assert_eq!(
+            builtin_sxhash_equal(vec![Value::Float(-0.0)]).unwrap(),
+            Value::Int(-2_305_843_009_213_693_952)
+        );
+
+        let nan = Value::Float(0.0_f64 / 0.0_f64);
+        let nan_eql = builtin_sxhash_eql(vec![nan.clone()]).unwrap();
+        let nan_equal = builtin_sxhash_equal(vec![nan.clone()]).unwrap();
+        assert_eq!(nan_eql, nan_equal);
+
+        for test_name in ["eql", "equal"] {
+            let table = builtin_make_hash_table(vec![
+                Value::keyword(":test"),
+                Value::symbol(test_name),
+            ])
+            .expect("hash table");
+            let _ = builtin_puthash(vec![Value::Float(0.0), Value::symbol("zero"), table.clone()])
+                .expect("puthash zero");
+            assert_eq!(
+                builtin_gethash(vec![Value::Float(-0.0), table.clone(), Value::symbol("miss")])
+                    .expect("gethash -0.0"),
+                Value::symbol("miss")
+            );
+
+            let _ = builtin_puthash(vec![nan.clone(), Value::symbol("nan"), table.clone()])
+                .expect("puthash nan");
+            assert_eq!(
+                builtin_gethash(vec![nan.clone(), table, Value::symbol("miss")])
+                    .expect("gethash nan"),
+                Value::symbol("nan")
+            );
+        }
     }
 
     #[test]
