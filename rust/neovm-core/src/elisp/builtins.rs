@@ -13774,7 +13774,6 @@ pub(crate) fn dispatch_builtin(
         "member" => builtin_member(args),
         "memq" => builtin_memq(args),
         "memql" => builtin_memql(args),
-        "assoc" => builtin_assoc(args),
         "assq" => builtin_assq(args),
         "copy-sequence" => builtin_copy_sequence(args),
         "purecopy" => builtin_purecopy(args),
@@ -15140,7 +15139,6 @@ pub(crate) fn dispatch_builtin_pure(name: &str, args: Vec<Value>) -> Option<Eval
         "elt" => builtin_elt(args),
         "memql" => builtin_memql(args),
         "nconc" => builtin_nconc(args),
-        "alist-get" => builtin_alist_get(args),
         "number-sequence" => builtin_number_sequence(args),
         // Output / misc
         "identity" => builtin_identity(args),
@@ -19413,6 +19411,9 @@ mod tests {
 
     #[test]
     fn dispatch_builtin_pure_defers_evaluator_window_accessors_and_mutators() {
+        assert!(dispatch_builtin_pure("assoc", vec![]).is_none());
+        assert!(dispatch_builtin_pure("alist-get", vec![]).is_none());
+        assert!(dispatch_builtin_pure("plist-member", vec![]).is_none());
         assert!(dispatch_builtin_pure("old-selected-window", vec![]).is_none());
         assert!(dispatch_builtin_pure("frame-old-selected-window", vec![]).is_none());
         assert!(dispatch_builtin_pure("set-frame-selected-window", vec![]).is_none());
