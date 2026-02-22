@@ -13762,6 +13762,18 @@ fn builtin_eventp(args: Vec<Value>) -> EvalResult {
     Ok(Value::bool(is_event))
 }
 
+/// `(timeout-event-p EVENT)` -> non-nil if EVENT is a timeout event form.
+///
+/// Emacs defines this as `(and (listp EVENT) (eq (car EVENT) 'timer-event))`.
+fn builtin_timeout_event_p(args: Vec<Value>) -> EvalResult {
+    expect_args("timeout-event-p", &args, 1)?;
+    let is_timeout_event = match &args[0] {
+        Value::Cons(cell) => cell.lock().expect("poisoned").car.as_symbol_name() == Some("timer-event"),
+        _ => false,
+    };
+    Ok(Value::bool(is_timeout_event))
+}
+
 /// `(event-modifiers EVENT)` -> list of event modifier symbols.
 fn builtin_event_modifiers(args: Vec<Value>) -> EvalResult {
     expect_args("event-modifiers", &args, 1)?;
@@ -16871,6 +16883,7 @@ pub(crate) fn dispatch_builtin(
         "event-basic-type" => builtin_event_basic_type(args),
         "event-apply-modifier" => builtin_event_apply_modifier(args),
         "eventp" => builtin_eventp(args),
+        "timeout-event-p" => builtin_timeout_event_p(args),
         "event-modifiers" => builtin_event_modifiers(args),
         "listify-key-sequence" => builtin_listify_key_sequence(args),
         "key-valid-p" => builtin_key_valid_p(args),
@@ -18057,6 +18070,7 @@ pub(crate) fn dispatch_builtin_pure(name: &str, args: Vec<Value>) -> Option<Eval
         "event-basic-type" => builtin_event_basic_type(args),
         "event-apply-modifier" => builtin_event_apply_modifier(args),
         "eventp" => builtin_eventp(args),
+        "timeout-event-p" => builtin_timeout_event_p(args),
         "event-modifiers" => builtin_event_modifiers(args),
         "listify-key-sequence" => builtin_listify_key_sequence(args),
         "key-valid-p" => builtin_key_valid_p(args),
@@ -25325,6 +25339,37 @@ mod tests {
                 );
             }
             other => panic!("expected signal, got: {other:?}"),
+        }
+    }
+
+    #[test]
+    fn timeout_event_p_matches_emacs_shape_and_arity() {
+        let timeout_event = Value::list(vec![Value::symbol("timer-event"), Value::Int(1)]);
+        let timeout = dispatch_builtin_pure("timeout-event-p", vec![timeout_event])
+            .expect("timeout-event-p should resolve")
+            .expect("timeout-event-p should evaluate");
+        assert_eq!(timeout, Value::True);
+
+        let not_timeout_event = Value::list(vec![Value::symbol("foo"), Value::Int(1)]);
+        let not_timeout = dispatch_builtin_pure("timeout-event-p", vec![not_timeout_event])
+            .expect("timeout-event-p should resolve")
+            .expect("timeout-event-p should evaluate");
+        assert!(not_timeout.is_nil());
+
+        let atom = dispatch_builtin_pure("timeout-event-p", vec![Value::symbol("timer-event")])
+            .expect("timeout-event-p should resolve")
+            .expect("timeout-event-p should evaluate");
+        assert!(atom.is_nil());
+
+        let arity = dispatch_builtin_pure(
+            "timeout-event-p",
+            vec![Value::Nil, Value::symbol("extra-arg")],
+        )
+        .expect("timeout-event-p should resolve")
+        .expect_err("timeout-event-p should reject extra args");
+        match arity {
+            Flow::Signal(sig) => assert_eq!(sig.symbol, "wrong-number-of-arguments"),
+            other => panic!("expected signal, got {other:?}"),
         }
     }
 

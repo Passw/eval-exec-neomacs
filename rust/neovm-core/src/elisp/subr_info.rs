@@ -1384,7 +1384,7 @@ fn subr_arity_value(name: &str) -> Value {
         "commandp" => arity_cons(1, Some(2)),
         "command-modes" => arity_cons(1, Some(1)),
         "command-remapping" => arity_cons(1, Some(3)),
-        "cancel-timer" | "timerp" => arity_cons(1, Some(1)),
+        "cancel-timer" | "timerp" | "timeout-event-p" => arity_cons(1, Some(1)),
         "run-at-time" | "run-with-timer" | "run-with-idle-timer" => arity_cons(3, None),
         "timer-activate" => arity_cons(1, Some(3)),
         "sleep-for" | "sit-for" => arity_cons(1, Some(2)),
@@ -2875,6 +2875,7 @@ mod tests {
         assert_subr_arity("commandp", 1, Some(2));
         assert_subr_arity("cancel-timer", 1, Some(1));
         assert_subr_arity("timerp", 1, Some(1));
+        assert_subr_arity("timeout-event-p", 1, Some(1));
         assert_subr_arity("run-at-time", 3, None);
         assert_subr_arity("run-with-timer", 3, None);
         assert_subr_arity("run-with-idle-timer", 3, None);

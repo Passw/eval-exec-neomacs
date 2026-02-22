@@ -1465,6 +1465,7 @@ const DISPATCH_BUILTIN_NAMES: &[&str] = &[
     "time-subtract",
     "timer-activate",
     "timerp",
+    "timeout-event-p",
     "tool-bar-height",
     "tool-bar-get-system-style",
     "tool-bar-pixel-width",
