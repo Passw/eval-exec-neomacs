@@ -11,7 +11,7 @@ fn print_special_handle(value: &Value) -> Option<String> {
 fn format_frame_handle(id: u64) -> String {
     if id >= crate::window::FRAME_ID_BASE {
         let ordinal = id - crate::window::FRAME_ID_BASE + 1;
-        format!("#<frame F{}>", ordinal)
+        format!("#<frame F{} 0x{:x}>", ordinal, id)
     } else {
         format!("#<frame {}>", id)
     }
@@ -550,10 +550,10 @@ mod tests {
         let f2 = Value::Frame(crate::window::FRAME_ID_BASE + 1);
         let legacy = Value::Frame(7);
 
-        assert_eq!(print_value(&f1), "#<frame F1>");
-        assert_eq!(print_value_bytes(&f1), b"#<frame F1>");
-        assert_eq!(print_value(&f2), "#<frame F2>");
-        assert_eq!(print_value_bytes(&f2), b"#<frame F2>");
+        assert_eq!(print_value(&f1), "#<frame F1 0x100000000>");
+        assert_eq!(print_value_bytes(&f1), b"#<frame F1 0x100000000>");
+        assert_eq!(print_value(&f2), "#<frame F2 0x100000001>");
+        assert_eq!(print_value_bytes(&f2), b"#<frame F2 0x100000001>");
         assert_eq!(print_value(&legacy), "#<frame 7>");
     }
 }

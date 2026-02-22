@@ -19375,6 +19375,21 @@ Last updated: 2026-02-21
       - `(message \"%s\" (selected-window))` contains `on *scratch*>`
       - `(format-message \"%S\" (selected-window))` contains `on *scratch*>`
 
+- Refined frame handle print shape toward oracle by including `0x...` tail segment:
+  - runtime changes:
+    - `rust/neovm-core/src/elisp/print.rs`
+      - frame handles now render as `#<frame FN 0x...>` for runtime frame-domain ids.
+      - byte printer now mirrors the same shape.
+      - updated unit coverage:
+        - `print_frame_handles_use_oracle_style_f_prefix`
+  - vm-compat corpus changes:
+    - updated:
+      - `test/neovm/vm-compat/cases/frame-handle-f-prefix-semantics.forms`
+      - `test/neovm/vm-compat/cases/frame-handle-f-prefix-semantics.expected.tsv`
+    - strengthened lock-ins:
+      - `(format \"%S\" (selected-frame))` matches `^#<frame F[0-9]+ 0x[0-9a-f]+>$`
+      - same shape for frame values extracted from monitor alists
+
 - Continue compatibility-first maintenance with small commit slices:
   - keep builtin surface and registry in lock-step
   - run oracle/parity checks after each behavior-affecting change
