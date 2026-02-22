@@ -940,7 +940,7 @@ fn extract_car_string(_name: &str, val: &Value) -> Result<String, Flow> {
 pub(crate) fn builtin_system_users(args: Vec<Value>) -> EvalResult {
     expect_range_args("system-users", &args, 0, 0)?;
 
-    let mut users = read_colon_file_names("/etc/passwd");
+    let mut users = read_colon_file_names(&system_users_passwd_path());
     if users.is_empty() {
         let fallback_user = std::env::var("USER")
             .or_else(|_| std::env::var("LOGNAME"))
@@ -959,7 +959,7 @@ pub(crate) fn builtin_system_users(args: Vec<Value>) -> EvalResult {
 /// Reads `/etc/group` and returns group names in oracle-compatible order.
 pub(crate) fn builtin_system_groups(args: Vec<Value>) -> EvalResult {
     expect_range_args("system-groups", &args, 0, 0)?;
-    let groups = read_colon_file_names("/etc/group");
+    let groups = read_colon_file_names(&system_groups_path());
     if groups.is_empty() {
         return Ok(Value::Nil);
     }
@@ -985,6 +985,14 @@ fn parse_colon_file_names(contents: &str) -> Vec<String> {
     // Emacs' output order matches reverse file order.
     names.reverse();
     names
+}
+
+fn system_users_passwd_path() -> String {
+    std::env::var("NEOVM_PASSWD_PATH").unwrap_or_else(|_| "/etc/passwd".to_string())
+}
+
+fn system_groups_path() -> String {
+    std::env::var("NEOVM_GROUP_PATH").unwrap_or_else(|_| "/etc/group".to_string())
 }
 
 fn read_colon_file_names(path: &str) -> Vec<String> {
@@ -1602,11 +1610,45 @@ mod tests {
     }
 
     #[test]
+    fn test_system_groups_respects_override_path() {
+        let dir = std::env::temp_dir().join("neovm_group_override");
+        let _ = fs::remove_dir_all(&dir);
+        fs::create_dir_all(&dir).unwrap();
+        let file = dir.join("group");
+        fs::write(&file, "tmpgroup:x:0:\n").unwrap();
+        std::env::set_var("NEOVM_GROUP_PATH", &file);
+        let result = builtin_system_groups(vec![]).unwrap();
+        let names = list_to_vec(&result).unwrap();
+        assert_eq!(names, vec![Value::string("tmpgroup")]);
+        std::env::remove_var("NEOVM_GROUP_PATH");
+        let _ = fs::remove_dir_all(&dir);
+    }
+
+    #[test]
     fn test_system_groups() {
         let result = builtin_system_groups(vec![]).unwrap();
         let items = list_to_vec(&result).unwrap();
         assert!(!items.is_empty());
         assert!(items[0].is_string());
+    }
+
+    #[test]
+    fn test_system_users_respects_override_path() {
+        let dir = std::env::temp_dir().join("neovm_passwd_override");
+        let _ = fs::remove_dir_all(&dir);
+        fs::create_dir_all(&dir).unwrap();
+        let file = dir.join("passwd");
+        fs::write(
+            &file,
+            "tmpuser:x:0:0::/tmp:/bin/sh\n",
+        )
+        .unwrap();
+        std::env::set_var("NEOVM_PASSWD_PATH", &file);
+        let result = builtin_system_users(vec![]).unwrap();
+        let names = list_to_vec(&result).unwrap();
+        assert_eq!(names, vec![Value::string("tmpuser")]);
+        std::env::remove_var("NEOVM_PASSWD_PATH");
+        let _ = fs::remove_dir_all(&dir);
     }
 
     #[test]
