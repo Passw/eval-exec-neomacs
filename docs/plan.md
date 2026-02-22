@@ -19853,6 +19853,21 @@ Last updated: 2026-02-21
         - `(wrong-number-of-arguments x-get-resource 1)`
         - `(wrong-number-of-arguments x-get-resource 5)`
 
+- Added dedicated `x-family-fonts` designator/structure lock-ins:
+  - vm-compat corpus changes:
+    - added:
+      - `test/neovm/vm-compat/cases/x-family-fonts-designator-structure-semantics.forms`
+      - `test/neovm/vm-compat/cases/x-family-fonts-designator-structure-semantics.expected.tsv`
+    - wired case into:
+      - `test/neovm/vm-compat/cases/default.list`
+    - lock-ins assert:
+      - no-arg and optional-frame calls preserve `nil` return in batch/no-X mode
+      - non-string FAMILY payloads preserve `wrong-type-argument` + `stringp`
+      - non-frame FRAME designators preserve `wrong-type-argument` + `frame-live-p`
+      - terminal/live-window/dead-window designator structures remain stable via predicate checks
+      - over-arity payload remains exact:
+        - `(wrong-number-of-arguments x-family-fonts 3)`
+
 - Continue compatibility-first maintenance with small commit slices:
   - keep builtin surface and registry in lock-step
   - run oracle/parity checks after each behavior-affecting change

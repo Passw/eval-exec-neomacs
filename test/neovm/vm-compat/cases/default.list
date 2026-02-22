@@ -500,6 +500,7 @@ cases/x-selection-property-tip-internal-semantics
 cases/x-backspace-delete-keys-designator-structure-semantics
 cases/x-get-atom-name-designator-structure-semantics
 cases/x-get-resource-arity-payload-semantics
+cases/x-family-fonts-designator-structure-semantics
 cases/x-selection-resource-property-semantics
 cases/display-monitor-semantics
 cases/display-monitor-frames-semantics
