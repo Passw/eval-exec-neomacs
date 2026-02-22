@@ -19513,6 +19513,18 @@ Last updated: 2026-02-21
       - `display-backing-store`, `display-images-p`
       - payload must include `#<window N>` and `get-device-terminal`, and must not include live-window buffer context (` on `)
 
+- Added dedicated `x-display` dead-window payload lock-ins for alias and type-error paths:
+  - vm-compat corpus changes:
+    - added:
+      - `test/neovm/vm-compat/cases/x-display-dead-window-error-payload-semantics.forms`
+      - `test/neovm/vm-compat/cases/x-display-dead-window-error-payload-semantics.expected.tsv`
+    - wired case into:
+      - `test/neovm/vm-compat/cases/default.list`
+    - lock-ins cover dead-window designators for:
+      - `x-display-color-p` and `display-color-p` alias path (`get-device-terminal`)
+      - `x-display-pixel-width`, `x-display-pixel-height`, `x-close-connection` type-error path (`frame-live-p`)
+      - all payloads keep compact `#<window N>` rendering and explicitly avoid live-window buffer context (` on `)
+
 - Continue compatibility-first maintenance with small commit slices:
   - keep builtin surface and registry in lock-step
   - run oracle/parity checks after each behavior-affecting change
