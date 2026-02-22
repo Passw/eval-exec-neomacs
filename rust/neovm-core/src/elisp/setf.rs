@@ -1445,6 +1445,36 @@ mod tests {
         assert_eq!(format!("{}", result), "(2 2 t t a b)");
     }
 
+    #[test]
+    fn maphash_eq_pointer_key_writeback_updates_bucket_keys() {
+        let mut ev = make_ev();
+        let forms = parse_forms(
+            r#"(let* ((ht (make-hash-table :test 'eq :size 5))
+                      (a (copy-sequence "x"))
+                      (b (copy-sequence "x")))
+                 (puthash a 'a ht)
+                 (puthash b 'b ht)
+                 (let ((cp (copy-hash-table ht)))
+                   (maphash
+                    (lambda (k _v)
+                      (when (stringp k)
+                        (aset k 0 ?y)))
+                    cp)
+                   (let* ((entries (apply #'append (internal--hash-table-buckets cp)))
+                          (keys (mapcar #'car entries)))
+                     (list (hash-table-count cp)
+                           (length entries)
+                           (not (memq nil keys))
+                           (equal '("y" "y")
+                                  (sort (mapcar #'copy-sequence keys) #'string<))
+                           (gethash a cp 'miss)
+                           (gethash b cp 'miss)))))"#,
+        )
+        .unwrap();
+        let result = ev.eval_expr(&forms[0]).unwrap();
+        assert_eq!(format!("{}", result), "(2 2 t t a b)");
+    }
+
     // -----------------------------------------------------------------------
     // Mixed int/float for incf/decf
     // -----------------------------------------------------------------------

@@ -872,6 +872,13 @@ impl<'a> Vm<'a> {
                         if let Some(existing) = guard.data.remove(&HashKey::Ptr(old_ptr)) {
                             guard.data.insert(HashKey::Ptr(new_ptr), existing);
                         }
+                        if guard
+                            .key_snapshots
+                            .remove(&HashKey::Ptr(old_ptr))
+                            .is_some()
+                        {
+                            guard.key_snapshots.insert(HashKey::Ptr(new_ptr), to.clone());
+                        }
                     }
                 }
                 for item in guard.data.values_mut() {

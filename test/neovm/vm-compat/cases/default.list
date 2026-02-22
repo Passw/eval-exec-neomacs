@@ -871,6 +871,7 @@ cases/hash-sxhash-float-exact-semantics
 cases/hash-table-buckets-diagnostic-semantics
 cases/hash-table-buckets-eq-pointer-semantics
 cases/hash-table-buckets-eq-pointer-key-shape-semantics
+cases/hash-table-buckets-eq-pointer-maphash-writeback-semantics
 cases/hash-table-buckets-eq-pointer-setf-semantics
 cases/hash-table-buckets-float-special-semantics
 cases/hash-table-nan-payload-distinct-semantics
