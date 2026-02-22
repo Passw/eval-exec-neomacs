@@ -1837,6 +1837,7 @@ const DISPATCH_BUILTIN_NAMES: &[&str] = &[
     "integer-or-null-p",
     "integerp",
     "keywordp",
+    "list-of-strings-p",
     "listp",
     "make-hash-table",
     "make-vector",

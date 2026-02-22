@@ -609,6 +609,29 @@ pub(crate) fn builtin_listp(args: Vec<Value>) -> EvalResult {
     Ok(Value::bool(args[0].is_list()))
 }
 
+pub(crate) fn builtin_list_of_strings_p(args: Vec<Value>) -> EvalResult {
+    expect_args("list-of-strings-p", &args, 1)?;
+    let mut seen = HashSet::new();
+    let mut cursor = args[0].clone();
+    loop {
+        match cursor {
+            Value::Nil => return Ok(Value::True),
+            Value::Cons(cell) => {
+                let ptr = std::sync::Arc::as_ptr(&cell) as usize;
+                if !seen.insert(ptr) {
+                    return Ok(Value::Nil);
+                }
+                let pair = cell.lock().expect("poisoned");
+                if !pair.car.is_string() {
+                    return Ok(Value::Nil);
+                }
+                cursor = pair.cdr.clone();
+            }
+            _ => return Ok(Value::Nil),
+        }
+    }
+}
+
 pub(crate) fn builtin_nlistp(args: Vec<Value>) -> EvalResult {
     expect_args("nlistp", &args, 1)?;
     Ok(Value::bool(!args[0].is_list()))
@@ -14138,6 +14161,8 @@ enum PureBuiltinId {
     Consp,
     #[strum(serialize = "listp")]
     Listp,
+    #[strum(serialize = "list-of-strings-p")]
+    ListOfStringsp,
     #[strum(serialize = "nlistp")]
     NListp,
     #[strum(serialize = "symbolp")]
@@ -14440,6 +14465,7 @@ fn dispatch_builtin_id_pure(id: PureBuiltinId, args: Vec<Value>) -> EvalResult {
         PureBuiltinId::Atom => builtin_atom(args),
         PureBuiltinId::Consp => builtin_consp(args),
         PureBuiltinId::Listp => builtin_listp(args),
+        PureBuiltinId::ListOfStringsp => builtin_list_of_strings_p(args),
         PureBuiltinId::NListp => builtin_nlistp(args),
         PureBuiltinId::Symbolp => builtin_symbolp(args),
         PureBuiltinId::Booleanp => builtin_booleanp(args),
