@@ -1247,6 +1247,38 @@ mod tests {
         );
     }
 
+    #[test]
+    fn pcase_pred_pattern_binder_and_dolist_behavior_matches_oracle() {
+        assert_eq!(
+            eval_last("(condition-case err (pcase-let (((pred) 1)) 'ok) (error err))"),
+            "OK (void-function nil)"
+        );
+        assert_eq!(
+            eval_last("(condition-case err (pcase-let (((pred integerp 2 3) 1)) 'ok) (error err))"),
+            "OK ok"
+        );
+        assert_eq!(
+            eval_last("(condition-case err (pcase-let* (((pred) 1)) 'ok) (error err))"),
+            "OK (void-function nil)"
+        );
+        assert_eq!(
+            eval_last("(condition-case err (pcase-let* (((pred integerp 2 3) 1)) 'ok) (error err))"),
+            "OK ok"
+        );
+        assert_eq!(
+            eval_last(
+                "(condition-case err (let ((acc nil)) (pcase-dolist ((pred) '(1 2)) (push 1 acc)) (nreverse acc)) (error err))"
+            ),
+            "OK (void-function nil)"
+        );
+        assert_eq!(
+            eval_last(
+                "(condition-case err (let ((acc nil)) (pcase-dolist ((pred integerp 2 3) '(1 2)) (push 1 acc)) (nreverse acc)) (error err))"
+            ),
+            "OK (1 1)"
+        );
+    }
+
     // =======================================================================
     // 9. guard pattern
     // =======================================================================
@@ -1280,6 +1312,38 @@ mod tests {
         assert_eq!(
             eval_last("(pcase 1 ((guard t 2) 'x) (_ 'y))"),
             "OK x"
+        );
+    }
+
+    #[test]
+    fn pcase_guard_pattern_binder_and_dolist_behavior_matches_oracle() {
+        assert_eq!(
+            eval_last("(condition-case err (pcase-let (((guard) 1)) 'ok) (error err))"),
+            "OK ok"
+        );
+        assert_eq!(
+            eval_last("(condition-case err (pcase-let (((guard t 2) 1)) 'ok) (error err))"),
+            "OK ok"
+        );
+        assert_eq!(
+            eval_last("(condition-case err (pcase-let* (((guard) 1)) 'ok) (error err))"),
+            "OK ok"
+        );
+        assert_eq!(
+            eval_last("(condition-case err (pcase-let* (((guard t 2) 1)) 'ok) (error err))"),
+            "OK ok"
+        );
+        assert_eq!(
+            eval_last(
+                "(condition-case err (let ((acc nil)) (pcase-dolist ((guard) '(1 2)) (push 1 acc)) (nreverse acc)) (error err))"
+            ),
+            "OK (1 1)"
+        );
+        assert_eq!(
+            eval_last(
+                "(condition-case err (let ((acc nil)) (pcase-dolist ((guard t 2) '(1 2)) (push 1 acc)) (nreverse acc)) (error err))"
+            ),
+            "OK (1 1)"
         );
     }
 

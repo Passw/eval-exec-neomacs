@@ -52,3 +52,15 @@
 52	(condition-case err (let ((acc nil)) (pcase-dolist ((or 1) '(1 2)) (push 1 acc)) (nreverse acc)) (error err))	OK (error "Please avoid it")
 53	(condition-case err (let ((acc nil)) (pcase-dolist ((or 1 2) '(1 2 3)) (push 1 acc)) (nreverse acc)) (error err))	OK (1 1 1)
 54	(condition-case err (let ((acc nil)) (pcase-dolist ((and) '(1 2)) (push 1 acc)) (nreverse acc)) (error err))	OK (1 1)
+55	(condition-case err (pcase-let (((guard) 1)) 'ok) (error err))	OK ok
+56	(condition-case err (pcase-let (((guard t 2) 1)) 'ok) (error err))	OK ok
+57	(condition-case err (pcase-let* (((guard) 1)) 'ok) (error err))	OK ok
+58	(condition-case err (pcase-let* (((guard t 2) 1)) 'ok) (error err))	OK ok
+59	(condition-case err (let ((acc nil)) (pcase-dolist ((guard) '(1 2)) (push 1 acc)) (nreverse acc)) (error err))	OK (1 1)
+60	(condition-case err (let ((acc nil)) (pcase-dolist ((guard t 2) '(1 2)) (push 1 acc)) (nreverse acc)) (error err))	OK (1 1)
+61	(condition-case err (pcase-let (((pred) 1)) 'ok) (error err))	OK (void-function nil)
+62	(condition-case err (pcase-let (((pred integerp 2 3) 1)) 'ok) (error err))	OK ok
+63	(condition-case err (pcase-let* (((pred) 1)) 'ok) (error err))	OK (void-function nil)
+64	(condition-case err (pcase-let* (((pred integerp 2 3) 1)) 'ok) (error err))	OK ok
+65	(condition-case err (let ((acc nil)) (pcase-dolist ((pred) '(1 2)) (push 1 acc)) (nreverse acc)) (error err))	OK (void-function nil)
+66	(condition-case err (let ((acc nil)) (pcase-dolist ((pred integerp 2 3) '(1 2)) (push 1 acc)) (nreverse acc)) (error err))	OK (1 1)

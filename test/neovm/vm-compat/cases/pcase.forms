@@ -67,3 +67,17 @@
 (condition-case err (let ((acc nil)) (pcase-dolist ((or 1) '(1 2)) (push 1 acc)) (nreverse acc)) (error err))
 (condition-case err (let ((acc nil)) (pcase-dolist ((or 1 2) '(1 2 3)) (push 1 acc)) (nreverse acc)) (error err))
 (condition-case err (let ((acc nil)) (pcase-dolist ((and) '(1 2)) (push 1 acc)) (nreverse acc)) (error err))
+
+; pred/guard behavior in pcase-let and pcase-dolist
+(condition-case err (pcase-let (((guard) 1)) 'ok) (error err))
+(condition-case err (pcase-let (((guard t 2) 1)) 'ok) (error err))
+(condition-case err (pcase-let* (((guard) 1)) 'ok) (error err))
+(condition-case err (pcase-let* (((guard t 2) 1)) 'ok) (error err))
+(condition-case err (let ((acc nil)) (pcase-dolist ((guard) '(1 2)) (push 1 acc)) (nreverse acc)) (error err))
+(condition-case err (let ((acc nil)) (pcase-dolist ((guard t 2) '(1 2)) (push 1 acc)) (nreverse acc)) (error err))
+(condition-case err (pcase-let (((pred) 1)) 'ok) (error err))
+(condition-case err (pcase-let (((pred integerp 2 3) 1)) 'ok) (error err))
+(condition-case err (pcase-let* (((pred) 1)) 'ok) (error err))
+(condition-case err (pcase-let* (((pred integerp 2 3) 1)) 'ok) (error err))
+(condition-case err (let ((acc nil)) (pcase-dolist ((pred) '(1 2)) (push 1 acc)) (nreverse acc)) (error err))
+(condition-case err (let ((acc nil)) (pcase-dolist ((pred integerp 2 3) '(1 2)) (push 1 acc)) (nreverse acc)) (error err))
