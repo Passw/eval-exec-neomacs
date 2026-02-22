@@ -19593,6 +19593,20 @@ Last updated: 2026-02-21
       - symbol (`'foo`), vector (`[foo]`), list (`'(foo)`), cons (`'(foo . bar)`)
       - covered functions: `x-display-pixel-width`, `x-display-pixel-height`
 
+- Added remaining `x-display` query designator type matrix lock-ins:
+  - vm-compat corpus changes:
+    - added:
+      - `test/neovm/vm-compat/cases/x-display-query-designator-type-matrix-semantics.forms`
+      - `test/neovm/vm-compat/cases/x-display-query-designator-type-matrix-semantics.expected.tsv`
+    - wired case into:
+      - `test/neovm/vm-compat/cases/default.list`
+    - matrix locks strict `frame-live-p` predicates across non-frame designators:
+      - symbol (`'foo`), vector (`[foo]`), list (`'(foo)`), cons (`'(foo . bar)`)
+      - covered functions:
+        - `x-display-backing-store`, `x-display-color-cells`, `x-display-mm-height`, `x-display-mm-width`
+        - `x-display-monitor-attributes-list`, `x-display-planes`, `x-display-save-under`, `x-display-screens`
+        - `x-display-visual-class`, `x-server-input-extension-version`, `x-server-vendor`
+
 - Continue compatibility-first maintenance with small commit slices:
   - keep builtin surface and registry in lock-step
   - run oracle/parity checks after each behavior-affecting change
