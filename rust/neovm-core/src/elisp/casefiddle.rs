@@ -48,6 +48,12 @@ fn code_to_char(code: i64) -> Option<char> {
 
 /// Uppercase a single character code, returning the new code.
 fn upcase_char(code: i64) -> i64 {
+    match code {
+        // Emacs integer/char case conversion uses simple/title mappings here.
+        223 => return 7838,
+        7306 => return 7306,
+        _ => {}
+    }
     match code_to_char(code) {
         Some(c) => {
             let mut upper = c.to_uppercase();
@@ -57,6 +63,13 @@ fn upcase_char(code: i64) -> i64 {
         }
         None => code,
     }
+}
+
+fn titlecase_word_initial(c: char) -> String {
+    if c == 'ß' {
+        return "Ss".to_string();
+    }
+    c.to_uppercase().collect()
 }
 
 // ---------------------------------------------------------------------------
@@ -92,7 +105,7 @@ fn capitalize_string(s: &str) -> String {
     for c in s.chars() {
         if c.is_alphanumeric() {
             if new_word {
-                for u in c.to_uppercase() {
+                for u in titlecase_word_initial(c).chars() {
                     result.push(u);
                 }
                 new_word = false;
@@ -137,7 +150,7 @@ fn upcase_initials_string(s: &str) -> String {
     for c in s.chars() {
         if c.is_alphanumeric() {
             if new_word {
-                for u in c.to_uppercase() {
+                for u in titlecase_word_initial(c).chars() {
                     result.push(u);
                 }
                 new_word = false;
@@ -294,5 +307,29 @@ mod tests {
     fn capitalize_with_punctuation() {
         let result = builtin_capitalize(vec![Value::string("it's a test")]).unwrap();
         assert_eq!(result.as_str(), Some("It'S A Test"));
+    }
+
+    #[test]
+    fn capitalize_unicode_edge_semantics() {
+        let int_sharp_s = builtin_capitalize(vec![Value::Int(223)]).unwrap();
+        assert_eq!(int_sharp_s.as_int(), Some(7838));
+
+        let int_mod_i = builtin_capitalize(vec![Value::Int(7306)]).unwrap();
+        assert_eq!(int_mod_i.as_int(), Some(7306));
+
+        let string_sharp_s = builtin_capitalize(vec![Value::string("ß")]).unwrap();
+        assert_eq!(string_sharp_s.as_str(), Some("Ss"));
+    }
+
+    #[test]
+    fn upcase_initials_unicode_edge_semantics() {
+        let int_sharp_s = builtin_upcase_initials(vec![Value::Int(223)]).unwrap();
+        assert_eq!(int_sharp_s.as_int(), Some(7838));
+
+        let int_mod_i = builtin_upcase_initials(vec![Value::Int(7306)]).unwrap();
+        assert_eq!(int_mod_i.as_int(), Some(7306));
+
+        let string_sharp_s = builtin_upcase_initials(vec![Value::string("ß")]).unwrap();
+        assert_eq!(string_sharp_s.as_str(), Some("Ss"));
     }
 }

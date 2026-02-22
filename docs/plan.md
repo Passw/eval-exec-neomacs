@@ -28,6 +28,26 @@ Last updated: 2026-02-22
 
 ## Doing
 
+- Aligned Unicode edge behavior for `capitalize` / `upcase-initials` (`casefiddle`):
+  - runtime changes:
+    - `rust/neovm-core/src/elisp/casefiddle.rs`
+      - integer/char upcase helper now mirrors oracle on key edge points:
+        - `223 -> 7838`
+        - `7306 -> 7306` (preserved)
+      - word-initial titlecase now emits `"Ss"` for `"ß"` in string paths.
+      - added unit coverage:
+        - `capitalize_unicode_edge_semantics`
+        - `upcase_initials_unicode_edge_semantics`
+  - vm-compat corpus changes:
+    - added and wired:
+      - `test/neovm/vm-compat/cases/casefiddle-unicode-edge-semantics.forms`
+      - `test/neovm/vm-compat/cases/casefiddle-unicode-edge-semantics.expected.tsv`
+      - `test/neovm/vm-compat/cases/default.list`
+  - verified:
+    - `cargo test --manifest-path rust/neovm-core/Cargo.toml unicode_edge_semantics -- --nocapture` (pass)
+    - `make -C test/neovm/vm-compat record FORMS=cases/casefiddle-unicode-edge-semantics.forms EXPECTED=cases/casefiddle-unicode-edge-semantics.expected.tsv` (pass)
+    - `make -C test/neovm/vm-compat check-one-neovm CASE=cases/casefiddle-unicode-edge-semantics` (pass)
+
 - Aligned Unicode edge behavior for string `upcase` / `downcase`:
   - runtime changes:
     - `rust/neovm-core/src/elisp/builtins.rs`

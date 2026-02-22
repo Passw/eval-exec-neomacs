@@ -1,0 +1,12 @@
+;; Lock-in: Unicode edge behavior for `capitalize` and `upcase-initials`.
+(list
+ (list 'capitalize-int-223 (capitalize 223))
+ (list 'capitalize-int-305 (capitalize 305))
+ (list 'capitalize-int-7306 (capitalize 7306))
+ (list 'capitalize-string-sharp-s (capitalize "ß"))
+ (list 'capitalize-string-dotless-i (capitalize "ı"))
+ (list 'upcase-initials-int-223 (upcase-initials 223))
+ (list 'upcase-initials-int-305 (upcase-initials 305))
+ (list 'upcase-initials-int-7306 (upcase-initials 7306))
+ (list 'upcase-initials-string-sharp-s (upcase-initials "ß"))
+ (list 'upcase-initials-string-dotless-i (upcase-initials "ı")))
