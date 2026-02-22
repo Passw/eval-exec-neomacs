@@ -467,6 +467,7 @@ cases/x-display-pixel-window-error-structure-semantics
 cases/x-display-dead-window-error-payload-semantics
 cases/x-server-window-error-structure-semantics
 cases/x-server-dead-window-error-payload-semantics
+cases/x-server-designator-type-matrix-semantics
 cases/x-server-message-payload-semantics
 cases/x-open-close-window-error-structure-semantics
 cases/x-open-close-dead-window-error-payload-semantics

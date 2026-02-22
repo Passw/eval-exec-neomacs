@@ -19560,6 +19560,17 @@ Last updated: 2026-02-21
       - `x-open-connection` keeps `(wrong-type-argument stringp VALUE)`
       - `x-close-connection` keeps `(wrong-type-argument frame-live-p VALUE)`
 
+- Added `x-server` non-frame designator type matrix lock-ins:
+  - vm-compat corpus changes:
+    - added:
+      - `test/neovm/vm-compat/cases/x-server-designator-type-matrix-semantics.forms`
+      - `test/neovm/vm-compat/cases/x-server-designator-type-matrix-semantics.expected.tsv`
+    - wired case into:
+      - `test/neovm/vm-compat/cases/default.list`
+    - matrix locks strict `frame-live-p` predicates across non-frame designators:
+      - symbol (`'foo`), vector (`[foo]`), list (`'(foo)`), cons (`'(foo . bar)`)
+      - covered functions: `x-server-version`, `x-server-max-request-size`, `x-display-grayscale-p`
+
 - Continue compatibility-first maintenance with small commit slices:
   - keep builtin surface and registry in lock-step
   - run oracle/parity checks after each behavior-affecting change
