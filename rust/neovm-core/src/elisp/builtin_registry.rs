@@ -482,6 +482,7 @@ const DISPATCH_BUILTIN_NAMES: &[&str] = &[
     "file-name-case-insensitive-p",
     "file-modes",
     "file-name-nondirectory",
+    "file-remote-p",
     "file-name-sans-extension",
     "file-newer-than-file-p",
     "file-readable-p",

@@ -373,6 +373,7 @@ fn subr_arity_value(name: &str) -> Value {
         "file-name-completion" => arity_cons(2, Some(3)),
         "file-name-extension" => arity_cons(1, Some(2)),
         "file-name-concat" => arity_cons(1, None),
+        "file-remote-p" => arity_cons(1, Some(3)),
         "file-truename" => arity_cons(1, Some(3)),
         "get-truename-buffer" | "unhandled-file-name-directory" => arity_cons(1, Some(1)),
         "find-buffer" => arity_cons(2, Some(2)),
@@ -3399,6 +3400,7 @@ mod tests {
         assert_subr_arity("file-name-directory", 1, Some(1));
         assert_subr_arity("file-name-extension", 1, Some(2));
         assert_subr_arity("file-name-nondirectory", 1, Some(1));
+        assert_subr_arity("file-remote-p", 1, Some(3));
         assert_subr_arity("file-name-sans-extension", 1, Some(1));
         assert_subr_arity("file-truename", 1, Some(3));
         assert_subr_arity("get-truename-buffer", 1, Some(1));
