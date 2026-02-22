@@ -15065,6 +15065,7 @@ pub(crate) fn dispatch_builtin_pure(name: &str, args: Vec<Value>) -> Option<Eval
         "functionp"
         | "format"
         | "format-message"
+        | "error"
         | "indirect-variable"
         | "macroexpand"
         | "message"
@@ -15153,7 +15154,6 @@ pub(crate) fn dispatch_builtin_pure(name: &str, args: Vec<Value>) -> Option<Eval
         "current-message" => builtin_current_message(args),
         "ngettext" => builtin_ngettext(args),
         "secure-hash-algorithms" => builtin_secure_hash_algorithms(args),
-        "error" => builtin_error(args),
         "prefix-numeric-value" => builtin_prefix_numeric_value(args),
         "propertize" => builtin_propertize(args),
         "gensym" => builtin_gensym(args),
@@ -19413,6 +19413,7 @@ mod tests {
         assert!(dispatch_builtin_pure("message", vec![]).is_none());
         assert!(dispatch_builtin_pure("message-box", vec![]).is_none());
         assert!(dispatch_builtin_pure("message-or-box", vec![]).is_none());
+        assert!(dispatch_builtin_pure("error", vec![]).is_none());
         assert!(dispatch_builtin_pure("princ", vec![]).is_none());
         assert!(dispatch_builtin_pure("prin1", vec![]).is_none());
         assert!(dispatch_builtin_pure("prin1-to-string", vec![]).is_none());
