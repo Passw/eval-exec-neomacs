@@ -64,6 +64,19 @@ fn expect_int(value: &Value) -> Result<i64, Flow> {
     }
 }
 
+/// Extract a numeric value from a Value.
+fn expect_number(value: &Value) -> Result<f64, Flow> {
+    match value {
+        Value::Int(n) => Ok(*n as f64),
+        Value::Float(n) => Ok(*n),
+        Value::Char(c) => Ok(*c as i64 as f64),
+        other => Err(signal(
+            "wrong-type-argument",
+            vec![Value::symbol("numberp"), other.clone()],
+        )),
+    }
+}
+
 #[derive(Clone, Debug)]
 enum IntegerOrMarkerArg {
     Int(i64),
@@ -2459,6 +2472,43 @@ pub(crate) fn builtin_window_live_p(
     Ok(Value::bool(live))
 }
 
+/// `(window-at X Y &optional FRAME)` -> window object or nil.
+pub(crate) fn builtin_window_at(
+    eval: &mut super::eval::Evaluator,
+    args: Vec<Value>,
+) -> EvalResult {
+    expect_min_args("window-at", &args, 2)?;
+    expect_max_args("window-at", &args, 3)?;
+    let x = expect_number(&args[0])?;
+    let y = expect_number(&args[1])?;
+    let fid = resolve_frame_id(eval, args.get(2), "frame-live-p")?;
+    let frame = eval
+        .frames
+        .get(fid)
+        .ok_or_else(|| signal("error", vec![Value::string("Frame not found")]))?;
+    let total_cols = frame_total_cols(frame) as f64;
+    let total_lines = frame_total_lines(frame) as f64;
+    if x < 0.0 || y < 0.0 || x >= total_cols || y >= total_lines {
+        return Ok(Value::Nil);
+    }
+
+    let px = (x * frame.char_width as f64) as f32;
+    let py = (y * frame.char_height as f64) as f32;
+    if let Some(wid) = frame.window_at(px, py) {
+        return Ok(window_value(wid));
+    }
+
+    if let (Some(minibuffer_wid), Some(minibuffer_leaf)) =
+        (frame.minibuffer_window, frame.minibuffer_leaf.as_ref())
+    {
+        if minibuffer_leaf.bounds().contains(px, py) {
+            return Ok(window_value(minibuffer_wid));
+        }
+    }
+
+    Ok(Value::Nil)
+}
+
 // ===========================================================================
 // Window manipulation
 // ===========================================================================
@@ -4021,6 +4071,51 @@ mod tests {
             out[25],
             "OK (wrong-number-of-arguments minibuffer-window-active-p 2)"
         );
+    }
+
+    #[test]
+    fn window_at_matches_batch_coordinate_and_error_semantics() {
+        let forms = parse_forms(
+            "(windowp (window-at 0 0))
+             (windowp (window-at 79 0))
+             (null (window-at 80 0))
+             (windowp (window-at 0 23))
+             (let ((w (window-at 0 24))) (and w (window-minibuffer-p w)))
+             (null (window-at 0 25))
+             (null (window-at -1 0))
+             (null (window-at 0 -1))
+             (windowp (window-at 79.9 0))
+             (null (window-at 80.0 0))
+             (windowp (window-at 0 24.1))
+             (condition-case err (window-at 'foo 0) (error err))
+             (condition-case err (window-at 0 'foo) (error err))
+             (condition-case err (window-at 0 0 999999) (error err))
+             (condition-case err (window-at 0) (error (car err)))
+             (condition-case err (window-at 0 0 nil nil) (error (car err)))",
+        )
+        .expect("parse");
+        let mut ev = Evaluator::new();
+        let out = ev
+            .eval_forms(&forms)
+            .iter()
+            .map(format_eval_result)
+            .collect::<Vec<_>>();
+        assert_eq!(out[0], "OK t");
+        assert_eq!(out[1], "OK t");
+        assert_eq!(out[2], "OK t");
+        assert_eq!(out[3], "OK t");
+        assert_eq!(out[4], "OK t");
+        assert_eq!(out[5], "OK t");
+        assert_eq!(out[6], "OK t");
+        assert_eq!(out[7], "OK t");
+        assert_eq!(out[8], "OK t");
+        assert_eq!(out[9], "OK t");
+        assert_eq!(out[10], "OK t");
+        assert_eq!(out[11], "OK (wrong-type-argument numberp foo)");
+        assert_eq!(out[12], "OK (wrong-type-argument numberp foo)");
+        assert_eq!(out[13], "OK (wrong-type-argument frame-live-p 999999)");
+        assert_eq!(out[14], "OK wrong-number-of-arguments");
+        assert_eq!(out[15], "OK wrong-number-of-arguments");
     }
 
     #[test]

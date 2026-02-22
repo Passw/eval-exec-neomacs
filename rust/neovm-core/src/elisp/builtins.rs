@@ -12826,6 +12826,7 @@ pub(crate) fn dispatch_builtin(
         "window-minibuffer-p" => {
             return Some(super::window_cmds::builtin_window_minibuffer_p(eval, args))
         }
+        "window-at" => return Some(super::window_cmds::builtin_window_at(eval, args)),
         "window-live-p" => return Some(super::window_cmds::builtin_window_live_p(eval, args)),
         "set-window-start" => {
             return Some(super::window_cmds::builtin_set_window_start(eval, args))
@@ -15079,7 +15080,8 @@ pub(crate) fn dispatch_builtin_pure(name: &str, args: Vec<Value>) -> Option<Eval
         | "plist-member"
         | "window-list-1"
         | "window-bump-use-time"
-        | "set-frame-selected-window" => {
+        | "set-frame-selected-window"
+        | "window-at" => {
             return None
         }
         _ => {}
