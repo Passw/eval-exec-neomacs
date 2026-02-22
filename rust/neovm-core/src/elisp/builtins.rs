@@ -7454,6 +7454,125 @@ pub(crate) fn builtin_gnutls_error_fatalp(args: Vec<Value>) -> EvalResult {
     Ok(Value::Nil)
 }
 
+fn expect_processp(value: &Value) -> Result<(), Flow> {
+    if value.is_nil() {
+        Err(signal(
+            "wrong-type-argument",
+            vec![Value::symbol("processp"), value.clone()],
+        ))
+    } else {
+        Ok(())
+    }
+}
+
+pub(crate) fn builtin_gnutls_peer_status_warning_describe(args: Vec<Value>) -> EvalResult {
+    expect_args("gnutls-peer-status-warning-describe", &args, 1)?;
+    if args[0].is_nil() {
+        return Ok(Value::Nil);
+    }
+    if args[0].as_symbol_name().is_none() {
+        return Err(signal(
+            "wrong-type-argument",
+            vec![Value::symbol("symbolp"), args[0].clone()],
+        ));
+    }
+    Ok(Value::Nil)
+}
+
+pub(crate) fn builtin_gnutls_asynchronous_parameters(args: Vec<Value>) -> EvalResult {
+    expect_args("gnutls-asynchronous-parameters", &args, 2)?;
+    Ok(Value::Nil)
+}
+
+pub(crate) fn builtin_gnutls_boot(args: Vec<Value>) -> EvalResult {
+    expect_args("gnutls-boot", &args, 3)?;
+    expect_processp(&args[0])?;
+    Ok(Value::Nil)
+}
+
+pub(crate) fn builtin_gnutls_bye(args: Vec<Value>) -> EvalResult {
+    expect_args("gnutls-bye", &args, 2)?;
+    expect_processp(&args[0])?;
+    Ok(Value::Nil)
+}
+
+pub(crate) fn builtin_gnutls_deinit(args: Vec<Value>) -> EvalResult {
+    expect_args("gnutls-deinit", &args, 1)?;
+    expect_processp(&args[0])?;
+    Ok(Value::Nil)
+}
+
+pub(crate) fn builtin_gnutls_format_certificate(args: Vec<Value>) -> EvalResult {
+    expect_args("gnutls-format-certificate", &args, 1)?;
+    let _ = expect_strict_string(&args[0])?;
+    Ok(Value::string("Certificate"))
+}
+
+pub(crate) fn builtin_gnutls_get_initstage(args: Vec<Value>) -> EvalResult {
+    expect_args("gnutls-get-initstage", &args, 1)?;
+    expect_processp(&args[0])?;
+    Ok(Value::Nil)
+}
+
+pub(crate) fn builtin_gnutls_hash_digest(args: Vec<Value>) -> EvalResult {
+    expect_args("gnutls-hash-digest", &args, 2)?;
+    if args[0].is_nil() {
+        return Err(signal(
+            "error",
+            vec![
+                Value::string("GnuTLS digest-method is invalid or not found"),
+                Value::Nil,
+            ],
+        ));
+    }
+    if args[0].as_symbol_name().is_none() {
+        return Err(signal(
+            "wrong-type-argument",
+            vec![Value::symbol("symbolp"), args[0].clone()],
+        ));
+    }
+    let _ = expect_strict_string(&args[1])?;
+    Ok(Value::string("digest"))
+}
+
+pub(crate) fn builtin_gnutls_hash_mac(args: Vec<Value>) -> EvalResult {
+    expect_args("gnutls-hash-mac", &args, 3)?;
+    if args[0].is_nil() {
+        return Err(signal(
+            "error",
+            vec![
+                Value::string("GnuTLS MAC-method is invalid or not found"),
+                Value::Nil,
+            ],
+        ));
+    }
+    if args[0].as_symbol_name().is_none() {
+        return Err(signal(
+            "wrong-type-argument",
+            vec![Value::symbol("symbolp"), args[0].clone()],
+        ));
+    }
+    let _ = expect_strict_string(&args[1])?;
+    let _ = expect_strict_string(&args[2])?;
+    Ok(Value::string("mac"))
+}
+
+pub(crate) fn builtin_gnutls_peer_status(args: Vec<Value>) -> EvalResult {
+    expect_args("gnutls-peer-status", &args, 1)?;
+    expect_processp(&args[0])?;
+    Ok(Value::Nil)
+}
+
+pub(crate) fn builtin_gnutls_symmetric_decrypt(args: Vec<Value>) -> EvalResult {
+    expect_range_args("gnutls-symmetric-decrypt", &args, 4, 5)?;
+    Ok(Value::Nil)
+}
+
+pub(crate) fn builtin_gnutls_symmetric_encrypt(args: Vec<Value>) -> EvalResult {
+    expect_range_args("gnutls-symmetric-encrypt", &args, 4, 5)?;
+    Ok(Value::Nil)
+}
+
 fn expect_window_live_or_nil(value: &Value) -> Result<(), Flow> {
     if value.is_nil() || matches!(value, Value::Window(_)) {
         Ok(())
@@ -16545,34 +16664,24 @@ pub(crate) fn dispatch_builtin(
         "get-unicode-property-internal" => builtin_get_unicode_property_internal(args),
         "get-variable-watchers" => builtin_get_variable_watchers(args),
         "gnutls-available-p" => builtin_gnutls_available_p(args),
-        "gnutls-asynchronous-parameters" => {
-            super::compat_internal::builtin_gnutls_asynchronous_parameters(args)
-        }
-        "gnutls-boot" => super::compat_internal::builtin_gnutls_boot(args),
-        "gnutls-bye" => super::compat_internal::builtin_gnutls_bye(args),
+        "gnutls-asynchronous-parameters" => builtin_gnutls_asynchronous_parameters(args),
+        "gnutls-boot" => builtin_gnutls_boot(args),
+        "gnutls-bye" => builtin_gnutls_bye(args),
         "gnutls-ciphers" => builtin_gnutls_ciphers(args),
-        "gnutls-deinit" => super::compat_internal::builtin_gnutls_deinit(args),
+        "gnutls-deinit" => builtin_gnutls_deinit(args),
         "gnutls-digests" => builtin_gnutls_digests(args),
         "gnutls-error-fatalp" => builtin_gnutls_error_fatalp(args),
         "gnutls-error-string" => builtin_gnutls_error_string(args),
         "gnutls-errorp" => builtin_gnutls_errorp(args),
-        "gnutls-format-certificate" => {
-            super::compat_internal::builtin_gnutls_format_certificate(args)
-        }
-        "gnutls-get-initstage" => super::compat_internal::builtin_gnutls_get_initstage(args),
-        "gnutls-hash-digest" => super::compat_internal::builtin_gnutls_hash_digest(args),
-        "gnutls-hash-mac" => super::compat_internal::builtin_gnutls_hash_mac(args),
+        "gnutls-format-certificate" => builtin_gnutls_format_certificate(args),
+        "gnutls-get-initstage" => builtin_gnutls_get_initstage(args),
+        "gnutls-hash-digest" => builtin_gnutls_hash_digest(args),
+        "gnutls-hash-mac" => builtin_gnutls_hash_mac(args),
         "gnutls-macs" => builtin_gnutls_macs(args),
-        "gnutls-peer-status" => super::compat_internal::builtin_gnutls_peer_status(args),
-        "gnutls-peer-status-warning-describe" => {
-            super::compat_internal::builtin_gnutls_peer_status_warning_describe(args)
-        }
-        "gnutls-symmetric-decrypt" => {
-            super::compat_internal::builtin_gnutls_symmetric_decrypt(args)
-        }
-        "gnutls-symmetric-encrypt" => {
-            super::compat_internal::builtin_gnutls_symmetric_encrypt(args)
-        }
+        "gnutls-peer-status" => builtin_gnutls_peer_status(args),
+        "gnutls-peer-status-warning-describe" => builtin_gnutls_peer_status_warning_describe(args),
+        "gnutls-symmetric-decrypt" => builtin_gnutls_symmetric_decrypt(args),
+        "gnutls-symmetric-encrypt" => builtin_gnutls_symmetric_encrypt(args),
         "gpm-mouse-start" => builtin_gpm_mouse_start(args),
         "gpm-mouse-stop" => builtin_gpm_mouse_stop(args),
         "handle-save-session" => builtin_handle_save_session(args),
@@ -17382,34 +17491,24 @@ pub(crate) fn dispatch_builtin_pure(name: &str, args: Vec<Value>) -> Option<Eval
         "get-unicode-property-internal" => builtin_get_unicode_property_internal(args),
         "get-variable-watchers" => builtin_get_variable_watchers(args),
         "gnutls-available-p" => builtin_gnutls_available_p(args),
-        "gnutls-asynchronous-parameters" => {
-            super::compat_internal::builtin_gnutls_asynchronous_parameters(args)
-        }
-        "gnutls-boot" => super::compat_internal::builtin_gnutls_boot(args),
-        "gnutls-bye" => super::compat_internal::builtin_gnutls_bye(args),
+        "gnutls-asynchronous-parameters" => builtin_gnutls_asynchronous_parameters(args),
+        "gnutls-boot" => builtin_gnutls_boot(args),
+        "gnutls-bye" => builtin_gnutls_bye(args),
         "gnutls-ciphers" => builtin_gnutls_ciphers(args),
-        "gnutls-deinit" => super::compat_internal::builtin_gnutls_deinit(args),
+        "gnutls-deinit" => builtin_gnutls_deinit(args),
         "gnutls-digests" => builtin_gnutls_digests(args),
         "gnutls-error-fatalp" => builtin_gnutls_error_fatalp(args),
         "gnutls-error-string" => builtin_gnutls_error_string(args),
         "gnutls-errorp" => builtin_gnutls_errorp(args),
-        "gnutls-format-certificate" => {
-            super::compat_internal::builtin_gnutls_format_certificate(args)
-        }
-        "gnutls-get-initstage" => super::compat_internal::builtin_gnutls_get_initstage(args),
-        "gnutls-hash-digest" => super::compat_internal::builtin_gnutls_hash_digest(args),
-        "gnutls-hash-mac" => super::compat_internal::builtin_gnutls_hash_mac(args),
+        "gnutls-format-certificate" => builtin_gnutls_format_certificate(args),
+        "gnutls-get-initstage" => builtin_gnutls_get_initstage(args),
+        "gnutls-hash-digest" => builtin_gnutls_hash_digest(args),
+        "gnutls-hash-mac" => builtin_gnutls_hash_mac(args),
         "gnutls-macs" => builtin_gnutls_macs(args),
-        "gnutls-peer-status" => super::compat_internal::builtin_gnutls_peer_status(args),
-        "gnutls-peer-status-warning-describe" => {
-            super::compat_internal::builtin_gnutls_peer_status_warning_describe(args)
-        }
-        "gnutls-symmetric-decrypt" => {
-            super::compat_internal::builtin_gnutls_symmetric_decrypt(args)
-        }
-        "gnutls-symmetric-encrypt" => {
-            super::compat_internal::builtin_gnutls_symmetric_encrypt(args)
-        }
+        "gnutls-peer-status" => builtin_gnutls_peer_status(args),
+        "gnutls-peer-status-warning-describe" => builtin_gnutls_peer_status_warning_describe(args),
+        "gnutls-symmetric-decrypt" => builtin_gnutls_symmetric_decrypt(args),
+        "gnutls-symmetric-encrypt" => builtin_gnutls_symmetric_encrypt(args),
         "gpm-mouse-start" => builtin_gpm_mouse_start(args),
         "gpm-mouse-stop" => builtin_gpm_mouse_stop(args),
         "handle-save-session" => builtin_handle_save_session(args),
@@ -23072,6 +23171,61 @@ mod tests {
             Flow::Signal(sig) => assert_eq!(sig.symbol, "error"),
             other => panic!("expected signal, got {other:?}"),
         }
+    }
+
+    #[test]
+    fn dispatch_builtin_pure_handles_gnutls_runtime_placeholders() {
+        let peer_warning =
+            dispatch_builtin_pure("gnutls-peer-status-warning-describe", vec![Value::Nil])
+                .expect("gnutls-peer-status-warning-describe should resolve")
+                .expect("gnutls-peer-status-warning-describe should evaluate");
+        assert_eq!(peer_warning, Value::Nil);
+
+        let bye_err = dispatch_builtin_pure("gnutls-bye", vec![Value::Nil, Value::Nil])
+            .expect("gnutls-bye should resolve")
+            .unwrap_err();
+        match bye_err {
+            Flow::Signal(sig) => assert_eq!(sig.symbol, "wrong-type-argument"),
+            other => panic!("expected signal, got {other:?}"),
+        }
+
+        let cert_err = dispatch_builtin_pure("gnutls-format-certificate", vec![Value::Nil])
+            .expect("gnutls-format-certificate should resolve")
+            .unwrap_err();
+        match cert_err {
+            Flow::Signal(sig) => assert_eq!(sig.symbol, "wrong-type-argument"),
+            other => panic!("expected signal, got {other:?}"),
+        }
+
+        let digest_err = dispatch_builtin_pure("gnutls-hash-digest", vec![Value::Nil, Value::string("a")])
+            .expect("gnutls-hash-digest should resolve")
+            .unwrap_err();
+        match digest_err {
+            Flow::Signal(sig) => assert_eq!(sig.symbol, "error"),
+            other => panic!("expected signal, got {other:?}"),
+        }
+
+        let mac = dispatch_builtin_pure(
+            "gnutls-hash-mac",
+            vec![Value::symbol("SHA256"), Value::string("k"), Value::string("a")],
+        )
+        .expect("gnutls-hash-mac should resolve")
+        .expect("gnutls-hash-mac should evaluate");
+        assert_eq!(mac, Value::string("mac"));
+
+        let enc = dispatch_builtin_pure(
+            "gnutls-symmetric-encrypt",
+            vec![
+                Value::symbol("AES-128-GCM"),
+                Value::string("k"),
+                Value::string("iv"),
+                Value::string("data"),
+                Value::string("aad"),
+            ],
+        )
+        .expect("gnutls-symmetric-encrypt should resolve")
+        .expect("gnutls-symmetric-encrypt should evaluate");
+        assert_eq!(enc, Value::Nil);
     }
 
     #[test]

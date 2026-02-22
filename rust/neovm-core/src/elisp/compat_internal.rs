@@ -129,17 +129,6 @@ fn expect_stringp(value: &Value) -> Result<(), Flow> {
     }
 }
 
-fn expect_processp(value: &Value) -> Result<(), Flow> {
-    if value.is_nil() {
-        Err(signal(
-            "wrong-type-argument",
-            vec![Value::symbol("processp"), value.clone()],
-        ))
-    } else {
-        Ok(())
-    }
-}
-
 fn expect_characterp_from_int(value: &Value) -> Result<char, Flow> {
     match value {
         Value::Int(n) if *n >= 0 => Ok((*n as u8) as char),
@@ -278,111 +267,6 @@ pub(crate) fn builtin_fontset_info(args: Vec<Value>) -> EvalResult {
 pub(crate) fn builtin_fontset_list(args: Vec<Value>) -> EvalResult {
     expect_args("fontset-list", &args, 0)?;
     Ok(Value::list(vec![Value::string(DEFAULT_FONTSET_NAME)]))
-}
-
-/// `(gnutls-peer-status-warning-describe WARNING)` -> nil.
-pub(crate) fn builtin_gnutls_peer_status_warning_describe(args: Vec<Value>) -> EvalResult {
-    expect_args("gnutls-peer-status-warning-describe", &args, 1)?;
-    if args[0].is_nil() {
-        return Ok(Value::Nil);
-    }
-    expect_symbolp(&args[0])?;
-    Ok(Value::Nil)
-}
-
-/// `(gnutls-asynchronous-parameters PROC ENABLE)` -> nil.
-pub(crate) fn builtin_gnutls_asynchronous_parameters(args: Vec<Value>) -> EvalResult {
-    expect_args("gnutls-asynchronous-parameters", &args, 2)?;
-    Ok(Value::Nil)
-}
-
-/// `(gnutls-boot PROC TYPE PROPS)` -> nil.
-pub(crate) fn builtin_gnutls_boot(args: Vec<Value>) -> EvalResult {
-    expect_args("gnutls-boot", &args, 3)?;
-    expect_processp(&args[0])?;
-    Ok(Value::Nil)
-}
-
-/// `(gnutls-bye PROC CONT)` -> nil.
-pub(crate) fn builtin_gnutls_bye(args: Vec<Value>) -> EvalResult {
-    expect_args("gnutls-bye", &args, 2)?;
-    expect_processp(&args[0])?;
-    Ok(Value::Nil)
-}
-
-/// `(gnutls-deinit PROC)` -> nil.
-pub(crate) fn builtin_gnutls_deinit(args: Vec<Value>) -> EvalResult {
-    expect_args("gnutls-deinit", &args, 1)?;
-    expect_processp(&args[0])?;
-    Ok(Value::Nil)
-}
-
-/// `(gnutls-format-certificate CERT)` -> string.
-pub(crate) fn builtin_gnutls_format_certificate(args: Vec<Value>) -> EvalResult {
-    expect_args("gnutls-format-certificate", &args, 1)?;
-    expect_stringp(&args[0])?;
-    Ok(Value::string("Certificate"))
-}
-
-/// `(gnutls-get-initstage PROC)` -> nil.
-pub(crate) fn builtin_gnutls_get_initstage(args: Vec<Value>) -> EvalResult {
-    expect_args("gnutls-get-initstage", &args, 1)?;
-    expect_processp(&args[0])?;
-    Ok(Value::Nil)
-}
-
-/// `(gnutls-hash-digest METHOD DATA)` -> string or compatibility error.
-pub(crate) fn builtin_gnutls_hash_digest(args: Vec<Value>) -> EvalResult {
-    expect_args("gnutls-hash-digest", &args, 2)?;
-    if args[0].is_nil() {
-        return Err(signal(
-            "error",
-            vec![
-                Value::string("GnuTLS digest-method is invalid or not found"),
-                Value::Nil,
-            ],
-        ));
-    }
-    expect_symbolp(&args[0])?;
-    expect_stringp(&args[1])?;
-    Ok(Value::string("digest"))
-}
-
-/// `(gnutls-hash-mac METHOD KEY DATA)` -> string or compatibility error.
-pub(crate) fn builtin_gnutls_hash_mac(args: Vec<Value>) -> EvalResult {
-    expect_args("gnutls-hash-mac", &args, 3)?;
-    if args[0].is_nil() {
-        return Err(signal(
-            "error",
-            vec![
-                Value::string("GnuTLS MAC-method is invalid or not found"),
-                Value::Nil,
-            ],
-        ));
-    }
-    expect_symbolp(&args[0])?;
-    expect_stringp(&args[1])?;
-    expect_stringp(&args[2])?;
-    Ok(Value::string("mac"))
-}
-
-/// `(gnutls-peer-status PROC)` -> nil.
-pub(crate) fn builtin_gnutls_peer_status(args: Vec<Value>) -> EvalResult {
-    expect_args("gnutls-peer-status", &args, 1)?;
-    expect_processp(&args[0])?;
-    Ok(Value::Nil)
-}
-
-/// `(gnutls-symmetric-decrypt CIPHER KEY IV DATA &optional AAD)` -> nil.
-pub(crate) fn builtin_gnutls_symmetric_decrypt(args: Vec<Value>) -> EvalResult {
-    expect_range_args("gnutls-symmetric-decrypt", &args, 4, 5)?;
-    Ok(Value::Nil)
-}
-
-/// `(gnutls-symmetric-encrypt CIPHER KEY IV DATA &optional AAD)` -> nil.
-pub(crate) fn builtin_gnutls_symmetric_encrypt(args: Vec<Value>) -> EvalResult {
-    expect_range_args("gnutls-symmetric-encrypt", &args, 4, 5)?;
-    Ok(Value::Nil)
 }
 
 /// `(font-at POS &optional WINDOW STRING)` -> nil or compatibility error.
@@ -618,7 +502,9 @@ mod tests {
 
     #[test]
     fn gnutls_peer_status_warning_describe_rejects_non_symbol() {
-        let err = builtin_gnutls_peer_status_warning_describe(vec![Value::Int(0)]).unwrap_err();
+        let err =
+            crate::elisp::builtins::builtin_gnutls_peer_status_warning_describe(vec![Value::Int(0)])
+                .unwrap_err();
         match err {
             Flow::Signal(sig) => assert_eq!(sig.symbol, "wrong-type-argument"),
             other => panic!("expected signal, got {other:?}"),
@@ -697,7 +583,8 @@ mod tests {
 
     #[test]
     fn gnutls_bye_requires_process() {
-        let err = builtin_gnutls_bye(vec![Value::Nil, Value::Nil]).unwrap_err();
+        let err = crate::elisp::builtins::builtin_gnutls_bye(vec![Value::Nil, Value::Nil])
+            .unwrap_err();
         match err {
             Flow::Signal(sig) => assert_eq!(sig.symbol, "wrong-type-argument"),
             other => panic!("expected signal, got {other:?}"),
@@ -706,7 +593,8 @@ mod tests {
 
     #[test]
     fn gnutls_format_certificate_requires_string() {
-        let err = builtin_gnutls_format_certificate(vec![Value::Nil]).unwrap_err();
+        let err =
+            crate::elisp::builtins::builtin_gnutls_format_certificate(vec![Value::Nil]).unwrap_err();
         match err {
             Flow::Signal(sig) => assert_eq!(sig.symbol, "wrong-type-argument"),
             other => panic!("expected signal, got {other:?}"),
@@ -715,7 +603,9 @@ mod tests {
 
     #[test]
     fn gnutls_hash_digest_nil_method_signals_error() {
-        let err = builtin_gnutls_hash_digest(vec![Value::Nil, Value::string("a")]).unwrap_err();
+        let err =
+            crate::elisp::builtins::builtin_gnutls_hash_digest(vec![Value::Nil, Value::string("a")])
+                .unwrap_err();
         match err {
             Flow::Signal(sig) => assert_eq!(sig.symbol, "error"),
             other => panic!("expected signal, got {other:?}"),
@@ -724,7 +614,7 @@ mod tests {
 
     #[test]
     fn gnutls_hash_mac_symbol_method_returns_string() {
-        let out = builtin_gnutls_hash_mac(vec![
+        let out = crate::elisp::builtins::builtin_gnutls_hash_mac(vec![
             Value::symbol("SHA256"),
             Value::string("k"),
             Value::string("a"),
@@ -735,7 +625,7 @@ mod tests {
 
     #[test]
     fn gnutls_symmetric_encrypt_accepts_optional_aad_slot() {
-        let out = builtin_gnutls_symmetric_encrypt(vec![
+        let out = crate::elisp::builtins::builtin_gnutls_symmetric_encrypt(vec![
             Value::symbol("AES-128-GCM"),
             Value::string("k"),
             Value::string("iv"),
