@@ -7437,16 +7437,7 @@ fi
 AC_SUBST([LIBX_OTHER])
 
 HAVE_OLDXMENU=no
-if test "$HAVE_GTK" = yes || test "$HAVE_X11" != yes; then
-  LIBXMENU=
-elif test "$USE_X_TOOLKIT" = none; then
-  HAVE_OLDXMENU=yes
-  LIBXMENU='$(oldXMenudir)/libXMenu11.a'
-  AUTODEPEND_PARENTS="$AUTODEPEND_PARENTS oldXMenu"
-else
-  LIBXMENU='$(lwlibdir)/liblw.a'
-  AUTODEPEND_PARENTS="$AUTODEPEND_PARENTS lwlib"
-fi
+LIBXMENU=
 AC_SUBST([LIBXMENU])
 
 AC_C_RESTRICT
@@ -7885,13 +7876,12 @@ AC_CONFIG_FILES([Makefile lib/gnulib.mk])
 dnl config.status treats $srcdir specially, so I think this is ok...
 ARCH_INDEPENDENT_CONFIG_FILES([$srcdir/doc/man/emacs.1])
 
-AC_CONFIG_FILES([lib/Makefile lib-src/Makefile oldXMenu/Makefile src/Makefile
-                 lwlib/Makefile nextstep/Makefile nt/Makefile])
+AC_CONFIG_FILES([lib/Makefile lib-src/Makefile src/Makefile])
 ARCH_INDEPENDENT_CONFIG_FILES([doc/emacs/Makefile doc/misc/Makefile
                                doc/lispintro/Makefile doc/lispref/Makefile
 			       lisp/Makefile leim/Makefile])
 
-SUBDIR_MAKEFILES="lib/Makefile lib-src/Makefile oldXMenu/Makefile src/Makefile lwlib/Makefile nextstep/Makefile nt/Makefile doc/emacs/Makefile doc/misc/Makefile doc/lispintro/Makefile doc/lispref/Makefile lisp/Makefile leim/Makefile"
+SUBDIR_MAKEFILES="lib/Makefile lib-src/Makefile src/Makefile doc/emacs/Makefile doc/misc/Makefile doc/lispintro/Makefile doc/lispref/Makefile lisp/Makefile leim/Makefile"
 
 dnl The test/ directory is missing if './make-dist --no-tests' was used.
 opt_makefile=test/Makefile
@@ -7985,57 +7975,15 @@ if test "$XCONFIGURE" != "android"; then
   if test $AUTO_DEPEND = yes; then
      for dir in $AUTODEPEND_PARENTS; do
        AS_MKDIR_P([$dir/deps])
-       AS_MKDIR_P([cross/$dir/deps])
      done
   fi
   if $gl_gnulib_enabled_dynarray || $gl_gnulib_enabled_scratch_buffer; then
     AS_MKDIR_P([lib/malloc])
-    AS_MKDIR_P([cross/lib/malloc])
     if test $AUTO_DEPEND = yes; then
       AS_MKDIR_P([lib/deps/malloc])
-      AS_MKDIR_P([cross/lib/deps/malloc])
     fi
   fi
-
-  dnl Make cross/lib, which various Makefiles in cross expect to
-  dnl always exist.
-  AS_MKDIR_P([cross/lib])
-  AS_MKDIR_P([cross/lib/malloc])
-  AS_MKDIR_P([cross/lib/sys])
-  AS_MKDIR_P([cross/lib-src])
-
-  dnl Make cross/etc; this directory will hold the documentation file
-  dnl holding doc strings for Android specific C files that aren't
-  dnl built during the initial compilation of Emacs for the build
-  dnl machine.
-  AS_MKDIR_P([cross/etc])
-
-  AS_IF([test "x$with_android" != "xno"], [
-    dnl Link gnulib files to cross/lib as well.  af_alg.h and
-    dnl lib/save-cwd.h are copied manually from gnulib, and as such
-    dnl aren't specified in gl_FILE_LIST.
-    emacs_files='gl_FILE_LIST lib/af_alg.h lib/save-cwd.h'
-    dnl These files are specific to Emacs.
-    emacs_files="$emacs_files lib/fingerprint.c lib/fingerprint.h \
-		   lib/save-cwd.c lib/openat-die.c lib/save-cwd.c \
-		   lib/min-max.h"
-    for file in $emacs_files; do
-      AS_IF([expr "X${file}J" : "Xlib/.*[[ch]]J" >/dev/null],
-	[AS_IF([test -f "$srcdir/$file"],
-	  [AC_CONFIG_LINKS([cross/$file:$file])])])
-    done])
 fi
-
-# Make java/Makefile
-ARCH_INDEPENDENT_CONFIG_FILES([java/Makefile])
-ARCH_INDEPENDENT_CONFIG_FILES([cross/Makefile])
-
-# Make java/AndroidManifest.xml
-ARCH_INDEPENDENT_CONFIG_FILES([java/AndroidManifest.xml])
-
-# Make ndk-build Makefiles.  This is only done inside the recursive
-# configure.
-ndk_CONFIG_FILES
 
 AC_OUTPUT
 
