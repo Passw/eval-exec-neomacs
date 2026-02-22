@@ -795,12 +795,7 @@ pub(crate) fn sf_pcase_let(eval: &mut Evaluator, tail: &[Expr]) -> EvalResult {
     let bindings_expr = match &tail[0] {
         Expr::List(entries) => entries.clone(),
         Expr::Symbol(s) if s == "nil" => Vec::new(),
-        _ => {
-            return Err(signal(
-                "wrong-type-argument",
-                vec![Value::string("pcase-let bindings must be a list")],
-            ))
-        }
+        other => return Err(signal("wrong-type-argument", vec![Value::symbol("listp"), quote_to_value(other)])),
     };
 
     // Phase 1: evaluate all values.
@@ -855,12 +850,7 @@ pub(crate) fn sf_pcase_let_star(eval: &mut Evaluator, tail: &[Expr]) -> EvalResu
     let bindings_expr = match &tail[0] {
         Expr::List(entries) => entries.clone(),
         Expr::Symbol(s) if s == "nil" => Vec::new(),
-        _ => {
-            return Err(signal(
-                "wrong-type-argument",
-                vec![Value::string("pcase-let* bindings must be a list")],
-            ))
-        }
+        other => return Err(signal("wrong-type-argument", vec![Value::symbol("listp"), quote_to_value(other)])),
     };
 
     // Process each binding sequentially, pushing one env frame per binding.
@@ -1756,6 +1746,22 @@ mod tests {
         );
     }
 
+    #[test]
+    fn pcase_let_non_list_bindings_form_signals_list_type_error() {
+        assert_eq!(
+            eval_last("(condition-case err (pcase-let 1 'ok) (error err))"),
+            "OK (wrong-type-argument listp 1)"
+        );
+        assert_eq!(
+            eval_last("(condition-case err (pcase-let t 'ok) (error err))"),
+            "OK (wrong-type-argument listp t)"
+        );
+        assert_eq!(
+            eval_last("(condition-case err (pcase-let nil 'ok) (error err))"),
+            "OK ok"
+        );
+    }
+
     // =======================================================================
     // 19. pcase-let* sequential binding
     // =======================================================================
@@ -1803,6 +1809,22 @@ mod tests {
         assert_eq!(
             eval_last("(condition-case err (pcase-let* ((x 1) y) y) (error err))"),
             "OK (wrong-type-argument listp y)"
+        );
+    }
+
+    #[test]
+    fn pcase_let_star_non_list_bindings_form_signals_list_type_error() {
+        assert_eq!(
+            eval_last("(condition-case err (pcase-let* 1 'ok) (error err))"),
+            "OK (wrong-type-argument listp 1)"
+        );
+        assert_eq!(
+            eval_last("(condition-case err (pcase-let* t 'ok) (error err))"),
+            "OK (wrong-type-argument listp t)"
+        );
+        assert_eq!(
+            eval_last("(condition-case err (pcase-let* nil 'ok) (error err))"),
+            "OK ok"
         );
     }
 

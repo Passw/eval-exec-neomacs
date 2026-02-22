@@ -68,3 +68,9 @@
 68	(condition-case err (pcase-let (((app car x y) '(1 2)) x)) (error err))	OK (wrong-type-argument listp x)
 69	(condition-case err (pcase-let* (x) x) (error err))	OK (wrong-type-argument listp x)
 70	(condition-case err (pcase-let* ((x 1) y) y) (error err))	OK (wrong-type-argument listp y)
+71	(condition-case err (pcase-let 1 'ok) (error err))	OK (wrong-type-argument listp 1)
+72	(condition-case err (pcase-let* 1 'ok) (error err))	OK (wrong-type-argument listp 1)
+73	(condition-case err (pcase-let t 'ok) (error err))	OK (wrong-type-argument listp t)
+74	(condition-case err (pcase-let* t 'ok) (error err))	OK (wrong-type-argument listp t)
+75	(condition-case err (pcase-let nil 'ok) (error err))	OK ok
+76	(condition-case err (pcase-let* nil 'ok) (error err))	OK ok

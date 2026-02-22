@@ -87,3 +87,11 @@
 (condition-case err (pcase-let (((app car x y) '(1 2)) x)) (error err))
 (condition-case err (pcase-let* (x) x) (error err))
 (condition-case err (pcase-let* ((x 1) y) y) (error err))
+
+; non-list pcase-let/pcase-let* bindings forms
+(condition-case err (pcase-let 1 'ok) (error err))
+(condition-case err (pcase-let* 1 'ok) (error err))
+(condition-case err (pcase-let t 'ok) (error err))
+(condition-case err (pcase-let* t 'ok) (error err))
+(condition-case err (pcase-let nil 'ok) (error err))
+(condition-case err (pcase-let* nil 'ok) (error err))
