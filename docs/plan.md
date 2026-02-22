@@ -19582,6 +19582,17 @@ Last updated: 2026-02-21
       - vector (`[foo]`), list (`'(foo)`), cons (`'(foo . bar)`)
       - for both `display-color-p` and `x-display-color-p`
 
+- Added `x-display` pixel designator type matrix lock-ins:
+  - vm-compat corpus changes:
+    - added:
+      - `test/neovm/vm-compat/cases/x-display-pixel-designator-type-matrix-semantics.forms`
+      - `test/neovm/vm-compat/cases/x-display-pixel-designator-type-matrix-semantics.expected.tsv`
+    - wired case into:
+      - `test/neovm/vm-compat/cases/default.list`
+    - matrix locks strict `frame-live-p` predicates across non-frame designators:
+      - symbol (`'foo`), vector (`[foo]`), list (`'(foo)`), cons (`'(foo . bar)`)
+      - covered functions: `x-display-pixel-width`, `x-display-pixel-height`
+
 - Continue compatibility-first maintenance with small commit slices:
   - keep builtin surface and registry in lock-step
   - run oracle/parity checks after each behavior-affecting change
