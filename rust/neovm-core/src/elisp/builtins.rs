@@ -6213,6 +6213,63 @@ pub(crate) fn builtin_unlock_file(args: Vec<Value>) -> EvalResult {
     Ok(Value::Nil)
 }
 
+pub(crate) fn builtin_internal_track_mouse(args: Vec<Value>) -> EvalResult {
+    expect_args("internal--track-mouse", &args, 1)?;
+    Ok(Value::Nil)
+}
+
+pub(crate) fn builtin_internal_char_font(args: Vec<Value>) -> EvalResult {
+    expect_range_args("internal-char-font", &args, 1, 2)?;
+    Ok(Value::Nil)
+}
+
+pub(crate) fn builtin_internal_complete_buffer(args: Vec<Value>) -> EvalResult {
+    expect_args("internal-complete-buffer", &args, 3)?;
+    Ok(Value::Nil)
+}
+
+pub(crate) fn builtin_internal_describe_syntax_value(args: Vec<Value>) -> EvalResult {
+    expect_args("internal-describe-syntax-value", &args, 1)?;
+    Ok(Value::Nil)
+}
+
+pub(crate) fn builtin_internal_event_symbol_parse_modifiers(args: Vec<Value>) -> EvalResult {
+    expect_args("internal-event-symbol-parse-modifiers", &args, 1)?;
+    Ok(Value::Nil)
+}
+
+pub(crate) fn builtin_internal_handle_focus_in(args: Vec<Value>) -> EvalResult {
+    expect_args("internal-handle-focus-in", &args, 1)?;
+    Ok(Value::Nil)
+}
+
+pub(crate) fn builtin_internal_make_var_non_special(args: Vec<Value>) -> EvalResult {
+    expect_args("internal-make-var-non-special", &args, 1)?;
+    Ok(Value::Nil)
+}
+
+pub(crate) fn builtin_internal_set_lisp_face_attribute_from_resource(
+    args: Vec<Value>,
+) -> EvalResult {
+    expect_range_args(
+        "internal-set-lisp-face-attribute-from-resource",
+        &args,
+        3,
+        4,
+    )?;
+    Ok(Value::Nil)
+}
+
+pub(crate) fn builtin_internal_stack_stats(args: Vec<Value>) -> EvalResult {
+    expect_args("internal-stack-stats", &args, 0)?;
+    Ok(Value::Nil)
+}
+
+pub(crate) fn builtin_internal_subr_documentation(args: Vec<Value>) -> EvalResult {
+    expect_args("internal-subr-documentation", &args, 1)?;
+    Ok(Value::Nil)
+}
+
 // ===========================================================================
 // Hook system (need evaluator)
 // ===========================================================================
@@ -15056,30 +15113,20 @@ pub(crate) fn dispatch_builtin(
         "internal--after-save-selected-window" => {
             builtin_internal_after_save_selected_window(eval, args)
         }
-        "internal--track-mouse" => super::compat_internal::builtin_internal_track_mouse(args),
-        "internal-char-font" => super::compat_internal::builtin_internal_char_font(args),
-        "internal-complete-buffer" => {
-            super::compat_internal::builtin_internal_complete_buffer(args)
-        }
-        "internal-describe-syntax-value" => {
-            super::compat_internal::builtin_internal_describe_syntax_value(args)
-        }
+        "internal--track-mouse" => builtin_internal_track_mouse(args),
+        "internal-char-font" => builtin_internal_char_font(args),
+        "internal-complete-buffer" => builtin_internal_complete_buffer(args),
+        "internal-describe-syntax-value" => builtin_internal_describe_syntax_value(args),
         "internal-event-symbol-parse-modifiers" => {
-            super::compat_internal::builtin_internal_event_symbol_parse_modifiers(args)
+            builtin_internal_event_symbol_parse_modifiers(args)
         }
-        "internal-handle-focus-in" => {
-            super::compat_internal::builtin_internal_handle_focus_in(args)
-        }
-        "internal-make-var-non-special" => {
-            super::compat_internal::builtin_internal_make_var_non_special(args)
-        }
+        "internal-handle-focus-in" => builtin_internal_handle_focus_in(args),
+        "internal-make-var-non-special" => builtin_internal_make_var_non_special(args),
         "internal-set-lisp-face-attribute-from-resource" => {
-            super::compat_internal::builtin_internal_set_lisp_face_attribute_from_resource(args)
+            builtin_internal_set_lisp_face_attribute_from_resource(args)
         }
-        "internal-stack-stats" => super::compat_internal::builtin_internal_stack_stats(args),
-        "internal-subr-documentation" => {
-            super::compat_internal::builtin_internal_subr_documentation(args)
-        }
+        "internal-stack-stats" => builtin_internal_stack_stats(args),
+        "internal-subr-documentation" => builtin_internal_subr_documentation(args),
         "byte-code" => super::compat_internal::builtin_byte_code(args),
         "decode-coding-region" => super::compat_internal::builtin_decode_coding_region(args),
         "defconst-1" => super::compat_internal::builtin_defconst_1(args),
@@ -15989,30 +16036,20 @@ pub(crate) fn dispatch_builtin_pure(name: &str, args: Vec<Value>) -> Option<Eval
         "internal--set-buffer-modified-tick" => {
             super::compat_internal::builtin_internal_set_buffer_modified_tick(args)
         }
-        "internal--track-mouse" => super::compat_internal::builtin_internal_track_mouse(args),
-        "internal-char-font" => super::compat_internal::builtin_internal_char_font(args),
-        "internal-complete-buffer" => {
-            super::compat_internal::builtin_internal_complete_buffer(args)
-        }
-        "internal-describe-syntax-value" => {
-            super::compat_internal::builtin_internal_describe_syntax_value(args)
-        }
+        "internal--track-mouse" => builtin_internal_track_mouse(args),
+        "internal-char-font" => builtin_internal_char_font(args),
+        "internal-complete-buffer" => builtin_internal_complete_buffer(args),
+        "internal-describe-syntax-value" => builtin_internal_describe_syntax_value(args),
         "internal-event-symbol-parse-modifiers" => {
-            super::compat_internal::builtin_internal_event_symbol_parse_modifiers(args)
+            builtin_internal_event_symbol_parse_modifiers(args)
         }
-        "internal-handle-focus-in" => {
-            super::compat_internal::builtin_internal_handle_focus_in(args)
-        }
-        "internal-make-var-non-special" => {
-            super::compat_internal::builtin_internal_make_var_non_special(args)
-        }
+        "internal-handle-focus-in" => builtin_internal_handle_focus_in(args),
+        "internal-make-var-non-special" => builtin_internal_make_var_non_special(args),
         "internal-set-lisp-face-attribute-from-resource" => {
-            super::compat_internal::builtin_internal_set_lisp_face_attribute_from_resource(args)
+            builtin_internal_set_lisp_face_attribute_from_resource(args)
         }
-        "internal-stack-stats" => super::compat_internal::builtin_internal_stack_stats(args),
-        "internal-subr-documentation" => {
-            super::compat_internal::builtin_internal_subr_documentation(args)
-        }
+        "internal-stack-stats" => builtin_internal_stack_stats(args),
+        "internal-subr-documentation" => builtin_internal_subr_documentation(args),
         "byte-code" => super::compat_internal::builtin_byte_code(args),
         "decode-coding-region" => super::compat_internal::builtin_decode_coding_region(args),
         "defconst-1" => super::compat_internal::builtin_defconst_1(args),
@@ -20375,6 +20412,74 @@ mod tests {
             .expect("builtin unlock-file should resolve")
             .expect("builtin unlock-file should evaluate");
         assert!(unlock_file.is_nil());
+    }
+
+    #[test]
+    fn pure_dispatch_internal_placeholder_cluster_matches_compat_contracts() {
+        let track_mouse = dispatch_builtin_pure("internal--track-mouse", vec![Value::Nil])
+            .expect("builtin internal--track-mouse should resolve")
+            .expect("builtin internal--track-mouse should evaluate");
+        assert!(track_mouse.is_nil());
+
+        let char_font = dispatch_builtin_pure("internal-char-font", vec![Value::Int(65)])
+            .expect("builtin internal-char-font should resolve")
+            .expect("builtin internal-char-font should evaluate");
+        assert!(char_font.is_nil());
+
+        let complete_buffer = dispatch_builtin_pure(
+            "internal-complete-buffer",
+            vec![Value::string("a"), Value::Int(1), Value::Int(2)],
+        )
+        .expect("builtin internal-complete-buffer should resolve")
+        .expect("builtin internal-complete-buffer should evaluate");
+        assert!(complete_buffer.is_nil());
+
+        let describe_syntax =
+            dispatch_builtin_pure("internal-describe-syntax-value", vec![Value::Int(0)])
+                .expect("builtin internal-describe-syntax-value should resolve")
+                .expect("builtin internal-describe-syntax-value should evaluate");
+        assert!(describe_syntax.is_nil());
+
+        let parse_modifiers = dispatch_builtin_pure(
+            "internal-event-symbol-parse-modifiers",
+            vec![Value::symbol("foo")],
+        )
+        .expect("builtin internal-event-symbol-parse-modifiers should resolve")
+        .expect("builtin internal-event-symbol-parse-modifiers should evaluate");
+        assert!(parse_modifiers.is_nil());
+
+        let handle_focus_in = dispatch_builtin_pure("internal-handle-focus-in", vec![Value::Nil])
+            .expect("builtin internal-handle-focus-in should resolve")
+            .expect("builtin internal-handle-focus-in should evaluate");
+        assert!(handle_focus_in.is_nil());
+
+        let make_var_non_special =
+            dispatch_builtin_pure("internal-make-var-non-special", vec![Value::symbol("x")])
+                .expect("builtin internal-make-var-non-special should resolve")
+                .expect("builtin internal-make-var-non-special should evaluate");
+        assert!(make_var_non_special.is_nil());
+
+        let set_face_attr = dispatch_builtin_pure(
+            "internal-set-lisp-face-attribute-from-resource",
+            vec![
+                Value::symbol("face"),
+                Value::symbol("attr"),
+                Value::string("value"),
+            ],
+        )
+        .expect("builtin internal-set-lisp-face-attribute-from-resource should resolve")
+        .expect("builtin internal-set-lisp-face-attribute-from-resource should evaluate");
+        assert!(set_face_attr.is_nil());
+
+        let stack_stats = dispatch_builtin_pure("internal-stack-stats", vec![])
+            .expect("builtin internal-stack-stats should resolve")
+            .expect("builtin internal-stack-stats should evaluate");
+        assert!(stack_stats.is_nil());
+
+        let subr_doc = dispatch_builtin_pure("internal-subr-documentation", vec![Value::Nil])
+            .expect("builtin internal-subr-documentation should resolve")
+            .expect("builtin internal-subr-documentation should evaluate");
+        assert!(subr_doc.is_nil());
     }
 
     #[test]
