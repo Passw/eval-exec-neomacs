@@ -9,3 +9,4 @@
 9	(file-size-human-readable 1536 nil 1 "B")	OK "1.51kB"
 10	(condition-case err (file-size-human-readable 1 nil nil 1) (error (list (car err) (cadr err) (equal (nth 2 err) 1))))	OK (wrong-type-argument sequencep t)
 11	(condition-case err (file-size-human-readable 1 nil nil '("B")) (error (list (car err) (cadr err) (equal (nth 2 err) "B"))))	OK (wrong-type-argument characterp t)
+12	(condition-case err (file-size-human-readable "x") (error (car err)))	OK wrong-type-argument

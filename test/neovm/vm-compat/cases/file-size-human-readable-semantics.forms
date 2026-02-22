@@ -14,3 +14,6 @@
 (condition-case err
     (file-size-human-readable 1 nil nil '("B"))
   (error (list (car err) (cadr err) (equal (nth 2 err) "B"))))
+(condition-case err
+    (file-size-human-readable "x")
+  (error (car err)))
