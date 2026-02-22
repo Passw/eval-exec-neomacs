@@ -48,8 +48,8 @@ if [[ ! -s "$tmp_names" ]]; then
   exit 1
 fi
 
-# NeoVM-prefixed symbols are extension builtins and intentionally absent in
-# GNU Emacs; exclude them from oracle parity comparison.
+# Policy-declared extension symbols are intentionally absent in GNU Emacs;
+# exclude them from oracle parity comparison.
 collect_core_dispatch_builtin_names "$tmp_names" "$tmp_core_names"
 
 if [[ ! -s "$tmp_core_names" ]]; then
