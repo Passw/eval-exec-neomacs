@@ -5586,6 +5586,33 @@ pub(crate) fn builtin_intern_soft(
     }
 }
 
+pub(crate) fn builtin_obarray_make(args: Vec<Value>) -> EvalResult {
+    expect_range_args("obarray-make", &args, 0, 1)?;
+    let size = if args.is_empty() || args[0].is_nil() {
+        1511usize
+    } else {
+        expect_wholenump(&args[0])? as usize
+    };
+    Ok(Value::vector(vec![Value::Nil; size]))
+}
+
+pub(crate) fn builtin_obarray_clear(args: Vec<Value>) -> EvalResult {
+    expect_args("obarray-clear", &args, 1)?;
+    match &args[0] {
+        Value::Vector(values) => {
+            let mut values = values.lock().expect("poisoned");
+            for slot in values.iter_mut() {
+                *slot = Value::Nil;
+            }
+            Ok(Value::Nil)
+        }
+        other => Err(signal(
+            "wrong-type-argument",
+            vec![Value::symbol("obarrayp"), other.clone()],
+        )),
+    }
+}
+
 // ===========================================================================
 // Hook system (need evaluator)
 // ===========================================================================
@@ -14520,8 +14547,8 @@ pub(crate) fn dispatch_builtin(
         "new-fontset" => super::compat_internal::builtin_new_fontset(args),
         "next-frame" => super::compat_internal::builtin_next_frame(args),
         "ntake" => builtin_ntake(args),
-        "obarray-clear" => super::compat_internal::builtin_obarray_clear(args),
-        "obarray-make" => super::compat_internal::builtin_obarray_make(args),
+        "obarray-clear" => builtin_obarray_clear(args),
+        "obarray-make" => builtin_obarray_make(args),
         "object-intervals" => super::compat_internal::builtin_object_intervals(args),
         "old-selected-frame" => super::compat_internal::builtin_old_selected_frame(args),
         "open-dribble-file" => super::compat_internal::builtin_open_dribble_file(args),
@@ -15491,8 +15518,8 @@ pub(crate) fn dispatch_builtin_pure(name: &str, args: Vec<Value>) -> Option<Eval
         "new-fontset" => super::compat_internal::builtin_new_fontset(args),
         "next-frame" => super::compat_internal::builtin_next_frame(args),
         "ntake" => builtin_ntake(args),
-        "obarray-clear" => super::compat_internal::builtin_obarray_clear(args),
-        "obarray-make" => super::compat_internal::builtin_obarray_make(args),
+        "obarray-clear" => builtin_obarray_clear(args),
+        "obarray-make" => builtin_obarray_make(args),
         "object-intervals" => super::compat_internal::builtin_object_intervals(args),
         "old-selected-frame" => super::compat_internal::builtin_old_selected_frame(args),
         "open-dribble-file" => super::compat_internal::builtin_open_dribble_file(args),
@@ -19005,6 +19032,48 @@ mod tests {
         .expect("builtin ntake should resolve")
         .expect("builtin ntake should evaluate");
         assert_eq!(truncated, Value::list(vec![Value::Int(7), Value::Int(8)]));
+    }
+
+    #[test]
+    fn pure_dispatch_obarray_make_and_clear_use_vector_semantics() {
+        let made = dispatch_builtin_pure("obarray-make", vec![Value::Int(3)])
+            .expect("builtin obarray-make should resolve")
+            .expect("builtin obarray-make should evaluate");
+        let Value::Vector(created) = &made else {
+            panic!("obarray-make should return vector");
+        };
+        let created = created.lock().expect("poisoned");
+        assert_eq!(created.len(), 3);
+        assert!(created.iter().all(Value::is_nil));
+
+        let default = dispatch_builtin_pure("obarray-make", vec![])
+            .expect("builtin obarray-make should resolve")
+            .expect("builtin obarray-make should evaluate");
+        let Value::Vector(default) = &default else {
+            panic!("obarray-make default should return vector");
+        };
+        assert_eq!(default.lock().expect("poisoned").len(), 1511);
+
+        let table = Value::vector(vec![Value::Int(1), Value::symbol("x")]);
+        let cleared = dispatch_builtin_pure("obarray-clear", vec![table.clone()])
+            .expect("builtin obarray-clear should resolve")
+            .expect("builtin obarray-clear should evaluate");
+        assert!(cleared.is_nil());
+        let Value::Vector(cleared) = &table else {
+            panic!("table should stay vector");
+        };
+        assert!(cleared.lock().expect("poisoned").iter().all(Value::is_nil));
+
+        let wrong_type = dispatch_builtin_pure("obarray-clear", vec![Value::Int(1)])
+            .expect("builtin obarray-clear should resolve")
+            .expect_err("obarray-clear should reject non-obarray arguments");
+        match wrong_type {
+            Flow::Signal(sig) => {
+                assert_eq!(sig.symbol, "wrong-type-argument");
+                assert_eq!(sig.data, vec![Value::symbol("obarrayp"), Value::Int(1)]);
+            }
+            other => panic!("expected signal, got: {other:?}"),
+        }
     }
 
     #[test]

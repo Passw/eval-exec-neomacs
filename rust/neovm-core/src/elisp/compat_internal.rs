@@ -1774,18 +1774,6 @@ pub(crate) fn builtin_next_frame(args: Vec<Value>) -> EvalResult {
     Ok(Value::Nil)
 }
 
-/// `(obarray-clear OBARRAY)` -> nil.
-pub(crate) fn builtin_obarray_clear(args: Vec<Value>) -> EvalResult {
-    expect_args("obarray-clear", &args, 1)?;
-    Ok(Value::Nil)
-}
-
-/// `(obarray-make &optional SIZE)` -> nil.
-pub(crate) fn builtin_obarray_make(args: Vec<Value>) -> EvalResult {
-    expect_range_args("obarray-make", &args, 0, 1)?;
-    Ok(Value::Nil)
-}
-
 /// `(previous-frame &optional FRAME MINIFRAME)` -> nil.
 pub(crate) fn builtin_previous_frame(args: Vec<Value>) -> EvalResult {
     expect_range_args("previous-frame", &args, 0, 2)?;
