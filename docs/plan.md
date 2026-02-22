@@ -19868,6 +19868,20 @@ Last updated: 2026-02-21
       - over-arity payload remains exact:
         - `(wrong-number-of-arguments x-family-fonts 3)`
 
+- Added dedicated `x-apply-session-resources` arity/payload lock-ins:
+  - vm-compat corpus changes:
+    - added:
+      - `test/neovm/vm-compat/cases/x-apply-session-resources-arity-payload-semantics.forms`
+      - `test/neovm/vm-compat/cases/x-apply-session-resources-arity-payload-semantics.expected.tsv`
+    - wired case into:
+      - `test/neovm/vm-compat/cases/default.list`
+    - lock-ins assert:
+      - zero-arg call preserves:
+        - `(error "Window system is not in use or not initialized")`
+      - over-arity payloads remain exact:
+        - `(wrong-number-of-arguments x-apply-session-resources 1)`
+        - `(wrong-number-of-arguments x-apply-session-resources 2)`
+
 - Continue compatibility-first maintenance with small commit slices:
   - keep builtin surface and registry in lock-step
   - run oracle/parity checks after each behavior-affecting change

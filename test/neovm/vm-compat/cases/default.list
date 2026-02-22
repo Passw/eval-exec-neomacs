@@ -497,6 +497,7 @@ cases/x-popup-restack-semantics
 cases/x-clipboard-input-context-semantics
 cases/x-color-selection-gui-alias-semantics
 cases/x-selection-property-tip-internal-semantics
+cases/x-apply-session-resources-arity-payload-semantics
 cases/x-backspace-delete-keys-designator-structure-semantics
 cases/x-get-atom-name-designator-structure-semantics
 cases/x-get-resource-arity-payload-semantics
