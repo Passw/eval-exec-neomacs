@@ -13877,17 +13877,12 @@ pub(crate) fn dispatch_builtin(
         "visited-file-modtime" => super::fileio::builtin_visited_file_modtime(args),
         "default-file-modes" => super::fileio::builtin_default_file_modes(args),
         "set-default-file-modes" => super::fileio::builtin_set_default_file_modes(args),
-        "delete-file" => super::fileio::builtin_delete_file(args),
         "delete-file-internal" => super::fileio::builtin_delete_file_internal(args),
         "delete-directory" => super::fileio::builtin_delete_directory(args),
         "delete-directory-internal" => super::fileio::builtin_delete_directory_internal(args),
-        "rename-file" => super::fileio::builtin_rename_file(args),
-        "copy-file" => super::fileio::builtin_copy_file(args),
         "add-name-to-file" => super::fileio::builtin_add_name_to_file(args),
         "make-symbolic-link" => super::fileio::builtin_make_symbolic_link(args),
-        "make-directory" => super::fileio::builtin_make_directory(args),
         "make-directory-internal" => super::fileio::builtin_make_directory_internal(args),
-        "make-temp-file" => super::fileio::builtin_make_temp_file(args),
         "make-temp-name" => super::fileio::builtin_make_temp_name(args),
         "make-nearby-temp-file" => super::fileio::builtin_make_nearby_temp_file(args),
         "next-read-file-uses-dialog-p" => super::fileio::builtin_next_read_file_uses_dialog_p(args),
@@ -15066,7 +15061,11 @@ pub(crate) fn dispatch_builtin_pure(name: &str, args: Vec<Value>) -> Option<Eval
         | "format"
         | "format-message"
         | "error"
+        | "copy-file"
+        | "delete-file"
         | "indirect-variable"
+        | "make-directory"
+        | "make-temp-file"
         | "macroexpand"
         | "message"
         | "message-box"
@@ -15075,6 +15074,7 @@ pub(crate) fn dispatch_builtin_pure(name: &str, args: Vec<Value>) -> Option<Eval
         | "prin1"
         | "prin1-to-string"
         | "print"
+        | "rename-file"
         | "setplist"
         | "terpri"
         | "write-char"
@@ -19406,9 +19406,13 @@ mod tests {
     #[test]
     fn dispatch_builtin_pure_defers_evaluator_window_accessors_and_mutators() {
         assert!(dispatch_builtin_pure("functionp", vec![]).is_none());
+        assert!(dispatch_builtin_pure("copy-file", vec![]).is_none());
+        assert!(dispatch_builtin_pure("delete-file", vec![]).is_none());
         assert!(dispatch_builtin_pure("format", vec![]).is_none());
         assert!(dispatch_builtin_pure("format-message", vec![]).is_none());
         assert!(dispatch_builtin_pure("indirect-variable", vec![]).is_none());
+        assert!(dispatch_builtin_pure("make-directory", vec![]).is_none());
+        assert!(dispatch_builtin_pure("make-temp-file", vec![]).is_none());
         assert!(dispatch_builtin_pure("macroexpand", vec![]).is_none());
         assert!(dispatch_builtin_pure("message", vec![]).is_none());
         assert!(dispatch_builtin_pure("message-box", vec![]).is_none());
@@ -19418,6 +19422,7 @@ mod tests {
         assert!(dispatch_builtin_pure("prin1", vec![]).is_none());
         assert!(dispatch_builtin_pure("prin1-to-string", vec![]).is_none());
         assert!(dispatch_builtin_pure("print", vec![]).is_none());
+        assert!(dispatch_builtin_pure("rename-file", vec![]).is_none());
         assert!(dispatch_builtin_pure("setplist", vec![]).is_none());
         assert!(dispatch_builtin_pure("terpri", vec![]).is_none());
         assert!(dispatch_builtin_pure("write-char", vec![]).is_none());
