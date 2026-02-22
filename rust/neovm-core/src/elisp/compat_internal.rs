@@ -99,16 +99,6 @@ fn expect_sequencep(value: &Value) -> Result<(), Flow> {
     }
 }
 
-fn expect_arrayp(value: &Value) -> Result<(), Flow> {
-    match value {
-        Value::Vector(_) | Value::Str(_) => Ok(()),
-        other => Err(signal(
-            "wrong-type-argument",
-            vec![Value::symbol("arrayp"), other.clone()],
-        )),
-    }
-}
-
 fn expect_vector_or_char_table_p(value: &Value) -> Result<(), Flow> {
     match value {
         Value::Vector(_) => Ok(()),
@@ -1074,71 +1064,6 @@ pub(crate) fn builtin_internal_set_buffer_modified_tick(args: Vec<Value>) -> Eva
     Ok(Value::Nil)
 }
 
-/// `(define-fringe-bitmap NAME BITS &optional HEIGHT WIDTH ALIGN)` -> NAME.
-pub(crate) fn builtin_define_fringe_bitmap(args: Vec<Value>) -> EvalResult {
-    expect_range_args("define-fringe-bitmap", &args, 2, 5)?;
-    expect_symbolp(&args[0])?;
-    expect_arrayp(&args[1])?;
-
-    if let Some(height) = args.get(2) {
-        if !height.is_nil() {
-            let _ = expect_fixnum(height)?;
-        }
-    }
-    if let Some(width) = args.get(3) {
-        if !width.is_nil() {
-            let _ = expect_fixnum(width)?;
-        }
-    }
-    if let Some(align) = args.get(4) {
-        if !align.is_nil() && align.as_symbol_name().is_none() {
-            return Err(signal("error", vec![Value::string("Bad align argument")]));
-        }
-    }
-
-    Ok(args[0].clone())
-}
-
-/// `(destroy-fringe-bitmap NAME)` -> nil.
-pub(crate) fn builtin_destroy_fringe_bitmap(args: Vec<Value>) -> EvalResult {
-    expect_args("destroy-fringe-bitmap", &args, 1)?;
-    expect_symbolp(&args[0])?;
-    Ok(Value::Nil)
-}
-
-/// `(display--line-is-continued-p)` -> nil.
-pub(crate) fn builtin_display_line_is_continued_p(args: Vec<Value>) -> EvalResult {
-    expect_args("display--line-is-continued-p", &args, 0)?;
-    Ok(Value::Nil)
-}
-
-/// `(display--update-for-mouse-movement X Y)` -> nil.
-pub(crate) fn builtin_display_update_for_mouse_movement(args: Vec<Value>) -> EvalResult {
-    expect_args("display--update-for-mouse-movement", &args, 2)?;
-    let _ = expect_fixnum(&args[0])?;
-    let _ = expect_fixnum(&args[1])?;
-    Ok(Value::Nil)
-}
-
-/// `(do-auto-save &optional NO-MESSAGE CURRENT-ONLY)` -> nil.
-pub(crate) fn builtin_do_auto_save(args: Vec<Value>) -> EvalResult {
-    expect_range_args("do-auto-save", &args, 0, 2)?;
-    Ok(Value::Nil)
-}
-
-/// `(external-debugging-output CHAR)` -> CHAR.
-pub(crate) fn builtin_external_debugging_output(args: Vec<Value>) -> EvalResult {
-    expect_args("external-debugging-output", &args, 1)?;
-    let ch = expect_fixnum(&args[0])?;
-    if ch < 0 {
-        return Err(signal(
-            "error",
-            vec![Value::string("Invalid character: f03fffff")],
-        ));
-    }
-    Ok(Value::Int(ch))
-}
-
 /// `(describe-buffer-bindings BUFFER &optional PREFIXES MENUS)` -> nil.
 pub(crate) fn builtin_describe_buffer_bindings(args: Vec<Value>) -> EvalResult {
     expect_range_args("describe-buffer-bindings", &args, 1, 3)?;
@@ -1315,7 +1240,8 @@ mod tests {
 
     #[test]
     fn external_debugging_rejects_negative_fixnum() {
-        let err = builtin_external_debugging_output(vec![Value::Int(-1)]).unwrap_err();
+        let err = crate::elisp::builtins::builtin_external_debugging_output(vec![Value::Int(-1)])
+            .unwrap_err();
         match err {
             Flow::Signal(sig) => assert_eq!(sig.symbol, "error"),
             other => panic!("expected signal, got {other:?}"),

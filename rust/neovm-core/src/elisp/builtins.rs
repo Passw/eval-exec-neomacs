@@ -6999,6 +6999,80 @@ pub(crate) fn builtin_find_coding_systems_region_internal(args: Vec<Value>) -> E
     Ok(Value::True)
 }
 
+pub(crate) fn builtin_define_fringe_bitmap(args: Vec<Value>) -> EvalResult {
+    expect_range_args("define-fringe-bitmap", &args, 2, 5)?;
+    if args[0].as_symbol_name().is_none() {
+        return Err(signal(
+            "wrong-type-argument",
+            vec![Value::symbol("symbolp"), args[0].clone()],
+        ));
+    }
+    if !matches!(args[1], Value::Vector(_) | Value::Str(_)) {
+        return Err(signal(
+            "wrong-type-argument",
+            vec![Value::symbol("arrayp"), args[1].clone()],
+        ));
+    }
+
+    if let Some(height) = args.get(2) {
+        if !height.is_nil() {
+            let _ = expect_fixnum(height)?;
+        }
+    }
+    if let Some(width) = args.get(3) {
+        if !width.is_nil() {
+            let _ = expect_fixnum(width)?;
+        }
+    }
+    if let Some(align) = args.get(4) {
+        if !align.is_nil() && align.as_symbol_name().is_none() {
+            return Err(signal("error", vec![Value::string("Bad align argument")]));
+        }
+    }
+
+    Ok(args[0].clone())
+}
+
+pub(crate) fn builtin_destroy_fringe_bitmap(args: Vec<Value>) -> EvalResult {
+    expect_args("destroy-fringe-bitmap", &args, 1)?;
+    if args[0].as_symbol_name().is_none() {
+        return Err(signal(
+            "wrong-type-argument",
+            vec![Value::symbol("symbolp"), args[0].clone()],
+        ));
+    }
+    Ok(Value::Nil)
+}
+
+pub(crate) fn builtin_display_line_is_continued_p(args: Vec<Value>) -> EvalResult {
+    expect_args("display--line-is-continued-p", &args, 0)?;
+    Ok(Value::Nil)
+}
+
+pub(crate) fn builtin_display_update_for_mouse_movement(args: Vec<Value>) -> EvalResult {
+    expect_args("display--update-for-mouse-movement", &args, 2)?;
+    let _ = expect_fixnum(&args[0])?;
+    let _ = expect_fixnum(&args[1])?;
+    Ok(Value::Nil)
+}
+
+pub(crate) fn builtin_do_auto_save(args: Vec<Value>) -> EvalResult {
+    expect_range_args("do-auto-save", &args, 0, 2)?;
+    Ok(Value::Nil)
+}
+
+pub(crate) fn builtin_external_debugging_output(args: Vec<Value>) -> EvalResult {
+    expect_args("external-debugging-output", &args, 1)?;
+    let ch = expect_fixnum(&args[0])?;
+    if ch < 0 {
+        return Err(signal(
+            "error",
+            vec![Value::string("Invalid character: f03fffff")],
+        ));
+    }
+    Ok(Value::Int(ch))
+}
+
 fn inotify_next_watch_id_store() -> &'static Mutex<i64> {
     static NEXT: OnceLock<Mutex<i64>> = OnceLock::new();
     NEXT.get_or_init(|| Mutex::new(0))
@@ -15800,18 +15874,12 @@ pub(crate) fn dispatch_builtin(
         "custom-set-faces" => super::custom::builtin_custom_set_faces(args),
 
         // Internal compatibility surface (pure)
-        "define-fringe-bitmap" => super::compat_internal::builtin_define_fringe_bitmap(args),
-        "destroy-fringe-bitmap" => super::compat_internal::builtin_destroy_fringe_bitmap(args),
-        "display--line-is-continued-p" => {
-            super::compat_internal::builtin_display_line_is_continued_p(args)
-        }
-        "display--update-for-mouse-movement" => {
-            super::compat_internal::builtin_display_update_for_mouse_movement(args)
-        }
-        "do-auto-save" => super::compat_internal::builtin_do_auto_save(args),
-        "external-debugging-output" => {
-            super::compat_internal::builtin_external_debugging_output(args)
-        }
+        "define-fringe-bitmap" => builtin_define_fringe_bitmap(args),
+        "destroy-fringe-bitmap" => builtin_destroy_fringe_bitmap(args),
+        "display--line-is-continued-p" => builtin_display_line_is_continued_p(args),
+        "display--update-for-mouse-movement" => builtin_display_update_for_mouse_movement(args),
+        "do-auto-save" => builtin_do_auto_save(args),
+        "external-debugging-output" => builtin_external_debugging_output(args),
         "describe-buffer-bindings" => {
             super::compat_internal::builtin_describe_buffer_bindings(args)
         }
@@ -16681,18 +16749,12 @@ pub(crate) fn dispatch_builtin_pure(name: &str, args: Vec<Value>) -> Option<Eval
         "display-pixel-width" => super::display::builtin_display_pixel_width(args),
         "display-pixel-height" => super::display::builtin_display_pixel_height(args),
         // Internal compatibility surface (pure)
-        "define-fringe-bitmap" => super::compat_internal::builtin_define_fringe_bitmap(args),
-        "destroy-fringe-bitmap" => super::compat_internal::builtin_destroy_fringe_bitmap(args),
-        "display--line-is-continued-p" => {
-            super::compat_internal::builtin_display_line_is_continued_p(args)
-        }
-        "display--update-for-mouse-movement" => {
-            super::compat_internal::builtin_display_update_for_mouse_movement(args)
-        }
-        "do-auto-save" => super::compat_internal::builtin_do_auto_save(args),
-        "external-debugging-output" => {
-            super::compat_internal::builtin_external_debugging_output(args)
-        }
+        "define-fringe-bitmap" => builtin_define_fringe_bitmap(args),
+        "destroy-fringe-bitmap" => builtin_destroy_fringe_bitmap(args),
+        "display--line-is-continued-p" => builtin_display_line_is_continued_p(args),
+        "display--update-for-mouse-movement" => builtin_display_update_for_mouse_movement(args),
+        "do-auto-save" => builtin_do_auto_save(args),
+        "external-debugging-output" => builtin_external_debugging_output(args),
         "describe-buffer-bindings" => {
             super::compat_internal::builtin_describe_buffer_bindings(args)
         }
@@ -22106,6 +22168,48 @@ mod tests {
         .expect("find-coding-systems-region-internal should resolve")
         .expect("find-coding-systems-region-internal should evaluate");
         assert_eq!(coding, Value::True);
+    }
+
+    #[test]
+    fn dispatch_builtin_pure_handles_fringe_display_and_debug_output_placeholders() {
+        let bitmap = dispatch_builtin_pure(
+            "define-fringe-bitmap",
+            vec![Value::symbol("neo"), Value::vector(vec![Value::Int(0)])],
+        )
+        .expect("define-fringe-bitmap should resolve")
+        .expect("define-fringe-bitmap should evaluate");
+        assert_eq!(bitmap, Value::symbol("neo"));
+
+        let destroy = dispatch_builtin_pure("destroy-fringe-bitmap", vec![Value::symbol("neo")])
+            .expect("destroy-fringe-bitmap should resolve")
+            .expect("destroy-fringe-bitmap should evaluate");
+        assert_eq!(destroy, Value::Nil);
+
+        let line = dispatch_builtin_pure("display--line-is-continued-p", vec![])
+            .expect("display--line-is-continued-p should resolve")
+            .expect("display--line-is-continued-p should evaluate");
+        assert_eq!(line, Value::Nil);
+
+        let update = dispatch_builtin_pure(
+            "display--update-for-mouse-movement",
+            vec![Value::Int(0), Value::Int(0)],
+        )
+        .expect("display--update-for-mouse-movement should resolve")
+        .expect("display--update-for-mouse-movement should evaluate");
+        assert_eq!(update, Value::Nil);
+
+        let autosave = dispatch_builtin_pure("do-auto-save", vec![])
+            .expect("do-auto-save should resolve")
+            .expect("do-auto-save should evaluate");
+        assert_eq!(autosave, Value::Nil);
+
+        let err = dispatch_builtin_pure("external-debugging-output", vec![Value::Int(-1)])
+            .expect("external-debugging-output should resolve")
+            .unwrap_err();
+        match err {
+            Flow::Signal(sig) => assert_eq!(sig.symbol, "error"),
+            other => panic!("expected signal, got {other:?}"),
+        }
     }
 
     #[test]
