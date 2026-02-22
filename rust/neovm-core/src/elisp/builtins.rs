@@ -15072,6 +15072,7 @@ pub(crate) fn dispatch_builtin(
 pub(crate) fn dispatch_builtin_pure(name: &str, args: Vec<Value>) -> Option<EvalResult> {
     match name {
         "functionp"
+        | "format"
         | "assoc"
         | "alist-get"
         | "plist-member"
@@ -19414,6 +19415,7 @@ mod tests {
     #[test]
     fn dispatch_builtin_pure_defers_evaluator_window_accessors_and_mutators() {
         assert!(dispatch_builtin_pure("functionp", vec![]).is_none());
+        assert!(dispatch_builtin_pure("format", vec![]).is_none());
         assert!(dispatch_builtin_pure("assoc", vec![]).is_none());
         assert!(dispatch_builtin_pure("alist-get", vec![]).is_none());
         assert!(dispatch_builtin_pure("plist-member", vec![]).is_none());
