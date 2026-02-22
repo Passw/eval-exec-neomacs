@@ -19809,6 +19809,20 @@ Last updated: 2026-02-21
       - `x-display-pixel-height`
       - both preserve `(error "Window system frame should be used")`
 
+- Added dedicated `x-backspace-delete-keys-p` designator/structure lock-ins:
+  - vm-compat corpus changes:
+    - added:
+      - `test/neovm/vm-compat/cases/x-backspace-delete-keys-designator-structure-semantics.forms`
+      - `test/neovm/vm-compat/cases/x-backspace-delete-keys-designator-structure-semantics.expected.tsv`
+    - wired case into:
+      - `test/neovm/vm-compat/cases/default.list`
+    - lock-ins assert:
+      - no-arg/`nil`/selected-frame calls preserve `(error "Window system frame should be used")`
+      - non-frame designators preserve `wrong-type-argument` + `frame-live-p` payload structure
+      - terminal/live-window/dead-window payload shapes remain stable via predicate checks
+      - two-arg over-arity payload remains exact:
+        - `(wrong-number-of-arguments x-backspace-delete-keys-p 2)`
+
 - Continue compatibility-first maintenance with small commit slices:
   - keep builtin surface and registry in lock-step
   - run oracle/parity checks after each behavior-affecting change
