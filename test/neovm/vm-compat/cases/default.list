@@ -449,6 +449,7 @@ cases/display-control-subr-arity-semantics
 cases/window-nav-helper-subr-arity-semantics
 cases/display-tty-x-helper-semantics
 cases/frame-window-designator-boundary-semantics
+cases/frame-window-predicate-callable-path-semantics
 cases/window-frame-subr-arity-semantics
 cases/window-alias-introspection-semantics
 cases/x-display-batch-semantics
