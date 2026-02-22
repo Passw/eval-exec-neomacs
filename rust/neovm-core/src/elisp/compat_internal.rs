@@ -1726,30 +1726,6 @@ pub(crate) fn builtin_make_record(args: Vec<Value>) -> EvalResult {
     Ok(Value::Nil)
 }
 
-/// `(map-charset-chars FUNCTION CHARSET &optional ARG FROM TO)` -> nil.
-pub(crate) fn builtin_map_charset_chars(args: Vec<Value>) -> EvalResult {
-    expect_range_args("map-charset-chars", &args, 2, 5)?;
-    Ok(Value::Nil)
-}
-
-/// `(map-keymap FUNCTION KEYMAP &optional SORT-FIRST)` -> nil.
-pub(crate) fn builtin_map_keymap(args: Vec<Value>) -> EvalResult {
-    expect_range_args("map-keymap", &args, 2, 3)?;
-    Ok(Value::Nil)
-}
-
-/// `(map-keymap-internal FUNCTION KEYMAP)` -> nil.
-pub(crate) fn builtin_map_keymap_internal(args: Vec<Value>) -> EvalResult {
-    expect_args("map-keymap-internal", &args, 2)?;
-    Ok(Value::Nil)
-}
-
-/// `(mapbacktrace FUNCTION &optional BASE)` -> nil.
-pub(crate) fn builtin_mapbacktrace(args: Vec<Value>) -> EvalResult {
-    expect_range_args("mapbacktrace", &args, 1, 2)?;
-    Ok(Value::Nil)
-}
-
 /// `(dump-emacs-portable FILE &optional TRACK-REFERRERS)` -> nil.
 pub(crate) fn builtin_dump_emacs_portable(args: Vec<Value>) -> EvalResult {
     expect_range_args("dump-emacs-portable", &args, 1, 2)?;

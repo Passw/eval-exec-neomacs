@@ -5687,6 +5687,26 @@ pub(crate) fn builtin_re_describe_compiled(args: Vec<Value>) -> EvalResult {
     Ok(Value::Nil)
 }
 
+pub(crate) fn builtin_map_charset_chars(args: Vec<Value>) -> EvalResult {
+    expect_range_args("map-charset-chars", &args, 2, 5)?;
+    Ok(Value::Nil)
+}
+
+pub(crate) fn builtin_map_keymap(args: Vec<Value>) -> EvalResult {
+    expect_range_args("map-keymap", &args, 2, 3)?;
+    Ok(Value::Nil)
+}
+
+pub(crate) fn builtin_map_keymap_internal(args: Vec<Value>) -> EvalResult {
+    expect_args("map-keymap-internal", &args, 2)?;
+    Ok(Value::Nil)
+}
+
+pub(crate) fn builtin_mapbacktrace(args: Vec<Value>) -> EvalResult {
+    expect_range_args("mapbacktrace", &args, 1, 2)?;
+    Ok(Value::Nil)
+}
+
 // ===========================================================================
 // Hook system (need evaluator)
 // ===========================================================================
@@ -14594,10 +14614,10 @@ pub(crate) fn dispatch_builtin(
         }
         "make-record" => super::compat_internal::builtin_make_record(args),
         "make-temp-file-internal" => builtin_make_temp_file_internal(args),
-        "map-charset-chars" => super::compat_internal::builtin_map_charset_chars(args),
-        "map-keymap" => super::compat_internal::builtin_map_keymap(args),
-        "map-keymap-internal" => super::compat_internal::builtin_map_keymap_internal(args),
-        "mapbacktrace" => super::compat_internal::builtin_mapbacktrace(args),
+        "map-charset-chars" => builtin_map_charset_chars(args),
+        "map-keymap" => builtin_map_keymap(args),
+        "map-keymap-internal" => builtin_map_keymap_internal(args),
+        "mapbacktrace" => builtin_mapbacktrace(args),
         "match-data--translate" => super::compat_internal::builtin_match_data_translate(args),
         "memory-info" => super::compat_internal::builtin_memory_info(args),
         "make-frame-invisible" => super::compat_internal::builtin_make_frame_invisible(args),
@@ -15561,10 +15581,10 @@ pub(crate) fn dispatch_builtin_pure(name: &str, args: Vec<Value>) -> Option<Eval
         }
         "make-record" => super::compat_internal::builtin_make_record(args),
         "make-temp-file-internal" => builtin_make_temp_file_internal(args),
-        "map-charset-chars" => super::compat_internal::builtin_map_charset_chars(args),
-        "map-keymap" => super::compat_internal::builtin_map_keymap(args),
-        "map-keymap-internal" => super::compat_internal::builtin_map_keymap_internal(args),
-        "mapbacktrace" => super::compat_internal::builtin_mapbacktrace(args),
+        "map-charset-chars" => builtin_map_charset_chars(args),
+        "map-keymap" => builtin_map_keymap(args),
+        "map-keymap-internal" => builtin_map_keymap_internal(args),
+        "mapbacktrace" => builtin_mapbacktrace(args),
         "match-data--translate" => super::compat_internal::builtin_match_data_translate(args),
         "memory-info" => super::compat_internal::builtin_memory_info(args),
         "make-frame-invisible" => super::compat_internal::builtin_make_frame_invisible(args),
@@ -19269,6 +19289,33 @@ mod tests {
         .expect("builtin re--describe-compiled should resolve with indent")
         .expect("builtin re--describe-compiled should evaluate with indent");
         assert!(re_indent.is_nil());
+    }
+
+    #[test]
+    fn pure_dispatch_map_placeholders_match_compat_contracts() {
+        let map_charset_chars = dispatch_builtin_pure(
+            "map-charset-chars",
+            vec![Value::Nil, Value::symbol("unicode"), Value::Nil],
+        )
+        .expect("builtin map-charset-chars should resolve")
+        .expect("builtin map-charset-chars should evaluate");
+        assert!(map_charset_chars.is_nil());
+
+        let map_keymap = dispatch_builtin_pure("map-keymap", vec![Value::Nil, Value::Nil])
+            .expect("builtin map-keymap should resolve")
+            .expect("builtin map-keymap should evaluate");
+        assert!(map_keymap.is_nil());
+
+        let map_keymap_internal =
+            dispatch_builtin_pure("map-keymap-internal", vec![Value::Nil, Value::Nil])
+                .expect("builtin map-keymap-internal should resolve")
+                .expect("builtin map-keymap-internal should evaluate");
+        assert!(map_keymap_internal.is_nil());
+
+        let mapbacktrace = dispatch_builtin_pure("mapbacktrace", vec![Value::Nil])
+            .expect("builtin mapbacktrace should resolve")
+            .expect("builtin mapbacktrace should evaluate");
+        assert!(mapbacktrace.is_nil());
     }
 
     #[test]
