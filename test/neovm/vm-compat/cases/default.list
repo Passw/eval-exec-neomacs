@@ -540,6 +540,7 @@ cases/delete-other-windows-current-buffer-semantics
 cases/split-delete-window-designator-error-semantics
 cases/delete-window-arity-semantics
 cases/split-window-arity-semantics
+cases/split-delete-window-callable-path-semantics
 cases/fit-window-to-buffer-designator-semantics
 cases/other-window-arity-semantics
 cases/window-accessor-arity-semantics
