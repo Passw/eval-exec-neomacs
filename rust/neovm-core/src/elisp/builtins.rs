@@ -6497,6 +6497,71 @@ pub(crate) fn builtin_treesit_node_descendant_for_range(args: Vec<Value>) -> Eva
     Ok(Value::Nil)
 }
 
+pub(crate) fn builtin_treesit_node_end(args: Vec<Value>) -> EvalResult {
+    expect_args("treesit-node-end", &args, 1)?;
+    Ok(Value::Nil)
+}
+
+pub(crate) fn builtin_treesit_node_eq(args: Vec<Value>) -> EvalResult {
+    expect_args("treesit-node-eq", &args, 2)?;
+    Ok(Value::Nil)
+}
+
+pub(crate) fn builtin_treesit_node_field_name_for_child(args: Vec<Value>) -> EvalResult {
+    expect_args("treesit-node-field-name-for-child", &args, 2)?;
+    Ok(Value::Nil)
+}
+
+pub(crate) fn builtin_treesit_node_first_child_for_pos(args: Vec<Value>) -> EvalResult {
+    expect_range_args("treesit-node-first-child-for-pos", &args, 2, 3)?;
+    Ok(Value::Nil)
+}
+
+pub(crate) fn builtin_treesit_node_match_p(args: Vec<Value>) -> EvalResult {
+    expect_range_args("treesit-node-match-p", &args, 2, 3)?;
+    Ok(Value::Nil)
+}
+
+pub(crate) fn builtin_treesit_node_next_sibling(args: Vec<Value>) -> EvalResult {
+    expect_range_args("treesit-node-next-sibling", &args, 1, 2)?;
+    Ok(Value::Nil)
+}
+
+pub(crate) fn builtin_treesit_node_p(args: Vec<Value>) -> EvalResult {
+    expect_args("treesit-node-p", &args, 1)?;
+    Ok(Value::Nil)
+}
+
+pub(crate) fn builtin_treesit_node_parent(args: Vec<Value>) -> EvalResult {
+    expect_args("treesit-node-parent", &args, 1)?;
+    Ok(Value::Nil)
+}
+
+pub(crate) fn builtin_treesit_node_parser(args: Vec<Value>) -> EvalResult {
+    expect_args("treesit-node-parser", &args, 1)?;
+    Ok(Value::Nil)
+}
+
+pub(crate) fn builtin_treesit_node_prev_sibling(args: Vec<Value>) -> EvalResult {
+    expect_range_args("treesit-node-prev-sibling", &args, 1, 2)?;
+    Ok(Value::Nil)
+}
+
+pub(crate) fn builtin_treesit_node_start(args: Vec<Value>) -> EvalResult {
+    expect_args("treesit-node-start", &args, 1)?;
+    Ok(Value::Nil)
+}
+
+pub(crate) fn builtin_treesit_node_string(args: Vec<Value>) -> EvalResult {
+    expect_args("treesit-node-string", &args, 1)?;
+    Ok(Value::Nil)
+}
+
+pub(crate) fn builtin_treesit_node_type(args: Vec<Value>) -> EvalResult {
+    expect_args("treesit-node-type", &args, 1)?;
+    Ok(Value::Nil)
+}
+
 // ===========================================================================
 // Hook system (need evaluator)
 // ===========================================================================
@@ -15559,27 +15624,19 @@ pub(crate) fn dispatch_builtin(
         "treesit-node-child-by-field-name" => builtin_treesit_node_child_by_field_name(args),
         "treesit-node-child-count" => builtin_treesit_node_child_count(args),
         "treesit-node-descendant-for-range" => builtin_treesit_node_descendant_for_range(args),
-        "treesit-node-end" => super::compat_internal::builtin_treesit_node_end(args),
-        "treesit-node-eq" => super::compat_internal::builtin_treesit_node_eq(args),
-        "treesit-node-field-name-for-child" => {
-            super::compat_internal::builtin_treesit_node_field_name_for_child(args)
-        }
-        "treesit-node-first-child-for-pos" => {
-            super::compat_internal::builtin_treesit_node_first_child_for_pos(args)
-        }
-        "treesit-node-match-p" => super::compat_internal::builtin_treesit_node_match_p(args),
-        "treesit-node-next-sibling" => {
-            super::compat_internal::builtin_treesit_node_next_sibling(args)
-        }
-        "treesit-node-p" => super::compat_internal::builtin_treesit_node_p(args),
-        "treesit-node-parent" => super::compat_internal::builtin_treesit_node_parent(args),
-        "treesit-node-parser" => super::compat_internal::builtin_treesit_node_parser(args),
-        "treesit-node-prev-sibling" => {
-            super::compat_internal::builtin_treesit_node_prev_sibling(args)
-        }
-        "treesit-node-start" => super::compat_internal::builtin_treesit_node_start(args),
-        "treesit-node-string" => super::compat_internal::builtin_treesit_node_string(args),
-        "treesit-node-type" => super::compat_internal::builtin_treesit_node_type(args),
+        "treesit-node-end" => builtin_treesit_node_end(args),
+        "treesit-node-eq" => builtin_treesit_node_eq(args),
+        "treesit-node-field-name-for-child" => builtin_treesit_node_field_name_for_child(args),
+        "treesit-node-first-child-for-pos" => builtin_treesit_node_first_child_for_pos(args),
+        "treesit-node-match-p" => builtin_treesit_node_match_p(args),
+        "treesit-node-next-sibling" => builtin_treesit_node_next_sibling(args),
+        "treesit-node-p" => builtin_treesit_node_p(args),
+        "treesit-node-parent" => builtin_treesit_node_parent(args),
+        "treesit-node-parser" => builtin_treesit_node_parser(args),
+        "treesit-node-prev-sibling" => builtin_treesit_node_prev_sibling(args),
+        "treesit-node-start" => builtin_treesit_node_start(args),
+        "treesit-node-string" => builtin_treesit_node_string(args),
+        "treesit-node-type" => builtin_treesit_node_type(args),
         "treesit-parser-add-notifier" => {
             super::compat_internal::builtin_treesit_parser_add_notifier(args)
         }
@@ -16456,27 +16513,19 @@ pub(crate) fn dispatch_builtin_pure(name: &str, args: Vec<Value>) -> Option<Eval
         "treesit-node-child-by-field-name" => builtin_treesit_node_child_by_field_name(args),
         "treesit-node-child-count" => builtin_treesit_node_child_count(args),
         "treesit-node-descendant-for-range" => builtin_treesit_node_descendant_for_range(args),
-        "treesit-node-end" => super::compat_internal::builtin_treesit_node_end(args),
-        "treesit-node-eq" => super::compat_internal::builtin_treesit_node_eq(args),
-        "treesit-node-field-name-for-child" => {
-            super::compat_internal::builtin_treesit_node_field_name_for_child(args)
-        }
-        "treesit-node-first-child-for-pos" => {
-            super::compat_internal::builtin_treesit_node_first_child_for_pos(args)
-        }
-        "treesit-node-match-p" => super::compat_internal::builtin_treesit_node_match_p(args),
-        "treesit-node-next-sibling" => {
-            super::compat_internal::builtin_treesit_node_next_sibling(args)
-        }
-        "treesit-node-p" => super::compat_internal::builtin_treesit_node_p(args),
-        "treesit-node-parent" => super::compat_internal::builtin_treesit_node_parent(args),
-        "treesit-node-parser" => super::compat_internal::builtin_treesit_node_parser(args),
-        "treesit-node-prev-sibling" => {
-            super::compat_internal::builtin_treesit_node_prev_sibling(args)
-        }
-        "treesit-node-start" => super::compat_internal::builtin_treesit_node_start(args),
-        "treesit-node-string" => super::compat_internal::builtin_treesit_node_string(args),
-        "treesit-node-type" => super::compat_internal::builtin_treesit_node_type(args),
+        "treesit-node-end" => builtin_treesit_node_end(args),
+        "treesit-node-eq" => builtin_treesit_node_eq(args),
+        "treesit-node-field-name-for-child" => builtin_treesit_node_field_name_for_child(args),
+        "treesit-node-first-child-for-pos" => builtin_treesit_node_first_child_for_pos(args),
+        "treesit-node-match-p" => builtin_treesit_node_match_p(args),
+        "treesit-node-next-sibling" => builtin_treesit_node_next_sibling(args),
+        "treesit-node-p" => builtin_treesit_node_p(args),
+        "treesit-node-parent" => builtin_treesit_node_parent(args),
+        "treesit-node-parser" => builtin_treesit_node_parser(args),
+        "treesit-node-prev-sibling" => builtin_treesit_node_prev_sibling(args),
+        "treesit-node-start" => builtin_treesit_node_start(args),
+        "treesit-node-string" => builtin_treesit_node_string(args),
+        "treesit-node-type" => builtin_treesit_node_type(args),
         "treesit-parser-add-notifier" => {
             super::compat_internal::builtin_treesit_parser_add_notifier(args)
         }
@@ -20955,6 +21004,80 @@ mod tests {
         .expect("builtin treesit-node-descendant-for-range should resolve")
         .expect("builtin treesit-node-descendant-for-range should evaluate");
         assert!(node_descendant.is_nil());
+    }
+
+    #[test]
+    fn pure_dispatch_treesit_node_placeholder_cluster_matches_compat_contracts() {
+        let node_end = dispatch_builtin_pure("treesit-node-end", vec![Value::Nil])
+            .expect("builtin treesit-node-end should resolve")
+            .expect("builtin treesit-node-end should evaluate");
+        assert!(node_end.is_nil());
+
+        let node_eq = dispatch_builtin_pure("treesit-node-eq", vec![Value::Nil, Value::Nil])
+            .expect("builtin treesit-node-eq should resolve")
+            .expect("builtin treesit-node-eq should evaluate");
+        assert!(node_eq.is_nil());
+
+        let field_name = dispatch_builtin_pure(
+            "treesit-node-field-name-for-child",
+            vec![Value::Nil, Value::Int(0)],
+        )
+        .expect("builtin treesit-node-field-name-for-child should resolve")
+        .expect("builtin treesit-node-field-name-for-child should evaluate");
+        assert!(field_name.is_nil());
+
+        let first_child_for_pos = dispatch_builtin_pure(
+            "treesit-node-first-child-for-pos",
+            vec![Value::Nil, Value::Int(0), Value::Nil],
+        )
+        .expect("builtin treesit-node-first-child-for-pos should resolve")
+        .expect("builtin treesit-node-first-child-for-pos should evaluate");
+        assert!(first_child_for_pos.is_nil());
+
+        let match_p = dispatch_builtin_pure("treesit-node-match-p", vec![Value::Nil, Value::Nil])
+            .expect("builtin treesit-node-match-p should resolve")
+            .expect("builtin treesit-node-match-p should evaluate");
+        assert!(match_p.is_nil());
+
+        let next_sibling = dispatch_builtin_pure("treesit-node-next-sibling", vec![Value::Nil])
+            .expect("builtin treesit-node-next-sibling should resolve")
+            .expect("builtin treesit-node-next-sibling should evaluate");
+        assert!(next_sibling.is_nil());
+
+        let node_p = dispatch_builtin_pure("treesit-node-p", vec![Value::Nil])
+            .expect("builtin treesit-node-p should resolve")
+            .expect("builtin treesit-node-p should evaluate");
+        assert!(node_p.is_nil());
+
+        let parent = dispatch_builtin_pure("treesit-node-parent", vec![Value::Nil])
+            .expect("builtin treesit-node-parent should resolve")
+            .expect("builtin treesit-node-parent should evaluate");
+        assert!(parent.is_nil());
+
+        let parser = dispatch_builtin_pure("treesit-node-parser", vec![Value::Nil])
+            .expect("builtin treesit-node-parser should resolve")
+            .expect("builtin treesit-node-parser should evaluate");
+        assert!(parser.is_nil());
+
+        let prev_sibling = dispatch_builtin_pure("treesit-node-prev-sibling", vec![Value::Nil])
+            .expect("builtin treesit-node-prev-sibling should resolve")
+            .expect("builtin treesit-node-prev-sibling should evaluate");
+        assert!(prev_sibling.is_nil());
+
+        let start = dispatch_builtin_pure("treesit-node-start", vec![Value::Nil])
+            .expect("builtin treesit-node-start should resolve")
+            .expect("builtin treesit-node-start should evaluate");
+        assert!(start.is_nil());
+
+        let node_string = dispatch_builtin_pure("treesit-node-string", vec![Value::Nil])
+            .expect("builtin treesit-node-string should resolve")
+            .expect("builtin treesit-node-string should evaluate");
+        assert!(node_string.is_nil());
+
+        let node_type = dispatch_builtin_pure("treesit-node-type", vec![Value::Nil])
+            .expect("builtin treesit-node-type should resolve")
+            .expect("builtin treesit-node-type should evaluate");
+        assert!(node_type.is_nil());
     }
 
     #[test]
