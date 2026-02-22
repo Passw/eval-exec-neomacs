@@ -3353,6 +3353,11 @@ pub(crate) fn builtin_daemonp(args: Vec<Value>) -> EvalResult {
     Ok(Value::Nil)
 }
 
+pub(crate) fn builtin_json_available_p(args: Vec<Value>) -> EvalResult {
+    expect_args("json-available-p", &args, 0)?;
+    Ok(Value::True)
+}
+
 pub(crate) fn builtin_daemon_initialized(args: Vec<Value>) -> EvalResult {
     expect_args("daemon-initialized", &args, 0)?;
     Err(signal(
@@ -16773,6 +16778,7 @@ pub(crate) fn dispatch_builtin(
         "current-idle-time" => builtin_current_idle_time(args),
         "get-internal-run-time" => builtin_get_internal_run_time(args),
         "float-time" => builtin_float_time(args),
+        "json-available-p" => builtin_json_available_p(args),
         "daemonp" => builtin_daemonp(args),
         "daemon-initialized" => builtin_daemon_initialized(args),
         "flush-standard-output" => builtin_flush_standard_output(args),
@@ -17963,6 +17969,7 @@ pub(crate) fn dispatch_builtin_pure(name: &str, args: Vec<Value>) -> Option<Eval
         "current-idle-time" => builtin_current_idle_time(args),
         "get-internal-run-time" => builtin_get_internal_run_time(args),
         "float-time" => builtin_float_time(args),
+        "json-available-p" => builtin_json_available_p(args),
         "daemonp" => builtin_daemonp(args),
         "daemon-initialized" => builtin_daemon_initialized(args),
         "flush-standard-output" => builtin_flush_standard_output(args),

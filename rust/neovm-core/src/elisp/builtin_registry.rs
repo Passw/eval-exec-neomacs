@@ -760,6 +760,7 @@ const DISPATCH_BUILTIN_NAMES: &[&str] = &[
     "isearch-process-search-char",
     "isearch-process-search-string",
     "isnan",
+    "json-available-p",
     "json-insert",
     "json-parse-buffer",
     "json-parse-string",

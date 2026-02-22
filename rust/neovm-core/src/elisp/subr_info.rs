@@ -1274,6 +1274,7 @@ fn subr_arity_value(name: &str) -> Value {
         "read-key-sequence" | "read-key-sequence-vector" => arity_cons(1, Some(6)),
         "read-non-nil-coding-system" => arity_cons(1, Some(1)),
         "json-insert" | "json-parse-string" | "json-serialize" => arity_cons(1, None),
+        "json-available-p" => arity_cons(0, Some(0)),
         "kbd" | "key-valid-p" | "keymap-parent" | "keymapp" | "listify-key-sequence" => {
             arity_cons(1, Some(1))
         }
@@ -3968,6 +3969,7 @@ mod tests {
         assert_subr_arity("insert-abbrev-table-description", 1, Some(2));
         assert_subr_arity("insert-image", 1, Some(5));
         assert_subr_arity("json-insert", 1, None);
+        assert_subr_arity("json-available-p", 0, Some(0));
         assert_subr_arity("json-parse-string", 1, None);
         assert_subr_arity("json-serialize", 1, None);
         assert_subr_arity("libxml-available-p", 0, Some(0));
