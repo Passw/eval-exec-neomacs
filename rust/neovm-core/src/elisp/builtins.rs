@@ -7073,6 +7073,31 @@ pub(crate) fn builtin_external_debugging_output(args: Vec<Value>) -> EvalResult 
     Ok(Value::Int(ch))
 }
 
+pub(crate) fn builtin_internal_define_uninitialized_variable(args: Vec<Value>) -> EvalResult {
+    expect_range_args("internal--define-uninitialized-variable", &args, 1, 2)?;
+    Ok(Value::Nil)
+}
+
+pub(crate) fn builtin_internal_labeled_narrow_to_region(args: Vec<Value>) -> EvalResult {
+    expect_args("internal--labeled-narrow-to-region", &args, 3)?;
+    Ok(Value::Nil)
+}
+
+pub(crate) fn builtin_internal_labeled_widen(args: Vec<Value>) -> EvalResult {
+    expect_args("internal--labeled-widen", &args, 1)?;
+    Ok(Value::Nil)
+}
+
+pub(crate) fn builtin_internal_obarray_buckets(args: Vec<Value>) -> EvalResult {
+    expect_args("internal--obarray-buckets", &args, 1)?;
+    Ok(Value::Nil)
+}
+
+pub(crate) fn builtin_internal_set_buffer_modified_tick(args: Vec<Value>) -> EvalResult {
+    expect_range_args("internal--set-buffer-modified-tick", &args, 1, 2)?;
+    Ok(Value::Nil)
+}
+
 fn inotify_next_watch_id_store() -> &'static Mutex<i64> {
     static NEXT: OnceLock<Mutex<i64>> = OnceLock::new();
     NEXT.get_or_init(|| Mutex::new(0))
@@ -15977,18 +16002,12 @@ pub(crate) fn dispatch_builtin(
         "help--describe-vector" => super::compat_internal::builtin_help_describe_vector(args),
         "init-image-library" => super::compat_internal::builtin_init_image_library(args),
         "internal--define-uninitialized-variable" => {
-            super::compat_internal::builtin_internal_define_uninitialized_variable(args)
+            builtin_internal_define_uninitialized_variable(args)
         }
-        "internal--labeled-narrow-to-region" => {
-            super::compat_internal::builtin_internal_labeled_narrow_to_region(args)
-        }
-        "internal--labeled-widen" => super::compat_internal::builtin_internal_labeled_widen(args),
-        "internal--obarray-buckets" => {
-            super::compat_internal::builtin_internal_obarray_buckets(args)
-        }
-        "internal--set-buffer-modified-tick" => {
-            super::compat_internal::builtin_internal_set_buffer_modified_tick(args)
-        }
+        "internal--labeled-narrow-to-region" => builtin_internal_labeled_narrow_to_region(args),
+        "internal--labeled-widen" => builtin_internal_labeled_widen(args),
+        "internal--obarray-buckets" => builtin_internal_obarray_buckets(args),
+        "internal--set-buffer-modified-tick" => builtin_internal_set_buffer_modified_tick(args),
         "internal--before-save-selected-window" => {
             builtin_internal_before_save_selected_window(eval, args)
         }
@@ -16852,18 +16871,12 @@ pub(crate) fn dispatch_builtin_pure(name: &str, args: Vec<Value>) -> Option<Eval
         "help--describe-vector" => super::compat_internal::builtin_help_describe_vector(args),
         "init-image-library" => super::compat_internal::builtin_init_image_library(args),
         "internal--define-uninitialized-variable" => {
-            super::compat_internal::builtin_internal_define_uninitialized_variable(args)
+            builtin_internal_define_uninitialized_variable(args)
         }
-        "internal--labeled-narrow-to-region" => {
-            super::compat_internal::builtin_internal_labeled_narrow_to_region(args)
-        }
-        "internal--labeled-widen" => super::compat_internal::builtin_internal_labeled_widen(args),
-        "internal--obarray-buckets" => {
-            super::compat_internal::builtin_internal_obarray_buckets(args)
-        }
-        "internal--set-buffer-modified-tick" => {
-            super::compat_internal::builtin_internal_set_buffer_modified_tick(args)
-        }
+        "internal--labeled-narrow-to-region" => builtin_internal_labeled_narrow_to_region(args),
+        "internal--labeled-widen" => builtin_internal_labeled_widen(args),
+        "internal--obarray-buckets" => builtin_internal_obarray_buckets(args),
+        "internal--set-buffer-modified-tick" => builtin_internal_set_buffer_modified_tick(args),
         "internal--track-mouse" => builtin_internal_track_mouse(args),
         "internal-char-font" => builtin_internal_char_font(args),
         "internal-complete-buffer" => builtin_internal_complete_buffer(args),
@@ -22210,6 +22223,44 @@ mod tests {
             Flow::Signal(sig) => assert_eq!(sig.symbol, "error"),
             other => panic!("expected signal, got {other:?}"),
         }
+    }
+
+    #[test]
+    fn dispatch_builtin_pure_handles_internal_labeled_and_modified_tick_placeholders() {
+        let define = dispatch_builtin_pure(
+            "internal--define-uninitialized-variable",
+            vec![Value::symbol("neo-var"), Value::Nil],
+        )
+        .expect("internal--define-uninitialized-variable should resolve")
+        .expect("internal--define-uninitialized-variable should evaluate");
+        assert_eq!(define, Value::Nil);
+
+        let narrow = dispatch_builtin_pure(
+            "internal--labeled-narrow-to-region",
+            vec![Value::Int(0), Value::Int(1), Value::symbol("tag")],
+        )
+        .expect("internal--labeled-narrow-to-region should resolve")
+        .expect("internal--labeled-narrow-to-region should evaluate");
+        assert_eq!(narrow, Value::Nil);
+
+        let widen = dispatch_builtin_pure("internal--labeled-widen", vec![Value::symbol("tag")])
+            .expect("internal--labeled-widen should resolve")
+            .expect("internal--labeled-widen should evaluate");
+        assert_eq!(widen, Value::Nil);
+
+        let buckets =
+            dispatch_builtin_pure("internal--obarray-buckets", vec![Value::symbol("obarray")])
+                .expect("internal--obarray-buckets should resolve")
+                .expect("internal--obarray-buckets should evaluate");
+        assert_eq!(buckets, Value::Nil);
+
+        let tick = dispatch_builtin_pure(
+            "internal--set-buffer-modified-tick",
+            vec![Value::Int(0), Value::Int(1)],
+        )
+        .expect("internal--set-buffer-modified-tick should resolve")
+        .expect("internal--set-buffer-modified-tick should evaluate");
+        assert_eq!(tick, Value::Nil);
     }
 
     #[test]

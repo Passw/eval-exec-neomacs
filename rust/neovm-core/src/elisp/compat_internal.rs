@@ -1034,36 +1034,6 @@ pub(crate) fn builtin_window_top_child(args: Vec<Value>) -> EvalResult {
     Ok(Value::Nil)
 }
 
-/// `(internal--define-uninitialized-variable)` -> nil.
-pub(crate) fn builtin_internal_define_uninitialized_variable(args: Vec<Value>) -> EvalResult {
-    expect_range_args("internal--define-uninitialized-variable", &args, 1, 2)?;
-    Ok(Value::Nil)
-}
-
-/// `(internal--labeled-narrow-to-region)` -> nil.
-pub(crate) fn builtin_internal_labeled_narrow_to_region(args: Vec<Value>) -> EvalResult {
-    expect_args("internal--labeled-narrow-to-region", &args, 3)?;
-    Ok(Value::Nil)
-}
-
-/// `(internal--labeled-widen)` -> nil.
-pub(crate) fn builtin_internal_labeled_widen(args: Vec<Value>) -> EvalResult {
-    expect_args("internal--labeled-widen", &args, 1)?;
-    Ok(Value::Nil)
-}
-
-/// `(internal--obarray-buckets)` -> nil.
-pub(crate) fn builtin_internal_obarray_buckets(args: Vec<Value>) -> EvalResult {
-    expect_args("internal--obarray-buckets", &args, 1)?;
-    Ok(Value::Nil)
-}
-
-/// `(internal--set-buffer-modified-tick)` -> nil.
-pub(crate) fn builtin_internal_set_buffer_modified_tick(args: Vec<Value>) -> EvalResult {
-    expect_range_args("internal--set-buffer-modified-tick", &args, 1, 2)?;
-    Ok(Value::Nil)
-}
-
 /// `(describe-buffer-bindings BUFFER &optional PREFIXES MENUS)` -> nil.
 pub(crate) fn builtin_describe_buffer_bindings(args: Vec<Value>) -> EvalResult {
     expect_range_args("describe-buffer-bindings", &args, 1, 3)?;
@@ -1571,8 +1541,11 @@ mod tests {
 
     #[test]
     fn internal_labeled_narrow_to_region_validates_arity() {
-        let err =
-            builtin_internal_labeled_narrow_to_region(vec![Value::Nil, Value::Nil]).unwrap_err();
+        let err = crate::elisp::builtins::builtin_internal_labeled_narrow_to_region(vec![
+            Value::Nil,
+            Value::Nil,
+        ])
+        .unwrap_err();
         match err {
             Flow::Signal(sig) => assert_eq!(sig.symbol, "wrong-number-of-arguments"),
             other => panic!("expected signal, got {other:?}"),
