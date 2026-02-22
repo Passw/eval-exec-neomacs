@@ -28,7 +28,7 @@ pub mod cl_lib;
 pub mod coding;
 pub mod comp;
 #[cfg(test)]
-pub mod compat_internal;
+pub mod compat_regressions;
 pub mod compiled_literal;
 pub mod composite;
 pub mod custom;

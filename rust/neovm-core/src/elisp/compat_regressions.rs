@@ -1,8 +1,7 @@
-//! Internal compatibility builtins.
+//! Compatibility regression tests.
 //!
-//! These primitives are exposed by GNU Emacs and touched by startup/runtime
-//! code paths. NeoVM provides compatibility implementations that preserve
-//! observable arity and error contracts for compatibility tests.
+//! These tests lock behavior for GNU Emacs compatibility paths that were
+//! historically implemented in `compat_internal`.
 
 #[cfg(test)]
 mod tests {
