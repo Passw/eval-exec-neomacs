@@ -19882,6 +19882,19 @@ Last updated: 2026-02-21
         - `(wrong-number-of-arguments x-apply-session-resources 1)`
         - `(wrong-number-of-arguments x-apply-session-resources 2)`
 
+- Added dedicated `x-win-suspend-error` arity/payload lock-ins:
+  - vm-compat corpus changes:
+    - added:
+      - `test/neovm/vm-compat/cases/x-win-suspend-error-arity-payload-semantics.forms`
+      - `test/neovm/vm-compat/cases/x-win-suspend-error-arity-payload-semantics.expected.tsv`
+    - wired case into:
+      - `test/neovm/vm-compat/cases/default.list`
+    - lock-ins assert:
+      - zero-arg call preserves `nil` return
+      - over-arity payloads remain exact:
+        - `(wrong-number-of-arguments x-win-suspend-error 1)`
+        - `(wrong-number-of-arguments x-win-suspend-error 2)`
+
 - Continue compatibility-first maintenance with small commit slices:
   - keep builtin surface and registry in lock-step
   - run oracle/parity checks after each behavior-affecting change
