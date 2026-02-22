@@ -19571,6 +19571,17 @@ Last updated: 2026-02-21
       - symbol (`'foo`), vector (`[foo]`), list (`'(foo)`), cons (`'(foo . bar)`)
       - covered functions: `x-server-version`, `x-server-max-request-size`, `x-display-grayscale-p`
 
+- Added `display-color-p`/`x-display-color-p` designator matrix lock-ins for structured values:
+  - vm-compat corpus changes:
+    - added:
+      - `test/neovm/vm-compat/cases/x-display-color-designator-type-matrix-semantics.forms`
+      - `test/neovm/vm-compat/cases/x-display-color-designator-type-matrix-semantics.expected.tsv`
+    - wired case into:
+      - `test/neovm/vm-compat/cases/default.list`
+    - matrix locks invalid-argument payload shape (`get-device-terminal`) across:
+      - vector (`[foo]`), list (`'(foo)`), cons (`'(foo . bar)`)
+      - for both `display-color-p` and `x-display-color-p`
+
 - Continue compatibility-first maintenance with small commit slices:
   - keep builtin surface and registry in lock-step
   - run oracle/parity checks after each behavior-affecting change
