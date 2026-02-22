@@ -6931,6 +6931,74 @@ pub(crate) fn builtin_sqlite_load_extension(args: Vec<Value>) -> EvalResult {
     ))
 }
 
+fn fillarray_character_from_value(value: &Value) -> Result<char, Flow> {
+    match value {
+        Value::Int(n) if *n >= 0 => Ok((*n as u8) as char),
+        Value::Char(c) => Ok(*c),
+        other => Err(signal(
+            "wrong-type-argument",
+            vec![Value::symbol("characterp"), other.clone()],
+        )),
+    }
+}
+
+pub(crate) fn builtin_fillarray(args: Vec<Value>) -> EvalResult {
+    const CHAR_TABLE_DEFAULT_SLOT: usize = 1;
+    const BOOL_VECTOR_SIZE_SLOT: usize = 1;
+    const BOOL_VECTOR_BITS_START: usize = 2;
+
+    expect_args("fillarray", &args, 2)?;
+    match &args[0] {
+        Value::Vector(items) => {
+            let is_bool_vector = super::chartable::is_bool_vector(&args[0]);
+            let is_char_table = !is_bool_vector && super::chartable::is_char_table(&args[0]);
+            let mut guard = items.lock().expect("poisoned");
+            if is_bool_vector {
+                let fill_bit = if args[1].is_nil() { 0 } else { 1 };
+                let logical_len = match guard.get(BOOL_VECTOR_SIZE_SLOT) {
+                    Some(Value::Int(n)) if *n > 0 => *n as usize,
+                    _ => 0,
+                };
+                let available_bits = guard.len().saturating_sub(BOOL_VECTOR_BITS_START);
+                let bit_count = logical_len.min(available_bits);
+                for bit in guard
+                    .iter_mut()
+                    .skip(BOOL_VECTOR_BITS_START)
+                    .take(bit_count)
+                {
+                    *bit = Value::Int(fill_bit);
+                }
+                return Ok(args[0].clone());
+            }
+            if is_char_table {
+                if guard.len() > CHAR_TABLE_DEFAULT_SLOT {
+                    guard[CHAR_TABLE_DEFAULT_SLOT] = args[1].clone();
+                }
+                return Ok(args[0].clone());
+            }
+            for slot in guard.iter_mut() {
+                *slot = args[1].clone();
+            }
+            Ok(args[0].clone())
+        }
+        Value::Str(original) => {
+            let fill = fillarray_character_from_value(&args[1])?;
+            let len = original.chars().count();
+            Ok(Value::string(fill.to_string().repeat(len)))
+        }
+        other => Err(signal(
+            "wrong-type-argument",
+            vec![Value::symbol("arrayp"), other.clone()],
+        )),
+    }
+}
+
+pub(crate) fn builtin_find_coding_systems_region_internal(args: Vec<Value>) -> EvalResult {
+    expect_range_args("find-coding-systems-region-internal", &args, 2, 3)?;
+    let _ = expect_integer_or_marker(&args[1])?;
+    Ok(Value::True)
+}
+
 fn inotify_next_watch_id_store() -> &'static Mutex<i64> {
     static NEXT: OnceLock<Mutex<i64>> = OnceLock::new();
     NEXT.get_or_init(|| Mutex::new(0))
@@ -16130,11 +16198,9 @@ pub(crate) fn dispatch_builtin(
         "sqlite-transaction" => builtin_sqlite_transaction(args),
         "sqlite-version" => builtin_sqlite_version(args),
         "sqlitep" => builtin_sqlitep(args),
-        "fillarray" => super::compat_internal::builtin_fillarray(args),
+        "fillarray" => builtin_fillarray(args),
         "define-hash-table-test" => super::compat_internal::builtin_define_hash_table_test(args),
-        "find-coding-systems-region-internal" => {
-            super::compat_internal::builtin_find_coding_systems_region_internal(args)
-        }
+        "find-coding-systems-region-internal" => builtin_find_coding_systems_region_internal(args),
 
         // Native compilation compatibility (pure)
         "comp--compile-ctxt-to-file0" => super::comp::builtin_comp_compile_ctxt_to_file0(args),
@@ -17007,11 +17073,9 @@ pub(crate) fn dispatch_builtin_pure(name: &str, args: Vec<Value>) -> Option<Eval
         "sqlite-transaction" => builtin_sqlite_transaction(args),
         "sqlite-version" => builtin_sqlite_version(args),
         "sqlitep" => builtin_sqlitep(args),
-        "fillarray" => super::compat_internal::builtin_fillarray(args),
+        "fillarray" => builtin_fillarray(args),
         "define-hash-table-test" => super::compat_internal::builtin_define_hash_table_test(args),
-        "find-coding-systems-region-internal" => {
-            super::compat_internal::builtin_find_coding_systems_region_internal(args)
-        }
+        "find-coding-systems-region-internal" => builtin_find_coding_systems_region_internal(args),
         _ => return None,
     })
 }
@@ -22019,6 +22083,29 @@ mod tests {
             Flow::Signal(sig) => assert_eq!(sig.symbol, "wrong-type-argument"),
             other => panic!("expected signal, got {other:?}"),
         }
+    }
+
+    #[test]
+    fn dispatch_builtin_pure_handles_fillarray_and_find_coding_region_internal() {
+        let vector = Value::vector(vec![Value::Int(1), Value::Int(2), Value::Int(3)]);
+        let filled = dispatch_builtin_pure("fillarray", vec![vector.clone(), Value::Int(9)])
+            .expect("fillarray should resolve")
+            .expect("fillarray should evaluate");
+        let Value::Vector(values) = filled else {
+            panic!("expected vector");
+        };
+        assert_eq!(
+            &*values.lock().expect("poisoned"),
+            &[Value::Int(9), Value::Int(9), Value::Int(9)]
+        );
+
+        let coding = dispatch_builtin_pure(
+            "find-coding-systems-region-internal",
+            vec![Value::Int(0), Value::Int(1)],
+        )
+        .expect("find-coding-systems-region-internal should resolve")
+        .expect("find-coding-systems-region-internal should evaluate");
+        assert_eq!(coding, Value::True);
     }
 
     #[test]

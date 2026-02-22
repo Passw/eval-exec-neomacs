@@ -10,9 +10,6 @@ use std::cell::RefCell;
 
 const FACE_ATTRIBUTES_VECTOR_LEN: usize = 20;
 const DEFAULT_FONTSET_NAME: &str = "-*-*-*-*-*-*-*-*-*-*-*-*-fontset-default";
-const CHAR_TABLE_DEFAULT_SLOT: usize = 1;
-const BOOL_VECTOR_SIZE_SLOT: usize = 1;
-const BOOL_VECTOR_BITS_START: usize = 2;
 
 thread_local! {
     static HASH_TABLE_TEST_ALIASES: RefCell<Vec<(String, HashTableTest)>> =
@@ -1223,54 +1220,6 @@ pub(crate) fn builtin_font_at(args: Vec<Value>) -> EvalResult {
     ))
 }
 
-/// `(fillarray ARRAY ITEM)` -> ARRAY after in-place/vector fill.
-pub(crate) fn builtin_fillarray(args: Vec<Value>) -> EvalResult {
-    expect_args("fillarray", &args, 2)?;
-    match &args[0] {
-        Value::Vector(items) => {
-            let is_bool_vector = super::chartable::is_bool_vector(&args[0]);
-            let is_char_table = !is_bool_vector && super::chartable::is_char_table(&args[0]);
-            let mut guard = items.lock().expect("poisoned");
-            if is_bool_vector {
-                let fill_bit = if args[1].is_nil() { 0 } else { 1 };
-                let logical_len = match guard.get(BOOL_VECTOR_SIZE_SLOT) {
-                    Some(Value::Int(n)) if *n > 0 => *n as usize,
-                    _ => 0,
-                };
-                let available_bits = guard.len().saturating_sub(BOOL_VECTOR_BITS_START);
-                let bit_count = logical_len.min(available_bits);
-                for bit in guard
-                    .iter_mut()
-                    .skip(BOOL_VECTOR_BITS_START)
-                    .take(bit_count)
-                {
-                    *bit = Value::Int(fill_bit);
-                }
-                return Ok(args[0].clone());
-            }
-            if is_char_table {
-                if guard.len() > CHAR_TABLE_DEFAULT_SLOT {
-                    guard[CHAR_TABLE_DEFAULT_SLOT] = args[1].clone();
-                }
-                return Ok(args[0].clone());
-            }
-            for slot in guard.iter_mut() {
-                *slot = args[1].clone();
-            }
-            Ok(args[0].clone())
-        }
-        Value::Str(original) => {
-            let fill = expect_characterp_from_int(&args[1])?;
-            let len = original.chars().count();
-            Ok(Value::string(fill.to_string().repeat(len)))
-        }
-        other => Err(signal(
-            "wrong-type-argument",
-            vec![Value::symbol("arrayp"), other.clone()],
-        )),
-    }
-}
-
 /// `(define-hash-table-test SYMBOL TEST HASH)` -> (TEST HASH).
 pub(crate) fn builtin_define_hash_table_test(args: Vec<Value>) -> EvalResult {
     expect_args("define-hash-table-test", &args, 3)?;
@@ -1283,13 +1232,6 @@ pub(crate) fn builtin_define_hash_table_test(args: Vec<Value>) -> EvalResult {
     Ok(Value::list(vec![args[1].clone(), args[2].clone()]))
 }
 
-/// `(find-coding-systems-region-internal FROM TO &optional TABLE)` -> t.
-pub(crate) fn builtin_find_coding_systems_region_internal(args: Vec<Value>) -> EvalResult {
-    expect_range_args("find-coding-systems-region-internal", &args, 2, 3)?;
-    expect_integer_or_marker_p(&args[1])?;
-    Ok(Value::True)
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1297,7 +1239,8 @@ mod tests {
     #[test]
     fn fillarray_vector_is_in_place() {
         let vec = Value::vector(vec![Value::Int(1), Value::Int(2)]);
-        let out = builtin_fillarray(vec![vec.clone(), Value::Int(9)]).unwrap();
+        let out =
+            crate::elisp::builtins::builtin_fillarray(vec![vec.clone(), Value::Int(9)]).unwrap();
         assert_eq!(out, vec);
         let Value::Vector(values) = out else {
             panic!("expected vector");
@@ -1310,7 +1253,9 @@ mod tests {
     fn fillarray_bool_vector_preserves_layout_and_sets_bits() {
         let bv = crate::elisp::chartable::builtin_make_bool_vector(vec![Value::Int(4), Value::Nil])
             .unwrap();
-        let out = builtin_fillarray(vec![bv.clone(), Value::symbol("non-nil")]).unwrap();
+        let out =
+            crate::elisp::builtins::builtin_fillarray(vec![bv.clone(), Value::symbol("non-nil")])
+                .unwrap();
         assert_eq!(out, bv);
         assert_eq!(
             crate::elisp::chartable::builtin_bool_vector_p(vec![bv.clone()]).unwrap(),
@@ -1322,7 +1267,7 @@ mod tests {
             Value::Int(4)
         );
 
-        builtin_fillarray(vec![bv.clone(), Value::Nil]).unwrap();
+        crate::elisp::builtins::builtin_fillarray(vec![bv.clone(), Value::Nil]).unwrap();
         assert_eq!(
             crate::elisp::chartable::builtin_bool_vector_count_population(vec![bv]).unwrap(),
             Value::Int(0)
@@ -1343,7 +1288,8 @@ mod tests {
         ])
         .unwrap();
 
-        let out = builtin_fillarray(vec![table.clone(), Value::Int(7)]).unwrap();
+        let out =
+            crate::elisp::builtins::builtin_fillarray(vec![table.clone(), Value::Int(7)]).unwrap();
         assert_eq!(out, table);
         assert_eq!(
             crate::elisp::chartable::builtin_char_table_p(vec![table.clone()]).unwrap(),
