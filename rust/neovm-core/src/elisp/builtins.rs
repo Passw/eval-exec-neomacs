@@ -6290,6 +6290,21 @@ pub(crate) fn builtin_module_load(args: Vec<Value>) -> EvalResult {
     Ok(Value::Nil)
 }
 
+pub(crate) fn builtin_dump_emacs_portable(args: Vec<Value>) -> EvalResult {
+    expect_range_args("dump-emacs-portable", &args, 1, 2)?;
+    Ok(Value::Nil)
+}
+
+pub(crate) fn builtin_dump_emacs_portable_sort_predicate(args: Vec<Value>) -> EvalResult {
+    expect_args("dump-emacs-portable--sort-predicate", &args, 2)?;
+    Ok(Value::Nil)
+}
+
+pub(crate) fn builtin_dump_emacs_portable_sort_predicate_copied(args: Vec<Value>) -> EvalResult {
+    expect_args("dump-emacs-portable--sort-predicate-copied", &args, 2)?;
+    Ok(Value::Nil)
+}
+
 // ===========================================================================
 // Hook system (need evaluator)
 // ===========================================================================
@@ -15154,12 +15169,10 @@ pub(crate) fn dispatch_builtin(
             super::compat_internal::builtin_define_coding_system_internal(args)
         }
         "defvar-1" => super::compat_internal::builtin_defvar_1(args),
-        "dump-emacs-portable" => super::compat_internal::builtin_dump_emacs_portable(args),
-        "dump-emacs-portable--sort-predicate" => {
-            super::compat_internal::builtin_dump_emacs_portable_sort_predicate(args)
-        }
+        "dump-emacs-portable" => builtin_dump_emacs_portable(args),
+        "dump-emacs-portable--sort-predicate" => builtin_dump_emacs_portable_sort_predicate(args),
         "dump-emacs-portable--sort-predicate-copied" => {
-            super::compat_internal::builtin_dump_emacs_portable_sort_predicate_copied(args)
+            builtin_dump_emacs_portable_sort_predicate_copied(args)
         }
         "encode-coding-region" => super::compat_internal::builtin_encode_coding_region(args),
         "find-operation-coding-system" => {
@@ -16077,12 +16090,10 @@ pub(crate) fn dispatch_builtin_pure(name: &str, args: Vec<Value>) -> Option<Eval
             super::compat_internal::builtin_define_coding_system_internal(args)
         }
         "defvar-1" => super::compat_internal::builtin_defvar_1(args),
-        "dump-emacs-portable" => super::compat_internal::builtin_dump_emacs_portable(args),
-        "dump-emacs-portable--sort-predicate" => {
-            super::compat_internal::builtin_dump_emacs_portable_sort_predicate(args)
-        }
+        "dump-emacs-portable" => builtin_dump_emacs_portable(args),
+        "dump-emacs-portable--sort-predicate" => builtin_dump_emacs_portable_sort_predicate(args),
         "dump-emacs-portable--sort-predicate-copied" => {
-            super::compat_internal::builtin_dump_emacs_portable_sort_predicate_copied(args)
+            builtin_dump_emacs_portable_sort_predicate_copied(args)
         }
         "encode-coding-region" => super::compat_internal::builtin_encode_coding_region(args),
         "find-operation-coding-system" => {
@@ -20523,6 +20534,33 @@ mod tests {
             .expect("builtin module-load should resolve")
             .expect("builtin module-load should evaluate");
         assert!(module_load.is_nil());
+    }
+
+    #[test]
+    fn pure_dispatch_dump_portable_placeholder_cluster_matches_compat_contracts() {
+        let dump_portable = dispatch_builtin_pure(
+            "dump-emacs-portable",
+            vec![Value::string("dump.pdmp"), Value::Nil],
+        )
+        .expect("builtin dump-emacs-portable should resolve")
+        .expect("builtin dump-emacs-portable should evaluate");
+        assert!(dump_portable.is_nil());
+
+        let sort_predicate = dispatch_builtin_pure(
+            "dump-emacs-portable--sort-predicate",
+            vec![Value::Nil, Value::Nil],
+        )
+        .expect("builtin dump-emacs-portable--sort-predicate should resolve")
+        .expect("builtin dump-emacs-portable--sort-predicate should evaluate");
+        assert!(sort_predicate.is_nil());
+
+        let sort_predicate_copied = dispatch_builtin_pure(
+            "dump-emacs-portable--sort-predicate-copied",
+            vec![Value::Nil, Value::Nil],
+        )
+        .expect("builtin dump-emacs-portable--sort-predicate-copied should resolve")
+        .expect("builtin dump-emacs-portable--sort-predicate-copied should evaluate");
+        assert!(sort_predicate_copied.is_nil());
     }
 
     #[test]

@@ -1581,24 +1581,6 @@ pub(crate) fn builtin_make_interpreted_closure(args: Vec<Value>) -> EvalResult {
     Ok(Value::Nil)
 }
 
-/// `(dump-emacs-portable FILE &optional TRACK-REFERRERS)` -> nil.
-pub(crate) fn builtin_dump_emacs_portable(args: Vec<Value>) -> EvalResult {
-    expect_range_args("dump-emacs-portable", &args, 1, 2)?;
-    Ok(Value::Nil)
-}
-
-/// `(dump-emacs-portable--sort-predicate A B)` -> nil.
-pub(crate) fn builtin_dump_emacs_portable_sort_predicate(args: Vec<Value>) -> EvalResult {
-    expect_args("dump-emacs-portable--sort-predicate", &args, 2)?;
-    Ok(Value::Nil)
-}
-
-/// `(dump-emacs-portable--sort-predicate-copied A B)` -> nil.
-pub(crate) fn builtin_dump_emacs_portable_sort_predicate_copied(args: Vec<Value>) -> EvalResult {
-    expect_args("dump-emacs-portable--sort-predicate-copied", &args, 2)?;
-    Ok(Value::Nil)
-}
-
 /// `(treesit-available-p)` -> nil.
 pub(crate) fn builtin_treesit_available_p(args: Vec<Value>) -> EvalResult {
     expect_args("treesit-available-p", &args, 0)?;
