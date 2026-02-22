@@ -15080,6 +15080,7 @@ pub(crate) fn dispatch_builtin_pure(name: &str, args: Vec<Value>) -> Option<Eval
         | "frame-old-selected-window"
         | "set-frame-selected-window"
         | "window-system"
+        | "frame-edges"
         | "window-at" => return None,
         _ => {}
     }
@@ -19418,6 +19419,7 @@ mod tests {
         assert!(dispatch_builtin_pure("frame-old-selected-window", vec![]).is_none());
         assert!(dispatch_builtin_pure("set-frame-selected-window", vec![]).is_none());
         assert!(dispatch_builtin_pure("window-system", vec![]).is_none());
+        assert!(dispatch_builtin_pure("frame-edges", vec![]).is_none());
         assert!(dispatch_builtin_pure("window-at", vec![]).is_none());
         assert!(dispatch_builtin_pure("window-bump-use-time", vec![]).is_none());
         assert!(dispatch_builtin_pure("window-list-1", vec![]).is_none());
