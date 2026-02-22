@@ -19713,6 +19713,19 @@ Last updated: 2026-02-21
       - live frame, terminal, live window, dead window
       - all return `(error "X windows are not in use or not initialized")`
 
+- Added dedicated `x-display` query frame-message payload lock-ins:
+  - vm-compat corpus changes:
+    - added:
+      - `test/neovm/vm-compat/cases/x-display-query-frame-message-payload-semantics.forms`
+      - `test/neovm/vm-compat/cases/x-display-query-frame-message-payload-semantics.expected.tsv`
+    - wired case into:
+      - `test/neovm/vm-compat/cases/default.list`
+    - lock-ins cover selected-frame designators for:
+      - `x-display-backing-store`, `x-display-color-cells`, `x-display-mm-height`, `x-display-mm-width`
+      - `x-display-monitor-attributes-list`, `x-display-planes`, `x-display-save-under`, `x-display-screens`
+      - `x-display-visual-class`, `x-server-input-extension-version`, `x-server-vendor`
+      - all preserve `(error "Window system frame should be used")` payload shape.
+
 - Continue compatibility-first maintenance with small commit slices:
   - keep builtin surface and registry in lock-step
   - run oracle/parity checks after each behavior-affecting change
