@@ -72,6 +72,12 @@ Last updated: 2026-02-22
         - `"ß" -> "Ss"`
         - `"\u{0149}" -> "\u{02BC}N"`
         - `"\u{01F0}" -> "J\u{030C}"`
+        - Greek/Armenian/presentation composites now match oracle titlecase forms, including:
+          - `"\u{0390}" -> "\u{0399}\u{0308}\u{0301}"`
+          - `"\u{0587}" -> "\u{0535}\u{0582}"`
+          - `"\u{FB00}" -> "Ff"`
+          - `"\u{FB13}" -> "\u{0544}\u{0576}"`
+          - iota-subscript titlecase edge forms (`\u{1F88}` precomposed preserve and `\u{1FB2} -> \u{1FBA}\u{0345}`)
       - added unit coverage:
         - `capitalize_unicode_edge_semantics`
         - `upcase_initials_unicode_edge_semantics`

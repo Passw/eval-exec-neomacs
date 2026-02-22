@@ -124,17 +124,72 @@ fn preserve_casefiddle_upcase_payload(code: i64) -> bool {
     )
 }
 
+fn titlecase_from_uppercase_expansion(expansion: &[char]) -> String {
+    let mut result = String::new();
+    let mut seen_cased = false;
+
+    for uc in expansion {
+        let is_cased = uc.is_uppercase() || uc.is_lowercase();
+        if !seen_cased {
+            result.push(*uc);
+            if is_cased {
+                seen_cased = true;
+            }
+            continue;
+        }
+
+        if is_cased {
+            for lc in uc.to_lowercase() {
+                result.push(lc);
+            }
+        } else {
+            result.push(*uc);
+        }
+    }
+
+    result
+}
+
+fn titlecase_combining_iota_override(code: i64) -> Option<&'static str> {
+    match code {
+        8114 => Some("\u{1FBA}\u{0345}"),
+        8116 => Some("\u{0386}\u{0345}"),
+        8119 => Some("\u{0391}\u{0342}\u{0345}"),
+        8130 => Some("\u{1FCA}\u{0345}"),
+        8132 => Some("\u{0389}\u{0345}"),
+        8135 => Some("\u{0397}\u{0342}\u{0345}"),
+        8178 => Some("\u{1FFA}\u{0345}"),
+        8180 => Some("\u{038F}\u{0345}"),
+        8183 => Some("\u{03A9}\u{0342}\u{0345}"),
+        _ => None,
+    }
+}
+
+fn titlecase_uses_precomposed_upcase(code: i64) -> bool {
+    matches!(
+        code,
+        8072..=8111
+            | 8115
+            | 8124
+            | 8131
+            | 8140
+            | 8179
+            | 8188
+    )
+}
+
 fn titlecase_word_initial(c: char) -> String {
-    if c == 'ß' {
-        return "Ss".to_string();
+    let code = c as i64;
+    if let Some(explicit) = titlecase_combining_iota_override(code) {
+        return explicit.to_string();
     }
-    if c == '\u{0149}' {
-        return "\u{02BC}N".to_string();
+
+    let expansion: Vec<char> = c.to_uppercase().collect();
+    if expansion.len() > 1 && !titlecase_uses_precomposed_upcase(code) {
+        return titlecase_from_uppercase_expansion(&expansion);
     }
-    if c == '\u{01F0}' {
-        return "J\u{030C}".to_string();
-    }
-    if let Some(mapped) = code_to_char(upcase_char(c as i64)) {
+
+    if let Some(mapped) = code_to_char(upcase_char(code)) {
         mapped.to_string()
     } else {
         c.to_uppercase().collect()
@@ -400,6 +455,34 @@ mod tests {
 
         let string_j_caron = builtin_capitalize(vec![Value::string("\u{01F0}")]).unwrap();
         assert_eq!(string_j_caron.as_str(), Some("J\u{030C}"));
+
+        let string_greek_dialytika_tonos =
+            builtin_capitalize(vec![Value::string("\u{0390}")]).unwrap();
+        assert_eq!(string_greek_dialytika_tonos.as_str(), Some("\u{0399}\u{0308}\u{0301}"));
+
+        let string_armenian_small_ligature = builtin_capitalize(vec![Value::string("\u{0587}")]).unwrap();
+        assert_eq!(string_armenian_small_ligature.as_str(), Some("\u{0535}\u{0582}"));
+
+        let string_latin_ligature_ff = builtin_capitalize(vec![Value::string("\u{FB00}")]).unwrap();
+        assert_eq!(string_latin_ligature_ff.as_str(), Some("Ff"));
+
+        let string_armenian_presentation_ligature =
+            builtin_capitalize(vec![Value::string("\u{FB13}")]).unwrap();
+        assert_eq!(
+            string_armenian_presentation_ligature.as_str(),
+            Some("\u{0544}\u{0576}")
+        );
+
+        let string_greek_precomposed_prosgegrammeni =
+            builtin_capitalize(vec![Value::string("\u{1F88}")]).unwrap();
+        assert_eq!(string_greek_precomposed_prosgegrammeni.as_str(), Some("\u{1F88}"));
+
+        let string_greek_combining_prosgegrammeni =
+            builtin_capitalize(vec![Value::string("\u{1FB2}")]).unwrap();
+        assert_eq!(
+            string_greek_combining_prosgegrammeni.as_str(),
+            Some("\u{1FBA}\u{0345}")
+        );
     }
 
     #[test]
@@ -424,5 +507,35 @@ mod tests {
 
         let string_j_caron = builtin_upcase_initials(vec![Value::string("\u{01F0}")]).unwrap();
         assert_eq!(string_j_caron.as_str(), Some("J\u{030C}"));
+
+        let string_greek_dialytika_tonos =
+            builtin_upcase_initials(vec![Value::string("\u{0390}")]).unwrap();
+        assert_eq!(string_greek_dialytika_tonos.as_str(), Some("\u{0399}\u{0308}\u{0301}"));
+
+        let string_armenian_small_ligature =
+            builtin_upcase_initials(vec![Value::string("\u{0587}")]).unwrap();
+        assert_eq!(string_armenian_small_ligature.as_str(), Some("\u{0535}\u{0582}"));
+
+        let string_latin_ligature_ff =
+            builtin_upcase_initials(vec![Value::string("\u{FB00}")]).unwrap();
+        assert_eq!(string_latin_ligature_ff.as_str(), Some("Ff"));
+
+        let string_armenian_presentation_ligature =
+            builtin_upcase_initials(vec![Value::string("\u{FB13}")]).unwrap();
+        assert_eq!(
+            string_armenian_presentation_ligature.as_str(),
+            Some("\u{0544}\u{0576}")
+        );
+
+        let string_greek_precomposed_prosgegrammeni =
+            builtin_upcase_initials(vec![Value::string("\u{1F88}")]).unwrap();
+        assert_eq!(string_greek_precomposed_prosgegrammeni.as_str(), Some("\u{1F88}"));
+
+        let string_greek_combining_prosgegrammeni =
+            builtin_upcase_initials(vec![Value::string("\u{1FB2}")]).unwrap();
+        assert_eq!(
+            string_greek_combining_prosgegrammeni.as_str(),
+            Some("\u{1FBA}\u{0345}")
+        );
     }
 }
