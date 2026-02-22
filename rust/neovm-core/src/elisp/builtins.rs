@@ -2439,6 +2439,7 @@ pub(crate) fn builtin_define_hash_table_test(args: Vec<Value>) -> EvalResult {
 
 pub(crate) fn builtin_make_hash_table(args: Vec<Value>) -> EvalResult {
     let mut test = HashTableTest::Eql;
+    let mut test_name: Option<String> = None;
     let mut size: i64 = 0;
     let mut weakness: Option<HashTableWeakness> = None;
     let mut seen_test = false;
@@ -2476,6 +2477,7 @@ pub(crate) fn builtin_make_hash_table(args: Vec<Value>) -> EvalResult {
                                 vec![Value::symbol("symbolp"), value.clone()],
                             ));
                         };
+                        test_name = Some(name.to_string());
                         test = match name {
                             "eq" => HashTableTest::Eq,
                             "eql" => HashTableTest::Eql,
@@ -2598,9 +2600,11 @@ pub(crate) fn builtin_make_hash_table(args: Vec<Value>) -> EvalResult {
             _ => return Err(invalid_hash_table_argument_list(args[i].clone())),
         }
     }
-    Ok(Value::hash_table_with_options(
-        test, size, weakness, 1.5, 0.8125,
-    ))
+    let table = Value::hash_table_with_options(test, size, weakness, 1.5, 0.8125);
+    if let Value::HashTable(table_ref) = &table {
+        table_ref.lock().expect("poisoned").test_name = test_name;
+    }
+    Ok(table)
 }
 
 pub(crate) fn builtin_gethash(args: Vec<Value>) -> EvalResult {
@@ -21108,9 +21112,16 @@ mod tests {
             Value::list(vec![Value::symbol("eq"), Value::symbol("sxhash-eq")])
         );
 
-        let table = dispatch_builtin_pure("make-hash-table", vec![Value::keyword(":test"), alias])
-            .expect("make-hash-table should resolve")
-            .expect("make-hash-table should evaluate");
+        let table = dispatch_builtin_pure(
+            "make-hash-table",
+            vec![Value::keyword(":test"), alias.clone()],
+        )
+        .expect("make-hash-table should resolve")
+        .expect("make-hash-table should evaluate");
+        let observed = crate::elisp::hashtab::builtin_hash_table_test(vec![table.clone()])
+            .expect("hash-table-test should evaluate");
+        assert_eq!(observed, alias);
+
         let Value::HashTable(table) = table else {
             panic!("expected hash table");
         };
@@ -21140,6 +21151,10 @@ mod tests {
         )
         .expect("make-hash-table should resolve")
         .expect("make-hash-table should evaluate");
+        let observed = crate::elisp::hashtab::builtin_hash_table_test(vec![table.clone()])
+            .expect("hash-table-test should evaluate");
+        assert_eq!(observed, Value::symbol(alias_name));
+
         let Value::HashTable(table) = table else {
             panic!("expected hash table");
         };
@@ -21165,6 +21180,10 @@ mod tests {
         )
         .expect("make-hash-table should resolve")
         .expect("make-hash-table should evaluate");
+        let first_name = crate::elisp::hashtab::builtin_hash_table_test(vec![first.clone()])
+            .expect("hash-table-test should evaluate for initial alias mapping");
+        assert_eq!(first_name, Value::symbol(alias_name));
+
         let Value::HashTable(first) = first else {
             panic!("expected hash table");
         };
@@ -21185,6 +21204,10 @@ mod tests {
         )
         .expect("make-hash-table should resolve after alias redefinition")
         .expect("make-hash-table should evaluate after alias redefinition");
+        let second_name = crate::elisp::hashtab::builtin_hash_table_test(vec![second.clone()])
+            .expect("hash-table-test should evaluate after alias redefinition");
+        assert_eq!(second_name, Value::symbol(alias_name));
+
         let Value::HashTable(second) = second else {
             panic!("expected hash table");
         };

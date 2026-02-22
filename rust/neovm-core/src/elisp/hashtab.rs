@@ -218,12 +218,16 @@ pub(crate) fn builtin_hash_table_test(args: Vec<Value>) -> EvalResult {
     match &args[0] {
         Value::HashTable(ht) => {
             let table = ht.lock().expect("poisoned");
-            let sym = match table.test {
-                HashTableTest::Eq => "eq",
-                HashTableTest::Eql => "eql",
-                HashTableTest::Equal => "equal",
-            };
-            Ok(Value::symbol(sym))
+            if let Some(name) = table.test_name.as_deref() {
+                Ok(Value::symbol(name))
+            } else {
+                let sym = match table.test {
+                    HashTableTest::Eq => "eq",
+                    HashTableTest::Eql => "eql",
+                    HashTableTest::Equal => "equal",
+                };
+                Ok(Value::symbol(sym))
+            }
         }
         other => Err(signal(
             "wrong-type-argument",

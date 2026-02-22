@@ -120,6 +120,10 @@ impl LambdaParams {
 #[derive(Clone, Debug)]
 pub struct LispHashTable {
     pub test: HashTableTest,
+    /// Symbol name provided via `:test` at construction time.
+    /// For user-defined tests this preserves the alias returned by
+    /// `hash-table-test`.
+    pub test_name: Option<String>,
     pub size: i64,
     pub weakness: Option<HashTableWeakness>,
     pub rehash_size: f64,
@@ -174,6 +178,7 @@ impl LispHashTable {
     ) -> Self {
         Self {
             test,
+            test_name: None,
             size,
             weakness,
             rehash_size,
