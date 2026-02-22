@@ -1738,54 +1738,6 @@ pub(crate) fn builtin_dump_emacs_portable_sort_predicate_copied(args: Vec<Value>
     Ok(Value::Nil)
 }
 
-/// `(tty--output-buffer-size &optional TERMINAL)` -> 0.
-pub(crate) fn builtin_tty_output_buffer_size(args: Vec<Value>) -> EvalResult {
-    expect_range_args("tty--output-buffer-size", &args, 0, 1)?;
-    Ok(Value::Int(0))
-}
-
-/// `(tty--set-output-buffer-size SIZE &optional TERMINAL)` -> nil.
-pub(crate) fn builtin_tty_set_output_buffer_size(args: Vec<Value>) -> EvalResult {
-    expect_range_args("tty--set-output-buffer-size", &args, 1, 2)?;
-    Ok(Value::Nil)
-}
-
-/// `(tty-suppress-bold-inverse-default-colors TERMINAL)` -> nil.
-pub(crate) fn builtin_tty_suppress_bold_inverse_default_colors(args: Vec<Value>) -> EvalResult {
-    expect_args("tty-suppress-bold-inverse-default-colors", &args, 1)?;
-    Ok(Value::Nil)
-}
-
-/// `(tool-bar-get-system-style)` -> nil.
-pub(crate) fn builtin_tool_bar_get_system_style(args: Vec<Value>) -> EvalResult {
-    expect_args("tool-bar-get-system-style", &args, 0)?;
-    Ok(Value::Nil)
-}
-
-/// `(tool-bar-pixel-width &optional FRAME)` -> 0.
-pub(crate) fn builtin_tool_bar_pixel_width(args: Vec<Value>) -> EvalResult {
-    expect_range_args("tool-bar-pixel-width", &args, 0, 1)?;
-    Ok(Value::Int(0))
-}
-
-/// `(thread--blocker THREAD)` -> nil.
-pub(crate) fn builtin_thread_blocker(args: Vec<Value>) -> EvalResult {
-    expect_args("thread--blocker", &args, 1)?;
-    Ok(Value::Nil)
-}
-
-/// `(translate-region-internal START END TABLE)` -> nil.
-pub(crate) fn builtin_translate_region_internal(args: Vec<Value>) -> EvalResult {
-    expect_args("translate-region-internal", &args, 3)?;
-    Ok(Value::Nil)
-}
-
-/// `(transpose-regions STARTR1 ENDR1 STARTR2 ENDR2 &optional LEAVE-MARKERS)` -> nil.
-pub(crate) fn builtin_transpose_regions(args: Vec<Value>) -> EvalResult {
-    expect_range_args("transpose-regions", &args, 4, 5)?;
-    Ok(Value::Nil)
-}
-
 /// `(treesit-available-p)` -> nil.
 pub(crate) fn builtin_treesit_available_p(args: Vec<Value>) -> EvalResult {
     expect_args("treesit-available-p", &args, 0)?;

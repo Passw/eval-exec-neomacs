@@ -6057,6 +6057,46 @@ pub(crate) fn builtin_this_single_command_raw_keys(args: Vec<Value>) -> EvalResu
     Ok(Value::Nil)
 }
 
+pub(crate) fn builtin_thread_blocker(args: Vec<Value>) -> EvalResult {
+    expect_args("thread--blocker", &args, 1)?;
+    Ok(Value::Nil)
+}
+
+pub(crate) fn builtin_tool_bar_get_system_style(args: Vec<Value>) -> EvalResult {
+    expect_args("tool-bar-get-system-style", &args, 0)?;
+    Ok(Value::Nil)
+}
+
+pub(crate) fn builtin_tool_bar_pixel_width(args: Vec<Value>) -> EvalResult {
+    expect_range_args("tool-bar-pixel-width", &args, 0, 1)?;
+    Ok(Value::Int(0))
+}
+
+pub(crate) fn builtin_translate_region_internal(args: Vec<Value>) -> EvalResult {
+    expect_args("translate-region-internal", &args, 3)?;
+    Ok(Value::Nil)
+}
+
+pub(crate) fn builtin_transpose_regions(args: Vec<Value>) -> EvalResult {
+    expect_range_args("transpose-regions", &args, 4, 5)?;
+    Ok(Value::Nil)
+}
+
+pub(crate) fn builtin_tty_output_buffer_size(args: Vec<Value>) -> EvalResult {
+    expect_range_args("tty--output-buffer-size", &args, 0, 1)?;
+    Ok(Value::Int(0))
+}
+
+pub(crate) fn builtin_tty_set_output_buffer_size(args: Vec<Value>) -> EvalResult {
+    expect_range_args("tty--set-output-buffer-size", &args, 1, 2)?;
+    Ok(Value::Nil)
+}
+
+pub(crate) fn builtin_tty_suppress_bold_inverse_default_colors(args: Vec<Value>) -> EvalResult {
+    expect_args("tty-suppress-bold-inverse-default-colors", &args, 1)?;
+    Ok(Value::Nil)
+}
+
 // ===========================================================================
 // Hook system (need evaluator)
 // ===========================================================================
@@ -15052,21 +15092,15 @@ pub(crate) fn dispatch_builtin(
         "suspend-emacs" => builtin_suspend_emacs(args),
         "this-single-command-keys" => builtin_this_single_command_keys(args),
         "this-single-command-raw-keys" => builtin_this_single_command_raw_keys(args),
-        "thread--blocker" => super::compat_internal::builtin_thread_blocker(args),
-        "tool-bar-get-system-style" => {
-            super::compat_internal::builtin_tool_bar_get_system_style(args)
-        }
-        "tool-bar-pixel-width" => super::compat_internal::builtin_tool_bar_pixel_width(args),
-        "translate-region-internal" => {
-            super::compat_internal::builtin_translate_region_internal(args)
-        }
-        "transpose-regions" => super::compat_internal::builtin_transpose_regions(args),
-        "tty--output-buffer-size" => super::compat_internal::builtin_tty_output_buffer_size(args),
-        "tty--set-output-buffer-size" => {
-            super::compat_internal::builtin_tty_set_output_buffer_size(args)
-        }
+        "thread--blocker" => builtin_thread_blocker(args),
+        "tool-bar-get-system-style" => builtin_tool_bar_get_system_style(args),
+        "tool-bar-pixel-width" => builtin_tool_bar_pixel_width(args),
+        "translate-region-internal" => builtin_translate_region_internal(args),
+        "transpose-regions" => builtin_transpose_regions(args),
+        "tty--output-buffer-size" => builtin_tty_output_buffer_size(args),
+        "tty--set-output-buffer-size" => builtin_tty_set_output_buffer_size(args),
         "tty-suppress-bold-inverse-default-colors" => {
-            super::compat_internal::builtin_tty_suppress_bold_inverse_default_colors(args)
+            builtin_tty_suppress_bold_inverse_default_colors(args)
         }
         "unencodable-char-position" => {
             super::compat_internal::builtin_unencodable_char_position(args)
@@ -15997,21 +16031,15 @@ pub(crate) fn dispatch_builtin_pure(name: &str, args: Vec<Value>) -> Option<Eval
         "suspend-emacs" => builtin_suspend_emacs(args),
         "this-single-command-keys" => builtin_this_single_command_keys(args),
         "this-single-command-raw-keys" => builtin_this_single_command_raw_keys(args),
-        "thread--blocker" => super::compat_internal::builtin_thread_blocker(args),
-        "tool-bar-get-system-style" => {
-            super::compat_internal::builtin_tool_bar_get_system_style(args)
-        }
-        "tool-bar-pixel-width" => super::compat_internal::builtin_tool_bar_pixel_width(args),
-        "translate-region-internal" => {
-            super::compat_internal::builtin_translate_region_internal(args)
-        }
-        "transpose-regions" => super::compat_internal::builtin_transpose_regions(args),
-        "tty--output-buffer-size" => super::compat_internal::builtin_tty_output_buffer_size(args),
-        "tty--set-output-buffer-size" => {
-            super::compat_internal::builtin_tty_set_output_buffer_size(args)
-        }
+        "thread--blocker" => builtin_thread_blocker(args),
+        "tool-bar-get-system-style" => builtin_tool_bar_get_system_style(args),
+        "tool-bar-pixel-width" => builtin_tool_bar_pixel_width(args),
+        "translate-region-internal" => builtin_translate_region_internal(args),
+        "transpose-regions" => builtin_transpose_regions(args),
+        "tty--output-buffer-size" => builtin_tty_output_buffer_size(args),
+        "tty--set-output-buffer-size" => builtin_tty_set_output_buffer_size(args),
         "tty-suppress-bold-inverse-default-colors" => {
-            super::compat_internal::builtin_tty_suppress_bold_inverse_default_colors(args)
+            builtin_tty_suppress_bold_inverse_default_colors(args)
         }
         "unencodable-char-position" => {
             super::compat_internal::builtin_unencodable_char_position(args)
@@ -20055,6 +20083,62 @@ mod tests {
             .expect("builtin this-single-command-raw-keys should resolve")
             .expect("builtin this-single-command-raw-keys should evaluate");
         assert!(single_raw_keys.is_nil());
+    }
+
+    #[test]
+    fn pure_dispatch_tty_tool_bar_placeholder_cluster_matches_compat_contracts() {
+        let thread_blocker = dispatch_builtin_pure("thread--blocker", vec![Value::Nil])
+            .expect("builtin thread--blocker should resolve")
+            .expect("builtin thread--blocker should evaluate");
+        assert!(thread_blocker.is_nil());
+
+        let tool_bar_style = dispatch_builtin_pure("tool-bar-get-system-style", vec![])
+            .expect("builtin tool-bar-get-system-style should resolve")
+            .expect("builtin tool-bar-get-system-style should evaluate");
+        assert!(tool_bar_style.is_nil());
+
+        let tool_bar_width = dispatch_builtin_pure("tool-bar-pixel-width", vec![])
+            .expect("builtin tool-bar-pixel-width should resolve")
+            .expect("builtin tool-bar-pixel-width should evaluate");
+        assert_eq!(tool_bar_width, Value::Int(0));
+
+        let translate = dispatch_builtin_pure(
+            "translate-region-internal",
+            vec![Value::Int(1), Value::Int(2), Value::Nil],
+        )
+        .expect("builtin translate-region-internal should resolve")
+        .expect("builtin translate-region-internal should evaluate");
+        assert!(translate.is_nil());
+
+        let transpose = dispatch_builtin_pure(
+            "transpose-regions",
+            vec![
+                Value::Int(1),
+                Value::Int(2),
+                Value::Int(3),
+                Value::Int(4),
+                Value::Nil,
+            ],
+        )
+        .expect("builtin transpose-regions should resolve")
+        .expect("builtin transpose-regions should evaluate");
+        assert!(transpose.is_nil());
+
+        let tty_buf = dispatch_builtin_pure("tty--output-buffer-size", vec![])
+            .expect("builtin tty--output-buffer-size should resolve")
+            .expect("builtin tty--output-buffer-size should evaluate");
+        assert_eq!(tty_buf, Value::Int(0));
+
+        let tty_set = dispatch_builtin_pure("tty--set-output-buffer-size", vec![Value::Int(4096)])
+            .expect("builtin tty--set-output-buffer-size should resolve")
+            .expect("builtin tty--set-output-buffer-size should evaluate");
+        assert!(tty_set.is_nil());
+
+        let tty_suppress =
+            dispatch_builtin_pure("tty-suppress-bold-inverse-default-colors", vec![Value::Nil])
+                .expect("builtin tty-suppress-bold-inverse-default-colors should resolve")
+                .expect("builtin tty-suppress-bold-inverse-default-colors should evaluate");
+        assert!(tty_suppress.is_nil());
     }
 
     #[test]
