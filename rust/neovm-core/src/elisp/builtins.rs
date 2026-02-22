@@ -14361,9 +14361,6 @@ pub(crate) fn dispatch_builtin(
         "frame-internal-border-width" => {
             super::compat_internal::builtin_frame_internal_border_width(args)
         }
-        "frame-old-selected-window" => {
-            super::compat_internal::builtin_frame_old_selected_window(args)
-        }
         "frame-or-buffer-changed-p" => {
             super::compat_internal::builtin_frame_or_buffer_changed_p(args)
         }
@@ -14546,7 +14543,6 @@ pub(crate) fn dispatch_builtin(
         "obarray-make" => super::compat_internal::builtin_obarray_make(args),
         "object-intervals" => super::compat_internal::builtin_object_intervals(args),
         "old-selected-frame" => super::compat_internal::builtin_old_selected_frame(args),
-        "old-selected-window" => super::compat_internal::builtin_old_selected_window(args),
         "open-dribble-file" => super::compat_internal::builtin_open_dribble_file(args),
         "open-font" => super::compat_internal::builtin_open_font(args),
         "optimize-char-table" => super::compat_internal::builtin_optimize_char_table(args),
@@ -15349,9 +15345,6 @@ pub(crate) fn dispatch_builtin_pure(name: &str, args: Vec<Value>) -> Option<Eval
         "frame-internal-border-width" => {
             super::compat_internal::builtin_frame_internal_border_width(args)
         }
-        "frame-old-selected-window" => {
-            super::compat_internal::builtin_frame_old_selected_window(args)
-        }
         "frame-or-buffer-changed-p" => {
             super::compat_internal::builtin_frame_or_buffer_changed_p(args)
         }
@@ -15528,7 +15521,6 @@ pub(crate) fn dispatch_builtin_pure(name: &str, args: Vec<Value>) -> Option<Eval
         "obarray-make" => super::compat_internal::builtin_obarray_make(args),
         "object-intervals" => super::compat_internal::builtin_object_intervals(args),
         "old-selected-frame" => super::compat_internal::builtin_old_selected_frame(args),
-        "old-selected-window" => super::compat_internal::builtin_old_selected_window(args),
         "open-dribble-file" => super::compat_internal::builtin_open_dribble_file(args),
         "open-font" => super::compat_internal::builtin_open_font(args),
         "optimize-char-table" => super::compat_internal::builtin_optimize_char_table(args),
@@ -19429,6 +19421,12 @@ mod tests {
         .expect("dispatch_builtin should resolve string-equal")
         .expect("dispatch_builtin should evaluate string-equal");
         assert!(result.is_truthy());
+    }
+
+    #[test]
+    fn dispatch_builtin_pure_defers_window_old_selection_accessors() {
+        assert!(dispatch_builtin_pure("old-selected-window", vec![]).is_none());
+        assert!(dispatch_builtin_pure("frame-old-selected-window", vec![]).is_none());
     }
 
     #[test]

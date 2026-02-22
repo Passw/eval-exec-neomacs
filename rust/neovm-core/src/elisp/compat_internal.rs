@@ -577,15 +577,6 @@ pub(crate) fn builtin_frame_internal_border_width(args: Vec<Value>) -> EvalResul
     Ok(Value::Int(0))
 }
 
-/// `(frame-old-selected-window &optional FRAME)` -> nil.
-pub(crate) fn builtin_frame_old_selected_window(args: Vec<Value>) -> EvalResult {
-    expect_range_args("frame-old-selected-window", &args, 0, 1)?;
-    if let Some(frame) = args.first() {
-        expect_frame_live_or_nil(frame)?;
-    }
-    Ok(Value::Nil)
-}
-
 /// `(frame-or-buffer-changed-p &optional SYM)` -> compatibility flag.
 pub(crate) fn builtin_frame_or_buffer_changed_p(args: Vec<Value>) -> EvalResult {
     expect_range_args("frame-or-buffer-changed-p", &args, 0, 1)?;
@@ -2060,12 +2051,6 @@ pub(crate) fn builtin_newline_cache_check(args: Vec<Value>) -> EvalResult {
 /// `(old-selected-frame)` -> nil.
 pub(crate) fn builtin_old_selected_frame(args: Vec<Value>) -> EvalResult {
     expect_args("old-selected-frame", &args, 0)?;
-    Ok(Value::Nil)
-}
-
-/// `(old-selected-window)` -> nil.
-pub(crate) fn builtin_old_selected_window(args: Vec<Value>) -> EvalResult {
-    expect_args("old-selected-window", &args, 0)?;
     Ok(Value::Nil)
 }
 
