@@ -32,14 +32,22 @@ Last updated: 2026-02-22
   - runtime changes:
     - `rust/neovm-core/src/elisp/display.rs`
       - now downcases character-code payloads for `Value::Int`/`Value::Char` error arguments before signaling `(wrong-type-argument stringp ...)`.
+      - preserves oracle identity payloads for Unicode edge ranges where Rust lowercase tables diverge from Emacs:
+        - singleton code points: `304`, `7305`, `8490`, `42955`, `42956`, `42958`, `42962`, `42964`, `42970`, `42972`
+        - supplemental ranges: `68944..=68965`, `93856..=93880`
       - added unit assertions in `x_clipboard_input_context_batch_semantics` for:
         - `65/?A -> 97`
         - `90/?Z -> 122`
+        - Unicode preserve/fold controls (`304`, `7305`, `8490`, `42955`, `68944`, `93856`, `66560`)
   - vm-compat corpus changes:
     - added and wired:
       - `test/neovm/vm-compat/cases/x-get-input-coding-system-char-fold-payload-semantics.forms`
       - `test/neovm/vm-compat/cases/x-get-input-coding-system-char-fold-payload-semantics.expected.tsv`
       - `test/neovm/vm-compat/cases/default.list`
+    - expanded case payload matrix to cover:
+      - ASCII fold controls
+      - negative and out-of-range integer paths
+      - Unicode singleton/range preserve points and supplemental fold control
   - verified:
     - `cargo test --manifest-path rust/neovm-core/Cargo.toml x_clipboard_input_context_batch_semantics -- --nocapture` (pass)
     - `make -C test/neovm/vm-compat record FORMS=cases/x-get-input-coding-system-char-fold-payload-semantics.forms EXPECTED=cases/x-get-input-coding-system-char-fold-payload-semantics.expected.tsv` (pass)

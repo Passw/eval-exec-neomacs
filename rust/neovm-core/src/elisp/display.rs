@@ -86,7 +86,28 @@ fn terminal_parameter_default_value(key: &Value) -> Option<Value> {
     }
 }
 
+fn preserve_emacs_downcase_payload(code: i64) -> bool {
+    matches!(
+        code,
+        304
+            | 7305
+            | 8490
+            | 42955
+            | 42956
+            | 42958
+            | 42962
+            | 42964
+            | 42970
+            | 42972
+            | 68944..=68965
+            | 93856..=93880
+    )
+}
+
 fn downcase_char_code(code: i64) -> i64 {
+    if preserve_emacs_downcase_payload(code) {
+        return code;
+    }
     if let Some(c) = u32::try_from(code).ok().and_then(char::from_u32) {
         c.to_lowercase().next().unwrap_or(c) as i64
     } else {
@@ -4546,6 +4567,41 @@ mod tests {
             builtin_x_get_input_coding_system(vec![Value::Int(90)]),
             "stringp",
             Value::Int(122),
+        );
+        assert_wrong_type(
+            builtin_x_get_input_coding_system(vec![Value::Int(304)]),
+            "stringp",
+            Value::Int(304),
+        );
+        assert_wrong_type(
+            builtin_x_get_input_coding_system(vec![Value::Int(7305)]),
+            "stringp",
+            Value::Int(7305),
+        );
+        assert_wrong_type(
+            builtin_x_get_input_coding_system(vec![Value::Int(8490)]),
+            "stringp",
+            Value::Int(8490),
+        );
+        assert_wrong_type(
+            builtin_x_get_input_coding_system(vec![Value::Int(42955)]),
+            "stringp",
+            Value::Int(42955),
+        );
+        assert_wrong_type(
+            builtin_x_get_input_coding_system(vec![Value::Int(68944)]),
+            "stringp",
+            Value::Int(68944),
+        );
+        assert_wrong_type(
+            builtin_x_get_input_coding_system(vec![Value::Int(93856)]),
+            "stringp",
+            Value::Int(93856),
+        );
+        assert_wrong_type(
+            builtin_x_get_input_coding_system(vec![Value::Int(66560)]),
+            "stringp",
+            Value::Int(66600),
         );
         assert_wrong_type(
             builtin_x_get_input_coding_system(vec![Value::Char('A')]),
