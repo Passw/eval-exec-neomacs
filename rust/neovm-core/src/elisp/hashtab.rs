@@ -19,6 +19,8 @@ const SXHASH_FIXNUM_SHIFT: u32 = 2;
 const SXHASH_FIXNUM_BITS: u32 = 62;
 const SXHASH_INTMASK: u64 = (1_u64 << SXHASH_FIXNUM_BITS) - 1;
 const SXHASH_FALLBACK_NONNEG_MASK: u64 = (1_u64 << (SXHASH_FIXNUM_BITS - 1)) - 1;
+const LISP_TYPE_INT0: u64 = 2;
+const LISP_TYPE_INT1: u64 = 6;
 const KNUTH_ALPHA: u32 = 2_654_435_769;
 
 // ---------------------------------------------------------------------------
@@ -217,6 +219,17 @@ fn reduce_emacs_uint_to_hash_hash(x: u64) -> u32 {
     (x ^ (x >> 32)) as u32
 }
 
+fn sxhash_eq_fixnum_uint(raw: u64) -> u64 {
+    let raw = raw & SXHASH_INTMASK;
+    // GNU Emacs `sxhash-eq` uses `XHASH ^ XTYPE` for fixnums/chars.
+    let xtype = if (raw & 1) == 0 {
+        LISP_TYPE_INT0
+    } else {
+        LISP_TYPE_INT1
+    };
+    raw ^ xtype
+}
+
 fn knuth_hash_index(hash: u32, bits: u32) -> usize {
     if bits == 0 {
         return 0;
@@ -315,8 +328,8 @@ fn sxhash_emacs_uint_for(value: &Value, test: HashTableTest) -> u64 {
     match test {
         HashTableTest::Equal => emacs_sxhash_obj_with_fallback(value, 0),
         HashTableTest::Eq | HashTableTest::Eql => match value {
-            Value::Int(n) => *n as u64,
-            Value::Char(c) => (*c as u32) as u64,
+            Value::Int(n) => sxhash_eq_fixnum_uint(*n as u64),
+            Value::Char(c) => sxhash_eq_fixnum_uint((*c as u32) as u64),
             Value::Float(f) if matches!(test, HashTableTest::Eql) => f.to_bits(),
             _ => fallback_sxhash_emacs_uint(value, test),
         },
@@ -340,25 +353,25 @@ fn internal_hash_table_index_size(table: &LispHashTable) -> usize {
 }
 
 fn internal_hash_table_diagnostic_hash(key: &HashKey, test: HashTableTest) -> u32 {
-    match (test, key) {
-        (HashTableTest::Eql, HashKey::Float(bits))
-        | (HashTableTest::Equal, HashKey::Float(bits)) => reduce_emacs_uint_to_hash_hash(*bits),
-        (HashTableTest::Equal, HashKey::Int(n)) => reduce_emacs_uint_to_hash_hash(*n as u64),
-        (HashTableTest::Equal, HashKey::Char(c)) => {
-            reduce_emacs_uint_to_hash_hash((*c as u32) as u64)
-        }
-        (HashTableTest::Equal, HashKey::Str(s)) => {
-            reduce_emacs_uint_to_hash_hash(emacs_hash_char_array(s.as_bytes()))
-        }
-        (HashTableTest::Equal, _) => {
+    match test {
+        HashTableTest::Eq => {
             let value = hash_key_to_value(key);
-            reduce_emacs_uint_to_hash_hash(sxhash_emacs_uint_for(&value, HashTableTest::Equal))
+            reduce_emacs_uint_to_hash_hash(sxhash_emacs_uint_for(&value, HashTableTest::Eq))
         }
-        _ => {
-            let mut hasher = DefaultHasher::new();
-            key.hash(&mut hasher);
-            reduce_emacs_uint_to_hash_hash(hasher.finish())
+        HashTableTest::Eql => {
+            let value = hash_key_to_value(key);
+            reduce_emacs_uint_to_hash_hash(sxhash_emacs_uint_for(&value, HashTableTest::Eql))
         }
+        HashTableTest::Equal => match key {
+            HashKey::Float(bits) => reduce_emacs_uint_to_hash_hash(*bits),
+            HashKey::Int(n) => reduce_emacs_uint_to_hash_hash(*n as u64),
+            HashKey::Char(c) => reduce_emacs_uint_to_hash_hash((*c as u32) as u64),
+            HashKey::Str(s) => reduce_emacs_uint_to_hash_hash(emacs_hash_char_array(s.as_bytes())),
+            _ => {
+                let value = hash_key_to_value(key);
+                reduce_emacs_uint_to_hash_hash(sxhash_emacs_uint_for(&value, HashTableTest::Equal))
+            }
+        },
     }
 }
 
@@ -837,6 +850,36 @@ mod tests {
     }
 
     #[test]
+    fn sxhash_eq_eql_fixnum_and_char_match_oracle_values() {
+        assert_eq!(builtin_sxhash_eq(vec![Value::Int(1)]).unwrap(), Value::Int(6));
+        assert_eq!(builtin_sxhash_eq(vec![Value::Int(2)]).unwrap(), Value::Int(0));
+        assert_eq!(builtin_sxhash_eq(vec![Value::Int(3)]).unwrap(), Value::Int(4));
+        assert_eq!(builtin_sxhash_eq(vec![Value::Int(65)]).unwrap(), Value::Int(86));
+        assert_eq!(builtin_sxhash_eq(vec![Value::Int(97)]).unwrap(), Value::Int(126));
+        assert_eq!(
+            builtin_sxhash_eq(vec![Value::Int(-1)]).unwrap(),
+            Value::Int(-1_152_921_504_606_846_969)
+        );
+        assert_eq!(
+            builtin_sxhash_eq(vec![Value::Int(-2)]).unwrap(),
+            Value::Int(-1_152_921_504_606_846_973)
+        );
+
+        assert_eq!(
+            builtin_sxhash_eql(vec![Value::Int(65)]).unwrap(),
+            Value::Int(86)
+        );
+        assert_eq!(
+            builtin_sxhash_eql(vec![Value::Char('A')]).unwrap(),
+            Value::Int(86)
+        );
+        assert_eq!(
+            builtin_sxhash_equal(vec![Value::Int(65)]).unwrap(),
+            Value::Int(81)
+        );
+    }
+
+    #[test]
     fn sxhash_float_matches_oracle_fixnum_values() {
         assert_eq!(
             builtin_sxhash_eql(vec![Value::Float(1.0)]).unwrap(),
@@ -1141,6 +1184,55 @@ mod tests {
                 Value::list(vec![Value::cons(Value::string("b"), Value::Int(114))]),
                 Value::list(vec![Value::cons(Value::string("a"), Value::Int(113))]),
             ])
+        );
+    }
+
+    #[test]
+    fn internal_hash_table_buckets_match_oracle_eq_eql_fixnum_hashes() {
+        for test_name in ["eq", "eql"] {
+            let table = builtin_make_hash_table(vec![
+                Value::keyword(":test"),
+                Value::symbol(test_name),
+                Value::keyword(":size"),
+                Value::Int(3),
+            ])
+            .expect("hash table");
+            let _ = builtin_puthash(vec![Value::Char('A'), Value::symbol("char"), table.clone()])
+                .expect("puthash char");
+            assert_eq!(
+                builtin_gethash(vec![Value::Int(65), table.clone(), Value::symbol("miss")])
+                    .expect("gethash int"),
+                Value::symbol("char")
+            );
+            assert_eq!(
+                builtin_gethash(vec![Value::Char('A'), table.clone(), Value::symbol("miss")])
+                    .expect("gethash char"),
+                Value::symbol("char")
+            );
+            assert_eq!(
+                builtin_internal_hash_table_buckets(vec![table]).expect("bucket alists"),
+                Value::list(vec![Value::list(vec![Value::cons(
+                    Value::Int(65),
+                    Value::Int(71)
+                )])])
+            );
+        }
+
+        let table = builtin_make_hash_table(vec![
+            Value::keyword(":test"),
+            Value::symbol("equal"),
+            Value::keyword(":size"),
+            Value::Int(3),
+        ])
+        .expect("hash table");
+        let _ = builtin_puthash(vec![Value::Char('A'), Value::symbol("char"), table.clone()])
+            .expect("puthash char");
+        assert_eq!(
+            builtin_internal_hash_table_buckets(vec![table]).expect("bucket alists"),
+            Value::list(vec![Value::list(vec![Value::cons(
+                Value::Int(65),
+                Value::Int(65)
+            )])])
         );
     }
 
