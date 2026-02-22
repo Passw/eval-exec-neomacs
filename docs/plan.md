@@ -19636,6 +19636,21 @@ Last updated: 2026-02-21
         - `x-display-monitor-attributes-list`, `x-display-planes`, `x-display-save-under`, `x-display-screens`
         - `x-display-visual-class`, `x-server-input-extension-version`, `x-server-vendor`
 
+- Added remaining `x-display` query message payload lock-ins:
+  - vm-compat corpus changes:
+    - added:
+      - `test/neovm/vm-compat/cases/x-display-query-message-payload-semantics.forms`
+      - `test/neovm/vm-compat/cases/x-display-query-message-payload-semantics.expected.tsv`
+    - wired case into:
+      - `test/neovm/vm-compat/cases/default.list`
+    - lock-ins cover exact `(error . message)` payload pairs for:
+      - string designator `"tty"` -> `"Display tty can’t be opened"`
+      - terminal designator `(car (terminal-list))` -> `"Terminal 0 is not an X display"`
+      - covered functions:
+        - `x-display-backing-store`, `x-display-color-cells`, `x-display-mm-height`, `x-display-mm-width`
+        - `x-display-monitor-attributes-list`, `x-display-planes`, `x-display-save-under`, `x-display-screens`
+        - `x-display-visual-class`, `x-server-input-extension-version`, `x-server-vendor`
+
 - Continue compatibility-first maintenance with small commit slices:
   - keep builtin surface and registry in lock-step
   - run oracle/parity checks after each behavior-affecting change
