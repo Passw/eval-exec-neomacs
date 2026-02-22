@@ -1424,12 +1424,6 @@ pub(crate) fn builtin_internal_set_buffer_modified_tick(args: Vec<Value>) -> Eva
     Ok(Value::Nil)
 }
 
-/// `(defconst-1 SYMBOL VALUE &optional DOCSTRING)` -> nil.
-pub(crate) fn builtin_defconst_1(args: Vec<Value>) -> EvalResult {
-    expect_range_args("defconst-1", &args, 2, 3)?;
-    Ok(Value::Nil)
-}
-
 /// `(define-coding-system-internal ...)` -> nil.
 pub(crate) fn builtin_define_coding_system_internal(args: Vec<Value>) -> EvalResult {
     if args.len() < 13 {
@@ -1441,30 +1435,6 @@ pub(crate) fn builtin_define_coding_system_internal(args: Vec<Value>) -> EvalRes
             ],
         ));
     }
-    Ok(Value::Nil)
-}
-
-/// `(defvar-1 SYMBOL VALUE &optional DOCSTRING)` -> nil.
-pub(crate) fn builtin_defvar_1(args: Vec<Value>) -> EvalResult {
-    expect_range_args("defvar-1", &args, 2, 3)?;
-    Ok(Value::Nil)
-}
-
-/// `(iso-charset DIMENSION CHARS FINAL-CHAR)` -> nil.
-pub(crate) fn builtin_iso_charset(args: Vec<Value>) -> EvalResult {
-    expect_args("iso-charset", &args, 3)?;
-    Ok(Value::Nil)
-}
-
-/// `(keymap--get-keyelt KEYMAP KEY)` -> nil.
-pub(crate) fn builtin_keymap_get_keyelt(args: Vec<Value>) -> EvalResult {
-    expect_args("keymap--get-keyelt", &args, 2)?;
-    Ok(Value::Nil)
-}
-
-/// `(keymap-prompt KEYMAP)` -> nil.
-pub(crate) fn builtin_keymap_prompt(args: Vec<Value>) -> EvalResult {
-    expect_args("keymap-prompt", &args, 1)?;
     Ok(Value::Nil)
 }
 

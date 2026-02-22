@@ -6346,6 +6346,31 @@ pub(crate) fn builtin_handler_bind_1(args: Vec<Value>) -> EvalResult {
     Ok(Value::Nil)
 }
 
+pub(crate) fn builtin_defconst_1(args: Vec<Value>) -> EvalResult {
+    expect_range_args("defconst-1", &args, 2, 3)?;
+    Ok(Value::Nil)
+}
+
+pub(crate) fn builtin_defvar_1(args: Vec<Value>) -> EvalResult {
+    expect_range_args("defvar-1", &args, 2, 3)?;
+    Ok(Value::Nil)
+}
+
+pub(crate) fn builtin_iso_charset(args: Vec<Value>) -> EvalResult {
+    expect_args("iso-charset", &args, 3)?;
+    Ok(Value::Nil)
+}
+
+pub(crate) fn builtin_keymap_get_keyelt(args: Vec<Value>) -> EvalResult {
+    expect_args("keymap--get-keyelt", &args, 2)?;
+    Ok(Value::Nil)
+}
+
+pub(crate) fn builtin_keymap_prompt(args: Vec<Value>) -> EvalResult {
+    expect_args("keymap-prompt", &args, 1)?;
+    Ok(Value::Nil)
+}
+
 // ===========================================================================
 // Hook system (need evaluator)
 // ===========================================================================
@@ -15205,11 +15230,11 @@ pub(crate) fn dispatch_builtin(
         "internal-subr-documentation" => builtin_internal_subr_documentation(args),
         "byte-code" => builtin_byte_code(args),
         "decode-coding-region" => builtin_decode_coding_region(args),
-        "defconst-1" => super::compat_internal::builtin_defconst_1(args),
+        "defconst-1" => builtin_defconst_1(args),
         "define-coding-system-internal" => {
             super::compat_internal::builtin_define_coding_system_internal(args)
         }
-        "defvar-1" => super::compat_internal::builtin_defvar_1(args),
+        "defvar-1" => builtin_defvar_1(args),
         "dump-emacs-portable" => builtin_dump_emacs_portable(args),
         "dump-emacs-portable--sort-predicate" => builtin_dump_emacs_portable_sort_predicate(args),
         "dump-emacs-portable--sort-predicate-copied" => {
@@ -15218,9 +15243,9 @@ pub(crate) fn dispatch_builtin(
         "encode-coding-region" => builtin_encode_coding_region(args),
         "find-operation-coding-system" => builtin_find_operation_coding_system(args),
         "handler-bind-1" => builtin_handler_bind_1(args),
-        "iso-charset" => super::compat_internal::builtin_iso_charset(args),
-        "keymap--get-keyelt" => super::compat_internal::builtin_keymap_get_keyelt(args),
-        "keymap-prompt" => super::compat_internal::builtin_keymap_prompt(args),
+        "iso-charset" => builtin_iso_charset(args),
+        "keymap--get-keyelt" => builtin_keymap_get_keyelt(args),
+        "keymap-prompt" => builtin_keymap_prompt(args),
         "kill-emacs" => super::compat_internal::builtin_kill_emacs(args),
         "lower-frame" => super::compat_internal::builtin_lower_frame(args),
         "lread--substitute-object-in-subtree" => {
@@ -16124,11 +16149,11 @@ pub(crate) fn dispatch_builtin_pure(name: &str, args: Vec<Value>) -> Option<Eval
         "internal-subr-documentation" => builtin_internal_subr_documentation(args),
         "byte-code" => builtin_byte_code(args),
         "decode-coding-region" => builtin_decode_coding_region(args),
-        "defconst-1" => super::compat_internal::builtin_defconst_1(args),
+        "defconst-1" => builtin_defconst_1(args),
         "define-coding-system-internal" => {
             super::compat_internal::builtin_define_coding_system_internal(args)
         }
-        "defvar-1" => super::compat_internal::builtin_defvar_1(args),
+        "defvar-1" => builtin_defvar_1(args),
         "dump-emacs-portable" => builtin_dump_emacs_portable(args),
         "dump-emacs-portable--sort-predicate" => builtin_dump_emacs_portable_sort_predicate(args),
         "dump-emacs-portable--sort-predicate-copied" => {
@@ -16137,9 +16162,9 @@ pub(crate) fn dispatch_builtin_pure(name: &str, args: Vec<Value>) -> Option<Eval
         "encode-coding-region" => builtin_encode_coding_region(args),
         "find-operation-coding-system" => builtin_find_operation_coding_system(args),
         "handler-bind-1" => builtin_handler_bind_1(args),
-        "iso-charset" => super::compat_internal::builtin_iso_charset(args),
-        "keymap--get-keyelt" => super::compat_internal::builtin_keymap_get_keyelt(args),
-        "keymap-prompt" => super::compat_internal::builtin_keymap_prompt(args),
+        "iso-charset" => builtin_iso_charset(args),
+        "keymap--get-keyelt" => builtin_keymap_get_keyelt(args),
+        "keymap-prompt" => builtin_keymap_prompt(args),
         "kill-emacs" => super::compat_internal::builtin_kill_emacs(args),
         "lower-frame" => super::compat_internal::builtin_lower_frame(args),
         "lread--substitute-object-in-subtree" => {
@@ -20649,6 +20674,40 @@ mod tests {
         .expect("builtin handler-bind-1 should resolve")
         .expect("builtin handler-bind-1 should evaluate");
         assert!(handler_bind.is_nil());
+    }
+
+    #[test]
+    fn pure_dispatch_def_keymap_placeholder_cluster_matches_compat_contracts() {
+        let defconst = dispatch_builtin_pure(
+            "defconst-1",
+            vec![Value::symbol("foo"), Value::Int(1), Value::string("doc")],
+        )
+        .expect("builtin defconst-1 should resolve")
+        .expect("builtin defconst-1 should evaluate");
+        assert!(defconst.is_nil());
+
+        let defvar = dispatch_builtin_pure("defvar-1", vec![Value::symbol("foo"), Value::Int(1)])
+            .expect("builtin defvar-1 should resolve")
+            .expect("builtin defvar-1 should evaluate");
+        assert!(defvar.is_nil());
+
+        let iso_charset = dispatch_builtin_pure(
+            "iso-charset",
+            vec![Value::Int(1), Value::Int(2), Value::Int(3)],
+        )
+        .expect("builtin iso-charset should resolve")
+        .expect("builtin iso-charset should evaluate");
+        assert!(iso_charset.is_nil());
+
+        let keyelt = dispatch_builtin_pure("keymap--get-keyelt", vec![Value::Nil, Value::Nil])
+            .expect("builtin keymap--get-keyelt should resolve")
+            .expect("builtin keymap--get-keyelt should evaluate");
+        assert!(keyelt.is_nil());
+
+        let keymap_prompt = dispatch_builtin_pure("keymap-prompt", vec![Value::Nil])
+            .expect("builtin keymap-prompt should resolve")
+            .expect("builtin keymap-prompt should evaluate");
+        assert!(keymap_prompt.is_nil());
     }
 
     #[test]
