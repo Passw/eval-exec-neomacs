@@ -1945,11 +1945,6 @@ pub(crate) fn builtin_format(args: Vec<Value>) -> EvalResult {
     builtin_format_wrapper_strict(args)
 }
 
-pub(crate) fn builtin_format_message(args: Vec<Value>) -> EvalResult {
-    expect_min_args("format-message", &args, 1)?;
-    builtin_format(args)
-}
-
 pub(crate) fn builtin_ngettext(args: Vec<Value>) -> EvalResult {
     expect_args("ngettext", &args, 3)?;
     let singular = expect_strict_string(&args[0])?;
@@ -13804,7 +13799,6 @@ pub(crate) fn dispatch_builtin(
 
         // Output / misc
         "identity" => builtin_identity(args),
-        "format-message" => builtin_format_message(args),
         "message" => builtin_message(args),
         "message-box" => builtin_message_box(args),
         "message-or-box" => builtin_message_or_box(args),
@@ -15073,6 +15067,7 @@ pub(crate) fn dispatch_builtin_pure(name: &str, args: Vec<Value>) -> Option<Eval
     match name {
         "functionp"
         | "format"
+        | "format-message"
         | "assoc"
         | "alist-get"
         | "plist-member"
@@ -15146,7 +15141,6 @@ pub(crate) fn dispatch_builtin_pure(name: &str, args: Vec<Value>) -> Option<Eval
         // Output / misc
         "identity" => builtin_identity(args),
         "purecopy" => builtin_purecopy(args),
-        "format-message" => builtin_format_message(args),
         "message" => builtin_message(args),
         "message-box" => builtin_message_box(args),
         "message-or-box" => builtin_message_or_box(args),
@@ -19416,6 +19410,7 @@ mod tests {
     fn dispatch_builtin_pure_defers_evaluator_window_accessors_and_mutators() {
         assert!(dispatch_builtin_pure("functionp", vec![]).is_none());
         assert!(dispatch_builtin_pure("format", vec![]).is_none());
+        assert!(dispatch_builtin_pure("format-message", vec![]).is_none());
         assert!(dispatch_builtin_pure("assoc", vec![]).is_none());
         assert!(dispatch_builtin_pure("alist-get", vec![]).is_none());
         assert!(dispatch_builtin_pure("plist-member", vec![]).is_none());
