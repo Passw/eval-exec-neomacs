@@ -1424,18 +1424,6 @@ pub(crate) fn builtin_internal_set_buffer_modified_tick(args: Vec<Value>) -> Eva
     Ok(Value::Nil)
 }
 
-/// `(byte-code BYTE-STR VECTOR MAXDEPTH)` -> nil.
-pub(crate) fn builtin_byte_code(args: Vec<Value>) -> EvalResult {
-    expect_args("byte-code", &args, 3)?;
-    Ok(Value::Nil)
-}
-
-/// `(decode-coding-region START END CODING &optional DESTINATION)` -> nil.
-pub(crate) fn builtin_decode_coding_region(args: Vec<Value>) -> EvalResult {
-    expect_range_args("decode-coding-region", &args, 3, 4)?;
-    Ok(Value::Nil)
-}
-
 /// `(defconst-1 SYMBOL VALUE &optional DOCSTRING)` -> nil.
 pub(crate) fn builtin_defconst_1(args: Vec<Value>) -> EvalResult {
     expect_range_args("defconst-1", &args, 2, 3)?;
@@ -1459,40 +1447,6 @@ pub(crate) fn builtin_define_coding_system_internal(args: Vec<Value>) -> EvalRes
 /// `(defvar-1 SYMBOL VALUE &optional DOCSTRING)` -> nil.
 pub(crate) fn builtin_defvar_1(args: Vec<Value>) -> EvalResult {
     expect_range_args("defvar-1", &args, 2, 3)?;
-    Ok(Value::Nil)
-}
-
-/// `(encode-coding-region START END CODING &optional DESTINATION)` -> nil.
-pub(crate) fn builtin_encode_coding_region(args: Vec<Value>) -> EvalResult {
-    expect_range_args("encode-coding-region", &args, 3, 4)?;
-    Ok(Value::Nil)
-}
-
-/// `(find-operation-coding-system OPERATION &rest ARGS)` -> nil.
-pub(crate) fn builtin_find_operation_coding_system(args: Vec<Value>) -> EvalResult {
-    if args.is_empty() {
-        return Err(signal(
-            "wrong-number-of-arguments",
-            vec![
-                Value::symbol("find-operation-coding-system"),
-                Value::Int(args.len() as i64),
-            ],
-        ));
-    }
-    Ok(Value::Nil)
-}
-
-/// `(handler-bind-1 HANDLERS &rest BODY)` -> nil.
-pub(crate) fn builtin_handler_bind_1(args: Vec<Value>) -> EvalResult {
-    if args.is_empty() {
-        return Err(signal(
-            "wrong-number-of-arguments",
-            vec![
-                Value::symbol("handler-bind-1"),
-                Value::Int(args.len() as i64),
-            ],
-        ));
-    }
     Ok(Value::Nil)
 }
 

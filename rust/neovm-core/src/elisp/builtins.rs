@@ -6305,6 +6305,47 @@ pub(crate) fn builtin_dump_emacs_portable_sort_predicate_copied(args: Vec<Value>
     Ok(Value::Nil)
 }
 
+pub(crate) fn builtin_byte_code(args: Vec<Value>) -> EvalResult {
+    expect_args("byte-code", &args, 3)?;
+    Ok(Value::Nil)
+}
+
+pub(crate) fn builtin_decode_coding_region(args: Vec<Value>) -> EvalResult {
+    expect_range_args("decode-coding-region", &args, 3, 4)?;
+    Ok(Value::Nil)
+}
+
+pub(crate) fn builtin_encode_coding_region(args: Vec<Value>) -> EvalResult {
+    expect_range_args("encode-coding-region", &args, 3, 4)?;
+    Ok(Value::Nil)
+}
+
+pub(crate) fn builtin_find_operation_coding_system(args: Vec<Value>) -> EvalResult {
+    if args.is_empty() {
+        return Err(signal(
+            "wrong-number-of-arguments",
+            vec![
+                Value::symbol("find-operation-coding-system"),
+                Value::Int(args.len() as i64),
+            ],
+        ));
+    }
+    Ok(Value::Nil)
+}
+
+pub(crate) fn builtin_handler_bind_1(args: Vec<Value>) -> EvalResult {
+    if args.is_empty() {
+        return Err(signal(
+            "wrong-number-of-arguments",
+            vec![
+                Value::symbol("handler-bind-1"),
+                Value::Int(args.len() as i64),
+            ],
+        ));
+    }
+    Ok(Value::Nil)
+}
+
 // ===========================================================================
 // Hook system (need evaluator)
 // ===========================================================================
@@ -15162,8 +15203,8 @@ pub(crate) fn dispatch_builtin(
         }
         "internal-stack-stats" => builtin_internal_stack_stats(args),
         "internal-subr-documentation" => builtin_internal_subr_documentation(args),
-        "byte-code" => super::compat_internal::builtin_byte_code(args),
-        "decode-coding-region" => super::compat_internal::builtin_decode_coding_region(args),
+        "byte-code" => builtin_byte_code(args),
+        "decode-coding-region" => builtin_decode_coding_region(args),
         "defconst-1" => super::compat_internal::builtin_defconst_1(args),
         "define-coding-system-internal" => {
             super::compat_internal::builtin_define_coding_system_internal(args)
@@ -15174,11 +15215,9 @@ pub(crate) fn dispatch_builtin(
         "dump-emacs-portable--sort-predicate-copied" => {
             builtin_dump_emacs_portable_sort_predicate_copied(args)
         }
-        "encode-coding-region" => super::compat_internal::builtin_encode_coding_region(args),
-        "find-operation-coding-system" => {
-            super::compat_internal::builtin_find_operation_coding_system(args)
-        }
-        "handler-bind-1" => super::compat_internal::builtin_handler_bind_1(args),
+        "encode-coding-region" => builtin_encode_coding_region(args),
+        "find-operation-coding-system" => builtin_find_operation_coding_system(args),
+        "handler-bind-1" => builtin_handler_bind_1(args),
         "iso-charset" => super::compat_internal::builtin_iso_charset(args),
         "keymap--get-keyelt" => super::compat_internal::builtin_keymap_get_keyelt(args),
         "keymap-prompt" => super::compat_internal::builtin_keymap_prompt(args),
@@ -16083,8 +16122,8 @@ pub(crate) fn dispatch_builtin_pure(name: &str, args: Vec<Value>) -> Option<Eval
         }
         "internal-stack-stats" => builtin_internal_stack_stats(args),
         "internal-subr-documentation" => builtin_internal_subr_documentation(args),
-        "byte-code" => super::compat_internal::builtin_byte_code(args),
-        "decode-coding-region" => super::compat_internal::builtin_decode_coding_region(args),
+        "byte-code" => builtin_byte_code(args),
+        "decode-coding-region" => builtin_decode_coding_region(args),
         "defconst-1" => super::compat_internal::builtin_defconst_1(args),
         "define-coding-system-internal" => {
             super::compat_internal::builtin_define_coding_system_internal(args)
@@ -16095,11 +16134,9 @@ pub(crate) fn dispatch_builtin_pure(name: &str, args: Vec<Value>) -> Option<Eval
         "dump-emacs-portable--sort-predicate-copied" => {
             builtin_dump_emacs_portable_sort_predicate_copied(args)
         }
-        "encode-coding-region" => super::compat_internal::builtin_encode_coding_region(args),
-        "find-operation-coding-system" => {
-            super::compat_internal::builtin_find_operation_coding_system(args)
-        }
-        "handler-bind-1" => super::compat_internal::builtin_handler_bind_1(args),
+        "encode-coding-region" => builtin_encode_coding_region(args),
+        "find-operation-coding-system" => builtin_find_operation_coding_system(args),
+        "handler-bind-1" => builtin_handler_bind_1(args),
         "iso-charset" => super::compat_internal::builtin_iso_charset(args),
         "keymap--get-keyelt" => super::compat_internal::builtin_keymap_get_keyelt(args),
         "keymap-prompt" => super::compat_internal::builtin_keymap_prompt(args),
@@ -20561,6 +20598,57 @@ mod tests {
         .expect("builtin dump-emacs-portable--sort-predicate-copied should resolve")
         .expect("builtin dump-emacs-portable--sort-predicate-copied should evaluate");
         assert!(sort_predicate_copied.is_nil());
+    }
+
+    #[test]
+    fn pure_dispatch_coding_placeholder_cluster_matches_compat_contracts() {
+        let byte_code = dispatch_builtin_pure(
+            "byte-code",
+            vec![Value::string(""), Value::vector(vec![]), Value::Int(0)],
+        )
+        .expect("builtin byte-code should resolve")
+        .expect("builtin byte-code should evaluate");
+        assert!(byte_code.is_nil());
+
+        let decode_region = dispatch_builtin_pure(
+            "decode-coding-region",
+            vec![
+                Value::Int(1),
+                Value::Int(2),
+                Value::symbol("utf-8"),
+                Value::Nil,
+            ],
+        )
+        .expect("builtin decode-coding-region should resolve")
+        .expect("builtin decode-coding-region should evaluate");
+        assert!(decode_region.is_nil());
+
+        let encode_region = dispatch_builtin_pure(
+            "encode-coding-region",
+            vec![
+                Value::Int(1),
+                Value::Int(2),
+                Value::symbol("utf-8"),
+                Value::Nil,
+            ],
+        )
+        .expect("builtin encode-coding-region should resolve")
+        .expect("builtin encode-coding-region should evaluate");
+        assert!(encode_region.is_nil());
+
+        let find_operation =
+            dispatch_builtin_pure("find-operation-coding-system", vec![Value::symbol("write")])
+                .expect("builtin find-operation-coding-system should resolve")
+                .expect("builtin find-operation-coding-system should evaluate");
+        assert!(find_operation.is_nil());
+
+        let handler_bind = dispatch_builtin_pure(
+            "handler-bind-1",
+            vec![Value::list(vec![]), Value::symbol("body")],
+        )
+        .expect("builtin handler-bind-1 should resolve")
+        .expect("builtin handler-bind-1 should evaluate");
+        assert!(handler_bind.is_nil());
     }
 
     #[test]
