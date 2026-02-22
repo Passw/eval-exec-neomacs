@@ -187,16 +187,6 @@ fn expect_processp(value: &Value) -> Result<(), Flow> {
     }
 }
 
-fn expect_numberp(value: &Value) -> Result<(), Flow> {
-    match value {
-        Value::Int(_) | Value::Char(_) | Value::Float(_) => Ok(()),
-        other => Err(signal(
-            "wrong-type-argument",
-            vec![Value::symbol("numberp"), other.clone()],
-        )),
-    }
-}
-
 fn expect_window_live_or_nil(value: &Value) -> Result<(), Flow> {
     if value.is_nil() || matches!(value, Value::Window(_)) {
         Ok(())
@@ -1222,14 +1212,6 @@ pub(crate) fn builtin_unlock_file(args: Vec<Value>) -> EvalResult {
     Ok(Value::Nil)
 }
 
-/// `(window-at X Y &optional FRAME)` -> nil.
-pub(crate) fn builtin_window_at(args: Vec<Value>) -> EvalResult {
-    expect_range_args("window-at", &args, 2, 3)?;
-    expect_numberp(&args[0])?;
-    expect_numberp(&args[1])?;
-    Ok(Value::Nil)
-}
-
 /// `(window-bottom-divider-width &optional WINDOW)` -> 0.
 pub(crate) fn builtin_window_bottom_divider_width(args: Vec<Value>) -> EvalResult {
     expect_range_args("window-bottom-divider-width", &args, 0, 1)?;
@@ -1237,15 +1219,6 @@ pub(crate) fn builtin_window_bottom_divider_width(args: Vec<Value>) -> EvalResul
         expect_window_live_or_nil(window)?;
     }
     Ok(Value::Int(0))
-}
-
-/// `(window-bump-use-time &optional WINDOW)` -> nil.
-pub(crate) fn builtin_window_bump_use_time(args: Vec<Value>) -> EvalResult {
-    expect_range_args("window-bump-use-time", &args, 0, 1)?;
-    if let Some(window) = args.first() {
-        expect_window_live_or_nil(window)?;
-    }
-    Ok(Value::Nil)
 }
 
 /// `(window-combination-limit WINDOW)` -> compatibility error.
@@ -1287,15 +1260,6 @@ pub(crate) fn builtin_window_lines_pixel_dimensions(args: Vec<Value>) -> EvalRes
         expect_window_live_or_nil(window)?;
     }
     Ok(Value::Nil)
-}
-
-/// `(window-list-1 &optional WINDOW MINIBUF ALL-FRAMES)` -> singleton list.
-pub(crate) fn builtin_window_list_1(args: Vec<Value>) -> EvalResult {
-    expect_range_args("window-list-1", &args, 0, 3)?;
-    if let Some(window) = args.first() {
-        expect_window_live_or_nil(window)?;
-    }
-    Ok(Value::list(vec![Value::Nil]))
 }
 
 /// `(window-new-normal &optional WINDOW)` -> 0.
@@ -2272,12 +2236,6 @@ pub(crate) fn builtin_set_charset_plist(args: Vec<Value>) -> EvalResult {
 /// `(set-fontset-font NAME TARGET FONT-SPEC &optional FRAME ADD)` -> nil.
 pub(crate) fn builtin_set_fontset_font(args: Vec<Value>) -> EvalResult {
     expect_range_args("set-fontset-font", &args, 3, 5)?;
-    Ok(Value::Nil)
-}
-
-/// `(set-frame-selected-window FRAME WINDOW &optional NORECORD)` -> nil.
-pub(crate) fn builtin_set_frame_selected_window(args: Vec<Value>) -> EvalResult {
-    expect_range_args("set-frame-selected-window", &args, 2, 3)?;
     Ok(Value::Nil)
 }
 
@@ -3333,18 +3291,6 @@ mod tests {
         let err = builtin_unlock_file(vec![Value::Nil]).unwrap_err();
         match err {
             Flow::Signal(sig) => assert_eq!(sig.symbol, "wrong-type-argument"),
-            other => panic!("expected signal, got {other:?}"),
-        }
-    }
-
-    #[test]
-    fn window_at_requires_numeric_coordinates() {
-        let err = builtin_window_at(vec![Value::Nil, Value::Nil]).unwrap_err();
-        match err {
-            Flow::Signal(sig) => {
-                assert_eq!(sig.symbol, "wrong-type-argument");
-                assert_eq!(sig.data.first(), Some(&Value::symbol("numberp")));
-            }
             other => panic!("expected signal, got {other:?}"),
         }
     }

@@ -14599,9 +14599,6 @@ pub(crate) fn dispatch_builtin(
         "set-buffer-redisplay" => super::compat_internal::builtin_set_buffer_redisplay(args),
         "set-charset-plist" => super::compat_internal::builtin_set_charset_plist(args),
         "set-fontset-font" => super::compat_internal::builtin_set_fontset_font(args),
-        "set-frame-selected-window" => {
-            super::compat_internal::builtin_set_frame_selected_window(args)
-        }
         "set-frame-window-state-change" => {
             super::compat_internal::builtin_set_frame_window_state_change(args)
         }
@@ -14680,11 +14677,9 @@ pub(crate) fn dispatch_builtin(
         "lossage-size" => super::compat_internal::builtin_lossage_size(args),
         "unlock-buffer" => super::compat_internal::builtin_unlock_buffer(args),
         "unlock-file" => super::compat_internal::builtin_unlock_file(args),
-        "window-at" => super::compat_internal::builtin_window_at(args),
         "window-bottom-divider-width" => {
             super::compat_internal::builtin_window_bottom_divider_width(args)
         }
-        "window-bump-use-time" => super::compat_internal::builtin_window_bump_use_time(args),
         "window-combination-limit" => {
             super::compat_internal::builtin_window_combination_limit(args)
         }
@@ -14693,7 +14688,6 @@ pub(crate) fn dispatch_builtin(
         "window-lines-pixel-dimensions" => {
             super::compat_internal::builtin_window_lines_pixel_dimensions(args)
         }
-        "window-list-1" => super::compat_internal::builtin_window_list_1(args),
         "window-new-normal" => super::compat_internal::builtin_window_new_normal(args),
         "window-new-pixel" => super::compat_internal::builtin_window_new_pixel(args),
         "window-new-total" => super::compat_internal::builtin_window_new_total(args),
@@ -15577,9 +15571,6 @@ pub(crate) fn dispatch_builtin_pure(name: &str, args: Vec<Value>) -> Option<Eval
         "set-buffer-redisplay" => super::compat_internal::builtin_set_buffer_redisplay(args),
         "set-charset-plist" => super::compat_internal::builtin_set_charset_plist(args),
         "set-fontset-font" => super::compat_internal::builtin_set_fontset_font(args),
-        "set-frame-selected-window" => {
-            super::compat_internal::builtin_set_frame_selected_window(args)
-        }
         "set-frame-window-state-change" => {
             super::compat_internal::builtin_set_frame_window_state_change(args)
         }
@@ -15658,11 +15649,9 @@ pub(crate) fn dispatch_builtin_pure(name: &str, args: Vec<Value>) -> Option<Eval
         "lossage-size" => super::compat_internal::builtin_lossage_size(args),
         "unlock-buffer" => super::compat_internal::builtin_unlock_buffer(args),
         "unlock-file" => super::compat_internal::builtin_unlock_file(args),
-        "window-at" => super::compat_internal::builtin_window_at(args),
         "window-bottom-divider-width" => {
             super::compat_internal::builtin_window_bottom_divider_width(args)
         }
-        "window-bump-use-time" => super::compat_internal::builtin_window_bump_use_time(args),
         "window-combination-limit" => {
             super::compat_internal::builtin_window_combination_limit(args)
         }
@@ -15671,7 +15660,6 @@ pub(crate) fn dispatch_builtin_pure(name: &str, args: Vec<Value>) -> Option<Eval
         "window-lines-pixel-dimensions" => {
             super::compat_internal::builtin_window_lines_pixel_dimensions(args)
         }
-        "window-list-1" => super::compat_internal::builtin_window_list_1(args),
         "window-new-normal" => super::compat_internal::builtin_window_new_normal(args),
         "window-new-pixel" => super::compat_internal::builtin_window_new_pixel(args),
         "window-new-total" => super::compat_internal::builtin_window_new_total(args),
@@ -19424,9 +19412,13 @@ mod tests {
     }
 
     #[test]
-    fn dispatch_builtin_pure_defers_window_old_selection_accessors() {
+    fn dispatch_builtin_pure_defers_evaluator_window_accessors_and_mutators() {
         assert!(dispatch_builtin_pure("old-selected-window", vec![]).is_none());
         assert!(dispatch_builtin_pure("frame-old-selected-window", vec![]).is_none());
+        assert!(dispatch_builtin_pure("set-frame-selected-window", vec![]).is_none());
+        assert!(dispatch_builtin_pure("window-at", vec![]).is_none());
+        assert!(dispatch_builtin_pure("window-bump-use-time", vec![]).is_none());
+        assert!(dispatch_builtin_pure("window-list-1", vec![]).is_none());
     }
 
     #[test]
