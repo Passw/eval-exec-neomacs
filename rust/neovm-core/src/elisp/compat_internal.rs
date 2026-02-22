@@ -1641,19 +1641,8 @@ pub(crate) fn builtin_handler_bind_1(args: Vec<Value>) -> EvalResult {
     Ok(Value::Nil)
 }
 
-/// `(insert-and-inherit &rest ARGS)` -> nil.
-pub(crate) fn builtin_insert_and_inherit(_args: Vec<Value>) -> EvalResult {
-    Ok(Value::Nil)
-}
-
 /// `(insert-before-markers-and-inherit &rest ARGS)` -> nil.
 pub(crate) fn builtin_insert_before_markers_and_inherit(_args: Vec<Value>) -> EvalResult {
-    Ok(Value::Nil)
-}
-
-/// `(insert-buffer-substring BUFFER &optional START END)` -> nil.
-pub(crate) fn builtin_insert_buffer_substring(args: Vec<Value>) -> EvalResult {
-    expect_range_args("insert-buffer-substring", &args, 1, 3)?;
     Ok(Value::Nil)
 }
 
