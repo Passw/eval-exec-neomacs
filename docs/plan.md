@@ -19620,6 +19620,22 @@ Last updated: 2026-02-21
       - `x-display-visual-class`, `x-server-input-extension-version`, `x-server-vendor`
       - payload shape keeps `wrong-type-argument` + `frame-live-p` with compact `#<window N>` rendering and no live-window buffer context (` on `)
 
+- Added remaining `x-display` query window error-structure lock-ins:
+  - vm-compat corpus changes:
+    - added:
+      - `test/neovm/vm-compat/cases/x-display-query-window-error-structure-semantics.forms`
+      - `test/neovm/vm-compat/cases/x-display-query-window-error-structure-semantics.expected.tsv`
+    - wired case into:
+      - `test/neovm/vm-compat/cases/default.list`
+    - lock-ins assert error payload structure for live window designators:
+      - `(car err)` is `wrong-type-argument`
+      - `(cadr err)` is `frame-live-p`
+      - `(windowp (nth 2 err))` is `t`
+      - covered functions:
+        - `x-display-backing-store`, `x-display-color-cells`, `x-display-mm-height`, `x-display-mm-width`
+        - `x-display-monitor-attributes-list`, `x-display-planes`, `x-display-save-under`, `x-display-screens`
+        - `x-display-visual-class`, `x-server-input-extension-version`, `x-server-vendor`
+
 - Continue compatibility-first maintenance with small commit slices:
   - keep builtin surface and registry in lock-step
   - run oracle/parity checks after each behavior-affecting change
