@@ -5613,6 +5613,15 @@ pub(crate) fn builtin_obarray_clear(args: Vec<Value>) -> EvalResult {
     }
 }
 
+pub(crate) fn builtin_make_temp_file_internal(args: Vec<Value>) -> EvalResult {
+    expect_args("make-temp-file-internal", &args, 4)?;
+    if !args[3].is_nil() {
+        // MODE is currently accepted for arity and type compatibility.
+        let _ = expect_fixnum(&args[3])?;
+    }
+    super::fileio::builtin_make_temp_file(vec![args[0].clone(), args[1].clone(), args[2].clone()])
+}
+
 // ===========================================================================
 // Hook system (need evaluator)
 // ===========================================================================
@@ -14519,7 +14528,7 @@ pub(crate) fn dispatch_builtin(
             super::compat_internal::builtin_make_interpreted_closure(args)
         }
         "make-record" => super::compat_internal::builtin_make_record(args),
-        "make-temp-file-internal" => super::compat_internal::builtin_make_temp_file_internal(args),
+        "make-temp-file-internal" => builtin_make_temp_file_internal(args),
         "map-charset-chars" => super::compat_internal::builtin_map_charset_chars(args),
         "map-keymap" => super::compat_internal::builtin_map_keymap(args),
         "map-keymap-internal" => super::compat_internal::builtin_map_keymap_internal(args),
@@ -15490,7 +15499,7 @@ pub(crate) fn dispatch_builtin_pure(name: &str, args: Vec<Value>) -> Option<Eval
             super::compat_internal::builtin_make_interpreted_closure(args)
         }
         "make-record" => super::compat_internal::builtin_make_record(args),
-        "make-temp-file-internal" => super::compat_internal::builtin_make_temp_file_internal(args),
+        "make-temp-file-internal" => builtin_make_temp_file_internal(args),
         "map-charset-chars" => super::compat_internal::builtin_map_charset_chars(args),
         "map-keymap" => super::compat_internal::builtin_map_keymap(args),
         "map-keymap-internal" => super::compat_internal::builtin_map_keymap_internal(args),
@@ -19071,6 +19080,50 @@ mod tests {
             Flow::Signal(sig) => {
                 assert_eq!(sig.symbol, "wrong-type-argument");
                 assert_eq!(sig.data, vec![Value::symbol("obarrayp"), Value::Int(1)]);
+            }
+            other => panic!("expected signal, got: {other:?}"),
+        }
+    }
+
+    #[test]
+    fn pure_dispatch_make_temp_file_internal_delegates_make_temp_file() {
+        let created = dispatch_builtin_pure(
+            "make-temp-file-internal",
+            vec![
+                Value::string("neovm-mtfi-"),
+                Value::Nil,
+                Value::string(".tmp"),
+                Value::Nil,
+            ],
+        )
+        .expect("builtin make-temp-file-internal should resolve")
+        .expect("builtin make-temp-file-internal should evaluate");
+        let path = created
+            .as_str()
+            .expect("make-temp-file-internal should return file path");
+        assert!(path.contains("neovm-mtfi-"));
+        assert!(path.ends_with(".tmp"));
+        assert!(std::path::Path::new(path).exists());
+        std::fs::remove_file(path).expect("temp file should be removable");
+
+        let mode_err = dispatch_builtin_pure(
+            "make-temp-file-internal",
+            vec![
+                Value::string("neovm-mtfi-mode-"),
+                Value::Nil,
+                Value::string(".tmp"),
+                Value::string("bad"),
+            ],
+        )
+        .expect("builtin make-temp-file-internal should resolve")
+        .expect_err("make-temp-file-internal should reject non-fixnum mode");
+        match mode_err {
+            Flow::Signal(sig) => {
+                assert_eq!(sig.symbol, "wrong-type-argument");
+                assert_eq!(
+                    sig.data,
+                    vec![Value::symbol("fixnump"), Value::string("bad")]
+                );
             }
             other => panic!("expected signal, got: {other:?}"),
         }

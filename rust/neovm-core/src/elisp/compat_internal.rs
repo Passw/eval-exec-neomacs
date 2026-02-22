@@ -1726,12 +1726,6 @@ pub(crate) fn builtin_make_record(args: Vec<Value>) -> EvalResult {
     Ok(Value::Nil)
 }
 
-/// `(make-temp-file-internal PREFIX DIR-FLAG SUFFIX MODE)` -> nil.
-pub(crate) fn builtin_make_temp_file_internal(args: Vec<Value>) -> EvalResult {
-    expect_args("make-temp-file-internal", &args, 4)?;
-    Ok(Value::Nil)
-}
-
 /// `(map-charset-chars FUNCTION CHARSET &optional ARG FROM TO)` -> nil.
 pub(crate) fn builtin_map_charset_chars(args: Vec<Value>) -> EvalResult {
     expect_range_args("map-charset-chars", &args, 2, 5)?;
