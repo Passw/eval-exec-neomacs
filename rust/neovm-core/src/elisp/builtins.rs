@@ -7345,6 +7345,70 @@ pub(crate) fn builtin_frame_window_state_change(args: Vec<Value>) -> EvalResult 
     Ok(Value::Nil)
 }
 
+pub(crate) fn builtin_fringe_bitmaps_at_pos(args: Vec<Value>) -> EvalResult {
+    expect_range_args("fringe-bitmaps-at-pos", &args, 0, 2)?;
+    if let Some(pos) = args.first() {
+        if !pos.is_nil() {
+            let _ = expect_integer_or_marker(pos)?;
+        }
+    }
+    if let Some(window) = args.get(1) {
+        if !window.is_nil() && !matches!(window, Value::Window(_)) {
+            return Err(signal(
+                "wrong-type-argument",
+                vec![Value::symbol("window-live-p"), window.clone()],
+            ));
+        }
+    }
+    Ok(Value::Nil)
+}
+
+pub(crate) fn builtin_gap_position(args: Vec<Value>) -> EvalResult {
+    expect_args("gap-position", &args, 0)?;
+    Ok(Value::Int(1))
+}
+
+pub(crate) fn builtin_gap_size(args: Vec<Value>) -> EvalResult {
+    expect_args("gap-size", &args, 0)?;
+    Ok(Value::Int(2001))
+}
+
+pub(crate) fn builtin_garbage_collect_maybe(args: Vec<Value>) -> EvalResult {
+    expect_args("garbage-collect-maybe", &args, 1)?;
+    let Value::Int(n) = args[0] else {
+        return Err(signal(
+            "wrong-type-argument",
+            vec![Value::symbol("wholenump"), args[0].clone()],
+        ));
+    };
+    if n < 0 {
+        return Err(signal(
+            "wrong-type-argument",
+            vec![Value::symbol("wholenump"), Value::Int(n)],
+        ));
+    }
+    Ok(Value::Nil)
+}
+
+pub(crate) fn builtin_get_unicode_property_internal(args: Vec<Value>) -> EvalResult {
+    expect_args("get-unicode-property-internal", &args, 2)?;
+    Err(signal(
+        "wrong-type-argument",
+        vec![Value::symbol("char-table-p"), args[0].clone()],
+    ))
+}
+
+pub(crate) fn builtin_get_variable_watchers(args: Vec<Value>) -> EvalResult {
+    expect_args("get-variable-watchers", &args, 1)?;
+    if !args[0].is_nil() && args[0].as_symbol_name().is_none() {
+        return Err(signal(
+            "wrong-type-argument",
+            vec![Value::symbol("symbolp"), args[0].clone()],
+        ));
+    }
+    Ok(Value::Nil)
+}
+
 fn expect_window_live_or_nil(value: &Value) -> Result<(), Flow> {
     if value.is_nil() || matches!(value, Value::Window(_)) {
         Ok(())
@@ -16429,14 +16493,12 @@ pub(crate) fn dispatch_builtin(
         "frame-scroll-bar-height" => builtin_frame_scroll_bar_height(args),
         "frame-scroll-bar-width" => builtin_frame_scroll_bar_width(args),
         "frame-window-state-change" => builtin_frame_window_state_change(args),
-        "fringe-bitmaps-at-pos" => super::compat_internal::builtin_fringe_bitmaps_at_pos(args),
-        "gap-position" => super::compat_internal::builtin_gap_position(args),
-        "gap-size" => super::compat_internal::builtin_gap_size(args),
-        "garbage-collect-maybe" => super::compat_internal::builtin_garbage_collect_maybe(args),
-        "get-unicode-property-internal" => {
-            super::compat_internal::builtin_get_unicode_property_internal(args)
-        }
-        "get-variable-watchers" => super::compat_internal::builtin_get_variable_watchers(args),
+        "fringe-bitmaps-at-pos" => builtin_fringe_bitmaps_at_pos(args),
+        "gap-position" => builtin_gap_position(args),
+        "gap-size" => builtin_gap_size(args),
+        "garbage-collect-maybe" => builtin_garbage_collect_maybe(args),
+        "get-unicode-property-internal" => builtin_get_unicode_property_internal(args),
+        "get-variable-watchers" => builtin_get_variable_watchers(args),
         "gnutls-available-p" => super::compat_internal::builtin_gnutls_available_p(args),
         "gnutls-asynchronous-parameters" => {
             super::compat_internal::builtin_gnutls_asynchronous_parameters(args)
@@ -17268,14 +17330,12 @@ pub(crate) fn dispatch_builtin_pure(name: &str, args: Vec<Value>) -> Option<Eval
         "frame-scroll-bar-height" => builtin_frame_scroll_bar_height(args),
         "frame-scroll-bar-width" => builtin_frame_scroll_bar_width(args),
         "frame-window-state-change" => builtin_frame_window_state_change(args),
-        "fringe-bitmaps-at-pos" => super::compat_internal::builtin_fringe_bitmaps_at_pos(args),
-        "gap-position" => super::compat_internal::builtin_gap_position(args),
-        "gap-size" => super::compat_internal::builtin_gap_size(args),
-        "garbage-collect-maybe" => super::compat_internal::builtin_garbage_collect_maybe(args),
-        "get-unicode-property-internal" => {
-            super::compat_internal::builtin_get_unicode_property_internal(args)
-        }
-        "get-variable-watchers" => super::compat_internal::builtin_get_variable_watchers(args),
+        "fringe-bitmaps-at-pos" => builtin_fringe_bitmaps_at_pos(args),
+        "gap-position" => builtin_gap_position(args),
+        "gap-size" => builtin_gap_size(args),
+        "garbage-collect-maybe" => builtin_garbage_collect_maybe(args),
+        "get-unicode-property-internal" => builtin_get_unicode_property_internal(args),
+        "get-variable-watchers" => builtin_get_variable_watchers(args),
         "gnutls-available-p" => super::compat_internal::builtin_gnutls_available_p(args),
         "gnutls-asynchronous-parameters" => {
             super::compat_internal::builtin_gnutls_asynchronous_parameters(args)
@@ -22881,6 +22941,51 @@ mod tests {
             .expect("delete-terminal should resolve")
             .expect("delete-terminal should evaluate");
         assert_eq!(deleted, Value::Nil);
+    }
+
+    #[test]
+    fn dispatch_builtin_pure_handles_fringe_gap_garbage_and_watcher_placeholders() {
+        let fringe = dispatch_builtin_pure("fringe-bitmaps-at-pos", vec![Value::Nil, Value::Nil])
+            .expect("fringe-bitmaps-at-pos should resolve")
+            .expect("fringe-bitmaps-at-pos should evaluate");
+        assert_eq!(fringe, Value::Nil);
+
+        let gap_pos = dispatch_builtin_pure("gap-position", vec![])
+            .expect("gap-position should resolve")
+            .expect("gap-position should evaluate");
+        assert_eq!(gap_pos, Value::Int(1));
+
+        let gap_size = dispatch_builtin_pure("gap-size", vec![])
+            .expect("gap-size should resolve")
+            .expect("gap-size should evaluate");
+        assert_eq!(gap_size, Value::Int(2001));
+
+        let gc = dispatch_builtin_pure("garbage-collect-maybe", vec![Value::Int(0)])
+            .expect("garbage-collect-maybe should resolve")
+            .expect("garbage-collect-maybe should evaluate");
+        assert_eq!(gc, Value::Nil);
+
+        let prop_err =
+            dispatch_builtin_pure("get-unicode-property-internal", vec![Value::Nil, Value::Int(0)])
+                .expect("get-unicode-property-internal should resolve")
+                .unwrap_err();
+        match prop_err {
+            Flow::Signal(sig) => assert_eq!(sig.symbol, "wrong-type-argument"),
+            other => panic!("expected signal, got {other:?}"),
+        }
+
+        let watcher_nil = dispatch_builtin_pure("get-variable-watchers", vec![Value::Nil])
+            .expect("get-variable-watchers should resolve")
+            .expect("get-variable-watchers should evaluate");
+        assert_eq!(watcher_nil, Value::Nil);
+
+        let watcher_err = dispatch_builtin_pure("get-variable-watchers", vec![Value::Int(1)])
+            .expect("get-variable-watchers should resolve")
+            .unwrap_err();
+        match watcher_err {
+            Flow::Signal(sig) => assert_eq!(sig.symbol, "wrong-type-argument"),
+            other => panic!("expected signal, got {other:?}"),
+        }
     }
 
     #[test]

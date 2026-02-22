@@ -140,16 +140,6 @@ fn expect_processp(value: &Value) -> Result<(), Flow> {
     }
 }
 
-fn expect_integer_or_marker_p(value: &Value) -> Result<(), Flow> {
-    match value {
-        Value::Int(_) | Value::Char(_) => Ok(()),
-        other => Err(signal(
-            "wrong-type-argument",
-            vec![Value::symbol("integer-or-marker-p"), other.clone()],
-        )),
-    }
-}
-
 fn expect_characterp_from_int(value: &Value) -> Result<char, Flow> {
     match value {
         Value::Int(n) if *n >= 0 => Ok((*n as u8) as char),
@@ -288,76 +278,6 @@ pub(crate) fn builtin_fontset_info(args: Vec<Value>) -> EvalResult {
 pub(crate) fn builtin_fontset_list(args: Vec<Value>) -> EvalResult {
     expect_args("fontset-list", &args, 0)?;
     Ok(Value::list(vec![Value::string(DEFAULT_FONTSET_NAME)]))
-}
-
-/// `(fringe-bitmaps-at-pos &optional POS WINDOW)` -> nil.
-pub(crate) fn builtin_fringe_bitmaps_at_pos(args: Vec<Value>) -> EvalResult {
-    expect_range_args("fringe-bitmaps-at-pos", &args, 0, 2)?;
-    if let Some(pos) = args.first() {
-        if !pos.is_nil() {
-            expect_integer_or_marker_p(pos)?;
-        }
-    }
-    if let Some(window) = args.get(1) {
-        if !window.is_nil() && !matches!(window, Value::Window(_)) {
-            return Err(signal(
-                "wrong-type-argument",
-                vec![Value::symbol("window-live-p"), window.clone()],
-            ));
-        }
-    }
-    Ok(Value::Nil)
-}
-
-/// `(gap-position)` -> 1.
-pub(crate) fn builtin_gap_position(args: Vec<Value>) -> EvalResult {
-    expect_args("gap-position", &args, 0)?;
-    Ok(Value::Int(1))
-}
-
-/// `(gap-size)` -> 2001.
-pub(crate) fn builtin_gap_size(args: Vec<Value>) -> EvalResult {
-    expect_args("gap-size", &args, 0)?;
-    Ok(Value::Int(2001))
-}
-
-/// `(garbage-collect-maybe N)` -> nil.
-pub(crate) fn builtin_garbage_collect_maybe(args: Vec<Value>) -> EvalResult {
-    expect_args("garbage-collect-maybe", &args, 1)?;
-    let Value::Int(n) = args[0] else {
-        return Err(signal(
-            "wrong-type-argument",
-            vec![Value::symbol("wholenump"), args[0].clone()],
-        ));
-    };
-    if n < 0 {
-        return Err(signal(
-            "wrong-type-argument",
-            vec![Value::symbol("wholenump"), Value::Int(n)],
-        ));
-    }
-    Ok(Value::Nil)
-}
-
-/// `(get-unicode-property-internal TABLE INDEX)` -> compatibility type error.
-pub(crate) fn builtin_get_unicode_property_internal(args: Vec<Value>) -> EvalResult {
-    expect_args("get-unicode-property-internal", &args, 2)?;
-    Err(signal(
-        "wrong-type-argument",
-        vec![Value::symbol("char-table-p"), args[0].clone()],
-    ))
-}
-
-/// `(get-variable-watchers SYMBOL)` -> nil.
-pub(crate) fn builtin_get_variable_watchers(args: Vec<Value>) -> EvalResult {
-    expect_args("get-variable-watchers", &args, 1)?;
-    if !args[0].is_nil() && args[0].as_symbol_name().is_none() {
-        return Err(signal(
-            "wrong-type-argument",
-            vec![Value::symbol("symbolp"), args[0].clone()],
-        ));
-    }
-    Ok(Value::Nil)
 }
 
 /// `(gnutls-available-p)` -> capability list.
@@ -734,7 +654,8 @@ mod tests {
 
     #[test]
     fn garbage_collect_maybe_requires_whole_number() {
-        let err = builtin_garbage_collect_maybe(vec![Value::True]).unwrap_err();
+        let err = crate::elisp::builtins::builtin_garbage_collect_maybe(vec![Value::True])
+            .unwrap_err();
         match err {
             Flow::Signal(sig) => assert_eq!(sig.symbol, "wrong-type-argument"),
             other => panic!("expected signal, got {other:?}"),
