@@ -524,6 +524,7 @@ cases/window-stale-buffer-reference-semantics
 cases/window-buffer-switch-semantics
 cases/window-buffer-designator-errors-semantics
 cases/window-buffer-missing-designator-semantics
+cases/window-buffer-callable-path-semantics
 cases/set-window-buffer-arity-semantics
 cases/set-window-buffer-bootstrap-semantics
 cases/set-window-buffer-state-keep-margins-semantics
