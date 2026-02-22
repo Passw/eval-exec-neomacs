@@ -580,6 +580,7 @@ cases/window-edge-callable-path-semantics
 cases/window-edge-geometry-semantics
 cases/window-minibuffer-frame-first-window-semantics
 cases/window-root-valid-minibuffer-active-semantics
+cases/window-minibuffer-root-callable-path-semantics
 cases/window-list-frame-designator-semantics
 cases/window-list-minibuf-all-frames-semantics
 cases/window-object-return-semantics
