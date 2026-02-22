@@ -338,7 +338,8 @@ fn subr_arity_value(name: &str) -> Value {
     match name {
         // Oracle-compatible overrides for core subrs used in vm-compat.
         n if is_cxr_subr_name(n) => arity_cons(1, Some(1)),
-        "message" | "message-box" | "message-or-box" | "format" | "format-message" => {
+        "message" | "message-box" | "message-or-box" | "format" | "format-message"
+        | "user-error" => {
             arity_cons(1, None)
         }
         "always" => arity_cons(0, None),
@@ -3453,6 +3454,7 @@ mod tests {
         assert_subr_arity("event-modifiers", 1, Some(1));
         assert_subr_arity("eventp", 1, Some(1));
         assert_subr_arity("error-message-string", 1, Some(1));
+        assert_subr_arity("user-error", 1, None);
         assert_subr_arity("copysign", 2, Some(2));
         assert_subr_arity("equal-including-properties", 2, Some(2));
         assert_subr_arity("function-equal", 2, Some(2));

@@ -3512,6 +3512,27 @@ pub(crate) fn builtin_error_eval(
     Err(signal("error", vec![Value::string(msg)]))
 }
 
+pub(crate) fn builtin_user_error(args: Vec<Value>) -> EvalResult {
+    expect_min_args("user-error", &args, 1)?;
+    let msg = match builtin_format(args)? {
+        Value::Str(s) => (*s).clone(),
+        _ => "user-error".to_string(),
+    };
+    Err(signal("user-error", vec![Value::string(msg)]))
+}
+
+pub(crate) fn builtin_user_error_eval(
+    eval: &mut super::eval::Evaluator,
+    args: Vec<Value>,
+) -> EvalResult {
+    expect_min_args("user-error", &args, 1)?;
+    let msg = match builtin_format_eval(eval, args)? {
+        Value::Str(s) => (*s).clone(),
+        _ => "user-error".to_string(),
+    };
+    Err(signal("user-error", vec![Value::string(msg)]))
+}
+
 pub(crate) fn builtin_secure_hash_algorithms(args: Vec<Value>) -> EvalResult {
     expect_args("secure-hash-algorithms", &args, 0)?;
     Ok(Value::list(vec![
@@ -16344,6 +16365,7 @@ pub(crate) fn dispatch_builtin(
         "message-box" => return Some(builtin_message_box_eval(eval, args)),
         "message-or-box" => return Some(builtin_message_or_box_eval(eval, args)),
         "error" => return Some(builtin_error_eval(eval, args)),
+        "user-error" => return Some(builtin_user_error_eval(eval, args)),
         "read-from-string" => return Some(super::reader::builtin_read_from_string(eval, args)),
         "read" => return Some(super::reader::builtin_read(eval, args)),
         "read-from-minibuffer" => {
@@ -16841,6 +16863,7 @@ pub(crate) fn dispatch_builtin(
         "ngettext" => builtin_ngettext(args),
         "secure-hash-algorithms" => builtin_secure_hash_algorithms(args),
         "error" => builtin_error(args),
+        "user-error" => builtin_user_error(args),
         "prefix-numeric-value" => builtin_prefix_numeric_value(args),
         "command-error-default-function" => builtin_command_error_default_function(args),
         "compute-motion" => builtin_compute_motion(args),
@@ -25770,6 +25793,43 @@ mod tests {
             .expect("builtin should evaluate");
             let text = rendered.as_str().expect("builtin should return a string");
             assert_eq!(decode_storage_char_codes(text), vec![value as u32]);
+        }
+    }
+
+    #[test]
+    fn user_error_signals_user_error_symbol_and_formatted_message() {
+        let mut eval = crate::elisp::eval::Evaluator::new();
+
+        let err = dispatch_builtin(
+            &mut eval,
+            "user-error",
+            vec![Value::string("oops %s"), Value::string("now")],
+        )
+        .expect("user-error should resolve")
+        .expect_err("user-error should signal");
+
+        match err {
+            Flow::Signal(sig) => {
+                assert_eq!(sig.symbol, "user-error");
+                assert_eq!(sig.data, vec![Value::string("oops now")]);
+            }
+            other => panic!("expected signal, got: {other:?}"),
+        }
+    }
+
+    #[test]
+    fn user_error_requires_message_argument() {
+        let mut eval = crate::elisp::eval::Evaluator::new();
+        let err = dispatch_builtin(&mut eval, "user-error", vec![])
+            .expect("user-error should resolve")
+            .expect_err("user-error should reject missing message");
+
+        match err {
+            Flow::Signal(sig) => {
+                assert_eq!(sig.symbol, "wrong-number-of-arguments");
+                assert_eq!(sig.data, vec![Value::symbol("user-error"), Value::Int(0)]);
+            }
+            other => panic!("expected signal, got: {other:?}"),
         }
     }
 

@@ -1572,6 +1572,7 @@ const DISPATCH_BUILTIN_NAMES: &[&str] = &[
     "use-global-map",
     "use-local-map",
     "use-region-p",
+    "user-error",
     "user-full-name",
     "user-login-name",
     "user-real-login-name",
