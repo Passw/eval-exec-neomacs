@@ -6269,7 +6269,7 @@ pub(crate) fn builtin_lock_buffer(args: Vec<Value>) -> EvalResult {
 
 pub(crate) fn builtin_lock_file(args: Vec<Value>) -> EvalResult {
     expect_args("lock-file", &args, 1)?;
-    let _ = expect_string(&args[0])?;
+    let _ = expect_strict_string(&args[0])?;
     Ok(Value::Nil)
 }
 
@@ -6285,7 +6285,7 @@ pub(crate) fn builtin_unlock_buffer(args: Vec<Value>) -> EvalResult {
 
 pub(crate) fn builtin_unlock_file(args: Vec<Value>) -> EvalResult {
     expect_args("unlock-file", &args, 1)?;
-    let _ = expect_string(&args[0])?;
+    let _ = expect_strict_string(&args[0])?;
     Ok(Value::Nil)
 }
 
@@ -8149,7 +8149,7 @@ pub(crate) fn builtin_inotify_valid_p(args: Vec<Value>) -> EvalResult {
 
 pub(crate) fn builtin_inotify_add_watch(args: Vec<Value>) -> EvalResult {
     expect_args("inotify-add-watch", &args, 3)?;
-    let _ = expect_string(&args[0])?;
+    let _ = expect_strict_string(&args[0])?;
     let (fd, wd) = inotify_register_watch();
     Ok(Value::cons(Value::Int(fd), Value::Int(wd)))
 }

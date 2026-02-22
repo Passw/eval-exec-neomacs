@@ -361,6 +361,20 @@ mod tests {
     }
 
     #[test]
+    fn inotify_add_watch_requires_string_path_argument() {
+        let err = crate::elisp::builtins::builtin_inotify_add_watch(vec![
+            Value::Nil,
+            Value::Nil,
+            Value::Nil,
+        ])
+        .unwrap_err();
+        match err {
+            Flow::Signal(sig) => assert_eq!(sig.symbol, "wrong-type-argument"),
+            other => panic!("expected signal, got {other:?}"),
+        }
+    }
+
+    #[test]
     fn window_combination_limit_requires_window_designator() {
         let err =
             crate::elisp::builtins::builtin_window_combination_limit(vec![Value::Nil]).unwrap_err();
