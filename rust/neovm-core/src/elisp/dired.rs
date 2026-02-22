@@ -976,6 +976,7 @@ fn parse_colon_file_names(contents: &str) -> Vec<String> {
             continue;
         }
         if let Some((name, _rest)) = trimmed.split_once(':') {
+            let name = name.trim();
             if !name.is_empty() {
                 names.push(name.to_string());
             }
@@ -1628,6 +1629,12 @@ mod tests {
     fn test_parse_colon_file_names_repels_malformed_entries() {
         let parsed = parse_colon_file_names("nocolon\n:empty\nvalid:x:1000\n");
         assert_eq!(parsed, vec!["valid".to_string()]);
+    }
+
+    #[test]
+    fn test_parse_colon_file_names_trims_spaces() {
+        let parsed = parse_colon_file_names("  spaced :x:0:0\nnormal:x:0:0\n");
+        assert_eq!(parsed, vec!["normal".to_string(), "spaced".to_string()]);
     }
 
     #[test]
