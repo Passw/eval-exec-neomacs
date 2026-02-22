@@ -481,6 +481,7 @@ const DISPATCH_BUILTIN_NAMES: &[&str] = &[
     "file-in-directory-p",
     "file-locked-p",
     "file-name-absolute-p",
+    "file-name-base",
     "file-name-all-completions",
     "file-name-as-directory",
     "file-name-completion",

@@ -434,6 +434,7 @@ fn subr_arity_value(name: &str) -> Value {
         | "buffer-base-buffer"
         | "buffer-last-name"
         | "buffer-name"
+        | "file-name-base"
         | "buffer-size"
         | "buffer-chars-modified-tick"
         | "buffer-modified-p"
@@ -3411,6 +3412,7 @@ mod tests {
     #[test]
     fn subr_arity_file_name_primitives_match_oracle() {
         assert_subr_arity("file-name-absolute-p", 1, Some(1));
+        assert_subr_arity("file-name-base", 0, Some(1));
         assert_subr_arity("backup-file-name-p", 1, Some(1));
         assert_subr_arity("auto-save-file-name-p", 1, Some(1));
         assert_subr_arity("abbreviate-file-name", 1, Some(1));

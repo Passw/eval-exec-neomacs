@@ -206,6 +206,12 @@ pub fn file_name_sans_extension(filename: &str) -> String {
     }
 }
 
+/// Return the base name of FILENAME without directory or final extension.
+pub fn file_name_base(filename: &str) -> String {
+    let nondirectory = file_name_nondirectory(filename);
+    file_name_sans_extension(&nondirectory)
+}
+
 /// Return FILENAME as a directory name (must end in `/`).
 /// Like Emacs `file-name-as-directory`.
 pub fn file_name_as_directory(filename: &str) -> String {
@@ -1567,6 +1573,14 @@ pub(crate) fn builtin_file_name_sans_extension(args: Vec<Value>) -> EvalResult {
     expect_args("file-name-sans-extension", &args, 1)?;
     let filename = expect_string_strict(&args[0])?;
     Ok(Value::string(file_name_sans_extension(&filename)))
+}
+
+/// (file-name-base &optional FILENAME) -> string
+pub(crate) fn builtin_file_name_base(args: Vec<Value>) -> EvalResult {
+    expect_max_args("file-name-base", &args, 1)?;
+    let filename = args.first().cloned().unwrap_or(Value::Nil);
+    let filename = expect_string_strict(&filename)?;
+    Ok(Value::string(file_name_base(&filename)))
 }
 
 /// (file-name-as-directory FILENAME) -> string
@@ -4683,6 +4697,12 @@ mod tests {
         let result = builtin_file_name_sans_extension(vec![Value::string("/home/user/test.el")]);
         assert_eq!(result.unwrap().as_str(), Some("/home/user/test"));
 
+        let result = builtin_file_name_base(vec![Value::string("/home/user/test.el")]);
+        assert_eq!(result.unwrap().as_str(), Some("test"));
+
+        let result = builtin_file_name_base(vec![Value::string("/tmp/dir/")]);
+        assert_eq!(result.unwrap().as_str(), Some(""));
+
         let result = builtin_file_name_as_directory(vec![Value::string("/home/user")]);
         assert_eq!(result.unwrap().as_str(), Some("/home/user/"));
 
@@ -4731,6 +4751,8 @@ mod tests {
             builtin_file_name_extension(vec![Value::string("x"), Value::Nil, Value::Nil]).is_err()
         );
         assert!(builtin_file_name_sans_extension(vec![Value::symbol("x")]).is_err());
+        assert!(builtin_file_name_base(vec![Value::symbol("x")]).is_err());
+        assert!(builtin_file_name_base(vec![]).is_err());
         assert!(builtin_file_name_as_directory(vec![Value::symbol("x")]).is_err());
         assert!(builtin_directory_file_name(vec![Value::symbol("x")]).is_err());
         assert!(builtin_backup_file_name_p(vec![Value::symbol("x")]).is_err());
