@@ -685,6 +685,7 @@ cases/lockfile-inotify-string-contract-semantics
 cases/default-file-modes-semantics
 cases/set-file-modes-semantics
 cases/set-file-times-semantics
+cases/file-owner-group-identity-semantics
 cases/system-users-groups-semantics
 cases/user-identity-semantics
 cases/runtime-identity-semantics
