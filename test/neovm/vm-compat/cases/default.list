@@ -566,6 +566,7 @@ cases/window-old-state-semantics
 cases/window-parameter-semantics
 cases/window-parameter-callable-path-semantics
 cases/window-preserve-size-resizable-semantics
+cases/window-start-point-callable-path-semantics
 cases/window-set-start-point-marker-semantics
 cases/window-vscroll-semantics
 cases/window-edge-geometry-semantics
