@@ -3811,9 +3811,6 @@ pub(crate) fn builtin_sort(eval: &mut super::eval::Evaluator, args: Vec<Value>) 
 fn expect_string(value: &Value) -> Result<String, Flow> {
     match value {
         Value::Str(s) => Ok((**s).clone()),
-        Value::Symbol(s) => Ok(s.clone()),
-        Value::Nil => Ok("nil".to_string()),
-        Value::True => Ok("t".to_string()),
         other => Err(signal(
             "wrong-type-argument",
             vec![Value::symbol("stringp"), other.clone()],
@@ -5654,7 +5651,20 @@ pub(crate) fn builtin_intern_soft(
             ));
         }
     }
-    let name = expect_string(&args[0])?;
+    let name = match &args[0] {
+        Value::Str(s) => (**s).clone(),
+        // Oracle treats symbol designators (including t, nil, and keywords)
+        // as already interned in the current obarray.
+        Value::Nil | Value::True | Value::Symbol(_) | Value::Keyword(_) => {
+            return Ok(args[0].clone());
+        }
+        other => {
+            return Err(signal(
+                "wrong-type-argument",
+                vec![Value::symbol("stringp"), other.clone()],
+            ));
+        }
+    };
     if eval.obarray().intern_soft(&name).is_some() {
         Ok(Value::symbol(name))
     } else {

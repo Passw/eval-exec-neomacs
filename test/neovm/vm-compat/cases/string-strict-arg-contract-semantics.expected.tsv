@@ -1,0 +1,14 @@
+1	(condition-case err (search-forward nil) (error err))	OK (wrong-type-argument stringp nil)
+2	(condition-case err (search-forward 'abc) (error err))	OK (wrong-type-argument stringp abc)
+3	(condition-case err (split-string nil) (error err))	OK (wrong-type-argument stringp nil)
+4	(condition-case err (string-prefix-p nil "abc") (error err))	OK (wrong-type-argument stringp nil)
+5	(condition-case err (string-suffix-p nil "abc") (error err))	OK (wrong-type-argument stringp nil)
+6	(condition-case err (load-file nil) (error err))	OK (wrong-type-argument stringp nil)
+7	(condition-case err (get-file-buffer nil) (error err))	OK (wrong-type-argument stringp nil)
+8	(condition-case err (string-to-char 'abc) (error err))	OK (wrong-type-argument stringp abc)
+9	(condition-case err (string-to-number 'abc) (error err))	OK (wrong-type-argument stringp abc)
+10	(condition-case err (intern 'abc) (error err))	OK (wrong-type-argument stringp abc)
+11	(condition-case err (intern-soft 'abc) (error err))	OK abc
+12	(condition-case err (intern-soft nil) (error err))	OK nil
+13	(condition-case err (intern-soft t) (error err))	OK t
+14	(condition-case err (intern-soft :kw) (error err))	OK :kw

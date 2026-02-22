@@ -697,6 +697,7 @@ cases/append-tail-object-semantics
 cases/vconcat-mixed-sequence-semantics
 cases/string-trim-semantics
 cases/string-prefix-suffix-semantics
+cases/string-strict-arg-contract-semantics
 cases/string-join-semantics
 cases/string-startup-bytecode-wrapper-semantics
 cases/string-concat-error-paths
