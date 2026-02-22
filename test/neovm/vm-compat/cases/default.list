@@ -530,6 +530,7 @@ cases/set-window-buffer-bootstrap-semantics
 cases/set-window-buffer-state-keep-margins-semantics
 cases/set-window-buffer-history-semantics
 cases/set-window-dedicated-p-designator-semantics
+cases/window-dedicated-callable-path-semantics
 cases/select-window-designator-semantics
 cases/select-window-current-buffer-semantics
 cases/other-window-current-buffer-semantics
