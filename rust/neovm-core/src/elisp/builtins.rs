@@ -6442,6 +6442,61 @@ pub(crate) fn builtin_make_interpreted_closure(args: Vec<Value>) -> EvalResult {
     Ok(Value::Nil)
 }
 
+pub(crate) fn builtin_treesit_available_p(args: Vec<Value>) -> EvalResult {
+    expect_args("treesit-available-p", &args, 0)?;
+    Ok(Value::Nil)
+}
+
+pub(crate) fn builtin_treesit_compiled_query_p(args: Vec<Value>) -> EvalResult {
+    expect_args("treesit-compiled-query-p", &args, 1)?;
+    Ok(Value::Nil)
+}
+
+pub(crate) fn builtin_treesit_induce_sparse_tree(args: Vec<Value>) -> EvalResult {
+    expect_range_args("treesit-induce-sparse-tree", &args, 2, 4)?;
+    Ok(Value::Nil)
+}
+
+pub(crate) fn builtin_treesit_language_abi_version(args: Vec<Value>) -> EvalResult {
+    expect_range_args("treesit-language-abi-version", &args, 0, 1)?;
+    Ok(Value::Nil)
+}
+
+pub(crate) fn builtin_treesit_language_available_p(args: Vec<Value>) -> EvalResult {
+    expect_range_args("treesit-language-available-p", &args, 1, 2)?;
+    Ok(Value::Nil)
+}
+
+pub(crate) fn builtin_treesit_library_abi_version(args: Vec<Value>) -> EvalResult {
+    expect_range_args("treesit-library-abi-version", &args, 0, 1)?;
+    Ok(Value::Nil)
+}
+
+pub(crate) fn builtin_treesit_node_check(args: Vec<Value>) -> EvalResult {
+    expect_args("treesit-node-check", &args, 2)?;
+    Ok(Value::Nil)
+}
+
+pub(crate) fn builtin_treesit_node_child(args: Vec<Value>) -> EvalResult {
+    expect_range_args("treesit-node-child", &args, 2, 3)?;
+    Ok(Value::Nil)
+}
+
+pub(crate) fn builtin_treesit_node_child_by_field_name(args: Vec<Value>) -> EvalResult {
+    expect_args("treesit-node-child-by-field-name", &args, 2)?;
+    Ok(Value::Nil)
+}
+
+pub(crate) fn builtin_treesit_node_child_count(args: Vec<Value>) -> EvalResult {
+    expect_range_args("treesit-node-child-count", &args, 1, 2)?;
+    Ok(Value::Nil)
+}
+
+pub(crate) fn builtin_treesit_node_descendant_for_range(args: Vec<Value>) -> EvalResult {
+    expect_range_args("treesit-node-descendant-for-range", &args, 3, 4)?;
+    Ok(Value::Nil)
+}
+
 // ===========================================================================
 // Hook system (need evaluator)
 // ===========================================================================
@@ -15493,33 +15548,17 @@ pub(crate) fn dispatch_builtin(
         "window-scroll-bar-width" => super::compat_internal::builtin_window_scroll_bar_width(args),
         "window-tab-line-height" => super::compat_internal::builtin_window_tab_line_height(args),
         "window-top-child" => super::compat_internal::builtin_window_top_child(args),
-        "treesit-available-p" => super::compat_internal::builtin_treesit_available_p(args),
-        "treesit-compiled-query-p" => {
-            super::compat_internal::builtin_treesit_compiled_query_p(args)
-        }
-        "treesit-induce-sparse-tree" => {
-            super::compat_internal::builtin_treesit_induce_sparse_tree(args)
-        }
-        "treesit-language-abi-version" => {
-            super::compat_internal::builtin_treesit_language_abi_version(args)
-        }
-        "treesit-language-available-p" => {
-            super::compat_internal::builtin_treesit_language_available_p(args)
-        }
-        "treesit-library-abi-version" => {
-            super::compat_internal::builtin_treesit_library_abi_version(args)
-        }
-        "treesit-node-check" => super::compat_internal::builtin_treesit_node_check(args),
-        "treesit-node-child" => super::compat_internal::builtin_treesit_node_child(args),
-        "treesit-node-child-by-field-name" => {
-            super::compat_internal::builtin_treesit_node_child_by_field_name(args)
-        }
-        "treesit-node-child-count" => {
-            super::compat_internal::builtin_treesit_node_child_count(args)
-        }
-        "treesit-node-descendant-for-range" => {
-            super::compat_internal::builtin_treesit_node_descendant_for_range(args)
-        }
+        "treesit-available-p" => builtin_treesit_available_p(args),
+        "treesit-compiled-query-p" => builtin_treesit_compiled_query_p(args),
+        "treesit-induce-sparse-tree" => builtin_treesit_induce_sparse_tree(args),
+        "treesit-language-abi-version" => builtin_treesit_language_abi_version(args),
+        "treesit-language-available-p" => builtin_treesit_language_available_p(args),
+        "treesit-library-abi-version" => builtin_treesit_library_abi_version(args),
+        "treesit-node-check" => builtin_treesit_node_check(args),
+        "treesit-node-child" => builtin_treesit_node_child(args),
+        "treesit-node-child-by-field-name" => builtin_treesit_node_child_by_field_name(args),
+        "treesit-node-child-count" => builtin_treesit_node_child_count(args),
+        "treesit-node-descendant-for-range" => builtin_treesit_node_descendant_for_range(args),
         "treesit-node-end" => super::compat_internal::builtin_treesit_node_end(args),
         "treesit-node-eq" => super::compat_internal::builtin_treesit_node_eq(args),
         "treesit-node-field-name-for-child" => {
@@ -16406,33 +16445,17 @@ pub(crate) fn dispatch_builtin_pure(name: &str, args: Vec<Value>) -> Option<Eval
         "window-scroll-bar-width" => super::compat_internal::builtin_window_scroll_bar_width(args),
         "window-tab-line-height" => super::compat_internal::builtin_window_tab_line_height(args),
         "window-top-child" => super::compat_internal::builtin_window_top_child(args),
-        "treesit-available-p" => super::compat_internal::builtin_treesit_available_p(args),
-        "treesit-compiled-query-p" => {
-            super::compat_internal::builtin_treesit_compiled_query_p(args)
-        }
-        "treesit-induce-sparse-tree" => {
-            super::compat_internal::builtin_treesit_induce_sparse_tree(args)
-        }
-        "treesit-language-abi-version" => {
-            super::compat_internal::builtin_treesit_language_abi_version(args)
-        }
-        "treesit-language-available-p" => {
-            super::compat_internal::builtin_treesit_language_available_p(args)
-        }
-        "treesit-library-abi-version" => {
-            super::compat_internal::builtin_treesit_library_abi_version(args)
-        }
-        "treesit-node-check" => super::compat_internal::builtin_treesit_node_check(args),
-        "treesit-node-child" => super::compat_internal::builtin_treesit_node_child(args),
-        "treesit-node-child-by-field-name" => {
-            super::compat_internal::builtin_treesit_node_child_by_field_name(args)
-        }
-        "treesit-node-child-count" => {
-            super::compat_internal::builtin_treesit_node_child_count(args)
-        }
-        "treesit-node-descendant-for-range" => {
-            super::compat_internal::builtin_treesit_node_descendant_for_range(args)
-        }
+        "treesit-available-p" => builtin_treesit_available_p(args),
+        "treesit-compiled-query-p" => builtin_treesit_compiled_query_p(args),
+        "treesit-induce-sparse-tree" => builtin_treesit_induce_sparse_tree(args),
+        "treesit-language-abi-version" => builtin_treesit_language_abi_version(args),
+        "treesit-language-available-p" => builtin_treesit_language_available_p(args),
+        "treesit-library-abi-version" => builtin_treesit_library_abi_version(args),
+        "treesit-node-check" => builtin_treesit_node_check(args),
+        "treesit-node-child" => builtin_treesit_node_child(args),
+        "treesit-node-child-by-field-name" => builtin_treesit_node_child_by_field_name(args),
+        "treesit-node-child-count" => builtin_treesit_node_child_count(args),
+        "treesit-node-descendant-for-range" => builtin_treesit_node_descendant_for_range(args),
         "treesit-node-end" => super::compat_internal::builtin_treesit_node_end(args),
         "treesit-node-eq" => super::compat_internal::builtin_treesit_node_eq(args),
         "treesit-node-field-name-for-child" => {
@@ -20862,6 +20885,76 @@ mod tests {
         .expect("builtin make-interpreted-closure should resolve")
         .expect("builtin make-interpreted-closure should evaluate");
         assert!(make_interpreted.is_nil());
+    }
+
+    #[test]
+    fn pure_dispatch_treesit_placeholder_cluster_matches_compat_contracts() {
+        let available = dispatch_builtin_pure("treesit-available-p", vec![])
+            .expect("builtin treesit-available-p should resolve")
+            .expect("builtin treesit-available-p should evaluate");
+        assert!(available.is_nil());
+
+        let compiled_query = dispatch_builtin_pure("treesit-compiled-query-p", vec![Value::Nil])
+            .expect("builtin treesit-compiled-query-p should resolve")
+            .expect("builtin treesit-compiled-query-p should evaluate");
+        assert!(compiled_query.is_nil());
+
+        let induce_sparse =
+            dispatch_builtin_pure("treesit-induce-sparse-tree", vec![Value::Nil, Value::Nil])
+                .expect("builtin treesit-induce-sparse-tree should resolve")
+                .expect("builtin treesit-induce-sparse-tree should evaluate");
+        assert!(induce_sparse.is_nil());
+
+        let language_abi = dispatch_builtin_pure("treesit-language-abi-version", vec![])
+            .expect("builtin treesit-language-abi-version should resolve")
+            .expect("builtin treesit-language-abi-version should evaluate");
+        assert!(language_abi.is_nil());
+
+        let language_available = dispatch_builtin_pure(
+            "treesit-language-available-p",
+            vec![Value::symbol("rust"), Value::Nil],
+        )
+        .expect("builtin treesit-language-available-p should resolve")
+        .expect("builtin treesit-language-available-p should evaluate");
+        assert!(language_available.is_nil());
+
+        let library_abi = dispatch_builtin_pure("treesit-library-abi-version", vec![])
+            .expect("builtin treesit-library-abi-version should resolve")
+            .expect("builtin treesit-library-abi-version should evaluate");
+        assert!(library_abi.is_nil());
+
+        let node_check = dispatch_builtin_pure("treesit-node-check", vec![Value::Nil, Value::Nil])
+            .expect("builtin treesit-node-check should resolve")
+            .expect("builtin treesit-node-check should evaluate");
+        assert!(node_check.is_nil());
+
+        let node_child =
+            dispatch_builtin_pure("treesit-node-child", vec![Value::Nil, Value::Int(0)])
+                .expect("builtin treesit-node-child should resolve")
+                .expect("builtin treesit-node-child should evaluate");
+        assert!(node_child.is_nil());
+
+        let node_child_by_field = dispatch_builtin_pure(
+            "treesit-node-child-by-field-name",
+            vec![Value::Nil, Value::string("name")],
+        )
+        .expect("builtin treesit-node-child-by-field-name should resolve")
+        .expect("builtin treesit-node-child-by-field-name should evaluate");
+        assert!(node_child_by_field.is_nil());
+
+        let node_child_count =
+            dispatch_builtin_pure("treesit-node-child-count", vec![Value::Nil, Value::Nil])
+                .expect("builtin treesit-node-child-count should resolve")
+                .expect("builtin treesit-node-child-count should evaluate");
+        assert!(node_child_count.is_nil());
+
+        let node_descendant = dispatch_builtin_pure(
+            "treesit-node-descendant-for-range",
+            vec![Value::Nil, Value::Int(0), Value::Int(1), Value::Nil],
+        )
+        .expect("builtin treesit-node-descendant-for-range should resolve")
+        .expect("builtin treesit-node-descendant-for-range should evaluate");
+        assert!(node_descendant.is_nil());
     }
 
     #[test]
