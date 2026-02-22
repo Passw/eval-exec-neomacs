@@ -4261,6 +4261,10 @@ pub(crate) fn builtin_symbol_function(
         return Ok(Value::symbol("inline"));
     }
 
+    if let Some(alias_target) = pure_builtin_symbol_alias_target(name) {
+        return Ok(Value::symbol(alias_target));
+    }
+
     if super::subr_info::is_special_form(name)
         || super::subr_info::is_evaluator_callable_name(name)
         || super::builtin_registry::is_dispatch_builtin_name(name)
@@ -5575,6 +5579,15 @@ pub(crate) fn builtin_indirect_function(
     Ok(args[0].clone())
 }
 
+fn pure_builtin_symbol_alias_target(name: &str) -> Option<&'static str> {
+    match name {
+        "string<" => Some("string-lessp"),
+        "string>" => Some("string-greaterp"),
+        "string=" => Some("string-equal"),
+        _ => None,
+    }
+}
+
 fn resolve_indirect_symbol_with_name(
     eval: &super::eval::Evaluator,
     name: &str,
@@ -5604,6 +5617,11 @@ fn resolve_indirect_symbol_with_name(
 
         if let Some(function) = super::subr_info::fallback_macro_value(&current) {
             return Some((current, function));
+        }
+
+        if let Some(alias_target) = pure_builtin_symbol_alias_target(&current) {
+            current = alias_target.to_string();
+            continue;
         }
 
         if super::subr_info::is_special_form(&current)
@@ -25335,6 +25353,19 @@ mod tests {
             .expect("symbol-function should resolve car");
         assert_eq!(typed, Value::Subr("car".to_string()));
 
+        let string_less_alias = builtin_symbol_function(&mut eval, vec![Value::symbol("string<")])
+            .expect("symbol-function should resolve string< alias");
+        assert_eq!(string_less_alias, Value::symbol("string-lessp"));
+
+        let string_greater_alias =
+            builtin_symbol_function(&mut eval, vec![Value::symbol("string>")])
+                .expect("symbol-function should resolve string> alias");
+        assert_eq!(string_greater_alias, Value::symbol("string-greaterp"));
+
+        let string_equal_alias = builtin_symbol_function(&mut eval, vec![Value::symbol("string=")])
+            .expect("symbol-function should resolve string= alias");
+        assert_eq!(string_equal_alias, Value::symbol("string-equal"));
+
         let read_key_sequence_vector =
             builtin_symbol_function(&mut eval, vec![Value::symbol("read-key-sequence-vector")])
                 .expect("symbol-function should resolve read-key-sequence-vector");
@@ -25989,6 +26020,24 @@ mod tests {
         let typed = builtin_indirect_function(&mut eval, vec![Value::symbol("car")])
             .expect("indirect-function should resolve car");
         assert_eq!(typed, Value::Subr("car".to_string()));
+
+        let string_less_alias =
+            builtin_indirect_function(&mut eval, vec![Value::symbol("string<")])
+                .expect("indirect-function should resolve string< alias");
+        assert_eq!(string_less_alias, Value::Subr("string-lessp".to_string()));
+
+        let string_greater_alias =
+            builtin_indirect_function(&mut eval, vec![Value::symbol("string>")])
+                .expect("indirect-function should resolve string> alias");
+        assert_eq!(
+            string_greater_alias,
+            Value::Subr("string-greaterp".to_string())
+        );
+
+        let string_equal_alias =
+            builtin_indirect_function(&mut eval, vec![Value::symbol("string=")])
+                .expect("indirect-function should resolve string= alias");
+        assert_eq!(string_equal_alias, Value::Subr("string-equal".to_string()));
 
         let read_key_sequence_vector =
             builtin_indirect_function(&mut eval, vec![Value::symbol("read-key-sequence-vector")])

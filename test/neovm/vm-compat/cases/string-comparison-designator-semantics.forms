@@ -1,5 +1,11 @@
 ; Ensure string comparison builtins accept string designators like GNU Emacs.
 (fboundp 'string>)
+(symbol-function 'string<)
+(symbol-function 'string>)
+(symbol-function 'string=)
+(indirect-function 'string<)
+(indirect-function 'string>)
+(indirect-function 'string=)
 (list (string< nil "x")
       (string-equal nil "x")
       (string> nil "a")
@@ -9,4 +15,4 @@
       (string< :bar "x")
       (string-equal :bar ":bar"))
 (condition-case err (string> 7 "a") (error (list (car err) (cadr err))))
-(func-arity 'string>)
+(list (func-arity 'string<) (func-arity 'string>) (func-arity 'string=))
