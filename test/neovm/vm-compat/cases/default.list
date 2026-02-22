@@ -581,6 +581,7 @@ cases/window-hscroll-margins-setter-semantics
 cases/window-hscroll-margins-callable-path-semantics
 cases/window-old-group-callable-path-semantics
 cases/window-old-state-semantics
+cases/window-bump-use-time-semantics
 cases/window-parameter-semantics
 cases/window-parameter-callable-path-semantics
 cases/window-preserve-size-resizable-semantics

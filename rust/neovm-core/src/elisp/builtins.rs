@@ -12735,6 +12735,9 @@ pub(crate) fn dispatch_builtin(
         "window-height" => return Some(super::window_cmds::builtin_window_height(eval, args)),
         "window-width" => return Some(super::window_cmds::builtin_window_width(eval, args)),
         "window-use-time" => return Some(super::window_cmds::builtin_window_use_time(eval, args)),
+        "window-bump-use-time" => {
+            return Some(super::window_cmds::builtin_window_bump_use_time(eval, args))
+        }
         "window-old-point" => {
             return Some(super::window_cmds::builtin_window_old_point(eval, args))
         }
@@ -15066,7 +15069,9 @@ pub(crate) fn dispatch_builtin(
 /// Used by the bytecode VM.
 pub(crate) fn dispatch_builtin_pure(name: &str, args: Vec<Value>) -> Option<EvalResult> {
     match name {
-        "assoc" | "alist-get" | "plist-member" | "window-list-1" => return None,
+        "assoc" | "alist-get" | "plist-member" | "window-list-1" | "window-bump-use-time" => {
+            return None
+        }
         _ => {}
     }
 

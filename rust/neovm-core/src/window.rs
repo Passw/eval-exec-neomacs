@@ -473,6 +473,8 @@ pub struct FrameManager {
     window_prev_buffers: HashMap<WindowId, Value>,
     window_next_buffers: HashMap<WindowId, Value>,
     window_buffer_positions: HashMap<WindowId, HashMap<BufferId, (usize, usize)>>,
+    window_use_times: HashMap<WindowId, i64>,
+    window_select_count: i64,
 }
 
 impl FrameManager {
@@ -489,6 +491,8 @@ impl FrameManager {
             window_prev_buffers: HashMap::new(),
             window_next_buffers: HashMap::new(),
             window_buffer_positions: HashMap::new(),
+            window_use_times: HashMap::new(),
+            window_select_count: 0,
         }
     }
 
@@ -516,7 +520,9 @@ impl FrameManager {
         let root = Window::new_leaf(window_id, buffer_id, bounds);
 
         let frame = Frame::new(frame_id, name.to_string(), width, height, root);
+        let selected_wid = frame.selected_window;
         self.frames.insert(frame_id, frame);
+        self.note_window_selected(selected_wid);
 
         if self.selected.is_none() {
             self.selected = Some(frame_id);
@@ -561,10 +567,12 @@ impl FrameManager {
             for wid in frame.window_list() {
                 self.deleted_windows.insert(wid);
                 self.window_buffer_positions.remove(&wid);
+                self.window_use_times.remove(&wid);
             }
             if let Some(minibuffer_wid) = frame.minibuffer_window {
                 self.deleted_windows.insert(minibuffer_wid);
                 self.window_buffer_positions.remove(&minibuffer_wid);
+                self.window_use_times.remove(&minibuffer_wid);
             }
             if self.selected == Some(id) {
                 self.selected = self.frames.keys().next().copied();
@@ -616,6 +624,7 @@ impl FrameManager {
         if removed {
             self.deleted_windows.insert(window_id);
             self.window_buffer_positions.remove(&window_id);
+            self.window_use_times.remove(&window_id);
         }
 
         if removed && frame.selected_window == window_id {
@@ -772,6 +781,43 @@ impl FrameManager {
         } else {
             self.window_next_buffers.insert(window_id, next_buffers);
         }
+    }
+
+    /// Return the use-time for WINDOW-ID.
+    pub fn window_use_time(&self, window_id: WindowId) -> i64 {
+        self.window_use_times.get(&window_id).copied().unwrap_or(0)
+    }
+
+    /// Mark WINDOW-ID as the most recently selected window.
+    pub fn note_window_selected(&mut self, window_id: WindowId) -> i64 {
+        self.window_select_count = self.window_select_count.saturating_add(1);
+        self.window_use_times
+            .insert(window_id, self.window_select_count);
+        self.window_select_count
+    }
+
+    /// Mark WINDOW-ID as second-most recently used.
+    ///
+    /// Returns the new use-time of WINDOW-ID when the bump happened, nil-like
+    /// behavior (`None`) otherwise.
+    pub fn bump_window_use_time(
+        &mut self,
+        selected_window_id: WindowId,
+        window_id: WindowId,
+    ) -> Option<i64> {
+        if window_id == selected_window_id {
+            return None;
+        }
+        if self.window_use_time(selected_window_id) != self.window_select_count {
+            return None;
+        }
+
+        let bumped_use_time = self.window_select_count;
+        self.window_use_times.insert(window_id, bumped_use_time);
+        self.window_select_count = self.window_select_count.saturating_add(1);
+        self.window_use_times
+            .insert(selected_window_id, self.window_select_count);
+        Some(bumped_use_time)
     }
 
     /// Return saved window state (window-start, point) for BUFFER-ID in WINDOW-ID.

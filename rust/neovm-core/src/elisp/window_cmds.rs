@@ -1340,12 +1340,45 @@ pub(crate) fn builtin_window_use_time(
 ) -> EvalResult {
     expect_max_args("window-use-time", &args, 1)?;
     let _ = ensure_selected_frame_id(eval);
-    let (fid, wid) = resolve_window_id(eval, args.first())?;
-    let use_time = eval
+    let (_fid, wid) = resolve_window_id(eval, args.first())?;
+    Ok(Value::Int(eval.frames.window_use_time(wid)))
+}
+
+/// `(window-bump-use-time &optional WINDOW)` -> integer or nil.
+pub(crate) fn builtin_window_bump_use_time(
+    eval: &mut super::eval::Evaluator,
+    args: Vec<Value>,
+) -> EvalResult {
+    expect_max_args("window-bump-use-time", &args, 1)?;
+    let selected_fid = ensure_selected_frame_id(eval);
+    let selected_wid = eval
         .frames
-        .get(fid)
-        .map_or(0, |frame| if frame.selected_window == wid { 1 } else { 0 });
-    Ok(Value::Int(use_time))
+        .get(selected_fid)
+        .map(|frame| frame.selected_window)
+        .ok_or_else(|| signal("error", vec![Value::string("No selected frame")]))?;
+    let target_wid = match args.first() {
+        None | Some(Value::Nil) => selected_wid,
+        Some(Value::Window(id)) => {
+            let wid = WindowId(*id);
+            if eval.frames.find_window_frame_id(wid).is_none() {
+                return Err(signal(
+                    "wrong-type-argument",
+                    vec![Value::symbol("window-live-p"), Value::Window(*id)],
+                ));
+            }
+            wid
+        }
+        Some(other) => {
+            return Err(signal(
+                "wrong-type-argument",
+                vec![Value::symbol("window-live-p"), other.clone()],
+            ))
+        }
+    };
+    Ok(match eval.frames.bump_window_use_time(selected_wid, target_wid) {
+        Some(use_time) => Value::Int(use_time),
+        None => Value::Nil,
+    })
 }
 
 /// `(window-old-point &optional WINDOW)` -> integer.
@@ -2548,6 +2581,7 @@ pub(crate) fn builtin_select_window(
             ))
         }
     };
+    let record_selection = args.get(1).is_none_or(Value::is_nil);
     let selected_buffer = {
         let frame = eval
             .frames
@@ -2561,6 +2595,9 @@ pub(crate) fn builtin_select_window(
         }
         frame.find_window(wid).and_then(|w| w.buffer_id())
     };
+    if record_selection {
+        let _ = eval.frames.note_window_selected(wid);
+    }
     if let Some(buffer_id) = selected_buffer {
         eval.buffers.set_current(buffer_id);
     }
@@ -2595,11 +2632,14 @@ pub(crate) fn builtin_other_window(
     let len = list.len() as i64;
     let new_idx = ((cur_idx as i64 + count) % len + len) % len;
     let new_wid = list[new_idx as usize];
-    let selected_buffer = if let Some(frame) = eval.frames.get_mut(fid) {
-        frame.select_window(new_wid);
-        frame.find_window(new_wid).and_then(|w| w.buffer_id())
+    let (selected_buffer, switched) = if let Some(frame) = eval.frames.get_mut(fid) {
+        let switched = frame.select_window(new_wid);
+        (frame.find_window(new_wid).and_then(|w| w.buffer_id()), switched)
     } else {
-        None
+        (None, false)
+    };
+    if switched {
+        let _ = eval.frames.note_window_selected(new_wid);
     };
     if let Some(buffer_id) = selected_buffer {
         eval.buffers.set_current(buffer_id);
@@ -3145,6 +3185,11 @@ pub(crate) fn builtin_select_frame(
             vec![Value::symbol("frame-live-p"), args[0].clone()],
         ));
     }
+    if args.get(1).is_none_or(Value::is_nil) {
+        if let Some(selected_wid) = eval.frames.get(fid).map(|f| f.selected_window) {
+            let _ = eval.frames.note_window_selected(selected_wid);
+        }
+    }
     if let Some(buf_id) = eval
         .frames
         .get(fid)
@@ -3196,6 +3241,11 @@ pub(crate) fn builtin_select_frame_set_input_focus(
             "wrong-type-argument",
             vec![Value::symbol("frame-live-p"), args[0].clone()],
         ));
+    }
+    if args.get(1).is_none_or(Value::is_nil) {
+        if let Some(selected_wid) = eval.frames.get(fid).map(|f| f.selected_window) {
+            let _ = eval.frames.note_window_selected(selected_wid);
+        }
     }
     if let Some(buf_id) = eval
         .frames
@@ -4910,6 +4960,37 @@ mod tests {
         assert_eq!(
             out[2],
             "OK ((wrong-type-argument window-live-p 999999) (wrong-type-argument window-live-p 999999) (wrong-type-argument window-live-p 999999) (wrong-type-argument window-live-p 999999) (wrong-type-argument window-live-p 999999) (wrong-number-of-arguments window-use-time 2) (wrong-number-of-arguments window-old-point 2) (wrong-number-of-arguments window-old-buffer 2) (wrong-number-of-arguments window-prev-buffers 2) (wrong-number-of-arguments window-next-buffers 2))"
+        );
+    }
+
+    #[test]
+    fn window_bump_use_time_tracks_second_most_recent_window() {
+        let forms = parse_forms(
+            "(let* ((w1 (selected-window))
+                    (w2 (split-window)))
+               (list (window-use-time w1)
+                     (window-use-time w2)
+                     (window-bump-use-time w2)
+                     (window-use-time w1)
+                     (window-use-time w2)
+                     (window-bump-use-time w1)))
+             (list (condition-case err (window-bump-use-time 1) (error err))
+                   (condition-case err (window-bump-use-time nil nil) (error err))
+                   (let ((w (split-window)))
+                     (delete-window w)
+                     (condition-case err (window-bump-use-time w) (error (car err)))))",
+        )
+        .expect("parse");
+        let mut ev = Evaluator::new();
+        let out = ev
+            .eval_forms(&forms)
+            .iter()
+            .map(format_eval_result)
+            .collect::<Vec<_>>();
+        assert_eq!(out[0], "OK (1 0 1 2 1 nil)");
+        assert_eq!(
+            out[1],
+            "OK ((wrong-type-argument window-live-p 1) (wrong-number-of-arguments window-bump-use-time 2) wrong-type-argument)"
         );
     }
 
