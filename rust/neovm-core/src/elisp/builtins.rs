@@ -5817,6 +5817,46 @@ pub(crate) fn builtin_overlay_recenter(args: Vec<Value>) -> EvalResult {
     Ok(Value::Nil)
 }
 
+pub(crate) fn builtin_profiler_cpu_log(args: Vec<Value>) -> EvalResult {
+    expect_args("profiler-cpu-log", &args, 0)?;
+    Ok(Value::Nil)
+}
+
+pub(crate) fn builtin_profiler_cpu_running_p(args: Vec<Value>) -> EvalResult {
+    expect_args("profiler-cpu-running-p", &args, 0)?;
+    Ok(Value::Nil)
+}
+
+pub(crate) fn builtin_profiler_cpu_start(args: Vec<Value>) -> EvalResult {
+    expect_args("profiler-cpu-start", &args, 1)?;
+    Ok(Value::Nil)
+}
+
+pub(crate) fn builtin_profiler_cpu_stop(args: Vec<Value>) -> EvalResult {
+    expect_args("profiler-cpu-stop", &args, 0)?;
+    Ok(Value::Nil)
+}
+
+pub(crate) fn builtin_profiler_memory_log(args: Vec<Value>) -> EvalResult {
+    expect_args("profiler-memory-log", &args, 0)?;
+    Ok(Value::Nil)
+}
+
+pub(crate) fn builtin_profiler_memory_running_p(args: Vec<Value>) -> EvalResult {
+    expect_args("profiler-memory-running-p", &args, 0)?;
+    Ok(Value::Nil)
+}
+
+pub(crate) fn builtin_profiler_memory_start(args: Vec<Value>) -> EvalResult {
+    expect_args("profiler-memory-start", &args, 0)?;
+    Ok(Value::Nil)
+}
+
+pub(crate) fn builtin_profiler_memory_stop(args: Vec<Value>) -> EvalResult {
+    expect_args("profiler-memory-stop", &args, 0)?;
+    Ok(Value::Nil)
+}
+
 // ===========================================================================
 // Hook system (need evaluator)
 // ===========================================================================
@@ -14762,16 +14802,14 @@ pub(crate) fn dispatch_builtin(
         "posn-at-point" => super::compat_internal::builtin_posn_at_point(args),
         "posn-at-x-y" => super::compat_internal::builtin_posn_at_x_y(args),
         "previous-frame" => builtin_previous_frame(args),
-        "profiler-cpu-log" => super::compat_internal::builtin_profiler_cpu_log(args),
-        "profiler-cpu-running-p" => super::compat_internal::builtin_profiler_cpu_running_p(args),
-        "profiler-cpu-start" => super::compat_internal::builtin_profiler_cpu_start(args),
-        "profiler-cpu-stop" => super::compat_internal::builtin_profiler_cpu_stop(args),
-        "profiler-memory-log" => super::compat_internal::builtin_profiler_memory_log(args),
-        "profiler-memory-running-p" => {
-            super::compat_internal::builtin_profiler_memory_running_p(args)
-        }
-        "profiler-memory-start" => super::compat_internal::builtin_profiler_memory_start(args),
-        "profiler-memory-stop" => super::compat_internal::builtin_profiler_memory_stop(args),
+        "profiler-cpu-log" => builtin_profiler_cpu_log(args),
+        "profiler-cpu-running-p" => builtin_profiler_cpu_running_p(args),
+        "profiler-cpu-start" => builtin_profiler_cpu_start(args),
+        "profiler-cpu-stop" => builtin_profiler_cpu_stop(args),
+        "profiler-memory-log" => builtin_profiler_memory_log(args),
+        "profiler-memory-running-p" => builtin_profiler_memory_running_p(args),
+        "profiler-memory-start" => builtin_profiler_memory_start(args),
+        "profiler-memory-stop" => builtin_profiler_memory_stop(args),
         "put-unicode-property-internal" => builtin_put_unicode_property_internal(args),
         "query-font" => super::compat_internal::builtin_query_font(args),
         "query-fontset" => super::compat_internal::builtin_query_fontset(args),
@@ -15727,16 +15765,14 @@ pub(crate) fn dispatch_builtin_pure(name: &str, args: Vec<Value>) -> Option<Eval
         "posn-at-point" => super::compat_internal::builtin_posn_at_point(args),
         "posn-at-x-y" => super::compat_internal::builtin_posn_at_x_y(args),
         "previous-frame" => builtin_previous_frame(args),
-        "profiler-cpu-log" => super::compat_internal::builtin_profiler_cpu_log(args),
-        "profiler-cpu-running-p" => super::compat_internal::builtin_profiler_cpu_running_p(args),
-        "profiler-cpu-start" => super::compat_internal::builtin_profiler_cpu_start(args),
-        "profiler-cpu-stop" => super::compat_internal::builtin_profiler_cpu_stop(args),
-        "profiler-memory-log" => super::compat_internal::builtin_profiler_memory_log(args),
-        "profiler-memory-running-p" => {
-            super::compat_internal::builtin_profiler_memory_running_p(args)
-        }
-        "profiler-memory-start" => super::compat_internal::builtin_profiler_memory_start(args),
-        "profiler-memory-stop" => super::compat_internal::builtin_profiler_memory_stop(args),
+        "profiler-cpu-log" => builtin_profiler_cpu_log(args),
+        "profiler-cpu-running-p" => builtin_profiler_cpu_running_p(args),
+        "profiler-cpu-start" => builtin_profiler_cpu_start(args),
+        "profiler-cpu-stop" => builtin_profiler_cpu_stop(args),
+        "profiler-memory-log" => builtin_profiler_memory_log(args),
+        "profiler-memory-running-p" => builtin_profiler_memory_running_p(args),
+        "profiler-memory-start" => builtin_profiler_memory_start(args),
+        "profiler-memory-stop" => builtin_profiler_memory_stop(args),
         "put-unicode-property-internal" => builtin_put_unicode_property_internal(args),
         "query-font" => super::compat_internal::builtin_query_font(args),
         "query-fontset" => super::compat_internal::builtin_query_fontset(args),
@@ -19558,6 +19594,49 @@ mod tests {
             .expect("builtin overlay-recenter should resolve")
             .expect("builtin overlay-recenter should evaluate");
         assert!(recentered.is_nil());
+    }
+
+    #[test]
+    fn pure_dispatch_profiler_placeholders_match_compat_contracts() {
+        let cpu_log = dispatch_builtin_pure("profiler-cpu-log", vec![])
+            .expect("builtin profiler-cpu-log should resolve")
+            .expect("builtin profiler-cpu-log should evaluate");
+        assert!(cpu_log.is_nil());
+
+        let cpu_running = dispatch_builtin_pure("profiler-cpu-running-p", vec![])
+            .expect("builtin profiler-cpu-running-p should resolve")
+            .expect("builtin profiler-cpu-running-p should evaluate");
+        assert!(cpu_running.is_nil());
+
+        let cpu_start = dispatch_builtin_pure("profiler-cpu-start", vec![Value::Int(1)])
+            .expect("builtin profiler-cpu-start should resolve")
+            .expect("builtin profiler-cpu-start should evaluate");
+        assert!(cpu_start.is_nil());
+
+        let cpu_stop = dispatch_builtin_pure("profiler-cpu-stop", vec![])
+            .expect("builtin profiler-cpu-stop should resolve")
+            .expect("builtin profiler-cpu-stop should evaluate");
+        assert!(cpu_stop.is_nil());
+
+        let mem_log = dispatch_builtin_pure("profiler-memory-log", vec![])
+            .expect("builtin profiler-memory-log should resolve")
+            .expect("builtin profiler-memory-log should evaluate");
+        assert!(mem_log.is_nil());
+
+        let mem_running = dispatch_builtin_pure("profiler-memory-running-p", vec![])
+            .expect("builtin profiler-memory-running-p should resolve")
+            .expect("builtin profiler-memory-running-p should evaluate");
+        assert!(mem_running.is_nil());
+
+        let mem_start = dispatch_builtin_pure("profiler-memory-start", vec![])
+            .expect("builtin profiler-memory-start should resolve")
+            .expect("builtin profiler-memory-start should evaluate");
+        assert!(mem_start.is_nil());
+
+        let mem_stop = dispatch_builtin_pure("profiler-memory-stop", vec![])
+            .expect("builtin profiler-memory-stop should resolve")
+            .expect("builtin profiler-memory-stop should evaluate");
+        assert!(mem_stop.is_nil());
     }
 
     #[test]

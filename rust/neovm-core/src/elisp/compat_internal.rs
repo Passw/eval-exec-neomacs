@@ -1768,54 +1768,6 @@ pub(crate) fn builtin_play_sound_internal(args: Vec<Value>) -> EvalResult {
     Ok(Value::Nil)
 }
 
-/// `(profiler-cpu-log)` -> nil.
-pub(crate) fn builtin_profiler_cpu_log(args: Vec<Value>) -> EvalResult {
-    expect_args("profiler-cpu-log", &args, 0)?;
-    Ok(Value::Nil)
-}
-
-/// `(profiler-cpu-running-p)` -> nil.
-pub(crate) fn builtin_profiler_cpu_running_p(args: Vec<Value>) -> EvalResult {
-    expect_args("profiler-cpu-running-p", &args, 0)?;
-    Ok(Value::Nil)
-}
-
-/// `(profiler-cpu-start SAMPLING-INTERVAL)` -> nil.
-pub(crate) fn builtin_profiler_cpu_start(args: Vec<Value>) -> EvalResult {
-    expect_args("profiler-cpu-start", &args, 1)?;
-    Ok(Value::Nil)
-}
-
-/// `(profiler-cpu-stop)` -> nil.
-pub(crate) fn builtin_profiler_cpu_stop(args: Vec<Value>) -> EvalResult {
-    expect_args("profiler-cpu-stop", &args, 0)?;
-    Ok(Value::Nil)
-}
-
-/// `(profiler-memory-log)` -> nil.
-pub(crate) fn builtin_profiler_memory_log(args: Vec<Value>) -> EvalResult {
-    expect_args("profiler-memory-log", &args, 0)?;
-    Ok(Value::Nil)
-}
-
-/// `(profiler-memory-running-p)` -> nil.
-pub(crate) fn builtin_profiler_memory_running_p(args: Vec<Value>) -> EvalResult {
-    expect_args("profiler-memory-running-p", &args, 0)?;
-    Ok(Value::Nil)
-}
-
-/// `(profiler-memory-start)` -> nil.
-pub(crate) fn builtin_profiler_memory_start(args: Vec<Value>) -> EvalResult {
-    expect_args("profiler-memory-start", &args, 0)?;
-    Ok(Value::Nil)
-}
-
-/// `(profiler-memory-stop)` -> nil.
-pub(crate) fn builtin_profiler_memory_stop(args: Vec<Value>) -> EvalResult {
-    expect_args("profiler-memory-stop", &args, 0)?;
-    Ok(Value::Nil)
-}
-
 /// `(record &rest SLOTS)` -> nil.
 pub(crate) fn builtin_record(args: Vec<Value>) -> EvalResult {
     if args.is_empty() {
