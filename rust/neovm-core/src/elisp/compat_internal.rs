@@ -1738,36 +1738,6 @@ pub(crate) fn builtin_dump_emacs_portable_sort_predicate_copied(args: Vec<Value>
     Ok(Value::Nil)
 }
 
-/// `(pdumper-stats)` -> nil.
-pub(crate) fn builtin_pdumper_stats(args: Vec<Value>) -> EvalResult {
-    expect_args("pdumper-stats", &args, 0)?;
-    Ok(Value::Nil)
-}
-
-/// `(position-symbol SYMBOL PROPERTY)` -> nil.
-pub(crate) fn builtin_position_symbol(args: Vec<Value>) -> EvalResult {
-    expect_args("position-symbol", &args, 2)?;
-    Ok(Value::Nil)
-}
-
-/// `(posn-at-point &optional POSITION WINDOW)` -> nil.
-pub(crate) fn builtin_posn_at_point(args: Vec<Value>) -> EvalResult {
-    expect_range_args("posn-at-point", &args, 0, 2)?;
-    Ok(Value::Nil)
-}
-
-/// `(posn-at-x-y X Y &optional FRAME-OR-WINDOW WHOLE)` -> nil.
-pub(crate) fn builtin_posn_at_x_y(args: Vec<Value>) -> EvalResult {
-    expect_range_args("posn-at-x-y", &args, 2, 4)?;
-    Ok(Value::Nil)
-}
-
-/// `(play-sound-internal SOUND)` -> nil.
-pub(crate) fn builtin_play_sound_internal(args: Vec<Value>) -> EvalResult {
-    expect_args("play-sound-internal", &args, 1)?;
-    Ok(Value::Nil)
-}
-
 /// `(record &rest SLOTS)` -> nil.
 pub(crate) fn builtin_record(args: Vec<Value>) -> EvalResult {
     if args.is_empty() {

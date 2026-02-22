@@ -5857,6 +5857,31 @@ pub(crate) fn builtin_profiler_memory_stop(args: Vec<Value>) -> EvalResult {
     Ok(Value::Nil)
 }
 
+pub(crate) fn builtin_pdumper_stats(args: Vec<Value>) -> EvalResult {
+    expect_args("pdumper-stats", &args, 0)?;
+    Ok(Value::Nil)
+}
+
+pub(crate) fn builtin_position_symbol(args: Vec<Value>) -> EvalResult {
+    expect_args("position-symbol", &args, 2)?;
+    Ok(Value::Nil)
+}
+
+pub(crate) fn builtin_posn_at_point(args: Vec<Value>) -> EvalResult {
+    expect_range_args("posn-at-point", &args, 0, 2)?;
+    Ok(Value::Nil)
+}
+
+pub(crate) fn builtin_posn_at_x_y(args: Vec<Value>) -> EvalResult {
+    expect_range_args("posn-at-x-y", &args, 2, 4)?;
+    Ok(Value::Nil)
+}
+
+pub(crate) fn builtin_play_sound_internal(args: Vec<Value>) -> EvalResult {
+    expect_args("play-sound-internal", &args, 1)?;
+    Ok(Value::Nil)
+}
+
 // ===========================================================================
 // Hook system (need evaluator)
 // ===========================================================================
@@ -14796,11 +14821,11 @@ pub(crate) fn dispatch_builtin(
         "optimize-char-table" => builtin_optimize_char_table(args),
         "overlay-lists" => builtin_overlay_lists(args),
         "overlay-recenter" => builtin_overlay_recenter(args),
-        "pdumper-stats" => super::compat_internal::builtin_pdumper_stats(args),
-        "play-sound-internal" => super::compat_internal::builtin_play_sound_internal(args),
-        "position-symbol" => super::compat_internal::builtin_position_symbol(args),
-        "posn-at-point" => super::compat_internal::builtin_posn_at_point(args),
-        "posn-at-x-y" => super::compat_internal::builtin_posn_at_x_y(args),
+        "pdumper-stats" => builtin_pdumper_stats(args),
+        "play-sound-internal" => builtin_play_sound_internal(args),
+        "position-symbol" => builtin_position_symbol(args),
+        "posn-at-point" => builtin_posn_at_point(args),
+        "posn-at-x-y" => builtin_posn_at_x_y(args),
         "previous-frame" => builtin_previous_frame(args),
         "profiler-cpu-log" => builtin_profiler_cpu_log(args),
         "profiler-cpu-running-p" => builtin_profiler_cpu_running_p(args),
@@ -15759,11 +15784,11 @@ pub(crate) fn dispatch_builtin_pure(name: &str, args: Vec<Value>) -> Option<Eval
         "optimize-char-table" => builtin_optimize_char_table(args),
         "overlay-lists" => builtin_overlay_lists(args),
         "overlay-recenter" => builtin_overlay_recenter(args),
-        "pdumper-stats" => super::compat_internal::builtin_pdumper_stats(args),
-        "play-sound-internal" => super::compat_internal::builtin_play_sound_internal(args),
-        "position-symbol" => super::compat_internal::builtin_position_symbol(args),
-        "posn-at-point" => super::compat_internal::builtin_posn_at_point(args),
-        "posn-at-x-y" => super::compat_internal::builtin_posn_at_x_y(args),
+        "pdumper-stats" => builtin_pdumper_stats(args),
+        "play-sound-internal" => builtin_play_sound_internal(args),
+        "position-symbol" => builtin_position_symbol(args),
+        "posn-at-point" => builtin_posn_at_point(args),
+        "posn-at-x-y" => builtin_posn_at_x_y(args),
         "previous-frame" => builtin_previous_frame(args),
         "profiler-cpu-log" => builtin_profiler_cpu_log(args),
         "profiler-cpu-running-p" => builtin_profiler_cpu_running_p(args),
@@ -19637,6 +19662,35 @@ mod tests {
             .expect("builtin profiler-memory-stop should resolve")
             .expect("builtin profiler-memory-stop should evaluate");
         assert!(mem_stop.is_nil());
+    }
+
+    #[test]
+    fn pure_dispatch_position_placeholders_match_compat_contracts() {
+        let pdumper = dispatch_builtin_pure("pdumper-stats", vec![])
+            .expect("builtin pdumper-stats should resolve")
+            .expect("builtin pdumper-stats should evaluate");
+        assert!(pdumper.is_nil());
+
+        let position_symbol =
+            dispatch_builtin_pure("position-symbol", vec![Value::symbol("x"), Value::Nil])
+                .expect("builtin position-symbol should resolve")
+                .expect("builtin position-symbol should evaluate");
+        assert!(position_symbol.is_nil());
+
+        let posn_at_point = dispatch_builtin_pure("posn-at-point", vec![])
+            .expect("builtin posn-at-point should resolve")
+            .expect("builtin posn-at-point should evaluate");
+        assert!(posn_at_point.is_nil());
+
+        let posn_at_xy = dispatch_builtin_pure("posn-at-x-y", vec![Value::Int(0), Value::Int(0)])
+            .expect("builtin posn-at-x-y should resolve")
+            .expect("builtin posn-at-x-y should evaluate");
+        assert!(posn_at_xy.is_nil());
+
+        let play_sound = dispatch_builtin_pure("play-sound-internal", vec![Value::Nil])
+            .expect("builtin play-sound-internal should resolve")
+            .expect("builtin play-sound-internal should evaluate");
+        assert!(play_sound.is_nil());
     }
 
     #[test]
