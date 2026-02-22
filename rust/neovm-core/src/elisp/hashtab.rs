@@ -187,20 +187,25 @@ fn internal_hash_table_index_size(table: &LispHashTable) -> usize {
     pow2.min(usize::MAX as u64) as usize
 }
 
-fn internal_hash_table_nonempty_buckets(table: &LispHashTable) -> Vec<Vec<(Value, Value)>> {
+fn internal_hash_table_diagnostic_hash(key: &HashKey) -> i64 {
+    let mut hasher = DefaultHasher::new();
+    key.hash(&mut hasher);
+    (hasher.finish() & (i64::MAX as u64)) as i64
+}
+
+fn internal_hash_table_nonempty_buckets(table: &LispHashTable) -> Vec<Vec<(Value, i64)>> {
     if table.data.is_empty() {
         return Vec::new();
     }
     let bucket_count = internal_hash_table_index_size(table).max(1);
-    let mut buckets: Vec<Vec<(Value, Value)>> = vec![Vec::new(); bucket_count];
-    for (key, value) in &table.data {
-        let mut hasher = DefaultHasher::new();
-        key.hash(&mut hasher);
-        let index = (hasher.finish() as usize) % bucket_count;
-        buckets[index].push((hash_key_to_value(key), value.clone()));
+    let mut buckets: Vec<Vec<(Value, i64)>> = vec![Vec::new(); bucket_count];
+    for key in table.data.keys() {
+        let hash = internal_hash_table_diagnostic_hash(key);
+        let index = (hash as usize) % bucket_count;
+        buckets[index].push((hash_key_to_value(key), hash));
     }
     for bucket in &mut buckets {
-        bucket.sort_by_key(|(key, value)| (print_value(key), print_value(value)));
+        bucket.sort_by_key(|(key, hash)| (print_value(key), *hash));
     }
     buckets
         .into_iter()
@@ -412,7 +417,7 @@ pub(crate) fn builtin_internal_hash_table_buckets(args: Vec<Value>) -> EvalResul
                 .map(|bucket| {
                     let alist_items: Vec<Value> = bucket
                         .into_iter()
-                        .map(|(key, value)| Value::cons(key, value))
+                        .map(|(key, hash)| Value::cons(key, Value::Int(hash)))
                         .collect();
                     Value::list(alist_items)
                 })
@@ -672,6 +677,51 @@ mod tests {
             builtin_internal_hash_table_index_size(vec![table_mid]).unwrap(),
             Value::Int(64)
         );
+    }
+
+    #[test]
+    fn internal_hash_table_buckets_report_hash_diagnostics() {
+        let table = builtin_make_hash_table(vec![
+            Value::keyword(":test"),
+            Value::symbol("equal"),
+            Value::keyword(":size"),
+            Value::Int(3),
+        ])
+        .expect("hash table");
+        if let Value::HashTable(ht) = &table {
+            let mut raw = ht.lock().expect("poisoned");
+            let test = raw.test.clone();
+            raw.data.insert(
+                Value::string("a").to_hash_key(&test),
+                Value::symbol("value-a"),
+            );
+            raw.data.insert(
+                Value::string("b").to_hash_key(&test),
+                Value::symbol("value-b"),
+            );
+        } else {
+            panic!("expected hash table");
+        }
+
+        let buckets = builtin_internal_hash_table_buckets(vec![table]).expect("bucket alists");
+        let outer = list_to_vec(&buckets).expect("outer list");
+        let mut seen = std::collections::BTreeMap::new();
+        for bucket in outer {
+            let entries = list_to_vec(&bucket).expect("bucket alist");
+            for entry in entries {
+                let Value::Cons(cell) = entry else {
+                    panic!("expected alist cons entry");
+                };
+                let pair = cell.lock().expect("poisoned");
+                let key = pair.car.as_str().expect("string key").to_string();
+                let hash = pair.cdr.as_int().expect("diagnostic hash integer");
+                seen.insert(key, hash);
+            }
+        }
+
+        assert_eq!(seen.len(), 2);
+        assert!(seen.contains_key("a"));
+        assert!(seen.contains_key("b"));
     }
 
     #[test]
