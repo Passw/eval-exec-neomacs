@@ -1,0 +1,12 @@
+; Ensure string comparison builtins accept string designators like GNU Emacs.
+(fboundp 'string>)
+(list (string< nil "x")
+      (string-equal nil "x")
+      (string> nil "a")
+      (string> "a" nil)
+      (string< 'foo "g")
+      (string-equal 'foo "foo")
+      (string< :bar "x")
+      (string-equal :bar ":bar"))
+(condition-case err (string> 7 "a") (error (list (car err) (cadr err))))
+(func-arity 'string>)

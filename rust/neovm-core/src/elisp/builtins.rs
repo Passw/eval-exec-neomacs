@@ -1655,16 +1655,23 @@ pub(crate) fn builtin_copy_sequence(args: Vec<Value>) -> EvalResult {
 
 pub(crate) fn builtin_string_equal(args: Vec<Value>) -> EvalResult {
     expect_args("string-equal", &args, 2)?;
-    let a = expect_string(&args[0])?;
-    let b = expect_string(&args[1])?;
+    let a = expect_string_comparison_operand(&args[0])?;
+    let b = expect_string_comparison_operand(&args[1])?;
     Ok(Value::bool(a == b))
 }
 
 pub(crate) fn builtin_string_lessp(args: Vec<Value>) -> EvalResult {
     expect_args("string-lessp", &args, 2)?;
-    let a = expect_string(&args[0])?;
-    let b = expect_string(&args[1])?;
+    let a = expect_string_comparison_operand(&args[0])?;
+    let b = expect_string_comparison_operand(&args[1])?;
     Ok(Value::bool(a < b))
+}
+
+pub(crate) fn builtin_string_greaterp(args: Vec<Value>) -> EvalResult {
+    expect_args("string-greaterp", &args, 2)?;
+    let a = expect_string_comparison_operand(&args[0])?;
+    let b = expect_string_comparison_operand(&args[1])?;
+    Ok(Value::bool(a > b))
 }
 
 fn substring_impl(name: &str, args: &[Value]) -> EvalResult {
@@ -3815,6 +3822,18 @@ fn expect_string(value: &Value) -> Result<String, Flow> {
             "wrong-type-argument",
             vec![Value::symbol("stringp"), other.clone()],
         )),
+    }
+}
+
+fn expect_string_comparison_operand(value: &Value) -> Result<String, Flow> {
+    match value {
+        Value::Str(s) => Ok((**s).clone()),
+        _ => value.as_symbol_name().map(str::to_owned).ok_or_else(|| {
+            signal(
+                "wrong-type-argument",
+                vec![Value::symbol("stringp"), value.clone()],
+            )
+        }),
     }
 }
 
@@ -14011,6 +14030,8 @@ enum PureBuiltinId {
     StringEqual,
     #[strum(serialize = "string-lessp", serialize = "string<")]
     StringLessp,
+    #[strum(serialize = "string-greaterp", serialize = "string>")]
+    StringGreaterp,
     #[strum(serialize = "substring")]
     Substring,
     #[strum(serialize = "concat")]
@@ -14240,6 +14261,7 @@ fn dispatch_builtin_id_pure(id: PureBuiltinId, args: Vec<Value>) -> EvalResult {
         PureBuiltinId::CopySequence => builtin_copy_sequence(args),
         PureBuiltinId::StringEqual => builtin_string_equal(args),
         PureBuiltinId::StringLessp => builtin_string_lessp(args),
+        PureBuiltinId::StringGreaterp => builtin_string_greaterp(args),
         PureBuiltinId::Substring => builtin_substring(args),
         PureBuiltinId::Concat => builtin_concat(args),
         PureBuiltinId::String => builtin_string(args),
@@ -19243,6 +19265,38 @@ mod tests {
             .expect("builtin string= should evaluate");
         assert_eq!(full, short);
         assert!(full.is_truthy());
+    }
+
+    #[test]
+    fn pure_dispatch_typed_string_comparisons_accept_symbol_designators() {
+        let less = dispatch_builtin_pure("string<", vec![Value::symbol("foo"), Value::string("g")])
+            .expect("builtin string< should resolve")
+            .expect("builtin string< should evaluate");
+        assert!(less.is_truthy());
+
+        let equal = dispatch_builtin_pure("string-equal", vec![Value::True, Value::string("t")])
+            .expect("builtin string-equal should resolve")
+            .expect("builtin string-equal should evaluate");
+        assert!(equal.is_truthy());
+
+        let greater = dispatch_builtin_pure("string>", vec![Value::Nil, Value::string("a")])
+            .expect("builtin string> should resolve")
+            .expect("builtin string> should evaluate");
+        assert!(greater.is_truthy());
+
+        let err = dispatch_builtin_pure("string>", vec![Value::Int(7), Value::string("a")])
+            .expect("builtin string> should resolve")
+            .expect_err("string> should reject non string/symbol designators");
+        match err {
+            Flow::Signal(sig) => {
+                assert_eq!(sig.symbol, "wrong-type-argument");
+                assert_eq!(
+                    sig.data,
+                    vec![Value::symbol("stringp"), Value::Int(7)],
+                );
+            }
+            other => panic!("unexpected flow: {other:?}"),
+        }
     }
 
     #[test]

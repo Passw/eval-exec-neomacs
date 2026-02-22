@@ -1106,7 +1106,9 @@ fn subr_arity_value(name: &str) -> Value {
         "byte-to-position" | "byte-to-string" | "position-bytes" => arity_cons(1, Some(1)),
         "substring" | "substring-no-properties" => arity_cons(1, Some(3)),
         "aref" | "char-equal" | "eq" | "eql" | "equal" | "function-equal" | "make-vector"
-        | "string-equal" | "string-lessp" | "throw" => arity_cons(2, Some(2)),
+        | "string-equal" | "string-lessp" | "string-greaterp" | "string>" | "throw" => {
+            arity_cons(2, Some(2))
+        }
         "aset" => arity_cons(3, Some(3)),
         "activate-mark" | "auto-composition-mode" | "deactivate-mark" => arity_cons(0, Some(1)),
         "clear-composition-cache" => arity_cons(0, Some(0)),
@@ -2833,6 +2835,8 @@ mod tests {
         assert_subr_arity("sequencep", 1, Some(1));
         assert_subr_arity("string-equal", 2, Some(2));
         assert_subr_arity("string-lessp", 2, Some(2));
+        assert_subr_arity("string-greaterp", 2, Some(2));
+        assert_subr_arity("string>", 2, Some(2));
         assert_subr_arity("string-to-char", 1, Some(1));
         assert_subr_arity("string-to-number", 1, Some(2));
         assert_subr_arity("stringp", 1, Some(1));

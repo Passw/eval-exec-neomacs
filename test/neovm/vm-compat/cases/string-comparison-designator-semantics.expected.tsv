@@ -1,0 +1,4 @@
+1	(fboundp 'string>)	OK t
+2	(list (string< nil "x") (string-equal nil "x") (string> nil "a") (string> "a" nil) (string< 'foo "g") (string-equal 'foo "foo") (string< :bar "x") (string-equal :bar ":bar"))	OK (t nil t nil t t t t)
+3	(condition-case err (string> 7 "a") (error (list (car err) (cadr err))))	OK (wrong-type-argument stringp)
+4	(func-arity 'string>)	OK (2 . 2)
