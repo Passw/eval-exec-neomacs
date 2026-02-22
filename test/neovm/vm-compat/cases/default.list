@@ -444,6 +444,7 @@ cases/display-query-vector-designator-error-semantics
 cases/display-query-list-designator-error-semantics
 cases/display-query-cons-designator-error-semantics
 cases/display-query-window-designator-error-payload-semantics
+cases/display-query-dead-window-designator-error-payload-semantics
 cases/display-images-face-support-semantics
 cases/display-frame-designator-semantics
 cases/display-frame-designator-edge-semantics
