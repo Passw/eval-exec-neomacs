@@ -1720,12 +1720,6 @@ pub(crate) fn builtin_make_interpreted_closure(args: Vec<Value>) -> EvalResult {
     Ok(Value::Nil)
 }
 
-/// `(make-record TYPE SLOTS WORDS)` -> nil.
-pub(crate) fn builtin_make_record(args: Vec<Value>) -> EvalResult {
-    expect_args("make-record", &args, 3)?;
-    Ok(Value::Nil)
-}
-
 /// `(dump-emacs-portable FILE &optional TRACK-REFERRERS)` -> nil.
 pub(crate) fn builtin_dump_emacs_portable(args: Vec<Value>) -> EvalResult {
     expect_range_args("dump-emacs-portable", &args, 1, 2)?;
@@ -1807,30 +1801,6 @@ pub(crate) fn builtin_native_elisp_load(args: Vec<Value>) -> EvalResult {
 /// `(new-fontset NAME FONTLIST)` -> nil.
 pub(crate) fn builtin_new_fontset(args: Vec<Value>) -> EvalResult {
     expect_args("new-fontset", &args, 2)?;
-    Ok(Value::Nil)
-}
-
-/// `(marker-last-position MARKER)` -> nil.
-pub(crate) fn builtin_marker_last_position(args: Vec<Value>) -> EvalResult {
-    expect_args("marker-last-position", &args, 1)?;
-    Ok(Value::Nil)
-}
-
-/// `(match-data--translate MAP)` -> nil.
-pub(crate) fn builtin_match_data_translate(args: Vec<Value>) -> EvalResult {
-    expect_args("match-data--translate", &args, 1)?;
-    Ok(Value::Nil)
-}
-
-/// `(newline-cache-check &optional BEG)` -> nil.
-pub(crate) fn builtin_newline_cache_check(args: Vec<Value>) -> EvalResult {
-    expect_range_args("newline-cache-check", &args, 0, 1)?;
-    Ok(Value::Nil)
-}
-
-/// `(old-selected-frame)` -> nil.
-pub(crate) fn builtin_old_selected_frame(args: Vec<Value>) -> EvalResult {
-    expect_args("old-selected-frame", &args, 0)?;
     Ok(Value::Nil)
 }
 

@@ -5707,6 +5707,31 @@ pub(crate) fn builtin_mapbacktrace(args: Vec<Value>) -> EvalResult {
     Ok(Value::Nil)
 }
 
+pub(crate) fn builtin_make_record(args: Vec<Value>) -> EvalResult {
+    expect_args("make-record", &args, 3)?;
+    Ok(Value::Nil)
+}
+
+pub(crate) fn builtin_marker_last_position(args: Vec<Value>) -> EvalResult {
+    expect_args("marker-last-position", &args, 1)?;
+    Ok(Value::Nil)
+}
+
+pub(crate) fn builtin_match_data_translate(args: Vec<Value>) -> EvalResult {
+    expect_args("match-data--translate", &args, 1)?;
+    Ok(Value::Nil)
+}
+
+pub(crate) fn builtin_newline_cache_check(args: Vec<Value>) -> EvalResult {
+    expect_range_args("newline-cache-check", &args, 0, 1)?;
+    Ok(Value::Nil)
+}
+
+pub(crate) fn builtin_old_selected_frame(args: Vec<Value>) -> EvalResult {
+    expect_args("old-selected-frame", &args, 0)?;
+    Ok(Value::Nil)
+}
+
 // ===========================================================================
 // Hook system (need evaluator)
 // ===========================================================================
@@ -14607,18 +14632,18 @@ pub(crate) fn dispatch_builtin(
         "make-char" => super::compat_internal::builtin_make_char(args),
         "make-closure" => super::compat_internal::builtin_make_closure(args),
         "make-finalizer" => super::compat_internal::builtin_make_finalizer(args),
-        "marker-last-position" => super::compat_internal::builtin_marker_last_position(args),
+        "marker-last-position" => builtin_marker_last_position(args),
         "make-indirect-buffer" => super::compat_internal::builtin_make_indirect_buffer(args),
         "make-interpreted-closure" => {
             super::compat_internal::builtin_make_interpreted_closure(args)
         }
-        "make-record" => super::compat_internal::builtin_make_record(args),
+        "make-record" => builtin_make_record(args),
         "make-temp-file-internal" => builtin_make_temp_file_internal(args),
         "map-charset-chars" => builtin_map_charset_chars(args),
         "map-keymap" => builtin_map_keymap(args),
         "map-keymap-internal" => builtin_map_keymap_internal(args),
         "mapbacktrace" => builtin_mapbacktrace(args),
-        "match-data--translate" => super::compat_internal::builtin_match_data_translate(args),
+        "match-data--translate" => builtin_match_data_translate(args),
         "memory-info" => super::compat_internal::builtin_memory_info(args),
         "make-frame-invisible" => super::compat_internal::builtin_make_frame_invisible(args),
         "make-terminal-frame" => super::compat_internal::builtin_make_terminal_frame(args),
@@ -14629,7 +14654,7 @@ pub(crate) fn dispatch_builtin(
         "module-load" => super::compat_internal::builtin_module_load(args),
         "mouse-pixel-position" => super::compat_internal::builtin_mouse_pixel_position(args),
         "mouse-position" => super::compat_internal::builtin_mouse_position(args),
-        "newline-cache-check" => super::compat_internal::builtin_newline_cache_check(args),
+        "newline-cache-check" => builtin_newline_cache_check(args),
         "native-comp-available-p" => super::compat_internal::builtin_native_comp_available_p(args),
         "native-comp-unit-file" => super::compat_internal::builtin_native_comp_unit_file(args),
         "native-comp-unit-set-file" => {
@@ -14642,7 +14667,7 @@ pub(crate) fn dispatch_builtin(
         "obarray-clear" => builtin_obarray_clear(args),
         "obarray-make" => builtin_obarray_make(args),
         "object-intervals" => super::compat_internal::builtin_object_intervals(args),
-        "old-selected-frame" => super::compat_internal::builtin_old_selected_frame(args),
+        "old-selected-frame" => builtin_old_selected_frame(args),
         "open-dribble-file" => super::compat_internal::builtin_open_dribble_file(args),
         "open-font" => super::compat_internal::builtin_open_font(args),
         "optimize-char-table" => super::compat_internal::builtin_optimize_char_table(args),
@@ -15574,18 +15599,18 @@ pub(crate) fn dispatch_builtin_pure(name: &str, args: Vec<Value>) -> Option<Eval
         "make-char" => super::compat_internal::builtin_make_char(args),
         "make-closure" => super::compat_internal::builtin_make_closure(args),
         "make-finalizer" => super::compat_internal::builtin_make_finalizer(args),
-        "marker-last-position" => super::compat_internal::builtin_marker_last_position(args),
+        "marker-last-position" => builtin_marker_last_position(args),
         "make-indirect-buffer" => super::compat_internal::builtin_make_indirect_buffer(args),
         "make-interpreted-closure" => {
             super::compat_internal::builtin_make_interpreted_closure(args)
         }
-        "make-record" => super::compat_internal::builtin_make_record(args),
+        "make-record" => builtin_make_record(args),
         "make-temp-file-internal" => builtin_make_temp_file_internal(args),
         "map-charset-chars" => builtin_map_charset_chars(args),
         "map-keymap" => builtin_map_keymap(args),
         "map-keymap-internal" => builtin_map_keymap_internal(args),
         "mapbacktrace" => builtin_mapbacktrace(args),
-        "match-data--translate" => super::compat_internal::builtin_match_data_translate(args),
+        "match-data--translate" => builtin_match_data_translate(args),
         "memory-info" => super::compat_internal::builtin_memory_info(args),
         "make-frame-invisible" => super::compat_internal::builtin_make_frame_invisible(args),
         "make-terminal-frame" => super::compat_internal::builtin_make_terminal_frame(args),
@@ -15596,7 +15621,7 @@ pub(crate) fn dispatch_builtin_pure(name: &str, args: Vec<Value>) -> Option<Eval
         "module-load" => super::compat_internal::builtin_module_load(args),
         "mouse-pixel-position" => super::compat_internal::builtin_mouse_pixel_position(args),
         "mouse-position" => super::compat_internal::builtin_mouse_position(args),
-        "newline-cache-check" => super::compat_internal::builtin_newline_cache_check(args),
+        "newline-cache-check" => builtin_newline_cache_check(args),
         "native-comp-available-p" => super::compat_internal::builtin_native_comp_available_p(args),
         "native-comp-unit-file" => super::compat_internal::builtin_native_comp_unit_file(args),
         "native-comp-unit-set-file" => {
@@ -15609,7 +15634,7 @@ pub(crate) fn dispatch_builtin_pure(name: &str, args: Vec<Value>) -> Option<Eval
         "obarray-clear" => builtin_obarray_clear(args),
         "obarray-make" => builtin_obarray_make(args),
         "object-intervals" => super::compat_internal::builtin_object_intervals(args),
-        "old-selected-frame" => super::compat_internal::builtin_old_selected_frame(args),
+        "old-selected-frame" => builtin_old_selected_frame(args),
         "open-dribble-file" => super::compat_internal::builtin_open_dribble_file(args),
         "open-font" => super::compat_internal::builtin_open_font(args),
         "optimize-char-table" => super::compat_internal::builtin_optimize_char_table(args),
@@ -19316,6 +19341,37 @@ mod tests {
             .expect("builtin mapbacktrace should resolve")
             .expect("builtin mapbacktrace should evaluate");
         assert!(mapbacktrace.is_nil());
+    }
+
+    #[test]
+    fn pure_dispatch_record_and_state_placeholders_match_compat_contracts() {
+        let make_record = dispatch_builtin_pure(
+            "make-record",
+            vec![Value::symbol("tag"), Value::Int(0), Value::Int(0)],
+        )
+        .expect("builtin make-record should resolve")
+        .expect("builtin make-record should evaluate");
+        assert!(make_record.is_nil());
+
+        let marker_last_position = dispatch_builtin_pure("marker-last-position", vec![Value::Nil])
+            .expect("builtin marker-last-position should resolve")
+            .expect("builtin marker-last-position should evaluate");
+        assert!(marker_last_position.is_nil());
+
+        let match_data_translate = dispatch_builtin_pure("match-data--translate", vec![Value::Nil])
+            .expect("builtin match-data--translate should resolve")
+            .expect("builtin match-data--translate should evaluate");
+        assert!(match_data_translate.is_nil());
+
+        let newline_cache_check = dispatch_builtin_pure("newline-cache-check", vec![])
+            .expect("builtin newline-cache-check should resolve")
+            .expect("builtin newline-cache-check should evaluate");
+        assert!(newline_cache_check.is_nil());
+
+        let old_selected_frame = dispatch_builtin_pure("old-selected-frame", vec![])
+            .expect("builtin old-selected-frame should resolve")
+            .expect("builtin old-selected-frame should evaluate");
+        assert!(old_selected_frame.is_nil());
     }
 
     #[test]
