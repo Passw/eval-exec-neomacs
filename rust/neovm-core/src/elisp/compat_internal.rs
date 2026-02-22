@@ -191,17 +191,6 @@ fn expect_characterp_from_int(value: &Value) -> Result<char, Flow> {
     }
 }
 
-fn expect_frame_live_or_nil(value: &Value) -> Result<(), Flow> {
-    if value.is_nil() || matches!(value, Value::Frame(_)) {
-        Ok(())
-    } else {
-        Err(signal(
-            "wrong-type-argument",
-            vec![Value::symbol("frame-live-p"), value.clone()],
-        ))
-    }
-}
-
 /// `(face-attributes-as-vector FACE)` -> FACE attribute vector.
 pub(crate) fn builtin_face_attributes_as_vector(args: Vec<Value>) -> EvalResult {
     expect_args("face-attributes-as-vector", &args, 1)?;
@@ -329,177 +318,6 @@ pub(crate) fn builtin_fontset_info(args: Vec<Value>) -> EvalResult {
 pub(crate) fn builtin_fontset_list(args: Vec<Value>) -> EvalResult {
     expect_args("fontset-list", &args, 0)?;
     Ok(Value::list(vec![Value::string(DEFAULT_FONTSET_NAME)]))
-}
-
-/// `(frame--face-hash-table &optional FRAME)` -> eq hash-table.
-pub(crate) fn builtin_frame_face_hash_table(args: Vec<Value>) -> EvalResult {
-    expect_range_args("frame--face-hash-table", &args, 0, 1)?;
-    if let Some(frame) = args.first() {
-        if !frame.is_nil() {
-            return Err(signal(
-                "wrong-type-argument",
-                vec![Value::symbol("frame-live-p"), frame.clone()],
-            ));
-        }
-    }
-    Ok(Value::hash_table(HashTableTest::Eq))
-}
-
-/// `(frame--set-was-invisible FRAME WAS-INVISIBLE)` -> WAS-INVISIBLE.
-pub(crate) fn builtin_frame_set_was_invisible(args: Vec<Value>) -> EvalResult {
-    expect_args("frame--set-was-invisible", &args, 2)?;
-    expect_frame_live_or_nil(&args[0])?;
-    Ok(args[1].clone())
-}
-
-/// `(frame-after-make-frame FRAME WAS-INVISIBLE)` -> nil.
-pub(crate) fn builtin_frame_after_make_frame(args: Vec<Value>) -> EvalResult {
-    expect_args("frame-after-make-frame", &args, 2)?;
-    expect_frame_live_or_nil(&args[0])?;
-    Ok(Value::Nil)
-}
-
-/// `(frame-ancestor-p ANCESTOR FRAME)` -> nil.
-pub(crate) fn builtin_frame_ancestor_p(args: Vec<Value>) -> EvalResult {
-    expect_args("frame-ancestor-p", &args, 2)?;
-    expect_frame_live_or_nil(&args[0])?;
-    expect_frame_live_or_nil(&args[1])?;
-    Ok(Value::Nil)
-}
-
-/// `(frame-bottom-divider-width &optional FRAME)` -> 0.
-pub(crate) fn builtin_frame_bottom_divider_width(args: Vec<Value>) -> EvalResult {
-    expect_range_args("frame-bottom-divider-width", &args, 0, 1)?;
-    if let Some(frame) = args.first() {
-        expect_frame_live_or_nil(frame)?;
-    }
-    Ok(Value::Int(0))
-}
-
-/// `(frame-child-frame-border-width &optional FRAME)` -> 0.
-pub(crate) fn builtin_frame_child_frame_border_width(args: Vec<Value>) -> EvalResult {
-    expect_range_args("frame-child-frame-border-width", &args, 0, 1)?;
-    if let Some(frame) = args.first() {
-        expect_frame_live_or_nil(frame)?;
-    }
-    Ok(Value::Int(0))
-}
-
-/// `(frame-focus &optional FRAME)` -> nil.
-pub(crate) fn builtin_frame_focus(args: Vec<Value>) -> EvalResult {
-    expect_range_args("frame-focus", &args, 0, 1)?;
-    if let Some(frame) = args.first() {
-        expect_frame_live_or_nil(frame)?;
-    }
-    Ok(Value::Nil)
-}
-
-/// `(frame-font-cache &optional FRAME)` -> nil.
-pub(crate) fn builtin_frame_font_cache(args: Vec<Value>) -> EvalResult {
-    expect_range_args("frame-font-cache", &args, 0, 1)?;
-    if let Some(frame) = args.first() {
-        expect_frame_live_or_nil(frame)?;
-    }
-    Ok(Value::Nil)
-}
-
-/// `(frame-fringe-width &optional FRAME)` -> 0.
-pub(crate) fn builtin_frame_fringe_width(args: Vec<Value>) -> EvalResult {
-    expect_range_args("frame-fringe-width", &args, 0, 1)?;
-    if let Some(frame) = args.first() {
-        expect_frame_live_or_nil(frame)?;
-    }
-    Ok(Value::Int(0))
-}
-
-/// `(frame-internal-border-width &optional FRAME)` -> 0.
-pub(crate) fn builtin_frame_internal_border_width(args: Vec<Value>) -> EvalResult {
-    expect_range_args("frame-internal-border-width", &args, 0, 1)?;
-    if let Some(frame) = args.first() {
-        expect_frame_live_or_nil(frame)?;
-    }
-    Ok(Value::Int(0))
-}
-
-/// `(frame-or-buffer-changed-p &optional SYM)` -> compatibility flag.
-pub(crate) fn builtin_frame_or_buffer_changed_p(args: Vec<Value>) -> EvalResult {
-    expect_range_args("frame-or-buffer-changed-p", &args, 0, 1)?;
-    let Some(symbol) = args.first() else {
-        return Ok(Value::True);
-    };
-    if symbol.is_nil() {
-        return Ok(Value::Nil);
-    }
-    if symbol.as_symbol_name().is_none() {
-        return Err(signal(
-            "wrong-type-argument",
-            vec![Value::symbol("symbolp"), symbol.clone()],
-        ));
-    }
-    Err(signal("void-variable", vec![symbol.clone()]))
-}
-
-/// `(frame-parent &optional FRAME)` -> nil.
-pub(crate) fn builtin_frame_parent(args: Vec<Value>) -> EvalResult {
-    expect_range_args("frame-parent", &args, 0, 1)?;
-    if let Some(frame) = args.first() {
-        expect_frame_live_or_nil(frame)?;
-    }
-    Ok(Value::Nil)
-}
-
-/// `(frame-pointer-visible-p &optional FRAME)` -> t.
-pub(crate) fn builtin_frame_pointer_visible_p(args: Vec<Value>) -> EvalResult {
-    expect_range_args("frame-pointer-visible-p", &args, 0, 1)?;
-    if let Some(frame) = args.first() {
-        expect_frame_live_or_nil(frame)?;
-    }
-    Ok(Value::True)
-}
-
-/// `(frame-right-divider-width &optional FRAME)` -> 0.
-pub(crate) fn builtin_frame_right_divider_width(args: Vec<Value>) -> EvalResult {
-    expect_range_args("frame-right-divider-width", &args, 0, 1)?;
-    if let Some(frame) = args.first() {
-        expect_frame_live_or_nil(frame)?;
-    }
-    Ok(Value::Int(0))
-}
-
-/// `(frame-scale-factor &optional FRAME)` -> 1.0.
-pub(crate) fn builtin_frame_scale_factor(args: Vec<Value>) -> EvalResult {
-    expect_range_args("frame-scale-factor", &args, 0, 1)?;
-    if let Some(frame) = args.first() {
-        expect_frame_live_or_nil(frame)?;
-    }
-    Ok(Value::Float(1.0))
-}
-
-/// `(frame-scroll-bar-height &optional FRAME)` -> 0.
-pub(crate) fn builtin_frame_scroll_bar_height(args: Vec<Value>) -> EvalResult {
-    expect_range_args("frame-scroll-bar-height", &args, 0, 1)?;
-    if let Some(frame) = args.first() {
-        expect_frame_live_or_nil(frame)?;
-    }
-    Ok(Value::Int(0))
-}
-
-/// `(frame-scroll-bar-width &optional FRAME)` -> 0.
-pub(crate) fn builtin_frame_scroll_bar_width(args: Vec<Value>) -> EvalResult {
-    expect_range_args("frame-scroll-bar-width", &args, 0, 1)?;
-    if let Some(frame) = args.first() {
-        expect_frame_live_or_nil(frame)?;
-    }
-    Ok(Value::Int(0))
-}
-
-/// `(frame-window-state-change &optional FRAME)` -> nil.
-pub(crate) fn builtin_frame_window_state_change(args: Vec<Value>) -> EvalResult {
-    expect_range_args("frame-window-state-change", &args, 0, 1)?;
-    if let Some(frame) = args.first() {
-        expect_frame_live_or_nil(frame)?;
-    }
-    Ok(Value::Nil)
 }
 
 /// `(fringe-bitmaps-at-pos &optional POS WINDOW)` -> nil.
@@ -939,7 +757,7 @@ mod tests {
 
     #[test]
     fn frame_face_hash_table_uses_eq_test() {
-        let out = builtin_frame_face_hash_table(vec![]).unwrap();
+        let out = crate::elisp::builtins::builtin_frame_face_hash_table(vec![]).unwrap();
         let Value::HashTable(table) = out else {
             panic!("expected hash table");
         };
@@ -960,13 +778,18 @@ mod tests {
 
     #[test]
     fn frame_set_was_invisible_returns_new_state() {
-        let out = builtin_frame_set_was_invisible(vec![Value::Nil, Value::True]).unwrap();
+        let out = crate::elisp::builtins::builtin_frame_set_was_invisible(vec![
+            Value::Nil,
+            Value::True,
+        ])
+        .unwrap();
         assert_eq!(out, Value::True);
     }
 
     #[test]
     fn frame_bottom_divider_width_rejects_non_frame_designator() {
-        let err = builtin_frame_bottom_divider_width(vec![Value::Int(0)]).unwrap_err();
+        let err = crate::elisp::builtins::builtin_frame_bottom_divider_width(vec![Value::Int(0)])
+            .unwrap_err();
         match err {
             Flow::Signal(sig) => assert_eq!(sig.symbol, "wrong-type-argument"),
             other => panic!("expected signal, got {other:?}"),
@@ -975,7 +798,7 @@ mod tests {
 
     #[test]
     fn frame_scale_factor_defaults_to_one_float() {
-        let out = builtin_frame_scale_factor(vec![]).unwrap();
+        let out = crate::elisp::builtins::builtin_frame_scale_factor(vec![]).unwrap();
         assert_eq!(out, Value::Float(1.0));
     }
 

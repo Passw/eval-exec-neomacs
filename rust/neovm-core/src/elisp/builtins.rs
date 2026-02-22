@@ -7137,6 +7137,159 @@ pub(crate) fn builtin_init_image_library(args: Vec<Value>) -> EvalResult {
     Ok(Value::Nil)
 }
 
+pub(crate) fn builtin_frame_face_hash_table(args: Vec<Value>) -> EvalResult {
+    expect_range_args("frame--face-hash-table", &args, 0, 1)?;
+    if let Some(frame) = args.first() {
+        if !frame.is_nil() {
+            return Err(signal(
+                "wrong-type-argument",
+                vec![Value::symbol("frame-live-p"), frame.clone()],
+            ));
+        }
+    }
+    Ok(Value::hash_table(HashTableTest::Eq))
+}
+
+pub(crate) fn builtin_frame_set_was_invisible(args: Vec<Value>) -> EvalResult {
+    expect_args("frame--set-was-invisible", &args, 2)?;
+    expect_frame_live_or_nil(&args[0])?;
+    Ok(args[1].clone())
+}
+
+pub(crate) fn builtin_frame_after_make_frame(args: Vec<Value>) -> EvalResult {
+    expect_args("frame-after-make-frame", &args, 2)?;
+    expect_frame_live_or_nil(&args[0])?;
+    Ok(Value::Nil)
+}
+
+pub(crate) fn builtin_frame_ancestor_p(args: Vec<Value>) -> EvalResult {
+    expect_args("frame-ancestor-p", &args, 2)?;
+    expect_frame_live_or_nil(&args[0])?;
+    expect_frame_live_or_nil(&args[1])?;
+    Ok(Value::Nil)
+}
+
+pub(crate) fn builtin_frame_bottom_divider_width(args: Vec<Value>) -> EvalResult {
+    expect_range_args("frame-bottom-divider-width", &args, 0, 1)?;
+    if let Some(frame) = args.first() {
+        expect_frame_live_or_nil(frame)?;
+    }
+    Ok(Value::Int(0))
+}
+
+pub(crate) fn builtin_frame_child_frame_border_width(args: Vec<Value>) -> EvalResult {
+    expect_range_args("frame-child-frame-border-width", &args, 0, 1)?;
+    if let Some(frame) = args.first() {
+        expect_frame_live_or_nil(frame)?;
+    }
+    Ok(Value::Int(0))
+}
+
+pub(crate) fn builtin_frame_focus(args: Vec<Value>) -> EvalResult {
+    expect_range_args("frame-focus", &args, 0, 1)?;
+    if let Some(frame) = args.first() {
+        expect_frame_live_or_nil(frame)?;
+    }
+    Ok(Value::Nil)
+}
+
+pub(crate) fn builtin_frame_font_cache(args: Vec<Value>) -> EvalResult {
+    expect_range_args("frame-font-cache", &args, 0, 1)?;
+    if let Some(frame) = args.first() {
+        expect_frame_live_or_nil(frame)?;
+    }
+    Ok(Value::Nil)
+}
+
+pub(crate) fn builtin_frame_fringe_width(args: Vec<Value>) -> EvalResult {
+    expect_range_args("frame-fringe-width", &args, 0, 1)?;
+    if let Some(frame) = args.first() {
+        expect_frame_live_or_nil(frame)?;
+    }
+    Ok(Value::Int(0))
+}
+
+pub(crate) fn builtin_frame_internal_border_width(args: Vec<Value>) -> EvalResult {
+    expect_range_args("frame-internal-border-width", &args, 0, 1)?;
+    if let Some(frame) = args.first() {
+        expect_frame_live_or_nil(frame)?;
+    }
+    Ok(Value::Int(0))
+}
+
+pub(crate) fn builtin_frame_or_buffer_changed_p(args: Vec<Value>) -> EvalResult {
+    expect_range_args("frame-or-buffer-changed-p", &args, 0, 1)?;
+    let Some(symbol) = args.first() else {
+        return Ok(Value::True);
+    };
+    if symbol.is_nil() {
+        return Ok(Value::Nil);
+    }
+    if symbol.as_symbol_name().is_none() {
+        return Err(signal(
+            "wrong-type-argument",
+            vec![Value::symbol("symbolp"), symbol.clone()],
+        ));
+    }
+    Err(signal("void-variable", vec![symbol.clone()]))
+}
+
+pub(crate) fn builtin_frame_parent(args: Vec<Value>) -> EvalResult {
+    expect_range_args("frame-parent", &args, 0, 1)?;
+    if let Some(frame) = args.first() {
+        expect_frame_live_or_nil(frame)?;
+    }
+    Ok(Value::Nil)
+}
+
+pub(crate) fn builtin_frame_pointer_visible_p(args: Vec<Value>) -> EvalResult {
+    expect_range_args("frame-pointer-visible-p", &args, 0, 1)?;
+    if let Some(frame) = args.first() {
+        expect_frame_live_or_nil(frame)?;
+    }
+    Ok(Value::True)
+}
+
+pub(crate) fn builtin_frame_right_divider_width(args: Vec<Value>) -> EvalResult {
+    expect_range_args("frame-right-divider-width", &args, 0, 1)?;
+    if let Some(frame) = args.first() {
+        expect_frame_live_or_nil(frame)?;
+    }
+    Ok(Value::Int(0))
+}
+
+pub(crate) fn builtin_frame_scale_factor(args: Vec<Value>) -> EvalResult {
+    expect_range_args("frame-scale-factor", &args, 0, 1)?;
+    if let Some(frame) = args.first() {
+        expect_frame_live_or_nil(frame)?;
+    }
+    Ok(Value::Float(1.0))
+}
+
+pub(crate) fn builtin_frame_scroll_bar_height(args: Vec<Value>) -> EvalResult {
+    expect_range_args("frame-scroll-bar-height", &args, 0, 1)?;
+    if let Some(frame) = args.first() {
+        expect_frame_live_or_nil(frame)?;
+    }
+    Ok(Value::Int(0))
+}
+
+pub(crate) fn builtin_frame_scroll_bar_width(args: Vec<Value>) -> EvalResult {
+    expect_range_args("frame-scroll-bar-width", &args, 0, 1)?;
+    if let Some(frame) = args.first() {
+        expect_frame_live_or_nil(frame)?;
+    }
+    Ok(Value::Int(0))
+}
+
+pub(crate) fn builtin_frame_window_state_change(args: Vec<Value>) -> EvalResult {
+    expect_range_args("frame-window-state-change", &args, 0, 1)?;
+    if let Some(frame) = args.first() {
+        expect_frame_live_or_nil(frame)?;
+    }
+    Ok(Value::Nil)
+}
+
 fn expect_window_live_or_nil(value: &Value) -> Result<(), Flow> {
     if value.is_nil() || matches!(value, Value::Window(_)) {
         Ok(())
@@ -16205,36 +16358,24 @@ pub(crate) fn dispatch_builtin(
         "fontset-font" => super::compat_internal::builtin_fontset_font(args),
         "fontset-info" => super::compat_internal::builtin_fontset_info(args),
         "fontset-list" => super::compat_internal::builtin_fontset_list(args),
-        "frame--set-was-invisible" => super::compat_internal::builtin_frame_set_was_invisible(args),
-        "frame-after-make-frame" => super::compat_internal::builtin_frame_after_make_frame(args),
-        "frame-ancestor-p" => super::compat_internal::builtin_frame_ancestor_p(args),
-        "frame-bottom-divider-width" => {
-            super::compat_internal::builtin_frame_bottom_divider_width(args)
-        }
-        "frame-child-frame-border-width" => {
-            super::compat_internal::builtin_frame_child_frame_border_width(args)
-        }
-        "frame-focus" => super::compat_internal::builtin_frame_focus(args),
-        "frame-font-cache" => super::compat_internal::builtin_frame_font_cache(args),
-        "frame--face-hash-table" => super::compat_internal::builtin_frame_face_hash_table(args),
-        "frame-fringe-width" => super::compat_internal::builtin_frame_fringe_width(args),
-        "frame-internal-border-width" => {
-            super::compat_internal::builtin_frame_internal_border_width(args)
-        }
-        "frame-or-buffer-changed-p" => {
-            super::compat_internal::builtin_frame_or_buffer_changed_p(args)
-        }
-        "frame-parent" => super::compat_internal::builtin_frame_parent(args),
-        "frame-pointer-visible-p" => super::compat_internal::builtin_frame_pointer_visible_p(args),
-        "frame-right-divider-width" => {
-            super::compat_internal::builtin_frame_right_divider_width(args)
-        }
-        "frame-scale-factor" => super::compat_internal::builtin_frame_scale_factor(args),
-        "frame-scroll-bar-height" => super::compat_internal::builtin_frame_scroll_bar_height(args),
-        "frame-scroll-bar-width" => super::compat_internal::builtin_frame_scroll_bar_width(args),
-        "frame-window-state-change" => {
-            super::compat_internal::builtin_frame_window_state_change(args)
-        }
+        "frame--set-was-invisible" => builtin_frame_set_was_invisible(args),
+        "frame-after-make-frame" => builtin_frame_after_make_frame(args),
+        "frame-ancestor-p" => builtin_frame_ancestor_p(args),
+        "frame-bottom-divider-width" => builtin_frame_bottom_divider_width(args),
+        "frame-child-frame-border-width" => builtin_frame_child_frame_border_width(args),
+        "frame-focus" => builtin_frame_focus(args),
+        "frame-font-cache" => builtin_frame_font_cache(args),
+        "frame--face-hash-table" => builtin_frame_face_hash_table(args),
+        "frame-fringe-width" => builtin_frame_fringe_width(args),
+        "frame-internal-border-width" => builtin_frame_internal_border_width(args),
+        "frame-or-buffer-changed-p" => builtin_frame_or_buffer_changed_p(args),
+        "frame-parent" => builtin_frame_parent(args),
+        "frame-pointer-visible-p" => builtin_frame_pointer_visible_p(args),
+        "frame-right-divider-width" => builtin_frame_right_divider_width(args),
+        "frame-scale-factor" => builtin_frame_scale_factor(args),
+        "frame-scroll-bar-height" => builtin_frame_scroll_bar_height(args),
+        "frame-scroll-bar-width" => builtin_frame_scroll_bar_width(args),
+        "frame-window-state-change" => builtin_frame_window_state_change(args),
         "fringe-bitmaps-at-pos" => super::compat_internal::builtin_fringe_bitmaps_at_pos(args),
         "gap-position" => super::compat_internal::builtin_gap_position(args),
         "gap-size" => super::compat_internal::builtin_gap_size(args),
@@ -17058,36 +17199,24 @@ pub(crate) fn dispatch_builtin_pure(name: &str, args: Vec<Value>) -> Option<Eval
         "fontset-font" => super::compat_internal::builtin_fontset_font(args),
         "fontset-info" => super::compat_internal::builtin_fontset_info(args),
         "fontset-list" => super::compat_internal::builtin_fontset_list(args),
-        "frame--set-was-invisible" => super::compat_internal::builtin_frame_set_was_invisible(args),
-        "frame-after-make-frame" => super::compat_internal::builtin_frame_after_make_frame(args),
-        "frame-ancestor-p" => super::compat_internal::builtin_frame_ancestor_p(args),
-        "frame-bottom-divider-width" => {
-            super::compat_internal::builtin_frame_bottom_divider_width(args)
-        }
-        "frame-child-frame-border-width" => {
-            super::compat_internal::builtin_frame_child_frame_border_width(args)
-        }
-        "frame-focus" => super::compat_internal::builtin_frame_focus(args),
-        "frame-font-cache" => super::compat_internal::builtin_frame_font_cache(args),
-        "frame--face-hash-table" => super::compat_internal::builtin_frame_face_hash_table(args),
-        "frame-fringe-width" => super::compat_internal::builtin_frame_fringe_width(args),
-        "frame-internal-border-width" => {
-            super::compat_internal::builtin_frame_internal_border_width(args)
-        }
-        "frame-or-buffer-changed-p" => {
-            super::compat_internal::builtin_frame_or_buffer_changed_p(args)
-        }
-        "frame-parent" => super::compat_internal::builtin_frame_parent(args),
-        "frame-pointer-visible-p" => super::compat_internal::builtin_frame_pointer_visible_p(args),
-        "frame-right-divider-width" => {
-            super::compat_internal::builtin_frame_right_divider_width(args)
-        }
-        "frame-scale-factor" => super::compat_internal::builtin_frame_scale_factor(args),
-        "frame-scroll-bar-height" => super::compat_internal::builtin_frame_scroll_bar_height(args),
-        "frame-scroll-bar-width" => super::compat_internal::builtin_frame_scroll_bar_width(args),
-        "frame-window-state-change" => {
-            super::compat_internal::builtin_frame_window_state_change(args)
-        }
+        "frame--set-was-invisible" => builtin_frame_set_was_invisible(args),
+        "frame-after-make-frame" => builtin_frame_after_make_frame(args),
+        "frame-ancestor-p" => builtin_frame_ancestor_p(args),
+        "frame-bottom-divider-width" => builtin_frame_bottom_divider_width(args),
+        "frame-child-frame-border-width" => builtin_frame_child_frame_border_width(args),
+        "frame-focus" => builtin_frame_focus(args),
+        "frame-font-cache" => builtin_frame_font_cache(args),
+        "frame--face-hash-table" => builtin_frame_face_hash_table(args),
+        "frame-fringe-width" => builtin_frame_fringe_width(args),
+        "frame-internal-border-width" => builtin_frame_internal_border_width(args),
+        "frame-or-buffer-changed-p" => builtin_frame_or_buffer_changed_p(args),
+        "frame-parent" => builtin_frame_parent(args),
+        "frame-pointer-visible-p" => builtin_frame_pointer_visible_p(args),
+        "frame-right-divider-width" => builtin_frame_right_divider_width(args),
+        "frame-scale-factor" => builtin_frame_scale_factor(args),
+        "frame-scroll-bar-height" => builtin_frame_scroll_bar_height(args),
+        "frame-scroll-bar-width" => builtin_frame_scroll_bar_width(args),
+        "frame-window-state-change" => builtin_frame_window_state_change(args),
         "fringe-bitmaps-at-pos" => super::compat_internal::builtin_fringe_bitmaps_at_pos(args),
         "gap-position" => super::compat_internal::builtin_gap_position(args),
         "gap-size" => super::compat_internal::builtin_gap_size(args),
@@ -22605,6 +22734,56 @@ mod tests {
             .expect("init-image-library should resolve")
             .expect("init-image-library should evaluate");
         assert_eq!(init, Value::Nil);
+    }
+
+    #[test]
+    fn dispatch_builtin_pure_handles_frame_placeholder_accessors() {
+        let face_table = dispatch_builtin_pure("frame--face-hash-table", vec![])
+            .expect("frame--face-hash-table should resolve")
+            .expect("frame--face-hash-table should evaluate");
+        let Value::HashTable(table) = face_table else {
+            panic!("expected hash table");
+        };
+        assert!(matches!(
+            table.lock().expect("poisoned").test,
+            HashTableTest::Eq
+        ));
+
+        let was_invisible = dispatch_builtin_pure(
+            "frame--set-was-invisible",
+            vec![Value::Nil, Value::True],
+        )
+        .expect("frame--set-was-invisible should resolve")
+        .expect("frame--set-was-invisible should evaluate");
+        assert_eq!(was_invisible, Value::True);
+
+        let changed = dispatch_builtin_pure("frame-or-buffer-changed-p", vec![])
+            .expect("frame-or-buffer-changed-p should resolve")
+            .expect("frame-or-buffer-changed-p should evaluate");
+        assert_eq!(changed, Value::True);
+
+        let changed_nil = dispatch_builtin_pure("frame-or-buffer-changed-p", vec![Value::Nil])
+            .expect("frame-or-buffer-changed-p should resolve")
+            .expect("frame-or-buffer-changed-p should evaluate");
+        assert_eq!(changed_nil, Value::Nil);
+
+        let scale = dispatch_builtin_pure("frame-scale-factor", vec![])
+            .expect("frame-scale-factor should resolve")
+            .expect("frame-scale-factor should evaluate");
+        assert_eq!(scale, Value::Float(1.0));
+
+        let pointer = dispatch_builtin_pure("frame-pointer-visible-p", vec![])
+            .expect("frame-pointer-visible-p should resolve")
+            .expect("frame-pointer-visible-p should evaluate");
+        assert_eq!(pointer, Value::True);
+
+        let err = dispatch_builtin_pure("frame-or-buffer-changed-p", vec![Value::Int(1)])
+            .expect("frame-or-buffer-changed-p should resolve")
+            .unwrap_err();
+        match err {
+            Flow::Signal(sig) => assert_eq!(sig.symbol, "wrong-type-argument"),
+            other => panic!("expected signal, got {other:?}"),
+        }
     }
 
     #[test]
