@@ -15071,7 +15071,8 @@ pub(crate) fn dispatch_builtin(
 /// Used by the bytecode VM.
 pub(crate) fn dispatch_builtin_pure(name: &str, args: Vec<Value>) -> Option<EvalResult> {
     match name {
-        "assoc"
+        "functionp"
+        | "assoc"
         | "alist-get"
         | "plist-member"
         | "window-list-1"
@@ -19412,6 +19413,7 @@ mod tests {
 
     #[test]
     fn dispatch_builtin_pure_defers_evaluator_window_accessors_and_mutators() {
+        assert!(dispatch_builtin_pure("functionp", vec![]).is_none());
         assert!(dispatch_builtin_pure("assoc", vec![]).is_none());
         assert!(dispatch_builtin_pure("alist-get", vec![]).is_none());
         assert!(dispatch_builtin_pure("plist-member", vec![]).is_none());
