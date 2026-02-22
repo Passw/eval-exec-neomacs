@@ -19823,6 +19823,21 @@ Last updated: 2026-02-21
       - two-arg over-arity payload remains exact:
         - `(wrong-number-of-arguments x-backspace-delete-keys-p 2)`
 
+- Added dedicated `x-get-atom-name` designator/structure lock-ins:
+  - vm-compat corpus changes:
+    - added:
+      - `test/neovm/vm-compat/cases/x-get-atom-name-designator-structure-semantics.forms`
+      - `test/neovm/vm-compat/cases/x-get-atom-name-designator-structure-semantics.expected.tsv`
+    - wired case into:
+      - `test/neovm/vm-compat/cases/default.list`
+    - lock-ins assert:
+      - default/`nil`/selected-frame calls preserve `(error "Window system frame should be used")`
+      - non-frame designators preserve `wrong-type-argument` + `frame-live-p` payload structure
+      - terminal/live-window/dead-window payload shapes remain stable via predicate checks
+      - arity payloads remain exact:
+        - `(wrong-number-of-arguments x-get-atom-name 0)`
+        - `(wrong-number-of-arguments x-get-atom-name 3)`
+
 - Continue compatibility-first maintenance with small commit slices:
   - keep builtin surface and registry in lock-step
   - run oracle/parity checks after each behavior-affecting change
