@@ -970,6 +970,7 @@ const DISPATCH_BUILTIN_NAMES: &[&str] = &[
     "object-intervals",
     "old-selected-frame",
     "old-selected-window",
+    "one-window-p",
     "open-dribble-file",
     "open-font",
     "open-line",

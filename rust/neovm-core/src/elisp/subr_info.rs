@@ -1351,6 +1351,7 @@ fn subr_arity_value(name: &str) -> Value {
         "delete-frame" | "delete-other-windows" | "delete-other-windows-internal" => {
             arity_cons(0, Some(2))
         }
+        "one-window-p" => arity_cons(0, Some(2)),
         "next-window" | "previous-window" | "pos-visible-in-window-p" => arity_cons(0, Some(3)),
         "other-window-for-scrolling" => arity_cons(0, Some(0)),
         "coordinates-in-window-p" => arity_cons(2, Some(2)),
@@ -3736,6 +3737,7 @@ mod tests {
         assert_subr_arity("delete-frame", 0, Some(2));
         assert_subr_arity("delete-other-windows", 0, Some(2));
         assert_subr_arity("delete-other-windows-internal", 0, Some(2));
+        assert_subr_arity("one-window-p", 0, Some(2));
         assert_subr_arity("next-window", 0, Some(3));
         assert_subr_arity("previous-window", 0, Some(3));
         assert_subr_arity("pop-to-buffer", 1, Some(3));

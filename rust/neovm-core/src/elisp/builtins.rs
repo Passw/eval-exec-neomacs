@@ -15844,6 +15844,7 @@ pub(crate) fn dispatch_builtin(
         }
         "select-window" => return Some(super::window_cmds::builtin_select_window(eval, args)),
         "other-window" => return Some(super::window_cmds::builtin_other_window(eval, args)),
+        "one-window-p" => return Some(super::window_cmds::builtin_one_window_p(eval, args)),
         "scroll-up-command" => {
             return Some(super::window_cmds::builtin_scroll_up_command(eval, args))
         }
@@ -17892,6 +17893,7 @@ pub(crate) fn dispatch_builtin_pure(name: &str, args: Vec<Value>) -> Option<Eval
         | "plist-member"
         | "window-list-1"
         | "window-bump-use-time"
+        | "one-window-p"
         | "old-selected-window"
         | "frame-old-selected-window"
         | "set-frame-selected-window"
