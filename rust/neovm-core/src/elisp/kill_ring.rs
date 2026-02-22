@@ -1340,6 +1340,34 @@ pub(crate) fn builtin_yank_pop(eval: &mut super::eval::Evaluator, args: Vec<Valu
 // Case commands
 // ===========================================================================
 
+fn downcase_case_string_emacs_compat(text: &str) -> String {
+    let mut out = String::with_capacity(text.len());
+    for ch in text.chars() {
+        if ch == '\u{212A}' {
+            out.push(ch);
+            continue;
+        }
+        for low in ch.to_lowercase() {
+            out.push(low);
+        }
+    }
+    out
+}
+
+fn upcase_case_string_emacs_compat(text: &str) -> String {
+    let mut out = String::with_capacity(text.len());
+    for ch in text.chars() {
+        if ch == '\u{0131}' {
+            out.push(ch);
+            continue;
+        }
+        for up in ch.to_uppercase() {
+            out.push(up);
+        }
+    }
+    out
+}
+
 /// `(downcase-region BEG END &optional REGION-NONCONTIGUOUS-P)` — convert the
 /// region to lower case.
 pub(crate) fn builtin_downcase_region(
@@ -1364,7 +1392,7 @@ pub(crate) fn builtin_downcase_region(
 
     let (beg, end) = resolve_case_region(eval, beg_val, end_val, args.get(2))?;
     let text = buf.buffer_substring(beg, end);
-    let lower = text.to_lowercase();
+    let lower = downcase_case_string_emacs_compat(&text);
 
     if text == lower {
         return Ok(Value::Nil);
@@ -1407,7 +1435,7 @@ pub(crate) fn builtin_upcase_region(
 
     let (beg, end) = resolve_case_region(eval, beg_val, end_val, args.get(2))?;
     let text = buf.buffer_substring(beg, end);
-    let upper = text.to_uppercase();
+    let upper = upcase_case_string_emacs_compat(&text);
 
     if text == upper {
         return Ok(Value::Nil);
@@ -1597,7 +1625,7 @@ pub(crate) fn builtin_downcase_word(
         (target, pt)
     };
     let text = buf.buffer_substring(beg, end);
-    let lower = text.to_lowercase();
+    let lower = downcase_case_string_emacs_compat(&text);
     if text == lower {
         return Ok(Value::Nil);
     }
@@ -1643,7 +1671,7 @@ pub(crate) fn builtin_upcase_word(
         (target, pt)
     };
     let text = buf.buffer_substring(beg, end);
-    let upper = text.to_uppercase();
+    let upper = upcase_case_string_emacs_compat(&text);
     if text == upper {
         return Ok(Value::Nil);
     }
@@ -3511,6 +3539,16 @@ mod tests {
         assert_eq!(results[2], r#"OK "hello world""#);
     }
 
+    #[test]
+    fn downcase_region_unicode_kelvin_preserved() {
+        let results = eval_all(
+            r#"(insert "K")
+               (downcase-region 1 2)
+               (buffer-string)"#,
+        );
+        assert_eq!(results[2], r#"OK "K""#);
+    }
+
     // -- upcase-region tests --
 
     #[test]
@@ -3521,6 +3559,16 @@ mod tests {
                (buffer-string)"#,
         );
         assert_eq!(results[2], r#"OK "HELLO WORLD""#);
+    }
+
+    #[test]
+    fn upcase_region_unicode_dotless_i_preserved() {
+        let results = eval_all(
+            r#"(insert "ı")
+               (upcase-region 1 2)
+               (buffer-string)"#,
+        );
+        assert_eq!(results[2], r#"OK "ı""#);
     }
 
     // -- capitalize-region tests --
@@ -3580,6 +3628,17 @@ mod tests {
         assert_eq!(results[3], r#"OK "hello WORLD""#);
     }
 
+    #[test]
+    fn downcase_word_unicode_kelvin_preserved() {
+        let results = eval_all(
+            r#"(insert "K")
+               (goto-char 0)
+               (downcase-word 1)
+               (buffer-string)"#,
+        );
+        assert_eq!(results[3], r#"OK "K""#);
+    }
+
     // -- upcase-word tests --
 
     #[test]
@@ -3591,6 +3650,17 @@ mod tests {
                (buffer-string)"#,
         );
         assert_eq!(results[3], r#"OK "HELLO world""#);
+    }
+
+    #[test]
+    fn upcase_word_unicode_dotless_i_preserved() {
+        let results = eval_all(
+            r#"(insert "ı")
+               (goto-char 0)
+               (upcase-word 1)
+               (buffer-string)"#,
+        );
+        assert_eq!(results[3], r#"OK "ı""#);
     }
 
     // -- capitalize-word tests --

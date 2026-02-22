@@ -1,0 +1,35 @@
+;; Lock-in: Unicode edge behavior for region/word case commands.
+(list
+ (list 'downcase-region-kelvin
+       (with-temp-buffer
+         (insert "K")
+         (downcase-region (point-min) (point-max))
+         (buffer-string)))
+ (list 'upcase-region-dotless-i
+       (with-temp-buffer
+         (insert "ı")
+         (upcase-region (point-min) (point-max))
+         (buffer-string)))
+ (list 'upcase-region-sharp-s
+       (with-temp-buffer
+         (insert "ß")
+         (upcase-region (point-min) (point-max))
+         (buffer-string)))
+ (list 'downcase-word-kelvin
+       (with-temp-buffer
+         (insert "K")
+         (goto-char (point-min))
+         (downcase-word 1)
+         (buffer-string)))
+ (list 'upcase-word-dotless-i
+       (with-temp-buffer
+         (insert "ı")
+         (goto-char (point-min))
+         (upcase-word 1)
+         (buffer-string)))
+ (list 'upcase-word-sharp-s
+       (with-temp-buffer
+         (insert "ß")
+         (goto-char (point-min))
+         (upcase-word 1)
+         (buffer-string))))
