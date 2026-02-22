@@ -19911,6 +19911,32 @@ Last updated: 2026-02-21
         - `(wrong-number-of-arguments x-device-class 0)`
         - `(wrong-number-of-arguments x-device-class 2)`
 
+- Aligned `x-clipboard-yank` kill-ring semantics and added lock-ins:
+  - runtime changes:
+    - `rust/neovm-core/src/elisp/display.rs`
+      - added evaluator-aware `builtin_x_clipboard_yank_eval`:
+        - empty `kill-ring` -> `(error "Kill ring is empty")`
+        - non-empty list with string/buffer head -> `nil`
+        - non-list and malformed-head paths preserve oracle `wrong-type-argument` predicates
+      - added helper lookup for dynamic/global variable values:
+        - `dynamic_or_global_symbol_value`
+      - added unit coverage:
+        - `eval_x_clipboard_yank_respects_kill_ring_binding`
+    - wired evaluator dispatch in:
+      - `rust/neovm-core/src/elisp/builtins.rs`
+  - vm-compat corpus changes:
+    - added:
+      - `test/neovm/vm-compat/cases/x-clipboard-yank-kill-ring-semantics.forms`
+      - `test/neovm/vm-compat/cases/x-clipboard-yank-kill-ring-semantics.expected.tsv`
+    - wired case into:
+      - `test/neovm/vm-compat/cases/default.list`
+    - lock-ins cover:
+      - empty kill-ring error payload
+      - non-empty string-head kill-ring `nil` return
+      - malformed kill-ring payload predicate contracts (`buffer-or-string-p`, `sequencep`, `listp`)
+      - over-arity payload:
+        - `(wrong-number-of-arguments x-clipboard-yank 1)`
+
 - Continue compatibility-first maintenance with small commit slices:
   - keep builtin surface and registry in lock-step
   - run oracle/parity checks after each behavior-affecting change

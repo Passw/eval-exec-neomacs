@@ -69,6 +69,15 @@ fn expect_symbol_key(value: &Value) -> Result<Value, Flow> {
     }
 }
 
+fn dynamic_or_global_symbol_value(eval: &super::eval::Evaluator, name: &str) -> Option<Value> {
+    for frame in eval.dynamic.iter().rev() {
+        if let Some(v) = frame.get(name) {
+            return Some(v.clone());
+        }
+    }
+    eval.obarray.symbol_value(name).cloned()
+}
+
 fn terminal_parameter_default_value(key: &Value) -> Option<Value> {
     match key.as_symbol_name() {
         Some("normal-erase-is-backspace") => Some(Value::Int(0)),
@@ -1670,6 +1679,44 @@ pub(crate) fn builtin_x_apply_session_resources(args: Vec<Value>) -> EvalResult 
 pub(crate) fn builtin_x_clipboard_yank(args: Vec<Value>) -> EvalResult {
     expect_args("x-clipboard-yank", &args, 0)?;
     Err(signal("error", vec![Value::string("Kill ring is empty")]))
+}
+
+/// Evaluator-aware variant of `x-clipboard-yank`.
+///
+/// In batch/no-X context this mirrors Oracle behavior:
+/// - empty kill-ring -> `(error "Kill ring is empty")`
+/// - non-empty list with string/buffer head -> `nil`
+/// - non-list kill-ring payload contracts -> `wrong-type-argument` shape
+pub(crate) fn builtin_x_clipboard_yank_eval(
+    eval: &mut super::eval::Evaluator,
+    args: Vec<Value>,
+) -> EvalResult {
+    expect_args("x-clipboard-yank", &args, 0)?;
+    let kill_ring = dynamic_or_global_symbol_value(eval, "kill-ring").unwrap_or(Value::Nil);
+    match kill_ring {
+        Value::Nil => Err(signal("error", vec![Value::string("Kill ring is empty")])),
+        Value::Cons(cell) => {
+            let head = {
+                let pair = cell.lock().expect("poisoned");
+                pair.car.clone()
+            };
+            match head {
+                Value::Str(_) | Value::Buffer(_) => Ok(Value::Nil),
+                other => Err(signal(
+                    "wrong-type-argument",
+                    vec![Value::symbol("buffer-or-string-p"), other],
+                )),
+            }
+        }
+        Value::Str(_) | Value::Vector(_) => Err(signal(
+            "wrong-type-argument",
+            vec![Value::symbol("listp"), kill_ring],
+        )),
+        other => Err(signal(
+            "wrong-type-argument",
+            vec![Value::symbol("sequencep"), other],
+        )),
+    }
 }
 
 /// (x-list-fonts PATTERN &optional FACE FRAME MAXIMUM WIDTH) -> error in batch/no-X context.
@@ -5105,6 +5152,59 @@ mod tests {
         assert!(width.is_err());
         assert!(height.is_err());
         assert!(color.is_nil());
+    }
+
+    #[test]
+    fn eval_x_clipboard_yank_respects_kill_ring_binding() {
+        let mut eval = crate::elisp::Evaluator::new();
+
+        match builtin_x_clipboard_yank_eval(&mut eval, vec![]) {
+            Err(Flow::Signal(sig)) => {
+                assert_eq!(sig.symbol, "error");
+                assert_eq!(sig.data, vec![Value::string("Kill ring is empty")]);
+            }
+            other => panic!("expected error signal, got {other:?}"),
+        }
+
+        eval.assign("kill-ring", Value::list(vec![Value::string("abc")]));
+        assert!(builtin_x_clipboard_yank_eval(&mut eval, vec![])
+            .unwrap()
+            .is_nil());
+
+        eval.assign("kill-ring", Value::list(vec![Value::Int(1)]));
+        match builtin_x_clipboard_yank_eval(&mut eval, vec![]) {
+            Err(Flow::Signal(sig)) => {
+                assert_eq!(sig.symbol, "wrong-type-argument");
+                assert_eq!(sig.data, vec![Value::symbol("buffer-or-string-p"), Value::Int(1)]);
+            }
+            other => panic!("expected wrong-type-argument signal, got {other:?}"),
+        }
+
+        eval.assign("kill-ring", Value::Int(1));
+        match builtin_x_clipboard_yank_eval(&mut eval, vec![]) {
+            Err(Flow::Signal(sig)) => {
+                assert_eq!(sig.symbol, "wrong-type-argument");
+                assert_eq!(sig.data, vec![Value::symbol("sequencep"), Value::Int(1)]);
+            }
+            other => panic!("expected wrong-type-argument signal, got {other:?}"),
+        }
+
+        eval.assign("kill-ring", Value::string("abc"));
+        match builtin_x_clipboard_yank_eval(&mut eval, vec![]) {
+            Err(Flow::Signal(sig)) => {
+                assert_eq!(sig.symbol, "wrong-type-argument");
+                assert_eq!(
+                    sig.data,
+                    vec![Value::symbol("listp"), Value::string("abc")]
+                );
+            }
+            other => panic!("expected wrong-type-argument signal, got {other:?}"),
+        }
+
+        match builtin_x_clipboard_yank_eval(&mut eval, vec![Value::Nil]) {
+            Err(Flow::Signal(sig)) => assert_eq!(sig.symbol, "wrong-number-of-arguments"),
+            other => panic!("expected wrong-number-of-arguments signal, got {other:?}"),
+        }
     }
 
     #[test]

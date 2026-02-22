@@ -496,6 +496,7 @@ cases/x-coordinate-frame-query-semantics
 cases/x-popup-restack-semantics
 cases/x-clipboard-input-context-semantics
 cases/x-win-suspend-error-arity-payload-semantics
+cases/x-clipboard-yank-kill-ring-semantics
 cases/x-device-class-designator-structure-semantics
 cases/x-color-selection-gui-alias-semantics
 cases/x-selection-property-tip-internal-semantics
