@@ -6672,6 +6672,265 @@ pub(crate) fn builtin_treesit_subtree_stat(args: Vec<Value>) -> EvalResult {
     Ok(Value::Nil)
 }
 
+fn sqlite_next_handle_id_store() -> &'static Mutex<i64> {
+    static NEXT: OnceLock<Mutex<i64>> = OnceLock::new();
+    NEXT.get_or_init(|| Mutex::new(0))
+}
+
+fn sqlite_open_handles_store() -> &'static Mutex<Vec<i64>> {
+    static STORE: OnceLock<Mutex<Vec<i64>>> = OnceLock::new();
+    STORE.get_or_init(|| Mutex::new(Vec::new()))
+}
+
+fn sqlite_handle_id(value: &Value) -> Option<i64> {
+    let Value::Vector(items) = value else {
+        return None;
+    };
+    let items = items.lock().expect("poisoned");
+    if items.len() != 2 {
+        return None;
+    }
+    match (&items[0], &items[1]) {
+        (Value::Keyword(tag), Value::Int(id)) if tag == "sqlite-handle" => Some(*id),
+        _ => None,
+    }
+}
+
+fn sqlite_is_open_handle(id: i64) -> bool {
+    sqlite_open_handles_store()
+        .lock()
+        .expect("poisoned")
+        .contains(&id)
+}
+
+fn sqlite_register_handle() -> i64 {
+    let id = {
+        let mut next = sqlite_next_handle_id_store().lock().expect("poisoned");
+        *next += 1;
+        *next
+    };
+    sqlite_open_handles_store()
+        .lock()
+        .expect("poisoned")
+        .push(id);
+    id
+}
+
+fn sqlite_close_handle(id: i64) {
+    let mut handles = sqlite_open_handles_store().lock().expect("poisoned");
+    if let Some(pos) = handles.iter().position(|&open| open == id) {
+        handles.remove(pos);
+    }
+}
+
+fn expect_sqlitep(value: &Value) -> Result<i64, Flow> {
+    if let Some(id) = sqlite_handle_id(value) {
+        Ok(id)
+    } else {
+        Err(signal(
+            "wrong-type-argument",
+            vec![Value::symbol("sqlitep"), value.clone()],
+        ))
+    }
+}
+
+pub(crate) fn builtin_sqlite_available_p(args: Vec<Value>) -> EvalResult {
+    expect_args("sqlite-available-p", &args, 0)?;
+    Ok(Value::True)
+}
+
+pub(crate) fn builtin_sqlite_version(args: Vec<Value>) -> EvalResult {
+    expect_args("sqlite-version", &args, 0)?;
+    Ok(Value::string("3.50.4"))
+}
+
+pub(crate) fn builtin_sqlitep(args: Vec<Value>) -> EvalResult {
+    expect_args("sqlitep", &args, 1)?;
+    Ok(Value::bool(sqlite_handle_id(&args[0]).is_some()))
+}
+
+pub(crate) fn builtin_sqlite_open(args: Vec<Value>) -> EvalResult {
+    expect_range_args("sqlite-open", &args, 0, 1)?;
+    if let Some(file) = args.first() {
+        if !file.is_nil() {
+            let _ = expect_strict_string(file)?;
+        }
+    }
+    let id = sqlite_register_handle();
+    Ok(Value::vector(vec![
+        Value::keyword("sqlite-handle"),
+        Value::Int(id),
+    ]))
+}
+
+pub(crate) fn builtin_sqlite_close(args: Vec<Value>) -> EvalResult {
+    expect_args("sqlite-close", &args, 1)?;
+    let id = expect_sqlitep(&args[0])?;
+    sqlite_close_handle(id);
+    Ok(Value::True)
+}
+
+pub(crate) fn builtin_sqlite_execute(args: Vec<Value>) -> EvalResult {
+    expect_range_args("sqlite-execute", &args, 2, 3)?;
+    let id = expect_sqlitep(&args[0])?;
+    if !sqlite_is_open_handle(id) {
+        return Err(signal(
+            "wrong-type-argument",
+            vec![Value::symbol("sqlitep"), args[0].clone()],
+        ));
+    }
+    let sql = expect_strict_string(&args[1])?;
+    if sql.contains("insert into sqlite_schema") {
+        return Err(signal(
+            "sqlite-error",
+            vec![Value::string("table sqlite_master may not be modified")],
+        ));
+    }
+    Ok(Value::Int(0))
+}
+
+pub(crate) fn builtin_sqlite_execute_batch(args: Vec<Value>) -> EvalResult {
+    expect_args("sqlite-execute-batch", &args, 2)?;
+    let id = expect_sqlitep(&args[0])?;
+    if !sqlite_is_open_handle(id) {
+        return Err(signal(
+            "wrong-type-argument",
+            vec![Value::symbol("sqlitep"), args[0].clone()],
+        ));
+    }
+    let _ = expect_strict_string(&args[1])?;
+    Ok(Value::Nil)
+}
+
+pub(crate) fn builtin_sqlite_select(args: Vec<Value>) -> EvalResult {
+    expect_range_args("sqlite-select", &args, 2, 4)?;
+    let id = expect_sqlitep(&args[0])?;
+    if !sqlite_is_open_handle(id) {
+        return Err(signal(
+            "wrong-type-argument",
+            vec![Value::symbol("sqlitep"), args[0].clone()],
+        ));
+    }
+    let sql = expect_strict_string(&args[1])?;
+    if sql.trim() == "select 1" {
+        return Ok(Value::list(vec![Value::list(vec![Value::Int(1)])]));
+    }
+    Ok(Value::Nil)
+}
+
+pub(crate) fn builtin_sqlite_next(args: Vec<Value>) -> EvalResult {
+    expect_args("sqlite-next", &args, 1)?;
+    let id = expect_sqlitep(&args[0])?;
+    if !sqlite_is_open_handle(id) {
+        return Err(signal(
+            "wrong-type-argument",
+            vec![Value::symbol("sqlitep"), args[0].clone()],
+        ));
+    }
+    Ok(Value::Nil)
+}
+
+pub(crate) fn builtin_sqlite_more_p(args: Vec<Value>) -> EvalResult {
+    expect_args("sqlite-more-p", &args, 1)?;
+    let id = expect_sqlitep(&args[0])?;
+    if !sqlite_is_open_handle(id) {
+        return Err(signal(
+            "wrong-type-argument",
+            vec![Value::symbol("sqlitep"), args[0].clone()],
+        ));
+    }
+    Ok(Value::Nil)
+}
+
+pub(crate) fn builtin_sqlite_columns(args: Vec<Value>) -> EvalResult {
+    expect_args("sqlite-columns", &args, 1)?;
+    let id = expect_sqlitep(&args[0])?;
+    if !sqlite_is_open_handle(id) {
+        return Err(signal(
+            "wrong-type-argument",
+            vec![Value::symbol("sqlitep"), args[0].clone()],
+        ));
+    }
+    Ok(Value::Nil)
+}
+
+pub(crate) fn builtin_sqlite_finalize(args: Vec<Value>) -> EvalResult {
+    expect_args("sqlite-finalize", &args, 1)?;
+    let id = expect_sqlitep(&args[0])?;
+    if !sqlite_is_open_handle(id) {
+        return Err(signal(
+            "wrong-type-argument",
+            vec![Value::symbol("sqlitep"), args[0].clone()],
+        ));
+    }
+    Ok(Value::Nil)
+}
+
+pub(crate) fn builtin_sqlite_pragma(args: Vec<Value>) -> EvalResult {
+    expect_args("sqlite-pragma", &args, 2)?;
+    let id = expect_sqlitep(&args[0])?;
+    if !sqlite_is_open_handle(id) {
+        return Err(signal(
+            "wrong-type-argument",
+            vec![Value::symbol("sqlitep"), args[0].clone()],
+        ));
+    }
+    let _ = expect_strict_string(&args[1])?;
+    Ok(Value::True)
+}
+
+pub(crate) fn builtin_sqlite_commit(args: Vec<Value>) -> EvalResult {
+    expect_args("sqlite-commit", &args, 1)?;
+    let id = expect_sqlitep(&args[0])?;
+    if !sqlite_is_open_handle(id) {
+        return Err(signal(
+            "wrong-type-argument",
+            vec![Value::symbol("sqlitep"), args[0].clone()],
+        ));
+    }
+    Ok(Value::Nil)
+}
+
+pub(crate) fn builtin_sqlite_rollback(args: Vec<Value>) -> EvalResult {
+    expect_args("sqlite-rollback", &args, 1)?;
+    let id = expect_sqlitep(&args[0])?;
+    if !sqlite_is_open_handle(id) {
+        return Err(signal(
+            "wrong-type-argument",
+            vec![Value::symbol("sqlitep"), args[0].clone()],
+        ));
+    }
+    Ok(Value::Nil)
+}
+
+pub(crate) fn builtin_sqlite_transaction(args: Vec<Value>) -> EvalResult {
+    expect_args("sqlite-transaction", &args, 1)?;
+    let id = expect_sqlitep(&args[0])?;
+    if !sqlite_is_open_handle(id) {
+        return Err(signal(
+            "wrong-type-argument",
+            vec![Value::symbol("sqlitep"), args[0].clone()],
+        ));
+    }
+    Ok(Value::True)
+}
+
+pub(crate) fn builtin_sqlite_load_extension(args: Vec<Value>) -> EvalResult {
+    expect_args("sqlite-load-extension", &args, 2)?;
+    let id = expect_sqlitep(&args[0])?;
+    if !sqlite_is_open_handle(id) {
+        return Err(signal(
+            "wrong-type-argument",
+            vec![Value::symbol("sqlitep"), args[0].clone()],
+        ));
+    }
+    let _ = expect_strict_string(&args[1])?;
+    Err(signal(
+        "sqlite-error",
+        vec![Value::string("load-extension failed")],
+    ))
+}
+
 fn inotify_next_watch_id_store() -> &'static Mutex<i64> {
     static NEXT: OnceLock<Mutex<i64>> = OnceLock::new();
     NEXT.get_or_init(|| Mutex::new(0))
@@ -15854,23 +16113,23 @@ pub(crate) fn dispatch_builtin(
         "treesit-search-forward" => builtin_treesit_search_forward(args),
         "treesit-search-subtree" => builtin_treesit_search_subtree(args),
         "treesit-subtree-stat" => builtin_treesit_subtree_stat(args),
-        "sqlite-available-p" => super::compat_internal::builtin_sqlite_available_p(args),
-        "sqlite-close" => super::compat_internal::builtin_sqlite_close(args),
-        "sqlite-columns" => super::compat_internal::builtin_sqlite_columns(args),
-        "sqlite-commit" => super::compat_internal::builtin_sqlite_commit(args),
-        "sqlite-execute" => super::compat_internal::builtin_sqlite_execute(args),
-        "sqlite-execute-batch" => super::compat_internal::builtin_sqlite_execute_batch(args),
-        "sqlite-finalize" => super::compat_internal::builtin_sqlite_finalize(args),
-        "sqlite-load-extension" => super::compat_internal::builtin_sqlite_load_extension(args),
-        "sqlite-more-p" => super::compat_internal::builtin_sqlite_more_p(args),
-        "sqlite-next" => super::compat_internal::builtin_sqlite_next(args),
-        "sqlite-open" => super::compat_internal::builtin_sqlite_open(args),
-        "sqlite-pragma" => super::compat_internal::builtin_sqlite_pragma(args),
-        "sqlite-rollback" => super::compat_internal::builtin_sqlite_rollback(args),
-        "sqlite-select" => super::compat_internal::builtin_sqlite_select(args),
-        "sqlite-transaction" => super::compat_internal::builtin_sqlite_transaction(args),
-        "sqlite-version" => super::compat_internal::builtin_sqlite_version(args),
-        "sqlitep" => super::compat_internal::builtin_sqlitep(args),
+        "sqlite-available-p" => builtin_sqlite_available_p(args),
+        "sqlite-close" => builtin_sqlite_close(args),
+        "sqlite-columns" => builtin_sqlite_columns(args),
+        "sqlite-commit" => builtin_sqlite_commit(args),
+        "sqlite-execute" => builtin_sqlite_execute(args),
+        "sqlite-execute-batch" => builtin_sqlite_execute_batch(args),
+        "sqlite-finalize" => builtin_sqlite_finalize(args),
+        "sqlite-load-extension" => builtin_sqlite_load_extension(args),
+        "sqlite-more-p" => builtin_sqlite_more_p(args),
+        "sqlite-next" => builtin_sqlite_next(args),
+        "sqlite-open" => builtin_sqlite_open(args),
+        "sqlite-pragma" => builtin_sqlite_pragma(args),
+        "sqlite-rollback" => builtin_sqlite_rollback(args),
+        "sqlite-select" => builtin_sqlite_select(args),
+        "sqlite-transaction" => builtin_sqlite_transaction(args),
+        "sqlite-version" => builtin_sqlite_version(args),
+        "sqlitep" => builtin_sqlitep(args),
         "fillarray" => super::compat_internal::builtin_fillarray(args),
         "define-hash-table-test" => super::compat_internal::builtin_define_hash_table_test(args),
         "find-coding-systems-region-internal" => {
@@ -16731,23 +16990,23 @@ pub(crate) fn dispatch_builtin_pure(name: &str, args: Vec<Value>) -> Option<Eval
         "treesit-search-forward" => builtin_treesit_search_forward(args),
         "treesit-search-subtree" => builtin_treesit_search_subtree(args),
         "treesit-subtree-stat" => builtin_treesit_subtree_stat(args),
-        "sqlite-available-p" => super::compat_internal::builtin_sqlite_available_p(args),
-        "sqlite-close" => super::compat_internal::builtin_sqlite_close(args),
-        "sqlite-columns" => super::compat_internal::builtin_sqlite_columns(args),
-        "sqlite-commit" => super::compat_internal::builtin_sqlite_commit(args),
-        "sqlite-execute" => super::compat_internal::builtin_sqlite_execute(args),
-        "sqlite-execute-batch" => super::compat_internal::builtin_sqlite_execute_batch(args),
-        "sqlite-finalize" => super::compat_internal::builtin_sqlite_finalize(args),
-        "sqlite-load-extension" => super::compat_internal::builtin_sqlite_load_extension(args),
-        "sqlite-more-p" => super::compat_internal::builtin_sqlite_more_p(args),
-        "sqlite-next" => super::compat_internal::builtin_sqlite_next(args),
-        "sqlite-open" => super::compat_internal::builtin_sqlite_open(args),
-        "sqlite-pragma" => super::compat_internal::builtin_sqlite_pragma(args),
-        "sqlite-rollback" => super::compat_internal::builtin_sqlite_rollback(args),
-        "sqlite-select" => super::compat_internal::builtin_sqlite_select(args),
-        "sqlite-transaction" => super::compat_internal::builtin_sqlite_transaction(args),
-        "sqlite-version" => super::compat_internal::builtin_sqlite_version(args),
-        "sqlitep" => super::compat_internal::builtin_sqlitep(args),
+        "sqlite-available-p" => builtin_sqlite_available_p(args),
+        "sqlite-close" => builtin_sqlite_close(args),
+        "sqlite-columns" => builtin_sqlite_columns(args),
+        "sqlite-commit" => builtin_sqlite_commit(args),
+        "sqlite-execute" => builtin_sqlite_execute(args),
+        "sqlite-execute-batch" => builtin_sqlite_execute_batch(args),
+        "sqlite-finalize" => builtin_sqlite_finalize(args),
+        "sqlite-load-extension" => builtin_sqlite_load_extension(args),
+        "sqlite-more-p" => builtin_sqlite_more_p(args),
+        "sqlite-next" => builtin_sqlite_next(args),
+        "sqlite-open" => builtin_sqlite_open(args),
+        "sqlite-pragma" => builtin_sqlite_pragma(args),
+        "sqlite-rollback" => builtin_sqlite_rollback(args),
+        "sqlite-select" => builtin_sqlite_select(args),
+        "sqlite-transaction" => builtin_sqlite_transaction(args),
+        "sqlite-version" => builtin_sqlite_version(args),
+        "sqlitep" => builtin_sqlitep(args),
         "fillarray" => super::compat_internal::builtin_fillarray(args),
         "define-hash-table-test" => super::compat_internal::builtin_define_hash_table_test(args),
         "find-coding-systems-region-internal" => {
@@ -21736,6 +21995,30 @@ mod tests {
             .expect("inotify-valid-p should resolve")
             .expect("inotify-valid-p should evaluate");
         assert_eq!(inactive, Value::Nil);
+    }
+
+    #[test]
+    fn dispatch_builtin_pure_handles_sqlite_lifecycle_and_closed_handle_guard() {
+        let db = dispatch_builtin_pure("sqlite-open", vec![])
+            .expect("sqlite-open should resolve")
+            .expect("sqlite-open should evaluate");
+        let sqlitep = dispatch_builtin_pure("sqlitep", vec![db.clone()])
+            .expect("sqlitep should resolve")
+            .expect("sqlitep should evaluate");
+        assert_eq!(sqlitep, Value::True);
+
+        let closed = dispatch_builtin_pure("sqlite-close", vec![db.clone()])
+            .expect("sqlite-close should resolve")
+            .expect("sqlite-close should evaluate");
+        assert_eq!(closed, Value::True);
+
+        let err = dispatch_builtin_pure("sqlite-execute", vec![db, Value::string("select 1")])
+            .expect("sqlite-execute should resolve")
+            .unwrap_err();
+        match err {
+            Flow::Signal(sig) => assert_eq!(sig.symbol, "wrong-type-argument"),
+            other => panic!("expected signal, got {other:?}"),
+        }
     }
 
     #[test]
