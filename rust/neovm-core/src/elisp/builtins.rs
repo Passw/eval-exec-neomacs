@@ -6371,6 +6371,19 @@ pub(crate) fn builtin_keymap_prompt(args: Vec<Value>) -> EvalResult {
     Ok(Value::Nil)
 }
 
+pub(crate) fn builtin_define_coding_system_internal(args: Vec<Value>) -> EvalResult {
+    if args.len() < 13 {
+        return Err(signal(
+            "wrong-number-of-arguments",
+            vec![
+                Value::symbol("define-coding-system-internal"),
+                Value::Int(args.len() as i64),
+            ],
+        ));
+    }
+    Ok(Value::Nil)
+}
+
 pub(crate) fn builtin_kill_emacs(args: Vec<Value>) -> EvalResult {
     expect_range_args("kill-emacs", &args, 0, 2)?;
     Ok(Value::Nil)
@@ -15289,9 +15302,7 @@ pub(crate) fn dispatch_builtin(
         "byte-code" => builtin_byte_code(args),
         "decode-coding-region" => builtin_decode_coding_region(args),
         "defconst-1" => builtin_defconst_1(args),
-        "define-coding-system-internal" => {
-            super::compat_internal::builtin_define_coding_system_internal(args)
-        }
+        "define-coding-system-internal" => builtin_define_coding_system_internal(args),
         "defvar-1" => builtin_defvar_1(args),
         "dump-emacs-portable" => builtin_dump_emacs_portable(args),
         "dump-emacs-portable--sort-predicate" => builtin_dump_emacs_portable_sort_predicate(args),
@@ -16204,9 +16215,7 @@ pub(crate) fn dispatch_builtin_pure(name: &str, args: Vec<Value>) -> Option<Eval
         "byte-code" => builtin_byte_code(args),
         "decode-coding-region" => builtin_decode_coding_region(args),
         "defconst-1" => builtin_defconst_1(args),
-        "define-coding-system-internal" => {
-            super::compat_internal::builtin_define_coding_system_internal(args)
-        }
+        "define-coding-system-internal" => builtin_define_coding_system_internal(args),
         "defvar-1" => builtin_defvar_1(args),
         "dump-emacs-portable" => builtin_dump_emacs_portable(args),
         "dump-emacs-portable--sort-predicate" => builtin_dump_emacs_portable_sort_predicate(args),
@@ -20758,6 +20767,33 @@ mod tests {
             .expect("builtin keymap-prompt should resolve")
             .expect("builtin keymap-prompt should evaluate");
         assert!(keymap_prompt.is_nil());
+    }
+
+    #[test]
+    fn pure_dispatch_define_coding_system_internal_matches_compat_contracts() {
+        let short_args = vec![Value::Nil; 12];
+        let err = dispatch_builtin_pure("define-coding-system-internal", short_args)
+            .expect("builtin define-coding-system-internal should resolve")
+            .expect_err("short arg list should fail");
+        match err {
+            Flow::Signal(sig) => {
+                assert_eq!(sig.symbol, "wrong-number-of-arguments");
+                assert_eq!(
+                    sig.data,
+                    vec![
+                        Value::symbol("define-coding-system-internal"),
+                        Value::Int(12),
+                    ]
+                );
+            }
+            other => panic!("expected signal, got: {other:?}"),
+        }
+
+        let ok_args = vec![Value::Nil; 13];
+        let ok = dispatch_builtin_pure("define-coding-system-internal", ok_args)
+            .expect("builtin define-coding-system-internal should resolve")
+            .expect("builtin define-coding-system-internal should evaluate");
+        assert!(ok.is_nil());
     }
 
     #[test]

@@ -1424,20 +1424,6 @@ pub(crate) fn builtin_internal_set_buffer_modified_tick(args: Vec<Value>) -> Eva
     Ok(Value::Nil)
 }
 
-/// `(define-coding-system-internal ...)` -> nil.
-pub(crate) fn builtin_define_coding_system_internal(args: Vec<Value>) -> EvalResult {
-    if args.len() < 13 {
-        return Err(signal(
-            "wrong-number-of-arguments",
-            vec![
-                Value::symbol("define-coding-system-internal"),
-                Value::Int(args.len() as i64),
-            ],
-        ));
-    }
-    Ok(Value::Nil)
-}
-
 /// `(treesit-available-p)` -> nil.
 pub(crate) fn builtin_treesit_available_p(args: Vec<Value>) -> EvalResult {
     expect_args("treesit-available-p", &args, 0)?;
