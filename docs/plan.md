@@ -37,7 +37,7 @@ Last updated: 2026-02-22
       - region/word string-case paths now preserve oracle edge payload families:
         - `downcase-region` / `downcase-word`: `7305`, `42955|42956|42958|42962|42964|42970|42972`, `68944..=68965`, `93856..=93880`
         - `upcase-region` / `upcase-word`: `411`, `612`, `7306`, `42957|42959|42963|42965|42971`, `68976..=68997`, `93883..=93907`
-      - `capitalize-region` / `upcase-initials-region` / `capitalize-word` now follow oracle titlecase expansions for ligature and Greek iota-subscript edge forms (e.g. `1415`, `64256`, `8114`).
+      - `capitalize-region` / `upcase-initials-region` / `capitalize-word` now follow oracle titlecase expansions for ligature and Greek iota-subscript edge forms (e.g. `1415`, `64256`, `8064`, `8114`).
       - added unit coverage:
         - `downcase_region_unicode_kelvin_preserved`
         - `upcase_region_unicode_dotless_i_preserved`
@@ -48,10 +48,12 @@ Last updated: 2026-02-22
         - `downcase_region_unicode_edge_preserved`
         - `upcase_region_unicode_edge_preserved`
         - `capitalize_region_unicode_ligature_titlecase`
+        - `capitalize_region_unicode_greek_precomposed_titlecase`
         - `upcase_initials_region_unicode_armenian_titlecase`
         - `downcase_word_unicode_extended_preserved`
         - `upcase_word_unicode_extended_preserved`
         - `capitalize_word_unicode_greek_iota_subscript_titlecase`
+        - `capitalize_word_unicode_greek_small_alpha_ypogegrammeni_titlecase`
   - vm-compat corpus changes:
     - added and wired:
       - `test/neovm/vm-compat/cases/case-region-word-unicode-edge-semantics.forms`
@@ -87,6 +89,7 @@ Last updated: 2026-02-22
           - `"\u{0587}" -> "\u{0535}\u{0582}"`
           - `"\u{FB00}" -> "Ff"`
           - `"\u{FB13}" -> "\u{0544}\u{0576}"`
+          - `"\u{1F80}" -> "\u{1F88}"`
           - iota-subscript titlecase edge forms (`\u{1F88}` precomposed preserve and `\u{1FB2} -> \u{1FBA}\u{0345}`)
       - added unit coverage:
         - `capitalize_unicode_edge_semantics`

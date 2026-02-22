@@ -1539,7 +1539,8 @@ fn titlecase_combining_iota_override(code: i64) -> Option<&'static str> {
 fn titlecase_uses_precomposed_upcase(code: i64) -> bool {
     matches!(
         code,
-        8072..=8111
+        8064..=8071
+            | 8072..=8111
             | 8115
             | 8124
             | 8131
@@ -3825,6 +3826,16 @@ mod tests {
     }
 
     #[test]
+    fn capitalize_region_unicode_greek_precomposed_titlecase() {
+        let results = eval_all(
+            r#"(insert (char-to-string 8064))
+               (capitalize-region 1 2)
+               (buffer-string)"#,
+        );
+        assert_eq!(results[2], r#"OK "ᾈ""#);
+    }
+
+    #[test]
     fn upcase_initials_region_unicode_armenian_titlecase() {
         let results = eval_all(
             r#"(insert (char-to-string 1415))
@@ -3959,6 +3970,17 @@ mod tests {
                (buffer-string)"#,
         );
         assert_eq!(results[3], r#"OK "Ὰͅ""#);
+    }
+
+    #[test]
+    fn capitalize_word_unicode_greek_small_alpha_ypogegrammeni_titlecase() {
+        let results = eval_all(
+            r#"(insert (char-to-string 8064))
+               (goto-char 0)
+               (capitalize-word 1)
+               (buffer-string)"#,
+        );
+        assert_eq!(results[3], r#"OK "ᾈ""#);
     }
 
     // -- transpose-chars tests --

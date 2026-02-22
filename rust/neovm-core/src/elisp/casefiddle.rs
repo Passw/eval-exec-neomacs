@@ -168,7 +168,8 @@ fn titlecase_combining_iota_override(code: i64) -> Option<&'static str> {
 fn titlecase_uses_precomposed_upcase(code: i64) -> bool {
     matches!(
         code,
-        8072..=8111
+        8064..=8071
+            | 8072..=8111
             | 8115
             | 8124
             | 8131
@@ -477,6 +478,10 @@ mod tests {
             builtin_capitalize(vec![Value::string("\u{1F88}")]).unwrap();
         assert_eq!(string_greek_precomposed_prosgegrammeni.as_str(), Some("\u{1F88}"));
 
+        let string_greek_small_alpha_ypogegrammeni =
+            builtin_capitalize(vec![Value::string("\u{1F80}")]).unwrap();
+        assert_eq!(string_greek_small_alpha_ypogegrammeni.as_str(), Some("\u{1F88}"));
+
         let string_greek_combining_prosgegrammeni =
             builtin_capitalize(vec![Value::string("\u{1FB2}")]).unwrap();
         assert_eq!(
@@ -530,6 +535,10 @@ mod tests {
         let string_greek_precomposed_prosgegrammeni =
             builtin_upcase_initials(vec![Value::string("\u{1F88}")]).unwrap();
         assert_eq!(string_greek_precomposed_prosgegrammeni.as_str(), Some("\u{1F88}"));
+
+        let string_greek_small_alpha_ypogegrammeni =
+            builtin_upcase_initials(vec![Value::string("\u{1F80}")]).unwrap();
+        assert_eq!(string_greek_small_alpha_ypogegrammeni.as_str(), Some("\u{1F88}"));
 
         let string_greek_combining_prosgegrammeni =
             builtin_upcase_initials(vec![Value::string("\u{1FB2}")]).unwrap();

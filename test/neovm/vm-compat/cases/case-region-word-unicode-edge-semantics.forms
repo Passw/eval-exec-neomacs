@@ -50,6 +50,11 @@
          (insert (char-to-string 64256))
          (capitalize-region (point-min) (point-max))
          (buffer-string)))
+ (list 'capitalize-region-greek-small-alpha-ypogegrammeni
+       (with-temp-buffer
+         (insert (char-to-string 8064))
+         (capitalize-region (point-min) (point-max))
+         (buffer-string)))
  (list 'downcase-word-kelvin
        (with-temp-buffer
          (insert "K")
@@ -83,6 +88,12 @@
  (list 'capitalize-word-greek-iota-subscript
        (with-temp-buffer
          (insert (char-to-string 8114))
+         (goto-char (point-min))
+         (capitalize-word 1)
+         (buffer-string)))
+ (list 'capitalize-word-greek-small-alpha-ypogegrammeni
+       (with-temp-buffer
+         (insert (char-to-string 8064))
          (goto-char (point-min))
          (capitalize-word 1)
          (buffer-string))))
