@@ -11,5 +11,15 @@
     (x-display-color-p 1)
   (error (cadr err)))
 (condition-case err
+    (x-display-color-p 'foo)
+  (error
+   (list (not (null (string-match-p "Invalid argument foo in" (cadr err))))
+         (not (null (string-match-p "#<window" (cadr err)))))))
+(condition-case err
+    (x-display-color-p "foo")
+  (error
+   (list (not (null (string-match-p "Display foo does not exist" (cadr err))))
+         (not (null (string-match-p "#<window" (cadr err)))))))
+(condition-case err
     (x-display-color-p (selected-frame))
   (error err))

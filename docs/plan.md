@@ -19410,6 +19410,16 @@ Last updated: 2026-02-21
       - `(display-monitor-attributes-list "foo")` and `(frame-monitor-attributes "foo")` keep the oracle `Display foo does not exist` path
       - all four paths explicitly avoid accidental `#<window ...>` payload rendering
 
+- Expanded `x-display-color-p` get-device-terminal error lock-ins for symbol/string designators:
+  - vm-compat corpus changes:
+    - updated:
+      - `test/neovm/vm-compat/cases/x-display-color-get-device-terminal-error-payload-semantics.forms`
+      - `test/neovm/vm-compat/cases/x-display-color-get-device-terminal-error-payload-semantics.expected.tsv`
+    - added lock-ins for:
+      - `(x-display-color-p 'foo)` keeps the oracle `Invalid argument foo in 'get-device-terminal'` path
+      - `(x-display-color-p "foo")` keeps the oracle `Display foo does not exist` path
+      - both symbol/string payload paths explicitly avoid accidental `#<window ...>` rendering
+
 - Continue compatibility-first maintenance with small commit slices:
   - keep builtin surface and registry in lock-step
   - run oracle/parity checks after each behavior-affecting change
