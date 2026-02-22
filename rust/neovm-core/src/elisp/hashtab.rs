@@ -13,6 +13,12 @@ use super::value::*;
 use std::collections::{hash_map::DefaultHasher, BTreeMap};
 use std::hash::{Hash, Hasher};
 
+const SXHASH_MAX_DEPTH: usize = 3;
+const SXHASH_MAX_LEN: usize = 7;
+const SXHASH_FIXNUM_SHIFT: u32 = 2;
+const SXHASH_INTMASK: u64 = (1_u64 << 61) - 1;
+const KNUTH_ALPHA: u32 = 2_654_435_769;
+
 // ---------------------------------------------------------------------------
 // Argument helpers
 // ---------------------------------------------------------------------------
@@ -77,6 +83,135 @@ fn hash_key_to_value(key: &HashKey) -> Value {
         HashKey::Frame(id) => Value::Frame(*id),
         HashKey::Ptr(_) => Value::Nil, // can't reconstruct from pointer
     }
+}
+
+fn sxhash_combine(x: u64, y: u64) -> u64 {
+    x.rotate_left(4).wrapping_add(y)
+}
+
+fn read_u16_ne(bytes: &[u8]) -> u16 {
+    let mut arr = [0_u8; 2];
+    arr.copy_from_slice(bytes);
+    u16::from_ne_bytes(arr)
+}
+
+fn read_u32_ne(bytes: &[u8]) -> u32 {
+    let mut arr = [0_u8; 4];
+    arr.copy_from_slice(bytes);
+    u32::from_ne_bytes(arr)
+}
+
+fn read_u64_ne(bytes: &[u8]) -> u64 {
+    let mut arr = [0_u8; 8];
+    arr.copy_from_slice(bytes);
+    u64::from_ne_bytes(arr)
+}
+
+fn emacs_hash_char_array(bytes: &[u8]) -> u64 {
+    let mut hash = bytes.len() as u64;
+    let word_bytes = std::mem::size_of::<u64>();
+    if bytes.len() >= word_bytes {
+        let mut p = 0_usize;
+        let step = word_bytes.max(bytes.len() >> 3);
+        while p + word_bytes <= bytes.len() {
+            let chunk = read_u64_ne(&bytes[p..p + word_bytes]);
+            hash = sxhash_combine(hash, chunk);
+            p = p.saturating_add(step);
+        }
+        let tail = read_u64_ne(&bytes[bytes.len() - word_bytes..]);
+        hash = sxhash_combine(hash, tail);
+    } else {
+        let mut tail = 0_u64;
+        let mut p = 0_usize;
+        if bytes.len().saturating_sub(p) >= 4 {
+            let chunk = read_u32_ne(&bytes[p..p + 4]) as u64;
+            tail = (tail << 32).wrapping_add(chunk);
+            p += 4;
+        }
+        if bytes.len().saturating_sub(p) >= 2 {
+            let chunk = read_u16_ne(&bytes[p..p + 2]) as u64;
+            tail = (tail << 16).wrapping_add(chunk);
+            p += 2;
+        }
+        if p < bytes.len() {
+            tail = (tail << 8).wrapping_add(bytes[p] as u64);
+        }
+        hash = sxhash_combine(hash, tail);
+    }
+    hash
+}
+
+fn fallback_sxhash_emacs_uint(value: &Value, test: HashTableTest) -> u64 {
+    let mut hasher = DefaultHasher::new();
+    match test {
+        HashTableTest::Equal => hash_value_for_equal(value, &mut hasher, 0),
+        _ => value.to_hash_key(&test).hash(&mut hasher),
+    }
+    hasher.finish()
+}
+
+fn emacs_sxhash_obj_with_fallback(value: &Value, depth: usize) -> u64 {
+    emacs_sxhash_obj(value, depth)
+        .unwrap_or_else(|| fallback_sxhash_emacs_uint(value, HashTableTest::Equal))
+}
+
+fn emacs_sxhash_list(value: &Value, depth: usize) -> u64 {
+    let mut hash = 0_u64;
+    let mut cursor = value.clone();
+    if depth < SXHASH_MAX_DEPTH {
+        for _ in 0..SXHASH_MAX_LEN {
+            let Value::Cons(cell) = cursor else {
+                break;
+            };
+            let pair = cell.lock().expect("poisoned");
+            hash = sxhash_combine(hash, emacs_sxhash_obj_with_fallback(&pair.car, depth + 1));
+            cursor = pair.cdr.clone();
+        }
+    }
+    if !cursor.is_nil() {
+        hash = sxhash_combine(hash, emacs_sxhash_obj_with_fallback(&cursor, depth + 1));
+    }
+    hash
+}
+
+fn emacs_sxhash_vector(vec: &std::sync::Arc<std::sync::Mutex<Vec<Value>>>, depth: usize) -> u64 {
+    let items = vec.lock().expect("poisoned");
+    let mut hash = items.len() as u64;
+    let count = items.len().min(SXHASH_MAX_LEN);
+    for item in items.iter().take(count) {
+        hash = sxhash_combine(hash, emacs_sxhash_obj_with_fallback(item, depth + 1));
+    }
+    hash
+}
+
+fn emacs_sxhash_obj(value: &Value, depth: usize) -> Option<u64> {
+    if depth > SXHASH_MAX_DEPTH {
+        return Some(0);
+    }
+    match value {
+        Value::Int(n) => Some(*n as u64),
+        Value::Char(c) => Some((*c as u32) as u64),
+        Value::Str(s) => Some(emacs_hash_char_array(s.as_bytes())),
+        Value::Cons(_) => Some(emacs_sxhash_list(value, depth)),
+        Value::Vector(vec) => Some(emacs_sxhash_vector(vec, depth)),
+        _ => None,
+    }
+}
+
+fn reduce_emacs_uint_to_fixnum(x: u64) -> i64 {
+    ((x ^ (x >> SXHASH_FIXNUM_SHIFT)) & SXHASH_INTMASK) as i64
+}
+
+fn reduce_emacs_uint_to_hash_hash(x: u64) -> u32 {
+    (x ^ (x >> 32)) as u32
+}
+
+fn knuth_hash_index(hash: u32, bits: u32) -> usize {
+    if bits == 0 {
+        return 0;
+    }
+    let product = hash.wrapping_mul(KNUTH_ALPHA);
+    ((product as u64) >> (32 - bits)) as usize
 }
 
 fn hash_value_for_equal(value: &Value, hasher: &mut DefaultHasher, depth: usize) {
@@ -165,14 +300,19 @@ fn hash_value_for_equal(value: &Value, hasher: &mut DefaultHasher, depth: usize)
     }
 }
 
-fn sxhash_for(value: &Value, test: HashTableTest) -> i64 {
-    let mut hasher = DefaultHasher::new();
+fn sxhash_emacs_uint_for(value: &Value, test: HashTableTest) -> u64 {
     match test {
-        HashTableTest::Equal => hash_value_for_equal(value, &mut hasher, 0),
-        _ => value.to_hash_key(&test).hash(&mut hasher),
+        HashTableTest::Equal => emacs_sxhash_obj_with_fallback(value, 0),
+        HashTableTest::Eq | HashTableTest::Eql => match value {
+            Value::Int(n) => *n as u64,
+            Value::Char(c) => (*c as u32) as u64,
+            _ => fallback_sxhash_emacs_uint(value, test),
+        },
     }
-    // Emacs returns fixnums; keep the top bit clear to stay non-negative.
-    (hasher.finish() & (i64::MAX as u64)) as i64
+}
+
+fn sxhash_for(value: &Value, test: HashTableTest) -> i64 {
+    reduce_emacs_uint_to_fixnum(sxhash_emacs_uint_for(value, test))
 }
 
 fn next_pow2_saturating(value: usize) -> usize {
@@ -187,10 +327,25 @@ fn internal_hash_table_index_size(table: &LispHashTable) -> usize {
     }
 }
 
-fn internal_hash_table_diagnostic_hash(key: &HashKey) -> i64 {
-    let mut hasher = DefaultHasher::new();
-    key.hash(&mut hasher);
-    (hasher.finish() & (i64::MAX as u64)) as i64
+fn internal_hash_table_diagnostic_hash(key: &HashKey, test: HashTableTest) -> u32 {
+    match (test, key) {
+        (HashTableTest::Equal, HashKey::Int(n)) => reduce_emacs_uint_to_hash_hash(*n as u64),
+        (HashTableTest::Equal, HashKey::Char(c)) => {
+            reduce_emacs_uint_to_hash_hash((*c as u32) as u64)
+        }
+        (HashTableTest::Equal, HashKey::Str(s)) => {
+            reduce_emacs_uint_to_hash_hash(emacs_hash_char_array(s.as_bytes()))
+        }
+        (HashTableTest::Equal, _) => {
+            let value = hash_key_to_value(key);
+            reduce_emacs_uint_to_hash_hash(sxhash_emacs_uint_for(&value, HashTableTest::Equal))
+        }
+        _ => {
+            let mut hasher = DefaultHasher::new();
+            key.hash(&mut hasher);
+            reduce_emacs_uint_to_hash_hash(hasher.finish())
+        }
+    }
 }
 
 fn internal_hash_table_nonempty_buckets(table: &LispHashTable) -> Vec<Vec<(Value, i64)>> {
@@ -198,11 +353,13 @@ fn internal_hash_table_nonempty_buckets(table: &LispHashTable) -> Vec<Vec<(Value
         return Vec::new();
     }
     let bucket_count = internal_hash_table_index_size(table).max(1);
+    let index_bits = bucket_count.trailing_zeros();
+    let test = table.test.clone();
     let mut buckets: Vec<Vec<(Value, i64)>> = vec![Vec::new(); bucket_count];
     for key in table.data.keys() {
-        let hash = internal_hash_table_diagnostic_hash(key);
-        let index = (hash as usize) % bucket_count;
-        buckets[index].push((hash_key_to_value(key), hash));
+        let hash = internal_hash_table_diagnostic_hash(key, test.clone());
+        let index = knuth_hash_index(hash, index_bits);
+        buckets[index].push((hash_key_to_value(key), hash as i64));
     }
     for bucket in &mut buckets {
         bucket.sort_by_key(|(key, hash)| (print_value(key), *hash));
@@ -646,6 +803,24 @@ mod tests {
     }
 
     #[test]
+    fn sxhash_equal_matches_oracle_for_small_int_and_string_values() {
+        assert_eq!(
+            builtin_sxhash_equal(vec![Value::string("a")]).unwrap(),
+            Value::Int(109)
+        );
+        assert_eq!(
+            builtin_sxhash_equal(vec![Value::string("b")]).unwrap(),
+            Value::Int(110)
+        );
+        assert_eq!(
+            builtin_sxhash_equal(vec![Value::string("ab")]).unwrap(),
+            Value::Int(31265)
+        );
+        assert_eq!(builtin_sxhash_equal(vec![Value::Int(1)]).unwrap(), Value::Int(1));
+        assert_eq!(builtin_sxhash_equal(vec![Value::Int(2)]).unwrap(), Value::Int(2));
+    }
+
+    #[test]
     fn internal_hash_table_introspection_empty_defaults() {
         let table = builtin_make_hash_table(vec![]).unwrap();
         assert_eq!(
@@ -799,6 +974,29 @@ mod tests {
         assert_eq!(seen.len(), 2);
         assert!(seen.contains_key("a"));
         assert!(seen.contains_key("b"));
+    }
+
+    #[test]
+    fn internal_hash_table_buckets_match_oracle_small_string_hashes() {
+        let table = builtin_make_hash_table(vec![
+            Value::keyword(":test"),
+            Value::symbol("equal"),
+            Value::keyword(":size"),
+            Value::Int(3),
+        ])
+        .expect("hash table");
+        let _ = builtin_puthash(vec![Value::string("a"), Value::Int(1), table.clone()])
+            .expect("puthash a");
+        let _ = builtin_puthash(vec![Value::string("b"), Value::Int(2), table.clone()])
+            .expect("puthash b");
+
+        assert_eq!(
+            builtin_internal_hash_table_buckets(vec![table]).expect("bucket alists"),
+            Value::list(vec![
+                Value::list(vec![Value::cons(Value::string("b"), Value::Int(114))]),
+                Value::list(vec![Value::cons(Value::string("a"), Value::Int(113))]),
+            ])
+        );
     }
 
     #[test]
