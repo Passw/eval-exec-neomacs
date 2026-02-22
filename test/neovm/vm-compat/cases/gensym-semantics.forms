@@ -10,4 +10,16 @@
 (let ((s (gensym "tmp-")))
   (string-prefix-p "tmp-" (symbol-name s)))
 
+(let ((s (symbol-name (gensym 1))))
+  (string-prefix-p "1" s))
+
+(let ((s (symbol-name (gensym :kw))))
+  (string-prefix-p ":kw" s))
+
+(let ((s (symbol-name (gensym [1 2]))))
+  (string-prefix-p "[1 2]" s))
+
+(let ((s (symbol-name (gensym nil))))
+  (string-prefix-p "g" s))
+
 (condition-case err (gensym nil nil) (error (car err)))

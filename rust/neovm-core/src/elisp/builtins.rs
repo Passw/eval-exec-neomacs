@@ -10213,15 +10213,27 @@ pub(crate) fn builtin_propertize(args: Vec<Value>) -> EvalResult {
     Ok(Value::string(s))
 }
 
+fn gensym_prefix_string(value: &Value) -> String {
+    match value {
+        // Oracle treats explicit nil like omitted prefix.
+        Value::Nil => "g".to_string(),
+        Value::Str(s) => (**s).clone(),
+        Value::Symbol(s) => s.clone(),
+        Value::Keyword(s) => s.clone(),
+        Value::True => "t".to_string(),
+        // For other objects, gensym follows `%s`-style coercion.
+        other => super::print::print_value(other),
+    }
+}
+
 pub(crate) fn builtin_gensym(args: Vec<Value>) -> EvalResult {
     use std::sync::atomic::{AtomicU64, Ordering};
     static COUNTER: AtomicU64 = AtomicU64::new(0);
     expect_max_args("gensym", &args, 1)?;
-    let prefix = if !args.is_empty() {
-        expect_string(&args[0])?
-    } else {
-        "g".to_string()
-    };
+    let prefix = args
+        .first()
+        .map(gensym_prefix_string)
+        .unwrap_or_else(|| "g".to_string());
     let n = COUNTER.fetch_add(1, Ordering::Relaxed);
     Ok(Value::Symbol(format!("{}{}", prefix, n)))
 }
@@ -27935,6 +27947,62 @@ mod tests {
         assert_eq!(
             builtin_get_byte(&mut eval, vec![Value::Int(1), s]).unwrap(),
             Value::Int(65)
+        );
+    }
+
+    #[test]
+    fn gensym_prefix_coercion_matches_oracle_shapes() {
+        let plain = builtin_gensym(vec![]).expect("gensym without prefix should succeed");
+        let plain_name = match plain {
+            Value::Symbol(name) => name,
+            other => panic!("unexpected gensym result: {other:?}"),
+        };
+        assert!(
+            plain_name.starts_with('g'),
+            "default gensym prefix should start with g"
+        );
+
+        let nil_prefix =
+            builtin_gensym(vec![Value::Nil]).expect("gensym nil prefix should match default");
+        let nil_name = match nil_prefix {
+            Value::Symbol(name) => name,
+            other => panic!("unexpected gensym result: {other:?}"),
+        };
+        assert!(
+            nil_name.starts_with('g'),
+            "explicit nil prefix should start with g"
+        );
+
+        let int_prefix = builtin_gensym(vec![Value::Int(1)]).expect("gensym integer prefix");
+        let int_name = match int_prefix {
+            Value::Symbol(name) => name,
+            other => panic!("unexpected gensym result: {other:?}"),
+        };
+        assert!(
+            int_name.starts_with('1'),
+            "integer prefix should be stringified with %s semantics"
+        );
+
+        let keyword_prefix =
+            builtin_gensym(vec![Value::keyword(":kw")]).expect("gensym keyword prefix");
+        let keyword_name = match keyword_prefix {
+            Value::Symbol(name) => name,
+            other => panic!("unexpected gensym result: {other:?}"),
+        };
+        assert!(
+            keyword_name.starts_with(":kw"),
+            "keyword prefix should preserve leading colon"
+        );
+
+        let vector_prefix = builtin_gensym(vec![Value::vector(vec![Value::Int(1), Value::Int(2)])])
+            .expect("gensym vector prefix");
+        let vector_name = match vector_prefix {
+            Value::Symbol(name) => name,
+            other => panic!("unexpected gensym result: {other:?}"),
+        };
+        assert!(
+            vector_name.starts_with("[1 2]"),
+            "vector prefix should use lisp %s rendering"
         );
     }
 }
