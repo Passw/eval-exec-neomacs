@@ -1831,6 +1831,7 @@ fn subr_arity_value(name: &str) -> Value {
         "terminal-live-p"
         | "frame-live-p"
         | "frame-visible-p"
+        | "frame-root-window-p"
         | "window-live-p"
         | "window-configuration-p"
         | "window-valid-p"
@@ -4090,6 +4091,7 @@ mod tests {
         assert_subr_arity("frame-parameters", 0, Some(1));
         assert_subr_arity("frame-position", 0, Some(1));
         assert_subr_arity("frame-root-window", 0, Some(1));
+        assert_subr_arity("frame-root-window-p", 1, Some(1));
         assert_subr_arity("frame-visible-p", 1, Some(1));
         assert_subr_arity("frame-text-cols", 0, Some(1));
         assert_subr_arity("frame-text-height", 0, Some(1));

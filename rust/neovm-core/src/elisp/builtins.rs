@@ -15955,6 +15955,9 @@ pub(crate) fn dispatch_builtin(
         "frame-root-window" => {
             return Some(super::window_cmds::builtin_frame_root_window(eval, args))
         }
+        "frame-root-window-p" => {
+            return Some(super::window_cmds::builtin_frame_root_window_p(eval, args))
+        }
         "windowp" => return Some(super::window_cmds::builtin_windowp(eval, args)),
         "window-valid-p" => return Some(super::window_cmds::builtin_window_valid_p(eval, args)),
         "framep" => return Some(super::window_cmds::builtin_framep(eval, args)),
@@ -17896,6 +17899,7 @@ pub(crate) fn dispatch_builtin_pure(name: &str, args: Vec<Value>) -> Option<Eval
         | "one-window-p"
         | "old-selected-window"
         | "frame-old-selected-window"
+        | "frame-root-window-p"
         | "set-frame-selected-window"
         | "window-system"
         | "frame-edges"

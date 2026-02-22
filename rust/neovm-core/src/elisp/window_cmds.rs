@@ -896,6 +896,25 @@ pub(crate) fn builtin_frame_root_window(
     Ok(window_value(root))
 }
 
+/// `(frame-root-window-p WINDOW)` -> t if WINDOW is the root window of its frame.
+pub(crate) fn builtin_frame_root_window_p(
+    eval: &mut super::eval::Evaluator,
+    args: Vec<Value>,
+) -> EvalResult {
+    expect_args("frame-root-window-p", &args, 1)?;
+    let (fid, wid) = resolve_window_id_with_pred(eval, args.first(), "window-live-p")?;
+    let frame = eval
+        .frames
+        .get(fid)
+        .ok_or_else(|| signal("error", vec![Value::string("Frame not found")]))?;
+    let root = frame
+        .window_list()
+        .first()
+        .copied()
+        .unwrap_or(frame.selected_window);
+    Ok(Value::bool(root == wid))
+}
+
 /// `(minibuffer-window &optional FRAME)` -> minibuffer window of FRAME.
 pub(crate) fn builtin_minibuffer_window(
     eval: &mut super::eval::Evaluator,
@@ -4149,6 +4168,31 @@ mod tests {
             out[25],
             "OK (wrong-number-of-arguments minibuffer-window-active-p 2)"
         );
+    }
+
+    #[test]
+    fn frame_root_window_p_semantics_and_errors() {
+        let forms = parse_forms(
+            "(frame-root-window-p (selected-window))
+             (frame-root-window-p (minibuffer-window))
+             (condition-case err (frame-root-window-p 999999) (error err))
+             (condition-case err (frame-root-window-p 'foo) (error err))
+             (condition-case err (frame-root-window-p) (error (car err)))
+             (condition-case err (frame-root-window-p nil nil) (error (car err)))",
+        )
+        .expect("parse");
+        let mut ev = Evaluator::new();
+        let out = ev
+            .eval_forms(&forms)
+            .iter()
+            .map(format_eval_result)
+            .collect::<Vec<_>>();
+        assert_eq!(out[0], "OK t");
+        assert_eq!(out[1], "OK nil");
+        assert_eq!(out[2], "OK (wrong-type-argument window-live-p 999999)");
+        assert_eq!(out[3], "OK (wrong-type-argument window-live-p foo)");
+        assert_eq!(out[4], "OK wrong-number-of-arguments");
+        assert_eq!(out[5], "OK wrong-number-of-arguments");
     }
 
     #[test]

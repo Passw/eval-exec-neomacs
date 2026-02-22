@@ -575,6 +575,7 @@ const DISPATCH_BUILTIN_NAMES: &[&str] = &[
     "frame-scroll-bar-height",
     "frame-scroll-bar-width",
     "frame-root-window",
+    "frame-root-window-p",
     "frame-selected-window",
     "frame-terminal",
     "frame-text-cols",
