@@ -310,6 +310,42 @@ pub fn file_name_parent_directory(filename: &str) -> Option<String> {
     Some(parent)
 }
 
+/// Return all path components of FILENAME.
+///
+/// Mirrors Emacs `file-name-split` semantics, including root and trailing
+/// directory markers represented as empty-string components.
+pub fn file_name_split(filename: &str) -> Vec<String> {
+    let mut components = Vec::new();
+    let mut rest = filename.to_string();
+
+    if directory_name_p(&rest) {
+        components.insert(0, String::new());
+        rest = directory_file_name(&rest);
+    }
+
+    while !rest.is_empty() {
+        components.insert(0, file_name_nondirectory(&rest));
+        let Some(dir) = file_name_directory(&rest) else {
+            break;
+        };
+        rest = directory_file_name(&dir);
+
+        // At filesystem root (or // root marker), prepend root component
+        // and stop peeling.
+        if dir == rest {
+            let root_component = if dir.is_empty() {
+                String::new()
+            } else {
+                dir[..dir.len() - 1].to_string()
+            };
+            components.insert(0, root_component);
+            break;
+        }
+    }
+
+    components
+}
+
 /// Return FILENAME as a directory name (must end in `/`).
 /// Like Emacs `file-name-as-directory`.
 pub fn file_name_as_directory(filename: &str) -> String {
@@ -1723,6 +1759,18 @@ pub(crate) fn builtin_file_name_parent_directory(args: Vec<Value>) -> EvalResult
         Some(parent) => Value::string(parent),
         None => Value::Nil,
     })
+}
+
+/// (file-name-split FILENAME) -> list of string
+pub(crate) fn builtin_file_name_split(args: Vec<Value>) -> EvalResult {
+    expect_args("file-name-split", &args, 1)?;
+    let filename = expect_string_strict(&args[0])?;
+    Ok(Value::list(
+        file_name_split(&filename)
+            .into_iter()
+            .map(Value::string)
+            .collect(),
+    ))
 }
 
 /// (file-name-as-directory FILENAME) -> string
@@ -4894,6 +4942,31 @@ mod tests {
         let result = builtin_file_name_parent_directory(vec![Value::string("//usr")]);
         assert_eq!(result.unwrap().as_str(), Some("//"));
 
+        let split = builtin_file_name_split(vec![Value::string("/foo/bar")]).unwrap();
+        assert_eq!(
+            list_to_vec(&split).unwrap(),
+            vec![
+                Value::string(""),
+                Value::string("foo"),
+                Value::string("bar"),
+            ]
+        );
+
+        let split = builtin_file_name_split(vec![Value::string("/")]).unwrap();
+        assert_eq!(
+            list_to_vec(&split).unwrap(),
+            vec![Value::string(""), Value::string(""), Value::string("")]
+        );
+
+        let split = builtin_file_name_split(vec![Value::string("foo/")]).unwrap();
+        assert_eq!(
+            list_to_vec(&split).unwrap(),
+            vec![Value::string("foo"), Value::string("")]
+        );
+
+        let split = builtin_file_name_split(vec![Value::string("")]).unwrap();
+        assert_eq!(split, Value::Nil);
+
         let malformed =
             builtin_file_name_with_extension(vec![Value::string("foo"), Value::string("")])
                 .expect_err("empty extension should be rejected");
@@ -4979,6 +5052,9 @@ mod tests {
         assert!(builtin_file_name_parent_directory(vec![Value::symbol("x")]).is_err());
         assert!(builtin_file_name_parent_directory(vec![]).is_err());
         assert!(builtin_file_name_parent_directory(vec![Value::string("x"), Value::Nil]).is_err());
+        assert!(builtin_file_name_split(vec![Value::symbol("x")]).is_err());
+        assert!(builtin_file_name_split(vec![]).is_err());
+        assert!(builtin_file_name_split(vec![Value::string("x"), Value::Nil]).is_err());
         assert!(builtin_file_name_as_directory(vec![Value::symbol("x")]).is_err());
         assert!(builtin_directory_file_name(vec![Value::symbol("x")]).is_err());
         assert!(builtin_backup_file_name_p(vec![Value::symbol("x")]).is_err());

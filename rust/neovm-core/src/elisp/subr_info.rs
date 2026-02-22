@@ -373,6 +373,7 @@ fn subr_arity_value(name: &str) -> Value {
         | "file-name-directory"
         | "file-name-nondirectory"
         | "file-name-parent-directory"
+        | "file-name-split"
         | "file-name-sans-extension"
         | "file-name-case-insensitive-p" => arity_cons(1, Some(1)),
         "file-name-all-completions" | "file-name-with-extension" => arity_cons(2, Some(2)),
@@ -3427,6 +3428,7 @@ mod tests {
         assert_subr_arity("file-name-directory", 1, Some(1));
         assert_subr_arity("file-name-extension", 1, Some(2));
         assert_subr_arity("file-name-parent-directory", 1, Some(1));
+        assert_subr_arity("file-name-split", 1, Some(1));
         assert_subr_arity("file-name-sans-versions", 1, Some(2));
         assert_subr_arity("file-name-nondirectory", 1, Some(1));
         assert_subr_arity("file-remote-p", 1, Some(3));
