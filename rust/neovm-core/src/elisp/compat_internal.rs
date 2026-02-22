@@ -280,58 +280,6 @@ pub(crate) fn builtin_fontset_list(args: Vec<Value>) -> EvalResult {
     Ok(Value::list(vec![Value::string(DEFAULT_FONTSET_NAME)]))
 }
 
-/// `(gnutls-available-p)` -> capability list.
-pub(crate) fn builtin_gnutls_available_p(args: Vec<Value>) -> EvalResult {
-    expect_args("gnutls-available-p", &args, 0)?;
-    Ok(Value::list(vec![Value::symbol("gnutls")]))
-}
-
-/// `(gnutls-ciphers)` -> non-empty cipher descriptor list.
-pub(crate) fn builtin_gnutls_ciphers(args: Vec<Value>) -> EvalResult {
-    expect_args("gnutls-ciphers", &args, 0)?;
-    Ok(Value::list(vec![Value::symbol("AES-256-GCM")]))
-}
-
-/// `(gnutls-digests)` -> non-empty digest descriptor list.
-pub(crate) fn builtin_gnutls_digests(args: Vec<Value>) -> EvalResult {
-    expect_args("gnutls-digests", &args, 0)?;
-    Ok(Value::list(vec![Value::symbol("SHA256")]))
-}
-
-/// `(gnutls-macs)` -> non-empty MAC descriptor list.
-pub(crate) fn builtin_gnutls_macs(args: Vec<Value>) -> EvalResult {
-    expect_args("gnutls-macs", &args, 0)?;
-    Ok(Value::list(vec![Value::symbol("AEAD")]))
-}
-
-/// `(gnutls-errorp CODE)` -> t.
-pub(crate) fn builtin_gnutls_errorp(args: Vec<Value>) -> EvalResult {
-    expect_args("gnutls-errorp", &args, 1)?;
-    Ok(Value::True)
-}
-
-/// `(gnutls-error-string CODE)` -> compatibility message string.
-pub(crate) fn builtin_gnutls_error_string(args: Vec<Value>) -> EvalResult {
-    expect_args("gnutls-error-string", &args, 1)?;
-    match args[0] {
-        Value::Int(0) => Ok(Value::string("Success.")),
-        Value::Nil => Ok(Value::string("Symbol has no numeric gnutls-code property")),
-        _ => Ok(Value::string("Unknown TLS error")),
-    }
-}
-
-/// `(gnutls-error-fatalp CODE)` -> nil for numeric codes.
-pub(crate) fn builtin_gnutls_error_fatalp(args: Vec<Value>) -> EvalResult {
-    expect_args("gnutls-error-fatalp", &args, 1)?;
-    if args[0].is_nil() {
-        return Err(signal(
-            "error",
-            vec![Value::string("Symbol has no numeric gnutls-code property")],
-        ));
-    }
-    Ok(Value::Nil)
-}
-
 /// `(gnutls-peer-status-warning-describe WARNING)` -> nil.
 pub(crate) fn builtin_gnutls_peer_status_warning_describe(args: Vec<Value>) -> EvalResult {
     expect_args("gnutls-peer-status-warning-describe", &args, 1)?;
@@ -664,7 +612,7 @@ mod tests {
 
     #[test]
     fn gnutls_error_string_zero_is_success() {
-        let out = builtin_gnutls_error_string(vec![Value::Int(0)]).unwrap();
+        let out = crate::elisp::builtins::builtin_gnutls_error_string(vec![Value::Int(0)]).unwrap();
         assert_eq!(out, Value::string("Success."));
     }
 

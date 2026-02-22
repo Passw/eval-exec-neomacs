@@ -7409,6 +7409,51 @@ pub(crate) fn builtin_get_variable_watchers(args: Vec<Value>) -> EvalResult {
     Ok(Value::Nil)
 }
 
+pub(crate) fn builtin_gnutls_available_p(args: Vec<Value>) -> EvalResult {
+    expect_args("gnutls-available-p", &args, 0)?;
+    Ok(Value::list(vec![Value::symbol("gnutls")]))
+}
+
+pub(crate) fn builtin_gnutls_ciphers(args: Vec<Value>) -> EvalResult {
+    expect_args("gnutls-ciphers", &args, 0)?;
+    Ok(Value::list(vec![Value::symbol("AES-256-GCM")]))
+}
+
+pub(crate) fn builtin_gnutls_digests(args: Vec<Value>) -> EvalResult {
+    expect_args("gnutls-digests", &args, 0)?;
+    Ok(Value::list(vec![Value::symbol("SHA256")]))
+}
+
+pub(crate) fn builtin_gnutls_macs(args: Vec<Value>) -> EvalResult {
+    expect_args("gnutls-macs", &args, 0)?;
+    Ok(Value::list(vec![Value::symbol("AEAD")]))
+}
+
+pub(crate) fn builtin_gnutls_errorp(args: Vec<Value>) -> EvalResult {
+    expect_args("gnutls-errorp", &args, 1)?;
+    Ok(Value::True)
+}
+
+pub(crate) fn builtin_gnutls_error_string(args: Vec<Value>) -> EvalResult {
+    expect_args("gnutls-error-string", &args, 1)?;
+    match args[0] {
+        Value::Int(0) => Ok(Value::string("Success.")),
+        Value::Nil => Ok(Value::string("Symbol has no numeric gnutls-code property")),
+        _ => Ok(Value::string("Unknown TLS error")),
+    }
+}
+
+pub(crate) fn builtin_gnutls_error_fatalp(args: Vec<Value>) -> EvalResult {
+    expect_args("gnutls-error-fatalp", &args, 1)?;
+    if args[0].is_nil() {
+        return Err(signal(
+            "error",
+            vec![Value::string("Symbol has no numeric gnutls-code property")],
+        ));
+    }
+    Ok(Value::Nil)
+}
+
 fn expect_window_live_or_nil(value: &Value) -> Result<(), Flow> {
     if value.is_nil() || matches!(value, Value::Window(_)) {
         Ok(())
@@ -16499,25 +16544,25 @@ pub(crate) fn dispatch_builtin(
         "garbage-collect-maybe" => builtin_garbage_collect_maybe(args),
         "get-unicode-property-internal" => builtin_get_unicode_property_internal(args),
         "get-variable-watchers" => builtin_get_variable_watchers(args),
-        "gnutls-available-p" => super::compat_internal::builtin_gnutls_available_p(args),
+        "gnutls-available-p" => builtin_gnutls_available_p(args),
         "gnutls-asynchronous-parameters" => {
             super::compat_internal::builtin_gnutls_asynchronous_parameters(args)
         }
         "gnutls-boot" => super::compat_internal::builtin_gnutls_boot(args),
         "gnutls-bye" => super::compat_internal::builtin_gnutls_bye(args),
-        "gnutls-ciphers" => super::compat_internal::builtin_gnutls_ciphers(args),
+        "gnutls-ciphers" => builtin_gnutls_ciphers(args),
         "gnutls-deinit" => super::compat_internal::builtin_gnutls_deinit(args),
-        "gnutls-digests" => super::compat_internal::builtin_gnutls_digests(args),
-        "gnutls-error-fatalp" => super::compat_internal::builtin_gnutls_error_fatalp(args),
-        "gnutls-error-string" => super::compat_internal::builtin_gnutls_error_string(args),
-        "gnutls-errorp" => super::compat_internal::builtin_gnutls_errorp(args),
+        "gnutls-digests" => builtin_gnutls_digests(args),
+        "gnutls-error-fatalp" => builtin_gnutls_error_fatalp(args),
+        "gnutls-error-string" => builtin_gnutls_error_string(args),
+        "gnutls-errorp" => builtin_gnutls_errorp(args),
         "gnutls-format-certificate" => {
             super::compat_internal::builtin_gnutls_format_certificate(args)
         }
         "gnutls-get-initstage" => super::compat_internal::builtin_gnutls_get_initstage(args),
         "gnutls-hash-digest" => super::compat_internal::builtin_gnutls_hash_digest(args),
         "gnutls-hash-mac" => super::compat_internal::builtin_gnutls_hash_mac(args),
-        "gnutls-macs" => super::compat_internal::builtin_gnutls_macs(args),
+        "gnutls-macs" => builtin_gnutls_macs(args),
         "gnutls-peer-status" => super::compat_internal::builtin_gnutls_peer_status(args),
         "gnutls-peer-status-warning-describe" => {
             super::compat_internal::builtin_gnutls_peer_status_warning_describe(args)
@@ -17336,25 +17381,25 @@ pub(crate) fn dispatch_builtin_pure(name: &str, args: Vec<Value>) -> Option<Eval
         "garbage-collect-maybe" => builtin_garbage_collect_maybe(args),
         "get-unicode-property-internal" => builtin_get_unicode_property_internal(args),
         "get-variable-watchers" => builtin_get_variable_watchers(args),
-        "gnutls-available-p" => super::compat_internal::builtin_gnutls_available_p(args),
+        "gnutls-available-p" => builtin_gnutls_available_p(args),
         "gnutls-asynchronous-parameters" => {
             super::compat_internal::builtin_gnutls_asynchronous_parameters(args)
         }
         "gnutls-boot" => super::compat_internal::builtin_gnutls_boot(args),
         "gnutls-bye" => super::compat_internal::builtin_gnutls_bye(args),
-        "gnutls-ciphers" => super::compat_internal::builtin_gnutls_ciphers(args),
+        "gnutls-ciphers" => builtin_gnutls_ciphers(args),
         "gnutls-deinit" => super::compat_internal::builtin_gnutls_deinit(args),
-        "gnutls-digests" => super::compat_internal::builtin_gnutls_digests(args),
-        "gnutls-error-fatalp" => super::compat_internal::builtin_gnutls_error_fatalp(args),
-        "gnutls-error-string" => super::compat_internal::builtin_gnutls_error_string(args),
-        "gnutls-errorp" => super::compat_internal::builtin_gnutls_errorp(args),
+        "gnutls-digests" => builtin_gnutls_digests(args),
+        "gnutls-error-fatalp" => builtin_gnutls_error_fatalp(args),
+        "gnutls-error-string" => builtin_gnutls_error_string(args),
+        "gnutls-errorp" => builtin_gnutls_errorp(args),
         "gnutls-format-certificate" => {
             super::compat_internal::builtin_gnutls_format_certificate(args)
         }
         "gnutls-get-initstage" => super::compat_internal::builtin_gnutls_get_initstage(args),
         "gnutls-hash-digest" => super::compat_internal::builtin_gnutls_hash_digest(args),
         "gnutls-hash-mac" => super::compat_internal::builtin_gnutls_hash_mac(args),
-        "gnutls-macs" => super::compat_internal::builtin_gnutls_macs(args),
+        "gnutls-macs" => builtin_gnutls_macs(args),
         "gnutls-peer-status" => super::compat_internal::builtin_gnutls_peer_status(args),
         "gnutls-peer-status-warning-describe" => {
             super::compat_internal::builtin_gnutls_peer_status_warning_describe(args)
@@ -22984,6 +23029,47 @@ mod tests {
             .unwrap_err();
         match watcher_err {
             Flow::Signal(sig) => assert_eq!(sig.symbol, "wrong-type-argument"),
+            other => panic!("expected signal, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn dispatch_builtin_pure_handles_gnutls_query_and_error_placeholders() {
+        let available = dispatch_builtin_pure("gnutls-available-p", vec![])
+            .expect("gnutls-available-p should resolve")
+            .expect("gnutls-available-p should evaluate");
+        assert_eq!(available, Value::list(vec![Value::symbol("gnutls")]));
+
+        let ciphers = dispatch_builtin_pure("gnutls-ciphers", vec![])
+            .expect("gnutls-ciphers should resolve")
+            .expect("gnutls-ciphers should evaluate");
+        assert_eq!(ciphers, Value::list(vec![Value::symbol("AES-256-GCM")]));
+
+        let digests = dispatch_builtin_pure("gnutls-digests", vec![])
+            .expect("gnutls-digests should resolve")
+            .expect("gnutls-digests should evaluate");
+        assert_eq!(digests, Value::list(vec![Value::symbol("SHA256")]));
+
+        let macs = dispatch_builtin_pure("gnutls-macs", vec![])
+            .expect("gnutls-macs should resolve")
+            .expect("gnutls-macs should evaluate");
+        assert_eq!(macs, Value::list(vec![Value::symbol("AEAD")]));
+
+        let errorp = dispatch_builtin_pure("gnutls-errorp", vec![Value::Int(0)])
+            .expect("gnutls-errorp should resolve")
+            .expect("gnutls-errorp should evaluate");
+        assert_eq!(errorp, Value::True);
+
+        let success = dispatch_builtin_pure("gnutls-error-string", vec![Value::Int(0)])
+            .expect("gnutls-error-string should resolve")
+            .expect("gnutls-error-string should evaluate");
+        assert_eq!(success, Value::string("Success."));
+
+        let fatal_err = dispatch_builtin_pure("gnutls-error-fatalp", vec![Value::Nil])
+            .expect("gnutls-error-fatalp should resolve")
+            .unwrap_err();
+        match fatal_err {
+            Flow::Signal(sig) => assert_eq!(sig.symbol, "error"),
             other => panic!("expected signal, got {other:?}"),
         }
     }
