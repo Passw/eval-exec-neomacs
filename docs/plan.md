@@ -19400,6 +19400,16 @@ Last updated: 2026-02-21
       - `(frame-monitor-attributes 1)` error payload mentions literal `1`
       - both integer-literal payloads explicitly avoid `#<window ...>` rendering
 
+- Expanded monitor window-designator error lock-ins to cover symbol/string display designators:
+  - vm-compat corpus changes:
+    - updated:
+      - `test/neovm/vm-compat/cases/display-monitor-window-designator-errors-semantics.forms`
+      - `test/neovm/vm-compat/cases/display-monitor-window-designator-errors-semantics.expected.tsv`
+    - added lock-ins for:
+      - `(display-monitor-attributes-list 'foo)` and `(frame-monitor-attributes 'foo)` keep the oracle `Invalid argument foo in 'get-device-terminal'` path
+      - `(display-monitor-attributes-list "foo")` and `(frame-monitor-attributes "foo")` keep the oracle `Display foo does not exist` path
+      - all four paths explicitly avoid accidental `#<window ...>` payload rendering
+
 - Continue compatibility-first maintenance with small commit slices:
   - keep builtin surface and registry in lock-step
   - run oracle/parity checks after each behavior-affecting change
