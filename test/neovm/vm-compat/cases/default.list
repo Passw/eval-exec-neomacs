@@ -534,6 +534,7 @@ cases/window-dedicated-callable-path-semantics
 cases/select-window-designator-semantics
 cases/select-window-current-buffer-semantics
 cases/other-window-current-buffer-semantics
+cases/select-other-window-callable-path-semantics
 cases/delete-window-current-buffer-semantics
 cases/delete-other-windows-current-buffer-semantics
 cases/split-delete-window-designator-error-semantics
