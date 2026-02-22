@@ -619,6 +619,11 @@ pub(crate) fn builtin_symbolp(args: Vec<Value>) -> EvalResult {
     Ok(Value::bool(args[0].is_symbol()))
 }
 
+pub(crate) fn builtin_booleanp(args: Vec<Value>) -> EvalResult {
+    expect_args("booleanp", &args, 1)?;
+    Ok(Value::bool(matches!(args[0], Value::Nil | Value::True)))
+}
+
 pub(crate) fn builtin_numberp(args: Vec<Value>) -> EvalResult {
     expect_args("numberp", &args, 1)?;
     Ok(Value::bool(args[0].is_number()))
@@ -14132,6 +14137,8 @@ enum PureBuiltinId {
     NListp,
     #[strum(serialize = "symbolp")]
     Symbolp,
+    #[strum(serialize = "booleanp")]
+    Booleanp,
     #[strum(serialize = "numberp")]
     Numberp,
     #[strum(serialize = "integerp")]
@@ -14428,6 +14435,7 @@ fn dispatch_builtin_id_pure(id: PureBuiltinId, args: Vec<Value>) -> EvalResult {
         PureBuiltinId::Listp => builtin_listp(args),
         PureBuiltinId::NListp => builtin_nlistp(args),
         PureBuiltinId::Symbolp => builtin_symbolp(args),
+        PureBuiltinId::Booleanp => builtin_booleanp(args),
         PureBuiltinId::Numberp => builtin_numberp(args),
         PureBuiltinId::Integerp => builtin_integerp(args),
         PureBuiltinId::Floatp => builtin_floatp(args),

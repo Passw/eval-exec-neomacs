@@ -1815,6 +1815,7 @@ const DISPATCH_BUILTIN_NAMES: &[&str] = &[
     "arrayp",
     "aset",
     "atom",
+    "booleanp",
     "bufferp",
     "ceiling",
     "char-to-string",
