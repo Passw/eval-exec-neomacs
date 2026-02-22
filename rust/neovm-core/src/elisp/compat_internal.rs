@@ -1750,51 +1750,15 @@ pub(crate) fn builtin_mapbacktrace(args: Vec<Value>) -> EvalResult {
     Ok(Value::Nil)
 }
 
-/// `(minibuffer-innermost-command-loop-p &optional WINDOW)` -> nil.
-pub(crate) fn builtin_minibuffer_innermost_command_loop_p(args: Vec<Value>) -> EvalResult {
-    expect_range_args("minibuffer-innermost-command-loop-p", &args, 0, 1)?;
-    Ok(Value::Nil)
-}
-
-/// `(minibuffer-prompt-end)` -> 1.
-pub(crate) fn builtin_minibuffer_prompt_end(args: Vec<Value>) -> EvalResult {
-    expect_args("minibuffer-prompt-end", &args, 0)?;
-    Ok(Value::Int(1))
-}
-
-/// `(next-frame &optional FRAME MINIFRAME)` -> nil.
-pub(crate) fn builtin_next_frame(args: Vec<Value>) -> EvalResult {
-    expect_range_args("next-frame", &args, 0, 2)?;
-    Ok(Value::Nil)
-}
-
-/// `(previous-frame &optional FRAME MINIFRAME)` -> nil.
-pub(crate) fn builtin_previous_frame(args: Vec<Value>) -> EvalResult {
-    expect_range_args("previous-frame", &args, 0, 2)?;
-    Ok(Value::Nil)
-}
-
 /// `(put-unicode-property-internal TABLE INDEX VALUE)` -> nil.
 pub(crate) fn builtin_put_unicode_property_internal(args: Vec<Value>) -> EvalResult {
     expect_args("put-unicode-property-internal", &args, 3)?;
     Ok(Value::Nil)
 }
 
-/// `(raise-frame &optional FRAME)` -> nil.
-pub(crate) fn builtin_raise_frame(args: Vec<Value>) -> EvalResult {
-    expect_range_args("raise-frame", &args, 0, 1)?;
-    Ok(Value::Nil)
-}
-
 /// `(re--describe-compiled OBJECT &optional INDENT)` -> nil.
 pub(crate) fn builtin_re_describe_compiled(args: Vec<Value>) -> EvalResult {
     expect_range_args("re--describe-compiled", &args, 1, 2)?;
-    Ok(Value::Nil)
-}
-
-/// `(redisplay &optional FORCE)` -> nil.
-pub(crate) fn builtin_redisplay(args: Vec<Value>) -> EvalResult {
-    expect_range_args("redisplay", &args, 0, 1)?;
     Ok(Value::Nil)
 }
 
@@ -1808,18 +1772,6 @@ pub(crate) fn builtin_rename_buffer(args: Vec<Value>) -> EvalResult {
 pub(crate) fn builtin_set_buffer_major_mode(args: Vec<Value>) -> EvalResult {
     expect_args("set-buffer-major-mode", &args, 1)?;
     Ok(Value::Nil)
-}
-
-/// `(suspend-emacs &optional STRING)` -> nil.
-pub(crate) fn builtin_suspend_emacs(args: Vec<Value>) -> EvalResult {
-    expect_range_args("suspend-emacs", &args, 0, 1)?;
-    Ok(Value::Nil)
-}
-
-/// `(vertical-motion LINES &optional WINDOW CURCOL)` -> 0.
-pub(crate) fn builtin_vertical_motion(args: Vec<Value>) -> EvalResult {
-    expect_range_args("vertical-motion", &args, 1, 3)?;
-    Ok(Value::Int(0))
 }
 
 /// `(dump-emacs-portable FILE &optional TRACK-REFERRERS)` -> nil.

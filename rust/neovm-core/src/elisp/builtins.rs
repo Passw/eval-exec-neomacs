@@ -5622,6 +5622,46 @@ pub(crate) fn builtin_make_temp_file_internal(args: Vec<Value>) -> EvalResult {
     super::fileio::builtin_make_temp_file(vec![args[0].clone(), args[1].clone(), args[2].clone()])
 }
 
+pub(crate) fn builtin_minibuffer_innermost_command_loop_p(args: Vec<Value>) -> EvalResult {
+    expect_range_args("minibuffer-innermost-command-loop-p", &args, 0, 1)?;
+    Ok(Value::Nil)
+}
+
+pub(crate) fn builtin_minibuffer_prompt_end(args: Vec<Value>) -> EvalResult {
+    expect_args("minibuffer-prompt-end", &args, 0)?;
+    Ok(Value::Int(1))
+}
+
+pub(crate) fn builtin_next_frame(args: Vec<Value>) -> EvalResult {
+    expect_range_args("next-frame", &args, 0, 2)?;
+    Ok(Value::Nil)
+}
+
+pub(crate) fn builtin_previous_frame(args: Vec<Value>) -> EvalResult {
+    expect_range_args("previous-frame", &args, 0, 2)?;
+    Ok(Value::Nil)
+}
+
+pub(crate) fn builtin_raise_frame(args: Vec<Value>) -> EvalResult {
+    expect_range_args("raise-frame", &args, 0, 1)?;
+    Ok(Value::Nil)
+}
+
+pub(crate) fn builtin_redisplay(args: Vec<Value>) -> EvalResult {
+    expect_range_args("redisplay", &args, 0, 1)?;
+    Ok(Value::Nil)
+}
+
+pub(crate) fn builtin_suspend_emacs(args: Vec<Value>) -> EvalResult {
+    expect_range_args("suspend-emacs", &args, 0, 1)?;
+    Ok(Value::Nil)
+}
+
+pub(crate) fn builtin_vertical_motion(args: Vec<Value>) -> EvalResult {
+    expect_range_args("vertical-motion", &args, 1, 3)?;
+    Ok(Value::Int(0))
+}
+
 // ===========================================================================
 // Hook system (need evaluator)
 // ===========================================================================
@@ -14539,10 +14579,8 @@ pub(crate) fn dispatch_builtin(
         "make-terminal-frame" => super::compat_internal::builtin_make_terminal_frame(args),
         "menu-bar-menu-at-x-y" => super::compat_internal::builtin_menu_bar_menu_at_x_y(args),
         "menu-or-popup-active-p" => super::compat_internal::builtin_menu_or_popup_active_p(args),
-        "minibuffer-innermost-command-loop-p" => {
-            super::compat_internal::builtin_minibuffer_innermost_command_loop_p(args)
-        }
-        "minibuffer-prompt-end" => super::compat_internal::builtin_minibuffer_prompt_end(args),
+        "minibuffer-innermost-command-loop-p" => builtin_minibuffer_innermost_command_loop_p(args),
+        "minibuffer-prompt-end" => builtin_minibuffer_prompt_end(args),
         "module-load" => super::compat_internal::builtin_module_load(args),
         "mouse-pixel-position" => super::compat_internal::builtin_mouse_pixel_position(args),
         "mouse-position" => super::compat_internal::builtin_mouse_position(args),
@@ -14554,7 +14592,7 @@ pub(crate) fn dispatch_builtin(
         }
         "native-elisp-load" => super::compat_internal::builtin_native_elisp_load(args),
         "new-fontset" => super::compat_internal::builtin_new_fontset(args),
-        "next-frame" => super::compat_internal::builtin_next_frame(args),
+        "next-frame" => builtin_next_frame(args),
         "ntake" => builtin_ntake(args),
         "obarray-clear" => builtin_obarray_clear(args),
         "obarray-make" => builtin_obarray_make(args),
@@ -14570,7 +14608,7 @@ pub(crate) fn dispatch_builtin(
         "position-symbol" => super::compat_internal::builtin_position_symbol(args),
         "posn-at-point" => super::compat_internal::builtin_posn_at_point(args),
         "posn-at-x-y" => super::compat_internal::builtin_posn_at_x_y(args),
-        "previous-frame" => super::compat_internal::builtin_previous_frame(args),
+        "previous-frame" => builtin_previous_frame(args),
         "profiler-cpu-log" => super::compat_internal::builtin_profiler_cpu_log(args),
         "profiler-cpu-running-p" => super::compat_internal::builtin_profiler_cpu_running_p(args),
         "profiler-cpu-start" => super::compat_internal::builtin_profiler_cpu_start(args),
@@ -14586,13 +14624,13 @@ pub(crate) fn dispatch_builtin(
         }
         "query-font" => super::compat_internal::builtin_query_font(args),
         "query-fontset" => super::compat_internal::builtin_query_fontset(args),
-        "raise-frame" => super::compat_internal::builtin_raise_frame(args),
+        "raise-frame" => builtin_raise_frame(args),
         "read-positioning-symbols" => {
             super::compat_internal::builtin_read_positioning_symbols(args)
         }
         "re--describe-compiled" => super::compat_internal::builtin_re_describe_compiled(args),
         "recent-auto-save-p" => super::compat_internal::builtin_recent_auto_save_p(args),
-        "redisplay" => super::compat_internal::builtin_redisplay(args),
+        "redisplay" => builtin_redisplay(args),
         "record" => super::compat_internal::builtin_record(args),
         "recordp" => super::compat_internal::builtin_recordp(args),
         "reconsider-frame-fonts" => super::compat_internal::builtin_reconsider_frame_fonts(args),
@@ -14636,7 +14674,7 @@ pub(crate) fn dispatch_builtin(
         "subr-native-comp-unit" => super::compat_internal::builtin_subr_native_comp_unit(args),
         "subr-native-lambda-list" => super::compat_internal::builtin_subr_native_lambda_list(args),
         "subr-type" => super::compat_internal::builtin_subr_type(args),
-        "suspend-emacs" => super::compat_internal::builtin_suspend_emacs(args),
+        "suspend-emacs" => builtin_suspend_emacs(args),
         "this-single-command-keys" => {
             super::compat_internal::builtin_this_single_command_keys(args)
         }
@@ -14669,7 +14707,7 @@ pub(crate) fn dispatch_builtin(
         "unix-sync" => super::compat_internal::builtin_unix_sync(args),
         "value<" => super::compat_internal::builtin_value_lt(args),
         "variable-binding-locus" => super::compat_internal::builtin_variable_binding_locus(args),
-        "vertical-motion" => super::compat_internal::builtin_vertical_motion(args),
+        "vertical-motion" => builtin_vertical_motion(args),
         "x-begin-drag" => super::compat_internal::builtin_x_begin_drag(args),
         "x-create-frame" => super::compat_internal::builtin_x_create_frame(args),
         "x-double-buffered-p" => super::compat_internal::builtin_x_double_buffered_p(args),
@@ -15510,10 +15548,8 @@ pub(crate) fn dispatch_builtin_pure(name: &str, args: Vec<Value>) -> Option<Eval
         "make-terminal-frame" => super::compat_internal::builtin_make_terminal_frame(args),
         "menu-bar-menu-at-x-y" => super::compat_internal::builtin_menu_bar_menu_at_x_y(args),
         "menu-or-popup-active-p" => super::compat_internal::builtin_menu_or_popup_active_p(args),
-        "minibuffer-innermost-command-loop-p" => {
-            super::compat_internal::builtin_minibuffer_innermost_command_loop_p(args)
-        }
-        "minibuffer-prompt-end" => super::compat_internal::builtin_minibuffer_prompt_end(args),
+        "minibuffer-innermost-command-loop-p" => builtin_minibuffer_innermost_command_loop_p(args),
+        "minibuffer-prompt-end" => builtin_minibuffer_prompt_end(args),
         "module-load" => super::compat_internal::builtin_module_load(args),
         "mouse-pixel-position" => super::compat_internal::builtin_mouse_pixel_position(args),
         "mouse-position" => super::compat_internal::builtin_mouse_position(args),
@@ -15525,7 +15561,7 @@ pub(crate) fn dispatch_builtin_pure(name: &str, args: Vec<Value>) -> Option<Eval
         }
         "native-elisp-load" => super::compat_internal::builtin_native_elisp_load(args),
         "new-fontset" => super::compat_internal::builtin_new_fontset(args),
-        "next-frame" => super::compat_internal::builtin_next_frame(args),
+        "next-frame" => builtin_next_frame(args),
         "ntake" => builtin_ntake(args),
         "obarray-clear" => builtin_obarray_clear(args),
         "obarray-make" => builtin_obarray_make(args),
@@ -15541,7 +15577,7 @@ pub(crate) fn dispatch_builtin_pure(name: &str, args: Vec<Value>) -> Option<Eval
         "position-symbol" => super::compat_internal::builtin_position_symbol(args),
         "posn-at-point" => super::compat_internal::builtin_posn_at_point(args),
         "posn-at-x-y" => super::compat_internal::builtin_posn_at_x_y(args),
-        "previous-frame" => super::compat_internal::builtin_previous_frame(args),
+        "previous-frame" => builtin_previous_frame(args),
         "profiler-cpu-log" => super::compat_internal::builtin_profiler_cpu_log(args),
         "profiler-cpu-running-p" => super::compat_internal::builtin_profiler_cpu_running_p(args),
         "profiler-cpu-start" => super::compat_internal::builtin_profiler_cpu_start(args),
@@ -15557,13 +15593,13 @@ pub(crate) fn dispatch_builtin_pure(name: &str, args: Vec<Value>) -> Option<Eval
         }
         "query-font" => super::compat_internal::builtin_query_font(args),
         "query-fontset" => super::compat_internal::builtin_query_fontset(args),
-        "raise-frame" => super::compat_internal::builtin_raise_frame(args),
+        "raise-frame" => builtin_raise_frame(args),
         "read-positioning-symbols" => {
             super::compat_internal::builtin_read_positioning_symbols(args)
         }
         "re--describe-compiled" => super::compat_internal::builtin_re_describe_compiled(args),
         "recent-auto-save-p" => super::compat_internal::builtin_recent_auto_save_p(args),
-        "redisplay" => super::compat_internal::builtin_redisplay(args),
+        "redisplay" => builtin_redisplay(args),
         "record" => super::compat_internal::builtin_record(args),
         "recordp" => super::compat_internal::builtin_recordp(args),
         "reconsider-frame-fonts" => super::compat_internal::builtin_reconsider_frame_fonts(args),
@@ -15607,7 +15643,7 @@ pub(crate) fn dispatch_builtin_pure(name: &str, args: Vec<Value>) -> Option<Eval
         "subr-native-comp-unit" => super::compat_internal::builtin_subr_native_comp_unit(args),
         "subr-native-lambda-list" => super::compat_internal::builtin_subr_native_lambda_list(args),
         "subr-type" => super::compat_internal::builtin_subr_type(args),
-        "suspend-emacs" => super::compat_internal::builtin_suspend_emacs(args),
+        "suspend-emacs" => builtin_suspend_emacs(args),
         "this-single-command-keys" => {
             super::compat_internal::builtin_this_single_command_keys(args)
         }
@@ -15640,7 +15676,7 @@ pub(crate) fn dispatch_builtin_pure(name: &str, args: Vec<Value>) -> Option<Eval
         "unix-sync" => super::compat_internal::builtin_unix_sync(args),
         "value<" => super::compat_internal::builtin_value_lt(args),
         "variable-binding-locus" => super::compat_internal::builtin_variable_binding_locus(args),
-        "vertical-motion" => super::compat_internal::builtin_vertical_motion(args),
+        "vertical-motion" => builtin_vertical_motion(args),
         "x-begin-drag" => super::compat_internal::builtin_x_begin_drag(args),
         "x-create-frame" => super::compat_internal::builtin_x_create_frame(args),
         "x-double-buffered-p" => super::compat_internal::builtin_x_double_buffered_p(args),
@@ -19127,6 +19163,38 @@ mod tests {
             }
             other => panic!("expected signal, got: {other:?}"),
         }
+    }
+
+    #[test]
+    fn pure_dispatch_minibuffer_and_frame_placeholders_match_compat_contracts() {
+        let prompt_end = dispatch_builtin_pure("minibuffer-prompt-end", vec![])
+            .expect("builtin minibuffer-prompt-end should resolve")
+            .expect("builtin minibuffer-prompt-end should evaluate");
+        assert_eq!(prompt_end, Value::Int(1));
+
+        for (name, args) in vec![
+            ("minibuffer-innermost-command-loop-p", vec![]),
+            ("next-frame", vec![]),
+            ("next-frame", vec![Value::Nil, Value::Nil]),
+            ("previous-frame", vec![]),
+            ("previous-frame", vec![Value::Nil, Value::Nil]),
+            ("raise-frame", vec![]),
+            ("raise-frame", vec![Value::Nil]),
+            ("redisplay", vec![]),
+            ("redisplay", vec![Value::True]),
+            ("suspend-emacs", vec![]),
+            ("suspend-emacs", vec![Value::string("hold")]),
+        ] {
+            let value = dispatch_builtin_pure(name, args)
+                .expect("builtin placeholder should resolve")
+                .expect("builtin placeholder should evaluate");
+            assert!(value.is_nil(), "{name} should return nil");
+        }
+
+        let vertical_motion = dispatch_builtin_pure("vertical-motion", vec![Value::Int(3)])
+            .expect("builtin vertical-motion should resolve")
+            .expect("builtin vertical-motion should evaluate");
+        assert_eq!(vertical_motion, Value::Int(0));
     }
 
     #[test]
