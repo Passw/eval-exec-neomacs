@@ -1738,36 +1738,6 @@ pub(crate) fn builtin_dump_emacs_portable_sort_predicate_copied(args: Vec<Value>
     Ok(Value::Nil)
 }
 
-/// `(native-comp-available-p)` -> nil.
-pub(crate) fn builtin_native_comp_available_p(args: Vec<Value>) -> EvalResult {
-    expect_args("native-comp-available-p", &args, 0)?;
-    Ok(Value::Nil)
-}
-
-/// `(native-comp-unit-file SUBR)` -> nil.
-pub(crate) fn builtin_native_comp_unit_file(args: Vec<Value>) -> EvalResult {
-    expect_args("native-comp-unit-file", &args, 1)?;
-    Ok(Value::Nil)
-}
-
-/// `(native-comp-unit-set-file SUBR FILE)` -> nil.
-pub(crate) fn builtin_native_comp_unit_set_file(args: Vec<Value>) -> EvalResult {
-    expect_args("native-comp-unit-set-file", &args, 2)?;
-    Ok(Value::Nil)
-}
-
-/// `(native-elisp-load FILE &optional NOERROR)` -> nil.
-pub(crate) fn builtin_native_elisp_load(args: Vec<Value>) -> EvalResult {
-    expect_range_args("native-elisp-load", &args, 1, 2)?;
-    Ok(Value::Nil)
-}
-
-/// `(new-fontset NAME FONTLIST)` -> nil.
-pub(crate) fn builtin_new_fontset(args: Vec<Value>) -> EvalResult {
-    expect_args("new-fontset", &args, 2)?;
-    Ok(Value::Nil)
-}
-
 /// `(open-font FONT-ENTITY &optional PIXEL-SIZE FRAME)` -> nil.
 pub(crate) fn builtin_open_font(args: Vec<Value>) -> EvalResult {
     expect_range_args("open-font", &args, 1, 3)?;

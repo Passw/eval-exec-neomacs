@@ -5762,6 +5762,31 @@ pub(crate) fn builtin_mouse_position(args: Vec<Value>) -> EvalResult {
     Ok(Value::Nil)
 }
 
+pub(crate) fn builtin_native_comp_available_p(args: Vec<Value>) -> EvalResult {
+    expect_args("native-comp-available-p", &args, 0)?;
+    Ok(Value::Nil)
+}
+
+pub(crate) fn builtin_native_comp_unit_file(args: Vec<Value>) -> EvalResult {
+    expect_args("native-comp-unit-file", &args, 1)?;
+    Ok(Value::Nil)
+}
+
+pub(crate) fn builtin_native_comp_unit_set_file(args: Vec<Value>) -> EvalResult {
+    expect_args("native-comp-unit-set-file", &args, 2)?;
+    Ok(Value::Nil)
+}
+
+pub(crate) fn builtin_native_elisp_load(args: Vec<Value>) -> EvalResult {
+    expect_range_args("native-elisp-load", &args, 1, 2)?;
+    Ok(Value::Nil)
+}
+
+pub(crate) fn builtin_new_fontset(args: Vec<Value>) -> EvalResult {
+    expect_args("new-fontset", &args, 2)?;
+    Ok(Value::Nil)
+}
+
 // ===========================================================================
 // Hook system (need evaluator)
 // ===========================================================================
@@ -14685,13 +14710,11 @@ pub(crate) fn dispatch_builtin(
         "mouse-pixel-position" => builtin_mouse_pixel_position(args),
         "mouse-position" => builtin_mouse_position(args),
         "newline-cache-check" => builtin_newline_cache_check(args),
-        "native-comp-available-p" => super::compat_internal::builtin_native_comp_available_p(args),
-        "native-comp-unit-file" => super::compat_internal::builtin_native_comp_unit_file(args),
-        "native-comp-unit-set-file" => {
-            super::compat_internal::builtin_native_comp_unit_set_file(args)
-        }
-        "native-elisp-load" => super::compat_internal::builtin_native_elisp_load(args),
-        "new-fontset" => super::compat_internal::builtin_new_fontset(args),
+        "native-comp-available-p" => builtin_native_comp_available_p(args),
+        "native-comp-unit-file" => builtin_native_comp_unit_file(args),
+        "native-comp-unit-set-file" => builtin_native_comp_unit_set_file(args),
+        "native-elisp-load" => builtin_native_elisp_load(args),
+        "new-fontset" => builtin_new_fontset(args),
         "next-frame" => builtin_next_frame(args),
         "ntake" => builtin_ntake(args),
         "obarray-clear" => builtin_obarray_clear(args),
@@ -15652,13 +15675,11 @@ pub(crate) fn dispatch_builtin_pure(name: &str, args: Vec<Value>) -> Option<Eval
         "mouse-pixel-position" => builtin_mouse_pixel_position(args),
         "mouse-position" => builtin_mouse_position(args),
         "newline-cache-check" => builtin_newline_cache_check(args),
-        "native-comp-available-p" => super::compat_internal::builtin_native_comp_available_p(args),
-        "native-comp-unit-file" => super::compat_internal::builtin_native_comp_unit_file(args),
-        "native-comp-unit-set-file" => {
-            super::compat_internal::builtin_native_comp_unit_set_file(args)
-        }
-        "native-elisp-load" => super::compat_internal::builtin_native_elisp_load(args),
-        "new-fontset" => super::compat_internal::builtin_new_fontset(args),
+        "native-comp-available-p" => builtin_native_comp_available_p(args),
+        "native-comp-unit-file" => builtin_native_comp_unit_file(args),
+        "native-comp-unit-set-file" => builtin_native_comp_unit_set_file(args),
+        "native-elisp-load" => builtin_native_elisp_load(args),
+        "new-fontset" => builtin_new_fontset(args),
         "next-frame" => builtin_next_frame(args),
         "ntake" => builtin_ntake(args),
         "obarray-clear" => builtin_obarray_clear(args),
@@ -19438,6 +19459,39 @@ mod tests {
             .expect("builtin mouse-position should resolve")
             .expect("builtin mouse-position should evaluate");
         assert!(mouse_position.is_nil());
+    }
+
+    #[test]
+    fn pure_dispatch_native_comp_placeholders_match_compat_contracts() {
+        let available = dispatch_builtin_pure("native-comp-available-p", vec![])
+            .expect("builtin native-comp-available-p should resolve")
+            .expect("builtin native-comp-available-p should evaluate");
+        assert!(available.is_nil());
+
+        let unit_file = dispatch_builtin_pure("native-comp-unit-file", vec![Value::Nil])
+            .expect("builtin native-comp-unit-file should resolve")
+            .expect("builtin native-comp-unit-file should evaluate");
+        assert!(unit_file.is_nil());
+
+        let unit_set_file = dispatch_builtin_pure(
+            "native-comp-unit-set-file",
+            vec![Value::Nil, Value::string("foo.eln")],
+        )
+        .expect("builtin native-comp-unit-set-file should resolve")
+        .expect("builtin native-comp-unit-set-file should evaluate");
+        assert!(unit_set_file.is_nil());
+
+        let native_elisp_load =
+            dispatch_builtin_pure("native-elisp-load", vec![Value::string("foo.eln")])
+                .expect("builtin native-elisp-load should resolve")
+                .expect("builtin native-elisp-load should evaluate");
+        assert!(native_elisp_load.is_nil());
+
+        let new_fontset =
+            dispatch_builtin_pure("new-fontset", vec![Value::string("x"), Value::string("y")])
+                .expect("builtin new-fontset should resolve")
+                .expect("builtin new-fontset should evaluate");
+        assert!(new_fontset.is_nil());
     }
 
     #[test]
