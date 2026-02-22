@@ -229,8 +229,11 @@ fn setf_place(eval: &mut super::eval::Evaluator, place: &Expr, value: Value) -> 
                         Value::HashTable(ht) => {
                             let mut ht = ht.lock().expect("poisoned");
                             let hk = key.to_hash_key(&ht.test);
+                            let inserting_new_key = !ht.data.contains_key(&hk);
                             ht.data.insert(hk.clone(), value.clone());
-                            ht.key_snapshots.insert(hk, key);
+                            if inserting_new_key {
+                                ht.key_snapshots.insert(hk, key);
+                            }
                             Ok(value)
                         }
                         _ => Err(signal(
@@ -1443,6 +1446,30 @@ mod tests {
         .unwrap();
         let result = ev.eval_expr(&check[0]).unwrap();
         assert_eq!(format!("{}", result), "(2 2 t t a b)");
+    }
+
+    #[test]
+    fn setf_gethash_equal_overwrite_preserves_first_key_identity() {
+        let mut ev = make_ev();
+        let forms = parse_forms(
+            r#"(let* ((k1 (copy-sequence "x"))
+                      (k2 (copy-sequence "x"))
+                      (ht (make-hash-table :test 'equal :size 5)))
+                 (setf (gethash k1 ht) 'a)
+                 (setf (gethash k2 ht) 'b)
+                 (aset k2 0 ?y)
+                 (let* ((entries (apply #'append (internal--hash-table-buckets ht)))
+                        (key (caar entries)))
+                   (list (hash-table-count ht)
+                         (gethash "x" ht 'miss)
+                         (gethash "y" ht 'miss)
+                         (equal key "x")
+                         (eq key k1)
+                         (eq key k2))))"#,
+        )
+        .unwrap();
+        let result = ev.eval_expr(&forms[0]).unwrap();
+        assert_eq!(format!("{}", result), "(1 b miss t t nil)");
     }
 
     #[test]

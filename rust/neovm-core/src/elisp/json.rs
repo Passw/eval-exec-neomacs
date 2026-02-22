@@ -878,8 +878,11 @@ impl<'a> JsonParser<'a> {
                 {
                     let mut table = table_arc.lock().expect("poisoned");
                     let hash_key = HashKey::Str(key.clone());
+                    let inserting_new_key = !table.data.contains_key(&hash_key);
                     table.data.insert(hash_key.clone(), val);
-                    table.key_snapshots.insert(hash_key, Value::string(key));
+                    if inserting_new_key {
+                        table.key_snapshots.insert(hash_key, Value::string(key));
+                    }
                 }
 
                 self.skip_ws();

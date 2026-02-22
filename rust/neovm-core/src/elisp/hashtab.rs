@@ -1307,6 +1307,45 @@ mod tests {
     }
 
     #[test]
+    fn internal_hash_table_buckets_equal_preserve_first_key_identity_on_overwrite() {
+        let table = builtin_make_hash_table(vec![
+            Value::keyword(":test"),
+            Value::symbol("equal"),
+            Value::keyword(":size"),
+            Value::Int(5),
+        ])
+        .expect("hash table");
+        let key_a = Value::string("x");
+        let key_b = Value::string("x");
+        let _ = builtin_puthash(vec![key_a.clone(), Value::symbol("a"), table.clone()])
+            .expect("puthash key-a");
+        let _ = builtin_puthash(vec![key_b.clone(), Value::symbol("b"), table.clone()])
+            .expect("puthash key-b overwrite");
+        assert_eq!(
+            builtin_hash_table_count(vec![table.clone()]).expect("hash-table-count"),
+            Value::Int(1)
+        );
+        assert_eq!(
+            builtin_gethash(vec![Value::string("x"), table.clone(), Value::symbol("miss")])
+                .expect("gethash x"),
+            Value::symbol("b")
+        );
+
+        let buckets = builtin_internal_hash_table_buckets(vec![table]).expect("bucket alists");
+        let outer = list_to_vec(&buckets).expect("outer list");
+        assert_eq!(outer.len(), 1);
+        let entries = list_to_vec(&outer[0]).expect("bucket alist");
+        assert_eq!(entries.len(), 1);
+        let Value::Cons(cell) = &entries[0] else {
+            panic!("expected alist cons entry");
+        };
+        let pair = cell.lock().expect("poisoned");
+        assert_eq!(pair.car.as_str(), Some("x"));
+        assert!(eq_value(&pair.car, &key_a));
+        assert!(!eq_value(&pair.car, &key_b));
+    }
+
+    #[test]
     fn internal_hash_table_buckets_match_oracle_small_float_hashes() {
         fn collect_float_hashes(table: Value) -> std::collections::BTreeMap<u64, i64> {
             let buckets = builtin_internal_hash_table_buckets(vec![table]).expect("bucket alists");

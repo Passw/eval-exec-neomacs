@@ -2659,7 +2659,9 @@ pub(crate) fn builtin_puthash(args: Vec<Value>) -> EvalResult {
             let inserting_new_key = !ht.data.contains_key(&key);
             maybe_resize_hash_table_for_insert(&mut ht, inserting_new_key);
             ht.data.insert(key.clone(), args[1].clone());
-            ht.key_snapshots.insert(key, args[0].clone());
+            if inserting_new_key {
+                ht.key_snapshots.insert(key, args[0].clone());
+            }
             Ok(args[1].clone())
         }
         _ => Err(signal(
