@@ -43,6 +43,7 @@ const DISPATCH_BUILTIN_NAMES: &[&str] = &[
     "alist-get",
     "all-completions",
     "all-threads",
+    "always",
     "append",
     "apply",
     "ash",

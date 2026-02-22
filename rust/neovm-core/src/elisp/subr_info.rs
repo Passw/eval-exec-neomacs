@@ -341,6 +341,7 @@ fn subr_arity_value(name: &str) -> Value {
         "message" | "message-box" | "message-or-box" | "format" | "format-message" => {
             arity_cons(1, None)
         }
+        "always" => arity_cons(0, None),
         "/" | "<" | "<=" | "=" | ">" | ">=" | "apply" | "funcall" | "funcall-interactively" => {
             arity_cons(1, None)
         }
@@ -2478,6 +2479,7 @@ mod tests {
         assert_subr_arity("abs", 1, Some(1));
         assert_subr_arity("ash", 2, Some(2));
         assert_subr_arity("apply", 1, None);
+        assert_subr_arity("always", 0, None);
     }
 
     #[test]

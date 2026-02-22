@@ -3235,6 +3235,10 @@ pub(crate) fn builtin_ignore(_args: Vec<Value>) -> EvalResult {
     Ok(Value::Nil)
 }
 
+pub(crate) fn builtin_always(_args: Vec<Value>) -> EvalResult {
+    Ok(Value::True)
+}
+
 pub(crate) fn builtin_message(args: Vec<Value>) -> EvalResult {
     expect_min_args("message", &args, 1)?;
     if args.len() == 1 && args[0].is_nil() {
@@ -16770,6 +16774,7 @@ pub(crate) fn dispatch_builtin(
         // Extended list (typed subset is dispatched above)
 
         // Output / misc
+        "always" => builtin_always(args),
         "identity" => builtin_identity(args),
         "message" => builtin_message(args),
         "message-box" => builtin_message_box(args),
@@ -17978,6 +17983,7 @@ pub(crate) fn dispatch_builtin_pure(name: &str, args: Vec<Value>) -> Option<Eval
         "nconc" => builtin_nconc(args),
         "number-sequence" => builtin_number_sequence(args),
         // Output / misc
+        "always" => builtin_always(args),
         "identity" => builtin_identity(args),
         "purecopy" => builtin_purecopy(args),
         "current-message" => builtin_current_message(args),
@@ -25371,6 +25377,22 @@ mod tests {
             Flow::Signal(sig) => assert_eq!(sig.symbol, "wrong-number-of-arguments"),
             other => panic!("expected signal, got {other:?}"),
         }
+    }
+
+    #[test]
+    fn always_accepts_any_arity_and_returns_true() {
+        let zero = dispatch_builtin_pure("always", vec![])
+            .expect("always should resolve")
+            .expect("always should evaluate");
+        assert_eq!(zero, Value::True);
+
+        let many = dispatch_builtin_pure(
+            "always",
+            vec![Value::Int(1), Value::symbol("x"), Value::list(vec![Value::Nil])],
+        )
+        .expect("always should resolve")
+        .expect("always should evaluate");
+        assert_eq!(many, Value::True);
     }
 
     #[test]
