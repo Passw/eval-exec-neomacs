@@ -5882,6 +5882,41 @@ pub(crate) fn builtin_play_sound_internal(args: Vec<Value>) -> EvalResult {
     Ok(Value::Nil)
 }
 
+pub(crate) fn builtin_record(args: Vec<Value>) -> EvalResult {
+    if args.is_empty() {
+        return Err(signal(
+            "wrong-number-of-arguments",
+            vec![Value::symbol("record"), Value::Int(0)],
+        ));
+    }
+    Ok(Value::Nil)
+}
+
+pub(crate) fn builtin_recordp(args: Vec<Value>) -> EvalResult {
+    expect_args("recordp", &args, 1)?;
+    Ok(Value::Nil)
+}
+
+pub(crate) fn builtin_query_font(args: Vec<Value>) -> EvalResult {
+    expect_args("query-font", &args, 1)?;
+    Ok(Value::Nil)
+}
+
+pub(crate) fn builtin_query_fontset(args: Vec<Value>) -> EvalResult {
+    expect_range_args("query-fontset", &args, 1, 2)?;
+    Ok(Value::Nil)
+}
+
+pub(crate) fn builtin_read_positioning_symbols(args: Vec<Value>) -> EvalResult {
+    expect_range_args("read-positioning-symbols", &args, 0, 1)?;
+    Ok(Value::Nil)
+}
+
+pub(crate) fn builtin_recent_auto_save_p(args: Vec<Value>) -> EvalResult {
+    expect_args("recent-auto-save-p", &args, 0)?;
+    Ok(Value::Nil)
+}
+
 // ===========================================================================
 // Hook system (need evaluator)
 // ===========================================================================
@@ -14836,17 +14871,15 @@ pub(crate) fn dispatch_builtin(
         "profiler-memory-start" => builtin_profiler_memory_start(args),
         "profiler-memory-stop" => builtin_profiler_memory_stop(args),
         "put-unicode-property-internal" => builtin_put_unicode_property_internal(args),
-        "query-font" => super::compat_internal::builtin_query_font(args),
-        "query-fontset" => super::compat_internal::builtin_query_fontset(args),
+        "query-font" => builtin_query_font(args),
+        "query-fontset" => builtin_query_fontset(args),
         "raise-frame" => builtin_raise_frame(args),
-        "read-positioning-symbols" => {
-            super::compat_internal::builtin_read_positioning_symbols(args)
-        }
+        "read-positioning-symbols" => builtin_read_positioning_symbols(args),
         "re--describe-compiled" => builtin_re_describe_compiled(args),
-        "recent-auto-save-p" => super::compat_internal::builtin_recent_auto_save_p(args),
+        "recent-auto-save-p" => builtin_recent_auto_save_p(args),
         "redisplay" => builtin_redisplay(args),
-        "record" => super::compat_internal::builtin_record(args),
-        "recordp" => super::compat_internal::builtin_recordp(args),
+        "record" => builtin_record(args),
+        "recordp" => builtin_recordp(args),
         "reconsider-frame-fonts" => super::compat_internal::builtin_reconsider_frame_fonts(args),
         "redirect-debugging-output" => {
             super::compat_internal::builtin_redirect_debugging_output(args)
@@ -15799,17 +15832,15 @@ pub(crate) fn dispatch_builtin_pure(name: &str, args: Vec<Value>) -> Option<Eval
         "profiler-memory-start" => builtin_profiler_memory_start(args),
         "profiler-memory-stop" => builtin_profiler_memory_stop(args),
         "put-unicode-property-internal" => builtin_put_unicode_property_internal(args),
-        "query-font" => super::compat_internal::builtin_query_font(args),
-        "query-fontset" => super::compat_internal::builtin_query_fontset(args),
+        "query-font" => builtin_query_font(args),
+        "query-fontset" => builtin_query_fontset(args),
         "raise-frame" => builtin_raise_frame(args),
-        "read-positioning-symbols" => {
-            super::compat_internal::builtin_read_positioning_symbols(args)
-        }
+        "read-positioning-symbols" => builtin_read_positioning_symbols(args),
         "re--describe-compiled" => builtin_re_describe_compiled(args),
-        "recent-auto-save-p" => super::compat_internal::builtin_recent_auto_save_p(args),
+        "recent-auto-save-p" => builtin_recent_auto_save_p(args),
         "redisplay" => builtin_redisplay(args),
-        "record" => super::compat_internal::builtin_record(args),
-        "recordp" => super::compat_internal::builtin_recordp(args),
+        "record" => builtin_record(args),
+        "recordp" => builtin_recordp(args),
         "reconsider-frame-fonts" => super::compat_internal::builtin_reconsider_frame_fonts(args),
         "redirect-debugging-output" => {
             super::compat_internal::builtin_redirect_debugging_output(args)
@@ -19691,6 +19722,50 @@ mod tests {
             .expect("builtin play-sound-internal should resolve")
             .expect("builtin play-sound-internal should evaluate");
         assert!(play_sound.is_nil());
+    }
+
+    #[test]
+    fn pure_dispatch_record_query_placeholders_match_compat_contracts() {
+        let record = dispatch_builtin_pure("record", vec![Value::symbol("tag"), Value::Int(1)])
+            .expect("builtin record should resolve")
+            .expect("builtin record should evaluate");
+        assert!(record.is_nil());
+
+        let record_arity = dispatch_builtin_pure("record", vec![])
+            .expect("builtin record should resolve")
+            .expect_err("record should reject empty slot lists");
+        match record_arity {
+            Flow::Signal(sig) => {
+                assert_eq!(sig.symbol, "wrong-number-of-arguments");
+                assert_eq!(sig.data, vec![Value::symbol("record"), Value::Int(0)]);
+            }
+            other => panic!("expected signal, got: {other:?}"),
+        }
+
+        let recordp = dispatch_builtin_pure("recordp", vec![Value::Nil])
+            .expect("builtin recordp should resolve")
+            .expect("builtin recordp should evaluate");
+        assert!(recordp.is_nil());
+
+        let query_font = dispatch_builtin_pure("query-font", vec![Value::Nil])
+            .expect("builtin query-font should resolve")
+            .expect("builtin query-font should evaluate");
+        assert!(query_font.is_nil());
+
+        let query_fontset = dispatch_builtin_pure("query-fontset", vec![Value::Nil])
+            .expect("builtin query-fontset should resolve")
+            .expect("builtin query-fontset should evaluate");
+        assert!(query_fontset.is_nil());
+
+        let read_pos = dispatch_builtin_pure("read-positioning-symbols", vec![])
+            .expect("builtin read-positioning-symbols should resolve")
+            .expect("builtin read-positioning-symbols should evaluate");
+        assert!(read_pos.is_nil());
+
+        let recent_auto_save = dispatch_builtin_pure("recent-auto-save-p", vec![])
+            .expect("builtin recent-auto-save-p should resolve")
+            .expect("builtin recent-auto-save-p should evaluate");
+        assert!(recent_auto_save.is_nil());
     }
 
     #[test]

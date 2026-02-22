@@ -1738,47 +1738,6 @@ pub(crate) fn builtin_dump_emacs_portable_sort_predicate_copied(args: Vec<Value>
     Ok(Value::Nil)
 }
 
-/// `(record &rest SLOTS)` -> nil.
-pub(crate) fn builtin_record(args: Vec<Value>) -> EvalResult {
-    if args.is_empty() {
-        return Err(signal(
-            "wrong-number-of-arguments",
-            vec![Value::symbol("record"), Value::Int(0)],
-        ));
-    }
-    Ok(Value::Nil)
-}
-
-/// `(recordp OBJECT)` -> nil.
-pub(crate) fn builtin_recordp(args: Vec<Value>) -> EvalResult {
-    expect_args("recordp", &args, 1)?;
-    Ok(Value::Nil)
-}
-
-/// `(query-font FONT-OBJECT)` -> nil.
-pub(crate) fn builtin_query_font(args: Vec<Value>) -> EvalResult {
-    expect_args("query-font", &args, 1)?;
-    Ok(Value::Nil)
-}
-
-/// `(query-fontset FONTSET &optional FRAME)` -> nil.
-pub(crate) fn builtin_query_fontset(args: Vec<Value>) -> EvalResult {
-    expect_range_args("query-fontset", &args, 1, 2)?;
-    Ok(Value::Nil)
-}
-
-/// `(read-positioning-symbols &optional STRING)` -> nil.
-pub(crate) fn builtin_read_positioning_symbols(args: Vec<Value>) -> EvalResult {
-    expect_range_args("read-positioning-symbols", &args, 0, 1)?;
-    Ok(Value::Nil)
-}
-
-/// `(recent-auto-save-p)` -> nil.
-pub(crate) fn builtin_recent_auto_save_p(args: Vec<Value>) -> EvalResult {
-    expect_args("recent-auto-save-p", &args, 0)?;
-    Ok(Value::Nil)
-}
-
 /// `(reconsider-frame-fonts FRAME)` -> nil.
 pub(crate) fn builtin_reconsider_frame_fonts(args: Vec<Value>) -> EvalResult {
     expect_args("reconsider-frame-fonts", &args, 1)?;
