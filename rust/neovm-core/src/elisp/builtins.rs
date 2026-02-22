@@ -11449,7 +11449,7 @@ pub(crate) fn builtin_delete_field(
 /// `(clear-string STRING)` -> nil
 pub(crate) fn builtin_clear_string(args: Vec<Value>) -> EvalResult {
     expect_args("clear-string", &args, 1)?;
-    let _ = expect_string(&args[0])?;
+    let _ = expect_strict_string(&args[0])?;
     Ok(Value::Nil)
 }
 

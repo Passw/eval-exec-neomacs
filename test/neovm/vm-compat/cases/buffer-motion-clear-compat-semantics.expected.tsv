@@ -7,10 +7,13 @@
 7	(condition-case err (buffer-text-pixel-size 1) (error err))	OK (wrong-type-argument stringp 1)
 8	(clear-string "")	OK nil
 9	(condition-case err (clear-string 1) (error err))	OK (wrong-type-argument stringp 1)
-10	(with-temp-buffer (let ((a (current-buffer)) (b (get-buffer-create " *vm-cbs*"))) (with-current-buffer a (erase-buffer) (insert "abcdef")) (with-current-buffer b (erase-buffer) (insert "abcxyz")) (list (compare-buffer-substrings a 1 4 b 1 4) (compare-buffer-substrings a 1 7 b 1 7) (compare-buffer-substrings a 4 7 b 4 7))))	OK (0 -4 -1)
-11	(condition-case err (compare-buffer-substrings (current-buffer) 'a 2 (current-buffer) 1 2) (error err))	OK (wrong-type-argument integer-or-marker-p a)
-12	(compute-motion 1 '(0 . 0) 2 '(0 . 0) 80 nil nil)	OK (1 0 0 0 nil)
-13	(condition-case err (compute-motion 1 '(0 . 0) 2 t 80 nil nil) (error err))	OK (wrong-type-argument consp t)
-14	(constrain-to-field 3 1)	OK 3
-15	(integerp (constrain-to-field nil 1))	OK t
-16	(condition-case err (command-error-default-function) (error err))	OK (wrong-number-of-arguments command-error-default-function 0)
+10	(condition-case err (clear-string nil) (error err))	OK (wrong-type-argument stringp nil)
+11	(condition-case err (clear-string t) (error err))	OK (wrong-type-argument stringp t)
+12	(condition-case err (clear-string 'sym) (error err))	OK (wrong-type-argument stringp sym)
+13	(with-temp-buffer (let ((a (current-buffer)) (b (get-buffer-create " *vm-cbs*"))) (with-current-buffer a (erase-buffer) (insert "abcdef")) (with-current-buffer b (erase-buffer) (insert "abcxyz")) (list (compare-buffer-substrings a 1 4 b 1 4) (compare-buffer-substrings a 1 7 b 1 7) (compare-buffer-substrings a 4 7 b 4 7))))	OK (0 -4 -1)
+14	(condition-case err (compare-buffer-substrings (current-buffer) 'a 2 (current-buffer) 1 2) (error err))	OK (wrong-type-argument integer-or-marker-p a)
+15	(compute-motion 1 '(0 . 0) 2 '(0 . 0) 80 nil nil)	OK (1 0 0 0 nil)
+16	(condition-case err (compute-motion 1 '(0 . 0) 2 t 80 nil nil) (error err))	OK (wrong-type-argument consp t)
+17	(constrain-to-field 3 1)	OK 3
+18	(integerp (constrain-to-field nil 1))	OK t
+19	(condition-case err (command-error-default-function) (error err))	OK (wrong-number-of-arguments command-error-default-function 0)
