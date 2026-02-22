@@ -18598,6 +18598,36 @@ Last updated: 2026-02-21
 
 ## Doing
 
+- Aligned string comparison designator + short-alias introspection semantics with oracle:
+  - runtime changes:
+    - `rust/neovm-core/src/elisp/builtins.rs`
+      - `string-equal` / `string-lessp` now accept GNU-compatible string designators (`string` + `symbol`/`nil`/`t`/keywords).
+      - added `string-greaterp` + `string>` pure builtin dispatch.
+      - canonicalized short aliases in introspection paths:
+        - `symbol-function 'string<` -> `string-lessp`
+        - `symbol-function 'string>` -> `string-greaterp`
+        - `symbol-function 'string=` -> `string-equal`
+      - `indirect-function` now resolves those aliases to canonical subrs.
+      - added unit coverage for string designators + alias introspection shape.
+    - `rust/neovm-core/src/elisp/subr_info.rs`
+      - added `string-greaterp` / `string>` arity metadata lock-ins.
+  - vm-compat corpus changes:
+    - added and wired:
+      - `test/neovm/vm-compat/cases/string-comparison-designator-semantics.forms`
+      - `test/neovm/vm-compat/cases/string-comparison-designator-semantics.expected.tsv`
+      - `test/neovm/vm-compat/cases/default.list`
+    - lock-ins cover:
+      - `fboundp` + `symbol-function` + `indirect-function` shape for `string<`/`string>`/`string=`,
+      - symbol designator coercion for comparison calls,
+      - `func-arity` parity for all three short aliases,
+      - wrong-type payload for non-designator operands.
+  - verified:
+    - `cargo test --manifest-path rust/neovm-core/Cargo.toml pure_dispatch_typed_string_comparisons_accept_symbol_designators -- --nocapture` (pass)
+    - `cargo test --manifest-path rust/neovm-core/Cargo.toml symbol_function_resolves_builtin_and_special_names -- --nocapture` (pass)
+    - `cargo test --manifest-path rust/neovm-core/Cargo.toml indirect_function_resolves_builtin_and_special_names -- --nocapture` (pass)
+    - `make -C test/neovm/vm-compat check-one-neovm CASE=cases/string-comparison-designator-semantics` (pass; `10/10`)
+    - `make -C test/neovm/vm-compat check-neovm-filter LIST=cases/default.list PATTERN='string-'` (pass; `50` cases)
+
 - Added `minor-mode-key-binding` emulation-alist iteration lock-ins:
   - runtime notes:
     - no runtime change needed; current emulation alist traversal/error behavior already matches oracle.
@@ -19226,6 +19256,6 @@ Last updated: 2026-02-21
 ## Next
 
 1. Keep `check-all-neovm` as a recurring post-slice gate (detect regressions before they batch up).
-2. Continue doc/runtime helper lock-ins for non-arity behavior drifts (`describe-variable`, `documentation-property` edge paths, remaining startup-doc shims).
-3. Continue `subr-arity` oracle cluster slices until next `check-builtin-registry-fboundp` drift report meaningfully drops.
+2. Identify the next still-stubbed display/window/frame builtin drift and land it as a small oracle-locked slice (`forms` + `expected.tsv` + runtime patch).
+3. Continue doc/runtime helper lock-ins for non-arity behavior drifts (`describe-variable`, `documentation-property` edge paths, remaining startup-doc shims).
 4. Keep Rust backend behind compile-time switch and preserve Emacs C core as default backend.
