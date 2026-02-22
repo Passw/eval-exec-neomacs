@@ -547,6 +547,7 @@ cases/frame-designator-errors-semantics
 cases/frame-terminal-designator-semantics
 cases/frame-terminal-error-payload-semantics
 cases/frame-terminal-funcall-apply-semantics
+cases/frame-window-callable-path-semantics
 cases/frame-selected-window-semantics
 cases/window-frame-semantics
 cases/select-frame-semantics
