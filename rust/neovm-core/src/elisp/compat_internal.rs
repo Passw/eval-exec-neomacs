@@ -8,7 +8,6 @@ use super::error::{signal, EvalResult, Flow};
 use super::value::{HashTableTest, Value};
 use std::cell::RefCell;
 
-const FACE_ATTRIBUTES_VECTOR_LEN: usize = 20;
 thread_local! {
     static HASH_TABLE_TEST_ALIASES: RefCell<Vec<(String, HashTableTest)>> =
         const { RefCell::new(Vec::new()) };
@@ -16,17 +15,6 @@ thread_local! {
 
 fn expect_args(name: &str, args: &[Value], n: usize) -> Result<(), Flow> {
     if args.len() != n {
-        Err(signal(
-            "wrong-number-of-arguments",
-            vec![Value::symbol(name), Value::Int(args.len() as i64)],
-        ))
-    } else {
-        Ok(())
-    }
-}
-
-fn expect_range_args(name: &str, args: &[Value], min: usize, max: usize) -> Result<(), Flow> {
-    if args.len() < min || args.len() > max {
         Err(signal(
             "wrong-number-of-arguments",
             vec![Value::symbol(name), Value::Int(args.len() as i64)],
@@ -74,202 +62,6 @@ pub(crate) fn lookup_hash_table_test_alias(name: &str) -> Option<HashTableTest> 
             .iter()
             .find_map(|(alias, test)| (alias == name).then_some(test.clone()))
     })
-}
-
-fn expect_fixnum(value: &Value) -> Result<i64, Flow> {
-    match value {
-        Value::Int(n) => Ok(*n),
-        Value::Char(c) => Ok(*c as i64),
-        other => Err(signal(
-            "wrong-type-argument",
-            vec![Value::symbol("fixnump"), other.clone()],
-        )),
-    }
-}
-
-fn is_font_object(value: &Value) -> bool {
-    match value {
-        Value::Vector(items) => {
-            let items = items.lock().expect("poisoned");
-            matches!(
-                items.first(),
-                Some(Value::Keyword(tag)) if tag == "font-object"
-            )
-        }
-        _ => false,
-    }
-}
-
-fn is_font_spec(value: &Value) -> bool {
-    match value {
-        Value::Vector(items) => {
-            let items = items.lock().expect("poisoned");
-            matches!(items.first(), Some(Value::Keyword(tag)) if tag == "font-spec")
-        }
-        _ => false,
-    }
-}
-
-fn unspecified_face_attributes_vector() -> Value {
-    Value::vector(vec![
-        Value::symbol("unspecified");
-        FACE_ATTRIBUTES_VECTOR_LEN
-    ])
-}
-
-fn expect_stringp(value: &Value) -> Result<(), Flow> {
-    match value {
-        Value::Str(_) => Ok(()),
-        other => Err(signal(
-            "wrong-type-argument",
-            vec![Value::symbol("stringp"), other.clone()],
-        )),
-    }
-}
-
-fn expect_characterp_from_int(value: &Value) -> Result<char, Flow> {
-    match value {
-        Value::Int(n) if *n >= 0 => Ok((*n as u8) as char),
-        Value::Char(c) => Ok(*c),
-        other => Err(signal(
-            "wrong-type-argument",
-            vec![Value::symbol("characterp"), other.clone()],
-        )),
-    }
-}
-
-/// `(face-attributes-as-vector FACE)` -> FACE attribute vector.
-pub(crate) fn builtin_face_attributes_as_vector(args: Vec<Value>) -> EvalResult {
-    expect_args("face-attributes-as-vector", &args, 1)?;
-    Ok(unspecified_face_attributes_vector())
-}
-
-/// `(font-face-attributes FONT &optional FRAME)` -> vector or compatibility error.
-pub(crate) fn builtin_font_face_attributes(args: Vec<Value>) -> EvalResult {
-    expect_range_args("font-face-attributes", &args, 1, 2)?;
-    if !is_font_object(&args[0]) {
-        return Err(signal("error", vec![Value::string("Invalid font object")]));
-    }
-    Ok(unspecified_face_attributes_vector())
-}
-
-/// `(font-get-glyphs FONT FROM TO &optional STR)` -> nil.
-pub(crate) fn builtin_font_get_glyphs(args: Vec<Value>) -> EvalResult {
-    expect_range_args("font-get-glyphs", &args, 3, 4)?;
-    if !is_font_object(&args[0]) {
-        return Err(signal(
-            "wrong-type-argument",
-            vec![Value::symbol("font-object"), args[0].clone()],
-        ));
-    }
-    let _ = expect_fixnum(&args[1])?;
-    let _ = expect_fixnum(&args[2])?;
-    Ok(Value::Nil)
-}
-
-/// `(font-has-char-p FONT CHAR &optional SCRIPT)` -> nil.
-pub(crate) fn builtin_font_has_char_p(args: Vec<Value>) -> EvalResult {
-    expect_range_args("font-has-char-p", &args, 2, 3)?;
-    if !is_font_object(&args[0]) && !is_font_spec(&args[0]) {
-        return Err(signal(
-            "wrong-type-argument",
-            vec![Value::symbol("font"), args[0].clone()],
-        ));
-    }
-    let _ = expect_characterp_from_int(&args[1])?;
-    Ok(Value::Nil)
-}
-
-/// `(font-info FONT &optional FRAME)` -> nil.
-pub(crate) fn builtin_font_info(args: Vec<Value>) -> EvalResult {
-    expect_range_args("font-info", &args, 1, 2)?;
-    expect_stringp(&args[0])?;
-    Ok(Value::Nil)
-}
-
-/// `(font-match-p SPEC FONT-SPEC)` -> nil.
-pub(crate) fn builtin_font_match_p(args: Vec<Value>) -> EvalResult {
-    expect_args("font-match-p", &args, 2)?;
-    if !is_font_spec(&args[0]) {
-        return Err(signal(
-            "wrong-type-argument",
-            vec![Value::symbol("font-spec"), args[0].clone()],
-        ));
-    }
-    if !is_font_spec(&args[1]) {
-        return Err(signal(
-            "wrong-type-argument",
-            vec![Value::symbol("font-spec"), args[1].clone()],
-        ));
-    }
-    Ok(Value::Nil)
-}
-
-/// `(font-shape-gstring GLYPH-STRING DIRECTION)` -> nil or compatibility error.
-pub(crate) fn builtin_font_shape_gstring(args: Vec<Value>) -> EvalResult {
-    expect_args("font-shape-gstring", &args, 2)?;
-    if !matches!(args[0], Value::Vector(_)) {
-        return Err(signal(
-            "error",
-            vec![Value::string("Invalid glyph-string: ")],
-        ));
-    }
-    let _ = expect_fixnum(&args[1])?;
-    Ok(Value::Nil)
-}
-
-/// `(font-variation-glyphs FONT-OBJECT CHAR)` -> nil.
-pub(crate) fn builtin_font_variation_glyphs(args: Vec<Value>) -> EvalResult {
-    expect_args("font-variation-glyphs", &args, 2)?;
-    if !is_font_object(&args[0]) {
-        return Err(signal(
-            "wrong-type-argument",
-            vec![Value::symbol("font-object"), args[0].clone()],
-        ));
-    }
-    let _ = expect_characterp_from_int(&args[1])?;
-    Ok(Value::Nil)
-}
-
-/// `(font-at POS &optional WINDOW STRING)` -> nil or compatibility error.
-pub(crate) fn builtin_font_at(args: Vec<Value>) -> EvalResult {
-    expect_range_args("font-at", &args, 1, 3)?;
-
-    if let Some(window) = args.get(1) {
-        if !window.is_nil() && !matches!(window, Value::Window(_)) {
-            return Err(signal(
-                "wrong-type-argument",
-                vec![Value::symbol("window-live-p"), window.clone()],
-            ));
-        }
-    }
-
-    if let Some(string_value) = args.get(2) {
-        if !string_value.is_nil() {
-            let Value::Str(s) = string_value else {
-                return Err(signal(
-                    "wrong-type-argument",
-                    vec![Value::symbol("stringp"), string_value.clone()],
-                ));
-            };
-            let pos = match args[0] {
-                Value::Int(n) => n,
-                Value::Char(c) => c as i64,
-                _ => 1,
-            };
-            return Err(signal(
-                "args-out-of-range",
-                vec![Value::string((**s).clone()), Value::Int(pos)],
-            ));
-        }
-    }
-
-    Err(signal(
-        "error",
-        vec![Value::string(
-            "Specified window is not displaying the current buffer",
-        )],
-    ))
 }
 
 /// `(define-hash-table-test SYMBOL TEST HASH)` -> (TEST HASH).
@@ -391,12 +183,13 @@ mod tests {
 
     #[test]
     fn face_attributes_as_vector_shape() {
-        let out = builtin_face_attributes_as_vector(vec![Value::Nil]).unwrap();
+        let out =
+            crate::elisp::builtins::builtin_face_attributes_as_vector(vec![Value::Nil]).unwrap();
         let Value::Vector(values) = out else {
             panic!("expected vector");
         };
         let values = values.lock().expect("poisoned");
-        assert_eq!(values.len(), FACE_ATTRIBUTES_VECTOR_LEN);
+        assert_eq!(values.len(), 20);
     }
 
     #[test]
@@ -413,7 +206,8 @@ mod tests {
 
     #[test]
     fn font_match_p_requires_font_spec_values() {
-        let err = builtin_font_match_p(vec![Value::Nil, Value::Nil]).unwrap_err();
+        let err =
+            crate::elisp::builtins::builtin_font_match_p(vec![Value::Nil, Value::Nil]).unwrap_err();
         match err {
             Flow::Signal(sig) => assert_eq!(sig.symbol, "wrong-type-argument"),
             other => panic!("expected signal, got {other:?}"),
@@ -422,11 +216,9 @@ mod tests {
 
     #[test]
     fn frame_set_was_invisible_returns_new_state() {
-        let out = crate::elisp::builtins::builtin_frame_set_was_invisible(vec![
-            Value::Nil,
-            Value::True,
-        ])
-        .unwrap();
+        let out =
+            crate::elisp::builtins::builtin_frame_set_was_invisible(vec![Value::Nil, Value::True])
+                .unwrap();
         assert_eq!(out, Value::True);
     }
 
@@ -448,8 +240,8 @@ mod tests {
 
     #[test]
     fn garbage_collect_maybe_requires_whole_number() {
-        let err = crate::elisp::builtins::builtin_garbage_collect_maybe(vec![Value::True])
-            .unwrap_err();
+        let err =
+            crate::elisp::builtins::builtin_garbage_collect_maybe(vec![Value::True]).unwrap_err();
         match err {
             Flow::Signal(sig) => assert_eq!(sig.symbol, "wrong-type-argument"),
             other => panic!("expected signal, got {other:?}"),
@@ -465,8 +257,10 @@ mod tests {
     #[test]
     fn gnutls_peer_status_warning_describe_rejects_non_symbol() {
         let err =
-            crate::elisp::builtins::builtin_gnutls_peer_status_warning_describe(vec![Value::Int(0)])
-                .unwrap_err();
+            crate::elisp::builtins::builtin_gnutls_peer_status_warning_describe(vec![Value::Int(
+                0,
+            )])
+            .unwrap_err();
         match err {
             Flow::Signal(sig) => assert_eq!(sig.symbol, "wrong-type-argument"),
             other => panic!("expected signal, got {other:?}"),
@@ -545,8 +339,8 @@ mod tests {
 
     #[test]
     fn gnutls_bye_requires_process() {
-        let err = crate::elisp::builtins::builtin_gnutls_bye(vec![Value::Nil, Value::Nil])
-            .unwrap_err();
+        let err =
+            crate::elisp::builtins::builtin_gnutls_bye(vec![Value::Nil, Value::Nil]).unwrap_err();
         match err {
             Flow::Signal(sig) => assert_eq!(sig.symbol, "wrong-type-argument"),
             other => panic!("expected signal, got {other:?}"),
@@ -555,8 +349,8 @@ mod tests {
 
     #[test]
     fn gnutls_format_certificate_requires_string() {
-        let err =
-            crate::elisp::builtins::builtin_gnutls_format_certificate(vec![Value::Nil]).unwrap_err();
+        let err = crate::elisp::builtins::builtin_gnutls_format_certificate(vec![Value::Nil])
+            .unwrap_err();
         match err {
             Flow::Signal(sig) => assert_eq!(sig.symbol, "wrong-type-argument"),
             other => panic!("expected signal, got {other:?}"),
@@ -565,9 +359,11 @@ mod tests {
 
     #[test]
     fn gnutls_hash_digest_nil_method_signals_error() {
-        let err =
-            crate::elisp::builtins::builtin_gnutls_hash_digest(vec![Value::Nil, Value::string("a")])
-                .unwrap_err();
+        let err = crate::elisp::builtins::builtin_gnutls_hash_digest(vec![
+            Value::Nil,
+            Value::string("a"),
+        ])
+        .unwrap_err();
         match err {
             Flow::Signal(sig) => assert_eq!(sig.symbol, "error"),
             other => panic!("expected signal, got {other:?}"),
@@ -600,7 +396,8 @@ mod tests {
 
     #[test]
     fn handle_switch_frame_requires_frame_object() {
-        let err = crate::elisp::builtins::builtin_handle_switch_frame(vec![Value::Nil]).unwrap_err();
+        let err =
+            crate::elisp::builtins::builtin_handle_switch_frame(vec![Value::Nil]).unwrap_err();
         match err {
             Flow::Signal(sig) => assert_eq!(sig.symbol, "wrong-type-argument"),
             other => panic!("expected signal, got {other:?}"),
@@ -637,8 +434,8 @@ mod tests {
 
     #[test]
     fn window_combination_limit_requires_window_designator() {
-        let err = crate::elisp::builtins::builtin_window_combination_limit(vec![Value::Nil])
-            .unwrap_err();
+        let err =
+            crate::elisp::builtins::builtin_window_combination_limit(vec![Value::Nil]).unwrap_err();
         match err {
             Flow::Signal(sig) => {
                 assert_eq!(sig.symbol, "wrong-type-argument");
@@ -650,9 +447,8 @@ mod tests {
 
     #[test]
     fn window_combination_limit_signals_internal_only_for_window_object() {
-        let err =
-            crate::elisp::builtins::builtin_window_combination_limit(vec![Value::Window(1)])
-                .unwrap_err();
+        let err = crate::elisp::builtins::builtin_window_combination_limit(vec![Value::Window(1)])
+            .unwrap_err();
         match err {
             Flow::Signal(sig) => assert_eq!(sig.symbol, "error"),
             other => panic!("expected signal, got {other:?}"),
@@ -661,8 +457,8 @@ mod tests {
 
     #[test]
     fn window_resize_apply_rejects_non_frame_designator() {
-        let err =
-            crate::elisp::builtins::builtin_window_resize_apply(vec![Value::Window(1)]).unwrap_err();
+        let err = crate::elisp::builtins::builtin_window_resize_apply(vec![Value::Window(1)])
+            .unwrap_err();
         match err {
             Flow::Signal(sig) => {
                 assert_eq!(sig.symbol, "wrong-type-argument");

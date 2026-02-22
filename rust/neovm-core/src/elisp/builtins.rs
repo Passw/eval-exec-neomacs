@@ -7118,7 +7118,9 @@ pub(crate) fn builtin_gpm_mouse_start(args: Vec<Value>) -> EvalResult {
     expect_args("gpm-mouse-start", &args, 0)?;
     Err(signal(
         "error",
-        vec![Value::string("Gpm-mouse only works in the GNU/Linux console")],
+        vec![Value::string(
+            "Gpm-mouse only works in the GNU/Linux console",
+        )],
     ))
 }
 
@@ -7573,6 +7575,7 @@ pub(crate) fn builtin_gnutls_symmetric_encrypt(args: Vec<Value>) -> EvalResult {
     Ok(Value::Nil)
 }
 
+const FACE_ATTRIBUTES_VECTOR_LEN: usize = 20;
 const DEFAULT_FONTSET_NAME: &str = "-*-*-*-*-*-*-*-*-*-*-*-*-fontset-default";
 
 pub(crate) fn builtin_font_get_system_font(args: Vec<Value>) -> EvalResult {
@@ -7594,6 +7597,156 @@ fn expect_characterp_from_int(value: &Value) -> Result<char, Flow> {
             vec![Value::symbol("characterp"), other.clone()],
         )),
     }
+}
+
+fn is_font_object(value: &Value) -> bool {
+    match value {
+        Value::Vector(items) => {
+            let items = items.lock().expect("poisoned");
+            matches!(
+                items.first(),
+                Some(Value::Keyword(tag)) if tag == "font-object"
+            )
+        }
+        _ => false,
+    }
+}
+
+fn is_font_spec(value: &Value) -> bool {
+    match value {
+        Value::Vector(items) => {
+            let items = items.lock().expect("poisoned");
+            matches!(items.first(), Some(Value::Keyword(tag)) if tag == "font-spec")
+        }
+        _ => false,
+    }
+}
+
+fn unspecified_face_attributes_vector() -> Value {
+    Value::vector(vec![
+        Value::symbol("unspecified");
+        FACE_ATTRIBUTES_VECTOR_LEN
+    ])
+}
+
+pub(crate) fn builtin_face_attributes_as_vector(args: Vec<Value>) -> EvalResult {
+    expect_args("face-attributes-as-vector", &args, 1)?;
+    Ok(unspecified_face_attributes_vector())
+}
+
+pub(crate) fn builtin_font_at(args: Vec<Value>) -> EvalResult {
+    expect_range_args("font-at", &args, 1, 3)?;
+
+    if let Some(window) = args.get(1) {
+        expect_window_live_or_nil(window)?;
+    }
+
+    if let Some(string_value) = args.get(2) {
+        if !string_value.is_nil() {
+            let Value::Str(s) = string_value else {
+                return Err(signal(
+                    "wrong-type-argument",
+                    vec![Value::symbol("stringp"), string_value.clone()],
+                ));
+            };
+            let pos = match args[0] {
+                Value::Int(n) => n,
+                Value::Char(c) => c as i64,
+                _ => 1,
+            };
+            return Err(signal(
+                "args-out-of-range",
+                vec![Value::string((**s).clone()), Value::Int(pos)],
+            ));
+        }
+    }
+
+    Err(signal(
+        "error",
+        vec![Value::string(
+            "Specified window is not displaying the current buffer",
+        )],
+    ))
+}
+
+pub(crate) fn builtin_font_face_attributes(args: Vec<Value>) -> EvalResult {
+    expect_range_args("font-face-attributes", &args, 1, 2)?;
+    if !is_font_object(&args[0]) {
+        return Err(signal("error", vec![Value::string("Invalid font object")]));
+    }
+    Ok(unspecified_face_attributes_vector())
+}
+
+pub(crate) fn builtin_font_get_glyphs(args: Vec<Value>) -> EvalResult {
+    expect_range_args("font-get-glyphs", &args, 3, 4)?;
+    if !is_font_object(&args[0]) {
+        return Err(signal(
+            "wrong-type-argument",
+            vec![Value::symbol("font-object"), args[0].clone()],
+        ));
+    }
+    let _ = expect_fixnum(&args[1])?;
+    let _ = expect_fixnum(&args[2])?;
+    Ok(Value::Nil)
+}
+
+pub(crate) fn builtin_font_has_char_p(args: Vec<Value>) -> EvalResult {
+    expect_range_args("font-has-char-p", &args, 2, 3)?;
+    if !is_font_object(&args[0]) && !is_font_spec(&args[0]) {
+        return Err(signal(
+            "wrong-type-argument",
+            vec![Value::symbol("font"), args[0].clone()],
+        ));
+    }
+    let _ = expect_characterp_from_int(&args[1])?;
+    Ok(Value::Nil)
+}
+
+pub(crate) fn builtin_font_info(args: Vec<Value>) -> EvalResult {
+    expect_range_args("font-info", &args, 1, 2)?;
+    let _ = expect_strict_string(&args[0])?;
+    Ok(Value::Nil)
+}
+
+pub(crate) fn builtin_font_match_p(args: Vec<Value>) -> EvalResult {
+    expect_args("font-match-p", &args, 2)?;
+    if !is_font_spec(&args[0]) {
+        return Err(signal(
+            "wrong-type-argument",
+            vec![Value::symbol("font-spec"), args[0].clone()],
+        ));
+    }
+    if !is_font_spec(&args[1]) {
+        return Err(signal(
+            "wrong-type-argument",
+            vec![Value::symbol("font-spec"), args[1].clone()],
+        ));
+    }
+    Ok(Value::Nil)
+}
+
+pub(crate) fn builtin_font_shape_gstring(args: Vec<Value>) -> EvalResult {
+    expect_args("font-shape-gstring", &args, 2)?;
+    if !matches!(args[0], Value::Vector(_)) {
+        return Err(signal(
+            "error",
+            vec![Value::string("Invalid glyph-string: ")],
+        ));
+    }
+    let _ = expect_fixnum(&args[1])?;
+    Ok(Value::Nil)
+}
+
+pub(crate) fn builtin_font_variation_glyphs(args: Vec<Value>) -> EvalResult {
+    expect_args("font-variation-glyphs", &args, 2)?;
+    if !is_font_object(&args[0]) {
+        return Err(signal(
+            "wrong-type-argument",
+            vec![Value::symbol("font-object"), args[0].clone()],
+        ));
+    }
+    let _ = expect_characterp_from_int(&args[1])?;
+    Ok(Value::Nil)
 }
 
 pub(crate) fn builtin_fontset_font(args: Vec<Value>) -> EvalResult {
@@ -16665,19 +16818,17 @@ pub(crate) fn dispatch_builtin(
         "describe-buffer-bindings" => builtin_describe_buffer_bindings(args),
         "describe-vector" => builtin_describe_vector(args),
         "delete-terminal" => builtin_delete_terminal(args),
-        "face-attributes-as-vector" => {
-            super::compat_internal::builtin_face_attributes_as_vector(args)
-        }
-        "font-at" => super::compat_internal::builtin_font_at(args),
-        "font-face-attributes" => super::compat_internal::builtin_font_face_attributes(args),
-        "font-get-glyphs" => super::compat_internal::builtin_font_get_glyphs(args),
+        "face-attributes-as-vector" => builtin_face_attributes_as_vector(args),
+        "font-at" => builtin_font_at(args),
+        "font-face-attributes" => builtin_font_face_attributes(args),
+        "font-get-glyphs" => builtin_font_get_glyphs(args),
         "font-get-system-font" => builtin_font_get_system_font(args),
         "font-get-system-normal-font" => builtin_font_get_system_normal_font(args),
-        "font-has-char-p" => super::compat_internal::builtin_font_has_char_p(args),
-        "font-info" => super::compat_internal::builtin_font_info(args),
-        "font-match-p" => super::compat_internal::builtin_font_match_p(args),
-        "font-shape-gstring" => super::compat_internal::builtin_font_shape_gstring(args),
-        "font-variation-glyphs" => super::compat_internal::builtin_font_variation_glyphs(args),
+        "font-has-char-p" => builtin_font_has_char_p(args),
+        "font-info" => builtin_font_info(args),
+        "font-match-p" => builtin_font_match_p(args),
+        "font-shape-gstring" => builtin_font_shape_gstring(args),
+        "font-variation-glyphs" => builtin_font_variation_glyphs(args),
         "fontset-font" => builtin_fontset_font(args),
         "fontset-info" => builtin_fontset_info(args),
         "fontset-list" => builtin_fontset_list(args),
@@ -17490,19 +17641,17 @@ pub(crate) fn dispatch_builtin_pure(name: &str, args: Vec<Value>) -> Option<Eval
         "describe-buffer-bindings" => builtin_describe_buffer_bindings(args),
         "describe-vector" => builtin_describe_vector(args),
         "delete-terminal" => builtin_delete_terminal(args),
-        "face-attributes-as-vector" => {
-            super::compat_internal::builtin_face_attributes_as_vector(args)
-        }
-        "font-at" => super::compat_internal::builtin_font_at(args),
-        "font-face-attributes" => super::compat_internal::builtin_font_face_attributes(args),
-        "font-get-glyphs" => super::compat_internal::builtin_font_get_glyphs(args),
+        "face-attributes-as-vector" => builtin_face_attributes_as_vector(args),
+        "font-at" => builtin_font_at(args),
+        "font-face-attributes" => builtin_font_face_attributes(args),
+        "font-get-glyphs" => builtin_font_get_glyphs(args),
         "font-get-system-font" => builtin_font_get_system_font(args),
         "font-get-system-normal-font" => builtin_font_get_system_normal_font(args),
-        "font-has-char-p" => super::compat_internal::builtin_font_has_char_p(args),
-        "font-info" => super::compat_internal::builtin_font_info(args),
-        "font-match-p" => super::compat_internal::builtin_font_match_p(args),
-        "font-shape-gstring" => super::compat_internal::builtin_font_shape_gstring(args),
-        "font-variation-glyphs" => super::compat_internal::builtin_font_variation_glyphs(args),
+        "font-has-char-p" => builtin_font_has_char_p(args),
+        "font-info" => builtin_font_info(args),
+        "font-match-p" => builtin_font_match_p(args),
+        "font-shape-gstring" => builtin_font_shape_gstring(args),
+        "font-variation-glyphs" => builtin_font_variation_glyphs(args),
         "fontset-font" => builtin_fontset_font(args),
         "fontset-info" => builtin_fontset_info(args),
         "fontset-list" => builtin_fontset_list(args),
@@ -23044,12 +23193,10 @@ mod tests {
             HashTableTest::Eq
         ));
 
-        let was_invisible = dispatch_builtin_pure(
-            "frame--set-was-invisible",
-            vec![Value::Nil, Value::True],
-        )
-        .expect("frame--set-was-invisible should resolve")
-        .expect("frame--set-was-invisible should evaluate");
+        let was_invisible =
+            dispatch_builtin_pure("frame--set-was-invisible", vec![Value::Nil, Value::True])
+                .expect("frame--set-was-invisible should resolve")
+                .expect("frame--set-was-invisible should evaluate");
         assert_eq!(was_invisible, Value::True);
 
         let changed = dispatch_builtin_pure("frame-or-buffer-changed-p", vec![])
@@ -23104,7 +23251,10 @@ mod tests {
 
         let vec_err = dispatch_builtin_pure(
             "describe-vector",
-            vec![Value::vector(vec![Value::Int(1)]), Value::symbol("display-buffer")],
+            vec![
+                Value::vector(vec![Value::Int(1)]),
+                Value::symbol("display-buffer"),
+            ],
         )
         .expect("describe-vector should resolve")
         .unwrap_err();
@@ -23149,10 +23299,12 @@ mod tests {
             .expect("garbage-collect-maybe should evaluate");
         assert_eq!(gc, Value::Nil);
 
-        let prop_err =
-            dispatch_builtin_pure("get-unicode-property-internal", vec![Value::Nil, Value::Int(0)])
-                .expect("get-unicode-property-internal should resolve")
-                .unwrap_err();
+        let prop_err = dispatch_builtin_pure(
+            "get-unicode-property-internal",
+            vec![Value::Nil, Value::Int(0)],
+        )
+        .expect("get-unicode-property-internal should resolve")
+        .unwrap_err();
         match prop_err {
             Flow::Signal(sig) => assert_eq!(sig.symbol, "wrong-type-argument"),
             other => panic!("expected signal, got {other:?}"),
@@ -23237,9 +23389,10 @@ mod tests {
             other => panic!("expected signal, got {other:?}"),
         }
 
-        let digest_err = dispatch_builtin_pure("gnutls-hash-digest", vec![Value::Nil, Value::string("a")])
-            .expect("gnutls-hash-digest should resolve")
-            .unwrap_err();
+        let digest_err =
+            dispatch_builtin_pure("gnutls-hash-digest", vec![Value::Nil, Value::string("a")])
+                .expect("gnutls-hash-digest should resolve")
+                .unwrap_err();
         match digest_err {
             Flow::Signal(sig) => assert_eq!(sig.symbol, "error"),
             other => panic!("expected signal, got {other:?}"),
@@ -23247,7 +23400,11 @@ mod tests {
 
         let mac = dispatch_builtin_pure(
             "gnutls-hash-mac",
-            vec![Value::symbol("SHA256"), Value::string("k"), Value::string("a")],
+            vec![
+                Value::symbol("SHA256"),
+                Value::string("k"),
+                Value::string("a"),
+            ],
         )
         .expect("gnutls-hash-mac should resolve")
         .expect("gnutls-hash-mac should evaluate");
@@ -23266,6 +23423,66 @@ mod tests {
         .expect("gnutls-symmetric-encrypt should resolve")
         .expect("gnutls-symmetric-encrypt should evaluate");
         assert_eq!(enc, Value::Nil);
+    }
+
+    #[test]
+    fn dispatch_builtin_pure_handles_font_face_placeholders() {
+        let face = dispatch_builtin_pure("face-attributes-as-vector", vec![Value::Nil])
+            .expect("face-attributes-as-vector should resolve")
+            .expect("face-attributes-as-vector should evaluate");
+        let Value::Vector(values) = face else {
+            panic!("expected vector");
+        };
+        assert_eq!(
+            values.lock().expect("poisoned").len(),
+            FACE_ATTRIBUTES_VECTOR_LEN
+        );
+
+        let font_object = Value::vector(vec![Value::keyword("font-object")]);
+        let font_spec = Value::vector(vec![Value::keyword("font-spec")]);
+
+        let attrs = dispatch_builtin_pure("font-face-attributes", vec![font_object.clone()])
+            .expect("font-face-attributes should resolve")
+            .expect("font-face-attributes should evaluate");
+        let Value::Vector(values) = attrs else {
+            panic!("expected vector");
+        };
+        assert_eq!(
+            values.lock().expect("poisoned").len(),
+            FACE_ATTRIBUTES_VECTOR_LEN
+        );
+
+        let glyphs = dispatch_builtin_pure(
+            "font-get-glyphs",
+            vec![font_object.clone(), Value::Int(0), Value::Int(1)],
+        )
+        .expect("font-get-glyphs should resolve")
+        .expect("font-get-glyphs should evaluate");
+        assert_eq!(glyphs, Value::Nil);
+
+        let has_char = dispatch_builtin_pure(
+            "font-has-char-p",
+            vec![font_spec.clone(), Value::Int('a' as i64)],
+        )
+        .expect("font-has-char-p should resolve")
+        .expect("font-has-char-p should evaluate");
+        assert_eq!(has_char, Value::Nil);
+
+        let match_err = dispatch_builtin_pure("font-match-p", vec![Value::Nil, font_spec])
+            .expect("font-match-p should resolve")
+            .unwrap_err();
+        match match_err {
+            Flow::Signal(sig) => assert_eq!(sig.symbol, "wrong-type-argument"),
+            other => panic!("expected signal, got {other:?}"),
+        }
+
+        let at_err = dispatch_builtin_pure("font-at", vec![Value::Int(1)])
+            .expect("font-at should resolve")
+            .unwrap_err();
+        match at_err {
+            Flow::Signal(sig) => assert_eq!(sig.symbol, "error"),
+            other => panic!("expected signal, got {other:?}"),
+        }
     }
 
     #[test]
@@ -23288,9 +23505,10 @@ mod tests {
         .expect("fontset-font should evaluate");
         assert_eq!(fontset, Value::Nil);
 
-        let info_err = dispatch_builtin_pure("fontset-info", vec![Value::symbol("fontset-default")])
-            .expect("fontset-info should resolve")
-            .unwrap_err();
+        let info_err =
+            dispatch_builtin_pure("fontset-info", vec![Value::symbol("fontset-default")])
+                .expect("fontset-info should resolve")
+                .unwrap_err();
         match info_err {
             Flow::Signal(sig) => assert_eq!(sig.symbol, "error"),
             other => panic!("expected signal, got {other:?}"),
