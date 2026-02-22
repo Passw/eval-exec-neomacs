@@ -465,6 +465,7 @@ cases/x-display-color-get-device-terminal-error-payload-semantics
 cases/x-display-color-alias-error-payload-semantics
 cases/x-display-color-designator-type-matrix-semantics
 cases/x-display-pixel-designator-type-matrix-semantics
+cases/x-display-pixel-frame-message-payload-semantics
 cases/x-display-query-designator-type-matrix-semantics
 cases/x-display-query-arity-type-payload-semantics
 cases/x-display-query-message-payload-semantics

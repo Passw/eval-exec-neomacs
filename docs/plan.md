@@ -19797,6 +19797,18 @@ Last updated: 2026-02-21
       - one/two/three-arg over-arity payloads stay exact:
         - `(wrong-number-of-arguments x-display-list N)`
 
+- Added dedicated `x-display-pixel-*` frame-message payload lock-ins:
+  - vm-compat corpus changes:
+    - added:
+      - `test/neovm/vm-compat/cases/x-display-pixel-frame-message-payload-semantics.forms`
+      - `test/neovm/vm-compat/cases/x-display-pixel-frame-message-payload-semantics.expected.tsv`
+    - wired case into:
+      - `test/neovm/vm-compat/cases/default.list`
+    - lock-ins assert selected-frame message payload stability for:
+      - `x-display-pixel-width`
+      - `x-display-pixel-height`
+      - both preserve `(error "Window system frame should be used")`
+
 - Continue compatibility-first maintenance with small commit slices:
   - keep builtin surface and registry in lock-step
   - run oracle/parity checks after each behavior-affecting change
