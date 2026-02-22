@@ -808,10 +808,8 @@ pub(crate) fn sf_pcase_let(eval: &mut Evaluator, tail: &[Expr]) -> EvalResult {
     for entry in &bindings_expr {
         let Expr::List(pair) = entry else {
             return Err(signal(
-                "error",
-                vec![Value::string(
-                    "pcase-let binding must be a list (PATTERN VAL)",
-                )],
+                "wrong-type-argument",
+                vec![Value::symbol("listp"), quote_to_value(entry)],
             ));
         };
         if pair.len() < 2 {
@@ -880,10 +878,8 @@ pub(crate) fn sf_pcase_let_star(eval: &mut Evaluator, tail: &[Expr]) -> EvalResu
                 }
             }
             return Err(signal(
-                "error",
-                vec![Value::string(
-                    "pcase-let* binding must be a list (PATTERN VAL)",
-                )],
+                "wrong-type-argument",
+                vec![Value::symbol("listp"), quote_to_value(entry)],
             ));
         };
         if pair.len() < 2 {
@@ -1746,6 +1742,20 @@ mod tests {
         assert_eq!(eval_last("(pcase-let (((pred numberp) \"x\")) 'ok)"), "OK ok");
     }
 
+    #[test]
+    fn pcase_let_non_list_binding_entry_signals_list_type_error() {
+        assert_eq!(
+            eval_last("(condition-case err (pcase-let ((x 1) y) y) (error err))"),
+            "OK (wrong-type-argument listp y)"
+        );
+        assert_eq!(
+            eval_last(
+                "(condition-case err (pcase-let (((app car x y) '(1 2)) x)) (error err))"
+            ),
+            "OK (wrong-type-argument listp x)"
+        );
+    }
+
     // =======================================================================
     // 19. pcase-let* sequential binding
     // =======================================================================
@@ -1782,6 +1792,18 @@ mod tests {
     #[test]
     fn pcase_let_star_predicate_mismatch_still_evaluates_body() {
         assert_eq!(eval_last("(pcase-let* (((pred numberp) \"x\")) 'ok)"), "OK ok");
+    }
+
+    #[test]
+    fn pcase_let_star_non_list_binding_entry_signals_list_type_error() {
+        assert_eq!(
+            eval_last("(condition-case err (pcase-let* (x) x) (error err))"),
+            "OK (wrong-type-argument listp x)"
+        );
+        assert_eq!(
+            eval_last("(condition-case err (pcase-let* ((x 1) y) y) (error err))"),
+            "OK (wrong-type-argument listp y)"
+        );
     }
 
     // =======================================================================

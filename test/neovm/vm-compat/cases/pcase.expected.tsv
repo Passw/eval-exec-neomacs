@@ -64,3 +64,7 @@
 64	(condition-case err (pcase-let* (((pred integerp 2 3) 1)) 'ok) (error err))	OK ok
 65	(condition-case err (let ((acc nil)) (pcase-dolist ((pred) '(1 2)) (push 1 acc)) (nreverse acc)) (error err))	OK (void-function nil)
 66	(condition-case err (let ((acc nil)) (pcase-dolist ((pred integerp 2 3) '(1 2)) (push 1 acc)) (nreverse acc)) (error err))	OK (1 1)
+67	(condition-case err (pcase-let ((x 1) y) y) (error err))	OK (wrong-type-argument listp y)
+68	(condition-case err (pcase-let (((app car x y) '(1 2)) x)) (error err))	OK (wrong-type-argument listp x)
+69	(condition-case err (pcase-let* (x) x) (error err))	OK (wrong-type-argument listp x)
+70	(condition-case err (pcase-let* ((x 1) y) y) (error err))	OK (wrong-type-argument listp y)

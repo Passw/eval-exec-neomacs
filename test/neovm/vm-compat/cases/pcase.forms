@@ -81,3 +81,9 @@
 (condition-case err (pcase-let* (((pred integerp 2 3) 1)) 'ok) (error err))
 (condition-case err (let ((acc nil)) (pcase-dolist ((pred) '(1 2)) (push 1 acc)) (nreverse acc)) (error err))
 (condition-case err (let ((acc nil)) (pcase-dolist ((pred integerp 2 3) '(1 2)) (push 1 acc)) (nreverse acc)) (error err))
+
+; non-list pcase-let/pcase-let* binding entries
+(condition-case err (pcase-let ((x 1) y) y) (error err))
+(condition-case err (pcase-let (((app car x y) '(1 2)) x)) (error err))
+(condition-case err (pcase-let* (x) x) (error err))
+(condition-case err (pcase-let* ((x 1) y) y) (error err))
