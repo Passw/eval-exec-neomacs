@@ -513,6 +513,7 @@ cases/terminal-live-p-designator-semantics
 cases/terminal-handle-printing
 cases/terminal-name-designator-payload-semantics
 cases/terminal-name-live-p-funcall-apply-semantics
+cases/terminal-parameter-funcall-apply-semantics
 cases/terminal-parameter-error-payload-semantics
 cases/frame-batch-semantics
 cases/frame-object-return-semantics
