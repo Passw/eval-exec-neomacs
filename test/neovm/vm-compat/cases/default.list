@@ -577,6 +577,7 @@ cases/window-list-frame-designator-semantics
 cases/window-list-minibuf-all-frames-semantics
 cases/window-object-return-semantics
 cases/window-list-minibuffer-window-accessor-semantics
+cases/get-buffer-window-callable-path-semantics
 cases/get-buffer-window-optional-buffer-semantics
 cases/other-buffer-semantics
 cases/kill-buffer-runtime-semantics
