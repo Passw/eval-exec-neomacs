@@ -6511,7 +6511,23 @@ pub(crate) fn builtin_make_record(args: Vec<Value>) -> EvalResult {
 
 pub(crate) fn builtin_marker_last_position(args: Vec<Value>) -> EvalResult {
     expect_args("marker-last-position", &args, 1)?;
-    Ok(Value::Nil)
+    if !super::marker::is_marker(&args[0]) {
+        return Err(signal(
+            "wrong-type-argument",
+            vec![Value::symbol("markerp"), args[0].clone()],
+        ));
+    }
+    match &args[0] {
+        Value::Vector(vec) => {
+            let items = with_heap(|h| h.get_vector(*vec).clone());
+            if let Some(Value::Int(pos)) = items.get(2) {
+                Ok(Value::Int(*pos))
+            } else {
+                Ok(Value::Int(0))
+            }
+        }
+        _ => unreachable!("markerp check above guarantees marker vector"),
+    }
 }
 
 pub(crate) fn builtin_match_data_translate(args: Vec<Value>) -> EvalResult {
@@ -23379,10 +23395,13 @@ mod tests {
         .expect("builtin make-record should evaluate");
         assert!(make_record.is_nil());
 
-        let marker_last_position = dispatch_builtin_pure("marker-last-position", vec![Value::Nil])
+        let marker_last_position = dispatch_builtin_pure(
+            "marker-last-position",
+            vec![crate::elisp::marker::make_marker_value(None, None, false)],
+        )
             .expect("builtin marker-last-position should resolve")
             .expect("builtin marker-last-position should evaluate");
-        assert!(marker_last_position.is_nil());
+        assert_eq!(marker_last_position, Value::Int(0));
 
         let match_data_translate = dispatch_builtin_pure("match-data--translate", vec![Value::Nil])
             .expect("builtin match-data--translate should resolve")
