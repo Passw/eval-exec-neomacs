@@ -331,6 +331,7 @@ cases/get-byte-semantics
 cases/string-pixel-width-semantics
 cases/indent-column-semantics
 cases/indent-to-return-column-semantics
+cases/indent-to-minimum-fixnump-semantics
 cases/move-to-column-force-semantics
 cases/back-to-indentation-semantics
 cases/indent-region-semantics

@@ -70,6 +70,17 @@ fn expect_int(value: &Value) -> Result<i64, Flow> {
     }
 }
 
+fn expect_fixnump(value: &Value) -> Result<i64, Flow> {
+    match value {
+        Value::Int(n) => Ok(*n),
+        Value::Char(c) => Ok(*c as i64),
+        other => Err(signal(
+            "wrong-type-argument",
+            vec![Value::symbol("fixnump"), other.clone()],
+        )),
+    }
+}
+
 fn expect_indent_column(value: &Value) -> Result<i64, Flow> {
     match value {
         Value::Int(n) => Ok(*n),
@@ -2808,9 +2819,9 @@ pub(crate) fn builtin_indent_line_to(
 /// Insert at least MINIMUM spaces (default 0).
 pub(crate) fn builtin_indent_to(eval: &mut super::eval::Evaluator, args: Vec<Value>) -> EvalResult {
     expect_min_args("indent-to", &args, 1)?;
-    let column = expect_int(&args[0])?.max(0) as usize;
-    let minimum = if args.len() > 1 && args[1].is_truthy() {
-        expect_int(&args[1])?.max(0) as usize
+    let column = expect_fixnump(&args[0])?.max(0) as usize;
+    let minimum = if args.len() > 1 && !args[1].is_nil() {
+        expect_fixnump(&args[1])?.max(0) as usize
     } else {
         0
     };
@@ -4210,6 +4221,20 @@ mod tests {
         );
         assert_eq!(results[0], "OK (6 6 6)");
         assert_eq!(results[1], "OK (0 5 5)");
+    }
+
+    #[test]
+    fn indent_to_minimum_requires_fixnump() {
+        let results = eval_all(
+            r#"(with-temp-buffer (condition-case err (indent-to 4 nil) (error err)))
+               (with-temp-buffer (condition-case err (indent-to 4 "x") (error err)))
+               (with-temp-buffer (condition-case err (indent-to 4 t) (error err)))
+               (with-temp-buffer (condition-case err (indent-to "x") (error err)))"#,
+        );
+        assert_eq!(results[0], "OK 4");
+        assert_eq!(results[1], r#"OK (wrong-type-argument fixnump "x")"#);
+        assert_eq!(results[2], "OK (wrong-type-argument fixnump t)");
+        assert_eq!(results[3], r#"OK (wrong-type-argument fixnump "x")"#);
     }
 
     // -- newline tests --
