@@ -6539,7 +6539,24 @@ pub(crate) fn builtin_old_selected_frame_eval(
 
 pub(crate) fn builtin_make_frame_invisible(args: Vec<Value>) -> EvalResult {
     expect_range_args("make-frame-invisible", &args, 0, 2)?;
-    Ok(Value::Nil)
+    if let Some(frame) = args.first() {
+        if !frame.is_nil() && !matches!(frame, Value::Frame(_)) {
+            return Err(signal(
+                "wrong-type-argument",
+                vec![Value::symbol("frame-live-p"), frame.clone()],
+            ));
+        }
+    }
+    let force = args.get(1).is_some_and(|arg| !arg.is_nil());
+    if force {
+        return Ok(Value::Nil);
+    }
+    Err(signal(
+        "error",
+        vec![Value::string(
+            "Attempt to make invisible the sole visible or iconified frame",
+        )],
+    ))
 }
 
 pub(crate) fn builtin_make_terminal_frame(args: Vec<Value>) -> EvalResult {
@@ -23186,7 +23203,10 @@ mod tests {
 
     #[test]
     fn pure_dispatch_frame_menu_mouse_placeholders_match_compat_contracts() {
-        let frame_invisible = dispatch_builtin_pure("make-frame-invisible", vec![])
+        let frame_invisible = dispatch_builtin_pure(
+            "make-frame-invisible",
+            vec![Value::Nil, Value::True],
+        )
             .expect("builtin make-frame-invisible should resolve")
             .expect("builtin make-frame-invisible should evaluate");
         assert!(frame_invisible.is_nil());
