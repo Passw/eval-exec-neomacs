@@ -6672,6 +6672,7 @@ pub(crate) fn builtin_overlay_lists(args: Vec<Value>) -> EvalResult {
 
 pub(crate) fn builtin_overlay_recenter(args: Vec<Value>) -> EvalResult {
     expect_args("overlay-recenter", &args, 1)?;
+    let _ = expect_integer_or_marker(&args[0])?;
     Ok(Value::Nil)
 }
 
