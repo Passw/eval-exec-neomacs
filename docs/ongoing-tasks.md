@@ -15,3 +15,4 @@ These are the next candidate slices to explore automatically (an initial 20 task
 - Identify the next VM builtin still stubbed or drifting (the plan references `frame-terminal`, display/window, and stub enforcement). Implement a targeted lock-in slice with new corpus cases and `check-neovm` regression checks.
 - Keep documenting the auto-progress in the plan (update `docs/plan.md` `## Doing` and `## Next`) each time a slice is completed.
 - Track recent slices such as the `recent-keys` capture for `call-interactively`/`command-execute` so their documentation stays visible for observers and CI log correlation.
+- Refer to `docs/neovm-subsystem-porting.md` when choosing the next subsystem to port; it lists the untracked Rust modules and the gated steps to bring each online.
