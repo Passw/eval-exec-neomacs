@@ -792,16 +792,25 @@ fn gc_bucket(name: &str, counts: &[i64]) -> Value {
 /// `(garbage-collect)` -> GC stats list.
 pub(crate) fn builtin_garbage_collect(args: Vec<Value>) -> EvalResult {
     expect_args("garbage-collect", &args, 0)?;
+    let counts = Value::memory_use_counts_snapshot();
+    let conses = counts[0].max(0);
+    let floats = counts[1].max(0);
+    let vector_cells = counts[2].max(0);
+    let symbols = counts[3].max(0);
+    let string_chars = counts[4].max(0);
+    let intervals = counts[5].max(0);
+    let strings = counts[6].max(0);
+
     Ok(Value::list(vec![
-        gc_bucket("conses", &[0, 0, 0]),
-        gc_bucket("symbols", &[0, 0, 0]),
-        gc_bucket("strings", &[0, 0, 0]),
-        gc_bucket("string-bytes", &[0, 0]),
-        gc_bucket("vectors", &[0, 0]),
-        gc_bucket("vector-slots", &[0, 0, 0]),
-        gc_bucket("floats", &[0, 0, 0]),
-        gc_bucket("intervals", &[0, 0, 0]),
-        gc_bucket("buffers", &[0, 0]),
+        gc_bucket("conses", &[16, conses, 0]),
+        gc_bucket("symbols", &[48, symbols, 0]),
+        gc_bucket("strings", &[32, strings, 0]),
+        gc_bucket("string-bytes", &[1, string_chars]),
+        gc_bucket("vectors", &[16, vector_cells]),
+        gc_bucket("vector-slots", &[8, vector_cells, 0]),
+        gc_bucket("floats", &[8, floats, 0]),
+        gc_bucket("intervals", &[56, intervals, 0]),
+        gc_bucket("buffers", &[992, 0]),
     ]))
 }
 
@@ -1225,6 +1234,14 @@ mod tests {
                 "buffers".to_string(),
             ]
         );
+        for bucket in &buckets {
+            let bucket_items = super::super::value::list_to_vec(bucket).expect("bucket list");
+            assert!(bucket_items.len() >= 2);
+            assert!(matches!(bucket_items[0], Value::Symbol(_)));
+            assert!(bucket_items[1..]
+                .iter()
+                .all(|item| matches!(item, Value::Int(_))));
+        }
 
         let err = builtin_garbage_collect(vec![Value::Int(1)]).unwrap_err();
         match err {
