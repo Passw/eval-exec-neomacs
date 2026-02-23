@@ -1018,6 +1018,7 @@ cases/set-buffer-major-mode-semantics
 cases/raise-frame-semantics
 cases/redisplay-semantics
 cases/old-selected-frame-semantics
+cases/next-frame-semantics
 cases/current-daemon-window-config-semantics
 cases/documentation-flush-force-invocation-time-semantics
 cases/predicate-file-length-format-semantics
