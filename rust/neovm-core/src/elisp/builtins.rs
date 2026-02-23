@@ -1184,10 +1184,7 @@ pub(crate) fn builtin_length(args: Vec<Value>) -> EvalResult {
     }
 }
 
-fn vector_sequence_length(
-    sequence: &Value,
-    vector: ObjId,
-) -> i64 {
+fn vector_sequence_length(sequence: &Value, vector: ObjId) -> i64 {
     super::chartable::bool_vector_length(sequence)
         .or_else(|| super::chartable::char_table_length(sequence))
         .unwrap_or_else(|| with_heap(|h| h.vector_len(vector)) as i64)
@@ -1378,7 +1375,9 @@ pub(crate) fn builtin_append(args: Vec<Value>) -> EvalResult {
         match arg {
             Value::Nil => {}
             Value::Cons(_) => extend_from_proper_list(&mut elements, arg)?,
-            Value::Vector(v) => elements.extend(with_heap(|h| h.get_vector(*v).clone()).into_iter()),
+            Value::Vector(v) => {
+                elements.extend(with_heap(|h| h.get_vector(*v).clone()).into_iter())
+            }
             Value::Str(s) => {
                 elements.extend(
                     decode_storage_char_codes(s)
@@ -3016,7 +3015,9 @@ pub(crate) fn builtin_clrhash(args: Vec<Value>) -> EvalResult {
 pub(crate) fn builtin_hash_table_count(args: Vec<Value>) -> EvalResult {
     expect_args("hash-table-count", &args, 1)?;
     match &args[0] {
-        Value::HashTable(ht) => Ok(Value::Int(with_heap(|h| h.get_hash_table(*ht).data.len()) as i64)),
+        Value::HashTable(ht) => Ok(Value::Int(
+            with_heap(|h| h.get_hash_table(*ht).data.len()) as i64
+        )),
         _ => Err(signal(
             "wrong-type-argument",
             vec![Value::symbol("hash-table-p"), args[0].clone()],
@@ -5079,13 +5080,17 @@ fn symbol_has_valid_ccl_program_idx(
 
 fn builtin_ccl_program_p_eval(eval: &mut super::eval::Evaluator, args: Vec<Value>) -> EvalResult {
     if args.len() == 1 && args[0].is_symbol() {
-        return Ok(Value::bool(symbol_has_valid_ccl_program_idx(eval, &args[0])?));
+        return Ok(Value::bool(symbol_has_valid_ccl_program_idx(
+            eval, &args[0],
+        )?));
     }
     super::ccl::builtin_ccl_program_p(args)
 }
 
 fn builtin_ccl_execute_eval(eval: &mut super::eval::Evaluator, args: Vec<Value>) -> EvalResult {
-    if args.first().is_some_and(Value::is_symbol) && !symbol_has_valid_ccl_program_idx(eval, &args[0])? {
+    if args.first().is_some_and(Value::is_symbol)
+        && !symbol_has_valid_ccl_program_idx(eval, &args[0])?
+    {
         let mut forced = args.clone();
         forced[0] = Value::Int(0);
         return super::ccl::builtin_ccl_execute(forced);
@@ -5097,7 +5102,9 @@ fn builtin_ccl_execute_on_string_eval(
     eval: &mut super::eval::Evaluator,
     args: Vec<Value>,
 ) -> EvalResult {
-    if args.first().is_some_and(Value::is_symbol) && !symbol_has_valid_ccl_program_idx(eval, &args[0])? {
+    if args.first().is_some_and(Value::is_symbol)
+        && !symbol_has_valid_ccl_program_idx(eval, &args[0])?
+    {
         let mut forced = args.clone();
         forced[0] = Value::Int(0);
         return super::ccl::builtin_ccl_execute_on_string(forced);
@@ -7764,11 +7771,7 @@ pub(crate) fn builtin_fillarray(args: Vec<Value>) -> EvalResult {
                 let bit_count = logical_len.min(available_bits);
                 with_heap_mut(|h| {
                     let vec = h.get_vector_mut(*items);
-                    for bit in vec
-                        .iter_mut()
-                        .skip(BOOL_VECTOR_BITS_START)
-                        .take(bit_count)
-                    {
+                    for bit in vec.iter_mut().skip(BOOL_VECTOR_BITS_START).take(bit_count) {
                         *bit = Value::Int(fill_bit);
                     }
                 });
@@ -8208,17 +8211,6 @@ pub(crate) fn builtin_get_unicode_property_internal(args: Vec<Value>) -> EvalRes
         "wrong-type-argument",
         vec![Value::symbol("char-table-p"), args[0].clone()],
     ))
-}
-
-pub(crate) fn builtin_get_variable_watchers(args: Vec<Value>) -> EvalResult {
-    expect_args("get-variable-watchers", &args, 1)?;
-    if !args[0].is_nil() && args[0].as_symbol_name().is_none() {
-        return Err(signal(
-            "wrong-type-argument",
-            vec![Value::symbol("symbolp"), args[0].clone()],
-        ));
-    }
-    Ok(Value::Nil)
 }
 
 pub(crate) fn builtin_gnutls_available_p(args: Vec<Value>) -> EvalResult {
@@ -13939,9 +13931,7 @@ fn builtin_eventp(args: Vec<Value>) -> EvalResult {
 fn builtin_timeout_event_p(args: Vec<Value>) -> EvalResult {
     expect_args("timeout-event-p", &args, 1)?;
     let is_timeout_event = match &args[0] {
-        Value::Cons(cell) => {
-            read_cons(*cell).car.as_symbol_name() == Some("timer-event")
-        }
+        Value::Cons(cell) => read_cons(*cell).car.as_symbol_name() == Some("timer-event"),
         _ => false,
     };
     Ok(Value::bool(is_timeout_event))
@@ -15480,6 +15470,9 @@ pub(crate) fn dispatch_builtin(
         }
         "remove-variable-watcher" => {
             return Some(super::advice::builtin_remove_variable_watcher(eval, args))
+        }
+        "get-variable-watchers" => {
+            return Some(super::advice::builtin_get_variable_watchers(eval, args))
         }
         // Syntax table operations (evaluator-dependent)
         "modify-syntax-entry" => {
@@ -17518,7 +17511,6 @@ pub(crate) fn dispatch_builtin(
         "gap-size" => builtin_gap_size(args),
         "garbage-collect-maybe" => builtin_garbage_collect_maybe(args),
         "get-unicode-property-internal" => builtin_get_unicode_property_internal(args),
-        "get-variable-watchers" => builtin_get_variable_watchers(args),
         "gnutls-available-p" => builtin_gnutls_available_p(args),
         "gnutls-asynchronous-parameters" => builtin_gnutls_asynchronous_parameters(args),
         "gnutls-boot" => builtin_gnutls_boot(args),
@@ -18366,7 +18358,6 @@ pub(crate) fn dispatch_builtin_pure(name: &str, args: Vec<Value>) -> Option<Eval
         "gap-size" => builtin_gap_size(args),
         "garbage-collect-maybe" => builtin_garbage_collect_maybe(args),
         "get-unicode-property-internal" => builtin_get_unicode_property_internal(args),
-        "get-variable-watchers" => builtin_get_variable_watchers(args),
         "gnutls-available-p" => builtin_gnutls_available_p(args),
         "gnutls-asynchronous-parameters" => builtin_gnutls_asynchronous_parameters(args),
         "gnutls-boot" => builtin_gnutls_boot(args),
@@ -22343,7 +22334,9 @@ mod tests {
         let Value::Vector(cleared) = &table else {
             panic!("table should stay vector");
         };
-        assert!(with_heap(|h| h.get_vector(*cleared).clone()).iter().all(Value::is_nil));
+        assert!(with_heap(|h| h.get_vector(*cleared).clone())
+            .iter()
+            .all(Value::is_nil));
 
         let wrong_type = dispatch_builtin_pure("obarray-clear", vec![Value::Int(1)])
             .expect("builtin obarray-clear should resolve")
@@ -23224,7 +23217,11 @@ mod tests {
             .expect("builtin malloc-trim should evaluate with integer pad");
         assert_eq!(malloc_trim_zero, Value::True);
 
-        for bad in [Value::Int(-1), Value::True, Value::vector(vec![Value::Int(1)])] {
+        for bad in [
+            Value::Int(-1),
+            Value::True,
+            Value::vector(vec![Value::Int(1)]),
+        ] {
             let err = dispatch_builtin_pure("malloc-trim", vec![bad.clone()])
                 .expect("builtin malloc-trim should resolve for bad pad")
                 .expect_err("malloc-trim should reject non-wholenump pad");
@@ -24061,6 +24058,9 @@ mod tests {
         assert!(dispatch_builtin_pure("window-at", vec![]).is_none());
         assert!(dispatch_builtin_pure("window-bump-use-time", vec![]).is_none());
         assert!(dispatch_builtin_pure("window-list-1", vec![]).is_none());
+        assert!(dispatch_builtin_pure("add-variable-watcher", vec![]).is_none());
+        assert!(dispatch_builtin_pure("remove-variable-watcher", vec![]).is_none());
+        assert!(dispatch_builtin_pure("get-variable-watchers", vec![]).is_none());
     }
 
     #[test]
@@ -24464,7 +24464,7 @@ mod tests {
     }
 
     #[test]
-    fn dispatch_builtin_pure_handles_fringe_gap_garbage_and_watcher_placeholders() {
+    fn dispatch_builtin_pure_handles_fringe_gap_and_garbage_placeholders() {
         let fringe = dispatch_builtin_pure("fringe-bitmaps-at-pos", vec![Value::Nil, Value::Nil])
             .expect("fringe-bitmaps-at-pos should resolve")
             .expect("fringe-bitmaps-at-pos should evaluate");
@@ -24492,19 +24492,6 @@ mod tests {
         .expect("get-unicode-property-internal should resolve")
         .unwrap_err();
         match prop_err {
-            Flow::Signal(sig) => assert_eq!(sig.symbol, "wrong-type-argument"),
-            other => panic!("expected signal, got {other:?}"),
-        }
-
-        let watcher_nil = dispatch_builtin_pure("get-variable-watchers", vec![Value::Nil])
-            .expect("get-variable-watchers should resolve")
-            .expect("get-variable-watchers should evaluate");
-        assert_eq!(watcher_nil, Value::Nil);
-
-        let watcher_err = dispatch_builtin_pure("get-variable-watchers", vec![Value::Int(1)])
-            .expect("get-variable-watchers should resolve")
-            .unwrap_err();
-        match watcher_err {
             Flow::Signal(sig) => assert_eq!(sig.symbol, "wrong-type-argument"),
             other => panic!("expected signal, got {other:?}"),
         }
@@ -29051,7 +29038,12 @@ mod tests {
             "register-ccl-program",
             vec![
                 Value::symbol("vm-ccl-plist-gate"),
-                Value::vector(vec![Value::Int(10), Value::Int(0), Value::Int(0), Value::Int(0)]),
+                Value::vector(vec![
+                    Value::Int(10),
+                    Value::Int(0),
+                    Value::Int(0),
+                    Value::Int(0),
+                ]),
             ],
         )
         .expect("re-register should dispatch")
@@ -29143,7 +29135,12 @@ mod tests {
             "register-ccl-program",
             vec![
                 Value::symbol("vm-ccl-plist-gate"),
-                Value::vector(vec![Value::Int(10), Value::Int(0), Value::Int(0), Value::Int(0)]),
+                Value::vector(vec![
+                    Value::Int(10),
+                    Value::Int(0),
+                    Value::Int(0),
+                    Value::Int(0),
+                ]),
             ],
         )
         .expect("malformed re-register should dispatch")

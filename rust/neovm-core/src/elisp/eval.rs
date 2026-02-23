@@ -1816,9 +1816,7 @@ impl Evaluator {
                             ht.data.insert(HashKey::Ptr(new_ptr), existing);
                         }
                         if ht.key_snapshots.remove(&HashKey::Ptr(old_ptr)).is_some() {
-                            ht
-                                .key_snapshots
-                                .insert(HashKey::Ptr(new_ptr), to.clone());
+                            ht.key_snapshots.insert(HashKey::Ptr(new_ptr), to.clone());
                         }
                     }
                 }
@@ -3218,6 +3216,8 @@ impl Evaluator {
                     &mut self.features,
                     &mut self.buffers,
                     &mut self.match_data,
+                    &mut self.advice,
+                    &mut self.watchers,
                 );
                 let result = vm.execute(&bc, args);
                 self.sync_features_variable();

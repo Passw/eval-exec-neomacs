@@ -226,6 +226,18 @@ impl VariableWatcherList {
             .is_some_and(|list| !list.is_empty())
     }
 
+    /// Return registered watcher callbacks for a variable in insertion order.
+    pub fn get_watchers(&self, var_name: &str) -> Vec<Value> {
+        self.watchers
+            .get(var_name)
+            .map(|list| {
+                list.iter()
+                    .map(|watcher| watcher.callback.clone())
+                    .collect()
+            })
+            .unwrap_or_default()
+    }
+
     /// Build a list of (callback, args) pairs to invoke for a variable change.
     ///
     /// Returns a Vec of (callback_value, argument_list) that the evaluator
@@ -449,6 +461,19 @@ pub(crate) fn builtin_remove_variable_watcher(
 
     eval.watchers.remove_watcher(&var_name, &callback_name);
     Ok(Value::Nil)
+}
+
+/// `(get-variable-watchers SYMBOL)`
+///
+/// Return a list of watcher callbacks registered for SYMBOL.
+pub(crate) fn builtin_get_variable_watchers(
+    eval: &mut super::eval::Evaluator,
+    args: Vec<Value>,
+) -> EvalResult {
+    expect_args("get-variable-watchers", &args, 1)?;
+
+    let var_name = expect_symbol_name(&args[0])?;
+    Ok(Value::list(eval.watchers.get_watchers(&var_name)))
 }
 
 // ---------------------------------------------------------------------------
@@ -691,5 +716,59 @@ mod tests {
 
         let calls = wl.notify_watchers("v", &Value::Int(99), &Value::Int(0), "set");
         assert_eq!(calls.len(), 3);
+    }
+
+    #[test]
+    fn get_watchers_returns_callbacks_in_registration_order() {
+        let mut wl = VariableWatcherList::new();
+        wl.add_watcher("v", Value::symbol("w1"));
+        wl.add_watcher("v", Value::symbol("w2"));
+
+        let watchers = wl.get_watchers("v");
+        assert_eq!(watchers, vec![Value::symbol("w1"), Value::symbol("w2")]);
+        assert!(wl.get_watchers("missing").is_empty());
+    }
+
+    #[test]
+    fn builtin_get_variable_watchers_tracks_runtime_registry() {
+        let mut eval = super::super::eval::Evaluator::new();
+        builtin_add_variable_watcher(
+            &mut eval,
+            vec![Value::symbol("vm-watched-var"), Value::symbol("watch-a")],
+        )
+        .unwrap();
+        builtin_add_variable_watcher(
+            &mut eval,
+            vec![Value::symbol("vm-watched-var"), Value::symbol("watch-b")],
+        )
+        .unwrap();
+
+        let watchers =
+            builtin_get_variable_watchers(&mut eval, vec![Value::symbol("vm-watched-var")])
+                .unwrap();
+        let watchers_vec = super::super::value::list_to_vec(&watchers).expect("watcher list");
+        assert_eq!(
+            watchers_vec,
+            vec![Value::symbol("watch-a"), Value::symbol("watch-b")]
+        );
+
+        builtin_remove_variable_watcher(
+            &mut eval,
+            vec![Value::symbol("vm-watched-var"), Value::symbol("watch-a")],
+        )
+        .unwrap();
+        let remaining =
+            builtin_get_variable_watchers(&mut eval, vec![Value::symbol("vm-watched-var")])
+                .unwrap();
+        assert_eq!(
+            super::super::value::list_to_vec(&remaining).expect("watcher list"),
+            vec![Value::symbol("watch-b")]
+        );
+
+        let wrong_type = builtin_get_variable_watchers(&mut eval, vec![Value::Int(1)]).unwrap_err();
+        match wrong_type {
+            Flow::Signal(sig) => assert_eq!(sig.symbol, "wrong-type-argument"),
+            other => panic!("expected signal, got {other:?}"),
+        }
     }
 }

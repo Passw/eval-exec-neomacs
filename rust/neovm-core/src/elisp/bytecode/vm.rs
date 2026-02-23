@@ -5,6 +5,7 @@ use std::collections::{HashMap, HashSet};
 use super::chunk::ByteCodeFunction;
 use super::opcode::Op;
 use crate::buffer::BufferManager;
+use crate::elisp::advice::{AdviceManager, VariableWatcherList};
 use crate::elisp::builtins;
 use crate::elisp::error::*;
 use crate::elisp::regex::MatchData;
@@ -35,6 +36,8 @@ pub struct Vm<'a> {
     features: &'a mut Vec<String>,
     buffers: &'a mut BufferManager,
     match_data: &'a mut Option<MatchData>,
+    advice: &'a mut AdviceManager,
+    watchers: &'a mut VariableWatcherList,
     depth: usize,
     max_depth: usize,
 }
@@ -47,6 +50,8 @@ impl<'a> Vm<'a> {
         features: &'a mut Vec<String>,
         buffers: &'a mut BufferManager,
         match_data: &'a mut Option<MatchData>,
+        advice: &'a mut AdviceManager,
+        watchers: &'a mut VariableWatcherList,
     ) -> Self {
         Self {
             obarray,
@@ -55,6 +60,8 @@ impl<'a> Vm<'a> {
             features,
             buffers,
             match_data,
+            advice,
+            watchers,
             depth: 0,
             max_depth: 200,
         }
@@ -880,9 +887,7 @@ impl<'a> Vm<'a> {
                             ht.data.insert(HashKey::Ptr(new_ptr), existing);
                         }
                         if ht.key_snapshots.remove(&HashKey::Ptr(old_ptr)).is_some() {
-                            ht
-                                .key_snapshots
-                                .insert(HashKey::Ptr(new_ptr), to.clone());
+                            ht.key_snapshots.insert(HashKey::Ptr(new_ptr), to.clone());
                         }
                     }
                 }
@@ -1146,6 +1151,8 @@ impl<'a> Vm<'a> {
         eval.features = self.features.clone();
         eval.buffers = self.buffers.clone();
         eval.match_data = self.match_data.clone();
+        std::mem::swap(self.advice, &mut eval.advice);
+        std::mem::swap(self.watchers, &mut eval.watchers);
 
         let result = builtins::dispatch_builtin(&mut eval, name, args);
 
@@ -1155,6 +1162,8 @@ impl<'a> Vm<'a> {
         std::mem::swap(self.features, &mut eval.features);
         std::mem::swap(self.buffers, &mut eval.buffers);
         std::mem::swap(self.match_data, &mut eval.match_data);
+        std::mem::swap(self.advice, &mut eval.advice);
+        std::mem::swap(self.watchers, &mut eval.watchers);
 
         result
     }
@@ -1507,6 +1516,8 @@ mod tests {
         let mut features: Vec<String> = Vec::new();
         let mut buffers = crate::buffer::BufferManager::new();
         let mut match_data: Option<MatchData> = None;
+        let mut advice = AdviceManager::new();
+        let mut watchers = VariableWatcherList::new();
 
         let mut last = Value::Nil;
         for form in &forms {
@@ -1518,6 +1529,8 @@ mod tests {
                 &mut features,
                 &mut buffers,
                 &mut match_data,
+                &mut advice,
+                &mut watchers,
             );
             last = vm.execute(&func, vec![]).map_err(map_flow)?;
         }
@@ -1540,6 +1553,16 @@ mod tests {
     fn vm_nil_t() {
         assert_eq!(vm_eval_str("nil"), "OK nil");
         assert_eq!(vm_eval_str("t"), "OK t");
+    }
+
+    #[test]
+    fn vm_eval_preserves_variable_watcher_registry_across_builtin_dispatch() {
+        assert_eq!(
+            vm_eval_str(
+                "(progn (add-variable-watcher 'vm-bytecode-var 'vm-bytecode-watch) (get-variable-watchers 'vm-bytecode-var))"
+            ),
+            "OK (vm-bytecode-watch)"
+        );
     }
 
     #[test]
