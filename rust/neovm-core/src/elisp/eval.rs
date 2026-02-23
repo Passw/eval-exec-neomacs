@@ -2193,7 +2193,7 @@ impl Evaluator {
                 ));
             };
             let value = self.eval(&tail[i + 1])?;
-            self.assign(name, value.clone());
+            self.assign_with_watchers(name, value.clone(), "set")?;
             last = value;
             i += 2;
         }
@@ -3584,6 +3584,36 @@ impl Evaluator {
 
         // Fall through to obarray value cell
         self.obarray.set_symbol_value(name, value);
+    }
+
+    pub(crate) fn run_variable_watchers(
+        &mut self,
+        name: &str,
+        new_value: &Value,
+        old_value: &Value,
+        operation: &str,
+    ) -> Result<(), Flow> {
+        if !self.watchers.has_watchers(name) {
+            return Ok(());
+        }
+        let calls = self
+            .watchers
+            .notify_watchers(name, new_value, old_value, operation);
+        for (callback, args) in calls {
+            let _ = self.apply(callback, args)?;
+        }
+        Ok(())
+    }
+
+    pub(crate) fn assign_with_watchers(
+        &mut self,
+        name: &str,
+        value: Value,
+        operation: &str,
+    ) -> EvalResult {
+        self.assign(name, value.clone());
+        self.run_variable_watchers(name, &value, &Value::Nil, operation)?;
+        Ok(value)
     }
 }
 

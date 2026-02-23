@@ -200,7 +200,7 @@ impl<'a> Vm<'a> {
                 Op::VarSet(idx) => {
                     let name = sym_name(constants, *idx);
                     let val = stack.pop().unwrap_or(Value::Nil);
-                    self.assign_var(&name, val);
+                    self.assign_var(&name, val)?;
                 }
                 Op::VarBind(idx) => {
                     let name = sym_name(constants, *idx);
@@ -933,23 +933,43 @@ impl<'a> Vm<'a> {
         Err(signal("void-variable", vec![Value::symbol(name)]))
     }
 
-    fn assign_var(&mut self, name: &str, value: Value) {
+    fn assign_var(&mut self, name: &str, value: Value) -> Result<(), Flow> {
         // Check lexenv
         for frame in self.lexenv.iter_mut().rev() {
             if frame.contains_key(name) {
                 frame.insert(name.to_string(), value);
-                return;
+                return Ok(());
             }
         }
         // Check dynamic
         for frame in self.dynamic.iter_mut().rev() {
             if frame.contains_key(name) {
                 frame.insert(name.to_string(), value);
-                return;
+                return Ok(());
             }
         }
         // Fall through to obarray
-        self.obarray.set_symbol_value(name, value);
+        self.obarray.set_symbol_value(name, value.clone());
+        self.run_variable_watchers(name, &value, &Value::Nil, "set")
+    }
+
+    fn run_variable_watchers(
+        &mut self,
+        name: &str,
+        new_value: &Value,
+        old_value: &Value,
+        operation: &str,
+    ) -> Result<(), Flow> {
+        if !self.watchers.has_watchers(name) {
+            return Ok(());
+        }
+        let calls = self
+            .watchers
+            .notify_watchers(name, new_value, old_value, operation);
+        for (callback, args) in calls {
+            let _ = self.call_function(callback, args)?;
+        }
+        Ok(())
     }
 
     fn bind_params(
@@ -1562,6 +1582,24 @@ mod tests {
                 "(progn (add-variable-watcher 'vm-bytecode-var 'vm-bytecode-watch) (get-variable-watchers 'vm-bytecode-var))"
             ),
             "OK (vm-bytecode-watch)"
+        );
+    }
+
+    #[test]
+    fn vm_varset_triggers_variable_watcher_callbacks() {
+        assert_eq!(
+            vm_eval_str(
+                "(progn
+                   (fset 'vm-bytecode-watch
+                     (lambda (sym new op where)
+                       (setq vm-bytecode-watch-op op)
+                       (setq vm-bytecode-watch-val new)
+                       new))
+                   (add-variable-watcher 'vm-bytecode-target 'vm-bytecode-watch)
+                   (setq vm-bytecode-target 19)
+                   (list vm-bytecode-watch-val vm-bytecode-watch-op))"
+            ),
+            "OK (19 set)"
         );
     }
 

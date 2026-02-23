@@ -4862,8 +4862,7 @@ pub(crate) fn builtin_set(eval: &mut super::eval::Evaluator, args: Vec<Value>) -
         return Err(signal("setting-constant", vec![Value::symbol(name)]));
     }
     let value = args[1].clone();
-    eval.assign(&resolved, value.clone());
-    Ok(value)
+    eval.assign_with_watchers(&resolved, value, "set")
 }
 
 pub(crate) fn builtin_fset(eval: &mut super::eval::Evaluator, args: Vec<Value>) -> EvalResult {
@@ -4937,6 +4936,7 @@ pub(crate) fn builtin_makunbound(
         return Err(signal("setting-constant", vec![Value::symbol(name)]));
     }
     eval.obarray_mut().makunbound(&resolved);
+    eval.run_variable_watchers(&resolved, &Value::Nil, &Value::Nil, "makunbound")?;
     Ok(args[0].clone())
 }
 
@@ -19586,8 +19586,40 @@ pub(crate) fn builtin_replace_match(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::elisp::expr::Expr;
     use crate::elisp::value::{LambdaData, LambdaParams};
     use std::sync::Arc;
+
+    fn install_variable_watcher_probe(eval: &mut crate::elisp::eval::Evaluator, callback: &str) {
+        let lambda = Value::Lambda(Arc::new(LambdaData {
+            params: LambdaParams {
+                required: vec![
+                    "symbol".to_string(),
+                    "newval".to_string(),
+                    "operation".to_string(),
+                    "where".to_string(),
+                ],
+                optional: Vec::new(),
+                rest: None,
+            },
+            body: vec![
+                Expr::List(vec![
+                    Expr::Symbol("setq".to_string()),
+                    Expr::Symbol("vm-watcher-last-op".to_string()),
+                    Expr::Symbol("operation".to_string()),
+                ]),
+                Expr::List(vec![
+                    Expr::Symbol("setq".to_string()),
+                    Expr::Symbol("vm-watcher-last-value".to_string()),
+                    Expr::Symbol("newval".to_string()),
+                ]),
+                Expr::Symbol("newval".to_string()),
+            ],
+            env: None,
+            docstring: None,
+        }));
+        eval.obarray_mut().set_symbol_function(callback, lambda);
+    }
 
     #[test]
     fn pure_dispatch_typed_add_still_works() {
@@ -28744,6 +28776,58 @@ mod tests {
         let bound_old = builtin_boundp(&mut eval, vec![Value::symbol("vm-defvaralias-old")])
             .expect("boundp should read aliased target");
         assert!(bound_old.is_nil());
+    }
+
+    #[test]
+    fn variable_watchers_observe_set_setq_and_makunbound() {
+        let mut eval = crate::elisp::eval::Evaluator::new();
+        install_variable_watcher_probe(&mut eval, "vm-watcher-probe");
+
+        super::super::advice::builtin_add_variable_watcher(
+            &mut eval,
+            vec![
+                Value::symbol("vm-watcher-target"),
+                Value::symbol("vm-watcher-probe"),
+            ],
+        )
+        .expect("add-variable-watcher should register callback");
+
+        builtin_set(
+            &mut eval,
+            vec![Value::symbol("vm-watcher-target"), Value::Int(7)],
+        )
+        .expect("set should trigger watcher");
+        let set_op = builtin_symbol_value(&mut eval, vec![Value::symbol("vm-watcher-last-op")])
+            .expect("watcher should record operation");
+        let set_val =
+            builtin_symbol_value(&mut eval, vec![Value::symbol("vm-watcher-last-value")])
+                .expect("watcher should record value");
+        assert_eq!(set_op, Value::symbol("set"));
+        assert_eq!(set_val, Value::Int(7));
+
+        eval.eval_expr(&Expr::List(vec![
+            Expr::Symbol("setq".to_string()),
+            Expr::Symbol("vm-watcher-target".to_string()),
+            Expr::Int(11),
+        ]))
+        .expect("setq should trigger watcher");
+        let setq_op = builtin_symbol_value(&mut eval, vec![Value::symbol("vm-watcher-last-op")])
+            .expect("watcher should record setq operation");
+        let setq_val =
+            builtin_symbol_value(&mut eval, vec![Value::symbol("vm-watcher-last-value")])
+                .expect("watcher should record setq value");
+        assert_eq!(setq_op, Value::symbol("set"));
+        assert_eq!(setq_val, Value::Int(11));
+
+        builtin_makunbound(&mut eval, vec![Value::symbol("vm-watcher-target")])
+            .expect("makunbound should trigger watcher");
+        let unbind_op = builtin_symbol_value(&mut eval, vec![Value::symbol("vm-watcher-last-op")])
+            .expect("watcher should record makunbound operation");
+        let unbind_val =
+            builtin_symbol_value(&mut eval, vec![Value::symbol("vm-watcher-last-value")])
+                .expect("watcher should record makunbound value");
+        assert_eq!(unbind_op, Value::symbol("makunbound"));
+        assert!(unbind_val.is_nil());
     }
 
     #[test]
