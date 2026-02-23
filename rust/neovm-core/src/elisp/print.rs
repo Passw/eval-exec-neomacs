@@ -2,7 +2,10 @@
 
 use super::expr::{self, Expr};
 use super::string_escape::{format_lisp_string, format_lisp_string_bytes};
-use super::value::{list_to_vec, Value, read_cons, with_heap};
+use super::value::{
+    StringTextPropertyRun, get_string_text_properties_for_arc, list_to_vec, read_cons, with_heap,
+    Value,
+};
 
 fn print_special_handle(value: &Value) -> Option<String> {
     super::display::print_terminal_handle(value)
@@ -17,6 +20,21 @@ fn format_frame_handle(id: u64) -> String {
     }
 }
 
+fn format_lisp_propertized_string(s: &str, runs: &[StringTextPropertyRun]) -> String {
+    let mut out = String::from("#(");
+    out.push_str(&format_lisp_string(s));
+    for run in runs {
+        out.push(' ');
+        out.push_str(&run.start.to_string());
+        out.push(' ');
+        out.push_str(&run.end.to_string());
+        out.push(' ');
+        out.push_str(&print_value(&run.plist));
+    }
+    out.push(')');
+    out
+}
+
 /// Print a `Value` as a Lisp string.
 pub fn print_value(value: &Value) -> String {
     if let Some(handle) = print_special_handle(value) {
@@ -29,7 +47,10 @@ pub fn print_value(value: &Value) -> String {
         Value::Float(f) => format_float(*f),
         Value::Symbol(s) => format_symbol_name(s),
         Value::Keyword(s) => s.clone(),
-        Value::Str(s) => format_lisp_string(s),
+        Value::Str(s) => match get_string_text_properties_for_arc(s) {
+            Some(runs) => format_lisp_propertized_string(s, &runs),
+            None => format_lisp_string(s),
+        },
         // Emacs chars are integer values, so print as codepoint.
         Value::Char(c) => (*c as u32).to_string(),
         Value::Cons(_) => {
@@ -104,7 +125,23 @@ fn append_print_value_bytes(value: &Value, out: &mut Vec<u8>) {
         Value::Float(f) => out.extend_from_slice(format_float(*f).as_bytes()),
         Value::Symbol(s) => out.extend_from_slice(format_symbol_name(s).as_bytes()),
         Value::Keyword(s) => out.extend_from_slice(s.as_bytes()),
-        Value::Str(s) => out.extend_from_slice(&format_lisp_string_bytes(s)),
+        Value::Str(s) => {
+            if let Some(runs) = get_string_text_properties_for_arc(s) {
+                out.extend_from_slice(b"#(");
+                out.extend_from_slice(&format_lisp_string_bytes(s));
+                for run in runs {
+                    out.push(b' ');
+                    out.extend_from_slice(run.start.to_string().as_bytes());
+                    out.push(b' ');
+                    out.extend_from_slice(run.end.to_string().as_bytes());
+                    out.push(b' ');
+                    append_print_value_bytes(&run.plist, out);
+                }
+                out.push(b')');
+            } else {
+                out.extend_from_slice(&format_lisp_string_bytes(s));
+            }
+        }
         Value::Char(c) => out.extend_from_slice((*c as u32).to_string().as_bytes()),
         Value::Cons(_) => {
             if let Some(shorthand) = print_list_shorthand_bytes(value) {
@@ -390,7 +427,7 @@ fn print_cons_bytes(value: &Value, out: &mut Vec<u8>) {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::elisp::value::{HashTableTest, LambdaData, LambdaParams};
+    use crate::elisp::value::{HashTableTest, LambdaData, LambdaParams, StringTextPropertyRun};
     use std::sync::Arc;
 
     #[test]
@@ -444,6 +481,37 @@ mod tests {
     #[test]
     fn print_string() {
         assert_eq!(print_value(&Value::string("hello")), "\"hello\"");
+    }
+
+    #[test]
+    fn print_propertized_string_literal_shape() {
+        let value = Value::string_with_text_properties(
+            " ",
+            vec![StringTextPropertyRun {
+                start: 0,
+                end: 1,
+                plist: Value::list(vec![
+                    Value::symbol("display"),
+                    Value::list(vec![
+                        Value::symbol("space"),
+                        Value::keyword(":align-to"),
+                        Value::list(vec![
+                            Value::symbol("+"),
+                            Value::symbol("header-line-indent-width"),
+                            Value::Int(0),
+                        ]),
+                    ]),
+                ]),
+            }],
+        );
+        assert_eq!(
+            print_value(&value),
+            r##"#(" " 0 1 (display (space :align-to (+ header-line-indent-width 0))))"##
+        );
+        assert_eq!(
+            print_value_bytes(&value),
+            br#"#(" " 0 1 (display (space :align-to (+ header-line-indent-width 0))))"#
+        );
     }
 
     #[test]

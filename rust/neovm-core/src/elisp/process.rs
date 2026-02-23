@@ -16,7 +16,7 @@ use std::ptr;
 use std::time::{SystemTime, UNIX_EPOCH};
 
 use super::error::{signal, EvalResult, Flow};
-use super::value::{list_to_vec, Value, read_cons, with_heap};
+use super::value::{StringTextPropertyRun, Value, list_to_vec, read_cons, with_heap};
 
 // ---------------------------------------------------------------------------
 // Types
@@ -2603,10 +2603,29 @@ pub(crate) fn builtin_list_processes_refresh(
     args: Vec<Value>,
 ) -> EvalResult {
     expect_args("list-processes--refresh", &args, 0)?;
+    let spacer = Value::string_with_text_properties(
+        " ",
+        vec![StringTextPropertyRun {
+            start: 0,
+            end: 1,
+            plist: Value::list(vec![
+                Value::symbol("display"),
+                Value::list(vec![
+                    Value::symbol("space"),
+                    Value::keyword(":align-to"),
+                    Value::list(vec![
+                        Value::symbol("+"),
+                        Value::symbol("header-line-indent-width"),
+                        Value::Int(0),
+                    ]),
+                ]),
+            ]),
+        }],
+    );
     Ok(Value::list(vec![
         Value::string(""),
         Value::symbol("header-line-indent"),
-        Value::string(" "),
+        spacer,
     ]))
 }
 
@@ -6105,6 +6124,15 @@ mod tests {
         assert_eq!(
             results[2],
             "OK (nil (wrong-type-argument stringp nil) (error \":name value not a string\") (error \"Missing :name keyword parameter\") t nil t (error \":name value not a string\") nil (wrong-type-argument stringp t) (wrong-type-argument stringp 1) (error \"No port specified\") (error \":speed not specified\") error error wrong-number-of-arguments (wrong-type-argument processp 1) (error \"Process is not a network process\") (error \"Unknown or unsupported option\"))"
+        );
+    }
+
+    #[test]
+    fn list_processes_refresh_returns_propertized_spacer() {
+        let result = eval_one(r#"(list-processes--refresh)"#);
+        assert_eq!(
+            result,
+            r##"OK ("" header-line-indent #(" " 0 1 (display (space :align-to (+ header-line-indent-width 0)))))"##
         );
     }
 

@@ -767,6 +767,7 @@ cases/process-coding-tty-query-semantics
 cases/process-tty-stream-kind-semantics
 cases/process-file-lines-menu-semantics
 cases/process-list-network-serial-semantics
+cases/process-list-refresh-propertized-spacer-semantics
 cases/set-network-process-option-contract-semantics
 cases/process-serial-port-contract-semantics
 cases/serial-process-configure-contract-semantics

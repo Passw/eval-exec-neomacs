@@ -5,7 +5,7 @@ use std::collections::HashMap;
 use std::fmt;
 use std::sync::{
     atomic::{AtomicU64, Ordering},
-    Arc,
+    Arc, Mutex, OnceLock,
 };
 
 use crate::gc::heap::LispHeap;
@@ -20,6 +20,8 @@ static SYMBOLS_CONSED: AtomicU64 = AtomicU64::new(ZERO_COUNT);
 static STRING_CHARS_CONSED: AtomicU64 = AtomicU64::new(ZERO_COUNT);
 static INTERVALS_CONSED: AtomicU64 = AtomicU64::new(ZERO_COUNT);
 static STRINGS_CONSED: AtomicU64 = AtomicU64::new(ZERO_COUNT);
+static STRING_TEXT_PROPS: OnceLock<Mutex<HashMap<usize, Vec<StringTextPropertyRun>>>> =
+    OnceLock::new();
 
 fn add_wrapping(counter: &AtomicU64, delta: u64) {
     counter.fetch_add(delta, Ordering::Relaxed);
@@ -27,6 +29,10 @@ fn add_wrapping(counter: &AtomicU64, delta: u64) {
 
 fn as_neovm_int(value: u64) -> i64 {
     value as i64
+}
+
+fn string_text_props() -> &'static Mutex<HashMap<usize, Vec<StringTextPropertyRun>>> {
+    STRING_TEXT_PROPS.get_or_init(|| Mutex::new(HashMap::new()))
 }
 
 // ---------------------------------------------------------------------------
@@ -124,6 +130,33 @@ pub(crate) fn with_heap_mut<R>(f: impl FnOnce(&mut LispHeap) -> R) -> R {
 pub struct ConsSnapshot {
     pub car: Value,
     pub cdr: Value,
+}
+
+/// A string text property run used by printed propertized-string literals.
+#[derive(Clone, Debug, PartialEq)]
+pub struct StringTextPropertyRun {
+    pub start: usize,
+    pub end: usize,
+    pub plist: Value,
+}
+
+pub fn set_string_text_properties_for_arc(
+    value: &Arc<String>,
+    runs: Vec<StringTextPropertyRun>,
+) {
+    let key = Arc::as_ptr(value) as usize;
+    let mut props = string_text_props().lock().expect("string text props poisoned");
+    if runs.is_empty() {
+        props.remove(&key);
+    } else {
+        props.insert(key, runs);
+    }
+}
+
+pub fn get_string_text_properties_for_arc(value: &Arc<String>) -> Option<Vec<StringTextPropertyRun>> {
+    let key = Arc::as_ptr(value) as usize;
+    let props = string_text_props().lock().expect("string text props poisoned");
+    props.get(&key).cloned()
 }
 
 /// Read car and cdr from a cons cell on the heap.
@@ -340,6 +373,17 @@ impl Value {
         add_wrapping(&STRINGS_CONSED, 1);
         add_wrapping(&STRING_CHARS_CONSED, s.len() as u64);
         Value::Str(Arc::new(s))
+    }
+
+    pub fn string_with_text_properties(
+        s: impl Into<String>,
+        runs: Vec<StringTextPropertyRun>,
+    ) -> Self {
+        let value = Self::string(s);
+        if let Value::Str(text) = &value {
+            set_string_text_properties_for_arc(text, runs);
+        }
+        value
     }
 
     pub fn cons(car: Value, cdr: Value) -> Self {
