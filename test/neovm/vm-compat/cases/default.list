@@ -850,6 +850,7 @@ cases/take
 cases/garbage-collect-semantics
 cases/memory-use-counts-semantics
 cases/malloc-trim-memory-info-semantics
+cases/module-load-error-semantics
 cases/match-data
 cases/rect-extract-semantics
 cases/rect-extract-line-semantics

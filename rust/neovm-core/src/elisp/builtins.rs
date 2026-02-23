@@ -6873,9 +6873,87 @@ pub(crate) fn builtin_memory_info(args: Vec<Value>) -> EvalResult {
     ]))
 }
 
+#[cfg(unix)]
+fn module_load_open_failed(path: &str) -> Flow {
+    let message = unsafe {
+        let err = libc::dlerror();
+        if err.is_null() {
+            format!("{path}: unknown dlopen error")
+        } else {
+            std::ffi::CStr::from_ptr(err).to_string_lossy().into_owned()
+        }
+    };
+    signal(
+        "module-open-failed",
+        vec![Value::string(path.to_string()), Value::string(message)],
+    )
+}
+
+#[cfg(unix)]
+fn module_symbol_present(handle: *mut libc::c_void, symbol: &std::ffi::CStr) -> bool {
+    unsafe {
+        libc::dlerror();
+        let found = libc::dlsym(handle, symbol.as_ptr());
+        if found.is_null() {
+            libc::dlerror().is_null()
+        } else {
+            true
+        }
+    }
+}
+
 pub(crate) fn builtin_module_load(args: Vec<Value>) -> EvalResult {
     expect_args("module-load", &args, 1)?;
-    Ok(Value::Nil)
+    let path = expect_strict_string(&args[0])?;
+
+    #[cfg(unix)]
+    {
+        let c_path = std::ffi::CString::new(path.clone()).map_err(|_| {
+            signal(
+                "module-open-failed",
+                vec![
+                    Value::string(path.clone()),
+                    Value::string("module path contains interior NUL byte"),
+                ],
+            )
+        })?;
+        let gpl_symbol =
+            std::ffi::CString::new("plugin_is_GPL_compatible").expect("symbol literal is valid");
+
+        unsafe {
+            libc::dlerror();
+        }
+        let handle = unsafe { libc::dlopen(c_path.as_ptr(), libc::RTLD_NOW | libc::RTLD_LOCAL) };
+        if handle.is_null() {
+            return Err(module_load_open_failed(&path));
+        }
+
+        if !module_symbol_present(handle, gpl_symbol.as_c_str()) {
+            unsafe {
+                libc::dlclose(handle);
+            }
+            return Err(signal(
+                "module-not-gpl-compatible",
+                vec![Value::string(path)],
+            ));
+        }
+
+        unsafe {
+            libc::dlclose(handle);
+        }
+        return Ok(Value::True);
+    }
+
+    #[cfg(not(unix))]
+    {
+        Err(signal(
+            "module-open-failed",
+            vec![
+                Value::string(path),
+                Value::string("dynamic modules are unsupported on this platform"),
+            ],
+        ))
+    }
 }
 
 pub(crate) fn builtin_dump_emacs_portable(args: Vec<Value>) -> EvalResult {
@@ -23022,10 +23100,33 @@ mod tests {
         assert_eq!(items.len(), 4);
         assert!(items.iter().all(|item| matches!(item, Value::Int(_))));
 
-        let module_load = dispatch_builtin_pure("module-load", vec![Value::string("x.so")])
+        let module_path = "__neovm_missing_module__.so";
+        let module_load_err =
+            dispatch_builtin_pure("module-load", vec![Value::string(module_path)])
+                .expect("builtin module-load should resolve")
+                .expect_err("builtin module-load should signal on missing path");
+        match module_load_err {
+            Flow::Signal(sig) => {
+                assert_eq!(sig.symbol, "module-open-failed");
+                assert_eq!(sig.data.first(), Some(&Value::string(module_path)));
+                assert!(
+                    matches!(sig.data.get(1), Some(Value::Str(_))),
+                    "module-open-failed should include string error message payload"
+                );
+            }
+            other => panic!("expected signal, got: {other:?}"),
+        }
+
+        let module_load_type_err = dispatch_builtin_pure("module-load", vec![Value::Nil])
             .expect("builtin module-load should resolve")
-            .expect("builtin module-load should evaluate");
-        assert!(module_load.is_nil());
+            .expect_err("module-load should reject non-string path");
+        match module_load_type_err {
+            Flow::Signal(sig) => {
+                assert_eq!(sig.symbol, "wrong-type-argument");
+                assert_eq!(sig.data, vec![Value::symbol("stringp"), Value::Nil]);
+            }
+            other => panic!("expected signal, got: {other:?}"),
+        }
     }
 
     #[test]
