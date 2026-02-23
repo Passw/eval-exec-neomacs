@@ -27,7 +27,13 @@
   (add-variable-watcher 'vm-sql-watch-base 'vm-sql-watch-rec)
   (with-temp-buffer
     (setq-local vm-sql-watch-alias 7))
-  (length vm-sql-watch-events))
+  (let ((where (nth 3 (car vm-sql-watch-events))))
+    (list (length vm-sql-watch-events)
+          (car (car vm-sql-watch-events))
+          (nth 1 (car vm-sql-watch-events))
+          (nth 2 (car vm-sql-watch-events))
+          (bufferp where)
+          (buffer-live-p where))))
 (progn
   (defvaralias 'vm-sql-const 'nil)
   (let ((x 0))

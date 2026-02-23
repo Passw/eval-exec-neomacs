@@ -977,7 +977,7 @@ impl<'a> Vm<'a> {
         }
         let calls = self
             .watchers
-            .notify_watchers(name, new_value, old_value, operation);
+            .notify_watchers(name, new_value, old_value, operation, &Value::Nil);
         for (callback, args) in calls {
             let _ = self.call_function(callback, args)?;
         }

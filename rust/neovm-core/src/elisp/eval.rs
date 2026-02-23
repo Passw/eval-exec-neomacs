@@ -2285,9 +2285,23 @@ impl Evaluator {
             }
 
             let value = self.eval(&tail[i + 1])?;
-            if let Some(buf) = self.buffers.current_buffer_mut() {
-                buf.set_buffer_local(&resolved, value.clone());
-                self.run_variable_watchers(&resolved, &value, &Value::Nil, "set")?;
+            if self.buffers.current_buffer().is_some() {
+                let where_arg = {
+                    let buf = self
+                        .buffers
+                        .current_buffer_mut()
+                        .expect("checked above for current buffer");
+                    let where_arg = Value::Buffer(buf.id);
+                    buf.set_buffer_local(&resolved, value.clone());
+                    where_arg
+                };
+                self.run_variable_watchers_with_where(
+                    &resolved,
+                    &value,
+                    &Value::Nil,
+                    "set",
+                    &where_arg,
+                )?;
             } else {
                 self.assign_with_watchers(&resolved, value.clone(), "set")?;
             }
@@ -3691,12 +3705,23 @@ impl Evaluator {
         old_value: &Value,
         operation: &str,
     ) -> Result<(), Flow> {
+        self.run_variable_watchers_with_where(name, new_value, old_value, operation, &Value::Nil)
+    }
+
+    pub(crate) fn run_variable_watchers_with_where(
+        &mut self,
+        name: &str,
+        new_value: &Value,
+        old_value: &Value,
+        operation: &str,
+        where_value: &Value,
+    ) -> Result<(), Flow> {
         if !self.watchers.has_watchers(name) {
             return Ok(());
         }
         let calls = self
             .watchers
-            .notify_watchers(name, new_value, old_value, operation);
+            .notify_watchers(name, new_value, old_value, operation, where_value);
         for (callback, args) in calls {
             let _ = self.apply(callback, args)?;
         }
@@ -4042,9 +4067,15 @@ mod tests {
                (add-variable-watcher 'vm-setq-local-watch-base 'vm-setq-local-watch-rec)
                (with-temp-buffer
                  (setq-local vm-setq-local-watch 7))
-               (length vm-setq-local-watch-events))",
+               (let ((where (nth 3 (car vm-setq-local-watch-events))))
+                 (list (length vm-setq-local-watch-events)
+                       (car (car vm-setq-local-watch-events))
+                       (nth 1 (car vm-setq-local-watch-events))
+                       (nth 2 (car vm-setq-local-watch-events))
+                       (bufferp where)
+                       (buffer-live-p where))))",
         );
-        assert_eq!(result, "OK 1");
+        assert_eq!(result, "OK (1 vm-setq-local-watch-base 7 set t nil)");
     }
 
     #[test]

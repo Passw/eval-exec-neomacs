@@ -252,13 +252,14 @@ impl VariableWatcherList {
     /// - SYMBOL: the variable name
     /// - NEWVAL: the new value
     /// - OPERATION: one of "set", "let", "unlet", "makunbound", "defvaralias"
-    /// - WHERE: nil for global changes (buffer-local not yet supported)
+    /// - WHERE: location designator (`nil` for global, buffer for buffer-local)
     pub fn notify_watchers(
         &self,
         var_name: &str,
         new_val: &Value,
         _old_val: &Value,
         operation: &str,
+        where_val: &Value,
     ) -> Vec<(Value, Vec<Value>)> {
         let mut calls = Vec::new();
         if let Some(list) = self.watchers.get(var_name) {
@@ -267,7 +268,7 @@ impl VariableWatcherList {
                     Value::symbol(var_name),
                     new_val.clone(),
                     Value::symbol(operation),
-                    Value::Nil, // WHERE — nil for global
+                    where_val.clone(),
                 ];
                 calls.push((watcher.callback.clone(), args));
             }
@@ -686,7 +687,13 @@ mod tests {
         wl.add_watcher("my-var", Value::symbol("my-watcher"));
         assert!(wl.has_watchers("my-var"));
 
-        let calls = wl.notify_watchers("my-var", &Value::Int(42), &Value::Int(0), "set");
+        let calls = wl.notify_watchers(
+            "my-var",
+            &Value::Int(42),
+            &Value::Int(0),
+            "set",
+            &Value::Nil,
+        );
         assert_eq!(calls.len(), 1);
 
         let (callback, args) = &calls[0];
@@ -710,7 +717,7 @@ mod tests {
         assert!(wl.has_watchers("my-var"));
 
         wl.remove_watcher("my-var", &Value::symbol("watcher1"));
-        let calls = wl.notify_watchers("my-var", &Value::Int(1), &Value::Int(0), "set");
+        let calls = wl.notify_watchers("my-var", &Value::Int(1), &Value::Int(0), "set", &Value::Nil);
         assert_eq!(calls.len(), 1);
         assert!(matches!(&calls[0].0, Value::Symbol(s) if s == "watcher2"));
     }
@@ -730,7 +737,7 @@ mod tests {
         wl.add_watcher("my-var", Value::symbol("w"));
         wl.add_watcher("my-var", Value::symbol("w"));
 
-        let calls = wl.notify_watchers("my-var", &Value::Int(1), &Value::Int(0), "set");
+        let calls = wl.notify_watchers("my-var", &Value::Int(1), &Value::Int(0), "set", &Value::Nil);
         assert_eq!(calls.len(), 1);
     }
 
@@ -776,7 +783,7 @@ mod tests {
     #[test]
     fn notify_no_watchers_returns_empty() {
         let wl = VariableWatcherList::new();
-        let calls = wl.notify_watchers("no-var", &Value::Int(1), &Value::Int(0), "set");
+        let calls = wl.notify_watchers("no-var", &Value::Int(1), &Value::Int(0), "set", &Value::Nil);
         assert!(calls.is_empty());
     }
 
@@ -787,7 +794,7 @@ mod tests {
         wl.add_watcher("v", Value::symbol("w2"));
         wl.add_watcher("v", Value::symbol("w3"));
 
-        let calls = wl.notify_watchers("v", &Value::Int(99), &Value::Int(0), "set");
+        let calls = wl.notify_watchers("v", &Value::Int(99), &Value::Int(0), "set", &Value::Nil);
         assert_eq!(calls.len(), 3);
     }
 
