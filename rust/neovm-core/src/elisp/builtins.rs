@@ -6412,7 +6412,7 @@ pub(crate) fn builtin_raise_frame(args: Vec<Value>) -> EvalResult {
 
 pub(crate) fn builtin_redisplay(args: Vec<Value>) -> EvalResult {
     expect_range_args("redisplay", &args, 0, 1)?;
-    Ok(Value::Nil)
+    Ok(Value::True)
 }
 
 pub(crate) fn builtin_suspend_emacs(args: Vec<Value>) -> EvalResult {
@@ -23001,8 +23001,6 @@ mod tests {
             ("previous-frame", vec![Value::Nil, Value::Nil]),
             ("raise-frame", vec![]),
             ("raise-frame", vec![Value::Nil]),
-            ("redisplay", vec![]),
-            ("redisplay", vec![Value::True]),
             ("suspend-emacs", vec![]),
             ("suspend-emacs", vec![Value::string("hold")]),
         ] {
@@ -23016,6 +23014,16 @@ mod tests {
             .expect("builtin vertical-motion should resolve")
             .expect("builtin vertical-motion should evaluate");
         assert_eq!(vertical_motion, Value::Int(0));
+
+        let redisplay = dispatch_builtin_pure("redisplay", vec![])
+            .expect("builtin redisplay should resolve")
+            .expect("builtin redisplay should evaluate");
+        assert_eq!(redisplay, Value::True);
+
+        let redisplay_force = dispatch_builtin_pure("redisplay", vec![Value::True])
+            .expect("builtin redisplay should resolve with optional arg")
+            .expect("builtin redisplay should evaluate with optional arg");
+        assert_eq!(redisplay_force, Value::True);
     }
 
     #[test]
