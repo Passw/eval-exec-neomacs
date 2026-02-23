@@ -771,6 +771,7 @@ cases/set-network-process-option-contract-semantics
 cases/process-serial-port-contract-semantics
 cases/serial-process-configure-contract-semantics
 cases/process-network-interface-signal-semantics
+cases/process-helper-minibuffer-history-sequence-semantics
 cases/process-helper-wrapper-semantics
 cases/process-shell-wrappers-quit-buffer-coding-semantics
 cases/getenv-optional-frame-semantics

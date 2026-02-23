@@ -331,6 +331,17 @@ fn expect_string(value: &Value) -> Result<String, Flow> {
     }
 }
 
+fn expect_sequence(value: &Value) -> Result<(), Flow> {
+    if matches!(
+        value,
+        Value::Nil | Value::Cons(_) | Value::Vector(_) | Value::Str(_)
+    ) {
+        Ok(())
+    } else {
+        Err(signal_wrong_type_sequence(value.clone()))
+    }
+}
+
 fn signal_wrong_type_sequence(value: Value) -> Flow {
     signal(
         "wrong-type-argument",
@@ -2209,6 +2220,7 @@ pub(crate) fn builtin_minibuffer_sort_preprocess_history(
     args: Vec<Value>,
 ) -> EvalResult {
     expect_args("minibuffer--sort-preprocess-history", &args, 1)?;
+    expect_sequence(&args[0])?;
     Ok(Value::Nil)
 }
 
@@ -6147,6 +6159,28 @@ mod tests {
         assert_eq!(
             results[1],
             "OK ((0 quote (nil)) (0) (0) (wrong-type-argument processp nil) error error (wrong-type-argument processp nil) (wrong-type-argument processp nil) nil nil nil (wrong-type-argument processp \"x\") nil nil nil nil nil (wrong-number-of-arguments backquote-delay-process 1) (wrong-number-of-arguments backquote-process 0) (wrong-number-of-arguments internal-default-interrupt-process 3) (wrong-number-of-arguments internal-default-signal-process 0) (wrong-number-of-arguments internal-default-process-filter 1) (wrong-number-of-arguments minibuffer--sort-preprocess-history 0) (wrong-number-of-arguments window-adjust-process-window-size 1) (wrong-number-of-arguments isearch-process-search-char 0) (wrong-number-of-arguments isearch-process-search-string 1))"
+        );
+    }
+
+    #[test]
+    fn minibuffer_sort_preprocess_history_sequence_contract() {
+        let results = eval_all(
+            r#"(minibuffer--sort-preprocess-history nil)
+               (minibuffer--sort-preprocess-history "")
+               (minibuffer--sort-preprocess-history [97])
+               (minibuffer--sort-preprocess-history '(97))
+               (condition-case err (minibuffer--sort-preprocess-history 1) (error err))
+               (condition-case err (minibuffer--sort-preprocess-history) (error err))"#,
+        );
+
+        assert_eq!(results[0], "OK nil");
+        assert_eq!(results[1], "OK nil");
+        assert_eq!(results[2], "OK nil");
+        assert_eq!(results[3], "OK nil");
+        assert_eq!(results[4], "OK (wrong-type-argument sequencep 1)");
+        assert_eq!(
+            results[5],
+            "OK (wrong-number-of-arguments minibuffer--sort-preprocess-history 0)"
         );
     }
 
