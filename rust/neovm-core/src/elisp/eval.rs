@@ -4488,6 +4488,37 @@ mod tests {
     }
 
     #[test]
+    fn variable_binding_locus_follows_buffer_local_and_alias_semantics() {
+        let results = eval_all(
+            "(let ((locus (condition-case err
+                              (progn (with-temp-buffer (setq-local x 2) (variable-binding-locus 'x)))
+                            (error err))))
+               (list (condition-case err (variable-binding-locus 'x) (error err))
+                     (condition-case err (progn (setq x 1) (variable-binding-locus 'x)) (error err))
+                     (bufferp locus)
+                     (buffer-live-p locus)
+                     (condition-case err (variable-binding-locus nil) (error err))
+                     (condition-case err (variable-binding-locus t) (error err))
+                     (condition-case err (variable-binding-locus :vm-k) (error err))
+                     (condition-case err (variable-binding-locus 1) (error err))
+                     (condition-case err (variable-binding-locus 'x nil) (error err))))
+             (progn
+               (defvaralias 'vm-vbl-alias 'vm-vbl-base)
+               (with-temp-buffer
+                 (setq-local vm-vbl-alias 9)
+                 (list (bufferp (variable-binding-locus 'vm-vbl-alias))
+                       (buffer-live-p (variable-binding-locus 'vm-vbl-alias))
+                       (bufferp (variable-binding-locus 'vm-vbl-base))
+                       (buffer-live-p (variable-binding-locus 'vm-vbl-base)))))",
+        );
+        assert_eq!(
+            results[0],
+            "OK (nil nil t nil nil nil nil (wrong-type-argument symbolp 1) (wrong-number-of-arguments variable-binding-locus 2))"
+        );
+        assert_eq!(results[1], "OK (t t t t)");
+    }
+
+    #[test]
     fn variable_watchers_report_let_and_unlet_runtime_transitions() {
         let results = eval_all(
             "(setq vm-watch-events nil)

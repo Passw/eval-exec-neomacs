@@ -6868,6 +6868,29 @@ pub(crate) fn builtin_variable_binding_locus(args: Vec<Value>) -> EvalResult {
     Ok(Value::Nil)
 }
 
+pub(crate) fn builtin_variable_binding_locus_eval(
+    eval: &mut super::eval::Evaluator,
+    args: Vec<Value>,
+) -> EvalResult {
+    expect_args("variable-binding-locus", &args, 1)?;
+    let name = args[0].as_symbol_name().ok_or_else(|| {
+        signal(
+            "wrong-type-argument",
+            vec![Value::symbol("symbolp"), args[0].clone()],
+        )
+    })?;
+    let resolved = resolve_variable_alias_name(eval, name)?;
+    if resolved == "nil" || resolved == "t" || resolved.starts_with(':') {
+        return Ok(Value::Nil);
+    }
+    if let Some(buf) = eval.buffers.current_buffer() {
+        if buf.get_buffer_local(&resolved).is_some() {
+            return Ok(Value::Buffer(buf.id));
+        }
+    }
+    Ok(Value::Nil)
+}
+
 pub(crate) fn builtin_x_begin_drag(args: Vec<Value>) -> EvalResult {
     expect_range_args("x-begin-drag", &args, 1, 6)?;
     Ok(Value::Nil)
@@ -15018,6 +15041,7 @@ pub(crate) fn dispatch_builtin(
         "get-byte" => return Some(builtin_get_byte(eval, args)),
         "buffer-local-value" => return Some(builtin_buffer_local_value(eval, args)),
         "local-variable-if-set-p" => return Some(builtin_local_variable_if_set_p_eval(eval, args)),
+        "variable-binding-locus" => return Some(builtin_variable_binding_locus_eval(eval, args)),
         "ntake" => return Some(builtin_ntake(args)),
         // Search / regex operations
         "search-forward" => return Some(builtin_search_forward(eval, args)),
