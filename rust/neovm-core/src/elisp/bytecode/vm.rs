@@ -88,6 +88,7 @@ impl<'a> Vm<'a> {
         let mut pc: usize = 0;
         let mut handlers: Vec<Handler> = Vec::new();
         let mut bind_count: usize = 0;
+        let mut unbind_watch: Vec<(String, Value)> = Vec::new();
 
         // Bind parameters
         let param_binds = self.bind_params(&func.params, args)?;
@@ -98,32 +99,44 @@ impl<'a> Vm<'a> {
                 if let Some(ref env) = func.env {
                     let saved_lexenv = std::mem::replace(self.lexenv, env.clone());
                     self.lexenv.push(param_binds);
-                    let result =
-                        self.run_loop(func, &mut stack, &mut pc, &mut handlers, &mut bind_count);
+                    let result = self.run_loop(
+                        func,
+                        &mut stack,
+                        &mut pc,
+                        &mut handlers,
+                        &mut bind_count,
+                        &mut unbind_watch,
+                    );
                     self.lexenv.pop();
                     *self.lexenv = saved_lexenv;
-                    // Unbind dynamic bindings
-                    for _ in 0..bind_count {
-                        self.dynamic.pop();
-                    }
-                    return result;
+                    let cleanup = self.cleanup_varbind_unwind(&mut bind_count, &mut unbind_watch);
+                    return merge_result_with_cleanup(result, cleanup);
                 }
             }
             self.dynamic.push(param_binds);
-            let result = self.run_loop(func, &mut stack, &mut pc, &mut handlers, &mut bind_count);
+            let result = self.run_loop(
+                func,
+                &mut stack,
+                &mut pc,
+                &mut handlers,
+                &mut bind_count,
+                &mut unbind_watch,
+            );
             self.dynamic.pop();
-            // Unbind additional bindings from varbind ops
-            for _ in 0..bind_count {
-                self.dynamic.pop();
-            }
-            return result;
+            let cleanup = self.cleanup_varbind_unwind(&mut bind_count, &mut unbind_watch);
+            return merge_result_with_cleanup(result, cleanup);
         }
 
-        let result = self.run_loop(func, &mut stack, &mut pc, &mut handlers, &mut bind_count);
-        for _ in 0..bind_count {
-            self.dynamic.pop();
-        }
-        result
+        let result = self.run_loop(
+            func,
+            &mut stack,
+            &mut pc,
+            &mut handlers,
+            &mut bind_count,
+            &mut unbind_watch,
+        );
+        let cleanup = self.cleanup_varbind_unwind(&mut bind_count, &mut unbind_watch);
+        merge_result_with_cleanup(result, cleanup)
     }
 
     fn run_loop(
@@ -133,6 +146,7 @@ impl<'a> Vm<'a> {
         pc: &mut usize,
         handlers: &mut Vec<Handler>,
         bind_count: &mut usize,
+        unbind_watch: &mut Vec<(String, Value)>,
     ) -> EvalResult {
         let ops = &func.ops;
         let constants = &func.constants;
@@ -205,18 +219,16 @@ impl<'a> Vm<'a> {
                 Op::VarBind(idx) => {
                     let name = sym_name(constants, *idx);
                     let val = stack.pop().unwrap_or(Value::Nil);
+                    let old_value = self.lookup_var(&name).unwrap_or(Value::Nil);
                     let mut frame = HashMap::new();
-                    frame.insert(name, val);
+                    frame.insert(name.clone(), val.clone());
                     self.dynamic.push(frame);
+                    unbind_watch.push((name.clone(), old_value));
+                    self.run_variable_watchers(&name, &val, &Value::Nil, "let")?;
                     *bind_count += 1;
                 }
                 Op::Unbind(n) => {
-                    for _ in 0..*n {
-                        if *bind_count > 0 {
-                            self.dynamic.pop();
-                            *bind_count -= 1;
-                        }
-                    }
+                    self.cleanup_varbind_unwind_n(*n as usize, bind_count, unbind_watch)?;
                 }
 
                 // -- Function calls --
@@ -1061,7 +1073,44 @@ impl<'a> Vm<'a> {
         let mut pc: usize = 0;
         let mut handlers: Vec<Handler> = Vec::new();
         let mut bind_count: usize = 0;
-        self.run_loop(func, &mut stack, &mut pc, &mut handlers, &mut bind_count)
+        let mut unbind_watch: Vec<(String, Value)> = Vec::new();
+        let result = self.run_loop(
+            func,
+            &mut stack,
+            &mut pc,
+            &mut handlers,
+            &mut bind_count,
+            &mut unbind_watch,
+        );
+        let cleanup = self.cleanup_varbind_unwind(&mut bind_count, &mut unbind_watch);
+        merge_result_with_cleanup(result, cleanup)
+    }
+
+    fn cleanup_varbind_unwind(
+        &mut self,
+        bind_count: &mut usize,
+        unbind_watch: &mut Vec<(String, Value)>,
+    ) -> Result<(), Flow> {
+        self.cleanup_varbind_unwind_n(*bind_count, bind_count, unbind_watch)
+    }
+
+    fn cleanup_varbind_unwind_n(
+        &mut self,
+        count: usize,
+        bind_count: &mut usize,
+        unbind_watch: &mut Vec<(String, Value)>,
+    ) -> Result<(), Flow> {
+        for _ in 0..count {
+            if *bind_count == 0 {
+                break;
+            }
+            self.dynamic.pop();
+            *bind_count -= 1;
+            if let Some((name, restored_value)) = unbind_watch.pop() {
+                self.run_variable_watchers(&name, &restored_value, &Value::Nil, "unlet")?;
+            }
+        }
+        Ok(())
     }
 
     /// Dispatch to builtin functions from the VM.
@@ -1186,6 +1235,14 @@ impl<'a> Vm<'a> {
         std::mem::swap(self.watchers, &mut eval.watchers);
 
         result
+    }
+}
+
+fn merge_result_with_cleanup(result: EvalResult, cleanup: Result<(), Flow>) -> EvalResult {
+    match (result, cleanup) {
+        (Err(error), _) => Err(error),
+        (Ok(_), Err(error)) => Err(error),
+        (Ok(value), Ok(())) => Ok(value),
     }
 }
 
@@ -1600,6 +1657,39 @@ mod tests {
                    (list vm-bytecode-watch-val vm-bytecode-watch-op))"
             ),
             "OK (19 set)"
+        );
+    }
+
+    #[test]
+    fn vm_varbind_and_unbind_trigger_variable_watcher_callbacks() {
+        assert_eq!(
+            vm_eval_str(
+                "(progn
+                   (setq vm-watch-events nil)
+                   (setq vm-watch-target 9)
+                   (fset 'vm-watch-rec
+                     (lambda (sym new op where)
+                       (setq vm-watch-events (cons (list op new) vm-watch-events))))
+                   (add-variable-watcher 'vm-watch-target 'vm-watch-rec)
+                   (let ((vm-watch-target 1)) 'done)
+                   vm-watch-events)"
+            ),
+            "OK ((unlet 9) (let 1))"
+        );
+
+        assert_eq!(
+            vm_eval_str(
+                "(progn
+                   (setq vm-watch-events nil)
+                   (setq vm-watch-target 9)
+                   (fset 'vm-watch-rec
+                     (lambda (sym new op where)
+                       (setq vm-watch-events (cons (list op new) vm-watch-events))))
+                   (add-variable-watcher 'vm-watch-target 'vm-watch-rec)
+                   (let* ((vm-watch-target 2)) 'done)
+                   vm-watch-events)"
+            ),
+            "OK ((unlet 9) (let 2))"
         );
     }
 
