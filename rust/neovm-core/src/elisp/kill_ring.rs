@@ -81,6 +81,18 @@ fn expect_fixnump(value: &Value) -> Result<i64, Flow> {
     }
 }
 
+fn expect_integer_or_marker(value: &Value) -> Result<i64, Flow> {
+    match value {
+        Value::Int(n) => Ok(*n),
+        Value::Char(c) => Ok(*c as i64),
+        v if super::marker::is_marker(v) => super::marker::marker_position_as_int(v),
+        other => Err(signal(
+            "wrong-type-argument",
+            vec![Value::symbol("integer-or-marker-p"), other.clone()],
+        )),
+    }
+}
+
 fn expect_indent_column(value: &Value) -> Result<i64, Flow> {
     match value {
         Value::Int(n) => Ok(*n),
@@ -3252,9 +3264,13 @@ pub(crate) fn builtin_indent_rigidly(
     args: Vec<Value>,
 ) -> EvalResult {
     expect_args("indent-rigidly", &args, 3)?;
-    let start_val = expect_int(&args[0])?;
-    let end_val = expect_int(&args[1])?;
-    let indent_arg = expect_int(&args[2])?;
+    let start_val = expect_integer_or_marker(&args[0])?;
+    let end_val = expect_integer_or_marker(&args[1])?;
+    let indent_arg = match &args[2] {
+        Value::Int(n) => *n,
+        Value::Char(c) => *c as i64,
+        _ => 1,
+    };
 
     let buf = eval
         .buffers
@@ -4415,6 +4431,35 @@ mod tests {
                (buffer-string)"#,
         );
         assert_eq!(results[2], r#"OK "a\nb\nc""#);
+    }
+
+    #[test]
+    fn indent_rigidly_argument_contract_subset() {
+        let results = eval_all(
+            r#"(with-temp-buffer (condition-case err (indent-rigidly 1 2 "x") (error err)))
+               (with-temp-buffer (condition-case err (indent-rigidly 1 2 t) (error err)))
+               (with-temp-buffer (condition-case err (indent-rigidly 1 2 [1]) (error err)))
+               (with-temp-buffer (condition-case err (indent-rigidly 1 2 nil) (error err)))
+               (with-temp-buffer (condition-case err (indent-rigidly "x" 2 1) (error err)))
+               (with-temp-buffer (condition-case err (indent-rigidly 1 "x" 1) (error err)))
+               (with-temp-buffer
+                 (insert "a")
+                 (condition-case err (indent-rigidly 1 2 1.5) (error err))
+                 (buffer-string))"#,
+        );
+        assert_eq!(results[0], "OK nil");
+        assert_eq!(results[1], "OK nil");
+        assert_eq!(results[2], "OK nil");
+        assert_eq!(results[3], "OK nil");
+        assert_eq!(
+            results[4],
+            r#"OK (wrong-type-argument integer-or-marker-p "x")"#
+        );
+        assert_eq!(
+            results[5],
+            r#"OK (wrong-type-argument integer-or-marker-p "x")"#
+        );
+        assert_eq!(results[6], r#"OK " a""#);
     }
 
     // -- copy-region-as-kill tests --

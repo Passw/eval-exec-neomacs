@@ -341,6 +341,7 @@ cases/tab-to-tab-stop-semantics
 cases/tab-to-tab-stop-return-column-semantics
 cases/indent-line-to-semantics
 cases/indent-line-to-return-column-semantics
+cases/indent-rigidly-arg-contract-semantics
 cases/indent-rigidly-read-only-variable-semantics
 cases/indent-subr-arity-semantics
 cases/custom-group-p-availability
