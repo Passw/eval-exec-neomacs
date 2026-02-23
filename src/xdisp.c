@@ -37,12 +37,12 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
    can see, Lisp calls redisplay and vice versa.
 
    Under window systems like X, some portions of the redisplay code
-   are also called asynchronously, due to mouse movement or expose
-   events.  "Asynchronously" in this context means that any C function
-   which calls maybe_quit or process_pending_signals could enter
-   redisplay via expose_frame and/or note_mouse_highlight, if X events
-   were recently reported to Emacs about mouse movements or frame(s)
-   that were exposed.  And such redisplay could invoke the Lisp
+   are also called asynchronously, due to mouse movement events.
+   "Asynchronously" in this context means that any C function which
+   calls maybe_quit or process_pending_signals could enter redisplay
+   via note_mouse_highlight, if X events were recently reported to
+   Emacs about mouse movements.  And such redisplay could invoke the
+   Lisp
    interpreter, e.g. via the :eval forms in mode-line-format, and as
    result the global state could change.  It is therefore very
    important that C functions which might cause such "asynchronous"
@@ -65,10 +65,6 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 		    note_mouse_highlight (asynchronous)	 |
 							 |
 				    X mouse events  -----+
-							 |
-			    expose_frame (asynchronous)	 |
-							 |
-				   X expose events  -----+
 
    What does redisplay do?  Obviously, it has to figure out somehow what
    has been changed since the last time the display has been updated,
@@ -145,33 +141,6 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
       window's glyph matrix is still valid, and only the position of
       the cursor might need to be updated.
 
-    . try_window_reusing_current_matrix
-
-      This function reuses the current glyph matrix of a window when
-      text has not changed, but the window start changed (e.g., due to
-      scrolling).
-
-    . try_window_id
-
-      This function attempts to update a window's glyph matrix by
-      reusing parts of its current glyph matrix.  It finds and reuses
-      the part that was not changed, and regenerates the rest.  (The
-      "id" part in the function's name stands for "insert/delete", not
-      for "identification" or somesuch.)
-
-    . try_window
-
-      This function performs the full, unoptimized, generation of a
-      single window's glyph matrix, assuming that its fonts were not
-      changed and that the cursor will not end up in the scroll
-      margins.  (Loading fonts requires re-adjustment of dimensions of
-      glyph matrices, which makes this method impossible to use.)
-
-   The optimizations are tried in sequence (some can be skipped if
-   it is known that they are not applicable).  If none of the
-   optimizations were successful, redisplay calls redisplay_windows,
-   which performs a full redisplay of all windows.
-
    Note that there's one more important optimization up Emacs's
    sleeve, but it is related to actually redrawing the potentially
    changed portions of the window/frame as part of the third step, not
@@ -195,13 +164,6 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
    glyphs for rows that need to be updated on the screen.  Rows that
    don't need to be updated are left "disabled", and their contents
    in the desired matrix should be ignored.
-
-   The function `display_line' is the central function to look at if
-   you are interested in how the rows of the desired matrix are
-   produced.  It constructs one row in a desired matrix given an
-   iterator structure containing both a buffer position and a
-   description of the environment in which the text is to be
-   displayed.  But this is too early, read on.
 
    Glyph rows.
 
@@ -295,12 +257,7 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
    pixel information about the element being displayed and at the same
    time will produce glyphs for it.  If the display element fits on
    the line being displayed, `set_iterator_to_next' is called next,
-   otherwise the glyphs produced are discarded, and `display_line'
-   marks this glyph row as a "continued line".  The function
-   `display_line' is the workhorse of filling glyph rows in the
-   desired matrix with glyphs.  In addition to producing glyphs, it
-   also handles line truncation and continuation, word wrap, and
-   cursor positioning (for the latter, see `set_cursor_from_row').
+   otherwise the glyphs produced are discarded.
 
    Frame matrices.
 
@@ -344,12 +301,11 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
    elements such as different fonts, tall images, etc.
 
    To solve this problem, the display engine implements several
-   functions that can move through buffer text in the same manner as
-   `display_line' and `display_string' do, but without producing any
+   functions that can move through buffer text without producing any
    glyphs for the glyph matrices.  The workhorse of this is
-   `move_it_in_display_line_to'.  Its code and logic are very similar
-   to `display_line', but it differs in two important aspects: it
-   doesn't produce glyphs for any glyph matrix, and it returns a
+   `move_it_in_display_line_to'.  It differs from display line
+   construction in two important aspects: it doesn't produce glyphs
+   for any glyph matrix, and it returns a
    status telling the caller how it ended the iteration: whether it
    reached the required position, hit the end of line, arrived at the
    window edge without exhausting the buffer's line, etc.  Since the
@@ -1172,7 +1128,6 @@ static int underlying_face_id (const struct it *);
 #ifdef HAVE_WINDOW_SYSTEM
 
 static void update_tool_bar (struct frame *, bool);
-static void gui_draw_bottom_divider (struct window *w);
 static void notice_overwritten_cursor (struct window *,
                                        enum glyph_row_area,
                                        int, int, int, int);
@@ -30565,174 +30520,10 @@ cancel_mouse_face (struct frame *f)
 
 
 /***********************************************************************
-			   Exposure Events
+			Window Borders and Dividers
  ***********************************************************************/
 
 #ifdef HAVE_WINDOW_SYSTEM
-
-/* Redraw the part of glyph row area AREA of glyph row ROW on window W
-   which intersects rectangle R.  R is in window-relative coordinates.  */
-
-static void
-expose_area (struct window *w, struct glyph_row *row, const Emacs_Rectangle *r,
-	     enum glyph_row_area area)
-{
-  struct glyph *first = row->glyphs[area];
-  struct glyph *end = row->glyphs[area] + row->used[area];
-  struct glyph *last;
-  int first_x, start_x, x;
-
-  if (area == TEXT_AREA && row->fill_line_p)
-    /* If row extends face to end of line write the whole line.  */
-    draw_glyphs (w, row->x, row, area,
-		 0, row->used[area],
-		 DRAW_NORMAL_TEXT, 0);
-  else
-    {
-      /* Set START_X to the window-relative start position for drawing glyphs of
-	 AREA.  The first glyph of the text area can be partially visible.
-	 The first glyphs of other areas cannot.  */
-      start_x = window_box_left_offset (w, area);
-      x = start_x;
-      if (area == TEXT_AREA)
-	x += row->x;
-
-      /* Find the first glyph that must be redrawn.  */
-      while (first < end
-	     && x + first->pixel_width < r->x)
-	{
-	  x += first->pixel_width;
-	  ++first;
-	}
-
-      /* Find the last one.  */
-      last = first;
-      first_x = x;
-      /* Use a signed int intermediate value to avoid catastrophic
-	 failures due to comparison between signed and unsigned, when
-	 x is negative (can happen for wide images that are hscrolled).  */
-      int r_end = r->x + (int) r->width;
-      while (last < end && x < r_end)
-	{
-	  x += last->pixel_width;
-	  ++last;
-	}
-
-      /* Repaint.  */
-      if (last > first)
-	draw_glyphs (w, first_x - start_x, row, area,
-		     first - row->glyphs[area], last - row->glyphs[area],
-		     DRAW_NORMAL_TEXT, 0);
-    }
-}
-
-
-/* Redraw the parts of the glyph row ROW on window W intersecting
-   rectangle R.  R is in window-relative coordinates.  Value is
-   true if mouse-face was overwritten.  */
-
-static bool
-expose_line (struct window *w, struct glyph_row *row, const Emacs_Rectangle *r)
-{
-  eassert (row->enabled_p);
-
-  if (row->mode_line_p || w->pseudo_window_p)
-    draw_glyphs (w, 0, row, TEXT_AREA,
-		 0, row->used[TEXT_AREA],
-		 DRAW_NORMAL_TEXT, 0);
-  else
-    {
-      if (row->used[LEFT_MARGIN_AREA])
-	expose_area (w, row, r, LEFT_MARGIN_AREA);
-      if (row->used[TEXT_AREA])
-	expose_area (w, row, r, TEXT_AREA);
-      if (row->used[RIGHT_MARGIN_AREA])
-	expose_area (w, row, r, RIGHT_MARGIN_AREA);
-      draw_row_fringe_bitmaps (w, row);
-    }
-
-  return row->mouse_face_p;
-}
-
-
-/* Redraw those parts of glyphs rows during expose event handling that
-   overlap other rows.  Redrawing of an exposed line writes over parts
-   of lines overlapping that exposed line; this function fixes that.
-
-   W is the window being exposed.  FIRST_OVERLAPPING_ROW is the first
-   row in W's current matrix that is exposed and overlaps other rows.
-   LAST_OVERLAPPING_ROW is the last such row.  */
-
-static void
-expose_overlaps (struct window *w,
-		 struct glyph_row *first_overlapping_row,
-		 struct glyph_row *last_overlapping_row,
-		 const Emacs_Rectangle *r)
-{
-  struct glyph_row *row;
-
-  for (row = first_overlapping_row; row <= last_overlapping_row; ++row)
-    if (row->overlapping_p)
-      {
-	eassert (row->enabled_p && !row->mode_line_p);
-
-	row->clip = r;
-	if (row->used[LEFT_MARGIN_AREA])
-	  gui_fix_overlapping_area (w, row, LEFT_MARGIN_AREA, OVERLAPS_BOTH);
-
-	if (row->used[TEXT_AREA])
-	  gui_fix_overlapping_area (w, row, TEXT_AREA, OVERLAPS_BOTH);
-
-	if (row->used[RIGHT_MARGIN_AREA])
-	  gui_fix_overlapping_area (w, row, RIGHT_MARGIN_AREA, OVERLAPS_BOTH);
-	row->clip = NULL;
-      }
-}
-
-
-/* Return true if W's cursor intersects rectangle R.  */
-
-static bool
-phys_cursor_in_rect_p (struct window *w, const Emacs_Rectangle *r)
-{
-  Emacs_Rectangle cr, result;
-  struct glyph *cursor_glyph;
-  struct glyph_row *row;
-
-  if (w->phys_cursor.vpos >= 0
-      && w->phys_cursor.vpos < w->current_matrix->nrows
-      && (row = MATRIX_ROW (w->current_matrix, w->phys_cursor.vpos),
-	  row->enabled_p)
-      && row->cursor_in_fringe_p)
-    {
-      /* Cursor is in the fringe.  */
-      cr.x = window_box_right_offset (w,
-				      (WINDOW_HAS_FRINGES_OUTSIDE_MARGINS (w)
-				       ? RIGHT_MARGIN_AREA
-				       : TEXT_AREA));
-      cr.y = row->y;
-      cr.width = WINDOW_RIGHT_FRINGE_WIDTH (w);
-      cr.height = row->height;
-      return gui_intersect_rectangles (&cr, r, &result);
-    }
-
-  cursor_glyph = get_phys_cursor_glyph (w);
-  if (cursor_glyph)
-    {
-      /* r is relative to W's box, but w->phys_cursor.x is relative
-	 to left edge of W's TEXT area.  Adjust it.  */
-      cr.x = window_box_left_offset (w, TEXT_AREA) + w->phys_cursor.x;
-      cr.y = w->phys_cursor.y;
-      cr.width = cursor_glyph->pixel_width;
-      cr.height = w->phys_cursor_height;
-      /* ++KFS: W32 version used W32-specific IntersectRect here, but
-	 I assume the effect is the same -- and this is portable.  */
-      return gui_intersect_rectangles (&cr, r, &result);
-    }
-  /* If we don't understand the format, pretend we're not in the hot-spot.  */
-  return false;
-}
-
 
 /* EXPORT:
    Draw a vertical window border to the right of window W if W doesn't
@@ -30812,311 +30603,6 @@ gui_draw_right_divider (struct window *w)
 	y1 -= WINDOW_BOTTOM_DIVIDER_WIDTH (w);
 
       FRAME_RIF (f)->draw_window_divider (w, x0, x1, y0, y1);
-    }
-}
-
-static void
-gui_draw_bottom_divider (struct window *w)
-{
-  struct frame *f = XFRAME (WINDOW_FRAME (w));
-
-  if (w->mini || w->pseudo_window_p)
-    return;
-  else if (WINDOW_BOTTOM_DIVIDER_WIDTH (w))
-    {
-      int x0 = WINDOW_LEFT_EDGE_X (w);
-      int x1 = WINDOW_RIGHT_EDGE_X (w);
-      int y0 = WINDOW_BOTTOM_EDGE_Y (w) - WINDOW_BOTTOM_DIVIDER_WIDTH (w);
-      int y1 = WINDOW_BOTTOM_EDGE_Y (w);
-      struct window *p = !NILP (w->parent) ? XWINDOW (w->parent) : NULL;
-
-      /* If W is vertically combined and has a sibling below, don't draw
-	 over any right divider.  */
-      if (WINDOW_RIGHT_DIVIDER_WIDTH (w)
-	  && p
-	  && ((WINDOW_VERTICAL_COMBINATION_P (p)
-	       && !NILP (w->next))
-	      || (WINDOW_HORIZONTAL_COMBINATION_P (p)
-		  && NILP (w->next)
-		  && !NILP (p->parent)
-		  && WINDOW_VERTICAL_COMBINATION_P (XWINDOW (p->parent))
-		  && !NILP (XWINDOW (p->parent)->next))))
-	x1 -= WINDOW_RIGHT_DIVIDER_WIDTH (w);
-
-      FRAME_RIF (f)->draw_window_divider (w, x0, x1, y0, y1);
-    }
-}
-
-/* Redraw the part of window W intersection rectangle FR.  Pixel
-   coordinates in FR are frame-relative.  Call this function with
-   input blocked.  Value is true if the exposure overwrites
-   mouse-face.  */
-
-static bool
-expose_window (struct window *w, const Emacs_Rectangle *fr)
-{
-  struct frame *f = XFRAME (w->frame);
-  Emacs_Rectangle wr, r;
-  bool mouse_face_overwritten_p = false;
-
-  /* If window is not yet fully initialized, do nothing.  This can
-     happen when toolkit scroll bars are used and a window is split.
-     Reconfiguring the scroll bar will generate an expose for a newly
-     created window.  */
-  if (w->current_matrix == NULL)
-    return false;
-
-  /* When we're currently updating the window, display and current
-     matrix usually don't agree.  Arrange for a thorough display
-     later.  */
-  if (w->must_be_updated_p)
-    {
-      SET_FRAME_GARBAGED (f);
-      return false;
-    }
-
-  /* Frame-relative pixel rectangle of W.  */
-  wr.x = WINDOW_LEFT_EDGE_X (w);
-  wr.y = WINDOW_TOP_EDGE_Y (w);
-  wr.width = WINDOW_PIXEL_WIDTH (w);
-  wr.height = WINDOW_PIXEL_HEIGHT (w);
-
-  if (gui_intersect_rectangles (fr, &wr, &r))
-    {
-      int yb = window_text_bottom_y (w);
-      struct glyph_row *row;
-      struct glyph_row *first_overlapping_row, *last_overlapping_row;
-
-      redisplay_trace ("expose_window (%d, %d, %u, %u)\n",
-		       r.x, r.y, r.width, r.height);
-
-      /* Convert to window coordinates.  */
-      r.x -= WINDOW_LEFT_EDGE_X (w);
-      r.y -= WINDOW_TOP_EDGE_Y (w);
-
-      /* Turn off the cursor.  */
-      bool cursor_cleared_p = (!w->pseudo_window_p
-			       && phys_cursor_in_rect_p (w, &r));
-      if (cursor_cleared_p)
-	gui_clear_cursor (w);
-
-      /* If the row containing the cursor extends face to end of line,
-	 then expose_area might overwrite the cursor outside the
-	 rectangle and thus notice_overwritten_cursor might clear
-	 w->phys_cursor_on_p.  We remember the original value and
-	 check later if it is changed.  */
-      bool phys_cursor_on_p = w->phys_cursor_on_p;
-
-      /* Use a signed int intermediate value to avoid catastrophic
-	 failures due to comparison between signed and unsigned, when
-	 y0 or y1 is negative (can happen for tall images).  */
-      int r_bottom = r.y + (int) r.height;
-
-      /* We must temporarily switch to the window's buffer, in case
-	 the fringe face has been remapped in that buffer's
-	 face-remapping-alist, so that draw_row_fringe_bitmaps,
-	 called from expose_line, will use the right face.  */
-      bool buffer_changed = false;
-      struct buffer *oldbuf = current_buffer;
-      if (!w->pseudo_window_p)
-	{
-	  set_buffer_internal_1 (XBUFFER (w->contents));
-	  buffer_changed = true;
-	}
-
-      /* Update lines intersecting rectangle R.  */
-      first_overlapping_row = last_overlapping_row = NULL;
-      for (row = w->current_matrix->rows;
-	   row->enabled_p;
-	   ++row)
-	{
-	  int y0 = row->y;
-	  int y1 = MATRIX_ROW_BOTTOM_Y (row);
-
-	  if ((y0 >= r.y && y0 < r_bottom)
-	      || (y1 > r.y && y1 < r_bottom)
-	      || (r.y >= y0 && r.y < y1)
-	      || (r_bottom > y0 && r_bottom < y1))
-	    {
-	      /* A header line may be overlapping, but there is no need
-		 to fix overlapping areas for them.  KFS 2005-02-12 */
-	      if (row->overlapping_p && !row->mode_line_p)
-		{
-		  if (first_overlapping_row == NULL)
-		    first_overlapping_row = row;
-		  last_overlapping_row = row;
-		}
-
-	      row->clip = fr;
-	      if (expose_line (w, row, &r))
-		mouse_face_overwritten_p = true;
-	      row->clip = NULL;
-	    }
-	  else if (row->overlapping_p)
-	    {
-	      /* We must redraw a row overlapping the exposed area.  */
-	      if (y0 < r.y
-		  ? y0 + row->phys_height > r.y
-		  : y0 + row->ascent - row->phys_ascent < r.y + (int) r.height)
-		{
-		  if (first_overlapping_row == NULL)
-		    first_overlapping_row = row;
-		  last_overlapping_row = row;
-		}
-	    }
-
-	  if (y1 >= yb)
-	    break;
-	}
-
-      if (buffer_changed)
-	set_buffer_internal_1 (oldbuf);
-
-      /* Display the mode line if there is one.  */
-      if (window_wants_mode_line (w)
-	  && (row = MATRIX_MODE_LINE_ROW (w->current_matrix),
-	      row->enabled_p)
-	  && row->y < r_bottom)
-	{
-	  if (expose_line (w, row, &r))
-	    mouse_face_overwritten_p = true;
-	}
-
-      if (!w->pseudo_window_p)
-	{
-	  /* Fix the display of overlapping rows.  */
-	  if (first_overlapping_row)
-	    expose_overlaps (w, first_overlapping_row, last_overlapping_row,
-			     fr);
-
-	  /* Draw border between windows.  */
-	  if (WINDOW_RIGHT_DIVIDER_WIDTH (w))
-	    gui_draw_right_divider (w);
-	  else
-	    gui_draw_vertical_border (w);
-
-	  if (WINDOW_BOTTOM_DIVIDER_WIDTH (w))
-	    gui_draw_bottom_divider (w);
-
-	  /* Turn the cursor on again.  */
-	  if (cursor_cleared_p
-	      || (phys_cursor_on_p && !w->phys_cursor_on_p))
-	    update_window_cursor (w, true);
-	}
-    }
-
-  return mouse_face_overwritten_p;
-}
-
-
-
-/* Redraw (parts) of all windows in the window tree rooted at W that
-   intersect R.  R contains frame pixel coordinates.  Value is
-   true if the exposure overwrites mouse-face.  */
-
-static bool
-expose_window_tree (struct window *w, const Emacs_Rectangle *r)
-{
-  struct frame *f = XFRAME (w->frame);
-  bool mouse_face_overwritten_p = false;
-
-  while (w && !FRAME_GARBAGED_P (f))
-    {
-      mouse_face_overwritten_p
-	|= (WINDOWP (w->contents)
-	    ? expose_window_tree (XWINDOW (w->contents), r)
-	    : expose_window (w, r));
-
-      w = NILP (w->next) ? NULL : XWINDOW (w->next);
-    }
-
-  return mouse_face_overwritten_p;
-}
-
-
-/* EXPORT:
-   Redisplay an exposed area of frame F.  X and Y are the upper-left
-   corner of the exposed rectangle.  W and H are width and height of
-   the exposed area.  All are pixel values.  W or H zero means redraw
-   the entire frame.  */
-
-void
-expose_frame (struct frame *f, int x, int y, int w, int h)
-{
-  Emacs_Rectangle r;
-  bool mouse_face_overwritten_p = false;
-
-  if (FRAME_GARBAGED_P (f))
-    {
-      redisplay_trace ("expose_frame garbaged\n");
-      return;
-    }
-
-  /* If basic faces haven't been realized yet, there is no point in
-     trying to redraw anything.  This can happen when we get an expose
-     event while Emacs is starting, e.g. by moving another window.  */
-  if (FRAME_FACE_CACHE (f) == NULL
-      || FRAME_FACE_CACHE (f)->used < BASIC_FACE_ID_SENTINEL)
-    {
-      redisplay_trace ("expose_frame no faces\n");
-      return;
-    }
-
-  if (w == 0 || h == 0)
-    {
-      r.x = r.y = 0;
-      r.width = FRAME_TEXT_WIDTH (f);
-      r.height = FRAME_TEXT_HEIGHT (f);
-    }
-  else
-    {
-      r.x = x;
-      r.y = y;
-      r.width = w;
-      r.height = h;
-    }
-
-  redisplay_trace ("expose_frame (%d, %d, %u, %u)\n",
-		   r.x, r.y, r.width, r.height);
-  mouse_face_overwritten_p = expose_window_tree (XWINDOW (f->root_window), &r);
-
-  if (WINDOWP (f->tab_bar_window))
-    mouse_face_overwritten_p
-      |= expose_window (XWINDOW (f->tab_bar_window), &r);
-
-  if (WINDOWP (f->tool_bar_window))
-    mouse_face_overwritten_p
-      |= expose_window (XWINDOW (f->tool_bar_window), &r);
-
-#ifdef HAVE_WINDOW_SYSTEM
-  if (WINDOWP (f->menu_bar_window))
-    mouse_face_overwritten_p
-      |= expose_window (XWINDOW (f->menu_bar_window), &r);
-#endif
-
-  /* Some window managers support a focus-follows-mouse style with
-     delayed raising of frames.  Imagine a partially obscured frame,
-     and moving the mouse into partially obscured mouse-face on that
-     frame.  The visible part of the mouse-face will be highlighted,
-     then the WM raises the obscured frame.  With at least one WM, KDE
-     2.1, Emacs is not getting any event for the raising of the frame
-     (even tried with SubstructureRedirectMask), only Expose events.
-     These expose events will draw text normally, i.e. not
-     highlighted.  Which means we must redo the highlight here.
-     Subsume it under ``we love X''.  --gerd 2001-08-15  */
-  /* Included in Windows version because Windows most likely does not
-     do the right thing if any third party tool offers
-     focus-follows-mouse with delayed raise.  --jason 2001-10-12  */
-  if (mouse_face_overwritten_p && !FRAME_GARBAGED_P (f))
-    {
-      Mouse_HLInfo *hlinfo = MOUSE_HL_INFO (f);
-      if (f == hlinfo->mouse_face_mouse_frame)
-	{
-	  int mouse_x = hlinfo->mouse_face_mouse_x;
-	  int mouse_y = hlinfo->mouse_face_mouse_y;
-	  clear_mouse_face (hlinfo);
-	  note_mouse_highlight (f, mouse_x, mouse_y);
-	}
     }
 }
 
