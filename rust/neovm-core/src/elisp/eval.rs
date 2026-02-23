@@ -2235,13 +2235,14 @@ impl Evaluator {
                 }
             };
             let value = self.eval(&tail[i + 1])?;
-            if self.obarray.is_constant(name) {
+            let resolved = super::builtins::resolve_variable_alias_name(self, name)?;
+            if self.obarray.is_constant(&resolved) {
                 return Err(signal(
                     "setting-constant",
                     vec![Value::symbol(name.clone())],
                 ));
             }
-            self.assign_with_watchers(name, value.clone(), "set")?;
+            self.assign_with_watchers(&resolved, value.clone(), "set")?;
             last = value;
             i += 2;
         }
@@ -4282,6 +4283,32 @@ mod tests {
         assert_eq!(results[3], "OK (setting-constant (t) 2)");
         assert_eq!(results[5], "OK (setting-constant (:vm-key) 3)");
         assert_eq!(results[6], "OK (wrong-type-argument symbolp 1)");
+    }
+
+    #[test]
+    fn setq_follows_variable_alias_resolution() {
+        let results = eval_all(
+            "(defvaralias 'vm-setq-alias 'vm-setq-base)
+             (setq vm-setq-alias 3)
+             (list (symbol-value 'vm-setq-base) (symbol-value 'vm-setq-alias))",
+        );
+        assert_eq!(results[2], "OK (3 3)");
+    }
+
+    #[test]
+    fn setq_alias_triggers_single_watcher_callback_on_resolved_target() {
+        let results = eval_all(
+            "(setq vm-setq-watch-events nil)
+             (defun vm-setq-watch-rec (symbol newval operation where)
+               (setq vm-setq-watch-events
+                     (cons (list symbol newval operation where)
+                           vm-setq-watch-events)))
+             (defvaralias 'vm-setq-watch 'vm-setq-watch-base)
+             (add-variable-watcher 'vm-setq-watch-base 'vm-setq-watch-rec)
+             (setq vm-setq-watch 9)
+             (length vm-setq-watch-events)",
+        );
+        assert_eq!(results[5], "OK 1");
     }
 
     #[test]
