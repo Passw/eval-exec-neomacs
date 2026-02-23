@@ -7262,11 +7262,20 @@ pub(crate) fn builtin_internal_event_symbol_parse_modifiers(args: Vec<Value>) ->
 
 pub(crate) fn builtin_internal_handle_focus_in(args: Vec<Value>) -> EvalResult {
     expect_args("internal-handle-focus-in", &args, 1)?;
-    Ok(Value::Nil)
+    Err(signal(
+        "error",
+        vec![Value::string("invalid focus-in event")],
+    ))
 }
 
 pub(crate) fn builtin_internal_make_var_non_special(args: Vec<Value>) -> EvalResult {
     expect_args("internal-make-var-non-special", &args, 1)?;
+    if args[0].as_symbol_name().is_none() {
+        return Err(signal(
+            "wrong-type-argument",
+            vec![Value::symbol("symbolp"), args[0].clone()],
+        ));
+    }
     Ok(Value::Nil)
 }
 
@@ -7279,7 +7288,14 @@ pub(crate) fn builtin_internal_set_lisp_face_attribute_from_resource(
         3,
         4,
     )?;
-    Ok(Value::Nil)
+    if args[0].as_symbol_name().is_none() {
+        return Err(signal(
+            "wrong-type-argument",
+            vec![Value::symbol("symbolp"), args[0].clone()],
+        ));
+    }
+    let _ = expect_strict_string(&args[2])?;
+    Ok(args[0].clone())
 }
 
 pub(crate) fn builtin_internal_stack_stats(args: Vec<Value>) -> EvalResult {
@@ -7289,7 +7305,7 @@ pub(crate) fn builtin_internal_stack_stats(args: Vec<Value>) -> EvalResult {
 
 pub(crate) fn builtin_internal_subr_documentation(args: Vec<Value>) -> EvalResult {
     expect_args("internal-subr-documentation", &args, 1)?;
-    Ok(Value::Nil)
+    Ok(Value::True)
 }
 
 pub(crate) fn builtin_malloc_info(args: Vec<Value>) -> EvalResult {
@@ -23729,8 +23745,14 @@ mod tests {
 
         let handle_focus_in = dispatch_builtin_pure("internal-handle-focus-in", vec![Value::Nil])
             .expect("builtin internal-handle-focus-in should resolve")
-            .expect("builtin internal-handle-focus-in should evaluate");
-        assert!(handle_focus_in.is_nil());
+            .expect_err("builtin internal-handle-focus-in should signal on invalid events");
+        match handle_focus_in {
+            Flow::Signal(sig) => {
+                assert_eq!(sig.symbol, "error");
+                assert_eq!(sig.data, vec![Value::string("invalid focus-in event")]);
+            }
+            other => panic!("unexpected flow: {other:?}"),
+        }
 
         let make_var_non_special =
             dispatch_builtin_pure("internal-make-var-non-special", vec![Value::symbol("x")])
@@ -23748,7 +23770,7 @@ mod tests {
         )
         .expect("builtin internal-set-lisp-face-attribute-from-resource should resolve")
         .expect("builtin internal-set-lisp-face-attribute-from-resource should evaluate");
-        assert!(set_face_attr.is_nil());
+        assert_eq!(set_face_attr, Value::symbol("face"));
 
         let stack_stats = dispatch_builtin_pure("internal-stack-stats", vec![])
             .expect("builtin internal-stack-stats should resolve")
@@ -23758,7 +23780,7 @@ mod tests {
         let subr_doc = dispatch_builtin_pure("internal-subr-documentation", vec![Value::Nil])
             .expect("builtin internal-subr-documentation should resolve")
             .expect("builtin internal-subr-documentation should evaluate");
-        assert!(subr_doc.is_nil());
+        assert_eq!(subr_doc, Value::True);
     }
 
     #[test]
