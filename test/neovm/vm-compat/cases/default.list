@@ -337,6 +337,7 @@ cases/back-to-indentation-semantics
 cases/indent-region-semantics
 cases/indent-mode-semantics
 cases/indent-read-only-variable-semantics
+cases/indent-for-tab-command-whitespace-semantics
 cases/tab-to-tab-stop-semantics
 cases/tab-to-tab-stop-return-column-semantics
 cases/indent-line-to-semantics

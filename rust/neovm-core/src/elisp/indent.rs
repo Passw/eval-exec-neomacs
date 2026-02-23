@@ -453,6 +453,9 @@ pub(crate) fn builtin_indent_for_tab_command(
         return Err(signal("buffer-read-only", vec![Value::string(name)]));
     }
 
+    // When point is in horizontal whitespace, Emacs collapses it before tab insert.
+    super::kill_ring::builtin_delete_horizontal_space(eval, vec![])?;
+
     let buf = eval
         .buffers
         .current_buffer_mut()
@@ -927,5 +930,20 @@ mod tests {
         .expect("parse forms");
         let value = ev.eval(&forms[0]).expect("eval");
         assert_eq!(value.as_str(), Some("\tx"));
+    }
+
+    #[test]
+    fn indent_for_tab_command_normalizes_leading_whitespace_at_point() {
+        let mut ev = super::super::eval::Evaluator::new();
+        let forms = super::super::parser::parse_forms(
+            r#"(with-temp-buffer
+                 (insert "  x")
+                 (goto-char 3)
+                 (list (indent-for-tab-command) (point) (string-to-list (buffer-string))))"#,
+        )
+        .expect("parse forms");
+        let value = ev.eval(&forms[0]).expect("eval");
+        let printed = super::super::print::print_value(&value);
+        assert_eq!(printed, "(nil 2 (9 120))");
     }
 }
