@@ -283,6 +283,12 @@ pub(crate) fn builtin_register_code_conversion_map(args: Vec<Value>) -> EvalResu
             vec![Value::symbol("symbolp"), args[0].clone()],
         ));
     }
+    if !args[1].is_vector() {
+        return Err(signal(
+            "wrong-type-argument",
+            vec![Value::symbol("vectorp"), args[1].clone()],
+        ));
+    }
 
     let name = args[0]
         .as_symbol_name()
@@ -499,6 +505,20 @@ mod tests {
         match err {
             Flow::Signal(sig) => {
                 assert_eq!(sig.symbol, "wrong-type-argument");
+            }
+            other => panic!("expected wrong-type-argument signal, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn register_code_conversion_map_requires_vector_map() {
+        let err = builtin_register_code_conversion_map(vec![Value::symbol("foo"), Value::Int(1)])
+            .expect_err("register-code-conversion-map map must be vector");
+        match err {
+            Flow::Signal(sig) => {
+                assert_eq!(sig.symbol, "wrong-type-argument");
+                assert_eq!(sig.data[0], Value::symbol("vectorp"));
+                assert_eq!(sig.data[1], Value::Int(1));
             }
             other => panic!("expected wrong-type-argument signal, got {other:?}"),
         }
