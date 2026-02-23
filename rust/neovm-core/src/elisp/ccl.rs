@@ -34,7 +34,12 @@ fn is_valid_ccl_program(program: &Value) -> bool {
         return false;
     }
 
-    is_integer(second) && is_integer(third)
+    let second = second.as_int();
+    if second.is_none() || second.is_some_and(|n| !(0..=3).contains(&n)) {
+        return false;
+    }
+
+    is_integer(third)
 }
 
 #[derive(Default)]
@@ -324,6 +329,7 @@ mod tests {
         let program = Value::vector(vec![Value::Int(10), Value::Int(0), Value::Int(0)]);
         let invalid_program = Value::vector(vec![Value::Int(0), Value::Int(0)]);
         let invalid_negative = Value::vector(vec![Value::Int(-1), Value::Int(0), Value::Int(0)]);
+        let invalid_header_mode = Value::vector(vec![Value::Int(10), Value::Int(4), Value::Int(0)]);
         assert_eq!(
             builtin_ccl_program_p(vec![program]).expect("valid program"),
             Value::True
@@ -334,6 +340,10 @@ mod tests {
         );
         assert_eq!(
             builtin_ccl_program_p(vec![invalid_negative]).expect("invalid program"),
+            Value::Nil
+        );
+        assert_eq!(
+            builtin_ccl_program_p(vec![invalid_header_mode]).expect("invalid program"),
             Value::Nil
         );
     }
@@ -531,6 +541,22 @@ mod tests {
         .expect_err("invalid program must be rejected");
         match err {
             Flow::Signal(sig) => {
+                assert_eq!(sig.data[0], Value::string("Error in CCL program"));
+            }
+            other => panic!("expected error signal, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn register_ccl_program_rejects_second_header_out_of_range() {
+        let err = builtin_register_ccl_program(vec![
+            Value::symbol("foo"),
+            Value::vector(vec![Value::Int(10), Value::Int(4), Value::Int(0)]),
+        ])
+        .expect_err("second header slot must be in 0..=3");
+        match err {
+            Flow::Signal(sig) => {
+                assert_eq!(sig.symbol, "error");
                 assert_eq!(sig.data[0], Value::string("Error in CCL program"));
             }
             other => panic!("expected error signal, got {other:?}"),
