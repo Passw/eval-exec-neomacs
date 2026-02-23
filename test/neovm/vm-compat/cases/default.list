@@ -28,6 +28,10 @@ cases/symbol-function-error-paths
 cases/indirect-function-core
 cases/indirect-function-alias-chains
 cases/variable-alias-setplist-runtime-semantics
+cases/variable-watcher-defvaralias-runtime-semantics
+cases/variable-watcher-dedup-callback-semantics
+cases/variable-watcher-remove-callback-semantics
+cases/variable-watcher-set-default-runtime-semantics
 cases/condition-case-unwind-introspection
 cases/backtrace-frame-semantics
 cases/backtrace-helper-wrapper-semantics
@@ -398,7 +402,13 @@ cases/buffer-local-value
 cases/buffer-local-variables-semantics
 cases/defvar-local
 cases/setq-local
+cases/setq-local-constant-semantics
 cases/setq-local-alias-runtime-semantics
+cases/setq-alias-runtime-semantics
+cases/setq-constant-semantics
+cases/setq-default-alias-constant-watcher-semantics
+cases/set-default-alias-constant-watcher-semantics
+cases/keyword-constant-value-semantics
 cases/undo-basics
 cases/undo-buffer-arg
 cases/undo-arity-semantics
