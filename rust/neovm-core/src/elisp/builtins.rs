@@ -7029,27 +7029,72 @@ fn interactive_form_from_expr_body(body: &[super::expr::Expr]) -> Option<Value> 
     Some(Value::list(interactive))
 }
 
-fn interactive_form_from_quoted_lambda(value: &Value) -> Option<Value> {
-    let items = list_to_vec(value)?;
-    if items.first().and_then(Value::as_symbol_name) != Some("lambda") {
-        return None;
+fn interactive_form_from_quoted_interactive_form(form: &Value) -> Result<Option<Value>, Flow> {
+    let Value::Cons(cell) = form else {
+        return Ok(None);
+    };
+    let pair = read_cons(*cell);
+    if pair.car.as_symbol_name() != Some("interactive") {
+        return Ok(None);
     }
 
-    let mut body_index = 2;
-    if matches!(items.get(body_index), Some(Value::Str(_))) {
-        body_index += 1;
+    match pair.cdr {
+        Value::Nil => Ok(Some(Value::list(vec![Value::symbol("interactive")]))),
+        Value::Cons(arg_cell) => {
+            let arg_pair = read_cons(arg_cell);
+            Ok(Some(Value::list(vec![
+                Value::symbol("interactive"),
+                arg_pair.car,
+            ])))
+        }
+        tail => Err(signal(
+            "wrong-type-argument",
+            vec![Value::symbol("listp"), tail],
+        )),
     }
+}
 
-    let interactive_form = items.get(body_index)?;
-    let interactive_items = list_to_vec(interactive_form)?;
-    if interactive_items.first().and_then(Value::as_symbol_name) != Some("interactive") {
-        return None;
+fn interactive_form_from_quoted_lambda(value: &Value) -> Result<Option<Value>, Flow> {
+    let Value::Cons(lambda_cell) = value else {
+        return Ok(None);
+    };
+    let lambda_pair = read_cons(*lambda_cell);
+    if lambda_pair.car.as_symbol_name() != Some("lambda") {
+        return Ok(None);
     }
-    let mut interactive = vec![Value::symbol("interactive")];
-    if let Some(spec) = interactive_items.get(1).cloned() {
-        interactive.push(spec);
+    let Value::Cons(params_cell) = lambda_pair.cdr else {
+        return Ok(None);
+    };
+    let params_pair = read_cons(params_cell);
+    let body = params_pair.cdr.clone();
+    let mut cursor = body.clone();
+    let mut can_skip_doc = true;
+
+    loop {
+        match cursor {
+            Value::Nil => return Ok(None),
+            Value::Cons(cell) => {
+                let pair = read_cons(cell);
+                if can_skip_doc && matches!(pair.car, Value::Str(_)) {
+                    can_skip_doc = false;
+                    cursor = pair.cdr;
+                    continue;
+                }
+                can_skip_doc = false;
+                if let Some(interactive) = interactive_form_from_quoted_interactive_form(&pair.car)?
+                {
+                    return Ok(Some(interactive));
+                }
+                cursor = pair.cdr;
+            }
+            _ => {
+                return Err(signal(
+                    "wrong-type-argument",
+                    vec![Value::symbol("listp"), body],
+                ))
+            }
+        }
     }
-    Some(Value::list(interactive))
 }
 
 pub(crate) fn builtin_interactive_form_eval(
@@ -7076,10 +7121,10 @@ pub(crate) fn builtin_interactive_form_eval(
     };
 
     let interactive = match &function {
-        Value::Lambda(lambda) | Value::Macro(lambda) => interactive_form_from_expr_body(&lambda.body),
+        Value::Lambda(lambda) | Value::Macro(lambda) => Ok(interactive_form_from_expr_body(&lambda.body)),
         Value::Cons(_) => interactive_form_from_quoted_lambda(&function),
-        _ => None,
-    };
+        _ => Ok(None),
+    }?;
     Ok(interactive.unwrap_or(Value::Nil))
 }
 
@@ -23507,6 +23552,90 @@ mod tests {
             builtin_interactive_form_eval(&mut eval, vec![Value::symbol("vm-interactive-form-nil")])
                 .expect("interactive-form should evaluate"),
             Value::list(vec![Value::symbol("interactive"), Value::Nil])
+        );
+    }
+
+    #[test]
+    fn interactive_form_eval_signals_listp_for_improper_lambda_shapes() {
+        let mut eval = crate::elisp::eval::Evaluator::new();
+
+        let dotted_interactive = Value::list(vec![
+            Value::symbol("lambda"),
+            Value::Nil,
+            Value::cons(Value::symbol("interactive"), Value::string("p")),
+            Value::Int(1),
+        ]);
+        let dotted_body = Value::cons(
+            Value::symbol("lambda"),
+            Value::cons(Value::Nil, Value::cons(Value::Int(1), Value::Int(2))),
+        );
+        let doc_dotted_body = Value::cons(
+            Value::symbol("lambda"),
+            Value::cons(
+                Value::Nil,
+                Value::cons(Value::string("doc"), Value::Int(2)),
+            ),
+        );
+        let doc_interactive_dotted_tail = Value::cons(
+            Value::symbol("lambda"),
+            Value::cons(
+                Value::Nil,
+                Value::cons(
+                    Value::string("doc"),
+                    Value::cons(
+                        Value::list(vec![Value::symbol("interactive")]),
+                        Value::Int(2),
+                    ),
+                ),
+            ),
+        );
+
+        let dotted_interactive_err =
+            builtin_interactive_form_eval(&mut eval, vec![dotted_interactive]).unwrap_err();
+        match dotted_interactive_err {
+            Flow::Signal(sig) => {
+                assert_eq!(sig.symbol, "wrong-type-argument");
+                assert_eq!(sig.data, vec![Value::symbol("listp"), Value::string("p")]);
+            }
+            other => panic!("unexpected flow: {other:?}"),
+        }
+
+        let dotted_body_err =
+            builtin_interactive_form_eval(&mut eval, vec![dotted_body]).unwrap_err();
+        match dotted_body_err {
+            Flow::Signal(sig) => {
+                assert_eq!(sig.symbol, "wrong-type-argument");
+                assert_eq!(
+                    sig.data,
+                    vec![
+                        Value::symbol("listp"),
+                        Value::cons(Value::Int(1), Value::Int(2))
+                    ]
+                );
+            }
+            other => panic!("unexpected flow: {other:?}"),
+        }
+
+        let doc_dotted_body_err =
+            builtin_interactive_form_eval(&mut eval, vec![doc_dotted_body]).unwrap_err();
+        match doc_dotted_body_err {
+            Flow::Signal(sig) => {
+                assert_eq!(sig.symbol, "wrong-type-argument");
+                assert_eq!(
+                    sig.data,
+                    vec![
+                        Value::symbol("listp"),
+                        Value::cons(Value::string("doc"), Value::Int(2))
+                    ]
+                );
+            }
+            other => panic!("unexpected flow: {other:?}"),
+        }
+
+        assert_eq!(
+            builtin_interactive_form_eval(&mut eval, vec![doc_interactive_dotted_tail])
+                .expect("interactive-form should stop at first interactive form"),
+            Value::list(vec![Value::symbol("interactive")])
         );
     }
 

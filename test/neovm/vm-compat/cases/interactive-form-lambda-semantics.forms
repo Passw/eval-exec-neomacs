@@ -37,6 +37,18 @@
  (interactive-form '(lambda nil "doc" (interactive "P") 1))
  (interactive-form '(lambda nil (interactive) 1))
  (interactive-form '(lambda nil (interactive nil) 1))
+ (condition-case err
+     (interactive-form '(lambda nil (interactive . "p") 1))
+   (error err))
+ (let ((orig (symbol-function 'vm-if-improper)))
+   (unwind-protect
+       (progn
+         (fset 'vm-if-improper '(lambda nil (interactive . "p") 1))
+         (condition-case err (interactive-form 'vm-if-improper) (error err)))
+     (fset 'vm-if-improper orig)))
+ (condition-case err (interactive-form '(lambda nil 1 . 2)) (error err))
+ (condition-case err (interactive-form '(lambda nil "doc" . 2)) (error err))
+ (interactive-form '(lambda nil "doc" (interactive) . 2))
  (interactive-form '(lambda nil 1))
  (interactive-form 0)
  (condition-case err (interactive-form) (error err)))
