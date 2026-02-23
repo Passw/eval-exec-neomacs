@@ -9,7 +9,7 @@ This is an auto-updating log for incremental NeoVM rewrite slices that should ke
 4. **Platform guidance** – expand README platform notes and link to issue #22 for macOS, plus consider creating future follow-ups for Windows/other hosts once a stable build path exists.
 
 ## Auto-exploration queue
-These are the next candidate slices to explore automatically (an initial 20 tasks is already in `docs/plan.md`; keep advancing through them in order, re-checking Oracle behavior each time). Track progress with verified batches and push after each slice.
+These are the next candidate slices to explore automatically (an initial 20 tasks is already in `docs/neomacs-direct-c-to-rust-plan.md`; keep advancing through them in order, re-checking Oracle behavior each time). Track progress with verified batches and push after each slice.
 
 ## Next actionable move
 - Identify the next VM builtin still stubbed or drifting (the plan references `frame-terminal`, display/window, and stub enforcement). Implement a targeted lock-in slice with new corpus cases and `check-neovm` regression checks.
@@ -18,6 +18,6 @@ These are the next candidate slices to explore automatically (an initial 20 task
 - Recent completed slice: aligned vm-compat runner case serialization with oracle (`elisp_compat_runner` now escapes only newline/carriage-return/tab, not backslashes), unblocking strict-form parity for `cases/documentation-property-semantics`.
 - Recent completed slice: aligned startup doc seeds for `use-system-tooltips` and `ctl-x-4-map` with oracle-facing `documentation-property` behavior, and refreshed `cases/documentation-property-semantics.expected.tsv` to lock the corrected tuples.
 - Recent completed slice: hardened vm-compat runner emission to preserve raw result bytes and oracle-equivalent control-escape forms (including `\\t`/`\\n` strict-form parity), plus strengthened the `use-system-tooltips` prefix probe back to an alignment assertion.
-- Keep documenting the auto-progress in the plan (update `docs/plan.md` `## Doing` and `## Next`) each time a slice is completed.
+- Keep documenting the auto-progress in the plan (update `docs/neomacs-direct-c-to-rust-plan.md` `## Doing` and `## Next`) each time a slice is completed.
 - Track recent slices such as the `recent-keys` capture for `call-interactively`/`command-execute` so their documentation stays visible for observers and CI log correlation.
 - Refer to `docs/neovm-subsystem-porting.md` when choosing the next subsystem to port; it lists the untracked Rust modules and the gated steps to bring each online.
