@@ -2335,16 +2335,16 @@ pub(crate) fn builtin_start_process(
     args: Vec<Value>,
 ) -> EvalResult {
     expect_min_args("start-process", &args, 3)?;
-    let name = expect_string(&args[0])?;
-    let buffer = if args[1].is_nil() {
-        None
+    let name = expect_process_name_string(&args[0])?;
+    let buffer = parse_make_process_buffer(eval, &args[1])?;
+    let program = if args[2].is_nil() {
+        "nil".to_string()
     } else {
-        Some(expect_string(&args[1])?)
+        expect_string_strict(&args[2])?
     };
-    let program = expect_string(&args[2])?;
     let proc_args: Vec<String> = args[3..]
         .iter()
-        .map(expect_string)
+        .map(expect_string_strict)
         .collect::<Result<Vec<_>, _>>()?;
 
     let id = eval
@@ -3995,6 +3995,47 @@ mod tests {
                (process-buffer 1)"#,
         ));
         assert_eq!(results[1], r#"OK "*output*""#);
+    }
+
+    #[test]
+    fn start_process_buffer_name_program_and_arg_contracts_match_oracle() {
+        let cat = find_bin("cat");
+        let results = eval_all(&format!(
+            r#"(with-temp-buffer
+                 (let ((p (start-process "neo-sp-contract-buffer" (current-buffer) "{cat}")))
+                   (unwind-protect
+                       (list (processp p)
+                             (null (condition-case err (process-send-eof nil) (error err)))
+                             (null (condition-case err (process-running-child-p nil) (error err))))
+                     (ignore-errors (delete-process p)))))
+               (condition-case err (start-process 'neo-sp-contract-name nil "{cat}") (error err))
+               (condition-case err (start-process t nil "{cat}") (error err))
+               (condition-case err (start-process nil nil "{cat}") (error err))
+               (condition-case err (start-process "neo-sp-contract-buf-symbol" 'x "{cat}") (error err))
+               (condition-case err (start-process "neo-sp-contract-buf-t" t "{cat}") (error err))
+               (condition-case err (start-process "neo-sp-contract-buf-int" 1 "{cat}") (error err))
+               (condition-case err (start-process "neo-sp-contract-prog-symbol" nil 'cat) (error err))
+               (condition-case err (start-process "neo-sp-contract-prog-t" nil t) (error err))
+               (processp (start-process "neo-sp-contract-prog-nil" nil nil))
+               (condition-case err (start-process "neo-sp-contract-arg-symbol" nil "{cat}" 'a) (error err))
+               (condition-case err (start-process "neo-sp-contract-arg-t" nil "{cat}" t) (error err))
+               (condition-case err (start-process "neo-sp-contract-arg-nil" nil "{cat}" nil) (error err))
+               (condition-case err (start-process "neo-sp-contract-arg-int" nil "{cat}" 1) (error err))"#,
+        ));
+        assert_eq!(results[0], "OK (t t t)");
+        assert_eq!(results[1], r#"OK (error ":name value not a string")"#);
+        assert_eq!(results[2], r#"OK (error ":name value not a string")"#);
+        assert_eq!(results[3], r#"OK (error ":name value not a string")"#);
+        assert_eq!(results[4], "OK (wrong-type-argument stringp x)");
+        assert_eq!(results[5], "OK (wrong-type-argument stringp t)");
+        assert_eq!(results[6], "OK (wrong-type-argument stringp 1)");
+        assert_eq!(results[7], "OK (wrong-type-argument stringp cat)");
+        assert_eq!(results[8], "OK (wrong-type-argument stringp t)");
+        assert_eq!(results[9], "OK t");
+        assert_eq!(results[10], "OK (wrong-type-argument stringp a)");
+        assert_eq!(results[11], "OK (wrong-type-argument stringp t)");
+        assert_eq!(results[12], "OK (wrong-type-argument stringp nil)");
+        assert_eq!(results[13], "OK (wrong-type-argument stringp 1)");
     }
 
     #[test]
