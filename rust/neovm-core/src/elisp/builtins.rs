@@ -6711,8 +6711,11 @@ pub(crate) fn builtin_native_comp_unit_set_file(args: Vec<Value>) -> EvalResult 
 
 pub(crate) fn builtin_native_elisp_load(args: Vec<Value>) -> EvalResult {
     expect_range_args("native-elisp-load", &args, 1, 2)?;
-    let _ = expect_strict_string(&args[0])?;
-    Ok(Value::Nil)
+    let file = expect_strict_string(&args[0])?;
+    Err(signal(
+        "native-lisp-load-failed",
+        vec![Value::string("file does not exists"), Value::string(file)],
+    ))
 }
 
 pub(crate) fn builtin_new_fontset(args: Vec<Value>) -> EvalResult {
@@ -23564,8 +23567,17 @@ mod tests {
         let native_elisp_load =
             dispatch_builtin_pure("native-elisp-load", vec![Value::string("foo.eln")])
                 .expect("builtin native-elisp-load should resolve")
-                .expect("builtin native-elisp-load should evaluate");
-        assert!(native_elisp_load.is_nil());
+                .expect_err("native-elisp-load should signal missing native file");
+        match native_elisp_load {
+            Flow::Signal(sig) => {
+                assert_eq!(sig.symbol, "native-lisp-load-failed");
+                assert_eq!(
+                    sig.data,
+                    vec![Value::string("file does not exists"), Value::string("foo.eln")]
+                );
+            }
+            other => panic!("expected signal, got: {other:?}"),
+        }
 
         let new_fontset =
             dispatch_builtin_pure("new-fontset", vec![Value::string("x"), Value::string("y")])
