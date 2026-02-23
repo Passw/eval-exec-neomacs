@@ -6335,23 +6335,37 @@ pub(crate) fn builtin_obarray_make(args: Vec<Value>) -> EvalResult {
     Ok(Value::vector(vec![Value::Nil; size]))
 }
 
+fn expect_obarray_vector_id(value: &Value) -> Result<ObjId, Flow> {
+    let Value::Vector(id) = value else {
+        return Err(signal(
+            "wrong-type-argument",
+            vec![Value::symbol("obarrayp"), value.clone()],
+        ));
+    };
+    let is_obarray = with_heap(|h| {
+        h.get_vector(*id)
+            .iter()
+            .all(|slot| slot.is_nil() || matches!(slot, Value::Cons(_)))
+    });
+    if !is_obarray {
+        return Err(signal(
+            "wrong-type-argument",
+            vec![Value::symbol("obarrayp"), value.clone()],
+        ));
+    }
+    Ok(*id)
+}
+
 pub(crate) fn builtin_obarray_clear(args: Vec<Value>) -> EvalResult {
     expect_args("obarray-clear", &args, 1)?;
-    match &args[0] {
-        Value::Vector(v) => {
-            with_heap_mut(|h| {
-                let vec = h.get_vector_mut(*v);
-                for slot in vec.iter_mut() {
-                    *slot = Value::Nil;
-                }
-            });
-            Ok(Value::Nil)
+    let id = expect_obarray_vector_id(&args[0])?;
+    with_heap_mut(|h| {
+        let vec = h.get_vector_mut(id);
+        for slot in vec.iter_mut() {
+            *slot = Value::Nil;
         }
-        other => Err(signal(
-            "wrong-type-argument",
-            vec![Value::symbol("obarrayp"), other.clone()],
-        )),
-    }
+    });
+    Ok(Value::Nil)
 }
 
 pub(crate) fn builtin_make_temp_file_internal(args: Vec<Value>) -> EvalResult {
@@ -8411,7 +8425,9 @@ pub(crate) fn builtin_internal_labeled_widen_eval(
 
 pub(crate) fn builtin_internal_obarray_buckets(args: Vec<Value>) -> EvalResult {
     expect_args("internal--obarray-buckets", &args, 1)?;
-    Ok(Value::Nil)
+    let id = expect_obarray_vector_id(&args[0])?;
+    let buckets = with_heap(|h| h.get_vector(id).clone());
+    Ok(Value::list(buckets))
 }
 
 pub(crate) fn builtin_internal_set_buffer_modified_tick(args: Vec<Value>) -> EvalResult {
@@ -22891,7 +22907,7 @@ mod tests {
         };
         assert_eq!(with_heap(|h| h.get_vector(*default).len()), 1511);
 
-        let table = Value::vector(vec![Value::Int(1), Value::symbol("x")]);
+        let table = Value::vector(vec![Value::Nil, Value::list(vec![Value::symbol("x")])]);
         let cleared = dispatch_builtin_pure("obarray-clear", vec![table.clone()])
             .expect("builtin obarray-clear should resolve")
             .expect("builtin obarray-clear should evaluate");
@@ -25011,7 +25027,7 @@ mod tests {
         assert_eq!(widen, Value::Nil);
 
         let buckets =
-            dispatch_builtin_pure("internal--obarray-buckets", vec![Value::symbol("obarray")])
+            dispatch_builtin_pure("internal--obarray-buckets", vec![Value::vector(vec![])])
                 .expect("internal--obarray-buckets should resolve")
                 .expect("internal--obarray-buckets should evaluate");
         assert_eq!(buckets, Value::Nil);

@@ -1048,6 +1048,7 @@ cases/internal-focus-face-subr-semantics
 cases/internal-face-resource-attribute-name-semantics
 cases/internal-face-resource-attribute-value-semantics
 cases/internal-labeled-narrow-widen-semantics
+cases/internal-obarray-buckets-semantics
 cases/internal-set-buffer-modified-tick-semantics
 cases/internal-runtime-introspection-compat-semantics
 cases/internal-gui-frame-runtime-compat-semantics
