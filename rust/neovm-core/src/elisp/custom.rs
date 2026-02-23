@@ -444,6 +444,7 @@ pub(crate) fn builtin_default_value(
     let resolved = super::builtins::resolve_variable_alias_name(eval, name)?;
     match eval.obarray.symbol_value(&resolved) {
         Some(v) => Ok(v.clone()),
+        None if resolved.starts_with(':') => Ok(Value::symbol(resolved)),
         None => Err(signal("void-variable", vec![Value::symbol(name)])),
     }
 }
@@ -1016,6 +1017,12 @@ mod tests {
     fn default_value_void_signals_error() {
         let results = eval_all(r#"(default-value 'nonexistent-var)"#);
         assert!(results[0].starts_with("ERR"));
+    }
+
+    #[test]
+    fn keyword_defaults_and_symbol_values_self_evaluate() {
+        let results = eval_all(r#"(list (default-value :foo) (default-toplevel-value :foo) (symbol-value :foo))"#);
+        assert_eq!(results[0], "OK (:foo :foo :foo)");
     }
 
     #[test]

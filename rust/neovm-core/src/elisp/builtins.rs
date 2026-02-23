@@ -4486,10 +4486,11 @@ pub(crate) fn builtin_default_toplevel_value(
         )
     })?;
     let resolved = resolve_variable_alias_name(eval, name)?;
-    eval.obarray()
-        .symbol_value(&resolved)
-        .cloned()
-        .ok_or_else(|| signal("void-variable", vec![Value::symbol(name)]))
+    match eval.obarray().symbol_value(&resolved).cloned() {
+        Some(value) => Ok(value),
+        None if resolved.starts_with(':') => Ok(Value::symbol(resolved)),
+        None => Err(signal("void-variable", vec![Value::symbol(name)])),
+    }
 }
 
 pub(crate) fn builtin_set_default_toplevel_value(
@@ -4635,10 +4636,11 @@ pub(crate) fn builtin_symbol_value(
             return Ok(value.clone());
         }
     }
-    eval.obarray()
-        .symbol_value(&resolved)
-        .cloned()
-        .ok_or_else(|| signal("void-variable", vec![Value::symbol(name)]))
+    match eval.obarray().symbol_value(&resolved).cloned() {
+        Some(value) => Ok(value),
+        None if resolved.starts_with(':') => Ok(Value::symbol(resolved)),
+        None => Err(signal("void-variable", vec![Value::symbol(name)])),
+    }
 }
 
 fn startup_virtual_autoload_function_cell(
