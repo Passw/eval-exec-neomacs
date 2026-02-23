@@ -16,3 +16,15 @@
         (list (default-value 'vm-sql-alias-default)
               (default-value 'vm-sql-base-default))
       (error err))))
+(progn
+  (defvaralias 'vm-sql-const 'nil)
+  (let ((x 0))
+    (condition-case err
+        (setq-local vm-sql-const (setq x 1))
+      (error (list err x)))))
+(progn
+  (defvaralias 'vm-sql-const-k ':vm-sql-k)
+  (let ((x 0))
+    (condition-case err
+        (setq-local vm-sql-const-k (setq x 2))
+      (error (list err x)))))

@@ -4008,6 +4008,26 @@ mod tests {
     }
 
     #[test]
+    fn setq_local_alias_to_constant_preserves_error_payload_and_rhs_skip() {
+        let results = eval_all(
+            "(progn
+               (defvaralias 'vm-setq-local-const 'nil)
+               (let ((x 0))
+                 (condition-case err
+                     (setq-local vm-setq-local-const (setq x 1))
+                   (error (list err x)))))
+             (progn
+               (defvaralias 'vm-setq-local-const-k ':vm-setq-local-k)
+               (let ((x 0))
+                 (condition-case err
+                     (setq-local vm-setq-local-const-k (setq x 2))
+                   (error (list err x)))))",
+        );
+        assert_eq!(results[0], "OK ((setting-constant vm-setq-local-const) 0)");
+        assert_eq!(results[1], "OK ((setting-constant vm-setq-local-const-k) 0)");
+    }
+
+    #[test]
     fn defmacro_works() {
         let result = eval_all(
             "(defmacro my-when (cond &rest body)
