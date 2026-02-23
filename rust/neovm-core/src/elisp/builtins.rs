@@ -29152,6 +29152,108 @@ mod tests {
     }
 
     #[test]
+    fn register_code_conversion_map_existing_symbol_plist_edges() {
+        let mut eval = crate::elisp::eval::Evaluator::new();
+
+        let first_id = dispatch_builtin(
+            &mut eval,
+            "register-code-conversion-map",
+            vec![
+                Value::symbol("vm-map-plist-edge"),
+                Value::vector(vec![Value::Int(1), Value::Int(2), Value::Int(3)]),
+            ],
+        )
+        .expect("register-code-conversion-map should dispatch")
+        .expect("initial register-code-conversion-map should succeed");
+        assert_eq!(first_id, Value::Int(0));
+
+        let _ = builtin_setplist_eval(
+            &mut eval,
+            vec![Value::symbol("vm-map-plist-edge"), Value::Nil],
+        )
+        .expect("setplist should clear plist");
+
+        let second_id = dispatch_builtin(
+            &mut eval,
+            "register-code-conversion-map",
+            vec![
+                Value::symbol("vm-map-plist-edge"),
+                Value::vector(vec![Value::Int(4), Value::Int(5), Value::Int(6)]),
+            ],
+        )
+        .expect("register-code-conversion-map should dispatch after plist clear")
+        .expect("register-code-conversion-map should keep id after plist clear");
+        assert_eq!(second_id, first_id);
+
+        let republished_map = builtin_get(
+            &mut eval,
+            vec![
+                Value::symbol("vm-map-plist-edge"),
+                Value::symbol("code-conversion-map"),
+            ],
+        )
+        .expect("get should read republished map");
+        assert_eq!(
+            republished_map,
+            Value::vector(vec![Value::Int(4), Value::Int(5), Value::Int(6)])
+        );
+        let republished_id = builtin_get(
+            &mut eval,
+            vec![
+                Value::symbol("vm-map-plist-edge"),
+                Value::symbol("code-conversion-map-id"),
+            ],
+        )
+        .expect("get should read republished id");
+        assert_eq!(republished_id, first_id);
+
+        let _ = builtin_setplist_eval(
+            &mut eval,
+            vec![Value::symbol("vm-map-plist-edge"), Value::Int(1)],
+        )
+        .expect("setplist should seed malformed plist");
+        let malformed = dispatch_builtin(
+            &mut eval,
+            "register-code-conversion-map",
+            vec![
+                Value::symbol("vm-map-plist-edge"),
+                Value::vector(vec![Value::Int(7), Value::Int(8), Value::Int(9)]),
+            ],
+        )
+        .expect("register-code-conversion-map malformed path should dispatch")
+        .expect_err("malformed plist should preserve plistp error");
+        match malformed {
+            Flow::Signal(sig) => {
+                assert_eq!(sig.symbol, "wrong-type-argument");
+                assert_eq!(sig.data, vec![Value::symbol("plistp"), Value::Int(1)]);
+            }
+            other => panic!("unexpected flow: {other:?}"),
+        }
+
+        let hidden_id = builtin_get(
+            &mut eval,
+            vec![
+                Value::symbol("vm-map-plist-edge"),
+                Value::symbol("code-conversion-map-id"),
+            ],
+        )
+        .expect("get should read hidden id after malformed plist");
+        assert_eq!(hidden_id, Value::Nil);
+
+        let next_id = dispatch_builtin(
+            &mut eval,
+            "register-code-conversion-map",
+            vec![
+                Value::symbol("vm-map-plist-edge-next"),
+                Value::vector(vec![Value::Int(9), Value::Int(8), Value::Int(7)]),
+            ],
+        )
+        .expect("register-code-conversion-map next should dispatch")
+        .expect("register-code-conversion-map next should succeed");
+        assert_eq!(next_id, Value::Int(1));
+    }
+
+    #[test]
     fn ccl_registration_plist_errors_preserve_oracle_id_side_effects() {
         let mut eval = crate::elisp::eval::Evaluator::new();
 
