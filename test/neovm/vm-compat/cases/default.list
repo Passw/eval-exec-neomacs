@@ -77,6 +77,7 @@ cases/ccl-code-conversion-map-type-semantics
 cases/ccl-code-conversion-map-plist-semantics
 cases/ccl-registration-plist-error-no-side-effects-semantics
 cases/ccl-symbol-registration-runtime-semantics
+cases/ccl-symbol-designator-plist-gate-semantics
 cases/commandp-semantics
 cases/commandp-builtin-command-matrix
 cases/commandp-core-command-matrix-extra

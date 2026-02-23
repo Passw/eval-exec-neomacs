@@ -5066,11 +5066,58 @@ fn builtin_register_code_conversion_map_eval(
     Ok(map_id)
 }
 
+fn symbol_has_valid_ccl_program_idx(
+    eval: &mut super::eval::Evaluator,
+    symbol: &Value,
+) -> Result<bool, Flow> {
+    if !symbol.is_symbol() {
+        return Ok(false);
+    }
+    let idx = builtin_get(eval, vec![symbol.clone(), Value::symbol("ccl-program-idx")])?;
+    Ok(idx.as_int().is_some_and(|n| n >= 0))
+}
+
+fn builtin_ccl_program_p_eval(eval: &mut super::eval::Evaluator, args: Vec<Value>) -> EvalResult {
+    if args.len() == 1 && args[0].is_symbol() {
+        return Ok(Value::bool(symbol_has_valid_ccl_program_idx(eval, &args[0])?));
+    }
+    super::ccl::builtin_ccl_program_p(args)
+}
+
+fn builtin_ccl_execute_eval(eval: &mut super::eval::Evaluator, args: Vec<Value>) -> EvalResult {
+    if args.first().is_some_and(Value::is_symbol) && !symbol_has_valid_ccl_program_idx(eval, &args[0])? {
+        let mut forced = args.clone();
+        forced[0] = Value::Int(0);
+        return super::ccl::builtin_ccl_execute(forced);
+    }
+    super::ccl::builtin_ccl_execute(args)
+}
+
+fn builtin_ccl_execute_on_string_eval(
+    eval: &mut super::eval::Evaluator,
+    args: Vec<Value>,
+) -> EvalResult {
+    if args.first().is_some_and(Value::is_symbol) && !symbol_has_valid_ccl_program_idx(eval, &args[0])? {
+        let mut forced = args.clone();
+        forced[0] = Value::Int(0);
+        return super::ccl::builtin_ccl_execute_on_string(forced);
+    }
+    super::ccl::builtin_ccl_execute_on_string(args)
+}
+
 fn builtin_register_ccl_program_eval(
     eval: &mut super::eval::Evaluator,
     args: Vec<Value>,
 ) -> EvalResult {
+    let was_registered = args
+        .first()
+        .and_then(Value::as_symbol_name)
+        .is_some_and(super::ccl::is_registered_ccl_program);
     let program_id = super::ccl::builtin_register_ccl_program(args.clone())?;
+
+    if was_registered {
+        return Ok(program_id);
+    }
 
     let publish = builtin_put(
         eval,
@@ -17408,9 +17455,9 @@ pub(crate) fn dispatch_builtin(
         "charset-after" => super::charset::builtin_charset_after(args),
 
         // CCL (pure)
-        "ccl-program-p" => super::ccl::builtin_ccl_program_p(args),
-        "ccl-execute" => super::ccl::builtin_ccl_execute(args),
-        "ccl-execute-on-string" => super::ccl::builtin_ccl_execute_on_string(args),
+        "ccl-program-p" => builtin_ccl_program_p_eval(eval, args),
+        "ccl-execute" => builtin_ccl_execute_eval(eval, args),
+        "ccl-execute-on-string" => builtin_ccl_execute_on_string_eval(eval, args),
         "register-ccl-program" => builtin_register_ccl_program_eval(eval, args),
         "register-code-conversion-map" => builtin_register_code_conversion_map_eval(eval, args),
 
@@ -28959,6 +29006,149 @@ mod tests {
             }
             other => panic!("unexpected flow: {other:?}"),
         }
+    }
+
+    #[test]
+    fn ccl_symbol_designators_follow_plist_idx_gates() {
+        let mut eval = crate::elisp::eval::Evaluator::new();
+
+        let _ = builtin_put(
+            &mut eval,
+            vec![
+                Value::symbol("vm-ccl-manual-programp"),
+                Value::symbol("ccl-program-idx"),
+                Value::Int(1),
+            ],
+        )
+        .expect("put should seed ccl-program-idx");
+        let manual_programp = dispatch_builtin(
+            &mut eval,
+            "ccl-program-p",
+            vec![Value::symbol("vm-ccl-manual-programp")],
+        )
+        .expect("ccl-program-p should dispatch")
+        .expect("ccl-program-p should evaluate symbol plist idx");
+        assert_eq!(manual_programp, Value::True);
+
+        let first_id = dispatch_builtin(
+            &mut eval,
+            "register-ccl-program",
+            vec![
+                Value::symbol("vm-ccl-plist-gate"),
+                Value::vector(vec![Value::Int(10), Value::Int(0), Value::Int(0)]),
+            ],
+        )
+        .expect("initial register-ccl-program should dispatch")
+        .expect("initial register-ccl-program should succeed");
+
+        let _ = builtin_setplist_eval(
+            &mut eval,
+            vec![Value::symbol("vm-ccl-plist-gate"), Value::Nil],
+        )
+        .expect("setplist should clear symbol plist");
+        let second_id = dispatch_builtin(
+            &mut eval,
+            "register-ccl-program",
+            vec![
+                Value::symbol("vm-ccl-plist-gate"),
+                Value::vector(vec![Value::Int(10), Value::Int(0), Value::Int(0), Value::Int(0)]),
+            ],
+        )
+        .expect("re-register should dispatch")
+        .expect("re-register should keep existing id");
+        assert_eq!(second_id, first_id);
+
+        let missing_idx = builtin_get(
+            &mut eval,
+            vec![
+                Value::symbol("vm-ccl-plist-gate"),
+                Value::symbol("ccl-program-idx"),
+            ],
+        )
+        .expect("get should read plist gate");
+        assert_eq!(missing_idx, Value::Nil);
+
+        let gated_programp = dispatch_builtin(
+            &mut eval,
+            "ccl-program-p",
+            vec![Value::symbol("vm-ccl-plist-gate")],
+        )
+        .expect("ccl-program-p should dispatch")
+        .expect("ccl-program-p should gate on plist idx");
+        assert_eq!(gated_programp, Value::Nil);
+
+        let execute_err = dispatch_builtin(
+            &mut eval,
+            "ccl-execute",
+            vec![
+                Value::symbol("vm-ccl-plist-gate"),
+                Value::vector(vec![
+                    Value::Int(0),
+                    Value::Int(0),
+                    Value::Int(0),
+                    Value::Int(0),
+                    Value::Int(0),
+                    Value::Int(0),
+                    Value::Int(0),
+                    Value::Int(0),
+                ]),
+            ],
+        )
+        .expect("ccl-execute should dispatch")
+        .expect_err("ccl-execute should treat gated symbol as invalid program");
+        match execute_err {
+            Flow::Signal(sig) => {
+                assert_eq!(sig.symbol, "error");
+                assert_eq!(sig.data, vec![Value::string("Invalid CCL program")]);
+            }
+            other => panic!("unexpected flow: {other:?}"),
+        }
+
+        let execute_on_string_err = dispatch_builtin(
+            &mut eval,
+            "ccl-execute-on-string",
+            vec![
+                Value::symbol("vm-ccl-plist-gate"),
+                Value::vector(vec![
+                    Value::Int(0),
+                    Value::Int(0),
+                    Value::Int(0),
+                    Value::Int(0),
+                    Value::Int(0),
+                    Value::Int(0),
+                    Value::Int(0),
+                    Value::Int(0),
+                    Value::Int(0),
+                ]),
+                Value::string("abc"),
+            ],
+        )
+        .expect("ccl-execute-on-string should dispatch")
+        .expect_err("ccl-execute-on-string should treat gated symbol as invalid program");
+        match execute_on_string_err {
+            Flow::Signal(sig) => {
+                assert_eq!(sig.symbol, "error");
+                assert_eq!(sig.data, vec![Value::string("Invalid CCL program")]);
+            }
+            other => panic!("unexpected flow: {other:?}"),
+        }
+
+        let _ = builtin_setplist_eval(
+            &mut eval,
+            vec![Value::symbol("vm-ccl-plist-gate"), Value::Int(1)],
+        )
+        .expect("setplist should allow malformed plist");
+        let malformed_reregister = dispatch_builtin(
+            &mut eval,
+            "register-ccl-program",
+            vec![
+                Value::symbol("vm-ccl-plist-gate"),
+                Value::vector(vec![Value::Int(10), Value::Int(0), Value::Int(0), Value::Int(0)]),
+            ],
+        )
+        .expect("malformed re-register should dispatch")
+        .expect("malformed re-register should return existing id");
+        assert_eq!(malformed_reregister, first_id);
     }
 
     #[test]

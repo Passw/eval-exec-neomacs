@@ -98,6 +98,11 @@ pub(crate) fn unregister_registered_ccl_program(name: &str) {
     let _ = registry.programs.remove(name);
 }
 
+pub(crate) fn is_registered_ccl_program(name: &str) -> bool {
+    let registry = ccl_registry().lock().unwrap_or_else(|e| e.into_inner());
+    registry.programs.contains_key(name)
+}
+
 enum CclProgramDesignatorKind {
     Inline,
     RegisteredSymbol,
