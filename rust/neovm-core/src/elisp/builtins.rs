@@ -6859,8 +6859,45 @@ pub(crate) fn builtin_set_frame_window_state_change(args: Vec<Value>) -> EvalRes
     Ok(Value::Nil)
 }
 
+fn is_known_fringe_bitmap(name: &str) -> bool {
+    matches!(
+        name,
+        "empty-line"
+            | "horizontal-bar"
+            | "vertical-bar"
+            | "hollow-square"
+            | "filled-square"
+            | "hollow-rectangle"
+            | "filled-rectangle"
+            | "right-bracket"
+            | "left-bracket"
+            | "bottom-right-angle"
+            | "bottom-left-angle"
+            | "top-right-angle"
+            | "top-left-angle"
+            | "right-triangle"
+            | "left-triangle"
+            | "large-circle"
+            | "right-curly-arrow"
+            | "left-curly-arrow"
+            | "down-arrow"
+            | "up-arrow"
+            | "right-arrow"
+            | "left-arrow"
+            | "exclamation-mark"
+            | "question-mark"
+    )
+}
+
 pub(crate) fn builtin_set_fringe_bitmap_face(args: Vec<Value>) -> EvalResult {
     expect_range_args("set-fringe-bitmap-face", &args, 1, 2)?;
+    let bitmap = args[0].as_symbol_name();
+    if !bitmap.is_some_and(is_known_fringe_bitmap) {
+        return Err(signal(
+            "error",
+            vec![Value::string("Undefined fringe bitmap")],
+        ));
+    }
     Ok(Value::Nil)
 }
 
@@ -23620,7 +23657,8 @@ mod tests {
             .expect("builtin set-frame-window-state-change should evaluate");
         assert!(set_state.is_nil());
 
-        let set_fringe = dispatch_builtin_pure("set-fringe-bitmap-face", vec![Value::Nil])
+        let set_fringe =
+            dispatch_builtin_pure("set-fringe-bitmap-face", vec![Value::symbol("left-triangle")])
             .expect("builtin set-fringe-bitmap-face should resolve")
             .expect("builtin set-fringe-bitmap-face should evaluate");
         assert!(set_fringe.is_nil());

@@ -1071,3 +1071,4 @@ cases/set-window-new-runtime-contracts-semantics
 cases/set-charset-plist-semantics
 cases/set-this-command-keys-semantics
 cases/window-frame-font-buffer-contracts-semantics
+cases/set-fringe-bitmap-face-semantics
