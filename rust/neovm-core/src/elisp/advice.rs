@@ -212,7 +212,7 @@ impl VariableWatcherList {
     /// Remove a watcher callback for a variable.
     pub fn remove_watcher(&mut self, var_name: &str, callback: &Value) {
         if let Some(list) = self.watchers.get_mut(var_name) {
-            list.retain(|w| &w.callback != callback);
+            list.retain(|w| !watcher_callback_matches(&w.callback, callback));
             if list.is_empty() {
                 self.watchers.remove(var_name);
             }
@@ -275,6 +275,30 @@ impl VariableWatcherList {
         }
         calls
     }
+}
+
+fn watcher_callback_matches(registered: &Value, candidate: &Value) -> bool {
+    if registered == candidate {
+        return true;
+    }
+    match (registered, candidate) {
+        (Value::Lambda(a), Value::Lambda(b)) | (Value::Macro(a), Value::Macro(b)) => {
+            lambda_data_matches(a, b)
+        }
+        _ => false,
+    }
+}
+
+fn lambda_data_matches(
+    left: &std::sync::Arc<super::value::LambdaData>,
+    right: &std::sync::Arc<super::value::LambdaData>,
+) -> bool {
+    left.params.required == right.params.required
+        && left.params.optional == right.params.optional
+        && left.params.rest == right.params.rest
+        && left.body == right.body
+        && left.env == right.env
+        && left.docstring == right.docstring
 }
 
 impl Default for VariableWatcherList {
@@ -844,6 +868,21 @@ mod tests {
             env: None,
             docstring: None,
         }));
+        let equivalent_callback = Value::Lambda(Arc::new(LambdaData {
+            params: LambdaParams {
+                required: vec![
+                    "symbol".to_string(),
+                    "newval".to_string(),
+                    "operation".to_string(),
+                    "where".to_string(),
+                ],
+                optional: Vec::new(),
+                rest: None,
+            },
+            body: vec![Expr::Symbol("newval".to_string())],
+            env: None,
+            docstring: None,
+        }));
 
         builtin_add_variable_watcher(
             &mut eval,
@@ -860,9 +899,9 @@ mod tests {
 
         builtin_remove_variable_watcher(
             &mut eval,
-            vec![Value::symbol("vm-watch-nonsym"), callback],
+            vec![Value::symbol("vm-watch-nonsym"), equivalent_callback],
         )
-        .expect("remove-variable-watcher should remove lambda callbacks");
+        .expect("remove-variable-watcher should remove equivalent lambda callbacks");
         let after = builtin_get_variable_watchers(&mut eval, vec![Value::symbol("vm-watch-nonsym")])
             .expect("get-variable-watchers should be empty after removal");
         assert!(after.is_nil());
