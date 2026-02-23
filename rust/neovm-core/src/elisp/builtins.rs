@@ -5041,6 +5041,9 @@ fn builtin_register_code_conversion_map_eval(
     eval: &mut super::eval::Evaluator,
     args: Vec<Value>,
 ) -> EvalResult {
+    if args.len() == 2 {
+        preflight_symbol_plist_put(eval, &args[0], "code-conversion-map")?;
+    }
     let map_id = super::ccl::builtin_register_code_conversion_map(args.clone())?;
 
     let _ = builtin_put(
@@ -5069,16 +5072,37 @@ fn builtin_register_ccl_program_eval(
 ) -> EvalResult {
     let program_id = super::ccl::builtin_register_ccl_program(args.clone())?;
 
-    let _ = builtin_put(
+    let publish = builtin_put(
         eval,
         vec![
             args[0].clone(),
             Value::symbol("ccl-program-idx"),
             program_id.clone(),
         ],
-    )?;
+    );
+    if let Err(err) = publish {
+        if let Some(name) = args[0].as_symbol_name() {
+            super::ccl::unregister_registered_ccl_program(name);
+        }
+        return Err(err);
+    }
 
     Ok(program_id)
+}
+
+fn preflight_symbol_plist_put(
+    eval: &mut super::eval::Evaluator,
+    symbol: &Value,
+    property: &str,
+) -> Result<(), Flow> {
+    let Some(name) = symbol.as_symbol_name() else {
+        return Ok(());
+    };
+    let Some(raw) = symbol_raw_plist_value(eval, name) else {
+        return Ok(());
+    };
+    let _ = builtin_plist_put(vec![raw, Value::symbol(property), Value::Nil])?;
+    Ok(())
 }
 
 pub(crate) fn builtin_setplist_eval(
@@ -28847,7 +28871,13 @@ mod tests {
         )
         .expect("register-code-conversion-map should dispatch")
         .expect("register-code-conversion-map should succeed");
-        assert_eq!(map_id, Value::Int(0));
+        let map_id_value = match map_id {
+            Value::Int(id) => {
+                assert!(id >= 0);
+                Value::Int(id)
+            }
+            other => panic!("expected integer map id, got {other:?}"),
+        };
 
         let published_map = builtin_get(
             &mut eval,
@@ -28867,7 +28897,7 @@ mod tests {
             ],
         )
         .expect("get should read published conversion map id");
-        assert_eq!(published_id, Value::Int(0));
+        assert_eq!(published_id, map_id_value);
 
         let sym_value = builtin_symbol_value(&mut eval, vec![Value::symbol("vm-ccl-map-prop")])
             .expect_err("register-code-conversion-map should not bind symbol value");
@@ -28892,7 +28922,13 @@ mod tests {
         )
         .expect("register-ccl-program should dispatch")
         .expect("register-ccl-program should succeed");
-        assert_eq!(program_id, Value::Int(1));
+        let program_id_value = match program_id {
+            Value::Int(id) => {
+                assert!(id > 0);
+                Value::Int(id)
+            }
+            other => panic!("expected integer program id, got {other:?}"),
+        };
 
         let published_id = builtin_get(
             &mut eval,
@@ -28902,7 +28938,7 @@ mod tests {
             ],
         )
         .expect("get should read published CCL program id");
-        assert_eq!(published_id, Value::Int(1));
+        assert_eq!(published_id, program_id_value);
 
         let unpublished_program = builtin_get(
             &mut eval,
@@ -28923,6 +28959,119 @@ mod tests {
             }
             other => panic!("unexpected flow: {other:?}"),
         }
+    }
+
+    #[test]
+    fn ccl_registration_plist_errors_preserve_oracle_id_side_effects() {
+        let mut eval = crate::elisp::eval::Evaluator::new();
+
+        let baseline_program_id = dispatch_builtin(
+            &mut eval,
+            "register-ccl-program",
+            vec![
+                Value::symbol("vm-ccl-program-id-baseline"),
+                Value::vector(vec![Value::Int(10), Value::Int(0), Value::Int(0)]),
+            ],
+        )
+        .expect("register-ccl-program baseline should dispatch")
+        .expect("register-ccl-program baseline should succeed")
+        .as_int()
+        .expect("baseline program id should be integer");
+
+        builtin_setplist_eval(
+            &mut eval,
+            vec![Value::symbol("vm-ccl-program-id-bad"), Value::Int(1)],
+        )
+        .expect("setplist should seed malformed plist");
+        let program_err = dispatch_builtin(
+            &mut eval,
+            "register-ccl-program",
+            vec![
+                Value::symbol("vm-ccl-program-id-bad"),
+                Value::vector(vec![Value::Int(10), Value::Int(0), Value::Int(0)]),
+            ],
+        )
+        .expect("register-ccl-program error path should dispatch")
+        .expect_err("register-ccl-program should fail on malformed plist");
+        match program_err {
+            Flow::Signal(sig) => {
+                assert_eq!(sig.symbol, "wrong-type-argument");
+                assert_eq!(sig.data, vec![Value::symbol("plistp"), Value::Int(1)]);
+            }
+            other => panic!("unexpected flow: {other:?}"),
+        }
+        let bad_program_designator = dispatch_builtin(
+            &mut eval,
+            "ccl-program-p",
+            vec![Value::symbol("vm-ccl-program-id-bad")],
+        )
+        .expect("ccl-program-p should dispatch")
+        .expect("ccl-program-p should return predicate value");
+        assert_eq!(bad_program_designator, Value::Nil);
+
+        let next_program_id = dispatch_builtin(
+            &mut eval,
+            "register-ccl-program",
+            vec![
+                Value::symbol("vm-ccl-program-id-next"),
+                Value::vector(vec![Value::Int(10), Value::Int(0), Value::Int(0)]),
+            ],
+        )
+        .expect("register-ccl-program next should dispatch")
+        .expect("register-ccl-program next should succeed")
+        .as_int()
+        .expect("next program id should be integer");
+        assert_eq!(next_program_id, baseline_program_id + 2);
+
+        let baseline_map_id = dispatch_builtin(
+            &mut eval,
+            "register-code-conversion-map",
+            vec![
+                Value::symbol("vm-ccl-map-id-baseline"),
+                Value::vector(vec![Value::Int(1), Value::Int(2), Value::Int(3)]),
+            ],
+        )
+        .expect("register-code-conversion-map baseline should dispatch")
+        .expect("register-code-conversion-map baseline should succeed")
+        .as_int()
+        .expect("baseline map id should be integer");
+
+        builtin_setplist_eval(
+            &mut eval,
+            vec![Value::symbol("vm-ccl-map-id-bad"), Value::Int(1)],
+        )
+        .expect("setplist should seed malformed plist");
+        let map_err = dispatch_builtin(
+            &mut eval,
+            "register-code-conversion-map",
+            vec![
+                Value::symbol("vm-ccl-map-id-bad"),
+                Value::vector(vec![Value::Int(4), Value::Int(5), Value::Int(6)]),
+            ],
+        )
+        .expect("register-code-conversion-map error path should dispatch")
+        .expect_err("register-code-conversion-map should fail on malformed plist");
+        match map_err {
+            Flow::Signal(sig) => {
+                assert_eq!(sig.symbol, "wrong-type-argument");
+                assert_eq!(sig.data, vec![Value::symbol("plistp"), Value::Int(1)]);
+            }
+            other => panic!("unexpected flow: {other:?}"),
+        }
+
+        let next_map_id = dispatch_builtin(
+            &mut eval,
+            "register-code-conversion-map",
+            vec![
+                Value::symbol("vm-ccl-map-id-next"),
+                Value::vector(vec![Value::Int(7), Value::Int(8), Value::Int(9)]),
+            ],
+        )
+        .expect("register-code-conversion-map next should dispatch")
+        .expect("register-code-conversion-map next should succeed")
+        .as_int()
+        .expect("next map id should be integer");
+        assert_eq!(next_map_id, baseline_map_id + 1);
     }
 
     #[test]

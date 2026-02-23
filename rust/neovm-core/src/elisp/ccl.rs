@@ -93,6 +93,11 @@ fn ccl_registry() -> &'static Mutex<CclRegistry> {
     REGISTRY.get_or_init(|| Mutex::new(CclRegistry::with_defaults()))
 }
 
+pub(crate) fn unregister_registered_ccl_program(name: &str) {
+    let mut registry = ccl_registry().lock().unwrap_or_else(|e| e.into_inner());
+    let _ = registry.programs.remove(name);
+}
+
 enum CclProgramDesignatorKind {
     Inline,
     RegisteredSymbol,
