@@ -6,7 +6,7 @@
 //! commands via `std::process::Command`.
 
 use std::collections::HashMap;
-#[cfg(target_os = "linux")]
+#[cfg(not(target_os = "windows"))]
 use std::ffi::CStr;
 use std::ffi::CString;
 use std::fs::OpenOptions;
@@ -1137,6 +1137,79 @@ fn pid_exists(pid: i64) -> bool {
         return false;
     }
     std::fs::metadata(format!("/proc/{pid}")).is_ok()
+}
+
+fn parse_effective_ids_from_proc_status(pid: i64) -> Option<(u32, u32)> {
+    let status = std::fs::read_to_string(format!("/proc/{pid}/status")).ok()?;
+    let mut euid = None;
+    let mut egid = None;
+    for line in status.lines() {
+        if let Some(rest) = line.strip_prefix("Uid:") {
+            let fields: Vec<&str> = rest.split_whitespace().collect();
+            if fields.len() >= 2 {
+                euid = fields[1].parse::<u32>().ok();
+            }
+        } else if let Some(rest) = line.strip_prefix("Gid:") {
+            let fields: Vec<&str> = rest.split_whitespace().collect();
+            if fields.len() >= 2 {
+                egid = fields[1].parse::<u32>().ok();
+            }
+        }
+        if euid.is_some() && egid.is_some() {
+            break;
+        }
+    }
+    Some((euid?, egid?))
+}
+
+#[cfg(not(target_os = "windows"))]
+fn lookup_user_name(uid: u32) -> Option<String> {
+    // SAFETY: libc returns either null or a valid passwd struct pointer.
+    let user = unsafe { libc::getpwuid(uid as libc::uid_t) };
+    if user.is_null() {
+        return None;
+    }
+    // SAFETY: `user` is non-null and `pw_name` is a valid C string pointer.
+    let name_ptr = unsafe { (*user).pw_name };
+    if name_ptr.is_null() {
+        return None;
+    }
+    // SAFETY: `name_ptr` is a valid NUL-terminated C string.
+    Some(
+        unsafe { CStr::from_ptr(name_ptr) }
+            .to_string_lossy()
+            .into_owned(),
+    )
+}
+
+#[cfg(target_os = "windows")]
+fn lookup_user_name(_uid: u32) -> Option<String> {
+    None
+}
+
+#[cfg(not(target_os = "windows"))]
+fn lookup_group_name(gid: u32) -> Option<String> {
+    // SAFETY: libc returns either null or a valid group struct pointer.
+    let group = unsafe { libc::getgrgid(gid as libc::gid_t) };
+    if group.is_null() {
+        return None;
+    }
+    // SAFETY: `group` is non-null and `gr_name` is a valid C string pointer.
+    let name_ptr = unsafe { (*group).gr_name };
+    if name_ptr.is_null() {
+        return None;
+    }
+    // SAFETY: `name_ptr` is a valid NUL-terminated C string.
+    Some(
+        unsafe { CStr::from_ptr(name_ptr) }
+            .to_string_lossy()
+            .into_owned(),
+    )
+}
+
+#[cfg(target_os = "windows")]
+fn lookup_group_name(_gid: u32) -> Option<String> {
+    None
 }
 
 fn parse_make_process_command(value: &Value) -> Result<Vec<String>, Flow> {
@@ -2946,17 +3019,29 @@ pub(crate) fn builtin_process_attributes(
 ) -> EvalResult {
     expect_args("process-attributes", &args, 1)?;
     let pid = match &args[0] {
-        Value::Int(n) if *n >= 0 => *n,
+        Value::Int(n) => *n,
         Value::Char(c) => *c as i64,
         _ => return Err(signal_wrong_type_numberp(args[0].clone())),
     };
     if !pid_exists(pid) {
         return Ok(Value::Nil);
     }
-    Ok(Value::list(vec![Value::cons(
-        Value::symbol("pid"),
-        Value::Int(pid),
-    )]))
+
+    let mut attrs = Vec::new();
+    if let Some((euid, egid)) = parse_effective_ids_from_proc_status(pid) {
+        attrs.push(Value::cons(
+            Value::symbol("group"),
+            Value::string(lookup_group_name(egid).unwrap_or_else(|| egid.to_string())),
+        ));
+        attrs.push(Value::cons(Value::symbol("egid"), Value::Int(egid as i64)));
+        attrs.push(Value::cons(
+            Value::symbol("user"),
+            Value::string(lookup_user_name(euid).unwrap_or_else(|| euid.to_string())),
+        ));
+        attrs.push(Value::cons(Value::symbol("euid"), Value::Int(euid as i64)));
+    }
+
+    Ok(Value::list(attrs))
 }
 
 /// (make-process &rest ARGS) -> process-or-nil
@@ -4856,6 +4941,31 @@ mod tests {
                    (ignore-errors (delete-process p))))"#,
         ));
         assert_eq!(result, "OK (error error error error error t nil nil nil signal 9)");
+    }
+
+    #[test]
+    fn process_attributes_runtime_shape_matches_oracle() {
+        let result = eval_one(
+            r#"(let ((attrs (process-attributes (emacs-pid))))
+                 (list
+                  (listp attrs)
+                  (null (assq 'pid attrs))
+                  (let ((pair (assq 'user attrs)))
+                    (and (consp pair) (stringp (cdr pair))))
+                  (let ((pair (assq 'group attrs)))
+                    (and (consp pair) (stringp (cdr pair))))
+                  (let ((pair (assq 'euid attrs)))
+                    (and (consp pair) (integerp (cdr pair))))
+                  (let ((pair (assq 'egid attrs)))
+                    (and (consp pair) (integerp (cdr pair))))
+                  (process-attributes -1)
+                  (condition-case err (process-attributes 'x) (error err))
+                  (process-attributes 999999999)))"#,
+        );
+        assert_eq!(
+            result,
+            "OK (t t t t t t nil (wrong-type-argument numberp x) nil)"
+        );
     }
 
     #[test]

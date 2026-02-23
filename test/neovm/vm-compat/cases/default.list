@@ -719,6 +719,7 @@ cases/process-stale-control-semantics
 cases/process-mark-type-thread-send-semantics
 cases/process-designator-buffer-lookup-semantics
 cases/process-control-make-setter-semantics
+cases/process-attributes-runtime-semantics
 cases/process-coding-tty-query-semantics
 cases/process-file-lines-menu-semantics
 cases/process-list-network-serial-semantics

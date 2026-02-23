@@ -110,6 +110,7 @@ All must be true:
 - `src/callproc.c` parity burn-down is active: `call-process`, `call-process-region`, and `start-file-process` now enforce oracle string contracts (with `PROGRAM=nil` preserved where required) via `cases/call-process-start-file-process-string-contract-semantics`.
 - `src/process.c` stale-handle mutator parity is now locked in (`set-process-{buffer,coding-system,inherit-coding-system-flag,thread,window-size}`, `set-process-{filter,sentinel,plist}`, `process-{put,get}`) via `cases/process-stale-mutator-semantics`.
 - `src/process.c` stale-handle control parity is now tightened for `continue/interrupt/kill/stop/quit-process` inactive-error behavior, with `signal-process` stale-path compatibility normalized and locked by `cases/process-stale-control-semantics`.
+- `src/process.c` `process-attributes` now matches oracle runtime shape for current-process identity fields (`user`, `group`, `euid`, `egid`) and negative-PID semantics (`-1` -> `nil`) via `cases/process-attributes-runtime-semantics`.
 
 ## Next (Direct Order)
 
