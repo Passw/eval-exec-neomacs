@@ -106,10 +106,12 @@ All must be true:
 
 - `src/callint.c` and `src/insdel.c` are now on Rust-default runtime paths (`6d25db1e`) with vm-compat lock-ins.
 - `src/process.c` is actively being tightened for oracle parity; latest slices enforce `set-binary-mode` unsupported-stream payload semantics and `accept-process-output` millisecond/fixnum contract parity.
+- `src/process.c` now also matches oracle `start-process` buffer/program/name and strict argument contracts via `cases/start-process-buffer-and-type-contract-semantics`.
+- `src/callproc.c` parity burn-down is active: `call-process`, `call-process-region`, and `start-file-process` now enforce oracle string contracts (with `PROGRAM=nil` preserved where required) via `cases/call-process-start-file-process-string-contract-semantics`.
 
 ## Next (Direct Order)
 
-1. Continue `src/process.c`/`src/callproc.c` parity burn-down with vm-compat lock-ins for remaining stubbed/drifting process and shell wrappers.
+1. Continue `src/process.c`/`src/callproc.c` parity burn-down with vm-compat lock-ins for remaining process/shell wrapper drifts (including return-shape and object-handle edges).
 2. Start `alloc`-adjacent direct replacement slices and mark concrete tracker rows `in-progress`.
 3. Remove short-lived C fallback paths once active tracker rows are stable on Rust-default behavior.
 

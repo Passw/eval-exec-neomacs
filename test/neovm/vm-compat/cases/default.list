@@ -707,6 +707,7 @@ cases/frame-handle-f-prefix-semantics
 cases/message-box-or-box-handle-semantics
 cases/process-error-conditions
 cases/process-basics
+cases/call-process-start-file-process-string-contract-semantics
 cases/process-subr-arity-semantics
 cases/process-runtime-introspection-semantics
 cases/start-process-buffer-and-type-contract-semantics

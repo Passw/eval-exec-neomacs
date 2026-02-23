@@ -15,7 +15,7 @@ Status values: `none`, `in-progress`, `rust-default`, `c-removed`, `glue-only`, 
 | `src/buffer.c` | `partial` | `rust/neovm-core/src/buffer/buffer.rs` | - | - | - | - |
 | `src/bytecode.c` | `none` | `-` | - | - | - | - |
 | `src/callint.c` | `rust-default` | `rust/neovm-core/src/elisp/interactive.rs` | `cases/execute-extended-command-prefix-return-semantics`, `cases/execute-extended-command-batch-eof-semantics` | `6d25db1e` | - | rust backend default for NeoVM runtime; legacy editor C path still present |
-| `src/callproc.c` | `none` | `-` | - | - | - | - |
+| `src/callproc.c` | `in-progress` | `rust/neovm-core/src/elisp/process.rs` | `cases/process-basics`, `cases/call-process-start-file-process-string-contract-semantics` | - | - | direct call-process/call-process-region/start-file-process contract parity tightening in progress |
 | `src/casefiddle.c` | `partial` | `rust/neovm-core/src/elisp/casefiddle.rs` | - | - | - | - |
 | `src/casetab.c` | `partial` | `rust/neovm-core/src/elisp/casetab.rs` | - | - | - | - |
 | `src/category.c` | `partial` | `rust/neovm-core/src/elisp/category.rs` | - | - | - | - |
@@ -71,7 +71,7 @@ Status values: `none`, `in-progress`, `rust-default`, `c-removed`, `glue-only`, 
 | `src/neomacsterm.c` | `none` | `-` | - | - | - | - |
 | `src/pdumper.c` | `none` | `-` | - | - | - | - |
 | `src/print.c` | `partial` | `rust/neovm-core/src/elisp/print.rs` | - | - | - | - |
-| `src/process.c` | `in-progress` | `rust/neovm-core/src/elisp/process.rs` | `cases/process-runtime-introspection-semantics`, `cases/file-runtime-wrapper-semantics`, `cases/accept-process-output-millis-semantics` | - | - | `set-binary-mode` and `accept-process-output` argument/error contracts now align with oracle |
+| `src/process.c` | `in-progress` | `rust/neovm-core/src/elisp/process.rs` | `cases/process-runtime-introspection-semantics`, `cases/start-process-buffer-and-type-contract-semantics`, `cases/file-runtime-wrapper-semantics`, `cases/accept-process-output-millis-semantics` | - | - | `set-binary-mode`, `accept-process-output`, and `start-process` contract behavior now align with oracle |
 | `src/profiler.c` | `partial` | `rust/neomacs-display/src/core/profiler.rs` | - | - | - | - |
 | `src/regex-emacs.c` | `partial` | `rust/neovm-core/src/elisp/regex.rs` | - | - | - | - |
 | `src/region-cache.c` | `none` | `-` | - | - | - | - |

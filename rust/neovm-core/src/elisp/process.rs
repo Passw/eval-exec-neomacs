@@ -2379,11 +2379,12 @@ pub(crate) fn builtin_start_file_process(
     expect_min_args("start-file-process", &args, 3)?;
     let name = expect_process_name_string(&args[0])?;
     let buffer = parse_make_process_buffer(eval, &args[1])?;
-    let program = expect_string(&args[2])?;
-    let proc_args = args[3..]
-        .iter()
-        .map(expect_string)
-        .collect::<Result<Vec<_>, _>>()?;
+    let program = if args[2].is_nil() {
+        "nil".to_string()
+    } else {
+        expect_string_strict(&args[2])?
+    };
+    let proc_args = parse_string_args_strict(&args[3..])?;
     let id = eval
         .processes
         .create_process(name, buffer, program, proc_args);
@@ -2417,14 +2418,11 @@ pub(crate) fn builtin_call_process(
     args: Vec<Value>,
 ) -> EvalResult {
     expect_min_args("call-process", &args, 1)?;
-    let program = expect_string(&args[0])?;
+    let program = expect_string_strict(&args[0])?;
     let infile = parse_optional_infile(&args, 1)?;
     let destination = args.get(2).unwrap_or(&Value::Nil);
-    let cmd_args: Vec<String> = if args.len() > 4 {
-        args[4..]
-            .iter()
-            .map(expect_string)
-            .collect::<Result<Vec<_>, _>>()?
+    let cmd_args = if args.len() > 4 {
+        parse_string_args_strict(&args[4..])?
     } else {
         Vec::new()
     };
@@ -2548,7 +2546,7 @@ pub(crate) fn builtin_call_process_region(
     args: Vec<Value>,
 ) -> EvalResult {
     expect_min_args("call-process-region", &args, 3)?;
-    let program = expect_string(&args[2])?;
+    let program = expect_string_strict(&args[2])?;
 
     let delete = args.len() > 3 && args[3].is_truthy();
     let destination = if args.len() > 4 {
@@ -2559,11 +2557,8 @@ pub(crate) fn builtin_call_process_region(
     let destination_spec = parse_call_process_destination(eval, destination)?;
     // DISPLAY (arg index 5): ignored.
 
-    let cmd_args: Vec<String> = if args.len() > 6 {
-        args[6..]
-            .iter()
-            .map(expect_string)
-            .collect::<Result<Vec<_>, _>>()?
+    let cmd_args = if args.len() > 6 {
+        parse_string_args_strict(&args[6..])?
     } else {
         Vec::new()
     };
@@ -4036,6 +4031,63 @@ mod tests {
         assert_eq!(results[11], "OK (wrong-type-argument stringp t)");
         assert_eq!(results[12], "OK (wrong-type-argument stringp nil)");
         assert_eq!(results[13], "OK (wrong-type-argument stringp 1)");
+    }
+
+    #[test]
+    fn call_process_and_start_file_process_string_contracts_match_oracle() {
+        let echo = find_bin("echo");
+        let results = eval_all(&format!(
+            r#"(condition-case err (call-process nil) (error err))
+               (condition-case err (call-process t) (error err))
+               (condition-case err (call-process 'foo) (error err))
+               (condition-case err (call-process "{echo}" nil nil nil 'x) (error err))
+               (condition-case err (call-process "{echo}" nil nil nil t) (error err))
+               (condition-case err (call-process "{echo}" nil nil nil nil) (error err))
+               (with-temp-buffer
+                 (insert "x")
+                 (condition-case err (call-process-region (point-min) (point-min) nil) (error err)))
+               (with-temp-buffer
+                 (insert "x")
+                 (condition-case err (call-process-region (point-min) (point-min) t) (error err)))
+               (with-temp-buffer
+                 (insert "x")
+                 (condition-case err (call-process-region (point-min) (point-min) 'foo) (error err)))
+               (with-temp-buffer
+                 (insert "x")
+                 (condition-case err (call-process-region (point-min) (point-min) "{echo}" nil nil nil 'x) (error err)))
+               (with-temp-buffer
+                 (insert "x")
+                 (condition-case err (call-process-region (point-min) (point-min) "{echo}" nil nil nil t) (error err)))
+               (with-temp-buffer
+                 (insert "x")
+                 (condition-case err (call-process-region (point-min) (point-min) "{echo}" nil nil nil nil) (error err)))
+               (condition-case err (start-file-process "neo-sfp-contract-arg-symbol" nil "{echo}" 'x) (error err))
+               (condition-case err (start-file-process "neo-sfp-contract-arg-t" nil "{echo}" t) (error err))
+               (condition-case err (start-file-process "neo-sfp-contract-arg-nil" nil "{echo}" nil) (error err))
+               (condition-case err (start-file-process "neo-sfp-contract-program-symbol" nil 'echo) (error err))
+               (condition-case err (start-file-process "neo-sfp-contract-program-t" nil t) (error err))
+               (let ((p (start-file-process "neo-sfp-contract-program-nil" nil nil)))
+                 (unwind-protect (processp p) (ignore-errors (delete-process p))))"#,
+        ));
+
+        assert_eq!(results[0], "OK (wrong-type-argument stringp nil)");
+        assert_eq!(results[1], "OK (wrong-type-argument stringp t)");
+        assert_eq!(results[2], "OK (wrong-type-argument stringp foo)");
+        assert_eq!(results[3], "OK (wrong-type-argument stringp x)");
+        assert_eq!(results[4], "OK (wrong-type-argument stringp t)");
+        assert_eq!(results[5], "OK (wrong-type-argument stringp nil)");
+        assert_eq!(results[6], "OK (wrong-type-argument stringp nil)");
+        assert_eq!(results[7], "OK (wrong-type-argument stringp t)");
+        assert_eq!(results[8], "OK (wrong-type-argument stringp foo)");
+        assert_eq!(results[9], "OK (wrong-type-argument stringp x)");
+        assert_eq!(results[10], "OK (wrong-type-argument stringp t)");
+        assert_eq!(results[11], "OK (wrong-type-argument stringp nil)");
+        assert_eq!(results[12], "OK (wrong-type-argument stringp x)");
+        assert_eq!(results[13], "OK (wrong-type-argument stringp t)");
+        assert_eq!(results[14], "OK (wrong-type-argument stringp nil)");
+        assert_eq!(results[15], "OK (wrong-type-argument stringp echo)");
+        assert_eq!(results[16], "OK (wrong-type-argument stringp t)");
+        assert_eq!(results[17], "OK t");
     }
 
     #[test]

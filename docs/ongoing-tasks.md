@@ -13,6 +13,8 @@ These are the next candidate slices to explore automatically (an initial 20 task
 
 ## Next actionable move
 - Identify the next VM builtin still stubbed or drifting (the plan references process/file wrappers, display/window, and stub enforcement). Implement a targeted lock-in slice with new corpus cases and `check-neovm` regression checks.
+- Recent completed slice: `start-process` now matches oracle buffer/program/name/arg contracts (including buffer-object designators and strict arg typing), locked by `cases/start-process-buffer-and-type-contract-semantics`.
+- Recent completed slice: `call-process`/`call-process-region`/`start-file-process` now enforce oracle string contracts (with `PROGRAM=nil` preserved where required), locked by `cases/call-process-start-file-process-string-contract-semantics`.
 - Recent completed slice: `accept-process-output` now matches oracle millisecond/fixnum contract and error payload order, locked by `cases/accept-process-output-millis-semantics`.
 - Recent completed slice: `set-binary-mode` now matches oracle unsupported-stream errors (`(error "unsupported stream" <sym>)`) via `cases/file-runtime-wrapper-semantics`.
 - Recent completed slice: `frame-edges` now preserves oracle-style live-window buffer context in `is not a live frame` messages, with `cases/frame-edges-window-message-semantics` added and gated.
