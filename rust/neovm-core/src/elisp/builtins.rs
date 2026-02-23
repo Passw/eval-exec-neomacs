@@ -7006,6 +7006,80 @@ pub(crate) fn builtin_interactive_form(args: Vec<Value>) -> EvalResult {
     Ok(Value::Nil)
 }
 
+fn interactive_form_from_expr_body(body: &[super::expr::Expr]) -> Option<Value> {
+    let mut body_iter = body.iter();
+    let first = match body_iter.next() {
+        Some(super::expr::Expr::Str(_)) => body_iter.next(),
+        other => other,
+    };
+
+    let super::expr::Expr::List(items) = first? else {
+        return None;
+    };
+    let super::expr::Expr::Symbol(head) = items.first()? else {
+        return None;
+    };
+    if head != "interactive" {
+        return None;
+    }
+    let spec = items
+        .get(1)
+        .map(super::eval::quote_to_value)
+        .unwrap_or(Value::Nil);
+    Some(Value::list(vec![Value::symbol("interactive"), spec]))
+}
+
+fn interactive_form_from_quoted_lambda(value: &Value) -> Option<Value> {
+    let items = list_to_vec(value)?;
+    if items.first().and_then(Value::as_symbol_name) != Some("lambda") {
+        return None;
+    }
+
+    let mut body_index = 2;
+    if matches!(items.get(body_index), Some(Value::Str(_))) {
+        body_index += 1;
+    }
+
+    let interactive_form = items.get(body_index)?;
+    let interactive_items = list_to_vec(interactive_form)?;
+    if interactive_items.first().and_then(Value::as_symbol_name) != Some("interactive") {
+        return None;
+    }
+    let spec = interactive_items.get(1).cloned().unwrap_or(Value::Nil);
+    Some(Value::list(vec![Value::symbol("interactive"), spec]))
+}
+
+pub(crate) fn builtin_interactive_form_eval(
+    eval: &mut super::eval::Evaluator,
+    args: Vec<Value>,
+) -> EvalResult {
+    expect_args("interactive-form", &args, 1)?;
+    if args[0].as_symbol_name() == Some("ignore") {
+        return Ok(Value::list(vec![Value::symbol("interactive"), Value::Nil]));
+    }
+
+    let function = match &args[0] {
+        Value::Symbol(name) => {
+            let Some((resolved_name, function)) = resolve_indirect_symbol_with_name(eval, name)
+            else {
+                return Ok(Value::Nil);
+            };
+            if resolved_name == "ignore" {
+                return Ok(Value::list(vec![Value::symbol("interactive"), Value::Nil]));
+            }
+            function
+        }
+        other => other.clone(),
+    };
+
+    let interactive = match &function {
+        Value::Lambda(lambda) | Value::Macro(lambda) => interactive_form_from_expr_body(&lambda.body),
+        Value::Cons(_) => interactive_form_from_quoted_lambda(&function),
+        _ => None,
+    };
+    Ok(interactive.unwrap_or(Value::Nil))
+}
+
 pub(crate) fn builtin_local_variable_if_set_p(args: Vec<Value>) -> EvalResult {
     expect_range_args("local-variable-if-set-p", &args, 1, 2)?;
     if args[0].as_symbol_name().is_none() {
@@ -15109,6 +15183,7 @@ pub(crate) fn dispatch_builtin(
         "buffer-local-value" => return Some(builtin_buffer_local_value(eval, args)),
         "local-variable-if-set-p" => return Some(builtin_local_variable_if_set_p_eval(eval, args)),
         "variable-binding-locus" => return Some(builtin_variable_binding_locus_eval(eval, args)),
+        "interactive-form" => return Some(builtin_interactive_form_eval(eval, args)),
         "ntake" => return Some(builtin_ntake(args)),
         // Search / regex operations
         "search-forward" => return Some(builtin_search_forward(eval, args)),
@@ -23301,6 +23376,93 @@ mod tests {
             .expect("builtin unlock-file should resolve")
             .expect("builtin unlock-file should evaluate");
         assert!(unlock_file.is_nil());
+    }
+
+    #[test]
+    fn interactive_form_eval_resolves_symbol_lambda_and_alias() {
+        let mut eval = crate::elisp::eval::Evaluator::new();
+        let lambda = Value::list(vec![
+            Value::symbol("lambda"),
+            Value::Nil,
+            Value::list(vec![Value::symbol("interactive"), Value::string("p")]),
+            Value::Int(1),
+        ]);
+        eval.obarray_mut()
+            .set_symbol_function("vm-interactive-form-lambda", lambda.clone());
+        eval.obarray_mut().set_symbol_function(
+            "vm-interactive-form-alias",
+            Value::symbol("vm-interactive-form-lambda"),
+        );
+
+        let expected = Value::list(vec![Value::symbol("interactive"), Value::string("p")]);
+        assert_eq!(
+            builtin_interactive_form_eval(
+                &mut eval,
+                vec![Value::symbol("vm-interactive-form-lambda")]
+            )
+            .expect("interactive-form should read lambda interactive spec"),
+            expected
+        );
+        assert_eq!(
+            builtin_interactive_form_eval(
+                &mut eval,
+                vec![Value::symbol("vm-interactive-form-alias")]
+            )
+            .expect("interactive-form should follow function aliases"),
+            expected
+        );
+        assert_eq!(
+            builtin_interactive_form_eval(&mut eval, vec![lambda])
+                .expect("interactive-form should parse quoted lambda designators"),
+            expected
+        );
+    }
+
+    #[test]
+    fn interactive_form_eval_skips_docstring_before_interactive_spec() {
+        let mut eval = crate::elisp::eval::Evaluator::new();
+        let lambda_with_doc = Value::list(vec![
+            Value::symbol("lambda"),
+            Value::Nil,
+            Value::string("doc"),
+            Value::list(vec![Value::symbol("interactive"), Value::string("P")]),
+            Value::Int(1),
+        ]);
+        eval.obarray_mut()
+            .set_symbol_function("vm-interactive-form-doc", lambda_with_doc);
+
+        assert_eq!(
+            builtin_interactive_form_eval(&mut eval, vec![Value::symbol("vm-interactive-form-doc")])
+                .expect("interactive-form should inspect lambda body after docstring"),
+            Value::list(vec![Value::symbol("interactive"), Value::string("P")])
+        );
+    }
+
+    #[test]
+    fn interactive_form_eval_returns_nil_for_non_interactive_lambda() {
+        let mut eval = crate::elisp::eval::Evaluator::new();
+        let lambda = Value::list(vec![Value::symbol("lambda"), Value::Nil, Value::Int(1)]);
+        eval.obarray_mut()
+            .set_symbol_function("vm-interactive-form-plain", lambda.clone());
+
+        assert!(
+            builtin_interactive_form_eval(
+                &mut eval,
+                vec![Value::symbol("vm-interactive-form-plain")]
+            )
+            .expect("interactive-form should evaluate")
+            .is_nil()
+        );
+        assert!(
+            builtin_interactive_form_eval(&mut eval, vec![lambda])
+                .expect("interactive-form should evaluate")
+                .is_nil()
+        );
+        assert!(
+            builtin_interactive_form_eval(&mut eval, vec![Value::Int(0)])
+                .expect("interactive-form should evaluate")
+                .is_nil()
+        );
     }
 
     #[test]

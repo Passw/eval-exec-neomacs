@@ -96,6 +96,7 @@ cases/command-loop-empty-keys-and-errors-semantics
 cases/self-insert-command-semantics
 cases/called-interactively-p-semantics
 cases/interactive-p-semantics
+cases/interactive-form-lambda-semantics
 cases/where-is-internal-semantics
 cases/describe-substitute-command-semantics
 cases/describe-key-briefly-sequence-semantics
