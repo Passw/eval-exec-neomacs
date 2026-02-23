@@ -6588,9 +6588,27 @@ pub(crate) fn builtin_mouse_pixel_position(args: Vec<Value>) -> EvalResult {
     Ok(Value::Nil)
 }
 
+pub(crate) fn builtin_mouse_pixel_position_eval(
+    eval: &mut super::eval::Evaluator,
+    args: Vec<Value>,
+) -> EvalResult {
+    expect_args("mouse-pixel-position", &args, 0)?;
+    let frame = super::window_cmds::builtin_selected_frame(eval, Vec::new())?;
+    Ok(Value::list(vec![frame, Value::Nil]))
+}
+
 pub(crate) fn builtin_mouse_position(args: Vec<Value>) -> EvalResult {
     expect_args("mouse-position", &args, 0)?;
     Ok(Value::Nil)
+}
+
+pub(crate) fn builtin_mouse_position_eval(
+    eval: &mut super::eval::Evaluator,
+    args: Vec<Value>,
+) -> EvalResult {
+    expect_args("mouse-position", &args, 0)?;
+    let frame = super::window_cmds::builtin_selected_frame(eval, Vec::new())?;
+    Ok(Value::list(vec![frame, Value::Nil]))
 }
 
 pub(crate) fn builtin_native_comp_available_p(args: Vec<Value>) -> EvalResult {
@@ -16686,6 +16704,8 @@ pub(crate) fn dispatch_builtin(
         "window-configuration-equal-p" => return Some(builtin_window_configuration_equal_p(args)),
         "old-selected-frame" => return Some(builtin_old_selected_frame_eval(eval, args)),
         "selected-frame" => return Some(super::window_cmds::builtin_selected_frame(eval, args)),
+        "mouse-pixel-position" => return Some(builtin_mouse_pixel_position_eval(eval, args)),
+        "mouse-position" => return Some(builtin_mouse_position_eval(eval, args)),
         "next-frame" => return Some(builtin_next_frame_eval(eval, args)),
         "previous-frame" => return Some(builtin_previous_frame_eval(eval, args)),
         "select-frame" => return Some(super::window_cmds::builtin_select_frame(eval, args)),
