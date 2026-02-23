@@ -84,6 +84,7 @@ pub struct Process {
 #[derive(Clone, Debug)]
 pub struct ProcessManager {
     processes: HashMap<ProcessId, Process>,
+    deleted_processes: HashMap<ProcessId, Process>,
     next_id: ProcessId,
     /// Environment variable overrides (for `setenv`/`getenv`).
     env_overrides: HashMap<String, Option<String>>,
@@ -99,6 +100,7 @@ impl ProcessManager {
     pub fn new() -> Self {
         Self {
             processes: HashMap::new(),
+            deleted_processes: HashMap::new(),
             next_id: 1,
             env_overrides: HashMap::new(),
         }
@@ -164,7 +166,13 @@ impl ProcessManager {
 
     /// Delete a process entirely.
     pub fn delete_process(&mut self, id: ProcessId) -> bool {
-        self.processes.remove(&id).is_some()
+        if let Some(mut proc) = self.processes.remove(&id) {
+            proc.status = ProcessStatus::Signal(9);
+            self.deleted_processes.insert(id, proc);
+            true
+        } else {
+            self.deleted_processes.contains_key(&id)
+        }
     }
 
     /// Get process status.
@@ -172,14 +180,36 @@ impl ProcessManager {
         self.processes.get(&id).map(|p| &p.status)
     }
 
+    /// Get process status for both live and stale process handles.
+    pub fn process_status_any(&self, id: ProcessId) -> Option<&ProcessStatus> {
+        self.processes
+            .get(&id)
+            .map(|p| &p.status)
+            .or_else(|| self.deleted_processes.get(&id).map(|p| &p.status))
+    }
+
     /// Get a process by id.
     pub fn get(&self, id: ProcessId) -> Option<&Process> {
         self.processes.get(&id)
     }
 
+    /// Get a process by id from either live or stale process tables.
+    pub fn get_any(&self, id: ProcessId) -> Option<&Process> {
+        self.processes.get(&id).or_else(|| self.deleted_processes.get(&id))
+    }
+
     /// Get a mutable process by id.
     pub fn get_mut(&mut self, id: ProcessId) -> Option<&mut Process> {
         self.processes.get_mut(&id)
+    }
+
+    /// Get a mutable process by id from either live or stale process tables.
+    pub fn get_any_mut(&mut self, id: ProcessId) -> Option<&mut Process> {
+        if self.processes.contains_key(&id) {
+            self.processes.get_mut(&id)
+        } else {
+            self.deleted_processes.get_mut(&id)
+        }
     }
 
     /// List all process ids.
@@ -813,6 +843,27 @@ fn resolve_process_or_wrong_type(
     }
 }
 
+fn resolve_process_or_wrong_type_any(
+    eval: &super::eval::Evaluator,
+    value: &Value,
+) -> Result<ProcessId, Flow> {
+    match value {
+        Value::Int(n) if *n >= 0 => {
+            let id = *n as ProcessId;
+            if eval.processes.get_any(id).is_some() {
+                Ok(id)
+            } else {
+                Err(signal_wrong_type_processp(value.clone()))
+            }
+        }
+        Value::Str(s) => eval
+            .processes
+            .find_by_name(s)
+            .ok_or_else(|| signal_wrong_type_processp(value.clone())),
+        _ => Err(signal_wrong_type_processp(value.clone())),
+    }
+}
+
 fn resolve_process_or_missing_error(
     eval: &super::eval::Evaluator,
     value: &Value,
@@ -826,6 +877,19 @@ fn resolve_process_or_missing_error(
     }
 }
 
+fn resolve_process_or_missing_error_any(
+    eval: &super::eval::Evaluator,
+    value: &Value,
+) -> Result<ProcessId, Flow> {
+    match value {
+        Value::Str(s) => eval
+            .processes
+            .find_by_name(s)
+            .ok_or_else(|| signal_process_does_not_exist(s)),
+        _ => resolve_process_or_wrong_type_any(eval, value),
+    }
+}
+
 fn resolve_process_for_status(
     eval: &super::eval::Evaluator,
     value: &Value,
@@ -833,7 +897,7 @@ fn resolve_process_for_status(
     match value {
         Value::Int(n) if *n >= 0 => {
             let id = *n as ProcessId;
-            if eval.processes.get(id).is_some() {
+            if eval.processes.get_any(id).is_some() {
                 Ok(Some(id))
             } else {
                 Err(signal_wrong_type_processp(value.clone()))
@@ -899,7 +963,8 @@ fn is_stale_process_id_designator(eval: &super::eval::Evaluator, value: &Value) 
     match value {
         Value::Int(n) if *n > 0 => {
             let id = *n as ProcessId;
-            eval.processes.get(id).is_none() && eval.processes.was_issued_id(id)
+            eval.processes.get(id).is_none()
+                && (eval.processes.get_any(id).is_some() || eval.processes.was_issued_id(id))
         }
         _ => false,
     }
@@ -1643,7 +1708,7 @@ pub(crate) fn builtin_clone_process(
             ],
         ));
     }
-    let id = resolve_live_process_or_wrong_type(eval, &args[0])?;
+    let id = resolve_process_or_wrong_type_any(eval, &args[0])?;
     Ok(Value::Int(id as i64))
 }
 
@@ -1703,7 +1768,7 @@ pub(crate) fn builtin_internal_default_process_filter(
     args: Vec<Value>,
 ) -> EvalResult {
     expect_args("internal-default-process-filter", &args, 2)?;
-    let _id = resolve_live_process_or_wrong_type(eval, &args[0])?;
+    let _id = resolve_process_or_wrong_type_any(eval, &args[0])?;
     Ok(Value::Nil)
 }
 
@@ -2713,7 +2778,15 @@ pub(crate) fn builtin_delete_process(
             ],
         ));
     }
-    let id = resolve_optional_process_or_current_buffer(eval, args.first())?;
+    let id = if let Some(process) = args.first() {
+        if process.is_nil() {
+            resolve_optional_process_or_current_buffer(eval, args.first())?
+        } else {
+            resolve_process_or_missing_error_any(eval, process)?
+        }
+    } else {
+        resolve_optional_process_or_current_buffer(eval, args.first())?
+    };
     eval.processes.delete_process(id);
     Ok(Value::Nil)
 }
@@ -2942,7 +3015,7 @@ pub(crate) fn builtin_process_status(
     let Some(id) = resolve_process_for_status(eval, &args[0])? else {
         return Ok(Value::Nil);
     };
-    match eval.processes.process_status(id) {
+    match eval.processes.process_status_any(id) {
         Some(ProcessStatus::Run) => Ok(Value::symbol("run")),
         Some(ProcessStatus::Stop) => Ok(Value::symbol("stop")),
         Some(ProcessStatus::Exit(_)) => Ok(Value::symbol("exit")),
@@ -2957,8 +3030,8 @@ pub(crate) fn builtin_process_exit_status(
     args: Vec<Value>,
 ) -> EvalResult {
     expect_args("process-exit-status", &args, 1)?;
-    let id = resolve_process_or_wrong_type(eval, &args[0])?;
-    match eval.processes.process_status(id) {
+    let id = resolve_process_or_wrong_type_any(eval, &args[0])?;
+    match eval.processes.process_status_any(id) {
         Some(ProcessStatus::Exit(code)) => Ok(Value::Int(*code as i64)),
         Some(ProcessStatus::Signal(sig)) => Ok(Value::Int(*sig as i64)),
         Some(_) => Ok(Value::Int(0)),
@@ -2983,8 +3056,8 @@ pub(crate) fn builtin_process_name(
     args: Vec<Value>,
 ) -> EvalResult {
     expect_args("process-name", &args, 1)?;
-    let id = resolve_process_or_wrong_type(eval, &args[0])?;
-    match eval.processes.get(id) {
+    let id = resolve_process_or_wrong_type_any(eval, &args[0])?;
+    match eval.processes.get_any(id) {
         Some(proc) => Ok(Value::string(proc.name.clone())),
         None => Err(signal_wrong_type_processp(args[0].clone())),
     }
@@ -2996,8 +3069,8 @@ pub(crate) fn builtin_process_buffer(
     args: Vec<Value>,
 ) -> EvalResult {
     expect_args("process-buffer", &args, 1)?;
-    let id = resolve_process_or_wrong_type(eval, &args[0])?;
-    match eval.processes.get(id) {
+    let id = resolve_process_or_wrong_type_any(eval, &args[0])?;
+    match eval.processes.get_any(id) {
         Some(proc) => match &proc.buffer_name {
             Some(name) => Ok(Value::string(name.clone())),
             None => Ok(Value::Nil),
@@ -3012,8 +3085,8 @@ pub(crate) fn builtin_process_coding_system(
     args: Vec<Value>,
 ) -> EvalResult {
     expect_args("process-coding-system", &args, 1)?;
-    let id = resolve_live_process_or_wrong_type(eval, &args[0])?;
-    let proc = eval.processes.get(id).ok_or_else(|| {
+    let id = resolve_process_or_wrong_type_any(eval, &args[0])?;
+    let proc = eval.processes.get_any(id).ok_or_else(|| {
         signal(
             "wrong-type-argument",
             vec![Value::symbol("processp"), args[0].clone()],
@@ -3031,7 +3104,7 @@ pub(crate) fn builtin_process_datagram_address(
     args: Vec<Value>,
 ) -> EvalResult {
     expect_args("process-datagram-address", &args, 1)?;
-    let _id = resolve_live_process_or_wrong_type(eval, &args[0])?;
+    let _id = resolve_process_or_wrong_type_any(eval, &args[0])?;
     Ok(Value::Nil)
 }
 
@@ -3041,8 +3114,8 @@ pub(crate) fn builtin_process_inherit_coding_system_flag(
     args: Vec<Value>,
 ) -> EvalResult {
     expect_args("process-inherit-coding-system-flag", &args, 1)?;
-    let id = resolve_live_process_or_wrong_type(eval, &args[0])?;
-    let proc = eval.processes.get(id).ok_or_else(|| {
+    let id = resolve_process_or_wrong_type_any(eval, &args[0])?;
+    let proc = eval.processes.get_any(id).ok_or_else(|| {
         signal(
             "wrong-type-argument",
             vec![Value::symbol("processp"), args[0].clone()],
@@ -3264,7 +3337,7 @@ pub(crate) fn builtin_process_tty_name(
             ],
         ));
     }
-    let _id = resolve_live_process_or_wrong_type(eval, &args[0])?;
+    let _id = resolve_process_or_wrong_type_any(eval, &args[0])?;
     let stream = args.get(1).cloned().unwrap_or(Value::Nil);
     if !process_tty_stream_selector_p(&stream) {
         return Err(signal(
@@ -3281,8 +3354,8 @@ pub(crate) fn builtin_process_mark(
     args: Vec<Value>,
 ) -> EvalResult {
     expect_args("process-mark", &args, 1)?;
-    let id = resolve_live_process_or_wrong_type(eval, &args[0])?;
-    let proc = eval.processes.get(id).ok_or_else(|| {
+    let id = resolve_process_or_wrong_type_any(eval, &args[0])?;
+    let proc = eval.processes.get_any(id).ok_or_else(|| {
         signal(
             "wrong-type-argument",
             vec![Value::symbol("processp"), args[0].clone()],
@@ -3301,7 +3374,7 @@ pub(crate) fn builtin_process_type(
     args: Vec<Value>,
 ) -> EvalResult {
     expect_args("process-type", &args, 1)?;
-    let _id = resolve_live_process_or_wrong_type(eval, &args[0])?;
+    let _id = resolve_process_or_wrong_type_any(eval, &args[0])?;
     Ok(Value::symbol("real"))
 }
 
@@ -3311,8 +3384,8 @@ pub(crate) fn builtin_process_thread(
     args: Vec<Value>,
 ) -> EvalResult {
     expect_args("process-thread", &args, 1)?;
-    let id = resolve_live_process_or_wrong_type(eval, &args[0])?;
-    let proc = eval.processes.get(id).ok_or_else(|| {
+    let id = resolve_process_or_wrong_type_any(eval, &args[0])?;
+    let proc = eval.processes.get_any(id).ok_or_else(|| {
         signal(
             "wrong-type-argument",
             vec![Value::symbol("processp"), args[0].clone()],
@@ -3480,9 +3553,10 @@ pub(crate) fn builtin_get_buffer_process(
 /// (processp OBJECT) -> bool
 pub(crate) fn builtin_processp(eval: &mut super::eval::Evaluator, args: Vec<Value>) -> EvalResult {
     expect_args("processp", &args, 1)?;
-    Ok(Value::bool(
-        resolve_live_process_designator(eval, &args[0]).is_some(),
-    ))
+    Ok(Value::bool(match &args[0] {
+        Value::Int(n) if *n >= 0 => eval.processes.get_any(*n as ProcessId).is_some(),
+        _ => false,
+    }))
 }
 
 /// (process-live-p PROCESS) -> list-or-nil
@@ -3506,7 +3580,7 @@ pub(crate) fn builtin_process_id(
     args: Vec<Value>,
 ) -> EvalResult {
     expect_args("process-id", &args, 1)?;
-    let id = resolve_live_process_or_wrong_type(eval, &args[0])?;
+    let id = resolve_process_or_wrong_type_any(eval, &args[0])?;
     Ok(Value::Int(id as i64))
 }
 
@@ -3516,8 +3590,8 @@ pub(crate) fn builtin_process_query_on_exit_flag(
     args: Vec<Value>,
 ) -> EvalResult {
     expect_args("process-query-on-exit-flag", &args, 1)?;
-    let id = resolve_live_process_or_wrong_type(eval, &args[0])?;
-    let proc = eval.processes.get(id).ok_or_else(|| {
+    let id = resolve_process_or_wrong_type_any(eval, &args[0])?;
+    let proc = eval.processes.get_any(id).ok_or_else(|| {
         signal(
             "wrong-type-argument",
             vec![Value::symbol("processp"), args[0].clone()],
@@ -3532,9 +3606,9 @@ pub(crate) fn builtin_set_process_query_on_exit_flag(
     args: Vec<Value>,
 ) -> EvalResult {
     expect_args("set-process-query-on-exit-flag", &args, 2)?;
-    let id = resolve_live_process_or_wrong_type(eval, &args[0])?;
+    let id = resolve_process_or_wrong_type_any(eval, &args[0])?;
     let flag = args[1].is_truthy();
-    let proc = eval.processes.get_mut(id).ok_or_else(|| {
+    let proc = eval.processes.get_any_mut(id).ok_or_else(|| {
         signal(
             "wrong-type-argument",
             vec![Value::symbol("processp"), args[0].clone()],
@@ -3550,8 +3624,8 @@ pub(crate) fn builtin_process_command(
     args: Vec<Value>,
 ) -> EvalResult {
     expect_args("process-command", &args, 1)?;
-    let id = resolve_live_process_or_wrong_type(eval, &args[0])?;
-    let proc = eval.processes.get(id).ok_or_else(|| {
+    let id = resolve_process_or_wrong_type_any(eval, &args[0])?;
+    let proc = eval.processes.get_any(id).ok_or_else(|| {
         signal(
             "wrong-type-argument",
             vec![Value::symbol("processp"), args[0].clone()],
@@ -3578,7 +3652,7 @@ pub(crate) fn builtin_process_contact(
             ],
         ));
     }
-    let _id = resolve_live_process_or_wrong_type(eval, &args[0])?;
+    let _id = resolve_process_or_wrong_type_any(eval, &args[0])?;
     Ok(Value::True)
 }
 
@@ -3588,8 +3662,8 @@ pub(crate) fn builtin_process_filter(
     args: Vec<Value>,
 ) -> EvalResult {
     expect_args("process-filter", &args, 1)?;
-    let id = resolve_live_process_or_wrong_type(eval, &args[0])?;
-    let proc = eval.processes.get(id).ok_or_else(|| {
+    let id = resolve_process_or_wrong_type_any(eval, &args[0])?;
+    let proc = eval.processes.get_any(id).ok_or_else(|| {
         signal(
             "wrong-type-argument",
             vec![Value::symbol("processp"), args[0].clone()],
@@ -3626,8 +3700,8 @@ pub(crate) fn builtin_process_sentinel(
     args: Vec<Value>,
 ) -> EvalResult {
     expect_args("process-sentinel", &args, 1)?;
-    let id = resolve_live_process_or_wrong_type(eval, &args[0])?;
-    let proc = eval.processes.get(id).ok_or_else(|| {
+    let id = resolve_process_or_wrong_type_any(eval, &args[0])?;
+    let proc = eval.processes.get_any(id).ok_or_else(|| {
         signal(
             "wrong-type-argument",
             vec![Value::symbol("processp"), args[0].clone()],
@@ -3664,8 +3738,8 @@ pub(crate) fn builtin_process_plist(
     args: Vec<Value>,
 ) -> EvalResult {
     expect_args("process-plist", &args, 1)?;
-    let id = resolve_live_process_or_wrong_type(eval, &args[0])?;
-    let proc = eval.processes.get(id).ok_or_else(|| {
+    let id = resolve_process_or_wrong_type_any(eval, &args[0])?;
+    let proc = eval.processes.get_any(id).ok_or_else(|| {
         signal(
             "wrong-type-argument",
             vec![Value::symbol("processp"), args[0].clone()],
@@ -4777,24 +4851,24 @@ mod tests {
                    (ignore-errors (delete-process p))))
                (condition-case err (process-send-eof) (error (car err)))
                (condition-case err (process-running-child-p) (error (car err)))
-               (condition-case err (process-mark 1) (error err))
-               (condition-case err (process-type 1) (error err))
-               (condition-case err (process-thread 1) (error err))
-               (condition-case err (process-send-region 1 1 1) (error err))
-               (condition-case err (process-send-eof 1) (error err))
-               (condition-case err (process-running-child-p 1) (error err))
+               (condition-case err (process-mark 'x) (error err))
+               (condition-case err (process-type 'x) (error err))
+               (condition-case err (process-thread 'x) (error err))
+               (condition-case err (process-send-region 'x 1 1) (error err))
+               (condition-case err (process-send-eof 'x) (error err))
+               (condition-case err (process-running-child-p 'x) (error err))
                (condition-case err (process-send-eof nil nil) (error (car err)))
                (condition-case err (process-running-child-p nil nil) (error (car err)))"#,
         ));
         assert_eq!(results[0], "OK (t t t t nil nil nil t nil nil nil)");
         assert_eq!(results[1], "OK error");
         assert_eq!(results[2], "OK error");
-        assert_eq!(results[3], "OK (wrong-type-argument processp 1)");
-        assert_eq!(results[4], "OK (wrong-type-argument processp 1)");
-        assert_eq!(results[5], "OK (wrong-type-argument processp 1)");
-        assert_eq!(results[6], "OK (wrong-type-argument processp 1)");
-        assert_eq!(results[7], "OK (wrong-type-argument processp 1)");
-        assert_eq!(results[8], "OK (wrong-type-argument processp 1)");
+        assert_eq!(results[3], "OK (wrong-type-argument processp x)");
+        assert_eq!(results[4], "OK (wrong-type-argument processp x)");
+        assert_eq!(results[5], "OK (wrong-type-argument processp x)");
+        assert_eq!(results[6], "OK (wrong-type-argument processp x)");
+        assert_eq!(results[7], "OK (wrong-type-argument processp x)");
+        assert_eq!(results[8], "OK (wrong-type-argument processp x)");
         assert_eq!(results[9], "OK wrong-number-of-arguments");
         assert_eq!(results[10], "OK wrong-number-of-arguments");
     }
@@ -4818,12 +4892,12 @@ mod tests {
                       (delete-process p)
                       (process-live-p p))
                    (ignore-errors (delete-process p))))
-               (condition-case err (process-coding-system 1) (error err))
-               (condition-case err (process-datagram-address 1) (error err))
-               (condition-case err (process-inherit-coding-system-flag 1) (error err))
-               (condition-case err (process-tty-name 1) (error err))
+               (condition-case err (process-coding-system 'x) (error err))
+               (condition-case err (process-datagram-address 'x) (error err))
+               (condition-case err (process-inherit-coding-system-flag 'x) (error err))
+               (condition-case err (process-tty-name 'x) (error err))
                (condition-case err (process-tty-name nil) (error err))
-               (condition-case err (process-tty-name 1 t) (error err))
+               (condition-case err (process-tty-name 'x t) (error err))
                (condition-case err (process-kill-buffer-query-function nil) (error (car err)))
                (condition-case err (process-coding-system) (error (car err)))
                (condition-case err (process-datagram-address) (error (car err)))
@@ -4834,12 +4908,12 @@ mod tests {
             results[0],
             "OK (t nil nil t t t t t (error \"Unknown stream\" 0) nil nil)"
         );
-        assert_eq!(results[1], "OK (wrong-type-argument processp 1)");
-        assert_eq!(results[2], "OK (wrong-type-argument processp 1)");
-        assert_eq!(results[3], "OK (wrong-type-argument processp 1)");
-        assert_eq!(results[4], "OK (wrong-type-argument processp 1)");
+        assert_eq!(results[1], "OK (wrong-type-argument processp x)");
+        assert_eq!(results[2], "OK (wrong-type-argument processp x)");
+        assert_eq!(results[3], "OK (wrong-type-argument processp x)");
+        assert_eq!(results[4], "OK (wrong-type-argument processp x)");
         assert_eq!(results[5], "OK (wrong-type-argument processp nil)");
-        assert_eq!(results[6], "OK (wrong-type-argument processp 1)");
+        assert_eq!(results[6], "OK (wrong-type-argument processp x)");
         assert_eq!(results[7], "OK wrong-number-of-arguments");
         assert_eq!(results[8], "OK wrong-number-of-arguments");
         assert_eq!(results[9], "OK wrong-number-of-arguments");

@@ -31,12 +31,12 @@
     (ignore-errors (delete-process p))))
 
 (list
- (condition-case err (process-coding-system 1) (error err))
- (condition-case err (process-datagram-address 1) (error err))
- (condition-case err (process-inherit-coding-system-flag 1) (error err))
- (condition-case err (process-tty-name 1) (error err))
+ (condition-case err (process-coding-system 'x) (error err))
+ (condition-case err (process-datagram-address 'x) (error err))
+ (condition-case err (process-inherit-coding-system-flag 'x) (error err))
+ (condition-case err (process-tty-name 'x) (error err))
  (condition-case err (process-tty-name nil) (error err))
- (condition-case err (process-tty-name 1 t) (error err))
+ (condition-case err (process-tty-name 'x t) (error err))
  (condition-case err (process-kill-buffer-query-function nil) (error err))
  (condition-case err (process-coding-system) (error (car err)))
  (condition-case err (process-datagram-address) (error (car err)))
