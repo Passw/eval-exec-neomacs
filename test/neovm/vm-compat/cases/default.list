@@ -412,6 +412,7 @@ cases/set-default-alias-constant-watcher-semantics
 cases/keyword-constant-value-semantics
 cases/make-variable-buffer-local-alias-constant-semantics
 cases/make-local-variable-alias-constant-semantics
+cases/local-variable-if-set-p-alias-semantics
 cases/kill-local-variable-alias-watcher-semantics
 cases/undo-basics
 cases/undo-buffer-arg

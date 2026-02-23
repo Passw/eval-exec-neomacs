@@ -6927,6 +6927,24 @@ pub(crate) fn builtin_local_variable_if_set_p(args: Vec<Value>) -> EvalResult {
     Ok(Value::Nil)
 }
 
+pub(crate) fn builtin_local_variable_if_set_p_eval(
+    eval: &mut super::eval::Evaluator,
+    args: Vec<Value>,
+) -> EvalResult {
+    expect_range_args("local-variable-if-set-p", &args, 1, 2)?;
+    let name = args[0].as_symbol_name().ok_or_else(|| {
+        signal(
+            "wrong-type-argument",
+            vec![Value::symbol("symbolp"), args[0].clone()],
+        )
+    })?;
+    let resolved = resolve_variable_alias_name(eval, name)?;
+    if resolved == "nil" || resolved == "t" || resolved.starts_with(':') {
+        return Ok(Value::Nil);
+    }
+    Ok(Value::bool(eval.custom.is_auto_buffer_local(&resolved)))
+}
+
 pub(crate) fn builtin_lock_buffer(args: Vec<Value>) -> EvalResult {
     expect_range_args("lock-buffer", &args, 0, 1)?;
     Ok(Value::Nil)
@@ -14999,6 +15017,7 @@ pub(crate) fn dispatch_builtin(
         "position-bytes" => return Some(builtin_position_bytes(eval, args)),
         "get-byte" => return Some(builtin_get_byte(eval, args)),
         "buffer-local-value" => return Some(builtin_buffer_local_value(eval, args)),
+        "local-variable-if-set-p" => return Some(builtin_local_variable_if_set_p_eval(eval, args)),
         "ntake" => return Some(builtin_ntake(args)),
         // Search / regex operations
         "search-forward" => return Some(builtin_search_forward(eval, args)),

@@ -4462,6 +4462,32 @@ mod tests {
     }
 
     #[test]
+    fn local_variable_if_set_p_follows_alias_and_contract_semantics() {
+        let results = eval_all(
+            "(progn
+               (defvaralias 'vm-lvis-alias 'vm-lvis-base)
+               (make-variable-buffer-local 'vm-lvis-base)
+               (list (local-variable-if-set-p 'vm-lvis-alias)
+                     (local-variable-if-set-p 'vm-lvis-base)))
+             (list
+               (condition-case err (local-variable-if-set-p nil) (error err))
+               (condition-case err (local-variable-if-set-p t) (error err))
+               (condition-case err (local-variable-if-set-p :vm-k) (error err))
+               (condition-case err (local-variable-if-set-p 1) (error err))
+               (condition-case err (local-variable-if-set-p 'x nil) (error err))
+               (condition-case err (local-variable-if-set-p 'x (current-buffer)) (error err))
+               (condition-case err (local-variable-if-set-p 'x 1) (error err))
+               (condition-case err (local-variable-if-set-p 'x (current-buffer) nil)
+                 (error err)))",
+        );
+        assert_eq!(results[0], "OK (t t)");
+        assert_eq!(
+            results[1],
+            "OK (nil nil nil (wrong-type-argument symbolp 1) nil nil nil (wrong-number-of-arguments local-variable-if-set-p 3))"
+        );
+    }
+
+    #[test]
     fn variable_watchers_report_let_and_unlet_runtime_transitions() {
         let results = eval_all(
             "(setq vm-watch-events nil)
