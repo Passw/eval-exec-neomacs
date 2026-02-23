@@ -4519,6 +4519,32 @@ mod tests {
     }
 
     #[test]
+    fn value_lt_matches_oracle_type_and_ordering_semantics() {
+        let results = eval_all(
+            "(list
+               (value< 1 2)
+               (value< 2 1)
+               (value< 1 1)
+               (value< 'a 'b)
+               (value< 'b 'a)
+               (value< \"a\" \"b\")
+               (condition-case err (value< 1 \"a\") (error err))
+               (value< 1.0 2)
+               (value< :a :b)
+               (value< '(1 2) '(1 3))
+               (value< '(1 2) '(1 2 0))
+               (value< [1 2] [1 3])
+               (condition-case err (value< [1] '(1)) (error err))
+               (condition-case err (value< '(1 . 2) '(1 2)) (error err))
+               (condition-case err (value< '(1 2) '(1 . 2)) (error err)))",
+        );
+        assert_eq!(
+            results[0],
+            "OK (t nil nil t nil t (type-mismatch 1 \"a\") t t t t t (type-mismatch [1] (1)) (type-mismatch 2 (2)) (type-mismatch (2) 2))"
+        );
+    }
+
+    #[test]
     fn variable_watchers_report_let_and_unlet_runtime_transitions() {
         let results = eval_all(
             "(setq vm-watch-events nil)

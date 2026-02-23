@@ -6860,12 +6860,79 @@ pub(crate) fn builtin_unix_sync(args: Vec<Value>) -> EvalResult {
 
 pub(crate) fn builtin_value_lt(args: Vec<Value>) -> EvalResult {
     expect_args("value<", &args, 2)?;
-    Ok(Value::Nil)
+    match compare_value_lt(&args[0], &args[1]) {
+        Ok(std::cmp::Ordering::Less) => Ok(Value::True),
+        Ok(_) => Ok(Value::Nil),
+        Err((lhs, rhs)) => Err(signal("type-mismatch", vec![lhs, rhs])),
+    }
 }
 
 pub(crate) fn builtin_variable_binding_locus(args: Vec<Value>) -> EvalResult {
     expect_args("variable-binding-locus", &args, 1)?;
     Ok(Value::Nil)
+}
+
+fn compare_value_lt(lhs: &Value, rhs: &Value) -> Result<std::cmp::Ordering, (Value, Value)> {
+    if let (Some(left), Some(right)) = (as_number_for_value_lt(lhs), as_number_for_value_lt(rhs)) {
+        return Ok(left
+            .partial_cmp(&right)
+            .unwrap_or(std::cmp::Ordering::Equal));
+    }
+
+    if let (Some(left), Some(right)) = (symbol_name_for_value_lt(lhs), symbol_name_for_value_lt(rhs)) {
+        return Ok(left.cmp(right));
+    }
+
+    match (lhs, rhs) {
+        (Value::Str(left), Value::Str(right)) => Ok(left.as_str().cmp(right.as_str())),
+        (Value::Cons(left_id), Value::Cons(right_id)) => {
+            let left_pair = read_cons(*left_id);
+            let right_pair = read_cons(*right_id);
+
+            let car_cmp = compare_value_lt(&left_pair.car, &right_pair.car)?;
+            if car_cmp != std::cmp::Ordering::Equal {
+                return Ok(car_cmp);
+            }
+
+            match (&left_pair.cdr, &right_pair.cdr) {
+                (Value::Nil, Value::Cons(_)) => Ok(std::cmp::Ordering::Less),
+                (Value::Cons(_), Value::Nil) => Ok(std::cmp::Ordering::Greater),
+                _ => compare_value_lt(&left_pair.cdr, &right_pair.cdr),
+            }
+        }
+        (Value::Vector(left_id), Value::Vector(right_id)) => {
+            let left_items = with_heap(|h| h.get_vector(*left_id).clone());
+            let right_items = with_heap(|h| h.get_vector(*right_id).clone());
+            let min_len = left_items.len().min(right_items.len());
+            for idx in 0..min_len {
+                let cmp = compare_value_lt(&left_items[idx], &right_items[idx])?;
+                if cmp != std::cmp::Ordering::Equal {
+                    return Ok(cmp);
+                }
+            }
+            Ok(left_items.len().cmp(&right_items.len()))
+        }
+        _ => Err((lhs.clone(), rhs.clone())),
+    }
+}
+
+fn as_number_for_value_lt(value: &Value) -> Option<f64> {
+    match value {
+        Value::Int(n) => Some(*n as f64),
+        Value::Char(c) => Some(*c as u32 as f64),
+        Value::Float(f) => Some(*f),
+        _ => None,
+    }
+}
+
+fn symbol_name_for_value_lt(value: &Value) -> Option<&str> {
+    match value {
+        Value::Nil => Some("nil"),
+        Value::True => Some("t"),
+        Value::Symbol(name) => Some(name.as_str()),
+        Value::Keyword(name) => Some(name.as_str()),
+        _ => None,
+    }
 }
 
 pub(crate) fn builtin_variable_binding_locus_eval(
@@ -23138,7 +23205,7 @@ mod tests {
         let value_lt = dispatch_builtin_pure("value<", vec![Value::Int(1), Value::Int(2)])
             .expect("builtin value< should resolve")
             .expect("builtin value< should evaluate");
-        assert!(value_lt.is_nil());
+        assert!(value_lt.is_truthy());
 
         let binding_locus =
             dispatch_builtin_pure("variable-binding-locus", vec![Value::symbol("x")])
