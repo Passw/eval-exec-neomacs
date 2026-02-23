@@ -6669,11 +6669,43 @@ pub(crate) fn builtin_native_comp_available_p(args: Vec<Value>) -> EvalResult {
 
 pub(crate) fn builtin_native_comp_unit_file(args: Vec<Value>) -> EvalResult {
     expect_args("native-comp-unit-file", &args, 1)?;
+    let is_native_comp_unit = match &args[0] {
+        Value::Vector(items) => {
+            let items = with_heap(|h| h.get_vector(*items).clone());
+            matches!(
+                items.first(),
+                Some(Value::Keyword(tag)) if tag == "native-comp-unit"
+            )
+        }
+        _ => false,
+    };
+    if !is_native_comp_unit {
+        return Err(signal(
+            "wrong-type-argument",
+            vec![Value::symbol("native-comp-unit"), args[0].clone()],
+        ));
+    }
     Ok(Value::Nil)
 }
 
 pub(crate) fn builtin_native_comp_unit_set_file(args: Vec<Value>) -> EvalResult {
     expect_args("native-comp-unit-set-file", &args, 2)?;
+    let is_native_comp_unit = match &args[0] {
+        Value::Vector(items) => {
+            let items = with_heap(|h| h.get_vector(*items).clone());
+            matches!(
+                items.first(),
+                Some(Value::Keyword(tag)) if tag == "native-comp-unit"
+            )
+        }
+        _ => false,
+    };
+    if !is_native_comp_unit {
+        return Err(signal(
+            "wrong-type-argument",
+            vec![Value::symbol("native-comp-unit"), args[0].clone()],
+        ));
+    }
     Ok(Value::Nil)
 }
 
@@ -23509,14 +23541,20 @@ mod tests {
             .expect("builtin native-comp-available-p should evaluate");
         assert!(available.is_truthy());
 
-        let unit_file = dispatch_builtin_pure("native-comp-unit-file", vec![Value::Nil])
+        let unit_file = dispatch_builtin_pure(
+            "native-comp-unit-file",
+            vec![Value::vector(vec![Value::keyword("native-comp-unit")])],
+        )
             .expect("builtin native-comp-unit-file should resolve")
             .expect("builtin native-comp-unit-file should evaluate");
         assert!(unit_file.is_nil());
 
         let unit_set_file = dispatch_builtin_pure(
             "native-comp-unit-set-file",
-            vec![Value::Nil, Value::string("foo.eln")],
+            vec![
+                Value::vector(vec![Value::keyword("native-comp-unit")]),
+                Value::string("foo.eln"),
+            ],
         )
         .expect("builtin native-comp-unit-set-file should resolve")
         .expect("builtin native-comp-unit-set-file should evaluate");

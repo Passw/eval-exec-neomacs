@@ -1088,3 +1088,4 @@ cases/mapbacktrace-semantics
 cases/make-record-contract-semantics
 cases/newline-cache-check-contract-semantics
 cases/native-comp-available-semantics
+cases/native-comp-unit-contract-semantics
