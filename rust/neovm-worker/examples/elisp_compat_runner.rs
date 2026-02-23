@@ -21,19 +21,30 @@ fn render_signal(signal: Signal) -> String {
     format!("({} {})", signal.symbol, payload)
 }
 
-fn write_status_line(index: usize, rendered_form: &str, status_bytes: &[u8]) {
+fn escape_case_string(input: &str) -> String {
+    let mut escaped = String::with_capacity(input.len());
+    for ch in input.chars() {
+        match ch {
+            '\n' => escaped.push_str("\\\\n"),
+            '\r' => escaped.push_str("\\\\r"),
+            '\t' => escaped.push_str("\\\\t"),
+            other => escaped.push(other),
+        }
+    }
+    escaped
+}
+
+fn write_status_line(index: usize, rendered_form: &str, status: &str) {
     let mut out = io::stdout().lock();
     out.write_all(CASE_PREFIX.as_bytes())
         .expect("failed writing case prefix");
     out.write_all((index + 1).to_string().as_bytes())
         .expect("failed writing case index");
-    out.write_all(b"\t")
-        .expect("failed writing TSV separator");
-    out.write_all(rendered_form.as_bytes())
+    out.write_all(b"\t").expect("failed writing TSV separator");
+    out.write_all(escape_case_string(rendered_form).as_bytes())
         .expect("failed writing rendered form");
-    out.write_all(b"\t")
-        .expect("failed writing TSV separator");
-    out.write_all(status_bytes)
+    out.write_all(b"\t").expect("failed writing TSV separator");
+    out.write_all(escape_case_string(status).as_bytes())
         .expect("failed writing status payload");
     out.write_all(b"\n")
         .expect("failed writing line terminator");
@@ -94,11 +105,8 @@ fn main() {
                         data: None,
                     },
                 };
-                write_status_line(
-                    index,
-                    &rendered_form,
-                    format!("ERR {}", render_signal(signal)).as_bytes(),
-                );
+                let status = format!("ERR {}", render_signal(signal));
+                write_status_line(index, &rendered_form, &status);
                 continue;
             }
         };
@@ -106,12 +114,12 @@ fn main() {
         let result = TaskScheduler::task_await(&rt, task, Some(Duration::from_secs(1)));
         match result {
             Ok(value) => {
-                let mut status = b"OK ".to_vec();
-                status.extend_from_slice(&value.bytes);
+                let status = format!("OK {}", String::from_utf8_lossy(&value.bytes));
                 write_status_line(index, &rendered_form, &status);
             }
             Err(err) => {
-                write_status_line(index, &rendered_form, render_task_error(err).as_bytes());
+                let status = render_task_error(err);
+                write_status_line(index, &rendered_form, &status);
             }
         }
     }

@@ -20142,6 +20142,14 @@ Last updated: 2026-02-22
       - `frame-terminal` preserves `frame-live-p` wrong-type payload shape with compact dead-window handle rendering
       - `tty-type`, `terminal-name`, `controlling-tty-p`, `suspend-tty`, and `resume-tty` preserve `terminal-live-p` wrong-type payload shape with compact dead-window handle rendering
 
+- Aligned vm-compat runner form/status escaping with oracle serialization rules:
+  - runtime/harness changes:
+    - `rust/neovm-worker/examples/elisp_compat_runner.rs`
+      - `escape_case_string` now escapes only newline/carriage return/tab; backslashes are emitted verbatim to match `oracle_eval.el`
+  - verification:
+    - `make -C test/neovm/vm-compat check-one-neovm CASE=cases/documentation-property-semantics`
+    - `make -C test/neovm/vm-compat check-neovm-filter LIST=cases/default.list PATTERN='frame-terminal-error-payload-semantics|terminal-window-error-payload-semantics|terminal-dead-window-error-payload-semantics|documentation-property-semantics'`
+
 - Continue compatibility-first maintenance with small commit slices:
   - keep builtin surface and registry in lock-step
   - run oracle/parity checks after each behavior-affecting change
