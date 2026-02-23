@@ -19,6 +19,7 @@ These are the next candidate slices to explore automatically (an initial 20 task
 - Recent completed slice: stale process mutators now match oracle for control-surface setters (`set-process-*`, `process-put`, `process-get`), locked by `cases/process-stale-mutator-semantics`.
 - Recent completed slice: stale process control operations now match oracle inactive-process signaling behavior for `continue/interrupt/kill/stop/quit-process`, locked by `cases/process-stale-control-semantics`.
 - Recent completed slice: `process-attributes` now matches oracle runtime identity-field shape (`user`/`group`/`euid`/`egid`) and negative PID semantics (`-1` -> `nil`), locked by `cases/process-attributes-runtime-semantics`.
+- Recent completed slice: `make-serial-process` now enforces oracle `:port` type contracts (`wrong-type-argument stringp` for non-string ports, `nil` still treated as missing), locked by `cases/process-serial-port-contract-semantics`.
 - Recent completed slice: `set-binary-mode` now matches oracle unsupported-stream errors (`(error "unsupported stream" <sym>)`) via `cases/file-runtime-wrapper-semantics`.
 - Recent completed slice: `frame-edges` now preserves oracle-style live-window buffer context in `is not a live frame` messages, with `cases/frame-edges-window-message-semantics` added and gated.
 - Recent completed slice: added dead-window payload lock-ins for `frame-terminal`/`terminal-name`/`tty-type`/`controlling-tty-p`/`suspend-tty`/`resume-tty` via `cases/terminal-dead-window-error-payload-semantics`.

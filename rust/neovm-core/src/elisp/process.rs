@@ -2412,7 +2412,7 @@ pub(crate) fn builtin_make_serial_process(
     }
 
     let mut name: Option<String> = None;
-    let mut port: Option<Value> = None;
+    let mut port: Option<String> = None;
     let mut speed: Option<Value> = None;
 
     let mut i = 0usize;
@@ -2428,7 +2428,11 @@ pub(crate) fn builtin_make_serial_process(
                 name = Some(expect_process_name_string(&value)?);
             }
             ":port" => {
-                port = Some(value);
+                if value.is_nil() {
+                    port = None;
+                } else {
+                    port = Some(expect_string_strict(&value)?);
+                }
             }
             ":speed" => {
                 speed = Some(value);
@@ -5330,6 +5334,8 @@ mod tests {
                     (ignore-errors (delete-process p))))
                 (condition-case err (make-pipe-process :name 1) (error err))
                 (make-serial-process)
+                (condition-case err (make-serial-process :name "sp" :port t :speed 9600) (error err))
+                (condition-case err (make-serial-process :name "sp" :port 1 :speed 9600) (error err))
                 (condition-case err (make-serial-process :name "sp") (error err))
                 (condition-case err (make-serial-process :name "sp" :port "/tmp/no-port") (error err))
                 (with-temp-buffer
@@ -5361,7 +5367,7 @@ mod tests {
         );
         assert_eq!(
             results[2],
-            "OK (nil (wrong-type-argument stringp nil) (error \":name value not a string\") (error \"Missing :name keyword parameter\") t nil t (error \":name value not a string\") nil (error \"No port specified\") (error \":speed not specified\") error error wrong-number-of-arguments (wrong-type-argument processp 1) (error \"Process is not a network process\") (error \"Unknown or unsupported option\"))"
+            "OK (nil (wrong-type-argument stringp nil) (error \":name value not a string\") (error \"Missing :name keyword parameter\") t nil t (error \":name value not a string\") nil (wrong-type-argument stringp t) (wrong-type-argument stringp 1) (error \"No port specified\") (error \":speed not specified\") error error wrong-number-of-arguments (wrong-type-argument processp 1) (error \"Process is not a network process\") (error \"Unknown or unsupported option\"))"
         );
     }
 

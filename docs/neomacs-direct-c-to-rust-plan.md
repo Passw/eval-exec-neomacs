@@ -111,6 +111,7 @@ All must be true:
 - `src/process.c` stale-handle mutator parity is now locked in (`set-process-{buffer,coding-system,inherit-coding-system-flag,thread,window-size}`, `set-process-{filter,sentinel,plist}`, `process-{put,get}`) via `cases/process-stale-mutator-semantics`.
 - `src/process.c` stale-handle control parity is now tightened for `continue/interrupt/kill/stop/quit-process` inactive-error behavior, with `signal-process` stale-path compatibility normalized and locked by `cases/process-stale-control-semantics`.
 - `src/process.c` `process-attributes` now matches oracle runtime shape for current-process identity fields (`user`, `group`, `euid`, `egid`) and negative-PID semantics (`-1` -> `nil`) via `cases/process-attributes-runtime-semantics`.
+- `src/process.c` `make-serial-process` now enforces oracle `:port` type contracts (`wrong-type-argument stringp` for non-string ports, `nil` treated as missing) via `cases/process-serial-port-contract-semantics`.
 
 ## Next (Direct Order)
 
