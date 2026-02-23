@@ -20131,6 +20131,17 @@ Last updated: 2026-02-22
       - live selected-window error messages include window buffer context (` on ` segment)
       - dead-window error messages remain compact (`#<window N>`) without buffer context
 
+- Added dead-window payload lock-ins for terminal/frame designator helpers:
+  - vm-compat corpus changes:
+    - added:
+      - `test/neovm/vm-compat/cases/terminal-dead-window-error-payload-semantics.forms`
+      - `test/neovm/vm-compat/cases/terminal-dead-window-error-payload-semantics.expected.tsv`
+    - wired case into:
+      - `test/neovm/vm-compat/cases/default.list`
+    - lock-ins assert (with dead-window designators):
+      - `frame-terminal` preserves `frame-live-p` wrong-type payload shape with compact dead-window handle rendering
+      - `tty-type`, `terminal-name`, `controlling-tty-p`, `suspend-tty`, and `resume-tty` preserve `terminal-live-p` wrong-type payload shape with compact dead-window handle rendering
+
 - Continue compatibility-first maintenance with small commit slices:
   - keep builtin surface and registry in lock-step
   - run oracle/parity checks after each behavior-affecting change
