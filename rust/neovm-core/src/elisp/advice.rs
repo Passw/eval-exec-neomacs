@@ -446,9 +446,10 @@ pub(crate) fn builtin_add_variable_watcher(
     expect_args("add-variable-watcher", &args, 2)?;
 
     let var_name = expect_symbol_name(&args[0])?;
+    let resolved = super::builtins::resolve_variable_alias_name(eval, &var_name)?;
     let callback = args[1].clone();
 
-    eval.watchers.add_watcher(&var_name, callback);
+    eval.watchers.add_watcher(&resolved, callback);
     Ok(Value::Nil)
 }
 
@@ -462,9 +463,10 @@ pub(crate) fn builtin_remove_variable_watcher(
     expect_args("remove-variable-watcher", &args, 2)?;
 
     let var_name = expect_symbol_name(&args[0])?;
+    let resolved = super::builtins::resolve_variable_alias_name(eval, &var_name)?;
     let callback_name = expect_symbol_name(&args[1])?;
 
-    eval.watchers.remove_watcher(&var_name, &callback_name);
+    eval.watchers.remove_watcher(&resolved, &callback_name);
     Ok(Value::Nil)
 }
 
@@ -478,7 +480,8 @@ pub(crate) fn builtin_get_variable_watchers(
     expect_args("get-variable-watchers", &args, 1)?;
 
     let var_name = expect_symbol_name(&args[0])?;
-    Ok(Value::list(eval.watchers.get_watchers(&var_name)))
+    let resolved = super::builtins::resolve_variable_alias_name(eval, &var_name)?;
+    Ok(Value::list(eval.watchers.get_watchers(&resolved)))
 }
 
 // ---------------------------------------------------------------------------
@@ -775,5 +778,48 @@ mod tests {
             Flow::Signal(sig) => assert_eq!(sig.symbol, "wrong-type-argument"),
             other => panic!("expected signal, got {other:?}"),
         }
+    }
+
+    #[test]
+    fn variable_watcher_builtins_follow_runtime_alias_resolution() {
+        let mut eval = super::super::eval::Evaluator::new();
+        super::super::builtins::builtin_defvaralias_eval(
+            &mut eval,
+            vec![
+                Value::symbol("vm-watch-alias"),
+                Value::symbol("vm-watch-base"),
+            ],
+        )
+        .expect("defvaralias should install alias edge");
+
+        builtin_add_variable_watcher(
+            &mut eval,
+            vec![Value::symbol("vm-watch-alias"), Value::symbol("watch-a")],
+        )
+        .expect("add-variable-watcher should resolve alias");
+
+        let via_alias = builtin_get_variable_watchers(&mut eval, vec![Value::symbol("vm-watch-alias")])
+            .expect("get-variable-watchers should resolve alias");
+        assert_eq!(
+            super::super::value::list_to_vec(&via_alias).expect("watcher list"),
+            vec![Value::symbol("watch-a")]
+        );
+
+        let via_base = builtin_get_variable_watchers(&mut eval, vec![Value::symbol("vm-watch-base")])
+            .expect("get-variable-watchers should resolve base");
+        assert_eq!(
+            super::super::value::list_to_vec(&via_base).expect("watcher list"),
+            vec![Value::symbol("watch-a")]
+        );
+
+        builtin_remove_variable_watcher(
+            &mut eval,
+            vec![Value::symbol("vm-watch-alias"), Value::symbol("watch-a")],
+        )
+        .expect("remove-variable-watcher should resolve alias");
+        let remaining =
+            builtin_get_variable_watchers(&mut eval, vec![Value::symbol("vm-watch-base")])
+                .expect("get-variable-watchers should return empty after removal");
+        assert!(remaining.is_nil());
     }
 }

@@ -4326,7 +4326,10 @@ fn is_internal_symbol_plist_property(property: &str) -> bool {
     property == VARIABLE_ALIAS_PROPERTY || property == RAW_SYMBOL_PLIST_PROPERTY
 }
 
-fn resolve_variable_alias_name(eval: &super::eval::Evaluator, name: &str) -> Result<String, Flow> {
+pub(super) fn resolve_variable_alias_name(
+    eval: &super::eval::Evaluator,
+    name: &str,
+) -> Result<String, Flow> {
     let mut current = name.to_string();
     let mut seen = HashSet::new();
 
