@@ -714,6 +714,7 @@ cases/start-process-buffer-and-type-contract-semantics
 cases/accept-process-output-millis-semantics
 cases/accept-process-output-stale-designator-semantics
 cases/process-stale-query-matrix-semantics
+cases/process-stale-mutator-semantics
 cases/process-mark-type-thread-send-semantics
 cases/process-designator-buffer-lookup-semantics
 cases/process-control-make-setter-semantics

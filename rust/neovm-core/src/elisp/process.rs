@@ -3130,7 +3130,7 @@ pub(crate) fn builtin_set_process_buffer(
     args: Vec<Value>,
 ) -> EvalResult {
     expect_args("set-process-buffer", &args, 2)?;
-    let id = resolve_process_or_wrong_type(eval, &args[0])?;
+    let id = resolve_process_or_wrong_type_any(eval, &args[0])?;
     let next_buffer_name = match &args[1] {
         Value::Nil => None,
         Value::Buffer(buffer_id) => Some(
@@ -3142,7 +3142,7 @@ pub(crate) fn builtin_set_process_buffer(
         ),
         _ => return Err(signal_wrong_type_bufferp(args[1].clone())),
     };
-    let proc = eval.processes.get_mut(id).ok_or_else(|| {
+    let proc = eval.processes.get_any_mut(id).ok_or_else(|| {
         signal(
             "wrong-type-argument",
             vec![Value::symbol("processp"), args[0].clone()],
@@ -3167,8 +3167,8 @@ pub(crate) fn builtin_set_process_coding_system(
             ],
         ));
     }
-    let id = resolve_process_or_wrong_type(eval, &args[0])?;
-    let proc = eval.processes.get_mut(id).ok_or_else(|| {
+    let id = resolve_process_or_wrong_type_any(eval, &args[0])?;
+    let proc = eval.processes.get_any_mut(id).ok_or_else(|| {
         signal(
             "wrong-type-argument",
             vec![Value::symbol("processp"), args[0].clone()],
@@ -3205,7 +3205,7 @@ pub(crate) fn builtin_set_process_datagram_address(
     args: Vec<Value>,
 ) -> EvalResult {
     expect_args("set-process-datagram-address", &args, 2)?;
-    let _id = resolve_process_or_wrong_type(eval, &args[0])?;
+    let _id = resolve_process_or_wrong_type_any(eval, &args[0])?;
     Ok(Value::Nil)
 }
 
@@ -3215,8 +3215,8 @@ pub(crate) fn builtin_set_process_inherit_coding_system_flag(
     args: Vec<Value>,
 ) -> EvalResult {
     expect_args("set-process-inherit-coding-system-flag", &args, 2)?;
-    let id = resolve_process_or_wrong_type(eval, &args[0])?;
-    let proc = eval.processes.get_mut(id).ok_or_else(|| {
+    let id = resolve_process_or_wrong_type_any(eval, &args[0])?;
+    let proc = eval.processes.get_any_mut(id).ok_or_else(|| {
         signal(
             "wrong-type-argument",
             vec![Value::symbol("processp"), args[0].clone()],
@@ -3232,7 +3232,7 @@ pub(crate) fn builtin_set_process_thread(
     args: Vec<Value>,
 ) -> EvalResult {
     expect_args("set-process-thread", &args, 2)?;
-    let id = resolve_process_or_wrong_type(eval, &args[0])?;
+    let id = resolve_process_or_wrong_type_any(eval, &args[0])?;
     let value = if args[1].is_nil() {
         Value::Nil
     } else if eval.threads.thread_id_from_handle(&args[1]).is_some() {
@@ -3240,7 +3240,7 @@ pub(crate) fn builtin_set_process_thread(
     } else {
         return Err(signal_wrong_type_threadp(args[1].clone()));
     };
-    let proc = eval.processes.get_mut(id).ok_or_else(|| {
+    let proc = eval.processes.get_any_mut(id).ok_or_else(|| {
         signal(
             "wrong-type-argument",
             vec![Value::symbol("processp"), args[0].clone()],
@@ -3256,10 +3256,11 @@ pub(crate) fn builtin_set_process_window_size(
     args: Vec<Value>,
 ) -> EvalResult {
     expect_args("set-process-window-size", &args, 3)?;
-    let id = resolve_process_or_wrong_type(eval, &args[0])?;
+    let id = resolve_process_or_wrong_type_any(eval, &args[0])?;
     let cols = expect_integer(&args[1])?;
     let rows = expect_integer(&args[2])?;
-    let proc = eval.processes.get_mut(id).ok_or_else(|| {
+    let is_live = eval.processes.get(id).is_some();
+    let proc = eval.processes.get_any_mut(id).ok_or_else(|| {
         signal(
             "wrong-type-argument",
             vec![Value::symbol("processp"), args[0].clone()],
@@ -3267,7 +3268,7 @@ pub(crate) fn builtin_set_process_window_size(
     })?;
     proc.window_cols = Some(cols);
     proc.window_rows = Some(rows);
-    Ok(Value::True)
+    Ok(if is_live { Value::True } else { Value::Nil })
 }
 
 /// (process-kill-buffer-query-function) -> bool
@@ -3678,13 +3679,13 @@ pub(crate) fn builtin_set_process_filter(
     args: Vec<Value>,
 ) -> EvalResult {
     expect_args("set-process-filter", &args, 2)?;
-    let id = resolve_live_process_or_wrong_type(eval, &args[0])?;
+    let id = resolve_process_or_wrong_type_any(eval, &args[0])?;
     let stored = if args[1].is_nil() {
         Value::symbol(DEFAULT_PROCESS_FILTER_SYMBOL)
     } else {
         args[1].clone()
     };
-    let proc = eval.processes.get_mut(id).ok_or_else(|| {
+    let proc = eval.processes.get_any_mut(id).ok_or_else(|| {
         signal(
             "wrong-type-argument",
             vec![Value::symbol("processp"), args[0].clone()],
@@ -3716,13 +3717,13 @@ pub(crate) fn builtin_set_process_sentinel(
     args: Vec<Value>,
 ) -> EvalResult {
     expect_args("set-process-sentinel", &args, 2)?;
-    let id = resolve_live_process_or_wrong_type(eval, &args[0])?;
+    let id = resolve_process_or_wrong_type_any(eval, &args[0])?;
     let stored = if args[1].is_nil() {
         Value::symbol(DEFAULT_PROCESS_SENTINEL_SYMBOL)
     } else {
         args[1].clone()
     };
-    let proc = eval.processes.get_mut(id).ok_or_else(|| {
+    let proc = eval.processes.get_any_mut(id).ok_or_else(|| {
         signal(
             "wrong-type-argument",
             vec![Value::symbol("processp"), args[0].clone()],
@@ -3760,8 +3761,8 @@ pub(crate) fn builtin_set_process_plist(
             vec![Value::symbol("listp"), args[1].clone()],
         ));
     }
-    let id = resolve_live_process_or_wrong_type(eval, &args[0])?;
-    let proc = eval.processes.get_mut(id).ok_or_else(|| {
+    let id = resolve_process_or_wrong_type_any(eval, &args[0])?;
+    let proc = eval.processes.get_any_mut(id).ok_or_else(|| {
         signal(
             "wrong-type-argument",
             vec![Value::symbol("processp"), args[0].clone()],
@@ -3777,10 +3778,10 @@ pub(crate) fn builtin_process_put(
     args: Vec<Value>,
 ) -> EvalResult {
     expect_args("process-put", &args, 3)?;
-    let id = resolve_live_process_or_wrong_type(eval, &args[0])?;
+    let id = resolve_process_or_wrong_type_any(eval, &args[0])?;
     let current_plist = eval
         .processes
-        .get(id)
+        .get_any(id)
         .ok_or_else(|| {
             signal(
                 "wrong-type-argument",
@@ -3791,7 +3792,7 @@ pub(crate) fn builtin_process_put(
         .clone();
     let new_plist =
         super::builtins::builtin_plist_put(vec![current_plist, args[1].clone(), args[2].clone()])?;
-    let proc = eval.processes.get_mut(id).ok_or_else(|| {
+    let proc = eval.processes.get_any_mut(id).ok_or_else(|| {
         signal(
             "wrong-type-argument",
             vec![Value::symbol("processp"), args[0].clone()],
@@ -3807,10 +3808,10 @@ pub(crate) fn builtin_process_get(
     args: Vec<Value>,
 ) -> EvalResult {
     expect_args("process-get", &args, 2)?;
-    let id = resolve_live_process_or_wrong_type(eval, &args[0])?;
+    let id = resolve_process_or_wrong_type_any(eval, &args[0])?;
     let plist = eval
         .processes
-        .get(id)
+        .get_any(id)
         .ok_or_else(|| {
             signal(
                 "wrong-type-argument",
@@ -4779,6 +4780,31 @@ mod tests {
             results[0],
             "OK (t t t t internal-default-process-filter internal-default-process-filter ignore ignore internal-default-process-sentinel internal-default-process-sentinel ignore ignore (a 1 k 2) 1 (a 1 k 2) 2 t nil nil nil nil)"
         );
+    }
+
+    #[test]
+    fn process_stale_mutator_matrix_matches_oracle() {
+        let cat = find_bin("cat");
+        let result = eval_one(&format!(
+            r#"(let ((p (start-process "proc-stale-mutator" nil "{cat}")))
+                 (unwind-protect
+                     (progn
+                       (delete-process p)
+                       (list
+                        (set-process-filter p 'ignore)
+                        (set-process-sentinel p 'ignore)
+                        (set-process-plist p '(a 1))
+                        (process-put p 'k 2)
+                        (set-process-query-on-exit-flag p nil)
+                        (set-process-buffer p nil)
+                        (set-process-coding-system p 'utf-8-unix)
+                        (set-process-inherit-coding-system-flag p t)
+                        (set-process-thread p nil)
+                        (set-process-window-size p 10 20)
+                        (set-process-datagram-address p nil)))
+                   (ignore-errors (delete-process p))))"#,
+        ));
+        assert_eq!(result, "OK (ignore ignore (a 1 k 2) (a 1 k 2) nil nil nil t nil nil nil)");
     }
 
     #[test]
