@@ -5037,6 +5037,32 @@ pub(crate) fn builtin_symbol_plist_fn(
     }
 }
 
+fn builtin_register_code_conversion_map_eval(
+    eval: &mut super::eval::Evaluator,
+    args: Vec<Value>,
+) -> EvalResult {
+    let map_id = super::ccl::builtin_register_code_conversion_map(args.clone())?;
+
+    let _ = builtin_put(
+        eval,
+        vec![
+            args[0].clone(),
+            Value::symbol("code-conversion-map"),
+            args[1].clone(),
+        ],
+    )?;
+    let _ = builtin_put(
+        eval,
+        vec![
+            args[0].clone(),
+            Value::symbol("code-conversion-map-id"),
+            map_id.clone(),
+        ],
+    )?;
+
+    Ok(map_id)
+}
+
 pub(crate) fn builtin_setplist_eval(
     eval: &mut super::eval::Evaluator,
     args: Vec<Value>,
@@ -17344,7 +17370,7 @@ pub(crate) fn dispatch_builtin(
         "ccl-execute" => super::ccl::builtin_ccl_execute(args),
         "ccl-execute-on-string" => super::ccl::builtin_ccl_execute_on_string(args),
         "register-ccl-program" => super::ccl::builtin_register_ccl_program(args),
-        "register-code-conversion-map" => super::ccl::builtin_register_code_conversion_map(args),
+        "register-code-conversion-map" => builtin_register_code_conversion_map_eval(eval, args),
 
         // XML/decompress (pure)
         "libxml-parse-html-region" => super::xml::builtin_libxml_parse_html_region(args),
@@ -28786,6 +28812,51 @@ mod tests {
             Flow::Signal(sig) => {
                 assert_eq!(sig.symbol, "wrong-type-argument");
                 assert_eq!(sig.data, vec![Value::symbol("plistp"), Value::Int(1)]);
+            }
+            other => panic!("unexpected flow: {other:?}"),
+        }
+    }
+
+    #[test]
+    fn register_code_conversion_map_publishes_symbol_properties() {
+        let mut eval = crate::elisp::eval::Evaluator::new();
+        let map = Value::vector(vec![Value::Int(1), Value::Int(2), Value::Int(3)]);
+
+        let map_id = dispatch_builtin(
+            &mut eval,
+            "register-code-conversion-map",
+            vec![Value::symbol("vm-ccl-map-prop"), map.clone()],
+        )
+        .expect("register-code-conversion-map should dispatch")
+        .expect("register-code-conversion-map should succeed");
+        assert_eq!(map_id, Value::Int(0));
+
+        let published_map = builtin_get(
+            &mut eval,
+            vec![
+                Value::symbol("vm-ccl-map-prop"),
+                Value::symbol("code-conversion-map"),
+            ],
+        )
+        .expect("get should read published conversion map");
+        assert_eq!(published_map, map);
+
+        let published_id = builtin_get(
+            &mut eval,
+            vec![
+                Value::symbol("vm-ccl-map-prop"),
+                Value::symbol("code-conversion-map-id"),
+            ],
+        )
+        .expect("get should read published conversion map id");
+        assert_eq!(published_id, Value::Int(0));
+
+        let sym_value = builtin_symbol_value(&mut eval, vec![Value::symbol("vm-ccl-map-prop")])
+            .expect_err("register-code-conversion-map should not bind symbol value");
+        match sym_value {
+            Flow::Signal(sig) => {
+                assert_eq!(sig.symbol, "void-variable");
+                assert_eq!(sig.data, vec![Value::symbol("vm-ccl-map-prop")]);
             }
             other => panic!("unexpected flow: {other:?}"),
         }

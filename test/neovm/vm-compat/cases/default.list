@@ -73,6 +73,7 @@ cases/ccl-registration-semantics
 cases/ccl-register-program-type-semantics
 cases/ccl-header-second-slot-bounds-semantics
 cases/ccl-code-conversion-map-type-semantics
+cases/ccl-code-conversion-map-plist-semantics
 cases/ccl-symbol-registration-runtime-semantics
 cases/commandp-semantics
 cases/commandp-builtin-command-matrix
