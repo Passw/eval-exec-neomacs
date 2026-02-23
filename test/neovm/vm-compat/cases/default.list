@@ -1091,3 +1091,4 @@ cases/native-comp-available-semantics
 cases/native-comp-unit-contract-semantics
 cases/native-elisp-load-semantics
 cases/keymap-get-keyelt-semantics
+cases/vertical-motion-semantics

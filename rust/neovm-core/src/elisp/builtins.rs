@@ -6454,6 +6454,17 @@ pub(crate) fn builtin_suspend_emacs(args: Vec<Value>) -> EvalResult {
 
 pub(crate) fn builtin_vertical_motion(args: Vec<Value>) -> EvalResult {
     expect_range_args("vertical-motion", &args, 1, 3)?;
+    let lines = expect_fixnum(&args[0])?;
+    if args.len() == 1 {
+        return Ok(Value::Int(lines));
+    }
+    let window = &args[1];
+    if !window.is_nil() && !matches!(window, Value::Window(_)) {
+        return Err(signal(
+            "wrong-type-argument",
+            vec![Value::symbol("window-live-p"), window.clone()],
+        ));
+    }
     Ok(Value::Int(0))
 }
 
@@ -23359,7 +23370,7 @@ mod tests {
         let vertical_motion = dispatch_builtin_pure("vertical-motion", vec![Value::Int(3)])
             .expect("builtin vertical-motion should resolve")
             .expect("builtin vertical-motion should evaluate");
-        assert_eq!(vertical_motion, Value::Int(0));
+        assert_eq!(vertical_motion, Value::Int(3));
 
         let redisplay = dispatch_builtin_pure("redisplay", vec![])
             .expect("builtin redisplay should resolve")
