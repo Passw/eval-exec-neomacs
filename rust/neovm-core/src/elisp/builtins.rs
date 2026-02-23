@@ -7159,6 +7159,11 @@ pub(crate) fn builtin_local_variable_if_set_p_eval(
 
 pub(crate) fn builtin_lock_buffer(args: Vec<Value>) -> EvalResult {
     expect_range_args("lock-buffer", &args, 0, 1)?;
+    if let Some(filename) = args.first() {
+        if !filename.is_nil() {
+            let _ = expect_strict_string(filename)?;
+        }
+    }
     Ok(Value::Nil)
 }
 
@@ -7170,7 +7175,41 @@ pub(crate) fn builtin_lock_file(args: Vec<Value>) -> EvalResult {
 
 pub(crate) fn builtin_lossage_size(args: Vec<Value>) -> EvalResult {
     expect_range_args("lossage-size", &args, 0, 1)?;
-    Ok(Value::Int(300))
+    static LOSSAGE_SIZE: OnceLock<Mutex<i64>> = OnceLock::new();
+    let state = LOSSAGE_SIZE.get_or_init(|| Mutex::new(300));
+    let mut current = state
+        .lock()
+        .map_err(|_| signal("error", vec![Value::string("lossage-size state poisoned")]))?;
+
+    if let Some(value) = args.first() {
+        if !value.is_nil() {
+            let n = match value {
+                Value::Int(n) => *n,
+                Value::Char(c) => *c as i64,
+                _ => {
+                    return Err(signal(
+                        "user-error",
+                        vec![Value::string("Value must be a positive integer")],
+                    ))
+                }
+            };
+            if n < 0 {
+                return Err(signal(
+                    "user-error",
+                    vec![Value::string("Value must be a positive integer")],
+                ));
+            }
+            if n < 100 {
+                return Err(signal(
+                    "user-error",
+                    vec![Value::string("Value must be >= 100")],
+                ));
+            }
+            *current = n;
+        }
+    }
+
+    Ok(Value::Int(*current))
 }
 
 pub(crate) fn builtin_unlock_buffer(args: Vec<Value>) -> EvalResult {

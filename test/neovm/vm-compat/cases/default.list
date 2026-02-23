@@ -91,6 +91,7 @@ cases/command-dispatch-arity-overflow-semantics
 cases/command-keys-arg-semantics
 cases/command-keys-recent-keys-semantics
 cases/clear-this-command-keys-semantics
+cases/lossage-size-lock-buffer-semantics
 cases/command-loop-keys-publication-semantics
 cases/command-loop-empty-keys-and-errors-semantics
 cases/self-insert-command-semantics
