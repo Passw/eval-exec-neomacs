@@ -1535,11 +1535,20 @@ impl Evaluator {
             return Ok(Value::Keyword(symbol.to_string()));
         }
 
+        let resolved = super::builtins::resolve_variable_alias_name(self, symbol)?;
+
         // If lexical binding is on and symbol is NOT special, check lexenv first
         if self.lexical_binding() && !self.obarray.is_special(symbol) {
             for frame in self.lexenv.iter().rev() {
                 if let Some(value) = frame.get(symbol) {
                     return Ok(value.clone());
+                }
+            }
+            if resolved != symbol && !self.obarray.is_special(&resolved) {
+                for frame in self.lexenv.iter().rev() {
+                    if let Some(value) = frame.get(&resolved) {
+                        return Ok(value.clone());
+                    }
                 }
             }
         }
@@ -1549,17 +1558,32 @@ impl Evaluator {
             if let Some(value) = frame.get(symbol) {
                 return Ok(value.clone());
             }
+            if resolved != symbol {
+                if let Some(value) = frame.get(&resolved) {
+                    return Ok(value.clone());
+                }
+            }
+        }
+
+        if resolved == "nil" {
+            return Ok(Value::Nil);
+        }
+        if resolved == "t" {
+            return Ok(Value::True);
+        }
+        if resolved.starts_with(':') {
+            return Ok(Value::Keyword(resolved));
         }
 
         // Buffer-local binding on current buffer.
         if let Some(buf) = self.buffers.current_buffer() {
-            if let Some(value) = buf.get_buffer_local(symbol) {
+            if let Some(value) = buf.get_buffer_local(&resolved) {
                 return Ok(value.clone());
             }
         }
 
         // Obarray value cell
-        if let Some(value) = self.obarray.symbol_value(symbol) {
+        if let Some(value) = self.obarray.symbol_value(&resolved) {
             return Ok(value.clone());
         }
 

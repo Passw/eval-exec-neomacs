@@ -254,7 +254,7 @@ pub(crate) fn builtin_make_variable_buffer_local(
 ) -> EvalResult {
     expect_args("make-variable-buffer-local", &args, 1)?;
     let name = match &args[0] {
-        Value::Symbol(s) => s.clone(),
+        Value::Symbol(s) | Value::Keyword(s) => s.clone(),
         Value::Nil => "nil".to_string(),
         Value::True => "t".to_string(),
         other => {
@@ -264,7 +264,11 @@ pub(crate) fn builtin_make_variable_buffer_local(
             ))
         }
     };
-    eval.custom.make_variable_buffer_local(&name);
+    let resolved = super::builtins::resolve_variable_alias_name(eval, &name)?;
+    if eval.obarray().is_constant(&resolved) {
+        return Err(signal("setting-constant", vec![Value::symbol(name)]));
+    }
+    eval.custom.make_variable_buffer_local(&resolved);
     Ok(args[0].clone())
 }
 
@@ -1189,6 +1193,38 @@ mod tests {
     fn make_variable_buffer_local_works() {
         let results = eval_all(r#"(make-variable-buffer-local 'my-var)"#);
         assert_eq!(results[0], "OK my-var");
+    }
+
+    #[test]
+    fn make_variable_buffer_local_resolves_alias_for_auto_local_assignment() {
+        let result = eval_all(
+            r#"(setq vm-mvbl-base 1)
+               (defvaralias 'vm-mvbl-alias 'vm-mvbl-base)
+               (make-variable-buffer-local 'vm-mvbl-alias)
+               (with-temp-buffer
+                 (setq vm-mvbl-alias 7)
+                 (list (local-variable-p 'vm-mvbl-alias)
+                       (local-variable-p 'vm-mvbl-base)
+                       vm-mvbl-alias
+                       vm-mvbl-base
+                       (default-value 'vm-mvbl-base)))"#,
+        );
+        assert_eq!(result[3], "OK (t t 7 7 1)");
+    }
+
+    #[test]
+    fn make_variable_buffer_local_constant_and_keyword_payloads_match_oracle() {
+        let result = eval_all(
+            r#"(list
+                 (condition-case err (make-variable-buffer-local nil) (error err))
+                 (condition-case err (make-variable-buffer-local t) (error err))
+                 (condition-case err (make-variable-buffer-local :vm-mvbl-k) (error err))
+                 (condition-case err (make-variable-buffer-local 1) (error err)))"#,
+        );
+        assert_eq!(
+            result[0],
+            "OK ((setting-constant nil) (setting-constant t) (setting-constant :vm-mvbl-k) (wrong-type-argument symbolp 1))"
+        );
     }
 
     // -- make-local-variable builtin ---------------------------------------
