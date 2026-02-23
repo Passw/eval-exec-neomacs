@@ -716,7 +716,7 @@ pub(crate) fn sf_setq_default(
     let mut i = 0;
     while i < tail.len() {
         let name = match &tail[i] {
-            Expr::Symbol(s) => s.clone(),
+            Expr::Symbol(s) | Expr::Keyword(s) => s.clone(),
             other => {
                 return Err(signal(
                     "wrong-type-argument",
@@ -725,8 +725,7 @@ pub(crate) fn sf_setq_default(
             }
         };
         let value = eval.eval(&tail[i + 1])?;
-        eval.obarray_mut().set_symbol_value(&name, value.clone());
-        last = value;
+        last = builtin_set_default(eval, vec![Value::symbol(name), value])?;
         i += 2;
     }
 
@@ -1006,6 +1005,47 @@ mod tests {
     fn setq_default_returns_last_value() {
         let results = eval_all(r#"(setq-default x 42)"#);
         assert_eq!(results[0], "OK 42");
+    }
+
+    #[test]
+    fn setq_default_follows_alias_resolution() {
+        let results = eval_all(
+            r#"(defvaralias 'vm-setq-default-alias 'vm-setq-default-base)
+               (setq-default vm-setq-default-alias 3)
+               (list (default-value 'vm-setq-default-base)
+                     (default-value 'vm-setq-default-alias))"#,
+        );
+        assert_eq!(results[2], "OK (3 3)");
+    }
+
+    #[test]
+    fn setq_default_rejects_constant_symbols() {
+        let results = eval_all(
+            r#"(list
+                 (condition-case err (setq-default nil 1) (error err))
+                 (condition-case err (setq-default :foo 1) (error err)))"#,
+        );
+        assert_eq!(
+            results[0],
+            "OK ((setting-constant nil) (setting-constant :foo))"
+        );
+    }
+
+    #[test]
+    fn setq_default_alias_triggers_variable_watchers_twice() {
+        let results = eval_all(
+            r#"(setq vm-setq-default-watch-events nil)
+               (fset 'vm-setq-default-watch-rec
+                     (lambda (symbol newval operation where)
+                       (setq vm-setq-default-watch-events
+                             (cons (list symbol newval operation where)
+                                   vm-setq-default-watch-events))))
+               (defvaralias 'vm-setq-default-watch 'vm-setq-default-watch-base)
+               (add-variable-watcher 'vm-setq-default-watch-base 'vm-setq-default-watch-rec)
+               (setq-default vm-setq-default-watch 7)
+               (length vm-setq-default-watch-events)"#,
+        );
+        assert_eq!(results[5], "OK 2");
     }
 
     // -- default-value and set-default builtins ----------------------------
