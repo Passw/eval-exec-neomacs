@@ -6893,17 +6893,22 @@ pub(crate) fn builtin_set_window_combination_limit(args: Vec<Value>) -> EvalResu
 
 pub(crate) fn builtin_set_window_new_normal(args: Vec<Value>) -> EvalResult {
     expect_range_args("set-window-new-normal", &args, 1, 2)?;
-    Ok(Value::Nil)
+    expect_window_valid_or_nil(&args[0])?;
+    Ok(args.get(1).cloned().unwrap_or(Value::Nil))
 }
 
 pub(crate) fn builtin_set_window_new_pixel(args: Vec<Value>) -> EvalResult {
     expect_range_args("set-window-new-pixel", &args, 2, 3)?;
-    Ok(Value::Nil)
+    expect_window_valid_or_nil(&args[0])?;
+    let _ = expect_int(&args[1])?;
+    Ok(args[1].clone())
 }
 
 pub(crate) fn builtin_set_window_new_total(args: Vec<Value>) -> EvalResult {
     expect_range_args("set-window-new-total", &args, 2, 3)?;
-    Ok(Value::Nil)
+    expect_window_valid_or_nil(&args[0])?;
+    let _ = expect_fixnum(&args[1])?;
+    Ok(args[1].clone())
 }
 
 pub(crate) fn builtin_sort_charsets(args: Vec<Value>) -> EvalResult {
@@ -23626,7 +23631,7 @@ mod tests {
         )
         .expect("builtin set-window-new-pixel should resolve")
         .expect("builtin set-window-new-pixel should evaluate");
-        assert!(set_new_pixel.is_nil());
+        assert_eq!(set_new_pixel, Value::Int(1));
 
         let set_new_total = dispatch_builtin_pure(
             "set-window-new-total",
@@ -23634,7 +23639,7 @@ mod tests {
         )
         .expect("builtin set-window-new-total should resolve")
         .expect("builtin set-window-new-total should evaluate");
-        assert!(set_new_total.is_nil());
+        assert_eq!(set_new_total, Value::Int(1));
     }
 
     #[test]

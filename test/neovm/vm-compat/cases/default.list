@@ -1067,3 +1067,4 @@ cases/internal-runtime-state-compat-semantics
 cases/internal-runtime-remaining-compat-semantics
 cases/set-mouse-position-semantics
 cases/set-window-runtime-contracts-semantics
+cases/set-window-new-runtime-contracts-semantics
