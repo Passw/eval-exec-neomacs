@@ -759,6 +759,7 @@ cases/process-file-lines-menu-semantics
 cases/process-list-network-serial-semantics
 cases/set-network-process-option-contract-semantics
 cases/process-serial-port-contract-semantics
+cases/serial-process-configure-contract-semantics
 cases/process-network-interface-signal-semantics
 cases/process-helper-wrapper-semantics
 cases/process-shell-wrappers-quit-buffer-coding-semantics

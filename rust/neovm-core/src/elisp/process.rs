@@ -2718,9 +2718,51 @@ pub(crate) fn builtin_make_serial_process(
 /// (serial-process-configure &rest ARGS) -> nil
 pub(crate) fn builtin_serial_process_configure(
     eval: &mut super::eval::Evaluator,
-    _args: Vec<Value>,
+    args: Vec<Value>,
 ) -> EvalResult {
-    let _ = resolve_optional_process_or_current_buffer(eval, None)?;
+    let mut process_id: Option<ProcessId> = None;
+    let mut i = 0usize;
+    while i < args.len() {
+        let key = &args[i];
+        let Some(key_name) = keyword_name(key) else {
+            i += 1;
+            continue;
+        };
+        let value = args.get(i + 1).cloned().unwrap_or(Value::Nil);
+        match key_name {
+            ":process" => {
+                if value.is_nil() {
+                    process_id = None;
+                } else {
+                    process_id = Some(resolve_process_or_missing_error(eval, &value)?);
+                }
+            }
+            ":name" => match value {
+                Value::Str(name) => {
+                    process_id = Some(
+                        eval.processes
+                            .find_by_name(&name)
+                            .ok_or_else(|| signal_process_does_not_exist(&name))?,
+                    );
+                }
+                other => return Err(signal_wrong_type_processp(other)),
+            },
+            _ => {}
+        }
+        i += 2;
+    }
+
+    let id = match process_id {
+        Some(id) => id,
+        None => resolve_optional_process_or_current_buffer(eval, None)?,
+    };
+    let proc = eval
+        .processes
+        .get(id)
+        .ok_or_else(|| signal_wrong_type_processp(Value::Int(id as i64)))?;
+    if proc.kind != ProcessKind::Serial {
+        return Err(signal("error", vec![Value::string("Not a serial process")]));
+    }
     Ok(Value::Nil)
 }
 
