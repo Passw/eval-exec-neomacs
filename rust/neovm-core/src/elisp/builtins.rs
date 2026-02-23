@@ -6532,6 +6532,7 @@ pub(crate) fn builtin_marker_last_position(args: Vec<Value>) -> EvalResult {
 
 pub(crate) fn builtin_match_data_translate(args: Vec<Value>) -> EvalResult {
     expect_args("match-data--translate", &args, 1)?;
+    let _ = expect_fixnum(&args[0])?;
     Ok(Value::Nil)
 }
 
@@ -23403,7 +23404,8 @@ mod tests {
             .expect("builtin marker-last-position should evaluate");
         assert_eq!(marker_last_position, Value::Int(0));
 
-        let match_data_translate = dispatch_builtin_pure("match-data--translate", vec![Value::Nil])
+        let match_data_translate =
+            dispatch_builtin_pure("match-data--translate", vec![Value::Int(1)])
             .expect("builtin match-data--translate should resolve")
             .expect("builtin match-data--translate should evaluate");
         assert!(match_data_translate.is_nil());
