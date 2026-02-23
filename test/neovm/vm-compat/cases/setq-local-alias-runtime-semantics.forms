@@ -17,6 +17,18 @@
               (default-value 'vm-sql-base-default))
       (error err))))
 (progn
+  (setq vm-sql-watch-events nil)
+  (fset 'vm-sql-watch-rec
+        (lambda (symbol newval operation where)
+          (setq vm-sql-watch-events
+                (cons (list symbol newval operation where)
+                      vm-sql-watch-events))))
+  (defvaralias 'vm-sql-watch-alias 'vm-sql-watch-base)
+  (add-variable-watcher 'vm-sql-watch-base 'vm-sql-watch-rec)
+  (with-temp-buffer
+    (setq-local vm-sql-watch-alias 7))
+  (length vm-sql-watch-events))
+(progn
   (defvaralias 'vm-sql-const 'nil)
   (let ((x 0))
     (condition-case err

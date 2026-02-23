@@ -2287,8 +2287,9 @@ impl Evaluator {
             let value = self.eval(&tail[i + 1])?;
             if let Some(buf) = self.buffers.current_buffer_mut() {
                 buf.set_buffer_local(&resolved, value.clone());
+                self.run_variable_watchers(&resolved, &value, &Value::Nil, "set")?;
             } else {
-                self.assign(&resolved, value.clone());
+                self.assign_with_watchers(&resolved, value.clone(), "set")?;
             }
             last = value;
             i += 2;
@@ -4025,6 +4026,25 @@ mod tests {
         );
         assert_eq!(results[0], "OK ((setting-constant vm-setq-local-const) 0)");
         assert_eq!(results[1], "OK ((setting-constant vm-setq-local-const-k) 0)");
+    }
+
+    #[test]
+    fn setq_local_alias_triggers_single_watcher_callback_on_resolved_target() {
+        let result = eval_one(
+            "(progn
+               (setq vm-setq-local-watch-events nil)
+               (fset 'vm-setq-local-watch-rec
+                     (lambda (symbol newval operation where)
+                       (setq vm-setq-local-watch-events
+                             (cons (list symbol newval operation where)
+                                   vm-setq-local-watch-events))))
+               (defvaralias 'vm-setq-local-watch 'vm-setq-local-watch-base)
+               (add-variable-watcher 'vm-setq-local-watch-base 'vm-setq-local-watch-rec)
+               (with-temp-buffer
+                 (setq-local vm-setq-local-watch 7))
+               (length vm-setq-local-watch-events))",
+        );
+        assert_eq!(result, "OK 1");
     }
 
     #[test]
