@@ -1,0 +1,3 @@
+(list
+ (condition-case err (native-comp-available-p) (error err))
+ (condition-case err (native-comp-available-p nil) (error err)))

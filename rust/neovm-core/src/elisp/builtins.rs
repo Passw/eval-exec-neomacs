@@ -6664,7 +6664,7 @@ pub(crate) fn builtin_mouse_position_eval(
 
 pub(crate) fn builtin_native_comp_available_p(args: Vec<Value>) -> EvalResult {
     expect_args("native-comp-available-p", &args, 0)?;
-    Ok(Value::Nil)
+    Ok(Value::True)
 }
 
 pub(crate) fn builtin_native_comp_unit_file(args: Vec<Value>) -> EvalResult {
@@ -23507,7 +23507,7 @@ mod tests {
         let available = dispatch_builtin_pure("native-comp-available-p", vec![])
             .expect("builtin native-comp-available-p should resolve")
             .expect("builtin native-comp-available-p should evaluate");
-        assert!(available.is_nil());
+        assert!(available.is_truthy());
 
         let unit_file = dispatch_builtin_pure("native-comp-unit-file", vec![Value::Nil])
             .expect("builtin native-comp-unit-file should resolve")
