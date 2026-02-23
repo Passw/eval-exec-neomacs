@@ -275,7 +275,7 @@ pub(crate) fn builtin_make_local_variable(
 ) -> EvalResult {
     expect_args("make-local-variable", &args, 1)?;
     let name = match &args[0] {
-        Value::Symbol(s) => s.clone(),
+        Value::Symbol(s) | Value::Keyword(s) => s.clone(),
         Value::Nil => "nil".to_string(),
         Value::True => "t".to_string(),
         other => {
@@ -285,15 +285,19 @@ pub(crate) fn builtin_make_local_variable(
             ))
         }
     };
+    let resolved = super::builtins::resolve_variable_alias_name(eval, &name)?;
+    if eval.obarray().is_constant(&resolved) {
+        return Err(signal("setting-constant", vec![Value::symbol(name)]));
+    }
     // Set the current value as buffer-local if a buffer is current.
     // Clone the value first to avoid borrow conflicts.
     let value = eval
         .obarray
-        .symbol_value(&name)
+        .symbol_value(&resolved)
         .cloned()
         .unwrap_or(Value::Nil);
     if let Some(buf) = eval.buffers.current_buffer_mut() {
-        buf.set_buffer_local(&name, value);
+        buf.set_buffer_local(&resolved, value);
     }
     Ok(args[0].clone())
 }
@@ -1199,6 +1203,37 @@ mod tests {
                (local-variable-p 'my-var)"#,
         );
         assert_eq!(results[4], "OK t");
+    }
+
+    #[test]
+    fn make_local_variable_resolves_alias_bindings() {
+        let result = eval_all(
+            r#"(setq vm-mlv-base 4)
+               (defvaralias 'vm-mlv-alias 'vm-mlv-base)
+               (with-temp-buffer
+                 (make-local-variable 'vm-mlv-alias)
+                 (list (local-variable-p 'vm-mlv-alias)
+                       (local-variable-p 'vm-mlv-base)
+                       (symbol-value 'vm-mlv-alias)
+                       (symbol-value 'vm-mlv-base)
+                       (default-value 'vm-mlv-base)))"#,
+        );
+        assert_eq!(result[2], "OK (t t 4 4 4)");
+    }
+
+    #[test]
+    fn make_local_variable_constant_and_keyword_payloads_match_oracle() {
+        let result = eval_all(
+            r#"(list
+                 (condition-case err (with-temp-buffer (make-local-variable nil)) (error err))
+                 (condition-case err (with-temp-buffer (make-local-variable t)) (error err))
+                 (condition-case err (with-temp-buffer (make-local-variable :vm-k)) (error err))
+                 (condition-case err (with-temp-buffer (make-local-variable 1)) (error err)))"#,
+        );
+        assert_eq!(
+            result[0],
+            "OK ((setting-constant nil) (setting-constant t) (setting-constant :vm-k) (wrong-type-argument symbolp 1))"
+        );
     }
 
     // -- local-variable-p builtin ------------------------------------------
