@@ -3234,13 +3234,15 @@ pub(crate) fn builtin_tab_to_tab_stop(
         ));
     }
 
-    let buf = eval
-        .buffers
-        .current_buffer_mut()
-        .ok_or_else(|| signal("error", vec![Value::string("No current buffer")]))?;
-    buf.insert("\t");
+    {
+        let buf = eval
+            .buffers
+            .current_buffer_mut()
+            .ok_or_else(|| signal("error", vec![Value::string("No current buffer")]))?;
+        buf.insert("\t");
+    }
 
-    Ok(Value::Nil)
+    super::indent::builtin_current_column_eval(eval, vec![])
 }
 
 /// `(indent-rigidly START END ARG)` — indent all lines in region by ARG columns.
@@ -4371,6 +4373,26 @@ mod tests {
                (buffer-string)"#,
         );
         assert_eq!(results[2], r#"OK "hi\t""#);
+    }
+
+    #[test]
+    fn tab_to_tab_stop_returns_reached_column() {
+        let results = eval_all(
+            r#"(with-temp-buffer
+                 (list (current-column)
+                       (tab-to-tab-stop)
+                       (current-column)
+                       (buffer-string)))
+               (with-temp-buffer
+                 (insert "abc")
+                 (goto-char (point-max))
+                 (list (current-column)
+                       (tab-to-tab-stop)
+                       (current-column)
+                       (buffer-string)))"#,
+        );
+        assert_eq!(results[0], r#"OK (0 8 8 "\t")"#);
+        assert_eq!(results[1], r#"OK (3 8 8 "abc\t")"#);
     }
 
     // -- indent-rigidly tests --
