@@ -187,6 +187,11 @@ impl ProcessManager {
         self.processes.keys().copied().collect()
     }
 
+    /// Returns true if this id has been allocated at least once.
+    pub fn was_issued_id(&self, id: ProcessId) -> bool {
+        id > 0 && id < self.next_id
+    }
+
     /// Find a process by name.
     pub fn find_by_name(&self, name: &str) -> Option<ProcessId> {
         self.processes
@@ -888,6 +893,16 @@ fn resolve_live_process_or_wrong_type(
             vec![Value::symbol("processp"), value.clone()],
         )
     })
+}
+
+fn is_stale_process_id_designator(eval: &super::eval::Evaluator, value: &Value) -> bool {
+    match value {
+        Value::Int(n) if *n > 0 => {
+            let id = *n as ProcessId;
+            eval.processes.get(id).is_none() && eval.processes.was_issued_id(id)
+        }
+        _ => false,
+    }
 }
 
 fn resolve_optional_process_or_current_buffer(
@@ -3392,6 +3407,9 @@ pub(crate) fn builtin_accept_process_output(
 
     if let Some(process) = args.first() {
         if !process.is_nil() && resolve_live_process_designator(eval, process).is_none() {
+            if is_stale_process_id_designator(eval, process) {
+                return Ok(Value::Nil);
+            }
             return Err(signal(
                 "wrong-type-argument",
                 vec![Value::symbol("processp"), process.clone()],
@@ -4703,6 +4721,7 @@ mod tests {
                   (eq p (get-process "proc-get-probe"))
                   (accept-process-output p 0.0)
                   (delete-process p)
+                  (accept-process-output p 0.0)
                   (get-process "proc-get-probe")))
                (condition-case err (get-process 'proc-get-probe) (error err))"#,
         ));
@@ -4710,7 +4729,7 @@ mod tests {
         assert_eq!(results[1], "OK nil");
         assert_eq!(results[2], "OK (wrong-type-argument processp 1)");
         assert_eq!(results[3], r#"OK (wrong-type-argument numberp "x")"#);
-        assert_eq!(results[4], "OK (t t nil nil nil)");
+        assert_eq!(results[4], "OK (t t nil nil nil nil)");
         assert_eq!(
             results[5],
             "OK (wrong-type-argument stringp proc-get-probe)"
