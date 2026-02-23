@@ -14,7 +14,7 @@ Status values: `none`, `in-progress`, `rust-default`, `c-removed`, `glue-only`, 
 | `src/bignum.c` | `none` | `-` | - | - | - | - |
 | `src/buffer.c` | `partial` | `rust/neovm-core/src/buffer/buffer.rs` | - | - | - | - |
 | `src/bytecode.c` | `none` | `-` | - | - | - | - |
-| `src/callint.c` | `in-progress` | `rust/neovm-core/src/elisp/interactive.rs` | `cases/execute-extended-command-prefix-return-semantics`, `cases/execute-extended-command-batch-eof-semantics` | - | - | direct cutover slice #1 |
+| `src/callint.c` | `rust-default` | `rust/neovm-core/src/elisp/interactive.rs` | `cases/execute-extended-command-prefix-return-semantics`, `cases/execute-extended-command-batch-eof-semantics` | pending | - | rust backend default for NeoVM runtime; legacy editor C path still present |
 | `src/callproc.c` | `none` | `-` | - | - | - | - |
 | `src/casefiddle.c` | `partial` | `rust/neovm-core/src/elisp/casefiddle.rs` | - | - | - | - |
 | `src/casetab.c` | `partial` | `rust/neovm-core/src/elisp/casetab.rs` | - | - | - | - |
@@ -54,7 +54,7 @@ Status values: `none`, `in-progress`, `rust-default`, `c-removed`, `glue-only`, 
 | `src/image.c` | `partial` | `rust/neovm-core/src/elisp/image.rs` | - | - | - | - |
 | `src/indent.c` | `partial` | `rust/neovm-core/src/elisp/indent.rs` | - | - | - | - |
 | `src/inotify.c` | `none` | `-` | - | - | - | - |
-| `src/insdel.c` | `in-progress` | `rust/neovm-core/src/buffer/buffer.rs` | `cases/command-dispatch-default-arg-semantics`, `cases/call-interactively-prefix-numeric-arg-semantics` | - | - | direct cutover slice #1 |
+| `src/insdel.c` | `rust-default` | `rust/neovm-core/src/buffer/buffer.rs` | `cases/command-dispatch-default-arg-semantics`, `cases/call-interactively-prefix-numeric-arg-semantics` | pending | - | rust backend default for NeoVM runtime; legacy editor C path still present |
 | `src/intervals.c` | `none` | `-` | - | - | - | - |
 | `src/itree.c` | `partial` | `rust/neomacs-display/src/core/itree.rs` | - | - | - | - |
 | `src/json.c` | `partial` | `rust/neovm-core/src/elisp/json.rs` | - | - | - | - |

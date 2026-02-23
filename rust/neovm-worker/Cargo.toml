@@ -6,7 +6,7 @@ license = "GPL-3.0-or-later"
 description = "Worker runtime and scheduler scaffolding for NeoVM"
 
 [features]
-default = ["core-backend-emacs-c"]
+default = ["core-backend-rust"]
 core-backend-emacs-c = ["neovm-core/core-backend-emacs-c"]
 core-backend-rust = ["neovm-core/core-backend-rust"]
 legacy-elc-literal = ["neovm-core/legacy-elc-literal"]

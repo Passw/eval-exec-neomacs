@@ -6,7 +6,7 @@ license = "GPL-3.0-or-later"
 description = "Core runtime structures for NeoVM"
 
 [features]
-default = ["core-backend-emacs-c"]
+default = ["core-backend-rust"]
 core-backend-emacs-c = []
 core-backend-rust = []
 legacy-elc-literal = []
