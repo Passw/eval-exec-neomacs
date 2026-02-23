@@ -16,6 +16,7 @@ These are the next candidate slices to explore automatically (an initial 20 task
 - Recent completed slice: `frame-edges` now preserves oracle-style live-window buffer context in `is not a live frame` messages, with `cases/frame-edges-window-message-semantics` added and gated.
 - Recent completed slice: added dead-window payload lock-ins for `frame-terminal`/`terminal-name`/`tty-type`/`controlling-tty-p`/`suspend-tty`/`resume-tty` via `cases/terminal-dead-window-error-payload-semantics`.
 - Recent completed slice: aligned vm-compat runner case serialization with oracle (`elisp_compat_runner` now escapes only newline/carriage-return/tab, not backslashes), unblocking strict-form parity for `cases/documentation-property-semantics`.
+- Recent completed slice: aligned startup doc seeds for `use-system-tooltips` and `ctl-x-4-map` with oracle-facing `documentation-property` behavior, and refreshed `cases/documentation-property-semantics.expected.tsv` to lock the corrected tuples.
 - Keep documenting the auto-progress in the plan (update `docs/plan.md` `## Doing` and `## Next`) each time a slice is completed.
 - Track recent slices such as the `recent-keys` capture for `call-interactively`/`command-execute` so their documentation stays visible for observers and CI log correlation.
 - Refer to `docs/neovm-subsystem-porting.md` when choosing the next subsystem to port; it lists the untracked Rust modules and the gated steps to bring each online.

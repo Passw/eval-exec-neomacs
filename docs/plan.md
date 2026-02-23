@@ -20150,6 +20150,22 @@ Last updated: 2026-02-22
     - `make -C test/neovm/vm-compat check-one-neovm CASE=cases/documentation-property-semantics`
     - `make -C test/neovm/vm-compat check-neovm-filter LIST=cases/default.list PATTERN='frame-terminal-error-payload-semantics|terminal-window-error-payload-semantics|terminal-dead-window-error-payload-semantics|documentation-property-semantics'`
 
+- Aligned startup `documentation-property` behavior with oracle for key probe symbols:
+  - runtime changes:
+    - `rust/neovm-core/src/elisp/doc.rs`
+      - startup doc seed for `use-system-tooltips` now uses oracle-leading wording (`"Use the toolkit to display tooltips."`)
+      - startup doc seed for `ctl-x-4-map` now stores plain display text (`"Keymap for subcommands of C-x 4."`) so raw/display parity matches oracle
+      - updated unit coverage:
+        - `documentation_property_eval_ctl_x_4_map_raw_matches_display_when_no_markup`
+  - vm-compat baseline updates:
+    - `test/neovm/vm-compat/cases/documentation-property-semantics.expected.tsv`
+      - index 38 `use-system-tooltips` tuple updated to `(t nil)`
+      - index 57 raw/display tuple updated to `(t t nil)`
+  - verification:
+    - `cargo test --manifest-path rust/neovm-core/Cargo.toml documentation_property_eval_ctl_x_4_map_raw_matches_display_when_no_markup`
+    - `STRICT_FORM=1 ./test/neovm/vm-compat/compare-results.sh <oracle-tsv> <neovm-tsv>` on `cases/documentation-property-semantics.forms` -> `compat outputs match: 57/57 cases`
+    - `make -C test/neovm/vm-compat check-neovm-filter LIST=cases/default.list PATTERN='frame-terminal-error-payload-semantics|terminal-window-error-payload-semantics|terminal-dead-window-error-payload-semantics|documentation-property-semantics'`
+
 - Continue compatibility-first maintenance with small commit slices:
   - keep builtin surface and registry in lock-step
   - run oracle/parity checks after each behavior-affecting change

@@ -2594,7 +2594,7 @@ pub(crate) static STARTUP_VARIABLE_DOC_STUBS: &[(&str, &str)] = &[
     ),
     (
         "use-system-tooltips",
-        "Whether to use the toolkit to display tooltips.",
+        "Use the toolkit to display tooltips.",
     ),
     (
         "user-init-file",
@@ -4351,7 +4351,7 @@ pub(crate) static STARTUP_VARIABLE_DOC_STRING_PROPERTIES: &[(&str, &str)] = &[
     ),
     (
         "ctl-x-4-map",
-        "Keymap for subcommands of \\`C-x 4'.",
+        "Keymap for subcommands of C-x 4.",
     ),
     (
         "ctl-x-5-map",
@@ -13705,7 +13705,7 @@ mod tests {
     }
 
     #[test]
-    fn documentation_property_eval_ctl_x_4_map_display_strips_markup_and_raw_preserves_it() {
+    fn documentation_property_eval_ctl_x_4_map_raw_matches_display_when_no_markup() {
         let mut evaluator = super::super::eval::Evaluator::new();
         let display = builtin_documentation_property_eval(
             &mut evaluator,
@@ -13734,7 +13734,7 @@ mod tests {
 
         assert!(display.contains("C-x 4"));
         assert!(!display.contains("\\`C-x 4'"));
-        assert!(raw.contains("\\`C-x 4'"));
+        assert_eq!(raw, display);
     }
 
     #[test]
