@@ -6531,6 +6531,7 @@ pub(crate) fn builtin_mapbacktrace(args: Vec<Value>) -> EvalResult {
 
 pub(crate) fn builtin_make_record(args: Vec<Value>) -> EvalResult {
     expect_args("make-record", &args, 3)?;
+    let _ = expect_wholenump(&args[1])?;
     Ok(Value::Nil)
 }
 
