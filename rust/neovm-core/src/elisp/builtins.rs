@@ -8366,6 +8366,49 @@ pub(crate) fn builtin_internal_labeled_widen(args: Vec<Value>) -> EvalResult {
     Ok(Value::Nil)
 }
 
+pub(crate) fn builtin_internal_labeled_narrow_to_region_eval(
+    eval: &mut super::eval::Evaluator,
+    args: Vec<Value>,
+) -> EvalResult {
+    expect_args("internal--labeled-narrow-to-region", &args, 3)?;
+    let start = expect_integer_or_marker(&args[0])?;
+    let end = expect_integer_or_marker(&args[1])?;
+    let buf = eval
+        .buffers
+        .current_buffer_mut()
+        .ok_or_else(|| signal("error", vec![Value::string("No current buffer")]))?;
+    let point_min = buf.text.byte_to_char(buf.point_min()) as i64 + 1;
+    let point_max = buf.text.byte_to_char(buf.point_max()) as i64 + 1;
+    let mut clamped_start = start.clamp(point_min, point_max);
+    let mut clamped_end = end.clamp(point_min, point_max);
+    if clamped_start > clamped_end {
+        std::mem::swap(&mut clamped_start, &mut clamped_end);
+    }
+    let s = if clamped_start > 0 {
+        clamped_start as usize - 1
+    } else {
+        0
+    };
+    let e = if clamped_end > 0 {
+        clamped_end as usize - 1
+    } else {
+        0
+    };
+    let byte_start = buf.text.char_to_byte(s);
+    let byte_end = buf.text.char_to_byte(e);
+    buf.narrow_to_region(byte_start, byte_end);
+    Ok(Value::Nil)
+}
+
+pub(crate) fn builtin_internal_labeled_widen_eval(
+    eval: &mut super::eval::Evaluator,
+    args: Vec<Value>,
+) -> EvalResult {
+    expect_args("internal--labeled-widen", &args, 1)?;
+    // LABEL is currently metadata-only; runtime behavior mirrors widen.
+    builtin_widen(eval, vec![])
+}
+
 pub(crate) fn builtin_internal_obarray_buckets(args: Vec<Value>) -> EvalResult {
     expect_args("internal--obarray-buckets", &args, 1)?;
     Ok(Value::Nil)
@@ -15431,6 +15474,10 @@ pub(crate) fn dispatch_builtin(
         "buffer-size" => return Some(builtin_buffer_size(eval, args)),
         "narrow-to-region" => return Some(builtin_narrow_to_region(eval, args)),
         "widen" => return Some(builtin_widen(eval, args)),
+        "internal--labeled-narrow-to-region" => {
+            return Some(builtin_internal_labeled_narrow_to_region_eval(eval, args))
+        }
+        "internal--labeled-widen" => return Some(builtin_internal_labeled_widen_eval(eval, args)),
         // set-mark and mark are now in navigation module (below)
         "buffer-modified-p" => return Some(builtin_buffer_modified_p(eval, args)),
         "set-buffer-modified-p" => return Some(builtin_set_buffer_modified_p(eval, args)),
