@@ -67,6 +67,7 @@ cases/doc-helper-arity-semantics
 cases/doc-helper-subr-arity-semantics
 cases/ccl-arity-semantics
 cases/ccl-semantics
+cases/ccl-program-p-designator-semantics
 cases/ccl-runtime-semantics
 cases/ccl-registration-semantics
 cases/ccl-code-conversion-map-type-semantics

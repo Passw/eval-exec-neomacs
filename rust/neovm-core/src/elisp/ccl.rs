@@ -161,7 +161,10 @@ fn expect_max_args(name: &str, args: &[Value], max: usize) -> Result<(), Flow> {
 /// This accepts program objects that match the minimum CCL header shape used by Emacs.
 pub(crate) fn builtin_ccl_program_p(args: Vec<Value>) -> EvalResult {
     expect_args("ccl-program-p", &args, 1)?;
-    Ok(Value::bool(is_valid_ccl_program(&args[0])))
+    let is_program = resolve_ccl_program_designator(&args[0])
+        .map(|(program, _)| is_valid_ccl_program(&program))
+        .unwrap_or(false);
+    Ok(Value::bool(is_program))
 }
 
 /// (ccl-execute CCL-PROGRAM STATUS) -> nil
@@ -320,6 +323,25 @@ mod tests {
         assert_eq!(
             builtin_ccl_program_p(vec![invalid_negative]).expect("invalid program"),
             Value::Nil
+        );
+    }
+
+    #[test]
+    fn ccl_programp_accepts_registered_symbol_designator() {
+        assert_eq!(
+            builtin_ccl_program_p(vec![Value::symbol("ccl-program-p-unregistered")])
+                .expect("unregistered symbol should be nil"),
+            Value::Nil
+        );
+        let _ = builtin_register_ccl_program(vec![
+            Value::symbol("ccl-program-p-registered"),
+            Value::vector(vec![Value::Int(10), Value::Int(0), Value::Int(0)]),
+        ])
+        .expect("registration should succeed");
+        assert_eq!(
+            builtin_ccl_program_p(vec![Value::symbol("ccl-program-p-registered")])
+                .expect("registered symbol should be accepted"),
+            Value::True
         );
     }
 
