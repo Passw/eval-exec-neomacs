@@ -1047,6 +1047,7 @@ cases/internal-event-parse-syntax-char-font-semantics
 cases/internal-focus-face-subr-semantics
 cases/internal-face-resource-attribute-name-semantics
 cases/internal-face-resource-attribute-value-semantics
+cases/internal-set-buffer-modified-tick-semantics
 cases/internal-runtime-introspection-compat-semantics
 cases/internal-gui-frame-runtime-compat-semantics
 cases/internal-runtime-state-compat-semantics
