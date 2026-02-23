@@ -7022,11 +7022,11 @@ fn interactive_form_from_expr_body(body: &[super::expr::Expr]) -> Option<Value> 
     if head != "interactive" {
         return None;
     }
-    let spec = items
-        .get(1)
-        .map(super::eval::quote_to_value)
-        .unwrap_or(Value::Nil);
-    Some(Value::list(vec![Value::symbol("interactive"), spec]))
+    let mut interactive = vec![Value::symbol("interactive")];
+    if let Some(spec) = items.get(1).map(super::eval::quote_to_value) {
+        interactive.push(spec);
+    }
+    Some(Value::list(interactive))
 }
 
 fn interactive_form_from_quoted_lambda(value: &Value) -> Option<Value> {
@@ -7045,8 +7045,11 @@ fn interactive_form_from_quoted_lambda(value: &Value) -> Option<Value> {
     if interactive_items.first().and_then(Value::as_symbol_name) != Some("interactive") {
         return None;
     }
-    let spec = interactive_items.get(1).cloned().unwrap_or(Value::Nil);
-    Some(Value::list(vec![Value::symbol("interactive"), spec]))
+    let mut interactive = vec![Value::symbol("interactive")];
+    if let Some(spec) = interactive_items.get(1).cloned() {
+        interactive.push(spec);
+    }
+    Some(Value::list(interactive))
 }
 
 pub(crate) fn builtin_interactive_form_eval(
@@ -23461,7 +23464,49 @@ mod tests {
         assert!(
             builtin_interactive_form_eval(&mut eval, vec![Value::Int(0)])
                 .expect("interactive-form should evaluate")
-                .is_nil()
+            .is_nil()
+        );
+    }
+
+    #[test]
+    fn interactive_form_eval_preserves_noarg_and_explicit_nil_shapes() {
+        let mut eval = crate::elisp::eval::Evaluator::new();
+        let noarg_lambda = Value::list(vec![
+            Value::symbol("lambda"),
+            Value::Nil,
+            Value::list(vec![Value::symbol("interactive")]),
+            Value::Int(1),
+        ]);
+        let nil_lambda = Value::list(vec![
+            Value::symbol("lambda"),
+            Value::Nil,
+            Value::list(vec![Value::symbol("interactive"), Value::Nil]),
+            Value::Int(1),
+        ]);
+        eval.obarray_mut()
+            .set_symbol_function("vm-interactive-form-noarg", noarg_lambda.clone());
+        eval.obarray_mut()
+            .set_symbol_function("vm-interactive-form-nil", nil_lambda.clone());
+
+        assert_eq!(
+            builtin_interactive_form_eval(&mut eval, vec![noarg_lambda])
+                .expect("interactive-form should evaluate"),
+            Value::list(vec![Value::symbol("interactive")])
+        );
+        assert_eq!(
+            builtin_interactive_form_eval(&mut eval, vec![Value::symbol("vm-interactive-form-noarg")])
+                .expect("interactive-form should evaluate"),
+            Value::list(vec![Value::symbol("interactive")])
+        );
+        assert_eq!(
+            builtin_interactive_form_eval(&mut eval, vec![nil_lambda])
+                .expect("interactive-form should evaluate"),
+            Value::list(vec![Value::symbol("interactive"), Value::Nil])
+        );
+        assert_eq!(
+            builtin_interactive_form_eval(&mut eval, vec![Value::symbol("vm-interactive-form-nil")])
+                .expect("interactive-form should evaluate"),
+            Value::list(vec![Value::symbol("interactive"), Value::Nil])
         );
     }
 
