@@ -6564,6 +6564,14 @@ pub(crate) fn builtin_match_data_translate(args: Vec<Value>) -> EvalResult {
 
 pub(crate) fn builtin_newline_cache_check(args: Vec<Value>) -> EvalResult {
     expect_range_args("newline-cache-check", &args, 0, 1)?;
+    if let Some(buffer) = args.first() {
+        if !buffer.is_nil() && !matches!(buffer, Value::Buffer(_)) {
+            return Err(signal(
+                "wrong-type-argument",
+                vec![Value::symbol("bufferp"), buffer.clone()],
+            ));
+        }
+    }
     Ok(Value::Nil)
 }
 

@@ -1086,3 +1086,4 @@ cases/match-data-translate-semantics
 cases/map-keymap-semantics
 cases/mapbacktrace-semantics
 cases/make-record-contract-semantics
+cases/newline-cache-check-contract-semantics
