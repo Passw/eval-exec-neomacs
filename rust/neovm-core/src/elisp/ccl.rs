@@ -261,8 +261,20 @@ pub(crate) fn builtin_register_ccl_program(args: Vec<Value>) -> EvalResult {
             vec![Value::symbol("symbolp"), args[0].clone()],
         ));
     }
+    let program = if args[1].is_nil() {
+        // Oracle accepts nil and behaves like a minimal valid registered program.
+        Value::vector(vec![Value::Int(0), Value::Int(0), Value::Int(0)])
+    } else {
+        if !args[1].is_vector() {
+            return Err(signal(
+                "wrong-type-argument",
+                vec![Value::symbol("vectorp"), args[1].clone()],
+            ));
+        }
+        args[1].clone()
+    };
 
-    if !is_valid_ccl_program(&args[1]) {
+    if !is_valid_ccl_program(&program) {
         return Err(signal("error", vec![Value::string("Error in CCL program")]));
     }
 
@@ -271,7 +283,7 @@ pub(crate) fn builtin_register_ccl_program(args: Vec<Value>) -> EvalResult {
         .expect("symbol already validated by is_symbol");
     let program_id = {
         let mut registry = ccl_registry().lock().unwrap_or_else(|e| e.into_inner());
-        registry.register_program(name, args[1].clone())
+        registry.register_program(name, program)
     };
     Ok(Value::Int(program_id))
 }
@@ -481,6 +493,33 @@ mod tests {
             }
             other => panic!("expected wrong-type-argument signal, got {other:?}"),
         }
+    }
+
+    #[test]
+    fn register_ccl_program_requires_vector_when_program_non_nil() {
+        let err = builtin_register_ccl_program(vec![Value::symbol("foo"), Value::Int(1)])
+            .expect_err("register-ccl-program program must be vector when non-nil");
+        match err {
+            Flow::Signal(sig) => {
+                assert_eq!(sig.symbol, "wrong-type-argument");
+                assert_eq!(sig.data[0], Value::symbol("vectorp"));
+                assert_eq!(sig.data[1], Value::Int(1));
+            }
+            other => panic!("expected wrong-type-argument signal, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn register_ccl_program_accepts_nil_program() {
+        let result = builtin_register_ccl_program(vec![Value::symbol("foo-nil"), Value::Nil])
+            .expect("register-ccl-program should accept nil");
+        match result {
+            Value::Int(id) => assert!(id > 0),
+            other => panic!("expected integer id, got {other:?}"),
+        }
+        let programp = builtin_ccl_program_p(vec![Value::symbol("foo-nil")])
+            .expect("registered nil program should resolve as valid");
+        assert_eq!(programp, Value::True);
     }
 
     #[test]
