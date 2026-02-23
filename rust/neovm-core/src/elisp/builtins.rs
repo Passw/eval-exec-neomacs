@@ -6854,12 +6854,23 @@ pub(crate) fn builtin_malloc_info(args: Vec<Value>) -> EvalResult {
 
 pub(crate) fn builtin_malloc_trim(args: Vec<Value>) -> EvalResult {
     expect_range_args("malloc-trim", &args, 0, 1)?;
-    Ok(Value::Nil)
+    if let Some(pad) = args.first() {
+        if !pad.is_nil() {
+            let _ = expect_wholenump(pad)?;
+        }
+    }
+    Ok(Value::True)
 }
 
 pub(crate) fn builtin_memory_info(args: Vec<Value>) -> EvalResult {
     expect_args("memory-info", &args, 0)?;
-    Ok(Value::Nil)
+    let counts = Value::memory_use_counts_snapshot();
+    Ok(Value::list(vec![
+        Value::Int(counts[0]),
+        Value::Int(counts[1]),
+        Value::Int(counts[2]),
+        Value::Int(counts[3]),
+    ]))
 }
 
 pub(crate) fn builtin_module_load(args: Vec<Value>) -> EvalResult {
@@ -22979,12 +22990,37 @@ mod tests {
         let malloc_trim = dispatch_builtin_pure("malloc-trim", vec![])
             .expect("builtin malloc-trim should resolve")
             .expect("builtin malloc-trim should evaluate");
-        assert!(malloc_trim.is_nil());
+        assert_eq!(malloc_trim, Value::True);
+
+        let malloc_trim_nil = dispatch_builtin_pure("malloc-trim", vec![Value::Nil])
+            .expect("builtin malloc-trim should resolve with nil pad")
+            .expect("builtin malloc-trim should evaluate with nil pad");
+        assert_eq!(malloc_trim_nil, Value::True);
+
+        let malloc_trim_zero = dispatch_builtin_pure("malloc-trim", vec![Value::Int(0)])
+            .expect("builtin malloc-trim should resolve with integer pad")
+            .expect("builtin malloc-trim should evaluate with integer pad");
+        assert_eq!(malloc_trim_zero, Value::True);
+
+        for bad in [Value::Int(-1), Value::True, Value::vector(vec![Value::Int(1)])] {
+            let err = dispatch_builtin_pure("malloc-trim", vec![bad.clone()])
+                .expect("builtin malloc-trim should resolve for bad pad")
+                .expect_err("malloc-trim should reject non-wholenump pad");
+            match err {
+                Flow::Signal(sig) => {
+                    assert_eq!(sig.symbol, "wrong-type-argument");
+                    assert_eq!(sig.data, vec![Value::symbol("wholenump"), bad]);
+                }
+                other => panic!("expected signal, got: {other:?}"),
+            }
+        }
 
         let memory_info = dispatch_builtin_pure("memory-info", vec![])
             .expect("builtin memory-info should resolve")
             .expect("builtin memory-info should evaluate");
-        assert!(memory_info.is_nil());
+        let items = list_to_vec(&memory_info).expect("memory-info should return list");
+        assert_eq!(items.len(), 4);
+        assert!(items.iter().all(|item| matches!(item, Value::Int(_))));
 
         let module_load = dispatch_builtin_pure("module-load", vec![Value::string("x.so")])
             .expect("builtin module-load should resolve")
