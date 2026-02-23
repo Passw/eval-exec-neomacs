@@ -1076,3 +1076,4 @@ cases/redirect-frame-focus-semantics
 cases/remove-pos-from-symbol-semantics
 cases/redirect-debugging-output-semantics
 cases/open-dribble-file-semantics
+cases/object-intervals-semantics

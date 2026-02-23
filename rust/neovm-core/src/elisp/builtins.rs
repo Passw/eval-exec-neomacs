@@ -6651,6 +6651,12 @@ pub(crate) fn builtin_open_dribble_file(args: Vec<Value>) -> EvalResult {
 
 pub(crate) fn builtin_object_intervals(args: Vec<Value>) -> EvalResult {
     expect_args("object-intervals", &args, 1)?;
+    if !matches!(args[0], Value::Str(_) | Value::Buffer(_)) {
+        return Err(signal(
+            "wrong-type-argument",
+            vec![Value::symbol("buffer-or-string-p"), args[0].clone()],
+        ));
+    }
     Ok(Value::Nil)
 }
 
@@ -23454,7 +23460,7 @@ mod tests {
             .expect("builtin open-dribble-file should evaluate");
         assert!(open_dribble.is_nil());
 
-        let intervals = dispatch_builtin_pure("object-intervals", vec![Value::Nil])
+        let intervals = dispatch_builtin_pure("object-intervals", vec![Value::string("x")])
             .expect("builtin object-intervals should resolve")
             .expect("builtin object-intervals should evaluate");
         assert!(intervals.is_nil());
