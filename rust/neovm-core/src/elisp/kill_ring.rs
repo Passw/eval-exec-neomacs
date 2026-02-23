@@ -3121,11 +3121,37 @@ pub(crate) fn builtin_just_one_space(
     let count = if args.is_empty() || args[0].is_nil() {
         1usize
     } else {
-        let raw = expect_int(&args[0])?;
-        if raw == i64::MIN {
-            i64::MAX as usize
-        } else {
-            raw.unsigned_abs() as usize
+        match &args[0] {
+            Value::Int(raw) => {
+                if *raw == i64::MIN {
+                    i64::MAX as usize
+                } else {
+                    raw.unsigned_abs() as usize
+                }
+            }
+            Value::Char(c) => *c as usize,
+            // Emacs signals integer-or-marker-p with (abs N)+1 for float N.
+            Value::Float(f) => {
+                return Err(signal(
+                    "wrong-type-argument",
+                    vec![
+                        Value::symbol("integer-or-marker-p"),
+                        Value::Float(f.abs() + 1.0),
+                    ],
+                ))
+            }
+            v if super::marker::is_marker(v) => {
+                return Err(signal(
+                    "wrong-type-argument",
+                    vec![Value::symbol("numberp"), v.clone()],
+                ))
+            }
+            other => {
+                return Err(signal(
+                    "wrong-type-argument",
+                    vec![Value::symbol("number-or-marker-p"), other.clone()],
+                ))
+            }
         }
     };
 
@@ -4544,6 +4570,35 @@ mod tests {
                (list (buffer-string) (point))"#,
         );
         assert_eq!(results[3], r#"OK ("ab" 2)"#);
+    }
+
+    #[test]
+    fn just_one_space_argument_contract_subset() {
+        let results = eval_all(
+            r#"(with-temp-buffer
+                 (condition-case err (just-one-space "x") (error (list (car err) (cadr err)))))
+               (with-temp-buffer
+                 (condition-case err (just-one-space t) (error (list (car err) (cadr err)))))
+               (with-temp-buffer
+                 (condition-case err (just-one-space 1.5) (error (list (car err) (cadr err) (caddr err)))))
+               (with-temp-buffer
+                 (condition-case err (just-one-space -1.5) (error (list (car err) (cadr err) (caddr err)))))
+               (with-temp-buffer
+                 (let ((m (make-marker)))
+                   (set-marker m 1)
+                   (condition-case err (just-one-space m) (error (list (car err) (cadr err))))))
+               (with-temp-buffer
+                 (insert "a \t  b")
+                 (goto-char 4)
+                 (just-one-space -2)
+                 (list (point) (string-to-list (buffer-string))))"#,
+        );
+        assert_eq!(results[0], "OK (wrong-type-argument number-or-marker-p)");
+        assert_eq!(results[1], "OK (wrong-type-argument number-or-marker-p)");
+        assert_eq!(results[2], "OK (wrong-type-argument integer-or-marker-p 2.5)");
+        assert_eq!(results[3], "OK (wrong-type-argument integer-or-marker-p 2.5)");
+        assert_eq!(results[4], "OK (wrong-type-argument numberp)");
+        assert_eq!(results[5], "OK (4 (97 32 32 98))");
     }
 
     // -- delete-indentation tests --
