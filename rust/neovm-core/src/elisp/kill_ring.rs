@@ -2924,6 +2924,7 @@ pub(crate) fn builtin_indent_to(eval: &mut super::eval::Evaluator, args: Vec<Val
 
 /// `(newline &optional ARG INTERACTIVE)` — insert one or more newlines.
 pub(crate) fn builtin_newline(eval: &mut super::eval::Evaluator, args: Vec<Value>) -> EvalResult {
+    expect_max_args("newline", &args, 2)?;
     let n = if args.is_empty() || args[0].is_nil() {
         1usize
     } else {
@@ -4364,6 +4365,18 @@ mod tests {
         assert_eq!(results[0], "OK (3 (97 10 98))");
         assert_eq!(results[1], "OK (3 (97 10 98))");
         assert_eq!(results[2], "OK (3 (97 10 98))");
+    }
+
+    #[test]
+    fn newline_rejects_too_many_args() {
+        let results = eval_all(
+            r#"(with-temp-buffer
+                 (condition-case err (newline 1 t nil) (error err)))
+               (with-temp-buffer
+                 (condition-case err (newline nil nil nil nil) (error err)))"#,
+        );
+        assert_eq!(results[0], "OK (wrong-number-of-arguments newline 3)");
+        assert_eq!(results[1], "OK (wrong-number-of-arguments newline 4)");
     }
 
     // -- newline-and-indent tests --
