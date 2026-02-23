@@ -4542,6 +4542,7 @@ pub(crate) fn builtin_defvaralias_eval(
             vec![Value::symbol(old_name)],
         ));
     }
+    let previous_target = resolve_variable_alias_name(eval, new_name)?;
     {
         let sym = eval.obarray_mut().get_or_intern(new_name);
         sym.special = true;
@@ -4550,7 +4551,12 @@ pub(crate) fn builtin_defvaralias_eval(
     }
     eval.obarray_mut().make_special(old_name);
     preflight_symbol_plist_put(eval, &Value::symbol(new_name), "variable-documentation")?;
-    eval.run_variable_watchers(new_name, &Value::symbol(old_name), &Value::Nil, "defvaralias")?;
+    eval.run_variable_watchers(
+        &previous_target,
+        &Value::symbol(old_name),
+        &Value::Nil,
+        "defvaralias",
+    )?;
     eval.watchers.clear_watchers(new_name);
     // GNU Emacs updates `variable-documentation` through plist machinery after
     // installing alias state, so malformed raw plists still raise
@@ -19616,6 +19622,11 @@ mod tests {
                 ]),
                 Expr::List(vec![
                     Expr::Symbol("setq".to_string()),
+                    Expr::Symbol("vm-watcher-last-symbol".to_string()),
+                    Expr::Symbol("symbol".to_string()),
+                ]),
+                Expr::List(vec![
+                    Expr::Symbol("setq".to_string()),
                     Expr::Symbol("vm-watcher-last-value".to_string()),
                     Expr::Symbol("newval".to_string()),
                 ]),
@@ -28859,10 +28870,13 @@ mod tests {
         )
         .expect("defvaralias should trigger watcher callback");
 
+        let symbol = builtin_symbol_value(&mut eval, vec![Value::symbol("vm-watcher-last-symbol")])
+            .expect("watcher should record watched symbol");
         let op = builtin_symbol_value(&mut eval, vec![Value::symbol("vm-watcher-last-op")])
             .expect("watcher should record defvaralias operation");
         let value = builtin_symbol_value(&mut eval, vec![Value::symbol("vm-watcher-last-value")])
             .expect("watcher should record aliased target");
+        assert_eq!(symbol, Value::symbol("vm-defvaralias-watch-new"));
         assert_eq!(op, Value::symbol("defvaralias"));
         assert_eq!(value, Value::symbol("vm-defvaralias-watch-old"));
 
@@ -28914,6 +28928,49 @@ mod tests {
             builtin_boundp(&mut eval, vec![Value::symbol("vm-watcher-last-op")])
                 .expect("boundp should report watcher state symbol");
         assert!(callback_state.is_nil());
+    }
+
+    #[test]
+    fn defvaralias_repoint_notifies_previous_alias_target_watchers() {
+        let mut eval = crate::elisp::eval::Evaluator::new();
+        install_variable_watcher_probe(&mut eval, "vm-defvaralias-repoint-watch");
+
+        builtin_defvaralias_eval(
+            &mut eval,
+            vec![
+                Value::symbol("vm-defvaralias-repoint-alias"),
+                Value::symbol("vm-defvaralias-repoint-old"),
+            ],
+        )
+        .expect("first defvaralias should install initial alias");
+
+        super::super::advice::builtin_add_variable_watcher(
+            &mut eval,
+            vec![
+                Value::symbol("vm-defvaralias-repoint-alias"),
+                Value::symbol("vm-defvaralias-repoint-watch"),
+            ],
+        )
+        .expect("add-variable-watcher should resolve alias to old target");
+
+        builtin_defvaralias_eval(
+            &mut eval,
+            vec![
+                Value::symbol("vm-defvaralias-repoint-alias"),
+                Value::symbol("vm-defvaralias-repoint-new"),
+            ],
+        )
+        .expect("second defvaralias should trigger previous-target watcher");
+
+        let symbol = builtin_symbol_value(&mut eval, vec![Value::symbol("vm-watcher-last-symbol")])
+            .expect("watcher should record previous alias target");
+        let op = builtin_symbol_value(&mut eval, vec![Value::symbol("vm-watcher-last-op")])
+            .expect("watcher should record operation");
+        let value = builtin_symbol_value(&mut eval, vec![Value::symbol("vm-watcher-last-value")])
+            .expect("watcher should record new alias target");
+        assert_eq!(symbol, Value::symbol("vm-defvaralias-repoint-old"));
+        assert_eq!(op, Value::symbol("defvaralias"));
+        assert_eq!(value, Value::symbol("vm-defvaralias-repoint-new"));
     }
 
     #[test]
