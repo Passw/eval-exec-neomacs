@@ -430,6 +430,13 @@ impl BufferManager {
         self.buffers.values().find(|b| b.name == name).map(|b| b.id)
     }
 
+    /// Find a killed buffer by its last known name.
+    pub fn find_dead_buffer_by_name(&self, name: &str) -> Option<BufferId> {
+        self.dead_buffer_last_names
+            .iter()
+            .find_map(|(id, last_name)| (last_name == name).then_some(*id))
+    }
+
     /// Remove a buffer.  Returns `true` if the buffer existed.
     ///
     /// If the killed buffer was current, `current` is set to `None`.

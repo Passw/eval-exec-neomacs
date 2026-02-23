@@ -744,6 +744,7 @@ cases/process-runtime-introspection-semantics
 cases/process-id-nonreal-kind-semantics
 cases/process-contact-kind-shape-semantics
 cases/process-nonreal-query-shape-semantics
+cases/process-buffer-stale-buffer-semantics
 cases/start-process-buffer-and-type-contract-semantics
 cases/start-process-buffer-create-semantics
 cases/accept-process-output-millis-semantics

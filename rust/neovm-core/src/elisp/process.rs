@@ -3617,11 +3617,13 @@ pub(crate) fn builtin_process_buffer(
     let id = resolve_process_or_wrong_type_any(eval, &args[0])?;
     match eval.processes.get_any(id) {
         Some(proc) => match &proc.buffer_name {
-            Some(name) => Ok(eval
-                .buffers
-                .find_buffer_by_name(name)
-                .map(Value::Buffer)
-                .unwrap_or(Value::Nil)),
+            Some(name) => Ok(
+                eval.buffers
+                    .find_buffer_by_name(name)
+                    .or_else(|| eval.buffers.find_dead_buffer_by_name(name))
+                    .map(Value::Buffer)
+                    .unwrap_or(Value::Nil),
+            ),
             None => Ok(Value::Nil),
         },
         None => Err(signal_wrong_type_processp(args[0].clone())),
