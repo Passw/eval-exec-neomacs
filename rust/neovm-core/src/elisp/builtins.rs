@@ -6497,6 +6497,14 @@ pub(crate) fn builtin_old_selected_frame(args: Vec<Value>) -> EvalResult {
     Ok(Value::Nil)
 }
 
+pub(crate) fn builtin_old_selected_frame_eval(
+    eval: &mut super::eval::Evaluator,
+    args: Vec<Value>,
+) -> EvalResult {
+    expect_args("old-selected-frame", &args, 0)?;
+    super::window_cmds::builtin_selected_frame(eval, Vec::new())
+}
+
 pub(crate) fn builtin_make_frame_invisible(args: Vec<Value>) -> EvalResult {
     expect_range_args("make-frame-invisible", &args, 0, 2)?;
     Ok(Value::Nil)
@@ -16618,6 +16626,7 @@ pub(crate) fn dispatch_builtin(
         "window-configuration-p" => return Some(builtin_window_configuration_p(args)),
         "window-configuration-frame" => return Some(builtin_window_configuration_frame(args)),
         "window-configuration-equal-p" => return Some(builtin_window_configuration_equal_p(args)),
+        "old-selected-frame" => return Some(builtin_old_selected_frame_eval(eval, args)),
         "selected-frame" => return Some(super::window_cmds::builtin_selected_frame(eval, args)),
         "select-frame" => return Some(super::window_cmds::builtin_select_frame(eval, args)),
         "select-frame-set-input-focus" => {
