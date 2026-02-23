@@ -6633,7 +6633,11 @@ pub(crate) fn builtin_native_elisp_load(args: Vec<Value>) -> EvalResult {
 
 pub(crate) fn builtin_new_fontset(args: Vec<Value>) -> EvalResult {
     expect_args("new-fontset", &args, 2)?;
-    Ok(Value::Nil)
+    let _ = expect_strict_string(&args[0])?;
+    Err(signal(
+        "error",
+        vec![Value::string("Fontset name must be in XLFD format")],
+    ))
 }
 
 pub(crate) fn builtin_open_font(args: Vec<Value>) -> EvalResult {
@@ -23451,8 +23455,17 @@ mod tests {
         let new_fontset =
             dispatch_builtin_pure("new-fontset", vec![Value::string("x"), Value::string("y")])
                 .expect("builtin new-fontset should resolve")
-                .expect("builtin new-fontset should evaluate");
-        assert!(new_fontset.is_nil());
+                .expect_err("new-fontset should reject non-XLFD names");
+        match new_fontset {
+            Flow::Signal(sig) => {
+                assert_eq!(sig.symbol, "error");
+                assert_eq!(
+                    sig.data,
+                    vec![Value::string("Fontset name must be in XLFD format")]
+                );
+            }
+            other => panic!("expected signal, got: {other:?}"),
+        }
     }
 
     #[test]
