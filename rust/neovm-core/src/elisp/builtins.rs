@@ -4546,6 +4546,9 @@ pub(crate) fn builtin_defvaralias_eval(
             .insert(VARIABLE_ALIAS_PROPERTY.to_string(), Value::symbol(old_name));
     }
     eval.obarray_mut().make_special(old_name);
+    preflight_symbol_plist_put(eval, &Value::symbol(new_name), "variable-documentation")?;
+    eval.run_variable_watchers(new_name, &Value::symbol(old_name), &Value::Nil, "defvaralias")?;
+    eval.watchers.clear_watchers(new_name);
     // GNU Emacs updates `variable-documentation` through plist machinery after
     // installing alias state, so malformed raw plists still raise
     // `(wrong-type-argument plistp ...)` with the alias edge retained.
@@ -28828,6 +28831,86 @@ mod tests {
                 .expect("watcher should record makunbound value");
         assert_eq!(unbind_op, Value::symbol("makunbound"));
         assert!(unbind_val.is_nil());
+    }
+
+    #[test]
+    fn defvaralias_triggers_variable_watchers_and_clears_alias_entry() {
+        let mut eval = crate::elisp::eval::Evaluator::new();
+        install_variable_watcher_probe(&mut eval, "vm-defvaralias-watch-probe");
+
+        super::super::advice::builtin_add_variable_watcher(
+            &mut eval,
+            vec![
+                Value::symbol("vm-defvaralias-watch-new"),
+                Value::symbol("vm-defvaralias-watch-probe"),
+            ],
+        )
+        .expect("add-variable-watcher should register callback");
+
+        builtin_defvaralias_eval(
+            &mut eval,
+            vec![
+                Value::symbol("vm-defvaralias-watch-new"),
+                Value::symbol("vm-defvaralias-watch-old"),
+            ],
+        )
+        .expect("defvaralias should trigger watcher callback");
+
+        let op = builtin_symbol_value(&mut eval, vec![Value::symbol("vm-watcher-last-op")])
+            .expect("watcher should record defvaralias operation");
+        let value = builtin_symbol_value(&mut eval, vec![Value::symbol("vm-watcher-last-value")])
+            .expect("watcher should record aliased target");
+        assert_eq!(op, Value::symbol("defvaralias"));
+        assert_eq!(value, Value::symbol("vm-defvaralias-watch-old"));
+
+        let remaining = super::super::advice::builtin_get_variable_watchers(
+            &mut eval,
+            vec![Value::symbol("vm-defvaralias-watch-new")],
+        )
+        .expect("get-variable-watchers should return alias watcher list");
+        assert!(remaining.is_nil());
+    }
+
+    #[test]
+    fn defvaralias_raw_plist_errors_skip_variable_watcher_callbacks() {
+        let mut eval = crate::elisp::eval::Evaluator::new();
+        install_variable_watcher_probe(&mut eval, "vm-defvaralias-watch-probe");
+
+        super::super::advice::builtin_add_variable_watcher(
+            &mut eval,
+            vec![
+                Value::symbol("vm-defvaralias-watch-bad"),
+                Value::symbol("vm-defvaralias-watch-probe"),
+            ],
+        )
+        .expect("add-variable-watcher should register callback");
+
+        builtin_setplist_eval(
+            &mut eval,
+            vec![Value::symbol("vm-defvaralias-watch-bad"), Value::Int(1)],
+        )
+        .expect("setplist should install malformed raw plist");
+
+        let err = builtin_defvaralias_eval(
+            &mut eval,
+            vec![
+                Value::symbol("vm-defvaralias-watch-bad"),
+                Value::symbol("vm-defvaralias-watch-target"),
+            ],
+        )
+        .expect_err("defvaralias should preserve plistp error");
+        match err {
+            Flow::Signal(sig) => {
+                assert_eq!(sig.symbol, "wrong-type-argument");
+                assert_eq!(sig.data, vec![Value::symbol("plistp"), Value::Int(1)]);
+            }
+            other => panic!("unexpected flow: {other:?}"),
+        }
+
+        let callback_state =
+            builtin_boundp(&mut eval, vec![Value::symbol("vm-watcher-last-op")])
+                .expect("boundp should report watcher state symbol");
+        assert!(callback_state.is_nil());
     }
 
     #[test]

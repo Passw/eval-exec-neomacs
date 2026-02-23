@@ -219,6 +219,11 @@ impl VariableWatcherList {
         }
     }
 
+    /// Remove all watcher callbacks for a variable.
+    pub fn clear_watchers(&mut self, var_name: &str) {
+        self.watchers.remove(var_name);
+    }
+
     /// Check if a variable has any watchers.
     pub fn has_watchers(&self, var_name: &str) -> bool {
         self.watchers
