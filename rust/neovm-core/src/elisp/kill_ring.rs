@@ -3216,6 +3216,7 @@ pub(crate) fn builtin_delete_indentation(
     eval: &mut super::eval::Evaluator,
     args: Vec<Value>,
 ) -> EvalResult {
+    expect_max_args("delete-indentation", &args, 3)?;
     let join_following = !args.is_empty() && args[0].is_truthy();
 
     let buf = eval
@@ -4628,6 +4629,24 @@ mod tests {
         );
         assert_eq!(results[0], "OK (nil 2 (97 32 98))");
         assert_eq!(results[1], "OK (nil 2 (97 32 98))");
+    }
+
+    #[test]
+    fn delete_indentation_rejects_too_many_args() {
+        let results = eval_all(
+            r#"(with-temp-buffer
+                 (condition-case err (delete-indentation nil nil nil nil) (error err)))
+               (with-temp-buffer
+                 (condition-case err (delete-indentation t nil nil nil) (error err)))"#,
+        );
+        assert_eq!(
+            results[0],
+            "OK (wrong-number-of-arguments delete-indentation 4)"
+        );
+        assert_eq!(
+            results[1],
+            "OK (wrong-number-of-arguments delete-indentation 4)"
+        );
     }
 
     // -- tab-to-tab-stop tests --

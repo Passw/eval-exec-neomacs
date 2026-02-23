@@ -384,6 +384,7 @@ cases/barf-bury-char-equal-cl-type-cancel-semantics
 cases/byte-position-string-clear-bitmap-semantics
 cases/delete-indentation-read-only-variable-semantics
 cases/delete-indentation-point-semantics
+cases/delete-indentation-arity-semantics
 cases/edit-read-only-variable-semantics
 cases/kill-word-read-only-variable-semantics
 cases/newline-read-only-variable-semantics
