@@ -6413,6 +6413,22 @@ pub(crate) fn builtin_previous_frame(args: Vec<Value>) -> EvalResult {
     Ok(Value::Nil)
 }
 
+pub(crate) fn builtin_previous_frame_eval(
+    eval: &mut super::eval::Evaluator,
+    args: Vec<Value>,
+) -> EvalResult {
+    expect_range_args("previous-frame", &args, 0, 2)?;
+    if let Some(frame) = args.first() {
+        if !frame.is_nil() && !matches!(frame, Value::Frame(_)) {
+            return Err(signal(
+                "wrong-type-argument",
+                vec![Value::symbol("frame-live-p"), frame.clone()],
+            ));
+        }
+    }
+    super::window_cmds::builtin_selected_frame(eval, Vec::new())
+}
+
 pub(crate) fn builtin_raise_frame(args: Vec<Value>) -> EvalResult {
     expect_range_args("raise-frame", &args, 0, 1)?;
     if let Some(frame) = args.first() {
@@ -16645,6 +16661,7 @@ pub(crate) fn dispatch_builtin(
         "old-selected-frame" => return Some(builtin_old_selected_frame_eval(eval, args)),
         "selected-frame" => return Some(super::window_cmds::builtin_selected_frame(eval, args)),
         "next-frame" => return Some(builtin_next_frame_eval(eval, args)),
+        "previous-frame" => return Some(builtin_previous_frame_eval(eval, args)),
         "select-frame" => return Some(super::window_cmds::builtin_select_frame(eval, args)),
         "select-frame-set-input-focus" => {
             return Some(super::window_cmds::builtin_select_frame_set_input_focus(
