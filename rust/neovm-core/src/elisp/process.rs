@@ -2746,6 +2746,12 @@ pub(crate) fn builtin_set_network_process_option(
             vec![Value::symbol("processp"), args[0].clone()],
         )
     })?;
+    if args[1].as_symbol_name().is_none() {
+        return Err(signal(
+            "wrong-type-argument",
+            vec![Value::symbol("symbolp"), args[1].clone()],
+        ));
+    }
     if proc.kind != ProcessKind::Network {
         return Err(signal(
             "error",
