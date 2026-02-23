@@ -6419,7 +6419,8 @@ pub(crate) fn builtin_vertical_motion(args: Vec<Value>) -> EvalResult {
 
 pub(crate) fn builtin_rename_buffer(args: Vec<Value>) -> EvalResult {
     expect_range_args("rename-buffer", &args, 1, 2)?;
-    Ok(Value::Nil)
+    let name = expect_strict_string(&args[0])?;
+    Ok(Value::string(name))
 }
 
 pub(crate) fn builtin_set_buffer_major_mode(args: Vec<Value>) -> EvalResult {
@@ -23013,7 +23014,7 @@ mod tests {
         let renamed = dispatch_builtin_pure("rename-buffer", vec![Value::string("x")])
             .expect("builtin rename-buffer should resolve")
             .expect("builtin rename-buffer should evaluate");
-        assert!(renamed.is_nil());
+        assert_eq!(renamed, Value::string("x"));
 
         let renamed_unique = dispatch_builtin_pure(
             "rename-buffer",
@@ -23021,7 +23022,7 @@ mod tests {
         )
         .expect("builtin rename-buffer should resolve with optional arg")
         .expect("builtin rename-buffer should evaluate with optional arg");
-        assert!(renamed_unique.is_nil());
+        assert_eq!(renamed_unique, Value::string("x"));
 
         let major_mode = dispatch_builtin_pure("set-buffer-major-mode", vec![Value::Nil])
             .expect("builtin set-buffer-major-mode should resolve")
