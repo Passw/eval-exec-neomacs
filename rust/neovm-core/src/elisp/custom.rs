@@ -309,18 +309,25 @@ pub(crate) fn builtin_local_variable_p(
     args: Vec<Value>,
 ) -> EvalResult {
     expect_min_args("local-variable-p", &args, 1)?;
-    let name = match &args[0] {
-        Value::Symbol(s) => s.clone(),
-        Value::Nil => "nil".to_string(),
-        Value::True => "t".to_string(),
-        _ => return Ok(Value::Nil),
-    };
+    expect_max_args("local-variable-p", &args, 2)?;
+    let name = args[0].as_symbol_name().ok_or_else(|| {
+        signal(
+            "wrong-type-argument",
+            vec![Value::symbol("symbolp"), args[0].clone()],
+        )
+    })?;
     let resolved = super::builtins::resolve_variable_alias_name(eval, &name)?;
 
     let buf = if args.len() > 1 {
         match &args[1] {
+            Value::Nil => eval.buffers.current_buffer(),
             Value::Buffer(id) => eval.buffers.get(*id),
-            _ => eval.buffers.current_buffer(),
+            other => {
+                return Err(signal(
+                    "wrong-type-argument",
+                    vec![Value::symbol("bufferp"), other.clone()],
+                ))
+            }
         }
     } else {
         eval.buffers.current_buffer()
@@ -1306,6 +1313,26 @@ mod tests {
                (local-variable-p 'nonexistent)"#,
         );
         assert_eq!(results[2], "OK nil");
+    }
+
+    #[test]
+    fn local_variable_p_enforces_buffer_and_symbol_contracts() {
+        let results = eval_all(
+            r#"(list
+                 (condition-case err (local-variable-p 'x) (error err))
+                 (condition-case err (local-variable-p 'x nil) (error err))
+                 (condition-case err (local-variable-p 'x (current-buffer)) (error err))
+                 (condition-case err (local-variable-p 'x 1) (error err))
+                 (condition-case err (local-variable-p 1 (current-buffer)) (error err))
+                 (condition-case err (local-variable-p :vm-k (current-buffer)) (error err))
+                 (condition-case err (local-variable-p nil (current-buffer)) (error err))
+                 (condition-case err (local-variable-p t (current-buffer)) (error err))
+                 (condition-case err (local-variable-p 'x (current-buffer) nil) (error err)))"#,
+        );
+        assert_eq!(
+            results[0],
+            "OK (nil nil nil (wrong-type-argument bufferp 1) (wrong-type-argument symbolp 1) nil nil nil (wrong-number-of-arguments local-variable-p 3))"
+        );
     }
 
     #[test]
