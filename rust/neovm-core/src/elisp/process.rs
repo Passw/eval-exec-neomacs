@@ -4042,6 +4042,15 @@ pub(crate) fn builtin_process_send_region(
     args: Vec<Value>,
 ) -> EvalResult {
     expect_args("process-send-region", &args, 3)?;
+
+    if let Value::Int(n) = args[0] {
+        if n >= 0 && is_stale_process_id_designator(eval, &args[0]) {
+            let _ = expect_int_or_marker(&args[1])?;
+            let _ = expect_int_or_marker(&args[2])?;
+            return Err(signal_process_not_running(eval, n as ProcessId));
+        }
+    }
+
     let id = resolve_optional_process_or_current_buffer(eval, Some(&args[0]))?;
     let start = expect_int_or_marker(&args[1])?;
     let end = expect_int_or_marker(&args[2])?;
