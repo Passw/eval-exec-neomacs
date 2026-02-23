@@ -415,7 +415,7 @@ pub(crate) fn builtin_kill_local_variable(
 ) -> EvalResult {
     expect_args("kill-local-variable", &args, 1)?;
     let name = match &args[0] {
-        Value::Symbol(s) => s.clone(),
+        Value::Symbol(s) | Value::Keyword(s) => s.clone(),
         Value::Nil => "nil".to_string(),
         Value::True => "t".to_string(),
         other => {
@@ -425,9 +425,28 @@ pub(crate) fn builtin_kill_local_variable(
             ))
         }
     };
-    if let Some(buf) = eval.buffers.current_buffer_mut() {
-        buf.properties.remove(&name);
+
+    let resolved = super::builtins::resolve_variable_alias_name(eval, &name)?;
+    if eval.buffers.current_buffer().is_some() {
+        let (buffer_id, removed) = {
+            let buf = eval
+                .buffers
+                .current_buffer_mut()
+                .expect("checked above for current buffer");
+            let removed = buf.properties.remove(&resolved).is_some();
+            (buf.id, removed)
+        };
+        if removed {
+            eval.run_variable_watchers_with_where(
+                &resolved,
+                &Value::Nil,
+                &Value::Nil,
+                "makunbound",
+                &Value::Buffer(buffer_id),
+            )?;
+        }
     }
+
     Ok(args[0].clone())
 }
 
@@ -1283,6 +1302,60 @@ mod tests {
         );
         assert_eq!(results[4], "OK t");
         assert_eq!(results[6], "OK nil");
+    }
+
+    #[test]
+    fn kill_local_variable_resolves_alias_bindings() {
+        let results = eval_all(
+            r#"(defvaralias 'vm-klv-alias 'vm-klv-base)
+               (with-temp-buffer
+                 (setq-local vm-klv-alias 3)
+                 (kill-local-variable 'vm-klv-alias)
+                 (list (local-variable-p 'vm-klv-alias)
+                       (local-variable-p 'vm-klv-base)
+                       (condition-case err
+                           (symbol-value 'vm-klv-alias)
+                         (error (car err)))))"#,
+        );
+        assert_eq!(results[1], "OK (nil nil void-variable)");
+    }
+
+    #[test]
+    fn kill_local_variable_accepts_keywords_like_oracle() {
+        let result = eval_all(
+            r#"(list
+                 (condition-case err (with-temp-buffer (kill-local-variable nil)) (error err))
+                 (condition-case err (with-temp-buffer (kill-local-variable t)) (error err))
+                 (condition-case err (with-temp-buffer (kill-local-variable :vm-k)) (error err))
+                 (condition-case err (with-temp-buffer (kill-local-variable 1)) (error err)))"#,
+        );
+        assert_eq!(
+            result[0],
+            "OK (nil t :vm-k (wrong-type-argument symbolp 1))"
+        );
+    }
+
+    #[test]
+    fn kill_local_variable_triggers_makunbound_watcher_with_buffer_where() {
+        let result = eval_all(
+            r#"(progn
+                 (setq vm-klv-a-events nil)
+                 (fset 'vm-klv-a-rec
+                       (lambda (symbol newval operation where)
+                         (setq vm-klv-a-events
+                               (cons (list symbol newval operation (bufferp where) (buffer-live-p where))
+                                     vm-klv-a-events))))
+                 (defvaralias 'vm-klv-a-alias 'vm-klv-a-base)
+                 (add-variable-watcher 'vm-klv-a-base 'vm-klv-a-rec)
+                 (with-temp-buffer
+                   (setq-local vm-klv-a-alias 7)
+                   (kill-local-variable 'vm-klv-a-alias))
+                 vm-klv-a-events)"#,
+        );
+        assert_eq!(
+            result[0],
+            "OK ((vm-klv-a-base nil makunbound t t) (vm-klv-a-base 7 set t t))"
+        );
     }
 
     // -- custom-set-variables builtin --------------------------------------

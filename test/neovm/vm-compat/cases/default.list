@@ -409,6 +409,7 @@ cases/setq-constant-semantics
 cases/setq-default-alias-constant-watcher-semantics
 cases/set-default-alias-constant-watcher-semantics
 cases/keyword-constant-value-semantics
+cases/kill-local-variable-alias-watcher-semantics
 cases/undo-basics
 cases/undo-buffer-arg
 cases/undo-arity-semantics
