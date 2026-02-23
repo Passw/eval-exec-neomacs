@@ -854,6 +854,34 @@ fn signal_process_not_active(eval: &super::eval::Evaluator, id: ProcessId) -> Fl
     )
 }
 
+fn stale_process_not_running_reason(status: &ProcessStatus) -> &'static str {
+    match status {
+        ProcessStatus::Signal(_) => "killed",
+        ProcessStatus::Exit(_) => "finished",
+        ProcessStatus::Stop => "stopped",
+        ProcessStatus::Run => "inactive",
+    }
+}
+
+fn signal_process_not_running(eval: &super::eval::Evaluator, id: ProcessId) -> Flow {
+    let (name, reason) = eval
+        .processes
+        .get_any(id)
+        .map(|proc| {
+            (
+                proc.name.clone(),
+                stale_process_not_running_reason(&proc.status),
+            )
+        })
+        .unwrap_or_else(|| (id.to_string(), "inactive"));
+    signal(
+        "error",
+        vec![Value::string(format!(
+            "Process {name} not running: {reason}\n"
+        ))],
+    )
+}
+
 fn resolve_process_or_wrong_type(
     eval: &super::eval::Evaluator,
     value: &Value,
@@ -3550,8 +3578,13 @@ pub(crate) fn builtin_process_send_string(
     args: Vec<Value>,
 ) -> EvalResult {
     expect_args("process-send-string", &args, 2)?;
+    let input = expect_string_strict(&args[1])?;
+    if let Value::Int(n) = args[0] {
+        if n >= 0 && is_stale_process_id_designator(eval, &args[0]) {
+            return Err(signal_process_not_running(eval, n as ProcessId));
+        }
+    }
     let id = resolve_process_or_missing_error(eval, &args[0])?;
-    let input = expect_string(&args[1])?;
     if !eval.processes.send_input(id, &input) {
         return Err(signal("error", vec![Value::string("Process not found")]));
     }
