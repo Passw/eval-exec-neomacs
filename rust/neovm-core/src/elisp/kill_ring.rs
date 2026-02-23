@@ -2812,7 +2812,7 @@ pub(crate) fn builtin_indent_line_to(
     buf.goto_char(line_start);
     buf.insert(&new_indent);
 
-    Ok(Value::Nil)
+    Ok(Value::Int(column as i64))
 }
 
 /// `(indent-to COLUMN &optional MINIMUM)` — indent from point to COLUMN.
@@ -4190,6 +4190,24 @@ mod tests {
                (buffer-string)"#,
         );
         assert_eq!(results[2], r#"OK "    hello""#);
+    }
+
+    #[test]
+    fn indent_line_to_returns_column() {
+        let results = eval_all(
+            r#"(with-temp-buffer
+                 (insert "  hi")
+                 (goto-char (point-min))
+                 (list (indent-line-to 4)
+                       (current-indentation)
+                       (buffer-string)))
+               (with-temp-buffer
+                 (insert "    hi")
+                 (goto-char (point-min))
+                 (indent-line-to 4))"#,
+        );
+        assert_eq!(results[0], r#"OK (4 4 "    hi")"#);
+        assert_eq!(results[1], "OK nil");
     }
 
     // -- indent-to tests --
