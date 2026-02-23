@@ -748,6 +748,7 @@ cases/process-buffer-stale-buffer-semantics
 cases/process-live-status-nonreal-semantics
 cases/process-send-string-stale-semantics
 cases/process-send-region-stale-semantics
+cases/process-send-eof-running-child-stale-semantics
 cases/start-process-buffer-and-type-contract-semantics
 cases/start-process-buffer-create-semantics
 cases/accept-process-output-millis-semantics

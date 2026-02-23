@@ -4086,6 +4086,11 @@ pub(crate) fn builtin_process_send_eof(
     }
     if let Some(process) = args.first() {
         if !process.is_nil() {
+            if let Value::Int(n) = process {
+                if *n >= 0 && is_stale_process_id_designator(eval, process) {
+                    return Err(signal_process_not_running(eval, *n as ProcessId));
+                }
+            }
             let _id = resolve_process_or_missing_error(eval, process)?;
             return Ok(process.clone());
         }
@@ -4107,6 +4112,13 @@ pub(crate) fn builtin_process_running_child_p(
                 Value::Int(args.len() as i64),
             ],
         ));
+    }
+    if let Some(process) = args.first() {
+        if let Value::Int(n) = process {
+            if *n >= 0 && is_stale_process_id_designator(eval, process) {
+                return Err(signal_process_not_active(eval, *n as ProcessId));
+            }
+        }
     }
     let _id = resolve_optional_process_or_current_buffer(eval, args.first())?;
     Ok(Value::Nil)
