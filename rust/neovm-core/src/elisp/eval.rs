@@ -2262,12 +2262,24 @@ impl Evaluator {
         let mut last = Value::Nil;
         let mut i = 0;
         while i < tail.len() {
-            let Expr::Symbol(name) = &tail[i] else {
-                return Err(signal("wrong-type-argument", vec![]));
+            let name = match &tail[i] {
+                Expr::Symbol(name) | Expr::Keyword(name) => name,
+                _ => {
+                    return Err(signal(
+                        "error",
+                        vec![Value::string(format!(
+                            "Attempting to set a non-symbol: {}",
+                            super::expr::print_expr(&tail[i])
+                        ))],
+                    ))
+                }
             };
 
-            if name == "nil" || name == "t" {
-                return Err(signal("setting-constant", vec![Value::symbol(name)]));
+            if self.obarray.is_constant(name) {
+                return Err(signal(
+                    "setting-constant",
+                    vec![Value::symbol(name.clone())],
+                ));
             }
 
             let value = self.eval(&tail[i + 1])?;
@@ -3948,6 +3960,31 @@ mod tests {
     fn setq_local_makes_binding_buffer_local() {
         let result = eval_one("(with-temp-buffer (setq-local vm-x 7) vm-x)");
         assert_eq!(result, "OK 7");
+    }
+
+    #[test]
+    fn setq_local_constant_and_type_payloads_match_oracle() {
+        let results = eval_all(
+            "(list
+                (condition-case err (setq-local :foo 1) (error err))
+                (condition-case err (setq-local nil 1) (error err))
+                (condition-case err (setq-local t 1) (error err))
+                (condition-case err (setq-local 1 2) (error err)))
+             (let ((x 0))
+               (condition-case err
+                   (setq-local nil (setq x 1))
+                 (error (list err x))))
+             (let ((x 0))
+               (condition-case err
+                   (setq-local :foo (setq x 2))
+                 (error (list err x))))",
+        );
+        assert_eq!(
+            results[0],
+            "OK ((setting-constant :foo) (setting-constant nil) (setting-constant t) (error \"Attempting to set a non-symbol: 1\"))"
+        );
+        assert_eq!(results[1], "OK ((setting-constant nil) 0)");
+        assert_eq!(results[2], "OK ((setting-constant :foo) 0)");
     }
 
     #[test]
