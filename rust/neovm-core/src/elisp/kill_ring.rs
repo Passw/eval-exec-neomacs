@@ -2914,6 +2914,9 @@ pub(crate) fn builtin_newline_and_indent(
     eval: &mut super::eval::Evaluator,
     args: Vec<Value>,
 ) -> EvalResult {
+    // Emacs normalizes surrounding horizontal whitespace at point first.
+    builtin_delete_horizontal_space(eval, vec![])?;
+
     // Insert newline(s).
     builtin_newline(eval, args)?;
 
@@ -4303,6 +4306,26 @@ mod tests {
         );
         // Should add newline + 4 spaces of indentation (copying prev line).
         assert_eq!(results[2], r#"OK "    hello\n    ""#);
+    }
+
+    #[test]
+    fn newline_and_indent_normalizes_surrounding_whitespace() {
+        let results = eval_all(
+            r#"(with-temp-buffer
+                 (insert "  x")
+                 (goto-char 3)
+                 (list (condition-case err (newline-and-indent) (error err))
+                       (point)
+                       (buffer-string)))
+               (with-temp-buffer
+                 (insert "a b")
+                 (goto-char 3)
+                 (list (condition-case err (newline-and-indent) (error err))
+                       (point)
+                       (buffer-string)))"#,
+        );
+        assert_eq!(results[0], r#"OK (nil 2 "\nx")"#);
+        assert_eq!(results[1], r#"OK (nil 3 "a\nb")"#);
     }
 
     // -- open-line tests --
