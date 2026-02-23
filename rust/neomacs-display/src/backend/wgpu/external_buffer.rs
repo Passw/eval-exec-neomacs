@@ -319,6 +319,7 @@ impl DmaBufBuffer {
 
         // Build import params with all planes — the Vulkan driver query
         // determines the correct plane count for the modifier.
+        #[cfg(feature = "video")]
         {
             use super::vulkan_dmabuf::{import_dmabuf, DmaBufImportParams};
             let params = DmaBufImportParams {

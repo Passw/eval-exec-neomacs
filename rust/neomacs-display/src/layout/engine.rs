@@ -1268,10 +1268,266 @@ impl LayoutEngine {
                     &mut next_visible,
                 );
 
+                if log::log_enabled!(log::Level::Debug) && (charpos < 20 || (charpos % 500 == 0)) {
+                    let ch_preview = if byte_idx < text.len() {
+                        let (ch, _) = decode_utf8(&text[byte_idx..]);
+                        ch
+                    } else { '?' };
+                    log::debug!("  invis_check: charpos={} invis={} next_visible={} ch={:?} byte_idx={} row={}",
+                        charpos, invis, next_visible, ch_preview, byte_idx, row);
+                }
+
                 if invis > 0 {
                     // Flush ligature run before invisible text skip
                     flush_run(&self.run_buf, frame_glyphs, ligatures);
                     self.run_buf.clear();
+
+                    // Even though the buffer text is invisible, overlays
+                    // at this position may have before-string/after-string
+                    // content that should be rendered (e.g., Doom dashboard).
+                    // Walk through the invisible region checking for overlay
+                    // strings at each property boundary.
+                    {
+                        let mut ipos = charpos;
+                        while ipos < next_visible && row < max_rows {
+                            let mut ib_len: i32 = 0;
+                            let mut ia_len: i32 = 0;
+                            let mut ib_face = FaceDataFFI::default();
+                            let mut ia_face = FaceDataFFI::default();
+                            let mut ib_nruns: i32 = 0;
+                            let mut ia_nruns: i32 = 0;
+                            let mut i_lf_bmp: i32 = 0;
+                            let mut i_lf_fg: u32 = 0;
+                            let mut i_lf_bg: u32 = 0;
+                            let mut i_rf_bmp: i32 = 0;
+                            let mut i_rf_fg: u32 = 0;
+                            let mut i_rf_bg: u32 = 0;
+                            let mut ib_naligns: i32 = 0;
+                            let mut ia_naligns: i32 = 0;
+                            neomacs_layout_overlay_strings_at(
+                                buffer, window, ipos,
+                                overlay_before_buf.as_mut_ptr(),
+                                overlay_before_buf.len() as i32,
+                                &mut ib_len,
+                                overlay_after_buf.as_mut_ptr(),
+                                overlay_after_buf.len() as i32,
+                                &mut ia_len,
+                                &mut ib_face, &mut ia_face,
+                                &mut ib_nruns, &mut ia_nruns,
+                                &mut i_lf_bmp, &mut i_lf_fg, &mut i_lf_bg,
+                                &mut i_rf_bmp, &mut i_rf_fg, &mut i_rf_bg,
+                                &mut ib_naligns, &mut ia_naligns,
+                            );
+
+                            // Store fringe bitmaps from overlay display properties
+                            let r = row as usize;
+                            if i_lf_bmp > 0 && r < row_left_fringe.len() {
+                                row_left_fringe[r] = (i_lf_bmp, i_lf_fg, i_lf_bg);
+                            }
+                            if i_rf_bmp > 0 && r < row_right_fringe.len() {
+                                row_right_fringe[r] = (i_rf_bmp, i_rf_fg, i_rf_bg);
+                            }
+
+                            // Render overlay before-string
+                            if ib_len > 0 {
+                                let ib_has_runs = ib_nruns > 0;
+                                let ib_face_runs = if ib_has_runs {
+                                    parse_overlay_face_runs(&overlay_before_buf, ib_len as usize, ib_nruns)
+                                } else {
+                                    Vec::new()
+                                };
+                                let ib_align_entries = if ib_naligns > 0 {
+                                    parse_overlay_align_entries(&overlay_before_buf, ib_len as usize, ib_nruns, ib_naligns)
+                                } else {
+                                    Vec::new()
+                                };
+                                let mut ib_current_align = 0usize;
+
+                                if !ib_has_runs {
+                                    if ib_face.face_id != 0 {
+                                        self.apply_face(&ib_face, frame, frame_glyphs);
+                                    }
+                                }
+
+                                let bstr = &overlay_before_buf[..ib_len as usize];
+                                let mut bi = 0usize;
+                                let mut ib_current_run = 0usize;
+                                while bi < bstr.len() && row < max_rows {
+                                    if ib_current_align < ib_align_entries.len()
+                                        && bi == ib_align_entries[ib_current_align].byte_offset as usize
+                                    {
+                                        let target_x = ib_align_entries[ib_current_align].align_to_cols * char_w;
+                                        if target_x > x_offset {
+                                            let gx = content_x + x_offset;
+                                            let gy = row_y[row as usize];
+                                            let stretch_w = target_x - x_offset;
+                                            let stretch_bg = overlay_run_bg_at(&ib_face_runs, bi, default_bg);
+                                            frame_glyphs.add_stretch(gx, gy, stretch_w, char_h, stretch_bg, 0, false);
+                                            col = ib_align_entries[ib_current_align].align_to_cols.ceil() as i32;
+                                            x_offset = target_x;
+                                        }
+                                        ib_current_align += 1;
+                                        let (_bch, blen) = decode_utf8(&bstr[bi..]);
+                                        bi += blen;
+                                        continue;
+                                    }
+
+                                    if ib_has_runs && ib_current_run < ib_face_runs.len() {
+                                        if let Some((ext_bg, true)) = overlay_run_bg_extend_at(&ib_face_runs, bi) {
+                                            row_extend_bg = Some((ext_bg, 0));
+                                            row_extend_row = row as i32;
+                                        }
+                                        ib_current_run = apply_overlay_face_run(
+                                            &ib_face_runs, bi, ib_current_run, frame_glyphs,
+                                        );
+                                    }
+
+                                    let (bch, blen) = decode_utf8(&bstr[bi..]);
+                                    bi += blen;
+                                    if bch == '\n' {
+                                        let remaining = avail_width - x_offset;
+                                        if remaining > 0.0 {
+                                            if let Some((ext_bg, _)) = row_extend_bg.filter(|_| row_extend_row == row as i32) {
+                                                let gx = content_x + x_offset;
+                                                let gy = row_y[row as usize];
+                                                frame_glyphs.add_stretch(gx, gy, remaining, char_h, ext_bg, 0, false);
+                                            }
+                                        }
+                                        reorder_row_bidi(frame_glyphs, row_glyph_start, frame_glyphs.glyphs.len(), content_x);
+                                        col = 0;
+                                        x_offset = 0.0;
+                                        row += 1;
+                                        row_glyph_start = frame_glyphs.glyphs.len();
+                                        if row >= max_rows { break; }
+                                        continue;
+                                    }
+                                    if bch != '\0' {
+                                        let gx = content_x + x_offset;
+                                        let gy = row_y[row as usize];
+                                        frame_glyphs.add_char(bch, gx, gy, char_w, char_h, ascent, false);
+                                        col += 1;
+                                        x_offset += char_w;
+                                        if x_offset >= avail_width {
+                                            reorder_row_bidi(frame_glyphs, row_glyph_start, frame_glyphs.glyphs.len(), content_x);
+                                            col = 0;
+                                            x_offset = 0.0;
+                                            row += 1;
+                                            row_glyph_start = frame_glyphs.glyphs.len();
+                                        }
+                                    }
+                                }
+                            }
+
+                            // Render overlay after-string
+                            if ia_len > 0 {
+                                let ia_has_runs = ia_nruns > 0;
+                                let ia_face_runs = if ia_has_runs {
+                                    parse_overlay_face_runs(&overlay_after_buf, ia_len as usize, ia_nruns)
+                                } else {
+                                    Vec::new()
+                                };
+                                let ia_align_entries = if ia_naligns > 0 {
+                                    parse_overlay_align_entries(&overlay_after_buf, ia_len as usize, ia_nruns, ia_naligns)
+                                } else {
+                                    Vec::new()
+                                };
+                                let mut ia_current_align = 0usize;
+
+                                if !ia_has_runs {
+                                    if ia_face.face_id != 0 {
+                                        self.apply_face(&ia_face, frame, frame_glyphs);
+                                    }
+                                }
+
+                                let astr = &overlay_after_buf[..ia_len as usize];
+                                let mut ai = 0usize;
+                                let mut ia_current_run = 0usize;
+                                while ai < astr.len() && row < max_rows {
+                                    if ia_current_align < ia_align_entries.len()
+                                        && ai == ia_align_entries[ia_current_align].byte_offset as usize
+                                    {
+                                        let target_x = ia_align_entries[ia_current_align].align_to_cols * char_w;
+                                        if target_x > x_offset {
+                                            let gx = content_x + x_offset;
+                                            let gy = row_y[row as usize];
+                                            let stretch_w = target_x - x_offset;
+                                            let stretch_bg = overlay_run_bg_at(&ia_face_runs, ai, default_bg);
+                                            frame_glyphs.add_stretch(gx, gy, stretch_w, char_h, stretch_bg, 0, false);
+                                            col = ia_align_entries[ia_current_align].align_to_cols.ceil() as i32;
+                                            x_offset = target_x;
+                                        }
+                                        ia_current_align += 1;
+                                        let (_ach, alen) = decode_utf8(&astr[ai..]);
+                                        ai += alen;
+                                        continue;
+                                    }
+
+                                    if ia_has_runs && ia_current_run < ia_face_runs.len() {
+                                        if let Some((ext_bg, true)) = overlay_run_bg_extend_at(&ia_face_runs, ai) {
+                                            row_extend_bg = Some((ext_bg, 0));
+                                            row_extend_row = row as i32;
+                                        }
+                                        ia_current_run = apply_overlay_face_run(
+                                            &ia_face_runs, ai, ia_current_run, frame_glyphs,
+                                        );
+                                    }
+
+                                    let (ach, alen) = decode_utf8(&astr[ai..]);
+                                    ai += alen;
+                                    if ach == '\n' {
+                                        let remaining = avail_width - x_offset;
+                                        if remaining > 0.0 {
+                                            if let Some((ext_bg, _)) = row_extend_bg.filter(|_| row_extend_row == row as i32) {
+                                                let gx = content_x + x_offset;
+                                                let gy = row_y[row as usize];
+                                                frame_glyphs.add_stretch(gx, gy, remaining, char_h, ext_bg, 0, false);
+                                            }
+                                        }
+                                        reorder_row_bidi(frame_glyphs, row_glyph_start, frame_glyphs.glyphs.len(), content_x);
+                                        col = 0;
+                                        x_offset = 0.0;
+                                        row += 1;
+                                        row_glyph_start = frame_glyphs.glyphs.len();
+                                        if row >= max_rows { break; }
+                                        continue;
+                                    }
+                                    if ach != '\0' {
+                                        let gx = content_x + x_offset;
+                                        let gy = row_y[row as usize];
+                                        frame_glyphs.add_char(ach, gx, gy, char_w, char_h, ascent, false);
+                                        col += 1;
+                                        x_offset += char_w;
+                                        if x_offset >= avail_width {
+                                            reorder_row_bidi(frame_glyphs, row_glyph_start, frame_glyphs.glyphs.len(), content_x);
+                                            col = 0;
+                                            x_offset = 0.0;
+                                            row += 1;
+                                            row_glyph_start = frame_glyphs.glyphs.len();
+                                        }
+                                    }
+                                }
+                            }
+
+                            // Advance to the next overlay boundary within the invisible range.
+                            // Use Fnext_single_char_property_change on 'invisible' to find
+                            // the next property boundary where a new overlay might start.
+                            // If there are no more boundaries, jump to next_visible.
+                            let next_boundary = {
+                                let mut nb: i64 = 0;
+                                // Re-check invisible at ipos+1 to find where property changes
+                                neomacs_layout_check_invisible(
+                                    buffer, window, ipos + 1, &mut nb,
+                                );
+                                nb
+                            };
+                            if next_boundary > ipos && next_boundary < next_visible {
+                                ipos = next_boundary;
+                            } else {
+                                break;
+                            }
+                        }
+                    }
+
                     // Skip invisible characters: advance byte_idx
                     // and charpos to next_visible
                     let chars_to_skip = next_visible - charpos;
@@ -1527,6 +1783,8 @@ impl LayoutEngine {
                 );
 
                 if display_prop.prop_type != 0 {
+                    log::debug!("  display_prop: charpos={} type={} covers_to={} str_len={} img_gpu_id={}",
+                        charpos, display_prop.prop_type, display_prop.covers_to, display_prop.str_len, display_prop.image_gpu_id);
                     // Flush ligature run before display property handling
                     flush_run(&self.run_buf, frame_glyphs, ligatures);
                     self.run_buf.clear();
@@ -3112,6 +3370,9 @@ impl LayoutEngine {
         flush_run(&self.run_buf, frame_glyphs, ligatures);
         self.run_buf.clear();
 
+        log::debug!("  layout_window done: charpos={} byte_idx={} row={} glyphs={} end_charpos={}",
+            charpos, byte_idx, row, frame_glyphs.glyphs.len(), window_end_charpos);
+
         // Place cursor before end-of-buffer overlay strings.
         // When point is at end-of-buffer and overlays have after-strings there
         // (e.g., fido-vertical-mode completions), the cursor must be placed
@@ -4239,4 +4500,3 @@ mod tests {
         assert!(!run_is_pure_ligature(&run3));
     }
 }
-
