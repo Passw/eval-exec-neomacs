@@ -1083,3 +1083,4 @@ cases/new-fontset-semantics
 cases/open-font-semantics
 cases/marker-last-position-semantics
 cases/match-data-translate-semantics
+cases/map-keymap-semantics

@@ -6491,11 +6491,23 @@ pub(crate) fn builtin_map_charset_chars(args: Vec<Value>) -> EvalResult {
 
 pub(crate) fn builtin_map_keymap(args: Vec<Value>) -> EvalResult {
     expect_range_args("map-keymap", &args, 2, 3)?;
+    if !is_lisp_keymap_object(&args[1]) {
+        return Err(signal(
+            "wrong-type-argument",
+            vec![Value::symbol("keymapp"), args[1].clone()],
+        ));
+    }
     Ok(Value::Nil)
 }
 
 pub(crate) fn builtin_map_keymap_internal(args: Vec<Value>) -> EvalResult {
     expect_args("map-keymap-internal", &args, 2)?;
+    if !is_lisp_keymap_object(&args[1]) {
+        return Err(signal(
+            "wrong-type-argument",
+            vec![Value::symbol("keymapp"), args[1].clone()],
+        ));
+    }
     Ok(Value::Nil)
 }
 
@@ -23369,13 +23381,18 @@ mod tests {
         .expect("builtin map-charset-chars should evaluate");
         assert!(map_charset_chars.is_nil());
 
-        let map_keymap = dispatch_builtin_pure("map-keymap", vec![Value::Nil, Value::Nil])
+        let map_keymap = dispatch_builtin_pure(
+            "map-keymap",
+            vec![Value::Nil, Value::list(vec![Value::symbol("keymap")])],
+        )
             .expect("builtin map-keymap should resolve")
             .expect("builtin map-keymap should evaluate");
         assert!(map_keymap.is_nil());
 
-        let map_keymap_internal =
-            dispatch_builtin_pure("map-keymap-internal", vec![Value::Nil, Value::Nil])
+        let map_keymap_internal = dispatch_builtin_pure(
+            "map-keymap-internal",
+            vec![Value::Nil, Value::list(vec![Value::symbol("keymap")])],
+        )
                 .expect("builtin map-keymap-internal should resolve")
                 .expect("builtin map-keymap-internal should evaluate");
         assert!(map_keymap_internal.is_nil());
