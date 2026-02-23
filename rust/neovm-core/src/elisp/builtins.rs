@@ -6818,6 +6818,14 @@ pub(crate) fn builtin_set_fontset_font(args: Vec<Value>) -> EvalResult {
 
 pub(crate) fn builtin_set_frame_window_state_change(args: Vec<Value>) -> EvalResult {
     expect_range_args("set-frame-window-state-change", &args, 0, 2)?;
+    if let Some(frame) = args.first() {
+        if !frame.is_nil() && !matches!(frame, Value::Frame(_)) {
+            return Err(signal(
+                "wrong-type-argument",
+                vec![Value::symbol("frame-live-p"), frame.clone()],
+            ));
+        }
+    }
     Ok(Value::Nil)
 }
 
@@ -6828,7 +6836,17 @@ pub(crate) fn builtin_set_fringe_bitmap_face(args: Vec<Value>) -> EvalResult {
 
 pub(crate) fn builtin_set_minibuffer_window(args: Vec<Value>) -> EvalResult {
     expect_args("set-minibuffer-window", &args, 1)?;
-    Ok(Value::Nil)
+    match args[0] {
+        Value::Window(id) if id >= crate::window::MINIBUFFER_WINDOW_ID_BASE => Ok(Value::Nil),
+        Value::Window(_) => Err(signal(
+            "error",
+            vec![Value::string("Window is not a minibuffer window")],
+        )),
+        _ => Err(signal(
+            "wrong-type-argument",
+            vec![Value::symbol("windowp"), args[0].clone()],
+        )),
+    }
 }
 
 pub(crate) fn builtin_set_mouse_pixel_position(args: Vec<Value>) -> EvalResult {
@@ -6859,7 +6877,18 @@ pub(crate) fn builtin_set_mouse_position(args: Vec<Value>) -> EvalResult {
 
 pub(crate) fn builtin_set_window_combination_limit(args: Vec<Value>) -> EvalResult {
     expect_args("set-window-combination-limit", &args, 2)?;
-    Ok(Value::Nil)
+    if !matches!(args[0], Value::Window(_)) {
+        return Err(signal(
+            "wrong-type-argument",
+            vec![Value::symbol("window-valid-p"), args[0].clone()],
+        ));
+    }
+    Err(signal(
+        "error",
+        vec![Value::string(
+            "Combination limit is meaningful for internal windows only",
+        )],
+    ))
 }
 
 pub(crate) fn builtin_set_window_new_normal(args: Vec<Value>) -> EvalResult {
@@ -23545,7 +23574,10 @@ mod tests {
             .expect("builtin set-fringe-bitmap-face should evaluate");
         assert!(set_fringe.is_nil());
 
-        let set_mini = dispatch_builtin_pure("set-minibuffer-window", vec![Value::Nil])
+        let minibuffer_window_id =
+            crate::window::MINIBUFFER_WINDOW_ID_BASE + crate::window::FRAME_ID_BASE;
+        let set_mini =
+            dispatch_builtin_pure("set-minibuffer-window", vec![Value::Window(minibuffer_window_id)])
             .expect("builtin set-minibuffer-window should resolve")
             .expect("builtin set-minibuffer-window should evaluate");
         assert!(set_mini.is_nil());
@@ -23567,10 +23599,21 @@ mod tests {
         assert!(set_mouse.is_nil());
 
         let set_combination =
-            dispatch_builtin_pure("set-window-combination-limit", vec![Value::Nil, Value::Nil])
+            dispatch_builtin_pure("set-window-combination-limit", vec![Value::Window(1), Value::Nil])
                 .expect("builtin set-window-combination-limit should resolve")
-                .expect("builtin set-window-combination-limit should evaluate");
-        assert!(set_combination.is_nil());
+                .expect_err("set-window-combination-limit should reject leaf windows");
+        match set_combination {
+            Flow::Signal(sig) => {
+                assert_eq!(sig.symbol, "error");
+                assert_eq!(
+                    sig.data,
+                    vec![Value::string(
+                        "Combination limit is meaningful for internal windows only",
+                    )]
+                );
+            }
+            other => panic!("expected signal, got: {other:?}"),
+        }
 
         let set_new_normal = dispatch_builtin_pure("set-window-new-normal", vec![Value::Nil])
             .expect("builtin set-window-new-normal should resolve")
