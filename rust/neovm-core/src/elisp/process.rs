@@ -3625,11 +3625,20 @@ pub(crate) fn builtin_process_exit_status(
 ) -> EvalResult {
     expect_args("process-exit-status", &args, 1)?;
     let id = resolve_process_or_wrong_type_any(eval, &args[0])?;
-    match eval.processes.process_status_any(id) {
-        Some(ProcessStatus::Exit(code)) => Ok(Value::Int(*code as i64)),
-        Some(ProcessStatus::Signal(sig)) => Ok(Value::Int(*sig as i64)),
-        Some(_) => Ok(Value::Int(0)),
-        None => Err(signal_wrong_type_processp(args[0].clone())),
+    let proc = eval
+        .processes
+        .get_any(id)
+        .ok_or_else(|| signal_wrong_type_processp(args[0].clone()))?;
+    match proc.status {
+        ProcessStatus::Exit(code) => Ok(Value::Int(code as i64)),
+        ProcessStatus::Signal(sig) => {
+            if proc.kind == ProcessKind::Real {
+                Ok(Value::Int(sig as i64))
+            } else {
+                Ok(Value::Int(0))
+            }
+        }
+        _ => Ok(Value::Int(0)),
     }
 }
 
