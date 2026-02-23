@@ -6833,11 +6833,27 @@ pub(crate) fn builtin_set_minibuffer_window(args: Vec<Value>) -> EvalResult {
 
 pub(crate) fn builtin_set_mouse_pixel_position(args: Vec<Value>) -> EvalResult {
     expect_args("set-mouse-pixel-position", &args, 3)?;
+    if !matches!(args[0], Value::Frame(_)) {
+        return Err(signal(
+            "wrong-type-argument",
+            vec![Value::symbol("frame-live-p"), args[0].clone()],
+        ));
+    }
+    let _ = expect_int(&args[1])?;
+    let _ = expect_int(&args[2])?;
     Ok(Value::Nil)
 }
 
 pub(crate) fn builtin_set_mouse_position(args: Vec<Value>) -> EvalResult {
     expect_args("set-mouse-position", &args, 3)?;
+    if !matches!(args[0], Value::Frame(_)) {
+        return Err(signal(
+            "wrong-type-argument",
+            vec![Value::symbol("frame-live-p"), args[0].clone()],
+        ));
+    }
+    let _ = expect_int(&args[1])?;
+    let _ = expect_int(&args[2])?;
     Ok(Value::Nil)
 }
 
@@ -23536,7 +23552,7 @@ mod tests {
 
         let set_mouse_pixel = dispatch_builtin_pure(
             "set-mouse-pixel-position",
-            vec![Value::Nil, Value::Int(0), Value::Int(0)],
+            vec![Value::Frame(1), Value::Int(0), Value::Int(0)],
         )
         .expect("builtin set-mouse-pixel-position should resolve")
         .expect("builtin set-mouse-pixel-position should evaluate");
@@ -23544,7 +23560,7 @@ mod tests {
 
         let set_mouse = dispatch_builtin_pure(
             "set-mouse-position",
-            vec![Value::Nil, Value::Int(0), Value::Int(0)],
+            vec![Value::Frame(1), Value::Int(0), Value::Int(0)],
         )
         .expect("builtin set-mouse-position should resolve")
         .expect("builtin set-mouse-position should evaluate");
