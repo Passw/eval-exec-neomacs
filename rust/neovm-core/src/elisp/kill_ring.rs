@@ -1065,6 +1065,7 @@ pub(crate) fn builtin_kill_whole_line(
     eval: &mut super::eval::Evaluator,
     args: Vec<Value>,
 ) -> EvalResult {
+    expect_max_args("kill-whole-line", &args, 1)?;
     sync_kill_ring_from_binding(eval);
     let buf = eval
         .buffers
@@ -3721,6 +3722,27 @@ mod tests {
         );
         // Point is at "line2", should kill "line2\n".
         assert_eq!(results[3], r#"OK "line1\nline3""#);
+    }
+
+    #[test]
+    fn kill_whole_line_rejects_too_many_args() {
+        let results = eval_all(
+            r#"(with-temp-buffer (condition-case err (kill-whole-line nil nil) (error err)))
+               (with-temp-buffer (condition-case err (kill-whole-line 1 nil) (error err)))
+               (with-temp-buffer (condition-case err (kill-whole-line 1 2 3) (error err)))"#,
+        );
+        assert_eq!(
+            results[0],
+            "OK (wrong-number-of-arguments kill-whole-line 2)"
+        );
+        assert_eq!(
+            results[1],
+            "OK (wrong-number-of-arguments kill-whole-line 2)"
+        );
+        assert_eq!(
+            results[2],
+            "OK (wrong-number-of-arguments kill-whole-line 3)"
+        );
     }
 
     // -- kill-word tests --
