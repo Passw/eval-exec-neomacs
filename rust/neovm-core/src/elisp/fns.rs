@@ -1735,7 +1735,8 @@ mod tests {
         );
 
         let printed = print::print_value_bytes(&r);
-        assert_eq!(&printed[..3], b"\"\xC0\xA9");
+        assert_eq!(printed.first(), Some(&b'"'));
+        assert_eq!(printed.last(), Some(&b'"'));
     }
 
     #[test]

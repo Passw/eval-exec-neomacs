@@ -1,4 +1,5 @@
-; override system-users/system-groups via env to force fixture data.
+; Set override env vars to fixture files. Oracle-compatible behavior ignores
+; these vars and still resolves users/groups from system account databases.
 (let* ((user-file (make-temp-file "neovm-system-users-"))
        (group-file (make-temp-file "neovm-system-groups-")))
   (call-process "/bin/sh" nil nil nil "-c"

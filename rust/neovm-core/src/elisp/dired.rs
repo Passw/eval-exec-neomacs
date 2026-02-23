@@ -988,11 +988,11 @@ fn parse_colon_file_names(contents: &str) -> Vec<String> {
 }
 
 fn system_users_passwd_path() -> String {
-    std::env::var("NEOVM_PASSWD_PATH").unwrap_or_else(|_| "/etc/passwd".to_string())
+    "/etc/passwd".to_string()
 }
 
 fn system_groups_path() -> String {
-    std::env::var("NEOVM_GROUP_PATH").unwrap_or_else(|_| "/etc/group".to_string())
+    "/etc/group".to_string()
 }
 
 fn read_colon_file_names(path: &str) -> Vec<String> {
@@ -1610,7 +1610,10 @@ mod tests {
     }
 
     #[test]
-    fn test_system_groups_respects_override_path() {
+    fn test_system_groups_ignores_override_path() {
+        let baseline = builtin_system_groups(vec![]).unwrap();
+        let baseline_names = list_to_vec(&baseline).unwrap();
+
         let dir = std::env::temp_dir().join("neovm_group_override");
         let _ = fs::remove_dir_all(&dir);
         fs::create_dir_all(&dir).unwrap();
@@ -1619,7 +1622,7 @@ mod tests {
         std::env::set_var("NEOVM_GROUP_PATH", &file);
         let result = builtin_system_groups(vec![]).unwrap();
         let names = list_to_vec(&result).unwrap();
-        assert_eq!(names, vec![Value::string("tmpgroup")]);
+        assert_eq!(names, baseline_names);
         std::env::remove_var("NEOVM_GROUP_PATH");
         let _ = fs::remove_dir_all(&dir);
     }
@@ -1633,20 +1636,19 @@ mod tests {
     }
 
     #[test]
-    fn test_system_users_respects_override_path() {
+    fn test_system_users_ignores_override_path() {
+        let baseline = builtin_system_users(vec![]).unwrap();
+        let baseline_names = list_to_vec(&baseline).unwrap();
+
         let dir = std::env::temp_dir().join("neovm_passwd_override");
         let _ = fs::remove_dir_all(&dir);
         fs::create_dir_all(&dir).unwrap();
         let file = dir.join("passwd");
-        fs::write(
-            &file,
-            "tmpuser:x:0:0::/tmp:/bin/sh\n",
-        )
-        .unwrap();
+        fs::write(&file, "tmpuser:x:0:0::/tmp:/bin/sh\n").unwrap();
         std::env::set_var("NEOVM_PASSWD_PATH", &file);
         let result = builtin_system_users(vec![]).unwrap();
         let names = list_to_vec(&result).unwrap();
-        assert_eq!(names, vec![Value::string("tmpuser")]);
+        assert_eq!(names, baseline_names);
         std::env::remove_var("NEOVM_PASSWD_PATH");
         let _ = fs::remove_dir_all(&dir);
     }
@@ -1661,9 +1663,7 @@ mod tests {
 
     #[test]
     fn test_parse_colon_file_names_skips_comments_and_blanks() {
-        let parsed = parse_colon_file_names(
-            "\n# comment\nuser1:x:1000\n\nuser2:x:1001\n",
-        );
+        let parsed = parse_colon_file_names("\n# comment\nuser1:x:1000\n\nuser2:x:1001\n");
         assert_eq!(parsed, vec!["user2".to_string(), "user1".to_string()]);
     }
 
@@ -1697,10 +1697,7 @@ mod tests {
         .unwrap();
 
         let names = read_colon_file_names(&path.to_string_lossy());
-        assert_eq!(
-            names,
-            vec!["beta".to_string(), "alpha".to_string()]
-        );
+        assert_eq!(names, vec!["beta".to_string(), "alpha".to_string()]);
 
         let _ = fs::remove_file(&path);
     }

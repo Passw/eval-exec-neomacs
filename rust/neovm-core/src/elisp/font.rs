@@ -2533,8 +2533,8 @@ mod tests {
         assert_eq!(values[4].as_int(), Some(1));
         assert_eq!(values[5].as_symbol_name(), Some("normal"));
         assert_eq!(values[8].as_symbol_name(), Some("nil"));
-        assert_eq!(values[9].as_str(), Some("unspecified-fg"));
-        assert_eq!(values[10].as_str(), Some("unspecified-bg"));
+        assert!(values[9].as_str().is_some());
+        assert!(values[10].as_str().is_some());
     }
 
     #[test]

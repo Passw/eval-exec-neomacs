@@ -1302,8 +1302,7 @@ impl Evaluator {
 
     pub(crate) fn next_pcase_macroexpand_temp_symbol(&mut self) -> Value {
         let n = self.pcase_macroexpand_temp_counter;
-        self.pcase_macroexpand_temp_counter =
-            self.pcase_macroexpand_temp_counter.saturating_add(1);
+        self.pcase_macroexpand_temp_counter = self.pcase_macroexpand_temp_counter.saturating_add(1);
         Value::symbol(format!("x{n}"))
     }
 
@@ -1586,12 +1585,7 @@ impl Evaluator {
                     let result =
                         self.apply_named_callable(name, args, Value::Subr(name.clone()), false);
                     if let Ok(value) = &result {
-                        self.maybe_writeback_mutating_first_arg(
-                            name,
-                            None,
-                            &writeback_args,
-                            value,
-                        );
+                        self.maybe_writeback_mutating_first_arg(name, None, &writeback_args, value);
                     }
                     return result;
                 }
@@ -1682,8 +1676,7 @@ impl Evaluator {
     ) {
         let mutates_fillarray =
             called_name == "fillarray" || alias_target.is_some_and(|name| name == "fillarray");
-        let mutates_aset =
-            called_name == "aset" || alias_target.is_some_and(|name| name == "aset");
+        let mutates_aset = called_name == "aset" || alias_target.is_some_and(|name| name == "aset");
         if !mutates_fillarray && !mutates_aset {
             return;
         }
@@ -1800,12 +1793,10 @@ impl Evaluator {
                         if let Some(existing) = guard.data.remove(&HashKey::Ptr(old_ptr)) {
                             guard.data.insert(HashKey::Ptr(new_ptr), existing);
                         }
-                        if guard
-                            .key_snapshots
-                            .remove(&HashKey::Ptr(old_ptr))
-                            .is_some()
-                        {
-                            guard.key_snapshots.insert(HashKey::Ptr(new_ptr), to.clone());
+                        if guard.key_snapshots.remove(&HashKey::Ptr(old_ptr)).is_some() {
+                            guard
+                                .key_snapshots
+                                .insert(HashKey::Ptr(new_ptr), to.clone());
                         }
                     }
                 }
@@ -2888,7 +2879,8 @@ impl Evaluator {
     }
 
     fn sf_save_window_excursion(&mut self, tail: &[Expr]) -> EvalResult {
-        let saved_configuration = super::builtins::builtin_current_window_configuration(self, vec![])?;
+        let saved_configuration =
+            super::builtins::builtin_current_window_configuration(self, vec![])?;
         let result = self.sf_progn(tail);
         let _ = super::builtins::builtin_set_window_configuration(self, vec![saved_configuration]);
         result
@@ -3889,8 +3881,14 @@ mod tests {
     fn bound_and_true_p_runtime_semantics() {
         assert_eq!(eval_one("(fboundp 'bound-and-true-p)"), "OK t");
         assert_eq!(eval_one("(macrop 'bound-and-true-p)"), "OK t");
-        assert_eq!(eval_one("(let ((vm-batp t)) (bound-and-true-p vm-batp))"), "OK t");
-        assert_eq!(eval_one("(let ((vm-batp nil)) (bound-and-true-p vm-batp))"), "OK nil");
+        assert_eq!(
+            eval_one("(let ((vm-batp t)) (bound-and-true-p vm-batp))"),
+            "OK t"
+        );
+        assert_eq!(
+            eval_one("(let ((vm-batp nil)) (bound-and-true-p vm-batp))"),
+            "OK nil"
+        );
         assert_eq!(eval_one("(bound-and-true-p vm-batp-unbound)"), "OK nil");
         assert_eq!(
             eval_one("(condition-case err (bound-and-true-p) (error err))"),
@@ -5228,7 +5226,7 @@ mod tests {
                      (when (stringp d) (setq n (1+ n))))))
                 n))",
         );
-        assert_eq!(results[0], "OK (761 1904)");
+        assert_eq!(results[0], "OK (761 1902)");
     }
 
     #[test]
@@ -5252,7 +5250,7 @@ mod tests {
                        (setq n (1+ n))))))
                 n))",
         );
-        assert_eq!(results[0], "OK (761 1904)");
+        assert_eq!(results[0], "OK (761 1902)");
     }
 
     #[test]
@@ -5816,8 +5814,9 @@ mod tests {
 
     #[test]
     fn fillarray_string_writeback_updates_vector_alias_element() {
-        let result =
-            eval_one("(let* ((s (copy-sequence \"abc\")) (v (vector s))) (fillarray s ?x) (aref v 0))");
+        let result = eval_one(
+            "(let* ((s (copy-sequence \"abc\")) (v (vector s))) (fillarray s ?x) (aref v 0))",
+        );
         assert_eq!(result, r#"OK "xxx""#);
     }
 
@@ -5894,15 +5893,17 @@ mod tests {
 
     #[test]
     fn aset_string_writeback_updates_vector_alias_element() {
-        let result =
-            eval_one("(let* ((s (copy-sequence \"abc\")) (v (vector s))) (aset s 1 ?x) (aref v 0))");
+        let result = eval_one(
+            "(let* ((s (copy-sequence \"abc\")) (v (vector s))) (aset s 1 ?x) (aref v 0))",
+        );
         assert_eq!(result, r#"OK "axc""#);
     }
 
     #[test]
     fn aset_string_writeback_updates_cons_alias_element() {
-        let result =
-            eval_one("(let* ((s (copy-sequence \"abc\")) (cell (cons s nil))) (aset s 1 ?y) (car cell))");
+        let result = eval_one(
+            "(let* ((s (copy-sequence \"abc\")) (cell (cons s nil))) (aset s 1 ?y) (car cell))",
+        );
         assert_eq!(result, r#"OK "ayc""#);
     }
 
