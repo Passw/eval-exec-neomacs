@@ -1078,3 +1078,4 @@ cases/redirect-debugging-output-semantics
 cases/open-dribble-file-semantics
 cases/object-intervals-semantics
 cases/overlay-recenter-semantics
+cases/optimize-char-table-semantics

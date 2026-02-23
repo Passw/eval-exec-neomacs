@@ -6662,6 +6662,12 @@ pub(crate) fn builtin_object_intervals(args: Vec<Value>) -> EvalResult {
 
 pub(crate) fn builtin_optimize_char_table(args: Vec<Value>) -> EvalResult {
     expect_range_args("optimize-char-table", &args, 1, 2)?;
+    if !super::chartable::is_char_table(&args[0]) {
+        return Err(signal(
+            "wrong-type-argument",
+            vec![Value::symbol("char-table-p"), args[0].clone()],
+        ));
+    }
     Ok(Value::Nil)
 }
 
@@ -23466,9 +23472,14 @@ mod tests {
             .expect("builtin object-intervals should evaluate");
         assert!(intervals.is_nil());
 
+        let char_table = crate::elisp::chartable::builtin_make_char_table(vec![Value::symbol(
+            "test-only",
+        )])
+        .expect("builtin make-char-table should evaluate");
+
         let optimized = dispatch_builtin_pure(
             "optimize-char-table",
-            vec![Value::Nil, Value::symbol("test-only")],
+            vec![char_table, Value::symbol("test-only")],
         )
         .expect("builtin optimize-char-table should resolve")
         .expect("builtin optimize-char-table should evaluate");
