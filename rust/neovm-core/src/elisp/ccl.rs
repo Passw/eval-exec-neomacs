@@ -1,18 +1,17 @@
-//! Code Conversion Language (CCL) stubs.
+//! Code Conversion Language (CCL) compatibility runtime.
 //!
 //! CCL is a low-level bytecode language for efficient character/text conversion.
-//! This implementation provides stubs for basic CCL operations:
+//! This implementation currently provides partial CCL behavior:
 //! - `ccl-program-p` — basic predicate for vector-shaped CCL program headers
-//! - `ccl-execute` — execute CCL program on status vector (stub, validates status/program shape)
-//! - `ccl-execute-on-string` — execute CCL program on string (stub, validates status/program shape)
-//! - `register-ccl-program` — register a CCL program (stub, returns nil)
-//! - `register-code-conversion-map` — register a code conversion map (stub, returns nil)
-//!
-//! Since the Elisp interpreter doesn't implement the full CCL runtime,
-//! all operations are no-ops that satisfy the API contract.
+//! - `register-ccl-program` — stores named CCL programs and returns stable ids
+//! - `register-code-conversion-map` — stores named conversion maps and returns stable ids
+//! - `ccl-execute` / `ccl-execute-on-string` — validates shape and designators
+//!   and mirrors current oracle error payloads for unsupported execution paths.
 
 use super::error::{signal, EvalResult, Flow};
 use super::value::*;
+use std::collections::HashMap;
+use std::sync::{Mutex, OnceLock};
 
 fn is_integer(value: &Value) -> bool {
     matches!(value, Value::Int(_))
@@ -36,6 +35,85 @@ fn is_valid_ccl_program(program: &Value) -> bool {
     }
 
     is_integer(second) && is_integer(third)
+}
+
+#[derive(Default)]
+struct CclRegistry {
+    programs: HashMap<String, (i64, Value)>,
+    code_conversion_maps: HashMap<String, (i64, Value)>,
+    next_program_id: i64,
+    next_code_conversion_map_id: i64,
+}
+
+impl CclRegistry {
+    fn with_defaults() -> Self {
+        Self {
+            programs: HashMap::new(),
+            code_conversion_maps: HashMap::new(),
+            next_program_id: 1,
+            next_code_conversion_map_id: 0,
+        }
+    }
+
+    fn register_program(&mut self, name: &str, program: Value) -> i64 {
+        if let Some((id, slot)) = self.programs.get_mut(name) {
+            *slot = program;
+            return *id;
+        }
+        let id = self.next_program_id;
+        self.next_program_id = self.next_program_id.saturating_add(1);
+        self.programs.insert(name.to_string(), (id, program));
+        id
+    }
+
+    fn lookup_program(&self, name: &str) -> Option<Value> {
+        self.programs.get(name).map(|(_, program)| program.clone())
+    }
+
+    fn register_code_conversion_map(&mut self, name: &str, value: Value) -> i64 {
+        if let Some((id, slot)) = self.code_conversion_maps.get_mut(name) {
+            *slot = value;
+            return *id;
+        }
+        let id = self.next_code_conversion_map_id;
+        self.next_code_conversion_map_id = self.next_code_conversion_map_id.saturating_add(1);
+        self.code_conversion_maps
+            .insert(name.to_string(), (id, value));
+        id
+    }
+}
+
+fn ccl_registry() -> &'static Mutex<CclRegistry> {
+    static REGISTRY: OnceLock<Mutex<CclRegistry>> = OnceLock::new();
+    REGISTRY.get_or_init(|| Mutex::new(CclRegistry::with_defaults()))
+}
+
+enum CclProgramDesignatorKind {
+    Inline,
+    RegisteredSymbol,
+}
+
+fn resolve_ccl_program_designator(value: &Value) -> Option<(Value, CclProgramDesignatorKind)> {
+    if matches!(value, Value::Vector(_)) {
+        return Some((value.clone(), CclProgramDesignatorKind::Inline));
+    }
+    let name = value.as_symbol_name()?;
+    let registry = ccl_registry().lock().unwrap_or_else(|e| e.into_inner());
+    registry
+        .lookup_program(name)
+        .map(|program| (program, CclProgramDesignatorKind::RegisteredSymbol))
+}
+
+fn ccl_program_code_index_message(program: &Value, designator_kind: CclProgramDesignatorKind) -> String {
+    let base_len = match program {
+        Value::Vector(handle) => with_heap(|h| h.vector_len(*handle) as i64),
+        _ => 0,
+    };
+    let index = match designator_kind {
+        CclProgramDesignatorKind::Inline => base_len.saturating_add(1),
+        CclProgramDesignatorKind::RegisteredSymbol => base_len.saturating_add(2),
+    };
+    format!("Error in CCL program at {index}th code")
 }
 
 // ---------------------------------------------------------------------------
@@ -108,14 +186,15 @@ pub(crate) fn builtin_ccl_execute(args: Vec<Value>) -> EvalResult {
         ));
     }
 
-    if is_valid_ccl_program(&args[0]) {
-        return Err(signal(
-            "error",
-            vec![Value::string("Error in CCL program at 4th code")],
-        ));
+    let Some((program, designator_kind)) = resolve_ccl_program_designator(&args[0]) else {
+        return Err(signal("error", vec![Value::string("Invalid CCL program")]));
+    };
+    if !is_valid_ccl_program(&program) {
+        return Err(signal("error", vec![Value::string("Invalid CCL program")]));
     }
 
-    Err(signal("error", vec![Value::string("Invalid CCL program")]))
+    let message = ccl_program_code_index_message(&program, designator_kind);
+    Err(signal("error", vec![Value::string(message)]))
 }
 
 /// (ccl-execute-on-string CCL-PROGRAM STATUS STRING &optional CONTINUE UNIBYTE-P) -> STRING
@@ -140,7 +219,10 @@ pub(crate) fn builtin_ccl_execute_on_string(args: Vec<Value>) -> EvalResult {
         ));
     }
 
-    if !is_valid_ccl_program(&args[0]) {
+    let Some((program, designator_kind)) = resolve_ccl_program_designator(&args[0]) else {
+        return Err(signal("error", vec![Value::string("Invalid CCL program")]));
+    };
+    if !is_valid_ccl_program(&program) {
         return Err(signal("error", vec![Value::string("Invalid CCL program")]));
     }
 
@@ -152,10 +234,10 @@ pub(crate) fn builtin_ccl_execute_on_string(args: Vec<Value>) -> EvalResult {
     //   4: UNIBYTE-P (optional, we don't use)
 
     match &args[2] {
-        Value::Str(_s) => Err(signal(
-            "error",
-            vec![Value::string("Error in CCL program at 4th code")],
-        )),
+        Value::Str(_s) => {
+            let message = ccl_program_code_index_message(&program, designator_kind);
+            Err(signal("error", vec![Value::string(message)]))
+        }
         other => {
             // Type error: STRING must be a string or nil
             Err(signal(
@@ -181,11 +263,14 @@ pub(crate) fn builtin_register_ccl_program(args: Vec<Value>) -> EvalResult {
         return Err(signal("error", vec![Value::string("Error in CCL program")]));
     }
 
-    // Arguments:
-    //   0: NAME (symbol name for the program)
-    //   1: CCL-PROG (the program definition)
-    // We accept both but don't store anything since we don't support CCL
-    Ok(Value::Int(1))
+    let name = args[0]
+        .as_symbol_name()
+        .expect("symbol already validated by is_symbol");
+    let program_id = {
+        let mut registry = ccl_registry().lock().unwrap_or_else(|e| e.into_inner());
+        registry.register_program(name, args[1].clone())
+    };
+    Ok(Value::Int(program_id))
 }
 
 /// (register-code-conversion-map SYMBOL MAP) -> nil
@@ -199,11 +284,14 @@ pub(crate) fn builtin_register_code_conversion_map(args: Vec<Value>) -> EvalResu
         ));
     }
 
-    // Arguments:
-    //   0: SYMBOL (name for the conversion map)
-    //   1: MAP (the conversion map definition, typically a char-table)
-    // We accept both but don't store anything since we don't support CCL
-    Ok(Value::Int(0))
+    let name = args[0]
+        .as_symbol_name()
+        .expect("symbol already validated by is_symbol");
+    let map_id = {
+        let mut registry = ccl_registry().lock().unwrap_or_else(|e| e.into_inner());
+        registry.register_code_conversion_map(name, args[1].clone())
+    };
+    Ok(Value::Int(map_id))
 }
 
 #[cfg(test)]
@@ -384,14 +472,21 @@ mod tests {
 
     #[test]
     fn register_ccl_program_returns_success_code() {
-        assert_eq!(
-            builtin_register_ccl_program(vec![
-                Value::symbol("foo"),
-                Value::vector(vec![Value::Int(10), Value::Int(0), Value::Int(0)]),
-            ])
-            .expect("valid registration should succeed"),
-            Value::Int(1)
-        );
+        let first = builtin_register_ccl_program(vec![
+            Value::symbol("foo"),
+            Value::vector(vec![Value::Int(10), Value::Int(0), Value::Int(0)]),
+        ])
+        .expect("valid registration should succeed");
+        let second = builtin_register_ccl_program(vec![
+            Value::symbol("foo"),
+            Value::vector(vec![Value::Int(10), Value::Int(0), Value::Int(0)]),
+        ])
+        .expect("repeat registration should keep id");
+        assert_eq!(first, second);
+        match first {
+            Value::Int(id) => assert!(id > 0),
+            other => panic!("expected integer id, got {other:?}"),
+        }
     }
 
     #[test]
@@ -411,14 +506,127 @@ mod tests {
 
     #[test]
     fn register_code_conversion_map_returns_success_code() {
-        assert_eq!(
-            builtin_register_code_conversion_map(vec![
-                Value::symbol("foo"),
-                Value::vector(vec![Value::Int(10), Value::Int(0), Value::Int(0)]),
-            ])
-            .expect("valid registration should succeed"),
-            Value::Int(0)
-        );
+        let first = builtin_register_code_conversion_map(vec![
+            Value::symbol("foo"),
+            Value::vector(vec![Value::Int(10), Value::Int(0), Value::Int(0)]),
+        ])
+        .expect("valid registration should succeed");
+        let second = builtin_register_code_conversion_map(vec![
+            Value::symbol("foo"),
+            Value::vector(vec![Value::Int(1), Value::Int(2), Value::Int(3)]),
+        ])
+        .expect("repeat registration should keep id");
+        assert_eq!(first, second);
+        match first {
+            Value::Int(id) => assert!(id >= 0),
+            other => panic!("expected integer id, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn register_ccl_program_assigns_new_ids_for_new_symbols() {
+        let a = builtin_register_ccl_program(vec![
+            Value::symbol("ccl-id-a"),
+            Value::vector(vec![Value::Int(10), Value::Int(0), Value::Int(0)]),
+        ])
+        .expect("registration a should succeed");
+        let b = builtin_register_ccl_program(vec![
+            Value::symbol("ccl-id-b"),
+            Value::vector(vec![Value::Int(10), Value::Int(0), Value::Int(0)]),
+        ])
+        .expect("registration b should succeed");
+        match (a, b) {
+            (Value::Int(aid), Value::Int(bid)) => assert!(bid > aid),
+            other => panic!("expected integer ids, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn register_code_conversion_map_assigns_new_ids_for_new_symbols() {
+        let a = builtin_register_code_conversion_map(vec![
+            Value::symbol("ccl-map-id-a"),
+            Value::vector(vec![Value::Int(10), Value::Int(0), Value::Int(0)]),
+        ])
+        .expect("registration a should succeed");
+        let b = builtin_register_code_conversion_map(vec![
+            Value::symbol("ccl-map-id-b"),
+            Value::vector(vec![Value::Int(10), Value::Int(0), Value::Int(0)]),
+        ])
+        .expect("registration b should succeed");
+        match (a, b) {
+            (Value::Int(aid), Value::Int(bid)) => assert!(bid > aid),
+            other => panic!("expected integer ids, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn ccl_execute_accepts_registered_symbol_program_designator() {
+        let _ = builtin_register_ccl_program(vec![
+            Value::symbol("ccl-designator-probe"),
+            Value::vector(vec![
+                Value::Int(10),
+                Value::Int(0),
+                Value::Int(0),
+                Value::Int(0),
+            ]),
+        ])
+        .expect("registration should succeed");
+        let err = builtin_ccl_execute(vec![
+            Value::symbol("ccl-designator-probe"),
+            Value::vector(vec![
+                Value::Int(0),
+                Value::Int(0),
+                Value::Int(0),
+                Value::Int(0),
+                Value::Int(0),
+                Value::Int(0),
+                Value::Int(0),
+                Value::Int(0),
+            ]),
+        ])
+        .expect_err("symbol designator should resolve to registered program");
+        match err {
+            Flow::Signal(sig) => {
+                assert_eq!(sig.data[0], Value::string("Error in CCL program at 6th code"));
+            }
+            other => panic!("expected error signal, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn ccl_execute_on_string_accepts_registered_symbol_program_designator() {
+        let _ = builtin_register_ccl_program(vec![
+            Value::symbol("ccl-designator-probe-on-string"),
+            Value::vector(vec![
+                Value::Int(10),
+                Value::Int(0),
+                Value::Int(0),
+                Value::Int(0),
+            ]),
+        ])
+        .expect("registration should succeed");
+        let err = builtin_ccl_execute_on_string(vec![
+            Value::symbol("ccl-designator-probe-on-string"),
+            Value::vector(vec![
+                Value::Int(0),
+                Value::Int(0),
+                Value::Int(0),
+                Value::Int(0),
+                Value::Int(0),
+                Value::Int(0),
+                Value::Int(0),
+                Value::Int(0),
+                Value::Int(0),
+            ]),
+            Value::string("abc"),
+        ])
+        .expect_err("symbol designator should resolve to registered program");
+        match err {
+            Flow::Signal(sig) => {
+                assert_eq!(sig.data[0], Value::string("Error in CCL program at 6th code"));
+            }
+            other => panic!("expected error signal, got {other:?}"),
+        }
     }
 
     #[test]

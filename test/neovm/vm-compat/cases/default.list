@@ -69,6 +69,7 @@ cases/ccl-arity-semantics
 cases/ccl-semantics
 cases/ccl-runtime-semantics
 cases/ccl-registration-semantics
+cases/ccl-symbol-registration-runtime-semantics
 cases/commandp-semantics
 cases/commandp-builtin-command-matrix
 cases/commandp-core-command-matrix-extra
