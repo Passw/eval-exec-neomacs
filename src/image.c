@@ -84,10 +84,7 @@ static unsigned long image_alloc_image_color (struct frame *, struct image *,
 #endif	/* USE_CAIRO */
 
 
-
 #define XBM_BIT_SHUFFLE(b) (b)
-
-
 
 
 typedef struct neomacs_bitmap_record Bitmap_Record;
@@ -95,8 +92,6 @@ typedef struct neomacs_bitmap_record Bitmap_Record;
 #include "neomacs_display.h"
 #define NLOG_MODULE "image"
 #include "neomacs_log.h"
-
-
 
 
 static void image_disable_image (struct frame *, struct image *);
@@ -112,7 +107,6 @@ static unsigned long lookup_rgb_color (struct frame *f, int r, int g, int b);
 static void free_color_table (void);
 static unsigned long *colors_in_color_table (int *n);
 #endif
-
 
 
 #ifdef USE_CAIRO
@@ -193,8 +187,6 @@ image_pix_container_create_from_bitmap_data (char *data, unsigned int width,
 /* Functions to access the contents of a bitmap, given an id.  */
 
 
-
-
 /* Allocate a new bitmap record.  Returns index of new record.  */
 
 static ptrdiff_t
@@ -235,13 +227,7 @@ image_create_bitmap_from_data (struct frame *f, char *bits,
   ptrdiff_t id;
 
 
-
-
-
-
-
   id = image_allocate_bitmap_record (f);
-
 
 
   {
@@ -260,7 +246,6 @@ image_create_bitmap_from_data (struct frame *f, char *bits,
   dpyinfo->bitmaps[id - 1].refcount = 1;
 
 
-
   return id;
 }
 
@@ -277,8 +262,6 @@ ptrdiff_t
 image_create_bitmap_from_file (struct frame *f, Lisp_Object file)
 {
   Display_Info *dpyinfo = FRAME_DISPLAY_INFO (f);
-
-
 
 
   ptrdiff_t id, size;
@@ -321,7 +304,6 @@ image_create_bitmap_from_file (struct frame *f, Lisp_Object file)
   return id;
 
 
-
 }
 
 /* Free bitmap B.  */
@@ -329,10 +311,6 @@ image_create_bitmap_from_file (struct frame *f, Lisp_Object file)
 static void
 free_bitmap_record (Display_Info *dpyinfo, Bitmap_Record *bm)
 {
-
-
-
-
 
 
   if (bm->stipple_bits)
@@ -1188,7 +1166,6 @@ image_alloc_image_color (struct frame *f, struct image *img,
 }
 
 
-
 /***********************************************************************
 			     Image Cache
  ***********************************************************************/
@@ -1828,7 +1805,6 @@ cache_image (struct frame *f, struct image *img)
 }
 
 
-
 /* Mark Lisp objects in image IMG.  */
 static void
 mark_image (struct image *img)
@@ -1854,7 +1830,6 @@ mark_image_cache (struct image_cache *c)
     }
 
 }
-
 
 
 /***********************************************************************
@@ -2416,7 +2391,6 @@ xbm_scan (char **s, char *end, char *sval, int *ival)
 }
 
 
-
 static void
 Create_Pixmap_From_Bitmap_Data (struct frame *f, struct image *img, char *data,
 				RGB_PIXEL_COLOR fg, RGB_PIXEL_COLOR bg,
@@ -2435,7 +2409,6 @@ Create_Pixmap_From_Bitmap_Data (struct frame *f, struct image *img, char *data,
     = image_pix_container_create_from_bitmap_data (data, img->width,
 						   img->height, fg, bg);
 }
-
 
 
 /* Replacement for XReadBitmapFileData which isn't available under old
@@ -2810,11 +2783,9 @@ xbm_load (struct frame *f, struct image *img)
 }
 
 
-
 /***********************************************************************
 			      XPM images
  ***********************************************************************/
-
 
 
 #ifdef USE_CAIRO
@@ -2836,7 +2807,6 @@ enum xpm_keyword_index
   XPM_BACKGROUND,
   XPM_LAST
 };
-
 
 
 #ifdef ALLOC_XPM_COLORS
@@ -3012,9 +2982,6 @@ xpm_free_colors (Display *dpy, Colormap cmap, Pixel *pixels, int npixels, void *
 
 /* Load image IMG which will be displayed on frame F.  Value is
    true if successful.  */
-
-
-
 
 
 /***********************************************************************
@@ -4023,213 +3990,6 @@ pbm_load (struct frame *f, struct image *img)
  ***********************************************************************/
 
 
-
-/***********************************************************************
-				 PNG
- ***********************************************************************/
-
-
-
-
-
-
-/***********************************************************************
-				 JPEG
- ***********************************************************************/
-
-#if defined (HAVE_JPEG)
-
-/* Indices of image specification fields in jpeg_format, below.  */
-
-enum jpeg_keyword_index
-{
-  JPEG_TYPE,
-  JPEG_DATA,
-  JPEG_FILE,
-  JPEG_ASCENT,
-  JPEG_MARGIN,
-  JPEG_RELIEF,
-  JPEG_ALGORITHM,
-  JPEG_HEURISTIC_MASK,
-  JPEG_MASK,
-  JPEG_BACKGROUND,
-  JPEG_LAST
-};
-
-/* Vector of image_keyword structures describing the format
-   of valid user-defined image specifications.  */
-
-static const struct image_keyword jpeg_format[JPEG_LAST] =
-{
-  {":type",		IMAGE_SYMBOL_VALUE,			1},
-  {":data",		IMAGE_STRING_VALUE,			0},
-  {":file",		IMAGE_STRING_VALUE,			0},
-  {":ascent",		IMAGE_ASCENT_VALUE,			0},
-  {":margin",		IMAGE_NON_NEGATIVE_INTEGER_VALUE_OR_PAIR, 0},
-  {":relief",		IMAGE_INTEGER_VALUE,			0},
-  {":conversions",	IMAGE_DONT_CHECK_VALUE_TYPE,		0},
-  {":heuristic-mask",	IMAGE_DONT_CHECK_VALUE_TYPE,		0},
-  {":mask",		IMAGE_DONT_CHECK_VALUE_TYPE,		0},
-  {":background",	IMAGE_STRING_OR_NIL_VALUE,		0}
-};
-
-/* Return true if OBJECT is a valid JPEG image specification.  */
-
-static bool
-jpeg_image_p (Lisp_Object object)
-{
-  struct image_keyword fmt[JPEG_LAST];
-
-  memcpy (fmt, jpeg_format, sizeof fmt);
-
-  if (!parse_image_spec (object, fmt, JPEG_LAST, Qjpeg))
-    return 0;
-
-  /* Must specify either the :data or :file keyword.  */
-  return fmt[JPEG_FILE].count + fmt[JPEG_DATA].count == 1;
-}
-
-#endif /* HAVE_JPEG */
-
-
-
-
-/***********************************************************************
-				 TIFF
- ***********************************************************************/
-
-#if defined (HAVE_TIFF)
-
-/* Indices of image specification fields in tiff_format, below.  */
-
-enum tiff_keyword_index
-{
-  TIFF_TYPE,
-  TIFF_DATA,
-  TIFF_FILE,
-  TIFF_ASCENT,
-  TIFF_MARGIN,
-  TIFF_RELIEF,
-  TIFF_ALGORITHM,
-  TIFF_HEURISTIC_MASK,
-  TIFF_MASK,
-  TIFF_BACKGROUND,
-  TIFF_INDEX,
-  TIFF_LAST
-};
-
-/* Vector of image_keyword structures describing the format
-   of valid user-defined image specifications.  */
-
-static const struct image_keyword tiff_format[TIFF_LAST] =
-{
-  {":type",		IMAGE_SYMBOL_VALUE,			1},
-  {":data",		IMAGE_STRING_VALUE,			0},
-  {":file",		IMAGE_STRING_VALUE,			0},
-  {":ascent",		IMAGE_ASCENT_VALUE,			0},
-  {":margin",		IMAGE_NON_NEGATIVE_INTEGER_VALUE_OR_PAIR, 0},
-  {":relief",		IMAGE_INTEGER_VALUE,			0},
-  {":conversions",	IMAGE_DONT_CHECK_VALUE_TYPE,		0},
-  {":heuristic-mask",	IMAGE_DONT_CHECK_VALUE_TYPE,		0},
-  {":mask",		IMAGE_DONT_CHECK_VALUE_TYPE,		0},
-  {":background",	IMAGE_STRING_OR_NIL_VALUE,		0},
-  {":index",		IMAGE_NON_NEGATIVE_INTEGER_VALUE,	0}
-};
-
-/* Return true if OBJECT is a valid TIFF image specification.  */
-
-static bool
-tiff_image_p (Lisp_Object object)
-{
-  struct image_keyword fmt[TIFF_LAST];
-  memcpy (fmt, tiff_format, sizeof fmt);
-
-  if (!parse_image_spec (object, fmt, TIFF_LAST, Qtiff))
-    return 0;
-
-  /* Must specify either the :data or :file keyword.  */
-  return fmt[TIFF_FILE].count + fmt[TIFF_DATA].count == 1;
-}
-
-#endif /* HAVE_TIFF */
-
-
-
-
-/***********************************************************************
-				 GIF
- ***********************************************************************/
-
-#if defined (HAVE_GIF)
-
-/* Indices of image specification fields in gif_format, below.  */
-
-enum gif_keyword_index
-{
-  GIF_TYPE,
-  GIF_DATA,
-  GIF_FILE,
-  GIF_ASCENT,
-  GIF_MARGIN,
-  GIF_RELIEF,
-  GIF_ALGORITHM,
-  GIF_HEURISTIC_MASK,
-  GIF_MASK,
-  GIF_IMAGE,
-  GIF_BACKGROUND,
-  GIF_LAST
-};
-
-/* Vector of image_keyword structures describing the format
-   of valid user-defined image specifications.  */
-
-static const struct image_keyword gif_format[GIF_LAST] =
-{
-  {":type",		IMAGE_SYMBOL_VALUE,			1},
-  {":data",		IMAGE_STRING_VALUE,			0},
-  {":file",		IMAGE_STRING_VALUE,			0},
-  {":ascent",		IMAGE_ASCENT_VALUE,			0},
-  {":margin",		IMAGE_NON_NEGATIVE_INTEGER_VALUE_OR_PAIR, 0},
-  {":relief",		IMAGE_INTEGER_VALUE,			0},
-  {":conversion",	IMAGE_DONT_CHECK_VALUE_TYPE,		0},
-  {":heuristic-mask",	IMAGE_DONT_CHECK_VALUE_TYPE,		0},
-  {":mask",		IMAGE_DONT_CHECK_VALUE_TYPE,		0},
-  {":index",		IMAGE_NON_NEGATIVE_INTEGER_VALUE,	0},
-  {":background",	IMAGE_STRING_OR_NIL_VALUE,		0}
-};
-
-/* Return true if OBJECT is a valid GIF image specification.  */
-
-static bool
-gif_image_p (Lisp_Object object)
-{
-  struct image_keyword fmt[GIF_LAST];
-  memcpy (fmt, gif_format, sizeof fmt);
-
-  if (!parse_image_spec (object, fmt, GIF_LAST, Qgif))
-    return 0;
-
-  /* Must specify either the :data or :file keyword.  */
-  return fmt[GIF_FILE].count + fmt[GIF_DATA].count == 1;
-}
-
-#endif /* HAVE_GIF */
-
-
-
-
-
-
-
-
-/***********************************************************************
-				 SVG
- ***********************************************************************/
-
-
-
-
-
 /***********************************************************************
 				Ghostscript
  ***********************************************************************/
@@ -4446,7 +4206,6 @@ DEFUN ("imagep", Fimagep, Simagep, 1, 1, 0,
 {
   return valid_image_p (spec) ? Qt : Qnil;
 }
-
 
 
 /***********************************************************************
@@ -4808,22 +4567,6 @@ static struct image_type const image_types[] =
 #ifdef HAVE_GHOSTSCRIPT
  { SYMBOL_INDEX (Qpostscript), gs_image_p, gs_load, image_clear_image },
 #endif
-#if defined HAVE_GIF
- { SYMBOL_INDEX (Qgif), gif_image_p, gif_load, image_clear_image,
-   IMAGE_TYPE_INIT (init_gif_functions) },
-#endif
-#if defined HAVE_TIFF
- { SYMBOL_INDEX (Qtiff), tiff_image_p, tiff_load, image_clear_image,
-   IMAGE_TYPE_INIT (init_tiff_functions) },
-#endif
-#if defined HAVE_JPEG
- { SYMBOL_INDEX (Qjpeg), jpeg_image_p, jpeg_load, image_clear_image,
-   IMAGE_TYPE_INIT (init_jpeg_functions) },
-#endif
-#if defined HAVE_WEBP
- { SYMBOL_INDEX (Qwebp), webp_image_p, webp_load, image_clear_image,
-   IMAGE_TYPE_INIT (init_webp_functions) },
-#endif
  { SYMBOL_INDEX (Qneomacs), neomacs_image_p, neomacs_load, neomacs_clear_image },
  { SYMBOL_INDEX (Qxbm), xbm_image_p, xbm_load, image_clear_image },
  { SYMBOL_INDEX (Qpbm), pbm_image_p, pbm_load, image_clear_image },
@@ -4942,21 +4685,6 @@ non-numeric, there is no explicit limit on the size of images.  */);
   DEFSYM (Qwebp, "webp"); add_image_type (Qwebp);
   DEFSYM (Qsvg, "svg");   add_image_type (Qsvg);
   DEFSYM (Qxpm, "xpm");   add_image_type (Qxpm);
-
-
-
-
-
-
-#if defined (HAVE_WEBP)						\
-  || (defined (HAVE_NATIVE_IMAGE_API)				\
-      && (defined (HAVE_NS) || defined (HAVE_HAIKU)))
-  DEFSYM (Qwebp, "webp");
-  DEFSYM (Qwebpdemux, "webpdemux");
-#endif
-
-
-
 
 
   defsubr (&Sinit_image_library);
