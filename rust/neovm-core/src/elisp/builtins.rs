@@ -6768,7 +6768,16 @@ pub(crate) fn builtin_recent_auto_save_p(args: Vec<Value>) -> EvalResult {
 
 pub(crate) fn builtin_reconsider_frame_fonts(args: Vec<Value>) -> EvalResult {
     expect_args("reconsider-frame-fonts", &args, 1)?;
-    Ok(Value::Nil)
+    if !args[0].is_nil() && !matches!(args[0], Value::Frame(_)) {
+        return Err(signal(
+            "wrong-type-argument",
+            vec![Value::symbol("frame-live-p"), args[0].clone()],
+        ));
+    }
+    Err(signal(
+        "error",
+        vec![Value::string("Window system frame should be used")],
+    ))
 }
 
 pub(crate) fn builtin_redirect_debugging_output(args: Vec<Value>) -> EvalResult {
@@ -6788,12 +6797,25 @@ pub(crate) fn builtin_remove_pos_from_symbol(args: Vec<Value>) -> EvalResult {
 
 pub(crate) fn builtin_resize_mini_window_internal(args: Vec<Value>) -> EvalResult {
     expect_args("resize-mini-window-internal", &args, 1)?;
-    Ok(Value::Nil)
+    match args[0] {
+        Value::Window(id) if id >= crate::window::MINIBUFFER_WINDOW_ID_BASE => Err(signal(
+            "error",
+            vec![Value::string("Cannot resize mini window")],
+        )),
+        Value::Window(_) => Err(signal(
+            "error",
+            vec![Value::string("Not a valid minibuffer window")],
+        )),
+        _ => Err(signal(
+            "wrong-type-argument",
+            vec![Value::symbol("window-live-p"), args[0].clone()],
+        )),
+    }
 }
 
 pub(crate) fn builtin_restore_buffer_modified_p(args: Vec<Value>) -> EvalResult {
     expect_args("restore-buffer-modified-p", &args, 1)?;
-    Ok(Value::Nil)
+    Ok(args[0].clone())
 }
 
 pub(crate) fn builtin_set_this_command_keys(args: Vec<Value>) -> EvalResult {
@@ -23519,8 +23541,17 @@ mod tests {
     fn pure_dispatch_reconsider_redirect_placeholders_match_compat_contracts() {
         let reconsider = dispatch_builtin_pure("reconsider-frame-fonts", vec![Value::Nil])
             .expect("builtin reconsider-frame-fonts should resolve")
-            .expect("builtin reconsider-frame-fonts should evaluate");
-        assert!(reconsider.is_nil());
+            .expect_err("reconsider-frame-fonts should require a window system frame");
+        match reconsider {
+            Flow::Signal(sig) => {
+                assert_eq!(sig.symbol, "error");
+                assert_eq!(
+                    sig.data,
+                    vec![Value::string("Window system frame should be used")]
+                );
+            }
+            other => panic!("expected signal, got: {other:?}"),
+        }
 
         let redirect_dbg = dispatch_builtin_pure("redirect-debugging-output", vec![Value::Nil])
             .expect("builtin redirect-debugging-output should resolve")
@@ -23537,10 +23568,17 @@ mod tests {
             .expect("builtin remove-pos-from-symbol should evaluate");
         assert!(remove_pos.is_nil());
 
-        let resize_mini = dispatch_builtin_pure("resize-mini-window-internal", vec![Value::Nil])
-            .expect("builtin resize-mini-window-internal should resolve")
-            .expect("builtin resize-mini-window-internal should evaluate");
-        assert!(resize_mini.is_nil());
+        let resize_mini =
+            dispatch_builtin_pure("resize-mini-window-internal", vec![Value::Window(1)])
+                .expect("builtin resize-mini-window-internal should resolve")
+                .expect_err("resize-mini-window-internal should reject non-minibuffer windows");
+        match resize_mini {
+            Flow::Signal(sig) => {
+                assert_eq!(sig.symbol, "error");
+                assert_eq!(sig.data, vec![Value::string("Not a valid minibuffer window")]);
+            }
+            other => panic!("expected signal, got: {other:?}"),
+        }
 
         let restore_modified = dispatch_builtin_pure("restore-buffer-modified-p", vec![Value::Nil])
             .expect("builtin restore-buffer-modified-p should resolve")
