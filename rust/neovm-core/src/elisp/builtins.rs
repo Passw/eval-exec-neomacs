@@ -6513,6 +6513,19 @@ pub(crate) fn builtin_map_keymap_internal(args: Vec<Value>) -> EvalResult {
 
 pub(crate) fn builtin_mapbacktrace(args: Vec<Value>) -> EvalResult {
     expect_range_args("mapbacktrace", &args, 1, 2)?;
+    match &args[0] {
+        Value::Nil | Value::True => {
+            return Err(signal("void-function", vec![args[0].clone()]));
+        }
+        Value::Symbol(_)
+        | Value::Subr(_)
+        | Value::Lambda(_)
+        | Value::Macro(_)
+        | Value::ByteCode(_) => {}
+        _ => {
+            return Err(signal("invalid-function", vec![args[0].clone()]));
+        }
+    }
     Ok(Value::Nil)
 }
 
@@ -23397,7 +23410,7 @@ mod tests {
                 .expect("builtin map-keymap-internal should evaluate");
         assert!(map_keymap_internal.is_nil());
 
-        let mapbacktrace = dispatch_builtin_pure("mapbacktrace", vec![Value::Nil])
+        let mapbacktrace = dispatch_builtin_pure("mapbacktrace", vec![Value::symbol("ignore")])
             .expect("builtin mapbacktrace should resolve")
             .expect("builtin mapbacktrace should evaluate");
         assert!(mapbacktrace.is_nil());
