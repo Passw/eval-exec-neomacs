@@ -6643,6 +6643,9 @@ pub(crate) fn builtin_open_font(args: Vec<Value>) -> EvalResult {
 
 pub(crate) fn builtin_open_dribble_file(args: Vec<Value>) -> EvalResult {
     expect_args("open-dribble-file", &args, 1)?;
+    if !args[0].is_nil() {
+        let _ = expect_strict_string(&args[0])?;
+    }
     Ok(Value::Nil)
 }
 
