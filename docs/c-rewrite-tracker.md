@@ -71,7 +71,7 @@ Status values: `none`, `in-progress`, `rust-default`, `c-removed`, `glue-only`, 
 | `src/neomacsterm.c` | `none` | `-` | - | - | - | - |
 | `src/pdumper.c` | `none` | `-` | - | - | - | - |
 | `src/print.c` | `partial` | `rust/neovm-core/src/elisp/print.rs` | - | - | - | - |
-| `src/process.c` | `in-progress` | `rust/neovm-core/src/elisp/process.rs` | `cases/process-runtime-introspection-semantics`, `cases/file-runtime-wrapper-semantics` | - | - | `set-binary-mode` now matches oracle unsupported-stream payload semantics |
+| `src/process.c` | `in-progress` | `rust/neovm-core/src/elisp/process.rs` | `cases/process-runtime-introspection-semantics`, `cases/file-runtime-wrapper-semantics`, `cases/accept-process-output-millis-semantics` | - | - | `set-binary-mode` and `accept-process-output` argument/error contracts now align with oracle |
 | `src/profiler.c` | `partial` | `rust/neomacs-display/src/core/profiler.rs` | - | - | - | - |
 | `src/regex-emacs.c` | `partial` | `rust/neovm-core/src/elisp/regex.rs` | - | - | - | - |
 | `src/region-cache.c` | `none` | `-` | - | - | - | - |

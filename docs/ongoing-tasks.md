@@ -13,6 +13,7 @@ These are the next candidate slices to explore automatically (an initial 20 task
 
 ## Next actionable move
 - Identify the next VM builtin still stubbed or drifting (the plan references process/file wrappers, display/window, and stub enforcement). Implement a targeted lock-in slice with new corpus cases and `check-neovm` regression checks.
+- Recent completed slice: `accept-process-output` now matches oracle millisecond/fixnum contract and error payload order, locked by `cases/accept-process-output-millis-semantics`.
 - Recent completed slice: `set-binary-mode` now matches oracle unsupported-stream errors (`(error "unsupported stream" <sym>)`) via `cases/file-runtime-wrapper-semantics`.
 - Recent completed slice: `frame-edges` now preserves oracle-style live-window buffer context in `is not a live frame` messages, with `cases/frame-edges-window-message-semantics` added and gated.
 - Recent completed slice: added dead-window payload lock-ins for `frame-terminal`/`terminal-name`/`tty-type`/`controlling-tty-p`/`suspend-tty`/`resume-tty` via `cases/terminal-dead-window-error-payload-semantics`.

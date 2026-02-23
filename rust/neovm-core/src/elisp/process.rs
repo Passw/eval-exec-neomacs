@@ -3405,8 +3405,21 @@ pub(crate) fn builtin_accept_process_output(
     }
 
     if let Some(seconds) = args.get(1) {
-        if args.get(2).is_some() {
-            if !seconds.is_nil() && !matches!(seconds, Value::Int(_)) {
+        if let Some(milliseconds) = args.get(2) {
+            if !milliseconds.is_nil() && !matches!(milliseconds, Value::Int(_)) {
+                return Err(signal(
+                    "wrong-type-argument",
+                    vec![Value::symbol("fixnump"), milliseconds.clone()],
+                ));
+            }
+            if milliseconds.is_nil() {
+                if !seconds.is_nil() && !seconds.is_number() {
+                    return Err(signal(
+                        "wrong-type-argument",
+                        vec![Value::symbol("numberp"), seconds.clone()],
+                    ));
+                }
+            } else if !seconds.is_nil() && !matches!(seconds, Value::Int(_)) {
                 return Err(signal(
                     "wrong-type-argument",
                     vec![Value::symbol("fixnump"), seconds.clone()],
@@ -4609,6 +4622,24 @@ mod tests {
             results[5],
             "OK (wrong-type-argument stringp proc-get-probe)"
         );
+    }
+
+    #[test]
+    fn accept_process_output_millis_contract_matches_oracle() {
+        let results = eval_all(
+            r#"(condition-case err (accept-process-output nil 0.1 "x") (error err))
+               (condition-case err (accept-process-output nil nil "x") (error err))
+               (condition-case err (accept-process-output nil 1 "x") (error err))
+               (condition-case err (accept-process-output nil 0.1 nil) (error err))
+               (condition-case err (accept-process-output nil 0.1 0) (error err))
+               (condition-case err (accept-process-output nil 1 2) (error err))"#,
+        );
+        assert_eq!(results[0], r#"OK (wrong-type-argument fixnump "x")"#);
+        assert_eq!(results[1], r#"OK (wrong-type-argument fixnump "x")"#);
+        assert_eq!(results[2], r#"OK (wrong-type-argument fixnump "x")"#);
+        assert_eq!(results[3], "OK nil");
+        assert_eq!(results[4], "OK (wrong-type-argument fixnump 0.1)");
+        assert_eq!(results[5], "OK nil");
     }
 
     #[test]

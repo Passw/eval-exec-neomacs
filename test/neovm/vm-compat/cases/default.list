@@ -709,6 +709,7 @@ cases/process-error-conditions
 cases/process-basics
 cases/process-subr-arity-semantics
 cases/process-runtime-introspection-semantics
+cases/accept-process-output-millis-semantics
 cases/process-mark-type-thread-send-semantics
 cases/process-designator-buffer-lookup-semantics
 cases/process-control-make-setter-semantics

@@ -105,7 +105,7 @@ All must be true:
 ## Doing (Current Log)
 
 - `src/callint.c` and `src/insdel.c` are now on Rust-default runtime paths (`6d25db1e`) with vm-compat lock-ins.
-- `src/process.c` is actively being tightened for oracle parity; latest slice enforces `set-binary-mode` unsupported-stream payload semantics (`a3b9690e`).
+- `src/process.c` is actively being tightened for oracle parity; latest slices enforce `set-binary-mode` unsupported-stream payload semantics and `accept-process-output` millisecond/fixnum contract parity.
 
 ## Next (Direct Order)
 
