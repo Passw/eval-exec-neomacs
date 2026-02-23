@@ -1069,3 +1069,4 @@ cases/set-mouse-position-semantics
 cases/set-window-runtime-contracts-semantics
 cases/set-window-new-runtime-contracts-semantics
 cases/set-charset-plist-semantics
+cases/set-this-command-keys-semantics
