@@ -264,6 +264,7 @@ cases/command-dispatch-line-motion-semantics
 cases/keyboard-quit-command-semantics
 cases/execute-extended-command-name-validation
 cases/execute-extended-command-prefix-return-semantics
+cases/execute-extended-command-batch-eof-semantics
 cases/funcall-apply-non-callable-matrix
 cases/funcall-arity-function-object-payloads
 cases/alias-funcall-apply-arity-function-object-payloads

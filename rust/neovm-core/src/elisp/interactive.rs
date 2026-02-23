@@ -1520,7 +1520,7 @@ pub(crate) fn builtin_universal_argument_command(
 
 /// `(execute-extended-command PREFIXARG &optional COMMAND-NAME TYPED)`
 /// Read a command name and execute it. This is the M-x equivalent.
-/// In our stub implementation, COMMAND-NAME must be provided.
+/// In batch mode, COMMAND-NAME must be provided or input reads hit EOF.
 pub(crate) fn builtin_execute_extended_command(
     eval: &mut Evaluator,
     args: Vec<Value>,
