@@ -2225,13 +2225,22 @@ impl Evaluator {
         let mut last = Value::Nil;
         let mut i = 0;
         while i < tail.len() {
-            let Expr::Symbol(name) = &tail[i] else {
-                return Err(signal(
-                    "wrong-type-argument",
-                    vec![Value::symbol("symbolp"), quote_to_value(&tail[i])],
-                ));
+            let name = match &tail[i] {
+                Expr::Symbol(name) | Expr::Keyword(name) => name,
+                _ => {
+                    return Err(signal(
+                        "wrong-type-argument",
+                        vec![Value::symbol("symbolp"), quote_to_value(&tail[i])],
+                    ))
+                }
             };
             let value = self.eval(&tail[i + 1])?;
+            if self.obarray.is_constant(name) {
+                return Err(signal(
+                    "setting-constant",
+                    vec![Value::symbol(name.clone())],
+                ));
+            }
             self.assign_with_watchers(name, value.clone(), "set")?;
             last = value;
             i += 2;
@@ -4213,6 +4222,29 @@ mod tests {
         assert_eq!(results[7], "OK (:error setting-constant (nil))");
         assert_eq!(results[8], "OK (:error setting-constant (t))");
         assert_eq!(results[9], "OK (:error setting-constant (t))");
+    }
+
+    #[test]
+    fn setq_constants_signal_setting_constant_after_rhs_evaluation() {
+        let results = eval_all(
+            "(setq vm-setq-side 0)
+             (condition-case err
+                 (setq nil (setq vm-setq-side 1))
+               (error (list (car err) (cdr err) vm-setq-side)))
+             (setq vm-setq-side 0)
+             (condition-case err
+                 (setq t (setq vm-setq-side 2))
+               (error (list (car err) (cdr err) vm-setq-side)))
+             (setq vm-setq-side 0)
+             (condition-case err
+                 (setq :vm-key (setq vm-setq-side 3))
+               (error (list (car err) (cdr err) vm-setq-side)))
+             (condition-case err (setq 1 2) (error err))",
+        );
+        assert_eq!(results[1], "OK (setting-constant (nil) 1)");
+        assert_eq!(results[3], "OK (setting-constant (t) 2)");
+        assert_eq!(results[5], "OK (setting-constant (:vm-key) 3)");
+        assert_eq!(results[6], "OK (wrong-type-argument symbolp 1)");
     }
 
     #[test]
