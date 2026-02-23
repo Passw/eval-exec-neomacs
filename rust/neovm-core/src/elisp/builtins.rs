@@ -4427,7 +4427,9 @@ pub(crate) fn builtin_boundp(eval: &mut super::eval::Evaluator, args: Vec<Value>
         )
     })?;
     let resolved = resolve_variable_alias_name(eval, name)?;
-    Ok(Value::bool(eval.obarray().boundp(&resolved)))
+    Ok(Value::bool(
+        eval.obarray().boundp(&resolved) || eval.obarray().is_constant(&resolved),
+    ))
 }
 
 pub(crate) fn builtin_obarrayp_eval(
@@ -4456,7 +4458,9 @@ pub(crate) fn builtin_special_variable_p(
         )
     })?;
     let resolved = resolve_variable_alias_name(eval, name)?;
-    Ok(Value::bool(eval.obarray().is_special(&resolved)))
+    Ok(Value::bool(
+        eval.obarray().is_special(&resolved) || eval.obarray().is_constant(&resolved),
+    ))
 }
 
 pub(crate) fn builtin_default_boundp(
@@ -4471,7 +4475,9 @@ pub(crate) fn builtin_default_boundp(
         )
     })?;
     let resolved = resolve_variable_alias_name(eval, name)?;
-    Ok(Value::bool(eval.obarray().boundp(&resolved)))
+    Ok(Value::bool(
+        eval.obarray().boundp(&resolved) || eval.obarray().is_constant(&resolved),
+    ))
 }
 
 pub(crate) fn builtin_default_toplevel_value(
@@ -28725,6 +28731,24 @@ mod tests {
         let resolved = builtin_indirect_function(&mut eval, vec![Value::True])
             .expect("indirect-function should resolve t after fset");
         assert_eq!(resolved, Value::Subr("car".to_string()));
+    }
+
+    #[test]
+    fn keyword_symbols_are_bound_and_special_constants() {
+        let mut eval = crate::elisp::eval::Evaluator::new();
+        let keyword = Value::keyword(":vm-bound-keyword");
+
+        let bound =
+            builtin_boundp(&mut eval, vec![keyword.clone()]).expect("boundp should accept keyword");
+        assert!(bound.is_truthy());
+
+        let default_bound = builtin_default_boundp(&mut eval, vec![keyword.clone()])
+            .expect("default-boundp should accept keyword");
+        assert!(default_bound.is_truthy());
+
+        let special = builtin_special_variable_p(&mut eval, vec![keyword])
+            .expect("special-variable-p should accept keyword");
+        assert!(special.is_truthy());
     }
 
     #[test]
