@@ -1,0 +1,18 @@
+(progn
+  (defvaralias 'vm-sql-alias 'vm-sql-base)
+  (with-temp-buffer
+    (setq-local vm-sql-alias 5)
+    (list (local-variable-p 'vm-sql-alias)
+          (local-variable-p 'vm-sql-base)
+          (buffer-local-boundp 'vm-sql-alias (current-buffer))
+          (buffer-local-boundp 'vm-sql-base (current-buffer))
+          (symbol-value 'vm-sql-alias)
+          (symbol-value 'vm-sql-base))))
+(progn
+  (defvaralias 'vm-sql-alias-default 'vm-sql-base-default)
+  (with-temp-buffer
+    (setq-local vm-sql-alias-default 9)
+    (condition-case err
+        (list (default-value 'vm-sql-alias-default)
+              (default-value 'vm-sql-base-default))
+      (error err))))

@@ -398,6 +398,7 @@ cases/buffer-local-value
 cases/buffer-local-variables-semantics
 cases/defvar-local
 cases/setq-local
+cases/setq-local-alias-runtime-semantics
 cases/undo-basics
 cases/undo-buffer-arg
 cases/undo-arity-semantics

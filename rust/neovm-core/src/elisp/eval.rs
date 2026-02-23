@@ -2275,8 +2275,9 @@ impl Evaluator {
                     ))
                 }
             };
+            let resolved = super::builtins::resolve_variable_alias_name(self, name)?;
 
-            if self.obarray.is_constant(name) {
+            if self.obarray.is_constant(&resolved) {
                 return Err(signal(
                     "setting-constant",
                     vec![Value::symbol(name.clone())],
@@ -2285,9 +2286,9 @@ impl Evaluator {
 
             let value = self.eval(&tail[i + 1])?;
             if let Some(buf) = self.buffers.current_buffer_mut() {
-                buf.set_buffer_local(name, value.clone());
+                buf.set_buffer_local(&resolved, value.clone());
             } else {
-                self.assign(name, value.clone());
+                self.assign(&resolved, value.clone());
             }
             last = value;
             i += 2;
@@ -3986,6 +3987,24 @@ mod tests {
         );
         assert_eq!(results[1], "OK ((setting-constant nil) 0)");
         assert_eq!(results[2], "OK ((setting-constant :foo) 0)");
+    }
+
+    #[test]
+    fn setq_local_follows_variable_alias_resolution() {
+        let result = eval_one(
+            "(progn
+               (defvaralias 'vm-setq-local-alias 'vm-setq-local-base)
+               (with-temp-buffer
+                 (setq-local vm-setq-local-alias 5)
+                 (list
+                   (symbol-value 'vm-setq-local-alias)
+                   (symbol-value 'vm-setq-local-base)
+                   (local-variable-p 'vm-setq-local-alias)
+                   (local-variable-p 'vm-setq-local-base)
+                   (buffer-local-boundp 'vm-setq-local-alias (current-buffer))
+                   (buffer-local-boundp 'vm-setq-local-base (current-buffer)))))",
+        );
+        assert_eq!(result, "OK (5 5 t t t t)");
     }
 
     #[test]

@@ -310,6 +310,7 @@ pub(crate) fn builtin_local_variable_p(
         Value::True => "t".to_string(),
         _ => return Ok(Value::Nil),
     };
+    let resolved = super::builtins::resolve_variable_alias_name(eval, &name)?;
 
     let buf = if args.len() > 1 {
         match &args[1] {
@@ -321,7 +322,7 @@ pub(crate) fn builtin_local_variable_p(
     };
 
     match buf {
-        Some(b) => Ok(Value::bool(b.get_buffer_local(&name).is_some())),
+        Some(b) => Ok(Value::bool(b.get_buffer_local(&resolved).is_some())),
         None => Ok(Value::Nil),
     }
 }
@@ -343,6 +344,7 @@ pub(crate) fn builtin_buffer_local_bound_p(
             ))
         }
     };
+    let resolved = super::builtins::resolve_variable_alias_name(eval, &name)?;
 
     let buffer_id = match args[1] {
         Value::Buffer(id) => id,
@@ -358,11 +360,11 @@ pub(crate) fn builtin_buffer_local_bound_p(
         return Ok(Value::Nil);
     };
 
-    if buf.get_buffer_local(&name).is_some() {
+    if buf.get_buffer_local(&resolved).is_some() {
         return Ok(Value::True);
     }
 
-    Ok(Value::bool(eval.obarray().boundp(&name)))
+    Ok(Value::bool(eval.obarray().boundp(&resolved)))
 }
 
 /// `(buffer-local-variables &optional BUFFER)` -- list all local variables.
@@ -1190,6 +1192,21 @@ mod tests {
                (local-variable-p 'nonexistent)"#,
         );
         assert_eq!(results[2], "OK nil");
+    }
+
+    #[test]
+    fn local_and_buffer_local_predicates_follow_alias_resolution() {
+        let results = eval_all(
+            r#"(defvaralias 'vm-local-p-alias 'vm-local-p-base)
+               (let ((buf (get-buffer-create "vm-local-p-buf")))
+                 (set-buffer buf)
+                 (setq-local vm-local-p-alias 8)
+                 (list (local-variable-p 'vm-local-p-alias buf)
+                       (local-variable-p 'vm-local-p-base buf)
+                       (buffer-local-boundp 'vm-local-p-alias buf)
+                       (buffer-local-boundp 'vm-local-p-base buf)))"#,
+        );
+        assert_eq!(results[1], "OK (t t t t)");
     }
 
     #[test]
