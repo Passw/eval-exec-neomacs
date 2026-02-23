@@ -4511,6 +4511,9 @@ pub(crate) fn builtin_set_default_toplevel_value(
     let value = args[1].clone();
     eval.obarray.set_symbol_value(&resolved, value.clone());
     eval.run_variable_watchers(&resolved, &value, &Value::Nil, "set")?;
+    if resolved != name {
+        eval.run_variable_watchers(&resolved, &value, &Value::Nil, "set")?;
+    }
     Ok(Value::Nil)
 }
 

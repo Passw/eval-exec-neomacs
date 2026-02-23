@@ -468,6 +468,9 @@ pub(crate) fn builtin_set_default(
     let value = args[1].clone();
     eval.obarray.set_symbol_value(&resolved, value.clone());
     eval.run_variable_watchers(&resolved, &value, &Value::Nil, "set")?;
+    if resolved != name {
+        eval.run_variable_watchers(&resolved, &value, &Value::Nil, "set")?;
+    }
     Ok(value)
 }
 
@@ -1079,6 +1082,40 @@ mod tests {
                vm-set-default-watch-last"#,
         );
         assert_eq!(results[3], "OK (vm-set-default-watch-target 42 set nil)");
+    }
+
+    #[test]
+    fn set_default_alias_triggers_variable_watchers_twice() {
+        let results = eval_all(
+            r#"(setq vm-set-default-alias-watch-events nil)
+               (fset 'vm-set-default-alias-watch-rec
+                     (lambda (symbol newval operation where)
+                       (setq vm-set-default-alias-watch-events
+                             (cons (list symbol newval operation where)
+                                   vm-set-default-alias-watch-events))))
+               (defvaralias 'vm-set-default-alias-watch 'vm-set-default-alias-base)
+               (add-variable-watcher 'vm-set-default-alias-base 'vm-set-default-alias-watch-rec)
+               (set-default 'vm-set-default-alias-watch 9)
+               (length vm-set-default-alias-watch-events)"#,
+        );
+        assert_eq!(results[5], "OK 2");
+    }
+
+    #[test]
+    fn set_default_toplevel_alias_triggers_variable_watchers_twice() {
+        let results = eval_all(
+            r#"(setq vm-set-default-top-watch-events nil)
+               (fset 'vm-set-default-top-watch-rec
+                     (lambda (symbol newval operation where)
+                       (setq vm-set-default-top-watch-events
+                             (cons (list symbol newval operation where)
+                                   vm-set-default-top-watch-events))))
+               (defvaralias 'vm-set-default-top-watch 'vm-set-default-top-base)
+               (add-variable-watcher 'vm-set-default-top-base 'vm-set-default-top-watch-rec)
+               (set-default-toplevel-value 'vm-set-default-top-watch 7)
+               (length vm-set-default-top-watch-events)"#,
+        );
+        assert_eq!(results[5], "OK 2");
     }
 
     // -- make-variable-buffer-local builtin --------------------------------
