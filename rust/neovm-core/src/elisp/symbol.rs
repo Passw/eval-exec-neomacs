@@ -217,7 +217,7 @@ impl Obarray {
 
     /// Check if a symbol is a constant.
     pub fn is_constant(&self, name: &str) -> bool {
-        self.symbols.get(name).is_some_and(|s| s.constant)
+        name.starts_with(':') || self.symbols.get(name).is_some_and(|s| s.constant)
     }
 
     /// Follow function indirection (defalias chains).
@@ -358,6 +358,7 @@ mod tests {
         let ob = Obarray::new();
         assert!(ob.is_constant("t"));
         assert!(ob.is_constant("nil"));
+        assert!(ob.is_constant(":keyword"));
         assert!(ob.is_special("t"));
         assert!(ob.is_special("nil"));
     }

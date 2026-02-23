@@ -435,18 +435,14 @@ pub(crate) fn builtin_default_value(
     args: Vec<Value>,
 ) -> EvalResult {
     expect_args("default-value", &args, 1)?;
-    let name = match &args[0] {
-        Value::Symbol(s) => s.clone(),
-        Value::Nil => "nil".to_string(),
-        Value::True => "t".to_string(),
-        other => {
-            return Err(signal(
-                "wrong-type-argument",
-                vec![Value::symbol("symbolp"), other.clone()],
-            ))
-        }
-    };
-    match eval.obarray.symbol_value(&name) {
+    let name = args[0].as_symbol_name().ok_or_else(|| {
+        signal(
+            "wrong-type-argument",
+            vec![Value::symbol("symbolp"), args[0].clone()],
+        )
+    })?;
+    let resolved = super::builtins::resolve_variable_alias_name(eval, name)?;
+    match eval.obarray.symbol_value(&resolved) {
         Some(v) => Ok(v.clone()),
         None => Err(signal("void-variable", vec![Value::symbol(name)])),
     }
@@ -458,19 +454,20 @@ pub(crate) fn builtin_set_default(
     args: Vec<Value>,
 ) -> EvalResult {
     expect_args("set-default", &args, 2)?;
-    let name = match &args[0] {
-        Value::Symbol(s) => s.clone(),
-        Value::Nil => "nil".to_string(),
-        Value::True => "t".to_string(),
-        other => {
-            return Err(signal(
-                "wrong-type-argument",
-                vec![Value::symbol("symbolp"), other.clone()],
-            ))
-        }
-    };
-    eval.obarray.set_symbol_value(&name, args[1].clone());
-    Ok(args[1].clone())
+    let name = args[0].as_symbol_name().ok_or_else(|| {
+        signal(
+            "wrong-type-argument",
+            vec![Value::symbol("symbolp"), args[0].clone()],
+        )
+    })?;
+    let resolved = super::builtins::resolve_variable_alias_name(eval, name)?;
+    if eval.obarray().is_constant(&resolved) {
+        return Err(signal("setting-constant", vec![Value::symbol(name)]));
+    }
+    let value = args[1].clone();
+    eval.obarray.set_symbol_value(&resolved, value.clone());
+    eval.run_variable_watchers(&resolved, &value, &Value::Nil, "set")?;
+    Ok(value)
 }
 
 // ---------------------------------------------------------------------------
@@ -1025,6 +1022,56 @@ mod tests {
     fn set_default_sets_global() {
         let results = eval_all(r#"(set-default 'my-var 99) (default-value 'my-var)"#);
         assert_eq!(results[1], "OK 99");
+    }
+
+    #[test]
+    fn set_default_and_default_value_follow_alias_resolution() {
+        let results = eval_all(
+            r#"(defvaralias 'vm-set-default-alias 'vm-set-default-base)
+               (set-default 'vm-set-default-alias 5)
+               (list (default-value 'vm-set-default-base)
+                     (default-value 'vm-set-default-alias))"#,
+        );
+        assert_eq!(results[2], "OK (5 5)");
+    }
+
+    #[test]
+    fn default_value_alias_void_uses_original_symbol_in_error_payload() {
+        let results = eval_all(
+            r#"(defvaralias 'vm-default-alias-unbound 'vm-default-base-unbound)
+               (condition-case err
+                   (default-value 'vm-default-alias-unbound)
+                 (error err))"#,
+        );
+        assert_eq!(results[1], "OK (void-variable vm-default-alias-unbound)");
+    }
+
+    #[test]
+    fn set_default_rejects_constant_symbols() {
+        let results = eval_all(
+            r#"(list
+                 (condition-case err (set-default nil 1) (error err))
+                 (condition-case err (set-default t 1) (error err))
+                 (condition-case err (set-default :foo 1) (error err)))"#,
+        );
+        assert_eq!(
+            results[0],
+            "OK ((setting-constant nil) (setting-constant t) (setting-constant :foo))"
+        );
+    }
+
+    #[test]
+    fn set_default_triggers_variable_watchers() {
+        let results = eval_all(
+            r#"(fset 'vm-set-default-watch-rec
+                     (lambda (symbol newval operation where)
+                       (setq vm-set-default-watch-last
+                             (list symbol newval operation where))))
+               (add-variable-watcher 'vm-set-default-watch-target 'vm-set-default-watch-rec)
+               (set-default 'vm-set-default-watch-target 42)
+               vm-set-default-watch-last"#,
+        );
+        assert_eq!(results[3], "OK (vm-set-default-watch-target 42 set nil)");
     }
 
     // -- make-variable-buffer-local builtin --------------------------------
