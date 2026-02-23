@@ -209,10 +209,10 @@ impl VariableWatcherList {
         }
     }
 
-    /// Remove a watcher callback for a variable, identified by function name.
-    pub fn remove_watcher(&mut self, var_name: &str, callback_name: &str) {
+    /// Remove a watcher callback for a variable.
+    pub fn remove_watcher(&mut self, var_name: &str, callback: &Value) {
         if let Some(list) = self.watchers.get_mut(var_name) {
-            list.retain(|w| !matches!(&w.callback, Value::Symbol(s) if s == callback_name));
+            list.retain(|w| &w.callback != callback);
             if list.is_empty() {
                 self.watchers.remove(var_name);
             }
@@ -464,9 +464,9 @@ pub(crate) fn builtin_remove_variable_watcher(
 
     let var_name = expect_symbol_name(&args[0])?;
     let resolved = super::builtins::resolve_variable_alias_name(eval, &var_name)?;
-    let callback_name = expect_symbol_name(&args[1])?;
+    let callback = args[1].clone();
 
-    eval.watchers.remove_watcher(&resolved, &callback_name);
+    eval.watchers.remove_watcher(&resolved, &callback);
     Ok(Value::Nil)
 }
 
@@ -491,6 +491,9 @@ pub(crate) fn builtin_get_variable_watchers(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use super::super::expr::Expr;
+    use super::super::value::{LambdaData, LambdaParams};
+    use std::sync::Arc;
 
     // -----------------------------------------------------------------------
     // AdviceType tests
@@ -683,7 +686,7 @@ mod tests {
         wl.add_watcher("my-var", Value::symbol("watcher2"));
         assert!(wl.has_watchers("my-var"));
 
-        wl.remove_watcher("my-var", "watcher1");
+        wl.remove_watcher("my-var", &Value::symbol("watcher1"));
         let calls = wl.notify_watchers("my-var", &Value::Int(1), &Value::Int(0), "set");
         assert_eq!(calls.len(), 1);
         assert!(matches!(&calls[0].0, Value::Symbol(s) if s == "watcher2"));
@@ -694,7 +697,7 @@ mod tests {
         let mut wl = VariableWatcherList::new();
         wl.add_watcher("my-var", Value::symbol("w1"));
 
-        wl.remove_watcher("my-var", "w1");
+        wl.remove_watcher("my-var", &Value::symbol("w1"));
         assert!(!wl.has_watchers("my-var"));
     }
 
@@ -821,5 +824,47 @@ mod tests {
             builtin_get_variable_watchers(&mut eval, vec![Value::symbol("vm-watch-base")])
                 .expect("get-variable-watchers should return empty after removal");
         assert!(remaining.is_nil());
+    }
+
+    #[test]
+    fn remove_variable_watcher_accepts_non_symbol_callbacks() {
+        let mut eval = super::super::eval::Evaluator::new();
+        let callback = Value::Lambda(Arc::new(LambdaData {
+            params: LambdaParams {
+                required: vec![
+                    "symbol".to_string(),
+                    "newval".to_string(),
+                    "operation".to_string(),
+                    "where".to_string(),
+                ],
+                optional: Vec::new(),
+                rest: None,
+            },
+            body: vec![Expr::Symbol("newval".to_string())],
+            env: None,
+            docstring: None,
+        }));
+
+        builtin_add_variable_watcher(
+            &mut eval,
+            vec![Value::symbol("vm-watch-nonsym"), callback.clone()],
+        )
+        .expect("add-variable-watcher should accept lambda callbacks");
+        let before =
+            builtin_get_variable_watchers(&mut eval, vec![Value::symbol("vm-watch-nonsym")])
+                .expect("get-variable-watchers should return lambda callback");
+        assert_eq!(
+            super::super::value::list_to_vec(&before).expect("watcher list"),
+            vec![callback.clone()]
+        );
+
+        builtin_remove_variable_watcher(
+            &mut eval,
+            vec![Value::symbol("vm-watch-nonsym"), callback],
+        )
+        .expect("remove-variable-watcher should remove lambda callbacks");
+        let after = builtin_get_variable_watchers(&mut eval, vec![Value::symbol("vm-watch-nonsym")])
+            .expect("get-variable-watchers should be empty after removal");
+        assert!(after.is_nil());
     }
 }
