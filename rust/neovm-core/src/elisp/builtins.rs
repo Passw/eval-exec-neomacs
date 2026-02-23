@@ -6425,6 +6425,7 @@ pub(crate) fn builtin_rename_buffer(args: Vec<Value>) -> EvalResult {
 
 pub(crate) fn builtin_set_buffer_major_mode(args: Vec<Value>) -> EvalResult {
     expect_args("set-buffer-major-mode", &args, 1)?;
+    let _ = expect_buffer_id(&args[0])?;
     Ok(Value::Nil)
 }
 
@@ -23024,7 +23025,11 @@ mod tests {
         .expect("builtin rename-buffer should evaluate with optional arg");
         assert_eq!(renamed_unique, Value::string("x"));
 
-        let major_mode = dispatch_builtin_pure("set-buffer-major-mode", vec![Value::Nil])
+        let major_mode =
+            dispatch_builtin_pure(
+                "set-buffer-major-mode",
+                vec![Value::Buffer(crate::buffer::BufferId(1))],
+            )
             .expect("builtin set-buffer-major-mode should resolve")
             .expect("builtin set-buffer-major-mode should evaluate");
         assert!(major_mode.is_nil());
