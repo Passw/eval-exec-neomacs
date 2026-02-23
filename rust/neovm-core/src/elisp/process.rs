@@ -1031,15 +1031,28 @@ fn resolve_optional_process_or_current_buffer(
         })
 }
 
-fn process_live_status_value(status: &ProcessStatus) -> Value {
+fn process_live_status_value(status: &ProcessStatus, kind: &ProcessKind) -> Value {
     match status {
-        ProcessStatus::Run => Value::list(vec![
-            Value::symbol("run"),
-            Value::symbol("open"),
-            Value::symbol("listen"),
-            Value::symbol("connect"),
-            Value::symbol("stop"),
-        ]),
+        ProcessStatus::Run => match kind {
+            ProcessKind::Network => Value::list(vec![
+                Value::symbol("listen"),
+                Value::symbol("connect"),
+                Value::symbol("stop"),
+            ]),
+            ProcessKind::Pipe => Value::list(vec![
+                Value::symbol("open"),
+                Value::symbol("listen"),
+                Value::symbol("connect"),
+                Value::symbol("stop"),
+            ]),
+            _ => Value::list(vec![
+                Value::symbol("run"),
+                Value::symbol("open"),
+                Value::symbol("listen"),
+                Value::symbol("connect"),
+                Value::symbol("stop"),
+            ]),
+        },
         ProcessStatus::Stop => Value::list(vec![Value::symbol("stop")]),
         ProcessStatus::Exit(_) | ProcessStatus::Signal(_) => Value::Nil,
     }
@@ -3563,7 +3576,10 @@ pub(crate) fn builtin_process_status(
             },
             ProcessStatus::Stop => Ok(Value::symbol("stop")),
             ProcessStatus::Exit(_) => Ok(Value::symbol("exit")),
-            ProcessStatus::Signal(_) => Ok(Value::symbol("signal")),
+            ProcessStatus::Signal(_) => match proc.kind {
+                ProcessKind::Real => Ok(Value::symbol("signal")),
+                _ => Ok(Value::symbol("closed")),
+            },
         },
         None => Ok(Value::Nil),
     }
@@ -4161,10 +4177,13 @@ pub(crate) fn builtin_process_live_p(
     let Some(id) = resolve_live_process_designator(eval, &args[0]) else {
         return Ok(Value::Nil);
     };
-    match eval.processes.process_status(id) {
-        Some(status) => Ok(process_live_status_value(status)),
-        None => Ok(Value::Nil),
-    }
+    let proc = eval.processes.get(id).ok_or_else(|| {
+        signal(
+            "wrong-type-argument",
+            vec![Value::symbol("processp"), args[0].clone()],
+        )
+    })?;
+    Ok(process_live_status_value(&proc.status, &proc.kind))
 }
 
 /// (process-id PROCESS) -> integer
