@@ -6808,7 +6808,14 @@ pub(crate) fn builtin_set_buffer_auto_saved(args: Vec<Value>) -> EvalResult {
 
 pub(crate) fn builtin_set_charset_plist(args: Vec<Value>) -> EvalResult {
     expect_args("set-charset-plist", &args, 2)?;
-    Ok(Value::Nil)
+    let is_charset = super::charset::builtin_charsetp(vec![args[0].clone()])?;
+    if is_charset.is_nil() {
+        return Err(signal(
+            "wrong-type-argument",
+            vec![Value::symbol("charsetp"), args[0].clone()],
+        ));
+    }
+    Ok(args[1].clone())
 }
 
 pub(crate) fn builtin_set_fontset_font(args: Vec<Value>) -> EvalResult {
@@ -23555,11 +23562,11 @@ mod tests {
     fn pure_dispatch_set_window_placeholder_cluster_matches_compat_contracts() {
         let set_charset = dispatch_builtin_pure(
             "set-charset-plist",
-            vec![Value::symbol("charset"), Value::list(vec![])],
+            vec![Value::symbol("unicode"), Value::list(vec![])],
         )
         .expect("builtin set-charset-plist should resolve")
         .expect("builtin set-charset-plist should evaluate");
-        assert!(set_charset.is_nil());
+        assert_eq!(set_charset, Value::list(vec![]));
 
         let set_fontset = dispatch_builtin_pure(
             "set-fontset-font",
