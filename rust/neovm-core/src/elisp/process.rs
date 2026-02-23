@@ -4121,8 +4121,26 @@ pub(crate) fn builtin_process_id(
     args: Vec<Value>,
 ) -> EvalResult {
     expect_args("process-id", &args, 1)?;
-    let id = resolve_process_or_wrong_type_any(eval, &args[0])?;
-    Ok(Value::Int(id as i64))
+    let id = match &args[0] {
+        Value::Int(n) if *n >= 0 => {
+            let id = *n as ProcessId;
+            if eval.processes.get_any(id).is_some() {
+                id
+            } else {
+                return Err(signal_wrong_type_processp(args[0].clone()));
+            }
+        }
+        _ => return Err(signal_wrong_type_processp(args[0].clone())),
+    };
+    let proc = eval
+        .processes
+        .get_any(id)
+        .ok_or_else(|| signal_wrong_type_processp(args[0].clone()))?;
+    if proc.kind == ProcessKind::Real {
+        Ok(Value::Int(id as i64))
+    } else {
+        Ok(Value::Nil)
+    }
 }
 
 /// (process-query-on-exit-flag PROCESS) -> bool
