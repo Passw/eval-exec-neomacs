@@ -7230,6 +7230,7 @@ pub(crate) fn builtin_internal_track_mouse(args: Vec<Value>) -> EvalResult {
 
 pub(crate) fn builtin_internal_char_font(args: Vec<Value>) -> EvalResult {
     expect_range_args("internal-char-font", &args, 1, 2)?;
+    let _ = expect_character_code(&args[0])?;
     Ok(Value::Nil)
 }
 
@@ -7240,12 +7241,23 @@ pub(crate) fn builtin_internal_complete_buffer(args: Vec<Value>) -> EvalResult {
 
 pub(crate) fn builtin_internal_describe_syntax_value(args: Vec<Value>) -> EvalResult {
     expect_args("internal-describe-syntax-value", &args, 1)?;
-    Ok(Value::Nil)
+    Ok(args[0].clone())
 }
 
 pub(crate) fn builtin_internal_event_symbol_parse_modifiers(args: Vec<Value>) -> EvalResult {
     expect_args("internal-event-symbol-parse-modifiers", &args, 1)?;
-    Ok(Value::Nil)
+    let name = args[0].as_symbol_name().ok_or_else(|| {
+        signal(
+            "wrong-type-argument",
+            vec![Value::symbol("symbolp"), args[0].clone()],
+        )
+    })?;
+    let (mut modifiers, base) = parse_event_symbol_prefixes(name);
+    modifiers.reverse();
+
+    let mut out = vec![Value::symbol(base)];
+    out.extend(modifiers);
+    Ok(Value::list(out))
 }
 
 pub(crate) fn builtin_internal_handle_focus_in(args: Vec<Value>) -> EvalResult {
@@ -23702,15 +23714,18 @@ mod tests {
             dispatch_builtin_pure("internal-describe-syntax-value", vec![Value::Int(0)])
                 .expect("builtin internal-describe-syntax-value should resolve")
                 .expect("builtin internal-describe-syntax-value should evaluate");
-        assert!(describe_syntax.is_nil());
+        assert_eq!(describe_syntax, Value::Int(0));
 
         let parse_modifiers = dispatch_builtin_pure(
             "internal-event-symbol-parse-modifiers",
-            vec![Value::symbol("foo")],
+            vec![Value::symbol("C-x")],
         )
         .expect("builtin internal-event-symbol-parse-modifiers should resolve")
         .expect("builtin internal-event-symbol-parse-modifiers should evaluate");
-        assert!(parse_modifiers.is_nil());
+        assert_eq!(
+            parse_modifiers,
+            Value::list(vec![Value::symbol("x"), Value::symbol("control")])
+        );
 
         let handle_focus_in = dispatch_builtin_pure("internal-handle-focus-in", vec![Value::Nil])
             .expect("builtin internal-handle-focus-in should resolve")

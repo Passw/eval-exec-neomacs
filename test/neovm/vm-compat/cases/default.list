@@ -1043,6 +1043,7 @@ cases/internal-sqlite-inotify-unlock-compat-semantics
 cases/internal-window-geometry-compat-semantics
 cases/internal-treesit-compat-semantics
 cases/internal-runtime-core-compat-semantics
+cases/internal-event-parse-syntax-char-font-semantics
 cases/internal-runtime-introspection-compat-semantics
 cases/internal-gui-frame-runtime-compat-semantics
 cases/internal-runtime-state-compat-semantics
