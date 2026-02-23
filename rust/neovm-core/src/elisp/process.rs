@@ -1489,12 +1489,17 @@ fn parse_make_process_command(value: &Value) -> Result<Vec<String>, Flow> {
 }
 
 fn parse_make_process_buffer(
-    eval: &super::eval::Evaluator,
+    eval: &mut super::eval::Evaluator,
     value: &Value,
 ) -> Result<Option<String>, Flow> {
     match value {
         Value::Nil => Ok(None),
-        Value::Str(name) => Ok(Some((**name).clone())),
+        Value::Str(name) => {
+            if eval.buffers.find_buffer_by_name(name).is_none() {
+                let _ = eval.buffers.create_buffer(name);
+            }
+            Ok(Some((**name).clone()))
+        }
         Value::Buffer(id) => eval
             .buffers
             .get(*id)
@@ -4732,9 +4737,11 @@ mod tests {
         let cat = find_bin("cat");
         let results = eval_all(&format!(
             r#"(start-process "p" "*output*" "{cat}")
-               (process-buffer 1)"#,
+               (bufferp (process-buffer 1))
+               (equal (buffer-name (process-buffer 1)) "*output*")"#,
         ));
-        assert_eq!(results[1], r#"OK "*output*""#);
+        assert_eq!(results[1], "OK t");
+        assert_eq!(results[2], "OK t");
     }
 
     #[test]

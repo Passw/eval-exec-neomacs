@@ -745,6 +745,7 @@ cases/process-id-nonreal-kind-semantics
 cases/process-contact-kind-shape-semantics
 cases/process-nonreal-query-shape-semantics
 cases/start-process-buffer-and-type-contract-semantics
+cases/start-process-buffer-create-semantics
 cases/accept-process-output-millis-semantics
 cases/accept-process-output-stale-designator-semantics
 cases/process-stale-query-matrix-semantics
