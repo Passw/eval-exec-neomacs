@@ -1156,6 +1156,128 @@ fn pid_exists(pid: i64) -> bool {
     std::fs::metadata(format!("/proc/{pid}")).is_ok()
 }
 
+#[derive(Clone, Debug)]
+struct ProcStatSnapshot {
+    comm: String,
+    state: String,
+    ppid: i64,
+    pgrp: i64,
+    sess: i64,
+    tpgid: i64,
+    minflt: i64,
+    majflt: i64,
+    cminflt: i64,
+    cmajflt: i64,
+    pri: i64,
+    nice: i64,
+    thcount: i64,
+    vsize: i64,
+    rss: i64,
+    ttname: String,
+}
+
+impl ProcStatSnapshot {
+    fn fallback(pid: i64) -> Self {
+        Self {
+            comm: String::new(),
+            state: String::new(),
+            ppid: 0,
+            pgrp: 0,
+            sess: 0,
+            tpgid: 0,
+            minflt: 0,
+            majflt: 0,
+            cminflt: 0,
+            cmajflt: 0,
+            pri: 0,
+            nice: 0,
+            thcount: 0,
+            vsize: 0,
+            rss: 0,
+            ttname: read_proc_tty_name(pid),
+        }
+    }
+}
+
+fn parse_stat_i64_field(fields: &[&str], index: usize) -> Option<i64> {
+    fields.get(index)?.parse::<i64>().ok()
+}
+
+#[cfg(not(target_os = "windows"))]
+fn page_size_kb() -> i64 {
+    // SAFETY: `sysconf(_SC_PAGESIZE)` has no additional preconditions.
+    let page_size_bytes = unsafe { libc::sysconf(libc::_SC_PAGESIZE) };
+    if page_size_bytes <= 0 {
+        4
+    } else {
+        ((page_size_bytes as i64) / 1024).max(1)
+    }
+}
+
+#[cfg(target_os = "windows")]
+fn page_size_kb() -> i64 {
+    4
+}
+
+fn read_proc_tty_name(pid: i64) -> String {
+    std::fs::read_link(format!("/proc/{pid}/fd/0"))
+        .ok()
+        .map(|path| path.to_string_lossy().into_owned())
+        .unwrap_or_else(|| "?".to_string())
+}
+
+fn parse_proc_stat_snapshot(pid: i64) -> Option<ProcStatSnapshot> {
+    let stat = std::fs::read_to_string(format!("/proc/{pid}/stat")).ok()?;
+    let open_paren = stat.find('(')?;
+    let close_paren = stat.rfind(')')?;
+    if close_paren <= open_paren {
+        return None;
+    }
+
+    let comm = stat.get((open_paren + 1)..close_paren)?.to_string();
+    let trailing = stat.get((close_paren + 1)..)?.trim_start();
+    let fields: Vec<&str> = trailing.split_whitespace().collect();
+    if fields.len() < 22 {
+        return None;
+    }
+
+    let state = fields[0].to_string();
+    let ppid = parse_stat_i64_field(&fields, 1)?;
+    let pgrp = parse_stat_i64_field(&fields, 2)?;
+    let sess = parse_stat_i64_field(&fields, 3)?;
+    let tpgid = parse_stat_i64_field(&fields, 5)?;
+    let minflt = parse_stat_i64_field(&fields, 7)?;
+    let cminflt = parse_stat_i64_field(&fields, 8)?;
+    let majflt = parse_stat_i64_field(&fields, 9)?;
+    let cmajflt = parse_stat_i64_field(&fields, 10)?;
+    let pri = parse_stat_i64_field(&fields, 15)?;
+    let nice = parse_stat_i64_field(&fields, 16)?;
+    let thcount = parse_stat_i64_field(&fields, 17)?;
+    let vsize = parse_stat_i64_field(&fields, 20)?;
+    let rss_pages = parse_stat_i64_field(&fields, 21)?;
+    let rss = rss_pages.saturating_mul(page_size_kb());
+    let ttname = read_proc_tty_name(pid);
+
+    Some(ProcStatSnapshot {
+        comm,
+        state,
+        ppid,
+        pgrp,
+        sess,
+        tpgid,
+        minflt,
+        majflt,
+        cminflt,
+        cmajflt,
+        pri,
+        nice,
+        thcount,
+        vsize,
+        rss,
+        ttname,
+    })
+}
+
 fn parse_effective_ids_from_proc_status(pid: i64) -> Option<(u32, u32)> {
     let status = std::fs::read_to_string(format!("/proc/{pid}/status")).ok()?;
     let mut euid = None;
@@ -3061,6 +3183,27 @@ pub(crate) fn builtin_process_attributes(
         ));
         attrs.push(Value::cons(Value::symbol("euid"), Value::Int(euid as i64)));
     }
+
+    let stat = parse_proc_stat_snapshot(pid).unwrap_or_else(|| ProcStatSnapshot::fallback(pid));
+    attrs.push(Value::cons(Value::symbol("comm"), Value::string(stat.comm)));
+    attrs.push(Value::cons(Value::symbol("state"), Value::string(stat.state)));
+    attrs.push(Value::cons(Value::symbol("ppid"), Value::Int(stat.ppid)));
+    attrs.push(Value::cons(Value::symbol("pgrp"), Value::Int(stat.pgrp)));
+    attrs.push(Value::cons(Value::symbol("sess"), Value::Int(stat.sess)));
+    attrs.push(Value::cons(Value::symbol("tpgid"), Value::Int(stat.tpgid)));
+    attrs.push(Value::cons(Value::symbol("minflt"), Value::Int(stat.minflt)));
+    attrs.push(Value::cons(Value::symbol("majflt"), Value::Int(stat.majflt)));
+    attrs.push(Value::cons(Value::symbol("cminflt"), Value::Int(stat.cminflt)));
+    attrs.push(Value::cons(Value::symbol("cmajflt"), Value::Int(stat.cmajflt)));
+    attrs.push(Value::cons(Value::symbol("pri"), Value::Int(stat.pri)));
+    attrs.push(Value::cons(Value::symbol("nice"), Value::Int(stat.nice)));
+    attrs.push(Value::cons(Value::symbol("thcount"), Value::Int(stat.thcount)));
+    attrs.push(Value::cons(Value::symbol("vsize"), Value::Int(stat.vsize)));
+    attrs.push(Value::cons(Value::symbol("rss"), Value::Int(stat.rss)));
+    attrs.push(Value::cons(
+        Value::symbol("ttname"),
+        Value::string(stat.ttname),
+    ));
 
     Ok(Value::list(attrs))
 }
@@ -5009,13 +5152,45 @@ mod tests {
                     (and (consp pair) (integerp (cdr pair))))
                   (let ((pair (assq 'egid attrs)))
                     (and (consp pair) (integerp (cdr pair))))
+                  (let ((pair (assq 'comm attrs)))
+                    (and (consp pair) (stringp (cdr pair))))
+                  (let ((pair (assq 'state attrs)))
+                    (and (consp pair) (stringp (cdr pair))))
+                  (let ((pair (assq 'ppid attrs)))
+                    (and (consp pair) (integerp (cdr pair))))
+                  (let ((pair (assq 'pgrp attrs)))
+                    (and (consp pair) (integerp (cdr pair))))
+                  (let ((pair (assq 'sess attrs)))
+                    (and (consp pair) (integerp (cdr pair))))
+                  (let ((pair (assq 'tpgid attrs)))
+                    (and (consp pair) (integerp (cdr pair))))
+                  (let ((pair (assq 'minflt attrs)))
+                    (and (consp pair) (integerp (cdr pair))))
+                  (let ((pair (assq 'majflt attrs)))
+                    (and (consp pair) (integerp (cdr pair))))
+                  (let ((pair (assq 'cminflt attrs)))
+                    (and (consp pair) (integerp (cdr pair))))
+                  (let ((pair (assq 'cmajflt attrs)))
+                    (and (consp pair) (integerp (cdr pair))))
+                  (let ((pair (assq 'pri attrs)))
+                    (and (consp pair) (integerp (cdr pair))))
+                  (let ((pair (assq 'nice attrs)))
+                    (and (consp pair) (integerp (cdr pair))))
+                  (let ((pair (assq 'thcount attrs)))
+                    (and (consp pair) (integerp (cdr pair))))
+                  (let ((pair (assq 'vsize attrs)))
+                    (and (consp pair) (integerp (cdr pair))))
+                  (let ((pair (assq 'rss attrs)))
+                    (and (consp pair) (integerp (cdr pair))))
+                  (let ((pair (assq 'ttname attrs)))
+                    (and (consp pair) (stringp (cdr pair))))
                   (process-attributes -1)
                   (condition-case err (process-attributes 'x) (error err))
                   (process-attributes 999999999)))"#,
         );
         assert_eq!(
             result,
-            "OK (t t t t t t nil (wrong-type-argument numberp x) nil)"
+            "OK (t t t t t t t t t t t t t t t t t t t t t t nil (wrong-type-argument numberp x) nil)"
         );
     }
 
