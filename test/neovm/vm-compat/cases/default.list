@@ -389,6 +389,7 @@ cases/kill-word-read-only-variable-semantics
 cases/newline-read-only-variable-semantics
 cases/newline-open-line-prefix-arg-semantics
 cases/newline-arity-semantics
+cases/newline-and-indent-arity-semantics
 cases/newline-and-indent-whitespace-semantics
 cases/whitespace-read-only-variable-semantics
 cases/kill-ring-command-context-semantics

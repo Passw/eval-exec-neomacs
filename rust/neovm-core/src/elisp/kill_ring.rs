@@ -2958,6 +2958,7 @@ pub(crate) fn builtin_newline_and_indent(
     eval: &mut super::eval::Evaluator,
     args: Vec<Value>,
 ) -> EvalResult {
+    expect_max_args("newline-and-indent", &args, 1)?;
     // Emacs normalizes surrounding horizontal whitespace at point first.
     builtin_delete_horizontal_space(eval, vec![])?;
 
@@ -4377,6 +4378,24 @@ mod tests {
         );
         assert_eq!(results[0], "OK (wrong-number-of-arguments newline 3)");
         assert_eq!(results[1], "OK (wrong-number-of-arguments newline 4)");
+    }
+
+    #[test]
+    fn newline_and_indent_rejects_too_many_args() {
+        let results = eval_all(
+            r#"(with-temp-buffer
+                 (condition-case err (newline-and-indent nil nil) (error err)))
+               (with-temp-buffer
+                 (condition-case err (newline-and-indent nil nil nil) (error err)))"#,
+        );
+        assert_eq!(
+            results[0],
+            "OK (wrong-number-of-arguments newline-and-indent 2)"
+        );
+        assert_eq!(
+            results[1],
+            "OK (wrong-number-of-arguments newline-and-indent 3)"
+        );
     }
 
     // -- newline-and-indent tests --
